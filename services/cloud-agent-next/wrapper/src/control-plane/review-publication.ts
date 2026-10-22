@@ -38,7 +38,6 @@ export function createReviewPublication(input: {
       if (type === 'session.turn.open' && state === 'submitted') state = 'running';
       if (type === 'session.turn.close' && state === 'running') {
         state = 'spent';
-        clearTimer();
       }
       const info = properties.info;
       if (
@@ -138,6 +137,7 @@ export function createReviewPublication(input: {
       return true;
     },
     dispose() {
+      state = 'abandoned';
       clearTimer();
       abort.abort();
     },

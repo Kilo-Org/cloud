@@ -5,6 +5,7 @@ import { createControlPlaneSessionHost } from './main.js';
 import type { KiloFeedCallbacks } from './kilo-runtime.js';
 import type { KiloEventFeedSource } from './kilo-event-feed.js';
 import type { SessionObservation } from './session-supervisor.js';
+import type { TurnManagerDeps } from './turn.js';
 import { createControlPlaneTerminals } from './terminals.js';
 
 async function settle() {
@@ -12,13 +13,21 @@ async function settle() {
   await Bun.sleep(5);
 }
 
-async function hostFixture() {
+async function waitFor(predicate: () => boolean): Promise<void> {
+  for (let index = 0; index < 200 && !predicate(); index++) await settle();
+}
+
+async function hostFixture(
+  turn: Pick<TurnManagerDeps, 'materializeAttachments' | 'runCondense' | 'scheduler'> = {}
+) {
   let now = Date.now();
   let preparing = false;
   let abortReply: () => Promise<boolean> = async () => true;
+  let drainReply: () => Promise<boolean> = async () => true;
   let summaryReply: () => Promise<boolean> = async () => true;
   const frames: ControlPlaneWrapperFrame[] = [];
   const aborts: Array<{ path: string; scope: unknown }> = [];
+  const drains: string[] = [];
   const prompts: string[] = [];
   const summaries: string[] = [];
   const summaryRequested = Promise.withResolvers<void>();
@@ -54,6 +63,23 @@ async function hostFixture() {
         aborts.push({ path: url.pathname, scope: url.searchParams.get('scope') });
         return Response.json(await abortReply());
       }
+      if (url.pathname.endsWith('/drain')) {
+        drains.push(url.pathname);
+        const body = (await request.json()) as { token: string };
+        const result = await drainReply();
+        // Kilo publishes the marker on the stream that is open when the drain ends.
+        const source = feeds.findLast(
+          feed => feed.source.server.authorization === request.headers.get('authorization')
+        );
+        if (result && source)
+          source.callbacks.onEvent({
+            type: 'session.drained',
+            nativeRuntimeId: source.source.nativeRuntimeId,
+            directory: source.source.directory,
+            properties: { sessionID: url.pathname.split('/').at(-2), token: body.token },
+          });
+        return Response.json(result);
+      }
       if (url.pathname.endsWith('/prompt_async')) {
         prompts.push(url.pathname);
         promptRequested.resolve();
@@ -76,13 +102,14 @@ async function hostFixture() {
   });
   let pid = 10_000;
   let snapshot: SessionObservation[] = [];
+  let snapshotReply: () => Promise<SessionObservation[]> = async () => snapshot;
   const host = createControlPlaneSessionHost({
     runtime: {
       timers: CONTROL_PLANE_TIMERS,
       log: () => undefined,
       prepareFilesystem: async () => undefined,
       readProcessStartTime: () => undefined,
-      readSnapshot: async () => snapshot,
+      readSnapshot: () => snapshotReply(),
       scheduler: {
         now: () => now,
         setInterval(handler) {
@@ -99,7 +126,7 @@ async function hostFixture() {
         return {
           pid: id,
           url: server.url.toString(),
-          authorization: 'Basic test',
+          authorization: `Basic test-${id}`,
           exited: new Promise<void>(() => undefined),
           stop: async () => {
             stopped.push(id);
@@ -121,7 +148,7 @@ async function hostFixture() {
         };
       },
     },
-    turn: { emit: frame => frames.push(frame), now: () => now, log: () => undefined },
+    turn: { emit: frame => frames.push(frame), now: () => now, log: () => undefined, ...turn },
     isPreparing: () => preparing,
   });
   const terminals = createControlPlaneTerminals({
@@ -137,6 +164,7 @@ async function hostFixture() {
     frames,
     feeds,
     aborts,
+    drains,
     prompts,
     summaries,
     summaryRequested: summaryRequested.promise,
@@ -166,11 +194,17 @@ async function hostFixture() {
     setAbort(reply: typeof abortReply) {
       abortReply = reply;
     },
+    setDrain(reply: typeof drainReply) {
+      drainReply = reply;
+    },
     setSummary(reply: typeof summaryReply) {
       summaryReply = reply;
     },
     setSnapshot(observations: SessionObservation[]) {
       snapshot = observations;
+    },
+    setSnapshotReply(reply: typeof snapshotReply) {
+      snapshotReply = reply;
     },
     prepare(value: boolean) {
       preparing = value;
@@ -235,7 +269,7 @@ describe('production session host composition', () => {
       expect(f.frames.filter(frame => frame.type === 'session.outcome')).toEqual([]);
 
       summary.resolve(true);
-      await settle();
+      await waitFor(() => !f.host.turns.hasPendingWork());
       expect(f.host.turns.hasPendingWork()).toBe(false);
       expect(f.host.getHeartbeat().active).toBe(false);
       expect(f.frames.filter(frame => frame.type === 'session.outcome')).toMatchObject([
@@ -399,7 +433,7 @@ describe('production session host composition', () => {
         f.event(feed, 'session.turn.open', { sessionID: 'ses_root' });
         f.event(feed, 'session.status', { sessionID: 'ses_root', status: { type: 'idle' } });
         f.event(feed, 'session.turn.close', { sessionID: 'ses_root', reason: 'completed' });
-        await settle();
+        await waitFor(() => f.frames.some(frame => frame.type === 'session.outcome'));
         expect(f.frames.filter(frame => frame.type === 'session.outcome')).toMatchObject([
           { status: 'completed', lastMessageId: 'm1' },
         ]);
@@ -597,7 +631,7 @@ describe('production session host composition', () => {
       f.event(first, 'session.turn.open', { sessionID: 'ses_root' });
       f.event(first, 'session.status', { sessionID: 'ses_root', status: { type: 'idle' } });
       f.event(first, 'session.turn.close', { sessionID: 'ses_root', reason: 'completed' });
-      await settle();
+      await waitFor(() => f.frames.some(frame => frame.type === 'session.outcome'));
       expect(f.frames.filter(frame => frame.type === 'session.outcome')).toMatchObject([
         { status: 'completed', lastMessageId: 'm1' },
       ]);
@@ -672,7 +706,7 @@ describe('production session host composition', () => {
       f.event(feed, 'session.turn.open', { sessionID: 'ses_root' });
       f.event(feed, 'session.status', { sessionID: 'ses_root', status: { type: 'idle' } });
       f.event(feed, 'session.turn.close', { sessionID: 'ses_root', reason: 'completed' });
-      await settle();
+      await waitFor(() => f.frames.filter(frame => frame.type === 'session.outcome').length === 2);
       expect(f.frames.filter(frame => frame.type === 'session.outcome')).toMatchObject([
         { status: 'failed', reason: 'no_progress', lastMessageId: 'm1' },
         { status: 'completed', lastMessageId: 'm2' },
@@ -724,9 +758,11 @@ describe('production session host composition', () => {
     }
   });
 
-  it('completes a Cloud turn when a completed close is deferred and reconciliation clears the execution', async () => {
+  it('requires native paired proof after a completed close and idle reconciliation', async () => {
     const f = await hostFixture();
     try {
+      const http = Promise.withResolvers<boolean>();
+      f.setDrain(() => http.promise);
       const feed = await f.runtime('/workspace');
       f.host.turns.registerRoute({
         sessionId: 'workspace_chat',
@@ -741,8 +777,7 @@ describe('production session host composition', () => {
       });
       await settle();
       f.event(feed, 'session.turn.open', { sessionID: 'ses_root' });
-      // The idle/status event is dropped, so the supervisor keeps the execution
-      // busy and the completed close is held instead of settling the turn.
+      // A missing idle/status event leaves supervision busy. Drain still owns completion.
       f.event(feed, 'session.turn.close', { sessionID: 'ses_root', reason: 'completed' });
       await settle();
       expect(f.frames.filter(frame => frame.type === 'session.outcome')).toEqual([]);
@@ -751,7 +786,9 @@ describe('production session host composition', () => {
         { id: 'ses_root', directory: '/workspace', status: 'idle', messages: [], interactions: [] },
       ]);
       await f.host.runtimes.get('/workspace')?.refreshActivity();
-      await settle();
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toEqual([]);
+      http.resolve(true);
+      await waitFor(() => f.frames.some(frame => frame.type === 'session.outcome'));
       expect(f.frames.filter(frame => frame.type === 'session.outcome')).toMatchObject([
         { status: 'completed', lastMessageId: 'm1' },
       ]);
@@ -759,4 +796,462 @@ describe('production session host composition', () => {
       await f.dispose();
     }
   });
+});
+
+describe('completion feed continuity and idle allocation', () => {
+  const route = {
+    sessionId: 'workspace_chat',
+    kiloSessionId: 'ses_root',
+    directory: '/workspace',
+    attemptId: 'a',
+  };
+  const prompt = (messageId: string) => ({
+    messageId,
+    turn: { type: 'prompt' as const, prompt: 'test' },
+    agent: { mode: 'code', model: 'test/model' },
+  });
+
+  const rootObservation = (status: 'busy' | 'idle') => ({
+    id: 'ses_root',
+    directory: '/workspace',
+    status,
+    messages: [],
+    interactions: [],
+  });
+
+  it('keeps work whose root execution is still live after the reconnect, then completes it', async () => {
+    const f = await hostFixture();
+    try {
+      const feed = await f.runtime('/workspace');
+      f.host.turns.registerRoute(route);
+      f.host.turns.submit(route.sessionId, prompt('m1'));
+      await f.promptRequested;
+      f.event(feed, 'session.turn.open', { sessionID: 'ses_root' });
+      f.setSnapshot([rootObservation('busy')]);
+      f.feeds[feed].callbacks.onFailure();
+      await waitFor(() => f.feeds.length === 2);
+      await f.host.runtimes.get('/workspace')?.refreshActivity();
+      await settle();
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toEqual([]);
+      f.event(1, 'session.status', { sessionID: 'ses_root', status: { type: 'idle' } });
+      f.event(1, 'session.turn.close', { sessionID: 'ses_root', reason: 'completed' });
+      await waitFor(() => f.frames.some(frame => frame.type === 'session.outcome'));
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toMatchObject([
+        { status: 'completed', lastMessageId: 'm1' },
+      ]);
+      expect(f.drains).toHaveLength(1);
+    } finally {
+      await f.dispose();
+    }
+  });
+
+  it('fails dispatched work only after the reconnect snapshot shows its root ended in the gap', async () => {
+    const stale = Promise.withResolvers<void>();
+    let reads = 0;
+    const f = await hostFixture();
+    try {
+      const feed = await f.runtime('/workspace');
+      f.host.turns.registerRoute(route);
+      f.host.turns.submit(route.sessionId, prompt('m1'));
+      await f.promptRequested;
+      f.event(feed, 'session.turn.open', { sessionID: 'ses_root' });
+      // A snapshot that began before the loss shows the root live; it must not settle the gap.
+      f.setSnapshotReply(async () => {
+        reads++;
+        if (reads === 1) {
+          await stale.promise;
+          return [rootObservation('busy')];
+        }
+        return [rootObservation('idle')];
+      });
+      const inFlight = f.host.runtimes.get('/workspace')?.refreshActivity();
+      f.feeds[feed].callbacks.onFailure();
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toEqual([]);
+      await waitFor(() => f.feeds.length === 2);
+      stale.resolve();
+      await inFlight;
+      await waitFor(() => f.frames.some(frame => frame.type === 'session.outcome'));
+      expect(reads).toBe(2);
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toMatchObject([
+        { status: 'failed', reason: 'no_outcome', lastMessageId: 'm1' },
+      ]);
+      f.event(1, 'session.drained', { sessionID: 'ses_root', token: 'unrelated' });
+      f.event(1, 'session.turn.close', { sessionID: 'ses_root', reason: 'completed' });
+      await settle();
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toHaveLength(1);
+      expect(f.prompts).toHaveLength(1);
+      expect(f.drains).toEqual([]);
+      expect(
+        f.frames.some(
+          frame =>
+            frame.type === 'session.events' &&
+            frame.events.some(
+              event =>
+                event.type === 'error' &&
+                String(event.properties.error).includes('history is incomplete')
+            )
+        )
+      ).toBe(true);
+    } finally {
+      await f.dispose();
+    }
+  });
+
+  it('fails observed work whose root a snapshot ended before the gap without a seen close', async () => {
+    const f = await hostFixture();
+    try {
+      const feed = await f.runtime('/workspace');
+      f.host.turns.registerRoute(route);
+      f.host.turns.submit(route.sessionId, prompt('m1'));
+      await f.promptRequested;
+      f.event(feed, 'session.turn.open', { sessionID: 'ses_root' });
+      f.setSnapshot([rootObservation('idle')]);
+      await f.host.runtimes.get('/workspace')?.refreshActivity();
+      expect(f.host.runtimes.get('/workspace')?.liveTreeExecutions('ses_root')).toEqual([]);
+      f.feeds[feed].callbacks.onFailure();
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toEqual([]);
+      await waitFor(() => f.frames.some(frame => frame.type === 'session.outcome'));
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toMatchObject([
+        { status: 'failed', reason: 'no_outcome', lastMessageId: 'm1' },
+      ]);
+    } finally {
+      await f.dispose();
+    }
+  });
+
+  it('keeps a held drain across a gap after a failed periodic snapshot, then completes it', async () => {
+    const child = (status: 'busy' | 'idle') => ({
+      ...rootObservation(status),
+      id: 'ses_child',
+      parentID: 'ses_root',
+    });
+    const drain = Promise.withResolvers<boolean>();
+    const f = await hostFixture();
+    try {
+      f.setDrain(() => drain.promise);
+      const feed = await f.runtime('/workspace');
+      const runtime = f.host.runtimes.get('/workspace');
+      f.host.turns.registerRoute(route);
+      f.host.turns.submit(route.sessionId, prompt('m1'));
+      await f.promptRequested;
+      f.event(feed, 'session.turn.open', { sessionID: 'ses_root' });
+      f.setSnapshot([rootObservation('busy'), child('busy')]);
+      await runtime?.refreshActivity();
+      f.event(feed, 'session.status', { sessionID: 'ses_root', status: { type: 'idle' } });
+      f.event(feed, 'session.turn.close', { sessionID: 'ses_root', reason: 'completed' });
+      await waitFor(() => f.drains.length === 1);
+      // Kilo stalls: the periodic snapshot times out while the feed is still open.
+      f.setSnapshotReply(async () => {
+        throw new Error('Kilo activity request timed out');
+      });
+      await runtime?.refreshActivity();
+      expect(runtime?.liveTreeExecutions('ses_root')).toHaveLength(1);
+      f.setSnapshotReply(async () => [rootObservation('idle'), child('busy')]);
+      f.feeds[feed].callbacks.onFailure();
+      await waitFor(() => f.feeds.length === 2);
+      await runtime?.refreshActivity();
+      await settle();
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toEqual([]);
+      f.event(1, 'session.status', { sessionID: 'ses_child', status: { type: 'idle' } });
+      f.event(1, 'session.turn.close', { sessionID: 'ses_child', reason: 'completed' });
+      drain.resolve(true);
+      await waitFor(() => f.frames.some(frame => frame.type === 'session.outcome'));
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toMatchObject([
+        { status: 'completed', lastMessageId: 'm1' },
+      ]);
+      expect(f.drains).toHaveLength(1);
+    } finally {
+      drain.resolve(false);
+      await f.dispose();
+    }
+  });
+
+  it('keeps closed but unproven work across a gap after new intake invalidates its drain', async () => {
+    const attachment = Promise.withResolvers<{ prompt: string }>();
+    const http = Promise.withResolvers<boolean>();
+    const f = await hostFixture({
+      materializeAttachments: async message => ({
+        ...message,
+        ...(message.id === 'm2' ? await attachment.promise : {}),
+      }),
+    });
+    try {
+      f.setDrain(() => http.promise);
+      const feed = await f.runtime('/workspace');
+      f.host.turns.registerRoute(route);
+      f.host.turns.submit(route.sessionId, prompt('m1'));
+      await f.promptRequested;
+      f.event(feed, 'session.turn.open', { sessionID: 'ses_root' });
+      f.event(feed, 'session.status', { sessionID: 'ses_root', status: { type: 'idle' } });
+      f.event(feed, 'session.turn.close', { sessionID: 'ses_root', reason: 'completed' });
+      await waitFor(() => f.drains.length === 1);
+      f.host.turns.submit(route.sessionId, prompt('m2'));
+      await settle();
+      f.feeds[feed].callbacks.onFailure();
+      await waitFor(() => f.feeds.length === 2);
+      await f.host.runtimes.get('/workspace')?.refreshActivity();
+      await settle();
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toEqual([]);
+      f.event(1, 'server.heartbeat', {});
+      f.setDrain(async () => true);
+      attachment.resolve({ prompt: 'new work' });
+      await waitFor(() => f.prompts.length === 2);
+      f.event(1, 'session.turn.open', { sessionID: 'ses_root' });
+      f.event(1, 'session.status', { sessionID: 'ses_root', status: { type: 'idle' } });
+      f.event(1, 'session.turn.close', { sessionID: 'ses_root', reason: 'completed' });
+      await waitFor(() => f.frames.some(frame => frame.type === 'session.outcome'));
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toMatchObject([
+        { status: 'completed', lastMessageId: 'm2' },
+      ]);
+    } finally {
+      http.resolve(true);
+      await f.dispose();
+    }
+  });
+
+  it('preserves proven work across a gap while intake is held, then keeps that intake across a gap its root survives', async () => {
+    const attachment = Promise.withResolvers<{ prompt: string }>();
+    const condense = Promise.withResolvers<{ success: boolean; wasAborted: boolean }>();
+    const started = Promise.withResolvers<void>();
+    const f = await hostFixture({
+      materializeAttachments: async message => ({
+        ...message,
+        ...(message.id === 'm2' ? await attachment.promise : {}),
+      }),
+      runCondense: () => {
+        started.resolve();
+        return condense.promise;
+      },
+    });
+    try {
+      const feed = await f.runtime('/workspace');
+      f.host.turns.registerRoute(route);
+      f.host.turns.submit(route.sessionId, {
+        ...prompt('m1'),
+        finalization: { condenseOnComplete: true },
+      });
+      await f.promptRequested;
+      f.event(feed, 'session.turn.open', { sessionID: 'ses_root' });
+      f.event(feed, 'session.status', { sessionID: 'ses_root', status: { type: 'idle' } });
+      f.event(feed, 'session.turn.close', { sessionID: 'ses_root', reason: 'completed' });
+      await started.promise;
+      f.host.turns.submit(route.sessionId, prompt('m2'));
+      await settle();
+      f.feeds[feed].callbacks.onFailure();
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toEqual([]);
+      await waitFor(() => f.feeds.length === 2);
+      f.event(1, 'server.heartbeat', {});
+      attachment.resolve({ prompt: 'new work' });
+      await waitFor(() => f.prompts.length === 2);
+      f.event(1, 'session.turn.open', { sessionID: 'ses_root' });
+      f.setSnapshot([rootObservation('busy')]);
+      f.feeds[1].callbacks.onFailure();
+      await waitFor(() => f.feeds.length === 3);
+      await f.host.runtimes.get('/workspace')?.refreshActivity();
+      condense.resolve({ success: true, wasAborted: false });
+      await settle();
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toEqual([]);
+      f.event(2, 'session.status', { sessionID: 'ses_root', status: { type: 'idle' } });
+      f.event(2, 'session.turn.close', { sessionID: 'ses_root', reason: 'completed' });
+      await waitFor(() => f.frames.some(frame => frame.type === 'session.outcome'));
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toMatchObject([
+        { status: 'completed', lastMessageId: 'm2' },
+      ]);
+    } finally {
+      condense.resolve({ success: true, wasAborted: false });
+      await f.dispose();
+    }
+  });
+
+  it('keeps a compact follower blocked when earlier ordinary root work closes', async () => {
+    const f = await hostFixture();
+    const summary = Promise.withResolvers<boolean>();
+    try {
+      const feed = await f.runtime('/workspace');
+      f.host.turns.registerRoute(route);
+      f.host.turns.submit(route.sessionId, prompt('first'));
+      await f.promptRequested;
+      f.event(feed, 'session.turn.open', { sessionID: 'ses_root' });
+      f.setSummary(() => summary.promise);
+      f.host.turns.submit(route.sessionId, {
+        messageId: 'compact',
+        turn: { type: 'command', command: 'compact', arguments: '' },
+        agent: { mode: 'code', model: 'test/model' },
+      });
+      await f.summaryRequested;
+      f.host.turns.submit(route.sessionId, prompt('follower'));
+      f.event(feed, 'session.turn.close', { sessionID: 'ses_root', reason: 'completed' });
+      await settle();
+      expect(f.prompts).toHaveLength(1);
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toEqual([]);
+      f.event(feed, 'session.turn.open', { sessionID: 'ses_root' });
+      summary.resolve(true);
+      await settle();
+      expect(f.prompts).toHaveLength(1);
+      f.event(feed, 'session.status', { sessionID: 'ses_root', status: { type: 'idle' } });
+      f.event(feed, 'session.turn.close', { sessionID: 'ses_root', reason: 'completed' });
+      await waitFor(() => f.prompts.length === 2);
+      expect(f.prompts).toHaveLength(2);
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toEqual([]);
+      f.event(feed, 'session.turn.open', { sessionID: 'ses_root' });
+      f.event(feed, 'session.status', { sessionID: 'ses_root', status: { type: 'idle' } });
+      f.event(feed, 'session.turn.close', { sessionID: 'ses_root', reason: 'completed' });
+      await waitFor(() => f.frames.some(frame => frame.type === 'session.outcome'));
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toMatchObject([
+        { status: 'completed', lastMessageId: 'follower' },
+      ]);
+    } finally {
+      summary.resolve(true);
+      await f.dispose();
+    }
+  });
+
+  it('bounds an empty root drain even while an unrelated sibling remains active', async () => {
+    const http = Promise.withResolvers<boolean>();
+    const pending: Array<{ ms: number; run(): void; cancelled: boolean }> = [];
+    const f = await hostFixture({
+      scheduler: {
+        setInterval,
+        clearInterval,
+        setTimeout(run, ms) {
+          const timer = { ms, run, cancelled: false };
+          pending.push(timer);
+          return timer as unknown as ReturnType<typeof setTimeout>;
+        },
+        clearTimeout(handle) {
+          (handle as unknown as { cancelled: boolean }).cancelled = true;
+        },
+      },
+    });
+    try {
+      f.setDrain(() => http.promise);
+      const feed = await f.runtime('/workspace');
+      f.host.turns.registerRoute(route);
+      f.host.turns.submit(route.sessionId, prompt('m1'));
+      await f.promptRequested;
+      f.event(feed, 'session.turn.open', { sessionID: 'ses_root' });
+      f.event(feed, 'session.turn.open', { sessionID: 'ses_sibling' });
+      f.event(feed, 'session.status', { sessionID: 'ses_root', status: { type: 'idle' } });
+      f.event(feed, 'session.turn.close', { sessionID: 'ses_root', reason: 'completed' });
+      await waitFor(() => f.drains.length === 1);
+      expect(f.host.runtimes.get('/workspace')?.liveTreeExecutions('ses_root')).toEqual([]);
+      expect(f.host.runtimes.get('/workspace')?.liveTreeExecutions('ses_sibling')).toHaveLength(1);
+      const fire = (ms: number) => {
+        const timer = pending.find(timer => timer.ms === ms && !timer.cancelled);
+        expect(timer).toBeDefined();
+        timer!.cancelled = true;
+        timer!.run();
+      };
+      for (let attempt = 0; attempt < 3; attempt++) {
+        expect(f.drains).toHaveLength(attempt + 1);
+        fire(10_000);
+        await settle();
+        if (attempt < 2) {
+          fire((attempt + 1) * 1_000);
+          await waitFor(() => f.drains.length === attempt + 2);
+        }
+      }
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toMatchObject([
+        { status: 'failed', reason: 'no_outcome', lastMessageId: 'm1' },
+      ]);
+      expect(f.host.getHeartbeat().active).toBe(true);
+    } finally {
+      http.resolve(true);
+      await f.dispose();
+    }
+  });
+
+  it.each(['idle-stop', 'answer'] as const)(
+    'lets a waiting child in native drain follow normal allocation behavior: %s',
+    async mode => {
+      const allocationModule = new URL(
+        '../../../src/control-plane/sandbox/allocation.ts',
+        import.meta.url
+      );
+      const { initialAllocationState, reduceAllocation } = await import(allocationModule.pathname);
+      const f = await hostFixture();
+      const http = Promise.withResolvers<boolean>();
+      try {
+        f.setDrain(() => http.promise);
+        const feed = await f.runtime('/workspace');
+        f.host.turns.registerRoute(route);
+        f.host.turns.submit(route.sessionId, prompt('m1'));
+        await f.promptRequested;
+        f.event(feed, 'session.turn.open', { sessionID: 'ses_root' });
+        f.event(feed, 'session.created', {
+          info: { id: 'ses_child', parentID: 'ses_root', directory: '/workspace' },
+        });
+        f.event(feed, 'session.turn.open', { sessionID: 'ses_child' });
+        f.event(feed, 'question.asked', { sessionID: 'ses_child', id: 'q' });
+        f.event(feed, 'session.status', { sessionID: 'ses_root', status: { type: 'idle' } });
+        f.event(feed, 'session.turn.close', { sessionID: 'ses_root', reason: 'completed' });
+        f.setSnapshot([
+          {
+            id: 'ses_child',
+            directory: '/workspace',
+            parentID: 'ses_root',
+            status: 'busy',
+            messages: [],
+            interactions: [{ id: 'q', blocking: true }],
+          },
+        ]);
+        await waitFor(() => f.drains.length === 1);
+        expect(f.host.getHeartbeat().active).toBe(false);
+        expect(f.host.runtimes.get('/workspace')?.liveTreeExecutions('ses_root')).toHaveLength(1);
+        let allocation = {
+          ...initialAllocationState(),
+          kind: 'connected',
+          allocationId: 'allocation',
+          connectionId: 'socket',
+          providerRef: 'provider',
+          wrapperId: 'wrapper',
+          lastActivityAt: f.now(),
+          lastFrameAt: f.now(),
+        };
+        const lastActivityAt = allocation.lastActivityAt;
+        const duration = mode === 'idle-stop' ? CONTROL_PLANE_TIMERS.sandbox.idleMs : 5_000;
+        for (let elapsed = 0; elapsed < duration; elapsed += 5_000) {
+          await f.advance(5_000);
+          const heartbeat = reduceAllocation(
+            allocation,
+            {
+              type: 'heartbeat',
+              at: f.now(),
+              allocationId: 'allocation',
+              connectionId: 'socket',
+              active: f.host.getHeartbeat().active,
+            },
+            CONTROL_PLANE_TIMERS.sandbox
+          );
+          allocation = heartbeat.state;
+          expect(heartbeat.effects).toEqual([]);
+          expect(allocation.lastActivityAt).toBe(lastActivityAt);
+        }
+        if (mode === 'idle-stop') {
+          const tick = reduceAllocation(
+            allocation,
+            { type: 'tick', at: f.now(), nextAllocationId: 'next', retryAllowed: false },
+            CONTROL_PLANE_TIMERS.sandbox
+          );
+          expect(tick.state).toMatchObject({ kind: 'stopping' });
+          expect(tick.stopReason).toBe('sandbox_stopped');
+          expect(f.frames.filter(frame => frame.type === 'session.outcome')).toEqual([]);
+        } else {
+          f.event(feed, 'question.replied', { sessionID: 'ses_child', requestID: 'q' });
+          f.setSnapshot([]);
+          expect(f.host.getHeartbeat().active).toBe(true);
+          f.event(feed, 'session.status', { sessionID: 'ses_child', status: { type: 'idle' } });
+          f.event(feed, 'session.turn.close', { sessionID: 'ses_child', reason: 'completed' });
+          http.resolve(true);
+          await waitFor(() => f.frames.some(frame => frame.type === 'session.outcome'));
+          expect(f.frames.filter(frame => frame.type === 'session.outcome')).toMatchObject([
+            { status: 'completed', lastMessageId: 'm1' },
+          ]);
+        }
+      } finally {
+        http.resolve(true);
+        await f.dispose();
+      }
+    }
+  );
 });

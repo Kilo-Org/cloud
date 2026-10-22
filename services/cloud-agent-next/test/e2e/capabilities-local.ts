@@ -23,6 +23,7 @@ import {
   findControlPlaneKiloRuntime,
   inspectControlPlaneSummaryCount,
   inspectControlPlaneUserMessageParts,
+  killOwnedControlPlanePrimary,
   LEGACY_CONTROL_WRAPPER_BASENAME,
   recycleControlConnection,
   signalKiloServerProcess,
@@ -33,7 +34,6 @@ import {
   currentOwnedSandbox,
   reclaimOwnedSandboxes,
   snapshotSandboxIds,
-  stopOwnedSandboxFamily,
   waitForOwnedSandbox,
 } from './lifecycle.js';
 import { captureLogCursor, readWorkerLogSnapshot, type LogRecord } from './idle-stop-evidence.js';
@@ -300,11 +300,7 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
     killOwnedContainer: async target => {
       const container = await requireOwnedContainer(target);
       await requireMatchingWrapper(container.id, target);
-      const killed = await stopOwnedSandboxFamily(
-        container,
-        target.cloudAgentSessionId,
-        target.kiloSessionId
-      );
+      const killed = await killOwnedControlPlanePrimary(container, target.kiloSessionId);
       frozenHandles.delete(target.cloudAgentSessionId);
       if (killed.length === 0) {
         return {

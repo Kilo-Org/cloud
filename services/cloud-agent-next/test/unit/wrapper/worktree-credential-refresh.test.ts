@@ -100,7 +100,7 @@ describe('cloud runtime feature configuration', () => {
     }
   });
 
-  it('disables background subagents, indexing and snapshots despite profile or inherited overrides', () => {
+  it('uses the CLI background subagent default and disables indexing and snapshots despite profile or inherited overrides', () => {
     const overrides = {
       KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS: 'true',
       KILO_DISABLE_CODEBASE_INDEXING: '',
@@ -114,7 +114,7 @@ describe('cloud runtime feature configuration', () => {
       overrides,
       overrides
     );
-    expect(env.KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS).toBe('false');
+    expect(env.KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS).toBeUndefined();
     expect(env.KILO_DISABLE_CODEBASE_INDEXING).toBe('vscode-no-workspace');
     expect(JSON.parse(env.KILO_CONFIG_CONTENT).snapshot).toBe(false);
     expect(JSON.parse(env.OPENCODE_CONFIG_CONTENT).snapshot).toBe(false);

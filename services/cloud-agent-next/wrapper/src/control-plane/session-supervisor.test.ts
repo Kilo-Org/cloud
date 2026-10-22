@@ -612,7 +612,7 @@ describe('native session supervision', () => {
     expect(f.supervisor.state('sibling')?.activity).toBe('running');
   });
 
-  it('does not turn a feed gap or a failed snapshot into no_progress', () => {
+  it('does not turn a feed gap with a failed reconnect snapshot into no_progress', () => {
     const f = fixture();
     f.open();
     f.advance(20 * MINUTE);
@@ -697,5 +697,42 @@ describe('native session supervision', () => {
     f.open();
     expect(f.supervisor.needsCompute()).toBe(false);
     expect(f.supervisor.observedSessions()).toEqual([]);
+  });
+});
+
+describe('root execution tree presence', () => {
+  it('counts waiting descendants, excludes unrelated roots, and preserves unknown observations', () => {
+    const f = fixture();
+    const tree = (root: string) => f.supervisor.liveTreeExecutions(root);
+    const execution = (id: string): number => {
+      const value = f.supervisor.state(id)?.execution;
+      if (value === undefined) throw new Error(`${id} has no live execution`);
+      return value;
+    };
+    expect(tree('root')).toEqual([]);
+    f.open('sibling');
+    expect(tree('root')).toEqual([]);
+    f.open('root');
+    f.open('child', 'root');
+    f.open('grandchild', 'child');
+    const grandchild = execution('grandchild');
+    expect(tree('root')).toEqual([execution('root'), execution('child'), grandchild]);
+    f.close('root');
+    f.close('child');
+    f.event('question.asked', { sessionID: 'grandchild', id: 'question' });
+    expect(tree('root')).toEqual([grandchild]);
+    expect(tree('child')).toEqual([grandchild]);
+    f.close('grandchild');
+    expect(tree('root')).toEqual([]);
+    expect(tree('sibling')).toEqual([execution('sibling')]);
+    // The feed still delivers events, so a failed periodic read does not hide the tree.
+    f.supervisor.snapshotFailed(f.supervisor.beginSnapshot());
+    expect(tree('sibling')).toEqual([execution('sibling')]);
+    f.supervisor.observationLost();
+    expect(tree('root')).toBeUndefined();
+    f.supervisor.snapshotFailed(f.supervisor.beginSnapshot());
+    expect(tree('root')).toBeUndefined();
+    f.supervisor.reconcile([], f.supervisor.beginSnapshot());
+    expect(tree('root')).toEqual([]);
   });
 });

@@ -1,3 +1,4 @@
+import { githubTaskGrantSchema, isGitHubTaskRef } from '@kilocode/worker-utils/github-task-grant';
 import { containedKiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
@@ -89,7 +90,7 @@ const runtimeProxySchema = z
   .strict();
 const capabilitySchema = z
   .object({
-    credential: tokenSchema.regex(/^(?:kka1|kgh2|kgl2|kbb1)\./),
+    credential: tokenSchema.regex(/^(?:kka1|kgh2|kgh3|kgl2|kbb1)\./),
     outboundContainerId: z.string().min(1),
     issuedAt: timestampSchema,
     expiresAt: timestampSchema,
@@ -139,6 +140,8 @@ const scmSchema = z
     gitUrl: z.string().url(),
     author: gitAuthorSchema.optional(),
     githubAppType: z.enum(['standard', 'lite']).optional(),
+    githubAuthSource: z.enum(['user', 'installation']).optional(),
+    githubTaskGrant: githubTaskGrantSchema.optional(),
     capability: capabilitySchema.optional(),
     nativeToken: realTokenSchema.optional(),
     gitlab: z
@@ -164,6 +167,7 @@ const sessionCredentialGrantShape = z
     version: z.literal(1),
     containmentEnabled: z.boolean().optional(),
     scopeId: scopeIdSchema,
+    githubTaskRef: z.string().refine(isGitHubTaskRef).optional(),
     sandboxId: z
       .string()
       .refine(isValidSandboxId)
@@ -315,7 +319,20 @@ function refinePersistedSessionCredentialGrant(
       reject();
     }
   } else {
-    const prefixes = { github: 'kgh2.', gitlab: 'kgl2.', bitbucket: 'kbb1.' };
+    const prefixes = {
+      github: grant.scm.githubTaskGrant ? 'kgh3.' : 'kgh2.',
+      gitlab: 'kgl2.',
+      bitbucket: 'kbb1.',
+    };
+    if (
+      grant.scm.githubTaskGrant &&
+      (grant.scm.githubTaskGrant.scopeId !== grant.scopeId ||
+        grant.scm.githubTaskGrant.taskRef !== grant.githubTaskRef ||
+        grant.repository?.type !== 'github' ||
+        `${grant.scm.githubTaskGrant.repository.owner}/${grant.scm.githubTaskGrant.repository.name}` !==
+          grant.repository.repo.toLowerCase())
+    )
+      reject();
     if (
       grant.scm.nativeToken ||
       !grant.scm.capability?.credential.startsWith(prefixes[grant.scm.purpose]) ||
@@ -652,6 +669,32 @@ function isCapabilityCurrent(
   );
 }
 
+function allowGitHubUserAuthorization(
+  repository: Extract<CredentialRepository, { type: 'github' }>,
+  existing: ScmGrant | undefined
+): boolean {
+  return repository.allowUserAuthorization && existing?.githubAuthSource !== 'installation';
+}
+
+/** Credential renewal must preserve the actor selected for this worktree. */
+function requireSameGitHubIdentity(
+  existing: ScmGrant | undefined,
+  next: Pick<ScmGrant, 'author' | 'githubAppType' | 'githubAuthSource'>
+): void {
+  if (!existing) return;
+  if (
+    (existing.githubAuthSource !== undefined &&
+      existing.githubAuthSource !== next.githubAuthSource) ||
+    (existing.githubAppType !== undefined && existing.githubAppType !== next.githubAppType) ||
+    (existing.author !== undefined &&
+      (existing.author.name !== next.author?.name || existing.author.email !== next.author?.email))
+  ) {
+    throw new Error(
+      'GitHub identity changed. Reconnect your GitHub account or start a new worktree.'
+    );
+  }
+}
+
 async function refreshScmCapability(
   env: CredentialEnv,
   grant: SessionCredentialGrant,
@@ -679,7 +722,8 @@ async function refreshScmCapability(
   if (
     !refresh &&
     isCapabilityCurrent(grant.scm?.capability, outboundContainerId, now) &&
-    (repository.type !== 'github' || grant.scm?.githubAppType !== undefined)
+    (repository.type !== 'github' ||
+      (grant.scm?.githubAppType !== undefined && grant.scm.githubTaskGrant !== undefined))
   )
     return grant;
   const common = {
@@ -690,11 +734,20 @@ async function refreshScmCapability(
   const alias = grant.scm?.alias ?? createControlPlaneCredential(grant.sandboxId, repository.type);
   let scm: ScmGrant;
   if (repository.type === 'github') {
+    if (!grant.githubTaskRef)
+      throw new Error('GitHub task scope is unavailable. Start a new worktree.');
     const issued = await issueCloudAgentGitHubSessionCapability(env, {
       ...common,
       githubRepo: repository.repo,
       accessPurpose: repository.accessPurpose ?? 'workflow',
-      allowUserAuthorization: repository.allowUserAuthorization,
+      allowUserAuthorization: allowGitHubUserAuthorization(repository, grant.scm),
+      taskScope: {
+        scopeId: grant.scopeId,
+        taskRef: grant.githubTaskRef,
+        ...(grant.scm?.githubTaskGrant
+          ? { repositoryId: grant.scm.githubTaskGrant.repository.id }
+          : {}),
+      },
       ...(repository.expectedIntegrationId
         ? { expectedIntegrationId: repository.expectedIntegrationId }
         : {}),
@@ -705,20 +758,30 @@ async function refreshScmCapability(
       );
       throw new Error('GitHub capability issuance is unavailable');
     }
+    const taskGrant = githubTaskGrantSchema.safeParse(issued.value.taskGrant);
+    if (
+      !taskGrant.success ||
+      taskGrant.data.scopeId !== grant.scopeId ||
+      taskGrant.data.taskRef !== grant.githubTaskRef
+    )
+      throw new Error('GitHub task policy is unavailable');
     scm = {
       purpose: 'github',
       alias,
       gitUrl: `https://github.com/${repository.repo}.git`,
       author: issued.value.gitAuthor,
       githubAppType: issued.value.appType,
+      githubAuthSource: issued.value.source,
       capability: cachedCapability(
         issued.value.capability,
-        'kgh2.',
+        'kgh3.',
         outboundContainerId,
         now,
         diagnostic
       ),
+      githubTaskGrant: taskGrant.data,
     };
+    requireSameGitHubIdentity(grant.scm, scm);
   } else if (repository.type === 'gitlab') {
     const issued = await issueCloudAgentGitLabSessionCapability(env, {
       ...common,
@@ -962,10 +1025,12 @@ async function resolveGitHubNativeCredential(
   nativeToken: string;
   author?: { name: string; email: string };
   githubAppType?: 'standard' | 'lite';
+  githubAuthSource?: 'user' | 'installation';
 }> {
   let nativeToken = input.repositoryToken;
   let author: { name: string; email: string } | undefined;
   let githubAppType: 'standard' | 'lite' | undefined;
+  let githubAuthSource: 'user' | 'installation' | undefined;
   if (input.repository.authentication === 'managed') {
     const resolved = await resolveCloudAgentGitHubAuthForRepo(env, {
       userId: input.userId,
@@ -984,6 +1049,7 @@ async function resolveGitHubNativeCredential(
     nativeToken = resolved.value.githubToken;
     author = resolved.value.gitAuthor;
     githubAppType = resolved.value.appType;
+    githubAuthSource = resolved.value.source;
   }
   if (!nativeToken) {
     input.diagnostic?.record({
@@ -998,6 +1064,7 @@ async function resolveGitHubNativeCredential(
     nativeToken,
     ...(author ? { author } : {}),
     ...(githubAppType ? { githubAppType } : {}),
+    ...(githubAuthSource ? { githubAuthSource } : {}),
   };
 }
 
@@ -1016,9 +1083,10 @@ async function resolveDirectScmCredentials(
       orgId: grant.orgId,
       repository,
       repositoryToken,
-      allowUserAuthorization: repository.allowUserAuthorization,
+      allowUserAuthorization: allowGitHubUserAuthorization(repository, grant.scm),
       ...(diagnostic ? { diagnostic } : {}),
     });
+    requireSameGitHubIdentity(grant.scm, github);
     return { ...grant, scm: github };
   }
   if (repository.type === 'gitlab') {
@@ -1219,6 +1287,19 @@ export async function prepareCredentialGrant(
     });
     invalidCredentials();
   }
+  if (
+    containmentEnabled &&
+    repository?.type === 'github' &&
+    !providerUsesOutboundCredentialProxy(provider)
+  )
+    throw new Error(
+      'This provider cannot enforce the GitHub task policy. Select a Cloudflare runtime.'
+    );
+  const githubTaskRef =
+    repository?.type === 'github' && containmentEnabled
+      ? `refs/heads/${input.payload.branch ?? `session/${scopeId.data}`}`
+      : undefined;
+  if (existing?.githubTaskRef && existing.githubTaskRef !== githubTaskRef) invalidCredentials();
   const members = existing?.members ?? [];
   if (
     members.some(
@@ -1248,6 +1329,7 @@ export async function prepareCredentialGrant(
     version: 1,
     ...(!containmentEnabled ? { containmentEnabled: false as const } : {}),
     scopeId: scopeId.data,
+    ...(githubTaskRef ? { githubTaskRef } : {}),
     directory,
     sandboxId,
     userId: source.userId,

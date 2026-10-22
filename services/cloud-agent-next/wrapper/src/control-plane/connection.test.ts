@@ -372,6 +372,24 @@ describe('control-plane handshake recovery', () => {
     });
   });
 
+  it('retries a busy allocation during HELLO without shutting down', () => {
+    withControlledConnection(({ connection, timeouts, connected, shutdowns }) => {
+      const socket = TestSocket.instances[0];
+      socket.onopen?.();
+      socket.onclose?.();
+      expect(connection.snapshot()).toMatchObject({ phase: 'idle', attempt: 1 });
+      expect(shutdowns).toEqual([]);
+      const retry = timeouts[timeouts.length - 1];
+      retry.run();
+      const replacement = TestSocket.instances[1];
+      replacement.onopen?.();
+      replacement.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+      expect(connected()).toBe(1);
+      expect(connection.snapshot().phase).toBe('connected');
+      expect(shutdowns).toEqual([]);
+    });
+  });
+
   it.each(['hello', 'fallback'] as const)('reconnects after a throwing %s write', failure => {
     withControlledConnection(({ connection, timeouts, connected, shutdowns }) => {
       const socket = TestSocket.instances[0];

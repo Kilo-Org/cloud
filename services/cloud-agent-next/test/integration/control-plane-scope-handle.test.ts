@@ -428,6 +428,10 @@ describe('rolling runtime compatibility', () => {
     });
     const { credential, allocationId } = launchIdentity(provider);
     // A newer wrapper reconnecting to this allocation must not enable sharing.
+    wrapper.close();
+    await waitFor(async () =>
+      expect((await sandbox.getAllocationState()).kind).toBe('disconnected')
+    );
     const replacement = await FakeWrapper.connect({ sandboxId, credential });
     expect((await replacement.hello({ wrapperId: 'wr_1', allocationId }))?.type).toBe('welcome');
     await runInDurableObject(sandbox, instance => {
@@ -436,7 +440,6 @@ describe('rolling runtime compatibility', () => {
     expect((await sandbox.status({ sessionId: first!.sessionId })).view.state).toBe('ready');
     expect((await sandbox.status({ sessionId: second!.sessionId })).view.state).toBe('ready');
     replacement.close();
-    wrapper.close();
   });
 
   it('enables sharing when an old allocation ends through its normal lifecycle', async () => {

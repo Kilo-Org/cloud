@@ -72,6 +72,12 @@ export function createSecretRedactor(
     if (!value) return;
     secrets.add(value);
     secrets.add(JSON.stringify(value).slice(1, -1));
+    if (value.length >= 8) {
+      if (value.isWellFormed()) secrets.add(encodeURIComponent(value));
+      secrets.add(Buffer.from(value).toString('base64'));
+      secrets.add(Buffer.from(value).toString('base64url'));
+      secrets.add(Buffer.from(value).toString('hex'));
+    }
     for (const line of value.split(/\r?\n/)) {
       if (line.trim()) secrets.add(line.trim());
     }
@@ -99,8 +105,7 @@ export function createSecretRedactor(
     for (const [name, value] of Object.entries(source)) {
       if (!value) continue;
       if (CONFIG_ENV_NAME.test(name)) {
-        secrets.add(value);
-        secrets.add(JSON.stringify(value).slice(1, -1));
+        remember(value);
         try {
           const parsed: unknown = JSON.parse(value);
           collect(parsed);

@@ -2266,6 +2266,11 @@ describe('server /sandbox-terminal', () => {
 describe('server control log routes', () => {
   it('accepts a log-only grant without touching sandbox liveness', async () => {
     const env = Object.assign(createEnv(), { R2_BUCKET: { put: vi.fn().mockResolvedValue(null) } });
+    const isLogUploadAuthorized = vi.fn().mockResolvedValue(true);
+    env.SANDBOX_CONTROL.getByName.mockReturnValue({
+      isLogUploadAuthorized,
+      reserveLogUpload: vi.fn().mockResolvedValue(true),
+    });
     const identity = {
       sandboxId: 'sandbox_test',
       allocationId: 'allocation_test',
@@ -2294,7 +2299,8 @@ describe('server control log routes', () => {
     );
     expect(response.status).toBe(204);
     expect(env.R2_BUCKET.put).toHaveBeenCalledOnce();
-    expect(env.SANDBOX_CONTROL.getByName).not.toHaveBeenCalled();
+    expect(env.SANDBOX_CONTROL.getByName).toHaveBeenCalledWith(identity.sandboxId);
+    expect(isLogUploadAuthorized).toHaveBeenCalledWith(identity);
     expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
   });
 

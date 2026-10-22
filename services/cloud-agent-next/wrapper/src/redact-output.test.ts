@@ -155,6 +155,17 @@ describe('known setup secret redaction', () => {
     expect(result).toContain('development');
   });
 
+  it('redacts malformed Unicode secrets without failing redactor construction', () => {
+    const secret = 'synthetic-malformed-\ud800-secret';
+    const redact = createSecretRedactor({ API_TOKEN: secret });
+    expect(redact(secret)).toBe('[REDACTED]');
+    expect(redact(JSON.stringify(secret))).not.toContain('synthetic-malformed');
+    const nested = createSecretRedactor({
+      KILO_CONFIG_CONTENT: JSON.stringify({ apiKey: secret }),
+    });
+    expect(nested(secret)).toBe('[REDACTED]');
+  });
+
   it('retains secrets from wrapper, attachment, and rebuilt worktree configurations', () => {
     const configs = ['wrapper-auth-secret', 'attachment-auth-secret', 'guest-worktree-alias'].map(
       key => ({

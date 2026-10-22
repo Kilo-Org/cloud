@@ -29,6 +29,7 @@ import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlit
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
 import { resolveSecret } from '../../auth.js';
+import { checkTerminalSessionAccess } from '../../terminal/session-access.js';
 import type { CallbackTarget } from '../../callbacks/index.js';
 import type { DurableAdmissionAck } from '../../execution/types.js';
 import { logger } from '../../logger.js';
@@ -659,6 +660,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       getWrapperId: () => this.currentWrapperId(),
       isRouteReady: () => this.route.state === 'ready',
       getSandboxStatus: () => this.getSandboxStatus(),
+      checkAccess: metadata => this.checkTerminalAccess(metadata),
+      scheduleAuthorization: () => this.armAlarm(),
       request: (sandboxId, input) => this.terminalRequest(sandboxId, input),
     });
     this.preview = createControlPlanePreview({
@@ -666,6 +669,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       resolveTarget: sandboxId => this.previewTargetFor(sandboxId),
     });
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
+  }
+
+  private async checkTerminalAccess(
+    metadata: SessionMetadata
+  ): Promise<'allowed' | 'denied' | 'unavailable'> {
+    return checkTerminalSessionAccess(this.env, metadata);
   }
 
   private async terminalRequest(
@@ -1878,6 +1887,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.initialized;
     if (this.registration === null) return;
     await this.enqueue(async () => {
+      await this.terminals.maintainAuthorization();
       // The alarm can wake an evicted instance; storage is authoritative.
       this.messages = await this.loadMessages();
       // Retry any report/callback obligation a previous attempt could not send.
@@ -1920,6 +1930,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       nextBackstopAt(this.messages, this.sessionTimers()),
       this.reportOutbox.nextDueAt() ?? null,
       this.messageCallbacks.nextCallbackDueAt() ?? null,
+      await this.terminals.nextAuthorizationCheckAt(),
     ].filter((value): value is number => value !== null);
     if (candidates.length === 0) {
       await this.ctx.storage.deleteAlarm();
@@ -2115,6 +2126,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       socket.close(1000, 'session access revoked');
       closed++;
     }
+    await this.terminals.revoke();
     return closed;
   }
 
@@ -2372,7 +2384,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     rows?: number;
   }): Promise<OperationResult<{ pty: WrapperPty }>> {
     await this.initialized;
-    return this.terminals.create(input);
+    try {
+      return await this.terminals.create(input);
+    } finally {
+      await this.armAlarm();
+    }
   }
 
   async terminalResize(input: {
@@ -2386,7 +2402,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   async terminalClose(input: { ptyId: string }): Promise<OperationResult<{ success: boolean }>> {
     await this.initialized;
-    return this.terminals.close(input);
+    try {
+      return await this.terminals.close(input);
+    } finally {
+      await this.armAlarm();
+    }
   }
 
   /**

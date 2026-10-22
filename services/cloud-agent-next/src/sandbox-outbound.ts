@@ -1,3 +1,8 @@
+import { prepareGitHubTaskRequest, isGitHubTaskDestination } from './github-task-outbound.js';
+import { getGitHubTaskLfsRoute } from '@kilocode/worker-utils/github-task-lfs';
+import { forwardGitHubTaskLfs } from './github-task-lfs.js';
+import { getGitHubTaskArchive } from '@kilocode/worker-utils/github-task-archive';
+import { forwardGitHubTaskArchive } from './github-task-archive.js';
 import { Buffer } from 'node:buffer';
 import { ContainerProxy } from '@cloudflare/sandbox';
 import { z } from 'zod';
@@ -23,7 +28,7 @@ import { forwardCloudAgentSessionScopeRequest } from './cloud-agent-session-scop
 
 export { MANAGED_SCM_OUTBOUND_HANDLER } from './sandbox-id.js';
 
-const GITHUB_CAPABILITY_PREFIXES = ['kgh1.', 'kgh2.'];
+const GITHUB_CAPABILITY_PREFIXES = ['kgh1.', 'kgh2.', 'kgh3.'];
 const GITLAB_CAPABILITY_PREFIXES = ['kgl1.', 'kgl2.'];
 const KILO_CAPABILITY_PREFIXES = ['kka1.'];
 const BITBUCKET_CAPABILITY_PREFIXES = ['kbb1.'];
@@ -31,7 +36,7 @@ const MAX_KILO_SESSION_BOOTSTRAP_BYTES = 16_000;
 const GITHUB_GIT_RETRY_MAX_BODY_BYTES = 1_048_576;
 const CONTROL_CREDENTIAL_CAPABILITY_PREFIXES = {
   kilo: 'kka1.',
-  github: 'kgh2.',
+  github: 'kgh3.',
   gitlab: 'kgl2.',
   bitbucket: 'kbb1.',
 } satisfies Record<ControlCredentialPurpose, string>;
@@ -60,7 +65,10 @@ type BitbucketTokenRedemptionBinding = {
     GitTokenService['redeemBitbucketSessionCapability']
   >;
 };
-type ManagedScmOutboundContext = { containerId: string };
+type ManagedScmOutboundContext = {
+  containerId: string;
+  githubClientCredential?: string;
+};
 type RedeemableAuthorization = {
   provider: 'github' | 'gitlab' | 'kilo' | 'bitbucket';
   capability: string;
@@ -522,7 +530,8 @@ async function handleManagedGitHubOutbound(
   request: Request,
   env: Cloudflare.Env,
   capability: { capability: string },
-  outboundContainerId: string
+  outboundContainerId: string,
+  clientCredential: string
 ): Promise<Response> {
   const logFields = {
     ...getSafeRequestLogFields(request),
@@ -542,6 +551,11 @@ async function handleManagedGitHubOutbound(
     return new Response('GitHub authorization unavailable', { status: 502 });
   }
 
+  if (!capability.capability.startsWith('kgh3.'))
+    return new Response('GitHub task policy requires a new worktree', { status: 403 });
+  const prepared = await prepareGitHubTaskRequest(request);
+  if (!prepared) return new Response('GitHub request is outside the task policy', { status: 403 });
+  request = prepared.request;
   let result: Awaited<ReturnType<GitHubTokenRedemptionBinding['redeemGitHubSessionCapability']>>;
   try {
     result = await tokenService.redeemGitHubSessionCapability({
@@ -549,6 +563,8 @@ async function handleManagedGitHubOutbound(
       outboundContainerId,
       requestMethod: request.method,
       requestUrl: request.url,
+      requestContentType: request.headers.get('content-type') ?? undefined,
+      requestBody: prepared.policyBody,
     });
   } catch (error) {
     logDiagnostic(
@@ -560,6 +576,7 @@ async function handleManagedGitHubOutbound(
       },
       'Managed GitHub outbound redemption failed'
     );
+    await request.body?.cancel().catch(() => undefined);
     return new Response('GitHub authorization unavailable', { status: 502 });
   }
 
@@ -569,13 +586,24 @@ async function handleManagedGitHubOutbound(
       { ...logFields, failureStage: 'redemption-policy', reason: result.reason },
       'Managed GitHub outbound redemption rejected'
     );
-    return new Response('GitHub authorization unavailable', { status: 502 });
+    await request.body?.cancel().catch(() => undefined);
+    return new Response('GitHub request is outside the task policy', { status: 403 });
   }
 
-  const headersToApply = { authorization: result.authorization };
+  const headersToApply =
+    result.authorization === null ? {} : { authorization: result.authorization };
   let response: Response;
   try {
-    if (!isGitHubGitUploadRetryableRequest(request)) {
+    if (getGitHubTaskArchive(new URL(request.url))) {
+      response = await forwardGitHubTaskArchive(request, result.authorization);
+    } else if (getGitHubTaskLfsRoute(new URL(request.url))) {
+      response = await forwardGitHubTaskLfs({
+        request,
+        policyBody: prepared.policyBody,
+        authorization: result.authorization,
+        capability: clientCredential,
+      });
+    } else if (!isGitHubGitUploadRetryableRequest(request)) {
       response = await forwardRedeemedRequest(request, headersToApply);
     } else if (request.method === 'POST') {
       const bodyBytes = await readBoundedRequestBodyBytes(request, GITHUB_GIT_RETRY_MAX_BODY_BYTES);
@@ -995,13 +1023,17 @@ async function handleControlPlaneOutbound(
       headers.set('x-kilocode-organizationid', organizationId ?? '');
     }
     headers.set('Host', new URL(request.url).host);
-    return await handleManagedScmOutbound(new Request(request, { headers }), env, ctx);
+    return await handleManagedScmOutbound(new Request(request, { headers }), env, {
+      ...ctx,
+      // LFS follow-up requests must still resolve the allocation alias outside the guest.
+      ...(parsed.purpose === 'github' ? { githubClientCredential: capability.capability } : {}),
+    });
   } catch {
     return new Response('SCM authorization unavailable', { status: 502 });
   }
 }
 
-export function handleManagedScmOutbound(
+export async function handleManagedScmOutbound(
   request: Request,
   env: Cloudflare.Env,
   ctx: ManagedScmOutboundContext
@@ -1052,12 +1084,32 @@ export function handleManagedScmOutbound(
     return Promise.resolve(new Response('GitLab authorization unavailable', { status: 502 }));
   }
   const capability = authorizationCapability ?? gitLabPrivateTokenCapability;
-  if (!capability) return fetch(request);
+  if (!capability) {
+    if (isGitHubTaskDestination(new URL(request.url))) {
+      if (!hasUnmanagedAuthorization && ['GET', 'HEAD'].includes(request.method)) {
+        const prepared = await prepareGitHubTaskRequest(request);
+        if (prepared) return fetch(new Request(prepared.request, { redirect: 'manual' }));
+      }
+      return Promise.resolve(
+        new Response('Use the managed GitHub task credential', {
+          status: 401,
+          headers: { 'WWW-Authenticate': 'Basic realm="GitHub task"' },
+        })
+      );
+    }
+    return fetch(request);
+  }
   if (isControlPlaneCredential(capability.capability)) {
     return handleControlPlaneOutbound(request, env, capability, ctx);
   }
   if (capability.provider === 'github') {
-    return handleManagedGitHubOutbound(request, env, capability, ctx.containerId);
+    return handleManagedGitHubOutbound(
+      request,
+      env,
+      capability,
+      ctx.containerId,
+      ctx.githubClientCredential ?? capability.capability
+    );
   }
   if (capability.provider === 'kilo') {
     return handleManagedKiloOutbound(request, env, capability, ctx.containerId);
@@ -1108,6 +1160,7 @@ export class SandboxContainment extends Sandbox {
   protected override get sandboxClassName(): SandboxClassName {
     return 'SandboxContainment';
   }
+  override enableInternet = false;
   interceptHttps = true;
 }
 // Assignment (not a static class field) so it invokes the inherited Container.outboundHandlers
@@ -1119,6 +1172,7 @@ export class SandboxSmallContainment extends SandboxSmall {
   protected override get sandboxClassName(): SandboxClassName {
     return 'SandboxSmallContainment';
   }
+  override enableInternet = false;
   interceptHttps = true;
 }
 SandboxSmallContainment.outboundHandlers = managedScmOutboundHandlers;
@@ -1127,6 +1181,7 @@ export class SandboxCodeReviewContainment extends SandboxCodeReview {
   protected override get sandboxClassName(): SandboxClassName {
     return 'SandboxCodeReviewContainment';
   }
+  override enableInternet = false;
   interceptHttps = true;
 }
 SandboxCodeReviewContainment.outboundHandlers = managedScmOutboundHandlers;

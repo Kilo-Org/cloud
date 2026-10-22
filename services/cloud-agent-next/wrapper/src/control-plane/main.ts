@@ -1,3 +1,4 @@
+import { rememberLogSecrets } from '../log-redaction.js';
 import {
   CONTROL_PLANE_ALLOCATION_ID_ENV,
   type ControlPlaneWrapperFrame,
@@ -306,6 +307,7 @@ export function createControlPlaneFrameDispatcher(
 export async function runControlPlaneWrapper(
   env: Record<string, string | undefined> = process.env
 ): Promise<ControlPlaneLifecycle | undefined> {
+  rememberLogSecrets(env);
   const uploadUrl = env.CONTROL_LOG_UPLOAD_URL;
   const uploadGrant = env.CONTROL_LOG_UPLOAD_GRANT;
   const projector = createControlDiagnosticProjector({

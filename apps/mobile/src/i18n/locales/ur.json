@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "کوئی ریپوزٹری نظر نہیں آ رہی۔ GitLab کے لیے ریپوزٹریوں تک رسائی چیک کریں، پھر فہرست تازہ کریں۔",
       "noRepositoriesVisibleBitbucket": "کوئی ریپوزٹری نظر نہیں آ رہی۔ Bitbucket کے لیے ریپوزٹریوں تک رسائی چیک کریں، پھر فہرست تازہ کریں۔",
       "bitbucketOrganizationsOnly": "Bitbucket صرف تنظیموں کے لیے دستیاب ہے۔",
+      "githubNeedsAttention": "GitHub کو دوبارہ منسلک کرنے کی ضرورت ہے",
+      "githubNeedsAttentionDescription": "Kilo GitHub App دوبارہ منسلک کریں، پھر اس کی ریپوزٹریاں لوڈ کرنے کے لیے فہرست تازہ کریں۔",
+      "partialRepositories": "کچھ GitHub ریپوزٹریاں لوڈ نہیں ہوئیں۔",
       "branchPickerTitle": "برانچ منتخب کریں",
       "branchDefault": "ڈیفالٹ",
       "branchAccessibility": "برانچ: {{label}}",
@@ -3687,6 +3690,8 @@
     "skillNameInvalid": "ہنر کا نام ایک حرف یا ہندسے سے شروع ہونا چاہیے اور صرف چھوٹے حروف، ہندسوں اور ڈیشز کا استعمال کریں",
     "skillContentRequired": "مہارت کا مواد درکار ہے۔",
     "skillSaveFailed": "مہارت نہیں بچا سکا",
+    "skillSourceCustom": "حسبِ ضرورت",
+    "skillSourceMarketplace": "مارکیٹ پلیس",
     "skillsHint": "ایک SKILL.md چسپاں کریں اور اس کا نام بھر جائے؛ ڈریگ اینڈ ڈراپ کے بغیر اپنے فون سے مہارت شامل کریں۔",
     "skillEditTitle": "مہارت میں ترمیم کریں۔",
     "mcp": {

@@ -15,9 +15,6 @@ import {
   type MirrorSessionRow,
 } from '@/lib/artifacts/artifact-crawl';
 
-// Real-File-shaped stand-in for expo-file-system. `materializeArtifact` writes
-// through the public File surface (`write`, `size`, `delete`), so the fake
-// implements exactly that and records what happened for assertions.
 const fakeFs = vi.hoisted(() => {
   type Tracked = {
     deleted: boolean;
@@ -35,7 +32,8 @@ const fakeFs = vi.hoisted(() => {
       files.push(this);
     }
 
-    write(content: string, options?: { encoding?: string }): void {
+    async write(content: string, options?: { encoding?: string }): Promise<void> {
+      await Promise.resolve();
       this.writes.push({ content, ...(options?.encoding ? { encoding: options.encoding } : {}) });
       this.size = content.length;
     }

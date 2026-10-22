@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "कुनै रिपोजिटरी देखिएको छैन। GitLab मा रिपोजिटरीको पहुँच जाँचेर सूची ताजा गर्नुहोस्।",
       "noRepositoriesVisibleBitbucket": "कुनै रिपोजिटरी देखिएको छैन। Bitbucket मा रिपोजिटरीको पहुँच जाँचेर सूची ताजा गर्नुहोस्।",
       "bitbucketOrganizationsOnly": "Bitbucket संस्थाहरूका लागि मात्र उपलब्ध छ।",
+      "githubNeedsAttention": "GitHub पुनः जडान गर्न आवश्यक छ",
+      "githubNeedsAttentionDescription": "Kilo GitHub एप पुनः जडान गर्नुहोस्, त्यसपछि रिपोजिटरीहरू लोड गर्न सूची ताजा गर्नुहोस्।",
+      "partialRepositories": "केही GitHub रिपोजिटरीहरू लोड भएनन्।",
       "branchPickerTitle": "ब्रान्च चयन गर्नुहोस्",
       "branchDefault": "पूर्वनिर्धारित",
       "branchAccessibility": "ब्रान्च: {{label}}",
@@ -3687,6 +3690,8 @@
     "skillNameInvalid": "सीपको नाम अक्षर वा अंकबाट सुरु हुनुपर्छ र सानो अक्षर, अंक र ड्यास मात्र प्रयोग गर्नुपर्छ।",
     "skillContentRequired": "सीप सामग्री आवश्यक छ",
     "skillSaveFailed": "कौशल बचाउन सकेन",
+    "skillSourceCustom": "कस्टम",
+    "skillSourceMarketplace": "मार्केटप्लेस",
     "skillsHint": "SKILL.md टाँस्नुहोस् र यसको नाम भरिन्छ; ड्र्याग र ड्रप बिना आफ्नो फोनबाट कौशल थप्नुहोस्।",
     "skillEditTitle": "कौशल सम्पादन गर्नुहोस्",
     "mcp": {

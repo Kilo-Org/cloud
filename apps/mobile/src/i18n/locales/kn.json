@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "ಯಾವುದೇ ರೆಪೊಸಿಟರಿಗಳು ಕಾಣಿಸುತ್ತಿಲ್ಲ. GitLab ಗೆ ರೆಪೊಸಿಟರಿಗಳನ್ನು ಪ್ರವೇಶಿಸಲು ಅನುಮತಿ ಇದೆಯೇ ಎಂದು ಪರಿಶೀಲಿಸಿ. ನಂತರ ಪಟ್ಟಿಯನ್ನು ನವೀಕರಿಸಿ.",
       "noRepositoriesVisibleBitbucket": "ಯಾವುದೇ ರೆಪೊಸಿಟರಿಗಳು ಕಾಣಿಸುತ್ತಿಲ್ಲ. Bitbucket ಗೆ ರೆಪೊಸಿಟರಿಗಳನ್ನು ಪ್ರವೇಶಿಸಲು ಅನುಮತಿ ಇದೆಯೇ ಎಂದು ಪರಿಶೀಲಿಸಿ. ನಂತರ ಪಟ್ಟಿಯನ್ನು ನವೀಕರಿಸಿ.",
       "bitbucketOrganizationsOnly": "Bitbucket ಸಂಸ್ಥೆಗಳಿಗೆ ಮಾತ್ರ ಲಭ್ಯ.",
+      "githubNeedsAttention": "GitHub ಅನ್ನು ಪುನಃ ಸಂಪರ್ಕಿಸಬೇಕು",
+      "githubNeedsAttentionDescription": "Kilo GitHub ಅಪ್ಲಿಕೇಶನ್ ಅನ್ನು ಪುನಃ ಸಂಪರ್ಕಿಸಿ, ನಂತರ ಅದರ ರೆಪೊಸಿಟರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಪಟ್ಟಿಯನ್ನು ನವೀಕರಿಸಿ.",
+      "partialRepositories": "ಕೆಲವು GitHub ರೆಪೊಸಿಟರಿಗಳು ಲೋಡ್ ಆಗಲಿಲ್ಲ.",
       "branchPickerTitle": "ಶಾಖೆ ಆಯ್ಕೆಮಾಡಿ",
       "branchDefault": "ಡೀಫಾಲ್ಟ್",
       "branchAccessibility": "ಶಾಖೆ: {{label}}",
@@ -3687,6 +3690,8 @@
     "skillNameInvalid": "ಕೌಶಲ್ಯದ ಹೆಸರು ಅಕ್ಷರ ಅಥವಾ ಅಂಕೆಯೊಂದಿಗೆ ಪ್ರಾರಂಭವಾಗಬೇಕು ಮತ್ತು ಸಣ್ಣ ಅಕ್ಷರಗಳು, ಅಂಕೆಗಳು ಮತ್ತು ಡ್ಯಾಶ್‌ಗಳನ್ನು ಮಾತ್ರ ಬಳಸಬೇಕು",
     "skillContentRequired": "ಕೌಶಲ್ಯ ವಿಷಯದ ಅಗತ್ಯವಿದೆ",
     "skillSaveFailed": "ಕೌಶಲ್ಯವನ್ನು ಉಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
+    "skillSourceCustom": "ಕಸ್ಟಮ್",
+    "skillSourceMarketplace": "ಮಾರುಕಟ್ಟೆ",
     "skillsHint": "SKILL.md ಅನ್ನು ಅಂಟಿಸಿ ಮತ್ತು ಅದರ ಹೆಸರು ತುಂಬುತ್ತದೆ; ಡ್ರ್ಯಾಗ್ ಮತ್ತು ಡ್ರಾಪ್ ಇಲ್ಲದೆ ನಿಮ್ಮ ಫೋನ್‌ನಿಂದ ಕೌಶಲ್ಯವನ್ನು ಸೇರಿಸಿ.",
     "skillEditTitle": "ಕೌಶಲ್ಯ ಸಂಪಾದಿಸಿ",
     "mcp": {

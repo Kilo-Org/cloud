@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "କୌଣସି ରିପୋଜିଟୋରୀ ଦେଖାଯାଉନାହିଁ। GitLab ର ରିପୋଜିଟୋରୀ ପ୍ରବେଶ ଅନୁମତି ଯାଞ୍ଚ କରି ରିଫ୍ରେସ୍ କରନ୍ତୁ।",
       "noRepositoriesVisibleBitbucket": "କୌଣସି ରିପୋଜିଟୋରୀ ଦେଖାଯାଉନାହିଁ। Bitbucket ର ରିପୋଜିଟୋରୀ ପ୍ରବେଶ ଅନୁମତି ଯାଞ୍ଚ କରି ରିଫ୍ରେସ୍ କରନ୍ତୁ।",
       "bitbucketOrganizationsOnly": "Bitbucket କେବଳ ସଂଗଠନଗୁଡ଼ିକ ପାଇଁ ଉପଲବ୍ଧ।",
+      "githubNeedsAttention": "GitHub ପୁନଃ ସଂଯୋଗ କରାଯିବା ଆବଶ୍ୟକ",
+      "githubNeedsAttentionDescription": "Kilo GitHub App ପୁନଃ ସଂଯୋଗ କରନ୍ତୁ, ତାପରେ ଏହାର ରିପୋଜିଟୋରୀ ଲୋଡ୍ କରିବା ପାଇଁ ରିଫ୍ରେସ୍ କରନ୍ତୁ।",
+      "partialRepositories": "କିଛି GitHub ରିପୋଜିଟୋରୀ ଲୋଡ୍ ହୋଇନାହିଁ।",
       "branchPickerTitle": "ଶାଖା ବାଛନ୍ତୁ",
       "branchDefault": "ପୂର୍ବନିର୍ଦ୍ଧାରିତ",
       "branchAccessibility": "ଶାଖା: {{label}}",
@@ -3687,6 +3690,8 @@
     "skillNameInvalid": "କୌଶଳ ନାମ ନିଶ୍ଚିତ ଭାବରେ ଏକ ଅକ୍ଷର କିମ୍ବା ଅଙ୍କରୁ ଆରମ୍ଭ ହେବ ଏବଂ କେବଳ ଛୋଟ ଅକ୍ଷର, ସଂଖ୍ୟା ଏବଂ ଡ୍ୟାସ୍ ବ୍ୟବହାର କରିବ।",
     "skillContentRequired": "ଦକ୍ଷତା ବିଷୟବସ୍ତୁ ଆବଶ୍ୟକ।",
     "skillSaveFailed": "ଦକ୍ଷତା ସଞ୍ଚୟ କରିପାରିଲା ନାହିଁ।",
+    "skillSourceCustom": "କଷ୍ଟମ୍",
+    "skillSourceMarketplace": "ମାର୍କେଟପ୍ଲେସ୍",
     "skillsHint": "ଏକ SKILL.md ଲେପନ କରନ୍ତୁ ଏବଂ ଏହାର ନାମ ପୁରଣ କରେ। ଡ୍ରାଗ୍ ଏବଂ ଡ୍ରପ୍ ନକରି ଆପଣଙ୍କ ଫୋନରୁ ଏକ ଦକ୍ଷତା ଯୋଡନ୍ତୁ।",
     "skillEditTitle": "ଦକ୍ଷତା ସମ୍ପାଦନ କରନ୍ତୁ।",
     "mcp": {

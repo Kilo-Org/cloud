@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਦਿਖਾਈ ਨਹੀਂ ਦੇ ਰਹੀ। GitLab ਲਈ ਰਿਪੋਜ਼ਟਰੀਆਂ ਤੱਕ ਪਹੁੰਚ ਦੀ ਜਾਂਚ ਕਰੋ, ਫਿਰ ਰਿਫਰੈਸ਼ ਕਰੋ।",
       "noRepositoriesVisibleBitbucket": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਦਿਖਾਈ ਨਹੀਂ ਦੇ ਰਹੀ। Bitbucket ਲਈ ਰਿਪੋਜ਼ਟਰੀਆਂ ਤੱਕ ਪਹੁੰਚ ਦੀ ਜਾਂਚ ਕਰੋ, ਫਿਰ ਰਿਫਰੈਸ਼ ਕਰੋ।",
       "bitbucketOrganizationsOnly": "Bitbucket ਸਿਰਫ਼ ਸੰਗਠਨਾਂ ਲਈ ਉਪਲਬਧ ਹੈ।",
+      "githubNeedsAttention": "GitHub ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰਨ ਦੀ ਲੋੜ ਹੈ",
+      "githubNeedsAttentionDescription": "Kilo GitHub ਐਪ ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਇਸਦੀਆਂ ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਕਰਨ ਲਈ ਰਿਫਰੈਸ਼ ਕਰੋ।",
+      "partialRepositories": "ਕੁਝ GitHub ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਹੋਈਆਂ।",
       "branchPickerTitle": "ਬ੍ਰਾਂਚ ਚੁਣੋ",
       "branchDefault": "ਡਿਫ਼ੌਲਟ",
       "branchAccessibility": "ਬ੍ਰਾਂਚ: {{label}}",
@@ -3687,6 +3690,8 @@
     "skillNameInvalid": "ਹੁਨਰ ਦਾ ਨਾਮ ਇੱਕ ਅੱਖਰ ਜਾਂ ਅੰਕ ਨਾਲ ਸ਼ੁਰੂ ਹੋਣਾ ਚਾਹੀਦਾ ਹੈ ਅਤੇ ਸਿਰਫ ਛੋਟੇ ਅੱਖਰਾਂ, ਅੰਕਾਂ ਅਤੇ ਡੈਸ਼ਾਂ ਦੀ ਵਰਤੋਂ ਕਰਨਾ ਚਾਹੀਦਾ ਹੈ",
     "skillContentRequired": "ਹੁਨਰ ਸਮੱਗਰੀ ਦੀ ਲੋੜ ਹੈ",
     "skillSaveFailed": "ਹੁਨਰ ਨੂੰ ਬਚਾ ਨਹੀਂ ਸਕਿਆ",
+    "skillSourceCustom": "ਕਸਟਮ",
+    "skillSourceMarketplace": "ਮਾਰਕੀਟਪਲੇਸ",
     "skillsHint": "ਇੱਕ SKILL.md ਪੇਸਟ ਕਰੋ ਅਤੇ ਇਸਦਾ ਨਾਮ ਭਰੋ; ਬਿਨਾਂ ਡਰੈਗ ਐਂਡ ਡ੍ਰੌਪ ਦੇ ਆਪਣੇ ਫ਼ੋਨ ਤੋਂ ਹੁਨਰ ਸ਼ਾਮਲ ਕਰੋ।",
     "skillEditTitle": "ਹੁਨਰ ਨੂੰ ਸੋਧੋ",
     "mcp": {

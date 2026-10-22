@@ -1714,6 +1714,9 @@
       "noRepositoriesVisibleGitlab": "Hiçbir depo görünmüyor. GitLab depo erişim izinlerini kontrol et, ardından listeyi yenile.",
       "noRepositoriesVisibleBitbucket": "Hiçbir depo görünmüyor. Bitbucket depo erişim izinlerini kontrol et, ardından listeyi yenile.",
       "bitbucketOrganizationsOnly": "Bitbucket yalnızca kuruluşlar için kullanılabilir.",
+      "githubNeedsAttention": "GitHub'ın yeniden bağlanması gerekiyor",
+      "githubNeedsAttentionDescription": "Kilo GitHub uygulamasını yeniden bağla, ardından depolarını yüklemek için listeyi yenile.",
+      "partialRepositories": "Bazı GitHub depoları yüklenemedi.",
       "branchPickerTitle": "Dal seç",
       "branchDefault": "Varsayılan",
       "branchAccessibility": "Dal: {{label}}",
@@ -3687,6 +3690,8 @@
     "skillNameInvalid": "Beceri adı bir harf veya rakamla başlamalı ve yalnızca küçük harfler, rakamlar ve kısa çizgiler kullanmalıdır",
     "skillContentRequired": "Beceri içeriği gerekli",
     "skillSaveFailed": "Beceri kaydedilemedi",
+    "skillSourceCustom": "Özel",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Bir SKILL.md yapıştırın ve adı doldurun; Sürükleyip bırakmadan telefonunuzdan bir beceri ekleyin.",
     "skillEditTitle": "Beceriyi düzenle",
     "mcp": {

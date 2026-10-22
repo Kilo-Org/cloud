@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Ingen kodelagre vises. Sjekk tilgangen til kodelagrene på GitLab, og oppdater listen.",
       "noRepositoriesVisibleBitbucket": "Ingen kodelagre vises. Sjekk tilgangen til kodelagrene på Bitbucket, og oppdater listen.",
       "bitbucketOrganizationsOnly": "Bitbucket er kun tilgjengelig for organisasjoner.",
+      "githubNeedsAttention": "GitHub må kobles til på nytt",
+      "githubNeedsAttentionDescription": "Koble Kilo GitHub-appen til på nytt, og oppdater for å laste inn kodelagrene.",
+      "partialRepositories": "Noen GitHub-kodelagre ble ikke lastet inn.",
       "branchPickerTitle": "Velg gren",
       "branchDefault": "Standard",
       "branchAccessibility": "Gren: {{label}}",
@@ -3687,6 +3690,8 @@
     "skillNameInvalid": "Ferdighetsnavn må starte med en bokstav eller et siffer og kun bruke små bokstaver, sifre og bindestreker",
     "skillContentRequired": "Ferdighetsinnhold kreves",
     "skillSaveFailed": "Kunne ikke lagre ferdigheter",
+    "skillSourceCustom": "Egendefinert",
+    "skillSourceMarketplace": "Markedsplass",
     "skillsHint": "Lim inn en SKILL.md og navnet fylles ut; legg til en ferdighet fra telefonen din uten å dra og slipp.",
     "skillEditTitle": "Rediger ferdighet",
     "mcp": {

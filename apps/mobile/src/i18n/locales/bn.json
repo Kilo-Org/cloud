@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "কোনো রিপোজিটরি দেখা যাচ্ছে না। GitLab-এর রিপোজিটরি অ্যাক্সেসের অনুমতি পরীক্ষা করে রিফ্রেশ করুন।",
       "noRepositoriesVisibleBitbucket": "কোনো রিপোজিটরি দেখা যাচ্ছে না। Bitbucket-এর রিপোজিটরি অ্যাক্সেসের অনুমতি পরীক্ষা করে রিফ্রেশ করুন।",
       "bitbucketOrganizationsOnly": "শুধু অর্গানাইজেশনের জন্য Bitbucket উপলব্ধ।",
+      "githubNeedsAttention": "GitHub পুনরায় সংযুক্ত করতে হবে",
+      "githubNeedsAttentionDescription": "Kilo GitHub অ্যাপ পুনরায় সংযুক্ত করুন, তারপর এর রিপোজিটরি লোড করতে রিফ্রেশ করুন।",
+      "partialRepositories": "কিছু GitHub রিপোজিটরি লোড হয়নি।",
       "branchPickerTitle": "ব্রাঞ্চ বেছে নিন",
       "branchDefault": "ডিফল্ট",
       "branchAccessibility": "ব্রাঞ্চ: {{label}}",
@@ -3687,6 +3690,8 @@
     "skillNameInvalid": "দক্ষতার নাম অবশ্যই একটি অক্ষর বা অঙ্ক দিয়ে শুরু করতে হবে এবং শুধুমাত্র ছোট হাতের অক্ষর, সংখ্যা এবং ড্যাশ ব্যবহার করতে হবে",
     "skillContentRequired": "দক্ষতা বিষয়বস্তু প্রয়োজন",
     "skillSaveFailed": "দক্ষতা বাঁচাতে পারেনি",
+    "skillSourceCustom": "কাস্টম",
+    "skillSourceMarketplace": "মার্কেটপ্লেস",
     "skillsHint": "একটি SKILL.md পেস্ট করুন এবং এর নামটি পূরণ করুন; ড্র্যাগ এবং ড্রপ ছাড়াই আপনার ফোন থেকে একটি দক্ষতা যোগ করুন।",
     "skillEditTitle": "দক্ষতা সম্পাদনা করুন",
     "mcp": {

@@ -2259,6 +2259,9 @@
       "noRepositoriesVisibleGitlab": "Não há repositórios visíveis. Verifique as permissões de acesso aos repositórios do GitLab e atualize a lista.",
       "noRepositoriesVisibleBitbucket": "Não há repositórios visíveis. Verifique as permissões de acesso aos repositórios do Bitbucket e atualize a lista.",
       "bitbucketOrganizationsOnly": "O Bitbucket está disponível apenas para organizações.",
+      "githubNeedsAttention": "O GitHub tem de ser religado",
+      "githubNeedsAttentionDescription": "Reconecte a aplicação Kilo para GitHub e, em seguida, atualize para carregar os respetivos repositórios.",
+      "partialRepositories": "Alguns repositórios do GitHub não foram carregados.",
       "branchPickerTitle": "Selecionar ramo",
       "branchDefault": "Predefinido",
       "branchAccessibility": "Ramo: {{label}}",
@@ -3732,6 +3735,8 @@
     "skillNameInvalid": "O nome da competência deve começar por uma letra ou dígito e usar apenas letras minúsculas, dígitos e hífenes",
     "skillContentRequired": "O conteúdo da competência é obrigatório",
     "skillSaveFailed": "Não foi possível guardar a competência",
+    "skillSourceCustom": "Personalizado",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Cole um SKILL.md e o nome é preenchido automaticamente; adicione uma competência a partir do telemóvel, sem arrastar e largar.",
     "skillEditTitle": "Editar competência",
     "mcp": {

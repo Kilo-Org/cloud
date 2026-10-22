@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Ez dago biltegirik ikusgai. Egiaztatu GitLab-ek biltegietarako sarbidea duela, eta gero freskatu zerrenda.",
       "noRepositoriesVisibleBitbucket": "Ez dago biltegirik ikusgai. Egiaztatu Bitbucket-ek biltegietarako sarbidea duela, eta gero freskatu zerrenda.",
       "bitbucketOrganizationsOnly": "Bitbucket erakundeei bakarrik dago eskuragarri.",
+      "githubNeedsAttention": "GitHub birkonektatu behar da",
+      "githubNeedsAttentionDescription": "Birkonektatu Kilo-ren GitHub aplikazioa eta gero freskatu bere biltegiak kargatzeko.",
+      "partialRepositories": "GitHub-eko biltegi batzuk ez ziren kargatu.",
       "branchPickerTitle": "Hautatu adarra",
       "branchDefault": "Lehenetsia",
       "branchAccessibility": "Adarra: {{label}}",
@@ -3687,6 +3690,8 @@
     "skillNameInvalid": "Trebetasunaren izenak letra edo zifra batekin hasi behar du eta letra xeheak, zifrak eta marratxoak soilik erabili behar ditu",
     "skillContentRequired": "Trebetasun edukia beharrezkoa da",
     "skillSaveFailed": "Ezin izan da trebetasuna gorde",
+    "skillSourceCustom": "Pertsonalizatua",
+    "skillSourceMarketplace": "Merkatua",
     "skillsHint": "Itsatsi SKILL.md bat eta bere izena beteko da; gehitu trebetasun bat telefonotik arrastatu eta jaregin gabe.",
     "skillEditTitle": "Editatu trebetasuna",
     "mcp": {

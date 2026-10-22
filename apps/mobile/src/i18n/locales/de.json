@@ -1714,6 +1714,9 @@
       "noRepositoriesVisibleGitlab": "Es werden keine Repositorys angezeigt. Prüfe den Zugriff auf deine GitLab-Repositorys und aktualisiere dann die Liste.",
       "noRepositoriesVisibleBitbucket": "Es werden keine Repositorys angezeigt. Prüfe den Zugriff auf deine Bitbucket-Repositorys und aktualisiere dann die Liste.",
       "bitbucketOrganizationsOnly": "Bitbucket ist nur für Organisationen verfügbar.",
+      "githubNeedsAttention": "GitHub muss neu verbunden werden",
+      "githubNeedsAttentionDescription": "Verbinde die GitHub-App von Kilo erneut und aktualisiere dann, um deren Repositorys zu laden.",
+      "partialRepositories": "Einige GitHub-Repositorys wurden nicht geladen.",
       "branchPickerTitle": "Branch auswählen",
       "branchDefault": "Standard",
       "branchAccessibility": "Branch: {{label}}",
@@ -3687,6 +3690,8 @@
     "skillNameInvalid": "Der Fertigkeitsname muss mit einem Buchstaben oder einer Ziffer beginnen und darf nur Kleinbuchstaben, Ziffern und Bindestriche enthalten",
     "skillContentRequired": "Kompetenzinhalte sind erforderlich",
     "skillSaveFailed": "Fertigkeit konnte nicht gespeichert werden",
+    "skillSourceCustom": "Benutzerdefiniert",
+    "skillSourceMarketplace": "Marktplatz",
     "skillsHint": "Füge eine SKILL.md ein und der Name wird ausgefüllt. Füge einen Skill von deinem Telefon aus ohne Drag & Drop hinzu.",
     "skillEditTitle": "Fertigkeit bearbeiten",
     "mcp": {

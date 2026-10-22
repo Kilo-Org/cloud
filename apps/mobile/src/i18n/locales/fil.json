@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Walang nakikitang imbakan ng code. Suriin ang access sa mga imbakan ng code sa GitLab, saka i-refresh.",
       "noRepositoriesVisibleBitbucket": "Walang nakikitang imbakan ng code. Suriin ang access sa mga imbakan ng code sa Bitbucket, saka i-refresh.",
       "bitbucketOrganizationsOnly": "Available lang ang Bitbucket para sa mga organisasyon.",
+      "githubNeedsAttention": "Kailangang i-reconnect ang GitHub",
+      "githubNeedsAttentionDescription": "I-reconnect ang Kilo GitHub App, saka i-refresh para ma-load ang mga imbakan ng code nito.",
+      "partialRepositories": "May mga imbakan ng code sa GitHub na hindi na-load.",
       "branchPickerTitle": "Pumili ng sangay",
       "branchDefault": "Default",
       "branchAccessibility": "Sangay: {{label}}",
@@ -3687,6 +3690,8 @@
     "skillNameInvalid": "Ang pangalan ng kasanayan ay dapat magsimula sa isang titik o digit at gumamit lamang ng maliliit na titik, digit, at gitling",
     "skillContentRequired": "Kinakailangan ang nilalaman ng kasanayan",
     "skillSaveFailed": "Hindi makapag-save ng kasanayan",
+    "skillSourceCustom": "Custom",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Mag-paste ng SKILL.md at mapunan ang pangalan nito; magdagdag ng kasanayan mula sa iyong telepono nang walang drag at drop.",
     "skillEditTitle": "Mag-edit ng kasanayan",
     "mcp": {

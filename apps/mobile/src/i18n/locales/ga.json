@@ -2315,6 +2315,9 @@
       "noRepositoriesVisibleGitlab": "Níl aon stór le feiceáil. Seiceáil an rochtain ar stórtha GitLab, ansin athnuaigh an liosta.",
       "noRepositoriesVisibleBitbucket": "Níl aon stór le feiceáil. Seiceáil an rochtain ar stórtha Bitbucket, ansin athnuaigh an liosta.",
       "bitbucketOrganizationsOnly": "Tá Bitbucket ar fáil d’eagraíochtaí amháin.",
+      "githubNeedsAttention": "Ní mór GitHub a athcheangal",
+      "githubNeedsAttentionDescription": "Athcheangail aip GitHub Kilo, ansin athnuaigh chun na stórtha a lódáil.",
+      "partialRepositories": "Níor lódáladh roinnt stórtha GitHub.",
       "branchPickerTitle": "Roghnaigh brainse",
       "branchDefault": "Réamhshocraithe",
       "branchAccessibility": "Brainse: {{label}}",
@@ -3822,6 +3825,8 @@
     "skillNameInvalid": "Ní mór tús a chur le hainm scile le litir nó le digit agus ní mór ach litreacha beaga, digití agus daiseanna a úsáid",
     "skillContentRequired": "Tá ábhar scile ag teastáil",
     "skillSaveFailed": "Níorbh fhéidir an scil a shábháil",
+    "skillSourceCustom": "Saincheaptha",
+    "skillSourceMarketplace": "Margadh",
     "skillsHint": "Greamaigh SKILL.md agus líonann a ainm isteach; cuir scil ó do ghuthán gan tarraing agus scaoil.",
     "skillEditTitle": "Cuir scil in eagar",
     "mcp": {

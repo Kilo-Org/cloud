@@ -1738,6 +1738,9 @@
       "noRepositoriesVisibleGitlab": "Репозиторії не відображаються. Перевірте доступ до репозиторіїв GitLab, а потім оновіть список.",
       "noRepositoriesVisibleBitbucket": "Репозиторії не відображаються. Перевірте доступ до репозиторіїв Bitbucket, а потім оновіть список.",
       "bitbucketOrganizationsOnly": "Bitbucket доступний лише для організацій.",
+      "githubNeedsAttention": "GitHub потребує повторного підключення",
+      "githubNeedsAttentionDescription": "Повторно підключіть застосунок Kilo GitHub, а потім оновіть список, щоб завантажити його репозиторії.",
+      "partialRepositories": "Деякі репозиторії GitHub не завантажилися.",
       "branchPickerTitle": "Вибрати гілку",
       "branchDefault": "Типова",
       "branchAccessibility": "Гілка: {{label}}",
@@ -3777,6 +3780,8 @@
     "skillNameInvalid": "Назва навички має починатися з літери або цифри та використовувати лише малі літери, цифри та тире",
     "skillContentRequired": "Зміст навичок є обов’язковим",
     "skillSaveFailed": "Не вдалося зберегти навички",
+    "skillSourceCustom": "Власна",
+    "skillSourceMarketplace": "Маркетплейс",
     "skillsHint": "Вставте SKILL.md і заповніть його назву; додайте навички зі свого телефону без перетягування.",
     "skillEditTitle": "Редагувати вміння",
     "mcp": {

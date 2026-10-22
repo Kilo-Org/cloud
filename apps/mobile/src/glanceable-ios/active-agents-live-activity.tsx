@@ -19,7 +19,11 @@ import {
   resizable,
   shapes,
 } from '@expo/ui/swift-ui/modifiers';
-import { createLiveActivity, type LiveActivityComponent } from 'expo-widgets';
+import {
+  createLiveActivity,
+  type LiveActivityComponent,
+  type LiveActivityFactory,
+} from 'expo-widgets';
 
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
 
@@ -198,8 +202,8 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   // count is also what stands in when the app wrote no flag, which is every
   // state that arrived over APNs: a question-only server state then offers no
   // tap, while a `permission` server state still offers the tap the app-closed
-  // press answers. `withStatus` zeroes the wait count on expiry but leaves
-  // `needsApproval` standing, so the wait term keeps the expired frame gateless.
+  // press answers. A lapsed frame blanks both counts in the same transition,
+  // so an expired card offers nothing either way.
   const canApprove =
     (props.needsInput ?? 0) > 0 && (props.needsApproval ?? 0) > 0 && props.canApprove !== false;
   // The press in flight replaces Approve with a muted Approving… pill; a
@@ -310,7 +314,8 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
         foregroundStyle(tone.color),
         fixedSize({ horizontal: true, vertical: false }),
         padding({ horizontal: 14 }),
-        frame({ minWidth: width, height: 32 }),
+        frame({ minWidth: width }),
+        frame({ height: 32 }),
         background(tone.fill, shapes.capsule()),
       ]}
     >
@@ -626,17 +631,14 @@ const registerLayout = () =>
     OPEN_AGENTS_URL
   );
 
-export const ActiveAgentsLiveActivity = registerLayout();
+let activityFactory: LiveActivityFactory<ContentState> | null = null;
 
-/**
- * Re-bake the stored layout in the active language.
- *
- * Constructing the factory only writes the layout into the shared app group,
- * and the name identifies the native Live Activity type, so the fresh factory
- * is discarded and `ActiveAgentsLiveActivity` stays the handle. The app boots
- * in English and applies the stored language afterwards, so this runs once the
- * language settles as well as on every later change.
- */
+export function getActiveAgentsLiveActivity(): LiveActivityFactory<ContentState> {
+  activityFactory ??= registerLayout();
+  return activityFactory;
+}
+
+/** Re-bake the stored layout in the active language. */
 export function refreshActiveAgentsLiveActivityCopy(): void {
-  registerLayout();
+  activityFactory = registerLayout();
 }

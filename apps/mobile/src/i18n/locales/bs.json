@@ -2259,6 +2259,9 @@
       "noRepositoriesVisibleGitlab": "Nema vidljivih repozitorija. Provjeri pristup GitLab repozitorijima, zatim osvježi spisak.",
       "noRepositoriesVisibleBitbucket": "Nema vidljivih repozitorija. Provjeri pristup Bitbucket repozitorijima, zatim osvježi spisak.",
       "bitbucketOrganizationsOnly": "Bitbucket je dostupan samo za organizacije.",
+      "githubNeedsAttention": "GitHub je potrebno ponovo povezati",
+      "githubNeedsAttentionDescription": "Ponovo poveži aplikaciju Kilo GitHub, a zatim osvježi da učitaš njene repozitorije.",
+      "partialRepositories": "Neki GitHub repozitoriji se nisu učitali.",
       "branchPickerTitle": "Odaberi granu",
       "branchDefault": "Zadano",
       "branchAccessibility": "Grana: {{label}}",
@@ -3732,6 +3735,8 @@
     "skillNameInvalid": "Ime vještine mora početi slovom ili cifrom i koristiti samo mala slova, cifre i crtice",
     "skillContentRequired": "Sadržaj vještina je obavezan",
     "skillSaveFailed": "Nije moguće sačuvati vještinu",
+    "skillSourceCustom": "Prilagođeno",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Zalijepite SKILL.md i njegovo ime se popunjava; dodajte vještinu sa svog telefona bez povlačenja i ispuštanja.",
     "skillEditTitle": "Uredi vještinu",
     "mcp": {

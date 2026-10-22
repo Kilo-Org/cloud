@@ -2287,6 +2287,9 @@
       "noRepositoriesVisibleGitlab": "Nobeno skladišče ni vidno. Preveri dostop do skladišč na GitLab, nato osveži seznam.",
       "noRepositoriesVisibleBitbucket": "Nobeno skladišče ni vidno. Preveri dostop do skladišč na Bitbucket, nato osveži seznam.",
       "bitbucketOrganizationsOnly": "Bitbucket je na voljo samo za organizacije.",
+      "githubNeedsAttention": "Znova poveži GitHub",
+      "githubNeedsAttentionDescription": "Znova poveži aplikacijo Kilo za GitHub, nato osveži, da se naložijo njena skladišča.",
+      "partialRepositories": "Nekaterih skladišč na GitHub ni bilo mogoče naložiti.",
       "branchPickerTitle": "Izberi vejo",
       "branchDefault": "Privzeta",
       "branchAccessibility": "Veja: {{label}}",
@@ -3777,6 +3780,8 @@
     "skillNameInvalid": "Ime spretnosti se mora začeti s črko ali številko in uporabljati samo male črke, številke in pomišljaje",
     "skillContentRequired": "Potrebna je vsebina spretnosti",
     "skillSaveFailed": "Spretnosti ni bilo mogoče shraniti",
+    "skillSourceCustom": "Po meri",
+    "skillSourceMarketplace": "Tržnica",
     "skillsHint": "Prilepite SKILL.md in njegovo ime se izpolni; dodajte veščino iz telefona brez povleci in spusti.",
     "skillEditTitle": "Spretnost urejanja",
     "mcp": {

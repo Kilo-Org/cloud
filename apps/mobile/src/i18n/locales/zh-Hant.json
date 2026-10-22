@@ -1714,6 +1714,9 @@
       "noRepositoriesVisibleGitlab": "沒有可顯示的儲存庫。請檢查 GitLab 的儲存庫存取權限，再重新整理。",
       "noRepositoriesVisibleBitbucket": "沒有可顯示的儲存庫。請檢查 Bitbucket 的儲存庫存取權限，再重新整理。",
       "bitbucketOrganizationsOnly": "Bitbucket 僅供組織使用。",
+      "githubNeedsAttention": "GitHub 需要重新連結",
+      "githubNeedsAttentionDescription": "請重新連結 Kilo GitHub 應用程式，然後重新整理以載入其儲存庫。",
+      "partialRepositories": "部分 GitHub 儲存庫未載入。",
       "branchPickerTitle": "選取分支",
       "branchDefault": "預設",
       "branchAccessibility": "分支: {{label}}",
@@ -3687,6 +3690,8 @@
     "skillNameInvalid": "技能名稱必須以字母或數字開頭，且只能使用小寫字母、數字和破折號",
     "skillContentRequired": "技能內容為必填項",
     "skillSaveFailed": "無法保存技能",
+    "skillSourceCustom": "自訂",
+    "skillSourceMarketplace": "市集",
     "skillsHint": "貼上一個SKILL.md並填寫其名稱；從手機添加技能，無需拖放。",
     "skillEditTitle": "編輯技能",
     "mcp": {

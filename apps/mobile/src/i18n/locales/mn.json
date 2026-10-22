@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Кодын сан харагдахгүй байна. GitLab-ийн кодын санд хандах эрхийг шалгаад жагсаалтыг шинэчилнэ үү.",
       "noRepositoriesVisibleBitbucket": "Кодын сан харагдахгүй байна. Bitbucket-ийн кодын санд хандах эрхийг шалгаад жагсаалтыг шинэчилнэ үү.",
       "bitbucketOrganizationsOnly": "Bitbucket зөвхөн байгууллагуудад боломжтой.",
+      "githubNeedsAttention": "GitHub-ыг дахин холбох шаардлагатай",
+      "githubNeedsAttentionDescription": "Kilo GitHub аппыг дахин холбоод жагсаалтыг шинэчилж кодын сангуудыг нь ачаална уу.",
+      "partialRepositories": "Зарим GitHub кодын сангууд ачаалагдсангүй.",
       "branchPickerTitle": "Салбар сонгох",
       "branchDefault": "Өгөгдмөл",
       "branchAccessibility": "Салбар: {{label}}",
@@ -3687,6 +3690,8 @@
     "skillNameInvalid": "Ур чадварын нэр нь үсэг эсвэл цифрээр эхэлж, зөвхөн жижиг үсэг, цифр, зураас ашиглана.",
     "skillContentRequired": "Ур чадварын агуулга шаардлагатай",
     "skillSaveFailed": "Ур чадвараа хадгалж чадсангүй",
+    "skillSourceCustom": "Өөрийн",
+    "skillSourceMarketplace": "Маркет",
     "skillsHint": "SKILL.md-г буулгаж, нэрийг нь бөглөнө; Чирэх, буулгахгүйгээр утаснаасаа ур чадвар нэмнэ үү.",
     "skillEditTitle": "Ур чадварыг засах",
     "mcp": {

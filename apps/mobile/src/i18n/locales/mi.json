@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Kāore he putunga waehere e kitea ana. Tirohia ngā whakaaetanga uru ki ngā putunga waehere mō GitLab, kātahi ka whakahou anō.",
       "noRepositoriesVisibleBitbucket": "Kāore he putunga waehere e kitea ana. Tirohia ngā whakaaetanga uru ki ngā putunga waehere mō Bitbucket, kātahi ka whakahou anō.",
       "bitbucketOrganizationsOnly": "He wātea a Bitbucket mō ngā whakahaere anake.",
+      "githubNeedsAttention": "Me hono anō a GitHub",
+      "githubNeedsAttentionDescription": "Honoa anō te taupānga Kilo mō GitHub, kātahi ka whakahou hei uta i ōna putunga waehere.",
+      "partialRepositories": "Kāore i uta ētahi o ngā putunga waehere GitHub.",
       "branchPickerTitle": "Kōwhiri peka",
       "branchDefault": "Taunoa",
       "branchAccessibility": "Peka: {{label}}",
@@ -3687,6 +3690,8 @@
     "skillNameInvalid": "Me timata te ingoa pukenga ki te reta, mati ranei me te whakamahi i nga reta iti, mati, me nga tohu",
     "skillContentRequired": "Kei te hiahiatia nga ihirangi pukenga",
     "skillSaveFailed": "Kaore i taea te penapena pukenga",
+    "skillSourceCustom": "Whaiaro",
+    "skillSourceMarketplace": "Mākete",
     "skillsHint": "Whakapiria he SKILL.md ka whakakiia tona ingoa; taapirihia he pukenga mai i to waea me te kore toia me te maturuturu.",
     "skillEditTitle": "Pukenga whakatika",
     "mcp": {

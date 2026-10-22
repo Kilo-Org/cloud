@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Hakuna hazina zinazoonekana. Angalia ruhusa za kufikia hazina kwenye GitLab, kisha pakia upya orodha.",
       "noRepositoriesVisibleBitbucket": "Hakuna hazina zinazoonekana. Angalia ruhusa za kufikia hazina kwenye Bitbucket, kisha pakia upya orodha.",
       "bitbucketOrganizationsOnly": "Bitbucket inapatikana kwa mashirika pekee.",
+      "githubNeedsAttention": "GitHub inahitaji kuunganishwa upya",
+      "githubNeedsAttentionDescription": "Unganisha upya programu ya Kilo kwenye GitHub, kisha pakia upya ili kupakia hazina zake.",
+      "partialRepositories": "Baadhi ya hazina za GitHub hazikupakia.",
       "branchPickerTitle": "Chagua tawi",
       "branchDefault": "Chaguomsingi",
       "branchAccessibility": "Tawi: {{label}}",
@@ -3687,6 +3690,8 @@
     "skillNameInvalid": "Jina la ustadi lazima lianze na herufi au tarakimu na litumie herufi ndogo, tarakimu na deshi pekee.",
     "skillContentRequired": "Maudhui ya ujuzi yanahitajika",
     "skillSaveFailed": "Haikuweza kuhifadhi ujuzi",
+    "skillSourceCustom": "Maalum",
+    "skillSourceMarketplace": "Soko",
     "skillsHint": "Bandika SKILL.md na jina lake lijazwe; ongeza ujuzi kutoka kwa simu yako bila kuburuta na kuangusha.",
     "skillEditTitle": "Hariri ujuzi",
     "mcp": {

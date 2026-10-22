@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Нема видливи репозиториуми. Провери го пристапот до репозиториумите на GitLab, па освежи.",
       "noRepositoriesVisibleBitbucket": "Нема видливи репозиториуми. Провери го пристапот до репозиториумите на Bitbucket, па освежи.",
       "bitbucketOrganizationsOnly": "Bitbucket е достапен само за организации.",
+      "githubNeedsAttention": "GitHub треба повторно да се поврзе",
+      "githubNeedsAttentionDescription": "Поврзи повторно апликацијата Kilo за GitHub, па освежи за да се вчитаат нејзините репозиториуми.",
+      "partialRepositories": "Некои репозиториуми од GitHub не се вчитаа.",
       "branchPickerTitle": "Избери гранка",
       "branchDefault": "Основна",
       "branchAccessibility": "Гранка: {{label}}",
@@ -3687,6 +3690,8 @@
     "skillNameInvalid": "Името на вештината мора да започнува со буква или цифра и да користи само мали букви, цифри и цртички",
     "skillContentRequired": "Потребна е содржина на вештини",
     "skillSaveFailed": "Не може да се спаси вештината",
+    "skillSourceCustom": "Прилагодено",
+    "skillSourceMarketplace": "Пазар",
     "skillsHint": "Залепете SKILL.md и неговото име се пополнува; додадете вештина од вашиот телефон без влечење и пуштање.",
     "skillEditTitle": "Вештина за уредување",
     "mcp": {

@@ -193,6 +193,21 @@ function appendOutput(key: string, value: string): void {
   fs.appendFileSync(outputPath, `${key}=${value}\n`);
 }
 
+// A lookup failure must not cost the build. The safe direction is "not
+// published": the job builds, which is the duplicate this re-check exists to
+// avoid, not a hash left without an artifact.
+function lookupOrMissing(repository: string, name: string): ArtifactLookup {
+  try {
+    return lookupArtifact(repository, name);
+  } catch (error) {
+    process.stderr.write(
+      `artifact ${name}: lookup failed (${error instanceof Error ? error.message : error}); ` +
+        'treating it as unpublished\n'
+    );
+    return { state: 'missing' };
+  }
+}
+
 // A heavy job re-checks its own artifact once its concurrency slot is free:
 // the run that held the slot may have published it, and a second build of the
 // same nativeHash is the waste this workflow exists to avoid. A pull_request
@@ -200,7 +215,7 @@ function appendOutput(key: string, value: string): void {
 // must find the durable one.
 function isPublished(name: string): boolean {
   const repository = process.env.GITHUB_REPOSITORY ?? '';
-  const found = lookupArtifact(repository, name);
+  const found = lookupOrMissing(repository, name);
   if (found.state === 'durable') return true;
   return found.state === 'short' && process.env.GITHUB_EVENT_NAME === 'pull_request';
 }
@@ -234,7 +249,7 @@ function main(): void {
     iosHash,
     androidHash,
     lookup: name => {
-      const found = lookupArtifact(repository, name);
+      const found = lookupOrMissing(repository, name);
       process.stderr.write(`artifact ${name}: ${found.state}\n`);
       return found;
     },

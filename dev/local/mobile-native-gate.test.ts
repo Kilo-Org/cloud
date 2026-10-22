@@ -209,8 +209,14 @@ test('a failed promote still builds the platform, and a skipped one does not dis
     assert.deepEqual(job.needs, ['gate', `promote_${platform}`]);
     // GitHub skips a job whose `needs` dependency was skipped unless the `if`
     // calls a status function. promote_* is skipped on every run that does not
-    // promote, so without `always()` the workflow builds nothing at all.
-    assert.match(job.if ?? '', /^always\(\)/, `${platform}: the if needs a status function`);
+    // promote, so without `always()` the workflow builds nothing at all. The
+    // `!cancelled()` keeps a superseded pull_request run from starting a macOS
+    // job after the run-level concurrency cancelled it.
+    assert.match(
+      job.if ?? '',
+      /^always\(\) && !cancelled\(\)/,
+      `${platform}: the if needs a status function and a cancellation guard`
+    );
     assert.match(job.if ?? '', /needs\.gate\.result == 'success'/);
     assert.match(job.if ?? '', new RegExp(`needs\\.gate\\.outputs\\.need_${platform} == 'true'`));
     assert.match(job.if ?? '', new RegExp(`needs\\.promote_${platform}\\.result != 'success'`));
@@ -478,6 +484,7 @@ function runGateCli(options: {
   changedFiles?: string[];
   artifacts?: string[];
   published?: string;
+  failLookups?: boolean;
 }): {
   outputs: Record<string, string>;
   ghLog: string;
@@ -500,7 +507,11 @@ function runGateCli(options: {
       `echo "$@" >> "${ghLog}"`,
       'case "$*" in',
       `  *"/pulls/"*) printf '%s\\n' ${changed} ;;`,
-      `  *"/actions/artifacts?name="*) printf '%s\\n' '${artifacts}' ;;`,
+      `  *"/actions/artifacts?name="*) ${
+        options.failLookups
+          ? 'echo "gh: API rate limit exceeded" >&2; exit 1'
+          : `printf '%s\\n' '${artifacts}'`
+      } ;;`,
       '  *) echo "unexpected gh args: $*" >&2; exit 1 ;;',
       'esac',
       '',
@@ -659,4 +670,24 @@ test('the published check reports missing when nothing is published', () => {
     published: 'mobile-native-ios-ioshash',
   });
   assert.deepEqual(outputs, { published: 'false' });
+});
+
+// An artifact-listing failure must cost at most a duplicate build, never the
+// artifact itself: the heavy job falls back to building, and the gate falls
+// back to the same decision it makes for a name nobody published.
+test('a failing artifact lookup makes the heavy job build', () => {
+  const { outputs } = runGateCli({
+    eventName: 'push',
+    published: 'mobile-native-ios-ioshash',
+    failLookups: true,
+  });
+  assert.deepEqual(outputs, { published: 'false' });
+});
+
+test('a failing artifact lookup makes the gate build', () => {
+  const { outputs } = runGateCli({
+    eventName: 'push',
+    failLookups: true,
+  });
+  assert.deepEqual(outputs, gateOutputs({ ios: { need: true }, android: { need: true } }));
 });

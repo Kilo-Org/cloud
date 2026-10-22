@@ -13,15 +13,19 @@
 # A finished artifact is the only thing the gate can see, and one native build
 # takes longer than the gap between two pushes of the same native inputs.
 # Two mechanisms keep that from multiplying the work:
-# - Both heavy jobs and both promote jobs take a job-level concurrency slot
-#   keyed on the nativeHash, and each heavy job re-checks its artifact
-#   (`mobile-native-gate.ts --published`) before it builds. A run that arrives
-#   while the first build of that hash is running waits for the slot, then
-#   exits in seconds instead of spending a second runner.
+# - Each heavy job takes a job-level concurrency slot keyed on the nativeHash
+#   and the event, and re-checks its artifact (`mobile-native-gate.ts
+#   --published`) before it builds. A run that arrives while the first build of
+#   that hash is running waits for the slot, then exits in seconds instead of
+#   spending a second runner. The event name is part of the key so a push build
+#   is never the pending job that a later pull_request job cancels, which would
+#   leave main without the durable artifact.
 # - A run that must publish the durable artifact (push, workflow_dispatch) but
 #   finds only the one-day pull_request artifact promotes it: the promote job
 #   copies the artifact under the same name with the durable retention, which
-#   costs a minute on ubuntu instead of a second full build.
+#   costs a minute on ubuntu instead of a second full build. The promote jobs
+#   take no concurrency slot on purpose: a cancelled promote reads as "not
+#   success" and would answer with the full build it exists to avoid.
 name: mobile-native-build
 
 on:
@@ -189,7 +193,7 @@ jobs:
     # durable build. `always()` keeps this job alive when the promote job was
     # skipped, which is the normal case.
     if: |
-      always() &&
+      always() && !cancelled() &&
       needs.gate.result == 'success' &&
       (needs.gate.outputs.need_ios == 'true' ||
        (needs.gate.outputs.promote_ios == 'true' && needs.promote_ios.result != 'success'))
@@ -301,7 +305,7 @@ jobs:
   android:
     needs: [gate, promote_android]
     if: |
-      always() &&
+      always() && !cancelled() &&
       needs.gate.result == 'success' &&
       (needs.gate.outputs.need_android == 'true' ||
        (needs.gate.outputs.promote_android == 'true' && needs.promote_android.result != 'success'))

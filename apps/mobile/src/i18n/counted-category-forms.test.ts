@@ -25,7 +25,7 @@ await i18n.init({
  * it at 101 as well.
  */
 const SAMPLE_COUNTS = [
-  0, 1, 2, 3, 4, 5, 6, 10, 11, 12, 21, 22, 25, 31, 100, 101, 111, 1001, 10001, 1000000,
+  0, 1, 2, 3, 4, 5, 6, 10, 11, 12, 21, 22, 25, 31, 100, 101, 111, 1001, 10_001, 1_000_000,
 ] as const;
 
 const PLURAL_SUFFIX = /_(zero|one|two|few|many|other)$/;
@@ -42,17 +42,16 @@ function pluralFamilies(
     const path = prefix ? `${prefix}.${key}` : key;
     if (child && typeof child === 'object' && !Array.isArray(child)) {
       pluralFamilies(child, path, found);
-      continue;
+    } else {
+      const match = PLURAL_SUFFIX.exec(path);
+      const category = match?.[1];
+      if (match && category && typeof child === 'string') {
+        const family = path.slice(0, -match[0].length);
+        const forms = found.get(family) ?? new Map<string, string>();
+        forms.set(category, child);
+        found.set(family, forms);
+      }
     }
-    const match = PLURAL_SUFFIX.exec(path);
-    const category = match?.[1];
-    if (!category || typeof child !== 'string') {
-      continue;
-    }
-    const family = path.slice(0, -match[0].length);
-    const forms = found.get(family) ?? new Map<string, string>();
-    forms.set(category, child);
-    found.set(family, forms);
   }
   return found;
 }
@@ -74,6 +73,28 @@ function threadTotal(language: SupportedLanguage, count: number): string {
 function otherCountsInSingularForm(language: SupportedLanguage): number[] {
   const rules = new Intl.PluralRules(language);
   return SAMPLE_COUNTS.filter(count => count > 1 && rules.select(count) === 'one');
+}
+
+/**
+ * The forms of one catalog that spell a number their own plural rules can
+ * select past 1, while a sibling category of the same family interpolates it.
+ */
+function spelledCounts(language: SupportedLanguage): string[] {
+  const rules = new Intl.PluralRules(language);
+  const spelled: string[] = [];
+  for (const [family, forms] of pluralFamilies(CATALOG_LOADERS[language]())) {
+    const interpolates = [...forms.values()].some(value => COUNT_TOKEN.test(value));
+    for (const [category, value] of forms) {
+      const spells = interpolates && !COUNT_TOKEN.test(value) && DIGIT.test(value);
+      const count = spells
+        ? SAMPLE_COUNTS.find(candidate => candidate > 1 && rules.select(candidate) === category)
+        : undefined;
+      if (count !== undefined) {
+        spelled.push(`${language} ${family}_${category} at ${count}`);
+      }
+    }
+  }
+  return spelled;
 }
 
 const SINGULAR_ALSO_COUNTS = SUPPORTED_LANGUAGES.filter(
@@ -102,26 +123,6 @@ describe('plural forms that carry the count', () => {
   });
 
   it('interpolates the count in every form a count past 1 selects', () => {
-    const spelled: string[] = [];
-    for (const language of SUPPORTED_LANGUAGES) {
-      const rules = new Intl.PluralRules(language);
-      for (const [family, forms] of pluralFamilies(CATALOG_LOADERS[language]())) {
-        if (![...forms.values()].some(value => COUNT_TOKEN.test(value))) {
-          continue;
-        }
-        for (const [category, value] of forms) {
-          if (COUNT_TOKEN.test(value) || !DIGIT.test(value)) {
-            continue;
-          }
-          const count = SAMPLE_COUNTS.find(
-            candidate => candidate > 1 && rules.select(candidate) === category
-          );
-          if (count !== undefined) {
-            spelled.push(`${language} ${family}_${category} at ${count}`);
-          }
-        }
-      }
-    }
-    expect(spelled).toEqual([]);
+    expect(SUPPORTED_LANGUAGES.flatMap(language => spelledCounts(language))).toEqual([]);
   });
 });

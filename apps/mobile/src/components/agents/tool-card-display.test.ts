@@ -199,6 +199,12 @@ describe('getToolDisplay mapping', () => {
     });
   });
 
+  it('names a patch file from an absolute cloud workspace path', () => {
+    const patchText =
+      '*** Begin Patch\n*** Update File: /workspace/user-1/sessions/ses_abc123/src/app.ts\n@@\n-old\n+new\n*** End Patch';
+    expect(getDisplay(makeToolPart('patch', completed({ patchText }))).subtitle).toBe('app.ts');
+  });
+
   it('maps a multi-file patch to the file count', () => {
     const patchText =
       '*** Begin Patch\n*** Update File: src/a.ts\n@@\n-old\n+new\n' +
@@ -605,27 +611,6 @@ describe('getToolDisplay translatable provenance', () => {
     // translation gateway.
     expect(
       getToolDisplay(makeToolPart('mcp', completed({ server_name: 'github' }))).translatable
-    ).toBe(false);
-  });
-
-  it('translates a known-tool label even though it is a projected name', () => {
-    // `Publish Image` is raw English app copy with no catalog, so it must reach
-    // the gateway; the surrounding identifiers must not.
-    expect(
-      getToolDisplay(makeToolPart('app-builder-images_transfer_image', completed())).translatable
-    ).toBe(true);
-    expect(
-      getToolDisplay(
-        makeToolPart(
-          'mcp',
-          completed({ server_name: 'app-builder-images', tool_name: 'transfer_image' })
-        )
-      ).translatable
-    ).toBe(true);
-    expect(
-      getToolDisplay(
-        makeToolPart('mcp', completed({ server_name: 'filesystem', tool_name: 'read_file' }))
-      ).translatable
     ).toBe(false);
   });
 

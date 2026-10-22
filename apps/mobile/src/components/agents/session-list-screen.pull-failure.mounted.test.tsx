@@ -90,12 +90,6 @@ vi.mock('@shopify/flash-list', () => ({
 }));
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
-  InteractionManager: {
-    runAfterInteractions: (run: () => void) => {
-      run();
-      return { cancel: () => undefined };
-    },
-  },
   Platform: { OS: 'ios' },
   Modal: 'Modal',
   Pressable: 'Pressable',
@@ -119,6 +113,11 @@ vi.mock('react-native', () => ({
         createElement(Fragment, { key: props.keyExtractor(item) }, props.renderItem({ item }))
       )
     ),
+}));
+vi.mock('@/lib/query/schedule-cache-maintenance', () => ({
+  scheduleCacheMaintenance: (run: () => void) => {
+    run();
+  },
 }));
 vi.mock('react-native-reanimated', () => ({
   __esModule: true,

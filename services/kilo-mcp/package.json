@@ -4,7 +4,7 @@
   "type": "module",
   "description": "Kilo remote MCP worker: catalog search + tRPC call proxy over MCP Streamable HTTP",
   "scripts": {
-    "dev": "wrangler dev --env dev",
+    "dev": "wrangler dev --env dev --local",
     "deploy": "wrangler deploy",
     "cf-typegen": "wrangler types",
     "catalog:ensure-index": "node scripts/embed-catalog.ts ensure-index",
@@ -24,6 +24,7 @@
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "drizzle-kit": "catalog:",
+    "jsonc-parser": "3.3.1",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "wrangler": "catalog:"

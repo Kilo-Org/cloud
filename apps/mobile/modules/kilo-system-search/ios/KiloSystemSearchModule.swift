@@ -127,23 +127,11 @@ public final class KiloSystemSearchModule: Module {
 
   private func apply(add: [SystemSearchRecord], removeIds: [String], promise: Promise) {
     let items = add.map(Self.searchableItem)
-    switch awaitIndexCall({ self.indexItems(items, completion: $0) }, promise: promise) {
-    case .timedOut:
+    guard awaitIndexCall({ self.indexItems(items, completion: $0) }, promise: promise) else {
       return
-    case .completed(let indexError):
-      if let indexError {
-        promise.reject(indexError)
-        return
-      }
     }
-    switch awaitIndexCall({ self.deleteItems(removeIds, completion: $0) }, promise: promise) {
-    case .timedOut:
+    guard awaitIndexCall({ self.deleteItems(removeIds, completion: $0) }, promise: promise) else {
       return
-    case .completed(let deleteError):
-      if let deleteError {
-        promise.reject(deleteError)
-        return
-      }
     }
     // The ledger advances only after both index calls succeed, so a rejection
     // leaves the previous ledger intact for the caller to retry. The serial
@@ -153,7 +141,7 @@ public final class KiloSystemSearchModule: Module {
   }
 
   private func clear(promise: Promise) {
-    switch awaitIndexCall(
+    let cleared = awaitIndexCall(
       { completion in
         self.index.deleteSearchableItems(
           withDomainIdentifiers: [KiloSystemSearchStore.domainIdentifier],
@@ -161,27 +149,18 @@ public final class KiloSystemSearchModule: Module {
         )
       },
       promise: promise
-    ) {
-    case .timedOut:
+    )
+    guard cleared else {
       return
-    case .completed(let clearError):
-      if let clearError {
-        promise.reject(clearError)
-        return
-      }
     }
     UserDefaults.standard.removeObject(forKey: KiloSystemSearchStore.ledgerKey)
     promise.resolve()
   }
 
-  /// The outcome of one index call: the completion's error, or a timeout whose
-  /// completion has not been observed yet.
-  private enum IndexCallResult {
-    case completed(Error?)
-    case timedOut
-  }
-
-  /// Runs one index call under the bound above.
+  /// Runs one index call under the bound above, and fails the promise when the
+  /// call cannot do its work. True means the index completed without an error,
+  /// so the caller may continue; false means the promise is already rejected
+  /// and the caller must stop.
   ///
   /// A timeout fails the promise, but the call may still be in flight: the
   /// completion is awaited for one further bounded interval, so a merely-late
@@ -197,7 +176,7 @@ public final class KiloSystemSearchModule: Module {
   private func awaitIndexCall(
     _ start: (@escaping (Error?) -> Void) -> Void,
     promise: Promise
-  ) -> IndexCallResult {
+  ) -> Bool {
     let wait = DispatchSemaphore(value: 0)
     var error: Error?
     start { value in
@@ -207,9 +186,13 @@ public final class KiloSystemSearchModule: Module {
     guard Self.waitForIndex(wait) else {
       promise.reject(Self.indexTimeoutError())
       _ = Self.waitForIndex(wait)
-      return .timedOut
+      return false
     }
-    return .completed(error)
+    if let error {
+      promise.reject(error)
+      return false
+    }
+    return true
   }
 
   /// Waits for one index call to answer, with the bound above. False means the

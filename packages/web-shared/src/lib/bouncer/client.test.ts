@@ -452,6 +452,21 @@ describe('usage event and charge cost fields', () => {
     expect(body.costMicrodollars).toBe(1234);
   });
 
+  it('sends siwc only when the request ran on a ChatGPT subscription', () => {
+    const event = {
+      requestId: 'r',
+      accountId: 'user:u',
+      inputTokens: 1,
+      outputTokens: 2,
+      clientAttributed: true,
+      hasTools: false,
+      requestedLogprobs: false,
+    };
+    expect(usageEventWireBody({ ...event, siwc: true }).siwc).toBe(true);
+    expect(usageEventWireBody({ ...event, siwc: false })).not.toHaveProperty('siwc');
+    expect(usageEventWireBody(event)).not.toHaveProperty('siwc');
+  });
+
   it('carries the payer usage on charge.attempted', () => {
     const body = creditEventWireBody({
       type: 'charge.attempted',
@@ -469,7 +484,7 @@ describe('usage event and charge cost fields', () => {
 function lastRequestBody(): Record<string, unknown> {
   const call = mockFetch.mock.calls[mockFetch.mock.calls.length - 1];
   const body = call?.[1]?.body;
-  return JSON.parse(String(body)) as Record<string, unknown>;
+  return JSON.parse(body as string) as Record<string, unknown>;
 }
 
 describe('normalizeJa4', () => {

@@ -10,7 +10,6 @@ describe('return URL validation', () => {
     expect(isValid('/profile')).toBe(true);
     expect(isValid('/organizations/123')).toBe(true);
     expect(isValid('/cloud/sessions')).toBe(true);
-    expect(isValid('/app-builder')).toBe(true);
   });
 
   it('should accept relative paths with query parameters', () => {

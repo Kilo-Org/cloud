@@ -11,11 +11,8 @@ import {
   Shield,
   ShieldCheck,
   Ban,
-  Database,
   DatabaseBackup,
   BarChart,
-  Rocket,
-  Blocks,
   Bot,
   Sparkles,
   MailCheck,
@@ -88,6 +85,11 @@ const userManagementItems: MenuItem[] = [
     icon: () => <ShieldCheck />,
   },
   {
+    title: () => 'Admin Action Log',
+    url: '/admin/action-audit-log',
+    icon: () => <FileSearch />,
+  },
+  {
     title: () => 'Organizations',
     url: '/admin/organizations',
     icon: () => <Building2 />,
@@ -96,6 +98,11 @@ const userManagementItems: MenuItem[] = [
     title: () => 'Trial Organizations',
     url: '/admin/organizations/trials',
     icon: () => <Clock />,
+  },
+  {
+    title: () => 'Internal Bot Users',
+    url: '/admin/internal-bot-users',
+    icon: () => <Bot />,
   },
   {
     title: () => 'Bulk Block',
@@ -194,24 +201,9 @@ const productEngineeringItems: MenuItem[] = [
     icon: () => <Bot />,
   },
   {
-    title: () => 'Deployments',
-    url: '/admin/deployments',
-    icon: () => <Rocket />,
-  },
-  {
-    title: () => 'App Builder',
-    url: '/admin/app-builder',
-    icon: () => <Blocks />,
-  },
-  {
     title: () => 'Email Testing',
     url: '/admin/email-testing',
     icon: () => <MailCheck />,
-  },
-  {
-    title: () => 'Managed Indexing',
-    url: '/admin/code-indexing',
-    icon: () => <Database />,
   },
   {
     title: () => 'Gas Town',
@@ -317,6 +309,7 @@ type AppSidebarViewProps = {
   session: Session | null;
   pendingDisputesCount?: number;
   canViewSessions?: boolean;
+  isSuperadmin?: boolean;
 } & React.ComponentProps<typeof Sidebar>;
 
 export function AppSidebarView({
@@ -325,6 +318,7 @@ export function AppSidebarView({
   session,
   pendingDisputesCount = 0,
   canViewSessions = false,
+  isSuperadmin = false,
   ...props
 }: AppSidebarViewProps) {
   return (
@@ -359,6 +353,7 @@ export function AppSidebarView({
               <SidebarMenu>
                 {section.items
                   .filter(item => item.url !== '/admin/session-traces' || canViewSessions)
+                  .filter(item => item.url !== '/admin/action-audit-log' || isSuperadmin)
                   .map(item => {
                     const isActive = isAdminMenuItemActive(pathname, item.url);
 
@@ -408,7 +403,7 @@ export function AppSidebar({
   const session = useSession();
   const pathname = usePathname();
   const trpc = useTRPC();
-  const { canViewSessions } = useAdminPermissions();
+  const { canViewSessions, isSuperadmin } = useAdminPermissions();
   const disputesSummaryQuery = useQuery({
     ...trpc.admin.disputes.summary.queryOptions(),
     staleTime: DISPUTES_SUMMARY_STALE_TIME_MS,
@@ -422,6 +417,7 @@ export function AppSidebar({
       session={session.data}
       pendingDisputesCount={pendingDisputesCount}
       canViewSessions={canViewSessions}
+      isSuperadmin={isSuperadmin}
     >
       {children}
     </AppSidebarView>

@@ -28,7 +28,17 @@ The usage wire contract lives in `@kilocode/usage-contracts`. Import it directly
 AI gateway handlers (`src/lib/ai-gateway/**` and everything they call) also run
 in `sfo1`, but `db` from `lib/drizzle` always connects to the Frankfurt primary.
 Each primary query from `sfo1` is a transatlantic round trip; a transaction is
-several. Before the upstream inference request is sent:
+several.
+
+Read-write (`db`) connections in gateway paths are generally not permissible.
+Besides the `sfo1` -> `fra1` latency they add to every request, each one holds a
+primary pool connection for the whole round trip, so slow primary access keeps
+connections checked out longer and contributes to primary connection pool
+exhaustion. Read replica lag is acceptable for authentication and authorization
+reads, such as user, API token, and organization lookups; do not switch them to
+the primary to avoid it.
+
+Before the upstream inference request is sent:
 
 - Read through `readDb`, which uses the US replica in `sfo1`. Many helpers
   default to `fromDb = db`; pass `readDb` explicitly. Omitting the argument

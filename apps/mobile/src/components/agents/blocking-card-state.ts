@@ -5,7 +5,8 @@
 // lets the repo's `node` vitest env cover the selection + CTA rules without
 // rendering React Native.
 
-import { type Component, type RefObject } from 'react';
+import { type RefObject } from 'react';
+import { type HostInstance } from 'react-native';
 
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
@@ -53,7 +54,7 @@ type BlockingCardPresentation = {
 
 export type BlockingCardA11yDeps = {
   announce: (message: string) => void;
-  focus: (ref: RefObject<Component | null>) => boolean;
+  focus: (ref: RefObject<HostInstance | null>) => boolean;
 };
 
 /**
@@ -137,7 +138,7 @@ export function getBlockingCardPresentationForKind(input: {
  */
 export function applyBlockingCardAppearance(
   presentation: BlockingCardPresentation,
-  ref: RefObject<Component | null>,
+  ref: RefObject<HostInstance | null>,
   deps: BlockingCardA11yDeps
 ): (() => void) | undefined {
   deps.announce(presentation.announcement);

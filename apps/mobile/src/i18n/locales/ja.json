@@ -1714,6 +1714,9 @@
       "noRepositoriesVisibleGitlab": "表示できるリポジトリがありません。GitLabのリポジトリへのアクセス権を確認してから、一覧を更新してください。",
       "noRepositoriesVisibleBitbucket": "表示できるリポジトリがありません。Bitbucketのリポジトリへのアクセス権を確認してから、一覧を更新してください。",
       "bitbucketOrganizationsOnly": "Bitbucketは組織でのみ利用できます。",
+      "githubNeedsAttention": "GitHubの再接続が必要です",
+      "githubNeedsAttentionDescription": "KiloのGitHubアプリを再接続して、リポジトリを読み込むために一覧を更新してください。",
+      "partialRepositories": "一部のGitHubのリポジトリを読み込めませんでした。",
       "branchPickerTitle": "ブランチを選択",
       "branchDefault": "デフォルト",
       "branchAccessibility": "ブランチ: {{label}}",
@@ -3684,6 +3687,8 @@
     "skillNameInvalid": "スキル名は文字または数字で始まり、小文字、数字、ダッシュのみを使用する必要があります",
     "skillContentRequired": "スキル内容は必須です",
     "skillSaveFailed": "スキルを保存できませんでした",
+    "skillSourceCustom": "カスタム",
+    "skillSourceMarketplace": "マーケットプレイス",
     "skillsHint": "SKILL.md を貼り付けると、その名前が入力されます。ドラッグ アンド ドロップせずにスマートフォンからスキルを追加します。",
     "skillEditTitle": "エディットスキル",
     "mcp": {

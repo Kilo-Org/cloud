@@ -1,5 +1,5 @@
 import { normalize, normalizeCliEvent, isChatEvent } from './normalizer';
-import type { CloudAgentEvent } from './event-types';
+import type { CloudAgentEvent } from './schemas';
 
 function createRaw(streamEventType: string, data: unknown, sessionId = 'ses-1'): CloudAgentEvent {
   return {

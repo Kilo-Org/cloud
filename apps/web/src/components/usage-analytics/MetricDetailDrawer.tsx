@@ -106,25 +106,6 @@ const getMetricInfo = (
         ),
         action: 'Tip: Linking coding → review actions significantly boosts your Depth score.',
       },
-      {
-        title: 'Give AI Better Context',
-        subtitle: 'Context & Indexing',
-        description: (
-          <>
-            If acceptance rates are low, the issue is often context—the AI is making suggestions
-            without understanding your codebase.{' '}
-            <Link
-              href={`/organizations/${organizationId}/code-indexing`}
-              className="text-blue-400 hover:underline"
-            >
-              Managed Indexing
-            </Link>{' '}
-            fixes this by giving the model vector-backed search across your repo. Better context
-            means more relevant suggestions, which builds the trust that drives deeper usage.
-          </>
-        ),
-        action: null,
-      },
     ],
   },
   coverage: {

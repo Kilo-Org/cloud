@@ -2259,6 +2259,9 @@
       "noRepositoriesVisibleGitlab": "No hi ha cap repositori visible. Comprova l'accés als repositoris de GitLab i actualitza la llista.",
       "noRepositoriesVisibleBitbucket": "No hi ha cap repositori visible. Comprova l'accés als repositoris de Bitbucket i actualitza la llista.",
       "bitbucketOrganizationsOnly": "Bitbucket només està disponible per a organitzacions.",
+      "githubNeedsAttention": "Cal tornar a connectar GitHub",
+      "githubNeedsAttentionDescription": "Torna a connectar l'aplicació de Kilo per a GitHub i actualitza per carregar-ne els repositoris.",
+      "partialRepositories": "No s'han pogut carregar alguns repositoris de GitHub.",
       "branchPickerTitle": "Selecciona una branca",
       "branchDefault": "Per defecte",
       "branchAccessibility": "Branca: {{label}}",
@@ -3729,6 +3732,8 @@
     "skillNameInvalid": "El nom de l'habilitat ha de començar amb una lletra o un dígit i utilitzar només lletres minúscules, dígits i guions",
     "skillContentRequired": "Es requereix contingut d'habilitat",
     "skillSaveFailed": "No s'ha pogut estalviar l'habilitat",
+    "skillSourceCustom": "Personalitzada",
+    "skillSourceMarketplace": "Mercat",
     "skillsHint": "Enganxeu un SKILL.md i el seu nom s'omple; afegeix una habilitat des del teu telèfon sense arrossegar i deixar anar.",
     "skillEditTitle": "Edita l'habilitat",
     "mcp": {

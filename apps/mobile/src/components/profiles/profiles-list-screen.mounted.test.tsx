@@ -1,4 +1,4 @@
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -82,11 +82,14 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
+vi.mock('@/components/screen-header', () => ({
+  ScreenHeader: ({ headerRight }: { headerRight?: ReactNode }) => headerRight ?? null,
+}));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/icon-button', () => ({ IconButton: 'IconButton' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -258,11 +261,11 @@ describe('ProfilesListScreen', () => {
     // A personal profile keeps no owner context, even from an org list.
     expect(routerPush).toHaveBeenCalledWith('/profiles/personal-1');
 
-    // The persistent create CTA is present once profiles exist.
-    const buttons = findAll(renderer.root, 'Button');
-    const createButton = buttons.at(-1);
+    const createButton = findAll(renderer.root, 'IconButton').find(
+      button => button.props.accessibilityLabel === 'New profile'
+    );
     if (!createButton) {
-      throw new Error('create button was not rendered');
+      throw new Error('header create action was not rendered');
     }
     act(() => {
       (createButton.props as { onPress: () => void }).onPress();

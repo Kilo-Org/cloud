@@ -15,6 +15,7 @@ const toastError = vi.hoisted(() => vi.fn());
 const routerReplace = vi.hoisted(() => vi.fn());
 const boundaryState = vi.hoisted(() => ({
   organizationId: 'org-1' as string | null,
+  org: { organizationName: 'First test organization' },
   role: 'owner' as string | undefined,
   isResolving: false,
 }));
@@ -123,16 +124,36 @@ describe('NewProfileScreen', () => {
     createMutate.mockResolvedValue({ id: 'profile-1' });
     boundaryState.organizationId = 'org-1';
     boundaryState.role = 'owner';
+    boundaryState.org = { organizationName: 'First test organization' };
     boundaryState.isResolving = false;
     mutationState.create.isPending = false;
   });
 
-  it('non-retryable: an empty name shows the inline error and persists nothing', async () => {
+  it('validates each name edit after the first submit and blocks invalid submissions', async () => {
     const { renderer, unmount } = await mount();
+    const nameError = () => findField(renderer.root, 'Profile name').props.error;
 
+    expect(nameError()).toBeUndefined();
     await pressCreate(renderer.root);
+    expect(nameError()).toBe('Enter a profile name');
+    expect(createMutate).not.toHaveBeenCalled();
 
-    expect(findField(renderer.root, 'Profile name').props.error).toBe('Enter a profile name');
+    typeName(renderer.root, 'x'.repeat(191));
+    expect(nameError()).toBe('Profile name is too long');
+    await pressCreate(renderer.root);
+    expect(createMutate).not.toHaveBeenCalled();
+
+    typeName(renderer.root, `  ${'x'.repeat(100)}  `);
+    expect(nameError()).toBeUndefined();
+
+    typeName(renderer.root, 'x'.repeat(101));
+    expect(nameError()).toBe('Profile name is too long');
+    await pressCreate(renderer.root);
+    expect(createMutate).not.toHaveBeenCalled();
+
+    typeName(renderer.root, '   ');
+    expect(nameError()).toBe('Enter a profile name');
+    await pressCreate(renderer.root);
     expect(createMutate).not.toHaveBeenCalled();
 
     unmount();
@@ -177,6 +198,53 @@ describe('NewProfileScreen', () => {
       unmount();
     }
   );
+
+  it('shows only the selected organization context and resets it when the boundary changes', async () => {
+    const { renderer, rerender, unmount } = await mount();
+    const visibleText = () =>
+      findAll(renderer.root, 'Text').map(node => String(node.props.children));
+    const selectOwner = (owner: string) => {
+      act(() => {
+        const props = findOwnerControl(renderer.root).props as {
+          onChange: (value: string) => void;
+        };
+        props.onChange(owner);
+      });
+    };
+
+    expect(visibleText()).not.toContain('First test organization');
+    selectOwner('organization');
+    expect(visibleText()).toContain('First test organization');
+
+    selectOwner('personal');
+    expect(visibleText()).not.toContain('First test organization');
+
+    selectOwner('organization');
+    boundaryState.organizationId = 'org-2';
+    boundaryState.org = { organizationName: 'Second test organization' };
+    rerender();
+
+    expect(findOwnerControl(renderer.root).props.value).toBe('personal');
+    expect(visibleText()).not.toContain('First test organization');
+    expect(visibleText()).not.toContain('Second test organization');
+    typeName(renderer.root, 'New organization profile');
+    await pressCreate(renderer.root);
+    expect(createMutate.mock.calls[0]?.[0]).toEqual({ name: 'New organization profile' });
+    createMutate.mockClear();
+
+    selectOwner('organization');
+    expect(visibleText()).toContain('Second test organization');
+    expect(visibleText()).not.toContain('First test organization');
+
+    await pressCreate(renderer.root);
+    await waitFor(() => createMutate.mock.calls.length > 0);
+    expect(createMutate.mock.calls[0]?.[0]).toEqual({
+      name: 'New organization profile',
+      organizationId: 'org-2',
+    });
+
+    unmount();
+  });
 
   it('personal context: renders no owner control', async () => {
     boundaryState.organizationId = null;
@@ -243,29 +311,6 @@ describe('NewProfileScreen', () => {
     rerender();
 
     expect(findAll(renderer.root, 'SegmentedControl')).toHaveLength(0);
-    typeName(renderer.root, 'Backend debugging');
-    await pressCreate(renderer.root);
-
-    await waitFor(() => createMutate.mock.calls.length > 0);
-    expect(createMutate.mock.calls[0]?.[0]).toEqual({ name: 'Backend debugging' });
-    expect(routerReplace).toHaveBeenCalledWith('/profiles/profile-1');
-
-    unmount();
-  });
-
-  it('stale context: a selected organization cannot submit its id after the context changes', async () => {
-    const { renderer, rerender, unmount } = await mount();
-
-    act(() => {
-      (findOwnerControl(renderer.root).props as { onChange: (v: string) => void }).onChange(
-        'organization'
-      );
-    });
-
-    boundaryState.organizationId = 'org-2';
-    rerender();
-
-    expect(findOwnerControl(renderer.root).props.value).toBe('personal');
     typeName(renderer.root, 'Backend debugging');
     await pressCreate(renderer.root);
 

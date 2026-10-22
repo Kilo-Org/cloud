@@ -659,13 +659,13 @@ async function failProviderRowAmbiguous(
  * is named explicitly, so an internal failure is never recorded as a client
  * rejection.
  *
- * The reachable codes are the ones `toProviderTrpcError` and the provider
- * failure taxonomy produce: BAD_REQUEST, FORBIDDEN, NOT_FOUND,
- * PRECONDITION_FAILED, CONFLICT, TOO_MANY_REQUESTS and — for a failure no
- * layer classified — INTERNAL_SERVER_ERROR. BAD_GATEWAY never arrives:
- * `isAmbiguousFailure` routes it to reconcile_pending before any settle, and
- * every other tRPC code falls back to `unclassified` rather than claiming the
- * provider refused the request.
+ * The codes this router produces are BAD_REQUEST, FORBIDDEN, NOT_FOUND,
+ * PRECONDITION_FAILED and CONFLICT (from `toProviderTrpcError`), plus
+ * INTERNAL_SERVER_ERROR for a failure no layer classified. BAD_GATEWAY never
+ * arrives: `isAmbiguousFailure` routes it to reconcile_pending before any
+ * settle. TOO_MANY_REQUESTS is not produced by a provider layer today and
+ * keeps its mapping for the shared failure taxonomy; every other code falls
+ * back to `unclassified` rather than claiming the provider refused the request.
  */
 function outcomeCodeFromFailure(error: unknown, trpcError: TRPCError): string {
   if (error instanceof ProviderReviewError) {

@@ -3035,7 +3035,7 @@
       "selectOrganization": "Organisation auswählen",
       "unavailableDescription": "Diese Organisation ist nicht mehr verfügbar. Wähle in deinem Profil eine andere Organisation aus, um fortzufahren.",
 
-      "unavailableSessionsDescription": "Diese Organisation ist nicht mehr verfügbar. Deine Sitzungen können nicht geladen werden.",
+      "unavailableSessionsDescription": "Diese Organisation ist nicht mehr verfügbar. Deren Sitzungen können nicht geladen werden.",
       "accessDeniedDescription": "Du hast keinen Zugriff auf diese Organisation."
     },
     "creditActivity": {

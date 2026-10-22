@@ -591,14 +591,23 @@ text, not route state. A route already prepared in this process (checkout presen
 open) returns `session.ready` at once. A `session.prepare` for a failed route starts fresh,
 including a new Kilo restart budget.
 
+Every in-sandbox git process authenticates through the platform's read-only credential helper
+(`scripts/kilo-git-credential`, pinned by `SYSTEM_GIT_CONFIG_ENV`), which reads the per-session
+credential record in the runtime home. That covers the wrapper's own clone and fetch, the Kilo CLI
+and the workspace terminal, including a token a route is given without a platform. `origin` is
+therefore always the canonical credential-free URL: a copy of a worktree never carries the
+credential, and a credential-bearing `origin` (from an older workspace or chosen by the agent) is
+rewritten to the same URL without userinfo. A credential refresh rewrites the record; the next git
+command picks it up.
+
 Eligible managed GitHub HTTPS preparation clone and fetch, and only those invocations, pass two
 invocation-scoped options together: `proactiveAuth=basic` so the first request carries the existing
-URL-bound control alias, and `followRedirects=false` so every redirect fails instead of letting Git
-reattach the alias to a redirected request. The credential remains the existing control alias; the
-only credential flow is contained resolution, repository-authorized redemption, and the bounded
-Retry-After handler. Every redirect fails the operation, including a same-origin redirect from a
-renamed or transferred repository, so the caller must use the current direct repository URL. The
-options are command arguments, not Git config.
+control alias from the helper, and `followRedirects=false` so every redirect fails instead of
+letting Git reattach the alias to a redirected request. The credential remains the existing control
+alias; the only credential flow is contained resolution, repository-authorized redemption, and the
+bounded Retry-After handler. Every redirect fails the operation, including a same-origin redirect
+from a renamed or transferred repository, so the caller must use the current direct repository URL.
+The options are command arguments, not Git config.
 
 #### Workspace stamp
 
@@ -615,7 +624,7 @@ generation }`; beside the directory when there is no repository). It replaces th
 
 Adopt makes the snapshot equal to a fresh clone, then runs the ordinary steps:
 
-1. Point `origin` at this route's credential.
+1. Point `origin` at this route's canonical, credential-free URL.
 2. `fetch --prune`, then refresh the remote default branch.
 3. Detach at the remote default branch, so a new branch starts from its tip.
 4. Delete every local branch. The captured session's branch, or this session's own from an earlier
@@ -650,10 +659,10 @@ leftovers). Concurrent sessions that adopt a due snapshot each capture, and the 
 After
 setup the wrapper writes the stamp (before the snapshot, so a restored container sees another
 allocation's stamp), sets `origin` to the bare URL, clears the reflogs and `FETCH_HEAD`, sends
-`workspace.capture` and waits for `workspace.captured`. It then restores the authenticated URL,
-whatever the outcome, and continues to the Kilo runtime. A snapshot therefore holds no agent edits,
-no Kilo home and no git credential. Process env never reaches the disk. Capture runs after setup, so
-the key names the setup commands too: a snapshot is reused only by a route with the same setup.
+`workspace.capture` and waits for `workspace.captured`. The origin already carries no credential,
+and nothing restores one afterwards. A snapshot therefore holds no agent edits, no Kilo home and no
+git credential. Process env never reaches the disk. Capture runs after setup, so the key names the
+setup commands too: a snapshot is reused only by a route with the same setup.
 
 ### Prompts and turn outcome
 

@@ -35,7 +35,11 @@ import {
   rememberAttachedRoot,
   rootForSession,
 } from './session-directories';
-import { authenticatedGitUrl } from './git-url';
+import {
+  credentialFreeGitUrl,
+  normalizeOriginCredential,
+  writeGitCredentialRecord,
+} from './git-credentials.js';
 import { createOutputRedactor, createSecretRedactor } from '../redact-output';
 import { stripAnsi } from '../event-parser';
 import type { ControlHandlerResult } from './sandbox-control-handlers';
@@ -451,6 +455,22 @@ async function executeSessionAttach(
     const workspaceFailure = await serializeWorkspacePreparation(directory, signal, async () => {
       try {
         signal.throwIfAborted();
+        if (attach.git?.token && env.HOME) {
+          stage = 'git_setup';
+          // Git authenticates through the pinned helper's per-session record, so
+          // no worktree ever holds the platform credential.
+          try {
+            await writeGitCredentialRecord({
+              home: env.HOME ?? '',
+              url: credentialFreeGitUrl(attach.git.url),
+              token: attach.git.token,
+              platform: attach.git.platform,
+            });
+          } catch {
+            return fail('not_ready', 'Worktree Git credential setup failed', true);
+          }
+          signal.throwIfAborted();
+        }
         const alreadyBootstrapped = await hasBootstrapMarker(directory);
         signal.throwIfAborted();
         const setupCommands = attach.setupCommands ?? [];
@@ -471,11 +491,7 @@ async function executeSessionAttach(
             progress.start('cloning', cloneStepId, 'Cloning repository…');
             if (needsClone) {
               progress.progress('cloning', cloneStepId, 'Cloning repository…');
-              const cloneUrl = authenticatedGitUrl(
-                attach.git.url,
-                attach.git.token,
-                attach.git.platform
-              );
+              const cloneUrl = credentialFreeGitUrl(attach.git.url);
               const cloned = await runGit(['clone', cloneUrl, directory], undefined, signal);
               signal.throwIfAborted();
               if (cloned.exitCode !== 0) {
@@ -598,26 +614,17 @@ async function executeSessionAttach(
           await writeBootstrapMarker(directory);
           signal.throwIfAborted();
         }
-        if (attach.kilo.containmentEnabled === false && attach.git?.token) {
+        if (attach.git) {
           stage = 'git_credentials';
-          const refreshed = await runGit(
-            [
-              'remote',
-              'set-url',
-              'origin',
-              authenticatedGitUrl(attach.git.url, attach.git.token, attach.git.platform),
-            ],
+          // A workspace prepared before the credential record existed, or one
+          // whose agent pointed origin at a token URL, is migrated here. A
+          // credential-free origin (a fork the agent chose) is left alone.
+          const origin = await normalizeOriginCredential({
+            git: args => runGit(args, directory, signal),
             directory,
-            signal
-          );
+          });
           signal.throwIfAborted();
-          if (refreshed.exitCode !== 0) {
-            return fail(
-              'not_ready',
-              formatGitResultFailure(refreshed, 'Worktree Git credential refresh failed', redact),
-              true
-            );
-          }
+          if (origin === 'failed') logToFile('Worktree Git origin normalization failed');
         }
         if (alreadyBootstrapped && attach.git?.author) {
           stage = 'git_setup';

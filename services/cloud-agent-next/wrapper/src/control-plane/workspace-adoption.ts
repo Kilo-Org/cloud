@@ -21,7 +21,8 @@ function failure(
  * Bring a repository restored from a snapshot to the state a fresh clone has, so
  * the ordinary branch logic then behaves the same on both paths:
  *
- * 1. point `origin` at this route's credential;
+ * 1. point `origin` at this route's canonical, credential-free URL. Git
+ *    authenticates through the platform's credential helper, never the remote URL;
  * 2. fetch, pruning refs the remote dropped, and refresh the remote default;
  * 3. detach at the remote default branch, so a new branch starts from its tip;
  * 4. drop every local branch. The captured session's branch, or this session's own

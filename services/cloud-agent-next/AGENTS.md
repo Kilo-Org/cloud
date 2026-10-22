@@ -8,7 +8,7 @@ Cloudflare Worker that powers Kilocode Cloud Agents. It exposes tRPC APIs for st
 
 The Durable Object is intentionally a small coordinator: it durably queues messages when a sandbox or wrapper is not ready, owns session metadata and event replay state, schedules alarms, prepares or restores the sandbox, and hands prompts to the wrapper. Most product behavior after the sandbox is available belongs on the wrapper/Kilo side. Keep the DO focused on durable coordination, not feature logic.
 
-Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved via the shared `git-token-service` Worker. The wrapper in `wrapper/` brokers Kilo SDK events into the worker’s `/ingest` WebSocket and owns the job lifecycle inside the sandbox.
+Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved via the shared `git-token-service` Worker. The wrapper in `wrapper/` brokers Kilo SDK events into the worker’s `/ingest` WebSocket and owns the job lifecycle inside the sandbox. In the sandbox, git authenticates only through the platform's read-only credential helper (`scripts/kilo-git-credential`, pinned by `SYSTEM_GIT_CONFIG_ENV`) and the per-session credential record in the runtime home; a worktree `origin` is always the canonical URL without userinfo, in both credential-containment modes.
 
 ## Development Commands
 

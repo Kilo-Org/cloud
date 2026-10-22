@@ -1825,8 +1825,7 @@ describe('createPreparationManager', () => {
     await harness.manager.prepare(spec, credentials);
 
     expect(harness.ensureCalls()).toBe(1);
-    const remote = harness.gitCalls.find(args => args[0] === 'remote');
-    expect(remote?.[3]).toContain('git-2');
+    expect(harness.gitCalls).toEqual([]);
     expect(harness.installCalls).toHaveLength(1);
     expect(harness.installCalls[0]!.env.KILOCODE_TOKEN).toBe('kilo-token-2');
     expect(lastFrame(harness.frames)).toEqual({
@@ -1852,10 +1851,7 @@ describe('createPreparationManager', () => {
     };
     await harness.manager.installCredentials(credentials);
 
-    const remote = harness.gitCalls.find(args => args[0] === 'remote');
-    expect(remote?.[1]).toBe('set-url');
-    expect(remote?.[3]).toContain('git-2');
-    expect(remote?.[3]).not.toContain('git-1');
+    expect(harness.gitCalls).toEqual([]);
     expect(harness.installCalls).toHaveLength(1);
     expect(harness.installCalls[0]!.key).toBe(spec.sessionId);
     expect(harness.installCalls[0]!.env.KILOCODE_TOKEN).toBe('kilo-token-2');
@@ -1865,25 +1861,18 @@ describe('createPreparationManager', () => {
     expect(harness.manager.isPrepared(spec.sessionId)).toBe(false);
   });
 
-  it('records refreshed Kilo environment before awaiting Git credential maintenance', async () => {
+  it('records refreshed Kilo environment before writing the renewed Git record', async () => {
     const harness = createHarness();
     const spec = routeSpec({ git: { url: 'https://github.com/acme/repo.git', token: 'git-1' } });
     await harness.manager.prepare(spec);
-    const gitStarted = Promise.withResolvers<void>();
-    const finishGit = Promise.withResolvers<ExecResult>();
-    harness.setGit(async () => {
-      gitStarted.resolve();
-      return finishGit.promise;
-    });
-    const installing = harness.manager.installCredentials({
+    harness.gitCalls.length = 0;
+    await harness.manager.installCredentials({
       sessionId: spec.sessionId,
       kilo: { token: 'kilo-token-2' },
       git: { token: 'git-2' },
     });
-    await gitStarted.promise;
     expect(harness.installCalls[0]?.env.KILOCODE_TOKEN).toBe('kilo-token-2');
-    finishGit.resolve(result(0));
-    await installing;
+    expect(harness.gitCalls).toEqual([]);
   });
 
   it('prefers the runtime-proxy handle and facade targets over the spec alias', async () => {
@@ -2215,7 +2204,7 @@ describe('adopting a repository snapshot', () => {
 
     expect(harness.gitCalls.some(args => args[0] === 'clone')).toBe(false);
     const setUrl = harness.gitCalls.find(args => args[0] === 'remote' && args[1] === 'set-url');
-    expect(setUrl?.[3]).toContain('git-1');
+    expect(setUrl?.[3]).toBe(REPO);
     expect(gitKinds(harness.gitCalls).slice(0, 7)).toEqual([
       'remote set-url',
       'fetch',
@@ -2551,12 +2540,12 @@ describe('capturing a repository snapshot', () => {
     });
   }
 
-  it('makes origin bare around the capture and restores the credential before Kilo starts', async () => {
+  it('leaves the credential-free origin bare around the capture', async () => {
     const harness = createHarness(FAST_TIMERS, { capture: true });
     const order: string[] = [];
     harness.setGit(args => {
-      if (args[0] === 'remote') {
-        order.push(args[3]?.includes('git-1') ? 'origin:authenticated' : 'origin:bare');
+      if (args[0] === 'remote' && args[1] === 'set-url') {
+        order.push(args[3]?.includes('@') ? 'origin:credential' : 'origin:bare');
       }
       if (args[0] === 'reflog') order.push('reflog');
       if (args[0] === 'rev-parse') return { stdout: 'abc123\n', stderr: '', exitCode: 0 };
@@ -2569,7 +2558,10 @@ describe('capturing a repository snapshot', () => {
     expect(harness.captureRequests).toEqual([
       { sessionId: spec.sessionId, commit: 'abc123', timeoutMs: FAST_TIMERS.wrapper.captureMs },
     ]);
-    expect(order).toEqual(['origin:bare', 'reflog', 'origin:authenticated']);
+    expect(order).toEqual(['origin:bare', 'reflog']);
+    expect(harness.gitCalls.filter(args => args[0] === 'remote' && args[1] === 'set-url')).toEqual([
+      ['remote', 'set-url', 'origin', REPO],
+    ]);
     expect(progressSteps(harness.frames)).toEqual([
       'clone',
       'checkout',
@@ -2604,7 +2596,7 @@ describe('capturing a repository snapshot', () => {
     expect(stampAtCapture).toMatchObject({ allocationId: 'alloc-current' });
   });
 
-  it('continues when the capture is not saved or the channel fails, and restores origin', async () => {
+  it('continues when the capture is not saved or the channel fails, with the bare origin', async () => {
     for (const outcome of [false, 'throw'] as const) {
       const harness = createHarness(FAST_TIMERS, { capture: true });
       harness.setCaptureResult(outcome);
@@ -2616,16 +2608,15 @@ describe('capturing a repository snapshot', () => {
       const setUrls = harness.gitCalls.filter(
         args => args[0] === 'remote' && args[1] === 'set-url'
       );
-      expect(setUrls.at(-1)?.[3]).toContain('git-1');
+      expect(setUrls.at(-1)?.[3]).toBe(REPO);
+      for (const args of setUrls) expect(args[3]).not.toContain('@');
     }
   });
 
   it('does not capture when origin cannot be made bare', async () => {
     const harness = createHarness(FAST_TIMERS, { capture: true });
     harness.setGit(args =>
-      args[0] === 'remote' && !args[3]?.includes('git-1')
-        ? result(1, 'fatal: no such remote')
-        : result(0)
+      args[0] === 'remote' && args[1] === 'set-url' ? result(1, 'fatal: no such remote') : result(0)
     );
 
     await harness.manager.prepare(captureSpec());
@@ -2649,28 +2640,36 @@ describe('capturing a repository snapshot', () => {
     expect(harness.captureRequests).toHaveLength(1);
     expect(harness.logs).toContain(`control-plane capture not saved session=${spec.sessionId}`);
     const setUrls = harness.gitCalls.filter(args => args[0] === 'remote' && args[1] === 'set-url');
-    expect(setUrls.at(-1)?.[3]).toContain('git-1');
+    expect(setUrls.at(-1)?.[3]).toBe(REPO);
     expect(harness.ensureCalls()).toBe(1);
     expect(harness.ensureSessionCalls()).toBe(1);
     expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.ready' });
     expect(harness.frames.some(frame => frame.type === 'session.failed')).toBe(false);
   });
 
-  it('fails the route when the credential cannot be restored after a capture', async () => {
-    const harness = createHarness(FAST_TIMERS, { capture: true });
-    harness.setGit(args =>
-      args[0] === 'remote' && args[3]?.includes('git-1')
-        ? result(1, 'fatal: cannot set url')
-        : result(0)
+  it('rewrites a credential-bearing origin on a reused workspace', async () => {
+    const harness = createHarness(FAST_TIMERS, { hasGit: true });
+    harness.setGit(args => {
+      if (args[0] === 'remote' && args[1] === 'get-url') {
+        return {
+          stdout: 'https://x-access-token:stale@github.com/acme/repo.git\n',
+          stderr: '',
+          exitCode: 0,
+        };
+      }
+      return result(0);
+    });
+
+    await harness.manager.prepare(
+      routeSpec({ git: { url: REPO, token: 'git-1', platform: 'github' } })
     );
 
-    await harness.manager.prepare(captureSpec());
-
-    expect(lastFrame(harness.frames)).toMatchObject({
-      type: 'session.failed',
-      reason: 'workspace_setup_failed',
-      step: 'snapshot',
-    });
+    expect(harness.gitCalls).toContainEqual(['remote', 'set-url', 'origin', REPO]);
+    for (const args of harness.gitCalls) {
+      if (args[0] !== 'remote') continue;
+      expect(args.join(' ')).not.toContain('@');
+    }
+    expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.ready' });
   });
 
   it('does not capture without a capture request, a repository or a capture channel', async () => {
@@ -2685,6 +2684,76 @@ describe('capturing a repository snapshot', () => {
     const withoutRepo = createHarness(FAST_TIMERS, { capture: true });
     await withoutRepo.manager.prepare(captureSpec({ git: undefined }));
     expect(withoutRepo.captureRequests).toEqual([]);
+  });
+});
+
+describe('workspace Git credentials', () => {
+  function recordPath(root: string, spec: ControlPlaneRouteSpec): string {
+    const home = path.join(
+      root,
+      createHash('sha256')
+        .update(spec.kilo?.scopeId ?? spec.sessionId)
+        .update('\0')
+        .update(spec.directory)
+        .digest('hex')
+    );
+    return path.join(home, '.local/share/kilo/cloud-agent/git-credentials');
+  }
+
+  it('clones with the credential-free URL and records the token for the helper', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-git-credentials-'));
+    try {
+      const harness = createHarness(FAST_TIMERS, { homeRoot: root });
+      const spec = routeSpec({
+        git: { url: 'https://github.com/acme/repo.git', token: 'git-1', platform: 'github' },
+      });
+
+      await harness.manager.prepare(spec);
+
+      const clone = harness.gitCalls.find(args => args[0] === 'clone');
+      expect(clone).toContain('https://github.com/acme/repo.git');
+      for (const args of harness.gitCalls) expect(args.join(' ')).not.toContain('git-1');
+      const recordPathForSpec = recordPath(root, spec);
+      expect(await fs.readFile(recordPathForSpec, 'utf8')).toBe(
+        'protocol=https\nhost=github.com\nusername=x-access-token\npassword=git-1\n'
+      );
+      expect((await fs.stat(recordPathForSpec)).mode & 0o777).toBe(0o600);
+      // The wrapper's own git runs with the platform helper pinned, so the
+      // record is the only place the credential lives.
+      expect(harness.ensureInputs[0]?.env.GIT_CONFIG_COUNT).toBe('2');
+      expect(harness.ensureInputs[0]?.env.GIT_CONFIG_KEY_0).toBe('credential.helper');
+      expect(harness.ensureInputs[0]?.env.GIT_CONFIG_VALUE_0).toBe(
+        '/opt/kilo-cloud/kilo-git-credential'
+      );
+      expect(harness.ensureInputs[0]?.env.GIT_TERMINAL_PROMPT).toBe('0');
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rewrites the record on a credential renewal without touching origin', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-git-credentials-'));
+    try {
+      const harness = createHarness(FAST_TIMERS, { homeRoot: root });
+      const spec = routeSpec({
+        git: { url: 'https://github.com/acme/repo.git', token: 'git-1', platform: 'github' },
+      });
+      await harness.manager.prepare(spec);
+      harness.gitCalls.length = 0;
+
+      await harness.manager.installCredentials({
+        sessionId: spec.sessionId,
+        git: { token: 'git-2', platform: 'github' },
+        kilo: { token: 'kilo-token-2' },
+      });
+
+      expect(harness.gitCalls).toEqual([]);
+      expect(await fs.readFile(recordPath(root, spec), 'utf8')).toBe(
+        'protocol=https\nhost=github.com\nusername=x-access-token\npassword=git-2\n'
+      );
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
   });
 });
 
@@ -3338,27 +3407,45 @@ describe('credentials buffered during prepare', () => {
     ).toBe(true);
   });
 
-  it('still updates the Git remote when the proxy handle is unchanged', async () => {
+  it('refreshes the Git record when the proxy handle is unchanged, leaving origin alone', async () => {
     // Regression guard for the prepare-side effect: an unchanged handle must
-    // still reach the runtime and refresh the Git remote. The "no restart
+    // still reach the runtime and refresh the Git credential. The "no restart
     // marker" half of the contract is covered by the real-runtime test
     // `does not roll for a repeated or stale proxy handle but latches a pending one`.
-    const harness = createHarness();
-    const spec = routeSpec({ git: { url: 'https://github.com/acme/repo.git', token: 'git-1' } });
-    const handle = proxyHandle(EXP_NOW);
-    await harness.manager.prepare(spec, credentialsFor(spec, handle));
-    harness.gitCalls.length = 0;
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-git-renewal-'));
+    try {
+      const harness = createHarness(FAST_TIMERS, { homeRoot: root });
+      const spec = routeSpec({
+        git: { url: 'https://github.com/acme/repo.git', token: 'git-1', platform: 'github' },
+      });
+      const handle = proxyHandle(EXP_NOW);
+      await harness.manager.prepare(spec, credentialsFor(spec, handle));
+      harness.gitCalls.length = 0;
 
-    await harness.manager.installCredentials({
-      sessionId: spec.sessionId,
-      git: { token: 'git-2' },
-      kilo: { token: 'alias' },
-      proxy: { handle, targets: specTargets(spec) },
-    });
+      await harness.manager.installCredentials({
+        sessionId: spec.sessionId,
+        git: { token: 'git-2', platform: 'github' },
+        kilo: { token: 'alias' },
+        proxy: { handle, targets: specTargets(spec) },
+      });
 
-    expect(harness.installCalls).toHaveLength(1);
-    expect(harness.installCalls[0]?.env.KILOCODE_TOKEN).toBe(handle);
-    expect(harness.gitCalls.some(args => args[0] === 'remote' && args[1] === 'set-url')).toBe(true);
+      expect(harness.installCalls).toHaveLength(1);
+      expect(harness.installCalls[0]?.env.KILOCODE_TOKEN).toBe(handle);
+      expect(harness.gitCalls).toEqual([]);
+      const home = path.join(
+        root,
+        createHash('sha256')
+          .update(spec.kilo!.scopeId)
+          .update('\0')
+          .update(spec.directory)
+          .digest('hex')
+      );
+      expect(
+        await fs.readFile(path.join(home, '.local/share/kilo/cloud-agent/git-credentials'), 'utf8')
+      ).toBe('protocol=https\nhost=github.com\nusername=x-access-token\npassword=git-2\n');
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
   });
 });
 

@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createWrapperKiloClient, type WrapperKiloClient } from '../../../wrapper/src/kilo-api.js';
-import { formatGitResultFailure } from '../../../wrapper/src/git-errors.js';
 import { applySessionAttach } from '../../../wrapper/src/control/apply-attach.js';
 import {
   buildWorktreeKiloEnvironment,
@@ -34,7 +33,17 @@ import type * as KiloApiModule from '../../../wrapper/src/kilo-api.js';
 import type * as UtilsModule from '../../../wrapper/src/utils.js';
 
 vi.mock('node:fs/promises', () => ({
-  default: { mkdir: vi.fn(async () => undefined), writeFile: vi.fn(async () => undefined) },
+  default: {
+    mkdir: vi.fn(async () => undefined),
+    writeFile: vi.fn(async () => undefined),
+    chmod: vi.fn(async () => undefined),
+    rm: vi.fn(async () => undefined),
+    rename: vi.fn(async () => undefined),
+    open: vi.fn(async () => ({
+      writeFile: vi.fn(async () => undefined),
+      close: vi.fn(async () => undefined),
+    })),
+  },
 }));
 vi.mock('@kilocode/sdk', () => ({ createKiloClient: vi.fn(() => ({})) }));
 vi.mock('../../../wrapper/src/kilo-api.js', async importOriginal => ({
@@ -971,9 +980,13 @@ describe('direct worktree credential refresh', () => {
     expect(f.close).not.toHaveBeenCalled();
   });
 
-  it('refreshes warm Git origin while preserving an explicit profile token without recycling', async () => {
+  it('keeps warm Git origin credential-free while preserving an explicit profile token without recycling', async () => {
     const f = fixture();
-    const runGit = vi.fn(async () => ({ stdout: '', stderr: '', exitCode: 0 }));
+    const runGit = vi.fn(async (args: string[]) =>
+      args[0] === 'remote' && args[1] === 'get-url'
+        ? { stdout: 'https://github.com/acme/repo.git', stderr: '', exitCode: 0 }
+        : { stdout: '', stderr: '', exitCode: 0 }
+    );
     const runSetup = vi.fn();
     const deps = {
       kiloRuntimes: f.registry,
@@ -995,17 +1008,64 @@ describe('direct worktree credential refresh', () => {
         deps
       );
       expect(result).toEqual({ ok: true, result: { attached: true } });
-      expect(runGit).toHaveBeenLastCalledWith(
-        ['remote', 'set-url', 'origin', `https://x-access-token:${token}@github.com/acme/repo.git`],
-        identity.directory,
-        expect.any(AbortSignal)
-      );
+      for (const [args] of runGit.mock.calls) {
+        expect(args.join(' ')).not.toContain(token);
+        expect(args.join(' ')).not.toContain('@github.com');
+      }
     }
+    // The record is the only place the platform credential lands; the wrapper
+    // never rewrites origin with it.
+    expect(vi.mocked(fs.open)).toHaveBeenCalled();
     expect(f.registry.get(identity.directory)?.env.GH_TOKEN).toBe('profile-override');
     expect(f.startServer).toHaveBeenCalledTimes(1);
     expect(f.close).not.toHaveBeenCalled();
     expect(runSetup).not.toHaveBeenCalled();
   });
+
+  it.each([true, false])(
+    'clones and reuses the worktree with no credential in origin (containment=%s)',
+    async containmentEnabled => {
+      const f = fixture();
+      const runGit = vi.fn(async (args: string[]) => {
+        if (args[0] === 'remote' && args[1] === 'get-url') {
+          return { stdout: 'https://github.com/acme/repo.git', stderr: '', exitCode: 0 };
+        }
+        if (args[0] === 'show-ref') return { stdout: '', stderr: '', exitCode: 1 };
+        return { stdout: '', stderr: '', exitCode: 0 };
+      });
+      const deps = {
+        kiloRuntimes: f.registry,
+        canRefreshCredentials: () => true,
+        hasBootstrapMarker: async () => false,
+        hasGit: async () => false,
+        sessionExists: async () => true,
+        runGit,
+      };
+      const payload = {
+        kilo: containmentEnabled ? { ...auth, containmentEnabled: true as const } : auth,
+        git: {
+          url: 'https://github.com/acme/repo.git',
+          token: 'github-token',
+          platform: 'github' as const,
+        },
+        env: { GH_TOKEN: 'github-token' },
+      };
+
+      expect(await applySessionAttach(identity, payload, deps)).toEqual({
+        ok: true,
+        result: { attached: true },
+      });
+
+      const calls = runGit.mock.calls.map(([args]) => args);
+      expect(calls.find(args => args[0] === 'clone')).toEqual([
+        'clone',
+        'https://github.com/acme/repo.git',
+        identity.directory,
+      ]);
+      expect(calls.some(args => args[0] === 'remote' && args[1] === 'set-url')).toBe(false);
+      for (const args of calls) expect(args.join(' ')).not.toContain('github-token');
+    }
+  );
 
   it('reattaches with fresh managed tokens after an active sibling becomes idle', async () => {
     const f = fixture();
@@ -1129,9 +1189,9 @@ describe('direct worktree credential refresh', () => {
     runtimeLifetime.abort();
   });
 
-  it('fails attach instead of accepting stale Git auth when origin refresh fails', async () => {
+  it('fails attach instead of accepting stale Git auth when the record cannot be written', async () => {
     const f = fixture();
-    const refreshed = { stdout: '', stderr: 'failed', exitCode: 1 };
+    vi.mocked(fs.open).mockRejectedValueOnce(new Error('private-disk-failure'));
     expect(
       await applySessionAttach(
         identity,
@@ -1148,13 +1208,13 @@ describe('direct worktree credential refresh', () => {
           kiloRuntimes: f.registry,
           canRefreshCredentials: () => true,
           hasBootstrapMarker: async () => true,
-          runGit: async () => refreshed,
+          runGit: async () => ({ stdout: '', stderr: '', exitCode: 0 }),
         }
       )
     ).toMatchObject({
       ok: false,
       error: {
-        message: formatGitResultFailure(refreshed, 'Worktree Git credential refresh failed'),
+        message: 'Worktree Git credential setup failed',
         retryable: true,
       },
     });

@@ -35,7 +35,11 @@ import {
   gitOperationError,
   type GitRouteClass,
 } from '../git-errors.js';
-import { authenticatedGitUrl } from '../control/git-url.js';
+import {
+  credentialFreeGitUrl,
+  normalizeOriginCredential,
+  writeGitCredentialRecord,
+} from '../control/git-credentials.js';
 import { checkoutSyntheticReviewRef, isSyntheticReviewRef } from '../git-review-ref.js';
 import {
   buildWorktreeKiloEnvironment,
@@ -608,11 +612,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     emitProgress(spec.sessionId, 'clone');
     await mkdir(directory);
     if (!spec.git || (await hasGit(directory))) return;
-    // Diagnostic route class only: a managed credential was injected into the
-    // clone URL, otherwise the plain (direct) URL is used. Never log the URL.
+    // Diagnostic route class only: the route carries a managed credential, which
+    // git receives through the pinned helper. Never log the URL.
     const gitRoute: GitRouteClass = spec.git.token ? 'managed' : 'direct';
     if (!(await hasGit(directory))) {
-      const cloneUrl = authenticatedGitUrl(spec.git.url, spec.git.token, spec.git.platform);
+      const cloneUrl = credentialFreeGitUrl(spec.git.url);
       const gitConfigArgs = managedGitHubPreparationGitArgs(spec, 'clone');
       const useBlobless = isBloblessReviewCloneEligible(
         spec.createdOnPlatform,
@@ -843,7 +847,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       await withinStep('restore', timers.restoreMs, async signal => {
         emitProgress(spec.sessionId, 'restore');
         await refreshAdoptedRepository({
-          remoteUrl: authenticatedGitUrl(git.url, git.token, git.platform),
+          remoteUrl: credentialFreeGitUrl(git.url),
           redact,
           git: (args, options) =>
             options?.network
@@ -891,9 +895,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   }
 
   /**
-   * Save the prepared workspace as a repository snapshot. `origin` is bare while the
-   * Sandbox DO snapshots the container, and gets this route's credential back
-   * whatever happens; a failed capture is logged and preparation continues.
+   * Save the prepared workspace as a repository snapshot. `origin` already carries
+   * no credential, and is set to the bare URL again while the Sandbox DO snapshots
+   * the container so an agent-chosen remote URL cannot reach the snapshot; a failed
+   * capture is logged and preparation continues.
    */
   async function captureWorkspace(
     spec: ControlPlaneRouteSpec,
@@ -912,7 +917,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       const bare = await stripGitCredentials({
         git: runWorkspaceGit,
         directory,
-        bareUrl: git.url,
+        bareUrl: credentialFreeGitUrl(git.url),
       });
       if (!bare) {
         log(`control-plane capture skipped, origin not bare session=${spec.sessionId}`);
@@ -926,27 +931,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           error instanceof Error ? createSecretRedactor(env)(error.message) : 'unknown'
         }`
       );
-    } finally {
-      await restoreOriginCredential(spec, runWorkspaceGit);
     }
-  }
-
-  async function restoreOriginCredential(
-    spec: ControlPlaneRouteSpec,
-    run: (args: string[]) => Promise<ExecResult>
-  ): Promise<void> {
-    const git = spec.git;
-    if (!git) return;
-    const url = authenticatedGitUrl(git.url, git.token, git.platform);
-    for (let attempt = 1; attempt <= STEP_RETRY_ATTEMPTS; attempt += 1) {
-      const result = await run(['remote', 'set-url', 'origin', url]);
-      if (result.exitCode === 0) return;
-    }
-    throw new WrapperBootstrapError({
-      code: 'WORKSPACE_SETUP_FAILED',
-      message: 'Failed to restore the repository credential after a snapshot',
-      retryable: true,
-    });
   }
 
   /**
@@ -968,6 +953,26 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     onReplacementWorkspace?: () => Promise<void>
   ): Promise<ControlPlaneWorkspaceOutcome> {
     const workspaceStartedAt = Date.now();
+    // Git authenticates through the pinned helper's per-session record, never
+    // through `origin`. A reused workspace is refreshed here too, so a renewed
+    // grant reaches the next `git push` without touching the remote.
+    if (spec.git) {
+      try {
+        await writeGitCredentialRecord({
+          home,
+          url: credentialFreeGitUrl(spec.git.url),
+          token: spec.git.token,
+          platform: spec.git.platform,
+        });
+      } catch {
+        setStep('clone');
+        throw new WrapperBootstrapError({
+          code: 'WORKSPACE_SETUP_FAILED',
+          message: 'Git credential setup failed',
+          retryable: true,
+        });
+      }
+    }
     const inspectStartedAt = Date.now();
     const { inspection, stamp: previous } = await inspectWorkspace(directory);
     log(
@@ -1367,6 +1372,15 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
             }
           }
         );
+        if (spec.git && workspace !== 'same') {
+          const origin = await normalizeOriginCredential({
+            git: args => runGit(args, { cwd: directory, env: builtEnv, inheritEnv: false }),
+            directory,
+          });
+          if (origin === 'failed') {
+            log(`control-plane Git origin normalization failed session=${sessionId}`);
+          }
+        }
       });
       if (owner.released) return;
       if (recovery && !replacementWorkspace) {
@@ -1476,18 +1490,17 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     route.env = nextEnv;
     await deps.runtimes.installCredentials(route.key, nextEnv, route.cloudAgentMcp);
     if (credentials.git?.token && route.spec.git) {
-      const url = authenticatedGitUrl(
-        route.spec.git.url,
-        credentials.git.token,
-        credentials.git.platform ?? route.spec.git.platform
-      );
-      const result = await runGit(['remote', 'set-url', 'origin', url], {
-        cwd: route.directory,
-        env: route.env,
-        inheritEnv: false,
-      });
-      if (result.exitCode !== 0) {
-        log(`control-plane Git credential refresh failed session=${credentials.sessionId}`);
+      // The helper re-reads the record on the next git command, so the agent's
+      // push/fetch picks up the renewed token while `origin` stays credential-free.
+      try {
+        await writeGitCredentialRecord({
+          home: route.home,
+          url: credentialFreeGitUrl(route.spec.git.url),
+          token: credentials.git.token,
+          platform: credentials.git.platform ?? route.spec.git.platform,
+        });
+      } catch {
+        log(`control-plane Git credential record refresh failed session=${credentials.sessionId}`);
       }
     }
   }

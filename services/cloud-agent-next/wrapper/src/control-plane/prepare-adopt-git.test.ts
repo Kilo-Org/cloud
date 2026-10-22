@@ -242,6 +242,23 @@ describe('adopting a repository snapshot against a real repository', () => {
     });
   });
 
+  it('rewrites a credential-bearing origin to the canonical URL before Kilo starts', async () => {
+    await manager('alloc-image').prepared.prepare(spec());
+    const credentialed = 'https://x-access-token:stale@github.com/acme/repo.git';
+    git(directory, 'remote', 'set-url', 'origin', credentialed);
+    await fs.rm(path.join(directory, '.git', 'kilo-workspace.json'));
+
+    const reused = manager('alloc-image');
+    await reused.prepared.prepare(spec({ sessionId: 'ses_b' }));
+
+    expect(ready(reused.frames)).toMatchObject({ workspace: 'cloned' });
+    // Only the userinfo is dropped: the agent's chosen remote is preserved.
+    expect(git(directory, 'remote', 'get-url', 'origin')).toBe('https://github.com/acme/repo.git');
+    expect(await fs.readFile(path.join(directory, '.git/config'), 'utf8')).not.toContain(
+      'x-access-token'
+    );
+  });
+
   it('does nothing for a second route on the same allocation', async () => {
     const first = manager('alloc-image');
     await first.prepared.prepare(spec());

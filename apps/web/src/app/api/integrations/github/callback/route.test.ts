@@ -1661,46 +1661,6 @@ describe('GET /api/integrations/github/callback admin proof', () => {
       `/organizations/${organizationId}/integrations/github?error=multiple_installations_disabled`
     );
   });
-
-  test('logs distinct messages for code-absent vs non-admin', async () => {
-    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-
-    // Case 1: code absent — should log code_absent.
-    const { GET } = await import('./route');
-    await GET(
-      makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}`
-      ) as never
-    );
-
-    const codeAbsentLogs = logSpy.mock.calls.filter(
-      (call: unknown[]) =>
-        typeof call[0] === 'string' && (call[0] as string).includes('[github_admin_proof')
-    );
-    expect(codeAbsentLogs.length).toBeGreaterThan(0);
-    expect(codeAbsentLogs[0][0]).toContain('code_absent');
-    expect(codeAbsentLogs[0][0]).not.toContain('fail_non_admin');
-
-    logSpy.mockClear();
-
-    // Case 2: code present but non-admin — should log fail_non_admin.
-    mockedAssertUserAdministersInstallation.mockResolvedValue(false);
-    await GET(
-      makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
-      ) as never
-    );
-
-    const nonAdminLogs = logSpy.mock.calls.filter(
-      (call: unknown[]) =>
-        typeof call[0] === 'string' && (call[0] as string).includes('[github_admin_proof')
-    );
-    expect(nonAdminLogs.length).toBeGreaterThan(0);
-    expect(nonAdminLogs[0][0]).toContain('fail_non_admin');
-    expect(nonAdminLogs[0][0]).not.toContain('code_absent');
-
-    logSpy.mockRestore();
-  });
 });
 
 describe('GET /api/integrations/github/callback Sentry redaction', () => {

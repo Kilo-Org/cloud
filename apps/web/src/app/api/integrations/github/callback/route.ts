@@ -507,10 +507,6 @@ async function handleCoreInstallFlow(params: {
       );
 
     if (!code) {
-      console.log('[github_admin_proof:code_absent]', {
-        installation_id: installationId,
-        setup_action: setupAction,
-      });
       return rejectUnauthorizedInstallation();
     }
 
@@ -530,32 +526,17 @@ async function handleCoreInstallFlow(params: {
           });
 
       if (!authorization) {
-        console.log('[github_admin_proof:fail_non_admin]', {
-          github_user_id: exchangeResult.id,
-          github_user_login: exchangeResult.login,
-          installation_id: installationId,
-        });
         return rejectUnauthorizedInstallation();
       }
       if (typeof authorization !== 'boolean') {
         verifiedGitHubUserId = authorization.identity.id;
         verifiedAccountType = authorization.candidate.accountType;
       }
-
-      console.log('[github_admin_proof:pass]', {
-        github_user_id: exchangeResult.id,
-        github_user_login: exchangeResult.login,
-        installation_id: installationId,
-      });
     } catch (error) {
-      console.error('[github_admin_proof:error]', {
-        installation_id: installationId,
-        error: error instanceof Error ? error.message : String(error),
-      });
       captureException(error, {
         tags: {
           endpoint: 'github/callback',
-          source: 'github_admin_proof',
+          source: 'github_app_installation',
         },
         extra: { installationId },
       });

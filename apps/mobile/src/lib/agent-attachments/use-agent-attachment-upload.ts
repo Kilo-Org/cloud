@@ -553,9 +553,9 @@ export function useAgentAttachmentUpload(
         return;
       }
       // The room is recomputed against the live list, because a removal, a
-      // restore, or a reset during the awaited work moved it, and the commit
-      // clamps once more. Only the kept chips are registered and uploaded, so
-      // an excess candidate never presigns.
+      // restore, or a reset during the awaited work moved it. The following
+      // commit runs synchronously against that same list, so only the kept
+      // chips are registered and uploaded: an excess candidate never presigns.
       const room = Math.max(0, AGENT_ATTACHMENT_MAX_FILES - attachmentsRef.current.length);
       const kept = additions.slice(0, room);
       for (const dropped of additions.slice(kept.length)) {
@@ -568,11 +568,7 @@ export function useAgentAttachmentUpload(
       if (kept.length === 0) {
         return;
       }
-      commitAttachments(current => {
-        const remaining = Math.max(0, AGENT_ATTACHMENT_MAX_FILES - current.length);
-        const admitted = kept.slice(0, remaining);
-        return admitted.length === 0 ? current : [...current, ...admitted];
-      });
+      commitAttachments(current => [...current, ...kept]);
       // Capacity, not classification, is what this warning reports: it fires
       // only when the selection did not fit, and names the count that did.
       // The admitted count selects the plural category, because that is the
@@ -987,11 +983,7 @@ export function useAgentAttachmentUpload(
       if (kept.length === 0) {
         return;
       }
-      commitAttachments(current => {
-        const remaining = Math.max(0, AGENT_ATTACHMENT_MAX_FILES - current.length);
-        const admitted = kept.slice(0, remaining);
-        return admitted.length === 0 ? current : [...current, ...admitted];
-      });
+      commitAttachments(current => [...current, ...kept]);
     },
     [commitAttachments]
   );

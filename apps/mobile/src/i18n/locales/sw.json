@@ -3927,7 +3927,7 @@
     "defaultModel": "Tumia modeli chaguomsingi ya Kilo",
     "duration": "Kikomo cha muda (dakika)",
     "spendLimit": "Kikomo cha matumizi (USD)",
-    "safeguardHint": "Vikomo maalum kwa kila muhtasari, si bajeti ya kila siku. Chaguomsingi: dakika 10 na $2. Ripoti huchapishwa baada ya dakika tano zaidi huku utengenezaji ukiendelea ndani ya vikomo hivi.",
+    "safeguardHint": "Vikomo maalum kwa kila muhtasari, si bajeti ya kila siku. Chaguomsingi: {{duration}} na {{amount}}. Ripoti huchapishwa baada ya dakika tano zaidi huku utengenezaji ukiendelea ndani ya vikomo hivi.",
     "invalidSafeguards": "Weka vikomo chanya na maalum vya muda na matumizi.",
     "estimate": "Makadirio {{estimate}} · kiwango cha juu {{maximum}}",
     "estimateUnavailable": "Muhtasari wenye malipo haupatikani kwa mipangilio hii.",

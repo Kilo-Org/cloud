@@ -3927,7 +3927,7 @@
     "defaultModel": "Standaardmodel van Kilo gebruiken",
     "duration": "Tijdslimiet (minuten)",
     "spendLimit": "Uitgavenlimiet (USD)",
-    "safeguardHint": "Vaste limieten per samenvatting, geen dagbudget. Standaard: 10 minuten en $2. Een rapport verschijnt na maximaal vijf minuten terwijl het genereren binnen deze limieten doorgaat.",
+    "safeguardHint": "Vaste limieten per samenvatting, geen dagbudget. Standaard: {{duration}} en {{amount}}. Een rapport verschijnt na maximaal vijf minuten terwijl het genereren binnen deze limieten doorgaat.",
     "invalidSafeguards": "Voer positieve, eindige tijd- en uitgavenlimieten in.",
     "estimate": "Schatting {{estimate}} · maximaal {{maximum}}",
     "estimateUnavailable": "Er is geen betaalde samenvatting beschikbaar voor deze instellingen.",

@@ -4107,7 +4107,7 @@
     "defaultModel": "Defnyddio model diofyn Kilo",
     "duration": "Terfyn amser (munudau)",
     "spendLimit": "Terfyn gwariant (USD)",
-    "safeguardHint": "Terfynau penodol fesul crynodeb, nid cyllideb ddyddiol. Diofyn: 10 munud a $2. Cyhoeddir adroddiad ar ôl pum munud fan bellaf tra bo'r creu'n parhau o fewn y terfynau hyn.",
+    "safeguardHint": "Terfynau penodol fesul crynodeb, nid cyllideb ddyddiol. Diofyn: {{duration}} a {{amount}}. Cyhoeddir adroddiad ar ôl pum munud fan bellaf tra bo'r creu'n parhau o fewn y terfynau hyn.",
     "invalidSafeguards": "Rhowch derfynau amser a gwariant positif a phenodol.",
     "estimate": "Amcangyfrif {{estimate}} · uchafswm {{maximum}}",
     "estimateUnavailable": "Nid oes crynodeb taledig ar gael ar gyfer y gosodiadau hyn.",

@@ -3927,7 +3927,7 @@
     "defaultModel": "Gebruik Kilo se verstekmodel",
     "duration": "Tydbeveiliging (minute)",
     "spendLimit": "Bestedingsbeveiliging (USD)",
-    "safeguardHint": "Eindige beveiligings per opsomming, nie 'n daaglikse begroting nie. Verstek: 10 minute en $2. 'n Verslag word ná hoogstens vyf minute gepubliseer terwyl generering binne hierdie limiete voortgaan.",
+    "safeguardHint": "Eindige beveiligings per opsomming, nie 'n daaglikse begroting nie. Verstek: {{duration}} en {{amount}}. 'n Verslag word ná hoogstens vyf minute gepubliseer terwyl generering binne hierdie limiete voortgaan.",
     "invalidSafeguards": "Voer positiewe, eindige tyd- en bestedingslimiete in.",
     "estimate": "Skatting {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "’n Betaalde opsomming is nie beskikbaar vir hierdie instellings nie.",

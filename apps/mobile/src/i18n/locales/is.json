@@ -3927,7 +3927,7 @@
     "defaultModel": "Nota sjálfgefið líkan Kilo",
     "duration": "Tímamörk (mínútur)",
     "spendLimit": "Kostnaðarmörk (USD)",
-    "safeguardHint": "Föst mörk fyrir hverja samantekt, ekki daglegt fjárhagsáætlun. Sjálfgefið: 10 mínútur og $2. Skýrsla birtist eftir í mesta lagi fimm mínútur á meðan vinnsla heldur áfram innan þessara marka.",
+    "safeguardHint": "Föst mörk fyrir hverja samantekt, ekki daglegt fjárhagsáætlun. Sjálfgefið: {{duration}} og {{amount}}. Skýrsla birtist eftir í mesta lagi fimm mínútur á meðan vinnsla heldur áfram innan þessara marka.",
     "invalidSafeguards": "Sláðu inn jákvæð, endanleg tíma- og kostnaðarmörk.",
     "estimate": "Áætlun {{estimate}} · hámark {{maximum}}",
     "estimateUnavailable": "Greitt samantekt er ekki tiltæk fyrir þessar stillingar.",

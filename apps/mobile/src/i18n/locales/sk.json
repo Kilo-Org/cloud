@@ -4017,7 +4017,7 @@
     "defaultModel": "Použiť predvolený model Kilo",
     "duration": "Časový limit (minúty)",
     "spendLimit": "Limit výdavkov (USD)",
-    "safeguardHint": "Pevné limity na jedno zhrnutie, nie denný rozpočet. Predvolené: 10 minút a $2. Správa sa zverejní najneskôr po piatich minútach, kým generovanie pokračuje v rámci týchto limitov.",
+    "safeguardHint": "Pevné limity na jedno zhrnutie, nie denný rozpočet. Predvolené: {{duration}} a {{amount}}. Správa sa zverejní najneskôr po piatich minútach, kým generovanie pokračuje v rámci týchto limitov.",
     "invalidSafeguards": "Zadajte kladné, konečné limity času a výdavkov.",
     "estimate": "Odhad {{estimate}} · maximálne {{maximum}}",
     "estimateUnavailable": "Platený súhrn nie je pre tieto nastavenia dostupný.",

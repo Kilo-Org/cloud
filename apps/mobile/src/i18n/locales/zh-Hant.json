@@ -3927,7 +3927,7 @@
     "defaultModel": "使用 Kilo 的預設模型",
     "duration": "時間上限（分鐘）",
     "spendLimit": "花費上限（USD）",
-    "safeguardHint": "每份摘要的固定上限，並非每日預算。預設：10 分鐘與 $2。報告最多五分鐘後發佈，產生作業會在這些限制內繼續進行。",
+    "safeguardHint": "每份摘要的固定上限，並非每日預算。預設：{{duration}}與 {{amount}}。報告最多五分鐘後發佈，產生作業會在這些限制內繼續進行。",
     "invalidSafeguards": "請輸入大於零的有限時間與花費上限。",
     "estimate": "預估 {{estimate}} · 上限 {{maximum}}",
     "estimateUnavailable": "這些設定無法提供付費摘要。",

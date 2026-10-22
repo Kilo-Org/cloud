@@ -3927,7 +3927,7 @@
     "defaultModel": "Kasuta Kilo vaikemudelit",
     "duration": "Ajapiirang (minutid)",
     "spendLimit": "Kulupiirang (USD)",
-    "safeguardHint": "Lõplikud piirangud kokkuvõtte kohta, mitte päevaeelarve. Vaikimisi: 10 minutit ja $2. Aruanne avaldatakse hiljemalt viie minuti pärast, samal ajal kui koostamine jätkub nende piirides.",
+    "safeguardHint": "Lõplikud piirangud kokkuvõtte kohta, mitte päevaeelarve. Vaikimisi: {{duration}} ja {{amount}}. Aruanne avaldatakse hiljemalt viie minuti pärast, samal ajal kui koostamine jätkub nende piirides.",
     "invalidSafeguards": "Sisesta positiivsed ja lõplikud aja- ja kulupiirangud.",
     "estimate": "Hinnang {{estimate}} · maksimaalselt {{maximum}}",
     "estimateUnavailable": "Nende seadetega pole tasuline kokkuvõte saadaval.",

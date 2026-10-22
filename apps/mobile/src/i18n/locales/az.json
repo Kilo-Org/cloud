@@ -3927,7 +3927,7 @@
     "defaultModel": "Kilo’nun standart modelini istifadə et",
     "duration": "Vaxt limiti (dəqiqə)",
     "spendLimit": "Xərc limiti (USD)",
-    "safeguardHint": "Hər xülasə üçün sonlu limitlər, gündəlik büdcə deyil. Standart: 10 dəqiqə və $2. Hesabat ən çox beş dəqiqədən sonra dərc olunur, yaratma isə bu limitlər daxilində davam edir.",
+    "safeguardHint": "Hər xülasə üçün sonlu limitlər, gündəlik büdcə deyil. Standart: {{duration}} və {{amount}}. Hesabat ən çox beş dəqiqədən sonra dərc olunur, yaratma isə bu limitlər daxilində davam edir.",
     "invalidSafeguards": "Müsbət, sonlu vaxt və xərc limitləri daxil edin.",
     "estimate": "Təxmin {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Bu parametrlər üçün ödənişli icmal mövcud deyil.",

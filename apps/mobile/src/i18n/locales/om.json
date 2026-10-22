@@ -3927,7 +3927,7 @@
     "defaultModel": "Moodeela durtii Kilo fayyadami",
     "duration": "Eegumsa yeroo (daqiiqaa)",
     "spendLimit": "Eegumsa baasii (USD)",
-    "safeguardHint": "Eegumsa cuunfaa tokkoof daangeffame, baajata guyyaa miti. Durtii: daqiiqaa 10 fi $2. Gabaasni yoo baay'ate daqiiqaa shan booda ni maxxanfama, uumamni daangaa kana keessatti itti fufa.",
+    "safeguardHint": "Eegumsa cuunfaa tokkoof daangeffame, baajata guyyaa miti. Durtii: {{duration}} fi {{amount}}. Gabaasni yoo baay'ate daqiiqaa shan booda ni maxxanfama, uumamni daangaa kana keessatti itti fufa.",
     "invalidSafeguards": "Daangaa yeroo fi baasii poozatiivii fi daangeffame galchi.",
     "estimate": "Goleessi {{estimate}} · daangaa {{maximum}}",
     "estimateUnavailable": "Waaloo bu'aa arguu kan dandeessisaa Hin qabu.",

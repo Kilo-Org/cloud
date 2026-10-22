@@ -3927,7 +3927,7 @@
     "defaultModel": "Brug Kilos standardmodel",
     "duration": "Tidsgrænse (minutter)",
     "spendLimit": "Forbrugsgrænse (USD)",
-    "safeguardHint": "Faste grænser pr. resumé, ikke et dagligt budget. Standard: 10 minutter og $2. En rapport udgives efter højst fem minutter, mens genereringen fortsætter inden for disse grænser.",
+    "safeguardHint": "Faste grænser pr. resumé, ikke et dagligt budget. Standard: {{duration}} og {{amount}}. En rapport udgives efter højst fem minutter, mens genereringen fortsætter inden for disse grænser.",
     "invalidSafeguards": "Angiv positive, endelige tids- og forbrugsgrænser.",
     "estimate": "Estimat {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Et betalt resumé er ikke tilgængeligt med disse indstillinger.",

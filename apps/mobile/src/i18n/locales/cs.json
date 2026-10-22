@@ -4017,7 +4017,7 @@
     "defaultModel": "Použít výchozí model Kilo",
     "duration": "Časový limit (minuty)",
     "spendLimit": "Limit útraty (USD)",
-    "safeguardHint": "Pevné limity pro každé shrnutí, nikoli denní rozpočet. Výchozí: 10 minut a $2. Report se zveřejní nejpozději po pěti minutách, generování pokračuje v rámci limitů.",
+    "safeguardHint": "Pevné limity pro každé shrnutí, nikoli denní rozpočet. Výchozí: {{duration}} a {{amount}}. Report se zveřejní nejpozději po pěti minutách, generování pokračuje v rámci limitů.",
     "invalidSafeguards": "Zadejte kladné konečné limity času a útraty.",
     "estimate": "Odhad {{estimate}} · maximum {{maximum}}",
     "estimateUnavailable": "Placené shrnutí není pro tato nastavení dostupné.",

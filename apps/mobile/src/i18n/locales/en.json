@@ -48,7 +48,7 @@
     "defaultModel": "Use Kilo’s default model",
     "duration": "Time safeguard (minutes)",
     "spendLimit": "Spend safeguard (USD)",
-    "safeguardHint": "Finite per-summary safeguards, not a daily budget. Defaults: 10 minutes and $2. A report publishes after at most five minutes while generation continues within these limits.",
+    "safeguardHint": "Finite per-summary safeguards, not a daily budget. Defaults: {{duration}} and {{amount}}. A report publishes after at most five minutes while generation continues within these limits.",
     "invalidSafeguards": "Enter positive, finite time and spend limits.",
     "estimate": "Estimate {{estimate}} · maximum {{maximum}}",
     "estimateUnavailable": "A paid summary is not available for these settings.",

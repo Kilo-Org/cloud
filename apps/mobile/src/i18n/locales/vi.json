@@ -3927,7 +3927,7 @@
     "defaultModel": "Dùng mô hình mặc định của Kilo",
     "duration": "Giới hạn thời gian (phút)",
     "spendLimit": "Giới hạn chi phí (USD)",
-    "safeguardHint": "Giới hạn cố định cho mỗi tóm tắt, không phải ngân sách hằng ngày. Mặc định: 10 phút và $2. Báo cáo được xuất bản sau tối đa năm phút trong khi quá trình tạo vẫn tiếp tục trong các giới hạn này.",
+    "safeguardHint": "Giới hạn cố định cho mỗi tóm tắt, không phải ngân sách hằng ngày. Mặc định: {{duration}} và {{amount}}. Báo cáo được xuất bản sau tối đa năm phút trong khi quá trình tạo vẫn tiếp tục trong các giới hạn này.",
     "invalidSafeguards": "Nhập giới hạn thời gian và chi phí dương, hữu hạn.",
     "estimate": "Ước tính {{estimate}} · tối đa {{maximum}}",
     "estimateUnavailable": "Không có bản tóm tắt trả phí cho các cài đặt này.",

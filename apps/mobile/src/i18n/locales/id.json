@@ -3927,7 +3927,7 @@
     "defaultModel": "Gunakan model default Kilo",
     "duration": "Batas waktu (menit)",
     "spendLimit": "Batas biaya (USD)",
-    "safeguardHint": "Batas tetap per ringkasan, bukan anggaran harian. Default: 10 menit dan $2. Laporan diterbitkan paling lambat lima menit sementara pembuatan berlanjut dalam batas ini.",
+    "safeguardHint": "Batas tetap per ringkasan, bukan anggaran harian. Default: {{duration}} dan {{amount}}. Laporan diterbitkan paling lambat lima menit sementara pembuatan berlanjut dalam batas ini.",
     "invalidSafeguards": "Masukkan batas waktu dan biaya yang positif dan terbatas.",
     "estimate": "Estimasi {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Ringkasan berbayar tidak tersedia untuk pengaturan ini.",

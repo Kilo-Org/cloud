@@ -3927,7 +3927,7 @@
     "defaultModel": "Guna model lalai Kilo",
     "duration": "Had masa (minit)",
     "spendLimit": "Had perbelanjaan (USD)",
-    "safeguardHint": "Had terhingga bagi setiap ringkasan, bukan bajet harian. Lalai: 10 minit dan $2. Laporan diterbitkan selepas paling lama lima minit sementara penjanaan diteruskan dalam had ini.",
+    "safeguardHint": "Had terhingga bagi setiap ringkasan, bukan bajet harian. Lalai: {{duration}} dan {{amount}}. Laporan diterbitkan selepas paling lama lima minit sementara penjanaan diteruskan dalam had ini.",
     "invalidSafeguards": "Masukkan had masa dan perbelanjaan yang positif dan terhingga.",
     "estimate": "Anggaran {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Ringkasan berbayar tidak tersedia untuk tetapan ini.",

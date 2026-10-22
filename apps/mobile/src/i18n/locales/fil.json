@@ -3927,7 +3927,7 @@
     "defaultModel": "Gamitin ang default na model ng Kilo",
     "duration": "Limitasyon sa oras (minuto)",
     "spendLimit": "Limitasyon sa gastos (USD)",
-    "safeguardHint": "Tiyak na limitasyon bawat buod, hindi pang-araw-araw na budget. Default: 10 minuto at $2. Ilalathala ang ulat pagkalipas ng hanggang limang minuto habang nagpapatuloy ang paggawa sa loob ng mga limitasyong ito.",
+    "safeguardHint": "Tiyak na limitasyon bawat buod, hindi pang-araw-araw na budget. Default: {{duration}} at {{amount}}. Ilalathala ang ulat pagkalipas ng hanggang limang minuto habang nagpapatuloy ang paggawa sa loob ng mga limitasyong ito.",
     "invalidSafeguards": "Maglagay ng positibo at tiyak na limitasyon sa oras at gastos.",
     "estimate": "Tantiya {{estimate}} · maximum {{maximum}}",
     "estimateUnavailable": "Hindi available ang bayad na buod para sa mga setting na ito.",

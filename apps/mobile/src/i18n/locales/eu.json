@@ -3927,7 +3927,7 @@
     "defaultModel": "Erabili Kiloren eredu lehenetsia",
     "duration": "Denbora-muga (minutuak)",
     "spendLimit": "Gastu-muga (USD)",
-    "safeguardHint": "Laburpen bakoitzeko muga finituak, ez eguneko aurrekontua. Lehenetsiak: 10 minutu eta $2. Txostena gehienez bost minuturen buruan argitaratzen da, sorkuntzak muga hauen barruan jarraitzen duen bitartean.",
+    "safeguardHint": "Laburpen bakoitzeko muga finituak, ez eguneko aurrekontua. Lehenetsiak: {{duration}} eta {{amount}}. Txostena gehienez bost minuturen buruan argitaratzen da, sorkuntzak muga hauen barruan jarraitzen duen bitartean.",
     "invalidSafeguards": "Sartu denbora- eta gastu-muga positibo eta finituak.",
     "estimate": "Estimazioa {{estimate}} · gehienez {{maximum}}",
     "estimateUnavailable": "Ezarpen hauekin ez dago ordainpeko laburpenik erabilgarri.",

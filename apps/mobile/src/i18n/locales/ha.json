@@ -3927,7 +3927,7 @@
     "defaultModel": "Yi amfani da model na asali na Kilo",
     "duration": "Kariyar lokaci (mintuna)",
     "spendLimit": "Kariyar kashe kuɗi (USD)",
-    "safeguardHint": "Kariya mai iyaka ga kowace taƙaitawa, ba kasafin kuɗin yau da kullum ba. Na asali: mintuna 10 da $2. Ana wallafa rahoto bayan mintuna biyar a mafi yawa yayin da ƙirƙira ke ci gaba cikin waɗannan iyakoki.",
+    "safeguardHint": "Kariya mai iyaka ga kowace taƙaitawa, ba kasafin kuɗin yau da kullum ba. Na asali: {{duration}} da {{amount}}. Ana wallafa rahoto bayan mintuna biyar a mafi yawa yayin da ƙirƙira ke ci gaba cikin waɗannan iyakoki.",
     "invalidSafeguards": "Shigar da iyakokin lokaci da kashe kuɗi masu kyau da iyaka.",
     "estimate": "Kimanin {{estimate}} · matsakaici {{maximum}}",
     "estimateUnavailable": "Biyyan kudi ba a samu ba don waɗannan saituna.",

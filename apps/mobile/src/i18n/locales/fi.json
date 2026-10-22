@@ -3927,7 +3927,7 @@
     "defaultModel": "Käytä Kilon oletusmallia",
     "duration": "Aikaraja (minuuttia)",
     "spendLimit": "Kuluraja (USD)",
-    "safeguardHint": "Äärelliset yhteenvetokohtaiset rajat, ei päivittäinen budjetti. Oletukset: 10 minuuttia ja $2. Raportti julkaistaan enintään viiden minuutin kuluttua, ja luonti jatkuu näissä rajoissa.",
+    "safeguardHint": "Äärelliset yhteenvetokohtaiset rajat, ei päivittäinen budjetti. Oletukset: {{duration}} ja {{amount}}. Raportti julkaistaan enintään viiden minuutin kuluttua, ja luonti jatkuu näissä rajoissa.",
     "invalidSafeguards": "Anna positiiviset, äärelliset aika- ja kulurajat.",
     "estimate": "Arvio {{estimate}} · enintään {{maximum}}",
     "estimateUnavailable": "Maksullinen yhteenveto ei ole saatavilla näillä asetuksilla.",

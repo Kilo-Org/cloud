@@ -3927,7 +3927,7 @@
     "defaultModel": "Sèvi ak modèl Kilo pa defo a",
     "duration": "Limit tan (minit)",
     "spendLimit": "Limit depans (USD)",
-    "safeguardHint": "Limit fiks pou chak rezime, se pa yon bidjè chak jou. Pa defo: 10 minit ak $2. Yon rapò pibliye apre senk minit pou pi plis pandan jenerasyon an kontinye nan limit sa yo.",
+    "safeguardHint": "Limit fiks pou chak rezime, se pa yon bidjè chak jou. Pa defo: {{duration}} ak {{amount}}. Yon rapò pibliye apre senk minit pou pi plis pandan jenerasyon an kontinye nan limit sa yo.",
     "invalidSafeguards": "Antre limit tan ak depans ki pozitif epi fini.",
     "estimate": "Estime {{estimate}} · maksimòm {{maximum}}",
     "estimateUnavailable": "Pa gen rezime ki pou peye ki disponib pou paramèt sa yo.",

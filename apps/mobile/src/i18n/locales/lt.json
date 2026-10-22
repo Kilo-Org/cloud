@@ -4017,7 +4017,7 @@
     "defaultModel": "Naudoti numatytąjį Kilo modelį",
     "duration": "Laiko apribojimas (minutės)",
     "spendLimit": "Išlaidų apribojimas (USD)",
-    "safeguardHint": "Baigtiniai apribojimai kiekvienai santraukai, ne dienos biudžetas. Numatyta: 10 minučių ir $2. Ataskaita paskelbiama ne vėliau kaip po penkių minučių, o kūrimas tęsiasi neviršijant šių ribų.",
+    "safeguardHint": "Baigtiniai apribojimai kiekvienai santraukai, ne dienos biudžetas. Numatyta: {{duration}} ir {{amount}}. Ataskaita paskelbiama ne vėliau kaip po penkių minučių, o kūrimas tęsiasi neviršijant šių ribų.",
     "invalidSafeguards": "Įveskite teigiamas, baigtines laiko ir išlaidų ribas.",
     "estimate": "Apskaičiavimas {{estimate}} · daugiausia {{maximum}}",
     "estimateUnavailable": "Mokama santrauka šiems nustatymams neprieinama.",

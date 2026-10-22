@@ -1,3 +1,7 @@
+import {
+  DEFAULT_BRIEFING_MAX_DURATION_SECONDS,
+  DEFAULT_BRIEFING_MAX_SPEND_MICRODOLLARS,
+} from '@kilocode/app-shared/agent-briefing';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +18,7 @@ import {
   briefingEstimateUnavailableKey,
   parseBriefingSafeguards,
 } from '@/lib/agent-briefing-state';
+import { formatDuration } from '@/lib/format';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useTRPC } from '@/lib/trpc';
@@ -208,7 +213,12 @@ export function BriefingContextSettings({
             updateLimits();
           }}
         />
-        <Text className="text-xs text-muted-foreground">{t('agentBriefing.safeguardHint')}</Text>
+        <Text className="text-xs text-muted-foreground">
+          {t('agentBriefing.safeguardHint', {
+            duration: formatDuration(DEFAULT_BRIEFING_MAX_DURATION_SECONDS, i18n.language, 'long'),
+            amount: briefingMoney(DEFAULT_BRIEFING_MAX_SPEND_MICRODOLLARS, i18n.language),
+          })}
+        </Text>
         {!valid ? (
           <Text className="text-sm text-destructive">{t('agentBriefing.invalidSafeguards')}</Text>
         ) : null}

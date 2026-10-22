@@ -3927,7 +3927,7 @@
     "defaultModel": "Kilo standart modelidan foydalanish",
     "duration": "Vaqt cheklovi (daqiqa)",
     "spendLimit": "Xarajat cheklovi (USD)",
-    "safeguardHint": "Har bir xulosa uchun cheklangan himoya, kunlik byudjet emas. Standart: 10 daqiqa va $2. Hisobot ko‘pi bilan besh daqiqada e’lon qilinadi, yaratish esa shu cheklovlar doirasida davom etadi.",
+    "safeguardHint": "Har bir xulosa uchun cheklangan himoya, kunlik byudjet emas. Standart: {{duration}} va {{amount}}. Hisobot ko‘pi bilan besh daqiqada e’lon qilinadi, yaratish esa shu cheklovlar doirasida davom etadi.",
     "invalidSafeguards": "Musbat, cheklangan vaqt va xarajat limitlarini kiriting.",
     "estimate": "Taxminiy hisob {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Bu sozlamalar uchun pullik xulosa mavjud emas.",

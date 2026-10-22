@@ -3972,7 +3972,7 @@
     "defaultModel": "Utiliser le modèle par défaut de Kilo",
     "duration": "Limite de temps (minutes)",
     "spendLimit": "Limite de dépense (USD)",
-    "safeguardHint": "Limites finies par résumé, pas un budget quotidien. Par défaut : 10 minutes et $2. Un rapport est publié après cinq minutes maximum, la génération se poursuivant dans ces limites.",
+    "safeguardHint": "Limites finies par résumé, pas un budget quotidien. Par défaut : {{duration}} et {{amount}}. Un rapport est publié après cinq minutes maximum, la génération se poursuivant dans ces limites.",
     "invalidSafeguards": "Saisissez des limites de temps et de dépense positives et finies.",
     "estimate": "Estimation {{estimate}} · maximum {{maximum}}",
     "estimateUnavailable": "Aucun résumé payant n’est disponible pour ces paramètres.",

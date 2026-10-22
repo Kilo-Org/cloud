@@ -3972,7 +3972,7 @@
     "defaultModel": "Folosește modelul implicit Kilo",
     "duration": "Limită de timp (minute)",
     "spendLimit": "Limită de cheltuieli (USD)",
-    "safeguardHint": "Limite finite per rezumat, nu un buget zilnic. Implicit: 10 minute și $2. Un raport se publică după cel mult cinci minute, iar generarea continuă în aceste limite.",
+    "safeguardHint": "Limite finite per rezumat, nu un buget zilnic. Implicit: {{duration}} și {{amount}}. Un raport se publică după cel mult cinci minute, iar generarea continuă în aceste limite.",
     "invalidSafeguards": "Introdu limite de timp și de cheltuieli pozitive și finite.",
     "estimate": "Estimare {{estimate}} · maxim {{maximum}}",
     "estimateUnavailable": "Nu este disponibil un rezumat plătit pentru aceste setări.",

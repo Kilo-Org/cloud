@@ -4062,7 +4062,7 @@
     "defaultModel": "Uża l-mudell default ta' Kilo",
     "duration": "Salvagwardja tal-ħin (minuti)",
     "spendLimit": "Salvagwardja tal-infiq (USD)",
-    "safeguardHint": "Salvagwardji finiti għal kull sommarju, mhux baġit ta' kuljum. Default: 10 minuti u $2. Rapport jiġi ppubblikat wara mhux aktar minn ħames minuti filwaqt li l-ġenerazzjoni tkompli f'dawn il-limiti.",
+    "safeguardHint": "Salvagwardji finiti għal kull sommarju, mhux baġit ta' kuljum. Default: {{duration}} u {{amount}}. Rapport jiġi ppubblikat wara mhux aktar minn ħames minuti filwaqt li l-ġenerazzjoni tkompli f'dawn il-limiti.",
     "invalidSafeguards": "Daħħal limiti ta' ħin u nfiq pożittivi u finiti.",
     "estimate": "Stima {{estimate}} · massimu {{maximum}}",
     "estimateUnavailable": "Sommarju li jitħallas mhuwiex disponibbli għal dawn is-settings.",

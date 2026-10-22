@@ -88,11 +88,15 @@ export function formatList(values: readonly string[], locale: string): string {
   return listFormat(locale, { style: 'long', type: 'conjunction' }).format(values);
 }
 
-export function formatDuration(seconds: number, locale: string): string {
+export function formatDuration(
+  seconds: number,
+  locale: string,
+  style: 'short' | 'long' = 'short'
+): string {
   const wholeSeconds = Math.max(0, Math.floor(seconds));
   const hours = Math.floor(wholeSeconds / 3600);
   const minutes = Math.floor((wholeSeconds % 3600) / 60);
-  return durationFormat(locale, { style: 'short' }).format({
+  return durationFormat(locale, { style }).format({
     hours,
     minutes,
     seconds: wholeSeconds % 60,

@@ -3927,7 +3927,7 @@
     "defaultModel": "使用 Kilo 默认模型",
     "duration": "时间保护上限（分钟）",
     "spendLimit": "花费保护上限（USD）",
-    "safeguardHint": "每份摘要的有限保护上限，并非每日预算。默认值：10 分钟和 $2。报告最多五分钟后发布，生成过程会在这些限制内继续。",
+    "safeguardHint": "每份摘要的有限保护上限，并非每日预算。默认值：{{duration}}和 {{amount}}。报告最多五分钟后发布，生成过程会在这些限制内继续。",
     "invalidSafeguards": "请输入有限的正数时间和花费上限。",
     "estimate": "预估 {{estimate}} · 最高 {{maximum}}",
     "estimateUnavailable": "这些设置下无法获取付费摘要。",

@@ -3927,7 +3927,7 @@
     "defaultModel": "Kilo’nun varsayılan modelini kullan",
     "duration": "Süre sınırı (dakika)",
     "spendLimit": "Harcama sınırı (USD)",
-    "safeguardHint": "Özet başına sınırlar; günlük bütçe değildir. Varsayılanlar: 10 dakika ve $2. Oluşturma bu sınırlar içinde sürerken rapor en geç beş dakika sonra yayımlanır.",
+    "safeguardHint": "Özet başına sınırlar; günlük bütçe değildir. Varsayılanlar: {{duration}} ve {{amount}}. Oluşturma bu sınırlar içinde sürerken rapor en geç beş dakika sonra yayımlanır.",
     "invalidSafeguards": "Pozitif ve sonlu süre ve harcama sınırları girin.",
     "estimate": "Tahmini {{estimate}} · en fazla {{maximum}}",
     "estimateUnavailable": "Bu ayarlar için ücretli özet mevcut değil.",

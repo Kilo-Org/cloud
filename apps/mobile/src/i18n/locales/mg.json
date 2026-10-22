@@ -3927,7 +3927,7 @@
     "defaultModel": "Ampiasao ny modely default an'i Kilo",
     "duration": "Fetra fotoana (minitra)",
     "spendLimit": "Fetra fandaniana (USD)",
-    "safeguardHint": "Fetra voafaritra isaky ny famintinana, fa tsy teti-bola isan'andro. Default: 10 minitra sy $2. Avoaka ao anatin'ny dimy minitra farafahabetsany ny tatitra raha mbola mitohy ao anatin'ireo fetra ireo ny famoronana.",
+    "safeguardHint": "Fetra voafaritra isaky ny famintinana, fa tsy teti-bola isan'andro. Default: {{duration}} sy {{amount}}. Avoaka ao anatin'ny dimy minitra farafahabetsany ny tatitra raha mbola mitohy ao anatin'ireo fetra ireo ny famoronana.",
     "invalidSafeguards": "Ampidiro fetra fotoana sy fandaniana tsara sy voafetra.",
     "estimate": "Vinavina {{estimate}} · ambony indrindra {{maximum}}",
     "estimateUnavailable": "Tsy misy famintinana kando iyou ho an'ireto fandrindrana ireto.",

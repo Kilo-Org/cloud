@@ -3927,7 +3927,7 @@
     "defaultModel": "Isticmaal moodeelka caadiga ah ee Kilo",
     "duration": "Ilaalinta waqtiga (daqiiqado)",
     "spendLimit": "Ilaalinta kharashka (USD)",
-    "safeguardHint": "Ilaalino xaddidan oo soo koobid kasta ah, maaha miisaaniyad maalinle ah. Caadi ahaan: 10 daqiiqo iyo $2. Warbixin ayaa la daabacaa ugu badnaan shan daqiiqo kadib inta samaynta ay sii socoto xadkan gudahooda.",
+    "safeguardHint": "Ilaalino xaddidan oo soo koobid kasta ah, maaha miisaaniyad maalinle ah. Caadi ahaan: {{duration}} iyo {{amount}}. Warbixin ayaa la daabacaa ugu badnaan shan daqiiqo kadib inta samaynta ay sii socoto xadkan gudahooda.",
     "invalidSafeguards": "Geli xadad waqti iyo kharash oo togan oo xaddidan.",
     "estimate": "Qiimeyn {{estimate}} · ugu badnaan {{maximum}}",
     "estimateUnavailable": "Kooban lacag lagu qiimaystay laguma heli karo dejimyadan.",

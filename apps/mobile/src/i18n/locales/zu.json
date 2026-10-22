@@ -3927,7 +3927,7 @@
     "defaultModel": "Sebenzisa imodeli ezenzakalelayo ye-Kilo",
     "duration": "Umkhawulo wesikhathi (amaminithi)",
     "spendLimit": "Umkhawulo wezindleko (USD)",
-    "safeguardHint": "Imikhawulo enqunyiwe ngesifinyezo ngasinye, hhayi isabelomali sansuku zonke. Okuzenzakalelayo: amaminithi angu-10 no-$2. Umbiko ushicilelwa ngemva kwamaminithi amahlanu kakhulu ngenkathi ukukhiqiza kuqhubeka ngaphakathi kwale mikhawulo.",
+    "safeguardHint": "Imikhawulo enqunyiwe ngesifinyezo ngasinye, hhayi isabelomali sansuku zonke. Okuzenzakalelayo: {{duration}} no-{{amount}}. Umbiko ushicilelwa ngemva kwamaminithi amahlanu kakhulu ngenkathi ukukhiqiza kuqhubeka ngaphakathi kwale mikhawulo.",
     "invalidSafeguards": "Faka imikhawulo yesikhathi neyezindleko enhle nenqunyiwe.",
     "estimate": "Kulinganiselwe {{estimate}} · okuphezulu kakhulu {{maximum}}",
     "estimateUnavailable": "Isifinyezo esikhokhelwayo asitholakali kule zilungiselelo.",

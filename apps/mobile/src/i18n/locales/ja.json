@@ -3927,7 +3927,7 @@
     "defaultModel": "Kiloのデフォルトモデルを使用",
     "duration": "時間の上限(分)",
     "spendLimit": "支出の上限(USD)",
-    "safeguardHint": "要約ごとの上限であり、1日の予算ではありません。デフォルト: 10分と$2。生成がこの上限内で続く間も、レポートは最長5分後に公開されます。",
+    "safeguardHint": "要約ごとの上限であり、1日の予算ではありません。デフォルト: {{duration}}と{{amount}}。生成がこの上限内で続く間も、レポートは最長5分後に公開されます。",
     "invalidSafeguards": "正の有限な時間と支出の上限を入力してください。",
     "estimate": "推定 {{estimate}} · 最大 {{maximum}}",
     "estimateUnavailable": "これらの設定では有料サマリーを利用できません。",

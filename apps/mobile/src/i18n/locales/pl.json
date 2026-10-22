@@ -4017,7 +4017,7 @@
     "defaultModel": "Użyj domyślnego modelu Kilo",
     "duration": "Limit czasu (minuty)",
     "spendLimit": "Limit wydatków (USD)",
-    "safeguardHint": "Skończone limity na podsumowanie, a nie budżet dzienny. Domyślnie: 10 minut i $2. Raport publikowany jest po maksymalnie pięciu minutach, a generowanie trwa dalej w tych limitach.",
+    "safeguardHint": "Skończone limity na podsumowanie, a nie budżet dzienny. Domyślnie: {{duration}} i {{amount}}. Raport publikowany jest po maksymalnie pięciu minutach, a generowanie trwa dalej w tych limitach.",
     "invalidSafeguards": "Wpisz dodatnie, skończone limity czasu i wydatków.",
     "estimate": "Szacunek {{estimate}} · maksymalnie {{maximum}}",
     "estimateUnavailable": "Płatne podsumowanie nie jest dostępne dla tych ustawień.",

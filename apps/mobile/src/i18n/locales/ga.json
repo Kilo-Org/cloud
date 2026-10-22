@@ -4062,7 +4062,7 @@
     "defaultModel": "Úsáid múnla réamhshocraithe Kilo",
     "duration": "Cosaint ama (nóiméid)",
     "spendLimit": "Cosaint caiteachais (USD)",
-    "safeguardHint": "Cosaintí teoranta in aghaidh na hachoimre, ní buiséad laethúil. Réamhshocruithe: 10 nóiméad agus $2. Foilsítear tuarascáil tar éis cúig nóiméad ar a mhéad agus leanann an giniúint ar aghaidh laistigh de na teorainneacha seo.",
+    "safeguardHint": "Cosaintí teoranta in aghaidh na hachoimre, ní buiséad laethúil. Réamhshocruithe: {{duration}} agus {{amount}}. Foilsítear tuarascáil tar éis cúig nóiméad ar a mhéad agus leanann an giniúint ar aghaidh laistigh de na teorainneacha seo.",
     "invalidSafeguards": "Cuir isteach teorainneacha ama agus caiteachais dearfacha, teoranta.",
     "estimate": "Meastachán {{estimate}} · uasmhéid {{maximum}}",
     "estimateUnavailable": "Níl achoimre íoctha ar fáil le haghaidh na socruithe seo.",

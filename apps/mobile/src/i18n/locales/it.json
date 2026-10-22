@@ -3972,7 +3972,7 @@
     "defaultModel": "Usa il modello predefinito di Kilo",
     "duration": "Limite di tempo (minuti)",
     "spendLimit": "Limite di spesa (USD)",
-    "safeguardHint": "Limiti finiti per singolo riepilogo, non un budget giornaliero. Predefiniti: 10 minuti e $2. Un report viene pubblicato entro cinque minuti mentre la generazione continua entro questi limiti.",
+    "safeguardHint": "Limiti finiti per singolo riepilogo, non un budget giornaliero. Predefiniti: {{duration}} e {{amount}}. Un report viene pubblicato entro cinque minuti mentre la generazione continua entro questi limiti.",
     "invalidSafeguards": "Inserisci limiti di tempo e spesa positivi e finiti.",
     "estimate": "Stima {{estimate}} · massimo {{maximum}}",
     "estimateUnavailable": "Nessun riepilogo a pagamento disponibile per queste impostazioni.",

@@ -3927,7 +3927,7 @@
     "defaultModel": "Usar o modelo predeterminado de Kilo",
     "duration": "Límite de tempo (minutos)",
     "spendLimit": "Límite de gasto (USD)",
-    "safeguardHint": "Límites finitos por resumo, non un orzamento diario. Predeterminados: 10 minutos e $2. O informe publícase como moito tras cinco minutos mentres a xeración continúa dentro destes límites.",
+    "safeguardHint": "Límites finitos por resumo, non un orzamento diario. Predeterminados: {{duration}} e {{amount}}. O informe publícase como moito tras cinco minutos mentres a xeración continúa dentro destes límites.",
     "invalidSafeguards": "Introduce límites de tempo e gasto positivos e finitos.",
     "estimate": "Estimación {{estimate}} · máximo {{maximum}}",
     "estimateUnavailable": "Non hai dispoñible un resumo de pago para estes axustes.",

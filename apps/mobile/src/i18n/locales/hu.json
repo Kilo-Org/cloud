@@ -3927,7 +3927,7 @@
     "defaultModel": "A Kilo alapértelmezett modelljének használata",
     "duration": "Időkorlát (perc)",
     "spendLimit": "Költési korlát (USD)",
-    "safeguardHint": "Véges, összefoglalónkénti korlátok, nem napi keret. Alapértelmezés: 10 perc és $2. A jelentés legfeljebb öt perc után megjelenik, a generálás pedig e korlátokon belül folytatódik.",
+    "safeguardHint": "Véges, összefoglalónkénti korlátok, nem napi keret. Alapértelmezés: {{duration}} és {{amount}}. A jelentés legfeljebb öt perc után megjelenik, a generálás pedig e korlátokon belül folytatódik.",
     "invalidSafeguards": "Adj meg pozitív, véges idő- és költési korlátot.",
     "estimate": "Becsült {{estimate}} · legfeljebb {{maximum}}",
     "estimateUnavailable": "Fizetett összefoglaló nem elérhető ezekkel a beállításokkal.",

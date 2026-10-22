@@ -3932,7 +3932,7 @@
     "defaultModel": "Använd Kilos standardmodell",
     "duration": "Tidsgräns (minuter)",
     "spendLimit": "Kostnadsgräns (USD)",
-    "safeguardHint": "Fasta gränser per sammanfattning, inte en daglig budget. Standard: 10 minuter och $2. En rapport publiceras efter högst fem minuter medan genereringen fortsätter inom dessa gränser.",
+    "safeguardHint": "Fasta gränser per sammanfattning, inte en daglig budget. Standard: {{duration}} och {{amount}}. En rapport publiceras efter högst fem minuter medan genereringen fortsätter inom dessa gränser.",
     "invalidSafeguards": "Ange positiva, ändliga tids- och kostnadsgränser.",
     "estimate": "Uppskattning {{estimate}} · maximalt {{maximum}}",
     "estimateUnavailable": "En betald sammanfattning är inte tillgänglig för dessa inställningar.",

@@ -3972,7 +3972,7 @@
     "defaultModel": "Koristi Kilo podrazumevani model",
     "duration": "Vremensko ograničenje (minuti)",
     "spendLimit": "Ograničenje potrošnje (USD)",
-    "safeguardHint": "Konačna ograničenja po rezimeu, ne dnevni budžet. Podrazumevano: 10 minuta i $2. Izveštaj se objavljuje nakon najviše pet minuta, dok se generisanje nastavlja u ovim granicama.",
+    "safeguardHint": "Konačna ograničenja po rezimeu, ne dnevni budžet. Podrazumevano: {{duration}} i {{amount}}. Izveštaj se objavljuje nakon najviše pet minuta, dok se generisanje nastavlja u ovim granicama.",
     "invalidSafeguards": "Unesite pozitivna, konačna ograničenja vremena i potrošnje.",
     "estimate": "Procena {{estimate}} · najviše {{maximum}}",
     "estimateUnavailable": "Plaćeni rezime nije dostupan za ova podešavanja.",

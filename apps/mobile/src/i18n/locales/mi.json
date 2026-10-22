@@ -3927,7 +3927,7 @@
     "defaultModel": "Whakamahia te tauira taunoa a Kilo",
     "duration": "Ārai wā (meneti)",
     "spendLimit": "Ārai whakapaunga (USD)",
-    "safeguardHint": "He ārai mutunga mō ia whakarāpopototanga, ehara i te tahua ia rā. Taunoa: 10 meneti me $2. Ka whakaputaina he pūrongo i muri i te rima meneti te roa rawa, ā, ka haere tonu te waihanga i roto i ēnei tepe.",
+    "safeguardHint": "He ārai mutunga mō ia whakarāpopototanga, ehara i te tahua ia rā. Taunoa: {{duration}} me {{amount}}. Ka whakaputaina he pūrongo i muri i te rima meneti te roa rawa, ā, ka haere tonu te waihanga i roto i ēnei tepe.",
     "invalidSafeguards": "Tāurua he tepe wā, whakapaunga hoki e tōrunga ana, e mutunga ana.",
     "estimate": "Tatau {{estimate}} · teitei rawa {{maximum}}",
     "estimateUnavailable": "Kāore he whakarāpopototanga utu mō ēnei tautuhinga.",

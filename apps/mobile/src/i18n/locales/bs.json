@@ -3972,7 +3972,7 @@
     "defaultModel": "Koristi zadani Kilo model",
     "duration": "Vremensko ograničenje (minute)",
     "spendLimit": "Ograničenje potrošnje (USD)",
-    "safeguardHint": "Konačna ograničenja po sažetku, ne dnevni budžet. Zadano: 10 minuta i $2. Izvještaj se objavljuje nakon najviše pet minuta dok se generisanje nastavlja unutar ovih ograničenja.",
+    "safeguardHint": "Konačna ograničenja po sažetku, ne dnevni budžet. Zadano: {{duration}} i {{amount}}. Izvještaj se objavljuje nakon najviše pet minuta dok se generisanje nastavlja unutar ovih ograničenja.",
     "invalidSafeguards": "Unesite pozitivna, konačna ograničenja vremena i potrošnje.",
     "estimate": "Procjena {{estimate}} · maksimalno {{maximum}}",
     "estimateUnavailable": "Plaćeni sažetak nije dostupan za ove postavke.",

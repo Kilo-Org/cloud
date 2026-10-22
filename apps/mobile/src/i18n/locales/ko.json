@@ -3927,7 +3927,7 @@
     "defaultModel": "Kilo 기본 모델 사용",
     "duration": "시간 안전 한도(분)",
     "spendLimit": "지출 안전 한도(USD)",
-    "safeguardHint": "일일 예산이 아닌 요약별 고정 안전 한도입니다. 기본값: 10분 및 $2. 보고서는 최대 5분 후 게시되며, 생성은 이 한도 내에서 계속됩니다.",
+    "safeguardHint": "일일 예산이 아닌 요약별 고정 안전 한도입니다. 기본값: {{duration}} 및 {{amount}}. 보고서는 최대 5분 후 게시되며, 생성은 이 한도 내에서 계속됩니다.",
     "invalidSafeguards": "유한한 양수로 시간 및 지출 한도를 입력하세요.",
     "estimate": "예상 비용 {{estimate}} · 최대 {{maximum}}",
     "estimateUnavailable": "이 설정에는 유료 요약을 사용할 수 없습니다.",

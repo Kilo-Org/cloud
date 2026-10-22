@@ -3927,7 +3927,7 @@
     "defaultModel": "Përdor modelin e parazgjedhur të Kilo",
     "duration": "Kufiri i kohës (minuta)",
     "spendLimit": "Kufiri i shpenzimit (USD)",
-    "safeguardHint": "Kufij të fundëm për çdo përmbledhje, jo buxhet ditor. Parazgjedhjet: 10 minuta dhe $2. Raporti publikohet pas maksimumi pesë minutash, ndërsa gjenerimi vazhdon brenda këtyre kufijve.",
+    "safeguardHint": "Kufij të fundëm për çdo përmbledhje, jo buxhet ditor. Parazgjedhjet: {{duration}} dhe {{amount}}. Raporti publikohet pas maksimumi pesë minutash, ndërsa gjenerimi vazhdon brenda këtyre kufijve.",
     "invalidSafeguards": "Fut kufij kohe dhe shpenzimi pozitivë dhe të fundëm.",
     "estimate": "Vlerësimi {{estimate}} · maksimumi {{maximum}}",
     "estimateUnavailable": "Një përmbledhje me pagesë nuk është e disponueshme për këto rregullime.",

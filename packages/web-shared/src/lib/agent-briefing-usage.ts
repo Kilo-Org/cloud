@@ -14,6 +14,7 @@ export const briefingChargeAccountingSchema = z.object({
       id: z.string(),
       settlementToken: z.string().optional(),
       usageId: z.uuid().nullable(),
+      deadlineAt: z.string().datetime().optional(),
     })
   ),
 });
@@ -28,6 +29,9 @@ export async function recordBriefingUsage(input: {
   const usage = input.usage;
   if (!usage || !input.settlementToken || !z.uuid().safeParse(usage.usageId).success) return;
 
+  // The gateway runs in sfo1 while db is the Frankfurt primary: this is the rare
+  // post-response write for a briefing request, and it takes a row lock so the
+  // receipt cannot land on a report whose generation has already moved on.
   await db.transaction(async tx => {
     const [report] = await tx
       .select({ id: agent_briefing_reports.id, summary: agent_briefing_reports.summary })

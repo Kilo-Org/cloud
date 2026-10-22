@@ -964,6 +964,77 @@ it('settles only after the receipt usage row is committed', async () => {
   });
 });
 
+it('settles committed usage past the generation deadline without a receipt', async () => {
+  const { caller, report, generationId, usageId } = await prepareFailedSummary('uncommitted');
+  const deadline = new Date(Date.now() - 20 * 60_000).toISOString();
+  await db
+    .update(agent_briefing_reports)
+    .set({
+      generation_deadline_at: deadline,
+      summary: {
+        ...report.summary,
+        chargeAccounting: {
+          baselineCostMicrodollars: 100,
+          generations: [{ id: generationId, usageId: null, deadlineAt: deadline }],
+        },
+      },
+    })
+    .where(eq(agent_briefing_reports.id, report.id));
+  await insertSummaryCharge(generationId, 300, usageId);
+  const [repaired] = await db
+    .select()
+    .from(agent_briefing_reports)
+    .where(eq(agent_briefing_reports.id, report.id));
+  await reconcileBriefingCharge(repaired);
+  const current = await caller.get({ reportId: report.id });
+  expect(current.summary).toMatchObject({
+    status: 'failed',
+    chargeStatus: 'settled',
+    costMicrodollars: 1600,
+    canRetry: true,
+  });
+  const [persisted] = await db
+    .select()
+    .from(agent_briefing_reports)
+    .where(eq(agent_briefing_reports.id, report.id));
+  expect(persisted.next_charge_check_at).toBeNull();
+});
+
+it('keeps settlement pending within the generation deadline', async () => {
+  const { caller, report, generationId, usageId } = await prepareFailedSummary('uncommitted');
+  const deadline = new Date(Date.now() + 5 * 60_000).toISOString();
+  await db
+    .update(agent_briefing_reports)
+    .set({
+      generation_deadline_at: deadline,
+      summary: {
+        ...report.summary,
+        chargeAccounting: {
+          baselineCostMicrodollars: 100,
+          generations: [{ id: generationId, usageId: null, deadlineAt: deadline }],
+        },
+      },
+    })
+    .where(eq(agent_briefing_reports.id, report.id));
+  await insertSummaryCharge(generationId, 300, usageId);
+  const [pendingRow] = await db
+    .select()
+    .from(agent_briefing_reports)
+    .where(eq(agent_briefing_reports.id, report.id));
+  await reconcileBriefingCharge(pendingRow);
+  const current = await caller.get({ reportId: report.id });
+  expect(current.summary).toMatchObject({
+    chargeStatus: 'pending',
+    costMicrodollars: 1600,
+    canRetry: false,
+  });
+  const [persisted] = await db
+    .select()
+    .from(agent_briefing_reports)
+    .where(eq(agent_briefing_reports.id, report.id));
+  expect(persisted.next_charge_check_at).not.toBeNull();
+});
+
 it('keeps generations without receipt accounting pending', async () => {
   const { caller, report, generationId } = await prepareFailedSummary('committed');
   await db
@@ -987,6 +1058,11 @@ it('keeps generations without receipt accounting pending', async () => {
     canRetry: false,
   });
   expect(legacy.generation_id).toBe(generationId);
+  const [persisted] = await db
+    .select()
+    .from(agent_briefing_reports)
+    .where(eq(agent_briefing_reports.id, report.id));
+  expect(persisted.next_charge_check_at).toBeNull();
 });
 
 it.each(['queued', 'running'] as const)(

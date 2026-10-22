@@ -482,6 +482,9 @@ async function queueSummary(
 }
 type BriefingTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+/** Margin past a generation's own deadline before the committed ledger is final. */
+const CHARGE_REPAIR_GRACE_MS = 10 * 60_000;
+
 function chargeAccounting(row: BriefingReportRow) {
   return briefingChargeAccountingSchema.parse(
     row.summary.chargeAccounting ?? {
@@ -524,11 +527,27 @@ async function reconcileLockedBriefingCharge(
   const total =
     accounting.baselineCostMicrodollars +
     charges.reduce((cost, charge) => cost + Number(charge.cost), 0);
-  const settled = accounting.generations.every(
-    generation =>
-      generation.usageId !== null &&
-      chargesByGeneration.get(generation.id)?.usageIds.includes(generation.usageId)
+  // The gateway's accounting runs inside its own request lifetime, so a finished
+  // generation whose deadline has passed cannot produce another row. That bound
+  // is what lets a lost receipt still settle from the committed ledger.
+  const now = Date.now();
+  const settlements = accounting.generations.map(generation => {
+    const charge = chargesByGeneration.get(generation.id);
+    if (generation.usageId !== null && charge?.usageIds.includes(generation.usageId) === true)
+      return 'settled' as const;
+    const deadline =
+      generation.deadlineAt ??
+      (generation.id === row.generation_id ? row.generation_deadline_at : null);
+    if (deadline === null)
+      return generation.settlementToken ? ('waiting' as const) : ('unreachable' as const);
+    if (now >= Date.parse(deadline) + CHARGE_REPAIR_GRACE_MS)
+      return charge === undefined ? ('unreachable' as const) : ('repaired' as const);
+    return 'waiting' as const;
+  });
+  const settled = settlements.every(
+    settlement => settlement === 'settled' || settlement === 'repaired'
   );
+  const awaitingRows = settlements.includes('waiting');
   const chargeStatus = settled ? 'settled' : 'pending';
   const canRetry =
     row.summary.status === 'failed' &&
@@ -544,7 +563,7 @@ async function reconcileLockedBriefingCharge(
   const [updated] = await tx
     .update(agent_briefing_reports)
     .set({
-      next_charge_check_at: settled ? null : new Date(Date.now() + 60_000).toISOString(),
+      next_charge_check_at: awaitingRows ? new Date(now + 60_000).toISOString() : null,
       summary: sql`${agent_briefing_reports.summary} || ${JSON.stringify({ costMicrodollars: total, chargeStatus, canRetry, chargeAccounting: accounting })}::jsonb`,
     })
     .where(eq(agent_briefing_reports.id, row.id))
@@ -619,17 +638,23 @@ export async function runBriefingSummary(reportId: string): Promise<void> {
     if (remainingMs <= 0) throw new Error('time_limit');
     generationId = `agent-briefing:${crypto.randomUUID()}`;
     const settlementToken = crypto.randomUUID();
+    const deadlineAt = new Date(
+      Date.parse(startedAt) + setting.maxDurationSeconds * 1000
+    ).toISOString();
     const accounting = chargeAccounting(row);
-    accounting.generations.push({ id: generationId, settlementToken, usageId: null });
+    accounting.generations.push({
+      id: generationId,
+      settlementToken,
+      usageId: null,
+      deadlineAt,
+    });
     const [claimed] = await db
       .update(agent_briefing_reports)
       .set({
         generation_id: generationId,
         generation_started_at: startedAt,
         next_charge_check_at: startedAt,
-        generation_deadline_at: new Date(
-          Date.parse(startedAt) + setting.maxDurationSeconds * 1000
-        ).toISOString(),
+        generation_deadline_at: deadlineAt,
         generation_revision: row.revision,
         generation_max_cost: setting.maxSpendMicrodollars,
         summary: sql`${agent_briefing_reports.summary} || ${JSON.stringify({ status: 'running', chargeStatus: 'pending', model: setting.model, startedAt, estimatedCostMicrodollars: bound.estimatedCost, chargeAccounting: accounting })}::jsonb`,

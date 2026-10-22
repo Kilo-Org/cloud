@@ -628,6 +628,47 @@ describe('addCandidates — capacity and stored names', () => {
     renderer.unmount();
   });
 
+  it('reports a selection that no longer fits at all instead of dropping it silently', async () => {
+    const measure = Promise.withResolvers<number>();
+    hoisted.measureLocalSize.mockReturnValueOnce(measure.promise);
+    const renderer = await mountHook();
+
+    let add: Promise<void> | undefined = undefined;
+    await act(async () => {
+      add = hookApi().addCandidates(documentCandidates(2, 'a'));
+      await Promise.resolve();
+    });
+
+    // The strip reaches its limit while the selection is still measuring.
+    await act(async () => {
+      hookApi().restoreChips(
+        Array.from({ length: 5 }, (_, index) =>
+          makeAttachment({ id: `r${index}`, filename: `r${index}.pdf` })
+        )
+      );
+      await settle();
+    });
+
+    await act(async () => {
+      measure.resolve(1024);
+      await add;
+      await settle();
+    });
+
+    expect(hookApi().attachments.map(chip => chip.filename)).toEqual([
+      'r0.pdf',
+      'r1.pdf',
+      'r2.pdf',
+      'r3.pdf',
+      'r4.pdf',
+    ]);
+    expect(hoisted.uploadOne).not.toHaveBeenCalled();
+    expect(hoisted.fileDelete).toHaveBeenCalledWith('file:///cache/a0.pdf');
+    expect(hoisted.fileDelete).toHaveBeenCalledWith('file:///cache/a1.pdf');
+    expect(toast.error).toHaveBeenCalledWith('Maximum 5 files allowed');
+    renderer.unmount();
+  });
+
   it('gives the claimed capacity back when a reset retires the selection', async () => {
     const measure = Promise.withResolvers<number>();
     hoisted.measureLocalSize.mockReturnValueOnce(measure.promise);

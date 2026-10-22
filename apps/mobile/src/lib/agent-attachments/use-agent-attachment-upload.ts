@@ -113,6 +113,17 @@ function storedAttachmentFilename(raw: string, extension: AgentAttachmentExtensi
   return sanitizeAttachmentFilename(normalizeFilename(sanitizeAttachmentFilename(raw), extension));
 }
 
+/** Announce that the composer holds its full complement of attachments. */
+function announceComposerFull(): void {
+  toast.error(
+    // i18n-dup-ok: 'agentChat.attachmentPicker.maxFilesAllowed_other' is this message's plural other category — the bare key carries that copy by i18next convention, so the family is one message, not two keys for the same copy.
+    i18n.t('agentChat.attachmentPicker.maxFilesAllowed', {
+      count: AGENT_ATTACHMENT_MAX_FILES,
+      displayCount: formatNumber(AGENT_ATTACHMENT_MAX_FILES, i18n.language),
+    })
+  );
+}
+
 // A cloud-agent sandbox URL encodes the R2 key of a stored attachment:
 //   file:///tmp/attachments/<sessionId>/<userId>/<messageUuid>/<filename>
 // whose R2 key is `<userId>/cloud-agent/<messageUuid>/<filename>` (see
@@ -566,6 +577,10 @@ export function useAgentAttachmentUpload(
         }
       }
       if (kept.length === 0) {
+        // The strip filled while this selection was measuring, so nothing
+        // fits. Say so with the full-composer message instead of dropping the
+        // selection silently.
+        announceComposerFull();
         return;
       }
       commitAttachments(current => [...current, ...kept]);
@@ -617,13 +632,7 @@ export function useAgentAttachmentUpload(
         candidates.length
       );
       if (!limit.ok) {
-        toast.error(
-          // i18n-dup-ok: 'agentChat.attachmentPicker.maxFilesAllowed_other' is this message's plural other category — the bare key carries that copy by i18next convention, so the family is one message, not two keys for the same copy.
-          i18n.t('agentChat.attachmentPicker.maxFilesAllowed', {
-            count: AGENT_ATTACHMENT_MAX_FILES,
-            displayCount: formatNumber(AGENT_ATTACHMENT_MAX_FILES, i18n.language),
-          })
-        );
+        announceComposerFull();
         return;
       }
       const accepted = candidates.slice(0, limit.acceptedCount);

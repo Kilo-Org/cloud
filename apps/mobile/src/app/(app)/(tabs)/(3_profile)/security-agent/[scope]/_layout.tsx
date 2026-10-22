@@ -6,6 +6,10 @@ import { SecurityAgentCommandObserver } from '@/components/security-agent/securi
 import { useFormSheetScreenOptions } from '@/lib/form-sheet';
 import { parseParam } from '@/lib/route-params';
 
+export const unstable_settings = {
+  anchor: 'index',
+};
+
 // Mounts exactly one command observer per scope alongside a headerless Stack,
 // so it stays mounted across Dashboard/Findings/Settings navigation without
 // ever running twice for the same scope. Also the single validation point
@@ -24,19 +28,8 @@ export default function SecurityAgentScopeLayout() {
   return (
     <>
       <SecurityAgentCommandObserver scope={scope} />
-      {/* Anchored entry needs a valid scope root, not a parameterless dismissal route. */}
-      <Stack
-        initialRouteName="index"
-        screenLayout={appScreenLayout}
-        screenOptions={{ headerShown: false }}
-      >
-        {/*
-         * An anchored navigation (a notification or system-search link to a
-         * finding) inserts `index` below the target with only its
-         * `initialParams`, not the URL params. Without `scope` here the
-         * dashboard under the finding queries with no `organizationId`.
-         */}
-        <Stack.Screen name="index" initialParams={{ scope }} />
+      <Stack screenLayout={appScreenLayout} screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
         <Stack.Screen name="dismiss/[id]" options={sheetOptions} />
         <Stack.Screen name="filter" options={sheetOptions} />
       </Stack>

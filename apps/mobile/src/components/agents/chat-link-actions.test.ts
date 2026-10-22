@@ -143,7 +143,7 @@ describe('chat link actions', () => {
   });
 
   it('shares the exact URL without treating dismissal as failure', async () => {
-    mockedShare.mockResolvedValue({ action: Share.dismissedAction });
+    mockedShare.mockResolvedValue({ action: Share.dismissedAction, activityType: undefined });
 
     await performChatLinkAction('share', 'https://kilo.ai/docs');
 
@@ -154,7 +154,7 @@ describe('chat link actions', () => {
   it('retries only sharing after a share failure', async () => {
     mockedShare
       .mockRejectedValueOnce(new Error('share unavailable'))
-      .mockResolvedValueOnce({ action: Share.sharedAction });
+      .mockResolvedValueOnce({ action: Share.sharedAction, activityType: undefined });
 
     await performChatLinkAction('share', 'https://kilo.ai/docs');
 

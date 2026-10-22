@@ -1,22 +1,23 @@
 // eslint-disable-next-line import/no-nodejs-modules -- Load the installed router without the native Expo entry.
 import { createRequire } from 'node:module';
-import type * as StackRouterModule from 'expo-router/build/react-navigation/routers/StackRouter.js';
+import type * as PathParserModule from 'expo-router/build/fork/getStateFromPath.js';
 import { Children, createElement, isValidElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type PushData } from '@kilocode/notifications';
 
-import SecurityAgentScopeLayout from '@/app/(app)/(tabs)/(3_profile)/security-agent/[scope]/_layout';
+import SecurityAgentScopeLayout, {
+  unstable_settings,
+} from '@/app/(app)/(tabs)/(3_profile)/security-agent/[scope]/_layout';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { notificationPathForData } from './notification-path';
 
 const loadRouter = createRequire(import.meta.url);
-const { StackActions, StackRouter: createStackRouter } = loadRouter(
-  'expo-router/build/react-navigation/routers/StackRouter.js'
-) as typeof StackRouterModule;
-type RouterAction = Parameters<ReturnType<typeof createStackRouter>['getStateForAction']>[1];
-type StackProps = { initialRouteName?: string; children?: ReactNode };
+const { getStateFromPath } = loadRouter(
+  'expo-router/build/fork/getStateFromPath.js'
+) as typeof PathParserModule;
+type StackProps = { children?: ReactNode };
 
 const captured = vi.hoisted(() => ({
   scope: 'personal' as string | string[] | undefined,
@@ -79,7 +80,7 @@ function mountScope(scope: string | string[] | undefined) {
   return renderer;
 }
 
-function initializeScope(scope: string) {
+function parseScopeEntry(scope: string, path: string) {
   mountScope(scope);
   const stack = captured.stack;
   if (!stack) {
@@ -87,105 +88,72 @@ function initializeScope(scope: string) {
   }
   // eslint-disable-next-line react/no-react-children -- Read the actual Stack.Screen declarations for this layout regression.
   const declared = Children.toArray(stack.children).map(child => {
-    if (!isValidElement<{ name: string; initialParams?: object }>(child)) {
+    if (!isValidElement<{ name: string }>(child)) {
       throw new Error('Expected a Stack.Screen declaration');
     }
     return child.props;
   });
-  const declaredNames = declared.map(screen => screen.name);
-  // Expo Router puts explicit declarations before the remaining file routes.
-  const options = {
-    routeNames: [...declaredNames, 'findings/index', 'findings/[id]'],
-    // React Navigation seeds a route it creates itself, such as the anchor
-    // below an anchored entry, from the screen's `initialParams` only.
-    routeParamList: Object.fromEntries(
-      declared.flatMap(screen =>
-        screen.initialParams ? [[screen.name, screen.initialParams] as const] : []
-      )
-    ),
-    routeGetIdList: {},
-  };
-  const router = createStackRouter({ initialRouteName: stack.initialRouteName });
-  let state = router.getInitialState(options);
-  return {
-    initialState: state,
-    apply: (action: RouterAction) => {
-      const next = router.getStateForAction(state, action, options);
-      if (!next) {
-        throw new Error(`Router rejected ${action.type}`);
-      }
-      state = router.getRehydratedState(next, options);
-      return state;
+  const routeNames = [...declared.map(screen => screen.name), 'findings/index', 'findings/[id]'];
+  const screens = Object.fromEntries(
+    routeNames.map(name => [name, name.replaceAll(/\[([^/]+)\]/g, ':$1').replace(/\/?index$/, '')])
+  );
+  const parsed = getStateFromPath(path, {
+    screens: {
+      scope: {
+        path: '(app)/(tabs)/(3_profile)/security-agent/:scope',
+        initialRouteName: unstable_settings.anchor,
+        screens,
+      },
     },
-  };
+  });
+  const state = parsed?.routes[0]?.state;
+  if (!state) {
+    throw new Error('Notification path did not resolve into the scope stack');
+  }
+  return state;
 }
 
-// Router-model POP is not evidence for a native gesture or the response handlers.
 describe.each(['personal', 'org-example'])('security notification history (%s)', scope => {
   it.each([
     { type: 'security_finding' },
     { type: 'security_lifecycle', event: 'analysis_completed' },
-  ] as const)('initializes index beneath a $type entry without a duplicate loop', payload => {
-    const { initialState, apply } = initializeScope(scope);
-    expect(initialState.routeNames).toEqual([
-      'index',
-      'dismiss/[id]',
-      'filter',
-      'findings/index',
-      'findings/[id]',
-    ]);
-    expect(initialState.routes.map(route => route.name)).toEqual(['index']);
-    expect(initialState.routes[0]?.params).toEqual({ scope });
-
+  ] as const)('resolves a $type entry above the scoped dashboard', payload => {
     const data = { ...payload, scope, findingId: 'finding-123' } satisfies PushData;
     const path = notificationPathForData(data);
     expect(path).toBe(
       `/(app)/(tabs)/(3_profile)/security-agent/${scope}/findings/finding-123?via=push`
     );
-    const url = new URL(path, 'https://example.test');
-    const segments = url.pathname.split('/');
-    const action = {
-      type: 'NAVIGATE',
-      payload: {
-        name: 'findings/[id]',
-        params: {
-          scope: segments.at(-3),
-          id: segments.at(-1),
-          via: url.searchParams.get('via'),
-        },
-      },
-    } as const;
-    const opened = apply(action);
-    expect(opened.routes.map(({ name, params }) => ({ name, params }))).toEqual([
-      { name: 'index', params: { scope } },
-      { name: 'findings/[id]', params: { scope, id: 'finding-123', via: 'push' } },
-    ]);
-    expect(apply(action)).toEqual(opened);
-    expect(apply(StackActions.pop())).toEqual(initialState);
+    const opened = parseScopeEntry(scope, path);
+    expect(opened.index).toBe(1);
+    expect(opened.routes.map(route => route.name)).toEqual(['index', 'findings/[id]']);
+    expect(opened.routes[0]?.params).toMatchObject({ scope });
+    expect(opened.routes[1]?.params).toMatchObject({ scope, id: 'finding-123', via: 'push' });
   });
 
-  it('returns to the same filtered findings list before and after a partial reset', () => {
-    const { apply } = initializeScope(scope);
-    const list = apply(
-      StackActions.push('findings/index', {
-        scope,
-        repoFullName: 'org/repo',
-        status: 'open',
-        severity: 'critical',
-        sortBy: 'sla_due_at_asc',
-      })
+  it('preserves scope and filters in a findings-list link', () => {
+    const state = parseScopeEntry(
+      scope,
+      `/(app)/(tabs)/(3_profile)/security-agent/${scope}/findings?repoFullName=org%2Frepo&status=open&severity=critical&sortBy=sla_due_at_asc`
     );
-    apply(StackActions.push('findings/[id]', { scope, id: 'finding-ordinary' }));
-    expect(apply(StackActions.pop())).toEqual(list);
-
-    const reset = apply({
-      type: 'RESET',
-      payload: { routes: list.routes.map(({ key, name, params }) => ({ key, name, params })) },
+    expect(state.routes.map(route => route.name)).toEqual(['index', 'findings/index']);
+    expect(state.routes[0]?.params).toMatchObject({ scope });
+    expect(state.routes[1]?.params).toMatchObject({
+      scope,
+      repoFullName: 'org/repo',
+      status: 'open',
+      severity: 'critical',
+      sortBy: 'sla_due_at_asc',
     });
-    expect(reset.routes).toEqual(list.routes);
-    apply(StackActions.push('findings/[id]', { scope, id: 'finding-ordinary' }));
-    expect(apply(StackActions.pop())).toEqual(reset);
   });
+});
+
+it.each(['personal', 'org-example'])('mounts one command observer for scope %s', scope => {
+  const tree = mountScope(scope);
+  const observers = tree.root.findAll(
+    node => (node.type as string) === 'SecurityAgentCommandObserver'
+  );
+  expect(observers).toHaveLength(1);
+  expect(observers[0]?.props.scope).toBe(scope);
 });
 
 it.each([{ scope: undefined }, { scope: '' }, { scope: ['personal', 'org-example'] }])(

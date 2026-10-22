@@ -81,8 +81,10 @@ vi.mock('@/components/agents/user-web-connection-provider', () => ({
 // The app-level mount subscribes to foreground transitions; the mock exposes
 // the same subscribe/remove contract as React Native.
 vi.mock('react-native', () => ({
-  InteractionManager: { runAfterInteractions: vi.fn() },
   AppState: { currentState: 'active', addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+}));
+vi.mock('@/lib/query/schedule-cache-maintenance', () => ({
+  scheduleCacheMaintenance: vi.fn(),
 }));
 // The mount also derives the app-owned needs-input plan from the route and
 // posts through expo-notifications; both are native-backed, so the mount test

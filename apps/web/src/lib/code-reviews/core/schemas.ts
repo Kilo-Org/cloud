@@ -11,6 +11,7 @@ import {
   ManualCodeReviewConfigSchema,
   CodeReviewTypeSchema,
   CodeReviewTriggerSourceSchema,
+  CODE_REVIEW_TERMINAL_REASONS,
 } from '@kilocode/db/schema-types';
 import { CODE_REVIEW_STATUSES } from '@kilocode/app-shared/code-review';
 import { CodeReviewAgentConfigSchema } from '@/lib/agent-config/core/types';
@@ -24,6 +25,12 @@ import { OwnerSchema, type Owner } from '@/lib/agent-config/core/owner';
  * Code review status enum
  */
 export const CodeReviewStatusSchema = z.enum(CODE_REVIEW_STATUSES);
+
+/**
+ * Code review terminal reason enum, for narrowing a persisted
+ * `cloud_agent_code_reviews.terminal_reason` back to the shared union.
+ */
+export const CodeReviewTerminalReasonSchema = z.enum(CODE_REVIEW_TERMINAL_REASONS);
 
 // ============================================================================
 // GitHub Webhook Schemas

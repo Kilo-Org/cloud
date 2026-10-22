@@ -109,6 +109,10 @@ const mockCaptureMessage = jest.mocked(captureMessage);
 
 const fakeUser = { id: 'user-1', api_token_pepper: 'pepper' } as User;
 
+const actualRequireAdmissionPayload = jest.requireActual<{
+  requireAdmissionPayload: typeof requireAdmissionPayload;
+}>('@/lib/auth/native-admission').requireAdmissionPayload;
+
 describe('POST /api/auth/native/token', () => {
   const createRequest = (body: unknown) =>
     new NextRequest('http://localhost:3000/api/auth/native/token', {
@@ -1101,8 +1105,8 @@ describe('POST /api/auth/native/token', () => {
       { provider: 'apple', idToken: 'apple-id-token' },
       { provider: 'google', idToken: 'google-id-token' },
       { provider: 'passkey', ticket: 'ticket-1' },
-    ])('refuses a $provider request with no proof before any side effect', async body => {
-      mockRequireAdmissionPayload.mockReturnValue(undefined);
+    ])('applies the admission contract to $provider requests', async body => {
+      mockRequireAdmissionPayload.mockImplementation(actualRequireAdmissionPayload);
 
       const response = await POST(createRequest(body));
 

@@ -133,21 +133,28 @@ function assertCredentialConfinement(workflow, completeByJob) {
 }
 
 /**
- * Change detection must judge its pipeline by the matcher. `grep -E` stops at
- * its first match, so the diff writer can take SIGPIPE, and `pipefail` would
- * then report a matching pipeline as a failure that reads as "no changes".
+ * Change detection must fail when the diff itself fails, and must judge the
+ * pipeline by the matcher: `grep -E` stops at its first match, so `pipefail`
+ * would otherwise report a matching pipeline as a failure.
  */
 function assertMatcherVerdict(step, jobName) {
+  const run = step.run ?? '';
   assert.match(
-    step.run ?? '',
-    /if set \+o pipefail && git diff --name-only/,
+    run,
+    /if ! git diff --name-only \"[^\"]+\" HEAD > \"\$changed\"; then/,
+    `${jobName}: change detection writes the name list from the diff`
+  );
+  assert.match(
+    run,
+    /if set \+o pipefail && cat \"\$changed\"/,
     `${jobName}: change detection reads a closed pipe as the matcher's answer`
   );
   assert.match(
-    step.run ?? '',
+    run,
     /\n\s*set -o pipefail\n/,
     `${jobName}: change detection restores the step's shell options`
   );
+  assert.match(run, /rm -f \"\$changed\"/, `${jobName}: change detection removes its name list`);
 }
 
 /** The `grep -Eq '…'` pattern a change-detection step runs. */
@@ -424,6 +431,18 @@ function validate(workflow) {
     JSON.stringify(prDump.env ?? {}),
     /MCP_CATALOG_KILO_AUTH|KILO_AUTH_CONTENT/,
     'PR apply must not use the personal CLI credential'
+  );
+  // Every job that runs the dump installs the same workspace scope, so the
+  // catalog it writes resolves the schemas it reads the same way.
+  const dumpInstall = findStep(
+    pr,
+    step => /pnpm install .*--filter web/.test(step.run ?? ''),
+    'PR dependency install'
+  );
+  assert.match(
+    dumpInstall.run ?? '',
+    /--filter cloud-agent-next$/,
+    `${prJobName}: the dump job installs the schemas it imports`
   );
   // The required check must not install the Kilo CLI: the apply path never
   // shells out to it, so a CLI here would only invite PR-side completions.
@@ -945,7 +964,14 @@ for (const [name, defect] of [
     'change detection drops its matcher verdict',
     workflow => {
       const step = workflow.jobs[prepareJobName].steps.find(item => item.id === 'catalog_changes');
-      step.run = step.run.replace('if set +o pipefail && git diff', 'if git diff');
+      step.run = step.run.replace('if set +o pipefail && cat', 'if cat');
+    },
+  ],
+  [
+    'change detection drops the diff status',
+    workflow => {
+      const step = workflow.jobs[prepareJobName].steps.find(item => item.id === 'catalog_changes');
+      step.run = step.run.replace('if ! git diff', 'if git diff');
     },
   ],
   [
@@ -959,7 +985,7 @@ for (const [name, defect] of [
     'merge change detection drops its matcher verdict',
     workflow => {
       const step = workflow.jobs[mergeJobName].steps.find(item => item.id === 'merge_changes');
-      step.run = step.run.replace('if set +o pipefail && git diff', 'if git diff');
+      step.run = step.run.replace('if set +o pipefail && cat', 'if cat');
     },
   ],
   [
@@ -990,6 +1016,15 @@ for (const [name, defect] of [
         (item.run ?? '').includes('--summaries-file')
       );
       delete step.if;
+    },
+  ],
+  [
+    'PR dump job drops the schema workspace install',
+    workflow => {
+      const step = workflow.jobs[prJobName].steps.find(item =>
+        /pnpm install .*--filter web/.test(item.run ?? '')
+      );
+      step.run = 'pnpm install --frozen-lockfile --filter web...';
     },
   ],
   [

@@ -104,16 +104,22 @@ jobs:
             echo "catalog=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # `grep -E` stops at its first match, so the diff writer may take
-          # SIGPIPE; the pipeline's verdict is the matcher's, or a matching
-          # change reads as "no changes".
-          if set +o pipefail && git diff --name-only "$base" HEAD \
+          # The diff runs on its own so a failure of the diff itself fails the
+          # step instead of reading as "no changes". `grep -E` then stops at its
+          # first match, so the pipeline's verdict is the matcher's.
+          changed="$(mktemp)"
+          if ! git diff --name-only "$base" HEAD > "$changed"; then
+            echo "::error::git diff against the base failed"
+            exit 1
+          fi
+          if set +o pipefail && cat "$changed" \
             | grep -Eq '^apps/web/src/|^packages/web-shared/src/|^services/kilo-mcp/|^services/cloud-agent-next/src/shared/|^packages/(app-shared|cloud-agent-profile|cloud-agent-sdk|kiloclaw-instance-tiers|kiloclaw-secret-catalog|organization-entitlement|session-ingest-contracts)/src/|^\.kilo/skills/|^\.github/workflows/kilo-mcp-catalog\.yml$|^scripts/kilo-mcp-catalog\.test\.mjs$'; then
             echo "catalog=true" >> "$GITHUB_OUTPUT"
           else
             echo "catalog=false" >> "$GITHUB_OUTPUT"
           fi
           set -o pipefail
+          rm -f "$changed"
 
       - name: Setup pnpm
         if: steps.catalog_changes.outputs.catalog == 'true'
@@ -453,9 +459,15 @@ jobs:
         if: needs.catalog-prepare.outputs.catalog == 'true'
         run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
 
+      # `cloud-agent-next` is not in web's dependency closure, but
+      # `apps/web/src/routers/cloud-agent-next-schemas.ts` imports schemas from
+      # it by relative path. Without that project installed, its bare `zod`
+      # import falls back to pnpm's hoisted copy, which can be a different
+      # version from the one the tests use, and the dump then rewrites the
+      # catalog with that version's JSON Schema output.
       - name: Install web dependencies
         if: needs.catalog-prepare.outputs.catalog == 'true'
-        run: pnpm install --frozen-lockfile --filter web...
+        run: pnpm install --frozen-lockfile --filter web... --filter cloud-agent-next
 
       # Same dummies the jest suite already tolerates (ci.yml does the same
       # for the production build). The dump layers apps/web/.env.test itself.
@@ -648,16 +660,22 @@ jobs:
             echo "catalog=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # `grep -E` stops at its first match, so the diff writer may take
-          # SIGPIPE; the pipeline's verdict is the matcher's, or a matching
-          # change reads as "no changes".
-          if set +o pipefail && git diff --name-only "$before" HEAD \
+          # The diff runs on its own so a failure of the diff itself fails the
+          # step instead of reading as "no changes". `grep -E` then stops at its
+          # first match, so the pipeline's verdict is the matcher's.
+          changed="$(mktemp)"
+          if ! git diff --name-only "$before" HEAD > "$changed"; then
+            echo "::error::git diff against the previous commit failed"
+            exit 1
+          fi
+          if set +o pipefail && cat "$changed" \
             | grep -Eq '^apps/web/src/|^packages/web-shared/src/|^services/kilo-mcp/|^services/cloud-agent-next/src/shared/|^packages/(app-shared|cloud-agent-profile|cloud-agent-sdk|kiloclaw-instance-tiers|kiloclaw-secret-catalog|organization-entitlement|session-ingest-contracts)/src/|^\.kilo/skills/|^\.github/workflows/kilo-mcp-catalog\.yml$|^scripts/kilo-mcp-catalog\.test\.mjs$'; then
             echo "catalog=true" >> "$GITHUB_OUTPUT"
           else
             echo "catalog=false" >> "$GITHUB_OUTPUT"
           fi
           set -o pipefail
+          rm -f "$changed"
 
       - name: Setup pnpm
         if: steps.merge_changes.outputs.catalog == 'true'

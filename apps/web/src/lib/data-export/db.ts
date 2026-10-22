@@ -30,7 +30,8 @@ import { z } from 'zod';
  * Export reads are bulk, keyset-paginated scans rather than interactive queries,
  * so this pool sets its own timeout instead of reusing `POSTGRES_MAX_QUERY_TIME`.
  * That variable is sized for the primary's request-path workload (5s under
- * `.env.test`) and is not applied to any pool in `drizzle.ts`.
+ * `.env.test`) and bounds only the read-replica pool in `drizzle.ts`, not this
+ * one.
  *
  * Enforced client side because Supavisor rejects `statement_timeout` in the
  * startup packet — the same constraint documented in lib/replication-health.ts.

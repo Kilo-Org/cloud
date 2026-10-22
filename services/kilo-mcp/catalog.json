@@ -36710,15 +36710,21 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "githubRepo": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
         }
       }
     },
     "tags": [
       "webhooktriggers",
       "capabilities",
-      "organizationid"
+      "organizationid",
+      "githubrepo"
     ],
-    "searchBlob": "webhookTriggers.capabilities Check which webhook trigger features the current user is allowed to use, such as whether they can set sandbox allocation limits. webhooktriggers capabilities organizationid organizationId"
+    "searchBlob": "webhookTriggers.capabilities Check which webhook trigger features the current user is allowed to use, such as whether they can set sandbox allocation limits. webhooktriggers capabilities organizationid githubrepo organizationId githubRepo"
   },
   "webhookTriggers.create": {
     "path": "webhookTriggers.create",
@@ -36780,7 +36786,15 @@
         },
         "sandboxAllocation": {
           "type": "string",
-          "const": "isolated-standard"
+          "enum": [
+            "isolated-standard",
+            "cloudflare-single",
+            "cloudflare-shared",
+            "cloudflare-containers-standard-3",
+            "cloudflare-containers-standard-4",
+            "vercel-small",
+            "vercel-large"
+          ]
         },
         "profileId": {
           "type": "string",
@@ -37125,7 +37139,15 @@
           "anyOf": [
             {
               "type": "string",
-              "const": "isolated-standard"
+              "enum": [
+                "isolated-standard",
+                "cloudflare-single",
+                "cloudflare-shared",
+                "cloudflare-containers-standard-3",
+                "cloudflare-containers-standard-4",
+                "vercel-small",
+                "vercel-large"
+              ]
             },
             {
               "type": "null"

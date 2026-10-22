@@ -33,6 +33,7 @@ import {
 import { isStepModel } from '@kilocode/web-shared/lib/ai-gateway/providers/stepfun';
 import { isDeepseekModel } from '@kilocode/web-shared/lib/ai-gateway/providers/deepseek';
 import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { applyTrackingIds } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import {
   repairChatCompletionsTools,
@@ -60,6 +61,7 @@ import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/
 import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
 import { removeRecursiveToolSchemaRefs } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-recursive-tool-schema-refs';
 import { removeTopLevelToolSchemaCombinators } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-top-level-tool-schema-combinators';
+import { removePaidServerFeatures } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-paid-server-features';
 import {
   addReflectionReasoningPlaceholders,
   isReflectionModel,
@@ -327,6 +329,9 @@ export async function applyProviderSpecificLogic(
   isNonTrialEnterprise: boolean
 ) {
   removeModelsFallback(requestedModel, requestToMutate, userId);
+  if (isFreeModelExcludingCustomLlms(requestedModel)) {
+    removePaidServerFeatures(provider, requestedModel, requestToMutate, userId);
+  }
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
   sanitizeBinaryToolResults(requestToMutate);

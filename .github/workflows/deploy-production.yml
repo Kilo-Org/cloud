@@ -26,9 +26,9 @@ jobs:
 
   check-production-db-startup:
     needs: check-changes
-    # Guard: this workflow only triggers on pushes to main, so the guard is
-    # defense-in-depth rather than a fork block. It is applied to every job
-    # so the workflow cannot run outside the canonical repo under any path.
+    # Guard: `schedule` and `workflow_dispatch` are reachable from a fork, so
+    # this is a real fork block. It is applied to every job so the workflow
+    # cannot run outside the canonical repo under any path.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
@@ -131,7 +131,7 @@ jobs:
   promote-ai-gateway:
     needs: [stage-ai-gateway, check-production-db-startup, run-migrations]
     # Guard: privileged workflow — only the canonical repo may run it.
-    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
+    if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-ai-gateway.outputs.deployment_url }}

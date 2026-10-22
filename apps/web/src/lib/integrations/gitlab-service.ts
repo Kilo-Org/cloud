@@ -25,6 +25,7 @@ import {
   validatePersonalAccessToken,
   type GitLabProjectAccessToken,
   type GitLabPATValidationResult,
+  GitLabAuthenticationError,
   GitLabProjectAccessTokenPermissionError,
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import { randomBytes, randomUUID } from 'crypto';
@@ -727,6 +728,14 @@ export async function getOrCreateProjectAccessToken(
 
     return newToken.token;
   } catch (error) {
+    if (error instanceof GitLabAuthenticationError) {
+      throw new TRPCError({
+        code: 'UNAUTHORIZED',
+        message:
+          'GitLab rejected the connected credential. Reconnect the GitLab integration and try again.',
+        cause: error,
+      });
+    }
     if (error instanceof GitLabProjectAccessTokenPermissionError) {
       throw new TRPCError({
         code: 'FORBIDDEN',
@@ -985,6 +994,40 @@ export async function importExistingProjectAccessToken(
  */
 export { validatePersonalAccessToken, type GitLabPATValidationResult };
 
+const GITLAB_REPOSITORY_SYNC_WARNING =
+  'Connected, but the repository list could not be loaded. Refresh the project list from the GitLab integration page.';
+
+/**
+ * Caches the connected account's repositories after the integration row and
+ * credential are committed.
+ *
+ * A provider refusal here says nothing about the connection itself, so it is
+ * reported as a warning on the successful result instead of failing the
+ * connect. `repositories_synced_at` stays null, so opening the repository list
+ * refetches it (see `listGitLabRepositories`).
+ */
+async function cacheConnectedGitLabRepositories(
+  integrationId: string,
+  token: string,
+  instanceUrl: string
+): Promise<string | undefined> {
+  try {
+    const repos = await fetchGitLabProjects(token, instanceUrl);
+    await updateRepositoriesForIntegration(integrationId, repos);
+    logExceptInTest('[connectWithPAT] Repositories cached', {
+      integrationId,
+      repoCount: repos.length,
+    });
+    return undefined;
+  } catch (error) {
+    logExceptInTest('[connectWithPAT] Repository sync failed after commit', {
+      integrationId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return GITLAB_REPOSITORY_SYNC_WARNING;
+  }
+}
+
 /**
  * Connects GitLab using a Personal Access Token
  *
@@ -1204,9 +1247,13 @@ export async function connectWithPAT(
         : countMetadataObjectEntries(existingMetadata.configured_webhooks),
     });
 
-    // Fetch and cache repositories
-    const repos = await fetchGitLabProjects(token, normalizedInstanceUrl);
-    await updateRepositoriesForIntegration(existingIntegration.id, repos);
+    // Fetch and cache repositories. The connection is already committed, so a
+    // repository-list failure is a warning from here on, never a failed connect.
+    const syncWarning = await cacheConnectedGitLabRepositories(
+      existingIntegration.id,
+      token,
+      normalizedInstanceUrl
+    );
 
     return {
       success: true,
@@ -1216,7 +1263,7 @@ export async function connectWithPAT(
         accountId: String(validatedUser.id),
         instanceUrl: normalizedInstanceUrl,
       },
-      warnings: validation.warnings,
+      warnings: [...(validation.warnings ?? []), ...(syncWarning ? [syncWarning] : [])],
     };
   }
 
@@ -1296,14 +1343,13 @@ export async function connectWithPAT(
     authType: 'pat',
   });
 
-  // 6. Fetch and cache repositories
-  const repos = await fetchGitLabProjects(token, normalizedInstanceUrl);
-  await updateRepositoriesForIntegration(integration.id, repos);
-
-  logExceptInTest('[connectWithPAT] Repositories cached', {
-    integrationId: integration.id,
-    repoCount: repos.length,
-  });
+  // 6. Fetch and cache repositories. The integration is committed above, so a
+  // repository-list failure is a warning from here on, never a failed connect.
+  const syncWarning = await cacheConnectedGitLabRepositories(
+    integration.id,
+    token,
+    normalizedInstanceUrl
+  );
 
   return {
     success: true,
@@ -1313,6 +1359,6 @@ export async function connectWithPAT(
       accountId: String(validatedUser.id),
       instanceUrl: normalizedInstanceUrl,
     },
-    warnings: validation.warnings,
+    warnings: [...(validation.warnings ?? []), ...(syncWarning ? [syncWarning] : [])],
   };
 }

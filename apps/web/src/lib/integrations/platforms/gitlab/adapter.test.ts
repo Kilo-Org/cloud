@@ -15,10 +15,19 @@ import {
   validateGitLabInstance,
   validatePersonalAccessToken,
   createProjectWebhook,
+  createProjectAccessToken,
   deleteProjectWebhook,
   fetchGitLabProjects,
   fetchGitLabRootTextFileAtRef,
   fetchGitLabRepositorySize,
+  GitLabAuthenticationError,
+  GitLabProjectAccessTokenPermissionError,
+  GitLabWebhookPermissionError,
+  listProjectAccessTokens,
+  listProjectWebhooks,
+  revokeProjectAccessToken,
+  rotateProjectAccessToken,
+  updateProjectWebhook,
 } from './adapter';
 
 // Mock fetch globally
@@ -679,5 +688,72 @@ describe('validatePersonalAccessToken', () => {
       error: 'GitLab instance URL host resolves to an address that is not allowed.',
     });
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('webhook and project access token refusals', () => {
+  const webhookOperations = [
+    ['listProjectWebhooks', () => listProjectWebhooks('token', 123)],
+    [
+      'createProjectWebhook',
+      () => createProjectWebhook('token', 123, 'https://example.com/webhook', 'webhook-secret'),
+    ],
+    [
+      'updateProjectWebhook',
+      () => updateProjectWebhook('token', 123, 456, 'https://example.com/webhook', 'secret'),
+    ],
+  ] as const;
+
+  const projectAccessTokenOperations = [
+    [
+      'createProjectAccessToken',
+      () => createProjectAccessToken('token', 123, 'Kilo bot', '2027-01-01'),
+    ],
+    ['listProjectAccessTokens', () => listProjectAccessTokens('token', 123)],
+    ['rotateProjectAccessToken', () => rotateProjectAccessToken('token', 123, 456, '2027-01-01')],
+    ['revokeProjectAccessToken', () => revokeProjectAccessToken('token', 123, 456)],
+  ] as const;
+
+  const allOperations = [...webhookOperations, ...projectAccessTokenOperations] as const;
+
+  function mockRefusal(status: number) {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status,
+      headers: new Headers(),
+      text: async () => `refused: ${status}`,
+      json: async () => ({}),
+    });
+  }
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it.each(allOperations)(
+    '%s reports a 401 as an authentication failure that needs a reconnect',
+    async (_name, run) => {
+      mockRefusal(401);
+
+      const refusal = await run().catch((error: unknown) => error);
+
+      expect(refusal).toBeInstanceOf(GitLabAuthenticationError);
+      expect(refusal).toMatchObject({ statusCode: 401, projectId: 123 });
+      expect((refusal as Error).message).toContain('Reconnect the GitLab integration');
+      expect((refusal as Error).message).not.toContain('Maintainer');
+    }
+  );
+
+  it.each(allOperations)('%s keeps a 403 as a permission failure', async (name, run) => {
+    const expectedError = webhookOperations.some(([operation]) => operation === name)
+      ? GitLabWebhookPermissionError
+      : GitLabProjectAccessTokenPermissionError;
+    mockRefusal(403);
+
+    const refusal = await run().catch((error: unknown) => error);
+
+    expect(refusal).toBeInstanceOf(expectedError);
+    expect(refusal).toMatchObject({ statusCode: 403, projectId: 123 });
+    expect((refusal as Error).message).toContain('Requires Maintainer role or higher');
   });
 });

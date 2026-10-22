@@ -157,8 +157,9 @@ export function GitLabIntegrationDetails({
   // Connect with PAT mutation
   const { mutate: connectWithPATMutate, isPending: isConnectingWithPAT } = useMutation(
     trpc.gitlab.connectWithPAT.mutationOptions({
-      onSuccess: () => {
-        toast.success('GitLab connected successfully!');
+      onSuccess: result => {
+        const warning = result.warnings?.join(' ');
+        toast.success('GitLab connected successfully!', warning ? { description: warning } : {});
         // Reset PAT form
         setPatToken('');
         setPATValidation({ status: 'idle' });

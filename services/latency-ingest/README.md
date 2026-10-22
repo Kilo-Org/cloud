@@ -2,8 +2,9 @@
 
 Cloudflare Worker that ingests client-observed request latency from the mobile app. The app
 measures `ttfbMs` (time to response headers) and `totalMs` (body read) per tRPC call, batches the
-samples, and POSTs them here. The Worker emits one structured log line per sample and Cloudflare
-logpush ships those lines to Axiom, where they join the server's `trpc_timing` rows by `requestId`.
+samples, and POSTs them here. The Worker emits one structured log line per sample plus one
+per-request duration line, and Cloudflare logpush ships those lines to Axiom, where the samples
+join the server's `trpc_timing` rows by `requestId`.
 
 ## Endpoints
 
@@ -19,8 +20,8 @@ Headers:
 | Header | Required | Purpose |
 |---|---|---|
 | `authorization: Bearer <session>` | yes | Session identity, presence-checked only (the Worker cannot verify it). Never logged or stored, and never the rate-limit key. |
-| `x-kilo-app-version` | yes | Must match `/^\d+(\.\d+)*$/` and be at least `MIN_APP_VERSION`. |
-| `x-kilo-app-platform` | no | `ios` or `android`; logged as `platform` (`unknown` when absent). |
+| `x-kilo-app-version` | yes | Must match `/^\d+(\.\d+)*$/`, be at most 32 characters, and be at least `MIN_APP_VERSION`. |
+| `x-kilo-app-platform` | no | `ios` or `android`; any other or absent value is logged as `unknown`. |
 | `cf-connecting-ip` | set by the edge | The trusted rate-limit identity. Cloudflare overwrites any caller value. |
 
 Body (strict schema):
@@ -47,7 +48,7 @@ Responses:
 | `204` | Accepted. An empty batch (`{"samples":[]}`) is also accepted with no log lines. |
 | `400` | Unparseable JSON or a schema mismatch (unknown keys included). |
 | `401` | Missing or non-bearer `authorization`. |
-| `403` | Missing, malformed, or below-minimum `x-kilo-app-version`. |
+| `403` | Missing, malformed, longer than 32 characters, or below-minimum `x-kilo-app-version`. |
 | `413` | Body over 64 KiB (enforced while reading, so an oversized chunked body is never buffered), or more than 50 samples in the batch. |
 | `429` | The rate limiter rejected the client (120 requests / 60 s per Cloudflare edge client IP). |
 
@@ -57,8 +58,6 @@ Each accepted sample logs one line:
 {
   "type": "client_latency",
   "client": "mobile",
-  "platform": "ios",
-  "version": "1.0.12",
   "requestId": "http-call-id",
   "procedures": ["user.getMe"],
   "batchSize": 1,
@@ -69,7 +68,28 @@ Each accepted sample logs one line:
 }
 ```
 
-The line carries no `userId` and no bearer/session value.
+The line carries no `userId` and no bearer/session value. The client dimensions
+are logged once per request, on the line below.
+
+Every request also logs exactly one duration line, so a Worker 504 on this route
+is attributable:
+
+```json
+{
+  "route": "/v1/latency",
+  "method": "POST",
+  "status": 204,
+  "durationMs": 3,
+  "outcome": "ok",
+  "platform": "ios",
+  "version": "1.0.12"
+}
+```
+
+`route` is the served route or the fixed value `unmatched`, never the requested
+pathname or query string. `platform` is a fixed value (`ios`, `android`, or
+`unknown`) and `version` has passed the version check; both are `null` on a
+request that failed it.
 
 ## Local Development
 

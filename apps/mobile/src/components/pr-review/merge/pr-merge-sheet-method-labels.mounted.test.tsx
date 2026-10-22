@@ -1,8 +1,3 @@
-// The method chips render resolved copy: an open merge sheet must follow a
-// live language change, not keep the strings its option list was built with at
-// mount. The sheet builds that list on every render for exactly that reason, so
-// this case fails if it is cached again.
-
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -111,7 +106,10 @@ type Chip = { announced: string; visible: string };
 /** The method radios in render order: the spoken label and the drawn label. */
 function methodChips(renderer: TestRenderer.ReactTestRenderer): Chip[] {
   return renderer.root
-    .findAll(node => node.props.accessibilityRole === 'radio')
+    .findAll(node => {
+      const state = node.props.accessibilityState as { selected?: boolean } | undefined;
+      return node.props.accessibilityRole === 'button' && state?.selected !== undefined;
+    })
     .map(chip => {
       const text = chip.findAll(node => String(node.type) === 'Text')[0];
       return {

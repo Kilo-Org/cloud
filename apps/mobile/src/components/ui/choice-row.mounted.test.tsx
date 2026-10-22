@@ -7,6 +7,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { ChoiceRow } from './choice-row';
 
 vi.mock('react-native', () => ({
+  Platform: { OS: 'android' },
   Pressable: 'Pressable',
   View: 'View',
 }));

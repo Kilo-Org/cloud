@@ -2070,8 +2070,15 @@
     {
       "idx": 295,
       "version": "7",
-      "when": 1792684623752,
-      "tag": "0295_yellow_starfox",
+      "when": 1792684800197,
+      "tag": "0295_tiresome_champions",
+      "breakpoints": true
+    },
+    {
+      "idx": 296,
+      "version": "7",
+      "when": 1792685550176,
+      "tag": "0296_yellow_starfox",
       "breakpoints": true
     }
   ]

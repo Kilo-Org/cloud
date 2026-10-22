@@ -10,8 +10,6 @@ import {
   Receipt,
   User,
   Building2,
-  Plus,
-  Rocket,
   Cable,
   Cloud,
   Bot,
@@ -54,8 +52,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
 
   // Feature flags
   const isGastownEnabled = useFeatureFlagEnabled('gastown-access');
-  const isAppBuilderEnabled = useFeatureFlagEnabled('app-builder-feature');
-  const isDeployEnabled = useFeatureFlagEnabled('deploy-feature');
   const isDevelopment = process.env.NODE_ENV === 'development';
 
   // Dashboard group
@@ -130,15 +126,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     url: string;
     className?: string;
   }> = [
-    ...(isAppBuilderEnabled || isDevelopment
-      ? [
-          {
-            title: 'App Builder',
-            icon: Plus,
-            url: '/app-builder',
-          },
-        ]
-      : []),
     {
       title: 'Cloud Agent',
       icon: Cloud,
@@ -164,15 +151,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       icon: Shield,
       url: '/security-agent',
     },
-    ...(isDeployEnabled || isDevelopment
-      ? [
-          {
-            title: 'Deploy',
-            icon: Rocket,
-            url: '/deploy',
-          },
-        ]
-      : []),
     ...(isGastownEnabled || isDevelopment
       ? [
           {

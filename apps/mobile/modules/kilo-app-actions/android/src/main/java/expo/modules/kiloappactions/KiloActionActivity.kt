@@ -169,10 +169,13 @@ class KiloActionActivity : Activity() {
       val timeout = if (startAgent) START_AGENT_RESULT_TIMEOUT_MS else RESULT_TIMEOUT_MS
       main.postDelayed({ finishWith(null) }, timeout)
     }
+    // Bring the app up before the dispatcher runs: a `StartAgent` request is
+    // confirmed inside the app, and an alert the JS side shows before an
+    // activity attaches is dropped.
+    if (startAgent) {
+      showInApp()
+    }
     if (AppActionDispatcher.dispatch(payload)) {
-      if (startAgent) {
-        showInApp()
-      }
       if (!awaitsResult) {
         finish()
       }

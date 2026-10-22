@@ -237,7 +237,8 @@ Discord message admission requires the shared Redis REST service. Accepted messa
 claims are scoped to the bot and message, expire after 15 minutes, and remain
 accepted through background processing completion or failure. The gateway uses
 eight forwarding slots, a 10-second request deadline, and primary-database
-ownership checks. Capacity drops are counted in listener logs.
+ownership checks with bounded retries. Listener availability is retained while
+ownership reads recover. Capacity drops are counted in listener logs.
 
 ### Encryption & Secrets
 

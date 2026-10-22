@@ -1,3 +1,4 @@
+import { setTimeout as delay } from 'node:timers/promises';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { Client, Events, GatewayIntentBits } from 'discord.js';
@@ -119,15 +120,23 @@ async function claimActiveListener(listenerId: string, expiresAt: string): Promi
   console.log('[DiscordGateway] Claimed active listener slot', { listenerId });
 }
 
-async function isActiveListener(listenerId: string): Promise<boolean> {
-  const rows = await db
-    .select({ listener_id: discord_gateway_listener.listener_id })
-    .from(discord_gateway_listener)
-    .where(
-      sql`${discord_gateway_listener.id} = 1 AND ${discord_gateway_listener.expires_at} > now()`
-    )
-    .limit(1);
-  return rows[0]?.listener_id === listenerId;
+async function isActiveListener(listenerId: string, signal: AbortSignal): Promise<boolean> {
+  for (let attempt = 0; ; attempt++) {
+    signal.throwIfAborted();
+    try {
+      const rows = await db
+        .select({ listener_id: discord_gateway_listener.listener_id })
+        .from(discord_gateway_listener)
+        .where(
+          sql`${discord_gateway_listener.id} = 1 AND ${discord_gateway_listener.expires_at} > now()`
+        )
+        .limit(1);
+      return rows[0]?.listener_id === listenerId;
+    } catch (error) {
+      if (attempt === 2 || signal.aborted) throw error;
+      await delay(100, undefined, { signal });
+    }
+  }
 }
 
 /**
@@ -149,13 +158,12 @@ async function runHeartbeat(listenerId: string, abortController: AbortController
     if (abortController.signal.aborted) break;
 
     try {
-      if (!(await isActiveListener(listenerId))) {
+      if (!(await isActiveListener(listenerId, abortController.signal))) {
         console.log('[DiscordGateway] Listener ownership ended', { listenerId });
         abortController.abort();
         break;
       }
     } catch (error) {
-      abortController.abort();
       console.error('[DiscordGateway] Heartbeat check failed:', error);
     }
   }
@@ -199,13 +207,12 @@ async function runGatewayListener(
 
   async function forwardMessage(event: ForwardedGatewayEvent): Promise<void> {
     try {
-      if (!(await isActiveListener(listenerId))) {
+      if (!(await isActiveListener(listenerId, abortSignal))) {
         abortController.abort();
         return;
       }
     } catch (error) {
       console.error('[DiscordGateway] Ownership check failed:', error);
-      abortController.abort();
       return;
     }
 

@@ -168,13 +168,28 @@ describe('Discord gateway delivery', () => {
     expect(second.client.destroy).not.toHaveBeenCalled();
   });
 
-  it('requires confirmed ownership', async () => {
-    const { client, request } = await startListener();
+  it('recovers ownership reads', async () => {
+    const { client } = await startListener();
     mockOwnerRead.mockRejectedValueOnce(new Error('Fixture unavailable'));
     client.emit('raw', packet());
-    await request;
+    await until(() => fetchMock.mock.calls.length === 1);
+    expect(mockOwnerRead).toHaveBeenCalledTimes(2);
+    expect(client.destroy).not.toHaveBeenCalled();
+  });
+
+  it('preserves listener availability', async () => {
+    const { client } = await startListener();
+    mockOwnerRead.mockRejectedValue(new Error('Fixture unavailable'));
+    client.emit('raw', packet());
+    await until(() => jest.mocked(console.error).mock.calls.length > 0);
+    expect(mockOwnerRead).toHaveBeenCalledTimes(3);
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(client.destroy).toHaveBeenCalledTimes(1);
+    expect(client.destroy).not.toHaveBeenCalled();
+    mockOwnerRead.mockImplementation(async () =>
+      mockListenerId ? [{ listener_id: mockListenerId }] : []
+    );
+    client.emit('raw', packet('666666666666666666'));
+    await until(() => fetchMock.mock.calls.length === 1);
   });
 
   it('applies the forwarding deadline', async () => {

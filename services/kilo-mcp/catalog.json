@@ -4134,6 +4134,7 @@
                 "bedrock",
                 "deepseek",
                 "fireworks",
+                "gmicloud",
                 "google",
                 "inception",
                 "openai",
@@ -6071,29 +6072,6 @@
     ],
     "searchBlob": "cloudAgentNext.getAttachmentUploadUrl Get a presigned URL to upload a file attachment for a cloud agent message. cloudagentnext getattachmentuploadurl messageuuid attachmentid contenttype contentlength extension messageUuid attachmentId contentType contentLength extension"
   },
-  "cloudAgentNext.getComputeBillingStatus": {
-    "path": "cloudAgentNext.getComputeBillingStatus",
-    "kind": "query",
-    "summary": "Get billing status and compute usage information for a cloud agent session.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "cloudAgentSessionId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "cloudAgentSessionId"
-      ]
-    },
-    "tags": [
-      "cloudagentnext",
-      "getcomputebillingstatus",
-      "cloudagentsessionid"
-    ],
-    "searchBlob": "cloudAgentNext.getComputeBillingStatus Get billing status and compute usage information for a cloud agent session. cloudagentnext getcomputebillingstatus cloudagentsessionid cloudAgentSessionId"
-  },
   "cloudAgentNext.getImageUploadUrl": {
     "path": "cloudAgentNext.getImageUploadUrl",
     "kind": "mutation",
@@ -6282,7 +6260,7 @@
           "format": "starts_with",
           "allOf": [
             {
-              "pattern": "^(agent|workspace)_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+              "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
             },
             {
               "pattern": "^workspace_.*"
@@ -17587,37 +17565,6 @@
     ],
     "searchBlob": "organizations.cloudAgentNext.getAttachmentUploadUrl Get a presigned URL to upload a file attachment for a cloud agent message. Use to attach a file. organizations cloudagentnext getattachmentuploadurl organizationid messageuuid attachmentid contenttype contentlength extension organizationId messageUuid attachmentId contentType contentLength extension"
   },
-  "organizations.cloudAgentNext.getComputeBillingStatus": {
-    "path": "organizations.cloudAgentNext.getComputeBillingStatus",
-    "kind": "query",
-    "summary": "Get the compute billing status for an organization's cloud agent session.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "cloudAgentSessionId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "organizationId",
-        "cloudAgentSessionId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "cloudagentnext",
-      "getcomputebillingstatus",
-      "organizationid",
-      "cloudagentsessionid"
-    ],
-    "searchBlob": "organizations.cloudAgentNext.getComputeBillingStatus Get the compute billing status for an organization's cloud agent session. organizations cloudagentnext getcomputebillingstatus organizationid cloudagentsessionid organizationId cloudAgentSessionId"
-  },
   "organizations.cloudAgentNext.getImageUploadUrl": {
     "path": "organizations.cloudAgentNext.getImageUploadUrl",
     "kind": "mutation",
@@ -17810,7 +17757,7 @@
           "format": "starts_with",
           "allOf": [
             {
-              "pattern": "^(agent|workspace)_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+              "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
             },
             {
               "pattern": "^workspace_.*"
@@ -36710,15 +36657,21 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "githubRepo": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
         }
       }
     },
     "tags": [
       "webhooktriggers",
       "capabilities",
-      "organizationid"
+      "organizationid",
+      "githubrepo"
     ],
-    "searchBlob": "webhookTriggers.capabilities Check which webhook trigger features the current user is allowed to use, such as whether they can set sandbox allocation limits. webhooktriggers capabilities organizationid organizationId"
+    "searchBlob": "webhookTriggers.capabilities Check which webhook trigger features the current user is allowed to use, such as whether they can set sandbox allocation limits. webhooktriggers capabilities organizationid githubrepo organizationId githubRepo"
   },
   "webhookTriggers.create": {
     "path": "webhookTriggers.create",
@@ -36738,6 +36691,9 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "runAsCreator": {
+          "type": "boolean"
         },
         "targetType": {
           "default": "cloud_agent",
@@ -36777,7 +36733,15 @@
         },
         "sandboxAllocation": {
           "type": "string",
-          "const": "isolated-standard"
+          "enum": [
+            "isolated-standard",
+            "cloudflare-single",
+            "cloudflare-shared",
+            "cloudflare-containers-standard-3",
+            "cloudflare-containers-standard-4",
+            "vercel-small",
+            "vercel-large"
+          ]
         },
         "profileId": {
           "type": "string",
@@ -36840,6 +36804,7 @@
       "create",
       "triggerid",
       "organizationid",
+      "runascreator",
       "targettype",
       "kiloclawinstanceid",
       "githubrepo",
@@ -36856,7 +36821,7 @@
       "cronexpression",
       "crontimezone"
     ],
-    "searchBlob": "webhookTriggers.create Create a new webhook or scheduled trigger that runs a Cloud Agent or KiloClaw Chat on an incoming request or cron schedule. Use this to set up an automation that fires when a GitHub event or webhook arrives. webhooktriggers create triggerid organizationid targettype kiloclawinstanceid githubrepo mode model variant sandboxallocation profileid prompttemplate autocommit condenseoncomplete webhookauth activationmode cronexpression crontimezone triggerId organizationId targetType kiloclawInstanceId githubRepo mode model variant sandboxAllocation profileId promptTemplate autoCommit condenseOnComplete webhookAuth activationMode cronExpression cronTimezone"
+    "searchBlob": "webhookTriggers.create Create a new webhook or scheduled trigger that runs a Cloud Agent or KiloClaw Chat on an incoming request or cron schedule. Use this to set up an automation that fires when a GitHub event or webhook arrives. webhooktriggers create triggerid organizationid runascreator targettype kiloclawinstanceid githubrepo mode model variant sandboxallocation profileid prompttemplate autocommit condenseoncomplete webhookauth activationmode cronexpression crontimezone triggerId organizationId runAsCreator targetType kiloclawInstanceId githubRepo mode model variant sandboxAllocation profileId promptTemplate autoCommit condenseOnComplete webhookAuth activationMode cronExpression cronTimezone"
   },
   "webhookTriggers.delete": {
     "path": "webhookTriggers.delete",
@@ -37121,7 +37086,15 @@
           "anyOf": [
             {
               "type": "string",
-              "const": "isolated-standard"
+              "enum": [
+                "isolated-standard",
+                "cloudflare-single",
+                "cloudflare-shared",
+                "cloudflare-containers-standard-3",
+                "cloudflare-containers-standard-4",
+                "vercel-small",
+                "vercel-large"
+              ]
             },
             {
               "type": "null"

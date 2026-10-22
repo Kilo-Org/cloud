@@ -219,13 +219,12 @@ async function resolveActionRepository(
   };
 }
 
-/** The empty state: no repository is named and none was used recently. */
+/**
+ * The empty state: no repository is named and none was used recently, so no
+ * provider is known and the message names none.
+ */
 function noRepositoryFailure(): AppActionResult {
-  return startAgentFailure(
-    'no-repository',
-    false,
-    i18n.t('agentChat.newSession.noRepositoriesVisible')
-  );
+  return startAgentFailure('no-repository', false, i18n.t('appActions.start.repositoryRequired'));
 }
 
 /**

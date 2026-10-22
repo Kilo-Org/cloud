@@ -22,12 +22,10 @@ import { isAttentionAcked, sessionNeedsInput } from '@/lib/session-attention';
  * and `reconcileSessionAttention` drops the ack once the server status leaves
  * attention (or the raise is replaced), so a re-raise counts again.
  *
- * Raise identity is `statusUpdatedAt ?? status` (see `session-attention`), but
- * the two kinds of observer do not always have both fields: the stored-session
- * rows reconcile with `status_updated_at`, while the tray rows reconcile with
- * no timestamp, so their ack pins to the raw status. A tray row still carries
- * the server `statusUpdatedAt`, so the ack must be matched against either
- * identity or an answered tray raise keeps counting as "Needs input".
+ * Raise identity is `statusUpdatedAt ?? status` (see `session-attention`). A
+ * tray row carries the server `statusUpdatedAt`, so the ack is read against
+ * that identity and the row's status: an answered raise counts as idle, while a
+ * re-raise under the same status counts as waiting again.
  */
 
 /** The row fields the ack resolution reads. */
@@ -43,10 +41,10 @@ export function isAnsweredAttentionRow(row: AttentionRow): boolean {
   if (!sessionNeedsInput(row.status)) {
     return false;
   }
-  return (
-    isAttentionAcked(row.id, row.statusUpdatedAt ?? row.status) ||
-    isAttentionAcked(row.id, row.status)
-  );
+  return isAttentionAcked(row.id, {
+    raiseId: row.statusUpdatedAt ?? row.status,
+    status: row.status,
+  });
 }
 
 /** Resolve every row to the status the glanceable surfaces should count. */

@@ -6,7 +6,7 @@ import {
 } from '@kilocode/session-ingest-contracts';
 import { sessionIdSchema } from './router/schemas.js';
 import { requireCurrentSessionAccess } from './session-access.js';
-import { isControlSession } from './session-plane.js';
+import { isControlSession } from './session-identity.js';
 import { getSandboxSessionStub } from './sandbox-session/session-stub.js';
 import { withDORetry } from './utils/do-retry.js';
 import type { Env } from './types.js';

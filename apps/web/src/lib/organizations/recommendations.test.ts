@@ -18,7 +18,6 @@ function buildState(overrides: Partial<RecommendationState> = {}): Recommendatio
     linearBotEnabled: false,
     teamIntegrationConnected: false,
     cloudAgentUsed: false,
-    projectDeployed: false,
     webhookTriggerCount: 1,
     githubConnected: false,
     githubLiteApp: false,

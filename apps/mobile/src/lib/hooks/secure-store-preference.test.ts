@@ -99,7 +99,7 @@ describe('createSecureStorePreference', () => {
     }
   });
 
-  it('shows a toast on a write failure while keeping the in-memory value', async () => {
+  it('shows a toast and keeps the last stored value when the write fails', async () => {
     getItemAsync.mockResolvedValue(null);
     setItemAsync.mockRejectedValue(new Error('disk full'));
     const store = createSecureStorePreference<boolean>({
@@ -110,12 +110,117 @@ describe('createSecureStorePreference', () => {
     });
 
     store.set(true);
-    expect(store.get()).toBe(true);
+    // The choice is not stored, so the app does not claim it.
+    expect(store.get()).toBe(false);
 
-    await flushMicrotasks();
+    await store.whenPersisted();
 
     expect(toastError).toHaveBeenCalledWith('Could not save setting');
+    expect(store.get()).toBe(false);
+  });
+
+  it('applies a choice only once its write lands', async () => {
+    getItemAsync.mockResolvedValue(null);
+    const writeGate = Promise.withResolvers<undefined>();
+    setItemAsync.mockImplementation(async () => {
+      await writeGate.promise;
+    });
+    const store = createSecureStorePreference<boolean>({
+      key: 'k',
+      defaultValue: false,
+      parse: raw => raw === 'true',
+      serialize: value => (value ? 'true' : 'false'),
+    });
+
+    store.set(true);
+    // In flight: the newest choice is what the next press builds on, but the
+    // rendered value is still the stored one.
+    expect(store.getRequested()).toBe(true);
+    expect(store.get()).toBe(false);
+
+    writeGate.resolve(undefined);
+    await store.whenPersisted();
+
     expect(store.get()).toBe(true);
+    expect(setItemAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('writes the newest choice, not every choice, when several land during one write', async () => {
+    getItemAsync.mockResolvedValue(null);
+    const firstWriteGate = Promise.withResolvers<undefined>();
+    setItemAsync.mockImplementationOnce(async () => {
+      await firstWriteGate.promise;
+    });
+    const store = createSecureStorePreference<boolean>({
+      key: 'k',
+      defaultValue: false,
+      parse: raw => raw === 'true',
+      serialize: value => (value ? 'true' : 'false'),
+    });
+
+    store.set(true);
+    store.set(false);
+    store.set(true);
+    store.set(false);
+
+    firstWriteGate.resolve(undefined);
+    await store.whenPersisted();
+
+    // The first write was already on its way; every later choice collapsed into
+    // the newest one, which therefore lands after it.
+    expect(setItemAsync.mock.calls.map(call => call[1])).toEqual(['true', 'false']);
+    expect(store.get()).toBe(false);
+  });
+
+  it('reports a requested null for a nullable store', async () => {
+    getItemAsync.mockResolvedValue(null);
+    const writeGate = Promise.withResolvers<undefined>();
+    setItemAsync.mockImplementationOnce(async () => {
+      await writeGate.promise;
+    });
+    const store = createSecureStorePreference<string | null>({
+      key: 'k',
+      defaultValue: null,
+      parse: raw => raw,
+      serialize: value => value ?? '',
+    });
+
+    store.set('chosen');
+    // A null target is a real choice ("auto"), not "nothing pending".
+    store.set(null);
+    expect(store.getRequested()).toBeNull();
+
+    writeGate.resolve(undefined);
+    await store.whenPersisted();
+    expect(store.get()).toBeNull();
+  });
+
+  it('releases whenPersisted() and drops a newer choice when the write fails', async () => {
+    getItemAsync.mockResolvedValue(null);
+    const writeGate = Promise.withResolvers<undefined>();
+    setItemAsync.mockImplementation(async (_key: string, value: string) => {
+      await writeGate.promise;
+      if (value === 'true') {
+        throw new Error('disk full');
+      }
+    });
+    const store = createSecureStorePreference<boolean>({
+      key: 'k',
+      defaultValue: false,
+      parse: raw => raw === 'true',
+      serialize: value => (value ? 'true' : 'false'),
+    });
+
+    store.set(true);
+    // A choice made while the failing write is in flight is dropped with it.
+    store.set(false);
+
+    writeGate.resolve(undefined);
+    await store.whenPersisted();
+
+    expect(toastError).toHaveBeenCalledTimes(1);
+    expect(store.get()).toBe(false);
+    expect(store.getRequested()).toBe(false);
   });
 
   it('lets a set() before the initial load resolves win over the disk value', async () => {

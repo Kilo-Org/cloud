@@ -12,6 +12,7 @@ import { useOpenPartDetail } from './open-part-detail-context';
 import { useOptionalSessionManager } from './session-manager-context';
 import { resolveSuggestionPresentation, suggestionToolInputSchema } from './suggestion-card-state';
 import { getToolDisplay, toolPartHasDetails } from './tool-card-display';
+import { toolStatusLabel } from './tool-status-label';
 import { GenericToolCardBody } from './tool-cards/generic-tool-card';
 
 // The session preview renders transcript rows without a live session, so it
@@ -43,7 +44,7 @@ export function SuggestToolCard({ part }: Readonly<{ part: ToolPart }>) {
       status={part.state.status}
       accessibilityLabel={t('agentChat.toolCard.accessibility', {
         label,
-        status: part.state.status,
+        status: toolStatusLabel(t, part.state.status),
       })}
       onPress={
         hasDetails && openPartDetail

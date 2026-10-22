@@ -1,3 +1,5 @@
+import { characterEntities } from 'character-entities';
+
 import { type HtmlElement, type HtmlNode, type MaskRange } from './markdown-html-scan';
 import { toScriptText } from './markdown-html-script';
 
@@ -22,8 +24,9 @@ export type InlineOptions = {
  */
 export const HARD_BREAK = '\uE000';
 
-// Maps and sets, not object literals: tag and entity names come from the
-// message, and a name like `constructor` must not find an inherited member.
+// Maps and sets, not object literals: tag names come from the message, and a
+// name like `constructor` must not find an inherited member. Entity names are
+// looked up in the named-reference set with `Object.hasOwn` for the same reason.
 const EMPHASIS_DELIMITERS: ReadonlyMap<string, string> = new Map([
   ['b', '**'],
   ['strong', '**'],
@@ -38,14 +41,6 @@ const EMPHASIS_DELIMITERS: ReadonlyMap<string, string> = new Map([
 const KEPT_ATTRIBUTES: ReadonlyMap<string, ReadonlySet<string>> = new Map([
   ['a', new Set(['href', 'title', 'target', 'rel'])],
   ['img', new Set(['src', 'alt', 'title'])],
-]);
-const NAMED_ENTITIES: ReadonlyMap<string, string> = new Map([
-  ['amp', '&'],
-  ['lt', '<'],
-  ['gt', '>'],
-  ['quot', '"'],
-  ['apos', "'"],
-  ['nbsp', '\u00A0'],
 ]);
 const MAX_CODE_POINT = 1_114_111;
 
@@ -92,16 +87,16 @@ function renderText(context: ConvertContext, start: number, end: number): string
   return rendered + value.slice(cursor, end).replace(WHITESPACE_RUN, ' ');
 }
 
-/** Decodes the entities code text needs as characters; null for one it does not know. */
+/** Decodes the entities code text needs as characters; null for a name the HTML set does not define. */
 export function decodeEntities(source: string): string | null {
   for (const [, body = ''] of source.matchAll(ENTITY)) {
-    if (!body.startsWith('#') && !NAMED_ENTITIES.has(body)) {
+    if (!body.startsWith('#') && !Object.hasOwn(characterEntities, body)) {
       return null;
     }
   }
   return source.replace(ENTITY, (entity, body: string) => {
     if (!body.startsWith('#')) {
-      return NAMED_ENTITIES.get(body) ?? entity;
+      return characterEntities[body] ?? entity;
     }
     const hex = body[1] === 'x' || body[1] === 'X';
     const codePoint = hex ? Number.parseInt(body.slice(2), 16) : Number.parseInt(body.slice(1), 10);

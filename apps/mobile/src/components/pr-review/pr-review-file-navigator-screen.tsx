@@ -142,7 +142,7 @@ function NavigatorError({
   }
   if (state?.kind === 'reconnect') {
     return (
-      <CenteredState className="px-6">
+      <CenteredState contentContainerClassName="px-6">
         <PrReviewReconnectNotice />
       </CenteredState>
     );

@@ -25,6 +25,7 @@
     "error": "שגיאה: {{error}}",
     "back": "חזרה",
     "somethingWentWrong": "משהו השתבש.",
+    "actionNotRecorded": "לא הצלחנו לתעד את הפעולה הזו. נסה שוב מאוחר יותר.",
     "couldNotOpen": "לא ניתן היה לפתוח את {{label}}.",
     "link": "קישור",
     "takingLonger": "זה לוקח יותר זמן מהצפוי. אפשר לסגור את המסך הזה ולבדוק שוב.",
@@ -111,7 +112,9 @@
     "online": "מקוון",
     "open": "פתיחת {{name}}",
     "openPullRequest": "PR פתוח",
+    "completed": "הושלם",
     "pending": "ממתין",
+    "running": "בהרצה",
     "performance": "ביצועים",
     "preferences": "העדפות",
     "privacyPolicy": "מדיניות פרטיות",
@@ -995,8 +998,9 @@
       "noProposals": "אין הצעות",
       "noProposalsDescription": "הצעות המבוססות על זיכרון הסקירה יופיעו כאן לאחר ש-Kilo ינתח תשובות של מתחזקים.",
       "off": "זיכרון הסקירה כבוי.",
+      "on": "זיכרון הסקירה דלוק.",
       "offDescription": "הפעל אותו כדי לאפשר ל-Kilo ללמוד מתשובות של מתחזקים ולהציע הנחיות לקובץ REVIEW.md.",
-      "readOnlyDescription": "רק בעלי הארגון ומנהלי החיוב יכולים להפעיל זיכרון סקירה.",
+      "readOnlyDescription": "רק בעלי הארגון ומנהלי החיוב יכולים לשנות זיכרון סקירה.",
       "title": "זיכרון סקירה"
     },
     "scopeList": {
@@ -1024,8 +1028,6 @@
     "updateFailed": "עדכון סוקר הקוד נכשל.",
     "configSaveFailed": "שמירת הגדרות הסקירה נכשלה.",
     "status": {
-      "running": "בהרצה",
-      "completed": "הושלם",
       "interrupted": "הופסקה"
     },
     "reviewStyle": {
@@ -1136,6 +1138,9 @@
       "triageModel": "מודל למיון ראשוני"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "מנהל Kilo",
+      "actorMaskedUser": "משתמש מוסתר",
+      "actorSystem": "מערכת Kilo",
       "couldNotLoad": "לא ניתן לטעון את דוח הביקורת.",
       "events": "אירועים",
       "generated": "מועד יצירת הדוח: {{generatedAt}}.",
@@ -1387,7 +1392,6 @@
       "installApp": "התקנת אפליקציית GitHub",
       "reauthorizeButton": "חידוש ההרשאה לאפליקציית GitHub",
       "reauthorizeDescription": "סוכן האבטחה זקוק להרשאת vulnerability_alerts כדי לגשת להתראות Dependabot. חדש את ההרשאה לאפליקציית GitHub כדי לתת לו גישה.",
-      "reauthorizeFailed": "לא ניתן להתחיל את חידוש ההרשאה. נסה שוב.",
       "reauthorizeTitle": "נדרשות הרשאות נוספות",
       "setupFailed": "לא ניתן להתחיל את הגדרת GitHub. נסה שוב."
     },
@@ -1411,6 +1415,7 @@
     "settingsSave": {
       "saveChanges": "שמירת שינויים",
       "unsavedMessage": "לשמור את השינויים לפני היציאה מהמסך?",
+      "unsavedInvalidMessage": "לא ניתן עדיין לשמור את השינויים האלה. תקן אותם כדי לשמור, או ויתר עליהם כדי לצאת.",
       "unsavedTitle": "שינויים שלא נשמרו"
     },
     "setup": {
@@ -1449,7 +1454,12 @@
       "syncMayNotHaveCompleted": "ייתכן שהסנכרון לא הושלם. נסה שוב כדי לעדכן את מצבו, או בטל את הבקשה.",
       "syncInProgress": "סנכרון אבטחה כבר מתבצע. נסה שוב.",
       "dismissalInProgress": "הדחייה הזו כבר מתבצעת. נסה שוב.",
-      "couldNotReadPendingSyncs": "לא ניתן לקרוא את הסנכרונים הממתינים. נסה שוב."
+      "couldNotReadPendingSyncs": "לא ניתן לקרוא את הסנכרונים הממתינים. נסה שוב.",
+      "ambiguous": "לא ניתן היה לאשר — בדוק את ביקורת האבטחה לפני שתנסה שוב.",
+      "settleFailed": "הפעולה הושלמה, אך לא הצלחנו לתעד את התוצאה. נסה שוב.",
+      "replayFailed": "הפעולה הזו לא הושלמה. נסה שוב.",
+      "actionFailed": "לא ניתן להשלים את הפעולה הזו. נסה שוב.",
+      "actionBlocked": "לא ניתן להשלים את הפעולה הזו. יש לתקן את הבעיה לפני שניתן יהיה לנסות שוב."
     },
     "analysisState": {
       "queued": "הניתוח ממתין בתור",
@@ -1815,7 +1825,8 @@
       "matchesBadge_one": "{{displayCount}} התאמה",
       "matchesBadge_other": "{{displayCount}} התאמות",
       "matchesBadge_two": "{{displayCount}} התאמות",
-      "noOutput": "אין פלט."
+      "noOutput": "אין פלט.",
+      "translationFailed": "התרגום נכשל"
     },
     "readToolMarkdown": {
       "linesTruncated": "שורות {{start}}–{{end}} (התוכן נחתך)",
@@ -2281,7 +2292,7 @@
     "thisDevice": "המכשיר הזה",
     "viewProfile": "הצגת הפרופיל",
     "signOutThisDevice": "ניתוק המכשיר הזה מהחשבון",
-    "signOutThisSession": "ניתוק החיבור הזה",
+    "signOutSessionLabel": "ניתוק {{device}} מהחשבון, מועד הכניסה: {{signedIn}}",
     "sessionSignedOut": "החיבור נותק.",
     "signOutThisDeviceTitle": "להתנתק מהמכשיר הזה?",
     "signOutThisSessionTitle": "לנתק את החיבור הזה?",
@@ -3014,7 +3025,6 @@
       "mergeResultDefaultError": "GitHub לא השלים את המיזוג.",
       "mergeResultNotCompleted": "ה-{{term}} לא מוזג. בדקו את המצב שלו ונסו שוב.",
       "ambiguous": "לא ניתן היה לוודא שהפעולה הושלמה — בדוק את ה-PR לפני שתנסה שוב.",
-      "persistenceFailed": "לא הצלחנו לתעד את הפעולה הזו. נסה שוב מאוחר יותר.",
       "forbidden": "אין הרשאה לפעולה הזו."
     },
     "capabilities": {
@@ -3043,11 +3053,23 @@
     "boundary": {
       "backToProfile": "חזרה לפרופיל",
       "loadErrorMessage": "כדאי לבדוק את החיבור לאינטרנט ולנסות שוב.",
+
+      "chooseAccount": "בחירת חשבון",
       "loadErrorTitle": "לא ניתן היה לטעון את הארגונים שלך.",
+      "membershipLostNotice": "אין לך גישה לארגון זה עוד. הוחלף ל-{{target}}.",
+      "noOrganization": "אין ארגון",
+
+      "noOrganizationDescription": "החשבון הזה אינו חלק מארגון. צור ארגון או הצטרף לאחד באתר כדי להשתמש בתכונות של ארגון כמו הזמנת חברים והתראות על יתרה נמוכה.",
+
+      "openWebOrganizations": "פתיחת ארגונים באתר",
+
       "organizationUnavailable": "הארגון אינו זמין.",
-      "selectDescription": "בחר ארגון מהפרופיל שלך כדי להמשיך.",
+      "selectDescriptionWithOrganizations": "אתה שייך לארגון אחד או יותר. בחר את החשבון שהמסך הזה אמור להשתמש בו.",
+
       "selectOrganization": "בחירת ארגון",
       "unavailableDescription": "הארגון הזה כבר אינו זמין. בחר ארגון אחר מהפרופיל שלך כדי להמשיך.",
+
+      "unavailableSessionsDescription": "הארגון הזה כבר אינו זמין. לא ניתן לטעון את הסשנים שלו.",
       "accessDeniedDescription": "אין לך גישה לארגון זה."
     },
     "creditActivity": {
@@ -3106,7 +3128,11 @@
       "separateEmailsHint": "אם הזנת כמה כתובות דוא״ל, הפרד ביניהן בפסיקים.",
       "thresholdLabel": "סף ההתראה (USD)",
       "title": "התראה על יתרה נמוכה",
-      "emailsError": "הזן לפחות כתובת דוא״ל תקינה אחת. אם יש כמה כתובות, הפרד ביניהן בפסיקים.",
+      "emailsInvalid": "אחת או יותר מכתובות הדוא״ל אינן תקינות.",
+      "emailsRequired": "הזן לפחות כתובת דוא״ל אחת.",
+      "saveEmailsError": "חלק מכתובות הדוא״ל לא התקבלו. בדוק אותן ונסה שוב.",
+      "saveError": "לא הצלחנו לשמור את ההתראה על יתרה נמוכה.",
+      "thresholdPlaceholder": "הזן סכום",
       "thresholdError": "הזן סכום גדול מ-0."
     },
     "memberLimit": {
@@ -3117,6 +3143,7 @@
       "removeLimit": "הסרת המגבלה",
       "title": "מגבלת שימוש יומית",
       "blankError": "הזן סכום, או הקש על הסרת המגבלה למטה.",
+      "blankWithoutLimitError": "הזן מגבלה יומית בין 0 ל-{{max}}.",
       "rangeError": "הזן סכום בין 0 ל-{{max}}."
     },
     "members": {
@@ -3586,6 +3613,7 @@
   "appActions": {
     "start": {
       "promptRequired": "כדי להפעיל סוכן נדרשת הנחיה. הוסף הנחיה והפעל שוב.",
+      "repositoryRequired": "כדי להפעיל סוכן נדרש מאגר. פתח את Kilo ובחר מאגר, ואז הפעל שוב.",
       "repositoryUnknown": "Kilo לא מזהה את {{repository}} כמאגר GitHub או GitLab. בחר מאגר אחר ב-Kilo.",
       "repositoryUnsupported": "{{repository}} הוא מאגר Bitbucket — הפעל סוכן עדיין לא יכול להשתמש בו. בחר מאגר אחר ב-Kilo."
     }
@@ -3657,7 +3685,6 @@
     "keyTooLong": "המפתח חייב להכיל 256 תווים או פחות",
     "keyDuplicate": "המפתח הזה כבר קיים בפרופיל",
     "valueLabel": "עֵרֶך",
-    "secretLabel": "סוֹד",
     "secrets": {
       "markSecret": "סמן כסוד",
       "masked": "ערך נסתר",
@@ -3716,7 +3743,9 @@
       "jsonTooLarge": "השתמש בעד 50 ערכים, מפתחות עד 128 וערכים עד 4096 תווים",
       "timeoutInvalid": "הזמן הקצוב חייב להיות מספר שלם של אלפיות שניות",
       "edit": "ערוך שרת MCP",
-      "saveFailed": "לא ניתן לשמור את שרת MCP"
+      "saveFailed": "לא ניתן לשמור את שרת MCP",
+      "deleteFailed": "לא ניתן למחוק את שרת MCP",
+      "updateFailed": "לא ניתן לעדכן את שרת MCP"
     },
     "agents": {
       "title": "סוכני פרופיל",
@@ -3743,6 +3772,7 @@
       "visibilitySubagent": "סוכן משנה - ניתן להתקשרות מאחרים בלבד",
       "visibilityAll": "הכל - שניהם",
       "saveFailed": "לא ניתן היה להציל את הסוכן",
+      "deleteFailed": "לא ניתן למחוק את הסוכן",
       "nameRequired": "הזן שם סוכן",
       "slugRequired": "הזן שבלול סוכן",
       "slugInvalid": "Slug חייב להתחיל באות ולהשתמש רק באותיות קטנות, ספרות ומקפים",
@@ -3757,10 +3787,12 @@
       "description": "תיאור הפקודה",
       "template": "תבנית",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "הסבר $ARGUMENTS",
       "subtask": "הפעל כתת-מטלת",
       "edit": "ערוך פקודת נטוי",
       "saveFailed": "לא ניתן לשמור את הפקודה",
+      "deleteFailed": "לא ניתן למחוק את הפקודה",
       "nameRequired": "הזן שם פקודה",
       "nameInvalid": "השם חייב להתחיל באות קטנה ולהשתמש רק באותיות קטנות, ספרות ומקפים",
       "templateRequired": "הזן תבנית פקודה",
@@ -3911,7 +3943,7 @@
     "view": "קריאת התדריך",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "הצגת סטטוס חי",
+    "dismiss": "התעלמות מהתדריך",
     "offline": "לא מקוון · תדריך שמור",
     "cached": "דוח שמור · רענון לא זמין",
     "revised": "עודכן · {{revision}}",

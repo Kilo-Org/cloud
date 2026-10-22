@@ -9,7 +9,7 @@ import { createElement, type ElementType, type ReactNode } from 'react';
 import type * as ReactModule from 'react';
 import { Platform, Pressable } from 'react-native';
 import { act, type ReactTestRenderer } from '@/test/renderer';
-import { type QueryClient } from '@tanstack/react-query';
+import { onlineManager, type QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -31,6 +31,14 @@ const currentUser = vi.hoisted(() => ({
 }));
 /** Window the card lays out in; a narrow one must stack the credits header. */
 const windowDims = vi.hoisted(() => ({ width: 390, height: 844, fontScale: 1, scale: 2 }));
+
+// The provider now announces the lost-membership recovery through the
+// toast adapter, whose module graph reaches react-native's Flow source
+// the mounted transform cannot parse. Suites mock the adapter (not the
+// sonner package) so the mock sits at the edge that imports it.
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
+}));
 
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
@@ -87,11 +95,17 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ push: routerPush }),
 }));
 
-// The mounted OrganizationProvider resolves its default from this list; an
-// empty settled list keeps the card's own selection assertions unchanged.
+// The mounted OrganizationProvider reads the shared memberships from this
+// list. The payload is driveable per test: a stored selection missing from
+// the fetched list now recovers to the first membership (or Personal), so a
+// test staging a stale stored selection seeds `listState.payload` with a
+// list that still names it.
+const listState = vi.hoisted(() => ({
+  payload: [] as { organizationId: string; organizationName: string; role: string }[],
+}));
 vi.mock('@/lib/hooks/use-organizations-list', () => ({
   useOrganizationsList: () => ({
-    data: [],
+    data: listState.payload,
     isFetched: true,
     isFetching: false,
     isError: false,
@@ -253,9 +267,14 @@ function headerClasses(renderer: ReactTestRenderer): string[] {
 beforeEach(() => {
   Platform.OS = 'ios';
   windowDims.width = 390;
+  // A test that simulates the app reporting offline must not leak that state.
+  onlineManager.setOnline(true);
   savedMetadata.clear();
   saveCompletion = undefined;
   addCreditsRowProps.latest = undefined;
+  // The shared memberships the provider reads default to none; tests that
+  // stage a stored selection set their own payload.
+  listState.payload = [];
   routerPush.mockReset();
   storage.read.mockReset().mockImplementation(async (key: string) => {
     await Promise.resolve();
@@ -331,6 +350,7 @@ describe('CreditsCard balance state', () => {
     const orgs = [
       { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
     ] as OrgListEntry[];
+    listState.payload = orgs;
     try {
       const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
       try {
@@ -356,16 +376,23 @@ describe('CreditsCard balance state', () => {
       label: organizationName,
     },
   ])('uses supplied memberships for the picker: $expected', async state => {
-    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'missing-org');
-    const { renderer, texts, unmount } = await mountCard(
+    // The staged stored selection is missing from the supplied list, so the
+    // provider recovers before the card renders: give the shared list the
+    // same payload the card receives, so the recovery lands on the selection
+    // the assertions then drive.
+    listState.payload = state.orgs as OrgListEntry[];
+    const seededSelection = (state.orgs as OrgListEntry[])[0]?.organizationId;
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, seededSelection ?? 'missing-org');
+    const { renderer, unmount } = await mountCard(
       createTestQueryClient(),
       state.orgs as OrgListEntry[]
     );
     await openSheet(renderer);
     expect([...accountLabels(renderer), 'Cancel']).toEqual(state.options);
     await choose(renderer, 'Cancel');
-    expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe('missing-org');
-    expect(texts()).toContain('Organization');
+    expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe(
+      (state.orgs as OrgListEntry[])[0]?.organizationId ?? undefined
+    );
     await openSheet(renderer);
     await choose(renderer, state.label);
     expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe(state.expected ?? undefined);
@@ -383,6 +410,10 @@ describe('CreditsCard balance state', () => {
         { organizationId: 'org-a', organizationName: 'Supplied organization', role: 'owner' },
         { organizationId: 'org-b', organizationName: 'Latest organization', role: 'owner' },
       ] as OrgListEntry[];
+      // The staged 'previous-org' selection must stay in the fetched list, or
+      // the provider's lost-membership recovery switches it away before the
+      // save-failure flow under test runs.
+      listState.payload = orgs;
       storage.write.mockRejectedValueOnce(new Error('write failed'));
       const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
       await openSheet(renderer);
@@ -588,6 +619,36 @@ describe('CreditsCard add-credits entry point', () => {
     }
   );
 
+  it('settles the balance read while the app reports offline', async () => {
+    // NetInfo can hold the device offline while the backend is reachable. A
+    // read that pauses there is pending without fetching, so the slot never
+    // leaves its skeleton: the card must ask Query to settle regardless.
+    currentUser.userId = 'user-1';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 12.5 });
+    onlineManager.setOnline(false);
+
+    const { texts, unmount } = await mountCard();
+    await waitFor(() => texts().includes('$12.50'));
+
+    expect(texts()).not.toContain('SKELETON');
+    unmount();
+    onlineManager.setOnline(true);
+  });
+
+  it('settles an unreachable balance read to the retry surface while offline', async () => {
+    currentUser.userId = 'user-1';
+    getContextBalanceQueryFn.mockRejectedValue(new Error('Network request failed'));
+    onlineManager.setOnline(false);
+
+    const { texts, unmount } = await mountCard();
+    await waitFor(() => texts().includes('Failed to load balance. Tap to retry.'));
+
+    expect(texts()).not.toContain('SKELETON');
+    expect(texts()).not.toContain('$0.00');
+    unmount();
+    onlineManager.setOnline(true);
+  });
+
   it('keeps personal Buy credits actionable when the balance request fails', async () => {
     currentUser.userId = 'user-1';
     getContextBalanceQueryFn.mockRejectedValue(new Error('Balance unavailable'));
@@ -631,6 +692,9 @@ describe('CreditsCard add-credits entry point', () => {
     const orgs = [
       { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
     ] as OrgListEntry[];
+    // The stored selection must stay in the fetched list, or the provider's
+    // lost-membership recovery switches it to Personal before the card reads it.
+    listState.payload = orgs;
 
     const { texts, unmount } = await mountCard(queryClient, orgs);
     await waitFor(() => addCreditsRowProps.latest?.url !== undefined);
@@ -652,6 +716,8 @@ describe('CreditsCard add-credits entry point', () => {
     const orgs = [
       { organizationId: 'org-a', organizationName: 'Acme', role: 'member' },
     ] as OrgListEntry[];
+    // Same seeding as the money-role case: keep the selection recoverable.
+    listState.payload = orgs;
 
     const { texts, unmount } = await mountCard(queryClient, orgs);
     await waitFor(() => texts().includes('Acme'));

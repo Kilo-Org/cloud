@@ -234,7 +234,6 @@ export function checkNativeAdmission(body: Record<string, unknown>): {
     return { admission: { ok: false, errorCode: 'ADMISSION_REQUIRED' }, verifyAsync: false };
   }
 
-  // Valid payload — async verification needed for enforce and report modes.
   return { admission: { ok: true }, verifyAsync: mode === 'enforce' || mode === 'report' };
 }
 
@@ -297,7 +296,6 @@ export async function verifyAdmissionAsync(
     return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
   }
 
-  // Route to platform-specific verifier
   if (admission.platform === 'ios') {
     return verifyAppleAdmission(admission);
   }

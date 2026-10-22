@@ -1,3 +1,4 @@
+import { onlineManager } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The mock harness is imported before any product module so its `vi.mock`
@@ -5,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   advanceUntil,
   authState,
+  connectivityState,
   findConfigureRows,
   findNode,
   flushInteractions,
@@ -27,6 +29,9 @@ import { createTestQueryClient, waitFor } from '@/test/render-with-providers';
 describe('ProfileScreen deferred queries', () => {
   beforeEach(() => {
     vi.useRealTimers();
+    // A test that simulates the app reporting offline must not leak that state.
+    onlineManager.setOnline(true);
+    connectivityState.value = 'online';
     providersQueryFn.mockReset();
     organizationsQueryFn.mockReset();
     signOutFn.mockReset();
@@ -202,6 +207,60 @@ describe('ProfileScreen deferred queries', () => {
     const queryError = findNode(renderer.root, 'QueryError');
     expect(queryError?.props.title).toBe('Could not load accounts');
     expect(typeof queryError?.props.onRetry).toBe('function');
+
+    unmount();
+  });
+
+  it('settles the linked-accounts read while the app reports offline', async () => {
+    // NetInfo can hold the device offline while the backend is reachable. A
+    // paused read is pending without fetching, so neither the row nor the error
+    // surface renders: the screen must ask Query to settle regardless.
+    providersQueryFn.mockResolvedValue({
+      providers: [{ provider: 'github', email: 'dev@kilo.ai' }],
+    });
+    organizationsQueryFn.mockResolvedValue([]);
+    onlineManager.setOnline(false);
+
+    const { renderer, unmount } = await mountProfile();
+
+    flushInteractions();
+    await waitFor(() => findConfigureRows(renderer.root, 'GitHub').length === 1);
+
+    expect(findConfigureRows(renderer.root, 'GitHub')[0]?.props.subtitle).toBe('dev@kilo.ai');
+    expect(nodeCount(renderer.root, 'Skeleton')).toBe(0);
+
+    unmount();
+  });
+
+  it('settles an unreachable linked-accounts read to its retry surface while offline', async () => {
+    providersQueryFn.mockRejectedValue(new Error('Network request failed'));
+    organizationsQueryFn.mockResolvedValue([]);
+    onlineManager.setOnline(false);
+
+    const { renderer, unmount } = await mountProfile();
+
+    flushInteractions();
+    await waitFor(() => nodeCount(renderer.root, 'QueryError') > 0);
+
+    const queryError = findNode(renderer.root, 'QueryError');
+    expect(queryError?.props.title).toBe('Could not load accounts');
+    expect(typeof queryError?.props.onRetry).toBe('function');
+    expect(nodeCount(renderer.root, 'Skeleton')).toBe(0);
+
+    unmount();
+  });
+
+  it('names connectivity when the failed read lands on a confirmed-offline device', async () => {
+    providersQueryFn.mockRejectedValue(new Error('Network request failed'));
+    organizationsQueryFn.mockResolvedValue([]);
+    connectivityState.value = 'offline';
+
+    const { renderer, unmount } = await mountProfile();
+
+    flushInteractions();
+    await waitFor(() => nodeCount(renderer.root, 'QueryError') > 0);
+
+    expect(findNode(renderer.root, 'QueryError')?.props.variant).toBe('offline');
 
     unmount();
   });

@@ -375,7 +375,7 @@ describe('SessionIngestDO integration', () => {
       expect(JSON.stringify(shared)).not.toContain('Private');
       expect(JSON.stringify(shared)).not.toContain('public.ts');
 
-      await stub.clearShareInfo();
+      await stub.deleteShareInfo(publicId);
       const cleared = JSON.parse(
         await stub
           .getSharedSessionStream({ publicId, ingestedBeforeMs: 2000 })
@@ -383,6 +383,81 @@ describe('SessionIngestDO integration', () => {
       );
       expect(cleared.info).toEqual({});
       expect(cleared.messages).toEqual([]);
+    });
+
+    it.each([
+      ['source', MAX_KILO_SDK_SESSION_SNAPSHOT_BYTES + 1],
+      ['projected row', MAX_INGEST_ITEM_BYTES + 1],
+    ])('rejects an oversized %s before persisting share info', async (_kind, bytes) => {
+      const sessionId = `ses_share_oversized_${crypto.randomUUID()}`;
+      const publicId = crypto.randomUUID();
+      const key = `test/share-info/${sessionId}`;
+      const stub = getStub(kiloUserId, sessionId);
+      try {
+        await env.SESSION_INGEST_R2.put(key, JSON.stringify({ title: 'x'.repeat(bytes) }));
+        await runInDurableObject(stub, async (_instance, state) => {
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data, item_data_r2_key, ingested_at) VALUES (?, ?, ?, ?, ?)',
+            'session',
+            'session',
+            '{}',
+            key,
+            1000
+          );
+        });
+        await runInDurableObject(stub, async instance => {
+          await expect(instance.captureShareInfo(publicId)).rejects.toThrow(
+            'Share snapshot is too large'
+          );
+        });
+        await runInDurableObject(stub, async (_instance, state) => {
+          expect([
+            ...state.storage.sql.exec(
+              'SELECT key FROM ingest_meta WHERE key = ?',
+              `shareInfo:${publicId}`
+            ),
+          ]).toEqual([]);
+        });
+      } finally {
+        await stub.clear();
+        await env.SESSION_INGEST_R2.delete(key);
+      }
+    });
+
+    it('projects an R2-backed session before checking its stored snapshot size', async () => {
+      const sessionId = `ses_share_project_${crypto.randomUUID()}`;
+      const publicId = crypto.randomUUID();
+      const key = `test/share-info/${sessionId}`;
+      const stub = getStub(kiloUserId, sessionId);
+      try {
+        await env.SESSION_INGEST_R2.put(
+          key,
+          JSON.stringify({
+            title: 'Shared title',
+            summary: { diffs: ['x'.repeat(3 * 1024 * 1024)], additions: 1 },
+          })
+        );
+        await runInDurableObject(stub, async (_instance, state) => {
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data, item_data_r2_key, ingested_at) VALUES (?, ?, ?, ?, ?)',
+            'session',
+            'session',
+            '{}',
+            key,
+            1000
+          );
+        });
+        await stub.captureShareInfo(publicId);
+        const shared = JSON.parse(
+          await stub
+            .getSharedSessionStream({ publicId, ingestedBeforeMs: Date.now() })
+            .then(s => new Response(s).text())
+        );
+        expect(shared.info).toEqual({ title: 'Shared title', summary: { additions: 1 } });
+      } finally {
+        await stub.clear();
+        await env.SESSION_INGEST_R2.delete(key);
+      }
     });
 
     it('prunes expired share info snapshots when a new share is captured', async () => {
@@ -409,6 +484,14 @@ describe('SessionIngestDO integration', () => {
         );
       });
       await stub.captureShareInfo(publicId);
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect([
+          ...state.storage.sql.exec(
+            'SELECT key FROM ingest_meta WHERE key = ?',
+            `shareInfo:${stalePublicId}`
+          ),
+        ]).toEqual([]);
+      });
 
       const current = JSON.parse(
         await stub

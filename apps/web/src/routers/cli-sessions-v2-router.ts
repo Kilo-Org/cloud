@@ -42,6 +42,7 @@ import {
   fetchSessionDiff,
   deleteSession as deleteSessionIngest,
   shareSession as shareSessionIngest,
+  SessionShareTooLargeError,
   unshareSession as unshareSessionIngest,
 } from '@/lib/session-ingest-client';
 import {
@@ -2334,6 +2335,9 @@ export const cliSessionsV2Router = createTRPCRouter({
       const result = await shareSessionIngest(session_id, ctx.user.id);
       return { share_token: result.share_token };
     } catch (error) {
+      if (error instanceof SessionShareTooLargeError) {
+        throw new TRPCError({ code: 'PAYLOAD_TOO_LARGE', message: error.message, cause: error });
+      }
       captureException(error, {
         tags: { source: 'cli-sessions-v2-router', endpoint: 'share' },
         extra: { session_id },

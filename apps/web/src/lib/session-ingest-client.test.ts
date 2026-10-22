@@ -14,6 +14,7 @@ import {
   fetchSessionMessagesPage,
   deleteSession,
   shareSession,
+  SessionShareTooLargeError,
   unshareSession,
   fetchSharedSessionMetadata,
   fetchSharedSessionSnapshot,
@@ -378,6 +379,14 @@ describe('shareSession', () => {
       audience: 'session-ingest',
       expiresIn: 60 * 60,
     });
+  });
+
+  it('preserves a specific oversized-share error from the worker', async () => {
+    mockFetch.mockResolvedValue(new Response(null, { status: 413 }));
+    await expect(shareSession('ses_abc123', 'user_123')).rejects.toBeInstanceOf(
+      SessionShareTooLargeError
+    );
+    expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
   it('throws on 404', async () => {

@@ -139,7 +139,7 @@ export function SessionActionsDialog({
               <h3 className="text-sm font-medium">Share Session</h3>
             </div>
             <p className="text-muted-foreground text-xs">
-              Share a public snapshot of this session with others
+              Create a public snapshot with a 7-day link. This replaces any previous link.
             </p>
 
             {shareUrl ? (

@@ -27,7 +27,7 @@ import {
   withDORetry,
 } from '@kilocode/worker-utils';
 import { ORGANIZATION_PARENT_ACCESS_ROLES } from '@kilocode/app-shared/organizations';
-import { getSessionIngestDO } from '../dos/SessionIngestDO';
+import { getSessionIngestDO, SHARE_INFO_TOO_LARGE_ERROR } from '../dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { getUserConnectionDO } from '../dos/UserConnectionDO';
 import { createConnectionTicket } from '../dos/connection-ticket';
@@ -803,6 +803,9 @@ api.post('/session/:sessionId/share', async c => {
     );
   } catch (error) {
     await removeSnapshot();
+    if (error instanceof Error && error.message === SHARE_INFO_TOO_LARGE_ERROR) {
+      return c.json({ success: false, error: 'share_snapshot_too_large' }, 413);
+    }
     if (error instanceof Error && error.message === 'Session deleted') {
       return c.json({ success: false, error: 'session_not_found' }, 404);
     }
@@ -824,8 +827,21 @@ api.post('/session/:sessionId/share', async c => {
   // while its signature is still valid. The capability's `shared_at` is
   // captured after the info snapshot, so the info cannot include session
   // updates that happen after the share boundary.
-  const shareResult = await db
-    .execute<{ public_id: string }>(sql`
+  const sharedSession = await db
+    .transaction(async tx => {
+      const [previous] = await tx
+        .select({ publicId: cli_sessions_v2.public_id })
+        .from(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, parsed.data),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
+        )
+        .limit(1)
+        .for('update');
+      if (!previous) return null;
+      const result = await tx.execute<{ public_id: string }>(sql`
       UPDATE ${cli_sessions_v2}
       SET public_id = ${publicId}
       WHERE ${cli_sessions_v2.session_id} = ${parsed.data}
@@ -859,16 +875,25 @@ api.post('/session/:sessionId/share', async c => {
           )
         )
       RETURNING ${cli_sessions_v2.public_id}
-    `)
+    `);
+      return result.rows[0] ? previous : null;
+    })
     .catch(async error => {
       await removeSnapshot();
       throw error;
     });
 
-  const sharedSession = shareResult.rows[0];
   if (!sharedSession) {
     await removeSnapshot();
     return c.json({ success: false, error: 'session_not_found' }, 404);
+  }
+  const previousPublicId = sharedSession.publicId;
+  if (previousPublicId) {
+    await withDORetry(
+      () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
+      stub => stub.deleteShareInfo(previousPublicId),
+      'SessionIngestDO.deleteShareInfo'
+    ).catch(() => undefined);
   }
 
   return c.json({ success: true, share_token: shareToken }, 200);
@@ -892,35 +917,44 @@ api.post('/session/:sessionId/unshare', async c => {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
 
-  const sessionRows = await db
-    .select({ session_id: cli_sessions_v2.session_id })
-    .from(cli_sessions_v2)
-    .where(
-      and(eq(cli_sessions_v2.session_id, parsed.data), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-    )
-    .limit(1);
-
-  if (!sessionRows[0]) {
+  const previous = await db.transaction(async tx => {
+    const [session] = await tx
+      .select({ publicId: cli_sessions_v2.public_id })
+      .from(cli_sessions_v2)
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, parsed.data),
+          eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+        )
+      )
+      .limit(1)
+      .for('update');
+    if (!session) return null;
+    await tx
+      .update(cli_sessions_v2)
+      .set({ public_id: null })
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, parsed.data),
+          eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+        )
+      );
+    return session;
+  });
+  if (!previous) {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
-
-  await db
-    .update(cli_sessions_v2)
-    .set({ public_id: null })
-    .where(
-      and(eq(cli_sessions_v2.session_id, parsed.data), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-    );
-
-  try {
+  const previousPublicId = previous.publicId;
+  if (previousPublicId) {
     await withDORetry(
       () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
-      stub => stub.clearShareInfo(),
-      'SessionIngestDO.clearShareInfo'
-    );
-  } catch (error) {
-    console.warn('Failed to clear share snapshot after unshare', {
-      sessionId: parsed.data,
-      error: error instanceof Error ? error.message : String(error),
+      stub => stub.deleteShareInfo(previousPublicId),
+      'SessionIngestDO.deleteShareInfo'
+    ).catch(error => {
+      console.warn('Failed to clear share snapshot after unshare', {
+        sessionId: parsed.data,
+        error: error instanceof Error ? error.message : String(error),
+      });
     });
   }
 

@@ -11,6 +11,7 @@ vi.mock('@kilocode/db/client', () => ({
 
 vi.mock('../dos/SessionIngestDO', () => ({
   getSessionIngestDO: vi.fn(),
+  SHARE_INFO_TOO_LARGE_ERROR: 'Share snapshot is too large',
 }));
 
 vi.mock('../dos/SessionAccessCacheDO', () => ({
@@ -136,7 +137,6 @@ function r2StagingStub(env: Parameters<typeof getSessionIngestDO>[0]) {
 function shareIngestStub() {
   return {
     captureShareInfo: vi.fn(async (_publicId: string) => undefined),
-    clearShareInfo: vi.fn(async () => undefined),
     deleteShareInfo: vi.fn(async (_publicId: string) => undefined),
   };
 }
@@ -620,6 +620,99 @@ describe('api routes', () => {
     expect(response.status).toBe(500);
     const r2Key = env.SESSION_INGEST_R2.put.mock.calls[0][0];
     expect(env.SESSION_INGEST_R2.delete).toHaveBeenCalledWith(r2Key);
+  });
+
+  it('POST /session/:sessionId/share removes only the retired snapshot', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ publicId: 'previous-generation' }]);
+    fns.executeResult.mockImplementation(async query => {
+      if (!(query instanceof SQL)) throw new Error('Expected share query');
+      return { rows: [{ public_id: new PgDialect().sqlToQuery(query).params[0] }] };
+    });
+    const ingestStub = shareIngestStub();
+    vi.mocked(getSessionIngestDO).mockReturnValue(ingestStub as never);
+    const response = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/share', { method: 'POST' }),
+      makeTestEnv()
+    );
+    expect(response.status).toBe(200);
+    expect(ingestStub.deleteShareInfo).toHaveBeenCalledExactlyOnceWith('previous-generation');
+    expect(fns.selectFor).toHaveBeenCalledWith('update');
+  });
+
+  it('POST /session/:sessionId/share returns 413 before rotation for an oversized snapshot', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    const ingestStub = shareIngestStub();
+    ingestStub.captureShareInfo.mockRejectedValue(new Error('Share snapshot is too large'));
+    vi.mocked(getSessionIngestDO).mockReturnValue(ingestStub as never);
+    const response = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/share', { method: 'POST' }),
+      makeTestEnv()
+    );
+    expect(response.status).toBe(413);
+    expect(await response.json()).toEqual({ success: false, error: 'share_snapshot_too_large' });
+    expect(fns.transaction).not.toHaveBeenCalled();
+    expect(fns.executeResult).not.toHaveBeenCalled();
+  });
+
+  it('keeps a pending share snapshot when unshare commits before the share', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    let currentPublicId: string | null = 'previous-generation';
+    const snapshots = new Set([currentPublicId]);
+    const captured = Promise.withResolvers<string>();
+    const resumeCapture = Promise.withResolvers<void>();
+    fns.selectResult.mockImplementation(async () => [{ publicId: currentPublicId }]);
+    fns.updateResult.mockImplementation(async () => {
+      currentPublicId = null;
+    });
+    fns.executeResult.mockImplementation(async query => {
+      if (!(query instanceof SQL)) throw new Error('Expected share query');
+      currentPublicId = String(new PgDialect().sqlToQuery(query).params[0]);
+      return { rows: [{ public_id: currentPublicId }] };
+    });
+    const ingestStub = {
+      captureShareInfo: async (publicId: string) => {
+        snapshots.add(publicId);
+        captured.resolve(publicId);
+        await resumeCapture.promise;
+      },
+      deleteShareInfo: async (publicId: string) => {
+        snapshots.delete(publicId);
+      },
+      clearShareInfo: async () => {
+        snapshots.clear();
+      },
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue(ingestStub as never);
+    const app = makeApiApp();
+    const env = makeTestEnv();
+    const pendingShare = app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/share', { method: 'POST' }),
+      env
+    );
+    const pendingPublicId = await captured.promise;
+    try {
+      const unshare = await app.fetch(
+        new Request('http://local/session/ses_12345678901234567890123456/unshare', {
+          method: 'POST',
+        }),
+        env
+      );
+      expect(unshare.status).toBe(200);
+      expect(currentPublicId).toBeNull();
+      expect(snapshots).toEqual(new Set([pendingPublicId]));
+    } finally {
+      resumeCapture.resolve();
+    }
+    const response = await pendingShare;
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { share_token: string };
+    const token = await verifySessionShareToken(env, body.share_token);
+    expect(currentPublicId).toBe(token?.jti);
+    expect(snapshots).toEqual(new Set([token?.jti]));
   });
 
   it('POST /session/:sessionId/unshare denies a removed organization member before mutations', async () => {
@@ -2505,6 +2598,7 @@ describe('api routes', () => {
   it('POST /session/:sessionId/share rotates the generation and returns a JWT', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ publicId: null }]);
     const ingestStub = shareIngestStub();
     vi.mocked(getSessionIngestDO).mockReturnValue(
       ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
@@ -2548,6 +2642,7 @@ describe('api routes', () => {
     try {
       const { db, fns } = makeDbFakes();
       vi.mocked(getWorkerDb).mockReturnValue(db);
+      fns.selectResult.mockResolvedValue([{ publicId: null }]);
       const ingestStub = shareIngestStub();
       vi.mocked(getSessionIngestDO).mockReturnValue(
         ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
@@ -2612,6 +2707,7 @@ describe('api routes', () => {
   it('POST /session/:sessionId/share sets a fresh public_id and returns a JWT', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ publicId: null }]);
     const ingestStub = shareIngestStub();
     vi.mocked(getSessionIngestDO).mockReturnValue(
       ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
@@ -2651,6 +2747,7 @@ describe('api routes', () => {
   it('POST /session/:sessionId/share rejects an authoritative access failure', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ publicId: null }]);
     const ingestStub = shareIngestStub();
     vi.mocked(getSessionIngestDO).mockReturnValue(
       ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
@@ -2676,6 +2773,7 @@ describe('api routes', () => {
   it('POST /session/:sessionId/share returns 404 before capture when the session is not accessible', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ publicId: null }]);
     vi.mocked(resolveAccessibleKiloSession).mockResolvedValue(null);
 
     const app = makeApiApp();
@@ -2694,6 +2792,7 @@ describe('api routes', () => {
   it('POST /session/:sessionId/share maps a deleted DO to session_not_found', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ publicId: null }]);
     const ingestStub = shareIngestStub();
     ingestStub.captureShareInfo.mockRejectedValue(new Error('Session deleted'));
     vi.mocked(getSessionIngestDO).mockReturnValue(
@@ -2718,6 +2817,7 @@ describe('api routes', () => {
   it('POST /session/:sessionId/share does not rotate when signing fails', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ publicId: null }]);
     const ingestStub = shareIngestStub();
     vi.mocked(getSessionIngestDO).mockReturnValue(
       ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
@@ -2752,7 +2852,7 @@ describe('api routes', () => {
     vi.mocked(getSessionIngestDO).mockReturnValue(
       ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
     );
-    fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_12345678901234567890123456' }]);
+    fns.selectResult.mockResolvedValueOnce([{ publicId: 'retired-generation' }]);
 
     const app = makeApiApp();
     const res = await app.fetch(
@@ -2764,7 +2864,8 @@ describe('api routes', () => {
 
     expect(res.status).toBe(200);
     expect(fns.updateSet).toHaveBeenCalled();
-    expect(ingestStub.clearShareInfo).toHaveBeenCalledTimes(1);
+    expect(ingestStub.deleteShareInfo).toHaveBeenCalledWith('retired-generation');
+    expect(fns.selectFor).toHaveBeenCalledWith('update');
   });
 
   it('GET /sessions/active returns sessions from UserConnectionDO', async () => {

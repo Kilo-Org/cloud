@@ -84,8 +84,8 @@ export function ShareSessionDialog({
           <DialogTitle>Share Session</DialogTitle>
           <DialogDescription>
             {shareUrl
-              ? 'Your session is ready to share!'
-              : 'Would you like to publicly share a snapshot of this session?'}
+              ? 'This link expires in 7 days. You can copy it or open it below.'
+              : 'Create a public snapshot of this session. The new link expires in 7 days and replaces any previous link.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -134,10 +134,10 @@ export function ShareSessionDialog({
                 {isSharing ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Sharing...
+                    Creating link...
                   </>
                 ) : (
-                  'Share'
+                  'Create new link'
                 )}
               </Button>
             </>

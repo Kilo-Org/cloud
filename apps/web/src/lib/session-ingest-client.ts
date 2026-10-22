@@ -390,6 +390,13 @@ const SharedSessionMetadataResponseSchema = z
   })
   .strict();
 
+export class SessionShareTooLargeError extends Error {
+  constructor() {
+    super('Session details are too large to share. Existing links are unchanged.');
+    this.name = 'SessionShareTooLargeError';
+  }
+}
+
 /**
  * Share a session via the session-ingest worker.
  *
@@ -416,6 +423,10 @@ export async function shareSession(
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   });
+
+  if (response.status === 413) {
+    throw new SessionShareTooLargeError();
+  }
 
   if (response.status === 404) {
     throw new Error('Session not found');

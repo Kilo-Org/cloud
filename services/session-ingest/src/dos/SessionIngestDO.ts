@@ -27,6 +27,7 @@ import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { ingestItems, ingestMeta, agentNotificationDispatch } from '../db/sqlite-schema';
 import type { Env } from '../env';
+import { MAX_INGEST_ITEM_BYTES } from '../util/ingest-limits';
 import type { IngestBatch } from '../types/session-sync';
 import type { SessionDataItem } from '../types/session-sync';
 import { getItemIdentity, getPartItemIdentityRange } from '../util/compaction';
@@ -116,6 +117,7 @@ type IngestMetaKey =
 
 const SHARE_INFO_KEY_PREFIX = 'shareInfo:';
 const SHARE_INFO_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+export const SHARE_INFO_TOO_LARGE_ERROR = 'Share snapshot is too large';
 
 type ShareInfoMetaKey = `${typeof SHARE_INFO_KEY_PREFIX}${string}`;
 
@@ -128,21 +130,14 @@ function shareInfoKey(publicId: string): ShareInfoMetaKey {
  * part of the public share, so drop it from the snapshot while keeping the
  * bounded summary counts and every field the import path reads.
  */
-function projectSharedSessionInfo(raw: string): string {
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return '{}';
-
-    const info = { ...(parsed as Record<string, unknown>) };
-    if (typeof info.summary === 'object' && info.summary !== null && !Array.isArray(info.summary)) {
-      const summary = { ...(info.summary as Record<string, unknown>) };
-      delete summary.diffs;
-      info.summary = summary;
-    }
-    return JSON.stringify(info);
-  } catch {
-    return '{}';
+function projectSharedSessionInfo(value: Record<string, unknown>): string {
+  const info = { ...value };
+  if (typeof info.summary === 'object' && info.summary !== null && !Array.isArray(info.summary)) {
+    const summary = { ...(info.summary as Record<string, unknown>) };
+    delete summary.diffs;
+    info.summary = summary;
   }
+  return JSON.stringify(info);
 }
 
 type ExtractableMetaKey =
@@ -1253,18 +1248,18 @@ export class SessionIngestDO extends DurableObject<Env> {
    */
   async captureShareInfo(publicId: string): Promise<void> {
     if (this.isDeleted()) throw new Error('Session deleted');
-    const sessionRow = this.db
-      .select({
-        item_data: ingestItems.item_data,
-        item_data_r2_key: ingestItems.item_data_r2_key,
-      })
-      .from(ingestItems)
-      .where(eq(ingestItems.item_type, 'session'))
-      .limit(1)
-      .get();
-    const info = sessionRow ? projectSharedSessionInfo(await this.readItemData(sessionRow)) : '{}';
+    const snapshot = await readKiloSdkSessionSnapshot(this.db, this.env.SESSION_INGEST_R2);
+    if (snapshot.kind === 'too_large') throw new Error(SHARE_INFO_TOO_LARGE_ERROR);
+    if (snapshot.kind !== 'value' && snapshot.kind !== 'pending') {
+      throw new Error('Share snapshot is unavailable');
+    }
+    if (this.isDeleted()) throw new Error('Session deleted');
+    const info = snapshot.kind === 'value' ? projectSharedSessionInfo(snapshot.info) : '{}';
     const now = Date.now();
     const value = JSON.stringify({ capturedAt: now, info });
+    if (new TextEncoder().encode(value).byteLength > MAX_INGEST_ITEM_BYTES) {
+      throw new Error(SHARE_INFO_TOO_LARGE_ERROR);
+    }
 
     this.db
       .insert(ingestMeta)
@@ -1278,13 +1273,6 @@ export class SessionIngestDO extends DurableObject<Env> {
     this.db
       .delete(ingestMeta)
       .where(eq(ingestMeta.key, shareInfoKey(publicId)))
-      .run();
-  }
-
-  async clearShareInfo(): Promise<void> {
-    this.db
-      .delete(ingestMeta)
-      .where(like(ingestMeta.key, `${SHARE_INFO_KEY_PREFIX}%`))
       .run();
   }
 
@@ -1345,18 +1333,6 @@ export class SessionIngestDO extends DurableObject<Env> {
     } catch {
       return null;
     }
-  }
-
-  private async readItemData(ref: ItemDataRef): Promise<string> {
-    if (!ref.item_data_r2_key) return ref.item_data;
-    const object = await this.env.SESSION_INGEST_R2.get(ref.item_data_r2_key);
-    if (!object) {
-      console.error('R2 blob missing while freezing share info', {
-        r2Key: ref.item_data_r2_key,
-      });
-      return '{}';
-    }
-    return object.text();
   }
 
   private buildSessionExportStream(options: {

@@ -19,6 +19,7 @@ import {
   type AuthVariables,
 } from './middleware/auth.middleware';
 import { createKiloAuthMiddleware } from '@kilocode/worker-utils/kilo-auth-middleware';
+import { findActiveDeviceSession } from '@kilocode/worker-utils/device-session-auth';
 import { GASTOWN_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { resolveSecret } from './util/secret.util';
 import { validateCfAccessRequest } from '@kilocode/worker-utils/cf-access';
@@ -184,6 +185,10 @@ const kiloAuthMiddleware = createKiloAuthMiddleware<GastownEnv>({
   resolveSecret,
   audiencePolicy: { audience: GASTOWN_AUDIENCE, mode: 'allow-legacy' },
   onAuthenticated: payload => logger.setTags({ userId: payload.kiloUserId }),
+  isActiveDeviceSession: async (env, deviceSessionId, userId) => {
+    if (!env.HYPERDRIVE) return false;
+    return findActiveDeviceSession(env.HYPERDRIVE.connectionString, deviceSessionId, userId);
+  },
 });
 
 const LOCAL_DEV_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]']);

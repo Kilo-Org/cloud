@@ -364,7 +364,8 @@ function addCliSocket(
     platform?: string;
   }> = [],
   instance?: Instance,
-  kiloUserId?: string
+  kiloUserId?: string,
+  deviceSessionId?: string
 ): MockWS {
   const attachment: {
     role: 'cli';
@@ -372,9 +373,11 @@ function addCliSocket(
     sessions: typeof sessions;
     instance?: typeof instance;
     kiloUserId?: string;
+    deviceSessionId?: string;
   } = { role: 'cli', connectionId, sessions };
   if (instance) attachment.instance = instance;
   if (kiloUserId) attachment.kiloUserId = kiloUserId;
+  if (deviceSessionId) attachment.deviceSessionId = deviceSessionId;
   const ws = createMockWs(['cli'], attachment);
   mockCtx.addSocket(ws);
   return ws;
@@ -385,9 +388,16 @@ function addWebSocket(
   mockCtx: ReturnType<typeof createMockCtx>,
   connectionId = 'web-1',
   subscribedSessions: string[] = [],
-  kiloUserId = 'usr_1'
+  kiloUserId = 'usr_1',
+  deviceSessionId?: string
 ): MockWS {
-  const attachment = { role: 'web' as const, connectionId, subscribedSessions, kiloUserId };
+  const attachment = {
+    role: 'web' as const,
+    connectionId,
+    subscribedSessions,
+    kiloUserId,
+    ...(deviceSessionId ? { deviceSessionId } : {}),
+  };
   const ws = createMockWs(['web'], attachment);
   mockCtx.addSocket(ws);
   return ws;
@@ -1125,6 +1135,21 @@ describe('UserConnectionDO', () => {
 
       const msgs = allSent(cliWs);
       expect(msgs).toContainEqual({ type: 'heartbeat_ack' });
+    });
+
+    it('keeps the device session binding across heartbeats so revocation can close the CLI', async () => {
+      const { doInstance, mockCtx } = setup();
+      const deviceSessionId = '11111111-1111-4111-8111-111111111111';
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1', deviceSessionId);
+
+      await doInstance.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'heartbeat', sessions: [makeSession('s1')] })
+      );
+
+      expect(cliWs.deserializeAttachment()).toMatchObject({ deviceSessionId });
+      expect(doInstance.closeDeviceSockets(deviceSessionId)).toBe(1);
+      expect(cliWs.close).toHaveBeenCalledWith(1000, 'device session revoked');
     });
 
     it('broadcasts a heartbeat session prLink to web sockets', async () => {
@@ -8527,5 +8552,61 @@ describe('closeViewerSockets', () => {
     expect(closed).toBe(0);
     expect(cli1.close).not.toHaveBeenCalled();
     expect(cli2.close).not.toHaveBeenCalled();
+  });
+});
+
+describe('closeDeviceSockets', () => {
+  it('closes web and CLI sockets authenticated by the revoked session only', () => {
+    const { doInstance, mockCtx } = setup();
+    const webRevoked = addWebSocket(
+      mockCtx,
+      'web-revoked',
+      [],
+      'usr_1',
+      '11111111-1111-4111-8111-111111111111'
+    );
+    const cliRevoked = addCliSocket(
+      mockCtx,
+      'cli-revoked',
+      [],
+      undefined,
+      'usr_1',
+      '11111111-1111-4111-8111-111111111111'
+    );
+    const webOther = addWebSocket(
+      mockCtx,
+      'web-other',
+      [],
+      'usr_1',
+      '22222222-2222-4222-8222-222222222222'
+    );
+    const legacyWeb = addWebSocket(mockCtx, 'web-legacy');
+
+    const closed = doInstance.closeDeviceSockets('11111111-1111-4111-8111-111111111111');
+
+    expect(closed).toBe(2);
+    expect(webRevoked.close).toHaveBeenCalledWith(1000, 'device session revoked');
+    expect(cliRevoked.close).toHaveBeenCalledWith(1000, 'device session revoked');
+    expect(webOther.close).not.toHaveBeenCalled();
+    expect(legacyWeb.close).not.toHaveBeenCalled();
+  });
+
+  it('closeAllSockets closes web, CLI and legacy sockets', () => {
+    const { doInstance, mockCtx } = setup();
+    const web = addWebSocket(mockCtx, 'web-1', [], 'usr_1', '11111111-1111-4111-8111-111111111111');
+    const cli = addCliSocket(
+      mockCtx,
+      'cli-1',
+      [],
+      undefined,
+      'usr_1',
+      '22222222-2222-4222-8222-222222222222'
+    );
+    const legacy = addCliSocket(mockCtx, 'cli-legacy');
+
+    expect(doInstance.closeAllSockets()).toBe(3);
+    expect(web.close).toHaveBeenCalledWith(1000, 'device session revoked');
+    expect(cli.close).toHaveBeenCalledWith(1000, 'device session revoked');
+    expect(legacy.close).toHaveBeenCalledWith(1000, 'device session revoked');
   });
 });

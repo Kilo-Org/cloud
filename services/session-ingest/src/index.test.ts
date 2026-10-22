@@ -388,3 +388,73 @@ describe('public session route', () => {
     expect(getSessionIngestDO).not.toHaveBeenCalled();
   });
 });
+
+describe('device session revocation route', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('rejects a request without the internal secret', async () => {
+    const res = await app.request(
+      '/internal/device-session/revoke',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ kiloUserId: 'usr_1' }),
+      },
+      defaultEnv
+    );
+
+    expect(res.status).toBe(401);
+    expect(getUserConnectionDO).not.toHaveBeenCalled();
+  });
+
+  it('closes sockets for one device session', async () => {
+    const closeDeviceSockets = vi.fn(async () => 2);
+    vi.mocked(getUserConnectionDO).mockReturnValue({
+      closeDeviceSockets,
+    } as unknown as ReturnType<typeof getUserConnectionDO>);
+
+    const res = await app.request(
+      '/internal/device-session/revoke',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'X-Internal-Secret': 'internal-secret',
+        },
+        body: JSON.stringify({
+          kiloUserId: 'usr_1',
+          deviceSessionId: '11111111-1111-4111-8111-111111111111',
+        }),
+      },
+      defaultEnv
+    );
+
+    expect(res.status).toBe(204);
+    expect(closeDeviceSockets).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111');
+  });
+
+  it('closes all user sockets when no device session is supplied', async () => {
+    const closeAllSockets = vi.fn(async () => 3);
+    vi.mocked(getUserConnectionDO).mockReturnValue({
+      closeAllSockets,
+    } as unknown as ReturnType<typeof getUserConnectionDO>);
+
+    const res = await app.request(
+      '/internal/device-session/revoke',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'X-Internal-Secret': 'internal-secret',
+        },
+        body: JSON.stringify({ kiloUserId: 'usr_1' }),
+      },
+      defaultEnv
+    );
+
+    expect(res.status).toBe(204);
+    expect(closeAllSockets).toHaveBeenCalled();
+  });
+});

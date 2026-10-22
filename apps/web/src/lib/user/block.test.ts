@@ -1,4 +1,5 @@
-import { describe, test, expect } from '@jest/globals';
+import '@/tests/setup/mock-device-session-realtime';
+import { describe, test, expect, beforeEach, jest } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import {
   kilocode_users,
@@ -9,7 +10,11 @@ import {
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+
+import { scheduleDeviceSessionRealtimeClose } from '@/lib/auth/device-session-realtime';
 import { blockUser } from '@/lib/user/block';
+
+const scheduleClose = jest.mocked(scheduleDeviceSessionRealtimeClose);
 
 async function getUser(id: string) {
   return db.query.kilocode_users.findFirst({
@@ -24,6 +29,10 @@ async function getUser(id: string) {
 }
 
 describe('blockUser (integration)', () => {
+  beforeEach(() => {
+    scheduleClose.mockClear();
+  });
+
   test('blocks an unblocked user and rotates the api_token_pepper', async () => {
     const actor = await insertTestUser({ is_admin: true });
     const user = await insertTestUser({ api_token_pepper: 'initial-pepper' });
@@ -35,6 +44,8 @@ describe('blockUser (integration)', () => {
     });
 
     expect(didBlock).toBe(true);
+
+    expect(scheduleClose).toHaveBeenCalledWith({ kiloUserId: user.id });
 
     const after = await getUser(user.id);
     expect(after?.blocked_reason).toBe('manual block');
@@ -88,6 +99,8 @@ describe('blockUser (integration)', () => {
       expect(didBlock).toBe(true);
     });
 
+    expect(scheduleClose).not.toHaveBeenCalled();
+
     const after = await getUser(user.id);
     expect(after?.blocked_reason).toBe('tx block');
     expect(after?.api_token_pepper).not.toBe('initial-pepper');
@@ -102,6 +115,8 @@ describe('blockUser (integration)', () => {
         throw new Error('boom');
       })
     ).rejects.toThrow('boom');
+
+    expect(scheduleClose).not.toHaveBeenCalled();
 
     const after = await getUser(user.id);
     expect(after?.blocked_reason).toBeNull();

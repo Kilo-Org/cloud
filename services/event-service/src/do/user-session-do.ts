@@ -9,7 +9,13 @@ const UNACKED_THRESHOLD = 1000;
 /** Close code for a socket that fell too far behind on acknowledgements. */
 const ZOMBIE_CLOSE_CODE = 4002;
 
-type SerializedState = { contexts: string[]; seq: number; acked: number; ackReceived: boolean };
+type SerializedState = {
+  contexts: string[];
+  seq: number;
+  acked: number;
+  ackReceived: boolean;
+  deviceSessionId?: string;
+};
 
 export class UserSessionDO extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
@@ -30,11 +36,13 @@ export class UserSessionDO extends DurableObject<Env> {
       const [client, server] = [pair[0], pair[1]];
 
       this.ctx.acceptWebSocket(server);
+      const deviceSessionId = new URL(request.url).searchParams.get('deviceSessionId') ?? undefined;
       server.serializeAttachment({
         contexts: [],
         seq: 0,
         acked: 0,
         ackReceived: false,
+        ...(deviceSessionId ? { deviceSessionId } : {}),
       } satisfies SerializedState);
 
       logger.debug('fetch: accepted websocket');
@@ -175,6 +183,30 @@ export class UserSessionDO extends DurableObject<Env> {
     });
   }
 
+  /**
+   * Close every live socket whose ticket was minted from one device session.
+   * Returns the number of sockets closed.
+   */
+  async closeDeviceSockets(deviceSessionId: string): Promise<number> {
+    let closed = 0;
+    for (const ws of this.ctx.getWebSockets()) {
+      const state = this.getState(ws);
+      if (state.deviceSessionId !== deviceSessionId) continue;
+      ws.close(1000, 'device session revoked');
+      closed++;
+    }
+    return closed;
+  }
+
+  /** Close every live socket for the user, including legacy sockets with no device identity. */
+  async closeAllSockets(): Promise<number> {
+    const sockets = this.ctx.getWebSockets();
+    for (const ws of sockets) {
+      ws.close(1000, 'device session revoked');
+    }
+    return sockets.length;
+  }
+
   // ── Helpers ────────────────────────────────────────────────────────
 
   /**
@@ -198,6 +230,7 @@ export class UserSessionDO extends DurableObject<Env> {
     seq: number;
     acked: number;
     ackReceived: boolean;
+    deviceSessionId?: string;
   } {
     const raw = ws.deserializeAttachment() as SerializedState | null;
     return {
@@ -205,18 +238,26 @@ export class UserSessionDO extends DurableObject<Env> {
       seq: raw?.seq ?? 0,
       acked: raw?.acked ?? 0,
       ackReceived: raw?.ackReceived ?? false,
+      ...(raw?.deviceSessionId ? { deviceSessionId: raw.deviceSessionId } : {}),
     };
   }
 
   private saveState(
     ws: WebSocket,
-    state: { contexts: Set<string>; seq: number; acked: number; ackReceived: boolean }
+    state: {
+      contexts: Set<string>;
+      seq: number;
+      acked: number;
+      ackReceived: boolean;
+      deviceSessionId?: string;
+    }
   ): void {
     ws.serializeAttachment({
       contexts: [...state.contexts],
       seq: state.seq,
       acked: state.acked,
       ackReceived: state.ackReceived,
+      ...(state.deviceSessionId ? { deviceSessionId: state.deviceSessionId } : {}),
     } satisfies SerializedState);
   }
 }

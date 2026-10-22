@@ -10,6 +10,8 @@ import {
   withDeadline,
 } from '@kilocode/event-service';
 import { extractBearerToken } from '@kilocode/worker-utils';
+import { findActiveDeviceSession } from '@kilocode/worker-utils/device-session-auth';
+import { z } from 'zod';
 import { authenticateToken } from './auth';
 import { TICKET_MINT_BUDGET_MS } from './ticket-mint-budget';
 import { configureDevLogging, logger, withLogTags } from './util/logger';
@@ -25,7 +27,12 @@ const CONNECTION_TICKET_TTL_MS = 30_000;
 type TicketMintOutcome = 'ok' | 'unauthorized' | 'mint_failed' | 'timeout';
 
 type TicketMintResult =
-  | { outcome: 'ok'; ticket: string; userId: string }
+  | {
+      outcome: 'ok';
+      ticket: string;
+      userId: string;
+      deviceSessionId?: string;
+    }
   | { outcome: Exclude<TicketMintOutcome, 'ok'> };
 
 /**
@@ -91,10 +98,15 @@ function acceptsWebSocketProtocol(header: string | undefined): boolean {
  * other colo created the same name, and every ticket is a first use. That
  * extra hop is where production mints missed the 8s budget (KILO-APP-2NH).
  */
-async function mintConnectionTicket(env: Env, userId: string): Promise<string | null> {
+async function mintConnectionTicket(
+  env: Env,
+  userId: string,
+  deviceSessionId?: string
+): Promise<string | null> {
   const id = env.CONNECTION_TICKET_DO.newUniqueId();
   const body = {
     userId,
+    ...(deviceSessionId ? { deviceSessionId } : {}),
     secret: crypto.randomUUID(),
     expiresAt: Date.now() + CONNECTION_TICKET_TTL_MS,
   } satisfies TicketMintRequest;
@@ -106,12 +118,15 @@ async function mintConnectionTicket(env: Env, userId: string): Promise<string | 
   }
 }
 
-async function consumeConnectionTicket(env: Env, ticket: string): Promise<string | null> {
+async function consumeConnectionTicket(
+  env: Env,
+  ticket: string
+): Promise<{ userId: string; deviceSessionId?: string } | null> {
   const [objectId, secret, ...rest] = ticket.split('.');
   if (!objectId || !secret || rest.length > 0) return null;
   try {
     const stub = env.CONNECTION_TICKET_DO.get(env.CONNECTION_TICKET_DO.idFromString(objectId));
-    return (await stub.consume(secret))?.userId ?? null;
+    return (await stub.consume(secret)) ?? null;
   } catch {
     return null;
   }
@@ -135,12 +150,17 @@ async function authenticateAndMintTicket(
         return { outcome: 'unauthorized' } satisfies TicketMintResult;
       }
 
-      const ticket = await mintConnectionTicket(env, auth.userId);
+      const ticket = await mintConnectionTicket(env, auth.userId, auth.deviceSessionId);
       if (!ticket) {
         return { outcome: 'mint_failed' } satisfies TicketMintResult;
       }
 
-      return { outcome: 'ok', ticket, userId: auth.userId } satisfies TicketMintResult;
+      return {
+        outcome: 'ok',
+        ticket,
+        userId: auth.userId,
+        ...(auth.deviceSessionId ? { deviceSessionId: auth.deviceSessionId } : {}),
+      } satisfies TicketMintResult;
     });
   } catch (err) {
     if (err instanceof RequestDeadlineError) {
@@ -207,10 +227,30 @@ app.get('/connect', async c => {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
-  const userId = await consumeConnectionTicket(c.env, query.data.ticket);
-  if (!userId) {
+  const consumed = await consumeConnectionTicket(c.env, query.data.ticket);
+  if (!consumed) {
     logger.debug('connect: ticket consume failed');
     return c.json({ error: 'Unauthorized' }, 401);
+  }
+  const { userId, deviceSessionId } = consumed;
+  if (deviceSessionId) {
+    let active: boolean;
+    try {
+      active = await findActiveDeviceSession(
+        c.env.HYPERDRIVE.connectionString,
+        deviceSessionId,
+        userId
+      );
+    } catch (error) {
+      logger.warn('connect: device session lookup failed', {
+        errorClass: error instanceof Error ? error.name : typeof error,
+      });
+      return c.json({ error: 'Service temporarily unavailable' }, 503);
+    }
+    if (!active) {
+      logger.debug('connect: device session revoked');
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
   }
   logger.setTags({ userId });
   logger.debug('connect: websocket upgrade', { userId });
@@ -219,13 +259,18 @@ app.get('/connect', async c => {
   const stub = c.env.USER_SESSION_DO.get(doId);
   const shouldEchoProtocol = acceptsWebSocketProtocol(c.req.header('Sec-WebSocket-Protocol'));
 
+  const upstreamUrl = new URL(c.req.raw.url);
+  upstreamUrl.searchParams.delete('deviceSessionId');
+  if (deviceSessionId) {
+    upstreamUrl.searchParams.set('deviceSessionId', deviceSessionId);
+  }
   const upstreamHeaders = new Headers(c.req.raw.headers);
   if (shouldEchoProtocol) {
     upstreamHeaders.set('Sec-WebSocket-Protocol', ACCEPTED_WEBSOCKET_PROTOCOL);
   } else {
     upstreamHeaders.delete('Sec-WebSocket-Protocol');
   }
-  const upstreamRequest = new Request(c.req.raw.url, {
+  const upstreamRequest = new Request(upstreamUrl.toString(), {
     method: c.req.raw.method,
     headers: upstreamHeaders,
   });
@@ -241,6 +286,43 @@ app.get('/connect', async c => {
     headers: responseHeaders,
     webSocket: response.webSocket,
   });
+});
+
+const revokeDeviceSessionSchema = z.object({
+  userId: z.string().min(1),
+  deviceSessionId: z.uuid().optional(),
+});
+
+function secretsMatch(stored: string, presented: string): boolean {
+  const a = new TextEncoder().encode(stored);
+  const b = new TextEncoder().encode(presented);
+  return a.byteLength === b.byteLength && crypto.subtle.timingSafeEqual(a, b);
+}
+
+app.post('/internal/device-session/revoke', async c => {
+  const provided = c.req.header('X-Internal-Secret');
+  let expected: string | null;
+  try {
+    expected = await c.env.INTERNAL_API_SECRET.get();
+  } catch {
+    return c.json({ error: 'Service temporarily unavailable' }, 503);
+  }
+  if (!provided || !expected || !secretsMatch(expected, provided)) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
+  const parsed = revokeDeviceSessionSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid request', issues: parsed.error.issues }, 400);
+  }
+
+  const stub = c.env.USER_SESSION_DO.get(c.env.USER_SESSION_DO.idFromName(parsed.data.userId));
+  if (parsed.data.deviceSessionId) {
+    await stub.closeDeviceSockets(parsed.data.deviceSessionId);
+  } else {
+    await stub.closeAllSockets();
+  }
+  return c.body(null, 204);
 });
 
 export default class extends WorkerEntrypoint<Env> {

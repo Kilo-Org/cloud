@@ -44,6 +44,7 @@ export type ApiContext = {
   Bindings: Env;
   Variables: {
     user_id: string;
+    device_session_id?: string;
     deletionAudience?: boolean;
   };
 };
@@ -1010,6 +1011,11 @@ api.get('/user/cli', async c => {
   // The DO can't recover the user from its idFromName-derived id; it needs the
   // authenticated user for the session-ready push.
   wsUrl.searchParams.set('kiloUserId', kiloUserId);
+  wsUrl.searchParams.delete('deviceSessionId');
+  const deviceSessionId = c.get('device_session_id');
+  if (deviceSessionId) {
+    wsUrl.searchParams.set('deviceSessionId', deviceSessionId);
+  }
 
   return stub.fetch(new Request(wsUrl.toString(), c.req.raw));
 });
@@ -1027,6 +1033,11 @@ api.get('/user/web', async c => {
   // The DO can't recover the user from its idFromName-derived id; the web
   // attachment needs it for command/subscribe access rechecks.
   wsUrl.searchParams.set('kiloUserId', kiloUserId);
+  wsUrl.searchParams.delete('deviceSessionId');
+  const deviceSessionId = c.get('device_session_id');
+  if (deviceSessionId) {
+    wsUrl.searchParams.set('deviceSessionId', deviceSessionId);
+  }
 
   return stub.fetch(new Request(wsUrl.toString(), c.req.raw));
 });
@@ -1036,12 +1047,19 @@ api.get('/user/web', async c => {
 // upgrade consumes it exactly once.
 api.post('/user/web-ticket', async c => {
   const kiloUserId = c.get('user_id');
+  const deviceSessionId = c.get('device_session_id');
   const { ticket, secret, getStub } = createConnectionTicket(c.env.CONNECTION_TICKET_DO);
   const doExpiresAt = Date.now() + 60_000;
 
   await withDORetry(
     getStub,
-    stub => stub.mint({ userId: kiloUserId, expiresAt: doExpiresAt, secret }),
+    stub =>
+      stub.mint({
+        userId: kiloUserId,
+        ...(deviceSessionId ? { deviceSessionId } : {}),
+        expiresAt: doExpiresAt,
+        secret,
+      }),
     'ConnectionTicketDO.mint'
   );
 

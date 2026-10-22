@@ -218,7 +218,7 @@ for (const enabled of [false, true]) {
           state === 'active'
         );
         const response = await request(headers);
-        expect(response.status).toBe(state === 'active' ? 200 : 403);
+        expect(response.status).toBe(state === 'active' ? 200 : 401);
         if (state !== 'active') expect(await auditLogs()).toEqual([]);
       }
     );

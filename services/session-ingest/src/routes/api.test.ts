@@ -95,13 +95,14 @@ function makeTestEnv(overrides: Partial<TestBindings> = {}): TestBindings {
   };
 }
 
-function makeApiApp(options?: { deletionAudience?: boolean }) {
+function makeApiApp(options?: { deletionAudience?: boolean; deviceSessionId?: string }) {
   const app = new Hono<{
     Bindings: TestBindings;
-    Variables: { user_id: string; deletionAudience?: boolean };
+    Variables: { user_id: string; deletionAudience?: boolean; device_session_id?: string };
   }>();
   app.use('*', async (c, next) => {
     c.set('user_id', 'usr_test');
+    c.set('device_session_id', options?.deviceSessionId);
     c.set('deletionAudience', options?.deletionAudience === true);
     await next();
   });
@@ -2933,6 +2934,33 @@ describe('api routes', () => {
     expect(forwardedUrl.pathname).toBe('/web');
     expect(forwardedUrl.searchParams.get('connectionId')).toBe('viewer-1');
   });
+
+  it.each([
+    ['cli', undefined],
+    ['web', undefined],
+    ['cli', '11111111-1111-4111-8111-111111111111'],
+    ['web', '11111111-1111-4111-8111-111111111111'],
+  ] as const)(
+    'GET /user/%s uses only the authenticated device context (%s)',
+    async (kind, deviceSessionId) => {
+      const stubFetch = vi.fn(async (_req: Request) => new Response(null, { status: 101 }));
+      vi.mocked(getUserConnectionDO).mockReturnValue({ fetch: stubFetch } as unknown as ReturnType<
+        typeof getUserConnectionDO
+      >);
+      await makeApiApp({ deviceSessionId }).fetch(
+        new Request(
+          `http://local/user/${kind}?deviceSessionId=client-value&connectionId=viewer-1`,
+          {
+            headers: { Upgrade: 'websocket' },
+          }
+        ),
+        makeTestEnv()
+      );
+      const forwarded = new URL(stubFetch.mock.calls[0][0].url);
+      expect(forwarded.searchParams.get('deviceSessionId')).toBe(deviceSessionId ?? null);
+      expect(forwarded.searchParams.get('connectionId')).toBe('viewer-1');
+    }
+  );
 
   it('POST /user/web-ticket mints seconds for the body and milliseconds for the DO store', async () => {
     const mint = vi.fn(async () => undefined);

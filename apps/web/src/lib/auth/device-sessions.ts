@@ -6,6 +6,7 @@ import { eq, and, isNull, gt, sql, getTableColumns } from 'drizzle-orm';
 import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { createHash, randomBytes } from 'node:crypto';
 import { persistAttestedKeyTx, type VerifyAdmissionOk } from './native-admission';
+import { scheduleDeviceSessionRealtimeClose } from './device-session-realtime';
 
 const REFRESH_TOKEN_BYTES = 32;
 
@@ -23,13 +24,18 @@ function isWithinLostRotationGrace(consumedAt: string): boolean {
 }
 
 async function revokeForReuse(deviceSessionId: string, revokedAt: string): Promise<void> {
-  await db
+  const revoked = await db
     .update(device_sessions)
     .set({ revoked_at: revokedAt, revoked_reason: 'refresh_reuse_detected' })
-    .where(eq(device_sessions.id, deviceSessionId));
+    .where(eq(device_sessions.id, deviceSessionId))
+    .returning({ kiloUserId: device_sessions.kilo_user_id });
   console.warn('[native-refresh] refresh token reuse detected; session revoked', {
     deviceSessionId,
   });
+  const kiloUserId = revoked[0]?.kiloUserId;
+  if (kiloUserId) {
+    await scheduleDeviceSessionRealtimeClose({ kiloUserId, deviceSessionId });
+  }
 }
 
 function hashToken(token: string): string {
@@ -399,11 +405,17 @@ export async function createDeviceSessionWithAttestedKey(params: {
  * Revoke a device session and all its refresh tokens.
  */
 export async function revokeDeviceSession(sessionId: string, reason: string): Promise<void> {
-  await db
+  const revoked = await db
     .update(device_sessions)
     .set({
       revoked_at: new Date().toISOString(),
       revoked_reason: reason,
     })
-    .where(eq(device_sessions.id, sessionId));
+    .where(eq(device_sessions.id, sessionId))
+    .returning({ kiloUserId: device_sessions.kilo_user_id });
+
+  const kiloUserId = revoked[0]?.kiloUserId;
+  if (kiloUserId) {
+    await scheduleDeviceSessionRealtimeClose({ kiloUserId, deviceSessionId: sessionId });
+  }
 }

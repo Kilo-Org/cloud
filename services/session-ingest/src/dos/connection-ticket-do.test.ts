@@ -70,6 +70,42 @@ describe('ConnectionTicketDO', () => {
     expect(getAlarm()).toBe(expiresAt);
   });
 
+  it('inspects a valid ticket without consuming its state or alarm', async () => {
+    const { instance, store, getAlarm } = makeDO();
+    const ticket = {
+      userId: 'usr_1',
+      deviceSessionId: 'device-1',
+      expiresAt: Date.now() + 60_000,
+      secret: SECRET,
+    };
+    await instance.mint(ticket);
+
+    await expect(instance.inspect(SECRET)).resolves.toEqual({
+      userId: ticket.userId,
+      deviceSessionId: ticket.deviceSessionId,
+    });
+    expect(store.get('ticket')).toEqual(ticket);
+    expect(getAlarm()).toBe(ticket.expiresAt);
+    await expect(instance.consume(SECRET)).resolves.toEqual({
+      userId: ticket.userId,
+      deviceSessionId: ticket.deviceSessionId,
+    });
+    await expect(instance.inspect(SECRET)).resolves.toBeNull();
+  });
+
+  it.each(['expired', 'wrong-secret'] as const)('burns an invalid inspection: %s', async reason => {
+    const { instance, store } = makeDO();
+    await instance.mint({
+      userId: 'usr_1',
+      expiresAt: Date.now() + (reason === 'expired' ? -1 : 60_000),
+      secret: SECRET,
+    });
+    await expect(
+      instance.inspect(reason === 'wrong-secret' ? 'wrong-secret' : SECRET)
+    ).resolves.toBeNull();
+    expect(store.get('ticket')).toBeUndefined();
+  });
+
   it('consumes a fresh ticket once and returns the userId', async () => {
     const { instance } = makeDO();
     await instance.mint({ userId: 'usr_1', expiresAt: Date.now() + 60_000, secret: SECRET });

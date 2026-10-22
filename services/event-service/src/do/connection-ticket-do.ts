@@ -3,12 +3,14 @@ import { z } from 'zod';
 
 const ticketStateSchema = z.object({
   userId: z.string().min(1),
+  deviceSessionId: z.string().min(1).optional(),
   secret: z.string().min(1),
   expiresAt: z.number().int(),
 });
 
 export const connectionTicketConsumeResponseSchema = z.object({
   userId: z.string().min(1),
+  deviceSessionId: z.string().min(1).optional(),
 });
 
 type TicketState = z.infer<typeof ticketStateSchema>;
@@ -35,7 +37,7 @@ export class ConnectionTicketDO extends DurableObject<Env> {
   }
 
   async consume(secret: string): Promise<ConnectionTicketConsumeResponse | null> {
-    const userId = await this.ctx.storage.transaction(async txn => {
+    const state = await this.ctx.storage.transaction(async txn => {
       const stored = await txn.get<TicketState>('ticket');
       const parsed = ticketStateSchema.safeParse(stored);
       await txn.delete('ticket');
@@ -47,15 +49,18 @@ export class ConnectionTicketDO extends DurableObject<Env> {
         return null;
       }
 
-      return parsed.data.userId;
+      return {
+        userId: parsed.data.userId,
+        ...(parsed.data.deviceSessionId ? { deviceSessionId: parsed.data.deviceSessionId } : {}),
+      };
     });
 
-    if (!userId) {
+    if (!state) {
       return null;
     }
 
     await this.ctx.storage.deleteAlarm();
-    return { userId } satisfies ConnectionTicketConsumeResponse;
+    return state satisfies ConnectionTicketConsumeResponse;
   }
 
   async alarm(): Promise<void> {

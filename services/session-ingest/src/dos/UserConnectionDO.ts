@@ -86,6 +86,9 @@ type WSAttachment =
       // Set from the authenticated /user/cli route; undefined on sockets
       // accepted before this field existed. Needed for the session-ready push.
       kiloUserId?: string;
+      // Device session that authenticated this socket, when the token carried
+      // one. Revoking that session closes the matching sockets.
+      deviceSessionId?: string;
       // Identity of the spawning CLI process (`kilo remote`). Undefined on
       // legacy CLIs (no spawner). Persisted in the attachment so the live
       // socket scan in `getConnectedInstances()` can read it without any
@@ -102,6 +105,9 @@ type WSAttachment =
       // accepted before this field existed. Needed for command/subscribe
       // access rechecks against current session membership.
       kiloUserId?: string;
+      // Device session that minted this socket's ticket, when the token
+      // carried one. Revoking that session closes the matching sockets.
+      deviceSessionId?: string;
     };
 
 // Type re-export so test files and other internal callers can reference the
@@ -456,6 +462,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       const reconnect = this.closeStaleSocket(connectionId);
 
       const kiloUserId = url.searchParams.get('kiloUserId') ?? undefined;
+      const deviceSessionId = url.searchParams.get('deviceSessionId') ?? undefined;
       const now = Date.now();
       const attachment: WSAttachment = {
         role: 'cli',
@@ -463,6 +470,7 @@ export class UserConnectionDO extends DurableObject<Env> {
         sessions: [],
         heartbeatAt: now,
         kiloUserId,
+        ...(deviceSessionId ? { deviceSessionId } : {}),
       };
       this.ctx.acceptWebSocket(server, ['cli']);
       server.serializeAttachment(attachment);
@@ -486,11 +494,13 @@ export class UserConnectionDO extends DurableObject<Env> {
       this.replaceWebSocket(connectionId);
 
       const kiloUserId = url.searchParams.get('kiloUserId') ?? undefined;
+      const deviceSessionId = url.searchParams.get('deviceSessionId') ?? undefined;
       const attachment: WSAttachment = {
         role: 'web',
         connectionId,
         subscribedSessions: [],
         kiloUserId,
+        ...(deviceSessionId ? { deviceSessionId } : {}),
       };
       this.ctx.acceptWebSocket(server, ['web']);
       server.serializeAttachment(attachment);
@@ -760,6 +770,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       protocolVersion,
       capabilities,
       kiloUserId: attachment.kiloUserId,
+      ...(attachment.deviceSessionId ? { deviceSessionId: attachment.deviceSessionId } : {}),
       ...(instance ? { instance } : {}),
     };
     try {
@@ -2217,6 +2228,31 @@ export class UserConnectionDO extends DurableObject<Env> {
     const sockets = this.ctx.getWebSockets('web');
     for (const ws of sockets) {
       ws.close(1000, 'session access revoked');
+    }
+    return sockets.length;
+  }
+
+  /**
+   * Close every live socket authenticated by one device session. Web viewers
+   * and CLI connections both carry the authenticated session in their
+   * attachment. Returns the number of sockets closed.
+   */
+  closeDeviceSockets(deviceSessionId: string): number {
+    let closed = 0;
+    for (const ws of this.ctx.getWebSockets()) {
+      const attachment = ws.deserializeAttachment() as WSAttachment | null;
+      if (attachment?.deviceSessionId !== deviceSessionId) continue;
+      ws.close(1000, 'device session revoked');
+      closed++;
+    }
+    return closed;
+  }
+
+  /** Close every live socket for the user, including legacy sockets with no device identity. */
+  closeAllSockets(): number {
+    const sockets = this.ctx.getWebSockets();
+    for (const ws of sockets) {
+      ws.close(1000, 'device session revoked');
     }
     return sockets.length;
   }

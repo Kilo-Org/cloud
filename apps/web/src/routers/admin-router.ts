@@ -105,6 +105,7 @@ import {
   inferRowlessAuthProviders,
 } from '@/lib/user';
 import { blockUser } from '@/lib/user/block';
+import { scheduleDeviceSessionRealtimeClose } from '@/lib/auth/device-session-realtime';
 import { getBlobContent } from '@/lib/r2/cli-sessions';
 import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
@@ -946,6 +947,10 @@ export const adminRouter = createTRPCRouter({
 
           return current;
         });
+
+        if (didTransition && isBlocking) {
+          await scheduleDeviceSessionRealtimeClose({ kiloUserId: input.userId });
+        }
 
         // Blocking is attributed on the user row; unblocking clears those
         // columns, so the audit row is the only record of who lifted it.

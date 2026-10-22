@@ -1,3 +1,4 @@
+import '@/tests/setup/mock-device-session-realtime';
 import { and, eq } from 'drizzle-orm';
 import {
   kilocode_users,

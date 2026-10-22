@@ -1,20 +1,25 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono, type Context } from 'hono';
 import { SignJWT } from 'jose';
 import { WASTELAND_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { createKiloAuthMiddleware } from '@kilocode/worker-utils/kilo-auth-middleware';
+import { findActiveDeviceSession } from '@kilocode/worker-utils/device-session-auth';
+import { kiloAuthMiddleware } from './kilo-auth.middleware';
 import type { WastelandEnv } from '../wasteland.worker';
-import { resolveSecret } from '../util/secret.util';
+
+vi.mock('@kilocode/worker-utils/device-session-auth', () => ({
+  findActiveDeviceSession: vi.fn(),
+}));
+vi.mock('../util/log.util', () => ({ logger: { setTags: vi.fn() } }));
+
+beforeEach(() => {
+  vi.mocked(findActiveDeviceSession).mockReset();
+});
 
 const TEST_SECRET = 'test-secret-that-is-long-enough-for-hs256';
 
 function createApp() {
   let downstreamCalls = 0;
   const app = new Hono<WastelandEnv>();
-  const kiloAuthMiddleware = createKiloAuthMiddleware<WastelandEnv>({
-    resolveSecret,
-    audiencePolicy: { audience: WASTELAND_AUDIENCE, mode: 'allow-legacy' },
-  });
   app.use('/api/*', kiloAuthMiddleware);
   app.use('/trpc/*', kiloAuthMiddleware);
   const handler = (c: Context<WastelandEnv>) => {
@@ -55,7 +60,10 @@ async function request(
       app.request(
         path,
         token === undefined ? {} : { headers: { Authorization: `Bearer ${token}` } },
-        { NEXTAUTH_SECRET: secret } as never
+        {
+          NEXTAUTH_SECRET: secret,
+          HYPERDRIVE: { connectionString: 'postgres://localhost/test' },
+        } as never
       )
     )
   );
@@ -149,7 +157,6 @@ describe('kiloAuthMiddleware', () => {
         isAdmin: true,
         apiTokenPepper: 'pepper',
         orgMemberships: [{ orgId: 'org-a', role: 'owner' }],
-        deviceSessionId: 'session-wasteland-test',
       })
     );
 
@@ -197,6 +204,42 @@ describe('kiloAuthMiddleware', () => {
     const responses = await request(app, await signToken(), secret);
 
     expect(responses.map(response => response.status)).toEqual([500, 500]);
+    expect(downstreamCalls()).toBe(0);
+  });
+});
+
+describe('kiloAuthMiddleware device sessions', () => {
+  const deviceSessionId = '11111111-1111-4111-8111-111111111111';
+
+  it.each([
+    ['active', true, 200],
+    ['revoked', false, 401],
+  ])('handles an %s device session', async (_state, active, status) => {
+    vi.mocked(findActiveDeviceSession).mockResolvedValue(active);
+    const { app, downstreamCalls } = createApp();
+    const responses = await request(
+      app,
+      await signToken({ aud: WASTELAND_AUDIENCE, deviceSessionId })
+    );
+
+    expect(responses.map(response => response.status)).toEqual([status, status]);
+    expect(downstreamCalls()).toBe(active ? 2 : 0);
+    expect(findActiveDeviceSession).toHaveBeenCalledWith(
+      'postgres://localhost/test',
+      deviceSessionId,
+      'user-abc'
+    );
+  });
+
+  it('keeps lookup failures retryable', async () => {
+    vi.mocked(findActiveDeviceSession).mockRejectedValue(new Error('Query read timeout'));
+    const { app, downstreamCalls } = createApp();
+    const responses = await request(
+      app,
+      await signToken({ aud: WASTELAND_AUDIENCE, deviceSessionId })
+    );
+
+    expect(responses.map(response => response.status)).toEqual([503, 503]);
     expect(downstreamCalls()).toBe(0);
   });
 });

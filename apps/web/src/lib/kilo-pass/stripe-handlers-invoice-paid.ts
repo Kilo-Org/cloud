@@ -15,6 +15,7 @@ import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 
 import { KILO_PASS_TIER_CONFIG } from '@kilocode/web-shared/lib/kilo-pass/constants';
 import { blockUser } from '@/lib/user/block';
+import { scheduleDeviceSessionRealtimeClose } from '@/lib/auth/device-session-realtime';
 import { KiloPassError } from '@/lib/kilo-pass/errors';
 import {
   appendKiloPassAuditLog,
@@ -1001,6 +1002,7 @@ export async function handleKiloPassInvoicePaid(params: {
   }
 
   if (duplicateCardEnforcement) {
+    await scheduleDeviceSessionRealtimeClose({ kiloUserId: duplicateCardEnforcement.kiloUserId });
     await enforceDuplicateCardBlock({
       enforcement: duplicateCardEnforcement,
       eventId,

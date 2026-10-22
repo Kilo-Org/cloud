@@ -1,3 +1,4 @@
+import '@/tests/setup/mock-device-session-realtime';
 import { afterEach, describe, test, expect } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import {

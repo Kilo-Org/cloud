@@ -23,6 +23,7 @@ import {
   kiloclaw_subscriptions,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
+import jwt from 'jsonwebtoken';
 import {
   LEGACY_KILOCLAW_PRICE_VERSION,
   PersonalSubscriptionCollapseUQConflictError,
@@ -153,7 +154,11 @@ jest.mock('@/lib/kiloclaw/install-dispatch', () => {
   };
 });
 
-let createCaller: (ctx: { user: Awaited<ReturnType<typeof insertTestUser>> }) => {
+let createCaller: (ctx: {
+  user: Awaited<ReturnType<typeof insertTestUser>>;
+  deviceSessionId?: string;
+}) => {
+  getGoogleSetupCommand: () => Promise<{ command: string }>;
   getStatus: () => Promise<unknown>;
   latestVersion: (input?: { currentImageTag?: string }) => Promise<unknown>;
   fileTree: (input?: { path?: string }) => Promise<unknown>;
@@ -1034,4 +1039,45 @@ describe('kiloclawRouter installFromSource', () => {
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(installDispatchMock.__dispatchInstallFromSource).not.toHaveBeenCalled();
   });
+});
+
+describe('kiloclawRouter getGoogleSetupCommand', () => {
+  it.each(['11111111-1111-4111-8111-111111111111', undefined])(
+    'preserves authenticated device context %s',
+    async deviceSessionId => {
+      await cleanupDbForTest();
+      const user = await insertTestUser({ api_token_pepper: 'setup-command-pepper' });
+      const instanceId = await createActivePersonalInstance(user.id);
+      await db.insert(kiloclaw_subscriptions).values({
+        user_id: user.id,
+        instance_id: instanceId,
+        plan: 'trial',
+        status: 'trialing',
+        trial_ends_at: new Date(Date.now() + 86400000).toISOString(),
+      });
+      const result = await createCaller({ user, deviceSessionId }).getGoogleSetupCommand();
+      const token = result.command.match(/--token="([^"]+)"/)?.[1];
+      expect(token).toBeDefined();
+      if (!token) throw new Error('Expected setup command credential');
+      const { validateAuthorizationHeader } = await import('@kilocode/web-shared/lib/tokens');
+      const claims = validateAuthorizationHeader(new Headers({ Authorization: `Bearer ${token}` }));
+      expect(claims).toMatchObject({ kiloUserId: user.id });
+      expect(claims.deviceSessionId).toBe(deviceSessionId);
+      const decoded = jwt.decode(token);
+      if (
+        !decoded ||
+        typeof decoded === 'string' ||
+        typeof decoded.exp !== 'number' ||
+        typeof decoded.iat !== 'number'
+      ) {
+        throw new Error('Expected setup credential lifetime');
+      }
+      expect(decoded.exp - decoded.iat).toBe(3600);
+      expect(result.command).toContain('docker pull ghcr.io/kilo-org/google-setup:latest');
+      expect(result.command).toContain(
+        'docker run -it --network host ghcr.io/kilo-org/google-setup:latest'
+      );
+      expect(result.command).toContain(`--instance-id=${instanceId}`);
+    }
+  );
 });

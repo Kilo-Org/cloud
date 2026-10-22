@@ -1,12 +1,7 @@
 import 'server-only';
 
 import type { User } from '@kilocode/db/schema';
-import {
-  device_sessions,
-  kilocode_users,
-  organization_memberships,
-  organizations,
-} from '@kilocode/db/schema';
+import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
 import { and, eq, isNull, ne } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 import { TRPCError } from '@trpc/server';
@@ -26,6 +21,7 @@ import {
   verifyKiloTokenForPolicy,
 } from '@kilocode/worker-utils/kilo-token-policy';
 import type { RuntimeAdmission } from '@kilocode/worker-utils/runtime-authorization-contract';
+import { isActiveDeviceSession } from '@kilocode/worker-utils/device-session-auth';
 import {
   isResourceTokenIssuanceEnabled,
   NEXTAUTH_SECRET,
@@ -180,14 +176,9 @@ async function currentUser(expectedUser: User): Promise<User> {
 }
 
 async function assertActiveDeviceSession(id: string, userId: string): Promise<void> {
-  const session = await db.query.device_sessions.findFirst({
-    where: and(
-      eq(device_sessions.id, id),
-      eq(device_sessions.kilo_user_id, userId),
-      isNull(device_sessions.revoked_at)
-    ),
-  });
-  if (!session) unauthorized();
+  if (!(await isActiveDeviceSession(db, id, userId))) {
+    unauthorized();
+  }
 }
 
 async function membershipsFor(userId: string) {

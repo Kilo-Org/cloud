@@ -20,6 +20,11 @@ const invalidateSessionAccessSchema = z.object({
   organizationId: z.uuid(),
 });
 
+const revokeDeviceSessionSchema = z.object({
+  kiloUserId: z.string().min(1),
+  deviceSessionId: z.uuid().optional(),
+});
+
 async function hasValidInternalSecret(c: {
   req: { header(name: string): string | undefined };
   env: Env;
@@ -33,7 +38,7 @@ async function hasValidInternalSecret(c: {
 
 const requireValidInternalSecret = createMiddleware<{
   Bindings: Env;
-  Variables: { user_id: string; deletionAudience?: boolean };
+  Variables: { user_id: string; device_session_id?: string; deletionAudience?: boolean };
 }>(async (c, next) => {
   let isValid: boolean;
   try {
@@ -131,6 +136,24 @@ app.post('/internal/session-access/invalidate', requireValidInternalSecret, asyn
   );
 
   await getUserConnectionDO(c.env, { kiloUserId: parsed.data.kiloUserId }).closeViewerSockets();
+
+  return c.body(null, 204);
+});
+
+app.post('/internal/device-session/revoke', requireValidInternalSecret, async c => {
+  const parsed = revokeDeviceSessionSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json({ success: false, error: 'Invalid request', issues: parsed.error.issues }, 400);
+  }
+
+  const stub = getUserConnectionDO(c.env, {
+    kiloUserId: parsed.data.kiloUserId,
+  });
+  if (parsed.data.deviceSessionId) {
+    await stub.closeDeviceSockets(parsed.data.deviceSessionId);
+  } else {
+    await stub.closeAllSockets();
+  }
 
   return c.body(null, 204);
 });

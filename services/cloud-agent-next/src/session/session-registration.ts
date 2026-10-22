@@ -2377,6 +2377,36 @@ function isCreateAbandonable(row: OperationLedgerRow): boolean {
 }
 
 /**
+ * Settles a takeover that can never make progress as `failed` and throws the
+ * typed terminal error, so the client rotates its operation key instead of
+ * conflicting until the row expires. The ownership row is NOT deleted and no
+ * fresh create is allocated, so nothing can double-admit the initial turn.
+ */
+async function failUnrecoverableCreate(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  options: SessionLedgerCreateOptions,
+  db: WorkerDb,
+  row: OperationLedgerRow
+): Promise<never> {
+  const distinctId = await resolveSessionCreateDistinctId(db, ctx.userId);
+  await settleTerminalOutcome(db, {
+    rowId: row.id,
+    status: 'failed',
+    outcomeCode: SESSION_CREATE_ABANDONED_OUTCOME_CODE,
+    outboxEvent: sessionCreateSettledOutboxEvent({
+      distinctId,
+      outcome: 'failed',
+      admission: 'takeover',
+      failureStage: 'registration',
+      startedAt: options.startedAt,
+      inOrganization: input.options?.kilocodeOrganizationId != null,
+    }),
+  });
+  throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
+}
+
+/**
  * Takeover / reconcile-pending reconciliation ladder. It never deletes the
  * ownership row and never fresh-creates from absent DO state, because the
  * original create RPC may still commit and double-admit the initial turn:
@@ -2404,8 +2434,14 @@ async function reconcileLedgerCreate(
   const ids = canonicalSessionIds(row);
 
   // A row recorded before the plane migration may carry `agent_*` IDs. Never
-  // resume those IDs through the control-plane DO or session ingest.
-  if (ids) assertStoredControlPlaneSessionId(ids.cloudAgentSessionId);
+  // resume those IDs through the control-plane DO or session ingest; they can
+  // never make progress, so settle the row terminally.
+  if (ids && !isControlSession(ids.cloudAgentSessionId)) {
+    logger
+      .withFields({ rowId: row.id })
+      .warn('Legacy session create cannot resume on the control plane');
+    return failUnrecoverableCreate(input, ctx, options, db, row);
+  }
 
   // (a) No progress IDs recorded → nothing external happened.
   if (!ids) {
@@ -2479,29 +2515,13 @@ async function reconcileLedgerCreate(
     // non-terminal, and let a later same-key retry reconcile again.
     //
     // Past the abandonment age the RPC cannot still be in flight, so a row that
-    // never produced DO state is definitively lost. Settle it `failed` and give
-    // the client a terminal outcome; the ownership row is still NOT deleted and
-    // no fresh create is allocated, so nothing can double-admit the initial turn.
-    // The next attempt uses a new operation key, new IDs, and a new DO.
+    // never produced DO state is definitively lost. The next attempt uses a new
+    // operation key, new IDs, and a new DO.
     if (isCreateAbandonable(row)) {
-      const distinctId = await resolveSessionCreateDistinctId(db, ctx.userId);
-      await settleTerminalOutcome(db, {
-        rowId: row.id,
-        status: 'failed',
-        outcomeCode: SESSION_CREATE_ABANDONED_OUTCOME_CODE,
-        outboxEvent: sessionCreateSettledOutboxEvent({
-          distinctId,
-          outcome: 'failed',
-          admission: 'takeover',
-          failureStage: 'registration',
-          startedAt: options.startedAt,
-          inOrganization: input.options?.kilocodeOrganizationId != null,
-        }),
-      });
       logger
         .withFields({ rowId: row.id, cloudAgentSessionId: ids.cloudAgentSessionId })
         .error('Abandoned session create: the Durable Object create RPC was never delivered');
-      throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
+      return failUnrecoverableCreate(input, ctx, options, db, row);
     }
 
     throw creationInProgressError();

@@ -3478,7 +3478,7 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     });
   });
 
-  it('rejects a stored agent_* canonical ID before takeover DO or ingest writes', async () => {
+  it('settles a stored agent_* canonical ID failed before takeover DO or ingest writes', async () => {
     admitOperationMock.mockResolvedValueOnce({
       admission: 'takeover',
       row: makeLedgerRow({
@@ -3489,14 +3489,24 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
         },
       }),
     });
+    // Only the user email lookup for the settle; no ownership lookup.
+    getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]]));
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
 
     await expect(runCreate(ctx)).rejects.toMatchObject({
-      code: 'CONFLICT',
-      message: 'creation_in_progress',
+      code: 'BAD_REQUEST',
+      message: 'session_creation_failed',
     });
 
+    expect(settleOperationMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        rowId: ROW_ID,
+        status: 'failed',
+        outcomeCode: SESSION_CREATE_ABANDONED_OUTCOME_CODE,
+      })
+    );
     expect(doStub.getMetadata).not.toHaveBeenCalled();
     expect(doStub.getMessageResult).not.toHaveBeenCalled();
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
@@ -3504,7 +3514,6 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     expect(createCliSessionMock).not.toHaveBeenCalled();
     expect(deleteCliSessionMock).not.toHaveBeenCalled();
     expect(recordOperationProgressMock).not.toHaveBeenCalled();
-    expect(settleOperationMock).not.toHaveBeenCalled();
   });
 
   it('regression: concurrent reconcile retries run the effect once and report creation_in_progress to the rest', async () => {

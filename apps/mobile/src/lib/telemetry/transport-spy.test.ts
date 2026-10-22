@@ -1,6 +1,7 @@
 /* oxlint-disable max-lines -- one transport-spy suite per SDK; splitting would duplicate the shared mock scaffold */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { SENTRY_NATIVE_OPTIONS } from '@/lib/sentry-dsn';
 import { type SentryInitExtras } from '@/lib/sentry-init';
 
 // ---- shared hoisted mocks ----
@@ -465,6 +466,14 @@ describe('Sentry transport spy', () => {
     initSentry(false);
     expect(hoisted.sentryHolder.initOptions).not.toHaveProperty('enableNdk');
     expect(hoisted.sentryHolder.initOptions?.enableTombstone).toBe(true);
+  });
+
+  it('leaves the NDK handler off for the native init that runs before JS', () => {
+    // Native init runs before any JS, so this value decides whether a startup
+    // crash can be replaced by the handler's own unwinder abort. It must stay
+    // off: JS installs the handler again below Android 12.
+    expect(SENTRY_NATIVE_OPTIONS.enableNdk).toBe(false);
+    expect(SENTRY_NATIVE_OPTIONS.enableTombstone).toBe(true);
   });
 
   it('registers no replay and disables screenshots when optional consent is false', async () => {

@@ -110,8 +110,11 @@ export function initSentry(optionalConsented: boolean, extras?: SentryInitExtras
     // NDK in-process handler duplicates it there. The handler's unwinder aborts
     // with std::bad_alloc on some devices while parsing /proc/self/maps
     // (Play: sentry__unwind_stack_libunwindstack), which replaces the real
-    // crash with the abort. Keep the NDK handler only where no tombstone
-    // exists, so pre-Android-12 builds still report native crashes.
+    // crash with the abort. Native init keeps the handler off for the pre-JS
+    // window (SENTRY_NATIVE_OPTIONS); this gate installs it again only below
+    // Android 12, where no tombstone exists and it is the only native crash
+    // source. The re-init closes the previous client, which closes the NDK
+    // integration (sentry-java NdkIntegration.close -> SentryNdk.close).
     ...(Platform.OS === 'android' ? { enableNdk: androidApiLevel() < 31 } : {}),
     enableMetricKit: true,
     enableAppHangTracking: false,

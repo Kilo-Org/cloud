@@ -15,6 +15,9 @@ import {
 const now = Date.parse('2026-10-15T09:00:00Z');
 const report: BriefingReport = {
   id: 'report-1',
+  kind: 'scheduled',
+  createdAt: '2026-10-15T08:00:00Z',
+  timezone: 'UTC',
   context: { id: 'personal', organizationId: null, name: 'Personal' },
   localDate: '2026-10-15',
   nightStartAt: '2026-10-14T22:00:00Z',
@@ -51,6 +54,20 @@ describe('visibleHomeBriefing', () => {
     expect(
       visibleHomeBriefing([report], 'organization-1', { dismissedReportIds: [], now })
     ).toBeUndefined();
+  });
+
+  it('keeps manual reports in history without replacing the scheduled Home card', () => {
+    const manual: BriefingReport = {
+      ...report,
+      id: 'manual-1',
+      kind: 'one_off',
+      morningEndAt: '2026-11-14T09:00:00Z',
+      expiresAt: '2026-11-14T09:00:00Z',
+    };
+    expect(visibleHomeBriefing([manual], null, { dismissedReportIds: [], now })).toBeUndefined();
+    expect(visibleHomeBriefing([manual, report], null, { dismissedReportIds: [], now })).toBe(
+      report
+    );
   });
 
   it('honors offline dismissal without requiring a server response', () => {
@@ -129,6 +146,12 @@ describe('briefingEstimateUnavailableKey', () => {
     );
     expect(briefingEstimateUnavailableKey('spend_limit_too_low')).toBe(
       'agentBriefing.estimateSpendLimitTooLow'
+    );
+    expect(briefingEstimateUnavailableKey('input_too_large')).toBe(
+      'agentBriefing.estimateInputTooLarge'
+    );
+    expect(briefingEstimateUnavailableKey('permission_unavailable')).toBe(
+      'agentBriefing.estimatePermissionUnavailable'
     );
     expect(briefingEstimateUnavailableKey('gateway_declined')).toBe(
       'agentBriefing.estimateUnavailable'

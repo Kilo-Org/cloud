@@ -119,7 +119,7 @@ describe('generateEphemeralDeploymentSlug', () => {
 });
 
 describe('generateDeploymentSlug', () => {
-  it('generates pronounceable app-builder slugs that satisfy shared validation', () => {
+  it('generates pronounceable deployment slugs that satisfy shared validation', () => {
     for (let i = 0; i < 100; i++) {
       const slug = generateDeploymentSlug(null);
       expect(slug).toMatch(/^[a-z]+-[a-z]+-\d{4}$/);

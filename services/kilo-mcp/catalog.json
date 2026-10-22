@@ -6071,29 +6071,6 @@
     ],
     "searchBlob": "cloudAgentNext.getAttachmentUploadUrl Get a presigned URL to upload a file attachment for a cloud agent message. cloudagentnext getattachmentuploadurl messageuuid attachmentid contenttype contentlength extension messageUuid attachmentId contentType contentLength extension"
   },
-  "cloudAgentNext.getComputeBillingStatus": {
-    "path": "cloudAgentNext.getComputeBillingStatus",
-    "kind": "query",
-    "summary": "Get billing status and compute usage information for a cloud agent session.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "cloudAgentSessionId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "cloudAgentSessionId"
-      ]
-    },
-    "tags": [
-      "cloudagentnext",
-      "getcomputebillingstatus",
-      "cloudagentsessionid"
-    ],
-    "searchBlob": "cloudAgentNext.getComputeBillingStatus Get billing status and compute usage information for a cloud agent session. cloudagentnext getcomputebillingstatus cloudagentsessionid cloudAgentSessionId"
-  },
   "cloudAgentNext.getImageUploadUrl": {
     "path": "cloudAgentNext.getImageUploadUrl",
     "kind": "mutation",
@@ -6282,7 +6259,7 @@
           "format": "starts_with",
           "allOf": [
             {
-              "pattern": "^(agent|workspace)_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+              "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
             },
             {
               "pattern": "^workspace_.*"
@@ -17587,37 +17564,6 @@
     ],
     "searchBlob": "organizations.cloudAgentNext.getAttachmentUploadUrl Get a presigned URL to upload a file attachment for a cloud agent message. Use to attach a file. organizations cloudagentnext getattachmentuploadurl organizationid messageuuid attachmentid contenttype contentlength extension organizationId messageUuid attachmentId contentType contentLength extension"
   },
-  "organizations.cloudAgentNext.getComputeBillingStatus": {
-    "path": "organizations.cloudAgentNext.getComputeBillingStatus",
-    "kind": "query",
-    "summary": "Get the compute billing status for an organization's cloud agent session.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "cloudAgentSessionId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "organizationId",
-        "cloudAgentSessionId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "cloudagentnext",
-      "getcomputebillingstatus",
-      "organizationid",
-      "cloudagentsessionid"
-    ],
-    "searchBlob": "organizations.cloudAgentNext.getComputeBillingStatus Get the compute billing status for an organization's cloud agent session. organizations cloudagentnext getcomputebillingstatus organizationid cloudagentsessionid organizationId cloudAgentSessionId"
-  },
   "organizations.cloudAgentNext.getImageUploadUrl": {
     "path": "organizations.cloudAgentNext.getImageUploadUrl",
     "kind": "mutation",
@@ -17810,7 +17756,7 @@
           "format": "starts_with",
           "allOf": [
             {
-              "pattern": "^(agent|workspace)_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+              "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
             },
             {
               "pattern": "^workspace_.*"

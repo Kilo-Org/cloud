@@ -19,6 +19,7 @@ import { SheetHeader } from '@/components/sheet-header';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
+import { selectableRowA11y } from '@/lib/a11y/selectable-row';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { cn } from '@/lib/utils';
 
@@ -279,8 +280,7 @@ export function AgentFormSheet({
                     'min-h-11 flex-row items-center rounded-md px-3 active:opacity-70',
                     selected && 'bg-secondary'
                   )}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: selected }}
+                  {...selectableRowA11y({ multi: false, selected })}
                   accessibilityLabel={t(option.labelKey)}
                   onPress={() => {
                     setVisibility(option.value);

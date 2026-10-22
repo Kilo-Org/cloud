@@ -60,18 +60,28 @@ async function mount(
 }
 
 function rows(renderer: ReactTestRenderer) {
-  return renderer.root
-    .findAll(node => node.type === Pressable && node.props.accessibilityRole === 'radio')
-    .map(node => ({
-      label: node.props.accessibilityLabel as string,
-      checked: (node.props.accessibilityState as { checked: boolean }).checked,
-      divider:
-        typeof node.props.className === 'string' &&
-        node.props.className.includes('border-hair-soft'),
-      check: node.findAll(child => child.type === Check).length > 0,
-      // Every account row reserves one blank gutter View so the labels line up.
-      gutter: node.findAll(child => child.type === View).length === 1,
-    }));
+  return (
+    renderer.root
+      // This suite mounts iOS, where a picker row is a button that reports its
+      // choice through the selected trait; Android keeps the radio role.
+      .findAll(node => node.type === Pressable && node.props.accessibilityRole === 'button')
+      .filter(node => node.props.accessibilityState !== undefined)
+      .map(node => {
+        // The mocked React Native tree types props loosely, so this suite reads
+        // the row's state through the shape `radioItemA11y` produces.
+        const state = node.props.accessibilityState as { selected: boolean };
+        return {
+          label: node.props.accessibilityLabel as string,
+          selected: state.selected,
+          divider:
+            typeof node.props.className === 'string' &&
+            node.props.className.includes('border-hair-soft'),
+          check: node.findAll(child => child.type === Check).length > 0,
+          // Every account row reserves one blank gutter View so the labels line up.
+          gutter: node.findAll(child => child.type === View).length === 1,
+        };
+      })
+  );
 }
 
 /** The native sheet wrapper; its `onClose` is the dismiss path the sheet owns. */
@@ -98,7 +108,7 @@ describe('ContextPickerSheet', () => {
     const renderer = await mount({ visible: false });
 
     expect(renderer.root.findAllByProps({ accessibilityRole: 'radiogroup' })).toHaveLength(0);
-    expect(renderer.root.findAllByProps({ accessibilityRole: 'radio' })).toHaveLength(0);
+    expect(renderer.root.findAllByProps({ accessibilityRole: 'button' })).toHaveLength(0);
   });
 
   it('draws a divider on every account row and the check on the current one', async () => {
@@ -108,10 +118,10 @@ describe('ContextPickerSheet', () => {
       'Select account'
     );
     expect(rows(renderer)).toEqual([
-      { label: 'Personal', checked: false, divider: true, check: false, gutter: true },
-      { label: 'Acme Corp', checked: true, divider: true, check: true, gutter: true },
+      { label: 'Personal', selected: false, divider: true, check: false, gutter: true },
+      { label: 'Acme Corp', selected: true, divider: true, check: true, gutter: true },
     ]);
-    // Cancel is the ordinary button below them: no radio state, no check.
+    // Cancel is the ordinary button below them: no selection state, no check.
     const cancel = renderer.root.find(
       node => node.type === Pressable && node.props.accessibilityLabel === 'Cancel'
     );
@@ -122,7 +132,7 @@ describe('ContextPickerSheet', () => {
   it('checks nothing when the stored account is not in the list', async () => {
     const renderer = await mount({ currentIndex: -1 });
 
-    expect(rows(renderer).map(row => row.checked)).toEqual([false, false]);
+    expect(rows(renderer).map(row => row.selected)).toEqual([false, false]);
     expect(rows(renderer).map(row => row.check)).toEqual([false, false]);
   });
 

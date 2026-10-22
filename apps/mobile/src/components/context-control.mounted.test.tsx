@@ -14,7 +14,7 @@ const list = vi.hoisted(() => vi.fn());
 const storage = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), remove: vi.fn() }));
 const auth = vi.hoisted(() => ({ token: 'token' as string | undefined }));
 // Mutable so the per-platform suite hands each platform the one sheet the picker
-// builds: the current-account mark rides the row's checked state, never a
+// builds: the current-account mark rides the row's selection state, never a
 // per-platform label branch.
 const platform = vi.hoisted(() => ({ OS: 'android' }));
 // Mutable so the theme test can prove the picker re-reads the active palette,
@@ -155,27 +155,53 @@ async function press(node: ReactTestInstance) {
   });
 }
 
+/** The account rows' role on the platform under test. */
+function accountRowRole() {
+  return platform.OS === 'ios' ? 'button' : 'radio';
+}
+
+/** An account row: the picker control shares a label with its current row, so
+ * the row is the node that carries a selection state. */
+function isAccountRow(node: ReactTestInstance) {
+  const state = node.props.accessibilityState as
+    | { checked?: boolean; selected?: boolean }
+    | undefined;
+  return (
+    node.type === Pressable &&
+    node.props.accessibilityRole === accountRowRole() &&
+    (state?.selected !== undefined || state?.checked !== undefined)
+  );
+}
+
 /** The open sheet's account rows, in option order, with their a11y state. */
 function rows(ui: Mounted) {
-  return ui.renderer.root
-    .findAll(node => node.type === Pressable && node.props.accessibilityRole === 'radio')
-    .map(node => {
-      const checks = node.findAll(child => child.type === Check);
-      return {
-        label: node.props.accessibilityLabel as string,
-        role: node.props.accessibilityRole as string,
-        checked: (node.props.accessibilityState as { checked: boolean }).checked,
-        divider:
-          typeof node.props.className === 'string' &&
-          node.props.className.includes('border-hair-soft'),
-        check: checks.length > 0,
-        checkColor: checks[0]?.props.color as string | undefined,
-      };
-    });
+  return ui.renderer.root.findAll(isAccountRow).map(node => {
+    const checks = node.findAll(child => child.type === Check);
+    const state = node.props.accessibilityState as {
+      checked?: boolean;
+      selected?: boolean;
+    };
+    return {
+      label: node.props.accessibilityLabel as string,
+      role: node.props.accessibilityRole as string,
+      selected: Boolean(state.selected ?? state.checked),
+      divider:
+        typeof node.props.className === 'string' &&
+        node.props.className.includes('border-hair-soft'),
+      check: checks.length > 0,
+      checkColor: checks[0]?.props.color as string | undefined,
+    };
+  });
 }
 
 function radioRow(ui: Mounted, label: string) {
-  return ui.renderer.root.findByProps({ accessibilityLabel: label, accessibilityRole: 'radio' });
+  const row = ui.renderer.root
+    .findAll(isAccountRow)
+    .find(node => node.props.accessibilityLabel === label);
+  if (!row) {
+    throw new Error(`missing account row: ${label}`);
+  }
+  return row;
 }
 
 /** The native sheet wrapper of the open picker; its `onClose` is the dismiss. */
@@ -310,12 +336,13 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     await openSheet(ui);
     const opened = rows(ui);
     expect(opened.map(row => row.label)).toEqual(['Personal', name]);
-    // A screen reader hears the current account through `checked`, the app's
-    // radio convention (`ui/radio-group.tsx`), not through icon colour alone.
-    expect(opened.map(row => row.checked)).toEqual([false, true]);
-    expect(opened.map(row => row.role)).toEqual(['radio', 'radio']);
+    // A screen reader hears the current account through the row's selection
+    // state (`selectableRowA11y`): `checked` on Android's radio, the selected
+    // trait on iOS's button.
+    expect(opened.map(row => row.selected)).toEqual([false, true]);
+    expect(opened.map(row => row.role)).toEqual([accountRowRole(), accountRowRole()]);
     // Each account row draws the shared divider, and only the current row
-    // carries the check; Cancel is a plain button with no radio state.
+    // carries the check; Cancel is a plain button with no selection state.
     expect(opened.map(row => row.divider)).toEqual([true, true]);
     expect(opened.map(row => row.check)).toEqual([false, true]);
     expect(cancelRow(ui).props.accessibilityState).toBeUndefined();
@@ -330,7 +357,7 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     // so the control must not name org-a.
     expect(picker(ui).props.accessibilityLabel).toBe('Personal');
     await openSheet(ui);
-    expect(rows(ui).map(row => row.checked)).toEqual([true, false]);
+    expect(rows(ui).map(row => row.selected)).toEqual([true, false]);
     await chooseRow(ui, name);
     expect(onSelectionChange).toHaveBeenCalledWith('org-a');
   });
@@ -350,11 +377,11 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     // resolves to the first organization, so the picker must mark that row. A
     // stored organization missing from the list recovers to that first
     // membership before the sheet opens, so its row is marked too.
-    { stored: null, checked: name },
-    { stored: 'org-missing', checked: name },
+    { stored: null, selected: name },
+    { stored: 'org-missing', selected: name },
   ])(
     'marks the account the user is actually on when the stored one is missing (stored=$stored)',
-    async ({ stored, checked }) => {
+    async ({ stored, selected }) => {
       storage.read.mockResolvedValue(stored);
       const ui = await mount();
       await waitFor(() => !picker(ui).props.disabled);
@@ -362,9 +389,9 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
       expect(rows(ui).map(row => row.label)).toEqual(['Personal', name]);
       expect(
         rows(ui)
-          .filter(row => row.checked)
+          .filter(row => row.selected)
           .map(row => row.label)
-      ).toEqual([checked]);
+      ).toEqual([selected]);
     }
   );
 
@@ -374,8 +401,8 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     await waitFor(() => !picker(ui).props.disabled);
     await openSheet(ui);
     expect(
-      rows(ui).map(row => ({ label: row.label, checked: row.checked, check: row.check }))
-    ).toEqual([{ label: 'Personal', checked: true, check: true }]);
+      rows(ui).map(row => ({ label: row.label, selected: row.selected, check: row.check }))
+    ).toEqual([{ label: 'Personal', selected: true, check: true }]);
     expect(texts(ui)).toContain('Cancel');
   });
 

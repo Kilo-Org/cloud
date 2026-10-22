@@ -62,16 +62,20 @@ describe('ProfileScreen Organization section', () => {
     });
 
     // The row opens the app's account picker: Personal first, then both
-    // memberships, with the current account checked.
-    const radios = root.findAll(
-      node => typeof node.type === 'string' && node.props.accessibilityRole === 'radio'
-    );
+    // memberships, with the current account checked. The helper mounts iOS,
+    // where a picker row is a button that reports its choice through the
+    // selected trait.
+    const sheet = root.find(node => String(node.type) === 'BottomSheet');
+    const radios = sheet.findAll(node => {
+      const state = node.props.accessibilityState as { selected?: boolean } | undefined;
+      return typeof node.type === 'string' && state?.selected !== undefined;
+    });
     expect(radios.map(radio => radio.props.accessibilityLabel)).toEqual([
       i18n.t('common.personal'),
       'Kilo',
       'Acme',
     ]);
-    expect(radios[0]?.props.accessibilityState).toMatchObject({ checked: true });
+    expect(radios[0]?.props.accessibilityState).toMatchObject({ selected: true });
 
     act(() => {
       (radios[2]?.props as { onPress?: () => void } | undefined)?.onPress?.();

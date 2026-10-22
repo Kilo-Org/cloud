@@ -5,7 +5,11 @@ import { SegmentedControl } from './segmented-control';
 
 // The node project never parses RN's Flow-typed sources, so the primitives the
 // control composes become string elements (same pattern as radio-group.test.ts).
-vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
+vi.mock('react-native', () => ({
+  Platform: { OS: 'android' },
+  Pressable: 'Pressable',
+  View: 'View',
+}));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 

@@ -19,6 +19,7 @@ vi.mock('@/lib/hooks/use-available-models', () => ({
   thinkingEffortLabel: (variant: string) => variant,
 }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'android' },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',

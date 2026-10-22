@@ -4,6 +4,7 @@ import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
+import { selectableRowA11y } from '@/lib/a11y/selectable-row';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -16,7 +17,7 @@ type ChoiceRowProps = {
   disabled?: boolean;
   /** Marks the row as busy for a11y, e.g. while its own save is in flight. */
   busy?: boolean;
-  /** Renders `accessibilityRole="checkbox"` instead of `"radio"`. */
+  /** Android renders `accessibilityRole="checkbox"` instead of `"radio"`; iOS uses a button with the selected trait. */
   multi?: boolean;
   /** Extra classes on the row container, e.g. a divider border. */
   className?: string;
@@ -53,8 +54,12 @@ export function ChoiceRow({
         void Haptics.selectionAsync();
         onPress();
       }}
-      accessibilityRole={multi ? 'checkbox' : 'radio'}
-      accessibilityState={{ checked: selected, disabled: Boolean(disabled), busy }}
+      {...selectableRowA11y({
+        multi: Boolean(multi),
+        selected,
+        disabled: Boolean(disabled),
+        busy,
+      })}
     >
       {children ?? (
         <View className="flex-1 pr-3">

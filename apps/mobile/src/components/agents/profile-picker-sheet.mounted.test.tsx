@@ -7,6 +7,7 @@ import { ProfilePickerSheet, type ProfilePickerSheetProps } from './profile-pick
 import { type SessionProfilePickerProfile } from './session-profile-picker-model';
 
 vi.mock('react-native', () => ({
+  Platform: { OS: 'android' },
   Pressable: 'Pressable',
   View: 'View',
 }));

@@ -235,22 +235,32 @@ async function openSheet(renderer: ReactTestRenderer) {
   });
 }
 
-/** The sheet's account rows, in option order. */
+/** The sheet's account rows, in option order. This suite mounts iOS, where a
+ * picker row is a button that reports its choice through the selected trait. */
 function accountLabels(renderer: ReactTestRenderer) {
   return renderer.root
-    .findAll(node => node.type === Pressable && node.props.accessibilityRole === 'radio')
+    .findAll(node => {
+      const state = node.props.accessibilityState as { selected?: boolean } | undefined;
+      return node.type === Pressable && state?.selected !== undefined;
+    })
     .map(node => node.props.accessibilityLabel as string);
 }
 
-/** Presses one row of the open sheet: an account (radio) or Cancel (button). */
+/** Presses one row of the open sheet: an account or Cancel. */
 async function choose(renderer: ReactTestRenderer, label: string) {
-  const target = renderer.root.find(
-    node =>
-      node.type === Pressable &&
-      node.props.accessibilityLabel === label &&
-      node.props.onPress !== undefined &&
-      (node.props.accessibilityRole === 'radio' ? true : node.props.accessibilityHint === undefined)
-  );
+  const target = renderer.root.find(node => {
+    if (node.type !== Pressable || node.props.accessibilityLabel !== label) {
+      return false;
+    }
+    if (node.props.onPress === undefined) {
+      return false;
+    }
+    const state = node.props.accessibilityState as { selected?: boolean } | undefined;
+    // An account row carries the selected trait; Cancel is the plain button
+    // without a hint. The card's own picker control shares an account label,
+    // so it is excluded by its hint.
+    return state?.selected !== undefined || node.props.accessibilityHint === undefined;
+  });
   await act(() => {
     (target.props.onPress as () => void)();
   });

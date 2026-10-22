@@ -51,22 +51,18 @@ describe('evaluateContainerCapacity', () => {
   });
 
   it('fires no alert when capacity is below all thresholds', async () => {
-    const queryFn = vi.fn(
-      async (): Promise<ContainerApplication[]> => [
-        { id: 'id1', name: 'cloud-agent-next-sandbox', instances: 50, maxInstances: 100 },
-      ]
-    );
+    const queryFn = vi.fn(async (): Promise<ContainerApplication[]> => [
+      { id: 'id1', name: 'cloud-agent-next-sandbox', instances: 50, maxInstances: 100 },
+    ]);
     await evaluateContainerCapacity(makeEnv(kv), queryFn, notifyFn);
     expect(sentAlerts).toHaveLength(0);
     expect(kv.store.size).toBe(0);
   });
 
   it('fires a ticket alert at 81% utilization and records dedup marker', async () => {
-    const queryFn = vi.fn(
-      async (): Promise<ContainerApplication[]> => [
-        { id: 'id1', name: 'cloud-agent-next-sandbox', instances: 81, maxInstances: 100 },
-      ]
-    );
+    const queryFn = vi.fn(async (): Promise<ContainerApplication[]> => [
+      { id: 'id1', name: 'cloud-agent-next-sandbox', instances: 81, maxInstances: 100 },
+    ]);
     await evaluateContainerCapacity(makeEnv(kv), queryFn, notifyFn);
     expect(sentAlerts).toHaveLength(1);
     expect(sentAlerts[0].severity).toBe('ticket');
@@ -77,11 +73,9 @@ describe('evaluateContainerCapacity', () => {
   });
 
   it('fires a page alert at 96% utilization', async () => {
-    const queryFn = vi.fn(
-      async (): Promise<ContainerApplication[]> => [
-        { id: 'id1', name: 'cloud-agent-next-sandbox', instances: 96, maxInstances: 100 },
-      ]
-    );
+    const queryFn = vi.fn(async (): Promise<ContainerApplication[]> => [
+      { id: 'id1', name: 'cloud-agent-next-sandbox', instances: 96, maxInstances: 100 },
+    ]);
     await evaluateContainerCapacity(makeEnv(kv), queryFn, notifyFn);
     expect(sentAlerts).toHaveLength(1);
     expect(sentAlerts[0].severity).toBe('page');
@@ -94,11 +88,9 @@ describe('evaluateContainerCapacity', () => {
       'o11y:alert:page:container_capacity:cloudflare:cloud-agent-next-sandbox:containers',
       new Date().toISOString()
     );
-    const queryFn = vi.fn(
-      async (): Promise<ContainerApplication[]> => [
-        { id: 'id1', name: 'cloud-agent-next-sandbox', instances: 81, maxInstances: 100 },
-      ]
-    );
+    const queryFn = vi.fn(async (): Promise<ContainerApplication[]> => [
+      { id: 'id1', name: 'cloud-agent-next-sandbox', instances: 81, maxInstances: 100 },
+    ]);
     await evaluateContainerCapacity(makeEnv(kv), queryFn, notifyFn);
     expect(sentAlerts).toHaveLength(0);
   });
@@ -108,21 +100,17 @@ describe('evaluateContainerCapacity', () => {
       'o11y:alert:page:container_capacity:cloudflare:cloud-agent-next-sandbox:containers',
       new Date().toISOString()
     );
-    const queryFn = vi.fn(
-      async (): Promise<ContainerApplication[]> => [
-        { id: 'id1', name: 'cloud-agent-next-sandbox', instances: 96, maxInstances: 100 },
-      ]
-    );
+    const queryFn = vi.fn(async (): Promise<ContainerApplication[]> => [
+      { id: 'id1', name: 'cloud-agent-next-sandbox', instances: 96, maxInstances: 100 },
+    ]);
     await evaluateContainerCapacity(makeEnv(kv), queryFn, notifyFn);
     expect(sentAlerts).toHaveLength(0);
   });
 
   it('records page dedup marker in KV when page alert fires', async () => {
-    const queryFn = vi.fn(
-      async (): Promise<ContainerApplication[]> => [
-        { id: 'id1', name: 'cloud-agent-next-sandbox', instances: 96, maxInstances: 100 },
-      ]
-    );
+    const queryFn = vi.fn(async (): Promise<ContainerApplication[]> => [
+      { id: 'id1', name: 'cloud-agent-next-sandbox', instances: 96, maxInstances: 100 },
+    ]);
     await evaluateContainerCapacity(makeEnv(kv), queryFn, notifyFn);
     const pageKey =
       'o11y:alert:page:container_capacity:cloudflare:cloud-agent-next-sandbox:containers';
@@ -130,11 +118,9 @@ describe('evaluateContainerCapacity', () => {
   });
 
   it('fires an info alert at 60% utilization', async () => {
-    const queryFn = vi.fn(
-      async (): Promise<ContainerApplication[]> => [
-        { id: 'id1', name: 'cloud-agent-next-sandbox', instances: 60, maxInstances: 100 },
-      ]
-    );
+    const queryFn = vi.fn(async (): Promise<ContainerApplication[]> => [
+      { id: 'id1', name: 'cloud-agent-next-sandbox', instances: 60, maxInstances: 100 },
+    ]);
     await evaluateContainerCapacity(makeEnv(kv), queryFn, notifyFn);
     expect(sentAlerts).toHaveLength(1);
     expect(sentAlerts[0].severity).toBe('info');
@@ -150,11 +136,9 @@ describe('evaluateContainerCapacity', () => {
       'o11y:alert:info:container_capacity:cloudflare:cloud-agent-next-sandbox:containers',
       new Date().toISOString()
     );
-    const queryFn = vi.fn(
-      async (): Promise<ContainerApplication[]> => [
-        { id: 'id1', name: 'cloud-agent-next-sandbox', instances: 81, maxInstances: 100 },
-      ]
-    );
+    const queryFn = vi.fn(async (): Promise<ContainerApplication[]> => [
+      { id: 'id1', name: 'cloud-agent-next-sandbox', instances: 81, maxInstances: 100 },
+    ]);
     await evaluateContainerCapacity(makeEnv(kv), queryFn, notifyFn);
     expect(sentAlerts).toHaveLength(1);
     expect(sentAlerts[0].severity).toBe('ticket');
@@ -165,11 +149,9 @@ describe('evaluateContainerCapacity', () => {
       'o11y:alert:ticket:container_capacity:cloudflare:cloud-agent-next-sandbox:containers',
       new Date().toISOString()
     );
-    const queryFn = vi.fn(
-      async (): Promise<ContainerApplication[]> => [
-        { id: 'id1', name: 'cloud-agent-next-sandbox', instances: 60, maxInstances: 100 },
-      ]
-    );
+    const queryFn = vi.fn(async (): Promise<ContainerApplication[]> => [
+      { id: 'id1', name: 'cloud-agent-next-sandbox', instances: 60, maxInstances: 100 },
+    ]);
     await evaluateContainerCapacity(makeEnv(kv), queryFn, notifyFn);
     expect(sentAlerts).toHaveLength(0);
   });

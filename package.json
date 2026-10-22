@@ -66,7 +66,7 @@
     "husky": "9.1.7",
     "ink": "6.8.0",
     "js-yaml": "4.3.2",
-    "oxfmt": "0.40.0",
+"oxfmt": "0.73.0",
     "oxlint": "1.88.0",
     "oxlint-plugin-react-native": "0.2.38",
     "oxlint-tsgolint": "7.0.2004",

@@ -497,23 +497,6 @@ describe('github-integration-helpers', () => {
       expect(result.partial).toBe(true);
     });
 
-    it('reports a pending installation as awaiting approval', async () => {
-      mockGetIntegrationsByOrganization.mockResolvedValue([
-        buildIntegration({ integration_status: 'pending', platform_installation_id: null }),
-      ]);
-
-      const { fetchAllGitHubRepositoriesForOrganization } =
-        await import('./github-integration-helpers');
-      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
-
-      expect(result).toMatchObject({
-        integrationInstalled: false,
-        errorMessage: 'GitHub installation is awaiting approval',
-        unavailableReason: 'pending_approval',
-      });
-      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
-    });
-
     it('treats an installation without a platform installation id as unavailable', async () => {
       mockGetIntegrationsByOrganization.mockResolvedValue([
         buildIntegration({ platform_installation_id: null }),

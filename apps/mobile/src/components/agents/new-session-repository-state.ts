@@ -34,7 +34,6 @@ export type RepositoryUnavailableReason =
   | 'suspended'
   | 'disconnected'
   | 'reauth_required'
-  | 'pending_approval'
   | 'not_configured';
 
 export type RepositoryGroupNotice = 'partial';

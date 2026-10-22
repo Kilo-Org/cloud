@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "ምንም ማከማቻዎች አይታዩም። በGitLab ላይ ማከማቻዎቹን የመድረስ ፈቃድ እንዳለ ያረጋግጡ፣ ከዚያ ያድሱ።",
       "noRepositoriesVisibleBitbucket": "ምንም ማከማቻዎች አይታዩም። በBitbucket ላይ ማከማቻዎቹን የመድረስ ፈቃድ እንዳለ ያረጋግጡ፣ ከዚያ ያድሱ።",
       "bitbucketOrganizationsOnly": "Bitbucket ለድርጅቶች ብቻ ይገኛል።",
+      "githubNeedsAttention": "GitHub እንደገና መገናኘት ያስፈልገዋል",
+      "githubNeedsAttentionDescription": "የKilo GitHub መተግበሪያ እንደገና ይገናኙ፣ ከዚያ ማከማቻዎቹን ለመጫን ያድሱ።",
+      "partialRepositories": "አንዳንድ የGitHub ማከማቻዎች አልተጫኑም።",
       "branchPickerTitle": "ቅርንጫፍ ይምረጡ",
       "branchDefault": "ነባሪ",
       "branchAccessibility": "ቅርንጫፍ፦ {{label}}",
@@ -3684,6 +3687,8 @@
     "skillNameInvalid": "የክህሎት ስም በፊደል ወይም ዲጂት መጀመር አለበት እና ትንሽ ሆሄያትን፣ አሃዞችን እና ሰረዞችን ብቻ መጠቀም አለበት።",
     "skillContentRequired": "የክህሎት ይዘት ያስፈልጋል",
     "skillSaveFailed": "ችሎታ ማዳን አልተቻለም",
+    "skillSourceCustom": "ብጁ",
+    "skillSourceMarketplace": "መደብር",
     "skillsHint": "SKILL.md ይለጥፉ እና ስሙ ይሞላል; ሳይጎትቱ እና መጣል ሳይኖር ከስልክዎ ላይ ችሎታ ይጨምሩ።",
     "skillEditTitle": "ችሎታን ያርትዑ",
     "mcp": {

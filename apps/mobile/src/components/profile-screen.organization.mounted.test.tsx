@@ -5,8 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   authState,
   findConfigureRows,
-  flushInteractions,
-  interactionState,
+  flushIdle,
+  idleState,
   keys,
   mountProfile,
   nodeCount,
@@ -28,8 +28,8 @@ describe('ProfileScreen Organization section', () => {
     organizationsQueryFn.mockReset();
     routerPush.mockReset();
     authState.token = 'token-1';
-    interactionState.storedCallback = undefined;
-    interactionState.cancel.mockReset();
+    idleState.storedCallback = undefined;
+    idleState.cancel.mockReset();
     organizationState.organizationId = 'org-1';
     organizationState.isLoaded = true;
     setOrganizationIdFn.mockReset();
@@ -46,7 +46,7 @@ describe('ProfileScreen Organization section', () => {
     const { renderer, unmount } = await mountProfile();
     const root = renderer.root;
 
-    flushInteractions();
+    flushIdle();
     const chooserTitle = i18n.t('organization.boundary.selectOrganization');
     await waitFor(() => findConfigureRows(root, chooserTitle).length === 1);
 
@@ -96,7 +96,7 @@ describe('ProfileScreen Organization section', () => {
 
     const { renderer, unmount } = await mountProfile();
 
-    flushInteractions();
+    flushIdle();
     await waitFor(
       () => providersQueryFn.mock.calls.length > 0 && organizationsQueryFn.mock.calls.length > 0
     );

@@ -5,6 +5,7 @@ import {
   type NativeSyntheticEvent,
   Platform,
   ScrollView,
+  type ScrollViewInstance,
   type ScrollViewProps,
   useWindowDimensions,
   View,
@@ -33,7 +34,7 @@ export function DetailScreenScrollView({ children, style, ...props }: ScrollView
     Platform.OS === 'ios' && props.automaticallyAdjustKeyboardInsets === true;
   const keyboardOcclusion = useKeyboardState(state => state.height);
   const { height: windowHeight } = useWindowDimensions();
-  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
   const lastFrameRef = useRef<{ width: number; height: number } | null>(null);
   const revealTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const offsetRef = useRef(0);

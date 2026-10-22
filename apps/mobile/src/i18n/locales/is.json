@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Engin kóðasöfn sjást. Athugaðu aðgang að kóðasöfnum í GitLab og endurnýjaðu svo.",
       "noRepositoriesVisibleBitbucket": "Engin kóðasöfn sjást. Athugaðu aðgang að kóðasöfnum í Bitbucket og endurnýjaðu svo.",
       "bitbucketOrganizationsOnly": "Bitbucket er aðeins í boði fyrir stofnanir.",
+      "githubNeedsAttention": "GitHub þarf að endurtengjast",
+      "githubNeedsAttentionDescription": "Endurtengdu GitHub-forritið frá Kilo og endurnýjaðu svo til að hlaða kóðasöfnum þess.",
+      "partialRepositories": "Ekki tókst að hlaða öllum kóðasöfnum frá GitHub.",
       "branchPickerTitle": "Velja kvist",
       "branchDefault": "Sjálfgefið",
       "branchAccessibility": "Kvistur: {{label}}",
@@ -3684,6 +3687,8 @@
     "skillNameInvalid": "Hæfniheiti verður að byrja á bókstaf eða tölustaf og nota aðeins lágstafi, tölustafi og bandstrik",
     "skillContentRequired": "Færniefni er krafist",
     "skillSaveFailed": "Ekki tókst að bjarga kunnáttu",
+    "skillSourceCustom": "Sérsniðið",
+    "skillSourceMarketplace": "Markaður",
     "skillsHint": "Límdu SKILL.md og nafn þess fyllir út; bættu við færni úr símanum þínum án þess að draga og sleppa.",
     "skillEditTitle": "Breyta færni",
     "mcp": {

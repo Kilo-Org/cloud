@@ -1726,6 +1726,9 @@
       "noRepositoriesVisibleGitlab": "לא מוצגים מאגרים. בדוק את הרשאות הגישה למאגרים ב-GitLab, ואז רענן את הרשימה.",
       "noRepositoriesVisibleBitbucket": "לא מוצגים מאגרים. בדוק את הרשאות הגישה למאגרים ב-Bitbucket, ואז רענן את הרשימה.",
       "bitbucketOrganizationsOnly": "Bitbucket זמין לארגונים בלבד.",
+      "githubNeedsAttention": "נדרש לחבר מחדש את GitHub",
+      "githubNeedsAttentionDescription": "חבר מחדש את אפליקציית Kilo ב-GitHub, ואז רענן כדי לטעון את המאגרים שלה.",
+      "partialRepositories": "חלק מהמאגרים ב-GitHub לא נטענו.",
       "branchPickerTitle": "בחירת ענף",
       "branchDefault": "ברירת מחדל",
       "branchAccessibility": "ענף: {{label}}",
@@ -3729,6 +3732,8 @@
     "skillNameInvalid": "שם המיומנות חייב להתחיל באות או ספרה ולהשתמש רק באותיות קטנות, ספרות ומקפים",
     "skillContentRequired": "נדרש תוכן מיומנות",
     "skillSaveFailed": "לא ניתן היה לשמור את המיומנות",
+    "skillSourceCustom": "מותאם אישית",
+    "skillSourceMarketplace": "חנות",
     "skillsHint": "הדבק SKILL.md ושמו ימלא; הוסף מיומנות מהטלפון שלך ללא גרירה ושחרור.",
     "skillEditTitle": "ערוך מיומנות",
     "mcp": {

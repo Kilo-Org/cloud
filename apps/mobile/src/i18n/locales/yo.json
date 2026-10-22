@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Kò sí ibi ìpamọ́ kóòdù tó hàn. Ṣàyẹ̀wò àṣẹ ìwọlé sí ibi ìpamọ́ kóòdù fún GitLab, lẹ́yìn náà tún àkójọ náà gbé wọlé.",
       "noRepositoriesVisibleBitbucket": "Kò sí ibi ìpamọ́ kóòdù tó hàn. Ṣàyẹ̀wò àṣẹ ìwọlé sí ibi ìpamọ́ kóòdù fún Bitbucket, lẹ́yìn náà tún àkójọ náà gbé wọlé.",
       "bitbucketOrganizationsOnly": "Bitbucket wà fún àwọn àjọ ṣoṣo.",
+      "githubNeedsAttention": "Ó yẹ kó o tún GitHub sopọ̀",
+      "githubNeedsAttentionDescription": "Tún Kilo GitHub App náà sopọ̀, lẹ́yìn náà tún gbé àwọn ibi ìpamọ́ kóòdù rẹ̀ wọlé.",
+      "partialRepositories": "Àwọn ibi ìpamọ́ kóòdù GitHub míràn kò gbé wọlé.",
       "branchPickerTitle": "Yan ẹ̀ka",
       "branchDefault": "Ìpìlẹ̀",
       "branchAccessibility": "Ẹ̀ka: {{label}}",
@@ -3684,6 +3687,8 @@
     "skillNameInvalid": "Orukọ ogbon gbọdọ bẹrẹ pẹlu lẹta tabi nọmba ati lo awọn lẹta kekere nikan, awọn nọmba, ati dashes",
     "skillContentRequired": "Akoonu ogbon ni a nilo",
     "skillSaveFailed": "Ko le fi ogbon pamọ",
+    "skillSourceCustom": "Ti ara rẹ",
+    "skillSourceMarketplace": "Ọjà",
     "skillsHint": "Lẹẹmọ SKILL.md ati orukọ rẹ kun; ṣafikun ọgbọn lati inu foonu rẹ laisi fa ati ju silẹ.",
     "skillEditTitle": "Olorijori Ṣatunkọ",
     "mcp": {

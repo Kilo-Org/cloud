@@ -2259,6 +2259,9 @@
       "noRepositoriesVisibleGitlab": "Nu este vizibil niciun depozit. Verifică accesul la depozitele GitLab, apoi reîmprospătează lista.",
       "noRepositoriesVisibleBitbucket": "Nu este vizibil niciun depozit. Verifică accesul la depozitele Bitbucket, apoi reîmprospătează lista.",
       "bitbucketOrganizationsOnly": "Bitbucket este disponibil doar pentru organizații.",
+      "githubNeedsAttention": "GitHub trebuie reconectat",
+      "githubNeedsAttentionDescription": "Reconectează aplicația Kilo GitHub, apoi reîmprospătează pentru a încărca depozitele acesteia.",
+      "partialRepositories": "Unele depozite GitHub nu s-au încărcat.",
       "branchPickerTitle": "Selectează ramura",
       "branchDefault": "Implicit",
       "branchAccessibility": "Ramură: {{label}}",
@@ -3729,6 +3732,8 @@
     "skillNameInvalid": "Numele aptitudinii trebuie să înceapă cu o literă sau o cifră și să folosească numai litere mici, cifre și liniuțe",
     "skillContentRequired": "Conținutul de calificare este necesar",
     "skillSaveFailed": "Nu s-a putut salva calificarea",
+    "skillSourceCustom": "Personalizat",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Lipiți un SKILL.md și numele acestuia se completează; adăugați o abilitate de pe telefon fără glisare și plasare.",
     "skillEditTitle": "Editați abilitate",
     "mcp": {

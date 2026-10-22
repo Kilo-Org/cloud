@@ -274,27 +274,32 @@ function createJotaiStorage(
 
     deleteMessage(messageId) {
       flushPendingDeltas();
+      // A buffered delta can create parts before the message row (see
+      // `applyPartDelta`), so part state is dropped regardless of the row.
       const messages = store.get(messagesAtom);
-      if (!messages.has(messageId)) return;
+      const hadMessage = messages.has(messageId);
+      if (hadMessage) {
+        const nextMessages = new Map(messages);
+        nextMessages.delete(messageId);
+        store.set(messagesAtom, nextMessages);
 
-      const nextMessages = new Map(messages);
-      nextMessages.delete(messageId);
-      store.set(messagesAtom, nextMessages);
+        const messageIds = store.get(messageIdsAtom);
+        const nextMessageIds = messageIds.filter(id => id !== messageId);
+        store.set(messageIdsAtom, nextMessageIds);
+      }
 
-      const messageIds = store.get(messageIdsAtom);
-      const nextMessageIds = messageIds.filter(id => id !== messageId);
-      store.set(messageIdsAtom, nextMessageIds);
-
-      if (partsMap.has(messageId)) {
-        for (const part of partsMap.get(messageId) ?? []) {
-          forgetPartUpdateTime(partEvidence, messageId, part.id);
-        }
-        partsMap.delete(messageId);
+      const hadParts = partsMap.has(messageId);
+      for (const part of partsMap.get(messageId) ?? []) {
+        forgetPartUpdateTime(partEvidence, messageId, part.id);
+      }
+      partsMap.delete(messageId);
+      partsSnapshot.delete(messageId);
+      if (hadParts) {
         bumpPartsRevision();
-        partsSnapshot.delete(messageId);
         notify(subscribers, `parts:${messageId}`);
       }
 
+      if (!hadMessage) return;
       notify(subscribers, `message:${messageId}`);
       notify(subscribers, 'messageIds');
     },

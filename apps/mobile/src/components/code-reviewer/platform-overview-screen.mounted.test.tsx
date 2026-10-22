@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- cohesive mounted suite for the reviewer overview read states */
 // actionRequired banner contract: a non-null `actionRequired` on the reviewer
 // config renders a distinct banner (title + description + recovery label)
 // above the enable switch. Null renders no banner — including the
@@ -6,7 +7,7 @@
 
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CODE_REVIEW_ACTION_REQUIRED_REASONS } from '@kilocode/app-shared/code-reviews';
 
@@ -25,7 +26,11 @@ const config = vi.hoisted(() => ({
 
 const provider = vi.hoisted(() => ({ status: 'connected' }));
 const connectivity = vi.hoisted(() => ({ known: true }));
-const platformError = vi.hoisted(() => ({ variants: [] as string[] }));
+const platformError = vi.hoisted(() => ({
+  variants: [] as string[],
+  retries: [] as (() => void)[],
+  retrying: [] as boolean[],
+}));
 const skeletonRenders = vi.hoisted(() => ({ count: 0 }));
 const centeredState = vi.hoisted(() => vi.fn());
 const scrollView = vi.hoisted(() => vi.fn());
@@ -73,8 +78,16 @@ vi.mock('@/components/code-reviewer/provider-connect-card', () => ({
   ProviderConnectCard: () => null,
 }));
 vi.mock('@/components/platform-error-screen', () => ({
-  PlatformErrorScreen: (props: { variant?: string }) => {
+  PlatformErrorScreen: (props: {
+    variant?: string;
+    onRetry?: () => void;
+    isRetrying?: boolean;
+  }) => {
     platformError.variants.push(props.variant ?? 'server');
+    platformError.retrying.push(props.isRetrying ?? false);
+    if (props.onRetry) {
+      platformError.retries.push(props.onRetry);
+    }
     return null;
   },
 }));
@@ -181,6 +194,12 @@ function collectText(node: unknown): string[] {
 }
 
 async function renderScreen(platform: 'github' | 'gitlab' = 'github'): Promise<string[]> {
+  const { texts } = await renderScreenHandle(platform);
+  return texts;
+}
+
+/** Renders the screen and keeps the renderer so a test can read later renders. */
+async function renderScreenHandle(platform: 'github' | 'gitlab' = 'github') {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
     ref.current = TestRenderer.create(
@@ -192,7 +211,11 @@ async function renderScreen(platform: 'github' | 'gitlab' = 'github'): Promise<s
   if (!renderer) {
     throw new Error('renderer was not created');
   }
-  return collectText(renderer.toJSON());
+  return {
+    renderer,
+    texts: collectText(renderer.toJSON()),
+    readTexts: () => collectText(renderer.toJSON()),
+  };
 }
 
 beforeEach(() => {
@@ -207,6 +230,8 @@ beforeEach(() => {
   provider.status = 'connected';
   connectivity.known = true;
   platformError.variants = [];
+  platformError.retries = [];
+  platformError.retrying = [];
   skeletonRenders.count = 0;
   centeredState.mockClear();
   scrollView.mockClear();
@@ -284,6 +309,80 @@ describe('PlatformOverviewScreen connected with unavailable config', () => {
 
     expect(platformError.variants).toEqual(['server']);
     expect(skeletonRenders.count).toBe(0);
+  });
+});
+
+describe('PlatformOverviewScreen pending idle config read', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    // A test's refetch implementation must not reach the next one or the
+    // timers of a later test.
+    config.refetch.mockReset();
+  });
+
+  it('shows the skeleton instead of a blank body while nothing is fetching', async () => {
+    // Pending, idle, no data, no error: exactly the state a cancelled first
+    // fetch reverts to. It matched none of the separate isLoading/isError/
+    // paused tests, so the header painted over an empty scroll area with
+    // nothing that would ever resolve it.
+    config.fetchStatus = 'idle';
+
+    const texts = await renderScreen();
+
+    expect(skeletonRenders.count).toBeGreaterThan(0);
+    expect(platformError.variants).toEqual([]);
+    expect(texts).not.toContain('Automatic reviews');
+  });
+
+  it('restarts the idle read on its own and paints the rows once it lands', async () => {
+    vi.useFakeTimers();
+    config.fetchStatus = 'idle';
+    config.refetch.mockImplementation(() => {
+      config.fetchStatus = 'idle';
+      config.data = makeConfig();
+      return Promise.resolve();
+    });
+
+    const { readTexts } = await renderScreenHandle();
+    expect(readTexts()).not.toContain('Automatic reviews');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+
+    expect(config.refetch).toHaveBeenCalledTimes(1);
+    expect(platformError.variants).toEqual([]);
+    expect(readTexts()).toContain('Automatic reviews');
+  });
+
+  it('ends on the error with Retry when the idle read cannot restart', async () => {
+    vi.useFakeTimers();
+    config.fetchStatus = 'idle';
+    // This read cannot be restarted: the attempt leaves it exactly as idle.
+    config.refetch.mockImplementation(() => Promise.resolve());
+
+    const { readTexts } = await renderScreenHandle();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+
+    // The single automatic attempt did not get a fetch running, so the body
+    // stops waiting behind a spinner and offers the action that can.
+    expect(config.refetch).toHaveBeenCalledTimes(1);
+    expect(platformError.variants).toEqual(['server']);
+    expect(readTexts()).not.toContain('Automatic reviews');
+
+    skeletonRenders.count = 0;
+    await act(() => {
+      platformError.retries.at(-1)?.();
+    });
+
+    // Retry restarts the read and returns the body to the loading state while
+    // a fresh cycle (with its own single automatic attempt) runs.
+    expect(config.refetch).toHaveBeenCalledTimes(2);
+    expect(skeletonRenders.count).toBeGreaterThan(0);
+    expect(platformError.variants).toEqual(['server']);
   });
 });
 

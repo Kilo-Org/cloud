@@ -13,7 +13,10 @@ import {
   releaseSignInCode,
   consumeSignInCode,
 } from '@kilocode/web-shared/lib/auth/magic-link-tokens';
-import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
+import {
+  hosted_domain_specials,
+  SIGNUP_STEP_UP_METHODS,
+} from '@kilocode/web-shared/lib/auth/constants';
 import { consumeSignInTicket } from '@/lib/auth/passkey';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import {
@@ -46,6 +49,8 @@ import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-t
 
 const posthogClient = PostHogClient();
 
+class NativeAdmissionUnavailableError extends Error {}
+
 // Bad/expired ID tokens are a 401; JWKS-fetch or network failures during verification are
 // server faults and must surface as 500, not be misreported as an invalid token.
 function isInvalidNativeTokenError(error: unknown): boolean {
@@ -73,6 +78,13 @@ function eligibilityResponse(
 function settlementFailureResponse(failure: Extract<CreateOrUpdateUserResult, { success: false }>) {
   if (failure.error === 'SIGNUP-STEP-UP') {
     return NextResponse.json({ error: failure.error, methods: failure.methods }, { status: 403 });
+  }
+  // Shipped apps only understand step-up, which offers their native Google and Apple sign-in.
+  if (failure.error === 'EMAIL-SIGNUP-DISABLED') {
+    return NextResponse.json(
+      { error: 'SIGNUP-STEP-UP', methods: [...SIGNUP_STEP_UP_METHODS] },
+      { status: 403 }
+    );
   }
   return NextResponse.json(
     { error: failure.error },
@@ -184,6 +196,34 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
   if (admissionGate.verifyAsync && body['admission'] && typeof body['admission'] === 'object') {
     admissionPayload = validateAdmissionPayload(body['admission']);
   }
+  let admissionVerification: VerifyAdmissionOk | undefined;
+  let admissionVerificationFailed = false;
+  const verifyNewAccountAdmission = async () => {
+    if (admissionVerification) {
+      return (
+        !admissionVerification.existingKeyUserId &&
+        (admissionVerification.platform !== 'ios' || Boolean(admissionVerification.publicKey))
+      );
+    }
+    if (admissionVerificationFailed) return false;
+    const payload = admissionPayload ?? validateAdmissionPayload(body['admission']);
+    if (!payload) return false;
+    let verified;
+    try {
+      verified = await verifyAdmissionAsync(payload);
+    } catch {
+      throw new NativeAdmissionUnavailableError();
+    }
+    if (
+      !verified.ok ||
+      verified.existingKeyUserId ||
+      (verified.platform === 'ios' && !verified.publicKey)
+    ) {
+      return false;
+    }
+    admissionVerification = verified;
+    return true;
+  };
 
   // ── Step 3: Provider identity verification ───────────────────────────────
   let args: CreateOrUpdateUserArgs;
@@ -350,11 +390,11 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       autoLinkToExistingUser = true;
 
       // ── Step 3b: Async admission verification BEFORE settlement ────────
-      let admissionVerification: VerifyAdmissionOk | undefined;
       if (admissionPayload) {
         try {
           const verified = await verifyAdmissionAsync(admissionPayload);
           if (!verified.ok) {
+            admissionVerificationFailed = true;
             // Under report mode, evaluate but still admit.
             if (shouldRefuseAsyncFailure()) {
               phase = 'release';
@@ -378,7 +418,8 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         request.headers,
         undefined,
         undefined,
-        true
+        true,
+        verifyNewAccountAdmission
       );
       if (!result.success) {
         phase = 'release';
@@ -523,6 +564,9 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       return NextResponse.json({ token, created: result.isNew }, { status: 200 });
     } catch (error) {
       phase = 'release';
+      if (error instanceof NativeAdmissionUnavailableError) {
+        return NextResponse.json({ error: 'INTERNAL_ERROR' }, { status: 500 });
+      }
       throw error;
     } finally {
       if (phase === 'release') {
@@ -534,11 +578,11 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
   // Apple/Google path.
 
   // ── Step 3c: Async admission verification BEFORE settlement ──────────────
-  let admissionVerification: VerifyAdmissionOk | undefined;
   if (admissionPayload) {
     try {
       const verified = await verifyAdmissionAsync(admissionPayload);
       if (!verified.ok) {
+        admissionVerificationFailed = true;
         if (shouldRefuseAsyncFailure()) {
           return NextResponse.json({ error: verified.errorCode }, { status: 403 });
         }
@@ -552,15 +596,24 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
   }
 
   // ── Step 4: User settlement ──────────────────────────────────────────────
-  const result = await createOrUpdateUser(
-    args,
-    undefined,
-    autoLinkToExistingUser,
-    request.headers,
-    undefined,
-    undefined,
-    true
-  );
+  let result: CreateOrUpdateUserResult;
+  try {
+    result = await createOrUpdateUser(
+      args,
+      undefined,
+      autoLinkToExistingUser,
+      request.headers,
+      undefined,
+      undefined,
+      true,
+      verifyNewAccountAdmission
+    );
+  } catch (error) {
+    if (error instanceof NativeAdmissionUnavailableError) {
+      return NextResponse.json({ error: 'INTERNAL_ERROR' }, { status: 500 });
+    }
+    throw error;
+  }
   if (!result.success) {
     return settlementFailureResponse(result);
   }

@@ -18,6 +18,7 @@ import { sendAlertNotification, type AlertPayload } from './notify';
 import { listAlertingConfigs, type AlertingConfig } from './config-store';
 import { listTtfbAlertingConfigs, type TtfbAlertingConfig } from './ttfb-config-store';
 import { evaluateContainerCapacity } from './container-capacity-evaluate';
+import { evaluateContainerAllocations } from './container-allocations';
 import { evaluateQueueBacklogAlert } from './queue-backlog-evaluate';
 import { evaluateGastownHealthAlert } from './gastown-health-evaluate';
 
@@ -313,6 +314,12 @@ export async function evaluateAlerts(env: Env): Promise<void> {
     await evaluateContainerCapacity(env);
   } catch (err) {
     errors.push(new Error('container_capacity evaluation', { cause: err }));
+  }
+
+  try {
+    await evaluateContainerAllocations(env);
+  } catch (err) {
+    errors.push(new Error('container_allocations evaluation', { cause: err }));
   }
 
   try {

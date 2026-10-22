@@ -72,6 +72,9 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/lib/pr-review/file-navigator-bridge', () => ({
   requestScrollToFile: vi.fn(),
 }));
+vi.mock('@/components/pr-review/pr-review-unavailable-actions', () => ({
+  PrReviewUnavailableActions: 'PrReviewUnavailableActions',
+}));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({

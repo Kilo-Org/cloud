@@ -7,7 +7,9 @@ import {
   Shield,
   Smartphone,
 } from '@/components/ui/icons';
+import { useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { useCallback } from 'react';
 import { View } from 'react-native';
 
 import { AppUnlockFeedback } from '@/components/app-unlock-screen';
@@ -58,6 +60,18 @@ export function GeneralSettingsScreen() {
     setCondenseToolCalls,
   } = useCondenseToolCallsPreference();
   const { t } = useTranslation();
+
+  // One enable attempt owns its feedback: leaving this screen retires it, so
+  // a later visit shows no error until the user tries again.
+  const { clearSettingOutcome } = unlock;
+  useFocusEffect(
+    useCallback(
+      () => () => {
+        clearSettingOutcome();
+      },
+      [clearSettingOutcome]
+    )
+  );
 
   return (
     <View className="flex-1 bg-background">

@@ -23,6 +23,7 @@ import {
 } from './client.js';
 import { findControlPlaneKiloRuntime } from './sandbox-control.js';
 import { SandboxStatusSnapshotSchema } from '../../src/shared/sandbox-status.js';
+import { KILO_CLI_VERSION } from '../../src/shared/kilo-cli-version.js';
 
 const execute = promisify(execFile);
 const serviceRoot = fileURLToPath(new URL('../..', import.meta.url).href);
@@ -113,7 +114,10 @@ try {
     .trim()
     .split(/\s+/)[0];
   assert.equal(hash, expectedHash, 'Running wrapper does not match the reviewed build');
-  assert.equal((await docker('exec', containerId, 'kilo', '--version')).stdout.trim(), '7.8.1');
+  assert.equal(
+    (await docker('exec', containerId, 'kilo', '--version')).stdout.trim(),
+    KILO_CLI_VERSION
+  );
   const snapshot = await getSessionSnapshot(config, sessionId, signal);
   await evidence('identity', {
     sessionId,
@@ -121,7 +125,7 @@ try {
     sandboxId: snapshot.sandboxId,
     containerId,
     wrapperHash: hash,
-    version: '7.8.1',
+    version: KILO_CLI_VERSION,
   });
   const seconds = mode === 'progress' ? 660 : mode === 'silent' ? 300 : 1800;
   let cursor = stream.events.length;

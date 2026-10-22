@@ -3,6 +3,7 @@ import { captureException } from '@sentry/nextjs';
 import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { getOpenRouterTranscriptionModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   getEffectiveModelDecision,
@@ -27,6 +28,7 @@ export async function handleTranscriptionModelsRequest(): Promise<
       const policy = await resolveOrganizationMemberModelPolicy({
         organizationId: auth.organizationId,
         kiloUserId: auth.user.id,
+        fromDb: readDb,
       });
       const models = [];
       for (const model of data.data) {

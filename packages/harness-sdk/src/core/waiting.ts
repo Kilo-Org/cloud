@@ -65,7 +65,7 @@ const tried = (parse: () => unknown): unknown => {
  * one. What it spends is the caller's own stream, and the caller can cut that
  * short at any time with `session.background`.
  */
-const waitFor = (wiring: Wiring, tool: Tool, asked?: boolean): Duration.DurationInput => {
+const waitFor = (wiring: Wiring, tool: Tool, asked?: boolean): Duration.Input => {
   if ((asked ?? tool.wait) === false) {
     return Duration.zero;
   }
@@ -138,7 +138,7 @@ const whileWaiting = <A>(
  * carries on without it.
  */
 const waited = (
-  fiber: Fiber.RuntimeFiber<ToolResult>,
+  fiber: Fiber.Fiber<ToolResult>,
   release: Deferred.Deferred<boolean>,
   wait: Duration.Duration
 ): Effect.Effect<Option.Option<Exit.Exit<ToolResult>>> =>

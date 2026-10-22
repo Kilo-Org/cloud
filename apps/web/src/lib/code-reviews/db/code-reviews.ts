@@ -1110,10 +1110,6 @@ export async function recordCodeReviewAttemptPublicationStatus(
 }
 
 /**
- * Updates code review status
- * Can optionally update session_id, cli_session_id, error_message, started_at, completed_at
- */
-/**
  * Persists the captured council outcome (decision + per-specialist votes/findings) on the
  * review so the cloud UI job-runs screen can render it. Council runs only.
  */
@@ -1874,7 +1870,7 @@ type CancelledReviewDatabaseRow = {
   prev_status: 'pending' | 'queued' | 'running';
   session_id: string | null;
   latest_active_attempt_id: string | null;
-  check_run_id: number | null;
+  check_run_id: string | null;
   head_sha: string;
   platform: CodeReviewPlatform;
   platform_project_id: number | null;
@@ -1888,7 +1884,7 @@ function mapCancelledReviewRow(row: CancelledReviewDatabaseRow): CancelledReview
     prevStatus: row.prev_status,
     sessionId: row.session_id,
     latestActiveAttemptId: row.latest_active_attempt_id,
-    checkRunId: row.check_run_id,
+    checkRunId: row.check_run_id === null ? null : Number(row.check_run_id),
     headSha: row.head_sha,
     platform: row.platform,
     platformProjectId: row.platform_project_id,

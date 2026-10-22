@@ -65,11 +65,9 @@ const config: StorybookConfig = {
     return config;
   },
   typescript: {
-    reactDocgen: 'react-docgen-typescript',
-    reactDocgenTypescriptOptions: {
-      shouldExtractLiteralValuesFromEnum: true,
-      propFilter: prop => (prop.parent ? !/node_modules/.test(prop.parent.fileName) : true),
-    },
+    // The TypeScript docgen engine loads the compiler API, which the workspace's
+    // native TypeScript 7 no longer ships. The Babel engine builds the tables.
+    reactDocgen: 'react-docgen',
   },
 };
 

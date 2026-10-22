@@ -15,8 +15,13 @@ import { ScrollView } from 'react-native';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { type SecurityFinding } from '@/lib/security-agent';
+import { mapSecurityDismissOperationError } from '@/lib/security-agent-ledger';
 import { SettingsRecoveryStatus } from './settings-recovery-status';
 import { DismissFindingScreen } from './dismiss-finding-screen';
+
+// The ledger module imports the operation-key helpers, whose expo-crypto root
+// import loads a native binding this node project does not have.
+vi.mock('expo-crypto', () => ({ randomUUID: () => '00000000-0000-4000-8000-000000000000' }));
 
 const PERSISTENCE_FAILED_MESSAGE = vi.hoisted(
   () => 'We could not record this action. Please try again later.'
@@ -85,24 +90,7 @@ vi.mock('@/lib/hooks/use-security-findings', () => ({
 }));
 vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
   useSecurityDismissDraft: () => dismissDraft,
-}));
-// Faithful-enough mirror of the real classifier (covered by its own suite):
-// the persistence-failure and replay-failed markers and the
-// missing-configuration rejection are non-retryable, the rest (transport,
-// in-progress copy, ambiguous, settle-failed) are retryable.
-vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({
-  isSecurityConfigurationError: (error: unknown) =>
-    error instanceof Error && error.message === CONFIGURATION_ERROR_MESSAGE,
-  securityConfigurationCopy: () => CONFIGURATION_COPY,
-  isSecuritySyncRetryable: (error: unknown) => {
-    const message = error instanceof Error ? error.message : '';
-    return !(
-      message === 'We could not record this action. Please try again later.' ||
-      message === 'This action did not complete. Please try again.' ||
-      message === 'operation_key_reuse_mismatch' ||
-      message === CONFIGURATION_ERROR_MESSAGE
-    );
-  },
+  securityDismissFailureCopy: (draft: { lastError: string }) => draft.lastError,
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
@@ -310,7 +298,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
 
   it('keeps the dismissal CTA enabled after a retryable failure and shows its copy', () => {
     dismiss.isError = true;
-    dismiss.error = new Error(IN_PROGRESS_COPY);
+    dismiss.error = mapSecurityDismissOperationError(new Error('operation_in_progress'));
     const root = renderScreen();
     selectReason();
 
@@ -320,7 +308,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
 
   it('disables the dismissal CTA and shows the persistence-failure copy after a non-retryable error', () => {
     dismiss.isError = true;
-    dismiss.error = new Error(PERSISTENCE_FAILED_MESSAGE);
+    dismiss.error = mapSecurityDismissOperationError(new Error(PERSISTENCE_FAILED_MESSAGE));
     const root = renderScreen();
     selectReason();
 
@@ -330,7 +318,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
 
   it('disables the dismissal CTA and shows configuration-specific copy after a missing-configuration error', () => {
     dismiss.isError = true;
-    dismiss.error = new Error(CONFIGURATION_ERROR_MESSAGE);
+    dismiss.error = mapSecurityDismissOperationError(new Error(CONFIGURATION_ERROR_MESSAGE));
     const root = renderScreen();
     selectReason();
 
@@ -374,6 +362,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       reason: 'not_used',
       comment: '',
       lastError: null,
+      lastErrorKey: null,
       retryable: null,
     });
   });
@@ -409,13 +398,14 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       onError?: (error: Error) => void;
     };
     act(() => {
-      options.onError?.(new Error(IN_PROGRESS_COPY));
+      options.onError?.(mapSecurityDismissOperationError(new Error('operation_in_progress')));
     });
 
     expect(dismissDraft.persist).toHaveBeenLastCalledWith({
       reason: 'not_used',
       comment: '',
       lastError: IN_PROGRESS_COPY,
+      lastErrorKey: 'securityAgent.mutations.dismissalInProgress',
       retryable: true,
     });
   });
@@ -432,13 +422,14 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       onError?: (error: Error) => void;
     };
     act(() => {
-      options.onError?.(new Error(CONFIGURATION_ERROR_MESSAGE));
+      options.onError?.(mapSecurityDismissOperationError(new Error(CONFIGURATION_ERROR_MESSAGE)));
     });
 
     expect(dismissDraft.persist).toHaveBeenLastCalledWith({
       reason: 'not_used',
       comment: '',
       lastError: CONFIGURATION_COPY,
+      lastErrorKey: 'securityAgent.mutations.serviceNotConfiguredResubmit',
       retryable: false,
     });
   });
@@ -453,6 +444,7 @@ describe('DismissFindingScreen draft persistence on type', () => {
       reason: 'not_used',
       comment: '',
       lastError: null,
+      lastErrorKey: null,
       retryable: null,
     });
   });
@@ -468,6 +460,7 @@ describe('DismissFindingScreen draft persistence on type', () => {
       reason: '',
       comment: 'some context',
       lastError: null,
+      lastErrorKey: null,
       retryable: null,
     });
   });

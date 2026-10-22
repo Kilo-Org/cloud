@@ -30,10 +30,6 @@ import { extractRepoFromGitUrl } from '../utils/git-utils';
 // Many files import it from here, so we keep the export to avoid breaking changes
 export { extractRepoFromGitUrl };
 
-// ============================================================================
-// IndexedDB Types
-// ============================================================================
-
 /**
  * Organization context for a session
  */
@@ -109,10 +105,6 @@ export type IndexedDbSessionData = {
   lastModel: string | null;
 };
 
-// ============================================================================
-// IndexedDB Store (jotai-minidb)
-// ============================================================================
-
 /** Lazily initialized session store instance */
 let _sessionStore: MiniDb<IndexedDbSessionData> | null = null;
 
@@ -143,10 +135,6 @@ function getSessionStore(): MiniDb<IndexedDbSessionData> {
 
   return _sessionStore;
 }
-
-// ============================================================================
-// Database Session Types
-// ============================================================================
 
 /**
  * API session type - matches the shape returned by cli-sessions-router.list (V1)
@@ -266,10 +254,6 @@ export type DbSessionDetails = {
   last_model?: string | null;
 };
 
-// ============================================================================
-// State Atoms
-// ============================================================================
-
 /**
  * Recent sessions fetched from database
  * This is populated by the useSidebarSessions hook
@@ -282,10 +266,6 @@ export const dbSessionsAtom = atom<(DbSession | DbSessionV2)[]>([]);
  */
 const sessionsLoadingAtom = atom(false);
 
-// ============================================================================
-// Derived Atoms
-// ============================================================================
-
 /**
  * Recent sessions for display - returns dbSessionsAtom data
  * Falls back to empty array if loading
@@ -296,19 +276,11 @@ export const recentSessionsAtom = atom(get => {
   return get(dbSessionsAtom);
 });
 
-// ============================================================================
-// IndexedDB State Atoms
-// ============================================================================
-
 /**
  * Current session's IndexedDB data (reactive)
  * This holds the full session data including messages from IndexedDB
  */
 const currentIndexedDbSessionAtom = atom<IndexedDbSessionData | null>(null);
-
-// ============================================================================
-// Action Atoms
-// ============================================================================
 
 /**
  * Update org context in IndexedDB
@@ -330,7 +302,6 @@ export const updateOrgContextAtom = atom(
   ): Promise<void> => {
     const { sessionId, orgContext, orgContextConfirmed } = payload;
 
-    // Update current session atom if it matches
     const currentSession = get(currentIndexedDbSessionAtom);
     if (currentSession && currentSession.sessionId === sessionId) {
       const updatedSession: IndexedDbSessionData = {
@@ -342,7 +313,6 @@ export const updateOrgContextAtom = atom(
       set(currentIndexedDbSessionAtom, updatedSession);
     }
 
-    // Update IndexedDB using jotai-minidb (client-side only)
     if (typeof window !== 'undefined') {
       try {
         const store = getSessionStore();
@@ -380,15 +350,10 @@ export const deleteSessionFromStoreAtom = atom(
       const store = getSessionStore();
       await set(store.delete, sessionId);
     } catch (error) {
-      // Error deleting from IndexedDB
       console.error('[db-session-atoms] Error deleting session from IndexedDB:', error);
     }
   }
 );
-
-// ============================================================================
-// Utility Functions
-// ============================================================================
 
 /**
  * Format a date for display in the session list
@@ -426,10 +391,8 @@ export function getSessionDisplayTitle(session: DbSession): string {
     return session.title;
   }
 
-  // Fall back to repository name
   const repo = extractRepoFromGitUrl(session.git_url);
   if (repo) return repo;
 
-  // Last resort: use session ID prefix
   return `Session ${session.session_id.substring(0, 8)}`;
 }

@@ -240,6 +240,62 @@ describe('getMinimumVersions', () => {
     }
   });
 
+  test('a superseded read writes no cache over its replacement', async () => {
+    jest.useFakeTimers();
+    try {
+      const superseded = Promise.withResolvers<unknown>();
+      limitMock.mockReturnValueOnce(superseded.promise);
+
+      const first = getMinimumVersions().catch((caught: unknown) => caught);
+      await jest.advanceTimersByTimeAsync(5_000);
+      expect(await first).toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+
+      // The replacement answers, and only then does the abandoned read settle
+      // with an older verdict.
+      await jest.advanceTimersByTimeAsync(FAILURE_BACKOFF_MS + 1);
+      const replacementRow = { ios: '2.0.0', android: '2.0.0' };
+      limitMock.mockResolvedValueOnce([replacementRow]);
+      await expect(getMinimumVersions()).resolves.toEqual(replacementRow);
+
+      superseded.resolve([row]);
+      await jest.advanceTimersByTimeAsync(0);
+      await expect(getMinimumVersions()).resolves.toEqual(replacementRow);
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('a superseded read failure opens no backoff', async () => {
+    jest.useFakeTimers();
+    try {
+      const superseded = Promise.withResolvers<unknown>();
+      limitMock.mockReturnValueOnce(superseded.promise);
+
+      const first = getMinimumVersions().catch((caught: unknown) => caught);
+      await jest.advanceTimersByTimeAsync(5_000);
+      expect(await first).toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+
+      await jest.advanceTimersByTimeAsync(FAILURE_BACKOFF_MS + 1);
+      limitMock.mockResolvedValueOnce([row]);
+      await expect(getMinimumVersions()).resolves.toEqual(row);
+
+      // The abandoned read fails shortly before its replacement's entry expires.
+      // It must neither report nor suppress the re-read the TTL asks for.
+      await jest.advanceTimersByTimeAsync(300_000 - 2_000);
+      superseded.reject(new Error('db down'));
+      await jest.advanceTimersByTimeAsync(0);
+      expect(mockCaptureException).not.toHaveBeenCalled();
+
+      limitMock.mockResolvedValueOnce([row]);
+      await jest.advanceTimersByTimeAsync(3_000);
+      await expect(getMinimumVersions()).resolves.toEqual(row);
+      expect(limitMock).toHaveBeenCalledTimes(3);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   test('shares one read between concurrent cold callers', async () => {
     limitMock.mockResolvedValue([row]);
 

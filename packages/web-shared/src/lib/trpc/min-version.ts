@@ -84,8 +84,12 @@ export function enforceMinimumVersion(
 /**
  * Update the cache from one read, or record its failure. The backoff is set
  * before the report so a throwing reporter cannot leave a stuck window.
+ *
+ * A read superseded by a newer one writes nothing: its replacement owns both
+ * the cache and the backoff, so a late settle cannot put an older verdict in
+ * the cache or reopen a window the replacement already closed.
  */
-async function runRead(): Promise<void> {
+async function runRead(generation: number): Promise<void> {
   try {
     const rows = await readDb
       .select({
@@ -94,12 +98,18 @@ async function runRead(): Promise<void> {
       })
       .from(app_min_versions)
       .limit(1);
+    if (readGeneration !== generation) {
+      return;
+    }
     cache = {
       versions: rows.length === 0 ? null : { ios: rows[0].ios, android: rows[0].android },
       fetchedAt: Date.now(),
     };
     nextRetryAt = 0;
   } catch (error) {
+    if (readGeneration !== generation) {
+      return;
+    }
     // One report per attempt, and the backoff below suppresses every attempt
     // inside the window, so an outage is reported at most once per window.
     nextRetryAt = Date.now() + FAILURE_BACKOFF_MS;
@@ -123,7 +133,7 @@ function ensureRead(now: number): Promise<void> | null {
   const generation = (readGeneration += 1);
   readStartedAt = now;
   liveReads += 1;
-  const read = runRead()
+  const read = runRead(generation)
     .catch(() => undefined)
     .finally(() => {
       liveReads -= 1;

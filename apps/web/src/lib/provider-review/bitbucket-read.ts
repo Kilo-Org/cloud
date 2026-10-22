@@ -289,6 +289,8 @@ async function fetchBoundedText(
     method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
     body?: unknown;
     accept?: string;
+    /** Response byte limit for this request; the transport ceiling otherwise. */
+    maxBytes?: number;
   }
 ): Promise<string | null> {
   const method = request.method ?? 'GET';
@@ -339,16 +341,19 @@ async function fetchBoundedText(
           throw new BitbucketReviewError('retryable', 'Bitbucket returned an unexpected response.');
         }
         totalBytes += value.byteLength;
-        if (totalBytes > MAX_BITBUCKET_RESPONSE_BYTES) {
+        const maxBytes = request.maxBytes ?? MAX_BITBUCKET_RESPONSE_BYTES;
+        if (totalBytes > maxBytes) {
           try {
             await reader.cancel();
           } catch {
             // The bounded read remains failed if cancellation itself fails.
           }
-          throw new BitbucketReviewError(
-            'retryable',
-            'The Bitbucket response exceeded the size limit.'
-          );
+          throw request.maxBytes === undefined
+            ? new BitbucketReviewError(
+                'retryable',
+                'The Bitbucket response exceeded the size limit.'
+              )
+            : new BitbucketReviewError('too_large', FILE_READ_TOO_LARGE_MESSAGE);
         }
         chunks.push(value);
       }
@@ -376,6 +381,7 @@ async function requestBitbucketText(
     const text = await fetchBoundedText(`${BITBUCKET_API_ORIGIN}${path}`, {
       accessToken: access.accessToken,
       accept: '*/*',
+      maxBytes: FILE_READ_MAX_BYTES,
     });
     return text ?? '';
   } catch (error) {

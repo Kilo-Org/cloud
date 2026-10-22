@@ -562,6 +562,33 @@ describe('getFileLines', () => {
     expect(result.lines).toEqual(['line one', 'line two']);
   });
 
+  it('applies the read budget to the body when the probe cannot answer', async () => {
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      const parsed = new URL(full);
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      if (parsed.pathname.includes('/src/') && parsed.searchParams.get('format') === 'meta') {
+        return jsonResponse({ error: { message: 'unsupported' } }, 500);
+      }
+      if (parsed.pathname.includes('/src/')) {
+        return new Response('x'.repeat(FILE_READ_MAX_BYTES + 1), {
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+        });
+      }
+      return jsonResponse({ pagelen: 50, values: [], next: null });
+    });
+
+    const error = await captureRejection(
+      getFileLines(ORG_OWNER, 'acme', 'repo', 'abc123def4567890', 'src/huge.ts', 1, 2)
+    );
+
+    expect(error.kind).toBe('too_large');
+    expect(error.retryable).toBe(false);
+  });
+
   it('refuses a non-commit ref before any Bitbucket API request', async () => {
     await expect(
       getFileLines(ORG_OWNER, 'acme', 'repo', '../../etc/passwd', 'src/retry.ts', 1, 2)

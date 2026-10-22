@@ -18,13 +18,22 @@ import {
   getUserFromBearerForCredentialExchange,
   getUserFromSessionForCredentialIssuance,
 } from '@kilocode/web-shared/lib/user/server';
-import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
-import { requireAdmissionPayload, verifyAdmissionAsync } from '@/lib/auth/native-admission';
+import {
+  createDeviceSession,
+  createDeviceSessionWithAttestedKey,
+  issueSessionCredentials,
+} from '@/lib/auth/device-sessions';
+import {
+  KeyCollisionError,
+  requireAdmissionPayload,
+  verifyAdmissionAsync,
+} from '@/lib/auth/native-admission';
 import type { User } from '@kilocode/db/schema';
 
 const mockGetUserFromBearer = jest.mocked(getUserFromBearerForCredentialExchange);
 const mockGetUserFromSession = jest.mocked(getUserFromSessionForCredentialIssuance);
 const mockCreateDeviceSession = jest.mocked(createDeviceSession);
+const mockCreateDeviceSessionWithAttestedKey = jest.mocked(createDeviceSessionWithAttestedKey);
 const mockIssueSessionCredentials = jest.mocked(issueSessionCredentials);
 const mockRequireAdmissionPayload = jest.mocked(requireAdmissionPayload);
 const mockVerifyAdmissionAsync = jest.mocked(verifyAdmissionAsync);
@@ -44,6 +53,7 @@ describe('POST /api/auth/native/exchange', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCreateDeviceSessionWithAttestedKey.mockReset();
     mockRequireAdmissionPayload.mockReturnValue({
       platform: 'android',
       kind: 'assertion',
@@ -158,6 +168,90 @@ describe('POST /api/auth/native/exchange', () => {
 
     expect(response.status).toBe(403);
     expect(mockGetUserFromSession).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+    expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+  });
+
+  it('binds a verified iOS key and creates the session in one call', async () => {
+    mockRequireAdmissionPayload.mockReturnValue({
+      platform: 'ios',
+      kind: 'attestation',
+      challenge: 'challenge',
+      payload: 'attestation-object',
+      keyId: 'ios-key',
+    });
+    mockVerifyAdmissionAsync.mockResolvedValue({
+      ok: true,
+      platform: 'ios',
+      keyId: 'ios-key',
+      publicKey: 'spki',
+    });
+    mockGetUserFromBearer.mockResolvedValue({ user: fakeUser, authFailedResponse: null });
+    mockCreateDeviceSessionWithAttestedKey.mockResolvedValue({
+      token: 'short-jwt',
+      refreshToken: 'refresh-abc',
+      expiresIn: 3600,
+      sessionId: 'session-1',
+    });
+
+    const response = await POST(createRequest(bearerHeaders));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      token: 'short-jwt',
+      refreshToken: 'refresh-abc',
+      expiresIn: 3600,
+    });
+    expect(mockCreateDeviceSessionWithAttestedKey).toHaveBeenCalledWith({
+      userId: fakeUser.id,
+      userAgent: undefined,
+      user: fakeUser,
+      verification: { ok: true, platform: 'ios', keyId: 'ios-key', publicKey: 'spki' },
+    });
+    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+    expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+  });
+
+  it('refuses a key that belongs to another account', async () => {
+    mockVerifyAdmissionAsync.mockResolvedValue({
+      ok: true,
+      platform: 'ios',
+      keyId: 'ios-key',
+      existingKeyUserId: 'user-2',
+    });
+    mockGetUserFromBearer.mockResolvedValue({ user: fakeUser, authFailedResponse: null });
+
+    const response = await POST(createRequest(bearerHeaders));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
+    expect(mockCreateDeviceSessionWithAttestedKey).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+    expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+  });
+
+  it('refuses when the key row collides with another account', async () => {
+    mockVerifyAdmissionAsync.mockResolvedValue({ ok: true, platform: 'ios', keyId: 'ios-key' });
+    mockGetUserFromBearer.mockResolvedValue({ user: fakeUser, authFailedResponse: null });
+    mockCreateDeviceSessionWithAttestedKey.mockRejectedValue(new KeyCollisionError());
+
+    const response = await POST(createRequest(bearerHeaders));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
+    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+    expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+  });
+
+  it('reports a key persistence failure instead of issuing an unbound credential', async () => {
+    mockVerifyAdmissionAsync.mockResolvedValue({ ok: true, platform: 'ios', keyId: 'ios-key' });
+    mockGetUserFromBearer.mockResolvedValue({ user: fakeUser, authFailedResponse: null });
+    mockCreateDeviceSessionWithAttestedKey.mockRejectedValue(new Error('db unavailable'));
+
+    const response = await POST(createRequest(bearerHeaders));
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: 'INTERNAL_ERROR' });
     expect(mockCreateDeviceSession).not.toHaveBeenCalled();
     expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
   });

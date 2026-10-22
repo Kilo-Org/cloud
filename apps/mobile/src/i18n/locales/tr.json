@@ -25,6 +25,7 @@
     "error": "hata: {{error}}",
     "back": "Geri",
     "somethingWentWrong": "Bir sorun oluştu.",
+    "actionNotRecorded": "Bu işlemi kaydedemedik. Lütfen daha sonra tekrar dene.",
     "couldNotOpen": "{{label}} açılamadı.",
     "link": "bağlantı",
     "takingLonger": "Bu işlem beklenenden uzun sürüyor. Bu ekranı kapatıp tekrar kontrol edebilirsin.",
@@ -35,6 +36,8 @@
     "connectGithub": "GitHub hesabını bağla",
     "cost": "Maliyet",
     "discard": "Vazgeç",
+    "discardChangesMessage": "Değişiklikleriniz kaybedilecek.",
+    "discardChangesTitle": "Değişikliklerden vazgeç?",
     "findings": "Bulgular",
     "mergeRequest": "birleştirme isteği",
     "notConnected": "Bağlı değil",
@@ -109,9 +112,9 @@
     "online": "Çevrimiçi",
     "open": "{{name}} öğesini aç",
     "openPullRequest": "Açık çekme isteği",
+    "completed": "Tamamlandı",
     "pending": "Bekliyor",
     "running": "Çalışıyor",
-    "completed": "Tamamlandı",
     "performance": "Performans",
     "preferences": "Tercihler",
     "privacyPolicy": "Gizlilik politikası",
@@ -992,8 +995,9 @@
       "noProposals": "Öneri yok",
       "noProposalsDescription": "Kilo, proje sorumlularının yanıtlarını analiz ettikten sonra inceleme belleğinin önerileri burada görünür.",
       "off": "İnceleme belleği kapalı.",
+      "on": "İnceleme belleği açık.",
       "offDescription": "Kilo'nun proje sorumlularının yanıtlarından öğrenmesi ve REVIEW.md yönergeleri önermesi için inceleme belleğini aç.",
-      "readOnlyDescription": "İnceleme belleğini yalnızca kuruluş sahipleri ve faturalandırma yöneticileri etkinleştirebilir.",
+      "readOnlyDescription": "İnceleme belleğini yalnızca kuruluş sahipleri ve faturalandırma yöneticileri değiştirebilir.",
       "title": "İnceleme belleği"
     },
     "scopeList": {
@@ -1033,7 +1037,8 @@
       "bugs": "Hatalar",
       "style": "Stil",
       "testing": "Test",
-      "documentation": "Belgeler"
+      "documentation": "Belgeler",
+      "unknown": "Diğer ({{area}})"
     },
     "gateThreshold": {
       "warning": "Uyarı"
@@ -1112,7 +1117,14 @@
       "triageReasoning": "Ön değerlendirme gerekçesi",
       "watchInCloudAgent": "Bulut ajanında izle",
       "whereFound": "Bulunduğu yerler ({{displayCount}})",
-      "yes": "Evet"
+      "yes": "Evet",
+      "action": {
+        "analyzeCodebase": "Kod tabanını analiz et",
+        "dismiss": "Yok say",
+        "manualReview": "El ile inceleme",
+        "monitor": "İzle",
+        "openPr": "Çekme isteği aç"
+      }
     },
     "analysisSettings": {
       "analysisModel": "Analiz modeli",
@@ -1123,6 +1135,9 @@
       "triageModel": "Ön değerlendirme modeli"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo yöneticisi",
+      "actorMaskedUser": "Maskelenmiş kullanıcı",
+      "actorSystem": "Kilo sistemi",
       "couldNotLoad": "Denetim raporu yüklenemedi.",
       "events": "Olaylar",
       "generated": "Raporun oluşturulma zamanı: {{generatedAt}}.",
@@ -1134,7 +1149,24 @@
       "summary": "Rapor özeti",
       "title": "Denetim raporu",
       "unavailable": "Denetim raporu kullanılamıyor",
-      "unavailableDescription": "Denetim raporlarını yalnızca kuruluş sahipleri ve faturalandırma yöneticileri görüntüleyebilir. Bir kuruluş sahibinden veya faturalandırma yöneticisinden sana erişim vermesini iste."
+      "unavailableDescription": "Denetim raporlarını yalnızca kuruluş sahipleri ve faturalandırma yöneticileri görüntüleyebilir. Bir kuruluş sahibinden veya faturalandırma yöneticisinden sana erişim vermesini iste.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analiz tamamlandı",
+        "findingAnalysisFailed": "Analiz başarısız oldu",
+        "findingAutoDismissed": "Otomatik yok sayıldı",
+        "findingCreated": "İçe aktarıldı",
+        "findingDeleted": "Silindi",
+        "findingDismissed": "Yok sayıldı",
+        "findingSeverityChanged": "Önem derecesi değişti",
+        "findingStatusChange": "Durum değişti",
+        "findingSuperseded": "Yenisiyle değiştirildi",
+        "remediationBlocked": "Düzeltme engellendi",
+        "remediationCancelled": "İptal edildi",
+        "remediationFailed": "Düzeltme başarısız oldu",
+        "remediationNoChangesNeeded": "Değişiklik gerekmedi",
+        "remediationPrOpened": "Çekme isteği açıldı",
+        "remediationQueued": "Düzeltme istendi"
+      }
     },
     "auditReportButton": {
       "viewA11y": "Denetim raporunu görüntüle"
@@ -1354,7 +1386,6 @@
       "installApp": "GitHub uygulamasını yükle",
       "reauthorizeButton": "GitHub uygulamasını yeniden yetkilendir",
       "reauthorizeDescription": "Güvenlik ajanının Dependabot uyarılarına erişebilmesi için vulnerability_alerts izni gerekir. Bu izni vermek için GitHub uygulamasını yeniden yetkilendir.",
-      "reauthorizeFailed": "Yeniden yetkilendirme başlatılamadı. Lütfen tekrar dene.",
       "reauthorizeTitle": "Ek izinler gerekiyor",
       "setupFailed": "GitHub kurulumu başlatılamadı. Lütfen tekrar dene."
     },
@@ -1377,6 +1408,7 @@
     "settingsSave": {
       "saveChanges": "Değişiklikleri kaydet",
       "unsavedMessage": "Bu ekrandan ayrılmadan önce değişikliklerini kaydetmek ister misin?",
+      "unsavedInvalidMessage": "Bu değişiklikler henüz kaydedilemez. Kaydetmek için bunları düzelt veya ayrılmak için vazgeç.",
       "unsavedTitle": "Kaydedilmemiş değişiklikler"
     },
     "setup": {
@@ -1415,7 +1447,12 @@
       "syncMayNotHaveCompleted": "Bir eşitleme tamamlanmamış olabilir. Durumunu güncellemek için tekrar dene veya işlemden vazgeç.",
       "syncInProgress": "Bir güvenlik eşitlemesi zaten devam ediyor. Lütfen tekrar dene.",
       "dismissalInProgress": "Bu yok sayma işlemi zaten devam ediyor. Lütfen tekrar dene.",
-      "couldNotReadPendingSyncs": "Bekleyen eşitlemeler okunamadı. Tekrar dene."
+      "couldNotReadPendingSyncs": "Bekleyen eşitlemeler okunamadı. Tekrar dene.",
+      "ambiguous": "İşlemin sonucu doğrulanamadı. Tekrar denemeden önce güvenlik incelemesini kontrol et.",
+      "settleFailed": "İşlem tamamlandı, ancak sonucu kaydedemedik. Lütfen tekrar dene.",
+      "replayFailed": "Bu işlem tamamlanmadı. Lütfen tekrar dene.",
+      "actionFailed": "Bu işlem tamamlanamadı. Lütfen tekrar dene.",
+      "actionBlocked": "Bu işlem tamamlanamadı. Yeniden denemeden önce sorunun düzeltilmesi gerekiyor."
     },
     "analysisState": {
       "queued": "Analiz kuyruğa alındı",
@@ -1700,6 +1737,7 @@
       "prefillModelUnavailable": "{{model}} artık kullanılamıyor. Varsayılan modelin kullanılıyor.",
       "couldNotReadPendingSessions": "Bekleyen oturumlar okunamadı. Tekrar dene.",
       "failedToCreate": "Oturum oluşturulamadı.",
+      "checkOrganizationAccess": "Bu kuruluşa erişiminizi kontrol edin, ardından tekrar deneyin.",
       "couldNotRefreshRepositories": "Depolar yenilenemedi. Tekrar dene.",
       "discardDraftTitle": "Taslak silinsin mi?",
       "discardDraftMessage": "İstemin silinecek.",
@@ -1769,7 +1807,8 @@
       "linesBadge_other": "{{displayCount}} satır",
       "matchesBadge_one": "{{displayCount}} eşleşme",
       "matchesBadge_other": "{{displayCount}} eşleşme",
-      "noOutput": "Çıktı yok."
+      "noOutput": "Çıktı yok.",
+      "translationFailed": "Çeviri başarısız oldu"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}. satırlar (kısaltıldı)",
@@ -2229,7 +2268,7 @@
     "webBrowser": "Web tarayıcısı",
     "viewProfile": "Profili görüntüle",
     "signOutThisDevice": "Bu cihazın oturumunu kapat",
-    "signOutThisSession": "Bu oturumu kapat",
+    "signOutSessionLabel": "{{device}} cihazındaki oturumu kapat, giriş: {{signedIn}}",
     "sessionSignedOut": "Oturum kapatıldı.",
     "signOutThisDeviceTitle": "Bu cihazın oturumu kapatılsın mı?",
     "signOutThisSessionTitle": "Bu oturum kapatılsın mı?",
@@ -2506,7 +2545,8 @@
       "description": "Mobilde çekme isteklerini incelemek için GitHub hesabını bağla.",
       "gitlabDescription": "Mobilde birleştirme isteklerini gözden geçirmek için GitLab hesabını bağla.",
       "bitbucketDescription": "Mobilde çekme isteklerini gözden geçirmek için Bitbucket'ı bu kuruluşla bağla.",
-      "bitbucketOrgOnlyDescription": "Profilində bir kuruluş seç ve onun Bitbucket çekme isteklerini gözden geçir."
+      "bitbucketOrgOnlyDescription": "Yukarıdaki hesabı bir kuruluşa geçir, onun Bitbucket çekme isteklerini gözden geçirmek için.",
+      "contextLine": "{{organization}} için"
     },
     "connectionExpired": "GitHub bağlantısının süresi doldu.",
     "couldNotLoadPullRequest": "Çekme isteği yüklenemedi.",
@@ -2933,7 +2973,9 @@
       "reviewNotSubmitted": "Bu inceleme bu hâliyle gönderilemiyor. PR değişmiş olabilir veya kendi çekme isteğini incelemeye çalışıyor olabilirsin.",
       "reviewNotSubmittedTerm": "Bu inceleme olduğu gibi gönderilemez. {{term}} değişmiş olabilir veya kendi {{term}}ni gözden geçiremezsin.",
       "couldNotPostComment": "Yorum gönderilemedi.",
-      "couldNotSubmitReview": "İnceleme gönderilemedi. Bağlantını kontrol et ve tekrar dene."
+      "couldNotSubmitReview": "İnceleme gönderilemedi. Bağlantını kontrol et ve tekrar dene.",
+      "rateLimited": "Çok fazla istek gönderildi. Lütfen daha sonra tekrar dene.",
+      "conflict": "Bu, üzerinde çalıştığın sırada değişti. Yeniden yükle ve tekrar dene."
     },
     "operation": {
       "couldNotReply": "Yanıt verilemedi.",
@@ -2941,7 +2983,6 @@
       "mergeResultDefaultError": "GitHub birleştirmeyi tamamlamadı.",
       "mergeResultNotCompleted": "{{term}} birleştirilmedi. Durumunu kontrol et ve tekrar dene.",
       "ambiguous": "İşlemin sonucu doğrulanamadı. Tekrar denemeden önce PR'ı kontrol et.",
-      "persistenceFailed": "Bu işlemi kaydedemedik. Lütfen daha sonra tekrar dene.",
       "forbidden": "Bu işlem için iznin yok."
     },
     "capabilities": {
@@ -2970,11 +3011,22 @@
     "boundary": {
       "backToProfile": "Profile geri dön",
       "loadErrorMessage": "Bağlantını kontrol edip tekrar dene.",
+
+      "chooseAccount": "Bir hesap seç",
       "loadErrorTitle": "Kuruluşların yüklenemedi.",
+      "noOrganization": "Kuruluş yok",
+
+      "noOrganizationDescription": "Bu hesap bir kuruluşun parçası değil. Üye davetleri ve düşük bakiye uyarıları gibi kuruluş özelliklerini kullanmak için web sitesinde bir kuruluş oluştur veya birine katıl.",
+
+      "openWebOrganizations": "Kuruluşları web sitesinde aç",
+
       "organizationUnavailable": "Kuruluş kullanılamıyor.",
-      "selectDescription": "Devam etmek için profilinden bir kuruluş seç.",
+      "selectDescriptionWithOrganizations": "Bir veya daha fazla kuruluşa aitsin. Bu ekranın kullanması gereken hesabı seç.",
+
       "selectOrganization": "Bir kuruluş seç",
       "unavailableDescription": "Bu kuruluş artık kullanılamıyor. Devam etmek için profilinden başka bir kuruluş seç.",
+
+      "unavailableSessionsDescription": "Bu kuruluş artık kullanılamıyor. Oturumları yüklenemiyor.",
       "accessDeniedDescription": "Bu kuruluşa erişimin yok."
     },
     "creditActivity": {
@@ -3033,7 +3085,11 @@
       "separateEmailsHint": "Birden fazla e-posta adresini virgülle ayır.",
       "thresholdLabel": "Uyarı eşiği (USD)",
       "title": "Düşük bakiye uyarısı",
-      "emailsError": "En az bir geçerli e-posta adresi gir. Birden fazla adresi virgülle ayır.",
+      "emailsInvalid": "Bir veya daha fazla e-posta adresi geçersiz.",
+      "emailsRequired": "En az bir e-posta adresi gir.",
+      "saveEmailsError": "Bazı e-posta adresleri kabul edilmedi. Kontrol edip tekrar dene.",
+      "saveError": "Düşük bakiye uyarısı kaydedilemedi.",
+      "thresholdPlaceholder": "Bir tutar gir",
       "thresholdError": "0'Dan büyük bir tutar gir."
     },
     "memberLimit": {
@@ -3044,6 +3100,7 @@
       "removeLimit": "Sınırı kaldır",
       "title": "Günlük kullanım sınırı",
       "blankError": "Bir tutar gir veya aşağıdaki “Sınırı kaldır” düğmesini kullan.",
+      "blankWithoutLimitError": "0 İle {{max}} arasında bir günlük sınır gir.",
       "rangeError": "0 İle {{max}} arasında bir tutar gir."
     },
     "members": {
@@ -3512,6 +3569,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Ajanı başlat için bir istem gerekir. Bir istem ekleyip yeniden çalıştır.",
+      "repositoryRequired": "Ajanı başlat için bir depo gerekir. Kilo'yu aç, bir depo seç, ardından yeniden çalıştır.",
       "repositoryUnknown": "Kilo, {{repository}} adresini GitHub veya GitLab deposu olarak tanımıyor. Kilo'da başka bir depo seç.",
       "repositoryUnsupported": "{{repository}} bir Bitbucket deposu — Ajanı başlat bunu henüz kullanamıyor. Kilo'da başka bir depo seç."
     }
@@ -3583,7 +3641,6 @@
     "keyTooLong": "Anahtar en fazla 256 karakter olmalıdır",
     "keyDuplicate": "Bu anahtar profilde zaten var",
     "valueLabel": "Değer",
-    "secretLabel": "Gizli",
     "secrets": {
       "markSecret": "Gizli olarak işaretle",
       "masked": "Gizli değer",
@@ -3642,7 +3699,9 @@
       "jsonTooLarge": "En fazla 50 giriş, 128'e kadar anahtar ve 4096 karaktere kadar değer kullanın",
       "timeoutInvalid": "Zaman aşımı tam sayı milisaniye olmalıdır",
       "edit": "MCP sunucusunu düzenle",
-      "saveFailed": "MCP sunucusu kaydedilemedi"
+      "saveFailed": "MCP sunucusu kaydedilemedi",
+      "deleteFailed": "MCP sunucusu silinemedi",
+      "updateFailed": "MCP sunucusu güncellenemedi"
     },
     "agents": {
       "title": "Profil aracıları",
@@ -3669,6 +3728,7 @@
       "visibilitySubagent": "Alt temsilci — yalnızca başkaları tarafından aranabilir",
       "visibilityAll": "Hepsi - ikisi de",
       "saveFailed": "Temsilci kaydedilemedi",
+      "deleteFailed": "Temsilci silinemedi",
       "nameRequired": "Bir temsilci adı girin",
       "slugRequired": "Bir temsilci bilgisi girin",
       "slugInvalid": "Bilgi bir harfle başlamalı ve yalnızca küçük harfler, rakamlar ve kısa çizgiler kullanmalıdır",
@@ -3683,10 +3743,12 @@
       "description": "Komut açıklaması",
       "template": "Şablon",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS'ı açıklayın",
       "subtask": "Alt görev olarak çalıştır",
       "edit": "Eğik çizgi komutunu düzenle",
       "saveFailed": "Komut kaydedilemedi",
+      "deleteFailed": "Komut silinemedi",
       "nameRequired": "Bir komut adı girin",
       "nameInvalid": "Ad küçük harfle başlamalı ve yalnızca küçük harfler, rakamlar ve kısa çizgiler kullanmalıdır",
       "templateRequired": "Bir komut şablonu girin",
@@ -3833,7 +3895,7 @@
     "view": "Özeti oku",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Canlı durumu göster",
+    "dismiss": "Özeti yok say",
     "offline": "Çevrimdışı · kayıtlı özet",
     "cached": "Kayıtlı rapor · yenileme kullanılamıyor",
     "revised": "Revize edildi · {{revision}}",

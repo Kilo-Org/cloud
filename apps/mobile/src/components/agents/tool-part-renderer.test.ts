@@ -242,6 +242,14 @@ const toolActivities: [string, Record<string, unknown>, string][] = [
     'unknown-tool',
   ].map(tool => [tool, {}, tool] satisfies [string, Record<string, unknown>, string]),
 ];
+/** The card's visible and announced state, in the active language. */
+const STATUS_LABEL_KEY = {
+  pending: 'common.pending',
+  running: 'common.running',
+  completed: 'common.completed',
+  error: 'common.failed',
+} satisfies Record<'pending' | 'running' | 'completed' | 'error', string>;
+
 const activityHistories: [string, StoredMessage[], string][] = [
   ['empty history', [], 'Thinking'],
   ['incomplete history', [makeStoredMessage()], 'Thinking'],
@@ -266,14 +274,6 @@ const activityHistories: [string, StoredMessage[], string][] = [
   ),
 ];
 
-/** The word the card shows for each SDK status; the raw enum never reaches the UI. */
-const STATUS_WORD_KEY = {
-  pending: 'common.pending',
-  running: 'common.running',
-  completed: 'common.completed',
-  error: 'common.failed',
-} as const;
-
 // One executable matrix checks the projection and both production entry points.
 describe.each(['top-level', 'nested'] as const)('%s child-card initial history', entry => {
   describe.each([
@@ -286,7 +286,6 @@ describe.each(['top-level', 'nested'] as const)('%s child-card initial history',
       'keeps activity and child access consistent for %s',
       async (_name, messages, activity) => {
         const part = makeToolPart('task', makeTaskState(status));
-        const statusWord = i18n.t(STATUS_WORD_KEY[status]);
         const childMessages = canOpen ? messages : [];
         const activeActivity = canOpen ? activity : 'Waiting for activity';
         const expectedActivity = active ? activeActivity : '';
@@ -312,15 +311,16 @@ describe.each(['top-level', 'nested'] as const)('%s child-card initial history',
                 depth: 1,
               });
         const { renderer, unmount } = await renderWithProviders(element);
+        const statusLabel = i18n.t(STATUS_LABEL_KEY[status]);
         try {
           expect(textContent(renderer.root)).toBe(
-            `Generalchild task${modelLabel}${expectedActivity}${statusWord}`
+            `Generalchild task${modelLabel}${expectedActivity}${statusLabel}`
           );
           expect(renderer.root.findAllByType(SpinningIcon)).toHaveLength(active ? 1 : 0);
           const button = renderer.root.findByType(Pressable);
           expect(button.props.accessibilityRole).toBe('button');
           expect(button.props.accessibilityLabel).toContain('General, child task');
-          expect(button.props.accessibilityLabel).toContain(statusWord);
+          expect(button.props.accessibilityLabel).toContain(statusLabel);
           expect(button.props.accessibilityLabel).not.toContain(status);
           if (modelLabel) {
             expect(button.props.accessibilityLabel).toContain(modelLabel);

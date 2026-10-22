@@ -183,6 +183,17 @@ vi.mock('expo-router', () => ({
     replace: (href: string) => {
       navigationRoutes.splice(-1, 1, href);
     },
+    // The POP_TO end state "Back to sessions" relies on: find the destination
+    // at or below the current index, truncate everything above it; with no
+    // match, drop the current route and land on the destination.
+    dismissTo: (href: string) => {
+      const index = navigationRoutes.lastIndexOf(href.split('?')[0] ?? href);
+      if (index === -1) {
+        navigationRoutes.splice(0, navigationRoutes.length, href);
+      } else {
+        navigationRoutes.splice(index + 1);
+      }
+    },
     push: (href: string) => {
       navigationRoutes.push(href);
     },
@@ -1124,7 +1135,7 @@ describe('SessionDetailContent display scope', () => {
     act(onPress);
     expect(openRenameModal).toHaveBeenCalledOnce();
     pressHeaderBack(renderer);
-    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)']);
+    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)/']);
     expect(globalContext.organizationId).toBe('global-org');
     expect(globalContext.setOrganizationId).not.toHaveBeenCalled();
   });
@@ -2365,7 +2376,7 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
 
     pressHeaderBack(view.renderer);
     expect(navigationRoutes).toEqual(
-      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)']
+      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)/']
     );
   });
 
@@ -2405,7 +2416,7 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
     );
     pressHeaderBack(view.renderer);
     expect(navigationRoutes).toEqual(
-      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)']
+      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)/']
     );
   });
 });
@@ -2447,15 +2458,15 @@ describe('shouldRefuseSilentAttachmentDrop', () => {
 
 // These tests run in the existing detail suite with the DOM-free renderer.
 // Request order and rendered state are deterministic; native paint timing is not.
-describe('child transcript requests', () => {
-  /** The catalog entry each SDK status renders as; the raw enum never reaches the card. */
-  const STATUS_WORD_KEY = {
-    pending: 'common.pending',
-    running: 'common.running',
-    completed: 'common.completed',
-    error: 'common.failed',
-  } as const;
+/** The card's visible and announced state, in the active language. */
+const STATUS_LABEL_KEY = {
+  pending: 'common.pending',
+  running: 'common.running',
+  completed: 'common.completed',
+  error: 'common.failed',
+} satisfies Record<'pending' | 'running' | 'completed' | 'error', string>;
 
+describe('child transcript requests', () => {
   it.each([
     {
       sessionId: SELECTED_ID,
@@ -2478,7 +2489,8 @@ describe('child transcript requests', () => {
   ] as const)(
     'renders the $status card without fetching a child transcript for labels',
     async ({ sessionId, status, textRows, activity }) => {
-      const statusWord = i18n.t(STATUS_WORD_KEY[status]);
+      const statusLabel = i18n.t(STATUS_LABEL_KEY[status]);
+      const text = `Researcher\nTask ${sessionId}${activity ? `\n${activity}` : ''}\n${statusLabel}`;
       const view = await mountDetails();
       const card = cardFor(view.renderer, sessionId);
       const button = card.findByProps({ accessibilityRole: 'button' }).props as ComponentProps<
@@ -2486,9 +2498,7 @@ describe('child transcript requests', () => {
       >;
 
       expect(view.renderer.root.findAllByType(ChildSessionSection)).toHaveLength(24);
-      expect(renderedText(card)).toBe(
-        ['Researcher', `Task ${sessionId}`, ...(activity ? [activity] : []), statusWord].join('\n')
-      );
+      expect(renderedText(card)).toBe(text);
       expect(card.findAll(node => (node.type as string) === 'Text')).toHaveLength(textRows);
       expect(button).toMatchObject({
         disabled: false,
@@ -2497,7 +2507,7 @@ describe('child transcript requests', () => {
       });
       expect(button.accessibilityLabel).toContain('Researcher');
       expect(button.accessibilityLabel).toContain(`Task ${sessionId}`);
-      expect(button.accessibilityLabel).toContain(statusWord);
+      expect(button.accessibilityLabel).toContain(statusLabel);
       expect(button.accessibilityLabel).not.toContain(status);
       expect(button.accessibilityLabel?.includes('Waiting for activity')).toBe(false);
       if (activity) {
@@ -2546,9 +2556,8 @@ describe('child transcript requests', () => {
       expect(selectedButton.accessibilityLabel?.includes('Writing response')).toBe(isRunning);
       expect(selectedCard.findAllByType(ChildSessionModelLabel)).toHaveLength(1);
       const nestedCard = cardFor(view.renderer, nestedId);
-      const statusWord = i18n.t(STATUS_WORD_KEY[status]);
       expect(renderedText(nestedCard)).toBe(
-        `Researcher\nTask ${nestedId}${isRunning ? '\nThinking' : ''}\n${statusWord}`
+        `Researcher\nTask ${nestedId}${isRunning ? '\nThinking' : ''}\n${i18n.t(STATUS_LABEL_KEY[status])}`
       );
       expect(nestedCard.findAll(node => (node.type as string) === 'Text')).toHaveLength(
         isRunning ? 4 : 3
@@ -2561,8 +2570,7 @@ describe('child transcript requests', () => {
         accessibilityHint: i18n.t('agentChat.childSession.openHint'),
       });
       expect(nestedButton.accessibilityLabel).toContain(`Task ${nestedId}`);
-      expect(nestedButton.accessibilityLabel).toContain(statusWord);
-      expect(nestedButton.accessibilityLabel).not.toContain(status);
+      expect(nestedButton.accessibilityLabel).toContain(i18n.t(STATUS_LABEL_KEY[status]));
       expect(nestedButton.accessibilityLabel?.includes('Waiting for activity')).toBe(false);
       if (isRunning) {
         expect(nestedButton.accessibilityLabel).toContain('Thinking');

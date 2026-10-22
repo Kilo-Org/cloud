@@ -1,27 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
-import {
-  auto_routing_custom_routers,
-  organization_memberships,
-  organizations,
-  type User,
-} from '@kilocode/db/schema';
+import { auto_routing_custom_routers, type User } from '@kilocode/db/schema';
 import { getAutoRoutingSettings } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
-import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import {
-  findEffectiveLegacyPoolRouter,
-  hasCustomRoutersAccess,
-  isCustomRoutersEnabled,
-  listUsableCustomRouters,
-} from './custom-routers';
-import { eq } from 'drizzle-orm';
+import { findEffectiveLegacyPoolRouter, listUsableCustomRouters } from './custom-routers';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client', () => ({
   getAutoRoutingSettings: jest.fn(),
 }));
-jest.mock('@kilocode/web-shared/lib/posthog-feature-flags');
 
 const MODEL = 'openai/test-pool-model';
 const DEFINITION = {
@@ -40,102 +27,34 @@ describe('canonical legacy pool discovery', () => {
   beforeEach(async () => {
     jest.resetAllMocks();
     user = await insertTestUser();
-    jest.mocked(isReleaseToggleEnabled).mockResolvedValue(false);
   });
 
   afterEach(async () => {
     await cleanupDbForTest();
   });
 
-  test('migration grants access only to marked rows without graduating the feature flag', async () => {
+  test('lists every personal and organization router, migrated or not', async () => {
+    const organization = await createTestOrganization('Owner', user.id, 0);
     await db.insert(auto_routing_custom_routers).values([
       { ...DEFINITION, owned_by_user_id: user.id },
       { ...DEFINITION, owned_by_user_id: user.id, slug: 'other', legacy_pool: false },
-    ]);
-
-    await expect(hasCustomRoutersAccess(user.id)).resolves.toBe(true);
-    await expect(isCustomRoutersEnabled(user.id)).resolves.toBe(false);
-    expect(await listUsableCustomRouters({ userId: user.id, organizationId: null })).toEqual([
-      expect.objectContaining({ slug: 'efficient', legacyPool: true }),
-    ]);
-  });
-
-  test('only organization members discover its migrated pool', async () => {
-    const organization = await createTestOrganization('Migrated', user.id, 0);
-    await db
-      .insert(auto_routing_custom_routers)
-      .values({ ...DEFINITION, owned_by_organization_id: organization.id });
-    const member = await insertTestUser();
-    const outsider = await insertTestUser();
-    await db.insert(organization_memberships).values({
-      organization_id: organization.id,
-      kilo_user_id: member.id,
-      role: 'member',
-    });
-
-    await expect(hasCustomRoutersAccess(member.id)).resolves.toBe(true);
-    await expect(hasCustomRoutersAccess(outsider.id)).resolves.toBe(false);
-    expect(
-      await listUsableCustomRouters({ userId: member.id, organizationId: organization.id })
-    ).toEqual([
-      expect.objectContaining({ ownerType: 'org', ownerId: organization.id, legacyPool: true }),
-    ]);
-  });
-
-  test.each(['owner', 'admin', 'billing_manager'] as const)(
-    'a parent %s discovers its child migrated pool without graduating the flag',
-    async role => {
-      const parent = await createTestOrganization('Parent', user.id, 0);
-      const childOwner = await insertTestUser();
-      const child = await createTestOrganization('Child', childOwner.id, 0);
-      await db
-        .update(organizations)
-        .set({ parent_organization_id: parent.id })
-        .where(eq(organizations.id, child.id));
-      await db
-        .update(organization_memberships)
-        .set({ role })
-        .where(eq(organization_memberships.kilo_user_id, user.id));
-      await db.insert(auto_routing_custom_routers).values({
+      {
         ...DEFINITION,
-        owned_by_organization_id: child.id,
-      });
+        owned_by_organization_id: organization.id,
+        slug: 'team',
+        legacy_pool: false,
+      },
+    ]);
 
-      await expect(hasCustomRoutersAccess(user.id)).resolves.toBe(true);
-      await expect(isCustomRoutersEnabled(user.id)).resolves.toBe(false);
-      expect(await listUsableCustomRouters({ userId: user.id, organizationId: child.id })).toEqual([
-        expect.objectContaining({ ownerType: 'org', ownerId: child.id, legacyPool: true }),
-      ]);
-    }
-  );
-
-  test('parent ordinary members and grandparent owners do not discover a child migrated pool', async () => {
-    const grandparent = await createTestOrganization('Grandparent', user.id, 0);
-    const parentOwner = await insertTestUser();
-    const parent = await createTestOrganization('Parent', parentOwner.id, 0);
-    const childOwner = await insertTestUser();
-    const child = await createTestOrganization('Child', childOwner.id, 0);
-    await db
-      .update(organizations)
-      .set({ parent_organization_id: grandparent.id })
-      .where(eq(organizations.id, parent.id));
-    await db
-      .update(organizations)
-      .set({ parent_organization_id: parent.id })
-      .where(eq(organizations.id, child.id));
-    const member = await insertTestUser();
-    await db.insert(organization_memberships).values({
-      organization_id: parent.id,
-      kilo_user_id: member.id,
-      role: 'member',
+    const routers = await listUsableCustomRouters({
+      userId: user.id,
+      organizationId: organization.id,
     });
-    await db.insert(auto_routing_custom_routers).values({
-      ...DEFINITION,
-      owned_by_organization_id: child.id,
-    });
-
-    await expect(hasCustomRoutersAccess(member.id)).resolves.toBe(false);
-    await expect(hasCustomRoutersAccess(user.id)).resolves.toBe(false);
+    expect(routers.map(router => `${router.ownerType}:${router.slug}`).sort()).toEqual([
+      'org:team',
+      'user:efficient',
+      'user:other',
+    ]);
   });
 
   test('the organization canonical pool takes priority over the personal canonical pool', async () => {

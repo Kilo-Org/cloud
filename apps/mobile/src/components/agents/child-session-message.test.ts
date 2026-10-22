@@ -20,7 +20,7 @@ import { ChildSessionMessage, ChildSessionSection } from './child-session-sectio
 import { ChildSessionModelLabel } from './child-session-model-label';
 import { MessageErrorBoundary } from './message-error-boundary';
 
-import { i18n as appI18n } from '@/i18n';
+import { i18n as i18nInstance } from '@/i18n';
 import type * as ReactI18next from 'react-i18next';
 
 vi.mock('react-i18next', async importOriginal => {
@@ -308,9 +308,9 @@ describe('ChildSessionMessage completion', () => {
         'General',
         'child task',
         'Test Model',
-        appI18n.t('common.completed'),
+        i18nInstance.t('common.completed'),
       ]);
-      expect(button().props.accessibilityLabel).toContain(appI18n.t('common.completed'));
+      expect(button().props.accessibilityLabel).toContain(i18nInstance.t('common.completed'));
       expect(button().props.accessibilityLabel).not.toContain('Considering next steps');
       expect(renderer.root.findAllByType(SpinningIcon)).toHaveLength(0);
       const { onPress } = button().props as { onPress: () => void };

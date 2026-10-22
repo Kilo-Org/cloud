@@ -34,20 +34,15 @@ import { useOptionalSessionManager } from './session-manager-context';
 
 const MAX_NESTING_DEPTH = 5;
 
-/** The SDK tool state's lifecycle, kept for colors and logic only. */
-type ToolStatus = ToolPart['state']['status'];
+type ChildSessionStatus = ToolPart['state']['status'];
 
-/**
- * The word the card shows for each status. The SDK enum never reaches the
- * screen: the badge and the card's accessibility label carry the catalog copy
- * for the app language, so a translated card has no English status token in it.
- */
+/** The card's visible and announced state, in the reader's language. */
 const STATUS_LABEL_KEY = {
   pending: 'common.pending',
   running: 'common.running',
   completed: 'common.completed',
   error: 'common.failed',
-} satisfies Record<ToolStatus, string>;
+} satisfies Record<ChildSessionStatus, string>;
 
 export type RenderPartFn = (props: {
   part: Part;
@@ -285,7 +280,7 @@ export function ChildSessionMessage({
   );
 }
 
-function getStatusBorderColor(status: ToolStatus, colors: ThemeColors): string {
+function getStatusBorderColor(status: string, colors: ThemeColors): string {
   if (status === 'error') {
     return colors.destructive;
   }
@@ -295,8 +290,7 @@ function getStatusBorderColor(status: ToolStatus, colors: ThemeColors): string {
   return colors.info;
 }
 
-/** Colors come from the SDK status; the visible word is the catalog label. */
-function StatusBadge({ status, label }: Readonly<{ status: ToolStatus; label: string }>) {
+function StatusBadge({ status, label }: Readonly<{ status: ChildSessionStatus; label: string }>) {
   const bgClass = getStatusBgClass(status);
   const textClass = getStatusTextClass(status);
 
@@ -309,7 +303,7 @@ function StatusBadge({ status, label }: Readonly<{ status: ToolStatus; label: st
   );
 }
 
-function getStatusBgClass(status: ToolStatus): string {
+function getStatusBgClass(status: string): string {
   if (status === 'completed') {
     return 'bg-good-tile-bg';
   }
@@ -319,7 +313,7 @@ function getStatusBgClass(status: ToolStatus): string {
   return 'bg-info-tile-bg';
 }
 
-function getStatusTextClass(status: ToolStatus): string {
+function getStatusTextClass(status: string): string {
   if (status === 'completed') {
     return 'text-good';
   }

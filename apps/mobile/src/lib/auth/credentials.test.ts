@@ -71,6 +71,9 @@ vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
 vi.mock('@/lib/hooks/use-live-activity-preference', () => ({
   clearLiveActivityPreference: vi.fn(),
 }));
+vi.mock('@/lib/hooks/use-tracking-permission-prompt', () => ({
+  clearTrackingPromptDismissed: vi.fn(),
+}));
 vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({
   clearPrReviewFooterPreference: vi.fn(),
 }));

@@ -19,6 +19,7 @@ import {
   fetchGitLabProjects,
   fetchGitLabRootTextFileAtRef,
   fetchGitLabRepositorySize,
+  revokeProjectAccessToken,
 } from './adapter';
 
 // Mock fetch globally
@@ -641,6 +642,57 @@ describe('createProjectWebhook', () => {
     ).rejects.toThrow('GitLab request refused cross-origin redirect with request body');
 
     expect(mockHttpsRequest).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('revokeProjectAccessToken', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('treats a 404 response as already revoked', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      text: async () => 'Not found',
+    });
+
+    await expect(revokeProjectAccessToken('user-token', 42, 601)).resolves.toBeUndefined();
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://gitlab.com/api/v4/projects/42/access_tokens/601',
+      expect.objectContaining({
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer user-token' },
+      })
+    );
+  });
+
+  it('reports the response status when the revocation is not settled', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      text: async () => 'Service Unavailable',
+    });
+
+    await expect(revokeProjectAccessToken('user-token', 42, 601)).rejects.toMatchObject({
+      name: 'GitLabProjectAccessTokenRevocationError',
+      projectId: 42,
+      status: 503,
+    });
+  });
+
+  it('reports a permission failure for a 403 response', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      text: async () => 'Forbidden',
+    });
+
+    await expect(revokeProjectAccessToken('user-token', 42, 601)).rejects.toMatchObject({
+      name: 'GitLabProjectAccessTokenPermissionError',
+      statusCode: 403,
+    });
   });
 });
 

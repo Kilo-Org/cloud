@@ -26,6 +26,7 @@ import {
   type GitLabProjectAccessToken,
   type GitLabPATValidationResult,
   GitLabProjectAccessTokenPermissionError,
+  GitLabProjectAccessTokenRevocationError,
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import { randomBytes, randomUUID } from 'crypto';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -881,9 +882,20 @@ async function updateStoredProjectAccessToken(
   });
 }
 
+function readProjectRevocationStatus(error: unknown): number | undefined {
+  if (error instanceof GitLabProjectAccessTokenRevocationError) return error.status;
+  if (error instanceof GitLabProjectAccessTokenPermissionError) return error.statusCode;
+  return undefined;
+}
+
 /**
  * Removes the stored Project Access Token for a project
  * Called when a project is removed from code reviews
+ *
+ * The metadata entry and the encrypted credential row are deleted only after
+ * GitLab settles the revocation, either by confirming it or by reporting the
+ * token as already gone (404). Any other outcome keeps both handles so a later
+ * removal can try again.
  */
 export async function removeStoredProjectAccessToken(
   integration: PlatformIntegration,
@@ -896,22 +908,26 @@ export async function removeStoredProjectAccessToken(
   if (!storedCredential) return;
   const instanceUrl = normalizeInstanceUrl(metadata?.gitlab_instance_url);
 
-  // Try to revoke the token in GitLab
   try {
     const userToken = await getValidGitLabToken(integration, actor);
     await revokeProjectAccessToken(userToken, projectId, storedCredential.tokenId, instanceUrl);
-    logExceptInTest('[removeStoredProjectAccessToken] Token revoked in GitLab', {
-      projectId,
-      tokenId: storedCredential.tokenId,
-    });
   } catch (error) {
-    // Log but don't fail - the token might already be revoked
-    logExceptInTest('[removeStoredProjectAccessToken] Failed to revoke token in GitLab', {
-      projectId,
-      tokenId: storedCredential.tokenId,
-      error: error instanceof Error ? error.message : String(error),
-    });
+    logExceptInTest(
+      '[removeStoredProjectAccessToken] Revocation unsettled; keeping stored project credential',
+      {
+        projectId,
+        tokenId: storedCredential.tokenId,
+        status: readProjectRevocationStatus(error),
+        error: error instanceof Error ? error.message : String(error),
+      }
+    );
+    return;
   }
+
+  logExceptInTest('[removeStoredProjectAccessToken] Token revoked in GitLab', {
+    projectId,
+    tokenId: storedCredential.tokenId,
+  });
 
   await db.transaction(async tx => {
     await mutateGitLabMetadataInTransaction(tx, integration.id, currentMetadata => {

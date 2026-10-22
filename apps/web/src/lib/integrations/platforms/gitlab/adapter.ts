@@ -1723,6 +1723,21 @@ export class GitLabProjectAccessTokenPermissionError extends Error {
 }
 
 /**
+ * Thrown when GitLab does not confirm a Project Access Token revocation.
+ * Carries the response status so callers can record it and choose when to retry.
+ */
+export class GitLabProjectAccessTokenRevocationError extends Error {
+  constructor(
+    public projectId: string | number,
+    public status: number,
+    message: string
+  ) {
+    super(message);
+    this.name = 'GitLabProjectAccessTokenRevocationError';
+  }
+}
+
+/**
  * Creates a Project Access Token for a GitLab project
  *
  * Project Access Tokens allow bot-like access to a project without using a user's credentials.
@@ -2045,7 +2060,11 @@ export async function revokeProjectAccessToken(
       );
     }
 
-    throw new Error(`GitLab revoke Project Access Token failed: ${response.status} - ${error}`);
+    throw new GitLabProjectAccessTokenRevocationError(
+      projectId,
+      response.status,
+      `GitLab revoke Project Access Token failed: ${response.status} - ${error}`
+    );
   }
 
   logExceptInTest('[revokeProjectAccessToken] Revoked token', {

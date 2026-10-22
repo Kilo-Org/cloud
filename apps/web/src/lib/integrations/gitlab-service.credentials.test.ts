@@ -19,6 +19,7 @@ import {
   buildGitLabProjectAccessTokenAad,
 } from '@kilocode/worker-utils/gitlab-credential';
 import type * as GitLabAdapter from '@/lib/integrations/platforms/gitlab/adapter';
+import { GitLabProjectAccessTokenRevocationError } from '@/lib/integrations/platforms/gitlab/adapter';
 import type * as GitLabService from './gitlab-service';
 import type { fetchGitLabCredential as FetchGitLabCredential } from '@/lib/integrations/platforms/gitlab/credential-broker-client';
 
@@ -844,6 +845,109 @@ describe('GitLab encrypted credential persistence', () => {
     expect(credentials).toHaveLength(1);
     expect(credentials[0].provider_resource_id).toBeNull();
     expect(updatedIntegration.metadata).toEqual(expect.objectContaining({ project_tokens: {} }));
+  });
+
+  it('keeps the stored project credential when GitLab does not settle the revocation', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    let [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await getOrCreateProjectAccessToken(integration, 42, { userId: user.id });
+    [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await db
+      .update(platform_integrations)
+      .set({
+        metadata: {
+          ...(integration.metadata as Record<string, unknown>),
+          project_tokens: {
+            '42': {
+              token_id: 991,
+              token: 'glpat-legacy-project-token',
+              expires_at: '2027-07-13',
+              created_at: '2026-07-13T00:00:00.000Z',
+              name: 'Kilo Code Review Bot',
+            },
+          },
+        },
+      })
+      .where(eq(platform_integrations.id, connected.integration.id));
+    [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    mockRevokeProjectAccessToken.mockRejectedValueOnce(
+      new GitLabProjectAccessTokenRevocationError(
+        42,
+        503,
+        'GitLab revoke Project Access Token failed: 503 - Service Unavailable'
+      )
+    );
+
+    await removeStoredProjectAccessToken(integration, 42, { userId: user.id });
+
+    const [credential] = await db
+      .select()
+      .from(platform_access_token_credentials)
+      .where(eq(platform_access_token_credentials.provider_resource_id, '42'));
+    const [updatedIntegration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+
+    expect(mockRevokeProjectAccessToken).toHaveBeenCalledTimes(1);
+    expect(credential).toEqual(
+      expect.objectContaining({ provider_resource_id: '42', credential_version: 1 })
+    );
+    expect(updatedIntegration.metadata).toEqual(
+      expect.objectContaining({
+        project_tokens: { '42': expect.objectContaining({ token_id: 991 }) },
+      })
+    );
+  });
+
+  it('keeps the stored project credential when the revocation request fails in transport', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    let [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await getOrCreateProjectAccessToken(integration, 42, { userId: user.id });
+    [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    mockRevokeProjectAccessToken.mockRejectedValueOnce(new TypeError('fetch failed'));
+
+    await removeStoredProjectAccessToken(integration, 42, { userId: user.id });
+
+    const [credential] = await db
+      .select()
+      .from(platform_access_token_credentials)
+      .where(eq(platform_access_token_credentials.provider_resource_id, '42'));
+    const [updatedIntegration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+
+    expect(mockRevokeProjectAccessToken).toHaveBeenCalledTimes(1);
+    expect(credential).toEqual(expect.objectContaining({ provider_resource_id: '42' }));
+    expect(updatedIntegration.metadata).not.toHaveProperty('project_tokens');
   });
 
   it('does not delete a project credential rotated during explicit revocation', async () => {

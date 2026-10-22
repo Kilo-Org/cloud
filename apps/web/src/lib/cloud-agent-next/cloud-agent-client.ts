@@ -17,7 +17,7 @@ import type { Images } from '@/lib/images-schema';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { parseCustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
+import { parseCustomerBillingFailure, type PreparationAttempt } from '@kilocode/cloud-agent-sdk';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import {
   getWorktreeChangesOutputSchema,
@@ -40,16 +40,6 @@ import {
 import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
 export type { SendMessagePayload } from './types.js';
 
-/**
- * Cloud Agent Next Client
- *
- * Client for the new cloud-agent-next worker that uses the V2 WebSocket-based API
- * with the new message format (Message + Part[]).
- *
- * PLACEHOLDER: Update CLOUD_AGENT_NEXT_API_URL when the new worker is ready.
- */
-
-// TODO: Update this URL when the new cloud-agent-next worker is deployed
 const CLOUD_AGENT_NEXT_API_URL = getEnvVariable('CLOUD_AGENT_NEXT_API_URL') || '';
 
 function isConnectionResetError(error: unknown): boolean {
@@ -133,23 +123,21 @@ export type AgentMode = string;
 
 /** Shared fields for prepareSession, present on both the non-clone and clone variants. */
 type PrepareSessionSharedFields = {
+  allowSubagentSessions?: boolean;
   githubAccessPurpose?: 'workflow' | 'agent';
   mode: AgentMode;
   model: string;
   variant?: string;
-  // GitHub-specific params
   githubRepo?: string;
   githubIntegrationId?: string;
   /** GitHub Personal Access Token for private repositories */
   githubToken?: string;
-  // Generic git params for GitLab and other providers
   gitUrl?: string;
   gitToken?: string;
   /** Explicit platform type for correct env var setup (avoids URL-based detection) */
   platform?: 'github' | 'gitlab' | 'bitbucket';
   bitbucketWorkspaceUuid?: string;
   bitbucketRepositoryUuid?: string;
-  // Common params
   kilocodeOrganizationId?: string;
   /** Profile ID forwarded to cloud-agent-next for server-side merge. */
   profileId?: string;
@@ -197,6 +185,8 @@ export type PrepareSessionNonCloneInput = PrepareSessionSharedFields & {
   autoInitiate?: boolean;
   /** Stable per-user-intent UUID; with `autoInitiate`, dedupes retries in the operation ledger. */
   operationKey?: string;
+  /** Client-proposed Kilo session ID, so the client can show the session before prepare returns. */
+  kiloSessionId?: string;
   cloneFromKiloSessionId?: undefined;
   cloneUpToMessageId?: undefined;
 };
@@ -234,6 +224,7 @@ export type CreateWorktreeChatInput = {
   sourceKiloSessionId: string;
   sourceCloudAgentSessionId: string;
   operationKey: string;
+  kiloSessionId?: string;
   kilocodeOrganizationId?: string;
   clientProvenance: 'browser';
 };
@@ -363,7 +354,6 @@ export type ExecutionStatus = {
 
 /** Output from getSession procedure (sanitized, no secrets) */
 export type GetSessionOutput = {
-  // Session identifiers
   sessionId: string;
   kiloSessionId?: string;
   userId: string;
@@ -376,12 +366,10 @@ export type GetSessionOutput = {
   parentSessionId?: string | null;
   cloudAgentSessionScopeId?: string | null;
 
-  // Repository info (no tokens)
   githubRepo?: string;
   gitUrl?: string;
   platform?: 'github' | 'gitlab' | 'bitbucket';
 
-  // Execution params
   prompt?: string;
   mode?: AgentMode;
   model?: string;
@@ -397,7 +385,6 @@ export type GetSessionOutput = {
     variant?: string;
   }>;
 
-  // Execution status (grouped for cleaner API)
   execution: ExecutionStatus;
 
   // Lifecycle timestamps (critical for idempotency)
@@ -409,10 +396,8 @@ export type GetSessionOutput = {
   // by Worker callback ingresses), and getSession is reachable by the
   // session's owning user.
 
-  // Initial message ID for correlation
   initialMessageId?: string;
 
-  // Versioning
   timestamp: number;
   version: number;
 
@@ -432,7 +417,6 @@ export type GetSessionOutput = {
  */
 export type UpdateSessionInput = {
   cloudAgentSessionId: string;
-  // Scalar fields - null to clear, value to set, undefined to skip
   mode?: AgentMode | null;
   model?: string | null;
   variant?: string | null;
@@ -442,7 +426,6 @@ export type UpdateSessionInput = {
   autoCommit?: boolean | null;
   condenseOnComplete?: boolean | null;
   appendSystemPrompt?: string | null;
-  // Collection fields - empty to clear, value to set, undefined to skip
   envVars?: Record<string, string>;
   encryptedSecrets?: Record<string, EncryptedEnvelope>;
   setupCommands?: string[];
@@ -651,6 +634,9 @@ type CloudAgentNextTRPCClient = {
   getSandboxStatus: {
     query: (input: GetSessionInput) => Promise<unknown>;
   };
+  getPreparationAttempts: {
+    query: (input: GetSessionInput) => Promise<PreparationAttempt[]>;
+  };
   getPendingInteractions: {
     query: (input: GetSessionInput) => Promise<GetPendingInteractionsOutput>;
   };
@@ -681,7 +667,6 @@ type CloudAgentNextTRPCClient = {
   updateSession: {
     mutate: (input: UpdateSessionInput) => Promise<UpdateSessionOutput>;
   };
-  // V2 mutation-based procedures (WebSocket streaming)
   initiateFromKilocodeSessionV2: {
     mutate: (input: InitiateFromPreparedSessionInput) => Promise<InitiateSessionOutput>;
   };
@@ -736,7 +721,6 @@ export class CloudAgentNextClient {
     this.authToken = authToken;
     this.options = options;
 
-    // Build common headers
     const baseHeaders: Record<string, string> = {
       Authorization: `Bearer ${this.authToken}`,
     };
@@ -891,6 +875,19 @@ export class CloudAgentNextClient {
     }
   }
 
+  /** The session's preparation attempts, as its stream replays them. */
+  async getPreparationAttempts(cloudAgentSessionId: string): Promise<PreparationAttempt[]> {
+    try {
+      return await this.client.getPreparationAttempts.query({ cloudAgentSessionId });
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'getPreparationAttempts' },
+        extra: { cloudAgentSessionId },
+      });
+      throw error;
+    }
+  }
+
   async getSandboxStatus(cloudAgentSessionId: string): Promise<SandboxStatusSnapshot> {
     try {
       return SandboxStatusSnapshotSchema.parse(
@@ -1031,7 +1028,6 @@ export class CloudAgentNextClient {
         error: normalizedError instanceof Error ? normalizedError.message : String(normalizedError),
       });
 
-      // Check for insufficient credits error
       if (isInsufficientCreditsError(normalizedError)) {
         throw new InsufficientCreditsError();
       }
@@ -1087,7 +1083,6 @@ export class CloudAgentNextClient {
       const normalizedError = normalizeCloudAgentProtocolError(error);
       preserveBillingFailure(normalizedError);
 
-      // Check for insufficient credits error
       if (isInsufficientCreditsError(normalizedError)) {
         throw new InsufficientCreditsError();
       }
@@ -1116,7 +1111,6 @@ export class CloudAgentNextClient {
       const normalizedError = normalizeCloudAgentProtocolError(error);
       preserveBillingFailure(normalizedError);
 
-      // Check for insufficient credits error
       if (isInsufficientCreditsError(normalizedError)) {
         throw new InsufficientCreditsError();
       }

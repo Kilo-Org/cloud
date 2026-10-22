@@ -8,7 +8,7 @@
  */
 
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
-import type { UserKiloFacade } from '../src/kilo-facade/user-kilo-facade.js';
+import { UserKiloFacade as RealUserKiloFacade } from '../src/kilo-facade/user-kilo-facade.js';
 import {
   KILO_FACADE_AUTH_TOKEN_HEADER,
   KILO_FACADE_GLOBAL_FEED_PATH,
@@ -20,6 +20,7 @@ import type {
   SendCloudAgentSessionNotificationResult,
 } from '../src/notifications-binding.js';
 import { CloudAgentSession as RealCloudAgentSession } from '../src/persistence/CloudAgentSession';
+import { createTestSessionIngestDouble } from './integration/helpers/session-ingest-double.js';
 import { isSandboxControlId } from '../src/sandbox-control/stub';
 import { admitSandboxWrapperUpgrade } from '../src/sandbox-control/socket-admission.js';
 import { SandboxControlV2 } from '../src/control-plane/sandbox/sandbox-do';
@@ -71,7 +72,15 @@ export class CloudAgentSession extends RealCloudAgentSession {
   }
 }
 
-export { UserKiloFacade } from '../src/kilo-facade/user-kilo-facade.js';
+// The Workers-runtime suite binds no `SESSION_INGEST` service and no Postgres,
+// so replace the binding with a storage-backed double. Integration tests seed it
+// through `runInDurableObject` on this same Durable Object.
+export class UserKiloFacade extends RealUserKiloFacade {
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, { ...env, SESSION_INGEST: createTestSessionIngestDouble(ctx.storage) });
+  }
+}
+
 // The test Worker binds the production `SANDBOX_CONTROL`/`SANDBOX_SESSION`
 // names to the control-plane V2 classes, matching production after the C1c flip.
 export { SandboxControlV2, SandboxSessionV2 };

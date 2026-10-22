@@ -94,8 +94,6 @@ vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key, language: 'en' } }))
 vi.mock('react-native', () => ({
   View: 'View',
   Alert: { alert: observed.alert },
-  // Sheet arms its Android back queue on the android platform this suite mocks.
-  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
 }));
 vi.mock('@shopify/flash-list', () => ({
   FlashList: ({

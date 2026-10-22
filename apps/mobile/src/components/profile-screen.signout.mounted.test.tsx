@@ -23,8 +23,6 @@ vi.mock('react-native', () => ({
   },
   Pressable: 'Pressable',
   View: 'View',
-  // Sheet arms its Android back queue on the android platform this suite mocks.
-  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
@@ -90,6 +88,12 @@ vi.mock('@/components/use-delete-account', () => ({
 
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => ({ userId: 'user-1' }),
+}));
+
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  getCommittedConnectivityStatus: () => 'online',
+  useCommittedConnectivityStatus: () => 'online',
+  useOfflineBannerState: () => false,
 }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({

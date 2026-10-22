@@ -34,13 +34,14 @@ vi.mock('react-native', () => ({
       return reactNativeMock.os;
     },
   },
-  // Sheet arms its Android back queue on the android platform this suite mocks.
-  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
 }));
 // The real library reports the window insets unchanged inside the sheet Modal;
 // the fix must not rewrite that context, only the header's own top clearance.
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => safeAreaMock.insets,
+}));
+vi.mock('expo-router', () => ({
+  useNavigation: () => ({ addListener: () => () => undefined }),
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({ Share: 'Share' }));

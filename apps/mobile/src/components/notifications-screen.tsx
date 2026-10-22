@@ -28,6 +28,7 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 
 import { deriveMasterGateLeadingPresentation } from '@/components/notifications-master-gate';
+import { BriefingNotificationToggle } from '@/components/agent-briefing/briefing-notification-toggle';
 import { liveActivitiesAllowedBySystem } from '@/glanceable-ios/system-switch';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -864,6 +865,7 @@ export function NotificationsScreen() {
             </>
           )}
         </View>
+        <BriefingNotificationToggle />
 
         {/* Message previews */}
         <View className="gap-3">

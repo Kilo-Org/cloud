@@ -10,7 +10,7 @@ import { trackSecurityAgentCommand } from '@/lib/hooks/use-security-agent-comman
 import {
   isSecuritySyncRetryable,
   mapSecurityDismissOperationError,
-} from '@/lib/hooks/use-security-agent-mutations';
+} from '@/lib/security-agent-ledger';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { reconcileFirstPage, withInfiniteRetention } from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';

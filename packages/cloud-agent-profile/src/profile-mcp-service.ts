@@ -146,9 +146,9 @@ function encryptRecord(
  * On update, `existing` carries the previously stored encrypted envelopes
  * so keys left as the masked placeholder round-trip unchanged.
  *
- * Local configuration consistency covers the full command argv and every
- * environment entry. Remote configuration consistency covers the URL.
- * Create has no stored configuration to compare.
+ * An update describes the server's complete configuration: the whole command
+ * argv and every environment entry for a local server, or the URL for a remote
+ * server. Create has no stored configuration to compare.
  */
 function buildStoredConfig(
   publicKeyBase64: string,
@@ -163,11 +163,8 @@ function buildStoredConfig(
       'command' in existing &&
       existing.command.length === input.config.command.length &&
       existing.command.every((part, index) => part === input.config.command[index]);
-    // Stored entries are envelopes once this service has written them, so a
-    // submitted entry is either the placeholder or a replacement value.
-    // Reuse therefore requires every entry to be the placeholder for a key
-    // that already exists; a replacement value means the caller supplies the
-    // whole environment, which `encryptRecord` then encrypts.
+    // Each submitted entry is the placeholder or a replacement value, so the
+    // complete environment accompanies any replacement.
     const environmentReusable =
       commandUnchanged &&
       storedEnvironment !== undefined &&
@@ -182,7 +179,7 @@ function buildStoredConfig(
     if (existing !== undefined && !environmentReusable && carriesPlaceholder) {
       throw new TRPCError({
         code: 'BAD_REQUEST',
-        message: 'Environment values must be re-entered when the command or environment changes',
+        message: 'Supply every environment value when the command or any environment value changes',
       });
     }
     return {

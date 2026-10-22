@@ -177,6 +177,18 @@ describe('POST /api/device-auth/codes', () => {
         redirect_origin: `https://${'a'.repeat(300)}`,
       },
     ],
+    [
+      'a redirect origin with a path',
+      { client_id: 'client-abc', client_name: 'Acme', redirect_origin: 'https://a.test/cb' },
+    ],
+    [
+      'a relative redirect origin',
+      { client_id: 'client-abc', client_name: 'Acme', redirect_origin: '/cb' },
+    ],
+    [
+      'a redirect origin that is prose',
+      { client_id: 'client-abc', client_name: 'Acme', redirect_origin: 'the trusted app' },
+    ],
   ])('refuses a client description with %s', async (_label, requesting_client) => {
     const response = await POST(
       new NextRequest('http://localhost:3000/api/device-auth/codes', {
@@ -188,5 +200,37 @@ describe('POST /api/device-auth/codes', () => {
 
     expect(response.status).toBe(400);
     expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  test('accepts a native app scheme as the redirect origin', async () => {
+    const requestingClient = {
+      clientId: 'client-abc',
+      clientName: 'Example App',
+      redirectOrigin: 'cursor://anysphere.cursor',
+    };
+    mockCreate.mockResolvedValue({
+      code: 'ABCD-EFGH',
+      userCode: 'ABCD-EFGH',
+      deviceCode: 'device-secret',
+      expiresAt: new Date(Date.now() + 600_000),
+      requestingClient,
+    });
+
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/device-auth/codes', {
+        method: 'POST',
+        body: JSON.stringify({
+          requesting_client: {
+            client_id: 'client-abc',
+            client_name: 'Example App',
+            redirect_origin: 'cursor://anysphere.cursor',
+          },
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).requestingClient).toEqual(requestingClient);
   });
 });

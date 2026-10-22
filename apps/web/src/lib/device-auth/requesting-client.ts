@@ -26,11 +26,43 @@ const displayField = z
   .max(REQUESTING_CLIENT_FIELD_MAX)
   .refine(value => !/\p{Cc}/u.test(value), 'must not contain control characters');
 
+/**
+ * An absolute origin: `scheme://host[:port]` for a web redirect, or a bare
+ * `scheme:` / `scheme://host` for a native app. A path, query, fragment,
+ * userinfo or whitespace means the value is not an origin, and the approval
+ * page never presents it as one.
+ */
+function isRedirectOrigin(value: string): boolean {
+  const scheme = /^[a-z][a-z0-9+.-]*:/iu.exec(value)?.[0];
+  if (scheme === undefined) return false;
+  if (value === scheme) return true;
+  if (/[\s@]/u.test(value)) return false;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (!url.hostname) return false;
+  if (url.username || url.password || url.search || url.hash) return false;
+  if (url.pathname !== '' && url.pathname !== '/') return false;
+  return value.replace(/\/$/u, '') === redirectOriginFor(url).replace(/\/$/u, '');
+}
+
+/** The origin shape the approval page shows for a parsed redirect URL. */
+function redirectOriginFor(url: URL): string {
+  if (url.protocol === 'http:' || url.protocol === 'https:') return url.origin;
+  return `${url.protocol}//${url.host}`;
+}
+
 /** The `requesting_client` member of `POST /api/device-auth/codes`. */
 export const requestingClientSchema = z.object({
   client_id: displayField,
   client_name: displayField,
-  redirect_origin: displayField,
+  redirect_origin: displayField.refine(
+    isRedirectOrigin,
+    'must be an absolute origin with no path, query, or fragment'
+  ),
 });
 
 export type RequestingClientPayload = z.infer<typeof requestingClientSchema>;

@@ -163,6 +163,9 @@ describe('DeviceAuthClient requesting app', () => {
     expect(html).toContain('https://client.test');
     expect(html).toContain('Client ID');
     expect(html).toContain('client-abc');
+    // The block reports what the requester said; it does not claim verification.
+    expect(html).toContain('These details come from the app that started this request.');
+    expect(html).toContain('I expect this connection and recognize the destination above.');
   });
 
   test('keeps the approval disabled until the app is confirmed', () => {

@@ -238,9 +238,11 @@ export function DeviceAuthClient({
             </Button>
           </div>
 
-          {/* What the approver is connecting: named by the requester, shown
-              before any approval, and confirmed here. A request that names no
-              client keeps the flow to the code and the signed-in account. */}
+          {/* What the requester reports about itself, shown before any
+              approval and confirmed here. The details come from the caller,
+              so the block says so rather than implying verification. A request
+              that reports no app keeps the flow to the code and the signed-in
+              account. */}
           {requestingClient ? (
             <div
               className="space-y-2 rounded-lg border p-4 max-[22rem]:p-2"
@@ -258,6 +260,9 @@ export function DeviceAuthClient({
                   <dd className="font-mono break-all">{requestingClient.clientId}</dd>
                 </div>
               </dl>
+              <p className="text-muted-foreground text-xs">
+                These details come from the app that started this request.
+              </p>
               <div className="flex items-start gap-2 pointer-coarse:min-h-11">
                 <Checkbox
                   id="confirm-requesting-client"
@@ -270,7 +275,7 @@ export function DeviceAuthClient({
                   htmlFor="confirm-requesting-client"
                   className="text-sm leading-5 pointer-coarse:py-2"
                 >
-                  I recognize this app and want to connect it to my Kilo account.
+                  I expect this connection and recognize the destination above.
                 </label>
               </div>
             </div>

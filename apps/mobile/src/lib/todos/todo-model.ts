@@ -47,6 +47,19 @@ export function todoSessionPrompt(todo: { title: string; notes: string | null })
 }
 
 /**
+ * The longest prefix of `value` that fits in `maxUnits` UTF-16 code units,
+ * which is what the router's `.max()` counts. A cut between the halves of a
+ * surrogate pair leaves a lone high surrogate, so that unit is dropped.
+ */
+function capCodeUnits(value: string, maxUnits: number): string {
+  if (value.length <= maxUnits) {
+    return value;
+  }
+  const head = value.slice(0, maxUnits);
+  return /[\uD800-\uDBFF]$/.test(head) ? head.slice(0, -1) : head;
+}
+
+/**
  * A new-session draft as a to-do: the first line is the title (capped at the
  * router's limit), the rest are the notes. Null for a blank draft.
  */
@@ -59,8 +72,8 @@ export function todoFromDraft(draft: string): { title: string; notes: string | n
   const firstLine = lineBreak === -1 ? trimmed : trimmed.slice(0, lineBreak);
   const rest = lineBreak === -1 ? '' : trimmed.slice(lineBreak + 1).trim();
   return {
-    title: firstLine.trim().slice(0, TODO_TITLE_MAX_LENGTH),
-    notes: rest.length > 0 ? rest.slice(0, TODO_NOTES_MAX_LENGTH) : null,
+    title: capCodeUnits(firstLine.trim(), TODO_TITLE_MAX_LENGTH),
+    notes: rest.length > 0 ? capCodeUnits(rest, TODO_NOTES_MAX_LENGTH) : null,
   };
 }
 

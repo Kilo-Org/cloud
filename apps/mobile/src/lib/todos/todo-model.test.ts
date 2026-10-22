@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  TODO_NOTES_MAX_LENGTH,
   TODO_TITLE_MAX_LENGTH,
   todoFromDraft,
   todoListGitUrl,
@@ -75,6 +76,24 @@ describe('todoFromDraft', () => {
   it('caps the title at the router limit', () => {
     const title = todoFromDraft('x'.repeat(TODO_TITLE_MAX_LENGTH + 20))?.title;
     expect(title).toHaveLength(TODO_TITLE_MAX_LENGTH);
+  });
+
+  it('backs the title cap off a code unit instead of splitting an emoji', () => {
+    const prefix = 'x'.repeat(TODO_TITLE_MAX_LENGTH - 1);
+    expect(todoFromDraft(`${prefix}😀 the rest`)).toEqual({ title: prefix, notes: null });
+  });
+
+  it('keeps a title that ends exactly on the cap whole', () => {
+    const title = `${'x'.repeat(TODO_TITLE_MAX_LENGTH - 2)}😀`;
+    expect(todoFromDraft(title)).toEqual({ title, notes: null });
+  });
+
+  it('backs the notes cap off a code unit instead of splitting an emoji', () => {
+    const prefix = 'n'.repeat(TODO_NOTES_MAX_LENGTH - 1);
+    expect(todoFromDraft(`Fix login\n${prefix}😀 the rest`)).toEqual({
+      title: 'Fix login',
+      notes: prefix,
+    });
   });
 
   it('is null for a blank draft', () => {

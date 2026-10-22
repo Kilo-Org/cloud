@@ -127,6 +127,90 @@ describe('processOpenRouterUsage', () => {
     expect(result.cost_mUsd).toBe(20000);
     expect(result.is_byok).toBe(true);
   });
+
+  const vercelChatUsage = {
+    completion_tokens: 100,
+    completion_tokens_details: { reasoning_tokens: 0 },
+    prompt_tokens: 50,
+    prompt_tokens_details: { cached_tokens: 10 },
+    total_tokens: 150,
+  };
+
+  const vercelGatewayMetadata = {
+    gateway: {
+      routing: {
+        finalProvider: 'fireworks',
+        modelAttempts: [
+          {
+            success: true,
+            providerAttempts: [{ provider: 'fireworks', credentialType: 'system', success: true }],
+          },
+        ],
+      },
+      cost: '0',
+      marketCost: '0.0125',
+    },
+  };
+
+  test('derives Vercel cost from gateway marketCost when usage has no cost', () => {
+    const result = processOpenRouterUsage(vercelChatUsage, coreProps, vercelGatewayMetadata);
+
+    expect(result.cost_mUsd).toBe(12500);
+    expect(result.is_byok).toBe(false);
+    expect(result.inputTokens).toBe(50);
+    expect(result.outputTokens).toBe(100);
+    expect(result.cacheHitTokens).toBe(10);
+  });
+
+  test('derives Vercel cost from gateway cost when marketCost is absent', () => {
+    const result = processOpenRouterUsage(vercelChatUsage, coreProps, {
+      gateway: { ...vercelGatewayMetadata.gateway, marketCost: undefined, cost: '0.004' },
+    });
+
+    expect(result.cost_mUsd).toBe(4000);
+  });
+
+  test('prefers usage cost and byok over Vercel gateway metadata', () => {
+    const result = processOpenRouterUsage(
+      {
+        ...vercelChatUsage,
+        cost: 0.002,
+        is_byok: false,
+        cost_details: { upstream_inference_cost: 0 },
+      },
+      coreProps,
+      vercelGatewayMetadata
+    );
+
+    expect(result.cost_mUsd).toBe(2000);
+    expect(result.is_byok).toBe(false);
+  });
+
+  test('derives Vercel cost when the response carries no usage object', () => {
+    const result = processOpenRouterUsage(null, coreProps, vercelGatewayMetadata);
+
+    expect(result.cost_mUsd).toBe(12500);
+    expect(result.is_byok).toBe(false);
+  });
+
+  test('records zero cost when neither usage nor gateway metadata has one', () => {
+    const result = processOpenRouterUsage(vercelChatUsage, coreProps, {
+      gateway: {
+        routing: {
+          finalProvider: 'fireworks',
+          modelAttempts: [
+            {
+              success: true,
+              providerAttempts: [{ provider: 'fireworks', credentialType: 'byok', success: true }],
+            },
+          ],
+        },
+      },
+    });
+
+    expect(result.cost_mUsd).toBe(0);
+    expect(result.is_byok).toBe(true);
+  });
 });
 
 describe('authoritative usage transaction configuration', () => {
@@ -491,6 +575,37 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
 
     expect(result.upstream_id).toBeNull();
     expect(result.generation_time).toBeNull();
+    expect(result.cost_mUsd).toBe(1000);
+    expect(result.is_byok).toBe(false);
+  });
+
+  test('derives Vercel chat cost from gateway metadata when the usage chunk has no cost', async () => {
+    const chunks = [
+      `data: {"id":"gen-cost-1","object":"chat.completion.chunk","created":1,"model":"moonshotai/kimi-k3-fast","choices":[{"index":0,"delta":{"provider_metadata":{"gateway":{"routing":{"finalProvider":"fireworks","modelAttempts":[{"success":true,"providerAttempts":[{"provider":"fireworks","credentialType":"system","success":true}]}]},"cost":"0","marketCost":"0.001"}}}}]}\n\n`,
+      `data: {"id":"gen-cost-1","object":"chat.completion.chunk","created":1,"model":"moonshotai/kimi-k3-fast","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":120,"completion_tokens":40,"total_tokens":160}}\n\n`,
+      'data: [DONE]\n\n',
+    ].join('');
+
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(chunks));
+        controller.close();
+      },
+    });
+
+    const result = await parseMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'vercel',
+      200
+    );
+
+    expect(result.cost_mUsd).toBe(1000);
+    expect(result.is_byok).toBe(false);
+    expect(result.inputTokens).toBe(120);
+    expect(result.outputTokens).toBe(40);
+    expect(result.inference_provider).toBe('fireworks');
   });
 
   test('records the Vercel upstream provider request id for non-streamed responses', () => {
@@ -540,6 +655,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     expect(result.upstream_id).toBe('chatcmpl-non-streamed');
     expect(result.inference_provider).toBe('fireworks');
     expect(result.generation_time).toBe(39303);
+    expect(result.cost_mUsd).toBe(1000);
+    expect(result.is_byok).toBe(false);
   });
 });
 
@@ -1455,6 +1572,73 @@ describe('logMicrodollarUsage', () => {
       where: eq(microdollar_usage_metadata.message_id, 'test-custom-llm-free'),
     });
     expect(metadataRecord?.is_free).toBe(true);
+  });
+
+  test('warns when a paid Vercel chat request resolves to zero cost', async () => {
+    jest.mocked(captureMessage).mockClear();
+    const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const user = await insertTestUser({
+        id: 'test-vercel-uncosted-chat-user',
+        microdollars_used: 0,
+        google_user_email: 'vercel-uncosted-chat@example.com',
+      });
+
+      await processTokenData(
+        {
+          ...BASE_USAGE_STATS,
+          messageId: null,
+          cost_mUsd: 0,
+          is_byok: false,
+          inference_provider: 'fireworks',
+          outputTokens: 40,
+        },
+        { ...createBaseUsageContext(user), provider: 'vercel', api_kind: 'chat_completions' }
+      );
+
+      expect(captureMessage).toHaveBeenCalledWith(
+        'SUSPICIOUS: Vercel chat usage resolved to zero cost',
+        expect.objectContaining({ level: 'warning', tags: { source: 'usage_processing' } })
+      );
+      expect(consoleWarn).toHaveBeenCalledWith(
+        'Vercel chat usage resolved to zero cost for a paid request:',
+        expect.objectContaining({ outputTokens: 40, inference_provider: 'fireworks' })
+      );
+    } finally {
+      consoleWarn.mockRestore();
+    }
+  });
+
+  test('does not warn about zero cost for free, BYOK, failed, or non-Vercel requests', async () => {
+    jest.mocked(captureMessage).mockClear();
+    const user = await insertTestUser({
+      id: 'test-vercel-uncosted-exempt-user',
+      microdollars_used: 0,
+      google_user_email: 'vercel-uncosted-exempt@example.com',
+    });
+    const usageContext: MicrodollarUsageContext = {
+      ...createBaseUsageContext(user),
+      provider: 'vercel',
+      api_kind: 'chat_completions',
+    };
+    const stats: MicrodollarUsageStats = {
+      ...BASE_USAGE_STATS,
+      messageId: null,
+      cost_mUsd: 0,
+      is_byok: false,
+      inference_provider: 'fireworks',
+      outputTokens: 40,
+    };
+
+    await processTokenData(stats, { ...usageContext, is_free: true });
+    await processTokenData(stats, { ...usageContext, user_byok: true });
+    await processTokenData({ ...stats, hasError: true }, usageContext);
+    await processTokenData(stats, { ...usageContext, provider: 'openrouter' });
+
+    expect(captureMessage).not.toHaveBeenCalledWith(
+      'SUSPICIOUS: Vercel chat usage resolved to zero cost',
+      expect.anything()
+    );
   });
 
   test.each(['deleted', 'unavailable'] as const)(

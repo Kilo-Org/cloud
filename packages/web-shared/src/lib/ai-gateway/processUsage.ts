@@ -90,6 +90,7 @@ import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gat
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import {
   computeOpenRouterCostFields,
+  computeVercelCostMicrodollars,
   drainSseStream,
   extractVercelGenerationTime,
   extractVercelIsByok,
@@ -1134,13 +1135,7 @@ export function processOpenRouterUsage(
   vercelProviderMetadata?: VercelProviderMetaData | null
 ): JustTheCostsUsageStats {
   // usage may be null when there's no response (e.g. error), so default to empty object
-  const { cost_mUsd, is_byok } = computeOpenRouterCostFields(
-    usage ?? {},
-    coreProps,
-    'sse_processing'
-  );
-
-  return {
+  const tokenStats = {
     inputTokens: usage?.prompt_tokens ?? 0,
     cacheHitTokens: usage?.prompt_tokens_details?.cached_tokens ?? 0,
     cacheWriteTokens:
@@ -1148,9 +1143,30 @@ export function processOpenRouterUsage(
       usage?.prompt_tokens_details?.cache_creation_input_tokens ??
       0,
     outputTokens: usage?.completion_tokens ?? 0,
-    cost_mUsd,
-    is_byok: is_byok ?? extractVercelIsByok(vercelProviderMetadata?.gateway),
   };
+  const vercelGateway = vercelProviderMetadata?.gateway;
+
+  // OpenRouter path: cost fields are present directly in usage
+  if (usage?.cost != null || usage?.is_byok != null) {
+    const { cost_mUsd, is_byok } = computeOpenRouterCostFields(usage, coreProps, 'sse_processing');
+    return {
+      ...tokenStats,
+      cost_mUsd,
+      is_byok: is_byok ?? extractVercelIsByok(vercelGateway),
+    };
+  }
+
+  // Vercel path: cost is in provider_metadata.gateway, as for the Messages and
+  // Responses parsers.
+  if (vercelGateway?.marketCost != null || vercelGateway?.cost != null) {
+    return {
+      ...tokenStats,
+      cost_mUsd: computeVercelCostMicrodollars(vercelGateway),
+      is_byok: extractVercelIsByok(vercelGateway),
+    };
+  }
+
+  return { ...tokenStats, cost_mUsd: 0, is_byok: extractVercelIsByok(vercelGateway) };
 }
 
 export async function parseMicrodollarUsageFromStream(
@@ -1454,7 +1470,53 @@ export async function processTokenData(
     usageStats.cacheDiscount_mUsd = 0;
   }
 
+  reportUncostedVercelChatUsage(usageStats, usageContext);
+
   return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
+}
+
+/**
+ * Warns when a paid Vercel chat-completions request produced output tokens but its
+ * final cost is still zero. Both the response's own cost fields and the gateway
+ * metadata are read before the generation lookup, so a zero here means the request
+ * reached accounting without a usable cost: the generation lookup missed and the
+ * response carried none, or the gateway priced the request at zero. Free and BYOK
+ * requests are excluded because zero is the intended charge for them.
+ */
+function reportUncostedVercelChatUsage(
+  usageStats: MicrodollarUsageStats,
+  usageContext: MicrodollarUsageContext
+): void {
+  if (
+    usageContext.provider !== 'vercel' ||
+    usageContext.api_kind !== 'chat_completions' ||
+    usageContext.is_free ||
+    usageContext.user_byok ||
+    usageStats.hasError ||
+    usageStats.status_code >= 400 ||
+    usageStats.outputTokens <= 0 ||
+    usageStats.cost_mUsd !== 0
+  ) {
+    return;
+  }
+
+  const details = {
+    kiloUserId: usageContext.kiloUserId,
+    messageId: usageStats.messageId,
+    model: usageStats.model,
+    requested_model: usageContext.requested_model,
+    inference_provider: usageStats.inference_provider,
+    inputTokens: usageStats.inputTokens,
+    outputTokens: usageStats.outputTokens,
+    streamed: usageStats.streamed,
+    status_code: usageStats.status_code,
+  };
+  console.warn('Vercel chat usage resolved to zero cost for a paid request:', details);
+  captureMessage('SUSPICIOUS: Vercel chat usage resolved to zero cost', {
+    level: 'warning',
+    tags: { source: 'usage_processing' },
+    extra: details,
+  });
 }
 
 /**

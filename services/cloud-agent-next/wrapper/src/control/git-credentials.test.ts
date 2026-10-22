@@ -137,19 +137,12 @@ describe('credential record', () => {
   });
 
   it('reports a record it could not remove', async () => {
-    await writeGitCredentialRecord({
-      home,
-      url: 'https://github.com/acme/repo.git',
-      token: 'token',
-      platform: 'github',
-    });
-    const directory = path.dirname(gitCredentialRecordPath(home));
-    await fs.chmod(directory, 0o500);
-    try {
-      expect(await clearGitCredentialRecord(home)).toBe(false);
-    } finally {
-      await fs.chmod(directory, 0o700);
-    }
+    // A non-empty directory at the record path fails removal for every user,
+    // including a privileged runner, so the failure case does not depend on mode bits.
+    const recordPath = gitCredentialRecordPath(home);
+    await fs.mkdir(recordPath, { recursive: true });
+    await fs.writeFile(path.join(recordPath, 'blocker'), 'x');
+    expect(await clearGitCredentialRecord(home)).toBe(false);
   });
 });
 

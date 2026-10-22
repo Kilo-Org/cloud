@@ -154,6 +154,10 @@ export const NO_AGREEMENT = new Map([
     'profiles.counts.commandsShort',
     'compact suffix, not agreement: "{{count}}c" names no inflected word',
   ],
+  [
+    'profiles.mcp.secretCount',
+    'bare count after a label: "Secret count: {{count}}" names no inflected word',
+  ],
 ]);
 
 /** The source files the audit scans: app code, not tests or mounted harnesses. */

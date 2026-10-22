@@ -222,14 +222,6 @@ export const reflection_beam_free_model: KiloExclusiveModel = {
   inference_providers: ['reflection'],
 };
 
-export function isKiloExclusiveFreeModel(model: string): boolean {
-  return kiloExclusiveModels.some(m => m.public_id === model && !m.pricing);
-}
-
-export function isKiloExclusiveModel(model: string): boolean {
-  return kiloExclusiveModels.some(m => m.public_id === model);
-}
-
 export const kiloExclusiveModels = [
   gemma_4_26b_a4b_it_free_model,
   qwen36_plus_stealth_model,
@@ -241,8 +233,22 @@ export const kiloExclusiveModels = [
   reflection_beam_free_model,
 ] as KiloExclusiveModel[];
 
+export function findKiloExclusiveModel(model: string): KiloExclusiveModel | null {
+  return kiloExclusiveModels.find(m => m.public_id === model) ?? null;
+}
+
+export function isKiloExclusiveFreeModel(model: string): boolean {
+  const exclusive = findKiloExclusiveModel(model);
+  return exclusive !== null && !exclusive.pricing;
+}
+
+export function isKiloExclusiveModel(model: string): boolean {
+  return findKiloExclusiveModel(model) !== null;
+}
+
 export function isKiloStealthModel(model: string): boolean {
-  return kiloExclusiveModels.some(m => m.public_id === model && isStealthModel(m));
+  const exclusive = findKiloExclusiveModel(model);
+  return exclusive !== null && isStealthModel(exclusive);
 }
 
 export function shouldRedactModelNameInMicrodollarUsage(
@@ -254,10 +260,6 @@ export function shouldRedactModelNameInMicrodollarUsage(
 
 export function shouldRedactErrorResponse(provider: ProviderId, model: string): boolean {
   return isKiloStealthModel(model);
-}
-
-export function findKiloExclusiveModel(model: string): KiloExclusiveModel | null {
-  return kiloExclusiveModels.find(m => m.public_id === model) ?? null;
 }
 
 /**

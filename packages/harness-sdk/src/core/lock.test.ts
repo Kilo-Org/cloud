@@ -1,4 +1,4 @@
-import { Effect, Layer, Stream } from 'effect';
+import { Effect, Layer, Semaphore, Stream } from 'effect';
 import { expect, it } from 'vitest';
 import { runWith } from './session-fixture.js';
 import { type Tool, type ToolDefinition, ToolRegistry } from './tool.js';
@@ -48,7 +48,7 @@ const open = (seen: string[]): Tool => ({ definition, run: () => marking(seen) }
 
 /** A tool that holds one thing, and holds a permit beside it. */
 const guarded = (seen: string[]): Tool => {
-  const permit = Effect.unsafeMakeSemaphore(1);
+  const permit = Semaphore.makeUnsafe(1);
   return { definition, run: () => permit.withPermits(1)(marking(seen)) };
 };
 

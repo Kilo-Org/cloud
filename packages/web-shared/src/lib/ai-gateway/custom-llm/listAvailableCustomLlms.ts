@@ -27,14 +27,14 @@ function convert(publicId: string, model: CustomLlmDefinition) {
       instruct_type: null,
     },
     pricing: {
-      prompt: model.pricing?.prompt ?? '0.0000000',
-      completion: model.pricing?.completion ?? '0.0000000',
+      prompt: '0',
+      completion: '0',
       request: '0',
       image: '0',
       web_search: '0',
       internal_reasoning: '0',
-      input_cache_read: model.pricing?.input_cache_read ?? '0.00000000',
-      input_cache_write: model.pricing?.input_cache_write ?? '0.00000000',
+      input_cache_read: '0',
+      input_cache_write: '0',
     },
     top_provider: {
       context_length: model.context_length,
@@ -44,6 +44,7 @@ function convert(publicId: string, model: CustomLlmDefinition) {
     per_request_limits: null,
     supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
     default_parameters: {},
+    isFree: true,
     mayTrainOnYourPrompts: true,
     opencode: opencode && withLegacyVariants(opencode),
   };

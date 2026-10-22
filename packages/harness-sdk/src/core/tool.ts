@@ -95,7 +95,7 @@ interface Tool {
    * It bounds the waiting; it does not decide whether there is any. `wait`
    * decides that, and the model's own answer beats both.
    */
-  readonly inlineFor?: Duration.DurationInput;
+  readonly inlineFor?: Duration.Input;
   /**
    * Whether the model waits for this tool, as the model is told by default.
    *
@@ -122,14 +122,13 @@ interface ToolRegistryService {
   readonly tools: readonly Tool[];
 }
 
-class ToolRegistry extends Context.Tag('harness/ToolRegistry')<
-  ToolRegistry,
-  ToolRegistryService
->() {}
+class ToolRegistry extends Context.Service<ToolRegistry, ToolRegistryService>()(
+  'harness/ToolRegistry'
+) {}
 
 /** The tool of that name, or nothing. */
 const toolNamed = (tools: readonly Tool[], name: string): Option.Option<Tool> =>
-  Option.fromNullable(tools.find(tool => tool.definition.name === name));
+  Option.fromNullishOr(tools.find(tool => tool.definition.name === name));
 
 /**
  * The name of the field the model sets to choose whether it waits.
@@ -163,11 +162,12 @@ const waitProperty = {
  * The tool's own answer if it gave one. Otherwise it is read from the deadline:
  * a tool that waits no time at all is a tool nobody waits for.
  */
-const waitsFor = (tool: Tool, session?: Duration.DurationInput): boolean =>
-  tool.wait ?? !Duration.isZero(Duration.decode(tool.inlineFor ?? session ?? defaultInlineFor));
+const waitsFor = (tool: Tool, session?: Duration.Input): boolean =>
+  tool.wait ??
+  !Duration.isZero(Duration.fromInputUnsafe(tool.inlineFor ?? session ?? defaultInlineFor));
 
 /** One tool as the model is told it, with the field the harness adds to all of them. */
-const asOffered = (tool: Tool, session?: Duration.DurationInput): ToolDefinition => ({
+const asOffered = (tool: Tool, session?: Duration.Input): ToolDefinition => ({
   ...tool.definition,
   parameters: {
     ...tool.definition.parameters,
@@ -188,7 +188,7 @@ const asOffered = (tool: Tool, session?: Duration.DurationInput): ToolDefinition
  */
 const definitionsOf = (
   tools: readonly Tool[],
-  session?: Duration.DurationInput
+  session?: Duration.Input
 ): readonly ToolDefinition[] => tools.map(tool => asOffered(tool, session));
 
 /**

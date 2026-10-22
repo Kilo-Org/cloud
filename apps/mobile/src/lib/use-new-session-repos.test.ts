@@ -416,6 +416,16 @@ describe('useRepositoryBranches', () => {
     expect(result.isRetryableError).toBe(false);
   });
 
+  it('reports a refused provider connection as permanent, not retryable', () => {
+    // The selector has no reconnect control, so a refused connection takes the
+    // same note as a permission refusal instead of a retry that cannot work.
+    mocks.branchQueryResult = { isError: true, error: { data: { code: 'PRECONDITION_FAILED' } } };
+    const result = mountBranches(githubRepo);
+
+    expect(result.isPermanentError).toBe(true);
+    expect(result.isRetryableError).toBe(false);
+  });
+
   it('reports the provider default and an empty list without an override', () => {
     mocks.branchQueryResult = { data: { defaultBranch: null, branches: [] } };
     const result = mountBranches(githubRepo);

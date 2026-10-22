@@ -133,7 +133,7 @@ const storeOn = (connection: Connection): SessionStoreService => {
     read: sessionId =>
       attempt('read', async () => {
         const rows = await db.select().from(sessions).where(eq(sessions.id, sessionId)).limit(1);
-        return Option.map(Option.fromNullable(assertSessions(rows)[0]), asStoredSession);
+        return Option.map(Option.fromNullishOr(assertSessions(rows)[0]), asStoredSession);
       }),
 
     append: exchange => attempt('append', () => insertExchange(connection, db, exchange)),

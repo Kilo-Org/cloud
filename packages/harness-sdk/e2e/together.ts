@@ -102,7 +102,7 @@ const untilAnswerWaits = (session: SessionHandle) =>
       waiting => waiting.some(one => one.kind === 'toolResult'),
       () => 'not yet' as const
     ),
-    Schedule.spaced('100 millis').pipe(Schedule.upTo('60 seconds'))
+    Schedule.spaced('100 millis').pipe(Schedule.upTo({ duration: '60 seconds' }))
   );
 
 /** The line entry that carries the answer to the question. */
@@ -137,21 +137,22 @@ for (const model of models) {
   takenUp.length = 0;
 
   const ran = await Effect.runPromise(
-    Effect.either(Effect.scoped(Effect.provide(program(model), tools.pipe(Layer.merge(kilo())))))
+    Effect.result(Effect.scoped(Effect.provide(program(model), tools.pipe(Layer.merge(kilo())))))
   );
-  if (ran._tag === 'Left') {
+  if (ran._tag === 'Failure') {
     /* `not yet` is the wait giving up: a minute passed and no answer ever
        joined the line, because the model never asked. Whether it calls the tool
        is the model's own — `openai/gpt-5.6-luna` answered the two questions out
        of its own head on 2026-09-06 — and there is no order to test between a
        message and an answer that was never asked for. */
-    const why = ran.left === 'not yet' ? 'never left a question outstanding' : String(ran.left);
+    const why =
+      ran.failure === 'not yet' ? 'never left a question outstanding' : String(ran.failure);
     console.log(`model ${model}: ${why}`);
-    wrongIf(ran.left !== 'not yet', `the run failed: ${why}`);
+    wrongIf(ran.failure !== 'not yet', `the run failed: ${why}`);
     continue;
   }
   asked.push(model);
-  const got = ran.right;
+  const got = ran.success;
 
   const rounds = got.rounds;
   const askedFor = takenUp[0] ?? [];

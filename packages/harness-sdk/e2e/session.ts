@@ -13,7 +13,7 @@
  * fake model that answers instantly; this proves it while a real answer is
  * still streaming, which is the only time the race can actually happen.
  */
-import { Effect, Stream } from 'effect';
+import { Effect, Fiber, Stream } from 'effect';
 import { SessionBusyError } from '../src/core/ask.js';
 import type { ModelUsage } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
@@ -30,12 +30,15 @@ interface Answer {
 }
 
 const ask = (session: SessionHandle, text: string) =>
-  Stream.runFold(session.ask(text), { said: '', usage: undefined } as Answer, (held, event) =>
-    event.kind === 'delta'
-      ? { ...held, said: held.said + event.text }
-      : event.kind === 'done'
-        ? { ...held, usage: event.usage }
-        : held
+  Stream.runFold(
+    session.ask(text),
+    () => ({ said: '', usage: undefined }) as Answer,
+    (held, event) =>
+      event.kind === 'delta'
+        ? { ...held, said: held.said + event.text }
+        : event.kind === 'done'
+          ? { ...held, usage: event.usage }
+          : held
   );
 
 const words = [
@@ -70,12 +73,12 @@ const growing = (model: string) =>
 const racing = (model: string) =>
   Effect.gen(function* () {
     const session = yield* openSession({ system, model, maxTokens: room });
-    const started = yield* Effect.fork(
+    const started = yield* Effect.forkChild(
       Stream.runCollect(Stream.take(session.ask('Answer with the word: one'), 1))
     );
     yield* Effect.sleep('300 millis');
-    const second = yield* Effect.either(Stream.runDrain(session.ask('Answer with the word: two')));
-    yield* started.await;
+    const second = yield* Effect.result(Stream.runDrain(session.ask('Answer with the word: two')));
+    yield* Fiber.await(started);
     return second;
   });
 
@@ -118,9 +121,9 @@ for (const model of models) {
 
   console.log(
     '\nsecond question while the first streamed:',
-    refused._tag === 'Left' ? refused.left._tag : 'it was accepted'
+    refused._tag === 'Failure' ? refused.failure._tag : 'it was accepted'
   );
-  if (!(refused._tag === 'Left' && refused.left instanceof SessionBusyError)) {
+  if (!(refused._tag === 'Failure' && refused.failure instanceof SessionBusyError)) {
     fail('a second question was accepted while the first was still streaming');
   }
 }

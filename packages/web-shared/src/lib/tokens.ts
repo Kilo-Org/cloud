@@ -18,6 +18,11 @@ import {
   isKiloResourceAudienceAllowed,
 } from '@kilocode/worker-utils/kilo-token-policy';
 import { CloudAgentNextRuntimeAuthorizationClaimSchema } from '@kilocode/worker-utils/runtime-proxy-attestation';
+import {
+  isCloudAgentAuthorityHttpPathAllowed,
+  validateCloudAgentAuthorityClaims,
+  type CloudAgentAuthority,
+} from '@kilocode/worker-utils/cloud-agent-authority';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import jwt from 'jsonwebtoken';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -211,6 +216,7 @@ export type JWTTokenPayload = {
   version: number;
   apiTokenPepper?: string;
   runtimeAuthorization?: unknown;
+  cloudAgentAuthority?: unknown;
 } & JWTTokenExtraPayload;
 
 function tryJwtVerify(token: string) {
@@ -253,7 +259,12 @@ export function isRejectedCredentialReason(reason: string | undefined): boolean 
 
 export function validateAuthorizationHeader(
   headers: Headers,
-  options?: { expectedAudience?: string; runtimeProxyAttestationVerified?: boolean }
+  options?: {
+    expectedAudience?: string;
+    runtimeProxyAttestationVerified?: boolean;
+    // Derive from an actual Request URL or fixed route path, never a request header.
+    requestPathname?: string;
+  }
 ) {
   const traceability_logging_id = crypto.randomUUID();
   const authHeader = headers.get('authorization');
@@ -308,6 +319,23 @@ export function validateAuthorizationHeader(
     };
   }
 
+  let cloudAgentAuthority: CloudAgentAuthority | undefined;
+  if (Object.hasOwn(payload, 'cloudAgentAuthority')) {
+    try {
+      cloudAgentAuthority = validateCloudAgentAuthorityClaims(payload);
+      if (
+        payload.env !== process.env.NODE_ENV ||
+        typeof payload.iat !== 'number' ||
+        payload.iat > Math.floor(Date.now() / 1000) ||
+        !isCloudAgentAuthorityHttpPathAllowed(cloudAgentAuthority, options?.requestPathname)
+      ) {
+        throw new Error('Cloud Agent authority is not allowed on this request');
+      }
+    } catch {
+      return { error: 'Invalid scoped API token', reason: 'cloud_agent_authority_denied' };
+    }
+  }
+
   if (
     typeof payload.runtimeAuthorization === 'object' &&
     payload.runtimeAuthorization !== null &&
@@ -336,6 +364,7 @@ export function validateAuthorizationHeader(
     botId: payload.botId,
     tokenSource: payload.tokenSource,
     deviceSessionId: payload.deviceSessionId,
+    cloudAgentAuthority,
   };
 }
 

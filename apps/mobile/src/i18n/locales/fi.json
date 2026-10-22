@@ -2825,10 +2825,10 @@
   },
   "queryError": {
     "neutralDescription": "Yritä uudelleen.",
-    "offlineTitle": "Lataus epäonnistui.",
+    "offlineTitle": "Lataus epäonnistui",
     "permissionDescription": "Sinulla ei ole oikeutta tarkastella tätä.",
     "notFoundDescription": "Tämä kohde on saatettu poistaa tai se ei ole enää käytettävissä.",
-    "serverTitle": "Lataaminen ei onnistunut.",
+    "serverTitle": "Lataaminen ei onnistunut",
     "serverDescription": "Palvelussamme tapahtui virhe. Yritä uudelleen."
   },
   "screenHeader": {
@@ -2880,7 +2880,7 @@
   "share": {
     "title": "Jaa Kiloon",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "searchPlaceholder": "Viimeksi käytetyn istunnon haku",
+    "searchPlaceholder": "Hae viimeaikaisista istunnoista",
     "connectedCli": "Yhdistetyllä komentorivikäyttöliittymällä",
     "newSessionOn": "Uusi istunto laitteessa {{name}}",
     "noMatchingSessions": "Hakua vastaavia istuntoja ei löytynyt.",
@@ -2894,7 +2894,7 @@
     "cliCantReceiveFilesMessage": "Tätä istuntoa suorittava Kilo CLI ei voi vastaanottaa tiedostoja. Päivitä Kilo CLI kyseisellä koneella tai jaa sisältö uuteen istuntoon.",
     "contentlessMessage": "Jaettavaa sisältöä ei ole. Mukana ei ollut tekstiä eikä tiedostoja.",
     "couldNotReadContent": "Jaettua sisältöä ei voitu lukea.",
-    "onlyFirstFilesAttached_one": "Vain ensimmäiset {{displayCount}} tiedosto liitetään.",
+    "onlyFirstFilesAttached_one": "Vain ensimmäinen {{displayCount}} tiedosto liitetään.",
     "onlyFirstFilesAttached_other": "Vain ensimmäiset {{displayCount}} tiedostoa liitetään."
   },
   "kiloPass": {
@@ -3584,8 +3584,8 @@
     "subtitle": "Lähetä laskutusyhteyshenkilöille sähköposti- tai push-varoitus, kun tämän alueen kulutus ylittää rajan tai nousee tavanomaisen tuntitahdin yläpuolelle.",
     "thresholdTitle": "Rajan ylitys",
     "thresholdSubtitle": "Tämän alueen juokseva kulutus valitulla ajanjaksolla ylittää rajasi",
-    "anomalyTitle": "Tunneittainen piikki",
-    "anomalySubtitle": "Yksi tunti on selvästi tämän alueen tavanomaista tahtia korkeampi",
+    "anomalyTitle": "Tuntikohtainen piikki",
+    "anomalySubtitle": "Tämän alueen tuntitahti on selvästi sen oman p95-vertailutason yläpuolella",
     "limitLabel": "Raja (USD)",
     "windowLabel": "Aikaikkuna",
     "window24h": "24 tuntia",

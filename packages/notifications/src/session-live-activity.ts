@@ -17,6 +17,7 @@ import {
   SESSION_LIVE_TARGET_LIMIT,
   type SessionLiveChanges,
   type SessionLiveFailureKind,
+  type SessionLiveOutcomeKind,
   type SessionLivePlan,
   type SessionLiveStep,
 } from './session-live-content';
@@ -54,7 +55,7 @@ export type SessionLiveActivityRow = {
   permissionCommand?: string | null;
   lastActivityAt?: string | null;
   costMicrodollars?: number | null;
-  outcome?: 'pr_opened' | 'changes' | 'none' | null;
+  outcome?: SessionLiveOutcomeKind | null;
   failure?: SessionLiveFailureKind | null;
   startedAt?: string | null;
   /** True when this session has an open pull request; set on a finished row. */
@@ -65,7 +66,6 @@ export type SessionLiveActivityBuildOptions = {
   approvalKey: string | null;
   updatedAt: string;
   statusSinceFallback: string;
-  /** The content the card already shows, so server-only facts survive. */
   /** The content the card already shows, so server-only facts survive a local rebuild. */
   previous?: Partial<SessionLiveActivityContentState> | undefined;
 };
@@ -89,7 +89,7 @@ function maxCost(
 function outcomeKind(
   row: SessionLiveActivityRow,
   changes: SessionLiveChanges | null
-): 'pr_opened' | 'changes' | 'none' {
+): SessionLiveOutcomeKind {
   if (row.outcome !== null && row.outcome !== undefined) return row.outcome;
   if (row.prOpened === true) return 'pr_opened';
   return changes === null ? 'none' : 'changes';
@@ -108,7 +108,10 @@ function outcomeKind(
  *   content the card already shows. A tray row carries no step, plan, diff or
  *   outcome, so a local update must not wipe the ones a push delivered.
  * - A finished row with a failure reads as the `failed` kind, which the layout
- *   draws as a stopped turn.
+ *   draws as a stopped turn. A row that carries `failure: null` reports no
+ *   failure and clears the remembered one; a row with no `failure` key at all
+ *   cannot report it either way, so the remembered failure survives, which is
+ *   what keeps a push-delivered `failed` card through a tray rebuild.
  * - Every text field is read through the shared display rule before it reaches
  *   the card, so a value from any producer draws as the line it stands for.
  */
@@ -118,7 +121,7 @@ export function buildSessionLiveActivityContentState(
 ): SessionLiveActivityContentState {
   const previous = options.previous;
   const base = glanceableStatusKind(row.status);
-  const failure = row.failure ?? previous?.failure?.kind ?? null;
+  const failure = row.failure === undefined ? (previous?.failure?.kind ?? null) : row.failure;
   const statusKind: SessionCardStatusKind = base === 'idle' && failure !== null ? 'failed' : base;
   const approvalKey = row.status === 'permission' ? options.approvalKey : null;
   const changes = row.changes ?? previous?.changes ?? null;

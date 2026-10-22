@@ -1,4 +1,19 @@
 import type { ForwardedAuth, GrantProps } from './types';
+import {
+  CloudAgentAuthoritySchema,
+  type CloudAgentAuthority,
+} from '../../../packages/worker-utils/src/cloud-agent-authority';
+
+export function hasCloudAgentAuthorityClaim(token: string): boolean {
+  try {
+    const payload: unknown = JSON.parse(
+      atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))
+    );
+    return typeof payload === 'object' && payload !== null && 'cloudAgentAuthority' in payload;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Organization header name. Mirrors ORGANIZATION_ID_HEADER in
@@ -19,13 +34,26 @@ export const ORGANIZATION_ID_HEADER = 'x-kilocode-organizationid';
  * Never log the returned value; `authorization` embeds a live Kilo token.
  */
 export function forwardedAuthFromProps(props: GrantProps): ForwardedAuth {
+  const authority =
+    props.cloudAgentAuthority === undefined
+      ? undefined
+      : CloudAgentAuthoritySchema.parse(props.cloudAgentAuthority);
+  if (
+    authority &&
+    (authority.ownerId !== props.kiloUserId ||
+      authority.organizationId !== (props.organizationId ?? null) ||
+      authority.expiresAt <= Math.floor(Date.now() / 1000))
+  ) {
+    throw new Error('Invalid Cloud Agent authority');
+  }
   return {
     authorization: `Bearer ${props.kiloToken}`,
     organizationId: props.organizationId ?? undefined,
     kiloUserId: props.kiloUserId,
     clientId: props.clientId,
-    adminEnabled: props.adminEnabled === true,
-    adminEligible: props.adminEligible === true,
+    adminEnabled: authority === undefined && props.adminEnabled === true,
+    adminEligible: authority === undefined && props.adminEligible === true,
+    ...(authority === undefined ? {} : { cloudAgentAuthority: authority }),
     // The grant's own connection id, forwarded so a protected request binds to
     // the session that created it. Absent or empty stays absent: a
     // pre-amendment grant (no sessionId) is unusable by the protected tools.
@@ -62,7 +90,7 @@ export type VerifyKiloSessionTokenOptions = {
  */
 export async function verifyKiloSessionToken(
   options: VerifyKiloSessionTokenOptions
-): Promise<{ kiloUserId: string } | null> {
+): Promise<{ kiloUserId: string; cloudAgentAuthority?: CloudAgentAuthority } | null> {
   const doFetch = options.fetchImpl ?? fetch;
   try {
     const response = await doFetch(`${options.webBaseUrl}/api/user`, {
@@ -81,6 +109,17 @@ export async function verifyKiloSessionToken(
     if (typeof body !== 'object' || body === null || Array.isArray(body)) return null;
     const id = (body as Record<string, unknown>)['id'];
     if (typeof id !== 'string' || id.length === 0) return null;
+    if ('cloudAgentAuthority' in body) {
+      const parsed = CloudAgentAuthoritySchema.safeParse(body.cloudAgentAuthority);
+      if (
+        !parsed.success ||
+        parsed.data.ownerId !== id ||
+        parsed.data.expiresAt <= Math.floor(Date.now() / 1000)
+      )
+        return null;
+      return { kiloUserId: id, cloudAgentAuthority: parsed.data };
+    }
+    if (hasCloudAgentAuthorityClaim(options.token)) return null;
     return { kiloUserId: id };
   } catch {
     // Non-2xx, malformed body, timeout and transport errors all answer the same

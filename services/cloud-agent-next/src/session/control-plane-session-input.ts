@@ -26,6 +26,7 @@ import { buildSandboxBillingInput } from '../container-usage-context.js';
 import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
 import { buildSignedPromptAttachments } from '../execution/attachment-prompt-parts.js';
 import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
+import { CODE_REVIEW_CONTAINERS_INSTANCE } from '../sandbox-containers/instance-size.js';
 import { createMessageId } from './message-id.js';
 import {
   buildSessionMetadataFromRegistration,
@@ -192,7 +193,10 @@ export function buildControlPlaneSandboxSelection(
       };
     }
     case 'cloudflare-containers': {
-      const instance = getSandboxAllocationInstance(allocation);
+      const instance =
+        sandboxKind === 'code-review'
+          ? CODE_REVIEW_CONTAINERS_INSTANCE
+          : getSandboxAllocationInstance(allocation);
       return {
         provider,
         configuration: instance === undefined ? { provider } : { provider, instance },

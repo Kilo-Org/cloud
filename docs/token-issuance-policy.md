@@ -101,15 +101,14 @@ This is a concrete, selective map from the shared Kilo token entry points. It do
 | Git operations | `apps/web/src/lib/integrations/platforms/{bitbucket,github,gitlab}/`; generic GitHub disconnect in `apps/web/src/lib/integrations/platforms/github/user-authorization-client.ts` | `services/git-token-service/src/index.ts` | Operation-specific values listed above; disconnect has none | Preserve existing values; potential later `git-token-service:github-user-authorizations:disconnect` | Do not replace mandatory operation-specific audiences with broad `git-token-service`. |
 | User-data export | `apps/web/src/lib/user-data-export-worker-client.ts` | `services/user-data-export/src/index.ts` | `user-data-export` | Preserve `user-data-export` | Requires its additional internal API key and five-minute assertion limit. |
 | Organization and attribution | `apps/web/src/app/api/organizations/[id]/user-tokens/route.ts` | `services/ai-attribution/src/util/auth.ts` | None | `ai-attribution` | Organization-bearing tokens have other valid uses; attribution consumer transport was not fully traced. |
-| Auto-routing benchmark | `apps/web/src/app/api/internal/auto-routing-benchmark/token/route.ts` | `services/auto-routing-benchmark/src/run.ts` decider CLI | None | `kilo-api` / `kilo-gateway` based on actual downstream call | `tokenSource: 'auto-routing-benchmark'` identifies issuance, not an authorization audience; full CLI call graph is unresolved. |
 | MCP catalog dump | `apps/web/src/app/api/internal/mcp-catalog/token/route.ts` | `.github/workflows/kilo-mcp-catalog.yml` `kilo run` (benchmarking service account) | None | `kilo-api` / `kilo-gateway` based on actual downstream call | `tokenSource: 'mcp-catalog'` identifies issuance; the `MCP_CATALOG_TOKEN_SECRET` shared secret only authenticates the mint and is never a Kilo credential. |
-| Internal bot users | `apps/web/src/app/api/internal/bot-token/route.ts` | Internal workloads running as `bot-internal-*` users (bouncer watch, auto-routing benchmark) | None (legacy); `kilo-api` + `kilo-gateway` (modern) | `kilo-api` / `kilo-gateway`, one hour | `tokenSource: 'internal-bot'`; minting requires a `bot-internal-*` bot user with a pepper and no block, plus an owner or member role in the requested organization; `BOT_TOKEN_MINT_SECRET` only authenticates the mint and is never a Kilo credential. Modern shape gated by `INTERNAL_BOT_RESOURCE_TOKENS_ENABLED`. |
+| Internal bot users | `apps/web/src/app/api/internal/bot-token/route.ts` | `services/auto-routing-benchmark/src/benchmark-token.ts` (decider CLI and executable model catalog); other internal workloads running as `bot-internal-*` users | None (legacy); `kilo-api` + `kilo-gateway` (modern) | `kilo-api` / `kilo-gateway`, one hour | `tokenSource: 'internal-bot'`; minting requires a `bot-internal-*` bot user with a pepper and no block, plus an owner or member role in the requested organization; `BOT_TOKEN_MINT_SECRET` only authenticates the mint and is never a Kilo credential. Modern shape gated by `INTERNAL_BOT_RESOURCE_TOKENS_ENABLED`. |
 
 ## Existing markers and excluded families
 
 Core optional markers accepted by the shared schema are documented in `packages/worker-utils/src/kilo-token.ts`: `tokenSource`, `botId`, `internalApiUse`, `createdOnPlatform`, `deviceAuthRequestCode`, `deviceSessionId`, admin/Gastown flags, and organization claims.
 
-- Confirmed `tokenSource` values: `cloud-agent`, `kilo-chat`, `auto-routing-benchmark`, `mcp-catalog`, `internal-bot`.
+- Confirmed `tokenSource` values: `cloud-agent`, `kilo-chat`, `mcp-catalog`, `internal-bot`.
 - Confirmed `botId` values: `reviewer`, `discord-bot`, `webhook-bot`.
 - `internalApiUse` and `createdOnPlatform` are additional automation markers; `services/security-auto-analysis/src/token.ts` emits `internalApiUse: true` and `createdOnPlatform: 'security-agent'`.
 - No universal signed system marker or reliable system-user-ID convention was confirmed.
@@ -123,7 +122,7 @@ Excluded from the credential-exchange compatibility class or treated as separate
 - encrypted Git/Kilo session capabilities, which have their own `purpose` field (for example `kilo_api_session`) in `services/git-token-service/src/kilo-session-capability.ts`;
 - container, share, repository, and MCP credentials, which require separate family-specific analysis rather than automatic migration as core Kilo API tokens.
 
-KiloClaw's five-minute control tokens (one-hour setup token), 24-hour access cookies, and 30-day runtime keys are distinct. Gastown runtime credentials also last 30 days; organization tokens last 15 minutes, benchmark tokens six hours, and internal bot tokens one hour. None qualifies for the five-year exchange compatibility class.
+KiloClaw's five-minute control tokens (one-hour setup token), 24-hour access cookies, and 30-day runtime keys are distinct. Gastown runtime credentials also last 30 days; organization tokens last 15 minutes and internal bot tokens, including the decider benchmark's, one hour. None qualifies for the five-year exchange compatibility class.
 
 ## Phase 4: web and HTML-deployment readers
 

@@ -203,6 +203,35 @@ describe('buildSessionLiveActivityContentState', () => {
     ).toBeNull();
   });
 
+  it('clears a remembered failure when the row reports none of its own', () => {
+    const previous = buildSessionLiveActivityContentState(
+      { id: 'ses_9', status: 'idle', failure: 'provider' },
+      options
+    );
+    const idle = buildSessionLiveActivityContentState(
+      { id: 'ses_9', status: 'idle', failure: null },
+      { ...options, previous }
+    );
+    expect(idle.statusKind).toBe('idle');
+    expect(idle.failure).toBeNull();
+    expect(idle.outcome).toEqual({ kind: 'none' });
+  });
+
+  it('keeps a remembered failure for a row that cannot report one', () => {
+    // A tray row carries no failure fact at all, so a foreground rebuild must
+    // not wipe the failed card a push delivered.
+    const previous = buildSessionLiveActivityContentState(
+      { id: 'ses_10', status: 'idle', failure: 'tool' },
+      options
+    );
+    const idle = buildSessionLiveActivityContentState(
+      { id: 'ses_10', status: 'idle' },
+      { ...options, previous }
+    );
+    expect(idle.statusKind).toBe('failed');
+    expect(idle.failure).toEqual({ kind: 'tool' });
+  });
+
   it('sets the wake time only for a scheduled session', () => {
     expect(
       buildSessionLiveActivityContentState(

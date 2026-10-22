@@ -89,7 +89,7 @@ describe('adminVercelModelIdOverridesRouter', () => {
         {
           openrouter_model_id: 'qwen/qwen3-32b',
           vercel_model_id: 'alibaba/qwen-3-32b-custom',
-          builtin_vercel_model_id: 'alibaba/qwen-3-32b',
+          builtin_vercel_model_id: 'alibaba/qwen3-32b',
         },
       ],
     });

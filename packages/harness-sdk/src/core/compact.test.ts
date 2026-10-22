@@ -1,4 +1,4 @@
-import { Effect, Either, Fiber, Option, Stream } from 'effect';
+import { Effect, Fiber, Option, Result, Stream } from 'effect';
 import { expect, it } from 'vitest';
 import { ModelError } from './model.js';
 import { textIn } from './prompt.js';
@@ -23,8 +23,8 @@ const askTwice = runWith({
   replies: [full, { deltas: ['the notes'] }, { deltas: ['after'] }],
   catalog: catalogWindowed(window),
   use: session =>
-    Effect.zipRight(
-      Effect.zipRight(Stream.runDrain(session.ask('one')), Stream.runDrain(session.ask('two'))),
+    Effect.andThen(
+      Effect.andThen(Stream.runDrain(session.ask('one')), Stream.runDrain(session.ask('two'))),
       session.history
     ),
 });
@@ -66,7 +66,7 @@ it('asks the summariser with the session key and the session effort', async () =
     catalog: catalogWindowed(window),
     options: { ...options, effort: 'high' },
     use: session =>
-      Effect.zipRight(Stream.runDrain(session.ask('one')), Stream.runDrain(session.ask('two'))),
+      Effect.andThen(Stream.runDrain(session.ask('one')), Stream.runDrain(session.ask('two'))),
   });
 
   expect(calls[1]).toMatchObject({ cacheKey: calls[0]?.cacheKey, effort: 'high' });
@@ -77,7 +77,7 @@ it('leaves a session that still fits alone', async () => {
     replies: [roomy, { deltas: ['after'] }],
     catalog: catalogWindowed(window),
     use: session =>
-      Effect.zipRight(Stream.runDrain(session.ask('one')), Stream.runDrain(session.ask('two'))),
+      Effect.andThen(Stream.runDrain(session.ask('one')), Stream.runDrain(session.ask('two'))),
   });
 
   /* Two questions, two calls. A summariser that ran here would cost a request
@@ -92,7 +92,7 @@ it('never compacts when the catalog names no window', async () => {
   const { calls } = await runWith({
     replies: [full, { deltas: ['after'] }],
     use: session =>
-      Effect.zipRight(Stream.runDrain(session.ask('one')), Stream.runDrain(session.ask('two'))),
+      Effect.andThen(Stream.runDrain(session.ask('one')), Stream.runDrain(session.ask('two'))),
   });
 
   expect(calls).toHaveLength(2);
@@ -109,7 +109,7 @@ it('counts what the cache read towards the window', async () => {
     ],
     catalog: catalogWindowed(window),
     use: session =>
-      Effect.zipRight(Stream.runDrain(session.ask('one')), Stream.runDrain(session.ask('two'))),
+      Effect.andThen(Stream.runDrain(session.ask('one')), Stream.runDrain(session.ask('two'))),
   });
 
   expect(calls).toHaveLength(3);
@@ -127,7 +127,7 @@ it('counts the completed answer and newly cached input before the next question'
     ],
     catalog: catalogWindowed(window),
     use: session =>
-      Effect.zipRight(Stream.runDrain(session.ask('one')), Stream.runDrain(session.ask('two'))),
+      Effect.andThen(Stream.runDrain(session.ask('one')), Stream.runDrain(session.ask('two'))),
   });
   expect(calls.at(-1)?.prompt.messages.map(textIn)).toEqual([
     'Summary of the conversation so far:\n\nthe summary',
@@ -141,7 +141,7 @@ it('obeys a caller who sets the share', async () => {
     catalog: catalogWindowed(window),
     options: { ...options, compactAt: 0.001 },
     use: session =>
-      Effect.zipRight(Stream.runDrain(session.ask('one')), Stream.runDrain(session.ask('two'))),
+      Effect.andThen(Stream.runDrain(session.ask('one')), Stream.runDrain(session.ask('two'))),
   });
 
   expect(calls).toHaveLength(3);
@@ -152,9 +152,9 @@ it('compacts when the caller says so, whatever the window says', async () => {
     replies: [roomy, { deltas: ['the notes'] }, { deltas: ['after'] }],
     catalog: catalogWindowed(window),
     use: session =>
-      Effect.zipRight(
-        Effect.zipRight(
-          Effect.zipRight(Stream.runDrain(session.ask('one')), session.compact),
+      Effect.andThen(
+        Effect.andThen(
+          Effect.andThen(Stream.runDrain(session.ask('one')), session.compact),
           Stream.runDrain(session.ask('two'))
         ),
         session.history
@@ -178,7 +178,7 @@ it('writes the summary to the store, so a continued session starts there too', a
     catalog: catalogWindowed(window),
     store: store.layer,
     use: session =>
-      Effect.zipRight(Stream.runDrain(session.ask('one')), Stream.runDrain(session.ask('two'))),
+      Effect.andThen(Stream.runDrain(session.ask('one')), Stream.runDrain(session.ask('two'))),
   });
 
   expect(store.seen).toEqual([
@@ -198,8 +198,8 @@ it('stops charging the old prompt size against the new one', async () => {
     replies: [full, { deltas: ['the notes'] }, roomy, { deltas: ['after'] }],
     catalog: catalogWindowed(window),
     use: session =>
-      Effect.zipRight(
-        Effect.zipRight(Stream.runDrain(session.ask('one')), Stream.runDrain(session.ask('two'))),
+      Effect.andThen(
+        Effect.andThen(Stream.runDrain(session.ask('one')), Stream.runDrain(session.ask('two'))),
         Stream.runDrain(session.ask('three'))
       ),
   });
@@ -222,12 +222,12 @@ it('leaves the session alone when the summary call fails, and tries again', asyn
     ],
     catalog: catalogWindowed(window),
     use: session =>
-      Effect.zipRight(
-        Effect.zipRight(
+      Effect.andThen(
+        Effect.andThen(
           Stream.runDrain(session.ask('one')),
-          Effect.either(Stream.runDrain(session.ask('two')))
+          Effect.result(Stream.runDrain(session.ask('two')))
         ),
-        Effect.zipRight(Stream.runDrain(session.ask('three')), session.history)
+        Effect.andThen(Stream.runDrain(session.ask('three')), session.history)
       ),
   });
 
@@ -253,9 +253,9 @@ it('refuses to compact while a question is still streaming', async () => {
     replies: [{ deltas: ['said'], stall: true }, { deltas: ['after'] }],
     use: session =>
       Effect.gen(function* () {
-        const reading = yield* Effect.fork(Stream.runDrain(session.ask('why')));
+        const reading = yield* Effect.forkChild(Stream.runDrain(session.ask('why')));
         yield* Effect.sleep('10 millis');
-        const refused = yield* Effect.either(session.compact);
+        const refused = yield* Effect.result(session.compact);
         yield* Fiber.interrupt(reading);
         /* The refusal must not hold the lock it did not take, so the session
            still answers. */
@@ -264,7 +264,7 @@ it('refuses to compact while a question is still streaming', async () => {
       }),
   });
 
-  expect(Either.getLeft(value.refused).pipe(Option.map(error => error._tag))).toStrictEqual(
+  expect(Result.getFailure(value.refused).pipe(Option.map(error => error._tag))).toStrictEqual(
     Option.some('harness/SessionBusyError')
   );
   /* Two calls: the question that stalled, and the one after it. No summary was
@@ -285,8 +285,8 @@ it('counts what the summary call cost', async () => {
     ],
     catalog: catalogWindowed(1000),
     use: session =>
-      Effect.zipRight(
-        Effect.zipRight(Stream.runDrain(session.ask('one')), Stream.runDrain(session.ask('two'))),
+      Effect.andThen(
+        Effect.andThen(Stream.runDrain(session.ask('one')), Stream.runDrain(session.ask('two'))),
         session.usage
       ),
   });

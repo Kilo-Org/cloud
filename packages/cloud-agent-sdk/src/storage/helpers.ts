@@ -359,8 +359,8 @@ function applyTextDeltas(part: Part, deltas: readonly string[]): Part {
 
 /**
  * Apply streamed text chunks to the stored parts of one message: find the part
- * and append, or seed it with the first chunk when the message or the part is
- * not stored yet.
+ * and append, or seed it with the joined chunks when the message or the part
+ * is not stored yet.
  *
  * Returns the message's current array untouched when the chunks change
  * nothing, so a caller can skip its snapshot invalidation and publication on a

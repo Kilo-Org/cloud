@@ -76,7 +76,7 @@ function McpAppView({ part, view }: Readonly<McpAppViewProps>) {
   const [height, setHeight] = useState(DEFAULT_VIEW_HEIGHT);
   const [attempt, setAttempt] = useState(0);
 
-  const webView = useRef<WebView | null>(null);
+  const webView = useRef<WebView<unknown> | null>(null);
   const bridge = useRef<RemoteMcpApp | null>(null);
 
   useEffect(() => {
@@ -178,7 +178,7 @@ function McpAppView({ part, view }: Readonly<McpAppViewProps>) {
 
   return (
     <View style={{ height }} className="overflow-hidden rounded-lg bg-secondary">
-      <WebView
+      <WebView<unknown>
         // A retry gets a page of its own: a page that failed to load has no
         // host object left to hand a document to.
         key={attempt}

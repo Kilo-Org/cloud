@@ -441,6 +441,39 @@ function validate(workflow) {
     'kilo-mcp-catalog',
     'upsert targets the prod index'
   );
+  // The prune's stale ids come from the previously committed catalog, never
+  // from listing the index: a full list of the production index times out.
+  const previous = findStep(
+    merge,
+    step => step.id === 'previous',
+    'merge job exports the previous catalog for the prune'
+  );
+  assert.equal(previous.if, mergeChangeGate, 'the export is gated with the upsert');
+  assert.match(previous.run ?? '', /github\.event\.before/, 'the export reads the base commit');
+  assert.match(
+    previous.run ?? '',
+    /catalog-before\.json/,
+    'the export writes the previous catalog to a file'
+  );
+  assert.match(
+    previous.run ?? '',
+    /echo "file=\$RUNNER_TEMP\/catalog-before\.json" >> "\$GITHUB_OUTPUT"/,
+    'the export publishes the file path as the step output'
+  );
+  assert.ok(
+    merge.steps.indexOf(previous) < merge.steps.indexOf(upsert),
+    'the previous catalog is exported before the upsert reads it'
+  );
+  assert.equal(
+    upsert.env?.MCP_CATALOG_PRUNE_FROM,
+    '${{ steps.previous.outputs.file }}',
+    'the upsert prunes from the exported previous catalog'
+  );
+  const ordered = [...merge.steps.slice(merge.steps.indexOf(previous))];
+  assert.ok(
+    ordered.every(step => /prune|previous/i.test(step.name ?? '') || step.run === embedCommand),
+    'nothing else runs between the export and the upsert'
+  );
 }
 
 /**

@@ -5,12 +5,15 @@
  * Reads services/kilo-mcp/catalog.json, embeds every row's searchBlob via the
  * Cloudflare REST API (Workers AI run endpoint), and upserts the vectors with
  * the procedure path as vector id (requirement 9) and {path, kind, tags} as
- * metadata. Batches at ≤64 rows per request. After the upsert it lists the
- * index and deletes every vector whose id the catalog no longer has, so a
- * removed or renamed procedure cannot keep occupying a kNN slot.
+ * metadata. Batches at ≤64 rows per request. When `MCP_CATALOG_PRUNE_FROM`
+ * names the previously committed catalog, it then deletes every vector whose
+ * procedure path that catalog had and this one no longer has, so a removed or
+ * renamed procedure stops competing for kNN slots. The prune reads the previous
+ * artifact, never the index: listing the whole production index times out.
  *
  * Subcommands:
- *   (none)|upsert  embed + upsert every catalog row, then prune stale vectors
+ *   (none)|upsert  embed + upsert every catalog row, then prune what the
+ *                  previous catalog had and this one no longer does
  *   ensure-index   create the Vectorize index idempotently (pinned dimensions
  *                  and metric from src/embedding.ts), then exit
  *
@@ -21,6 +24,10 @@
  *   CLOUDFLARE_ACCOUNT_ID   Cloudflare account id
  *   CLOUDFLARE_API_TOKEN    API token with Workers AI + Vectorize permissions
  *   VECTORIZE_INDEX_NAME    index name, e.g. kilo-mcp-catalog-dev
+ *
+ * Env (optional):
+ *   MCP_CATALOG_PRUNE_FROM  path to the previously committed catalog.json;
+ *                           its paths minus the current ones are deleted
  *
  * Usage (from services/kilo-mcp):
  *   node scripts/embed-catalog.ts ensure-index
@@ -39,10 +46,7 @@ const API_ROOT = 'https://api.cloudflare.com/client/v4';
 /** Rows per AI-embed / Vectorize-upsert request (requirement: batch ≤64). */
 export const EMBED_BATCH_SIZE = 64;
 
-/** Vector ids per list page. The API caps `count` at 1000. */
-export const LIST_PAGE_SIZE = 500;
-
-/** Ids per delete_by_ids request, well below the list cap. */
+/** Ids per delete_by_ids request. */
 export const PRUNE_BATCH_SIZE = 100;
 
 /** One upsert record: vector id = procedure path, values = embedding, metadata. */
@@ -235,75 +239,54 @@ export async function embedAndUpsert(options: EmbedOptions): Promise<{ vectors: 
 }
 
 /**
- * Every vector id currently in the index, paged through the list endpoint.
- * Used by the prune, which needs the ids the catalog no longer names.
- */
-export async function listVectorIds(options: EmbedOptions): Promise<string[]> {
-  const fetchImpl = options.fetchImpl ?? defaultFetch();
-  const base = `/accounts/${options.CLOUDFLARE_ACCOUNT_ID}/vectorize/v2/indexes/${options.VECTORIZE_INDEX_NAME}/list`;
-  const ids: string[] = [];
-  let cursor: string | undefined;
-  for (;;) {
-    const query = `?count=${LIST_PAGE_SIZE}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
-    const page = (await cfRequest(fetchImpl, options, `${base}${query}`)) as {
-      vectors?: Array<{ id?: string }>;
-      nextCursor?: string;
-      isTruncated?: boolean;
-    };
-    for (const vector of page.vectors ?? []) {
-      if (typeof vector.id === 'string') ids.push(vector.id);
-    }
-    // A truncated page without a cursor cannot be followed; stop rather than
-    // report a partial index as complete.
-    if (page.isTruncated !== true || !page.nextCursor) return ids;
-    cursor = page.nextCursor;
-  }
-}
-
-/**
- * Delete the vectors whose procedure path the catalog no longer has. The index
- * is otherwise rebuilt by upsert alone, so a removed or renamed procedure would
- * keep a vector that competes for every future kNN slot.
+ * Delete the vectors whose procedure path the previous catalog had and the
+ * current one no longer has. The index is otherwise rebuilt by upsert alone, so
+ * a removed or renamed procedure would keep a vector that competes for every
+ * future kNN slot.
  *
- * An empty catalog prunes nothing: the dump refuses to write one, so an empty
- * artifact means something went wrong, and emptying the production index on a
- * bad artifact is worse than leaving stale ids behind.
+ * The previous artifact is the source of stale ids, never the index itself:
+ * listing the whole production index through the REST API times out.
+ *
+ * An empty current catalog prunes nothing: the dump refuses to write one, so an
+ * empty artifact means something went wrong, and emptying the production index
+ * on a bad artifact is worse than leaving the stale ids behind.
  */
-export async function pruneStaleVectors(options: EmbedOptions): Promise<{ deleted: string[] }> {
+export async function pruneRemovedPaths(
+  options: EmbedOptions,
+  previousCatalog: Catalog | undefined
+): Promise<{ deleted: string[] }> {
   const fetchImpl = options.fetchImpl ?? defaultFetch();
   const log = options.log ?? (() => {});
-  const paths = new Set(Object.keys(options.catalog));
-  if (paths.size === 0) {
+  if (!previousCatalog) {
+    log('no previous catalog; nothing to prune');
+    return { deleted: [] };
+  }
+  if (Object.keys(options.catalog).length === 0) {
     log('catalog is empty; skipping the stale-vector prune');
     return { deleted: [] };
   }
 
-  const listed = await listVectorIds({ ...options, fetchImpl });
-  const stale = listed.filter(id => !paths.has(id));
-  if (stale.length === 0) {
-    log(
-      `✅ index "${options.VECTORIZE_INDEX_NAME}" matches the catalog (${listed.length} vectors)`
-    );
+  const removed = Object.keys(previousCatalog).filter(path => !(path in options.catalog));
+  if (removed.length === 0) {
+    log('✅ no procedure left the catalog; nothing to prune');
     return { deleted: [] };
   }
 
-  for (let start = 0; start < stale.length; start += PRUNE_BATCH_SIZE) {
-    const batch = stale.slice(start, start + PRUNE_BATCH_SIZE);
+  for (let start = 0; start < removed.length; start += PRUNE_BATCH_SIZE) {
+    const batch = removed.slice(start, start + PRUNE_BATCH_SIZE);
     await cfRequest(
       fetchImpl,
       options,
       `/accounts/${options.CLOUDFLARE_ACCOUNT_ID}/vectorize/v2/indexes/${options.VECTORIZE_INDEX_NAME}/delete_by_ids`,
       { method: 'POST', body: JSON.stringify({ ids: batch }) }
     );
-    log(
-      `  pruned ${Math.min(start + PRUNE_BATCH_SIZE, stale.length)}/${stale.length} stale vectors`
-    );
+    log(`  pruned ${Math.min(start + PRUNE_BATCH_SIZE, removed.length)}/${removed.length} vectors`);
   }
 
   log(
-    `✅ deleted ${stale.length} stale vectors from "${options.VECTORIZE_INDEX_NAME}" (${listed.length - stale.length} current)`
+    `✅ deleted ${removed.length} vectors for procedures the catalog no longer has from "${options.VECTORIZE_INDEX_NAME}"`
   );
-  return { deleted: stale };
+  return { deleted: removed };
 }
 
 function envFromProcess(): EmbedEnv {
@@ -353,6 +336,18 @@ export function parseCatalog(value: unknown): Catalog {
   return catalog;
 }
 
+/**
+ * The previously committed catalog named by `MCP_CATALOG_PRUNE_FROM`, or
+ * undefined when the caller has no previous artifact (first run, or a base
+ * commit whose catalog could not be read).
+ */
+export function loadPreviousCatalog(
+  path = process.env['MCP_CATALOG_PRUNE_FROM']
+): Catalog | undefined {
+  if (!path) return undefined;
+  return parseCatalog(JSON.parse(readFileSync(path, 'utf8')) as unknown);
+}
+
 /** Read the committed catalog.json that sits next to this script's package. */
 export function loadCatalog(): Catalog {
   // import.meta.url is ALREADY a file URL: decode it with fileURLToPath —
@@ -381,7 +376,7 @@ async function main(): Promise<void> {
     );
   }
   await embedAndUpsert(options);
-  await pruneStaleVectors(options);
+  await pruneRemovedPaths(options, loadPreviousCatalog());
 }
 
 const isMain = Boolean(process.argv[1]) && import.meta.url === pathToFileURL(process.argv[1]).href;

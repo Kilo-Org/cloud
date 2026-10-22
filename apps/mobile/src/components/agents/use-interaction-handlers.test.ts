@@ -167,6 +167,47 @@ describe('useInteractionHandlers attention ack', () => {
     expect(isAttentionAcked('kilo-session-1', { raiseId: '2026-09-18T21:30:00.000Z' })).toBe(false);
   });
 
+  it.each(['answer', 'skip', 'permission'] as const)(
+    'keeps the %s ack on the submitted raise when another arrives in flight',
+    async operation => {
+      const gate = Promise.withResolvers<undefined>();
+      const manager = {
+        answerQuestion: vi.fn().mockReturnValue(gate.promise),
+        rejectQuestion: vi.fn().mockReturnValue(gate.promise),
+        respondToPermission: vi.fn().mockReturnValue(gate.promise),
+      };
+      const status = operation === 'permission' ? 'permission' : 'question';
+      const firstRaise = '2026-09-18T21:00:00.000Z';
+      const nextRaise = '2026-09-18T21:30:00.000Z';
+      let observed = { status, statusUpdatedAt: firstRaise };
+      const { render } = renderInteractionHandlers({
+        manager: manager as never,
+        kiloSessionId: 'kilo-session-1',
+        activeQuestion: { requestId: 'q1' },
+        activePermission: { requestId: 'p1' },
+        surface: 'remote-session',
+        readObservedRaise: () => observed,
+      });
+      const handlers = render();
+      const pending = (async () => {
+        if (operation === 'answer') {
+          await handlers.handleAnswerQuestion([['yes']]);
+        } else if (operation === 'skip') {
+          await handlers.handleRejectQuestion();
+        } else {
+          await handlers.handleRespondToPermission('once');
+        }
+      })();
+
+      observed = { status, statusUpdatedAt: nextRaise };
+      gate.resolve(undefined);
+      await pending;
+
+      expect(isAttentionAcked('kilo-session-1', { raiseId: firstRaise, status })).toBe(true);
+      expect(isAttentionAcked('kilo-session-1', { raiseId: nextRaise, status })).toBe(false);
+    }
+  );
+
   it('ignores an observed raise of the other kind', async () => {
     const manager = {
       answerQuestion: vi.fn().mockResolvedValue(undefined),

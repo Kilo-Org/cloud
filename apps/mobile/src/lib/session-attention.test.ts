@@ -704,6 +704,25 @@ describe('revision snapshot and listener notification', () => {
     unsubscribe();
   });
 
+  it.each([true, false])(
+    'keeps the newer raise with acked=%s when an earlier response finishes late',
+    newerAcked => {
+      const earlier = '2026-10-12 09:45:12.945+00';
+      const newer = '2026-10-12T09:46:00.000Z';
+      ackSessionAttention('s1', 'question', earlier);
+      reconcileSessionAttention('s1', 'question', newer);
+      if (newerAcked) {
+        ackSessionAttention('s1', 'question', newer);
+      }
+
+      ackSessionAttention('s1', 'question', earlier);
+
+      expect(__peekSessionAttentionForTests('s1')).toEqual({ raiseId: newer });
+      expect(isAttentionAcked('s1', { raiseId: newer, status: 'question' })).toBe(newerAcked);
+      expect(isAttentionAcked('s1', { raiseId: earlier, status: 'question' })).toBe(false);
+    }
+  );
+
   it('bumps revision on mutating reconciles and stays stable on no-ops', () => {
     const listener = vi.fn<() => void>();
     const unsubscribe = subscribe(listener);

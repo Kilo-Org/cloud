@@ -297,6 +297,8 @@ function getServerSnapshot(): number {
  * already tracks for the same status — the raise that was on screen when the
  * answer happened.
  *
+ * A late response cannot replace a newer dated raise already tracked here.
+ *
  * Re-acking the raise already acked changes nothing — skip the bump so we
  * don't fire a redundant global re-render.
  */
@@ -310,6 +312,12 @@ export function ackSessionAttention(
   // entry's raise was answered already and must not be reused for a new one.
   const trackedRaise = entry?.ackedAt === null && entry.status === status ? entry.raiseId : null;
   const raiseId = statusUpdatedAt ?? trackedRaise ?? status;
+  if (
+    entry?.raiseId != null &&
+    parseTimestamp(entry.raiseId).getTime() > parseTimestamp(raiseId).getTime()
+  ) {
+    return;
+  }
   if (entry && entry.ackedAt !== null && sameRaise(entry.raiseId, raiseId)) {
     return;
   }

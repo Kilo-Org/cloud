@@ -15,13 +15,13 @@ export type ObservedSessionRaise = {
 };
 
 /**
- * Read the raise the tray last observed for a session, at call time.
+ * Read the raise the tray last observed before submitting a response.
  *
  * The answer paths know which request they answered but not when its raise was
  * created; the raise id is `statusUpdatedAt ?? status` of the row, and the row
  * the app has observed lives in the `activeSessions.list` cache the tab layout,
  * the list rows and the live-sync owner all write. This reads that cache once
- * per ack — no fetch, no subscription — so an ack can name the exact raise the
+ * per submission — no fetch, no subscription — so an ack can name the exact raise the
  * user answered instead of degrading to its status.
  *
  * Returns null when the session is not in the cache (an offline or already

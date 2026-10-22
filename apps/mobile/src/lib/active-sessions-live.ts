@@ -198,12 +198,6 @@ type PreservedFields = {
    * but `lastActivityAt` may be legitimately absent (NULL in DB).
    */
   lastActivityAt: string | undefined;
-  /**
-   * Sticky: heartbeat and `sessions.list` rows never carry the status-change
-   * time. Only a tRPC fetch or a `session.status.updated` event writes it, so
-   * a merge must keep it or the newest session and its age go blank.
-   */
-  statusUpdatedAt: string | undefined;
   /** Sticky like the three above: WS payloads never carry an org id. */
   organizationId: string | null | undefined;
   /**
@@ -231,7 +225,6 @@ function readEnrichment(current: CachedActiveSession | undefined): PreservedFiel
     createdAt: current?.createdAt,
     updatedAt: current?.updatedAt,
     lastActivityAt: current?.lastActivityAt,
-    statusUpdatedAt: current?.statusUpdatedAt,
     organizationId: current?.organizationId,
     totalCostMicrodollars: current?.totalCostMicrodollars,
     associatedPr: current?.associatedPr,
@@ -246,11 +239,12 @@ function withEnrichmentAndConnectionId(
   connectionId: string
 ): CachedActiveSession {
   const enrichment = readEnrichment(current);
+  const status = effectiveStatus(row.status, current?.status);
   return {
     id: row.id,
     // Sticky attention: a non-attention WS status must not clear a held
     // question/permission. "stored" for WS paths is the cached row status.
-    status: effectiveStatus(row.status, current?.status),
+    status,
     // The tray title is DB-authoritative (the router enriches it from
     // cli_sessions_v2), so once a row has been through a tRPC fetch a heartbeat's
     // CLI title must not overwrite it — nothing propagates a cloud rename back to
@@ -265,6 +259,8 @@ function withEnrichmentAndConnectionId(
     // only when the WS row omits the field (legacy payloads).
     capabilities: row.capabilities ?? current?.capabilities,
     ...enrichment,
+    // Socket statuses are undated; a changed status cannot inherit the cached time.
+    statusUpdatedAt: status === current?.status ? current.statusUpdatedAt : undefined,
     // Wire wins, including omission: a CLI that reports `scheduled` with no
     // wake time must show scheduled with no time, not a cached timestamp.
     ...(row.scheduledAt === undefined ? {} : { scheduledAt: row.scheduledAt }),
@@ -349,8 +345,8 @@ export function mergeHeartbeatForActiveSessions(
 /**
  * Apply an explicit status transition (including leaving attention).
  * Unknown session ids are ignored — live cache only holds active rows. The
- * transition's own time replaces the row's `statusUpdatedAt`, so the newest
- * session and its age do not wait for the next tRPC poll.
+ * transition's own time replaces the row's `statusUpdatedAt`. An undated
+ * transition preserves the cached time only when the status is unchanged.
  */
 export function applySessionStatusUpdated(
   current: readonly CachedActiveSession[],
@@ -377,6 +373,8 @@ export function applySessionStatusUpdated(
     }
     if (statusUpdatedAt !== undefined) {
       next.statusUpdatedAt = statusUpdatedAt;
+    } else if (row.status !== update.status) {
+      delete next.statusUpdatedAt;
     }
     return next;
   });

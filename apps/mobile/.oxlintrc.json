@@ -376,7 +376,8 @@
     "func-name-matching": "off",
     "import/newline-after-import": "off",
     "logical-assignment-operators": "off",
-    "no-irregular-whitespace": "off",
+    // Prose lives in comments; code whitespace is still reported.
+    "no-irregular-whitespace": ["error", { "skipComments": true }],
     "no-multi-assign": "off",
     "no-redeclare": "off",
     "no-underscore-dangle": "off",

@@ -77,10 +77,10 @@ describe('baseSendMessageNextSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('still accepts a text-only prompt', () => {
+  it('accepts a text-only prompt', () => {
     const result = baseSendMessageNextSchema.safeParse({
       cloudAgentSessionId: 'cloud-session-1',
-      payload: promptPayload('hello'),
+      payload: promptPayload(atCap),
     });
     expect(result.success).toBe(true);
   });

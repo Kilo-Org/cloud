@@ -728,10 +728,12 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
 
       // The tRPC option type widens the result to include undefined; `query`
       // resolves with the fetched data or rejects.
-      const fetchedBitbucketStatus = (await queryClient.query(
-        trpc.organizations.bitbucket.getStatus.queryOptions({ organizationId })
-      )) as NonNullable<typeof bitbucketStatusData>;
-      const bitbucketStatus = statusOverride ?? bitbucketStatusData ?? fetchedBitbucketStatus;
+      const bitbucketStatus =
+        statusOverride ??
+        bitbucketStatusData ??
+        ((await queryClient.query(
+          trpc.organizations.bitbucket.getStatus.queryOptions({ organizationId })
+        )) as NonNullable<typeof bitbucketStatusData>);
 
       if (bitbucketStatus.integrationId && bitbucketStatus.canManage) {
         const result = await refreshBitbucketRepositoriesFromProvider({

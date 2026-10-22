@@ -2,7 +2,15 @@
 import * as Clipboard from 'expo-clipboard';
 import { type Href, useRouter } from 'expo-router';
 import { Globe } from '@/components/ui/icons';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  type ComponentRef,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   I18nManager,
@@ -82,7 +90,7 @@ export function LoginScreen() {
   // the geometry rules stay in one place. The viewport is the ScrollView's own
   // frame, which already excludes the wrapper's keyboard and bottom-chrome
   // reservation.
-  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<ComponentRef<typeof ScrollView> | null>(null);
   const measureRequestRef = useRef(0);
   const [viewportFrame, setViewportFrame] = useState<{ top: number; bottom: number } | null>(null);
   const [contentHeight, setContentHeight] = useState<number | null>(null);
@@ -115,7 +123,7 @@ export function LoginScreen() {
   }, []);
 
   const captureScroll = useCallback(
-    (node: ScrollView | null) => {
+    (node: ComponentRef<typeof ScrollView> | null) => {
       scrollRef.current = node;
       measureViewport();
     },

@@ -341,7 +341,10 @@ describe('login-screen language globe', () => {
     const renderer = await mountLoginScreen();
     const scroll = renderer.root.findByType('ScrollView');
     const content = renderer.root.find(
-      node => node.type === 'View' && typeof node.props.onLayout === 'function'
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        typeof node.props.onLayout === 'function'
     );
     const measureContent = content.props.onLayout as (event: {
       nativeEvent: { layout: { height: number } };

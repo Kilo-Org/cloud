@@ -48,6 +48,13 @@ export function isDataCollectionExplicitlyDisallowed(
   return provider?.data_collection === 'deny' || provider?.zdr === true;
 }
 
+// https://openrouter.ai/docs/guides/features/plugins
+export type OpenRouterPlugin = {
+  id: string;
+  enabled?: boolean;
+  [option: string]: unknown;
+};
+
 export type OpenRouterReasoningConfig = {
   effort?: OpenAI.Chat.Completions.ChatCompletionReasoningEffort;
   max_tokens?: number;
@@ -77,8 +84,7 @@ export type SharedGatewayRequestProperties = {
   fallbacks?: unknown;
 
   // OpenRouter plugins (web search, PDF parsing with OCR, ...), stripped from free requests
-  // https://openrouter.ai/docs/guides/features/plugins
-  plugins?: unknown;
+  plugins?: OpenRouterPlugin[];
 
   // Non-standard reasoning configuration
   enable_thinking?: boolean; // Alibaba

@@ -24,7 +24,6 @@ export const FEATURE_VALUES = [
   'cloud-agent-web',
   'code-review',
   'code-review-memory',
-  'app-builder',
   'agent-manager',
   'security-agent',
   'security-remediation',
@@ -67,7 +66,6 @@ export function validateFeatureHeader(headerValue: string | null): FeatureValue 
 const SERVER_SIDE_PRODUCT_FEATURES: ReadonlySet<FeatureValue> = new Set([
   'cloud-agent',
   'code-review',
-  'app-builder',
   'gastown',
 ]);
 

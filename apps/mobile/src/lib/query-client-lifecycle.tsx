@@ -10,7 +10,7 @@ import {
 } from '@/lib/hooks/use-offline-banner-state';
 
 type QueryClientLifecycleSources = {
-  getAppState: () => AppStateStatus;
+  getAppState: () => typeof AppState.currentState;
   onAppStateChange: (listener: (state: AppStateStatus) => void) => () => void;
   onConnectivityChange: (listener: (state: ConnectivityState) => void) => () => void;
   /** Commits of the app's confirmed connectivity (probe-backed), or null to opt out. */

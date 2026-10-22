@@ -132,7 +132,7 @@ describe('ImagesSchema', () => {
 
   it('rejects client-provided R2 service prefixes', () => {
     const result = ImagesSchema.safeParse({
-      path: 'app-builder/123e4567-e89b-12d3-a456-426614174000',
+      path: 'images/123e4567-e89b-12d3-a456-426614174000',
       files: ['123e4567-e89b-12d3-a456-426614174001.png'],
     });
 

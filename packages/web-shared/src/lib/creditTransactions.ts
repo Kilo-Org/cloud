@@ -23,9 +23,9 @@ export async function getCreditTransactionsSummaryByUserId(
   `
   );
   const result = rows[0] as {
-    total_promotional_musd: bigint;
-    total_purchased_musd: bigint;
-    credit_transaction_count: bigint;
+    total_promotional_musd: string;
+    total_purchased_musd: string;
+    credit_transaction_count: string;
   };
 
   return {
@@ -50,9 +50,9 @@ export async function getCreditTransactionsSummaryForOrganization(
   `
   );
   const result = rows[0] as {
-    total_promotional_musd: bigint;
-    total_purchased_musd: bigint;
-    credit_transaction_count: bigint;
+    total_promotional_musd: string;
+    total_purchased_musd: string;
+    credit_transaction_count: string;
   };
 
   return {

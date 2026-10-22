@@ -58,15 +58,11 @@ describe('modelLabelFromCatalogue', () => {
   it('localizes a stored Auto model the catalogue dropped', async () => {
     await i18n.changeLanguage('de');
 
-    expect(modelLabelFromCatalogue(catalogue, 'kilo-auto/small', 'Auto Small')).toBe(
-      'Auto Klein'
-    );
+    expect(modelLabelFromCatalogue(catalogue, 'kilo-auto/small', 'Auto Small')).toBe('Auto Klein');
   });
 
   it('names a third-party model from the catalogue entry', () => {
-    expect(modelLabelFromCatalogue(catalogue, 'anthropic/claude-sonnet-4')).toBe(
-      'Claude Sonnet 4'
-    );
+    expect(modelLabelFromCatalogue(catalogue, 'anthropic/claude-sonnet-4')).toBe('Claude Sonnet 4');
   });
 
   it('falls back to the stored name, then the id, for a model the catalogue lacks', () => {

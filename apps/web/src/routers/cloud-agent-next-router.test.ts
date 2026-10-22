@@ -1312,7 +1312,7 @@ describe('cloudAgentNextRouter.prepareSession', () => {
     expect(mockPrepareSession).not.toHaveBeenCalled();
   });
 
-  it('routes free models through the AppBuilder client so the worker skips the balance minimum', async () => {
+  it('routes free models through the skipped-balance client so the worker skips the balance minimum', async () => {
     mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValueOnce({
       isFree: true,
       hasUserByokAvailable: false,
@@ -1340,7 +1340,7 @@ describe('cloudAgentNextRouter.prepareSession', () => {
     expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
   });
 
-  it('routes BYOK-capable paid models through the AppBuilder client so the worker skips the balance minimum', async () => {
+  it('routes BYOK-capable paid models through the skipped-balance client so the worker skips the balance minimum', async () => {
     mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValueOnce({
       isFree: false,
       hasUserByokAvailable: true,

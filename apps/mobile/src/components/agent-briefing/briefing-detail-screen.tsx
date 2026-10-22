@@ -5,9 +5,10 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { briefingMoney, BriefingScorecard } from './briefing-card';
+import { BriefingScorecard } from './briefing-card';
 import { briefingSessionHref, briefingSourceHref } from './briefing-session-href';
 import { BriefingSummary } from './briefing-summary';
+import { BriefingPeriodLabel } from './briefing-period-label';
 import { formatBriefingTimestamp } from './briefing-window';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -21,6 +22,7 @@ import {
   useBriefingInvalidation,
   useBriefingPreferences,
 } from '@/lib/agent-briefing';
+import { briefingMoney } from '@/lib/agent-briefing-format';
 import { briefingAccessDenied, briefingReportMissing } from '@/lib/agent-briefing-state';
 import { openExternalUrl } from '@/lib/external-link';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
@@ -87,7 +89,7 @@ export function BriefingDetailScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t('agentBriefing.title')}
+        title={t(report?.kind === 'one_off' ? 'agentBriefing.oneOff' : 'agentBriefing.title')}
         showBackButton
         backFallback={BRIEFING_PATH as Href}
       />
@@ -113,13 +115,7 @@ export function BriefingDetailScreen() {
             <Text className="text-lg font-semibold">
               {report.context.organizationId === null ? t('common.personal') : report.context.name}
             </Text>
-            <Text className="text-sm text-muted-foreground">{report.localDate}</Text>
-            <Text className="text-xs text-muted-foreground">
-              {t('agentBriefing.window', {
-                start: formatBriefingTimestamp(report.nightStartAt, i18n.language, timeZone),
-                end: formatBriefingTimestamp(report.cutoffAt, i18n.language, timeZone),
-              })}
-            </Text>
+            <BriefingPeriodLabel report={report} />
             {report.revised ? (
               <Text className="text-xs text-muted-foreground">
                 {t('agentBriefing.revised', { revision: report.revision })}
@@ -137,20 +133,35 @@ export function BriefingDetailScreen() {
           {Object.values(report.coverage).some(value => value !== 'complete') ? (
             <Text className="text-xs text-muted-foreground">{t('agentBriefing.coverageHint')}</Text>
           ) : null}
-          <BriefingSummary report={report} />
+          {report.kind === 'one_off' ? (
+            <Text className="text-xs text-muted-foreground">
+              {t('agentBriefing.historicalStateHint')}
+            </Text>
+          ) : null}
+          {report.kind === 'one_off' &&
+          report.scorecard.sessions === 0 &&
+          report.summary.status === 'disabled' ? (
+            <Text className="text-sm">{t('agentBriefing.emptyPeriod')}</Text>
+          ) : (
+            <BriefingSummary report={report} />
+          )}
           <View className="gap-2">
             <Text className="font-semibold">{t('common.agents')}</Text>
             {report.sessions.map(session => {
+              const coverage = report.coverage.spend;
+              const lowerBound =
+                coverage !== 'complete' &&
+                coverage !== 'unavailable' &&
+                session.spendMicrodollars > 0;
               let spend = t('common.unknown');
               if (
-                report.coverage.spend !== 'unavailable' &&
-                (report.coverage.spend === 'complete' || session.spendMicrodollars > 0)
+                coverage !== 'unavailable' &&
+                (coverage === 'complete' || session.spendMicrodollars > 0)
               ) {
-                const amount = briefingMoney(session.spendMicrodollars, i18n.language);
-                spend =
-                  report.coverage.spend === 'complete'
-                    ? amount
-                    : t('agentBriefing.atLeast', { value: amount });
+                const amount = briefingMoney(session.spendMicrodollars, i18n.language, {
+                  lowerBound,
+                });
+                spend = lowerBound ? t('agentBriefing.atLeast', { value: amount }) : amount;
               }
               return (
                 <Pressable

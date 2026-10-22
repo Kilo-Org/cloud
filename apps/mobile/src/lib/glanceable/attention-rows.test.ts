@@ -26,7 +26,7 @@ describe('resolveAnsweredRaises', () => {
   });
 
   it('resolves an answered raise to idle so the surfaces stop reporting Needs input', () => {
-    ackSessionAttention('s1');
+    ackSessionAttention('s1', 'permission');
 
     expect(resolveAnsweredRaises([{ id: 's1', status: 'permission' }])).toEqual([
       { id: 's1', status: 'idle' },
@@ -34,7 +34,7 @@ describe('resolveAnsweredRaises', () => {
   });
 
   it('keeps a different session waiting when only one raise was answered', () => {
-    ackSessionAttention('s1');
+    ackSessionAttention('s1', 'question');
 
     expect(
       resolveAnsweredRaises([
@@ -48,7 +48,7 @@ describe('resolveAnsweredRaises', () => {
   });
 
   it('does not reclassify a non-attention row the ack store still holds', () => {
-    ackSessionAttention('s1');
+    ackSessionAttention('s1', 'permission');
     reconcileSessionAttention('s1', 'permission', 'R1');
 
     expect(resolveAnsweredRaises([{ id: 's1', status: 'busy' }])).toEqual([
@@ -57,8 +57,7 @@ describe('resolveAnsweredRaises', () => {
   });
 
   it('counts a re-raise again once reconcile replaces the answered raise', () => {
-    ackSessionAttention('s1');
-    reconcileSessionAttention('s1', 'permission', 'R1');
+    ackSessionAttention('s1', 'permission', 'R1');
     reconcileSessionAttention('s1', 'permission', 'R2');
 
     expect(
@@ -67,8 +66,7 @@ describe('resolveAnsweredRaises', () => {
   });
 
   it('matches the raise identity the reconciler stored', () => {
-    ackSessionAttention('s1');
-    reconcileSessionAttention('s1', 'permission', 'R1');
+    ackSessionAttention('s1', 'permission', 'R1');
 
     expect(isAnsweredAttentionRow({ id: 's1', status: 'permission', statusUpdatedAt: 'R1' })).toBe(
       true
@@ -76,7 +74,7 @@ describe('resolveAnsweredRaises', () => {
   });
 
   it('resolves a raise the tray reconciler pinned to the raw status while the row carries a timestamp', () => {
-    ackSessionAttention('s1');
+    ackSessionAttention('s1', 'permission');
     // The tray rows reconcile with no timestamp (`(tabs)/_layout.tsx`,
     // `remote-session-row.tsx`), so the ack pins to the raw status while the
     // same tray row carries the server `statusUpdatedAt`.
@@ -90,7 +88,7 @@ describe('resolveAnsweredRaises', () => {
   });
 
   it('drops an answered raise from the derived counts while a waiting sibling stays', () => {
-    ackSessionAttention('s1');
+    ackSessionAttention('s1', 'permission');
     const rows = [
       { id: 's1', status: 'permission' },
       { id: 's2', status: 'permission' },
@@ -115,7 +113,7 @@ describe('resolveAnsweredRaises', () => {
     // reads the same tray row carrying its server `statusUpdatedAt`. Both shade
     // surfaces must agree, so the Active-agents status must not still say
     // "Needs input" beside the needs-input notification's "Request approved".
-    ackSessionAttention('s1');
+    ackSessionAttention('s1', 'permission');
     reconcileSessionAttention('s1', 'permission', null);
     const rows = [{ id: 's1', status: 'permission', statusUpdatedAt: '2026-09-18T21:00:00.000Z' }];
 

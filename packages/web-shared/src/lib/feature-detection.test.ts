@@ -40,7 +40,6 @@ describe('isServerSideProductFeature', () => {
   test('returns true for server-side products', () => {
     expect(isServerSideProductFeature('cloud-agent')).toBe(true);
     expect(isServerSideProductFeature('code-review')).toBe(true);
-    expect(isServerSideProductFeature('app-builder')).toBe(true);
     expect(isServerSideProductFeature('gastown')).toBe(true);
   });
 

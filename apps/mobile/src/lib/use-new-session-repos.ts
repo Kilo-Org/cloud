@@ -8,6 +8,7 @@ import {
   detectRepositoryPlatform,
   type NewSessionRepository,
   type RepositoryGroup,
+  type RepositoryGroupNotice,
   type RepositoryGroups,
   repositoryIdentityKey,
   type RepositoryPlatform,
@@ -199,7 +200,11 @@ export function useNewSessionRepos({
     isError: githubQuery.isError,
     integrationInstalled: githubQuery.data?.integrationInstalled,
     repositoryCount: githubRepositories.length,
+    unavailableReason: githubQuery.data?.unavailableReason,
   });
+  const githubNotice: RepositoryGroupNotice | undefined = githubQuery.data?.partial
+    ? 'partial'
+    : undefined;
   const gitlabStatus = resolveProviderStatus({
     isLoading: gitlabQuery.isLoading,
     isError: gitlabQuery.isError,
@@ -217,7 +222,12 @@ export function useNewSessionRepos({
     () =>
       resolveRepositoryGroups({
         organizationId,
-        github: { key: 'github', status: githubStatus, repositories: githubRepositories },
+        github: {
+          key: 'github',
+          status: githubStatus,
+          repositories: githubRepositories,
+          notice: githubNotice,
+        },
         gitlab: { key: 'gitlab', status: gitlabStatus, repositories: gitlabRepositories },
         bitbucket: {
           key: 'bitbucket',
@@ -230,6 +240,7 @@ export function useNewSessionRepos({
       organizationId,
       githubStatus,
       githubRepositories,
+      githubNotice,
       gitlabStatus,
       gitlabRepositories,
       bitbucketStatus,
@@ -391,6 +402,8 @@ export type RepositoryBranchesState = {
   /** The provider's default branch, or null when it reports none. */
   defaultBranch: string | null;
   branches: string[];
+  /** The provider holds more branches than `branches` includes. */
+  truncated: boolean;
   /** The query runs only for a selected repository in a scope that can serve it. */
   isEnabled: boolean;
   isLoading: boolean;
@@ -475,6 +488,7 @@ export function useRepositoryBranches(
   return {
     defaultBranch: branchQuery.data?.defaultBranch ?? null,
     branches: branchQuery.data?.branches ?? [],
+    truncated: branchQuery.data?.truncated === true,
     isEnabled,
     isLoading: isEnabled && branchQuery.isPending,
     isRetryableError: branchQuery.isError && !permanentFailure,

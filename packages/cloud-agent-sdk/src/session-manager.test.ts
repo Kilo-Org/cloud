@@ -3,6 +3,7 @@ import {
   cliModelLabel,
   createSessionManager,
   formatError,
+  INTERRUPT_ABORT_SUPPRESSION_MS,
   type SessionManagerConfig,
   type FetchedSessionData,
   type AssociatedPrData,
@@ -24,6 +25,7 @@ import type {
 } from './session';
 import type { JotaiSessionStorage } from './storage/jotai';
 import { createChatProcessor } from './chat-processor';
+import { createServiceState } from './service-state';
 import type {
   AssistantMessage,
   UserMessage,
@@ -6325,9 +6327,9 @@ describe('createSessionManager', () => {
     });
 
     it('state recovery to busy preserves the expected abort guard', async () => {
-      // After the session recovers (activity → busy), the one-shot guard
-      // must survive — a delayed Aborted from the prior interrupt
-      // must still be suppressed to avoid re-bricking the composer.
+      // After the session recovers (activity → busy), the guard must survive
+      // inside the suppression window — a delayed Aborted from the prior
+      // interrupt must still be suppressed to avoid re-bricking the composer.
       let notifyStateChange: (() => void) | undefined;
       mockSession.state.subscribe.mockImplementation(callback => {
         notifyStateChange = callback;
@@ -6352,6 +6354,81 @@ describe('createSessionManager', () => {
       expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe(
         'Connection to agent lost'
       );
+    });
+
+    it('clears the abort guard when the interrupt call rejects', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.interrupt.mockRejectedValueOnce(new Error('stop failed'));
+      await mgr.interrupt();
+
+      mockSessionCallbacks.onError?.('Aborted');
+
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe('Aborted');
+    });
+
+    it('surfaces an Aborted that arrives after the suppression window', async () => {
+      jest.useFakeTimers();
+      try {
+        const config = createMockConfig();
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+
+        mockSession.interrupt.mockResolvedValueOnce({});
+        await mgr.interrupt();
+
+        await jest.advanceTimersByTimeAsync(INTERRUPT_ABORT_SUPPRESSION_MS);
+
+        mockSessionCallbacks.onError?.('Aborted');
+
+        expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe('Aborted');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('keeps the newer suppression window when two interrupt calls overlap', async () => {
+      jest.useFakeTimers();
+      try {
+        const config = createMockConfig();
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+
+        const gates: Array<() => void> = [];
+        mockSession.interrupt.mockImplementation(
+          () =>
+            new Promise<void>(resolve => {
+              gates.push(resolve);
+            })
+        );
+
+        const first = mgr.interrupt();
+        const second = mgr.interrupt();
+        gates[0]?.();
+        await jest.advanceTimersByTimeAsync(0);
+
+        // The second call settles 20s later, so its window ends 20s after the
+        // first one's.
+        await jest.advanceTimersByTimeAsync(20_000);
+        gates[1]?.();
+        await jest.advanceTimersByTimeAsync(0);
+
+        // Past the first call's expiry, inside the second call's window.
+        await jest.advanceTimersByTimeAsync(INTERRUPT_ABORT_SUPPRESSION_MS - 20_000 + 1_000);
+        mockSessionCallbacks.onError?.('Aborted');
+        expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+
+        await jest.advanceTimersByTimeAsync(INTERRUPT_ABORT_SUPPRESSION_MS);
+        mockSessionCallbacks.onError?.('Aborted');
+        expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe('Aborted');
+
+        await first;
+        await second;
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 
@@ -6819,6 +6896,51 @@ describe('createSessionManager', () => {
     });
   });
 
+  describe('service state integration', () => {
+    it('keeps the published pending map across preparation and question events', async () => {
+      const config = createMockConfig();
+      const state = createServiceState({ rootSessionId: 'ses-1' });
+      const originalState = mockSession.state;
+      mockSession.state = state as unknown as MockSession['state'];
+      try {
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        const published = atomValue<ReadonlyMap<string, MessageDeliveryState>>(
+          config.store,
+          mgr.atoms.pendingMessages
+        );
+
+        state.process({
+          type: 'preparing',
+          version: 2,
+          attemptId: 'attempt-1',
+          triggerMessageId: 'trigger-1',
+          action: 'step_output',
+          step: 'setup',
+          message: 'still working',
+        });
+        state.process({ type: 'question.asked', requestId: 'q1', questions: [] });
+
+        expect(
+          atomValue<ReadonlyMap<string, MessageDeliveryState>>(
+            config.store,
+            mgr.atoms.pendingMessages
+          )
+        ).toBe(published);
+
+        state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+        expect(
+          atomValue<ReadonlyMap<string, MessageDeliveryState>>(
+            config.store,
+            mgr.atoms.pendingMessages
+          ).get('m1')
+        ).toEqual({ status: 'queued' });
+      } finally {
+        mockSession.state = originalState;
+      }
+    });
+  });
+
   describe('pendingMessages atom', () => {
     async function switchAndCaptureSubscriber(
       config: SessionManagerConfig,
@@ -6916,6 +7038,57 @@ describe('createSessionManager', () => {
       unsubscribe();
 
       expect(snapshots).toEqual([['m1'], []]);
+    });
+
+    it('keeps the published map when a notification carries the same delivery entries', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      const pendingMap = new Map<string, MessageDeliveryState>([['m1', { status: 'queued' }]]);
+      mockSession.state.getPendingMessages.mockReturnValue(pendingMap);
+
+      const triggerSubscriber = await switchAndCaptureSubscriber(config, mgr);
+      const published = atomValue<ReadonlyMap<string, MessageDeliveryState>>(
+        config.store,
+        mgr.atoms.pendingMessages
+      );
+      const onPendingChange = jest.fn();
+      const unsubscribe = config.store.sub(mgr.atoms.pendingMessages, onPendingChange);
+
+      // The service state notifies for every event and mutates one shared map
+      // in place, so a preparation step output reaches here with unchanged
+      // delivery entries.
+      triggerSubscriber();
+      triggerSubscriber();
+      unsubscribe();
+
+      expect(onPendingChange).not.toHaveBeenCalled();
+      expect(
+        atomValue<ReadonlyMap<string, MessageDeliveryState>>(
+          config.store,
+          mgr.atoms.pendingMessages
+        )
+      ).toBe(published);
+    });
+
+    it('publishes a new map when a failed entry changes in place', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      const pendingMap = new Map<string, MessageDeliveryState>([
+        ['m1', { status: 'failed', error: 'x', reason: 'exhausted', attempts: 1 }],
+      ]);
+      mockSession.state.getPendingMessages.mockReturnValue(pendingMap);
+
+      const triggerSubscriber = await switchAndCaptureSubscriber(config, mgr);
+
+      pendingMap.set('m1', { status: 'failed', error: 'x', reason: 'exhausted', attempts: 2 });
+      triggerSubscriber();
+
+      expect(
+        atomValue<ReadonlyMap<string, MessageDeliveryState>>(
+          config.store,
+          mgr.atoms.pendingMessages
+        ).get('m1')
+      ).toEqual({ status: 'failed', error: 'x', reason: 'exhausted', attempts: 2 });
     });
 
     it('leaves failedPromptAtom null when a queued message transitions', async () => {

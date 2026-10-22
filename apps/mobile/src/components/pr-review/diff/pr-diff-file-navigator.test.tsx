@@ -16,7 +16,7 @@ import '@/i18n';
 import { PrDiffFileNavigator } from '@/components/pr-review/diff/pr-diff-file-navigator';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 import { type ProviderPrRef, ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
-import { renderWithProviders } from '@/test/render-with-providers';
+import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
@@ -221,6 +221,15 @@ function typeSearch(
   act(() => {
     (input.props.onChangeText as (value: string) => void)(text);
   });
+}
+
+// Every string a mocked `Text` node rendered, one per line: the terminal
+// states are asserted on their copy, not on a key name.
+function renderedText(renderer: RenderWithProvidersResult['renderer']) {
+  return renderer.root
+    .findAll(node => String(node.type) === 'Text')
+    .map(node => (typeof node.props.children === 'string' ? node.props.children : ''))
+    .join('\n');
 }
 
 function findRetryButton(renderer: Awaited<ReturnType<typeof mountNavigator>>['renderer']) {
@@ -651,5 +660,118 @@ describe('PrDiffFileNavigator viewed-set provider keying (s6)', () => {
       { platform: 'github', owner: 'octocat', repo: 'hello-world', number: 7 },
       'sha',
     ]);
+  });
+});
+
+// The terminal states speak the scope's provider: the navigator reuses the
+// same `usePrDiffStateCopy` selector the Files tab reads, so a GitLab merge
+// request keeps its own noun and only GitHub can blame a missing Kilo GitHub
+// App (Bitbucket Cloud has no such App).
+describe('PrDiffFileNavigator provider wording', () => {
+  const GITHUB_APP_CLAUSE = "the Kilo GitHub App isn't installed on it";
+  const NEUTRAL_DESCRIPTION = 'It may have been deleted, or you may not have access to it.';
+
+  const GITLAB_REF: ProviderPrRef = {
+    platform: 'gitlab',
+    projectPath: 'group/sub/repo',
+    mrIid: 12,
+  };
+  const BITBUCKET_REF: ProviderPrRef = {
+    platform: 'bitbucket',
+    workspace: 'acme',
+    repoSlug: 'widgets',
+    prId: 42,
+  };
+  const GITHUB_REF: ProviderPrRef = {
+    platform: 'github',
+    owner: 'octocat',
+    repo: 'hello-world',
+    number: 7,
+  };
+
+  beforeEach(() => {
+    fetchNextPageMock.mockReset();
+    fetchAllRunMock.mockReset();
+    rowRenders.length = 0;
+    flashListProps.current = null;
+    viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
+    fetchAllResult = {
+      run: fetchAllRunMock,
+      isRunning: false,
+      loadedFiles: 0,
+      totalFiles: null,
+      error: null,
+    };
+  });
+
+  function setFirstPageState(kind: 'not-found' | 'permission') {
+    listQueryResult = {
+      query: {
+        isLoading: false,
+        isFetching: false,
+        isFetchingNextPage: false,
+        hasNextPage: false,
+        fetchNextPage: fetchNextPageMock,
+        refetch: vi.fn(),
+      },
+      files: [],
+      firstPageErrorState: { kind },
+      laterPageError: false,
+    };
+  }
+
+  async function mountInScope(ref: ProviderPrRef) {
+    const { renderer } = await renderWithProviders(
+      <ProviderPrScopeProvider value={{ ref, organizationId: null }}>
+        <PrDiffFileNavigator {...BASE_PROPS} />
+      </ProviderPrScopeProvider>
+    );
+    return renderer;
+  }
+
+  it('says "merge request" and drops the GitHub App clause for GitLab', async () => {
+    setFirstPageState('not-found');
+
+    const text = renderedText(await mountInScope(GITLAB_REF));
+
+    expect(text).toContain('Merge request unavailable');
+    expect(text).toContain(NEUTRAL_DESCRIPTION);
+    expect(text).not.toContain(GITHUB_APP_CLAUSE);
+  });
+
+  it('keeps the pull-request noun but drops the GitHub App clause for Bitbucket', async () => {
+    setFirstPageState('not-found');
+
+    const text = renderedText(await mountInScope(BITBUCKET_REF));
+
+    expect(text).toContain('Pull request unavailable');
+    expect(text).toContain(NEUTRAL_DESCRIPTION);
+    expect(text).not.toContain(GITHUB_APP_CLAUSE);
+  });
+
+  it('keeps the GitHub App clause for GitHub', async () => {
+    setFirstPageState('not-found');
+
+    const text = renderedText(await mountInScope(GITHUB_REF));
+
+    expect(text).toContain('Pull request unavailable');
+    expect(text).toContain(GITHUB_APP_CLAUSE);
+  });
+
+  it('names a merge request in the GitLab permission copy', async () => {
+    setFirstPageState('permission');
+
+    const text = renderedText(await mountInScope(GITLAB_REF));
+
+    expect(text).toContain("You don't have permission to view this merge request.");
+    expect(text).not.toContain('this pull request');
+  });
+
+  it('keeps the pull-request permission copy for GitHub', async () => {
+    setFirstPageState('permission');
+
+    const text = renderedText(await mountInScope(GITHUB_REF));
+
+    expect(text).toContain("You don't have permission to view this pull request.");
   });
 });

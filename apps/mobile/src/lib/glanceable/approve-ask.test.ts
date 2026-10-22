@@ -334,7 +334,21 @@ describe('runGlanceableApprove', () => {
     readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
     answerPermissionMutate.mockResolvedValue(undefined);
     await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'approved' });
-    expect(isAttentionAcked('ses_1', null)).toBe(true);
+    expect(isAttentionAcked('ses_1', { raiseId: 'permission' })).toBe(true);
+  });
+
+  it('acks the raise its ask recorded, not whatever raise is observed next', async () => {
+    readWaitingAsk.mockResolvedValue({
+      ...PERMISSION_ASK,
+      statusUpdatedAt: '2026-09-18T21:00:00.000Z',
+    });
+    answerPermissionMutate.mockResolvedValue(undefined);
+
+    await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'approved' });
+
+    expect(isAttentionAcked('ses_1', { raiseId: '2026-09-18T21:00:00.000Z' })).toBe(true);
+    // A permission raised after the answered one is not suppressed.
+    expect(isAttentionAcked('ses_1', { raiseId: '2026-09-18T21:30:00.000Z' })).toBe(false);
   });
 
   it('acks a raise proven gone, and never acks a retryable failure', async () => {
@@ -343,20 +357,20 @@ describe('runGlanceableApprove', () => {
     readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
     answerPermissionMutate.mockRejectedValue(withCode('NOT_FOUND'));
     await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'gone' });
-    expect(isAttentionAcked('ses_1', null)).toBe(true);
+    expect(isAttentionAcked('ses_1', { raiseId: 'permission' })).toBe(true);
 
     // Retryable keeps the ask live: the next tap has to answer that same
     // session, so an ack here would hide the raise the user must retry.
     __resetSessionAttentionForTests();
     answerPermissionMutate.mockRejectedValue(new Error('network down'));
     await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'retryable' });
-    expect(isAttentionAcked('ses_1', null)).toBe(false);
+    expect(isAttentionAcked('ses_1', { raiseId: 'permission' })).toBe(false);
   });
 
   it('does not ack an ask it never answered', async () => {
     readWaitingAsk.mockResolvedValue({ ...PERMISSION_ASK, isCloudAgent: false });
     await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'none' });
-    expect(isAttentionAcked('ses_1', null)).toBe(false);
+    expect(isAttentionAcked('ses_1', { raiseId: 'permission' })).toBe(false);
   });
 
   it.each([
@@ -533,7 +547,7 @@ describe('refreshGlanceableSnapshot', () => {
     // row would republish the pre-action snapshot — the answered session still
     // waiting — on the ongoing card and the widget, which is what the ack is
     // for. The poll still reads the raw row: that is what proves the sync.
-    ackSessionAttention('ses_1');
+    ackSessionAttention('ses_1', 'permission');
     const publisher = makePublisher();
     const rows = [{ id: 'ses_1', status: 'permission' }];
     const fetchRows = vi.fn(async () => rows);

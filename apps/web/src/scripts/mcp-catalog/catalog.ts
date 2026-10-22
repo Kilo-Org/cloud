@@ -47,6 +47,7 @@ export const ROOT_ROUTER_PATH = join(__dirname, '..', '..', 'routers', 'root-rou
  */
 const NATIVE_ONLY_PATHS: Record<string, true> = {
   'activeSessions.widgetCredential': true,
+  'agentBriefing.createOneOff': true,
   'agentBriefing.generateSummary': true,
   'agentBriefing.retrySummary': true,
   'agentBriefing.updateContextPreferences': true,

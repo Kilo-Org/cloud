@@ -21,6 +21,7 @@
  * only an explicit `session.status.updated` (or disconnect) clears it.
  */
 
+import { parseTimestamp } from '@kilocode/app-shared/utils';
 import {
   type CliConnectionData,
   cliConnectionDataSchema,
@@ -150,13 +151,13 @@ type SessionStatusUpdate = {
   statusUpdatedAt?: string;
 };
 
-/** Hermes only parses ISO 8601, so a status time enters the cache normalized. */
+/** Hermes cannot parse a PostgreSQL timestamp, so a status time enters the cache normalized. */
 function toIsoStatusTime(value: string | null): string | undefined {
   if (value === null) {
     return undefined;
   }
-  const at = Date.parse(value);
-  return Number.isNaN(at) ? undefined : new Date(at).toISOString();
+  const at = parseTimestamp(value).getTime();
+  return Number.isFinite(at) ? new Date(at).toISOString() : undefined;
 }
 
 /**

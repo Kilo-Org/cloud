@@ -1,4 +1,5 @@
 import 'server-only';
+import { ORGANIZATION_PARENT_ACCESS_ROLES } from '@kilocode/app-shared/organizations';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import type { Organization, User } from '@kilocode/db/schema';
 import { organization_memberships, organizations } from '@kilocode/db/schema';
@@ -18,13 +19,6 @@ import z from 'zod';
 
 const warnInSentry = sentryLogger('org_auth', 'warning');
 
-// Mirrors routers/organizations/utils.ts: parent-organization roles that
-// inherit access to child organizations.
-const parentOrganizationAccessRoles = [
-  'owner',
-  'admin',
-  'billing_manager',
-] satisfies OrganizationRole[];
 const rolePriority = ['owner', 'admin', 'billing_manager', 'member'] satisfies OrganizationRole[];
 
 type UserWithRole = User & {
@@ -119,7 +113,7 @@ export async function getAuthorizedOrgContext(
       and(
         eq(organization_memberships.organization_id, organizations.parent_organization_id),
         eq(organization_memberships.kilo_user_id, user.id),
-        inArray(organization_memberships.role, parentOrganizationAccessRoles)
+        inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
       )
     )
     .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)));

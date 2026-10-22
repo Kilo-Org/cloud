@@ -141,22 +141,30 @@ export async function rotateRefreshToken(
   const tokenHash = hashToken(refreshToken);
   const now = new Date().toISOString();
 
-  // Step 1: Look up the token row to check validity and reuse BEFORE consuming.
-  // `firstReadAt` is the database time of this request's first read.
+  // Steps 1-3: Look up the token, its parent session, and the user in one
+  // joined read BEFORE consuming. `firstReadAt` is the database time of this
+  // request's first read. The joins are inner: a missing session or user row
+  // yields no row, which refuses without revocation, and the full user row
+  // read here is the one token generation consumes later.
   const [row] = await db
     .select({
       ...getTableColumns(device_refresh_tokens),
       firstReadAt: sql<string>`clock_timestamp()::text`,
+      session: device_sessions,
+      user: kilocode_users,
     })
     .from(device_refresh_tokens)
+    .innerJoin(device_sessions, eq(device_sessions.id, device_refresh_tokens.device_session_id))
+    .innerJoin(kilocode_users, eq(kilocode_users.id, device_sessions.kilo_user_id))
     .where(eq(device_refresh_tokens.token_hash, tokenHash))
     .limit(1);
 
-  // Unknown token: refuse without revocation.
+  // Unknown token, or a token whose session or user no longer exists: refuse
+  // without revocation.
   if (!row) {
     return { ok: false, error: 'INVALID_REFRESH_TOKEN' };
   }
-  const { firstReadAt } = row;
+  const { firstReadAt, session, user } = row;
 
   // Expired token: refuse without revocation.
   if (new Date(row.expires_at) <= new Date()) {
@@ -170,32 +178,12 @@ export async function rotateRefreshToken(
     return { ok: false, error: 'INVALID_REFRESH_TOKEN' };
   }
 
-  // Step 2: Check parent session validity BEFORE consuming.
-  const [session] = await db
-    .select()
-    .from(device_sessions)
-    .where(eq(device_sessions.id, row.device_session_id))
-    .limit(1);
-
-  if (!session) {
-    return { ok: false, error: 'INVALID_REFRESH_TOKEN' };
-  }
-
+  // Parent session validity BEFORE consuming.
   if (session.revoked_at) {
     return { ok: false, error: 'SESSION_REVOKED' };
   }
 
-  // Step 3: Check user blocked_reason BEFORE consuming.
-  const [user] = await db
-    .select({ id: kilocode_users.id, blocked_reason: kilocode_users.blocked_reason })
-    .from(kilocode_users)
-    .where(eq(kilocode_users.id, session.kilo_user_id))
-    .limit(1);
-
-  if (!user) {
-    return { ok: false, error: 'INVALID_REFRESH_TOKEN' };
-  }
-
+  // User blocked_reason BEFORE consuming.
   if (user.blocked_reason) {
     return { ok: false, error: 'USER_BLOCKED' };
   }
@@ -204,18 +192,6 @@ export async function rotateRefreshToken(
   // transaction. If issuing the replacement fails, the transaction rolls back
   // and the old token remains usable, so the client can retry with it.
   const outcome = await db.transaction(async tx => {
-    // Fetch the full user for token generation BEFORE consuming, so a missing
-    // user refuses without burning the token.
-    const [fullUser] = await tx
-      .select()
-      .from(kilocode_users)
-      .where(eq(kilocode_users.id, session.kilo_user_id))
-      .limit(1);
-
-    if (!fullUser) {
-      return { kind: 'missing_user' } as const;
-    }
-
     // Step 4: Lock the parent session row and recheck revoked_at INSIDE the
     // transaction, before consuming. The pre-transaction session check above
     // can be raced by a revokeDeviceSession that commits between that read and
@@ -325,7 +301,7 @@ export async function rotateRefreshToken(
 
     // Step 7: Issue the replacement pair in the same transaction.
     const accessToken = generateApiToken(
-      fullUser,
+      user,
       { deviceSessionId: lockedSession.id },
       { expiresIn: TOKEN_EXPIRY.oneHour }
     );
@@ -384,10 +360,8 @@ export async function createDeviceSessionWithAttestedKey(params: {
   verification: VerifyAdmissionOk;
 }): Promise<{ token: string; refreshToken: string; expiresIn: number; sessionId: string }> {
   return await db.transaction(async tx => {
-    // Persist the attested key inside the transaction
     await persistAttestedKeyTx(tx, params.userId, params.verification);
 
-    // Create the device session
     const [session] = await tx
       .insert(device_sessions)
       .values({
@@ -400,7 +374,6 @@ export async function createDeviceSessionWithAttestedKey(params: {
       throw new Error('Failed to create device session');
     }
 
-    // Issue credentials
     const accessToken = generateApiToken(
       params.user,
       { deviceSessionId: session.id },

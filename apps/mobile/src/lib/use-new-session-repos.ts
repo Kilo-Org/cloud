@@ -242,7 +242,7 @@ export function useNewSessionRepos({
   const [isRefreshingProviders, setIsRefreshingProviders] = useState(false);
 
   const forceFreshGitLab = useCallback(async () => {
-    const fresh = await queryClient.fetchQuery({
+    const fresh = await queryClient.query({
       ...(organizationId
         ? trpc.organizations.cloudAgentNext.listGitLabRepositories.queryOptions({
             organizationId,
@@ -270,7 +270,7 @@ export function useNewSessionRepos({
     if (!organizationId) {
       return;
     }
-    const fresh = await queryClient.fetchQuery({
+    const fresh = await queryClient.query({
       ...trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryOptions({
         organizationId,
         forceRefresh: true,
@@ -396,7 +396,7 @@ export type RepositoryBranchesState = {
   isLoading: boolean;
   /** A transient failure: the caller offers a retry. */
   isRetryableError: boolean;
-  /** FORBIDDEN/UNAUTHORIZED/NOT_FOUND — a retry cannot fix it, so no retry CTA. */
+  /** A refusal a retry cannot fix (permission, not found, or a refused connection). */
   isPermanentError: boolean;
   isRetrying: boolean;
   retry: () => void;
@@ -462,6 +462,11 @@ export function useRepositoryBranches(
       (branchQuery.error as { data?: { code?: string } } | null)?.data?.code
     : undefined;
   const { permanent } = classifyProviderErrorCode(errorCode);
+  // The reconnect state (PRECONDITION_FAILED) is a refused provider
+  // connection: this selector has no reconnect control, so it takes the same
+  // permanent note as a permission refusal instead of a retry that cannot
+  // succeed.
+  const permanentFailure = permanent || errorCode === 'PRECONDITION_FAILED';
 
   const retry = useCallback(() => {
     void branchQuery.refetch();
@@ -472,8 +477,8 @@ export function useRepositoryBranches(
     branches: branchQuery.data?.branches ?? [],
     isEnabled,
     isLoading: isEnabled && branchQuery.isPending,
-    isRetryableError: branchQuery.isError && !permanent,
-    isPermanentError: branchQuery.isError && permanent,
+    isRetryableError: branchQuery.isError && !permanentFailure,
+    isPermanentError: branchQuery.isError && permanentFailure,
     isRetrying: branchQuery.isFetching && branchQuery.isError,
     retry,
   };

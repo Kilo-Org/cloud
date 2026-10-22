@@ -10,7 +10,7 @@ import {
 
 import { t } from '../auth.js';
 import { parseSessionMetadata, type SessionMetadata } from '../../persistence/session-metadata.js';
-import type * as SessionPlane from '../../session-plane.js';
+import type * as SessionPlane from '../../session-identity.js';
 import type { TRPCContext } from '../../types.js';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
@@ -61,11 +61,11 @@ vi.mock('./organization-membership.js', () => ({
   assertOrganizationMembership: assertOrganizationMembershipMock,
 }));
 
-vi.mock('../../session-plane.js', async importOriginal => {
+vi.mock('../../session-identity.js', async importOriginal => {
   const original = await importOriginal<typeof SessionPlane>();
   return {
     ...original,
-    generateSessionId: (plane: string) => generateSessionIdMock(plane),
+    generateSessionId: () => generateSessionIdMock(),
   };
 });
 
@@ -444,6 +444,27 @@ describe('createWorktreeChat request validation and authorization', () => {
     expect(CreateWorktreeChatInput.safeParse({ ...input, unexpected: true }).success).toBe(false);
   });
 
+  it('creates the chat under a client-proposed session id and rejects a malformed one', async () => {
+    const { caller, input } = fixture();
+    const proposed = 'ses_0123456789abABCDEFGHIJKLMN';
+    createSessionForCloudAgentMock.mockResolvedValueOnce({
+      status: 'ready',
+      clone: { sessionId: proposed, copiedItemCount: 0 },
+    });
+
+    expect(
+      CreateWorktreeChatInput.safeParse({ ...input, kiloSessionId: `${proposed.slice(0, -1)}-` })
+        .success
+    ).toBe(false);
+    await expect(
+      caller.createWorktreeChat({ ...input, kiloSessionId: proposed })
+    ).resolves.toMatchObject({ kiloSessionId: proposed });
+    expect(generateKiloSessionIdMock).not.toHaveBeenCalled();
+    expect(createSessionForCloudAgentMock).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: proposed })
+    );
+  });
+
   it('requires a user token before loading source ownership', async () => {
     const { caller, input } = fixture({ authToken: '' });
 
@@ -589,7 +610,7 @@ describe('createWorktreeChat request validation and authorization', () => {
       kiloSessionId: DESTINATION_KILO_SESSION_ID,
       worktreeId: WORKTREE_ID,
     });
-    expect(generateSessionIdMock).toHaveBeenCalledWith('control');
+    expect(generateSessionIdMock).toHaveBeenCalledWith();
   });
 });
 
@@ -1034,7 +1055,7 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
     expect(legacySessionNamespace.get).not.toHaveBeenCalled();
     expect(sandboxControlNamespace.get).not.toHaveBeenCalled();
     expect(destinationStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-    expect(generateSessionIdMock).toHaveBeenCalledWith('control');
+    expect(generateSessionIdMock).toHaveBeenCalledWith();
   });
 
   it('does not create ownership when canonical operation progress cannot be recorded', async () => {
@@ -1123,6 +1144,28 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
       })
     );
   });
+
+  it('never copies parent opt-in or delegated lineage when copying a session profile to a sibling', async () => {
+    for (const scope of [
+      { allowSubagentSessions: true },
+      { parentCloudAgentSessionId: SOURCE_WORKSPACE_ID },
+    ]) {
+      const metadata = { ...sourceMetadata(), ...scope };
+      const { caller, input, destinationStub } = fixture({ metadata });
+      if (scope.allowSubagentSessions === true) {
+        await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+        });
+        expect(destinationStub.registerSessionFromMetadata).not.toHaveBeenCalled();
+        continue;
+      }
+      await caller.createWorktreeChat(input);
+      const registration = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0];
+      expect(registration?.metadata.profile?.envVars).toEqual(metadata.profile?.envVars);
+      expect(registration?.metadata.allowSubagentSessions).not.toBe(true);
+      expect(registration?.metadata.parentCloudAgentSessionId).toBeUndefined();
+    }
+  });
 });
 
 describe('createWorktreeChat operation-ledger replay and conflict handling', () => {
@@ -1209,6 +1252,19 @@ describe('createWorktreeChat operation-ledger replay and conflict handling', () 
       expect(createSessionForCloudAgentMock).not.toHaveBeenCalled();
     }
   );
+
+  it('rejects a same-key retry that proposes a different session id', async () => {
+    const { caller, input } = fixture();
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: ledgerRow({ status: 'completed', canonical_result: await progressFor(input) }),
+    });
+
+    await expect(
+      caller.createWorktreeChat({ ...input, kiloSessionId: 'ses_0123456789abABCDEFGHIJKLMN' })
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(createSessionForCloudAgentMock).not.toHaveBeenCalled();
+  });
 
   it('does not replay IDs from a failed settled operation', async () => {
     const { caller, input } = fixture();

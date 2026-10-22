@@ -54,7 +54,45 @@
     "anti-slop/no-reflect-get": "error",
     "anti-slop/no-runtime-typeof": "error",
     "anti-slop/no-unknown-returns": "error",
-    "zod-utils/no-inline-zod-schema": "error"
+    "zod-utils/no-inline-zod-schema": "error",
+
+    // oxlint 1.88 implements many of the rules the categories above select and
+    // tightens detection in others, so this upgrade alone reports about 8,000
+    // findings. They stay off until each rule is adopted on its own, with its
+    // findings fixed in a change that can review them.
+    "import/newline-after-import": "off",
+    "jsx-a11y/control-has-associated-label": "off",
+    "jsx-a11y/prefer-tag-over-role": "off",
+    "no-multi-assign": "off",
+    "no-underscore-dangle": "off",
+    "object-shorthand": "off",
+    "one-var": "off",
+    "prefer-named-capture-group": "off",
+    "react/exhaustive-effect-dependencies": "off",
+    "react/function-component-definition": "off",
+    "react/incompatible-library": "off",
+    "react/memo-dependencies": "off",
+    "react/refs": "off",
+    "react/set-state-in-effect": "off",
+    "require-unicode-regexp": "off",
+    "typescript/consistent-return": "off",
+    "typescript/dot-notation": "off",
+    "typescript/method-signature-style": "off",
+    "typescript/no-unnecessary-type-assertion": "off",
+    "typescript/no-unnecessary-type-conversion": "off",
+    "typescript/no-unnecessary-type-parameters": "off",
+    "typescript/prefer-regexp-exec": "off",
+    "unicorn/consistent-function-scoping": "off",
+    "unicorn/custom-error-definition": "off",
+    "unicorn/max-nested-calls": "off",
+    "unicorn/prefer-export-from": "off",
+    "unicorn/prefer-import-meta-properties": "off",
+    "unicorn/prefer-number-coercion": "off",
+    "unicorn/prefer-single-call": "off",
+    "vitest/prefer-expect-assertions": "off",
+    "vitest/prefer-importing-vitest-globals": "off",
+    "vitest/prefer-strict-boolean-matchers": "off",
+    "vitest/require-mock-type-parameters": "off"
   },
   "env": {
     "browser": true,

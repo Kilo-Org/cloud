@@ -52,6 +52,16 @@ export default function BranchPickerScreen() {
       onDone={close}
       onCancel={close}
     >
+      {/* The provider holds branches this list cannot include. The rows below
+          are real but not the whole repository, so the sheet says so before the
+          list starts rather than after a thousand rows. */}
+      {bridge.truncated ? (
+        <View className="border-b border-hair-soft px-4 py-3">
+          <Text className="text-sm text-muted-foreground">
+            {t('agentChat.newSession.branchListIncomplete')}
+          </Text>
+        </View>
+      ) : null}
       <View>
         {bridge.branches.map(branch => {
           const isSelected = branch === bridge.selectedBranch;

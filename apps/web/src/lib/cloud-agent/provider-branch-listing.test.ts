@@ -63,6 +63,7 @@ describe('listProviderRepositoryBranches (gitlab)', () => {
     expect(listing).toEqual({
       defaultBranch: 'main',
       branches: ['main', 'feature/deploy'],
+      truncated: false,
     });
     expect(mockFetchGitLabBranches).toHaveBeenCalledWith(
       'glpat-mock-token',
@@ -182,7 +183,7 @@ describe('listProviderRepositoryBranches (github refusals)', () => {
       repositoryFullName: 'octocat/hello',
     });
 
-    expect(listing).toEqual({ defaultBranch: 'main', branches: ['main', 'dev'] });
+    expect(listing).toEqual({ defaultBranch: 'main', branches: ['main', 'dev'], truncated: false });
   });
 });
 

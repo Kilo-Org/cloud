@@ -174,7 +174,9 @@ const POLL_INTERVAL_MS = 100;
 /** Deps shared by every test that drives a fake manager on the fake clock. */
 function fakeManagerDeps(
   fake: FakeManager,
-  extra?: { ack?: (kiloSessionId: string) => void }
+  extra?: {
+    ack?: (kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void;
+  }
 ): NonNullable<Parameters<typeof runNeedsInputInteraction>[0]['deps']> {
   const clock = createFakeClock();
   return {
@@ -208,7 +210,8 @@ describe('runNeedsInputInteraction', () => {
           seeds.store.set(seeds.activePermission, { requestId: 'perm-1' });
         },
       });
-      const ack = vi.fn<(kiloSessionId: string) => void>();
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
 
       const outcome = await runNeedsInputInteraction({
         kiloSessionId: SESSION_ID,
@@ -220,7 +223,7 @@ describe('runNeedsInputInteraction', () => {
       expect(fake.switchSession).toHaveBeenCalledWith(SESSION_ID);
       expect(fake.respondToPermission).toHaveBeenCalledWith('perm-1', 'once');
       expect(fake.answerQuestion).not.toHaveBeenCalled();
-      expect(ack).toHaveBeenCalledWith(SESSION_ID);
+      expect(ack).toHaveBeenCalledWith(SESSION_ID, 'permission', null);
       expect(fake.destroy).toHaveBeenCalledTimes(1);
     });
 
@@ -230,7 +233,8 @@ describe('runNeedsInputInteraction', () => {
           seeds.store.set(seeds.activeQuestion, { requestId: 'question-1' });
         },
       });
-      const ack = vi.fn<(kiloSessionId: string) => void>();
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
 
       const outcome = await runNeedsInputInteraction({
         kiloSessionId: SESSION_ID,
@@ -242,7 +246,7 @@ describe('runNeedsInputInteraction', () => {
       expect(outcome).toBe('ok');
       expect(fake.answerQuestion).toHaveBeenCalledWith('question-1', [['use the second option']]);
       expect(fake.respondToPermission).not.toHaveBeenCalled();
-      expect(ack).toHaveBeenCalledWith(SESSION_ID);
+      expect(ack).toHaveBeenCalledWith(SESSION_ID, 'question', null);
       expect(fake.destroy).toHaveBeenCalledTimes(1);
     });
 
@@ -380,7 +384,8 @@ describe('runNeedsInputInteraction', () => {
           seeds.store.set(seeds.activePermission, { requestId: 'perm-1' });
         },
       });
-      const ack = vi.fn<(kiloSessionId: string) => void>();
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
 
       const outcome = await runNeedsInputInteraction({
         kiloSessionId: SESSION_ID,
@@ -450,7 +455,8 @@ describe('runNeedsInputInteraction', () => {
 
     it('returns retryable when no raise of either kind appears in the budget, so the actions are kept', async () => {
       const fake = createFakeManager();
-      const ack = vi.fn<(kiloSessionId: string) => void>();
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
 
       const outcome = await runNeedsInputInteraction({
         kiloSessionId: SESSION_ID,
@@ -470,7 +476,8 @@ describe('runNeedsInputInteraction', () => {
 
     it('returns retryable for a reply when neither kind is pending at the deadline', async () => {
       const fake = createFakeManager();
-      const ack = vi.fn<(kiloSessionId: string) => void>();
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
 
       const outcome = await runNeedsInputInteraction({
         kiloSessionId: SESSION_ID,
@@ -533,7 +540,8 @@ describe('runNeedsInputInteraction', () => {
         },
       });
       getSessionQuery.mockResolvedValue({ organization_id: 'org-1', status: 'idle' });
-      const ack = vi.fn<(kiloSessionId: string) => void>();
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
 
       const outcome = await runNeedsInputInteraction({
         kiloSessionId: SESSION_ID,
@@ -545,7 +553,7 @@ describe('runNeedsInputInteraction', () => {
       expect(fake.respondToPermission).not.toHaveBeenCalled();
       expect(fake.answerQuestion).not.toHaveBeenCalled();
       // The raise is over, so the Agents row and badge stop offering it.
-      expect(ack).toHaveBeenCalledWith(SESSION_ID);
+      expect(ack).toHaveBeenCalledWith(SESSION_ID, 'permission', null);
       expect(fake.destroy).toHaveBeenCalledTimes(1);
     });
 
@@ -564,7 +572,8 @@ describe('runNeedsInputInteraction', () => {
       getSessionQuery
         .mockResolvedValueOnce({ organization_id: 'org-1', status: 'permission' })
         .mockResolvedValue({ organization_id: 'org-1', status: 'permission' });
-      const ack = vi.fn<(kiloSessionId: string) => void>();
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
 
       const outcome = await runNeedsInputInteraction({
         kiloSessionId: SESSION_ID,
@@ -575,7 +584,7 @@ describe('runNeedsInputInteraction', () => {
       expect(outcome).toBe('ok');
       expect(fake.respondToPermission).not.toHaveBeenCalled();
       expect(fake.answerQuestion).not.toHaveBeenCalled();
-      expect(ack).toHaveBeenCalledWith(SESSION_ID);
+      expect(ack).toHaveBeenCalledWith(SESSION_ID, 'permission', null);
       expect(fake.destroy).toHaveBeenCalledTimes(1);
     });
 
@@ -589,7 +598,8 @@ describe('runNeedsInputInteraction', () => {
         },
       });
       getSessionQuery.mockResolvedValue({ organization_id: 'org-1', status: 'permission' });
-      const ack = vi.fn<(kiloSessionId: string) => void>();
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
 
       const outcome = await runNeedsInputInteraction({
         kiloSessionId: SESSION_ID,
@@ -615,7 +625,8 @@ describe('runNeedsInputInteraction', () => {
         .mockRejectedValue(
           Object.assign(new Error('network down'), { data: { code: 'INTERNAL_SERVER_ERROR' } })
         );
-      const ack = vi.fn<(kiloSessionId: string) => void>();
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
 
       const outcome = await runNeedsInputInteraction({
         kiloSessionId: SESSION_ID,
@@ -640,7 +651,8 @@ describe('runNeedsInputInteraction', () => {
           seeds.store.set(seeds.isReadOnly, true);
         },
       });
-      const ack = vi.fn<(kiloSessionId: string) => void>();
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
 
       const outcome = await runNeedsInputInteraction({
         kiloSessionId: SESSION_ID,
@@ -662,7 +674,8 @@ describe('runNeedsInputInteraction', () => {
           seeds.store.set(seeds.agentStatus, { type: 'error', message: 'transport failed' });
         },
       });
-      const ack = vi.fn<(kiloSessionId: string) => void>();
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
 
       const outcome = await runNeedsInputInteraction({
         kiloSessionId: SESSION_ID,
@@ -682,7 +695,8 @@ describe('runNeedsInputInteraction', () => {
           seeds.store.set(seeds.sessionType, null);
         },
       });
-      const ack = vi.fn<(kiloSessionId: string) => void>();
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
 
       const outcome = await runNeedsInputInteraction({
         kiloSessionId: SESSION_ID,
@@ -699,7 +713,8 @@ describe('runNeedsInputInteraction', () => {
       // `connecting` is the never-opened socket: the budget expiring here is
       // exactly the cold headless start the raise can still be live behind.
       const fake = createFakeManager();
-      const ack = vi.fn<(kiloSessionId: string) => void>();
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
 
       const outcome = await runNeedsInputInteraction({
         kiloSessionId: SESSION_ID,
@@ -712,7 +727,8 @@ describe('runNeedsInputInteraction', () => {
     });
 
     it('acks a session the user can no longer see', async () => {
-      const ack = vi.fn<(kiloSessionId: string) => void>();
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
 
       const outcome = await runNeedsInputInteraction({
         kiloSessionId: SESSION_ID,
@@ -726,7 +742,31 @@ describe('runNeedsInputInteraction', () => {
       });
 
       expect(outcome).toBe('unavailable');
-      expect(ack).toHaveBeenCalledWith(SESSION_ID);
+      expect(ack).toHaveBeenCalledWith(SESSION_ID, 'permission', null);
+    });
+
+    it('acks the raise its stored row reports, not the next one', async () => {
+      const fake = createFakeManager({
+        onSwitch: seeds => {
+          seeds.store.set(seeds.activePermission, { requestId: 'perm-1' });
+        },
+      });
+      getSessionQuery.mockResolvedValue({
+        organization_id: 'org-1',
+        status: 'permission',
+        status_updated_at: '2026-09-18 21:00:00+00',
+      });
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'approve',
+        deps: fakeManagerDeps(fake, { ack }),
+      });
+
+      expect(outcome).toBe('ok');
+      expect(ack).toHaveBeenCalledWith(SESSION_ID, 'permission', '2026-09-18 21:00:00+00');
     });
 
     it('answers a raise that lands with the snapshot replay just after the budget', async () => {
@@ -740,7 +780,8 @@ describe('runNeedsInputInteraction', () => {
       });
       const clock = createFakeClock();
       let seeded = false;
-      const ack = vi.fn<(kiloSessionId: string) => void>();
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
 
       const outcome = await runNeedsInputInteraction({
         kiloSessionId: SESSION_ID,
@@ -764,7 +805,7 @@ describe('runNeedsInputInteraction', () => {
 
       expect(outcome).toBe('ok');
       expect(fake.respondToPermission).toHaveBeenCalledWith('perm-late', 'once');
-      expect(ack).toHaveBeenCalledWith(SESSION_ID);
+      expect(ack).toHaveBeenCalledWith(SESSION_ID, 'permission', null);
     });
 
     it('returns retryable when the raise does not match the action, so the raise keeps its actions', async () => {
@@ -810,7 +851,8 @@ describe('runNeedsInputInteraction', () => {
       const fake = createFakeManager();
       const clock = createFakeClock();
       let seeded = false;
-      const ack = vi.fn<(kiloSessionId: string) => void>();
+      const ack =
+        vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
 
       const outcome = await runNeedsInputInteraction({
         kiloSessionId: SESSION_ID,

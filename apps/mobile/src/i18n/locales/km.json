@@ -3894,7 +3894,7 @@
     "blockers": "ឧបសគ្គថ្មី",
     "spend": "ការចំណាយពេលយប់",
     "view": "អានរបាយការណ៍",
-    "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "viewWithPreview": "$t(agentBriefing.view)។ {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
     "dismiss": "មិនអើពើនឹងរបាយការណ៍",
     "offline": "គ្មានអ៊ីនធឺណិត · របាយការណ៍ដែលបានរក្សាទុក",

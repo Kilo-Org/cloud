@@ -83,6 +83,7 @@ export type RouteContext = {
   routePreparationMs: number;
   /** Sends `session.prepare` when a wrapper socket is bound; a no-op otherwise. */
   sendPrepare: (route: RouteRecord) => void;
+  releasePreparation: (sessionId: string) => void;
   /** Short bounded notification to the session's V2 DO; dropped on failure. */
   notify: (sessionId: string, update: ControlPlaneRouteUpdate) => Promise<void>;
   /**
@@ -426,6 +427,10 @@ export async function ensureRoute(
 /** Ready routes after `hello`: a restart starts a new attempt, else re-notify. */
 export async function onWrapperConnected(ctx: RouteContext, restarted: boolean): Promise<void> {
   for (const route of await listRoutes(ctx.db)) {
+    if (route.state === 'failed') {
+      ctx.releasePreparation(route.sessionId);
+      continue;
+    }
     if (route.state === 'ready' && restarted) {
       // Kilo state died with the old wrapper (spec §6): a new attempt.
       await ctx.notify(route.sessionId, {
@@ -500,6 +505,7 @@ export async function failExpiredRoutes(ctx: RouteContext): Promise<void> {
   for (const route of await listRoutes(ctx.db)) {
     if (route.state !== 'preparing' || route.attemptDeadlineAt > now) continue;
     writeRoute(ctx.db, { ...route, state: 'failed', reason: 'preparation_timeout' });
+    ctx.releasePreparation(route.sessionId);
     logControlDiagnostic('route_failed', {
       sessionId: route.sessionId,
       attemptId: route.attemptId,

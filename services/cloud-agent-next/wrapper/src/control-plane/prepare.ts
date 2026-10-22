@@ -21,6 +21,7 @@ import type { WrapperKiloClient } from '../kilo-api.js';
 import { fetchKiloServer } from '../kilo-server-auth.js';
 import {
   git,
+  isTimeoutTermination,
   runProcess,
   withTimeoutAndAbort,
   type ExecResult,
@@ -76,6 +77,7 @@ import {
 /** Spec §7 "Setup commands": current per-command limits. */
 const SETUP_COMMAND_INACTIVITY_TIMEOUT_MS = 5 * 60_000;
 const SETUP_COMMAND_HARD_TIMEOUT_MS = 8 * 60_000;
+const LOCAL_GIT_TIMEOUT_MS = 30_000;
 /** Spec §7 "Clone or fetch": network errors get 3 attempts with backoff. */
 const CLONE_RETRY_ATTEMPTS = 3;
 const CLONE_RETRY_BACKOFF_MS = [1_000, 2_000];
@@ -220,8 +222,9 @@ type PreparedRoute = {
 };
 
 type PreparingRoute = {
+  attemptId: string | undefined;
   promise: Promise<void>;
-  released: boolean;
+  controller: AbortController;
   /** `runtimeKey(spec)` captured before the first await, for last-route release. */
   runtimeKey: string;
   /** A credentials frame that arrived before the route was prepared. */
@@ -834,13 +837,15 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     directory: string,
     env: Record<string, string>,
     redact: (text: string) => string,
-    setStep: (step: ControlPlanePreparationStep) => void
+    setStep: (step: ControlPlanePreparationStep) => void,
+    preparationSignal: AbortSignal
   ): Promise<boolean> {
     const git = spec.git;
     if (!git) return false;
     setStep('restore');
     try {
-      await withinStep('restore', timers.restoreMs, async signal => {
+      await withinStep('restore', timers.restoreMs, async stepSignal => {
+        const signal = AbortSignal.any([preparationSignal, stepSignal]);
         emitProgress(spec.sessionId, 'restore');
         await refreshAdoptedRepository({
           remoteUrl: authenticatedGitUrl(git.url, git.token, git.platform),
@@ -860,6 +865,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       });
       return true;
     } catch (error) {
+      preparationSignal.throwIfAborted();
       log(
         `control-plane adopt failed, cloning session=${spec.sessionId} error=${
           error instanceof Error ? redact(error.message) : 'unknown'
@@ -881,12 +887,27 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     return { inspection, stamp };
   }
 
-  async function headCommit(directory: string, env: Record<string, string>): Promise<string> {
+  async function headCommit(
+    directory: string,
+    env: Record<string, string>,
+    signal: AbortSignal
+  ): Promise<string> {
     const result = await runGit(['rev-parse', 'HEAD'], {
       cwd: directory,
       env,
       inheritEnv: false,
+      timeoutMs: LOCAL_GIT_TIMEOUT_MS,
+      signal,
     });
+    signal.throwIfAborted();
+    if (isTimeoutTermination(result)) {
+      throw new WrapperBootstrapError({
+        code: 'WORKSPACE_SETUP_FAILED',
+        subtype: 'workspace_setup_unknown',
+        message: 'Reading the repository commit timed out',
+        retryable: true,
+      });
+    }
     return result.exitCode === 0 ? result.stdout.trim() : '';
   }
 
@@ -907,7 +928,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     emitProgress(spec.sessionId, 'snapshot');
     await truncateLog().catch(() => undefined);
     const runWorkspaceGit = (args: string[]): Promise<ExecResult> =>
-      runGit(args, { cwd: directory, env, inheritEnv: false });
+      runGit(args, { cwd: directory, env, inheritEnv: false, timeoutMs: LOCAL_GIT_TIMEOUT_MS });
     try {
       const bare = await stripGitCredentials({
         git: runWorkspaceGit,
@@ -965,11 +986,13 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     redact: (text: string) => string,
     home: string,
     setStep: (step: ControlPlanePreparationStep) => void,
+    signal: AbortSignal,
     onReplacementWorkspace?: () => Promise<void>
   ): Promise<ControlPlaneWorkspaceOutcome> {
     const workspaceStartedAt = Date.now();
     const inspectStartedAt = Date.now();
     const { inspection, stamp: previous } = await inspectWorkspace(directory);
+    signal.throwIfAborted();
     log(
       `control-plane workspace inspect session=${spec.sessionId} inspection=${inspection} elapsedMs=${Date.now() - inspectStartedAt}`
     );
@@ -985,7 +1008,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       // rebuilt from a clone, so the layers stacked on it do not accumulate.
       const rebuild = previous !== null && snapshotAction(previous, now()) === 'rebuild';
       const adoptStartedAt = Date.now();
-      adopted = !rebuild && (await adoptWorkspace(spec, directory, env, redact, setStep));
+      adopted = !rebuild && (await adoptWorkspace(spec, directory, env, redact, setStep, signal));
+      signal.throwIfAborted();
       log(
         `control-plane workspace adopt done session=${spec.sessionId} adopted=${adopted} rebuild=${rebuild} elapsedMs=${Date.now() - adoptStartedAt}`
       );
@@ -996,14 +1020,18 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     const cloning = !adopted && Boolean(spec.git) && !(await hasGit(directory));
     if (!adopted) {
       setStep('clone');
-      await withinStep('clone', timers.cloneMs, signal =>
-        cloneWorkspace(spec, directory, env, redact, signal, () => setStep('checkout'))
+      await withinStep('clone', timers.cloneMs, stepSignal =>
+        cloneWorkspace(spec, directory, env, redact, AbortSignal.any([signal, stepSignal]), () =>
+          setStep('checkout')
+        )
       );
     }
+    signal.throwIfAborted();
     setStep('setup');
-    await runSetupCommands(spec, directory, env, redact, new AbortController().signal);
+    await runSetupCommands(spec, directory, env, redact, signal);
+    signal.throwIfAborted();
     if (cloning || adopted) await onReplacementWorkspace?.();
-    const commit = await headCommit(directory, env);
+    const commit = await headCommit(directory, env, signal);
     // The stamp goes down before the snapshot, so a container restored from it
     // sees another allocation's stamp and adopts rather than trusting the files.
     const plan = planStamp({ cloning, adopted, previous, now: now() });
@@ -1063,6 +1091,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       );
       const startedAt = Date.now();
       const result = await runSetup(command, directory, env, output.onOutput, signal);
+      signal.throwIfAborted();
       output.flush();
       if (result.exitCode !== 0) {
         const timedOut = result.terminationReason !== undefined;
@@ -1163,7 +1192,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       if (sessionId !== excludeSessionId && route.key === key) return true;
     }
     for (const [sessionId, record] of preparing) {
-      if (sessionId === excludeSessionId || record.released) continue;
+      if (sessionId === excludeSessionId || record.controller.signal.aborted) continue;
       if (record.runtimeKey === key) return true;
     }
     return false;
@@ -1335,9 +1364,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           step => {
             currentStep = step;
           },
+          owner.controller.signal,
           async () => {
             replacementWorkspace = true;
-            if (!recovery || owner.released) return;
+            if (!recovery || owner.controller.signal.aborted) return;
             currentStep = 'restore';
             try {
               emitProgress(sessionId, 'restore', 'Restoring saved worktree changes');
@@ -1368,7 +1398,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           }
         );
       });
-      if (owner.released) return;
+      if (owner.controller.signal.aborted) return;
       if (recovery && !replacementWorkspace) {
         log(`local worktree recovery session=${sessionId} skipped reason=surviving_workspace`);
       }
@@ -1381,9 +1411,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           withinStep('kilo_runtime', timers.kiloRuntimeStartMs, () =>
             deps.runtimes.ensure({ key, directory, env: builtEnv })
           ),
-        () => !owner.released
+        () => !owner.controller.signal.aborted
       );
-      if (owner.released) return;
+      if (owner.controller.signal.aborted) {
+        return;
+      }
       currentStep = 'kilo_session';
       emitProgress(sessionId, 'kilo_session');
       // A previous release's tree walk may still be running on this runtime;
@@ -1401,9 +1433,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
               !(replacementWorkspace && localRecoveryApplied)
             )
           ),
-        () => !owner.released
+        () => !owner.controller.signal.aborted
       );
-      if (owner.released) return;
+      if (owner.controller.signal.aborted) {
+        return;
+      }
       prepared.set(sessionId, {
         key,
         spec,
@@ -1429,12 +1463,16 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           );
         }
       }
-      if (owner.released) return;
+      if (owner.controller.signal.aborted) {
+        return;
+      }
       emitSessionReadyNative(sessionId);
       deps.emit({ type: 'session.ready', sessionId, ...(workspace ? { workspace } : {}) });
       log(`control-plane prepare ready session=${sessionId} directory=${directory}`);
     } catch (error) {
-      if (owner.released) return;
+      if (owner.controller.signal.aborted) {
+        return;
+      }
       log(
         `control-plane prepare failed session=${sessionId} step=${currentStep} error=${redactSecrets(
           error instanceof Error ? error.message : String(error),
@@ -1453,7 +1491,9 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     const route = prepared.get(credentials.sessionId);
     if (!route) {
       const preparation = preparing.get(credentials.sessionId);
-      if (preparation && !preparation.released) preparation.pendingCredentials = credentials;
+      if (preparation && !preparation.controller.signal.aborted) {
+        preparation.pendingCredentials = credentials;
+      }
       return;
     }
     route.cloudAgentMcp = credentials.cloudAgentMcp ?? route.cloudAgentMcp;
@@ -1485,6 +1525,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         cwd: route.directory,
         env: route.env,
         inheritEnv: false,
+        timeoutMs: LOCAL_GIT_TIMEOUT_MS,
       });
       if (result.exitCode !== 0) {
         log(`control-plane Git credential refresh failed session=${credentials.sessionId}`);
@@ -1495,16 +1536,24 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   return {
     prepare: function prepare(spec, credentials) {
       const existing = preparing.get(spec.sessionId);
-      if (existing && !existing.released) return existing.promise;
+      if (
+        existing &&
+        !existing.controller.signal.aborted &&
+        existing.attemptId === spec.attemptId
+      ) {
+        return existing.promise;
+      }
       if (existing) {
+        existing.controller.abort();
         const owner: PreparingRoute = {
+          attemptId: spec.attemptId,
           promise: Promise.resolve(),
-          released: false,
+          controller: new AbortController(),
           runtimeKey: runtimeKey(spec),
         };
         owner.promise = existing.promise
           .then(() => {
-            if (owner.released) return;
+            if (owner.controller.signal.aborted) return;
             preparing.delete(spec.sessionId);
             // A frame buffered on this owner would be lost when the re-entrant
             // prepare creates a fresh owner for the same session.
@@ -1521,8 +1570,9 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         return owner.promise;
       }
       const owner: PreparingRoute = {
+        attemptId: spec.attemptId,
         promise: Promise.resolve(),
-        released: false,
+        controller: new AbortController(),
         runtimeKey: runtimeKey(spec),
       };
       const route = prepared.get(spec.sessionId);
@@ -1544,7 +1594,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
                 );
               }
             }
-            if (!owner.released) {
+            if (!owner.controller.signal.aborted) {
               emitSessionReadyNative(spec.sessionId);
               deps.emit({ type: 'session.ready', sessionId: spec.sessionId, workspace: 'same' });
             }
@@ -1563,7 +1613,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     },
     release(sessionId) {
       const preparation = preparing.get(sessionId);
-      if (preparation) preparation.released = true;
+      preparation?.controller.abort();
       const route = prepared.get(sessionId);
       if (!route) return;
       prepared.delete(sessionId);

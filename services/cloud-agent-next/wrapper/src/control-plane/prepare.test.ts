@@ -19,7 +19,7 @@ import type { ControlDiagnosticFields } from '../../../src/shared/control-diagno
 import type { WrapperKiloClient } from '../kilo-api.js';
 import type { ExecResult, ProcessOptions, ProcessOutputStream } from '../utils.js';
 import * as processUtils from '../utils.js';
-import { createPreparationManager, type PrepareRuntimePort } from './prepare.js';
+import { createPreparationManager, type PrepareRuntimePort, type PrepareDeps } from './prepare.js';
 import {
   SNAPSHOT_MAX_GENERATION,
   SNAPSHOT_REFRESH_AFTER_MS,
@@ -313,6 +313,7 @@ function createHarness(
     beforeWorkspace?: () => Promise<void>;
     releaseCleanupDeadlineMs?: number;
     runtimes?: PrepareRuntimePort;
+    runSetup?: PrepareDeps['runSetup'];
   } = {}
 ): Harness {
   const frames: ControlPlaneWrapperFrame[] = [];
@@ -507,8 +508,11 @@ function createHarness(
       }
       return result(0);
     },
-    runSetup: async (_command, _directory, _env, onOutput) => {
+    runSetup: async (_command, _directory, _env, onOutput, signal) => {
       await options.beforeWorkspace?.();
+      if (options.runSetup) {
+        return options.runSetup(_command, _directory, _env, onOutput, signal);
+      }
       setupOutput?.(onOutput ?? (() => undefined));
       return setupResult;
     },
@@ -715,6 +719,84 @@ function createRegistryRuntimes(): {
 }
 
 describe('createPreparationManager', () => {
+  it.each(['release', 'replacement'])(
+    'aborts setup on %s and prepares the next attempt',
+    async action => {
+      const entered = Promise.withResolvers<void>();
+      const results: ExecResult[] = [];
+      let active = 0;
+      let maxActive = 0;
+      const harness = createHarness(FAST_TIMERS, {
+        runSetup: async (command, _directory, _env, _onOutput, signal) => {
+          maxActive = Math.max(maxActive, ++active);
+          try {
+            const result = await processUtils.runProcess('sh', ['-c', command], {
+              cwd: os.tmpdir(),
+              signal,
+              timeoutMs: 2_000,
+              terminationGraceMs: 50,
+              onOutput: () => entered.resolve(),
+            });
+            results.push(result);
+            return result;
+          } finally {
+            active--;
+          }
+        },
+      });
+      const spec = routeSpec({ setupCommands: ['echo started; sleep 30'] });
+      const running = harness.manager.prepare(spec);
+      await entered.promise;
+      expect(harness.manager.prepare(spec)).toBe(running);
+      if (action === 'release') harness.manager.release(spec.sessionId);
+      const next = harness.manager.prepare({
+        ...spec,
+        attemptId: 'attempt-2',
+        setupCommands: ['true'],
+      });
+      expect(next).not.toBe(running);
+      await Promise.all([running, next]);
+      expect(results.map(result => result.exitCode)).toEqual([124, 0]);
+      expect(results[0]?.terminationReason).toBe('abort');
+      expect(maxActive).toBe(1);
+      expect(harness.manager.isPreparing()).toBe(false);
+      expect(harness.manager.isPrepared(spec.sessionId)).toBe(true);
+      expect(harness.frames.filter(frame => frame.type === 'session.ready')).toHaveLength(1);
+      expect(harness.frames.some(frame => frame.type === 'session.failed')).toBe(false);
+      const commandEnds = harness.frames.flatMap(frame =>
+        frame.type === 'session.events'
+          ? frame.events.filter(event => event.type === 'session.setup.finished')
+          : []
+      );
+      expect(commandEnds).toHaveLength(1);
+    }
+  );
+
+  it('fails a timed-out commit read before starting Kilo, including without setup commands', async () => {
+    const harness = createHarness();
+    let commitReads = 0;
+    harness.setGit((args, options) => {
+      if (args.join(' ') !== 'rev-parse HEAD') return result(0);
+      commitReads++;
+      expect(options?.timeoutMs).toBe(30_000);
+      expect(options?.signal).toBeInstanceOf(AbortSignal);
+      return { ...result(124), terminationReason: 'timeout' };
+    });
+    await harness.manager.prepare(routeSpec({ git: { url: 'https://git.test/repo' } }));
+    expect(commitReads).toBe(1);
+    expect(harness.ensureCalls()).toBe(0);
+    expect(harness.manager.isPreparing()).toBe(false);
+    expect(lastFrame(harness.frames)).toMatchObject({
+      type: 'session.failed',
+      reason: 'workspace_setup_failed',
+      subtype: 'workspace_setup_unknown',
+    });
+    expect(
+      harness.logs.some(line => line.includes('Reading the repository commit timed out'))
+    ).toBe(true);
+    expect(progressSteps(harness.frames)).not.toContain('setup');
+  });
+
   it('starts a fresh preparation requested before the released owner finishes', async () => {
     const entered = Promise.withResolvers<void>();
     const resume = Promise.withResolvers<void>();

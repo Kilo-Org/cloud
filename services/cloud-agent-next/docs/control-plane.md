@@ -328,11 +328,13 @@ notification, so a lost notification never leaves it waiting.
 | Allocation enters `creating`, `starting` or `stopping` | Notify each preparing route of the sandbox step (`sandbox_create`, `sandbox_start`; a create retry or a pending stop adds a detail). `prepare` and `status` return the same step while the allocation is in one of those states (`creating`, `starting`, `stopping`, `stopped`). |
 | Wrapper `session.ready` | `ready`; notify. |
 | Wrapper `session.failed` (while preparing, or later when Kilo is unavailable) | `failed`; notify. |
-| Deadline while `preparing` | `failed` (`preparation_timeout`); notify. |
+| Deadline while `preparing` | `failed` (`preparation_timeout`); send `session.release` to cancel preparation; notify. |
 | Socket lost | Notify `reconnecting`. Route state unchanged. |
 | `hello`, same `wrapperId` | Notify `ready` again for ready routes; send `session.prepare` again for preparing routes. |
 | `hello`, new `wrapperId` | Ready routes → `preparing`; notify `route lost` (`agent_restarted`); send `session.prepare` again. |
 | `release` (session deleted) | Remove the route; send `session.release`. |
+
+On wrapper connection, failed routes resend `session.release` so a missed cancellation does not leave preparation running.
 
 ### Forwarding
 
@@ -590,6 +592,10 @@ Each step sends progress. Long steps also send a short, throttled `detail` line 
 text, not route state. A route already prepared in this process (checkout present, Kilo session
 open) returns `session.ready` at once. A `session.prepare` for a failed route starts fresh,
 including a new Kilo restart budget.
+
+Repeated preparation for the same attempt shares its pending result. A new attempt cancels the old
+preparation and waits for it to finish before starting. Release cancels clone, fetch, setup commands,
+and commit reads. Commit reads and snapshot or credential Git commands have a 30-second limit.
 
 Eligible managed GitHub HTTPS preparation clone and fetch, and only those invocations, pass two
 invocation-scoped options together: `proactiveAuth=basic` so the first request carries the existing

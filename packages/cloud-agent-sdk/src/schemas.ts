@@ -764,10 +764,43 @@ export const sessionQueueChangedDataSchema = z
   .passthrough();
 export type SessionQueueChangedData = z.infer<typeof sessionQueueChangedDataSchema>;
 
+/** Runtime mirror of `QuestionInfo` in `@kilocode/app-shared/opencode`. */
+const questionInfoSchema = z.object({
+  question: z.string(),
+  header: z.string(),
+  options: z.array(
+    z.object({
+      label: z.string(),
+      description: z.string(),
+      mode: z.string().optional(),
+    })
+  ),
+  multiple: z.boolean().optional(),
+  custom: z.boolean().optional(),
+});
+
+/**
+ * A question list is positional: the answer payload mirrors the CLI's question
+ * indices (`answerQuestion(requestId, answers: string[][])`). Keep the longest
+ * run of entries that match `QuestionInfo` and stop at the first entry that
+ * does not, so a rendered question keeps its CLI index instead of every later
+ * answer sliding onto the wrong question. No usable entry means the payload
+ * carries no questions the client can render.
+ */
+const questionListSchema = z.array(z.unknown()).transform(entries => {
+  const questions: z.infer<typeof questionInfoSchema>[] = [];
+  for (const entry of entries) {
+    const parsed = questionInfoSchema.safeParse(entry);
+    if (!parsed.success) break;
+    questions.push(parsed.data);
+  }
+  return questions.length > 0 ? questions : entries.length > 0 ? undefined : [];
+});
+
 export const questionAskedDataSchema = z.object({
   id: z.string(),
   tool: z.object({ callID: z.string() }).optional(),
-  questions: z.array(z.unknown()).optional().catch(undefined),
+  questions: questionListSchema.optional().catch(undefined),
 });
 export type QuestionAskedData = z.infer<typeof questionAskedDataSchema>;
 

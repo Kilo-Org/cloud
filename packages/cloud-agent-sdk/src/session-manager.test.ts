@@ -6981,6 +6981,36 @@ describe('createSessionManager', () => {
       expect(mockSession.state.clearFailedMessage).toHaveBeenCalledWith('m1');
     });
 
+    it('clears the terminal error when the retried failure held it', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await switchAndCaptureSubscriber(config, mgr);
+
+      config.store.set(mgr.atoms.error, 'The message could not be delivered');
+      mockSession.state.clearFailedMessage.mockReturnValueOnce(true);
+
+      mgr.clearFailedMessage('m1');
+
+      // The service undid the failure that reached `errorAtom` through
+      // `config.onError`, so the banner must not outlive the accepted retry.
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+    });
+
+    it('keeps the banner when the retried failure did not hold the error', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await switchAndCaptureSubscriber(config, mgr);
+
+      config.store.set(mgr.atoms.error, 'Session terminated');
+      mockSession.state.clearFailedMessage.mockReturnValueOnce(false);
+
+      mgr.clearFailedMessage('m1');
+
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe('Session terminated');
+    });
+
     it('deletes a client-materialised failed row so a retry cannot duplicate it', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
@@ -7744,6 +7774,47 @@ describe('createSessionManager', () => {
 
       // The stack was reset by clearTranscript, so no pre-clear cursor is restored.
       expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+    });
+
+    it('resets the omitted-item accounting so a cleared view reports no omitted history', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async (id, options) => {
+        if (id !== 'ses-1') return makePage({ kiloSessionId: id });
+        if (!options.cursor) {
+          return makePage({
+            kiloSessionId: id,
+            messages: [makePageMessage('msg-initial', 'ses-1', 'initial')],
+            nextCursor: 'cursor-A',
+            omittedItemCount: 2,
+          });
+        }
+        return makePage({
+          kiloSessionId: id,
+          messages: [makePageMessage('msg-older', 'ses-1', 'older')],
+          nextCursor: null,
+          omittedItemCount: 3,
+        });
+      });
+      const cached = new Map<string, SessionSnapshotPage>();
+      const config = createMockConfig({
+        fetchSnapshotPage,
+        writeCachedSnapshotPage: page => cached.set(page.info.id, page),
+        readCachedSnapshotPage: async id => cached.get(id) ?? null,
+        fetchSession: async id => ({ ...defaultFetchedSession, kiloSessionId: id }),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.loadOlderMessages();
+      expect(atomValue<number>(config.store, mgr.atoms.olderMessagesOmittedItemCount)).toBe(5);
+
+      mgr.clearTranscript();
+      expect(atomValue<number>(config.store, mgr.atoms.olderMessagesOmittedItemCount)).toBe(0);
+
+      // Leaving caches the cleared view; a stale count here would repaint the
+      // omitted banner on the next open of this session.
+      await mgr.switchSession(kiloId('ses-2'));
+      expect(cached.get('ses-1')?.omittedItemCount).toBe(0);
+      mgr.destroy();
     });
 
     it('purges all replayed history on reconnect with no post-clear send', async () => {

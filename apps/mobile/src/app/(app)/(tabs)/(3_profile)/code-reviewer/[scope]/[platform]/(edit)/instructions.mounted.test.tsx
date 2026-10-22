@@ -71,6 +71,9 @@ vi.mock('@/lib/navigation/prevent-remove', () => ({
 }));
 vi.mock('react-native', () => ({
   View: 'View',
+  Pressable: 'Pressable',
+  InputAccessoryView: 'InputAccessoryView',
+  Keyboard: { dismiss: vi.fn() },
   TextInput: (props: {
     children?: ReactNode;
     className?: string;

@@ -162,6 +162,25 @@ function removeNonSensicalMaxTokens(
   }
 }
 
+/**
+ * Providers an exclusive model request may route to.
+ *
+ * Only a list of provider slugs expresses a client routing preference; any
+ * other value is ignored. When the client's list leaves no provider allowed by
+ * the model's `inference_providers`, the model's own restriction is used, so a
+ * request never carries an empty allowlist to the upstream.
+ */
+function restrictedProviderOnly(
+  requestedOnly: unknown,
+  restriction: readonly OpenRouterInferenceProviderId[]
+): string[] {
+  const requested = Array.isArray(requestedOnly)
+    ? requestedOnly.filter(value => typeof value === 'string')
+    : [];
+  const allowed = [...new Set<string>(requested).intersection(new Set<string>(restriction))];
+  return allowed.length > 0 ? allowed : [...restriction];
+}
+
 /** Rewrites a gateway request to target a Kilo-exclusive model. */
 export function applyKiloExclusiveModelSettings(
   requestToMutate: GatewayRequest,
@@ -183,10 +202,8 @@ export function applyKiloExclusiveModelSettings(
     return;
   }
   const provider = requestToMutate.body.provider;
-  if (isOpenRouterProviderConfig(provider) && provider.only) {
-    provider.only = [...new Set(provider.only).intersection(new Set<string>(restriction))];
-  } else if (isOpenRouterProviderConfig(provider)) {
-    provider.only = [...restriction];
+  if (isOpenRouterProviderConfig(provider)) {
+    provider.only = restrictedProviderOnly(provider.only, restriction);
   } else {
     requestToMutate.body.provider = { only: [...restriction] };
   }

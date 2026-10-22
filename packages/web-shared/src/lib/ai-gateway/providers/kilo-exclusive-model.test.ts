@@ -267,7 +267,7 @@ describe('applyKiloExclusiveModelSettings', () => {
     expect(req.body.provider?.only?.sort()).toEqual(['amazon-bedrock', 'anthropic']);
   });
 
-  it('produces an empty only list when caller only and restriction are disjoint', () => {
+  it('falls back to the model restriction when caller only and restriction are disjoint', () => {
     const req = makeRequest({ only: ['openai'] });
     applyKiloExclusiveModelSettings(
       req,
@@ -276,8 +276,35 @@ describe('applyKiloExclusiveModelSettings', () => {
         inference_providers: ['anthropic'] as OpenRouterInferenceProviderId[],
       })
     );
-    expect(req.body.provider?.only).toEqual([]);
+    expect(req.body.provider?.only).toEqual(['anthropic']);
   });
+
+  it('keeps the model restriction when the caller only list is empty', () => {
+    const req = makeRequest({ only: [] });
+    applyKiloExclusiveModelSettings(
+      req,
+      makeModel({
+        internal_id: 'vendor/x',
+        inference_providers: ['anthropic', 'amazon-bedrock'] as OpenRouterInferenceProviderId[],
+      })
+    );
+    expect(req.body.provider?.only).toEqual(['anthropic', 'amazon-bedrock']);
+  });
+
+  it.each([['anthropic'], [42], [{ provider: 'anthropic' }], [null]])(
+    'ignores a caller only value that is not a list of provider slugs: %j',
+    only => {
+      const req = makeRequest({ only } as unknown as OpenRouterProviderConfig);
+      applyKiloExclusiveModelSettings(
+        req,
+        makeModel({
+          internal_id: 'vendor/x',
+          inference_providers: ['anthropic'] as OpenRouterInferenceProviderId[],
+        })
+      );
+      expect(req.body.provider).toEqual({ only: ['anthropic'] });
+    }
+  );
 
   it('does not route stealth models by inference provider', () => {
     const req = makeRequest({ zdr: true });

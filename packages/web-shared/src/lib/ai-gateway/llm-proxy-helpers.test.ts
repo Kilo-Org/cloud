@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
-import type { GatewayRequest } from './providers/openrouter/types';
+import type { GatewayRequest, OpenRouterProviderConfig } from './providers/openrouter/types';
 import { createMockUsageContext } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
 
 // `countAndStoreEditUsage` schedules the usage write through `next/server`'s
@@ -1612,5 +1612,38 @@ describe('checkExclusiveModelProviderAllowed', () => {
       }
     );
     expect(ignoreResult?.status).toBe(403);
+  });
+
+  it.each([
+    ['anthropic'],
+    [42],
+    [{ provider: 'anthropic' }],
+    [[{ provider: 'anthropic' }, 'openai']],
+  ])('rejects a provider.only value that is not a list of provider slugs: %j', async only => {
+    const result = checkExclusiveModelProviderAllowed(reflection_beam_free_model.public_id, {
+      only,
+    } as unknown as OpenRouterProviderConfig);
+    expect(result?.status).toBe(400);
+    expect(await result?.json()).toMatchObject({
+      error_type: 'invalid_request',
+      error: 'provider.only must be a list of provider slugs.',
+    });
+  });
+
+  it('accepts an absent or empty provider.only list', () => {
+    expect(checkExclusiveModelProviderAllowed(reflection_beam_free_model.public_id, {})).toBeNull();
+    expect(
+      checkExclusiveModelProviderAllowed(reflection_beam_free_model.public_id, {
+        only: null,
+      } as unknown as OpenRouterProviderConfig)
+    ).toBeNull();
+    expect(
+      checkExclusiveModelProviderAllowed(reflection_beam_free_model.public_id, {
+        only: ['reflection'],
+      })
+    ).toBeNull();
+    expect(
+      checkExclusiveModelProviderAllowed(reflection_beam_free_model.public_id, { only: [] })?.status
+    ).toBe(403);
   });
 });

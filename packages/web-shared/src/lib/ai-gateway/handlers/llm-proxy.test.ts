@@ -745,6 +745,55 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
+  it('rejects a provider.only that is not a list of provider slugs for an exclusive model', async () => {
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+
+    const response = await handleLlmProxyRequest(
+      makeRequest({
+        ...makeBody('reflection/beam-free'),
+        provider: { only: 'reflection' },
+      }) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error_type: 'invalid_request',
+      error: 'provider.only must be a list of provider slugs.',
+    });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('refuses an exclusive model when the caller names no allowed provider', async () => {
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+
+    const response = await handleLlmProxyRequest(
+      makeRequest({
+        ...makeBody('reflection/beam-free'),
+        provider: { only: ['anthropic'] },
+      }) as never
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ error_type: 'provider_not_allowed' });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('keeps the allowed provider when the caller lists one for an exclusive model', async () => {
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+
+    const response = await handleLlmProxyRequest(
+      makeRequest({
+        ...makeBody('reflection/beam-free'),
+        provider: { only: ['reflection'] },
+      }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual({
+      only: ['reflection'],
+    });
+  });
+
   it('passes the Vercel request ID to request logging', async () => {
     const { handleLlmProxyRequest } = await import('./llm-proxy');
 

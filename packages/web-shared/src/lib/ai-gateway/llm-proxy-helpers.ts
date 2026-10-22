@@ -226,6 +226,18 @@ export function dataCollectionRequiredResponse() {
   );
 }
 
+function isProviderSlugList(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every(slug => typeof slug === 'string');
+}
+
+function invalidProviderOnlyResponse() {
+  const error = 'provider.only must be a list of provider slugs.';
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.invalid_request, message: error },
+    { status: 400 }
+  );
+}
+
 export function checkExclusiveModelProviderAllowed(
   model: string,
   provider: OpenRouterProviderConfig | undefined
@@ -233,6 +245,10 @@ export function checkExclusiveModelProviderAllowed(
   if (!provider) return null;
   const exclusiveModel = findKiloExclusiveModel(model);
   if (!exclusiveModel) return null;
+  const requestedOnly: unknown = provider.only;
+  if (requestedOnly !== undefined && requestedOnly !== null && !isProviderSlugList(requestedOnly)) {
+    return invalidProviderOnlyResponse();
+  }
   const inferenceProviders = exclusiveModel.inference_providers;
   if (inferenceProviders.length === 0) return null;
   if (

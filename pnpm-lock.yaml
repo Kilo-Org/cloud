@@ -25,14 +25,14 @@ catalogs:
       specifier: 3.6.2
       version: 3.6.2
     '@tanstack/query-async-storage-persister':
-      specifier: 5.100.10
-      version: 5.100.10
+      specifier: 5.104.3
+      version: 5.104.3
     '@tanstack/react-query':
-      specifier: 5.100.10
-      version: 5.100.10
+      specifier: 5.104.3
+      version: 5.104.3
     '@tanstack/react-query-persist-client':
-      specifier: 5.100.10
-      version: 5.100.10
+      specifier: 5.104.3
+      version: 5.104.3
     '@trpc/client':
       specifier: 11.19.0
       version: 11.19.0
@@ -192,7 +192,6 @@ patchedDependencies:
   expo-widgets@58.0.17: 460b9294721505a0314d95a86cbf0063074e50259180af2d686cad950ef6ab42
   llama.rn@0.12.9: 62dce8190ea1c3bfe58fe2ab460927672af84bea3a32dcf566e92015ad13bd67
   react-native-appsflyer@7.0.2-v2: 7affcf3da23038fe6874ab68124824cb9e56d5ea8336611869b97d30fb1716b7
-  react-native-css@3.0.7: 5da5211f36064faa7a2637adbac34046be8c01413d8b897396076f950f164561
   react-native@0.88.0: 669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c
 
 importers:
@@ -368,7 +367,7 @@ importers:
         version: 1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7)
       '@tanstack/react-query':
         specifier: 'catalog:'
-        version: 5.100.10(react@19.2.6)
+        version: 5.104.3(react@19.2.6)
       '@tanstack/react-virtual':
         specifier: ^3.14.3
         version: 3.14.3(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -513,7 +512,7 @@ importers:
         version: link:../../packages/kilo-chat
       '@kilocode/kilo-chat-hooks':
         specifier: workspace:*
-        version: file:packages/kilo-chat-hooks(@tanstack/react-query@5.100.10(react@19.3.0))(react@19.3.0)
+        version: file:packages/kilo-chat-hooks(@tanstack/react-query@5.104.3(react@19.3.0))(react@19.3.0)
       '@kilocode/notifications':
         specifier: workspace:*
         version: link:../../packages/notifications
@@ -543,7 +542,7 @@ importers:
         version: 1.5.2(@types/react@19.3.0)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       '@sentry/react-native':
         specifier: ~8.31.0
-        version: 8.31.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.6(typescript@7.0.2))(@expo/env@2.5.2)(bufferutil@4.1.0)(dotenv@18.0.8)(expo-router@58.0.19)(expo@58.0.10)(metro-config@0.87.1)(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.64.7)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(esbuild@0.28.2))
+        version: 8.31.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.6(typescript@7.0.2))(@expo/env@2.5.2)(bufferutil@4.1.0)(dotenv@18.0.8)(expo-router@58.0.19)(expo@58.0.10)(metro-config@0.87.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.64.7)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(esbuild@0.28.2))
       '@shopify/flash-list':
         specifier: 2.3.3
         version: 2.3.3(@babel/runtime@7.29.7)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
@@ -552,19 +551,19 @@ importers:
         version: 4.3.3
       '@tanstack/query-async-storage-persister':
         specifier: 'catalog:'
-        version: 5.100.10
+        version: 5.104.3
       '@tanstack/react-query':
         specifier: 'catalog:'
-        version: 5.100.10(react@19.3.0)
+        version: 5.104.3(react@19.3.0)
       '@tanstack/react-query-persist-client':
         specifier: 'catalog:'
-        version: 5.100.10(@tanstack/react-query@5.100.10(react@19.3.0))(react@19.3.0)
+        version: 5.104.3(@tanstack/react-query@5.104.3(react@19.3.0))(react@19.3.0)
       '@trpc/client':
         specifier: 'catalog:'
         version: 11.19.0(@trpc/server@11.19.0(typescript@7.0.2))(typescript@7.0.2)
       '@trpc/tanstack-react-query':
         specifier: 'catalog:'
-        version: 11.19.0(@tanstack/react-query@5.100.10(react@19.3.0))(@trpc/client@11.19.0(@trpc/server@11.19.0(typescript@7.0.2))(typescript@7.0.2))(@trpc/server@11.19.0(typescript@7.0.2))(react@19.3.0)(typescript@7.0.2)
+        version: 11.19.0(@tanstack/react-query@5.104.3(react@19.3.0))(@trpc/client@11.19.0(@trpc/server@11.19.0(typescript@7.0.2))(typescript@7.0.2))(@trpc/server@11.19.0(typescript@7.0.2))(react@19.3.0)(typescript@7.0.2)
       character-entities:
         specifier: 2.0.2
         version: 2.0.2
@@ -734,8 +733,8 @@ importers:
         specifier: 18.1.1
         version: 18.1.1
       nativewind:
-        specifier: 5.0.0-preview.4
-        version: 5.0.0-preview.4(react-native-css@3.0.7(patch_hash=5da5211f36064faa7a2637adbac34046be8c01413d8b897396076f950f164561)(@expo/metro-config@58.0.13(bufferutil@4.1.0)(expo@58.0.10)(typescript@7.0.2)(utf-8-validate@6.0.6))(lightningcss@1.30.1)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(tailwindcss@4.3.3)
+        specifier: 5.0.0-rc.0
+        version: 5.0.0-rc.0(react-native-css@3.1.0-rc.0(@expo/metro-config@58.0.13(bufferutil@4.1.0)(expo@58.0.10)(typescript@7.0.2)(utf-8-validate@6.0.6))(lightningcss@1.30.1)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(tailwindcss@4.3.3)
       posthog-react-native:
         specifier: 4.81.2
         version: 4.81.2(expo-application@58.1.1(expo@58.0.10))(expo-device@58.0.5(expo@58.0.10))(expo-file-system@58.0.9(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6)))(expo-localization@58.0.4(expo@58.0.10)(react@19.3.0))(react-native-safe-area-context@5.10.1(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native-svg@15.15.5(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))
@@ -755,8 +754,8 @@ importers:
         specifier: 7.0.2-v2
         version: 7.0.2-v2(patch_hash=7affcf3da23038fe6874ab68124824cb9e56d5ea8336611869b97d30fb1716b7)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(typescript@7.0.2)
       react-native-css:
-        specifier: 3.0.7
-        version: 3.0.7(patch_hash=5da5211f36064faa7a2637adbac34046be8c01413d8b897396076f950f164561)(@expo/metro-config@58.0.13(bufferutil@4.1.0)(expo@58.0.10)(typescript@7.0.2)(utf-8-validate@6.0.6))(lightningcss@1.30.1)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
+        specifier: 3.1.0-rc.0
+        version: 3.1.0-rc.0(@expo/metro-config@58.0.13(bufferutil@4.1.0)(expo@58.0.10)(typescript@7.0.2)(utf-8-validate@6.0.6))(lightningcss@1.30.1)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       react-native-enriched-markdown:
         specifier: 1.1.1
         version: 1.1.1(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
@@ -859,7 +858,7 @@ importers:
         version: 1.4.0
       '@tanstack/react-query':
         specifier: 'catalog:'
-        version: 5.100.10(react@19.2.6)
+        version: 5.104.3(react@19.2.6)
       clsx:
         specifier: 2.1.1
         version: 2.1.1
@@ -1169,7 +1168,7 @@ importers:
         version: 5.10.0
       '@tanstack/react-query':
         specifier: 'catalog:'
-        version: 5.100.10(react@19.2.6)
+        version: 5.104.3(react@19.2.6)
       '@trpc/client':
         specifier: 'catalog:'
         version: 11.19.0(@trpc/server@11.19.0(typescript@5.9.3))(typescript@5.9.3)
@@ -1178,7 +1177,7 @@ importers:
         version: 11.19.0(typescript@5.9.3)
       '@trpc/tanstack-react-query':
         specifier: 'catalog:'
-        version: 11.19.0(@tanstack/react-query@5.100.10(react@19.2.6))(@trpc/client@11.19.0(@trpc/server@11.19.0(typescript@5.9.3))(typescript@5.9.3))(@trpc/server@11.19.0(typescript@5.9.3))(react@19.2.6)(typescript@5.9.3)
+        version: 11.19.0(@tanstack/react-query@5.104.3(react@19.2.6))(@trpc/client@11.19.0(@trpc/server@11.19.0(typescript@5.9.3))(typescript@5.9.3))(@trpc/server@11.19.0(typescript@5.9.3))(react@19.2.6)(typescript@5.9.3)
       '@types/archiver':
         specifier: 7.0.0
         version: 7.0.0
@@ -1718,8 +1717,8 @@ importers:
         version: 15.1.0(ttsc@0.33.0)
     devDependencies:
       '@anthropic-ai/sdk':
-        specifier: 0.104.1
-        version: 0.104.1(zod@4.6.7)
+        specifier: 0.137.0
+        version: 0.137.0(zod@4.6.7)
       '@ttsc/unplugin':
         specifier: 0.33.0
         version: 0.33.0(ttsc@0.33.0)
@@ -1730,8 +1729,8 @@ importers:
         specifier: 'catalog:'
         version: 0.31.10
       openai:
-        specifier: 6.49.0
-        version: 6.49.0(@aws-sdk/credential-provider-node@3.972.21)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.7)
+        specifier: 7.36.0
+        version: 7.36.0(@aws-sdk/credential-provider-node@3.972.21)(undici@7.29.1)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.7)
       ttsc:
         specifier: 0.33.0
         version: 0.33.0
@@ -1775,7 +1774,7 @@ importers:
     devDependencies:
       '@tanstack/react-query':
         specifier: 'catalog:'
-        version: 5.100.10(react@19.2.6)
+        version: 5.104.3(react@19.2.6)
       '@types/react':
         specifier: 19.2.14
         version: 19.2.14
@@ -3881,6 +3880,15 @@ packages:
 
   '@anthropic-ai/sdk@0.109.1':
     resolution: {integrity: sha512-q9OnEKLr5H9nxSuXdgDgJhxfYMiE+AaUEBze2Gk91UcaaLnsN+Lx5fbCYywiqurU/APLdwv23x03Wm6WN3EBsg==}
+    hasBin: true
+    peerDependencies:
+      zod: ^3.25.0 || ^4.0.0
+    peerDependenciesMeta:
+      zod:
+        optional: true
+
+  '@anthropic-ai/sdk@0.137.0':
+    resolution: {integrity: sha512-YpEnbPz8kWF1BWthwUCnRhci7OvDLSUO8NFKoevoPkjNkK9CJeibZITgxr9vhqOP8Le61e5tNDHFTxw1dc6Png==}
     hasBin: true
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
@@ -10968,23 +10976,23 @@ packages:
     peerDependencies:
       vite: '>=8.1.6 <8.2.0'
 
-  '@tanstack/query-async-storage-persister@5.100.10':
-    resolution: {integrity: sha512-NbxsCI9qyMbEooFnFsAR2dbVQ6cmxZpOWSjLFy62qfMkxXnNjkskqex7YgtzWSaD/ozOOLgrbDiyYWEPYKmMyQ==}
+  '@tanstack/query-async-storage-persister@5.104.3':
+    resolution: {integrity: sha512-xunlTTS1NFNE5Uk0pEZMhriYMqdaiZVhqTSQmTfKzLHg+oDBM6tUhSQsdCwAC77mvGC5J59tGkwhFz8CHtvdsg==}
 
-  '@tanstack/query-core@5.100.10':
-    resolution: {integrity: sha512-8UR0yJR+GiQ40m3lPhUr0xbfAupe6GSQiksSBSa9SM2NjezFyxXCIA69/lz8cSoNKZLrw1/PktIyQBJcVeMi3w==}
+  '@tanstack/query-core@5.104.3':
+    resolution: {integrity: sha512-DZY9TuJAOgU3UyHUhXb4CcTYEHNZszlwkPg4VViIwTxOKzLprPUU+rbaPZQd3srqkGOtpaDdKpW972UV/LKlcg==}
 
-  '@tanstack/query-persist-client-core@5.100.10':
-    resolution: {integrity: sha512-O9Pey40DhTTDBABS0bHr+KNL5/VMf6PrqjexS8WoDDtnkaoWM+y0MSe0V9E5W+BwvkjM33mB3aYcCxa175gZTQ==}
+  '@tanstack/query-persist-client-core@5.104.3':
+    resolution: {integrity: sha512-6nhc/QbMpkKeuAM81SFSdcsJ9B8dm3fGHPODbau2cRSDyqcXiSl7sXQM7POVktch/YdgIGYPIQyZOQQaRarHMA==}
 
-  '@tanstack/react-query-persist-client@5.100.10':
-    resolution: {integrity: sha512-EImacngLXYEtzlrIPf8IAqKN3foS7cmSj4GWqsHJvc7K+8fy2c3s7mdV8oTJeii/TvrzO4X9fcnXi6tUHMIOHA==}
+  '@tanstack/react-query-persist-client@5.104.3':
+    resolution: {integrity: sha512-Dooa5cQ2Ter+9yHD3oD6vUzY+X4VEG9l9XkilX5OWFXMAtCEC+rSXwlfwYqNEMzAVigH7AcdubeRj2Vm+rCf8g==}
     peerDependencies:
-      '@tanstack/react-query': ^5.100.10
+      '@tanstack/react-query': ^5.104.3
       react: ^18 || ^19
 
-  '@tanstack/react-query@5.100.10':
-    resolution: {integrity: sha512-FLaZf2RCrA/Zgp4aiu5tG3TyasTRO7aZ99skxQpr3Hg/zXOhu6yq5FZCYQ/tRaJtM9ylnoK8tFK7PolXQadv6Q==}
+  '@tanstack/react-query@5.104.3':
+    resolution: {integrity: sha512-5Ts1ImwJKqoJgPkLxl9WrPQy1JEoEmti3MaaODCfBamHUGFk57IFrc+AIksPq+BAm10EsroX56qm398Z42LG7w==}
     peerDependencies:
       react: ^18 || ^19
 
@@ -13061,8 +13069,8 @@ packages:
   colorette@2.0.20:
     resolution: {integrity: sha512-IfEDxwoWIjkeXL1eXcDiow4UbKjhLdq6/EuSVR9GMN7KVH3r9gQ83e73hsz1Nd1T3ijd5xv1wcWRYO+D6kCI2w==}
 
-  colorjs.io@0.6.0-alpha.1:
-    resolution: {integrity: sha512-c/h/8uAmPydQcriRdX8UTAFHj6SpSHFHBA8LvMikvYWAVApPTwg/pyOXNsGmaCBd6L/EeDlRHSNhTtnIFp/qsg==}
+  colorjs.io@0.7.0:
+    resolution: {integrity: sha512-JfLy3aZW1Xp2iwSFzGlLn0XSMnIdItH3BmzsXtwHVFEWwVUJIwKBWNzjQq2Tgf3998OY7qW2R6klrlYo8vmEGg==}
 
   columnify@1.6.0:
     resolution: {integrity: sha512-lomjuFZKfM6MSAnV9aCZC9sc0qGbmZdfygNv+nCpqVkSKdCxCklLtd16O0EILGkImHw9ZpHkAnHaB+8Zxq5W6Q==}
@@ -17246,11 +17254,11 @@ packages:
     engines: {node: ^12.20.0 || ^14.18.0 || >=16.0.0}
     hasBin: true
 
-  nativewind@5.0.0-preview.4:
-    resolution: {integrity: sha512-eLsFGczxIsWADoD18EbEyt01aWgw4uP1/t/O7JIsp/OEbSgVYVobW97e2DDTOxxiiqSu0RexC1KSo5d7tes9uQ==}
+  nativewind@5.0.0-rc.0:
+    resolution: {integrity: sha512-CrESAPb428+EVNvGhUaMfbNllyk6lOnX1ZlVlNktCeae/4mIbb6x4SxN62Rg3cLHNRrRLYZEPYGmqkZ8fVIRZQ==}
     engines: {node: '>=20'}
     peerDependencies:
-      react-native-css: ^3.0.1
+      react-native-css: 3.1.0-rc.0
       tailwindcss: '>4.1.11'
 
   natural-compare@1.4.0:
@@ -17565,6 +17573,30 @@ packages:
       '@smithy/hash-node':
         optional: true
       '@smithy/signature-v4':
+        optional: true
+      ws:
+        optional: true
+      zod:
+        optional: true
+
+  openai@7.36.0:
+    resolution: {integrity: sha512-IiTbJojXJ8h24yjcibcD2kHCEMLjLOCyq6WuPe165xCgj4HphVCk/fb1I1jPZBDyFCR5O444Zl9Pyk1ajE8VkA==}
+    engines: {node: '>=22.0.0'}
+    peerDependencies:
+      '@aws-sdk/credential-provider-node': '>=3.972.0 <4'
+      '@smithy/hash-node': '>=4.3.0 <5'
+      '@smithy/signature-v4': '>=5.4.0 <6'
+      undici: 7.29.1
+      ws: 8.21.0
+      zod: ^3.25 || ^4.0
+    peerDependenciesMeta:
+      '@aws-sdk/credential-provider-node':
+        optional: true
+      '@smithy/hash-node':
+        optional: true
+      '@smithy/signature-v4':
+        optional: true
+      undici:
         optional: true
       ws:
         optional: true
@@ -18445,8 +18477,8 @@ packages:
     peerDependencies:
       react-native: '>=0.76.0'
 
-  react-native-css@3.0.7:
-    resolution: {integrity: sha512-xsU9T5MleHI/DDmY72A7ZikbkDfDNkMrAEichOJW2bBUMxPzAJPrFk9ys4cXYk4gLFaR11y23EccOJ+JT6Iusw==}
+  react-native-css@3.1.0-rc.0:
+    resolution: {integrity: sha512-/wfPJ8pXiPxvHUs0QcocN3ViV4QJdnXpKukNirZJcJ/MeZKrStSEHm2rBq+KuZm8/2XDl4GfeuaVvJctYGtdgA==}
     peerDependencies:
       '@expo/metro-config': '>=54'
       lightningcss: 1.30.1
@@ -20961,6 +20993,14 @@ snapshots:
       standardwebhooks: 1.0.0
     optionalDependencies:
       zod: 4.4.3
+
+  '@anthropic-ai/sdk@0.137.0(zod@4.6.7)':
+    dependencies:
+      '@opentelemetry/api': 1.9.1
+      json-schema-to-ts: 3.1.1
+      standardwebhooks: 1.0.0
+    optionalDependencies:
+      zod: 4.6.7
 
   '@apm-js-collab/code-transformer-bundler-plugins@0.7.3':
     dependencies:
@@ -25340,11 +25380,11 @@ snapshots:
       '@jsonjoy.com/codegen': 17.67.0(tslib@2.8.1)
       tslib: 2.8.1
 
-  '@kilocode/kilo-chat-hooks@file:packages/kilo-chat-hooks(@tanstack/react-query@5.100.10(react@19.3.0))(react@19.3.0)':
+  '@kilocode/kilo-chat-hooks@file:packages/kilo-chat-hooks(@tanstack/react-query@5.104.3(react@19.3.0))(react@19.3.0)':
     dependencies:
       '@kilocode/event-service': link:packages/event-service
       '@kilocode/kilo-chat': link:packages/kilo-chat
-      '@tanstack/react-query': 5.100.10(react@19.3.0)
+      '@tanstack/react-query': 5.104.3(react@19.3.0)
       react: 19.3.0
 
   '@kilocode/plugin@7.2.52':
@@ -28743,7 +28783,7 @@ snapshots:
       '@sentry/conventions': 0.27.0
       '@sentry/core': 11.7.0
 
-  '@sentry/react-native@8.31.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.6(typescript@7.0.2))(@expo/env@2.5.2)(bufferutil@4.1.0)(dotenv@18.0.8)(expo-router@58.0.19)(expo@58.0.10)(metro-config@0.87.1)(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.64.7)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(esbuild@0.28.2))':
+  '@sentry/react-native@8.31.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.6(typescript@7.0.2))(@expo/env@2.5.2)(bufferutil@4.1.0)(dotenv@18.0.8)(expo-router@58.0.19)(expo@58.0.10)(metro-config@0.87.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.64.7)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(esbuild@0.28.2))':
     dependencies:
       '@expo/config-plugins': 58.0.9(typescript@7.0.2)
       '@sentry/browser': 10.76.2
@@ -30106,31 +30146,31 @@ snapshots:
       tailwindcss: 4.3.1
       vite: 8.1.6(@types/node@24.12.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
 
-  '@tanstack/query-async-storage-persister@5.100.10':
+  '@tanstack/query-async-storage-persister@5.104.3':
     dependencies:
-      '@tanstack/query-core': 5.100.10
-      '@tanstack/query-persist-client-core': 5.100.10
+      '@tanstack/query-core': 5.104.3
+      '@tanstack/query-persist-client-core': 5.104.3
 
-  '@tanstack/query-core@5.100.10': {}
+  '@tanstack/query-core@5.104.3': {}
 
-  '@tanstack/query-persist-client-core@5.100.10':
+  '@tanstack/query-persist-client-core@5.104.3':
     dependencies:
-      '@tanstack/query-core': 5.100.10
+      '@tanstack/query-core': 5.104.3
 
-  '@tanstack/react-query-persist-client@5.100.10(@tanstack/react-query@5.100.10(react@19.3.0))(react@19.3.0)':
+  '@tanstack/react-query-persist-client@5.104.3(@tanstack/react-query@5.104.3(react@19.3.0))(react@19.3.0)':
     dependencies:
-      '@tanstack/query-persist-client-core': 5.100.10
-      '@tanstack/react-query': 5.100.10(react@19.3.0)
+      '@tanstack/query-persist-client-core': 5.104.3
+      '@tanstack/react-query': 5.104.3(react@19.3.0)
       react: 19.3.0
 
-  '@tanstack/react-query@5.100.10(react@19.2.6)':
+  '@tanstack/react-query@5.104.3(react@19.2.6)':
     dependencies:
-      '@tanstack/query-core': 5.100.10
+      '@tanstack/query-core': 5.104.3
       react: 19.2.6
 
-  '@tanstack/react-query@5.100.10(react@19.3.0)':
+  '@tanstack/react-query@5.104.3(react@19.3.0)':
     dependencies:
-      '@tanstack/query-core': 5.100.10
+      '@tanstack/query-core': 5.104.3
       react: 19.3.0
 
   '@tanstack/react-virtual@3.14.3(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
@@ -30202,17 +30242,17 @@ snapshots:
     dependencies:
       typescript: 7.0.2
 
-  '@trpc/tanstack-react-query@11.19.0(@tanstack/react-query@5.100.10(react@19.2.6))(@trpc/client@11.19.0(@trpc/server@11.19.0(typescript@5.9.3))(typescript@5.9.3))(@trpc/server@11.19.0(typescript@5.9.3))(react@19.2.6)(typescript@5.9.3)':
+  '@trpc/tanstack-react-query@11.19.0(@tanstack/react-query@5.104.3(react@19.2.6))(@trpc/client@11.19.0(@trpc/server@11.19.0(typescript@5.9.3))(typescript@5.9.3))(@trpc/server@11.19.0(typescript@5.9.3))(react@19.2.6)(typescript@5.9.3)':
     dependencies:
-      '@tanstack/react-query': 5.100.10(react@19.2.6)
+      '@tanstack/react-query': 5.104.3(react@19.2.6)
       '@trpc/client': 11.19.0(@trpc/server@11.19.0(typescript@5.9.3))(typescript@5.9.3)
       '@trpc/server': 11.19.0(typescript@5.9.3)
       react: 19.2.6
       typescript: 5.9.3
 
-  '@trpc/tanstack-react-query@11.19.0(@tanstack/react-query@5.100.10(react@19.3.0))(@trpc/client@11.19.0(@trpc/server@11.19.0(typescript@7.0.2))(typescript@7.0.2))(@trpc/server@11.19.0(typescript@7.0.2))(react@19.3.0)(typescript@7.0.2)':
+  '@trpc/tanstack-react-query@11.19.0(@tanstack/react-query@5.104.3(react@19.3.0))(@trpc/client@11.19.0(@trpc/server@11.19.0(typescript@7.0.2))(typescript@7.0.2))(@trpc/server@11.19.0(typescript@7.0.2))(react@19.3.0)(typescript@7.0.2)':
     dependencies:
-      '@tanstack/react-query': 5.100.10(react@19.3.0)
+      '@tanstack/react-query': 5.104.3(react@19.3.0)
       '@trpc/client': 11.19.0(@trpc/server@11.19.0(typescript@7.0.2))(typescript@7.0.2)
       '@trpc/server': 11.19.0(typescript@7.0.2)
       react: 19.3.0
@@ -32299,7 +32339,7 @@ snapshots:
 
   colorette@2.0.20: {}
 
-  colorjs.io@0.6.0-alpha.1: {}
+  colorjs.io@0.7.0: {}
 
   columnify@1.6.0:
     dependencies:
@@ -38179,9 +38219,9 @@ snapshots:
 
   napi-postinstall@0.3.4: {}
 
-  nativewind@5.0.0-preview.4(react-native-css@3.0.7(patch_hash=5da5211f36064faa7a2637adbac34046be8c01413d8b897396076f950f164561)(@expo/metro-config@58.0.13(bufferutil@4.1.0)(expo@58.0.10)(typescript@7.0.2)(utf-8-validate@6.0.6))(lightningcss@1.30.1)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(tailwindcss@4.3.3):
+  nativewind@5.0.0-rc.0(react-native-css@3.1.0-rc.0(@expo/metro-config@58.0.13(bufferutil@4.1.0)(expo@58.0.10)(typescript@7.0.2)(utf-8-validate@6.0.6))(lightningcss@1.30.1)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(tailwindcss@4.3.3):
     dependencies:
-      react-native-css: 3.0.7(patch_hash=5da5211f36064faa7a2637adbac34046be8c01413d8b897396076f950f164561)(@expo/metro-config@58.0.13(bufferutil@4.1.0)(expo@58.0.10)(typescript@7.0.2)(utf-8-validate@6.0.6))(lightningcss@1.30.1)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
+      react-native-css: 3.1.0-rc.0(@expo/metro-config@58.0.13(bufferutil@4.1.0)(expo@58.0.10)(typescript@7.0.2)(utf-8-validate@6.0.6))(lightningcss@1.30.1)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       tailwindcss: 4.3.3
       tailwindcss-safe-area: 1.3.0(tailwindcss@4.3.3)
 
@@ -38577,6 +38617,13 @@ snapshots:
   openai@6.49.0(@aws-sdk/credential-provider-node@3.972.21)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.7):
     optionalDependencies:
       '@aws-sdk/credential-provider-node': 3.972.21
+      ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      zod: 4.6.7
+
+  openai@7.36.0(@aws-sdk/credential-provider-node@3.972.21)(undici@7.29.1)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.7):
+    optionalDependencies:
+      '@aws-sdk/credential-provider-node': 3.972.21
+      undici: 7.29.1
       ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod: 4.6.7
 
@@ -39705,12 +39752,12 @@ snapshots:
       - supports-color
       - typescript
 
-  react-native-css@3.0.7(patch_hash=5da5211f36064faa7a2637adbac34046be8c01413d8b897396076f950f164561)(@expo/metro-config@58.0.13(bufferutil@4.1.0)(expo@58.0.10)(typescript@7.0.2)(utf-8-validate@6.0.6))(lightningcss@1.30.1)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0):
+  react-native-css@3.1.0-rc.0(@expo/metro-config@58.0.13(bufferutil@4.1.0)(expo@58.0.10)(typescript@7.0.2)(utf-8-validate@6.0.6))(lightningcss@1.30.1)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0):
     dependencies:
       '@expo/metro-config': 58.0.13(bufferutil@4.1.0)(expo@58.0.10)(typescript@7.0.2)(utf-8-validate@6.0.6)
       '@types/debug': 4.1.12
       babel-plugin-react-compiler: 19.1.0-rc.3
-      colorjs.io: 0.6.0-alpha.1
+      colorjs.io: 0.7.0
       comment-json: 4.6.2
       debug: 4.4.3
       lightningcss: 1.30.1

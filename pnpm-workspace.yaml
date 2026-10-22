@@ -25,9 +25,9 @@ catalog:
   # mobile). Must NOT be added to `overrides`: the Sentry bundler plugins consume
   # @sentry/cli through its Node API, which v3 broke. See the note in `overrides`.
   '@sentry/cli': 3.6.2
-  '@tanstack/query-async-storage-persister': 5.100.10
-  '@tanstack/react-query': 5.100.10
-  '@tanstack/react-query-persist-client': 5.100.10
+  '@tanstack/query-async-storage-persister': 5.104.3
+  '@tanstack/react-query': 5.104.3
+  '@tanstack/react-query-persist-client': 5.104.3
   '@trpc/client': 11.19.0
   '@trpc/server': 11.19.0
   '@trpc/tanstack-react-query': 11.19.0
@@ -290,8 +290,6 @@ patchedDependencies:
   expo-background-task@58.0.10: patches/expo-background-task@58.0.10.patch
   # React Native installs on-device JSI bindings through its TurboModule runtime hook.
   llama.rn@0.12.9: patches/llama.rn@0.12.9.patch
-  # Expo Router's Activity host needs the React Native component registry through the styling facade.
-  react-native-css@3.0.7: patches/react-native-css@3.0.7.patch
   '@expo/react-native-action-sheet@4.1.1': patches/@expo+react-native-action-sheet@4.1.1.patch
 publicHoistPattern:
   - '@types/*'

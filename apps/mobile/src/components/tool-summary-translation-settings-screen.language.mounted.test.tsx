@@ -99,7 +99,7 @@ describe('ToolSummaryTranslationSettingsScreen model row in the app language', (
     });
   });
 
-  it('names a picked Auto model in German while storing the catalog name raw', async () => {
+  it('names a picked Auto model in German', async () => {
     await i18n.changeLanguage('de');
     preference.model = { id: 'kilo-auto/efficient', name: 'Auto Efficient' };
     const renderer = await mountScreen();
@@ -107,6 +107,25 @@ describe('ToolSummaryTranslationSettingsScreen model row in the app language', (
     expect(findConfigureRow(renderer, i18n.t('common.model')).props).toMatchObject({
       subtitle: 'Auto Effizient',
     });
-    expect(preference.model.name).toBe('Auto Efficient');
+  });
+
+  // The stored name is the catalogue's English one, so the row must recompute
+  // its label when the app language changes rather than keep the label it had
+  // when the model was picked.
+  it('relabels the stored model when the app language changes', async () => {
+    await i18n.changeLanguage('en');
+    const renderer = await mountScreen();
+
+    expect(findConfigureRow(renderer, i18n.t('common.model')).props).toMatchObject({
+      subtitle: 'Auto Small',
+    });
+
+    await act(async () => {
+      await i18n.changeLanguage('de');
+    });
+
+    expect(findConfigureRow(renderer, i18n.t('common.model')).props).toMatchObject({
+      subtitle: 'Auto Klein',
+    });
   });
 });

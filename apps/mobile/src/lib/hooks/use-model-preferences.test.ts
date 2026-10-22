@@ -10,7 +10,7 @@ type MutationOptions = {
   mutationFn?: (vars: unknown) => Promise<unknown>;
   onMutate?: (vars: unknown) => Promise<unknown> | unknown;
   onError?: (error: unknown, vars: unknown, context: unknown) => void;
-  onSuccess?: (result: unknown, vars: unknown) => void;
+  onSuccess?: (result: unknown, vars: unknown, context: unknown) => Promise<void> | void;
   onSettled?: (data?: unknown, error?: unknown, vars?: unknown) => Promise<void> | void;
   scope?: { id: string };
 };
@@ -79,6 +79,7 @@ vi.mock('@/lib/trpc', () => ({
     modelPreferences: {
       addFavorite: { mutate: vi.fn() },
       removeFavorite: { mutate: vi.fn() },
+      setLastSelected: { mutate: vi.fn() },
     },
   },
 }));
@@ -154,5 +155,42 @@ describe('useModelPreferences (generation guard)', () => {
     addFavorite?.onError?.(new Error('boom'), { model: 'm1' }, older);
     expect(setQueryDataMock).not.toHaveBeenCalled();
     expect(setFavoritesErrorMock).toHaveBeenCalledWith('boom');
+  });
+
+  it('serializes last-selected saves and refetches only for the newest pick', async () => {
+    useModelPreferences(undefined);
+    const setLastSelected = capturedMutations[0];
+
+    await setLastSelected?.mutationFn?.({ model: 'm1', variant: 'high' });
+    expect(chainSaveMock).toHaveBeenCalledWith(
+      'model-preferences-last-selected',
+      expect.any(Function)
+    );
+
+    const older = await setLastSelected?.onMutate?.({ model: 'first' });
+    const newer = await setLastSelected?.onMutate?.({ model: 'chosen', variant: 'high' });
+    invalidateQueriesMock.mockClear();
+
+    await setLastSelected?.onSuccess?.(undefined, { model: 'first' }, older);
+    expect(invalidateQueriesMock).not.toHaveBeenCalled();
+
+    await setLastSelected?.onSuccess?.(undefined, { model: 'chosen', variant: 'high' }, newer);
+    expect(invalidateQueriesMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('reconciles a failed last-selected save only for the newest pick', async () => {
+    useModelPreferences(undefined);
+    const setLastSelected = capturedMutations[0];
+    const older = await setLastSelected?.onMutate?.({ model: 'first' });
+    const newer = await setLastSelected?.onMutate?.({ model: 'chosen', variant: 'high' });
+    invalidateQueriesMock.mockClear();
+    toastErrorMock.mockClear();
+
+    setLastSelected?.onError?.(new Error('boom'), { model: 'first' }, older);
+    expect(toastErrorMock).toHaveBeenCalledWith('boom');
+    expect(invalidateQueriesMock).not.toHaveBeenCalled();
+
+    setLastSelected?.onError?.(new Error('boom'), { model: 'chosen' }, newer);
+    expect(invalidateQueriesMock).toHaveBeenCalledTimes(1);
   });
 });

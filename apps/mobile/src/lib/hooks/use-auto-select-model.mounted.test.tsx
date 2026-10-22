@@ -50,7 +50,13 @@ vi.mock('@/lib/trpc', () => ({
       setFavorites: { mutationOptions: (options: object) => options },
     },
   }),
-  trpcClient: {},
+  trpcClient: {
+    modelPreferences: {
+      setLastSelected: {
+        mutate: (input: { model: string; variant?: string }) => fixture.save(input),
+      },
+    },
+  },
 }));
 
 let selected = { model: '', variant: '' };

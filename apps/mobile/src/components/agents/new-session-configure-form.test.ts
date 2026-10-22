@@ -1089,11 +1089,12 @@ describe('NewSessionConfigureForm', () => {
     expect(settingsColumn).toBeDefined();
     expect(settingsColumn).not.toBe(promptColumn);
     expect(findElementByType(settingsColumn, 'NewSessionRepositorySection')).not.toBeNull();
-    // The card's frame is its column, with nothing under it inside that frame.
-    expect(findElementByType(rows, 'NewSessionPrompt')).toMatchObject({
-      belowCardHeight: 0,
-      cardTop: 0,
-    });
+    // Each column holds only its own side: the card's column carries no setting
+    // rows and the setting rows' column carries no card, which is what a single
+    // scroll frame could never satisfy.
+    expect(findElementByType(promptColumn, 'NewSessionRunTarget')).toBeNull();
+    expect(findElementByType(promptColumn, 'NewSessionRepositorySection')).toBeNull();
+    expect(findElementByType(settingsColumn, 'NewSessionPrompt')).toBeNull();
   });
 
   it('returns to the single column when the window turns back to portrait', async () => {

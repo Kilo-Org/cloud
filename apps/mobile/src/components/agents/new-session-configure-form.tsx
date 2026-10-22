@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- THE new-session body: one screen for every entry point, with a mutually-exclusive branch per target/state. */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   type LayoutChangeEvent,
   Pressable,
@@ -187,6 +187,12 @@ export function NewSessionConfigureForm({
   // `pt-4` the stacked content container carries sits on the row around it, so
   // the card's top offset inside that frame is zero.
   const [promptColumnHeight, setPromptColumnHeight] = useState(0);
+  // The draft the composer last reported. Its input is uncontrolled, so the
+  // remount a layout switch causes — the card moves into the other column — would
+  // seed the fresh input from the entry's one-time prefill and drop what the user
+  // typed, while the route keeps the live draft and Start stays enabled. Reading
+  // this at render gives the remounted card the live text instead.
+  const draftTextRef = useRef(initialPrompt ?? '');
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   // A phone held sideways leaves the card a frame no taller than itself, which
   // hides the Run on row and the repository picker below it; the form splits
@@ -200,6 +206,11 @@ export function NewSessionConfigureForm({
   const runOnNote =
     runOnInlineNote ??
     (showInstanceDisconnectedNote ? remoteSpawnInstanceDisconnectedNote() : null);
+
+  function handleDraftChange(text: string) {
+    draftTextRef.current = text;
+    onChangeText(text);
+  }
 
   function handleScrollFrameLayout(event: LayoutChangeEvent) {
     const next = Math.max(Math.round(event.nativeEvent.layout.height), 0);
@@ -220,7 +231,6 @@ export function NewSessionConfigureForm({
       model={model}
       variant={variant}
       modelOptions={modelOptions}
-      onChangeText={onChangeText}
       onModeChange={onModeChange}
       onModelSelect={onModelSelect}
       customOptions={customOptions}
@@ -235,7 +245,8 @@ export function NewSessionConfigureForm({
       onPrefillAttachments={onPrefillAttachments}
       shareId={shareId}
       voiceInputSettlerRef={voiceInputSettlerRef}
-      initialPrompt={initialPrompt}
+      initialPrompt={draftTextRef.current}
+      onChangeText={handleDraftChange}
       frameHeight={frame}
       cardTop={top}
       belowCardHeight={below}

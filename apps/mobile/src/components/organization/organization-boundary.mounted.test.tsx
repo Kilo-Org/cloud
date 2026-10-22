@@ -2,10 +2,11 @@
 // to four distinct copies. An account with no memberships gets the
 // no-organization state whose action opens the web organizations page;
 // memberships with nothing selected get the picker state whose action opens
-// the context picker sheet; a deep-link override absent from the member list
-// is access-denied; a fetch failure is a retryable QueryError; a still
-// resolving context is a spinner. A stale persisted selection (no override)
-// keeps the older "unavailable" copy.
+// the context picker sheet; a deep-link override absent from a NON-empty
+// member list is access-denied, while the same override against zero
+// memberships is the no-organization state; a fetch failure is a retryable
+// QueryError; a still resolving context is a spinner. A stale persisted
+// selection (no override) keeps the older "unavailable" copy.
 
 import { type ComponentType, createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -189,9 +190,13 @@ describe('OrganizationBoundary settled states', () => {
     });
   });
 
-  it('renders access-denied when an override org is absent from the member list', () => {
+  it('renders access-denied when an override org is absent from a non-empty member list', () => {
     useOrgBoundaryMock.mockReturnValue(
-      boundaryState({ organizationId: 'org-missing', org: undefined })
+      boundaryState({
+        organizationId: 'org-missing',
+        org: undefined,
+        orgs: [{ organizationId: 'org-1', organizationName: 'Organization' }],
+      })
     );
 
     const renderer = mountBoundary('org-missing');
@@ -229,6 +234,38 @@ describe('OrganizationBoundary settled states', () => {
         collectText(node).includes('Open organizations on web')
     );
     expect(webButton).toBeDefined();
+    act(() => {
+      (webButton.props.onPress as (() => void) | undefined)?.();
+    });
+    expect(openExternalUrlMock).toHaveBeenCalledWith('https://cloud.example.test/organizations', {
+      label: 'Open organizations on web',
+    });
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('offers the web organizations page for a deep-link override with no memberships', () => {
+    useOrgBoundaryMock.mockReturnValue(
+      boundaryState({ organizationId: 'org-linked', org: undefined, orgs: [] })
+    );
+
+    const renderer = mountBoundary('org-linked');
+    const texts = collectText(renderer.toJSON());
+
+    expect(findByType(renderer.root, 'EmptyStateMock')).toHaveLength(1);
+    expect(texts).toContain('No organization');
+    expect(texts).toContain('Open organizations on web');
+    expect(texts).toContain('Back to profile');
+    expect(texts).not.toContain('Access denied');
+    expect(texts).not.toContain('Select an organization');
+
+    const webButton = renderer.root.find(
+      node =>
+        String(node.type) === 'ButtonMock' &&
+        collectText(node).includes('Open organizations on web')
+    );
     act(() => {
       (webButton.props.onPress as (() => void) | undefined)?.();
     });

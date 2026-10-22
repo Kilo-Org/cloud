@@ -187,7 +187,7 @@ export async function sendStaleSyncAlertNotification(
     return 'simulated';
   }
 
-  await sendNotification(notification, { requireConfigured: true });
+  await sendNotification(notification, { requireConfigured: true, destination: 'gateway' });
   return 'posted';
 }
 

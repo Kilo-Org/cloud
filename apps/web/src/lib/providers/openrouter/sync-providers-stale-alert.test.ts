@@ -11,7 +11,10 @@ jest.mock('@kilocode/web-shared/lib/constants', () => ({
   APP_URL: 'https://app.kilo.ai',
 }));
 
-import type { AdminSlackNotification } from '@kilocode/web-shared/lib/slack/admin-notifications';
+import type {
+  AdminSlackNotification,
+  sendAdminSlackNotification,
+} from '@kilocode/web-shared/lib/slack/admin-notifications';
 import {
   alertIfSyncStale,
   buildStaleSyncAlertNotification,
@@ -200,10 +203,7 @@ describe('sendStaleSyncAlertNotification', () => {
   it('simulates the Cloud alert outside production Vercel', async () => {
     process.env.VERCEL_ENV = 'preview';
     const infoSpy = jest.spyOn(console, 'info').mockImplementation(() => undefined);
-    const sendNotification = jest.fn(
-      async (_notification: AdminSlackNotification, _options?: { requireConfigured?: boolean }) =>
-        undefined
-    );
+    const sendNotification = jest.fn<typeof sendAdminSlackNotification>(async () => undefined);
 
     await expect(sendStaleSyncAlertNotification(notification, { sendNotification })).resolves.toBe(
       'simulated'
@@ -216,12 +216,9 @@ describe('sendStaleSyncAlertNotification', () => {
     );
   });
 
-  it('uses the required Cloud alert channel webhook in production Vercel', async () => {
+  it('uses the required gateway webhook in production Vercel', async () => {
     process.env.VERCEL_ENV = 'production';
-    const sendNotification = jest.fn(
-      async (_notification: AdminSlackNotification, _options?: { requireConfigured?: boolean }) =>
-        undefined
-    );
+    const sendNotification = jest.fn<typeof sendAdminSlackNotification>(async () => undefined);
 
     await expect(sendStaleSyncAlertNotification(notification, { sendNotification })).resolves.toBe(
       'posted'
@@ -229,18 +226,16 @@ describe('sendStaleSyncAlertNotification', () => {
 
     expect(sendNotification).toHaveBeenCalledWith(notification, {
       requireConfigured: true,
+      destination: 'gateway',
     });
   });
 });
 
 describe('sendTestStaleSyncAlertNotification', () => {
-  it('posts to the required Cloud alert webhook outside production Vercel', async () => {
+  it('posts to the required gateway webhook outside production Vercel', async () => {
     process.env.VERCEL_ENV = 'development';
     const notification = { text: 'Test stale-sync alert' };
-    const sendNotification = jest.fn(
-      async (_notification: AdminSlackNotification, _options?: { requireConfigured?: boolean }) =>
-        undefined
-    );
+    const sendNotification = jest.fn<typeof sendAdminSlackNotification>(async () => undefined);
 
     await expect(sendTestStaleSyncAlertNotification(notification, sendNotification)).resolves.toBe(
       'posted'
@@ -248,6 +243,7 @@ describe('sendTestStaleSyncAlertNotification', () => {
 
     expect(sendNotification).toHaveBeenCalledWith(notification, {
       requireConfigured: true,
+      destination: 'gateway',
     });
   });
 });

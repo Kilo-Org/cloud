@@ -245,6 +245,9 @@ export const SLACK_CREDENTIAL_KEYSET_JSON = getEnvVariable('SLACK_CREDENTIAL_KEY
 export const SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL = getEnvVariable(
   'SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL'
 );
+export const SLACK_GATEWAY_NOTIFICATIONS_WEBHOOK_URL = getEnvVariable(
+  'SLACK_GATEWAY_NOTIFICATIONS_WEBHOOK_URL'
+);
 
 // Linear (bot integration)
 // The adapter stores installations (including OAuth tokens) via the configured

@@ -1,6 +1,9 @@
 import 'server-only';
 
-import { SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL } from '@kilocode/web-shared/lib/config.server';
+import {
+  SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL,
+  SLACK_GATEWAY_NOTIFICATIONS_WEBHOOK_URL,
+} from '@kilocode/web-shared/lib/config.server';
 import type { AnyBlock, MessageAttachment } from '@slack/types';
 
 const SLACK_WEBHOOK_TIMEOUT_MS = 10_000;
@@ -29,21 +32,29 @@ export class AdminSlackNotificationError extends Error {
 }
 
 /**
- * Sends a notification to the Slack channel configured for Admin UI events.
+ * Sends a notification to the configured admin or gateway Slack channel.
  *
  * This function is server-only. Call it from an admin tRPC procedure, route
  * handler, or server action; never send the webhook URL to a browser.
  */
 export async function sendAdminSlackNotification(
   notification: AdminSlackNotification,
-  options: { requireConfigured?: boolean } = {}
+  options: { requireConfigured?: boolean; destination?: 'admin' | 'gateway' } = {}
 ): Promise<void> {
-  if (!SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL) {
+  const webhookVariable =
+    options.destination === 'gateway'
+      ? 'SLACK_GATEWAY_NOTIFICATIONS_WEBHOOK_URL'
+      : 'SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL';
+  const webhookUrl =
+    options.destination === 'gateway'
+      ? SLACK_GATEWAY_NOTIFICATIONS_WEBHOOK_URL
+      : SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL;
+  if (!webhookUrl) {
     if (options.requireConfigured) {
       throw new AdminSlackNotificationError('configuration');
     }
     console.warn(
-      '[AdminSlackNotifications] SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL is not configured; notification skipped'
+      `[AdminSlackNotifications] ${webhookVariable} is not configured; notification skipped`
     );
     return;
   }
@@ -51,7 +62,7 @@ export async function sendAdminSlackNotification(
   let response: Response;
 
   try {
-    response = await fetch(SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL, {
+    response = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
       body: JSON.stringify(notification),

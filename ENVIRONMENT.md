@@ -359,6 +359,7 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `SLACK_ENCRYPTION_KEY` - Encrypts the Slack bot token at rest (AES-256-GCM) in the Chat SDK state store. Generate with `openssl rand -base64 32`; must decode to exactly 32 bytes or `apps/web` fails at startup. `[SECRET]`
 - `SLACK_CREDENTIAL_KEYSET_JSON` - RSA keyset for encrypting Slack bot credentials at rest, as JSON or base64-encoded JSON: `{"active":{"keyId":"...","publicKeyPem":"..."},"decrypt":[{"keyId":"...","privateKeyPem":"..."}]}`. Web holds the private half because the Slack webhook decrypts in-process; the active key ID must also appear in `decrypt` with a private key. `[SECRET]`
 - `SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL` - Slack incoming webhook used by server-side Admin UI code to send events, summaries, reminders, and actions. `[SECRET]`
+- `SLACK_GATEWAY_NOTIFICATIONS_WEBHOOK_URL` - Slack incoming webhook for provider catalog and direct BYOK sync alerts, including their admin test alerts. Separate from other admin notifications. `[SECRET]`
 - `SLACK_USER_FEEDBACK_WEBHOOK_URL` - Slack incoming webhook for user feedback. [SERVER]
 - `SLACK_DEPLOY_THREAT_WEBHOOK_URL` - Slack incoming webhook for deploy threat alerts. [SERVER]
 

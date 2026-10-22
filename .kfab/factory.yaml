@@ -2,7 +2,9 @@ version: 1
 
 setupCommands:
   - pnpm install --frozen-lockfile
+  - test -s .env.local || pnpm dev:setup-env --ci
+  - KILO_PORT_OFFSET=auto USE_PRODUCTION_DB=false pnpm test:db
 
 verificationCommands:
   - pnpm --filter web run lint
-  - pnpm run test:web-rewrites
+  - pnpm --filter web test --ci --maxWorkers=2

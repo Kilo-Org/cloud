@@ -14,6 +14,7 @@ import {
   autoCompleteInstallation,
   createPendingIntegration,
   findIntegrationByInstallationId,
+  findGitLabIntegrationByWebhookToken,
   findGitHubBotLinkIntegrations,
   suspendIntegration,
   suspendIntegrationForOwner,
@@ -1378,5 +1379,84 @@ describe('updateIntegrationMetadataForOwner', () => {
         integrationId
       )
     ).rejects.toThrow('No github integration found for owner');
+  });
+});
+
+describe('findGitLabIntegrationByWebhookToken', () => {
+  const orgId = crypto.randomUUID();
+
+  beforeEach(async () => {
+    await db.insert(organizations).values({ id: orgId, name: `GitLab lookup org ${Date.now()}` });
+  });
+
+  afterEach(async () => {
+    await db.delete(organizations).where(eq(organizations.id, orgId));
+  });
+
+  async function insertGitLabIntegration(values: {
+    platform?: string;
+    integration_status?: string;
+    metadata: Record<string, unknown>;
+  }) {
+    const [integration] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: orgId,
+        platform: values.platform ?? 'gitlab',
+        integration_type: 'oauth',
+        integration_status: values.integration_status ?? 'active',
+        kilo_requester_user_id: 'requester-1',
+        metadata: values.metadata,
+      })
+      .returning();
+    return integration;
+  }
+
+  test('returns the single integration whose stored secret matches', async () => {
+    const target = await insertGitLabIntegration({ metadata: { webhook_secret: 'secret-target' } });
+    await insertGitLabIntegration({ metadata: { webhook_secret: 'secret-other' } });
+
+    const found = await findGitLabIntegrationByWebhookToken('secret-target');
+
+    expect(found?.id).toBe(target.id);
+    expect(found?.webhook_secret).toBe('secret-target');
+    expect(found?.owned_by_organization_id).toBe(orgId);
+  });
+
+  test('resolves an integration that is inactive by status', async () => {
+    const inactive = await insertGitLabIntegration({
+      integration_status: 'suspended',
+      metadata: { webhook_secret: 'secret-inactive' },
+    });
+
+    const found = await findGitLabIntegrationByWebhookToken('secret-inactive');
+
+    expect(found?.id).toBe(inactive.id);
+    expect(found?.integration_status).toBe('suspended');
+    expect(found?.suspended_at).toBeNull();
+  });
+
+  test('ignores another platform carrying the same secret key', async () => {
+    await insertGitLabIntegration({
+      platform: 'bitbucket',
+      metadata: { webhook_secret: 'secret-shared' },
+    });
+    const gitlab = await insertGitLabIntegration({ metadata: { webhook_secret: 'secret-shared' } });
+
+    const found = await findGitLabIntegrationByWebhookToken('secret-shared');
+
+    expect(found?.id).toBe(gitlab.id);
+  });
+
+  test('returns null for a secret that matches no row', async () => {
+    await insertGitLabIntegration({ metadata: { webhook_secret: 'secret-known' } });
+
+    expect(await findGitLabIntegrationByWebhookToken('secret-unknown')).toBeNull();
+  });
+
+  test('returns null when GitLab rows carry no stored secret', async () => {
+    await insertGitLabIntegration({ metadata: { auth_type: 'oauth' } });
+
+    expect(await findGitLabIntegrationByWebhookToken('secret-known')).toBeNull();
   });
 });

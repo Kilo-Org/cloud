@@ -23,7 +23,10 @@ import { addReactionToMR, isMergeCommit, setCommitStatus } from '../adapter';
 import { normalizeGitLabInstanceUrl } from '../instance-url';
 import { resolveMergeRequestCheckoutRef } from './merge-request-checkout-ref';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
-import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
+import {
+  getIntegrationById,
+  type GitLabWebhookIntegration,
+} from '@/lib/integrations/db/platform-integrations';
 import {
   getOrCreateProjectAccessToken,
   getValidGitLabToken,
@@ -36,7 +39,7 @@ const DUPLICATE_MERGE_CONTINUATION_REASON = 'Superseded by duplicate merge-commi
 
 export async function handleMergeRequestCodeReview(
   payload: MergeRequestPayload,
-  integration: PlatformIntegration
+  integration: GitLabWebhookIntegration
 ) {
   const { object_attributes: mr, project } = payload;
 
@@ -582,7 +585,7 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
 
 export async function handleMergeRequest(
   payload: MergeRequestPayload,
-  integration: PlatformIntegration
+  integration: GitLabWebhookIntegration
 ) {
   const { action } = payload.object_attributes;
 

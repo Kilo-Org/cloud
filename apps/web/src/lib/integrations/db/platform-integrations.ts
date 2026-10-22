@@ -1489,25 +1489,53 @@ export async function upsertPlatformIntegrationForOwner(
 }
 
 /**
- * For MVP: We look up by webhook secret token stored in metadata
+ * The fields a GitLab webhook delivery needs: what the code-review handler
+ * reads, the health fields the route gates on, and the secret itself for the
+ * constant-time comparison at the authentication boundary.
  */
-export async function findGitLabIntegrationByWebhookToken(webhookToken: string) {
-  // GitLab integrations store webhook_secret in metadata
-  // We need to find the integration where metadata.webhook_secret matches
-  const integrations = await db
-    .select()
+export type GitLabWebhookIntegration = {
+  id: string;
+  owned_by_organization_id: string | null;
+  owned_by_user_id: string | null;
+  kilo_requester_user_id: string | null;
+  integration_status: string | null;
+  suspended_at: string | null;
+  webhook_secret: string;
+};
+
+/**
+ * Resolve the GitLab integration that owns a webhook secret.
+ *
+ * The delivery carries only the shared hook secret, so the match happens in the
+ * database against the `metadata` key on the existing platform index, and the
+ * query projects only the columns the route needs and returns at most one row.
+ * The lookup is independent of integration status; the caller applies its
+ * health gate to the row it receives.
+ */
+export async function findGitLabIntegrationByWebhookToken(
+  webhookToken: string
+): Promise<GitLabWebhookIntegration | null> {
+  const [integration] = await db
+    .select({
+      id: platform_integrations.id,
+      owned_by_organization_id: platform_integrations.owned_by_organization_id,
+      owned_by_user_id: platform_integrations.owned_by_user_id,
+      kilo_requester_user_id: platform_integrations.kilo_requester_user_id,
+      integration_status: platform_integrations.integration_status,
+      suspended_at: platform_integrations.suspended_at,
+      webhook_secret: sql<string>`${platform_integrations.metadata}->>'webhook_secret'`,
+    })
     .from(platform_integrations)
-    .where(eq(platform_integrations.platform, PLATFORM.GITLAB));
+    .where(
+      and(
+        eq(platform_integrations.platform, PLATFORM.GITLAB),
+        sql`${platform_integrations.metadata}->>'webhook_secret' = ${webhookToken}`
+      )
+    )
+    .orderBy(platform_integrations.id)
+    .limit(1);
 
-  // Find the integration with matching webhook token
-  for (const integration of integrations) {
-    const metadata = integration.metadata as { webhook_secret?: string } | null;
-    if (metadata?.webhook_secret === webhookToken) {
-      return integration;
-    }
-  }
-
-  return null;
+  return integration ?? null;
 }
 
 /**

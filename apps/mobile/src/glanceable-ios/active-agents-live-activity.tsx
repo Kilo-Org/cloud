@@ -198,8 +198,8 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   // count is also what stands in when the app wrote no flag, which is every
   // state that arrived over APNs: a question-only server state then offers no
   // tap, while a `permission` server state still offers the tap the app-closed
-  // press answers. `withStatus` zeroes the wait count on expiry but leaves
-  // `needsApproval` standing, so the wait term keeps the expired frame gateless.
+  // press answers. A lapsed frame blanks both counts in the same transition,
+  // so an expired card offers nothing either way.
   const canApprove =
     (props.needsInput ?? 0) > 0 && (props.needsApproval ?? 0) > 0 && props.canApprove !== false;
   // The press in flight replaces Approve with a muted Approving… pill; a

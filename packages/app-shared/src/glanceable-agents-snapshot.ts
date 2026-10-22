@@ -135,6 +135,31 @@ export type GlanceableCounts = {
   scheduled: number;
 };
 
+/**
+ * The work fields a frame carries when it asserts no work at all: one that has
+ * lapsed, and one built for a terminal scope. Both producers spread this one
+ * record instead of listing the fields again, so a field added to the snapshot
+ * cannot be blanked by one path and survive the other.
+ */
+export const NO_GLANCEABLE_WORK = {
+  running: 0,
+  needsInput: 0,
+  needsApproval: 0,
+  idle: 0,
+  scheduled: 0,
+  needsInputSince: null,
+  scheduledAt: null,
+} as const satisfies Pick<
+  GlanceableAgentsSnapshot,
+  | 'running'
+  | 'needsInput'
+  | 'needsApproval'
+  | 'idle'
+  | 'scheduled'
+  | 'needsInputSince'
+  | 'scheduledAt'
+>;
+
 /** One session row, as both producers read it from the active-sessions list. */
 export type GlanceableSessionRow = {
   status: string;

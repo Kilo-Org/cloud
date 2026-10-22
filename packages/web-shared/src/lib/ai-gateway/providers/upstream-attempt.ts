@@ -10,8 +10,10 @@ import {
   OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/eligibility';
 import { OPENAI_ON_BEHALF_OF_TOKEN_HEADER } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
+import { isChatGptAccessTokenRejected } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/rejected-token';
 import {
   clearOpenAiChatGptUsageLimit,
+  expireOpenAiChatGptAccessToken,
   markOpenAiChatGptNotEligible,
   recordOpenAiChatGptUsageLimit,
   type OpenAiChatGptOwner,
@@ -118,11 +120,9 @@ export async function sendUpstreamAttempt({
   if (providerContext.provider.id === OPENAI_CHATGPT_PROVIDER_ID) {
     const owner = providerContext.provider.chatGptOwner;
     await syncChatGptUsageLimit(result.response, owner);
-    await recordChatGptNotEligible(
-      result.response,
-      owner,
-      extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER]
-    );
+    const accessToken = extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER];
+    await recordChatGptNotEligible(result.response, owner, accessToken);
+    await expireRejectedChatGptAccessToken(result.response, owner, accessToken);
   }
 
   return {
@@ -201,6 +201,25 @@ async function recordChatGptNotEligible(
   try {
     if (!isChatGptUserNotEligible(response.status, await response.clone().json())) return;
     await markOpenAiChatGptNotEligible(owner, accessToken, OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE);
+  } catch {
+    // Best-effort: the caller still receives the upstream response.
+  }
+}
+
+/**
+ * Forces the next request to refresh a token OpenAI rejected before its stored
+ * expiry. The rejected response still reaches the caller unchanged.
+ */
+async function expireRejectedChatGptAccessToken(
+  response: Response,
+  owner: OpenAiChatGptOwner | undefined,
+  accessToken: string | undefined
+): Promise<void> {
+  if (!owner || !accessToken || response.status !== 401) return;
+
+  try {
+    if (!isChatGptAccessTokenRejected(response.status, await response.clone().json())) return;
+    await expireOpenAiChatGptAccessToken(owner, accessToken);
   } catch {
     // Best-effort: the caller still receives the upstream response.
   }

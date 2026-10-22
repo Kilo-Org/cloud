@@ -87,7 +87,7 @@ function getReplicaUrl(): string {
 // 48h of production pool metrics show most instances use 2-5 connections with zero
 // waiting, but the aggregate across ~2,200 concurrent Vercel instances exhausts
 // Supabase's ~500 connection limit (466 idle connections observed from kilocode-backend).
-// Revisit after the microdollar_usage query performance work lands (see plans/db-perf-improvements.md).
+// Revisit after the microdollar_usage query performance work lands.
 const max = 10;
 
 const idleTimeoutMillis = 5_000;

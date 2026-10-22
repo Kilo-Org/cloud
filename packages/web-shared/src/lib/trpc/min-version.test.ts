@@ -149,20 +149,40 @@ describe('getMinimumVersions', () => {
     }
   });
 
-  test('bounds a read that never settles', async () => {
+  test('stops waiting for a read that never settles without starting another', async () => {
     jest.useFakeTimers();
     try {
-      limitMock.mockReturnValue(new Promise(() => {}));
+      const stuck = Promise.withResolvers<unknown>();
+      limitMock.mockReturnValue(stuck.promise);
 
-      const pending = getMinimumVersions().catch((caught: unknown) => caught);
-      await jest.advanceTimersByTimeAsync(60_000);
+      const first = getMinimumVersions().catch((caught: unknown) => caught);
+      // The gate waits 5s for one read before giving the caller an answer.
+      await jest.advanceTimersByTimeAsync(5_000);
 
-      const error = await pending;
+      const error = await first;
       if (!error || typeof error !== 'object' || !('code' in error)) {
         throw new Error('expected getMinimumVersions to reject with a TRPCError');
       }
       expect(error.code).toBe('SERVICE_UNAVAILABLE');
+      // Nothing failed yet, so nothing was reported.
+      expect(mockCaptureException).not.toHaveBeenCalled();
+
+      // Inside the window the gate answers without waiting on the stuck read.
+      await expect(getMinimumVersions()).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+      expect(limitMock).toHaveBeenCalledTimes(1);
+
+      // When the stuck read finally fails it reports once, and no second read
+      // was ever issued alongside it.
+      stuck.reject(new Error('db down'));
+      await jest.advanceTimersByTimeAsync(0);
       expect(mockCaptureException).toHaveBeenCalledTimes(1);
+      expect(limitMock).toHaveBeenCalledTimes(1);
+
+      // After the window a fresh read is allowed.
+      limitMock.mockResolvedValueOnce([row]);
+      await jest.advanceTimersByTimeAsync(FAILURE_BACKOFF_MS + 1);
+      await expect(getMinimumVersions()).resolves.toEqual(row);
+      expect(limitMock).toHaveBeenCalledTimes(2);
     } finally {
       jest.useRealTimers();
     }

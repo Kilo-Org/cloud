@@ -16,9 +16,9 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 // off every mobile request.
 const NO_ROW_CACHE_TTL_MS = 30 * 1000;
 // The gate runs in front of every mobile procedure, so a read that never settles
-// would be awaited by all of them. Bound it well inside the mobile control-plane
-// budget and treat the timeout as a failed read.
-const READ_TIMEOUT_MS = 5_000;
+// must not be awaited by all of them for their whole budget. Bound how long a
+// caller waits; the single read keeps its connection and is never duplicated.
+const READ_WAIT_MS = 5_000;
 const VERSION_PATTERN = /^\d+(\.\d+)*$/;
 
 type CachedMinimumVersions = {
@@ -28,10 +28,14 @@ type CachedMinimumVersions = {
 };
 
 let cache: CachedMinimumVersions | null = null;
-/** Earliest time at which a failed read may be attempted again. */
+/** Earliest time at which a failed read, or another wait, may be retried. */
 let nextRetryAt = 0;
-/** Shared refresh, so concurrent callers never issue more than one SELECT. */
-let inFlight: Promise<MinimumVersions | null> | null = null;
+/**
+ * The one read allowed at a time. It never rejects, and clears itself when it
+ * settles, so a read that outlives a caller's wait cannot be joined by a second
+ * one and cannot accumulate pool connections.
+ */
+let readInFlight: Promise<void> | null = null;
 
 export function isMobileClient(headersList?: MinimumVersionHeaders | null): boolean {
   return headersList?.get('x-kilo-client') === 'mobile';
@@ -66,53 +70,59 @@ export function enforceMinimumVersion(
 }
 
 /**
- * Bound one read. The underlying query keeps running; its result is ignored and
- * its rejection is already handled, so a late settle never becomes unhandled.
+ * Update the cache from one read, or record its failure. The backoff is set
+ * before the report so a throwing reporter cannot leave a stuck window.
  */
-function withReadTimeout<T>(read: PromiseLike<T>): Promise<T> {
-  const query = Promise.resolve(read);
-  const { promise, resolve, reject } = Promise.withResolvers<T>();
-  const timer = setTimeout(() => {
-    reject(new Error(`app_min_versions read timed out after ${READ_TIMEOUT_MS}ms`));
-  }, READ_TIMEOUT_MS);
-  query.then(
-    value => {
-      clearTimeout(timer);
-      resolve(value);
-    },
-    (error: unknown) => {
-      clearTimeout(timer);
-      reject(error);
-    }
-  );
-  return promise;
-}
-
-async function readMinimumVersions(): Promise<MinimumVersions | null> {
+async function runRead(): Promise<void> {
   try {
-    const rows = await withReadTimeout(
-      readDb
-        .select({
-          ios: app_min_versions.ios_min_version,
-          android: app_min_versions.android_min_version,
-        })
-        .from(app_min_versions)
-        .limit(1)
-    );
-    const versions = rows.length === 0 ? null : { ios: rows[0].ios, android: rows[0].android };
-    cache = { versions, fetchedAt: Date.now() };
+    const rows = await readDb
+      .select({
+        ios: app_min_versions.ios_min_version,
+        android: app_min_versions.android_min_version,
+      })
+      .from(app_min_versions)
+      .limit(1);
+    cache = {
+      versions: rows.length === 0 ? null : { ios: rows[0].ios, android: rows[0].android },
+      fetchedAt: Date.now(),
+    };
     nextRetryAt = 0;
-    return versions;
   } catch (error) {
     // One report per attempt, and the backoff below suppresses every attempt
     // inside the window, so an outage is reported at most once per window.
-    captureException(error);
     nextRetryAt = Date.now() + FAILURE_BACKOFF_MS;
-    if (cache) {
-      return cache.versions;
-    }
-    throw minimumVersionUnavailableError();
+    captureException(error);
   }
+}
+
+/** Start the read, or join the one already running. */
+function ensureRead(): Promise<void> {
+  if (!readInFlight) {
+    readInFlight = runRead()
+      .catch(() => undefined)
+      .finally(() => {
+        readInFlight = null;
+      });
+  }
+  return readInFlight;
+}
+
+/**
+ * Wait for the read, but no longer than `READ_WAIT_MS`. Resolves `false` when
+ * the wait expired with the read still running: the caller stops waiting while
+ * the read keeps its connection, and `ensureRead` refuses to start another.
+ */
+function waitForRead(read: Promise<void>): Promise<boolean> {
+  const { promise, resolve } = Promise.withResolvers<boolean>();
+  const timer = setTimeout(() => {
+    resolve(false);
+  }, READ_WAIT_MS);
+  // `ensureRead` never rejects, so there is no rejection to observe here.
+  void read.then(() => {
+    clearTimeout(timer);
+    resolve(true);
+  });
+  return promise;
 }
 
 /**
@@ -120,38 +130,38 @@ async function readMinimumVersions(): Promise<MinimumVersions | null> {
  *
  * A successful read is cached — for `CACHE_TTL_MS` when it returned a row, and
  * for the shorter `NO_ROW_CACHE_TTL_MS` when it found none, so a fail-closed
- * verdict follows a configuration fix quickly — and callers that arrive while a
- * refresh is in flight share it. A read is bounded by `READ_TIMEOUT_MS`, and a
- * failed or timed-out read is negatively cached for `FAILURE_BACKOFF_MS`:
+ * verdict follows a configuration fix quickly. At most one read runs at a time
+ * and every caller joins it, so a cold instance or an expired entry never
+ * issues more than one `SELECT`, and a read that outlives a caller's wait is
+ * never duplicated. A failed read is negatively cached for `FAILURE_BACKOFF_MS`:
  * callers get the last-known value without awaiting a read that is already
- * failing, and no new read is attempted until the window passes.
+ * failing, and neither a failure nor an expired wait is retried inside the
+ * window.
  *
- * Resolves `null` only when the last successful read found no row. A read that
- * fails with nothing cached rejects with `minimumVersionUnavailableError()` — a
- * retryable `SERVICE_UNAVAILABLE` — so an infrastructure failure is never
- * reported to a client as a required app update.
+ * Resolves `null` only when the last successful read found no row. When nothing
+ * is cached and the read fails or does not answer in time, it rejects with
+ * `minimumVersionUnavailableError()` — a retryable `SERVICE_UNAVAILABLE` — so an
+ * infrastructure failure is never reported to a client as a required app update.
  */
 export async function getMinimumVersions(): Promise<MinimumVersions | null> {
   const now = Date.now();
   if (cache && now - cache.fetchedAt < (cache.versions ? CACHE_TTL_MS : NO_ROW_CACHE_TTL_MS)) {
     return cache.versions;
   }
-  if (cache && now < nextRetryAt) {
-    return cache.versions;
-  }
-  if (inFlight) {
-    return inFlight;
-  }
   if (now < nextRetryAt) {
+    if (cache) {
+      return cache.versions;
+    }
     throw minimumVersionUnavailableError();
   }
-  const refresh = readMinimumVersions();
-  inFlight = refresh;
-  try {
-    return await refresh;
-  } finally {
-    inFlight = null;
+  const settled = await waitForRead(ensureRead());
+  if (!settled) {
+    nextRetryAt = Date.now() + FAILURE_BACKOFF_MS;
   }
+  if (cache) {
+    return cache.versions;
+  }
+  throw minimumVersionUnavailableError();
 }
 
 /**

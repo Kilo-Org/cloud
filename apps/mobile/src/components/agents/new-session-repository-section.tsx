@@ -1,10 +1,7 @@
 import { Fragment, type ReactElement } from 'react';
 import { View } from 'react-native';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
-import { ExternalLink, RefreshCw } from '@/components/ui/icons';
 
-import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { QueryError } from '@/components/query-error';
 import { RepoSelector } from '@/components/agents/repo-selector';
@@ -14,7 +11,13 @@ import {
   setConnectCtaCollapsed,
   useCollapsedConnectCtas,
 } from '@/lib/hooks/use-collapsed-connect-ctas-preference';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import {
+  RepositoryActionRow,
+  RepositoryPartialNotice,
+  RepositoryRefreshButton,
+  RepositoryUnavailableCard,
+} from '@/components/agents/repository-card-actions';
+import { connectNoteKey, PROVIDER_COPY } from '@/components/agents/repository-provider-copy';
 import {
   type NewSessionRepository,
   type RepositoryGroup,
@@ -46,53 +49,6 @@ type NewSessionRepositorySectionProps = {
   isCloneEntry: boolean;
 };
 
-const PROVIDER_COPY = {
-  github: {
-    connectTitle: 'common.connectGithub',
-    connectDescription: 'agentChat.newSession.connectGithubDescription',
-    openLabel: 'agentChat.newSession.openGithub',
-    connectedTitle: 'agentChat.newSession.githubConnected',
-    errorTitle: 'agentChat.newSession.couldNotLoadGithubRepositories',
-    emptyDescription: 'agentChat.newSession.noRepositoriesVisible',
-  },
-  gitlab: {
-    connectTitle: 'common.connectGitlab',
-    connectDescription: 'agentChat.newSession.connectGitlabDescription',
-    openLabel: 'agentChat.newSession.openGitlab',
-    connectedTitle: 'agentChat.newSession.gitlabConnected',
-    errorTitle: 'agentChat.newSession.couldNotLoadGitlabRepositories',
-    emptyDescription: 'agentChat.newSession.noRepositoriesVisibleGitlab',
-  },
-  bitbucket: {
-    connectTitle: 'common.connectBitbucket',
-    connectDescription: 'agentChat.newSession.connectBitbucketDescription',
-    openLabel: 'agentChat.newSession.openBitbucket',
-    connectedTitle: 'common.bitbucketConnected',
-    errorTitle: 'agentChat.newSession.couldNotLoadBitbucketRepositories',
-    emptyDescription: 'agentChat.newSession.noRepositoriesVisibleBitbucket',
-  },
-} satisfies Record<
-  RepositoryPlatform,
-  {
-    connectTitle: string;
-    connectDescription: string;
-    openLabel: string;
-    connectedTitle: string;
-    errorTitle: string;
-    emptyDescription: string;
-  }
->;
-
-/**
- * The restriction a provider's connect card must state outright. Bitbucket
- * connects for an organization, never for a personal account, so "connect it"
- * can never read as a promise that a personal session will get Bitbucket
- * repositories — or their branches.
- */
-function connectNoteKey(platform: RepositoryPlatform): string | undefined {
-  return platform === 'bitbucket' ? 'agentChat.newSession.bitbucketOrganizationsOnly' : undefined;
-}
-
 /**
  * Provider-aware repository section. One group per provider renders its own
  * empty/error state independently, and the picker trigger always renders,
@@ -114,7 +70,6 @@ export function NewSessionRepositorySection({
   organizationId,
   isCloneEntry,
 }: Readonly<NewSessionRepositorySectionProps>) {
-  const colors = useThemeColors();
   const { t } = useTranslation();
   const { collapsedCtas, hasLoaded: collapseStateLoaded } = useCollapsedConnectCtas();
 
@@ -164,7 +119,16 @@ export function NewSessionRepositorySection({
       )}
 
       {groups.map(group => (
-        <Fragment key={group.key}>{renderGroupCard(group.key, group.status)}</Fragment>
+        <Fragment key={group.key}>
+          {group.notice === 'partial' ? (
+            <RepositoryPartialNotice
+              platform={group.key}
+              onRefreshRepos={onRefreshRepos}
+              isRetrying={isRetrying}
+            />
+          ) : null}
+          {renderGroupCard(group.key, group.status)}
+        </Fragment>
       ))}
     </View>
   );
@@ -187,6 +151,16 @@ export function NewSessionRepositorySection({
       }
       case 'connected-empty': {
         return renderConnectedEmptyCard(platform);
+      }
+      case 'unavailable': {
+        return (
+          <RepositoryUnavailableCard
+            platform={platform}
+            onConnect={onConnect}
+            onRefreshRepos={onRefreshRepos}
+            isRetrying={isRetrying}
+          />
+        );
       }
       case 'error': {
         return (
@@ -257,53 +231,14 @@ export function NewSessionRepositorySection({
 
   function renderConnectActions(platform: RepositoryPlatform): ReactElement {
     const copy = PROVIDER_COPY[platform];
-    // The label takes the row's remaining width and is pinned to one line: a
-    // label sized to its own content is measured at its longest word's width
-    // and wraps onto a second line the button's min height then clips. Its
-    // trailing (inline-end) margin mirrors the glyph and the row gap, so the
-    // centred label stays on the button's own centre. The margin is logical,
-    // not physical: in RTL the row mirrors the glyph to the leading edge and
-    // React Native resolves `marginInlineEnd` to `marginLeft`, while a physical
-    // `marginRight` would push the label 24px the wrong way.
     return (
-      <View className="flex-row gap-2">
-        <Button
-          variant="outline"
-          className="flex-1"
-          onPress={() => {
-            onConnect(platform);
-          }}
-        >
-          <ExternalLink size={16} color={colors.foreground} />
-          {/*
-            The label owns the row's remaining width and is pinned to one line.
-            A box sized to the label's own measured width is a fraction narrower
-            than the glyphs Android lays out, so "Open GitLab" wrapped onto two
-            lines and grew the button taller than its one-line siblings; giving
-            the label the free space keeps its box wider than the text, and
-            `numberOfLines` pins the line. The explorer captures
-            new-session-filled and new-session-kb-down both showed that wrap.
-            The logical `me-[24px]` inset keeps the centered label clear of the
-            leading glyph in RTL as well, which the physical `mr-` would not.
-          */}
-          <Text className="me-[24px] flex-1 text-center" numberOfLines={1}>
-            {t(selectedRepository === null ? copy.openLabel : copy.connectTitle)}
-          </Text>
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          onPress={onRefreshRepos}
-          disabled={isRetrying}
-          accessibilityLabel={t('agentChat.newSession.refreshRepositories')}
-        >
-          {isRetrying ? (
-            <ActivityIndicator size="small" color={colors.foreground} />
-          ) : (
-            <RefreshCw size={16} color={colors.foreground} />
-          )}
-        </Button>
-      </View>
+      <RepositoryActionRow
+        platform={platform}
+        labelKey={selectedRepository === null ? copy.openLabel : copy.connectTitle}
+        onConnect={onConnect}
+        onRefreshRepos={onRefreshRepos}
+        isRetrying={isRetrying}
+      />
     );
   }
 
@@ -316,19 +251,7 @@ export function NewSessionRepositorySection({
           <Text variant="muted">{t(copy.emptyDescription)}</Text>
         </View>
         <View className="flex-row gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onPress={onRefreshRepos}
-            disabled={isRetrying}
-            accessibilityLabel={t('agentChat.newSession.refreshRepositories')}
-          >
-            {isRetrying ? (
-              <ActivityIndicator size="small" color={colors.foreground} />
-            ) : (
-              <RefreshCw size={16} color={colors.foreground} />
-            )}
-          </Button>
+          <RepositoryRefreshButton onRefreshRepos={onRefreshRepos} isRetrying={isRetrying} />
         </View>
       </View>
     );

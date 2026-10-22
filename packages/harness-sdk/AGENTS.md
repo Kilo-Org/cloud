@@ -1791,8 +1791,9 @@ the entry even with the key.
 
 `openai` and `@anthropic-ai/sdk` are the contract the three wires are written
 against, and every import of either is a type. Nothing of either survives the
-build, so both are dev dependencies and a consumer installs neither: 18.8 MB
-unpacked between them, against 4 runtime dependencies that are all used.
+build, so both are dev dependencies and a consumer installs neither: 21.5 MiB
+and 14.2 MiB unpacked at `openai` 7.36.0 and `@anthropic-ai/sdk` 0.137.0,
+against 4 runtime dependencies that are all used.
 
 That holds only while no published declaration names one. Exporting a type
 built out of one — `ContentBlock`, say, which two wires exported and neither

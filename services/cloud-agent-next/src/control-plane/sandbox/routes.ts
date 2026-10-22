@@ -12,7 +12,10 @@ import {
   type ControlPlaneRouteView,
   type ControlPlaneWorkspaceFailureSubtype,
 } from '../../shared/control-plane-protocol.js';
-import type { SessionCredentialGrant } from '../../sandbox-control/session-credentials.js';
+import {
+  SessionCredentialUpgradeRequiredError,
+  type SessionCredentialGrant,
+} from '../../sandbox-control/session-credentials.js';
 import { logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
 import {
   createGrantDiagnostic,
@@ -372,12 +375,15 @@ export async function startAttempt(
   try {
     issued = await ctx.issueGrant(attemptSpec, source, diagnostic);
   } catch (error) {
+    const upgradeRequired = error instanceof SessionCredentialUpgradeRequiredError;
     return failRoute(
       ctx,
       attemptSpec,
       attemptId,
-      'workspace_setup_failed',
-      admissionFailureStage(error, 'credential_grant_failed'),
+      upgradeRequired ? 'credential_upgrade_required' : 'workspace_setup_failed',
+      upgradeRequired
+        ? 'credential_upgrade_required'
+        : admissionFailureStage(error, 'credential_grant_failed'),
       diagnostic.snapshot()
     );
   }

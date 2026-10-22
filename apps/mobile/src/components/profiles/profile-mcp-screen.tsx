@@ -72,11 +72,19 @@ function McpServerRowView({
           </Text>
           {secretCount > 0 ? (
             <View
-              className="flex-row items-center gap-0.5"
-              accessibilityLabel={t('profiles.mcp.secretCount')}
+              accessible
+              accessibilityRole="text"
+              accessibilityLabel={t('profiles.mcp.secretCount', { count: secretCount })}
+              className="flex-row items-center"
             >
-              <Lock size={12} color={colors.mutedForeground} />
-              <Text className="text-xs text-muted-foreground">{secretCount}</Text>
+              <View
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                className="flex-row items-center gap-0.5"
+              >
+                <Lock size={12} color={colors.mutedForeground} />
+                <Text className="text-xs text-muted-foreground">{secretCount}</Text>
+              </View>
             </View>
           ) : null}
         </View>

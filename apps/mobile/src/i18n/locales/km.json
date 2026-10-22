@@ -224,7 +224,7 @@
     "hideBalance": "លាក់សមតុល្យ",
     "showBalance": "បង្ហាញសមតុល្យ",
     "balanceHidden": "សមតុល្យត្រូវបានលាក់",
-    "bonusCreditsExpiring": "ឥណទានបន្ថែមចំនួន {{amount}} នឹងផុតកំណត់នៅ {{date}}។",
+    "bonusCreditsExpiring": "ឥណទានចំនួន {{amount}} នឹងផុតកំណត់នៅ {{date}}។",
     "signOutTitle": "ចេញពីគណនី?",
     "signOutMessage": "អ្នកត្រូវចូលគណនីម្តងទៀត ដើម្បីប្រើកន្លែងធ្វើការរបស់អ្នក។",
     "deleteAccountTitle": "លុបគណនី?",

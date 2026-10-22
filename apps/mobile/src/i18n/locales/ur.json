@@ -224,7 +224,7 @@
     "hideBalance": "بیلنس چھپائیں",
     "showBalance": "بیلنس دکھائیں",
     "balanceHidden": "بیلنس چھپا ہوا ہے",
-    "bonusCreditsExpiring": "{{amount}} کے بونس کریڈٹس کی میعاد {{date}} کو ختم ہو رہی ہے۔",
+    "bonusCreditsExpiring": "{{amount}} کے کریڈٹس کی میعاد {{date}} کو ختم ہو رہی ہے۔",
     "signOutTitle": "سائن آؤٹ کریں؟",
     "signOutMessage": "اپنے ورک اسپیس تک رسائی کے لیے آپ کو دوبارہ سائن ان کرنا ہوگا۔",
     "deleteAccountTitle": "اکاؤنٹ حذف کریں؟",

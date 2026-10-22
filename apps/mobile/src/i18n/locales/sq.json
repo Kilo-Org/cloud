@@ -224,7 +224,7 @@
     "hideBalance": "Fshih gjendjen",
     "showBalance": "Shfaq gjendjen",
     "balanceHidden": "Gjendja është e fshehur",
-    "bonusCreditsExpiring": "Kredite bonus në vlerën {{amount}} skadojnë më {{date}}.",
+    "bonusCreditsExpiring": "Kredite në vlerën {{amount}} skadojnë më {{date}}.",
     "signOutTitle": "Do të dalësh nga llogaria?",
     "signOutMessage": "Do të duhet të hysh përsëri për të pasur qasje në hapësirën tënde të punës.",
     "deleteAccountTitle": "Të fshihet llogaria?",

@@ -4,6 +4,7 @@ import { CirclePlus, GitBranch, GitMerge, GitPullRequest, History } from '@/comp
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
+import { ScopeAccessDeniedScreen } from '@/components/organization/scope-access-denied-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Text } from '@/components/ui/text';
@@ -16,6 +17,7 @@ import {
   useGitHubStatus,
   useGitLabStatus,
 } from '@/lib/hooks/use-code-reviewer';
+import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access';
 import { useTRPC } from '@/lib/trpc';
 
 const PLATFORM_ICONS = {
@@ -52,10 +54,11 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
   const trpc = useTRPC();
   const isPersonal = scope === PERSONAL_SCOPE;
 
-  const { data: orgs } = useQuery({
+  const organizations = useQuery({
     ...trpc.organizations.list.queryOptions(),
     enabled: !isPersonal,
   });
+  const orgs = organizations.data;
   const scopeTitle = isPersonal
     ? t('common.personal')
     : (orgs?.find(org => org.organizationId === scope)?.organizationName ??
@@ -64,6 +67,39 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
   const githubStatus = useGitHubStatus(scope);
   const gitlabStatus = useGitLabStatus(scope);
   const bitbucketReadiness = useBitbucketReadiness(scope);
+  const access = classifyOrganizationScopeAccess({
+    isOrganizationScope: !isPersonal,
+    errors: [githubStatus.error, gitlabStatus.error, bitbucketReadiness.error],
+  });
+
+  // Re-resolve membership and every platform status together: a restored
+  // membership must land the real rows, and a live installer account must not
+  // wait on a serially refreshed status.
+  const retryAccess = async () => {
+    await Promise.allSettled([
+      organizations.refetch(),
+      githubStatus.refetch(),
+      gitlabStatus.refetch(),
+      bitbucketReadiness.refetch(),
+    ]);
+  };
+
+  if (access !== 'granted') {
+    return (
+      <ScopeAccessDeniedScreen
+        title={scopeTitle}
+        eyebrow={t('common.codeReviewer')}
+        kind={access}
+        onRetry={() => void retryAccess()}
+        isRetrying={
+          organizations.isFetching ||
+          githubStatus.isFetching ||
+          gitlabStatus.isFetching ||
+          bitbucketReadiness.isFetching
+        }
+      />
+    );
+  }
 
   const statusFor = (platform: ReviewerPlatform) => {
     if (platform === 'gitlab') {

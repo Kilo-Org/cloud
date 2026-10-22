@@ -591,6 +591,8 @@
     "installKiloGitHubApp": "Installera GitHub-appen för Kilo",
     "checkConnection": "Kontrollera anslutningen",
     "couldNotLoadPullRequest": "Kunde inte läsa in PR:en.",
+    "reviewServiceUnavailable": "Tjänsten är otillgänglig",
+    "reviewServiceUnavailableDescription": "Tjänsten är tillfälligt otillgänglig. Försök igen om en stund.",
     "description": "Beskrivning",
     "noDescriptionProvided": "Ingen beskrivning har angetts.",
     "review": "Granskning",
@@ -762,6 +764,7 @@
       "truncationBanner_other": "Visar de första {{limit}} av {{total}} ändrade filerna på grund av en begränsning i GitHubs API."
     },
     "linkPasteClipboardEmpty": "Urklipp är tomt",
+    "linkPasteDenied": "Åtkomst till klistra in nekades. Tillåt inklistring och försök igen.",
     "linkPasteNotAPullRequest": "Länken leder inte till en PR eller merge request",
     "announce": {
       "commentPosted": "Kommentar publicerad",
@@ -1458,7 +1461,7 @@
       "off": "Granskningsminnet är avstängt",
       "on": "Granskningsminnet är påslaget",
       "offDescription": "Aktivera det så att Kilo kan lära sig av de projektansvarigas svar och föreslå riktlinjer för REVIEW.md.",
-      "readOnlyDescription": "Endast organisationsägare och faktureringsansvariga kan ändra granskningsminne.",
+      "readOnlyDescription": "Endast organisationsägare, administratörer och faktureringsansvariga kan ändra granskningsminne.",
       "enable": "Aktivera granskningsminne",
       "loadingProposals": "Läser in förslag",
       "couldNotLoadProposals": "Kunde inte läsa in förslagen",
@@ -1478,7 +1481,10 @@
       "starting": "Startar granskning…",
       "start": "Starta granskning"
     },
-    "notConnectedReadOnly": "Det finns ingen anslutning till {{platform}}. Endast organisationsägare och faktureringsansvariga kan skapa anslutningen.",
+    "notConnectedReadOnly": "Det finns ingen anslutning till {{platform}}. Endast organisationsägare och administratörer kan skapa anslutningen.",
+    "gitlab": {
+      "notConnectedReadOnly": "Det finns ingen anslutning till {{platform}}. Be en organisationsägare, administratör eller faktureringsansvarig att ansluta den."
+    },
     "webhookSetup": "Konfigurationen av webbhookar är inte klar",
     "webhookSetupDescription": "Vissa kodarkiv kanske inte granskas automatiskt.",
     "autoReviews": "Automatiska granskningar",
@@ -1486,7 +1492,7 @@
     "followReviewMd": "Följ REVIEW.md",
     "followReviewMdSubtitle": "Följ instruktionerna i varje kodarkivs REVIEW.md-fil",
     "bitbucket": {
-      "notConnectedReadOnly": "Det finns ingen anslutning till Bitbucket. Endast organisationsägare och faktureringsansvariga kan skapa anslutningen.",
+      "notConnectedReadOnly": "Det finns ingen anslutning till Bitbucket. Endast organisationsägare, administratörer och faktureringsansvariga kan skapa anslutningen.",
       "setupIncomplete": "Konfigurationen är inte klar. Slutför den på kilo.ai",
       "setup": "Konfiguration av Bitbucket"
     },
@@ -1746,7 +1752,7 @@
       "couldNotLoad": "Kunde inte läsa in det här fyndet",
       "couldNotCheckPermissions": "Kunde inte kontrollera behörigheten att avfärda fynd",
       "cannotDismissTitle": "Det går inte att avfärda fyndet",
-      "cannotDismissDescription": "Endast organisationsägare och faktureringsansvariga kan avfärda fynd.",
+      "cannotDismissDescription": "Endast organisationsägare, administratörer och faktureringsansvariga kan avfärda fynd.",
       "alreadyResolvedDescription": "Fyndet har redan åtgärdats och kan inte längre avfärdas."
     },
     "findingDetails": {
@@ -1788,7 +1794,7 @@
       "automationAllOff": "Allt avstängt",
       "automationCount": "{{displayCount}} av 3 aktiverade",
       "notificationsCount": "{{displayCount}} av 2 aktiverade",
-      "disabledNoManage": "Security Agent är inaktiverad. Endast organisationsägare och faktureringsansvariga kan aktivera den.",
+      "disabledNoManage": "Security Agent är inaktiverad. Endast organisationsägare, administratörer och faktureringsansvariga kan aktivera den.",
       "disabledNoRepo": "Välj minst ett kodarkiv innan du aktiverar Security Agent.",
       "disabledPrompt": "Aktivera Security Agent för att synkronisera Dependabot-varningar, välja kodarkiv och ställa in automatisering."
     },
@@ -1837,7 +1843,7 @@
       "invalidDayCount": "Ange 1–365 dagar, endast heltal.",
       "remediationDeadlineA11y": "Tidsfrist för åtgärd i dagar, {{label}}",
       "enterWholeNumber": "Ange ett heltal mellan 1 och 365",
-      "permissionNote": "Endast organisationsägare och faktureringsansvariga kan ändra dessa inställningar.",
+      "permissionNote": "Endast organisationsägare, administratörer och faktureringsansvariga kan ändra dessa inställningar.",
       "enableTracking": "Aktivera SLA-uppföljning",
       "enableTrackingSubtitle": "Ange tidsfrister för åtgärder utifrån fyndens allvarlighetsgrad.",
       "deadlinesHeading": "Tidsfrister för åtgärder (dagar)"
@@ -1893,7 +1899,7 @@
       "summary": "Rapportsammanfattning",
       "title": "Revisionsrapport",
       "unavailable": "Revisionsrapporten är inte tillgänglig",
-      "unavailableDescription": "Endast organisationsägare och faktureringsansvariga kan se revisionsrapporter. Be en organisationsägare eller faktureringsansvarig att ge dig åtkomst.",
+      "unavailableDescription": "Endast organisationsägare, administratörer och faktureringsansvariga kan se revisionsrapporter. Be en organisationsägare, administratör eller faktureringsansvarig att ge dig åtkomst.",
       "queryFailed": "Hämtningen av rapporten slutfördes inte. Försök igen.",
       "eventActions": {
         "findingAnalysisCompleted": "Analys slutförd",
@@ -2243,6 +2249,8 @@
       "commitAndPush": "Committa och pusha",
       "startSession": "Starta session",
       "selectRepositoryToStart": "Välj ett kodarkiv för att starta.",
+      "enterPromptToStart": "Lägg till en uppmaning för att starta.",
+      "enterPromptOrFileToStart": "Lägg till en uppmaning eller en fil för att starta.",
       "connectProviderToStart": "Anslut en leverantör för att starta.",
       "promptPlaceholder": "Vad vill du arbeta med?",
       "couldNotLoadModels": "Det gick inte att läsa in modellerna.",
@@ -3107,7 +3115,7 @@
     "members": {
       "changeRole": "Ändra roll",
       "emptyDescriptionCanInvite": "Bjud in kollegor för att börja samarbeta i den här organisationen.",
-      "emptyDescriptionCannotInvite": "Be en ägare eller faktureringsansvarig att bjuda in kollegor.",
+      "emptyDescriptionCannotInvite": "Be en ägare, administratör eller faktureringsansvarig att bjuda in kollegor.",
       "emptyTitle": "Inga medlemmar ännu",
       "invitedDate": "Inbjuden {{date}}",
       "limitPerDay": "{{amount}}/dag",
@@ -3371,7 +3379,8 @@
       "settingsToolsOn": "På — inställningsverktygen skickas till modellen",
       "settingsToolsOff": "Av — inget inställningsverktyg skickas till modellen",
       "serverChecking": "Kontrollerar denna server…",
-      "serverToolCount": "{{count}} verktyg",
+      "serverToolCount_one": "{{count}} verktyg",
+      "serverToolCount_other": "{{count}} verktyg",
       "serverUnreachable": "Kunde inte nå denna server",
       "serverOff": "Denna server är avstängd"
     },
@@ -3607,14 +3616,11 @@
     "emptyDescription": "Skapa en profil för att återanvända miljövariabler, installationskommandon och färdigheter över sessioner.",
     "loadFailed": "Det gick inte att läsa in profiler",
     "counts": {
-      "vars": "{{count}} variabler",
       "vars_one": "{{count}} variabel",
       "vars_other": "{{count}} variabler",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} färdigheter",
       "skills_one": "{{count}} färdighet",
       "skills_other": "{{count}} färdigheter",
-      "commands": "{{count}} kommandon",
       "commands_one": "{{count}} kommando",
       "commands_other": "{{count}} kommandon",
       "varsShort": "{{count}}var",
@@ -3793,6 +3799,8 @@
     "empty": "Kreditpaket är inte tillgängliga just nu.",
     "noMatchingProducts": "App Store returnerade inga matchande kreditpaket.",
     "noMatchingProductsPlay": "Google Play returnerade inga matchande kreditpaket.",
+    "storeTimedOut": "App Store svarade inte i tid. Försök igen.",
+    "storeTimedOutPlay": "Google Play svarade inte i tid. Försök igen.",
     "purchaseOwnedByAnotherAccount": "Krediterna på detta Apple-konto tillhör ett annat Kilo-konto. Logga in på det Kilo-kontot för att använda dem.",
     "purchaseOwnedByAnotherAccountPlay": "Krediterna på detta Google Play-konto tillhör ett annat Kilo-konto. Logga in på det Kilo-kontot för att använda dem."
   },

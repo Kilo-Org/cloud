@@ -591,6 +591,8 @@
     "installKiloGitHubApp": "A Kilo GitHub-alkalmazásának telepítése",
     "checkConnection": "Kapcsolat ellenőrzése",
     "couldNotLoadPullRequest": "Nem sikerült betölteni a módosítási kérelmet",
+    "reviewServiceUnavailable": "A szolgáltatás nem érhető el",
+    "reviewServiceUnavailableDescription": "A szolgáltatás átmenetileg nem érhető el. Rövidesen próbálja újra.",
     "description": "Leírás",
     "noDescriptionProvided": "Nincs megadva leírás.",
     "review": "Ellenőrzés",
@@ -762,6 +764,7 @@
       "truncationBanner_other": "A GitHub API korlátja miatt a {{total}} módosított fájl közül csak az első {{limit}} látható."
     },
     "linkPasteClipboardEmpty": "A vágólap üres.",
+    "linkPasteDenied": "A beillesztéshez való hozzáférés elutasítva. Engedélyezze a beillesztést, és próbálja újra.",
     "linkPasteNotAPullRequest": "Ez nem egy PR vagy merge request hivatkozása",
     "announce": {
       "commentPosted": "Hozzászólás közzétéve",
@@ -1458,7 +1461,7 @@
       "off": "A kódellenőrzési memória ki van kapcsolva.",
       "on": "A kódellenőrzési memória be van kapcsolva.",
       "offDescription": "Kapcsold be, hogy a Kilo tanulhasson a karbantartók válaszaiból, és útmutatást javasolhasson a REVIEW.md fájlhoz.",
-      "readOnlyDescription": "Csak a szervezet tulajdonosai és a számlázásért felelős kezelők módosíthatják a kódellenőrzési memóriát.",
+      "readOnlyDescription": "Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei módosíthatják a kódellenőrzési memóriát.",
       "enable": "Kódellenőrzési memória engedélyezése",
       "loadingProposals": "Javaslatok betöltése",
       "couldNotLoadProposals": "Nem sikerült betölteni a javaslatokat.",
@@ -1478,7 +1481,10 @@
       "starting": "Kódellenőrzés indítása…",
       "start": "Kódellenőrzés indítása"
     },
-    "notConnectedReadOnly": "Nincs kapcsolat ezzel a platformmal: {{platform}}. Csak a szervezet tulajdonosai és a számlázásért felelős kezelők csatlakoztathatják.",
+    "notConnectedReadOnly": "Nincs kapcsolat ezzel a platformmal: {{platform}}. Csak a szervezet tulajdonosai és adminisztrátorai csatlakoztathatják.",
+    "gitlab": {
+      "notConnectedReadOnly": "A {{platform}} nincs csatlakoztatva. Kérd meg egy tulajdonost, adminisztrátort vagy számlázási felelőst, hogy csatlakoztassa."
+    },
     "webhookSetup": "A webhook beállítása hiányos.",
     "webhookSetupDescription": "Előfordulhat, hogy egyes kódtárakban nem fut automatikus kódellenőrzés.",
     "autoReviews": "Automatikus kódellenőrzések",
@@ -1486,7 +1492,7 @@
     "followReviewMd": "REVIEW.md követése",
     "followReviewMdSubtitle": "A kódtárak REVIEW.md fájljaiban megadott utasítások követése",
     "bitbucket": {
-      "notConnectedReadOnly": "A Bitbucket nincs csatlakoztatva. Csak a szervezet tulajdonosai és a számlázásért felelős kezelők csatlakoztathatják.",
+      "notConnectedReadOnly": "A Bitbucket nincs csatlakoztatva. Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei csatlakoztathatják.",
       "setupIncomplete": "A beállítás hiányos. Fejezd be a beállítást a kilo.ai oldalon.",
       "setup": "Bitbucket beállítása"
     },
@@ -1746,7 +1752,7 @@
       "couldNotLoad": "Nem sikerült betölteni ezt a találatot.",
       "couldNotCheckPermissions": "Nem sikerült ellenőrizni az elvetéshez szükséges jogosultságokat.",
       "cannotDismissTitle": "Ez a találat nem vethető el",
-      "cannotDismissDescription": "Csak a szervezet tulajdonosai és a számlázásért felelős kezelők vethetnek el találatokat.",
+      "cannotDismissDescription": "Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei vethetnek el találatokat.",
       "alreadyResolvedDescription": "Ezt a találatot már megoldották, ezért nem vethető el."
     },
     "findingDetails": {
@@ -1788,7 +1794,7 @@
       "automationAllOff": "Mind kikapcsolva",
       "automationCount": "3 közül {{displayCount}} engedélyezve",
       "notificationsCount": "2 közül {{displayCount}} engedélyezve",
-      "disabledNoManage": "A biztonsági ügynök ki van kapcsolva. Csak a szervezet tulajdonosai és a számlázásért felelős kezelők kapcsolhatják be.",
+      "disabledNoManage": "A biztonsági ügynök ki van kapcsolva. Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei kapcsolhatják be.",
       "disabledNoRepo": "A biztonsági ügynök engedélyezése előtt válassz ki legalább egy adattárat.",
       "disabledPrompt": "Kapcsold be a biztonsági ügynököt a Dependabot-riasztások szinkronizálásához, az adattárak kiválasztásához és az automatizálás beállításához."
     },
@@ -1837,7 +1843,7 @@
       "invalidDayCount": "Adj meg egy egész számot 1 és 365 között a napok számához.",
       "remediationDeadlineA11y": "{{label}}: hibajavítási határidő napokban",
       "enterWholeNumber": "Adj meg egy 1 és 365 közötti egész számot",
-      "permissionNote": "Csak a szervezet tulajdonosai és a számlázásért felelős kezelők módosíthatják ezeket a beállításokat.",
+      "permissionNote": "Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei módosíthatják ezeket a beállításokat.",
       "enableTracking": "SLA-követés engedélyezése",
       "enableTrackingSubtitle": "A találatok súlyossága alapján határozd meg a hibajavítási határidőket.",
       "deadlinesHeading": "Hibajavítási határidők (nap)"
@@ -1893,7 +1899,7 @@
       "summary": "Jelentés összefoglalója",
       "title": "Auditjelentés",
       "unavailable": "Az auditjelentés nem érhető el",
-      "unavailableDescription": "Csak a szervezet tulajdonosai és a számlázásért felelős kezelők tekinthetik meg az auditjelentéseket. Kérj hozzáférést egy tulajdonostól vagy a számlázásért felelős kezelőtől.",
+      "unavailableDescription": "Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei tekinthetik meg az auditjelentéseket. Kérj hozzáférést egy tulajdonostól, adminisztrátortól vagy számlázási felelőstől.",
       "queryFailed": "A jelentés lekérdezése nem fejeződött be. Próbáld újra.",
       "eventActions": {
         "findingAnalysisCompleted": "Elemzés befejezve",
@@ -2243,6 +2249,8 @@
       "commitAndPush": "Véglegesítés és feltöltés",
       "startSession": "Munkamenet indítása",
       "selectRepositoryToStart": "Válassz egy adattárat az indításhoz.",
+      "enterPromptToStart": "Adj hozzá egy promptot az indításhoz.",
+      "enterPromptOrFileToStart": "Adj hozzá egy promptot vagy egy fájlt az indításhoz.",
       "connectProviderToStart": "Csatlakoztass egy szolgáltatót az indításhoz.",
       "promptPlaceholder": "Min szeretnél dolgozni?",
       "couldNotLoadModels": "Nem sikerült betölteni a modelleket.",
@@ -2410,7 +2418,7 @@
       "thought": "Gondolat",
       "showDetails": "Részletek megjelenítése",
       "pending": "Függőben…",
-      "running": "Fut…"
+      "running": "Folyamatban…"
     },
     "messageErrorBoundary": {
       "failedToRender": "Nem sikerült megjeleníteni a tartalmat."
@@ -3108,7 +3116,7 @@
     "members": {
       "changeRole": "Szerepkör módosítása",
       "emptyDescriptionCanInvite": "Hívd meg a csapattársaidat, hogy együtt dolgozhassatok ebben a szervezetben.",
-      "emptyDescriptionCannotInvite": "Kérd meg a tulajdonost vagy a számlázási felelőst, hogy hívja meg a csapattársakat.",
+      "emptyDescriptionCannotInvite": "Kérd meg egy tulajdonost, adminisztrátort vagy számlázási felelőst, hogy hívja meg a csapattársakat.",
       "emptyTitle": "Még nincs tag",
       "invitedDate": "Meghívva: {{date}}",
       "limitPerDay": "{{amount}}/nap",
@@ -3372,7 +3380,8 @@
       "settingsToolsOn": "Be — a beállításeszközök elküldésre kerülnek a modellnek",
       "settingsToolsOff": "Ki — semmilyen beállításeszköz nem kerül elküldésre a modellnek",
       "serverChecking": "Szerver ellenőrzése…",
-      "serverToolCount": "{{count}} eszköz",
+      "serverToolCount_one": "{{count}} eszköz",
+      "serverToolCount_other": "{{count}} eszköz",
       "serverUnreachable": "Nem sikerült elérni ezt a szervert",
       "serverOff": "Ez a szerver ki van kapcsolva"
     },
@@ -3608,10 +3617,13 @@
     "emptyDescription": "Hozzon létre egy profilt a környezeti változók, a beállítási parancsok és a készségek munkamenetek közötti újrafelhasználásához.",
     "loadFailed": "Nem sikerült betölteni a profilokat",
     "counts": {
-      "vars": "{{count}} változó",
+      "vars_one": "{{count}} változó",
+      "vars_other": "{{count}} változó",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} készség",
-      "commands": "{{count}} parancs",
+      "skills_one": "{{count}} készség",
+      "skills_other": "{{count}} készség",
+      "commands_one": "{{count}} parancs",
+      "commands_other": "{{count}} parancs",
       "varsShort": "{{count}}v",
       "skillsShort": "{{count}}k",
       "commandsShort": "{{count}}p"
@@ -3788,6 +3800,8 @@
     "empty": "A kreditcsomagok jelenleg nem érhetők el.",
     "noMatchingProducts": "Az App Store nem adott vissza megfelelő kreditcsomagot.",
     "noMatchingProductsPlay": "A Google Play nem adott vissza megfelelő kreditcsomagot.",
+    "storeTimedOut": "Az App Store nem válaszolt időben. Próbáld újra.",
+    "storeTimedOutPlay": "A Google Play nem válaszolt időben. Próbáld újra.",
     "purchaseOwnedByAnotherAccount": "Az ehhez az Apple Account-fiókhoz tartozó kreditek egy másik Kilo-fiókhoz kapcsolódnak. A használatukhoz jelentkezz be abba a Kilo-fiókba.",
     "purchaseOwnedByAnotherAccountPlay": "Az ezen Google Play-fiókon lévő kreditek egy másik Kilo-fiókhoz tartoznak. A használatukhoz jelentkezz be abba a Kilo-fiókba."
   },

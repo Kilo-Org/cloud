@@ -591,6 +591,8 @@
     "installKiloGitHubApp": "Kilo GitHub ਐਪ ਸਥਾਪਿਤ ਕਰੋ",
     "checkConnection": "ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ",
     "couldNotLoadPullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀ।",
+    "reviewServiceUnavailable": "ਸੇਵਾ ਉਪਲਬਧ ਨਹੀਂ ਹੈ",
+    "reviewServiceUnavailableDescription": "ਸੇਵਾ ਆਰਜ਼ੀ ਤੌਰ 'ਤੇ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਥੋੜ੍ਹੀ ਦੇਰ ਬਾਅਦ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "description": "ਵੇਰਵਾ",
     "noDescriptionProvided": "ਕੋਈ ਵੇਰਵਾ ਨਹੀਂ ਦਿੱਤਾ ਗਿਆ।",
     "review": "ਸਮੀਖਿਆ",
@@ -762,6 +764,7 @@
       "truncationBanner_other": "ਬਦਲੀਆਂ {{total}} ਫਾਈਲਾਂ ਵਿੱਚੋਂ ਪਹਿਲੀਆਂ {{limit}} ਦਿਖਾਈਆਂ ਜਾ ਰਹੀਆਂ ਹਨ — GitHub API ਦੀ ਸੀਮਾ ਹੈ।"
     },
     "linkPasteClipboardEmpty": "ਕਲਿੱਪਬੋਰਡ ਖਾਲੀ ਹੈ।",
+    "linkPasteDenied": "ਪੇਸਟ ਕਰਨ ਦੀ ਪਹੁੰਚ ਤੋਂ ਇਨਕਾਰ ਕੀਤਾ ਗਿਆ। ਪੇਸਟ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਦਿਓ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "linkPasteNotAPullRequest": "ਇਹ ਪੁੱਲ ਰਿਕਵੈਸਟ ਜਾਂ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਦਾ ਲਿੰਕ ਨਹੀਂ ਹੈ",
     "announce": {
       "commentPosted": "ਟਿੱਪਣੀ ਪੋਸਟ ਹੋ ਗਈ",
@@ -1458,7 +1461,7 @@
       "off": "ਸਮੀਖਿਆ ਦੀ ਮੈਮੋਰੀ ਬੰਦ ਹੈ।",
       "on": "ਸਮੀਖਿਆ ਦੀ ਮੈਮੋਰੀ ਚਾਲੂ ਹੈ।",
       "offDescription": "ਇਸ ਨੂੰ ਚਾਲੂ ਕਰੋ ਤਾਂ ਜੋ Kilo ਰੱਖ-ਰਖਾਅ ਕਰਨ ਵਾਲਿਆਂ ਦੇ ਜਵਾਬਾਂ ਤੋਂ ਸਿੱਖ ਸਕੇ ਅਤੇ REVIEW.md ਲਈ ਹਦਾਇਤਾਂ ਸੁਝਾ ਸਕੇ।",
-      "readOnlyDescription": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਅਤੇ ਬਿਲਿੰਗ ਪ੍ਰਬੰਧਕ ਸਮੀਖਿਆ ਦੀ ਮੈਮੋਰੀ ਬਦਲ ਸਕਦੇ ਹਨ।",
+      "readOnlyDescription": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਅਤੇ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਸਮੀਖਿਆ ਦੀ ਮੈਮੋਰੀ ਬਦਲ ਸਕਦੇ ਹਨ।",
       "enable": "ਸਮੀਖਿਆ ਦੀ ਮੈਮੋਰੀ ਚਾਲੂ ਕਰੋ",
       "loadingProposals": "ਪ੍ਰਸਤਾਵ ਲੋਡ ਹੋ ਰਹੇ ਹਨ",
       "couldNotLoadProposals": "ਪ੍ਰਸਤਾਵ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
@@ -1478,7 +1481,10 @@
       "starting": "ਸਮੀਖਿਆ ਸ਼ੁਰੂ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ…",
       "start": "ਸਮੀਖਿਆ ਸ਼ੁਰੂ ਕਰੋ"
     },
-    "notConnectedReadOnly": "{{platform}} ਕਨੈਕਟ ਨਹੀਂ ਹੈ। ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਅਤੇ ਬਿਲਿੰਗ ਪ੍ਰਬੰਧਕ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦੇ ਹਨ।",
+    "notConnectedReadOnly": "{{platform}} ਕਨੈਕਟ ਨਹੀਂ ਹੈ। ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਅਤੇ ਐਡਮਿਨ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦੇ ਹਨ।",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} ਕਨੈਕਟ ਨਹੀਂ ਹੈ। ਕਿਸੇ ਸੰਗਠਨ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਨੂੰ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਹੋ।"
+    },
     "webhookSetup": "ਵੈਬਹੁੱਕ ਦਾ ਸੈੱਟਅੱਪ ਅਧੂਰਾ ਹੈ।",
     "webhookSetupDescription": "ਕੁਝ ਰਿਪੋਜ਼ਟਰੀਆਂ ਦੀ ਸਵੈਚਾਲਿਤ ਸਮੀਖਿਆ ਨਾ ਹੋਣ ਦੀ ਸੰਭਾਵਨਾ ਹੈ।",
     "autoReviews": "ਸਵੈਚਾਲਿਤ ਸਮੀਖਿਆਵਾਂ",
@@ -1486,7 +1492,7 @@
     "followReviewMd": "REVIEW.md ਦੀ ਪਾਲਣਾ ਕਰੋ",
     "followReviewMdSubtitle": "ਹਰ ਰਿਪੋਜ਼ਟਰੀ ਦੀ REVIEW.md ਫਾਈਲ ਦੀਆਂ ਹਦਾਇਤਾਂ ਦੀ ਪਾਲਣਾ ਕਰੋ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ਕਨੈਕਟ ਨਹੀਂ ਹੈ। ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਅਤੇ ਬਿਲਿੰਗ ਪ੍ਰਬੰਧਕ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦੇ ਹਨ।",
+      "notConnectedReadOnly": "Bitbucket ਕਨੈਕਟ ਨਹੀਂ ਹੈ। ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਅਤੇ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦੇ ਹਨ।",
       "setupIncomplete": "ਸੈੱਟਅੱਪ ਅਧੂਰਾ ਹੈ — kilo.ai 'ਤੇ ਸੈੱਟਅੱਪ ਪੂਰਾ ਕਰੋ।",
       "setup": "Bitbucket ਦਾ ਸੈੱਟਅੱਪ"
     },
@@ -1746,7 +1752,7 @@
       "couldNotLoad": "ਜਾਂਚ ਦਾ ਇਹ ਨਤੀਜਾ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
       "couldNotCheckPermissions": "ਖਾਰਜ ਕਰਨ ਦੀਆਂ ਇਜਾਜ਼ਤਾਂ ਦੀ ਜਾਂਚ ਨਹੀਂ ਹੋ ਸਕੀ।",
       "cannotDismissTitle": "ਇਹ ਸਮੱਸਿਆ ਖਾਰਜ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ",
-      "cannotDismissDescription": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਅਤੇ ਬਿਲਿੰਗ ਪ੍ਰਬੰਧਕ ਸਮੱਸਿਆਵਾਂ ਖਾਰਜ ਕਰ ਸਕਦੇ ਹਨ।",
+      "cannotDismissDescription": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਅਤੇ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਸਮੱਸਿਆਵਾਂ ਖਾਰਜ ਕਰ ਸਕਦੇ ਹਨ।",
       "alreadyResolvedDescription": "ਇਹ ਸਮੱਸਿਆ ਪਹਿਲਾਂ ਹੀ ਹੱਲ ਹੋ ਚੁੱਕੀ ਹੈ ਅਤੇ ਹੁਣ ਇਸ ਨੂੰ ਖਾਰਜ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ।"
     },
     "findingDetails": {
@@ -1788,7 +1794,7 @@
       "automationAllOff": "ਸਾਰੇ ਬੰਦ",
       "automationCount": "3 ਵਿੱਚੋਂ {{displayCount}} ਚਾਲੂ",
       "notificationsCount": "2 ਵਿੱਚੋਂ {{displayCount}} ਚਾਲੂ",
-      "disabledNoManage": "ਸੁਰੱਖਿਆ ਏਜੰਟ ਬੰਦ ਹੈ। ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਅਤੇ ਬਿਲਿੰਗ ਪ੍ਰਬੰਧਕ ਇਸ ਨੂੰ ਚਾਲੂ ਕਰ ਸਕਦੇ ਹਨ।",
+      "disabledNoManage": "ਸੁਰੱਖਿਆ ਏਜੰਟ ਬੰਦ ਹੈ। ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਅਤੇ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਇਸ ਨੂੰ ਚਾਲੂ ਕਰ ਸਕਦੇ ਹਨ।",
       "disabledNoRepo": "ਸੁਰੱਖਿਆ ਏਜੰਟ ਚਾਲੂ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਘੱਟੋ-ਘੱਟ ਇੱਕ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣੋ।",
       "disabledPrompt": "Dependabot ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਸਿੰਕ ਕਰਨ, ਰਿਪੋਜ਼ਟਰੀਆਂ ਚੁਣਨ ਅਤੇ ਸਵੈਚਾਲਨ ਦੀਆਂ ਸੈਟਿੰਗਾਂ ਕਰਨ ਲਈ ਸੁਰੱਖਿਆ ਏਜੰਟ ਚਾਲੂ ਕਰੋ।"
     },
@@ -1837,7 +1843,7 @@
       "invalidDayCount": "ਦਿਨਾਂ ਦੀ ਗਿਣਤੀ 1 ਤੋਂ 365 ਤੱਕ ਪੂਰਨ ਅੰਕ ਵਿੱਚ ਦਰਜ ਕਰੋ।",
       "remediationDeadlineA11y": "{{label}} ਲਈ ਸੁਧਾਰ ਦੀ ਸਮਾਂ ਸੀਮਾ, ਦਿਨਾਂ ਵਿੱਚ",
       "enterWholeNumber": "1 ਤੋਂ 365 ਤੱਕ ਕੋਈ ਪੂਰਨ ਅੰਕ ਦਰਜ ਕਰੋ",
-      "permissionNote": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਅਤੇ ਬਿਲਿੰਗ ਪ੍ਰਬੰਧਕ ਇਹ ਸੈਟਿੰਗਾਂ ਬਦਲ ਸਕਦੇ ਹਨ।",
+      "permissionNote": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਅਤੇ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਇਹ ਸੈਟਿੰਗਾਂ ਬਦਲ ਸਕਦੇ ਹਨ।",
       "enableTracking": "SLA ਦੀ ਨਿਗਰਾਨੀ ਚਾਲੂ ਕਰੋ",
       "enableTrackingSubtitle": "ਸਮੱਸਿਆ ਦੀ ਗੰਭੀਰਤਾ ਮੁਤਾਬਕ ਸੁਧਾਰ ਦੀ ਸਮਾਂ ਸੀਮਾ ਨਿਰਧਾਰਤ ਕਰੋ।",
       "deadlinesHeading": "ਸੁਧਾਰ ਦੀਆਂ ਸਮਾਂ ਸੀਮਾਵਾਂ (ਦਿਨ)"
@@ -1893,7 +1899,7 @@
       "summary": "ਰਿਪੋਰਟ ਦਾ ਸਾਰ",
       "title": "ਆਡਿਟ ਰਿਪੋਰਟ",
       "unavailable": "ਆਡਿਟ ਰਿਪੋਰਟ ਉਪਲਬਧ ਨਹੀਂ",
-      "unavailableDescription": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਅਤੇ ਬਿਲਿੰਗ ਪ੍ਰਬੰਧਕ ਆਡਿਟ ਰਿਪੋਰਟਾਂ ਦੇਖ ਸਕਦੇ ਹਨ। ਕਿਸੇ ਮਾਲਕ ਜਾਂ ਬਿਲਿੰਗ ਪ੍ਰਬੰਧਕ ਨੂੰ ਤੁਹਾਨੂੰ ਪਹੁੰਚ ਦੇਣ ਲਈ ਕਹੋ।",
+      "unavailableDescription": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਅਤੇ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਆਡਿਟ ਰਿਪੋਰਟਾਂ ਦੇਖ ਸਕਦੇ ਹਨ। ਕਿਸੇ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਨੂੰ ਤੁਹਾਨੂੰ ਪਹੁੰਚ ਦੇਣ ਲਈ ਕਹੋ।",
       "queryFailed": "ਰਿਪੋਰਟ ਦੀ ਕੁਐਰੀ ਪੂਰੀ ਨਹੀਂ ਹੋਈ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "eventActions": {
         "findingAnalysisCompleted": "ਵਿਸ਼ਲੇਸ਼ਣ ਪੂਰਾ ਹੋਇਆ",
@@ -2243,6 +2249,8 @@
       "commitAndPush": "ਕਮਿਟ ਤੇ ਪੁਸ਼ ਕਰੋ",
       "startSession": "ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰੋ",
       "selectRepositoryToStart": "ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਇੱਕ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣੋ।",
+      "enterPromptToStart": "ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਇੱਕ ਪ੍ਰਾਂਪਟ ਜੋੜੋ।",
+      "enterPromptOrFileToStart": "ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਇੱਕ ਪ੍ਰਾਂਪਟ ਜਾਂ ਫਾਈਲ ਜੋੜੋ।",
       "connectProviderToStart": "ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਇੱਕ ਪ੍ਰਦਾਤਾ ਕਨੈਕਟ ਕਰੋ।",
       "promptPlaceholder": "ਤੁਸੀਂ ਕਿਸ 'ਤੇ ਕੰਮ ਕਰਨਾ ਚਾਹੋਗੇ?",
       "couldNotLoadModels": "ਮਾਡਲ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ।",
@@ -3108,7 +3116,7 @@
     "members": {
       "changeRole": "ਭੂਮਿਕਾ ਬਦਲੋ",
       "emptyDescriptionCanInvite": "ਇਸ ਸੰਸਥਾ ਵਿੱਚ ਮਿਲ ਕੇ ਕੰਮ ਕਰਨ ਲਈ ਆਪਣੀ ਟੀਮ ਦੇ ਸਾਥੀਆਂ ਨੂੰ ਸੱਦਾ ਦਿਓ।",
-      "emptyDescriptionCannotInvite": "ਮਾਲਕ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਨੂੰ ਟੀਮ ਦੇ ਸਾਥੀਆਂ ਨੂੰ ਸੱਦਾ ਦੇਣ ਲਈ ਕਹੋ।",
+      "emptyDescriptionCannotInvite": "ਕਿਸੇ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਨੂੰ ਟੀਮ ਦੇ ਸਾਥੀਆਂ ਨੂੰ ਸੱਦਾ ਦੇਣ ਲਈ ਕਹੋ।",
       "emptyTitle": "ਅਜੇ ਕੋਈ ਮੈਂਬਰ ਨਹੀਂ",
       "invitedDate": "{{date}} ਨੂੰ ਸੱਦਾ ਦਿੱਤਾ ਗਿਆ",
       "limitPerDay": "{{amount}}/ਦਿਨ",
@@ -3372,7 +3380,8 @@
       "settingsToolsOn": "ਚਾਲੂ — ਸੈਟਿੰਗਾਂ ਟੂਲ ਮਾਡਲ ਨੂੰ ਭੇਜੇ ਜਾਂਦੇ ਹਨ",
       "settingsToolsOff": "ਬੰਦ — ਮਾਡਲ ਨੂੰ ਕੋਈ ਸੈਟਿੰਗਾਂ ਟੂਲ ਨਹੀਂ ਭੇਜਿਆ ਜਾਂਦਾ",
       "serverChecking": "ਇਹ ਸਰਵਰ ਜਾਂਚਿਆ ਜਾ ਰਿਹਾ ਹੈ…",
-      "serverToolCount": "{{count}} ਟੂਲ",
+      "serverToolCount_one": "{{count}} ਟੂਲ",
+      "serverToolCount_other": "{{count}} ਟੂਲ",
       "serverUnreachable": "ਇਸ ਸਰਵਰ ਤੱਕ ਨਹੀਂ ਪਹੁੰਚ ਸਕਿਆ",
       "serverOff": "ਇਹ ਸਰਵਰ ਬੰਦ ਹੈ"
     },
@@ -3608,10 +3617,13 @@
     "emptyDescription": "ਸਾਰੇ ਸੈਸ਼ਨਾਂ ਵਿੱਚ ਵਾਤਾਵਰਣ ਵੇਰੀਏਬਲ, ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ ਅਤੇ ਹੁਨਰਾਂ ਦੀ ਮੁੜ ਵਰਤੋਂ ਕਰਨ ਲਈ ਇੱਕ ਪ੍ਰੋਫਾਈਲ ਬਣਾਓ।",
     "loadFailed": "ਪ੍ਰੋਫਾਈਲਾਂ ਨੂੰ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
     "counts": {
-      "vars": "{{count}} ਵੇਰੀਏਬਲ",
+      "vars_one": "{{count}} ਵੇਰੀਏਬਲ",
+      "vars_other": "{{count}} ਵੇਰੀਏਬਲ",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} ਹੁਨਰ",
-      "commands": "{{count}} ਕਮਾਂਡਾਂ",
+      "skills_one": "{{count}} ਹੁਨਰ",
+      "skills_other": "{{count}} ਹੁਨਰ",
+      "commands_one": "{{count}} ਕਮਾਂਡ",
+      "commands_other": "{{count}} ਕਮਾਂਡਾਂ",
       "varsShort": "{{count}}ਵ",
       "skillsShort": "{{count}}ਹ",
       "commandsShort": "{{count}}ਕ"
@@ -3788,6 +3800,8 @@
     "empty": "ਕ੍ਰੈਡਿਟ ਪੈਕ ਇਸ ਸਮੇਂ ਉਪਲਬਧ ਨਹੀਂ ਹਨ।",
     "noMatchingProducts": "App Store ਨੇ ਕੋਈ ਮੇਲ ਖਾਂਦਾ ਕ੍ਰੈਡਿਟ ਪੈਕ ਵਾਪਸ ਨਹੀਂ ਕੀਤਾ।",
     "noMatchingProductsPlay": "Google Play ਨੇ ਕੋਈ ਮੇਲ ਖਾਂਦਾ ਕ੍ਰੈਡਿਟ ਪੈਕ ਵਾਪਸ ਨਹੀਂ ਕੀਤਾ।",
+    "storeTimedOut": "App Store ਨੇ ਸਮੇਂ ਸਿਰ ਜਵਾਬ ਨਹੀਂ ਦਿੱਤਾ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "storeTimedOutPlay": "Google Play ਨੇ ਸਮੇਂ ਸਿਰ ਜਵਾਬ ਨਹੀਂ ਦਿੱਤਾ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "purchaseOwnedByAnotherAccount": "ਇਸ Apple Account ਵਾਲੇ ਕ੍ਰੈਡਿਟ ਕਿਸੇ ਹੋਰ Kilo ਖਾਤੇ ਨਾਲ ਸਬੰਧਤ ਹਨ। ਇਹਨਾਂ ਨੂੰ ਵਰਤਣ ਲਈ ਉਸ Kilo ਖਾਤੇ ਵਿੱਚ ਸਾਈਨ ਇਨ ਕਰੋ।",
     "purchaseOwnedByAnotherAccountPlay": "ਇਸ Google Play ਖਾਤੇ 'ਤੇ ਕ੍ਰੈਡਿਟ ਇੱਕ ਵੱਖਰੇ Kilo ਖਾਤੇ ਨਾਲ ਸਬੰਧਤ ਹਨ। ਇਹਨਾਂ ਨੂੰ ਵਰਤਣ ਲਈ ਉਸ Kilo ਖਾਤੇ ਵਿੱਚ ਸਾਈਨ ਇਨ ਕਰੋ।"
   },

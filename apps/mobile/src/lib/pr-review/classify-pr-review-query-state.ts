@@ -12,10 +12,7 @@
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { i18n } from '@/i18n';
 
-/**
- * The PR-review error-to-view contract. Owned here so every screen and pure
- * selector imports the name instead of inferring it from the classifier.
- */
+
 export type PrReviewQueryState =
   | {
       /**
@@ -49,6 +46,17 @@ export type PrReviewQueryState =
        * keep failing in the same way.
        */
       kind: 'reconnect';
+    }
+  | {
+      /**
+       * The read failed with BAD_GATEWAY: the review read path returned a
+       * retryable gateway failure — the authorization layer in front of
+       * GitHub is temporarily unavailable, GitHub itself answered 5xx, or
+       * the provider read layer reported a retryable transport failure.
+       * The caller should render its own unavailable state with a retry
+       * CTA instead of the generic server-error copy.
+       */
+      kind: 'service-unavailable';
     };
 
 export function classifyPrReviewQueryState(error: unknown): PrReviewQueryState {
@@ -64,6 +72,9 @@ export function classifyPrReviewQueryState(error: unknown): PrReviewQueryState {
   }
   if (code === 'UNAUTHORIZED') {
     return { kind: 'reconnect' };
+  }
+  if (code === 'BAD_GATEWAY') {
+    return { kind: 'service-unavailable' };
   }
   return { kind: 'retryable' };
 }

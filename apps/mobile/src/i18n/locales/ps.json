@@ -591,6 +591,8 @@
     "installKiloGitHubApp": "د Kilo د GitHub اپلیکیشن نصب کړئ",
     "checkConnection": "اړیکه وګورئ",
     "couldNotLoadPullRequest": "پل ریکویسټ بار نه شو.",
+    "reviewServiceUnavailable": "خدمة نه شته",
+    "reviewServiceUnavailableDescription": "خدمه لنډ مهال لپاره نه شته. بیا هڅه وکړه.",
     "description": "تشریح",
     "noDescriptionProvided": "هېڅ تشریح نه ده ورکړل شوې.",
     "review": "بیاکتنه",
@@ -762,6 +764,7 @@
       "truncationBanner_other": "له {{total}} بدل شویو فایلونو څخه لومړني {{limit}} ښودل کېږي — دا د GitHub API حد دی."
     },
     "linkPasteClipboardEmpty": "کلیپبورډ تش دی.",
+    "linkPasteDenied": "د پېسټ لاسرسی رد شو. پېسټ ته اجازه ورکړئ او بیاځلي هڅه وکړئ.",
     "linkPasteNotAPullRequest": "د پول ریکویسټ یا د یوځای کولو غوښتنې لینک نه دی",
     "announce": {
       "commentPosted": "تبصره خپره شوه",
@@ -1458,7 +1461,7 @@
       "off": "د بیاکتنې حافظه غیرفعاله ده.",
       "on": "د بیاکتنې حافظه فعاله ده.",
       "offDescription": "د بیاکتنې حافظه فعاله کړئ، څو Kilo د ساتونکو له ځوابونو زده کړه وکړي او د REVIEW.md لپاره لارښوونې وړاندیز کړي.",
-      "readOnlyDescription": "یوازې د سازمان مالکان او د تادیاتو مدیران کولی شي د بیاکتنې حافظه بدله کړي.",
+      "readOnlyDescription": "یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي د بیاکتنې حافظه بدله کړي.",
       "enable": "د بیاکتنې حافظه فعاله کړئ",
       "loadingProposals": "وړاندیزونه بارول",
       "couldNotLoadProposals": "وړاندیزونه بار نه شول.",
@@ -1478,7 +1481,10 @@
       "starting": "بیاکتنه پیلېږي…",
       "start": "بیاکتنه پیل کړئ"
     },
-    "notConnectedReadOnly": "{{platform}} نښلول شوی نه دی. یوازې د سازمان مالکان او د تادیاتو مدیران کولی شي دا ونښلوي.",
+    "notConnectedReadOnly": "{{platform}} نښلول شوی نه دی. یوازې د سازمان مالکان او مدیران کولی شي دا ونښلوي.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} نښلول شوی نه دی. له یو سازمان مالک، مدیر، یا د بلونو مدیر څخه وغواړئ چې دا ونښلوي."
+    },
     "webhookSetup": "د وېب هوک تنظیم نیمګړی دی.",
     "webhookSetupDescription": "ښايي د ځینو ذخیرو اتوماتیکه بیاکتنه و نه شي.",
     "autoReviews": "اتوماتیکې بیاکتنې",
@@ -1486,7 +1492,7 @@
     "followReviewMd": "د REVIEW.md لارښوونې تعقیب کړئ",
     "followReviewMdSubtitle": "د هرې ذخیرې د REVIEW.md فایل لارښوونې تعقیب کړئ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket نښلول شوی نه دی. یوازې د سازمان مالکان او د تادیاتو مدیران کولی شي دا ونښلوي.",
+      "notConnectedReadOnly": "Bitbucket نښلول شوی نه دی. یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي دا ونښلوي.",
       "setupIncomplete": "تنظیم نیمګړی دی — په kilo.ai کې یې بشپړ کړئ.",
       "setup": "د Bitbucket چمتو کول"
     },
@@ -1746,7 +1752,7 @@
       "couldNotLoad": "دا موندنه بار نه شوه.",
       "couldNotCheckPermissions": "د له پامه غورځولو اجازې و نه کتل شوې.",
       "cannotDismissTitle": "دا موندنه له پامه نه شي غورځول کېدای",
-      "cannotDismissDescription": "یوازې د سازمان مالکان او د تادیاتو مدیران کولی شي موندنې له پامه وغورځوي.",
+      "cannotDismissDescription": "یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي موندنې له پامه وغورځوي.",
       "alreadyResolvedDescription": "دا موندنه لا دمخه حل شوې ده او نور له پامه نه شي غورځول کېدای."
     },
     "findingDetails": {
@@ -1788,7 +1794,7 @@
       "automationAllOff": "ټول غیرفعال",
       "automationCount": "له 3 څخه {{displayCount}} فعال",
       "notificationsCount": "له 2 څخه {{displayCount}} فعال",
-      "disabledNoManage": "امنیتي اجنټ غیرفعال دی. یوازې د سازمان مالکان او د تادیاتو مدیران کولی شي دا فعال کړي.",
+      "disabledNoManage": "امنیتي اجنټ غیرفعال دی. یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي دا فعال کړي.",
       "disabledNoRepo": "د امنیتي اجنټ له فعالولو مخکې لږ تر لږه یوه ذخیره غوره کړئ.",
       "disabledPrompt": "امنیتي اجنټ فعال کړئ، څو د Dependabot خبرتیاوې هممهاله کړئ، ذخیرې غوره کړئ او اتوماتیکې کړنې تنظیم کړئ."
     },
@@ -1837,7 +1843,7 @@
       "invalidDayCount": "د ورځو شمېر باید له 1 تر 365 پورې یو بشپړ عدد وي.",
       "remediationDeadlineA11y": "د {{label}} د اصلاح مهلت په ورځو کې",
       "enterWholeNumber": "له 1 څخه تر 365 پورې یو صحیح عدد ولیکئ",
-      "permissionNote": "یوازې د سازمان مالکان او د تادیاتو مدیران کولی شي دا ترتیبات بدل کړي.",
+      "permissionNote": "یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي دا ترتیبات بدل کړي.",
       "enableTracking": "د SLA تعقیب فعال کړئ",
       "enableTrackingSubtitle": "د موندنې د شدت له مخې د اصلاح وروستۍ نېټې وټاکئ.",
       "deadlinesHeading": "د اصلاح مهلتونه (ورځې)"
@@ -1893,7 +1899,7 @@
       "summary": "د راپور لنډیز",
       "title": "د پلټنې راپور",
       "unavailable": "د پلټنې راپور نشته",
-      "unavailableDescription": "یوازې د سازمان مالکان او د تادیاتو مدیران کولی شي د پلټنې راپورونه وګوري. له یوه مالک یا د تادیاتو له مدیر څخه د لاسرسي اجازه وغواړئ.",
+      "unavailableDescription": "یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي د پلټنې راپورونه وګوري. له یوه مالک، مدیر یا د بلونو له مدیر څخه د لاسرسي اجازه وغواړئ.",
       "queryFailed": "د راپور د معلوماتو غوښتنه بشپړه نه شوه. بیا هڅه وکړئ.",
       "eventActions": {
         "findingAnalysisCompleted": "تحلیل بشپړ شو",
@@ -2243,6 +2249,8 @@
       "commitAndPush": "کمیټ او پش کړئ",
       "startSession": "ناسته پیل کړئ",
       "selectRepositoryToStart": "د پیل لپاره یو زېرمتون وټاکئ.",
+      "enterPromptToStart": "د پیل لپاره یو پرومپټ اضافه کړئ.",
+      "enterPromptOrFileToStart": "د پیل لپاره یو پرومپټ یا فایل اضافه کړئ.",
       "connectProviderToStart": "د پیل لپاره د خدمت چمتو کوونکی ونښلوئ.",
       "promptPlaceholder": "غواړئ پر څه کار وکړئ؟",
       "couldNotLoadModels": "ماډلونه بار نه شول.",
@@ -3108,7 +3116,7 @@
     "members": {
       "changeRole": "دنده بدله کړئ",
       "emptyDescriptionCanInvite": "په دې سازمان کې د ګډ کار د پیلولو لپاره خپلو همکارانو ته بلنه ورکړئ.",
-      "emptyDescriptionCannotInvite": "له مالک یا د بلونو له مدیر څخه وغواړئ چې همکارانو ته بلنه ورکړي.",
+      "emptyDescriptionCannotInvite": "له مالک، مدیر یا د بلونو له مدیر څخه وغواړئ چې همکارانو ته بلنه ورکړي.",
       "emptyTitle": "لا هیڅ غړی نشته",
       "invitedDate": "په {{date}} بلنه ورکړل شوې",
       "limitPerDay": "{{amount}}/ورځ",
@@ -3372,7 +3380,8 @@
       "settingsToolsOn": "فعال — د ترتیباتو وسیلې ماډل ته لېږل کیږي",
       "settingsToolsOff": "غیرفعال — هیڅ د ترتیباتو وسیله ماډل ته نه لېږل کیږي",
       "serverChecking": "دا سرور ګڼل کیږي…",
-      "serverToolCount": "{{count}} وسیلې",
+      "serverToolCount_one": "{{count}} وسیله",
+      "serverToolCount_other": "{{count}} وسیلې",
       "serverUnreachable": "دې سرور ته رسېدل ممکن نه شول",
       "serverOff": "دا سرور بند دی"
     },
@@ -3608,10 +3617,13 @@
     "emptyDescription": "د چاپیریال متغیرونو ، تنظیم کولو امرونو ، او په غونډو کې مهارتونه د بیا کارولو لپاره پروفایل رامینځته کړئ.",
     "loadFailed": "پروفایلونه نشي پورته کولی",
     "counts": {
-      "vars": "{{count}} تغیرات",
+      "vars_one": "{{count}} تغیر",
+      "vars_other": "{{count}} تغیرات",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} مهارتونه",
-      "commands": "{{count}} امرونه",
+      "skills_one": "{{count}} مهارت",
+      "skills_other": "{{count}} مهارتونه",
+      "commands_one": "{{count}} امر",
+      "commands_other": "{{count}} امرونه",
       "varsShort": "{{count}}ت",
       "skillsShort": "{{count}}م",
       "commandsShort": "{{count}}ا"
@@ -3788,6 +3800,8 @@
     "empty": "د کریډیټ بنډلونه اوس شتون نلري.",
     "noMatchingProducts": "App Store د سمون خور کریډیټ بنډلونه بیرته را نه کړل.",
     "noMatchingProductsPlay": "Google Play د سمون خور کریډیټ بنډلونه بیرته را نه کړل.",
+    "storeTimedOut": "App Store په وخت کې ځواب ورنه کړ. بیا هڅه وکړئ.",
+    "storeTimedOutPlay": "Google Play په وخت کې ځواب ورنه کړ. بیا هڅه وکړئ.",
     "purchaseOwnedByAnotherAccount": "په دې Apple Account کې کریډیټونه د Kilo په بل حساب پورې اړه لري. د کارولو لپاره یې د Kilo هماغه حساب ته ننوځئ.",
     "purchaseOwnedByAnotherAccountPlay": "دا Google Play حساب باندې کریډیټونه د بل Kilo حساب پورې اړه لري. د کارولو لپاره هغه Kilo حساب ته ننوځئ."
   },

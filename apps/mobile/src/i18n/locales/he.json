@@ -897,7 +897,7 @@
     },
     "autoReviews": "סקירות אוטומטיות",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket לא מחובר. רק בעלי הארגון ומנהלי החיוב יכולים לחבר אותו.",
+      "notConnectedReadOnly": "Bitbucket לא מחובר. רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לחבר אותו.",
       "setupIncomplete": "ההגדרה לא הושלמה. השלם אותה ב-kilo.ai.",
       "setup": "הגדרת Bitbucket"
     },
@@ -921,7 +921,10 @@
       "starting": "הסקירה מתחילה…",
       "title": "סקירה ידנית"
     },
-    "notConnectedReadOnly": "{{platform}} לא מחובר. רק בעלי הארגון ומנהלי החיוב יכולים לחבר אותו.",
+    "notConnectedReadOnly": "{{platform}} לא מחובר. רק בעלי הארגון ומנהלים יכולים לחבר אותו.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} אינו מחובר. בקש מבעלים של הארגון, מנהל או מנהל חיובים לחבר אותו."
+    },
     "platformList": {
       "activity": "פעילות",
       "checking": "בבדיקה…",
@@ -1000,7 +1003,7 @@
       "off": "זיכרון הסקירה כבוי.",
       "on": "זיכרון הסקירה דלוק.",
       "offDescription": "הפעל אותו כדי לאפשר ל-Kilo ללמוד מתשובות של מתחזקים ולהציע הנחיות לקובץ REVIEW.md.",
-      "readOnlyDescription": "רק בעלי הארגון ומנהלי החיוב יכולים לשנות זיכרון סקירה.",
+      "readOnlyDescription": "רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לשנות זיכרון סקירה.",
       "title": "זיכרון סקירה"
     },
     "scopeList": {
@@ -1152,7 +1155,7 @@
       "summary": "סיכום הדוח",
       "title": "דוח ביקורת",
       "unavailable": "דוח הביקורת אינו זמין",
-      "unavailableDescription": "רק בעלי הארגון ומנהלי החיוב יכולים לצפות בדוחות ביקורת. בקש מאחד מבעלי הארגון או ממנהל החיוב לתת לך גישה.",
+      "unavailableDescription": "רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לצפות בדוחות ביקורת. בקש מבעל ארגון, ממנהל או ממנהל חיובים לתת לך גישה.",
       "eventActions": {
         "findingAnalysisCompleted": "הניתוח הושלם",
         "findingAnalysisFailed": "הניתוח נכשל",
@@ -1269,7 +1272,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "הממצא הזה כבר נפתר ולא ניתן עוד לדחות אותו.",
-      "cannotDismissDescription": "רק בעלי הארגון ומנהלי החיוב יכולים לדחות ממצאים.",
+      "cannotDismissDescription": "רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לדחות ממצאים.",
       "cannotDismissTitle": "לא ניתן לדחות את הממצא הזה",
       "commentAccessibility": "הערת דחייה",
       "commentLabel": "הערה (לא חובה)",
@@ -1401,7 +1404,7 @@
       "automationCount": "{{displayCount}} מתוך 3 מופעלים",
       "couldNotLoadPermissions": "לא ניתן לטעון את ההרשאות.",
       "couldNotLoadSettings": "לא ניתן לטעון את הגדרות סוכן האבטחה.",
-      "disabledNoManage": "סוכן האבטחה מושבת. רק בעלי הארגון ומנהלי החיוב יכולים להפעיל אותו.",
+      "disabledNoManage": "סוכן האבטחה מושבת. רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים להפעיל אותו.",
       "disabledNoRepo": "יש לבחור לפחות מאגר אחד לפני הפעלת סוכן האבטחה.",
       "disabledPrompt": "הפעל את סוכן האבטחה כדי לסנכרן התראות Dependabot, לבחור מאגרים ולהגדיר אוטומציה.",
       "notificationsCount": "{{displayCount}} מתוך 2 מופעלים",
@@ -1435,7 +1438,7 @@
       "lowDescription": "השפעה מזערית על האבטחה.",
       "medium": "בינונית",
       "mediumDescription": "השפעה מוגבלת או ניצול בתנאים מסוימים בלבד.",
-      "permissionNote": "רק בעלי הארגון ומנהלי החיוב יכולים לשנות את ההגדרות האלה.",
+      "permissionNote": "רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לשנות את ההגדרות האלה.",
       "remediationDeadlineA11y": "מספר הימים לתיקון ממצאים בחומרה {{label}}",
       "title": "מדיניות SLA"
     },
@@ -1741,6 +1744,8 @@
       "commitAndPush": "קומיט ודחיפה",
       "startSession": "התחלת סשן",
       "selectRepositoryToStart": "בחר מאגר כדי להתחיל.",
+      "enterPromptToStart": "הוסף פרומפט כדי להתחיל.",
+      "enterPromptOrFileToStart": "הוסף פרומפט או קובץ כדי להתחיל.",
       "connectProviderToStart": "חבר ספק כדי להתחיל.",
       "promptPlaceholder": "על מה תרצה לעבוד?",
       "couldNotLoadModels": "לא ניתן היה לטעון את המודלים.",
@@ -2575,6 +2580,8 @@
     },
     "connectionExpired": "פג תוקף החיבור ל-GitHub.",
     "couldNotLoadPullRequest": "לא ניתן היה לטעון את בקשת המשיכה.",
+    "reviewServiceUnavailable": "השירות אינו זמין",
+    "reviewServiceUnavailableDescription": "השירות אינו זמין באופן זמני. נסו שוב בעוד רגע.",
     "couldNotOpenGitHubAppSettings": "לא הצלחנו לפתוח את הגדרות האפליקציה ב-GitHub.",
     "description": "תיאור",
     "discussion": {
@@ -3000,6 +3007,7 @@
       "truncationBanner_two": "מוצגים {{limit}} הקבצים הראשונים מתוך {{total}} קבצים ששונו — בגלל מגבלת ה-API של GitHub."
     },
     "linkPasteClipboardEmpty": "לוח ההעתקה ריק.",
+    "linkPasteDenied": "גישה להדבקה נדחתה. אפשר הדבקה ונסה שוב.",
     "linkPasteNotAPullRequest": "זה לא קישור לבקשת משיכה או מיזוג",
     "announce": {
       "commentPosted": "התגובה פורסמה",
@@ -3147,7 +3155,7 @@
     "members": {
       "changeRole": "שינוי תפקיד",
       "emptyDescriptionCanInvite": "הזמן חברי צוות כדי להתחיל לשתף פעולה בארגון זה.",
-      "emptyDescriptionCannotInvite": "בקש מבעלי הארגון או ממנהל החיובים להזמין חברי צוות.",
+      "emptyDescriptionCannotInvite": "בקש מבעל ארגון, ממנהל או ממנהל חיובים להזמין חברי צוות.",
       "emptyTitle": "אין עדיין חברים",
       "invitedDate": "מועד ההזמנה: {{date}}",
       "limitPerDay": "{{amount}} ליום",
@@ -3413,7 +3421,9 @@
       "settingsToolsOn": "פועל — כלי ההגדרות נשלחים למודל",
       "settingsToolsOff": "כבוי — שום כלי הגדרות לא נשלח למודל",
       "serverChecking": "בודק את השרת הזה…",
-      "serverToolCount": "{{count}} כלים",
+      "serverToolCount_one": "{{count}} כלי",
+      "serverToolCount_other": "{{count}} כלים",
+      "serverToolCount_two": "{{count}} כלים",
       "serverUnreachable": "לא ניתן היה להגיע לשרת הזה",
       "serverOff": "השרת הזה כבוי"
     },
@@ -3649,10 +3659,16 @@
     "emptyDescription": "צור פרופיל לשימוש חוזר במשתני סביבה, פקודות הגדרה ומיומנויות בפעילויות שונות.",
     "loadFailed": "לא ניתן היה לטעון פרופילים",
     "counts": {
-      "vars": "{{count}} משתנים",
+      "vars_one": "{{count}} משתנה",
+      "vars_other": "{{count}} משתנים",
+      "vars_two": "{{count}} משתנים",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} מיומנויות",
-      "commands": "{{count}} פקודות",
+      "skills_one": "{{count}} מיומנות",
+      "skills_other": "{{count}} מיומנויות",
+      "skills_two": "{{count}} מיומנויות",
+      "commands_one": "{{count}} פקודה",
+      "commands_other": "{{count}} פקודות",
+      "commands_two": "{{count}} פקודות",
       "varsShort": "{{count}}מ",
       "skillsShort": "{{count}}מי",
       "commandsShort": "{{count}}פ"
@@ -3829,6 +3845,8 @@
     "empty": "חבילות קרדיטים אינן זמינות כעת.",
     "noMatchingProducts": "App Store לא החזיר חבילות קרדיטים תואמות.",
     "noMatchingProductsPlay": "Google Play לא החזיר חבילות קרדיטים תואמות.",
+    "storeTimedOut": "App Store לא הגיב בזמן. ניסיון נוסף.",
+    "storeTimedOutPlay": "Google Play לא הגיב בזמן. ניסיון נוסף.",
     "purchaseOwnedByAnotherAccount": "הקרדיטים בחשבון Apple Account הזה שייכים לחשבון Kilo אחר. היכנס לחשבון Kilo הזה כדי להשתמש בהם.",
     "purchaseOwnedByAnotherAccountPlay": "הקרדיטים בחשבון Google Play הזה שייכים לחשבון Kilo אחר. היכנס לחשבון Kilo הזה כדי להשתמש בהם."
   },

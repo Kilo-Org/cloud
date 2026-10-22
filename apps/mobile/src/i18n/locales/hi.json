@@ -894,7 +894,7 @@
     },
     "autoReviews": "स्वचालित समीक्षाएँ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket कनेक्ट नहीं है। केवल संगठन के मालिक और बिलिंग मैनेजर ही इसे कनेक्ट कर सकते हैं।",
+      "notConnectedReadOnly": "Bitbucket कनेक्ट नहीं है। केवल संगठन के मालिक, एडमिन और बिलिंग प्रबंधक ही इसे कनेक्ट कर सकते हैं।",
       "setupIncomplete": "सेटअप अधूरा है। kilo.ai पर कॉन्फ़िगरेशन पूरा करें।",
       "setup": "Bitbucket सेटअप"
     },
@@ -918,7 +918,10 @@
       "starting": "समीक्षा शुरू हो रही है…",
       "title": "मैन्युअल समीक्षा"
     },
-    "notConnectedReadOnly": "{{platform}} कनेक्ट नहीं है। केवल संगठन के मालिक और बिलिंग मैनेजर ही इसे कनेक्ट कर सकते हैं।",
+    "notConnectedReadOnly": "{{platform}} कनेक्ट नहीं है। केवल संगठन के मालिक और एडमिन ही इसे कनेक्ट कर सकते हैं।",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} कनेक्ट नहीं है। इसे कनेक्ट करने के लिए संगठन के मालिक, एडमिन या बिलिंग प्रबंधक से अनुरोध करें।"
+    },
     "platformList": {
       "activity": "गतिविधि",
       "checking": "जाँच हो रही है…",
@@ -997,7 +1000,7 @@
       "off": "समीक्षा मेमोरी बंद है।",
       "on": "समीक्षा मेमोरी चालू है।",
       "offDescription": "इसे चालू करें ताकि Kilo मेंटेनर के जवाबों से सीखकर REVIEW.md के लिए दिशानिर्देश सुझा सके।",
-      "readOnlyDescription": "केवल संगठन के मालिक और बिलिंग मैनेजर ही समीक्षा मेमोरी बदल सकते हैं।",
+      "readOnlyDescription": "केवल संगठन के मालिक, एडमिन और बिलिंग प्रबंधक ही समीक्षा मेमोरी बदल सकते हैं।",
       "title": "समीक्षा से सीखी बातें"
     },
     "scopeList": {
@@ -1149,7 +1152,7 @@
       "summary": "रिपोर्ट का सारांश",
       "title": "ऑडिट रिपोर्ट",
       "unavailable": "ऑडिट रिपोर्ट अनुपलब्ध",
-      "unavailableDescription": "केवल संगठन के मालिक और बिलिंग मैनेजर ही ऑडिट रिपोर्ट देख सकते हैं। किसी मालिक या बिलिंग मैनेजर से आपको अनुमति देने के लिए कहें।",
+      "unavailableDescription": "केवल संगठन के मालिक, एडमिन और बिलिंग प्रबंधक ही ऑडिट रिपोर्ट देख सकते हैं। आपको अनुमति देने के लिए किसी मालिक, एडमिन या बिलिंग प्रबंधक से कहें।",
       "eventActions": {
         "findingAnalysisCompleted": "विश्लेषण पूर्ण हुआ",
         "findingAnalysisFailed": "विश्लेषण विफल रहा",
@@ -1263,7 +1266,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "यह समस्या पहले ही हल हो चुकी है और अब इसे खारिज नहीं किया जा सकता।",
-      "cannotDismissDescription": "केवल संगठन के मालिक और बिलिंग मैनेजर ही समस्याएँ खारिज कर सकते हैं।",
+      "cannotDismissDescription": "केवल संगठन के मालिक, एडमिन और बिलिंग प्रबंधक ही समस्याएँ खारिज कर सकते हैं।",
       "cannotDismissTitle": "यह समस्या खारिज नहीं की जा सकती",
       "commentAccessibility": "खारिज करने के बारे में टिप्पणी",
       "commentLabel": "टिप्पणी (वैकल्पिक)",
@@ -1395,7 +1398,7 @@
       "automationCount": "3 में से {{displayCount}} चालू",
       "couldNotLoadPermissions": "अनुमतियाँ लोड नहीं हो सकीं।",
       "couldNotLoadSettings": "सुरक्षा एजेंट की सेटिंग लोड नहीं हो सकीं।",
-      "disabledNoManage": "सुरक्षा एजेंट बंद है। केवल संगठन के मालिक और बिलिंग मैनेजर ही इसे चालू कर सकते हैं।",
+      "disabledNoManage": "सुरक्षा एजेंट बंद है। केवल संगठन के मालिक, एडमिन और बिलिंग प्रबंधक ही इसे चालू कर सकते हैं।",
       "disabledNoRepo": "सुरक्षा एजेंट चालू करने से पहले कम से कम एक रिपॉज़िटरी चुनें।",
       "disabledPrompt": "Dependabot अलर्ट सिंक करने, रिपॉज़िटरी चुनने और स्वचालन की सेटिंग तय करने के लिए सुरक्षा एजेंट चालू करें।",
       "notificationsCount": "2 में से {{displayCount}} चालू",
@@ -1428,7 +1431,7 @@
       "lowDescription": "सुरक्षा पर बहुत कम असर।",
       "medium": "मध्यम",
       "mediumDescription": "सीमित असर या कुछ खास शर्तों में ही जोखिम।",
-      "permissionNote": "केवल संगठन के मालिक और बिलिंग मैनेजर ही ये सेटिंग बदल सकते हैं।",
+      "permissionNote": "केवल संगठन के मालिक, एडमिन और बिलिंग प्रबंधक ही ये सेटिंग बदल सकते हैं।",
       "remediationDeadlineA11y": "{{label}} स्तर की समस्याओं के सुधार की समय सीमा, दिनों में",
       "title": "SLA नीति"
     },
@@ -1729,6 +1732,8 @@
       "commitAndPush": "कमिट और पुश करें",
       "startSession": "सत्र शुरू करें",
       "selectRepositoryToStart": "शुरू करने के लिए रिपॉज़िटरी चुनें।",
+      "enterPromptToStart": "शुरू करने के लिए एक प्रॉम्प्ट जोड़ें।",
+      "enterPromptOrFileToStart": "शुरू करने के लिए प्रॉम्प्ट या फ़ाइल जोड़ें।",
       "connectProviderToStart": "शुरू करने के लिए प्रदाता कनेक्ट करें।",
       "promptPlaceholder": "आप किस पर काम करना चाहेंगे?",
       "couldNotLoadModels": "मॉडल लोड नहीं हो सके।",
@@ -2550,6 +2555,8 @@
     },
     "connectionExpired": "GitHub कनेक्शन की अवधि समाप्त हो गई।",
     "couldNotLoadPullRequest": "पुल रिक्वेस्ट लोड नहीं हो सकी।",
+    "reviewServiceUnavailable": "सेवा अनुपलब्ध है",
+    "reviewServiceUnavailableDescription": "सेवा अस्थायी रूप से अनुपलब्ध है। शीघ्र ही फिर से प्रयास करें।",
     "couldNotOpenGitHubAppSettings": "GitHub ऐप की सेटिंग नहीं खुल सकीं।",
     "description": "विवरण",
     "discussion": {
@@ -2960,6 +2967,7 @@
       "truncationBanner_other": "बदली गई {{total}} फ़ाइलों में से पहली {{limit}} फ़ाइलें दिखाई जा रही हैं — GitHub API की सीमा के कारण।"
     },
     "linkPasteClipboardEmpty": "क्लिपबोर्ड खाली है।",
+    "linkPasteDenied": "पेस्ट करने की अनुमति अस्वीकार कर दी गई। पेस्ट करने की अनुमति दें और फिर से कोशिश करें।",
     "linkPasteNotAPullRequest": "यह पुल रिक्वेस्ट या मर्ज रिक्वेस्ट का लिंक नहीं है",
     "announce": {
       "commentPosted": "टिप्पणी पोस्ट हुई",
@@ -3107,7 +3115,7 @@
     "members": {
       "changeRole": "भूमिका बदलें",
       "emptyDescriptionCanInvite": "इस संगठन में साथ काम करने के लिए टीम के साथियों को आमंत्रित करें।",
-      "emptyDescriptionCannotInvite": "टीम के साथियों को आमंत्रित करने के लिए मालिक या बिलिंग प्रबंधक से कहें।",
+      "emptyDescriptionCannotInvite": "टीम के साथियों को आमंत्रित करने के लिए मालिक, एडमिन या बिलिंग प्रबंधक से कहें।",
       "emptyTitle": "अभी कोई सदस्य नहीं",
       "invitedDate": "{{date}} को आमंत्रित",
       "limitPerDay": "{{amount}}/दिन",
@@ -3372,7 +3380,8 @@
       "settingsToolsOn": "चालू — सेटिंग्स टूल मॉडल को भेजे जाते हैं",
       "settingsToolsOff": "बंद — मॉडल को कोई सेटिंग्स टूल नहीं भेजा जाता",
       "serverChecking": "इस सर्वर की जाँच हो रही है…",
-      "serverToolCount": "{{count}} टूल",
+      "serverToolCount_one": "{{count}} टूल",
+      "serverToolCount_other": "{{count}} टूल",
       "serverUnreachable": "इस सर्वर तक नहीं पहुँच सका",
       "serverOff": "यह सर्वर बंद है"
     },
@@ -3608,10 +3617,13 @@
     "emptyDescription": "सभी सत्रों में पर्यावरण चर, सेटअप कमांड और कौशल का पुन: उपयोग करने के लिए एक प्रोफ़ाइल बनाएं।",
     "loadFailed": "प्रोफ़ाइल लोड नहीं हो सकीं",
     "counts": {
-      "vars": "{{count}} चर",
+      "vars_one": "{{count}} चर",
+      "vars_other": "{{count}} चर",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} कौशल",
-      "commands": "{{count}} आदेश",
+      "skills_one": "{{count}} कौशल",
+      "skills_other": "{{count}} कौशल",
+      "commands_one": "{{count}} आदेश",
+      "commands_other": "{{count}} आदेश",
       "varsShort": "{{count}}च",
       "skillsShort": "{{count}}क",
       "commandsShort": "{{count}}आ"
@@ -3788,6 +3800,8 @@
     "empty": "क्रेडिट पैक अभी उपलब्ध नहीं हैं।",
     "noMatchingProducts": "App Store ने कोई मेल खाता क्रेडिट पैक नहीं लौटाया।",
     "noMatchingProductsPlay": "Google Play ने कोई मेल खाता क्रेडिट पैक नहीं लौटाया।",
+    "storeTimedOut": "App Store ने समय पर जवाब नहीं दिया। फिर से कोशिश करें।",
+    "storeTimedOutPlay": "Google Play ने समय पर जवाब नहीं दिया। फिर से प्रयास करें।",
     "purchaseOwnedByAnotherAccount": "इस Apple Account का क्रेडिट किसी दूसरे Kilo खाते से जुड़ा है। इसका उपयोग करने के लिए उस Kilo खाते में साइन इन करें।",
     "purchaseOwnedByAnotherAccountPlay": "इस Google Play खाते का क्रेडिट किसी दूसरे Kilo खाते से संबंधित है। इसका उपयोग करने के लिए उस Kilo खाते में साइन इन करें।"
   },

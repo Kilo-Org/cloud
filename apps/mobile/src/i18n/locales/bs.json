@@ -602,6 +602,8 @@
     "installKiloGitHubApp": "Instaliraj aplikaciju Kilo za GitHub",
     "checkConnection": "Provjeri vezu",
     "couldNotLoadPullRequest": "Učitavanje zahtjeva za spajanje nije uspjelo.",
+    "reviewServiceUnavailable": "Usluga je privremeno nedostupna",
+    "reviewServiceUnavailableDescription": "Usluga je privremeno nedostupna. Pokušajte ponovo uskoro.",
     "description": "Opis",
     "noDescriptionProvided": "Opis nije naveden.",
     "review": "Pregled",
@@ -778,6 +780,7 @@
       "truncationBanner_few": "Prikazuje se prvih {{limit}} od {{total}} promijenjenih datoteka zbog ograničenja GitHub API-ja."
     },
     "linkPasteClipboardEmpty": "Međuspremnik je prazan.",
+    "linkPasteDenied": "Pristanak za lijepljenje je odbijen. Dozvolite lijepljenje i pokušajte ponovo.",
     "linkPasteNotAPullRequest": "Ovo nije povezanica na zahtjev za spajanje niti merge request",
     "announce": {
       "commentPosted": "Komentar objavljen",
@@ -1477,7 +1480,7 @@
       "off": "Memorija pregleda je isključena.",
       "on": "Memorija pregleda je uključena.",
       "offDescription": "Uključi je da Kilo uči iz odgovora održavatelja i predlaže smjernice za REVIEW.md.",
-      "readOnlyDescription": "Samo vlasnici organizacije i upravitelji naplate mogu promijeniti memoriju pregleda.",
+      "readOnlyDescription": "Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu promijeniti memoriju pregleda.",
       "enable": "Omogući memoriju pregleda",
       "loadingProposals": "Učitavanje prijedloga",
       "couldNotLoadProposals": "Nije moguće učitati prijedloge.",
@@ -1497,7 +1500,10 @@
       "starting": "Pokretanje pregleda…",
       "start": "Započni pregled"
     },
-    "notConnectedReadOnly": "Platforma {{platform}} nije povezana. Samo vlasnici organizacije i upravitelji naplate mogu je povezati.",
+    "notConnectedReadOnly": "Platforma {{platform}} nije povezana. Samo vlasnici organizacije i administratori mogu je povezati.",
+    "gitlab": {
+      "notConnectedReadOnly": "Platforma {{platform}} nije povezana. Zamolite vlasnika organizacije, administratora ili menadžera za naplatu da je poveže."
+    },
     "webhookSetup": "Podešavanje webhooka nije završeno.",
     "webhookSetupDescription": "Neki repozitoriji možda neće imati automatske preglede.",
     "autoReviews": "Automatski pregledi",
@@ -1505,7 +1511,7 @@
     "followReviewMd": "Slijedi upute iz REVIEW.md",
     "followReviewMdSubtitle": "Poštuj upute iz datoteke REVIEW.md u svakom repozitoriju",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije i upravitelji naplate mogu ga povezati.",
+      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu ga povezati.",
       "setupIncomplete": "Podešavanje nije završeno. Završi ga na kilo.ai.",
       "setup": "Podešavanje Bitbucketa"
     },
@@ -1768,7 +1774,7 @@
       "couldNotLoad": "Nije moguće učitati ovaj nalaz.",
       "couldNotCheckPermissions": "Nije moguće provjeriti dozvole za odbacivanje.",
       "cannotDismissTitle": "Ovaj nalaz nije moguće odbaciti",
-      "cannotDismissDescription": "Samo vlasnici organizacije i upravitelji naplate mogu odbaciti nalaze.",
+      "cannotDismissDescription": "Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu odbaciti nalaze.",
       "alreadyResolvedDescription": "Ovaj nalaz je već riješen i više ga nije moguće odbaciti."
     },
     "findingDetails": {
@@ -1810,7 +1816,7 @@
       "automationAllOff": "Sve isključeno",
       "automationCount": "{{displayCount}} od 3 omogućeno",
       "notificationsCount": "{{displayCount}} od 2 omogućeno",
-      "disabledNoManage": "Sigurnosni agent je isključen. Samo vlasnici organizacije i upravitelji naplate mogu ga uključiti.",
+      "disabledNoManage": "Sigurnosni agent je isključen. Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu ga uključiti.",
       "disabledNoRepo": "Odaberi barem jedan repozitorij prije uključivanja sigurnosnog agenta.",
       "disabledPrompt": "Uključi sigurnosnog agenta za sinhronizaciju upozorenja iz Dependabota, odabir repozitorija i podešavanje automatizacije.",
       "repositoriesCount_few": "Odabrana {{displayCount}} repozitorija"
@@ -1860,7 +1866,7 @@
       "invalidDayCount": "unesi cijeli broj dana od 1 do 365.",
       "remediationDeadlineA11y": "Rok za otklanjanje u danima: {{label}}",
       "enterWholeNumber": "Unesi cijeli broj od 1 do 365",
-      "permissionNote": "Samo vlasnici organizacije i upravitelji naplate mogu mijenjati ove postavke.",
+      "permissionNote": "Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu mijenjati ove postavke.",
       "enableTracking": "Omogući praćenje SLA-a",
       "enableTrackingSubtitle": "Postavi rokove za otklanjanje na osnovu ozbiljnosti nalaza.",
       "deadlinesHeading": "Rokovi za otklanjanje (dani)"
@@ -1916,7 +1922,7 @@
       "summary": "Sažetak izvještaja",
       "title": "Revizijski izvještaj",
       "unavailable": "Revizijski izvještaj nije dostupan",
-      "unavailableDescription": "Samo vlasnici organizacije i upravitelji naplate mogu pregledavati revizijske izvještaje. Zatraži pristup od vlasnika ili upravitelja naplate.",
+      "unavailableDescription": "Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu pregledavati revizijske izvještaje. Zatraži pristup od vlasnika, administratora ili menadžera za naplatu.",
       "queryFailed": "Upit za izvještaj nije završen. Pokušaj ponovo.",
       "eventActions": {
         "findingAnalysisCompleted": "Analiza dovršena",
@@ -2271,6 +2277,8 @@
       "commitAndPush": "Potvrdi i pošalji",
       "startSession": "Započni sesiju",
       "selectRepositoryToStart": "Odaberi repozitorij za početak.",
+      "enterPromptToStart": "Dodaj upit za početak.",
+      "enterPromptOrFileToStart": "Dodaj upit ili datoteku za početak.",
       "connectProviderToStart": "Poveži platformu za početak.",
       "promptPlaceholder": "Na čemu želiš raditi?",
       "couldNotLoadModels": "Nije moguće učitati modele.",
@@ -3148,7 +3156,7 @@
     "members": {
       "changeRole": "Promijeni ulogu",
       "emptyDescriptionCanInvite": "Pozovi kolege iz tima da počnete sarađivati u ovoj organizaciji.",
-      "emptyDescriptionCannotInvite": "Zamoli vlasnika ili menadžera za naplatu da pozove kolege iz tima.",
+      "emptyDescriptionCannotInvite": "Zamoli vlasnika, administratora ili menadžera za naplatu da pozove kolege iz tima.",
       "emptyTitle": "Još nema članova",
       "invitedDate": "Pozvan {{date}}",
       "limitPerDay": "{{amount}}/dan",
@@ -3413,7 +3421,9 @@
       "settingsToolsOn": "Uključeno — alati za postavke šalju se modelu",
       "settingsToolsOff": "Isključeno — nijedan alat za postavke ne šalje se modelu",
       "serverChecking": "Provjera ovog servera…",
-      "serverToolCount": "{{count}} alata",
+      "serverToolCount_few": "{{count}} alata",
+      "serverToolCount_one": "{{count}} alat",
+      "serverToolCount_other": "{{count}} alata",
       "serverUnreachable": "Nije bilo moguće doći do ovog servera",
       "serverOff": "Ovaj server je isključen"
     },
@@ -3649,10 +3659,16 @@
     "emptyDescription": "Kreirajte profil za ponovno korištenje varijabli okruženja, naredbi za postavljanje i vještina u svim sesijama.",
     "loadFailed": "Učitavanje profila nije uspjelo",
     "counts": {
-      "vars": "{{count}} varijabli",
+      "vars_few": "{{count}} varijable",
+      "vars_one": "{{count}} varijabla",
+      "vars_other": "{{count}} varijabli",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} vještina",
-      "commands": "{{count}} komandi",
+      "skills_few": "{{count}} vještine",
+      "skills_one": "{{count}} vještina",
+      "skills_other": "{{count}} vještina",
+      "commands_few": "{{count}} komande",
+      "commands_one": "{{count}} komanda",
+      "commands_other": "{{count}} komandi",
       "varsShort": "{{count}}var",
       "skillsShort": "{{count}}vje",
       "commandsShort": "{{count}}kom"
@@ -3829,6 +3845,8 @@
     "empty": "Paketi kredita trenutno nisu dostupni.",
     "noMatchingProducts": "App Store nije vratio odgovarajuće pakete kredita.",
     "noMatchingProductsPlay": "Google Play nije vratio odgovarajuće pakete kredita.",
+    "storeTimedOut": "App Store nije odgovorio na vrijeme. Pokušaj ponovo.",
+    "storeTimedOutPlay": "Google Play nije odgovorio na vrijeme. Pokušaj ponovo.",
     "purchaseOwnedByAnotherAccount": "Krediti na ovom računu Apple Account pripadaju drugom Kilo računu. Prijavi se na taj Kilo račun da ih koristiš.",
     "purchaseOwnedByAnotherAccountPlay": "Krediti na ovom Google Play nalogu pripadaju drugom Kilo nalogu. Prijavite se na taj Kilo nalog da biste ih koristili."
   },

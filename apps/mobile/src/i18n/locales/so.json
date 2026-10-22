@@ -591,6 +591,8 @@
     "installKiloGitHubApp": "Rakib barnaamijka Kilo ee GitHub",
     "checkConnection": "Hubi xiriirka",
     "couldNotLoadPullRequest": "Codsiga isku-darka lama soo rari karin.",
+    "reviewServiceUnavailable": "Adeegyada lama heli karo",
+    "reviewServiceUnavailableDescription": "Adeegyada waa ku meel gaar ah oo lama heli karo. Mar kale isku day dhawaan.",
     "description": "Sharaxaad",
     "noDescriptionProvided": "Sharaxaad lama bixin.",
     "review": "Dib-u-eegis",
@@ -762,6 +764,7 @@
       "truncationBanner_other": "Waxaa la muujinayaa {{limit}}-ka ugu horreeya ee {{total}} fayl oo la beddelay — xadka API-ga GitHub."
     },
     "linkPasteClipboardEmpty": "Sabuuradda nuqulladu waa madhan tahay.",
+    "linkPasteDenied": "Helitaanka ku-dhejinta waa laga diiday. U ogolow ku-dhejinta oo mar kale isku day.",
     "linkPasteNotAPullRequest": "Kani ma aha xiriiriye PR ama merge request ah",
     "announce": {
       "commentPosted": "Faallada waa la daabacay",
@@ -1458,7 +1461,7 @@
       "off": "Xusuusta dib-u-eegistu way dansan tahay.",
       "on": "Xusuusta dib-u-eegistu way shidan tahay.",
       "offDescription": "Shid si Kilo uu wax uga barto jawaabaha daryeelayaasha mashruuca una soo jeediyo tilmaamo loogu talagalay REVIEW.md.",
-      "readOnlyDescription": "Milkiilayaasha ururka iyo maamulayaasha biilasha oo keliya ayaa bedeli kara xusuusta dib-u-eegista.",
+      "readOnlyDescription": "Milkiilayaasha ururka, maamulayaasha iyo maareeyayaasha biilasha oo keliya ayaa bedeli kara xusuusta dib-u-eegista.",
       "enable": "Shid xusuusta dib-u-eegista",
       "loadingProposals": "Waa la soo dejinayaa soo-jeedinnada",
       "couldNotLoadProposals": "Soo-jeedinnada lama soo dejin karin.",
@@ -1478,7 +1481,10 @@
       "starting": "Waa la bilaabayaa dib-u-eegista...",
       "start": "Bilow dib-u-eegista"
     },
-    "notConnectedReadOnly": "{{platform}} kuma xidhna. Milkiilayaasha ururka iyo maamulayaasha biilasha oo keliya ayaa ku xidhi kara.",
+    "notConnectedReadOnly": "{{platform}} kuma xidhna. Milkiilayaasha ururka iyo maamulayaasha oo keliya ayaa ku xidhi kara.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} kuma xidhna. Weydii mulkiile, maamule ama maareeyaha biilasha ururka si ay ugu xidhaan."
+    },
     "webhookSetup": "Dejinta ogeysiisyada shabakadda ma dhammaystirna.",
     "webhookSetupDescription": "Qaar ka mid ah kaydadka ayaa laga yaabaa inayan helin dib-u-eegis otomaatig ah.",
     "autoReviews": "Dib-u-eegis otomaatig ah",
@@ -1486,7 +1492,7 @@
     "followReviewMd": "Raac REVIEW.md",
     "followReviewMdSubtitle": "Raac tilmaamaha ku jira faylka REVIEW.md ee kayd kasta",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket kuma xidhna. Milkiilayaasha ururka iyo maamulayaasha biilasha oo keliya ayaa ku xidhi kara.",
+      "notConnectedReadOnly": "Bitbucket kuma xidhna. Milkiilayaasha ururka, maamulayaasha iyo maareeyayaasha biilasha oo keliya ayaa ku xidhi kara.",
       "setupIncomplete": "Dejintu ma dhammaystirna. Ku dhammaystir bogga kilo.ai.",
       "setup": "Diyaarinta Bitbucket"
     },
@@ -1746,7 +1752,7 @@
       "couldNotLoad": "Natiijadan lama soo rari karin.",
       "couldNotCheckPermissions": "Lama hubin karin oggolaanshaha iska dhaafidda.",
       "cannotDismissTitle": "Ma iska dhaafi kartid natiijadan",
-      "cannotDismissDescription": "Milkiilayaasha ururka iyo maamulayaasha biilasha oo keliya ayaa iska dhaafi kara natiijooyinka.",
+      "cannotDismissDescription": "Milkiilayaasha ururka, maamulayaasha iyo maareeyayaasha biilasha oo keliya ayaa iska dhaafi kara natiijooyinka.",
       "alreadyResolvedDescription": "Natiijadan hore ayaa loo xalliyay, mar dambena lama iska dhaafi karo."
     },
     "findingDetails": {
@@ -1788,7 +1794,7 @@
       "automationAllOff": "Dhammaan way dansan yihiin",
       "automationCount": "{{displayCount}} oo ka mid ah 3 ayaa shidan",
       "notificationsCount": "{{displayCount}} oo ka mid ah 2 ayaa shidan",
-      "disabledNoManage": "Wakiilka amniga waa la damiyay. Milkiilayaasha ururka iyo maamulayaasha biilasha oo keliya ayaa shidi kara.",
+      "disabledNoManage": "Wakiilka amniga waa la damiyay. Milkiilayaasha ururka, maamulayaasha iyo maareeyayaasha biilasha oo keliya ayaa shidi kara.",
       "disabledNoRepo": "Dooro ugu yaraan hal kayd ka hor intaadan shidin Wakiilka amniga.",
       "disabledPrompt": "Shid Wakiilka amniga si aad u isku waafajiso digniinaha Dependabot, u doorato kaydadka, una dejiso hawlaha otomaatigga ah."
     },
@@ -1837,7 +1843,7 @@
       "invalidDayCount": "geli 1 ilaa 365 maalmood, adigoo isticmaalaya tirooyin dhan oo keliya.",
       "remediationDeadlineA11y": "Muddada hagaajinta ee {{label}}, oo maalmo ah",
       "enterWholeNumber": "Geli tiro dhan oo u dhaxaysa 1 iyo 365",
-      "permissionNote": "Milkiilayaasha ururka iyo maamulayaasha biilasha oo keliya ayaa beddeli kara dejintan.",
+      "permissionNote": "Milkiilayaasha ururka, maamulayaasha iyo maareeyayaasha biilasha oo keliya ayaa beddeli kara dejintan.",
       "enableTracking": "Shid la socodka SLA",
       "enableTrackingSubtitle": "Deji waqtiyada kama dambaysta ah ee hagaajinta adigoo ku salaynaya heerka halista natiijada.",
       "deadlinesHeading": "Waqtiyada kama dambaysta ah ee hagaajinta (maalmo)"
@@ -1893,7 +1899,7 @@
       "summary": "Soo koobidda warbixinta",
       "title": "Warbixinta hanti-dhawrka",
       "unavailable": "Warbixinta hanti-dhawrka lama heli karo",
-      "unavailableDescription": "Milkiilayaasha ururka iyo maamulayaasha biilasha oo keliya ayaa arki kara warbixinnada hanti-dhawrka. Ka codso milkiile ama maamule biilasha inuu kuu oggolaado inaad aragto.",
+      "unavailableDescription": "Milkiilayaasha ururka, maamulayaasha iyo maareeyayaasha biilasha oo keliya ayaa arki kara warbixinnada hanti-dhawrka. Ka codso mulkiile, maamule ama maareeye biilasha inuu kuu oggolaado inaad aragto.",
       "queryFailed": "Weydiinta warbixintu ma dhammaan. Mar kale isku day.",
       "eventActions": {
         "findingAnalysisCompleted": "Falanqaynta waa la dhammeeyay",
@@ -2243,6 +2249,8 @@
       "commitAndPush": "Diiwaangeli oo dir",
       "startSession": "Bilow kalfadhiga",
       "selectRepositoryToStart": "Dooro kayd si aad u bilowdo.",
+      "enterPromptToStart": "Ku dar fariin si aad u bilowdo.",
+      "enterPromptOrFileToStart": "Ku dar fariin ama fayl si aad u bilowdo.",
       "connectProviderToStart": "Ku xidh bixiye si aad u bilowdo.",
       "promptPlaceholder": "Maxaad rabtaa inaad ka shaqayso?",
       "couldNotLoadModels": "Moodeellada lama soo shubi karin.",
@@ -3108,7 +3116,7 @@
     "members": {
       "changeRole": "Beddel doorka",
       "emptyDescriptionCanInvite": "Casuun xubnaha kooxdaada si aad ururkan uga wada shaqaysaan.",
-      "emptyDescriptionCannotInvite": "Ka codso mulkiilaha ama maareeyaha biilasha inuu casuumo xubnaha kooxdaada.",
+      "emptyDescriptionCannotInvite": "Ka codso mulkiile, maamule ama maareeye biilasha inuu casuumo xubnaha kooxdaada.",
       "emptyTitle": "Weli ma jiraan xubno",
       "invitedDate": "La casuumay {{date}}",
       "limitPerDay": "{{amount}}/maalin",
@@ -3372,7 +3380,8 @@
       "settingsToolsOn": "Daaran — qalabka dejinta waxaa loo diraa moodeelka",
       "settingsToolsOff": "Dami — ma jiro qalab dejin oo loo diraa moodeelka",
       "serverChecking": "Waa la hubinayaa serverkan…",
-      "serverToolCount": "{{count}} qalab",
+      "serverToolCount_one": "{{count}} qalab",
+      "serverToolCount_other": "{{count}} qalab",
       "serverUnreachable": "Lama gaari karin serverkan",
       "serverOff": "Serverkan waa dammaan"
     },
@@ -3608,10 +3617,13 @@
     "emptyDescription": "Abuur profile si dib loogu isticmaalo doorsoomayaasha deegaanka, amarrada dejinta, iyo xirfadaha kalfadhiyada oo dhan.",
     "loadFailed": "Waa la rari waayay muuqaallada",
     "counts": {
-      "vars": "{{count}} doorsoomayaal",
+      "vars_one": "{{count}} doorsoome",
+      "vars_other": "{{count}} doorsoomayaal",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} xirfado",
-      "commands": "{{count}} amar",
+      "skills_one": "{{count}} xirfad",
+      "skills_other": "{{count}} xirfado",
+      "commands_one": "{{count}} amar",
+      "commands_other": "{{count}} amar",
       "varsShort": "{{count}}d",
       "skillsShort": "{{count}}x",
       "commandsShort": "{{count}}a"
@@ -3788,6 +3800,8 @@
     "empty": "Xirmooyinka lacagta adeeg hadda lama heli karo.",
     "noMatchingProducts": "App Store ma soo celin xirmooyin lacag adeeg oo u dhigma.",
     "noMatchingProductsPlay": "Google Play ma soo celin xirmooyin lacag adeeg oo u dhigma.",
+    "storeTimedOut": "App Store wakhtigii ma jawaabin. Mar kale isku day.",
+    "storeTimedOutPlay": "Google Play wakhtigii ma jawaabin. Mar kale isku day.",
     "purchaseOwnedByAnotherAccount": "Lacagta adeeg ee ku jirta Apple Account-kan waxaa leh akoon kale oo Kilo ah. Isticmaalka, soo gal akoonkaas Kilo.",
     "purchaseOwnedByAnotherAccountPlay": "Lacagta adeeg ee ku yaal xisaabtan Google Play waxaa leh koonto Kilo oo kale. Isticmaalka, ku saxiix bax koontada Kilo-ga ah."
   },

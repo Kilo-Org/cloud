@@ -602,6 +602,8 @@
     "installKiloGitHubApp": "Instal·la l'aplicació de Kilo per a GitHub",
     "checkConnection": "Comprova la connexió",
     "couldNotLoadPullRequest": "No s'ha pogut carregar la sol·licitud d'integració.",
+    "reviewServiceUnavailable": "El servei no està disponible",
+    "reviewServiceUnavailableDescription": "El servei no està disponible temporalment. Torna-ho a provar en una estona.",
     "description": "Descripció",
     "noDescriptionProvided": "No s'ha proporcionat cap descripció.",
     "review": "Revisió",
@@ -778,6 +780,7 @@
       "truncationBanner_many": "A causa del límit de l'API de GitHub, només es mostren els primers {{limit}} de {{total}} fitxers modificats."
     },
     "linkPasteClipboardEmpty": "El porta-retalls és buit.",
+    "linkPasteDenied": "S'ha denegat l'accés per enganxar. Permeteu enganxar i torneu-ho a provar.",
     "linkPasteNotAPullRequest": "No és un enllaç a una sol·licitud d'integració o de fusió",
     "announce": {
       "commentPosted": "Comentari publicat",
@@ -1477,7 +1480,7 @@
       "off": "La memòria de revisió està desactivada.",
       "on": "La memòria de revisió està activada.",
       "offDescription": "Activa-la perquè Kilo aprengui de les respostes dels mantenidors i proposi pautes per al fitxer REVIEW.md.",
-      "readOnlyDescription": "Només els propietaris de l'organització i els gestors de facturació poden canviar la memòria de revisió.",
+      "readOnlyDescription": "Només els propietaris, els administradors i els gestors de facturació de l'organització poden canviar la memòria de revisió.",
       "enable": "Activa la memòria de revisió",
       "loadingProposals": "S'estan carregant les propostes",
       "couldNotLoadProposals": "No s'han pogut carregar les propostes.",
@@ -1497,7 +1500,10 @@
       "starting": "S'està iniciant la revisió…",
       "start": "Inicia la revisió"
     },
-    "notConnectedReadOnly": "{{platform}} no està connectat. Només els propietaris de l'organització i els gestors de facturació poden connectar-lo.",
+    "notConnectedReadOnly": "{{platform}} no està connectat. Només els propietaris i els administradors de l'organització poden connectar-lo.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} no està connectat. Demana a un Propietari, Administrador o Gestor de facturació de l'organització que el connecti."
+    },
     "webhookSetup": "La configuració del webhook és incompleta.",
     "webhookSetupDescription": "És possible que alguns repositoris no rebin revisions automàtiques.",
     "autoReviews": "Revisions automàtiques",
@@ -1505,7 +1511,7 @@
     "followReviewMd": "Segueix REVIEW.md",
     "followReviewMdSubtitle": "Respecta els fitxers d'instruccions REVIEW.md de cada repositori",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket no està connectat. Només els propietaris de l'organització i els gestors de facturació poden connectar-lo.",
+      "notConnectedReadOnly": "Bitbucket no està connectat. Només els propietaris, els administradors i els gestors de facturació de l'organització poden connectar-lo.",
       "setupIncomplete": "La configuració és incompleta. Acaba-la a kilo.ai.",
       "setup": "Configuració de Bitbucket"
     },
@@ -1768,7 +1774,7 @@
       "couldNotLoad": "No s'ha pogut carregar aquest problema.",
       "couldNotCheckPermissions": "No s'han pogut comprovar els permisos per descartar incidències.",
       "cannotDismissTitle": "No es pot descartar aquesta incidència",
-      "cannotDismissDescription": "Només els propietaris de l'organització i els gestors de facturació poden descartar incidències.",
+      "cannotDismissDescription": "Només els propietaris, els administradors i els gestors de facturació de l'organització poden descartar incidències.",
       "alreadyResolvedDescription": "Aquesta incidència ja s'ha resolt i no es pot descartar."
     },
     "findingDetails": {
@@ -1810,7 +1816,7 @@
       "automationAllOff": "Tot desactivat",
       "automationCount": "{{displayCount}} de 3 activades",
       "notificationsCount": "{{displayCount}} de 2 activades",
-      "disabledNoManage": "L'agent de seguretat està desactivat. Només els propietaris de l'organització i els gestors de facturació poden activar-lo.",
+      "disabledNoManage": "L'agent de seguretat està desactivat. Només els propietaris, els administradors i els gestors de facturació de l'organització poden activar-lo.",
       "disabledNoRepo": "Selecciona almenys un repositori abans d'activar l'agent de seguretat.",
       "disabledPrompt": "Activa l'agent de seguretat per sincronitzar les alertes de Dependabot, triar repositoris i configurar l'automatització.",
       "repositoriesCount_many": "{{displayCount}} repositoris seleccionats"
@@ -1860,7 +1866,7 @@
       "invalidDayCount": "el termini ha de ser d'entre 1 i 365 dies, en nombres enters.",
       "remediationDeadlineA11y": "Termini de correcció en dies per a la gravetat {{label}}",
       "enterWholeNumber": "Introdueix un nombre enter entre 1 i 365",
-      "permissionNote": "Només els propietaris de l'organització i els gestors de facturació poden canviar aquesta configuració.",
+      "permissionNote": "Només els propietaris, els administradors i els gestors de facturació de l'organització poden canviar aquesta configuració.",
       "enableTracking": "Activa el seguiment de l'SLA",
       "enableTrackingSubtitle": "Estableix terminis de correcció segons la gravetat de la incidència.",
       "deadlinesHeading": "Terminis de correcció (dies)"
@@ -1916,7 +1922,7 @@
       "summary": "Resum de l'informe",
       "title": "Informe d'auditoria",
       "unavailable": "Informe d'auditoria no disponible",
-      "unavailableDescription": "Només els propietaris de l'organització i els gestors de facturació poden veure informes d'auditoria. Demana a un propietari o gestor de facturació que et concedeixi l'accés.",
+      "unavailableDescription": "Només els propietaris, els administradors i els gestors de facturació de l'organització poden veure informes d'auditoria. Demana a un propietari, administrador o gestor de facturació que et concedeixi l'accés.",
       "queryFailed": "La consulta de l'informe no ha acabat. Torna-ho a provar.",
       "eventActions": {
         "findingAnalysisCompleted": "Anàlisi completada",
@@ -2271,6 +2277,8 @@
       "commitAndPush": "Consigna i envia",
       "startSession": "Inicia la sessió",
       "selectRepositoryToStart": "Selecciona un repositori per començar.",
+      "enterPromptToStart": "Afegeix un prompt per començar.",
+      "enterPromptOrFileToStart": "Afegeix un prompt o un fitxer per començar.",
       "connectProviderToStart": "Connecta un proveïdor per començar.",
       "promptPlaceholder": "En què vols treballar?",
       "couldNotLoadModels": "No s'han pogut carregar els models.",
@@ -3148,7 +3156,7 @@
     "members": {
       "changeRole": "Canvia el rol",
       "emptyDescriptionCanInvite": "Convida companys per començar a col·laborar en aquesta organització.",
-      "emptyDescriptionCannotInvite": "Demana a un propietari o a un gestor de facturació que convidi companys d'equip.",
+      "emptyDescriptionCannotInvite": "Demana a un propietari, administrador o gestor de facturació que convidi companys d'equip.",
       "emptyTitle": "Encara no hi ha membres",
       "invitedDate": "Convidat el {{date}}",
       "limitPerDay": "{{amount}}/dia",
@@ -3413,7 +3421,9 @@
       "settingsToolsOn": "Activat — les eines de configuració s'envien al model",
       "settingsToolsOff": "Desactivat — no s'envia cap eina de configuració al model",
       "serverChecking": "S'està comprovant aquest servidor…",
-      "serverToolCount": "{{count}} eines",
+      "serverToolCount_many": "{{count}} eines",
+      "serverToolCount_one": "{{count}} eina",
+      "serverToolCount_other": "{{count}} eines",
       "serverUnreachable": "No s'ha pogut contactar amb aquest servidor",
       "serverOff": "Aquest servidor està desactivat"
     },
@@ -3649,10 +3659,16 @@
     "emptyDescription": "Creeu un perfil per reutilitzar variables d'entorn, ordres de configuració i habilitats entre sessions.",
     "loadFailed": "No s'han pogut carregar els perfils",
     "counts": {
-      "vars": "{{count}} variables",
+      "vars_many": "{{count}} variables",
+      "vars_one": "{{count}} variable",
+      "vars_other": "{{count}} variables",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} habilitats",
-      "commands": "{{count}} ordres",
+      "skills_many": "{{count}} habilitats",
+      "skills_one": "{{count}} habilitat",
+      "skills_other": "{{count}} habilitats",
+      "commands_many": "{{count}} ordres",
+      "commands_one": "{{count}} ordre",
+      "commands_other": "{{count}} ordres",
       "varsShort": "{{count}}v",
       "skillsShort": "{{count}}h",
       "commandsShort": "{{count}}o"
@@ -3829,6 +3845,8 @@
     "empty": "Els paquets de crèdits no estan disponibles ara mateix.",
     "noMatchingProducts": "L'App Store no ha retornat cap paquet de crèdits coincident.",
     "noMatchingProductsPlay": "Google Play no ha retornat cap paquet de crèdits coincident.",
+    "storeTimedOut": "L'App Store no ha respost a temps. Torna-ho a provar.",
+    "storeTimedOutPlay": "Google Play no ha respost a temps. Torna-ho a provar.",
     "purchaseOwnedByAnotherAccount": "Els crèdits d'aquest Apple Account pertanyen a un altre compte de Kilo. Inicia la sessió en aquell compte de Kilo per utilitzar-los.",
     "purchaseOwnedByAnotherAccountPlay": "Els crèdits d'aquest compte de Google Play pertanyen a un compte de Kilo diferent. Inicia la sessió en aquest compte de Kilo per utilitzar-los."
   },

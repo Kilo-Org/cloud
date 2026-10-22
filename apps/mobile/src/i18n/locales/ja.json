@@ -894,7 +894,7 @@
     },
     "autoReviews": "自動レビュー",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucketが接続されていません。接続できるのは組織のオーナーと請求管理者のみです。",
+      "notConnectedReadOnly": "Bitbucketが接続されていません。接続できるのは組織のオーナー、管理者、請求管理者のみです。",
       "setupIncomplete": "セットアップが完了していません。kilo.aiで設定を完了してください。",
       "setup": "Bitbucketのセットアップ"
     },
@@ -918,7 +918,10 @@
       "starting": "レビューを開始中…",
       "title": "手動レビュー"
     },
-    "notConnectedReadOnly": "{{platform}}が接続されていません。接続できるのは組織のオーナーと請求管理者のみです。",
+    "notConnectedReadOnly": "{{platform}}が接続されていません。接続できるのは組織のオーナーと管理者のみです。",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}}が接続されていません。組織のオーナー、管理者、または請求管理者に接続を依頼してください。"
+    },
     "platformList": {
       "activity": "アクティビティ",
       "checking": "確認中…",
@@ -997,7 +1000,7 @@
       "off": "レビューメモリはオフです。",
       "on": "レビューメモリはオンです。",
       "offDescription": "有効にすると、Kiloがメンテナーの返信から学習し、REVIEW.mdに記載する指針を提案します。",
-      "readOnlyDescription": "レビューメモリを変更できるのは組織のオーナーと請求管理者のみです。",
+      "readOnlyDescription": "レビューメモリを変更できるのは組織のオーナー、管理者、請求管理者のみです。",
       "title": "レビューメモリ"
     },
     "scopeList": {
@@ -1149,7 +1152,7 @@
       "summary": "レポートの概要",
       "title": "監査レポート",
       "unavailable": "監査レポートを利用できません",
-      "unavailableDescription": "監査レポートを表示できるのは、組織のオーナーと請求管理者のみです。アクセス権の付与をオーナーまたは請求管理者に依頼してください。",
+      "unavailableDescription": "監査レポートを表示できるのは、組織のオーナー、管理者、請求管理者のみです。アクセス権の付与をオーナー、管理者、または請求管理者に依頼してください。",
       "eventActions": {
         "findingAnalysisCompleted": "分析が完了しました",
         "findingAnalysisFailed": "分析に失敗しました",
@@ -1263,7 +1266,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "この検出結果はすでに解決済みのため、却下できません。",
-      "cannotDismissDescription": "検出結果を却下できるのは、組織のオーナーと請求管理者のみです。",
+      "cannotDismissDescription": "検出結果を却下できるのは、組織のオーナー、管理者、請求管理者のみです。",
       "cannotDismissTitle": "この検出結果は却下できません",
       "commentAccessibility": "却下時のコメント",
       "commentLabel": "コメント（任意）",
@@ -1395,7 +1398,7 @@
       "automationCount": "3件中{{displayCount}}件が有効",
       "couldNotLoadPermissions": "権限情報を読み込めませんでした。",
       "couldNotLoadSettings": "セキュリティエージェントの設定を読み込めませんでした。",
-      "disabledNoManage": "セキュリティエージェントは無効です。有効にできるのは、組織のオーナーと請求管理者のみです。",
+      "disabledNoManage": "セキュリティエージェントは無効です。有効にできるのは、組織のオーナー、管理者、請求管理者のみです。",
       "disabledNoRepo": "セキュリティエージェントを有効にする前に、リポジトリを1つ以上選択してください。",
       "disabledPrompt": "セキュリティエージェントを有効にして、Dependabotアラートの同期、リポジトリの選択、自動化の設定を行ってください。",
       "notificationsCount": "2件中{{displayCount}}件が有効",
@@ -1428,7 +1431,7 @@
       "lowDescription": "セキュリティへの影響はごくわずかです。",
       "medium": "中",
       "mediumDescription": "影響が限定的、または特定の条件下でのみ発生します。",
-      "permissionNote": "これらの設定を変更できるのは、組織のオーナーと請求管理者のみです。",
+      "permissionNote": "これらの設定を変更できるのは、組織のオーナー、管理者、請求管理者のみです。",
       "remediationDeadlineA11y": "{{label}}の修復期限（日数）",
       "title": "SLAポリシー"
     },
@@ -1729,6 +1732,8 @@
       "commitAndPush": "コミットしてプッシュ",
       "startSession": "セッションを開始",
       "selectRepositoryToStart": "開始するにはリポジトリを選択してください。",
+      "enterPromptToStart": "開始するにはプロンプトを追加してください。",
+      "enterPromptOrFileToStart": "開始するにはプロンプトまたはファイルを追加してください。",
       "connectProviderToStart": "開始するにはプロバイダーを接続してください。",
       "promptPlaceholder": "何に取り組みますか？",
       "couldNotLoadModels": "モデルを読み込めませんでした。",
@@ -2550,6 +2555,8 @@
     },
     "connectionExpired": "GitHubとの連携が期限切れになりました。",
     "couldNotLoadPullRequest": "プルリクエストを読み込めませんでした。",
+    "reviewServiceUnavailable": "レビューサービスを利用できません",
+    "reviewServiceUnavailableDescription": "レビューサービスは一時的に利用できません。しばらくしてからもう一度お試しください。",
     "couldNotOpenGitHubAppSettings": "GitHub Appの設定を開けませんでした。",
     "description": "説明",
     "discussion": {
@@ -2960,6 +2967,7 @@
       "truncationBanner_other": "GitHub APIの制限により、変更された{{total}}件のファイルのうち、最初の{{limit}}件を表示しています。"
     },
     "linkPasteClipboardEmpty": "クリップボードが空です。",
+    "linkPasteDenied": "ペーストが許可されませんでした。ペーストを許可して、もう一度お試しください。",
     "linkPasteNotAPullRequest": "プルリクエストまたはマージリクエストのリンクではありません",
     "announce": {
       "commentPosted": "コメントを投稿しました",
@@ -3107,7 +3115,7 @@
     "members": {
       "changeRole": "役割を変更",
       "emptyDescriptionCanInvite": "この組織で共同作業を始めるには、チームメイトを招待してください。",
-      "emptyDescriptionCannotInvite": "チームメイトを招待するよう、オーナーまたは請求管理者に依頼してください。",
+      "emptyDescriptionCannotInvite": "チームメイトを招待するよう、オーナー、管理者、または請求管理者に依頼してください。",
       "emptyTitle": "まだメンバーがいません",
       "invitedDate": "{{date}}に招待",
       "limitPerDay": "{{amount}}/日",
@@ -3372,7 +3380,8 @@
       "settingsToolsOn": "オン — 設定ツールがモデルに送信されます",
       "settingsToolsOff": "オフ — 設定ツールはモデルに送信されません",
       "serverChecking": "このサーバーを確認しています…",
-      "serverToolCount": "{{count}} 個のツール",
+      "serverToolCount_one": "{{count}} 個のツール",
+      "serverToolCount_other": "{{count}} 個のツール",
       "serverUnreachable": "このサーバーに接続できませんでした",
       "serverOff": "このサーバーはオフです"
     },
@@ -3608,10 +3617,13 @@
     "emptyDescription": "プロファイルを作成して、セッション間で環境変数、セットアップ コマンド、スキルを再利用します。",
     "loadFailed": "プロファイルを読み込めませんでした",
     "counts": {
-      "vars": "{{count}} 変数",
+      "vars_one": "{{count}} 変数",
+      "vars_other": "{{count}} 変数",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} スキル",
-      "commands": "{{count}} コマンド",
+      "skills_one": "{{count}} スキル",
+      "skills_other": "{{count}} スキル",
+      "commands_one": "{{count}} コマンド",
+      "commands_other": "{{count}} コマンド",
       "varsShort": "{{count}}変",
       "skillsShort": "{{count}}ス",
       "commandsShort": "{{count}}コ"
@@ -3788,6 +3800,8 @@
     "empty": "現在、クレジットパックを利用できません。",
     "noMatchingProducts": "App Storeから一致するクレジットパックが返されませんでした。",
     "noMatchingProductsPlay": "Google Playから一致するクレジットパックが返されませんでした。",
+    "storeTimedOut": "App Storeが時間内に応答しませんでした。再試行",
+    "storeTimedOutPlay": "Google Playが時間内に応答しませんでした。再試行",
     "purchaseOwnedByAnotherAccount": "このApple Accountのクレジットは、別のKiloアカウントに紐付いています。使用するには、そのKiloアカウントにサインインしてください。",
     "purchaseOwnedByAnotherAccountPlay": "このGoogle Playアカウントのクレジットは別のKiloアカウントに属しています。使用するにはそのKiloアカウントにサインインしてください。"
   },

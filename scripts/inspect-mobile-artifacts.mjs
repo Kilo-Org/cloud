@@ -272,7 +272,16 @@ function inspectAndroid(aabPath) {
   try {
     const jarPath = join(work, 'bundletool.jar');
     try {
-      run('curl', ['-fsSL', BUNDLETOOL_URL, '-o', jarPath]);
+      run('curl', [
+        '-fsSL',
+        '--proto',
+        '=https',
+        '--proto-redir',
+        '=https',
+        BUNDLETOOL_URL,
+        '-o',
+        jarPath,
+      ]);
     } catch (error) {
       failures.push(`cannot download bundletool: ${error.message}`);
       return;

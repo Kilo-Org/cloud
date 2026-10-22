@@ -69,3 +69,12 @@ index c080a5853fa71f2708c6ed0f15092b6f43231f76..5da1348eaa9d3530253b683f8427b3c5
                  }
                  else {
                      onUnhandledLinking((0, extractPathFromURL_1.extractExpoPathFromURL)(prefixes, url));
+diff --git a/build/react-navigation/bottom-tabs/views/BottomTabBar.js b/build/react-navigation/bottom-tabs/views/BottomTabBar.js
+--- a/build/react-navigation/bottom-tabs/views/BottomTabBar.js
++++ b/build/react-navigation/bottom-tabs/views/BottomTabBar.js
+@@ -199 +199 @@
+-    return ((0, jsx_runtime_1.jsxs)(react_native_1.Animated.View, { style: [
++    return ((0, jsx_runtime_1.jsxs)(react_native_1.Animated.View, { accessible: false, style: [
+@@ -258 +258 @@
+-        ], onLayout: sidebar ? undefined : handleLayout, children: [(0, jsx_runtime_1.jsx)(react_native_1.View, { style: [react_native_1.StyleSheet.absoluteFill, styles.pointerEventsNone], children: tabBarBackgroundElement }), (0, jsx_runtime_1.jsx)(react_native_1.View, { role: "tablist", style: sidebar ? styles.sideContent : styles.bottomContent, children: routes.map((route, index) => {
++        ], onLayout: sidebar ? undefined : handleLayout, children: [(0, jsx_runtime_1.jsx)(react_native_1.View, { style: [react_native_1.StyleSheet.absoluteFill, styles.pointerEventsNone], children: tabBarBackgroundElement }), (0, jsx_runtime_1.jsx)(react_native_1.View, { role: "none", accessible: false, style: sidebar ? styles.sideContent : styles.bottomContent, children: routes.map((route, index) => {

@@ -1870,8 +1870,8 @@
       "nextViewDetails": "Προβολή λεπτομερειών",
       "viewPr": "Προβολή PR",
       "analyze": "Ανάλυση",
-      "a11y": "Εύρημα σοβαρότητας {{severity}}: {{title}}. {{repo}}. {{analysis}}",
-      "a11yWithDeadline": "Εύρημα σοβαρότητας {{severity}}: {{title}}. {{repo}}. {{analysis}}. {{deadline}}"
+      "a11y": "Εύρημα σοβαρότητας: {{severity}}. {{title}}. {{repo}}. {{analysis}}",
+      "a11yWithDeadline": "Εύρημα σοβαρότητας: {{severity}}. {{title}}. {{repo}}. {{analysis}}. {{deadline}}"
     },
     "setup": {
       "couldNotOpenGithub": "Δεν ήταν δυνατό το άνοιγμα του GitHub. Δοκίμασε ξανά."

@@ -493,7 +493,7 @@
       "unresolveThread": "Markahang hindi pa nalutas ang talakayan",
       "resolved": "Nalutas",
       "outdated": "Luma na",
-      "comment_one": "1 komento",
+      "comment_one": "{{displayCount}} komento",
       "comment": "{{displayCount}} na komento",
       "comment_other": "{{displayCount}} na komento",
       "startedRelative": " · nagsimula {{relative}}",

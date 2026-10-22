@@ -501,7 +501,7 @@
       "unresolveThread": "Atcelt pavediena atrisinājumu",
       "resolved": "Atrisināts",
       "outdated": "Novecojis",
-      "comment_one": "1 komentārs",
+      "comment_one": "{{displayCount}} komentārs",
       "comment": "{{displayCount}} komentāri",
       "comment_other": "{{displayCount}} komentāri",
       "startedRelative": " · sākts {{relative}}",

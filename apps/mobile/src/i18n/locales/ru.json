@@ -2639,7 +2639,7 @@
       "mutedUser": "Сообщения от {{login}} скрыты",
       "noDiscussion": "Обсуждений пока нет",
       "noDiscussionDescription": "В этом запросе на слияние пока нет обсуждений кода и общих комментариев.",
-      "comment_one": "1 комментарий",
+      "comment_one": "{{displayCount}} комментарий",
       "outdated": "Устарело",
       "quotedDiffSnippet": "Цитата из фрагмента изменений",
       "reactionPill": "Реакция {{emoji}}: {{displayCount}} {{countLabel}}",

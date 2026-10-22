@@ -493,7 +493,7 @@
       "unresolveThread": "Означи ја нишката како нерешена",
       "resolved": "Решено",
       "outdated": "Застарено",
-      "comment_one": "1 коментар",
+      "comment_one": "{{displayCount}} коментар",
       "comment": "{{displayCount}} коментари",
       "comment_other": "{{displayCount}} коментари",
       "startedRelative": " · започната {{relative}}",

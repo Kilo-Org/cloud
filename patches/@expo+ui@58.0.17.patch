@@ -1,8 +1,8 @@
 diff --git a/android/build.gradle b/android/build.gradle
-index 0dc730c0f4f6c5921ec41b42777e87d5e7718934..b1681d807c7d4060fc6ea7770d1ab26d2ec6bd58 100644
+index 451dea211d69e0b38f56af577fa31e3babf42312..aa70efbe9c41e845d50d57d01591e4f78373ae84 100644
 --- a/android/build.gradle
 +++ b/android/build.gradle
-@@ -47,6 +47,10 @@ dependencies {
+@@ -48,6 +48,10 @@ dependencies {
    implementation "com.squareup.okhttp3:okhttp:4.9.2"
    implementation "com.google.android.material:material:1.13.0"
    implementation "androidx.core:core-ktx:1.18.0"
@@ -14,7 +14,7 @@ index 0dc730c0f4f6c5921ec41b42777e87d5e7718934..b1681d807c7d4060fc6ea7770d1ab26d
    // Testing
    testImplementation 'junit:junit:4.13.2'
 diff --git a/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt b/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
-index e90edd3fd682f1a53a0950526ae63fe20f3efd24..d41c2c63d6b545d11174da5f1da467de1664d15b 100644
+index 9ca09321e7068ced9a490fdd06dac7a2d8ec3949..376cffc337a4e370dc94b8d6968589d870b30010 100644
 --- a/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
 +++ b/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
 @@ -8,6 +8,7 @@ import android.content.Context
@@ -24,8 +24,8 @@ index e90edd3fd682f1a53a0950526ae63fe20f3efd24..d41c2c63d6b545d11174da5f1da467de
 +import androidx.activity.compose.BackHandler
  import androidx.compose.material3.BottomSheetDefaults
  import androidx.compose.material3.ExperimentalMaterial3Api
- import androidx.compose.material3.ModalBottomSheet
-@@ -156,11 +157,19 @@ fun FunctionalComposableScope.ModalBottomSheetContent(
+ import androidx.compose.material3.MaterialTheme
+@@ -171,11 +172,19 @@ fun FunctionalComposableScope.ModalBottomSheetContent(
        else -> null
      },
      properties = ModalBottomSheetProperties(
@@ -46,8 +46,150 @@ index e90edd3fd682f1a53a0950526ae63fe20f3efd24..d41c2c63d6b545d11174da5f1da467de
      ForwardKeyEventsToActivity(appContext.currentActivity)
      Children(UIComposableScope(), filter = { !isSlotView(it) })
    }
+diff --git a/build/community/bottom-sheet/BottomSheet.android.js b/build/community/bottom-sheet/BottomSheet.android.js
+index d39d9de891d83a7bf10f74e66d4a55bd38b63a22..c50c9b5888cfb7fe060e887a26ff48254375c56e 100644
+--- a/build/community/bottom-sheet/BottomSheet.android.js
++++ b/build/community/bottom-sheet/BottomSheet.android.js
+@@ -37,7 +37,7 @@ function findNearestSnapPointIndex(snapPoints, position) {
+  * @remarks Supports two snap states: partially expanded (~50%) and fully expanded.
+  * `snapToIndex(0)` maps to partial, `snapToIndex(lastIndex)` maps to expanded.
+  */ export function BottomSheet(props) {
+-    const { ref, snapPoints: snapPointsProp, index: indexProp = 0, onChange, onClose, onDismiss, enablePanDownToClose = false, enableDynamicSizing = true, handleComponent, backgroundStyle, children } = props;
++    const { ref, snapPoints: snapPointsProp, index: indexProp = 0, onChange, onClose, onDismiss, enablePanDownToClose = false, dismissGestures = enablePanDownToClose, onRequestDismiss, enableDynamicSizing = true, handleComponent, backgroundStyle, children } = props;
+     const { width } = useWindowDimensions();
+     const hasMultipleSnapPoints = snapPointsProp != null && snapPointsProp.length > 1;
+     const fitToContents = enableDynamicSizing && (!snapPointsProp || snapPointsProp.length === 0);
+@@ -69,6 +69,8 @@ function findNearestSnapPointIndex(snapPoints, position) {
+     onCloseRef.current = onClose;
+     const onDismissRef = useRef(onDismiss);
+     onDismissRef.current = onDismiss;
++    const onRequestDismissRef = useRef(onRequestDismiss);
++    onRequestDismissRef.current = onRequestDismiss;
+     const fireCloseCallbacks = useCallback(()=>{
+         if (closedRef.current) return;
+         closedRef.current = true;
+@@ -76,12 +78,23 @@ function findNearestSnapPointIndex(snapPoints, position) {
+         onDismissRef.current?.();
+         onChangeRef.current?.(-1);
+     }, []);
++    const hideThenClose = useCallback(()=>{
++        const finish = ()=>{
++            setIsOpen(false);
++            pendingIndexRef.current = null;
++            fireCloseCallbacks();
++        };
++        const sheet = sheetRef.current;
++        if (!sheet) {
++            finish();
++            return;
++        }
++        void sheet.hide().then(finish, finish);
++    }, [fireCloseCallbacks]);
+     // Sync with external index prop changes
+     useEffect(()=>{
+         if (indexProp === -1) {
+-            pendingIndexRef.current = null;
+-            setIsOpen(false);
+-            fireCloseCallbacks();
++            hideThenClose();
+         } else if (indexProp >= 0) {
+             pendingIndexRef.current = clampIndex(indexProp);
+             closedRef.current = false;
+@@ -90,22 +103,20 @@ function findNearestSnapPointIndex(snapPoints, position) {
+     }, [
+         clampIndex,
+         indexProp,
+-        fireCloseCallbacks
++        hideThenClose
+     ]);
+     const handleDismiss = useCallback(()=>{
+-        setIsOpen(false);
+-        fireCloseCallbacks();
++        // A back press or scrim tap asks; it does not have to be obeyed. Keeping the
++        // native sheet mounted leaves the dialog up, so the caller can confirm first.
++        if (onRequestDismissRef.current?.() === false) return;
++        hideThenClose();
+     }, [
+-        fireCloseCallbacks
++        hideThenClose
+     ]);
+     const methods = useMemo(()=>{
+         const snapToIndex = (index)=>{
+             if (index === -1) {
+-                sheetRef.current?.hide().then(()=>{
+-                    setIsOpen(false);
+-                    pendingIndexRef.current = null;
+-                    fireCloseCallbacks();
+-                });
++                hideThenClose();
+                 return;
+             }
+             const clampedIndex = clampIndex(index);
+@@ -125,13 +136,7 @@ function findNearestSnapPointIndex(snapPoints, position) {
+             }
+             onChangeRef.current?.(clampedIndex);
+         };
+-        const close = ()=>{
+-            sheetRef.current?.hide().then(()=>{
+-                setIsOpen(false);
+-                pendingIndexRef.current = null;
+-                fireCloseCallbacks();
+-            });
+-        };
++        const close = hideThenClose;
+         return {
+             snapToIndex,
+             snapToPosition: (position)=>snapToIndex(findNearestSnapPointIndex(snapPointsProp, position)),
+@@ -146,7 +151,7 @@ function findNearestSnapPointIndex(snapPoints, position) {
+         clampIndex,
+         maxIndex,
+         hasMultipleSnapPoints,
+-        fireCloseCallbacks,
++        hideThenClose,
+         snapPointsProp
+     ]);
+     useImperativeHandle(ref, ()=>methods, [
+@@ -177,7 +182,7 @@ function findNearestSnapPointIndex(snapPoints, position) {
+                     skipPartiallyExpanded: skipPartially,
+                     initialFullyExpanded: hasMultipleSnapPoints && pendingIndexRef.current === maxIndex,
+                     showDragHandle: handleComponent !== null,
+-                    sheetGesturesEnabled: enablePanDownToClose,
++                    sheetGesturesEnabled: dismissGestures,
+                     containerColor: containerColor,
+                     properties: {
+                         shouldDismissOnBackPress: enablePanDownToClose,
+diff --git a/build/community/bottom-sheet/BottomSheet.ios.js b/build/community/bottom-sheet/BottomSheet.ios.js
+index 5ab7afffe56b6e91764c0beb083d629207f38753..9ab11ce9e2161de7b870848ded7170414c7736c9 100644
+--- a/build/community/bottom-sheet/BottomSheet.ios.js
++++ b/build/community/bottom-sheet/BottomSheet.ios.js
+@@ -71,7 +71,7 @@ function findNearestDetentIndex(detents, position) {
+  *
+  * @remarks Uses SwiftUI's `.sheet()` presentation (modal overlay).
+  */ export function BottomSheet(props) {
+-    const { ref, snapPoints: snapPointsProp, index: indexProp = 0, onChange, onClose, onDismiss, enablePanDownToClose = false, enableDynamicSizing = true, handleComponent, backgroundStyle, children } = props;
++    const { ref, snapPoints: snapPointsProp, index: indexProp = 0, onChange, onClose, onDismiss, enablePanDownToClose = false, dismissGestures = enablePanDownToClose, enableDynamicSizing = true, handleComponent, backgroundStyle, children } = props;
+     const { width } = useWindowDimensions();
+     const [isPresented, setIsPresented] = useState(indexProp >= 0);
+     const [currentIndex, setCurrentIndex] = useState(Math.max(indexProp, 0));
+@@ -192,7 +192,7 @@ function findNearestDetentIndex(detents, position) {
+                 })
+             ],
+             presentationDragIndicator(handleComponent === null ? 'hidden' : 'visible'),
+-            interactiveDismissDisabled(!enablePanDownToClose),
++            interactiveDismissDisabled(!dismissGestures),
+             ...bg ? [
+                 presentationBackground(bg)
+             ] : []
+@@ -204,6 +204,7 @@ function findNearestDetentIndex(detents, position) {
+         handleDetentChange,
+         handleComponent,
+         enablePanDownToClose,
++        dismissGestures,
+         backgroundStyle
+     ]);
+     return /*#__PURE__*/ _jsx(BottomSheetInternalContext.Provider, {
 diff --git a/build/community/bottom-sheet/types.d.ts b/build/community/bottom-sheet/types.d.ts
-index 72fc6becbc414c318799e28103d15484ed86f703..f7ea8b83a635e2787a7ff1ca647a417ad943eda7 100644
+index cf72b27f4304b6772a844acd0eb144796c03b5c0..e7e37082a05174b6f4c2910917422f837af2e654 100644
 --- a/build/community/bottom-sheet/types.d.ts
 +++ b/build/community/bottom-sheet/types.d.ts
 @@ -169,6 +169,18 @@ export interface BottomSheetProps {
@@ -70,7 +212,7 @@ index 72fc6becbc414c318799e28103d15484ed86f703..f7ea8b83a635e2787a7ff1ca647a417a
       * Whether the sheet should automatically size to fit its content.
       * @default true
 diff --git a/build/swift-ui/Text/index.d.ts b/build/swift-ui/Text/index.d.ts
-index a8843b740a937f5245db0cb74d4d0dd2caf9363a..69b242d0e8ae5c76e795890e7d80a1c9cde457ec 100644
+index 2a5e57bc85660a666fc95f42b5a284ba16ebaf53..121d743b4fdb52213a08fbd2b1b75a3d2e103445 100644
 --- a/build/swift-ui/Text/index.d.ts
 +++ b/build/swift-ui/Text/index.d.ts
 @@ -1,9 +1,19 @@
@@ -96,18 +238,13 @@ index a8843b740a937f5245db0cb74d4d0dd2caf9363a..69b242d0e8ae5c76e795890e7d80a1c9
      /**
       * Text content or nested Text components.
 diff --git a/ios/TextView.swift b/ios/TextView.swift
-index 7dfe0a9dc9fafb625067dbb29f80d82f767d63e1..2d8e9da616dc4d8dc3f2a390e4f0f3507035c049 100644
+index 7dfe0a9dc9fafb625067dbb29f80d82f767d63e1..a56405cb660d045d2ad30c6815cad0337b05607b 100644
 --- a/ios/TextView.swift
 +++ b/ios/TextView.swift
-@@ -5,11 +5,17 @@ import ExpoModulesCore
+@@ -5,11 +5,12 @@ import ExpoModulesCore
  
  public enum TextDateStyle: String, Enumerable {
    case timer, relative, offset, date, time
-+  // Repo-local styles the SDK lacks:
-+  // `elapsed` — the time since `date` in its single largest unit, seconds
-+  // included only when under a minute ("31 minutes", "1 hour", "3 days",
-+  // "20 seconds"); `ago` — the same, worded as a past reference ("31 minutes
-+  // ago", "yesterday"). Both fall back to the relative style below iOS 18.
 +  case elapsed, ago
  
    func toSwiftUI() -> SwiftUI.Text.DateStyle {
@@ -118,7 +255,7 @@ index 7dfe0a9dc9fafb625067dbb29f80d82f767d63e1..2d8e9da616dc4d8dc3f2a390e4f0f350
      case .offset: return .offset
      case .date: return .date
      case .time: return .time
-@@ -55,6 +61,15 @@ public struct TextView: ExpoSwiftUI.View {
+@@ -55,6 +56,15 @@ public struct TextView: ExpoSwiftUI.View {
          pauseTime: props.pauseTime,
          countsDown: props.countsDown ?? true
        )
@@ -135,7 +272,7 @@ index 7dfe0a9dc9fafb625067dbb29f80d82f767d63e1..2d8e9da616dc4d8dc3f2a390e4f0f350
        text = Text(date, style: props.dateStyle?.toSwiftUI() ?? .date)
      } else {
 diff --git a/src/community/bottom-sheet/BottomSheet.android.tsx b/src/community/bottom-sheet/BottomSheet.android.tsx
-index ac8ae4a..d2403c9 100644
+index 419edefacdca8b98e318dc924c66575171e35124..a905674b97920c0e176aac371b9aa896eecb54c6 100644
 --- a/src/community/bottom-sheet/BottomSheet.android.tsx
 +++ b/src/community/bottom-sheet/BottomSheet.android.tsx
 @@ -61,6 +61,11 @@ export function BottomSheet(props: BottomSheetProps) {
@@ -253,7 +390,7 @@ index ac8ae4a..d2403c9 100644
              properties={{
                shouldDismissOnBackPress: enablePanDownToClose,
 diff --git a/src/community/bottom-sheet/BottomSheet.ios.tsx b/src/community/bottom-sheet/BottomSheet.ios.tsx
-index 4c805f7effb3e278ddf6a12e02ee08264a64ac5e..344a6170dfaea3fb42ed82a08f94f06f06096c17 100644
+index d0eb811efbd9e87dc1b71be1fe6fc3288afd990a..0d4b403a109691f81958c6e6d55a4115495e43dd 100644
 --- a/src/community/bottom-sheet/BottomSheet.ios.tsx
 +++ b/src/community/bottom-sheet/BottomSheet.ios.tsx
 @@ -89,6 +89,9 @@ export function BottomSheet(props: BottomSheetProps) {
@@ -266,7 +403,7 @@ index 4c805f7effb3e278ddf6a12e02ee08264a64ac5e..344a6170dfaea3fb42ed82a08f94f06f
      enableDynamicSizing = true,
      handleComponent,
      backgroundStyle,
-@@ -208,7 +211,7 @@ export function BottomSheet(props: BottomSheetProps) {
+@@ -209,7 +212,7 @@ export function BottomSheet(props: BottomSheetProps) {
              }),
            ]),
        presentationDragIndicator(handleComponent === null ? 'hidden' : 'visible'),
@@ -275,7 +412,7 @@ index 4c805f7effb3e278ddf6a12e02ee08264a64ac5e..344a6170dfaea3fb42ed82a08f94f06f
        ...(bg ? [presentationBackground(bg)] : []),
      ];
    }, [
-@@ -218,6 +221,7 @@ export function BottomSheet(props: BottomSheetProps) {
+@@ -219,6 +222,7 @@ export function BottomSheet(props: BottomSheetProps) {
      handleDetentChange,
      handleComponent,
      enablePanDownToClose,
@@ -284,7 +421,7 @@ index 4c805f7effb3e278ddf6a12e02ee08264a64ac5e..344a6170dfaea3fb42ed82a08f94f06f
    ]);
  
 diff --git a/src/community/bottom-sheet/types.ts b/src/community/bottom-sheet/types.ts
-index d7372fcb72e3717329ee8df4e27e2f537f17decb..878774bde4dc8e8f3df325aaf0e6a88404fbe91f 100644
+index 51326fbfdeb9642f52e6fe244093cc697fa585f7..1e04882719c9093b89e49d536a7aa0fbf8c48cd1 100644
 --- a/src/community/bottom-sheet/types.ts
 +++ b/src/community/bottom-sheet/types.ts
 @@ -191,6 +191,31 @@ export interface BottomSheetProps {

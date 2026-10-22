@@ -3687,6 +3687,8 @@
     "skillNameInvalid": "ہنر کا نام ایک حرف یا ہندسے سے شروع ہونا چاہیے اور صرف چھوٹے حروف، ہندسوں اور ڈیشز کا استعمال کریں",
     "skillContentRequired": "مہارت کا مواد درکار ہے۔",
     "skillSaveFailed": "مہارت نہیں بچا سکا",
+    "skillSourceCustom": "حسبِ ضرورت",
+    "skillSourceMarketplace": "مارکیٹ پلیس",
     "skillsHint": "ایک SKILL.md چسپاں کریں اور اس کا نام بھر جائے؛ ڈریگ اینڈ ڈراپ کے بغیر اپنے فون سے مہارت شامل کریں۔",
     "skillEditTitle": "مہارت میں ترمیم کریں۔",
     "mcp": {

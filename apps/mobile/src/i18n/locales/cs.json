@@ -3777,6 +3777,8 @@
     "skillNameInvalid": "Název dovednosti musí začínat písmenem nebo číslicí a používat pouze malá písmena, číslice a pomlčky",
     "skillContentRequired": "Je vyžadován obsah dovedností",
     "skillSaveFailed": "Nepodařilo se zachránit dovednost",
+    "skillSourceCustom": "Vlastní",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Vložte SKILL.md a jeho název se vyplní; přidejte dovednost z telefonu bez přetahování.",
     "skillEditTitle": "Upravit dovednost",
     "mcp": {

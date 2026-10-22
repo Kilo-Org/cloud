@@ -3687,6 +3687,8 @@
     "skillNameInvalid": "Nama keterampilan harus dimulai dengan huruf atau angka dan hanya menggunakan huruf kecil, angka, dan tanda hubung",
     "skillContentRequired": "Konten keterampilan diperlukan",
     "skillSaveFailed": "Tidak dapat menyimpan keterampilan",
+    "skillSourceCustom": "Kustom",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Tempelkan SKILL.md dan isikan namanya; tambahkan keterampilan dari ponsel Anda tanpa drag and drop.",
     "skillEditTitle": "Mengedit keterampilan",
     "mcp": {

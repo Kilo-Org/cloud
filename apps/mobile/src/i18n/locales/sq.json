@@ -3687,6 +3687,8 @@
     "skillNameInvalid": "Emri i aftësisë duhet të fillojë me një shkronjë ose shifër dhe të përdorë vetëm shkronja të vogla, shifra dhe viza",
     "skillContentRequired": "Kërkohet përmbajtja e aftësive",
     "skillSaveFailed": "Aftësia nuk mund të kursehej",
+    "skillSourceCustom": "E personalizuar",
+    "skillSourceMarketplace": "Tregu",
     "skillsHint": "Ngjit një SKILL.md dhe emri i saj plotëson; shtoni një aftësi nga telefoni juaj pa zvarritje dhe lëshim.",
     "skillEditTitle": "Shkathtësia e redaktimit",
     "mcp": {

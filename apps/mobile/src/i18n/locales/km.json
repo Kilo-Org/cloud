@@ -3687,6 +3687,8 @@
     "skillNameInvalid": "ឈ្មោះជំនាញត្រូវតែចាប់ផ្តើមដោយអក្សរ ឬខ្ទង់ ហើយប្រើតែអក្សរតូច ខ្ទង់ និងសញ្ញាដាច់ៗប៉ុណ្ណោះ។",
     "skillContentRequired": "មាតិកាជំនាញត្រូវបានទាមទារ",
     "skillSaveFailed": "មិនអាចរក្សាទុកជំនាញបានទេ។",
+    "skillSourceCustom": "ផ្ទាល់ខ្លួន",
+    "skillSourceMarketplace": "ទីផ្សារ",
     "skillsHint": "បិទភ្ជាប់ SKILL.md ហើយឈ្មោះរបស់វាបំពេញ; បន្ថែមជំនាញពីទូរស័ព្ទរបស់អ្នកដោយមិនចាំបាច់អូស និងទម្លាក់។",
     "skillEditTitle": "កែសម្រួលជំនាញ",
     "mcp": {
@@ -3916,7 +3918,7 @@
     "blockers": "ឧបសគ្គថ្មី",
     "spend": "ការចំណាយពេលយប់",
     "view": "អានរបាយការណ៍",
-    "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "viewWithPreview": "$t(agentBriefing.view)។ {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
     "dismiss": "មិនអើពើនឹងរបាយការណ៍",
     "offline": "គ្មានអ៊ីនធឺណិត · របាយការណ៍ដែលបានរក្សាទុក",

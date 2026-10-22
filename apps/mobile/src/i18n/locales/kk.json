@@ -3687,6 +3687,8 @@
     "skillNameInvalid": "Дағды атауы әріптен немесе цифрдан басталып, тек кіші әріптерді, сандарды және сызықшаларды пайдалануы керек.",
     "skillContentRequired": "Біліктілік мазмұны қажет",
     "skillSaveFailed": "Шеберлікті сақтау мүмкін болмады",
+    "skillSourceCustom": "Арнайы",
+    "skillSourceMarketplace": "Market",
     "skillsHint": "SKILL.md қойыңыз және оның аты толтырылады; сүйреп апармай телефоныңыздан дағды қосыңыз.",
     "skillEditTitle": "Дағдыны өңдеу",
     "mcp": {

@@ -1,8 +1,8 @@
 diff --git a/android/src/main/java/expo/modules/backgroundtask/BackgroundTaskScheduler.kt b/android/src/main/java/expo/modules/backgroundtask/BackgroundTaskScheduler.kt
-index 74c5719139a2dd00300e36af02c9b2b685bf9519..f23f8df4d2f79164af76551d929f67debc5298aa 100644
+index 67097c6..0689d51 100644
 --- a/android/src/main/java/expo/modules/backgroundtask/BackgroundTaskScheduler.kt
 +++ b/android/src/main/java/expo/modules/backgroundtask/BackgroundTaskScheduler.kt
-@@ -262,7 +262,11 @@ object BackgroundTaskScheduler {
+@@ -266,7 +266,11 @@ object BackgroundTaskScheduler {
  
      return try {
        val workInfos = workManager.getWorkInfosForUniqueWork(WORKER_IDENTIFIER).await()

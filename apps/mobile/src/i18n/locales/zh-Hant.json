@@ -3687,6 +3687,8 @@
     "skillNameInvalid": "技能名稱必須以字母或數字開頭，且只能使用小寫字母、數字和破折號",
     "skillContentRequired": "技能內容為必填項",
     "skillSaveFailed": "無法保存技能",
+    "skillSourceCustom": "自訂",
+    "skillSourceMarketplace": "市集",
     "skillsHint": "貼上一個SKILL.md並填寫其名稱；從手機添加技能，無需拖放。",
     "skillEditTitle": "編輯技能",
     "mcp": {

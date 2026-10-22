@@ -3687,6 +3687,8 @@
     "skillNameInvalid": "Trebetasunaren izenak letra edo zifra batekin hasi behar du eta letra xeheak, zifrak eta marratxoak soilik erabili behar ditu",
     "skillContentRequired": "Trebetasun edukia beharrezkoa da",
     "skillSaveFailed": "Ezin izan da trebetasuna gorde",
+    "skillSourceCustom": "Pertsonalizatua",
+    "skillSourceMarketplace": "Merkatua",
     "skillsHint": "Itsatsi SKILL.md bat eta bere izena beteko da; gehitu trebetasun bat telefonotik arrastatu eta jaregin gabe.",
     "skillEditTitle": "Editatu trebetasuna",
     "mcp": {

@@ -3687,6 +3687,8 @@
     "skillNameInvalid": "Ang pangalan ng kasanayan ay dapat magsimula sa isang titik o digit at gumamit lamang ng maliliit na titik, digit, at gitling",
     "skillContentRequired": "Kinakailangan ang nilalaman ng kasanayan",
     "skillSaveFailed": "Hindi makapag-save ng kasanayan",
+    "skillSourceCustom": "Custom",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Mag-paste ng SKILL.md at mapunan ang pangalan nito; magdagdag ng kasanayan mula sa iyong telepono nang walang drag at drop.",
     "skillEditTitle": "Mag-edit ng kasanayan",
     "mcp": {

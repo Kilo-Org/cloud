@@ -3687,6 +3687,8 @@
     "skillNameInvalid": "Tên kỹ năng phải bắt đầu bằng một chữ cái hoặc chữ số và chỉ sử dụng chữ cái viết thường, chữ số và dấu gạch ngang",
     "skillContentRequired": "Nội dung kỹ năng là bắt buộc",
     "skillSaveFailed": "Không thể lưu kỹ năng",
+    "skillSourceCustom": "Tùy chỉnh",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Dán SKILL.md và điền tên của nó vào; thêm kỹ năng từ điện thoại của bạn mà không cần kéo và thả.",
     "skillEditTitle": "Chỉnh sửa kỹ năng",
     "mcp": {

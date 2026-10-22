@@ -16,8 +16,8 @@ import type {
   PreparationStepSnapshot,
 } from './types';
 import {
-  cloudAgentEventSchema,
   cloudWorktreeChangesReadyDataSchema,
+  isValidCloudAgentEvent,
   kilocodePayloadSchema,
   messageUpdatedDataSchema,
   messagePartUpdatedDataSchema,
@@ -708,7 +708,7 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
  * Returns null for invalid or unrecognized events.
  */
 export function normalize(raw: CloudAgentEvent): NormalizedEvent | null {
-  if (!cloudAgentEventSchema.safeParse(raw).success) return null;
+  if (!isValidCloudAgentEvent(raw)) return null;
 
   if (raw.streamEventType === 'cloud.worktree.changes.ready') {
     const r = cloudWorktreeChangesReadyDataSchema.safeParse(raw.data);

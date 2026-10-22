@@ -111,9 +111,7 @@ vi.mock('@/lib/auth/push-registration-reconciliation', () => ({
   attemptPushRegistrationReconciliation: vi.fn(),
 }));
 
-// The queries the actions section does not depend on stay deferred, so the
-// sign-out tile is exercised without their interaction-manager flush.
-vi.mock('@/lib/hooks/use-after-interactions', () => ({ useAfterInteractions: () => false }));
+vi.mock('@/lib/hooks/use-after-idle', () => ({ useAfterIdle: () => false }));
 
 vi.mock('@/lib/profile-agent-navigation', () => ({
   getCodeReviewerProfilePath: () => '/code-reviewer',

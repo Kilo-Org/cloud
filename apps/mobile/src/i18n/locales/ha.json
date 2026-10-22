@@ -3687,6 +3687,8 @@
     "skillNameInvalid": "Dole ne sunan gwani ya fara da harafi ko lambobi kuma yayi amfani da ƙananan haruffa kawai, lambobi, da dashes",
     "skillContentRequired": "Ana buƙatar abun ciki gwaninta",
     "skillSaveFailed": "An kasa ajiye fasaha",
+    "skillSourceCustom": "Al'ada",
+    "skillSourceMarketplace": "Kasuwa",
     "skillsHint": "Manna SKILL.md kuma sunansa ya cika; ƙara fasaha daga wayarka ba tare da ja da sauke ba.",
     "skillEditTitle": "Gyara fasaha",
     "mcp": {

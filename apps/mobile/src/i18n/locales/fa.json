@@ -3687,6 +3687,8 @@
     "skillNameInvalid": "نام مهارت باید با یک حرف یا رقم شروع شود و فقط از حروف کوچک، ارقام و خط تیره استفاده کند.",
     "skillContentRequired": "محتوای مهارتی مورد نیاز است",
     "skillSaveFailed": "مهارت ذخیره نشد",
+    "skillSourceCustom": "سفارشی",
+    "skillSourceMarketplace": "بازار",
     "skillsHint": "یک SKILL.md قرار دهید و نام آن پر می شود. یک مهارت از تلفن خود بدون کشیدن و رها کردن اضافه کنید.",
     "skillEditTitle": "مهارت ویرایش",
     "mcp": {

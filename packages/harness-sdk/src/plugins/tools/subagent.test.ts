@@ -155,7 +155,7 @@ it('counts the subagent’s tokens against the subagent, and hands them over', a
       { deltas: [], calls: [call], stop: 'tools', usage: { inputTokens: 11, outputTokens: 2 } },
       { deltas: ['nine, it says'], usage: { inputTokens: 12, outputTokens: 3 } },
     ],
-    use: session => Effect.zipRight(Stream.runDrain(session.ask('how many?')), session.usage),
+    use: session => Effect.andThen(Stream.runDrain(session.ask('how many?')), session.usage),
   });
 
   const parent: ModelUsage = value;

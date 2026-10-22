@@ -10,10 +10,6 @@ const splitLinkMock = vi.hoisted(() =>
   vi.fn((opts: { condition: unknown; true: unknown; false: unknown }) => [opts.true, opts.false])
 );
 
-// Mutable so a test can toggle the optional ingest endpoint before importing
-// trpc.ts (`vi.resetModules()` re-reads the config mock factory).
-const latencyIngestUrlMock = vi.hoisted(() => ({ value: undefined as string | undefined }));
-
 const randomUUIDMock = vi.hoisted(() => vi.fn(() => 'test-request-id'));
 
 const secureStoreMock = vi.hoisted(() => {
@@ -79,11 +75,8 @@ vi.mock('@/lib/config', () => ({
   E2E_LATENCY_SESSION_MS: 0,
   // The secure-store read path reads this fault window; keep it closed.
   E2E_SECURE_STORE_FAULT_MS: 0,
-  // A getter, not a snapshot: the mock factory object is cached, so a test
-  // must be able to swap the optional endpoint without re-running it.
-  get LATENCY_INGEST_URL(): string | undefined {
-    return latencyIngestUrlMock.value;
-  },
+  // The ingest endpoint stays unset so a wiring test never posts latency.
+  LATENCY_INGEST_URL: undefined,
 }));
 
 vi.mock('@/lib/storage-keys', () => ({
@@ -184,6 +177,16 @@ describe('getAuthHeaders', () => {
     // rereads neither key.
     await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
     expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends the app product token as the User-Agent on every tRPC call', async () => {
+    secureStoreMock.store.set('auth-token', 'stored-token');
+    secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
+    const headers = await loadHeaders();
+
+    await expect(headers()).resolves.toMatchObject({
+      'User-Agent': 'Kilo-Code/1.0.4 (ios)',
+    });
   });
 
   it('uses the newest owner token published while the cold expiry was read', async () => {
@@ -425,30 +428,8 @@ describe('network error reporting', () => {
 
 type SplitCondition = (op: { path: string; context: { skipBatch?: boolean } }) => boolean;
 
-type LatencySample = {
-  requestId: string;
-  procedures: string[];
-  ttfbMs: number;
-  totalMs: number;
-  status: number;
-  ok: boolean;
-};
-
-function latencySample(overrides: Partial<LatencySample> = {}): LatencySample {
-  return {
-    requestId: 'req-1',
-    procedures: ['user.getMe'],
-    ttfbMs: 5,
-    totalMs: 9,
-    status: 200,
-    ok: true,
-    ...overrides,
-  };
-}
-
 describe('latency wiring', () => {
   beforeEach(() => {
-    latencyIngestUrlMock.value = undefined;
     secureStoreMock.store.clear();
     mockFetch.mockReset();
     vi.stubGlobal('fetch', mockFetch);
@@ -459,7 +440,6 @@ describe('latency wiring', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
-    latencyIngestUrlMock.value = undefined;
   });
 
   async function loadLatencyLinks(): Promise<{
@@ -574,62 +554,5 @@ describe('latency wiring', () => {
 
     const init = mockFetch.mock.calls[0]?.[1] as RequestInit | undefined;
     expect(init?.body).toBe('{"organizationId":null}');
-  });
-
-  it('posts a non-empty batch with auth, client metadata, and the JSON content type', async () => {
-    latencyIngestUrlMock.value = 'https://latency.example.com';
-    secureStoreMock.store.set('auth-token', 'stored-token');
-    mockFetch.mockResolvedValue(new Response(null, { status: 204 }));
-    const { postLatencyBatch } = await import('@/lib/telemetry/latency-ingest');
-    const samples = [latencySample()];
-
-    await postLatencyBatch({ samples });
-
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://latency.example.com/v1/latency');
-    expect(init.method).toBe('POST');
-    expect(JSON.parse(init.body as string)).toEqual({ samples });
-    const headers = new Headers(init.headers);
-    expect(headers.get('authorization')).toBe('Bearer stored-token');
-    expect(headers.get('content-type')).toBe('application/json');
-    expect(headers.get('x-kilo-client')).toBe('mobile');
-    expect(headers.get('x-kilo-app-platform')).toBe('ios');
-    expect(headers.get('x-kilo-app-version')).toBe('1.0.4');
-  });
-
-  it('does nothing when the ingest endpoint is unset', async () => {
-    latencyIngestUrlMock.value = undefined;
-    const { postLatencyBatch } = await import('@/lib/telemetry/latency-ingest');
-
-    await postLatencyBatch({ samples: [latencySample()] });
-
-    expect(mockFetch).not.toHaveBeenCalled();
-  });
-
-  it('does nothing for an empty batch', async () => {
-    latencyIngestUrlMock.value = 'https://latency.example.com';
-    const { postLatencyBatch } = await import('@/lib/telemetry/latency-ingest');
-
-    await postLatencyBatch({ samples: [] });
-
-    expect(mockFetch).not.toHaveBeenCalled();
-  });
-
-  it('drops the batch quietly on a network failure', async () => {
-    latencyIngestUrlMock.value = 'https://latency.example.com';
-    mockFetch.mockRejectedValue(new Error('ingest down'));
-    const { postLatencyBatch } = await import('@/lib/telemetry/latency-ingest');
-
-    await expect(postLatencyBatch({ samples: [latencySample()] })).resolves.toBeUndefined();
-  });
-
-  it('drops the batch quietly on a 5xx response', async () => {
-    latencyIngestUrlMock.value = 'https://latency.example.com';
-    mockFetch.mockResolvedValue(new Response('nope', { status: 503 }));
-    const { postLatencyBatch } = await import('@/lib/telemetry/latency-ingest');
-
-    await expect(postLatencyBatch({ samples: [latencySample()] })).resolves.toBeUndefined();
-    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });

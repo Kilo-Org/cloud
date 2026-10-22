@@ -1,4 +1,4 @@
-import { Chunk, type Duration, Effect, Fiber, Stream } from 'effect';
+import { type Duration, Effect, Fiber, Stream } from 'effect';
 import { expect, it } from 'vitest';
 import type { AbortLike, FetchLike } from '../../core/fetch.js';
 import { ModelClient } from '../../core/model.js';
@@ -41,11 +41,11 @@ const watched = (
   return { fetch, signals };
 };
 
-const interrupted = (fetch: FetchLike, after: Duration.DurationInput): Promise<void> =>
+const interrupted = (fetch: FetchLike, after: Duration.Input): Promise<void> =>
   Effect.runPromise(
     Effect.gen(function* () {
       const client = yield* ModelClient;
-      const reading = yield* Effect.fork(Stream.runDrain(client.stream(sampleRequest())));
+      const reading = yield* Effect.forkChild(Stream.runDrain(client.stream(sampleRequest())));
       yield* Effect.sleep(after);
       yield* Fiber.interrupt(reading);
     }).pipe(Effect.provide(testGateway({ fetch })))
@@ -83,6 +83,6 @@ it('gives back every event of a stream that ends on its own', async () => {
     )
   );
 
-  expect(Chunk.toReadonlyArray(events).map(event => event.kind)).toEqual(['delta', 'done']);
+  expect(events.map(event => event.kind)).toEqual(['delta', 'done']);
   expect(signals[0]?.aborted).toBeTruthy();
 });

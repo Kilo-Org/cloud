@@ -102,7 +102,7 @@ timer or sandbox acceptance:
 
 ```bash
 cd services/cloud-agent-next/wrapper
-KILO_781_BINARY=/path/to/isolated/kilo-7.8.15 bun test --max-concurrency=1 src/control-plane/kilo-supervision-fixture.real.test.ts
+KILO_781_BINARY=/path/to/isolated/kilo-7.8.1 bun test --max-concurrency=1 src/control-plane/kilo-supervision-fixture.real.test.ts
 ```
 
 The local production-timer driver discovers this worktree's ports, uses the seeded
@@ -150,7 +150,7 @@ and post-Stop follow-ups.
 Private reports and transcripts are retained; chats and sandboxes are not deleted
 automatically. See the known CLI 7.4.20 limitation under Troubleshooting.
 
-Official SDK basic-chat acceptance (pinned `@kilocode/sdk/v2` `7.8.15`):
+Official SDK basic-chat acceptance (pinned `@kilocode/sdk/v2` `7.8.1`):
 
 ```bash
 pnpm --filter cloud-agent-next exec tsx test/e2e/sdk-basic-chat.ts
@@ -165,6 +165,35 @@ then proves SDK attach/chat behavior: warm and cold projected reads, cold event
 wake-up plus `promptAsync()`, intentional `prompt()` rejection, active `abort()`,
 stable warm/cold message pagination, and selector rejection without transcript mutation.
 It stops owned sandbox families and releases any fake-LLM gate in cleanup.
+
+Hosted native facade acceptance (production-shaped `/kilo` surface):
+
+```bash
+pnpm --filter cloud-agent-next exec tsx test/e2e/native-facade-acceptance.ts
+```
+
+This driver runs against the real local Worker, real Durable Objects, real
+Postgres, a real Docker sandbox and the real `kilo serve`, faking only the LLM.
+It proves discovery/pagination, live stream integrity, native questions and
+human-required permissions, the `kilo.native.fence` snapshot boundary,
+same-key start replay with changed-intent rejection, abort of one in-flight turn,
+cold no-wake reads and message-triggered recovery. Results land in
+`dev/logs/<runID>.json` (`NATIVE_E2E_REPORT` overrides the path). Checks that
+prove an owned acceptance criterion fail rather than report `blocked`.
+
+Automatic idle shutdown is a separate invocation. It needs the interactive
+idle window shortened without changing the session's IDE origin, so set
+`CONTROL_PLANE_TIMER_DIVISOR=10` in `services/cloud-agent-next/.dev.vars`,
+restart the stack (the divisor also shortens the reconnect window, so do not mix
+this leg with long sequences), and run:
+
+```bash
+NATIVE_E2E_IDLE_LEG=1 pnpm --filter cloud-agent-next exec tsx test/e2e/native-facade-acceptance.ts
+```
+
+The leg creates its own `desktop`-origin session, waits for Cloud's own idle
+deadline to reclaim the sandbox, proves detail/transcript/attach read without
+waking it, then resumes it with ordinary input.
 
 Focused lifecycle scenario:
 

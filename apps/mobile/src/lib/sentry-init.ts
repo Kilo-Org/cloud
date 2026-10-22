@@ -61,12 +61,11 @@ let profilerRegistrations = 0;
 //   integration). The authoritative per-launch timing metric is the PostHog
 //   `app_startup` event in src/lib/startup-timing.ts.
 //
-// Android API level of the running build. An unreadable `Platform.Version`
-// keeps the NDK handler (level 0), so an unknown platform never loses native
-// crash capture.
+// Android API level of the running build. `Platform.Version` is a number on
+// Android and a string elsewhere; an unreadable value keeps the NDK handler
+// (level 0), so an unknown platform never loses native crash capture.
 function androidApiLevel(): number {
-  const version = Platform.Version;
-  const level = typeof version === 'number' ? version : Number(version);
+  const level = Number(Platform.Version);
   return Number.isFinite(level) ? level : 0;
 }
 

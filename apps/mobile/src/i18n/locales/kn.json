@@ -3790,6 +3790,8 @@
     "empty": "ಕ್ರೆಡಿಟ್ ಪ್ಯಾಕ್ಗಳು ಸದ್ಯಕ್ಕೆ ಲಭ್ಯವಿಲ್ಲ.",
     "noMatchingProducts": "App Store ಯಾವುದೇ ಹೊಂದಿಕೆಯಾಗುವ ಕ್ರೆಡಿಟ್ ಪ್ಯಾಕ್ಗಳನ್ನು ಹಿಂತಿರುಗಿಸಲಿಲ್ಲ.",
     "noMatchingProductsPlay": "Google Play ಯಾವುದೇ ಹೊಂದಿಕೆಯಾಗುವ ಕ್ರೆಡಿಟ್ ಪ್ಯಾಕ್ಗಳನ್ನು ಹಿಂತಿರುಗಿಸಲಿಲ್ಲ.",
+    "storeTimedOut": "App Store ಸಮಯಕ್ಕೆ ಸರಿಯಾಗಿ ಪ್ರತಿಕ್ರಿಯಿಸಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
+    "storeTimedOutPlay": "Google Play ಸಮಯಕ್ಕೆ ಸರಿಯಾಗಿ ಪ್ರತಿಕ್ರಿಯಿಸಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
     "purchaseOwnedByAnotherAccount": "ಈ Apple Account ನಲ್ಲಿನ ಕ್ರೆಡಿಟ್ಗಳು ಬೇರೆ Kilo ಖಾತೆಗೆ ಸೇರಿವೆ. ಅವನ್ನು ಬಳಸಲು ಆ Kilo ಖಾತೆಗೆ ಸೈನ್ ಇನ್ ಮಾಡಿ.",
     "purchaseOwnedByAnotherAccountPlay": "ಈ Google Play ಖಾತೆಯಲ್ಲಿನ ಕ್ರೆಡಿಟ್ಗಳು ಬೇರೆ Kilo ಖಾತೆಗೆ ಸೇರಿವೆ. ಅವನ್ನು ಬಳಸಲು ಆ Kilo ಖಾತೆಗೆ ಸೈನ್ ಇನ್ ಮಾಡಿ."
   },

@@ -3790,6 +3790,8 @@
     "empty": "Guthaben-Pakete sind derzeit nicht verfügbar.",
     "noMatchingProducts": "Der App Store hat keine passenden Guthaben-Pakete zurückgegeben.",
     "noMatchingProductsPlay": "Google Play hat keine passenden Guthaben-Pakete zurückgegeben.",
+    "storeTimedOut": "Der App Store hat nicht rechtzeitig geantwortet. Erneut versuchen.",
+    "storeTimedOutPlay": "Google Play hat nicht rechtzeitig geantwortet. Erneut versuchen.",
     "purchaseOwnedByAnotherAccount": "Das Guthaben dieses Apple Accounts gehört zu einem anderen Kilo-Konto. Melde dich bei dem zugehörigen Kilo-Konto an, um es zu nutzen.",
     "purchaseOwnedByAnotherAccountPlay": "Das Guthaben auf diesem Google-Konto gehört zu einem anderen Kilo-Konto. Melde dich bei diesem Kilo-Konto an, um es zu nutzen."
   },

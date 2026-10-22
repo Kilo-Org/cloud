@@ -3790,6 +3790,8 @@
     "empty": "پاکێتەکانی کرێدیت ئێستا بەردەست نین.",
     "noMatchingProducts": "هیچ پاکێتی کرێدیتی گونجاوی لەلایەن App Storeەوە نەگەڕێندرایەوە.",
     "noMatchingProductsPlay": "هیچ پاکێتی کرێدیتی گونجاوی لەلایەن Google Playەوە نەگەڕێندرایەوە.",
+    "storeTimedOut": "App Store لە کاتی خۆیدا وەڵامی نەداوە. دووبارە هەوڵ بدەوە.",
+    "storeTimedOutPlay": "Google Play لە کاتی خۆیدا وەڵامی نەداوە. دووبارە هەوڵ بدەوە.",
     "purchaseOwnedByAnotherAccount": "کرێدیتەکانی سەر ئەم Apple Accountە هی هەژمارێکی تری Kiloیە. بچۆ ناو ئەو هەژمارەی Kilo بۆ بەکارهێنانیان.",
     "purchaseOwnedByAnotherAccountPlay": "کرێدیتەکانی سەر ئەم هەژمارەی Google Play سەر بە هەژمارەیەکی دیکەی Kilo یە. بچۆ ژوورەوە لەو هەژمارەی Kilo بۆ بەکارهێنانیان."
   },

@@ -3831,6 +3831,8 @@
     "empty": "Os pacotes de créditos estão indisponíveis no momento.",
     "noMatchingProducts": "A App Store não retornou nenhum pacote de créditos correspondente.",
     "noMatchingProductsPlay": "O Google Play não retornou nenhum pacote de créditos correspondente.",
+    "storeTimedOut": "A App Store não respondeu a tempo. Tente novamente.",
+    "storeTimedOutPlay": "O Google Play não respondeu a tempo. Tente novamente.",
     "purchaseOwnedByAnotherAccount": "Os créditos desta Conta Apple pertencem a uma conta Kilo diferente. Entre nessa conta Kilo para usá-los.",
     "purchaseOwnedByAnotherAccountPlay": "Os créditos nesta conta do Google Play pertencem a uma conta Kilo diferente. Entre nessa conta Kilo para usá-los."
   },

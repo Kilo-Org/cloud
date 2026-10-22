@@ -3831,6 +3831,8 @@
     "empty": "חבילות קרדיטים אינן זמינות כעת.",
     "noMatchingProducts": "App Store לא החזיר חבילות קרדיטים תואמות.",
     "noMatchingProductsPlay": "Google Play לא החזיר חבילות קרדיטים תואמות.",
+    "storeTimedOut": "App Store לא הגיב בזמן. ניסיון נוסף.",
+    "storeTimedOutPlay": "Google Play לא הגיב בזמן. ניסיון נוסף.",
     "purchaseOwnedByAnotherAccount": "הקרדיטים בחשבון Apple Account הזה שייכים לחשבון Kilo אחר. היכנס לחשבון Kilo הזה כדי להשתמש בהם.",
     "purchaseOwnedByAnotherAccountPlay": "הקרדיטים בחשבון Google Play הזה שייכים לחשבון Kilo אחר. היכנס לחשבון Kilo הזה כדי להשתמש בהם."
   },

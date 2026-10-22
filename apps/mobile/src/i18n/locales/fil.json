@@ -3790,6 +3790,8 @@
     "empty": "Hindi available ang mga credit pack sa ngayon.",
     "noMatchingProducts": "Walang katugmang credit pack na ibinalik ang App Store.",
     "noMatchingProductsPlay": "Walang katugmang credit pack na ibinalik ang Google Play.",
+    "storeTimedOut": "Hindi tumugon sa oras ang App Store. Subukan muli.",
+    "storeTimedOutPlay": "Hindi tumugon sa oras ang Google Play. Subukan muli.",
     "purchaseOwnedByAnotherAccount": "Ang kredito sa Apple Account na ito ay kabilang sa ibang Kilo account. Mag-sign in sa Kilo account na iyon para magamit ito.",
     "purchaseOwnedByAnotherAccountPlay": "Ang kredito sa Google Play account na ito ay kabilang sa ibang Kilo account. Mag-sign in sa Kilo account na iyon para magamit ito."
   },

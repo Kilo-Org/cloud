@@ -3790,6 +3790,8 @@
     "empty": "Các gói tín dụng hiện không khả dụng.",
     "noMatchingProducts": "App Store không trả về gói tín dụng phù hợp nào.",
     "noMatchingProductsPlay": "Google Play không trả về gói tín dụng phù hợp nào.",
+    "storeTimedOut": "App Store không phản hồi kịp thời. Thử lại.",
+    "storeTimedOutPlay": "Google Play không phản hồi kịp thời. Thử lại.",
     "purchaseOwnedByAnotherAccount": "Tín dụng trên Apple Account này thuộc về một tài khoản Kilo khác. Hãy đăng nhập vào tài khoản Kilo đó để sử dụng.",
     "purchaseOwnedByAnotherAccountPlay": "Tín dụng trên Tài khoản Google Play này thuộc về một tài khoản Kilo khác. Hãy đăng nhập vào tài khoản Kilo đó để sử dụng."
   },

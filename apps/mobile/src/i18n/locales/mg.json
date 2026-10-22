@@ -3790,6 +3790,8 @@
     "empty": "Tsy misy ny fonosana kireditra amin'izao fotoana izao.",
     "noMatchingProducts": "Tsy nisy fonosana kireditra mifanaraka naverin'ny App Store.",
     "noMatchingProductsPlay": "Tsy nisy fonosana kireditra mifanaraka naverin'ny Google Play.",
+    "storeTimedOut": "Tsy namaly tamin'ny fotoana ilay App Store. Andramo indray.",
+    "storeTimedOutPlay": "Tsy namaly tamin'ny fotoana ilay Google Play. Andramo indray.",
     "purchaseOwnedByAnotherAccount": "Ny kireditra amin'ity Apple Account ity dia an'ny kaonty Kilo hafa. Midira amin'izany kaonty Kilo izany hampiasana azy.",
     "purchaseOwnedByAnotherAccountPlay": "Ny kireditra amin'ity kaonty Google Play ity dia an'ny kaonty Kilo hafa. Midira amin'izany kaonty Kilo izany hampiasana azy."
   },

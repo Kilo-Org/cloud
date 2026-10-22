@@ -3790,6 +3790,8 @@
     "empty": "Xirmooyinka lacagta adeeg hadda lama heli karo.",
     "noMatchingProducts": "App Store ma soo celin xirmooyin lacag adeeg oo u dhigma.",
     "noMatchingProductsPlay": "Google Play ma soo celin xirmooyin lacag adeeg oo u dhigma.",
+    "storeTimedOut": "App Store wakhtigii ma jawaabin. Mar kale isku day.",
+    "storeTimedOutPlay": "Google Play wakhtigii ma jawaabin. Mar kale isku day.",
     "purchaseOwnedByAnotherAccount": "Lacagta adeeg ee ku jirta Apple Account-kan waxaa leh akoon kale oo Kilo ah. Isticmaalka, soo gal akoonkaas Kilo.",
     "purchaseOwnedByAnotherAccountPlay": "Lacagta adeeg ee ku yaal xisaabtan Google Play waxaa leh koonto Kilo oo kale. Isticmaalka, ku saxiix bax koontada Kilo-ga ah."
   },

@@ -3790,6 +3790,8 @@
     "empty": "የክሬዲት ጥቅሎች አሁን አይገኙም።",
     "noMatchingProducts": "ከApp Store ምንም ተመሳሳይ የክሬዲት ጥቅሎች አልተመለሱም።",
     "noMatchingProductsPlay": "ከGoogle Play ምንም ተመሳሳይ የክሬዲት ጥቅሎች አልተመለሱም።",
+    "storeTimedOut": "App Store በወቅቱ አልሰራም። እንደገና ይሞክሩ።",
+    "storeTimedOutPlay": "Google Play በወቅቱ አልሰራም። እንደገና ይሞክሩ።",
     "purchaseOwnedByAnotherAccount": "በዚህ Apple Account ላይ ያለው ክሬዲት የሌላ የKilo መለያ ነው። እነሱን ለመጠቀም ወደዚያ የKilo መለያ ይግቡ።",
     "purchaseOwnedByAnotherAccountPlay": "በዚህ Google Play መለያ ላይ ያለው ክሬዲት የተለየ የKilo መለያ ነው። እነሱን ለመጠቀም ወደዚያ የKilo መለያ ይግቡ።"
   },

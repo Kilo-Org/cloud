@@ -3790,6 +3790,8 @@
     "empty": "क्रेडिट प्याकहरू अहिले उपलब्ध छैनन्।",
     "noMatchingProducts": "App Store ले कुनै मिल्दो क्रेडिट प्याक फर्काएन।",
     "noMatchingProductsPlay": "Google Play ले कुनै मिल्दो क्रेडिट प्याक फर्काएन।",
+    "storeTimedOut": "App Store ले समयमै जवाफ दिएन। फेरि प्रयास गर्नुहोस्।",
+    "storeTimedOutPlay": "Google Play ले समयमै जवाफ दिएन। फेरि प्रयास गर्नुहोस्।",
     "purchaseOwnedByAnotherAccount": "यो Apple Account मा रहेको क्रेडिट अर्कै Kilo खाताको हो। प्रयोग गर्न त्यही Kilo खातामा साइन इन गर्नुहोस्।",
     "purchaseOwnedByAnotherAccountPlay": "यो Google Play खातामा रहेको क्रेडिट अर्को Kilo खातासँग सम्बन्धित छ। प्रयोग गर्न त्यो Kilo खातामा साइन इन गर्नुहोस्।"
   },

@@ -3790,6 +3790,8 @@
     "empty": "Pake kredi yo pa disponib kounye a.",
     "noMatchingProducts": "App Store pa t retounen okenn pake kredi ki matche.",
     "noMatchingProductsPlay": "Google Play pa t retounen okenn pake kredi ki matche.",
+    "storeTimedOut": "App Store pa t reponn a tan. Eseye ankò.",
+    "storeTimedOutPlay": "Google Play pa t reponn a tan. Eseye ankò.",
     "purchaseOwnedByAnotherAccount": "Kredi ki sou Apple Account sa a fè pati yon lòt kont Kilo. Konekte nan kont Kilo sa a pou itilize yo.",
     "purchaseOwnedByAnotherAccountPlay": "Kredi ki sou kont Google Play sa a fè pati yon lòt kont Kilo. Siyen nan kont Kilo sa a pou itilize yo."
   },

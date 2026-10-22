@@ -3790,6 +3790,8 @@
     "empty": "Կրեդիտային փաթեթներն այժմ հասանելի չեն։",
     "noMatchingProducts": "App Store-ը համապատասխան կրեդիտային փաթեթներ չվերադարձրեց։",
     "noMatchingProductsPlay": "Google Play-ը համապատասխան կրեդիտային փաթեթներ չվերադարձրեց։",
+    "storeTimedOut": "App Store-ը ժամանակին չպատասխանեց։ Կրկին փորձել։",
+    "storeTimedOutPlay": "Google Play-ը ժամանակին չպատասխանեց։ Կրկին փորձել։",
     "purchaseOwnedByAnotherAccount": "Այս Apple Account-ի կրեդիտները պատկանում են մեկ այլ Kilo հաշվի։ Դրանք օգտագործելու համար մուտք գործեք այդ Kilo հաշիվ։",
     "purchaseOwnedByAnotherAccountPlay": "Այս Google Play հաշվի կրեդիտները պատկանում են մեկ այլ Kilo հաշվի։ Դրանք օգտագործելու համար մուտք գործեք այդ Kilo հաշիվ։"
   },

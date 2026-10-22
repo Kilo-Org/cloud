@@ -3790,6 +3790,8 @@
     "empty": "Creditpakketten zijn momenteel niet beschikbaar.",
     "noMatchingProducts": "De App Store heeft geen overeenkomende creditpakketten geretourneerd.",
     "noMatchingProductsPlay": "Google Play heeft geen overeenkomende creditpakketten geretourneerd.",
+    "storeTimedOut": "De App Store reageerde niet op tijd. Opnieuw proberen.",
+    "storeTimedOutPlay": "Google Play reageerde niet op tijd. Opnieuw proberen.",
     "purchaseOwnedByAnotherAccount": "De credits op deze Apple Account horen bij een ander Kilo-account. Meld je aan bij dat Kilo-account om ze te gebruiken.",
     "purchaseOwnedByAnotherAccountPlay": "De credits op dit Google Play-account horen bij een ander Kilo-account. Meld je aan bij dat Kilo-account om ze te gebruiken."
   },

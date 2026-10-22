@@ -3790,6 +3790,8 @@
     "empty": "Τα πακέτα πιστώσεων δεν είναι διαθέσιμα αυτή τη στιγμή.",
     "noMatchingProducts": "Το App Store δεν επέστρεψε αντίστοιχα πακέτα πιστώσεων.",
     "noMatchingProductsPlay": "Το Google Play δεν επέστρεψε αντίστοιχα πακέτα πιστώσεων.",
+    "storeTimedOut": "Το App Store δεν αποκρίθηκε εγκαίρως. Νέα προσπάθεια.",
+    "storeTimedOutPlay": "Το Google Play δεν αποκρίθηκε εγκαίρως. Νέα προσπάθεια.",
     "purchaseOwnedByAnotherAccount": "Οι πιστώσεις σε αυτό το Apple Account ανήκουν σε διαφορετικό λογαριασμό Kilo. Συνδέσου σε εκείνον τον λογαριασμό Kilo για να τις χρησιμοποιήσεις.",
     "purchaseOwnedByAnotherAccountPlay": "Οι πιστώσεις σε αυτόν τον λογαριασμό Google Play ανήκουν σε διαφορετικό λογαριασμό Kilo. Συνδεθείτε σε αυτόν τον λογαριασμό Kilo για να τις χρησιμοποιήσετε."
   },

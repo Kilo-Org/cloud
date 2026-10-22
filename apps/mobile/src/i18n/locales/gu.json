@@ -3790,6 +3790,8 @@
     "empty": "ક્રેડિટ પેક અત્યારે ઉપલબ્ધ નથી.",
     "noMatchingProducts": "App Store એ કોઈ મેળ ખાતું ક્રેડિટ પેક પરત કર્યું નથી.",
     "noMatchingProductsPlay": "Google Play એ કોઈ મેળ ખાતું ક્રેડિટ પેક પરત કર્યું નથી.",
+    "storeTimedOut": "App Store એ સમયસર પ્રતિસાદ આપ્યો નથી. ફરી પ્રયત્ન કરો.",
+    "storeTimedOutPlay": "Google Play એ સમયસર પ્રતિસાદ આપ્યો નથી. ફરી પ્રયત્ન કરો.",
     "purchaseOwnedByAnotherAccount": "આ Apple Account પરની ક્રેડિટ બીજા Kilo ખાતાની છે. તેનો ઉપયોગ કરવા તે Kilo ખાતામાં સાઇન ઇન કરો.",
     "purchaseOwnedByAnotherAccountPlay": "આ Google Play ખાતા પરની ક્રેડિટ અલગ Kilo ખાતાની છે. તેનો ઉપયોગ કરવા તે Kilo ખાતામાં સાઇન ઇન કરો."
   },

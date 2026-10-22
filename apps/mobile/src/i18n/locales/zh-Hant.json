@@ -3790,6 +3790,8 @@
     "empty": "目前無法取得點數包。",
     "noMatchingProducts": "App Store 未傳回相符的點數包。",
     "noMatchingProductsPlay": "Google Play 未傳回相符的點數包。",
+    "storeTimedOut": "App Store 未及時回應。請再試一次。",
+    "storeTimedOutPlay": "Google Play 未及時回應。請再試一次。",
     "purchaseOwnedByAnotherAccount": "此 Apple 帳戶上的點數屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以使用。",
     "purchaseOwnedByAnotherAccountPlay": "此 Google Play 帳戶上的點數屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以使用。"
   },

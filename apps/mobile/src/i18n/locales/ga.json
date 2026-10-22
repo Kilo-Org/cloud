@@ -3913,6 +3913,8 @@
     "empty": "Níl pacáistí creidmheasa ar fáil faoi láthair.",
     "noMatchingProducts": "Níor thug an App Store aon phacáistí creidmheasa comhoiriúnacha ar ais.",
     "noMatchingProductsPlay": "Níor thug Google Play aon phacáistí creidmheasa comhoiriúnacha ar ais.",
+    "storeTimedOut": "Níor fhreagair an App Store in am. Bain triail as arís.",
+    "storeTimedOutPlay": "Níor fhreagair Google Play in am. Bain triail as arís.",
     "purchaseOwnedByAnotherAccount": "Baineann na creidmheasanna ar an Apple Account seo le cuntas Kilo eile. Sínigh isteach sa chuntas Kilo sin chun iad a úsáid.",
     "purchaseOwnedByAnotherAccountPlay": "Baineann na creidmheasanna ar an gcuntas Google Play seo le cuntas Kilo éagsúil. Sínigh isteach sa chuntas Kilo sin chun iad a úsáid."
   },

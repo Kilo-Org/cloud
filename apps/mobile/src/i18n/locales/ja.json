@@ -3790,6 +3790,8 @@
     "empty": "現在、クレジットパックを利用できません。",
     "noMatchingProducts": "App Storeから一致するクレジットパックが返されませんでした。",
     "noMatchingProductsPlay": "Google Playから一致するクレジットパックが返されませんでした。",
+    "storeTimedOut": "App Storeが時間内に応答しませんでした。再試行",
+    "storeTimedOutPlay": "Google Playが時間内に応答しませんでした。再試行",
     "purchaseOwnedByAnotherAccount": "このApple Accountのクレジットは、別のKiloアカウントに紐付いています。使用するには、そのKiloアカウントにサインインしてください。",
     "purchaseOwnedByAnotherAccountPlay": "このGoogle Playアカウントのクレジットは別のKiloアカウントに属しています。使用するにはそのKiloアカウントにサインインしてください。"
   },

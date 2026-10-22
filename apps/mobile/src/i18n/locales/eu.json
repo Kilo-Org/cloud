@@ -3790,6 +3790,8 @@
     "empty": "Kreditu-paketeak ez daude orain erabilgarri.",
     "noMatchingProducts": "App Store-k ez du bat datorren kreditu-paketerik itzuli.",
     "noMatchingProductsPlay": "Google Play-k ez du bat datorren kreditu-paketerik itzuli.",
+    "storeTimedOut": "App Store-k ez du denboran erantzun. Saiatu berriro.",
+    "storeTimedOutPlay": "Google Play-k ez du denboran erantzun. Saiatu berriro.",
     "purchaseOwnedByAnotherAccount": "Apple Account honetako kredituak beste Kilo kontu bati dagozkio. Erabiltzeko, hasi saioa Kilo kontu horretan.",
     "purchaseOwnedByAnotherAccountPlay": "Google Play kontu honetako kredituak beste Kilo kontu bati dagozkio. Erabiltzeko, hasi saioa Kilo kontu horretan."
   },

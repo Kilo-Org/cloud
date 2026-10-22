@@ -3790,6 +3790,8 @@
     "empty": "Kāore ngā pākete whiwhinga e wātea ana i tēnei wā.",
     "noMatchingProducts": "Kāore te App Store i whakahoki i ētahi pākete whiwhinga ōrite.",
     "noMatchingProductsPlay": "Kāore Google Play i whakahoki i ētahi pākete whiwhinga ōrite.",
+    "storeTimedOut": "Kāore te App Store i whakautu i te wā. Whakamātau anō.",
+    "storeTimedOutPlay": "Kāore a Google Play i whakautu i te wā. Whakamātau anō.",
     "purchaseOwnedByAnotherAccount": "Nō tētahi atu pūkete Kilo ngā whiwhinga o tēnei Apple Account. Whakauru ki taua pūkete Kilo hei whakamahi.",
     "purchaseOwnedByAnotherAccountPlay": "Nō tētahi atu pūkete Kilo ngā whiwhinga o tēnei pūkete Google Play. Whakauru ki taua pūkete Kilo hei whakamahi."
   },

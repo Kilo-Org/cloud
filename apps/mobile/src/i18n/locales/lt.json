@@ -3872,6 +3872,8 @@
     "empty": "Kreditų paketai šiuo metu neprieinami.",
     "noMatchingProducts": "App Store negrąžino jokių atitinkančių kreditų paketų.",
     "noMatchingProductsPlay": "Google Play negrąžino jokių atitinkančių kreditų paketų.",
+    "storeTimedOut": "App Store neatsakė laiku. Bandyti dar kartą.",
+    "storeTimedOutPlay": "Google Play neatsakė laiku. Bandyti dar kartą.",
     "purchaseOwnedByAnotherAccount": "Šios Apple Account paskyros kreditai priklauso kitai Kilo paskyrai. Norėdami juos naudoti, prisijunkite prie tos Kilo paskyros.",
     "purchaseOwnedByAnotherAccountPlay": "Šios Google Play paskyros kreditai priklauso kitai Kilo paskyrai. Norėdami juos naudoti, prisijunkite prie tos Kilo paskyros."
   },

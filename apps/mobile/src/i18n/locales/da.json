@@ -3790,6 +3790,8 @@
     "empty": "Kreditpakker er ikke tilgængelige lige nu.",
     "noMatchingProducts": "App Store returnerede ingen matchende kreditpakker.",
     "noMatchingProductsPlay": "Google Play returnerede ingen matchende kreditpakker.",
+    "storeTimedOut": "App Store svarede ikke i tide. Prøv igen.",
+    "storeTimedOutPlay": "Google Play svarede ikke i tide. Prøv igen.",
     "purchaseOwnedByAnotherAccount": "Kreditterne på denne Apple-konto tilhører en anden Kilo-konto. Log ind på den Kilo-konto for at bruge dem.",
     "purchaseOwnedByAnotherAccountPlay": "Kreditterne på denne Google Play-konto tilhører en anden Kilo-konto. Log ind på den Kilo-konto for at bruge dem."
   },

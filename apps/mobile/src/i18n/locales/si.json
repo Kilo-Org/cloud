@@ -3790,6 +3790,8 @@
     "empty": "ක්‍රෙඩිට් පැකේජ දැනට නොමැත.",
     "noMatchingProducts": "App Store ගැළපෙන ක්‍රෙඩිට් පැකේජ ආපසු ලබා දුන්නේ නැත.",
     "noMatchingProductsPlay": "Google Play ගැළපෙන ක්‍රෙඩිට් පැකේජ ආපසු ලබා දුන්නේ නැත.",
+    "storeTimedOut": "App Store නියමිත වේලාව තුළ ප්‍රතිචාර නොදැක්වීය. නැවත උත්සාහ කරන්න.",
+    "storeTimedOutPlay": "Google Play නියමිත වේලාව තුළ ප්‍රතිචාර නොදැක්වීය. නැවත උත්සාහ කරන්න.",
     "purchaseOwnedByAnotherAccount": "මෙම Apple Account හි ක්‍රෙඩිට් වෙනත් Kilo ගිණුමකට අයත් වේ. ඒවා භාවිත කිරීමට එම Kilo ගිණුමට පිවිසෙන්න.",
     "purchaseOwnedByAnotherAccountPlay": "මෙම Google Play ගිණුමේ ක්‍රෙඩිට් වෙනත් Kilo ගිණුමකට අයත් වේ. ඒවා භාවිත කිරීමට එම Kilo ගිණුමට පුරනය වන්න."
   },

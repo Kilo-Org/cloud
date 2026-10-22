@@ -3790,6 +3790,8 @@
     "empty": "Paketat e krediteve nuk janë të disponueshme tani.",
     "noMatchingProducts": "App Store nuk ktheu paketa kreditesh që përputhen.",
     "noMatchingProductsPlay": "Google Play nuk ktheu paketa kreditesh që përputhen.",
+    "storeTimedOut": "App Store nuk u përgjigj në kohë. Provo përsëri.",
+    "storeTimedOutPlay": "Google Play nuk u përgjigj në kohë. Provoni përsëri.",
     "purchaseOwnedByAnotherAccount": "Kreditet në këtë Apple Account i përkasin një llogarie tjetër Kilo. Hyr në atë llogari Kilo për t'i përdorur.",
     "purchaseOwnedByAnotherAccountPlay": "Kreditet në këtë llogari Google Play i përkasin një llogarie tjetër Kilo. Hyni në atë llogari Kilo për t'i përdorur."
   },

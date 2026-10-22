@@ -3790,6 +3790,8 @@
     "empty": "ခရက်ဒစ် ပက်ခ်များ ယခု မရနိုင်ပါ။",
     "noMatchingProducts": "App Store မှ ကိုက်ညီသော ခရက်ဒစ် ပက်ခ်များ ပြန်မပေးပါ။",
     "noMatchingProductsPlay": "Google Play မှ ကိုက်ညီသော ခရက်ဒစ် ပက်ခ်များ ပြန်မပေးပါ။",
+    "storeTimedOut": "App Store မှ အချိန်အတွင်း တုံ့ပြန်မှု မရှိပါ။ ထပ်စမ်းကြည့်ပါ။",
+    "storeTimedOutPlay": "Google Play မှ အချိန်အတွင်း တုံ့ပြန်မှု မရှိပါ။ ထပ်စမ်းကြည့်ပါ။",
     "purchaseOwnedByAnotherAccount": "ဤ Apple Account ရှိ ခရက်ဒစ်များသည် အခြား Kilo အကောင့်တစ်ခုနှင့် သက်ဆိုင်သည်။ အသုံးပြုရန် ထို Kilo အကောင့်ဖြင့် ဝင်ပါ။",
     "purchaseOwnedByAnotherAccountPlay": "ဤ Google Play အကောင့်ရှိ ခရက်ဒစ်များသည် အခြား Kilo အကောင့်တစ်ခုနှင့် သက်ဆိုင်သည်။ အသုံးပြုရန် ထို Kilo အကောင့်ဖြင့် ဝင်ပါ။"
   },

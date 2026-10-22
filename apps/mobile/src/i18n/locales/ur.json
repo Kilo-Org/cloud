@@ -3790,6 +3790,8 @@
     "empty": "کریڈٹ پیک اس وقت دستیاب نہیں ہیں۔",
     "noMatchingProducts": "App Store نے کوئی مماثل کریڈٹ پیک واپس نہیں کیا۔",
     "noMatchingProductsPlay": "Google Play نے کوئی مماثل کریڈٹ پیک واپس نہیں کیا۔",
+    "storeTimedOut": "App Store نے وقت پر جواب نہیں دیا۔ دوبارہ کوشش کریں۔",
+    "storeTimedOutPlay": "Google Play نے وقت پر جواب نہیں دیا۔ دوبارہ کوشش کریں۔",
     "purchaseOwnedByAnotherAccount": "اس Apple Account کے کریڈٹس کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتے ہیں۔ انہیں استعمال کرنے کے لیے اسی Kilo اکاؤنٹ میں سائن ان کریں۔",
     "purchaseOwnedByAnotherAccountPlay": "اس Google Play اکاؤنٹ کے کریڈٹس کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتے ہیں۔ انہیں استعمال کرنے کے لیے اس Kilo اکاؤنٹ میں سائن ان کریں۔"
   },

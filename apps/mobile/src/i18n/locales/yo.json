@@ -3790,6 +3790,8 @@
     "empty": "Àwọn àpò kírẹ́dítì kò sí ní báyìí.",
     "noMatchingProducts": "App Store kò dá àwọn àpò kírẹ́dítì tó báramu padà.",
     "noMatchingProductsPlay": "Google Play kò dá àwọn àpò kírẹ́dítì tó báramu padà.",
+    "storeTimedOut": "App Store kò dáhùn ní àkókò tó yẹ. Tún gbìyànjú.",
+    "storeTimedOutPlay": "Google Play kò dáhùn ní àkókò tó yẹ. Tún gbìyànjú.",
     "purchaseOwnedByAnotherAccount": "Kírẹ́dítì lórí Apple Account yìí jẹ́ ti àkọọ́lẹ̀ Kilo mìíràn. Wọlé sí àkọọ́lẹ̀ Kilo yẹn láti lò ó.",
     "purchaseOwnedByAnotherAccountPlay": "Kírẹ́dítì lori Google Play àkọọ́lẹ̀ yii jẹ ti Kilo àkọọ́lẹ̀ miiran. Wọle si Kilo àkọọ́lẹ̀ yẹn lati lo o."
   },

@@ -3854,6 +3854,8 @@
     "empty": "Credit packs are unavailable right now.",
     "noMatchingProducts": "No matching credit packs were returned by App Store.",
     "noMatchingProductsPlay": "No matching credit packs were returned by Google Play.",
+    "storeTimedOut": "App Store didn't respond in time. Try again.",
+    "storeTimedOutPlay": "Google Play didn't respond in time. Try again.",
     "purchaseOwnedByAnotherAccount": "The credits on this Apple Account belong to a different Kilo account. Sign in to that Kilo account to use them.",
     "purchaseOwnedByAnotherAccountPlay": "The credits on this Google Play account belong to a different Kilo account. Sign in to that Kilo account to use them."
   },

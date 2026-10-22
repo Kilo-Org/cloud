@@ -3790,6 +3790,8 @@
     "empty": "Пакетите со кредити во моментов не се достапни.",
     "noMatchingProducts": "App Store не врати соодветни пакети со кредити.",
     "noMatchingProductsPlay": "Google Play не врати соодветни пакети со кредити.",
+    "storeTimedOut": "App Store не одговори на време. Обиди се повторно.",
+    "storeTimedOutPlay": "Google Play не одговори на време. Обиди се повторно.",
     "purchaseOwnedByAnotherAccount": "Кредитите на оваа Apple Account припаѓаат на друга сметка на Kilo. Најави се на таа сметка на Kilo за да ги користиш.",
     "purchaseOwnedByAnotherAccountPlay": "Кредитите на оваа Google Play сметка припаѓаат на друга Kilo сметка. Најавете се на таа Kilo сметка за да ги користите."
   },

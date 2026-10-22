@@ -3790,6 +3790,8 @@
     "empty": "Ngwugwu ego ojiji adịghị ugbu a.",
     "noMatchingProducts": "App Store eweghachighị ngwugwu ego ojiji dabara adaba.",
     "noMatchingProductsPlay": "Google Play eweghachighị ngwugwu ego ojiji dabara adaba.",
+    "storeTimedOut": "App Store azaghịghị n'oge. Nwaa ọzọ.",
+    "storeTimedOutPlay": "Google Play azaghịghị n'oge. Nwaa ọzọ.",
     "purchaseOwnedByAnotherAccount": "Ego ojiji dị na Apple Account a bụ nke akaụntụ Kilo ọzọ. Banye na akaụntụ Kilo ahụ iji jiri ya.",
     "purchaseOwnedByAnotherAccountPlay": "Ego ojiji dị na akaụntụ Google Play a bụ nke akaụntụ Kilo ọzọ. Banye na akaụntụ Kilo ahụ iji jiri ya."
   },

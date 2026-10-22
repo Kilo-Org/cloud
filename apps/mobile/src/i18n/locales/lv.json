@@ -3831,6 +3831,8 @@
     "empty": "Kredītu paketes šobrīd nav pieejamas.",
     "noMatchingProducts": "App Store neatgrieza nevienu atbilstošu kredītu paketi.",
     "noMatchingProductsPlay": "Google Play neatgrieza nevienu atbilstošu kredītu paketi.",
+    "storeTimedOut": "App Store neatbildēja laicīgi. Mēģināt vēlreiz.",
+    "storeTimedOutPlay": "Google Play neatbildēja laicīgi. Mēģināt vēlreiz.",
     "purchaseOwnedByAnotherAccount": "Kredīti šajā Apple Account kontā pieder citam Kilo kontam. Lai tos izmantotu, pieraksties attiecīgajā Kilo kontā.",
     "purchaseOwnedByAnotherAccountPlay": "Kredīti šajā Google Play kontā pieder citam Kilo kontam. Lai tos izmantotu, piesakieties tajā Kilo kontā."
   },

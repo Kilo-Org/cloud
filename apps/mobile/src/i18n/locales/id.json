@@ -3790,6 +3790,8 @@
     "empty": "Paket kredit tidak tersedia saat ini.",
     "noMatchingProducts": "App Store tidak mengembalikan paket kredit yang cocok.",
     "noMatchingProductsPlay": "Google Play tidak mengembalikan paket kredit yang cocok.",
+    "storeTimedOut": "App Store tidak merespons tepat waktu. Coba lagi.",
+    "storeTimedOutPlay": "Google Play tidak merespons tepat waktu. Coba lagi.",
     "purchaseOwnedByAnotherAccount": "Kredit pada Apple Account ini milik akun Kilo yang berbeda. Masuk ke akun Kilo tersebut untuk menggunakannya.",
     "purchaseOwnedByAnotherAccountPlay": "Kredit di akun Google Play ini milik akun Kilo yang berbeda. Masuk ke akun Kilo tersebut untuk menggunakannya."
   },

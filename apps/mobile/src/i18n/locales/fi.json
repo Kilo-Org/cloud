@@ -3790,6 +3790,8 @@
     "empty": "Krediittipaketit eivät ole juuri nyt saatavilla.",
     "noMatchingProducts": "App Store ei palauttanut yhtään sopivaa krediittipakettia.",
     "noMatchingProductsPlay": "Google Play ei palauttanut yhtään sopivaa krediittipakettia.",
+    "storeTimedOut": "App Store ei vastannut ajoissa. Yritä uudelleen.",
+    "storeTimedOutPlay": "Google Play ei vastannut ajoissa. Yritä uudelleen.",
     "purchaseOwnedByAnotherAccount": "Tämän Apple-tilin krediitit kuuluvat toiselle Kilo-tilille. Käytä niitä kirjautumalla kyseiselle Kilo-tilille.",
     "purchaseOwnedByAnotherAccountPlay": "Tämän Google Play -tilin krediitit kuuluvat eri Kilo-tilille. Käytä niitä kirjautumalla siihen Kilo-tiliin."
   },

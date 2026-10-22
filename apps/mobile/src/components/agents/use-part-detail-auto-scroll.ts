@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { type NativeScrollEvent, type NativeSyntheticEvent, type ScrollView } from 'react-native';
+import {
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type ScrollViewInstance,
+} from 'react-native';
 
 import {
   isSessionListAtBottom,
@@ -28,7 +32,7 @@ type UsePartDetailAutoScrollParams = {
  * turn follow off mid-stream.
  */
 export function usePartDetailAutoScroll({ enabled, resetKey }: UsePartDetailAutoScrollParams) {
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const shouldAutoScrollRef = useRef(true);
   const isAutoScrollingRef = useRef(false);
   const isUserScrollingRef = useRef(false);

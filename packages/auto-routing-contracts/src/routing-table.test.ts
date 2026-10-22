@@ -322,7 +322,7 @@ describe('RoutingTableSchema', () => {
       }).success
     ).toBe(false);
   });
-  it('requires at least one candidate per taxonomy route', () => {
+  it('rejects an empty candidate list for a present route', () => {
     expect(
       RoutingTableSchema.safeParse({
         version: 'v',
@@ -336,6 +336,20 @@ describe('RoutingTableSchema', () => {
         },
       }).success
     ).toBe(false);
+  });
+
+  it('accepts a table that omits a taxonomy route instead of requiring full coverage', () => {
+    const parsed = RoutingTableSchema.parse({
+      version: 'v',
+      generatedAt: new Date(0).toISOString(),
+      minAccuracy: 0.7,
+      switchCostFactor: 3,
+      source: 'benchmark',
+      routes: {
+        'implementation/code_generation': [candidate('impl', 0.9, 1)],
+      },
+    });
+    expect(Object.keys(parsed.routes)).toEqual(['implementation/code_generation']);
   });
 
   it('accepts a table routed by classifier taxonomy pair', () => {

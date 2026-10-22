@@ -80,8 +80,11 @@ describe('convertHtmlToMarkdown inline tags', () => {
     expect(convertHtmlToMarkdown('<a href="https://x.dev" class="c">x</a>')).toBe(
       '<a href="https://x.dev" class="c">x</a>'
     );
+  });
+
+  it('converts a bracket in link text, which its escape keeps literal', () => {
     expect(convertHtmlToMarkdown('<a href="https://x.dev">a]b</a>')).toBe(
-      '<a href="https://x.dev">a]b</a>'
+      String.raw`[a\]b](https://x.dev)`
     );
   });
 
@@ -188,6 +191,22 @@ describe('convertHtmlToMarkdown block tags', () => {
     expect(convertHtmlToMarkdown('<table><tr><th>A</th></tr><tr><td>1</td></tr></table>')).toBe(
       '| A |\n| --- |\n| 1 |'
     );
+  });
+
+  it('keeps a pipe inside a table cell, escaped once', () => {
+    expect(convertHtmlToMarkdown('<table><tr><th>A</th></tr><tr><td>a|b</td></tr></table>')).toBe(
+      '| A |\n| --- |\n| a\\|b |'
+    );
+    expect(
+      convertHtmlToMarkdown(String.raw`<table><tr><th>A</th></tr><tr><td>a\|b</td></tr></table>`)
+    ).toBe(String.raw`| A |
+| --- |
+| a\\\|b |`);
+    expect(
+      convertHtmlToMarkdown(String.raw`<table><tr><th>A</th></tr><tr><td>a\\|b</td></tr></table>`)
+    ).toBe(String.raw`| A |
+| --- |
+| a\\\\\|b |`);
   });
 
   it('keeps tables markdown cannot express as HTML', () => {

@@ -47,6 +47,11 @@ export function deviceFit(downloadBytes: number, budget: DeviceBudget): DeviceFi
   return memory <= budget.memoryBytes * TIGHT_SHARE ? 'tight' : 'tooLarge';
 }
 
+/** Whether the device is known to run this file: an unjudged fit is not a fit. */
+export function fitsDevice(fit: DeviceFit | undefined): boolean {
+  return fit === 'fits' || fit === 'tight';
+}
+
 /**
  * The largest parameter count whose Q4_K_M file still fits, tightly, in memory.
  * Only a first filter: Hugging Face can state the count of a draft model the

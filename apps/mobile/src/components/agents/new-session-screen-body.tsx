@@ -79,6 +79,7 @@ import {
   resolveContinueStartDisabled,
   resolveNewSessionStartBlockedReason,
   resolveNewSessionStartDisabled,
+  resolveRemoteStartMissingContent,
 } from '@/lib/new-session-submit';
 import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import { getRepoBindingsPath } from '@/lib/profile-agent-navigation';
@@ -584,17 +585,27 @@ export function NewSessionScreenBody() {
   // failed spawn keeps the screen mounted (draft preserved for retry); a
   // blocked admission or cancelled voice submit never arms the marker, so
   // the unmount flush preserves the draft.
-  const { markRemoteSpawnAttempted } = useRemoteSpawnDraftCleanup({
+  const { markRemoteSpawnAttempted, markRemoteSpawnFailed } = useRemoteSpawnDraftCleanup({
     userId: isCloneEntry ? undefined : userId,
   });
 
   // A committed remote spawn arms the discard-confirm bypass alongside the
   // draft-clearing marker. The bypass is reset when the spawn settles without
-  // navigating (a failed spawn), so an abandon after a failure still confirms.
+  // navigating (a failed spawn), so an abandon after a failure still confirms,
+  // and the failure also disarms the draft-clearing marker so the draft
+  // survives leaving to Home. The ready callback re-arms the marker for the
+  // same attempt: a success that lands late (after the deadline flipped the
+  // form to the inline failure and the user pressed Retry) has consumed the
+  // prompt, so the unmount must still clear the draft instead of flushing it
+  // back into the composer for the next visit.
   const handleSpawnAdmitted = useCallback(() => {
     markRemoteSpawnAttempted();
     skipDiscardGuardRef.current = true;
   }, [markRemoteSpawnAttempted]);
+  const handleSpawnFailed = useCallback(() => {
+    markRemoteSpawnFailed();
+    skipDiscardGuardRef.current = false;
+  }, [markRemoteSpawnFailed]);
 
   // Clone entry never touches the shared draft. The inline "Run on" reason is
   // a delivered clone/import failure (or an incapable CLI, derived below) and
@@ -609,6 +620,10 @@ export function NewSessionScreenBody() {
   const armCloneNavigateBypass = useCallback(() => {
     cloneNavigateBypassRef.current = true;
   }, []);
+  const handleSpawnReady = useCallback(() => {
+    markRemoteSpawnAttempted();
+    armCloneNavigateBypass();
+  }, [markRemoteSpawnAttempted, armCloneNavigateBypass]);
 
   // A to-do start can target a remote instance instead of Cloud Agent; the
   // spawned session links to the to-do the same way the cloud path links it.
@@ -720,17 +735,17 @@ export function NewSessionScreenBody() {
     // a blocked admission or cancelled voice submit never clears the draft.
     onSpawnAdmitted: handleSpawnAdmitted,
     // A committed spawn that settles without navigating (retryable or
-    // non-retryable) must re-arm the discard confirm, so an abandon after a
-    // failed spawn still asks. A successful spawn replaces the screen before
-    // this can run, so the bypass stays armed and the guard consumes it.
-    onSpawnFailed: () => {
-      skipDiscardGuardRef.current = false;
-    },
+    // non-retryable) disarms the draft-clearing marker (the draft survives
+    // the failure and the leave to Home) and re-arms the discard confirm, so
+    // an abandon after a failed spawn still asks. A successful spawn replaces
+    // the screen before this can run, so the bypass stays armed and the guard
+    // consumes it.
+    onSpawnFailed: handleSpawnFailed,
     cloneFromKiloSessionId: isCloneEntry ? cloneFromKiloSessionId : null,
     cloneUpToMessageId: cloneUpToMessageId || null,
     forkPrefillText: forkPrefillText || null,
     onCloneImportFailure: handleCloneImportFailure,
-    onSpawnReady: armCloneNavigateBypass,
+    onSpawnReady: handleSpawnReady,
     onSpawnSucceeded: handleSpawnSucceeded,
   });
   const runCloudCreate = useContinueCloudCreate(organizationId, armCloneNavigateBypass);
@@ -896,11 +911,14 @@ export function NewSessionScreenBody() {
           userId,
           surface: 'agent-new',
           sessionId: null,
+          // Carried so a launch this screen loses to an Activity recreation
+          // reopens the same organization scope.
+          organizationId: organizationId ?? null,
         },
         themedSheet
       )
     );
-  }, [addCandidates, showActionSheetWithOptions, userId, themedSheet]);
+  }, [addCandidates, showActionSheetWithOptions, userId, themedSheet, organizationId]);
 
   const handleRemoveAttachment = useCallback(
     (id: string) => {
@@ -964,7 +982,15 @@ export function NewSessionScreenBody() {
       if (runOnInstance === null) {
         return true;
       }
+      // An empty composer hands the spawn nothing: `buildComposerSharePayload`
+      // returns null, the spawn carries no prompt and no file, and Start would
+      // stay busy until the SDK timeout with nothing to show for it. A file
+      // alone is content (the destination keeps it for the user to send).
       return (
+        resolveRemoteStartMissingContent({
+          hasPrompt,
+          hasAttachments: attachments.attachments.length > 0,
+        }) ||
         remoteSpawn.isSpawningRemote ||
         isSubmitting ||
         attachments.hasFailedAttachments ||
@@ -1004,6 +1030,8 @@ export function NewSessionScreenBody() {
           isLoadingRepositories,
           isRemoteTargetSelected,
           selectedRepo,
+          hasAttachments: attachments.attachments.length > 0,
+          selectedRepositoryResolved: selectedRepository !== null,
           gate: {
             isCreating,
             isSubmitting,
@@ -1023,6 +1051,8 @@ export function NewSessionScreenBody() {
           isLoadingRepositories,
           isRemoteTargetSelected,
           selectedRepo,
+          hasAttachments: attachments.attachments.length > 0,
+          selectedRepositoryResolved: selectedRepository !== null,
           gate: {
             attachmentsHasFailed: attachments.hasFailedAttachments,
             attachmentsIsUploading: attachments.isUploading,
@@ -1047,6 +1077,10 @@ export function NewSessionScreenBody() {
     startBlockedReason = t('agentChat.newSession.refreshRepositories');
   } else if (startBlockedReasonKey === 'select-repository') {
     startBlockedReason = t('agentChat.newSession.selectRepositoryToStart');
+  } else if (startBlockedReasonKey === 'enter-prompt') {
+    startBlockedReason = t('agentChat.newSession.enterPromptToStart');
+  } else if (startBlockedReasonKey === 'enter-prompt-or-file') {
+    startBlockedReason = t('agentChat.newSession.enterPromptOrFileToStart');
   }
 
   const handleStartSession = useCallback(() => {
@@ -1218,6 +1252,8 @@ export function NewSessionScreenBody() {
         onStartSession={handleStartSession}
         cloudCreateError={cloudCreateError}
         onRetryCloudCreate={handleStartSession}
+        remoteSpawnFailure={remoteSpawn.remoteSpawnFailure}
+        onRetryRemoteSpawn={handleStartSession}
       />
       {/* The discard confirm: a Modal overlay, so the composer behind it keeps
           its layout while the destructive choice keeps its red fill. */}

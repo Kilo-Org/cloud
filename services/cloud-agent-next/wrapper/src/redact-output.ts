@@ -56,33 +56,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Builds a redactor that remembers the values of every environment whose name
+ * Collects the values of every environment whose name
  * matches `SECRET_NAME`, plus the values of `secretEnvKeys` regardless of name.
  * Later environments override earlier ones for a named key, mirroring how the
  * caller layers them.
  */
-export function createSecretRedactor(
+export function collectSecretValues(
   environment: Record<string, string | undefined>,
   additionalEnvironments: readonly Record<string, string | undefined>[] = [],
   secretEnvKeys: readonly string[] = []
-): (text: string) => string {
+): string[] {
   const sources = [environment, ...additionalEnvironments];
   const secrets = new Set<string>();
   const remember = (value: string): void => {
     if (!value) return;
     secrets.add(value);
-    secrets.add(JSON.stringify(value).slice(1, -1));
-    if (value.length >= 8) {
-      if (value.isWellFormed()) secrets.add(encodeURIComponent(value));
-      secrets.add(Buffer.from(value).toString('base64'));
-      secrets.add(Buffer.from(value).toString('base64url'));
-      secrets.add(Buffer.from(value).toString('hex'));
-    }
-    for (const line of value.split(/\r?\n/)) {
-      if (line.trim()) secrets.add(line.trim());
-    }
-    const authorization = /^(?:Bearer|Basic)\s+(.+)$/i.exec(value);
-    if (authorization?.[1]) secrets.add(authorization[1]);
   };
   const collect = (value: unknown, inMcp = false, mcpCredentialValues = false): void => {
     if (Array.isArray(value)) {
@@ -126,8 +114,39 @@ export function createSecretRedactor(
       }
     }
   }
+  return [...secrets];
+}
+
+export function createSecretValueRedactor(values: Iterable<string>): (text: string) => string {
+  const secrets = new Set<string>();
+  for (const value of values) {
+    if (!value) continue;
+    secrets.add(value);
+    secrets.add(JSON.stringify(value).slice(1, -1));
+    if (value.length >= 8) {
+      if (value.isWellFormed()) secrets.add(encodeURIComponent(value));
+      secrets.add(Buffer.from(value).toString('base64'));
+      secrets.add(Buffer.from(value).toString('base64url'));
+      secrets.add(Buffer.from(value).toString('hex'));
+    }
+    for (const line of value.split(/\r?\n/)) {
+      if (line.trim()) secrets.add(line.trim());
+    }
+    const authorization = /^(?:Bearer|Basic)\s+(.+)$/i.exec(value);
+    if (authorization?.[1]) secrets.add(authorization[1]);
+  }
   const known = [...secrets].sort((left, right) => right.length - left.length);
   return text => redactSecrets(text, known);
+}
+
+export function createSecretRedactor(
+  environment: Record<string, string | undefined>,
+  additionalEnvironments: readonly Record<string, string | undefined>[] = [],
+  secretEnvKeys: readonly string[] = []
+): (text: string) => string {
+  return createSecretValueRedactor(
+    collectSecretValues(environment, additionalEnvironments, secretEnvKeys)
+  );
 }
 
 export function createOutputRedactor(

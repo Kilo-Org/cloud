@@ -602,6 +602,9 @@ export function createControlTerminalRuntime(options: {
     },
 
     async close(identity, payload) {
+      requireAttached(identity);
+      // A previous close can finish after the caller's deadline and be retried.
+      if (!terminals.has(payload.ptyId)) return { success: true };
       const terminal = requireTerminal(identity, payload.ptyId, true);
       try {
         const success = await currentKiloRuntime(terminal).kiloClient.deletePty(

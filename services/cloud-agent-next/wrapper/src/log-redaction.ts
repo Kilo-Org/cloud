@@ -1,8 +1,8 @@
-import { createSecretRedactor, redactSecrets } from './redact-output.js';
+import { collectSecretValues, createSecretValueRedactor, redactSecrets } from './redact-output.js';
 
-const MAX_ENVIRONMENT_BYTES = 1024 * 1024;
-const MAX_ENVIRONMENTS = 128;
-const redactors: Array<(text: string) => string> = [];
+const MAX_SECRET_BYTES = 1024 * 1024;
+const remembered = new Set<string>();
+let redact = redactSecrets;
 let rememberedBytes = 0;
 let exhausted = false;
 
@@ -12,21 +12,25 @@ export function rememberLogSecrets(
   secretEnvKeys: readonly string[] = []
 ): void {
   if (exhausted) return;
-  rememberedBytes += Object.values(environment).reduce(
-    (total, value) => total + (value?.length ?? 0),
-    0
-  );
-  if (rememberedBytes > MAX_ENVIRONMENT_BYTES || redactors.length >= MAX_ENVIRONMENTS) {
-    exhausted = true;
-    redactors.length = 0;
-    return;
+  let changed = false;
+  for (const value of collectSecretValues(environment, [], secretEnvKeys)) {
+    if (remembered.has(value)) continue;
+    rememberedBytes += Buffer.byteLength(value);
+    if (rememberedBytes > MAX_SECRET_BYTES) {
+      exhausted = true;
+      remembered.clear();
+      redact = redactSecrets;
+      return;
+    }
+    remembered.add(value);
+    changed = true;
   }
-  redactors.push(createSecretRedactor(environment, [], secretEnvKeys));
+  if (changed) redact = createSecretValueRedactor(remembered);
 }
 
 rememberLogSecrets(process.env);
 
 export function redactLogText(text: string): string {
   if (exhausted) return '[Log text suppressed: secret filtering capacity reached]\n';
-  return redactors.reduce((safe, redact) => redact(safe), redactSecrets(text));
+  return redact(text);
 }

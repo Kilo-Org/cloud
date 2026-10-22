@@ -27,7 +27,7 @@ const router = vi.hoisted(() => ({ back: vi.fn(), push: vi.fn() }));
 const navigation = vi.hoisted(() => ({ dispatch: vi.fn(), goBack: vi.fn() }));
 const preventRemove = vi.hoisted(() => ({
   enabled: false,
-  handler: undefined as ((options: { data: { action: unknown } }) => void) | undefined,
+  handler: undefined as ((options: { repeat: () => void }) => void) | undefined,
 }));
 // The TextInput records its props on render so the test drives a real edit
 // through the screen's own onChangeText, not a fabricated dirty flag.
@@ -55,19 +55,14 @@ vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ scope: 'personal', platform: 'github' }),
   useRouter: () => router,
   useNavigation: () => navigation,
+  usePreventRemove: (enabled: boolean, handler: (options: { repeat: () => void }) => void) => {
+    preventRemove.enabled = enabled;
+    preventRemove.handler = handler;
+  },
 }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   useReviewConfig: () => config,
   useSaveReviewConfig: () => save,
-}));
-vi.mock('@/lib/navigation/prevent-remove', () => ({
-  usePreventRemove: (
-    enabled: boolean,
-    handler: (options: { data: { action: unknown } }) => void
-  ) => {
-    preventRemove.enabled = enabled;
-    preventRemove.handler = handler;
-  },
 }));
 vi.mock('react-native', () => ({
   View: 'View',
@@ -155,6 +150,18 @@ function visibleConfirmationCount(renderer: TestRenderer.ReactTestRenderer) {
   return findByHostType(renderer, 'DestructiveConfirmDialog').length;
 }
 
+// The guard holds the removal back and replays it through the `repeat`
+// callback expo-router hands it, so the stub feeds the same contract the hook
+// provides: an intercepted exit that re-runs the captured action.
+function triggerPreventRemove() {
+  const action = { type: 'GO_BACK' };
+  preventRemove.handler?.({
+    repeat: () => {
+      navigation.dispatch(action);
+    },
+  });
+}
+
 const STORED = 'first line\nsecond line\nthird line\nfourth line\nfifth line\nsixth line';
 
 // The TextInput mock records on every render; the last entry is the current
@@ -234,7 +241,7 @@ describe('InstructionsRoute editor', () => {
 
     // Android hardware back / header back while dirty: the guard intercepts.
     act(() => {
-      preventRemove.handler?.({ data: { action: { type: 'GO_BACK' } } });
+      triggerPreventRemove();
     });
     expect(visibleConfirmationCount(renderer)).toBe(1);
     const dialog = confirmDialog.current;
@@ -259,7 +266,7 @@ describe('InstructionsRoute editor', () => {
     // The draft the screen holds (draftRef) is what save persists: another
     // intercepted leave offers Save, and its payload is the edited text.
     act(() => {
-      preventRemove.handler?.({ data: { action: { type: 'GO_BACK' } } });
+      triggerPreventRemove();
     });
     const reopened = confirmDialog.current;
     if (!reopened?.extraAction) {
@@ -272,7 +279,7 @@ describe('InstructionsRoute editor', () => {
 
     // Discard: replays the captured navigation and leaves.
     act(() => {
-      preventRemove.handler?.({ data: { action: { type: 'GO_BACK' } } });
+      triggerPreventRemove();
     });
     expect(visibleConfirmationCount(renderer)).toBe(1);
     act(() => {
@@ -290,7 +297,7 @@ describe('InstructionsRoute editor', () => {
       input.onChangeText('  rewritten draft\n');
     });
     act(() => {
-      preventRemove.handler?.({ data: { action: { type: 'GO_BACK' } } });
+      triggerPreventRemove();
     });
     const dialog = confirmDialog.current;
     const extraAction = dialog?.extraAction;
@@ -349,7 +356,7 @@ describe('InstructionsRoute editor', () => {
     // The next navigation is the screen's own back: the guard must let it
     // through without a confirm, then re-arm for later edits.
     act(() => {
-      preventRemove.handler?.({ data: { action: { type: 'GO_BACK' } } });
+      triggerPreventRemove();
     });
     expect(navigation.dispatch).toHaveBeenCalledTimes(1);
     expect(visibleConfirmationCount(renderer)).toBe(0);
@@ -371,7 +378,7 @@ describe('InstructionsRoute editor', () => {
     expect(preventRemove.enabled).toBe(true);
     // The screen's own save (reading the draft ref) still persists the edit.
     act(() => {
-      preventRemove.handler?.({ data: { action: { type: 'GO_BACK' } } });
+      triggerPreventRemove();
     });
     const reopened = confirmDialog.current;
     const reopenedSave = reopened?.extraAction;

@@ -222,6 +222,15 @@ export const INBOX_PAGE_SIZE = 25;
 export const FILES_PAGE_SIZE = 50;
 export const FILES_MAX_PAGES = 60;
 export const FILE_LINES_MAX = 500;
+/**
+ * Byte ceiling for one file read behind the PR-review line procedures. GitHub's
+ * contents API inlines a body only up to this size, so it is the cut-off for a
+ * file the review surface serves. A larger file answers `too_large`, which the
+ * procedures surface as tRPC `PAYLOAD_TOO_LARGE`.
+ */
+export const FILE_READ_MAX_BYTES = 1024 * 1024;
+/** Fixed copy for a file above FILE_READ_MAX_BYTES; safe to show to a caller. */
+export const FILE_READ_TOO_LARGE_MESSAGE = `The file exceeds the ${FILE_READ_MAX_BYTES}-byte review read limit.`;
 export const REVIEW_THREADS_PAGE_SIZE = 50;
 export const REVIEW_THREAD_COMMENTS_PAGE_SIZE = 50;
 // Conversation (issue) comments on the first listReviewThreads page only.

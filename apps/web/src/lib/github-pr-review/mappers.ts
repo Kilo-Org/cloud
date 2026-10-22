@@ -3,6 +3,7 @@ import 'server-only';
 import { z } from 'zod';
 
 import {
+  FILE_LINES_MAX,
   FILES_MAX_PAGES,
   REVIEW_THREADS_PAGE_SIZE,
   type GitHubPrReviewChecksResult,
@@ -377,13 +378,33 @@ export function sliceFileLines(args: { rawContent: string; startLine: number; en
   totalLines: number;
 } {
   const { rawContent, startLine, endLine } = args;
-  const all = rawContent.split(/\r?\n/);
-  const totalLines = all.length;
   const start = Math.max(1, startLine);
   const requestedEnd = Math.max(start, endLine);
-  const cappedEnd = Math.min(requestedEnd, start + 500 - 1);
-  const slice = all.slice(start - 1, cappedEnd);
-  return { lines: slice, totalLines };
+  const cappedEnd = Math.min(requestedEnd, start + FILE_LINES_MAX - 1);
+  // Walk the line boundaries with `indexOf` and materialize a string only for
+  // the requested window; `totalLines` comes from the same walk. The result
+  // matches `String.prototype.split(/\r?\n/)` followed by the window slice: a
+  // trailing newline ends an empty last line and a CR before the LF is not part
+  // of the line.
+  const lines: string[] = [];
+  let lineNumber = 1;
+  let lineStart = 0;
+  for (;;) {
+    const newlineIndex = rawContent.indexOf('\n', lineStart);
+    if (lineNumber >= start && lineNumber <= cappedEnd) {
+      let lineEnd = newlineIndex === -1 ? rawContent.length : newlineIndex;
+      // The `\r` of a CRLF ending belongs to the separator, so it is dropped
+      // only when a `\n` follows it; a bare trailing `\r` is file content.
+      if (newlineIndex !== -1 && lineEnd > lineStart && rawContent.charCodeAt(lineEnd - 1) === 13) {
+        lineEnd -= 1;
+      }
+      lines.push(rawContent.slice(lineStart, lineEnd));
+    }
+    if (newlineIndex === -1) break;
+    lineNumber += 1;
+    lineStart = newlineIndex + 1;
+  }
+  return { lines, totalLines: lineNumber };
 }
 
 export type GraphQlReviewThreadInput = {

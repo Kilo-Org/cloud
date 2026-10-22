@@ -33,6 +33,8 @@ import {
   CONVERSATION_COMMENTS_MAX_PAGES,
   CONVERSATION_COMMENTS_PAGE_SIZE,
   FILE_LINES_MAX,
+  FILE_READ_MAX_BYTES,
+  FILE_READ_TOO_LARGE_MESSAGE,
   FILES_MAX_PAGES,
   FILES_PAGE_SIZE,
   INBOX_PAGE_SIZE,
@@ -1598,6 +1600,20 @@ async function assertViewerOwnsComment(args: {
   return 'owned';
 }
 
+/**
+ * One file read behind `getFileLines` holds at most the shared byte budget,
+ * whichever observation of the blob supplies the number. A file above it is a
+ * typed `PAYLOAD_TOO_LARGE` rejection; a window is never truncated.
+ */
+function assertFileWithinReadBudget(bytes: number): void {
+  if (bytes > FILE_READ_MAX_BYTES) {
+    throw new TRPCError({
+      code: 'PAYLOAD_TOO_LARGE',
+      message: FILE_READ_TOO_LARGE_MESSAGE,
+    });
+  }
+}
+
 export const githubPrReviewRouter = createTRPCRouter({
   getPullRequest: baseProcedure.input(GetPullRequestInput).query(async ({ ctx, input }) => {
     const overview = await withGitHubUserTokenRetry({
@@ -1715,6 +1731,25 @@ export const githubPrReviewRouter = createTRPCRouter({
     return withGitHubUserTokenRetry({
       kiloUserId: ctx.user.id,
       call: async octokit => {
+        // The window is capped at FILE_LINES_MAX lines. The contents metadata
+        // carries the blob size, so only a blob inside the budget is read; the
+        // raw read follows and the delivered body is measured against the same
+        // budget, which keeps the ceiling true whichever ref the two calls see.
+        const metadata = await octokit.repos.getContent({
+          owner: input.owner,
+          repo: input.repo,
+          path: input.path,
+          ref: input.ref,
+        });
+        const entry = metadata.data as unknown;
+        if (Array.isArray(entry)) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Requested path is not a file',
+          });
+        }
+        const { size } = (entry ?? {}) as { size?: number };
+        assertFileWithinReadBudget(typeof size === 'number' ? size : 0);
         const response = await octokit.repos.getContent({
           owner: input.owner,
           repo: input.repo,
@@ -1729,6 +1764,9 @@ export const githubPrReviewRouter = createTRPCRouter({
             message: 'Requested path is not a file',
           });
         }
+        // Both observations of the blob stay inside the budget: the delivered
+        // body is measured against it before any line is sliced.
+        assertFileWithinReadBudget(Buffer.byteLength(data));
         const cappedEnd = Math.min(input.endLine, input.startLine + FILE_LINES_MAX - 1);
         return sliceFileLines({
           rawContent: data,

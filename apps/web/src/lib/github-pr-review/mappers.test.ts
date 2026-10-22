@@ -5,7 +5,7 @@ import {
   buildReviewThreadsResult,
   sliceFileLines,
 } from './mappers';
-import { FILES_MAX_PAGES } from './dtos';
+import { FILE_LINES_MAX, FILES_MAX_PAGES } from './dtos';
 
 describe('buildOverviewDto', () => {
   const basePr = {
@@ -397,6 +397,58 @@ describe('sliceFileLines', () => {
     const huge = Array.from({ length: 1000 }, (_, i) => `line${i}`).join('\n');
     const result = sliceFileLines({ rawContent: huge, startLine: 1, endLine: 10_000 });
     expect(result.lines).toHaveLength(500);
+  });
+
+  it('reads a trailing newline as a final empty line', () => {
+    const result = sliceFileLines({ rawContent: 'a\nb\n', startLine: 1, endLine: 10 });
+    expect(result.lines).toEqual(['a', 'b', '']);
+    expect(result.totalLines).toBe(3);
+  });
+
+  it('drops the carriage return of a CRLF ending', () => {
+    const result = sliceFileLines({ rawContent: 'a\r\nb\r\nc', startLine: 2, endLine: 3 });
+    expect(result.lines).toEqual(['b', 'c']);
+    expect(result.totalLines).toBe(3);
+  });
+
+  it('keeps a bare trailing carriage return as file content', () => {
+    const result = sliceFileLines({ rawContent: 'a\r', startLine: 1, endLine: 1 });
+    expect(result.lines).toEqual(['a\r']);
+    expect(result.totalLines).toBe(1);
+  });
+
+  it('reads empty content as one empty line', () => {
+    expect(sliceFileLines({ rawContent: '', startLine: 1, endLine: 5 })).toEqual({
+      lines: [''],
+      totalLines: 1,
+    });
+  });
+
+  it('matches the slice of a fully split body for arbitrary content and windows', () => {
+    // Deterministic generator: the window scan must agree with the full split
+    // for every combination of CRLF endings, empty lines, and window bounds.
+    let seed = 20261022;
+    const random = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
+    const pieces = ['', 'a', 'bb', 'x\r', 'line', '\r', 'tail\r'];
+    for (let round = 0; round < 500; round += 1) {
+      const lineCount = Math.floor(random() * 20);
+      const body = Array.from(
+        { length: lineCount },
+        () => pieces[Math.floor(random() * pieces.length)]
+      ).join(random() < 0.3 ? '\r\n' : '\n');
+      const rawContent = random() < 0.4 ? `${body}\n` : body;
+      const startLine = 1 + Math.floor(random() * 25);
+      const endLine = startLine + Math.floor(random() * 1200);
+      const result = sliceFileLines({ rawContent, startLine, endLine });
+      const all = rawContent.split(/\r?\n/);
+      expect(result.totalLines).toBe(all.length);
+      expect(result.lines).toEqual(
+        all.slice(startLine - 1, Math.min(endLine, startLine + FILE_LINES_MAX - 1))
+      );
+    }
   });
 });
 

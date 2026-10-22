@@ -10,7 +10,7 @@ import {
   listInbox,
 } from './bitbucket-read';
 import { BitbucketReviewError } from './bitbucket-authorization';
-import { FILE_LINES_MAX } from '@/lib/github-pr-review/dtos';
+import { FILE_LINES_MAX, FILE_READ_MAX_BYTES } from '@/lib/github-pr-review/dtos';
 
 const mockGetBitbucketWorkspaceAccessTokenStatus = jest.fn();
 const mockReadCachedRepositories = jest.fn();
@@ -261,6 +261,9 @@ beforeEach(() => {
     }
     if (parsed.pathname.endsWith('/pullrequests/12')) return jsonResponse(prDetail);
     if (parsed.pathname.includes('/src/')) {
+      if (parsed.searchParams.get('format') === 'meta') {
+        return jsonResponse({ path: 'src/retry.ts', size: 24, mimetype: 'text/plain' });
+      }
       return new Response('line one\nline two\nline three', {
         status: 200,
         headers: { 'content-type': 'text/plain' },
@@ -467,6 +470,66 @@ describe('getFileLines', () => {
     expect(result.totalLines).toBe(3);
   });
 
+  it('reads the file metadata before the file body', async () => {
+    await getFileLines(ORG_OWNER, 'acme', 'repo', 'abc123def4567890', 'src/retry.ts', 1, 2);
+
+    const sourceCalls = fetchMock.mock.calls
+      .map(call => new URL(String(call[0])))
+      .filter(url => url.pathname.includes('/src/'));
+    expect(sourceCalls.map(url => url.searchParams.get('format'))).toEqual(['meta', null]);
+  });
+
+  it('rejects a file above the read budget before the file body is read', async () => {
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      const parsed = new URL(full);
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      if (parsed.pathname.includes('/src/') && parsed.searchParams.get('format') === 'meta') {
+        return jsonResponse({ path: 'src/huge.ts', size: FILE_READ_MAX_BYTES + 1 });
+      }
+      if (parsed.pathname.includes('/src/')) {
+        throw new Error('the file body must not be read for an oversized file');
+      }
+      return jsonResponse({ pagelen: 50, values: [], next: null });
+    });
+
+    const error = await captureRejection(
+      getFileLines(ORG_OWNER, 'acme', 'repo', 'abc123def4567890', 'src/huge.ts', 1, 2)
+    );
+
+    expect(error).toBeInstanceOf(BitbucketReviewError);
+    expect(error.kind).toBe('too_large');
+    expect(error.retryable).toBe(false);
+  });
+
+  it('applies the budget to the delivered body when the metadata under-reports its size', async () => {
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      const parsed = new URL(full);
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      if (parsed.pathname.includes('/src/') && parsed.searchParams.get('format') === 'meta') {
+        return jsonResponse({ path: 'src/huge.ts', size: 4 });
+      }
+      if (parsed.pathname.includes('/src/')) {
+        return new Response('x'.repeat(FILE_READ_MAX_BYTES + 1), {
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+        });
+      }
+      return jsonResponse({ pagelen: 50, values: [], next: null });
+    });
+
+    const error = await captureRejection(
+      getFileLines(ORG_OWNER, 'acme', 'repo', 'abc123def4567890', 'src/huge.ts', 1, 2)
+    );
+
+    expect(error.kind).toBe('too_large');
+  });
+
   it('refuses a non-commit ref before any Bitbucket API request', async () => {
     await expect(
       getFileLines(ORG_OWNER, 'acme', 'repo', '../../etc/passwd', 'src/retry.ts', 1, 2)
@@ -502,8 +565,12 @@ describe('getFileLines', () => {
     const content = Array.from({ length: 600 }, (_, index) => `line ${index + 1}`).join('\n');
     fetchMock.mockImplementation(async (url: string | URL) => {
       const full = url.toString();
+      const parsed = new URL(full);
       if (full.includes('token-service.example.com')) {
         return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      if (parsed.pathname.includes('/src/') && parsed.searchParams.get('format') === 'meta') {
+        return jsonResponse({ path: 'src/retry.ts', size: content.length });
       }
       if (full.includes('/src/')) {
         return new Response(content, { status: 200, headers: { 'content-type': 'text/plain' } });

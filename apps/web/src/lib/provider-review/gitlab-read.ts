@@ -26,7 +26,6 @@ import type {
 } from '@kilocode/app-shared/provider-review';
 import {
   fetchGitLabMergeRequest,
-  fetchGitLabRootTextFileAtRef,
   fetchGitLabUser,
   getMRHeadCommit,
   type GitLabDiscussion,
@@ -37,7 +36,11 @@ import {
   resolveGitLabUrlSafely,
   type GitLabResolvedUrl,
 } from '@/lib/integrations/platforms/gitlab/instance-url';
-import { FILE_LINES_MAX } from '@/lib/github-pr-review/dtos';
+import {
+  FILE_LINES_MAX,
+  FILE_READ_MAX_BYTES,
+  FILE_READ_TOO_LARGE_MESSAGE,
+} from '@/lib/github-pr-review/dtos';
 import {
   authorizeOwner,
   authorizeProject,
@@ -492,6 +495,76 @@ export type GitLabFileLines = {
 };
 
 /**
+ * Read a response body with the shared byte budget as the hard limit: the
+ * stream is abandoned as soon as the budget is passed, and a file above the
+ * budget is a non-retryable too_large rejection.
+ */
+async function readBodyWithinReadBudget(response: Response): Promise<string> {
+  const reader = response.body?.getReader();
+  if (!reader) return '';
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > FILE_READ_MAX_BYTES) {
+        try {
+          await reader.cancel();
+        } catch {
+          // The rejection below stands even if cancellation itself fails.
+        }
+        throw new GitLabReviewError('too_large', FILE_READ_TOO_LARGE_MESSAGE);
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  if (totalBytes === 0) return '';
+  const merged = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(merged);
+}
+
+/**
+ * The raw body of one file at a ref, through the same guarded transport as the
+ * JSON reads, with the byte budget enforced while the body streams. A missing
+ * file is null.
+ */
+async function readFileTextWithinReadBudget(
+  access: { accessToken: string; instanceUrl: string },
+  projectPath: string,
+  filePath: string,
+  ref: string
+): Promise<string | null> {
+  const url = buildGitLabUrl(
+    access.instanceUrl,
+    `/api/v4/projects/${encodeURIComponent(projectPath)}/repository/files/${encodeURIComponent(filePath)}/raw`,
+    { ref }
+  );
+  const response = await fetchGitLabValidated(url, {
+    headers: { Authorization: `Bearer ${access.accessToken}` },
+    method: 'GET',
+    redirect: 'manual',
+    signal: AbortSignal.timeout(GITLAB_REQUEST_TIMEOUT_MS),
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new GitLabApiStatusError(
+      response.status,
+      `GitLab GET request failed: ${response.status}`
+    );
+  }
+  return readBodyWithinReadBudget(response);
+}
+
+/**
  * A 1-based inclusive line window of a file at a ref, for comment context.
  * A missing file is a non-retryable not_found.
  */
@@ -506,13 +579,7 @@ export async function getFileLines(
 ): Promise<GitLabFileLines> {
   const access = await authorizeProject(owner, projectPath, instanceHint);
   try {
-    const text = await fetchGitLabRootTextFileAtRef(
-      access.accessToken,
-      access.projectPath,
-      path,
-      ref,
-      access.instanceUrl
-    );
+    const text = await readFileTextWithinReadBudget(access, access.projectPath, path, ref);
     if (text === null) {
       throw new GitLabReviewError('not_found', 'The file was not found at this ref.');
     }

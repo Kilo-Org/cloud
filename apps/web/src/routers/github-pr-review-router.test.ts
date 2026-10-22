@@ -5,6 +5,7 @@ import { TRPCError } from '@trpc/server';
 import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
 import { INBOX_SEARCH_QUERY, prLedgerResourceKey } from './github-pr-review-router';
+import { FILE_READ_MAX_BYTES, FILE_READ_TOO_LARGE_MESSAGE } from '@/lib/github-pr-review/dtos';
 
 const getGitHubUserAccessToken = jest.fn();
 
@@ -76,6 +77,7 @@ type OctokitMock = {
   };
   repos: {
     get: jest.Mock;
+    getContent: jest.Mock;
     listCommitStatusesForRef: jest.Mock;
   };
   checks: {
@@ -138,6 +140,7 @@ function buildOctokit(token: string): OctokitMock {
     },
     repos: {
       get: jest.fn(),
+      getContent: jest.fn(),
       listCommitStatusesForRef: jest.fn(),
     },
     checks,
@@ -2951,5 +2954,89 @@ describe('githubPrReviewRouter UGC terms gate', () => {
     });
     expect(t1Octokit.pulls.updateReviewComment).not.toHaveBeenCalled();
     expect(t1Octokit.issues.updateComment).not.toHaveBeenCalled();
+  });
+});
+
+describe('githubPrReviewRouter.getFileLines', () => {
+  const fileLinesInput = {
+    owner: 'octocat',
+    repo: 'hello',
+    ref: 'feature/x',
+    path: 'src/app.ts',
+    startLine: 2,
+    endLine: 3,
+  };
+
+  function connectedCaller() {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    return createCaller({ user: { id: 'user-1' } as User });
+  }
+
+  it('reads the blob inside the budget and returns the requested window', async () => {
+    const caller = connectedCaller();
+    const octokit = buildOctokit('t1');
+    octokit.repos.getContent
+      .mockResolvedValueOnce({ data: { type: 'file', size: 17, sha: 'blob-sha' } })
+      .mockResolvedValueOnce({ data: 'one\ntwo\nthree\nfour' });
+
+    const result = await caller.getFileLines(fileLinesInput);
+
+    expect(result).toEqual({ lines: ['two', 'three'], totalLines: 4 });
+    expect(octokit.repos.getContent).toHaveBeenNthCalledWith(1, {
+      owner: 'octocat',
+      repo: 'hello',
+      path: 'src/app.ts',
+      ref: 'feature/x',
+    });
+    // The metadata `sha` is the blob id, not a commit-ish the contents
+    // endpoint accepts as `ref`, so both reads use the caller's ref.
+    expect(octokit.repos.getContent).toHaveBeenNthCalledWith(2, {
+      owner: 'octocat',
+      repo: 'hello',
+      path: 'src/app.ts',
+      ref: 'feature/x',
+      mediaType: { format: 'raw' },
+    });
+  });
+
+  it('rejects a file above the read budget before the raw download', async () => {
+    const caller = connectedCaller();
+    const octokit = buildOctokit('t1');
+    octokit.repos.getContent.mockResolvedValueOnce({
+      data: { type: 'file', size: FILE_READ_MAX_BYTES + 1, sha: 'blob-sha' },
+    });
+
+    await expect(caller.getFileLines(fileLinesInput)).rejects.toMatchObject({
+      code: 'PAYLOAD_TOO_LARGE',
+      message: FILE_READ_TOO_LARGE_MESSAGE,
+    });
+    expect(octokit.repos.getContent).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies the budget to the delivered body when the metadata under-reports its size', async () => {
+    const caller = connectedCaller();
+    const octokit = buildOctokit('t1');
+    octokit.repos.getContent
+      .mockResolvedValueOnce({ data: { type: 'file', size: 4, sha: 'blob-sha' } })
+      .mockResolvedValueOnce({ data: 'x'.repeat(FILE_READ_MAX_BYTES + 1) });
+
+    await expect(caller.getFileLines(fileLinesInput)).rejects.toMatchObject({
+      code: 'PAYLOAD_TOO_LARGE',
+      message: FILE_READ_TOO_LARGE_MESSAGE,
+    });
+  });
+
+  it('keeps a directory answer a BAD_REQUEST not-a-file without a raw download', async () => {
+    const caller = connectedCaller();
+    const octokit = buildOctokit('t1');
+    octokit.repos.getContent.mockResolvedValueOnce({
+      data: [{ type: 'file', path: 'src/app.ts' }],
+    });
+
+    await expect(caller.getFileLines(fileLinesInput)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Requested path is not a file',
+    });
+    expect(octokit.repos.getContent).toHaveBeenCalledTimes(1);
   });
 });

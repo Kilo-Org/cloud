@@ -32,7 +32,11 @@ import {
   type BitbucketRepositoryAccess,
   type BitbucketReviewOwner,
 } from './bitbucket-authorization';
-import { FILE_LINES_MAX } from '@/lib/github-pr-review/dtos';
+import {
+  FILE_LINES_MAX,
+  FILE_READ_MAX_BYTES,
+  FILE_READ_TOO_LARGE_MESSAGE,
+} from '@/lib/github-pr-review/dtos';
 
 const BITBUCKET_API_ORIGIN = 'https://api.bitbucket.org';
 const BITBUCKET_PAGE_SIZE = 50;
@@ -194,6 +198,11 @@ const BitbucketInboxPullRequestSchema = z.object({
 const BitbucketPageSchema = z.object({
   values: z.array(z.unknown()).default([]),
   next: z.string().nullable().optional(),
+});
+
+/** `GET /src/{ref}/{path}?format=meta` describes the file instead of returning it. */
+const BitbucketFileMetadataSchema = z.object({
+  size: z.number().nullable().optional(),
 });
 
 function mapPullRequestState(state: string): ProviderPrSummary['state'] {
@@ -633,6 +642,17 @@ export type BitbucketFileLines = {
 };
 
 /**
+ * A file above the shared read budget is a non-retryable too_large rejection.
+ * Both observations of the blob (the `format=meta` size and the delivered text)
+ * pass through here.
+ */
+function assertFileWithinReadBudget(size: number | null | undefined): void {
+  if (typeof size === 'number' && size > FILE_READ_MAX_BYTES) {
+    throw new BitbucketReviewError('too_large', FILE_READ_TOO_LARGE_MESSAGE);
+  }
+}
+
+/**
  * A 1-based inclusive line window of a file at a commit, for comment context.
  * A missing file is a non-retryable not_found.
  */
@@ -655,10 +675,16 @@ export async function getFileLines(
       throw new BitbucketReviewError('not_found', 'The file was not found at this commit.');
     }
     const encodedPath = cleanPath.split('/').map(encodeURIComponent).join('/');
-    const text = await requestBitbucketText(
-      access,
-      `/2.0/repositories/${repositorySegment(access.repository)}/src/${encodeURIComponent(ref)}/${encodedPath}`
+    const sourcePath = `/2.0/repositories/${repositorySegment(access.repository)}/src/${encodeURIComponent(ref)}/${encodedPath}`;
+    // Metadata first: `format=meta` describes the file instead of returning
+    // it, so a file outside the budget is rejected before its body is read. An
+    // answer without a usable size falls through to the bounded body read.
+    const metadata = BitbucketFileMetadataSchema.safeParse(
+      await requestBitbucketJson<unknown>(access, sourcePath, { query: { format: 'meta' } })
     );
+    if (metadata.success) assertFileWithinReadBudget(metadata.data.size);
+    const text = await requestBitbucketText(access, sourcePath);
+    assertFileWithinReadBudget(Buffer.byteLength(text));
     const allLines = text.split('\n');
     const start = Math.max(1, Math.min(startLine, allLines.length));
     // Bound the window by the same shared cap the GitHub adapter applies, so

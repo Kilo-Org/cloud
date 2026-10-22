@@ -16,6 +16,7 @@ export type ProviderReviewErrorKind =
   | 'reconnect'
   | 'stale_head'
   | 'bad_request'
+  | 'too_large'
   | 'retryable';
 
 /**

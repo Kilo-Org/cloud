@@ -945,7 +945,7 @@ export async function refreshContributorChampionCredits(): Promise<CreditRefresh
         const rows = await tx.execute<{
           id: string;
           contributor_id: string;
-          credit_amount_microdollars: bigint;
+          credit_amount_microdollars: string;
           linked_kilo_user_id: string | null;
         }>(sql`
           SELECT id, contributor_id, credit_amount_microdollars, linked_kilo_user_id

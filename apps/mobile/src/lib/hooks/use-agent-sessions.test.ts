@@ -33,8 +33,10 @@ vi.mock('@/lib/active-sessions-live-sync', () => ({
 }));
 
 vi.mock('react-native', () => ({
-  InteractionManager: { runAfterInteractions: vi.fn() },
   AppState: { currentState: 'active', addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+}));
+vi.mock('@/lib/query/schedule-cache-maintenance', () => ({
+  scheduleCacheMaintenance: vi.fn(),
 }));
 
 function createTrpcStub(infiniteQueryOptions: unknown) {

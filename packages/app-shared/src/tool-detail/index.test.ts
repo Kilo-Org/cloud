@@ -29,25 +29,6 @@ function detail(tool: string, state: ToolState, options?: { valueMaxLength?: num
 }
 
 describe('buildToolDetail name resolution', () => {
-  it('unwraps the mcp envelope and resolves a known server/tool name', () => {
-    const result = detail(
-      'mcp',
-      completed(
-        {
-          server_name: 'app-builder-images',
-          tool_name: 'transfer_image',
-          arguments: { url: 'https://example.com/image.png', quality: 'high' },
-        },
-        'Published'
-      )
-    );
-
-    expect(result.name).toBe('Publish Image');
-    expect(result.arguments).toEqual({ url: 'https://example.com/image.png', quality: 'high' });
-    expect(result.summary).toBe('https://example.com/image.png · quality=high');
-    expect(result.fields.map(field => field.key)).toEqual(['url', 'quality']);
-  });
-
   it('names an unknown mcp tool as server/tool', () => {
     const result = detail(
       'mcp',
@@ -82,9 +63,7 @@ describe('buildToolDetail name resolution', () => {
     expect(result.arguments).toEqual(input);
   });
 
-  it('resolves the known display names for direct tool ids', () => {
-    expect(detail('app-builder-images_transfer_image', pending({})).name).toBe('Publish Image');
-    expect(detail('app-builder-images_get_image', pending({})).name).toBe('Analyze Image');
+  it('preserves raw names for unknown direct tool ids', () => {
     expect(detail('unrecognized_tool', pending({})).name).toBe('unrecognized_tool');
   });
 });
@@ -251,16 +230,13 @@ describe('buildToolDetail empty projection fallback', () => {
   it('falls back to the raw envelope when the mcp arguments record is empty', () => {
     const result = detail(
       'mcp',
-      completed(
-        { server_name: 'app-builder-images', tool_name: 'transfer_image', arguments: {} },
-        ''
-      )
+      completed({ server_name: 'filesystem', tool_name: 'read_file', arguments: {} }, '')
     );
 
     expect(result.arguments).toEqual({});
     expect(result.fields).toEqual([
-      { key: 'server_name', value: 'app-builder-images' },
-      { key: 'tool_name', value: 'transfer_image' },
+      { key: 'server_name', value: 'filesystem' },
+      { key: 'tool_name', value: 'read_file' },
       { key: 'arguments', value: '{}' },
     ]);
   });
@@ -325,14 +301,8 @@ describe('buildToolDetailSummary', () => {
     });
   });
 
-  it('marks a known-tool label as a label and a server/tool id as an identifier', () => {
+  it('treats a server/tool id as an identifier', () => {
     expect(buildToolDetailSummary({ tool: 'mcp', state: pending({}) }).nameIsLabel).toBe(false);
-    expect(
-      buildToolDetailSummary({
-        tool: 'mcp',
-        state: pending({ server_name: 'app-builder-images', tool_name: 'transfer_image' }),
-      })
-    ).toEqual({ name: 'Publish Image', nameIsLabel: true });
     expect(
       buildToolDetailSummary({
         tool: 'mcp',

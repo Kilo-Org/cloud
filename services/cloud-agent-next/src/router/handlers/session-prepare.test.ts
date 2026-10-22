@@ -328,7 +328,7 @@ describe('prepareSession operation-ledger admission gate', () => {
   it('rejects setting a parent callback through updateSession before accessing the session', async () => {
     await expect(
       router.createCaller(createContext()).updateSession({
-        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+        cloudAgentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
         callbackTarget: { url: 'session:parent' },
       })
     ).rejects.toMatchObject({

@@ -229,7 +229,7 @@ export const sandboxBillingInputEnvelopeSchema = z
       .min(1)
       .max(63)
       .refine(isValidSandboxId, 'Invalid sandboxId format')
-      .transform(value => value as SandboxId),
+      .transform(value => value),
     subject: billingSubjectSchema,
     actor: billingActorSchema,
     onBehalfOf: billingSubjectSchema.optional(),
@@ -246,7 +246,6 @@ export const sandboxBillingInputEnvelopeSchema = z
   .strict();
 
 const KNOWN_ORIGINS = new Set([
-  'app-builder',
   'cloud-agent',
   'cloud-agent-web',
   'code-review',

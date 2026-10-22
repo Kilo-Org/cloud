@@ -21,7 +21,7 @@ const expoFileSystemMock = vi.hoisted(() => {
       get exists() {
         return fileStore.has(uri);
       },
-      write(content: string) {
+      writeSync(content: string) {
         fileStore.set(uri, content);
       },
       textSync() {

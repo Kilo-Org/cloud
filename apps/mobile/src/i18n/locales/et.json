@@ -3819,11 +3819,13 @@
       "namePlaceholder": "Vead, Ideed, Väljalase…",
       "emoji": "Emotikon",
       "mode": "Režiim",
-      "defaultsHint": "Sellest loendist alustatud seansid kasutavad neid vaikeseadeid."
+      "defaultsHint": "Sellest loendist alustatud seansid kasutavad neid vaikeseadeid.",
+      "saveFailed": "Loendi salvestamine ei õnnestunud. Kontrolli oma ühendust ja proovi uuesti."
     },
     "list": {
       "addPlaceholder": "Uus ülesanne",
       "add": "Lisa ülesanne",
+      "addFailed": "Ülesande lisamine ei õnnestunud. Kontrolli oma ühendust ja proovi uuesti.",
       "empty": "Ülesandeid veel pole",
       "setDefaults": "Määra hoidla, režiim ja mudel",
       "completed_one": "Lõpetatud ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "Alusta uut seanssi",
       "startNewSessionHint": "Uue seansi alustamiseks vajuta pikalt.",
       "linkSession": "Seo seanss",
-      "linkFailed": "Seanssi ei õnnestunud ülesandega siduda"
+      "linkFailed": "Seanssi ei õnnestunud ülesandega siduda",
+      "startRefreshFailed": "Seanss algas, kuid seda loendit ei värskendatud."
     },
     "linkSession": {
       "title": "Seansside linkimine",

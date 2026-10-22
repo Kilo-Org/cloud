@@ -3948,11 +3948,13 @@
       "namePlaceholder": "Żbalji, Ideat, Ħruġ…",
       "emoji": "Emoji",
       "mode": "Mod",
-      "defaultsHint": "Is-sessjonijiet li jinbdew minn din il-lista jużaw dawn id-defaults."
+      "defaultsHint": "Is-sessjonijiet li jinbdew minn din il-lista jużaw dawn id-defaults.",
+      "saveFailed": "Il-lista ma ġietx salvata. Iċċekkja l-konnessjoni tiegħek u erġa’ pprova."
     },
     "list": {
       "addPlaceholder": "Kompitu ġdid",
       "add": "Żid kompitu",
+      "addFailed": "Il-kompitu ma ġiex miżjud. Iċċekkja l-konnessjoni tiegħek u erġa’ pprova.",
       "empty": "S'issa m'hemmx kompiti",
       "setDefaults": "Issettja repożitorju, mod u mudell",
       "completed_one": "Lest ({{count}})",
@@ -3995,7 +3997,8 @@
       "startNewSession": "Ibda sessjoni ġdida",
       "startNewSessionHint": "Agħfas fit-tul biex tibda sessjoni ġdida.",
       "linkSession": "Qabbad sessjoni",
-      "linkFailed": "Ma setgħetx tiġi marbuta s-sessjoni mal-kompitu"
+      "linkFailed": "Ma setgħetx tiġi marbuta s-sessjoni mal-kompitu",
+      "startRefreshFailed": "Is-sessjoni bdiet, imma din il-lista ma ġietx aġġornata."
     },
     "linkSession": {
       "title": "Agħżel sessjoni",

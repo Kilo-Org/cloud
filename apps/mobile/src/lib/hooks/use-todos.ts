@@ -24,9 +24,18 @@ let pendingTodoSequence = 0;
 /** To-dos whose delete is held for the undo toast; the item-list read hides them. */
 const heldDeletes = new Set<string>();
 
+/** Where a failed todo mutation reports itself. */
+export type MutationFailureReporter = (error: { message: string }) => void;
+
 function showMutationError(error: { message: string }) {
   toast.error(error.message || i18n.t('common.somethingWentWrong'));
 }
+
+/**
+ * A form that keeps its draft and renders the failure itself passes this, so
+ * its inline error is the single announcement (the inline-error pattern).
+ */
+export const reportNothing: MutationFailureReporter = () => undefined;
 
 export async function invalidateTodoQueries(queryClient: QueryClient, trpc: TodoTrpcQueries) {
   await queryClient.invalidateQueries(trpc.todos.pathFilter());
@@ -78,7 +87,11 @@ function withoutHeldDeletes(items: TodoItem[]): TodoItem[] {
 function useOptimisticArray<TRow>(queryKey: readonly unknown[]) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  return function optimistic<TInput>(apply: (rows: TRow[], input: TInput) => TRow[]) {
+  return function optimistic<TInput>(
+    apply: (rows: TRow[], input: TInput) => TRow[],
+    /** The mutation's failure surface; the shared toast unless a form shows it inline. */
+    reportFailure: MutationFailureReporter = showMutationError
+  ) {
     return {
       onMutate: async (input: TInput) => {
         await queryClient.cancelQueries({ queryKey });
@@ -94,7 +107,7 @@ function useOptimisticArray<TRow>(queryKey: readonly unknown[]) {
         if (context?.previous) {
           queryClient.setQueryData(queryKey, context.previous);
         }
-        showMutationError(error);
+        reportFailure(error);
       },
       onSettled: async () => {
         await invalidateTodoQueries(queryClient, trpc);
@@ -114,7 +127,15 @@ export function useTodoLists(organizationId: string | null, enabled = true) {
   });
 }
 
-export function useTodoListMutations(organizationId: string | null) {
+/**
+ * The list mutations for one context. `reportFailure` picks their failure
+ * surface: the shared toast, or nothing for a form that keeps the draft and
+ * shows the failure inline (the list settings sheet).
+ */
+export function useTodoListMutations(
+  organizationId: string | null,
+  reportFailure: MutationFailureReporter = showMutationError
+) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const optimistic = useOptimisticArray<TodoList>(
@@ -123,7 +144,7 @@ export function useTodoListMutations(organizationId: string | null) {
 
   const create = useMutation(
     trpc.todos.lists.create.mutationOptions({
-      onError: showMutationError,
+      onError: reportFailure,
       onSettled: async () => {
         await invalidateTodoQueries(queryClient, trpc);
       },
@@ -131,17 +152,19 @@ export function useTodoListMutations(organizationId: string | null) {
   );
   const update = useMutation(
     trpc.todos.lists.update.mutationOptions(
-      optimistic<TodosInputs['lists']['update']>((lists, { id, archived, ...patch }) =>
-        lists.map(list => {
-          if (list.id !== id) {
-            return list;
-          }
-          let archivedAt = list.archivedAt;
-          if (archived !== undefined) {
-            archivedAt = archived ? (list.archivedAt ?? new Date().toISOString()) : null;
-          }
-          return { ...list, ...patch, archivedAt };
-        })
+      optimistic<TodosInputs['lists']['update']>(
+        (lists, { id, archived, ...patch }) =>
+          lists.map(list => {
+            if (list.id !== id) {
+              return list;
+            }
+            let archivedAt = list.archivedAt;
+            if (archived !== undefined) {
+              archivedAt = archived ? (list.archivedAt ?? new Date().toISOString()) : null;
+            }
+            return { ...list, ...patch, archivedAt };
+          }),
+        reportFailure
       )
     )
   );
@@ -209,6 +232,8 @@ export function useTodoItemMutations(listId: string) {
 
   const create = useMutation(
     trpc.todos.items.create.mutationOptions(
+      // The add row keeps the typed title and shows the failure inline, so the
+      // shared toast would repeat it (inline-error pattern).
       optimistic<TodosInputs['items']['create']>((items, input) => {
         pendingTodoSequence += 1;
         const now = new Date().toISOString();
@@ -224,7 +249,7 @@ export function useTodoItemMutations(listId: string) {
           sessions: [],
         };
         return [pending, ...items];
-      })
+      }, reportNothing)
     )
   );
   const listUpdate = optimistic<UpdateInput>((items, input) =>

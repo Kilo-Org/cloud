@@ -3819,11 +3819,13 @@
       "namePlaceholder": "Nsogbu, Echiche, Mwepụta…",
       "emoji": "Akara ngosi",
       "mode": "Ụdị ọrụ",
-      "defaultsHint": "Nnọkọ ndị a na-amalite site na ndepụta a na-eji ihe ndabara ndị a."
+      "defaultsHint": "Nnọkọ ndị a na-amalite site na ndepụta a na-eji ihe ndabara ndị a.",
+      "saveFailed": "Enweghị ike ịchekwa ndepụta ahụ. Lelee njikọ gị wee nwalee ọzọ."
     },
     "list": {
       "addPlaceholder": "Tinye ọrụ",
       "add": "Tinye",
+      "addFailed": "Enweghị ike itinye ọrụ ahụ. Lelee njikọ gị wee nwalee ọzọ.",
       "empty": "Enweghị ọrụ ọ bụla",
       "setDefaults": "Tinye ebe nchekwa koodu, ụdị ọrụ na ihe nlereanya",
       "completed_one": "Emechara ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "Malite nzukọ ọhụrụ",
       "startNewSessionHint": "Pịa ogologo oge iji malite nzukọ ọhụrụ.",
       "linkSession": "Jikọọ nnọkọ",
-      "linkFailed": "Enweghị ike ijikọ nnọkọ ahụ na ọrụ ahụ"
+      "linkFailed": "Enweghị ike ijikọ nnọkọ ahụ na ọrụ ahụ",
+      "startRefreshFailed": "Nnọkọ ahụ amaliteela, mana ndepụta a emelighị ya."
     },
     "linkSession": {
       "title": "Jikọọ nnọkọ",

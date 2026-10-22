@@ -3883,11 +3883,13 @@
       "namePlaceholder": "Bugs, Ideas, Release…",
       "emoji": "Emoji",
       "mode": "Mode",
-      "defaultsHint": "Sessions started from this list use these defaults."
+      "defaultsHint": "Sessions started from this list use these defaults.",
+      "saveFailed": "Couldn’t save the list. Check your connection and try again."
     },
     "list": {
       "addPlaceholder": "Add a to-do",
       "add": "Add to-do",
+      "addFailed": "Couldn’t add the to-do. Check your connection and try again.",
       "empty": "No to-dos yet",
       "setDefaults": "Set repository, mode and model",
       "completed_one": "Completed ({{count}})",
@@ -3924,7 +3926,8 @@
       "startNewSession": "Start new session",
       "startNewSessionHint": "Long-press to start a new session.",
       "linkSession": "Link session",
-      "linkFailed": "Couldn’t link the session to the to-do"
+      "linkFailed": "Couldn’t link the session to the to-do",
+      "startRefreshFailed": "The session started, but this list didn’t update."
     },
     "linkSession": {
       "title": "Link a session",

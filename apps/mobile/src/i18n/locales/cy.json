@@ -3991,11 +3991,13 @@
       "namePlaceholder": "Bygiau, Syniadau, Rhyddhau…",
       "emoji": "Emoji",
       "mode": "Modd",
-      "defaultsHint": "Mae sesiynau sy'n dechrau o'r rhestr hon yn defnyddio'r rhagosodiadau hyn."
+      "defaultsHint": "Mae sesiynau sy'n dechrau o'r rhestr hon yn defnyddio'r rhagosodiadau hyn.",
+      "saveFailed": "Ni fu modd cadw'r rhestr. Gwiriwch eich cysylltiad a rhowch gynnig arall."
     },
     "list": {
       "addPlaceholder": "Ychwanegu tasg",
       "add": "Ychwanegu tasg",
+      "addFailed": "Ni fu modd ychwanegu'r dasg. Gwiriwch eich cysylltiad a rhowch gynnig arall.",
       "empty": "Dim tasgau eto",
       "setDefaults": "Gosod ystorfa, modd a model",
       "completed_zero": "Wedi'u cwblhau ({{count}})",
@@ -4040,7 +4042,8 @@
       "startNewSession": "Dechrau sesiwn newydd",
       "startNewSessionHint": "Gwasga'n hir i ddechrau sesiwn newydd.",
       "linkSession": "Cysylltu sesiwn",
-      "linkFailed": "Methu cysylltu'r sesiwn â'r dasg"
+      "linkFailed": "Methu cysylltu'r sesiwn â'r dasg",
+      "startRefreshFailed": "Dechreuodd y sesiwn, ond ni fu modd diweddaru'r rhestr hon."
     },
     "linkSession": {
       "title": "Cysylltu sesiwn",

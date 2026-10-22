@@ -3819,11 +3819,13 @@
       "namePlaceholder": "Hatalar, fikirler, sürüm…",
       "emoji": "Emoji",
       "mode": "Mod",
-      "defaultsHint": "Bu listeden başlatılan oturumlar bu varsayılanları kullanır."
+      "defaultsHint": "Bu listeden başlatılan oturumlar bu varsayılanları kullanır.",
+      "saveFailed": "Liste kaydedilemedi. Bağlantınızı kontrol edip tekrar deneyin."
     },
     "list": {
       "addPlaceholder": "Bir görev ekle",
       "add": "Görev ekle",
+      "addFailed": "Görev eklenemedi. Bağlantınızı kontrol edip tekrar deneyin.",
       "empty": "Henüz görev yok",
       "setDefaults": "Depo, mod ve model ayarla",
       "completed_one": "Tamamlandı ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "Yeni oturum başlat",
       "startNewSessionHint": "Yeni bir oturum başlatmak için uzun bas.",
       "linkSession": "Oturum bağla",
-      "linkFailed": "Oturum göreve bağlanamadı"
+      "linkFailed": "Oturum göreve bağlanamadı",
+      "startRefreshFailed": "Oturum başladı, ancak bu liste güncellenmedi."
     },
     "linkSession": {
       "title": "Bir oturum bağla",

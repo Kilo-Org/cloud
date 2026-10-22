@@ -3819,11 +3819,13 @@
       "namePlaceholder": "Akatsak, ideiak, argitalpena…",
       "emoji": "Emojia",
       "mode": "Modua",
-      "defaultsHint": "Zerrenda honetatik hasitako saioek balio lehenetsi hauek erabiltzen dituzte."
+      "defaultsHint": "Zerrenda honetatik hasitako saioek balio lehenetsi hauek erabiltzen dituzte.",
+      "saveFailed": "Ezin izan da zerrenda gorde. Egiaztatu zure konexioa eta saiatu berriro."
     },
     "list": {
       "addPlaceholder": "Gehitu zeregin bat",
       "add": "Zeregina gehitu",
+      "addFailed": "Ezin izan da zeregina gehitu. Egiaztatu zure konexioa eta saiatu berriro.",
       "empty": "Oraindik ez dago zereginik",
       "setDefaults": "Ezarri biltegia, modua eta eredua",
       "completed_one": "Amaituta ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "Hasi saio berria",
       "startNewSessionHint": "Eduki sakatuta saio berri bat hasteko.",
       "linkSession": "Lotu saioa",
-      "linkFailed": "Ezin izan da saioa zereginarekin lotu"
+      "linkFailed": "Ezin izan da saioa zereginarekin lotu",
+      "startRefreshFailed": "Saioa hasi da, baina zerrenda hau ez da eguneratu."
     },
     "linkSession": {
       "title": "Lotu saio bat",

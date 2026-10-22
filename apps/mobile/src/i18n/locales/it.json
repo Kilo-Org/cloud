@@ -3862,11 +3862,13 @@
       "namePlaceholder": "Bug, Idee, Release…",
       "emoji": "Emoji",
       "mode": "Modalità",
-      "defaultsHint": "Le sessioni avviate da questo elenco usano questi valori predefiniti."
+      "defaultsHint": "Le sessioni avviate da questo elenco usano questi valori predefiniti.",
+      "saveFailed": "Impossibile salvare l’elenco. Controlla la connessione e riprova."
     },
     "list": {
       "addPlaceholder": "Aggiungi un'attività",
       "add": "Aggiungi attività",
+      "addFailed": "Impossibile aggiungere l’attività. Controlla la connessione e riprova.",
       "empty": "Ancora nessuna attività",
       "setDefaults": "Imposta repository, modalità e modello",
       "completed_one": "Completate ({{count}})",
@@ -3905,7 +3907,8 @@
       "startNewSession": "Avvia nuova sessione",
       "startNewSessionHint": "Tieni premuto per avviare una nuova sessione.",
       "linkSession": "Collega sessione",
-      "linkFailed": "Impossibile collegare la sessione all'attività"
+      "linkFailed": "Impossibile collegare la sessione all'attività",
+      "startRefreshFailed": "La sessione è stata avviata, ma questo elenco non è stato aggiornato."
     },
     "linkSession": {
       "title": "Collega una sessione",

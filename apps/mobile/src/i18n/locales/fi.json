@@ -3819,11 +3819,13 @@
       "namePlaceholder": "Virheet, ideat, julkaisu…",
       "emoji": "Emoji",
       "mode": "Tila",
-      "defaultsHint": "Tästä listasta aloitetut istunnot käyttävät näitä oletusasetuksia."
+      "defaultsHint": "Tästä listasta aloitetut istunnot käyttävät näitä oletusasetuksia.",
+      "saveFailed": "Listaa ei voitu tallentaa. Tarkista yhteytesi ja yritä uudelleen."
     },
     "list": {
       "addPlaceholder": "Lisää uusi tehtävä",
       "add": "Lisää tehtävä",
+      "addFailed": "Tehtävää ei voitu lisätä. Tarkista yhteytesi ja yritä uudelleen.",
       "empty": "Ei vielä tehtäviä",
       "setDefaults": "Aseta koodivarasto, tila ja malli",
       "completed_one": "Valmis ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "Aloita uusi istunto",
       "startNewSessionHint": "Aloita uusi istunto pitämällä painettuna.",
       "linkSession": "Linkitä istunto",
-      "linkFailed": "Istunnon linkittäminen tehtävään ei onnistunut"
+      "linkFailed": "Istunnon linkittäminen tehtävään ei onnistunut",
+      "startRefreshFailed": "Istunto aloitettiin, mutta tätä listaa ei päivitetty."
     },
     "linkSession": {
       "title": "Istunnon linkittäminen",

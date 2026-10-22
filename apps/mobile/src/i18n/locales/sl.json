@@ -3905,11 +3905,13 @@
       "namePlaceholder": "Hrošči, ideje, izdaje…",
       "emoji": "Emoji",
       "mode": "Način",
-      "defaultsHint": "Seje, začete s tega seznama, uporabijo te privzete vrednosti."
+      "defaultsHint": "Seje, začete s tega seznama, uporabijo te privzete vrednosti.",
+      "saveFailed": "Seznama ni bilo mogoče shraniti. Preverite povezavo in poskusite znova."
     },
     "list": {
       "addPlaceholder": "Dodaj novo nalogo",
       "add": "Dodaj nalogo",
+      "addFailed": "Naloge ni bilo mogoče dodati. Preverite povezavo in poskusite znova.",
       "empty": "Ni še nalog",
       "setDefaults": "Nastavi repozitorij, način in model",
       "completed_one": "Dokončano ({{count}})",
@@ -3950,7 +3952,8 @@
       "startNewSession": "Začni novo sejo",
       "startNewSessionHint": "Za novo sejo pridržite.",
       "linkSession": "Poveži sejo",
-      "linkFailed": "Seje ni bilo mogoče povezati z nalogo"
+      "linkFailed": "Seje ni bilo mogoče povezati z nalogo",
+      "startRefreshFailed": "Seja se je začela, vendar se ta seznam ni posodobil."
     },
     "linkSession": {
       "title": "Povezava seje",

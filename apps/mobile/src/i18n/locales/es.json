@@ -3862,11 +3862,13 @@
       "namePlaceholder": "Errores, Ideas, Versión…",
       "emoji": "Emoji",
       "mode": "Modo",
-      "defaultsHint": "Las sesiones iniciadas desde esta lista usan estos valores predeterminados."
+      "defaultsHint": "Las sesiones iniciadas desde esta lista usan estos valores predeterminados.",
+      "saveFailed": "No se pudo guardar la lista. Comprueba tu conexión e inténtalo de nuevo."
     },
     "list": {
       "addPlaceholder": "Añadir una tarea",
       "add": "Añadir tarea",
+      "addFailed": "No se pudo añadir la tarea. Comprueba tu conexión e inténtalo de nuevo.",
       "empty": "Aún no hay tareas",
       "setDefaults": "Definir repositorio, modo y modelo",
       "completed_one": "Completadas ({{count}})",
@@ -3905,7 +3907,8 @@
       "startNewSession": "Iniciar nueva sesión",
       "startNewSessionHint": "Mantén pulsado para iniciar una nueva sesión.",
       "linkSession": "Vincular sesión",
-      "linkFailed": "No se pudo vincular la sesión a la tarea"
+      "linkFailed": "No se pudo vincular la sesión a la tarea",
+      "startRefreshFailed": "La sesión se inició, pero esta lista no se actualizó."
     },
     "linkSession": {
       "title": "Vincular una sesión",

@@ -3819,11 +3819,13 @@
       "namePlaceholder": "Xatolar, g‘oyalar, relizlar…",
       "emoji": "Emoji",
       "mode": "Rejim",
-      "defaultsHint": "Bu ro‘yxatdan boshlangan sessiyalar shu standart sozlamalardan foydalanadi."
+      "defaultsHint": "Bu ro‘yxatdan boshlangan sessiyalar shu standart sozlamalardan foydalanadi.",
+      "saveFailed": "Ro‘yxatni saqlab bo‘lmadi. Internetingizni tekshirib, qayta urinib ko‘ring."
     },
     "list": {
       "addPlaceholder": "Yangi vazifa qo‘shish",
       "add": "Vazifa qo‘shish",
+      "addFailed": "Vazifani qo‘shib bo‘lmadi. Internetingizni tekshirib, qayta urinib ko‘ring.",
       "empty": "Hozircha vazifalar yo‘q",
       "setDefaults": "Repozitoriy, rejim va modelni belgilash",
       "completed_one": "Yakunlangan ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "Yangi sessiya boshlash",
       "startNewSessionHint": "Yangi sessiya boshlash uchun uzoq bosib turing.",
       "linkSession": "Sessiya bog‘lash",
-      "linkFailed": "Sessiyani vazifaga bog‘lab bo‘lmadi"
+      "linkFailed": "Sessiyani vazifaga bog‘lab bo‘lmadi",
+      "startRefreshFailed": "Sessiya boshlandi, lekin bu ro‘yxat yangilanmadi."
     },
     "linkSession": {
       "title": "Sessiyani bog‘lash",

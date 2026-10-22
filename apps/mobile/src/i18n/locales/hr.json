@@ -3862,11 +3862,13 @@
       "namePlaceholder": "Greške, Ideje, Izdanje…",
       "emoji": "Emotikon",
       "mode": "Način",
-      "defaultsHint": "Sesije pokrenute s ovog popisa koriste ove zadane postavke."
+      "defaultsHint": "Sesije pokrenute s ovog popisa koriste ove zadane postavke.",
+      "saveFailed": "Nije bilo moguće spremiti popis. Provjerite vezu i pokušajte ponovno."
     },
     "list": {
       "addPlaceholder": "Novi zadatak",
       "add": "Dodaj zadatak",
+      "addFailed": "Nije bilo moguće dodati zadatak. Provjerite vezu i pokušajte ponovno.",
       "empty": "Još nema zadataka",
       "setDefaults": "Postavi repozitorij, način i model",
       "completed_one": "Dovršeno ({{count}})",
@@ -3905,7 +3907,8 @@
       "startNewSession": "Započni novu sesiju",
       "startNewSessionHint": "Dugo pritisni za novu sesiju.",
       "linkSession": "Poveži sesiju",
-      "linkFailed": "Sesiju nije bilo moguće povezati sa zadatkom"
+      "linkFailed": "Sesiju nije bilo moguće povezati sa zadatkom",
+      "startRefreshFailed": "Sesija je pokrenuta, ali se ovaj popis nije ažurirao."
     },
     "linkSession": {
       "title": "Povezivanje sesije",

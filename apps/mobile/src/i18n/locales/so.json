@@ -3819,11 +3819,13 @@
       "namePlaceholder": "Cilado, Fikrado, Siideyn…",
       "emoji": "Calaamad",
       "mode": "Qaab",
-      "defaultsHint": "Kalfadhiyada laga bilaabo liiskan waxay isticmaalaan kuwan caadiga ah."
+      "defaultsHint": "Kalfadhiyada laga bilaabo liiskan waxay isticmaalaan kuwan caadiga ah.",
+      "saveFailed": "Liiska lama kaydin karin. Hubi xiriirkaaga oo mar kale isku day."
     },
     "list": {
       "addPlaceholder": "Ku dar hawl",
       "add": "Ku dar",
+      "addFailed": "Hawsha lama darin karin. Hubi xiriirkaaga oo mar kale isku day.",
       "empty": "Weli ma jiraan hawlo",
       "setDefaults": "Deji kaydka, qaabka iyo moodeelka",
       "completed_one": "La dhammeeyay ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "Bilow fadhi cusub",
       "startNewSessionHint": "Riix muddo dheer si aad u bilowdo fadhi cusub.",
       "linkSession": "Ku xidh kalfadhi",
-      "linkFailed": "Lama xidhi karin kalfadhiga hawsha"
+      "linkFailed": "Lama xidhi karin kalfadhiga hawsha",
+      "startRefreshFailed": "Cashurka waa la bilaabiyay, laakiin liiskan lama cusbooneysiiyin."
     },
     "linkSession": {
       "title": "Ku xidh kalfadhi",

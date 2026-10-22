@@ -3819,11 +3819,13 @@
       "namePlaceholder": "Fejl, Idéer, Udgivelse…",
       "emoji": "Emoji",
       "mode": "Tilstand",
-      "defaultsHint": "Sessioner, der startes fra denne liste, bruger disse standardindstillinger."
+      "defaultsHint": "Sessioner, der startes fra denne liste, bruger disse standardindstillinger.",
+      "saveFailed": "Kunne ikke gemme listen. Tjek din forbindelse, og prøv igen."
     },
     "list": {
       "addPlaceholder": "Tilføj en opgave",
       "add": "Tilføj opgave",
+      "addFailed": "Kunne ikke tilføje opgaven. Tjek din forbindelse, og prøv igen.",
       "empty": "Ingen opgaver endnu",
       "setDefaults": "Angiv kodelager, tilstand og model",
       "completed_one": "Afsluttet ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "Start ny session",
       "startNewSessionHint": "Langt tryk for at starte en ny session.",
       "linkSession": "Tilknyt session",
-      "linkFailed": "Kunne ikke tilknytte sessionen til opgaven"
+      "linkFailed": "Kunne ikke tilknytte sessionen til opgaven",
+      "startRefreshFailed": "Sessionen startede, men listen blev ikke opdateret."
     },
     "linkSession": {
       "title": "Tilknyt en session",

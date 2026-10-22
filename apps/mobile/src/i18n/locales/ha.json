@@ -3819,11 +3819,13 @@
       "namePlaceholder": "Kurakurai, Ra'ayoyi, Fitarwa…",
       "emoji": "Emoji",
       "mode": "Yanayi",
-      "defaultsHint": "Zamannin da aka fara daga wannan jeri suna amfani da waɗannan saitunan asali."
+      "defaultsHint": "Zamannin da aka fara daga wannan jeri suna amfani da waɗannan saitunan asali.",
+      "saveFailed": "Ba a iya ajiye jerin ba. Duba hanyar haɗinka ka sake gwadawa."
     },
     "list": {
       "addPlaceholder": "Ƙara aiki",
       "add": "Ƙara aiki",
+      "addFailed": "Ba a iya ƙara aikin ba. Duba hanyar haɗinka ka sake gwadawa.",
       "empty": "Babu ayyuka tukuna",
       "setDefaults": "Saita ma'ajiya, yanayi da samfuri",
       "completed_one": "An kammala ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "Fara sabon zama",
       "startNewSessionHint": "Riƙe dogon lokaci don fara sabon zama.",
       "linkSession": "Haɗa zama",
-      "linkFailed": "An kasa haɗa zaman da aikin"
+      "linkFailed": "An kasa haɗa zaman da aikin",
+      "startRefreshFailed": "Zaman ya fara, amma wannan jerin bai sabunta ba."
     },
     "linkSession": {
       "title": "Haɗa wani zama",

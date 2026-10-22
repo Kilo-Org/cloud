@@ -3862,11 +3862,13 @@
       "namePlaceholder": "Kļūdas, idejas, laidieni…",
       "emoji": "Emocijzīme",
       "mode": "Režīms",
-      "defaultsHint": "Sesijas, kas sāktas no šī saraksta, izmanto šos noklusējumus."
+      "defaultsHint": "Sesijas, kas sāktas no šī saraksta, izmanto šos noklusējumus.",
+      "saveFailed": "Neizdevās saglabāt sarakstu. Pārbaudiet savienojumu un mēģiniet vēlreiz."
     },
     "list": {
       "addPlaceholder": "Pievienot jaunu uzdevumu",
       "add": "Pievienot uzdevumu",
+      "addFailed": "Neizdevās pievienot uzdevumu. Pārbaudiet savienojumu un mēģiniet vēlreiz.",
       "empty": "Vēl nav uzdevumu",
       "setDefaults": "Iestatīt repozitoriju, režīmu un modeli",
       "completed_one": "Pabeigti ({{count}})",
@@ -3905,7 +3907,8 @@
       "startNewSession": "Sākt jaunu sesiju",
       "startNewSessionHint": "Turiet nospiestu, lai sāktu jaunu sesiju.",
       "linkSession": "Saistīt sesiju",
-      "linkFailed": "Neizdevās saistīt sesiju ar uzdevumu"
+      "linkFailed": "Neizdevās saistīt sesiju ar uzdevumu",
+      "startRefreshFailed": "Sesija tika sākta, bet šis saraksts neatjaunojās."
     },
     "linkSession": {
       "title": "Sesijas saistīšana",

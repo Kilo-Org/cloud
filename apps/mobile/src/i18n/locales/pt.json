@@ -3862,11 +3862,13 @@
       "namePlaceholder": "Erros, ideias, versão…",
       "emoji": "Emoji",
       "mode": "Modo",
-      "defaultsHint": "As sessões iniciadas a partir desta lista usam estas predefinições."
+      "defaultsHint": "As sessões iniciadas a partir desta lista usam estas predefinições.",
+      "saveFailed": "Não foi possível guardar a lista. Verifica a tua ligação e tenta novamente."
     },
     "list": {
       "addPlaceholder": "Adiciona uma tarefa",
       "add": "Adicionar tarefa",
+      "addFailed": "Não foi possível adicionar a tarefa. Verifica a tua ligação e tenta novamente.",
       "empty": "Ainda sem tarefas",
       "setDefaults": "Definir repositório, modo e modelo",
       "completed_one": "Concluídas ({{count}})",
@@ -3905,7 +3907,8 @@
       "startNewSession": "Iniciar nova sessão",
       "startNewSessionHint": "Mantenha premido para iniciar uma nova sessão.",
       "linkSession": "Associar sessão",
-      "linkFailed": "Não foi possível associar a sessão à tarefa"
+      "linkFailed": "Não foi possível associar a sessão à tarefa",
+      "startRefreshFailed": "A sessão iniciou, mas esta lista não foi atualizada."
     },
     "linkSession": {
       "title": "Associar a uma sessão",

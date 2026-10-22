@@ -3862,11 +3862,13 @@
       "namePlaceholder": "Bugs, Idées, Version…",
       "emoji": "Émoji",
       "mode": "Mode",
-      "defaultsHint": "Les sessions lancées depuis cette liste utilisent ces valeurs par défaut."
+      "defaultsHint": "Les sessions lancées depuis cette liste utilisent ces valeurs par défaut.",
+      "saveFailed": "Impossible d’enregistrer la liste. Vérifiez votre connexion et réessayez."
     },
     "list": {
       "addPlaceholder": "Ajouter une tâche",
       "add": "Ajouter la tâche",
+      "addFailed": "Impossible d’ajouter la tâche. Vérifiez votre connexion et réessayez.",
       "empty": "Aucune tâche pour l'instant",
       "setDefaults": "Définir le dépôt, le mode et le modèle",
       "completed_one": "Terminées ({{count}})",
@@ -3905,7 +3907,8 @@
       "startNewSession": "Démarrer une nouvelle session",
       "startNewSessionHint": "Appuyez longuement pour démarrer une nouvelle session.",
       "linkSession": "Lier une session",
-      "linkFailed": "Impossible de lier la session à la tâche"
+      "linkFailed": "Impossible de lier la session à la tâche",
+      "startRefreshFailed": "La session a démarré, mais cette liste ne s’est pas mise à jour."
     },
     "linkSession": {
       "title": "Lier une session",

@@ -3862,11 +3862,13 @@
       "namePlaceholder": "Erori, Idei, Lansare…",
       "emoji": "Emoji",
       "mode": "Mod",
-      "defaultsHint": "Sesiunile pornite din această listă folosesc aceste valori implicite."
+      "defaultsHint": "Sesiunile pornite din această listă folosesc aceste valori implicite.",
+      "saveFailed": "Nu s-a putut salva lista. Verifică conexiunea și încearcă din nou."
     },
     "list": {
       "addPlaceholder": "Sarcină nouă",
       "add": "Adaugă sarcină",
+      "addFailed": "Nu s-a putut adăuga sarcina. Verifică conexiunea și încearcă din nou.",
       "empty": "Încă nu există sarcini",
       "setDefaults": "Setează depozitul, modul și modelul",
       "completed_one": "Finalizat ({{count}})",
@@ -3905,7 +3907,8 @@
       "startNewSession": "Începe o sesiune nouă",
       "startNewSessionHint": "Ține apăsat pentru a începe o sesiune nouă.",
       "linkSession": "Asociază sesiunea",
-      "linkFailed": "Nu s-a putut asocia sesiunea cu sarcina"
+      "linkFailed": "Nu s-a putut asocia sesiunea cu sarcina",
+      "startRefreshFailed": "Sesiunea a pornit, dar această listă nu s-a actualizat."
     },
     "linkSession": {
       "title": "Asociază o sesiune",

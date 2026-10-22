@@ -3819,11 +3819,13 @@
       "namePlaceholder": "Amaphutha, Imibono, Ukukhishwa…",
       "emoji": "Emoji",
       "mode": "Imodi",
-      "defaultsHint": "Amaseshini aqalwa kulolu hlu asebenzisa lezi zilungiselelo ezizenzakalelayo."
+      "defaultsHint": "Amaseshini aqalwa kulolu hlu asebenzisa lezi zilungiselelo ezizenzakalelayo.",
+      "saveFailed": "Ayikwazanga ukulondoloza uhlu. Hlola uxhumano lwakho bese uzama futhi."
     },
     "list": {
       "addPlaceholder": "Engeza umsebenzi",
       "add": "Engeza umsebenzi",
+      "addFailed": "Awukwazanga ukungeza umsebenzi. Hlola uxhumano lwakho bese uzama futhi.",
       "empty": "Ayikho imisebenzi okwamanje",
       "setDefaults": "Setha inqolobane yekhodi, imodi nemodeli",
       "completed_one": "Kuqediwe ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "Qala iseshini entsha",
       "startNewSessionHint": "Cindezela isikhathi eside ukuqala iseshini entsha.",
       "linkSession": "Xhumanisa iseshini",
-      "linkFailed": "Ayikwazanga ukuxhumanisa iseshini nomsebenzi"
+      "linkFailed": "Ayikwazanga ukuxhumanisa iseshini nomsebenzi",
+      "startRefreshFailed": "Iseshini siqalile, kodwa lolu hlu aluvuselelwa."
     },
     "linkSession": {
       "title": "Ukuxhumanisa iseshini",

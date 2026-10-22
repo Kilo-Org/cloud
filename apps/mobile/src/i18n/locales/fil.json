@@ -3819,11 +3819,13 @@
       "namePlaceholder": "Mga bug, ideya, release…",
       "emoji": "Emoji",
       "mode": "Mode",
-      "defaultsHint": "Gagamitin ng mga sesyong sisimulan mula sa listahang ito ang mga default na ito."
+      "defaultsHint": "Gagamitin ng mga sesyong sisimulan mula sa listahang ito ang mga default na ito.",
+      "saveFailed": "Hindi ma-save ang listahan. I-check ang iyong koneksyon at subukang muli."
     },
     "list": {
       "addPlaceholder": "Magdagdag ng gagawin",
       "add": "Idagdag ang gagawin",
+      "addFailed": "Hindi maidagdag ang gagawin. I-check ang iyong koneksyon at subukang muli.",
       "empty": "Wala pang gagawin",
       "setDefaults": "Itakda ang repositoryo, mode at modelo",
       "completed_one": "Nakumpleto ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "Magsimula ng bagong session",
       "startNewSessionHint": "Mahabang pindot para magsimula ng bagong session.",
       "linkSession": "I-link ang sesyon",
-      "linkFailed": "Hindi na-link ang sesyon sa gagawin"
+      "linkFailed": "Hindi na-link ang sesyon sa gagawin",
+      "startRefreshFailed": "Nagsimula na ang sesyon, pero hindi na-update ang listahang ito."
     },
     "linkSession": {
       "title": "Mag-link ng sesyon",

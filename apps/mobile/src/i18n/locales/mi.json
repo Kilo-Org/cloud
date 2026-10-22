@@ -3819,11 +3819,13 @@
       "namePlaceholder": "Hē, Whakaaro, Whakaputanga…",
       "emoji": "Emoji",
       "mode": "Aratau",
-      "defaultsHint": "Ka whakamahi ngā wātū ka tīmata mai i tēnei rārangi i ēnei taunoa."
+      "defaultsHint": "Ka whakamahi ngā wātū ka tīmata mai i tēnei rārangi i ēnei taunoa.",
+      "saveFailed": "Kāore i taea te tiaki i te rārangi. Tirohia tō hononga, ka ngana anō."
     },
     "list": {
       "addPlaceholder": "Tāpiri mahi",
       "add": "Tāpiri",
+      "addFailed": "Kāore i taea te tāpiri i te mahi. Tirohia tō hononga, ka ngana anō.",
       "empty": "Kāore anō he mahi",
       "setDefaults": "Tautuhia te pūranga waehere, te aratau me te tauira",
       "completed_one": "Kua oti ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "Tīmata wātū hou",
       "startNewSessionHint": "Pēhia kia roa kia tīmata ai i tētahi wātū hou.",
       "linkSession": "Hono wātū",
-      "linkFailed": "Kāore i taea te hono te wātū ki te mahi"
+      "linkFailed": "Kāore i taea te hono te wātū ki te mahi",
+      "startRefreshFailed": "Kua tīmata te wātū, engari kāore i whakahōutia tēnei rārangi."
     },
     "linkSession": {
       "title": "Hono i tētahi wātū",

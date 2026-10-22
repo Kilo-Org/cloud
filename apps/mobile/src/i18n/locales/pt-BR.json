@@ -3862,11 +3862,13 @@
       "namePlaceholder": "Bugs, Ideias, Versão…",
       "emoji": "Emoji",
       "mode": "Modo",
-      "defaultsHint": "As sessões iniciadas a partir desta lista usam estes padrões."
+      "defaultsHint": "As sessões iniciadas a partir desta lista usam estes padrões.",
+      "saveFailed": "Não foi possível salvar a lista. Verifique sua conexão e tente novamente."
     },
     "list": {
       "addPlaceholder": "Adicionar uma tarefa",
       "add": "Adicionar tarefa",
+      "addFailed": "Não foi possível adicionar a tarefa. Verifique sua conexão e tente novamente.",
       "empty": "Ainda não há tarefas",
       "setDefaults": "Definir repositório, modo e modelo",
       "completed_one": "Concluídas ({{count}})",
@@ -3905,7 +3907,8 @@
       "startNewSession": "Iniciar nova sessão",
       "startNewSessionHint": "Toque e segure para iniciar uma nova sessão.",
       "linkSession": "Vincular sessão",
-      "linkFailed": "Não foi possível vincular a sessão à tarefa"
+      "linkFailed": "Não foi possível vincular a sessão à tarefa",
+      "startRefreshFailed": "A sessão foi iniciada, mas esta lista não foi atualizada."
     },
     "linkSession": {
       "title": "Vincular uma sessão",

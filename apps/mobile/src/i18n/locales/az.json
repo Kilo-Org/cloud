@@ -3819,11 +3819,13 @@
       "namePlaceholder": "Xətalar, İdeyalar, Buraxılış…",
       "emoji": "Emoji",
       "mode": "Rejim",
-      "defaultsHint": "Bu siyahıdan başladılan sessiyalar bu standart dəyərlərdən istifadə edir."
+      "defaultsHint": "Bu siyahıdan başladılan sessiyalar bu standart dəyərlərdən istifadə edir.",
+      "saveFailed": "Siyahını yadda saxlamaq alınmadı. Bağlantınızı yoxlayın və yenidən cəhd edin."
     },
     "list": {
       "addPlaceholder": "Yeni tapşırıq əlavə et",
       "add": "Tapşırıq əlavə et",
+      "addFailed": "Tapşırığı əlavə etmək alınmadı. Bağlantınızı yoxlayın və yenidən cəhd edin.",
       "empty": "Hələ tapşırıq yoxdur",
       "setDefaults": "Repozitoriya, rejim və model təyin et",
       "completed_one": "Tamamlanıb ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "Yeni sessiya başlat",
       "startNewSessionHint": "Yeni sessiya başlatmaq üçün uzun bas.",
       "linkSession": "Sessiyanı əlaqələndir",
-      "linkFailed": "Sessiyanı tapşırıqla əlaqələndirmək mümkün olmadı"
+      "linkFailed": "Sessiyanı tapşırıqla əlaqələndirmək mümkün olmadı",
+      "startRefreshFailed": "Sessiya başladı, lakin bu siyahı yenilənmədi."
     },
     "linkSession": {
       "title": "Sessiya əlaqələndir",

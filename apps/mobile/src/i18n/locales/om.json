@@ -3819,11 +3819,13 @@
       "namePlaceholder": "Rakkoo, Yaada, Baasii…",
       "emoji": "Mallattoo miiraa",
       "mode": "Haala",
-      "defaultsHint": "Turtiiwwan tarree kana irraa eegalan durtiiwwan kana fayyadamu."
+      "defaultsHint": "Turtiiwwan tarree kana irraa eegalan durtiiwwan kana fayyadamu.",
+      "saveFailed": "Tarreen ol kaa’uun hin danda’amne. Walitti qabsiisa kee mirkaneessiis irra deebiin yaali."
     },
     "list": {
       "addPlaceholder": "Hojii dabali",
       "add": "Dabali",
+      "addFailed": "Hojii dabaluun hin danda’amne. Walitti qabsiisa kee mirkaneessiis irra deebiin yaali.",
       "empty": "Hojii hin jiru",
       "setDefaults": "Kuusaa koodii, haala fi moodela sirreessi",
       "completed_one": "Xumurame ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "Seeshinii haaraa jalqabi",
       "startNewSessionHint": "Seeshinii haaraa jalqabuuf yeroo dheeraa tuqi.",
       "linkSession": "Turtii walitti hidhi",
-      "linkFailed": "Turtii hojii waliin walitti hidhuun hin danda'amne"
+      "linkFailed": "Turtii hojii waliin walitti hidhuun hin danda'amne",
+      "startRefreshFailed": "Seesiiniin eegalame, garuu tarreen kun hin haaromsamne."
     },
     "linkSession": {
       "title": "Turtii walitti hidhi",

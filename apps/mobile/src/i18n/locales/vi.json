@@ -3819,11 +3819,13 @@
       "namePlaceholder": "Lỗi, Ý tưởng, Bản phát hành…",
       "emoji": "Biểu tượng cảm xúc",
       "mode": "Chế độ",
-      "defaultsHint": "Các phiên bắt đầu từ danh sách này dùng các giá trị mặc định này."
+      "defaultsHint": "Các phiên bắt đầu từ danh sách này dùng các giá trị mặc định này.",
+      "saveFailed": "Không thể lưu danh sách. Kiểm tra kết nối của bạn và thử lại."
     },
     "list": {
       "addPlaceholder": "Thêm việc cần làm",
       "add": "Thêm",
+      "addFailed": "Không thể thêm việc cần làm. Kiểm tra kết nối của bạn và thử lại.",
       "empty": "Chưa có việc cần làm nào",
       "setDefaults": "Đặt kho mã nguồn, chế độ và mô hình",
       "completed_one": "Đã hoàn tất ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "Bắt đầu phiên mới",
       "startNewSessionHint": "Nhấn giữ để bắt đầu phiên mới.",
       "linkSession": "Liên kết phiên",
-      "linkFailed": "Không thể liên kết phiên với việc cần làm"
+      "linkFailed": "Không thể liên kết phiên với việc cần làm",
+      "startRefreshFailed": "Phiên đã bắt đầu, nhưng danh sách này chưa được cập nhật."
     },
     "linkSession": {
       "title": "Liên kết một phiên",

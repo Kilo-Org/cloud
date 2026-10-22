@@ -3862,11 +3862,13 @@
       "namePlaceholder": "Greške, Ideje, Izdanje…",
       "emoji": "Emoji",
       "mode": "Režim",
-      "defaultsHint": "Sesije pokrenute sa ovog spiska koriste ove podrazumevane vrednosti."
+      "defaultsHint": "Sesije pokrenute sa ovog spiska koriste ove podrazumevane vrednosti.",
+      "saveFailed": "Nije bilo moguće sačuvati spisak. Proverite internet vezu i pokušajte ponovo."
     },
     "list": {
       "addPlaceholder": "Dodaj zadatak",
       "add": "Dodaj zadatak",
+      "addFailed": "Nije bilo moguće dodati zadatak. Proverite internet vezu i pokušajte ponovo.",
       "empty": "Još nema zadataka",
       "setDefaults": "Podesi repozitorijum, režim i model",
       "completed_one": "Završeno ({{count}})",
@@ -3905,7 +3907,8 @@
       "startNewSession": "Pokreni novu sesiju",
       "startNewSessionHint": "Pritisni i drži da pokreneš novu sesiju.",
       "linkSession": "Poveži sesiju",
-      "linkFailed": "Sesija nije mogla da se poveže sa zadatkom"
+      "linkFailed": "Sesija nije mogla da se poveže sa zadatkom",
+      "startRefreshFailed": "Sesija je pokrenuta, ali ovaj spisak nije ažuriran."
     },
     "linkSession": {
       "title": "Poveži sesiju",

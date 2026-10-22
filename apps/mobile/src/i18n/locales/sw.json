@@ -3819,11 +3819,13 @@
       "namePlaceholder": "Hitilafu, Mawazo, Toleo…",
       "emoji": "Emoji",
       "mode": "Hali",
-      "defaultsHint": "Vikao vinavyoanzishwa kutoka orodha hii hutumia mipangilio hii chaguo-msingi."
+      "defaultsHint": "Vikao vinavyoanzishwa kutoka orodha hii hutumia mipangilio hii chaguo-msingi.",
+      "saveFailed": "Imeshindikana kuhifadhi orodha. Angalia muunganisho wako kisha ujaribu tena."
     },
     "list": {
       "addPlaceholder": "Ongeza kazi",
       "add": "Ongeza kazi",
+      "addFailed": "Imeshindikana kuongeza kazi. Angalia muunganisho wako kisha ujaribu tena.",
       "empty": "Hakuna kazi bado",
       "setDefaults": "Weka hazina, hali na modeli",
       "completed_one": "Zimekamilika ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "Anza kikao kipya",
       "startNewSessionHint": "Bonyeza kwa muda mrefu kuanza kikao kipya.",
       "linkSession": "Unganisha kikao",
-      "linkFailed": "Imeshindikana kuunganisha kikao na kazi"
+      "linkFailed": "Imeshindikana kuunganisha kikao na kazi",
+      "startRefreshFailed": "Kikao kilianza, lakini orodha hii haikusasishwa."
     },
     "linkSession": {
       "title": "Kuunganisha kikao",

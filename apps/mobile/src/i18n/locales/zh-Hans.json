@@ -3819,11 +3819,13 @@
       "namePlaceholder": "缺陷、想法、发布…",
       "emoji": "表情符号",
       "mode": "模式",
-      "defaultsHint": "从此列表启动的会话将使用这些默认设置。"
+      "defaultsHint": "从此列表启动的会话将使用这些默认设置。",
+      "saveFailed": "无法保存列表。请检查网络连接后重试。"
     },
     "list": {
       "addPlaceholder": "添加待办事项",
       "add": "添加待办",
+      "addFailed": "无法添加待办事项。请检查网络连接后重试。",
       "empty": "暂无待办事项",
       "setDefaults": "设置仓库、模式和模型",
       "completed_one": "已完成 ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "开始新会话",
       "startNewSessionHint": "长按以开始新会话。",
       "linkSession": "关联会话",
-      "linkFailed": "无法将会话关联到该待办事项"
+      "linkFailed": "无法将会话关联到该待办事项",
+      "startRefreshFailed": "会话已启动，但此列表未更新。"
     },
     "linkSession": {
       "title": "关联会话",

@@ -3819,11 +3819,13 @@
       "namePlaceholder": "Feil, ideer, utgivelse…",
       "emoji": "Emoji",
       "mode": "Modus",
-      "defaultsHint": "Økter som startes fra denne listen, bruker disse standardverdiene."
+      "defaultsHint": "Økter som startes fra denne listen, bruker disse standardverdiene.",
+      "saveFailed": "Kunne ikke lagre listen. Sjekk tilkoblingen og prøv igjen."
     },
     "list": {
       "addPlaceholder": "Legg inn et gjøremål",
       "add": "Legg til gjøremål",
+      "addFailed": "Kunne ikke legge til gjøremålet. Sjekk tilkoblingen og prøv igjen.",
       "empty": "Ingen gjøremål ennå",
       "setDefaults": "Angi kodelager, modus og modell",
       "completed_one": "Fullført ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "Start ny økt",
       "startNewSessionHint": "Langtrykk for å starte en ny økt.",
       "linkSession": "Koble til økt",
-      "linkFailed": "Kunne ikke koble økten til gjøremålet."
+      "linkFailed": "Kunne ikke koble økten til gjøremålet.",
+      "startRefreshFailed": "Økten startet, men listen ble ikke oppdatert."
     },
     "linkSession": {
       "title": "Koble til en økt",

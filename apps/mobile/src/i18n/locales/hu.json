@@ -3819,11 +3819,13 @@
       "namePlaceholder": "Hibák, ötletek, kiadás…",
       "emoji": "Emodzsi",
       "mode": "Mód",
-      "defaultsHint": "Az ebből a listából indított munkamenetek ezeket az alapértékeket használják."
+      "defaultsHint": "Az ebből a listából indított munkamenetek ezeket az alapértékeket használják.",
+      "saveFailed": "Nem sikerült menteni a listát. Ellenőrizd a kapcsolatot, és próbáld újra."
     },
     "list": {
       "addPlaceholder": "Írj be egy teendőt",
       "add": "Teendő hozzáadása",
+      "addFailed": "Nem sikerült hozzáadni a teendőt. Ellenőrizd a kapcsolatot, és próbáld újra.",
       "empty": "Még nincsenek teendők",
       "setDefaults": "Adattár, mód és modell beállítása",
       "completed_one": "Befejezve ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "Új munkamenet indítása",
       "startNewSessionHint": "Hosszan nyomd meg új munkamenet indításához.",
       "linkSession": "Munkamenet társítása",
-      "linkFailed": "Nem sikerült a munkamenetet a teendőhöz társítani."
+      "linkFailed": "Nem sikerült a munkamenetet a teendőhöz társítani.",
+      "startRefreshFailed": "A munkamenet elindult, de ez a lista nem frissült."
     },
     "linkSession": {
       "title": "Munkamenet hozzákapcsolása",

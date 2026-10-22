@@ -3819,11 +3819,13 @@
       "namePlaceholder": "Erros, Ideas, Lanzamento…",
       "emoji": "Emoji",
       "mode": "Modo",
-      "defaultsHint": "As sesións iniciadas desde esta lista usan estes valores predeterminados."
+      "defaultsHint": "As sesións iniciadas desde esta lista usan estes valores predeterminados.",
+      "saveFailed": "Non se puido gardar a lista. Comproba a conexión e téntao de novo."
     },
     "list": {
       "addPlaceholder": "Engadir unha tarefa",
       "add": "Engadir tarefa",
+      "addFailed": "Non se puido engadir a tarefa. Comproba a conexión e téntao de novo.",
       "empty": "Aínda non hai tarefas",
       "setDefaults": "Define repositorio, modo e modelo",
       "completed_one": "Rematadas ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "Iniciar nova sesión",
       "startNewSessionHint": "Mantén premido para iniciar unha nova sesión.",
       "linkSession": "Vincular sesión",
-      "linkFailed": "Non se puido vincular a sesión á tarefa"
+      "linkFailed": "Non se puido vincular a sesión á tarefa",
+      "startRefreshFailed": "A sesión iniciouse, pero esta lista non se actualizou."
     },
     "linkSession": {
       "title": "Vincular unha sesión",

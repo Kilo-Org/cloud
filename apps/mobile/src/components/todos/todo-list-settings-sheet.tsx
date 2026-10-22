@@ -9,12 +9,13 @@ import { ModelSelector } from '@/components/agents/model-selector';
 import { RepoSelector } from '@/components/agents/repo-selector';
 import { PickerSheet } from '@/components/picker-sheet';
 import { QueryError } from '@/components/query-error';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
-import { useTodoListMutations, useTodoLists } from '@/lib/hooks/use-todos';
+import { reportNothing, useTodoListMutations, useTodoLists } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   TODO_LIST_EMOJI_MAX_LENGTH,
@@ -38,7 +39,7 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const { create, update } = useTodoListMutations(organizationId);
+  const { create, update } = useTodoListMutations(organizationId, reportNothing);
   const scope = organizationId ?? undefined;
   const { repositories, recents, groups } = useNewSessionRepos({ organizationId: scope });
   const { models, isLoading: isLoadingModels } = useAvailableModels(scope);
@@ -50,7 +51,9 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
   const [mode, setMode] = useState(list?.mode ?? null);
   const [model, setModel] = useState(list?.model ?? null);
   const [variant, setVariant] = useState(list?.variant ?? null);
-  const saving = create.isPending;
+  const [saveFailed, setSaveFailed] = useState(false);
+  const savingRef = useRef(false);
+  const saving = create.isPending || update.isPending;
 
   const { requestClose, dialog } = useSheetDismissGuard({
     isDirty: () =>
@@ -83,9 +86,9 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
     }, [])
   );
 
-  function save() {
+  async function save() {
     const name = nameRef.current.trim();
-    if (name.length === 0) {
+    if (name.length === 0 || savingRef.current) {
       return;
     }
     const emoji = emojiRef.current.trim();
@@ -97,19 +100,22 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
       model,
       variant,
     };
-    if (list) {
-      update.mutate({ id: list.id, ...fields });
+    savingRef.current = true;
+    setSaveFailed(false);
+    try {
+      // An existing list updates in place; a new one is created in the route's
+      // context. Either way the sheet closes only once the write succeeded.
+      await (list
+        ? update.mutateAsync({ id: list.id, ...fields })
+        : create.mutateAsync({ organizationId, ...fields }));
       router.back();
-      return;
+    } catch {
+      // The fields and the sheet stay, so the user can retry in place; the
+      // status line below the fields is this save's only error surface.
+      setSaveFailed(true);
+    } finally {
+      savingRef.current = false;
     }
-    create.mutate(
-      { organizationId, ...fields },
-      {
-        onSuccess: () => {
-          router.back();
-        },
-      }
-    );
   }
 
   return (
@@ -117,7 +123,9 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
       <PickerSheet
         title={list ? t('todos.listSettings.title') : t('todos.lists.newList')}
         doneLabel={t('common.save')}
-        onDone={save}
+        onDone={() => {
+          void save();
+        }}
         onCancel={requestClose}
         disabled={saving}
         doneDisabled={!hasName || saving}
@@ -146,7 +154,9 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
                   const next = text.trim().length > 0;
                   setHasName(current => (current === next ? current : next));
                 }}
-                onSubmitEditing={save}
+                onSubmitEditing={() => {
+                  void save();
+                }}
                 returnKeyType="done"
                 maxLength={TODO_LIST_NAME_MAX_LENGTH}
                 placeholder={t('todos.listSettings.namePlaceholder')}
@@ -214,6 +224,10 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
             </View>
           </View>
           {saving ? <ActivityIndicator color={colors.mutedForeground} /> : null}
+          <AccessibleStatus
+            message={saveFailed ? t('todos.listSettings.saveFailed') : null}
+            className="text-sm"
+          />
         </View>
       </PickerSheet>
       {dialog}

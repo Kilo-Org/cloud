@@ -3819,11 +3819,13 @@
       "namePlaceholder": "Bug, Lide, Vèsyon…",
       "emoji": "Emoji",
       "mode": "Mòd",
-      "defaultsHint": "Sesyon ki kòmanse nan lis sa a itilize paramèt sa yo."
+      "defaultsHint": "Sesyon ki kòmanse nan lis sa a itilize paramèt sa yo.",
+      "saveFailed": "Pa t’ posib sove lis la. Verifye koneksyon w la epi eseye ankò."
     },
     "list": {
       "addPlaceholder": "Ajoute yon travay",
       "add": "Ajoute travay",
+      "addFailed": "Pa t’ posib ajoute travay la. Verifye koneksyon w la epi eseye ankò.",
       "empty": "Poko gen travay",
       "setDefaults": "Mete depo, mòd ak modèl",
       "completed_one": "Fini ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "Kòmanse nouvo sesyon",
       "startNewSessionHint": "Peze lontan pou kòmanse yon nouvo sesyon.",
       "linkSession": "Lye sesyon",
-      "linkFailed": "Nou pa t ka lye sesyon an ak travay la"
+      "linkFailed": "Nou pa t ka lye sesyon an ak travay la",
+      "startRefreshFailed": "Sesyon an te kòmanse, men lis sa a pa t’ mete ajou."
     },
     "linkSession": {
       "title": "Lye yon sesyon",

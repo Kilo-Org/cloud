@@ -3862,11 +3862,13 @@
       "namePlaceholder": "Errors, idees, versions…",
       "emoji": "Emoji",
       "mode": "Mode",
-      "defaultsHint": "Les sessions iniciades des d'aquesta llista utilitzen aquests valors per defecte."
+      "defaultsHint": "Les sessions iniciades des d'aquesta llista utilitzen aquests valors per defecte.",
+      "saveFailed": "No s’ha pogut desar la llista. Comprova la connexió i torna-ho a provar."
     },
     "list": {
       "addPlaceholder": "Afegeix una tasca",
       "add": "Afegeix la tasca",
+      "addFailed": "No s’ha pogut afegir la tasca. Comprova la connexió i torna-ho a provar.",
       "empty": "Encara no hi ha tasques",
       "setDefaults": "Defineix el repositori, el mode i el model",
       "completed_one": "Completades ({{count}})",
@@ -3905,7 +3907,8 @@
       "startNewSession": "Inicia una sessió nova",
       "startNewSessionHint": "Mantén premut per iniciar una sessió nova.",
       "linkSession": "Vincula una sessió",
-      "linkFailed": "No s'ha pogut vincular la sessió a la tasca"
+      "linkFailed": "No s'ha pogut vincular la sessió a la tasca",
+      "startRefreshFailed": "La sessió s’ha iniciat, però aquesta llista no s’ha actualitzat."
     },
     "linkSession": {
       "title": "Vincular una sessió",

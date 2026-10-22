@@ -3819,11 +3819,13 @@
       "namePlaceholder": "バグ、アイデア、リリース…",
       "emoji": "絵文字",
       "mode": "モード",
-      "defaultsHint": "このリストから開始したセッションには、この既定値が使われます。"
+      "defaultsHint": "このリストから開始したセッションには、この既定値が使われます。",
+      "saveFailed": "リストを保存できませんでした。接続を確認して、もう一度お試しください。"
     },
     "list": {
       "addPlaceholder": "タスクを追加",
       "add": "タスクを追加",
+      "addFailed": "タスクを追加できませんでした。接続を確認して、もう一度お試しください。",
       "empty": "タスクはまだありません",
       "setDefaults": "リポジトリ、モード、モデルを設定",
       "completed_one": "完了 ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "新しいセッションを開始",
       "startNewSessionHint": "長押しして新しいセッションを開始します。",
       "linkSession": "セッションをリンク",
-      "linkFailed": "セッションをタスクにリンクできませんでした"
+      "linkFailed": "セッションをタスクにリンクできませんでした",
+      "startRefreshFailed": "セッションは開始されましたが、このリストは更新されませんでした。"
     },
     "linkSession": {
       "title": "セッションをリンク",

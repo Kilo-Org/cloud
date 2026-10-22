@@ -3819,11 +3819,13 @@
       "namePlaceholder": "Fouten, ideeën, releases…",
       "emoji": "Emoji",
       "mode": "Modus",
-      "defaultsHint": "Sessies die je vanaf deze lijst start, gebruiken deze standaardwaarden."
+      "defaultsHint": "Sessies die je vanaf deze lijst start, gebruiken deze standaardwaarden.",
+      "saveFailed": "Kon de lijst niet opslaan. Controleer je verbinding en probeer het opnieuw."
     },
     "list": {
       "addPlaceholder": "Een taak toevoegen",
       "add": "Taak toevoegen",
+      "addFailed": "Kon de taak niet toevoegen. Controleer je verbinding en probeer het opnieuw.",
       "empty": "Nog geen taken",
       "setDefaults": "Coderepository, modus en model instellen",
       "completed_one": "Voltooid ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "Nieuwe sessie starten",
       "startNewSessionHint": "Houd ingedrukt om een nieuwe sessie te starten.",
       "linkSession": "Sessie koppelen",
-      "linkFailed": "De sessie kon niet aan de taak worden gekoppeld"
+      "linkFailed": "De sessie kon niet aan de taak worden gekoppeld",
+      "startRefreshFailed": "De sessie is gestart, maar deze lijst is niet bijgewerkt."
     },
     "linkSession": {
       "title": "Een sessie koppelen",

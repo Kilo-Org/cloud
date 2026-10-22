@@ -3819,11 +3819,13 @@
       "namePlaceholder": "Bugs, Ideen, Release…",
       "emoji": "Emoji",
       "mode": "Modus",
-      "defaultsHint": "Sitzungen, die aus dieser Liste gestartet werden, verwenden diese Standardwerte."
+      "defaultsHint": "Sitzungen, die aus dieser Liste gestartet werden, verwenden diese Standardwerte.",
+      "saveFailed": "Liste konnte nicht gespeichert werden. Prüfe deine Verbindung und versuche es erneut."
     },
     "list": {
       "addPlaceholder": "Aufgabe hinzufügen",
       "add": "Aufgabe hinzufügen",
+      "addFailed": "Aufgabe konnte nicht hinzugefügt werden. Prüfe deine Verbindung und versuche es erneut.",
       "empty": "Noch keine Aufgaben",
       "setDefaults": "Repository, Modus und Modell festlegen",
       "completed_one": "Abgeschlossen ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "Neue Sitzung starten",
       "startNewSessionHint": "Lange drücken, um eine neue Sitzung zu starten.",
       "linkSession": "Sitzung verknüpfen",
-      "linkFailed": "Die Sitzung konnte nicht mit der Aufgabe verknüpft werden."
+      "linkFailed": "Die Sitzung konnte nicht mit der Aufgabe verknüpft werden.",
+      "startRefreshFailed": "Die Sitzung wurde gestartet, aber diese Liste wurde nicht aktualisiert."
     },
     "linkSession": {
       "title": "Eine Sitzung verknüpfen",

@@ -3819,11 +3819,13 @@
       "namePlaceholder": "Bug, ide, rilis…",
       "emoji": "Emoji",
       "mode": "Mode",
-      "defaultsHint": "Sesi yang dimulai dari daftar ini memakai default ini."
+      "defaultsHint": "Sesi yang dimulai dari daftar ini memakai default ini.",
+      "saveFailed": "Tidak dapat menyimpan daftar. Periksa koneksi Anda dan coba lagi."
     },
     "list": {
       "addPlaceholder": "Tambahkan tugas",
       "add": "Tambah tugas",
+      "addFailed": "Tidak dapat menambahkan tugas. Periksa koneksi Anda dan coba lagi.",
       "empty": "Belum ada tugas",
       "setDefaults": "Atur repositori, mode, dan model",
       "completed_one": "Selesai ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "Mulai sesi baru",
       "startNewSessionHint": "Tekan lama untuk memulai sesi baru.",
       "linkSession": "Tautkan sesi",
-      "linkFailed": "Tidak dapat menautkan sesi ke tugas"
+      "linkFailed": "Tidak dapat menautkan sesi ke tugas",
+      "startRefreshFailed": "Sesi dimulai, tetapi daftar ini tidak diperbarui."
     },
     "linkSession": {
       "title": "Tautkan sebuah sesi",

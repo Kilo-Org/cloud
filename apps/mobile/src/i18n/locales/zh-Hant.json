@@ -3819,11 +3819,13 @@
       "namePlaceholder": "錯誤、想法、版本…",
       "emoji": "表情符號",
       "mode": "模式",
-      "defaultsHint": "從此清單開始的工作階段會使用這些預設值。"
+      "defaultsHint": "從此清單開始的工作階段會使用這些預設值。",
+      "saveFailed": "無法儲存清單。請檢查您的連線，然後再試一次。"
     },
     "list": {
       "addPlaceholder": "新增待辦事項",
       "add": "新增待辦事項",
+      "addFailed": "無法新增待辦事項。請檢查您的連線，然後再試一次。",
       "empty": "尚無待辦事項",
       "setDefaults": "設定儲存庫、模式和模型",
       "completed_one": "已完成 ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "開始新的工作階段",
       "startNewSessionHint": "長按以開始新的工作階段。",
       "linkSession": "連結工作階段",
-      "linkFailed": "無法將工作階段連結至待辦事項"
+      "linkFailed": "無法將工作階段連結至待辦事項",
+      "startRefreshFailed": "工作階段已開始，但此清單並未更新。"
     },
     "linkSession": {
       "title": "連結工作階段",

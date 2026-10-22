@@ -3819,11 +3819,13 @@
       "namePlaceholder": "Villur, Hugmyndir, Útgáfa…",
       "emoji": "Emoji",
       "mode": "Hamur",
-      "defaultsHint": "Lotur sem hefjast úr þessum lista nota þessi sjálfgefnu gildi."
+      "defaultsHint": "Lotur sem hefjast úr þessum lista nota þessi sjálfgefnu gildi.",
+      "saveFailed": "Gat ekki vistað listann. Athugaðu nettenginguna þína og reyndu aftur."
     },
     "list": {
       "addPlaceholder": "Bæta við verkefni",
       "add": "Bæta við",
+      "addFailed": "Gat ekki bætt við verkefninu. Athugaðu nettenginguna þína og reyndu aftur.",
       "empty": "Engin verkefni enn",
       "setDefaults": "Stilltu kóðasafn, ham og líkan",
       "completed_one": "Lokið ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "Byrja nýja lotu",
       "startNewSessionHint": "Haltu inni til að byrja nýja lotu.",
       "linkSession": "Tengja lotu",
-      "linkFailed": "Ekki tókst að tengja lotuna við verkefnið"
+      "linkFailed": "Ekki tókst að tengja lotuna við verkefnið",
+      "startRefreshFailed": "Lotan hófst, en listinn uppfærðist ekki."
     },
     "linkSession": {
       "title": "Tengja lotu við verkefni",

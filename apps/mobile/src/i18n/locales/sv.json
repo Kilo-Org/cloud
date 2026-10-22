@@ -3824,11 +3824,13 @@
       "namePlaceholder": "Buggar, Idéer, Utgåva…",
       "emoji": "Emoji",
       "mode": "Läge",
-      "defaultsHint": "Sessioner som startas från den här listan använder dessa standardvärden."
+      "defaultsHint": "Sessioner som startas från den här listan använder dessa standardvärden.",
+      "saveFailed": "Det gick inte att spara listan. Kontrollera din anslutning och försök igen."
     },
     "list": {
       "addPlaceholder": "Lägg till en uppgift",
       "add": "Lägg till uppgift",
+      "addFailed": "Det gick inte att lägga till uppgiften. Kontrollera din anslutning och försök igen.",
       "empty": "Inga uppgifter ännu",
       "setDefaults": "Ange kodarkiv, läge och modell",
       "completed_one": "Slutförda ({{count}})",
@@ -3865,7 +3867,8 @@
       "startNewSession": "Starta ny session",
       "startNewSessionHint": "Håll in för att starta en ny session.",
       "linkSession": "Länka session",
-      "linkFailed": "Kunde inte länka sessionen till uppgiften"
+      "linkFailed": "Kunde inte länka sessionen till uppgiften",
+      "startRefreshFailed": "Sessionen startades, men den här listan uppdaterades inte."
     },
     "linkSession": {
       "title": "Länka en session",

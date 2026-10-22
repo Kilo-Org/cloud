@@ -3819,11 +3819,13 @@
       "namePlaceholder": "Foute, Idees, Vrystelling…",
       "emoji": "Emoji",
       "mode": "Modus",
-      "defaultsHint": "Sessies wat uit hierdie lys begin word, gebruik hierdie verstekwaardes."
+      "defaultsHint": "Sessies wat uit hierdie lys begin word, gebruik hierdie verstekwaardes.",
+      "saveFailed": "Kon die lys nie stoor nie. Kontroleer jou verbinding en probeer weer."
     },
     "list": {
       "addPlaceholder": "Voeg 'n taak by",
       "add": "Voeg taak by",
+      "addFailed": "Kon die taak nie byvoeg nie. Kontroleer jou verbinding en probeer weer.",
       "empty": "Nog geen take nie",
       "setDefaults": "Stel bewaarplek, modus en model",
       "completed_one": "Voltooi ({{count}})",
@@ -3860,7 +3862,8 @@
       "startNewSession": "Begin nuwe sessie",
       "startNewSessionHint": "Druk lank om 'n nuwe sessie te begin.",
       "linkSession": "Koppel sessie",
-      "linkFailed": "Kon nie die sessie aan die taak koppel nie"
+      "linkFailed": "Kon nie die sessie aan die taak koppel nie",
+      "startRefreshFailed": "Die sessie het begin, maar hierdie lys is nie opgedateer nie."
     },
     "linkSession": {
       "title": "Koppel 'n sessie",

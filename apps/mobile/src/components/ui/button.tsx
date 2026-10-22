@@ -3,7 +3,7 @@ import * as React from 'react';
 import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
-import { TextClassContext } from '@/components/ui/text';
+import { Text, TextClassContext } from '@/components/ui/text';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -179,6 +179,31 @@ function Button({
   const busyIndicator = loading ? (
     <ActivityIndicator size="small" color={spinnerColor(variant, colors)} />
   ) : null;
+  // A bare string or number child has no host to draw on: Pressable is a View,
+  // and a View draws no text, so the button collapses to its padding and the
+  // label disappears while the accessibility tree still names it. Wrap scalars
+  // in the themed label Text so every caller's label renders. Array children
+  // get the same treatment per entry; whitespace-only strings are skipped so
+  // JSX spacing idioms between an icon and a labeled element keep their today
+  // behaviour (they draw nothing in a View, and the row's gap does the spacing).
+  // Elements pass through untouched.
+  // oxlint-disable anti-slop/no-runtime-typeof -- ReactNode has no non-typeof way to detect its plain-string/number variants
+  const childrenIsScalar = typeof children === 'string' || typeof children === 'number';
+  let normalizedChildren: React.ReactNode = children;
+  if (childrenIsScalar) {
+    normalizedChildren = <Text>{children}</Text>;
+  } else if (Array.isArray(children)) {
+    normalizedChildren = children.map((child, index) => {
+      if (typeof child === 'string' && /^\s*$/.test(child)) {
+        return child;
+      }
+      const childIsScalar = typeof child === 'string' || typeof child === 'number';
+      return (
+        <React.Fragment key={index}>{childIsScalar ? <Text>{child}</Text> : child}</React.Fragment>
+      );
+    });
+  }
+  // oxlint-enable anti-slop/no-runtime-typeof
   return (
     <TextClassContext.Provider value={buttonTextVariants({ variant, size })}>
       <Pressable
@@ -200,7 +225,7 @@ function Button({
         ) : (
           busyIndicator
         )}
-        {children}
+        {normalizedChildren}
         {rendersBusySlot ? (
           // Mirrors the leading slot (and the row's own gap), so the label keeps
           // the button's centre instead of drifting toward the trailing edge.

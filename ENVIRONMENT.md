@@ -73,6 +73,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 
 - `NEXT_PUBLIC_TURNSTILE_SITE_KEY` - Cloudflare Turnstile public site key; used in `apps/web/src/components/auth/sign-in/TurnstileView.tsx`. [PUBLIC]
 - `TURNSTILE_SECRET_KEY` - Cloudflare Turnstile secret key; used in test files. `[SECRET]`
+- `EMAIL_SIGNUPS_ENABLED` - Set to exact `true` to allow new accounts via email (web magic link and mobile email code). Unset or any other value refuses them. Existing users keep email sign-in either way, and OAuth, passkey, and SSO sign-ups are unaffected. Jest's global setup (`apps/web/src/tests/setup/globalSetup.ts`) defaults it to `true`; keep it out of tracked dotenv files so `pnpm web:env set` can set it. Takes effect on redeploy. [SERVER]
 - `NEXT_PUBLIC_STYTCH_PROJECT_ENV` - Stytch public project environment identifier; used in `apps/web/src/components/auth/StytchClient.tsx`. [PUBLIC]
 - `NEXT_PUBLIC_STYTCH_PUBLIC_TOKEN` - Stytch public token for client SDKs; used in `apps/web/src/components/auth/StytchClient.tsx`. [PUBLIC]
 - `STYTCH_PROJECT_ID` - Stytch project ID for secret-side SDK calls. `[SECRET]`
@@ -91,9 +92,10 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `GASTOWN_RESOURCE_TOKENS_ENABLED` - Default-off family gate for Gastown control tokens; requires the master and exact `true`. This is not a safe-activation declaration: known ingest-audience and live-token-transport blockers remain deferred. [SERVER]
 - `WASTELAND_RESOURCE_TOKENS_ENABLED` - Default-off family gate for Wasteland control tokens; requires the master and exact `true`. [SERVER]
 - `CHAT_RESOURCE_TOKENS_ENABLED` - Default-off family gate for fresh chat resource issuance; requires the master and exact `true`. Validated modern devices retain chat/event-service/notifications issuance after rollback, capped by one hour and parent expiry. [SERVER]
-- `DELEGATED_RESOURCE_TOKENS_ENABLED` - Default-off family gate for explicit API, gateway, attribution, and HTML-deploy delegation, including the organization user-token resource route; requires the master and exact `true`. Disabled explicit delegation remains unavailable. [SERVER]
+- `DELEGATED_RESOURCE_TOKENS_ENABLED` - Default-off family gate for explicit API, gateway, and attribution delegation, including the organization user-token resource route; requires the master and exact `true`. Disabled explicit delegation remains unavailable. [SERVER]
 - `WORKFLOW_GATEWAY_RESOURCE_TOKENS_ENABLED` - Default-off family gate for server workflow gateway tokens; requires the master and exact `true`. [SERVER]
 - `INTERNAL_BOT_RESOURCE_TOKENS_ENABLED` - Default-off family gate for internal bot tokens from `POST /api/internal/bot-token`; requires the master and exact `true`. [SERVER]
+- `CODE_REVIEW_CONTAINERS_ORG_IDS` - Comma-separated user or org IDs whose Code Reviewer sessions use DO-managed Cloudflare Containers. Empty is off; `*` includes personal accounts. Enrolled sessions use 1 vCPU, 4 GiB memory, and 8 GB disk. Billing remains `cloud-agent-code-review-2026-07`. Every session uses the control plane. [SERVER]
 - `RUNTIME_ISOLATION_ENABLED` - Cloud Agent Worker rollout control for new modern control-plane sessions and worktree destinations. Production and dev Worker configs set this to `true`; exact `true` permits adoption, while unset/other values reject it before durable work. Legacy attachments keep directory-shared Kilo runtimes. Persisted modern runtime authorization continues selecting per-session isolation after rollback, and the connected wrapper must advertise the isolation capability. Actual web issuance remains off behind its separate issuance gates. Outstanding smoke failures must be resolved before merge; enabling this Worker admission gate does not remove that merge prerequisite. Foreground expiry recovery retains the same session identity and requires acknowledged idle transport retirement; this flag does not establish complete real-provider smoke coverage. See `docs/token-issuance-policy.md`, Phase 5.2 merge, automatic deployment, and activation. [SERVER]
 - `CALLBACK_TOKEN_SECRET` - Secret for signing callback tokens. Required for local development. `[SECRET]`
 - `INTERNAL_SECRET` - Alias/fallback for `INTERNAL_API_SECRET`; used in KiloClaw E2E scripts (`services/kiloclaw/e2e/`). `[SECRET]`
@@ -200,8 +202,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `GOOGLE_PLAY_RTDN_PUSH_AUDIENCE` - Expected OIDC audience for Play Real-time Developer Notification Pub/Sub push (the HTTPS URL of POST /api/kilo-pass/play/notifications). `[SERVER]`
 - `GOOGLE_PLAY_RTDN_PUSH_SERVICE_ACCOUNT_EMAIL` - Expected service-account email for the Play RTDN Pub/Sub push OIDC token; the token `email` claim must match it. [SERVER]
 - `APPLE_APP_BUNDLE_ID` - iOS app bundle ID for Apple App Attest and Sign In verification. [SERVER]
-- `NATIVE_ADMISSION_MODE` - Native admission enforcement mode: `off` (default), `report`, or `enforce`. [SERVER]
-- `NATIVE_ADMISSION_SIMULATOR_BYPASS` - When `true` in non-production, bypasses Play Integrity API verification. [SERVER]
+- `NATIVE_ADMISSION_DEV_SENTINEL` - When `true`, non-production accepts the fixed device-attestation sentinel from devices that cannot attest (simulator, emulator without Play Services). Ignored when `NODE_ENV=production`. The mobile build reads the same name. [SERVER]
 - `GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER` - Google Cloud project number for Play Integrity API. Also read by the mobile build, where it ships in the bundle; it is an identifier, not a secret. [SERVER]
 - `GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY` - Service account JSON key for Play Integrity API. `[SECRET]`
 - `GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME` - Expected Android package name (e.g., `com.kilocode.app`), verified against the Play Integrity verdict. [SERVER]
@@ -253,16 +254,8 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `NEXT_PUBLIC_SESSION_INGEST_WS_URL` - WebSocket URL for session ingest from the browser. [PUBLIC]
 - `CODE_REVIEW_WORKER_URL` - URL for the code review worker. [SERVER]
 - `CODE_REVIEW_WORKER_AUTH_TOKEN` - Auth token for the code review worker. `[SECRET]`
-- `APP_BUILDER_URL` - URL for the App Builder worker. [SERVER]
-- `APP_BUILDER_AUTH_TOKEN` - Auth token for the App Builder worker. `[SECRET]`
 - `KILOCLAW_API_URL` - Base URL for KiloClaw API; used heavily by `apps/web/src/routers/kiloclaw-router.ts` and tests. [SERVER]
-- `USER_DEPLOYMENTS_API_BASE_URL` - Base URL for the user deployments builder. [SERVER]
-- `USER_DEPLOYMENTS_API_AUTH_KEY` - Auth key for the user deployments builder. `[SECRET]`
-- `USER_DEPLOYMENTS_DISPATCHER_URL` - URL for the deployments dispatcher (local dev). [SERVER]
-- `USER_DEPLOYMENTS_DISPATCHER_AUTH_KEY` - Auth key for the deployments dispatcher. `[SECRET]`
-- `USER_DEPLOYMENTS_ENV_VARS_PUBLIC_KEY` - Public key for encrypting user deployment env vars. [SERVER]
-- `USER_DEPLOYMENTS_ENV_VARS_PRIVATE_KEY` - Private key counterpart for decrypting user deployment env vars. `[SECRET]`
-- `CLOUD_AGENT_NEXT_API_URL` - URL for the Cloud Agent Next API; used by App Builder chat and other clients. [SERVER]
+- `CLOUD_AGENT_NEXT_API_URL` - URL for the Cloud Agent Next API. [SERVER]
 - `NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL` - WebSocket URL for Cloud Agent Next from the browser. [PUBLIC]
 - `CLOUD_AGENT_R2_ATTACHMENTS_BUCKET_NAME` - R2 bucket for cloud agent file attachments. [SERVER]
 - `GASTOWN_SERVICE_URL` - URL for the Gastown service. [SERVER]
@@ -339,6 +332,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `QDRANT_API_KEY` - Qdrant API key. `[SECRET]`
 - `MILVUS_ADDRESS` - Milvus vector DB address. [SERVER]
 - `MILVUS_TOKEN` - Milvus auth token. `[SECRET]`
+- `CODE_INDEXING_ENABLED` - Set to `true` to enable cloud managed code indexing. Disabled by default; unset, empty, or any other value keeps the feature off. [SERVER]
 
 ### Email & Notifications
 
@@ -359,7 +353,6 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `SLACK_CREDENTIAL_KEYSET_JSON` - RSA keyset for encrypting Slack bot credentials at rest, as JSON or base64-encoded JSON: `{"active":{"keyId":"...","publicKeyPem":"..."},"decrypt":[{"keyId":"...","privateKeyPem":"..."}]}`. Web holds the private half because the Slack webhook decrypts in-process; the active key ID must also appear in `decrypt` with a private key. `[SECRET]`
 - `SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL` - Slack incoming webhook used by server-side Admin UI code to send events, summaries, reminders, and actions. `[SECRET]`
 - `SLACK_USER_FEEDBACK_WEBHOOK_URL` - Slack incoming webhook for user feedback. [SERVER]
-- `SLACK_DEPLOY_THREAT_WEBHOOK_URL` - Slack incoming webhook for deploy threat alerts. [SERVER]
 
 ### Feature Flags
 
@@ -458,8 +451,6 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `KILO_BIN_PATH` - Path or name of the `kilo` CLI binary; used by `services/cloud-agent-next/scripts/update-default-slash-commands.mjs`. [SERVER]
 - `WORKSPACE_PATH` - Filesystem path of the agent workspace. [SERVER]
 - `SESSION_ID` - Reserved session identifier for the `cloud-agent-next` runtime; reserved in `RESERVED_ENV_VARS`. [SERVER]
-- `CODE_REVIEW_CONTROL_PLANE_IDS` - Comma-separated user or org IDs whose Code Reviewer (`createdOnPlatform: 'code-review'`) sessions run on the call-home control plane (`workspace_` sessions) instead of the legacy plane. Empty admits nobody. `*` includes personal accounts. `wrangler.jsonc` sets `*` in production and dev; set the value in the Cloudflare dashboard to narrow it without a deploy. Independent of the origin-based routing that now sends interactive web, chat-bot, Security Agent, webhook-ingest and scheduled sessions to the control plane; only the worker-trusted code-review billing origin is honored, so a public `start` cannot select it. [SERVER]
-- `CODE_REVIEW_CONTAINERS_ORG_IDS` - Comma-separated user or org IDs whose Code Reviewer sessions run on the DO-managed Cloudflare Containers runtime instead of Cloudflare Sandbox. Empty is off. `*` includes personal accounts. This enrollment also implies control-plane routing, independent of `CODE_REVIEW_CONTROL_PLANE_IDS`. Enrolled sessions use a custom code-review instance type matching the existing code-review allocation: 1 vCPU, 4 GiB memory, 8 GB disk (Cloudflare custom instances cap disk at 2 GB per GiB of memory, so the containment class's 20 GB disk cannot be combined with 4 GiB). Each enrolled session is still billed under `cloud-agent-code-review-2026-07`. [SERVER]
 - `SANDBOX_SELECTION_IDS` - Comma-separated user or org IDs allowed to pick a Cloud Agent sandbox destination on the new-session page. Empty admits nobody. `*` includes personal accounts. Production `wrangler.jsonc` sets the allowlist, so a deploy overwrites the Cloudflare dashboard value. Wrangler `dev` and `.dev.vars.example` default to `*`. [SERVER]
 - `VERCEL_SANDBOX_ORG_IDS` - Comma-separated org IDs routed to Vercel sandboxes. Empty is off. `*` includes personal accounts. [SERVER]
 - `CLOUDFLARE_CONTAINERS_ORG_IDS` - Comma-separated org IDs enrolled for the DO-managed Cloudflare Containers runtime, which is also the default sandbox destination for isolated control-plane sessions. Empty is off. `*` includes every organization and personal account. Production `wrangler.jsonc` sets `*` so a deploy overwrites the Cloudflare dashboard value; wrangler `dev` also sets `*`. [SERVER]
@@ -481,12 +472,6 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `GASTOWN_GIT_AUTHOR_EMAIL` - Git author email used by agents in Gastown for commits. [SERVER]
 - `AGENT_IDLE_TIMEOUT_MS` - Timeout in ms before an idle Gastown agent is terminated; used in `services/gastown/container/src/process-manager.ts`. [SERVER]
 - `REFINERY_IDLE_TIMEOUT_MS` - Timeout in ms before an idle Refinery sub-process is killed; used in `services/gastown/container/src/process-manager.ts`. [SERVER]
-
-### Deploy Infra (Dispatcher)
-
-- `LOCAL_AUTH_TOKEN` - Auth token for the local deployment dispatcher env. `[SECRET]`
-- `STAGING_AUTH_TOKEN` - Auth token for the staging deployment dispatcher env. `[SECRET]`
-- `PROD_AUTH_TOKEN` - Auth token for the production deployment dispatcher env. `[SECRET]`
 
 ### Auto Routing Worker
 
@@ -524,7 +509,6 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 ## Tests / Dev
 
 - `IS_IN_AUTOMATED_TEST` - Set to `1` to put the app in automated-test mode (e.g. skip Turnstile challenges). [SERVER]
-- `AUTH_TOKEN` - Generic auth token used in `services/app-builder/src/_integration_tests/git-test-helpers.ts` to authenticate integration tests against local services. `[SECRET]`
 - `CANDIDATE_TAG` - Tag string used by `scripts/test-rollout-bucket.mjs` to test rollout bucket assignment. [SERVER]
 - `PERCENT` - Percentage value (0-100) used by `scripts/test-rollout-bucket.mjs` when testing rollout bucket logic. [SERVER]
 - `SNOWFLAKE_MAX_POLL_ATTEMPTS` - Max poll attempts for Snowflake job completion in `services/kiloclaw-billing/src/snowflake.ts`. [SERVER]

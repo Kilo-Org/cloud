@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 
 import { BriefingScorecard } from './briefing-card';
+import { BriefingPeriodLabel } from './briefing-period-label';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -94,6 +95,19 @@ export function BriefingListScreen() {
         }
       />
       <View className="gap-3 px-4 pb-3">
+        <Button
+          disabled={!access.enabled}
+          onPress={() => {
+            const context = organizationId === null ? 'personal' : organizationId;
+            const destination: Href = {
+              pathname: `${BRIEFING_PATH}/create`,
+              params: context === undefined ? {} : { context },
+            };
+            router.push(destination);
+          }}
+        >
+          <Text>{t('agentBriefing.create')}</Text>
+        </Button>
         <View className="flex-row flex-wrap gap-2">
           <Button
             variant={!history ? 'secondary' : 'ghost'}
@@ -204,12 +218,12 @@ export function BriefingListScreen() {
                 <Text>
                   {item.context.organizationId === null ? t('common.personal') : item.context.name}
                 </Text>
-                <Text className="text-xs text-muted-foreground">
-                  {item.localDate}
-                  {item.revised
-                    ? ` · ${t('agentBriefing.revised', { revision: item.revision })}`
-                    : ''}
-                </Text>
+                <BriefingPeriodLabel report={item} />
+                {item.revised ? (
+                  <Text className="text-xs text-muted-foreground">
+                    {t('agentBriefing.revised', { revision: item.revision })}
+                  </Text>
+                ) : null}
                 {item.dismissedAt || dismissals.data?.some(entry => entry.reportId === item.id) ? (
                   <Text className="text-xs text-muted-foreground">{t('common.dismissed')}</Text>
                 ) : null}
@@ -219,9 +233,11 @@ export function BriefingListScreen() {
           )}
           ListEmptyComponent={
             <View className="gap-2 p-8">
-              <Text className="text-center">{t('agentBriefing.empty')}</Text>
+              <Text className="text-center">
+                {t(history ? 'agentBriefing.emptyHistory' : 'agentBriefing.empty')}
+              </Text>
               <Text className="text-center text-sm text-muted-foreground">
-                {t('agentBriefing.emptyHint')}
+                {t(history ? 'agentBriefing.historyHint' : 'agentBriefing.emptyHint')}
               </Text>
             </View>
           }

@@ -25,6 +25,7 @@
     "error": "erreur : {{error}}",
     "back": "Retour",
     "somethingWentWrong": "Une erreur s'est produite.",
+    "actionNotRecorded": "Nous n'avons pas pu enregistrer cette action. Veuillez réessayer plus tard.",
     "couldNotOpen": "Impossible d'ouvrir {{label}}.",
     "link": "lien",
     "takingLonger": "Cela prend plus de temps que prévu. Vous pouvez fermer cet écran et revenir vérifier plus tard.",
@@ -865,7 +866,7 @@
     },
     "autoReviews": "Revues automatiques",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket n'est pas connecté. Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent établir la connexion.",
+      "notConnectedReadOnly": "Bitbucket n'est pas connecté. Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent établir la connexion.",
       "setupIncomplete": "La configuration est incomplète. Terminez-la sur kilo.ai.",
       "setup": "Configuration de Bitbucket"
     },
@@ -889,7 +890,10 @@
       "starting": "Démarrage de la revue…",
       "title": "Revue manuelle"
     },
-    "notConnectedReadOnly": "{{platform}} n'est pas connecté. Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent établir la connexion.",
+    "notConnectedReadOnly": "{{platform}} n'est pas connecté. Seuls les propriétaires et les administrateurs de l'organisation peuvent établir la connexion.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} n'est pas connecté. Demandez à un propriétaire, un administrateur ou un responsable de la facturation de le connecter."
+    },
     "platformList": {
       "activity": "Activité",
       "checking": "Vérification…",
@@ -966,8 +970,9 @@
       "noProposals": "Aucune proposition",
       "noProposalsDescription": "Les propositions de la mémoire de revue apparaissent ici après l'analyse des réponses des responsables du dépôt par Kilo.",
       "off": "La mémoire de revue est désactivée.",
+      "on": "La mémoire de revue est activée.",
       "offDescription": "Activez-la pour permettre à Kilo d'apprendre des réponses des responsables du dépôt et de proposer des consignes pour REVIEW.md.",
-      "readOnlyDescription": "Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent activer la mémoire de revue.",
+      "readOnlyDescription": "Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent modifier la mémoire de revue.",
       "title": "Mémoire des revues"
     },
     "scopeList": {
@@ -1105,6 +1110,9 @@
       "triageModel": "Modèle de triage"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Administrateur Kilo",
+      "actorMaskedUser": "Utilisateur masqué",
+      "actorSystem": "Système Kilo",
       "couldNotLoad": "Impossible de charger le rapport d'audit.",
       "events": "Événements",
       "generated": "Ce rapport a été généré le {{generatedAt}}.",
@@ -1116,7 +1124,7 @@
       "summary": "Résumé du rapport",
       "title": "Rapport d'audit",
       "unavailable": "Rapport d'audit indisponible",
-      "unavailableDescription": "Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent consulter les rapports d'audit. Demandez à l'un d'eux de vous accorder l'accès.",
+      "unavailableDescription": "Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent consulter les rapports d'audit. Demandez à un propriétaire, un administrateur ou un responsable de la facturation de vous accorder l'accès.",
       "eventActions": {
         "findingAnalysisCompleted": "Analyse terminée",
         "findingAnalysisFailed": "Échec de l'analyse",
@@ -1233,7 +1241,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "Ce signalement a déjà été résolu et ne peut plus être exclu.",
-      "cannotDismissDescription": "Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent exclure des signalements.",
+      "cannotDismissDescription": "Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent exclure des signalements.",
       "cannotDismissTitle": "Impossible d'exclure ce signalement",
       "commentAccessibility": "Commentaire sur l'exclusion",
       "commentLabel": "Commentaire (facultatif)",
@@ -1365,7 +1373,7 @@
       "automationCount": "{{displayCount}} sur 3 activées",
       "couldNotLoadPermissions": "Impossible de charger les autorisations.",
       "couldNotLoadSettings": "Impossible de charger les paramètres de l'agent de sécurité.",
-      "disabledNoManage": "L'agent de sécurité est désactivé. Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent l'activer.",
+      "disabledNoManage": "L'agent de sécurité est désactivé. Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent l'activer.",
       "disabledNoRepo": "Sélectionnez au moins un dépôt avant d'activer l'agent de sécurité.",
       "disabledPrompt": "Activez l'agent de sécurité pour synchroniser les alertes Dependabot, choisir des dépôts et configurer l'automatisation.",
       "notificationsCount": "{{displayCount}} sur 2 activées",
@@ -1399,7 +1407,7 @@
       "lowDescription": "Impact minimal sur la sécurité.",
       "medium": "Moyen",
       "mediumDescription": "Impact limité ou conditions spécifiques.",
-      "permissionNote": "Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent modifier ces paramètres.",
+      "permissionNote": "Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent modifier ces paramètres.",
       "remediationDeadlineA11y": "Délai de correction en jours pour la gravité {{label}}",
       "title": "Politique SLA"
     },
@@ -1418,7 +1426,12 @@
       "syncMayNotHaveCompleted": "Une synchronisation n'a peut-être pas abouti. Réessayez pour mettre son état à jour, ou abandonnez.",
       "syncInProgress": "Une synchronisation des données de sécurité est déjà en cours. Réessayez.",
       "dismissalInProgress": "L'exclusion de ce signalement est déjà en cours. Réessayez.",
-      "couldNotReadPendingSyncs": "Impossible de lire les synchronisations en attente. Réessayez."
+      "couldNotReadPendingSyncs": "Impossible de lire les synchronisations en attente. Réessayez.",
+      "ambiguous": "Impossible de confirmer le résultat. Vérifiez la révision de sécurité avant de réessayer.",
+      "settleFailed": "L'action a été effectuée, mais nous n'avons pas pu enregistrer le résultat. Réessayez.",
+      "replayFailed": "Cette action n'a pas abouti. Réessayez.",
+      "actionFailed": "Impossible d'effectuer cette action. Réessayez.",
+      "actionBlocked": "Impossible d'effectuer cette action. Le problème doit être résolu avant de pouvoir réessayer."
     },
     "analysisState": {
       "queued": "Analyse en file d'attente",
@@ -1614,6 +1627,9 @@
       "noRepositoriesVisibleGitlab": "Aucun dépôt visible. Vérifiez les droits d'accès aux dépôts GitLab, puis actualisez.",
       "noRepositoriesVisibleBitbucket": "Aucun dépôt visible. Vérifiez les droits d'accès aux dépôts Bitbucket, puis actualisez.",
       "bitbucketOrganizationsOnly": "Bitbucket n'est disponible que pour les organisations.",
+      "githubNeedsAttention": "GitHub doit être reconnecté",
+      "githubNeedsAttentionDescription": "Reconnectez l'application Kilo GitHub, puis actualisez pour charger ses dépôts.",
+      "partialRepositories": "Certains dépôts GitHub ne se sont pas chargés.",
       "branchPickerTitle": "Sélectionner une branche",
       "branchDefault": "Par défaut",
       "branchAccessibility": "Branche : {{label}}",
@@ -1632,6 +1648,8 @@
       "commitAndPush": "Valider et envoyer",
       "startSession": "Démarrer la session",
       "selectRepositoryToStart": "Sélectionnez un dépôt pour commencer.",
+      "enterPromptToStart": "Ajoutez une invite pour commencer.",
+      "enterPromptOrFileToStart": "Ajoutez une invite ou un fichier pour commencer.",
       "connectProviderToStart": "Connectez un fournisseur pour commencer.",
       "promptPlaceholder": "Sur quoi souhaitez-vous travailler ?",
       "couldNotLoadModels": "Impossible de charger les modèles.",
@@ -2212,7 +2230,7 @@
     "thisDevice": "Cet appareil",
     "viewProfile": "Voir le profil",
     "signOutThisDevice": "Déconnecter cet appareil",
-    "signOutThisSession": "Déconnecter cette session",
+    "signOutSessionLabel": "Déconnecter {{device}}, connexion : {{signedIn}}",
     "sessionSignedOut": "Session déconnectée.",
     "signOutThisDeviceTitle": "Déconnecter cet appareil ?",
     "signOutThisSessionTitle": "Déconnecter cette session ?",
@@ -2565,6 +2583,8 @@
     },
     "connectionExpired": "La connexion à GitHub a expiré.",
     "couldNotLoadPullRequest": "Impossible de charger la demande de fusion.",
+    "reviewServiceUnavailable": "Service indisponible",
+    "reviewServiceUnavailableDescription": "Le service est temporairement indisponible. Réessayez dans quelques instants.",
     "couldNotOpenGitHubAppSettings": "Impossible d'ouvrir les paramètres de l'application GitHub.",
     "description": "Présentation",
     "discussion": {
@@ -2990,6 +3010,7 @@
       "truncationBanner_many": "Seuls les {{limit}} premiers fichiers modifiés sur {{total}} sont affichés, en raison d'une limite de l'API GitHub."
     },
     "linkPasteClipboardEmpty": "Le presse-papiers est vide.",
+    "linkPasteDenied": "L'accès au collage a été refusé. Autorisez le collage et réessayez.",
     "linkPasteNotAPullRequest": "Ce n'est pas un lien de PR ou de merge request",
     "announce": {
       "commentPosted": "Commentaire publié",
@@ -3013,7 +3034,6 @@
       "mergeResultDefaultError": "GitHub n'a pas terminé la fusion.",
       "mergeResultNotCompleted": "La fusion de {{term}} n'a pas abouti. Vérifiez son état et réessayez.",
       "ambiguous": "Impossible de confirmer le résultat. Vérifiez la PR avant de réessayer.",
-      "persistenceFailed": "Nous n'avons pas pu enregistrer cette action. Veuillez réessayer plus tard.",
       "forbidden": "Cette action n'est pas autorisée."
     },
     "capabilities": {
@@ -3042,11 +3062,23 @@
     "boundary": {
       "backToProfile": "Retour au profil",
       "loadErrorMessage": "Vérifiez votre connexion et réessayez.",
+
+      "chooseAccount": "Choisir un compte",
       "loadErrorTitle": "Impossible de charger vos organisations.",
+      "membershipLostNotice": "Vous n'avez plus accès à cette organisation. Basculé vers {{target}}.",
+      "noOrganization": "Aucune organisation",
+
+      "noOrganizationDescription": "Ce compte ne fait partie d'aucune organisation. Créez une organisation ou rejoignez-en une sur le site web pour utiliser les fonctionnalités d'organisation telles que les invitations de membres et les alertes de solde faible.",
+
+      "openWebOrganizations": "Ouvrir les organisations sur le site web",
+
       "organizationUnavailable": "L'organisation n'est pas disponible.",
-      "selectDescription": "Choisissez une organisation dans votre profil pour continuer.",
+      "selectDescriptionWithOrganizations": "Vous appartenez à une ou plusieurs organisations. Choisissez le compte que cet écran doit utiliser.",
+
       "selectOrganization": "Choix d'une organisation",
       "unavailableDescription": "Cette organisation n'est plus disponible. Choisissez-en une dans votre profil pour continuer.",
+
+      "unavailableSessionsDescription": "Cette organisation n'est plus disponible. Ses sessions ne peuvent pas être chargées.",
       "accessDeniedDescription": "Vous n'avez pas accès à cette organisation."
     },
     "creditActivity": {
@@ -3105,7 +3137,11 @@
       "separateEmailsHint": "Séparez les adresses e-mail par des virgules.",
       "thresholdLabel": "Seuil d'alerte (USD)",
       "title": "Alerte de solde faible",
-      "emailsError": "Saisissez au moins une adresse e-mail valide. Séparez les adresses par des virgules.",
+      "emailsInvalid": "Une ou plusieurs adresses e-mail ne sont pas valides.",
+      "emailsRequired": "Saisissez au moins une adresse e-mail.",
+      "saveEmailsError": "Certaines adresses e-mail n'ont pas été acceptées. Vérifiez-les et réessayez.",
+      "saveError": "Impossible d'enregistrer l'alerte de solde faible.",
+      "thresholdPlaceholder": "Saisissez un montant",
       "thresholdError": "Saisissez un montant supérieur à 0."
     },
     "memberLimit": {
@@ -3116,12 +3152,13 @@
       "removeLimit": "Supprimer la limite",
       "title": "Limite d'utilisation quotidienne",
       "blankError": "Saisissez un montant ou touchez Supprimer la limite ci-dessous.",
+      "blankWithoutLimitError": "Saisissez une limite quotidienne comprise entre 0 et {{max}}.",
       "rangeError": "Saisissez un montant compris entre 0 et {{max}}."
     },
     "members": {
       "changeRole": "Changer le rôle",
       "emptyDescriptionCanInvite": "Invitez des collègues pour commencer à collaborer dans cette organisation.",
-      "emptyDescriptionCannotInvite": "Demandez à un propriétaire ou à un responsable de la facturation d'inviter des collègues.",
+      "emptyDescriptionCannotInvite": "Demandez à un propriétaire, à un administrateur ou à un responsable de la facturation d'inviter des collègues.",
       "emptyTitle": "Aucun membre pour le moment",
       "invitedDate": "Invité le {{date}}",
       "limitPerDay": "{{amount}}/jour",
@@ -3387,7 +3424,9 @@
       "settingsToolsOn": "Activé — les outils de réglages sont envoyés au modèle",
       "settingsToolsOff": "Désactivé — aucun outil de réglages n'est envoyé au modèle",
       "serverChecking": "Vérification de ce serveur…",
-      "serverToolCount": "{{count}} outils",
+      "serverToolCount_many": "{{count}} outils",
+      "serverToolCount_one": "{{count}} outil",
+      "serverToolCount_other": "{{count}} outils",
       "serverUnreachable": "Impossible de joindre ce serveur",
       "serverOff": "Ce serveur est désactivé",
       "app": {
@@ -3539,6 +3578,8 @@
       "quantizationsHelp": "Les fichiers plus petits utilisent moins de mémoire et de stockage. Les fichiers plus volumineux donnent généralement de meilleures réponses.",
       "quantDetail": "Téléchargement de {{size}} · environ {{memory}} de mémoire",
       "downloadQuant": "Télécharger {{quant}}",
+      "downloadModelA11y": "Télécharger {{name}}",
+      "detailsA11y": "Détails : {{name}}",
       "loadingModel": "Chargement des détails du modèle",
       "couldNotLoadModel": "Impossible de charger ce modèle",
       "noFiles": "Aucun fichier exécutable par cette application",
@@ -3590,6 +3631,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Démarrer un agent nécessite une consigne. Ajoutez une consigne et relancez-le.",
+      "repositoryRequired": "Démarrer un agent nécessite un dépôt. Ouvrez Kilo et choisissez-en un, puis relancez-le.",
       "repositoryUnknown": "Kilo ne reconnaît pas {{repository}} comme un dépôt GitHub ou GitLab. Choisissez un autre dépôt dans Kilo.",
       "repositoryUnsupported": "{{repository}} est un dépôt Bitbucket — Démarrer un agent ne peut pas encore l'utiliser. Choisissez un autre dépôt dans Kilo."
     }
@@ -3627,10 +3669,16 @@
     "emptyDescription": "Créez un profil pour réutiliser les variables d'environnement, les commandes de configuration et les compétences au fil des sessions.",
     "loadFailed": "Impossible de charger les profils",
     "counts": {
-      "vars": "{{count}} variables",
+      "vars_many": "{{count}} variables",
+      "vars_one": "{{count}} variable",
+      "vars_other": "{{count}} variables",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} compétences",
-      "commands": "{{count}} commandes",
+      "skills_many": "{{count}} compétences",
+      "skills_one": "{{count}} compétence",
+      "skills_other": "{{count}} compétences",
+      "commands_many": "{{count}} commandes",
+      "commands_one": "{{count}} commande",
+      "commands_other": "{{count}} commandes",
       "varsShort": "{{count}}var",
       "skillsShort": "{{count}}comp",
       "commandsShort": "{{count}}cmd"
@@ -3661,7 +3709,6 @@
     "keyTooLong": "La clé doit contenir 256 caractères ou moins",
     "keyDuplicate": "Cette clé existe déjà dans le profil",
     "valueLabel": "Valeur",
-    "secretLabel": "Secrète",
     "secrets": {
       "markSecret": "Marquer comme secret",
       "masked": "Valeur cachée",
@@ -3705,7 +3752,7 @@
       "environment": "Environnement (JSON)",
       "headers": "En-têtes (JSON)",
       "timeout": "Temps mort",
-      "secretCount": "Compte secret",
+      "secretCount": "Compte secret : {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3720,7 +3767,9 @@
       "jsonTooLarge": "Utilisez au maximum 50 entrées, des clés jusqu'à 128 et des valeurs jusqu'à 4096 caractères",
       "timeoutInvalid": "Le délai d'attente doit être un nombre entier de millisecondes",
       "edit": "Modifier le serveur MCP",
-      "saveFailed": "Impossible de sauvegarder le serveur MCP"
+      "saveFailed": "Impossible de sauvegarder le serveur MCP",
+      "deleteFailed": "Impossible de supprimer le serveur MCP",
+      "updateFailed": "Impossible de mettre à jour le serveur MCP"
     },
     "agents": {
       "title": "Agents de profil",
@@ -3746,7 +3795,11 @@
       "visibilityPrimary": "Primaire : affiché dans le sélecteur",
       "visibilitySubagent": "Sous-agent – appelable uniquement par d'autres",
       "visibilityAll": "Tous — les deux",
+      "modePrimary": "Primaire uniquement",
+      "modeSubagent": "Sous-agent uniquement",
+      "modeAll": "Tous les modes",
       "saveFailed": "Impossible de sauvegarder l'agent",
+      "deleteFailed": "Impossible de supprimer l'agent",
       "nameRequired": "Entrez un nom d'agent",
       "slugRequired": "Entrez un slug d'agent",
       "slugInvalid": "Slug doit commencer par une lettre et utiliser uniquement des lettres minuscules, des chiffres et des tirets.",
@@ -3766,6 +3819,7 @@
       "subtask": "Exécuter en tant que sous-tâche",
       "edit": "Modifier la commande barre oblique",
       "saveFailed": "Impossible d'enregistrer la commande",
+      "deleteFailed": "Impossible de supprimer la commande",
       "nameRequired": "Entrez un nom de commande",
       "nameInvalid": "Le nom doit commencer par une lettre minuscule et utiliser uniquement des lettres minuscules, des chiffres et des tirets.",
       "templateRequired": "Entrez un modèle de commande",
@@ -3804,6 +3858,8 @@
     "empty": "Les packs de crédits sont indisponibles pour le moment.",
     "noMatchingProducts": "L'App Store n'a renvoyé aucun pack de crédits correspondant.",
     "noMatchingProductsPlay": "Google Play n'a renvoyé aucun pack de crédits correspondant.",
+    "storeTimedOut": "L'App Store n'a pas répondu à temps. Réessayez.",
+    "storeTimedOutPlay": "Google Play n'a pas répondu à temps. Réessayez.",
     "purchaseOwnedByAnotherAccount": "Les crédits associés à ce compte Apple Account appartiennent à un autre compte Kilo. Connectez-vous à cet autre compte Kilo pour les utiliser.",
     "purchaseOwnedByAnotherAccountPlay": "Les crédits sur ce compte Google Play appartiennent à un autre compte Kilo. Connectez-vous à ce compte Kilo pour les utiliser."
   },
@@ -3960,6 +4016,33 @@
     "paidDisclosure": "{{estimate}} estimé, jusqu’à {{maximum}}, avec une limite de {{minutes}} minutes. Les frais s’appliquent même en cas d’échec.",
     "enable": "Activer les résumés payants",
     "contextSettings": "Paramètres AI · {{context}}",
-    "allContexts": "Les briefings personnels et d’organisation restent séparés."
+    "allContexts": "Les briefings personnels et d’organisation restent séparés.",
+    "create": "Créer un briefing",
+    "oneOff": "Ponctuel",
+    "createdAt": "Créé {{time}}",
+    "chooseContext": "Choisissez un contexte",
+    "period": "Période du briefing",
+    "last24Hours": "Dernières 24 heures",
+    "last7Days": "7 derniers jours",
+    "customPeriod": "Période personnalisée",
+    "periodStart": "Début de la période",
+    "periodEnd": "Fin de la période",
+    "periodHint": "Choisissez jusqu’à 31 jours. La couverture historique peut être incomplète.",
+    "periodSessions": "Actives sur la période",
+    "periodSpend": "Dépenses sur la période",
+    "invalidPeriod": "Choisissez un début antérieur à la fin.",
+    "futurePeriod": "La période ne peut pas se terminer dans le futur.",
+    "periodTooLong": "Choisissez une période de 31 jours ou moins.",
+    "invalidLocalTime": "Cette heure locale n’existe pas dans le fuseau horaire du briefing. Choisissez une autre heure.",
+    "reviewBriefing": "Examiner le briefing",
+    "reviewAgain": "Préparer un nouvel examen",
+    "payer": "Facturé à {{context}}",
+    "emptyPeriod": "Aucune activité trouvée sur cette période. Aucun résumé AI ni aucuns frais.",
+    "emptyHistory": "Aucun briefing enregistré",
+    "historicalStateHint": "L’état de la session correspond à la fin de la période sélectionnée, et non à son état actuel en temps réel.",
+    "oneOffHint": "L’AI reçoit les éléments sélectionnés, dont les données sensibles ont été masquées, dans la langue de votre application. Ce rapport ponctuel ne modifie ni votre programmation matinale ni vos préférences AI.",
+    "createOffline": "Connectez-vous à Internet pour examiner ou créer un briefing. Les demandes payantes ne sont jamais mises en attente hors ligne.",
+    "estimateInputTooLarge": "Cette période contient trop d’éléments pour le modèle sélectionné.",
+    "estimatePermissionUnavailable": "Vous n’avez pas l’autorisation d’utiliser le solde de ce contexte."
   }
 }

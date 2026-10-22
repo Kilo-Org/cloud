@@ -14,6 +14,17 @@ import { isPlatformIntegrationHealthy, platformIntegrationHealthSql } from '../c
 import { PendingInstallationMetadataWrapperSchema } from '../core/schemas';
 import type { GitHubAppType } from '../platforms/github/app-selector';
 import { canOrganizationUseMultipleGitHubInstallations } from '../github/multiple-installations';
+import { effectiveAppTypeCondition, ownerCondition } from './predicates';
+
+/**
+ * Exact app-type scope. The writers below must not reach a row whose app type
+ * is NULL: the caller named one app, and a legacy row that predates the column
+ * cannot be attributed to it. Readers that must include legacy rows use
+ * `effectiveAppTypeCondition`.
+ */
+function exactAppTypeCondition(appType: GitHubAppType) {
+  return eq(platform_integrations.github_app_type, appType);
+}
 
 /**
  * Finds a platform integration by installation ID.
@@ -35,16 +46,7 @@ function installationLookupConditions(
   ];
   if (platform === PLATFORM.GITHUB)
     conditions.push(eq(platform_integrations.github_connection_role, 'workflow'));
-  if (githubAppType) {
-    const appTypeCondition =
-      githubAppType === 'standard'
-        ? or(
-            eq(platform_integrations.github_app_type, 'standard'),
-            isNull(platform_integrations.github_app_type)
-          )
-        : eq(platform_integrations.github_app_type, githubAppType);
-    if (appTypeCondition) conditions.push(appTypeCondition);
-  }
+  if (githubAppType) conditions.push(effectiveAppTypeCondition(githubAppType));
   return conditions;
 }
 
@@ -117,12 +119,7 @@ export async function findGitHubBotLinkIntegrations(input: {
           : and(
               eq(platform_integrations.platform, PLATFORM.GITHUB),
               eq(platform_integrations.platform_installation_id, input.installationId),
-              input.appType === 'standard'
-                ? or(
-                    eq(platform_integrations.github_app_type, 'standard'),
-                    isNull(platform_integrations.github_app_type)
-                  )
-                : eq(platform_integrations.github_app_type, 'lite')
+              effectiveAppTypeCondition(input.appType)
             )
       )
     )
@@ -161,26 +158,15 @@ export async function findIntegrationByInstallationIdForOwner(
    *  written in the same transaction and must be read back before commit. */
   transaction?: DrizzleTransaction
 ) {
-  const appTypeCondition =
-    githubAppType === 'standard'
-      ? or(
-          eq(platform_integrations.github_app_type, 'standard'),
-          isNull(platform_integrations.github_app_type)
-        )
-      : githubAppType
-        ? eq(platform_integrations.github_app_type, githubAppType)
-        : undefined;
   const [integration] = await (transaction ?? db)
     .select()
     .from(platform_integrations)
     .where(
       and(
-        owner.type === 'user'
-          ? eq(platform_integrations.owned_by_user_id, owner.id)
-          : eq(platform_integrations.owned_by_organization_id, owner.id),
+        ownerCondition(owner),
         eq(platform_integrations.platform, platform),
         eq(platform_integrations.platform_installation_id, platformInstallationId),
-        appTypeCondition
+        githubAppType ? effectiveAppTypeCondition(githubAppType) : undefined
       )
     )
     .limit(1);
@@ -269,10 +255,7 @@ export async function getIntegrationById(integrationId: string, organizationId?:
 }
 
 export async function getGitHubIntegrationById(owner: Owner, integrationId: string) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const [integration] = await db
     .select()
@@ -363,20 +346,11 @@ export async function updateIntegrationRepositories(
   repositories: PlatformRepository[],
   githubAppType?: GitHubAppType
 ) {
-  const appTypeCondition =
-    githubAppType === 'standard'
-      ? or(
-          eq(platform_integrations.github_app_type, 'standard'),
-          isNull(platform_integrations.github_app_type)
-        )
-      : githubAppType
-        ? eq(platform_integrations.github_app_type, githubAppType)
-        : undefined;
   const conditions = [
     eq(platform_integrations.platform, platform),
     eq(platform_integrations.platform_installation_id, installationId),
   ];
-  if (appTypeCondition) conditions.push(appTypeCondition);
+  if (githubAppType) conditions.push(effectiveAppTypeCondition(githubAppType));
   if (platform === PLATFORM.GITHUB)
     conditions.push(isNull(platform_integrations.github_disconnected_at));
 
@@ -619,9 +593,7 @@ export async function suspendIntegration(
     eq(platform_integrations.owned_by_organization_id, organizationId),
     eq(platform_integrations.platform, platform),
   ];
-  if (githubAppType) {
-    conditions.push(eq(platform_integrations.github_app_type, githubAppType));
-  }
+  if (githubAppType) conditions.push(exactAppTypeCondition(githubAppType));
   if (installationId) {
     conditions.push(eq(platform_integrations.platform_installation_id, installationId));
   }
@@ -655,9 +627,7 @@ export async function unsuspendIntegration(
     eq(platform_integrations.owned_by_organization_id, organizationId),
     eq(platform_integrations.platform, platform),
   ];
-  if (githubAppType) {
-    conditions.push(eq(platform_integrations.github_app_type, githubAppType));
-  }
+  if (githubAppType) conditions.push(exactAppTypeCondition(githubAppType));
   if (installationId) {
     conditions.push(eq(platform_integrations.platform_installation_id, installationId));
   }
@@ -690,9 +660,7 @@ export async function deleteIntegration(
     eq(platform_integrations.owned_by_organization_id, organizationId),
     eq(platform_integrations.platform, platform),
   ];
-  if (githubAppType) {
-    conditions.push(eq(platform_integrations.github_app_type, githubAppType));
-  }
+  if (githubAppType) conditions.push(exactAppTypeCondition(githubAppType));
   if (installationId) {
     conditions.push(eq(platform_integrations.platform_installation_id, installationId));
   }
@@ -704,21 +672,13 @@ export async function deleteGitHubInstallationRecords(
   installationId: string,
   githubAppType: GitHubAppType
 ) {
-  const appTypeCondition =
-    githubAppType === 'standard'
-      ? or(
-          eq(platform_integrations.github_app_type, githubAppType),
-          isNull(platform_integrations.github_app_type)
-        )
-      : eq(platform_integrations.github_app_type, githubAppType);
-
   await db
     .delete(platform_integrations)
     .where(
       and(
         eq(platform_integrations.platform, PLATFORM.GITHUB),
         eq(platform_integrations.platform_installation_id, installationId),
-        appTypeCondition
+        effectiveAppTypeCondition(githubAppType)
       )
     );
 }
@@ -1061,6 +1021,8 @@ export function personalGitHubIntegrationOrder() {
 /**
  * Gets platform integration for an owner (user or organization).
  * Optionally filters by integration status (e.g. 'active').
+ * Organization GitHub lookups ignore the status argument and return the
+ * healthy primary workflow integration.
  */
 export async function getIntegrationForOwner(
   owner: Owner,
@@ -1070,10 +1032,7 @@ export async function getIntegrationForOwner(
   if (owner.type === 'org' && platform === PLATFORM.GITHUB) {
     return getPrimaryGitHubIntegrationForOrganization(owner.id);
   }
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const conditions = [ownershipCondition, eq(platform_integrations.platform, platform)];
   if (platform === PLATFORM.GITHUB)
@@ -1154,10 +1113,7 @@ export async function getGitHubConnectionStatusForOwner(
  * Gets all platform integrations for an owner (user or organization)
  */
 export async function getAllIntegrationsForOwner(owner: Owner) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const integrations = await db.select().from(platform_integrations).where(ownershipCondition);
 
@@ -1177,15 +1133,10 @@ export async function deleteIntegrationForOwner(
   githubAppType?: GitHubAppType,
   installationId?: string
 ) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const conditions = [ownershipCondition, eq(platform_integrations.platform, platform)];
-  if (githubAppType) {
-    conditions.push(eq(platform_integrations.github_app_type, githubAppType));
-  }
+  if (githubAppType) conditions.push(exactAppTypeCondition(githubAppType));
   if (installationId) {
     conditions.push(eq(platform_integrations.platform_installation_id, installationId));
   }
@@ -1207,15 +1158,10 @@ export async function suspendIntegrationForOwner(
   githubAppType?: GitHubAppType,
   installationId?: string
 ) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const conditions = [ownershipCondition, eq(platform_integrations.platform, platform)];
-  if (githubAppType) {
-    conditions.push(eq(platform_integrations.github_app_type, githubAppType));
-  }
+  if (githubAppType) conditions.push(exactAppTypeCondition(githubAppType));
   if (installationId) {
     conditions.push(eq(platform_integrations.platform_installation_id, installationId));
   }
@@ -1245,15 +1191,10 @@ export async function unsuspendIntegrationForOwner(
   githubAppType?: GitHubAppType,
   installationId?: string
 ) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const conditions = [ownershipCondition, eq(platform_integrations.platform, platform)];
-  if (githubAppType) {
-    conditions.push(eq(platform_integrations.github_app_type, githubAppType));
-  }
+  if (githubAppType) conditions.push(exactAppTypeCondition(githubAppType));
   if (installationId) {
     conditions.push(eq(platform_integrations.platform_installation_id, installationId));
   }
@@ -1359,12 +1300,7 @@ export async function upsertPlatformIntegrationForOwner(
           and(
             eq(platform_integrations.platform, PLATFORM.GITHUB),
             eq(platform_integrations.platform_installation_id, data.platformInstallationId),
-            appType === 'standard'
-              ? or(
-                  eq(platform_integrations.github_app_type, 'standard'),
-                  isNull(platform_integrations.github_app_type)
-                )
-              : eq(platform_integrations.github_app_type, 'lite')
+            effectiveAppTypeCondition(appType)
           )
         )
         .for('update');
@@ -1445,10 +1381,7 @@ export async function upsertPlatformIntegrationForOwner(
   }
 
   // Non-GitHub platforms use the existing per-owner pattern.
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const [existing] = await db
     .select()
@@ -1575,10 +1508,7 @@ export async function updateIntegrationMetadataForOwner(
   metadataUpdates: Record<string, unknown>,
   integrationId: string
 ): Promise<void> {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const updated = await db
     .update(platform_integrations)

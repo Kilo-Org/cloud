@@ -148,7 +148,7 @@ Direct full-screen entry clears the status bar; presented sheets do not add a se
 - Import `Image` from `@/components/ui/image` and other UI primitives from `@/components/ui/<component>`.
 - Add reusables with `pnpm dlx @react-native-reusables/cli@latest add <component> --styling-library nativewind -y`.
 - Style with Tailwind `className`. No inline styles, no `StyleSheet.create`. Merge classes with `cn()` from `@/lib/utils`.
-- Opacity modifiers do not work on theme colors (CSS variables): `bg-destructive/10` fails. Use a concrete Tailwind color with a dark variant. Non-variable colors like `bg-black/5` are fine.
+- Opacity modifiers do not work on theme colors (CSS variables): `bg-destructive/10` is dropped. Where a `*-tile-bg` / `*-tile-border` pair exists — `danger` for `destructive`, plus `good`, `warn`, `info`, the agent colors and the row hues — use it; otherwise use a concrete color with a dark variant. `<utility>-black/<alpha>` compiles to an unparseable `#NaN` color and paints nothing either; use a concrete value, for example `bg-[#0000000d]` for 5%. `pnpm check:classes` enforces both.
 - Type dynamic Expo Router paths as `Href`. Never silence route types with `as never`.
 - Use Lucide icons, never emoji. Color icons with `color={colors.<token>}` from `useThemeColors()`; `className` colors do not work on them.
 
@@ -174,6 +174,7 @@ Direct full-screen entry clears the status bar; presented sheets do not add a se
 - Use `ActivityIndicator` only for inline waits. Where layout would jump, use the existing Reanimated `FadeIn`/`FadeOut`/`LinearTransition` patterns.
 - Set `freezeOnBlur: true` on tabs. Use haptics for commits and outcomes only, never passive interaction.
 - Set `transition={0}` on small or header `expo-image` images to avoid flicker.
+- A scroll view takes a horizontal inset through `contentContainerClassName`, never `className`: the scroller's own style does not narrow the scroll content, so an inset there leaves the end side flush in right-to-left layouts. `CenteredState` applies that class to its content box instead, because a `contentContainerStyle` of its own drops the caller's class.
 
 ## Translations
 

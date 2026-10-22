@@ -10,6 +10,7 @@ import { useOfflineBannerSpace } from '@/components/offline-banner-space';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { offlineHeaderReservation } from '@/lib/offline-banner-state';
 import { useScreenInsets, useSideInsetStyle } from '@/lib/screen-insets';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 /**
@@ -139,9 +140,15 @@ type ScreenHeaderProps = {
    * wider than the title can spare.
    */
   inlineActionsWidth?: number;
-  /** Home, Quick Chat, and session headers supply context below the title.
-   * Other callers keep their existing title-only layout when this slot is absent. */
-  context?: React.ReactNode;
+  /**
+   * Keep the `inlineActions` cluster on the title row even when the shared-row
+   * check would reflow it. That check reserves a readable title, and the home
+   * header's heading is a fixed 40dp mark with no text, so the reserve does not
+   * apply: at a 2.5x accessibility font scale the account picker would drop
+   * under the mark on a phone wide enough to hold both. Leave it on for a
+   * heading that carries text.
+   */
+  allowInlineActionsStacking?: boolean;
   modal?: boolean;
   showBackButton?: boolean;
   onBack?: () => void;
@@ -197,7 +204,7 @@ export function ScreenHeader({
   headerRightShrinks = false,
   inlineActions,
   inlineActionsWidth,
-  context,
+  allowInlineActionsStacking = true,
   modal,
   centerTitle = modal ?? false,
   showBackButton,
@@ -229,6 +236,7 @@ export function ScreenHeader({
   // width drops it beneath the title before it squeezes the title's own
   // readable minimum, so the 30px Agents title never breaks inside a word.
   const stackInlineActions =
+    allowInlineActionsStacking &&
     inlineActions != null &&
     shouldStackHeaderActions(windowWidth, fontScale, inlineActionsWidth ?? 0);
 
@@ -344,7 +352,6 @@ export function ScreenHeader({
         </Eyebrow>
       ) : null}
       {titleNode}
-      {context}
     </View>
   );
   // A centered title shares its row with the leading and trailing controls.
@@ -358,11 +365,15 @@ export function ScreenHeader({
   // before layout (YogaLayoutableShadowNode `swapLeftAndRightInYogaStyleProps`),
   // so `-mr-4` under RTL becomes a negative END margin — the side facing the
   // title — and the heading (the next sibling, whose interactive title fills
-  // it) starts 12 points under the back control's 44-point target. Measured on
+  // it) starts 12 points under the back control's target. Measured on
   // the row: the title box covered 0.27 of the back target's area, and the
   // explorer's `overlapping_controls` scan reports above 0.25. A
   // `marginInlineStart` is resolved to Yoga Start in both directions, so `-ms-4`
   // pulls the control into the gutter and leaves the 4-point `gap-1` intact.
+  //
+  // The control's box is the shared 48dp icon target (`ICON_TARGET_BOX_CLASS`):
+  // the audit reads the node's view rect, so `hitSlop` cannot carry an
+  // `h-11` frame to Android's 48dp minimum.
   const backControl = canGoBack ? (
     <Pressable
       onPress={() => {
@@ -380,7 +391,8 @@ export function ScreenHeader({
       accessibilityRole="button"
       accessibilityLabel={resolvedBackIcon === 'close' ? t('common.close') : t('common.goBack')}
       className={cn(
-        'h-11 w-11 shrink-0 items-center justify-center active:opacity-70',
+        ICON_TARGET_BOX_CLASS,
+        'shrink-0 active:opacity-70',
         !separateHeading && '-ms-4'
       )}
     >
@@ -413,16 +425,29 @@ export function ScreenHeader({
     backControl &&
     (!inlineActions || stackInlineActions) &&
     (!headerRight || stackActions) ? (
-      <View className="h-11 w-11 shrink-0" accessibilityElementsHidden pointerEvents="none" />
+      <View
+        className="h-[48px] w-[48px] shrink-0"
+        accessibilityElementsHidden
+        pointerEvents="none"
+      />
     ) : null;
   // The inline controls keep the title's row only while it can still hold a
   // readable title; below that they take a row of their own. On their own row
   // they keep the header's full width, so a long translation (Croatian
   // "TRENUTAČNO AKTIVNO" / "PRETHODNE SESIJE" beside the filter) stays legible
   // instead of squeezing the 30px title into a mid-word break.
+  //
+  // A caller that turns the reflow off has to cap the slot instead: the heading
+  // is `flex-1` over a zero basis, so an unbounded trailing cluster resolves
+  // all negative free space on itself and leaves the heading at zero width,
+  // where a fixed-size child such as the Home mark paints under the cluster.
+  // The half-row cap is the same one `headerRightShrinks` uses; with it the
+  // free space can never go negative, so the heading always keeps its share.
   const inlineActionsSlot =
     inlineActions && !stackInlineActions ? (
-      <View className="ms-3 min-w-0 shrink">{inlineActions}</View>
+      <View className={cn('ms-3 min-w-0 shrink', !allowInlineActionsStacking && 'max-w-[50%]')}>
+        {inlineActions}
+      </View>
     ) : null;
   const stackedInlineActionsRow =
     inlineActions && stackInlineActions ? (

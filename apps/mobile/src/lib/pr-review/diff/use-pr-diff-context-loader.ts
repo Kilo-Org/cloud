@@ -109,7 +109,7 @@ export function usePrDiffContextLoader(args: {
       const target = contextScopeForItem(scope, item.ref, { owner, repo, headSha });
       void (async () => {
         try {
-          const result = await queryClient.fetchQuery(
+          const result = await queryClient.query(
             buildPrFileLinesQueryOptions(trpc, target.scope, {
               ref: target.ref,
               path: item.filePath,

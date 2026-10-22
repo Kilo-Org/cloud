@@ -25,6 +25,7 @@
     "error": "تېروتنه: {{error}}",
     "back": "شاته",
     "somethingWentWrong": "تېروتنه وشوه.",
+    "actionNotRecorded": "موږ ونه شو کړای دا کړنه ثبت کړو. مهرباني وکړئ وروسته بیا هڅه وکړئ.",
     "couldNotOpen": "{{label}} پرانیستل نه شو.",
     "link": "لینک",
     "takingLonger": "دا له تمې ډېر وخت نیسي. تاسو یې تړلی شئ او بیا یې کتلی شئ.",
@@ -590,6 +591,8 @@
     "installKiloGitHubApp": "د Kilo د GitHub اپلیکیشن نصب کړئ",
     "checkConnection": "اړیکه وګورئ",
     "couldNotLoadPullRequest": "پل ریکویسټ بار نه شو.",
+    "reviewServiceUnavailable": "خدمة نه شته",
+    "reviewServiceUnavailableDescription": "خدمه لنډ مهال لپاره نه شته. بیا هڅه وکړه.",
     "description": "تشریح",
     "noDescriptionProvided": "هېڅ تشریح نه ده ورکړل شوې.",
     "review": "بیاکتنه",
@@ -761,6 +764,7 @@
       "truncationBanner_other": "له {{total}} بدل شویو فایلونو څخه لومړني {{limit}} ښودل کېږي — دا د GitHub API حد دی."
     },
     "linkPasteClipboardEmpty": "کلیپبورډ تش دی.",
+    "linkPasteDenied": "د پېسټ لاسرسی رد شو. پېسټ ته اجازه ورکړئ او بیاځلي هڅه وکړئ.",
     "linkPasteNotAPullRequest": "د پول ریکویسټ یا د یوځای کولو غوښتنې لینک نه دی",
     "announce": {
       "commentPosted": "تبصره خپره شوه",
@@ -784,7 +788,6 @@
       "mergeResultDefaultError": "GitHub یوځای کول بشپړ نه کړل.",
       "mergeResultNotCompleted": "{{term}} و نه یوځای شو. حالت یې وګورئ او بیا هڅه وکړئ.",
       "ambiguous": "تایید نه شو — له بیا هڅې مخکې PR وګورئ.",
-      "persistenceFailed": "موږ ونه شو کړای دا کړنه ثبت کړو. مهرباني وکړئ وروسته بیا هڅه وکړئ.",
       "forbidden": "اجازه نشته."
     },
     "capabilities": {
@@ -1456,8 +1459,9 @@
       "loading": "د بیاکتنې حافظه بارول",
       "couldNotLoad": "د بیاکتنې حافظه بار نه شوه.",
       "off": "د بیاکتنې حافظه غیرفعاله ده.",
+      "on": "د بیاکتنې حافظه فعاله ده.",
       "offDescription": "د بیاکتنې حافظه فعاله کړئ، څو Kilo د ساتونکو له ځوابونو زده کړه وکړي او د REVIEW.md لپاره لارښوونې وړاندیز کړي.",
-      "readOnlyDescription": "یوازې د سازمان مالکان او د تادیاتو مدیران کولی شي د بیاکتنې حافظه فعاله کړي.",
+      "readOnlyDescription": "یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي د بیاکتنې حافظه بدله کړي.",
       "enable": "د بیاکتنې حافظه فعاله کړئ",
       "loadingProposals": "وړاندیزونه بارول",
       "couldNotLoadProposals": "وړاندیزونه بار نه شول.",
@@ -1477,7 +1481,10 @@
       "starting": "بیاکتنه پیلېږي…",
       "start": "بیاکتنه پیل کړئ"
     },
-    "notConnectedReadOnly": "{{platform}} نښلول شوی نه دی. یوازې د سازمان مالکان او د تادیاتو مدیران کولی شي دا ونښلوي.",
+    "notConnectedReadOnly": "{{platform}} نښلول شوی نه دی. یوازې د سازمان مالکان او مدیران کولی شي دا ونښلوي.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} نښلول شوی نه دی. له یو سازمان مالک، مدیر، یا د بلونو مدیر څخه وغواړئ چې دا ونښلوي."
+    },
     "webhookSetup": "د وېب هوک تنظیم نیمګړی دی.",
     "webhookSetupDescription": "ښايي د ځینو ذخیرو اتوماتیکه بیاکتنه و نه شي.",
     "autoReviews": "اتوماتیکې بیاکتنې",
@@ -1485,7 +1492,7 @@
     "followReviewMd": "د REVIEW.md لارښوونې تعقیب کړئ",
     "followReviewMdSubtitle": "د هرې ذخیرې د REVIEW.md فایل لارښوونې تعقیب کړئ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket نښلول شوی نه دی. یوازې د سازمان مالکان او د تادیاتو مدیران کولی شي دا ونښلوي.",
+      "notConnectedReadOnly": "Bitbucket نښلول شوی نه دی. یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي دا ونښلوي.",
       "setupIncomplete": "تنظیم نیمګړی دی — په kilo.ai کې یې بشپړ کړئ.",
       "setup": "د Bitbucket چمتو کول"
     },
@@ -1745,7 +1752,7 @@
       "couldNotLoad": "دا موندنه بار نه شوه.",
       "couldNotCheckPermissions": "د له پامه غورځولو اجازې و نه کتل شوې.",
       "cannotDismissTitle": "دا موندنه له پامه نه شي غورځول کېدای",
-      "cannotDismissDescription": "یوازې د سازمان مالکان او د تادیاتو مدیران کولی شي موندنې له پامه وغورځوي.",
+      "cannotDismissDescription": "یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي موندنې له پامه وغورځوي.",
       "alreadyResolvedDescription": "دا موندنه لا دمخه حل شوې ده او نور له پامه نه شي غورځول کېدای."
     },
     "findingDetails": {
@@ -1787,7 +1794,7 @@
       "automationAllOff": "ټول غیرفعال",
       "automationCount": "له 3 څخه {{displayCount}} فعال",
       "notificationsCount": "له 2 څخه {{displayCount}} فعال",
-      "disabledNoManage": "امنیتي اجنټ غیرفعال دی. یوازې د سازمان مالکان او د تادیاتو مدیران کولی شي دا فعال کړي.",
+      "disabledNoManage": "امنیتي اجنټ غیرفعال دی. یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي دا فعال کړي.",
       "disabledNoRepo": "د امنیتي اجنټ له فعالولو مخکې لږ تر لږه یوه ذخیره غوره کړئ.",
       "disabledPrompt": "امنیتي اجنټ فعال کړئ، څو د Dependabot خبرتیاوې هممهاله کړئ، ذخیرې غوره کړئ او اتوماتیکې کړنې تنظیم کړئ."
     },
@@ -1836,7 +1843,7 @@
       "invalidDayCount": "د ورځو شمېر باید له 1 تر 365 پورې یو بشپړ عدد وي.",
       "remediationDeadlineA11y": "د {{label}} د اصلاح مهلت په ورځو کې",
       "enterWholeNumber": "له 1 څخه تر 365 پورې یو صحیح عدد ولیکئ",
-      "permissionNote": "یوازې د سازمان مالکان او د تادیاتو مدیران کولی شي دا ترتیبات بدل کړي.",
+      "permissionNote": "یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي دا ترتیبات بدل کړي.",
       "enableTracking": "د SLA تعقیب فعال کړئ",
       "enableTrackingSubtitle": "د موندنې د شدت له مخې د اصلاح وروستۍ نېټې وټاکئ.",
       "deadlinesHeading": "د اصلاح مهلتونه (ورځې)"
@@ -1879,6 +1886,9 @@
       "viewA11y": "د پلټنې راپور وګورئ"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "د Kilo مدیر",
+      "actorMaskedUser": "پټ شوی کارن",
+      "actorSystem": "د Kilo سیسټم",
       "couldNotLoad": "د پلټنې راپور بار نه شو.",
       "events": "پېښې",
       "generated": "په {{generatedAt}} جوړ شو.",
@@ -1889,7 +1899,7 @@
       "summary": "د راپور لنډیز",
       "title": "د پلټنې راپور",
       "unavailable": "د پلټنې راپور نشته",
-      "unavailableDescription": "یوازې د سازمان مالکان او د تادیاتو مدیران کولی شي د پلټنې راپورونه وګوري. له یوه مالک یا د تادیاتو له مدیر څخه د لاسرسي اجازه وغواړئ.",
+      "unavailableDescription": "یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي د پلټنې راپورونه وګوري. له یوه مالک، مدیر یا د بلونو له مدیر څخه د لاسرسي اجازه وغواړئ.",
       "queryFailed": "د راپور د معلوماتو غوښتنه بشپړه نه شوه. بیا هڅه وکړئ.",
       "eventActions": {
         "findingAnalysisCompleted": "تحلیل بشپړ شو",
@@ -1957,7 +1967,12 @@
       "syncMayNotHaveCompleted": "ښايي هممهاله کول بشپړ شوي نه وي. د حالت د سمون لپاره بیا هڅه وکړئ، یا یې پرېږدئ.",
       "syncInProgress": "امنیتي هممهاله کول لا دمخه روان دي. مهرباني وکړئ بیا هڅه وکړئ.",
       "dismissalInProgress": "د دې موندنې له پامه غورځول لا دمخه روان دي. مهرباني وکړئ بیا هڅه وکړئ.",
-      "couldNotReadPendingSyncs": "د هممهاله کولو پاتې غوښتنې و نه لوستل شوې. بیا هڅه وکړئ."
+      "couldNotReadPendingSyncs": "د هممهاله کولو پاتې غوښتنې و نه لوستل شوې. بیا هڅه وکړئ.",
+      "ambiguous": "تایید نه شو — له بیا هڅې مخکې د امنیت بیاکتنه وګورئ.",
+      "settleFailed": "کړنه بشپړه شوه، خو پایله مو ثبت نه شوه. مهرباني وکړئ بیا هڅه وکړئ.",
+      "replayFailed": "دا کړنه بشپړه نه شوه. مهرباني وکړئ بیا هڅه وکړئ.",
+      "actionFailed": "د دې کړنې بشپړول ممکن نه وو. مهرباني وکړئ بیا هڅه وکړئ.",
+      "actionBlocked": "د دې کړنې بشپړول ممکن نه وو. د بیا هڅې دمخه باید دا ستونزه حل شي."
     },
     "analysisState": {
       "queued": "شننه په کتار کې ده",
@@ -2216,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "هېڅ زېرمتون نه ښکاري. د GitLab زېرمتونونو ته د لاسرسي اجازې وګورئ، بیا لېست تازه کړئ.",
       "noRepositoriesVisibleBitbucket": "هېڅ زېرمتون نه ښکاري. د Bitbucket زېرمتونونو ته د لاسرسي اجازې وګورئ، بیا لېست تازه کړئ.",
       "bitbucketOrganizationsOnly": "Bitbucket یوازې د بنسټونو لپاره شتون لري.",
+      "githubNeedsAttention": "GitHub باید بیا نښلول شي",
+      "githubNeedsAttentionDescription": "د Kilo GitHub اپلیکیشن بیا نښلول کړئ، بیا یې د زېرمتونونو د بارولو لپاره تازه کړئ.",
+      "partialRepositories": "ځینې د GitHub زېرمتونونه بار نه شول.",
       "branchPickerTitle": "څانګه وټاکئ",
       "branchDefault": "ډیفالټ",
       "branchAccessibility": "څانګه: {{label}}",
@@ -2234,6 +2252,8 @@
       "commitAndPush": "کمیټ او پش کړئ",
       "startSession": "ناسته پیل کړئ",
       "selectRepositoryToStart": "د پیل لپاره یو زېرمتون وټاکئ.",
+      "enterPromptToStart": "د پیل لپاره یو پرومپټ اضافه کړئ.",
+      "enterPromptOrFileToStart": "د پیل لپاره یو پرومپټ یا فایل اضافه کړئ.",
       "connectProviderToStart": "د پیل لپاره د خدمت چمتو کوونکی ونښلوئ.",
       "promptPlaceholder": "غواړئ پر څه کار وکړئ؟",
       "couldNotLoadModels": "ماډلونه بار نه شول.",
@@ -2772,7 +2792,7 @@
     "thisDevice": "دا وسیله",
     "viewProfile": "پروفایل وګورئ",
     "signOutThisDevice": "له دې وسیلې ووځئ",
-    "signOutThisSession": "له دې ناستې ووځئ",
+    "signOutSessionLabel": "له {{device}} ووځئ، د ننوتلو وخت: {{signedIn}}",
     "sessionSignedOut": "له ناستې ووتل شو.",
     "signOutThisDeviceTitle": "له دې وسیلې حساب وباسم؟",
     "signOutThisSessionTitle": "له دې ناستې ووځم؟",
@@ -3010,11 +3030,23 @@
     "boundary": {
       "backToProfile": "بېرته پروفایل ته ورشئ",
       "loadErrorMessage": "خپله انټرنېټي اړیکه وګورئ او بیا هڅه وکړئ.",
+
+      "chooseAccount": "یو حساب غوره کړئ",
       "loadErrorTitle": "ستاسو سازمانونه بار نه شول.",
+      "membershipLostNotice": "تاسو دې سازمان ته نور لاسرسی نه لرئ. په {{target}} بدل شو.",
+      "noOrganization": "هیڅ سازمان نشته",
+
+      "noOrganizationDescription": "دا حساب د یو سازمان برخه نه ده. د غړو بلنې او د ټیټ بیلانس خبرتیاوې په څیر د سازمان ځانګړتیاوې کارولو لپاره په ویب کې سازمان جوړ کړئ یا یو ځای شئ.",
+
+      "openWebOrganizations": "په ویب کې سازمانونه پرانیزئ",
+
       "organizationUnavailable": "سازمان د لاسرسي وړ نه دی.",
-      "selectDescription": "د دوام لپاره له خپل پروفایل څخه یو سازمان غوره کړئ.",
+      "selectDescriptionWithOrganizations": "تاسو د یو یا ډیرو سازمانونو غړی یاست. هغه حساب غوره کړئ چې دا سکرین باید یې وکاروي.",
+
       "selectOrganization": "یو سازمان غوره کړئ",
       "unavailableDescription": "دا سازمان نور د لاسرسي وړ نه دی. د دوام لپاره له خپل پروفایل څخه یو سازمان غوره کړئ.",
+
+      "unavailableSessionsDescription": "دا سازمان نور د لاسرسي وړ نه دی. د دې سازمان نښتې نشي لوډ کېدلی.",
       "accessDeniedDescription": "تاسو دې سازمان ته لاسرسی نه لرئ."
     },
     "creditActivity": {
@@ -3066,7 +3098,11 @@
       "separateEmailsHint": "د برېښنالیک پتې په کامو سره جلا کړئ.",
       "thresholdLabel": "تر دې بیلانس لاندې خبرتیا (USD)",
       "title": "د کم بیلانس خبرتیا",
-      "emailsError": "لږ تر لږه د برېښنالیک یوه سمه پته ولیکئ. که څو پتې وي، په کامو یې جلا کړئ.",
+      "emailsInvalid": "یوه یا څو د برېښنالیک پتې سمې نه دي.",
+      "emailsRequired": "لږ تر لږه د برېښنالیک یوه پته ولیکئ.",
+      "saveEmailsError": "ځینې برېښنالیک پتې ومنل نه شوې. هغه وګورئ او بیا هڅه وکړئ.",
+      "saveError": "د کم بیلانس خبرتیا ونه شوه خوندي کول.",
+      "thresholdPlaceholder": "یوه اندازه ولیکئ",
       "thresholdError": "له 0 څخه زیاته اندازه ولیکئ."
     },
     "memberLimit": {
@@ -3077,12 +3113,13 @@
       "removeLimit": "حد لرې کړئ",
       "title": "د ورځني کارولو حد",
       "blankError": "یوه اندازه ولیکئ، یا لاندې د «حد لرې کړئ» تڼۍ وکاروئ.",
+      "blankWithoutLimitError": "د 0 او {{max}} ترمنځ ورځنی حد ولیکئ.",
       "rangeError": "د 0 او {{max}} ترمنځ یوه اندازه ولیکئ."
     },
     "members": {
       "changeRole": "دنده بدله کړئ",
       "emptyDescriptionCanInvite": "په دې سازمان کې د ګډ کار د پیلولو لپاره خپلو همکارانو ته بلنه ورکړئ.",
-      "emptyDescriptionCannotInvite": "له مالک یا د بلونو له مدیر څخه وغواړئ چې همکارانو ته بلنه ورکړي.",
+      "emptyDescriptionCannotInvite": "له مالک، مدیر یا د بلونو له مدیر څخه وغواړئ چې همکارانو ته بلنه ورکړي.",
       "emptyTitle": "لا هیڅ غړی نشته",
       "invitedDate": "په {{date}} بلنه ورکړل شوې",
       "limitPerDay": "{{amount}}/ورځ",
@@ -3346,7 +3383,8 @@
       "settingsToolsOn": "فعال — د ترتیباتو وسیلې ماډل ته لېږل کیږي",
       "settingsToolsOff": "غیرفعال — هیڅ د ترتیباتو وسیله ماډل ته نه لېږل کیږي",
       "serverChecking": "دا سرور ګڼل کیږي…",
-      "serverToolCount": "{{count}} وسیلې",
+      "serverToolCount_one": "{{count}} وسیله",
+      "serverToolCount_other": "{{count}} وسیلې",
       "serverUnreachable": "دې سرور ته رسېدل ممکن نه شول",
       "serverOff": "دا سرور بند دی",
       "app": {
@@ -3498,6 +3536,8 @@
       "quantizationsHelp": "کوچنۍ فایلونه لږ حافظه او ځای کاروي. لوی فایلونه معمولاً ښه ځوابونه ورکوي.",
       "quantDetail": "{{size}} ډاونلوډ · شاوخوا {{memory}} حافظه",
       "downloadQuant": "{{quant}} ډاونلوډ کړئ",
+      "downloadModelA11y": "{{name}} ډاونلوډ کړئ",
+      "detailsA11y": "جزئیات: {{name}}",
       "loadingModel": "د ماډل جزئیات پورته کېږي",
       "couldNotLoadModel": "دا ماډل پورته نه شو",
       "noFiles": "هېڅ داسې فایل نشته چې دا اپ یې چلولی شي",
@@ -3549,6 +3589,7 @@
   "appActions": {
     "start": {
       "promptRequired": "د اجنټ پیل کولو لپاره پرامپټ ته اړتیا ده. پرامپټ اضافه کړئ او بیا یې وچلوئ.",
+      "repositoryRequired": "د اجنټ پیل کولو لپاره زېرمتون ته اړتیا ده. Kilo خلاص کړئ او یو وټاکئ، بیا یې وچلوئ.",
       "repositoryUnknown": "Kilo {{repository}} د GitHub یا GitLab زېرمتون په توګه نه پېژني. په Kilo کې بل زېرمتون وټاکئ.",
       "repositoryUnsupported": "{{repository}} د Bitbucket زېرمتون دی — اجنټ پیل کړئ لاهم نشي کولی ترې وکار اخلي. په Kilo کې بل زېرمتون وټاکئ."
     }
@@ -3586,10 +3627,13 @@
     "emptyDescription": "د چاپیریال متغیرونو ، تنظیم کولو امرونو ، او په غونډو کې مهارتونه د بیا کارولو لپاره پروفایل رامینځته کړئ.",
     "loadFailed": "پروفایلونه نشي پورته کولی",
     "counts": {
-      "vars": "{{count}} تغیرات",
+      "vars_one": "{{count}} تغیر",
+      "vars_other": "{{count}} تغیرات",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} مهارتونه",
-      "commands": "{{count}} امرونه",
+      "skills_one": "{{count}} مهارت",
+      "skills_other": "{{count}} مهارتونه",
+      "commands_one": "{{count}} امر",
+      "commands_other": "{{count}} امرونه",
       "varsShort": "{{count}}ت",
       "skillsShort": "{{count}}م",
       "commandsShort": "{{count}}ا"
@@ -3620,7 +3664,6 @@
     "keyTooLong": "کلید باید 256 توري یا لږ وي",
     "keyDuplicate": "دا کلید دمخه په پروفایل کې شته",
     "valueLabel": "ارزښت",
-    "secretLabel": "پټه",
     "secrets": {
       "markSecret": "د پټ په توګه نښه کړئ",
       "masked": "پټ ارزښت",
@@ -3664,7 +3707,7 @@
       "environment": "چاپیریال (JSON)",
       "headers": "سرلیکونه (JSON)",
       "timeout": "وخت ختم شو",
-      "secretCount": "پټه شمیره",
+      "secretCount": "پټه شمیره: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3679,7 +3722,9 @@
       "jsonTooLarge": "تر 50 پورې ننوتنې وکاروئ، کلیدونه تر 128 او ارزښتونه تر 4096 تورو پورې",
       "timeoutInvalid": "د وخت پای باید د ملی ثانیو بشپړ شمیر وي",
       "edit": "د MCP سرور ترمیم کړئ",
-      "saveFailed": "د MCP سرور خوندي نه شو"
+      "saveFailed": "د MCP سرور خوندي نه شو",
+      "deleteFailed": "د MCP سرور ړنګول نشو کړای",
+      "updateFailed": "د MCP سرور نه سو تازه کړای"
     },
     "agents": {
       "title": "پروفایل اجنټان",
@@ -3705,7 +3750,11 @@
       "visibilityPrimary": "لومړني - په غوره کونکي کې ښودل شوي",
       "visibilitySubagent": "Subagent - یوازې د نورو څخه د غوښتنې وړ",
       "visibilityAll": "ټول - دواړه",
+      "modePrimary": "یوازې لومړني",
+      "modeSubagent": "یوازې سبایجینټ",
+      "modeAll": "ټول حالتونه",
       "saveFailed": "اجنټ خوندي نشو کړای",
+      "deleteFailed": "اجنټ ړنګول نشو کړای",
       "nameRequired": "د اجنټ نوم دننه کړئ",
       "slugRequired": "د اجنټ سلګ داخل کړئ",
       "slugInvalid": "سلګ باید د یوه لیک سره پیل شي او یوازې کوچني توري، عددونه او ډیشونه وکاروي",
@@ -3725,6 +3774,7 @@
       "subtask": "د فرعي دندې په توګه چلول",
       "edit": "د سلیش کمانډ ایډیټ کړئ",
       "saveFailed": "کمانډ خوندي نشو کړای",
+      "deleteFailed": "کمانډ ړنګول نشو کړای",
       "nameRequired": "د کمانډ نوم دننه کړئ",
       "nameInvalid": "نوم باید د کوچنیو تورو سره پیل شي او یوازې د کوچنیو تورو، عددونو او ډیشونو څخه کار واخلئ",
       "templateRequired": "د کمانډ ټیمپلیټ دننه کړئ",
@@ -3763,6 +3813,8 @@
     "empty": "د کریډیټ بنډلونه اوس شتون نلري.",
     "noMatchingProducts": "App Store د سمون خور کریډیټ بنډلونه بیرته را نه کړل.",
     "noMatchingProductsPlay": "Google Play د سمون خور کریډیټ بنډلونه بیرته را نه کړل.",
+    "storeTimedOut": "App Store په وخت کې ځواب ورنه کړ. بیا هڅه وکړئ.",
+    "storeTimedOutPlay": "Google Play په وخت کې ځواب ورنه کړ. بیا هڅه وکړئ.",
     "purchaseOwnedByAnotherAccount": "په دې Apple Account کې کریډیټونه د Kilo په بل حساب پورې اړه لري. د کارولو لپاره یې د Kilo هماغه حساب ته ننوځئ.",
     "purchaseOwnedByAnotherAccountPlay": "دا Google Play حساب باندې کریډیټونه د بل Kilo حساب پورې اړه لري. د کارولو لپاره هغه Kilo حساب ته ننوځئ."
   },
@@ -3912,6 +3964,33 @@
     "enable": "پیسه ییز لنډیزونه فعال کړئ",
     "contextSettings": "د AI تنظیمات · {{context}}",
     "allContexts": "شخصي او سازماني لنډیزونه جلا پاتې کېږي.",
+    "create": "لنډیز جوړ کړئ",
+    "oneOff": "یوځلنی",
+    "createdAt": "په {{time}} جوړ شوی",
+    "chooseContext": "یو چوکاټ غوره کړئ",
+    "period": "د لنډیز موده",
+    "last24Hours": "تېر ۲۴ ساعتونه",
+    "last7Days": "تېرې ۷ ورځې",
+    "customPeriod": "ځانګړې موده",
+    "periodStart": "د مودې پیل",
+    "periodEnd": "د مودې پای",
+    "periodHint": "تر ۳۱ ورځو پورې موده غوره کړئ. د تېر وخت معلومات ښايي بشپړ نه وي.",
+    "periodSessions": "په موده کې فعالې ناستې",
+    "periodSpend": "د مودې لګښت",
+    "invalidPeriod": "د پیل وخت د پای له وخت څخه مخکې وټاکئ.",
+    "futurePeriod": "د مودې پای په راتلونکي کې نه شي کېدای.",
+    "periodTooLong": "د ۳۱ ورځو یا تر دې لنډه موده غوره کړئ.",
+    "invalidLocalTime": "دا ځايي وخت د لنډیز په وخت سیمه کې شتون نه لري. بل وخت غوره کړئ.",
+    "reviewBriefing": "لنډیز وڅېړئ",
+    "reviewAgain": "نوې بیاکتنه چمتو کړئ",
+    "payer": "لګښت د {{context}} له حسابه اخیستل کېږي",
+    "emptyPeriod": "په دې موده کې هېڅ فعالیت ونه موندل شو. نه د AI لنډیز جوړېږي او نه لګښت اخیستل کېږي.",
+    "emptyHistory": "هېڅ خوندي شوي لنډیزونه نشته",
+    "historicalStateHint": "د ناستې حالت د ټاکل شوې مودې د پای حالت ښيي، نه اوسنی ژوندی حالت.",
+    "oneOffHint": "AI ستاسو د کاریال په ژبه ټاکل شوي شواهد ترلاسه کوي چې حساس معلومات ترې لرې شوي وي. دا یوځلنی راپور ستاسو د سهار مهالویش یا د AI غوره توبونه نه بدلوي.",
+    "createOffline": "د لنډیز د کتنې یا جوړولو لپاره له انټرنېټ سره وصل شئ. د پیسو غوښتنې هېڅکله له انټرنېټ پرته په کتار کې نه ساتل کېږي.",
+    "estimateInputTooLarge": "په دې موده کې د ټاکل شوي ماډل لپاره شواهد ډېر زیات دي.",
+    "estimatePermissionUnavailable": "تاسو د دې چوکاټ د حساب د پاتې پیسو د کارولو اجازه نه لرئ.",
     "estimatePricingUnavailable": "د دې موډل بیې نه دی معلومې.",
     "estimateBalanceUnavailable": "د باشخه لنډیز لپاره بیلانس کافي نه دی.",
     "estimateModelNotAllowed": "دا موډل دلته اجازه نه لري.",

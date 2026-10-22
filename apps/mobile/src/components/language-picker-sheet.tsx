@@ -166,6 +166,15 @@ export function LanguagePickerSheet({
     }
   };
 
+  // The preference was persisted before the reload attempt, so a failed reload
+  // is not a failed change: Continue leaves the sheet with the saved language.
+  // Clearing the failed state first keeps the normal sheet from re-arming the
+  // guard, and `closePicker` arms the one-shot skip the guard is still holding.
+  const handleContinue = () => {
+    setReloadFailed(false);
+    closePicker();
+  };
+
   const retryReload = async () => {
     if (busy) {
       return;
@@ -186,6 +195,8 @@ export function LanguagePickerSheet({
           void retryReload();
         }}
         doneLabel={t('common.retry')}
+        onCancel={handleContinue}
+        cancelLabel={t('common.continue')}
         disabled={busy}
         scrollable={false}
       >

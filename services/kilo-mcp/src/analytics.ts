@@ -98,13 +98,41 @@ export type CallRejectedInput = {
 
 export type OAuthSignInPhase = 'started' | 'succeeded' | 'failed';
 
+/**
+ * Why an OAuth exchange failed, as a closed vocabulary. `reason` carries the
+ * OAuth error code, which several distinct causes share; this is the cause.
+ * The union is the privacy boundary: a slug can only reach telemetry by being
+ * a member here, so a raw library description cannot be passed in by mistake.
+ */
+export type OAuthFailureDetail =
+  | 'client_id_mismatch'
+  | 'client_not_found'
+  | 'grant_not_found'
+  | 'invalid_refresh_token'
+  | 'refresh_token_expired'
+  | 'invalid_token_format'
+  | 'authorization_code_grant_missing'
+  | 'invalid_authorization_code'
+  | 'invalid_authorization_code_format'
+  | 'authorization_code_reused'
+  | 'invalid_pkce_verifier'
+  | 'invalid_access_token'
+  | 'access_token_expired'
+  | 'resource_audience_mismatch'
+  | 'access_token_resource_mismatch'
+  | 'refresh_token_reuse'
+  | 'other';
+
+/** Detail for a rejected replay of a rotated refresh token. */
+export const REFRESH_TOKEN_REUSE_DETAIL: OAuthFailureDetail = 'refresh_token_reuse';
+
 export type OAuthSignInInput = {
   identity: AnalyticsIdentity | null;
   phase: OAuthSignInPhase;
   clientId?: string;
   reason?: string;
-  /** Why the reason fired, as a fixed vocabulary slug; never free text. */
-  detail?: string;
+  /** Why the reason fired, as a member of the fixed vocabulary; never free text. */
+  detail?: OAuthFailureDetail;
 };
 
 /** `kilo_mcp_session_started`. */

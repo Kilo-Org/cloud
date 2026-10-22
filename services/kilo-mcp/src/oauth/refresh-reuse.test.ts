@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { REFRESH_TOKEN_REUSE_DETAIL } from '../analytics';
 import type { McpAnalytics } from '../analytics';
-import { OAUTH_DETAIL_REFRESH_TOKEN_REUSE } from './provider-hooks';
 import {
   createRefreshReuseHandler,
   detectRefreshTokenReuse,
@@ -218,7 +218,7 @@ describe('detectRefreshTokenReuse', () => {
       phase: 'failed',
       identity: { kiloUserId: 'u', organizationId: null },
       reason: 'invalid_grant',
-      detail: OAUTH_DETAIL_REFRESH_TOKEN_REUSE,
+      detail: REFRESH_TOKEN_REUSE_DETAIL,
     });
   });
 

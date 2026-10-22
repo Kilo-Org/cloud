@@ -22,7 +22,7 @@ import type {
   OAuthProviderOptions,
   TokenExchangeCallbackOptions,
 } from '@cloudflare/workers-oauth-provider';
-import type { AnalyticsIdentity, McpAnalytics } from '../analytics';
+import type { AnalyticsIdentity, McpAnalytics, OAuthFailureDetail } from '../analytics';
 
 /** The argument the provider passes to its `onError` hook. */
 export type OAuthProviderError = Parameters<NonNullable<OAuthProviderOptions['onError']>>[0];
@@ -70,21 +70,19 @@ export function tokenExchangeCallback(
   });
 }
 
-/** Failure detail for a rejected reuse of a rotated refresh token. */
-export const OAUTH_DETAIL_REFRESH_TOKEN_REUSE = 'refresh_token_reuse';
-
 /**
- * The library's `error_description` values, mapped to a fixed slug vocabulary.
+ * The library's `error_description` values, mapped to the fixed detail
+ * vocabulary exported by `analytics.ts`.
  *
  * `onError` sees the library's own description strings (`oauth-provider.js`
  * `createErrorResponse`), which are what separate a revoked grant from an
  * expired one, a client/refresh-token mismatch from a malformed token, and a
  * resource-audience problem from a genuinely invalid bearer. The raw text is
  * never captured: it is free text the library may interpolate into, so only a
- * slug from this table leaves the worker. An unlisted description reports
+ * member of the vocabulary leaves the worker. An unlisted description reports
  * `other`, which keeps the vocabulary bounded without losing the reason code.
  */
-const OAUTH_ERROR_DETAILS: Record<string, string> = {
+const OAUTH_ERROR_DETAILS: Record<string, OAuthFailureDetail> = {
   'Client ID mismatch': 'client_id_mismatch',
   'Client not found': 'client_not_found',
   'Grant not found': 'grant_not_found',
@@ -102,21 +100,23 @@ const OAUTH_ERROR_DETAILS: Record<string, string> = {
   'Access token is not bound to the configured resource': 'access_token_resource_mismatch',
 };
 
-/** The slug for one library error, or `other` for a description outside the table. */
-function oauthErrorDetail(description: string): string {
-  return OAUTH_ERROR_DETAILS[description] ?? 'other';
-}
-
 /**
  * Emit `oauthSignIn failed` for a provider error response. The `reason` is the
  * OAuth error code and `detail` narrows it to a cause; no identity is known at
  * the error boundary, so it is always anonymous.
+ *
+ * The own-property check keeps the vocabulary closed: a description of
+ * `constructor` or `__proto__` must report `other`, not resolve through
+ * `Object.prototype`.
  */
 export function onError(error: OAuthProviderError, deps: ProviderHookDeps = {}): void {
+  const detail: OAuthFailureDetail = Object.hasOwn(OAUTH_ERROR_DETAILS, error.description)
+    ? (OAUTH_ERROR_DETAILS[error.description] ?? 'other')
+    : 'other';
   deps.analytics?.oauthSignIn({
     phase: 'failed',
     identity: null,
     reason: error.code,
-    detail: oauthErrorDetail(error.description),
+    detail,
   });
 }

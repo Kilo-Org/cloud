@@ -8,7 +8,7 @@ import { z } from 'zod';
  * provider would answer it.
  */
 import { REFRESH_HISTORY_TTL_MS } from './session-lifetime';
-import { OAUTH_DETAIL_REFRESH_TOKEN_REUSE } from './provider-hooks';
+import { REFRESH_TOKEN_REUSE_DETAIL } from '../analytics';
 import type { McpAnalytics } from '../analytics';
 
 export const TOKEN_ENDPOINT_PATH = '/token';
@@ -123,7 +123,7 @@ export async function detectRefreshTokenReuse(
     phase: 'failed',
     identity: { kiloUserId: issued.userId, organizationId: null },
     reason: 'invalid_grant',
-    detail: OAUTH_DETAIL_REFRESH_TOKEN_REUSE,
+    detail: REFRESH_TOKEN_REUSE_DETAIL,
   });
   return reuseDetectedResponse(request);
 }

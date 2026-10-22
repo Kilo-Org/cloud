@@ -122,19 +122,18 @@ describe('onError', () => {
   });
 
   it('reports a description outside the vocabulary as other, never the raw text', () => {
-    const { analytics, calls } = fakeAnalytics();
-    onError(
-      {
-        code: 'invalid_request',
-        description: 'Request parameter "x" must not be repeated',
-        status: 400,
-        headers: {},
-      },
-      { analytics }
-    );
-    expect(calls).toEqual([
-      { phase: 'failed', identity: null, reason: 'invalid_request', detail: 'other' },
-    ]);
+    for (const description of [
+      'Request parameter "x" must not be repeated',
+      'constructor',
+      '__proto__',
+      'toString',
+    ]) {
+      const { analytics, calls } = fakeAnalytics();
+      onError({ code: 'invalid_request', description, status: 400, headers: {} }, { analytics });
+      expect(calls).toEqual([
+        { phase: 'failed', identity: null, reason: 'invalid_request', detail: 'other' },
+      ]);
+    }
   });
 
   it('is a no-op without an analytics emitter and never throws', () => {

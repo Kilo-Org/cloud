@@ -15,6 +15,10 @@ import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { textRequestPriceCeiling } from '@kilocode/web-shared/lib/ai-gateway/request-cost-limit';
+import {
+  BRIEFING_SETTLEMENT_HEADER,
+  briefingChargeAccountingSchema,
+} from '@kilocode/web-shared/lib/agent-briefing-usage';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import {
@@ -264,7 +268,9 @@ export async function estimateBriefingSummary(
   const model = input.model ?? setting.model;
   const maxSpendMicrodollars = input.maxSpendMicrodollars ?? setting.maxSpendMicrodollars;
   const maxDurationSeconds = input.maxDurationSeconds ?? setting.maxDurationSeconds;
-  const report = input.reportId ? await briefingReportRow(user.id, input.reportId) : null;
+  const report = input.reportId
+    ? await reconcileBriefingCharge(await briefingReportRow(user.id, input.reportId))
+    : null;
   if (report && report.organization_id !== (input.organizationId ?? null))
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'Report context does not match estimate' });
   const language = report?.language ?? (await getBriefingPreferences(user.id)).language;
@@ -352,7 +358,7 @@ async function queueSummary(
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'Not a one-off briefing' });
   const setting = await briefingContextSettings(user.id, accessible.organization_id);
   const queued = await db.transaction(async tx => {
-    const [row] = await tx
+    const [locked] = await tx
       .select()
       .from(agent_briefing_reports)
       .where(
@@ -362,7 +368,8 @@ async function queueSummary(
         )
       )
       .for('update');
-    if (!row) throw new TRPCError({ code: 'NOT_FOUND', message: 'Briefing not found' });
+    if (!locked) throw new TRPCError({ code: 'NOT_FOUND', message: 'Briefing not found' });
+    const row = await reconcileLockedBriefingCharge(tx, locked);
     const summary = briefingSummarySchema.parse(row.summary);
     if (publishOneOff && row.published_at) return row;
     if (row.kind === 'one_off' && ['pending', 'running'].includes(summary.status)) return row;
@@ -448,10 +455,11 @@ async function queueSummary(
         generation_started_at: null,
         generation_finished_at: null,
         generation_deadline_at: null,
-        next_charge_check_at: null,
+        next_charge_check_at: row.next_charge_check_at,
         updated_at: now,
         ...(publishOneOff ? { published_at: now } : {}),
         summary: {
+          ...row.summary,
           ...summary,
           status: 'pending',
           manualRequested: true,
@@ -472,42 +480,92 @@ async function queueSummary(
   });
   return serializeBriefing(await briefingReportRow(user.id, queued.id));
 }
-export async function reconcileBriefingCharge(row: BriefingReportRow): Promise<BriefingReportRow> {
-  if (!row.generation_id) return row;
-  const [charge] = await db
+type BriefingTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+function chargeAccounting(row: BriefingReportRow) {
+  return briefingChargeAccountingSchema.parse(
+    row.summary.chargeAccounting ?? {
+      baselineCostMicrodollars: z
+        .number()
+        .nonnegative()
+        .catch(0)
+        .parse(row.summary.priorCostMicrodollars),
+      generations: row.generation_id ? [{ id: row.generation_id, usageId: null }] : [],
+    }
+  );
+}
+
+async function reconcileLockedBriefingCharge(
+  tx: BriefingTransaction,
+  row: BriefingReportRow
+): Promise<BriefingReportRow> {
+  const accounting = chargeAccounting(row);
+  if (accounting.generations.length === 0) return row;
+  const generationIds = accounting.generations.map(generation => generation.id);
+  const charges = await tx
     .select({
+      generationId: microdollar_usage_metadata.session_id,
       cost: sql<number>`coalesce(sum(${microdollar_usage.cost}), 0)::float8`,
-      count: sql<number>`count(*)::integer`,
+      usageIds: sql<string[]>`array_agg(${microdollar_usage.id}::text)`,
     })
     .from(microdollar_usage)
     .innerJoin(microdollar_usage_metadata, eq(microdollar_usage_metadata.id, microdollar_usage.id))
     .where(
       and(
         eq(microdollar_usage.kilo_user_id, row.kilo_user_id),
-        eq(microdollar_usage_metadata.session_id, row.generation_id),
+        sql`${microdollar_usage_metadata.session_id} = ANY(${sql.param(generationIds)}::text[])`,
         row.organization_id
           ? eq(microdollar_usage.organization_id, row.organization_id)
           : sql`${microdollar_usage.organization_id} IS NULL`
       )
-    );
-  const previous = z.number().nonnegative().catch(0).parse(row.summary.priorCostMicrodollars);
-  const total = previous + Number(charge?.cost ?? 0);
-  const chargeStatus = Number(charge?.count ?? 0) > 0 ? 'settled' : 'pending';
-  const [updated] = await db
+    )
+    .groupBy(microdollar_usage_metadata.session_id);
+  const chargesByGeneration = new Map(charges.map(charge => [charge.generationId, charge]));
+  const total =
+    accounting.baselineCostMicrodollars +
+    charges.reduce((cost, charge) => cost + Number(charge.cost), 0);
+  const settled = accounting.generations.every(
+    generation =>
+      generation.usageId !== null &&
+      chargesByGeneration.get(generation.id)?.usageIds.includes(generation.usageId)
+  );
+  const chargeStatus = settled ? 'settled' : 'pending';
+  const canRetry =
+    row.summary.status === 'failed' &&
+    settled &&
+    Number(chargesByGeneration.get(row.generation_id)?.cost ?? 0) > 0;
+  if (
+    settled &&
+    row.summary.chargeStatus === 'settled' &&
+    row.summary.canRetry === canRetry &&
+    z.number().nonnegative().catch(-1).parse(row.summary.costMicrodollars) === total
+  )
+    return row;
+  const [updated] = await tx
     .update(agent_briefing_reports)
     .set({
-      next_charge_check_at:
-        chargeStatus === 'settled' ? null : new Date(Date.now() + 60_000).toISOString(),
-      summary: sql`jsonb_set(${agent_briefing_reports.summary} || ${JSON.stringify({ costMicrodollars: total, chargeStatus })}::jsonb, '{canRetry}', to_jsonb((${agent_briefing_reports.summary}->>'status' = 'failed') AND ${total > previous}))`,
+      next_charge_check_at: settled ? null : new Date(Date.now() + 60_000).toISOString(),
+      summary: sql`${agent_briefing_reports.summary} || ${JSON.stringify({ costMicrodollars: total, chargeStatus, canRetry, chargeAccounting: accounting })}::jsonb`,
     })
-    .where(
-      and(
-        eq(agent_briefing_reports.id, row.id),
-        eq(agent_briefing_reports.generation_id, row.generation_id)
-      )
-    )
+    .where(eq(agent_briefing_reports.id, row.id))
     .returning();
   return updated ?? row;
+}
+
+export async function reconcileBriefingCharge(row: BriefingReportRow): Promise<BriefingReportRow> {
+  return db.transaction(async tx => {
+    const [current] = await tx
+      .select()
+      .from(agent_briefing_reports)
+      .where(
+        and(
+          eq(agent_briefing_reports.id, row.id),
+          eq(agent_briefing_reports.kilo_user_id, row.kilo_user_id)
+        )
+      )
+      .for('update');
+    return current ? reconcileLockedBriefingCharge(tx, current) : row;
+  });
 }
 export async function runBriefingSummary(reportId: string): Promise<void> {
   const [candidate] = await db
@@ -515,7 +573,9 @@ export async function runBriefingSummary(reportId: string): Promise<void> {
     .from(agent_briefing_reports)
     .where(eq(agent_briefing_reports.id, reportId));
   if (!candidate || candidate.generation_id || candidate.summary.status !== 'pending') return;
-  const row = await briefingReportRow(candidate.kilo_user_id, reportId);
+  const row = await reconcileBriefingCharge(
+    await briefingReportRow(candidate.kilo_user_id, reportId)
+  );
   if (row.summary.status !== 'pending') return;
   const setting = await briefingContextSettings(row.kilo_user_id, row.organization_id);
   const [user] = await db
@@ -530,13 +590,18 @@ export async function runBriefingSummary(reportId: string): Promise<void> {
     if (row.kind === 'one_off' || row.summary.manualRequested === true) {
       const reviewed = summaryAuthorizationSchema.safeParse(row.summary.authorization);
       const summary = briefingSummarySchema.parse(row.summary);
+      const authorizedPrior = z
+        .number()
+        .nonnegative()
+        .catch(reviewed.success ? reviewed.data.priorCost : 0)
+        .parse(summary.priorCostMicrodollars);
       if (
         !reviewed.success ||
         reviewed.data.model !== setting.model ||
         reviewed.data.maxSpendMicrodollars !== setting.maxSpendMicrodollars ||
         reviewed.data.maxDurationSeconds !== setting.maxDurationSeconds ||
         reviewed.data.revision !== row.revision ||
-        reviewed.data.priorCost !== summary.costMicrodollars
+        reviewed.data.priorCost !== authorizedPrior
       )
         throw new Error('permission_unavailable');
     }
@@ -553,6 +618,9 @@ export async function runBriefingSummary(reportId: string): Promise<void> {
     const remainingMs = setting.maxDurationSeconds * 1000 - (Date.now() - Date.parse(startedAt));
     if (remainingMs <= 0) throw new Error('time_limit');
     generationId = `agent-briefing:${crypto.randomUUID()}`;
+    const settlementToken = crypto.randomUUID();
+    const accounting = chargeAccounting(row);
+    accounting.generations.push({ id: generationId, settlementToken, usageId: null });
     const [claimed] = await db
       .update(agent_briefing_reports)
       .set({
@@ -564,14 +632,15 @@ export async function runBriefingSummary(reportId: string): Promise<void> {
         ).toISOString(),
         generation_revision: row.revision,
         generation_max_cost: setting.maxSpendMicrodollars,
-        summary: sql`${agent_briefing_reports.summary} || ${JSON.stringify({ status: 'running', chargeStatus: 'pending', model: setting.model, startedAt, estimatedCostMicrodollars: bound.estimatedCost })}::jsonb`,
+        summary: sql`${agent_briefing_reports.summary} || ${JSON.stringify({ status: 'running', chargeStatus: 'pending', model: setting.model, startedAt, estimatedCostMicrodollars: bound.estimatedCost, chargeAccounting: accounting })}::jsonb`,
       })
       .where(
         and(
           eq(agent_briefing_reports.id, row.id),
           eq(agent_briefing_reports.revision, row.revision),
           sql`${agent_briefing_reports.generation_id} IS NULL`,
-          sql`${agent_briefing_reports.summary}->>'status' = 'pending'`
+          sql`${agent_briefing_reports.summary}->>'status' = 'pending'`,
+          sql`${agent_briefing_reports.summary}->'costMicrodollars' = ${JSON.stringify(row.summary.costMicrodollars)}::jsonb`
         )
       )
       .returning();
@@ -583,6 +652,7 @@ export async function runBriefingSummary(reportId: string): Promise<void> {
         Authorization: `Bearer ${generateApiToken(user, { internalApiUse: true }, { expiresIn: setting.maxDurationSeconds + 60 })}`,
         'X-Kilo-Session': generationId,
         'X-Kilo-Request': generationId,
+        [BRIEFING_SETTLEMENT_HEADER]: settlementToken,
         'X-Kilo-Max-Cost-Microdollars': String(setting.maxSpendMicrodollars),
         ...(row.organization_id ? { 'X-KiloCode-OrganizationId': row.organization_id } : {}),
         'User-Agent': 'Kilo-Agent-Briefing',

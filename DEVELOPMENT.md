@@ -600,6 +600,7 @@ Pricing estimates and gateway spend checks resolve latest-model aliases through 
 An alias remains unavailable when its target is missing or has no usable pricing.
 The gateway rejects an alias request if provider routing selects a different target from the priced catalog target.
 The structured report remains available when generation fails or reaches a limit.
+Summary charges accumulate across a report's generations: each generation keeps its settlement record, a pending update preserves the reconciled total, and retry becomes available only when every tracked generation's usage is final.
 
 Apply database migrations before deploying the session-ingest, notification, gateway, and web changes.
 The CLI status producer must send occurrence timestamps and transition identities for reliable historical blocker counts.

@@ -472,17 +472,25 @@ describe('agent briefing ownership and lifecycle', () => {
   it('reconciles delayed real ledger rows without clobbering summary state and enables only billable retry', async () => {
     const { report } = await seedReport();
     const generationId = `agent-briefing:${crypto.randomUUID()}`;
+    const usageId = crypto.randomUUID();
     const [failed] = await db
       .update(agent_briefing_reports)
       .set({
         generation_id: generationId,
-        summary: { ...emptySummary, status: 'failed', chargeStatus: 'pending' },
+        summary: {
+          ...emptySummary,
+          status: 'failed',
+          chargeStatus: 'pending',
+          chargeAccounting: {
+            baselineCostMicrodollars: 0,
+            generations: [{ id: generationId, usageId }],
+          },
+        },
       })
       .where(eq(agent_briefing_reports.id, report.id))
       .returning();
     if (!failed) throw new Error('Failed fixture was not inserted');
     expect((await reconcileBriefingCharge(failed)).summary.canRetry).toBe(false);
-    const usageId = crypto.randomUUID();
     await db.insert(microdollar_usage).values({
       id: usageId,
       kilo_user_id: user.id,

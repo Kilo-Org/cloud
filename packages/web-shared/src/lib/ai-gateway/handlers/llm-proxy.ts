@@ -6,6 +6,10 @@ import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { extractPromptInfo } from '@kilocode/web-shared/lib/ai-gateway/extractPromptInfo';
 import { determineFallbackFeature } from '@kilocode/web-shared/lib/ai-gateway/determineFallbackFeature';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
+import {
+  BRIEFING_SETTLEMENT_HEADER,
+  recordBriefingUsage,
+} from '@kilocode/web-shared/lib/agent-briefing-usage';
 import type {
   OpenRouterChatCompletionRequest,
   GatewayResponsesRequest,
@@ -136,7 +140,7 @@ import {
   hasMiddleOutTransform,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { redactProviderHints } from '@kilocode/auto-routing-contracts';
-import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
 import {
@@ -1105,7 +1109,33 @@ export async function handleLlmProxyRequest(
 
   const clonedReponse = response.clone(); // reading from body is side-effectful
 
-  accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
+  const accounting = accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
+  const settlementToken = request.headers.get(BRIEFING_SETTLEMENT_HEADER);
+  if (
+    settlementToken &&
+    !isAnonymousContext(user) &&
+    !usageContext.isStreaming &&
+    autoModel === null &&
+    usageContext.session_id?.startsWith('agent-briefing:') &&
+    clientRequestId === usageContext.session_id
+  ) {
+    const generationId = usageContext.session_id;
+    after(
+      accounting
+        .then(usage =>
+          recordBriefingUsage({
+            kiloUserId: user.id,
+            organizationId,
+            generationId,
+            settlementToken,
+            usage,
+          })
+        )
+        .catch(() => {
+          errorExceptInTest('Briefing accounting receipt could not be stored');
+        })
+    );
+  }
 
   const requestLogging = {
     user: maybeUser,

@@ -1019,6 +1019,7 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
     });
 
     expect(linkAttachmentsForDispatch).toHaveBeenCalledWith('user-1', attachments);
+    expect(mockSendMessage).toHaveBeenCalledTimes(1);
     expect(linkAttachmentsForDispatch.mock.invocationCallOrder[0]).toBeLessThan(
       mockSendMessage.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
     );

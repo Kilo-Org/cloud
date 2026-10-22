@@ -665,7 +665,7 @@ describe('cloud-agent pending-upload ledger', () => {
     });
 
     const linked = await linkPendingUploads(kiloUserId, messageUuid, [objectKey]);
-    expect(linked).toEqual({ reapedObjectKeys: [] });
+    expect(linked).toEqual({ unlinkedObjectKeys: [] });
 
     const summary = await reapAbandonedUploads();
 
@@ -696,7 +696,7 @@ describe('cloud-agent pending-upload ledger', () => {
     await reapAbandonedUploads();
 
     const linked = await linkPendingUploads(kiloUserId, messageUuid, [objectKey]);
-    expect(linked).toEqual({ reapedObjectKeys: [objectKey] });
+    expect(linked).toEqual({ unlinkedObjectKeys: [objectKey] });
     const [after] = await db
       .select({ status: cloud_agent_pending_uploads.status })
       .from(cloud_agent_pending_uploads)
@@ -753,7 +753,6 @@ describe('cloud-agent pending-upload ledger', () => {
     const messageUuid = crypto.randomUUID();
     const attachment = crypto.randomUUID();
     const legacyFile = `${crypto.randomUUID()}.pdf`;
-    const objectKey = buildObjectKey(kiloUserId, messageUuid, attachment);
     const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
     const row = await insertPendingRow({
@@ -775,16 +774,24 @@ describe('cloud-agent pending-upload ledger', () => {
     expect(after?.status).toBe('linked');
   });
 
-  it('refuses a dispatch whose attachment row was already reaped', async () => {
+  it('leaves every row of a refused message reapable', async () => {
     const kiloUserId = `ca-user-${crypto.randomUUID()}`;
     const messageUuid = crypto.randomUUID();
-    const attachment = crypto.randomUUID();
+    const readyAttachment = crypto.randomUUID();
+    const goneAttachment = crypto.randomUUID();
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     const past = new Date(Date.now() - 60_000).toISOString();
 
+    const readyRow = await insertPendingRow({
+      kiloUserId,
+      messageUuid,
+      attachmentId: readyAttachment,
+      expiresAt: future,
+    });
     await insertPendingRow({
       kiloUserId,
       messageUuid,
-      attachmentId: attachment,
+      attachmentId: goneAttachment,
       expiresAt: past,
       status: 'reaped',
     });
@@ -792,8 +799,14 @@ describe('cloud-agent pending-upload ledger', () => {
     await expect(
       linkAttachmentsForDispatch(kiloUserId, {
         path: messageUuid,
-        files: [`${attachment}.bin`],
+        files: [`${readyAttachment}.bin`, `${goneAttachment}.bin`],
       })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    const [after] = await db
+      .select({ status: cloud_agent_pending_uploads.status })
+      .from(cloud_agent_pending_uploads)
+      .where(eq(cloud_agent_pending_uploads.id, readyRow));
+    expect(after?.status).toBe('pending');
   });
 });

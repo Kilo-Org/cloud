@@ -660,6 +660,7 @@ describe('send-time attachment filenames', () => {
   };
   const sendInput = {
     cloudAgentSessionId: 'agent_12345678-1234-4234-9234-123456789abc',
+    messageId: 'msg_123456789abc123456789ABCDE',
     payload: { type: 'prompt', prompt: '', mode: 'code', model: 'kilo/test-model' },
   };
   const attachmentsWith = (extension: string) => ({

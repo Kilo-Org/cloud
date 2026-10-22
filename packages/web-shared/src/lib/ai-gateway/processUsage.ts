@@ -86,6 +86,7 @@ import {
   parseMessagesMicrodollarUsageFromStream,
   parseMessagesMicrodollarUsageFromString,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.messages';
+import { estimateUnparseableResponseUsage } from '@kilocode/web-shared/lib/ai-gateway/processUsage.estimate';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gateway/processUsage.constants';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import {
@@ -1075,11 +1076,35 @@ export function countAndStoreUsage(
   const parseResponseText = async (
     parse: (content: string) => MicrodollarUsageStats
   ): Promise<MicrodollarUsageStats | null> => {
+    let content: string;
     try {
-      return parse(await clonedReponse.text());
+      content = await clonedReponse.text();
     } catch (error) {
       if (isResponseInterruptedError(error)) return null;
       throw error;
+    }
+    try {
+      return parse(content);
+    } catch (error) {
+      const estimate = await estimateUnparseableResponseUsage(
+        content,
+        usageContext,
+        clonedReponse.status
+      );
+      // The parse error message can quote the response body, so it is not reported.
+      captureMessage('Charged an estimate for a response whose usage could not be parsed', {
+        level: 'error',
+        tags: { source: 'usage_processing' },
+        extra: {
+          error_name: error instanceof Error ? error.name : typeof error,
+          api_kind: usageContext.api_kind,
+          provider: usageContext.provider,
+          requested_model: usageContext.requested_model,
+          status_code: clonedReponse.status,
+          estimated_cost_mUsd: estimate.cost_mUsd,
+        },
+      });
+      return estimate;
     }
   };
 

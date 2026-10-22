@@ -20,6 +20,11 @@ function sumTextCharLength(value: unknown): number {
   return 0;
 }
 
+// Counts only actual text content, not JSON punctuation or field names.
+export function estimateInputTokenCount(request: GatewayRequest): number {
+  return Math.round(sumTextCharLength(request.body) / 4);
+}
+
 // Underestimates tokens on purpose: we only count actual text content (not JSON
 // punctuation or field names), then add the reserved max output tokens. This
 // count is used to detect context overflows on vague upstream errors, so we

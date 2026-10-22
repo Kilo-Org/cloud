@@ -71,6 +71,7 @@ import {
 } from '../websocket/stream.js';
 import {
   getPreparationSnapshots,
+  listPreparationAttempts,
   reconcileStalePreparationAttempts,
 } from '../session/preparation-history.js';
 import { createPreparationProgressRecorder } from '../session/preparation-progress.js';
@@ -82,7 +83,12 @@ import {
 import type { AttentionEvent } from '../websocket/ingest-attention-classifier.js';
 import { dispatchCloudAgentAttentionPush } from '../websocket/ingest-attention-classifier.js';
 import type { StoredEvent } from '../websocket/types.js';
-import type { WrapperCommand, CloudStatusData, CommandsAvailableData } from '../shared/protocol.js';
+import type {
+  WrapperCommand,
+  CloudStatusData,
+  CommandsAvailableData,
+  PreparationAttempt,
+} from '../shared/protocol.js';
 import {
   isPublicCloudAgentExtensionSourceType,
   projectPublicCloudAgentExtensionEvent,
@@ -1151,11 +1157,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         deriveCloudStatus: () => this.deriveCloudStatus(),
         deriveQueuedMessages: () => this.deriveQueuedMessages(),
         getPreparationSnapshots: async () => {
-          const metadata = await this.getMetadata();
-          reconcileStalePreparationAttempts(this.eventQueries, {
-            now: Date.now(),
-            sessionPrepared: Boolean(metadata?.lifecycle.preparedAt),
-          });
+          await this.reconcilePreparationAttempts();
           return getPreparationSnapshots(this.eventQueries);
         },
         getAvailableCommands: () => this.getAvailableCommands(),
@@ -1956,6 +1958,21 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   async getLatestEventId(): Promise<number | null> {
     if (await this.hasDeletionIntent()) return null;
     return this.eventQueries.getLatestEventId();
+  }
+
+  /** The preparation attempts the stream replays, for the first transcript page. */
+  async getPreparationAttempts(): Promise<PreparationAttempt[]> {
+    if (await this.hasDeletionIntent()) return [];
+    await this.reconcilePreparationAttempts();
+    return listPreparationAttempts(this.eventQueries);
+  }
+
+  private async reconcilePreparationAttempts(): Promise<void> {
+    const metadata = await this.getMetadata();
+    reconcileStalePreparationAttempts(this.eventQueries, {
+      now: Date.now(),
+      sessionPrepared: Boolean(metadata?.lifecycle.preparedAt),
+    });
   }
 
   async getMessageResult(messageId: string): Promise<MessageResultRPCResponse> {

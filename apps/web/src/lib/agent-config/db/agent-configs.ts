@@ -186,7 +186,6 @@ export async function getAgentConfigForOwner(
     eq(agent_configs.platform, platform),
   ];
 
-  // Add owner-specific condition
   if (owner.type === 'org') {
     conditions.push(eq(agent_configs.owned_by_organization_id, owner.id));
   } else {
@@ -288,7 +287,6 @@ export async function setAgentEnabledForOwner(
     eq(agent_configs.platform, platform),
   ];
 
-  // Add owner-specific condition
   if (owner.type === 'org') {
     conditions.push(eq(agent_configs.owned_by_organization_id, owner.id));
   } else {

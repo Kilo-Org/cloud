@@ -142,7 +142,7 @@ function subtractFollowed(
     ...snapshot,
     running: Math.max(0, snapshot.running - followed.running),
     needsInput,
-    needsApproval: Math.max(0, (snapshot.needsApproval ?? 0) - followed.needsApproval),
+    needsApproval: Math.max(0, snapshot.needsApproval - followed.needsApproval),
     idle: Math.max(0, snapshot.idle - followed.idle),
     scheduled,
     needsInputSince: needsInput === 0 ? null : snapshot.needsInputSince,

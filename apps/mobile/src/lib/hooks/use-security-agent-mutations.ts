@@ -8,13 +8,8 @@ import {
   nextMutationGeneration,
 } from '@/lib/hooks/mutation-generations';
 import { trackSecurityAgentCommand } from '@/lib/hooks/use-security-agent-commands';
-import {
-  isOperationInProgress,
-  OPERATION_KEY_REUSE_MISMATCH_MESSAGE,
-  useHoistedOperationKey,
-} from '@/lib/operation-key';
+import { useHoistedOperationKey } from '@/lib/operation-key';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
-import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { reconcileFirstPage } from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import {
@@ -22,95 +17,13 @@ import {
   type SecurityAgentConfig,
   type SecurityAgentConfigPatch,
 } from '@/lib/security-agent';
+import {
+  isSecuritySyncRetryable,
+  mapSecuritySyncOperationError,
+  securitySyncIntentFingerprint,
+} from '@/lib/security-agent-ledger';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 import { pick } from '@/lib/utils';
-
-// P1-A-08e ledger markers (server contract, mirrored from shared-handlers.ts).
-// The raw markers are shared in `@/lib/operation-key`; the server sends
-// user-facing copy for every other ledger outcome.
-const SECURITY_OPERATION_REPLAY_FAILED_MESSAGE = 'This action did not complete. Please try again.';
-// Ambiguous transport outcome: the Worker may have accepted the command, so the
-// server reconciles a same-key retry instead of re-submitting blind.
-const SECURITY_AMBIGUOUS_MESSAGE = "Couldn't confirm — check the security review before retrying.";
-// Confirmed outcome whose settle failed: a same-key retry re-records it.
-const SECURITY_LEDGER_SETTLE_FAILED_MESSAGE =
-  'The action completed, but we could not record the result. Please try again.';
-// The ambiguous outcome could not be recorded as reconcile-pending, so the
-// same-key retry guarantee does not hold; the next submit needs a fresh key.
-const SECURITY_LEDGER_PERSISTENCE_FAILED_MESSAGE =
-  'We could not record this action. Please try again later.';
-
-// The manual-sync Worker URL or internal secret is unset server-side, so no
-// resubmit can succeed until the deployment is reconfigured.
-export const SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE = 'Security service is not configured';
-
-/** Surface copy for the missing-configuration state (dismiss sheet). */
-export function securityConfigurationCopy(): string {
-  return i18n.t('securityAgent.mutations.serviceNotConfiguredResubmit');
-}
-
-/**
- * Card copy for a reconcile-first sync row: a crash mid-sync left the outcome
- * uncertain, so the card offers a same-key reconcile retry instead of a blind
- * re-POST.
- */
-export function securitySyncReconcileCopy(): string {
-  return i18n.t('securityAgent.mutations.syncMayNotHaveCompleted');
-}
-
-/** True when the error is the server's missing-Worker-configuration rejection. */
-export function isSecurityConfigurationError(error: unknown): boolean {
-  return error instanceof Error && error.message === SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE;
-}
-
-/**
- * True when the mutation may be retried under the SAME operation key. Also
- * used for finding dismissal, which shares the ledger markers.
- */
-export function isSecuritySyncRetryable(error: unknown): boolean {
-  if (error instanceof Error) {
-    if (isSecurityConfigurationError(error)) {
-      return false;
-    }
-    if (error.message === OPERATION_KEY_REUSE_MISMATCH_MESSAGE) {
-      return false;
-    }
-    if (error.message === SECURITY_OPERATION_REPLAY_FAILED_MESSAGE) {
-      return false;
-    }
-    if (error.message === SECURITY_LEDGER_PERSISTENCE_FAILED_MESSAGE) {
-      return false;
-    }
-    if (
-      error.message === SECURITY_AMBIGUOUS_MESSAGE ||
-      error.message === SECURITY_LEDGER_SETTLE_FAILED_MESSAGE
-    ) {
-      return true;
-    }
-  }
-  return classifyPrReviewMutationError(error).kind === 'retryable';
-}
-
-// The copy is a user-facing conflict, not a defect: keeping the server error as
-// `cause` lets the app-error reporter skip it like any other tRPC error.
-function mapOperationInProgress(error: unknown, copy: string) {
-  return isOperationInProgress(error) ? new Error(copy, { cause: error }) : error;
-}
-
-/** Maps the raw in-progress marker onto retryable sync copy; others pass through. */
-export function mapSecuritySyncOperationError(error: unknown) {
-  return mapOperationInProgress(error, i18n.t('securityAgent.mutations.syncInProgress'));
-}
-
-/** Same marker, dismissal copy: the dismiss sheet must not talk about a sync. */
-export function mapSecurityDismissOperationError(error: unknown) {
-  return mapOperationInProgress(error, i18n.t('securityAgent.mutations.dismissalInProgress'));
-}
-
-/** Intent fingerprint for a manual sync: a changed scope or repo is a new intent. */
-export function securitySyncIntentFingerprint(scope: string, repoFullName?: string): string {
-  return JSON.stringify({ resource: [scope], repoFullName });
-}
 
 // Split out of use-security-agent.ts (mutations only) to stay under the
 // 300-line file limit — these are the write-side hooks, kept alongside the

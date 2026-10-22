@@ -15,13 +15,56 @@ export const SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS = 3 * 24 * 60 * 60;
 const SYNC_PROVIDERS_STALE_ALERT_TTL_MS = SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS * 1000;
 
 const STALE_WINDOW_LABEL = 'hour';
-const STATUS_COPY = `No full sync has completed within the past ${STALE_WINDOW_LABEL}.`;
-const IMPACT_COPY =
-  'New providers and models may take longer to appear; existing catalog data remains available.';
 const URGENCY_COPY = 'Important, not urgent. Some delay is acceptable.';
-const INVESTIGATION_COPY =
-  'During normal operations, check Sentry for `web.sync_providers` and Vercel logs for `[sync-providers]` errors.';
 const TEST_COPY = 'This verifies alert delivery only; it does not indicate an active issue.';
+
+type SyncStateColumn = keyof Pick<
+  typeof ai_gateway_sync_providers_state.$inferSelect,
+  | 'last_completed_at'
+  | 'stale_alert_last_posted_at'
+  | 'direct_byok_last_completed_at'
+  | 'direct_byok_stale_alert_last_posted_at'
+>;
+
+type SyncJob = {
+  title: string;
+  status: string;
+  impact: string;
+  investigation: string;
+  logPrefix: string;
+  sentryComponent: string;
+  lastCompletedColumn: SyncStateColumn;
+  lastAlertColumn: SyncStateColumn;
+};
+
+export const SYNC_JOBS = {
+  providers: {
+    title: 'Provider/model catalog sync',
+    status: `No full sync has completed within the past ${STALE_WINDOW_LABEL}.`,
+    impact:
+      'New providers and models may take longer to appear; existing catalog data remains available.',
+    investigation:
+      'During normal operations, check Sentry for `web.sync_providers` and Vercel logs for `[sync-providers]` errors.',
+    logPrefix: '[sync-providers]',
+    sentryComponent: 'sync-providers-stale-alert',
+    lastCompletedColumn: 'last_completed_at',
+    lastAlertColumn: 'stale_alert_last_posted_at',
+  },
+  direct_byok: {
+    title: 'Direct BYOK model list sync',
+    status: `No direct BYOK model list sync has completed within the past ${STALE_WINDOW_LABEL}.`,
+    impact:
+      'New direct BYOK models may take longer to appear; existing direct BYOK model lists remain available.',
+    investigation:
+      'During normal operations, check Sentry for `web.sync_direct_byok_providers` and Vercel logs for `[sync-direct-byok-providers]` errors.',
+    logPrefix: '[sync-direct-byok-providers]',
+    sentryComponent: 'sync-direct-byok-providers-stale-alert',
+    lastCompletedColumn: 'direct_byok_last_completed_at',
+    lastAlertColumn: 'direct_byok_stale_alert_last_posted_at',
+  },
+} as const satisfies Record<string, SyncJob>;
+
+export type SyncJobId = keyof typeof SYNC_JOBS;
 
 export function parseIsoTimestamp(value: string | null): Date | null {
   if (!value) return null;
@@ -52,26 +95,26 @@ export function shouldPostStaleSyncAlert(input: {
 }
 
 export function buildStaleSyncAlertNotification(input: {
+  jobId: SyncJobId;
   lastCompletedAt: Date | null;
   now: Date;
   kind?: 'live' | 'test';
 }): AdminSlackNotification {
+  const job: SyncJob = SYNC_JOBS[input.jobId];
   const kind = input.kind ?? 'live';
   const lastCompletedLabel = input.lastCompletedAt
     ? input.lastCompletedAt.toISOString()
     : 'never recorded';
   const headline =
-    kind === 'test'
-      ? '[TEST] Provider/model catalog sync delay notification.'
-      : 'Provider/model catalog sync is delayed.';
+    kind === 'test' ? `[TEST] ${job.title} delay notification.` : `${job.title} is delayed.`;
   const text = [
     headline,
     ...(kind === 'test' ? [TEST_COPY] : []),
-    STATUS_COPY,
+    job.status,
     `Last completed: ${lastCompletedLabel}.`,
-    IMPACT_COPY,
+    job.impact,
     URGENCY_COPY,
-    INVESTIGATION_COPY,
+    job.investigation,
   ].join(' ');
 
   return {
@@ -83,8 +126,8 @@ export function buildStaleSyncAlertNotification(input: {
           type: 'mrkdwn',
           text:
             kind === 'test'
-              ? ':large_yellow_circle: *[TEST] Provider/model catalog sync delay notification*'
-              : ':large_yellow_circle: *Provider/model catalog sync is delayed*',
+              ? `:large_yellow_circle: *[TEST] ${job.title} delay notification*`
+              : `:large_yellow_circle: *${job.title} is delayed*`,
         },
       },
       {
@@ -93,11 +136,11 @@ export function buildStaleSyncAlertNotification(input: {
           type: 'mrkdwn',
           text: [
             ...(kind === 'test' ? [`*Test only:* ${TEST_COPY}`] : []),
-            `*Status:* ${STATUS_COPY}`,
+            `*Status:* ${job.status}`,
             `*Last completed:* ${lastCompletedLabel}`,
-            `*Impact:* ${IMPACT_COPY}`,
+            `*Impact:* ${job.impact}`,
             `*Urgency:* ${URGENCY_COPY}`,
-            `*Follow-up:* ${INVESTIGATION_COPY}`,
+            `*Follow-up:* ${job.investigation}`,
           ].join('\n'),
         },
       },
@@ -167,45 +210,50 @@ type StaleAlertDependencies = {
   sendNotification?: SendStaleAlertNotification;
 };
 
-async function defaultGetLastCompletedAt(): Promise<string | null> {
+async function readSyncStateColumn(column: SyncStateColumn): Promise<string | null> {
   const [row] = await db
-    .select({ lastCompletedAt: ai_gateway_sync_providers_state.last_completed_at })
+    .select({ value: ai_gateway_sync_providers_state[column] })
     .from(ai_gateway_sync_providers_state)
     .where(eq(ai_gateway_sync_providers_state.id, 1))
     .limit(1);
-  return row?.lastCompletedAt ?? null;
+  return row?.value ?? null;
 }
 
-async function defaultGetLastAlertAt(): Promise<string | null> {
-  const [row] = await db
-    .select({ lastAlertAt: ai_gateway_sync_providers_state.stale_alert_last_posted_at })
-    .from(ai_gateway_sync_providers_state)
-    .where(eq(ai_gateway_sync_providers_state.id, 1))
-    .limit(1);
-  return row?.lastAlertAt ?? null;
+export function getSyncLastCompletedAt(jobId: SyncJobId): Promise<string | null> {
+  return readSyncStateColumn(SYNC_JOBS[jobId].lastCompletedColumn);
 }
 
-async function defaultSetLastAlertAt(iso: string): Promise<void> {
-  await db.transaction(async tx => {
+async function writeLatestSyncStateTimestamp(column: SyncStateColumn, iso: string) {
+  return db.transaction(async tx => {
     await tx.insert(ai_gateway_sync_providers_state).values({ id: 1 }).onConflictDoNothing();
     const [row] = await tx
-      .select({ lastAlertAt: ai_gateway_sync_providers_state.stale_alert_last_posted_at })
+      .select({ value: ai_gateway_sync_providers_state[column] })
       .from(ai_gateway_sync_providers_state)
       .where(eq(ai_gateway_sync_providers_state.id, 1))
       .for('update');
     if (!row) throw new Error('Sync-providers state row is missing');
 
-    const current = parseIsoTimestamp(row.lastAlertAt);
+    const current = parseIsoTimestamp(row.value);
     const requested = new Date(iso);
     const latestIso = current && current > requested ? current.toISOString() : iso;
+    const patch: Partial<typeof ai_gateway_sync_providers_state.$inferInsert> = {};
+    patch[column] = latestIso;
     await tx
       .update(ai_gateway_sync_providers_state)
-      .set({ stale_alert_last_posted_at: latestIso })
+      .set(patch)
       .where(eq(ai_gateway_sync_providers_state.id, 1));
+    return latestIso;
   });
 }
 
+export async function recordSyncCompleted(jobId: SyncJobId): Promise<string> {
+  const completedAt = new Date().toISOString();
+  await writeLatestSyncStateTimestamp(SYNC_JOBS[jobId].lastCompletedColumn, completedAt);
+  return completedAt;
+}
+
 export async function postStaleSyncAlert(input: {
+  jobId: SyncJobId;
   lastCompletedAt: Date | null;
   now?: Date;
   kind?: 'live' | 'test';
@@ -215,6 +263,7 @@ export async function postStaleSyncAlert(input: {
   const sendNotification = input.sendNotification ?? sendStaleSyncAlertNotification;
   return sendNotification(
     buildStaleSyncAlertNotification({
+      jobId: input.jobId,
       lastCompletedAt: input.lastCompletedAt,
       now,
       kind: input.kind,
@@ -222,17 +271,18 @@ export async function postStaleSyncAlert(input: {
   );
 }
 
-export async function postTestStaleSyncAlert({
-  now: nowFn = () => new Date(),
-  getLastCompletedAt = defaultGetLastCompletedAt,
-  sendNotification = sendTestStaleSyncAlertNotification,
-}: Pick<
-  StaleAlertDependencies,
-  'now' | 'getLastCompletedAt' | 'sendNotification'
-> = {}): Promise<StaleAlertDelivery> {
+export async function postTestStaleSyncAlert(
+  jobId: SyncJobId,
+  {
+    now: nowFn = () => new Date(),
+    getLastCompletedAt = () => getSyncLastCompletedAt(jobId),
+    sendNotification = sendTestStaleSyncAlertNotification,
+  }: Pick<StaleAlertDependencies, 'now' | 'getLastCompletedAt' | 'sendNotification'> = {}
+): Promise<StaleAlertDelivery> {
   const now = nowFn();
   const lastCompletedAt = parseIsoTimestamp(await getLastCompletedAt());
   return postStaleSyncAlert({
+    jobId,
     lastCompletedAt,
     now,
     kind: 'test',
@@ -240,13 +290,17 @@ export async function postTestStaleSyncAlert({
   });
 }
 
-export async function alertIfSyncProvidersStale({
-  now: nowFn = () => new Date(),
-  getLastCompletedAt = defaultGetLastCompletedAt,
-  getLastAlertAt = defaultGetLastAlertAt,
-  setLastAlertAt = defaultSetLastAlertAt,
-  sendNotification = sendStaleSyncAlertNotification,
-}: StaleAlertDependencies = {}): Promise<void> {
+export async function alertIfSyncStale(
+  jobId: SyncJobId,
+  {
+    now: nowFn = () => new Date(),
+    getLastCompletedAt = () => getSyncLastCompletedAt(jobId),
+    getLastAlertAt = () => readSyncStateColumn(SYNC_JOBS[jobId].lastAlertColumn),
+    setLastAlertAt = iso => writeLatestSyncStateTimestamp(SYNC_JOBS[jobId].lastAlertColumn, iso),
+    sendNotification = sendStaleSyncAlertNotification,
+  }: StaleAlertDependencies = {}
+): Promise<void> {
+  const job: SyncJob = SYNC_JOBS[jobId];
   try {
     const now = nowFn();
     const [lastCompletedRaw, lastAlertRaw] = await Promise.all([
@@ -257,11 +311,11 @@ export async function alertIfSyncProvidersStale({
     const lastAlertAt = parseIsoTimestamp(lastAlertRaw);
     if (!shouldPostStaleSyncAlert({ lastCompletedAt, lastAlertAt, now })) return;
 
-    const delivery = await postStaleSyncAlert({ lastCompletedAt, now, sendNotification });
+    const delivery = await postStaleSyncAlert({ jobId, lastCompletedAt, now, sendNotification });
     if (delivery !== 'posted') return;
     await setLastAlertAt(now.toISOString());
   } catch (error) {
-    console.error('[sync-providers] stale full-sync alert failed', error);
-    captureException(error, { tags: { component: 'sync-providers-stale-alert' } });
+    console.error(`${job.logPrefix} stale sync alert failed`, error);
+    captureException(error, { tags: { component: job.sentryComponent } });
   }
 }

@@ -53,6 +53,8 @@ import { withDORetry } from './utils/do-retry.js';
 import { parseBearerCredential } from './sandbox-control/credential.js';
 import { admitSandboxWrapperUpgrade } from './sandbox-control/socket-admission.js';
 import { PtyIdSchema, sessionIdSchema } from './router/schemas.js';
+import { registerRuntimeArtifactRoutes } from './sandbox-control/runtime-artifact-routes.js';
+import { registerStartupFailureRoute } from './sandbox-control/startup-failure.js';
 import { registerControlLogRoutes } from './sandbox-control/log-routes.js';
 import {
   runtimeCredentialProxyFacadeBaseUrl,
@@ -61,7 +63,7 @@ import {
   verifyRuntimeCredentialProxyHandle,
 } from './runtime-credential-proxy.js';
 import { logRuntimeProxyRequestFailed } from './runtime-credential-proxy-diagnostics.js';
-import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
+import { deriveKiloSandboxTargets, deriveLoopbackFacadeTargets } from './kilo/kilo-targets.js';
 import {
   inferRuntimeCredentialProxyRoute,
   resolveRuntimeCredentialProxyScopeIngestRoute,
@@ -302,6 +304,8 @@ function requireInternalApi(c: Context<HonoContext>): Response | null {
 }
 
 registerControlLogRoutes(app);
+registerRuntimeArtifactRoutes(app);
+registerStartupFailureRoute(app);
 
 app.get('/sandbox-control/:sandboxId', async (c: Context<HonoContext>) => {
   return admitSandboxWrapperUpgrade(c.req.raw, c.env, c.req.param('sandboxId') ?? '');
@@ -505,8 +509,11 @@ async function forwardRuntimeCredentialProxy(
     return c.text('Credential unavailable', 503);
   }
   if (!credential) return c.text('Unauthorized', 401);
-  const targets = deriveKiloSandboxTargets(c.env, credential.token, { requireHttps: true });
-  if (!targets.success) return c.text('Not found', 404);
+  const derivedTargets = deriveKiloSandboxTargets(c.env, credential.token, { requireHttps: true });
+  const targets = derivedTargets.success
+    ? derivedTargets.targets
+    : deriveLoopbackFacadeTargets(c.env);
+  if (!targets) return c.text('Not found', 404);
 
   const search = new URL(c.req.url).search;
   const scopeView = route === 'ingest' ? credential.scopeView : undefined;
@@ -515,7 +522,7 @@ async function forwardRuntimeCredentialProxy(
   let upstream: URL | null;
   if (scopeView !== undefined) {
     const adopted = resolveRuntimeCredentialProxyScopeIngestRoute({
-      targets: targets.targets,
+      targets: targets,
       route,
       method: c.req.method,
       pathname: path,
@@ -534,7 +541,7 @@ async function forwardRuntimeCredentialProxy(
     }
   } else {
     const scopedUpstream = resolveRuntimeCredentialProxyScopedIngestRoute({
-      targets: targets.targets,
+      targets: targets,
       route,
       method: c.req.method,
       pathname: path,
@@ -548,7 +555,7 @@ async function forwardRuntimeCredentialProxy(
     upstream =
       scopedUpstream ??
       runtimeCredentialProxyUpstream(
-        targets.targets,
+        targets,
         route,
         c.req.method,
         path,
@@ -736,6 +743,8 @@ async function routeAuthenticatedKiloFacade(c: Context<HonoContext>): Promise<Re
   if (!authResult.success) {
     return c.text(authResult.error, 401);
   }
+  if (authResult.cloudAgentAuthority)
+    return c.text('Cloud Agent authority only permits preparation', 403);
   return routeToUserKiloFacade(c, authResult.userId, authResult.token);
 }
 
@@ -1174,6 +1183,7 @@ app.use(
       env: c.env,
       userId: c.get('userId'),
       authToken: c.get('authToken'),
+      cloudAgentAuthority: c.get('cloudAgentAuthority'),
       botId: c.get('botId'),
       validatedSessionAccess: c.get('validatedSessionAccess'),
       request: c.req.raw,
@@ -1223,7 +1233,7 @@ export default {
   },
   async queue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
     if (batch.queue.startsWith('cloud-agent-next-callback-queue')) {
-      const consumer = createCallbackQueueConsumer();
+      const consumer = createCallbackQueueConsumer(env);
       return consumer(batch as MessageBatch<CallbackJob>);
     }
     if (CLOUD_AGENT_REPORT_QUEUE_NAMES.has(batch.queue)) {

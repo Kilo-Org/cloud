@@ -1,6 +1,7 @@
 import { Validator, type OutputUnit, type SchemaDraft } from '@cfworker/json-schema';
 import { ORGANIZATION_ID_HEADER } from './auth';
 import { isGuardedRow } from './search';
+import { validateCloudAgentAuthorityRequest } from '../../../packages/worker-utils/src/cloud-agent-authority';
 import {
   JsonRpcFailure,
   type Catalog,
@@ -12,6 +13,21 @@ import {
 /** JSON-RPC error codes (see https://www.jsonrpc.org/specification). */
 const INVALID_PARAMS = -32602;
 const INTERNAL_ERROR = -32000;
+
+function assertScopedCall(auth: ForwardedAuth, path: string, input: unknown): void {
+  if (auth.cloudAgentAuthority === undefined) return;
+  try {
+    if (
+      auth.cloudAgentAuthority.ownerId !== auth.kiloUserId ||
+      auth.cloudAgentAuthority.organizationId !== (auth.organizationId ?? null)
+    ) {
+      throw new Error('Invalid authority binding');
+    }
+    validateCloudAgentAuthorityRequest(auth.cloudAgentAuthority, path, input);
+  } catch {
+    throw new JsonRpcFailure(INVALID_PARAMS, 'Cloud Agent authority does not permit this request');
+  }
+}
 
 /** Cap for a serialized tool result; over the cap the text is cut and marked. */
 export const MAX_RESULT_BYTES = 16 * 1024;
@@ -283,8 +299,8 @@ function assertInputMatchesSchema(row: CatalogRow, path: string, input: unknown)
  *
  * The caller has already validated `input` against the published schema and,
  * for a guarded row, obtained the user's approval; every rejection decidable
- * locally is thrown before any upstream request, and this helper never
- * re-decides access.
+ * locally is thrown before any upstream request. Scoped authority is checked
+ * again at this final forwarding boundary.
  */
 export async function forwardCatalogCall(options: {
   row: CatalogRow;
@@ -294,6 +310,7 @@ export async function forwardCatalogCall(options: {
   fetchImpl?: typeof fetch;
 }): Promise<{ text: string; truncated: boolean }> {
   const { row, input, auth, webBaseUrl } = options;
+  assertScopedCall(auth, row.path, input);
   const path = row.path;
   const sendInput = input !== undefined && input !== null;
   const url = new URL(`/api/trpc/${row.path}`, webBaseUrl);
@@ -410,6 +427,7 @@ export async function callCatalogEndpoint(options: {
   fetchImpl?: typeof fetch;
 }): Promise<{ text: string; truncated: boolean }> {
   const { catalog, path, input } = options;
+  assertScopedCall(options.auth, path, input);
   const row = catalogRowFor(catalog, path);
   if (!row) {
     throw unknownPath(path);
@@ -449,6 +467,7 @@ export async function requestProtectedCall(options: {
   fetchImpl?: typeof fetch;
 }): Promise<{ text: string; truncated: boolean }> {
   const { catalog, path, input, auth, requests } = options;
+  assertScopedCall(auth, path, input);
   const row = catalogRowFor(catalog, path);
   if (!row) {
     throw unknownPath(path);
@@ -521,6 +540,12 @@ export async function executeProtectedCall(options: {
   fetchImpl?: typeof fetch;
 }): Promise<{ text: string; truncated: boolean }> {
   const { catalog, path, inputJson } = options;
+  if (options.auth.cloudAgentAuthority !== undefined) {
+    throw new JsonRpcFailure(
+      INVALID_PARAMS,
+      'Cloud Agent authority cannot execute protected calls'
+    );
+  }
   const row = catalogRowFor(catalog, path);
   if (!row || !isGuardedRow(row)) {
     // The catalog changed under a pending request (the row was demoted or

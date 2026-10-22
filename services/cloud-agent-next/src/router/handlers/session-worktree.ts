@@ -8,6 +8,7 @@ import {
 } from '@kilocode/db/operation-ledger';
 import { cli_sessions_v2, type OperationLedgerRow } from '@kilocode/db/schema';
 import {
+  clientKiloSessionIdSchema,
   cloudAgentWorktreeIdSchema,
   sessionIdSchema as kiloSessionIdSchema,
   type CloudAgentWorktreeId,
@@ -51,6 +52,8 @@ export const CreateWorktreeChatInput = z
     sourceKiloSessionId: kiloSessionIdSchema,
     sourceCloudAgentSessionId: workspaceSessionIdSchema,
     operationKey: z.uuid(),
+    /** Client-proposed id, so the client can show the chat before this call returns. */
+    kiloSessionId: clientKiloSessionIdSchema.optional(),
     kilocodeOrganizationId: z.uuid().optional(),
     clientProvenance: z.literal('browser'),
   })
@@ -237,6 +240,7 @@ async function loadWorktreeSource(
     metadata.auth.kiloSessionId !== input.sourceKiloSessionId ||
     metadata.identity.createdOnPlatform !== 'cloud-agent-web' ||
     metadata.identity.botId !== undefined ||
+    metadata.allowSubagentSessions === true ||
     metadata.devcontainer !== undefined ||
     workspace.devcontainerRequested === true ||
     workspace.worktreeId !== worktreeId ||
@@ -272,6 +276,8 @@ async function worktreeIntentFingerprint(
       organizationId: input.kilocodeOrganizationId ?? null,
       worktreeId: source.worktreeId,
       clientProvenance: input.clientProvenance,
+      // Only when proposed, so operations created before this field keep their fingerprint.
+      ...(input.kiloSessionId ? { kiloSessionId: input.kiloSessionId } : {}),
       ...(source.workspace.sandboxAllocation
         ? { sandboxAllocation: source.workspace.sandboxAllocation }
         : {}),
@@ -833,13 +839,14 @@ async function executeWorktreeCreate(
   row: OperationLedgerRow,
   source: WorktreeSource,
   ctx: TRPCContext,
-  fingerprint: string
+  fingerprint: string,
+  requestedKiloSessionId: string | undefined
 ): Promise<WorktreeResult> {
   const startedAt = Date.now();
   await assertNewDestinationRuntimeIsolation(ctx);
   const progress = operationProgressSchema.parse({
     cloudAgentSessionId: generateSessionId('control'),
-    kiloSessionId: generateKiloSessionId(),
+    kiloSessionId: requestedKiloSessionId ?? generateKiloSessionId(),
     worktreeId: source.worktreeId,
     [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: fingerprint,
     ...(source.workspace.sandboxAllocation
@@ -891,7 +898,8 @@ async function reconcileWorktreeCreate(
   source: WorktreeSource,
   ctx: TRPCContext,
   progress: OperationProgress | undefined,
-  fingerprint: string
+  fingerprint: string,
+  requestedKiloSessionId: string | undefined
 ): Promise<WorktreeResult> {
   const startedAt = Date.now();
   const diagnostic = {
@@ -906,7 +914,9 @@ async function reconcileWorktreeCreate(
     ...diagnostic,
     result: progress ? 'started' : 'no_progress',
   });
-  if (!progress) return executeWorktreeCreate(db, row, source, ctx, fingerprint);
+  if (!progress) {
+    return executeWorktreeCreate(db, row, source, ctx, fingerprint, requestedKiloSessionId);
+  }
 
   const existingMetadata = await withDORetry(
     () => getSandboxSessionStub(ctx.env, ctx.userId, progress.cloudAgentSessionId),
@@ -1098,7 +1108,14 @@ const createWorktreeChatHandler = protectedProcedure
           );
           throw operationConflict();
         }
-        return executeWorktreeCreate(db, admission.row, source, ctx, fingerprint);
+        return executeWorktreeCreate(
+          db,
+          admission.row,
+          source,
+          ctx,
+          fingerprint,
+          input.kiloSessionId
+        );
       case 'duplicate_settled':
         if (admission.row.status !== 'completed' || !progress) {
           logControlDiagnostic(
@@ -1131,7 +1148,15 @@ const createWorktreeChatHandler = protectedProcedure
         throw creationInProgress();
       case 'takeover':
       case 'duplicate_reconcile_pending':
-        return reconcileWorktreeCreate(db, admission.row, source, ctx, progress, fingerprint);
+        return reconcileWorktreeCreate(
+          db,
+          admission.row,
+          source,
+          ctx,
+          progress,
+          fingerprint,
+          input.kiloSessionId
+        );
     }
   });
 

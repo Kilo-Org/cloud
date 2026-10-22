@@ -344,6 +344,24 @@ export function readPreparationSteps(
   });
 }
 
+/**
+ * Every materialized attempt with its steps, in the order a client that
+ * replays the snapshots builds them, so a page can show them before the stream.
+ * Step output is left out: only an opened step shows it, and the stream sends it.
+ */
+export function listPreparationAttempts(eventQueries: EventQueries): PreparationAttempt[] {
+  const attempts: PreparationAttempt[] = [];
+  for (const row of eventQueries.findByEntityPrefix('preparation/attempt/')) {
+    const snapshot = parseSnapshot(row.payload);
+    if (snapshot?.action !== 'attempt_snapshot') continue;
+    const steps = readPreparationSteps(eventQueries, snapshot.attempt.id).map(
+      ({ outputTail: _outputTail, outputTruncated: _outputTruncated, ...step }) => step
+    );
+    attempts.push({ ...snapshot.attempt, steps });
+  }
+  return attempts.sort((a, b) => a.startedAt - b.startedAt);
+}
+
 export type PreparationOutcome = { status: 'completed' } | { status: 'failed'; safeError: string };
 
 /**

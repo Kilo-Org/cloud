@@ -23,8 +23,8 @@ export function statusFilterLabelKey(kind: GlanceableStatusKind): string {
 
 /**
  * Read the `status` route parameter as one status kind. Returns null for an
- * absent, repeated, or unknown value, so a stale or hand-written link never
- * filters the list to a status that does not exist.
+ * absent, empty, or unknown value. A repeated value uses the first entry,
+ * matching standard query-parameter handling.
  */
 export function parseStatusFilterKind(
   value: string | string[] | undefined

@@ -2092,6 +2092,27 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(state.routeParams.status).toBeUndefined();
   });
 
+  it('keeps the filter options of the whole live set while a status filter is active', async () => {
+    state.live.activeSessions = [
+      { ...row, id: 'idle-1', status: 'idle' },
+      {
+        ...row,
+        id: 'work-1',
+        status: 'running',
+        organizationId: null,
+        gitUrl: 'https://github.com/kilo/cloud.git',
+      },
+    ];
+    state.routeParams = { status: 'idle' };
+    await renderScreen();
+
+    act(() => {
+      headerAction('agents-open-filters').props.onPress();
+    });
+
+    expect(requireNode('SessionFilterModal').props.projectOptions).toHaveLength(1);
+  });
+
   it('shows a clearable no-match state when the Home status filter has no rows', async () => {
     state.live.activeSessions = [{ ...row, id: 'work-1', status: 'running' }];
     state.routeParams = { status: 'idle' };

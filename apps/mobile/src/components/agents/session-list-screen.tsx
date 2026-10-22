@@ -91,8 +91,15 @@ export function AgentSessionListScreen({
   // rows down. Treat it exactly like a failed pull when rows are still shown.
   const retryableRowsFailure = hasLiveRows && sessions.terminalError?.kind === 'retryable';
 
-  const query = useLiveSessionQuery(statusSessions);
-  const { visibleSessions, isSearching } = query;
+  const query = useLiveSessionQuery(activeSessions);
+  const { visibleSessions: filteredSessions, isSearching } = query;
+  // The status narrowing applies after the search and persisted filters, so the
+  // filter picker still offers every option the live set contains and
+  // `canFilter` cannot shrink to the selected status and hide its own control.
+  const visibleSessions = useMemo(
+    () => filterSessionsByStatusKind(filteredSessions, statusKind),
+    [filteredSessions, statusKind]
+  );
   // The no-match body is the state the tab bar's band was reopened for, and its
   // compact form fills that band down to the corner the FAB floats in. Since
   // reserving the FAB's band here is what parked the state's second line and

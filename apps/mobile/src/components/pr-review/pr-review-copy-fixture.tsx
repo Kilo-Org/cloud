@@ -167,8 +167,6 @@ export function PrReviewCopyFixture() {
           repoName={triple.repo}
           number={triple.number}
           headSha={headSha}
-          headRef="greeting"
-          baseRef="main"
           isCrossRepo={false}
           prNodeId="fixture-pr"
           title={t('prReview.fileNavigator.title')}

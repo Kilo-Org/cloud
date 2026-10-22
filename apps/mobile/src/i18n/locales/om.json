@@ -2113,7 +2113,7 @@
       "dollar_other": "doolaara",
       "costSpoken": "baasii {{cost}}",
       "costSpokenWithTime": "gatii {{cost}}, {{time}}",
-      "spokenJoiner": ", and",
+      "spokenJoiner": "fi",
       "pullRequest": "gaaffii walitti makuu {{number}}"
     },
     "githubInstall": {

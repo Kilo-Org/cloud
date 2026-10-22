@@ -2113,7 +2113,7 @@
       "dollar_other": "دۆلار",
       "costSpoken": "تێچوون: {{cost}}",
       "costSpokenWithTime": "تێچووی {{cost}}، {{time}}",
-      "spokenJoiner": ", and",
+      "spokenJoiner": "و",
       "pullRequest": "داواکاری ڕاکێشانی {{number}}"
     },
     "githubInstall": {

@@ -2113,7 +2113,7 @@
       "dollar_other": "dola",
       "costSpoken": "pri {{cost}}",
       "costSpokenWithTime": "pri {{cost}}, {{time}}",
-      "spokenJoiner": ", and",
+      "spokenJoiner": "ak",
       "pullRequest": "demann fizyon {{number}}"
     },
     "githubInstall": {

@@ -2113,7 +2113,7 @@
       "dollar_other": "dolara",
       "costSpoken": "sarany {{cost}}",
       "costSpokenWithTime": "sarany {{cost}}, {{time}}",
-      "spokenJoiner": ", and",
+      "spokenJoiner": "sy",
       "pullRequest": "fangatahana fampiraisana {{number}}"
     },
     "githubInstall": {

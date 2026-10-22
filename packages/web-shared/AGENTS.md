@@ -36,8 +36,8 @@ several. Before the upstream inference request is sent:
 - Do not open `db` transactions, take row locks, or write. Defer writes with
   `after()`, or forward them to `fra1` like `recordUsageInPrimaryRegion` does.
 - Keep primary access only where correctness needs it (read-after-write, a row
-  lock, or an optimistic write such as lazy credit expiry), on a rare path, with
-  a comment saying why.
+  lock, an authorization or revocation decision, or an optimistic write such as
+  lazy credit expiry), on a rare path, with a comment saying why.
 - Shared helpers that the web app also calls keep their primary default and take
   a `fromDb` argument; gateway callers pass `readDb`.
 - `readDb` falls back to the primary when `POSTGRES_REPLICA_US_URL` is unset, so

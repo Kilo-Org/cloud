@@ -2,7 +2,7 @@ import 'server-only';
 
 import { and, eq, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 import { openai_chatgpt_connections } from '@kilocode/db/schema';
-import { db, readDb, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   decryptApiKey,
   encryptApiKey,
@@ -126,13 +126,17 @@ export async function getOpenAiChatGptConnection(
  * status router deliberately keeps using `getOpenAiChatGptConnection`, so a
  * terminal refresh failure still surfaces its reconnect message.
  *
- * Reads the replica: it runs before inference on gateway requests, which also
- * execute in sfo1. Token refresh re-reads the row on the primary under a lock.
+ * Reads the primary so the eligibility decision reflects a committed change to
+ * the row: deleting or disabling a connection writes the primary, and the route
+ * must follow it on the next request. The read runs before inference on gateway
+ * requests, which also execute in sfo1, so it is the documented correctness
+ * exception for the round trip it costs. A refresh re-reads the row on the
+ * primary under a lock.
  */
 export async function getOpenAiChatGptStoredConnection(
   owner: OpenAiChatGptOwner
 ): Promise<{ connection: OpenAiChatGptConnection; isEnabled: boolean } | null> {
-  const row = await readOpenAiChatGptConnectionRow(readDb, owner);
+  const row = await readOpenAiChatGptConnectionRow(db, owner);
   if (!row) return null;
   const connection = decryptOpenAiChatGptConnection(row.encrypted_connection);
   return connection ? { connection, isEnabled: row.is_enabled } : null;

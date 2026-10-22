@@ -1,18 +1,18 @@
 jest.mock('@kilocode/web-shared/lib/drizzle', () => {
-  const db = {
+  const client = () => ({
     select: jest.fn(),
     insert: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
-  };
-  return { db, readDb: db };
+  });
+  return { db: client(), readDb: client() };
 });
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   BYOK_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
 }));
 
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   encryptApiKey,
   type EncryptedData,
@@ -68,7 +68,9 @@ function buildConnection(
 
 describe('openai-chatgpt connection store', () => {
   const mockDb = db as unknown as MockDb;
+  const mockReadDb = readDb as unknown as MockDb;
   let rows: StoredRow[] = [];
+  let replicaRows: StoredRow[] = [];
   let activeOwner: OpenAiChatGptOwner = USER_OWNER;
 
   function matchesActiveOwner(row: StoredRow): boolean {
@@ -80,18 +82,26 @@ describe('openai-chatgpt connection store', () => {
     );
   }
 
+  function selectFrom(current: () => StoredRow[]): () => unknown {
+    return () => ({
+      from: jest.fn(() => ({
+        where: jest.fn(() => ({
+          limit: jest.fn(() => Promise.resolve(current().filter(matchesActiveOwner))),
+        })),
+      })),
+    });
+  }
+
   beforeEach(() => {
     rows = [];
+    replicaRows = [];
     activeOwner = USER_OWNER;
 
     mockDb.select.mockReset();
-    mockDb.select.mockImplementation(() => ({
-      from: jest.fn(() => ({
-        where: jest.fn(() => ({
-          limit: jest.fn(() => Promise.resolve(rows.filter(matchesActiveOwner))),
-        })),
-      })),
-    }));
+    mockDb.select.mockImplementation(selectFrom(() => rows));
+
+    mockReadDb.select.mockReset();
+    mockReadDb.select.mockImplementation(selectFrom(() => replicaRows));
 
     mockDb.insert.mockReset();
     mockDb.insert.mockImplementation(() => ({
@@ -277,5 +287,46 @@ describe('openai-chatgpt connection store', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].organization_id).toBe(TEST_ORG_ID);
     await expect(getOpenAiChatGptConnection(USER_OWNER)).resolves.toBeNull();
+  });
+
+  it('resolves the stored connection state from the primary connection', async () => {
+    replicaRows.push({
+      kilo_user_id: TEST_USER_ID,
+      organization_id: null,
+      encrypted_connection: encryptApiKey(JSON.stringify(buildConnection()), BYOK_ENCRYPTION_KEY),
+      is_enabled: true,
+      created_by: TEST_USER_ID,
+    });
+
+    await expect(getOpenAiChatGptStoredConnection(USER_OWNER)).resolves.toBeNull();
+    expect(mockDb.select).toHaveBeenCalledTimes(1);
+    expect(mockReadDb.select).not.toHaveBeenCalled();
+  });
+
+  it('reports the enablement stored on the primary connection', async () => {
+    const encrypted_connection = encryptApiKey(
+      JSON.stringify(buildConnection()),
+      BYOK_ENCRYPTION_KEY
+    );
+    rows.push({
+      kilo_user_id: TEST_USER_ID,
+      organization_id: null,
+      encrypted_connection,
+      is_enabled: true,
+      created_by: TEST_USER_ID,
+    });
+    replicaRows.push({
+      kilo_user_id: TEST_USER_ID,
+      organization_id: null,
+      encrypted_connection,
+      is_enabled: false,
+      created_by: TEST_USER_ID,
+    });
+
+    await expect(getOpenAiChatGptStoredConnection(USER_OWNER)).resolves.toEqual({
+      connection: buildConnection(),
+      isEnabled: true,
+    });
+    expect(mockReadDb.select).not.toHaveBeenCalled();
   });
 });

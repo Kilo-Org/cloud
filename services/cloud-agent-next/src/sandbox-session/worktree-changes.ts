@@ -28,11 +28,7 @@ import {
 export const WORKTREE_CHANGES_KEY = 'worktree_changes';
 export const WORKTREE_FILE_PREFIX = 'worktree_file:';
 
-/**
- * Transport-neutral outcome of one worktree-change request. The legacy plane
- * maps its `ResponseFrame` into this shape at the call site; the V2 Session DO
- * maps the new control-plane result. The manager itself carries no old frame.
- */
+/** Result of a control-plane worktree capture. */
 export type WorktreeCaptureOutcome =
   | { ok: true; result: unknown }
   | { ok: false; code: string; message: string; retryable: boolean };

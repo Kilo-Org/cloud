@@ -2049,8 +2049,36 @@
     {
       "idx": 292,
       "version": "7",
-      "when": 1792630516309,
-      "tag": "0292_lean_silver_samurai",
+      "when": 1792612549366,
+      "tag": "0292_direct_byok_sync_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 293,
+      "version": "7",
+      "when": 1792667291991,
+      "tag": "0293_preferred_provider_order",
+      "breakpoints": true
+    },
+    {
+      "idx": 294,
+      "version": "7",
+      "when": 1792681536086,
+      "tag": "0294_heavy_guardian",
+      "breakpoints": true
+    },
+    {
+      "idx": 295,
+      "version": "7",
+      "when": 1792684800197,
+      "tag": "0295_tiresome_champions",
+      "breakpoints": true
+    },
+    {
+      "idx": 296,
+      "version": "7",
+      "when": 1792689795460,
+      "tag": "0296_device_auth_client_details",
       "breakpoints": true
     }
   ]

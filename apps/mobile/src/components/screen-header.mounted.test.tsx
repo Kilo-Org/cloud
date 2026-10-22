@@ -9,6 +9,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { OFFLINE_BANNER_HEIGHT } from '@/lib/offline-banner-state';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
 import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import { ScreenHeader, shouldStackHeaderActions } from './screen-header';
@@ -247,13 +248,11 @@ describe('ScreenHeader mounted', () => {
     Object.assign(layout, { width: 390, fontScale: 1 });
   });
 
-  it('gives the back control a 44-point target and no hit slop', () => {
+  it('gives the back control the 48dp icon target and no hit slop', () => {
     const renderer = renderHeader({ title: 'Sessions' });
 
     const back = findBackPressable(renderer.root);
-    expect(back.props.className).toContain('h-11 w-11');
-    expect(back.props.className).toContain('items-center');
-    expect(back.props.className).toContain('justify-center');
+    expect(back.props.className).toContain(ICON_TARGET_BOX_CLASS);
     expect(back.props.className).toContain('-ms-4');
     expect(back.props.className).toContain('shrink-0');
     expect(back.props.className).toContain('active:opacity-70');
@@ -393,6 +392,49 @@ describe('ScreenHeader mounted', () => {
           /(^|\s)ms-3(\s|$)/.test(String(node.props.className ?? ''))
       )
     ).toHaveLength(0);
+  });
+
+  it("keeps a mark-only heading's inlineActions on the row when the caller forbids a reflow", () => {
+    // The shared-row check reserves 120dp of readable title per font-scale
+    // unit: at a 3x accessibility scale on a 390dp phone that reserve is 360dp
+    // against 334dp free, so the picker reflowed under the mark although both
+    // fit. The home header turns the check off for its picker.
+    Object.assign(layout, { width: 390, fontScale: 3 });
+
+    const reflowed = renderHeader({
+      title: 'Kilo',
+      titleContent: 'MARK',
+      size: 'large',
+      inlineActions: 'ACTIONS',
+    });
+    expect(reflowed.root.findAll(isStackedActionsRow)).toHaveLength(1);
+
+    const pinned = renderHeader({
+      title: 'Kilo',
+      titleContent: 'MARK',
+      size: 'large',
+      inlineActions: 'ACTIONS',
+      allowInlineActionsStacking: false,
+    });
+    expect(pinned.root.findAll(isStackedActionsRow)).toHaveLength(0);
+    const inline = findInlineActionsWrapper(pinned.root);
+    expect(inline.children).toEqual(['ACTIONS']);
+    expect(inline.parent?.props.className).toContain('flex-row');
+    // Turning the reflow off must cap the slot instead: the heading sits on a
+    // zero flex basis, so an unbounded cluster would keep all negative free
+    // space and leave the heading at zero width, with a fixed-size mark
+    // painting under the cluster.
+    expect(inline.props.className).toContain('max-w-[50%]');
+
+    // A caller that keeps the reflow keeps the uncapped slot.
+    Object.assign(layout, { width: 390, fontScale: 1 });
+    const uncapped = renderHeader({
+      title: 'Kilo',
+      titleContent: 'MARK',
+      size: 'large',
+      inlineActions: 'ACTIONS',
+    });
+    expect(findInlineActionsWrapper(uncapped.root).props.className).not.toContain('max-w-[50%]');
   });
 
   it('keeps the title hit slop asymmetric so it never overlaps the back target', () => {
@@ -568,8 +610,7 @@ describe('ScreenHeader mounted', () => {
     const renderer = renderHeader({});
 
     const back = findBackPressable(renderer.root);
-    expect(back.props.className).toContain('h-11 w-11');
-    expect(back.props.className).toContain('items-center justify-center');
+    expect(back.props.className).toContain(ICON_TARGET_BOX_CLASS);
     expect(back.props.hitSlop).toBeUndefined();
   });
 
@@ -578,7 +619,6 @@ describe('ScreenHeader mounted', () => {
     const variants: ScreenHeaderProps[] = [
       { title: 'Sessions' },
       { title: 'Agents', size: 'large' },
-      { title: 'Quick Chat', size: 'large', context: 'ACCOUNT' },
       { title: 'Sessions', modal: true },
       { title: 'A long sheet title', centerTitle: true },
       { title: 'Sessions', eyebrow: 'Agents' },
@@ -602,9 +642,6 @@ describe('ScreenHeader mounted', () => {
       if (props.reserveTitleSpace) {
         expect(title.parent?.props.className).toContain(cappedLines > 2 ? 'min-h-21' : 'min-h-14');
         expect(title.parent?.props.className).toContain('justify-center');
-      }
-      if (props.context) {
-        expect(title.parent?.children).toEqual([title, props.context]);
       }
       if (props.modal || props.centerTitle) {
         expect(title.props.className).toContain('text-center');
@@ -670,7 +707,7 @@ describe('ScreenHeader mounted', () => {
       node =>
         typeof node.type === 'string' &&
         (node.type as string) === 'View' &&
-        node.props.className === 'h-11 w-11 shrink-0'
+        node.props.className === 'h-[48px] w-[48px] shrink-0'
     );
     expect(spacer).toBeDefined();
   });
@@ -683,7 +720,7 @@ describe('ScreenHeader mounted', () => {
       node =>
         typeof node.type === 'string' &&
         (node.type as string) === 'View' &&
-        node.props.className === 'h-11 w-11 shrink-0'
+        node.props.className === 'h-[48px] w-[48px] shrink-0'
     );
     expect(spacers).toHaveLength(0);
   });
@@ -708,7 +745,7 @@ describe('ScreenHeader mounted', () => {
         renderer.update(createElement(ScreenHeader, { title: '#6054', eyebrow }));
       });
       expect(renderer.root.findByType('Eyebrow').props.numberOfLines).toBe(1);
-      expect(findBackPressable(renderer.root).props.className).toContain('h-11 w-11');
+      expect(findBackPressable(renderer.root).props.className).toContain(ICON_TARGET_BOX_CLASS);
       renderer.unmount();
     }
   });

@@ -1,5 +1,5 @@
 {
-  "id": "5b3dad28-183c-4dd6-be30-53bf90a0217e",
+  "id": "48da44e5-b482-4eae-a823-83defe1a305a",
   "prevId": "140eaf3d-3dc3-47a6-8127-257c20dfa20d",
   "version": "7",
   "dialect": "postgresql",
@@ -2250,6 +2250,18 @@
         },
         "stale_alert_last_posted_at": {
           "name": "stale_alert_last_posted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "direct_byok_last_completed_at": {
+          "name": "direct_byok_last_completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "direct_byok_stale_alert_last_posted_at": {
+          "name": "direct_byok_stale_alert_last_posted_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -12181,30 +12193,6 @@
         "ip_address": {
           "name": "ip_address",
           "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "requesting_client_id": {
-          "name": "requesting_client_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "requesting_client_name": {
-          "name": "requesting_client_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "requesting_redirect_origin": {
-          "name": "requesting_redirect_origin",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "client_confirmed_at": {
-          "name": "client_confirmed_at",
-          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },

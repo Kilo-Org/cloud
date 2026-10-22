@@ -11,7 +11,7 @@ const fixture = vi.hoisted(() => {
     stored,
     hasLoaded: true,
     save: (_input: { model: string; variant?: string }) => Promise.resolve(),
-  read: () => Promise.resolve({ favorites: ['first'], lastSelected: { model: 'first' } }),
+    read: () => Promise.resolve({ favorites: ['first'], lastSelected: { model: 'first' } }),
   };
 });
 const queryKey = [['modelPreferences', 'get'], { type: 'query' }] as const;

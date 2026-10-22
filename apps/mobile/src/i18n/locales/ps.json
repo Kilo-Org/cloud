@@ -1466,6 +1466,20 @@
       "loadingProposals": "وړاندیزونه بارول",
       "couldNotLoadProposals": "وړاندیزونه بار نه شول.",
       "noProposals": "هېڅ وړاندیز نشته",
+      "proposalDetails": "د وړاندیز جزیات",
+      "proposalTitle": "د وړاندیز سرلیک",
+      "rationale": "دلیل",
+      "saveFirst": "د پل ریکوېسټ له پرانیستلو مخکې خپل بدلونونه خوندي کړئ.",
+      "proposalSaved": "وړاندیز خوندي شو",
+      "proposalDismissed": "وړاندیز رد شو",
+      "prOpened": "د REVIEW.md پل ریکوېسټ پرانیستل شو",
+      "alreadyPresent": "لارښوونې لا دمخه په REVIEW.md کې شته",
+      "status": {
+        "edited": "سمون شوی",
+        "opening_change_request": "د PR پرانیستل",
+        "change_request_failed": "PR پرانیستل نه شو",
+        "superseded": "لا دمخه شته"
+      },
       "noProposalsDescription": "کله چې Kilo د ساتونکو ځوابونه تحلیل کړي، د بیاکتنې د حافظې وړاندیزونه به دلته ښکاره شي."
     },
     "manualReview": {

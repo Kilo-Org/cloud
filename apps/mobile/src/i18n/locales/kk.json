@@ -1466,6 +1466,20 @@
       "loadingProposals": "Ұсыныстар жүктелуде",
       "couldNotLoadProposals": "Ұсыныстарды жүктеу мүмкін болмады.",
       "noProposals": "Ұсыныстар жоқ",
+      "proposalDetails": "Ұсыныс мәліметтері",
+      "proposalTitle": "Ұсыныс атауы",
+      "rationale": "Негіздеме",
+      "saveFirst": "Pull request ашпас бұрын өзгерістеріңізді сақтаңыз.",
+      "proposalSaved": "Ұсыныс сақталды",
+      "proposalDismissed": "Ұсыныс қабылданбады",
+      "prOpened": "REVIEW.md үшін pull request ашылды",
+      "alreadyPresent": "Нұсқаулар REVIEW.md файлында бұрыннан бар",
+      "status": {
+        "edited": "Өңделген",
+        "opening_change_request": "PR ашылуда",
+        "change_request_failed": "PR ашу сәтсіз аяқталды",
+        "superseded": "Бұрыннан бар"
+      },
       "noProposalsDescription": "Kilo жобаға жауаптылардың жауаптарын талдағаннан кейін тексеру жадының ұсыныстары осында көрсетіледі."
     },
     "manualReview": {

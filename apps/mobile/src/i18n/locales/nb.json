@@ -1466,6 +1466,20 @@
       "loadingProposals": "Laster inn forslag",
       "couldNotLoadProposals": "Kunne ikke laste inn forslagene.",
       "noProposals": "Ingen forslag",
+      "proposalDetails": "Forslagsdetaljer",
+      "proposalTitle": "Forslagstittel",
+      "rationale": "Begrunnelse",
+      "saveFirst": "Lagre endringene dine før du åpner en pull request.",
+      "proposalSaved": "Forslaget er lagret",
+      "proposalDismissed": "Forslaget er avvist",
+      "prOpened": "Pull request for REVIEW.md er åpnet",
+      "alreadyPresent": "Retningslinjene finnes allerede i REVIEW.md",
+      "status": {
+        "edited": "Redigert",
+        "opening_change_request": "Åpner PR",
+        "change_request_failed": "PR mislyktes",
+        "superseded": "Finnes allerede"
+      },
       "noProposalsDescription": "Forslag fra minnet for kodegjennomganger vises her etter at Kilo har analysert svar fra vedlikeholderne."
     },
     "manualReview": {

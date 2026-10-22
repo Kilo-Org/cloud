@@ -1466,6 +1466,20 @@
       "loadingProposals": "Waa la soo dejinayaa soo-jeedinnada",
       "couldNotLoadProposals": "Soo-jeedinnada lama soo dejin karin.",
       "noProposals": "Ma jiraan soo-jeedinno",
+      "proposalDetails": "Faahfaahinta soo-jeedinta",
+      "proposalTitle": "Cinwaanka soo-jeedinta",
+      "rationale": "Sababta",
+      "saveFirst": "Kaydi wax-ka-beddelladaada ka hor intaadan furin pull request.",
+      "proposalSaved": "Soo-jeedinta waa la kaydiyay",
+      "proposalDismissed": "Soo-jeedinta waa la iska dhaafay",
+      "prOpened": "Pull request-ka REVIEW.md waa la furay",
+      "alreadyPresent": "Tilmaamuhu hore ayay ugu jiraan REVIEW.md",
+      "status": {
+        "edited": "Wax laga beddelay",
+        "opening_change_request": "Waa la furayaa PR",
+        "change_request_failed": "PR wuu fashilmay",
+        "superseded": "Hore ayuu u jiraa"
+      },
       "noProposalsDescription": "Soo-jeedinnada xusuusta dib-u-eegista ayaa halkan ka soo muuqanaya marka Kilo uu falanqeeyo jawaabaha daryeelayaasha mashruuca."
     },
     "manualReview": {

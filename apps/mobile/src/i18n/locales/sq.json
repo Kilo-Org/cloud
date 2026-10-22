@@ -1466,6 +1466,20 @@
       "loadingProposals": "Duke ngarkuar propozimet",
       "couldNotLoadProposals": "Nuk u ngarkuan propozimet.",
       "noProposals": "Asnjë propozim",
+      "proposalDetails": "Detajet e propozimit",
+      "proposalTitle": "Titulli i propozimit",
+      "rationale": "Arsyetimi",
+      "saveFirst": "Ruaji ndryshimet para se të hapësh një pull request.",
+      "proposalSaved": "Propozimi u ruajt",
+      "proposalDismissed": "Propozimi u hodh poshtë",
+      "prOpened": "U hap pull request për REVIEW.md",
+      "alreadyPresent": "Udhëzimet janë tashmë në REVIEW.md",
+      "status": {
+        "edited": "Redaktuar",
+        "opening_change_request": "Duke hapur PR",
+        "change_request_failed": "PR dështoi",
+        "superseded": "Tashmë i pranishëm"
+      },
       "noProposalsDescription": "Propozimet e kujtesës së shqyrtimit shfaqen këtu pasi Kilo analizon përgjigjet e mirëmbajtësve."
     },
     "manualReview": {

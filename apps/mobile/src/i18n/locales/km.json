@@ -1466,6 +1466,20 @@
       "loadingProposals": "កំពុងផ្ទុកសំណើ",
       "couldNotLoadProposals": "មិនអាចផ្ទុកសំណើបានទេ។",
       "noProposals": "គ្មានសំណើ",
+      "proposalDetails": "ព័ត៌មានលម្អិតនៃសំណើ",
+      "proposalTitle": "ចំណងជើងសំណើ",
+      "rationale": "មូលហេតុ",
+      "saveFirst": "រក្សាទុកការកែសម្រួលរបស់អ្នក មុនពេលបើក pull request។",
+      "proposalSaved": "បានរក្សាទុកសំណើ",
+      "proposalDismissed": "បានច្រានចោលសំណើ",
+      "prOpened": "បានបើក pull request សម្រាប់ REVIEW.md",
+      "alreadyPresent": "ការណែនាំមានរួចហើយនៅក្នុង REVIEW.md",
+      "status": {
+        "edited": "បានកែសម្រួល",
+        "opening_change_request": "កំពុងបើក PR",
+        "change_request_failed": "ការបើក PR បានបរាជ័យ",
+        "superseded": "មានរួចហើយ"
+      },
       "noProposalsDescription": "សំណើពីអង្គចងចាំសម្រាប់ការត្រួតពិនិត្យនឹងបង្ហាញនៅទីនេះ បន្ទាប់ពី Kilo វិភាគការឆ្លើយតបរបស់អ្នកថែទាំគម្រោង។"
     },
     "manualReview": {

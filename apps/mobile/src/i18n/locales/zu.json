@@ -1466,6 +1466,20 @@
       "loadingProposals": "Kulayishwa iziphakamiso",
       "couldNotLoadProposals": "Asikwazanga ukulayisha iziphakamiso.",
       "noProposals": "Azikho iziphakamiso",
+      "proposalDetails": "Imininingwane yesiphakamiso",
+      "proposalTitle": "Isihloko sesiphakamiso",
+      "rationale": "Isizathu",
+      "saveFirst": "Londoloza izinguquko zakho ngaphambi kokuvula i-PR.",
+      "proposalSaved": "Isiphakamiso silondoloziwe",
+      "proposalDismissed": "Isiphakamiso sichithiwe",
+      "prOpened": "I-PR ye-REVIEW.md ivuliwe",
+      "alreadyPresent": "Imihlahlandlela isivele ikhona ku-REVIEW.md",
+      "status": {
+        "edited": "Kuhlelwe",
+        "opening_change_request": "Kuvulwa i-PR",
+        "change_request_failed": "I-PR yehlulekile",
+        "superseded": "Isivele ikhona"
+      },
       "noProposalsDescription": "Iziphakamiso zenkumbulo yokuhlola zivela lapha ngemva kokuba i-Kilo ihlaziye izimpendulo zabagcini bekhodi."
     },
     "manualReview": {

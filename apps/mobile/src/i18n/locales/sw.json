@@ -1466,6 +1466,20 @@
       "loadingProposals": "Inapakia mapendekezo",
       "couldNotLoadProposals": "Imeshindikana kupakia mapendekezo.",
       "noProposals": "Hakuna mapendekezo",
+      "proposalDetails": "Maelezo ya pendekezo",
+      "proposalTitle": "Kichwa cha pendekezo",
+      "rationale": "Sababu",
+      "saveFirst": "Hifadhi mabadiliko yako kabla ya kufungua ombi la kuunganisha mabadiliko.",
+      "proposalSaved": "Pendekezo limehifadhiwa",
+      "proposalDismissed": "Pendekezo limeondolewa",
+      "prOpened": "Ombi la kuunganisha mabadiliko ya REVIEW.md limefunguliwa",
+      "alreadyPresent": "Mwongozo tayari upo kwenye REVIEW.md",
+      "status": {
+        "edited": "Limehaririwa",
+        "opening_change_request": "Inafungua PR",
+        "change_request_failed": "PR imeshindikana",
+        "superseded": "Tayari upo"
+      },
       "noProposalsDescription": "Mapendekezo ya kumbukumbu ya ukaguzi yataonekana hapa baada ya Kilo kuchambua majibu ya watunzaji wa mradi."
     },
     "manualReview": {

@@ -1466,6 +1466,20 @@
       "loadingProposals": "દરખાસ્તો લોડ થઈ રહી છે",
       "couldNotLoadProposals": "દરખાસ્તો લોડ કરી શકાઈ નહીં.",
       "noProposals": "કોઈ દરખાસ્ત નથી",
+      "proposalDetails": "દરખાસ્તની વિગતો",
+      "proposalTitle": "દરખાસ્તનું શીર્ષક",
+      "rationale": "કારણ",
+      "saveFirst": "પુલ રિક્વેસ્ટ ખોલતાં પહેલાં તમારા ફેરફારો સાચવો.",
+      "proposalSaved": "દરખાસ્ત સાચવાઈ",
+      "proposalDismissed": "દરખાસ્ત ફગાવાઈ",
+      "prOpened": "REVIEW.md માટે પુલ રિક્વેસ્ટ ખોલાઈ",
+      "alreadyPresent": "માર્ગદર્શિકા REVIEW.md માં પહેલેથી જ છે",
+      "status": {
+        "edited": "સંપાદિત",
+        "opening_change_request": "PR ખોલાઈ રહી છે",
+        "change_request_failed": "PR ખોલવામાં નિષ્ફળતા",
+        "superseded": "પહેલેથી હાજર"
+      },
       "noProposalsDescription": "Kilo મેન્ટેનરના જવાબોનું વિશ્લેષણ કરે પછી સમીક્ષા મેમરીની દરખાસ્તો અહીં દેખાશે."
     },
     "manualReview": {

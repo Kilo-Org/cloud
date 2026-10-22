@@ -1466,6 +1466,20 @@
       "loadingProposals": "Takliflar yuklanmoqda",
       "couldNotLoadProposals": "Takliflarni yuklab bo'lmadi.",
       "noProposals": "Takliflar yo'q",
+      "proposalDetails": "Taklif tafsilotlari",
+      "proposalTitle": "Taklif sarlavhasi",
+      "rationale": "Asos",
+      "saveFirst": "Pull request ochishdan oldin o'zgartirishlaringizni saqlang.",
+      "proposalSaved": "Taklif saqlandi",
+      "proposalDismissed": "Taklif rad etildi",
+      "prOpened": "REVIEW.md uchun pull request ochildi",
+      "alreadyPresent": "Ko'rsatmalar REVIEW.md faylida allaqachon mavjud",
+      "status": {
+        "edited": "Tahrirlangan",
+        "opening_change_request": "PR ochilmoqda",
+        "change_request_failed": "PR ochilmadi",
+        "superseded": "Allaqachon mavjud"
+      },
       "noProposalsDescription": "Kilo loyiha mas'ullarining javoblarini tahlil qilgach, ko'rib chiqish xotirasining takliflari shu yerda ko'rsatiladi."
     },
     "manualReview": {

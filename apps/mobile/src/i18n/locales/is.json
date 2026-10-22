@@ -1466,6 +1466,20 @@
       "loadingProposals": "Sæki tillögur",
       "couldNotLoadProposals": "Ekki tókst að sækja tillögur.",
       "noProposals": "Engar tillögur",
+      "proposalDetails": "Upplýsingar um tillögu",
+      "proposalTitle": "Titill tillögu",
+      "rationale": "Rökstuðningur",
+      "saveFirst": "Vistaðu breytingarnar áður en þú opnar samrunabeiðni.",
+      "proposalSaved": "Tillaga vistuð",
+      "proposalDismissed": "Tillögu vísað frá",
+      "prOpened": "Samrunabeiðni fyrir REVIEW.md opnuð",
+      "alreadyPresent": "Leiðbeiningarnar eru þegar í REVIEW.md",
+      "status": {
+        "edited": "Breytt",
+        "opening_change_request": "Opna PR",
+        "change_request_failed": "Ekki tókst að opna PR",
+        "superseded": "Þegar til staðar"
+      },
       "noProposalsDescription": "Tillögur úr yfirferðarminninu birtast hér eftir að Kilo greinir svör viðhaldsaðila."
     },
     "manualReview": {

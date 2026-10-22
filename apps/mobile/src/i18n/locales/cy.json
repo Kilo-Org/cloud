@@ -1542,6 +1542,20 @@
       "loadingProposals": "Llwytho cynigion",
       "couldNotLoadProposals": "Ni ellid llwytho'r cynigion.",
       "noProposals": "Dim cynigion",
+      "proposalDetails": "Manylion y cynnig",
+      "proposalTitle": "Teitl y cynnig",
+      "rationale": "Sail resymegol",
+      "saveFirst": "Cadwch eich newidiadau cyn agor cais tynnu.",
+      "proposalSaved": "Cynnig wedi'i gadw",
+      "proposalDismissed": "Cynnig wedi'i ddiystyru",
+      "prOpened": "Cais tynnu REVIEW.md wedi'i agor",
+      "alreadyPresent": "Mae'r canllawiau eisoes yn REVIEW.md",
+      "status": {
+        "edited": "Wedi'i olygu",
+        "opening_change_request": "Agor PR",
+        "change_request_failed": "PR wedi methu",
+        "superseded": "Eisoes yn bodoli"
+      },
       "noProposalsDescription": "Bydd cynigion y cof adolygu yn ymddangos yma ar ôl i Kilo ddadansoddi ymatebion y cynhalwyr."
     },
     "manualReview": {

@@ -1466,6 +1466,20 @@
       "loadingProposals": "Laai voorstelle",
       "couldNotLoadProposals": "Die voorstelle kon nie gelaai word nie.",
       "noProposals": "Geen voorstelle",
+      "proposalDetails": "Voorstelbesonderhede",
+      "proposalTitle": "Voorsteltitel",
+      "rationale": "Motivering",
+      "saveFirst": "Stoor jou wysigings voordat jy 'n pull request oopmaak.",
+      "proposalSaved": "Voorstel gestoor",
+      "proposalDismissed": "Voorstel verwerp",
+      "prOpened": "Pull request vir REVIEW.md oopgemaak",
+      "alreadyPresent": "Riglyne is reeds in REVIEW.md",
+      "status": {
+        "edited": "Gewysig",
+        "opening_change_request": "Maak PR oop",
+        "change_request_failed": "PR het misluk",
+        "superseded": "Reeds teenwoordig"
+      },
       "noProposalsDescription": "Voorstelle uit die hersieningsgeheue verskyn hier nadat Kilo instandhouers se antwoorde ontleed het."
     },
     "manualReview": {

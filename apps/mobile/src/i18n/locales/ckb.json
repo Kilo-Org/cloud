@@ -1466,6 +1466,20 @@
       "loadingProposals": "بارکردنی پێشنیارەکان",
       "couldNotLoadProposals": "نەتوانرا پێشنیارەکان بار بکرێن.",
       "noProposals": "هیچ پێشنیارێک نییە",
+      "proposalDetails": "وردەکارییەکانی پێشنیار",
+      "proposalTitle": "ناونیشانی پێشنیار",
+      "rationale": "هۆکار",
+      "saveFirst": "پێش کردنەوەی داواکاری ڕاکێشان، دەستکارییەکانت پاشەکەوت بکە.",
+      "proposalSaved": "پێشنیارەکە پاشەکەوت کرا",
+      "proposalDismissed": "پێشنیارەکە ڕەت کرایەوە",
+      "prOpened": "داواکاری ڕاکێشان بۆ REVIEW.md کرایەوە",
+      "alreadyPresent": "ڕێنماییەکە پێشتر لە REVIEW.md هەیە",
+      "status": {
+        "edited": "دەستکاری کراو",
+        "opening_change_request": "کردنەوەی PR",
+        "change_request_failed": "PR شکستی هێنا",
+        "superseded": "پێشتر هەیە"
+      },
       "noProposalsDescription": "دوای ئەوەی Kilo وەڵامەکانی بەڕێوەبەرانی پڕۆژە شیکاری بکات، پێشنیارەکانی بیرگەی پێداچوونەوە لێرە دەردەکەون."
     },
     "manualReview": {

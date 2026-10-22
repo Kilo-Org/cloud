@@ -1466,6 +1466,20 @@
       "loadingProposals": "Yaadota dhihaatan fe'aa jira",
       "couldNotLoadProposals": "Yaadota dhihaatan fe'uun hin danda'amne.",
       "noProposals": "Yaadni dhihaate hin jiru",
+      "proposalDetails": "Bal'ina yaada dhihaatee",
+      "proposalTitle": "Mata duree yaada dhihaatee",
+      "rationale": "Sababa",
+      "saveFirst": "Pull request banuu kee dura gulaallii kee olkaa'i.",
+      "proposalSaved": "Yaadni dhihaate olkaa'ameera",
+      "proposalDismissed": "Yaadni dhihaate dhiifameera",
+      "prOpened": "Pull request REVIEW.md banameera",
+      "alreadyPresent": "Qajeelfamni duraanuu REVIEW.md keessa jira",
+      "status": {
+        "edited": "Gulaalameera",
+        "opening_change_request": "PR banaa jira",
+        "change_request_failed": "PR hin milkoofne",
+        "superseded": "Duraanuu jira"
+      },
       "noProposalsDescription": "Kilo deebii kunuunsitootaa erga xiinxalee booda yaadonni yaadannoo sakatta'aa irraa dhihaatan asitti mul'atu."
     },
     "manualReview": {

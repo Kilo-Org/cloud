@@ -1466,6 +1466,20 @@
       "loadingProposals": "در حال بارگذاری پیشنهادها",
       "couldNotLoadProposals": "بارگذاری پیشنهادها ممکن نشد.",
       "noProposals": "پیشنهادی وجود ندارد",
+      "proposalDetails": "جزئیات پیشنهاد",
+      "proposalTitle": "عنوان پیشنهاد",
+      "rationale": "دلیل پیشنهاد",
+      "saveFirst": "پیش از باز کردن پول ریکوئست، ویرایش‌های خود را ذخیره کنید.",
+      "proposalSaved": "پیشنهاد ذخیره شد",
+      "proposalDismissed": "پیشنهاد رد شد",
+      "prOpened": "پول ریکوئست برای REVIEW.md باز شد",
+      "alreadyPresent": "دستورالعمل‌ها از قبل در REVIEW.md موجود است",
+      "status": {
+        "edited": "ویرایش‌شده",
+        "opening_change_request": "در حال باز کردن PR",
+        "change_request_failed": "باز کردن PR ناموفق بود",
+        "superseded": "از قبل موجود است"
+      },
       "noProposalsDescription": "پس از اینکه Kilo پاسخ‌های نگهدارندگان را تحلیل کند، پیشنهادهای حافظه بررسی اینجا نمایش داده می‌شوند."
     },
     "manualReview": {

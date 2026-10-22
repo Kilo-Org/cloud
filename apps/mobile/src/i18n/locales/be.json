@@ -1504,6 +1504,20 @@
       "loadingProposals": "Загрузка прапаноў",
       "couldNotLoadProposals": "Не атрымалася загрузіць прапановы.",
       "noProposals": "Няма прапаноў",
+      "proposalDetails": "Падрабязнасці прапановы",
+      "proposalTitle": "Назва прапановы",
+      "rationale": "Абгрунтаванне",
+      "saveFirst": "Захавайце змены перад адкрыццём пул-рэквеста.",
+      "proposalSaved": "Прапанова захавана",
+      "proposalDismissed": "Прапанова адхілена",
+      "prOpened": "Пул-рэквест для REVIEW.md адкрыты",
+      "alreadyPresent": "Рэкамендацыі ўжо ёсць у REVIEW.md",
+      "status": {
+        "edited": "Адрэдагавана",
+        "opening_change_request": "Адкрыццё PR",
+        "change_request_failed": "Збой PR",
+        "superseded": "Ужо ёсць"
+      },
       "noProposalsDescription": "Прапановы на аснове памяці праверак з'явяцца тут пасля таго, як Kilo прааналізуе адказы суправаджальнікаў праекта."
     },
     "manualReview": {

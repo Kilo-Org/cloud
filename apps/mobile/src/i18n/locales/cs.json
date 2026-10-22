@@ -1504,6 +1504,20 @@
       "loadingProposals": "Načítání návrhů",
       "couldNotLoadProposals": "Návrhy se nepodařilo načíst.",
       "noProposals": "Žádné návrhy",
+      "proposalDetails": "Podrobnosti návrhu",
+      "proposalTitle": "Název návrhu",
+      "rationale": "Odůvodnění",
+      "saveFirst": "Před otevřením pull requestu uložte změny.",
+      "proposalSaved": "Návrh uložen",
+      "proposalDismissed": "Návrh zamítnut",
+      "prOpened": "Pull request pro REVIEW.md otevřen",
+      "alreadyPresent": "Pokyny již existují v souboru REVIEW.md",
+      "status": {
+        "edited": "Upraveno",
+        "opening_change_request": "Otevírání PR",
+        "change_request_failed": "PR selhal",
+        "superseded": "Již existuje"
+      },
       "noProposalsDescription": "Návrhy z paměti kontrol se zde zobrazí, jakmile Kilo analyzuje odpovědi správců."
     },
     "manualReview": {

@@ -1466,6 +1466,20 @@
       "loadingProposals": "A ń gbé àwọn àbá wọlé",
       "couldNotLoadProposals": "A kò lè gbé àwọn àbá wọlé.",
       "noProposals": "Kò sí àbá",
+      "proposalDetails": "Àlàyé àbá",
+      "proposalTitle": "Àkọlé àbá",
+      "rationale": "Ìdí",
+      "saveFirst": "Fi àwọn àtúnṣe rẹ pamọ́ kí o tó ṣí PR.",
+      "proposalSaved": "A ti fi àbá pamọ́",
+      "proposalDismissed": "A ti kọ àbá sílẹ̀",
+      "prOpened": "A ti ṣí PR fún REVIEW.md",
+      "alreadyPresent": "Ìtọ́sọ́nà ti wà nínú REVIEW.md tẹ́lẹ̀",
+      "status": {
+        "edited": "A ti ṣàtúnṣe",
+        "opening_change_request": "A ń ṣí PR",
+        "change_request_failed": "Ṣíṣí PR kùnà",
+        "superseded": "Ó ti wà tẹ́lẹ̀"
+      },
       "noProposalsDescription": "Àwọn àbá ìrántí àtúnyẹ̀wò yóò hàn níbí lẹ́yìn tí Kilo bá ṣe ìtúpalẹ̀ àwọn ìdáhùn olùtọ́jú."
     },
     "manualReview": {

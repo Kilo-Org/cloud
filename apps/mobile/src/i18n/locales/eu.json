@@ -1466,6 +1466,20 @@
       "loadingProposals": "Proposamenak kargatzen",
       "couldNotLoadProposals": "Ezin izan dira proposamenak kargatu.",
       "noProposals": "Ez dago proposamenik",
+      "proposalDetails": "Proposamenaren xehetasunak",
+      "proposalTitle": "Proposamenaren izenburua",
+      "rationale": "Justifikazioa",
+      "saveFirst": "Gorde aldaketak pull request bat ireki aurretik.",
+      "proposalSaved": "Proposamena gordeta",
+      "proposalDismissed": "Proposamena baztertuta",
+      "prOpened": "REVIEW.md fitxategirako pull requesta irekita",
+      "alreadyPresent": "Jarraibideak dagoeneko REVIEW.md fitxategian daude",
+      "status": {
+        "edited": "Editatuta",
+        "opening_change_request": "PRa irekitzen",
+        "change_request_failed": "PRak huts egin du",
+        "superseded": "Dagoeneko badago"
+      },
       "noProposalsDescription": "Berrikuspen-memoriaren proposamenak hemen agertuko dira Kilok mantentzaileen erantzunak aztertu ondoren."
     },
     "manualReview": {

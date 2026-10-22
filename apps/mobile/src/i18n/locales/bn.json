@@ -1466,6 +1466,20 @@
       "loadingProposals": "প্রস্তাব লোড হচ্ছে",
       "couldNotLoadProposals": "প্রস্তাবগুলো লোড করা যায়নি।",
       "noProposals": "কোনো প্রস্তাব নেই",
+      "proposalDetails": "প্রস্তাবের বিবরণ",
+      "proposalTitle": "প্রস্তাবের শিরোনাম",
+      "rationale": "যৌক্তিকতা",
+      "saveFirst": "পুল রিকোয়েস্ট খোলার আগে আপনার পরিবর্তনগুলো সংরক্ষণ করুন।",
+      "proposalSaved": "প্রস্তাব সংরক্ষিত হয়েছে",
+      "proposalDismissed": "প্রস্তাব খারিজ করা হয়েছে",
+      "prOpened": "REVIEW.md-এর পুল রিকোয়েস্ট খোলা হয়েছে",
+      "alreadyPresent": "নির্দেশনা ইতিমধ্যেই REVIEW.md-এ রয়েছে",
+      "status": {
+        "edited": "সম্পাদিত",
+        "opening_change_request": "PR খোলা হচ্ছে",
+        "change_request_failed": "PR ব্যর্থ হয়েছে",
+        "superseded": "ইতিমধ্যেই রয়েছে"
+      },
       "noProposalsDescription": "Kilo রক্ষণাবেক্ষণকারীদের উত্তর বিশ্লেষণ করার পরে পর্যালোচনার মেমরি থেকে তৈরি প্রস্তাবগুলো এখানে দেখা যাবে।"
     },
     "manualReview": {

@@ -1466,6 +1466,20 @@
       "loadingProposals": "تجاویز لوڈ ہو رہی ہیں",
       "couldNotLoadProposals": "تجاویز لوڈ نہیں ہو سکیں۔",
       "noProposals": "کوئی تجویز نہیں",
+      "proposalDetails": "تجویز کی تفصیلات",
+      "proposalTitle": "تجویز کا عنوان",
+      "rationale": "وجہ",
+      "saveFirst": "پل ریکویسٹ کھولنے سے پہلے اپنی تبدیلیاں محفوظ کریں۔",
+      "proposalSaved": "تجویز محفوظ ہو گئی",
+      "proposalDismissed": "تجویز مسترد کر دی گئی",
+      "prOpened": "REVIEW.md کے لیے پل ریکویسٹ کھول دی گئی",
+      "alreadyPresent": "ہدایات REVIEW.md میں پہلے سے موجود ہیں",
+      "status": {
+        "edited": "ترمیم شدہ",
+        "opening_change_request": "PR کھولی جا رہی ہے",
+        "change_request_failed": "PR کھولنے میں ناکامی",
+        "superseded": "پہلے سے موجود"
+      },
       "noProposalsDescription": "جب Kilo دیکھ بھال کرنے والوں کے جوابات کا تجزیہ کرے گا تو جائزے کی یادداشت سے حاصل کردہ تجاویز یہاں ظاہر ہوں گی۔"
     },
     "manualReview": {

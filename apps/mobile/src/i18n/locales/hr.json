@@ -1485,6 +1485,20 @@
       "loadingProposals": "Učitavanje prijedloga",
       "couldNotLoadProposals": "Nije moguće učitati prijedloge.",
       "noProposals": "Nema prijedloga",
+      "proposalDetails": "Pojedinosti prijedloga",
+      "proposalTitle": "Naslov prijedloga",
+      "rationale": "Obrazloženje",
+      "saveFirst": "Spremi izmjene prije otvaranja zahtjeva za povlačenje.",
+      "proposalSaved": "Prijedlog spremljen",
+      "proposalDismissed": "Prijedlog odbačen",
+      "prOpened": "Zahtjev za povlačenje za REVIEW.md otvoren",
+      "alreadyPresent": "Smjernice već postoje u datoteci REVIEW.md",
+      "status": {
+        "edited": "Uređeno",
+        "opening_change_request": "Otvaranje PR-a",
+        "change_request_failed": "Otvaranje PR-a nije uspjelo",
+        "superseded": "Već postoji"
+      },
       "noProposalsDescription": "Prijedlozi memorije pregleda pojavit će se ovdje nakon što Kilo analizira odgovore održavatelja."
     },
     "manualReview": {

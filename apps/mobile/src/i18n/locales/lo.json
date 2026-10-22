@@ -1466,6 +1466,20 @@
       "loadingProposals": "ກຳລັງໂຫຼດຂໍ້ສະເໜີ",
       "couldNotLoadProposals": "ບໍ່ສາມາດໂຫຼດຂໍ້ສະເໜີໄດ້.",
       "noProposals": "ບໍ່ມີຂໍ້ສະເໜີ",
+      "proposalDetails": "ລາຍລະອຽດຂໍ້ສະເໜີ",
+      "proposalTitle": "ຫົວຂໍ້ຂໍ້ສະເໜີ",
+      "rationale": "ເຫດຜົນ",
+      "saveFirst": "ບັນທຶກການແກ້ໄຂຂອງເຈົ້າກ່ອນເປີດ PR.",
+      "proposalSaved": "ບັນທຶກຂໍ້ສະເໜີແລ້ວ",
+      "proposalDismissed": "ປັດຂໍ້ສະເໜີແລ້ວ",
+      "prOpened": "ເປີດ PR ສຳລັບ REVIEW.md ແລ້ວ",
+      "alreadyPresent": "ມີຄຳແນະນຳຢູ່ໃນ REVIEW.md ແລ້ວ",
+      "status": {
+        "edited": "ແກ້ໄຂແລ້ວ",
+        "opening_change_request": "ກຳລັງເປີດ PR",
+        "change_request_failed": "ເປີດ PR ບໍ່ສຳເລັດ",
+        "superseded": "ມີຢູ່ແລ້ວ"
+      },
       "noProposalsDescription": "ຂໍ້ສະເໜີຈາກຄວາມຈຳການກວດສອບຈະປາກົດຢູ່ບ່ອນນີ້ ຫຼັງຈາກ Kilo ວິເຄາະຄຳຕອບຂອງຜູ້ດູແລ."
     },
     "manualReview": {

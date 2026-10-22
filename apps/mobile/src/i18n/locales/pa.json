@@ -1466,6 +1466,20 @@
       "loadingProposals": "ਪ੍ਰਸਤਾਵ ਲੋਡ ਹੋ ਰਹੇ ਹਨ",
       "couldNotLoadProposals": "ਪ੍ਰਸਤਾਵ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
       "noProposals": "ਕੋਈ ਪ੍ਰਸਤਾਵ ਨਹੀਂ",
+      "proposalDetails": "ਪ੍ਰਸਤਾਵ ਦੇ ਵੇਰਵੇ",
+      "proposalTitle": "ਪ੍ਰਸਤਾਵ ਦਾ ਸਿਰਲੇਖ",
+      "rationale": "ਤਰਕ",
+      "saveFirst": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਖੋਲ੍ਹਣ ਤੋਂ ਪਹਿਲਾਂ ਆਪਣੀਆਂ ਤਬਦੀਲੀਆਂ ਸੁਰੱਖਿਅਤ ਕਰੋ।",
+      "proposalSaved": "ਪ੍ਰਸਤਾਵ ਸੁਰੱਖਿਅਤ ਕੀਤਾ ਗਿਆ",
+      "proposalDismissed": "ਪ੍ਰਸਤਾਵ ਖਾਰਜ ਕੀਤਾ ਗਿਆ",
+      "prOpened": "REVIEW.md ਲਈ ਪੁੱਲ ਰਿਕਵੈਸਟ ਖੋਲ੍ਹੀ ਗਈ",
+      "alreadyPresent": "ਹਦਾਇਤਾਂ REVIEW.md ਵਿੱਚ ਪਹਿਲਾਂ ਹੀ ਮੌਜੂਦ ਹਨ",
+      "status": {
+        "edited": "ਸੰਪਾਦਿਤ",
+        "opening_change_request": "PR ਖੋਲ੍ਹੀ ਜਾ ਰਹੀ ਹੈ",
+        "change_request_failed": "PR ਅਸਫਲ ਰਹੀ",
+        "superseded": "ਪਹਿਲਾਂ ਹੀ ਮੌਜੂਦ"
+      },
       "noProposalsDescription": "Kilo ਵੱਲੋਂ ਰੱਖ-ਰਖਾਅ ਕਰਨ ਵਾਲਿਆਂ ਦੇ ਜਵਾਬਾਂ ਦਾ ਵਿਸ਼ਲੇਸ਼ਣ ਕਰਨ ਤੋਂ ਬਾਅਦ ਸਮੀਖਿਆ ਦੀ ਮੈਮੋਰੀ ਦੇ ਪ੍ਰਸਤਾਵ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੇ।"
     },
     "manualReview": {

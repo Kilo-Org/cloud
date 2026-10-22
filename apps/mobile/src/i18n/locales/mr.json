@@ -1466,6 +1466,20 @@
       "loadingProposals": "प्रस्ताव लोड होत आहेत",
       "couldNotLoadProposals": "प्रस्ताव लोड करता आले नाहीत.",
       "noProposals": "कोणतेही प्रस्ताव नाहीत",
+      "proposalDetails": "प्रस्तावाचे तपशील",
+      "proposalTitle": "प्रस्तावाचे शीर्षक",
+      "rationale": "कारणमीमांसा",
+      "saveFirst": "पुल रिक्वेस्ट उघडण्यापूर्वी तुमचे बदल जतन करा.",
+      "proposalSaved": "प्रस्ताव जतन केला",
+      "proposalDismissed": "प्रस्ताव फेटाळला",
+      "prOpened": "REVIEW.md साठी पुल रिक्वेस्ट उघडली",
+      "alreadyPresent": "मार्गदर्शक सूचना REVIEW.md मध्ये आधीच आहेत",
+      "status": {
+        "edited": "संपादित",
+        "opening_change_request": "PR उघडत आहे",
+        "change_request_failed": "PR अयशस्वी झाली",
+        "superseded": "आधीच आहे"
+      },
       "noProposalsDescription": "Kilo ने प्रकल्पाची देखभाल करणाऱ्यांच्या उत्तरांचे विश्लेषण केल्यानंतर पुनरावलोकन मेमरीचे प्रस्ताव येथे दिसतील."
     },
     "manualReview": {

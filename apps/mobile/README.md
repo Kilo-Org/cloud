@@ -25,6 +25,21 @@ Unavailable usage and low-balance settings expose Retry. The low-balance row
 retries its settings read until data is available, then opens configuration.
 Cached settings remain visible during offline pauses and refresh failures.
 
+## Review memory proposals
+
+Code Reviewer review-memory rows show the proposal status and open full proposal
+details. Personal owners and organization owners, admins, and billing managers can
+edit or dismiss open, edited, and failed proposals, or open a REVIEW.md pull request.
+Save edits before opening the pull request. Other members can inspect the same
+details without mutation controls.
+
+For local device verification, run
+`pnpm dev:seed app:mobile-review-memory kilo-<name>-<timestamp>@example.com`.
+The fixture requires a localhost database and `SKIP_STRIPE_API=true`, returns mobile
+deep links, and creates no provider integration. It covers editable, opened, failed,
+and member-only proposals; successful provider pull-request creation requires a
+separate integration fixture.
+
 ## Getting started
 
 Generally speaking, you only need a new dev build if making dependency/native changes.

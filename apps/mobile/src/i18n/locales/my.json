@@ -1466,6 +1466,20 @@
       "loadingProposals": "အဆိုပြုချက်များကို ရယူနေသည်",
       "couldNotLoadProposals": "အဆိုပြုချက်များကို ရယူ၍ မရပါ။",
       "noProposals": "အဆိုပြုချက် မရှိပါ",
+      "proposalDetails": "အဆိုပြုချက် အသေးစိတ်",
+      "proposalTitle": "အဆိုပြုချက် ခေါင်းစဉ်",
+      "rationale": "အကြောင်းပြချက်",
+      "saveFirst": "Pull request မဖွင့်မီ သင်၏ ပြင်ဆင်ချက်များကို သိမ်းဆည်းပါ။",
+      "proposalSaved": "အဆိုပြုချက်ကို သိမ်းဆည်းပြီးပါပြီ",
+      "proposalDismissed": "အဆိုပြုချက်ကို ပယ်ချပြီးပါပြီ",
+      "prOpened": "REVIEW.md အတွက် pull request ဖွင့်ပြီးပါပြီ",
+      "alreadyPresent": "လမ်းညွှန်ချက်များ REVIEW.md တွင် ရှိပြီးသားဖြစ်သည်",
+      "status": {
+        "edited": "ပြင်ဆင်ပြီး",
+        "opening_change_request": "PR ဖွင့်နေသည်",
+        "change_request_failed": "PR မအောင်မြင်ပါ",
+        "superseded": "ရှိပြီးသား"
+      },
       "noProposalsDescription": "ပရောဂျက်ထိန်းသိမ်းသူများ၏ ပြန်ကြားချက်များကို Kilo ခွဲခြမ်းစိတ်ဖြာပြီးနောက် စစ်ဆေးမှုမှတ်ဉာဏ်မှ အဆိုပြုချက်များ ဤနေရာတွင် ပေါ်လာမည်။"
     },
     "manualReview": {

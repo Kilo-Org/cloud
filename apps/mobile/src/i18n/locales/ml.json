@@ -1466,6 +1466,20 @@
       "loadingProposals": "നിർദ്ദേശങ്ങൾ ലോഡ് ചെയ്യുന്നു",
       "couldNotLoadProposals": "നിർദ്ദേശങ്ങൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "noProposals": "നിർദ്ദേശങ്ങളില്ല",
+      "proposalDetails": "നിർദ്ദേശത്തിന്റെ വിശദാംശങ്ങൾ",
+      "proposalTitle": "നിർദ്ദേശത്തിന്റെ ശീർഷകം",
+      "rationale": "കാരണം",
+      "saveFirst": "പുൾ റിക്വസ്റ്റ് തുറക്കുന്നതിന് മുമ്പ് നിങ്ങളുടെ മാറ്റങ്ങൾ സംരക്ഷിക്കുക.",
+      "proposalSaved": "നിർദ്ദേശം സംരക്ഷിച്ചു",
+      "proposalDismissed": "നിർദ്ദേശം തള്ളിക്കളഞ്ഞു",
+      "prOpened": "REVIEW.md പുൾ റിക്വസ്റ്റ് തുറന്നു",
+      "alreadyPresent": "മാർഗ്ഗനിർദ്ദേശങ്ങൾ REVIEW.md-ൽ ഇതിനകം ഉണ്ട്",
+      "status": {
+        "edited": "തിരുത്തി",
+        "opening_change_request": "PR തുറക്കുന്നു",
+        "change_request_failed": "PR പരാജയപ്പെട്ടു",
+        "superseded": "ഇതിനകം ഉണ്ട്"
+      },
       "noProposalsDescription": "പരിപാലകരുടെ മറുപടികൾ Kilo വിശകലനം ചെയ്ത ശേഷം അവലോകന മെമ്മറിയുടെ നിർദ്ദേശങ്ങൾ ഇവിടെ കാണാം."
     },
     "manualReview": {

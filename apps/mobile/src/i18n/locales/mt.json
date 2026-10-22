@@ -1523,6 +1523,20 @@
       "loadingProposals": "Qed jitgħabbew il-proposti",
       "couldNotLoadProposals": "Ma setgħux jitgħabbew il-proposti.",
       "noProposals": "L-ebda proposta",
+      "proposalDetails": "Dettalji tal-proposta",
+      "proposalTitle": "Titlu tal-proposta",
+      "rationale": "Raġuni",
+      "saveFirst": "Issejvja l-bidliet tiegħek qabel tiftaħ pull request.",
+      "proposalSaved": "Il-proposta ġiet issejvjata",
+      "proposalDismissed": "Il-proposta twarrbet",
+      "prOpened": "Infetħet pull request għal REVIEW.md",
+      "alreadyPresent": "Il-linji gwida diġà jinsabu f'REVIEW.md",
+      "status": {
+        "edited": "Editjata",
+        "opening_change_request": "Qed tinfetaħ PR",
+        "change_request_failed": "Il-PR falliet",
+        "superseded": "Diġà preżenti"
+      },
       "noProposalsDescription": "Il-proposti tal-memorja tar-reviżjoni jidhru hawn wara li Kilo janalizza t-tweġibiet tal-manutenturi."
     },
     "manualReview": {

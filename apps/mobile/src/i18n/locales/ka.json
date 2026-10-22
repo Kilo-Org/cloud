@@ -1466,6 +1466,20 @@
       "loadingProposals": "წინადადებების ჩატვირთვა",
       "couldNotLoadProposals": "წინადადებების ჩატვირთვა ვერ მოხერხდა.",
       "noProposals": "წინადადებები არ არის",
+      "proposalDetails": "წინადადების დეტალები",
+      "proposalTitle": "წინადადების სათაური",
+      "rationale": "დასაბუთება",
+      "saveFirst": "Pull request-ის გახსნამდე შეინახე ცვლილებები.",
+      "proposalSaved": "წინადადება შენახულია",
+      "proposalDismissed": "წინადადება უარყოფილია",
+      "prOpened": "REVIEW.md-ის pull request გახსნილია",
+      "alreadyPresent": "მითითებები უკვე არის REVIEW.md-ში",
+      "status": {
+        "edited": "შეცვლილია",
+        "opening_change_request": "PR იხსნება",
+        "change_request_failed": "PR-ის გახსნა ვერ მოხერხდა",
+        "superseded": "უკვე არსებობს"
+      },
       "noProposalsDescription": "შემოწმების მეხსიერების წინადადებები აქ გამოჩნდება მას შემდეგ, რაც Kilo პროექტის მომვლელების პასუხებს გააანალიზებს."
     },
     "manualReview": {

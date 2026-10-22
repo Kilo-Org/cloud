@@ -1504,6 +1504,20 @@
       "loadingProposals": "Įkeliami pasiūlymai",
       "couldNotLoadProposals": "Nepavyko įkelti pasiūlymų.",
       "noProposals": "Pasiūlymų nėra",
+      "proposalDetails": "Pasiūlymo informacija",
+      "proposalTitle": "Pasiūlymo pavadinimas",
+      "rationale": "Pagrindimas",
+      "saveFirst": "Prieš atidarant PR, išsaugok pakeitimus.",
+      "proposalSaved": "Pasiūlymas išsaugotas",
+      "proposalDismissed": "Pasiūlymas atmestas",
+      "prOpened": "Atidaryta REVIEW.md PR",
+      "alreadyPresent": "Gairės jau yra REVIEW.md faile",
+      "status": {
+        "edited": "Redaguota",
+        "opening_change_request": "Atidaroma PR",
+        "change_request_failed": "Nepavyko atidaryti PR",
+        "superseded": "Jau yra"
+      },
       "noProposalsDescription": "Peržiūros atminties pasiūlymai bus rodomi čia, kai Kilo išanalizuos prižiūrėtojų atsakymus."
     },
     "manualReview": {

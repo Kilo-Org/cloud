@@ -1466,6 +1466,20 @@
       "loadingProposals": "Բեռնվում են առաջարկները",
       "couldNotLoadProposals": "Չհաջողվեց բեռնել առաջարկները։",
       "noProposals": "Առաջարկներ չկան",
+      "proposalDetails": "Առաջարկի մանրամասները",
+      "proposalTitle": "Առաջարկի վերնագիրը",
+      "rationale": "Հիմնավորում",
+      "saveFirst": "Պահպանիր փոփոխություններդ՝ նախքան pull request բացելը։",
+      "proposalSaved": "Առաջարկը պահպանված է",
+      "proposalDismissed": "Առաջարկը մերժված է",
+      "prOpened": "REVIEW.md-ի pull request-ը բացված է",
+      "alreadyPresent": "Հրահանգներն արդեն կան REVIEW.md-ում",
+      "status": {
+        "edited": "Խմբագրված է",
+        "opening_change_request": "Բացվում է PR-ը",
+        "change_request_failed": "Չհաջողվեց բացել PR-ը",
+        "superseded": "Արդեն առկա է"
+      },
       "noProposalsDescription": "Ստուգման հիշողության առաջարկներն այստեղ կհայտնվեն, երբ Kilo-ն վերլուծի նախագծի պատասխանատուների պատասխանները։"
     },
     "manualReview": {

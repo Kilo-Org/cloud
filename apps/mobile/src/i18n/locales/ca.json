@@ -1485,6 +1485,20 @@
       "loadingProposals": "S'estan carregant les propostes",
       "couldNotLoadProposals": "No s'han pogut carregar les propostes.",
       "noProposals": "Cap proposta",
+      "proposalDetails": "Detalls de la proposta",
+      "proposalTitle": "Títol de la proposta",
+      "rationale": "Justificació",
+      "saveFirst": "Desa els canvis abans d'obrir una pull request.",
+      "proposalSaved": "Proposta desada",
+      "proposalDismissed": "Proposta descartada",
+      "prOpened": "Pull request de REVIEW.md oberta",
+      "alreadyPresent": "Les pautes ja són a REVIEW.md",
+      "status": {
+        "edited": "Editada",
+        "opening_change_request": "S'està obrint la PR",
+        "change_request_failed": "La PR ha fallat",
+        "superseded": "Ja hi és"
+      },
       "noProposalsDescription": "Les propostes de la memòria de revisió apareixeran aquí quan Kilo hagi analitzat les respostes dels mantenidors."
     },
     "manualReview": {

@@ -1466,6 +1466,20 @@
       "loadingProposals": "Се вчитуваат предлозите",
       "couldNotLoadProposals": "Не успеа вчитувањето на предлозите.",
       "noProposals": "Нема предлози",
+      "proposalDetails": "Детали за предлогот",
+      "proposalTitle": "Наслов на предлогот",
+      "rationale": "Образложение",
+      "saveFirst": "Зачувај ги измените пред да отвориш PR.",
+      "proposalSaved": "Предлогот е зачуван",
+      "proposalDismissed": "Предлогот е отфрлен",
+      "prOpened": "Отворен е PR за REVIEW.md",
+      "alreadyPresent": "Насоките веќе се во REVIEW.md",
+      "status": {
+        "edited": "Изменето",
+        "opening_change_request": "Се отвора PR",
+        "change_request_failed": "Не успеа отворањето на PR",
+        "superseded": "Веќе постои"
+      },
       "noProposalsDescription": "Предлозите од меморијата за прегледи ќе се појават тука откако Kilo ќе ги анализира одговорите на одржувачите."
     },
     "manualReview": {

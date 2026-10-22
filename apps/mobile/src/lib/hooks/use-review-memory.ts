@@ -1,12 +1,14 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
+import { type ProposalDraft } from '@/lib/review-memory-proposals';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 // Review memory only exists for GitHub, so the owner input pins the platform
 // and only varies the scope segment (personal vs. an organization id).
-function reviewMemoryOwnerInput(scope: string) {
+export function reviewMemoryOwnerInput(scope: string) {
   return scope === PERSONAL_SCOPE
     ? { platform: 'github' as const }
     : { organizationId: scope, platform: 'github' as const };
@@ -38,4 +40,71 @@ export function useSetReviewMemoryEnabled(scope: string) {
       announcingToast.error(error.message);
     },
   });
+}
+
+export function useReviewMemoryProposalActions(scope: string) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const ownerInput = reviewMemoryOwnerInput(scope);
+  const onError = (error: { message: string }) => {
+    announcingToast.error(error.message);
+  };
+  const onSettled = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: trpc.reviewMemory.getDashboardSummary.queryKey(ownerInput),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.reviewMemory.listProposalsPage.pathKey(),
+      }),
+    ]);
+  };
+  const save = useMutation(
+    trpc.reviewMemory.updateProposal.mutationOptions({
+      onError,
+      onSettled,
+      onSuccess: () => {
+        announcingToast.success(i18n.t('codeReviewer.reviewMemory.proposalSaved'));
+      },
+    })
+  );
+  const reject = useMutation(
+    trpc.reviewMemory.rejectProposal.mutationOptions({
+      onError,
+      onSettled,
+      onSuccess: () => {
+        announcingToast.success(i18n.t('codeReviewer.reviewMemory.proposalDismissed'));
+      },
+    })
+  );
+  const approve = useMutation(
+    trpc.reviewMemory.approveAndOpenChangeRequest.mutationOptions({
+      onError,
+      onSettled,
+      onSuccess: proposal => {
+        announcingToast.success(
+          i18n.t(
+            proposal.status === 'superseded'
+              ? 'codeReviewer.reviewMemory.alreadyPresent'
+              : 'codeReviewer.reviewMemory.prOpened'
+          )
+        );
+      },
+    })
+  );
+  return {
+    isPending: save.isPending || reject.isPending || approve.isPending,
+    save: async (proposalId: string, draft: ProposalDraft) => {
+      const proposal = await save.mutateAsync({ ...ownerInput, proposalId, ...draft });
+      return proposal;
+    },
+    reject: async (proposalId: string) => {
+      const proposal = await reject.mutateAsync({ ...ownerInput, proposalId });
+      return proposal;
+    },
+    approve: async (proposalId: string) => {
+      const proposal = await approve.mutateAsync({ ...ownerInput, proposalId });
+      return proposal;
+    },
+  };
 }

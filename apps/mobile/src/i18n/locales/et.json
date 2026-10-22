@@ -1466,6 +1466,20 @@
       "loadingProposals": "Ettepanekute laadimine",
       "couldNotLoadProposals": "Ettepanekuid ei õnnestunud laadida.",
       "noProposals": "Ettepanekuid pole",
+      "proposalDetails": "Ettepaneku üksikasjad",
+      "proposalTitle": "Ettepaneku pealkiri",
+      "rationale": "Põhjendus",
+      "saveFirst": "Salvesta muudatused enne tõmbetaotluse avamist.",
+      "proposalSaved": "Ettepanek salvestatud",
+      "proposalDismissed": "Ettepanek tagasi lükatud",
+      "prOpened": "Faili REVIEW.md tõmbetaotlus avatud",
+      "alreadyPresent": "Juhised on failis REVIEW.md juba olemas",
+      "status": {
+        "edited": "Muudetud",
+        "opening_change_request": "PR-i avamine",
+        "change_request_failed": "PR ebaõnnestus",
+        "superseded": "Juba olemas"
+      },
       "noProposalsDescription": "Ülevaatuste mälu ettepanekud ilmuvad siia pärast seda, kui Kilo on hooldajate vastuseid analüüsinud."
     },
     "manualReview": {

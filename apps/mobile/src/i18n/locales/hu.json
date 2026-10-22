@@ -1466,6 +1466,20 @@
       "loadingProposals": "Javaslatok betöltése",
       "couldNotLoadProposals": "Nem sikerült betölteni a javaslatokat.",
       "noProposals": "Nincsenek javaslatok",
+      "proposalDetails": "Javaslat részletei",
+      "proposalTitle": "Javaslat címe",
+      "rationale": "Indoklás",
+      "saveFirst": "Mentsd a módosításaidat a pull request megnyitása előtt.",
+      "proposalSaved": "Javaslat mentve",
+      "proposalDismissed": "Javaslat elvetve",
+      "prOpened": "Pull request megnyitva a REVIEW.md fájlhoz",
+      "alreadyPresent": "Az útmutatás már szerepel a REVIEW.md fájlban",
+      "status": {
+        "edited": "Szerkesztve",
+        "opening_change_request": "PR megnyitása",
+        "change_request_failed": "PR megnyitása sikertelen",
+        "superseded": "Már szerepel"
+      },
       "noProposalsDescription": "A kódellenőrzési memória javaslatai itt jelennek meg, miután a Kilo elemzi a karbantartók válaszait."
     },
     "manualReview": {

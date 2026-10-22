@@ -1466,6 +1466,20 @@
       "loadingProposals": "යෝජනා පූරණය කරමින් පවතී",
       "couldNotLoadProposals": "යෝජනා පූරණය කළ නොහැකි විය.",
       "noProposals": "යෝජනා නොමැත",
+      "proposalDetails": "යෝජනාවේ විස්තර",
+      "proposalTitle": "යෝජනාවේ මාතෘකාව",
+      "rationale": "හේතු දැක්වීම",
+      "saveFirst": "Pull request එකක් විවෘත කිරීමට පෙර ඔබේ සංස්කරණ සුරකින්න.",
+      "proposalSaved": "යෝජනාව සුරකින ලදී",
+      "proposalDismissed": "යෝජනාව ඉවත දමන ලදී",
+      "prOpened": "REVIEW.md සඳහා pull request එකක් විවෘත කරන ලදී",
+      "alreadyPresent": "මාර්ගෝපදේශ දැනටමත් REVIEW.md තුළ ඇත",
+      "status": {
+        "edited": "සංස්කරණය කරන ලදී",
+        "opening_change_request": "PR විවෘත කරමින් පවතී",
+        "change_request_failed": "PR අසාර්ථක විය",
+        "superseded": "දැනටමත් ඇත"
+      },
       "noProposalsDescription": "Kilo නඩත්තුකරුවන්ගේ පිළිතුරු විශ්ලේෂණය කළ පසු සමාලෝචන මතකයේ යෝජනා මෙහි දිස් වේ."
     },
     "manualReview": {

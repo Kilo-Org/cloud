@@ -1466,6 +1466,20 @@
       "loadingProposals": "Təkliflər yüklənir",
       "couldNotLoadProposals": "Təklifləri yükləmək mümkün olmadı.",
       "noProposals": "Təklif yoxdur",
+      "proposalDetails": "Təklifin təfərrüatları",
+      "proposalTitle": "Təklifin başlığı",
+      "rationale": "Əsaslandırma",
+      "saveFirst": "Pull sorğusu açmazdan əvvəl dəyişikliklərini yadda saxla.",
+      "proposalSaved": "Təklif yadda saxlanıldı",
+      "proposalDismissed": "Təklif rədd edildi",
+      "prOpened": "REVIEW.md üçün pull sorğusu açıldı",
+      "alreadyPresent": "Təlimatlar artıq REVIEW.md faylında mövcuddur",
+      "status": {
+        "edited": "Redaktə edilib",
+        "opening_change_request": "PR açılır",
+        "change_request_failed": "PR uğursuz oldu",
+        "superseded": "Artıq mövcuddur"
+      },
       "noProposalsDescription": "Kilo layihəyə cavabdeh şəxslərin cavablarını təhlil etdikdən sonra kod yoxlaması yaddaşının təklifləri burada görünəcək."
     },
     "manualReview": {

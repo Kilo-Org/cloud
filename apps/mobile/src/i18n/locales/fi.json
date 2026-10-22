@@ -1466,6 +1466,20 @@
       "loadingProposals": "Ladataan ehdotuksia",
       "couldNotLoadProposals": "Ehdotuksia ei voitu ladata.",
       "noProposals": "Ei ehdotuksia",
+      "proposalDetails": "Ehdotuksen tiedot",
+      "proposalTitle": "Ehdotuksen otsikko",
+      "rationale": "Perustelut",
+      "saveFirst": "Tallenna muutoksesi ennen pull requestin avaamista.",
+      "proposalSaved": "Ehdotus tallennettu",
+      "proposalDismissed": "Ehdotus hylätty",
+      "prOpened": "REVIEW.md-tiedoston pull request avattu",
+      "alreadyPresent": "Ohjeet ovat jo REVIEW.md-tiedostossa",
+      "status": {
+        "edited": "Muokattu",
+        "opening_change_request": "Avataan PR:ää",
+        "change_request_failed": "PR:n avaaminen epäonnistui",
+        "superseded": "Jo olemassa"
+      },
       "noProposalsDescription": "Katselmointimuistin ehdotukset näkyvät tässä, kun Kilo on analysoinut ylläpitäjien vastaukset."
     },
     "manualReview": {

@@ -1485,6 +1485,20 @@
       "loadingProposals": "A carregar propostas",
       "couldNotLoadProposals": "Não foi possível carregar as propostas.",
       "noProposals": "Sem propostas",
+      "proposalDetails": "Detalhes da proposta",
+      "proposalTitle": "Título da proposta",
+      "rationale": "Justificação",
+      "saveFirst": "Guarda as tuas alterações antes de abrir um pull request.",
+      "proposalSaved": "Proposta guardada",
+      "proposalDismissed": "Proposta rejeitada",
+      "prOpened": "Pull request para o REVIEW.md aberto",
+      "alreadyPresent": "As orientações já constam do REVIEW.md",
+      "status": {
+        "edited": "Editada",
+        "opening_change_request": "A abrir PR",
+        "change_request_failed": "Falha ao abrir PR",
+        "superseded": "Já existe"
+      },
       "noProposalsDescription": "As propostas da memória de revisão aparecem aqui depois de o Kilo analisar as respostas dos responsáveis pelo projeto."
     },
     "manualReview": {

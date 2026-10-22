@@ -1504,6 +1504,20 @@
       "loadingProposals": "Načítavajú sa návrhy",
       "couldNotLoadProposals": "Návrhy sa nepodarilo načítať.",
       "noProposals": "Žiadne návrhy",
+      "proposalDetails": "Podrobnosti návrhu",
+      "proposalTitle": "Názov návrhu",
+      "rationale": "Odôvodnenie",
+      "saveFirst": "Pred otvorením pull requestu uložte svoje úpravy.",
+      "proposalSaved": "Návrh bol uložený",
+      "proposalDismissed": "Návrh bol zamietnutý",
+      "prOpened": "Pull request pre REVIEW.md bol otvorený",
+      "alreadyPresent": "Pokyny už sú v súbore REVIEW.md",
+      "status": {
+        "edited": "Upravené",
+        "opening_change_request": "Otvára sa PR",
+        "change_request_failed": "PR zlyhal",
+        "superseded": "Už existuje"
+      },
       "noProposalsDescription": "Návrhy z pamäte kontrol sa tu zobrazia, keď Kilo analyzuje odpovede správcov."
     },
     "manualReview": {

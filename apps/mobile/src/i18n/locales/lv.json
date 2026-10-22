@@ -1485,6 +1485,20 @@
       "loadingProposals": "Tiek ielādēti priekšlikumi",
       "couldNotLoadProposals": "Neizdevās ielādēt priekšlikumus.",
       "noProposals": "Nav priekšlikumu",
+      "proposalDetails": "Priekšlikuma informācija",
+      "proposalTitle": "Priekšlikuma nosaukums",
+      "rationale": "Pamatojums",
+      "saveFirst": "Saglabā labojumus pirms PR atvēršanas.",
+      "proposalSaved": "Priekšlikums saglabāts",
+      "proposalDismissed": "Priekšlikums noraidīts",
+      "prOpened": "Atvērts PR failam REVIEW.md",
+      "alreadyPresent": "Norādījumi jau ir REVIEW.md failā",
+      "status": {
+        "edited": "Rediģēts",
+        "opening_change_request": "Tiek atvērts PR",
+        "change_request_failed": "Neizdevās atvērt PR",
+        "superseded": "Jau ir pievienots"
+      },
       "noProposalsDescription": "Koda pārskatīšanas atmiņas priekšlikumi būs redzami šeit pēc tam, kad Kilo būs analizējis uzturētāju atbildes."
     },
     "manualReview": {

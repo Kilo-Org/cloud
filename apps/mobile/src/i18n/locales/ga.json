@@ -1523,6 +1523,20 @@
       "loadingProposals": "Ag lódáil moltaí",
       "couldNotLoadProposals": "Níorbh fhéidir na moltaí a lódáil.",
       "noProposals": "Níl aon mholadh ann",
+      "proposalDetails": "Sonraí an mholta",
+      "proposalTitle": "Teideal an mholta",
+      "rationale": "Réasúnaíocht",
+      "saveFirst": "Sábháil do chuid athruithe sula n-osclaíonn tú iarratas tarraingthe.",
+      "proposalSaved": "Moladh sábháilte",
+      "proposalDismissed": "Moladh diúltaithe",
+      "prOpened": "Osclaíodh iarratas tarraingthe do REVIEW.md",
+      "alreadyPresent": "Tá an treoir in REVIEW.md cheana féin",
+      "status": {
+        "edited": "Curtha in eagar",
+        "opening_change_request": "PR á oscailt",
+        "change_request_failed": "Theip ar an PR",
+        "superseded": "Ann cheana féin"
+      },
       "noProposalsDescription": "Beidh moltaí ón gcuimhne athbhreithnithe le feiceáil anseo tar éis do Kilo anailís a dhéanamh ar fhreagraí na gcothaitheoirí."
     },
     "manualReview": {

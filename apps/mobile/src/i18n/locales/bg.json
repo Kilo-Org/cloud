@@ -1466,6 +1466,20 @@
       "loadingProposals": "Зареждане на предложенията",
       "couldNotLoadProposals": "Не успяхме да заредим предложенията.",
       "noProposals": "Няма предложения",
+      "proposalDetails": "Подробности за предложението",
+      "proposalTitle": "Заглавие на предложението",
+      "rationale": "Обосновка",
+      "saveFirst": "Запази промените си, преди да отвориш pull request.",
+      "proposalSaved": "Предложението е запазено",
+      "proposalDismissed": "Предложението е отхвърлено",
+      "prOpened": "Отворен е pull request за REVIEW.md",
+      "alreadyPresent": "Насоките вече са в REVIEW.md",
+      "status": {
+        "edited": "Редактирано",
+        "opening_change_request": "Отваряне на PR",
+        "change_request_failed": "Неуспешен PR",
+        "superseded": "Вече е налично"
+      },
       "noProposalsDescription": "Предложенията от паметта за прегледи се появяват тук, след като Kilo анализира отговорите на отговорниците за проекта."
     },
     "manualReview": {

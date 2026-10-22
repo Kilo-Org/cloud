@@ -1466,6 +1466,20 @@
       "loadingProposals": "Mampiditra soso-kevitra",
       "couldNotLoadProposals": "Tsy nety nampidirina ny soso-kevitra.",
       "noProposals": "Tsy misy soso-kevitra",
+      "proposalDetails": "Antsipirian'ny soso-kevitra",
+      "proposalTitle": "Lohatenin'ny soso-kevitra",
+      "rationale": "Antony",
+      "saveFirst": "Tehirizo ny fanovana nataonao alohan'ny hanokafana PR.",
+      "proposalSaved": "Voatahiry ny soso-kevitra",
+      "proposalDismissed": "Nolavina ny soso-kevitra",
+      "prOpened": "Nosokafana ny PR ho an'ny REVIEW.md",
+      "alreadyPresent": "Efa ao amin'ny REVIEW.md ny torolalana",
+      "status": {
+        "edited": "Voahitsy",
+        "opening_change_request": "Manokatra PR",
+        "change_request_failed": "Tsy nety nosokafana ny PR",
+        "superseded": "Efa misy"
+      },
       "noProposalsDescription": "Hiseho eto ny soso-kevitry ny fitadidiana ny fanamarinana rehefa voafakafak'i Kilo ny valin'ny mpikojakoja."
     },
     "manualReview": {

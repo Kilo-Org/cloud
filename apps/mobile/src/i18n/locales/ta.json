@@ -1466,6 +1466,20 @@
       "loadingProposals": "முன்மொழிவுகளை ஏற்றுகிறது",
       "couldNotLoadProposals": "முன்மொழிவுகளை ஏற்ற முடியவில்லை.",
       "noProposals": "முன்மொழிவுகள் இல்லை",
+      "proposalDetails": "முன்மொழிவு விவரங்கள்",
+      "proposalTitle": "முன்மொழிவின் தலைப்பு",
+      "rationale": "காரணம்",
+      "saveFirst": "புல் ரிக்வெஸ்ட்டைத் திறப்பதற்கு முன் உங்கள் திருத்தங்களைச் சேமிக்கவும்.",
+      "proposalSaved": "முன்மொழிவு சேமிக்கப்பட்டது",
+      "proposalDismissed": "முன்மொழிவு நிராகரிக்கப்பட்டது",
+      "prOpened": "REVIEW.md புல் ரிக்வெஸ்ட் திறக்கப்பட்டது",
+      "alreadyPresent": "வழிகாட்டுதல்கள் ஏற்கனவே REVIEW.md இல் உள்ளன",
+      "status": {
+        "edited": "திருத்தப்பட்டது",
+        "opening_change_request": "PR திறக்கப்படுகிறது",
+        "change_request_failed": "PR தோல்வியடைந்தது",
+        "superseded": "ஏற்கனவே உள்ளது"
+      },
       "noProposalsDescription": "பராமரிப்பாளர்களின் பதில்களை Kilo பகுப்பாய்வு செய்த பிறகு மதிப்பாய்வு நினைவகத்தின் முன்மொழிவுகள் இங்கே காட்டப்படும்."
     },
     "manualReview": {

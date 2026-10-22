@@ -1466,6 +1466,20 @@
       "loadingProposals": "Memuatkan cadangan",
       "couldNotLoadProposals": "Tidak dapat memuatkan cadangan.",
       "noProposals": "Tiada cadangan",
+      "proposalDetails": "Butiran cadangan",
+      "proposalTitle": "Tajuk cadangan",
+      "rationale": "Rasional",
+      "saveFirst": "Simpan suntingan anda sebelum membuka pull request.",
+      "proposalSaved": "Cadangan disimpan",
+      "proposalDismissed": "Cadangan ditolak",
+      "prOpened": "Pull request REVIEW.md dibuka",
+      "alreadyPresent": "Panduan sudah ada dalam REVIEW.md",
+      "status": {
+        "edited": "Disunting",
+        "opening_change_request": "Membuka PR",
+        "change_request_failed": "PR gagal",
+        "superseded": "Sudah ada"
+      },
       "noProposalsDescription": "Cadangan memori semakan muncul di sini selepas Kilo menganalisis balasan penyelenggara."
     },
     "manualReview": {

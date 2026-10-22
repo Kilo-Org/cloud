@@ -1557,6 +1557,20 @@
       "loadingProposals": "Loading proposals",
       "couldNotLoadProposals": "Could not load proposals",
       "noProposals": "No proposals",
+      "proposalDetails": "Proposal details",
+      "proposalTitle": "Proposal title",
+      "rationale": "Rationale",
+      "saveFirst": "Save your edits before opening a pull request.",
+      "proposalSaved": "Proposal saved",
+      "proposalDismissed": "Proposal dismissed",
+      "prOpened": "REVIEW.md pull request opened",
+      "alreadyPresent": "Guidance is already present in REVIEW.md",
+      "status": {
+        "edited": "Edited",
+        "opening_change_request": "Opening PR",
+        "change_request_failed": "PR failed",
+        "superseded": "Already present"
+      },
       "noProposalsDescription": "Review memory proposals appear here after Kilo analyzes maintainer replies."
     },
     "manualReview": {

@@ -1466,6 +1466,20 @@
       "loadingProposals": "Kei te uta i ngā tono",
       "couldNotLoadProposals": "Kāore i taea te uta i ngā tono.",
       "noProposals": "Kāore he tono",
+      "proposalDetails": "Ngā taipitopito o te tono",
+      "proposalTitle": "Te taitara o te tono",
+      "rationale": "Te take",
+      "saveFirst": "Tiakina ō whakatikatika i mua i te whakatuwhera i tētahi PR.",
+      "proposalSaved": "Kua tiakina te tono",
+      "proposalDismissed": "Kua whakakorea te tono",
+      "prOpened": "Kua whakatuwheratia te PR mō REVIEW.md",
+      "alreadyPresent": "Kei roto kē ngā aratohu i REVIEW.md",
+      "status": {
+        "edited": "Kua whakatikaina",
+        "opening_change_request": "Kei te whakatuwhera PR",
+        "change_request_failed": "Kāore i taea te whakatuwhera i te PR",
+        "superseded": "Kei roto kē"
+      },
       "noProposalsDescription": "Ka puta ngā tono mahara arotake ki konei i muri i te tātari a Kilo i ngā whakautu a ngā kaitiaki."
     },
     "manualReview": {

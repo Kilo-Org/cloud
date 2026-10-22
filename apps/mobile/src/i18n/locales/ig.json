@@ -1466,6 +1466,20 @@
       "loadingProposals": "Na-ebudata aro",
       "couldNotLoadProposals": "Enweghị ike ibudata aro.",
       "noProposals": "Enweghị aro",
+      "proposalDetails": "Nkọwa aro",
+      "proposalTitle": "Aha aro",
+      "rationale": "Ihe kpatara ya",
+      "saveFirst": "Chekwaa mgbanwe gị tupu imepe pull request.",
+      "proposalSaved": "Echekwara aro",
+      "proposalDismissed": "Ewepụla aro",
+      "prOpened": "Emeghela pull request maka REVIEW.md",
+      "alreadyPresent": "Nduzi adịlarị na REVIEW.md",
+      "status": {
+        "edited": "Edezigharịrị",
+        "opening_change_request": "Na-emepe PR",
+        "change_request_failed": "Imepe PR akụrụ afọ n'ala",
+        "superseded": "Ọ dịlarị"
+      },
       "noProposalsDescription": "Aro ebe nchekwa nyocha ga-apụta ebe a mgbe Kilo nyochachara nzaghachi ndị na-elekọta."
     },
     "manualReview": {

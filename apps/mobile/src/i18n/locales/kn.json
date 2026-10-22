@@ -1466,6 +1466,20 @@
       "loadingProposals": "ಪ್ರಸ್ತಾಪಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ",
       "couldNotLoadProposals": "ಪ್ರಸ್ತಾಪಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "noProposals": "ಯಾವುದೇ ಪ್ರಸ್ತಾಪಗಳಿಲ್ಲ",
+      "proposalDetails": "ಪ್ರಸ್ತಾಪದ ವಿವರಗಳು",
+      "proposalTitle": "ಪ್ರಸ್ತಾಪದ ಶೀರ್ಷಿಕೆ",
+      "rationale": "ಕಾರಣ",
+      "saveFirst": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ತೆರೆಯುವ ಮೊದಲು ನಿಮ್ಮ ಬದಲಾವಣೆಗಳನ್ನು ಉಳಿಸಿ.",
+      "proposalSaved": "ಪ್ರಸ್ತಾಪವನ್ನು ಉಳಿಸಲಾಗಿದೆ",
+      "proposalDismissed": "ಪ್ರಸ್ತಾಪವನ್ನು ತಿರಸ್ಕರಿಸಲಾಗಿದೆ",
+      "prOpened": "REVIEW.md ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ತೆರೆಯಲಾಗಿದೆ",
+      "alreadyPresent": "ಮಾರ್ಗಸೂಚಿಗಳು ಈಗಾಗಲೇ REVIEW.md ನಲ್ಲಿವೆ",
+      "status": {
+        "edited": "ಸಂಪಾದಿಸಲಾಗಿದೆ",
+        "opening_change_request": "PR ತೆರೆಯಲಾಗುತ್ತಿದೆ",
+        "change_request_failed": "PR ತೆರೆಯಲು ವಿಫಲವಾಗಿದೆ",
+        "superseded": "ಈಗಾಗಲೇ ಇದೆ"
+      },
       "noProposalsDescription": "ನಿರ್ವಹಣೆ ಮಾಡುವವರ ಉತ್ತರಗಳನ್ನು Kilo ವಿಶ್ಲೇಷಿಸಿದ ನಂತರ ಪರಿಶೀಲನಾ ಸ್ಮರಣೆಯ ಪ್ರಸ್ತಾಪಗಳು ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತವೆ."
     },
     "manualReview": {

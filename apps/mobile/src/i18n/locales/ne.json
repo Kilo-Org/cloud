@@ -1466,6 +1466,20 @@
       "loadingProposals": "प्रस्तावहरू लोड गर्दै",
       "couldNotLoadProposals": "प्रस्तावहरू लोड गर्न सकिएन।",
       "noProposals": "कुनै प्रस्ताव छैन",
+      "proposalDetails": "प्रस्तावको विवरण",
+      "proposalTitle": "प्रस्तावको शीर्षक",
+      "rationale": "औचित्य",
+      "saveFirst": "पुल रिक्वेस्ट खोल्नुअघि आफ्ना सम्पादनहरू सुरक्षित गर्नुहोस्।",
+      "proposalSaved": "प्रस्ताव सुरक्षित गरियो",
+      "proposalDismissed": "प्रस्ताव खारेज गरियो",
+      "prOpened": "REVIEW.md को पुल रिक्वेस्ट खोलियो",
+      "alreadyPresent": "निर्देशनहरू REVIEW.md मा पहिले नै छन्",
+      "status": {
+        "edited": "सम्पादन गरिएको",
+        "opening_change_request": "PR खोल्दै",
+        "change_request_failed": "PR असफल भयो",
+        "superseded": "पहिले नै छ"
+      },
       "noProposalsDescription": "Kilo ले मर्मतकर्ताका जवाफहरू विश्लेषण गरेपछि समीक्षा मेमोरीका प्रस्तावहरू यहाँ देखिनेछन्।"
     },
     "manualReview": {

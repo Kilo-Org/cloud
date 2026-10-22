@@ -1485,6 +1485,20 @@
       "loadingProposals": "Učitavanje predloga",
       "couldNotLoadProposals": "Nije moguće učitati predloge.",
       "noProposals": "Nema predloga",
+      "proposalDetails": "Detalji predloga",
+      "proposalTitle": "Naslov predloga",
+      "rationale": "Obrazloženje",
+      "saveFirst": "Sačuvaj izmene pre otvaranja pull requesta.",
+      "proposalSaved": "Predlog je sačuvan",
+      "proposalDismissed": "Predlog je odbačen",
+      "prOpened": "Pull request za REVIEW.md je otvoren",
+      "alreadyPresent": "Smernice već postoje u REVIEW.md",
+      "status": {
+        "edited": "Izmenjeno",
+        "opening_change_request": "Otvaranje PR-a",
+        "change_request_failed": "PR nije uspeo",
+        "superseded": "Već postoji"
+      },
       "noProposalsDescription": "Predlozi iz memorije pregleda pojaviće se ovde kada Kilo analizira odgovore osoba koje održavaju repozitorijum."
     },
     "manualReview": {

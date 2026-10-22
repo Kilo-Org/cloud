@@ -1466,6 +1466,20 @@
       "loadingProposals": "Ap chaje pwopozisyon yo",
       "couldNotLoadProposals": "Nou pa t ka chaje pwopozisyon yo.",
       "noProposals": "Pa gen pwopozisyon",
+      "proposalDetails": "Detay pwopozisyon an",
+      "proposalTitle": "Tit pwopozisyon an",
+      "rationale": "Rezon",
+      "saveFirst": "Anrejistre chanjman ou yo anvan ou ouvri yon pull request.",
+      "proposalSaved": "Pwopozisyon an anrejistre",
+      "proposalDismissed": "Pwopozisyon an rejte",
+      "prOpened": "Pull request pou REVIEW.md ouvri",
+      "alreadyPresent": "Direktiv yo deja nan REVIEW.md",
+      "status": {
+        "edited": "Modifye",
+        "opening_change_request": "Ap ouvri PR",
+        "change_request_failed": "Ouvèti PR la echwe",
+        "superseded": "Deja prezan"
+      },
       "noProposalsDescription": "Pwopozisyon memwa revizyon an parèt isit la apre Kilo analize repons moun ki responsab antretyen kòd la."
     },
     "manualReview": {

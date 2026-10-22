@@ -1466,6 +1466,20 @@
       "loadingProposals": "ପ୍ରସ୍ତାବ ଲୋଡ୍ ହେଉଛି",
       "couldNotLoadProposals": "ପ୍ରସ୍ତାବ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "noProposals": "କୌଣସି ପ୍ରସ୍ତାବ ନାହିଁ",
+      "proposalDetails": "ପ୍ରସ୍ତାବର ବିବରଣୀ",
+      "proposalTitle": "ପ୍ରସ୍ତାବର ଶୀର୍ଷକ",
+      "rationale": "ଯୁକ୍ତିସଙ୍ଗତ କାରଣ",
+      "saveFirst": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଖୋଲିବା ପୂର୍ବରୁ ଆପଣଙ୍କ ପରିବର୍ତ୍ତନଗୁଡ଼ିକ ସଞ୍ଚୟ କରନ୍ତୁ।",
+      "proposalSaved": "ପ୍ରସ୍ତାବ ସଞ୍ଚୟ ହୋଇଛି",
+      "proposalDismissed": "ପ୍ରସ୍ତାବ ଖାରଜ ହୋଇଛି",
+      "prOpened": "REVIEW.md ପାଇଁ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଖୋଲାଯାଇଛି",
+      "alreadyPresent": "ନିର୍ଦ୍ଦେଶାବଳୀ REVIEW.md ରେ ପୂର୍ବରୁ ଅଛି",
+      "status": {
+        "edited": "ସମ୍ପାଦିତ",
+        "opening_change_request": "PR ଖୋଲାଯାଉଛି",
+        "change_request_failed": "PR ବିଫଳ ହୋଇଛି",
+        "superseded": "ପୂର୍ବରୁ ଅଛି"
+      },
       "noProposalsDescription": "Kilo ରକ୍ଷଣାବେକ୍ଷକଙ୍କ ଉତ୍ତର ବିଶ୍ଳେଷଣ କରିବା ପରେ ସମୀକ୍ଷା ସ୍ମୃତିର ପ୍ରସ୍ତାବଗୁଡ଼ିକ ଏଠାରେ ଦେଖାଯାଏ।"
     },
     "manualReview": {

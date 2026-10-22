@@ -1466,6 +1466,20 @@
       "loadingProposals": "Φόρτωση προτάσεων",
       "couldNotLoadProposals": "Δεν ήταν δυνατή η φόρτωση των προτάσεων.",
       "noProposals": "Καμία πρόταση",
+      "proposalDetails": "Λεπτομέρειες πρότασης",
+      "proposalTitle": "Τίτλος πρότασης",
+      "rationale": "Αιτιολόγηση",
+      "saveFirst": "Αποθήκευσε τις αλλαγές σου πριν ανοίξεις ένα pull request.",
+      "proposalSaved": "Η πρόταση αποθηκεύτηκε",
+      "proposalDismissed": "Η πρόταση απορρίφθηκε",
+      "prOpened": "Το pull request για το REVIEW.md άνοιξε",
+      "alreadyPresent": "Οι οδηγίες υπάρχουν ήδη στο REVIEW.md",
+      "status": {
+        "edited": "Τροποποιήθηκε",
+        "opening_change_request": "Άνοιγμα PR",
+        "change_request_failed": "Το PR απέτυχε",
+        "superseded": "Υπάρχει ήδη"
+      },
       "noProposalsDescription": "Οι προτάσεις της μνήμης ελέγχων εμφανίζονται εδώ αφού το Kilo αναλύσει τις απαντήσεις των υπευθύνων συντήρησης."
     },
     "manualReview": {

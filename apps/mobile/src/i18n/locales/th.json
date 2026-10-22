@@ -1466,6 +1466,20 @@
       "loadingProposals": "กำลังโหลดข้อเสนอ",
       "couldNotLoadProposals": "โหลดข้อเสนอไม่สำเร็จ",
       "noProposals": "ไม่มีข้อเสนอ",
+      "proposalDetails": "รายละเอียดข้อเสนอ",
+      "proposalTitle": "ชื่อข้อเสนอ",
+      "rationale": "เหตุผล",
+      "saveFirst": "บันทึกการแก้ไขก่อนเปิด Pull Request",
+      "proposalSaved": "บันทึกข้อเสนอแล้ว",
+      "proposalDismissed": "ปิดข้อเสนอแล้ว",
+      "prOpened": "เปิด Pull Request สำหรับไฟล์ REVIEW.md แล้ว",
+      "alreadyPresent": "มีคำแนะนำนี้ในไฟล์ REVIEW.md อยู่แล้ว",
+      "status": {
+        "edited": "แก้ไขแล้ว",
+        "opening_change_request": "กำลังเปิด PR",
+        "change_request_failed": "เปิด PR ไม่สำเร็จ",
+        "superseded": "มีอยู่แล้ว"
+      },
       "noProposalsDescription": "ข้อเสนอจากความจำในการตรวจสอบจะแสดงที่นี่หลังจาก Kilo วิเคราะห์คำตอบของผู้ดูแล"
     },
     "manualReview": {

@@ -1485,6 +1485,20 @@
       "loadingProposals": "Se încarcă propunerile",
       "couldNotLoadProposals": "Nu s-au putut încărca propunerile.",
       "noProposals": "Nicio propunere",
+      "proposalDetails": "Detaliile propunerii",
+      "proposalTitle": "Titlul propunerii",
+      "rationale": "Justificare",
+      "saveFirst": "Salvează modificările înainte de a deschide un pull request.",
+      "proposalSaved": "Propunere salvată",
+      "proposalDismissed": "Propunere respinsă",
+      "prOpened": "Pull request pentru REVIEW.md deschis",
+      "alreadyPresent": "Instrucțiunile există deja în REVIEW.md",
+      "status": {
+        "edited": "Editată",
+        "opening_change_request": "Se deschide PR-ul",
+        "change_request_failed": "Deschiderea PR-ului a eșuat",
+        "superseded": "Există deja"
+      },
       "noProposalsDescription": "Propunerile memoriei de revizuire apar aici după ce Kilo analizează răspunsurile responsabililor de proiect."
     },
     "manualReview": {

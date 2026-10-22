@@ -1466,6 +1466,20 @@
       "loadingProposals": "ప్రతిపాదనలను లోడ్ చేస్తోంది",
       "couldNotLoadProposals": "ప్రతిపాదనలను లోడ్ చేయలేకపోయాము.",
       "noProposals": "ప్రతిపాదనలు లేవు",
+      "proposalDetails": "ప్రతిపాదన వివరాలు",
+      "proposalTitle": "ప్రతిపాదన శీర్షిక",
+      "rationale": "కారణం",
+      "saveFirst": "పుల్ రిక్వెస్ట్ తెరవడానికి ముందు మీ మార్పులను సేవ్ చేయండి.",
+      "proposalSaved": "ప్రతిపాదన సేవ్ చేయబడింది",
+      "proposalDismissed": "ప్రతిపాదన తిరస్కరించబడింది",
+      "prOpened": "REVIEW.md పుల్ రిక్వెస్ట్ తెరవబడింది",
+      "alreadyPresent": "మార్గదర్శకాలు ఇప్పటికే REVIEW.mdలో ఉన్నాయి",
+      "status": {
+        "edited": "సవరించబడింది",
+        "opening_change_request": "PR తెరుస్తోంది",
+        "change_request_failed": "PR విఫలమైంది",
+        "superseded": "ఇప్పటికే ఉంది"
+      },
       "noProposalsDescription": "నిర్వహణదారుల ప్రత్యుత్తరాలను Kilo విశ్లేషించిన తర్వాత సమీక్ష మెమరీ ప్రతిపాదనలు ఇక్కడ కనిపిస్తాయి."
     },
     "manualReview": {

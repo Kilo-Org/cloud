@@ -1466,6 +1466,20 @@
       "loadingProposals": "የቀረቡ ሐሳቦችን በመጫን ላይ",
       "couldNotLoadProposals": "የቀረቡ ሐሳቦችን መጫን አልተቻለም።",
       "noProposals": "የቀረቡ ሐሳቦች የሉም",
+      "proposalDetails": "የቀረበው ሐሳብ ዝርዝሮች",
+      "proposalTitle": "የቀረበው ሐሳብ ርዕስ",
+      "rationale": "ምክንያት",
+      "saveFirst": "Pull request ከመክፈትዎ በፊት ለውጦችዎን ያስቀምጡ።",
+      "proposalSaved": "የቀረበው ሐሳብ ተቀምጧል",
+      "proposalDismissed": "የቀረበው ሐሳብ ተሰርዟል",
+      "prOpened": "የREVIEW.md pull request ተከፍቷል",
+      "alreadyPresent": "መመሪያዎቹ አስቀድመው በREVIEW.md ውስጥ አሉ",
+      "status": {
+        "edited": "ተስተካክሏል",
+        "opening_change_request": "PR በመክፈት ላይ",
+        "change_request_failed": "PR አልተሳካም",
+        "superseded": "አስቀድሞ አለ"
+      },
       "noProposalsDescription": "Kilo የፕሮጀክት ተንከባካቢዎችን ምላሾች ከተነተነ በኋላ የግምገማ ትውስታ ያቀረባቸው ሐሳቦች እዚህ ይታያሉ።"
     },
     "manualReview": {

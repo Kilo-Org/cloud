@@ -1504,6 +1504,20 @@
       "loadingProposals": "Nalaganje predlogov",
       "couldNotLoadProposals": "Predlogov ni bilo mogoče naložiti.",
       "noProposals": "Ni predlogov",
+      "proposalDetails": "Podrobnosti predloga",
+      "proposalTitle": "Naslov predloga",
+      "rationale": "Utemeljitev",
+      "saveFirst": "Pred odpiranjem zahtevka za združitev shrani spremembe.",
+      "proposalSaved": "Predlog shranjen",
+      "proposalDismissed": "Predlog zavrnjen",
+      "prOpened": "Zahtevek za združitev za REVIEW.md je odprt",
+      "alreadyPresent": "Smernice so že v datoteki REVIEW.md",
+      "status": {
+        "edited": "Urejeno",
+        "opening_change_request": "Odpiranje PR-ja",
+        "change_request_failed": "PR ni uspel",
+        "superseded": "Že obstaja"
+      },
       "noProposalsDescription": "Predlogi pomnjenja pregledov se prikažejo tukaj, ko Kilo analizira odgovore vzdrževalcev."
     },
     "manualReview": {

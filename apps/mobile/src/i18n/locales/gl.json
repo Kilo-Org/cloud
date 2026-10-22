@@ -1466,6 +1466,20 @@
       "loadingProposals": "Cargando propostas",
       "couldNotLoadProposals": "Non se puideron cargar as propostas.",
       "noProposals": "Non hai propostas",
+      "proposalDetails": "Detalles da proposta",
+      "proposalTitle": "Título da proposta",
+      "rationale": "Xustificación",
+      "saveFirst": "Garda os cambios antes de abrir unha solicitude de incorporación.",
+      "proposalSaved": "Proposta gardada",
+      "proposalDismissed": "Proposta descartada",
+      "prOpened": "Solicitude de incorporación para REVIEW.md aberta",
+      "alreadyPresent": "As pautas xa están en REVIEW.md",
+      "status": {
+        "edited": "Editada",
+        "opening_change_request": "Abrindo a PR",
+        "change_request_failed": "Erro ao abrir a PR",
+        "superseded": "Xa existe"
+      },
       "noProposalsDescription": "As propostas da memoria de revisión aparecerán aquí despois de que Kilo analice as respostas dos responsables do mantemento."
     },
     "manualReview": {

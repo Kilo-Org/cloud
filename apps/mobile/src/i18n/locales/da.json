@@ -1466,6 +1466,20 @@
       "loadingProposals": "Indlæser forslag",
       "couldNotLoadProposals": "Forslagene kunne ikke indlæses.",
       "noProposals": "Ingen forslag",
+      "proposalDetails": "Forslagsdetaljer",
+      "proposalTitle": "Forslagets titel",
+      "rationale": "Begrundelse",
+      "saveFirst": "Gem dine ændringer, før du åbner en pull request.",
+      "proposalSaved": "Forslag gemt",
+      "proposalDismissed": "Forslag afvist",
+      "prOpened": "Pull request til REVIEW.md åbnet",
+      "alreadyPresent": "Retningslinjerne findes allerede i REVIEW.md",
+      "status": {
+        "edited": "Redigeret",
+        "opening_change_request": "Åbner PR",
+        "change_request_failed": "PR mislykkedes",
+        "superseded": "Findes allerede"
+      },
       "noProposalsDescription": "Forslag fra hukommelsen for gennemgange vises her, når Kilo har analyseret svar fra de vedligeholdelsesansvarlige."
     },
     "manualReview": {

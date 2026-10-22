@@ -1466,6 +1466,20 @@
       "loadingProposals": "Nilo-load ang mga mungkahi",
       "couldNotLoadProposals": "Hindi ma-load ang mga mungkahi.",
       "noProposals": "Walang mungkahi",
+      "proposalDetails": "Mga detalye ng mungkahi",
+      "proposalTitle": "Pamagat ng mungkahi",
+      "rationale": "Paliwanag",
+      "saveFirst": "I-save ang mga pagbabago mo bago magbukas ng pull request.",
+      "proposalSaved": "Na-save ang mungkahi",
+      "proposalDismissed": "Ibinasura ang mungkahi",
+      "prOpened": "Nabuksan ang pull request para sa REVIEW.md",
+      "alreadyPresent": "Nasa REVIEW.md na ang gabay",
+      "status": {
+        "edited": "Na-edit",
+        "opening_change_request": "Binubuksan ang PR",
+        "change_request_failed": "Nabigong buksan ang PR",
+        "superseded": "Naroon na"
+      },
       "noProposalsDescription": "Lalabas dito ang mga mungkahi mula sa memorya ng pagsusuri kapag nasuri na ng Kilo ang mga tugon ng tagapangalaga ng code."
     },
     "manualReview": {

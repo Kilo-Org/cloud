@@ -1,11 +1,12 @@
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { type ReactNode, useMemo } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, Switch, View, type ViewStyle } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { CenteredState } from '@/components/centered-state';
+import { ReviewMemoryProposalSheet } from '@/components/code-reviewer/review-memory-proposal-sheet';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -14,22 +15,19 @@ import { Button } from '@/components/ui/button';
 import { Brain } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
 import { useReviewerPermission, useSetReviewMemoryEnabled } from '@/lib/hooks/use-code-reviewer';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { reviewMemoryOwnerInput } from '@/lib/hooks/use-review-memory';
+import {
+  ACTIVE_PROPOSAL_STATUSES,
+  proposalStatusLabel,
+  type ReviewMemoryProposal,
+} from '@/lib/review-memory-proposals';
 import { useTRPC } from '@/lib/trpc';
 
 const PAGE_SIZE = 20;
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
-
-// Review memory only exists for GitHub, so the owner input pins the platform
-// and only varies the scope segment (personal vs. an organization id).
-function reviewMemoryOwnerInput(scope: string) {
-  return scope === PERSONAL_SCOPE
-    ? ({ platform: 'github' } as const)
-    : ({ organizationId: scope, platform: 'github' } as const);
-}
 
 export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
   const trpc = useTRPC();
@@ -38,6 +36,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
   const paddingBottom = useTabBarBottomPadding();
   const ownerInput = reviewMemoryOwnerInput(scope);
   const permission = useReviewerPermission(scope);
+  const [selectedProposal, setSelectedProposal] = useState<ReviewMemoryProposal | null>(null);
 
   const summaryQuery = useQuery(trpc.reviewMemory.getDashboardSummary.queryOptions(ownerInput));
   const setEnabled = useSetReviewMemoryEnabled(scope);
@@ -45,7 +44,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
 
   const proposalsQuery = useInfiniteQuery(
     trpc.reviewMemory.listProposalsPage.infiniteQueryOptions(
-      { ...ownerInput, limit: PAGE_SIZE },
+      { ...ownerInput, limit: PAGE_SIZE, statuses: ACTIVE_PROPOSAL_STATUSES },
       {
         enabled,
         getNextPageParam: lastPage => lastPage.nextCursor ?? undefined,
@@ -176,14 +175,28 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
         style={listStyle}
         keyExtractor={proposal => proposal.id}
         renderItem={({ item }) => (
-          <View className="border-b-[0.5px] border-hair-soft px-6 py-3">
+          <Pressable
+            className="min-h-11 border-b-[0.5px] border-hair-soft px-6 py-3 active:opacity-70"
+            accessibilityRole="button"
+            accessibilityLabel={[
+              item.title,
+              item.repo_full_name,
+              proposalStatusLabel(item.status, t),
+            ].join('\n')}
+            onPress={() => {
+              setSelectedProposal(item);
+            }}
+          >
             <Text className="text-sm font-medium" numberOfLines={1}>
               {item.title}
             </Text>
             <Text variant="muted" className="mt-0.5 text-xs">
               {item.repo_full_name}
             </Text>
-          </View>
+            <Text variant="muted" className="mt-1 text-xs">
+              {proposalStatusLabel(item.status, t)}
+            </Text>
+          </Pressable>
         )}
         ListFooterComponent={
           <>
@@ -259,6 +272,20 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
         </View>
       ) : null}
       {body}
+      {selectedProposal ? (
+        <ReviewMemoryProposalSheet
+          key={`${scope}:${selectedProposal.id}`}
+          scope={scope}
+          proposal={
+            proposals.find(proposal => proposal.id === selectedProposal.id) ?? selectedProposal
+          }
+          available={proposals.some(proposal => proposal.id === selectedProposal.id)}
+          permission={permission}
+          onClose={() => {
+            setSelectedProposal(null);
+          }}
+        />
+      ) : null}
     </View>
   );
 }

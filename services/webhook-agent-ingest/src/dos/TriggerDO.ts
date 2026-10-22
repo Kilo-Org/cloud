@@ -27,11 +27,13 @@ import {
   type WebhookAuthInput,
 } from '../util/webhook-auth';
 import { redactSensitiveHeaders } from '@kilocode/worker-utils/redact-headers';
+import {
+  sandboxAllocationSchema,
+  type SandboxAllocation,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import { computeNextCronTime } from '../util/cron';
 
 export type { ProcessStatus, RequestUpdates } from '../db/types';
-
-const SandboxAllocation = z.literal('isolated-standard');
 
 export const TriggerConfig = z.object({
   triggerId: z.string(),
@@ -47,7 +49,7 @@ export const TriggerConfig = z.object({
   mode: z.string().nullable().optional(),
   model: z.string().nullable().optional(),
   variant: z.string().optional(),
-  sandboxAllocation: SandboxAllocation.optional(),
+  sandboxAllocation: sandboxAllocationSchema.optional(),
   promptTemplate: z.string(),
   profileId: z.string().nullable().optional(),
   autoCommit: z.boolean().optional(),
@@ -100,7 +102,7 @@ type ConfigureInput = {
   mode?: string;
   model?: string;
   variant?: string;
-  sandboxAllocation?: 'isolated-standard';
+  sandboxAllocation?: SandboxAllocation;
   promptTemplate: string;
   profileId?: string;
   autoCommit?: boolean;
@@ -120,7 +122,7 @@ type UpdateConfigInput = {
   mode?: string;
   model?: string;
   variant?: string | null;
-  sandboxAllocation?: 'isolated-standard' | null;
+  sandboxAllocation?: SandboxAllocation | null;
   promptTemplate?: string;
   isActive?: boolean;
   profileId?: string;
@@ -154,7 +156,9 @@ export class TriggerDO extends DurableObject<Env> {
     }
 
     const targetType = configOverrides.targetType ?? 'cloud_agent';
-    const sandboxAllocation = SandboxAllocation.optional().parse(configOverrides.sandboxAllocation);
+    const sandboxAllocation = sandboxAllocationSchema
+      .optional()
+      .parse(configOverrides.sandboxAllocation);
     if (sandboxAllocation !== undefined && targetType === 'kiloclaw_chat') {
       throw new Error('Sandbox allocation is only supported for cloud agent triggers');
     }
@@ -334,7 +338,9 @@ export class TriggerDO extends DurableObject<Env> {
       return { success: false };
     }
 
-    const sandboxAllocationUpdate = SandboxAllocation.nullish().parse(updates.sandboxAllocation);
+    const sandboxAllocationUpdate = sandboxAllocationSchema
+      .nullish()
+      .parse(updates.sandboxAllocation);
     if (sandboxAllocationUpdate !== undefined && existingConfig.targetType === 'kiloclaw_chat') {
       throw new Error('Sandbox allocation is only supported for cloud agent triggers');
     }
@@ -930,11 +936,11 @@ function extractStoredWebhookAuth(config: TriggerConfig | null): StoredWebhookAu
   };
 }
 
-function parseSandboxAllocation(value: string | null): 'isolated-standard' | undefined {
+function parseSandboxAllocation(value: string | null): SandboxAllocation | undefined {
   if (value === null) {
     return undefined;
   }
-  return SandboxAllocation.parse(value);
+  return sandboxAllocationSchema.parse(value);
 }
 
 function recordToCapturedRequest(record: RequestRow): CapturedRequest {

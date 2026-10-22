@@ -92,6 +92,32 @@ describe('buildSessionLiveActivityContentState', () => {
     expect(sessionLiveActivityContentStateSchema.parse(content)).toEqual(content);
   });
 
+  it('keeps the permission wait when the request text draws nothing', () => {
+    const content = buildSessionLiveActivityContentState(
+      {
+        id: 'ses_blank_text',
+        title: '\u200B\u2066',
+        status: 'permission',
+        permissionCommand: '\u2066\u200B\u2069',
+        currentStep: { verb: 'running', target: '\u200B' },
+        plan: { done: 1, total: 3, current: '\u2066\u2069' },
+      },
+      options
+    );
+    // Approve answers the key, not the command, so the wait survives text that
+    // draws nothing; the card shows its local "answer needed" text instead.
+    expect(content).toMatchObject({
+      title: null,
+      statusKind: 'needsInput',
+      awaitingPermission: true,
+      approvalKey: options.approvalKey,
+      permissionCommand: null,
+      currentStep: { verb: 'running', target: null },
+      plan: { done: 1, total: 3, current: null },
+    });
+    expect(sessionLiveActivityContentStateSchema.parse(content)).toEqual(content);
+  });
+
   it('carries the derived facts and keeps the server-only ones on a local update', () => {
     const step = { verb: 'editing' as const, target: 'auth.ts' };
     const plan = { done: 3, total: 7, current: 'Write tests' };

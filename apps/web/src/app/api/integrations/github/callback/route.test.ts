@@ -101,6 +101,8 @@ jest.mock('@/lib/integrations/db/github-installations', () => ({
   bindGitHubIntegrationToCanonicalInstallation: jest.fn(),
   updateGitHubInstallationRepositories: jest.fn(),
   lockGitHubInstallationIdentity: jest.fn(async () => undefined),
+}));
+jest.mock('@/lib/integrations/db/predicates', () => ({
   effectiveAppTypeCondition: jest.fn(() => undefined),
 }));
 jest.mock('@kilocode/worker-utils/account-access', () => ({

@@ -15,6 +15,7 @@ import {
   updateRepositoriesForIntegration,
 } from '@/lib/integrations/db/platform-integrations';
 import { uninstallExclusiveGitHubInstallation } from '@/lib/integrations/db/github-installations';
+import { ownerCondition } from '@/lib/integrations/db/predicates';
 import {
   deleteGitHubInstallation,
   fetchGitHubBranches,
@@ -27,10 +28,7 @@ import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organ
  * Only returns GitHub integrations to prevent errors with non-GitHub platforms
  */
 export async function listIntegrations(owner: Owner) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const integrations = await db
     .select()
@@ -45,10 +43,7 @@ export async function listIntegrations(owner: Owner) {
  * Get GitHub App installation status for an owner
  */
 export async function getInstallation(owner: Owner): Promise<PlatformIntegration | null> {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const [integration] = await db
     .select()
@@ -159,10 +154,7 @@ export async function listRepositories(
   integrationId: string,
   forceRefresh: boolean = false
 ) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const [integration] = await db
     .select()
@@ -220,10 +212,7 @@ export async function listRepositories(
  * owner is refused rather than replaced by another matching row.
  */
 export async function cancelPendingInstallation(owner: Owner, integrationId: string) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const [integration] = await db
     .select()
@@ -264,10 +253,7 @@ export async function listBranches(
   repositoryFullName: string,
   purpose: 'workflow' | 'agent' = 'workflow'
 ) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const [integration] = await db
     .select()

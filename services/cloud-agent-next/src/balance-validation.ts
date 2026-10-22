@@ -4,7 +4,7 @@ import { DEFAULT_BACKEND_URL } from './constants.js';
 import { logger } from './logger.js';
 import type { Env } from './types.js';
 import type { PersistenceEnv } from './persistence/types.js';
-import { fetchSessionMetadata } from './session-service.js';
+import { fetchSessionMetadata } from './session/metadata.js';
 import { verifyKiloTokenForPolicy } from '@kilocode/worker-utils/kilo-token-policy';
 import {
   issueRuntimeProxyAttestation,

@@ -224,7 +224,7 @@
     "hideBalance": "Amaga el saldo",
     "showBalance": "Mostra el saldo",
     "balanceHidden": "Saldo amagat",
-    "bonusCreditsExpiring": "{{amount}} en crèdits de bonificació caduquen el {{date}}.",
+    "bonusCreditsExpiring": "{{amount}} en crèdits caduquen el {{date}}.",
     "signOutTitle": "Vols tancar la sessió?",
     "signOutMessage": "Hauràs de tornar a iniciar la sessió per accedir al teu espai de treball.",
     "deleteAccountTitle": "Vols eliminar el compte?",

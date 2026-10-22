@@ -224,7 +224,7 @@
     "hideBalance": "ቀሪ ሂሳብ ደብቅ",
     "showBalance": "ቀሪ ሂሳብ አሳይ",
     "balanceHidden": "ቀሪ ሂሳብ ተደብቋል",
-    "bonusCreditsExpiring": "{{amount}} የጉርሻ ክሬዲት በ{{date}} ጊዜው ያበቃል።",
+    "bonusCreditsExpiring": "{{amount}} ክሬዲት በ{{date}} ጊዜው ያበቃል።",
     "signOutTitle": "ከመለያዎ መውጣት ይፈልጋሉ?",
     "signOutMessage": "የሥራ ቦታህን ለመጠቀም እንደገና መግባት ያስፈልግሃል።",
     "deleteAccountTitle": "መለያዎን መሰረዝ ይፈልጋሉ?",

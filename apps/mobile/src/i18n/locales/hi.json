@@ -224,7 +224,7 @@
     "hideBalance": "बैलेंस छिपाएँ",
     "showBalance": "बैलेंस दिखाएँ",
     "balanceHidden": "बैलेंस छिपा हुआ है",
-    "bonusCreditsExpiring": "{{amount}} के बोनस क्रेडिट की समय-सीमा {{date}} को समाप्त होगी।",
+    "bonusCreditsExpiring": "{{amount}} के क्रेडिट की समय-सीमा {{date}} को समाप्त होगी।",
     "signOutTitle": "साइन आउट करें?",
     "signOutMessage": "अपने कार्यक्षेत्र तक पहुँचने के लिए आपको फिर से साइन इन करना होगा।",
     "deleteAccountTitle": "खाता हटाएँ?",

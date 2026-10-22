@@ -2455,6 +2455,16 @@ export const kiloPassRouter = createTRPCRouter({
         });
       }
 
+      // A subscription set to cancel at period end ends instead of switching plans, so the
+      // user has to resume it before changing plans.
+      if (subscription.cancelAtPeriodEnd) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message:
+            'Your Kilo Pass is set to cancel. Resume your subscription before changing plans.',
+        });
+      }
+
       const fromTier = subscription.tier;
       const fromCadence = subscription.cadence;
       const toTier = input.targetTier;

@@ -315,7 +315,7 @@
     "hideBalance": "Hide balance",
     "showBalance": "Show balance",
     "balanceHidden": "Balance hidden",
-    "bonusCreditsExpiring": "{{amount}} in bonus credits expiring {{date}}",
+    "bonusCreditsExpiring": "{{amount}} in credits expiring {{date}}",
     "signOutTitle": "Sign out?",
     "signOutMessage": "You will need to sign in again to access your workspace.",
     "deleteAccountTitle": "Delete account?",

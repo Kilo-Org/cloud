@@ -224,7 +224,7 @@
     "hideBalance": "Cuddio'r balans",
     "showBalance": "Dangos y balans",
     "balanceHidden": "Balans wedi'i guddio",
-    "bonusCreditsExpiring": "Mae {{amount}} o gredydau bonws yn dod i ben ar {{date}}.",
+    "bonusCreditsExpiring": "Mae {{amount}} o gredydau yn dod i ben ar {{date}}.",
     "signOutTitle": "Allgofnodi?",
     "signOutMessage": "Bydd angen i ti fewngofnodi eto i gael mynediad i dy weithle.",
     "deleteAccountTitle": "Dileu cyfrif?",

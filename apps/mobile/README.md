@@ -119,6 +119,15 @@ When updating EAS CLI, keep the `eas-cli` development dependency and `eas.json`'
 - An inactive display produces a black screenshot.
 - Type a draft, change the appearance in both directions, and verify the draft stays readable.
 
+## Briefing localization
+
+Scheduled report dates use the app language and preserve the report's calendar
+day across device timezones. Period windows retain the report's own timezone.
+Briefing totals, agent spend, estimates, and charges use USD currency precision
+and locale separators. Positive amounts below half a cent display as less than
+one cent; partial-coverage lower bounds retain the separate at-least marker.
+The summary prompt requests the same precision, separators, and sub-cent rule.
+
 ## One-off agent briefings
 
 - Open **Briefings → Create briefing** and select Personal or one organization.

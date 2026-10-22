@@ -35842,6 +35842,40 @@
     ],
     "searchBlob": "user.getMyPushTokens List all push notification tokens registered for the current user across platforms, with their locale. user getmypushtokens"
   },
+  "user.getNotificationHistory": {
+    "path": "user.getNotificationHistory",
+    "kind": "query",
+    "summary": "List the signed-in user's past notifications, optionally filtered by category, with pagination for older entries.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "category": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "cursor": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
+    },
+    "tags": [
+      "user",
+      "getnotificationhistory",
+      "category",
+      "cursor",
+      "limit"
+    ],
+    "searchBlob": "user.getNotificationHistory List the signed-in user's past notifications, optionally filtered by category, with pagination for older entries. user getnotificationhistory category cursor limit category cursor limit"
+  },
   "user.getNotificationPreferences": {
     "path": "user.getNotificationPreferences",
     "kind": "query",
@@ -36739,6 +36773,9 @@
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         },
+        "runAsCreator": {
+          "type": "boolean"
+        },
         "targetType": {
           "default": "cloud_agent",
           "type": "string",
@@ -36840,6 +36877,7 @@
       "create",
       "triggerid",
       "organizationid",
+      "runascreator",
       "targettype",
       "kiloclawinstanceid",
       "githubrepo",
@@ -36856,7 +36894,7 @@
       "cronexpression",
       "crontimezone"
     ],
-    "searchBlob": "webhookTriggers.create Create a new webhook or scheduled trigger that runs a Cloud Agent or KiloClaw Chat on an incoming request or cron schedule. Use this to set up an automation that fires when a GitHub event or webhook arrives. webhooktriggers create triggerid organizationid targettype kiloclawinstanceid githubrepo mode model variant sandboxallocation profileid prompttemplate autocommit condenseoncomplete webhookauth activationmode cronexpression crontimezone triggerId organizationId targetType kiloclawInstanceId githubRepo mode model variant sandboxAllocation profileId promptTemplate autoCommit condenseOnComplete webhookAuth activationMode cronExpression cronTimezone"
+    "searchBlob": "webhookTriggers.create Create a new webhook or scheduled trigger that runs a Cloud Agent or KiloClaw Chat on an incoming request or cron schedule. Use this to set up an automation that fires when a GitHub event or webhook arrives. webhooktriggers create triggerid organizationid runascreator targettype kiloclawinstanceid githubrepo mode model variant sandboxallocation profileid prompttemplate autocommit condenseoncomplete webhookauth activationmode cronexpression crontimezone triggerId organizationId runAsCreator targetType kiloclawInstanceId githubRepo mode model variant sandboxAllocation profileId promptTemplate autoCommit condenseOnComplete webhookAuth activationMode cronExpression cronTimezone"
   },
   "webhookTriggers.delete": {
     "path": "webhookTriggers.delete",

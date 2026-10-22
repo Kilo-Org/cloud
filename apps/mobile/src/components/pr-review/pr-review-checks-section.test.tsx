@@ -22,6 +22,7 @@ const query = vi.hoisted(() => ({
       detailsUrl: string | null;
     }[],
     rollup: { total: 0, success: 0, failure: 0, pending: 0, skipped: 0 },
+    truncated: undefined as boolean | undefined,
   },
   isLoading: false,
   isError: false,
@@ -131,6 +132,7 @@ function setRuns(runs: Run[]) {
   query.data = {
     checkRuns: runs,
     rollup: { total: runs.length, success: 0, failure: 0, pending: 0, skipped: 0 },
+    truncated: undefined,
   };
 }
 
@@ -244,6 +246,24 @@ describe('PrReviewChecksSection status groups', () => {
     const renderer = mount();
 
     expect(textNodes(renderer, 'prReview.checks.checksCount=1/1')).toHaveLength(1);
+  });
+
+  it('marks the header total as a lower bound when the server cut the listing', () => {
+    // The server read the listing up to its page ceiling and said so, so the
+    // rows are the entries it read rather than every entry the ref has; the
+    // header count must not read as a total.
+    setRuns([run('passed', 'completed', 'success'), run('failed', 'completed', 'failure')]);
+    query.data = { ...query.data, truncated: true };
+    const renderer = mount();
+
+    expect(textNodes(renderer, 'prReview.checks.checksCount=2+/2')).toHaveLength(1);
+  });
+
+  it('leaves the header total unmarked when the listing was read in full', () => {
+    setRuns([run('passed', 'completed', 'success'), run('failed', 'completed', 'failure')]);
+    const renderer = mount();
+
+    expect(textNodes(renderer, 'prReview.checks.checksCount=2/2')).toHaveLength(1);
   });
 });
 

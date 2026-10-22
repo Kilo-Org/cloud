@@ -4,6 +4,7 @@
 import { TRPCError } from '@trpc/server';
 import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
+import { CHECKS_MAX_PAGES, CHECKS_PAGE_SIZE } from '@/lib/github-pr-review/dtos';
 import { INBOX_SEARCH_QUERY, prLedgerResourceKey } from './github-pr-review-router';
 
 const getGitHubUserAccessToken = jest.fn();
@@ -84,7 +85,6 @@ type OctokitMock = {
   users: {
     getAuthenticated: jest.Mock;
   };
-  paginate: jest.Mock;
   request: jest.Mock;
 };
 
@@ -113,7 +113,14 @@ const tokenOctokits = new Map<string, OctokitMock>();
 function buildOctokit(token: string): OctokitMock {
   const existing = tokenOctokits.get(token);
   if (existing) return existing;
-  const checks = { listForRef: jest.fn() };
+  // listChecks reads each listing one page at a time. The defaults answer with
+  // a single short page and no Link header, so a leg stops after page 1.
+  const checks = {
+    listForRef: jest.fn(async () => ({
+      headers: {},
+      data: { total_count: checkRunsFixture.length, check_runs: checkRunsFixture },
+    })),
+  };
   const octokit: OctokitMock = {
     __token: token,
     pulls: {
@@ -138,15 +145,13 @@ function buildOctokit(token: string): OctokitMock {
     },
     repos: {
       get: jest.fn(),
-      listCommitStatusesForRef: jest.fn(),
+      listCommitStatusesForRef: jest.fn(async () => ({
+        headers: {},
+        data: commitStatusesFixture,
+      })),
     },
     checks,
     users: { getAuthenticated: jest.fn() },
-    // listChecks calls paginate(checks.listForRef, …) then
-    // paginate(repos.listCommitStatusesForRef, …); dispatch on the method.
-    paginate: jest.fn(async (method: unknown) =>
-      method === checks.listForRef ? checkRunsFixture : commitStatusesFixture
-    ),
     request: jest.fn(),
   };
   tokenOctokits.set(token, octokit);
@@ -1315,13 +1320,13 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
     await expect(resultPromise).resolves.toMatchObject({ number: 1, title: 'Fix the thing' });
   });
 
-  it('listChecks starts both paginate calls before either resolves', async () => {
+  it('listChecks starts both listing walks before either first page resolves', async () => {
     getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
     const caller = createCaller({ user: { id: 'user-1' } as User });
     const octokit = buildOctokit('t1');
 
     let resolveChecks!: (value: unknown) => void;
-    octokit.paginate.mockImplementationOnce(
+    octokit.checks.listForRef.mockImplementationOnce(
       () =>
         new Promise(resolve => {
           resolveChecks = resolve;
@@ -1330,9 +1335,16 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
 
     const resultPromise = caller.listChecks({ owner: 'octocat', repo: 'hello', ref: 'heads/main' });
 
-    await waitFor(() => expect(octokit.paginate).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(octokit.checks.listForRef).toHaveBeenCalledTimes(1));
 
-    resolveChecks(checkRunsFixture);
+    // The commit-status walk asked for its first page before the check-run
+    // page resolved.
+    expect(octokit.repos.listCommitStatusesForRef).toHaveBeenCalledTimes(1);
+
+    resolveChecks({
+      headers: {},
+      data: { total_count: checkRunsFixture.length, check_runs: checkRunsFixture },
+    });
 
     await expect(resultPromise).resolves.toMatchObject({
       rollup: { total: 2, success: 2, failure: 0, pending: 0, skipped: 0 },
@@ -1396,6 +1408,155 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
     expect(result.reviewDecision).toBeNull();
     expect(result.repo.viewerLogin).toBeNull();
     expect(result.number).toBe(1);
+  });
+});
+
+describe('githubPrReviewRouter.listChecks page ceiling', () => {
+  function filledCheckRun(name: string) {
+    return {
+      name,
+      status: 'completed',
+      conclusion: 'success',
+      details_url: null,
+      html_url: null,
+      app: { name: 'CI' },
+    };
+  }
+
+  function nextPageHeader(page: number) {
+    return { link: `<https://api.github.com/...?page=${page + 1}>; rel="next"` };
+  }
+
+  function fullCheckRunsPage(page: number) {
+    return {
+      data: {
+        total_count: CHECKS_PAGE_SIZE,
+        check_runs: Array.from({ length: CHECKS_PAGE_SIZE }, (_, index) =>
+          filledCheckRun(`run-${page}-${index}`)
+        ),
+      },
+      headers: nextPageHeader(page),
+    };
+  }
+
+  function fullStatusesPage(page: number) {
+    return {
+      data: Array.from({ length: CHECKS_PAGE_SIZE }, (_, index) => ({
+        context: `context-${page}-${index}`,
+        state: 'success',
+        target_url: null,
+        updated_at: '2026-01-01T00:00:00Z',
+      })),
+      headers: nextPageHeader(page),
+    };
+  }
+
+  it('caps both listing walks and reports a partial result', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const octokit = buildOctokit('t1');
+
+    octokit.checks.listForRef.mockImplementation(async params => {
+      expect(params.per_page).toBe(CHECKS_PAGE_SIZE);
+      return fullCheckRunsPage(params.page);
+    });
+    octokit.repos.listCommitStatusesForRef.mockImplementation(async params =>
+      fullStatusesPage(params.page)
+    );
+
+    const result = await caller.listChecks({ owner: 'octocat', repo: 'hello', ref: 'heads/main' });
+
+    expect(octokit.checks.listForRef).toHaveBeenCalledTimes(CHECKS_MAX_PAGES);
+    expect(octokit.repos.listCommitStatusesForRef).toHaveBeenCalledTimes(CHECKS_MAX_PAGES);
+    const expectedPages = Array.from({ length: CHECKS_MAX_PAGES }, (_, index) => index + 1);
+    expect(octokit.checks.listForRef.mock.calls.map(([params]) => params.page)).toEqual(
+      expectedPages
+    );
+    expect(result.truncated).toBe(true);
+    expect(result.checkRuns).toHaveLength(CHECKS_PAGE_SIZE * CHECKS_MAX_PAGES * 2);
+    expect(result.rollup.total).toBe(CHECKS_PAGE_SIZE * CHECKS_MAX_PAGES * 2);
+  });
+
+  it('keeps the frozen result shape for a ref under the ceiling', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const octokit = buildOctokit('t1');
+
+    octokit.checks.listForRef.mockImplementation(async params => ({
+      data: {
+        total_count: 3,
+        check_runs: Array.from({ length: 3 }, (_, index) =>
+          filledCheckRun(`run-${params.page}-${index}`)
+        ),
+      },
+      // A short page with no next link: the listing ends here.
+      headers: {},
+    }));
+
+    const result = await caller.listChecks({ owner: 'octocat', repo: 'hello', ref: 'heads/main' });
+
+    expect(octokit.checks.listForRef).toHaveBeenCalledTimes(1);
+    expect(result.truncated).toBeUndefined();
+    expect(Object.keys(result).sort()).toEqual(['checkRuns', 'rollup']);
+    expect(result.checkRuns).toHaveLength(4);
+  });
+
+  it('uses page length when the response has no next link', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const octokit = buildOctokit('t1');
+
+    octokit.checks.listForRef.mockImplementation(async params => ({
+      data: {
+        total_count: CHECKS_PAGE_SIZE,
+        check_runs: Array.from({ length: CHECKS_PAGE_SIZE }, (_, index) =>
+          filledCheckRun(`run-${params.page}-${index}`)
+        ),
+      },
+      headers: {},
+    }));
+
+    const result = await caller.listChecks({ owner: 'octocat', repo: 'hello', ref: 'heads/main' });
+
+    expect(octokit.checks.listForRef).toHaveBeenCalledTimes(CHECKS_MAX_PAGES);
+    expect(result.truncated).toBe(true);
+  });
+
+  it('continues after a short page that carries a next link', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const octokit = buildOctokit('t1');
+
+    octokit.checks.listForRef.mockImplementation(async params => ({
+      data: {
+        total_count: 2,
+        check_runs: [filledCheckRun(`run-${params.page}`)],
+      },
+      headers: params.page === 1 ? nextPageHeader(params.page) : {},
+    }));
+
+    const result = await caller.listChecks({ owner: 'octocat', repo: 'hello', ref: 'heads/main' });
+
+    expect(octokit.checks.listForRef.mock.calls.map(([params]) => params.page)).toEqual([1, 2]);
+    expect(result.checkRuns).toHaveLength(3);
+    expect(result.truncated).toBeUndefined();
+  });
+
+  it('marks a partial result when the status listing reaches its page budget', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const octokit = buildOctokit('t1');
+
+    octokit.repos.listCommitStatusesForRef.mockImplementation(async params =>
+      fullStatusesPage(params.page)
+    );
+
+    const result = await caller.listChecks({ owner: 'octocat', repo: 'hello', ref: 'heads/main' });
+
+    expect(octokit.checks.listForRef).toHaveBeenCalledTimes(1);
+    expect(octokit.repos.listCommitStatusesForRef).toHaveBeenCalledTimes(CHECKS_MAX_PAGES);
+    expect(result.truncated).toBe(true);
+    expect(result.rollup.total).toBe(1 + CHECKS_PAGE_SIZE * CHECKS_MAX_PAGES);
   });
 });
 

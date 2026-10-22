@@ -30,6 +30,8 @@ import {
   type OverviewGraphQlData,
 } from '@/lib/github-pr-review/mappers';
 import {
+  CHECKS_MAX_PAGES,
+  CHECKS_PAGE_SIZE,
   CONVERSATION_COMMENTS_MAX_PAGES,
   CONVERSATION_COMMENTS_PAGE_SIZE,
   FILE_LINES_MAX,
@@ -1598,6 +1600,38 @@ async function assertViewerOwnsComment(args: {
   return 'owned';
 }
 
+// One page of a REST listing, plus the provider's own "there is more" signal:
+// `Link: rel="next"` is present exactly while another page exists.
+type CheckListPage = { items: unknown[]; linkHasNext: boolean | undefined };
+
+function readLinkHasNext(headers: { link?: string } | undefined): boolean | undefined {
+  const link = headers?.link;
+  return typeof link === 'string' ? link.includes('rel="next"') : undefined;
+}
+
+/**
+ * Read one check listing page by page until the provider reports no next page
+ * or CHECKS_MAX_PAGES pages have been read. `truncated` says the walk stopped
+ * at the ceiling with entries left behind, which the response carries so a
+ * client can present the rows as partial instead of as the whole list.
+ */
+async function fetchBoundedCheckList(args: {
+  fetchPage: (page: number) => Promise<CheckListPage>;
+}): Promise<{ items: unknown[]; truncated: boolean }> {
+  const items: unknown[] = [];
+  for (let page = 1; page <= CHECKS_MAX_PAGES; page += 1) {
+    const { items: pageItems, linkHasNext } = await args.fetchPage(page);
+    items.push(...pageItems);
+    // The Link header decides, so a page shorter than the requested size can
+    // still have more pages behind it. A response with no Link header (an
+    // older proxy, a test double) falls back to the page-length heuristic,
+    // the same rule listFiles uses.
+    const hasNext = linkHasNext ?? pageItems.length === CHECKS_PAGE_SIZE;
+    if (!hasNext) return { items, truncated: false };
+  }
+  return { items, truncated: true };
+}
+
 export const githubPrReviewRouter = createTRPCRouter({
   getPullRequest: baseProcedure.input(GetPullRequestInput).query(async ({ ctx, input }) => {
     const overview = await withGitHubUserTokenRetry({
@@ -1650,19 +1684,37 @@ export const githubPrReviewRouter = createTRPCRouter({
     return withGitHubUserTokenRetry({
       kiloUserId: ctx.user.id,
       call: async octokit => {
-        // Start both paginate calls before awaiting so the checks retrieval
-        // runs in parallel.
-        const checkRunsPromise = octokit.paginate(octokit.checks.listForRef, {
-          owner: input.owner,
-          repo: input.repo,
-          ref: input.ref,
-          per_page: 100,
+        // Start both walks before awaiting so their first pages are fetched in
+        // parallel.
+        const checkRunsPromise = fetchBoundedCheckList({
+          fetchPage: async page => {
+            const response = await octokit.checks.listForRef({
+              owner: input.owner,
+              repo: input.repo,
+              ref: input.ref,
+              per_page: CHECKS_PAGE_SIZE,
+              page,
+            });
+            return {
+              items: response.data.check_runs,
+              linkHasNext: readLinkHasNext(response.headers),
+            };
+          },
         });
-        const statusesPromise = octokit.paginate(octokit.repos.listCommitStatusesForRef, {
-          owner: input.owner,
-          repo: input.repo,
-          ref: input.ref,
-          per_page: 100,
+        const statusesPromise = fetchBoundedCheckList({
+          fetchPage: async page => {
+            const response = await octokit.repos.listCommitStatusesForRef({
+              owner: input.owner,
+              repo: input.repo,
+              ref: input.ref,
+              per_page: CHECKS_PAGE_SIZE,
+              page,
+            });
+            return {
+              items: response.data,
+              linkHasNext: readLinkHasNext(response.headers),
+            };
+          },
         });
 
         const [checkRunsResult, statusesResult] = await Promise.allSettled([
@@ -1677,8 +1729,9 @@ export const githubPrReviewRouter = createTRPCRouter({
         if (statusesResult.status === 'rejected') throw statusesResult.reason;
 
         return buildChecksResult({
-          checkRuns: checkRunsResult.value as never,
-          commitStatuses: statusesResult.value as never,
+          checkRuns: checkRunsResult.value.items as never,
+          commitStatuses: statusesResult.value.items as never,
+          truncated: checkRunsResult.value.truncated || statusesResult.value.truncated,
         });
       },
     });

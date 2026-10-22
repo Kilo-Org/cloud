@@ -275,6 +275,12 @@ export function buildChecksResult(args: {
     target_url: string | null;
     updated_at: string | null;
   }>;
+  /**
+   * Whether the caller stopped reading the provider listings at the page
+   * ceiling. Only `true` reaches the result, so a ref under the ceiling keeps
+   * the shape it always had.
+   */
+  truncated?: boolean;
 }): GitHubPrReviewChecksResult {
   const checkRunDtos = args.checkRuns.map(c => ({
     name: c.name,
@@ -314,7 +320,9 @@ export function buildChecksResult(args: {
     pending: merged.filter(c => rollupState(c.status, c.conclusion) === 'pending').length,
     skipped: merged.filter(c => rollupState(c.status, c.conclusion) === 'skipped').length,
   };
-  return { checkRuns: merged, rollup };
+  return args.truncated
+    ? { checkRuns: merged, rollup, truncated: true }
+    : { checkRuns: merged, rollup };
 }
 
 // Classify a merged check/status into exactly one rollup bucket. Anything that

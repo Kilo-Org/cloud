@@ -9,10 +9,12 @@ import { BlacklistDomainsConfigSchema } from '@kilocode/worker-utils/account-acc
 import { BLACKLIST_DOMAINS_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
 import type { BlacklistDomainsConfig } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { TRPCError } from '@trpc/server';
+import { captureException } from '@sentry/nextjs';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { sql, count, isNotNull, desc, min, max } from 'drizzle-orm';
 import * as z from 'zod';
+import { backfillBlockBlacklistedDomainsBatch } from '@/lib/abuse/block-blacklisted-domains';
 
 const SuspiciousDomainsInputSchema = z
   .object({
@@ -25,11 +27,15 @@ const SuspiciousDomainsInputSchema = z
 // actually caught users, ordered by count.
 const STATS_ROW_LIMIT = 200;
 
+async function readConfigOrThrow(): Promise<BlacklistDomainsConfig> {
+  const raw = await redisClient.get<string>(BLACKLIST_DOMAINS_REDIS_KEY);
+  if (!raw) return DEFAULT_BLACKLIST_DOMAINS_CONFIG;
+  return BlacklistDomainsConfigSchema.parse(JSON.parse(raw));
+}
+
 async function readConfig(): Promise<BlacklistDomainsConfig> {
   try {
-    const raw = await redisClient.get<string>(BLACKLIST_DOMAINS_REDIS_KEY);
-    if (!raw) return DEFAULT_BLACKLIST_DOMAINS_CONFIG;
-    return BlacklistDomainsConfigSchema.parse(JSON.parse(raw));
+    return await readConfigOrThrow();
   } catch {
     return DEFAULT_BLACKLIST_DOMAINS_CONFIG;
   }
@@ -46,6 +52,20 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
       ...new Set(input.domains.map(d => d.toLowerCase().trim()).filter(Boolean)),
     ];
 
+    // Diff against the list the admin started from so only newly added domains
+    // trigger a backfill. A failed read must not look like an empty list: that
+    // would turn a one-domain save into a backfill of every listed domain. Skip
+    // the automatic run in that case and let the manual backfill handle it.
+    let addedDomains: string[] | null;
+    try {
+      const previous = await readConfigOrThrow();
+      const previousDomains = new Set(previous.domains.map(d => d.toLowerCase().trim()));
+      addedDomains = normalizedDomains.filter(domain => !previousDomains.has(domain));
+    } catch (error) {
+      captureException(error, { tags: { source: 'blacklist_domains_previous_config_read' } });
+      addedDomains = null;
+    }
+
     const config: BlacklistDomainsConfig = {
       domains: normalizedDomains,
       updated_at: new Date().toISOString(),
@@ -59,7 +79,26 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
         message: 'Redis is not configured — cannot save blacklisted domains',
       });
     }
-    return config;
+
+    // The list is already live for auth checks at this point, so a backfill
+    // failure must not fail the save. Report it and point the admin at the
+    // manual backfill instead.
+    const backfill = { blocked: 0, remaining: false, failed: addedDomains === null };
+    if (addedDomains && addedDomains.length > 0) {
+      try {
+        const result = await backfillBlockBlacklistedDomainsBatch({
+          actorId: ctx.user.id,
+          domains: addedDomains,
+        });
+        backfill.blocked = result.processed;
+        backfill.remaining = result.remaining;
+      } catch (error) {
+        captureException(error, { tags: { source: 'blacklist_domains_auto_backfill' } });
+        backfill.failed = true;
+      }
+    }
+
+    return { ...config, backfill };
   }),
 
   stats: adminProcedure.query(async () => {

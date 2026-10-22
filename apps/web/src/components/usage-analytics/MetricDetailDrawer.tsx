@@ -104,8 +104,7 @@ const getMetricInfo = (
             merge.
           </>
         ),
-        action:
-          'Tip: Linking coding → review → deploy actions significantly boosts your Depth score.',
+        action: 'Tip: Linking coding → review actions significantly boosts your Depth score.',
       },
       {
         title: 'Give AI Better Context',
@@ -122,25 +121,6 @@ const getMetricInfo = (
             </Link>{' '}
             fixes this by giving the model vector-backed search across your repo. Better context
             means more relevant suggestions, which builds the trust that drives deeper usage.
-          </>
-        ),
-        action: null,
-      },
-      {
-        title: 'Validate AI Output in Real Environments',
-        subtitle: 'Deployment Testing',
-        description: (
-          <>
-            Generated code that never runs is hard to trust.{' '}
-            <Link
-              href={`/organizations/${organizationId}/deploy`}
-              className="text-blue-400 hover:underline"
-            >
-              Kilo Deploy
-            </Link>{' '}
-            lets you spin up a live URL for branches of your project so that your team can verify
-            changes against live URLs before merging. Teams that test AI output this way tend to
-            retain more of that code long-term.
           </>
         ),
         action: null,

@@ -29,6 +29,34 @@ Cached settings remain visible during offline pauses and refresh failures.
 
 Generally speaking, you only need a new dev build if making dependency/native changes.
 
+The app uses Expo SDK 58, React Native 0.88 and React 19.3. Align SDK-managed
+dependencies with the selected release's `bundledNativeModules.json`, and retain
+the workspace release-age policy when resolving upgrades. Existing development-tool
+exemptions remain separate from the SDK's release eligibility.
+
+Native compatibility requirements:
+
+- Keep versioned dependency patches and their lockfile hashes together. Regenerate
+  them against pristine package sources, and rebuild both development clients.
+- Android builds the patched background-task, notifications and task-manager modules
+  from source, together with task-manager's app loader.
+- `android.uniquePackageNames=false` retains compatibility with AppsFlyer's SDK and
+  purchase connector, which share a namespace. AGP 9 otherwise rejects that vendor pair.
+- The supported Gesture Handler builder API remains explicitly allowed by the
+  deprecation lint rule; other deprecated APIs remain checked.
+- `react-native-css` forwards React Native's native component registry through its
+  CommonJS facade for Router's native screen host, so the styling facade needs no
+  patch of its own.
+- The `llama.rn` iOS patch installs JSI bindings through React Native's TurboModule
+  runtime hook and conforms to the generated native spec.
+- The iOS App Actions bridge uses `@JS` for Expo's noncopyable JavaScript values.
+  Its runtime-owned reference releases the dispatcher on the JavaScript thread.
+- Root React types stay aligned with the root/web runtime; mobile declares its own
+  SDK-matched types. Keep both explicit so cached dependency hoisting cannot mix
+  the web and native JSX type identities.
+- Deferred cache maintenance keeps a 500 ms timer fallback alongside idle work.
+  The first delivery cancels the other so invalidation runs once during sustained JS work.
+
 Native permission translations live in `plugins/permission-prompt-copy.json` for all 87 supported languages.
 The camera and photo library prompts explain AI agent attachments and include specific examples.
 Background location descriptions remain disabled because the app does not request background location.
@@ -62,21 +90,20 @@ When updating EAS CLI, keep the `eas-cli` development dependency and `eas.json`'
 #### iPhone Duo and iOS 27
 
 - Use Xcode 27.1 or later to test native iPhone Duo layouts.
-- Keep `expo-build-properties.ios.enableSceneSupport` enabled in `app.config.ts` while the app uses Expo SDK 57.
+- Expo SDK 58 includes scene lifecycle support in its template; no scene-support opt-in is needed.
 - Expo's scene delegate creates the window and forwards lifecycle events and links to the app delegate.
 - After a native config change, regenerate the iOS project and rebuild the app.
 - Do not edit the generated `ios/` files.
 - Sign local simulator builds with an Apple Development identity and its correct team ID.
 - Unsigned builds cannot restore the local account from the keychain on this simulator.
 - Check both displays, all three fold poses, and each orientation after the rebuild.
-- When the app moves to Expo SDK 58, remove the scene support option; its template includes scene support.
 
 #### Widget layout checks
 
 - Home widgets keep a 16pt band on all four sides, including the updating placeholder.
 - Check the medium placeholder on a 164pt-tall card: its header, bars and footer must fit within 132pt or SwiftUI centres the overflow into the padding.
 - Arabic Live Activity direction comes from `homeWidgetLocale` in the shared app group, not the simulator language.
-- The Live Activity direction override is native code in `patches/expo-widgets@57.0.22.patch`. Rebuild the iOS extension after changing the patch; restarting Metro alone leaves the installed extension unchanged.
+- The Live Activity direction override is native code in `patches/expo-widgets@58.0.17.patch`. Rebuild the iOS extension after changing the patch; restarting Metro alone leaves the installed extension unchanged.
 - After switching the app language, reopen the development client on Metro before applying a fixture and capturing widgets.
 
 #### Responsive layout checks

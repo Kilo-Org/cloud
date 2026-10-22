@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Պահոցներ չեն երևում։ Ստուգեք GitLab-ի պահոցների մուտքի թույլտվությունները, ապա թարմացրեք ցանկը։",
       "noRepositoriesVisibleBitbucket": "Պահոցներ չեն երևում։ Ստուգեք Bitbucket-ի պահոցների մուտքի թույլտվությունները, ապա թարմացրեք ցանկը։",
       "bitbucketOrganizationsOnly": "Bitbucket-ը հասանելի է միայն կազմակերպությունների համար։",
+      "githubNeedsAttention": "GitHub-ը պետք է վերամիացվի",
+      "githubNeedsAttentionDescription": "Վերամիացրեք Kilo-ի GitHub հավելվածը, ապա թարմացրեք՝ բեռնելու դրա պահոցները։",
+      "partialRepositories": "GitHub-ի որոշ պահոցներ չբեռնվեցին։",
       "branchPickerTitle": "Ընտրել ճյուղը",
       "branchDefault": "Կանխադրված",
       "branchAccessibility": "Ճյուղ՝ {{label}}",
@@ -3684,6 +3687,8 @@
     "skillNameInvalid": "Հմտության անունը պետք է սկսվի տառով կամ թվանշանով և օգտագործի միայն փոքրատառեր, թվանշաններ և գծիկներ",
     "skillContentRequired": "Հմտությունների բովանդակությունը պարտադիր է",
     "skillSaveFailed": "Չհաջողվեց պահպանել հմտությունը",
+    "skillSourceCustom": "սեփական",
+    "skillSourceMarketplace": "շուկա",
     "skillsHint": "Տեղադրեք SKILL.md-ը և լրացվում է դրա անունը; ավելացնել հմտություն ձեր հեռախոսից՝ առանց քաշելու և թողնելու:",
     "skillEditTitle": "Խմբագրման հմտություն",
     "mcp": {

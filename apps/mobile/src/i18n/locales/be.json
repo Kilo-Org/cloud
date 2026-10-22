@@ -2287,6 +2287,9 @@
       "noRepositoriesVisibleGitlab": "Рэпазіторыі не адлюстроўваюцца. Праверце доступ да рэпазіторыяў GitLab і абнавіце спіс.",
       "noRepositoriesVisibleBitbucket": "Рэпазіторыі не адлюстроўваюцца. Праверце доступ да рэпазіторыяў Bitbucket і абнавіце спіс.",
       "bitbucketOrganizationsOnly": "Bitbucket даступны толькі для арганізацый.",
+      "githubNeedsAttention": "GitHub патрабуе паўторнага падключэння",
+      "githubNeedsAttentionDescription": "Паўторна падключыце праграму Kilo для GitHub, а потым абнавіце спіс, каб загрузіць яе рэпазіторыі.",
+      "partialRepositories": "Некаторыя рэпазіторыі GitHub не загрузіліся.",
       "branchPickerTitle": "Выбраць галіну",
       "branchDefault": "Прадвызначаная",
       "branchAccessibility": "Галіна: {{label}}",
@@ -3774,6 +3777,8 @@
     "skillNameInvalid": "Назва навыку павінна пачынацца з літары або лічбы і выкарыстоўваць толькі малыя літары, лічбы і працяжнікі",
     "skillContentRequired": "Змест навыкаў патрабуецца",
     "skillSaveFailed": "Не ўдалося захаваць навык",
+    "skillSourceCustom": "Карыстацкі",
+    "skillSourceMarketplace": "Маркетплэйс",
     "skillsHint": "Устаўце SKILL.md і запоўніце яго імя; дадаць навык са свайго тэлефона без перацягвання.",
     "skillEditTitle": "Майстэрства рэдагавання",
     "mcp": {

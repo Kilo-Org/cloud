@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "களஞ்சியங்கள் எதுவும் தெரியவில்லை. GitLab-இல் களஞ்சியங்களை அணுக அனுமதி உள்ளதா எனச் சரிபார்த்துப் புதுப்பிக்கவும்.",
       "noRepositoriesVisibleBitbucket": "களஞ்சியங்கள் எதுவும் தெரியவில்லை. Bitbucket-இல் களஞ்சியங்களை அணுக அனுமதி உள்ளதா எனச் சரிபார்த்துப் புதுப்பிக்கவும்.",
       "bitbucketOrganizationsOnly": "நிறுவனங்களுக்கு மட்டுமே Bitbucket கிடைக்கும்.",
+      "githubNeedsAttention": "GitHub மீண்டும் இணைக்கப்பட வேண்டும்",
+      "githubNeedsAttentionDescription": "Kilo GitHub செயலியை மீண்டும் இணைத்து, பின்னர் அதன் களஞ்சியங்களை ஏற்றப் புதுப்பிக்கவும்.",
+      "partialRepositories": "சில GitHub களஞ்சியங்கள் ஏற்றப்படவில்லை.",
       "branchPickerTitle": "கிளையைத் தேர்ந்தெடுக்கவும்",
       "branchDefault": "இயல்புநிலை",
       "branchAccessibility": "கிளை: {{label}}",
@@ -3684,6 +3687,8 @@
     "skillNameInvalid": "திறன் பெயர் ஒரு எழுத்து அல்லது இலக்கத்துடன் தொடங்க வேண்டும் மற்றும் சிறிய எழுத்துக்கள், இலக்கங்கள் மற்றும் கோடுகளை மட்டுமே பயன்படுத்த வேண்டும்",
     "skillContentRequired": "திறன் உள்ளடக்கம் தேவை",
     "skillSaveFailed": "திறமையைச் சேமிக்க முடியவில்லை",
+    "skillSourceCustom": "தனிப்பயன்",
+    "skillSourceMarketplace": "சந்தை",
     "skillsHint": "ஒரு SKILL.md ஐ ஒட்டவும், அதன் பெயர் நிரப்பப்படும்; இழுத்து விடாமல் உங்கள் ஃபோனிலிருந்து திறமையைச் சேர்க்கவும்.",
     "skillEditTitle": "திருத்தும் திறமை",
     "mcp": {

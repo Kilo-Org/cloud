@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Non se ve ningún repositorio. Comproba o acceso aos repositorios de GitLab e despois actualiza a lista.",
       "noRepositoriesVisibleBitbucket": "Non se ve ningún repositorio. Comproba o acceso aos repositorios de Bitbucket e despois actualiza a lista.",
       "bitbucketOrganizationsOnly": "Bitbucket só está dispoñible para organizacións.",
+      "githubNeedsAttention": "Hai que volver conectar GitHub",
+      "githubNeedsAttentionDescription": "Volve conectar a aplicación de GitHub de Kilo e despois actualiza para cargar os seus repositorios.",
+      "partialRepositories": "Algúns repositorios de GitHub non se cargaron.",
       "branchPickerTitle": "Seleccionar rama",
       "branchDefault": "Predeterminada",
       "branchAccessibility": "Rama: {{label}}",
@@ -3684,6 +3687,8 @@
     "skillNameInvalid": "O nome da habilidade debe comezar cunha letra ou un díxitos e usar só letras minúsculas, díxitos e guións",
     "skillContentRequired": "Requírese contido de habilidade",
     "skillSaveFailed": "Non se puido gardar a habilidade",
+    "skillSourceCustom": "Personalizada",
+    "skillSourceMarketplace": "Mercado",
     "skillsHint": "Pega un SKILL.md e o seu nome énchese; engade unha habilidade desde o teu teléfono sen arrastrar e soltar.",
     "skillEditTitle": "Editar habilidade",
     "mcp": {

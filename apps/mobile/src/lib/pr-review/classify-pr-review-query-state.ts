@@ -12,7 +12,6 @@
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { i18n } from '@/i18n';
 
-
 export type PrReviewQueryState =
   | {
       /**

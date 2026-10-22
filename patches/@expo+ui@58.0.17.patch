@@ -14,7 +14,7 @@ index 451dea211d69e0b38f56af577fa31e3babf42312..aa70efbe9c41e845d50d57d01591e4f7
    // Testing
    testImplementation 'junit:junit:4.13.2'
 diff --git a/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt b/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
-index 9ca09321e7068ced9a490fdd06dac7a2d8ec3949..376cffc337a4e370dc94b8d6968589d870b30010 100644
+index 9ca09321e7068ced9a490fdd06dac7a2d8ec3949..f4b9d0d0555892a0f7bc8dea165a5442b89d53bc 100644
 --- a/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
 +++ b/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
 @@ -8,6 +8,7 @@ import android.content.Context
@@ -25,7 +25,36 @@ index 9ca09321e7068ced9a490fdd06dac7a2d8ec3949..376cffc337a4e370dc94b8d6968589d8
  import androidx.compose.material3.BottomSheetDefaults
  import androidx.compose.material3.ExperimentalMaterial3Api
  import androidx.compose.material3.MaterialTheme
-@@ -171,11 +172,19 @@ fun FunctionalComposableScope.ModalBottomSheetContent(
+@@ -19,6 +20,7 @@ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.DisposableEffect
+ import androidx.compose.runtime.LaunchedEffect
+ import androidx.compose.runtime.rememberCoroutineScope
++import androidx.compose.runtime.rememberUpdatedState
+ import androidx.compose.ui.graphics.Color as ComposeColor
+ import androidx.compose.ui.graphics.luminance
+ import androidx.compose.ui.graphics.takeOrElse
+@@ -74,7 +76,8 @@ private fun Activity.isAcceptingText(): Boolean {
+  * Without this check, typing "rr" in a sheet TextInput reloads the app.
+  */
+ @Composable
+-private fun ForwardKeyEventsToActivity(activity: Activity?) {
++private fun ForwardKeyEventsToActivity(activity: Activity?, onOpeningBack: () -> Boolean) {
++  val currentOnOpeningBack = rememberUpdatedState(onOpeningBack)
+   val dialog = (LocalView.current.parent as? DialogWindowProvider)?.window?.callback as? Dialog
+   if (dialog == null || activity == null) {
+     return
+@@ -82,6 +85,10 @@ private fun ForwardKeyEventsToActivity(activity: Activity?) {
+ 
+   DisposableEffect(dialog, activity) {
+     dialog.setOnKeyListener { _, keyCode, event ->
++      // The dialog can receive Back before its lifecycle-aware BackHandler is active.
++      if (event.action == KeyEvent.ACTION_UP && keyCode == KeyEvent.KEYCODE_BACK && currentOnOpeningBack.value()) {
++        return@setOnKeyListener true
++      }
+       val isForwardable = event.action == KeyEvent.ACTION_UP &&
+         keyCode != KeyEvent.KEYCODE_BACK &&
+         keyCode != KeyEvent.KEYCODE_ESCAPE &&
+@@ -171,12 +178,27 @@ fun FunctionalComposableScope.ModalBottomSheetContent(
        else -> null
      },
      properties = ModalBottomSheetProperties(
@@ -39,13 +68,22 @@ index 9ca09321e7068ced9a490fdd06dac7a2d8ec3949..376cffc337a4e370dc94b8d6968589d8
      ),
      modifier = ModifierRegistry.applyModifiers(props.modifiers, appContext, composableScope, globalEventDispatcher)
    ) {
+-    ForwardKeyEventsToActivity(appContext.currentActivity)
 +    // Registered inside the dialog, so it runs before the wrapper's fallback.
 +    if (props.properties.shouldDismissOnBackPress) {
 +      BackHandler { onDismissRequest() }
 +    }
-     ForwardKeyEventsToActivity(appContext.currentActivity)
++    ForwardKeyEventsToActivity(appContext.currentActivity) {
++      if (props.properties.shouldDismissOnBackPress && (!sheetState.isVisible || sheetState.isAnimationRunning)) {
++        onDismissRequest()
++        true
++      } else {
++        false
++      }
++    }
      Children(UIComposableScope(), filter = { !isSlotView(it) })
    }
+ 
 diff --git a/build/community/bottom-sheet/BottomSheet.android.js b/build/community/bottom-sheet/BottomSheet.android.js
 index d39d9de891d83a7bf10f74e66d4a55bd38b63a22..c50c9b5888cfb7fe060e887a26ff48254375c56e 100644
 --- a/build/community/bottom-sheet/BottomSheet.android.js

@@ -133,12 +133,50 @@ describe('organization-only ownership', () => {
 });
 
 describe('authorizeWorkspace', () => {
-  it('resolves the org integration identity and returns the released token', async () => {
+  it('resolves the org integration identity, its repository set, and the released token', async () => {
     const access = await authorizeWorkspace(ORG_OWNER);
 
     expect(access.accessToken).toBe('at-mock-token');
     expect(access.workspace).toEqual(WORKSPACE);
+    expect(access.repositories).toEqual([
+      {
+        uuid: '87654321-4321-4321-4321-210987654321',
+        slug: 'repo',
+        fullName: 'acme/repo',
+      },
+      {
+        uuid: '11111111-2222-3333-4444-555555555555',
+        slug: 'other',
+        fullName: 'acme/other',
+      },
+    ]);
     expect(mockGetBitbucketWorkspaceAccessTokenStatus).toHaveBeenCalledWith('org_1');
+    expect(mockReadCachedRepositories).toHaveBeenCalledWith({
+      organizationId: 'org_1',
+      expectedIntegrationId: 'intg_1',
+    });
+  });
+
+  it('reads the repository set before releasing the token', async () => {
+    mockReadCachedRepositories.mockResolvedValue({ status: 'insufficient_permissions' });
+
+    await expect(authorizeWorkspace(ORG_OWNER)).rejects.toMatchObject({
+      kind: 'forbidden',
+      retryable: false,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['not_connected', 'not_found', false],
+    ['reconnect_required', 'not_found', false],
+    ['invalid_request', 'bad_request', false],
+    ['temporarily_unavailable', 'retryable', true],
+  ] as const)('maps the %s repository set state to %s', async (status, kind, retryable) => {
+    mockReadCachedRepositories.mockResolvedValue({ status });
+
+    await expect(authorizeWorkspace(ORG_OWNER)).rejects.toMatchObject({ kind, retryable });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('maps a missing connection to non-retryable not_found', async () => {

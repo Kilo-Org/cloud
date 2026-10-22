@@ -47,9 +47,6 @@ const MAX_BITBUCKET_RESPONSE_BYTES = 10 * 1024 * 1024;
 const MAX_SUMMARY_DIFFSTAT_PAGES = 3;
 /** The merge gate checks at most this many pages of the latest builds. */
 const MAX_BUILD_PAGES = 3;
-/** The inbox enumerates at most this many pages of this size of workspace repositories. */
-const INBOX_REPOSITORY_PAGE_SIZE = 100;
-const INBOX_REPOSITORY_PAGES = 3;
 /** How many repository PR collections the inbox fetches at once. */
 const INBOX_REPOSITORY_CONCURRENCY = 8;
 /**
@@ -939,24 +936,29 @@ export async function listChecks(
 }
 
 /**
- * Open pull requests across the connected workspace, for the PR Review inbox.
- * Each item carries platform, workspace, and repository identity, so the list
- * can never navigate into a different provider's repo.
+ * Open pull requests of the integration's cached repositories, for the PR
+ * Review inbox. Each item carries platform, workspace, and repository
+ * identity, so the list can never navigate into a different provider's repo.
+ *
+ * The candidate repositories are the integration's cached repository set —
+ * the same set authorizeRepository treats as the repository boundary — so
+ * every row names a repository this layer can open.
  *
  * Bitbucket removed the aggregate collections that used to answer this in one
  * request (`/2.0/pullrequests?role=REVIEWER` and the workspace-level twin
  * both answer "There is no API hosted at this URL" today), and a workspace
  * access token cannot resolve its own account (`/2.0/user` answers 403), so
- * "reviewer = me" is not reproducible. The inbox therefore lists every open
- * PR of the workspace's repositories, newest first.
+ * "reviewer = me" is not reproducible. The inbox therefore lists the open
+ * PRs of the integration's repositories, newest first.
  *
  * The fan-out sorts across repositories, so one inbox page cannot map onto a
  * single provider page: page N refetches provider pages 1..N of every
- * repository (each listing is pinned to `sort=-updated_on`, the inbox's own
- * sort key) and serves the sorted window [(N-1)·size, N·size). Refetching
- * the earlier provider pages is what keeps the windows from drifting: a
- * plain provider-page-N fan-out plus sort-and-trim would silently drop the
- * rows page 1's trim left over, and they would never be re-served.
+ * integration repository (each listing is pinned to `sort=-updated_on`, the
+ * inbox's own sort key) and serves the sorted window
+ * [(N-1)·size, N·size). Refetching the earlier provider pages is what keeps
+ * the windows from drifting: a plain provider-page-N fan-out plus
+ * sort-and-trim would silently drop the rows page 1's trim left over, and
+ * they would never be re-served.
  */
 export async function listInbox(
   owner: BitbucketReviewOwner,
@@ -970,7 +972,15 @@ export async function listInbox(
       // Past the walk bound the pagination ends instead of crawling.
       return { items: [], nextCursor: null };
     }
-    const slugs = await listWorkspaceRepositorySlugs(access, access.workspace.slug);
+    const slugs = access.repositories.map(repository => repository.slug);
+    if (slugs.length === 0) {
+      // An integration whose repository set is empty lists nothing: an empty
+      // page, no provider fan-out.
+      return { items: [], nextCursor: null };
+    }
+    const allowedFullNames = new Set(
+      access.repositories.map(repository => repository.fullName.toLowerCase())
+    );
     const values: unknown[] = [];
     let deeperProviderPage = false;
     for (let providerPage = 1; providerPage <= page; providerPage += 1) {
@@ -1008,7 +1018,7 @@ export async function listInbox(
     for (const value of values) {
       const parsed = BitbucketInboxPullRequestSchema.safeParse(value);
       if (!parsed.success) continue;
-      const ref = inboxRefFrom(parsed.data, access.workspace.slug);
+      const ref = inboxRefFrom(parsed.data, allowedFullNames);
       if (!ref) continue;
       items.push({
         ref,
@@ -1045,7 +1055,7 @@ function inboxUpdatedMs(item: ProviderPrInboxItem): number {
 
 /**
  * The inbox cursor is a plain page counter, not a provider `next` URL: one
- * inbox page fans out over the workspace's repositories, so no single next
+ * inbox page fans out over the integration's repositories, so no single next
  * link can represent it. The page number is the sorted window index — page N
  * serves rows [(N-1)·size, N·size) of the merged newest-first order. A
  * cursor minted for another workspace, or in the old next-URL shape, decodes
@@ -1070,54 +1080,22 @@ function decodeInboxPageCursor(cursor: string | undefined, identity: string): nu
 }
 
 /**
- * Repository slugs of the workspace, newest enumeration capped: at most
- * INBOX_REPOSITORY_PAGES pages of INBOX_REPOSITORY_PAGE_SIZE. A workspace
- * larger than the cap shows PRs of the repositories Bitbucket enumerates
- * first — a bounded inbox beats an unbounded crawl.
- */
-async function listWorkspaceRepositorySlugs(
-  access: { accessToken: string },
-  workspaceSlug: string
-): Promise<string[]> {
-  const slugs: string[] = [];
-  for (let repoPage = 1; repoPage <= INBOX_REPOSITORY_PAGES; repoPage += 1) {
-    const payload = await requestBitbucketJson<unknown>(
-      access,
-      `/2.0/repositories/${encodeURIComponent(workspaceSlug)}`,
-      { query: { pagelen: INBOX_REPOSITORY_PAGE_SIZE, page: repoPage } }
-    );
-    const parsed = z
-      .object({
-        values: z.array(z.object({ slug: z.string().min(1).nullable().optional() })).default([]),
-      })
-      .safeParse(payload);
-    if (!parsed.success) {
-      throw new BitbucketReviewError('retryable', 'Bitbucket returned an unexpected page.');
-    }
-    for (const repository of parsed.data.values) {
-      if (repository.slug) slugs.push(repository.slug);
-    }
-    if (parsed.data.values.length < INBOX_REPOSITORY_PAGE_SIZE) break;
-  }
-  return slugs;
-}
-
-/**
  * The ref of an inbox row: `workspace/repo-slug` from the destination
- * repository full name. A row whose identity is unparseable — or outside the
- * connected workspace — is skipped: an item without a full identity could
- * navigate into the wrong repository.
+ * repository full name. Every published row names a repository in the
+ * integration's repository set, so a row from any other repository — or with
+ * an unparseable identity — is skipped.
  */
 function inboxRefFrom(
   value: z.infer<typeof BitbucketInboxPullRequestSchema>,
-  workspaceSlug: string
+  allowedFullNames: ReadonlySet<string>
 ): ProviderPrSummary['ref'] | null {
   const fullName =
     value.destination?.repository?.full_name ?? value.source?.repository?.full_name ?? '';
   const segments = fullName.split('/');
   if (segments.length !== 2) return null;
   const [rowWorkspace, rowRepoSlug] = segments;
-  if (rowWorkspace.toLowerCase() !== workspaceSlug.toLowerCase() || !rowRepoSlug) return null;
+  if (!rowWorkspace || !rowRepoSlug) return null;
+  if (!allowedFullNames.has(fullName.toLowerCase())) return null;
   return {
     platform: 'bitbucket',
     workspace: rowWorkspace,

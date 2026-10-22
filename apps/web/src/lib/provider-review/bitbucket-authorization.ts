@@ -162,6 +162,15 @@ export type BitbucketWorkspaceAccess = {
   owner: BitbucketReviewOwner;
 };
 
+/**
+ * Workspace access plus the repositories the integration is configured for:
+ * its cached repository set, resolved before the token is released. A
+ * workspace-wide read scopes its provider requests to exactly this set.
+ */
+export type BitbucketWorkspaceRepositoryAccess = BitbucketWorkspaceAccess & {
+  repositories: BitbucketRepositoryIdentity[];
+};
+
 /** The credentials and resolved repository identity one repository request may use. */
 export type BitbucketRepositoryAccess = BitbucketWorkspaceAccess & {
   repository: BitbucketRepositoryIdentity;
@@ -397,25 +406,77 @@ async function resolveWorkspaceIntegration(
 }
 
 /**
- * Resolve the active organization integration and release its workspace
- * access token. The inbox has no repository to verify, so it uses this
- * instead of authorizeRepository.
+ * Read the integration's cached repository set — the repository authorization
+ * boundary — as exact identities, mapped onto the review layer's error kinds.
+ * A set that cannot be read is a classified failure, so a caller always knows
+ * which repositories the integration covers.
+ */
+async function readAuthorizedRepositoryCache(
+  owner: BitbucketReviewOwner & { type: 'organization' },
+  integrationId: string
+): Promise<BitbucketRepositoryIdentity[]> {
+  const cache = await readCachedBitbucketWorkspaceAccessTokenRepositories({
+    organizationId: owner.organizationId,
+    expectedIntegrationId: integrationId,
+  });
+  if (cache.status === 'not_connected' || cache.status === 'reconnect_required') {
+    throw new BitbucketReviewError(
+      'not_found',
+      'The Bitbucket connection is no longer active. Reconnect Bitbucket to continue.'
+    );
+  }
+  if (cache.status === 'invalid_request') {
+    throw new BitbucketReviewError('bad_request', 'Bitbucket rejected the repository request.');
+  }
+  // A permanent token-scope failure: the connected integration cannot list the
+  // workspace's repositories, so no retry helps. Name the remedy instead of
+  // folding it into a generic "try again" (the retryable fallback below).
+  if (cache.status === 'insufficient_permissions') {
+    throw new BitbucketReviewError(
+      'forbidden',
+      'The Bitbucket connection is missing the repository scope. Reconnect Bitbucket with repository read access to continue.'
+    );
+  }
+  if (cache.status !== 'available') {
+    throw new BitbucketReviewError(
+      'retryable',
+      'The Bitbucket repository list is temporarily unavailable. Try again.'
+    );
+  }
+  // The cache parser already refuses an entry that is not exactly
+  // `<workspace>/<repository>`, with a non-empty repository segment; the
+  // guard here keeps that invariant local to the projection.
+  return cache.repositories.flatMap(repository => {
+    const [workspace, slug] = repository.fullName.split('/');
+    return workspace && slug
+      ? [{ uuid: repository.id, slug, fullName: repository.fullName }]
+      : [];
+  });
+}
+
+/**
+ * Resolve the active organization integration, read its cached repository
+ * set, and release its workspace access token. The inbox has no single
+ * repository to verify, so it scopes its provider reads to this returned
+ * repository set instead of using authorizeRepository. The set is read before
+ * the token is released, so an unreadable set yields no token.
  */
 export async function authorizeWorkspace(
   owner: BitbucketReviewOwner
-): Promise<BitbucketWorkspaceAccess> {
+): Promise<BitbucketWorkspaceRepositoryAccess> {
   if (owner.type !== 'organization') {
     // Bitbucket Cloud has no personal integration: an understandable state in
     // personal context is a clear refusal, never a partial workflow.
     throw new BitbucketReviewError('not_found', BITBUCKET_ORGANIZATION_ONLY_MESSAGE);
   }
   const resolved = await resolveWorkspaceIntegration(owner);
+  const repositories = await readAuthorizedRepositoryCache(owner, resolved.integrationId);
   const accessToken = await releaseWorkspaceAccessToken({
     owner,
     workspace: resolved.workspace,
     integrationId: resolved.integrationId,
   });
-  return { accessToken, workspace: resolved.workspace, owner };
+  return { accessToken, workspace: resolved.workspace, owner, repositories };
 }
 
 /**
@@ -458,37 +519,10 @@ export async function authorizeRepository(
     );
   }
 
-  const cache = await readCachedBitbucketWorkspaceAccessTokenRepositories({
-    organizationId: owner.organizationId,
-    expectedIntegrationId: resolved.integrationId,
-  });
-  if (cache.status === 'not_connected' || cache.status === 'reconnect_required') {
-    throw new BitbucketReviewError(
-      'not_found',
-      'The Bitbucket connection is no longer active. Reconnect Bitbucket to continue.'
-    );
-  }
-  if (cache.status === 'invalid_request') {
-    throw new BitbucketReviewError('bad_request', 'Bitbucket rejected the repository request.');
-  }
-  // A permanent token-scope failure: the connected integration cannot list the
-  // workspace's repositories, so no retry helps. Name the remedy instead of
-  // folding it into a generic "try again" (the retryable fallback below).
-  if (cache.status === 'insufficient_permissions') {
-    throw new BitbucketReviewError(
-      'forbidden',
-      'The Bitbucket connection is missing the repository scope. Reconnect Bitbucket with repository read access to continue.'
-    );
-  }
-  if (cache.status !== 'available') {
-    throw new BitbucketReviewError(
-      'retryable',
-      'The Bitbucket repository list is temporarily unavailable. Try again.'
-    );
-  }
+  const repositories = await readAuthorizedRepositoryCache(owner, resolved.integrationId);
 
   const requestedFullName = `${requestedWorkspace}/${requestedRepository}`;
-  const match = cache.repositories.find(
+  const match = repositories.find(
     repository => repository.fullName.toLowerCase() === requestedFullName
   );
   if (!match) {
@@ -497,7 +531,6 @@ export async function authorizeRepository(
       'This repository is not part of your connected Bitbucket workspace.'
     );
   }
-  const matchRepository = match.fullName.split('/')[1];
 
   const accessToken = await releaseWorkspaceAccessToken({
     owner,
@@ -507,11 +540,7 @@ export async function authorizeRepository(
   return {
     accessToken,
     workspace: resolved.workspace,
-    repository: {
-      uuid: match.id,
-      slug: matchRepository ?? requestedRepository,
-      fullName: match.fullName,
-    },
+    repository: match,
     owner,
   };
 }

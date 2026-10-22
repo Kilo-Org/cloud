@@ -943,20 +943,35 @@ describe('listInbox', () => {
     destination: { branch: { name: 'main' }, repository: { full_name: fullName } },
   });
 
-  it('fans out over the workspace repositories and carries full identity', async () => {
+  it('fans out over the integration repositories and carries full identity', async () => {
+    mockReadCachedRepositories.mockResolvedValue({
+      status: 'available',
+      repositories: [
+        {
+          id: '87654321-4321-4321-4321-210987654321',
+          workspaceUuid: WORKSPACE.uuid,
+          name: 'repo',
+          fullName: 'acme/repo',
+          private: true,
+          defaultBranch: 'main',
+        },
+        {
+          id: '99999999-8888-7777-6666-555555555555',
+          workspaceUuid: WORKSPACE.uuid,
+          name: 'empty-repo',
+          fullName: 'acme/empty-repo',
+          private: true,
+          defaultBranch: 'main',
+        },
+      ],
+      syncedAt: '2026-09-06T00:00:00.000Z',
+    });
     fetchMock.mockImplementation(async (url: string | URL) => {
       const full = url.toString();
       if (full.includes('token-service.example.com')) {
         return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
       }
       const parsed = new URL(full);
-      if (parsed.pathname === '/2.0/repositories/acme') {
-        return jsonResponse({
-          pagelen: 100,
-          values: [{ slug: 'repo' }, { slug: 'empty-repo' }],
-          next: null,
-        });
-      }
       if (parsed.pathname === '/2.0/repositories/acme/repo/pullrequests') {
         expect(parsed.searchParams.get('q')).toBe('state="OPEN"');
         // The provider listing is pinned to the inbox's own sort key, so the
@@ -966,14 +981,7 @@ describe('listInbox', () => {
           pagelen: 50,
           values: [
             inboxPr(12, '2026-09-02T00:00:00.000000+00:00'),
-            {
-              id: 13,
-              title: 'Foreign workspace PR',
-              state: 'OPEN',
-              draft: false,
-              updated_on: '2026-09-03T00:00:00.000000+00:00',
-              destination: { repository: { full_name: 'other-ws/other-repo' } },
-            },
+            inboxPr(15, '2026-09-04T00:00:00.000000+00:00', 'acme/decoy'),
             {
               id: 14,
               title: 'No repository identity',
@@ -1004,6 +1012,63 @@ describe('listInbox', () => {
     expect(result.nextCursor).toBeNull();
   });
 
+  it('reads only the integration repositories', async () => {
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      const parsed = new URL(full);
+      if (parsed.pathname === '/2.0/repositories/acme/repo/pullrequests') {
+        return jsonResponse({
+          pagelen: 50,
+          values: [inboxPr(12, '2026-09-02T00:00:00.000000+00:00')],
+          next: null,
+        });
+      }
+      throw new Error(`Unexpected provider read: ${parsed.pathname}`);
+    });
+
+    const result = await listInbox(ORG_OWNER);
+
+    expect(result.items.map(item => item.ref)).toEqual([
+      expect.objectContaining({ workspace: 'acme', repoSlug: 'repo', prId: 12 }),
+    ]);
+    expect(fetchMock.mock.calls.map(call => new URL(String(call[0])).pathname)).toEqual([
+      '/internal/bitbucket/workspace-access-token',
+      '/2.0/repositories/acme/repo/pullrequests',
+    ]);
+  });
+
+  it('answers an empty page when the integration repository set is empty', async () => {
+    mockReadCachedRepositories.mockResolvedValue({
+      status: 'available',
+      repositories: [],
+      syncedAt: '2026-09-06T00:00:00.000Z',
+    });
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      throw new Error(`Unexpected provider read: ${full}`);
+    });
+
+    const result = await listInbox(ORG_OWNER);
+
+    expect(result).toEqual({ items: [], nextCursor: null });
+  });
+
+  it('maps an unreadable repository set onto the review error kinds', async () => {
+    mockReadCachedRepositories.mockResolvedValue({ status: 'reconnect_required' });
+
+    await expect(listInbox(ORG_OWNER)).rejects.toMatchObject({
+      kind: 'not_found',
+      retryable: false,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('merges pages across repositories newest first and continues with a page cursor', async () => {
     fetchMock.mockImplementation(async (url: string | URL) => {
       const full = url.toString();
@@ -1011,9 +1076,6 @@ describe('listInbox', () => {
         return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
       }
       const parsed = new URL(full);
-      if (parsed.pathname === '/2.0/repositories/acme') {
-        return jsonResponse({ pagelen: 100, values: [{ slug: 'repo' }], next: null });
-      }
       if (parsed.pathname === '/2.0/repositories/acme/repo/pullrequests') {
         // The provider listing is sorted newest first (the inbox request pins
         // sort=-updated_on): page 2 holds only older rows.
@@ -1058,9 +1120,6 @@ describe('listInbox', () => {
         return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
       }
       const parsed = new URL(full);
-      if (parsed.pathname === '/2.0/repositories/acme') {
-        return jsonResponse({ pagelen: 100, values: [{ slug: 'repo' }], next: null });
-      }
       if (parsed.pathname === '/2.0/repositories/acme/repo/pullrequests') {
         const page = parsed.searchParams.get('page');
         if (page === '2') {
@@ -1104,22 +1163,38 @@ describe('listInbox', () => {
   });
 
   it('serves every row of several repositories across pages without drops', async () => {
-    // Two repositories with 50 open PRs each: page 1 serves the newest 50 of
-    // the 100 aggregated rows, page 2 the remaining 50 — the old page-N
-    // fan-out re-fetched provider page 2 (empty here) and dropped 50 rows.
+    // Two integrated repositories with 50 open PRs each: page 1 serves the
+    // newest 50 of the 100 aggregated rows, page 2 the remaining 50 — the old
+    // page-N fan-out re-fetched provider page 2 (empty here) and dropped 50
+    // rows.
+    mockReadCachedRepositories.mockResolvedValue({
+      status: 'available',
+      repositories: [
+        {
+          id: '87654321-4321-4321-4321-210987654321',
+          workspaceUuid: WORKSPACE.uuid,
+          name: 'repo-a',
+          fullName: 'acme/repo-a',
+          private: true,
+          defaultBranch: 'main',
+        },
+        {
+          id: '99999999-8888-7777-6666-555555555555',
+          workspaceUuid: WORKSPACE.uuid,
+          name: 'repo-b',
+          fullName: 'acme/repo-b',
+          private: true,
+          defaultBranch: 'main',
+        },
+      ],
+      syncedAt: '2026-09-06T00:00:00.000Z',
+    });
     fetchMock.mockImplementation(async (url: string | URL) => {
       const full = url.toString();
       if (full.includes('token-service.example.com')) {
         return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
       }
       const parsed = new URL(full);
-      if (parsed.pathname === '/2.0/repositories/acme') {
-        return jsonResponse({
-          pagelen: 100,
-          values: [{ slug: 'repo-a' }, { slug: 'repo-b' }],
-          next: null,
-        });
-      }
       const match = parsed.pathname.match(
         /^\/2\.0\/repositories\/acme\/(repo-[ab])\/pullrequests$/
       );
@@ -1128,12 +1203,14 @@ describe('listInbox', () => {
         // exactly repo-b's page; the single provider page holds all 50 rows.
         const base = match[1] === 'repo-a' ? 100 : 200;
         const hour = match[1] === 'repo-a' ? '00' : '01';
+        const fullName = `acme/${match[1]}`;
         return jsonResponse({
           pagelen: 50,
           values: Array.from({ length: 50 }, (_, index) =>
             inboxPr(
               base + index,
-              `2026-09-02T${hour}:00:${String(index).padStart(2, '0')}.000000+00:00`
+              `2026-09-02T${hour}:00:${String(index).padStart(2, '0')}.000000+00:00`,
+              fullName
             )
           ),
           next: null,
@@ -1172,9 +1249,6 @@ describe('listInbox', () => {
         return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
       }
       const parsed = new URL(full);
-      if (parsed.pathname === '/2.0/repositories/acme') {
-        return jsonResponse({ pagelen: 100, values: [{ slug: 'repo' }], next: null });
-      }
       if (parsed.pathname === '/2.0/repositories/acme/repo/pullrequests') {
         expect(parsed.searchParams.get('page')).toBe('1');
         return jsonResponse({

@@ -3,11 +3,10 @@ import { createEventHelpers, sessionInfo, userMsg, textPart } from './helpers';
 
 const { kilocode } = createEventHelpers();
 
-const prompt =
-  "I want to build mobile portrait mode friendly interactive birthday invitation for an upcoming 6 year old girl party. Please suggest some cool ideas and let's implement.";
-const messageId = 'msg_ca0395def0011t6S1qwxQbPSYB';
+const prompt = 'Build a sample project overview with two sections.';
+const messageId = 'msg_00000000000000000000000001';
 const syntheticPartId = `${messageId}-text`;
-const realPartId = 'prt_ca0395df1001ez5Rq0YoFEEjdO';
+const realPartId = 'prt_00000000000000000000000001';
 
 const optimisticUserTextReconciliation: Fixture = {
   name: 'optimistic-user-text-reconciliation',

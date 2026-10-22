@@ -1,7 +1,7 @@
 import * as z from 'zod';
 
 import { allFixtures } from './__fixtures__';
-import { realSessionExcerpt } from './__fixtures__/real-session-excerpt';
+import { sessionReplay } from './__fixtures__/session-replay';
 import { messageUpdatedDataSchema } from './schemas';
 import { createTestSession } from './test-helpers';
 
@@ -40,9 +40,9 @@ describe.each(allFixtures)('fixture: $name', ({ description, events, expected })
   });
 });
 
-describe('real-session-excerpt fixture', () => {
+describe('session replay fixture', () => {
   it('documents backend message timestamps are millisecond-scale', () => {
-    const rootMessageEvents = realSessionExcerpt.events
+    const rootMessageEvents = sessionReplay.events
       .flatMap(event => {
         if (
           typeof event.data !== 'object' ||
@@ -54,7 +54,7 @@ describe('real-session-excerpt fixture', () => {
         const result = messageTimeSchema.safeParse(event.data.properties);
         return result.success ? [result.data.info] : [];
       })
-      .filter(info => info.sessionID === 'ses_35fc6b339ffeaf91IozzdnLtJ7');
+      .filter(info => info.sessionID === 'ses_00000000000000000000000001');
     const rootUserEvent = rootMessageEvents.find(info => info.role === 'user');
     const rootAssistantEvent = rootMessageEvents.find(info => info.role === 'assistant');
 

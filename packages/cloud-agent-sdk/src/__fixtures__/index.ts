@@ -4,7 +4,7 @@ import { childSessions } from './child-sessions';
 import { toolUseCycle } from './tool-use-cycle';
 import { autocommit } from './autocommit';
 import { interruption } from './interruption';
-import { realSessionExcerpt } from './real-session-excerpt';
+import { sessionReplay } from './session-replay';
 import { optimisticUserTextReconciliation } from './optimistic-user-text-reconciliation';
 import { messageDeliveryExhausted } from './message-delivery-exhausted';
 
@@ -14,7 +14,7 @@ const allFixtures: Fixture[] = [
   toolUseCycle,
   autocommit,
   interruption,
-  realSessionExcerpt,
+  sessionReplay,
   optimisticUserTextReconciliation,
   messageDeliveryExhausted,
 ];

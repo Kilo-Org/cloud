@@ -591,6 +591,8 @@
     "installKiloGitHubApp": "Kilo GitHub செயலியை நிறுவவும்",
     "checkConnection": "இணைப்பைச் சரிபார்க்கவும்",
     "couldNotLoadPullRequest": "இணைப்புக் கோரிக்கையை ஏற்ற முடியவில்லை.",
+    "reviewServiceUnavailable": "சேவை கிடைக்கவில்லை",
+    "reviewServiceUnavailableDescription": "சேவை தற்காலிகமாகக் கிடைக்கவில்லை. சற்று நேரத்தில் மீண்டும் முயற்சிக்கவும்.",
     "description": "விளக்கம்",
     "noDescriptionProvided": "விளக்கம் வழங்கப்படவில்லை.",
     "review": "மதிப்பாய்வு",

@@ -613,6 +613,8 @@
     "installKiloGitHubApp": "Įdiegti Kilo GitHub programėlę",
     "checkConnection": "Patikrinti ryšį",
     "couldNotLoadPullRequest": "Nepavyko įkelti pakeitimų užklausos.",
+    "reviewServiceUnavailable": "Paslauga neprieinama",
+    "reviewServiceUnavailableDescription": "Paslauga laikinai neprieinama. Pabandykite dar kartą netrukus.",
     "description": "Aprašymas",
     "noDescriptionProvided": "Aprašymas nepateiktas.",
     "review": "Peržiūra",

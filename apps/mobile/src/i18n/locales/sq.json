@@ -591,6 +591,8 @@
     "installKiloGitHubApp": "Instalo aplikacionin Kilo për GitHub",
     "checkConnection": "Kontrollo lidhjen",
     "couldNotLoadPullRequest": "Nuk u ngarkua kërkesa për bashkim.",
+    "reviewServiceUnavailable": "Shërbimi nuk është i disponueshëm",
+    "reviewServiceUnavailableDescription": "Shërbimi është përkohësisht i padisponueshëm. Provo sërish së shpejti.",
     "description": "Përshkrimi",
     "noDescriptionProvided": "Nuk është dhënë asnjë përshkrim.",
     "review": "Shqyrtimi",

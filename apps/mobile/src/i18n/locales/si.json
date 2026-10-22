@@ -591,6 +591,8 @@
     "installKiloGitHubApp": "Kilo GitHub යෙදුම ස්ථාපනය කරන්න",
     "checkConnection": "සම්බන්ධතාව පරීක්ෂා කරන්න",
     "couldNotLoadPullRequest": "පුල් ඉල්ලීම පූරණය කිරීමට නොහැකි විය.",
+    "reviewServiceUnavailable": "සේවාව ලබාගත නොහැක",
+    "reviewServiceUnavailableDescription": "සේවාව තාවකාලිකව ලබාගත නොහැක. ටිකකින් නැවත උත්සාහ කරන්න.",
     "description": "විස්තරය",
     "noDescriptionProvided": "විස්තරයක් සපයා නොමැත.",
     "review": "සමාලෝචනය",

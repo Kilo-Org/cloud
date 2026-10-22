@@ -602,6 +602,8 @@
     "installKiloGitHubApp": "Instalează aplicația Kilo pentru GitHub",
     "checkConnection": "Verifică conexiunea",
     "couldNotLoadPullRequest": "Nu s-a putut încărca PR-ul.",
+    "reviewServiceUnavailable": "Serviciul nu este disponibil",
+    "reviewServiceUnavailableDescription": "Serviciul este temporar indisponibil. Încearcă din nou în scurt timp.",
     "description": "Descriere",
     "noDescriptionProvided": "Nu există nicio descriere.",
     "review": "Revizuire",

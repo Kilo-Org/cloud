@@ -591,6 +591,8 @@
     "installKiloGitHubApp": "Kilo GitHub қолданбасын орнату",
     "checkConnection": "Қосылымды тексеру",
     "couldNotLoadPullRequest": "Біріктіру сұрауын жүктеу мүмкін болмады.",
+    "reviewServiceUnavailable": "Қызмет қолжетімсіз",
+    "reviewServiceUnavailableDescription": "Қызмет уақытша қолжетімсіз. Көп ұзамай қайта көріңіз.",
     "description": "Сипаттама",
     "noDescriptionProvided": "Сипаттама берілмеген.",
     "review": "Тексеру",

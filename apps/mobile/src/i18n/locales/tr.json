@@ -2555,6 +2555,8 @@
     },
     "connectionExpired": "GitHub bağlantısının süresi doldu.",
     "couldNotLoadPullRequest": "Çekme isteği yüklenemedi.",
+    "reviewServiceUnavailable": "İnceleme servisi kullanılamıyor",
+    "reviewServiceUnavailableDescription": "İnceleme servisi geçici olarak kullanılamıyor. Kısa süre içinde yeniden deneyin.",
     "couldNotOpenGitHubAppSettings": "GitHub uygulaması ayarları açılamadı.",
     "description": "Açıklama",
     "discussion": {

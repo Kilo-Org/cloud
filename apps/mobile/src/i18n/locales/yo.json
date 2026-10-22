@@ -591,6 +591,8 @@
     "installKiloGitHubApp": "Fi ìṣàfilọ́lẹ̀ Kilo fún GitHub sórí rẹ̀",
     "checkConnection": "Ṣàyẹ̀wò ìsopọ̀",
     "couldNotLoadPullRequest": "A kò lè ṣàkójọ ìbéèrè ìṣọ̀kan.",
+    "reviewServiceUnavailable": "Àdàjọ kò sí",
+    "reviewServiceUnavailableDescription": "Àdàjọ kò sí fún ìgbà díè. Gbiyanju lẹ́ẹ̀kansi láìpẹ́.",
     "description": "Àpèjúwe",
     "noDescriptionProvided": "A kò pèsè àpèjúwe kankan.",
     "review": "Àtúnyẹ̀wò",

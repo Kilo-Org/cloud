@@ -591,6 +591,8 @@
     "installKiloGitHubApp": "Installer Kilo GitHub-appen",
     "checkConnection": "Sjekk tilkoblingen",
     "couldNotLoadPullRequest": "Kunne ikke laste inn PR-en.",
+    "reviewServiceUnavailable": "Tjenesten er utilgjengelig",
+    "reviewServiceUnavailableDescription": "Tjenesten er midlertidig utilgjengelig. Prøv igjen om en stund.",
     "description": "Beskrivelse",
     "noDescriptionProvided": "Det er ikke lagt til noen beskrivelse.",
     "review": "Gjennomgang",

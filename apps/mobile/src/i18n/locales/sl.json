@@ -613,6 +613,8 @@
     "installKiloGitHubApp": "Namesti aplikacijo Kilo za GitHub",
     "checkConnection": "Preveri povezavo",
     "couldNotLoadPullRequest": "Zahtevka za združitev ni bilo mogoče naložiti.",
+    "reviewServiceUnavailable": "Storitev ni na voljo",
+    "reviewServiceUnavailableDescription": "Storitev začasno ni na voljo. Poskusite znova čez trenutek.",
     "description": "Opis",
     "noDescriptionProvided": "Opis ni dodan.",
     "review": "Pregled",

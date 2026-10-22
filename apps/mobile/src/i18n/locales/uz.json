@@ -591,6 +591,8 @@
     "installKiloGitHubApp": "Kilo GitHub ilovasini o'rnatish",
     "checkConnection": "Ulanishni tekshirish",
     "couldNotLoadPullRequest": "PRni yuklab bo'lmadi.",
+    "reviewServiceUnavailable": "Xizmat mavjud emas",
+    "reviewServiceUnavailableDescription": "Xizmat vaqtincha mavjud emas. Yaqinda qayta urinib ko'ring.",
     "description": "Tavsif",
     "noDescriptionProvided": "Tavsif berilmagan.",
     "review": "Ko‘rib chiqish",

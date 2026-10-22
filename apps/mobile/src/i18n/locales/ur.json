@@ -591,6 +591,8 @@
     "installKiloGitHubApp": "Kilo GitHub ایپ انسٹال کریں",
     "checkConnection": "کنکشن چیک کریں",
     "couldNotLoadPullRequest": "پل ریکویسٹ لوڈ نہیں ہو سکی۔",
+    "reviewServiceUnavailable": "سروس دستیاب نہیں ہے",
+    "reviewServiceUnavailableDescription": "سروس عارضی طور پر دستیاب نہیں ہے۔ جلد دوبارہ کوشش کریں۔",
     "description": "تفصیل",
     "noDescriptionProvided": "کوئی تفصیل فراہم نہیں کی گئی۔",
     "review": "جائزہ",

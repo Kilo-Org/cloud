@@ -591,6 +591,8 @@
     "installKiloGitHubApp": "I-install ang Kilo GitHub App",
     "checkConnection": "Suriin ang koneksyon",
     "couldNotLoadPullRequest": "Hindi ma-load ang pull request.",
+    "reviewServiceUnavailable": "Hindi available ang serbisyo",
+    "reviewServiceUnavailableDescription": "Pansamantagal na hindi available ang serbisyo. Subukan muli sa lalong madaling panahon.",
     "description": "Paglalarawan",
     "noDescriptionProvided": "Walang ibinigay na paglalarawan.",
     "review": "Pagsusuri",

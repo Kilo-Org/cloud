@@ -591,6 +591,8 @@
     "installKiloGitHubApp": "Setja upp Kilo-forritið fyrir GitHub",
     "checkConnection": "Athuga tengingu",
     "couldNotLoadPullRequest": "Ekki tókst að hlaða sameiningarbeiðninni.",
+    "reviewServiceUnavailable": "Þjónusta er ekki tiltæk",
+    "reviewServiceUnavailableDescription": "Þjónustan er tímabundið ótiltæk. Reyndu aftur fljótlega.",
     "description": "Lýsing",
     "noDescriptionProvided": "Engin lýsing hefur verið gefin.",
     "review": "Rýni",

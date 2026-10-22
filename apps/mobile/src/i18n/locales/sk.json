@@ -613,6 +613,8 @@
     "installKiloGitHubApp": "Nainštalovať aplikáciu Kilo pre GitHub",
     "checkConnection": "Skontrolovať pripojenie",
     "couldNotLoadPullRequest": "Žiadosť o zlúčenie sa nepodarilo načítať.",
+    "reviewServiceUnavailable": "Služba nie je dostupná",
+    "reviewServiceUnavailableDescription": "Služba je dočasne nedostupná. Skúste to čoskoro znova.",
     "description": "Opis",
     "noDescriptionProvided": "Opis nie je uvedený.",
     "review": "Kontrola",

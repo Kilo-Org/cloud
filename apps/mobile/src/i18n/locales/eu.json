@@ -591,6 +591,8 @@
     "installKiloGitHubApp": "Instalatu Kilo GitHub aplikazioa",
     "checkConnection": "Egiaztatu konexioa",
     "couldNotLoadPullRequest": "Ezin izan da bateratze-eskaera kargatu.",
+    "reviewServiceUnavailable": "Zerbitzua ez dago erabilgarri",
+    "reviewServiceUnavailableDescription": "Zerbitzua aldi baterako ez dago erabilgarri. Saiatu berriro laster.",
     "description": "Deskribapena",
     "noDescriptionProvided": "Ez da deskribapenik eman.",
     "review": "Berrikuspena",

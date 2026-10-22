@@ -591,6 +591,8 @@
     "installKiloGitHubApp": "Enstale aplikasyon Kilo pou GitHub la",
     "checkConnection": "Tcheke koneksyon an",
     "couldNotLoadPullRequest": "Pa t ka chaje demann fizyon an.",
+    "reviewServiceUnavailable": "Sèvis la pa disponib",
+    "reviewServiceUnavailableDescription": "Sèvis la pa disponib tanporèman. Eseye ankò byento.",
     "description": "Deskripsyon",
     "noDescriptionProvided": "Pa gen deskripsyon.",
     "review": "Revizyon",

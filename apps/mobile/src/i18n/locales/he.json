@@ -2580,6 +2580,8 @@
     },
     "connectionExpired": "פג תוקף החיבור ל-GitHub.",
     "couldNotLoadPullRequest": "לא ניתן היה לטעון את בקשת המשיכה.",
+    "reviewServiceUnavailable": "השירות אינו זמין",
+    "reviewServiceUnavailableDescription": "השירות אינו זמין באופן זמני. נסו שוב בעוד רגע.",
     "couldNotOpenGitHubAppSettings": "לא הצלחנו לפתוח את הגדרות האפליקציה ב-GitHub.",
     "description": "תיאור",
     "discussion": {

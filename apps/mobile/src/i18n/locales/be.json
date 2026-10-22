@@ -613,6 +613,8 @@
     "installKiloGitHubApp": "Усталяваць праграму Kilo для GitHub",
     "checkConnection": "Праверыць злучэнне",
     "couldNotLoadPullRequest": "Не атрымалася загрузіць запыт на зліццё.",
+    "reviewServiceUnavailable": "Сэрвіс недаступны",
+    "reviewServiceUnavailableDescription": "Сэрвіс часова недаступны. Паспрабуйце зноў праз хвіліну.",
     "description": "Апісанне",
     "noDescriptionProvided": "Апісання няма.",
     "review": "Праверка",

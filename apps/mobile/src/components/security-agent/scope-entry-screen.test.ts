@@ -313,7 +313,13 @@ describe.each([
       organizationId: 'org_123',
     });
     const other = trpc.securityAgent.getConfig.queryOptions();
-    void queryClient.prefetchQuery(other);
+    void (async () => {
+      try {
+        await queryClient.query(other);
+      } catch {
+        // Offline: the fetch stays paused for the retry path.
+      }
+    })();
     queryClient.setQueryData(configKey, configData);
     const root = await mount('org_123', Screen);
     const error = host(root, 'PlatformErrorScreen')[0];

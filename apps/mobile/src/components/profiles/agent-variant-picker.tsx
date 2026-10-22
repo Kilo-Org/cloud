@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
+import { selectableRowA11y } from '@/lib/a11y/selectable-row';
 import { thinkingEffortLabel } from '@/lib/hooks/use-available-models';
 import { cn } from '@/lib/utils';
 
@@ -41,8 +42,7 @@ export function AgentVariantPicker({
                 selected ? 'bg-foreground' : 'bg-secondary'
               )}
               disabled={disabled}
-              accessibilityRole="radio"
-              accessibilityState={{ checked: selected }}
+              {...selectableRowA11y({ multi: false, selected })}
               accessibilityLabel={
                 selected
                   ? t('agentChat.modelSelector.thinkingEffortSelected', {

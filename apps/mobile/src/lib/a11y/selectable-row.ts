@@ -14,15 +14,8 @@ type SelectableRowOptions = {
 };
 
 /**
- * Role and state for a row that picks one option (`multi` false) or toggles one
- * value (`multi` true).
- *
- * iOS has no checkbox or radio trait: React Native maps both roles to
- * `UIAccessibilityTraitNone` and only folds the checked state into the element's
- * accessibility value, so VoiceOver reads such a row as plain text and offers no
- * activation. iOS therefore gets the button trait, and the row's selection rides
- * the `selected` trait. Android keeps the native checkbox and radio with their
- * checked state.
+ * React Native maps iOS checkbox/radio roles to no native trait. Use button
+ * and selected traits there; retain checkbox/radio and checked on Android.
  */
 export function selectableRowA11y({
   multi,

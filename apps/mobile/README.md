@@ -25,6 +25,14 @@ Unavailable usage and low-balance settings expose Retry. The low-balance row
 retries its settings read until data is available, then opens configuration.
 Cached settings remain visible during offline pauses and refresh failures.
 
+## Selectable row accessibility
+
+Use `selectableRowA11y` from `@/lib/a11y/selectable-row` for custom checkbox and
+radio rows. It exposes button/selected traits on iOS and checkbox or radio roles
+with checked state on Android. `ChoiceRow` and `radioItemA11y` use this mapping.
+Verify both the native role and state transitions in device accessibility trees;
+a rendered checkmark alone does not verify accessibility.
+
 ## Getting started
 
 Generally speaking, you only need a new dev build if making dependency/native changes.

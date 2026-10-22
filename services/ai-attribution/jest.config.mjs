@@ -1,7 +1,6 @@
 /** @type {import('jest').Config} */
-// ts-jest compiles through the TypeScript compiler API, which typescript@7 no
-// longer ships. @swc/jest transpiles the tests without it; `tsgo --noEmit`
-// remains the type check.
+// TypeScript 7 is the native compiler and ships no compiler JS API. @swc/jest
+// transpiles the tests without one; `tsgo --noEmit` remains the type check.
 export default {
   testEnvironment: 'node',
   testMatch: ['**/*.test.ts'],

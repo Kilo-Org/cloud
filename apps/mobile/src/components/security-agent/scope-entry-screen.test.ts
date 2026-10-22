@@ -300,7 +300,7 @@ describe.each([
       expect(host(root, 'ConfigureRow')).toHaveLength(0);
       expect(host(root, 'ScreenHeader')[0]?.props.headerRight).toBeNull();
       expect(host(root, 'Text').map(node => node.props.children)).toContain(
-        'Security Agent is disabled. Only organization owners and billing managers can turn it on.'
+        'Security Agent is disabled. Only organization owners, admins, and billing managers can turn it on.'
       );
       expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
     }
@@ -313,7 +313,13 @@ describe.each([
       organizationId: 'org_123',
     });
     const other = trpc.securityAgent.getConfig.queryOptions();
-    void queryClient.prefetchQuery(other);
+    void (async () => {
+      try {
+        await queryClient.query(other);
+      } catch {
+        // Offline: the fetch stays paused for the retry path.
+      }
+    })();
     queryClient.setQueryData(configKey, configData);
     const root = await mount('org_123', Screen);
     const error = host(root, 'PlatformErrorScreen')[0];

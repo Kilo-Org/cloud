@@ -28,6 +28,7 @@ import { useAgentProfile } from '@/lib/hooks/use-agent-profiles';
 import { useProfileCommandsSave } from '@/lib/hooks/use-profile-commands-save';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 
 type CommandRow = Readonly<{ sequence: number; command: string }>;
 
@@ -153,7 +154,7 @@ export function ProfileCommandsScreen({
   };
 
   const controlClass = (disabled: boolean) =>
-    cn('h-11 w-11 items-center justify-center active:opacity-70', disabled && 'opacity-40');
+    cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70', disabled && 'opacity-40');
 
   const commandTotal = nonBlankCommands(commands).length;
   const renderCommandRow = (command: string, index: number) => {
@@ -213,7 +214,7 @@ export function ProfileCommandsScreen({
             <ChevronDown size={20} color={colors.mutedForeground} />
           </Pressable>
           <Pressable
-            className="h-11 w-11 items-center justify-center active:opacity-70"
+            className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
             accessibilityRole="button"
             accessibilityLabel={t('common.delete')}
             onPress={() => {

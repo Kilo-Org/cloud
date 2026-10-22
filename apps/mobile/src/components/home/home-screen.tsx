@@ -62,10 +62,14 @@ export function HomeScreen() {
         }
         size="large"
         showBackButton={false}
-        // The active account below the greeting: the same switchable control
-        // the profile credits card uses, so the org a new task will start in
-        // is visible (and changeable) before the form opens.
-        context={<ContextControl />}
+        // The active account at the mark's trailing edge, on the mark's row:
+        // the same switchable control the profile credits card uses, so the org
+        // a new task will start in is visible (and changeable) before the form
+        // opens. The heading is the mark alone, so the row never reflows the
+        // picker under it (`allowInlineActionsStacking` reserves room for a
+        // heading's text that this header does not have).
+        inlineActions={<ContextControl />}
+        allowInlineActionsStacking={false}
         // The logo is the header's only visible child, so this is the brand
         // mark's leading edge: it must be the page gutter the sections, cards
         // and actions use (`mx-4`), not a wider header-only gutter.

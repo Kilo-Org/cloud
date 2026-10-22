@@ -11,11 +11,8 @@ import {
   Shield,
   ShieldCheck,
   Ban,
-  Database,
   DatabaseBackup,
   BarChart,
-  Rocket,
-  Blocks,
   Bot,
   Sparkles,
   MailCheck,
@@ -204,24 +201,9 @@ const productEngineeringItems: MenuItem[] = [
     icon: () => <Bot />,
   },
   {
-    title: () => 'Deployments',
-    url: '/admin/deployments',
-    icon: () => <Rocket />,
-  },
-  {
-    title: () => 'App Builder',
-    url: '/admin/app-builder',
-    icon: () => <Blocks />,
-  },
-  {
     title: () => 'Email Testing',
     url: '/admin/email-testing',
     icon: () => <MailCheck />,
-  },
-  {
-    title: () => 'Managed Indexing',
-    url: '/admin/code-indexing',
-    icon: () => <Database />,
   },
   {
     title: () => 'Gas Town',

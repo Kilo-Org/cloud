@@ -7,7 +7,7 @@ import {
   emitScheduledJobEvent,
 } from '@kilocode/worker-utils/scheduled-job-observability';
 import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { alertIfSyncProvidersStale } from '@/lib/providers/openrouter/sync-providers-stale-alert';
+import { alertIfSyncStale } from '@/lib/providers/openrouter/sync-providers-stale-alert';
 import { syncAndStoreProviders } from '@/lib/providers/openrouter/sync-providers';
 
 // The cron job runs every 5 minutes, so if increasing the timeout beyond 4 minutes
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   });
 
   try {
-    await alertIfSyncProvidersStale();
+    await alertIfSyncStale('providers');
   } catch (error) {
     console.error('[sync-providers] stale full-sync alert escaped', error);
   }

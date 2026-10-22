@@ -1,7 +1,7 @@
 FROM debian:trixie-slim AS runtime
 
 # Install Node.js 24 (required by OpenClaw)
-ENV NODE_VERSION=24.15.0
+ENV NODE_VERSION=24.22.1
 ENV OPENCLAW_PLUGIN_STAGE_DIR=/usr/local/share/openclaw-plugin-runtime-deps
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \

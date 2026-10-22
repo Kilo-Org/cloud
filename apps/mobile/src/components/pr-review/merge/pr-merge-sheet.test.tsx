@@ -653,6 +653,10 @@ function forbiddenError(): Error {
   return Object.assign(new Error('403 Forbidden'), { data: { code: 'FORBIDDEN' } });
 }
 
+function revokedError(): Error {
+  return Object.assign(new Error('revoked'), { data: { code: 'PRECONDITION_FAILED' } });
+}
+
 /** True when the error effect wrote `value` into any state slot. */
 function stateValueWritten(value: string): boolean {
   return stateSetters.some(setter => setter.mock.calls.some(call => call[0] === value));
@@ -731,6 +735,41 @@ describe('PrMergeSheet refused-merge wording (s6f)', () => {
     // eslint-disable-next-line new-cap
     PrMergeSheet(baseProps);
     expect(stateValueWritten("You don't have permission to merge this pull request.")).toBe(true);
+  });
+});
+
+describe('PrMergeSheet reconnect wording', () => {
+  beforeEach(() => {
+    stateSetters.length = 0;
+    mergeMutationMocks.mutateAsync.mockReset();
+    mergeMutationMocks.isPending = false;
+    mergeMutationMocks.error = null;
+    vi.clearAllMocks();
+  });
+
+  it('names the merge-request provider in the status line above the notice', () => {
+    mergeMutationMocks.error = revokedError();
+    // eslint-disable-next-line new-cap
+    PrMergeSheet({ ...baseProps, prRef: GITLAB_REF, mergeState: mergeState() });
+    // The status line sits above the GitLab reconnect notice, so it must not
+    // announce a GitHub connection on a merge request.
+    expect(stateValueWritten('GitLab connection expired')).toBe(true);
+    expect(stateValueWritten('GitHub connection expired.')).toBe(false);
+  });
+
+  it('names the Bitbucket provider in the status line above the notice', () => {
+    mergeMutationMocks.error = revokedError();
+    // eslint-disable-next-line new-cap
+    PrMergeSheet({ ...baseProps, prRef: BITBUCKET_REF, mergeState: mergeState() });
+    expect(stateValueWritten('Bitbucket connection expired')).toBe(true);
+    expect(stateValueWritten('GitHub connection expired.')).toBe(false);
+  });
+
+  it('keeps the GitHub copy on the GitHub arm', () => {
+    mergeMutationMocks.error = revokedError();
+    // eslint-disable-next-line new-cap
+    PrMergeSheet(baseProps);
+    expect(stateValueWritten('GitHub connection expired.')).toBe(true);
   });
 });
 

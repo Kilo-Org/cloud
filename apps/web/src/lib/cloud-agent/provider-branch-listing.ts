@@ -55,13 +55,19 @@ export type ProviderBranchListing = {
   /** The provider's default branch, or null when the provider reports none. */
   defaultBranch: string | null;
   branches: string[];
+  /**
+   * True when the provider holds more branches than `branches` includes, so a
+   * client presents the list as partial instead of as the whole repository.
+   */
+  truncated: boolean;
 };
 
-/** The router output contract: `{ defaultBranch, branches }`, nothing else. */
+/** The router output contract: `{ defaultBranch, branches, truncated }`, nothing else. */
 export const ProviderBranchListingSchema = z
   .object({
     defaultBranch: z.string().nullable(),
     branches: z.array(z.string()),
+    truncated: z.boolean(),
   })
   .strict();
 
@@ -130,6 +136,9 @@ function toListing(branches: GitHubBranchRef[]): ProviderBranchListing {
   return {
     defaultBranch: branches.find(branch => branch.isDefault)?.name ?? null,
     branches: branches.map(branch => branch.name),
+    // Both provider walks page until the provider runs out, so nothing here is
+    // held back from the caller.
+    truncated: false,
   };
 }
 
@@ -434,6 +443,9 @@ async function listBitbucketBranches(
   const names: string[] = [];
   const seen = new Set<string>();
   let cursor: string | undefined;
+  // Set only when the page budget ends the walk with a cursor still pointing
+  // at a next page: the provider holds branches this listing does not include.
+  let truncated = false;
   try {
     for (let page = 0; page < MAX_BRANCH_PAGES; page += 1) {
       const result = await fetchPage(
@@ -453,13 +465,20 @@ async function listBitbucketBranches(
       }
       if (!result.nextCursor || result.nextCursor === cursor) break;
       cursor = result.nextCursor;
+      if (page === MAX_BRANCH_PAGES - 1) truncated = true;
     }
   } catch (error) {
     if (error instanceof BitbucketReviewError) throw bitbucketErrorToTrpcError(error);
     throw error;
   }
 
-  return { defaultBranch, branches: names };
+  // The default branch is what the session checks out, and it is selected
+  // before the list is browsed, so a partial walk must still offer it: a
+  // default that sorts past the page budget would otherwise be unselectable.
+  const branches =
+    defaultBranch !== null && !seen.has(defaultBranch) ? [defaultBranch, ...names] : names;
+
+  return { defaultBranch, branches, truncated };
 }
 
 /**

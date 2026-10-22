@@ -2241,6 +2241,7 @@
       "branchLoadError": "Tarmoqlarni yuklab bo‘lmadi",
       "branchUnavailable": "Ushbu repozitoriy uchun tarmoqlar mavjud emas. Provayderdagi kirish huquqingizni tekshiring, so‘ng boshqa repozitoriy tanlang.",
       "branchEmpty": "Mavjud tarmoqlar yo‘q",
+      "branchListIncomplete": "Faqat ba'zi tarmoqlar ko‘rsatilgan. Repozitoriyda bu ro‘yxat sig‘dira oladiganidan ko‘proq tarmoq bor.",
       "branchPlaceholder": "Tarmoq tanlang",
       "runOnWithTarget": "Ishga tushirish muhiti: {{target}}",
       "environment": "Muhit",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "{{count}} vosita",
       "serverToolCount_other": "{{count}} vosita",
       "serverUnreachable": "Bu serverga yetib boʻlmadi",
-      "serverOff": "Bu server oʻchirilgan"
+      "serverOff": "Bu server oʻchirilgan",
+      "app": {
+        "label": "Vosita interfeysi",
+        "failed": "Ushbu vositanning interfeysini yuklab bo‘lmadi.",
+        "empty": "Ushbu vositanning interfeysida ko‘rsatish uchun hech narsa yo‘q."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autentifikatsiya",

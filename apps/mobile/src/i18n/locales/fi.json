@@ -2241,6 +2241,7 @@
       "branchLoadError": "Haarojen lataaminen epäonnistui",
       "branchUnavailable": "Tämän koodivaraston haarat eivät ole käytettävissä. Tarkista pääsysi palveluntarjoajalta ja valitse toinen koodivarasto.",
       "branchEmpty": "Haaroja ei ole käytettävissä",
+      "branchListIncomplete": "Vain osa haaroista näytetään. Koodivarastossa on enemmän haaroja kuin tähän luetteloon mahtuu.",
       "branchPlaceholder": "Valitse haara",
       "runOnWithTarget": "Suoritusympäristö: {{target}}",
       "environment": "Ympäristö",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "{{count}} työkalu",
       "serverToolCount_other": "{{count}} työkalua",
       "serverUnreachable": "Tähän palvelimeen ei saatu yhteyttä",
-      "serverOff": "Tämä palvelin on pois päältä"
+      "serverOff": "Tämä palvelin on pois päältä",
+      "app": {
+        "label": "Työkalun käyttöliittymä",
+        "failed": "Tämän työkalun käyttöliittymää ei voitu ladata.",
+        "empty": "Tämän työkalun käyttöliittymässä ei ole näytettävää."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Todennus",

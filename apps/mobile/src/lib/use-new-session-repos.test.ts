@@ -435,6 +435,16 @@ describe('useRepositoryBranches', () => {
     expect(getSelectedBranchOverride(githubRepo)).toBeNull();
   });
 
+  it('carries the partial-listing flag so the selector can say the list is incomplete', () => {
+    mocks.branchQueryResult = {
+      data: { defaultBranch: 'main', branches: ['main', 'release'], truncated: true },
+    };
+    expect(mountBranches(githubRepo).truncated).toBe(true);
+
+    mocks.branchQueryResult = { data: { defaultBranch: 'main', branches: ['main'] } };
+    expect(mountBranches(githubRepo).truncated).toBe(false);
+  });
+
   it('fetches through the organization procedure when the query runs', async () => {
     mountBranches(githubRepo, 'org-1');
     const queryFn = (branchQueryOptions() as { queryFn?: () => Promise<unknown> }).queryFn;

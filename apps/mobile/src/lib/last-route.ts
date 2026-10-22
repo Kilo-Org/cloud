@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { currentRouteHref } from '@/lib/current-route-href';
 import { LAST_ROUTE_KEY } from '@/lib/storage-keys';
 import { isConcreteLastRouteHref } from '@/lib/last-route-recordable';
 import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
@@ -72,26 +73,6 @@ function notify(): void {
   for (const listener of listeners) {
     listener();
   }
-}
-
-/**
- * Routes that moved out of a tab stack into the root stack. A record mirrored
- * by an older build still names the old stack; replaying it would open an
- * unmatched route after the update, so the parse maps it to where the screen
- * lives now.
- */
-const MOVED_ROUTE_PREFIXES: readonly (readonly [string, string])[] = [
-  ['/(app)/(tabs)/(3_profile)/code-reviewer', '/(app)/code-reviewer'],
-  ['/(app)/(tabs)/(3_profile)/security-agent', '/(app)/security-agent'],
-];
-
-function currentRouteHref(href: string): string {
-  for (const [from, to] of MOVED_ROUTE_PREFIXES) {
-    if (href === from || href.startsWith(`${from}/`) || href.startsWith(`${from}?`)) {
-      return `${to}${href.slice(from.length)}`;
-    }
-  }
-  return href;
 }
 
 /** Parse a stored record; a corrupt, unreadable, or placeholder-bearing mirror reads as absent. */

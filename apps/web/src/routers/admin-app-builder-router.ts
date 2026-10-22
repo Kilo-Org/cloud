@@ -12,6 +12,7 @@ import * as z from 'zod';
 import { eq, and, or, ilike, desc, asc, count, isNotNull, sql, type SQL } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import * as appBuilderClient from '@/lib/app-builder/app-builder-client';
+import { isValidUUID } from '@/lib/utils';
 
 const ListProjectsSchema = z.object({
   offset: z.number().min(0).default(0),
@@ -175,8 +176,7 @@ export const adminAppBuilderRouter = createTRPCRouter({
       ];
 
       // Only add UUID column searches if searchTerm looks like a valid UUID
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (uuidRegex.test(searchTerm)) {
+      if (isValidUUID(searchTerm)) {
         searchConditions.push(eq(app_builder_projects.id, searchTerm));
         searchConditions.push(eq(app_builder_projects.owned_by_organization_id, searchTerm));
       }

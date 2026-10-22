@@ -106,7 +106,7 @@ import { blockUser } from '@/lib/user/block';
 import { getBlobContent } from '@/lib/r2/cli-sessions';
 import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
-import { toNonNullish } from '@/lib/utils';
+import { isValidUUID, toNonNullish } from '@/lib/utils';
 import { TRPCError } from '@trpc/server';
 import { assertNoError, successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
@@ -310,11 +310,10 @@ const DeleteNoteSchema = z.object({
   note_id: z.string(),
 });
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const sessionIdSchema = z
   .string()
   .min(1)
-  .refine(s => UUID_REGEX.test(s) || s.startsWith('ses_'), {
+  .refine(s => isValidUUID(s) || s.startsWith('ses_'), {
     message: 'Must be a UUID or ses_-prefixed session ID',
   });
 

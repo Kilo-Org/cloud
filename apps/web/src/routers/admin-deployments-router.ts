@@ -14,6 +14,7 @@ import { TRPCError } from '@trpc/server';
 import { deleteDeployment } from '@/lib/user-deployments/deployments-service';
 import type { AdminDeploymentTableProps, AdminDeploymentBuild } from '@/types/admin-deployments';
 import type { Owner } from '@/lib/integrations/core/types';
+import { isValidUUID } from '@/lib/utils';
 
 const ListDeploymentsSchema = z.object({
   page: z.number().min(1).default(1),
@@ -61,8 +62,7 @@ export const adminDeploymentsRouter = createTRPCRouter({
       ];
 
       // Only add org ID search if searchTerm looks like a valid UUID
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (uuidRegex.test(searchTerm)) {
+      if (isValidUUID(searchTerm)) {
         searchConditions.push(eq(deployments.owned_by_organization_id, searchTerm));
       }
 

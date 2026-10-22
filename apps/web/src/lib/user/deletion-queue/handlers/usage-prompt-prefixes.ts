@@ -3,6 +3,7 @@ import { user_deletion_requests, user_deletion_steps } from '@kilocode/db/schema
 import { UserDeletionStepStatus, type UserDeletionTaskProgress } from '@kilocode/db/schema-types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getPostgresErrorCode } from '@/lib/db-errors';
+import { isValidUUID } from '@/lib/utils';
 import {
   USER_DELETION_USAGE_PREFIX_BATCH_SIZE,
   USER_DELETION_USAGE_PREFIX_STATEMENT_TIMEOUT_MS,
@@ -11,8 +12,6 @@ import { continueIfLowTime } from '@/lib/user/deletion-queue/handlers/common';
 import type { DeletionHandler } from '@/lib/user/deletion-queue/handlers/common';
 import { userIdKeyedAbsenceOutcome } from '@/lib/user/deletion-queue/deletion-subject';
 import { scrubUsagePromptPrefixesPage, type UsagePromptPrefixCursor } from '@/lib/user';
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type ParsedUsagePrefixProgress = {
   cursor: UsagePromptPrefixCursor | null;
@@ -59,7 +58,7 @@ function parseUsagePrefixProgress(
 
   const createdAt = rawCursor.slice(0, separator);
   const id = rawCursor.slice(separator + 1);
-  if (Number.isNaN(Date.parse(createdAt)) || !UUID_RE.test(id)) return null;
+  if (Number.isNaN(Date.parse(createdAt)) || !isValidUUID(id)) return null;
 
   return {
     cursor: { createdAt, id },

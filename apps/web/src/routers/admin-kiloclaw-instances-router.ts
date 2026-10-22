@@ -10,6 +10,7 @@ import {
   orphanVolumeSubscriptionContextKey,
 } from '@kilocode/db';
 import { createHash } from 'crypto';
+import { isValidUUID } from '@/lib/utils';
 import {
   kiloclaw_instances,
   kiloclaw_subscriptions,
@@ -993,8 +994,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         ilike(kilocode_users.google_user_email, ilikePattern),
       ];
 
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (uuidRegex.test(searchTerm)) {
+      if (isValidUUID(searchTerm)) {
         searchConditions.push(eq(kiloclaw_instances.id, searchTerm));
         searchConditions.push(eq(kiloclaw_instances.user_id, searchTerm));
       }

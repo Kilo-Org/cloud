@@ -3,9 +3,8 @@ import { kilocode_users } from '@kilocode/db/schema';
 import { inArray } from 'drizzle-orm';
 import * as z from 'zod';
 import { posthogQuery } from '@/lib/posthog-query';
+import { isValidUUID } from '@/lib/utils';
 import type { Organization } from '@kilocode/db/schema';
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function getAutocompleteAcceptedSuggestionsPerDay(params: {
   organizationId: Organization['id'];
@@ -20,7 +19,7 @@ export async function getAutocompleteAcceptedSuggestionsPerDay(params: {
   }
 
   // Validate organizationId is a valid UUID to prevent SQL injection
-  if (!UUID_REGEX.test(organizationId)) {
+  if (!isValidUUID(organizationId)) {
     console.error(
       '[getAutocompleteAcceptedSuggestionsPerDay] Invalid organizationId:',
       organizationId

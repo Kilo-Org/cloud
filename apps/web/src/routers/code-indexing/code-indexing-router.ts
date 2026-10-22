@@ -24,6 +24,7 @@ import { getIndexStorage } from '@/lib/code-indexing/storage';
 import { getUserUUID } from '@kilocode/web-shared/lib/user/server';
 import { findUserByEmail } from '@/lib/user';
 import { chunkCountToSizeKbSql } from '@/lib/code-indexing/util';
+import { isValidUUID } from '@/lib/utils';
 import {
   trackCodeIndexingSearch,
   trackCodeIndexingDelete,
@@ -152,8 +153,7 @@ async function resolveOrganizationIdWithOverride(
       });
     }
 
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (uuidRegex.test(input.overrideUser)) {
+    if (isValidUUID(input.overrideUser)) {
       return await elevateViaKiloAdmin(ctx, {
         reason: 'code_index_user_override',
         target: organizationTarget(input.overrideUser),

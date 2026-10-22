@@ -134,9 +134,13 @@ export function formatBytes(value: number | null): string {
   return `${scaled.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
 }
 
+/**
+ * True for any UUID-shaped string (8-4-4-4-12 hex, case-insensitive), matching
+ * the textual form of PostgreSQL `uuid` columns. Deliberately not restricted to
+ * RFC 4122 v1-v5, so nil UUIDs and v6/v7/v8 remain valid.
+ */
 export function isValidUUID(str: string): boolean {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(str);
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 }
 
 export async function parseResultJsonWithZodSchema<T>(

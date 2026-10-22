@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import { isValidUUID } from '@/lib/utils';
 import { and, asc, count, desc, eq, gte, inArray, lt, or, type SQL } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 
@@ -229,7 +230,6 @@ export type ReviewMemoryProposalPage = {
 };
 
 const PROPOSAL_CURSOR_SEPARATOR = '|';
-const PROPOSAL_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Keyset pagination cursor for `listProposalsPage`. The list orders by
 // `updated_at` desc with `id` desc as the deterministic tie-breaker, so the
@@ -248,7 +248,7 @@ function decodeProposalCursor(cursor: string): { updatedAt: string; id: string }
   if (separatorIndex <= 0) return null;
   const updatedAt = cursor.slice(0, separatorIndex);
   const id = cursor.slice(separatorIndex + 1);
-  if (!PROPOSAL_ID_PATTERN.test(id)) return null;
+  if (!isValidUUID(id)) return null;
   if (Number.isNaN(new Date(updatedAt).getTime())) return null;
   return { updatedAt, id };
 }

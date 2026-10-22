@@ -61,7 +61,11 @@ import {
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { formatNumber } from '@/lib/format';
 import { i18n } from '@/i18n';
-import { type ProviderPrRef, providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
+import {
+  type ProviderPrRef,
+  providerPrRefKey,
+  type ProviderPrTriple,
+} from '@/lib/pr-review/provider-pr-ref';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { clearDraft, isMergeDraft, prMergeDraftKey, saveDraft } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
@@ -295,7 +299,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
     'retryable' | 'non-retryable' | 'reconnect' | null
   >(null);
 
-  const ref: { owner: string; repo: string; number: number } = useMemo(
+  const ref: ProviderPrTriple = useMemo(
     () => ({ owner, repo: repoName, number }),
     [owner, repoName, number]
   );

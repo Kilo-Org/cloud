@@ -879,6 +879,23 @@ describe('server runtime credential proxy', () => {
     );
   }
 
+  async function settleBeforeBodyDeadline<T>(settle: Promise<T> | T): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        settle,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error('handler did not settle before the upstream body was produced')),
+            1000
+          );
+        }),
+      ]);
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+    }
+  }
+
   it('denies invalid handles before resolving a session or fetching', async () => {
     const env = createEnv();
     const upstream = vi.fn();
@@ -1696,7 +1713,137 @@ describe('server runtime credential proxy', () => {
     }
   });
 
-  it('emits the upstream status for a failed model-proxy request', async () => {
+  it.each([
+    [
+      'provider',
+      'iad1::iad1::abc12-1700000000000-012345abcdef',
+      'abc12-1700000000000-012345abcdef',
+    ],
+    ['provider', undefined, undefined],
+    ['provider', 'iad1::abc12-1700000000000-012345abcdef', undefined],
+    ['provider', 'iad1::iad1::abc12-1700000000000-012345abcdef, duplicate', undefined],
+    ['provider', 'https://secret-header.test/private', undefined],
+    ['provider', 'eyJhbGciOiJIUzI1NiJ9.secret.signature', undefined],
+    ['provider', 'x'.repeat(4096), undefined],
+    ['provider', 'iad1::iad1::abc12-1700000000000-012345abcde ', undefined],
+    [
+      'provider',
+      'iad1::iad1::abc12-1700000000000-012345abcdef',
+      'abc12-1700000000000-012345abcdef',
+      'cancel',
+    ],
+    ['backend', 'iad1::iad1::abc12-1700000000000-012345abcdef', undefined],
+    ['exa', 'iad1::iad1::abc12-1700000000000-012345abcdef', undefined],
+    ['ingest', 'iad1::iad1::abc12-1700000000000-012345abcdef', undefined],
+  ])(
+    'emits one bounded failure for %s with header case %#',
+    async (route, header, expectedId, consumption = 'consume') => {
+      const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test' });
+      const resolve = vi.fn().mockResolvedValue({
+        token: 'https://api.kilo.ai:backing-token',
+        runtimeAuthorization: {
+          userId: 'usr_proxy',
+          authorizationId: '11111111-1111-4111-8111-111111111111',
+          resourceId: 'agent_proxy',
+        },
+      });
+      env.CLOUD_AGENT_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
+      const responseHeaders = new Headers({
+        'Content-Type': 'application/octet-stream',
+        'X-Unrelated': 'secret-unrelated-header',
+        'X-Request-Id': 'iad1::iad1::abc12-1700000000000-012345abcdef',
+        'Set-Cookie': 'secret-response-cookie',
+      });
+      if (header !== undefined) responseHeaders.set('x-vercel-id', header);
+      const bodyBytes = new Uint8Array([0, 255, 13, 10, 128]);
+      const cancel = vi.fn();
+      const upstreamResponse = new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(bodyBytes.slice(0, 2));
+            controller.enqueue(bodyBytes.slice(2));
+            controller.close();
+          },
+          cancel,
+        }),
+        { status: 401, statusText: 'Unauthorized', headers: responseHeaders }
+      );
+      const upstream = vi.fn().mockResolvedValue(upstreamResponse);
+      vi.stubGlobal('fetch', upstream);
+      try {
+        const proxyPath =
+          route === 'provider'
+            ? 'provider/api/openrouter/chat/completions'
+            : route === 'backend'
+              ? 'backend/api/user'
+              : route === 'exa'
+                ? 'exa/api/exa/search'
+                : 'ingest/api/session/kilo_proxy/export';
+        const requestHandle = await handle();
+        const response = await fetchWorker(
+          new Request(
+            `https://worker.test/api/runtime-credential-proxy/${proxyPath}?secret-query=private`,
+            {
+              method: route === 'backend' || route === 'ingest' ? 'GET' : 'POST',
+              headers: {
+                Authorization: `Bearer ${requestHandle}`,
+                Cookie: 'secret-request-cookie',
+                'X-Unrelated': 'secret-request-header',
+                'Content-Type': 'application/json',
+              },
+              body: route === 'backend' || route === 'ingest' ? undefined : 'secret-request-body',
+            }
+          ),
+          env
+        );
+        expect(response.status).toBe(401);
+        expect(response.statusText).toBe('Unauthorized');
+        expect(upstreamResponse.bodyUsed).toBe(false);
+        expect(loggerWithFieldsMock).toHaveBeenCalledTimes(1);
+        if (consumption === 'cancel') {
+          await response.body?.cancel('client cancelled');
+          expect(cancel).toHaveBeenCalledExactlyOnceWith('client cancelled');
+        } else {
+          expect(new Uint8Array(await response.arrayBuffer())).toEqual(bodyBytes);
+          expect(cancel).not.toHaveBeenCalled();
+        }
+        const expectedHeaders = new Headers(responseHeaders);
+        expectedHeaders.delete('set-cookie');
+        expect([...response.headers]).toEqual([...expectedHeaders]);
+        expect(upstream).toHaveBeenCalledOnce();
+        const [forwarded, options] = upstream.mock.calls[0];
+        expect(options).toEqual({ redirect: 'manual' });
+        expect(forwarded.headers.get('authorization')).toBe(
+          'Bearer https://api.kilo.ai:backing-token'
+        );
+        expect(forwarded.headers.get('cookie')).toBeNull();
+        expect(forwarded.headers.get(RUNTIME_PROXY_ATTESTATION_HEADER)).toBeTruthy();
+        if (route === 'provider' || route === 'exa') {
+          await expect(forwarded.text()).resolves.toBe('secret-request-body');
+        }
+        expect(loggerWithFieldsMock).toHaveBeenCalledTimes(1);
+        expect(loggerWithFieldsMock).toHaveBeenCalledWith({
+          logTag: 'runtime_proxy_request_failed',
+          upstreamAttempted: true,
+          upstreamStatus: 401,
+          ...(expectedId ? { upstreamVercelRequestId: expectedId } : {}),
+          sessionId: 'agent_proxy',
+          kiloSessionId: 'kilo_proxy',
+        });
+        expect(loggerWarnMock).toHaveBeenCalledExactlyOnceWith(
+          'Runtime credential proxy request failed'
+        );
+        const logged = JSON.stringify([loggerWithFieldsMock.mock.calls, loggerWarnMock.mock.calls]);
+        for (const sentinel of [requestHandle, 'backing-token', 'secret-', 'private', 'eyJhbGci']) {
+          expect(logged).not.toContain(sentinel);
+        }
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    }
+  );
+
+  it('returns the failed upstream response before its body is produced, then drains it', async () => {
     const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test' });
     const resolve = vi.fn().mockResolvedValue({
       token: 'https://api.kilo.ai:backing-token',
@@ -1707,34 +1854,152 @@ describe('server runtime credential proxy', () => {
       },
     });
     env.CLOUD_AGENT_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
-    const upstream = vi.fn().mockResolvedValue(new Response('Unauthorized', { status: 401 }));
+    const responseHeaders = new Headers({
+      'Content-Type': 'application/octet-stream',
+      'X-Unrelated': 'secret-unrelated-header',
+      'x-vercel-id': 'iad1::sfo1::abc12-1700000000000-012345abcdef',
+      'Set-Cookie': 'secret-response-cookie',
+    });
+    let upstreamController: ReadableStreamDefaultController<Uint8Array> | undefined;
+    const cancel = vi.fn();
+    const upstreamResponse = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          upstreamController = controller;
+        },
+        cancel,
+      }),
+      { status: 401, statusText: 'Unauthorized', headers: responseHeaders }
+    );
+    const upstream = vi.fn().mockResolvedValue(upstreamResponse);
     vi.stubGlobal('fetch', upstream);
     try {
-      const response = await fetchWorker(
-        new Request(
-          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/chat/completions',
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${await handle()}`,
-              'Content-Type': 'application/json',
-            },
-            body: '{}',
-          }
-        ),
-        env
+      const requestHandle = await handle();
+      const response = await settleBeforeBodyDeadline(
+        fetchWorker(
+          new Request(
+            'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/chat/completions?secret-query=private',
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${requestHandle}`,
+                Cookie: 'secret-request-cookie',
+                'Content-Type': 'application/json',
+              },
+              body: 'secret-request-body',
+            }
+          ),
+          env
+        )
       );
+
       expect(response.status).toBe(401);
-      await expect(response.text()).resolves.toBe('Unauthorized');
-      expect(upstream).toHaveBeenCalledOnce();
+      expect(response.statusText).toBe('Unauthorized');
+      expect(upstreamResponse.bodyUsed).toBe(false);
+      expect(upstreamController).toBeDefined();
       expect(loggerWithFieldsMock).toHaveBeenCalledTimes(1);
       expect(loggerWithFieldsMock).toHaveBeenCalledWith({
         logTag: 'runtime_proxy_request_failed',
         upstreamAttempted: true,
         upstreamStatus: 401,
+        upstreamVercelRequestId: 'abc12-1700000000000-012345abcdef',
         sessionId: 'agent_proxy',
         kiloSessionId: 'kilo_proxy',
       });
+      expect(loggerWarnMock).toHaveBeenCalledExactlyOnceWith(
+        'Runtime credential proxy request failed'
+      );
+
+      const firstChunk = new Uint8Array([0, 255, 13]);
+      const secondChunk = new Uint8Array([10, 128, 7]);
+      upstreamController?.enqueue(firstChunk);
+      upstreamController?.enqueue(secondChunk);
+      upstreamController?.close();
+
+      expect(new Uint8Array(await response.arrayBuffer())).toEqual(
+        new Uint8Array([...firstChunk, ...secondChunk])
+      );
+      expect(cancel).not.toHaveBeenCalled();
+
+      const expectedHeaders = new Headers(responseHeaders);
+      expectedHeaders.delete('set-cookie');
+      expect([...response.headers]).toEqual([...expectedHeaders]);
+      expect(upstream).toHaveBeenCalledOnce();
+      const [forwarded, options] = upstream.mock.calls[0];
+      expect(options).toEqual({ redirect: 'manual' });
+      expect(forwarded.headers.get('authorization')).toBe(
+        'Bearer https://api.kilo.ai:backing-token'
+      );
+      expect(forwarded.headers.get('cookie')).toBeNull();
+      expect(forwarded.headers.get(RUNTIME_PROXY_ATTESTATION_HEADER)).toBeTruthy();
+      await expect(forwarded.text()).resolves.toBe('secret-request-body');
+      expect(loggerWithFieldsMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('forwards client cancellation of an unopened failed upstream body exactly once', async () => {
+    const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test' });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
+        token: 'https://api.kilo.ai:backing-token',
+        runtimeAuthorization: {
+          userId: 'usr_proxy',
+          authorizationId: '11111111-1111-4111-8111-111111111111',
+          resourceId: 'agent_proxy',
+        },
+      }),
+    });
+    let upstreamController: ReadableStreamDefaultController<Uint8Array> | undefined;
+    const cancel = vi.fn();
+    const upstreamResponse = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          upstreamController = controller;
+        },
+        cancel,
+      }),
+      {
+        status: 401,
+        statusText: 'Unauthorized',
+        headers: { 'x-vercel-id': 'iad1::sfo1::abc12-1700000000000-012345abcdef' },
+      }
+    );
+    const upstream = vi.fn().mockResolvedValue(upstreamResponse);
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const requestHandle = await handle();
+      const response = await settleBeforeBodyDeadline(
+        fetchWorker(
+          new Request(
+            'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/chat/completions',
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${requestHandle}`,
+                'Content-Type': 'application/json',
+              },
+              body: '{}',
+            }
+          ),
+          env
+        )
+      );
+
+      expect(response.status).toBe(401);
+      expect(upstreamResponse.bodyUsed).toBe(false);
+      expect(upstreamController).toBeDefined();
+      expect(loggerWithFieldsMock).toHaveBeenCalledTimes(1);
+
+      await response.body?.cancel('client cancelled');
+
+      expect(cancel).toHaveBeenCalledExactlyOnceWith('client cancelled');
+      expect(loggerWithFieldsMock).toHaveBeenCalledTimes(1);
+      expect(loggerWarnMock).toHaveBeenCalledExactlyOnceWith(
+        'Runtime credential proxy request failed'
+      );
+      expect(upstream).toHaveBeenCalledOnce();
     } finally {
       vi.unstubAllGlobals();
     }
@@ -1752,7 +2017,11 @@ describe('server runtime credential proxy', () => {
         },
       }),
     });
-    const upstream = vi.fn().mockResolvedValue(new Response('ok'));
+    const upstream = vi.fn().mockResolvedValue(
+      new Response('ok', {
+        headers: { 'x-vercel-id': 'iad1::iad1::abc12-1700000000000-012345abcdef' },
+      })
+    );
     vi.stubGlobal('fetch', upstream);
     try {
       const response = await fetchWorker(

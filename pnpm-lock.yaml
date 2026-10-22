@@ -2153,7 +2153,7 @@ importers:
         version: 7.0.0-dev.20260707.2
       tsx:
         specifier: ^4.21.0
-        version: 4.21.0
+        version: 4.23.15
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

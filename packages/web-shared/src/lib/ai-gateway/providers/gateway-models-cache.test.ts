@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 const mockLimit = jest.fn<() => Promise<Array<{ models: unknown }>>>();
+const mockWarnExceptInTest = jest.fn();
+
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  warnExceptInTest: (...args: unknown[]) => mockWarnExceptInTest(...args),
+}));
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   readDb: {
@@ -136,6 +141,7 @@ describe('isValidOpenRouterModelId', () => {
 
   beforeEach(() => {
     mockLimit.mockReset();
+    mockWarnExceptInTest.mockClear();
   });
 
   it.each([
@@ -239,6 +245,53 @@ describe('isValidOpenRouterModelId', () => {
     await expect(isValidOpenRouterModelId('not-a-real-model')).resolves.toBe(true);
   });
 
+  it('warns once per empty-metadata window', async () => {
+    jest.useFakeTimers();
+    try {
+      const { isValidOpenRouterModelId } = await loadValidator();
+      mockLimit.mockResolvedValue([]);
+
+      await expect(isValidOpenRouterModelId('vendor/one')).resolves.toBe(true);
+      await expect(isValidOpenRouterModelId('vendor/two')).resolves.toBe(true);
+      expect(mockWarnExceptInTest).toHaveBeenCalledTimes(1);
+      expect(mockWarnExceptInTest).toHaveBeenCalledWith(
+        '[isValidOpenRouterModelId] no model metadata available, assuming id is valid'
+      );
+
+      jest.advanceTimersByTime(300_001);
+
+      await expect(isValidOpenRouterModelId('vendor/three')).resolves.toBe(true);
+      expect(mockWarnExceptInTest).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('warns again only after metadata recovers and empties again', async () => {
+    jest.useFakeTimers();
+    try {
+      const { isValidOpenRouterModelId } = await loadValidator();
+      mockLimit.mockResolvedValue([]);
+
+      await isValidOpenRouterModelId('vendor/missing');
+      expect(mockWarnExceptInTest).toHaveBeenCalledTimes(1);
+
+      mockLimit.mockResolvedValue([{ models: { 'openai/gpt-4o': textModel('openai/gpt-4o') } }]);
+      jest.advanceTimersByTime(300_001);
+
+      await expect(isValidOpenRouterModelId('openai/gpt-4o')).resolves.toBe(true);
+      expect(mockWarnExceptInTest).toHaveBeenCalledTimes(1);
+
+      mockLimit.mockResolvedValue([]);
+      jest.advanceTimersByTime(300_001);
+
+      await expect(isValidOpenRouterModelId('vendor/missing')).resolves.toBe(true);
+      expect(mockWarnExceptInTest).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('reads Vercel inference providers from the database catalog', async () => {
     const { getCachedVercelInferenceProviderIdsForModel } = await loadValidator();
     mockLimit.mockResolvedValue([
@@ -259,6 +312,59 @@ describe('isValidOpenRouterModelId', () => {
     await expect(
       getCachedVercelInferenceProviderIdsForModel('anthropic/claude-sonnet-4.5')
     ).resolves.toEqual(['anthropic', 'bedrock']);
+  });
+
+  it('answers every queried id from one catalog snapshot per window', async () => {
+    jest.useFakeTimers();
+    try {
+      const { getCachedVercelInferenceProviderIdsForModel } = await loadValidator();
+      mockLimit.mockResolvedValue([
+        {
+          models: {
+            'anthropic/claude-sonnet-4.5': storedModel({
+              id: 'anthropic/claude-sonnet-4.5',
+              endpoints: [{ provider_name: 'anthropic' }, { provider_name: 'bedrock' }],
+            }),
+          },
+        },
+      ]);
+
+      for (let index = 0; index < 200; index += 1) {
+        await expect(
+          getCachedVercelInferenceProviderIdsForModel(`vendor/unlisted-${index}`)
+        ).resolves.toBeNull();
+      }
+      await expect(
+        getCachedVercelInferenceProviderIdsForModel('anthropic/claude-sonnet-4.5')
+      ).resolves.toEqual(['anthropic', 'bedrock']);
+      expect(mockLimit).toHaveBeenCalledTimes(1);
+
+      mockLimit.mockResolvedValue([
+        {
+          models: {
+            'anthropic/claude-sonnet-4.5': storedModel({
+              id: 'anthropic/claude-sonnet-4.5',
+              endpoints: [{ provider_name: 'anthropic' }, { provider_name: 'bedrock' }],
+            }),
+            'anthropic/claude-sonnet-4.6': storedModel({
+              id: 'anthropic/claude-sonnet-4.6',
+              endpoints: [{ provider_name: 'google-vertex' }],
+            }),
+          },
+        },
+      ]);
+      jest.advanceTimersByTime(300_001);
+
+      await expect(
+        getCachedVercelInferenceProviderIdsForModel('anthropic/claude-sonnet-4.6')
+      ).resolves.toEqual(['google-vertex']);
+      await expect(
+        getCachedVercelInferenceProviderIdsForModel('vendor/unlisted-0')
+      ).resolves.toBeNull();
+      expect(mockLimit).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('resolves an OpenRouter alias from the database catalog', async () => {

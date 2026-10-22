@@ -166,6 +166,7 @@ describe('webhook trigger variant inputs', () => {
   it('authorizes personal request logs before reading the worker', async () => {
     mockGetWebhookRequestLogs.mockResolvedValue({
       logs: [],
+      transcript: null,
       processStatus: 'captured',
       logsReady: false,
     });

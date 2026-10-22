@@ -82,26 +82,28 @@ export function extractVercelInferenceProviderIdsFromModel(model: StoredModel): 
   ];
 }
 
-const vercelInferenceProviderFetchers = new Map<string, () => Promise<string[] | null>>();
+/**
+ * Inference provider ids per model id, projected from the cached Vercel metadata map. Nothing is
+ * keyed by the queried id, so the retained set is bounded by the catalog rather than by lookups.
+ */
+const getVercelInferenceProviderIdsByModel = createCachedFetch<ReadonlyMap<string, string[]>>(
+  async () => {
+    const models = await getVercelModelsMetadataFromDatabase();
+    return new Map(
+      Object.entries(models).map(([modelId, model]) => [
+        modelId,
+        extractVercelInferenceProviderIdsFromModel(model),
+      ])
+    );
+  },
+  TTL_MS,
+  new Map()
+);
 
-export function getCachedVercelInferenceProviderIdsForModel(
+export async function getCachedVercelInferenceProviderIdsForModel(
   modelId: string
 ): Promise<string[] | null> {
-  let fetchProviders = vercelInferenceProviderFetchers.get(modelId);
-  if (!fetchProviders) {
-    fetchProviders = createCachedFetch<string[] | null>(
-      async () => {
-        const models = await getVercelModelsMetadataFromDatabase();
-        const model = models[modelId];
-        return model ? extractVercelInferenceProviderIdsFromModel(model) : null;
-      },
-      TTL_MS,
-      null
-    );
-    vercelInferenceProviderFetchers.set(modelId, fetchProviders);
-  }
-
-  return fetchProviders();
+  return (await getVercelInferenceProviderIdsByModel()).get(modelId) ?? null;
 }
 
 function createLanguageModelIdsFetcher(fetchModels: () => Promise<StoredModelMap>) {
@@ -150,16 +152,24 @@ const legacyOpenRouterAliases: ReadonlySet<string> = new Set([
   'minimax/minimax-m2.5-20260211',
 ]);
 
+// The cached empty id set is the same instance for a whole TTL window, so warning once per distinct
+// empty snapshot reports an outage once per window instead of once per validated model id.
+let warnedMissingOpenRouterModelMetadataFor: ReadonlySet<string> | null = null;
+
 export async function isValidOpenRouterModelId(modelId: string): Promise<boolean> {
   if (legacyOpenRouterAliases.has(modelId)) {
     return true;
   }
   const openRouterModelIds = await getOpenRouterModelsFromDatabase();
   if (openRouterModelIds.size === 0) {
-    warnExceptInTest(
-      '[isValidOpenRouterModelId] no model metadata available, assuming id is valid'
-    );
+    if (warnedMissingOpenRouterModelMetadataFor !== openRouterModelIds) {
+      warnedMissingOpenRouterModelMetadataFor = openRouterModelIds;
+      warnExceptInTest(
+        '[isValidOpenRouterModelId] no model metadata available, assuming id is valid'
+      );
+    }
     return true;
   }
+  warnedMissingOpenRouterModelMetadataFor = null;
   return openRouterModelIds.has(modelId);
 }

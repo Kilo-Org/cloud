@@ -173,6 +173,25 @@ describe('To-do quick add', () => {
     expect(errorLine()).toBeNull();
   });
 
+  it('keeps text typed for the next to-do while the add is in flight', async () => {
+    const pending = Promise.withResolvers<undefined>();
+    state.onAdd.mockReturnValueOnce(pending.promise);
+    type('First task');
+
+    act(() => {
+      addButton().onPress();
+    });
+    type('Second task');
+
+    await act(async () => {
+      pending.resolve(undefined);
+      await Promise.resolve();
+    });
+
+    expect(state.onAdd).toHaveBeenCalledExactlyOnceWith('First task');
+    expect(inputField().value).toBe('Second task');
+  });
+
   it('sends one add when pressed again while the first is in flight', async () => {
     const pending = Promise.withResolvers<undefined>();
     state.onAdd.mockReturnValueOnce(pending.promise);

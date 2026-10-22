@@ -44,10 +44,13 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
   const { repositories, recents, groups } = useNewSessionRepos({ organizationId: scope });
   const { models, isLoading: isLoadingModels } = useAvailableModels(scope);
 
-  // Controlled, so an update that fails and rolls the cached list back leaves
-  // the user's edits in the fields instead of the stored name.
-  const [name, setName] = useState(list?.name ?? '');
-  const [emoji, setEmoji] = useState(list?.emoji ?? '');
+  const nameRef = useRef(list?.name ?? '');
+  const emojiRef = useRef(list?.emoji ?? '');
+  // The first render's stored text: `defaultValue` must not follow the cached
+  // list, or a failed update rolling back would overwrite what the user typed.
+  const [storedName] = useState(list?.name ?? '');
+  const [storedEmoji] = useState(list?.emoji ?? '');
+  const [hasName, setHasName] = useState(Boolean(list?.name.trim()));
   const [gitUrl, setGitUrl] = useState(list?.gitUrl ?? null);
   const [mode, setMode] = useState(list?.mode ?? null);
   const [model, setModel] = useState(list?.model ?? null);
@@ -55,12 +58,11 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
   const [saveFailed, setSaveFailed] = useState(false);
   const savingRef = useRef(false);
   const saving = create.isPending || update.isPending;
-  const hasName = name.trim().length > 0;
 
   const { requestClose, dialog } = useSheetDismissGuard({
     isDirty: () =>
-      name !== (list?.name ?? '') ||
-      emoji !== (list?.emoji ?? '') ||
+      nameRef.current !== (list?.name ?? '') ||
+      emojiRef.current !== (list?.emoji ?? '') ||
       gitUrl !== (list?.gitUrl ?? null) ||
       mode !== (list?.mode ?? null) ||
       model !== (list?.model ?? null) ||
@@ -89,11 +91,11 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
   );
 
   async function save() {
-    const trimmedName = name.trim();
+    const trimmedName = nameRef.current.trim();
     if (trimmedName.length === 0 || savingRef.current) {
       return;
     }
-    const trimmedEmoji = emoji.trim();
+    const trimmedEmoji = emojiRef.current.trim();
     const fields = {
       name: trimmedName,
       emoji: trimmedEmoji.length > 0 ? trimmedEmoji : null,
@@ -137,8 +139,10 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
             <View className="w-20 gap-2">
               <FieldLabel>{t('todos.listSettings.emoji')}</FieldLabel>
               <Input
-                value={emoji}
-                onChangeText={setEmoji}
+                defaultValue={storedEmoji}
+                onChangeText={text => {
+                  emojiRef.current = text;
+                }}
                 maxLength={TODO_LIST_EMOJI_MAX_LENGTH}
                 accessibilityLabel={t('todos.listSettings.emoji')}
                 className="rounded-lg border border-border bg-secondary text-base text-foreground"
@@ -147,9 +151,13 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
             <View className="min-w-0 flex-1 gap-2">
               <FieldLabel>{t('todos.listSettings.name')}</FieldLabel>
               <Input
-                value={name}
+                defaultValue={storedName}
                 autoFocus={!list}
-                onChangeText={setName}
+                onChangeText={text => {
+                  nameRef.current = text;
+                  const next = text.trim().length > 0;
+                  setHasName(current => (current === next ? current : next));
+                }}
                 onSubmitEditing={() => {
                   void save();
                 }}

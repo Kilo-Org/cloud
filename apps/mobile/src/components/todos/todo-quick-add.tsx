@@ -35,9 +35,13 @@ export function TodoQuickAdd({ onAdd }: Readonly<{ onAdd: (title: string) => Pro
     setFailed(false);
     try {
       await onAdd(title);
-      textRef.current = '';
-      setHasText(false);
-      inputRef.current?.clear();
+      // The user may have kept typing for the next to-do while this one was in
+      // flight; only the submitted title leaves the field.
+      if (textRef.current.trim() === title) {
+        textRef.current = '';
+        setHasText(false);
+        inputRef.current?.clear();
+      }
     } catch {
       // The title stays in the field, so the row's status line below is the
       // only report the retry needs.

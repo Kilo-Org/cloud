@@ -637,15 +637,20 @@ export async function listChecks(
 }
 
 /**
- * The inbox lists the acting account's own review requests, so a provider
- * permission refusal on that read is the CONNECTION's — there is no
- * merge-request role in play. Left as `forbidden` it becomes the member's
- * "you don't have permission to view this" state, which is wrong for someone
- * who does have organization access; the connection needs reconnecting.
+ * The inbox lists the acting account's own review requests, so a provider 403
+ * on that read is the CONNECTION's — there is no merge-request role in play.
+ * `classifyGitLabErrorForOwner` already resolves an organization connection's
+ * 403 to `reconnect`; this adds the personal arm and, for both, copy that
+ * names the inbox the person was reading instead of a merge request, which
+ * the list request never mentioned.
  */
 function classifyInboxError(error: unknown, owner: GitLabReviewOwner): GitLabReviewError {
-  const classified = classifyGitLabErrorForOwner(error, owner);
-  if (classified.kind !== 'forbidden') return classified;
+  // The provider status has to be read before the owner-aware step: that step
+  // rewrites an organization connection's 403 into a reconnect whose copy
+  // names a merge request, which this list request never mentioned.
+  if (classifyGitLabError(error).providerStatus !== 403) {
+    return classifyGitLabErrorForOwner(error, owner);
+  }
   return new GitLabReviewError(
     'reconnect',
     'Your GitLab connection cannot read your review requests. Reconnect GitLab and try again.'

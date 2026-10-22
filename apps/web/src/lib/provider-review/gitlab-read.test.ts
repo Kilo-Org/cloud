@@ -738,6 +738,19 @@ describe('listInbox', () => {
     expect(error.retryable).toBe(false);
     expect(error.message).toMatch(/reconnect/i);
   });
+
+  it('wraps an organization connection refusal with inbox copy', async () => {
+    mockFetchGitLabUser.mockRejectedValue(new GitLabApiStatusError(403, 'GitLab user fetch: 403'));
+
+    const error = await captureRejection(listInbox(ORG_OWNER));
+
+    // The owner-aware classifier resolves the organization connection's 403 to
+    // a reconnect on its own; the inbox keeps copy that names the list the
+    // reader asked for instead of a merge request the request never mentioned.
+    expect(error.kind).toBe('reconnect');
+    expect(error.retryable).toBe(false);
+    expect(error.message).toMatch(/review requests/i);
+  });
 });
 
 describe('getMergeState', () => {

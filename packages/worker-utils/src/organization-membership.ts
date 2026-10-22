@@ -137,7 +137,7 @@ export function personalOrActiveOrganizationCondition(
       and(
         isNotNull(organization_memberships.id),
         isNotNull(organizations.id),
-        isNull(organizations.deleted_at)
+        liveOrganizationCondition(organizations)
       )
     ) ?? sql`false`
   );
@@ -158,7 +158,7 @@ export function personalOrInheritedOrganizationCondition(
       and(
         isNotNull(organizations.id),
         isNotNull(parentOrganizationsTable.id),
-        isNull(parentOrganizationsTable.deleted_at),
+        liveOrganizationCondition(parentOrganizationsTable),
         isNotNull(parentOrganizationMembershipsTable.id)
       )
     ) ?? sql`false`

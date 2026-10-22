@@ -585,27 +585,22 @@ export async function registerProfiles(
             admitted_at: nowIso,
           },
           pairs
-        ) as BatchItem<'sqlite'>
+        )
       );
     }
 
     for (const item of admissions) {
       stmts.push(
-        pendingRegisterUpsertStatement(
-          orm,
-          buildPendingUpsertValues(item.entry, current, nowIso)
-        ) as BatchItem<'sqlite'>
+        pendingRegisterUpsertStatement(orm, buildPendingUpsertValues(item.entry, current, nowIso))
       );
     }
 
     // Runs for reported pairs too, so an existing platform row records that
     // an owner wants it.
-    stmts.push(
-      claimUserRequestedStatement(orm, input.pairs, current, nowIso) as BatchItem<'sqlite'>
-    );
+    stmts.push(claimUserRequestedStatement(orm, input.pairs, current, nowIso));
 
     if (chargedModels.size > 0) {
-      stmts.push(admissionQuotaGuardStatement(orm, quotaScope) as BatchItem<'sqlite'>);
+      stmts.push(admissionQuotaGuardStatement(orm, quotaScope));
     }
 
     try {

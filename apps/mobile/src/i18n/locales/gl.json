@@ -591,6 +591,8 @@
     "installKiloGitHubApp": "Instalar a aplicación de Kilo para GitHub",
     "checkConnection": "Comprobar a conexión",
     "couldNotLoadPullRequest": "Non se puido cargar a solicitude de integración.",
+    "reviewServiceUnavailable": "O servizo non está dispoñible",
+    "reviewServiceUnavailableDescription": "O servizo non está dispoñible temporalmente. Téntao de novo en breves.",
     "description": "Descrición",
     "noDescriptionProvided": "Non se engadiu ningunha descrición.",
     "review": "Revisión",
@@ -762,6 +764,7 @@
       "truncationBanner_other": "Amósanse os primeiros {{limit}} de {{total}} ficheiros modificados polo límite da API de GitHub."
     },
     "linkPasteClipboardEmpty": "O portapapeis está baleiro.",
+    "linkPasteDenied": "Denegouse o acceso para pegar. Permite pegar e vólvao intentar.",
     "linkPasteNotAPullRequest": "Non é unha ligazón a unha solicitude de integración ou de fusión",
     "announce": {
       "commentPosted": "Comentario publicado",
@@ -1458,7 +1461,7 @@
       "off": "A memoria de revisión está desactivada.",
       "on": "A memoria de revisión está activada.",
       "offDescription": "Actívaa para que Kilo aprenda das respostas dos responsables do mantemento e propoña pautas para REVIEW.md.",
-      "readOnlyDescription": "Só os propietarios da organización e os xestores de facturación poden cambiar a memoria de revisión.",
+      "readOnlyDescription": "Só os propietarios da organización, os administradores e os xestores de facturación poden cambiar a memoria de revisión.",
       "enable": "Activar a memoria de revisión",
       "loadingProposals": "Cargando propostas",
       "couldNotLoadProposals": "Non se puideron cargar as propostas.",
@@ -1478,7 +1481,10 @@
       "starting": "Iniciando a revisión…",
       "start": "Iniciar a revisión"
     },
-    "notConnectedReadOnly": "{{platform}} non está conectado. Só os propietarios da organización e os xestores de facturación poden conectalo.",
+    "notConnectedReadOnly": "{{platform}} non está conectado. Só os propietarios da organización e os administradores poden conectalo.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} non está conectado. Pídelle ao propietario, ao administrador ou ao xestor de facturación da organización que o conecte."
+    },
     "webhookSetup": "A configuración do webhook está incompleta.",
     "webhookSetupDescription": "Algúns repositorios poden non recibir revisións automáticas.",
     "autoReviews": "Revisións automáticas",
@@ -1486,7 +1492,7 @@
     "followReviewMd": "Seguir REVIEW.md",
     "followReviewMdSubtitle": "Respecta as instrucións do ficheiro REVIEW.md de cada repositorio",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket non está conectado. Só os propietarios da organización e os xestores de facturación poden conectalo.",
+      "notConnectedReadOnly": "Bitbucket non está conectado. Só os propietarios da organización, os administradores e os xestores de facturación poden conectalo.",
       "setupIncomplete": "A configuración está incompleta. Remátaa en kilo.ai.",
       "setup": "Configuración de Bitbucket"
     },
@@ -1746,7 +1752,7 @@
       "couldNotLoad": "Non se puido cargar este problema detectado.",
       "couldNotCheckPermissions": "Non se puideron comprobar os permisos para descartar achados.",
       "cannotDismissTitle": "Non se pode descartar este achado",
-      "cannotDismissDescription": "Só os propietarios da organización e os xestores de facturación poden descartar achados.",
+      "cannotDismissDescription": "Só os propietarios da organización, os administradores e os xestores de facturación poden descartar achados.",
       "alreadyResolvedDescription": "Este achado xa está resolto e non se pode descartar."
     },
     "findingDetails": {
@@ -1788,7 +1794,7 @@
       "automationAllOff": "Todo desactivado",
       "automationCount": "{{displayCount}} de 3 activados",
       "notificationsCount": "{{displayCount}} de 2 activadas",
-      "disabledNoManage": "O axente de seguridade está desactivado. Só os propietarios da organización e os xestores de facturación poden activalo.",
+      "disabledNoManage": "O axente de seguridade está desactivado. Só os propietarios da organización, os administradores e os xestores de facturación poden activalo.",
       "disabledNoRepo": "Selecciona polo menos un repositorio antes de activar o axente de seguridade.",
       "disabledPrompt": "Activa o axente de seguridade para sincronizar os avisos de Dependabot, escoller repositorios e configurar a automatización."
     },
@@ -1837,7 +1843,7 @@
       "invalidDayCount": "o prazo debe ser de 1 a 365 días, sen decimais.",
       "remediationDeadlineA11y": "Prazo de corrección para a gravidade {{label}}, en días",
       "enterWholeNumber": "Introduce un número enteiro entre 1 e 365",
-      "permissionNote": "Só os propietarios da organización e os xestores de facturación poden cambiar esta configuración.",
+      "permissionNote": "Só os propietarios da organización, os administradores e os xestores de facturación poden cambiar esta configuración.",
       "enableTracking": "Activar o seguimento do SLA",
       "enableTrackingSubtitle": "Establece prazos de corrección segundo a gravidade do achado.",
       "deadlinesHeading": "Prazos de corrección (días)"
@@ -1893,7 +1899,7 @@
       "summary": "Resumo do informe",
       "title": "Informe de auditoría",
       "unavailable": "Informe de auditoría non dispoñible",
-      "unavailableDescription": "Só os propietarios da organización e os xestores de facturación poden ver os informes de auditoría. Pídelle a un propietario ou xestor de facturación que che conceda acceso.",
+      "unavailableDescription": "Só os propietarios da organización, os administradores e os xestores de facturación poden ver os informes de auditoría. Pídelle a un propietario, administrador ou xestor de facturación que che conceda acceso.",
       "queryFailed": "A consulta do informe non rematou. Téntao de novo.",
       "eventActions": {
         "findingAnalysisCompleted": "Análise completada",
@@ -2243,6 +2249,8 @@
       "commitAndPush": "Confirmar e enviar",
       "startSession": "Iniciar sesión",
       "selectRepositoryToStart": "Selecciona un repositorio para comezar.",
+      "enterPromptToStart": "Engade un prompt para comezar.",
+      "enterPromptOrFileToStart": "Engade un prompt ou un ficheiro para comezar.",
       "connectProviderToStart": "Conecta un provedor para comezar.",
       "promptPlaceholder": "En que che gustaría traballar?",
       "couldNotLoadModels": "Non se puideron cargar os modelos.",
@@ -3022,6 +3030,7 @@
 
       "chooseAccount": "Seleccionar unha conta",
       "loadErrorTitle": "Non se puideron cargar as túas organizacións.",
+      "membershipLostNotice": "Xa non tes acceso a esta organización. Cambiado a {{target}}.",
       "noOrganization": "Sen organización",
 
       "noOrganizationDescription": "Esta conta non forma parte dunha organización. Crea unha ou únete a unha na web para usar funcións de organización como as invitacións de membros e as alertas de saldo baixo.",
@@ -3107,7 +3116,7 @@
     "members": {
       "changeRole": "Cambiar rol",
       "emptyDescriptionCanInvite": "Invita os teus compañeiros de equipo para comezar a colaborar nesta organización.",
-      "emptyDescriptionCannotInvite": "Pídelle a un propietario ou a un xestor de facturación que invite os teus compañeiros de equipo.",
+      "emptyDescriptionCannotInvite": "Pídelle a un propietario, administrador ou xestor de facturación que invite os teus compañeiros de equipo.",
       "emptyTitle": "Aínda non hai membros",
       "invitedDate": "Invitación enviada o {{date}}",
       "limitPerDay": "{{amount}}/día",
@@ -3371,7 +3380,8 @@
       "settingsToolsOn": "Activado — as ferramentas de configuración envíanse ao modelo",
       "settingsToolsOff": "Desactivado — non se envía ningunha ferramenta de configuración ao modelo",
       "serverChecking": "Comprobando este servidor…",
-      "serverToolCount": "{{count}} ferramentas",
+      "serverToolCount_one": "{{count}} ferramenta",
+      "serverToolCount_other": "{{count}} ferramentas",
       "serverUnreachable": "Non se puido contactar con este servidor",
       "serverOff": "Este servidor está desactivado"
     },
@@ -3518,6 +3528,8 @@
       "quantizationsHelp": "Os ficheiros máis pequenos usan menos memoria e almacenamento. Os máis grandes adoitan dar mellores respostas.",
       "quantDetail": "Descarga de {{size}} · uns {{memory}} de memoria",
       "downloadQuant": "Descargar {{quant}}",
+      "downloadModelA11y": "Descargar {{name}}",
+      "detailsA11y": "Detalles: {{name}}",
       "loadingModel": "Cargando os detalles do modelo",
       "couldNotLoadModel": "Non se puido cargar este modelo",
       "noFiles": "Non hai ficheiros que esta app poida executar",
@@ -3569,6 +3581,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Iniciar un axente necesita unha instrución. Engade unha instrución e execútao de novo.",
+      "repositoryRequired": "Iniciar un axente necesita un repositorio. Abre Kilo e elixe un, e execútao de novo.",
       "repositoryUnknown": "Kilo non recoñece {{repository}} como un repositorio de GitHub ou GitLab. Escolle outro repositorio en Kilo.",
       "repositoryUnsupported": "{{repository}} é un repositorio de Bitbucket — Iniciar un axente aínda non pode usalo. Escolle outro repositorio en Kilo."
     }
@@ -3606,10 +3619,13 @@
     "emptyDescription": "Crea un perfil para reutilizar as variables de ambiente, os comandos de configuración e as habilidades nas sesións.",
     "loadFailed": "Non se puideron cargar os perfís",
     "counts": {
-      "vars": "{{count}} variables",
+      "vars_one": "{{count}} variable",
+      "vars_other": "{{count}} variables",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} habilidades",
-      "commands": "{{count}} comandos",
+      "skills_one": "{{count}} habilidade",
+      "skills_other": "{{count}} habilidades",
+      "commands_one": "{{count}} comando",
+      "commands_other": "{{count}} comandos",
       "varsShort": "{{count}}v",
       "skillsShort": "{{count}}h",
       "commandsShort": "{{count}}c"
@@ -3685,7 +3701,7 @@
       "environment": "Ambiente (JSON)",
       "headers": "Cabeceiras (JSON)",
       "timeout": "Tempo de espera",
-      "secretCount": "Conta secreta",
+      "secretCount": "Conta secreta: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3728,6 +3744,9 @@
       "visibilityPrimary": "Primario: móstrase no selector",
       "visibilitySubagent": "Subaxente: só se pode chamar desde outros",
       "visibilityAll": "Todos - ambos",
+      "modePrimary": "Só primario",
+      "modeSubagent": "Só subaxente",
+      "modeAll": "Todos",
       "saveFailed": "Non se puido gardar o axente",
       "deleteFailed": "Non se puido eliminar o axente",
       "nameRequired": "Introduza un nome de axente",
@@ -3788,6 +3807,8 @@
     "empty": "Os paquetes de créditos non están dispoñibles agora mesmo.",
     "noMatchingProducts": "A App Store non devolveu ningún paquete de créditos coincidente.",
     "noMatchingProductsPlay": "Google Play non devolveu ningún paquete de créditos coincidente.",
+    "storeTimedOut": "A App Store non respondeu a tempo. Téntao de novo.",
+    "storeTimedOutPlay": "Google Play non respondeu a tempo. Téntao de novo.",
     "purchaseOwnedByAnotherAccount": "Os créditos desta Apple Account pertencen a outra conta de Kilo. Inicia sesión nesa conta de Kilo para usalos.",
     "purchaseOwnedByAnotherAccountPlay": "Os créditos desta conta de Google Play pertencen a outra conta de Kilo. Inicia sesión nesa conta de Kilo para usalos."
   },

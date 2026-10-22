@@ -894,7 +894,7 @@
     },
     "autoReviews": "Otomatik incelemeler",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket bağlı değil. Yalnızca kuruluş sahipleri ve faturalandırma yöneticileri bağlayabilir.",
+      "notConnectedReadOnly": "Bitbucket bağlı değil. Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir.",
       "setupIncomplete": "Kurulum tamamlanmadı. Yapılandırmayı kilo.ai üzerinden tamamla.",
       "setup": "Bitbucket kurulumu"
     },
@@ -918,7 +918,10 @@
       "starting": "İnceleme başlatılıyor…",
       "title": "Manuel inceleme"
     },
-    "notConnectedReadOnly": "{{platform}} bağlı değil. Yalnızca kuruluş sahipleri ve faturalandırma yöneticileri bağlayabilir.",
+    "notConnectedReadOnly": "{{platform}} bağlı değil. Yalnızca kuruluş sahipleri ve yöneticiler bağlayabilir.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} bağlı değil. Bağlaması için bir kuruluş sahibi, yönetici veya faturalandırma yöneticisinden istekte bulunun."
+    },
     "platformList": {
       "activity": "Etkinlik",
       "checking": "Kontrol ediliyor…",
@@ -997,7 +1000,7 @@
       "off": "İnceleme belleği kapalı.",
       "on": "İnceleme belleği açık.",
       "offDescription": "Kilo'nun proje sorumlularının yanıtlarından öğrenmesi ve REVIEW.md yönergeleri önermesi için inceleme belleğini aç.",
-      "readOnlyDescription": "İnceleme belleğini yalnızca kuruluş sahipleri ve faturalandırma yöneticileri değiştirebilir.",
+      "readOnlyDescription": "İnceleme belleğini yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri değiştirebilir.",
       "title": "İnceleme belleği"
     },
     "scopeList": {
@@ -1149,7 +1152,7 @@
       "summary": "Rapor özeti",
       "title": "Denetim raporu",
       "unavailable": "Denetim raporu kullanılamıyor",
-      "unavailableDescription": "Denetim raporlarını yalnızca kuruluş sahipleri ve faturalandırma yöneticileri görüntüleyebilir. Bir kuruluş sahibinden veya faturalandırma yöneticisinden sana erişim vermesini iste.",
+      "unavailableDescription": "Denetim raporlarını yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri görüntüleyebilir. Bir kuruluş sahibi, yönetici veya faturalandırma yöneticisinden sana erişim vermesini iste.",
       "eventActions": {
         "findingAnalysisCompleted": "Analiz tamamlandı",
         "findingAnalysisFailed": "Analiz başarısız oldu",
@@ -1263,7 +1266,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "Bu bulgu zaten çözüldüğü için artık yok sayılamaz.",
-      "cannotDismissDescription": "Bulguları yalnızca kuruluş sahipleri ve faturalandırma yöneticileri yok sayabilir.",
+      "cannotDismissDescription": "Bulguları yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri yok sayabilir.",
       "cannotDismissTitle": "Bu bulgu yok sayılamıyor",
       "commentAccessibility": "Yok sayma yorumu",
       "commentLabel": "Yorum (isteğe bağlı)",
@@ -1395,7 +1398,7 @@
       "automationCount": "Etkin özellik: {{displayCount}} / 3",
       "couldNotLoadPermissions": "İzinler yüklenemedi.",
       "couldNotLoadSettings": "Güvenlik ajanı ayarları yüklenemedi.",
-      "disabledNoManage": "Güvenlik ajanı devre dışı. Yalnızca kuruluş sahipleri ve faturalandırma yöneticileri etkinleştirebilir.",
+      "disabledNoManage": "Güvenlik ajanı devre dışı. Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri etkinleştirebilir.",
       "disabledNoRepo": "Güvenlik ajanını etkinleştirmeden önce en az bir depo seç.",
       "disabledPrompt": "Dependabot uyarılarını eşitlemek, depoları seçmek ve otomasyonu yapılandırmak için Güvenlik ajanını etkinleştir.",
       "notificationsCount": "Etkin bildirim: {{displayCount}} / 2",
@@ -1428,7 +1431,7 @@
       "lowDescription": "Güvenliğe etkisi çok düşüktür.",
       "medium": "Orta",
       "mediumDescription": "Etkisi sınırlıdır veya yalnızca belirli koşullarda ortaya çıkar.",
-      "permissionNote": "Bu ayarları yalnızca kuruluş sahipleri ve faturalandırma yöneticileri değiştirebilir.",
+      "permissionNote": "Bu ayarları yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri değiştirebilir.",
       "remediationDeadlineA11y": "{{label}} önem derecesi için gün cinsinden düzeltme süresi",
       "title": "SLA ilkesi"
     },
@@ -1729,6 +1732,8 @@
       "commitAndPush": "İşle ve gönder",
       "startSession": "Oturumu başlat",
       "selectRepositoryToStart": "Başlamak için bir depo seç.",
+      "enterPromptToStart": "Başlamak için bir istem ekle.",
+      "enterPromptOrFileToStart": "Başlamak için bir istem veya dosya ekle.",
       "connectProviderToStart": "Başlamak için bir sağlayıcı bağla.",
       "promptPlaceholder": "Ne üzerinde çalışmak istersin?",
       "couldNotLoadModels": "Modeller yüklenemedi.",
@@ -2550,6 +2555,8 @@
     },
     "connectionExpired": "GitHub bağlantısının süresi doldu.",
     "couldNotLoadPullRequest": "Çekme isteği yüklenemedi.",
+    "reviewServiceUnavailable": "İnceleme servisi kullanılamıyor",
+    "reviewServiceUnavailableDescription": "İnceleme servisi geçici olarak kullanılamıyor. Kısa süre içinde yeniden deneyin.",
     "couldNotOpenGitHubAppSettings": "GitHub uygulaması ayarları açılamadı.",
     "description": "Açıklama",
     "discussion": {
@@ -2960,6 +2967,7 @@
       "truncationBanner_other": "GitHub API sınırı nedeniyle değiştirilen {{total}} dosyanın ilk {{limit}} tanesi gösteriliyor."
     },
     "linkPasteClipboardEmpty": "Pano boş.",
+    "linkPasteDenied": "Yapıştırma erişimi reddedildi. Yapıştırmaya izin verin ve tekrar deneyin.",
     "linkPasteNotAPullRequest": "Bu bir çekme isteği veya birleştirme isteği bağlantısı değil",
     "announce": {
       "commentPosted": "Yorum gönderildi",
@@ -3014,6 +3022,7 @@
 
       "chooseAccount": "Bir hesap seç",
       "loadErrorTitle": "Kuruluşların yüklenemedi.",
+      "membershipLostNotice": "Bu kuruluşa artık erişimin yok. {{target}}'e geçildi.",
       "noOrganization": "Kuruluş yok",
 
       "noOrganizationDescription": "Bu hesap bir kuruluşun parçası değil. Üye davetleri ve düşük bakiye uyarıları gibi kuruluş özelliklerini kullanmak için web sitesinde bir kuruluş oluştur veya birine katıl.",
@@ -3106,7 +3115,7 @@
     "members": {
       "changeRole": "Rolü değiştir",
       "emptyDescriptionCanInvite": "Bu kuruluşta birlikte çalışmak için ekip arkadaşlarını davet et.",
-      "emptyDescriptionCannotInvite": "Kuruluş sahibinden veya faturalandırma yöneticisinden ekip arkadaşlarını davet etmesini iste.",
+      "emptyDescriptionCannotInvite": "Bir kuruluş sahibi, yönetici veya faturalandırma yöneticisinden ekip arkadaşlarını davet etmesini iste.",
       "emptyTitle": "Henüz üye yok",
       "invitedDate": "Davet tarihi: {{date}}",
       "limitPerDay": "{{amount}}/gün",
@@ -3371,7 +3380,8 @@
       "settingsToolsOn": "Açık — ayar araçları modele gönderilir",
       "settingsToolsOff": "Kapalı — modele hiçbir ayar aracı gönderilmez",
       "serverChecking": "Bu sunucu denetleniyor…",
-      "serverToolCount": "{{count}} araç",
+      "serverToolCount_one": "{{count}} araç",
+      "serverToolCount_other": "{{count}} araç",
       "serverUnreachable": "Bu sunucuya ulaşılamadı",
       "serverOff": "Bu sunucu kapalı"
     },
@@ -3518,6 +3528,8 @@
       "quantizationsHelp": "Küçük dosyalar daha az bellek ve depolama alanı kullanır. Büyük dosyalar genellikle daha iyi yanıtlar verir.",
       "quantDetail": "{{size}} indirme · yaklaşık {{memory}} bellek",
       "downloadQuant": "{{quant}} indir",
+      "downloadModelA11y": "{{name}} indir",
+      "detailsA11y": "Ayrıntılar: {{name}}",
       "loadingModel": "Model ayrıntıları yükleniyor",
       "couldNotLoadModel": "Bu model yüklenemedi",
       "noFiles": "Bu uygulamanın çalıştırabileceği dosya yok",
@@ -3569,6 +3581,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Ajanı başlat için bir istem gerekir. Bir istem ekleyip yeniden çalıştır.",
+      "repositoryRequired": "Ajanı başlat için bir depo gerekir. Kilo'yu aç, bir depo seç, ardından yeniden çalıştır.",
       "repositoryUnknown": "Kilo, {{repository}} adresini GitHub veya GitLab deposu olarak tanımıyor. Kilo'da başka bir depo seç.",
       "repositoryUnsupported": "{{repository}} bir Bitbucket deposu — Ajanı başlat bunu henüz kullanamıyor. Kilo'da başka bir depo seç."
     }
@@ -3606,10 +3619,13 @@
     "emptyDescription": "Oturumlar arasında ortam değişkenlerini, kurulum komutlarını ve becerileri yeniden kullanmak için bir profil oluşturun.",
     "loadFailed": "Profiller yüklenemedi",
     "counts": {
-      "vars": "{{count}} değişken",
+      "vars_one": "{{count}} değişken",
+      "vars_other": "{{count}} değişken",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} yetenek",
-      "commands": "{{count}} komut",
+      "skills_one": "{{count}} yetenek",
+      "skills_other": "{{count}} yetenek",
+      "commands_one": "{{count}} komut",
+      "commands_other": "{{count}} komut",
       "varsShort": "{{count}}d",
       "skillsShort": "{{count}}y",
       "commandsShort": "{{count}}k"
@@ -3685,7 +3701,7 @@
       "environment": "Çevre (JSON)",
       "headers": "Başlıklar (JSON)",
       "timeout": "Zaman aşımı",
-      "secretCount": "Gizli sayım",
+      "secretCount": "Gizli sayım: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3728,6 +3744,9 @@
       "visibilityPrimary": "Birincil — seçicide gösterilir",
       "visibilitySubagent": "Alt temsilci — yalnızca başkaları tarafından aranabilir",
       "visibilityAll": "Hepsi - ikisi de",
+      "modePrimary": "Yalnızca birincil",
+      "modeSubagent": "Yalnızca alt temsilci",
+      "modeAll": "Tüm modlar",
       "saveFailed": "Temsilci kaydedilemedi",
       "deleteFailed": "Temsilci silinemedi",
       "nameRequired": "Bir temsilci adı girin",
@@ -3788,6 +3807,8 @@
     "empty": "Kredi paketleri şu anda kullanılamıyor.",
     "noMatchingProducts": "App Store eşleşen kredi paketi döndürmedi.",
     "noMatchingProductsPlay": "Google Play eşleşen kredi paketi döndürmedi.",
+    "storeTimedOut": "App Store zamanında yanıt vermedi. Tekrar dene.",
+    "storeTimedOutPlay": "Google Play zamanında yanıt vermedi. Tekrar dene.",
     "purchaseOwnedByAnotherAccount": "Bu Apple Account üzerindeki krediler farklı bir Kilo hesabına ait. Kullanmak için o Kilo hesabıyla oturum aç.",
     "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hesabındaki krediler farklı bir Kilo hesabına ait. Kullanmak için o Kilo hesabıyla oturum açın."
   },

@@ -591,6 +591,8 @@
     "installKiloGitHubApp": "Kilo GitHub অ্যাপ ইনস্টল করুন",
     "checkConnection": "সংযোগ পরীক্ষা করুন",
     "couldNotLoadPullRequest": "পুল রিকোয়েস্ট লোড করা যায়নি।",
+    "reviewServiceUnavailable": "পরিষেবা অনুপলব্ধ",
+    "reviewServiceUnavailableDescription": "পরিষেবাটি সাময়িকভাবে অনুপলব্ধ। শীঘ্রই আবার চেষ্টা করুন।",
     "description": "বিবরণ",
     "noDescriptionProvided": "কোনো বিবরণ দেওয়া হয়নি।",
     "review": "পর্যালোচনা",
@@ -762,6 +764,7 @@
       "truncationBanner_other": "GitHub API-এর সীমার কারণে পরিবর্তিত {{total}}টি ফাইলের মধ্যে প্রথম {{limit}}টি দেখানো হচ্ছে।"
     },
     "linkPasteClipboardEmpty": "ক্লিপবোর্ড খালি।",
+    "linkPasteDenied": "পেস্ট করার অনুমতি অস্বীকার করা হয়েছে। পেস্ট করার অনুমতি দিয়ে আবার চেষ্টা করুন।",
     "linkPasteNotAPullRequest": "এটি পুল রিকোয়েস্ট বা মার্জ রিকোয়েস্টের লিংক নয়",
     "announce": {
       "commentPosted": "মন্তব্য পোস্ট হয়েছে",
@@ -1458,7 +1461,7 @@
       "off": "পর্যালোচনার মেমরি বন্ধ আছে।",
       "on": "পর্যালোচনার মেমরি চালু আছে।",
       "offDescription": "রক্ষণাবেক্ষণকারীদের উত্তর থেকে শিখতে এবং REVIEW.md-এর জন্য নির্দেশনা প্রস্তাব করতে Kilo-কে এই সুবিধাটি চালু করে দিন।",
-      "readOnlyDescription": "শুধুমাত্র সংস্থার মালিক এবং বিলিং ম্যানেজাররা পর্যালোচনার মেমরি পরিবর্তন করতে পারেন।",
+      "readOnlyDescription": "শুধুমাত্র সংস্থার মালিক, অ্যাডমিন এবং বিলিং ম্যানেজাররা পর্যালোচনার মেমরি পরিবর্তন করতে পারেন।",
       "enable": "পর্যালোচনার মেমরি চালু করুন",
       "loadingProposals": "প্রস্তাব লোড হচ্ছে",
       "couldNotLoadProposals": "প্রস্তাবগুলো লোড করা যায়নি।",
@@ -1478,7 +1481,10 @@
       "starting": "পর্যালোচনা শুরু হচ্ছে…",
       "start": "পর্যালোচনা শুরু করুন"
     },
-    "notConnectedReadOnly": "{{platform}} সংযুক্ত নয়। শুধুমাত্র সংস্থার মালিক এবং বিলিং ম্যানেজাররা এটি সংযুক্ত করতে পারেন।",
+    "notConnectedReadOnly": "{{platform}} সংযুক্ত নয়। শুধুমাত্র সংস্থার মালিক এবং অ্যাডমিনরা এটি সংযুক্ত করতে পারেন।",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} সংযুক্ত নয়। এটি সংযুক্ত করতে একজন সংস্থার মালিক, অ্যাডমিন বা বিলিং ম্যানেজারকে অনুরোধ করুন।"
+    },
     "webhookSetup": "ওয়েবহুক সেটআপ সম্পূর্ণ হয়নি।",
     "webhookSetupDescription": "কিছু রিপোজিটরি স্বয়ংক্রিয় পর্যালোচনা নাও পেতে পারে।",
     "autoReviews": "স্বয়ংক্রিয় পর্যালোচনা",
@@ -1486,7 +1492,7 @@
     "followReviewMd": "REVIEW.md অনুসরণ করুন",
     "followReviewMdSubtitle": "প্রতিটি রিপোজিটরির REVIEW.md ফাইলের নির্দেশনা অনুসরণ করুন",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket সংযুক্ত নয়। শুধুমাত্র সংস্থার মালিক এবং বিলিং ম্যানেজাররা এটি সংযুক্ত করতে পারেন।",
+      "notConnectedReadOnly": "Bitbucket সংযুক্ত নয়। শুধুমাত্র সংস্থার মালিক, অ্যাডমিন এবং বিলিং ম্যানেজাররা এটি সংযুক্ত করতে পারেন।",
       "setupIncomplete": "সেটআপ সম্পূর্ণ হয়নি — kilo.ai-এ কনফিগারেশন শেষ করুন।",
       "setup": "Bitbucket সেটআপ"
     },
@@ -1746,7 +1752,7 @@
       "couldNotLoad": "শনাক্ত সমস্যাটি লোড করা যায়নি।",
       "couldNotCheckPermissions": "খারিজ করার অনুমতি পরীক্ষা করা যায়নি।",
       "cannotDismissTitle": "এই ত্রুটিটি খারিজ করা যাচ্ছে না",
-      "cannotDismissDescription": "শুধুমাত্র সংস্থার মালিক এবং বিলিং ম্যানেজাররা ত্রুটি খারিজ করতে পারেন।",
+      "cannotDismissDescription": "শুধুমাত্র সংস্থার মালিক, অ্যাডমিন এবং বিলিং ম্যানেজাররা ত্রুটি খারিজ করতে পারেন।",
       "alreadyResolvedDescription": "এই ত্রুটির সমাধান হয়ে গেছে, তাই এটি আর খারিজ করা যাবে না।"
     },
     "findingDetails": {
@@ -1788,7 +1794,7 @@
       "automationAllOff": "সব বন্ধ",
       "automationCount": "৩টির মধ্যে {{displayCount}}টি চালু",
       "notificationsCount": "২টির মধ্যে {{displayCount}}টি চালু",
-      "disabledNoManage": "সিকিউরিটি এজেন্ট বন্ধ আছে। শুধুমাত্র সংস্থার মালিক এবং বিলিং ম্যানেজাররা এটি চালু করতে পারেন।",
+      "disabledNoManage": "সিকিউরিটি এজেন্ট বন্ধ আছে। শুধুমাত্র সংস্থার মালিক, অ্যাডমিন এবং বিলিং ম্যানেজাররা এটি চালু করতে পারেন।",
       "disabledNoRepo": "সিকিউরিটি এজেন্ট চালু করার আগে অন্তত একটি রিপোজিটরি নির্বাচন করুন।",
       "disabledPrompt": "Dependabot-এর সতর্কতা সিঙ্ক করতে, রিপোজিটরি বেছে নিতে এবং অটোমেশন কনফিগার করতে সিকিউরিটি এজেন্ট চালু করুন।"
     },
@@ -1837,7 +1843,7 @@
       "invalidDayCount": "দিনের সংখ্যা ১ থেকে ৩৬৫-এর মধ্যে পূর্ণসংখ্যা হতে হবে।",
       "remediationDeadlineA11y": "{{label}} তীব্রতার ত্রুটি সমাধানের সময়সীমা, দিনের হিসাবে",
       "enterWholeNumber": "১ থেকে ৩৬৫-এর মধ্যে একটি পূর্ণসংখ্যা লিখুন",
-      "permissionNote": "শুধুমাত্র সংস্থার মালিক এবং বিলিং ম্যানেজাররা এই সেটিংস পরিবর্তন করতে পারেন।",
+      "permissionNote": "শুধুমাত্র সংস্থার মালিক, অ্যাডমিন এবং বিলিং ম্যানেজাররা এই সেটিংস পরিবর্তন করতে পারেন।",
       "enableTracking": "SLA নজরদারি চালু করুন",
       "enableTrackingSubtitle": "ত্রুটির তীব্রতা অনুযায়ী সমাধানের সময়সীমা নির্ধারণ করুন।",
       "deadlinesHeading": "সমাধানের সময়সীমা (দিন)"
@@ -1893,7 +1899,7 @@
       "summary": "রিপোর্টের সারাংশ",
       "title": "অডিট রিপোর্ট",
       "unavailable": "অডিট রিপোর্ট পাওয়া যাচ্ছে না",
-      "unavailableDescription": "শুধুমাত্র সংস্থার মালিক এবং বিলিং ম্যানেজাররা অডিট রিপোর্ট দেখতে পারেন। দেখার অনুমতির জন্য কোনো মালিক বা বিলিং ম্যানেজারকে অনুরোধ করুন।",
+      "unavailableDescription": "শুধুমাত্র সংস্থার মালিক, অ্যাডমিন এবং বিলিং ম্যানেজাররা অডিট রিপোর্ট দেখতে পারেন। অ্যাক্সেস পেতে একজন মালিক, অ্যাডমিন বা বিলিং ম্যানেজারকে অনুরোধ করুন।",
       "queryFailed": "রিপোর্টের তথ্য আনার কাজ শেষ হয়নি। আবার চেষ্টা করুন।",
       "eventActions": {
         "findingAnalysisCompleted": "বিশ্লেষণ সম্পন্ন হয়েছে",
@@ -2243,6 +2249,8 @@
       "commitAndPush": "কমিট ও পুশ করুন",
       "startSession": "সেশন শুরু করুন",
       "selectRepositoryToStart": "শুরু করতে একটি রিপোজিটরি বেছে নিন।",
+      "enterPromptToStart": "শুরু করতে একটি প্রম্পট যোগ করুন।",
+      "enterPromptOrFileToStart": "শুরু করতে একটি প্রম্পট বা ফাইল যোগ করুন।",
       "connectProviderToStart": "শুরু করতে একটি প্রোভাইডার সংযুক্ত করুন।",
       "promptPlaceholder": "আপনি কী নিয়ে কাজ করতে চান?",
       "couldNotLoadModels": "মডেল লোড করা যায়নি।",
@@ -3022,6 +3030,7 @@
 
       "chooseAccount": "একটি অ্যাকাউন্ট নির্বাচন করুন",
       "loadErrorTitle": "আপনার সংস্থাগুলো লোড করা যায়নি।",
+      "membershipLostNotice": "এই সংস্থায় আপনার আর অ্যাক্সেস নেই। স্যুইচ করা হয়েছে {{target}}-এ।",
       "noOrganization": "কোনো সংস্থা নেই",
 
       "noOrganizationDescription": "এই অ্যাকাউন্টটি কোনো সংস্থার অংশ নয়। সদস্য আমন্ত্রণ এবং কম ব্যালেন্স সতর্কতার মতো সংস্থার বৈশিষ্ট্য ব্যবহার করতে ওয়েবে একটি সংস্থা তৈরি করুন বা যোগ দিন।",
@@ -3107,7 +3116,7 @@
     "members": {
       "changeRole": "ভূমিকা পরিবর্তন করুন",
       "emptyDescriptionCanInvite": "এই সংস্থায় একসঙ্গে কাজ শুরু করতে দলের অন্যদের আমন্ত্রণ জানান।",
-      "emptyDescriptionCannotInvite": "দলের অন্যদের আমন্ত্রণ জানাতে মালিক বা বিলিং ম্যানেজারকে বলুন।",
+      "emptyDescriptionCannotInvite": "দলের অন্যদের আমন্ত্রণ জানাতে কোনো মালিক, অ্যাডমিন বা বিলিং ম্যানেজারকে বলুন।",
       "emptyTitle": "এখনো কোনো সদস্য নেই",
       "invitedDate": "আমন্ত্রণ পাঠানো হয়েছে: {{date}}",
       "limitPerDay": "{{amount}}/দিন",
@@ -3371,7 +3380,8 @@
       "settingsToolsOn": "চালু — সেটিংস টুল মডেলে পাঠানো হয়",
       "settingsToolsOff": "বন্ধ — মডেলে কোনো সেটিংস টুল পাঠানো হয় না",
       "serverChecking": "এই সার্ভার যাচাই করা হচ্ছে…",
-      "serverToolCount": "{{count}} টুল",
+      "serverToolCount_one": "{{count}} টুল",
+      "serverToolCount_other": "{{count}} টুল",
       "serverUnreachable": "এই সার্ভারে পৌঁছানো যায়নি",
       "serverOff": "এই সার্ভার বন্ধ আছে"
     },
@@ -3518,6 +3528,8 @@
       "quantizationsHelp": "ছোট ফাইল কম মেমরি ও স্টোরেজ ব্যবহার করে। বড় ফাইল সাধারণত ভালো উত্তর দেয়।",
       "quantDetail": "{{size}} ডাউনলোড · প্রায় {{memory}} মেমরি",
       "downloadQuant": "{{quant}} ডাউনলোড করুন",
+      "downloadModelA11y": "{{name}} ডাউনলোড করুন",
+      "detailsA11y": "বিস্তারিত: {{name}}",
       "loadingModel": "মডেলের বিবরণ লোড হচ্ছে",
       "couldNotLoadModel": "এই মডেলটি লোড করা যায়নি",
       "noFiles": "এই অ্যাপে চালানো যায় এমন কোনো ফাইল নেই",
@@ -3569,6 +3581,7 @@
   "appActions": {
     "start": {
       "promptRequired": "এজেন্ট চালু করতে একটি প্রম্পট প্রয়োজন। একটি প্রম্পট যোগ করুন এবং আবার চালান।",
+      "repositoryRequired": "এজেন্ট চালু করতে একটি রিপোজিটরি প্রয়োজন। Kilo খুলুন এবং একটি রিপোজিটরি বেছে নিন, তারপর আবার চালান।",
       "repositoryUnknown": "Kilo {{repository}}-কে GitHub বা GitLab রিপোজিটরি হিসেবে চেনে না। Kilo-তে অন্য একটি রিপোজিটরি বেছে নিন।",
       "repositoryUnsupported": "{{repository}} একটি Bitbucket রিপোজিটরি — এজেন্ট চালু করুন এখনও এটি ব্যবহার করতে পারে না। Kilo-তে অন্য একটি রিপোজিটরি বেছে নিন।"
     }
@@ -3606,10 +3619,13 @@
     "emptyDescription": "সেশন জুড়ে পরিবেশ ভেরিয়েবল, সেটআপ কমান্ড এবং দক্ষতা পুনরায় ব্যবহার করার জন্য একটি প্রোফাইল তৈরি করুন।",
     "loadFailed": "প্রোফাইল লোড করা যায়নি",
     "counts": {
-      "vars": "{{count}} ভেরিয়েবল",
+      "vars_one": "{{count}} ভেরিয়েবল",
+      "vars_other": "{{count}} ভেরিয়েবল",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} দক্ষতা",
-      "commands": "{{count}} কমান্ড",
+      "skills_one": "{{count}} দক্ষতা",
+      "skills_other": "{{count}} দক্ষতা",
+      "commands_one": "{{count}} কমান্ড",
+      "commands_other": "{{count}} কমান্ড",
       "varsShort": "{{count}}ভ",
       "skillsShort": "{{count}}দ",
       "commandsShort": "{{count}}ক"
@@ -3685,7 +3701,7 @@
       "environment": "পরিবেশ (JSON)",
       "headers": "হেডার (JSON)",
       "timeout": "টাইমআউট",
-      "secretCount": "গোপন গণনা",
+      "secretCount": "গোপন গণনা: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3728,6 +3744,9 @@
       "visibilityPrimary": "প্রাথমিক — পিকারে দেখানো হয়েছে",
       "visibilitySubagent": "Subagent — শুধুমাত্র অন্যদের থেকে কলযোগ্য",
       "visibilityAll": "সব — উভয়",
+      "modePrimary": "শুধু প্রাথমিক",
+      "modeSubagent": "শুধু সাবএজেন্ট",
+      "modeAll": "সব",
       "saveFailed": "এজেন্ট সংরক্ষণ করতে পারেনি",
       "deleteFailed": "এজেন্ট মুছে ফেলা যায়নি",
       "nameRequired": "একটি এজেন্ট নাম লিখুন",
@@ -3788,6 +3807,8 @@
     "empty": "ক্রেডিট প্যাক এখন পাওয়া যাচ্ছে না।",
     "noMatchingProducts": "App Store কোনো মিলে যাওয়া ক্রেডিট প্যাক ফেরত দেয়নি।",
     "noMatchingProductsPlay": "Google Play কোনো মিলে যাওয়া ক্রেডিট প্যাক ফেরত দেয়নি।",
+    "storeTimedOut": "App Store সময়মতো সাড়া দেয়নি। আবার চেষ্টা করুন।",
+    "storeTimedOutPlay": "Google Play সময়মতো সাড়া দেয়নি। আবার চেষ্টা করুন।",
     "purchaseOwnedByAnotherAccount": "এই Apple Account-এর ক্রেডিট অন্য একটি Kilo অ্যাকাউন্টের। সেগুলো ব্যবহার করতে সেই Kilo অ্যাকাউন্টে সাইন-ইন করুন।",
     "purchaseOwnedByAnotherAccountPlay": "এই Google Play অ্যাকাউন্টের ক্রেডিট একটি ভিন্ন Kilo অ্যাকাউন্টের। সেগুলো ব্যবহার করতে সেই Kilo অ্যাকাউন্টে সাইন ইন করুন।"
   },

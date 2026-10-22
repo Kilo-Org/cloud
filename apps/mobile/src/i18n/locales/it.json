@@ -866,7 +866,7 @@
     },
     "autoReviews": "Revisioni automatiche",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket non è connesso. Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono connetterlo.",
+      "notConnectedReadOnly": "Bitbucket non è connesso. Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono connetterlo.",
       "setupIncomplete": "La configurazione è incompleta. Completala su kilo.ai.",
       "setup": "Configurazione di Bitbucket"
     },
@@ -890,7 +890,10 @@
       "starting": "Avvio della revisione…",
       "title": "Revisione manuale"
     },
-    "notConnectedReadOnly": "{{platform}} non è connesso. Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono connetterlo.",
+    "notConnectedReadOnly": "{{platform}} non è connesso. Solo i proprietari dell'organizzazione e gli amministratori possono connetterlo.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} non è connesso. Chiedi a un Proprietario, a un Amministratore o a un Responsabile della fatturazione dell'organizzazione di connetterlo."
+    },
     "platformList": {
       "activity": "Attività",
       "checking": "Verifica in corso…",
@@ -969,7 +972,7 @@
       "off": "La memoria di revisione è disattivata.",
       "on": "La memoria di revisione è attivata.",
       "offDescription": "Attivala per consentire a Kilo di imparare dalle risposte dei responsabili del progetto e proporre indicazioni per REVIEW.md.",
-      "readOnlyDescription": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono modificare la memoria di revisione.",
+      "readOnlyDescription": "Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono modificare la memoria di revisione.",
       "title": "Memoria delle revisioni"
     },
     "scopeList": {
@@ -1121,7 +1124,7 @@
       "summary": "Riepilogo del report",
       "title": "Report di audit",
       "unavailable": "Report di audit non disponibile",
-      "unavailableDescription": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono visualizzare i report di audit. Chiedi a un proprietario o a un responsabile della fatturazione di concederti l'accesso.",
+      "unavailableDescription": "Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono visualizzare i report di audit. Chiedi a un proprietario, a un amministratore o a un responsabile della fatturazione di concederti l'accesso.",
       "eventActions": {
         "findingAnalysisCompleted": "Analisi completata",
         "findingAnalysisFailed": "Analisi non riuscita",
@@ -1238,7 +1241,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "Questa segnalazione è già stata risolta e non può più essere ignorata.",
-      "cannotDismissDescription": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono ignorare le segnalazioni.",
+      "cannotDismissDescription": "Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono ignorare le segnalazioni.",
       "cannotDismissTitle": "Impossibile ignorare questa segnalazione",
       "commentAccessibility": "Commento sull'esclusione",
       "commentLabel": "Commento (facoltativo)",
@@ -1370,7 +1373,7 @@
       "automationCount": "{{displayCount}} su 3 attive",
       "couldNotLoadPermissions": "Impossibile caricare le autorizzazioni.",
       "couldNotLoadSettings": "Impossibile caricare le impostazioni di Security Agent.",
-      "disabledNoManage": "Security Agent è disattivato. Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono attivarlo.",
+      "disabledNoManage": "Security Agent è disattivato. Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono attivarlo.",
       "disabledNoRepo": "Seleziona almeno un repository prima di attivare Security Agent.",
       "disabledPrompt": "Attiva Security Agent per sincronizzare gli avvisi di Dependabot, scegliere i repository e configurare l'automazione.",
       "notificationsCount": "{{displayCount}} su 2 attive",
@@ -1404,7 +1407,7 @@
       "lowDescription": "Impatto minimo sulla sicurezza.",
       "medium": "Livello medio",
       "mediumDescription": "Impatto limitato o condizioni specifiche.",
-      "permissionNote": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono modificare queste impostazioni.",
+      "permissionNote": "Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono modificare queste impostazioni.",
       "remediationDeadlineA11y": "Termine per la correzione in giorni, gravità {{label}}",
       "title": "Criterio SLA"
     },
@@ -1710,6 +1713,8 @@
       "commitAndPush": "Commit e push",
       "startSession": "Avvia sessione",
       "selectRepositoryToStart": "Seleziona un repository per iniziare.",
+      "enterPromptToStart": "Aggiungi un prompt per iniziare.",
+      "enterPromptOrFileToStart": "Aggiungi un prompt o un file per iniziare.",
       "connectProviderToStart": "Connetti una piattaforma per iniziare.",
       "promptPlaceholder": "Su cosa vuoi lavorare?",
       "couldNotLoadModels": "Impossibile caricare i modelli.",
@@ -2575,6 +2580,8 @@
     },
     "connectionExpired": "La connessione a GitHub è scaduta.",
     "couldNotLoadPullRequest": "Impossibile caricare la pull request.",
+    "reviewServiceUnavailable": "Servizio non disponibile",
+    "reviewServiceUnavailableDescription": "Il servizio è temporaneamente non disponibile. Riprova tra poco.",
     "couldNotOpenGitHubAppSettings": "Impossibile aprire le impostazioni dell'app GitHub.",
     "description": "Descrizione",
     "discussion": {
@@ -3000,6 +3007,7 @@
       "truncationBanner_many": "Sono visualizzati i primi {{limit}} file modificati su {{total}}, per un limite dell'API di GitHub."
     },
     "linkPasteClipboardEmpty": "Gli appunti sono vuoti.",
+    "linkPasteDenied": "L'accesso per incollare è stato negato. Consenti di incollare e riprova.",
     "linkPasteNotAPullRequest": "Non è un collegamento a una pull request o merge request",
     "announce": {
       "commentPosted": "Commento pubblicato",
@@ -3054,6 +3062,7 @@
 
       "chooseAccount": "Seleziona un account",
       "loadErrorTitle": "Impossibile caricare le tue organizzazioni.",
+      "membershipLostNotice": "Non hai più accesso a questa organizzazione. Passato a {{target}}.",
       "noOrganization": "Nessuna organizzazione",
 
       "noOrganizationDescription": "Questo account non fa parte di un'organizzazione. Crea o unisciti a un'organizzazione sul web per usare le funzioni dell'organizzazione come gli inviti dei membri e gli avvisi di saldo basso.",
@@ -3146,7 +3155,7 @@
     "members": {
       "changeRole": "Cambia ruolo",
       "emptyDescriptionCanInvite": "Invita i membri del tuo team per iniziare a collaborare in questa organizzazione.",
-      "emptyDescriptionCannotInvite": "Chiedi a un proprietario o a un responsabile della fatturazione di invitare i membri del tuo team.",
+      "emptyDescriptionCannotInvite": "Chiedi a un proprietario, a un amministratore o a un responsabile della fatturazione di invitare i membri del tuo team.",
       "emptyTitle": "Ancora nessun membro",
       "invitedDate": "Invitato il {{date}}",
       "limitPerDay": "{{amount}}/giorno",
@@ -3412,7 +3421,9 @@
       "settingsToolsOn": "Attivo — gli strumenti delle impostazioni vengono inviati al modello",
       "settingsToolsOff": "Disattivo — nessuno strumento delle impostazioni viene inviato al modello",
       "serverChecking": "Verifica di questo server…",
-      "serverToolCount": "{{count}} strumenti",
+      "serverToolCount_many": "{{count}} di strumenti",
+      "serverToolCount_one": "{{count}} strumento",
+      "serverToolCount_other": "{{count}} strumenti",
       "serverUnreachable": "Impossibile raggiungere questo server",
       "serverOff": "Questo server è disattivato"
     },
@@ -3559,6 +3570,8 @@
       "quantizationsHelp": "I file più piccoli usano meno memoria e spazio. I file più grandi di solito danno risposte migliori.",
       "quantDetail": "Download di {{size}} · circa {{memory}} di memoria",
       "downloadQuant": "Scarica {{quant}}",
+      "downloadModelA11y": "Scarica {{name}}",
+      "detailsA11y": "Dettagli: {{name}}",
       "loadingModel": "Caricamento dettagli del modello",
       "couldNotLoadModel": "Impossibile caricare questo modello",
       "noFiles": "Nessun file eseguibile da questa app",
@@ -3610,6 +3623,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Avvia agente richiede un prompt. Aggiungi un prompt e rieseguilo.",
+      "repositoryRequired": "Avvia agente richiede un repository. Apri Kilo e scegline uno, quindi rieseguilo.",
       "repositoryUnknown": "Kilo non riconosce {{repository}} come repository GitHub o GitLab. Scegli un altro repository in Kilo.",
       "repositoryUnsupported": "{{repository}} è un repository Bitbucket — Avvia agente non può ancora usarlo. Scegli un altro repository in Kilo."
     }
@@ -3647,10 +3661,16 @@
     "emptyDescription": "Crea un profilo per riutilizzare variabili di ambiente, comandi di configurazione e competenze tra le sessioni.",
     "loadFailed": "Impossibile caricare i profili",
     "counts": {
-      "vars": "{{count}} variabili",
+      "vars_many": "{{count}} di variabili",
+      "vars_one": "{{count}} variabile",
+      "vars_other": "{{count}} variabili",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} competenze",
-      "commands": "{{count}} comandi",
+      "skills_many": "{{count}} di competenze",
+      "skills_one": "{{count}} competenza",
+      "skills_other": "{{count}} competenze",
+      "commands_many": "{{count}} di comandi",
+      "commands_one": "{{count}} comando",
+      "commands_other": "{{count}} comandi",
       "varsShort": "{{count}}v",
       "skillsShort": "{{count}}comp",
       "commandsShort": "{{count}}cmd"
@@ -3726,7 +3746,7 @@
       "environment": "Ambiente (JSON)",
       "headers": "Intestazioni (JSON)",
       "timeout": "Tempo scaduto",
-      "secretCount": "Conteggio segreto",
+      "secretCount": "Conteggio segreto: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3769,6 +3789,9 @@
       "visibilityPrimary": "Principale: mostrato nel selettore",
       "visibilitySubagent": "Subagente: richiamabile solo da altri",
       "visibilityAll": "Tutti, entrambi",
+      "modePrimary": "Solo principale",
+      "modeSubagent": "Solo subagente",
+      "modeAll": "Tutte le modalità",
       "saveFailed": "Impossibile salvare l'agente",
       "deleteFailed": "Impossibile eliminare l'agente",
       "nameRequired": "Inserisci il nome di un agente",
@@ -3829,6 +3852,8 @@
     "empty": "I pacchetti di crediti non sono disponibili al momento.",
     "noMatchingProducts": "L'App Store non ha restituito pacchetti di crediti corrispondenti.",
     "noMatchingProductsPlay": "Google Play non ha restituito pacchetti di crediti corrispondenti.",
+    "storeTimedOut": "L'App Store non ha risposto in tempo. Riprova.",
+    "storeTimedOutPlay": "Google Play non ha risposto in tempo. Riprova.",
     "purchaseOwnedByAnotherAccount": "I crediti associati a questo Apple Account appartengono a un altro account Kilo. Accedi a quell'account Kilo per usarli.",
     "purchaseOwnedByAnotherAccountPlay": "I crediti su questo account Google Play appartengono a un account Kilo diverso. Accedi a quell'account Kilo per usarli."
   },

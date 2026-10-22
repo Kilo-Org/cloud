@@ -591,6 +591,8 @@
     "installKiloGitHubApp": "Sakinisha programu ya Kilo ya GitHub",
     "checkConnection": "Angalia muunganisho",
     "couldNotLoadPullRequest": "Imeshindikana kupakia ombi la kuunganisha.",
+    "reviewServiceUnavailable": "Hudima haipatikani",
+    "reviewServiceUnavailableDescription": "Hudima haipatikani kwa muda. Jaribu tena hivi karibuni.",
     "description": "Maelezo",
     "noDescriptionProvided": "Hakuna maelezo yaliyotolewa.",
     "review": "Ukaguzi",
@@ -762,6 +764,7 @@
       "truncationBanner_other": "Inaonyesha faili {{limit}} za kwanza kati ya {{total}} zilizobadilishwa — hiki ndicho kikomo cha API ya GitHub."
     },
     "linkPasteClipboardEmpty": "Ubao wa kunakili ni tupu.",
+    "linkPasteDenied": "Ufikiaji wa kuweka umekataliwa. Ruhusu kuweka kisha ujaribu tena.",
     "linkPasteNotAPullRequest": "Sio kiungo cha ombi la kuunganisha",
     "announce": {
       "commentPosted": "Maoni yamechapishwa",
@@ -1458,7 +1461,7 @@
       "off": "Kumbukumbu ya ukaguzi imezimwa.",
       "on": "Kumbukumbu ya ukaguzi imewashwa.",
       "offDescription": "Iwashe ili Kilo ijifunze kutoka kwa majibu ya watunzaji wa mradi na ipendekeze mwongozo wa REVIEW.md.",
-      "readOnlyDescription": "Wamiliki wa shirika na wasimamizi wa malipo pekee wanaweza kubadilisha kumbukumbu ya ukaguzi.",
+      "readOnlyDescription": "Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kubadilisha kumbukumbu ya ukaguzi.",
       "enable": "Washa kumbukumbu ya ukaguzi",
       "loadingProposals": "Inapakia mapendekezo",
       "couldNotLoadProposals": "Imeshindikana kupakia mapendekezo.",
@@ -1478,7 +1481,10 @@
       "starting": "Inaanza ukaguzi…",
       "start": "Anza ukaguzi"
     },
-    "notConnectedReadOnly": "{{platform}} haijaunganishwa. Wamiliki wa shirika na wasimamizi wa malipo pekee wanaweza kuiunganisha.",
+    "notConnectedReadOnly": "{{platform}} haijaunganishwa. Wamiliki na wasimamizi wa shirika pekee wanaweza kuiunganisha.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} haijaunganishwa. Omba mmiliki wa shirika, msimamizi, au msimamizi wa bili aiunganishe."
+    },
     "webhookSetup": "Usanidi wa arifa za wavuti haujakamilika.",
     "webhookSetupDescription": "Hazina zingine huenda hazipokei ukaguzi wa kiotomatiki.",
     "autoReviews": "Ukaguzi wa kiotomatiki",
@@ -1486,7 +1492,7 @@
     "followReviewMd": "Fuata REVIEW.md",
     "followReviewMdSubtitle": "Fuata maagizo katika faili ya REVIEW.md ya kila hazina",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket haijaunganishwa. Wamiliki wa shirika na wasimamizi wa malipo pekee wanaweza kuiunganisha.",
+      "notConnectedReadOnly": "Bitbucket haijaunganishwa. Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuiunganisha.",
       "setupIncomplete": "Usanidi haujakamilika — ukamilishe kwenye kilo.ai.",
       "setup": "Usanidi wa Bitbucket"
     },
@@ -1746,7 +1752,7 @@
       "couldNotLoad": "Imeshindikana kupakia matokeo haya.",
       "couldNotCheckPermissions": "Imeshindikana kuangalia ruhusa za kuondoa matatizo.",
       "cannotDismissTitle": "Huwezi kuondoa tatizo hili",
-      "cannotDismissDescription": "Wamiliki wa shirika na wasimamizi wa malipo pekee wanaweza kuondoa matatizo.",
+      "cannotDismissDescription": "Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuondoa matatizo.",
       "alreadyResolvedDescription": "Tatizo hili tayari limetatuliwa na haliwezi kuondolewa tena."
     },
     "findingDetails": {
@@ -1788,7 +1794,7 @@
       "automationAllOff": "Zote zimezimwa",
       "automationCount": "{{displayCount}} kati ya 3 zimewashwa",
       "notificationsCount": "{{displayCount}} kati ya 2 zimewashwa",
-      "disabledNoManage": "Wakala wa usalama amezimwa. Wamiliki wa shirika na wasimamizi wa malipo pekee wanaweza kumwasha.",
+      "disabledNoManage": "Wakala wa usalama amezimwa. Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuwasha.",
       "disabledNoRepo": "Chagua angalau hazina moja kabla ya kuwasha wakala wa usalama.",
       "disabledPrompt": "Washa wakala wa usalama ili kusawazisha arifa za Dependabot, kuchagua hazina na kusanidi utendakazi wa kiotomatiki."
     },
@@ -1837,7 +1843,7 @@
       "invalidDayCount": "weka siku 1–365 kwa nambari nzima tu.",
       "remediationDeadlineA11y": "Muda wa mwisho wa urekebishaji wa {{label}} kwa siku",
       "enterWholeNumber": "Ingiza nambari kamili kati ya 1 na 365",
-      "permissionNote": "Wamiliki wa shirika na wasimamizi wa malipo pekee wanaweza kubadilisha mipangilio hii.",
+      "permissionNote": "Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kubadilisha mipangilio hii.",
       "enableTracking": "Washa ufuatiliaji wa SLA",
       "enableTrackingSubtitle": "Weka muda wa mwisho wa urekebishaji kulingana na ukali wa tatizo.",
       "deadlinesHeading": "Muda wa mwisho wa urekebishaji (siku)"
@@ -1893,7 +1899,7 @@
       "summary": "Muhtasari wa ripoti",
       "title": "Ripoti ya ukaguzi",
       "unavailable": "Ripoti ya ukaguzi haipatikani",
-      "unavailableDescription": "Wamiliki wa shirika na wasimamizi wa malipo pekee wanaweza kuona ripoti za ukaguzi. Mwombe mmiliki au msimamizi wa malipo akupe ruhusa ya kuzifikia.",
+      "unavailableDescription": "Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuona ripoti za ukaguzi. Mwombe mmiliki, msimamizi, au msimamizi wa bili akupe ruhusa ya kuzifikia.",
       "queryFailed": "Hoja ya kupata ripoti haikukamilika. Jaribu tena.",
       "eventActions": {
         "findingAnalysisCompleted": "Uchambuzi umekamilika",
@@ -2243,6 +2249,8 @@
       "commitAndPush": "Hifadhi na utume",
       "startSession": "Anza kikao",
       "selectRepositoryToStart": "Chagua hazina ili kuanza.",
+      "enterPromptToStart": "Ongeza maelekezo ili kuanza.",
+      "enterPromptOrFileToStart": "Ongeza maelekezo au faili ili kuanza.",
       "connectProviderToStart": "Unganisha mtoa huduma ili kuanza.",
       "promptPlaceholder": "Ungependa kufanya kazi gani?",
       "couldNotLoadModels": "Imeshindikana kupakia modeli.",
@@ -3022,6 +3030,7 @@
 
       "chooseAccount": "Chagua akaunti",
       "loadErrorTitle": "Imeshindikana kupakia mashirika yako.",
+      "membershipLostNotice": "Huna tena ruhusa ya kufikia shirika hili. Imebadilishwa kwenda {{target}}.",
       "noOrganization": "Hakuna shirika",
 
       "noOrganizationDescription": "Akaunti hii si sehemu ya shirika. Unda au jiunge na shirika kwenye wavuti ili kutumia vipengele vya shirika kama vile mialiko ya wanachama na arifa za salio la chini.",
@@ -3107,7 +3116,7 @@
     "members": {
       "changeRole": "Badilisha jukumu",
       "emptyDescriptionCanInvite": "Alika wenzako wa timu ili muanze kushirikiana katika shirika hili.",
-      "emptyDescriptionCannotInvite": "Mwombe mmiliki au msimamizi wa bili awaalike wenzako wa timu.",
+      "emptyDescriptionCannotInvite": "Mwombe mmiliki, msimamizi, au msimamizi wa bili awaalike wenzako wa timu.",
       "emptyTitle": "Bado hakuna wanachama",
       "invitedDate": "Alialikwa {{date}}",
       "limitPerDay": "{{amount}}/siku",
@@ -3371,7 +3380,8 @@
       "settingsToolsOn": "Imewashwa — zana za mipangilio zinatumwa kwa modeli",
       "settingsToolsOff": "Imezimwa — hakuna zana ya mipangilio inayotumwa kwa modeli",
       "serverChecking": "Inakagua seva hii…",
-      "serverToolCount": "zana {{count}}",
+      "serverToolCount_one": "zana {{count}}",
+      "serverToolCount_other": "zana {{count}}",
       "serverUnreachable": "Haikuweza kufikia seva hii",
       "serverOff": "Seva hii imezimwa"
     },
@@ -3518,6 +3528,8 @@
       "quantizationsHelp": "Faili ndogo hutumia kumbukumbu na hifadhi kidogo. Faili kubwa kwa kawaida hutoa majibu bora zaidi.",
       "quantDetail": "Upakuaji wa {{size}} · takriban {{memory}} za kumbukumbu",
       "downloadQuant": "Pakua {{quant}}",
+      "downloadModelA11y": "Pakua {{name}}",
+      "detailsA11y": "Maelezo: {{name}}",
       "loadingModel": "Inapakia maelezo ya modeli",
       "couldNotLoadModel": "Imeshindwa kupakia modeli hii",
       "noFiles": "Hakuna faili ambazo programu hii inaweza kuendesha",
@@ -3569,6 +3581,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Anzisha wakala inahitaji maagizo. Ongeza maagizo na uiendeshe tena.",
+      "repositoryRequired": "Anzisha wakala inahitaji hazina. Fungua Kilo na uchague moja, kisha uiendeshe tena.",
       "repositoryUnknown": "Kilo haitambui {{repository}} kama hazina ya GitHub au GitLab. Chagua hazina nyingine katika Kilo.",
       "repositoryUnsupported": "{{repository}} ni hazina ya Bitbucket — Anzisha wakala bado haiwezi kuitumia. Chagua hazina nyingine katika Kilo."
     }
@@ -3606,10 +3619,13 @@
     "emptyDescription": "Unda wasifu ili kutumia tena vigezo vya mazingira, amri za usanidi na ujuzi katika vipindi vyote.",
     "loadFailed": "Haikuweza kupakia wasifu",
     "counts": {
-      "vars": "{{count}} vigezo",
+      "vars_one": "{{count}} kigezo",
+      "vars_other": "{{count}} vigezo",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} ujuzi",
-      "commands": "{{count}} amri",
+      "skills_one": "{{count}} ujuzi",
+      "skills_other": "{{count}} ujuzi",
+      "commands_one": "{{count}} amri",
+      "commands_other": "{{count}} amri",
       "varsShort": "{{count}}v",
       "skillsShort": "{{count}}u",
       "commandsShort": "{{count}}a"
@@ -3685,7 +3701,7 @@
       "environment": "Mazingira (JSON)",
       "headers": "Vijajuu (JSON)",
       "timeout": "Muda umekwisha",
-      "secretCount": "Hesabu ya siri",
+      "secretCount": "Hesabu ya siri: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3728,6 +3744,9 @@
       "visibilityPrimary": "Msingi - imeonyeshwa kwenye kiteua",
       "visibilitySubagent": "Subagent - inaitwa tu kutoka kwa wengine",
       "visibilityAll": "Wote - wote wawili",
+      "modePrimary": "Msingi tu",
+      "modeSubagent": "Subagent tu",
+      "modeAll": "Hali zote",
       "saveFailed": "Haikuweza kuhifadhi wakala",
       "deleteFailed": "Haikuweza kufuta wakala",
       "nameRequired": "Weka jina la wakala",
@@ -3788,6 +3807,8 @@
     "empty": "Pakiti za salio hazipatikani kwa sasa.",
     "noMatchingProducts": "App Store haikurudisha pakiti za salio zinazolingana.",
     "noMatchingProductsPlay": "Google Play haikurudisha pakiti za salio zinazolingana.",
+    "storeTimedOut": "App Store haikujibu kwa wakati. Jaribu tena.",
+    "storeTimedOutPlay": "Google Play haikujibu kwa wakati. Jaribu tena.",
     "purchaseOwnedByAnotherAccount": "Salio katika Apple Account hii ni ya akaunti nyingine ya Kilo. Ingia kwenye akaunti hiyo ya Kilo ili kulitumia.",
     "purchaseOwnedByAnotherAccountPlay": "Salio kwenye Akaunti hii ya Google Play ni ya akaunti nyingine ya Kilo. Ingia kwenye akaunti hiyo ya Kilo ili kulitumia."
   },

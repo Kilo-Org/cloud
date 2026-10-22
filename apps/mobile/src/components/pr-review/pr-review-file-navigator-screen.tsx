@@ -150,7 +150,16 @@ function NavigatorError({
   return (
     <QueryError
       variant="server"
-      title={t('prReview.fileNavigator.couldNotLoadFiles')}
+      title={
+        state?.kind === 'service-unavailable'
+          ? t('prReview.reviewServiceUnavailable')
+          : t('prReview.fileNavigator.couldNotLoadFiles')
+      }
+      message={
+        state?.kind === 'service-unavailable'
+          ? t('prReview.reviewServiceUnavailableDescription')
+          : undefined
+      }
       onRetry={onRetry}
       isRetrying={isRetrying}
     />

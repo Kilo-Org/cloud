@@ -6,6 +6,7 @@
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/opentelemetry/custom-setup/
 
 import { consoleLoggingIntegration, init } from '@sentry/nextjs';
+import { RESTRICTED_DATA_COLLECTION } from '@kilocode/web-shared/lib/observability/sentry-data-collection';
 
 if (process.env.NODE_ENV !== 'development') {
   init({
@@ -17,6 +18,8 @@ if (process.env.NODE_ENV !== 'development') {
     // Setting this option to true will print useful information to the console while you're setting up Sentry.
     debug: false,
     normalizeDepth: 5,
+
+    dataCollection: RESTRICTED_DATA_COLLECTION,
 
     integrations: [
       // send console.log, console.error, and console.warn calls as logs to Sentry

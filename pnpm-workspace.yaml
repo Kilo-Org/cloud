@@ -25,9 +25,9 @@ catalog:
   # mobile). Must NOT be added to `overrides`: the Sentry bundler plugins consume
   # @sentry/cli through its Node API, which v3 broke. See the note in `overrides`.
   '@sentry/cli': 3.6.2
-  '@tanstack/query-async-storage-persister': 5.100.10
-  '@tanstack/react-query': 5.100.10
-  '@tanstack/react-query-persist-client': 5.100.10
+  '@tanstack/query-async-storage-persister': 5.104.3
+  '@tanstack/react-query': 5.104.3
+  '@tanstack/react-query-persist-client': 5.104.3
   '@trpc/client': 11.19.0
   '@trpc/server': 11.19.0
   '@trpc/tanstack-react-query': 11.19.0
@@ -99,15 +99,6 @@ minimumReleaseAgeExclude:
   # agent transcript list is exactly that shape. Patch release; exempted so the
   # contract test's pin can move off 2.3.2 without waiting out minimumReleaseAge.
   - '@shopify/flash-list@2.3.3'
-  # react-native-keyboard-controller's 1.22.3 release notes carry the
-  # KeyboardChatScrollView fixes this phase depends on (crash on unmount,
-  # overscroll during interactive dismissal on iOS, propagation view surfaceId
-  # for focused input events inside a Modal). 1.22.6 is the latest patch. Expo
-  # SDK 57 pins 1.21.9, which predates all three, so the pin is overridden with
-  # the same mechanism flash-list uses.
-  - react-native-keyboard-controller@1.22.6
-  # react-native-enriched-markdown 1.1.0 adds onImagePress/onCodeBlockPress, which the transcript markdown cutover wires.
-  - react-native-enriched-markdown@1.1.0
   # react-native-reanimated 4.7.1 carries the stability fixes the app needs
   # (synchronously updated props reset, Android crashes, layout animations).
   # Approved early exception; worklets 0.13.0 is its required pair and is old
@@ -119,12 +110,15 @@ overrides:
   # being assignable to each other across workspace imports.
   pg: 8.23.1
   # Do NOT add an '@sentry/cli' override here to dedupe it against the catalog.
-  # @sentry/bundler-plugin-core (used by @sentry/nextjs to upload source maps)
-  # requires ^2.58.5 and calls @sentry/cli through its Node API. v3 replaced the
+  # @sentry/react-native pulls @sentry/bundler-plugins@10, which requires
+  # @sentry/cli ^2.58.5 and calls it through its Node API. v3 replaced the
   # CommonJS default class export with a named one, so forcing v3 makes every
   # `new SentryCli()` throw "_sentry_cli.default is not a constructor". The plugin
   # swallows that as a recoverable error, so builds stay green while silently
   # uploading nothing. This previously broke apps/web source maps for months.
+  # @sentry/nextjs 11 no longer consumes @sentry/cli (its bundler plugin uses the
+  # separate `sentry` CLI package), so the web path no longer relies on this rule;
+  # the mobile path still does.
   '@babel/plugin-transform-modules-systemjs': 7.29.7
   '@babel/core': 7.29.7
   mdast-util-to-hast: 13.2.1

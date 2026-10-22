@@ -9,10 +9,12 @@ import { BlacklistDomainsConfigSchema } from '@kilocode/worker-utils/account-acc
 import { BLACKLIST_DOMAINS_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
 import type { BlacklistDomainsConfig } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { TRPCError } from '@trpc/server';
+import { captureException } from '@sentry/nextjs';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { sql, count, isNotNull, desc, min, max } from 'drizzle-orm';
 import * as z from 'zod';
+import { backfillBlockBlacklistedDomainsBatch } from '@/lib/abuse/block-blacklisted-domains';
 
 const SuspiciousDomainsInputSchema = z
   .object({
@@ -46,6 +48,13 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
       ...new Set(input.domains.map(d => d.toLowerCase().trim()).filter(Boolean)),
     ];
 
+    // Diff against the list the admin started from so only newly added domains
+    // trigger a backfill. Existing users on domains that were already listed
+    // have either been backfilled already or are handled by the manual backfill.
+    const previous = await readConfig();
+    const previousDomains = new Set(previous.domains.map(d => d.toLowerCase().trim()));
+    const addedDomains = normalizedDomains.filter(domain => !previousDomains.has(domain));
+
     const config: BlacklistDomainsConfig = {
       domains: normalizedDomains,
       updated_at: new Date().toISOString(),
@@ -59,7 +68,26 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
         message: 'Redis is not configured — cannot save blacklisted domains',
       });
     }
-    return config;
+
+    // The list is already live for auth checks at this point, so a backfill
+    // failure must not fail the save. Report it and point the admin at the
+    // manual backfill instead.
+    const backfill = { blocked: 0, remaining: false, failed: false };
+    if (addedDomains.length > 0) {
+      try {
+        const result = await backfillBlockBlacklistedDomainsBatch({
+          actorId: ctx.user.id,
+          domains: addedDomains,
+        });
+        backfill.blocked = result.processed;
+        backfill.remaining = result.remaining;
+      } catch (error) {
+        captureException(error, { tags: { source: 'blacklist_domains_auto_backfill' } });
+        backfill.failed = true;
+      }
+    }
+
+    return { ...config, backfill };
   }),
 
   stats: adminProcedure.query(async () => {

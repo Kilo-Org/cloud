@@ -7,7 +7,7 @@ import {
   gitCredentialRecordPath,
   gitUrlCarriesCredential,
   normalizeOriginCredential,
-  removeGitCredentialRecord,
+  clearGitCredentialRecord,
   writeGitCredentialRecord,
 } from './git-credentials.js';
 
@@ -125,13 +125,31 @@ describe('credential record', () => {
       token: 'token',
       platform: 'github',
     });
-    await removeGitCredentialRecord(home);
+    expect(await clearGitCredentialRecord(home)).toBe(true);
     expect(
       await fs.access(gitCredentialRecordPath(home)).then(
         () => 'present',
         () => 'missing'
       )
     ).toBe('missing');
+    // Nothing to remove is also a clean result.
+    expect(await clearGitCredentialRecord(home)).toBe(true);
+  });
+
+  it('reports a record it could not remove', async () => {
+    await writeGitCredentialRecord({
+      home,
+      url: 'https://github.com/acme/repo.git',
+      token: 'token',
+      platform: 'github',
+    });
+    const directory = path.dirname(gitCredentialRecordPath(home));
+    await fs.chmod(directory, 0o500);
+    try {
+      expect(await clearGitCredentialRecord(home)).toBe(false);
+    } finally {
+      await fs.chmod(directory, 0o700);
+    }
   });
 });
 

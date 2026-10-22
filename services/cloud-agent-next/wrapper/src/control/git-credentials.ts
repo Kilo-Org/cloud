@@ -112,6 +112,21 @@ async function replaceCredentialRecord(home: string, record: string): Promise<vo
 }
 
 /**
+ * Drop the record before a container snapshot and report whether it is verifiably
+ * gone. A caller that cannot prove the removal must not let the snapshot run.
+ */
+export async function clearGitCredentialRecord(home: string): Promise<boolean> {
+  const recordPath = gitCredentialRecordPath(home);
+  try {
+    await fs.rm(recordPath, { force: true });
+    await fs.access(recordPath);
+    return false;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'ENOENT';
+  }
+}
+
+/**
  * Install the token this route may use for its repository host, or remove a stale
  * record when it has none (a sibling in the same home may have left one). The
  * helper authenticates every later `git fetch`/`push` in the worktree, including
@@ -121,11 +136,6 @@ async function replaceCredentialRecord(home: string, record: string): Promise<vo
  * only an HTTPS remote gets a record. `requireGitCredentialRecord` is the strict
  * form for a caller that has already rejected an authenticated non-HTTPS repository.
  */
-/** Drop the record without touching the rest of the runtime home. */
-export async function removeGitCredentialRecord(home: string): Promise<void> {
-  await fs.rm(gitCredentialRecordPath(home), { force: true });
-}
-
 export async function writeGitCredentialRecord(
   input: RepositoryCredential & { home: string }
 ): Promise<void> {

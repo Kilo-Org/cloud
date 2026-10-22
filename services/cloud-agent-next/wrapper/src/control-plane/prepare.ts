@@ -38,7 +38,7 @@ import {
 import {
   credentialFreeGitUrl,
   normalizeOriginCredential,
-  removeGitCredentialRecord,
+  clearGitCredentialRecord,
   writeGitCredentialRecord,
 } from '../control/git-credentials.js';
 import { checkoutSyntheticReviewRef, isSyntheticReviewRef } from '../git-review-ref.js';
@@ -925,7 +925,12 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         log(`control-plane capture skipped, origin not bare session=${spec.sessionId}`);
         return;
       }
-      await removeGitCredentialRecord(home).catch(() => undefined);
+      if (!(await clearGitCredentialRecord(home))) {
+        log(
+          `control-plane capture skipped, credential record not removed session=${spec.sessionId}`
+        );
+        return;
+      }
       const saved = await capture.request(spec.sessionId, commit, timers.captureMs);
       log(`control-plane capture ${saved ? 'saved' : 'not saved'} session=${spec.sessionId}`);
     } catch (error) {

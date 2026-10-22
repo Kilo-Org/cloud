@@ -32,7 +32,7 @@ import { resolveSecret } from '../../auth.js';
 import type { CallbackTarget } from '../../callbacks/index.js';
 import type { DurableAdmissionAck } from '../../execution/types.js';
 import { logger } from '../../logger.js';
-import type { WrapperPty } from '../../kilo/wrapper-client.js';
+import type { WrapperPty } from '../../terminal/types.js';
 import type { OperationResult } from '../../persistence/types.js';
 import {
   CurrentSessionMetadataSchema,
@@ -70,7 +70,7 @@ import type {
 import type { LatestAssistantMessage } from '../../session/types.js';
 import { createEventQueries, type EventQueries } from '../../session/queries/index.js';
 import { createPreparationProgressRecorder } from '../../session/preparation-progress.js';
-import { sessionIdFromDoName } from '../../session-plane.js';
+import { sessionIdFromDoName } from '../../session-identity.js';
 import {
   finalizePreparationAttempt,
   getPreparationSnapshots,
@@ -2104,7 +2104,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   /**
    * C1c security: closes this session's stream sockets when its owner leaves an
    * organization (legacy `closeOrgStreams`). Reads the org from the same
-   * persisted metadata both planes use and only closes on a match.
+   * persisted session metadata and only closes on a match.
    */
   async closeOrgStreams(organizationId: string): Promise<number> {
     await this.initialized;
@@ -2121,7 +2121,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   /**
    * C1c: updates a prepared session's callback target (legacy `tryUpdate`,
    * retained for `services/code-review-infra`). Stores the same grouped
-   * metadata both planes persist.
+   * persisted session metadata.
    */
   async tryUpdate(updates: { callbackTarget?: CallbackTarget | null }): Promise<OperationResult> {
     await this.initialized;

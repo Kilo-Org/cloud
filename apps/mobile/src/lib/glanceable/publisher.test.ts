@@ -570,28 +570,32 @@ describe('GlanceablePublisher', () => {
     const { sink, calls } = makeSink();
     const publisher = new GlanceablePublisher({ sinks: [sink], now: () => now });
     publisher.handleSessions(
-      [{ status: 'busy' }, { status: 'question' }, { status: 'idle' }],
+      [{ status: 'busy' }, { status: 'question' }, { status: 'permission' }, { status: 'idle' }],
       PUB_CTX
     );
     const successful = lastSnapshot(calls, 'publish');
+    expect(successful.needsApproval).toBe(1);
     const failures = [
-      [60_000, 'stale', 1],
-      [GLANCEABLE_SNAPSHOT_EXPIRY_MS - 1, 'stale', 1],
-      [GLANCEABLE_SNAPSHOT_EXPIRY_MS, 'expired', 0],
-      [GLANCEABLE_SNAPSHOT_EXPIRY_MS + 60_000, 'expired', 0],
+      [60_000, 'stale'],
+      [GLANCEABLE_SNAPSHOT_EXPIRY_MS - 1, 'stale'],
+      [GLANCEABLE_SNAPSHOT_EXPIRY_MS, 'expired'],
+      [GLANCEABLE_SNAPSHOT_EXPIRY_MS + 60_000, 'expired'],
     ] as const;
-    for (const [index, [elapsed, status, expectedCount]] of failures.entries()) {
+    for (const [index, [elapsed, status]] of failures.entries()) {
       now = NOW + elapsed;
       publisher.handleFetchError(PUB_CTX);
+      const lapsed = status === 'expired';
       expect(lastSnapshot(calls, 'publish')).toMatchObject({
         revision: index + 2,
         updatedAt: successful.updatedAt,
         expiresAt: successful.expiresAt,
         scopeKey: successful.scopeKey,
         status,
-        running: expectedCount,
-        needsInput: expectedCount,
-        idle: expectedCount,
+        running: lapsed ? 0 : 1,
+        needsInput: lapsed ? 0 : 2,
+        idle: lapsed ? 0 : 1,
+        // The approval count lapses with the wait it belongs to.
+        needsApproval: lapsed ? 0 : 1,
       });
     }
     expect(lastSnapshot(calls, 'publish').needsInputSince).toBeNull();

@@ -3,12 +3,13 @@
 // persistence boundary) must render localized fallback copy that still names
 // the raw code, never a bare English word inside a translated list.
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { PLATFORM_CAPABILITIES, type ReviewConfigData } from '@/lib/code-reviewer-config';
+import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { buildOverviewRows } from './platform-overview-rows';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 
 // The pure project cannot parse the icon chain (react-native's Flow
 // `import typeof` syntax), and the icons are irrelevant to row building.
@@ -53,6 +54,42 @@ function focusSubtitle(config: ReviewConfigData): string {
   }
   return focusRow.subtitle;
 }
+
+describe('buildOverviewRows model label', () => {
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  function modelSubtitle(config: ReviewConfigData, models: ModelOption[]): string {
+    const row = buildOverviewRows({
+      data: config,
+      capabilities,
+      models,
+      modelsLoading: false,
+      onOpenModelPicker: () => undefined,
+    }).find(candidate => candidate.field === 'model');
+    if (!row) {
+      throw new Error('model row not found');
+    }
+    return row.subtitle;
+  }
+
+  it('names the selected Auto model the way the picker does, in the app language', async () => {
+    await i18n.changeLanguage('de');
+
+    expect(
+      modelSubtitle(makeConfig({ modelSlug: 'kilo-auto/efficient' }), [
+        { id: 'kilo-auto/efficient', name: 'Auto Efficient', variants: [], isPreferred: true },
+      ])
+    ).toBe('Auto Effizient');
+  });
+
+  it('keeps the stored slug for a model the catalogue no longer carries', () => {
+    expect(modelSubtitle(makeConfig({ modelSlug: 'kilo-auto/retired' }), [])).toBe(
+      'kilo-auto/retired'
+    );
+  });
+});
 
 describe('buildOverviewRows focus-area labels', () => {
   it('labels known areas with their translated names', () => {

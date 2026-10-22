@@ -8,6 +8,7 @@ import { toast } from 'sonner-native';
 import { BriefingScorecard } from './briefing-card';
 import { briefingSessionHref, briefingSourceHref } from './briefing-session-href';
 import { BriefingSummary } from './briefing-summary';
+import { BriefingPeriodLabel } from './briefing-period-label';
 import { formatBriefingTimestamp } from './briefing-window';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -24,7 +25,6 @@ import {
 import { briefingMoney } from '@/lib/agent-briefing-format';
 import { briefingAccessDenied, briefingReportMissing } from '@/lib/agent-briefing-state';
 import { openExternalUrl } from '@/lib/external-link';
-import { formatCalendarDate } from '@/lib/format';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
@@ -89,7 +89,7 @@ export function BriefingDetailScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t('agentBriefing.title')}
+        title={t(report?.kind === 'one_off' ? 'agentBriefing.oneOff' : 'agentBriefing.title')}
         showBackButton
         backFallback={BRIEFING_PATH as Href}
       />
@@ -115,15 +115,7 @@ export function BriefingDetailScreen() {
             <Text className="text-lg font-semibold">
               {report.context.organizationId === null ? t('common.personal') : report.context.name}
             </Text>
-            <Text className="text-sm text-muted-foreground">
-              {formatCalendarDate(report.localDate, i18n.language)}
-            </Text>
-            <Text className="text-xs text-muted-foreground">
-              {t('agentBriefing.window', {
-                start: formatBriefingTimestamp(report.nightStartAt, i18n.language, timeZone),
-                end: formatBriefingTimestamp(report.cutoffAt, i18n.language, timeZone),
-              })}
-            </Text>
+            <BriefingPeriodLabel report={report} />
             {report.revised ? (
               <Text className="text-xs text-muted-foreground">
                 {t('agentBriefing.revised', { revision: report.revision })}
@@ -141,7 +133,18 @@ export function BriefingDetailScreen() {
           {Object.values(report.coverage).some(value => value !== 'complete') ? (
             <Text className="text-xs text-muted-foreground">{t('agentBriefing.coverageHint')}</Text>
           ) : null}
-          <BriefingSummary report={report} />
+          {report.kind === 'one_off' ? (
+            <Text className="text-xs text-muted-foreground">
+              {t('agentBriefing.historicalStateHint')}
+            </Text>
+          ) : null}
+          {report.kind === 'one_off' &&
+          report.scorecard.sessions === 0 &&
+          report.summary.status === 'disabled' ? (
+            <Text className="text-sm">{t('agentBriefing.emptyPeriod')}</Text>
+          ) : (
+            <BriefingSummary report={report} />
+          )}
           <View className="gap-2">
             <Text className="font-semibold">{t('common.agents')}</Text>
             {report.sessions.map(session => {

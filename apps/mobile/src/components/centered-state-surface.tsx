@@ -11,8 +11,16 @@ import {
   useRef,
   useState,
 } from 'react';
-import { type LayoutChangeEvent, Platform, View, type ViewProps } from 'react-native';
+import {
+  type LayoutChangeEvent,
+  Platform,
+  View,
+  type ViewInstance,
+  type ViewProps,
+} from 'react-native';
 import { type Stack } from 'expo-router';
+import { type ParamListBase } from 'expo-router/react-navigation';
+import { type NativeStackNavigationProp } from 'expo-router/native-stack';
 
 import { getBottomReservation, getStateSurfaceInsets } from '@/lib/centered-state-layout';
 import {
@@ -29,7 +37,15 @@ type SurfaceGeometry = SurfaceMeasurement & {
   register: () => () => void;
 };
 
-type ScreenLayoutProps = Parameters<NonNullable<ComponentProps<typeof Stack>['screenLayout']>>[0];
+type ScreenLayoutProps = Omit<
+  Parameters<NonNullable<ComponentProps<typeof Stack>['screenLayout']>>[0],
+  'navigation'
+> & {
+  navigation: Pick<
+    NativeStackNavigationProp<ParamListBase>,
+    'setOptions' | 'isFocused' | 'addListener'
+  >;
+};
 
 const StateSurfaceContext = createContext<SurfaceGeometry | null>(null);
 
@@ -151,7 +167,11 @@ export function NativeStateSurface({ children, navigation, options }: ScreenLayo
     setPropsState({ incoming, external });
   }
   const externalProps = propsState.external;
-  useImperativeHandle<View | null, View | null>(externalProps?.ref, () => nativeNode, [nativeNode]);
+  useImperativeHandle<ViewInstance | null, ViewInstance | null>(
+    externalProps?.ref,
+    () => nativeNode,
+    [nativeNode]
+  );
   const scheduledRef = useRef<number | null>(null);
   const schedule = useCallback(() => {
     if (scheduledRef.current !== null) {

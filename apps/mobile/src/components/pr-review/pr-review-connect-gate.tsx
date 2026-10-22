@@ -11,12 +11,9 @@ import { toast } from 'sonner-native';
 import { EmptyState } from '@/components/empty-state';
 import { GitHubIcon } from '@/components/icons/github-icon';
 import { PrReviewContextLine } from '@/components/pr-review/pr-review-context-line';
-import {
-  PR_REVIEW_ENTRY_HREF,
-  ProviderConnectGate,
-} from '@/components/pr-review/pr-review-provider-connect-gate';
+import { PrReviewGateHeader } from '@/components/pr-review/pr-review-gate-header';
+import { ProviderConnectGate } from '@/components/pr-review/pr-review-provider-connect-gate';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -146,7 +143,7 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
   if (view === 'error') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('common.prReview')} backFallback={PR_REVIEW_ENTRY_HREF} />
+        <PrReviewGateHeader />
         <QueryError
           variant="server"
           title={t('prReview.connect.checkFailedTitle')}
@@ -163,7 +160,7 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
   if (view === 'loading') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('common.prReview')} backFallback={PR_REVIEW_ENTRY_HREF} />
+        <PrReviewGateHeader />
         <CenteredState>
           <ActivityIndicator size="small" color={colors.mutedForeground} />
         </CenteredState>
@@ -175,7 +172,7 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
     const revoked = view === 'reconnect';
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('common.prReview')} backFallback={PR_REVIEW_ENTRY_HREF} />
+        <PrReviewGateHeader />
         <EmptyState
           icon={revoked ? ShieldAlert : PlugZap}
           title={revoked ? t('prReview.connect.reconnectTitle') : t('common.connectGithub')}

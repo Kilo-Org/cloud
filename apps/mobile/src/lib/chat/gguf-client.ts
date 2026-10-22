@@ -4,7 +4,7 @@ import {
   type ModelEvent,
   type ModelRequest,
 } from '@kilocode/harness-sdk';
-import { Effect, Stream } from 'effect';
+import { Cause, Effect, Queue, Stream } from 'effect';
 import { type ContextParams, type LlamaContext, type TokenData } from 'llama.rn';
 
 import { LocalModelError, type LocalModelProblem } from './local-model-error';
@@ -124,7 +124,7 @@ export function ggufModelClient({
   };
 
   const answer = (request: ModelRequest, file: GgufModelFile) =>
-    Stream.async<ModelEvent, ModelError>(emit => {
+    Stream.callback<ModelEvent, ModelError>(queue => {
       sequence += 1;
       const id = `gguf-${sequence}`;
       let state: 'running' | 'over' = 'running';
@@ -135,19 +135,19 @@ export function ggufModelClient({
       const stop = (problem: LocalModelProblem, started: boolean) => {
         if (running()) {
           state = 'over';
-          void emit.fail(failure(problem, started));
+          Queue.failCauseUnsafe(queue, Cause.fail(failure(problem, started)));
         }
       };
       const say = (text: string) => {
         // A parser may revise what it already parsed; nothing said is taken back.
         if (text.length > streamed.length && text.startsWith(streamed)) {
-          void emit.single({ kind: 'delta', text: text.slice(streamed.length) });
+          Queue.offerUnsafe(queue, { kind: 'delta', text: text.slice(streamed.length) });
           streamed = text;
         }
       };
       const think = (text: string) => {
         if (text.length > thought.length && text.startsWith(thought)) {
-          void emit.single({ kind: 'reasoning', text: text.slice(thought.length) });
+          Queue.offerUnsafe(queue, { kind: 'reasoning', text: text.slice(thought.length) });
           thought = text;
         }
       };
@@ -160,12 +160,12 @@ export function ggufModelClient({
           say(data.accumulated_text === undefined ? streamed + data.token : (data.content ?? ''));
         }
       };
-      const finish = async (result: CompletionResult) => {
+      const finish = (result: CompletionResult) => {
         state = 'over';
         think(result.reasoning_content ?? '');
         say(answerOf(result));
         for (const [index, call] of result.tool_calls.entries()) {
-          void emit.single({
+          Queue.offerUnsafe(queue, {
             kind: 'toolCall',
             call: {
               id: call.id ?? `${id}-call-${index}`,
@@ -174,7 +174,7 @@ export function ggufModelClient({
             },
           });
         }
-        await emit.single({
+        Queue.offerUnsafe(queue, {
           kind: 'done',
           usage: {
             inputTokens: result.tokens_evaluated,
@@ -184,7 +184,7 @@ export function ggufModelClient({
           },
           stop: stopOf(result),
         });
-        await emit.end();
+        Queue.endUnsafe(queue);
       };
       const interrupt = async () => {
         if (handle !== undefined) {
@@ -222,7 +222,7 @@ export function ggufModelClient({
             stop('failed', streamed !== '');
             return;
           }
-          await finish(result.value);
+          finish(result.value);
         } catch {
           stop('failed', streamed !== '');
         } finally {
@@ -230,14 +230,18 @@ export function ggufModelClient({
           inflight = undefined;
         }
       };
-      void run();
-      return Effect.sync(() => {
-        if (running()) {
-          // Interrupted mid-answer: stop llama.cpp. Its last result is ignored.
-          state = 'over';
-          void interrupt();
-        }
-      });
+      return Effect.andThen(
+        Effect.addFinalizer(() =>
+          Effect.sync(() => {
+            if (running()) {
+              // Interrupted mid-answer: stop llama.cpp. Its last result is ignored.
+              state = 'over';
+              void interrupt();
+            }
+          })
+        ),
+        () => Effect.sync(() => void run())
+      );
     });
 
   return {

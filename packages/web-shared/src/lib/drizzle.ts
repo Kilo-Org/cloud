@@ -80,7 +80,7 @@ function getReplicaUrl(): string {
     euReplicaUrls: [
       getEnvVariable('POSTGRES_REPLICA_EU_URL'),
       getEnvVariable('POSTGRES_REPLICA_EU_URL_2'),
-    ].filter(Boolean) as string[],
+    ].filter(Boolean),
   });
 }
 

@@ -1,4 +1,4 @@
-ARG NODE_VERSION="24.22.0"
+ARG NODE_VERSION="24.22.1"
 FROM docker.io/library/node:${NODE_VERSION}-slim AS node-runtime
 
 FROM docker.io/cloudflare/sandbox:0.12.12

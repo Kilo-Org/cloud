@@ -1,6 +1,9 @@
 ARG SANDBOX_VERSION="0.12.12"
+ARG NODE_VERSION="24"
 
 FROM docker.io/cloudflare/sandbox:${SANDBOX_VERSION}-musl AS cloudflare-sandbox
+
+FROM docker.io/library/node:${NODE_VERSION}-alpine AS node-runtime
 
 FROM docker:dind-rootless
 
@@ -26,14 +29,20 @@ COPY --from=cloudflare-sandbox /bin/bash /bin/bash
 COPY --from=cloudflare-sandbox /usr/lib/libreadline.so.8 /usr/lib/libreadline.so.8
 COPY --from=cloudflare-sandbox /usr/lib/libreadline.so.8.2 /usr/lib/libreadline.so.8.2
 
-RUN apk add --no-cache \
+COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
+COPY --from=node-runtime /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && ln -sf /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
+
+RUN apk add --no-cache --upgrade \
     bash \
+    ca-certificates \
     curl \
     git \
     git-lfs \
     jq \
-    nodejs \
-    npm \
+    libgcc \
+    libstdc++ \
     openssh-client \
     ripgrep \
     tar \

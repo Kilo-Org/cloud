@@ -30,9 +30,8 @@ vi.mock('@shopify/flash-list', () => ({
       { getItemType: props.getItemType },
       props.ListHeaderComponent,
       data.length > 0
-        ? data.map(
-            (item, index): ReactNode =>
-              createElement(Fragment, { key: index }, props.renderItem({ item }))
+        ? data.map((item, index): ReactNode =>
+            createElement(Fragment, { key: index }, props.renderItem({ item }))
           )
         : props.ListEmptyComponent
     );

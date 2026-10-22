@@ -14,7 +14,7 @@
  */
 
 import type { IngestEvent, StoredEvent } from './types.js';
-import type { EventId, SessionId } from '../types/ids.js';
+import type { SessionId } from '../types/ids.js';
 import type { EventQueries } from '../session/queries/index.js';
 import { createErrorMessage } from './stream.js';
 import { z } from 'zod';
@@ -26,8 +26,6 @@ import {
 } from '../session/ingest-handlers/index.js';
 import {
   WrapperTerminalFailureCodes,
-  type CompleteEventData,
-  type KilocodeEventData,
   type CloudStatusData,
   type CommandsAvailableData,
 } from '../shared/protocol.js';
@@ -692,7 +690,7 @@ export function createIngestHandler(
           const cloudStatus = cloudStatusForPreparingEvent(ingestEvent.data, applied);
           if (cloudStatus) {
             broadcastFn({
-              id: 0 as EventId,
+              id: 0,
               execution_id: eventSourceId,
               session_id: sessionId,
               stream_event_type: 'cloud.status',
@@ -736,14 +734,10 @@ export function createIngestHandler(
         if (eventType === 'kilocode') {
           const parsedKilocode = kilocodeEventSchema.safeParse(ingestEvent.data);
           if (parsedKilocode.success) {
-            await handleKilocodeEvent(
-              parsedKilocode.data as KilocodeEventData,
-              attachment.kiloSessionState,
-              {
-                updateKiloSessionId: id => doContext.updateKiloSessionId(id),
-                logger: console,
-              }
-            );
+            await handleKilocodeEvent(parsedKilocode.data, attachment.kiloSessionState, {
+              updateKiloSessionId: id => doContext.updateKiloSessionId(id),
+              logger: console,
+            });
             ws.serializeAttachment(attachment);
             const attention = classifyAttentionKilocodeEvent(ingestEvent.data);
             if (attention) {
@@ -808,7 +802,7 @@ export function createIngestHandler(
 
         if (eventTypeStr === 'autocommit_started') {
           broadcastFn({
-            id: 0 as EventId,
+            id: 0,
             execution_id: eventSourceId,
             session_id: sessionId,
             stream_event_type: 'cloud.status',
@@ -824,7 +818,7 @@ export function createIngestHandler(
         }
         if (eventTypeStr === 'autocommit_completed') {
           broadcastFn({
-            id: 0 as EventId,
+            id: 0,
             execution_id: eventSourceId,
             session_id: sessionId,
             stream_event_type: 'cloud.status',
@@ -841,7 +835,7 @@ export function createIngestHandler(
 
         if (eventType === 'complete') {
           broadcastFn({
-            id: 0 as EventId,
+            id: 0,
             execution_id: eventSourceId,
             session_id: sessionId,
             stream_event_type: 'cloud.status',
@@ -856,7 +850,7 @@ export function createIngestHandler(
             console.warn('Invalid complete event payload');
             return;
           }
-          await handleBranchCapture(parsedComplete.data as CompleteEventData, {
+          await handleBranchCapture(parsedComplete.data, {
             updateUpstreamBranch: branch => doContext.updateUpstreamBranch(branch),
             logger: console,
           });
@@ -947,7 +941,7 @@ export function createIngestHandler(
                 .warn('Ignoring invalid runtime model diagnostics');
             }
             broadcastFn({
-              id: 0 as EventId,
+              id: 0,
               execution_id: eventSourceId,
               session_id: sessionId,
               stream_event_type: 'cloud.status',

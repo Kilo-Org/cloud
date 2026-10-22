@@ -24171,6 +24171,9 @@
         "skipBotPullRequests": {
           "type": "boolean"
         },
+        "skipExternalPullRequests": {
+          "type": "boolean"
+        },
         "gateThreshold": {
           "type": "string",
           "enum": [
@@ -24331,12 +24334,13 @@
       "repositorymodeloverrides",
       "disablereviewmd",
       "skipbotpullrequests",
+      "skipexternalpullrequests",
       "gatethreshold",
       "council",
       "councilenabledrepositoryids",
       "autoconfigurewebhooks"
     ],
-    "searchBlob": "organizations.reviewAgent.saveReviewConfig Save the full configuration for an organization's code review agent, including repositories, model, and review style. Use to set up the review agent. organizations reviewagent savereviewconfig organizationid platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids manuallyaddedrepositories repositorymodeloverrides disablereviewmd skipbotpullrequests gatethreshold council councilenabledrepositoryids autoconfigurewebhooks organizationId platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds manuallyAddedRepositories repositoryModelOverrides disableReviewMd skipBotPullRequests gateThreshold council councilEnabledRepositoryIds autoConfigureWebhooks"
+    "searchBlob": "organizations.reviewAgent.saveReviewConfig Save the full configuration for an organization's code review agent, including repositories, model, and review style. Use to set up the review agent. organizations reviewagent savereviewconfig organizationid platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids manuallyaddedrepositories repositorymodeloverrides disablereviewmd skipbotpullrequests skipexternalpullrequests gatethreshold council councilenabledrepositoryids autoconfigurewebhooks organizationId platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds manuallyAddedRepositories repositoryModelOverrides disableReviewMd skipBotPullRequests skipExternalPullRequests gateThreshold council councilEnabledRepositoryIds autoConfigureWebhooks"
   },
   "organizations.reviewAgent.toggleReviewAgent": {
     "path": "organizations.reviewAgent.toggleReviewAgent",
@@ -27880,6 +27884,9 @@
         "skipBotPullRequests": {
           "type": "boolean"
         },
+        "skipExternalPullRequests": {
+          "type": "boolean"
+        },
         "gateThreshold": {
           "type": "string",
           "enum": [
@@ -27915,10 +27922,11 @@
       "repositorymodeloverrides",
       "disablereviewmd",
       "skipbotpullrequests",
+      "skipexternalpullrequests",
       "gatethreshold",
       "autoconfigurewebhooks"
     ],
-    "searchBlob": "personalReviewAgent.saveReviewConfig Save or replace the personal code review agent settings, such as review style, focus areas, custom instructions, model, and which repositories to review. Use it to create the review configuration for a user. personalreviewagent savereviewconfig platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids manuallyaddedrepositories repositorymodeloverrides disablereviewmd skipbotpullrequests gatethreshold autoconfigurewebhooks platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds manuallyAddedRepositories repositoryModelOverrides disableReviewMd skipBotPullRequests gateThreshold autoConfigureWebhooks"
+    "searchBlob": "personalReviewAgent.saveReviewConfig Save or replace the personal code review agent settings, such as review style, focus areas, custom instructions, model, and which repositories to review. Use it to create the review configuration for a user. personalreviewagent savereviewconfig platform reviewstyle focusareas custominstructions modelslug thinkingeffort repositoryselectionmode selectedrepositoryids manuallyaddedrepositories repositorymodeloverrides disablereviewmd skipbotpullrequests skipexternalpullrequests gatethreshold autoconfigurewebhooks platform reviewStyle focusAreas customInstructions modelSlug thinkingEffort repositorySelectionMode selectedRepositoryIds manuallyAddedRepositories repositoryModelOverrides disableReviewMd skipBotPullRequests skipExternalPullRequests gateThreshold autoConfigureWebhooks"
   },
   "personalReviewAgent.toggleReviewAgent": {
     "path": "personalReviewAgent.toggleReviewAgent",

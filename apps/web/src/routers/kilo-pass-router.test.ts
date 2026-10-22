@@ -4824,6 +4824,41 @@ describe('kiloPassRouter', () => {
       ).rejects.toThrow('Manage this Kilo Pass subscription through the mobile app store.');
       expectNoStripeManagementCalls(stripeMock);
     });
+
+    it('rejects a plan change while cancellation is pending, without touching Stripe', async () => {
+      const stripeMock = getStripeMock();
+      const stripeSubscriptionId = 'sub_test_schedule_while_cancelling';
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-schedule-while-cancelling@example.com',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        cancelAtPeriodEnd: true,
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(
+        caller.kiloPass.scheduleChange({
+          targetTier: KiloPassTier.Tier49,
+          targetCadence: KiloPassCadence.Monthly,
+        })
+      ).rejects.toThrow('Resume your subscription before changing plans.');
+
+      expectNoStripeManagementCalls(stripeMock);
+      const rows = await db.query.kilo_pass_scheduled_changes.findMany({
+        where: eq(kilo_pass_scheduled_changes.stripe_subscription_id, stripeSubscriptionId),
+      });
+      expect(rows).toHaveLength(0);
+      const row = await db.query.kilo_pass_subscriptions.findFirst({
+        columns: { cancel_at_period_end: true },
+        where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubscriptionId),
+      });
+      expect(row?.cancel_at_period_end).toBe(true);
+    });
   });
 
   describe('cancelScheduledChange', () => {

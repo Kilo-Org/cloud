@@ -1,8 +1,16 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { handleTRPCRequest } from '@/lib/trpc-route-handler';
+import {
+  codeIndexingGoneResponse,
+  isCodeIndexingEnabled,
+} from '@/lib/code-indexing/availability.server';
 
 export async function POST(request: NextRequest) {
+  if (!isCodeIndexingEnabled()) {
+    return codeIndexingGoneResponse();
+  }
+
   const body: unknown = await request.json().catch(() => undefined);
   if (body === undefined) {
     return NextResponse.json(

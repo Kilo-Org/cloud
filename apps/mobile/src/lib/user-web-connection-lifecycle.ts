@@ -5,7 +5,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { type ConnectivityState, connectivityStatus } from '@/lib/connectivity-online';
 
 type NativeLifecycleSources = {
-  getAppState: () => AppStateStatus;
+  getAppState: () => typeof AppState.currentState;
   onAppStateChange: (listener: (state: AppStateStatus) => void) => () => void;
   onConnectivityChange: (listener: (state: ConnectivityState) => void) => () => void;
 };

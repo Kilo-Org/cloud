@@ -9,7 +9,7 @@ import {
   useImperativeHandle,
   useState,
 } from 'react';
-import { type LayoutChangeEvent, type View } from 'react-native';
+import { type LayoutChangeEvent, type View, type ViewInstance } from 'react-native';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -19,7 +19,7 @@ import { NativeStateSurface, StateSurface, useStateSurface } from './centered-st
 type SurfaceProps = ComponentProps<typeof NativeStateSurface>;
 type Options = SurfaceProps['options'];
 type NativeProps = NonNullable<Options['unstable_nativeProps']>;
-type Measurement = Parameters<View['measureInWindow']>[0];
+type Measurement = Parameters<ViewInstance['measureInWindow']>[0];
 
 const geometryHook = vi.hoisted(() => vi.fn(() => ({ status: 'unavailable', geometry: null })));
 vi.mock('@/lib/hooks/use-native-state-geometry', () => ({ useNativeStateGeometry: geometryHook }));
@@ -30,8 +30,10 @@ vi.mock('react-native', () => ({
   useWindowDimensions: () => ({ width: 400, height: 800 }),
   View: ({ ref, ...props }: ComponentPropsWithRef<typeof View>) => {
     useImperativeHandle(ref, () => {
-      const handle: Partial<View> = { measureInWindow: vi.fn<View['measureInWindow']>() };
-      return handle as View;
+      const handle: Partial<ViewInstance> = {
+        measureInWindow: vi.fn<ViewInstance['measureInWindow']>(),
+      };
+      return handle as ViewInstance;
     }, []);
     return createElement('View', props);
   },
@@ -39,13 +41,13 @@ vi.mock('react-native', () => ({
 
 function createHarness(initialOptions: Options = {}, strict = false) {
   const measurements: Measurement[] = [];
-  const nodeMock: Partial<View> = {
+  const nodeMock: Partial<ViewInstance> = {
     measureInWindow: vi.fn((onMeasure: Measurement) => {
       measurements.push(onMeasure);
     }),
     scrollTop: 0,
   };
-  const node = nodeMock as View;
+  const node = nodeMock as ViewInstance;
   const listeners = new Map<string, () => void>();
   let updateOptions: ((options: Options) => void) | undefined = undefined;
   let currentOptions = initialOptions;
@@ -167,8 +169,8 @@ describe('NativeStateSurface refs', () => {
   it.each([false, true])(
     'preserves replacement props without a render loop in StrictMode %s',
     async strict => {
-      const firstRef = createRef<View>();
-      const nextRef = createRef<View>();
+      const firstRef = createRef<ViewInstance>();
+      const nextRef = createRef<ViewInstance>();
       const firstLayout = vi.fn<NonNullable<NativeProps['onLayout']>>();
       const nextLayout = vi.fn<NonNullable<NativeProps['onLayout']>>();
       const harness = createHarness(
@@ -213,7 +215,7 @@ describe('NativeStateSurface refs', () => {
   );
 
   it('preserves external refs when a caller copies the installed props', async () => {
-    const ref = createRef<View>();
+    const ref = createRef<ViewInstance>();
     const onLayout = vi.fn<NonNullable<NativeProps['onLayout']>>();
     const harness = createHarness({ unstable_nativeProps: { ref, onLayout } }, true);
     const mounted = await harness.mount();
@@ -259,7 +261,7 @@ describe('NativeStateSurface refs', () => {
 
   it('clears invalid measurements and pairs callback ref cleanup', async () => {
     const cleanup = vi.fn<() => void>();
-    const ref = vi.fn((node: View | null) => (node ? cleanup : undefined));
+    const ref = vi.fn((node: ViewInstance | null) => (node ? cleanup : undefined));
     const harness = createHarness({ unstable_nativeProps: { ref } }, true);
     const mounted = await harness.mount();
     await harness.settle();
@@ -268,6 +270,19 @@ describe('NativeStateSurface refs', () => {
     await harness.update({ unstable_nativeProps: undefined });
     expect(cleanup).toHaveBeenCalledTimes(assignments());
     await harness.settle(0, 0);
+    expect(harness.geometry()?.frame).toBeNull();
+    mounted.unmount();
+  });
+
+  it('keeps the surface pending until native bounds are finite', async () => {
+    const harness = createHarness();
+    const mounted = await harness.mount();
+    await act(async () => {
+      await Promise.resolve();
+      for (const onMeasure of harness.measurements.splice(0)) {
+        onMeasure(0, Number.NaN, 400, Number.NaN);
+      }
+    });
     expect(harness.geometry()?.frame).toBeNull();
     mounted.unmount();
   });

@@ -271,7 +271,11 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
             <Settings className="h-5 w-5 text-blue-400" />
             {showUpdatePanel ? 'Update Kilo Pass' : 'Manage Kilo Pass'}
           </DialogTitle>
-          {showUpdatePanel ? null : (
+          {showUpdatePanel ? (
+            <DialogDescription className="sr-only">
+              Choose a new tier or billing cadence for your Kilo Pass.
+            </DialogDescription>
+          ) : (
             <DialogDescription className="text-muted-foreground">
               Update your subscription, payment method, or cancellation status.
             </DialogDescription>

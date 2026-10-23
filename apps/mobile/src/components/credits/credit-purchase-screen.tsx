@@ -244,9 +244,10 @@ export function CreditPurchaseScreen() {
           </Text>
           {/* The two store legal links are controls of their own, not words in
               the sentence above, so each carries the shared legal-link box: a
-              real 48dp target the control-size audit can read, laid out
-              layout-neutrally so the footer keeps its `text-xs` line. `px-1`
-              stays the screen's inset, not the shared row's. */}
+              real 48dp target the control-size audit can read, which keeps its
+              height in the flow so the two boxes never overlap when a long
+              locale wraps them onto two lines. `px-1` stays the screen's inset,
+              not the shared row's. */}
           <View className={cn('px-1', LEGAL_LINK_ROW_CLASS)}>
             <Pressable
               accessibilityRole="link"

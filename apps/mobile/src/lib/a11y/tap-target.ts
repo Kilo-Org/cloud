@@ -190,6 +190,11 @@ export const INLINE_LINK_CONNECTOR_CLASS = 'min-w-[10px] text-center';
  * size the control-size audit reads from a node's own rect (Android's
  * `<Button>` minimum). `hitSlop` cannot reach it: the audit measures the rect,
  * not the touch region.
+ *
+ * The utilities below are spelled out rather than interpolated from the dp
+ * constants beside them: the class compiler reads class names out of the source
+ * files, so an interpolated name can miss the generated stylesheet and silently
+ * apply nothing. The tests hold the literals to the constants.
  */
 export const LEGAL_LINK_MIN_DP = 48;
 
@@ -202,7 +207,7 @@ export const LEGAL_LINK_MIN_DP = 48;
  * what keeps the geometry honest: a box that cancelled its own height would
  * reach 17dp into the line below.
  */
-export const LEGAL_LINK_BOX_CLASS = `min-h-[${LEGAL_LINK_MIN_DP}px] min-w-[${LEGAL_LINK_MIN_DP}px] items-center justify-center`;
+export const LEGAL_LINK_BOX_CLASS = 'min-h-[48px] min-w-[48px] items-center justify-center';
 
 /**
  * The `text-xs` line a legal link centres on, in dp: line-height
@@ -220,7 +225,7 @@ export const LEGAL_LINK_LINE_DP = 14;
 export const LEGAL_LINK_SENTENCE_CANCEL_DP = (LEGAL_LINK_MIN_DP - LEGAL_LINK_LINE_DP) / 2;
 
 /** The box a legal link renders as the last word of a consent sentence. */
-export const LEGAL_LINK_SENTENCE_BOX_CLASS = `${LEGAL_LINK_BOX_CLASS} -my-[${LEGAL_LINK_SENTENCE_CANCEL_DP}px]`;
+export const LEGAL_LINK_SENTENCE_BOX_CLASS = `${LEGAL_LINK_BOX_CLASS} -my-[17px]`;
 
 /**
  * The row the two store legal links share: side by side when they fit, one per

@@ -190,6 +190,11 @@ describe('standalone legal link geometry', () => {
     expect(await compiledDp(LEGAL_LINK_BOX_CLASS, 'minHeight')).toBe(LEGAL_LINK_MIN_DP);
     expect(await compiledDp(LEGAL_LINK_BOX_CLASS, 'minWidth')).toBe(LEGAL_LINK_MIN_DP);
     expect(await compiledDp(LEGAL_LINK_SENTENCE_BOX_CLASS, 'minHeight')).toBe(LEGAL_LINK_MIN_DP);
+    // The utilities are literal in the source so the class compiler can see
+    // them; these hold the literals to the dp constants beside them.
+    expect(LEGAL_LINK_BOX_CLASS).toContain(`min-h-[${LEGAL_LINK_MIN_DP}px]`);
+    expect(LEGAL_LINK_BOX_CLASS).toContain(`min-w-[${LEGAL_LINK_MIN_DP}px]`);
+    expect(LEGAL_LINK_SENTENCE_BOX_CLASS).toContain(`-my-[${LEGAL_LINK_SENTENCE_CANCEL_DP}px]`);
   });
 
   it('keeps the two store boxes apart when the row wraps', async () => {

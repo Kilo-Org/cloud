@@ -255,11 +255,11 @@ function networkOutcome(context: NetworkErrorContext): NetworkOutcome {
 const BATCH_ENVELOPE_STATUS = 207;
 
 /**
- * True for a batch envelope that carries no tRPC error item: every item
- * succeeded, or the cloned body could not be read, so the parsed context has
- * neither an inner status nor a tRPC code. The envelope only says the body is a
- * batch, so nothing failed: no event, and not even the breadcrumb that an
- * expected answer leaves.
+ * True for a batch envelope whose parsed body yields no tRPC error metadata:
+ * no inner status and no tRPC code. Every item succeeded, the error item (if
+ * any) carries no readable detail, or the cloned body could not be read. The
+ * envelope only says the body is a batch, so nothing failed: no event, and not
+ * even the breadcrumb that an expected answer leaves.
  */
 function isBatchEnvelopeWithoutError(context: NetworkErrorContext): boolean {
   if (context.status !== BATCH_ENVELOPE_STATUS) {
@@ -501,9 +501,9 @@ function safeShouldReport(url: string, shouldReport: (url: string) => boolean): 
  * reported once at warning level and every transport failure (a rejection
  * that is not an abort) leaves one breadcrumb. `isResponseError` chooses the
  * statuses that count as errors (default `>= 400`; tRPC adds 207 so a batch
- * that carries an error item is reported). A batch envelope that carries no
- * error item is not a failure and records nothing. An expected answer
- * (`isExpectedResponse`) is a breadcrumb instead of a report. `readResponseError`
+ * that yields an error status or code is reported). A batch envelope whose body
+ * yields no error status or code is not a failure and records nothing. An
+ * expected answer (`isExpectedResponse`) is a breadcrumb instead of a report. `readResponseError`
  * may parse the body via a clone to enrich the report. The original rejection is
  * re-thrown and the original Response is returned unchanged; the original body
  * is never read.

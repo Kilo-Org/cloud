@@ -4,6 +4,7 @@ import {
   customRouterCandidateModel,
   customRouterEntryKey,
   customRouterEntryRef,
+  linkedAvgCostUsd,
   resolveEffectivePolicy,
   type AutoRouter,
   type BenchmarkConfig,
@@ -49,7 +50,7 @@ import {
 } from './profiles';
 import { variantFromStorage } from './reasoning-effort';
 import { deciderCasesForRouter } from './run';
-import { buildCustomRoutingTable } from './routing-table-builder';
+import { buildCustomRoutingTable, filterSummariesByProvenance } from './routing-table-builder';
 
 type ModelCatalog = z.infer<typeof BenchmarkModelCatalogSchema>;
 
@@ -60,43 +61,64 @@ export type CatalogSource = {
 
 export const CATALOG_UNAVAILABLE_FAILURE_REASON = 'Model is unavailable in the current catalog.';
 
-/**
- * How one pool entry is measured. The owner's CLI measures every client entry and
- * each gateway entry the platform key cannot serve, under the entry's own model ID.
- * The platform measures the rest as catalog-expanded concrete pairs; a gateway
- * entry the catalog no longer lists has no pairs.
- */
 export type ResolvedCustomRouterEntry =
-  | { measuredBy: 'client'; entry: CustomRouterEntry; variants: (string | null)[] }
+  | {
+      measuredBy: 'client';
+      entry: CustomRouterEntry;
+      variants: (string | null)[];
+      linkedVariants?: Map<string | null, BenchmarkPair>;
+    }
   | { measuredBy: 'platform'; entry: GatewayCustomRouterEntry; pairs: BenchmarkPair[] | null };
 
 export async function resolveCustomRouterEntries(
   entries: readonly CustomRouterEntry[],
   clientEvalEntryKeys: readonly string[],
-  source: CatalogSource
+  source: CatalogSource,
+  profiles: { db: D1Database; router: AutoRouter }
 ): Promise<{ resolved: ResolvedCustomRouterEntry[]; catalog: ModelCatalog | null }> {
-  const catalog = entries.some(entry => entry.kind === 'gateway')
+  const catalog = entries.some(entry => entry.kind === 'gateway' || entry.measuredAs)
     ? await fetchBenchmarkModelCatalog(source.catalogEnv, source.fetchImpl)
     : null;
   const clientEval = new Set(clientEvalEntryKeys);
-  const resolved = entries.map((entry): ResolvedCustomRouterEntry => {
-    if (entry.kind === 'client') {
+  const resolved = await Promise.all(
+    entries.map(async (entry): Promise<ResolvedCustomRouterEntry> => {
+      const concrete =
+        entry.kind === 'gateway' && catalog ? catalogModelVariants(catalog, entry.model) : null;
+      if (entry.kind === 'client' || clientEval.has(customRouterEntryKey(entry))) {
+        const variants =
+          entry.kind === 'client'
+            ? entry.variants.length > 0
+              ? entry.variants
+              : [null]
+            : (concrete?.variants ?? [null]);
+        const measuredAs = entry.measuredAs;
+        if (!measuredAs || !catalog) return { measuredBy: 'client', entry, variants };
+        const measured = catalogModelVariants(catalog, measuredAs);
+        const historical = measured
+          ? []
+          : await loadProfileRowsForPairs(
+              profiles.db,
+              profiles.router,
+              variants.map(variant => ({ model: measuredAs, variant }))
+            );
+        const linkedVariants = new Map(
+          variants
+            .filter(variant =>
+              measured
+                ? measured.variants.includes(variant)
+                : historical.some(row => variantFromStorage(row.variant) === variant)
+            )
+            .map(variant => [variant, { model: measuredAs, variant }] as const)
+        );
+        return { measuredBy: 'client', entry, variants, linkedVariants };
+      }
       return {
-        measuredBy: 'client',
+        measuredBy: 'platform',
         entry,
-        variants: entry.variants.length > 0 ? entry.variants : [null],
+        pairs: concrete?.variants.map(variant => ({ model: concrete.model, variant })) ?? null,
       };
-    }
-    const concrete = catalog ? catalogModelVariants(catalog, entry.model) : null;
-    if (clientEval.has(customRouterEntryKey(entry))) {
-      return { measuredBy: 'client', entry, variants: concrete?.variants ?? [null] };
-    }
-    return {
-      measuredBy: 'platform',
-      entry,
-      pairs: concrete?.variants.map(variant => ({ model: concrete.model, variant })) ?? null,
-    };
-  });
+    })
+  );
   return { resolved, catalog };
 }
 
@@ -156,7 +178,22 @@ function groupPlatformRows(rows: readonly ProfileRow[]): Map<string, ProfileRow[
 }
 
 function platformPairs(resolved: readonly ResolvedCustomRouterEntry[]): BenchmarkPair[] {
-  return resolved.flatMap(item => (item.measuredBy === 'platform' ? (item.pairs ?? []) : []));
+  return resolved.flatMap(item =>
+    item.measuredBy === 'platform' ? (item.pairs ?? []) : [...(item.linkedVariants?.values() ?? [])]
+  );
+}
+
+function isCurrentLinkedProfile(
+  row: ProfileRow,
+  current: CurrentProfileContext,
+  pair: BenchmarkPair,
+  catalog: ModelCatalog | null
+): boolean {
+  return (
+    Boolean(
+      catalog && catalogModelVariants(catalog, pair.model)?.variants.includes(pair.variant)
+    ) && isCurrentBenchmarkProfile(row, current, pair)
+  );
 }
 
 type CustomRouterMeasurements = {
@@ -176,7 +213,8 @@ async function loadCustomRouterMeasurements(
   const { resolved, catalog } = await resolveCustomRouterEntries(
     context.entries,
     context.clientEvalEntryKeys,
-    source
+    source,
+    { db, router: context.baseRouter }
   );
   const [platformRows, clientRows] = await Promise.all([
     loadProfileRowsForPairs(db, context.baseRouter, platformPairs(resolved)),
@@ -207,6 +245,14 @@ export async function assembleCustomRouterTable(
   const { current, resolved, catalog, platformRows, clientRows } =
     await loadCustomRouterMeasurements(db, config, context, source);
   const platformReady: { entry: BenchmarkPair; runId: string; stale: boolean }[] = [];
+  const linkedReady: {
+    entry: BenchmarkPair;
+    runId: string;
+    stale: boolean;
+    candidate: string;
+    ownerPricing: CandidatePricing | null;
+    platformPricing: CandidatePricing | null;
+  }[] = [];
   const clientReady: { profile: ClientProfileRow; stale: boolean }[] = [];
   const prices = new Map(catalog ? catalogCandidatePrices(catalog) : []);
   for (const item of resolved) {
@@ -224,10 +270,37 @@ export async function assembleCustomRouterTable(
       continue;
     }
     const ref = customRouterEntryRef(item.entry);
+    const candidate = customRouterCandidateModel(ref);
+    const ownerPricing =
+      item.entry.kind === 'client'
+        ? item.entry.pricing === null
+          ? null
+          : clientCandidatePricing(item.entry.pricing)
+        : (prices.get(item.entry.model) ?? null);
     if (item.entry.kind === 'client') {
-      prices.set(customRouterCandidateModel(ref), clientCandidatePricing(item.entry.pricing));
+      prices.set(candidate, clientCandidatePricing(item.entry.pricing));
     }
     for (const variant of item.variants) {
+      const linked = item.linkedVariants?.get(variant);
+      if (linked) {
+        if (item.entry.kind === 'gateway' && ownerPricing === null) continue;
+        const served = newestReadyMeasurement(
+          platformRows.get(benchmarkPairKey(linked)) ?? [],
+          row => isCurrentLinkedProfile(row, current, linked, catalog),
+          platformMeasuredAt
+        );
+        if (served?.row.run_id) {
+          linkedReady.push({
+            entry: linked,
+            runId: served.row.run_id,
+            stale: served.stale,
+            candidate,
+            ownerPricing,
+            platformPricing: prices.get(linked.model) ?? null,
+          });
+        }
+        continue;
+      }
       const served = newestReadyMeasurement(
         clientRows.get(clientPairKey(ref, variant)) ?? [],
         row => isCurrentClientProfile(row, current),
@@ -237,11 +310,13 @@ export async function assembleCustomRouterTable(
       if (served) clientReady.push({ profile: served.row, stale: served.stale });
     }
   }
-  if (platformReady.length === 0 && clientReady.length === 0) return { table: null };
+  if (platformReady.length === 0 && linkedReady.length === 0 && clientReady.length === 0) {
+    return { table: null };
+  }
 
   const [platformSummaries, platformCases, clientCases] = await Promise.all([
-    getSummariesForRuns(db, [...new Set(platformReady.map(r => r.runId))]),
-    getRoutingCaseResultsForEntries(db, platformReady),
+    getSummariesForRuns(db, [...new Set([...platformReady, ...linkedReady].map(r => r.runId))]),
+    getRoutingCaseResultsForEntries(db, [...platformReady, ...linkedReady]),
     getClientRoutingCaseResults(
       db,
       clientReady.map(r => r.profile)
@@ -262,6 +337,26 @@ export async function assembleCustomRouterTable(
       summaries: profile.route_summaries.map(summary => ({ ...summary, runId })),
     };
   });
+  const linkedEntries = linkedReady.map(linked => ({
+    ready: {
+      entry: { model: linked.candidate, variant: linked.entry.variant },
+      runId: linked.runId,
+      stale: linked.stale,
+    },
+    summaries: platformSummaries.flatMap(summary => {
+      if (
+        summary.model !== linked.entry.model ||
+        (summary.variant ?? null) !== linked.entry.variant ||
+        summary.runId !== linked.runId
+      )
+        return [];
+      const avgCostUsd = linkedAvgCostUsd(summary, linked.ownerPricing, linked.platformPricing);
+      return avgCostUsd === null ? [] : [{ ...summary, model: linked.candidate, avgCostUsd }];
+    }),
+    cases: platformCases
+      .filter(pair => pair.model === linked.entry.model && pair.variant === linked.entry.variant)
+      .map(pair => ({ ...pair, model: linked.candidate })),
+  }));
 
   const policy = resolveEffectivePolicy(config);
   return {
@@ -282,9 +377,23 @@ export async function assembleCustomRouterTable(
       switchHorizonTurns: policy.switchHorizonTurns,
       lowConfidenceThreshold: policy.lowConfidenceThreshold,
       prices,
-      readyEntries: [...platformReady, ...clientEntries.map(c => c.ready)],
-      summaries: [...platformSummaries, ...clientEntries.flatMap(c => c.summaries)],
-      perCaseResults: [...platformCases, ...clientCases],
+      readyEntries: [
+        ...platformReady,
+        ...linkedEntries.map(c => c.ready),
+        ...clientEntries.map(c => c.ready),
+      ],
+      summaries: [
+        ...filterSummariesByProvenance(platformReady, platformSummaries),
+        ...linkedEntries.flatMap(c => c.summaries),
+        ...clientEntries.flatMap(c => c.summaries),
+      ],
+      perCaseResults: [
+        ...platformCases.filter(pair =>
+          platformReady.some(ready => benchmarkPairKey(ready.entry) === benchmarkPairKey(pair))
+        ),
+        ...linkedEntries.flatMap(c => c.cases),
+        ...clientCases,
+      ],
       complexityLabels: ComplexityLabelsSchema.parse(caseComplexity),
     }),
   };
@@ -326,10 +435,12 @@ export async function lookupCustomRouterStatuses(
     source
   );
   let platformRows = loaded.platformRows;
-  const staleOnly = platformPairs(resolved).filter(pair => {
-    const rows = platformRows.get(benchmarkPairKey(pair)) ?? [];
-    return rows.length > 0 && !rows.some(row => isCurrentBenchmarkProfile(row, current, pair));
-  });
+  const staleOnly = resolved
+    .flatMap(item => (item.measuredBy === 'platform' ? (item.pairs ?? []) : []))
+    .filter(pair => {
+      const rows = platformRows.get(benchmarkPairKey(pair)) ?? [];
+      return rows.length > 0 && !rows.some(row => isCurrentBenchmarkProfile(row, current, pair));
+    });
   if (staleOnly.length > 0) {
     const nowIso = (source.now ?? new Date()).toISOString();
     const orm = drizzle(db);
@@ -350,15 +461,25 @@ export async function lookupCustomRouterStatuses(
         const ref = customRouterEntryRef(item.entry);
         return {
           key,
-          variants: item.variants.map(variant => ({
-            variant,
-            ...measurementStatus(
-              clientRows.get(clientPairKey(ref, variant)) ?? [],
-              row => isCurrentClientProfile(row, current),
-              clientMeasuredAt,
-              clientProfileComplete(context.baseRouter, current.repetitions)
-            ),
-          })),
+          variants: item.variants.map(variant => {
+            const linked = item.linkedVariants?.get(variant);
+            return {
+              variant,
+              linked: Boolean(linked),
+              ...(linked
+                ? measurementStatus(
+                    platformRows.get(benchmarkPairKey(linked)) ?? [],
+                    row => isCurrentLinkedProfile(row, current, linked, loaded.catalog),
+                    platformMeasuredAt
+                  )
+                : measurementStatus(
+                    clientRows.get(clientPairKey(ref, variant)) ?? [],
+                    row => isCurrentClientProfile(row, current),
+                    clientMeasuredAt,
+                    clientProfileComplete(context.baseRouter, current.repetitions)
+                  )),
+            };
+          }),
         };
       }
       if (!item.pairs) {
@@ -367,6 +488,7 @@ export async function lookupCustomRouterStatuses(
           variants: [
             {
               variant: null,
+              linked: false,
               status: 'failed' as const,
               failureReason: CATALOG_UNAVAILABLE_FAILURE_REASON,
             },
@@ -377,6 +499,7 @@ export async function lookupCustomRouterStatuses(
         key,
         variants: item.pairs.map(pair => ({
           variant: pair.variant,
+          linked: false,
           ...measurementStatus(
             platformRows.get(benchmarkPairKey(pair)) ?? [],
             row => isCurrentBenchmarkProfile(row, current, pair),

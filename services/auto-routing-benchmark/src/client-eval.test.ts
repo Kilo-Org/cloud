@@ -151,6 +151,44 @@ describe('client eval (real SQLite)', () => {
     expect(resumed.staleEntries).toEqual([]);
   });
 
+  it('omits linked variants from the plan and rejects their uploads while unmatched variants still grade', async () => {
+    const entries = [{ ...localModel, measuredAs: 'vendor/platform' }];
+    deps.source.fetchImpl = async () =>
+      Response.json({
+        data: [
+          {
+            id: 'vendor/platform',
+            opencode: { variants: { low: { reasoning: { effort: 'low' } } } },
+          },
+        ],
+      });
+    const plan = await planClientEval(db, CONFIG, { ...context, entries }, deps.source);
+    expect(new Set(plan.items.map(item => item.variant))).toEqual(new Set(['high']));
+    await expect(
+      gradeClientEvalResult(db, CONFIG, upload({ entries }), deps)
+    ).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(
+      await gradeClientEvalResult(db, CONFIG, upload({ entries, variant: 'high' }), deps)
+    ).toEqual({ score: 1 });
+    expect(judge).not.toHaveBeenCalled();
+    expect(writeUsage).not.toHaveBeenCalled();
+  });
+
+  it('keeps a removed-catalog linked variant out of client eval when platform history exists', async () => {
+    sqlite
+      .prepare(`INSERT INTO benchmark_profiles (router, model, variant, engine_identity,
+      repetitions, status, run_id, requested_at, updated_at)
+      VALUES ('efficient', 'vendor/platform', 'low', 'old', 1, 'ready', 'old-run', 'a', 'a')`)
+      .run();
+    const entries = [{ ...localModel, measuredAs: 'vendor/platform' }];
+    deps.source.fetchImpl = async () => Response.json({ data: [] });
+    const plan = await planClientEval(db, CONFIG, { ...context, entries }, deps.source);
+    expect(new Set(plan.items.map(item => item.variant))).toEqual(new Set(['high']));
+    await expect(
+      gradeClientEvalResult(db, CONFIG, upload({ entries }), deps)
+    ).rejects.toMatchObject({ code: 'invalid_request' });
+  });
+
   it('re-plans an older-engine measurement in full and reports it stale', async () => {
     await gradeClientEvalResult(db, CONFIG, upload(), deps);
     sqlite.exec(`UPDATE client_profiles SET engine_identity = 'efficient:v0:old'`);

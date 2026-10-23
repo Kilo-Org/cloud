@@ -12,6 +12,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   View: 'View',
   ScrollView: 'ScrollView',
   Switch: 'Switch',

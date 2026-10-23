@@ -97,12 +97,24 @@ export function useSettingsBackGuard({
   // popping a spurious "Unsaved changes" confirm whose own Save button would
   // save a second time.
   const skipNextGuardRef = useRef(false);
-  const [leaveAllowed, setLeaveAllowed] = useState(false);
+  // Counts every confirmed leave rather than a boolean: a leave that lands
+  // after the guard is already open must still replay its own action instead
+  // of overwriting a pending one the effect has already consumed.
+  const [leaveCount, setLeaveCount] = useState(0);
+  const leaveAllowed = leaveCount > 0;
+  // The removal this screen walked back, replayed once the guard below has
+  // actually disabled itself. `repeat()` clears the prevention through a React
+  // state setter and then dispatches the action immediately, so calling it from
+  // inside the callback races that state: the navigator still sees the route as
+  // prevented and drops the action, leaving the screen in place after a
+  // successful save. The effect replays it from a commit where
+  // `preventRemove` is already false.
+  const pendingLeaveRef = useRef<null | (() => void)>(null);
 
   usePreventRemove(dirty && !leaveAllowed, ({ repeat }) => {
     const leave = () => {
-      setLeaveAllowed(true);
-      repeat();
+      pendingLeaveRef.current = repeat;
+      setLeaveCount(count => count + 1);
     };
     if (skipNextGuardRef.current) {
       skipNextGuardRef.current = false;
@@ -143,6 +155,18 @@ export function useSettingsBackGuard({
       // on them, so the portal dialog can never hide behind a presented surface.
     });
   });
+
+  useEffect(() => {
+    if (leaveCount === 0) {
+      return;
+    }
+    const replay = pendingLeaveRef.current;
+    if (!replay) {
+      return;
+    }
+    pendingLeaveRef.current = null;
+    replay();
+  }, [leaveCount]);
 
   return {
     onBack: () => {

@@ -298,7 +298,9 @@ const OpenRouterProviderSchema = z.object({
   baseUrl: z.string().optional(),
   dataPolicy: z
     .object({
+      /** Stores prompts for feedback or training; governed by `data_collection`. */
       training: z.boolean().optional(),
+      /** Stores prompts for any reason, including compliance; governed by `zdr`. */
       retainsPrompts: z.boolean().optional(),
       canPublish: z.boolean().optional(),
       termsOfServiceURL: z.string().optional(),

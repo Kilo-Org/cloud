@@ -170,7 +170,9 @@ export async function authorizeGitHubRepository(params: {
       // A single GitHub error (rate limit, 5xx, timeout) must not end the action.
       permission = await getGitHubRepositoryPermission(permissionInput, params.fetchPermission);
     }
-    if (permission === 'admin' || permission === 'write') return { allowed: true };
+    if (permission === 'admin' || permission === 'maintain' || permission === 'write') {
+      return { allowed: true };
+    }
   } catch (error) {
     console.warn('[KiloBot] Failed to verify GitHub repository access:', {
       repository,

@@ -417,12 +417,12 @@ export async function hasPRCommentWithMarker(
 }
 
 /**
- * Returns the permission string ('admin' | 'write' | 'read' | 'none') or null
+ * Returns the permission string ('admin' | 'maintain' | 'write' | 'read' | 'none') or null
  * if the lookup fails (e.g. the App lacks permission to query collaborators).
  */
-export type CollaboratorPermission = 'admin' | 'write' | 'read' | 'none';
+export type CollaboratorPermission = 'admin' | 'maintain' | 'write' | 'read' | 'none';
 
-const KNOWN_PERMISSIONS = new Set<string>(['admin', 'write', 'read', 'none']);
+const KNOWN_PERMISSIONS = new Set<string>(['admin', 'maintain', 'write', 'read', 'none']);
 
 export async function getCollaboratorPermissionLevel(
   installationId: string,

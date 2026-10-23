@@ -13,7 +13,7 @@ import {
 
 const mockedAssertAuthorized = jest.mocked(assertGitHubInstallationRuntimeAuthorized);
 
-type Permission = 'admin' | 'write' | 'read' | 'none' | null;
+type Permission = 'admin' | 'maintain' | 'write' | 'read' | 'none' | null;
 
 function createIntegration(overrides: Partial<PlatformIntegration> = {}): PlatformIntegration {
   return {
@@ -28,7 +28,7 @@ function createIntegration(overrides: Partial<PlatformIntegration> = {}): Platfo
 }
 
 function createFetchPermission(permission: Permission) {
-  return jest.fn(async () => permission as 'admin' | 'write' | 'read' | 'none' | null);
+  return jest.fn(async () => permission as 'admin' | 'maintain' | 'write' | 'read' | 'none' | null);
 }
 
 beforeEach(() => {
@@ -40,6 +40,7 @@ describe('authorizeGitHubRepository', () => {
     ['read', false],
     ['none', false],
     ['write', true],
+    ['maintain', true],
     ['admin', true],
   ] as const)('a %s collaborator is %s', async (permission, expectedAllowed) => {
     const fetchPermission = createFetchPermission(permission);

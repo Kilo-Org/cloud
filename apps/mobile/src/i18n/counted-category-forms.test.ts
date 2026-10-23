@@ -139,6 +139,7 @@ describe('agreement-neutral duration copy', () => {
       const count = String(minutes);
       const countIndex = rendered.lastIndexOf(count);
       expect(countIndex).toBeGreaterThanOrEqual(0);
+      expect(rendered.slice(0, countIndex)).toContain('λεπτά');
       const suffix = rendered.slice(countIndex + count.length);
       expect(suffix.startsWith('.')).toBe(true);
       return `${rendered.slice(0, countIndex)}{{minutes}}${suffix}`;

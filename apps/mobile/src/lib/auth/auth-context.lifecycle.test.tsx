@@ -2942,6 +2942,34 @@ describe('session restoration after provider remount', () => {
     expect(restored.getCtx().restoreFailed).toBe(false);
   });
 
+  it('reads secure storage again on every later mount, not only the second one', async () => {
+    const mod = await loadAuthModule();
+    const first = await mountAndGetContext(mod);
+    await act(async () => {
+      await first.getCtx().signIn('first-token', 'first-refresh', 3600);
+    });
+    await act(() => {
+      first.unmount();
+    });
+
+    const second = await mountAndGetContext(mod);
+    expect(second.getCtx().token).toBe('first-token');
+    await act(() => {
+      second.unmount();
+    });
+
+    // A token written while the second mount was alive must win over every
+    // snapshot: the preload from JavaScript start and the second mount's read.
+    store.set(AUTH_TOKEN_KEY, 'second-token');
+    store.set(REFRESH_TOKEN_KEY, 'second-refresh');
+    const third = await mountAndGetContext(mod);
+    onTestFinished(() => {
+      third.unmount();
+    });
+    expect(third.getCtx().token).toBe('second-token');
+    expect(third.getCtx().restoreFailed).toBe(false);
+  });
+
   it('does not restore an initial session after explicit sign-out', async () => {
     store.set(AUTH_TOKEN_KEY, 'initial-token');
     store.set(REFRESH_TOKEN_KEY, 'initial-refresh');

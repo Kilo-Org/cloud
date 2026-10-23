@@ -38,11 +38,14 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
   }
   if (__DEV__) {
     const reviewCopyFixture =
-      /(?:^|\/)dev\/pr-review-copy-fixture\/(checks|navigator|files|merge)\/?(?:[?#].*)?$/.exec(
+      /(?:^|\/)dev\/pr-review-copy-fixture\/(checks|navigator|files|merge|overview|merge-request-missing|merge-request-error|submit)\/?(?:\?(.*))?$/.exec(
         path
       );
     if (reviewCopyFixture) {
-      return `/(auth)/pr-review-copy-fixture?surface=${reviewCopyFixture[1]}`;
+      // Carry the link's own query (the submit surface reads the PR triple from
+      // it) alongside the surface the fixture mounts.
+      const extras = reviewCopyFixture[2] ? `&${reviewCopyFixture[2]}` : '';
+      return `/(auth)/pr-review-copy-fixture?surface=${reviewCopyFixture[1]}${extras}`;
     }
     if (/(?:^|\/)dev\/button-label-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/button-label-fixture';

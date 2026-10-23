@@ -218,9 +218,7 @@ describe('the workspace the Chat tab names', () => {
   it('names the active workspace above an empty list', async () => {
     const ui = await mount();
 
-    await waitFor(
-      () => accountControl(ui).props.accessibilityLabel === HAFENWERK.organizationName
-    );
+    await waitFor(() => accountControl(ui).props.accessibilityLabel === HAFENWERK.organizationName);
 
     // The row is what explains the empty state underneath it, so both are on
     // screen at once: an empty list with no workspace named is the finding.
@@ -233,22 +231,15 @@ describe('the workspace the Chat tab names', () => {
 
   it('follows the workspace the reader switches to, with the list it scopes', async () => {
     const ui = await mount();
-    await waitFor(
-      () => accountControl(ui).props.accessibilityLabel === HAFENWERK.organizationName
-    );
+    await waitFor(() => accountControl(ui).props.accessibilityLabel === HAFENWERK.organizationName);
 
     await chooseAccount(ui, NORDLICHT.organizationName);
 
-    await waitFor(
-      () => accountControl(ui).props.accessibilityLabel === NORDLICHT.organizationName
-    );
+    await waitFor(() => accountControl(ui).props.accessibilityLabel === NORDLICHT.organizationName);
     // The name and the list cannot disagree: the screen is read for the
     // workspace the row just named.
     expect(state.places.at(-1)?.chatScope).toBe(`user-1:${NORDLICHT.organizationId}`);
-    expect(storage.write).toHaveBeenCalledWith(
-      ORGANIZATION_STORAGE_KEY,
-      NORDLICHT.organizationId
-    );
+    expect(storage.write).toHaveBeenCalledWith(ORGANIZATION_STORAGE_KEY, NORDLICHT.organizationId);
   });
 
   it('names the personal scope when the account has no workspace', async () => {

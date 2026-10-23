@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import { useFocusEffect } from 'expo-router';
-import { Alert, AppState, Platform } from 'react-native';
+import { Alert, AppState, Platform, View } from 'react-native';
 
 import { i18n } from '@/i18n';
 import { AgentSessionListScreen } from '@/components/agents/session-list-screen';
+import { ContextControl } from '@/components/context-control';
 import { type AgentsView, AgentsViewSegment } from '@/components/todos/agents-view-segment';
 import { TodoListsScreen } from '@/components/todos/todo-lists-screen';
 import { runPendingWidgetActions } from '@/glanceable-ios/widget-actions';
@@ -119,7 +120,9 @@ async function retryGitHubInstall(organizationId?: string): Promise<void> {
     Alert.alert(
       i18n.t('agents.githubInstall.couldNotOpenTitle'),
       i18n.t('agents.githubInstall.couldNotOpenMessage'),
-      [{ text: i18n.t('common.tryAgain'), onPress: () => void retryGitHubInstall(organizationId) }]
+      [{ text: i18n.t('common.tryAgain'), onPress: () => void retryGitHubInstall(organizationId) }],
+      // Android back dismisses; reopening the flow retries the same way.
+      { cancelable: true }
     );
   }
 }
@@ -132,7 +135,9 @@ export default function AgentSessionList() {
       void retryGitHubInstall(result?.organizationId);
     });
     if (alert) {
-      Alert.alert(alert.title, alert.message, alert.buttons);
+      // Android back dismisses; the outcome alerts are informational and the
+      // retry flow re-arms from the tab.
+      Alert.alert(alert.title, alert.message, alert.buttons, { cancelable: true });
     }
   }, []);
 
@@ -164,10 +169,23 @@ export default function AgentSessionList() {
     }, [])
   );
 
-  const segmentControl = <AgentsViewSegment value={view} onChange={setView} />;
+  // The account the tab is scoped to belongs to the tab, not to either view:
+  // both the live list and the To-dos list query the selected personal or
+  // organization scope, and an organization scope with no rows otherwise reads
+  // as "no sessions" while the user's personal sessions sit one switch away.
+  // Both views render this header under their title, so the scope and its
+  // switch are identical on Sessions and on To-dos.
+  const tabHeader = (
+    <>
+      <View className="px-[22px] pb-1">
+        <ContextControl />
+      </View>
+      <AgentsViewSegment value={view} onChange={setView} />
+    </>
+  );
   return view === 'sessions' ? (
-    <AgentSessionListScreen segmentControl={segmentControl} />
+    <AgentSessionListScreen tabHeader={tabHeader} />
   ) : (
-    <TodoListsScreen segmentControl={segmentControl} />
+    <TodoListsScreen tabHeader={tabHeader} />
   );
 }

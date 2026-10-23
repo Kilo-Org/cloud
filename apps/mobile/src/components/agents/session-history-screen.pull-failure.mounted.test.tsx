@@ -164,11 +164,12 @@ vi.mock('@/lib/organization-context', () => ({
 vi.mock('@/lib/hooks/use-session-mutations', () => ({
   useSessionMutations: () => ({ deleteSession: vi.fn(), renameSession: vi.fn() }),
 }));
-vi.mock('@/lib/a11y/announce', () => ({ moveA11yFocus: vi.fn() }));
+vi.mock('@/lib/a11y/announce', () => ({ requestA11yFocus: vi.fn() }));
 vi.mock('@/lib/a11y/status-announcement', () => ({
   useStatusAnnouncement: vi.fn(),
 }));
 vi.mock('@/lib/tab-bar-layout', () => ({ getEffectiveTabBarHeight: () => 60 }));
+vi.mock('@/components/context-control', () => ({ ContextControl: 'ContextControl' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/agents/session-list-header-actions', () => ({

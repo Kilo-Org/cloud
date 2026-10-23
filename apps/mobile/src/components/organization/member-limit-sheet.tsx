@@ -6,7 +6,11 @@ import { ScrollView, View } from 'react-native';
 
 import { CenteredState } from '@/components/centered-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
-import { limitError, parseLimit } from '@/components/organization/member-limit-validators';
+import {
+  limitError,
+  parseLimit,
+  saveErrorCopy,
+} from '@/components/organization/member-limit-validators';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
@@ -53,6 +57,19 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
   );
   const [fieldTouched, setFieldTouched] = useState(false);
   const canSave = fieldError === null;
+  // A rejected save is rendered in localized copy, never as the server wrote it.
+  const saveError = mutations.updateMember.isError
+    ? saveErrorCopy(mutations.updateMember.error)
+    : null;
+  const resetUpdateMember = mutations.updateMember.reset;
+  const clearSaveError = () => {
+    if (mutations.updateMember.isError) {
+      resetUpdateMember();
+    }
+  };
+
+  const touchedFieldError = fieldTouched ? fieldError : null;
+  const limitFieldError = saveError?.field === 'limit' ? saveError.message : touchedFieldError;
 
   const onSaved = () => {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -79,11 +96,12 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
         placeholder={t('organization.memberLimit.noLimitPlaceholder')}
         keyboardType="decimal-pad"
         defaultValue={initialValue || undefined}
-        error={fieldTouched ? (fieldError ?? undefined) : undefined}
+        error={limitFieldError ?? undefined}
         onChangeText={value => {
           limitRef.current = value;
           setFieldError(limitError(value, hasCurrentLimit));
           setFieldTouched(true);
+          clearSaveError();
         }}
         onBlur={() => {
           setFieldTouched(true);
@@ -94,7 +112,7 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
           is the single announcement owner: one announcement per platform,
           visuals preserved (tone error). */}
       <AccessibleStatus
-        message={mutations.updateMember.isError ? mutations.updateMember.error.message : null}
+        message={saveError?.field === 'form' ? saveError.message : null}
         className="text-sm"
       />
 

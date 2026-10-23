@@ -2,7 +2,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, ScrollView, Switch, View } from 'react-native';
+import { Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
@@ -10,6 +10,7 @@ import { Section } from '@/components/consent/section';
 import { type ConsentMode } from '@/components/consent/consent-mode';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { PRIVACY_URL } from '@/lib/config';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -344,7 +345,11 @@ export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
 
           <Text className="mt-6 text-xs text-muted-foreground">
             {t('consent.retentionPrefix')}{' '}
-            <Text className="text-xs text-primary underline" onPress={handleOpenPrivacy}>
+            <Text
+              className="text-xs text-primary underline"
+              accessibilityRole="link"
+              onPress={handleOpenPrivacy}
+            >
               {t('consent.privacyPolicy')}
             </Text>
             .

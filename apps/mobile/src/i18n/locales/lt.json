@@ -3731,7 +3731,7 @@
       "agents_one": "{{count}} agentas",
       "agents_few": "{{count}} agentai",
       "agents_many": "{{count}} agentų",
-      "agents_other": "{{count}} agento"
+      "agents_other": "{{count}} agentų"
     },
     "nameLabel": "Profilio pavadinimas",
     "namePlaceholder": "pvz. Backend derinimas",

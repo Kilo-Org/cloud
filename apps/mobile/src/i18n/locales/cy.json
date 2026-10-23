@@ -3819,7 +3819,7 @@
       "setupCommands_two": "{{count}} gorchymyn gosod",
       "setupCommands_few": "{{count}} gorchymyn gosod",
       "setupCommands_many": "{{count}} gorchymyn gosod",
-      "setupCommands_other": "{{count}} gorchn? no wait",
+      "setupCommands_other": "{{count}} gorchmynion gosod",
       "agents_zero": "{{count}} asiantau",
       "agents_one": "{{count}} asiant",
       "agents_two": "{{count}} asiantau",

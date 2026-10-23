@@ -8,7 +8,7 @@ import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  'group shrink-0 flex-row items-center justify-center gap-2 rounded-md shadow-none',
+  'group shrink-0 flex-row items-center justify-center rounded-md shadow-none',
   {
     variants: {
       variant: {
@@ -26,7 +26,7 @@ const buttonVariants = cva(
         // the 44pt (default/lg) / 36pt-plus-hitSlop (sm) touch target.
         // Use px because native rem defaults to 14pt, not 16pt.
         default: 'min-h-[44px] px-4 py-2',
-        sm: 'min-h-[36px] gap-1.5 rounded-md px-3 py-1.5',
+        sm: 'min-h-[36px] rounded-md px-3 py-1.5',
         lg: 'min-h-[44px] rounded-md px-6 py-2',
         icon: 'h-[44px] w-[44px]',
       },
@@ -37,6 +37,22 @@ const buttonVariants = cva(
     },
   }
 );
+
+// The row gap lives in its own variant so the busy label wrapper, which holds
+// the children one level deeper, spaces them exactly as the row would.
+const buttonGapVariants = cva('', {
+  variants: {
+    size: {
+      default: 'gap-2',
+      sm: 'gap-1.5',
+      lg: 'gap-2',
+      icon: '',
+    },
+  },
+  defaultVariants: {
+    size: 'default',
+  },
+});
 
 // sm is 36pt tall; expand the touchable area by 4pt on every edge to reach 44pt
 // without changing the compact visual size.
@@ -173,9 +189,8 @@ function Button({
   // replace, so it draws the indicator inline instead.
   const usesBusyLayout = loading !== undefined && size !== 'icon';
   // The children sit one level deeper in that layout, so their spacing moves
-  // inside the wrapper: it takes the gap the row's size sets, or a compact
-  // button would change from 6px to 8px between its icon and label.
-  const busyLabelGap = size === 'sm' ? 'gap-1.5' : 'gap-2';
+  // inside the wrapper; it takes the same size gap the row would have applied.
+  const busyLabelGap = buttonGapVariants({ size });
   const busyIndicator = loading ? (
     <ActivityIndicator size="small" color={spinnerColor(variant, colors)} />
   ) : null;
@@ -210,6 +225,7 @@ function Button({
         className={cn(
           isDimmed && 'opacity-50',
           buttonVariants({ variant, size }),
+          buttonGapVariants({ size }),
           isMutedDisabled && 'bg-primary-disabled',
           className
         )}

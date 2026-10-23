@@ -862,6 +862,18 @@ function mockNotePage(notes: TestNote[]) {
   );
 }
 
+function mockNotePageOf(notes: TestNote[], totalPages: number) {
+  mockFetch.mockImplementationOnce((_url: string) =>
+    Promise.resolve({
+      ok: true,
+      json: async () => notes,
+      headers: {
+        get: (name: string) => (name.toLowerCase() === 'x-total-pages' ? String(totalPages) : null),
+      },
+    })
+  );
+}
+
 describe('findKiloReviewNote', () => {
   beforeEach(() => {
     mockFetch.mockReset();
@@ -936,6 +948,19 @@ describe('findKiloReviewNote', () => {
     );
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
+
+  it('keeps the author check on a later notes page', async () => {
+    mockTokenUser();
+    mockNotePageOf(
+      [makeNote({ id: 16, body: 'stranger text <!-- kilo-review -->', authorId: 77 })],
+      2
+    );
+    mockNotePage([makeNote({ id: 17, body: 'bot text <!-- kilo-review -->', authorId: 42 })]);
+
+    const result = await findKiloReviewNote('test-token', 'group/project', 7);
+
+    expect(result).toEqual({ noteId: 17, body: 'bot text <!-- kilo-review -->' });
+  });
 });
 
 describe('hasMRNoteWithMarker', () => {
@@ -955,6 +980,26 @@ describe('hasMRNoteWithMarker', () => {
   it('reports no marker when a different account authored the matching note', async () => {
     mockTokenUser();
     mockNotePage([makeNote({ id: 22, body: 'notice <!-- billing-notice -->', authorId: 77 })]);
+
+    await expect(
+      hasMRNoteWithMarker('test-token', 'group/project', 7, '<!-- billing-notice -->')
+    ).resolves.toBe(false);
+  });
+
+  it('reports the marker for a token-user note on a later page', async () => {
+    mockTokenUser();
+    mockNotePageOf([makeNote({ id: 23, body: 'notice <!-- billing-notice -->', authorId: 77 })], 2);
+    mockNotePage([makeNote({ id: 24, body: 'notice <!-- billing-notice -->', authorId: 42 })]);
+
+    await expect(
+      hasMRNoteWithMarker('test-token', 'group/project', 7, '<!-- billing-notice -->')
+    ).resolves.toBe(true);
+  });
+
+  it('reports no marker when only other accounts carry it across pages', async () => {
+    mockTokenUser();
+    mockNotePageOf([makeNote({ id: 25, body: 'notice <!-- billing-notice -->', authorId: 77 })], 2);
+    mockNotePage([makeNote({ id: 26, body: 'notice <!-- billing-notice -->', authorId: 88 })]);
 
     await expect(
       hasMRNoteWithMarker('test-token', 'group/project', 7, '<!-- billing-notice -->')

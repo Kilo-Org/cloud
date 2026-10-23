@@ -158,11 +158,7 @@ export function restoreFollowedSessionCards(
   // teardown, but no longer a follow.
   const finished: string[] = [];
   for (const card of stored) {
-    if (
-      ctx === null ||
-      card.userId !== ctx.userId ||
-      card.organizationId !== ctx.organizationId
-    ) {
+    if (ctx === null || card.userId !== ctx.userId || card.organizationId !== ctx.organizationId) {
       dismissSessionCard(card.sessionId);
     } else if (card.finishedUntil === undefined) {
       kept.set(card.sessionId, card.approvalKey);

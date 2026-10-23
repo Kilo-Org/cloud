@@ -56,7 +56,11 @@ export function getCodeReviewCancellationCopy(input: {
   // Nothing stored means nothing was explained away, so there is no notice to
   // render: the status alone is the whole outcome.
   if (!message) return null;
-  const label = input.status === 'cancelled' ? 'Cancelled' : 'Interrupted';
+  // The status callback persists a cloud-agent interrupt as `cancelled` with
+  // reason `interrupted` (see `codeReviewTerminalOutcome`), so the reason
+  // decides the outcome word, not the status alone.
+  const interrupted = input.status === 'interrupted' || input.terminalReason === 'interrupted';
+  const label = interrupted ? 'Interrupted' : 'Cancelled';
 
   if (message === INTEGRATION_DISCONNECTED_MESSAGE) {
     return {

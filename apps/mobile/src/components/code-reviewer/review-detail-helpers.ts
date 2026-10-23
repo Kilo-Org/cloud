@@ -82,10 +82,13 @@ export function reviewCancellationLabel(
   if (args.terminalReason === 'superseded' || args.errorMessage.startsWith('Superseded by ')) {
     return t('codeReviewer.reviewDetail.cancelReasonSuperseded');
   }
+  // The status callback persists a cloud-agent interrupt as `cancelled` with
+  // reason `interrupted`, so the reason decides the outcome sentence.
+  const interrupted = args.status === 'interrupted' || args.terminalReason === 'interrupted';
   return t(
-    args.status === 'cancelled'
-      ? 'codeReviewer.reviewDetail.cancelReasonCancelled'
-      : 'codeReviewer.reviewDetail.cancelReasonInterrupted'
+    interrupted
+      ? 'codeReviewer.reviewDetail.cancelReasonInterrupted'
+      : 'codeReviewer.reviewDetail.cancelReasonCancelled'
   );
 }
 

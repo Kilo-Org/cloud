@@ -232,4 +232,14 @@ describe('reviewCancellationLabel', () => {
       i18n.t('codeReviewer.reviewDetail.cancelReasonInterrupted')
     );
   });
+
+  it('reads an interrupt persisted as cancelled by its reason', () => {
+    expect(
+      label({
+        status: 'cancelled',
+        errorMessage: 'container restarted',
+        terminalReason: 'interrupted',
+      })
+    ).toBe(i18n.t('codeReviewer.reviewDetail.cancelReasonInterrupted'));
+  });
 });

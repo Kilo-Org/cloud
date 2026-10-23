@@ -99,6 +99,17 @@ describe('getCodeReviewCancellationCopy', () => {
     ).toEqual({ label: 'Interrupted', message: 'This review was interrupted.' });
   });
 
+  it('reads an interrupt persisted as cancelled by its reason', () => {
+    expect(
+      getCodeReviewCancellationCopy({
+        status: 'cancelled',
+        terminalReason: 'interrupted',
+        errorMessage: 'container restarted',
+        platform: 'github',
+      })
+    ).toEqual({ label: 'Interrupted', message: 'This review was interrupted.' });
+  });
+
   it('does not resolve an inherited object member as copy', () => {
     expect(
       getCodeReviewCancellationCopy({

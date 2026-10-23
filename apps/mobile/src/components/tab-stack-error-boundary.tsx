@@ -17,30 +17,16 @@ import { captureTelemetry } from '@/lib/telemetry/error-sink';
  */
 const RECOVERY_REFETCH_DEADLINE_MS = 10_000;
 
-/**
- * The reads the screens under this stack render. A render throw can come from
- * any of their payloads, and the crashed screen is unmounted by the time Retry
- * runs, so the recovery refetches each prefix with `type: 'all'` (inactive
- * observers included) instead of rebuilding the payload that broke the render.
- * The list is every tRPC root the stack's screens read: the tab itself (user,
- * organizations, the pass and agent-profile reads) plus the code-reviewer,
- * profile-management (including its GitHub and GitLab repository reads),
- * security-agent and spend-alert screens.
- */
-const PROFILE_STACK_QUERY_PREFIXES: readonly (readonly unknown[])[] = [
-  [['user']],
-  [['organizations']],
-  [['kiloPass']],
-  [['agentProfiles']],
-  [['personalReviewAgent']],
-  [['securityAgent']],
-  [['codeReviews']],
-  [['reviewMemory']],
-  [['spendAlerts']],
-  [['cloudAgentNext']],
-];
+/** Cap the React component stack before it rides in `extra`. */
+const MAX_COMPONENT_STACK_LENGTH = 2000;
 
-type BoundaryProps = {
+/** Fallback fingerprint part for a throw that carries no name or message. */
+const UNKNOWN_FINGERPRINT_PART = 'unknown';
+
+type TabStackBoundaryProps = {
+  titleKey: string;
+  subsystem: string;
+  queryPrefixes: readonly (readonly unknown[])[];
   children: ReactNode;
   /** The local recovery action; the owner remounts the boundary through its `key` so the fallback resets. */
   onRetry: () => void;
@@ -52,11 +38,18 @@ type BoundaryState = {
   hasError: boolean;
 };
 
-/** Cap the React component stack before it rides in `extra`. */
-const MAX_COMPONENT_STACK_LENGTH = 2000;
-
-/** Fallback fingerprint part for a throw that carries no name or message. */
-const UNKNOWN_FINGERPRINT_PART = 'unknown';
+export type TabStackErrorBoundaryProps = {
+  /**
+   * i18n key of the header this tab renders. It stays above the inline error so
+   * the tab keeps its own chrome while the stack recovers.
+   */
+  titleKey: string;
+  /** Telemetry subsystem tag for the tab, e.g. `profile` or `agents`. */
+  subsystem: string;
+  /** Every tRPC root the tab's screens render; the retry refetches these. */
+  queryPrefixes: readonly (readonly unknown[])[];
+  children?: ReactNode;
+};
 
 function truncateComponentStack(componentStack: string): string {
   if (componentStack.length <= MAX_COMPONENT_STACK_LENGTH) {
@@ -80,19 +73,20 @@ function fingerprintPart(error: unknown, part: 'name' | 'message'): string {
 }
 
 /**
- * The fallback keeps the screen chrome the tab's own boundary would otherwise
- * take down with it: the Profile header and the scroll viewport stay mounted
- * inside the tab, so the bottom tab bar (owned by the tabs layout above this
- * stack) is untouched and every other tab stays reachable.
+ * The fallback keeps the screen chrome the root boundary would otherwise take
+ * down with it: the tab's own header and scroll viewport stay mounted inside
+ * the tab, so the bottom tab bar (owned by the tabs layout above the stacks)
+ * is untouched and every other tab stays reachable.
  */
-function ProfileStackErrorFallback({
+function TabStackErrorFallback({
+  titleKey,
   onRetry,
   isRetrying,
-}: Readonly<{ onRetry: () => void; isRetrying: boolean }>) {
+}: Readonly<{ titleKey: string; onRetry: () => void; isRetrying: boolean }>) {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('common.profile')} size="large" showBackButton={false} />
+      <ScreenHeader title={t(titleKey)} size="large" showBackButton={false} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-4 pt-4"
@@ -105,16 +99,16 @@ function ProfileStackErrorFallback({
 }
 
 /**
- * Local render-error boundary for the Profile stack. A throw while a screen of
- * the stack renders (including one produced by a payload a background refetch
+ * Local render-error boundary for one tab's stack. A throw while a screen of the
+ * stack renders (including one produced by a payload a background refetch
  * settled into) has no closer boundary, so it reaches the app's root error
  * boundary: that replaces the app with the full-screen error state — the tab
- * bar and the Profile header disappear — and its retry resets navigation to the
+ * bar and the tab's header disappear — and its retry resets navigation to the
  * initial tab. This boundary degrades the same throw to the screen's own
- * retryable error state and keeps the user on Profile.
+ * retryable error state and keeps the person on the tab they chose.
  */
-class ProfileStackRenderBoundary extends Component<BoundaryProps, BoundaryState> {
-  constructor(props: BoundaryProps) {
+class TabStackRenderBoundary extends Component<TabStackBoundaryProps, BoundaryState> {
+  constructor(props: TabStackBoundaryProps) {
     super(props);
     this.state = { hasError: false };
   }
@@ -133,14 +127,14 @@ class ProfileStackRenderBoundary extends Component<BoundaryProps, BoundaryState>
         level: 'error',
         error,
         tags: {
-          'error.subsystem': 'profile',
+          'error.subsystem': this.props.subsystem,
           'error.operation': 'render_stack',
         },
         ...(componentStack.length > 0
           ? { extra: { componentStack: truncateComponentStack(componentStack) } }
           : {}),
         fingerprint: [
-          'profile',
+          this.props.subsystem,
           'render_stack',
           fingerprintPart(error, 'name'),
           fingerprintPart(error, 'message'),
@@ -154,7 +148,8 @@ class ProfileStackRenderBoundary extends Component<BoundaryProps, BoundaryState>
   override render(): ReactNode {
     if (this.state.hasError) {
       return (
-        <ProfileStackErrorFallback
+        <TabStackErrorFallback
+          titleKey={this.props.titleKey}
           onRetry={this.props.onRetry}
           isRetrying={this.props.isRetrying}
         />
@@ -165,15 +160,20 @@ class ProfileStackRenderBoundary extends Component<BoundaryProps, BoundaryState>
 }
 
 /**
- * Owns the fallback's retry. The stack's reads are refetched before the
- * boundary is remounted: bumping the key in the same tick would mount the fresh
- * boundary against the very cached payload that just threw, so it would throw
- * again and pin the fallback through the refetch. Only the prefixes the stack's
- * screens read are refetched, so a crash on this tab never bursts the rest of
- * the app's cache; inactive observers are included, so a screen that unmounted
- * with the throw is refreshed too.
+ * Owns the fallback's retry. The tab's reads are refetched before the boundary
+ * is remounted: bumping the key in the same tick would mount the fresh boundary
+ * against the very cached payload that just threw, so it would throw again and
+ * pin the fallback through the refetch. Only the prefixes the tab's screens
+ * read are refetched, so a crash on one tab never bursts the rest of the app's
+ * cache; inactive observers are included, so a screen that unmounted with the
+ * throw is refreshed too.
  */
-export function ProfileStackErrorBoundary({ children }: Readonly<{ children: ReactNode }>) {
+export function TabStackErrorBoundary({
+  titleKey,
+  subsystem,
+  queryPrefixes,
+  children,
+}: Readonly<TabStackErrorBoundaryProps>) {
   const queryClient = useQueryClient();
   const [attempt, setAttempt] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
@@ -183,9 +183,7 @@ export function ProfileStackErrorBoundary({ children }: Readonly<{ children: Rea
       try {
         await withDeadline(RECOVERY_REFETCH_DEADLINE_MS, async () => {
           await Promise.all(
-            PROFILE_STACK_QUERY_PREFIXES.map(queryKey =>
-              queryClient.refetchQueries({ queryKey, type: 'all' })
-            )
+            queryPrefixes.map(queryKey => queryClient.refetchQueries({ queryKey, type: 'all' }))
           );
         });
       } catch {
@@ -196,11 +194,18 @@ export function ProfileStackErrorBoundary({ children }: Readonly<{ children: Rea
         setAttempt(current => current + 1);
       }
     })();
-  }, [queryClient]);
+  }, [queryClient, queryPrefixes]);
 
   return (
-    <ProfileStackRenderBoundary key={attempt} onRetry={retry} isRetrying={isRetrying}>
+    <TabStackRenderBoundary
+      key={attempt}
+      titleKey={titleKey}
+      subsystem={subsystem}
+      queryPrefixes={queryPrefixes}
+      onRetry={retry}
+      isRetrying={isRetrying}
+    >
       {children}
-    </ProfileStackRenderBoundary>
+    </TabStackRenderBoundary>
   );
 }

@@ -136,8 +136,11 @@ export function projectOptionKey(gitUrl: string): string {
  * reading `Date.now()` behind the memo (see `useNowTicker`); omitted, the
  * formatter reads the current time.
  */
-export function formatMeta(timestamp: string, nowMs?: number): string {
-  return timeAgo(parseTimestamp(timestamp), undefined, nowMs).toLocaleUpperCase(i18n.language);
+export function formatMeta(timestamp: string | null | undefined, nowMs?: number): string {
+  const date = parseTimestamp(timestamp);
+  return Number.isNaN(date.getTime())
+    ? ''
+    : timeAgo(date, undefined, nowMs).toLocaleUpperCase(i18n.language);
 }
 
 /**

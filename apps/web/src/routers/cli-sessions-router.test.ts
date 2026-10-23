@@ -2091,6 +2091,44 @@ describe('cli-sessions-router', () => {
       );
     });
 
+    it('holds the shared snapshot available throughout a fork copy', async () => {
+      const caller = await createCallerForUser(otherUser.id);
+      const { copyBlobs } = await import('@/lib/r2/cli-sessions');
+      const started = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      jest.mocked(copyBlobs).mockImplementationOnce(async () => {
+        started.resolve();
+        await release.promise;
+        return { ui_messages_blob_url: 'sessions/fork-copy/ui_messages.json' };
+      });
+
+      const pendingFork = caller.cliSessions.fork({
+        share_or_session_id: sharedSessionId,
+        created_on_platform: 'vscode',
+      });
+      try {
+        await started.promise;
+        await expect(
+          db.transaction(async tx => {
+            await tx
+              .select({ share_id: sharedCliSessions.share_id })
+              .from(sharedCliSessions)
+              .where(eq(sharedCliSessions.share_id, sharedSessionId))
+              .for('update', { noWait: true });
+          })
+        ).rejects.toMatchObject({ cause: { code: '55P03' } });
+      } finally {
+        release.resolve();
+      }
+
+      const forked = await pendingFork;
+      const [stored] = await db
+        .select({ ui_messages_blob_url: cliSessions.ui_messages_blob_url })
+        .from(cliSessions)
+        .where(eq(cliSessions.session_id, forked.session_id));
+      expect(stored.ui_messages_blob_url).toBe('sessions/fork-copy/ui_messages.json');
+    });
+
     it('creates a fork of a session that has no blobs', async () => {
       const caller = await createCallerForUser(otherUser.id);
       const { copyBlobs } = await import('@/lib/r2/cli-sessions');

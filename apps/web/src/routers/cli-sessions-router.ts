@@ -289,32 +289,44 @@ async function createForkedSessionCopy(params: {
   kiloUserId: string;
   sourceId: string;
   sourceFolder: FolderName;
+  sourceShareId?: string;
   values: Omit<typeof cliSessions.$inferInsert, 'session_id'>;
 }) {
   const sessionId = await reserveForkedSession(params.kiloUserId, params.values);
 
   try {
-    const blobUrls = await copySessionBlobs(
-      params.sourceId,
-      params.sourceFolder,
-      sessionId,
-      'sessions'
-    );
+    return await db.transaction(async tx => {
+      let sourceId = params.sourceId;
+      if (params.sourceShareId) {
+        const [share] = await tx
+          .select()
+          .from(sharedCliSessions)
+          .where(eq(sharedCliSessions.share_id, params.sourceShareId))
+          .for('share');
 
-    const [newSession] = await db
-      .update(cliSessions)
-      .set(blobUrlColumns(blobUrls))
-      .where(eq(cliSessions.session_id, sessionId))
-      .returning(commonSessionFields);
+        if (!share) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Shared session not found' });
+        }
+        sourceId = sharedSessionCurrentCopyId(share);
+      }
 
-    if (!newSession) {
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: 'Session not found',
-      });
-    }
+      const blobUrls = await copySessionBlobs(sourceId, params.sourceFolder, sessionId, 'sessions');
 
-    return newSession;
+      const [newSession] = await tx
+        .update(cliSessions)
+        .set(blobUrlColumns(blobUrls))
+        .where(eq(cliSessions.session_id, sessionId))
+        .returning(commonSessionFields);
+
+      if (!newSession) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Session not found',
+        });
+      }
+
+      return newSession;
+    });
   } catch (error) {
     await discardReservedFork(sessionId);
     throw error;
@@ -597,6 +609,8 @@ export const cliSessionsRouter = createTRPCRouter({
       kiloUserId: ctx.user.id,
       sourceId: forkableSession.source_id,
       sourceFolder: forkableSession.source_folder,
+      sourceShareId:
+        forkableSession.source_folder === 'shared-sessions' ? input.share_or_session_id : undefined,
       values: {
         kilo_user_id: ctx.user.id,
         title,

@@ -1,6 +1,6 @@
 import type { Layer } from 'effect';
 import type { SessionStore, StoreError } from '../../core/storage.js';
-import type { SqlDriver, SqlValue } from './driver.js';
+import type { SqlDriver, SqlMethod, SqlValue } from './driver.js';
 import { layerSqliteStore } from './sqlite.js';
 
 /**
@@ -229,7 +229,7 @@ const gateOfDatabase = (database: ExpoDatabase): Gate => {
 const runOn = async (
   statement: ExpoStatement,
   params: readonly SqlValue[],
-  method: string
+  method: SqlMethod
 ): Promise<{ rows: unknown[] }> => {
   const bound: SqlValue[] = [...params];
   if (method === 'run') {
@@ -253,7 +253,7 @@ const expoDriver = (database: ExpoDatabase): SqlDriver => {
   const gate = gateOfDatabase(database);
   let released = false;
 
-  const driver = (sql: string, params: readonly SqlValue[], method: string) =>
+  const driver = (sql: string, params: readonly SqlValue[], method: SqlMethod) =>
     (method === 'run' ? gate.alone : gate.share)(async () => {
       const pool = poolFor(pools, sql, released);
       const statement = await take(pool, database, sql);
@@ -267,7 +267,7 @@ const expoDriver = (database: ExpoDatabase): SqlDriver => {
       }
     });
 
-  return Object.assign(driver as SqlDriver, {
+  return Object.assign(driver, {
     close: () => {
       released = true;
       return release(pools);

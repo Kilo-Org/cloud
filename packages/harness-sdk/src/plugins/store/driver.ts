@@ -9,6 +9,9 @@
 /** What this store binds to a statement. It holds text and numbers, nothing else. */
 type SqlValue = string | number | null;
 
+/** What a call asks for: a write, or one of the three read shapes. */
+type SqlMethod = 'run' | 'all' | 'values' | 'get';
+
 /**
  * Rows come back by position, not by name, which is the shape drizzle maps onto
  * the selected columns.
@@ -20,11 +23,7 @@ type SqlValue = string | number | null;
  * and `node.ts` closes none of it.
  */
 interface SqlDriver {
-  (
-    sql: string,
-    params: readonly SqlValue[],
-    method: 'run' | 'all' | 'values' | 'get'
-  ): Promise<{ rows: unknown[] }>;
+  (sql: string, params: readonly SqlValue[], method: SqlMethod): Promise<{ rows: unknown[] }>;
   readonly close?: () => Promise<void>;
 }
 
@@ -73,5 +72,5 @@ const transact = (connection: Connection, run: () => Promise<void>): Promise<voi
     }
   });
 
-export type { Connection, SqlDriver, SqlValue };
+export type { Connection, SqlDriver, SqlMethod, SqlValue };
 export { connectionOf, transact };

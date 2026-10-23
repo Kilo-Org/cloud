@@ -480,6 +480,68 @@ describe('AgentSessionListContent liveness', () => {
       )
     ).toBe(true);
   });
+  it('keeps stale history behind pull recovery feedback and its timeout', async () => {
+    const { promise, resolve } = Promise.withResolvers<undefined>();
+    vi.useFakeTimers();
+    try {
+      const props = contentProps({
+        isError: true,
+        hasFreshHistory: false,
+        sections: [{ title: 'Today', data: [session('cached')] }],
+        refetch: () => promise,
+      });
+      const renderer = mount(props);
+      const refreshControl = hosts(renderer, 'CenteredState')[0]?.props.refreshControl as
+        | { props: { onRefresh: () => void } }
+        | undefined;
+      expect(refreshControl).toBeDefined();
+      act(() => {
+        refreshControl?.props.onRefresh();
+        renderer.update(createElement(AgentSessionListContent, { ...props, isError: false }));
+      });
+      expect(hosts(renderer, 'StoredSessionRow')).toHaveLength(0);
+      expect(hosts(renderer, 'Button')[0]?.props.loading).toBe(true);
+      act(() => {
+        vi.advanceTimersByTime(PULL_FEEDBACK_BUDGET_MS);
+      });
+      expect(hosts(renderer, 'StoredSessionRow')).toHaveLength(0);
+      expect(hosts(renderer, 'Button')[0]?.props.loading).toBe(false);
+      await act(async () => {
+        resolve(undefined);
+        await promise;
+        renderer.update(
+          createElement(AgentSessionListContent, {
+            ...props,
+            isError: false,
+            hasFreshHistory: true,
+          })
+        );
+      });
+      expect(rows(renderer).map(item => item.id)).toEqual(['cached']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('keeps the true empty-history action during a pull', () => {
+    const { promise } = Promise.withResolvers<undefined>();
+    const renderer = mount(
+      contentProps({
+        hasAnySessions: false,
+        hasFreshHistory: false,
+        refetch: () => promise,
+      })
+    );
+    const refreshControl = hosts(renderer, 'CenteredState')[0]?.props.refreshControl as
+      | { props: { onRefresh: () => void } }
+      | undefined;
+    expect(refreshControl).toBeDefined();
+    act(() => {
+      refreshControl?.props.onRefresh();
+    });
+    const statusMessages = hosts(renderer, 'AccessibleStatus').map(node => node.props.message);
+    expect(statusMessages).not.toContain(i18n.t('common.couldNotLoadSessions'));
+    expect(hosts(renderer, 'Button').some(node => node.props.loading === true)).toBe(false);
+  });
 
   it('retires a stale pull failure when the screen settles a later non-pull refresh', () => {
     const hang = vi.fn<ContentProps['refetch']>(async () => {

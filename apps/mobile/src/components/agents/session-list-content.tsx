@@ -129,13 +129,19 @@ export function AgentSessionListContent({
   // The stored refetch resolves void: a pull failure surfaces through the
   // query error state (showInlineError below), so a settlement is always
   // "accepted" here. Only the feedback budget can fail a history pull.
+  const pullStartedFromHistoryError = useRef(false);
   const pull = usePullRefresh(async () => {
     await refetch();
     return true;
   });
   const { markSettled } = pull;
   const pullBusy = pull.refreshing || pull.busy;
+  // Preserve the full-screen error during a pull only when the pull began there;
+  // an empty-history pull must keep its empty state while the refresh is pending.
+  const errorPullBusy = pullStartedFromHistoryError.current && pullBusy;
+  const errorPullFailed = pullStartedFromHistoryError.current && pull.failed;
   const handleRefresh = () => {
+    pullStartedFromHistoryError.current = isError && !hasActiveQuery && !hasFreshHistory;
     pull.startPull();
   };
   const handlePullRetry = () => {
@@ -174,8 +180,8 @@ export function AgentSessionListContent({
 
   const surface = selectSessionListContentSurface({
     isLoading,
-    isError,
-    isRetrying,
+    isError: isError || errorPullFailed,
+    isRetrying: isRetrying || errorPullBusy,
     hasAnySessions,
     hasHistoryContent: sections.length > 0,
     hasActiveQuery,
@@ -365,7 +371,7 @@ export function AgentSessionListContent({
         <QueryError
           message={t('common.couldNotLoadSessions')}
           onRetry={onRetry}
-          isRetrying={isRetrying}
+          isRetrying={isRetrying || errorPullBusy}
           refreshControl={refreshControl}
         />
       </Animated.View>

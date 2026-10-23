@@ -35,6 +35,33 @@ describe('control-plane idle timers', () => {
   });
 });
 
+describe('control-plane preparation attempt budget', () => {
+  it('outlasts every step of one preparation attempt in sequence', () => {
+    const { sandbox, wrapper } = CONTROL_PLANE_TIMERS;
+    const steps =
+      sandbox.providerCreateMs +
+      sandbox.wrapperFirstConnectMs +
+      sandbox.wrapperHelloMs +
+      wrapper.restoreMs +
+      wrapper.cloneMs +
+      wrapper.kiloRuntimeStartMs +
+      wrapper.kiloSessionMs;
+
+    // A shorter attempt deadline would fail a slow but valid preparation as
+    // `preparation_timeout` while each step stayed inside its own bound.
+    expect(sandbox.routePreparationMs).toBeGreaterThanOrEqual(steps);
+  });
+
+  it('keeps the attempt budget real when the development divisor shrinks step timers', () => {
+    const scaled = resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: '10' });
+
+    expect(scaled.sandbox.routePreparationMs).toBe(CONTROL_PLANE_TIMERS.sandbox.routePreparationMs);
+    expect(scaled.sandbox.routePreparationMs).toBeGreaterThanOrEqual(
+      scaled.wrapper.cloneMs + scaled.wrapper.restoreMs
+    );
+  });
+});
+
 describe('sandbox idle policy for route origins', () => {
   it('keeps the interactive window for a sandbox without routes', () => {
     expect(sandboxIdlePolicyForOrigins([])).toBe('interactive');

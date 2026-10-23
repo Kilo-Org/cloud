@@ -2163,10 +2163,7 @@ export type GitLabProjectAccessTokenValidation =
  * Checks whether a stored token is still valid on GitLab
  * (e.g., it might have been manually revoked by the user).
  *
- * Only a successful authenticated response reports `valid`. Explicit denials
- * report `invalid`; anything that leaves the token's health unknown reports
- * `unverified`, which callers must treat as unusable but must not remove the
- * stored credential for.
+ * Reports the authenticated probe outcome for the caller's credential policy.
  */
 export async function validateProjectAccessToken(
   token: string,

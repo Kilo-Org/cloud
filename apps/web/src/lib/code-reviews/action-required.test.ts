@@ -153,11 +153,6 @@ describe('classifyCodeReviewActionRequiredFailure', () => {
         'Repository clone timed out: termination hard_timeout, elapsed 300041ms'
       )
     ).toBeNull();
-    expect(
-      classifyCodeReviewActionRequiredFailure(
-        'Dispatch failed: GitLab did not answer the credential check for owner/repo, so this review did not start. Retry the review.'
-      )
-    ).toBeNull();
   });
 
   it('routes GitLab project access recovery to GitLab integrations', () => {

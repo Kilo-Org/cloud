@@ -45,7 +45,6 @@ import {
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import {
   getOrCreateProjectAccessToken,
-  GitLabProjectAccessTokenUnverifiedError,
   type GitLabIntegrationMetadata,
 } from '@/lib/integrations/gitlab-service';
 import { isGitLabReconnectRequiredError } from '@/lib/integrations/platforms/gitlab/credential-errors';
@@ -559,12 +558,6 @@ export async function prepareReviewPayload(
             projectId,
           });
         } catch (pratError) {
-          if (pratError instanceof GitLabProjectAccessTokenUnverifiedError) {
-            throw new Error(
-              `GitLab did not answer the credential check for ${review.repo_full_name}, ` +
-                `so this review did not start. Retry the review.`
-            );
-          }
           if (isGitLabReconnectRequiredError(pratError)) {
             throw new Error(
               `GitLab rejected the connected credential while preparing this review of ` +

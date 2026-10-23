@@ -69,7 +69,6 @@ let connectWithPAT: typeof GitLabService.connectWithPAT;
 let getValidGitLabToken: typeof GitLabService.getValidGitLabToken;
 let getValidGitLabProjectAccessToken: typeof GitLabService.getValidGitLabProjectAccessToken;
 let getOrCreateProjectAccessToken: typeof GitLabService.getOrCreateProjectAccessToken;
-let GitLabProjectAccessTokenUnverifiedError: typeof GitLabService.GitLabProjectAccessTokenUnverifiedError;
 let removeStoredProjectAccessToken: typeof GitLabService.removeStoredProjectAccessToken;
 let disconnectGitLabIntegration: typeof GitLabService.disconnectGitLabIntegration;
 
@@ -100,7 +99,6 @@ describe('GitLab encrypted credential persistence', () => {
       getValidGitLabToken,
       getValidGitLabProjectAccessToken,
       getOrCreateProjectAccessToken,
-      GitLabProjectAccessTokenUnverifiedError,
       removeStoredProjectAccessToken,
       disconnectGitLabIntegration,
     } = await import('./gitlab-service'));
@@ -810,7 +808,10 @@ describe('GitLab encrypted credential persistence', () => {
     expect(updatedIntegration.metadata).toEqual(expect.objectContaining({ project_tokens: {} }));
   });
 
-  it('replaces a project credential GitLab denies with a fresh one', async () => {
+  it.each([
+    { status: 'invalid', reason: 'unauthorized', httpStatus: 401 },
+    { status: 'invalid', reason: 'forbidden', httpStatus: 403 },
+  ] as const)('replaces a denied project credential after a bounded probe', async validation => {
     const user = await insertTestUser();
     const connected = await connectWithPAT(
       { type: 'user', id: user.id },
@@ -827,11 +828,9 @@ describe('GitLab encrypted credential persistence', () => {
       .select()
       .from(platform_integrations)
       .where(eq(platform_integrations.id, connected.integration.id));
-    mockValidateProjectAccessToken.mockResolvedValueOnce({
-      status: 'invalid',
-      reason: 'forbidden',
-      httpStatus: 403,
-    });
+    mockValidateProjectAccessToken
+      .mockResolvedValueOnce({ status: 'unverified', reason: 'transport' })
+      .mockResolvedValueOnce(validation);
     mockCreateProjectAccessToken.mockResolvedValueOnce({
       id: 888,
       name: 'Kilo Code Review Bot',
@@ -872,7 +871,10 @@ describe('GitLab encrypted credential persistence', () => {
     expect(updatedIntegration.metadata).toEqual(expect.objectContaining({ project_tokens: {} }));
   });
 
-  it('keeps the stored project credential when its health cannot be confirmed', async () => {
+  it.each([
+    { status: 'unverified', reason: 'http-error', httpStatus: 500 },
+    { status: 'unverified', reason: 'transport' },
+  ] as const)('reuses the stored project credential after a bounded probe', async validation => {
     const user = await insertTestUser();
     const connected = await connectWithPAT(
       { type: 'user', id: user.id },
@@ -894,15 +896,11 @@ describe('GitLab encrypted credential persistence', () => {
       .from(platform_access_token_credentials)
       .where(eq(platform_access_token_credentials.provider_resource_id, '42'));
     mockValidateProjectAccessToken.mockClear();
-    mockValidateProjectAccessToken.mockResolvedValue({
-      status: 'unverified',
-      reason: 'http-error',
-      httpStatus: 500,
-    });
+    mockValidateProjectAccessToken.mockResolvedValue(validation);
 
-    await expect(
-      getOrCreateProjectAccessToken(integration, 42, { userId: user.id })
-    ).rejects.toThrow(GitLabProjectAccessTokenUnverifiedError);
+    await expect(getOrCreateProjectAccessToken(integration, 42, { userId: user.id })).resolves.toBe(
+      'glpat-created-project-token'
+    );
 
     const credentials = await db
       .select()
@@ -974,7 +972,7 @@ describe('GitLab encrypted credential persistence', () => {
 
     await expect(
       getOrCreateProjectAccessToken(integration, 42, { userId: user.id })
-    ).rejects.toThrow(GitLabProjectAccessTokenUnverifiedError);
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
 
     expect(mockValidateProjectAccessToken).toHaveBeenCalledTimes(1);
     expect(mockCreateProjectAccessToken).toHaveBeenCalledTimes(1);

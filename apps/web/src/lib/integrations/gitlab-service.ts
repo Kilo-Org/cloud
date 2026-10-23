@@ -575,24 +575,6 @@ async function getStoredProjectCredential(integrationId: string, projectId: stri
   };
 }
 
-/**
- * Raised when GitLab does not answer whether the stored project credential is
- * usable. The request is retryable and the stored credential is left in place.
- */
-export class GitLabProjectAccessTokenUnverifiedError extends Error {
-  constructor(
-    readonly projectId: string | number,
-    readonly reason: 'instance-url' | 'transport' | 'http-error',
-    readonly httpStatus?: number
-  ) {
-    super(
-      `GitLab could not confirm the stored credential for project ${projectId}` +
-        `${httpStatus === undefined ? '' : ` (HTTP ${httpStatus})`}. Retry the operation.`
-    );
-    this.name = 'GitLabProjectAccessTokenUnverifiedError';
-  }
-}
-
 async function validateStoredProjectAccessToken(
   token: string,
   instanceUrl: string
@@ -623,6 +605,9 @@ async function validateStoredProjectAccessToken(
  * 2. If exists and not expiring soon, returns it
  * 3. If exists but expiring soon, rotates it
  * 4. If doesn't exist, creates a new one
+ *
+ * Validation is best effort for transient provider failures; explicit denials
+ * require replacement. Invalid instance configuration is reported to the caller.
  *
  * @param integration - The GitLab integration record
  * @param projectId - GitLab project ID
@@ -656,14 +641,15 @@ export async function getOrCreateProjectAccessToken(
           reason: validation.reason,
           status: validation.httpStatus,
         });
-        throw new GitLabProjectAccessTokenUnverifiedError(
-          projectIdStr,
-          validation.reason,
-          validation.httpStatus
-        );
+        if (validation.reason === 'instance-url') {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'GitLab instance URL is invalid.',
+          });
+        }
       }
 
-      if (validation.status === 'valid') {
+      if (validation.status !== 'invalid') {
         logExceptInTest('[getOrCreateProjectAccessToken] Using existing token', {
           projectId,
           tokenId: storedCredential.tokenId,

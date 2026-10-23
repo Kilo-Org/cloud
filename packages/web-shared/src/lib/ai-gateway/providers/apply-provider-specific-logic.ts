@@ -1,3 +1,4 @@
+import * as z from 'zod';
 import {
   isOpenRouterProviderConfig,
   type GatewayResponsesRequest,
@@ -220,13 +221,17 @@ function hasFallbackModels(value: unknown) {
   return value !== undefined && value !== null && !(Array.isArray(value) && value.length === 0);
 }
 
-const KNOWN_SERVICE_TIERS: Record<string, true> = {
-  auto: true,
-  default: true,
-  flex: true,
-  priority: true,
-  scale: true,
-};
+/**
+ * Service tiers the log may name. Every other value, including non-strings and
+ * names inherited from `Object.prototype`, is recorded as `unrecognized` rather
+ * than as the client-supplied value.
+ */
+const loggedServiceTierSchema = z.enum(['auto', 'default', 'flex', 'priority', 'scale']);
+
+function serviceTierForLog(serviceTier: unknown) {
+  const parsed = loggedServiceTierSchema.safeParse(serviceTier);
+  return parsed.success ? parsed.data : 'unrecognized';
+}
 
 export function removeUnsupportedRequestServiceTier(
   requestedModel: string,
@@ -248,10 +253,7 @@ export function removeUnsupportedRequestServiceTier(
   console.warn('[applyProviderSpecificLogic] Removed unsupported request-level service tier', {
     model: requestedModel,
     requestKind: requestToMutate.kind,
-    serviceTier:
-      typeof serviceTier === 'string' && Object.hasOwn(KNOWN_SERVICE_TIERS, serviceTier)
-        ? serviceTier
-        : 'unrecognized',
+    serviceTier: serviceTierForLog(serviceTier),
     reason,
   });
   delete requestToMutate.body.service_tier;

@@ -116,7 +116,26 @@ describe('removeUnsupportedRequestServiceTier', () => {
     }
   );
 
-  it.each(['unrecognized-tier', 'constructor', '__proto__'])(
+  it.each(['auto', 'default', 'flex', 'priority', 'scale'] as const)(
+    'records the recognized tier verbatim (%s)',
+    tier => {
+      const model = GEMINI_FLASH_CURRENT_MODEL_ID;
+      const request = makeRequest(model);
+      request.body.service_tier = tier;
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      removeUnsupportedRequestServiceTier(model, request, null);
+
+      expect(request.body.service_tier).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(
+        '[applyProviderSpecificLogic] Removed unsupported request-level service tier',
+        expect.objectContaining({ serviceTier: tier })
+      );
+      warn.mockRestore();
+    }
+  );
+
+  it.each(['unrecognized-tier', 'constructor', '__proto__', 42, null] as const)(
     'records only a recognized tier value (%s)',
     tier => {
       const model = GEMINI_FLASH_CURRENT_MODEL_ID;

@@ -3834,20 +3834,23 @@ describe('personalReviewAgent.getGitLabStatus P1-D-32 (omits webhook secret)', (
     expect(status).toEqual({ connected: false, reconnectRequired: true, integration: null });
   });
 
-  it('asks for re-authorization when the existing row is not active', async () => {
-    await seedPersonalGitLabIntegration(
-      testUser.id,
-      { gitlab_instance_url: 'https://gitlab.example.com' },
-      'suspended'
-    );
+  it.each(['pending', 'suspended'] as const)(
+    'asks for re-authorization when the existing row is %s',
+    async integrationStatus => {
+      await seedPersonalGitLabIntegration(
+        testUser.id,
+        { gitlab_instance_url: 'https://gitlab.example.com' },
+        integrationStatus
+      );
 
-    const caller = await createCallerForUser(testUser.id);
-    const status = await caller.personalReviewAgent.getGitLabStatus();
+      const caller = await createCallerForUser(testUser.id);
+      const status = await caller.personalReviewAgent.getGitLabStatus();
 
-    expect(status).toEqual({ connected: false, reconnectRequired: true, integration: null });
-    // A row that cannot serve a review never reaches the credential broker.
-    expect(mockIsGitLabCredentialConnected).not.toHaveBeenCalled();
-  });
+      expect(status).toEqual({ connected: false, reconnectRequired: true, integration: null });
+      // A row that cannot serve a review never reaches the credential broker.
+      expect(mockIsGitLabCredentialConnected).not.toHaveBeenCalled();
+    }
+  );
 
   it('keeps the first-time connect state when the user has no integration', async () => {
     const caller = await createCallerForUser(testUser.id);

@@ -9,11 +9,11 @@ type SheetPlatform = 'android' | 'ios' | 'macos' | 'windows' | 'web';
  * is shorter than twice the tallest organization form plus the tab bar it has to
  * stay above (the band alone is 78pt with an Android safe-area inset), so the
  * half detent would put the form's last row and its submit action under the bar
- * with no way to reach them. Wallets in this range open these sheets at the full
+ * with no way to reach them. Windows in this range open these sheets at the full
  * detent instead, where the shared sheet scroll view keeps the content above the
  * bar.
  */
-export const ORG_SHEET_HALF_DETENT_MIN_WINDOW_HEIGHT = 840;
+const ORG_SHEET_HALF_DETENT_MIN_WINDOW_HEIGHT = 840;
 
 /**
  * Detents for the organization form sheets: `[half, full]` in a window tall

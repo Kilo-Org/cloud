@@ -73,6 +73,8 @@ const spectatorStream = vi.hoisted(() => ({
 }));
 
 vi.mock('react-native', () => ({
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   View: (props: { style?: unknown; className?: string; children?: ReactNode }) => {
     viewRenders.list.push(props);
     return createElement('View', props, props.children);
@@ -413,19 +415,57 @@ describe('ReviewDetailScreen outcome-first order', () => {
     expect(renderScreen()).toContain(i18n.t('codeReviewer.reviewDetail.reviewFailed'));
   });
 
-  it.each(['cancelled', 'interrupted'])('preserves the reason for a %s review', status => {
+  it.each(['cancelled', 'interrupted'])(
+    'explains a %s review instead of echoing the stored diagnostic',
+    status => {
+      detail.data = {
+        success: true,
+        review: makeReview({
+          status,
+          terminal_reason: 'superseded',
+          error_message: 'Superseded by new push',
+        }),
+        tokenUsage: { input: 0, output: 0 },
+      };
+      const texts = renderScreen();
+      expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.cancelReasonSuperseded'));
+      expect(texts.join(' ')).not.toContain('Superseded by new push');
+      expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.reviewFailed'));
+    }
+  );
+
+  it('names the platform to reconnect after an integration disconnect', () => {
     detail.data = {
       success: true,
       review: makeReview({
-        status,
-        terminal_reason: 'superseded',
-        error_message: 'Superseded by new push',
+        status: 'cancelled',
+        terminal_reason: 'user_cancelled',
+        error_message: 'Platform integration disconnected',
       }),
       tokenUsage: { input: 0, output: 0 },
     };
     const texts = renderScreen();
-    expect(texts).toContain('Superseded by new push');
-    expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.reviewFailed'));
+    expect(texts).toContain(
+      i18n.t('codeReviewer.reviewDetail.cancelReasonIntegrationDisconnected', {
+        platform: 'GitHub',
+      })
+    );
+    expect(texts.join(' ')).not.toContain('Platform integration disconnected');
+  });
+
+  it('falls back to the outcome for a cancellation it cannot attribute', () => {
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status: 'cancelled',
+        terminal_reason: 'user_cancelled',
+        error_message: 'Cancelled by user',
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    const texts = renderScreen();
+    expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.cancelReasonCancelled'));
+    expect(texts.join(' ')).not.toContain('Cancelled by user');
   });
 
   it('uses existing localized copy for a typed action-required failure', () => {
@@ -1354,9 +1394,7 @@ describe('ReviewDetailScreen retry when Code Reviewer cannot run', () => {
     act(() => {
       fixSettings?.onPress?.();
     });
-    expect(routerMock.push).toHaveBeenCalledWith(
-      '/(app)/(tabs)/(3_profile)/code-reviewer/personal/github'
-    );
+    expect(routerMock.push).toHaveBeenCalledWith('/(app)/code-reviewer/personal/github');
   });
 
   it('links to the settings when the configuration needs attention', () => {

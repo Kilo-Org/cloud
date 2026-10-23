@@ -172,6 +172,7 @@ vi.mock('react-native', () => ({
     },
   },
   Keyboard: {
+    dismiss: vi.fn(),
     addListener: (
       event: string,
       listener: (event: { endCoordinates: { height: number } }) => void
@@ -711,6 +712,30 @@ describe('AgentSessionListScreen live presentation', () => {
     ).toHaveLength(0);
   });
 
+  it.each([
+    ['ios', 'min-h-[44px]'],
+    ['android', 'min-h-[48px]'],
+  ])(
+    'gives the history link its own %s touch-target frame in both placements',
+    async (os, frame) => {
+      // The link's only child is one eyebrow line, so its own rect used to be
+      // that line (14.7pt on device) and a control-size audit reads exactly
+      // that rect: `hitSlop` widens the touch region, never the rect. Both
+      // placements share the control, so both carry the same frame.
+      state.platform.OS = os;
+      await renderScreen();
+      expect(action('Session history').props.className).toContain(frame);
+      expect(action('Session history').props.hitSlop).toBeUndefined();
+
+      state.live.activeSessions = [row];
+      await renderScreen();
+      const headerLink = action(i18n.t('agents.sessionList.pastSessions'));
+      expect(headerLink.props.testID).toBe('agents-view-history');
+      expect(headerLink.props.className).toContain(frame);
+      expect(headerLink.props.hitSlop).toBeUndefined();
+    }
+  );
+
   it('uses shared scrolling and refresh while preserving the large-text creation action', async () => {
     state.topInset = 44;
     // The full controls row exists only over a non-empty live list (the
@@ -729,7 +754,6 @@ describe('AgentSessionListScreen live presentation', () => {
 
     expect(header().parent?.children[0]).toBe(header());
     expect(header().props.headerRight).toBeUndefined();
-    expect(header().props.context).toBeUndefined();
     expect(emptyState.props.placement).toBeUndefined();
     expect(nodes('ScrollView')).toHaveLength(0);
     expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(60);
@@ -747,7 +771,7 @@ describe('AgentSessionListScreen live presentation', () => {
     const createAction = action('New session');
     const label = createAction.findByType(Text);
     expect(createAction.props.className).toContain('max-w-full');
-    expect(createAction.props.className).toContain('min-h-[44px]');
+    expect(createAction.props.className).toContain('min-h-[48px]');
     expect(label.props.className).toBe('shrink text-center');
     expect(label.props.numberOfLines).toBeUndefined();
     expect(label.props.allowFontScaling).not.toBe(false);
@@ -1331,7 +1355,6 @@ describe('AgentSessionListScreen header and admission', () => {
     // 480x1040 capture until "Agents" broke mid-word ("Age / nts") and this
     // label stacked ("SEE / ALL").
     expect(header().props.headerRight).toBeUndefined();
-    expect(header().props.context).toBeUndefined();
     expect(actionsWrapper?.parent).toBe(title.parent?.parent?.parent);
     expect(actionsWrapper?.props.className).toContain('min-w-0');
     expect(actionsWrapper?.props.className).toContain('shrink');
@@ -1429,7 +1452,6 @@ describe('AgentSessionListScreen header and admission', () => {
     expect(actions.props.className).toContain('min-h-11');
     expect(actions.props.className).toContain('shrink');
     expect(header().props.headerRight).toBeUndefined();
-    expect(header().props.context).toBeUndefined();
     expect(
       nodes('Pressable').filter(node => node.props.accessibilityHint === 'Select account')
     ).toHaveLength(0);

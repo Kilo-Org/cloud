@@ -57,14 +57,17 @@ describe('validateInternalApiKey', () => {
       expect(result.success).toBe(true);
     });
 
-    it('should reject invalid API key', () => {
-      const result = validateInternalApiKey('wrong-key', TEST_SECRET);
+    it.each(['wrong-key', `${TEST_SECRET.slice(0, -1)}X`])(
+      'should reject invalid API key %s',
+      key => {
+        const result = validateInternalApiKey(key, TEST_SECRET);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('Invalid internal API key');
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error).toBe('Invalid internal API key');
+        }
       }
-    });
+    );
   });
 });
 

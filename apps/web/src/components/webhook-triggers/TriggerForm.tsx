@@ -1,6 +1,19 @@
 'use client';
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSession } from 'next-auth/react';
+import {
+  sandboxAllocationSchema,
+  getSandboxAllocationRequest,
+  type SandboxAllocation,
+  type SandboxSelectionCapabilities,
+} from '@kilocode/worker-utils/sandbox-allocation';
+import { formatSandboxDestination } from '@/components/cloud-agent-next/sandbox-selection';
+import {
+  describeDefaultSandbox,
+  getEligibleAllocationChoices,
+  groupChoicesByProvider,
+} from '@/components/cloud-agent-next/settings/settings-options';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +24,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -35,6 +50,8 @@ import {
   triggerIdSchema,
   triggerIdCreateSchema,
   RESERVED_TRIGGER_IDS,
+  MIN_CREATOR_WEBHOOK_SECRET_LENGTH,
+  CREATOR_WEBHOOK_SECRET_LENGTH_MESSAGE,
 } from '@/lib/webhook-trigger-validation';
 import { TimezoneSelector } from './TimezoneSelector';
 import { ScheduleBuilder } from './ScheduleBuilder';
@@ -45,6 +62,7 @@ import type { AgentMode } from '@/components/cloud-agent/types';
 
 export type TriggerFormData = {
   triggerId: string;
+  runAsCreator?: boolean;
   activationMode: 'webhook' | 'scheduled';
   cronExpression?: string;
   cronTimezone?: string;
@@ -52,7 +70,7 @@ export type TriggerFormData = {
   mode: AgentMode;
   model: string;
   variant?: string | null;
-  sandboxAllocation?: 'isolated-standard' | null;
+  sandboxAllocation?: SandboxAllocation | null;
   promptTemplate: string;
   profileId: string;
   autoCommit?: boolean;
@@ -70,6 +88,7 @@ export type TriggerFormProps = {
   organizationId?: string;
   initialData?: {
     triggerId: string;
+    executionUserId?: string | null;
     activationMode?: 'webhook' | 'scheduled';
     cronExpression?: string | null;
     cronTimezone?: string | null;
@@ -77,7 +96,7 @@ export type TriggerFormProps = {
     mode: AgentMode;
     model: string;
     variant?: string;
-    sandboxAllocation?: 'isolated-standard' | null;
+    sandboxAllocation?: SandboxAllocation | null;
     promptTemplate: string;
     profileId?: string;
     autoCommit?: boolean;
@@ -99,7 +118,11 @@ export type TriggerFormProps = {
   onDelete?: () => Promise<void>;
   isLoading?: boolean;
   canSetSandboxAllocation?: boolean;
+  sandboxSelection?: SandboxSelectionCapabilities;
+  onRepositoryChange?: (repository: string) => void;
   isLoadingCapabilities?: boolean;
+  hasCapabilitiesError?: boolean;
+  onRetryCapabilities?: () => void;
   /** Full inbound webhook URL (only needed in edit mode) */
   inboundUrl?: string;
 };
@@ -129,10 +152,20 @@ export function TriggerForm({
   onDelete,
   isLoading = false,
   canSetSandboxAllocation = false,
+  sandboxSelection,
+  onRepositoryChange,
   isLoadingCapabilities = false,
+  hasCapabilitiesError = false,
+  onRetryCapabilities,
   inboundUrl,
 }: TriggerFormProps) {
+  const { data: session } = useSession();
   const isEditMode = formMode === 'edit';
+  const [runAsCreator, setRunAsCreator] = useState(!!initialData?.executionUserId);
+  const creatorLabel =
+    isEditMode && initialData?.executionUserId !== session?.user?.id
+      ? 'Webhook creator'
+      : session?.user?.name || session?.user?.email || 'Your account';
 
   // Form state
   const [activationMode, setActivationMode] = useState<'webhook' | 'scheduled'>(
@@ -149,16 +182,40 @@ export function TriggerForm({
   const [agentMode, setAgentMode] = useState<AgentMode>((initialData?.mode as AgentMode) ?? 'ask');
   const [model, setModel] = useState(initialData?.model ?? '');
   const [variant, setVariant] = useState(initialData?.variant);
-  const initialSandboxAllocation =
-    initialData?.sandboxAllocation === 'isolated-standard' ? 'isolated-standard' : 'automatic';
-  const [sandboxAllocation, setSandboxAllocation] = useState<'automatic' | 'isolated-standard'>(
+  const initialSandboxAllocation = initialData?.sandboxAllocation ?? 'automatic';
+  const [sandboxAllocation, setSandboxAllocation] = useState<'automatic' | SandboxAllocation>(
     initialSandboxAllocation
   );
-  const hasSavedSandboxAllocation = initialSandboxAllocation === 'isolated-standard';
+  const hasSavedSandboxAllocation = initialSandboxAllocation !== 'automatic';
+  const sandboxChoices = getEligibleAllocationChoices(sandboxSelection);
+  const sandboxIsAvailable = sandboxChoices.some(choice => choice.allocation === sandboxAllocation);
+  const sandboxIsUnchanged = isEditMode && sandboxAllocation === initialSandboxAllocation;
+  const showUnavailableSandbox =
+    sandboxSelection !== undefined &&
+    !isLoadingCapabilities &&
+    !hasCapabilitiesError &&
+    sandboxAllocation !== 'automatic' &&
+    !sandboxIsAvailable;
+  const defaultSandbox = describeDefaultSandbox(
+    sandboxSelection?.effectiveDestination ?? sandboxSelection?.defaultDestination
+  );
   const showSandboxAllocation =
     canSetSandboxAllocation ||
     hasSavedSandboxAllocation ||
-    sandboxAllocation === 'isolated-standard';
+    sandboxAllocation !== 'automatic' ||
+    hasCapabilitiesError;
+  let sandboxHelpText =
+    'Automatic uses your Cloud Agent repository and organization defaults. Sandbox selection may affect compute charges.';
+  if (isLoadingCapabilities) {
+    sandboxHelpText = 'Loading sandbox options...';
+  } else if (hasCapabilitiesError) {
+    sandboxHelpText =
+      'Sandbox options could not be loaded. Retry to change the sandbox, or choose Automatic.';
+  } else if (showUnavailableSandbox) {
+    sandboxHelpText = sandboxIsUnchanged
+      ? 'The saved sandbox is no longer offered. It is kept unless you choose another sandbox or Automatic.'
+      : 'Selected sandbox is not available. Choose another sandbox or Automatic.';
+  }
   const modelVariants = models.find(option => option.id === model)?.variants ?? [];
   const [showRepoDefaults, setShowRepoDefaults] = useState(false);
 
@@ -192,6 +249,7 @@ export function TriggerForm({
   // Reset form when initialData changes (for edit mode)
   useEffect(() => {
     if (initialData) {
+      setRunAsCreator(!!initialData.executionUserId);
       setActivationMode(initialData.activationMode ?? 'webhook');
       setCronExpression(initialData.cronExpression ?? '');
       setCronTimezone(initialData.cronTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
@@ -210,6 +268,7 @@ export function TriggerForm({
       setWebhookAuthHeader(initialData.webhookAuthHeader ?? '');
     }
     if (!initialData) {
+      setRunAsCreator(false);
       setWebhookAuthEnabled(false);
       setWebhookAuthHeader('');
       setSandboxAllocation('automatic');
@@ -240,10 +299,15 @@ export function TriggerForm({
   const trimmedWebhookAuthSecret = webhookAuthSecret.trim();
   const webhookAuthHeaderError =
     webhookAuthEnabled && !trimmedWebhookAuthHeader ? 'Webhook auth header is required' : null;
-  const webhookAuthSecretError =
-    webhookAuthEnabled && !initialWebhookAuthConfigured && !trimmedWebhookAuthSecret
+  const webhookAuthSecretError = !webhookAuthEnabled
+    ? null
+    : !initialWebhookAuthConfigured && !trimmedWebhookAuthSecret
       ? 'Webhook auth secret is required when enabling authentication'
-      : null;
+      : runAsCreator &&
+          trimmedWebhookAuthSecret &&
+          trimmedWebhookAuthSecret.length < MIN_CREATOR_WEBHOOK_SECRET_LENGTH
+        ? CREATOR_WEBHOOK_SECRET_LENGTH_MESSAGE
+        : null;
 
   // Trigger ID validation — use stricter schema for new triggers
   const activeTriggerIdSchema = isEditMode ? triggerIdSchema : triggerIdCreateSchema;
@@ -324,18 +388,24 @@ export function TriggerForm({
       errors.push(webhookAuthHeaderError);
     }
 
+    if (runAsCreator && !isScheduled && !webhookAuthEnabled) {
+      errors.push('Webhook authentication is required when running as the creator');
+    }
+
     if (!isScheduled && webhookAuthSecretError) {
       errors.push(webhookAuthSecretError);
     }
 
     const requiresSandboxAllocationEligibility =
-      sandboxAllocation === 'isolated-standard' &&
-      (!isEditMode || sandboxAllocation !== initialSandboxAllocation);
+      sandboxAllocation !== 'automatic' && !sandboxIsUnchanged;
     if (
       requiresSandboxAllocationEligibility &&
-      (!canSetSandboxAllocation || isLoadingCapabilities)
+      (!canSetSandboxAllocation ||
+        isLoadingCapabilities ||
+        hasCapabilitiesError ||
+        !sandboxIsAvailable)
     ) {
-      errors.push('Dedicated Standard allocation is not available');
+      errors.push('Selected sandbox is not available. Choose another sandbox or Automatic.');
     }
 
     return errors;
@@ -350,11 +420,14 @@ export function TriggerForm({
     profileId,
     webhookAuthHeaderError,
     webhookAuthSecretError,
+    runAsCreator,
+    webhookAuthEnabled,
     sandboxAllocation,
-    initialSandboxAllocation,
-    isEditMode,
+    sandboxIsUnchanged,
+    sandboxIsAvailable,
     canSetSandboxAllocation,
     isLoadingCapabilities,
+    hasCapabilitiesError,
   ]);
 
   const isFormValid = formErrors.length === 0;
@@ -384,12 +457,13 @@ export function TriggerForm({
         : sandboxAllocation === 'automatic'
           ? null
           : sandboxAllocation
-      : sandboxAllocation === 'isolated-standard'
+      : sandboxAllocation !== 'automatic'
         ? sandboxAllocation
         : undefined;
 
     return {
       triggerId,
+      runAsCreator: organizationId ? runAsCreator : undefined,
       activationMode,
       cronExpression: isScheduled ? cronExpression.trim() : undefined,
       cronTimezone: isScheduled ? cronTimezone : undefined,
@@ -411,6 +485,8 @@ export function TriggerForm({
     isFormValid,
     profileId,
     triggerId,
+    runAsCreator,
+    organizationId,
     activationMode,
     cronExpression,
     cronTimezone,
@@ -590,7 +666,10 @@ export function TriggerForm({
                 <RepositoryCombobox
                   repositories={repositories}
                   value={githubRepo}
-                  onValueChange={setGithubRepo}
+                  onValueChange={repository => {
+                    setGithubRepo(repository);
+                    onRepositoryChange?.(repository);
+                  }}
                   isLoading={isLoadingRepositories}
                   error={repositoriesError}
                   placeholder="Select a repository"
@@ -647,7 +726,47 @@ export function TriggerForm({
               )}
             </div>
 
-            {/* Prompt Template */}
+            {organizationId && (
+              <div className="space-y-2">
+                <Label htmlFor="runAsCreator">Run as</Label>
+                <Select
+                  value={runAsCreator ? 'creator' : 'organization-bot'}
+                  onValueChange={value => {
+                    setRunAsCreator(value === 'creator');
+                    if (value === 'creator') setWebhookAuthEnabled(true);
+                  }}
+                  disabled={isEditMode || isLoading}
+                >
+                  <SelectTrigger
+                    id="runAsCreator"
+                    className="min-h-11 w-full sm:w-80"
+                    aria-describedby="runAsCreatorHelp"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="organization-bot">Organization bot</SelectItem>
+                    <SelectItem value="creator">{creatorLabel}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p id="runAsCreatorHelp" className="text-muted-foreground max-w-prose text-xs">
+                  {runAsCreator
+                    ? 'Runs as the user who created this trigger, using organization credits. Only the creator can edit it. Execution stops if they leave the organization or their account is blocked.'
+                    : 'Runs as the organization webhook bot by default.'}
+                  {isEditMode
+                    ? ' Execution identity cannot be changed. Create a new trigger to use a different identity.'
+                    : ' This choice cannot be changed after creation. Creator-run webhooks require authentication.'}
+                </p>
+                {runAsCreator && (
+                  <p className="text-muted-foreground max-w-prose text-xs">
+                    Organization profiles and repository settings remain shared. Members who can
+                    edit them can affect runs under your identity. Enable this only if you trust
+                    those members.
+                  </p>
+                )}
+              </div>
+            )}
+
             <PromptTemplateField
               value={promptTemplate}
               onChange={setPromptTemplate}
@@ -657,43 +776,85 @@ export function TriggerForm({
 
             {showSandboxAllocation && (
               <div className="space-y-2">
-                <Label htmlFor="sandboxAllocation">Container allocation</Label>
+                <Label htmlFor="sandboxAllocation">Sandbox</Label>
                 <Select
                   value={sandboxAllocation}
                   onValueChange={value => {
-                    if (value === 'automatic' || value === 'isolated-standard') {
-                      setSandboxAllocation(value);
-                    }
+                    if (value === 'automatic') return setSandboxAllocation(value);
+                    const allocation = sandboxAllocationSchema.safeParse(value);
+                    if (allocation.success) setSandboxAllocation(allocation.data);
                   }}
                   disabled={isLoading || isLoadingCapabilities}
                 >
                   <SelectTrigger
                     id="sandboxAllocation"
-                    className="w-full sm:w-80"
+                    className="w-full min-w-0 pointer-coarse:min-h-11 sm:max-w-lg"
                     aria-describedby="sandboxAllocationHelp"
+                    aria-invalid={showUnavailableSandbox && !sandboxIsUnchanged}
                   >
-                    <SelectValue />
+                    <SelectValue>
+                      <span className="truncate tabular-nums">
+                        {sandboxAllocation === 'automatic'
+                          ? defaultSandbox
+                            ? `Automatic · ${defaultSandbox.summary}`
+                            : 'Automatic'
+                          : formatSandboxDestination(
+                              getSandboxAllocationRequest(sandboxAllocation)
+                            )}
+                      </span>
+                    </SelectValue>
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="automatic">Automatic</SelectItem>
-                    <SelectItem
-                      value="isolated-standard"
-                      disabled={!canSetSandboxAllocation && !hasSavedSandboxAllocation}
-                    >
-                      Dedicated Standard
+                  <SelectContent className="max-w-[calc(100vw-2rem)]">
+                    <SelectItem value="automatic" className="pointer-coarse:min-h-11">
+                      Automatic
                     </SelectItem>
+                    {groupChoicesByProvider(sandboxChoices).map(group => (
+                      <SelectGroup key={group.provider}>
+                        <SelectLabel>{group.provider}</SelectLabel>
+                        {group.choices.map(choice => (
+                          <SelectItem
+                            key={choice.allocation}
+                            value={choice.allocation}
+                            disabled={hasCapabilitiesError}
+                            textValue={choice.instance}
+                            className="pointer-coarse:min-h-11"
+                          >
+                            <span className="whitespace-normal tabular-nums">
+                              {choice.instance}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ))}
+                    {showUnavailableSandbox && (
+                      <SelectItem value={sandboxAllocation} disabled>
+                        {sandboxAllocation === 'isolated-standard'
+                          ? 'Dedicated Standard (legacy)'
+                          : formatSandboxDestination(
+                              getSandboxAllocationRequest(sandboxAllocation)
+                            )}
+                        {' (unavailable)'}
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
-                <p id="sandboxAllocationHelp" className="text-muted-foreground max-w-prose text-xs">
-                  Automatic uses existing Cloud Agent routing. Dedicated Standard provisions one
-                  container per execution with 4 vCPU, 12 GiB RAM, and 20 GB disk, which may affect
-                  compute charges.
+                <p
+                  id="sandboxAllocationHelp"
+                  role={hasCapabilitiesError ? 'alert' : undefined}
+                  className="text-muted-foreground max-w-prose text-xs"
+                >
+                  {sandboxHelpText}
                 </p>
-                {!canSetSandboxAllocation && hasSavedSandboxAllocation && (
-                  <p className="text-muted-foreground text-xs">
-                    Dedicated Standard requires an enabled organization. Choose Automatic to use
-                    default routing.
-                  </p>
+                {hasCapabilitiesError && onRetryCapabilities && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isLoading || isLoadingCapabilities}
+                    onClick={onRetryCapabilities}
+                  >
+                    Retry sandbox options
+                  </Button>
                 )}
               </div>
             )}
@@ -748,7 +909,7 @@ export function TriggerForm({
                           setWebhookAuthSecret('');
                         }
                       }}
-                      disabled={isLoading}
+                      disabled={isLoading || runAsCreator}
                     />
                     <Label htmlFor="webhookAuthEnabled" className="cursor-pointer font-normal">
                       {webhookAuthEnabled ? 'Authentication enabled' : 'Authentication disabled'}

@@ -4,6 +4,8 @@ import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatList } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -40,6 +42,12 @@ export function ChoiceRow({
   children,
 }: Readonly<ChoiceRowProps>) {
   const colors = useThemeColors();
+  // A busy row needs an explicit accessible name: React Native replaces the
+  // name derived from the child `Text` nodes with its own content description
+  // (label + busy state) as soon as a state has no node setter, and it does
+  // not restore the derived name once the state clears.
+  const namedParts =
+    children == null ? [label, description].flatMap(part => (part ? [part] : [])) : [];
 
   return (
     <Pressable
@@ -54,6 +62,7 @@ export function ChoiceRow({
         onPress();
       }}
       accessibilityRole={multi ? 'checkbox' : 'radio'}
+      accessibilityLabel={namedParts.length > 0 ? formatList(namedParts, i18n.language) : undefined}
       accessibilityState={{ checked: selected, disabled: Boolean(disabled), busy }}
     >
       {children ?? (

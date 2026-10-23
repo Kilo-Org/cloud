@@ -38,6 +38,9 @@ export async function resolveWastelandUpstreamForUser(
         user,
         reason: 'service_token_mint',
         target: serviceTarget('wasteland'),
+        // Reached from server-component pages that redirect a legacy
+        // `/wasteland/by-id/<id>` URL, not from a route handler.
+        surface: 'server-component',
       });
     }
     const orgMemberships = await getUserOrgMemberships(user.id);

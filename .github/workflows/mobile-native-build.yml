@@ -209,8 +209,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # The concurrency group above serializes this hash, so the build that
-      # held the slot may have published the artifact while this job queued.
       - name: Check whether another run published this artifact
         id: published
         env:
@@ -319,8 +317,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # The concurrency group above serializes this hash, so the build that
-      # held the slot may have published the artifact while this job queued.
       - name: Check whether another run published this artifact
         id: published
         env:

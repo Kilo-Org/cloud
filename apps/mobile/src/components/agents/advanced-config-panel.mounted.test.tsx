@@ -19,6 +19,7 @@ const listMock = vi.hoisted(() => ({
 vi.mock('@/lib/hooks/use-agent-profiles', () => listMock);
 
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   Switch: 'Switch',
@@ -302,6 +303,19 @@ describe('AdvancedConfigPanel', () => {
     addVariable(renderer, 'API_KEY', 'abc');
 
     expect(buttonByText(renderer, 'Save as Profile')).toBeDefined();
+    expect(texts(renderer)).toContain('1 environment variables · 0 setup commands');
+  });
+
+  it('accepts an empty value in the session draft, matching prepare-session', () => {
+    const renderer = mount();
+    press(byLabel(renderer, 'Advanced Configuration'));
+    addVariable(renderer, 'NO_COLOR', '');
+
+    // The profile Variables screen asks for a value; this draft editor does not,
+    // because prepare-session and the web editor accept `KEY=`.
+    expect(
+      renderer.root.findAllByType('FormField' as never).filter(node => node.props.label === 'Value')
+    ).toHaveLength(0);
     expect(texts(renderer)).toContain('1 environment variables · 0 setup commands');
   });
 

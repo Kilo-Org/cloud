@@ -2,11 +2,17 @@
 /**
  * Mobile patterns that go wrong in a way nothing else reports.
  *
- * Two kinds. Some are dropped outright, so the element renders with no
- * background, no shadow, no alignment, and the build stays quiet — each of
- * those bans is pinned to a compiler assertion further down, so it lifts the
- * moment react-native-css handles the value. The rest apply, but land in the
- * wrong place, and only in one writing direction.
+ * Classes the compiler drops outright leave the element with no background,
+ * no shadow, no alignment, and the build stays quiet. Each of those bans is
+ * pinned to a compiler assertion further down, so it lifts the moment
+ * react-native-css handles the value.
+ *
+ * Classes and markup that apply but land in the wrong place do so in one
+ * writing direction only, so they stay invisible until the app is read in an
+ * RTL locale.
+ *
+ * Formatting built by hand instead of through `@/lib/intl-cache` skips the tag
+ * normalisation every other surface shares, and pins or ignores the locale.
  *
  * Usage: node tools/nativewind/check-classes.mjs
  */
@@ -65,16 +71,6 @@ const THEME_TOKENS = (() => {
 
 const RULES = [
   {
-    // `bg-black/40` compiles to `#NaNNaNNaN66`: Tailwind emits
-    // `color-mix(in oklab, #000 40%, transparent)`, and folding that mix
-    // through OKLab yields NaN channels for achromatic black. React Native
-    // cannot parse the result, so the element paints nothing at all. Other
-    // colours survive the same fold — `bg-white/20` gives `#fff3` — so this
-    // is black specifically, not the `/alpha` modifier in general.
-    pattern: new RegExp(`\\b(?:${COLOR_UTILITIES})-black/\\d+\\b`, 'g'),
-    advice: 'compiles to an unparseable #NaN colour; use a concrete value, e.g. bg-[#00000066]',
-  },
-  {
     // A `/opacity` modifier on a theme colour compiles to
     // `color-mix(in oklab, var(--color-…) n%, transparent)`. NativeWind v5
     // cannot decompose the variable, so the runtime drops the declaration and
@@ -96,6 +92,16 @@ const RULES = [
     // `ltr:` class matches in both directions and silently applies in RTL.
     pattern: /\bltr:/g,
     advice: 'the ltr: variant also matches in RTL; express the rule with rtl: instead',
+  },
+  {
+    // A numeric `leading-N` compiles to `calc(var(--spacing) * N)`, and the
+    // runtime's line-height resolver treats that resolved length as a unitless
+    // multiplier of the font size. `leading-9` on a 30px title paints a 945pt
+    // line box, which pushes everything below it off the screen. An explicit
+    // length is resolved as a length.
+    pattern: /(?<![\w-])leading-\d+(?:\.5)?(?![\w[.-])/g,
+    advice:
+      'a numeric leading-N is multiplied by the font size at runtime; use an explicit length, e.g. leading-[1.25rem]',
   },
 ];
 
@@ -252,17 +258,10 @@ function checkCompilerStillDropsThese() {
     );
     return;
   }
-  const firstValue = css => {
-    const sheet = compile(css).stylesheet();
+  const firstValue = (css, options) => {
+    const sheet = compile(css, options).stylesheet();
     return JSON.stringify(sheet?.s?.[0]?.[1]?.[0]?.d?.[0] ?? null);
   };
-
-  const black = firstValue('.x { background-color: color-mix(in oklab, #000 40%, transparent); }');
-  if (!black.includes('NaN')) {
-    fail(
-      `check-classes: color-mix over black now compiles to ${black} instead of NaN — drop the *-black/<alpha> rule`
-    );
-  }
 
   const alignment = compile('.x { text-align: start; }').warnings();
   if (!JSON.stringify(alignment).includes('text-align')) {
@@ -281,6 +280,20 @@ function checkCompilerStillDropsThese() {
   if (!themeOpacity.includes('colorMix')) {
     fail(
       `check-classes: color-mix over an @theme inline variable now compiles to ${themeOpacity} instead of a deferred colorMix — drop the theme-token opacity rule`
+    );
+  }
+
+  // With `inlineVariables: false` (apps/mobile/metro.config.js) the spacing
+  // scale reaches the runtime as a deferred calc inside the line-height
+  // function, which multiplies the result by the font size. When the compiler
+  // folds it to a length instead, this stops matching and the rule can go.
+  const spacingLeading = firstValue(
+    ':root { --spacing: 0.25rem; }\n.x { line-height: calc(var(--spacing) * 5); }',
+    { inlineVariables: false }
+  );
+  if (!spacingLeading.includes('"lineHeight",[{},"calc"')) {
+    fail(
+      `check-classes: a spacing-scale line height now compiles to ${spacingLeading} instead of a deferred calc — drop the numeric leading rule`
     );
   }
 }

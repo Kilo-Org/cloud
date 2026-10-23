@@ -1,7 +1,7 @@
 const { withAppDelegate } = require('expo/config-plugins');
 
 /**
- * Copies the mount-skip errors from `patches/react-native@0.86.3.patch` into
+ * Copies the mount-skip errors from `patches/react-native@0.88.0.patch` into
  * Sentry breadcrumbs on iOS.
  *
  * The patch reports a Fabric mutation for an unregistered component view

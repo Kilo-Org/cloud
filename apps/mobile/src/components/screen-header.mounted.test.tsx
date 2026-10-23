@@ -394,6 +394,49 @@ describe('ScreenHeader mounted', () => {
     ).toHaveLength(0);
   });
 
+  it("keeps a mark-only heading's inlineActions on the row when the caller forbids a reflow", () => {
+    // The shared-row check reserves 120dp of readable title per font-scale
+    // unit: at a 3x accessibility scale on a 390dp phone that reserve is 360dp
+    // against 334dp free, so the picker reflowed under the mark although both
+    // fit. The home header turns the check off for its picker.
+    Object.assign(layout, { width: 390, fontScale: 3 });
+
+    const reflowed = renderHeader({
+      title: 'Kilo',
+      titleContent: 'MARK',
+      size: 'large',
+      inlineActions: 'ACTIONS',
+    });
+    expect(reflowed.root.findAll(isStackedActionsRow)).toHaveLength(1);
+
+    const pinned = renderHeader({
+      title: 'Kilo',
+      titleContent: 'MARK',
+      size: 'large',
+      inlineActions: 'ACTIONS',
+      allowInlineActionsStacking: false,
+    });
+    expect(pinned.root.findAll(isStackedActionsRow)).toHaveLength(0);
+    const inline = findInlineActionsWrapper(pinned.root);
+    expect(inline.children).toEqual(['ACTIONS']);
+    expect(inline.parent?.props.className).toContain('flex-row');
+    // Turning the reflow off must cap the slot instead: the heading sits on a
+    // zero flex basis, so an unbounded cluster would keep all negative free
+    // space and leave the heading at zero width, with a fixed-size mark
+    // painting under the cluster.
+    expect(inline.props.className).toContain('max-w-[50%]');
+
+    // A caller that keeps the reflow keeps the uncapped slot.
+    Object.assign(layout, { width: 390, fontScale: 1 });
+    const uncapped = renderHeader({
+      title: 'Kilo',
+      titleContent: 'MARK',
+      size: 'large',
+      inlineActions: 'ACTIONS',
+    });
+    expect(findInlineActionsWrapper(uncapped.root).props.className).not.toContain('max-w-[50%]');
+  });
+
   it('keeps the title hit slop asymmetric so it never overlaps the back target', () => {
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
 
@@ -511,18 +554,20 @@ describe('ScreenHeader mounted', () => {
     }
   );
 
-  it('labels the title with the override or the default open-menu label', () => {
+  it('labels the title with its own text and hints at the action', () => {
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
-    expect(findTitlePressable(renderer.root).props.accessibilityLabel).toBe(
-      'Open menu for Sessions'
-    );
+    const title = findTitlePressable(renderer.root);
+    expect(title.props.accessibilityLabel).toBe('Sessions');
+    expect(title.props.accessibilityHint).toBe('Open menu for Sessions');
 
     const customRenderer = renderHeader({
       title: 'Sessions',
       onTitlePress: () => undefined,
-      onTitlePressAccessibilityLabel: 'Rename session',
+      onTitlePressAccessibilityHint: 'Rename session',
     });
-    expect(findTitlePressable(customRenderer.root).props.accessibilityLabel).toBe('Rename session');
+    const custom = findTitlePressable(customRenderer.root);
+    expect(custom.props.accessibilityLabel).toBe('Sessions');
+    expect(custom.props.accessibilityHint).toBe('Rename session');
   });
 
   it('renders the close icon and label for backIcon="close"', () => {
@@ -576,7 +621,6 @@ describe('ScreenHeader mounted', () => {
     const variants: ScreenHeaderProps[] = [
       { title: 'Sessions' },
       { title: 'Agents', size: 'large' },
-      { title: 'Quick Chat', size: 'large', context: 'ACCOUNT' },
       { title: 'Sessions', modal: true },
       { title: 'A long sheet title', centerTitle: true },
       { title: 'Sessions', eyebrow: 'Agents' },
@@ -585,6 +629,15 @@ describe('ScreenHeader mounted', () => {
       { title: longTitle, titleNumberOfLines: 1, onTitlePress: () => undefined },
       { title: longTitle, titleNumberOfLines: 3, headerRight: 'METRICS', reserveTitleSpace: true },
       { title: longTitle, titleNumberOfLines: 9, reserveTitleSpace: true },
+      { title: 'Agents', size: 'large', reserveTitleSpace: true },
+      { title: longTitle, size: 'large', titleNumberOfLines: 2, reserveTitleSpace: true },
+      {
+        title: longTitle,
+        size: 'large',
+        titleNumberOfLines: 3,
+        headerRight: 'METRICS',
+        reserveTitleSpace: true,
+      },
     ];
 
     for (const props of variants) {
@@ -592,17 +645,22 @@ describe('ScreenHeader mounted', () => {
       const back = findBackPressable(renderer.root);
       const title = renderer.root.findByProps({ accessibilityRole: 'header' });
       // The cap is clamped to the three lines the reserved box covers, so a
-      // title can never paint a line the reserve does not hold.
-      const cappedLines = Math.min(props.titleNumberOfLines ?? 2, 3);
+      // title can never paint a line the reserve does not hold. The default
+      // is one line: CJK titles ellipsize instead of orphaning characters.
+      const cappedLines = Math.min(props.titleNumberOfLines ?? 1, 3);
       expect(title.props.numberOfLines).toBe(cappedLines);
       expect(title.props.ellipsizeMode).toBe('tail');
       expect(title.children).toEqual([props.title]);
       if (props.reserveTitleSpace) {
-        expect(title.parent?.props.className).toContain(cappedLines > 2 ? 'min-h-21' : 'min-h-14');
-        expect(title.parent?.props.className).toContain('justify-center');
-      }
-      if (props.context) {
-        expect(title.parent?.children).toEqual([title, props.context]);
+        const large = props.size === 'large';
+        let reserveClass = large ? 'min-h-[72px]' : 'min-h-14';
+        if (cappedLines > 2) {
+          reserveClass = large ? 'min-h-[108px]' : 'min-h-21';
+        } else if (cappedLines === 1) {
+          reserveClass = large ? 'min-h-[36px]' : 'min-h-7';
+        }
+        expect(title.parent?.props.className).toContain(reserveClass);
+        expect(title.parent?.props.className).toContain('justify-start');
       }
       if (props.modal || props.centerTitle) {
         expect(title.props.className).toContain('text-center');
@@ -629,7 +687,7 @@ describe('ScreenHeader mounted', () => {
     // The reserved box holds the same three lines (3 x the `text-lg` 1.75rem
     // line height), so the rendered title cannot move the body below it.
     expect(title.parent?.props.className).toContain('min-h-21');
-    expect(title.parent?.props.className).toContain('justify-center');
+    expect(title.parent?.props.className).toContain('justify-start');
   });
 
   it('keeps the close control on the title row when the sheet skips the safe-area inset', () => {

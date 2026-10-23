@@ -275,6 +275,10 @@ export async function handleLlmProxyRequest(
       const body = JSON.parse(requestBodyText) as GatewayResponsesRequest;
       requestBodyParsed = { kind: 'responses', body };
     }
+    // Usage accounting parses the response as SSE only when `stream` is exactly true.
+    if (requestBodyParsed.body.stream) {
+      requestBodyParsed.body.stream = true;
+    }
   } catch (e) {
     return malformedJsonResponse(e);
   }

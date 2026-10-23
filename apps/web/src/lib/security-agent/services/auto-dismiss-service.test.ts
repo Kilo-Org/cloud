@@ -413,9 +413,11 @@ describe('maybeAutoDismissAnalysis', () => {
       auto_dismiss_confidence_threshold: 'high',
     } as Awaited<ReturnType<typeof securityConfigModule.getSecurityAgentConfig>>);
     mockGetIntegrationForOwner.mockResolvedValue(makeIntegration('inst-123'));
-    mockDismissDependabotAlert.mockRejectedValue(
-      Object.assign(new Error('GitHub API error'), { status: 403 })
-    );
+    const rejection = Object.assign(new Error('GitHub API error'), {
+      status: 403,
+      request: { headers: { authorization: 'token installation-secret' } },
+    });
+    mockDismissDependabotAlert.mockRejectedValue(rejection);
     mockUpdateSecurityFindingStatus.mockResolvedValue(undefined);
 
     const result = await maybeAutoDismissAnalysis({
@@ -450,7 +452,24 @@ describe('maybeAutoDismissAnalysis', () => {
         ],
       },
     });
-    expect(mockCaptureException).not.toHaveBeenCalled();
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    const [captured, capturedContext] = mockCaptureException.mock.calls[0] as [
+      Error,
+      { tags: Record<string, string>; extra: Record<string, unknown> },
+    ];
+    expect(captured).toBeInstanceOf(Error);
+    expect(captured).not.toBe(rejection);
+    expect(captured.message).toBe('Dependabot writeback error: 403');
+    expect(capturedContext).toEqual({
+      tags: { operation: 'writebackDependabotDismissal' },
+      extra: {
+        findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        status: 403,
+        message: 'GitHub API error',
+      },
+    });
+    expect(JSON.stringify(mockCaptureException.mock.calls)).not.toContain('installation-secret');
+    expect(JSON.stringify(mockCaptureMessage.mock.calls)).not.toContain('installation-secret');
   });
 
   describe('autoDismissEligibleFindings', () => {

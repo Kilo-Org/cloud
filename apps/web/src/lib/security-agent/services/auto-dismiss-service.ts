@@ -272,6 +272,10 @@ async function safeWritebackDependabotDismissal(
       status: apiError.status,
       message: apiError.message,
     });
+    captureException(new Error(`Dependabot writeback error: ${apiError.status ?? 'unknown'}`), {
+      tags: { operation: 'writebackDependabotDismissal' },
+      extra: { findingId: finding.id, status: apiError.status, message: apiError.message },
+    });
   }
 }
 

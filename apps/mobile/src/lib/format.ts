@@ -12,13 +12,6 @@ import {
  * app language drives the output. FormatJS fills the constructors Hermes omits.
  */
 
-/**
- * USD in the active language, with the currency symbol that language's own
- * data writes: most languages render `$`, and the ones that disambiguate the
- * dollar currency render `US$`, `$US`, `USD` or their own abbreviation. The
- * symbol therefore follows the same CLDR data as the non-USD branch of
- * `formatMoneyFromCents`.
- */
 export function formatUsd(
   amount: number,
   locale: string,
@@ -28,7 +21,10 @@ export function formatUsd(
     ...options,
     style: 'currency',
     currency: 'USD',
-  }).format(amount);
+  })
+    .formatToParts(amount)
+    .map(part => (part.type === 'currency' ? '$' : part.value))
+    .join('');
 }
 
 export function formatMoney(amount: number, locale: string): string {

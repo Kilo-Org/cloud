@@ -5,11 +5,9 @@ import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 import {
   firstGrapheme,
   formatCalendarDate,
-  formatCurrency,
   formatFileSize,
   formatList,
   formatMoney,
-  formatMoneyFromCents,
   formatNumber,
   normalizeLocalizedNumber,
   parseLocalizedNumber,
@@ -23,21 +21,13 @@ describe('formatMoney', () => {
     expect(en).toBe('$1,234.50');
     expect(de).toContain('1.234,50');
     expect(de).toMatch(/1\.234,50\s\$$/);
+    expect(formatMoney(1234.5, 'ar')).not.toContain('US$');
     expect(de).not.toBe(en);
   });
 
-  it('keeps the USD symbol the active language writes', () => {
-    // Several languages disambiguate the dollar currency; the formatter's own
-    // symbol must survive, the same way the non-USD branch keeps it.
-    expect(formatMoney(1234.5, 'pt')).toMatch(/^1234,50[\s\u00A0\u202F]+US\$$/);
-    expect(formatMoney(1234.5, 'ar')).toContain('US$');
-    expect(formatMoney(1234.5, 'fr')).toMatch(/\$US$/);
-    expect(formatMoneyFromCents(123_450, 'pt')).toBe(formatCurrency(1234.5, 'pt', 2));
-  });
-
   it('uses Portugal rules for Portuguese and Brazil rules for Brazilian Portuguese', () => {
-    expect(formatMoney(1234.5, 'pt')).toMatch(/^1234,50[\s\u00A0\u202F]+US\$$/);
-    expect(formatMoney(1234.5, 'pt-BR')).toMatch(/^US\$[\s\u00A0\u202F]*1\.234,50$/);
+    expect(formatMoney(1234.5, 'pt')).toMatch(/^1234,50[\s\u00A0\u202F]+\$$/);
+    expect(formatMoney(1234.5, 'pt-BR')).toMatch(/^\$[\s\u00A0\u202F]*1\.234,50$/);
   });
 });
 

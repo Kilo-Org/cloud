@@ -250,3 +250,20 @@ export const sandboxSelectionCapabilitiesSchema = z
   });
 
 export type SandboxSelectionCapabilities = z.infer<typeof sandboxSelectionCapabilitiesSchema>;
+
+export function isSandboxAllocationAvailable(
+  capabilities: SandboxSelectionCapabilities,
+  allocation: SandboxAllocation
+): boolean {
+  return (
+    capabilities.enabled &&
+    (allocation === 'isolated-standard' ||
+      allocation === 'cloudflare-single' ||
+      capabilities.options.some(
+        option =>
+          getKiloSandboxAllocation(option.allocation) === allocation &&
+          option.unavailableReason === undefined &&
+          option.repositoryUnavailableReason === undefined
+      ))
+  );
+}

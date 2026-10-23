@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
-import { sessionDoName } from '../../src/session-plane.js';
+import { sessionDoName } from '../../src/session-identity.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
@@ -16,6 +16,7 @@ import type {
   StopResult,
 } from '../../src/sandbox-control/provider.js';
 import {
+  FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   createFakeCredentialBroker,
   FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
   installFakeCredentialEnv,
@@ -57,7 +58,7 @@ function metadata(input: { sessionId: string; kiloSessionId: string; sandboxId: 
       orgId: ORG_ID,
       createdOnPlatform: 'cloud-agent-web',
     },
-    auth: { kiloSessionId: input.kiloSessionId, kilocodeToken: 'native-token' },
+    auth: { kiloSessionId: input.kiloSessionId, kilocodeToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN },
     agent: { mode: 'code', model: 'test/model' },
     repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
     workspace: {

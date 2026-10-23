@@ -2,11 +2,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   authTerminalFingerprint,
+  claimAuthTerminalFailureReport,
   classifyAuthResponse,
   parseRetryAfterMs,
   reportAuthTerminalFailure,
   resetAuthTerminalReports,
-  shouldReportAuthTerminalFailure,
 } from '@/lib/auth/auth-response-class';
 import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 
@@ -153,9 +153,23 @@ describe('terminal failure reporting', () => {
     }).not.toThrow();
   });
 
-  it('marks the first terminal failure as reportable and later repeats as not', () => {
+  it('claims the first report of a route and status and refuses every repeat', () => {
     resetAuthTerminalReports();
-    expect(shouldReportAuthTerminalFailure('/api/auth/native/refresh', 401)).toBe(true);
-    expect(shouldReportAuthTerminalFailure('/api/auth/native/refresh', 401)).toBe(false);
+    expect(claimAuthTerminalFailureReport('/api/auth/native/refresh', 401)).toBe(true);
+    expect(claimAuthTerminalFailureReport('/api/auth/native/refresh', 401)).toBe(false);
+    expect(claimAuthTerminalFailureReport('/api/auth/native/token', 401)).toBe(true);
+  });
+
+  it('lets a claim spend the report, so a later report of it files nothing', () => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+    resetAuthTerminalReports();
+
+    expect(claimAuthTerminalFailureReport('/api/auth/native/refresh', 401)).toBe(true);
+    reportAuthTerminalFailure('/api/auth/native/refresh', 401);
+
+    expect(events).toHaveLength(0);
   });
 });

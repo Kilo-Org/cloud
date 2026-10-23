@@ -12,16 +12,14 @@ import {
 import { useNewSessionRepos, useRepositoryBranches } from './use-new-session-repos';
 
 const mocks = vi.hoisted(() => ({
-  fetchQuery: vi.fn(async (_opts: unknown): Promise<unknown> => ({})),
+  query: vi.fn(async (_opts: unknown): Promise<unknown> => ({})),
   setQueryData: vi.fn(() => undefined),
   toastError: vi.fn(),
   refreshGitHubForceFresh: vi.fn(async () => undefined),
-  listBranches: vi.fn(
-    async (_input: unknown): Promise<unknown> => ({
-      defaultBranch: 'main',
-      branches: ['main'],
-    })
-  ),
+  listBranches: vi.fn(async (_input: unknown): Promise<unknown> => ({
+    defaultBranch: 'main',
+    branches: ['main'],
+  })),
   /** Every `useQuery` call in mount order, so a test can read the branch query's options. */
   queryCalls: [] as { queryKey?: unknown[]; enabled?: boolean; staleTime?: number }[],
   /** Result the branch query (the one with a `queryFn`) reports. */
@@ -59,7 +57,7 @@ vi.mock('@tanstack/react-query', () => ({
     };
     return options.queryFn ? { ...base, ...mocks.branchQueryResult } : base;
   },
-  useQueryClient: () => ({ fetchQuery: mocks.fetchQuery, setQueryData: mocks.setQueryData }),
+  useQueryClient: () => ({ query: mocks.query, setQueryData: mocks.setQueryData }),
 }));
 
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.example.com' }));
@@ -181,11 +179,11 @@ function requireResult(resultRef: { current: ReposResult | null }): ReposResult 
   return result;
 }
 
-// Every provider's force-fresh reads `fetchQuery` with a `queryKey` whose first
+// Every provider's force-fresh reads `query` with a `queryKey` whose first
 // element names the provider, so the fake can answer Bitbucket and GitLab
 // differently from one call site.
 function mockFetchQuery(resultForBitbucket: unknown, gitlabAndGithub: unknown) {
-  mocks.fetchQuery.mockImplementation(async (opts: unknown) => {
+  mocks.query.mockImplementation(async (opts: unknown) => {
     const queryKey = (opts as { queryKey?: unknown[] }).queryKey;
     return Array.isArray(queryKey) && queryKey[0] === 'bitbucket'
       ? resultForBitbucket
@@ -195,7 +193,7 @@ function mockFetchQuery(resultForBitbucket: unknown, gitlabAndGithub: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.fetchQuery.mockImplementation(async (_opts: unknown) => ({ repositories: [] }));
+  mocks.query.mockImplementation(async (_opts: unknown) => ({ repositories: [] }));
   mocks.queryCalls.length = 0;
   mocks.branchQueryResult = {};
 });
@@ -435,6 +433,16 @@ describe('useRepositoryBranches', () => {
     expect(result.branches).toEqual([]);
     expect(result.defaultBranch).toBeNull();
     expect(getSelectedBranchOverride(githubRepo)).toBeNull();
+  });
+
+  it('carries the partial-listing flag so the selector can say the list is incomplete', () => {
+    mocks.branchQueryResult = {
+      data: { defaultBranch: 'main', branches: ['main', 'release'], truncated: true },
+    };
+    expect(mountBranches(githubRepo).truncated).toBe(true);
+
+    mocks.branchQueryResult = { data: { defaultBranch: 'main', branches: ['main'] } };
+    expect(mountBranches(githubRepo).truncated).toBe(false);
   });
 
   it('fetches through the organization procedure when the query runs', async () => {

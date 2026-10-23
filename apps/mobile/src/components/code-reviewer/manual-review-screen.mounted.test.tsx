@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { scrollTo as scrollToSpy } from '@/test/scroll-view-mock';
-import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
+import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { ManualReviewScreen } from './manual-review-screen';
@@ -15,7 +15,7 @@ import { ManualReviewScreen } from './manual-review-screen';
 // clipped mid-label at the scroll fold, under the tab bar, at 560 density. The
 // fix pins the action in a footer below the scroll view, so these tests assert
 // the structural guarantee (the action is not inside the scroll viewport) and
-// the footer clearance (it sits a tab bar's height above the overlay).
+// the footer clearance (it sits the screen's bottom clearance above the edge).
 const BOTTOM_INSET = 24;
 const TAB_SCREEN_BOTTOM_GAP = 16;
 
@@ -184,8 +184,13 @@ function only<T>(items: T[], what: string): T {
 }
 
 async function renderScreen() {
+  // The root stack publishes `null`: no tab bar under this screen.
   const { renderer, unmount } = await renderWithProviders(
-    createElement(ManualReviewScreen, { scope: 'personal' })
+    createElement(
+      TabBarLabelContext,
+      { value: null },
+      createElement(ManualReviewScreen, { scope: 'personal' })
+    )
   );
   return { renderer, unmount };
 }
@@ -228,7 +233,7 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
     platformState.OS = platform;
   });
 
-  it('pins the start action outside the scroll viewport, clear of the tab bar', async () => {
+  it('pins the start action outside the scroll viewport, clear of the bottom inset', async () => {
     const { renderer, unmount } = await renderScreen();
 
     const scrollViews = findAllOfType(renderer.root, 'ScrollView');
@@ -240,21 +245,15 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
 
     const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
     const [footerClearance] = paddingBottomsAbove(action);
-    expect(footerClearance).toBe(
-      getEffectiveTabBarHeight({
-        bottomInset: BOTTOM_INSET,
-        platform,
-        fontScale: 1,
-      }) + TAB_SCREEN_BOTTOM_GAP
-    );
+    expect(footerClearance).toBe(BOTTOM_INSET + TAB_SCREEN_BOTTOM_GAP);
 
     unmount();
   });
 
-  it('drops the tab bar clearance while the keyboard lifts the footer', async () => {
+  it('drops the bottom clearance while the keyboard lifts the footer', async () => {
     const { renderer, unmount } = await renderScreen();
 
-    // A keyboard at least as tall as the tab bar. The footer hands the whole
+    // A keyboard at least as tall as the clearance. The footer hands the whole
     // bottom space to the lift view (`KeyboardAvoidingView`), which owns it
     // while the keyboard is open, so its own clearance collapses to 0.
     const keyboardLift = platform === 'android' ? 300 : 324;
@@ -268,36 +267,29 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
     expect(findAllOfType(renderer.root, 'KeyboardAvoidingView')).toHaveLength(1);
 
     // The provider clears the height when the keyboard hides; the footer
-    // restores its tab-bar clearance.
+    // restores its bottom clearance.
     act(() => {
       keyboardStore.setHeight(0);
     });
-    expect(paddingBottomsAbove(action)).toEqual([
-      getEffectiveTabBarHeight({ bottomInset: BOTTOM_INSET, platform, fontScale: 1 }) +
-        TAB_SCREEN_BOTTOM_GAP,
-    ]);
+    expect(paddingBottomsAbove(action)).toEqual([BOTTOM_INSET + TAB_SCREEN_BOTTOM_GAP]);
 
     unmount();
   });
 
-  it('keeps the tab bar clearance a short keyboard does not cover', async () => {
+  it('keeps the footer clearance a short keyboard does not cover', async () => {
     const { renderer, unmount } = await renderScreen();
 
-    // The hardware-keyboard IME bar is one navigation bar tall; the footer keeps
-    // the difference so the action never lands behind the tab bar (e1-fill).
-    const keyboardLift = BOTTOM_INSET + BOTTOM_INSET;
+    // A keyboard shorter than the clearance leaves part of it uncovered; the
+    // footer keeps the difference so the action never lands behind the bottom
+    // edge (e1-fill).
+    const keyboardLift = BOTTOM_INSET;
     act(() => {
       keyboardStore.setHeight(keyboardLift);
     });
 
     const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
-    const footerClearance = getEffectiveTabBarHeight({
-      bottomInset: BOTTOM_INSET,
-      platform,
-      fontScale: 1,
-    });
     expect(paddingBottomsAbove(action)).toEqual([
-      footerClearance + TAB_SCREEN_BOTTOM_GAP - keyboardLift,
+      BOTTOM_INSET + TAB_SCREEN_BOTTOM_GAP - keyboardLift,
     ]);
 
     unmount();
@@ -311,11 +303,8 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
     const button = only(findAllOfType(renderer.root, 'Button'), 'primary action');
     expect((button.props as { disabled: boolean }).disabled).toBe(true);
     // The footer is the sole clearance source now (the deleted lift layer is
-    // gone); at rest it reserves the tab bar height plus its final gap.
-    expect(paddingBottomsAbove(button)).toEqual([
-      getEffectiveTabBarHeight({ bottomInset: BOTTOM_INSET, platform, fontScale: 1 }) +
-        TAB_SCREEN_BOTTOM_GAP,
-    ]);
+    // gone); at rest it reserves the screen's bottom clearance plus its final gap.
+    expect(paddingBottomsAbove(button)).toEqual([BOTTOM_INSET + TAB_SCREEN_BOTTOM_GAP]);
     unmount();
   });
 
@@ -325,11 +314,8 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
     const button = only(findAllOfType(renderer.root, 'Button'), 'primary action');
     expect((button.props as { loading: boolean }).loading).toBe(true);
     // The footer is the sole clearance source now (the deleted lift layer is
-    // gone); at rest it reserves the tab bar height plus its final gap.
-    expect(paddingBottomsAbove(button)).toEqual([
-      getEffectiveTabBarHeight({ bottomInset: BOTTOM_INSET, platform, fontScale: 1 }) +
-        TAB_SCREEN_BOTTOM_GAP,
-    ]);
+    // gone); at rest it reserves the screen's bottom clearance plus its final gap.
+    expect(paddingBottomsAbove(button)).toEqual([BOTTOM_INSET + TAB_SCREEN_BOTTOM_GAP]);
     unmount();
   });
 
@@ -361,9 +347,7 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
     act(() => {
       action.props.onPress();
     });
-    expect(status.push).toHaveBeenCalledWith(
-      '/(app)/(tabs)/(3_profile)/code-reviewer/personal/github'
-    );
+    expect(status.push).toHaveBeenCalledWith('/(app)/code-reviewer/personal/github');
     expect(findAllOfType(renderer.root, 'ScrollView')).toHaveLength(0);
     unmount();
   });

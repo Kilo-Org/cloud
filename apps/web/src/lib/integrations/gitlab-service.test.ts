@@ -41,7 +41,7 @@ describe('normalizeInstanceUrl', () => {
   });
 
   it('rejects unsafe self-hosted URLs', () => {
-    expect(() => normalizeInstanceUrl('http://127.0.0.1:8080')).toThrow('host is not allowed');
+    expect(() => normalizeInstanceUrl('https://127.0.0.1:8080')).toThrow('host is not allowed');
   });
 
   it('detects instance URL changes', () => {

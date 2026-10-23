@@ -24,6 +24,7 @@ jest.mock('@octokit/auth-app', () => ({
   createAppAuth: jest.fn(() => async () => ({ token: 'mock-token', expiresAt: '2099-01-01' })),
 }));
 
+import { MAX_INLINE_COMMENT_BODY_CHARS } from '@/lib/code-reviews/core/constants';
 import { fetchPRInlineComments } from './adapter';
 
 const PER_PAGE = 100;
@@ -106,7 +107,7 @@ describe('fetchPRInlineComments', () => {
   });
 
   it('truncates each stored body to the rendered length', async () => {
-    const longBody = 'x'.repeat(500) + '\nsecond line';
+    const longBody = 'x'.repeat(600) + '\nsecond line';
     mockListReviewComments.mockResolvedValueOnce({
       data: [
         {
@@ -122,8 +123,8 @@ describe('fetchPRInlineComments', () => {
 
     const comments = await fetchPRInlineComments('42', 'acme', 'widgets', 7);
 
-    expect(comments[0].body).toBe('x'.repeat(60));
-    expect(comments[0].body.length).toBeLessThanOrEqual(60);
+    expect(comments[0].body).toBe('x'.repeat(MAX_INLINE_COMMENT_BODY_CHARS));
+    expect(comments[0].body.length).toBeLessThanOrEqual(MAX_INLINE_COMMENT_BODY_CHARS);
   });
 
   it('keeps bodies within the stored byte budget when the provider always returns full pages', async () => {
@@ -141,18 +142,20 @@ describe('fetchPRInlineComments', () => {
 
     const comments = await fetchPRInlineComments('42', 'acme', 'widgets', 7);
 
-    // Bodies are truncated to 60 chars before counting, so the page cap (5 pages
-    // × 100 × 60 bytes = 30 KB) is the binding bound, under the 64 KB budget.
+    // Bodies are stored whole before counting, so the page cap (5 pages × 100 ×
+    // 200 bytes = 100 KB) is the binding bound, under the 512 KB budget.
     const totalBytes = comments.reduce((sum, c) => sum + Buffer.byteLength(c.body), 0);
-    expect(totalBytes).toBeLessThanOrEqual(64 * 1024);
+    expect(totalBytes).toBeLessThanOrEqual(512 * 1024);
     expect(mockListReviewComments).toHaveBeenCalledTimes(MAX_PAGES);
   });
 
   it('stops on the stored byte budget before the page cap for multi-byte bodies', async () => {
-    const multiByteBody = '漢'.repeat(200);
-    const bytesPerStoredBody = Buffer.byteLength(multiByteBody.slice(0, 60));
-    expect(bytesPerStoredBody).toBe(180);
-    const expectedStored = Math.ceil((64 * 1024) / bytesPerStoredBody);
+    const multiByteBody = '漢'.repeat(MAX_INLINE_COMMENT_BODY_CHARS);
+    const bytesPerStoredBody = Buffer.byteLength(
+      multiByteBody.slice(0, MAX_INLINE_COMMENT_BODY_CHARS)
+    );
+    expect(bytesPerStoredBody).toBe(MAX_INLINE_COMMENT_BODY_CHARS * 3);
+    const expectedStored = Math.ceil((512 * 1024) / bytesPerStoredBody);
 
     mockListReviewComments.mockImplementation(async ({ page }: { page: number }) => ({
       data: Array.from({ length: PER_PAGE }, (_, index) => ({
@@ -170,6 +173,6 @@ describe('fetchPRInlineComments', () => {
     expect(comments).toHaveLength(expectedStored);
     expect(mockListReviewComments.mock.calls.length).toBeLessThan(MAX_PAGES);
     const totalBytes = comments.reduce((sum, c) => sum + Buffer.byteLength(c.body), 0);
-    expect(totalBytes).toBeGreaterThanOrEqual(64 * 1024);
+    expect(totalBytes).toBeGreaterThanOrEqual(512 * 1024);
   });
 });

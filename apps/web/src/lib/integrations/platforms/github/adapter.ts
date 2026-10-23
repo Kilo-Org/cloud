@@ -5,6 +5,7 @@ import { logExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/util
 
 import crypto from 'crypto';
 import type { InstallationToken } from '@/lib/integrations/core/types';
+import { MAX_INLINE_COMMENT_BODY_CHARS } from '@/lib/code-reviews/core/constants';
 import { type GitHubAppType, getGitHubAppCredentials } from './app-selector';
 import { assertGitHubInstallationRuntimeAuthorized } from '../../github/runtime-authorization';
 
@@ -598,8 +599,7 @@ export async function exchangeGitHubOAuthCode(
 
 const KILO_REVIEW_COMMENTS_PER_PAGE = 100;
 const MAX_KILO_REVIEW_COMMENT_PAGES = 5;
-const MAX_PR_INLINE_COMMENT_BODY_BYTES = 64 * 1024;
-const MAX_PR_INLINE_COMMENT_BODY_CHARS = 60;
+const MAX_PR_INLINE_COMMENT_BODY_BYTES = 512 * 1024;
 
 type PRIssueComment = {
   id: number;
@@ -807,7 +807,7 @@ export async function fetchPRInlineComments(
     });
 
     for (const c of data) {
-      const body = c.body.slice(0, MAX_PR_INLINE_COMMENT_BODY_CHARS);
+      const body = c.body.slice(0, MAX_INLINE_COMMENT_BODY_CHARS);
       storedBodyBytes += Buffer.byteLength(body);
       comments.push({
         id: c.id,

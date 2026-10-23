@@ -8,7 +8,10 @@
 
 import { z } from 'zod';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
-import { DEFAULT_CODE_REVIEW_MODEL } from '@/lib/code-reviews/core/constants';
+import {
+  DEFAULT_CODE_REVIEW_MODEL,
+  MAX_INLINE_COMMENT_BODY_CHARS,
+} from '@/lib/code-reviews/core/constants';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import DEFAULT_PROMPT_TEMPLATE_BITBUCKET from '@/lib/code-reviews/prompts/default-prompt-template-bitbucket.json';
 import DEFAULT_PROMPT_TEMPLATE_GITHUB from '@/lib/code-reviews/prompts/default-prompt-template.json';
@@ -351,7 +354,9 @@ export async function generateReviewPrompt(
     prompt += '| File | Line | Issue |\n|------|------|-------|\n';
 
     for (const c of active.slice(0, 20)) {
-      const firstLine = escapeMarkdownTableCell(c.body.split('\n')[0].substring(0, 60));
+      const firstLine = escapeMarkdownTableCell(
+        sanitizeUserInput(c.body.split('\n')[0]).slice(0, MAX_INLINE_COMMENT_BODY_CHARS)
+      );
       prompt += `| \`${c.path}\` | ${c.line ?? 'N/A'} | ${firstLine} |\n`;
     }
 

@@ -533,6 +533,30 @@ describe('generateReviewPrompt (incremental review)', () => {
     expect(prompt).toContain('src/foo.ts');
   });
 
+  it('renders the whole finding title in the inline comments table', async () => {
+    const findingTitle =
+      '**WARNING:** the retry helper drops the request identifier once the pending queue is full';
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
+      reviewId: 'review-123',
+      existingReviewState: {
+        ...existingReviewStateWithSummary,
+        inlineComments: [
+          {
+            id: 9,
+            path: 'src/foo.ts',
+            line: 10,
+            body: `${findingTitle}\n\nThe queue never re-queues the dropped request.`,
+            isOutdated: false,
+          },
+        ],
+      },
+      previousHeadSha: 'abc123prev',
+    });
+
+    expect(prompt).toContain(`| \`src/foo.ts\` | 10 | ${findingTitle} |`);
+    expect(prompt).not.toContain('never re-queues the dropped request');
+  });
+
   it('uses UPDATE summary command in incremental mode', async () => {
     const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
       reviewId: 'review-123',

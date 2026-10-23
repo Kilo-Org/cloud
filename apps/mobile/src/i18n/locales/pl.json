@@ -226,7 +226,7 @@
     "hideBalance": "Ukryj saldo",
     "showBalance": "Pokaż saldo",
     "balanceHidden": "Saldo ukryte",
-    "bonusCreditsExpiring": "Środki promocyjne w kwocie {{amount}} stracą ważność {{date}}.",
+    "bonusCreditsExpiring": "Środki w kwocie {{amount}} stracą ważność {{date}}.",
     "signOutTitle": "Wylogować się?",
     "signOutMessage": "Aby wrócić do swojego obszaru roboczego, musisz zalogować się ponownie.",
     "deleteAccountTitle": "Usunąć konto?",
@@ -901,7 +901,7 @@
     },
     "autoReviews": "Automatyczne przeglądy",
     "bitbucket": {
-      "notConnectedReadOnly": "Brak połączenia z Bitbucket. Tylko właściciele organizacji i administratorzy rozliczeń mogą je skonfigurować.",
+      "notConnectedReadOnly": "Brak połączenia z Bitbucket. Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je skonfigurować.",
       "setupIncomplete": "Konfiguracja jest niekompletna. Dokończ ją na kilo.ai.",
       "setup": "Konfiguracja Bitbucket"
     },
@@ -924,7 +924,10 @@
       "starting": "Rozpoczynanie przeglądu…",
       "title": "Ręczny przegląd"
     },
-    "notConnectedReadOnly": "Brak połączenia z {{platform}}. Tylko właściciele organizacji i administratorzy rozliczeń mogą je skonfigurować.",
+    "notConnectedReadOnly": "Brak połączenia z {{platform}}. Tylko właściciele organizacji i administratorzy mogą je skonfigurować.",
+    "gitlab": {
+      "notConnectedReadOnly": "Brak połączenia z {{platform}}. Poproś Właściciela, Administratora lub Osobę zarządzającą rozliczeniami w organizacji, aby ją połączyć."
+    },
     "platformList": {
       "activity": "Aktywność",
       "checking": "Sprawdzanie…",
@@ -1003,7 +1006,7 @@
       "off": "Pamięć przeglądów jest wyłączona.",
       "on": "Pamięć przeglądów jest włączona.",
       "offDescription": "Włącz ją, aby Kilo uczyło się na podstawie odpowiedzi opiekunów repozytorium i proponowało wytyczne do pliku REVIEW.md.",
-      "readOnlyDescription": "Tylko właściciele organizacji i administratorzy rozliczeń mogą zmieniać pamięć przeglądów.",
+      "readOnlyDescription": "Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą zmieniać pamięć przeglądów.",
       "title": "Pamięć przeglądów"
     },
     "scopeList": {
@@ -1155,7 +1158,7 @@
       "summary": "Podsumowanie raportu",
       "title": "Raport audytu",
       "unavailable": "Raport audytu niedostępny",
-      "unavailableDescription": "Tylko właściciele organizacji i administratorzy rozliczeń mogą przeglądać raporty audytu. Poproś właściciela lub administratora rozliczeń o przyznanie dostępu.",
+      "unavailableDescription": "Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą przeglądać raporty audytu. Poproś właściciela, administratora lub osobę zarządzającą rozliczeniami o przyznanie dostępu.",
       "eventActions": {
         "findingAnalysisCompleted": "Ukończono analizę",
         "findingAnalysisFailed": "Analiza nie powiodła się",
@@ -1275,7 +1278,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "Ten problem został już rozwiązany i nie można go odrzucić.",
-      "cannotDismissDescription": "Tylko właściciele organizacji i administratorzy rozliczeń mogą odrzucać problemy.",
+      "cannotDismissDescription": "Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą odrzucać problemy.",
       "cannotDismissTitle": "Nie można odrzucić tego problemu",
       "commentAccessibility": "Komentarz do odrzucenia",
       "commentLabel": "Komentarz (opcjonalnie)",
@@ -1407,7 +1410,7 @@
       "automationCount": "Włączono {{displayCount}} z 3",
       "couldNotLoadPermissions": "Nie udało się wczytać uprawnień.",
       "couldNotLoadSettings": "Nie udało się wczytać ustawień agenta bezpieczeństwa.",
-      "disabledNoManage": "Agent bezpieczeństwa jest wyłączony. Tylko właściciele organizacji i administratorzy rozliczeń mogą go włączyć.",
+      "disabledNoManage": "Agent bezpieczeństwa jest wyłączony. Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą go włączyć.",
       "disabledNoRepo": "Wybierz co najmniej jedno repozytorium przed włączeniem agenta bezpieczeństwa.",
       "disabledPrompt": "Włącz agenta bezpieczeństwa, aby synchronizować alerty Dependabot, wybierać repozytoria i konfigurować automatyzację.",
       "notificationsCount": "Włączono {{displayCount}} z 2",
@@ -1442,7 +1445,7 @@
       "lowDescription": "Minimalny wpływ na bezpieczeństwo.",
       "medium": "Poziom średni",
       "mediumDescription": "Ograniczone skutki lub konieczność spełnienia określonych warunków.",
-      "permissionNote": "Tylko właściciele organizacji i administratorzy rozliczeń mogą zmieniać te ustawienia.",
+      "permissionNote": "Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą zmieniać te ustawienia.",
       "remediationDeadlineA11y": "Termin naprawy w dniach. Krytyczność: {{label}}",
       "title": "Zasady SLA"
     },
@@ -1735,6 +1738,9 @@
       "noRepositoriesVisibleGitlab": "Nie widać żadnych repozytoriów. Sprawdź uprawnienia dostępu do repozytoriów w GitLab, a następnie odśwież listę.",
       "noRepositoriesVisibleBitbucket": "Nie widać żadnych repozytoriów. Sprawdź uprawnienia dostępu do repozytoriów w Bitbucket, a następnie odśwież listę.",
       "bitbucketOrganizationsOnly": "Bitbucket jest dostępny tylko dla organizacji.",
+      "githubNeedsAttention": "GitHub wymaga ponownego połączenia",
+      "githubNeedsAttentionDescription": "Połącz ponownie aplikację Kilo w GitHub, a następnie odśwież listę, aby wczytać jej repozytoria.",
+      "partialRepositories": "Nie udało się wczytać niektórych repozytoriów z GitHub.",
       "branchPickerTitle": "Wybierz gałąź",
       "branchDefault": "Domyślna",
       "branchAccessibility": "Gałąź: {{label}}",
@@ -1742,6 +1748,7 @@
       "branchLoadError": "Nie udało się wczytać gałęzi",
       "branchUnavailable": "Gałęzie nie są dostępne dla tego repozytorium. Sprawdź swój dostęp u dostawcy, a potem wybierz inne repozytorium.",
       "branchEmpty": "Brak dostępnych gałęzi",
+      "branchListIncomplete": "Wyświetlono tylko niektóre gałęzie. Repozytorium ma więcej gałęzi, niż może pomieścić ta lista.",
       "branchPlaceholder": "Wybierz gałąź",
       "runOnWithTarget": "Miejsce uruchomienia: {{target}}",
       "environment": "Środowisko",
@@ -1753,6 +1760,8 @@
       "commitAndPush": "Zatwierdź i wypchnij",
       "startSession": "Rozpocznij sesję",
       "selectRepositoryToStart": "Wybierz repozytorium, aby rozpocząć.",
+      "enterPromptToStart": "Dodaj prompt, aby rozpocząć.",
+      "enterPromptOrFileToStart": "Dodaj prompt lub plik, aby rozpocząć.",
       "connectProviderToStart": "Połącz dostawcę, aby rozpocząć.",
       "promptPlaceholder": "Nad czym chcesz pracować?",
       "couldNotLoadModels": "Nie udało się wczytać modeli.",
@@ -2600,6 +2609,8 @@
     },
     "connectionExpired": "Połączenie z serwisem GitHub wygasło.",
     "couldNotLoadPullRequest": "Nie udało się wczytać PR.",
+    "reviewServiceUnavailable": "Usługa niedostępna",
+    "reviewServiceUnavailableDescription": "Usługa jest chwilowo niedostępna. Spróbuj ponownie za chwilę.",
     "couldNotOpenGitHubAppSettings": "Nie udało się otworzyć ustawień aplikacji GitHub.",
     "description": "Opis",
     "discussion": {
@@ -3040,6 +3051,7 @@
       "truncationBanner_many": "Widoczne są tylko pierwsze pliki spośród {{total}} zmienionych plików. Ich liczbę ogranicza limit API GitHub: {{limit}}."
     },
     "linkPasteClipboardEmpty": "Schowek jest pusty.",
+    "linkPasteDenied": "Odmówiono dostępu do wklejania. Zezwól na wklejanie i spróbuj ponownie.",
     "linkPasteNotAPullRequest": "To nie jest odnośnik do PR ani merge requestu",
     "announce": {
       "commentPosted": "Opublikowano komentarz",
@@ -3094,6 +3106,7 @@
 
       "chooseAccount": "Wybierz konto",
       "loadErrorTitle": "Nie udało się wczytać twoich organizacji.",
+      "membershipLostNotice": "Nie masz już dostępu do tej organizacji. Przełączono na {{target}}.",
       "noOrganization": "Brak organizacji",
 
       "noOrganizationDescription": "To konto nie należy do organizacji. Utwórz organizację lub dołącz do niej w przeglądarce, aby korzystać z funkcji organizacji, takich jak zaproszenia dla członków i alerty o niskim saldzie.",
@@ -3186,7 +3199,7 @@
     "members": {
       "changeRole": "Zmień rolę",
       "emptyDescriptionCanInvite": "Zaproś członków zespołu, aby rozpocząć współpracę w tej organizacji.",
-      "emptyDescriptionCannotInvite": "Poproś właściciela lub osobę zarządzającą rozliczeniami o zaproszenie członków zespołu.",
+      "emptyDescriptionCannotInvite": "Poproś właściciela, administratora lub osobę zarządzającą rozliczeniami o zaproszenie członków zespołu.",
       "emptyTitle": "Brak członków",
       "invitedDate": "Zaproszono {{date}}",
       "limitPerDay": "{{amount}}/dzień",
@@ -3453,9 +3466,17 @@
       "settingsToolsOn": "Włączone — narzędzia ustawień są wysyłane do modelu",
       "settingsToolsOff": "Wyłączone — żadne narzędzie ustawień nie jest wysyłane do modelu",
       "serverChecking": "Sprawdzanie tego serwera…",
-      "serverToolCount": "{{count}} narzędzi",
+      "serverToolCount_few": "{{count}} narzędzia",
+      "serverToolCount_many": "{{count}} narzędzi",
+      "serverToolCount_one": "{{count}} narzędzie",
+      "serverToolCount_other": "{{count}} narzędzi",
       "serverUnreachable": "Nie udało się połączyć z tym serwerem",
-      "serverOff": "Ten serwer jest wyłączony"
+      "serverOff": "Ten serwer jest wyłączony",
+      "app": {
+        "label": "Interfejs narzędzia",
+        "failed": "Nie udało się załadować interfejsu tego narzędzia.",
+        "empty": "Interfejs tego narzędzia nie ma nic do pokazania."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Uwierzytelnianie",
@@ -3600,6 +3621,8 @@
       "quantizationsHelp": "Mniejsze pliki zajmują mniej pamięci i miejsca. Większe pliki zwykle dają lepsze odpowiedzi.",
       "quantDetail": "Pobieranie: {{size}} · ok. {{memory}} pamięci",
       "downloadQuant": "Pobierz {{quant}}",
+      "downloadModelA11y": "Pobierz {{name}}",
+      "detailsA11y": "Szczegóły: {{name}}",
       "loadingModel": "Wczytywanie szczegółów modelu",
       "couldNotLoadModel": "Nie udało się wczytać tego modelu",
       "noFiles": "Brak plików, które ta aplikacja może uruchomić",
@@ -3651,6 +3674,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Uruchomienie agenta wymaga polecenia. Dodaj polecenie i uruchom go ponownie.",
+      "repositoryRequired": "Uruchomienie agenta wymaga repozytorium. Otwórz Kilo i wybierz je, a następnie uruchom go ponownie.",
       "repositoryUnknown": "Kilo nie rozpoznaje {{repository}} jako repozytorium GitHub lub GitLab. Wybierz inne repozytorium w Kilo.",
       "repositoryUnsupported": "{{repository}} to repozytorium Bitbucket — Uruchom agenta nie może jeszcze go użyć. Wybierz inne repozytorium w Kilo."
     }
@@ -3688,10 +3712,19 @@
     "emptyDescription": "Utwórz profil, aby ponownie używać zmiennych środowiskowych, poleceń konfiguracyjnych i umiejętności w różnych sesjach.",
     "loadFailed": "Nie udało się załadować profili",
     "counts": {
-      "vars": "{{count}} zmiennych",
+      "vars_few": "{{count}} zmienne",
+      "vars_many": "{{count}} zmiennych",
+      "vars_one": "{{count}} zmienna",
+      "vars_other": "{{count}} zmiennych",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} umiejętności",
-      "commands": "{{count}} poleceń",
+      "skills_few": "{{count}} umiejętności",
+      "skills_many": "{{count}} umiejętności",
+      "skills_one": "{{count}} umiejętność",
+      "skills_other": "{{count}} umiejętności",
+      "commands_few": "{{count}} polecenia",
+      "commands_many": "{{count}} poleceń",
+      "commands_one": "{{count}} polecenie",
+      "commands_other": "{{count}} poleceń",
       "varsShort": "{{count}}z",
       "skillsShort": "{{count}}u",
       "commandsShort": "{{count}}p"
@@ -3750,6 +3783,8 @@
     "skillNameInvalid": "Nazwa umiejętności musi zaczynać się od litery lub cyfry i zawierać wyłącznie małe litery, cyfry i myślniki",
     "skillContentRequired": "Wymagane są umiejętności",
     "skillSaveFailed": "Nie udało się zapisać umiejętności",
+    "skillSourceCustom": "Własne",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Wklej SKILL.md, a jego nazwa zostanie wypełniona; dodaj umiejętność ze swojego telefonu bez przeciągania i upuszczania.",
     "skillEditTitle": "Edytuj umiejętność",
     "mcp": {
@@ -3765,7 +3800,7 @@
       "environment": "Środowisko (JSON)",
       "headers": "Nagłówki (JSON)",
       "timeout": "Limit czasu",
-      "secretCount": "Tajna liczba",
+      "secretCount": "Tajna liczba: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3808,6 +3843,9 @@
       "visibilityPrimary": "Podstawowy — pokazany w selektorze",
       "visibilitySubagent": "Subagent — można go wywołać tylko od innych osób",
       "visibilityAll": "Wszyscy – oba",
+      "modePrimary": "Tylko podstawowy",
+      "modeSubagent": "Tylko subagent",
+      "modeAll": "Wszystkie tryby",
       "saveFailed": "Nie udało się zapisać agenta",
       "deleteFailed": "Nie udało się usunąć agenta",
       "nameRequired": "Wprowadź nazwę agenta",
@@ -3868,6 +3906,8 @@
     "empty": "Pakiety kredytów są obecnie niedostępne.",
     "noMatchingProducts": "App Store nie zwrócił pasujących pakietów kredytów.",
     "noMatchingProductsPlay": "Google Play nie zwrócił pasujących pakietów kredytów.",
+    "storeTimedOut": "App Store nie odpowiedział na czas. Spróbuj ponownie.",
+    "storeTimedOutPlay": "Google Play nie odpowiedział na czas. Spróbuj ponownie.",
     "purchaseOwnedByAnotherAccount": "Kredyty na tym koncie Apple należą do innego konta Kilo. Zaloguj się na to konto Kilo, aby z nich korzystać.",
     "purchaseOwnedByAnotherAccountPlay": "Kredyty na tym koncie Google Play należą do innego konta Kilo. Zaloguj się na to konto Kilo, aby z nich korzystać."
   },
@@ -4025,6 +4065,33 @@
     "enable": "Włącz płatne podsumowania",
     "contextSettings": "Ustawienia AI · {{context}}",
     "allContexts": "Raporty osobiste i organizacji są przechowywane oddzielnie.",
+    "create": "Utwórz raport",
+    "oneOff": "Jednorazowy",
+    "createdAt": "Utworzono {{time}}",
+    "chooseContext": "Wybierz jeden kontekst",
+    "period": "Okres raportu",
+    "last24Hours": "Ostatnie 24 godziny",
+    "last7Days": "Ostatnie 7 dni",
+    "customPeriod": "Niestandardowy okres",
+    "periodStart": "Początek okresu",
+    "periodEnd": "Koniec okresu",
+    "periodHint": "Wybierz maksymalnie 31 dni. Dane historyczne mogą być niepełne.",
+    "periodSessions": "Sesje aktywne w okresie",
+    "periodSpend": "Wydatki w okresie",
+    "invalidPeriod": "Wybierz początek wcześniejszy niż koniec.",
+    "futurePeriod": "Okres nie może kończyć się w przyszłości.",
+    "periodTooLong": "Wybierz okres nie dłuższy niż 31 dni.",
+    "invalidLocalTime": "Ten czas lokalny nie istnieje w strefie czasowej raportu. Wybierz inny czas.",
+    "reviewBriefing": "Przejrzyj raport",
+    "reviewAgain": "Przygotuj nowy przegląd",
+    "payer": "Opłata obciąża {{context}}",
+    "emptyPeriod": "Nie znaleziono aktywności w tym okresie. Podsumowanie AI nie zostanie utworzone, a opłata nie zostanie naliczona.",
+    "emptyHistory": "Brak zapisanych raportów",
+    "historicalStateHint": "Stan sesji odzwierciedla koniec wybranego okresu, a nie bieżący stan na żywo.",
+    "oneOffHint": "AI otrzymuje wybrane materiały z usuniętymi danymi wrażliwymi w języku aplikacji. Ten jednorazowy raport nie zmienia porannego harmonogramu ani preferencji AI.",
+    "createOffline": "Połącz się z internetem, aby przejrzeć lub utworzyć raport. Płatne żądania nigdy nie są kolejkowane w trybie offline.",
+    "estimateInputTooLarge": "Ten okres zawiera zbyt dużo materiałów dla wybranego modelu.",
+    "estimatePermissionUnavailable": "Nie masz uprawnień do korzystania ze środków w tym kontekście.",
     "estimatePricingUnavailable": "Cennik tego modelu jest niedostępny.",
     "estimateBalanceUnavailable": "Brak wystarczających środków na płatne podsumowanie.",
     "estimateModelNotAllowed": "Ten model nie jest tu dozwolony.",

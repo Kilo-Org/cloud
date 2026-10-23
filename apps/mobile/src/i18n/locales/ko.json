@@ -226,7 +226,7 @@
     "hideBalance": "잔액 숨기기",
     "showBalance": "잔액 표시",
     "balanceHidden": "잔액이 숨겨짐",
-    "bonusCreditsExpiring": "{{date}}에 만료되는 보너스 크레딧은 {{amount}}입니다.",
+    "bonusCreditsExpiring": "{{date}}에 만료되는 크레딧은 {{amount}}입니다.",
     "signOutTitle": "로그아웃할까요?",
     "signOutMessage": "작업 영역을 이용하려면 다시 로그인해야 합니다.",
     "deleteAccountTitle": "계정을 삭제할까요?",
@@ -895,7 +895,7 @@
     },
     "autoReviews": "자동 리뷰",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket이 연결되지 않았습니다. 조직 소유자와 결제 관리자만 연결할 수 있습니다.",
+      "notConnectedReadOnly": "Bitbucket이 연결되지 않았습니다. 조직 소유자, 관리자, 결제 관리자만 연결할 수 있습니다.",
       "setupIncomplete": "설정이 완료되지 않았습니다. kilo.ai에서 설정을 완료하세요.",
       "setup": "Bitbucket 설정"
     },
@@ -918,7 +918,10 @@
       "starting": "리뷰 시작 중…",
       "title": "수동 리뷰"
     },
-    "notConnectedReadOnly": "{{platform}} 연결이 설정되지 않았습니다. 조직 소유자와 결제 관리자만 연결할 수 있습니다.",
+    "notConnectedReadOnly": "{{platform}} 연결이 설정되지 않았습니다. 조직 소유자와 관리자만 연결할 수 있습니다.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} 연결이 설정되지 않았습니다. 조직 소유자, 관리자 또는 결제 관리자에게 연결을 요청하세요."
+    },
     "platformList": {
       "activity": "활동",
       "checking": "확인 중…",
@@ -997,7 +1000,7 @@
       "off": "리뷰 메모리가 꺼져 있습니다.",
       "on": "리뷰 메모리가 켜져 있습니다.",
       "offDescription": "리뷰 메모리를 활성화하면 Kilo가 유지보수 담당자의 답변을 학습하여 REVIEW.md 지침을 제안합니다.",
-      "readOnlyDescription": "조직 소유자와 결제 관리자만 리뷰 메모리를 변경할 수 있습니다.",
+      "readOnlyDescription": "조직 소유자, 관리자, 결제 관리자만 리뷰 메모리를 변경할 수 있습니다.",
       "title": "리뷰 메모리"
     },
     "scopeList": {
@@ -1149,7 +1152,7 @@
       "summary": "보고서 요약",
       "title": "감사 보고서",
       "unavailable": "감사 보고서 열람 불가",
-      "unavailableDescription": "조직 소유자와 결제 관리자만 감사 보고서를 볼 수 있습니다. 소유자나 결제 관리자에게 접근 권한을 요청하세요.",
+      "unavailableDescription": "조직 소유자, 관리자, 결제 관리자만 감사 보고서를 볼 수 있습니다. 소유자, 관리자, 결제 관리자에게 접근 권한을 요청하세요.",
       "eventActions": {
         "findingAnalysisCompleted": "분석 완료됨",
         "findingAnalysisFailed": "분석 실패함",
@@ -1263,7 +1266,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "이 문제는 이미 해결되어 더 이상 무시 처리할 수 없습니다.",
-      "cannotDismissDescription": "조직 소유자와 결제 관리자만 발견된 문제를 무시 처리할 수 있습니다.",
+      "cannotDismissDescription": "조직 소유자, 관리자, 결제 관리자만 발견된 문제를 무시 처리할 수 있습니다.",
       "cannotDismissTitle": "이 문제를 무시 처리할 수 없음",
       "commentAccessibility": "무시 처리에 대한 추가 설명",
       "commentLabel": "추가 설명(선택 사항)",
@@ -1395,7 +1398,7 @@
       "automationCount": "3개 중 {{displayCount}}개 활성화됨",
       "couldNotLoadPermissions": "권한을 불러올 수 없습니다.",
       "couldNotLoadSettings": "보안 에이전트 설정을 불러올 수 없습니다.",
-      "disabledNoManage": "보안 에이전트가 비활성화되어 있습니다. 조직 소유자와 결제 관리자만 활성화할 수 있습니다.",
+      "disabledNoManage": "보안 에이전트가 비활성화되어 있습니다. 조직 소유자, 관리자, 결제 관리자만 활성화할 수 있습니다.",
       "disabledNoRepo": "보안 에이전트를 활성화하기 전에 저장소를 하나 이상 선택하세요.",
       "disabledPrompt": "보안 에이전트를 활성화하여 Dependabot 알림을 동기화하고, 저장소를 선택하고, 자동화를 설정하세요.",
       "notificationsCount": "2개 중 {{displayCount}}개 활성화됨",
@@ -1428,7 +1431,7 @@
       "lowDescription": "보안에 미치는 영향이 매우 적습니다.",
       "medium": "중간",
       "mediumDescription": "영향이 제한적이거나 특정 조건에서만 발생합니다.",
-      "permissionNote": "조직 소유자와 결제 관리자만 이 설정을 변경할 수 있습니다.",
+      "permissionNote": "조직 소유자, 관리자, 결제 관리자만 이 설정을 변경할 수 있습니다.",
       "remediationDeadlineA11y": "{{label}} 수정 기한, 일 단위",
       "title": "SLA 정책"
     },
@@ -1711,6 +1714,9 @@
       "noRepositoriesVisibleGitlab": "표시할 저장소가 없습니다. GitLab의 저장소 접근 권한을 확인한 후 새로고침하세요.",
       "noRepositoriesVisibleBitbucket": "표시할 저장소가 없습니다. Bitbucket의 저장소 접근 권한을 확인한 후 새로고침하세요.",
       "bitbucketOrganizationsOnly": "Bitbucket은 조직에서만 사용할 수 있습니다.",
+      "githubNeedsAttention": "GitHub 재연결 필요",
+      "githubNeedsAttentionDescription": "Kilo GitHub 앱을 다시 연결한 후 새로고침하여 저장소를 불러오세요.",
+      "partialRepositories": "일부 GitHub 저장소를 불러오지 못했습니다.",
       "branchPickerTitle": "브랜치 선택",
       "branchDefault": "기본값",
       "branchAccessibility": "브랜치: {{label}}",
@@ -1718,6 +1724,7 @@
       "branchLoadError": "브랜치를 불러오지 못했습니다",
       "branchUnavailable": "이 저장소에서는 브랜치를 사용할 수 없습니다. 공급업체에서의 접근 권한을 확인한 후 다른 저장소를 선택하세요.",
       "branchEmpty": "사용 가능한 브랜치가 없습니다",
+      "branchListIncomplete": "일부 브랜치만 표시됩니다. 이 저장소에는 이 목록에 담을 수 있는 것보다 더 많은 브랜치가 있습니다.",
       "branchPlaceholder": "브랜치 선택",
       "runOnWithTarget": "실행 위치: {{target}}",
       "environment": "환경",
@@ -1729,6 +1736,8 @@
       "commitAndPush": "커밋 및 푸시",
       "startSession": "세션 시작",
       "selectRepositoryToStart": "시작하려면 저장소를 선택하세요.",
+      "enterPromptToStart": "시작하려면 프롬프트를 추가하세요.",
+      "enterPromptOrFileToStart": "시작하려면 프롬프트 또는 파일을 추가하세요.",
       "connectProviderToStart": "시작하려면 서비스를 연결하세요.",
       "promptPlaceholder": "어떤 작업을 할까요?",
       "couldNotLoadModels": "모델을 불러올 수 없습니다.",
@@ -2550,6 +2559,8 @@
     },
     "connectionExpired": "GitHub 연결이 만료되었습니다.",
     "couldNotLoadPullRequest": "풀 리퀘스트를 불러오지 못했습니다.",
+    "reviewServiceUnavailable": "리뷰 서비스를 사용할 수 없습니다",
+    "reviewServiceUnavailableDescription": "리뷰 서비스를 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.",
     "couldNotOpenGitHubAppSettings": "GitHub 앱 설정을 열지 못했습니다.",
     "description": "설명",
     "discussion": {
@@ -2960,6 +2971,7 @@
       "truncationBanner_other": "GitHub API 제한으로 변경된 파일 {{total}}개 중 처음 {{limit}}개만 표시합니다."
     },
     "linkPasteClipboardEmpty": "클립보드가 비어 있습니다.",
+    "linkPasteDenied": "붙여넣기 권한이 거부되었습니다. 붙여넣기를 허용한 후 다시 시도하세요.",
     "linkPasteNotAPullRequest": "풀 리퀘스트 또는 머지 요청 링크가 아닙니다",
     "announce": {
       "commentPosted": "댓글이 게시되었습니다",
@@ -3014,6 +3026,7 @@
 
       "chooseAccount": "계정 선택",
       "loadErrorTitle": "조직 목록을 불러올 수 없습니다.",
+      "membershipLostNotice": "이 조직에 더 이상 접근할 수 없습니다. {{target}}(으)로 전환되었습니다.",
       "noOrganization": "조직 없음",
 
       "noOrganizationDescription": "이 계정은 조직에 속해 있지 않습니다. 멤버 초대 및 잔액 부족 알림과 같은 조직 기능을 사용하려면 웹에서 조직을 만들거나 참여하세요.",
@@ -3106,7 +3119,7 @@
     "members": {
       "changeRole": "역할 변경",
       "emptyDescriptionCanInvite": "이 조직에서 협업을 시작하려면 팀원을 초대하세요.",
-      "emptyDescriptionCannotInvite": "소유자나 결제 관리자에게 팀원 초대를 요청하세요.",
+      "emptyDescriptionCannotInvite": "소유자, 관리자, 결제 관리자에게 팀원 초대를 요청하세요.",
       "emptyTitle": "아직 멤버 없음",
       "invitedDate": "{{date}}에 초대됨",
       "limitPerDay": "일일 {{amount}}",
@@ -3371,9 +3384,15 @@
       "settingsToolsOn": "켜짐 — 설정 도구가 모델로 전송됩니다",
       "settingsToolsOff": "꺼짐 — 설정 도구가 모델로 전송되지 않습니다",
       "serverChecking": "이 서버를 확인하는 중…",
-      "serverToolCount": "도구 {{count}}개",
+      "serverToolCount_one": "도구 {{count}}개",
+      "serverToolCount_other": "도구 {{count}}개",
       "serverUnreachable": "이 서버에 연결할 수 없습니다",
-      "serverOff": "이 서버는 꺼져 있습니다"
+      "serverOff": "이 서버는 꺼져 있습니다",
+      "app": {
+        "label": "도구 인터페이스",
+        "failed": "이 도구의 인터페이스를 불러올 수 없습니다.",
+        "empty": "이 도구의 인터페이스에 표시할 항목이 없습니다."
+      }
     },
     "mcpOAuth": {
       "authMethod": "인증",
@@ -3518,6 +3537,8 @@
       "quantizationsHelp": "파일이 작을수록 메모리와 저장 공간을 적게 사용합니다. 파일이 클수록 대체로 더 나은 답변을 제공합니다.",
       "quantDetail": "다운로드 {{size}} · 메모리 약 {{memory}}",
       "downloadQuant": "{{quant}} 다운로드",
+      "downloadModelA11y": "{{name}} 다운로드",
+      "detailsA11y": "세부 정보: {{name}}",
       "loadingModel": "모델 세부 정보를 불러오는 중",
       "couldNotLoadModel": "이 모델을 불러올 수 없습니다",
       "noFiles": "이 앱에서 실행할 수 있는 파일이 없습니다",
@@ -3569,6 +3590,7 @@
   "appActions": {
     "start": {
       "promptRequired": "에이전트를 시작하려면 프롬프트가 필요합니다. 프롬프트를 추가하고 다시 실행하세요.",
+      "repositoryRequired": "에이전트를 시작하려면 저장소가 필요합니다. Kilo를 열고 저장소를 선택한 다음 다시 실행하세요.",
       "repositoryUnknown": "Kilo는 {{repository}}을(를) GitHub 또는 GitLab 저장소로 인식하지 않습니다. Kilo에서 다른 저장소를 선택하세요.",
       "repositoryUnsupported": "{{repository}}은(는) Bitbucket 저장소입니다 — 에이전트 시작은 아직 이를 사용할 수 없습니다. Kilo에서 다른 저장소를 선택하세요."
     }
@@ -3606,10 +3628,13 @@
     "emptyDescription": "세션 전체에서 환경 변수, 설정 명령 및 기술을 재사용하기 위한 프로필을 만듭니다.",
     "loadFailed": "프로필을 로드할 수 없습니다.",
     "counts": {
-      "vars": "{{count}} 변수",
+      "vars_one": "{{count}} 변수",
+      "vars_other": "{{count}} 변수",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} 스킬",
-      "commands": "{{count}} 명령",
+      "skills_one": "{{count}} 스킬",
+      "skills_other": "{{count}} 스킬",
+      "commands_one": "{{count}} 명령",
+      "commands_other": "{{count}} 명령",
       "varsShort": "{{count}}변",
       "skillsShort": "{{count}}스",
       "commandsShort": "{{count}}명"
@@ -3668,6 +3693,8 @@
     "skillNameInvalid": "스킬 이름은 문자 또는 숫자로 시작해야 하며 소문자, 숫자, 대시만 사용할 수 있습니다.",
     "skillContentRequired": "스킬 내용이 필요합니다",
     "skillSaveFailed": "스킬 저장이 안되네요",
+    "skillSourceCustom": "커스텀",
+    "skillSourceMarketplace": "마켓플레이스",
     "skillsHint": "SKILL.md를 붙여넣으면 이름이 채워집니다. 드래그 앤 드롭 없이 휴대폰에서 스킬을 추가하세요.",
     "skillEditTitle": "스킬 편집",
     "mcp": {
@@ -3683,7 +3710,7 @@
       "environment": "환경(JSON)",
       "headers": "헤더(JSON)",
       "timeout": "시간 초과",
-      "secretCount": "비밀 카운트",
+      "secretCount": "비밀 카운트: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3726,6 +3753,9 @@
       "visibilityPrimary": "기본 — 선택기에 표시됨",
       "visibilitySubagent": "하위 에이전트 — 다른 사람에게서만 호출 가능",
       "visibilityAll": "모두 — 둘 다",
+      "modePrimary": "기본 전용",
+      "modeSubagent": "하위 에이전트 전용",
+      "modeAll": "모든 모드",
       "saveFailed": "에이전트를 저장할 수 없습니다.",
       "deleteFailed": "에이전트를 삭제할 수 없습니다.",
       "nameRequired": "상담사 이름을 입력하세요.",
@@ -3786,6 +3816,8 @@
     "empty": "현재 크레딧 팩을 사용할 수 없습니다.",
     "noMatchingProducts": "App Store에서 일치하는 크레딧 팩을 반환하지 않았습니다.",
     "noMatchingProductsPlay": "Google Play에서 일치하는 크레딧 팩을 반환하지 않았습니다.",
+    "storeTimedOut": "App Store에서 제시간에 응답하지 않았습니다. 다시 시도",
+    "storeTimedOutPlay": "Google Play에서 제시간에 응답하지 않았습니다. 다시 시도",
     "purchaseOwnedByAnotherAccount": "이 Apple Account의 크레딧은 다른 Kilo 계정에 속해 있습니다. 사용하려면 해당 Kilo 계정에 로그인하세요.",
     "purchaseOwnedByAnotherAccountPlay": "이 Google Play 계정의 크레딧은 다른 Kilo 계정에 속합니다. 사용하려면 해당 Kilo 계정으로 로그인하세요."
   },
@@ -3935,6 +3967,33 @@
     "enable": "유료 요약 사용",
     "contextSettings": "AI 설정 · {{context}}",
     "allContexts": "개인 및 조직 브리핑은 별도로 관리됩니다.",
+    "create": "브리핑 만들기",
+    "oneOff": "일회성",
+    "createdAt": "{{time}} 생성",
+    "chooseContext": "컨텍스트 하나 선택",
+    "period": "브리핑 대상 기간",
+    "last24Hours": "지난 24시간",
+    "last7Days": "지난 7일",
+    "customPeriod": "사용자 지정 기간",
+    "periodStart": "기간 시작",
+    "periodEnd": "기간 종료",
+    "periodHint": "최대 31일까지 선택하세요. 과거 데이터가 일부 누락되어 있을 수 있습니다.",
+    "periodSessions": "기간 내 활성 세션",
+    "periodSpend": "기간 내 지출",
+    "invalidPeriod": "종료 시점보다 이른 시작 시점을 선택하세요.",
+    "futurePeriod": "기간 종료 시점은 미래일 수 없습니다.",
+    "periodTooLong": "31일 이내의 기간을 선택하세요.",
+    "invalidLocalTime": "이 현지 시각은 브리핑 시간대에 존재하지 않습니다. 다른 시각을 선택하세요.",
+    "reviewBriefing": "브리핑 검토",
+    "reviewAgain": "새 검토 준비",
+    "payer": "{{context}}에 요금 부과",
+    "emptyPeriod": "이 기간에 활동이 없습니다. AI 요약이 생성되지 않으며 요금도 부과되지 않습니다.",
+    "emptyHistory": "저장된 브리핑 없음",
+    "historicalStateHint": "세션 상태는 현재 실시간 상태가 아니라 선택한 기간의 종료 시점 상태를 반영합니다.",
+    "oneOffHint": "AI는 선택된 근거 자료에서 민감한 정보를 가린 후 앱 언어로 전달받습니다. 이 일회성 보고서는 아침 일정이나 AI 환경설정을 변경하지 않습니다.",
+    "createOffline": "브리핑을 검토하거나 만들려면 인터넷에 연결하세요. 유료 요청은 오프라인 상태에서 대기열에 추가되지 않습니다.",
+    "estimateInputTooLarge": "이 기간의 근거 자료가 선택한 모델이 처리하기에 너무 많습니다.",
+    "estimatePermissionUnavailable": "이 컨텍스트의 잔액을 사용할 권한이 없습니다.",
     "estimatePricingUnavailable": "이 모델의 가격 정보를 사용할 수 없습니다.",
     "estimateBalanceUnavailable": "유료 요약을 위한 잔액이 부족합니다.",
     "estimateModelNotAllowed": "이 모델은 여기서 사용할 수 없습니다.",

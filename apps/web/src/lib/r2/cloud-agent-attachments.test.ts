@@ -125,9 +125,8 @@ describe('cloud-agent attachment upload URL signing', () => {
     expect(mockGetSignedUrl).not.toHaveBeenCalled();
   });
 
-  it('preserves image-only App Builder key generation and metadata', async () => {
+  it('preserves image-only key generation and metadata', async () => {
     await generateImageUploadUrl({
-      service: 'app-builder',
       userId: 'user-1',
       messageUuid: MESSAGE_UUID,
       imageId: ATTACHMENT_ID,
@@ -137,7 +136,7 @@ describe('cloud-agent attachment upload URL signing', () => {
 
     const command = mockGetSignedUrl.mock.calls[0]?.[1] as { input: Record<string, unknown> };
     expect(command.input).toMatchObject({
-      Key: `user-1/app-builder/${MESSAGE_UUID}/${ATTACHMENT_ID}.png`,
+      Key: `user-1/cloud-agent/${MESSAGE_UUID}/${ATTACHMENT_ID}.png`,
       Metadata: { imageId: ATTACHMENT_ID },
     });
   });

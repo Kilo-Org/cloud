@@ -226,7 +226,7 @@
     "hideBalance": "Balansni yashirish",
     "showBalance": "Balansni ko'rsatish",
     "balanceHidden": "Balans yashirilgan",
-    "bonusCreditsExpiring": "{{amount}} miqdoridagi bonus kreditlarning muddati {{date}} sanasida tugaydi.",
+    "bonusCreditsExpiring": "{{amount}} miqdoridagi kreditlarning muddati {{date}} sanasida tugaydi.",
     "signOutTitle": "Tizimdan chiqilsinmi?",
     "signOutMessage": "Ish maydoningizdan foydalanish uchun hisobingizga qayta kirishingiz kerak bo‘ladi.",
     "deleteAccountTitle": "Hisob o'chirilsinmi?",
@@ -593,6 +593,8 @@
     "installKiloGitHubApp": "Kilo GitHub ilovasini o'rnatish",
     "checkConnection": "Ulanishni tekshirish",
     "couldNotLoadPullRequest": "PRni yuklab bo'lmadi.",
+    "reviewServiceUnavailable": "Xizmat mavjud emas",
+    "reviewServiceUnavailableDescription": "Xizmat vaqtincha mavjud emas. Yaqinda qayta urinib ko'ring.",
     "description": "Tavsif",
     "noDescriptionProvided": "Tavsif berilmagan.",
     "review": "Ko‘rib chiqish",
@@ -764,6 +766,7 @@
       "truncationBanner_other": "O'zgargan {{total}} ta fayldan dastlabki {{limit}} tasi ko'rsatilmoqda — bu GitHub API cheklovi."
     },
     "linkPasteClipboardEmpty": "Nusxalash buferi bo'sh.",
+    "linkPasteDenied": "Joylashga kirish rad etildi. Joylashga ruxsat bering va qaytadan urinib ko'ring.",
     "linkPasteNotAPullRequest": "Bu PR yoki merge so‘rovi havolasi emas",
     "announce": {
       "commentPosted": "Izoh joylashtirildi",
@@ -1459,7 +1462,7 @@
       "off": "Ko'rib chiqish xotirasi o'chiq.",
       "on": "Ko'rib chiqish xotirasi yoniq.",
       "offDescription": "Kilo loyiha mas'ullarining javoblaridan o'rganishi va REVIEW.md uchun ko'rsatmalar taklif qilishi uchun bu funksiyani yoqing.",
-      "readOnlyDescription": "Faqat tashkilot egalari va hisob-kitob menejerlari ko'rib chiqish xotirasini o'zgartirishi mumkin.",
+      "readOnlyDescription": "Faqat tashkilot egalar, administratorlar va to'lov menejerlari ko'rib chiqish xotirasini o'zgartirishi mumkin.",
       "enable": "Ko'rib chiqish xotirasini yoqish",
       "loadingProposals": "Takliflar yuklanmoqda",
       "couldNotLoadProposals": "Takliflarni yuklab bo'lmadi.",
@@ -1478,7 +1481,10 @@
       "starting": "Ko'rib chiqish boshlanmoqda…",
       "start": "Ko'rib chiqishni boshlash"
     },
-    "notConnectedReadOnly": "{{platform}} ulanmagan. Faqat tashkilot egalari va hisob-kitob menejerlari uni ulashi mumkin.",
+    "notConnectedReadOnly": "{{platform}} ulanmagan. Faqat tashkilot egalar va administratorlar uni ulashi mumkin.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} ulanmagan. Uni ulashni tashkilot Egasi, Administrator yoki To'lov menejeridan so'rang."
+    },
     "webhookSetup": "Vebhukni sozlash yakunlanmagan.",
     "webhookSetupDescription": "Ba'zi repozitoriyalarda avtomatik ko'rib chiqish ishlamasligi mumkin.",
     "autoReviews": "Avtomatik ko'rib chiqishlar",
@@ -1486,7 +1492,7 @@
     "followReviewMd": "REVIEW.md fayliga amal qilish",
     "followReviewMdSubtitle": "Har bir repozitoriyaning REVIEW.md faylidagi ko'rsatmalarga amal qilish",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ulanmagan. Faqat tashkilot egalari va hisob-kitob menejerlari uni ulashi mumkin.",
+      "notConnectedReadOnly": "Bitbucket ulanmagan. Faqat tashkilot egalar, administratorlar va to'lov menejerlari uni ulashi mumkin.",
       "setupIncomplete": "Sozlash yakunlanmagan. Uni kilo.ai saytida yakunlang.",
       "setup": "Bitbucketni sozlash"
     },
@@ -1746,7 +1752,7 @@
       "couldNotLoad": "Bu muammo haqidagi ma’lumotlarni yuklab bo‘lmadi.",
       "couldNotCheckPermissions": "Rad etish huquqini tekshirib bo'lmadi.",
       "cannotDismissTitle": "Bu muammoni rad etib bo'lmaydi",
-      "cannotDismissDescription": "Faqat tashkilot egalari va hisob-kitob menejerlari muammolarni rad etishi mumkin.",
+      "cannotDismissDescription": "Faqat tashkilot egalar, administratorlar va to'lov menejerlari muammolarni rad etishi mumkin.",
       "alreadyResolvedDescription": "Bu muammo allaqachon hal qilingan. Endi uni rad etib bo'lmaydi."
     },
     "findingDetails": {
@@ -1788,7 +1794,7 @@
       "automationAllOff": "Hammasi o'chiq",
       "automationCount": "3 tadan {{displayCount}} tasi yoqilgan",
       "notificationsCount": "2 tadan {{displayCount}} tasi yoqilgan",
-      "disabledNoManage": "Xavfsizlik agenti o'chirilgan. Faqat tashkilot egalari va hisob-kitob menejerlari uni yoqishi mumkin.",
+      "disabledNoManage": "Xavfsizlik agenti o'chirilgan. Faqat tashkilot egalar, administratorlar va to'lov menejerlari uni yoqishi mumkin.",
       "disabledNoRepo": "Xavfsizlik agentini yoqishdan oldin kamida bitta repozitoriyani tanlang.",
       "disabledPrompt": "Dependabot ogohlantirishlarini sinxronlash, repozitoriyalarni tanlash va avtomatlashtirishni sozlash uchun Xavfsizlik agentini yoqing."
     },
@@ -1837,7 +1843,7 @@
       "invalidDayCount": "kunlar soni 1 dan 365 gacha bo'lgan butun son bo'lishi kerak.",
       "remediationDeadlineA11y": "{{label}} darajasidagi muammoni tuzatish muddati, kun hisobida",
       "enterWholeNumber": "1 Dan 365 gacha bo‘lgan butun sonni kiriting",
-      "permissionNote": "Faqat tashkilot egalari va hisob-kitob menejerlari bu sozlamalarni o'zgartira oladi.",
+      "permissionNote": "Faqat tashkilot egalar, administratorlar va to'lov menejerlari bu sozlamalarni o'zgartira oladi.",
       "enableTracking": "SLA kuzatuvini yoqish",
       "enableTrackingSubtitle": "Muammoning xavf darajasiga qarab tuzatish muddatlarini belgilaydi.",
       "deadlinesHeading": "Tuzatish muddatlari (kun)"
@@ -1893,7 +1899,7 @@
       "summary": "Hisobot xulosasi",
       "title": "Audit hisoboti",
       "unavailable": "Audit hisoboti mavjud emas",
-      "unavailableDescription": "Faqat tashkilot egalari va hisob-kitob menejerlari audit hisobotlarini ko'rishi mumkin. Tashkilot egasi yoki hisob-kitob menejeridan sizga kirish huquqini berishni so'rang.",
+      "unavailableDescription": "Faqat tashkilot egalar, administratorlar va to'lov menejerlari audit hisobotlarini ko'rishi mumkin. Tashkilot egasi, administrator yoki to'lov menejeridan sizga kirish huquqini berishni so'rang.",
       "queryFailed": "Hisobot so'rovi tugallanmadi. Qayta urinib ko'ring.",
       "eventActions": {
         "findingAnalysisCompleted": "Tahlil yakunlandi",
@@ -2225,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Repozitoriyalar ko'rinmayapti. GitLab repozitoriyalariga kirish ruxsatlarini tekshiring, so'ng ro'yxatni yangilang.",
       "noRepositoriesVisibleBitbucket": "Repozitoriyalar ko'rinmayapti. Bitbucket repozitoriyalariga kirish ruxsatlarini tekshiring, so'ng ro'yxatni yangilang.",
       "bitbucketOrganizationsOnly": "Bitbucket faqat tashkilotlar uchun mavjud.",
+      "githubNeedsAttention": "GitHub qayta ulanishi kerak",
+      "githubNeedsAttentionDescription": "Kilo GitHub ilovasini qayta ulang, so'ng uning repozitoriyalarini yuklash uchun ro'yxatni yangilang.",
+      "partialRepositories": "Ba'zi GitHub repozitoriyalari yuklanmadi.",
       "branchPickerTitle": "Tarmoqni tanlash",
       "branchDefault": "Standart",
       "branchAccessibility": "Tarmoq: {{label}}",
@@ -2232,6 +2241,7 @@
       "branchLoadError": "Tarmoqlarni yuklab bo‘lmadi",
       "branchUnavailable": "Ushbu repozitoriy uchun tarmoqlar mavjud emas. Provayderdagi kirish huquqingizni tekshiring, so‘ng boshqa repozitoriy tanlang.",
       "branchEmpty": "Mavjud tarmoqlar yo‘q",
+      "branchListIncomplete": "Faqat ba'zi tarmoqlar ko‘rsatilgan. Repozitoriyda bu ro‘yxat sig‘dira oladiganidan ko‘proq tarmoq bor.",
       "branchPlaceholder": "Tarmoq tanlang",
       "runOnWithTarget": "Ishga tushirish muhiti: {{target}}",
       "environment": "Muhit",
@@ -2243,6 +2253,8 @@
       "commitAndPush": "Kommit va yuborish",
       "startSession": "Sessiyani boshlash",
       "selectRepositoryToStart": "Boshlash uchun repozitoriya tanlang.",
+      "enterPromptToStart": "Boshlash uchun so'rov qo'shing.",
+      "enterPromptOrFileToStart": "Boshlash uchun so'rov yoki fayl qo'shing.",
       "connectProviderToStart": "Boshlash uchun provayderni ulang.",
       "promptPlaceholder": "Nima ustida ishlashni xohlaysiz?",
       "couldNotLoadModels": "Modellarni yuklab bo'lmadi.",
@@ -3022,6 +3034,7 @@
 
       "chooseAccount": "Hisobni tanlang",
       "loadErrorTitle": "Tashkilotlaringizni yuklab bo'lmadi.",
+      "membershipLostNotice": "Sizda ushbu tashkilotga kirish huquqi endi yo'q. {{target}} ga o'tkazildi.",
       "noOrganization": "Tashkilot yo'q",
 
       "noOrganizationDescription": "Bu hisob hech qanday tashkilotga tegishli emas. A'zolarni taklif qilish va kam balans haqidagi ogohlantirishlar kabi tashkilot funksiyalaridan foydalanish uchun saytda tashkilot yarating yoki unga qo'shiling.",
@@ -3107,7 +3120,7 @@
     "members": {
       "changeRole": "Rolni o'zgartirish",
       "emptyDescriptionCanInvite": "Bu tashkilotda hamkorlikni boshlash uchun hamkasblarni taklif qiling.",
-      "emptyDescriptionCannotInvite": "Tashkilot egasidan yoki to'lov menejeridan hamkasblarni taklif qilishni so'rang.",
+      "emptyDescriptionCannotInvite": "Tashkilot egasidan, administratordan yoki to'lov menejeridan hamkasblarni taklif qilishni so'rang.",
       "emptyTitle": "Hali a'zolar yo'q",
       "invitedDate": "Taklif qilingan sana: {{date}}",
       "limitPerDay": "kuniga {{amount}}",
@@ -3371,9 +3384,15 @@
       "settingsToolsOn": "Yoniq — sozlama vositalari modelga yuboriladi",
       "settingsToolsOff": "Oʻchiq — modelga hech qanday sozlama vositasi yuborilmaydi",
       "serverChecking": "Bu server tekshirilmoqda…",
-      "serverToolCount": "{{count}} vosita",
+      "serverToolCount_one": "{{count}} vosita",
+      "serverToolCount_other": "{{count}} vosita",
       "serverUnreachable": "Bu serverga yetib boʻlmadi",
-      "serverOff": "Bu server oʻchirilgan"
+      "serverOff": "Bu server oʻchirilgan",
+      "app": {
+        "label": "Vosita interfeysi",
+        "failed": "Ushbu vositanning interfeysini yuklab bo‘lmadi.",
+        "empty": "Ushbu vositanning interfeysida ko‘rsatish uchun hech narsa yo‘q."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autentifikatsiya",
@@ -3518,6 +3537,8 @@
       "quantizationsHelp": "Kichikroq fayllar kamroq operativ va doimiy xotira egallaydi. Kattaroq fayllar odatda yaxshiroq javob beradi.",
       "quantDetail": "Yuklab olish: {{size}} · taxminan {{memory}} operativ xotira",
       "downloadQuant": "{{quant}} yuklab olish",
+      "downloadModelA11y": "{{name}} yuklab olish",
+      "detailsA11y": "Tafsilotlar: {{name}}",
       "loadingModel": "Model tafsilotlari yuklanmoqda",
       "couldNotLoadModel": "Bu modelni yuklab bo‘lmadi",
       "noFiles": "Bu ilova ishga tushira oladigan fayllar yo‘q",
@@ -3569,6 +3590,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Agentni ishga tushirish uchun so'rov kerak. So'rov qo'shing va qayta ishga tushiring.",
+      "repositoryRequired": "Agentni ishga tushirish uchun repozitoriya kerak. Kilo'ni oching, bir repozitoriy tanlang va qayta ishga tushiring.",
       "repositoryUnknown": "Kilo {{repository}} ni GitHub yoki GitLab repozitoriyasi deb tanimaydi. Kilo'da boshqa repozitoriy tanlang.",
       "repositoryUnsupported": "{{repository}} Bitbucket repozitoriyasi — Agentni ishga tushirish hali undan foydalana olmaydi. Kilo'da boshqa repozitoriy tanlang."
     }
@@ -3606,10 +3628,13 @@
     "emptyDescription": "Seanslar davomida muhit o'zgaruvchilari, sozlash buyruqlari va ko'nikmalarni qayta ishlatish uchun profil yarating.",
     "loadFailed": "Profillarni yuklab bo‘lmadi",
     "counts": {
-      "vars": "{{count}} o'zgaruvchi",
+      "vars_one": "{{count}} o'zgaruvchi",
+      "vars_other": "{{count}} o'zgaruvchi",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} ko'nikma",
-      "commands": "{{count}} buyruq",
+      "skills_one": "{{count}} ko'nikma",
+      "skills_other": "{{count}} ko'nikma",
+      "commands_one": "{{count}} buyruq",
+      "commands_other": "{{count}} buyruq",
       "varsShort": "{{count}}o'",
       "skillsShort": "{{count}}k",
       "commandsShort": "{{count}}b"
@@ -3668,6 +3693,8 @@
     "skillNameInvalid": "Malaka nomi harf yoki raqam bilan boshlanishi va faqat kichik harflar, raqamlar va tirelardan foydalanishi kerak",
     "skillContentRequired": "Ko'nikma tarkibi talab qilinadi",
     "skillSaveFailed": "Mahorat saqlanmadi",
+    "skillSourceCustom": "Maxsus",
+    "skillSourceMarketplace": "Bozor",
     "skillsHint": "SKILL.md-ni joylashtiring va uning nomi kiritiladi; sudrab tashlamasdan telefoningizdan mahorat qo'shing.",
     "skillEditTitle": "Tahrirlash mahorati",
     "mcp": {
@@ -3683,7 +3710,7 @@
       "environment": "Atrof-muhit (JSON)",
       "headers": "Sarlavhalar (JSON)",
       "timeout": "Taym-aut; turib qolish; tanaffus",
-      "secretCount": "Yashirin hisob",
+      "secretCount": "Yashirin hisob: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3726,6 +3753,9 @@
       "visibilityPrimary": "Asosiy - tanlovchida ko'rsatilgan",
       "visibilitySubagent": "Subagent - faqat boshqalar tomonidan chaqirilishi mumkin",
       "visibilityAll": "Hammasi - ikkalasi ham",
+      "modePrimary": "Faqat asosiy",
+      "modeSubagent": "Faqat subagent",
+      "modeAll": "Hamma rejimlar",
       "saveFailed": "Agentni saqlab boʻlmadi",
       "deleteFailed": "Agentni oʻchirib boʻlmadi",
       "nameRequired": "Agent nomini kiriting",
@@ -3786,6 +3816,8 @@
     "empty": "Kredit paketlari hozircha mavjud emas.",
     "noMatchingProducts": "App Store mos keladigan kredit paketlarini qaytarmadi.",
     "noMatchingProductsPlay": "Google Play mos keladigan kredit paketlarini qaytarmadi.",
+    "storeTimedOut": "App Store o'z vaqtida javob bermadi. Qayta urinish.",
+    "storeTimedOutPlay": "Google Play o'z vaqtida javob bermadi. Qayta urinish.",
     "purchaseOwnedByAnotherAccount": "Bu Apple Account hisobidagi kreditlar boshqa Kilo hisobiga tegishli. Ulardan foydalanish uchun o'sha Kilo hisobiga kiring.",
     "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hisobidagi kreditlar boshqa Kilo hisobiga tegishli. Ulardan foydalanish uchun o'sha Kilo hisobiga kiring."
   },
@@ -3935,6 +3967,33 @@
     "enable": "Pullik xulosalarni yoqish",
     "contextSettings": "AI sozlamalari · {{context}}",
     "allContexts": "Shaxsiy va tashkilot brifinglari alohida saqlanadi.",
+    "create": "Brifing yaratish",
+    "oneOff": "Bir martalik",
+    "createdAt": "{{time}} da yaratilgan",
+    "chooseContext": "Bitta kontekstni tanlang",
+    "period": "Brifing davri",
+    "last24Hours": "Oxirgi 24 soat",
+    "last7Days": "Oxirgi 7 kun",
+    "customPeriod": "Ixtiyoriy davr",
+    "periodStart": "Davr boshlanishi",
+    "periodEnd": "Davr tugashi",
+    "periodHint": "31 kungacha bo‘lgan davrni tanlang. Tarixiy ma’lumotlar to‘liq bo‘lmasligi mumkin.",
+    "periodSessions": "Davr davomida faol",
+    "periodSpend": "Davr xarajatlari",
+    "invalidPeriod": "Tugash vaqtidan oldingi boshlanish vaqtini tanlang.",
+    "futurePeriod": "Davr kelajakda tugashi mumkin emas.",
+    "periodTooLong": "31 kun yoki undan qisqa davrni tanlang.",
+    "invalidLocalTime": "Bu mahalliy vaqt brifing vaqt mintaqasida mavjud emas. Boshqa vaqtni tanlang.",
+    "reviewBriefing": "Brifingni ko‘rib chiqish",
+    "reviewAgain": "Yangi ko‘rib chiqishni tayyorlash",
+    "payer": "To‘lov {{context}} hisobidan olinadi",
+    "emptyPeriod": "Bu davrda faollik topilmadi. AI xulosasi yaratilmaydi va to‘lov olinmaydi.",
+    "emptyHistory": "Saqlangan brifinglar yo‘q",
+    "historicalStateHint": "Seans holati joriy holatni emas, tanlangan davr oxiridagi holatni aks ettiradi.",
+    "oneOffHint": "AI tanlangan va maxfiy ma’lumotlari olib tashlangan dalillarni ilovangiz tilida oladi. Bu bir martalik hisobot ertalabki jadvalingizni yoki AI sozlamalaringizni o‘zgartirmaydi.",
+    "createOffline": "Brifingni ko‘rib chiqish yoki yaratish uchun internetga ulaning. Pulli so‘rovlar internetga ulanmagan paytda hech qachon navbatga qo‘yilmaydi.",
+    "estimateInputTooLarge": "Bu davrdagi dalillar hajmi tanlangan model uchun juda katta.",
+    "estimatePermissionUnavailable": "Sizda bu kontekst balansidan foydalanish ruxsati yo‘q.",
     "estimatePricingUnavailable": "Bu model uchun narxlar mavjud emas.",
     "estimateBalanceUnavailable": "Pullik xuloma uchun balans yetarli emas.",
     "estimateModelNotAllowed": "Bu model bu yerda ruxsat etilmagan.",

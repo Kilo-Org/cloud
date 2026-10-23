@@ -5,6 +5,7 @@ import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View, type ViewStyle } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { type CodeReviewStatus, isCodeReviewStatus } from '@kilocode/app-shared/code-review';
 import { EmptyState } from '@/components/empty-state';
@@ -22,7 +23,11 @@ import { dedupeById } from '@/lib/query/dedupe-by-id';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = { paddingHorizontal: 24, paddingTop: 16 } satisfies ViewStyle;
+
+// The gutter each row keeps inside the safe-area side insets. In landscape those
+// insets are what clear the sensor housing, so a title never starts under it;
+// portrait insets are zero and this gutter is the whole margin.
+const LIST_CONTENT_GUTTER = 24;
 
 // Tone classes stay mobile-local; the label is the translated catalog key
 // for the same stable status code web reads, so it can't drift from web.
@@ -90,6 +95,17 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const { t } = useTranslation();
   const paddingBottom = useTabBarBottomPadding();
+  const insets = useSafeAreaInsets();
+  // One style for the whole content container: every row starts at the same
+  // offset, including the recycled ones, and a rotation re-derives it once.
+  const listContentContainerStyle = useMemo<ViewStyle>(
+    () => ({
+      paddingTop: 16,
+      paddingLeft: insets.left + LIST_CONTENT_GUTTER,
+      paddingRight: insets.right + LIST_CONTENT_GUTTER,
+    }),
+    [insets.left, insets.right]
+  );
   const {
     data,
     isLoading,
@@ -140,8 +156,8 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
             onPress={() => {
               router.push(
                 (hasConnectedProvider
-                  ? `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/manual-review`
-                  : `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}`) as Href
+                  ? `/(app)/code-reviewer/${scope}/manual-review`
+                  : `/(app)/code-reviewer/${scope}`) as Href
               );
             }}
           >
@@ -189,9 +205,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
                 index < reviews.length - 1 && 'border-b-[0.5px] border-hair-soft'
               )}
               onPress={() => {
-                router.push(
-                  `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/reviews/${review.id}` as Href
-                );
+                router.push(`/(app)/code-reviewer/${scope}/reviews/${review.id}` as Href);
               }}
             >
               <Text className="text-sm font-medium" numberOfLines={1}>

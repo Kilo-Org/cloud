@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { type Text as RNText, ScrollView, View } from 'react-native';
+import { ScrollView, type TextInstance, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
@@ -14,7 +14,7 @@ import {
   getBlockingCardPresentationForKind,
 } from '@/components/agents/blocking-card-state';
 import { permissionToolLabel } from '@/components/agents/permission-tool-label';
-import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
+import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -73,14 +73,14 @@ export function PermissionCard({
   // accessibility element. The focus target is a non-interactive leaf title
   // inside the header; this keeps every Deny/Allow option reachable by
   // VoiceOver while still landing focus on the card when it appears.
-  const titleRef = useRef<RNText | null>(null);
+  const titleRef = useRef<TextInstance | null>(null);
   const presentationRef = useRef(presentation);
   presentationRef.current = presentation;
   useEffect(
     () =>
       applyBlockingCardAppearance(presentationRef.current, titleRef, {
         announce: announceForA11y,
-        focus: moveA11yFocus,
+        focus: requestA11yFocus,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only announce/focus on a new request
     [requestId]

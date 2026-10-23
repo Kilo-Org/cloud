@@ -11,6 +11,7 @@ import type { Page } from '@playwright/test';
  */
 
 const AUTHENTICATE_ROUTE = '/api/auth/passkey/authenticate';
+const REGISTER_ROUTE = '/api/auth/passkey/register';
 const SIGN_IN_PATH = '/users/sign_in?signup=true';
 
 /** The browser's platform authenticator, provisioned with a resident passkey. */
@@ -62,6 +63,15 @@ async function signOut(page: Page): Promise<void> {
   });
 }
 
+/** The JSON the browser's credential API returns for `navigator.credentials.get()`. */
+type AssertionJson = {
+  id: string;
+  rawId: string;
+  type: string;
+  response: { clientDataJSON: string; authenticatorData: string; signature: string };
+  clientExtensionResults: Record<string, unknown>;
+};
+
 test('sign in with a passkey, and refuse a replayed or wrong challenge', async ({
   page,
 }, testInfo) => {
@@ -72,6 +82,24 @@ test('sign in with a passkey, and refuse a replayed or wrong challenge', async (
   // (2) Add a passkey from Connected Accounts and show the row.
   await page.goto('/connected-accounts');
   await expect(page.getByText('No passkeys yet')).toBeVisible();
+
+  // The registration boundary refuses a body that is not a WebAuthn attestation
+  // as a bad request: it names a credential but no attestation object, so no
+  // ceremony runs and nothing is stored.
+  const registerOptions = await page.request.post(REGISTER_ROUTE, { data: { action: 'options' } });
+  expect(registerOptions.ok()).toBe(true);
+  const { challengeId: registerChallengeId } = (await registerOptions.json()) as {
+    challengeId: string;
+  };
+  const malformedAttestation = await page.request.post(REGISTER_ROUTE, {
+    data: {
+      action: 'verify',
+      challengeId: registerChallengeId,
+      response: { id: 'credential-1', rawId: 'credential-1', type: 'public-key', response: {} },
+    },
+  });
+  expect(malformedAttestation.status()).toBe(400);
+
   await page.getByRole('button', { name: 'Add a passkey' }).click();
   const rows = page.getByRole('list', { name: 'Your passkeys' }).getByRole('listitem');
   await expect(rows).toHaveCount(1, { timeout: 30_000 });
@@ -83,12 +111,12 @@ test('sign in with a passkey, and refuse a replayed or wrong challenge', async (
   expect(await sessionEmail(page)).toBeFalsy();
 
   // (4) Sign in with the passkey and land signed in.
-  const verifyBodies: { challengeId: string; response: unknown }[] = [];
+  const verifyBodies: { challengeId: string; response: AssertionJson }[] = [];
   page.on('request', request => {
     if (request.method() !== 'POST' || !request.url().includes(AUTHENTICATE_ROUTE)) return;
     const body = request.postDataJSON() as { action?: string } | null;
     if (body?.action === 'verify') {
-      verifyBodies.push(body as { challengeId: string; response: unknown });
+      verifyBodies.push(body as { challengeId: string; response: AssertionJson });
     }
   });
 
@@ -121,10 +149,19 @@ test('sign in with a passkey, and refuse a replayed or wrong challenge', async (
   expect(optionsResponse.ok()).toBe(true);
   const { challengeId } = (await optionsResponse.json()) as { challengeId: string };
 
+  // The same well-formed assertion, signed for the previous challenge.
   const wrongChallenge = await page.request.post(AUTHENTICATE_ROUTE, {
-    data: { action: 'verify', challengeId, response: captured.response },
+    data: { ...captured, challengeId },
   });
   expect(wrongChallenge.status()).toBe(401);
+
+  // A body that is not a WebAuthn assertion is a bad request, not a refusal.
+  // The inner response alone has no credential id, so it never reaches the
+  // verifier.
+  const malformed = await page.request.post(AUTHENTICATE_ROUTE, {
+    data: { action: 'verify', challengeId, response: captured.response.response },
+  });
+  expect(malformed.status()).toBe(400);
 
   // (1) A device that holds no passkey at all: the ceremony is refused without
   // a crash, the refusal is retryable, and no provider is lost.

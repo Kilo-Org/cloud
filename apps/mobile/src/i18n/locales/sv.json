@@ -226,7 +226,7 @@
     "hideBalance": "Dölj saldo",
     "showBalance": "Visa saldo",
     "balanceHidden": "Saldo dolt",
-    "bonusCreditsExpiring": "{{amount}} i bonuskrediter går ut {{date}}.",
+    "bonusCreditsExpiring": "{{amount}} i krediter går ut {{date}}.",
     "signOutTitle": "Logga ut?",
     "signOutMessage": "Du måste logga in igen för att komma åt din arbetsyta.",
     "deleteAccountTitle": "Ta bort konto?",
@@ -593,6 +593,8 @@
     "installKiloGitHubApp": "Installera GitHub-appen för Kilo",
     "checkConnection": "Kontrollera anslutningen",
     "couldNotLoadPullRequest": "Kunde inte läsa in PR:en.",
+    "reviewServiceUnavailable": "Tjänsten är otillgänglig",
+    "reviewServiceUnavailableDescription": "Tjänsten är tillfälligt otillgänglig. Försök igen om en stund.",
     "description": "Beskrivning",
     "noDescriptionProvided": "Ingen beskrivning har angetts.",
     "review": "Granskning",
@@ -764,6 +766,7 @@
       "truncationBanner_other": "Visar de första {{limit}} av {{total}} ändrade filerna på grund av en begränsning i GitHubs API."
     },
     "linkPasteClipboardEmpty": "Urklipp är tomt",
+    "linkPasteDenied": "Åtkomst till klistra in nekades. Tillåt inklistring och försök igen.",
     "linkPasteNotAPullRequest": "Länken leder inte till en PR eller merge request",
     "announce": {
       "commentPosted": "Kommentar publicerad",
@@ -1459,7 +1462,7 @@
       "off": "Granskningsminnet är avstängt",
       "on": "Granskningsminnet är påslaget",
       "offDescription": "Aktivera det så att Kilo kan lära sig av de projektansvarigas svar och föreslå riktlinjer för REVIEW.md.",
-      "readOnlyDescription": "Endast organisationsägare och faktureringsansvariga kan ändra granskningsminne.",
+      "readOnlyDescription": "Endast organisationsägare, administratörer och faktureringsansvariga kan ändra granskningsminne.",
       "enable": "Aktivera granskningsminne",
       "loadingProposals": "Läser in förslag",
       "couldNotLoadProposals": "Kunde inte läsa in förslagen",
@@ -1478,7 +1481,10 @@
       "starting": "Startar granskning…",
       "start": "Starta granskning"
     },
-    "notConnectedReadOnly": "Det finns ingen anslutning till {{platform}}. Endast organisationsägare och faktureringsansvariga kan skapa anslutningen.",
+    "notConnectedReadOnly": "Det finns ingen anslutning till {{platform}}. Endast organisationsägare och administratörer kan skapa anslutningen.",
+    "gitlab": {
+      "notConnectedReadOnly": "Det finns ingen anslutning till {{platform}}. Be en organisationsägare, administratör eller faktureringsansvarig att ansluta den."
+    },
     "webhookSetup": "Konfigurationen av webbhookar är inte klar",
     "webhookSetupDescription": "Vissa kodarkiv kanske inte granskas automatiskt.",
     "autoReviews": "Automatiska granskningar",
@@ -1486,7 +1492,7 @@
     "followReviewMd": "Följ REVIEW.md",
     "followReviewMdSubtitle": "Följ instruktionerna i varje kodarkivs REVIEW.md-fil",
     "bitbucket": {
-      "notConnectedReadOnly": "Det finns ingen anslutning till Bitbucket. Endast organisationsägare och faktureringsansvariga kan skapa anslutningen.",
+      "notConnectedReadOnly": "Det finns ingen anslutning till Bitbucket. Endast organisationsägare, administratörer och faktureringsansvariga kan skapa anslutningen.",
       "setupIncomplete": "Konfigurationen är inte klar. Slutför den på kilo.ai",
       "setup": "Konfiguration av Bitbucket"
     },
@@ -1746,7 +1752,7 @@
       "couldNotLoad": "Kunde inte läsa in det här fyndet",
       "couldNotCheckPermissions": "Kunde inte kontrollera behörigheten att avfärda fynd",
       "cannotDismissTitle": "Det går inte att avfärda fyndet",
-      "cannotDismissDescription": "Endast organisationsägare och faktureringsansvariga kan avfärda fynd.",
+      "cannotDismissDescription": "Endast organisationsägare, administratörer och faktureringsansvariga kan avfärda fynd.",
       "alreadyResolvedDescription": "Fyndet har redan åtgärdats och kan inte längre avfärdas."
     },
     "findingDetails": {
@@ -1788,7 +1794,7 @@
       "automationAllOff": "Allt avstängt",
       "automationCount": "{{displayCount}} av 3 aktiverade",
       "notificationsCount": "{{displayCount}} av 2 aktiverade",
-      "disabledNoManage": "Security Agent är inaktiverad. Endast organisationsägare och faktureringsansvariga kan aktivera den.",
+      "disabledNoManage": "Security Agent är inaktiverad. Endast organisationsägare, administratörer och faktureringsansvariga kan aktivera den.",
       "disabledNoRepo": "Välj minst ett kodarkiv innan du aktiverar Security Agent.",
       "disabledPrompt": "Aktivera Security Agent för att synkronisera Dependabot-varningar, välja kodarkiv och ställa in automatisering."
     },
@@ -1837,7 +1843,7 @@
       "invalidDayCount": "Ange 1–365 dagar, endast heltal.",
       "remediationDeadlineA11y": "Tidsfrist för åtgärd i dagar, {{label}}",
       "enterWholeNumber": "Ange ett heltal mellan 1 och 365",
-      "permissionNote": "Endast organisationsägare och faktureringsansvariga kan ändra dessa inställningar.",
+      "permissionNote": "Endast organisationsägare, administratörer och faktureringsansvariga kan ändra dessa inställningar.",
       "enableTracking": "Aktivera SLA-uppföljning",
       "enableTrackingSubtitle": "Ange tidsfrister för åtgärder utifrån fyndens allvarlighetsgrad.",
       "deadlinesHeading": "Tidsfrister för åtgärder (dagar)"
@@ -1893,7 +1899,7 @@
       "summary": "Rapportsammanfattning",
       "title": "Revisionsrapport",
       "unavailable": "Revisionsrapporten är inte tillgänglig",
-      "unavailableDescription": "Endast organisationsägare och faktureringsansvariga kan se revisionsrapporter. Be en organisationsägare eller faktureringsansvarig att ge dig åtkomst.",
+      "unavailableDescription": "Endast organisationsägare, administratörer och faktureringsansvariga kan se revisionsrapporter. Be en organisationsägare, administratör eller faktureringsansvarig att ge dig åtkomst.",
       "queryFailed": "Hämtningen av rapporten slutfördes inte. Försök igen.",
       "eventActions": {
         "findingAnalysisCompleted": "Analys slutförd",
@@ -2225,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Inga kodarkiv visas. Kontrollera åtkomsten till kodarkiven i GitLab och uppdatera sedan listan.",
       "noRepositoriesVisibleBitbucket": "Inga kodarkiv visas. Kontrollera åtkomsten till kodarkiven i Bitbucket och uppdatera sedan listan.",
       "bitbucketOrganizationsOnly": "Bitbucket är bara tillgängligt för organisationer.",
+      "githubNeedsAttention": "GitHub måste återanslutas",
+      "githubNeedsAttentionDescription": "Anslut Kilos GitHub-app igen och uppdatera sedan för att läsa in dess kodarkiv.",
+      "partialRepositories": "Vissa kodarkiv från GitHub gick inte att läsa in.",
       "branchPickerTitle": "Välj gren",
       "branchDefault": "Standard",
       "branchAccessibility": "Gren: {{label}}",
@@ -2232,6 +2241,7 @@
       "branchLoadError": "Kunde inte läsa in grenar",
       "branchUnavailable": "Inga grenar är tillgängliga för det här kodarkivet. Kontrollera din åtkomst hos leverantören och välj ett annat kodarkiv.",
       "branchEmpty": "Inga grenar tillgängliga",
+      "branchListIncomplete": "Endast vissa grenar visas. Kodarkivet har fler grenar än den här listan kan innehålla.",
       "branchPlaceholder": "Välj en gren",
       "runOnWithTarget": "Kör på: {{target}}",
       "environment": "Miljö",
@@ -2243,6 +2253,8 @@
       "commitAndPush": "Committa och pusha",
       "startSession": "Starta session",
       "selectRepositoryToStart": "Välj ett kodarkiv för att starta.",
+      "enterPromptToStart": "Lägg till en uppmaning för att starta.",
+      "enterPromptOrFileToStart": "Lägg till en uppmaning eller en fil för att starta.",
       "connectProviderToStart": "Anslut en leverantör för att starta.",
       "promptPlaceholder": "Vad vill du arbeta med?",
       "couldNotLoadModels": "Det gick inte att läsa in modellerna.",
@@ -3022,6 +3034,7 @@
 
       "chooseAccount": "Välj ett konto",
       "loadErrorTitle": "Det gick inte att läsa in dina organisationer.",
+      "membershipLostNotice": "Du har inte längre åtkomst till den här organisationen. Växlade till {{target}}.",
       "noOrganization": "Ingen organisation",
 
       "noOrganizationDescription": "Det här kontot tillhör ingen organisation. Skapa eller gå med i en organisation på webben för att använda organisationsfunktioner som medlemsinbjudningar och varningar om lågt saldo.",
@@ -3106,7 +3119,7 @@
     "members": {
       "changeRole": "Ändra roll",
       "emptyDescriptionCanInvite": "Bjud in kollegor för att börja samarbeta i den här organisationen.",
-      "emptyDescriptionCannotInvite": "Be en ägare eller faktureringsansvarig att bjuda in kollegor.",
+      "emptyDescriptionCannotInvite": "Be en ägare, administratör eller faktureringsansvarig att bjuda in kollegor.",
       "emptyTitle": "Inga medlemmar ännu",
       "invitedDate": "Inbjuden {{date}}",
       "limitPerDay": "{{amount}}/dag",
@@ -3370,9 +3383,15 @@
       "settingsToolsOn": "På — inställningsverktygen skickas till modellen",
       "settingsToolsOff": "Av — inget inställningsverktyg skickas till modellen",
       "serverChecking": "Kontrollerar denna server…",
-      "serverToolCount": "{{count}} verktyg",
+      "serverToolCount_one": "{{count}} verktyg",
+      "serverToolCount_other": "{{count}} verktyg",
       "serverUnreachable": "Kunde inte nå denna server",
-      "serverOff": "Denna server är avstängd"
+      "serverOff": "Denna server är avstängd",
+      "app": {
+        "label": "Verktygsgränssnitt",
+        "failed": "Det här verktygets gränssnitt kunde inte läsas in.",
+        "empty": "Det här verktygets gränssnitt har inget att visa."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autentisering",
@@ -3517,6 +3536,8 @@
       "quantizationsHelp": "Mindre filer använder mindre minne och lagringsutrymme. Större filer ger oftast bättre svar.",
       "quantDetail": "{{size}} nedladdning · cirka {{memory}} minne",
       "downloadQuant": "Ladda ner {{quant}}",
+      "downloadModelA11y": "Ladda ner {{name}}",
+      "detailsA11y": "Detaljer: {{name}}",
       "loadingModel": "Läser in modellinformation",
       "couldNotLoadModel": "Det gick inte att läsa in den här modellen",
       "noFiles": "Inga filer som appen kan köra",
@@ -3568,6 +3589,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Starta agenten kräver en prompt. Lägg till en prompt och kör den igen.",
+      "repositoryRequired": "Starta agenten kräver ett kodarkiv. Öppna Kilo och välj ett, kör den sedan igen.",
       "repositoryUnknown": "Kilo känner inte igen {{repository}} som ett GitHub- eller GitLab-kodarkiv. Välj ett annat kodarkiv i Kilo.",
       "repositoryUnsupported": "{{repository}} är ett Bitbucket-kodarkiv — Starta agenten kan ännu inte använda det. Välj ett annat kodarkiv i Kilo."
     }
@@ -3605,14 +3627,11 @@
     "emptyDescription": "Skapa en profil för att återanvända miljövariabler, installationskommandon och färdigheter över sessioner.",
     "loadFailed": "Det gick inte att läsa in profiler",
     "counts": {
-      "vars": "{{count}} variabler",
       "vars_one": "{{count}} variabel",
       "vars_other": "{{count}} variabler",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} färdigheter",
       "skills_one": "{{count}} färdighet",
       "skills_other": "{{count}} färdigheter",
-      "commands": "{{count}} kommandon",
       "commands_one": "{{count}} kommando",
       "commands_other": "{{count}} kommandon",
       "varsShort": "{{count}}var",
@@ -3673,6 +3692,8 @@
     "skillNameInvalid": "Färdighetsnamn måste börja med en bokstav eller siffra och endast använda små bokstäver, siffror och bindestreck",
     "skillContentRequired": "Färdighetsinnehåll krävs",
     "skillSaveFailed": "Det gick inte att spara färdigheten",
+    "skillSourceCustom": "Anpassad",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Klistra in en SKILL.md och dess namn fylls i; lägg till en färdighet från din telefon utan att dra och släppa.",
     "skillEditTitle": "Redigera färdighet",
     "mcp": {
@@ -3688,7 +3709,7 @@
       "environment": "Miljö (JSON)",
       "headers": "Rubriker (JSON)",
       "timeout": "Timeout",
-      "secretCount": "Antal hemligheter",
+      "secretCount": "Antal hemligheter: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3731,6 +3752,9 @@
       "visibilityPrimary": "Primär — visas i väljaren",
       "visibilitySubagent": "Subagent — endast anropsbar från andra",
       "visibilityAll": "Alla — båda",
+      "modePrimary": "Endast primär",
+      "modeSubagent": "Endast subagent",
+      "modeAll": "Alla lägen",
       "saveFailed": "Det gick inte att spara agenten",
       "deleteFailed": "Det gick inte att ta bort agenten",
       "nameRequired": "Ange ett agentnamn",
@@ -3791,6 +3815,8 @@
     "empty": "Kreditpaket är inte tillgängliga just nu.",
     "noMatchingProducts": "App Store returnerade inga matchande kreditpaket.",
     "noMatchingProductsPlay": "Google Play returnerade inga matchande kreditpaket.",
+    "storeTimedOut": "App Store svarade inte i tid. Försök igen.",
+    "storeTimedOutPlay": "Google Play svarade inte i tid. Försök igen.",
     "purchaseOwnedByAnotherAccount": "Krediterna på detta Apple-konto tillhör ett annat Kilo-konto. Logga in på det Kilo-kontot för att använda dem.",
     "purchaseOwnedByAnotherAccountPlay": "Krediterna på detta Google Play-konto tillhör ett annat Kilo-konto. Logga in på det Kilo-kontot för att använda dem."
   },
@@ -3940,6 +3966,33 @@
     "enable": "Aktivera betalda sammanfattningar",
     "contextSettings": "AI-inställningar · {{context}}",
     "allContexts": "Personliga sammanfattningar och organisationssammanfattningar hålls åtskilda.",
+    "create": "Skapa sammanfattning",
+    "oneOff": "Engångsrapport",
+    "createdAt": "Skapad {{time}}",
+    "chooseContext": "Välj en kontext",
+    "period": "Sammanfattningsperiod",
+    "last24Hours": "Senaste 24 timmarna",
+    "last7Days": "Senaste 7 dagarna",
+    "customPeriod": "Anpassad period",
+    "periodStart": "Periodens början",
+    "periodEnd": "Periodens slut",
+    "periodHint": "Välj upp till 31 dagar. Historiska uppgifter kan vara ofullständiga.",
+    "periodSessions": "Aktiva under perioden",
+    "periodSpend": "Kostnad under perioden",
+    "invalidPeriod": "Välj en starttid före sluttiden.",
+    "futurePeriod": "Perioden kan inte sluta i framtiden.",
+    "periodTooLong": "Välj en period på högst 31 dagar.",
+    "invalidLocalTime": "Den här lokala tiden finns inte i sammanfattningens tidszon. Välj en annan tid.",
+    "reviewBriefing": "Granska sammanfattning",
+    "reviewAgain": "Förbered en ny granskning",
+    "payer": "Debiteras {{context}}",
+    "emptyPeriod": "Ingen aktivitet hittades under den här perioden. Ingen AI-sammanfattning skapas och ingen avgift tas ut.",
+    "emptyHistory": "Inga sparade sammanfattningar",
+    "historicalStateHint": "Sessionens tillstånd återspeglar slutet av den valda perioden, inte aktuell status i realtid.",
+    "oneOffHint": "AI får utvalt underlag med känsliga uppgifter maskerade, på appens språk. Den här engångsrapporten ändrar inte ditt morgonschema eller dina AI-inställningar.",
+    "createOffline": "Anslut till internet för att granska eller skapa en sammanfattning. Betalda förfrågningar köas aldrig utan internetanslutning.",
+    "estimateInputTooLarge": "Den här perioden innehåller för mycket underlag för den valda modellen.",
+    "estimatePermissionUnavailable": "Du har inte behörighet att använda saldot för den här kontexten.",
     "estimatePricingUnavailable": "Prissättning för denna modell är inte tillgänglig.",
     "estimateBalanceUnavailable": "Inte tillräcklig saldo för en betald sammanfattning.",
     "estimateModelNotAllowed": "Denna modell är inte tillåten här.",

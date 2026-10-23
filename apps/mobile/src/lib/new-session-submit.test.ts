@@ -8,6 +8,7 @@ import {
   resolveNewSessionStartDisabled,
   resolveNewSessionSubmitDisabled,
   resolveNewSessionSubmitEnabled,
+  resolveRemoteStartMissingContent,
 } from './new-session-submit';
 
 // Inputs that satisfy every precondition. Used as a base and then
@@ -189,6 +190,30 @@ describe('resolveNewSessionStartDisabled', () => {
   });
 });
 
+describe('resolveRemoteStartMissingContent', () => {
+  it('reports missing content for an empty composer', () => {
+    expect(resolveRemoteStartMissingContent({ hasPrompt: false, hasAttachments: false })).toBe(
+      true
+    );
+  });
+
+  it('accepts prompt text alone', () => {
+    expect(resolveRemoteStartMissingContent({ hasPrompt: true, hasAttachments: false })).toBe(
+      false
+    );
+  });
+
+  it('accepts a file alone, exactly as the spawn payload builder does', () => {
+    expect(resolveRemoteStartMissingContent({ hasPrompt: false, hasAttachments: true })).toBe(
+      false
+    );
+  });
+
+  it('accepts a prompt with a file', () => {
+    expect(resolveRemoteStartMissingContent({ hasPrompt: true, hasAttachments: true })).toBe(false);
+  });
+});
+
 describe('resolveContinueStartDisabled', () => {
   it('clone Cloud with no prompt and a loaded repo/model is enabled', () => {
     expect(resolveContinueStartDisabled(continueInput())).toBe(false);
@@ -336,6 +361,8 @@ type ReasonInput = Parameters<typeof resolveNewSessionStartBlockedReason>[0];
 function newSessionReasonInput(overrides: {
   hasRepositories?: boolean;
   hasConnectableProvider?: boolean;
+  hasAttachments?: boolean;
+  selectedRepositoryResolved?: boolean;
   isLoadingRepositories?: boolean;
   isRemoteTargetSelected?: boolean;
   selectedRepo?: string;
@@ -345,6 +372,8 @@ function newSessionReasonInput(overrides: {
     entry: 'new-session',
     hasRepositories: overrides.hasRepositories ?? true,
     hasConnectableProvider: overrides.hasConnectableProvider ?? false,
+    hasAttachments: overrides.hasAttachments ?? false,
+    selectedRepositoryResolved: overrides.selectedRepositoryResolved ?? true,
     isLoadingRepositories: overrides.isLoadingRepositories ?? false,
     isRemoteTargetSelected: overrides.isRemoteTargetSelected ?? false,
     selectedRepo: overrides.selectedRepo ?? '',
@@ -355,6 +384,8 @@ function newSessionReasonInput(overrides: {
 function continueReasonInput(overrides: {
   hasRepositories?: boolean;
   hasConnectableProvider?: boolean;
+  hasAttachments?: boolean;
+  selectedRepositoryResolved?: boolean;
   isLoadingRepositories?: boolean;
   isRemoteTargetSelected?: boolean;
   selectedRepo?: string;
@@ -364,6 +395,8 @@ function continueReasonInput(overrides: {
     entry: 'continue',
     hasRepositories: overrides.hasRepositories ?? true,
     hasConnectableProvider: overrides.hasConnectableProvider ?? false,
+    hasAttachments: overrides.hasAttachments ?? false,
+    selectedRepositoryResolved: overrides.selectedRepositoryResolved ?? true,
     isLoadingRepositories: overrides.isLoadingRepositories ?? false,
     isRemoteTargetSelected: overrides.isRemoteTargetSelected ?? false,
     selectedRepo: overrides.selectedRepo ?? '',
@@ -454,12 +487,111 @@ describe('resolveNewSessionStartBlockedReason', () => {
     ).toBeNull();
   });
 
-  it('returns null for a remote-CLI target', () => {
+  it('returns null for a remote-CLI target that has content', () => {
     expect(
       resolveNewSessionStartBlockedReason(
         newSessionReasonInput({
           isRemoteTargetSelected: true,
           gate: newSessionGate({ isRemoteTargetSelected: true }),
+        })
+      )
+    ).toBeNull();
+  });
+
+  it('names the empty composer for a remote-CLI target with no prompt and no file', () => {
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          isRemoteTargetSelected: true,
+          gate: newSessionGate({ isRemoteTargetSelected: true, hasPrompt: false }),
+        })
+      )
+    ).toBe('enter-prompt-or-file');
+  });
+
+  it('keeps a remote-CLI reason silent once a file is attached without a prompt', () => {
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          isRemoteTargetSelected: true,
+          hasAttachments: true,
+          gate: newSessionGate({ isRemoteTargetSelected: true, hasPrompt: false }),
+        })
+      )
+    ).toBeNull();
+  });
+
+  it('never names a repository or a prompt for a remote-CLI clone entry', () => {
+    expect(
+      resolveNewSessionStartBlockedReason(
+        continueReasonInput({
+          isRemoteTargetSelected: true,
+          gate: continueGate({ isRemoteTargetSelected: true }),
+        })
+      )
+    ).toBeNull();
+  });
+
+  it('names the prompt for Cloud Agent when the repository is chosen and text is all that is left', () => {
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          selectedRepo: 'org/repo',
+          gate: newSessionGate({ hasPrompt: false }),
+        })
+      )
+    ).toBe('enter-prompt');
+  });
+
+  it('names the prompt for Cloud Agent even with an attachment, which does not submit on its own', () => {
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          selectedRepo: 'org/repo',
+          hasAttachments: true,
+          gate: newSessionGate({ hasPrompt: false }),
+        })
+      )
+    ).toBe('enter-prompt');
+  });
+
+  it('stays silent for Cloud Agent when the prompt is missing beside another blocker', () => {
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          selectedRepo: 'org/repo',
+          gate: newSessionGate({ hasPrompt: false, isProfileLoading: true }),
+        })
+      )
+    ).toBeNull();
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          selectedRepo: 'org/repo',
+          gate: newSessionGate({ hasPrompt: false, model: '' }),
+        })
+      )
+    ).toBeNull();
+  });
+
+  it('never blames the prompt for a selected repository that no longer resolves', () => {
+    // A stale picker key blocks Start on its own; the repository section asks
+    // for a new pick, so naming the empty composer would hide the real blocker.
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          selectedRepo: 'org/repo',
+          selectedRepositoryResolved: false,
+          gate: newSessionGate({ hasPrompt: false }),
+        })
+      )
+    ).toBeNull();
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          selectedRepo: 'org/repo',
+          selectedRepositoryResolved: false,
+          gate: newSessionGate({ hasPrompt: true }),
         })
       )
     ).toBeNull();

@@ -121,9 +121,8 @@ export const openAiChatGptRouter = createTRPCRouter({
   status: baseProcedure
     .input(OpenAiChatGptOwnerInputSchema)
     .output(OpenAiChatGptStatusSchema)
-    .query(
-      async ({ ctx, input }): Promise<OpenAiChatGptStatus> =>
-        readStatus(await resolveOwner(ctx, input.organizationId, input.scope))
+    .query(async ({ ctx, input }): Promise<OpenAiChatGptStatus> =>
+      readStatus(await resolveOwner(ctx, input.organizationId, input.scope))
     ),
 
   disconnect: baseProcedure

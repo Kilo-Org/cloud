@@ -226,7 +226,7 @@
     "hideBalance": "બેલેન્સ છુપાવો",
     "showBalance": "બેલેન્સ બતાવો",
     "balanceHidden": "બેલેન્સ છુપાયેલ છે",
-    "bonusCreditsExpiring": "{{amount}}ના બોનસ ક્રેડિટની મુદત {{date}}ના રોજ પૂરી થાય છે.",
+    "bonusCreditsExpiring": "{{amount}}ના ક્રેડિટની મુદત {{date}}ના રોજ પૂરી થાય છે.",
     "signOutTitle": "સાઇન આઉટ કરવું છે?",
     "signOutMessage": "તમારા વર્કસ્પેસનો ઉપયોગ કરવા માટે તમારે ફરી સાઇન ઇન કરવું પડશે.",
     "deleteAccountTitle": "એકાઉન્ટ કાઢી નાખવું છે?",
@@ -593,6 +593,8 @@
     "installKiloGitHubApp": "Kilo GitHub એપ ઇન્સ્ટોલ કરો",
     "checkConnection": "જોડાણ તપાસો",
     "couldNotLoadPullRequest": "પુલ રિક્વેસ્ટ લોડ કરી શકાઈ નહીં.",
+    "reviewServiceUnavailable": "સેવા અનુપલબ્ધ છે",
+    "reviewServiceUnavailableDescription": "સેવા કામટરપણે અનુપલબ્ધ છે. થોડી વારમાં ફરી પ્રયાસ કરો.",
     "description": "વર્ણન",
     "noDescriptionProvided": "કોઈ વર્ણન આપવામાં આવ્યું નથી.",
     "review": "સમીક્ષા",
@@ -764,6 +766,7 @@
       "truncationBanner_other": "બદલાયેલી કુલ {{total}} ફાઇલોમાંથી પહેલી {{limit}} દેખાય છે — આ GitHub APIની મર્યાદા છે."
     },
     "linkPasteClipboardEmpty": "ક્લિપબોર્ડ ખાલી છે.",
+    "linkPasteDenied": "પેસ્ટ કરવાની ઍક્સેસ નકારી દેવામાં આવી. પેસ્ટની મંજૂરી આપો અને ફરી પ્રયત્ન કરો.",
     "linkPasteNotAPullRequest": "આ પુલ રિક્વેસ્ટ કે મર્જ રિક્વેસ્ટનો લિંક નથી",
     "announce": {
       "commentPosted": "ટિપ્પણી પોસ્ટ થઈ",
@@ -1459,7 +1462,7 @@
       "off": "સમીક્ષા મેમરી બંધ છે.",
       "on": "સમીક્ષા મેમરી ચાલુ છે.",
       "offDescription": "Kilo મેન્ટેનરના જવાબોમાંથી શીખી શકે અને REVIEW.md માટે માર્ગદર્શિકા સૂચવી શકે તે માટે આ સુવિધા ચાલુ કરો.",
-      "readOnlyDescription": "માત્ર સંસ્થાના માલિકો અને બિલિંગ મેનેજરો જ સમીક્ષા મેમરી બદલી શકે છે.",
+      "readOnlyDescription": "માત્ર સંસ્થાના માલિકો, એડમિનો અને બિલિંગ મેનેજરો જ સમીક્ષા મેમરી બદલી શકે છે.",
       "enable": "સમીક્ષા મેમરી ચાલુ કરો",
       "loadingProposals": "દરખાસ્તો લોડ થઈ રહી છે",
       "couldNotLoadProposals": "દરખાસ્તો લોડ કરી શકાઈ નહીં.",
@@ -1478,7 +1481,10 @@
       "starting": "સમીક્ષા શરૂ થઈ રહી છે…",
       "start": "સમીક્ષા શરૂ કરો"
     },
-    "notConnectedReadOnly": "{{platform}} જોડાયેલું નથી. માત્ર સંસ્થાના માલિકો અને બિલિંગ મેનેજરો જ તેને જોડી શકે છે.",
+    "notConnectedReadOnly": "{{platform}} જોડાયેલું નથી. માત્ર સંસ્થાના માલિકો અને એડમિનો જ તેને જોડી શકે છે.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} જોડાયેલું નથી. તેને જોડવા માટે સંસ્થાના માલિક, એડમિન અથવા બિલિંગ મેનેજરને વિનંતી કરો."
+    },
     "webhookSetup": "વેબહુકનું સેટઅપ અધૂરું છે.",
     "webhookSetupDescription": "કેટલીક રિપોઝિટરીઓની સ્વચાલિત સમીક્ષા ન થઈ શકે.",
     "autoReviews": "સ્વચાલિત સમીક્ષાઓ",
@@ -1486,7 +1492,7 @@
     "followReviewMd": "REVIEW.md અનુસરો",
     "followReviewMdSubtitle": "દરેક રિપોઝિટરીની REVIEW.md ફાઇલમાં આપેલી સૂચનાઓનું પાલન કરો",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket જોડાયેલું નથી. માત્ર સંસ્થાના માલિકો અને બિલિંગ મેનેજરો જ તેને જોડી શકે છે.",
+      "notConnectedReadOnly": "Bitbucket જોડાયેલું નથી. માત્ર સંસ્થાના માલિકો, એડમિનો અને બિલિંગ મેનેજરો જ તેને જોડી શકે છે.",
       "setupIncomplete": "સેટઅપ અધૂરું છે — kilo.ai પર ગોઠવણી પૂરી કરો.",
       "setup": "Bitbucket સેટઅપ"
     },
@@ -1746,7 +1752,7 @@
       "couldNotLoad": "આ તારણ લોડ કરી શકાયું નહીં.",
       "couldNotCheckPermissions": "ખારિજ કરવાની પરવાનગીઓ ચકાસી શકાઈ નહીં.",
       "cannotDismissTitle": "આ તારણ ખારિજ કરી શકાતું નથી",
-      "cannotDismissDescription": "માત્ર સંસ્થાના માલિકો અને બિલિંગ મેનેજરો જ તારણો ખારિજ કરી શકે છે.",
+      "cannotDismissDescription": "માત્ર સંસ્થાના માલિકો, એડમિનો અને બિલિંગ મેનેજરો જ તારણો ખારિજ કરી શકે છે.",
       "alreadyResolvedDescription": "આ તારણ પહેલેથી ઉકેલાઈ ગયું છે, તેથી હવે તેને ખારિજ કરી શકાતું નથી."
     },
     "findingDetails": {
@@ -1788,7 +1794,7 @@
       "automationAllOff": "બધું બંધ",
       "automationCount": "3 માંથી {{displayCount}} ચાલુ",
       "notificationsCount": "2 માંથી {{displayCount}} ચાલુ",
-      "disabledNoManage": "સુરક્ષા એજન્ટ બંધ છે. માત્ર સંસ્થાના માલિકો અને બિલિંગ મેનેજરો જ તેને ચાલુ કરી શકે છે.",
+      "disabledNoManage": "સુરક્ષા એજન્ટ બંધ છે. માત્ર સંસ્થાના માલિકો, એડમિનો અને બિલિંગ મેનેજરો જ તેને ચાલુ કરી શકે છે.",
       "disabledNoRepo": "સુરક્ષા એજન્ટ ચાલુ કરતાં પહેલાં ઓછામાં ઓછી એક રિપોઝિટરી પસંદ કરો.",
       "disabledPrompt": "Dependabot ની ચેતવણીઓ સિંક કરવા, રિપોઝિટરીઓ પસંદ કરવા અને સ્વચાલન ગોઠવવા સુરક્ષા એજન્ટ ચાલુ કરો."
     },
@@ -1837,7 +1843,7 @@
       "invalidDayCount": "દિવસોની સંખ્યા 1 થી 365 વચ્ચેની પૂર્ણ સંખ્યા હોવી જરૂરી છે.",
       "remediationDeadlineA11y": "{{label}} માટે સુધારણાની સમયમર્યાદા દિવસોમાં",
       "enterWholeNumber": "1થી 365 સુધીનો પૂર્ણાંક દાખલ કરો",
-      "permissionNote": "માત્ર સંસ્થાના માલિકો અને બિલિંગ મેનેજરો જ આ સેટિંગ્સ બદલી શકે છે.",
+      "permissionNote": "માત્ર સંસ્થાના માલિકો, એડમિનો અને બિલિંગ મેનેજરો જ આ સેટિંગ્સ બદલી શકે છે.",
       "enableTracking": "SLA ટ્રેકિંગ ચાલુ કરો",
       "enableTrackingSubtitle": "તારણની ગંભીરતા પ્રમાણે સુધારણાની સમયમર્યાદા નક્કી કરો.",
       "deadlinesHeading": "સુધારણાની સમયમર્યાદા (દિવસોમાં)"
@@ -1893,7 +1899,7 @@
       "summary": "અહેવાલનો સારાંશ",
       "title": "ઑડિટ અહેવાલ",
       "unavailable": "ઑડિટ અહેવાલ ઉપલબ્ધ નથી",
-      "unavailableDescription": "માત્ર સંસ્થાના માલિકો અને બિલિંગ મેનેજરો જ ઑડિટ અહેવાલ જોઈ શકે છે. તે જોવાની પરવાનગી માટે માલિક અથવા બિલિંગ મેનેજરને વિનંતી કરો.",
+      "unavailableDescription": "માત્ર સંસ્થાના માલિકો, એડમિનો અને બિલિંગ મેનેજરો જ ઑડિટ અહેવાલ જોઈ શકે છે. તે જોવાની પરવાનગી માટે માલિક, એડમિન અથવા બિલિંગ મેનેજરને વિનંતી કરો.",
       "queryFailed": "અહેવાલ માટેની ક્વેરી પૂરી થઈ નહીં. ફરી પ્રયાસ કરો.",
       "eventActions": {
         "findingAnalysisCompleted": "વિશ્લેષણ પૂર્ણ થયું",
@@ -2225,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "કોઈ રિપોઝિટરી દેખાતી નથી. GitLab માટે રિપોઝિટરીનો ઍક્સેસ તપાસો, પછી રિફ્રેશ કરો.",
       "noRepositoriesVisibleBitbucket": "કોઈ રિપોઝિટરી દેખાતી નથી. Bitbucket માટે રિપોઝિટરીનો ઍક્સેસ તપાસો, પછી રિફ્રેશ કરો.",
       "bitbucketOrganizationsOnly": "Bitbucket ફક્ત સંસ્થાઓ માટે ઉપલબ્ધ છે.",
+      "githubNeedsAttention": "GitHub ફરી કનેક્ટ કરવાની જરૂર છે",
+      "githubNeedsAttentionDescription": "Kilo GitHub એપને ફરી કનેક્ટ કરો, પછી તેની રિપોઝિટરીઓ લોડ કરવા માટે રિફ્રેશ કરો.",
+      "partialRepositories": "કેટલીક GitHub રિપોઝિટરીઓ લોડ થઈ નહીં.",
       "branchPickerTitle": "બ્રાંચ પસંદ કરો",
       "branchDefault": "ડિફૉલ્ટ",
       "branchAccessibility": "બ્રાંચ: {{label}}",
@@ -2232,6 +2241,7 @@
       "branchLoadError": "બ્રાંચ લોડ થઈ શક્યાં નહીં",
       "branchUnavailable": "આ રિપોઝિટરી માટે બ્રાંચ ઉપલબ્ધ નથી. પ્રદાતા પાસે તમારી એક્સેસ તપાસો, પછી બીજી રિપોઝિટરી પસંદ કરો.",
       "branchEmpty": "કોઈ બ્રાંચ ઉપલબ્ધ નથી",
+      "branchListIncomplete": "માત્ર અમુક બ્રાંચ બતાવવામાં આવી છે. આ રિપોઝિટરીમાં આ યાદીમાં સમાવી શકાય તેથી વધુ બ્રાંચ છે.",
       "branchPlaceholder": "એક બ્રાંચ પસંદ કરો",
       "runOnWithTarget": "{{target}} પર ચલાવો",
       "environment": "કાર્યપરિસર",
@@ -2243,6 +2253,8 @@
       "commitAndPush": "કમિટ અને પુશ કરો",
       "startSession": "સત્ર શરૂ કરો",
       "selectRepositoryToStart": "શરૂ કરવા માટે રિપોઝિટરી પસંદ કરો.",
+      "enterPromptToStart": "શરૂ કરવા માટે એક પ્રોમ્પ્ટ ઉમેરો.",
+      "enterPromptOrFileToStart": "શરૂ કરવા માટે પ્રોમ્પ્ટ કે ફાઇલ ઉમેરો.",
       "connectProviderToStart": "શરૂ કરવા માટે સેવા પ્રદાતા જોડો.",
       "promptPlaceholder": "તમે શેના પર કામ કરવા માંગો છો?",
       "couldNotLoadModels": "મોડલ લોડ કરી શકાયાં નહીં.",
@@ -3022,6 +3034,7 @@
 
       "chooseAccount": "એકાઉન્ટ પસંદ કરો",
       "loadErrorTitle": "તમારી સંસ્થાઓ લોડ કરી શકાઈ નહીં.",
+      "membershipLostNotice": "તમારી પાસે આ સંસ્થાનો ઍક્સેસ હવે નથી. {{target}} પર સ્વિચ કર્યું.",
       "noOrganization": "કોઈ સંસ્થા નથી",
 
       "noOrganizationDescription": "આ એકાઉન્ટ કોઈ સંસ્થાનો ભાગ નથી. સભ્ય આમંત્રણો અને ઓછી બેલેન્સ ચેતવણીઓ જેવી સંસ્થા સુવિધાઓનો ઉપયોગ કરવા માટે વેબ પર સંસ્થા બનાવો અથવા એકમાં જોડાઓ.",
@@ -3107,7 +3120,7 @@
     "members": {
       "changeRole": "ભૂમિકા બદલો",
       "emptyDescriptionCanInvite": "આ સંસ્થામાં સાથે કામ કરવાનું શરૂ કરવા ટીમના સાથીઓને આમંત્રિત કરો.",
-      "emptyDescriptionCannotInvite": "ટીમના સાથીઓને આમંત્રિત કરવા માલિક અથવા બિલિંગ મેનેજરને કહો.",
+      "emptyDescriptionCannotInvite": "ટીમના સાથીઓને આમંત્રિત કરવા માલિક, એડમિન અથવા બિલિંગ મેનેજરને કહો.",
       "emptyTitle": "હજી કોઈ સભ્ય નથી",
       "invitedDate": "{{date}}ના રોજ આમંત્રણ મોકલ્યું",
       "limitPerDay": "{{amount}}/દિવસ",
@@ -3371,9 +3384,15 @@
       "settingsToolsOn": "ચાલુ — સેટિંગ્સ સાધનો મોડેલને મોકલવામાં આવે છે",
       "settingsToolsOff": "બંધ — મોડેલને કોઈ સેટિંગ્સ સાધન મોકલવામાં આવતું નથી",
       "serverChecking": "આ સર્વર તપાસી રહ્યું છે…",
-      "serverToolCount": "{{count}} સાધનો",
       "serverUnreachable": "આ સર્વર સુધી પહોંચી શકાયું નથી",
-      "serverOff": "આ સર્વર બંધ છે"
+      "serverOff": "આ સર્વર બંધ છે",
+      "app": {
+        "label": "ટૂલ ઇન્ટરફેસ",
+        "failed": "આ ટૂલનું ઇન્ટરફેસ લોડ થઈ શક્યું નથી.",
+        "empty": "આ ટૂલના ઇન્ટરફેસમાં બતાવવા માટે કંઈ નથી."
+      },
+      "serverToolCount_one": "{{count}} સાધન",
+      "serverToolCount_other": "{{count}} સાધનો"
     },
     "mcpOAuth": {
       "authMethod": "પ્રમાણીકરણ",
@@ -3518,6 +3537,8 @@
       "quantizationsHelp": "નાની ફાઇલો ઓછી મેમરી અને સ્ટોરેજ વાપરે છે. મોટી ફાઇલો સામાન્ય રીતે વધુ સારા જવાબો આપે છે.",
       "quantDetail": "{{size}} ડાઉનલોડ · આશરે {{memory}} મેમરી",
       "downloadQuant": "{{quant}} ડાઉનલોડ કરો",
+      "downloadModelA11y": "{{name}} ડાઉનલોડ કરો",
+      "detailsA11y": "વિગતો: {{name}}",
       "loadingModel": "મોડેલની વિગતો લોડ થઈ રહી છે",
       "couldNotLoadModel": "આ મોડેલ લોડ કરી શકાયું નહીં",
       "noFiles": "આ ઍપ ચલાવી શકે એવી કોઈ ફાઇલ નથી",
@@ -3569,6 +3590,7 @@
   "appActions": {
     "start": {
       "promptRequired": "એજન્ટ શરૂ કરવા માટે પ્રોમ્પ્ટ જરૂરી છે. પ્રોમ્પ્ટ ઉમેરો અને ફરી ચલાવો.",
+      "repositoryRequired": "એજન્ટ શરૂ કરવા માટે રિપોઝિટરી જરૂરી છે. Kilo ખોલો અને એક પસંદ કરો, પછી તેને ફરી ચલાવો.",
       "repositoryUnknown": "Kilo {{repository}} ને GitHub કે GitLab રિપોઝિટરી તરીકે ઓળખતું નથી. Kilo માં બીજી રિપોઝિટરી પસંદ કરો.",
       "repositoryUnsupported": "{{repository}} એ Bitbucket રિપોઝિટરી છે — એજન્ટ શરૂ કરો હજી તેનો ઉપયોગ કરી શકતું નથી. Kilo માં બીજી રિપોઝિટરી પસંદ કરો."
     }
@@ -3606,13 +3628,16 @@
     "emptyDescription": "સમગ્ર સત્રોમાં પર્યાવરણ ચલો, સેટઅપ કમાન્ડ અને કૌશલ્યોનો ફરીથી ઉપયોગ કરવા માટે પ્રોફાઇલ બનાવો.",
     "loadFailed": "પ્રોફાઇલ લોડ કરી શકાઈ નથી",
     "counts": {
-      "vars": "{{count}} ચલો",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} કૌશલ્ય",
-      "commands": "{{count}} આદેશો",
       "varsShort": "{{count}}ચ",
       "skillsShort": "{{count}}ક",
-      "commandsShort": "{{count}}આ"
+      "commandsShort": "{{count}}આ",
+      "commands_one": "{{count}} આદેશ",
+      "commands_other": "{{count}} આદેશો",
+      "skills_one": "{{count}} કૌશલ્ય",
+      "skills_other": "{{count}} કૌશલ્યો",
+      "vars_one": "{{count}} ચલ",
+      "vars_other": "{{count}} ચલો"
     },
     "nameLabel": "પ્રોફાઇલ નામ",
     "namePlaceholder": "દા.ત. બેકએન્ડ ડીબગીંગ",
@@ -3668,6 +3693,8 @@
     "skillNameInvalid": "કૌશલ્યનું નામ અક્ષર અથવા અંકથી શરૂ થવું જોઈએ અને માત્ર નાના અક્ષરો, અંકો અને ડેશનો ઉપયોગ કરવો જોઈએ",
     "skillContentRequired": "કૌશલ્ય સામગ્રી જરૂરી છે",
     "skillSaveFailed": "કૌશલ્ય બચાવી શક્યા નથી",
+    "skillSourceCustom": "કસ્ટમ",
+    "skillSourceMarketplace": "માર્કેટપ્લેસ",
     "skillsHint": "એક SKILL.md પેસ્ટ કરો અને તેનું નામ ભરે છે; ખેંચો અને છોડો વગર તમારા ફોનમાંથી કુશળતા ઉમેરો.",
     "skillEditTitle": "કૌશલ્ય સંપાદિત કરો",
     "mcp": {
@@ -3683,7 +3710,7 @@
       "environment": "પર્યાવરણ (JSON)",
       "headers": "હેડર્સ (JSON)",
       "timeout": "સમયસમાપ્ત",
-      "secretCount": "ગુપ્ત ગણતરી",
+      "secretCount": "ગુપ્ત ગણતરી: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3726,6 +3753,9 @@
       "visibilityPrimary": "પ્રાથમિક — પીકરમાં બતાવેલ છે",
       "visibilitySubagent": "સબએજન્ટ - ફક્ત અન્ય લોકો પાસેથી કૉલ કરી શકાય છે",
       "visibilityAll": "બધા - બંને",
+      "modePrimary": "ફક્ત પ્રાથમિક",
+      "modeSubagent": "ફક્ત સબએજન્ટ",
+      "modeAll": "બધા",
       "saveFailed": "એજન્ટને સાચવી શકાયો નથી",
       "deleteFailed": "એજન્ટને ડિલીટ કરી શકાયો નથી",
       "nameRequired": "એજન્ટનું નામ દાખલ કરો",
@@ -3786,6 +3816,8 @@
     "empty": "ક્રેડિટ પેક અત્યારે ઉપલબ્ધ નથી.",
     "noMatchingProducts": "App Store એ કોઈ મેળ ખાતું ક્રેડિટ પેક પરત કર્યું નથી.",
     "noMatchingProductsPlay": "Google Play એ કોઈ મેળ ખાતું ક્રેડિટ પેક પરત કર્યું નથી.",
+    "storeTimedOut": "App Store એ સમયસર પ્રતિસાદ આપ્યો નથી. ફરી પ્રયત્ન કરો.",
+    "storeTimedOutPlay": "Google Play એ સમયસર પ્રતિસાદ આપ્યો નથી. ફરી પ્રયત્ન કરો.",
     "purchaseOwnedByAnotherAccount": "આ Apple Account પરની ક્રેડિટ બીજા Kilo ખાતાની છે. તેનો ઉપયોગ કરવા તે Kilo ખાતામાં સાઇન ઇન કરો.",
     "purchaseOwnedByAnotherAccountPlay": "આ Google Play ખાતા પરની ક્રેડિટ અલગ Kilo ખાતાની છે. તેનો ઉપયોગ કરવા તે Kilo ખાતામાં સાઇન ઇન કરો."
   },
@@ -3935,6 +3967,33 @@
     "enable": "પેઇડ સારાંશ ચાલુ કરો",
     "contextSettings": "AI સેટિંગ્સ · {{context}}",
     "allContexts": "વ્યક્તિગત અને સંસ્થાના સારાંશ અલગ રહે છે.",
+    "create": "સારાંશ બનાવો",
+    "oneOff": "એક જ વખતનો",
+    "createdAt": "{{time}} બનાવ્યો",
+    "chooseContext": "એક સંદર્ભ પસંદ કરો",
+    "period": "સારાંશનો સમયગાળો",
+    "last24Hours": "છેલ્લા 24 કલાક",
+    "last7Days": "છેલ્લા 7 દિવસ",
+    "customPeriod": "પસંદગીનો સમયગાળો",
+    "periodStart": "સમયગાળાની શરૂઆત",
+    "periodEnd": "સમયગાળાનો અંત",
+    "periodHint": "વધુમાં વધુ 31 દિવસ પસંદ કરો. ભૂતકાળની માહિતી અધૂરી હોઈ શકે છે.",
+    "periodSessions": "સમયગાળામાં સક્રિય",
+    "periodSpend": "સમયગાળાનો ખર્ચ",
+    "invalidPeriod": "અંત પહેલાંની શરૂઆત પસંદ કરો.",
+    "futurePeriod": "સમયગાળાનો અંત ભવિષ્યમાં ન હોઈ શકે.",
+    "periodTooLong": "31 દિવસ કે તેથી ઓછો સમયગાળો પસંદ કરો.",
+    "invalidLocalTime": "આ સ્થાનિક સમય સારાંશના સમય ઝોનમાં અસ્તિત્વમાં નથી. બીજો સમય પસંદ કરો.",
+    "reviewBriefing": "સારાંશની સમીક્ષા કરો",
+    "reviewAgain": "નવી સમીક્ષા તૈયાર કરો",
+    "payer": "ચાર્જ {{context}} પાસેથી વસૂલાશે",
+    "emptyPeriod": "આ સમયગાળામાં કોઈ પ્રવૃત્તિ મળી નથી. કોઈ AI સારાંશ કે ચાર્જ નહીં.",
+    "emptyHistory": "કોઈ સાચવેલા સારાંશ નથી",
+    "historicalStateHint": "સત્રની સ્થિતિ પસંદ કરેલા સમયગાળાના અંતની સ્થિતિ દર્શાવે છે, હાલની જીવંત સ્થિતિ નહીં.",
+    "oneOffHint": "AI ને તમારી ઍપની ભાષામાં પસંદ કરેલા અને સંવેદનશીલ વિગતો છુપાવેલા પુરાવા મળે છે. આ એક જ વખતનો અહેવાલ તમારા સવારના સમયપત્રક કે AI પસંદગીઓને બદલતો નથી.",
+    "createOffline": "સારાંશની સમીક્ષા કરવા અથવા બનાવવા માટે ઇન્ટરનેટ સાથે જોડાઓ. ચાર્જ લાગતી વિનંતીઓ ઇન્ટરનેટ ન હોય ત્યારે ક્યારેય કતારમાં રાખવામાં આવતી નથી.",
+    "estimateInputTooLarge": "આ સમયગાળામાં પસંદ કરેલા મોડેલની ક્ષમતા કરતાં વધુ પુરાવા છે.",
+    "estimatePermissionUnavailable": "તમને આ સંદર્ભનું બેલેન્સ વાપરવાની પરવાનગી નથી.",
     "estimatePricingUnavailable": "આ મોડેલ માટે પ્રાઇસિંગ ઉપલબ્ધ નથી.",
     "estimateBalanceUnavailable": "પેઇડ સારાંશ માટે પૂરતી બેલેન્સ નથી.",
     "estimateModelNotAllowed": "આ મોડેલ અહીં મંજૂર નથી.",

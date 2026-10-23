@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { type Href, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams, usePreventRemove, useRouter } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
@@ -80,8 +80,8 @@ import {
   resolveNewSessionConnectProvider,
   resolveNewSessionStartBlockedReason,
   resolveNewSessionStartDisabled,
+  resolveRemoteStartMissingContent,
 } from '@/lib/new-session-submit';
-import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import { getRepoBindingsPath } from '@/lib/profile-agent-navigation';
 import {
   clearDraft,
@@ -875,12 +875,13 @@ export function NewSessionScreenBody() {
   // swipe are blocked with no discard alert. The one-shot bypass, armed by the
   // success callbacks right before the replace, lets the success navigation
   // through so back from the new session returns to the source session.
-  const navigation = useNavigation();
+  const [cloneLeaveAllowed, setCloneLeaveAllowed] = useState(false);
   const isStarting = runOnInstance !== null ? remoteSpawn.isSpawningRemote : isCreating;
-  usePreventRemove(isCloneEntry && isStarting, ({ data }) => {
+  usePreventRemove(isCloneEntry && isStarting && !cloneLeaveAllowed, ({ repeat }) => {
     if (cloneNavigateBypassRef.current) {
       cloneNavigateBypassRef.current = false;
-      navigation.dispatch(data.action);
+      setCloneLeaveAllowed(true);
+      repeat();
     }
   });
 
@@ -982,7 +983,15 @@ export function NewSessionScreenBody() {
       if (runOnInstance === null) {
         return true;
       }
+      // An empty composer hands the spawn nothing: `buildComposerSharePayload`
+      // returns null, the spawn carries no prompt and no file, and Start would
+      // stay busy until the SDK timeout with nothing to show for it. A file
+      // alone is content (the destination keeps it for the user to send).
       return (
+        resolveRemoteStartMissingContent({
+          hasPrompt,
+          hasAttachments: attachments.attachments.length > 0,
+        }) ||
         remoteSpawn.isSpawningRemote ||
         isSubmitting ||
         attachments.hasFailedAttachments ||
@@ -1026,6 +1035,8 @@ export function NewSessionScreenBody() {
           isLoadingRepositories,
           isRemoteTargetSelected,
           selectedRepo,
+          hasAttachments: attachments.attachments.length > 0,
+          selectedRepositoryResolved: selectedRepository !== null,
           gate: {
             isCreating,
             isSubmitting,
@@ -1045,6 +1056,8 @@ export function NewSessionScreenBody() {
           isLoadingRepositories,
           isRemoteTargetSelected,
           selectedRepo,
+          hasAttachments: attachments.attachments.length > 0,
+          selectedRepositoryResolved: selectedRepository !== null,
           gate: {
             attachmentsHasFailed: attachments.hasFailedAttachments,
             attachmentsIsUploading: attachments.isUploading,
@@ -1086,6 +1099,10 @@ export function NewSessionScreenBody() {
     };
   } else if (startBlockedReasonKey === 'select-repository') {
     startBlockedReason = t('agentChat.newSession.selectRepositoryToStart');
+  } else if (startBlockedReasonKey === 'enter-prompt') {
+    startBlockedReason = t('agentChat.newSession.enterPromptToStart');
+  } else if (startBlockedReasonKey === 'enter-prompt-or-file') {
+    startBlockedReason = t('agentChat.newSession.enterPromptOrFileToStart');
   }
 
   const handleStartSession = useCallback(() => {

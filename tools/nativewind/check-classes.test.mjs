@@ -90,6 +90,16 @@ test('reads the container classes after an arrow-function prop', context => {
   );
 });
 
+test('preserves container class inspection with callbacks', context => {
+  expectProblem(
+    context,
+    screen(
+      '<ScrollView onScroll={({ nativeEvent }) => nativeEvent.contentOffset.x > 0 && onScroll()} className="px-3" />'
+    ),
+    /screen\.tsx:3: <ScrollView> carries "px-3" on its own className/
+  );
+});
+
 test('reads the container classes across attribute lines', context => {
   expectProblem(
     context,

@@ -1,8 +1,8 @@
 import { DatabaseSync } from 'node:sqlite';
-import { Effect } from 'effect';
+import { Effect, Layer } from 'effect';
 import { expect, it } from 'vitest';
-import { SessionStore, type SessionStoreService } from '../../core/storage.js';
-import { expoDriver, type ExpoDatabase } from './expo.js';
+import { SessionStore, StoreError, type SessionStoreService } from '../../core/storage.js';
+import { expoDriver, type ExpoDatabase, type ExpoStatement } from './expo.js';
 import type { SqlValue } from './driver.js';
 import { layerSqliteStore } from './sqlite.js';
 import { textOf } from '../../core/turn.js';
@@ -10,43 +10,143 @@ import { textOf } from '../../core/turn.js';
 /**
  * Expo's SQLite is a native module, so it cannot run here. What can run is the
  * adapter: a database of the same shape, backed by Node's SQLite, proves that
- * the raw rows land in the right columns and that every statement is finalized.
+ * the raw rows land in the right columns, that a prepared statement is reused,
+ * and that none is left open when the store is released.
  *
  * The shapes cannot drift apart unnoticed. `layerExpoStore` takes Expo's own
  * `SQLiteDatabase`, so the compiler checks a real database against the same
  * interface this double implements.
+ *
+ * The double also keeps the two rules the native module keeps, because they are
+ * what the adapter exists to respect: one cursor per prepared statement, so a
+ * run refuses a result an earlier run was still reading, and one connection, so
+ * a write that runs while a read holds its cursor is recorded rather than
+ * answered with rows that moved underneath it.
  */
-const standIn = (): { readonly database: ExpoDatabase; readonly open: () => number } => {
-  const sqlite = new DatabaseSync(':memory:');
-  const live = { count: 0 };
-  const database: ExpoDatabase = {
-    prepareSync: (source: string) => {
-      const statement = sqlite.prepare(source);
-      live.count += 1;
-      return {
-        executeSync: (params: SqlValue[]) => statement.run(...params),
-        executeForRawResultSync: (params: SqlValue[]) => ({
-          /* Expo answers a raw query by position, so the double does too. */
-          getAllSync: () => statement.all(...params).map(Object.values),
-        }),
-        finalizeSync: () => {
-          live.count -= 1;
+interface StandIn {
+  readonly database: ExpoDatabase;
+  /** Statements prepared and not finalized. */
+  readonly open: () => number;
+  /** How many statements were prepared for the SQL texts holding this text. */
+  readonly prepared: (holding: string) => number;
+  /** Whether a write ran while a read was between its run and its rows. */
+  readonly wroteDuringRead: () => boolean;
+}
+
+/** What the double shares with every statement it prepares. */
+interface Backing {
+  readonly sqlite: DatabaseSync;
+  readonly counting: {
+    readonly live: { count: number };
+    readonly perText: Map<string, number>;
+  };
+  readonly connection: {
+    reading: number;
+    wrote: boolean;
+  };
+}
+
+/** One prepared statement, with the two rules expo-sqlite holds it to. */
+const statementOf = (backing: Backing, source: string): ExpoStatement => {
+  const { sqlite, counting, connection } = backing;
+  const statement = sqlite.prepare(source);
+  counting.live.count += 1;
+  counting.perText.set(source, (counting.perText.get(source) ?? 0) + 1);
+  let generation = 0;
+  return {
+    executeAsync: (params: SqlValue[]) => {
+      if (connection.reading > 0) {
+        connection.wrote = true;
+      }
+      generation += 1;
+      statement.run(...params);
+      return Promise.resolve();
+    },
+    executeForRawResultAsync: (params: SqlValue[]) => {
+      generation += 1;
+      const mine = generation;
+      connection.reading += 1;
+      const rows = statement.iterate(...params);
+      const first = rows.next();
+      return Promise.resolve({
+        getAllAsync: () => {
+          connection.reading -= 1;
+          if (mine !== generation) {
+            return Promise.reject(
+              new Error('this result is no longer readable because the statement ran again')
+            );
+          }
+          const read: unknown[][] = [];
+          if (first.done !== true) {
+            read.push(Object.values(first.value));
+          }
+          for (let row = rows.next(); row.done !== true; row = rows.next()) {
+            read.push(Object.values(row.value));
+          }
+          return Promise.resolve(read);
         },
-      };
+      });
+    },
+    finalizeAsync: () => {
+      counting.live.count -= 1;
+      return Promise.resolve();
     },
   };
-  return { database, open: () => live.count };
+};
+
+const standIn = (): StandIn => {
+  const backing: Backing = {
+    sqlite: new DatabaseSync(':memory:'),
+    counting: { live: { count: 0 }, perText: new Map() },
+    connection: { reading: 0, wrote: false },
+  };
+  const { counting, connection } = backing;
+
+  return {
+    database: {
+      prepareAsync: (source: string) => Promise.resolve(statementOf(backing, source)),
+    },
+    open: () => counting.live.count,
+    prepared: holding =>
+      [...counting.perText].reduce(
+        (sum, [source, count]) => (source.includes(holding) ? sum + count : sum),
+        0
+      ),
+    wroteDuringRead: () => connection.wrote,
+  };
 };
 
 const session = { id: 'ses_1', system: 'sys', model: 'claude-opus-5', effort: 'high' } as const;
 
+/**
+ * Runs against the store and closes its layer afterwards, so a test can check
+ * what a release left behind. `Layer.build` is what gives the release a scope;
+ * the layer's finalizer is what finalizes the statements the driver kept.
+ */
 const use = <A, E>(
   database: ExpoDatabase,
   run: (store: SessionStoreService) => Effect.Effect<A, E>
 ): Promise<A> =>
   Effect.runPromise(
-    Effect.provide(Effect.flatMap(SessionStore, run), layerSqliteStore(expoDriver(database)))
+    Effect.scoped(
+      Effect.flatMap(Layer.build(layerSqliteStore(expoDriver(database))), context =>
+        Effect.provide(Effect.flatMap(SessionStore, run), context)
+      )
+    )
   );
+
+const oneTurn = (id: string, body: string, prompted: number) => ({
+  sessionId: id,
+  turns: [
+    {
+      id: `trn_${id}_${body}`,
+      sessionId: id,
+      role: 'user' as const,
+      parts: [{ id: `prt_${id}_${body}`, kind: 'text' as const, body }],
+    },
+  ],
+  prompted,
+});
 
 it('carries a session and its turns through the Expo shape', async () => {
   const { database } = standIn();
@@ -54,30 +154,8 @@ it('carries a session and its turns through the Expo shape', async () => {
   const read = await use(database, store =>
     Effect.gen(function* () {
       yield* store.create(session);
-      yield* store.append({
-        sessionId: 'ses_1',
-        turns: [
-          {
-            id: 'trn_1',
-            sessionId: 'ses_1',
-            role: 'user',
-            parts: [{ id: `prt_${String('hello')}`, kind: 'text', body: 'hello' }],
-          },
-        ],
-        prompted: 0,
-      });
-      yield* store.append({
-        sessionId: 'ses_1',
-        turns: [
-          {
-            id: 'trn_2',
-            sessionId: 'ses_1',
-            role: 'assistant',
-            parts: [{ id: `prt_${String('hi')}`, kind: 'text', body: 'hi' }],
-          },
-        ],
-        prompted: 41,
-      });
+      yield* store.append(oneTurn('ses_1', 'hello', 0));
+      yield* store.append(oneTurn('ses_1', 'hi', 41));
       return { options: yield* store.read('ses_1'), turns: yield* store.load('ses_1') };
     })
   );
@@ -86,26 +164,101 @@ it('carries a session and its turns through the Expo shape', async () => {
   expect(read.turns.map(textOf)).toEqual(['hello', 'hi']);
 });
 
-it('finalizes every statement it prepares, including the one that failed', async () => {
-  const { database, open } = standIn();
+it('prepares each SQL text once and runs it again for the next load', async () => {
+  const { database, prepared } = standIn();
+  const counts: number[] = [];
 
-  const failed = await use(database, store =>
-    Effect.flip(
-      store.append({
-        sessionId: 'ses_missing',
-        turns: [
-          {
-            id: 'trn_1',
-            sessionId: 'ses_missing',
-            role: 'user',
-            parts: [{ id: `prt_${String('hello')}`, kind: 'text', body: 'hello' }],
-          },
-        ],
-        prompted: 0,
-      })
-    )
+  const loaded = await use(database, store =>
+    Effect.gen(function* () {
+      yield* store.create(session);
+      yield* store.append(oneTurn('ses_1', 'hello', 1));
+      const first = yield* store.load('ses_1');
+      counts.push(prepared('from "parts"'));
+      const second = yield* store.load('ses_1');
+      counts.push(prepared('from "parts"'));
+      return [first, second] as const;
+    })
   );
 
-  expect(failed).toMatchObject({ operation: 'append' });
+  expect(loaded[1].map(textOf)).toEqual(loaded[0].map(textOf));
+  expect(counts[0]).toBeGreaterThan(0);
+  expect(counts[1]).toBe(counts[0]);
+});
+
+it('runs two reads of one SQL text at once without either losing its rows', async () => {
+  const { database, open } = standIn();
+
+  const loaded = await use(database, store =>
+    Effect.gen(function* () {
+      yield* store.create(session);
+      yield* store.create({ ...session, id: 'ses_2' });
+      yield* store.append(oneTurn('ses_1', 'first', 0));
+      yield* store.append(oneTurn('ses_2', 'second', 0));
+      return yield* Effect.all([store.load('ses_1'), store.load('ses_2')], {
+        concurrency: 'unbounded',
+      });
+    })
+  );
+
+  expect(loaded.map(turns => turns.map(textOf))).toEqual([['first'], ['second']]);
+  expect(open()).toBe(0);
+});
+
+it('keeps a write out of a read that is between its run and its rows', async () => {
+  const { database, open, wroteDuringRead } = standIn();
+  const driver = expoDriver(database);
+  await driver('CREATE TABLE probe (a integer)', [], 'run');
+  await driver('INSERT INTO probe VALUES (1)', [], 'run');
+
+  /* Started in this order, a read is between its run and its rows before the
+     write reaches the database, which is the window the gate exists for. */
+  const [read] = await Promise.all([
+    driver('SELECT a FROM probe', [], 'all'),
+    driver('INSERT INTO probe VALUES (2)', [], 'run'),
+  ]);
+
+  expect(read.rows).toEqual([[1]]);
+  expect(wroteDuringRead()).toBeFalsy();
+  await driver.close?.();
+  expect(open()).toBe(0);
+});
+
+it('drops a statement that threw, and prepares another for the next call', async () => {
+  const { database, prepared, open } = standIn();
+
+  const failed = await use(database, store =>
+    Effect.gen(function* () {
+      yield* store.create(session);
+      const first = yield* Effect.flip(store.append(oneTurn('ses_missing', 'lost', 0)));
+      const second = yield* Effect.flip(store.append(oneTurn('ses_missing', 'lost again', 0)));
+      const after = prepared('insert into "turns"');
+      yield* store.append(oneTurn('ses_1', 'kept', 0));
+      return { first, second, after, reread: yield* store.load('ses_1') };
+    })
+  );
+
+  expect(failed.first).toBeInstanceOf(StoreError);
+  expect(failed.first).toMatchObject({ operation: 'append' });
+  expect(failed.second).toMatchObject({ operation: 'append' });
+  /* Each failure finalized its statement rather than pooling one whose cursor
+     state is unknown, so the retry prepared its own. */
+  expect(failed.after).toBe(2);
+  expect(failed.reread.map(textOf)).toEqual(['kept']);
+  expect(open()).toBe(0);
+});
+
+it('finalizes every statement it prepared once the store is released', async () => {
+  const { database, open, prepared } = standIn();
+
+  const read = await use(database, store =>
+    Effect.gen(function* () {
+      yield* store.create(session);
+      yield* store.append(oneTurn('ses_1', 'hello', 1));
+      return yield* store.load('ses_1');
+    })
+  );
+
+  expect(read.map(textOf)).toEqual(['hello']);
+  expect(prepared('from "turns"')).toBeGreaterThan(0);
   expect(open()).toBe(0);
 });

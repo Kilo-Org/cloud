@@ -12,12 +12,21 @@ type SqlValue = string | number | null;
 /**
  * Rows come back by position, not by name, which is the shape drizzle maps onto
  * the selected columns.
+ *
+ * `close` is for a driver that keeps a native handle between calls — a prepared
+ * statement, which only the platform adapter can finalize. The store runs it
+ * when the layer is released, so nothing a driver holds outlives the store. A
+ * driver that holds nothing leaves it out: the database belongs to the caller,
+ * and `node.ts` closes none of it.
  */
-type SqlDriver = (
-  sql: string,
-  params: readonly SqlValue[],
-  method: 'run' | 'all' | 'values' | 'get'
-) => Promise<{ rows: unknown[] }>;
+interface SqlDriver {
+  (
+    sql: string,
+    params: readonly SqlValue[],
+    method: 'run' | 'all' | 'values' | 'get'
+  ): Promise<{ rows: unknown[] }>;
+  readonly close?: () => Promise<void>;
+}
 
 /**
  * A driver and the line every write on it stands in.

@@ -148,18 +148,24 @@ const storeOn = (connection: Connection): SessionStoreService => {
  * Opens the store: migrates, then hands back the plugin. Migrating here rather
  * than on first use means a database that cannot be migrated fails when the
  * layer is built, not on the first question somebody asks.
+ *
+ * What the driver kept between calls is released here too, so a prepared
+ * statement lives exactly as long as the store that prepared it. A driver that
+ * keeps nothing says so by leaving `close` out.
  */
 const layerSqliteStore = (driver: SqlDriver): Layer.Layer<SessionStore, StoreError> =>
   Layer.suspend(() => {
     const connection = connectionOf(driver);
+    const { close } = driver;
     return Layer.effect(
       SessionStore,
-      Effect.map(
+      Effect.acquireRelease(
         attempt('create', async () => {
           await driver('PRAGMA foreign_keys = ON', [], 'run');
           await migrate(connection);
+          return storeOn(connection);
         }),
-        () => storeOn(connection)
+        () => (close === undefined ? Effect.void : Effect.ignore(Effect.tryPromise(() => close())))
       )
     );
   });

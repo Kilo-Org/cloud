@@ -12,9 +12,9 @@
 // outbox; `useSaveSecurityAgentConfig` expectedRevision and generation
 // guard+scope; `useSetSecurityAgentEnabled` generation guard+scope; `scope.id`
 // network serialization (real MutationCache); `securitySyncIntentFingerprint`;
-// `isSecuritySyncRetryable`; in-progress copy per surface; and
-// `isSecurityConfigurationError`.
-/* eslint-disable max-lines -- one file for the useTriggerSecuritySync wiring/retryability/outbox, useSaveSecurityAgentConfig expectedRevision + generation-guard/scope, useSetSecurityAgentEnabled generation-guard/scope, scope.id serialization (real MutationCache), securitySyncIntentFingerprint, isSecuritySyncRetryable, in-progress copy per surface, and isSecurityConfigurationError suites */
+// `isSecuritySyncRetryable`; in-progress copy per surface; and the ledger
+// marker copy mapping.
+/* eslint-disable max-lines -- one file for the useTriggerSecuritySync wiring/retryability/outbox, useSaveSecurityAgentConfig expectedRevision + generation-guard/scope, useSetSecurityAgentEnabled generation-guard/scope, scope.id serialization (real MutationCache), securitySyncIntentFingerprint, isSecuritySyncRetryable, in-progress copy per surface, and the ledger marker copy mapping suites */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake outbox factories settle without await because they resolve immediately */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -23,12 +23,17 @@ import type * as ReactQuery from '@tanstack/react-query';
 
 import type * as OperationKeyModule from '@/lib/operation-key';
 import {
-  isSecurityConfigurationError,
   isSecuritySyncRetryable,
   mapSecurityDismissOperationError,
   mapSecuritySyncOperationError,
+  SECURITY_AMBIGUOUS_MESSAGE,
+  SECURITY_LEDGER_PERSISTENCE_FAILED_MESSAGE,
+  SECURITY_LEDGER_SETTLE_FAILED_MESSAGE,
+  SECURITY_OPERATION_REPLAY_FAILED_MESSAGE,
   SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
   securitySyncIntentFingerprint,
+} from '@/lib/security-agent-ledger';
+import {
   useSaveSecurityAgentConfig,
   useSetSecurityAgentEnabled,
   useTriggerSecuritySync,
@@ -45,9 +50,7 @@ vi.mock('expo-crypto', () => ({
   randomUUID: () => 'not-used',
 }));
 
-vi.mock('react-native', () => ({
-  InteractionManager: { runAfterInteractions: vi.fn() },
-}));
+vi.mock('@/lib/query/schedule-cache-maintenance', () => ({ scheduleCacheMaintenance: vi.fn() }));
 
 vi.mock('@/lib/operation-key', async importOriginal => {
   const actual = await importOriginal<typeof OperationKeyModule>();
@@ -563,36 +566,68 @@ describe('isSecuritySyncRetryable (P1-A-08e key-rotation policy)', () => {
   });
 });
 
-describe('in-progress copy per surface (same server marker)', () => {
-  it('maps the marker onto sync copy for a sync', () => {
+describe('ledger marker copy per surface', () => {
+  it('maps the in-progress marker onto each surface copy', () => {
     expect(mapSecuritySyncOperationError(new Error('operation_in_progress'))).toMatchObject({
       message: 'A security sync is already in progress. Please try again.',
     });
-  });
-
-  it('maps the marker onto dismissal copy for a dismissal', () => {
     expect(mapSecurityDismissOperationError(new Error('operation_in_progress'))).toMatchObject({
       message: 'This dismissal is already in progress. Please try again.',
     });
   });
 
-  it('passes any other error through unchanged on both paths', () => {
-    const other = new Error('Network request failed');
-    expect(mapSecuritySyncOperationError(other)).toBe(other);
-    expect(mapSecurityDismissOperationError(other)).toBe(other);
+  it('maps every ledger marker onto its copy and keeps its retryability', () => {
+    const cases = [
+      [
+        SECURITY_AMBIGUOUS_MESSAGE,
+        "Couldn't confirm — check the security review before retrying.",
+        true,
+      ],
+      [
+        SECURITY_LEDGER_SETTLE_FAILED_MESSAGE,
+        'The action completed, but we could not record the result. Please try again.',
+        true,
+      ],
+      [
+        SECURITY_LEDGER_PERSISTENCE_FAILED_MESSAGE,
+        'We could not record this action. Please try again later.',
+        false,
+      ],
+      [
+        SECURITY_OPERATION_REPLAY_FAILED_MESSAGE,
+        'This action did not complete. Please try again.',
+        false,
+      ],
+    ] as const;
+    for (const [marker, copy, retryable] of cases) {
+      const mapped = mapSecuritySyncOperationError(new Error(marker));
+      expect(mapped.message).toBe(copy);
+      expect(isSecuritySyncRetryable(mapped)).toBe(retryable);
+    }
   });
-});
 
-describe('isSecurityConfigurationError', () => {
-  it('recognizes the server missing-configuration message', () => {
-    expect(isSecurityConfigurationError(new Error(SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE))).toBe(
-      true
+  it('maps the missing-configuration rejection onto its copy, still non-retryable', () => {
+    const mapped = mapSecuritySyncOperationError(
+      new Error(SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE)
     );
+    expect(mapped.message).toBe(
+      'Security service is not configured. Resubmitting cannot succeed until this is fixed.'
+    );
+    expect(isSecuritySyncRetryable(mapped)).toBe(false);
   });
 
-  it('rejects unrelated errors and non-Error values', () => {
-    expect(isSecurityConfigurationError(new Error('Network request failed'))).toBe(false);
-    expect(isSecurityConfigurationError(null)).toBe(false);
-    expect(isSecurityConfigurationError('Security service is not configured')).toBe(false);
+  it('maps an unrecognised message onto the generic copy and carries its retryability', () => {
+    const transport = mapSecuritySyncOperationError(new Error('Network request failed'));
+    expect(transport.message).toBe('Could not complete this action. Please try again.');
+    expect(isSecuritySyncRetryable(transport)).toBe(true);
+
+    const forbidden = Object.assign(new Error('no permission'), {
+      data: { code: 'FORBIDDEN' },
+    });
+    const mappedForbidden = mapSecurityDismissOperationError(forbidden);
+    expect(mappedForbidden.message).toBe(
+      'Could not complete this action. The problem needs fixing before you can retry.'
+    );
+    expect(isSecuritySyncRetryable(mappedForbidden)).toBe(false);
   });
 });

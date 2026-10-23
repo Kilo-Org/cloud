@@ -1,13 +1,5 @@
-import { AccessibilityInfo, findNodeHandle } from 'react-native';
-import { type Component, type RefObject } from 'react';
-
-// Shared accessibility helpers used across mobile screens. These wrap
-// `react-native` primitives so call sites stay small and so unit tests can
-// target a single import surface (rather than mocking `react-native`
-// per-feature). The functions are intentionally side-effecting and best
-// effort — they never throw on missing handles or native accessibility
-// failures, so a TalkBack/VoiceOver outage never breaks the UI or a caller's
-// completion flow.
+import { AccessibilityInfo, type HostInstance } from 'react-native';
+import { type RefObject } from 'react';
 
 /**
  * Announce a message to assistive technologies (TalkBack on Android,
@@ -29,19 +21,19 @@ export function announceForA11y(message: string): void {
 }
 
 /**
- * Move assistive-technology focus to a component by ref. Returns `true` if a
- * focusable node handle was found and the platform accepted the move, so
- * callers can fall back to a different focus target on tablets/web where
- * `setAccessibilityFocus` may be a no-op. A throwing native call counts as a
- * rejected move (returns `false`) and never propagates.
+ * Request assistive-technology focus on a mounted native host.
+ * `true` means the host existed and the request was dispatched without throwing,
+ * not that focus moved: `sendAccessibilityEvent` reports no outcome.
+ * `false` means the host was missing or the native call threw (swallowed), so a
+ * caller can retry when the host mounts or choose another target.
  */
-export function moveA11yFocus(ref: RefObject<Component | null>): boolean {
-  const node = findNodeHandle(ref.current);
+export function requestA11yFocus(ref: RefObject<HostInstance | null>): boolean {
+  const node = ref.current;
   if (node == null) {
     return false;
   }
   try {
-    AccessibilityInfo.setAccessibilityFocus(node);
+    AccessibilityInfo.sendAccessibilityEvent(node, 'focus');
   } catch {
     return false;
   }

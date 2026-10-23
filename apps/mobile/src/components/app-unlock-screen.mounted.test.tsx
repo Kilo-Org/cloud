@@ -26,12 +26,26 @@ import fr from '@/i18n/locales/fr.json';
 import AppLayout from '@/app/(app)/_layout';
 import KiloClawLayout from '@/app/(app)/(tabs)/(1_kiloclaw)/_layout';
 import OrganizationLayout from '@/app/(app)/(tabs)/(3_profile)/organization/_layout';
-import SecurityAgentScopeLayout from '@/app/(app)/(tabs)/(3_profile)/security-agent/[scope]/_layout';
+import SecurityAgentScopeLayout from '@/app/(app)/security-agent/[scope]/_layout';
 import PrReviewNumberLayout from '@/app/(app)/pr-review/[owner]/[repo]/[number]/_layout';
 import { AppUnlockProvider } from '@/lib/app-unlock-context';
 
 beforeEach(resetUnlockMocks);
 afterEach(unmountUnlock);
+
+/** The biometric row's native switch, re-read after each render. */
+function unlockSetting() {
+  const found = root().findAll(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'Switch' &&
+      node.props.accessibilityLabel === 'Unlock with biometrics'
+  )[0];
+  if (!found) {
+    throw new Error('Unlock with biometrics switch not found');
+  }
+  return found;
+}
 
 it.each([false, true])(
   'waits for language across all five layouts and retains the draft on relock; catalog failure=%s',
@@ -252,15 +266,14 @@ describe.each(['ios', 'android'])('%s shared unlock announcements', os => {
 
   it.each([false, true])('announces setting feedback once with locked=%s', async locked => {
     await mount(nestedUnlockScenes(<GeneralSettingsScreen />));
-    const preference = root().findByProps({
-      accessibilityLabel: 'Unlock with biometrics',
-    });
     const save = Promise.withResolvers<undefined>();
     storage.setItemAsync.mockReturnValueOnce(save.promise);
     await flush(() => {
-      (preference.props.onPress as () => void)();
+      (unlockSetting().props.onValueChange as (next: boolean) => void)(false);
     });
-    expect(preference.props).toMatchObject({ accessibilityState: { busy: true, checked: true } });
+    expect(unlockSetting().props).toMatchObject({
+      accessibilityState: { busy: true, checked: true },
+    });
     expect(announcements).not.toHaveBeenCalled();
     if (locked) {
       const now = vi.spyOn(Date, 'now').mockReturnValue(0);
@@ -277,14 +290,14 @@ describe.each(['ios', 'android'])('%s shared unlock announcements', os => {
     const message = 'Could not save setting';
     expectFeedback(root(), message, locked ? 3 : 1);
     expect(announcements.mock.calls).toEqual(os === 'ios' ? [[message]] : []);
-    expect(preference.props).toMatchObject({
+    expect(unlockSetting().props).toMatchObject({
       disabled: locked,
       accessibilityState: { checked: true },
     });
     if (locked) {
       expect(retry()?.props).toMatchObject({ disabled: false, accessibilityLabel: 'Retry' });
       await flush(retry()?.props.onPress as () => void);
-      expect(preference.props.disabled).toBe(false);
+      expect(unlockSetting().props.disabled).toBe(false);
       expect(text(root())).not.toContain(message);
       expect(announcements.mock.calls).toEqual(os === 'ios' ? [[message]] : []);
     }

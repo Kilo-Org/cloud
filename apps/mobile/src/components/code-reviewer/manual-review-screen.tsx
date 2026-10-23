@@ -1,9 +1,9 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
-import { Check, GitPullRequest } from '@/components/ui/icons';
+import { GitPullRequest } from '@/components/ui/icons';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, TextInput, View } from 'react-native';
+import { ScrollView, TextInput, View } from 'react-native';
 
 import { matchesCodeReviewUrlSuffix } from '@kilocode/app-shared/code-review';
 import { ModelSelector } from '@/components/agents/model-selector';
@@ -14,23 +14,17 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
 import { Input } from '@/components/ui/input';
-import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import { classifyProviderErrorCode } from '@/lib/code-reviewer-status';
-import { useAvailableModels } from '@/lib/hooks/use-available-models';
-import {
-  PERSONAL_SCOPE,
-  useGitHubStatus,
-  useGitLabStatus,
-  useReviewConfig,
-} from '@/lib/hooks/use-code-reviewer';
+import { useGitHubStatus, useGitLabStatus, useReviewConfig } from '@/lib/hooks/use-code-reviewer';
 import { useCreateManualReview } from '@/lib/hooks/use-code-reviews';
+import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { cn } from '@/lib/utils';
 
 import { ManualReviewActionFooter } from './manual-review-action-footer';
+import { ManualReviewPlatformPicker } from './manual-review-platform-picker';
+import { ManualReviewStartFeedback } from './manual-review-start-feedback';
+import { MANUAL_REVIEW_START_DEADLINE_MS, useDeadlineWatchedStart } from './deadline-watched-start';
 
 const MANUAL_REVIEW_PLATFORMS = ['github', 'gitlab'] as const;
 type ManualReviewPlatform = (typeof MANUAL_REVIEW_PLATFORMS)[number];
@@ -60,6 +54,24 @@ function isValidManualReviewUrl(platform: ManualReviewPlatform, url: string): bo
   return URL_HOST_PATTERN[platform].test(url) && matchesCodeReviewUrlSuffix(platform, url);
 }
 
+/**
+ * True when the failure is the client control-plane deadline firing, matched
+ * by error name down the cause chain: tRPC wraps the fetch rejection in a
+ * `TRPCClientError` whose `cause` carries the deadline error, and the
+ * deadline class's identity can be lost across module boundaries (its name
+ * survives). Same bounded walk as `isStalledTransportError`, name-based.
+ */
+function isDeadlineStall(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current instanceof Error; depth += 1) {
+    if (current.name === 'RequestDeadlineError') {
+      return true;
+    }
+    current = (current as Error & { cause?: unknown }).cause;
+  }
+  return false;
+}
+
 export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const { t } = useTranslation();
@@ -77,8 +89,60 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const instructionsRef = useRef('');
   const [urlError, setUrlError] = useState<string | null>(null);
   const config = useReviewConfig(scope, platform);
-  const createReview = useCreateManualReview(scope);
-  const { models } = useAvailableModels(scope === PERSONAL_SCOPE ? undefined : scope);
+  // The screen renders the create's failure inline (stall or settled error),
+  // so the hook's toast stays off for it. The watchdog fires at the
+  // control-plane deadline while the request is still pending, releases the
+  // busy button, and a late success still navigates.
+  const createReview = useCreateManualReview(scope, { silent: true });
+  const start = useDeadlineWatchedStart(
+    MANUAL_REVIEW_START_DEADLINE_MS,
+    () => createReview.isPending,
+    settle => {
+      const url = urlRef.current.trim();
+      if (!isValidManualReviewUrl(platform, url)) {
+        setUrlError(t('codeReviewer.manualReview.invalidUrl'));
+        return false;
+      }
+      setUrlError(null);
+      if (!config.data) {
+        return false;
+      }
+      createReview.mutate(
+        {
+          platform,
+          url,
+          modelSlug: effectiveModel.modelSlug,
+          thinkingEffort: effectiveModel.thinkingEffort,
+          instructions: instructionsRef.current.trim() || undefined,
+        },
+        {
+          onSuccess: ({ reviewId }) => {
+            settle(null);
+            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            router.replace(`/(app)/code-reviewer/${scope}/reviews/${reviewId}` as Href);
+          },
+          onError: error => {
+            // A client-deadline rejection is the stall, not a server reason:
+            // render the localized wait copy instead of the raw timeout text.
+            // Matched by error name, not instanceof: the deadline class can
+            // cross a module boundary where its identity is lost. Anything
+            // else is the server's or transport's own message.
+            if (isDeadlineStall(error)) {
+              settle(t('common.takingLonger'));
+              return;
+            }
+            const message =
+              error instanceof Error && error.message
+                ? error.message
+                : t('codeReviewer.unknownError');
+            settle(message);
+          },
+        }
+      );
+      return true;
+    }
+  );
+  const { models } = useReviewerModels(scope);
   const [modelChoice, setModelChoice] = useState<ModelChoice | null>(null);
   const effectiveModel = modelChoice ?? {
     modelSlug: config.data?.modelSlug ?? '',
@@ -86,32 +150,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   };
 
   const onSubmit = () => {
-    const url = urlRef.current.trim();
-    if (!isValidManualReviewUrl(platform, url)) {
-      setUrlError(t('codeReviewer.manualReview.invalidUrl'));
-      return;
-    }
-    setUrlError(null);
-    if (!config.data) {
-      return;
-    }
-    createReview.mutate(
-      {
-        platform,
-        url,
-        modelSlug: effectiveModel.modelSlug,
-        thinkingEffort: effectiveModel.thinkingEffort,
-        instructions: instructionsRef.current.trim() || undefined,
-      },
-      {
-        onSuccess: ({ reviewId }) => {
-          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          router.replace(
-            `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/reviews/${reviewId}` as Href
-          );
-        },
-      }
-    );
+    start.begin();
   };
 
   if (!statusesLoading && statusesError && !isConnected('github') && !isConnected('gitlab')) {
@@ -164,7 +203,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             <Button
               className="mt-3 w-full"
               onPress={() => {
-                router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/github` as Href);
+                router.push(`/(app)/code-reviewer/${scope}/github` as Href);
               }}
             >
               <Text>{t('common.connectGithub')}</Text>
@@ -193,59 +232,16 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               {t('common.platform')}
             </Text>
-            {statusesLoading ? (
-              <View className="gap-2">
-                <Skeleton className="h-14 w-full rounded-lg" />
-                <Skeleton className="h-14 w-full rounded-lg" />
-              </View>
-            ) : (
-              <RadioGroup
-                label={t('common.platform')}
-                className="overflow-hidden rounded-lg bg-secondary"
-              >
-                {MANUAL_REVIEW_PLATFORMS.map((option, index) => {
-                  const connected = isConnected(option);
-                  return (
-                    <Pressable
-                      key={option}
-                      disabled={!connected}
-                      className={cn(
-                        'flex-row items-center justify-between px-4 py-3 active:opacity-70',
-                        index < MANUAL_REVIEW_PLATFORMS.length - 1 &&
-                          'border-b-[0.5px] border-hair-soft',
-                        !connected && 'opacity-50'
-                      )}
-                      onPress={() => {
-                        void Haptics.selectionAsync();
-                        urlRef.current = '';
-                        setUrlError(null);
-                        setPlatformChoice(option);
-                      }}
-                      {...radioItemA11y({
-                        label: PLATFORM_CAPABILITIES[option].label,
-                        checked: connected && platform === option,
-                        disabled: !connected,
-                      })}
-                    >
-                      <View>
-                        <Text className="text-sm font-medium">
-                          {PLATFORM_CAPABILITIES[option].label}
-                        </Text>
-                        {!connected && (
-                          <Text variant="muted" className="text-xs">
-                            {t('common.notConnected')}
-                          </Text>
-                        )}
-                      </View>
-                      <Check
-                        size={18}
-                        color={connected && platform === option ? colors.foreground : 'transparent'}
-                      />
-                    </Pressable>
-                  );
-                })}
-              </RadioGroup>
-            )}
+            <ManualReviewPlatformPicker
+              isLoading={statusesLoading}
+              platform={platform}
+              isConnected={isConnected}
+              onSelect={option => {
+                urlRef.current = '';
+                setUrlError(null);
+                setPlatformChoice(option);
+              }}
+            />
           </View>
 
           <View className="gap-3">
@@ -321,13 +317,18 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             trailing control left to reveal, and scrolling the body to its end
             would carry the focused URL field off screen. */}
         <ManualReviewActionFooter>
+          <ManualReviewStartFeedback
+            stalled={start.stalled}
+            startError={start.failureMessage}
+            onRetry={onSubmit}
+          />
           <Button
-            loading={createReview.isPending}
+            loading={start.isPending}
             disabled={!config.data || !isConnected(platform)}
             onPress={onSubmit}
           >
             <Text>
-              {createReview.isPending
+              {start.isPending
                 ? t('codeReviewer.manualReview.starting')
                 : t('codeReviewer.manualReview.start')}
             </Text>

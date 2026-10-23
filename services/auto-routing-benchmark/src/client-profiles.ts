@@ -144,12 +144,19 @@ const ranSuccessfully = sql`(${clientCaseResults.exit_code} IS NOT NULL AND ${cl
 export async function getClientCase(
   db: D1Database,
   key: { profileId: string; caseId: string; rep: number }
-): Promise<{ score: number; ran: boolean } | null> {
+): Promise<{
+  score: number;
+  ran: boolean;
+  revision: number;
+  pendingGraderUsage: string | null;
+} | null> {
   const [row] = await drizzle(db)
     .select({
       score: clientCaseResults.score,
       exitCode: clientCaseResults.exit_code,
       timedOut: clientCaseResults.timed_out,
+      revision: clientCaseResults.revision,
+      pendingGraderUsage: clientCaseResults.pending_grader_usage,
     })
     .from(clientCaseResults)
     .where(
@@ -159,7 +166,14 @@ export async function getClientCase(
         eq(clientCaseResults.rep, key.rep)
       )
     );
-  return row ? { score: row.score, ran: row.exitCode === 0 && !row.timedOut } : null;
+  return row
+    ? {
+        score: row.score,
+        ran: row.exitCode === 0 && !row.timedOut,
+        revision: row.revision,
+        pendingGraderUsage: row.pendingGraderUsage,
+      }
+    : null;
 }
 
 /**
@@ -194,6 +208,7 @@ export async function saveClientCaseResult(
           timed_out: row.timed_out,
           score: row.score,
           grader_cost_usd: row.grader_cost_usd,
+          pending_grader_usage: row.pending_grader_usage,
           uploaded_at: row.uploaded_at,
           revision: sql`excluded.revision`,
         },
@@ -209,16 +224,32 @@ export async function deleteClientCaseUpload(
   db: D1Database,
   key: { profileId: string; caseId: string; rep: number; revision: number }
 ): Promise<void> {
+  await drizzle(db).delete(clientCaseResults).where(clientCaseUploadWhere(key));
+}
+
+/** Mark one upload's grader usage as acknowledged by the usage writer. */
+export async function clearPendingGraderUsage(
+  db: D1Database,
+  key: { profileId: string; caseId: string; rep: number; revision: number }
+): Promise<void> {
   await drizzle(db)
-    .delete(clientCaseResults)
-    .where(
-      and(
-        eq(clientCaseResults.profile_id, key.profileId),
-        eq(clientCaseResults.case_id, key.caseId),
-        eq(clientCaseResults.rep, key.rep),
-        eq(clientCaseResults.revision, key.revision)
-      )
-    );
+    .update(clientCaseResults)
+    .set({ pending_grader_usage: null })
+    .where(clientCaseUploadWhere(key));
+}
+
+function clientCaseUploadWhere(key: {
+  profileId: string;
+  caseId: string;
+  rep: number;
+  revision: number;
+}) {
+  return and(
+    eq(clientCaseResults.profile_id, key.profileId),
+    eq(clientCaseResults.case_id, key.caseId),
+    eq(clientCaseResults.rep, key.rep),
+    eq(clientCaseResults.revision, key.revision)
+  );
 }
 
 /** `${caseId}\0${rep}` keys of cases that ran, per profile id. */
@@ -255,7 +286,7 @@ export function clientCaseKey(caseId: string, rep: number): string {
   return `${caseId}\0${rep}`;
 }
 
-type GradedClientCase = Omit<ClientCaseResultRow, 'output'>;
+type GradedClientCase = Omit<ClientCaseResultRow, 'output' | 'pending_grader_usage'>;
 
 async function listGradedClientCases(
   db: D1Database,

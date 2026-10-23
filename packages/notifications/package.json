@@ -16,12 +16,12 @@
   "dependencies": {
     "@kilocode/app-shared": "workspace:*",
     "@kilocode/session-ingest-contracts": "workspace:*",
-    "i18next": "^26.3.6",
+    "i18next": "^26.4.7",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:vitest5"
   }
 }

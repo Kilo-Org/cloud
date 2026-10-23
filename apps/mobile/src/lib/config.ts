@@ -55,6 +55,13 @@ export const GOOGLE_IOS_CLIENT_ID: string | undefined = optional('googleIosClien
 export const PLAY_INTEGRITY_PROJECT_NUMBER: string | undefined = optional(
   'playIntegrityProjectNumber'
 );
+
+// Non-production builds send the fixed admission sentinel when the device
+// cannot attest (simulator, emulator without Play Services). The server accepts
+// it only when it also runs outside production, so a production app build with
+// this flag baked in still cannot use it.
+export const NATIVE_ADMISSION_DEV_SENTINEL: boolean =
+  optional('nativeAdmissionDevSentinel') === 'true' && extra?.isProductionBuild !== true;
 export const SENTRY_ENVIRONMENT: string | undefined = optional('sentryEnvironment');
 
 /** Client-observed latency ingest endpoint. The optional `LATENCY_INGEST_URL`

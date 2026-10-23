@@ -16,11 +16,8 @@ setupTimers();
 describe('ActiveSessionsLiveSync — departure refetch hook still works', () => {
   // The departure-triggered stored refetch lives in use-agent-sessions
   // and keys off the active-id set. This test simulates the data flow
-  // that hook observes: a heartbeat omits a previously-known id, the
-  // active-id set shrinks, and a refetch on the stored query is fired.
-  // (We use a side-effect callback to model the refetch; the live-sync
-  // owner is not responsible for triggering the stored refetch — it
-  // only owns the active cache.)
+  // that hook observes. The live-sync owner is not responsible for
+  // triggering the stored refetch — it only owns the active cache.
   it('a heartbeat that omits an id shrinks the active set, enabling departure detection', async () => {
     const conn = makeConnection();
     const qc = makeFakeQueryClient();

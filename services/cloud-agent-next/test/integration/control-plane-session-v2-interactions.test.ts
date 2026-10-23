@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
-import { sessionDoName } from '../../src/session-plane.js';
+import { sessionDoName } from '../../src/session-identity.js';
 import { createMessageId, MESSAGE_ID_PATTERN } from '../../src/session/message-id.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import {

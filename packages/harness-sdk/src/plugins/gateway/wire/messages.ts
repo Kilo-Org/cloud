@@ -21,12 +21,14 @@ interface WireUsage extends CostFields {
  * here has produced one, and naming it would claim a meaning nothing has
  * tested.
  *
- * The keys are strings and not `Anthropic.StopReason`, because the SDK's union
- * is behind its own documentation: at 0.104.1 it does not carry
- * `model_context_window_exceeded`, which the provider documents and sends.
- * Binding to the union would reject a name the provider actually uses. The two
- * OpenAI shapes have no such gap; keeping all three the same way is worth more
- * than one of them typechecking against a vendor list.
+ * The keys are strings and not `Anthropic.StopReason`. The union trails the
+ * provider: at 0.104.1 it did not carry `model_context_window_exceeded`, which
+ * the provider documents and sends, and 0.137.0 adds it. The next name either
+ * the provider or a relay between puts on a stop reason would arrive the same
+ * way, and a shape that drops what it read is worse than one that maps a name
+ * the SDK has not published yet. The two OpenAI shapes have no such gap;
+ * keeping all three the same way is worth more than one of them typechecking
+ * against a vendor list.
  */
 const stopReasons: Readonly<Record<string, StopReason>> = {
   end_turn: 'end',

@@ -5,7 +5,7 @@ import { getBillingContext } from '@kilocode/container-usage';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
-import { sessionDoName } from '../../src/session-plane.js';
+import { sessionDoName } from '../../src/session-identity.js';
 import { createMessageId } from '../../src/session/message-id.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import {

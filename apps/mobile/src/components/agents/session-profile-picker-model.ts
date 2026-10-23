@@ -1,4 +1,8 @@
-import { type ProfileCountItem } from '@/lib/profile-count-labels';
+import {
+  type ProfileCountCounts,
+  type ProfileCountItem,
+  profileCountItems,
+} from '@/lib/profile-count-labels';
 
 /**
  * Pure resolution of the session-start profile picker: which profile is shown,
@@ -15,14 +19,14 @@ import { type ProfileCountItem } from '@/lib/profile-count-labels';
 
 type ProfileLayerSource = 'repo-binding' | 'default' | 'explicit';
 
-/** One profile as the picker and the chip render it. */
-export type SessionProfilePickerProfile = {
+/**
+ * One profile as the picker and the chip render it. The count fields are the
+ * server's whole `ProfileSummary` set, so every surface that summarizes a
+ * profile reads the same numbers through `profileCountItems`.
+ */
+export type SessionProfilePickerProfile = ProfileCountCounts & {
   id: string;
   name: string;
-  varCount: number;
-  mcpServerCount: number;
-  skillCount: number;
-  kiloCommandCount: number;
 };
 
 export type SessionProfilePickerInput<
@@ -47,8 +51,9 @@ export type SessionProfilePickerState<
   /** The active profile's name, or null when no profile applies. */
   chipName: string | null;
   /**
-   * The active layer pair's non-zero counts, in web order (vars, MCP, skills,
-   * commands). The caller localizes them; empty when nothing is configured.
+   * The active layer pair's non-zero counts, in the canonical order (vars, MCP,
+   * skills, slash commands, setup commands, agents). The caller localizes them;
+   * empty when nothing is configured.
    */
   chipCountItems: ProfileCountItem[];
   /** Where the top layer came from, or null when none applies. */
@@ -107,40 +112,23 @@ export function resolveSessionProfileLayerIds({
 }
 
 /**
- * The non-zero counts a picker row shows, in web order (vars, MCP, skills,
- * commands), omitting zero counts. The caller localizes them, so the unit
- * words live in the catalog.
- */
-export function sessionProfileCountItems(profile: SessionProfilePickerProfile): ProfileCountItem[] {
-  const items: (ProfileCountItem | null)[] = [
-    profile.varCount > 0 ? { kind: 'vars', count: profile.varCount } : null,
-    profile.mcpServerCount > 0 ? { kind: 'mcp', count: profile.mcpServerCount } : null,
-    profile.skillCount > 0 ? { kind: 'skills', count: profile.skillCount } : null,
-    profile.kiloCommandCount > 0 ? { kind: 'commands', count: profile.kiloCommandCount } : null,
-  ];
-  return items.filter((item): item is ProfileCountItem => item !== null);
-}
-
-/**
- * The active pair's counts: vars take the larger layer (they merge), MCP,
- * skills and commands add. Matches the web chip's arithmetic. Zero counts are
- * omitted; the caller localizes the rest.
+ * The active pair's counts, in the canonical order: vars take the larger layer
+ * (they merge), every other collection adds. Both layers feed the same count
+ * source, so the pair and a single profile never disagree on order or on which
+ * fields they read.
  */
 function activeCountItems(
   base: SessionProfilePickerProfile | null,
   top: SessionProfilePickerProfile | null
 ): ProfileCountItem[] {
-  const vars = Math.max(base?.varCount ?? 0, top?.varCount ?? 0);
-  const mcps = (base?.mcpServerCount ?? 0) + (top?.mcpServerCount ?? 0);
-  const skills = (base?.skillCount ?? 0) + (top?.skillCount ?? 0);
-  const cmds = (base?.kiloCommandCount ?? 0) + (top?.kiloCommandCount ?? 0);
-  const items: (ProfileCountItem | null)[] = [
-    vars > 0 ? { kind: 'vars', count: vars } : null,
-    mcps > 0 ? { kind: 'mcp', count: mcps } : null,
-    skills > 0 ? { kind: 'skills', count: skills } : null,
-    cmds > 0 ? { kind: 'commands', count: cmds } : null,
-  ];
-  return items.filter((item): item is ProfileCountItem => item !== null);
+  return profileCountItems({
+    varCount: Math.max(base?.varCount ?? 0, top?.varCount ?? 0),
+    mcpServerCount: (base?.mcpServerCount ?? 0) + (top?.mcpServerCount ?? 0),
+    skillCount: (base?.skillCount ?? 0) + (top?.skillCount ?? 0),
+    kiloCommandCount: (base?.kiloCommandCount ?? 0) + (top?.kiloCommandCount ?? 0),
+    commandCount: (base?.commandCount ?? 0) + (top?.commandCount ?? 0),
+    agentCount: (base?.agentCount ?? 0) + (top?.agentCount ?? 0),
+  });
 }
 
 export function resolveSessionProfilePicker<P extends SessionProfilePickerProfile>(

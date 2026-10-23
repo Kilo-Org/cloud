@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config, type User } from '@kilocode/db/schema';
 import type { PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
-import { PREFERRED_PROVIDER_ORDER_FALLBACK_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 
@@ -39,12 +38,9 @@ describe('adminPreferredProviderOrderRouter', () => {
     });
   });
 
-  it('returns no stored config and the built-in fallback when unset', async () => {
+  it('returns no stored config when unset', async () => {
     const caller = await createCallerForUser(admin.id);
-    await expect(caller.admin.preferredProviderOrder.get()).resolves.toEqual({
-      config: null,
-      fallback: PREFERRED_PROVIDER_ORDER_FALLBACK_CONFIG,
-    });
+    await expect(caller.admin.preferredProviderOrder.get()).resolves.toEqual({ config: null });
   });
 
   it('stores, updates, and clears the config without touching other columns', async () => {

@@ -146,7 +146,10 @@
   ],
   "de": ["block", "manual review", "no changes needed", "open", "open pull request", "pr opened"],
   "el": [
+    "{{count}} open",
+    "archived ({{count}})",
     "balanced",
+    "completed ({{count}})",
     "critical",
     "no changes needed",
     "open",
@@ -368,7 +371,9 @@
     "open",
     "open pull request",
     "reactions",
+    "review",
     "search sessions",
+    "stopped",
     "superseded",
     "tokens"
   ],
@@ -987,6 +992,7 @@
     "superseded"
   ],
   "zh-Hans": [
+    "block",
     "commit",
     "file",
     "files",

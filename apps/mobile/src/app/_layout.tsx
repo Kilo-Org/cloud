@@ -45,7 +45,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 
 import { useRootNavigationReady } from '@/lib/navigation-ready';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { View, type ViewInstance } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
@@ -58,7 +58,7 @@ import { StateSurface } from '@/components/centered-state-surface';
 import { LanguageReloadErrorScreen } from '@/components/language-reload-error-screen';
 import { RuntimeErrorScreen } from '@/components/runtime-error-screen';
 import { splashContentScale } from '@/components/splash-reveal';
-import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
+import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { MotionProvider } from '@/lib/a11y/motion';
 import { useAuth } from '@/lib/auth/auth-context';
 import { resolveBootstrapDecision, shouldShowBootstrapLoading } from '@/lib/bootstrap-decision';
@@ -1119,11 +1119,11 @@ function RootLayoutNav({
   // Hidden root-route entry contract (D17): while `hidden`, the wrapper leaves
   // both accessibility trees. On the hidden → visible transition,
   // `announceForA11y` is the deterministic entry context for screen-reader
-  // users, and the wrapper focus is best-effort (`moveA11yFocus` returns false
-  // when the platform declines — no retry), deferred to the next frame so the
-  // revealed tree is measurable. Per-screen heading/first-control focus is
-  // owned by the screens themselves; the gate cannot know the active screen's
-  // heading.
+  // users, and the wrapper focus is best-effort (`requestA11yFocus` returns false
+  // only when the wrapper has no node yet or the native call throws — no retry),
+  // deferred to the next frame so the revealed tree is measurable. Per-screen
+  // heading/first-control focus is owned by the screens themselves; the gate
+  // cannot know the active screen's heading.
   //
   // The transition is skipped while a bootstrap error is shown: the wrapper
   // is unmounted then (the error screen replaces it), so "Content ready"
@@ -1131,7 +1131,7 @@ function RootLayoutNav({
   // cleanup cancels the pending frame, which React runs before any later
   // render's frame can fire, so an interrupted reveal never focuses a stale
   // wrapper.
-  const wrapperRef = useRef<View>(null);
+  const wrapperRef = useRef<ViewInstance>(null);
   const wasHiddenRef = useRef(wrapperObscured);
   useEffect(() => {
     const wasHidden = wasHiddenRef.current;
@@ -1141,7 +1141,7 @@ function RootLayoutNav({
     }
     announceForA11y(i18n.t('bootstrap.contentReady'));
     const frame = requestAnimationFrame(() => {
-      moveA11yFocus(wrapperRef);
+      requestA11yFocus(wrapperRef);
     });
     return () => {
       cancelAnimationFrame(frame);

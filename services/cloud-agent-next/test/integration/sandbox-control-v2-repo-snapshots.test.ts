@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { resolveSecret } from '../../src/auth.js';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
-import { sessionDoName } from '../../src/session-plane.js';
+import { sessionDoName } from '../../src/session-identity.js';
 import { verifySandboxLaunchCredential } from '../../src/sandbox-control/credential.js';
 import { validateControlLogUploadGrant } from '../../src/sandbox-control/log-upload-grant.js';
 import {

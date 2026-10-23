@@ -35,7 +35,10 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfile: () => h.query,
   useAgentProfileMutations: () => h.mutations,
 }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ back: h.back }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ back: h.back }),
+  usePreventRemove: () => undefined,
+}));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
 vi.mock('react-native', () => ({
   View: 'View',

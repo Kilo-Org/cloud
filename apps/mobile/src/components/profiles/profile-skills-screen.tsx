@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, Switch, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Pencil, Sparkles, Trash2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import {
   type AgentProfileDetail,
@@ -21,7 +22,7 @@ import {
 } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
@@ -54,6 +55,7 @@ function hasUsableMessage(error: unknown): boolean {
 function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const subtitleKey = skillRowSubtitle(skill);
   return (
     <View className="min-h-16 flex-row items-center gap-1 rounded-lg bg-secondary px-3 py-2">
       <View className="min-w-0 flex-1 gap-0.5">
@@ -61,7 +63,7 @@ function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>
           {skill.name}
         </Text>
         <Text variant="muted" className="text-xs">
-          {skillRowSubtitle(skill)}
+          {subtitleKey === null ? skill.sourceType : t(subtitleKey)}
         </Text>
       </View>
       <Switch
@@ -190,7 +192,7 @@ export function ProfileSkillsScreen({
         placement="top"
         action={
           canManage ? (
-            <Button onPress={startAdd}>
+            <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
               <Text>{t('profiles.addSkill')}</Text>
             </Button>
           ) : null

@@ -16,6 +16,7 @@ import { ProfileRepoPinsSection } from '@/components/profiles/profile-repo-pins-
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { useConfirmDialog } from '@/components/ui/dialog';
@@ -49,6 +50,7 @@ import {
   getProfileSkillsPath,
   getProfileSlashCommandsPath,
   getProfileVariablesPath,
+  type ProfileManagementStack,
 } from '@/lib/profile-agent-navigation';
 
 /** Icon per Overview section, matching the section's purpose. */
@@ -69,7 +71,10 @@ const SECTION_PATHS = {
   mcp: getProfileMcpPath,
   skills: getProfileSkillsPath,
   agents: getProfileAgentsPath,
-} satisfies Record<OverviewSectionKey, (profileId: string, organizationId?: string) => Href>;
+} satisfies Record<
+  OverviewSectionKey,
+  (profileId: string, organizationId: string | undefined, stack: ProfileManagementStack) => Href
+>;
 
 /**
  * The mutation hook toasts `error.message`; the screen only supplies a
@@ -82,15 +87,14 @@ function hasUsableMessage(error: unknown): boolean {
 type MetadataFormProps = Readonly<{
   profile: AgentProfileDetail;
   isSaving: boolean;
-  onSave: (values: { name: string; description: string }) => void;
+  onSave: (values: { name: string; description: string }) => Promise<boolean>;
   disabled?: boolean;
 }>;
 
 /**
- * Uncontrolled metadata form. The screen remounts this component — keyed on the
- * metadata it seeds via `metadataFormKey` — so a refetch re-seeds both fields
- * only when that metadata changed; the refs live here, so the remount resets
- * them alongside the inputs.
+ * Uncontrolled metadata form, remounted via `metadataFormKey` only when server
+ * metadata changes. Defaults follow the draft refs so pending/error renders
+ * cannot restore the old server values in the native fields.
  */
 function ProfileMetadataForm({ profile, isSaving, onSave, disabled = false }: MetadataFormProps) {
   const { t } = useTranslation();
@@ -98,8 +102,9 @@ function ProfileMetadataForm({ profile, isSaving, onSave, disabled = false }: Me
   const descriptionRef = useRef(profile.description ?? '');
   const [nameError, setNameError] = useState<string | null>(null);
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
+  const [saveFailed, setSaveFailed] = useState(false);
 
-  const submit = () => {
+  const submit = async () => {
     const name = nameRef.current.trim();
     const nameIssue = validateProfileName(name);
     if (nameIssue !== null) {
@@ -115,7 +120,8 @@ function ProfileMetadataForm({ profile, isSaving, onSave, disabled = false }: Me
     }
     setNameError(null);
     setDescriptionError(null);
-    onSave({ name, description });
+    setSaveFailed(false);
+    setSaveFailed(!(await onSave({ name, description })));
   };
 
   return (
@@ -123,7 +129,7 @@ function ProfileMetadataForm({ profile, isSaving, onSave, disabled = false }: Me
       <FormField
         label={t('profiles.nameLabel')}
         placeholder={t('profiles.namePlaceholder')}
-        defaultValue={profile.name}
+        defaultValue={nameRef.current}
         error={nameError ?? undefined}
         disabled={disabled || isSaving}
         required
@@ -138,7 +144,7 @@ function ProfileMetadataForm({ profile, isSaving, onSave, disabled = false }: Me
       <FormField
         label={t('profiles.descriptionLabel')}
         placeholder={t('profiles.descriptionPlaceholder')}
-        defaultValue={profile.description ?? ''}
+        defaultValue={descriptionRef.current}
         error={descriptionError ?? undefined}
         multiline
         textAlignVertical="top"
@@ -151,8 +157,9 @@ function ProfileMetadataForm({ profile, isSaving, onSave, disabled = false }: Me
           }
         }}
       />
+      {saveFailed ? <AccessibleStatus message={t('profiles.saveFailed')} /> : null}
       <Button loading={isSaving} disabled={disabled || isSaving} onPress={submit}>
-        <Text>{t('common.save')}</Text>
+        <Text>{t(saveFailed ? 'common.retry' : 'common.save')}</Text>
       </Button>
     </View>
   );
@@ -161,7 +168,13 @@ function ProfileMetadataForm({ profile, isSaving, onSave, disabled = false }: Me
 export function ProfileOverviewScreen({
   profileId,
   organizationId,
-}: Readonly<{ profileId: string; organizationId?: string }>) {
+  stack,
+}: Readonly<{
+  profileId: string;
+  organizationId?: string;
+  /** The Stack this screen is mounted in; its section rows stay in it. */
+  stack: ProfileManagementStack;
+}>) {
   const router = useRouter();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
@@ -180,10 +193,12 @@ export function ProfileOverviewScreen({
     try {
       await update.mutateAsync({ profileId, name, description });
       toast.success(t('common.updated'));
+      return true;
     } catch (error) {
       if (!hasUsableMessage(error)) {
         toast.error(t('profiles.saveFailed'));
       }
+      return false;
     }
   };
 
@@ -216,7 +231,12 @@ export function ProfileOverviewScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={profile?.name ?? t('profiles.title')} />
+      <ScreenHeader
+        title={profile?.name ?? t('profiles.title')}
+        // The profile name is user prose, not a UI label, so it keeps a second
+        // line for a natural break.
+        titleNumberOfLines={2}
+      />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-6 px-6 pt-4"
@@ -245,9 +265,7 @@ export function ProfileOverviewScreen({
               key={metadataFormKey(profile)}
               profile={profile}
               isSaving={update.isPending}
-              onSave={values => {
-                void saveMetadata(values);
-              }}
+              onSave={saveMetadata}
               disabled={!canManage}
             />
 
@@ -282,7 +300,7 @@ export function ProfileOverviewScreen({
                     subtitle={String(row.count)}
                     last={index === rows.length - 1}
                     onPress={() => {
-                      router.push(SECTION_PATHS[row.key](profileId, organizationId));
+                      router.push(SECTION_PATHS[row.key](profileId, organizationId, stack));
                     }}
                   />
                 ))}

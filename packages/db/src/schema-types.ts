@@ -1340,23 +1340,6 @@ export type ReviewMemoryProposalStatus = (typeof REVIEW_MEMORY_PROPOSAL_STATUSES
 
 export type ReviewMemoryEvidenceItem = { excerpt: string; prNumber: number | null };
 
-// --- Deployment types ---
-
-export const providerSchema = z.enum(['github', 'git', 'app-builder']);
-
-export type Provider = z.infer<typeof providerSchema>;
-
-export const buildStatusSchema = z.enum([
-  'queued',
-  'building',
-  'deploying',
-  'deployed',
-  'failed',
-  'cancelled',
-]);
-
-export type BuildStatus = z.infer<typeof buildStatusSchema>;
-
 // --- Code Reviewer analytics ---
 
 export const CODE_REVIEW_ANALYTICS_SCHEMA_VERSION = 1;
@@ -2200,6 +2183,7 @@ export type DirectByokModelFlag = z.infer<typeof DirectByokModelFlagSchema>;
 export const DirectByokModelSchema = z.object({
   id: z.string(),
   name: z.string(),
+  description: z.string().optional(),
   flags: z.array(DirectByokModelFlagSchema).readonly().optional(),
   context_length: z.number(),
   max_completion_tokens: z.number(),

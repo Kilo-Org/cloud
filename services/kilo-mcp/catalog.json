@@ -240,6 +240,34 @@
     ],
     "searchBlob": "agentBriefing.list List existing agent briefing reports for the user, optionally filtered by personal or organization scope with pagination. agentbriefing list scope organizationid cursor limit currentonly scope organizationId cursor limit currentOnly"
   },
+  "agentBriefing.oneOffPreferences": {
+    "path": "agentBriefing.oneOffPreferences",
+    "kind": "query",
+    "summary": "Get the saved timezone and language preferences used when generating a one-off agent activity briefing for a custom date range.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "timezone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 35
+        }
+      }
+    },
+    "tags": [
+      "agentbriefing",
+      "oneoffpreferences",
+      "timezone",
+      "language"
+    ],
+    "searchBlob": "agentBriefing.oneOffPreferences Get the saved timezone and language preferences used when generating a one-off agent activity briefing for a custom date range. agentbriefing oneoffpreferences timezone language timezone language"
+  },
   "agentBriefing.preferences": {
     "path": "agentBriefing.preferences",
     "kind": "query",
@@ -267,6 +295,65 @@
       "language"
     ],
     "searchBlob": "agentBriefing.preferences Get the current user's agent briefing preferences, such as timezone, language, and notification schedule. agentbriefing preferences timezone language timezone language"
+  },
+  "agentBriefing.prepareOneOff": {
+    "path": "agentBriefing.prepareOneOff",
+    "kind": "mutation",
+    "summary": "Prepare a one-off agent briefing report for a specific date and time range, returning the draft report with session stats and a cost estimate for AI summary generation.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "startAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "endAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "timezone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 35
+        }
+      },
+      "required": [
+        "requestId",
+        "startAt",
+        "endAt",
+        "timezone",
+        "language"
+      ]
+    },
+    "tags": [
+      "agentbriefing",
+      "prepareoneoff",
+      "requestid",
+      "organizationid",
+      "startat",
+      "endat",
+      "timezone",
+      "language"
+    ],
+    "searchBlob": "agentBriefing.prepareOneOff Prepare a one-off agent briefing report for a specific date and time range, returning the draft report with session stats and a cost estimate for AI summary generation. agentbriefing prepareoneoff requestid organizationid startat endat timezone language requestId organizationId startAt endAt timezone language"
   },
   "agentBriefing.read": {
     "path": "agentBriefing.read",
@@ -3466,587 +3553,6 @@
     ],
     "searchBlob": "agentProfiles.updateSkill Edit an existing skill on an agent profile, including its name, description, markdown, or files. agentprofiles updateskill profileid organizationid skillid name description rawmarkdown files enabled profileId organizationId skillId name description rawMarkdown files enabled"
   },
-  "appBuilder.canMigrateToGitHub": {
-    "path": "appBuilder.canMigrateToGitHub",
-    "kind": "query",
-    "summary": "Check whether an app builder project can be migrated or exported to a GitHub repository.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "projectId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "projectId"
-      ]
-    },
-    "tags": [
-      "appbuilder",
-      "canmigratetogithub",
-      "projectid"
-    ],
-    "searchBlob": "appBuilder.canMigrateToGitHub Check whether an app builder project can be migrated or exported to a GitHub repository. appbuilder canmigratetogithub projectid projectId"
-  },
-  "appBuilder.checkEligibility": {
-    "path": "appBuilder.checkEligibility",
-    "kind": "query",
-    "summary": "Check whether the current user's account balance is sufficient to use the app builder feature.",
-    "inputSchema": {},
-    "tags": [
-      "appbuilder",
-      "checkeligibility"
-    ],
-    "searchBlob": "appBuilder.checkEligibility Check whether the current user's account balance is sufficient to use the app builder feature. appbuilder checkeligibility"
-  },
-  "appBuilder.createProject": {
-    "path": "appBuilder.createProject",
-    "kind": "mutation",
-    "summary": "Create a new app-builder project from a prompt, with an optional model, title, images, and template. Use this to start building a new app.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "prompt": {
-          "type": "string",
-          "minLength": 1
-        },
-        "model": {
-          "type": "string",
-          "minLength": 1
-        },
-        "title": {
-          "type": "string"
-        },
-        "images": {
-          "type": "object",
-          "properties": {
-            "path": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 500
-            },
-            "files": {
-              "minItems": 1,
-              "type": "array",
-              "items": {
-                "type": "string",
-                "maxLength": 255
-              }
-            }
-          },
-          "required": [
-            "path",
-            "files"
-          ]
-        },
-        "template": {
-          "type": "string",
-          "enum": [
-            "resume",
-            "startup-landing-page"
-          ]
-        },
-        "mode": {
-          "type": "string",
-          "enum": [
-            "code",
-            "ask"
-          ]
-        }
-      },
-      "required": [
-        "prompt",
-        "model"
-      ]
-    },
-    "tags": [
-      "appbuilder",
-      "createproject",
-      "prompt",
-      "model",
-      "title",
-      "images",
-      "template",
-      "mode"
-    ],
-    "searchBlob": "appBuilder.createProject Create a new app-builder project from a prompt, with an optional model, title, images, and template. Use this to start building a new app. appbuilder createproject prompt model title images template mode prompt model title images template mode"
-  },
-  "appBuilder.deleteProject": {
-    "path": "appBuilder.deleteProject",
-    "kind": "mutation",
-    "summary": "Delete an app-builder project permanently. Use this to remove a project the user no longer needs.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "projectId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "projectId"
-      ]
-    },
-    "tags": [
-      "appbuilder",
-      "deleteproject",
-      "projectid"
-    ],
-    "searchBlob": "appBuilder.deleteProject Delete an app-builder project permanently. Use this to remove a project the user no longer needs. appbuilder deleteproject projectid projectId"
-  },
-  "appBuilder.deployProject": {
-    "path": "appBuilder.deployProject",
-    "kind": "mutation",
-    "summary": "Deploy an app-builder project so it goes live. Use this to publish the current project to its hosting environment.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "projectId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "projectId"
-      ]
-    },
-    "tags": [
-      "appbuilder",
-      "deployproject",
-      "projectid"
-    ],
-    "searchBlob": "appBuilder.deployProject Deploy an app-builder project so it goes live. Use this to publish the current project to its hosting environment. appbuilder deployproject projectid projectId"
-  },
-  "appBuilder.generateCloneToken": {
-    "path": "appBuilder.generateCloneToken",
-    "kind": "mutation",
-    "summary": "Generate a token that lets a user clone the app-builder project repository. Use this to get git clone credentials for the project.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "projectId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "projectId"
-      ]
-    },
-    "tags": [
-      "appbuilder",
-      "generateclonetoken",
-      "projectid"
-    ],
-    "searchBlob": "appBuilder.generateCloneToken Generate a token that lets a user clone the app-builder project repository. Use this to get git clone credentials for the project. appbuilder generateclonetoken projectid projectId"
-  },
-  "appBuilder.getImageUploadUrl": {
-    "path": "appBuilder.getImageUploadUrl",
-    "kind": "mutation",
-    "summary": "Get a presigned URL to upload an image for an app-builder message. Use this before sending a message that includes an image attachment.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "messageUuid": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "imageId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "contentType": {
-          "type": "string",
-          "enum": [
-            "image/png",
-            "image/jpeg",
-            "image/webp",
-            "image/gif"
-          ]
-        },
-        "contentLength": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "maximum": 5242880
-        }
-      },
-      "required": [
-        "messageUuid",
-        "imageId",
-        "contentType",
-        "contentLength"
-      ]
-    },
-    "tags": [
-      "appbuilder",
-      "getimageuploadurl",
-      "messageuuid",
-      "imageid",
-      "contenttype",
-      "contentlength"
-    ],
-    "searchBlob": "appBuilder.getImageUploadUrl Get a presigned URL to upload an image for an app-builder message. Use this before sending a message that includes an image attachment. appbuilder getimageuploadurl messageuuid imageid contenttype contentlength messageUuid imageId contentType contentLength"
-  },
-  "appBuilder.getLegacySessionMessages": {
-    "path": "appBuilder.getLegacySessionMessages",
-    "kind": "query",
-    "summary": "Retrieve the chat or session messages associated with an app builder project and a cloud agent session.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "projectId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "cloudAgentSessionId": {
-          "type": "string",
-          "minLength": 1
-        }
-      },
-      "required": [
-        "projectId",
-        "cloudAgentSessionId"
-      ]
-    },
-    "tags": [
-      "appbuilder",
-      "getlegacysessionmessages",
-      "projectid",
-      "cloudagentsessionid"
-    ],
-    "searchBlob": "appBuilder.getLegacySessionMessages Retrieve the chat or session messages associated with an app builder project and a cloud agent session. appbuilder getlegacysessionmessages projectid cloudagentsessionid projectId cloudAgentSessionId"
-  },
-  "appBuilder.getPreviewUrl": {
-    "path": "appBuilder.getPreviewUrl",
-    "kind": "query",
-    "summary": "Get the preview URL for an app builder project so it can be opened or embedded in a browser.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "projectId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "projectId"
-      ]
-    },
-    "tags": [
-      "appbuilder",
-      "getpreviewurl",
-      "projectid"
-    ],
-    "searchBlob": "appBuilder.getPreviewUrl Get the preview URL for an app builder project so it can be opened or embedded in a browser. appbuilder getpreviewurl projectid projectId"
-  },
-  "appBuilder.getProject": {
-    "path": "appBuilder.getProject",
-    "kind": "query",
-    "summary": "Fetch a full app builder project by ID, including its configuration and data, authenticated for the current user.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "projectId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "projectId"
-      ]
-    },
-    "tags": [
-      "appbuilder",
-      "getproject",
-      "projectid"
-    ],
-    "searchBlob": "appBuilder.getProject Fetch a full app builder project by ID, including its configuration and data, authenticated for the current user. appbuilder getproject projectid projectId"
-  },
-  "appBuilder.interruptSession": {
-    "path": "appBuilder.interruptSession",
-    "kind": "mutation",
-    "summary": "Stop the running cloud agent session for an app-builder project. Use this to cancel an in-progress build or chat session.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "projectId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "projectId"
-      ]
-    },
-    "tags": [
-      "appbuilder",
-      "interruptsession",
-      "projectid"
-    ],
-    "searchBlob": "appBuilder.interruptSession Stop the running cloud agent session for an app-builder project. Use this to cancel an in-progress build or chat session. appbuilder interruptsession projectid projectId"
-  },
-  "appBuilder.listProjects": {
-    "path": "appBuilder.listProjects",
-    "kind": "query",
-    "summary": "List all app builder projects owned by the current user.",
-    "inputSchema": {},
-    "tags": [
-      "appbuilder",
-      "listprojects"
-    ],
-    "searchBlob": "appBuilder.listProjects List all app builder projects owned by the current user. appbuilder listprojects"
-  },
-  "appBuilder.migrateToGitHub": {
-    "path": "appBuilder.migrateToGitHub",
-    "kind": "mutation",
-    "summary": "Move an app-builder project into a GitHub repository. Use this to export the project to a given GitHub repo.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "projectId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "repoFullName": {
-          "type": "string",
-          "minLength": 3,
-          "maxLength": 200,
-          "pattern": "^[a-zA-Z0-9._-]+\\/[a-zA-Z0-9._-]+$"
-        }
-      },
-      "required": [
-        "projectId",
-        "repoFullName"
-      ]
-    },
-    "tags": [
-      "appbuilder",
-      "migratetogithub",
-      "projectid",
-      "repofullname"
-    ],
-    "searchBlob": "appBuilder.migrateToGitHub Move an app-builder project into a GitHub repository. Use this to export the project to a given GitHub repo. appbuilder migratetogithub projectid repofullname projectId repoFullName"
-  },
-  "appBuilder.sendMessage": {
-    "path": "appBuilder.sendMessage",
-    "kind": "mutation",
-    "summary": "Send a chat message to the cloud agent session for an app-builder project, optionally with images or a model. Use this to continue the conversation or request changes.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "projectId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "message": {
-          "type": "string",
-          "minLength": 1
-        },
-        "images": {
-          "type": "object",
-          "properties": {
-            "path": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 500
-            },
-            "files": {
-              "minItems": 1,
-              "type": "array",
-              "items": {
-                "type": "string",
-                "maxLength": 255
-              }
-            }
-          },
-          "required": [
-            "path",
-            "files"
-          ]
-        },
-        "model": {
-          "type": "string",
-          "minLength": 1
-        },
-        "forceNewSession": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "projectId",
-        "message"
-      ]
-    },
-    "tags": [
-      "appbuilder",
-      "sendmessage",
-      "projectid",
-      "message",
-      "images",
-      "model",
-      "forcenewsession"
-    ],
-    "searchBlob": "appBuilder.sendMessage Send a chat message to the cloud agent session for an app-builder project, optionally with images or a model. Use this to continue the conversation or request changes. appbuilder sendmessage projectid message images model forcenewsession projectId message images model forceNewSession"
-  },
-  "appBuilder.startSession": {
-    "path": "appBuilder.startSession",
-    "kind": "mutation",
-    "summary": "Start a new cloud agent session for an app-builder project. Use this to begin an interactive coding session on the project.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "projectId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "projectId"
-      ]
-    },
-    "tags": [
-      "appbuilder",
-      "startsession",
-      "projectid"
-    ],
-    "searchBlob": "appBuilder.startSession Start a new cloud agent session for an app-builder project. Use this to begin an interactive coding session on the project. appbuilder startsession projectid projectId"
-  },
-  "appBuilder.triggerBuild": {
-    "path": "appBuilder.triggerBuild",
-    "kind": "mutation",
-    "summary": "Start a build for an existing app-builder project. Use this to rebuild or compile the project after changes.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "projectId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "projectId"
-      ]
-    },
-    "tags": [
-      "appbuilder",
-      "triggerbuild",
-      "projectid"
-    ],
-    "searchBlob": "appBuilder.triggerBuild Start a build for an existing app-builder project. Use this to rebuild or compile the project after changes. appbuilder triggerbuild projectid projectId"
-  },
-  "appBuilderFeedback.create": {
-    "path": "appBuilderFeedback.create",
-    "kind": "mutation",
-    "summary": "Submit user feedback about the App Builder experience for a project, including the feedback text and the preview session state at the time. Use this to record a bug report or comment about an App Builder session.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "project_id": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "organization_id": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "feedback_text": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 10000
-        },
-        "model": {
-          "type": "string",
-          "maxLength": 255
-        },
-        "preview_status": {
-          "type": "string",
-          "maxLength": 100
-        },
-        "is_streaming": {
-          "type": "boolean"
-        },
-        "message_count": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "recent_messages": {
-          "maxItems": 10,
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "role": {
-                "type": "string",
-                "maxLength": 50
-              },
-              "text": {
-                "type": "string",
-                "maxLength": 10000
-              },
-              "ts": {
-                "type": "number"
-              }
-            },
-            "required": [
-              "role",
-              "text",
-              "ts"
-            ]
-          }
-        }
-      },
-      "required": [
-        "project_id",
-        "feedback_text"
-      ]
-    },
-    "tags": [
-      "appbuilderfeedback",
-      "create",
-      "project_id",
-      "organization_id",
-      "feedback_text",
-      "model",
-      "preview_status",
-      "is_streaming",
-      "message_count",
-      "recent_messages"
-    ],
-    "searchBlob": "appBuilderFeedback.create Submit user feedback about the App Builder experience for a project, including the feedback text and the preview session state at the time. Use this to record a bug report or comment about an App Builder session. appbuilderfeedback create project_id organization_id feedback_text model preview_status is_streaming message_count recent_messages project_id organization_id feedback_text model preview_status is_streaming message_count recent_messages"
-  },
   "appReportedMessages.createReport": {
     "path": "appReportedMessages.createReport",
     "kind": "mutation",
@@ -4134,6 +3640,7 @@
                 "bedrock",
                 "deepseek",
                 "fireworks",
+                "gmicloud",
                 "google",
                 "inception",
                 "openai",
@@ -5648,6 +5155,21 @@
         "session_id": {
           "type": "string",
           "minLength": 1
+        },
+        "duration": {
+          "default": "7d",
+          "type": "string",
+          "enum": [
+            "1h",
+            "1d",
+            "7d",
+            "30d",
+            "forever"
+          ]
+        },
+        "include_new_messages": {
+          "default": false,
+          "type": "boolean"
         }
       },
       "required": [
@@ -5657,9 +5179,11 @@
     "tags": [
       "clisessionsv2",
       "share",
-      "session_id"
+      "session_id",
+      "duration",
+      "include_new_messages"
     ],
-    "searchBlob": "cliSessionsV2.share Share a CLI session by generating a public share link. Return the share token. clisessionsv2 share session_id session_id"
+    "searchBlob": "cliSessionsV2.share Share a CLI session by generating a public share link. Return the share token. clisessionsv2 share session_id duration include_new_messages session_id duration include_new_messages"
   },
   "cliSessionsV2.unshare": {
     "path": "cliSessionsV2.unshare",
@@ -6071,29 +5595,6 @@
     ],
     "searchBlob": "cloudAgentNext.getAttachmentUploadUrl Get a presigned URL to upload a file attachment for a cloud agent message. cloudagentnext getattachmentuploadurl messageuuid attachmentid contenttype contentlength extension messageUuid attachmentId contentType contentLength extension"
   },
-  "cloudAgentNext.getComputeBillingStatus": {
-    "path": "cloudAgentNext.getComputeBillingStatus",
-    "kind": "query",
-    "summary": "Get billing status and compute usage information for a cloud agent session.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "cloudAgentSessionId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "cloudAgentSessionId"
-      ]
-    },
-    "tags": [
-      "cloudagentnext",
-      "getcomputebillingstatus",
-      "cloudagentsessionid"
-    ],
-    "searchBlob": "cloudAgentNext.getComputeBillingStatus Get billing status and compute usage information for a cloud agent session. cloudagentnext getcomputebillingstatus cloudagentsessionid cloudAgentSessionId"
-  },
   "cloudAgentNext.getImageUploadUrl": {
     "path": "cloudAgentNext.getImageUploadUrl",
     "kind": "mutation",
@@ -6282,7 +5783,7 @@
           "format": "starts_with",
           "allOf": [
             {
-              "pattern": "^(agent|workspace)_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+              "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
             },
             {
               "pattern": "^workspace_.*"
@@ -9552,462 +9053,6 @@
     "admin": true,
     "debug": true
   },
-  "deployments.cancelBuild": {
-    "path": "deployments.cancelBuild",
-    "kind": "mutation",
-    "summary": "Cancel a running or queued build for a deployment. Use this to stop an in-progress build.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "deploymentId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "buildId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "deploymentId",
-        "buildId"
-      ]
-    },
-    "tags": [
-      "deployments",
-      "cancelbuild",
-      "deploymentid",
-      "buildid"
-    ],
-    "searchBlob": "deployments.cancelBuild Cancel a running or queued build for a deployment. Use this to stop an in-progress build. deployments cancelbuild deploymentid buildid deploymentId buildId"
-  },
-  "deployments.checkDeploymentEligibility": {
-    "path": "deployments.checkDeploymentEligibility",
-    "kind": "query",
-    "summary": "Check whether the current user has ever made a payment and is eligible to create a deployment.",
-    "inputSchema": {},
-    "tags": [
-      "deployments",
-      "checkdeploymenteligibility"
-    ],
-    "searchBlob": "deployments.checkDeploymentEligibility Check whether the current user has ever made a payment and is eligible to create a deployment. deployments checkdeploymenteligibility"
-  },
-  "deployments.checkSlugAvailability": {
-    "path": "deployments.checkSlugAvailability",
-    "kind": "query",
-    "summary": "Check whether a proposed deployment slug is available for use.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "slug": {
-          "type": "string",
-          "minLength": 3,
-          "maxLength": 63,
-          "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
-        }
-      },
-      "required": [
-        "slug"
-      ]
-    },
-    "tags": [
-      "deployments",
-      "checkslugavailability",
-      "slug"
-    ],
-    "searchBlob": "deployments.checkSlugAvailability Check whether a proposed deployment slug is available for use. deployments checkslugavailability slug slug"
-  },
-  "deployments.createDeployment": {
-    "path": "deployments.createDeployment",
-    "kind": "mutation",
-    "summary": "Create a new deployment from a GitHub repository and branch. Use this to deploy a repo for the first time, with optional environment variables.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "platformIntegrationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "repositoryFullName": {
-          "type": "string",
-          "minLength": 1,
-          "pattern": "^[^/]+\\/[^/]+$"
-        },
-        "branch": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 255,
-          "pattern": "^[a-zA-Z0-9/_.-]+$"
-        },
-        "envVars": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "key": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 255,
-                "allOf": [
-                  {
-                    "pattern": "^[A-Z0-9_]+$"
-                  },
-                  {
-                    "pattern": "^[A-Z0-9]"
-                  }
-                ]
-              },
-              "value": {
-                "type": "string",
-                "maxLength": 5120
-              },
-              "isSecret": {
-                "type": "boolean"
-              }
-            },
-            "required": [
-              "key",
-              "value",
-              "isSecret"
-            ]
-          }
-        }
-      },
-      "required": [
-        "platformIntegrationId",
-        "repositoryFullName",
-        "branch"
-      ]
-    },
-    "tags": [
-      "deployments",
-      "createdeployment",
-      "platformintegrationid",
-      "repositoryfullname",
-      "branch",
-      "envvars"
-    ],
-    "searchBlob": "deployments.createDeployment Create a new deployment from a GitHub repository and branch. Use this to deploy a repo for the first time, with optional environment variables. deployments createdeployment platformintegrationid repositoryfullname branch envvars platformIntegrationId repositoryFullName branch envVars"
-  },
-  "deployments.deleteDeployment": {
-    "path": "deployments.deleteDeployment",
-    "kind": "mutation",
-    "summary": "Delete a deployment by its ID. Use this to permanently remove a deployment the user owns.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "id"
-      ]
-    },
-    "tags": [
-      "deployments",
-      "deletedeployment",
-      "id"
-    ],
-    "searchBlob": "deployments.deleteDeployment Delete a deployment by its ID. Use this to permanently remove a deployment the user owns. deployments deletedeployment id id"
-  },
-  "deployments.deleteEnvVar": {
-    "path": "deployments.deleteEnvVar",
-    "kind": "mutation",
-    "summary": "Delete an environment variable from a deployment by its key. Use this to remove a variable the deployment no longer needs.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "deploymentId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "key": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "deploymentId",
-        "key"
-      ]
-    },
-    "tags": [
-      "deployments",
-      "deleteenvvar",
-      "deploymentid",
-      "key"
-    ],
-    "searchBlob": "deployments.deleteEnvVar Delete an environment variable from a deployment by its key. Use this to remove a variable the deployment no longer needs. deployments deleteenvvar deploymentid key deploymentId key"
-  },
-  "deployments.getBuildEvents": {
-    "path": "deployments.getBuildEvents",
-    "kind": "query",
-    "summary": "Retrieve a paginated list of build log events for a deployment and build, optionally continuing after a given event ID.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "deploymentId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "buildId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "limit": {
-          "default": 100,
-          "type": "number",
-          "minimum": 1,
-          "maximum": 1000
-        },
-        "afterEventId": {
-          "type": "number"
-        }
-      },
-      "required": [
-        "deploymentId",
-        "buildId"
-      ]
-    },
-    "tags": [
-      "deployments",
-      "getbuildevents",
-      "deploymentid",
-      "buildid",
-      "limit",
-      "aftereventid"
-    ],
-    "searchBlob": "deployments.getBuildEvents Retrieve a paginated list of build log events for a deployment and build, optionally continuing after a given event ID. deployments getbuildevents deploymentid buildid limit aftereventid deploymentId buildId limit afterEventId"
-  },
-  "deployments.getDeployment": {
-    "path": "deployments.getDeployment",
-    "kind": "query",
-    "summary": "Fetch a single deployment's details by its ID for the current user.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "id"
-      ]
-    },
-    "tags": [
-      "deployments",
-      "getdeployment",
-      "id"
-    ],
-    "searchBlob": "deployments.getDeployment Fetch a single deployment's details by its ID for the current user. deployments getdeployment id id"
-  },
-  "deployments.listDeployments": {
-    "path": "deployments.listDeployments",
-    "kind": "query",
-    "summary": "List all deployments belonging to the current user.",
-    "inputSchema": {},
-    "tags": [
-      "deployments",
-      "listdeployments"
-    ],
-    "searchBlob": "deployments.listDeployments List all deployments belonging to the current user. deployments listdeployments"
-  },
-  "deployments.listEnvVars": {
-    "path": "deployments.listEnvVars",
-    "kind": "query",
-    "summary": "List the environment variables configured for a given deployment owned by the current user.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "deploymentId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "deploymentId"
-      ]
-    },
-    "tags": [
-      "deployments",
-      "listenvvars",
-      "deploymentid"
-    ],
-    "searchBlob": "deployments.listEnvVars List the environment variables configured for a given deployment owned by the current user. deployments listenvvars deploymentid deploymentId"
-  },
-  "deployments.redeploy": {
-    "path": "deployments.redeploy",
-    "kind": "mutation",
-    "summary": "Redeploy an existing deployment by its ID. Use this to rebuild and redeploy from the same source and branch.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "id"
-      ]
-    },
-    "tags": [
-      "deployments",
-      "redeploy",
-      "id"
-    ],
-    "searchBlob": "deployments.redeploy Redeploy an existing deployment by its ID. Use this to rebuild and redeploy from the same source and branch. deployments redeploy id id"
-  },
-  "deployments.renameDeployment": {
-    "path": "deployments.renameDeployment",
-    "kind": "mutation",
-    "summary": "Rename a deployment by changing its slug. Use this to give a deployment a new URL-friendly name.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "deploymentId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "newSlug": {
-          "type": "string",
-          "minLength": 3,
-          "maxLength": 63,
-          "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
-        }
-      },
-      "required": [
-        "deploymentId",
-        "newSlug"
-      ]
-    },
-    "tags": [
-      "deployments",
-      "renamedeployment",
-      "deploymentid",
-      "newslug"
-    ],
-    "searchBlob": "deployments.renameDeployment Rename a deployment by changing its slug. Use this to give a deployment a new URL-friendly name. deployments renamedeployment deploymentid newslug deploymentId newSlug"
-  },
-  "deployments.renameEnvVar": {
-    "path": "deployments.renameEnvVar",
-    "kind": "mutation",
-    "summary": "Rename an environment variable key on a deployment. Use this to change the variable name while keeping its value.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "deploymentId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "oldKey": {
-          "type": "string"
-        },
-        "newKey": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 255,
-          "allOf": [
-            {
-              "pattern": "^[A-Z0-9_]+$"
-            },
-            {
-              "pattern": "^[A-Z0-9]"
-            }
-          ]
-        }
-      },
-      "required": [
-        "deploymentId",
-        "oldKey",
-        "newKey"
-      ]
-    },
-    "tags": [
-      "deployments",
-      "renameenvvar",
-      "deploymentid",
-      "oldkey",
-      "newkey"
-    ],
-    "searchBlob": "deployments.renameEnvVar Rename an environment variable key on a deployment. Use this to change the variable name while keeping its value. deployments renameenvvar deploymentid oldkey newkey deploymentId oldKey newKey"
-  },
-  "deployments.setEnvVar": {
-    "path": "deployments.setEnvVar",
-    "kind": "mutation",
-    "summary": "Add or update an environment variable on a deployment. Use this to set a key and value, optionally marking it secret.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "key": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 255,
-          "allOf": [
-            {
-              "pattern": "^[A-Z0-9_]+$"
-            },
-            {
-              "pattern": "^[A-Z0-9]"
-            }
-          ]
-        },
-        "value": {
-          "type": "string",
-          "maxLength": 5120
-        },
-        "isSecret": {
-          "type": "boolean"
-        },
-        "deploymentId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "key",
-        "value",
-        "isSecret",
-        "deploymentId"
-      ]
-    },
-    "tags": [
-      "deployments",
-      "setenvvar",
-      "key",
-      "value",
-      "issecret",
-      "deploymentid"
-    ],
-    "searchBlob": "deployments.setEnvVar Add or update an environment variable on a deployment. Use this to set a key and value, optionally marking it secret. deployments setenvvar key value issecret deploymentid key value isSecret deploymentId"
-  },
   "discord.getInstallation": {
     "path": "discord.getInstallation",
     "kind": "query",
@@ -10347,7 +9392,10 @@
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
-      }
+      },
+      "required": [
+        "integrationId"
+      ]
     },
     "tags": [
       "githubapps",
@@ -11036,6 +10084,11 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
+        "prNodeId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
         "owner": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_.-]+$"
@@ -11048,35 +10101,9 @@
           "type": "integer",
           "exclusiveMinimum": 0,
           "maximum": 9007199254740991
-        },
-        "prNodeId": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 256
-        },
-        "method": {
-          "type": "string",
-          "enum": [
-            "MERGE",
-            "REBASE",
-            "SQUASH"
-          ]
-        },
-        "commitTitle": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 255
-        },
-        "commitMessage": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 65535
         }
       },
       "required": [
-        "owner",
-        "repo",
-        "number",
         "prNodeId"
       ],
       "additionalProperties": false
@@ -11084,15 +10111,12 @@
     "tags": [
       "githubprreview",
       "disableautomerge",
+      "prnodeid",
       "owner",
       "repo",
-      "number",
-      "prnodeid",
-      "method",
-      "committitle",
-      "commitmessage"
+      "number"
     ],
-    "searchBlob": "githubPrReview.disableAutoMerge Turn off auto-merge for a GitHub pull request. githubprreview disableautomerge owner repo number prnodeid method committitle commitmessage owner repo number prNodeId method commitTitle commitMessage"
+    "searchBlob": "githubPrReview.disableAutoMerge Turn off auto-merge for a GitHub pull request. githubprreview disableautomerge prnodeid owner repo number prNodeId owner repo number"
   },
   "githubPrReview.enableAutoMerge": {
     "path": "githubPrReview.enableAutoMerge",
@@ -11102,6 +10126,11 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
+        "prNodeId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
         "owner": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_.-]+$"
@@ -11114,11 +10143,6 @@
           "type": "integer",
           "exclusiveMinimum": 0,
           "maximum": 9007199254740991
-        },
-        "prNodeId": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 256
         },
         "method": {
           "type": "string",
@@ -11140,9 +10164,6 @@
         }
       },
       "required": [
-        "owner",
-        "repo",
-        "number",
         "prNodeId"
       ],
       "additionalProperties": false
@@ -11150,15 +10171,15 @@
     "tags": [
       "githubprreview",
       "enableautomerge",
+      "prnodeid",
       "owner",
       "repo",
       "number",
-      "prnodeid",
       "method",
       "committitle",
       "commitmessage"
     ],
-    "searchBlob": "githubPrReview.enableAutoMerge Turn on auto-merge for a GitHub pull request so it merges when checks pass. githubprreview enableautomerge owner repo number prnodeid method committitle commitmessage owner repo number prNodeId method commitTitle commitMessage"
+    "searchBlob": "githubPrReview.enableAutoMerge Turn on auto-merge for a GitHub pull request so it merges when checks pass. githubprreview enableautomerge prnodeid owner repo number method committitle commitmessage prNodeId owner repo number method commitTitle commitMessage"
   },
   "githubPrReview.getFileLines": {
     "path": "githubPrReview.getFileLines",
@@ -15756,671 +14777,6 @@
     ],
     "searchBlob": "openAiChatGpt.status Check whether the signed-in user's \"Sign in with ChatGPT\" (OpenAI ChatGPT BYOK) connection is connected, disconnected, or in an error state, including linked account email and connection time. openaichatgpt status organizationid scope organizationId scope"
   },
-  "organizations.appBuilder.canMigrateToGitHub": {
-    "path": "organizations.appBuilder.canMigrateToGitHub",
-    "kind": "query",
-    "summary": "Check whether an App Builder project can be migrated to GitHub.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "projectId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "projectId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "appbuilder",
-      "canmigratetogithub",
-      "organizationid",
-      "projectid"
-    ],
-    "searchBlob": "organizations.appBuilder.canMigrateToGitHub Check whether an App Builder project can be migrated to GitHub. organizations appbuilder canmigratetogithub organizationid projectid organizationId projectId"
-  },
-  "organizations.appBuilder.checkEligibility": {
-    "path": "organizations.appBuilder.checkEligibility",
-    "kind": "query",
-    "summary": "Check whether a user in the organization is eligible to use App Builder based on their credit balance.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "appbuilder",
-      "checkeligibility",
-      "organizationid"
-    ],
-    "searchBlob": "organizations.appBuilder.checkEligibility Check whether a user in the organization is eligible to use App Builder based on their credit balance. organizations appbuilder checkeligibility organizationid organizationId"
-  },
-  "organizations.appBuilder.createProject": {
-    "path": "organizations.appBuilder.createProject",
-    "kind": "mutation",
-    "summary": "Create a new app builder project for an organization from a prompt. Use to start building an app.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "prompt": {
-          "type": "string",
-          "minLength": 1
-        },
-        "model": {
-          "type": "string",
-          "minLength": 1
-        },
-        "title": {
-          "type": "string"
-        },
-        "images": {
-          "type": "object",
-          "properties": {
-            "path": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 500
-            },
-            "files": {
-              "minItems": 1,
-              "type": "array",
-              "items": {
-                "type": "string",
-                "maxLength": 255
-              }
-            }
-          },
-          "required": [
-            "path",
-            "files"
-          ]
-        },
-        "template": {
-          "type": "string",
-          "enum": [
-            "resume",
-            "startup-landing-page"
-          ]
-        },
-        "mode": {
-          "type": "string",
-          "enum": [
-            "code",
-            "ask"
-          ]
-        }
-      },
-      "required": [
-        "organizationId",
-        "prompt",
-        "model"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "appbuilder",
-      "createproject",
-      "organizationid",
-      "prompt",
-      "model",
-      "title",
-      "images",
-      "template",
-      "mode"
-    ],
-    "searchBlob": "organizations.appBuilder.createProject Create a new app builder project for an organization from a prompt. Use to start building an app. organizations appbuilder createproject organizationid prompt model title images template mode organizationId prompt model title images template mode"
-  },
-  "organizations.appBuilder.deleteProject": {
-    "path": "organizations.appBuilder.deleteProject",
-    "kind": "mutation",
-    "summary": "Delete an app builder project. Use to remove an app.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "projectId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "projectId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "appbuilder",
-      "deleteproject",
-      "organizationid",
-      "projectid"
-    ],
-    "searchBlob": "organizations.appBuilder.deleteProject Delete an app builder project. Use to remove an app. organizations appbuilder deleteproject organizationid projectid organizationId projectId"
-  },
-  "organizations.appBuilder.deployProject": {
-    "path": "organizations.appBuilder.deployProject",
-    "kind": "mutation",
-    "summary": "Deploy an app builder project. Use to publish a built app.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "projectId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "projectId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "appbuilder",
-      "deployproject",
-      "organizationid",
-      "projectid"
-    ],
-    "searchBlob": "organizations.appBuilder.deployProject Deploy an app builder project. Use to publish a built app. organizations appbuilder deployproject organizationid projectid organizationId projectId"
-  },
-  "organizations.appBuilder.generateCloneToken": {
-    "path": "organizations.appBuilder.generateCloneToken",
-    "kind": "mutation",
-    "summary": "Generate a token to clone an app builder project's repository. Use to get clone access.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "projectId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "projectId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "appbuilder",
-      "generateclonetoken",
-      "organizationid",
-      "projectid"
-    ],
-    "searchBlob": "organizations.appBuilder.generateCloneToken Generate a token to clone an app builder project's repository. Use to get clone access. organizations appbuilder generateclonetoken organizationid projectid organizationId projectId"
-  },
-  "organizations.appBuilder.getImageUploadUrl": {
-    "path": "organizations.appBuilder.getImageUploadUrl",
-    "kind": "mutation",
-    "summary": "Get a presigned URL to upload an image for an app builder message. Use to attach an image to a build prompt.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "messageUuid": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "imageId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "contentType": {
-          "type": "string",
-          "enum": [
-            "image/png",
-            "image/jpeg",
-            "image/webp",
-            "image/gif"
-          ]
-        },
-        "contentLength": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "maximum": 5242880
-        }
-      },
-      "required": [
-        "organizationId",
-        "messageUuid",
-        "imageId",
-        "contentType",
-        "contentLength"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "appbuilder",
-      "getimageuploadurl",
-      "organizationid",
-      "messageuuid",
-      "imageid",
-      "contenttype",
-      "contentlength"
-    ],
-    "searchBlob": "organizations.appBuilder.getImageUploadUrl Get a presigned URL to upload an image for an app builder message. Use to attach an image to a build prompt. organizations appbuilder getimageuploadurl organizationid messageuuid imageid contenttype contentlength organizationId messageUuid imageId contentType contentLength"
-  },
-  "organizations.appBuilder.getLegacySessionMessages": {
-    "path": "organizations.appBuilder.getLegacySessionMessages",
-    "kind": "query",
-    "summary": "Get messages from a legacy cloud agent session associated with an App Builder project.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "projectId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "cloudAgentSessionId": {
-          "type": "string",
-          "minLength": 1
-        }
-      },
-      "required": [
-        "organizationId",
-        "projectId",
-        "cloudAgentSessionId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "appbuilder",
-      "getlegacysessionmessages",
-      "organizationid",
-      "projectid",
-      "cloudagentsessionid"
-    ],
-    "searchBlob": "organizations.appBuilder.getLegacySessionMessages Get messages from a legacy cloud agent session associated with an App Builder project. organizations appbuilder getlegacysessionmessages organizationid projectid cloudagentsessionid organizationId projectId cloudAgentSessionId"
-  },
-  "organizations.appBuilder.getPreviewUrl": {
-    "path": "organizations.appBuilder.getPreviewUrl",
-    "kind": "query",
-    "summary": "Get the preview URL for an organization's App Builder project.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "projectId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "projectId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "appbuilder",
-      "getpreviewurl",
-      "organizationid",
-      "projectid"
-    ],
-    "searchBlob": "organizations.appBuilder.getPreviewUrl Get the preview URL for an organization's App Builder project. organizations appbuilder getpreviewurl organizationid projectid organizationId projectId"
-  },
-  "organizations.appBuilder.getProject": {
-    "path": "organizations.appBuilder.getProject",
-    "kind": "query",
-    "summary": "Get App Builder project details for an organization.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "projectId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "projectId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "appbuilder",
-      "getproject",
-      "organizationid",
-      "projectid"
-    ],
-    "searchBlob": "organizations.appBuilder.getProject Get App Builder project details for an organization. organizations appbuilder getproject organizationid projectid organizationId projectId"
-  },
-  "organizations.appBuilder.interruptSession": {
-    "path": "organizations.appBuilder.interruptSession",
-    "kind": "mutation",
-    "summary": "Stop the running app builder session for a project. Use to cancel app generation.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "projectId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "projectId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "appbuilder",
-      "interruptsession",
-      "organizationid",
-      "projectid"
-    ],
-    "searchBlob": "organizations.appBuilder.interruptSession Stop the running app builder session for a project. Use to cancel app generation. organizations appbuilder interruptsession organizationid projectid organizationId projectId"
-  },
-  "organizations.appBuilder.listProjects": {
-    "path": "organizations.appBuilder.listProjects",
-    "kind": "query",
-    "summary": "List all App Builder projects belonging to an organization.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "appbuilder",
-      "listprojects",
-      "organizationid"
-    ],
-    "searchBlob": "organizations.appBuilder.listProjects List all App Builder projects belonging to an organization. organizations appbuilder listprojects organizationid organizationId"
-  },
-  "organizations.appBuilder.listUserProjects": {
-    "path": "organizations.appBuilder.listUserProjects",
-    "kind": "query",
-    "summary": "List App Builder projects within the organization that were created by the current user.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "appbuilder",
-      "listuserprojects",
-      "organizationid"
-    ],
-    "searchBlob": "organizations.appBuilder.listUserProjects List App Builder projects within the organization that were created by the current user. organizations appbuilder listuserprojects organizationid organizationId"
-  },
-  "organizations.appBuilder.migrateToGitHub": {
-    "path": "organizations.appBuilder.migrateToGitHub",
-    "kind": "mutation",
-    "summary": "Migrate an app builder project to a GitHub repository. Use to move an app under GitHub source control.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "projectId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "repoFullName": {
-          "type": "string",
-          "minLength": 3,
-          "maxLength": 200,
-          "pattern": "^[a-zA-Z0-9._-]+\\/[a-zA-Z0-9._-]+$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "projectId",
-        "repoFullName"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "appbuilder",
-      "migratetogithub",
-      "organizationid",
-      "projectid",
-      "repofullname"
-    ],
-    "searchBlob": "organizations.appBuilder.migrateToGitHub Migrate an app builder project to a GitHub repository. Use to move an app under GitHub source control. organizations appbuilder migratetogithub organizationid projectid repofullname organizationId projectId repoFullName"
-  },
-  "organizations.appBuilder.sendMessage": {
-    "path": "organizations.appBuilder.sendMessage",
-    "kind": "mutation",
-    "summary": "Send a message or prompt to an app builder project's session. Use to instruct the app builder.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "projectId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "message": {
-          "type": "string",
-          "minLength": 1
-        },
-        "images": {
-          "type": "object",
-          "properties": {
-            "path": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 500
-            },
-            "files": {
-              "minItems": 1,
-              "type": "array",
-              "items": {
-                "type": "string",
-                "maxLength": 255
-              }
-            }
-          },
-          "required": [
-            "path",
-            "files"
-          ]
-        },
-        "model": {
-          "type": "string",
-          "minLength": 1
-        },
-        "forceNewSession": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "organizationId",
-        "projectId",
-        "message"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "appbuilder",
-      "sendmessage",
-      "organizationid",
-      "projectid",
-      "message",
-      "images",
-      "model",
-      "forcenewsession"
-    ],
-    "searchBlob": "organizations.appBuilder.sendMessage Send a message or prompt to an app builder project's session. Use to instruct the app builder. organizations appbuilder sendmessage organizationid projectid message images model forcenewsession organizationId projectId message images model forceNewSession"
-  },
-  "organizations.appBuilder.startSession": {
-    "path": "organizations.appBuilder.startSession",
-    "kind": "mutation",
-    "summary": "Start a new app builder coding session for a project. Use to begin or resume work on an app.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "projectId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "projectId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "appbuilder",
-      "startsession",
-      "organizationid",
-      "projectid"
-    ],
-    "searchBlob": "organizations.appBuilder.startSession Start a new app builder coding session for a project. Use to begin or resume work on an app. organizations appbuilder startsession organizationid projectid organizationId projectId"
-  },
-  "organizations.appBuilder.triggerBuild": {
-    "path": "organizations.appBuilder.triggerBuild",
-    "kind": "mutation",
-    "summary": "Trigger a build for an app builder project. Use to rebuild an app.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "projectId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "projectId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "appbuilder",
-      "triggerbuild",
-      "organizationid",
-      "projectid"
-    ],
-    "searchBlob": "organizations.appBuilder.triggerBuild Trigger a build for an app builder project. Use to rebuild an app. organizations appbuilder triggerbuild organizationid projectid organizationId projectId"
-  },
   "organizations.auditLogs.getActionTypes": {
     "path": "organizations.auditLogs.getActionTypes",
     "kind": "query",
@@ -17587,37 +15943,6 @@
     ],
     "searchBlob": "organizations.cloudAgentNext.getAttachmentUploadUrl Get a presigned URL to upload a file attachment for a cloud agent message. Use to attach a file. organizations cloudagentnext getattachmentuploadurl organizationid messageuuid attachmentid contenttype contentlength extension organizationId messageUuid attachmentId contentType contentLength extension"
   },
-  "organizations.cloudAgentNext.getComputeBillingStatus": {
-    "path": "organizations.cloudAgentNext.getComputeBillingStatus",
-    "kind": "query",
-    "summary": "Get the compute billing status for an organization's cloud agent session.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "cloudAgentSessionId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "organizationId",
-        "cloudAgentSessionId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "cloudagentnext",
-      "getcomputebillingstatus",
-      "organizationid",
-      "cloudagentsessionid"
-    ],
-    "searchBlob": "organizations.cloudAgentNext.getComputeBillingStatus Get the compute billing status for an organization's cloud agent session. organizations cloudagentnext getcomputebillingstatus organizationid cloudagentsessionid organizationId cloudAgentSessionId"
-  },
   "organizations.cloudAgentNext.getImageUploadUrl": {
     "path": "organizations.cloudAgentNext.getImageUploadUrl",
     "kind": "mutation",
@@ -17810,7 +16135,7 @@
           "format": "starts_with",
           "allOf": [
             {
-              "pattern": "^(agent|workspace)_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+              "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
             },
             {
               "pattern": "^workspace_.*"
@@ -20186,693 +18511,6 @@
       "cursor"
     ],
     "searchBlob": "organizations.creditTransactionsPage Get a page of credit transactions for an organization using cursor pagination. organizations credittransactionspage organizationid cursor organizationId cursor"
-  },
-  "organizations.deployments.cancelBuild": {
-    "path": "organizations.deployments.cancelBuild",
-    "kind": "mutation",
-    "summary": "Cancel an in-progress build for an organization deployment. Use to stop a running build.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "deploymentId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "buildId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "deploymentId",
-        "buildId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "deployments",
-      "cancelbuild",
-      "organizationid",
-      "deploymentid",
-      "buildid"
-    ],
-    "searchBlob": "organizations.deployments.cancelBuild Cancel an in-progress build for an organization deployment. Use to stop a running build. organizations deployments cancelbuild organizationid deploymentid buildid organizationId deploymentId buildId"
-  },
-  "organizations.deployments.checkDeploymentEligibility": {
-    "path": "organizations.deployments.checkDeploymentEligibility",
-    "kind": "query",
-    "summary": "Check whether an organization is allowed to create a deployment because it has previously paid.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "deployments",
-      "checkdeploymenteligibility",
-      "organizationid"
-    ],
-    "searchBlob": "organizations.deployments.checkDeploymentEligibility Check whether an organization is allowed to create a deployment because it has previously paid. organizations deployments checkdeploymenteligibility organizationid organizationId"
-  },
-  "organizations.deployments.checkSlugAvailability": {
-    "path": "organizations.deployments.checkSlugAvailability",
-    "kind": "query",
-    "summary": "Check whether a deployment slug is available for use.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "slug": {
-          "type": "string",
-          "minLength": 3,
-          "maxLength": 63,
-          "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "slug"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "deployments",
-      "checkslugavailability",
-      "organizationid",
-      "slug"
-    ],
-    "searchBlob": "organizations.deployments.checkSlugAvailability Check whether a deployment slug is available for use. organizations deployments checkslugavailability organizationid slug organizationId slug"
-  },
-  "organizations.deployments.createDeployment": {
-    "path": "organizations.deployments.createDeployment",
-    "kind": "mutation",
-    "summary": "Create a new app deployment for an organization from a GitHub repository and branch. Use to deploy an app.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "platformIntegrationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "repositoryFullName": {
-          "type": "string",
-          "minLength": 1,
-          "pattern": "^[^/]+\\/[^/]+$"
-        },
-        "branch": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 255,
-          "pattern": "^[a-zA-Z0-9/_.-]+$"
-        },
-        "envVars": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "key": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 255,
-                "allOf": [
-                  {
-                    "pattern": "^[A-Z0-9_]+$"
-                  },
-                  {
-                    "pattern": "^[A-Z0-9]"
-                  }
-                ]
-              },
-              "value": {
-                "type": "string",
-                "maxLength": 5120
-              },
-              "isSecret": {
-                "type": "boolean"
-              }
-            },
-            "required": [
-              "key",
-              "value",
-              "isSecret"
-            ]
-          }
-        }
-      },
-      "required": [
-        "organizationId",
-        "platformIntegrationId",
-        "repositoryFullName",
-        "branch"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "deployments",
-      "createdeployment",
-      "organizationid",
-      "platformintegrationid",
-      "repositoryfullname",
-      "branch",
-      "envvars"
-    ],
-    "searchBlob": "organizations.deployments.createDeployment Create a new app deployment for an organization from a GitHub repository and branch. Use to deploy an app. organizations deployments createdeployment organizationid platformintegrationid repositoryfullname branch envvars organizationId platformIntegrationId repositoryFullName branch envVars"
-  },
-  "organizations.deployments.deleteDeployment": {
-    "path": "organizations.deployments.deleteDeployment",
-    "kind": "mutation",
-    "summary": "Delete an organization's app deployment. Use to remove a deployed app.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "id": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "id"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "deployments",
-      "deletedeployment",
-      "organizationid",
-      "id"
-    ],
-    "searchBlob": "organizations.deployments.deleteDeployment Delete an organization's app deployment. Use to remove a deployed app. organizations deployments deletedeployment organizationid id organizationId id"
-  },
-  "organizations.deployments.deleteEnvVar": {
-    "path": "organizations.deployments.deleteEnvVar",
-    "kind": "mutation",
-    "summary": "Delete an environment variable from an organization deployment. Use to remove a deployment env var.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "deploymentId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "key": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "organizationId",
-        "deploymentId",
-        "key"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "deployments",
-      "deleteenvvar",
-      "organizationid",
-      "deploymentid",
-      "key"
-    ],
-    "searchBlob": "organizations.deployments.deleteEnvVar Delete an environment variable from an organization deployment. Use to remove a deployment env var. organizations deployments deleteenvvar organizationid deploymentid key organizationId deploymentId key"
-  },
-  "organizations.deployments.getBuildEvents": {
-    "path": "organizations.deployments.getBuildEvents",
-    "kind": "query",
-    "summary": "Get paginated build log events for a specific deployment build.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "deploymentId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "buildId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "limit": {
-          "default": 100,
-          "type": "number",
-          "minimum": 1,
-          "maximum": 1000
-        },
-        "afterEventId": {
-          "type": "number"
-        }
-      },
-      "required": [
-        "organizationId",
-        "deploymentId",
-        "buildId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "deployments",
-      "getbuildevents",
-      "organizationid",
-      "deploymentid",
-      "buildid",
-      "limit",
-      "aftereventid"
-    ],
-    "searchBlob": "organizations.deployments.getBuildEvents Get paginated build log events for a specific deployment build. organizations deployments getbuildevents organizationid deploymentid buildid limit aftereventid organizationId deploymentId buildId limit afterEventId"
-  },
-  "organizations.deployments.getDeployment": {
-    "path": "organizations.deployments.getDeployment",
-    "kind": "query",
-    "summary": "Get details for one of an organization's deployments by ID.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "id": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "id"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "deployments",
-      "getdeployment",
-      "organizationid",
-      "id"
-    ],
-    "searchBlob": "organizations.deployments.getDeployment Get details for one of an organization's deployments by ID. organizations deployments getdeployment organizationid id organizationId id"
-  },
-  "organizations.deployments.getPasswordStatus": {
-    "path": "organizations.deployments.getPasswordStatus",
-    "kind": "query",
-    "summary": "Get the password protection status for a deployment, keyed by its internal worker name.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "deploymentId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "deploymentId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "deployments",
-      "getpasswordstatus",
-      "organizationid",
-      "deploymentid"
-    ],
-    "searchBlob": "organizations.deployments.getPasswordStatus Get the password protection status for a deployment, keyed by its internal worker name. organizations deployments getpasswordstatus organizationid deploymentid organizationId deploymentId"
-  },
-  "organizations.deployments.listDeployments": {
-    "path": "organizations.deployments.listDeployments",
-    "kind": "query",
-    "summary": "List all deployments belonging to an organization.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "deployments",
-      "listdeployments",
-      "organizationid"
-    ],
-    "searchBlob": "organizations.deployments.listDeployments List all deployments belonging to an organization. organizations deployments listdeployments organizationid organizationId"
-  },
-  "organizations.deployments.listEnvVars": {
-    "path": "organizations.deployments.listEnvVars",
-    "kind": "query",
-    "summary": "List the environment variables configured for an organization's deployment.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "deploymentId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "deploymentId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "deployments",
-      "listenvvars",
-      "organizationid",
-      "deploymentid"
-    ],
-    "searchBlob": "organizations.deployments.listEnvVars List the environment variables configured for an organization's deployment. organizations deployments listenvvars organizationid deploymentid organizationId deploymentId"
-  },
-  "organizations.deployments.redeploy": {
-    "path": "organizations.deployments.redeploy",
-    "kind": "mutation",
-    "summary": "Redeploy an organization's app from its current source. Use to rebuild and release an updated deployment.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "id": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "id"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "deployments",
-      "redeploy",
-      "organizationid",
-      "id"
-    ],
-    "searchBlob": "organizations.deployments.redeploy Redeploy an organization's app from its current source. Use to rebuild and release an updated deployment. organizations deployments redeploy organizationid id organizationId id"
-  },
-  "organizations.deployments.removePassword": {
-    "path": "organizations.deployments.removePassword",
-    "kind": "mutation",
-    "summary": "Remove the access password from an organization deployment. Use to make a deployed app public.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "deploymentId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "deploymentId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "deployments",
-      "removepassword",
-      "organizationid",
-      "deploymentid"
-    ],
-    "searchBlob": "organizations.deployments.removePassword Remove the access password from an organization deployment. Use to make a deployed app public. organizations deployments removepassword organizationid deploymentid organizationId deploymentId"
-  },
-  "organizations.deployments.renameDeployment": {
-    "path": "organizations.deployments.renameDeployment",
-    "kind": "mutation",
-    "summary": "Change the URL slug of an organization deployment. Use to rename a deployed app.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "deploymentId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "newSlug": {
-          "type": "string",
-          "minLength": 3,
-          "maxLength": 63,
-          "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "deploymentId",
-        "newSlug"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "deployments",
-      "renamedeployment",
-      "organizationid",
-      "deploymentid",
-      "newslug"
-    ],
-    "searchBlob": "organizations.deployments.renameDeployment Change the URL slug of an organization deployment. Use to rename a deployed app. organizations deployments renamedeployment organizationid deploymentid newslug organizationId deploymentId newSlug"
-  },
-  "organizations.deployments.renameEnvVar": {
-    "path": "organizations.deployments.renameEnvVar",
-    "kind": "mutation",
-    "summary": "Rename an environment variable on an organization deployment. Use to change a deployment env var key.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "deploymentId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "oldKey": {
-          "type": "string"
-        },
-        "newKey": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 255,
-          "allOf": [
-            {
-              "pattern": "^[A-Z0-9_]+$"
-            },
-            {
-              "pattern": "^[A-Z0-9]"
-            }
-          ]
-        }
-      },
-      "required": [
-        "organizationId",
-        "deploymentId",
-        "oldKey",
-        "newKey"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "deployments",
-      "renameenvvar",
-      "organizationid",
-      "deploymentid",
-      "oldkey",
-      "newkey"
-    ],
-    "searchBlob": "organizations.deployments.renameEnvVar Rename an environment variable on an organization deployment. Use to change a deployment env var key. organizations deployments renameenvvar organizationid deploymentid oldkey newkey organizationId deploymentId oldKey newKey"
-  },
-  "organizations.deployments.setEnvVar": {
-    "path": "organizations.deployments.setEnvVar",
-    "kind": "mutation",
-    "summary": "Add or update an environment variable for an organization deployment, optionally as a secret. Use to configure deployment environment variables.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "key": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 255,
-          "allOf": [
-            {
-              "pattern": "^[A-Z0-9_]+$"
-            },
-            {
-              "pattern": "^[A-Z0-9]"
-            }
-          ]
-        },
-        "value": {
-          "type": "string",
-          "maxLength": 5120
-        },
-        "isSecret": {
-          "type": "boolean"
-        },
-        "deploymentId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "key",
-        "value",
-        "isSecret",
-        "deploymentId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "deployments",
-      "setenvvar",
-      "organizationid",
-      "key",
-      "value",
-      "issecret",
-      "deploymentid"
-    ],
-    "searchBlob": "organizations.deployments.setEnvVar Add or update an environment variable for an organization deployment, optionally as a secret. Use to configure deployment environment variables. organizations deployments setenvvar organizationid key value issecret deploymentid organizationId key value isSecret deploymentId"
-  },
-  "organizations.deployments.setPassword": {
-    "path": "organizations.deployments.setPassword",
-    "kind": "mutation",
-    "summary": "Set an access password that protects an organization deployment. Use to password-protect a deployed app.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "deploymentId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "password": {
-          "type": "string",
-          "minLength": 8
-        }
-      },
-      "required": [
-        "organizationId",
-        "deploymentId",
-        "password"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "deployments",
-      "setpassword",
-      "organizationid",
-      "deploymentid",
-      "password"
-    ],
-    "searchBlob": "organizations.deployments.setPassword Set an access password that protects an organization deployment. Use to password-protect a deployed app. organizations deployments setpassword organizationid deploymentid password organizationId deploymentId password"
   },
   "organizations.funds.childBalances": {
     "path": "organizations.funds.childBalances",
@@ -28390,38 +26028,6 @@
       "model_deny_list"
     ],
     "searchBlob": "organizations.settings.updateAllowLists Set which model providers are allowed and which models are blocked for an organization. Use to restrict model access for enterprise plans. organizations settings updateallowlists organizationid provider_allow_list model_deny_list organizationId provider_allow_list model_deny_list"
-  },
-  "organizations.settings.updateCodeIndexingFeatureFlag": {
-    "path": "organizations.settings.updateCodeIndexingFeatureFlag",
-    "kind": "mutation",
-    "summary": "Enable or disable code indexing for an organization. Use as an admin to toggle the code indexing feature.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "code_indexing_enabled": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "organizationId",
-        "code_indexing_enabled"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "settings",
-      "updatecodeindexingfeatureflag",
-      "organizationid",
-      "code_indexing_enabled"
-    ],
-    "searchBlob": "organizations.settings.updateCodeIndexingFeatureFlag Enable or disable code indexing for an organization. Use as an admin to toggle the code indexing feature. organizations settings updatecodeindexingfeatureflag organizationid code_indexing_enabled organizationId code_indexing_enabled",
-    "admin": true
   },
   "organizations.settings.updateDataCollection": {
     "path": "organizations.settings.updateDataCollection",

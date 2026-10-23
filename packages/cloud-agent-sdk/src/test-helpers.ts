@@ -2,7 +2,7 @@ import { normalize, isChatEvent } from './normalizer';
 import { createMemoryStorage } from './storage/memory';
 import { createChatProcessor } from './chat-processor';
 import { createServiceState } from './service-state';
-import type { CloudAgentEvent } from './event-types';
+import type { CloudAgentEvent } from './schemas';
 import type { UserMessage, TextPart } from '@kilocode/app-shared/opencode';
 import type {
   KiloSessionId,

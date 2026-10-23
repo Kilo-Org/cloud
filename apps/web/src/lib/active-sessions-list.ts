@@ -38,9 +38,10 @@ export const activeSessionSchema = z.object({
   /**
    * When this session's status last changed, from
    * `cli_sessions_v2.status_updated_at`, normalized to ISO 8601. Omitted when
-   * the column is NULL, unparseable, or the row was never enriched. The
-   * glanceable snapshot reads it to report how long the longest-waiting agent
-   * has needed input, and Hermes only parses the ISO form.
+   * the column is NULL, unparseable, dates a different status than the resolved
+   * status, or the row was never enriched. The glanceable snapshot reads it to
+   * report how long the longest-waiting agent has needed input, and Hermes only
+   * parses the ISO form.
    */
   statusUpdatedAt: z.string().optional(),
   /**
@@ -99,10 +100,8 @@ export const CLOUD_AGENT_CONNECTION_ID = 'cloud-agent';
 /**
  * Recency window shared by the two time-bounded liveness proofs for a cloud
  * session: a warm `idle` session that just finished, and session activity that
- * session-ingest recorded in `last_activity_at`. Mirrors
- * `KILO_SERVER_IDLE_TIMEOUT_MS_DEFAULT` in
- * services/cloud-agent-next/src/persistence/CloudAgentSession.ts:189-190.
- * Env override drift is accepted (A2).
+ * session-ingest recorded in `last_activity_at`. Recent cloud sessions stay
+ * visible in the tray for 15 minutes.
  */
 const CLOUD_AGENT_LIVE_CUTOFF = sql`now() - interval '15 minutes'`;
 
@@ -294,8 +293,11 @@ function mapEnrichedHeartbeatSession(
   if (row.last_activity_at != null) {
     mapped.lastActivityAt = row.last_activity_at;
   }
+  delete mapped.statusUpdatedAt;
   const statusUpdatedAt =
-    row.status_updated_at == null ? null : toIsoTimestamp(row.status_updated_at);
+    mapped.status !== row.status || row.status_updated_at == null
+      ? null
+      : toIsoTimestamp(row.status_updated_at);
   if (statusUpdatedAt !== null) {
     mapped.statusUpdatedAt = statusUpdatedAt;
   }
@@ -332,7 +334,9 @@ function mapCloudCandidateRow(row: CloudCandidateRow): ActiveSession {
     mapped.lastActivityAt = row.last_activity_at;
   }
   const statusUpdatedAt =
-    row.status_updated_at == null ? null : toIsoTimestamp(row.status_updated_at);
+    mapped.status !== row.status || row.status_updated_at == null
+      ? null
+      : toIsoTimestamp(row.status_updated_at);
   if (statusUpdatedAt !== null) {
     mapped.statusUpdatedAt = statusUpdatedAt;
   }

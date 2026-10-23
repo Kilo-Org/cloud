@@ -19,7 +19,7 @@ import * as z from 'zod';
 import type { StoredEvent } from '../../websocket/types.js';
 import type { EventId } from '../../types/ids.js';
 import type { AssistantMessagePart, LatestAssistantMessage } from '../types.js';
-import { events } from '../../db/sqlite-schema.js';
+import { events } from '../../control-plane/session/sqlite-schema.js';
 import type { SQL } from 'drizzle-orm';
 import { CALLBACK_ACTIVITY_MESSAGE_LIMIT } from '../../callbacks/recent-activity.js';
 

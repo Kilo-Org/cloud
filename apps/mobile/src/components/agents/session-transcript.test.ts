@@ -569,11 +569,11 @@ describe('session transcript', () => {
   it('keeps a sanitized-empty user message when its delivery failed', () => {
     const failedMessage = userMessageWithText('msg_failed', '<script>hidden</script>');
 
-    const transcript = mergeSessionTranscript(
-      [failedMessage],
-      [],
-      new Map([[failedMessage.info.id, { status: 'failed', error: 'nope', reason: 'exhausted' }]])
-    );
+    const transcript = mergeSessionTranscript([failedMessage], [], {
+      deliveryStates: new Map([
+        [failedMessage.info.id, { status: 'failed', error: 'nope', reason: 'exhausted' }],
+      ]),
+    });
 
     expect(keysOf(transcript)).toEqual(['msg_failed']);
   });
@@ -660,13 +660,11 @@ describe('session transcript', () => {
 
     // The recorded failed run keeps that one row, so the typed failure footer
     // stays attached to the submission that failed.
-    const failed = mergeSessionTranscript(
-      [optimistic],
-      [],
-      new Map([
+    const failed = mergeSessionTranscript([optimistic], [], {
+      deliveryStates: new Map([
         ['msg_opt', { status: 'failed', error: 'Unauthorized: Unauthorized', reason: 'exhausted' }],
-      ])
-    );
+      ]),
+    });
     expect(keysOf(failed)).toEqual(['msg_opt']);
   });
 
@@ -703,16 +701,49 @@ describe('session transcript', () => {
     expect(transcript.filter(item => item.type === 'message')).toHaveLength(0);
 
     // With the run recorded failed the row stays for the typed footer.
-    const failed = mergeSessionTranscript(
-      [stub],
-      [],
-      new Map([['msg_stub', { status: 'failed', error: 'boom', reason: 'execution' }]])
-    );
+    const failed = mergeSessionTranscript([stub], [], {
+      deliveryStates: new Map([
+        ['msg_stub', { status: 'failed', error: 'boom', reason: 'execution' }],
+      ]),
+    });
     expect(keysOf(failed)).toEqual(['msg_stub']);
 
     // A confirmed zero-part row keeps the transient rendering.
     const transient = mergeSessionTranscript([message('msg_transient')], []);
     expect(keysOf(transient)).toEqual(['msg_transient']);
+  });
+
+  it('drops a confirmed zero-part row when the transcript is final', () => {
+    // A stored session opened read-only has no live writer, so no part can
+    // arrive for this row. Rendering it painted an empty user bubble under a
+    // time marker whose content never came (stored-session finding).
+    const phantom = message('msg_phantom');
+    const options = { dropUnrenderableUserRows: true };
+
+    expect(mergeSessionTranscript([phantom], [], options)).toEqual([]);
+
+    // A delivery failure still owns its typed footer.
+    expect(
+      keysOf(
+        mergeSessionTranscript([phantom], [], {
+          ...options,
+          deliveryStates: new Map([
+            ['msg_phantom', { status: 'failed', error: 'boom', reason: 'execution' }],
+          ]),
+        })
+      )
+    ).toEqual(['msg_phantom']);
+
+    // A row that renders content is untouched.
+    expect(
+      keysOf(
+        mergeSessionTranscript(
+          [userMessageWithText('msg_real', 'Repair the billing run')],
+          [],
+          options
+        )
+      )
+    ).toEqual(['msg_real']);
   });
 
   it('keeps every unchanged item identity when only the last message changes', () => {

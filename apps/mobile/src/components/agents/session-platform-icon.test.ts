@@ -50,7 +50,6 @@ describe('sessionPlatformIconKind', () => {
     expect(sessionPlatformIconKind('other')).toBeNull();
     expect(sessionPlatformIconKind('gastown')).toBeNull();
     expect(sessionPlatformIconKind('linear')).toBeNull();
-    expect(sessionPlatformIconKind('app-builder')).toBeNull();
     expect(sessionPlatformIconKind('agent-builder')).toBeNull();
     expect(sessionPlatformIconKind(null)).toBeNull();
     expect(sessionPlatformIconKind(undefined)).toBeNull();

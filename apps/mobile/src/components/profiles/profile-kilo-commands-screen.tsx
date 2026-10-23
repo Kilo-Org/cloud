@@ -28,6 +28,7 @@ import {
   useAgentProfile,
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
@@ -164,7 +165,7 @@ export function ProfileKiloCommandsScreen({
         placement="top"
         action={
           canManage ? (
-            <Button onPress={startAdd}>
+            <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
               <Text>{t('profiles.slashCommands.add')}</Text>
             </Button>
           ) : null

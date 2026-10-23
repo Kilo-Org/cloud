@@ -18,7 +18,7 @@ import {
   Sparkles,
   Trash2,
 } from '@/components/ui/icons';
-import { type LayoutChangeEvent, type ScrollView, View } from 'react-native';
+import { type LayoutChangeEvent, type ScrollViewInstance, View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
 import { useConfirmDialog } from '@/components/ui/dialog';
@@ -38,7 +38,7 @@ import { useFeedbackPrompt } from '@/components/use-feedback-prompt';
 import { i18n } from '@/i18n';
 import { useAuth } from '@/lib/auth/auth-context';
 import { openExternalUrl } from '@/lib/external-link';
-import { useAfterInteractions } from '@/lib/hooks/use-after-interactions';
+import { useAfterIdle } from '@/lib/hooks/use-after-idle';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useOrganization } from '@/lib/organization-context';
@@ -82,16 +82,12 @@ export function ProfileScreen() {
   const { signOut, token } = useAuth();
   const router = useRouter();
   const trpc = useTRPC();
-  const deleteScrollRef = useRef<ScrollView>(null);
+  const deleteScrollRef = useRef<ScrollViewInstance>(null);
   const [deleteKeyboardOcclusion, setDeleteKeyboardOcclusion] = useState(0);
   const [deleteScrollFrameHeight, setDeleteScrollFrameHeight] = useState(0);
   const { organizationId, isLoaded: organizationContextLoaded } = useOrganization();
   const isAuthenticated = token != null;
-  // The account queries wait for the tab transition to settle, but the hook
-  // bounds that wait: an interaction queue that never reports idle (an
-  // automated UI session holds one open) must not hide the Linked accounts row,
-  // the only place the signed-in address renders.
-  const afterInteractions = useAfterInteractions();
+  const afterIdle = useAfterIdle();
   // Both destructive confirms on this screen go through the app's dialog: it
   // carries the destructive (red) affordance on iOS and Android alike, because
   // Android's native `AlertDialog` paints every button with the theme accent.
@@ -104,7 +100,7 @@ export function ProfileScreen() {
     refetch: refetchProviders,
   } = useQuery({
     ...trpc.user.getAuthProviders.queryOptions(),
-    enabled: isAuthenticated && afterInteractions,
+    enabled: isAuthenticated && afterIdle,
     // The Linked accounts row must settle while the online manager reports
     // offline: a paused read is pending without fetching, so `isLoading` is
     // false and the section neither paints a row nor an error. This one either
@@ -123,10 +119,10 @@ export function ProfileScreen() {
     refetch: refetchOrganizations,
   } = useQuery({
     ...trpc.organizations.list.queryOptions(),
-    enabled: isAuthenticated && afterInteractions,
+    enabled: isAuthenticated && afterIdle,
   });
   const agentScope = organizationContextLoaded
-    ? getProfileAgentScope(organizationId, orgs, organizationsFetching || !afterInteractions)
+    ? getProfileAgentScope(organizationId, orgs, organizationsFetching || !afterIdle)
     : undefined;
   const { openPicker, picker } = useContextPicker(orgs);
   const selectedOrg = orgs?.find(org => org.organizationId === organizationId);
@@ -416,13 +412,13 @@ export function ProfileScreen() {
         {(providersError ||
           (data?.providers.length ?? 0) > 0 ||
           isLoading ||
-          (!afterInteractions && !data)) && (
+          (!afterIdle && !data)) && (
           <View className="mt-6 gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               {t('profile.linkedAccounts')}
             </Text>
 
-            {(isLoading || !afterInteractions) && !data && !providersError && (
+            {(isLoading || !afterIdle) && !data && !providersError && (
               <Animated.View exiting={FadeOut.duration(150)}>
                 {/* Content-shaped skeleton (icon tile + two text bars in the
                     row's own bg-secondary card): a plain block read as an

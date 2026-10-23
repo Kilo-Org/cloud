@@ -441,6 +441,49 @@ function validate(workflow) {
     'kilo-mcp-catalog',
     'upsert targets the prod index'
   );
+  // The prune's ids come from git history, never from listing the index: a
+  // full list of the production index times out, and a single-step diff would
+  // strand the ids of a run whose prune failed.
+  const ids = findStep(
+    merge,
+    step => step.id === 'prune_ids',
+    'merge job collects every id the index was ever built from'
+  );
+  assert.equal(ids.if, mergeChangeGate, 'the id collection is gated with the upsert');
+  assert.match(
+    ids.run ?? '',
+    /git log --format=%H -- services\/kilo-mcp\/catalog\.json/,
+    'the ids come from every version of the committed catalog'
+  );
+  assert.match(ids.run ?? '', /keys\[\]/, 'each version contributes its procedure paths');
+  assert.match(ids.run ?? '', /sort -u/, 'the union is deduped');
+  // `git log` and `git show` walk every commit, so the walk's prerequisite is a
+  // full clone: without it the union silently covers only the pushed range.
+  const mergeCheckout = merge.steps.find(step =>
+    (step.uses ?? '').startsWith('useblacksmith/checkout@')
+  );
+  assert.equal(mergeCheckout?.with?.['fetch-depth'], 0, 'the history walk needs the full clone');
+  assert.match(
+    ids.run ?? '',
+    /out="\$RUNNER_TEMP\/catalog-ever-ids\.txt"/,
+    'the collection writes the id list to a file'
+  );
+  assert.match(
+    ids.run ?? '',
+    /echo "file=\$out" >> "\$GITHUB_OUTPUT"/,
+    'the collection publishes its file as the step output'
+  );
+  assert.ok(
+    merge.steps.indexOf(ids) < merge.steps.indexOf(upsert),
+    'the id list is collected before the upsert reads it'
+  );
+  assert.equal(
+    upsert.env?.MCP_CATALOG_PRUNE_IDS,
+    '${{ steps.prune_ids.outputs.file }}',
+    'the upsert prunes from the collected id list'
+  );
+  const afterIds = merge.steps.slice(merge.steps.indexOf(ids) + 1);
+  assert.equal(afterIds[0] === upsert, true, 'the upsert runs immediately after the id collection');
 }
 
 /**

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, Switch, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import {
   validateVariableInput,
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Eye, EyeOff, Lock, Trash2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { cleanVariableKey } from '@/lib/agent-profile-forms';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';

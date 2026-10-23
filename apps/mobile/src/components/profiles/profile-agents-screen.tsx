@@ -26,7 +26,7 @@ import {
 } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
@@ -218,7 +218,7 @@ export function ProfileAgentsScreen({
         placement="top"
         action={
           canManage ? (
-            <Button onPress={startAdd}>
+            <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
               <Text>{t('profiles.agents.add')}</Text>
             </Button>
           ) : null

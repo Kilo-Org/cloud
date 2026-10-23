@@ -15,7 +15,7 @@ import type {
 import type { Env } from '../../../src/types.js';
 import type { WorktreeChangesReady } from '../../../src/control-plane/worktree-changes-ready.js';
 import { CurrentSessionMetadataSchema } from '../../../src/persistence/session-metadata.js';
-import { sessionDoName } from '../../../src/session-plane.js';
+import { sessionDoName } from '../../../src/session-identity.js';
 
 export type RecordedRouteUpdate = { sessionId: string; update: ControlPlaneRouteUpdate };
 export type RecordedEvents = { sessionId: string; notification: ControlPlaneEventsNotification };

@@ -97,6 +97,30 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: pnpm run deploy
 
+      - name: Check selected staging source for usage writer relay
+        id: usage_relay
+        if: inputs.worker == 'services/usage-ingest' && inputs.target_environment == 'staging'
+        working-directory: services/usage-ingest
+        run: |
+          node --input-type=commonjs <<'NODE'
+          const { appendFileSync, existsSync } = require('node:fs');
+          const { unstable_readConfig } = require('wrangler');
+          const config = unstable_readConfig({ config: 'wrangler.jsonc', env: 'staging' });
+          const required = config.services.some(service => service.binding === 'USAGE_WRITER_RELAY');
+          if (required && !existsSync('wrangler.writer-relay.jsonc')) {
+            throw new Error('Selected staging source requires the usage writer relay but its config is missing');
+          }
+          appendFileSync(process.env.GITHUB_OUTPUT, `required=${required}\n`);
+          NODE
+
+      - name: Deploy private staging usage writer relay
+        if: steps.usage_relay.outputs.required == 'true'
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: services/usage-ingest
+          command: deploy --config wrangler.writer-relay.jsonc
+
       - name: Deploy to Cloudflare Workers
         id: deploy
         if: inputs.worker != 'services/auto-routing-benchmark' || inputs.target_environment != 'production'
@@ -222,14 +246,10 @@ jobs:
 
           # Workers excluded from automatic deployment:
           EXCLUDED=(
-            services/app-builder
-            services/deploy-infra/builder
-            services/deploy-infra/dispatcher
             services/kiloclaw  # Docker-based deploy in deploy-kiloclaw.yml (manual-only)
             services/gastown   # Deployed separately
             services/wasteland # Deployed separately
             services/user-data-export # Automatic deploy suspended
-            services/deploy-infra/builder-docker-container/container-files  # Build artifact template, not a deployable worker
           )
 
           # Discover all workers with a wrangler.jsonc
@@ -347,6 +367,30 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: pnpm run deploy
+
+      - name: Check selected staging source for usage writer relay
+        id: usage_relay
+        if: matrix.worker == 'services/usage-ingest' && inputs.target_environment == 'staging'
+        working-directory: services/usage-ingest
+        run: |
+          node --input-type=commonjs <<'NODE'
+          const { appendFileSync, existsSync } = require('node:fs');
+          const { unstable_readConfig } = require('wrangler');
+          const config = unstable_readConfig({ config: 'wrangler.jsonc', env: 'staging' });
+          const required = config.services.some(service => service.binding === 'USAGE_WRITER_RELAY');
+          if (required && !existsSync('wrangler.writer-relay.jsonc')) {
+            throw new Error('Selected staging source requires the usage writer relay but its config is missing');
+          }
+          appendFileSync(process.env.GITHUB_OUTPUT, `required=${required}\n`);
+          NODE
+
+      - name: Deploy private staging usage writer relay
+        if: steps.usage_relay.outputs.required == 'true'
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: services/usage-ingest
+          command: deploy --config wrangler.writer-relay.jsonc
 
       - name: Deploy to Cloudflare Workers
         id: deploy

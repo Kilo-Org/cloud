@@ -1,5 +1,4 @@
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
-import { PREFERRED_PROVIDER_ORDER_FALLBACK_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import { PreferredProviderOrderConfigSchema } from '@kilocode/db/schema-types';
@@ -17,7 +16,7 @@ export const adminPreferredProviderOrderRouter = createTRPCRouter({
       .from(ai_gateway_config)
       .where(eq(ai_gateway_config.id, 1))
       .limit(1);
-    return { config: row?.config ?? null, fallback: PREFERRED_PROVIDER_ORDER_FALLBACK_CONFIG };
+    return { config: row?.config ?? null };
   }),
 
   set: adminProcedure.input(SetPreferredProviderOrderConfigSchema).mutation(async ({ input }) => {

@@ -636,7 +636,7 @@ function AgentForm({
                   htmlFor="agent-top-p"
                   hint="Nucleus sampling cutoff. Only tokens within the top `p` probability mass are considered."
                 >
-                  top_p
+                  Top P
                 </FieldLabel>
                 <Input
                   id="agent-top-p"

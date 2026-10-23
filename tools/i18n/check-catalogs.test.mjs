@@ -181,6 +181,99 @@ test('rejects an empty translated value', context => {
   assert.match(result.stderr, /mobile\/ru: "agents\.title" is empty/);
 });
 
+test('rejects a trailing space that English does not carry', context => {
+  const result = runChecker(context, {
+    translated: { agents: { ...TRANSLATED.agents, title: 'Localized agents ' } },
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /mobile\/ru: "agents\.title" leading or trailing space differs/);
+});
+
+test('accepts a locale-owned separator in the login legal sentence', context => {
+  // A catalog that does not separate words with spaces abuts the prefix, the
+  // Terms link and the conjunction, so its values carry no edge whitespace
+  // where English has one.
+  const english = {
+    login: {
+      termsPrefix: 'By continuing you agree to our ',
+      terms: 'Terms',
+      termsConnector: ' and ',
+    },
+  };
+  const result = runChecker(context, {
+    language: 'zh-Hans',
+    english,
+    translated: {
+      login: { termsPrefix: '继续即表示你同意我们的', terms: '条款', termsConnector: '和' },
+    },
+    source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('still rejects separator whitespace elsewhere in the same catalog', context => {
+  const english = { login: { termsPrefix: 'By continuing you agree to our ', terms: 'Terms' } };
+  const result = runChecker(context, {
+    language: 'zh-Hans',
+    english,
+    translated: { login: { termsPrefix: '继续即表示你同意我们的', terms: '条款 ' } },
+    source: "t('login.termsPrefix'); t('login.terms');",
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /mobile\/zh-Hans: "login\.terms" leading or trailing space differs/);
+});
+
+for (const [name, termsPrefix, termsConnector] of [
+  ['a dropped separator in a spaced catalog', 'Unsere', ' und '],
+  ['a padded prefix beside a bare conjunction', 'Unsere ', 'und'],
+]) {
+  test(`rejects ${name}`, context => {
+    const english = {
+      login: {
+        termsPrefix: 'By continuing you agree to our ',
+        terms: 'Terms',
+        termsConnector: ' and ',
+      },
+    };
+    const result = runChecker(context, {
+      language: 'de',
+      english,
+      translated: { login: { termsPrefix, terms: 'Bedingungen', termsConnector } },
+      source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
+    });
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(
+      result.stderr,
+      /mobile\/de: "login\.termsPrefix" and "login\.termsConnector" disagree about their separator/
+    );
+  });
+}
+
+test('accepts a spaced catalog that pads both separator keys', context => {
+  const english = {
+    login: {
+      termsPrefix: 'By continuing you agree to our ',
+      terms: 'Terms',
+      termsConnector: ' and ',
+    },
+  };
+  const result = runChecker(context, {
+    language: 'de',
+    english,
+    translated: {
+      login: {
+        termsPrefix: 'Wenn du fortfährst, akzeptierst du unsere ',
+        terms: 'Bedingungen',
+        termsConnector: ' und ',
+      },
+    },
+    source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
 test('rejects a translated $TOKEN expansion token', context => {
   const result = runChecker(context, {
     english: { agents: { template: 'Explain $ARGUMENTS' } },
@@ -310,4 +403,80 @@ test('still rejects an unrelated extra key beside a counted family', context => 
   });
   assert.equal(result.status, 1, result.stderr);
   assert.match(result.stderr, /mobile\/ru: extra key "counts\.stray" is not in en\.json/);
+});
+
+const AGENT_EDITOR = {
+  agents: { title: 'Agents' },
+  profiles: {
+    agents: {
+      visibilityPrimary: 'Primary — in the picker',
+      visibilitySubagent: 'Subagent — callable from others',
+      visibilityAll: 'All — both',
+      topP: 'Top P',
+    },
+  },
+};
+const AGENT_EDITOR_TRANSLATED = {
+  agents: { title: 'Агенты' },
+  profiles: {
+    agents: {
+      visibilityPrimary: 'Основной — в списке',
+      visibilitySubagent: 'Субагент — только извне',
+      visibilityAll: 'Все — оба',
+      topP: 'Top P',
+    },
+  },
+};
+const AGENT_EDITOR_SOURCE = [
+  "t('agents.title');",
+  "t('profiles.agents.visibilityPrimary');",
+  "t('profiles.agents.visibilitySubagent');",
+  "t('profiles.agents.visibilityAll');",
+  "t('profiles.agents.topP');",
+].join('\n');
+
+test('accepts one spaced em dash in every agent-editor visibility option', context => {
+  const result = runChecker(context, {
+    english: AGENT_EDITOR,
+    translated: AGENT_EDITOR_TRANSLATED,
+    source: AGENT_EDITOR_SOURCE,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('rejects a visibility option whose label and description use a hyphen', context => {
+  const result = runChecker(context, {
+    english: AGENT_EDITOR,
+    translated: {
+      ...AGENT_EDITOR_TRANSLATED,
+      profiles: {
+        agents: { ...AGENT_EDITOR_TRANSLATED.profiles.agents, visibilityAll: 'Все - оба' },
+      },
+    },
+    source: AGENT_EDITOR_SOURCE,
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ru: "profiles\.agents\.visibilityAll" must join its label and description with " — "/
+  );
+});
+
+test('rejects a catalog that translates the sampling parameter label', context => {
+  const result = runChecker(context, {
+    english: AGENT_EDITOR,
+    translated: {
+      ...AGENT_EDITOR_TRANSLATED,
+      profiles: {
+        agents: { ...AGENT_EDITOR_TRANSLATED.profiles.agents, topP: 'Верхний P' },
+      },
+    },
+    source: AGENT_EDITOR_SOURCE,
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ru: "profiles\.agents\.topP" must read "Top P" in every catalog/
+  );
 });

@@ -12,6 +12,7 @@ const mockQueryClient = {
   setQueryData: jest.fn(),
   invalidateQueries: jest.fn(),
   fetchQuery: jest.fn(async () => ({ status: 'unavailable', repositories: [] })),
+  query: jest.fn(async () => ({ status: 'unavailable', repositories: [] })),
 };
 const mockCreateLocalSession = jest.fn((_draft: unknown) => 'local-session-1');
 const mockReleaseMutate = jest.fn(async (_input: unknown) => undefined);

@@ -78,12 +78,12 @@ vi.mock('@/lib/hooks/use-user-web-connection-state', () => ({
   useUserWebConnectionState: () => false,
 }));
 vi.mock('react-native', () => ({
-  InteractionManager: {
-    runAfterInteractions: (run: () => void) => {
-      state.maintenance.push(run);
-    },
-  },
   AppState: { currentState: 'active', addEventListener: state.appStateAddEventListener },
+}));
+vi.mock('@/lib/query/schedule-cache-maintenance', () => ({
+  scheduleCacheMaintenance: (run: () => void) => {
+    state.maintenance.push(run);
+  },
 }));
 vi.mock('@/components/agents/user-web-connection-provider', () => ({
   useUserWebConnection: vi.fn(),

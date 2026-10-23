@@ -14,7 +14,14 @@
 // dismisses (cancel) or the mutation succeeds (auto-dismiss).
 
 import * as Haptics from 'expo-haptics';
-import { Keyboard, ScrollView, type TextInput, useWindowDimensions, View } from 'react-native';
+import {
+  Keyboard,
+  ScrollView,
+  type ScrollViewInstance,
+  type TextInput,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -79,12 +86,10 @@ type PrMergeSheetProps = Readonly<{
   repoName: string;
   number: number;
   headSha: string;
-  headRef: string;
   isCrossRepo: boolean;
   prNodeId: string;
   title: string;
   bodyMarkdown: string | null;
-  baseRef: string;
   repo: PrOverviewRepoSettings;
   initialMethod: PrMergeMethod;
   mode: PrMergeSheetMode;
@@ -209,31 +214,32 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
   // Provider arms derive the method list from the platform, not the GitHub
   // repo settings: GitLab offers merge + squash, Bitbucket Cloud only the
   // merge commit. GitHub keeps the repo-settings list unchanged.
-  const providerMethodOptions = useMemo(() => {
-    if (!prRef) {
-      return null;
-    }
-    return mergeMethodOptionsFor({
-      ...repoSettings,
-      allowMergeCommit: true,
-      allowSquashMerge: prRef.platform === 'gitlab',
-      allowRebaseMerge: false,
-      allowAutoMerge: prRef.platform === 'gitlab',
-    });
-  }, [prRef, repoSettings]);
-  const methodOptions = useMemo(
-    () => providerMethodOptions ?? mergeMethodOptionsFor(repoSettings),
-    [providerMethodOptions, repoSettings]
-  );
-  const safeInitial: AllowedMergeMethod = useMemo(
+  //
+  // The list is built on every render, not memoized: its labels are resolved
+  // copy, so a reader switching language with the sheet open must see the new
+  // catalog. A memo would cache the previous language's strings, because
+  // `mergeMethodOptionsFor` translates through the module i18n instance rather
+  // than the render's `t`. Three options per render cost nothing.
+  const providerMethodOptions = prRef
+    ? mergeMethodOptionsFor({
+        ...repoSettings,
+        allowMergeCommit: true,
+        allowSquashMerge: prRef.platform === 'gitlab',
+        allowRebaseMerge: false,
+        allowAutoMerge: prRef.platform === 'gitlab',
+      })
+    : null;
+  const methodOptions = providerMethodOptions ?? mergeMethodOptionsFor(repoSettings);
+  // The sheet's selection is seeded once: the route's method when the repo
+  // offers it, else the arm's first allowed method. A lazy initializer keeps
+  // the option scan off every render now that the list is rebuilt each time.
+  const [method, setMethod] = useState<AllowedMergeMethod>(
     () =>
       methodOptions.find(o => o.value === initialMethod)?.value ??
       (providerMethodOptions
         ? (providerMethodOptions[0]?.value ?? defaultMergeMethodOptionFor(repoSettings))
-        : defaultMergeMethodOptionFor(repoSettings)),
-    [initialMethod, methodOptions, providerMethodOptions, repoSettings]
+        : defaultMergeMethodOptionFor(repoSettings))
   );
-  const [method, setMethod] = useState<AllowedMergeMethod>(safeInitial);
 
   const showDeleteBranchToggle = prRef ? true : !isCrossRepo;
   const [deleteBranch, setDeleteBranch] = useState<boolean>(repoSettings.deleteBranchOnMerge);
@@ -243,7 +249,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
   // read the ref on submit. `defaultValue` is for the first commit only.
   const titleInputRef = useRef<TextInput>(null);
   const messageInputRef = useRef<TextInput>(null);
-  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
   const titleRef = useRef(defaultCommitTitle(title, number));
   const messageRef = useRef(defaultCommitMessage(bodyMarkdown));
   const { height: windowHeight } = useWindowDimensions();
@@ -418,9 +424,6 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
       return 'REBASE';
     })();
     return {
-      owner,
-      repo: repoName,
-      number,
       prNodeId,
       method: autoMethod,
       commitTitle: titleRef.current.trim().length > 0 ? titleRef.current.trim() : undefined,

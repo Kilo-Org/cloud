@@ -889,8 +889,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
   const result = await executor.execute<{
     usage_id: string;
     usage_created_at: string;
-    new_microdollars_used: number | null;
-    kilo_pass_threshold: number | null;
+    new_microdollars_used: string | null;
+    kilo_pass_threshold: string | null;
   }>(sql`
           WITH microdollar_usage_ins AS (
             INSERT INTO microdollar_usage (

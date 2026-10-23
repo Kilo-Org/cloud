@@ -1,4 +1,5 @@
 import { createElement } from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { act } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { expect, it, vi } from 'vitest';
@@ -124,7 +125,13 @@ it('follows the scene navigation it is replaced with instead of the old one', as
     );
 
   act(() => {
-    view.renderer.update(sceneElement(second.navigation));
+    view.renderer.update(
+      createElement(
+        QueryClientProvider,
+        { client: view.queryClient },
+        sceneElement(second.navigation)
+      )
+    );
   });
 
   // A leftover listener on the replaced navigator would hide or expose this

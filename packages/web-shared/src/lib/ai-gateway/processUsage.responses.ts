@@ -14,6 +14,7 @@ import type {
 import type { GatewayResponsesRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   computeOpenRouterCostFields,
+  providerReportsIsByok,
   computeVercelCostMicrodollars,
   drainSseStream,
   extractVercelGenerationTime,
@@ -65,7 +66,7 @@ export function processResponsesApiUsage(
       usage,
       coreProps,
       'responses_sse_processing',
-      provider
+      providerReportsIsByok(provider)
     );
     return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens, cost_mUsd, is_byok };
   }

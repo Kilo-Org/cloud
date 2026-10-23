@@ -90,6 +90,7 @@ import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gat
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import {
   computeOpenRouterCostFields,
+  providerReportsIsByok,
   drainSseStream,
   extractVercelGenerationTime,
   extractVercelIsByok,
@@ -1071,9 +1072,10 @@ export function countAndStoreUsage(
   openrouterRequestSpan: Span | undefined
 ) {
   let usageStatsPromise: Promise<MicrodollarUsageStats | null> = Promise.resolve(null);
-  // An interrupted non-streaming body (client abort, gateway duration budget, upstream
-  // disconnect) never delivers its usage object, so there is nothing to record and no
-  // reason to report the missing usage as suspicious.
+  // An interrupted non-streaming body (gateway duration budget, upstream disconnect)
+  // never delivers its usage object, so there is nothing to record and no reason to
+  // report the missing usage as suspicious. A client disconnect does not interrupt it
+  // in production; see "Vercel request cancellation" in apps/ai-gateway/AGENTS.md.
   let responseInterrupted = false;
 
   const parseResponseText = async (
@@ -1161,7 +1163,7 @@ export function processOpenRouterUsage(
     usage ?? {},
     coreProps,
     'sse_processing',
-    provider
+    providerReportsIsByok(provider)
   );
 
   return {
@@ -1323,7 +1325,7 @@ export function parseMicrodollarUsageFromString(
     | null;
 
   if (
-    provider === 'openrouter' &&
+    providerReportsIsByok(provider) &&
     responseJson?.usage?.is_byok == null &&
     responseJson?.usage?.cost
   ) {

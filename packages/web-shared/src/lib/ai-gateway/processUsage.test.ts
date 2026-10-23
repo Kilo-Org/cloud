@@ -142,14 +142,17 @@ describe('processOpenRouterUsage', () => {
       jest.mocked(captureMessage).mockClear();
     });
 
-    test('reports OpenRouter usage with cost but without is_byok', () => {
-      processOpenRouterUsage(usage, coreProps, 'openrouter');
+    test.each(['openrouter', 'vercel'] as const)(
+      'reports %s usage with cost but without is_byok',
+      provider => {
+        processOpenRouterUsage(usage, coreProps, provider);
 
-      expect(captureMessage).toHaveBeenCalledWith(
-        "SUSPICIOUS: openrouters cost accounting doesn't make sense",
-        expect.anything()
-      );
-    });
+        expect(captureMessage).toHaveBeenCalledWith(
+          "SUSPICIOUS: openrouters cost accounting doesn't make sense",
+          expect.anything()
+        );
+      }
+    );
 
     test('bills the reported cost from providers that never report is_byok', () => {
       const result = processOpenRouterUsage(usage, coreProps, 'martian');

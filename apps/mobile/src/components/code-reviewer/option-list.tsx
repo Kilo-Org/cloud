@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next';
-import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
@@ -11,6 +10,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { RadioGroup } from '@/components/ui/radio-group';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { usePopWhenFocused } from '@/lib/navigation/pop-when-focused';
 
 type OptionListProps<T extends string, TSaveResult> = {
   title: string;
@@ -37,7 +37,7 @@ export function OptionList<T extends string, TSaveResult>({
   descriptions,
   disabled,
 }: Readonly<OptionListProps<T, TSaveResult>>) {
-  const router = useRouter();
+  const popWhenFocused = usePopWhenFocused();
   const colors = useThemeColors();
   const { t } = useTranslation();
   const [pending, setPending] = useState<T | null>(null);
@@ -48,7 +48,9 @@ export function OptionList<T extends string, TSaveResult>({
     setFailedOption(null);
     try {
       await onSelect(option);
-      router.back();
+      // A Back pressed while the save was in flight already left this screen;
+      // popping again would remove the screen beneath it.
+      popWhenFocused();
     } catch {
       // The save hook already surfaces the failure (toast + cache
       // rollback) — keep the screen up, clear the busy state, and hand the

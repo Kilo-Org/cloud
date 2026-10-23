@@ -62,6 +62,16 @@ it.each([undefined, 'staging'])(
               USAGE_WRITER_PROTECTION_BYPASS: 'local-bypass',
             },
           },
+          ...(env === 'staging'
+            ? [
+                {
+                  configPath: new URL('../wrangler.writer-relay.jsonc', import.meta.url),
+                  vars: {
+                    USAGE_WRITER_URL: `http://127.0.0.1:${address.port}/api/internal/usage/record`,
+                  },
+                },
+              ]
+            : []),
         ],
       });
       harness = server;

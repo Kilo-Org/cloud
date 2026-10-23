@@ -15,13 +15,23 @@ import {
   validateGitLabInstance,
   validatePersonalAccessToken,
   createProjectWebhook,
+  createProjectAccessToken,
   deleteProjectWebhook,
   fetchGitLabProjects,
+  fetchGitLabBranches,
   fetchGitLabRootTextFileAtRef,
   fetchGitLabRepositorySize,
+  GitLabAuthenticationError,
+  GitLabProjectAccessTokenPermissionError,
+  GitLabWebhookPermissionError,
   getMRDiffRefs,
   getMRHeadCommit,
+  listProjectAccessTokens,
+  listProjectWebhooks,
+  revokeProjectAccessToken,
+  rotateProjectAccessToken,
   updateProjectWebhook,
+  fetchMRInlineComments,
 } from './adapter';
 
 // Mock fetch globally
@@ -427,6 +437,120 @@ describe('fetchGitLabProjects', () => {
       expect.anything()
     );
   });
+
+  it('treats a missing x-next-page on a full page as the last page', async () => {
+    const fullPage = Array.from({ length: 100 }, (_, i) => ({
+      id: i + 1,
+      name: `project-${i}`,
+      path_with_namespace: `group/project-${i}`,
+      visibility: 'private',
+      archived: false,
+    }));
+    mockFetch.mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        json: async () => fullPage,
+        headers: { get: () => null },
+      })
+    );
+
+    const projects = await fetchGitLabProjects('test-token');
+    expect(projects).toHaveLength(100);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports an error when x-next-page advances beyond the page cap', async () => {
+    const fullPage = Array.from({ length: 100 }, (_, i) => ({
+      id: i + 1,
+      name: `project-${i}`,
+      path_with_namespace: `group/project-${i}`,
+      visibility: 'private',
+      archived: false,
+    }));
+    mockFetch.mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        json: async () => fullPage,
+        headers: { get: (name: string) => (name === 'x-next-page' ? '999999' : null) },
+      })
+    );
+
+    await expect(fetchGitLabProjects('test-token')).rejects.toThrow(
+      'GitLab pagination limit exceeded: project listing returned more than 100 pages'
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports an error when a single page returns more than the item cap', async () => {
+    const hugePage = Array.from({ length: 10001 }, (_, i) => ({
+      id: i + 1,
+      name: `project-${i}`,
+      path_with_namespace: `group/project-${i}`,
+      visibility: 'private',
+      archived: false,
+    }));
+    mockFetch.mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        json: async () => hugePage,
+        headers: { get: () => null },
+      })
+    );
+
+    await expect(fetchGitLabProjects('test-token')).rejects.toThrow(
+      'GitLab pagination limit exceeded: project listing returned more than 10000 items'
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports an error when a provider signals a huge x-total-pages with full pages', async () => {
+    const branches = Array.from({ length: 100 }, (_, i) => ({
+      name: `branch-${i}`,
+      commit: { id: 'abc' },
+    }));
+    mockFetch.mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        json: async () => branches,
+        headers: { get: (name: string) => (name === 'x-total-pages' ? '999999' : null) },
+      })
+    );
+
+    await expect(fetchGitLabBranches('test-token', 123)).rejects.toThrow(
+      'GitLab pagination limit exceeded: branch listing returned more than 100 pages'
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats a non-numeric x-total-pages as a single page', async () => {
+    mockFetch.mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        json: async () => [{ name: 'main', commit: { id: 'abc' } }],
+        headers: { get: (name: string) => (name === 'x-total-pages' ? 'not-a-number' : null) },
+      })
+    );
+
+    const branches = await fetchGitLabBranches('test-token', 123);
+    expect(branches.map(b => b.name)).toEqual(['main']);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('terminates normally when a provider reports a finite x-total-pages', async () => {
+    let call = 0;
+    mockFetch.mockImplementation(() => {
+      call++;
+      return Promise.resolve({
+        ok: true,
+        json: async () => [{ name: call === 1 ? 'main' : 'feature', commit: { id: 'abc' } }],
+        headers: { get: (name: string) => (name === 'x-total-pages' ? '2' : null) },
+      });
+    });
+
+    const branches = await fetchGitLabBranches('test-token', 123);
+    expect(branches.map(b => b.name)).toEqual(['main', 'feature']);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('fetchGitLabRootTextFileAtRef', () => {
@@ -782,5 +906,194 @@ describe('validatePersonalAccessToken', () => {
       error: 'GitLab instance URL host resolves to an address that is not allowed.',
     });
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+});
+
+function discussionWithNote(input: {
+  discussionId: string;
+  noteId: number;
+  authorId: number;
+  authorUsername: string;
+  body?: string;
+}) {
+  return {
+    id: input.discussionId,
+    individual_note: false,
+    notes: [
+      {
+        id: input.noteId,
+        body: input.body ?? 'comment body',
+        author: { id: input.authorId, username: input.authorUsername, name: 'Author' },
+        system: false,
+        resolvable: true,
+        resolved: false,
+        position: {
+          base_sha: 'base',
+          start_sha: 'start',
+          head_sha: 'head',
+          old_path: 'src/file.ts',
+          new_path: 'src/file.ts',
+          position_type: 'text',
+          old_line: null,
+          new_line: 12,
+        },
+      },
+    ],
+  };
+}
+
+describe('webhook and project access token refusals', () => {
+  const webhookOperations = [
+    ['listProjectWebhooks', () => listProjectWebhooks('token', 123)],
+    [
+      'createProjectWebhook',
+      () => createProjectWebhook('token', 123, 'https://example.com/webhook', 'webhook-secret'),
+    ],
+    [
+      'updateProjectWebhook',
+      () => updateProjectWebhook('token', 123, 456, 'https://example.com/webhook', 'secret'),
+    ],
+  ] as const;
+
+  const projectAccessTokenOperations = [
+    [
+      'createProjectAccessToken',
+      () => createProjectAccessToken('token', 123, 'Kilo bot', '2027-01-01'),
+    ],
+    ['listProjectAccessTokens', () => listProjectAccessTokens('token', 123)],
+    ['rotateProjectAccessToken', () => rotateProjectAccessToken('token', 123, 456, '2027-01-01')],
+    ['revokeProjectAccessToken', () => revokeProjectAccessToken('token', 123, 456)],
+  ] as const;
+
+  const allOperations = [...webhookOperations, ...projectAccessTokenOperations] as const;
+
+  function mockRefusal(status: number) {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status,
+      headers: new Headers(),
+      text: async () => `refused: ${status}`,
+      json: async () => ({}),
+    });
+  }
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it.each(allOperations)(
+    '%s reports a 401 as an authentication failure that needs a reconnect',
+    async (_name, run) => {
+      mockRefusal(401);
+
+      const refusal = await run().catch((error: unknown) => error);
+
+      expect(refusal).toBeInstanceOf(GitLabAuthenticationError);
+      expect(refusal).toMatchObject({ statusCode: 401, projectId: 123 });
+      expect((refusal as Error).message).toContain('Reconnect the GitLab integration');
+      expect((refusal as Error).message).not.toContain('Maintainer');
+    }
+  );
+
+  it.each(allOperations)('%s keeps a 403 as a permission failure', async (name, run) => {
+    const expectedError = webhookOperations.some(([operation]) => operation === name)
+      ? GitLabWebhookPermissionError
+      : GitLabProjectAccessTokenPermissionError;
+    mockRefusal(403);
+
+    const refusal = await run().catch((error: unknown) => error);
+
+    expect(refusal).toBeInstanceOf(expectedError);
+    expect(refusal).toMatchObject({ statusCode: 403, projectId: 123 });
+    expect((refusal as Error).message).toContain('Requires Maintainer role or higher');
+  });
+});
+
+describe('fetchMRInlineComments authorship', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('marks notes written by the token user as Kilo-authored', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          discussionWithNote({
+            discussionId: 'd1',
+            noteId: 1,
+            authorId: 7,
+            authorUsername: 'project_42_bot',
+          }),
+          discussionWithNote({
+            discussionId: 'd2',
+            noteId: 2,
+            authorId: 300,
+            authorUsername: 'contributor',
+          }),
+        ],
+        headers: { get: () => null },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: 7, username: 'project_42_bot' }),
+        headers: { get: () => null },
+      });
+
+    const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
+
+    expect(comments.map(c => [c.id, c.authoredByKilo, c.user.username])).toEqual([
+      [1, true, 'project_42_bot'],
+      [2, false, 'contributor'],
+    ]);
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      2,
+      'https://gitlab.com/api/v4/user',
+      expect.anything()
+    );
+  });
+
+  it('does not look up the token user when the MR has no inline notes', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => [{ id: 'd1', individual_note: true, notes: [] }],
+      headers: { get: () => null },
+    });
+
+    const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
+
+    expect(comments).toEqual([]);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns unattributed comments when the token-user lookup fails', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          discussionWithNote({
+            discussionId: 'd1',
+            noteId: 1,
+            authorId: 7,
+            authorUsername: 'project_42_bot',
+          }),
+        ],
+        headers: { get: () => null },
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        text: async () => 'Unauthorized',
+        headers: { get: () => null },
+      });
+
+    const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
+
+    expect(comments).toEqual([
+      expect.objectContaining({
+        id: 1,
+        authoredByKilo: false,
+        user: { username: 'project_42_bot' },
+      }),
+    ]);
   });
 });

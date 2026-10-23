@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   buildProfileSelectorState,
   PROFILE_SELECTOR_KEYS as K,
-  profileSelectorCountItems,
   type ProfileSelectorProfile,
 } from './profile-selector-model';
 
@@ -35,21 +34,6 @@ const rowKinds = (state: ReturnType<typeof buildProfileSelectorState>) =>
 
 const profileIds = (state: ReturnType<typeof buildProfileSelectorState>) =>
   state.rows.flatMap(row => (row.kind === 'profile' ? [row.profile.id] : []));
-
-describe('profileSelectorCountItems', () => {
-  it('resolves N vars and N cmds when either count is non-zero', () => {
-    expect(
-      profileSelectorCountItems(profile({ id: 'a', name: 'A', varCount: 3, commandCount: 1 }))
-    ).toEqual([
-      { kind: 'vars', count: 3 },
-      { kind: 'commands', count: 1 },
-    ]);
-  });
-
-  it('resolves nothing when both counts are zero', () => {
-    expect(profileSelectorCountItems(profile({ id: 'a', name: 'A' }))).toEqual([]);
-  });
-});
 
 describe('buildProfileSelectorState', () => {
   it('offers only No profile, Manage and repo defaults when there are no profiles', () => {

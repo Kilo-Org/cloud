@@ -9,6 +9,8 @@ import {
 const base: SelectScopeEntryViewInput = {
   isLoading: false,
   isError: false,
+  isDenied: false,
+  isGithubStatusUnknown: false,
   hasIntegration: true,
   hasPermissions: true,
   isEnabled: true,
@@ -31,6 +33,22 @@ describe('selectScopeEntryView', () => {
     expect(selectScopeEntryView({ ...base, isLoading: true, isError: true })).toBe('loading');
   });
 
+  it('returns denied when access is lost', () => {
+    expect(viewFor({ isDenied: true })).toBe('denied');
+  });
+
+  it('returns denied before error, the setup gates and the dashboard', () => {
+    expect(viewFor({ isDenied: true, isError: true })).toBe('denied');
+    expect(viewFor({ isDenied: true, hasIntegration: false, hasPermissions: false })).toBe(
+      'denied'
+    );
+    expect(viewFor({ isDenied: true })).not.toBe('dashboard');
+  });
+
+  it('returns loading before denied', () => {
+    expect(selectScopeEntryView({ ...base, isLoading: true, isDenied: true })).toBe('loading');
+  });
+
   it('returns connect-github when integrated is missing', () => {
     expect(viewFor({ hasIntegration: false })).toBe('connect-github');
   });
@@ -51,6 +69,33 @@ describe('selectScopeEntryView', () => {
 
   it('returns dashboard when connected and enabled', () => {
     expect(viewFor({ isEnabled: true })).toBe('dashboard');
+  });
+
+  it('returns dashboard for an enabled scope whose GitHub status is unreadable', () => {
+    // The config read already decided the destination; only the connect /
+    // re-authorize choice needs the status, so its failure must not hold the
+    // enabled entry on the error screen.
+    expect(
+      viewFor({ isGithubStatusUnknown: true, hasIntegration: false, hasPermissions: false })
+    ).toBe('dashboard');
+  });
+
+  it('keeps the error screen when the GitHub status is unreadable and the scope is not enabled', () => {
+    // Only the enabled destination is known from config alone. Connect vs
+    // re-authorize needs the status, so the failure stays fatal there.
+    expect(
+      viewFor({
+        isGithubStatusUnknown: true,
+        isError: true,
+        isEnabled: false,
+        hasIntegration: false,
+        hasPermissions: false,
+      })
+    ).toBe('error');
+  });
+
+  it('keeps a denied scope denied even when the GitHub status is unreadable', () => {
+    expect(viewFor({ isGithubStatusUnknown: true, isDenied: true })).toBe('denied');
   });
 
   it('does not return a blank/redirect outcome for the disabled case', () => {

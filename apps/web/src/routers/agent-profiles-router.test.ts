@@ -731,6 +731,64 @@ describe('Agent Profiles Router', () => {
           })
         ).rejects.toThrow('You do not have access to this organization');
       });
+
+      /**
+       * Every row `listCombined` returns opens with the scope its bucket
+       * implies, and only that scope: the mobile Profiles list navigates with
+       * the bucket's `organizationId`, so a row the list shows must read back
+       * through `get`. The opposite scope is NOT_FOUND rather than a different
+       * profile, which is what the client's stale-row state reports.
+       */
+      test('every listed profile reads back with its own bucket scope', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+
+        const { id: orgProfileId } = await caller.agentProfiles.create({
+          organizationId: organizationA.id,
+          name: 'Listed Org Profile',
+        });
+        const { id: personalProfileId } = await caller.agentProfiles.create({
+          name: 'Listed Personal Profile',
+        });
+
+        const combined = await caller.agentProfiles.listCombined({
+          organizationId: organizationA.id,
+        });
+        expect(combined.orgProfiles.map(profile => profile.id)).toContain(orgProfileId);
+        expect(combined.personalProfiles.map(profile => profile.id)).toContain(personalProfileId);
+
+        const orgProfile = await caller.agentProfiles.get({
+          organizationId: organizationA.id,
+          profileId: orgProfileId,
+        });
+        expect(orgProfile.name).toBe('Listed Org Profile');
+
+        const personalProfile = await caller.agentProfiles.get({ profileId: personalProfileId });
+        expect(personalProfile.name).toBe('Listed Personal Profile');
+
+        // A full profile's collections survive the read the list's counts came
+        // from: the overview renders those counts, so a listing profile that
+        // fails to read back is the reported defect.
+        await caller.agentProfiles.setCommands({
+          organizationId: organizationA.id,
+          profileId: orgProfileId,
+          commands: Array.from({ length: 20 }, (_, index) => `${'x'.repeat(480)}-${index}`),
+        });
+        const withCommands = await caller.agentProfiles.get({
+          organizationId: organizationA.id,
+          profileId: orgProfileId,
+        });
+        expect(withCommands.commands).toHaveLength(20);
+
+        await expect(caller.agentProfiles.get({ profileId: orgProfileId })).rejects.toThrow(
+          'Profile not found'
+        );
+        await expect(
+          caller.agentProfiles.get({
+            organizationId: organizationA.id,
+            profileId: personalProfileId,
+          })
+        ).rejects.toThrow('Profile not found');
+      });
     });
   });
 

@@ -1,9 +1,11 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { selectProfileOverviewErrorView } from '@/components/profiles/profile-overview-error';
 import {
   defaultDescriptionKey,
   deleteErrorMessage,
@@ -41,6 +43,7 @@ import {
 } from '@/lib/hooks/use-agent-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { useTRPC } from '@/lib/trpc';
 import {
   getProfileAgentsPath,
   getProfileCommandsPath,
@@ -48,6 +51,7 @@ import {
   getProfileSkillsPath,
   getProfileSlashCommandsPath,
   getProfileVariablesPath,
+  getProfilesPath,
 } from '@/lib/profile-agent-navigation';
 
 /** Icon per Overview section, matching the section's purpose. */
@@ -164,6 +168,8 @@ export function ProfileOverviewScreen({
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const colors = useThemeColors();
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
   // Reactive: a connectivity commit re-renders the error variant selection.
   const committedConnectivity = useCommittedConnectivityStatus();
   const profileQuery = useAgentProfile(profileId, organizationId);
@@ -172,6 +178,25 @@ export function ProfileOverviewScreen({
 
   const profile = profileQuery.data;
   const isOrgOwned = organizationId !== undefined;
+
+  // A profile the server no longer serves leaves the Profiles list advertising
+  // a row that can never open: refresh the lists (not the failed detail read,
+  // which would only re-issue the same NOT_FOUND) so the dead row leaves them.
+  const errorView = profileQuery.isError
+    ? selectProfileOverviewErrorView(profileQuery.error, committedConnectivity)
+    : null;
+  const staleRow = errorView?.staleRow === true;
+  useEffect(() => {
+    if (!staleRow) {
+      return;
+    }
+    void queryClient.invalidateQueries(trpc.agentProfiles.list.pathFilter());
+    void queryClient.invalidateQueries(trpc.agentProfiles.listCombined.pathFilter());
+  }, [staleRow, queryClient, trpc]);
+
+  const backToProfiles = () => {
+    router.replace(getProfilesPath());
+  };
 
   const saveMetadata = async ({ name, description }: { name: string; description: string }) => {
     try {
@@ -223,14 +248,28 @@ export function ProfileOverviewScreen({
         {/* A stale read keeps the cached profile usable: the error banner sits
             above the content and only takes over when there is nothing to
             show. A confirmed-offline device is a connectivity failure, not a
-            server one; `unknown` connectivity keeps the server variant. */}
-        {profileQuery.isError ? (
+            server one; `unknown` connectivity keeps the server variant. A
+            profile the server no longer serves (NOT_FOUND) or refuses
+            (FORBIDDEN) gets its own state with a way back instead of a Retry
+            that re-issues the same refusal. */}
+        {errorView ? (
           <QueryError
-            variant={committedConnectivity === 'offline' ? 'offline' : 'server'}
+            variant={errorView.variant}
             placement="top"
-            title={t('profiles.loadFailed')}
-            onRetry={() => void profileQuery.refetch()}
+            title={
+              errorView.variant === 'not-found' || errorView.variant === 'permission'
+                ? undefined
+                : t('profiles.loadFailed')
+            }
+            onRetry={errorView.showRetry ? () => void profileQuery.refetch() : undefined}
             isRetrying={profileQuery.isRefetching}
+            action={
+              errorView.showRetry ? undefined : (
+                <Button variant="outline" onPress={backToProfiles}>
+                  <Text>{t('common.goBack')}</Text>
+                </Button>
+              )
+            }
           />
         ) : null}
 

@@ -146,7 +146,7 @@ describe('TabScreenScrollView', () => {
     const { renderer, unmount } = await renderWithProviders(
       createElement(
         TabBarLabelContext,
-        { value: true },
+        { value: { showLabel: true, labelLines: 1 } },
         createElement(TabScreenScrollView, null, createElement('Content'))
       )
     );

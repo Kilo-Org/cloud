@@ -6,12 +6,7 @@ const LITERAL_LEADING_CHARACTER = /^\s*[=+\-@\t\r]/;
  */
 export function csvField(value: string): string {
   const field = LITERAL_LEADING_CHARACTER.test(value) ? `'${value}` : value;
-  if (
-    field.includes('"') ||
-    field.includes(',') ||
-    field.includes('\n') ||
-    field.includes('\r')
-  ) {
+  if (field.includes('"') || field.includes(',') || field.includes('\n') || field.includes('\r')) {
     return `"${field.replace(/"/g, '""')}"`;
   }
   return field;

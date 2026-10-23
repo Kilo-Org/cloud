@@ -89,6 +89,15 @@ describe('confirmAppActionStart', () => {
     buttons[0]?.onPress();
     await expect(answer).resolves.toBe(false);
   });
+  it('resolves false when the confirmation is dismissed', async () => {
+    const answer = confirmAppActionStart({ prompt: 'fix the build' });
+    await openedAlert();
+    const call = mocks.alert.mock.calls.at(0);
+    const options = call?.[3] as { onDismiss: () => void } | undefined;
+    expect(options?.onDismiss).toBeTypeOf('function');
+    options?.onDismiss();
+    await expect(answer).resolves.toBe(false);
+  });
 
   it('resolves true when the person continues', async () => {
     const answer = confirmAppActionStart({ prompt: 'fix the build' });

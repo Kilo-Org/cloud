@@ -95,11 +95,15 @@ const mcp = vi.hoisted(() => ({
 }));
 
 vi.mock('./local-models', () => ({ localModelProvider: () => undefined }));
-const backendState = vi.hoisted(() => ({ profiles: [] as StoredChatBackend[] }));
+const backendState = vi.hoisted(() => ({ profiles: [] as StoredChatBackend[], failNext: false }));
 vi.mock('./backend-store', () => ({
   listChatBackends: () => backendState.profiles,
   waitForChatBackends: async () => {
     await Promise.resolve();
+    if (backendState.failNext) {
+      backendState.failNext = false;
+      throw new Error('the backends could not be read');
+    }
   },
 }));
 
@@ -472,6 +476,7 @@ beforeEach(async () => {
   remote.offered.length = 0;
   continuesWith = [];
   backendState.profiles = [];
+  backendState.failNext = false;
   opened = await startChat(place, { model: 'kilo/one', effort: null });
   await settled();
   /* Cleared after the chat above, so a test counts only its own discoveries. */
@@ -1103,6 +1108,26 @@ describe('opening a chat where it was recorded', () => {
     await enterChat(place, opened);
     await settled();
     expect(continued).toContain(opened);
+  });
+
+  it('settles the state even when the chat cannot be ended', async () => {
+    /* Ending it closes the scope that writes the conversation down, and that
+       close can fail. The chat is let go either way: nothing of it is drawn
+       here, and no question asked here reaches its session. */
+    backendState.failNext = true;
+
+    await enterChat(otherAccount, opened);
+    await settled();
+
+    expect(snapshotOf(opened)).toMatchObject({
+      status: 'idle',
+      turns: [],
+      failureKey: 'queryError.notFoundDescription',
+    });
+
+    await say(opened, { text: 'into it', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    expect(asked).toEqual([]);
   });
 
   it('does not open an id the store never recorded', async () => {

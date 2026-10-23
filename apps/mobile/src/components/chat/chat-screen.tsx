@@ -20,6 +20,7 @@ import { useSessionModelOptions } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { useChat, useChatList, useChatPlace } from '@/lib/chat/use-chat';
+import { CHAT_UNAVAILABLE_KEY } from '@/lib/chat/state';
 import { asMessages } from '@/lib/chat/turns';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getChatBackendsHasLoaded, useChatBackends } from '@/lib/chat/backend-store';
@@ -265,7 +266,9 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
           status={state.status}
           messages={messages}
           failureKey={state.failureKey}
-          retryable={!actions.hasUnanswered}
+          // A chat that is not one this place may read is not one this place can
+          // retry into: entering it again settles the same state.
+          retryable={!actions.hasUnanswered && state.failureKey !== CHAT_UNAVAILABLE_KEY}
           onRetry={() => void retry()}
           onSend={handleSend}
           composerControlRef={actions.composerControlRef}

@@ -18,6 +18,7 @@ import { KILO_MCP_URL } from '@/lib/config';
 import { encryptedDatabase } from '@/lib/persist/encrypted-kv';
 import {
   change,
+  CHAT_UNAVAILABLE_KEY,
   type ChatTarget,
   forgetState,
   moveState,
@@ -335,12 +336,22 @@ export async function enterChat(place: ChatPlace, sessionId: string): Promise<vo
  * What is left is idle with nothing in it and the app's copy for something that
  * is no longer here, so a screen shows no transcript and a question asked of it
  * stops at the registry rather than reaching a session.
+ *
+ * Ending the live one can fail — the store writes the conversation as its
+ * scope closes, and a database that is full or already shut refuses — so the
+ * chat is let go before that close runs and a failed close is not allowed to
+ * leave this place holding it.
  */
 async function settleUnavailable(sessionId: string): Promise<void> {
-  if (chats.has(sessionId)) {
-    /* Closing the scope is what writes the conversation down, so the place the
-       chat belongs to reads it back when it opens the chat again. */
-    await releaseChat(sessionId);
+  const chat = chats.get(sessionId);
+  if (chat !== undefined) {
+    try {
+      await endChat(sessionId, chat);
+    } catch {
+      /* Nothing of the conversation was written down and the session is no
+         longer reachable from here. The state below is what the screen draws
+         either way. */
+    }
   }
   change(sessionId, {
     status: 'idle',
@@ -348,7 +359,7 @@ async function settleUnavailable(sessionId: string): Promise<void> {
     effort: null,
     ...NOTHING,
     failed: 'the chat does not belong to this place',
-    failureKey: 'queryError.notFoundDescription',
+    failureKey: CHAT_UNAVAILABLE_KEY,
   });
 }
 
@@ -1140,6 +1151,26 @@ async function halt(sessionId: string, chat: Chat): Promise<boolean> {
 }
 
 /**
+ * Ends one chat's session and forgets it. Closing the scope is what tells the
+ * store to write down whatever it still holds.
+ *
+ * The chat is dropped from the live ones first, because that close can fail:
+ * the store writes the conversation as the scope closes, and a database that is
+ * full or already shut refuses. Whatever is left of the attempt is then not
+ * something the registry answers with.
+ */
+async function endChat(sessionId: string, chat: Chat): Promise<void> {
+  chats.delete(sessionId);
+  await halt(sessionId, chat);
+  /* Whatever was still waiting goes with the chat. Asking it now would open a
+     round on a session whose scope is closing under it. */
+  chat.waiting.length = 0;
+  const runtime = await runtimeFor(chat);
+  await runtime.runPromise(Scope.close(chat.scope, Exit.void));
+  forgetState(sessionId);
+}
+
+/**
  * Ends a chat, whether it is being deleted or the account is going. Closing the
  * scope is what tells the store to write down whatever it still holds.
  *
@@ -1156,14 +1187,7 @@ export async function releaseChat(sessionId: string): Promise<void> {
     forgetState(current);
     return;
   }
-  await halt(current, chat);
-  /* Whatever was still waiting goes with the chat. Asking it now would open a
-     round on a session whose scope is closing under it. */
-  chat.waiting.length = 0;
-  const runtime = await runtimeFor(chat);
-  await runtime.runPromise(Scope.close(chat.scope, Exit.void));
-  chats.delete(current);
-  forgetState(current);
+  await endChat(current, chat);
 }
 
 /** Ends every chat, which is what signing out does before the wipe. */

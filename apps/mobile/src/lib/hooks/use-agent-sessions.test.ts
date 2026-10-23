@@ -364,7 +364,9 @@ describe('newest-first session paging at the retention bound', () => {
 
   it('keeps page one cached when the list pages past the bound', async () => {
     const { ids, fetched, hasNextPage } = await walkPastRetentionBound(
-      readStoredOptions(buildStoredSessionsQueryOptions(createTrpcStub(echoInfiniteQueryOptions), {}))
+      readStoredOptions(
+        buildStoredSessionsQueryOptions(createTrpcStub(echoInfiniteQueryOptions), {})
+      )
     );
 
     // The newest page (`ses-0`) is still at the front, the walk stopped at the

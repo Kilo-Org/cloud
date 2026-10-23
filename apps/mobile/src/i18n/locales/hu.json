@@ -3684,6 +3684,7 @@
     "moveDown": "Mozgassa le",
     "moveCommandUp": "{{position}}. parancs áthelyezése feljebb",
     "moveCommandDown": "{{position}}. parancs áthelyezése lejjebb",
+    "deleteCommand": "{{position}}. parancs törlése",
     "skillsTitle": "Készségek",
     "addSkill": "Készség hozzáadása",
     "skillNameLabel": "Készség neve",

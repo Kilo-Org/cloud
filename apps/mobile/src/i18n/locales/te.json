@@ -3684,6 +3684,7 @@
     "moveDown": "క్రిందికి తరలించు",
     "moveCommandUp": "ఆదేశం {{position}}ను పైకి తరలించండి",
     "moveCommandDown": "ఆదేశం {{position}}ను క్రిందికి తరలించండి",
+    "deleteCommand": "ఆదేశం {{position}}ను తొలగించండి",
     "skillsTitle": "నైపుణ్యాలు",
     "addSkill": "నైపుణ్యాన్ని జోడించండి",
     "skillNameLabel": "నైపుణ్యం పేరు",

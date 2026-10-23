@@ -3684,6 +3684,7 @@
     "moveDown": "Ilipat pababa",
     "moveCommandUp": "Ilipat ang utos {{position}} pataas",
     "moveCommandDown": "Ilipat ang utos {{position}} pababa",
+    "deleteCommand": "Burahin ang utos {{position}}",
     "skillsTitle": "Mga kasanayan",
     "addSkill": "Magdagdag ng kasanayan",
     "skillNameLabel": "Pangalan ng kasanayan",

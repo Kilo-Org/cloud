@@ -3684,6 +3684,7 @@
     "moveDown": "Liigu alla",
     "moveCommandUp": "Liiguta käsk {{position}} üles",
     "moveCommandDown": "Liiguta käsk {{position}} alla",
+    "deleteCommand": "Kustuta käsk {{position}}",
     "skillsTitle": "Oskused",
     "addSkill": "Lisa oskusi",
     "skillNameLabel": "Oskuste nimi",

@@ -3819,6 +3819,7 @@
     "moveDown": "Nimxu 'l isfel",
     "moveCommandUp": "Mexxi l-kmand {{position}} 'l fuq",
     "moveCommandDown": "Mexxi l-kmand {{position}} 'l isfel",
+    "deleteCommand": "Ħassar l-kmand {{position}}",
     "skillsTitle": "Ħiliet",
     "addSkill": "Żid il-ħila",
     "skillNameLabel": "Isem tal-ħila",

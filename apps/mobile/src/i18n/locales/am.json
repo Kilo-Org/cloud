@@ -3684,6 +3684,7 @@
     "moveDown": "ወደ ታች ውሰድ",
     "moveCommandUp": "ትዕዛዝ {{position}} ወደ ላይ አንቀሳቅስ",
     "moveCommandDown": "ትዕዛዝ {{position}} ወደ ታች አንቀሳቅስ",
+    "deleteCommand": "ትዕዛዝ {{position}} ሰርዝ",
     "skillsTitle": "ችሎታዎች",
     "addSkill": "ችሎታ ጨምር",
     "skillNameLabel": "የክህሎት ስም",

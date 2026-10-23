@@ -3684,6 +3684,7 @@
     "moveDown": "Μετακίνηση προς τα κάτω",
     "moveCommandUp": "Μετακίνηση εντολής {{position}} προς τα πάνω",
     "moveCommandDown": "Μετακίνηση εντολής {{position}} προς τα κάτω",
+    "deleteCommand": "Διαγραφή εντολής {{position}}",
     "skillsTitle": "Δεξιότητες",
     "addSkill": "Προσθέστε δεξιότητα",
     "skillNameLabel": "Όνομα δεξιότητας",

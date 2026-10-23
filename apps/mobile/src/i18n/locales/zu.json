@@ -3684,6 +3684,7 @@
     "moveDown": "Hamba phansi",
     "moveCommandUp": "Hambisa umyalo {{position}} phezulu",
     "moveCommandDown": "Hambisa umyalo {{position}} phansi",
+    "deleteCommand": "Susa umyalo {{position}}",
     "skillsTitle": "Amakhono",
     "addSkill": "Engeza ikhono",
     "skillNameLabel": "Igama lekhono",

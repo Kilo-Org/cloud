@@ -3684,6 +3684,7 @@
     "moveDown": "Di chuyển xuống",
     "moveCommandUp": "Di chuyển lệnh {{position}} lên",
     "moveCommandDown": "Di chuyển lệnh {{position}} xuống",
+    "deleteCommand": "Xóa lệnh {{position}}",
     "skillsTitle": "Kỹ năng",
     "addSkill": "Thêm kỹ năng",
     "skillNameLabel": "Tên kỹ năng",

@@ -3684,6 +3684,7 @@
     "moveDown": "ផ្លាស់ទីចុះក្រោម",
     "moveCommandUp": "ផ្លាស់ទីពាក្យបញ្ជា {{position}} ឡើងលើ",
     "moveCommandDown": "ផ្លាស់ទីពាក្យបញ្ជា {{position}} ចុះក្រោម",
+    "deleteCommand": "លុបពាក្យបញ្ជា {{position}}",
     "skillsTitle": "ជំនាញ",
     "addSkill": "បន្ថែមជំនាញ",
     "skillNameLabel": "ឈ្មោះជំនាញ",

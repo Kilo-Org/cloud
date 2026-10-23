@@ -3684,6 +3684,7 @@
     "moveDown": "Færðu þig niður",
     "moveCommandUp": "Færa skipun {{position}} upp",
     "moveCommandDown": "Færa skipun {{position}} niður",
+    "deleteCommand": "Eyða skipun {{position}}",
     "skillsTitle": "Færni",
     "addSkill": "Bættu við færni",
     "skillNameLabel": "Nafn kunnáttu",

@@ -3684,6 +3684,7 @@
     "moveDown": "Nach unten verschieben",
     "moveCommandUp": "Befehl {{position}} nach oben verschieben",
     "moveCommandDown": "Befehl {{position}} nach unten verschieben",
+    "deleteCommand": "Befehl {{position}} löschen",
     "skillsTitle": "Fähigkeiten",
     "addSkill": "Fertigkeit hinzufügen",
     "skillNameLabel": "Fähigkeitsname",

@@ -3684,6 +3684,7 @@
     "moveDown": "Aşağı hərəkət edin",
     "moveCommandUp": "{{position}} nömrəli əmri yuxarı köçür",
     "moveCommandDown": "{{position}} nömrəli əmri aşağı köçür",
+    "deleteCommand": "{{position}} nömrəli əmri sil",
     "skillsTitle": "Bacarıqlar",
     "addSkill": "Bacarıq əlavə edin",
     "skillNameLabel": "Bacarıq adı",

@@ -3684,6 +3684,7 @@
     "moveDown": "Mandrosoa midina",
     "moveCommandUp": "Afindra baiko {{position}} miakatra",
     "moveCommandDown": "Afindra baiko {{position}} midina",
+    "deleteCommand": "Fafao baiko {{position}}",
     "skillsTitle": "fahaiza-manao",
     "addSkill": "Ampio fahaizana",
     "skillNameLabel": "Anarana fahaizana",

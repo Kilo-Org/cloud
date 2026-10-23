@@ -3684,6 +3684,7 @@
     "moveDown": "به پایین حرکت کنید",
     "moveCommandUp": "فرمان {{position}} را به بالا منتقل کنید",
     "moveCommandDown": "فرمان {{position}} را به پایین منتقل کنید",
+    "deleteCommand": "فرمان {{position}} را حذف کنید",
     "skillsTitle": "مهارت ها",
     "addSkill": "مهارت را اضافه کنید",
     "skillNameLabel": "نام مهارت",

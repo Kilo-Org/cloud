@@ -3684,6 +3684,7 @@
     "moveDown": "Yi lọ si isalẹ",
     "moveCommandUp": "Gbe òfin {{position}} sókè",
     "moveCommandDown": "Gbe òfin {{position}} sílẹ̀",
+    "deleteCommand": "Pa òfin {{position}} rẹ́",
     "skillsTitle": "Awọn ogbon",
     "addSkill": "Fi ogbon kun",
     "skillNameLabel": "Orukọ ogbon",

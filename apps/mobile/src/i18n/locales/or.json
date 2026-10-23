@@ -3684,6 +3684,7 @@
     "moveDown": "ତଳକୁ ଯାଅ।",
     "moveCommandUp": "ନିର୍ଦ୍ଦେଶ {{position}} ଉପରକୁ ଘୁଞ୍ଚାନ୍ତୁ",
     "moveCommandDown": "ନିର୍ଦ୍ଦେଶ {{position}} ତଳକୁ ଘୁଞ୍ଚାନ୍ତୁ",
+    "deleteCommand": "ନିର୍ଦ୍ଦେଶ {{position}} ବିଲୋପ କରନ୍ତୁ",
     "skillsTitle": "ଦକ୍ଷତା।",
     "addSkill": "ଦକ୍ଷତା ଯୋଡନ୍ତୁ।",
     "skillNameLabel": "ଦକ୍ଷତା ନାମ",

@@ -3684,6 +3684,7 @@
     "moveDown": "तल सार्नुहोस्",
     "moveCommandUp": "आदेश {{position}} माथि सार्नुहोस्",
     "moveCommandDown": "आदेश {{position}} तल सार्नुहोस्",
+    "deleteCommand": "आदेश {{position}} मेट्नुहोस्",
     "skillsTitle": "सीपहरू",
     "addSkill": "कौशल थप्नुहोस्",
     "skillNameLabel": "कौशल नाम",

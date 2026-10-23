@@ -3684,6 +3684,7 @@
     "moveDown": "Sogeza chini",
     "moveCommandUp": "Sogeza amri {{position}} juu",
     "moveCommandDown": "Sogeza amri {{position}} chini",
+    "deleteCommand": "Futa amri {{position}}",
     "skillsTitle": "Ujuzi",
     "addSkill": "Ongeza ujuzi",
     "skillNameLabel": "Jina la ujuzi",

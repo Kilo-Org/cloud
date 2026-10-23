@@ -3684,6 +3684,7 @@
     "moveDown": "အောက်သို့ရွှေ့ပါ။",
     "moveCommandUp": "အမိန့် {{position}} ကို အပေါ်သို့ ရွှေ့ပါ",
     "moveCommandDown": "အမိန့် {{position}} ကို အောက်သို့ ရွှေ့ပါ",
+    "deleteCommand": "အမိန့် {{position}} ကို ဖျက်ပါ",
     "skillsTitle": "ကျွမ်းကျင်မှု",
     "addSkill": "ကျွမ်းကျင်မှုထည့်ပါ။",
     "skillNameLabel": "အရည်အချင်းနာမည်",

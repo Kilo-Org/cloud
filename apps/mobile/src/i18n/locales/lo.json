@@ -3684,6 +3684,7 @@
     "moveDown": "ຍ້າຍລົງ",
     "moveCommandUp": "ຍ້າຍຄໍາສັ່ງ {{position}} ຂຶ້ນ",
     "moveCommandDown": "ຍ້າຍຄໍາສັ່ງ {{position}} ລົງ",
+    "deleteCommand": "ລຶບຄໍາສັ່ງ {{position}}",
     "skillsTitle": "ທັກສະ",
     "addSkill": "ເພີ່ມທັກສະ",
     "skillNameLabel": "ຊື່ທັກສະ",

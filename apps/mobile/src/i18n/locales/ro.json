@@ -3729,6 +3729,7 @@
     "moveDown": "Deplasați-vă în jos",
     "moveCommandUp": "Mută comanda {{position}} în sus",
     "moveCommandDown": "Mută comanda {{position}} în jos",
+    "deleteCommand": "Șterge comanda {{position}}",
     "skillsTitle": "Abilități",
     "addSkill": "Adăugați abilitate",
     "skillNameLabel": "Numele aptitudinii",

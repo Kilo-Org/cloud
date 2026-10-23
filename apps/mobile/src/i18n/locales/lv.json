@@ -3729,6 +3729,7 @@
     "moveDown": "Pārvietojieties uz leju",
     "moveCommandUp": "Pārvietot komandu {{position}} uz augšu",
     "moveCommandDown": "Pārvietot komandu {{position}} uz leju",
+    "deleteCommand": "Dzēst komandu {{position}}",
     "skillsTitle": "Prasmes",
     "addSkill": "Pievienojiet prasmi",
     "skillNameLabel": "Prasmes nosaukums",

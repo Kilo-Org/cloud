@@ -3684,6 +3684,7 @@
     "moveDown": "Pastga siljiting",
     "moveCommandUp": "{{position}}-raqamli buyruqni yuqoriga siljiting",
     "moveCommandDown": "{{position}}-raqamli buyruqni pastga siljiting",
+    "deleteCommand": "{{position}}-raqamli buyruqni o‘chiring",
     "skillsTitle": "Ko'nikmalar",
     "addSkill": "Qobiliyat qo'shing",
     "skillNameLabel": "Malaka nomi",

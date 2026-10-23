@@ -3684,6 +3684,7 @@
     "moveDown": "खाली हलवा",
     "moveCommandUp": "आदेश {{position}} वर हलवा",
     "moveCommandDown": "आदेश {{position}} खाली हलवा",
+    "deleteCommand": "आदेश {{position}} हटवा",
     "skillsTitle": "कौशल्य",
     "addSkill": "कौशल्य जोडा",
     "skillNameLabel": "कौशल्याचे नाव",

@@ -3684,6 +3684,7 @@
     "moveDown": "بڕۆ بۆ خوارەوە",
     "moveCommandUp": "فەرمانی {{position}} ببە بۆ سەرەوە",
     "moveCommandDown": "فەرمانی {{position}} ببە بۆ خوارەوە",
+    "deleteCommand": "فەرمانی {{position}} بسڕەوە",
     "skillsTitle": "کارامەییەکان",
     "addSkill": "لێهاتوویی زیاد بکە",
     "skillNameLabel": "ناوی لێهاتوویی",

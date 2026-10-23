@@ -3684,6 +3684,7 @@
     "moveDown": "Mugitu behera",
     "moveCommandUp": "Mugitu {{position}}. komandoa gora",
     "moveCommandDown": "Mugitu {{position}}. komandoa behera",
+    "deleteCommand": "Ezabatu {{position}}. komandoa",
     "skillsTitle": "Trebetasunak",
     "addSkill": "Gehitu trebetasuna",
     "skillNameLabel": "Trebetasunaren izena",

@@ -3684,6 +3684,7 @@
     "moveDown": "ಕೆಳಗೆ ಸರಿಸಿ",
     "moveCommandUp": "ಆಜ್ಞೆ {{position}} ಅನ್ನು ಮೇಲಕ್ಕೆ ಸರಿಸಿ",
     "moveCommandDown": "ಆಜ್ಞೆ {{position}} ಅನ್ನು ಕೆಳಗೆ ಸರಿಸಿ",
+    "deleteCommand": "ಆಜ್ಞೆ {{position}} ಅನ್ನು ಅಳಿಸಿ",
     "skillsTitle": "ಕೌಶಲ್ಯಗಳು",
     "addSkill": "ಕೌಶಲ್ಯವನ್ನು ಸೇರಿಸಿ",
     "skillNameLabel": "ಕೌಶಲ್ಯದ ಹೆಸರು",

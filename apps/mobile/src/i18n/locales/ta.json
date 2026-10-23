@@ -3684,6 +3684,7 @@
     "moveDown": "கீழே நகர்த்தவும்",
     "moveCommandUp": "{{position}} கட்டளையை மேலே நகர்த்து",
     "moveCommandDown": "{{position}} கட்டளையை கீழே நகர்த்து",
+    "deleteCommand": "{{position}} கட்டளையை நீக்கவும்",
     "skillsTitle": "திறன்கள்",
     "addSkill": "திறமையைச் சேர்க்கவும்",
     "skillNameLabel": "திறமை பெயர்",

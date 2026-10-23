@@ -3684,6 +3684,7 @@
     "moveDown": "Deplase desann",
     "moveCommandUp": "Deplase kòmandman {{position}} anwo",
     "moveCommandDown": "Deplase kòmandman {{position}} anba",
+    "deleteCommand": "Efase kòmandman {{position}}",
     "skillsTitle": "Konpetans",
     "addSkill": "Ajoute konpetans",
     "skillNameLabel": "Non konpetans",

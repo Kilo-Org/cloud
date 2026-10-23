@@ -3684,6 +3684,7 @@
     "moveDown": "Matsa ƙasa",
     "moveCommandUp": "Matsar da umarni {{position}} sama",
     "moveCommandDown": "Matsar da umarni {{position}} ƙasa",
+    "deleteCommand": "Share umarni {{position}}",
     "skillsTitle": "Ƙwarewa",
     "addSkill": "Ƙara fasaha",
     "skillNameLabel": "Sunan gwaninta",

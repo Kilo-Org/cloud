@@ -3684,6 +3684,7 @@
     "moveDown": "ਹੇਠਾਂ ਚਲੇ ਜਾਓ",
     "moveCommandUp": "ਕਮਾਂਡ {{position}} ਉੱਪਰ ਭੇਜੋ",
     "moveCommandDown": "ਕਮਾਂਡ {{position}} ਹੇਠਾਂ ਭੇਜੋ",
+    "deleteCommand": "ਕਮਾਂਡ {{position}} ਮਿਟਾਓ",
     "skillsTitle": "ਹੁਨਰ",
     "addSkill": "ਹੁਨਰ ਸ਼ਾਮਲ ਕਰੋ",
     "skillNameLabel": "ਹੁਨਰ ਦਾ ਨਾਮ",

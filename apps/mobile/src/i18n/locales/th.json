@@ -3684,6 +3684,7 @@
     "moveDown": "เลื่อนลง",
     "moveCommandUp": "ย้ายคำสั่ง {{position}} ขึ้น",
     "moveCommandDown": "ย้ายคำสั่ง {{position}} ลง",
+    "deleteCommand": "ลบคำสั่ง {{position}}",
     "skillsTitle": "ทักษะ",
     "addSkill": "เพิ่มทักษะ",
     "skillNameLabel": "ชื่อทักษะ",

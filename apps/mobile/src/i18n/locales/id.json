@@ -3684,6 +3684,7 @@
     "moveDown": "Pindah ke bawah",
     "moveCommandUp": "Pindahkan perintah {{position}} ke atas",
     "moveCommandDown": "Pindahkan perintah {{position}} ke bawah",
+    "deleteCommand": "Hapus perintah {{position}}",
     "skillsTitle": "Keterampilan",
     "addSkill": "Tambahkan keterampilan",
     "skillNameLabel": "Nama keterampilan",

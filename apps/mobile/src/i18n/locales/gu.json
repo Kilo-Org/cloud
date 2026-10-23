@@ -3684,6 +3684,7 @@
     "moveDown": "નીચે ખસેડો",
     "moveCommandUp": "આદેશ {{position}} ઉપર ખસેડો",
     "moveCommandDown": "આદેશ {{position}} નીચે ખસેડો",
+    "deleteCommand": "આદેશ {{position}} કાઢી નાખો",
     "skillsTitle": "કૌશલ્ય",
     "addSkill": "કૌશલ્ય ઉમેરો",
     "skillNameLabel": "કૌશલ્યનું નામ",

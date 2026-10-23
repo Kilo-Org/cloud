@@ -3729,6 +3729,7 @@
     "moveDown": "Spostati giù",
     "moveCommandUp": "Sposta il comando {{position}} in alto",
     "moveCommandDown": "Sposta il comando {{position}} in basso",
+    "deleteCommand": "Elimina il comando {{position}}",
     "skillsTitle": "Competenze",
     "addSkill": "Aggiungi abilità",
     "skillNameLabel": "Nome dell'abilità",

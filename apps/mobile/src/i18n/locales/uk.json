@@ -3774,6 +3774,7 @@
     "moveDown": "Рухатися вниз",
     "moveCommandUp": "Перемістити команду {{position}} вгору",
     "moveCommandDown": "Перемістити команду {{position}} вниз",
+    "deleteCommand": "Видалити команду {{position}}",
     "skillsTitle": "Навички",
     "addSkill": "Додайте навички",
     "skillNameLabel": "Назва навички",

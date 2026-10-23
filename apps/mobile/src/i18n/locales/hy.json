@@ -3684,6 +3684,7 @@
     "moveDown": "Տեղափոխեք ներքև",
     "moveCommandUp": "Տեղափոխել {{position}} հրամանը վերև",
     "moveCommandDown": "Տեղափոխել {{position}} հրամանը ներքև",
+    "deleteCommand": "Ջնջել {{position}} հրամանը",
     "skillsTitle": "Հմտություններ",
     "addSkill": "Ավելացնել հմտություն",
     "skillNameLabel": "Հմտության անուն",

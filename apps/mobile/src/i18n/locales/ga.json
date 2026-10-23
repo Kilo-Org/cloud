@@ -3819,6 +3819,7 @@
     "moveDown": "Bog síos",
     "moveCommandUp": "Bog ordú {{position}} suas",
     "moveCommandDown": "Bog ordú {{position}} síos",
+    "deleteCommand": "Scrios ordú {{position}}",
     "skillsTitle": "Scileanna",
     "addSkill": "Cuir scil leis",
     "skillNameLabel": "Ainm scile",

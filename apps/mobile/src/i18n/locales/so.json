@@ -3684,6 +3684,7 @@
     "moveDown": "Hoos u dhaqaaq",
     "moveCommandUp": "U rari taliska {{position}} kor",
     "moveCommandDown": "U rari taliska {{position}} hoos",
+    "deleteCommand": "Tirtir taliska {{position}}",
     "skillsTitle": "Xirfadaha",
     "addSkill": "Ku dar xirfad",
     "skillNameLabel": "Magaca xirfada",

@@ -3684,6 +3684,7 @@
     "moveDown": "Flyt ned",
     "moveCommandUp": "Flyt kommando {{position}} op",
     "moveCommandDown": "Flyt kommando {{position}} ned",
+    "deleteCommand": "Slet kommando {{position}}",
     "skillsTitle": "Færdigheder",
     "addSkill": "Tilføj færdigheder",
     "skillNameLabel": "Færdighedsnavn",

@@ -3774,6 +3774,7 @@
     "moveDown": "Opuszczać",
     "moveCommandUp": "Przenieś polecenie {{position}} w górę",
     "moveCommandDown": "Przenieś polecenie {{position}} w dół",
+    "deleteCommand": "Usuń polecenie {{position}}",
     "skillsTitle": "Umiejętności",
     "addSkill": "Dodaj umiejętność",
     "skillNameLabel": "Nazwa umiejętności",

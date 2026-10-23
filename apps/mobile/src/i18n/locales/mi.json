@@ -3684,6 +3684,7 @@
     "moveDown": "Nuku ki raro",
     "moveCommandUp": "Neke whakahau {{position}} ki runga",
     "moveCommandDown": "Neke whakahau {{position}} ki raro",
+    "deleteCommand": "Muku whakahau {{position}}",
     "skillsTitle": "Pukenga",
     "addSkill": "Tāpiri pūkenga",
     "skillNameLabel": "Ingoa Pūkenga",

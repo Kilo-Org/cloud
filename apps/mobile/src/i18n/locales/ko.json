@@ -3684,6 +3684,7 @@
     "moveDown": "아래로 이동",
     "moveCommandUp": "명령 {{position}}을(를) 위로 이동",
     "moveCommandDown": "명령 {{position}}을(를) 아래로 이동",
+    "deleteCommand": "{\"value\": \"명령 {{position}}을(를) 삭제\"}",
     "skillsTitle": "기술",
     "addSkill": "스킬 추가",
     "skillNameLabel": "스킬명",

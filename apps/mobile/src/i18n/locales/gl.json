@@ -3684,6 +3684,7 @@
     "moveDown": "Mover cara abaixo",
     "moveCommandUp": "Mover o comando {{position}} cara arriba",
     "moveCommandDown": "Mover o comando {{position}} cara abaixo",
+    "deleteCommand": "Eliminar o comando {{position}}",
     "skillsTitle": "Habilidades",
     "addSkill": "Engade habilidade",
     "skillNameLabel": "Nome da habilidade",

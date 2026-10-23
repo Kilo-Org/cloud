@@ -3684,6 +3684,7 @@
     "moveDown": "Lëvizni poshtë",
     "moveCommandUp": "Zhvendos komandën {{position}} lart",
     "moveCommandDown": "Zhvendos komandën {{position}} poshtë",
+    "deleteCommand": "Fshi komandën {{position}}",
     "skillsTitle": "Aftësitë",
     "addSkill": "Shtoni aftësi",
     "skillNameLabel": "Emri i aftësisë",

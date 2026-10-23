@@ -3684,6 +3684,7 @@
     "moveDown": "नीचे की ओर",
     "moveCommandUp": "आदेश {{position}} को ऊपर ले जाएँ",
     "moveCommandDown": "आदेश {{position}} को नीचे ले जाएँ",
+    "deleteCommand": "आदेश {{position}} हटाएँ",
     "skillsTitle": "कौशल",
     "addSkill": "कौशल जोड़ें",
     "skillNameLabel": "कौशल का नाम",

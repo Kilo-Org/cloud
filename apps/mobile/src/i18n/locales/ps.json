@@ -3684,6 +3684,7 @@
     "moveDown": "لاندې حرکت وکړئ",
     "moveCommandUp": "{{position}} امر پورته کړئ",
     "moveCommandDown": "{{position}} امر لاندې کړئ",
+    "deleteCommand": "{{position}} امر ړنګ کړئ",
     "skillsTitle": "مهارتونه",
     "addSkill": "مهارتونه اضافه کړئ",
     "skillNameLabel": "د مهارت نوم",

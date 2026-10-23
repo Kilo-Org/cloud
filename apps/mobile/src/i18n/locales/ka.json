@@ -3684,6 +3684,7 @@
     "moveDown": "ქვევით გადაადგილება",
     "moveCommandUp": "გადაიტანე ბრძანება {{position}} ზემოთ",
     "moveCommandDown": "გადაიტანე ბრძანება {{position}} ქვემოთ",
+    "deleteCommand": "წაშალე ბრძანება {{position}}",
     "skillsTitle": "უნარები",
     "addSkill": "დაამატეთ უნარი",
     "skillNameLabel": "უნარის სახელი",

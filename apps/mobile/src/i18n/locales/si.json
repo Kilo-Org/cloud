@@ -3684,6 +3684,7 @@
     "moveDown": "පහළට ගමන් කරන්න",
     "moveCommandUp": "විධානය {{position}} ඉහළට ගෙනයන්න",
     "moveCommandDown": "විධානය {{position}} පහළට ගෙනයන්න",
+    "deleteCommand": "විධානය {{position}} මකන්න",
     "skillsTitle": "කුසලතා",
     "addSkill": "කුසලතා එකතු කරන්න",
     "skillNameLabel": "කුසලතා නාමය",

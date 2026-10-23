@@ -3684,6 +3684,7 @@
     "moveDown": "Придвижете се надолу",
     "moveCommandUp": "Преместете команда {{position}} нагоре",
     "moveCommandDown": "Преместете команда {{position}} надолу",
+    "deleteCommand": "Изтрийте команда {{position}}",
     "skillsTitle": "Умения",
     "addSkill": "Добавете умение",
     "skillNameLabel": "Име на умението",

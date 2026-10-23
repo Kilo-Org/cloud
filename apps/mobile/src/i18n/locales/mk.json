@@ -3684,6 +3684,7 @@
     "moveDown": "Движете се надолу",
     "moveCommandUp": "Премести команда {{position}} нагоре",
     "moveCommandDown": "Премести команда {{position}} надолу",
+    "deleteCommand": "Избриши команда {{position}}",
     "skillsTitle": "Вештини",
     "addSkill": "Додадете вештина",
     "skillNameLabel": "Име на вештина",

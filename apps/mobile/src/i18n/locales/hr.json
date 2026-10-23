@@ -3729,6 +3729,7 @@
     "moveDown": "Pomakni se dolje",
     "moveCommandUp": "Premjesti naredbu {{position}} gore",
     "moveCommandDown": "Premjesti naredbu {{position}} dolje",
+    "deleteCommand": "Obriši naredbu {{position}}",
     "skillsTitle": "Vještine",
     "addSkill": "Dodajte vještinu",
     "skillNameLabel": "Naziv vještine",

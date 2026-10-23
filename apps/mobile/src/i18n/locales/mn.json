@@ -3684,6 +3684,7 @@
     "moveDown": "Доош хөдөл",
     "moveCommandUp": "{{position}} дугаар командыг дээш зөөх",
     "moveCommandDown": "{{position}} дугаар командыг доош зөөх",
+    "deleteCommand": "{{position}} дугаар командыг устгах",
     "skillsTitle": "Ур чадвар",
     "addSkill": "Ур чадвар нэмэх",
     "skillNameLabel": "Ур чадварын нэр",

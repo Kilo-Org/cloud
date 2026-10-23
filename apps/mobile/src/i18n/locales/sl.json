@@ -3774,6 +3774,7 @@
     "moveDown": "Premakni se navzdol",
     "moveCommandUp": "Premakni ukaz {{position}} navzgor",
     "moveCommandDown": "Premakni ukaz {{position}} navzdol",
+    "deleteCommand": "Izbriši ukaz {{position}}",
     "skillsTitle": "Spretnosti",
     "addSkill": "Dodajte spretnost",
     "skillNameLabel": "Ime spretnosti",

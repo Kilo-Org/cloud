@@ -3729,6 +3729,7 @@
     "moveDown": "לזוז למטה",
     "moveCommandUp": "העבר את הפקודה {{position}} למעלה",
     "moveCommandDown": "העבר את הפקודה {{position}} למטה",
+    "deleteCommand": "מחק את הפקודה {{position}}",
     "skillsTitle": "מיומנויות",
     "addSkill": "הוסף מיומנות",
     "skillNameLabel": "שם מיומנות",

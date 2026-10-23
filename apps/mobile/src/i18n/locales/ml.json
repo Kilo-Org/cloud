@@ -3684,6 +3684,7 @@
     "moveDown": "താഴേക്ക് നീങ്ങുക",
     "moveCommandUp": "കമാൻഡ് {{position}} മുകളിലേക്ക് നീക്കുക",
     "moveCommandDown": "കമാൻഡ് {{position}} താഴേക്ക് നീക്കുക",
+    "deleteCommand": "കമാൻഡ് {{position}} ഇല്ലാതാക്കുക",
     "skillsTitle": "കഴിവുകൾ",
     "addSkill": "വൈദഗ്ദ്ധ്യം ചേർക്കുക",
     "skillNameLabel": "കഴിവിൻ്റെ പേര്",

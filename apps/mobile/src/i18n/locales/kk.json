@@ -3684,6 +3684,7 @@
     "moveDown": "Төмен жылжытыңыз",
     "moveCommandUp": "{{position}} пәрменін жоғары жылжыту",
     "moveCommandDown": "{{position}} пәрменін төмен жылжыту",
+    "deleteCommand": "{{position}} пәрменін жою",
     "skillsTitle": "Дағдылар",
     "addSkill": "Шеберлікті қосыңыз",
     "skillNameLabel": "Дағды атауы",

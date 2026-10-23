@@ -3684,6 +3684,7 @@
     "moveDown": "Budata ala",
     "moveCommandUp": "Bufee iwu {{position}} elu",
     "moveCommandDown": "Bufee iwu {{position}} ala",
+    "deleteCommand": "Hichapụ iwu {{position}}",
     "skillsTitle": "Nkà",
     "addSkill": "Tinye nka",
     "skillNameLabel": "Aha nka",

@@ -3684,6 +3684,7 @@
     "moveDown": "Gad bu'aa",
     "moveCommandUp": "Ajaja {{position}} ol sochoosi",
     "moveCommandDown": "Ajaja {{position}} gad sochoosi",
+    "deleteCommand": "Ajaja {{position}} balleessi",
     "skillsTitle": "Dandeettiiwwan",
     "addSkill": "Ogummaa itti dabali",
     "skillNameLabel": "Maqaa ogummaa",

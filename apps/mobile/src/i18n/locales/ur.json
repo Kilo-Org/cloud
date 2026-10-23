@@ -3684,6 +3684,7 @@
     "moveDown": "نیچے کی طرف بڑھیں۔",
     "moveCommandUp": "کمانڈ {{position}} کو اوپر منتقل کریں",
     "moveCommandDown": "کمانڈ {{position}} کو نیچے منتقل کریں",
+    "deleteCommand": "کمانڈ {{position}} کو حذف کریں",
     "skillsTitle": "ہنر",
     "addSkill": "مہارت شامل کریں۔",
     "skillNameLabel": "ہنر کا نام",

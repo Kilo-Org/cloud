@@ -3683,6 +3683,7 @@
     "moveDown": "Flytta ner",
     "moveCommandUp": "Flytta kommando {{position}} uppåt",
     "moveCommandDown": "Flytta kommando {{position}} nedåt",
+    "deleteCommand": "Ta bort kommando {{position}}",
     "skillsTitle": "Färdigheter",
     "addSkill": "Lägg till färdighet",
     "skillNameLabel": "Färdighetsnamn",

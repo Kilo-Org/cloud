@@ -3729,6 +3729,7 @@
     "moveDown": "Mou cap avall",
     "moveCommandUp": "Mou l'ordre {{position}} amunt",
     "moveCommandDown": "Mou l'ordre {{position}} avall",
+    "deleteCommand": "Elimina l'ordre {{position}}",
     "skillsTitle": "Habilitats",
     "addSkill": "Afegeix habilitat",
     "skillNameLabel": "Nom de l'habilitat",

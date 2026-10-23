@@ -218,4 +218,49 @@ describe('getCreditBlocks', () => {
     expect(result.creditBlocks).toHaveLength(0);
     expect(result.isFirstPurchase).toBe(true);
   });
+
+  it('attaches the purchase a linked expiry closed to its deduction row', () => {
+    const transactions = [
+      makeTransaction('grant', 0, 1_000_000, {
+        description: 'Promotional credits',
+        created_at: '2023-03-03',
+        expiry_date: '2024-01-10',
+      }),
+      makeTransaction('expiry', 0, -1_000_000, {
+        description: 'Expired: Promotional credits',
+        credit_category: 'credits_expired',
+        original_transaction_id: 'grant',
+        created_at: '2024-01-10',
+      }),
+    ];
+
+    const result = getCreditBlocks(transactions, now, makeEntity(0, 0), ENTITY_ID);
+
+    expect(result.deductions).toHaveLength(1);
+    expect(result.deductions[0]).toMatchObject({
+      id: 'expiry',
+      amount_mUsd: -1_000_000,
+      purchase: {
+        id: 'grant',
+        date: '2023-03-03',
+        description: 'Promotional credits',
+        amount_mUsd: 1_000_000,
+      },
+    });
+  });
+
+  it('leaves a deduction without a linked purchase unpaired', () => {
+    const transactions = [
+      makeTransaction('legacy-expiry', 0, -500_000, {
+        description: 'Deducting credits, due to expiration time.',
+        credit_category: 'credits_expired',
+        created_at: '2024-01-10',
+      }),
+    ];
+
+    const result = getCreditBlocks(transactions, now, makeEntity(0, 0), ENTITY_ID);
+
+    expect(result.deductions).toHaveLength(1);
+    expect(result.deductions[0].purchase).toBeNull();
+  });
 });

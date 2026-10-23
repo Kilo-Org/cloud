@@ -98,6 +98,61 @@ function deductionKindLabel(kind: 'deduction' | 'adjustment' | 'balance_neutral'
   }
 }
 
+/** One table group per credit event: a purchase with the expiry that closed it. */
+type DeductionGroup = {
+  key: string;
+  main: { date: string; description: string; type: string; amount_mUsd: number };
+  child?: { description: string; type: string; amount_mUsd: number };
+};
+
+function buildDeductionGroups(
+  deductions: {
+    id: string;
+    date: string;
+    description: string;
+    amount_mUsd: number;
+    kind: 'deduction' | 'adjustment' | 'balance_neutral';
+    purchase: { id: string; date: string; description: string; amount_mUsd: number } | null;
+  }[]
+): DeductionGroup[] {
+  return deductions
+    .map(deduction => {
+      if (!deduction.purchase) {
+        return {
+          key: deduction.id,
+          main: {
+            date: deduction.date,
+            description: deduction.description,
+            type: deductionKindLabel(deduction.kind),
+            amount_mUsd: deduction.amount_mUsd,
+          },
+        };
+      }
+      // The purchase is the main row, so its date leads the pair and the
+      // expiry reads as the second ledger line of the same event.
+      return {
+        key: deduction.id,
+        main: {
+          date: deduction.purchase.date,
+          description: deduction.purchase.description,
+          type: 'Purchase',
+          amount_mUsd: deduction.purchase.amount_mUsd,
+        },
+        child: {
+          description: deduction.description,
+          type: deductionKindLabel(deduction.kind),
+          amount_mUsd: deduction.amount_mUsd,
+        },
+      };
+    })
+    .sort((a, b) => new Date(b.main.date).getTime() - new Date(a.main.date).getTime());
+}
+
+function formatSignedAmount(amount_mUsd: number): string {
+  const amount = formatMicrodollars(Math.abs(amount_mUsd));
+  return amount_mUsd < 0 ? `-${amount}` : `+${amount}`;
+}
+
 function CreditsPageContent() {
   const router = useRouter();
   const trpc = useTRPC();
@@ -320,6 +375,7 @@ function CreditsPageContent() {
       : paidCreditPolicy.creditExpiryPolicy === 'one_year'
         ? 'Expire one year after purchase'
         : 'Do not expire';
+  const deductionGroups = buildDeductionGroups(creditData.deductions);
 
   return (
     <PageLayout
@@ -623,18 +679,33 @@ function CreditsPageContent() {
                     <Th align="right">Amount</Th>
                   </tr>
                 </thead>
-                <tbody className="divide-border divide-y">
-                  {creditData.deductions.map(deduction => (
-                    <tr key={deduction.id} className="even:bg-muted">
-                      <Td>{formatIsoDateString_UsaDateOnlyFormat(deduction.date)}</Td>
-                      <Td className="whitespace-normal">{deduction.description}</Td>
-                      <Td>{deductionKindLabel(deduction.kind)}</Td>
+                {deductionGroups.map((group, index) => (
+                  <tbody key={group.key} className={index % 2 === 1 ? 'bg-muted' : undefined}>
+                    <tr className="border-border border-t">
+                      <Td>{formatIsoDateString_UsaDateOnlyFormat(group.main.date)}</Td>
+                      <Td className="whitespace-normal">{group.main.description}</Td>
+                      <Td>{group.main.type}</Td>
                       <Td numeric align="right">
-                        -{formatMicrodollars(Math.abs(deduction.amount_mUsd))}
+                        {formatSignedAmount(group.main.amount_mUsd)}
                       </Td>
                     </tr>
-                  ))}
-                </tbody>
+                    {group.child && (
+                      <tr>
+                        <Td>{''}</Td>
+                        <Td className="whitespace-normal">
+                          <span aria-hidden="true" className="text-muted-foreground mr-1.5">
+                            └
+                          </span>
+                          {group.child.description}
+                        </Td>
+                        <Td>{group.child.type}</Td>
+                        <Td numeric align="right">
+                          {formatSignedAmount(group.child.amount_mUsd)}
+                        </Td>
+                      </tr>
+                    )}
+                  </tbody>
+                ))}
               </table>
             </div>
             {creditData.deductions.length === 0 && (

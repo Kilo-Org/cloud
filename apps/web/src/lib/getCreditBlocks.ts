@@ -95,16 +95,33 @@ export function getCreditBlocks(
 
   // Extract deduction transactions (negative amounts) for display.
   // These include KiloClaw subscription charges and settlement deductions.
+  // An expiry row points at the grant it closed through
+  // `original_transaction_id`, so the row can show the purchase it ended.
+  const transactionById = new Map(transactions.map(transaction => [transaction.id, transaction]));
   const deductions = transactions
     .filter(tx => tx.amount_microdollars < 0)
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .map(tx => ({
-      id: tx.id,
-      date: tx.created_at,
-      description: tx.description ?? tx.credit_category ?? 'Credit deduction',
-      credit_category: tx.credit_category,
-      amount_mUsd: tx.amount_microdollars, // negative
-    }));
+    .map(tx => {
+      const source = tx.original_transaction_id
+        ? transactionById.get(tx.original_transaction_id)
+        : undefined;
+      return {
+        id: tx.id,
+        date: tx.created_at,
+        description: tx.description ?? tx.credit_category ?? 'Credit deduction',
+        credit_category: tx.credit_category,
+        amount_mUsd: tx.amount_microdollars, // negative
+        purchase:
+          source && source.amount_microdollars > 0
+            ? {
+                id: source.id,
+                date: source.created_at,
+                description: source.description ?? source.credit_category ?? 'Credit purchase',
+                amount_mUsd: source.amount_microdollars,
+              }
+            : null,
+      };
+    });
 
   return {
     creditBlocks,

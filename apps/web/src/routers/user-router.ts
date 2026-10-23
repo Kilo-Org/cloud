@@ -210,6 +210,15 @@ const CreditDeductionSchema = z.object({
   description: z.string(),
   amount_mUsd: z.number(),
   kind: CreditDeductionKindSchema,
+  /** The grant this deduction closed, present for an expiry row. */
+  purchase: z
+    .object({
+      id: z.string(),
+      date: z.string(),
+      description: z.string(),
+      amount_mUsd: z.number(),
+    })
+    .nullable(),
 });
 
 const GetCreditBlocksOutputSchema = z.object({
@@ -261,6 +270,12 @@ type RawDeduction = {
   description: string;
   credit_category: string | null;
   amount_mUsd: number;
+  purchase: {
+    id: string;
+    date: string;
+    description: string;
+    amount_mUsd: number;
+  } | null;
 };
 
 /**
@@ -373,6 +388,7 @@ async function enrichDeductionsWithInstanceNames(
     description: string;
     amount_mUsd: number;
     kind: z.infer<typeof CreditDeductionKindSchema>;
+    purchase: RawDeduction['purchase'];
   }[]
 > {
   // Collect unique instance IDs from pure-credit deduction categories.
@@ -463,6 +479,7 @@ async function enrichDeductionsWithInstanceNames(
       description,
       amount_mUsd: d.amount_mUsd,
       kind: getDeductionKind(d.credit_category),
+      purchase: d.purchase,
     };
   });
 }

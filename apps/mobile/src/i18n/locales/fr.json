@@ -1637,6 +1637,7 @@
       "branchLoadError": "Impossible de charger les branches",
       "branchUnavailable": "Aucune branche n'est disponible pour ce dépôt. Vérifiez votre accès auprès du fournisseur, puis choisissez un autre dépôt.",
       "branchEmpty": "Aucune branche disponible",
+      "branchListIncomplete": "Seules certaines branches sont affichées. Le dépôt contient plus de branches que cette liste ne peut en inclure.",
       "branchPlaceholder": "Sélectionner une branche",
       "runOnWithTarget": "Exécution sur : {{target}}",
       "environment": "Environnement",
@@ -3428,7 +3429,12 @@
       "serverToolCount_one": "{{count}} outil",
       "serverToolCount_other": "{{count}} outils",
       "serverUnreachable": "Impossible de joindre ce serveur",
-      "serverOff": "Ce serveur est désactivé"
+      "serverOff": "Ce serveur est désactivé",
+      "app": {
+        "label": "Interface de l'outil",
+        "failed": "L'interface de cet outil n'a pas pu se charger.",
+        "empty": "L'interface de cet outil n'a rien à afficher."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Authentification",

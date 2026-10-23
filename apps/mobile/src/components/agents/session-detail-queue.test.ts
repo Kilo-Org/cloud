@@ -272,7 +272,7 @@ vi.mock('@/lib/analytics/posthog', () => ({
   SESSION_VIEWED_EVENT: 'session_viewed',
 }));
 vi.mock('@/lib/a11y/announce', () => ({
-  moveA11yFocus: () => false,
+  requestA11yFocus: () => false,
   announceForA11y: hoisted.announce,
 }));
 vi.mock('@/lib/persist/drafts', () => ({
@@ -319,6 +319,9 @@ vi.mock('@/lib/hooks/use-session-model-options', () => ({
 }));
 vi.mock('@/lib/hooks/use-remote-model-catalog-retry', () => ({
   useRemoteModelCatalogRetry: vi.fn(),
+}));
+vi.mock('@/lib/hooks/use-session-raise-reader', () => ({
+  useSessionRaiseReader: () => () => null,
 }));
 vi.mock('@/lib/use-github-repos-refresh', () => ({
   useGitHubReposRefresh: () => ({ openGitHubIntegration: vi.fn() }),

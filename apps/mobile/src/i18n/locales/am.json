@@ -2241,6 +2241,7 @@
       "branchLoadError": "ቅርንጫፎችን መጫን አልተቻለም",
       "branchUnavailable": "ለዚህ ማከማቻ ቅርንጫፎች አይገኙም። ከአቅራቢው ጋር ያለዎትን መዳረስ ያረጋግጡ፣ ከዚያ ሌላ ማከማቻ ይምረጡ።",
       "branchEmpty": "ምንም ቅርንጫፎች አይገኙም",
+      "branchListIncomplete": "የተዘረዘሩት የተወሰኑ ቅርንጫፎች ብቻ ናቸው። ይህ ዝርዝር የሚያካትታቸው በላይ ሆኖ ማከማቻው ተጨማሪ ቅርንጫፎች አሉት።",
       "branchPlaceholder": "አንድ ቅርንጫፍ ይምረጡ",
       "runOnWithTarget": "ማስኬጃ፦ {{target}}",
       "environment": "የሥራ አካባቢ",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "{{count}} መሳሪያ",
       "serverToolCount_other": "{{count}} መሳሪያዎች",
       "serverUnreachable": "ይህን ሰርቨር ማግኘት አልተቻለም",
-      "serverOff": "ይህ ሰርቨር ተዘግቷል"
+      "serverOff": "ይህ ሰርቨር ተዘግቷል",
+      "app": {
+        "label": "የመሣሪያ በይነገጽ",
+        "failed": "የዚህ መሣሪያ በይነገጽ መጫን አልተቻለም።",
+        "empty": "የዚህ መሣሪያ በይነገጽ የሚያሳየ ነገር የለውም።"
+      }
     },
     "mcpOAuth": {
       "authMethod": "ማረጋገጫ",

@@ -2241,6 +2241,7 @@
       "branchLoadError": "Nem sikerült betölteni az ágakat",
       "branchUnavailable": "Ehhez az adattárhoz nem érhetők el ágak. Ellenőrizd a jogosultságodat a szolgáltatónál, majd válassz másik adattárat.",
       "branchEmpty": "Nincs elérhető ág",
+      "branchListIncomplete": "Csak néhány ág látható. Az adattárban több ág van, mint amennyit ez a lista tartalmazhat.",
       "branchPlaceholder": "Válassz ágat",
       "runOnWithTarget": "Futtatás helye: {{target}}",
       "environment": "Környezet",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "{{count}} eszköz",
       "serverToolCount_other": "{{count}} eszköz",
       "serverUnreachable": "Nem sikerült elérni ezt a szervert",
-      "serverOff": "Ez a szerver ki van kapcsolva"
+      "serverOff": "Ez a szerver ki van kapcsolva",
+      "app": {
+        "label": "Eszköz felülete",
+        "failed": "Az eszköz felületét nem sikerült betölteni.",
+        "empty": "Az eszköz felületén nincs mit megjeleníteni."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Hitelesítés",

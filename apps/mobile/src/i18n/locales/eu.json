@@ -2241,6 +2241,7 @@
       "branchLoadError": "Ezin izan dira adarrak kargatu",
       "branchUnavailable": "Ez dago adarrik eskuragarri biltegi honetarako. Egiaztatu hornitzailearekin duzun sarbidea eta hautatu beste biltegi bat.",
       "branchEmpty": "Ez dago adarrik eskuragarri",
+      "branchListIncomplete": "Adar batzuk baino ez dira erakusten. Biltegi honek zerrenda honek sar ditzakeena baino adar gehiago ditu.",
       "branchPlaceholder": "Hautatu adar bat",
       "runOnWithTarget": "Exekutatu honetan: {{target}}",
       "environment": "Ingurunea",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "{{count}} tresna",
       "serverToolCount_other": "{{count}} tresna",
       "serverUnreachable": "Ezin izan da zerbitzari honetara iritsi",
-      "serverOff": "Zerbitzari hau desgaituta dago"
+      "serverOff": "Zerbitzari hau desgaituta dago",
+      "app": {
+        "label": "Tresnaren interfazea",
+        "failed": "Ezin izan da tresna honen interfazea kargatu.",
+        "empty": "Tresna honen interfazeak ez du ezer erakusteko."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autentifikazioa",

@@ -2241,6 +2241,7 @@
       "branchLoadError": "Kunne ikke laste inn grener",
       "branchUnavailable": "Ingen grener er tilgjengelige for dette kodelageret. Sjekk tilgangen din hos leverandøren og velg et annet kodelager.",
       "branchEmpty": "Ingen tilgjengelige grener",
+      "branchListIncomplete": "Bare noen grener vises. Kodelageret har flere grener enn denne listen kan inneholde.",
       "branchPlaceholder": "Velg en gren",
       "runOnWithTarget": "Kjør på: {{target}}",
       "environment": "Miljø",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "{{count}} verktøy",
       "serverToolCount_other": "{{count}} verktøy",
       "serverUnreachable": "Kunne ikke nå denne serveren",
-      "serverOff": "Denne serveren er av"
+      "serverOff": "Denne serveren er av",
+      "app": {
+        "label": "Verktøygrensesnitt",
+        "failed": "Kunne ikke laste inn grensesnittet for dette verktøyet.",
+        "empty": "Grensesnittet for dette verktøyet har ingenting å vise."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autentisering",

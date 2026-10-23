@@ -2269,6 +2269,7 @@
       "branchLoadError": "Neizdevās ielādēt atzarus",
       "branchUnavailable": "Šim repozitorijam atzari nav pieejami. Pārbaudi savas tiesības pie pakalpojumu sniedzēja un izvēlies citu repozitoriju.",
       "branchEmpty": "Nav pieejamu atzaru",
+      "branchListIncomplete": "Tiek rādīti tikai daži atzari. Repozitorijā ir vairāk atzaru, nekā šis saraksts var ietvert.",
       "branchPlaceholder": "Izvēlēties atzaru",
       "runOnWithTarget": "Izpildes vide: {{target}}",
       "environment": "Vide",
@@ -3426,6 +3427,11 @@
       "serverChecking": "Pārbauda šo serveri…",
       "serverUnreachable": "Neizdevās sasniegt šo serveri",
       "serverOff": "Šis serveris ir izslēgts",
+      "app": {
+        "label": "Rīka saskarne",
+        "failed": "Neizdevās ielādēt šī rīka saskarni.",
+        "empty": "Šī rīka saskarnē nav ko parādīt."
+      },
       "serverToolCount_zero": "{{count}} rīku",
       "serverToolCount_one": "{{count}} rīks",
       "serverToolCount_other": "{{count}} rīki"

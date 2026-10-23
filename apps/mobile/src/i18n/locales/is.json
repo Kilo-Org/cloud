@@ -2241,6 +2241,7 @@
       "branchLoadError": "Ekki tókst að hlaða kvistum",
       "branchUnavailable": "Engir kvistar eru tiltækir fyrir þetta kóðasafn. Athugaðu aðganginn þinn hjá veitunni og veldu annað kóðasafn.",
       "branchEmpty": "Engir kvistar tiltækir",
+      "branchListIncomplete": "Aðeins sumir kvistar eru sýndir. Kóðasafnið hefur fleiri kvista en þessi listi getur innihaldið.",
       "branchPlaceholder": "Veldu kvist",
       "runOnWithTarget": "Keyra á: {{target}}",
       "environment": "Umhverfi",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "{{count}} verkfæri",
       "serverToolCount_other": "{{count}} verkfæri",
       "serverUnreachable": "Náði ekki sambandi við þennan þjón",
-      "serverOff": "Þessi þjónn er óvirkur"
+      "serverOff": "Þessi þjónn er óvirkur",
+      "app": {
+        "label": "Viðmót tóls",
+        "failed": "Ekki tókst að hlaða viðmóti tólsins.",
+        "empty": "Viðmót tólsins hefur ekkert til að sýna."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Auðkenning",

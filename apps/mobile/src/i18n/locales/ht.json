@@ -2241,6 +2241,7 @@
       "branchLoadError": "Pa t ka chaje branch yo",
       "branchUnavailable": "Pa gen branch disponib pou depo sa a. Tcheke aksè ou ak founisè a, epi chwazi yon lòt depo.",
       "branchEmpty": "Pa gen branch disponib",
+      "branchListIncomplete": "Se sèlman kèk branch ki montre. Depo a gen plis branch pase sa lis sa a ka enkli.",
       "branchPlaceholder": "Chwazi yon branch",
       "runOnWithTarget": "Egzekite sou: {{target}}",
       "environment": "Anviwònman",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "{{count}} zouti",
       "serverToolCount_other": "{{count}} zouti",
       "serverUnreachable": "Nou pa t kapab rive jwenn sèvè sa a",
-      "serverOff": "Sèvè sa a etenn"
+      "serverOff": "Sèvè sa a etenn",
+      "app": {
+        "label": "Entèfas zouti a",
+        "failed": "Entèfas zouti sa a pa ka chaje.",
+        "empty": "Entèfas zouti sa a pa gen anyen pou montre."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Otantifikasyon",

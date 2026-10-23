@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { GastownAccessVerdict } from '../../util/gastown-access-flag.util';
 import {
   OWNER_ACCESS_CHECK_INTERVAL_MS,
+  OWNER_ACCESS_FLAG_CACHE_TTL_MS,
   refreshOwnerAccess,
   type OwnerAccessDeps,
   type OwnerAccessState,
@@ -39,7 +40,7 @@ describe('refreshOwnerAccess', () => {
     await expect(refreshOwnerAccess(t.deps)).resolves.toBe(true);
     expect(t.evaluateAccess).toHaveBeenCalledWith('user-1');
     expect(t.applyToContainer).toHaveBeenCalledWith(true);
-    expect(t.getState()).toEqual({ revoked: true, checkedAt: NOW });
+    expect(t.getState()).toEqual({ revoked: true, checkedAt: NOW, evaluatedAt: NOW });
   });
 
   it('restores container starts when the owner flag turns on', async () => {
@@ -51,7 +52,7 @@ describe('refreshOwnerAccess', () => {
 
     await expect(refreshOwnerAccess(t.deps)).resolves.toBe(false);
     expect(t.applyToContainer).toHaveBeenCalledWith(false);
-    expect(t.getState()).toEqual({ revoked: false, checkedAt: NOW });
+    expect(t.getState()).toEqual({ revoked: false, checkedAt: NOW, evaluatedAt: NOW });
   });
 
   it('reuses a recent verdict without calling PostHog', async () => {
@@ -76,6 +77,67 @@ describe('refreshOwnerAccess', () => {
     expect(t.getState()).toEqual({ revoked: true, checkedAt: NOW });
   });
 
+  it.each([false, true])(
+    'caches revoked=%s for one week without extending expiry',
+    async revoked => {
+      expect(OWNER_ACCESS_FLAG_CACHE_TTL_MS).toBe(7 * 24 * 60 * 60_000);
+      const evaluatedAt = NOW - OWNER_ACCESS_FLAG_CACHE_TTL_MS + 1;
+      const t = makeDeps({
+        state: { revoked, checkedAt: NOW - OWNER_ACCESS_CHECK_INTERVAL_MS, evaluatedAt },
+        ownerUserId: 'user-1',
+        verdict: revoked ? 'allowed' : 'denied',
+      });
+
+      await expect(refreshOwnerAccess(t.deps)).resolves.toBe(revoked);
+      expect(t.evaluateAccess).not.toHaveBeenCalled();
+      expect(t.applyToContainer).toHaveBeenCalledWith(revoked);
+      expect(t.getState()).toEqual({ revoked, checkedAt: NOW, evaluatedAt });
+    }
+  );
+
+  it.each([false, true])('refreshes revoked=%s when the one-week cache expires', async revoked => {
+    const t = makeDeps({
+      state: {
+        revoked,
+        checkedAt: NOW - OWNER_ACCESS_CHECK_INTERVAL_MS,
+        evaluatedAt: NOW - OWNER_ACCESS_FLAG_CACHE_TTL_MS,
+      },
+      ownerUserId: 'user-1',
+      verdict: revoked ? 'allowed' : 'denied',
+    });
+
+    await expect(refreshOwnerAccess(t.deps)).resolves.toBe(!revoked);
+    expect(t.evaluateAccess).toHaveBeenCalledExactlyOnceWith('user-1');
+    expect(t.applyToContainer).toHaveBeenCalledWith(!revoked);
+    expect(t.getState()).toEqual({ revoked: !revoked, checkedAt: NOW, evaluatedAt: NOW });
+  });
+
+  it('retries an unknown verdict after ten minutes instead of caching it for a week', async () => {
+    const evaluatedAt = NOW - OWNER_ACCESS_FLAG_CACHE_TTL_MS;
+    const t = makeDeps({
+      state: { revoked: true, checkedAt: NOW - OWNER_ACCESS_CHECK_INTERVAL_MS, evaluatedAt },
+      ownerUserId: 'user-1',
+      verdict: 'unknown',
+    });
+
+    await expect(refreshOwnerAccess(t.deps)).resolves.toBe(true);
+    expect(t.getState()).toEqual({ revoked: true, checkedAt: NOW, evaluatedAt });
+
+    t.deps.now = () => NOW + OWNER_ACCESS_CHECK_INTERVAL_MS - 1;
+    await expect(refreshOwnerAccess(t.deps)).resolves.toBe(true);
+    expect(t.evaluateAccess).toHaveBeenCalledTimes(1);
+
+    t.deps.now = () => NOW + OWNER_ACCESS_CHECK_INTERVAL_MS;
+    t.evaluateAccess.mockResolvedValue('allowed');
+    await expect(refreshOwnerAccess(t.deps)).resolves.toBe(false);
+    expect(t.evaluateAccess).toHaveBeenCalledTimes(2);
+    expect(t.getState()).toEqual({
+      revoked: false,
+      checkedAt: NOW + OWNER_ACCESS_CHECK_INTERVAL_MS,
+      evaluatedAt: NOW + OWNER_ACCESS_CHECK_INTERVAL_MS,
+    });
+  });
+
   it('does not revoke a town without an owner user', async () => {
     const t = makeDeps({ ownerUserId: undefined });
 
@@ -92,6 +154,11 @@ describe('refreshOwnerAccess', () => {
     });
 
     await expect(refreshOwnerAccess(t.deps)).resolves.toBe(true);
-    expect(t.getState()).toEqual({ revoked: true, checkedAt: NOW });
+    expect(t.getState()).toEqual({ revoked: true, checkedAt: NOW, evaluatedAt: NOW });
+
+    t.deps.now = () => NOW + OWNER_ACCESS_CHECK_INTERVAL_MS;
+    await expect(refreshOwnerAccess(t.deps)).resolves.toBe(true);
+    expect(t.evaluateAccess).toHaveBeenCalledTimes(1);
+    expect(t.applyToContainer).toHaveBeenCalledTimes(2);
   });
 });

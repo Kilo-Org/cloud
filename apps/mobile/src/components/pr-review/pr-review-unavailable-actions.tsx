@@ -3,6 +3,7 @@ import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useProviderPrScopeOrNull } from '@/lib/pr-review/provider-pr-ref';
 import { useCheckProviderConnection } from '@/lib/pr-review/use-check-provider-connection';
 
@@ -38,10 +39,16 @@ export function PrReviewUnavailableActions({
 
   return (
     <View className="mt-3 w-full gap-2">
-      <Button variant="outline" onPress={onRetry} loading={isRetrying}>
+      <Button
+        className={STATE_ACTION_CLASS}
+        variant="outline"
+        onPress={onRetry}
+        loading={isRetrying}
+      >
         <Text>{t('common.retry')}</Text>
       </Button>
       <Button
+        className={STATE_ACTION_CLASS}
         variant="outline"
         onPress={() => {
           providerConnection.mutate({

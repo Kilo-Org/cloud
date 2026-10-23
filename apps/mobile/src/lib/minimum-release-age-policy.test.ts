@@ -86,6 +86,15 @@ const workspaceYaml = readFileSync(workspaceYamlPath, 'utf8');
 const lockfilePath = fileURLToPath(new URL('../../../../pnpm-lock.yaml', import.meta.url));
 const lockfile = readFileSync(lockfilePath, 'utf8');
 
+// True when the lockfile carries `entry` as a whole resolved package spec: it
+// must start at a token boundary (start of line, whitespace, quote or paren) and
+// end one (a colon, quote, paren or whitespace), so a stale pin such as
+// `name@1.2.3` cannot match a resolution of `name@1.2.34`.
+function lockfileResolves(entry: string): boolean {
+  const escaped = entry.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?:^|[\\s('])${escaped}(?![\\w.+-])`, 'm').test(lockfile);
+}
+
 function parseExcludeEntries(source: string): string[] {
   const lines = source.split('\n');
   const sectionStart = lines.indexOf('minimumReleaseAgeExclude:');
@@ -150,7 +159,9 @@ describe('minimum release age policy contract', () => {
   it('names only versions the committed lockfile resolves', () => {
     for (const entry of excludeEntries) {
       expect(entry).toMatch(EXACT_VERSION_PATTERN);
-      expect(lockfile).toContain(entry);
+      expect(lockfileResolves(entry), `${entry} is not a resolved package in pnpm-lock.yaml`).toBe(
+        true
+      );
     }
   });
 });

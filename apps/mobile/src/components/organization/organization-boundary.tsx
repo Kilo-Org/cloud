@@ -42,8 +42,11 @@ type OrganizationBoundaryProps = Readonly<{
  *      to profile stays as the plain exit.
  *    - memberships exist but nothing is selected → the action opens the
  *      context picker sheet, the same account switcher the composer uses.
- *    - a deep-link override absent from the list is access-denied; a stale
- *      persisted selection keeps the older "unavailable" copy.
+ *    - a deep-link override absent from a non-empty member list is
+ *      access-denied; a stale persisted selection keeps the older
+ *      "unavailable" copy. An absent override with zero memberships is the
+ *      no-organization state above, not access-denied: the account has no
+ *      organization to be denied access to.
  * Calls `useOrgBoundary()` itself — cheap, context/query-cache backed — so
  * callers only need to pass a `title` for full screens (sheets omit it).
  */
@@ -100,8 +103,7 @@ export function OrganizationBoundary({
       </Button>
     );
     const hasOrganizations = (orgs?.length ?? 0) > 0;
-    const isAbsentOverride = organizationIdOverride != null && org == null;
-    if (!hasOrganizations && !isAbsentOverride) {
+    if (!hasOrganizations) {
       const openWebOrganizations = () => {
         void openExternalUrl(`${WEB_BASE_URL}/organizations`, {
           label: t('organization.boundary.openWebOrganizations'),

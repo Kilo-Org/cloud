@@ -26,7 +26,7 @@ import fr from '@/i18n/locales/fr.json';
 import AppLayout from '@/app/(app)/_layout';
 import KiloClawLayout from '@/app/(app)/(tabs)/(1_kiloclaw)/_layout';
 import OrganizationLayout from '@/app/(app)/(tabs)/(3_profile)/organization/_layout';
-import SecurityAgentScopeLayout from '@/app/(app)/(tabs)/(3_profile)/security-agent/[scope]/_layout';
+import SecurityAgentScopeLayout from '@/app/(app)/security-agent/[scope]/_layout';
 import PrReviewNumberLayout from '@/app/(app)/pr-review/[owner]/[repo]/[number]/_layout';
 import { AppUnlockProvider } from '@/lib/app-unlock-context';
 

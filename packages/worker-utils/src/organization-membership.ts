@@ -17,6 +17,63 @@ export const parentOrganizationMembershipsTable = alias(
 );
 
 /**
+ * Aliases for the standalone `EXISTS` form of the access rules below. Both
+ * forms build their conditions from the same expressions and the same
+ * `@kilocode/db/schema` tables, so the policy has one definition.
+ */
+const activeMemberMembership = alias(organization_memberships, 'active_member_membership');
+const activeMemberOrganization = alias(organizations, 'active_member_organization');
+const activeTargetOrganization = alias(organizations, 'active_target_organization');
+const activeParentOrganization = alias(organizations, 'active_parent_organization');
+const activeParentMembership = alias(organization_memberships, 'active_parent_membership');
+
+type OrganizationColumns = {
+  id: AnyPgColumn;
+  parent_organization_id: AnyPgColumn;
+  deleted_at: AnyPgColumn;
+};
+
+type OrganizationMembershipColumns = {
+  organization_id: AnyPgColumn;
+  kilo_user_id: AnyPgColumn;
+  role: AnyPgColumn;
+};
+
+/** The organization is live: an "active" decision ignores soft-deleted rows. */
+function liveOrganizationCondition(organization: OrganizationColumns): SQL {
+  return isNull(organization.deleted_at);
+}
+
+/** The caller holds a membership row in the organization. */
+function membershipCondition(
+  membership: OrganizationMembershipColumns,
+  organizationIdColumn: OrganizationIdColumn,
+  kiloUserId: string | AnyPgColumn
+): SQL {
+  return (
+    and(
+      eq(membership.organization_id, organizationIdColumn),
+      eq(membership.kilo_user_id, kiloUserId)
+    ) ?? sql`false`
+  );
+}
+
+/** The caller holds a membership row in the target organization's parent. */
+function inheritingParentMembershipCondition(
+  membership: OrganizationMembershipColumns,
+  targetOrganization: OrganizationColumns,
+  kiloUserId: string | AnyPgColumn
+): SQL {
+  return (
+    and(
+      eq(membership.organization_id, targetOrganization.parent_organization_id),
+      eq(membership.kilo_user_id, kiloUserId),
+      inArray(membership.role, ORGANIZATION_PARENT_ACCESS_ROLES)
+    ) ?? sql`false`
+  );
+}
+
+/**
  * Join condition for the caller's membership in the row's organization.
  * Pair it with {@link activeOrganizationJoinCondition} so a soft-deleted
  * organization cannot satisfy the membership join.
@@ -25,12 +82,7 @@ export function organizationMembershipJoinCondition(
   kiloUserId: string | AnyPgColumn,
   organizationIdColumn: OrganizationIdColumn
 ): SQL {
-  return (
-    and(
-      eq(organization_memberships.organization_id, organizationIdColumn),
-      eq(organization_memberships.kilo_user_id, kiloUserId)
-    ) ?? sql`false`
-  );
+  return membershipCondition(organization_memberships, organizationIdColumn, kiloUserId);
 }
 
 /**
@@ -40,7 +92,8 @@ export function organizationMembershipJoinCondition(
  */
 export function activeOrganizationJoinCondition(organizationIdColumn: OrganizationIdColumn): SQL {
   return (
-    and(eq(organizations.id, organizationIdColumn), isNull(organizations.deleted_at)) ?? sql`false`
+    and(eq(organizations.id, organizationIdColumn), liveOrganizationCondition(organizations)) ??
+    sql`false`
   );
 }
 
@@ -53,7 +106,7 @@ export function parentOrganizationJoinCondition(): SQL {
   return (
     and(
       eq(parentOrganizationsTable.id, organizations.parent_organization_id),
-      isNull(parentOrganizationsTable.deleted_at)
+      liveOrganizationCondition(parentOrganizationsTable)
     ) ?? sql`false`
   );
 }
@@ -64,12 +117,10 @@ export function parentOrganizationJoinCondition(): SQL {
  * child-organization access match.
  */
 export function parentOrganizationMembershipJoinCondition(kiloUserId: string | AnyPgColumn): SQL {
-  return (
-    and(
-      eq(parentOrganizationMembershipsTable.organization_id, organizations.parent_organization_id),
-      eq(parentOrganizationMembershipsTable.kilo_user_id, kiloUserId),
-      inArray(parentOrganizationMembershipsTable.role, ORGANIZATION_PARENT_ACCESS_ROLES)
-    ) ?? sql`false`
+  return inheritingParentMembershipCondition(
+    parentOrganizationMembershipsTable,
+    organizations,
+    kiloUserId
   );
 }
 
@@ -86,7 +137,7 @@ export function personalOrActiveOrganizationCondition(
       and(
         isNotNull(organization_memberships.id),
         isNotNull(organizations.id),
-        isNull(organizations.deleted_at)
+        liveOrganizationCondition(organizations)
       )
     ) ?? sql`false`
   );
@@ -107,7 +158,7 @@ export function personalOrInheritedOrganizationCondition(
       and(
         isNotNull(organizations.id),
         isNotNull(parentOrganizationsTable.id),
-        isNull(parentOrganizationsTable.deleted_at),
+        liveOrganizationCondition(parentOrganizationsTable),
         isNotNull(parentOrganizationMembershipsTable.id)
       )
     ) ?? sql`false`
@@ -128,28 +179,32 @@ export function activeOrganizationAccessSql(
     ${organizationIdColumn} IS NULL
     OR EXISTS (
       SELECT 1
-      FROM "organization_memberships" AS active_member_membership
-      INNER JOIN "organizations" AS active_member_organization
-        ON active_member_organization.id = active_member_membership.organization_id
-        AND active_member_organization.deleted_at IS NULL
-      WHERE active_member_membership.organization_id = ${organizationIdColumn}
-        AND active_member_membership.kilo_user_id = ${kiloUserId}
+      FROM ${organization_memberships} AS ${activeMemberMembership}
+      INNER JOIN ${organizations} AS ${activeMemberOrganization}
+        ON ${and(
+          eq(activeMemberOrganization.id, activeMemberMembership.organization_id),
+          liveOrganizationCondition(activeMemberOrganization)
+        )}
+      WHERE ${membershipCondition(activeMemberMembership, organizationIdColumn, kiloUserId)}
     )
     OR EXISTS (
       SELECT 1
-      FROM "organizations" AS active_target_organization
-      INNER JOIN "organizations" AS active_parent_organization
-        ON active_parent_organization.id = active_target_organization.parent_organization_id
-        AND active_parent_organization.deleted_at IS NULL
-      INNER JOIN "organization_memberships" AS active_parent_membership
-        ON active_parent_membership.organization_id = active_target_organization.parent_organization_id
-        AND active_parent_membership.kilo_user_id = ${kiloUserId}
-        AND active_parent_membership.role IN (${sql.join(
-          ORGANIZATION_PARENT_ACCESS_ROLES.map(role => sql`${role}`),
-          sql`, `
-        )})
-      WHERE active_target_organization.id = ${organizationIdColumn}
-        AND active_target_organization.deleted_at IS NULL
+      FROM ${organizations} AS ${activeTargetOrganization}
+      INNER JOIN ${organizations} AS ${activeParentOrganization}
+        ON ${and(
+          eq(activeParentOrganization.id, activeTargetOrganization.parent_organization_id),
+          liveOrganizationCondition(activeParentOrganization)
+        )}
+      INNER JOIN ${organization_memberships} AS ${activeParentMembership}
+        ON ${inheritingParentMembershipCondition(
+          activeParentMembership,
+          activeTargetOrganization,
+          kiloUserId
+        )}
+      WHERE ${and(
+        eq(activeTargetOrganization.id, organizationIdColumn),
+        liveOrganizationCondition(activeTargetOrganization)
+      )}
     )
   )`;
 }

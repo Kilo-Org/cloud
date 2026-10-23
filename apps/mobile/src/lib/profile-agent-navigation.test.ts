@@ -25,8 +25,10 @@ describe('getProfileAgentScope', () => {
     expect(getProfileAgentScope('org-2', organizations)).toBe('org-2');
   });
 
-  it('falls back to personal when the stored organization is unavailable', () => {
-    expect(getProfileAgentScope('removed-org', organizations)).toBe('personal');
+  it('keeps a stored organization the settled list no longer contains', () => {
+    // A lost membership must reach the organization scope, which reports that
+    // access is gone; substituting Personal opened its first-run setup instead.
+    expect(getProfileAgentScope('removed-org', organizations)).toBe('removed-org');
   });
 
   it('waits until organizations have loaded before resolving a selected organization', () => {
@@ -40,16 +42,10 @@ describe('getProfileAgentScope', () => {
 
 describe('Profile agent paths', () => {
   it('builds direct Code Reviewer and Security Agent routes for a scope', () => {
-    expect(getCodeReviewerProfilePath('personal')).toBe(
-      '/(app)/(tabs)/(3_profile)/code-reviewer/personal'
-    );
-    expect(getCodeReviewerProfilePath('org-1')).toBe(
-      '/(app)/(tabs)/(3_profile)/code-reviewer/org-1'
-    );
-    expect(getSecurityAgentPath('personal')).toBe(
-      '/(app)/(tabs)/(3_profile)/security-agent/personal'
-    );
-    expect(getSecurityAgentPath('org-1')).toBe('/(app)/(tabs)/(3_profile)/security-agent/org-1');
+    expect(getCodeReviewerProfilePath('personal')).toBe('/(app)/code-reviewer/personal');
+    expect(getCodeReviewerProfilePath('org-1')).toBe('/(app)/code-reviewer/org-1');
+    expect(getSecurityAgentPath('personal')).toBe('/(app)/security-agent/personal');
+    expect(getSecurityAgentPath('org-1')).toBe('/(app)/security-agent/org-1');
   });
 });
 

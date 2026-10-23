@@ -3,7 +3,7 @@ import { FlashList } from '@shopify/flash-list';
 import { act, type ComponentProps, createElement, type ReactElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import SecurityAgentFilterFindingsRoute from '@/app/(app)/(tabs)/(3_profile)/security-agent/[scope]/filter';
+import SecurityAgentFilterFindingsRoute from '@/app/(app)/security-agent/[scope]/filter';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PickerSheet } from '@/components/picker-sheet';
 import { EmptyState } from '@/components/empty-state';

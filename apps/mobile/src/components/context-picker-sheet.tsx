@@ -2,7 +2,6 @@ import { Check } from '@/components/ui/icons';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -13,7 +12,7 @@ const SHEET_SNAP_POINTS = ['50%', '90%'];
 
 type ContextPickerSheetProps = {
   visible: boolean;
-  /** Sheet heading; the radio group's accessible name. */
+  /** Sheet heading, shown above the account rows. */
   title: string;
   /** Account rows followed by the Cancel row at `cancelButtonIndex`. */
   options: string[];
@@ -25,13 +24,9 @@ type ContextPickerSheetProps = {
 };
 
 /**
- * The account picker's bottom sheet. It draws the divider and the
- * current-account check from the app palette, and every account row exposes its
- * selection to a screen reader through `radioItemA11y`'s `checked` state (the
- * app's radio convention — see `ui/radio-group.tsx`). The library's action
- * sheet can do neither: its rows carry the option string as their only
- * accessible name, so the check would be colour-only, and its JS sheet
- * hardcodes a white surface that breaks in dark mode.
+ * The account picker sheet draws its divider and current-account check from
+ * the app palette. Each row is an action button whose selected state parallels
+ * the visible check, so the account choice is available beyond color.
  */
 export function ContextPickerSheet({
   visible,
@@ -84,36 +79,37 @@ function ContextPickerSheetBody({
           {title}
         </Text>
         <ScrollView nestedScrollEnabled className="flex-1" showsVerticalScrollIndicator={false}>
-          <RadioGroup label={title}>
-            {options.map((label, index) => {
-              if (index === cancelButtonIndex) {
-                return null;
-              }
-              return (
-                <Pressable
-                  key={index}
-                  className={cn(
-                    'min-h-11 flex-row items-center gap-2 px-3 py-3 active:bg-secondary',
-                    index < cancelButtonIndex && 'border-b-[0.5px] border-hair-soft'
-                  )}
-                  onPress={() => {
-                    onSelect(index);
-                  }}
-                  {...radioItemA11y({ label, checked: index === currentIndex })}
-                >
-                  {/* Every account row holds the same blank gutter so the
+          {options.map((label, index) => {
+            if (index === cancelButtonIndex) {
+              return null;
+            }
+            return (
+              <Pressable
+                key={index}
+                className={cn(
+                  'min-h-11 flex-row items-center gap-2 px-3 py-3 active:bg-secondary',
+                  index < cancelButtonIndex && 'border-b-[0.5px] border-hair-soft'
+                )}
+                onPress={() => {
+                  onSelect(index);
+                }}
+                accessible
+                accessibilityRole="button"
+                accessibilityLabel={label}
+                accessibilityState={{ selected: index === currentIndex }}
+              >
+                {/* Every account row holds the same blank gutter so the
                       labels line up; only the current account paints a check
                       in it. */}
-                  <View className="w-4 items-center">
-                    {index === currentIndex && <Check size={16} color={colors.primary} />}
-                  </View>
-                  <Text className="min-w-0 flex-1 text-sm" numberOfLines={1}>
-                    {label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </RadioGroup>
+                <View className="w-4 items-center">
+                  {index === currentIndex && <Check size={16} color={colors.primary} />}
+                </View>
+                <Text className="min-w-0 flex-1 text-sm" numberOfLines={1}>
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </ScrollView>
         <Pressable
           accessibilityRole="button"

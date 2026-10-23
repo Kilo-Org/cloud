@@ -61,10 +61,15 @@ export function useCreateBriefing(): CreateBriefingState {
       mounted.current = false;
     };
   }, []);
-  const onError = (failure: { message: string }) => {
-    toast.error(failure.message);
+  // A backend failure sentence is written by the server in one language, so the
+  // screen never renders it. Known reasons arrive as structured data (the
+  // estimate) and are already localized; anything else gets one localized line
+  // and the raw message stays out of the UI.
+  const onError = () => {
+    const message = i18n.t('agentBriefing.createFailed');
+    toast.error(message);
     if (mounted.current) {
-      setError(failure.message);
+      setError(message);
     }
   };
   const prepareOptions = trpc.agentBriefing.prepareOneOff.mutationOptions({
@@ -140,9 +145,9 @@ export function useCreateBriefing(): CreateBriefingState {
         currentPrepared.current = { data: result, epoch };
         setPrepared(result);
       }
-    } catch (error) {
+    } catch {
       if (isCurrentAuthEpoch(epoch) && !isSignOutActive()) {
-        onError(error instanceof Error ? error : { message: i18n.t('common.somethingWentWrong') });
+        onError();
       }
     } finally {
       busy.current = false;
@@ -178,9 +183,9 @@ export function useCreateBriefing(): CreateBriefingState {
       client.setQueryData(trpc.agentBriefing.get.queryKey({ reportId: report.id }), report);
       void client.invalidateQueries({ queryKey: trpc.agentBriefing.list.pathKey() });
       return mounted.current && revision.current === version ? report : null;
-    } catch (error) {
+    } catch {
       if (isCurrentAuthEpoch(epoch) && !isSignOutActive()) {
-        onError(error instanceof Error ? error : { message: i18n.t('common.somethingWentWrong') });
+        onError();
       }
       return null;
     } finally {

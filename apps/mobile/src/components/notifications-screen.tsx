@@ -853,7 +853,7 @@ export function NotificationsScreen() {
             </>
           )}
         </View>
-        <BriefingNotificationToggle />
+        <BriefingNotificationToggle showSettingsLink={false} />
 
         {/* Message previews */}
         <View className="gap-3">

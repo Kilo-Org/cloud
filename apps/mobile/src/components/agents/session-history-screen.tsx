@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, View } from 'react-native';
+import { AppState, Keyboard, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect, useNavigation } from 'expo-router';
@@ -220,6 +220,9 @@ export function SessionHistoryScreen() {
             showNewSession={false}
             onNewSession={noopCreateSession}
             onOpenFilters={() => {
+              // The search field sits above this button; without the dismissal
+              // the keyboard stays up and covers the sheet’s Apply row.
+              Keyboard.dismiss();
               setShowFilterModal(true);
             }}
           />

@@ -95,7 +95,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   Platform: platformState,
-  Keyboard: { addListener: keyboardState.addListener },
+  Keyboard: { dismiss: vi.fn(), addListener: keyboardState.addListener },
   KeyboardAvoidingView: 'KeyboardAvoidingView',
   AppState: { addEventListener: appState.addEventListener },
 }));

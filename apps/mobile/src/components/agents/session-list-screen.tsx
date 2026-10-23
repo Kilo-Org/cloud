@@ -1,7 +1,14 @@
 /* eslint-disable max-lines -- The live list keeps its query, pull-refresh, keyboard container, and FAB orchestration together on one screen. */
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
-import { AppState, I18nManager, Pressable, useWindowDimensions, View } from 'react-native';
+import {
+  AppState,
+  I18nManager,
+  Keyboard,
+  Pressable,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -266,6 +273,9 @@ export function AgentSessionListScreen({
         <SessionFilterButton
           activeCount={query.activeFilterCount}
           onPress={() => {
+            // The search field sits above this button; without the dismissal
+            // the keyboard stays up and covers the sheet’s Apply row.
+            Keyboard.dismiss();
             setShowFilterModal(true);
           }}
           testID="agents-open-filters"

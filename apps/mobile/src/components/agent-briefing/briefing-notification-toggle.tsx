@@ -10,7 +10,14 @@ import { type BriefingPreferences, useBriefingPreferences } from '@/lib/agent-br
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useTRPC } from '@/lib/trpc';
 
-export function BriefingNotificationToggle() {
+/**
+ * The notification switch for the agent brief, plus the way to the device's
+ * notification permission. The link is suppressed on the Notifications screen
+ * itself, where it would open the page it is already on.
+ */
+export function BriefingNotificationToggle({
+  showSettingsLink = true,
+}: Readonly<{ showSettingsLink?: boolean }>) {
   const trpc = useTRPC();
   const client = useQueryClient();
   const router = useRouter();
@@ -65,15 +72,17 @@ export function BriefingNotificationToggle() {
           <Text>{t('common.retry')}</Text>
         </Button>
       ) : null}
-      <Button
-        variant="ghost"
-        size="sm"
-        onPress={() => {
-          router.push('/(app)/(tabs)/(3_profile)/notifications' as Href);
-        }}
-      >
-        <Text>{t('agentBriefing.notificationPermission')}</Text>
-      </Button>
+      {showSettingsLink ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          onPress={() => {
+            router.push('/(app)/(tabs)/(3_profile)/notifications' as Href);
+          }}
+        >
+          <Text>{t('agentBriefing.notificationPermission')}</Text>
+        </Button>
+      ) : null}
     </View>
   );
 }

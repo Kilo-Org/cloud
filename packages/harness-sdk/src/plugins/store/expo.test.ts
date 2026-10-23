@@ -289,3 +289,10 @@ it('finalizes what it prepared for a build that failed', async () => {
   expect(prepared).toBeGreaterThan(3);
   expect(open()).toBe(0);
 });
+
+it('answers no session for an id it never stored', async () => {
+  const { database, open } = standIn();
+  const found = await use(database, store => store.read('ses_missing'));
+  expect(found).toMatchObject({ _tag: 'None' });
+  expect(open()).toBe(0);
+});

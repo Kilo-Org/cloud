@@ -595,6 +595,73 @@ describe('createNetworkErrorFetch', () => {
     expect(result).toBe(response);
     expect(events).toHaveLength(0);
   });
+
+  // A batch envelope only says the body is a batch. With no tRPC error item in
+  // it nothing failed, so the response records neither an event nor a
+  // breadcrumb: these are the shapes that produced synthetic `failed` events.
+  const trpcBatchOptions = {
+    source: 'trpc',
+    isResponseError: (status: number) => status >= 400 || status === 207,
+    readResponseError: readTrpcResponseError,
+  } as const;
+
+  it('(k) records nothing for an all-success 207 batch', async () => {
+    const response = Response.json([{ result: { data: 'ok' } }], { status: 207 });
+    const wrapped = createNetworkErrorFetch(resolvingFetch(response), trpcBatchOptions);
+
+    const result = await wrapped('https://example.com/api/trpc/session.list?batch=1');
+
+    expect(result).toBe(response);
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs).toHaveLength(0);
+  });
+
+  it('(k2) records nothing for a 207 batch whose body cannot be read', async () => {
+    const response = new Response('<html>not json</html>', { status: 207 });
+    const wrapped = createNetworkErrorFetch(resolvingFetch(response), trpcBatchOptions);
+
+    const result = await wrapped('https://example.com/api/trpc/session.list?batch=1');
+
+    expect(result).toBe(response);
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs).toHaveLength(0);
+  });
+
+  it('(k3) records nothing for a 207 batch error item with no status or code', async () => {
+    const body = [{ result: { data: 'ok' } }, { error: { message: 'unreadable detail' } }];
+    const response = Response.json(body, { status: 207 });
+    const wrapped = createNetworkErrorFetch(resolvingFetch(response), trpcBatchOptions);
+
+    await wrapped('https://example.com/api/trpc/session.list?batch=1');
+
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs).toHaveLength(0);
+  });
+
+  it('(k4) still reports a 207 batch whose error item is a 500', async () => {
+    const response = Response.json(
+      [
+        { result: { data: 'ok' } },
+        {
+          error: {
+            message: 'boom',
+            code: -32_600,
+            data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500 },
+          },
+        },
+      ],
+      { status: 207 }
+    );
+    const wrapped = createNetworkErrorFetch(resolvingFetch(response), trpcBatchOptions);
+
+    await wrapped('https://example.com/api/trpc/session.list?batch=1');
+
+    const event = reportedEvent();
+    expect(events).toHaveLength(1);
+    expect(breadcrumbs).toHaveLength(0);
+    expect(errorMessageOf(event)).toBe('GET /api/trpc/session.list -> 500');
+    expect(event?.fingerprint).toEqual(['network-error', 'trpc', 'session.list', 'http.500']);
+  });
 });
 
 describe('createNetworkErrorFetch status policy', () => {
@@ -787,6 +854,19 @@ describe('reportNetworkError', () => {
       outcome: 'failed',
     });
     expect(event?.fingerprint).toEqual(['network-error', 'fetch', '/health', 'failed']);
+  });
+
+  it('emits nothing for a batch envelope with no error item', () => {
+    reportNetworkError({
+      source: 'trpc',
+      url: 'https://example.com/api/trpc/a.b?batch=1',
+      method: 'POST',
+      status: 207,
+      durationMs: 5,
+    });
+
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs).toHaveLength(0);
   });
 
   it('groups one defect across the ephemeral dev port', () => {

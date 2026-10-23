@@ -28,6 +28,22 @@ export function withInfiniteRetention<T extends object>(
 }
 
 /**
+ * Whether an infinite list may load another page under its retention bound.
+ *
+ * A newest-first list has to reach its bound by refusing the next page, not by
+ * letting `maxPages` trim: a forward fetch runs `addToEnd`, which drops index 0
+ * of the pages array once the bound is exceeded, and index 0 is page one — the
+ * newest page. Fold this into `getNextPageParam` so the cursor ends at the
+ * bound, every loaded page stays cached, and the newest rows stay reachable.
+ */
+export function hasRetentionBudget(
+  pageCount: number,
+  maxPages: number = INFINITE_QUERY_MAX_PAGES
+): boolean {
+  return pageCount < maxPages;
+}
+
+/**
  * Reset every matching infinite query to empty, then invalidate the same
  * prefix so page one is refetched from `initialPageParam`.
  *

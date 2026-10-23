@@ -103,7 +103,7 @@ describe('retryFailedMessage', () => {
     // The marker folds onto the message row as `timeMarker`, so the failed
     // submission is the only item and its key no longer carries a `time:` row.
     expect(
-      mergeSessionTranscript([submission], [], deliveryStates).map(item =>
+      mergeSessionTranscript([submission], [], { deliveryStates }).map(item =>
         getSessionTranscriptItemKey(item)
       )
     ).toEqual(['m-retried']);
@@ -117,7 +117,7 @@ describe('retryFailedMessage', () => {
     });
 
     expect(deliveryStates.has('m-retried')).toBe(false);
-    expect(mergeSessionTranscript([submission], [], deliveryStates)).toEqual([]);
+    expect(mergeSessionTranscript([submission], [], { deliveryStates })).toEqual([]);
   });
 
   it('keeps the failure showing when the re-send itself fails', async () => {

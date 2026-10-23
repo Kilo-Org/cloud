@@ -1625,7 +1625,7 @@
       "backToSessions": "返回会话列表",
       "follow": "在锁定屏幕上关注",
       "unfollow": "停止在锁定屏幕上关注",
-      "couldNotLoad": "无法加载会话。",
+      "couldNotLoad": "无法加载会话",
       "failedToLoadDetails": "无法加载会话详情。",
       "failedToStopExecution": "停止执行失败。",
       "stopped": "会话已停止",
@@ -1642,7 +1642,7 @@
       "emptyTitle": "暂无消息",
       "renameAccessibility": "重命名会话：{{title}}",
       "cloningSession": "正在克隆会话",
-      "couldNotLoadThisSession": "无法加载此会话。",
+      "couldNotLoadThisSession": "无法加载此会话",
       "cloneFailedRetry": "无法克隆此会话。请重试。",
       "notEnoughCredits": "额度不足，无法运行 Cloud Agent。请充值后重试。",
       "previousTaskFinishing": "上一个任务正在收尾，请稍等。",
@@ -1891,7 +1891,7 @@
       "cacheRead": "缓存读取",
       "cacheWrite": "缓存写入",
       "total": "总计",
-      "reportAiResponseFailedRetryable": "无法举报此回复。",
+      "reportAiResponseFailedRetryable": "举报此回复失败。请重试。",
       "reportAiResponseFailedTerminal": "此回复无法举报。"
     },
     "modelCost": {
@@ -1911,11 +1911,11 @@
       "failedToRender": "无法显示内容。"
     },
     "messageFailure": {
-      "deliveryTitle": "消息发送失败。",
+      "deliveryTitle": "发送失败",
       "deliveryInterrupted": "你已停止发送此消息。",
       "deliveryExhausted": "多次尝试后，仍无法发送此消息。",
       "deliveryExecution": "智能体无法处理此消息。",
-      "assistantTitle": "生成回复失败。",
+      "assistantTitle": "回复失败",
       "assistantProviderRejected": "提供商拒绝了该请求。",
       "assistantStopped": "已停止生成回复。",
       "assistantContextOverflow": "对话长度已超出模型的处理范围。",
@@ -1935,9 +1935,9 @@
       "couldNotLoadFileRetry": "无法加载此文件。请重试。",
       "retryLoadingFile": "重新加载文件",
       "fileEmpty": "此文件为空。",
-      "previewUnavailable": "无法预览。",
+      "previewUnavailable": "无法预览",
       "fileUnavailableInSession": "无法在此会话中使用此文件。",
-      "shareFailed": "分享失败。",
+      "shareFailed": "分享失败",
       "sharingUnavailable": "此设备不支持文件分享。",
       "shareFailedRetry": "分享文件失败。请重试。",
       "openAsText": "以文本形式打开",
@@ -1945,7 +1945,7 @@
     },
     "preparation": {
       "exitCode": "退出码：{{code}}",
-      "earlierOutputOmitted": "已省略较早的输出。",
+      "earlierOutputOmitted": "已省略较早的输出",
       "preparingEnvironment": "正在准备环境",
       "preparationComplete": "准备完成",
       "preparationFailed": "准备失败",
@@ -1965,7 +1965,7 @@
       "retrying": "正在重试……"
     },
     "questionCard": {
-      "title": "智能体需要你的回答",
+      "title": "智能体需要你的输入",
       "skipQuestionsTitle": "跳过问题？",
       "skipQuestionsMessage": "智能体将跳过此步骤。",
       "answerProgress": "已回答 {{answered}}/{{total}}",
@@ -1973,7 +1973,7 @@
       "option": "{{label}}",
       "optionSelected": "{{label}}，已选中",
       "typeYourOwnAnswer": "自行填写答案",
-      "typeYourOwnAnswerPlaceholder": "你的答案……",
+      "typeYourOwnAnswerPlaceholder": "输入你的答案……",
       "skip": "跳过",
       "retrySkip": "再次尝试跳过",
       "submitting": "正在提交……",
@@ -1984,7 +1984,7 @@
       "permissionUnavailable": "此授权请求已失效。",
       "failedToSkipQuestion": "跳过问题失败。请重试。",
       "failedToSubmitAnswer": "提交答案失败。请重试。",
-      "failedToRespondToPermission": "无法提交授权决定。请重试。",
+      "failedToRespondToPermission": "响应权限请求失败。请重试。",
       "submissionFailed": "提交失败。请重试。",
       "questionAnnouncement": "智能体需要你的回答。回答期间，消息输入框暂不可用。",
       "permissionAnnouncement": "智能体需要授权才能继续。做出决定前，消息输入框暂不可用。",
@@ -2003,8 +2003,8 @@
       "waitingForActivity": "等待任务进展"
     },
     "childSessionSheet": {
-      "couldNotLoad": "无法加载子智能体会话。",
-      "failed": "子智能体会话失败。",
+      "couldNotLoad": "无法加载子智能体会话",
+      "failed": "子智能体会话失败",
       "noMessages": "暂无子智能体消息",
       "noMessagesDescription": "此子智能体会话已完成，但未生成会话记录。",
       "loading": "正在加载子智能体会话",
@@ -2099,7 +2099,7 @@
     },
     "composer": {
       "addAttachment": "添加附件",
-      "removeOrRetryFailed": "请先移除上传失败的附件，或重新上传。",
+      "removeOrRetryFailed": "请先移除上传失败的附件，或重试上传。",
       "attachmentsWithSlashCommands": "附件无法与斜杠命令一起发送。",
       "photoMetadataNotRemoved": "无法移除附件中的照片元数据。",
       "waitForUploads": "请等待附件上传完成。",
@@ -2129,8 +2129,8 @@
       "share": "分享",
       "prLinkActions": "PR 链接操作",
       "linkActions": "链接操作",
-      "couldNotCopyLink": "无法复制链接。",
-      "couldNotShareLink": "无法分享链接。",
+      "couldNotCopyLink": "无法复制链接",
+      "couldNotShareLink": "无法分享链接",
       "showLinkActions": "显示链接操作"
     },
     "compaction": {
@@ -2158,7 +2158,7 @@
       "initDescription": "引导式 AGENTS.md 设置",
       "resumeClaudeDescription": "导入 Claude Code 会话记录",
       "resumeCodexDescription": "导入 OpenAI Codex 会话记录",
-      "reviewDescription": "查看更改 [uncommitted|staged|unpushed|branch|commit|pr]",
+      "reviewDescription": "审查更改 [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "使用 /{{command}}",
       "useSkillCommand": "使用技能 /{{command}}",
       "skillBadge": "技能",
@@ -2190,7 +2190,7 @@
       "subagentsDescription": "来自子会话的其余费用",
       "olderActivity": "较早的活动",
       "olderActivityDescription": "无法归入已加载历史记录的费用",
-      "ofWindowTokens": "共 {{window}} 个词元",
+      "ofWindowTokens": "／ {{window}} 个词元",
       "tokens": "词元",
       "tokensWithPercentage": "个词元（{{percentage}}）",
       "stepsCount_one": "{{steps}} 步",
@@ -2212,7 +2212,7 @@
       "unavailable": "此会话无法接收权限请求。"
     },
     "prBadge": {
-      "open": "开启拉取请求",
+      "open": "开启的拉取请求",
       "closed": "已关闭的拉取请求",
       "merged": "已合并的拉取请求",
       "draft": "拉取请求草稿",
@@ -2222,7 +2222,7 @@
     "markdownImage": {
       "load": "加载",
       "loadWithHost": "加载 {{host}}",
-      "httpsOnly": "仅支持通过 HTTPS 加载图片。",
+      "httpsOnly": "仅支持通过 HTTPS 加载图片",
       "trustTitle": "从 {{host}} 加载图片？",
       "trustMessage": "信任 {{host}} 后，其图片将不再每次询问即可加载。你可以稍后在受信任的网站中撤销。",
       "loadOnce": "仅加载一次"
@@ -2231,7 +2231,7 @@
       "invalidLink": "此链接无法打开。",
       "hostConfirmTitle": "打开外部链接？",
       "hostConfirmMessage": "此链接将在你的浏览器中打开 {{host}}。",
-      "open": "开启",
+      "open": "打开",
       "trustThisHost": "信任此网站"
     },
     "folderPicker": {
@@ -2240,7 +2240,7 @@
       "emptyTitle": "没有子文件夹",
       "fieldLabel": "文件夹",
       "retryableDescription": "请检查网络连接后重试。仍可点击“完成”选用此文件夹。",
-      "retryableTitle": "无法列出文件夹",
+      "retryableTitle": "文件夹列表加载失败",
       "tapToListHint": "点击文件夹可查看其中的内容。",
       "unsupportedDescription": "此 CLI 无法列出文件夹。点击“完成”可保留启动时的文件夹，再点击“开始会话”即可在该文件夹中启动会话。",
       "unsupportedTitle": "无法列出文件夹"
@@ -3921,7 +3921,7 @@
     "loadError": "无法加载简报",
     "sessions": "夜间活跃",
     "pullRequests": "已创建的 PRs",
-    "blockers": "新阻碍",
+    "blockers": "新增阻塞项",
     "spend": "夜间花费",
     "view": "阅读简报",
     "viewWithPreview": "$t(agentBriefing.view)。{{preview}}",

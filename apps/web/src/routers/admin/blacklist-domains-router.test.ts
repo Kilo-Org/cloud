@@ -15,7 +15,7 @@ jest.mock('@kilocode/web-shared/lib/redis', () => ({
 
 import { describe, expect, it, beforeEach } from '@jest/globals';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
-import { kilocode_users } from '@kilocode/db';
+import { admin_action_audit_logs, kilocode_users } from '@kilocode/db';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { eq, inArray } from 'drizzle-orm';
@@ -488,5 +488,146 @@ describe('admin.blacklistDomains.set', () => {
     expect(result.backfill).toEqual({ blocked: 0, remaining: false, failed: true });
     expect(mockedBackfill).not.toHaveBeenCalled();
     expect(mockedRedisSet).toHaveBeenCalled();
+  });
+});
+
+describe('admin.blacklistDomains.set audit log', () => {
+  function mockPreviousDomains(domains: string[]) {
+    mockedRedisGet.mockResolvedValue(
+      JSON.stringify({ domains, updated_at: null, updated_by: null, updated_by_email: null })
+    );
+  }
+
+  async function auditRows() {
+    return db
+      .select()
+      .from(admin_action_audit_logs)
+      .where(eq(admin_action_audit_logs.action, 'blacklist_domains.set'));
+  }
+
+  it('records one row naming up to two added domains', async () => {
+    mockPreviousDomains(['existing.com']);
+    await insertTestUser({
+      google_user_email: 'a@mailinator.com',
+      email_domain: 'mailinator.com',
+    });
+
+    const caller = await createCallerForUser(admin.id);
+    await caller.admin.blacklistDomains.set({
+      domains: ['existing.com', 'Mailinator.com', ' SPAM.org '],
+    });
+
+    const rows = await auditRows();
+    expect(rows).toHaveLength(1);
+    const [row] = rows;
+    expect(row.actor_id).toBe(admin.id);
+    expect(row.actor_email).toBe(admin.google_user_email);
+    expect(row.target_type).toBeNull();
+    expect(row.target_id).toBeNull();
+    expect(row.message).toBe('Domain blacklist: added mailinator.com, spam.org');
+    expect(row.metadata).toEqual({
+      addedCount: 2,
+      removedCount: 0,
+      totalDomains: 3,
+      diffAvailable: true,
+      addedDomains: ['mailinator.com', 'spam.org'],
+      removedDomains: [],
+    });
+    expect(row.message).not.toMatch(/block|backfill/i);
+    expect(JSON.stringify(row.metadata)).not.toMatch(/block|backfill/i);
+  });
+
+  it('summarizes more than two added domains as a count', async () => {
+    const caller = await createCallerForUser(admin.id);
+    await caller.admin.blacklistDomains.set({
+      domains: ['a.com', 'b.com', 'c.com', 'd.com', 'e.com'],
+    });
+
+    const rows = await auditRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].message).toBe('Domain blacklist: 5 domains added');
+    expect(rows[0].metadata).toEqual({
+      addedCount: 5,
+      removedCount: 0,
+      totalDomains: 5,
+      diffAvailable: true,
+      removedDomains: [],
+    });
+  });
+
+  it('records removals with the same naming rule', async () => {
+    mockPreviousDomains(['keep.com', 'gone.com']);
+
+    const caller = await createCallerForUser(admin.id);
+    await caller.admin.blacklistDomains.set({ domains: ['keep.com'] });
+
+    const rows = await auditRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].actor_id).toBe(admin.id);
+    expect(rows[0].target_type).toBeNull();
+    expect(rows[0].message).toBe('Domain blacklist: removed gone.com');
+    expect(rows[0].metadata).toEqual({
+      addedCount: 0,
+      removedCount: 1,
+      totalDomains: 1,
+      diffAvailable: true,
+      addedDomains: [],
+      removedDomains: ['gone.com'],
+    });
+  });
+
+  it('summarizes more than two removed domains as a count', async () => {
+    mockPreviousDomains(['keep.com', 'a.com', 'b.com', 'c.com']);
+
+    const caller = await createCallerForUser(admin.id);
+    await caller.admin.blacklistDomains.set({ domains: ['keep.com', 'new.com'] });
+
+    const rows = await auditRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].message).toBe('Domain blacklist: added new.com; 3 domains removed');
+    expect(rows[0].metadata).toEqual({
+      addedCount: 1,
+      removedCount: 3,
+      totalDomains: 2,
+      diffAvailable: true,
+      addedDomains: ['new.com'],
+    });
+  });
+
+  it('does not record a save that leaves the list unchanged', async () => {
+    mockPreviousDomains(['mailinator.com']);
+
+    const caller = await createCallerForUser(admin.id);
+    await caller.admin.blacklistDomains.set({ domains: ['MAILINATOR.com'] });
+
+    expect(await auditRows()).toHaveLength(0);
+  });
+
+  it('does not record when the Redis write fails', async () => {
+    mockedRedisSet.mockResolvedValue(null);
+
+    const caller = await createCallerForUser(admin.id);
+    await expect(
+      caller.admin.blacklistDomains.set({ domains: ['mailinator.com'] })
+    ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+
+    expect(await auditRows()).toHaveLength(0);
+  });
+
+  it('records a row without a diff when the previous config cannot be read', async () => {
+    mockedRedisGet.mockRejectedValue(new Error('redis unavailable'));
+
+    const caller = await createCallerForUser(admin.id);
+    await caller.admin.blacklistDomains.set({ domains: ['mailinator.com', 'spam.org'] });
+
+    const rows = await auditRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].message).toBe('Domain blacklist updated (change details unavailable)');
+    expect(rows[0].metadata).toEqual({
+      addedCount: null,
+      removedCount: null,
+      totalDomains: 2,
+      diffAvailable: false,
+    });
   });
 });

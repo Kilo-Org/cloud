@@ -896,6 +896,7 @@ export const AdminActionAuditAction = z.enum([
   'organization.gitlab_webhook_secret.rotate',
   'organization.bitbucket.update',
   'organization.webhook_session.share',
+  'blacklist_domains.set',
 ]);
 
 export type AdminActionAuditAction = z.infer<typeof AdminActionAuditAction>;

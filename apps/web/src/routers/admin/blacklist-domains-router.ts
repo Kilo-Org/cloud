@@ -15,6 +15,7 @@ import { kilocode_users } from '@kilocode/db/schema';
 import { sql, count, isNotNull, desc, min, max } from 'drizzle-orm';
 import * as z from 'zod';
 import { backfillBlockBlacklistedDomainsBatch } from '@/lib/abuse/block-blacklisted-domains';
+import { recordAdminAction, type AdminActionContext } from '@/lib/admin/admin-action-audit';
 
 const SuspiciousDomainsInputSchema = z
   .object({
@@ -31,6 +32,58 @@ async function readConfigOrThrow(): Promise<BlacklistDomainsConfig> {
   const raw = await redisClient.get<string>(BLACKLIST_DOMAINS_REDIS_KEY);
   if (!raw) return DEFAULT_BLACKLIST_DOMAINS_CONFIG;
   return BlacklistDomainsConfigSchema.parse(JSON.parse(raw));
+}
+
+// A bulk import can change thousands of entries; name domains in the audit row
+// only for small edits and summarize larger ones as a count.
+const AUDIT_DOMAIN_NAME_LIMIT = 2;
+
+function describeDomainChange(domains: string[], verb: 'added' | 'removed'): string | null {
+  if (domains.length === 0) return null;
+  if (domains.length <= AUDIT_DOMAIN_NAME_LIMIT) return `${verb} ${domains.join(', ')}`;
+  return `${domains.length} domains ${verb}`;
+}
+
+async function recordBlacklistChange(
+  ctx: AdminActionContext,
+  change: {
+    addedDomains: string[] | null;
+    removedDomains: string[] | null;
+    totalDomains: number;
+  }
+): Promise<void> {
+  const { addedDomains, removedDomains, totalDomains } = change;
+
+  if (addedDomains === null || removedDomains === null) {
+    await recordAdminAction(ctx, {
+      action: 'blacklist_domains.set',
+      target: null,
+      message: 'Domain blacklist updated (change details unavailable)',
+      metadata: { addedCount: null, removedCount: null, totalDomains, diffAvailable: false },
+    });
+    return;
+  }
+
+  if (addedDomains.length === 0 && removedDomains.length === 0) return;
+
+  const parts = [
+    describeDomainChange(addedDomains, 'added'),
+    describeDomainChange(removedDomains, 'removed'),
+  ].filter(part => part !== null);
+
+  await recordAdminAction(ctx, {
+    action: 'blacklist_domains.set',
+    target: null,
+    message: `Domain blacklist: ${parts.join('; ')}`,
+    metadata: {
+      addedCount: addedDomains.length,
+      removedCount: removedDomains.length,
+      totalDomains,
+      diffAvailable: true,
+      ...(addedDomains.length <= AUDIT_DOMAIN_NAME_LIMIT && { addedDomains }),
+      ...(removedDomains.length <= AUDIT_DOMAIN_NAME_LIMIT && { removedDomains }),
+    },
+  });
 }
 
 async function readConfig(): Promise<BlacklistDomainsConfig> {
@@ -57,13 +110,19 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
     // would turn a one-domain save into a backfill of every listed domain. Skip
     // the automatic run in that case and let the manual backfill handle it.
     let addedDomains: string[] | null;
+    let removedDomains: string[] | null;
     try {
       const previous = await readConfigOrThrow();
-      const previousDomains = new Set(previous.domains.map(d => d.toLowerCase().trim()));
+      const previousDomains = new Set(
+        previous.domains.map(d => d.toLowerCase().trim()).filter(Boolean)
+      );
+      const normalizedSet = new Set(normalizedDomains);
       addedDomains = normalizedDomains.filter(domain => !previousDomains.has(domain));
+      removedDomains = [...previousDomains].filter(domain => !normalizedSet.has(domain));
     } catch (error) {
       captureException(error, { tags: { source: 'blacklist_domains_previous_config_read' } });
       addedDomains = null;
+      removedDomains = null;
     }
 
     const config: BlacklistDomainsConfig = {
@@ -79,6 +138,12 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
         message: 'Redis is not configured — cannot save blacklisted domains',
       });
     }
+
+    await recordBlacklistChange(ctx, {
+      addedDomains,
+      removedDomains,
+      totalDomains: normalizedDomains.length,
+    });
 
     // The list is already live for auth checks at this point, so a backfill
     // failure must not fail the save. Report it and point the admin at the

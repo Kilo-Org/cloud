@@ -8,7 +8,7 @@ processing outcome logs remain enabled, now including `queue` for old/EU filters
 Disable both staging settings after the investigation to reduce log volume.
 
 | Event | Fields and boundary |
-| --- | --- |
+|---|---|
 | `usage_ingest_enqueue_start` | Validated `usage_id`, `publisher_entry_at_ms`, `before_send_at_ms`; emitted before the existing single send |
 | `usage_ingest_enqueue` | `accepted` / `unavailable`, `after_send_at_ms`, monotonic `send_duration_ms`; accepted sends also repeat entry/before times and expose valid optional returned `queue_backlog_count`, `queue_backlog_bytes`, `queue_oldest_message_at_ms` |
 | `usage_ingest_handler_entry` | `queue`, local invocation `batch_id`, actual `batch_size`, handler entry and per-message start epochs, queue message ID/timestamp, attempts, validated usage ID/event timestamp, optional batch backlog sample; emitted before that message's writer call |

@@ -46,6 +46,8 @@ const mockDecorateFindingsWithRemediation = jest.fn<(params: unknown) => Promise
 const mockGetRemediationAttemptHistory = jest.fn<() => Promise<unknown>>();
 const mockDeleteFindingsByRepository =
   jest.fn<(params: unknown) => Promise<{ deletedCount: number }>>();
+const mockGetOrphanedRepositoriesWithFindingCounts =
+  jest.fn<(params: unknown) => Promise<unknown>>();
 const mockTrackSecurityAgentSync = jest.fn();
 const mockTrackSecurityAgentUiInteraction = jest.fn();
 const mockTrackSecurityAgentRemediationAction = jest.fn();
@@ -147,7 +149,7 @@ jest.mock('../db/security-findings', () => ({
   getSecurityFindingById: mockGetSecurityFindingById,
   getSecurityFindingsSummary: jest.fn(),
   getLastSyncTime: jest.fn(),
-  getOrphanedRepositoriesWithFindingCounts: jest.fn(),
+  getOrphanedRepositoriesWithFindingCounts: mockGetOrphanedRepositoriesWithFindingCounts,
   deleteFindingsByRepository: mockDeleteFindingsByRepository,
 }));
 jest.mock('../db/security-remediation', () => ({
@@ -2164,8 +2166,8 @@ describe('cached repository snapshot', () => {
       expect.objectContaining({ repoFullNamesInScope: [] })
     );
     expect(consoleError).toHaveBeenCalledWith(
-      expect.stringContaining('ignored unreadable cached repositories'),
-      expect.objectContaining({ ownerId: ORGANIZATION_ID, ignoredCount: 1 })
+      expect.stringContaining('could not match cached repository ids'),
+      expect.objectContaining({ ownerId: ORGANIZATION_ID, unreadableCount: 1 })
     );
     consoleError.mockRestore();
   });
@@ -2203,8 +2205,8 @@ describe('cached repository snapshot', () => {
       expect.objectContaining({ repoFullNamesInScope: ['kilo/repo'] })
     );
     expect(consoleError).toHaveBeenCalledWith(
-      expect.stringContaining('ignored unreadable cached repositories'),
-      expect.objectContaining({ ignoredCount: 1 })
+      expect.stringContaining('could not match cached repository ids'),
+      expect.objectContaining({ unreadableCount: 1 })
     );
     consoleError.mockRestore();
   });
@@ -2229,6 +2231,80 @@ describe('cached repository snapshot', () => {
       },
     ]);
     expect(mockUpdateRepositoriesForIntegration).toHaveBeenCalledWith('integration-123', fetched);
+    consoleError.mockRestore();
+  });
+});
+
+describe('cached repository snapshot with an unreadable id', () => {
+  beforeEach(() => {
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue({
+      config: { repository_selection_mode: 'all' },
+      storedConfig: { repository_selection_mode: 'all' },
+      isEnabled: true,
+      configRevision: 1,
+    });
+  });
+
+  it('keeps an unmatched repository connected for orphan detection', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const orphaned = [
+      { repoFullName: 'kilo/repo', findingCount: 4 },
+      { repoFullName: 'kilo/gone', findingCount: 2 },
+    ];
+    mockGetOrphanedRepositoriesWithFindingCounts.mockResolvedValue(orphaned);
+
+    const result = await createHandlersWithRepositorySnapshot(
+      unreadableSnapshot
+    ).getOrphanedRepositories({ ctx: context, input: {} });
+
+    // The entry keeps its name even though its id cannot be matched, so only a
+    // repository missing from the snapshot is reported as orphaned.
+    expect(mockGetOrphanedRepositoriesWithFindingCounts).toHaveBeenCalledWith({
+      owner: { organizationId: ORGANIZATION_ID },
+      accessibleRepoFullNames: ['kilo/repo'],
+    });
+    expect(result).toEqual(orphaned);
+    consoleError.mockRestore();
+  });
+
+  it('refetches a snapshot that kept some entries but dropped others', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const fetched = [
+      { id: 1, full_name: 'kilo/repo', name: 'repo', private: true },
+      { id: 2, full_name: 'kilo/other', name: 'other', private: true },
+    ];
+    mockFetchGitHubRepositories.mockResolvedValue(fetched);
+    mockUpdateRepositoriesForIntegration.mockResolvedValue();
+
+    const repositories = await createHandlersWithRepositorySnapshot(mixedSnapshot).getRepositories({
+      ctx: context,
+      input: {},
+    });
+
+    // Reading one numeric entry is not enough: the dropped one stays invisible
+    // until the snapshot is rebuilt from the provider.
+    expect(mockUpdateRepositoriesForIntegration).toHaveBeenCalledWith('integration-123', fetched);
+    expect(repositories.map(repository => repository.fullName)).toEqual([
+      'kilo/repo',
+      'kilo/other',
+    ]);
+    consoleError.mockRestore();
+  });
+
+  it('still lists the entries it could read when the refresh fails', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockFetchGitHubRepositories.mockRejectedValue(new Error('GitHub unavailable'));
+
+    const repositories = await createHandlersWithRepositorySnapshot(mixedSnapshot).getRepositories({
+      ctx: context,
+      input: {},
+    });
+
+    expect(repositories.map(repository => repository.fullName)).toEqual(['kilo/repo']);
+    expect(consoleError).toHaveBeenCalledWith(
+      'Could not refresh the cached GitHub repositories',
+      expect.objectContaining({ ownerId: ORGANIZATION_ID, error: 'GitHub unavailable' })
+    );
     consoleError.mockRestore();
   });
 });

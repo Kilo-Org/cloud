@@ -160,39 +160,51 @@ type SecurityAgentDeps<TExtra = {}> = {
 };
 
 /**
- * The owner's cached repository snapshot, reduced to the entries this router
- * can match by id.
+ * What this router can read out of the owner's cached repository snapshot.
  *
  * `platform_integrations.repositories` is shared with other providers and is
- * typed `number | string` ids, while everything here matches a repository by
- * numeric id. The strict reader other modules use throws on a snapshot it
- * cannot read, and every procedure in this router that decorates findings
- * reads the snapshot this way, so one unreadable entry answered 500 for the
- * whole findings surface at that owner: the list, the detail and the analysis
- * panel. Keep the entries that do carry a numeric id, and report the rest, so
- * a damaged snapshot costs those repositories their scope instead of the page.
- *
- * Every consumer fails closed on a shorter list: remediation eligibility
- * rejects `repo_not_in_scope`, and `getRepositories` refetches and rewrites a
- * snapshot it found empty.
+ * typed `number | string` ids, while the Security Agent matches a repository
+ * against `selected_repository_ids` by numeric id. The strict reader other
+ * modules use throws on an id it cannot match, and every procedure in this
+ * router that decorates a finding reads the snapshot, so one unreadable entry
+ * answered 500 for the whole findings surface at that owner: the list, the
+ * detail and the analysis panel. Read the snapshot once here, report what
+ * could not be matched, and let a damaged entry cost only that repository's
+ * id-scoped membership.
  */
-function readRepositorySnapshot(owner: Owner, integration: Integration): PlatformRepository[] {
+type RepositorySnapshot = {
+  /** Entries this router can match against a selected repository id. */
+  repositories: PlatformRepository[];
+  /** Every full name in the snapshot, whatever its id. Reading a name never
+   * needs an id, so an unreadable id does not remove a repository here. */
+  fullNames: string[];
+  /** Entries whose id this router cannot match. */
+  unreadableCount: number;
+};
+
+function readRepositorySnapshot(owner: Owner, integration: Integration): RepositorySnapshot {
   const snapshot = integration?.repositories ?? null;
   if (!snapshot) {
-    return [];
+    return { repositories: [], fullNames: [], unreadableCount: 0 };
   }
   const repositories = snapshot.filter(
     (repository): repository is PlatformRepository => typeof repository.id === 'number'
   );
-  const ignoredCount = snapshot.length - repositories.length;
-  if (ignoredCount > 0) {
-    console.error('Security Agent ignored unreadable cached repositories', {
+  const unreadableCount = snapshot.length - repositories.length;
+  if (unreadableCount > 0) {
+    console.error('Security Agent could not match cached repository ids', {
       ownerType: owner.type,
       ownerId: owner.id,
-      ignoredCount,
+      unreadableCount,
     });
   }
-  return repositories;
+  return {
+    repositories,
+    fullNames: snapshot
+      .map(repository => repository.full_name)
+      .filter((name): name is string => !!name),
+    unreadableCount,
+  };
 }
 
 function getRepoFullNamesInScope(
@@ -200,7 +212,7 @@ function getRepoFullNamesInScope(
   integration: Integration,
   config: { repository_selection_mode?: 'all' | 'selected'; selected_repository_ids?: number[] }
 ): string[] {
-  const repositories = readRepositorySnapshot(owner, integration);
+  const { repositories } = readRepositorySnapshot(owner, integration);
   if (config.repository_selection_mode === 'all') {
     return repositories.map(repo => repo.full_name).filter((name): name is string => !!name);
   }
@@ -1195,7 +1207,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         if (input.isEnabled && integration) {
           const installationId = integration.platform_installation_id;
           if (installationId) {
-            const allRepos = readRepositorySnapshot(owner, integration);
+            const allRepos = readRepositorySnapshot(owner, integration).repositories;
 
             let repositoriesToSync: string[];
 
@@ -1297,16 +1309,38 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         return [];
       }
 
-      let repos = readRepositorySnapshot(owner, integration);
-      if (repos.length === 0 && integration.platform_installation_id) {
-        const appType = integration.github_app_type || 'standard';
-        const fetchedRepos = await fetchGitHubRepositories(
-          integration.platform_installation_id,
-          appType,
-          integration.id
-        );
-        await updateRepositoriesForIntegration(integration.id, fetchedRepos);
-        repos = fetchedRepos;
+      const snapshot = readRepositorySnapshot(owner, integration);
+      let repos = snapshot.repositories;
+      // A dropped entry is a snapshot this router cannot fully read, so refetch
+      // and rewrite it the same way as one it read as empty: otherwise the
+      // dropped repositories stay invisible in every repository picker.
+      if (
+        integration.platform_installation_id &&
+        (repos.length === 0 || snapshot.unreadableCount > 0)
+      ) {
+        const readableCount = repos.length;
+        try {
+          const appType = integration.github_app_type || 'standard';
+          const fetchedRepos = await fetchGitHubRepositories(
+            integration.platform_installation_id,
+            appType,
+            integration.id
+          );
+          await updateRepositoriesForIntegration(integration.id, fetchedRepos);
+          repos = fetchedRepos;
+        } catch (error) {
+          // A snapshot nothing could be read from has no answer of its own, so
+          // it keeps the provider error. A partially read one still lists the
+          // entries it could read, and the next read retries the refresh.
+          if (readableCount === 0) {
+            throw error;
+          }
+          console.error('Could not refresh the cached GitHub repositories', {
+            ownerType: owner.type,
+            ownerId: owner.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
 
       const repositoryDetails = repos.map(repo => ({
@@ -1514,7 +1548,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        const allRepos = readRepositorySnapshot(owner, integration);
+        const allRepos = readRepositorySnapshot(owner, integration).repositories;
 
         let syncScope:
           | { syncType: 'single_repo'; repoCount: number; repoFullName: string }
@@ -2035,15 +2069,13 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
       const integration = await deps.getIntegration(ctx, extra);
 
-      const accessibleRepoFullNames: string[] = [];
-      if (integration && integration.integration_status === 'active') {
-        const repos = readRepositorySnapshot(owner, integration);
-        for (const repo of repos) {
-          if (repo.full_name) {
-            accessibleRepoFullNames.push(repo.full_name);
-          }
-        }
-      }
+      // Orphan detection compares names, never ids: a repository whose cached
+      // id could not be matched is still connected, and calling its findings
+      // orphaned would offer them for deletion.
+      const accessibleRepoFullNames: string[] =
+        integration && integration.integration_status === 'active'
+          ? readRepositorySnapshot(owner, integration).fullNames
+          : [];
 
       const orphanedRepos = await getOrphanedRepositoriesWithFindingCounts({
         owner: securityOwner,

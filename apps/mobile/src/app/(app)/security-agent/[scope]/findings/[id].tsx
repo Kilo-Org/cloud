@@ -9,9 +9,7 @@ export default function SecurityAgentFindingDetailRoute() {
   const findingId = parseParam(rawId);
 
   if (!findingId) {
-    return (
-      <InvalidRouteState backTo={`/(app)/(tabs)/(3_profile)/security-agent/${scope}` as Href} />
-    );
+    return <InvalidRouteState backTo={`/(app)/security-agent/${scope}` as Href} />;
   }
 
   return <FindingDetailScreen scope={scope} findingId={findingId} />;

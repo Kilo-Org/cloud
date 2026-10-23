@@ -483,6 +483,48 @@ describe('deep-link-launch', () => {
       expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)');
     });
 
+    it.each([
+      [
+        '/(app)/(tabs)/(3_profile)/security-agent/personal/findings/finding-1?source=push',
+        '/(app)/security-agent/personal/findings/finding-1?source=push',
+      ],
+      ['/(app)/(tabs)/(3_profile)/security-agent', '/(app)/security-agent'],
+      [
+        '/(app)/(tabs)/(3_profile)/code-reviewer/personal/github',
+        '/(app)/code-reviewer/personal/github',
+      ],
+      [
+        '/(app)/(tabs)/(3_profile)/code-reviewer?scope=personal',
+        '/(app)/code-reviewer?scope=personal',
+      ],
+      ['/(app)/security-agent/personal', '/(app)/security-agent/personal'],
+      ['/(app)/(tabs)/(3_profile)/profiles/p1', '/(app)/(tabs)/(3_profile)/profiles/p1'],
+      [
+        '/(app)/(tabs)/(3_profile)/code-reviewer-extra',
+        '/(app)/(tabs)/(3_profile)/code-reviewer-extra',
+      ],
+    ])('restores the current destination for persisted href %s', async (href, expected) => {
+      store.set(
+        PENDING_DEEP_LINK_KEY,
+        JSON.stringify({
+          href,
+          source: 'notification',
+          storedAt: Date.now(),
+          userId: 'user-a',
+          organizationId: 'org-1',
+        })
+      );
+      setCurrentDeepLinkUserId('user-a');
+
+      await restorePersistedPendingDeepLink();
+
+      expect(consumePendingDeepLink()).toEqual({
+        href: expected,
+        organizationId: 'org-1',
+      });
+      expect(consumePendingDeepLink()).toBeNull();
+    });
+
     it('discards a record captured for a different user', async () => {
       store.set(
         PENDING_DEEP_LINK_KEY,
@@ -705,9 +747,7 @@ describe('deep-link-launch', () => {
       _setGetLinkingURLForTests(() => 'https://app.kilo.ai/security-agent/findings');
       captureLaunchDeepLink();
       // Assert immediately — no await. The point of the test is synchronicity.
-      expect(getPendingDeepLink()).toBe(
-        '/(app)/(tabs)/(3_profile)/security-agent/personal/findings'
-      );
+      expect(getPendingDeepLink()).toBe('/(app)/security-agent/personal/findings');
     });
 
     it('carries the resume anchor of a cold launch URL into the stash', () => {

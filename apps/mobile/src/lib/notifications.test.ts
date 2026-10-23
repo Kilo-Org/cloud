@@ -708,7 +708,7 @@ const securityResponses = ['personal', 'org-example'].flatMap(scope =>
     ] as const
   ).map(payload => ({
     data: { ...payload, scope, findingId: 'finding-123' } satisfies Notifications.PushData,
-    path: `/(app)/(tabs)/(3_profile)/security-agent/${scope}/findings/finding-123?via=push`,
+    path: `/(app)/security-agent/${scope}/findings/finding-123?via=push`,
   }))
 );
 const responseCases = [

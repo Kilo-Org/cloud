@@ -5,6 +5,7 @@ import {
   type SecurityFindingRouteParams,
   toSecurityFindingParams,
 } from '@kilocode/app-shared/security-agent';
+import * as Sentry from '@sentry/react-native';
 import { type ErrorBoundaryProps, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -117,10 +118,14 @@ export default function SecurityAgentFilterFindingsRoute() {
 // A render failure inside the sheet stays inside the sheet: the findings list
 // underneath keeps its place and the reader can go back instead of being reset
 // to the app root by the global boundary. Deliberately not a PickerSheet — the
-// shell is what may just have failed.
-export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
+// shell is what may just have failed. Wrapped like the root boundary in
+// `app/_layout.tsx`, because catching here means the error no longer reaches
+// that one: without the wrap the crash would be contained but unreported.
+function FilterSheetErrorBoundary({ retry }: ErrorBoundaryProps) {
   return <FilterSheetFailure onRetry={() => void retry()} />;
 }
+
+export const ErrorBoundary = Sentry.wrapExpoRouterErrorBoundary(FilterSheetErrorBoundary);
 
 function FilterSheetFailure({ onRetry }: Readonly<{ onRetry: () => void }>) {
   const router = useRouter();

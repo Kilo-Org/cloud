@@ -48,6 +48,11 @@ const state = vi.hoisted(() => {
 const mocks = vi.hoisted(() => ({ back: vi.fn(), dismissTo: vi.fn(), retry: vi.fn() }));
 
 vi.mock('react-native', () => ({ View: 'View' }));
+// The route wraps its error boundary for crash reporting; the wrap is pass-through
+// here so the fallback stays under test without loading the native SDK.
+vi.mock('@sentry/react-native', () => ({
+  wrapExpoRouterErrorBoundary: (component: unknown) => component,
+}));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: mocks.back, dismissTo: mocks.dismissTo }),
   useLocalSearchParams: () => ({ scope: 'personal', ...state.params }),

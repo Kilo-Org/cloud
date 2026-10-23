@@ -629,6 +629,15 @@ describe('ScreenHeader mounted', () => {
       { title: longTitle, titleNumberOfLines: 1, onTitlePress: () => undefined },
       { title: longTitle, titleNumberOfLines: 3, headerRight: 'METRICS', reserveTitleSpace: true },
       { title: longTitle, titleNumberOfLines: 9, reserveTitleSpace: true },
+      { title: 'Agents', size: 'large', reserveTitleSpace: true },
+      { title: longTitle, size: 'large', titleNumberOfLines: 2, reserveTitleSpace: true },
+      {
+        title: longTitle,
+        size: 'large',
+        titleNumberOfLines: 3,
+        headerRight: 'METRICS',
+        reserveTitleSpace: true,
+      },
     ];
 
     for (const props of variants) {
@@ -636,14 +645,22 @@ describe('ScreenHeader mounted', () => {
       const back = findBackPressable(renderer.root);
       const title = renderer.root.findByProps({ accessibilityRole: 'header' });
       // The cap is clamped to the three lines the reserved box covers, so a
-      // title can never paint a line the reserve does not hold.
-      const cappedLines = Math.min(props.titleNumberOfLines ?? 2, 3);
+      // title can never paint a line the reserve does not hold. The default
+      // is one line: CJK titles ellipsize instead of orphaning characters.
+      const cappedLines = Math.min(props.titleNumberOfLines ?? 1, 3);
       expect(title.props.numberOfLines).toBe(cappedLines);
       expect(title.props.ellipsizeMode).toBe('tail');
       expect(title.children).toEqual([props.title]);
       if (props.reserveTitleSpace) {
-        expect(title.parent?.props.className).toContain(cappedLines > 2 ? 'min-h-21' : 'min-h-14');
-        expect(title.parent?.props.className).toContain('justify-center');
+        const large = props.size === 'large';
+        let reserveClass = large ? 'min-h-[72px]' : 'min-h-14';
+        if (cappedLines > 2) {
+          reserveClass = large ? 'min-h-[108px]' : 'min-h-21';
+        } else if (cappedLines === 1) {
+          reserveClass = large ? 'min-h-[36px]' : 'min-h-7';
+        }
+        expect(title.parent?.props.className).toContain(reserveClass);
+        expect(title.parent?.props.className).toContain('justify-start');
       }
       if (props.modal || props.centerTitle) {
         expect(title.props.className).toContain('text-center');
@@ -670,7 +687,7 @@ describe('ScreenHeader mounted', () => {
     // The reserved box holds the same three lines (3 x the `text-lg` 1.75rem
     // line height), so the rendered title cannot move the body below it.
     expect(title.parent?.props.className).toContain('min-h-21');
-    expect(title.parent?.props.className).toContain('justify-center');
+    expect(title.parent?.props.className).toContain('justify-start');
   });
 
   it('keeps the close control on the title row when the sheet skips the safe-area inset', () => {

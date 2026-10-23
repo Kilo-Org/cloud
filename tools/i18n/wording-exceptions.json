@@ -152,10 +152,15 @@
     "completed ({{count}})",
     "critical",
     "no changes needed",
+    "none",
     "open",
     "open pull request",
     "pr opened",
-    "remediation blocked"
+    "remediation blocked",
+    "{{displaycount}} failed",
+    "{{displaycount}} passed",
+    "{{displaycount}} skipped",
+    "{{loaded}} of {{total}} files loaded"
   ],
   "es": [
     "analysis failed",
@@ -992,6 +997,7 @@
     "superseded"
   ],
   "zh-Hans": [
+    "block",
     "commit",
     "file",
     "files",

@@ -14,6 +14,7 @@ type ListResult = {
   effectiveDefaultId: string | null;
   isLoading: boolean;
   isError: boolean;
+  error?: unknown;
   isRefetching: boolean;
   refetch: () => void;
 };
@@ -26,6 +27,8 @@ type ProfileSummary = {
   commandCount: number;
   mcpServerCount: number;
   skillCount: number;
+  kiloCommandCount: number;
+  agentCount: number;
   ownerType?: 'organization' | 'user';
 };
 
@@ -116,6 +119,8 @@ function profile(overrides: Partial<ProfileSummary> & { id: string }): ProfileSu
     commandCount: 0,
     mcpServerCount: 0,
     skillCount: 0,
+    kiloCommandCount: 0,
+    agentCount: 0,
     ...overrides,
   };
 }
@@ -152,12 +157,14 @@ describe('ProfilesListScreen', () => {
     refetchFn.mockReset();
     routerPush.mockReset();
     organizationState.organizationId = 'org-1';
+    connectivityState.value = 'online';
     Object.assign(listState, {
       orgProfiles: [],
       personalProfiles: [],
       effectiveDefaultId: null,
       isLoading: false,
       isError: false,
+      error: undefined,
       isRefetching: false,
     });
   });
@@ -181,10 +188,39 @@ describe('ProfilesListScreen', () => {
 
     const queryError = findOne(renderer.root, 'QueryError');
     expect(queryError.props.title).toBe("Couldn't load profiles");
+    expect(queryError.props.variant).toBe('server');
     act(() => {
       (queryError.props as { onRetry: () => void }).onRetry();
     });
     expect(refetchFn).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('a lost organization access renders the permission state without a retry', async () => {
+    listState.isError = true;
+    listState.error = { data: { code: 'UNAUTHORIZED' } };
+
+    const { renderer, unmount } = await mount();
+
+    const queryError = findOne(renderer.root, 'QueryError');
+    expect(queryError.props.variant).toBe('permission');
+    // The variant's own copy names the cause; the load-failure title would not.
+    expect(queryError.props.title).toBeUndefined();
+    expect(queryError.props.onRetry).toBeUndefined();
+
+    unmount();
+  });
+
+  it('a deleted organization renders the not-found state without a retry', async () => {
+    listState.isError = true;
+    listState.error = { data: { code: 'NOT_FOUND' } };
+
+    const { renderer, unmount } = await mount();
+
+    const queryError = findOne(renderer.root, 'QueryError');
+    expect(queryError.props.variant).toBe('not-found');
+    expect(queryError.props.onRetry).toBeUndefined();
 
     unmount();
   });
@@ -233,7 +269,7 @@ describe('ProfilesListScreen', () => {
     if (!personalRow) {
       throw new Error('personal row missing');
     }
-    expect(personalRow.props.subtitle).toBe('2 MCP');
+    expect(personalRow.props.subtitle).toBe('2 MCP · 9 setup cmds');
     const star = personalRow.props.trailing as {
       type: string;
       props: { accessibilityLabel: string };
@@ -247,7 +283,7 @@ describe('ProfilesListScreen', () => {
     if (!orgRow) {
       throw new Error('org row missing');
     }
-    expect(orgRow.props.subtitle).toBe('1v');
+    expect(orgRow.props.subtitle).toBe('1 var');
     // The row's leading icon names its owner.
     expect(orgRow.props.icon).toBe('Building2');
     expect(personalRow.props.icon).toBe('User');

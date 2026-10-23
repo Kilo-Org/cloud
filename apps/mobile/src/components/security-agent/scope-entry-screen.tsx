@@ -1,5 +1,4 @@
 import { isPersonalSecurityScope } from '@kilocode/app-shared/security-agent';
-import Animated, { FadeIn } from 'react-native-reanimated';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -30,7 +29,7 @@ function ScopeEntrySkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('common.securityAgent')} />
+      <ScreenHeader className="px-6" title={t('common.securityAgent')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-10 w-full rounded-lg" />
         <View className="flex-row flex-wrap gap-3">
@@ -62,10 +61,15 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   // Pending includes uncached queries paused by NetInfo. Cached query errors
   // must not replace usable settings or a resolved capability with an error screen.
   const isLoading = permission.isPending || config.isPending || capability.status === 'loading';
+  // The GitHub status read is the only input that decides between the connect
+  // and re-authorize setup screens, so its failure is fatal unless the enabled
+  // destination is already known from the config read.
+  const isGithubStatusUnknown = !permission.data && permission.isError;
+  const isEnabledResolved = config.data?.isEnabled ?? false;
   const isError =
-    (!permission.data && permission.isError) ||
     (!config.data && config.isError) ||
-    capability.status === 'error';
+    capability.status === 'error' ||
+    (isGithubStatusUnknown && !isEnabledResolved);
   const isPaused =
     permission.fetchStatus === 'paused' ||
     config.fetchStatus === 'paused' ||
@@ -73,12 +77,13 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
 
   const hasIntegration = permission.data?.hasIntegration ?? false;
   const hasPermissions = permission.data?.hasPermissions ?? false;
-  const isEnabled = config.data?.isEnabled ?? false;
+  const isEnabled = isEnabledResolved;
 
   const view = selectScopeEntryView({
     isLoading,
     isError,
     isDenied: access !== 'granted',
+    isGithubStatusUnknown,
     hasIntegration,
     hasPermissions,
     isEnabled,
@@ -154,6 +159,16 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   const connectUrl = mintUrl;
 
   const refetchAll = recovery.retry;
+  const { clearLastAttemptFailed } = recovery;
+
+  // A recorded failure describes the error episode that produced it. Clearing
+  // it on any other view keeps a later, unrelated failure from claiming that
+  // the reader's last retry is what failed.
+  useEffect(() => {
+    if (view !== 'error') {
+      clearLastAttemptFailed();
+    }
+  }, [view, clearLastAttemptFailed]);
 
   if (view === 'denied') {
     return (
@@ -166,16 +181,24 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
     );
   }
 
-  if (
-    view === 'error' ||
-    (isLoading && (isError || recovery.isRetrying || (isPaused && isConnectivityKnown)))
-  ) {
+  const isLoadFailureView =
+    view === 'error' || (isLoading && (isError || (isPaused && isConnectivityKnown)));
+
+  if (isLoadFailureView) {
+    // A retry in flight must be visible: the failure screen is swapped for the
+    // loading skeleton, so progress does not depend on a text-less button
+    // spinner, and a failure returns to the error screen with fresh feedback
+    // instead of the identical frame the tap started from. A retry that
+    // resolves the other reads still lands on their own view, as before.
+    if (recovery.isRetrying) {
+      return <ScopeEntrySkeleton />;
+    }
     return (
       <PlatformErrorScreen
         title={t('common.securityAgent')}
         errorTitle={t('securityAgent.scopeEntry.couldNotLoad')}
+        message={recovery.lastAttemptFailed ? t('securityAgent.scopeEntry.retryFailed') : undefined}
         onRetry={() => void recovery.retry()}
-        isRetrying={recovery.isRetrying}
       />
     );
   }
@@ -197,7 +220,11 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       // made the landing permanently unusable on a transient backend failure.
       return (
         <View className="flex-1 bg-background">
-          <ScreenHeader title={t('common.securityAgent')} headerRight={auditAction} />
+          <ScreenHeader
+            className="px-6"
+            title={t('common.securityAgent')}
+            headerRight={auditAction}
+          />
           {!connectUrl && isMinting ? (
             <View className="gap-3 px-6 pt-4">
               <Skeleton className="h-10 w-full rounded-lg" />
@@ -225,7 +252,11 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       // re-mints on press.
       return (
         <View className="flex-1 bg-background">
-          <ScreenHeader title={t('common.securityAgent')} headerRight={auditAction} />
+          <ScreenHeader
+            className="px-6"
+            title={t('common.securityAgent')}
+            headerRight={auditAction}
+          />
           {!reauthUrl && !connectUrl && isMinting ? (
             <View className="gap-3 px-6 pt-4">
               <Skeleton className="h-10 w-full rounded-lg" />
@@ -260,16 +291,16 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       );
     }
     case 'dashboard': {
-      // Fade the Dashboard in when the agent is enabled: the
-      // `disabled-settings` branch's <SettingsOverviewScreen> unmounts in
-      // place once `config.isEnabled` flips true, which is otherwise an
-      // abrupt snap. Only the incoming subtree is wrapped — the loading,
-      // error, and setup branches above must stay snap-instant so they
-      // feel like real state changes, not animations.
+      // No entrance animation: a Reanimated `FadeIn` carries
+      // `initialValues: { opacity: 0 }`, so a first mount whose entrance is
+      // dropped or never started leaves this whole subtree — the header
+      // included — invisible at opacity 0, and only the tab bar outside the
+      // screen paints. The dashboard (and its header) must paint in the frame
+      // the enabled view resolves.
       return (
-        <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+        <View className="flex-1">
           <DashboardScreen scope={scope} />
-        </Animated.View>
+        </View>
       );
     }
     default: {

@@ -13,6 +13,7 @@ import { QueryError } from '@/components/query-error';
 import { MarkdownText } from '@/components/agents/markdown-text';
 import { PrOverviewMeta } from '@/components/pr-review/pr-review-meta-parts';
 import { PrReviewChecksSection } from '@/components/pr-review/pr-review-checks-section';
+import { PrReviewOverviewSkeleton } from '@/components/pr-review/pr-review-overview-skeleton';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import { PrMergeSection } from '@/components/pr-review/merge/pr-merge-section';
@@ -52,28 +53,6 @@ type PrReviewOverviewProps = {
   readonly isActive: boolean;
   readonly refreshControl?: ScrollViewProps['refreshControl'];
 };
-
-function OverviewSkeleton() {
-  return (
-    <View className="gap-6">
-      <View className="gap-2">
-        <View className="h-5 w-20 rounded-full bg-muted" />
-        <View className="h-7 w-3/4 rounded bg-muted" />
-        <View className="h-5 w-1/2 rounded bg-muted" />
-      </View>
-      <View className="gap-2">
-        <View className="h-3 w-32 rounded bg-muted" />
-        <View className="h-3 w-48 rounded bg-muted" />
-        <View className="h-3 w-40 rounded bg-muted" />
-      </View>
-      <View className="gap-2">
-        <View className="h-3 w-full rounded bg-muted" />
-        <View className="h-3 w-5/6 rounded bg-muted" />
-        <View className="h-3 w-2/3 rounded bg-muted" />
-      </View>
-    </View>
-  );
-}
 
 export function PrReviewOverview({
   owner,
@@ -249,7 +228,7 @@ export function PrReviewOverview({
         contentContainerClassName="px-4"
         refreshControl={refreshControl}
       >
-        <OverviewSkeleton />
+        <PrReviewOverviewSkeleton />
       </DetailScreenScrollView>
     );
   }
@@ -268,7 +247,10 @@ export function PrReviewOverview({
     >
       <View className="gap-3">
         <PrStateChip descriptor={chip} />
-        <Text className="text-[22px] font-semibold leading-7 text-foreground" numberOfLines={3}>
+        <Text
+          className="text-[22px] font-semibold leading-[1.75rem] text-foreground"
+          numberOfLines={3}
+        >
           {data.title}
         </Text>
         <PrAuthorRow author={data.author} />

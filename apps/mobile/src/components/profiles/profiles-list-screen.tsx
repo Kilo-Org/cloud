@@ -3,13 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
-import {
-  buildProfileSections,
-  isEffectiveDefault,
-  profileCounts,
-  profileListCountItems,
-} from '@/components/profiles/profile-list-model';
+import { buildProfileSections, isEffectiveDefault } from '@/components/profiles/profile-list-model';
 import { profileOrganizationId, profileOwnerType } from '@/components/profiles/profile-owner-model';
+import { selectProfilesListErrorView } from '@/components/profiles/profiles-list-error-view';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -30,7 +26,7 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { formatProfileCountItemsShort } from '@/lib/profile-count-labels';
+import { formatProfileCountItems, profileCountItems } from '@/lib/profile-count-labels';
 import { type AgentProfileListItem, useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
 import { useOrganization } from '@/lib/organization-context';
 import {
@@ -86,11 +82,18 @@ export function ProfilesListScreen({
     effectiveDefaultId,
     isLoading,
     isError,
+    error,
     isRefetching,
     refetch,
   } = useAgentProfileList(organizationId ?? undefined);
   // Reactive: a connectivity commit re-renders the error variant selection.
   const committedConnectivity = useCommittedConnectivityStatus();
+  // An access outcome is terminal: naming it keeps the screen from reporting a
+  // server fault and offering a Retry that cannot succeed.
+  const listError = selectProfilesListErrorView({
+    error: isError ? error : undefined,
+    connectivity: committedConnectivity,
+  });
 
   const sections = buildProfileSections({ orgProfiles, personalProfiles, isOrgContext });
   // Wait for the stored organization before choosing the list context, so a
@@ -132,14 +135,15 @@ export function ProfilesListScreen({
       >
         {/* A failed refetch keeps the cached rows usable: the error banner sits
             above the content and only replaces it when there is nothing to
-            show. A confirmed-offline device is a connectivity failure, not a
-            server one; `unknown` connectivity keeps the server variant. */}
+            show. The variant comes from the tRPC code, so an access denial is
+            never reported as a server fault, and a terminal code offers no
+            Retry action. */}
         {isError && (
           <QueryError
-            variant={committedConnectivity === 'offline' ? 'offline' : 'server'}
+            variant={listError.variant}
             placement="top"
-            title={t('profiles.loadFailed')}
-            onRetry={() => void refetch()}
+            title={listError.titleKey ? t(listError.titleKey) : undefined}
+            onRetry={listError.showRetry ? () => void refetch() : undefined}
             isRetrying={isRefetching}
           />
         )}
@@ -173,10 +177,7 @@ export function ProfilesListScreen({
                 </Text>
               ) : null}
               {section.profiles.map((profile, index) => {
-                const subtitle = formatProfileCountItemsShort(
-                  t,
-                  profileListCountItems(profileCounts(profile))
-                ).join(' · ');
+                const subtitle = formatProfileCountItems(t, profileCountItems(profile)).join(' · ');
                 return (
                   <ConfigureRow
                     key={profile.id}

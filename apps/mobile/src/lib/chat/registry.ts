@@ -506,7 +506,7 @@ export async function say(
       askedModel: model,
       askedEffort: effort,
       failed: reason(error),
-      failureKey: backendFailureKey(error),
+      failureKey: backendFailureKey(error, model),
     });
   }
 }
@@ -624,7 +624,10 @@ function reading(sessionId: string, question: Question, runtime: ChatRuntime): E
         Effect.promise(async () => {
           await settle(sessionId, runtime, {
             reason: why(cause),
-            key: backendFailureKey(Option.getOrUndefined(Cause.findErrorOption(cause))),
+            key: backendFailureKey(
+              Option.getOrUndefined(Cause.findErrorOption(cause)),
+              snapshotOf(sessionId).model
+            ),
           });
         }),
       onSuccess: () =>
@@ -727,7 +730,10 @@ async function drain(sessionId: string, chat: Chat, failed: boolean): Promise<vo
       if (held !== undefined) {
         held.pendingTools = true;
       }
-      change(current, { failed: reason(error), failureKey: backendFailureKey(error) });
+      change(current, {
+        failed: reason(error),
+        failureKey: backendFailureKey(error, snapshotOf(current).model),
+      });
       return;
     }
   }

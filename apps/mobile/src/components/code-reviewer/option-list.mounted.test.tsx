@@ -2,6 +2,8 @@
 // router.back), clears the row's busy state, and renders an inline localized
 // error with a Retry action that resubmits the failed option. Retry success
 // pops the screen; a selection while an error shows clears the error.
+// Save-completion contract: the pop runs only while this screen is still the
+// focused route, so a Back pressed during the save pops exactly once.
 
 /* eslint-disable promise-function-async -- gate fakes must stay pending until the test releases them */
 
@@ -21,6 +23,7 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: routerBack }),
+  useNavigation: () => ({ isFocused: () => focus.focused }),
 }));
 vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),
@@ -55,6 +58,8 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 
 const routerBack = vi.hoisted(() => vi.fn());
+// Route focus as the navigator reports it: `false` once this screen is gone.
+const focus = vi.hoisted(() => ({ focused: true }));
 
 const OPTIONS = ['off', 'all'] as const;
 
@@ -123,6 +128,7 @@ async function press(pressable: () => void): Promise<void> {
 
 beforeEach(() => {
   routerBack.mockReset();
+  focus.focused = true;
 });
 
 describe('OptionList failed save', () => {
@@ -212,5 +218,30 @@ describe('OptionList failed save', () => {
       await Promise.resolve();
     });
     expect(routerBack).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('OptionList save that outlives the screen', () => {
+  it('leaves the screen beneath alone when the save resolves after the user left', async () => {
+    const gate = Promise.withResolvers<boolean>();
+    const onSelect = vi.fn<SelectFn>().mockReturnValue(gate.promise);
+    const renderer = await mountAsync(onSelect);
+    await act(async () => {
+      row(renderer, 'All').onPress();
+      await Promise.resolve();
+    });
+    expect(row(renderer, 'All').busy).toBe(true);
+
+    // Back while the PATCH is in flight: the navigator already removed this
+    // screen, so it reports itself unfocused by the time the save resolves.
+    focus.focused = false;
+    await act(async () => {
+      gate.resolve(true);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(onSelect).toHaveBeenCalledWith('all');
+    expect(routerBack).not.toHaveBeenCalled();
   });
 });

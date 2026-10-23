@@ -57,7 +57,7 @@ function ListDefaultsLine({ list, onPress }: Readonly<{ list: TodoList; onPress:
       className="mx-4 mb-1 min-h-11 flex-row items-center gap-2 py-2 active:opacity-70"
     >
       <Settings2 size={16} color={colors.mutedForeground} />
-      <Text className="min-w-0 flex-1 text-sm leading-5 text-ink2">
+      <Text className="min-w-0 flex-1 text-sm leading-[1.25rem] text-ink2">
         {summary ?? t('todos.list.setDefaults')}
       </Text>
       <DirectionalChevronRight size={16} color={colors.mutedForeground} />
@@ -236,6 +236,10 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={title}
+        // The list name is user prose, not a UI label, so it keeps a second
+        // line for a natural break; the shared one-line default only suits
+        // fixed labels.
+        titleNumberOfLines={2}
         reserveTitleSpace
         backFallback={LISTS_HREF}
         {...(list

@@ -1,4 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { ChevronDown } from '@/components/ui/icons';
 import { DirectionalChevronLeft } from '@/components/ui/directional-icons';
 import { I18nManager, Platform, Pressable, useWindowDimensions, View } from 'react-native';
@@ -86,7 +87,16 @@ type ScreenHeaderProps = {
   /** Omit to render a bare back-button bar (e.g. when the screen body provides its own title). */
   title?: string;
   titleContent?: React.ReactNode;
-  /** Line cap for the title, at most {@link MAX_TITLE_LINES}. */
+  /**
+   * Line cap for the title, at most {@link MAX_TITLE_LINES}. The default is
+   * one line: a header title that does not fit ellipsizes at its tail instead
+   * of wrapping. Android breaks CJK strings between any two characters, so a
+   * two-line cap orphans the string's last characters (ja-JP
+   * セキュリティエージェント rendered as 「…ジェン」 / 「ト」) — a tail
+   * ellipsis is the only natural boundary a CJK title has. Callers whose
+   * titles are real prose opt back into wrapping with an explicit cap
+   * (session headers: `SESSION_HEADER_TITLE_LINES`, todos: 2).
+   */
   titleNumberOfLines?: number;
   /**
    * Cap the eyebrow to this many lines, overriding the header's default single
@@ -181,19 +191,30 @@ type ScreenHeaderProps = {
  * height is `1.75rem`, the large 30px variant's is 36px. Class names must be
  * static because NativeWind extracts them at build time. The reserve tracks the
  * line cap so a title that grows a line (loading -> loaded, rename) cannot move
- * the body below the header.
+ * the body below the header — and a one-line cap reserves one line, not the
+ * two-line default it replaced, or the header keeps a blank line it can never
+ * fill.
+ *
+ * The large branches stay in px: NativeWind's rem is 14pt, so `min-h-9` would
+ * be 31.5pt under the 36px the large title paints.
  */
 function reservedTitleHeightClass(size: ScreenHeaderProps['size'], titleLines: number): string {
   if (size === 'large') {
-    return titleLines > 2 ? 'min-h-[108px]' : 'min-h-[72px]';
+    if (titleLines > 2) {
+      return 'min-h-[108px]';
+    }
+    return titleLines === 1 ? 'min-h-[36px]' : 'min-h-[72px]';
   }
-  return titleLines > 2 ? 'min-h-21' : 'min-h-14';
+  if (titleLines > 2) {
+    return 'min-h-21';
+  }
+  return titleLines === 1 ? 'min-h-7' : 'min-h-14';
 }
 
 export function ScreenHeader({
   title,
   titleContent,
-  titleNumberOfLines = 2,
+  titleNumberOfLines = 1,
   eyebrowNumberOfLines,
   reserveTitleSpace = false,
   eyebrow,
@@ -221,7 +242,8 @@ export function ScreenHeader({
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { width: windowWidth, fontScale } = useWindowDimensions();
+  const { width: windowWidth } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
   const canGoBack = showBackButton ?? (router.canGoBack() || backFallback !== undefined);
   const isOfflineBannerVisible = useOfflineBannerSpace();
   // A window too narrow to hold the title beside its actions drops the actions
@@ -316,7 +338,12 @@ export function ScreenHeader({
       </Text>
     );
     const titleLayout = reserveTitleSpace ? (
-      <View className={cn(reservedTitleHeightClass(size, titleLines), 'justify-center')}>
+      // Pinned to the top of the reserved box: a short title keeps the header's
+      // own padding above it instead of floating in the middle of the box it
+      // reserves for the longest title, which read as a blank band between the
+      // status bar and the screen. The box height is unchanged, so a title that
+      // grows still cannot move the body.
+      <View className={cn(reservedTitleHeightClass(size, titleLines), 'justify-start')}>
         {titleText}
       </View>
     ) : (

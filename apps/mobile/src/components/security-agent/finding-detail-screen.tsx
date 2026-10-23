@@ -13,6 +13,7 @@ import { FindingRemediationPanel } from '@/components/security-agent/finding-rem
 import { PanelErrorBoundary } from '@/components/security-agent/panel-error-boundary';
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
+import { IconButton } from '@/components/ui/icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -153,6 +154,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
+          className="px-6"
           title={t('securityAgent.findingDetail.title')}
           showBackButton
           onBack={handleBack}
@@ -170,6 +172,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
+          className="px-6"
           title={t('securityAgent.findingDetail.title')}
           showBackButton
           onBack={handleBack}
@@ -187,6 +190,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
+          className="px-6"
           title={t('securityAgent.findingDetail.title')}
           showBackButton
           onBack={handleBack}
@@ -212,22 +216,21 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        className="px-6"
         title={t('securityAgent.findingDetail.title')}
         eyebrow={finding.repo_full_name}
         showBackButton
         onBack={handleBack}
         headerRight={
           canDismiss ? (
-            <Pressable
+            <IconButton
               onPress={() => {
                 router.push(getSecurityAgentPath(scope, `dismiss/${findingId}`));
               }}
-              accessibilityRole="button"
               accessibilityLabel={t('securityAgent.dismiss.title')}
-              className="size-11 items-center justify-center active:opacity-70"
             >
               <Ban size={20} color={colors.mutedForeground} />
-            </Pressable>
+            </IconButton>
           ) : undefined
         }
       />

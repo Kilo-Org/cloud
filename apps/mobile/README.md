@@ -33,6 +33,13 @@ Unavailable usage and low-balance settings expose Retry. The low-balance row
 retries its settings read until data is available, then opens configuration.
 Cached settings remain visible during offline pauses and refresh failures.
 
+## Remote session recovery
+
+A response that fails before producing any content still shows its failure and
+Retry action, including after reopening the session. Retry resends the original
+user prompt as a new turn in the same session; the original prompt remains in
+the transcript.
+
 ## Email sign-in
 
 The email form validates syntax and a 254-character maximum after trimming and

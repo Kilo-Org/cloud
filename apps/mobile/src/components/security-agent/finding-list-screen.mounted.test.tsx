@@ -232,6 +232,7 @@ describe('Security Agent list surfaces', () => {
 
     await refresh(empty.props.refreshControl as ReactElement<{ onRefresh: () => void }>);
     expect(repositories.refetch).toHaveBeenCalledTimes(1);
+    expect(capacity.refetch).toHaveBeenCalledTimes(1);
   });
 
   it('keeps loading ahead of errors and empty content', async () => {

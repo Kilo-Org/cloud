@@ -152,8 +152,14 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
       try {
         // Refresh only — never triggers a new sync. The repositories fetch
         // failure disables the filter control until a refetch succeeds, so
-        // every list refresh also retries it.
-        const [findingsResult] = await Promise.all([findings.refetch(), repositories.refetch()]);
+        // every list refresh also retries it. The capacity counters are on
+        // screen, so a pull refreshes them too instead of leaving the notice
+        // and the actions on an older read.
+        const [findingsResult] = await Promise.all([
+          findings.refetch(),
+          repositories.refetch(),
+          capacity.refetch(),
+        ]);
         if (findingsResult.isError) {
           toast.error(t('common.couldNotRefresh'));
         }

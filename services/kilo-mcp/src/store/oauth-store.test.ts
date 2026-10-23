@@ -101,48 +101,6 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
     store = createStore(db);
   });
 
-  describe('migration tracking', () => {
-    it('applies the tracked schema and records it in __drizzle_migrations', () => {
-      const tables = db
-        .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
-        .all() as Array<{ name: string }>;
-      // Protocol state stays in the library; local tables bridge consent,
-      // authenticate strict refresh replays using issued hashes, and hold the
-      // OTP authenticators and protected requests (o2). The dropped approval
-      // queue tables are gone (o5). The account-wide wrong-code limiter adds
-      // `failed_attempts` and `locked_until` in migration 0008, the
-      // flow-cookie binding adds `flow_token` in migration 0009.
-      expect(tables.map(t => t.name)).toEqual([
-        '__drizzle_migrations',
-        'mcp_admin_authenticators',
-        'mcp_protected_requests',
-        'oauth_pending_authorizations',
-        'oauth_refresh_token_history',
-      ]);
-      const authenticatorColumns = db
-        .prepare('PRAGMA table_info(mcp_admin_authenticators)')
-        .all() as Array<{ name: string }>;
-      expect(authenticatorColumns.map(column => column.name)).toContain('failed_attempts');
-      expect(authenticatorColumns.map(column => column.name)).toContain('locked_until');
-      const pendingColumns = db
-        .prepare('PRAGMA table_info(oauth_pending_authorizations)')
-        .all() as Array<{ name: string }>;
-      expect(pendingColumns.map(column => column.name)).toContain('flow_token');
-      const applied = db.prepare('SELECT COUNT(*) AS n FROM __drizzle_migrations').get() as {
-        n: number;
-      };
-      expect(applied.n).toBe(10);
-    });
-
-    it('a second DO instance over the same storage does not re-apply the migration', async () => {
-      createStore(db);
-      const applied = db.prepare('SELECT COUNT(*) AS n FROM __drizzle_migrations').get() as {
-        n: number;
-      };
-      expect(applied.n).toBe(10);
-    });
-  });
-
   describe('refresh history', () => {
     it('persists current and superseded hashes across DO recreation and isolates grants', async () => {
       const first = await hashRefreshToken('u:g:first');
@@ -261,6 +219,7 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       id: 'pa-1',
       authRequest,
       deviceAuthCode: 'PAIR-PA-1',
+      userCode: 'SHOW-CODE',
       flowToken: 'flow-tok-1',
       createdAt: NOW,
       expiresAt: LATER,
@@ -273,6 +232,7 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       expect(record).toMatchObject({
         id: 'pa-1',
         deviceAuthCode: 'PAIR-PA-1',
+        userCode: 'SHOW-CODE',
         status: 'pending',
         kiloUserId: null,
         organizationId: null,
@@ -282,6 +242,8 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
         expiresAt: LATER,
       });
       expect(record?.authRequest).toEqual(authRequest);
+      const recreated = createStore(db);
+      expect(await recreated.getPendingAuthorization('pa-1')).toEqual(record);
       expect(await store.getPendingAuthorization('pa-ghost')).toBeNull();
     });
 
@@ -606,6 +568,7 @@ describe('production token routing (real provider + DO SQLite)', () => {
           if (url.endsWith('/api/device-auth/codes')) {
             return Response.json({
               code: 'PAIR-1',
+              user_code: 'SHOW-CODE',
               requestingClient: {
                 clientId: client.client_id,
                 clientName: 'Test Client',

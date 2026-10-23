@@ -148,7 +148,7 @@ export async function createKiloPairing(
   request: Request,
   client: RequestingClient
 ): Promise<
-  | { ok: true; pairingCode: string; requestingClient: RequestingClient }
+  | { ok: true; pairingCode: string; userCode: string; requestingClient: RequestingClient }
   | { ok: false; kind: KiloPairingFailure }
 > {
   const fetchImpl = deps.fetchImpl ?? fetch;
@@ -176,7 +176,13 @@ export async function createKiloPairing(
     return { ok: false, kind: 'unreachable' };
   }
   const code = 'code' in answer ? answer.code : undefined;
-  if (typeof code !== 'string' || code.length === 0) {
+  const userCode = 'user_code' in answer ? answer.user_code : undefined;
+  if (
+    typeof code !== 'string' ||
+    code.length === 0 ||
+    typeof userCode !== 'string' ||
+    userCode.length === 0
+  ) {
     return { ok: false, kind: 'unreachable' };
   }
   const echoed = readRequestingClient(
@@ -185,7 +191,7 @@ export async function createKiloPairing(
   if (echoed === null || echoed.clientId !== client.clientId) {
     return { ok: false, kind: 'client_unconfirmed' };
   }
-  return { ok: true, pairingCode: code, requestingClient: echoed };
+  return { ok: true, pairingCode: code, userCode, requestingClient: echoed };
 }
 
 export type KiloPollOutcome =

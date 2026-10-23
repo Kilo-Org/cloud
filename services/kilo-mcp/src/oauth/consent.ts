@@ -280,6 +280,7 @@ async function handleAuthorize(request: Request, env: Env, deps: ConsentDeps): P
     id,
     authRequest,
     deviceAuthCode: pairing.pairingCode,
+    userCode: pairing.userCode,
     flowToken,
     createdAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + PENDING_TTL_SECONDS * 1000).toISOString(),
@@ -295,7 +296,7 @@ async function handleAuthorize(request: Request, env: Env, deps: ConsentDeps): P
   const page = consentPage({
     clientName: client.clientName ?? 'your MCP client',
     scope: MCP_SCOPE,
-    webSignInUrl: `${deps.webBaseUrl.replace(/\/$/, '')}/device-auth?code=${encodeURIComponent(pairing.pairingCode)}`,
+    webSignInUrl: `${deps.webBaseUrl.replace(/\/$/, '')}/device-auth?code=${encodeURIComponent(pairing.userCode)}`,
     statusUrl: `${AUTH_PATHS.pairingStatus}?id=${encodeURIComponent(id)}`,
     restartUrl: request.url,
   });
@@ -455,12 +456,13 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
   const actionUrl = `${AUTH_PATHS.orgPicker}?id=${encodeURIComponent(id)}`;
 
   if (!isPaired(record)) {
-    // Kilo sign-in not finished for this record: send the user back through
-    // the consent page for the SAME pairing (the device-auth code is stored).
+    if (record.userCode === null) {
+      return errorPage('invalid_request', STALE_REQUEST_MESSAGE);
+    }
     return consentPage({
       clientName,
       scope: MCP_SCOPE,
-      webSignInUrl: `${deps.webBaseUrl.replace(/\/$/, '')}/device-auth?code=${encodeURIComponent(record.deviceAuthCode)}`,
+      webSignInUrl: `${deps.webBaseUrl.replace(/\/$/, '')}/device-auth?code=${encodeURIComponent(record.userCode)}`,
       statusUrl: `${AUTH_PATHS.pairingStatus}?id=${encodeURIComponent(id)}`,
       restartUrl: restartAuthorizeUrl(record.authRequest, url.origin),
     });

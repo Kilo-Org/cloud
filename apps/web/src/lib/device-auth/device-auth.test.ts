@@ -278,14 +278,14 @@ describe('Device Auth', () => {
     };
 
     test('stores the named client and gives it back on the approved poll', async () => {
-      const { code } = await createDeviceAuthRequest({ requestingClient });
-      expect(await getDeviceAuthRequest(code)).toMatchObject({
+      const { code, userCode } = await createDeviceAuthRequest({ requestingClient });
+      expect(await getDeviceAuthRequest(userCode)).toMatchObject({
         requesting_client_id: 'client-abc',
         requesting_client_name: 'Claude Desktop',
         requesting_redirect_origin: 'https://client.test',
       });
 
-      await approveDeviceAuthRequest(code, testUserId, { confirmedClientId: 'client-abc' });
+      await approveDeviceAuthRequest(userCode, testUserId, { confirmedClientId: 'client-abc' });
 
       await expect(pollDeviceAuthRequest(code)).resolves.toMatchObject({
         status: 'approved',
@@ -299,15 +299,15 @@ describe('Device Auth', () => {
       ['no confirmation', undefined],
       ['a different client', 'client-other'],
     ])('refuses %s and leaves the request pending', async (_label, confirmedClientId) => {
-      const { code } = await createDeviceAuthRequest({ requestingClient });
+      const { userCode } = await createDeviceAuthRequest({ requestingClient });
 
       await expect(
-        approveDeviceAuthRequest(code, testUserId, {
+        approveDeviceAuthRequest(userCode, testUserId, {
           ...(confirmedClientId ? { confirmedClientId } : {}),
         })
       ).rejects.toThrow(DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE);
 
-      expect(await getDeviceAuthRequest(code)).toMatchObject({
+      expect(await getDeviceAuthRequest(userCode)).toMatchObject({
         status: 'pending',
         kilo_user_id: null,
         client_confirmed_at: null,
@@ -315,9 +315,9 @@ describe('Device Auth', () => {
     });
 
     test('approves a request that names no client without a confirmation', async () => {
-      const { code } = await createDeviceAuthRequest({});
+      const { code, userCode } = await createDeviceAuthRequest({});
 
-      await approveDeviceAuthRequest(code, testUserId);
+      await approveDeviceAuthRequest(userCode, testUserId);
 
       await expect(pollDeviceAuthRequest(code)).resolves.toMatchObject({
         status: 'approved',

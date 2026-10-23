@@ -23,7 +23,7 @@ const CLIENT = {
 
 /** An apps/web answer that stored the client it was asked about. */
 function pairingCreated(): Response {
-  return Response.json({ code: 'PAIR-1', requestingClient: CLIENT });
+  return Response.json({ code: 'PAIR-1', user_code: 'SHOW-CODE', requestingClient: CLIENT });
 }
 
 function fetchMock(
@@ -76,7 +76,12 @@ describe('createKiloPairing', () => {
       authorizeRequest(),
       CLIENT
     );
-    expect(result).toEqual({ ok: true, pairingCode: 'PAIR-1', requestingClient: CLIENT });
+    expect(result).toEqual({
+      ok: true,
+      pairingCode: 'PAIR-1',
+      userCode: 'SHOW-CODE',
+      requestingClient: CLIENT,
+    });
     const [url, init] = fetchImpl.mock.calls[0]!;
     expect(url).toBe(`${WEB}/api/device-auth/codes`);
     expect(init?.method).toBe('POST');
@@ -94,6 +99,7 @@ describe('createKiloPairing', () => {
     const fetchImpl = fetchMock(() =>
       Response.json({
         code: 'PAIR-1',
+        user_code: 'SHOW-CODE',
         requestingClient: { ...CLIENT, clientName: 'Unnamed application' },
       })
     );
@@ -110,6 +116,7 @@ describe('createKiloPairing', () => {
   it('refuses an answer that does not name the same client', async () => {
     const otherClient = Response.json({
       code: 'PAIR-1',
+      user_code: 'SHOW-CODE',
       requestingClient: { ...CLIENT, clientId: 'client-other' },
     });
     await expect(
@@ -123,7 +130,7 @@ describe('createKiloPairing', () => {
       createKiloPairing(
         {
           webBaseUrl: WEB,
-          fetchImpl: fetchMock(() => Response.json({ code: 'PAIR-1' })),
+          fetchImpl: fetchMock(() => Response.json({ code: 'PAIR-1', user_code: 'SHOW-CODE' })),
         },
         authorizeRequest(),
         CLIENT
@@ -212,6 +219,20 @@ describe('createKiloPairing', () => {
         CLIENT
       )
     ).resolves.toEqual({ ok: false, kind: 'unreachable' });
+    for (const userCode of [undefined, '', 7]) {
+      await expect(
+        createKiloPairing(
+          {
+            webBaseUrl: WEB,
+            fetchImpl: fetchMock(() =>
+              Response.json({ code: 'PAIR-1', user_code: userCode, requestingClient: CLIENT })
+            ),
+          },
+          authorizeRequest(),
+          CLIENT
+        )
+      ).resolves.toEqual({ ok: false, kind: 'unreachable' });
+    }
   });
 });
 

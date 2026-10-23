@@ -128,6 +128,7 @@ function createFakeStore(): OAuthStoreApi &
         id: input.id,
         authRequest: input.authRequest,
         deviceAuthCode: input.deviceAuthCode,
+        userCode: input.userCode,
         status: 'pending',
         kiloUserId: null,
         organizationId: null,
@@ -246,6 +247,7 @@ async function seedPending(
     id,
     authRequest: authRequest(),
     deviceAuthCode: overrides.deviceAuthCode ?? 'PAIR-1',
+    userCode: 'SHOW-CODE',
     flowToken: overrides.flowToken ?? FLOW_TOKEN,
     createdAt: iso(-1000),
     expiresAt: overrides.expiresAt ?? iso(600_000),
@@ -359,7 +361,11 @@ function flowFetch(
       if (url.endsWith(suffix)) return response();
     }
     if (url.endsWith('/api/device-auth/codes')) {
-      return Response.json({ code: 'PAIR-1', requestingClient: REQUESTING_CLIENT });
+      return Response.json({
+        code: 'PAIR-1',
+        user_code: 'SHOW-CODE',
+        requestingClient: REQUESTING_CLIENT,
+      });
     }
     if (url.endsWith('/api/device-auth/codes/PAIR-1')) {
       return Response.json({
@@ -430,6 +436,8 @@ describe('GET /authorize (consent)', () => {
     const html = await response.text();
     expect(html).toContain('Connect to Kilo MCP');
     expect(html).toContain('Test Client');
+    expect(html).toContain(`${WEB}/device-auth?code=SHOW-CODE`);
+    expect(html).not.toContain('PAIR-1');
     const id = [...store.pending.keys()][0]!;
     // The status URL carries the internal pending id, never the device-auth code.
     expect(html).toContain(`/authorize/status?id=${id}`);
@@ -441,7 +449,11 @@ describe('GET /authorize (consent)', () => {
         id
       )
     ).toThrow();
-    expect(store.pending.get(id)).toMatchObject({ deviceAuthCode: 'PAIR-1', status: 'pending' });
+    expect(store.pending.get(id)).toMatchObject({
+      deviceAuthCode: 'PAIR-1',
+      userCode: 'SHOW-CODE',
+      status: 'pending',
+    });
     expect(calls).toEqual([{ phase: 'started', identity: null, clientId: CLIENT_ID }]);
     expectNoCredentialLeak(calls);
   });
@@ -526,7 +538,11 @@ describe('GET /authorize (consent)', () => {
         const body = init?.body;
         if (typeof body !== 'string') throw new Error('expected a JSON string pairing body');
         bodies.push(JSON.parse(body));
-        return Response.json({ code: 'PAIR-1', requestingClient: REQUESTING_CLIENT });
+        return Response.json({
+          code: 'PAIR-1',
+          user_code: 'SHOW-CODE',
+          requestingClient: REQUESTING_CLIENT,
+        });
       }
       throw new Error(`unexpected fetch ${url}`);
     }) as unknown as typeof fetch;
@@ -576,7 +592,7 @@ describe('GET /authorize (consent)', () => {
     const { helpers } = fakeHelpers({ authRequest: authRequest(), client: clientInfo() });
     const { analytics, calls } = fakeAnalytics();
     const fetchImpl = vi.fn(async () =>
-      Response.json({ code: 'PAIR-1' })
+      Response.json({ code: 'PAIR-1', user_code: 'SHOW-CODE' })
     ) as unknown as typeof fetch;
     const response = await run(
       createDefaultHandler(deps(store, fetchImpl, { analytics })),
@@ -783,7 +799,13 @@ describe('GET /authorize/status', () => {
       const handler = createDefaultHandler(deps(store, fetchImpl, { analytics }));
       const env = envWith(fakeHelpers({}).helpers);
       await expect(
-        run(handler, new Request(`${ISSUER}/authorize/status?id=pa-1`), env).then(r => r.json())
+        run(
+          handler,
+          new Request(`${ISSUER}/authorize/status?id=pa-1`, {
+            headers: { Cookie: flowCookie() },
+          }),
+          env
+        ).then(r => r.json())
       ).resolves.toEqual({ status: 'denied' });
       // No identity is stored for the record and it is closed for good.
       expect(store.pending.get('pa-1')).toMatchObject({
@@ -792,7 +814,13 @@ describe('GET /authorize/status', () => {
         kiloToken: null,
       });
       await expect(
-        run(handler, new Request(`${ISSUER}/authorize/status?id=pa-1`), env).then(r => r.json())
+        run(
+          handler,
+          new Request(`${ISSUER}/authorize/status?id=pa-1`, {
+            headers: { Cookie: flowCookie() },
+          }),
+          env
+        ).then(r => r.json())
       ).resolves.toEqual({ status: 'denied' });
       expect(fetchImpl).toHaveBeenCalledTimes(1);
       expect(calls).toEqual([
@@ -809,7 +837,9 @@ describe('GET /authorize/status', () => {
     await expect(
       run(
         handler,
-        new Request(`${ISSUER}/authorize/status?id=pa-1`),
+        new Request(`${ISSUER}/authorize/status?id=pa-1`, {
+          headers: { Cookie: flowCookie() },
+        }),
         envWith(fakeHelpers({}).helpers)
       ).then(r => r.json())
     ).resolves.toEqual({ status: 'needs_org', picker_url: '/authorize/org?id=pa-1' });
@@ -981,7 +1011,23 @@ describe('GET/POST /authorize/org', () => {
     expect(response.status).toBe(200);
     const html = await response.text();
     expect(html).toContain('Connect to Kilo MCP');
-    expect(html).toContain(`${WEB}/device-auth?code=PAIR-1`);
+    expect(html).toContain(`${WEB}/device-auth?code=SHOW-CODE`);
+  });
+
+  it('returns the stale-request response for an incomplete stored request', async () => {
+    const store = createFakeStore();
+    await seedPending(store);
+    const record = await store.getPendingAuthorization('pa-1');
+    if (!record) throw new Error('expected pending fixture');
+    store.pending.set('pa-1', { ...record, userCode: null });
+    const response = await run(
+      createDefaultHandler(deps(store, flowFetch())),
+      new Request(`${ISSUER}/authorize/org?id=pa-1`, { headers: { Cookie: flowCookie() } }),
+      envWith(fakeHelpers({ client: clientInfo() }).helpers)
+    );
+    expect(response.status).toBe(400);
+    expect(await response.text()).not.toContain('/device-auth?code=');
+    expect(store.pending.get('pa-1')).toEqual({ ...record, userCode: null });
   });
 
   it('binds a member organization and completes the authorization with the library', async () => {

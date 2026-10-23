@@ -54,7 +54,7 @@ async function lockOwnerCopies(tx: DrizzleTransaction, kiloUserId: string): Prom
   );
 }
 
-export type ReserveSharedSessionParams = {
+export type PublishSharedSessionCopyParams = {
   kiloUserId: string;
   sessionId: string;
   sharedState: string;
@@ -70,59 +70,36 @@ export function blobUrlColumns(copiedBlobs: Partial<Record<BlobUrlKeys, string>>
   };
 }
 
-/**
- * Reserve a share row for a session and state, or return its existing id.
- * Existing links are refreshed from the session's current folder whenever
- * the caller publishes them again.
- */
-export async function reserveSharedSession({
-  kiloUserId,
-  sessionId,
-  sharedState,
-}: ReserveSharedSessionParams): Promise<string> {
-  return db.transaction(async tx => {
-    await lockOwnerCopies(tx, kiloUserId);
+/** Copy-folder ids referenced by a shared-session row. */
+export function sharedSessionCopyIds(
+  share: Pick<
+    typeof sharedCliSessions.$inferSelect,
+    | 'share_id'
+    | 'api_conversation_history_blob_url'
+    | 'task_metadata_blob_url'
+    | 'ui_messages_blob_url'
+    | 'git_state_blob_url'
+  >
+): string[] {
+  const copyIds = new Set<string>();
 
-    const [existing] = await tx
-      .select({ share_id: sharedCliSessions.share_id })
-      .from(sharedCliSessions)
-      .where(
-        and(
-          eq(sharedCliSessions.session_id, sessionId),
-          eq(sharedCliSessions.kilo_user_id, kiloUserId),
-          eq(sharedCliSessions.shared_state, sharedState)
-        )
-      )
-      .limit(1);
-
-    if (existing) {
-      return existing.share_id;
+  for (const blobUrl of [
+    share.api_conversation_history_blob_url,
+    share.task_metadata_blob_url,
+    share.ui_messages_blob_url,
+    share.git_state_blob_url,
+  ]) {
+    const [folderName, copyId] = blobUrl?.split('/') ?? [];
+    if (folderName === 'shared-sessions' && copyId) {
+      copyIds.add(copyId);
     }
+  }
 
-    const [totals] = await tx
-      .select({ shareCount: count() })
-      .from(sharedCliSessions)
-      .where(
-        and(eq(sharedCliSessions.kilo_user_id, kiloUserId), isNotNull(sharedCliSessions.session_id))
-      );
+  if (copyIds.size === 0) {
+    copyIds.add(share.share_id);
+  }
 
-    if (totals.shareCount >= CLI_SESSION_SHARE_MAX_PER_OWNER) {
-      throw new TRPCError({
-        code: 'BAD_REQUEST',
-        message: `An account can hold ${CLI_SESSION_SHARE_MAX_PER_OWNER} shared sessions. Delete a shared session before sharing another.`,
-      });
-    }
-
-    const shareId = crypto.randomUUID();
-    await tx.insert(sharedCliSessions).values({
-      share_id: shareId,
-      session_id: sessionId,
-      kilo_user_id: kiloUserId,
-      shared_state: sharedState,
-    });
-
-    return shareId;
-  });
+  return [...copyIds];
 }
 
 /**
@@ -186,6 +163,102 @@ export async function copySessionBlobs(
 }
 
 /**
+ * Publish a fresh copy for an existing link or create a link after its first
+ * copy completes. The owner lock keeps allowance accounting atomic, while the
+ * row lock serializes refreshes and deletion of one published link.
+ */
+export async function publishSharedSessionCopy({
+  kiloUserId,
+  sessionId,
+  sharedState,
+}: PublishSharedSessionCopyParams): Promise<{ share_id: string; session_id: string }> {
+  let copyId: string | undefined;
+  let previousCopyIds: string[] = [];
+
+  let shareId: string;
+  try {
+    shareId = await db.transaction(async tx => {
+      await lockOwnerCopies(tx, kiloUserId);
+
+      const [existing] = await tx
+        .select({
+          share_id: sharedCliSessions.share_id,
+          api_conversation_history_blob_url: sharedCliSessions.api_conversation_history_blob_url,
+          task_metadata_blob_url: sharedCliSessions.task_metadata_blob_url,
+          ui_messages_blob_url: sharedCliSessions.ui_messages_blob_url,
+          git_state_blob_url: sharedCliSessions.git_state_blob_url,
+        })
+        .from(sharedCliSessions)
+        .where(
+          and(
+            eq(sharedCliSessions.session_id, sessionId),
+            eq(sharedCliSessions.kilo_user_id, kiloUserId),
+            eq(sharedCliSessions.shared_state, sharedState)
+          )
+        )
+        .limit(1)
+        .for('update');
+
+      if (!existing) {
+        const [totals] = await tx
+          .select({ shareCount: count() })
+          .from(sharedCliSessions)
+          .where(
+            and(
+              eq(sharedCliSessions.kilo_user_id, kiloUserId),
+              isNotNull(sharedCliSessions.session_id)
+            )
+          );
+
+        if (totals.shareCount >= CLI_SESSION_SHARE_MAX_PER_OWNER) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `An account can hold ${CLI_SESSION_SHARE_MAX_PER_OWNER} shared sessions. Delete a shared session before sharing another.`,
+          });
+        }
+      }
+
+      shareId = existing?.share_id ?? crypto.randomUUID();
+      copyId = crypto.randomUUID();
+      const copiedBlobs = await copySessionBlobs(sessionId, 'sessions', copyId, 'shared-sessions');
+
+      if (existing) {
+        previousCopyIds = sharedSessionCopyIds(existing);
+        await tx
+          .update(sharedCliSessions)
+          .set(blobUrlColumns(copiedBlobs))
+          .where(eq(sharedCliSessions.share_id, shareId));
+      } else {
+        await tx.insert(sharedCliSessions).values({
+          share_id: shareId,
+          session_id: sessionId,
+          kilo_user_id: kiloUserId,
+          shared_state: sharedState,
+          ...blobUrlColumns(copiedBlobs),
+        });
+      }
+
+      return shareId;
+    });
+  } catch (error) {
+    if (copyId) {
+      try {
+        await deleteSharedSessionCopies([copyId]);
+      } catch {
+        // A cleanup failure must not replace the error that caused the rollback.
+      }
+    }
+    throw error;
+  }
+
+  if (previousCopyIds.length > 0) {
+    await deleteSharedSessionCopies(previousCopyIds);
+  }
+
+  return { share_id: shareId, session_id: sessionId };
+}
+
+/**
  * Undo a fork reservation whose copy did not complete. The row belongs to the
  * request that inserted it, so removing it together with whatever the copy
  * wrote leaves nothing behind.
@@ -200,9 +273,9 @@ export async function discardReservedFork(sessionId: string): Promise<void> {
   await db.delete(cliSessions).where(eq(cliSessions.session_id, sessionId));
 }
 
-/** Delete the shared-sessions object copies of the given shares. */
-export async function deleteSharedSessionCopies(shareIds: string[]): Promise<void> {
-  for (const shareId of shareIds) {
-    await deleteBlobs(shareId, sessionBlobRefs('shared-sessions'));
+/** Delete the shared-sessions object copies in the given copy folders. */
+export async function deleteSharedSessionCopies(copyIds: string[]): Promise<void> {
+  for (const copyId of copyIds) {
+    await deleteBlobs(copyId, sessionBlobRefs('shared-sessions'));
   }
 }

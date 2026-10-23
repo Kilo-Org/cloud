@@ -31,9 +31,10 @@ import {
   copySessionBlobs,
   deleteSharedSessionCopies,
   discardReservedFork,
+  publishSharedSessionCopy,
   reserveForkedSession,
-  reserveSharedSession,
   sessionBlobRefs,
+  sharedSessionCopyIds,
 } from '@/lib/cli-sessions/session-copies';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { getCodeReviewById } from '@/lib/code-reviews/db/code-reviews';
@@ -42,14 +43,12 @@ import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 const PAGE_SIZE = 10;
 const SHARE_BLOB_DELETE_ATTEMPTS = 3;
 
-async function deleteShareBlobsWithRetry(shareId: string): Promise<void> {
-  const blobsToDelete = sessionBlobRefs('shared-sessions');
-
+async function deleteShareBlobsWithRetry(copyIds: string[]): Promise<void> {
   let lastError: unknown;
 
   for (let attempt = 0; attempt < SHARE_BLOB_DELETE_ATTEMPTS; attempt += 1) {
     try {
-      await deleteBlobs(shareId, blobsToDelete);
+      await deleteSharedSessionCopies(copyIds);
       return;
     } catch (error) {
       lastError = error;
@@ -273,56 +272,6 @@ async function getForkableSession(
     source_id: input.share_or_session_id,
     source_folder: 'sessions' as const,
   };
-}
-
-/**
- * Publish the current session folder under its stable share id. Lock the row
- * while copying so concurrent refreshes cannot interleave writes to the same
- * object keys.
- */
-async function createSharedSessionCopy(params: {
-  kiloUserId: string;
-  sessionId: string;
-  sharedState: string;
-}): Promise<{ share_id: string; session_id: string }> {
-  const shareId = await reserveSharedSession(params);
-  const completed = await db.transaction(async tx => {
-    const [lockedShare] = await tx
-      .select({ share_id: sharedCliSessions.share_id })
-      .from(sharedCliSessions)
-      .where(eq(sharedCliSessions.share_id, shareId))
-      .for('update');
-
-    if (!lockedShare) return false;
-
-    const blobUrls = await copySessionBlobs(
-      params.sessionId,
-      'sessions',
-      shareId,
-      'shared-sessions'
-    );
-    const [updated] = await tx
-      .update(sharedCliSessions)
-      .set(blobUrlColumns(blobUrls))
-      .where(eq(sharedCliSessions.share_id, shareId))
-      .returning({ share_id: sharedCliSessions.share_id });
-
-    return Boolean(updated);
-  });
-
-  if (!completed) {
-    try {
-      await deleteSharedSessionCopies([shareId]);
-    } catch {
-      // The row is gone; a cleanup failure must not replace the conflict.
-    }
-    throw new TRPCError({
-      code: 'CONFLICT',
-      message: 'The share was removed before its copy finished. Share the session again.',
-    });
-  }
-
-  return { share_id: shareId, session_id: params.sessionId };
 }
 
 /**
@@ -581,14 +530,20 @@ export const cliSessionsRouter = createTRPCRouter({
     for (const share of shares) {
       await db.transaction(async tx => {
         const [lockedShare] = await tx
-          .select({ share_id: sharedCliSessions.share_id })
+          .select({
+            share_id: sharedCliSessions.share_id,
+            api_conversation_history_blob_url: sharedCliSessions.api_conversation_history_blob_url,
+            task_metadata_blob_url: sharedCliSessions.task_metadata_blob_url,
+            ui_messages_blob_url: sharedCliSessions.ui_messages_blob_url,
+            git_state_blob_url: sharedCliSessions.git_state_blob_url,
+          })
           .from(sharedCliSessions)
           .where(eq(sharedCliSessions.share_id, share.share_id))
           .for('update');
 
         if (!lockedShare) return;
 
-        await deleteShareBlobsWithRetry(share.share_id);
+        await deleteShareBlobsWithRetry(sharedSessionCopyIds(lockedShare));
         await tx.delete(sharedCliSessions).where(eq(sharedCliSessions.share_id, share.share_id));
       });
     }
@@ -617,7 +572,7 @@ export const cliSessionsRouter = createTRPCRouter({
 
     await getSessionWithExistsCheck(session_id, ctx.user.id);
 
-    return createSharedSessionCopy({
+    return publishSharedSessionCopy({
       kiloUserId: ctx.user.id,
       sessionId: session_id,
       sharedState: shared_state,

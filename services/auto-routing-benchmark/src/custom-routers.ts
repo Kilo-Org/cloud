@@ -93,20 +93,22 @@ export async function resolveCustomRouterEntries(
             : (concrete?.variants ?? [null]);
         const measuredAs = entry.measuredAs;
         if (!measuredAs || !catalog) return { measuredBy: 'client', entry, variants };
-        const measured = catalogModelVariants(catalog, measuredAs);
-        const historical = measured
-          ? []
-          : await loadProfileRowsForPairs(
-              profiles.db,
-              profiles.router,
-              variants.map(variant => ({ model: measuredAs, variant }))
-            );
+        // Same-name variants link only when the platform has measured them: the catalog lists
+        // variants it has not benchmarked yet, and those stay on the owner's client eval.
+        const measuredRows = await loadProfileRowsForPairs(
+          profiles.db,
+          profiles.router,
+          variants.map(variant => ({ model: measuredAs, variant }))
+        );
         const linkedVariants = new Map(
           variants
             .filter(variant =>
-              measured
-                ? measured.variants.includes(variant)
-                : historical.some(row => variantFromStorage(row.variant) === variant)
+              measuredRows.some(
+                row =>
+                  row.status === 'ready' &&
+                  row.run_id !== null &&
+                  variantFromStorage(row.variant) === variant
+              )
             )
             .map(variant => [variant, { model: measuredAs, variant }] as const)
         );

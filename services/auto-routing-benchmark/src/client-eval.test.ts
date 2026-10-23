@@ -152,13 +152,23 @@ describe('client eval (real SQLite)', () => {
   });
 
   it('omits linked variants from the plan and rejects their uploads while unmatched variants still grade', async () => {
+    sqlite
+      .prepare(`INSERT INTO benchmark_profiles (router, model, variant, engine_identity,
+      repetitions, status, run_id, requested_at, updated_at)
+      VALUES ('efficient', 'vendor/platform', 'low', ?, 1, 'ready', 'platform-run', 'a', 'a')`)
+      .run(ENGINE);
     const entries = [{ ...localModel, measuredAs: 'vendor/platform' }];
     deps.source.fetchImpl = async () =>
       Response.json({
         data: [
           {
             id: 'vendor/platform',
-            opencode: { variants: { low: { reasoning: { effort: 'low' } } } },
+            opencode: {
+              variants: {
+                low: { reasoning: { effort: 'low' } },
+                high: { reasoning: { effort: 'high' } },
+              },
+            },
           },
         ],
       });

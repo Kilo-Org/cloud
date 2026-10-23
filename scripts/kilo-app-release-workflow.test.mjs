@@ -363,7 +363,12 @@ test('the release workflow gates the build on the upload cap and lands the chang
 });
 
 test('the mobile build tooling runs the EAS CLI the workspace installs', () => {
-  validateEasCli(readWorkflow(), readJson(mobilePackagePath), readJson(easConfigPath), readLockfile());
+  validateEasCli(
+    readWorkflow(),
+    readJson(mobilePackagePath),
+    readJson(easConfigPath),
+    readLockfile()
+  );
 });
 
 const mutations = {

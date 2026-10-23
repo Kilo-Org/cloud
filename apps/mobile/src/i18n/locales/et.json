@@ -66,6 +66,7 @@
     "message": "Sõnum",
     "off": "Väljas",
     "organization": "Organisatsioon",
+    "organizationTrialEnded": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Organisatsiooni omanik saab arveldust kilo.ai keskkonnas uuendada ja seejärel uuesti proovida.",
     "platform": "Platvorm",
     "prReview": "PR-i ülevaatus",
     "queued": "Järjekorras",
@@ -3069,8 +3070,10 @@
       "truncated": "Saadaval on ka varasemad krediiditehingud."
     },
     "inviteMember": {
+      "alreadyMember": "See isik on juba selle organisatsiooni liige.",
       "emailError": "Sisesta kehtiv e-posti aadress.",
       "emailPlaceholder": "nimi@ettevote.ee",
+      "pendingInvitation": "Sellele e-posti aadressile on juba saadetud kutse, mis on ootel.",
       "permissionDenied": "Sul puudub õigus liikmeid kutsuda.",
       "roleMember": "Roll: liige",
       "sendInvite": "Saada kutse",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "E-kirja saatmine ebaõnnestus",
       "inviteCreated": "Kutse loodud",
       "pendingInvitations": "Ootel kutsed",
+      "ownRoleChange": "Sa ei saa oma rolli muuta.",
       "resendInvite": "Saada kutse uuesti",
       "shareInviteLink": "Jaga kutselinki"
     },

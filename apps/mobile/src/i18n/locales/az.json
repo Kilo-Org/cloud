@@ -66,6 +66,7 @@
     "message": "Mesaj",
     "off": "Söndürülüb",
     "organization": "Təşkilat",
+    "organizationTrialEnded": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Təşkilat sahibi kilo.ai ünvanında billinqi yeniləyə və sonra yenidən cəhd edə bilər.",
     "platform": "Platforma",
     "prReview": "PR yoxlaması",
     "queued": "Növbədə",
@@ -3069,8 +3070,10 @@
       "truncated": "Əvvəlki kredit əməliyyatlarına da baxmaq olar."
     },
     "inviteMember": {
+      "alreadyMember": "Bu şəxs artıq bu təşkilatın üzvüdür.",
       "emailError": "Düzgün e-poçt ünvanı daxil et.",
       "emailPlaceholder": "ad@sirket.com",
+      "pendingInvitation": "Bu e-poçt ünvanının artıq gözləyən dəvəti var.",
       "permissionDenied": "Üzv dəvət etmək icazən yoxdur.",
       "roleMember": "Rol: üzv",
       "sendInvite": "Dəvət göndər",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "E-poçt göndərilmədi",
       "inviteCreated": "Dəvət yaradıldı",
       "pendingInvitations": "Gözləyən dəvətlər",
+      "ownRoleChange": "Öz rolunu dəyişə bilməzsən.",
       "resendInvite": "Dəvəti yenidən göndər",
       "shareInviteLink": "Dəvət keçidini paylaş"
     },

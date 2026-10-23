@@ -20,6 +20,7 @@ import { captureEvent, ORGANIZATION_MEMBER_INVITED_EVENT } from '@/lib/analytics
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { isMoneyRole, type OrgRole, useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { cn, EMAIL_PATTERN } from '@/lib/utils';
 
 const INVITABLE_ROLES: OrgRole[] = ['member', 'billing_manager', 'owner'];
@@ -161,9 +162,13 @@ export function InviteMemberSheet() {
 
         {/* The mutation hook has no toast for invite (inline error pattern P2),
             so AccessibleStatus is the single announcement owner here: one
-            announcement per platform, visuals preserved (tone error). */}
+            announcement per platform, visuals preserved (tone error). The
+            server's sentence never reaches the screen; a known rejection gets
+            its own localized copy. */}
         <AccessibleStatus
-          message={mutations.invite.isError ? mutations.invite.error.message : null}
+          message={
+            mutations.invite.isError ? organizationErrorMessage(mutations.invite.error) : null
+          }
           className="text-sm"
         />
       </ScrollView>

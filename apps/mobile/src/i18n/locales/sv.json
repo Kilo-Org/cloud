@@ -66,6 +66,7 @@
     "message": "Meddelande",
     "off": "Av",
     "organization": "Organisation",
+    "organizationTrialEnded": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. En organisationsägare kan uppdatera faktureringen på kilo.ai och sedan försöka igen.",
     "platform": "Plattform",
     "prReview": "PR-granskning",
     "queued": "I kö",
@@ -3068,8 +3069,10 @@
       "truncated": "Det finns äldre kreditaktivitet att visa."
     },
     "inviteMember": {
+      "alreadyMember": "Den här personen är redan medlem i den här organisationen.",
       "emailError": "Ange en giltig e-postadress",
       "emailPlaceholder": "namn@foretag.se",
+      "pendingInvitation": "Den här e-postadressen har redan en väntande inbjudan.",
       "permissionDenied": "Du har inte behörighet att bjuda in medlemmar.",
       "roleMember": "Roll: Medlem",
       "sendInvite": "Skicka inbjudan",
@@ -3141,6 +3144,7 @@
       "emailStatusFailed": "E-postmeddelandet kunde inte skickas",
       "inviteCreated": "Inbjudan skapad",
       "pendingInvitations": "Väntande inbjudningar",
+      "ownRoleChange": "Du kan inte ändra din egen roll.",
       "resendInvite": "Skicka inbjudan igen",
       "shareInviteLink": "Dela inbjudningslänk"
     },

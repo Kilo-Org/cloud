@@ -66,6 +66,7 @@
     "message": "ਸੁਨੇਹਾ",
     "off": "ਬੰਦ",
     "organization": "ਸੰਸਥਾ",
+    "organizationTrialEnded": "ਸੰਸਥਾ ਦਾ ਟ੍ਰਾਇਲ ਖਤਮ ਹੋ ਗਿਆ ਹੈ ਅਤੇ ਇਸਦੀ ਕੋਈ ਸਰਗਰਮ ਯੋਜਨਾ ਨਹੀਂ ਹੈ। ਸੰਸਥਾ ਦਾ ਮਾਲਕ kilo.ai 'ਤੇ ਬਿਲਿੰਗ ਅੱਪਡੇਟ ਕਰ ਸਕਦਾ ਹੈ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "platform": "ਪਲੇਟਫਾਰਮ",
     "prReview": "PR ਦੀ ਸਮੀਖਿਆ",
     "queued": "ਕਤਾਰ ਵਿੱਚ",
@@ -3069,8 +3070,10 @@
       "truncated": "ਕ੍ਰੈਡਿਟ ਦਾ ਪੁਰਾਣਾ ਲੇਖਾ-ਜੋਖਾ ਵੀ ਉਪਲਬਧ ਹੈ।"
     },
     "inviteMember": {
+      "alreadyMember": "ਇਹ ਵਿਅਕਤੀ ਪਹਿਲਾਂ ਹੀ ਇਸ ਸੰਸਥਾ ਦਾ ਮੈਂਬਰ ਹੈ।",
       "emailError": "ਸਹੀ ਈਮੇਲ ਪਤਾ ਦਰਜ ਕਰੋ।",
       "emailPlaceholder": "ਨਾਮ@ਕੰਪਨੀ.com",
+      "pendingInvitation": "ਇਸ ਈਮੇਲ ਲਈ ਪਹਿਲਾਂ ਹੀ ਇੱਕ ਸੱਦਾ ਬਕਾਇਆ ਹੈ।",
       "permissionDenied": "ਤੁਹਾਡੇ ਕੋਲ ਮੈਂਬਰਾਂ ਨੂੰ ਸੱਦਾ ਦੇਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
       "roleMember": "ਭੂਮਿਕਾ: ਮੈਂਬਰ",
       "sendInvite": "ਸੱਦਾ ਭੇਜੋ",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "ਈਮੇਲ ਨਹੀਂ ਭੇਜੀ ਜਾ ਸਕੀ",
       "inviteCreated": "ਸੱਦਾ ਬਣਾਇਆ ਗਿਆ",
       "pendingInvitations": "ਜਵਾਬ ਦੀ ਉਡੀਕ ਵਾਲੇ ਸੱਦੇ",
+      "ownRoleChange": "ਤੁਸੀਂ ਆਪਣੀ ਭੂਮਿਕਾ ਨਹੀਂ ਬਦਲ ਸਕਦੇ।",
       "resendInvite": "ਸੱਦਾ ਦੁਬਾਰਾ ਭੇਜੋ",
       "shareInviteLink": "ਸੱਦੇ ਦਾ ਲਿੰਕ ਸਾਂਝਾ ਕਰੋ"
     },

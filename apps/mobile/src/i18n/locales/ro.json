@@ -66,6 +66,7 @@
     "message": "Mesaj",
     "off": "Dezactivat",
     "organization": "Organizație",
+    "organizationTrialEnded": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Un proprietar al organizației poate actualiza facturarea pe kilo.ai, apoi poate încerca din nou.",
     "platform": "Platformă",
     "prReview": "Revizuire PR",
     "queued": "În coadă",
@@ -3109,8 +3110,10 @@
       "truncated": "Sunt disponibile operațiuni mai vechi cu credite."
     },
     "inviteMember": {
+      "alreadyMember": "Această persoană este deja membru al acestei organizații.",
       "emailError": "Introdu o adresă de e-mail validă.",
       "emailPlaceholder": "nume@companie.com",
+      "pendingInvitation": "Acest e-mail are deja o invitație în așteptare.",
       "permissionDenied": "Nu ai permisiunea de a invita membri.",
       "roleMember": "Rolul atribuit este cel de membru.",
       "sendInvite": "Trimite invitația",
@@ -3182,6 +3185,7 @@
       "emailStatusFailed": "Trimiterea e-mailului a eșuat",
       "inviteCreated": "Invitație creată",
       "pendingInvitations": "Invitații în așteptare",
+      "ownRoleChange": "Nu îți poți schimba propriul rol.",
       "resendInvite": "Retrimite invitația",
       "shareInviteLink": "Partajează linkul de invitație"
     },

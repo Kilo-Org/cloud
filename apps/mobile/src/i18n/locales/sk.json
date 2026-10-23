@@ -66,6 +66,7 @@
     "message": "Správa",
     "off": "Vypnuté",
     "organization": "Organizácia",
+    "organizationTrialEnded": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Vlastník organizácie môže aktualizovať fakturáciu na kilo.ai a potom to skúsiť znova.",
     "platform": "Platforma",
     "prReview": "Kontrola PR",
     "queued": "V poradí",
@@ -3149,8 +3150,10 @@
       "truncated": "K dispozícii sú aj staršie pohyby kreditov."
     },
     "inviteMember": {
+      "alreadyMember": "Táto osoba je už členom tejto organizácie.",
       "emailError": "Zadaj platnú e-mailovú adresu.",
       "emailPlaceholder": "meno@firma.sk",
+      "pendingInvitation": "Táto e-mailová adresa už má čakajúcu pozvánku.",
       "permissionDenied": "Nemáš povolenie pozývať členov.",
       "roleMember": "Rola: člen",
       "sendInvite": "Odoslať pozvánku",
@@ -3222,6 +3225,7 @@
       "emailStatusFailed": "E-mail sa nepodarilo odoslať",
       "inviteCreated": "Pozvánka vytvorená",
       "pendingInvitations": "Čakajúce pozvánky",
+      "ownRoleChange": "Nemôžete si zmeniť vlastnú rolu.",
       "resendInvite": "Znova odoslať pozvánku",
       "shareInviteLink": "Zdieľať odkaz na pozvánku"
     },

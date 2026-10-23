@@ -66,6 +66,7 @@
     "message": "Votre message",
     "off": "Désactivé",
     "organization": "Organisation",
+    "organizationTrialEnded": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Le propriétaire de l'organisation peut mettre à jour la facturation sur kilo.ai, puis réessayer.",
     "platform": "Plateforme",
     "prReview": "Revue de PR",
     "queued": "En file d'attente",
@@ -3108,8 +3109,10 @@
       "renameTitle": "Renommer l'organisation"
     },
     "inviteMember": {
+      "alreadyMember": "Cette personne est déjà membre de cette organisation.",
       "emailError": "Saisissez une adresse e-mail valide.",
       "emailPlaceholder": "nom@entreprise.com",
+      "pendingInvitation": "Cette adresse e-mail a déjà une invitation en attente.",
       "permissionDenied": "Vous n'avez pas l'autorisation d'inviter des membres.",
       "roleMember": "Le rôle attribué est celui de membre.",
       "sendInvite": "Envoyer l'invitation",
@@ -3181,6 +3184,7 @@
       "emailStatusFailed": "Échec de l'envoi de l'e-mail",
       "inviteCreated": "Invitation créée",
       "pendingInvitations": "Invitations en attente",
+      "ownRoleChange": "Vous ne pouvez pas changer votre propre rôle.",
       "resendInvite": "Renvoyer l'invitation",
       "shareInviteLink": "Partager le lien d'invitation"
     },

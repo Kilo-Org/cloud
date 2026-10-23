@@ -66,6 +66,7 @@
     "message": "Ergaa",
     "off": "Cufame",
     "organization": "Dhaabbata",
+    "organizationTrialEnded": "Yeroon yaalii dhaabbataa xumurameera, karoora socho'aa hin qabu. Abbaan dhaabbataa kaffaltii kilo.ai irratti haaromsuu danda'a, sana booda irra deebi'ii yaali.",
     "platform": "Pilaatfoormii",
     "prReview": "Sakatta'a PR",
     "queued": "Dabaree eeggachaa jira",
@@ -3069,8 +3070,10 @@
       "truncated": "Sochiin kiriiditii duraanii ni argama."
     },
     "inviteMember": {
+      "alreadyMember": "Namni kun duraanuu miseensa dhaabbata kanaati.",
       "emailError": "Teessoo imeelii sirrii galchi.",
       "emailPlaceholder": "maqaa@company.com",
+      "pendingInvitation": "Teessoon imeelii kun duraanuu affeerraa eeggachaa jiru qaba.",
       "permissionDenied": "Miseensoota affeeruuf hayyama hin qabdu.",
       "roleMember": "Gahee: Miseensa",
       "sendInvite": "Affeerraa ergi",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "Imeelii erguun hin milkoofne",
       "inviteCreated": "Affeerraan uumamteera",
       "pendingInvitations": "Affeerraawwan deebii eegaa jiran",
+      "ownRoleChange": "Gahee mataa kee jijjiiruu hin dandeessu.",
       "resendInvite": "Affeerraa deebi'ii ergi",
       "shareInviteLink": "Geessituu affeerraa qoodi"
     },

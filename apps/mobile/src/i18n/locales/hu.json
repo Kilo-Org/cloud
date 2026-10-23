@@ -66,6 +66,7 @@
     "message": "Üzenet",
     "off": "Ki",
     "organization": "Szervezet",
+    "organizationTrialEnded": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. A szervezet tulajdonosa frissítheti a számlázást a kilo.ai oldalon, majd próbálja újra.",
     "platform": "Platform",
     "prReview": "PR-ellenőrzés",
     "queued": "Várólistán",
@@ -3069,8 +3070,10 @@
       "truncated": "Korábbi kreditműveletek is elérhetők."
     },
     "inviteMember": {
+      "alreadyMember": "Ez a személy már tagja ennek a szervezetnek.",
       "emailError": "Adj meg egy érvényes e-mail-címet.",
       "emailPlaceholder": "nev@ceg.hu",
+      "pendingInvitation": "Erre az e-mail-címre már van egy függőben lévő meghívó.",
       "permissionDenied": "Nincs jogosultságod tagok meghívására.",
       "roleMember": "Szerepkör: tag.",
       "sendInvite": "Meghívó küldése",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "Sikertelen e-mail-küldés",
       "inviteCreated": "Meghívó létrehozva",
       "pendingInvitations": "Függőben lévő meghívók",
+      "ownRoleChange": "Nem módosíthatja a saját szerepkörét.",
       "resendInvite": "Meghívó újraküldése",
       "shareInviteLink": "Meghívóhivatkozás megosztása"
     },

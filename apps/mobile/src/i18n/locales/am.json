@@ -66,6 +66,7 @@
     "message": "መልእክት",
     "off": "ጠፍቷል",
     "organization": "ድርጅት",
+    "organizationTrialEnded": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም። የድርጅት ባለቤት በkilo.ai ላይ የክፍያ መረጃን ማዘመን ይችላል፣ ከዚያ እንደገና ይሞክሩ።",
     "platform": "መድረክ",
     "prReview": "የPR ግምገማ",
     "queued": "ወረፋ ይዟል",
@@ -3069,8 +3070,10 @@
       "truncated": "የቆዩ የክሬዲት እንቅስቃሴዎች ይገኛሉ።"
     },
     "inviteMember": {
+      "alreadyMember": "ይህ ሰው አስቀድሞ የዚህ ድርጅት አባል ነው።",
       "emailError": "ትክክለኛ የኢሜይል አድራሻ ያስገቡ።",
       "emailPlaceholder": "ስም@company.com",
+      "pendingInvitation": "ይህ ኢሜይል አስቀድሞ በመጠባበቅ ላይ ያለ ግብዣ አለው።",
       "permissionDenied": "አባላትን ለመጋበዝ ፈቃድ የለዎትም።",
       "roleMember": "ሚና፦ አባል",
       "sendInvite": "ግብዣ ይላኩ",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "ኢሜይሉ አልተላከም",
       "inviteCreated": "ግብዣው ተፈጥሯል",
       "pendingInvitations": "ምላሽ የሚጠብቁ ግብዣዎች",
+      "ownRoleChange": "የራስዎን ሚና መቀየር አይችሉም።",
       "resendInvite": "ግብዣውን እንደገና ይላኩ",
       "shareInviteLink": "የግብዣውን አገናኝ ያጋሩ"
     },

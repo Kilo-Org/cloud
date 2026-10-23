@@ -66,6 +66,7 @@
     "message": "Messaggio",
     "off": "Disattivato",
     "organization": "Organizzazione",
+    "organizationTrialEnded": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Il proprietario dell'organizzazione può aggiornare la fatturazione su kilo.ai, poi riprova.",
     "platform": "Piattaforma",
     "prReview": "Revisione PR",
     "queued": "In coda",
@@ -3108,8 +3109,10 @@
       "renameTitle": "Rinomina l'organizzazione"
     },
     "inviteMember": {
+      "alreadyMember": "Questa persona è già un membro di questa organizzazione.",
       "emailError": "Inserisci un indirizzo email valido.",
       "emailPlaceholder": "nome@azienda.com",
+      "pendingInvitation": "Questo indirizzo email ha già un invito in sospeso.",
       "permissionDenied": "Non hai l'autorizzazione per invitare membri.",
       "roleMember": "L'invito assegna il ruolo di membro.",
       "sendInvite": "Invia l'invito",
@@ -3181,6 +3184,7 @@
       "emailStatusFailed": "Invio email non riuscito",
       "inviteCreated": "Invito creato",
       "pendingInvitations": "Inviti in sospeso",
+      "ownRoleChange": "Non puoi modificare il tuo ruolo.",
       "resendInvite": "Invia di nuovo l'invito",
       "shareInviteLink": "Condividi il link di invito"
     },

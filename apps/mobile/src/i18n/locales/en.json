@@ -157,6 +157,7 @@
     "message": "Message",
     "off": "Off",
     "organization": "Organization",
+    "organizationTrialEnded": "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again.",
     "platform": "Platform",
     "prReview": "PR Review",
     "queued": "Queued",
@@ -3167,8 +3168,10 @@
       }
     },
     "inviteMember": {
+      "alreadyMember": "This person is already a member of this organization.",
       "emailError": "Enter a valid email address",
       "emailPlaceholder": "name@company.com",
+      "pendingInvitation": "This email already has a pending invitation.",
       "permissionDenied": "You don't have permission to invite members.",
       "roleMember": "Role: Member",
       "sendInvite": "Send invite",
@@ -3240,6 +3243,7 @@
       "emailStatusFailed": "Email failed",
       "inviteCreated": "Invite created",
       "pendingInvitations": "Pending invitations",
+      "ownRoleChange": "You cannot change your own role.",
       "resendInvite": "Resend invite",
       "shareInviteLink": "Share invite link"
     },

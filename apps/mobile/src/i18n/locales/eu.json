@@ -66,6 +66,7 @@
     "message": "Mezua",
     "off": "Desaktibatuta",
     "organization": "Erakundea",
+    "organizationTrialEnded": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Erakundearen jabe batek fakturazioa egunera dezake kilo.ai-n, eta gero berriro saiatu.",
     "platform": "Plataforma",
     "prReview": "PR-en berrikuspena",
     "queued": "Ilaran",
@@ -3069,8 +3070,10 @@
       "truncated": "Aurreko kreditu-jarduera eskuragarri dago."
     },
     "inviteMember": {
+      "alreadyMember": "Pertsona hau dagoeneko erakunde honetako kidea da.",
       "emailError": "Sartu baliozko helbide elektroniko bat.",
       "emailPlaceholder": "izena@enpresa.eus",
+      "pendingInvitation": "Helbide elektroniko honek dagoeneko gonbidapen bat du zain.",
       "permissionDenied": "Ez duzu kideak gonbidatzeko baimenik.",
       "roleMember": "Rola: kidea",
       "sendInvite": "Bidali gonbidapena",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "Mezu elektronikoaren bidalketak huts egin du",
       "inviteCreated": "Gonbidapena sortuta",
       "pendingInvitations": "Onartzeko zain dauden gonbidapenak",
+      "ownRoleChange": "Ezin duzu zure rola aldatu.",
       "resendInvite": "Bidali gonbidapena berriro",
       "shareInviteLink": "Partekatu gonbidapen-esteka"
     },

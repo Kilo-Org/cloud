@@ -66,6 +66,7 @@
     "message": "رسالة",
     "off": "معطّل",
     "organization": "المؤسسة",
+    "organizationTrialEnded": "انتهت الفترة التجريبية للمؤسسة ولم تعد لديها خطة نشطة. يمكن لمالك المؤسسة تحديث الفوترة على kilo.ai، ثم المحاولة مرة أخرى.",
     "platform": "المنصة",
     "prReview": "مراجعة PR",
     "queued": "في قائمة الانتظار",
@@ -3228,8 +3229,10 @@
       "renameTitle": "إعادة تسمية المؤسسة"
     },
     "inviteMember": {
+      "alreadyMember": "هذا الشخص عضو بالفعل في هذه المؤسسة.",
       "emailError": "أدخل عنوان بريد إلكتروني صالحًا.",
       "emailPlaceholder": "user@example.com",
+      "pendingInvitation": "توجد بالفعل دعوة معلّقة لهذا البريد الإلكتروني.",
       "permissionDenied": "ليست لديك صلاحية لدعوة الأعضاء.",
       "roleMember": "الدور هو عضو.",
       "sendInvite": "إرسال الدعوة",
@@ -3301,6 +3304,7 @@
       "emailStatusFailed": "تعذّر إرسال البريد الإلكتروني",
       "inviteCreated": "تم إنشاء الدعوة",
       "pendingInvitations": "الدعوات المعلّقة",
+      "ownRoleChange": "لا يمكنك تغيير دورك.",
       "resendInvite": "إعادة إرسال الدعوة",
       "shareInviteLink": "مشاركة رابط الدعوة"
     },

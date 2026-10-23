@@ -66,6 +66,7 @@
     "message": "Poruka",
     "off": "Isključeno",
     "organization": "Organizacija",
+    "organizationTrialEnded": "Probni period organizacije je završen i ona nema aktivan plan. Vlasnik organizacije može da ažurira naplatu na kilo.ai, a zatim pokuša ponovo.",
     "platform": "Platforma",
     "prReview": "Pregled PR-a",
     "queued": "U redu čekanja",
@@ -3109,8 +3110,10 @@
       "truncated": "Dostupne su i ranije promene kredita."
     },
     "inviteMember": {
+      "alreadyMember": "Ova osoba je već član ove organizacije.",
       "emailError": "Unesi važeću adresu e-pošte.",
       "emailPlaceholder": "ime@firma.com",
+      "pendingInvitation": "Ova adresa e-pošte već ima pozivnicu na čekanju.",
       "permissionDenied": "Nemaš dozvolu da pozivaš članove.",
       "roleMember": "Dodeljena uloga je član.",
       "sendInvite": "Pošalji pozivnicu",
@@ -3182,6 +3185,7 @@
       "emailStatusFailed": "E-pošta nije poslata",
       "inviteCreated": "Pozivnica kreirana",
       "pendingInvitations": "Pozivnice na čekanju",
+      "ownRoleChange": "Ne možeš da promeniš sopstvenu ulogu.",
       "resendInvite": "Ponovo pošalji pozivnicu",
       "shareInviteLink": "Podeli link pozivnice"
     },

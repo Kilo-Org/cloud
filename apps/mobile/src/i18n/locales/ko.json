@@ -66,6 +66,7 @@
     "message": "메시지",
     "off": "꺼짐",
     "organization": "조직",
+    "organizationTrialEnded": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. 조직 소유자는 kilo.ai에서 결제 정보를 업데이트한 후 다시 시도하세요.",
     "platform": "플랫폼",
     "prReview": "PR 리뷰",
     "queued": "대기 중",
@@ -3068,8 +3069,10 @@
       "renameTitle": "조직 이름 변경"
     },
     "inviteMember": {
+      "alreadyMember": "이 사용자는 이미 이 조직의 멤버입니다.",
       "emailError": "올바른 이메일 주소를 입력하세요.",
       "emailPlaceholder": "이름@회사.com",
+      "pendingInvitation": "이 이메일에는 이미 보류 중인 초대가 있습니다.",
       "permissionDenied": "멤버를 초대할 권한이 없습니다.",
       "roleMember": "멤버 역할로 초대합니다.",
       "sendInvite": "초대 보내기",
@@ -3141,6 +3144,7 @@
       "emailStatusFailed": "이메일 발송 실패",
       "inviteCreated": "초대를 만들었습니다.",
       "pendingInvitations": "수락 대기 중인 초대",
+      "ownRoleChange": "자신의 역할은 변경할 수 없습니다.",
       "resendInvite": "초대 다시 보내기",
       "shareInviteLink": "초대 링크 공유"
     },

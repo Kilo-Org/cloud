@@ -66,6 +66,7 @@
     "message": "संदेश",
     "off": "बंद",
     "organization": "संस्था",
+    "organizationTrialEnded": "संस्थेची चाचणी संपली आहे आणि तिच्याकडे कोणतीही सक्रिय योजना नाही. संस्थेचा मालक kilo.ai वर बिलिंग अपडेट करू शकतो, त्यानंतर पुन्हा प्रयत्न करा.",
     "platform": "प्लॅटफॉर्म",
     "prReview": "PR समीक्षा",
     "queued": "रांगेत",
@@ -3069,8 +3070,10 @@
       "truncated": "क्रेडिटचे जुने व्यवहार उपलब्ध आहेत."
     },
     "inviteMember": {
+      "alreadyMember": "ही व्यक्ती या संस्थेचा आधीच सदस्य आहे.",
       "emailError": "वैध ईमेल पत्ता द्या.",
       "emailPlaceholder": "नाव@company.com",
+      "pendingInvitation": "या ईमेलकडे आधीच एक प्रलंबित आमंत्रण आहे.",
       "permissionDenied": "तुम्हाला सदस्यांना आमंत्रित करण्याची परवानगी नाही.",
       "roleMember": "भूमिका: सदस्य",
       "sendInvite": "आमंत्रण पाठवा",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "ईमेल अयशस्वी",
       "inviteCreated": "आमंत्रण तयार केले",
       "pendingInvitations": "प्रलंबित आमंत्रणे",
+      "ownRoleChange": "तुम्ही तुमची स्वतःची भूमिका बदलू शकत नाही.",
       "resendInvite": "आमंत्रण पुन्हा पाठवा",
       "shareInviteLink": "आमंत्रणाची लिंक शेअर करा"
     },

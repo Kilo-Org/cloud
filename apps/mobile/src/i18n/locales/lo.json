@@ -66,6 +66,7 @@
     "message": "ຂໍ້ຄວາມ",
     "off": "ປິດ",
     "organization": "ອົງກອນ",
+    "organizationTrialEnded": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າຂອງອົງກອນສາມາດອັບເດດການເກັບເງິນໄດ້ທີ່ kilo.ai, ແລ້ວລອງອີກຄັ້ງ.",
     "platform": "ແພລດຟອມ",
     "prReview": "ການກວດສອບ PR",
     "queued": "ລໍຄິວ",
@@ -3069,8 +3070,10 @@
       "truncated": "ຍັງມີປະຫວັດເຄຣດິດກ່ອນໜ້ານີ້ໃຫ້ເບິ່ງ."
     },
     "inviteMember": {
+      "alreadyMember": "ບຸກຄົນນີ້ເປັນສະມາຊິກຂອງອົງກອນນີ້ແລ້ວ.",
       "emailError": "ໃສ່ທີ່ຢູ່ອີເມວທີ່ຖືກຕ້ອງ.",
       "emailPlaceholder": "ຕົວຢ່າງ: name@company.com",
+      "pendingInvitation": "ອີເມວນີ້ມີຄຳເຊີນທີ່ລໍຖ້າຢູ່ແລ້ວ.",
       "permissionDenied": "ທ່ານບໍ່ມີສິດເຊີນສະມາຊິກ.",
       "roleMember": "ບົດບາດ: ສະມາຊິກ",
       "sendInvite": "ສົ່ງຄຳເຊີນ",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "ສົ່ງອີເມວບໍ່ສຳເລັດ",
       "inviteCreated": "ສ້າງຄຳເຊີນແລ້ວ",
       "pendingInvitations": "ຄຳເຊີນທີ່ລໍຖ້າການຕອບຮັບ",
+      "ownRoleChange": "ທ່ານບໍ່ສາມາດປ່ຽນບົດບາດຂອງຕົນເອງໄດ້.",
       "resendInvite": "ສົ່ງຄຳເຊີນອີກຄັ້ງ",
       "shareInviteLink": "ແບ່ງປັນລິ້ງເຊີນ"
     },

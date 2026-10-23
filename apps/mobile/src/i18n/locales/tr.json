@@ -66,6 +66,7 @@
     "message": "Mesaj",
     "off": "Kapalı",
     "organization": "Kuruluş",
+    "organizationTrialEnded": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. Kuruluş sahibi kilo.ai adresinden faturalandırmayı güncelleyip ardından tekrar deneyebilir.",
     "platform": "Kod barındırma hizmeti",
     "prReview": "PR incelemesi",
     "queued": "Kuyrukta",
@@ -3068,8 +3069,10 @@
       "renameTitle": "Kuruluşu yeniden adlandır"
     },
     "inviteMember": {
+      "alreadyMember": "Bu kişi zaten bu kuruluşun bir üyesi.",
       "emailError": "Geçerli bir e-posta adresi gir.",
       "emailPlaceholder": "ad@sirket.com",
+      "pendingInvitation": "Bu e-posta adresinin zaten bekleyen bir daveti var.",
       "permissionDenied": "Üye davet etme iznin yok.",
       "roleMember": "Rol: Üye",
       "sendInvite": "Davet gönder",
@@ -3141,6 +3144,7 @@
       "emailStatusFailed": "E-posta gönderilemedi",
       "inviteCreated": "Davet oluşturuldu",
       "pendingInvitations": "Bekleyen davetler",
+      "ownRoleChange": "Kendi rolünüzü değiştiremezsiniz.",
       "resendInvite": "Daveti yeniden gönder",
       "shareInviteLink": "Davet bağlantısını paylaş"
     },

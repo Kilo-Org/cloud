@@ -66,6 +66,7 @@
     "message": "Mesej",
     "off": "Tidak aktif",
     "organization": "Organisasi",
+    "organizationTrialEnded": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Pemilik organisasi boleh mengemas kini bil di kilo.ai, kemudian cuba lagi.",
     "platform": "Platform kod",
     "prReview": "Semakan PR",
     "queued": "Dalam baris gilir",
@@ -3069,8 +3070,10 @@
       "truncated": "Aktiviti kredit terdahulu tersedia."
     },
     "inviteMember": {
+      "alreadyMember": "Orang ini sudah menjadi ahli organisasi ini.",
       "emailError": "Masukkan alamat e-mel yang sah.",
       "emailPlaceholder": "nama@syarikat.com",
+      "pendingInvitation": "E-mel ini sudah mempunyai jemputan yang belum selesai.",
       "permissionDenied": "Anda tidak mempunyai kebenaran untuk menjemput ahli.",
       "roleMember": "Peranan: Ahli",
       "sendInvite": "Hantar jemputan",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "Penghantaran e-mel gagal",
       "inviteCreated": "Jemputan dicipta",
       "pendingInvitations": "Jemputan menunggu jawapan",
+      "ownRoleChange": "Anda tidak boleh menukar peranan anda sendiri.",
       "resendInvite": "Hantar semula jemputan",
       "shareInviteLink": "Kongsi pautan jemputan"
     },

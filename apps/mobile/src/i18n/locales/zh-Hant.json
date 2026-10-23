@@ -66,6 +66,7 @@
     "message": "訊息",
     "off": "關閉",
     "organization": "組織",
+    "organizationTrialEnded": "組織的試用期已結束，且沒有使用中的方案。組織擁有者可以在 kilo.ai 更新帳單資訊，然後再試一次。",
     "platform": "平台",
     "prReview": "PR 審查",
     "queued": "排隊中",
@@ -3068,8 +3069,10 @@
       "renameTitle": "重新命名組織"
     },
     "inviteMember": {
+      "alreadyMember": "這個人已經是此組織的成員。",
       "emailError": "請輸入有效的電子郵件地址。",
       "emailPlaceholder": "例如：name@company.com",
+      "pendingInvitation": "這個電子郵件地址已有待處理的邀請。",
       "permissionDenied": "你沒有邀請成員的權限。",
       "roleMember": "角色：成員",
       "sendInvite": "傳送邀請",
@@ -3141,6 +3144,7 @@
       "emailStatusFailed": "電子郵件傳送失敗",
       "inviteCreated": "邀請已建立",
       "pendingInvitations": "待處理的邀請",
+      "ownRoleChange": "您無法變更自己的角色。",
       "resendInvite": "重新傳送邀請",
       "shareInviteLink": "分享邀請連結"
     },

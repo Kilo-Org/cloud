@@ -26,6 +26,13 @@ type RenameModalProps<TSaveResult> = {
    * keep the single-line field.
    */
   multiline?: boolean;
+  /**
+   * Turns a rejected save into the line shown under the field. Defaults to the
+   * error's own message; a caller whose procedure returns server sentences
+   * meant for logs passes a mapper that yields localized copy instead
+   * (organization rename, for example).
+   */
+  errorCopy?: (error: unknown) => string;
 };
 
 // Mount this component only while the dialog should be open (e.g. `{visible && <RenameModal ... />}`)
@@ -38,6 +45,7 @@ export function RenameModal<TSaveResult>({
   onClose,
   maxLength = 50,
   multiline = false,
+  errorCopy,
 }: Readonly<RenameModalProps<TSaveResult>>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -87,7 +95,10 @@ export function RenameModal<TSaveResult>({
       await withUiDeadline(operation, SAVE_UI_DEADLINE_MS);
       onClose();
     } catch (error) {
-      setErrorText(error instanceof Error ? error.message : t('common.somethingWentWrong'));
+      setErrorText(
+        errorCopy?.(error) ??
+          (error instanceof Error ? error.message : t('common.somethingWentWrong'))
+      );
     } finally {
       setPending(false);
     }

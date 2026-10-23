@@ -66,6 +66,7 @@
     "message": "Hafatra",
     "off": "Tsy mandeha",
     "organization": "Fikambanana",
+    "organizationTrialEnded": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Ny tompon'ny fikambanana dia afaka manavao ny faktiora ao amin'ny kilo.ai, ary hanandrana indray.",
     "platform": "Sehatra",
     "prReview": "Fandinihana PR",
     "queued": "Voalahatra",
@@ -3069,8 +3070,10 @@
       "truncated": "Misy hetsika taloha kokoa momba ny kireditra."
     },
     "inviteMember": {
+      "alreadyMember": "Efa mpikambana ao amin'ity fikambanana ity ity olona ity.",
       "emailError": "Mampidira adiresy mailaka manan-kery.",
       "emailPlaceholder": "anarana@orinasa.com",
+      "pendingInvitation": "Efa manana fanasana miandry ity mailaka ity.",
       "permissionDenied": "Tsy manana alalana hanasa mpikambana ianao.",
       "roleMember": "Andraikitra: mpikambana",
       "sendInvite": "Alefaso ny fanasana",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "Tsy lasa ny mailaka",
       "inviteCreated": "Noforonina ny fanasana",
       "pendingInvitations": "Fanasana miandry",
+      "ownRoleChange": "Tsy afaka manova ny andraikitrao ianao.",
       "resendInvite": "Alefaso indray ny fanasana",
       "shareInviteLink": "Zarao ny rohy fanasana"
     },

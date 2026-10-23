@@ -66,6 +66,7 @@
     "message": "Bericht",
     "off": "Uit",
     "organization": "Organisatie",
+    "organizationTrialEnded": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Een eigenaar van de organisatie kan de facturering bijwerken op kilo.ai en het daarna opnieuw proberen.",
     "platform": "Codeplatform",
     "prReview": "PR-beoordeling",
     "queued": "In de wachtrij",
@@ -3068,8 +3069,10 @@
       "renameTitle": "Organisatie hernoemen"
     },
     "inviteMember": {
+      "alreadyMember": "Deze persoon is al lid van deze organisatie.",
       "emailError": "Voer een geldig e-mailadres in.",
       "emailPlaceholder": "naam@bedrijf.nl",
+      "pendingInvitation": "Dit e-mailadres heeft al een openstaande uitnodiging.",
       "permissionDenied": "Je hebt geen toestemming om leden uit te nodigen.",
       "roleMember": "Rol: lid",
       "sendInvite": "Uitnodiging verzenden",
@@ -3141,6 +3144,7 @@
       "emailStatusFailed": "E-mail verzenden mislukt",
       "inviteCreated": "Uitnodiging aangemaakt",
       "pendingInvitations": "Openstaande uitnodigingen",
+      "ownRoleChange": "Je kunt je eigen rol niet wijzigen.",
       "resendInvite": "Uitnodiging opnieuw verzenden",
       "shareInviteLink": "Uitnodigingslink delen"
     },

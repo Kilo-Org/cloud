@@ -66,6 +66,7 @@
     "message": "Umlayezo",
     "off": "Ivaliwe",
     "organization": "Inhlangano",
+    "organizationTrialEnded": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Umnikazi wenhlangano angabuyekeza ukukhokhela ku-kilo.ai, bese ezama futhi.",
     "platform": "Inkundla",
     "prReview": "Ukuhlolwa kwe-PR",
     "queued": "Kusemgqeni",
@@ -3069,8 +3070,10 @@
       "truncated": "Umnyakazo wamakhredithi wangaphambili uyatholakala."
     },
     "inviteMember": {
+      "alreadyMember": "Lo muntu usevele eyilungu lale nhlangano.",
       "emailError": "Faka ikheli le-imeyili elivumelekile.",
       "emailPlaceholder": "igama@inkampani.com",
+      "pendingInvitation": "Le imeyili isivele inesimemo esilindile.",
       "permissionDenied": "Awunayo imvume yokumema amalungu.",
       "roleMember": "Iqhaza lakho ngelokuba ilungu.",
       "sendInvite": "Thumela isimemo",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "Ukuthumela i-imeyili kwehlulekile",
       "inviteCreated": "Isimemo sakhiwe",
       "pendingInvitations": "Izimemo ezilindile",
+      "ownRoleChange": "Awukwazi ukushintsha iqhaza lakho.",
       "resendInvite": "Thumela kabusha isimemo",
       "shareInviteLink": "Yabelana ngesixhumanisi sesimemo"
     },

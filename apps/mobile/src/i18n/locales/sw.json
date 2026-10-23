@@ -66,6 +66,7 @@
     "message": "Ujumbe",
     "off": "Imezimwa",
     "organization": "Shirika",
+    "organizationTrialEnded": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Mmiliki wa shirika anaweza kusasisha malipo kwenye kilo.ai, kisha ajaribu tena.",
     "platform": "Jukwaa",
     "prReview": "Ukaguzi wa PR",
     "queued": "Kwenye foleni",
@@ -3069,8 +3070,10 @@
       "truncated": "Shughuli za awali za salio zinapatikana."
     },
     "inviteMember": {
+      "alreadyMember": "Mtu huyu tayari ni mwanachama wa shirika hili.",
       "emailError": "Weka anwani halali ya barua pepe.",
       "emailPlaceholder": "jina@company.com",
+      "pendingInvitation": "Barua pepe hii tayari ina mwaliko unaosubiri.",
       "permissionDenied": "Huna ruhusa ya kualika wanachama.",
       "roleMember": "Jukumu: mwanachama",
       "sendInvite": "Tuma mwaliko",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "Barua pepe haikutumwa",
       "inviteCreated": "Mwaliko umeundwa",
       "pendingInvitations": "Mialiko inayosubiri",
+      "ownRoleChange": "Huwezi kubadilisha jukumu lako mwenyewe.",
       "resendInvite": "Tuma mwaliko tena",
       "shareInviteLink": "Shiriki kiungo cha mwaliko"
     },

@@ -66,6 +66,7 @@
     "message": "Nachricht",
     "off": "Aus",
     "organization": "Organisation",
+    "organizationTrialEnded": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Ein Inhaber der Organisation kann die Abrechnung unter kilo.ai aktualisieren und es dann erneut versuchen.",
     "platform": "Plattform",
     "prReview": "PR-Prüfung",
     "queued": "In der Warteschlange",
@@ -3068,8 +3069,10 @@
       "renameTitle": "Organisation umbenennen"
     },
     "inviteMember": {
+      "alreadyMember": "Diese Person ist bereits Mitglied dieser Organisation.",
       "emailError": "Gib eine gültige E-Mail-Adresse ein.",
       "emailPlaceholder": "name@firma.de",
+      "pendingInvitation": "Für diese E-Mail-Adresse liegt bereits eine ausstehende Einladung vor.",
       "permissionDenied": "Du hast keine Berechtigung, Mitglieder einzuladen.",
       "roleMember": "Die Rolle ist „Mitglied“.",
       "sendInvite": "Einladung senden",
@@ -3141,6 +3144,7 @@
       "emailStatusFailed": "E-Mail-Versand fehlgeschlagen",
       "inviteCreated": "Einladung erstellt",
       "pendingInvitations": "Ausstehende Einladungen",
+      "ownRoleChange": "Sie können Ihre eigene Rolle nicht ändern.",
       "resendInvite": "Einladung erneut senden",
       "shareInviteLink": "Einladungslink teilen"
     },

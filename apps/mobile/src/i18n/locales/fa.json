@@ -66,6 +66,7 @@
     "message": "پیام",
     "off": "خاموش",
     "organization": "سازمان",
+    "organizationTrialEnded": "دوره آزمایشی سازمان به پایان رسیده است و هیچ طرح فعالی ندارد. مالک سازمان می‌تواند صورتحساب را در kilo.ai به‌روزرسانی کند و سپس دوباره تلاش کند.",
     "platform": "پلتفرم",
     "prReview": "بازبینی PR",
     "queued": "در صف",
@@ -3069,8 +3070,10 @@
       "truncated": "سوابق قبلی گردش اعتبار در دسترس است."
     },
     "inviteMember": {
+      "alreadyMember": "این شخص از قبل عضو این سازمان است.",
       "emailError": "یک آدرس ایمیل معتبر وارد کنید.",
       "emailPlaceholder": "ایمیل، مثلاً name@company.com",
+      "pendingInvitation": "این ایمیل از قبل یک دعوت‌نامه در انتظار دارد.",
       "permissionDenied": "شما اجازه دعوت اعضا را ندارید.",
       "roleMember": "نقش: عضو",
       "sendInvite": "ارسال دعوت‌نامه",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "ارسال ایمیل ناموفق بود",
       "inviteCreated": "دعوت‌نامه ایجاد شد",
       "pendingInvitations": "دعوت‌نامه‌های در انتظار پذیرش",
+      "ownRoleChange": "شما نمی‌توانید نقش خودتان را تغییر دهید.",
       "resendInvite": "ارسال دوبارهٔ دعوت‌نامه",
       "shareInviteLink": "اشتراک‌گذاری پیوند دعوت"
     },

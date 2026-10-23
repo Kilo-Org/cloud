@@ -66,6 +66,7 @@
     "message": "Xabar",
     "off": "O‘chiq",
     "organization": "Tashkilot",
+    "organizationTrialEnded": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Tashkilot egasi kilo.ai saytida hisob-kitobni yangilab, so'ng qayta urinib ko'rishi mumkin.",
     "platform": "Platforma",
     "prReview": "PRni ko‘rib chiqish",
     "queued": "Navbatda",
@@ -3069,8 +3070,10 @@
       "truncated": "Kreditlar bo'yicha oldingi amallar ham mavjud."
     },
     "inviteMember": {
+      "alreadyMember": "Bu shaxs allaqachon ushbu tashkilotning a'zosi.",
       "emailError": "To'g'ri elektron pochta manzilini kiriting.",
       "emailPlaceholder": "ism@kompaniya.com",
+      "pendingInvitation": "Bu elektron pochta uchun allaqachon kutilayotgan taklifnoma mavjud.",
       "permissionDenied": "A'zolarni taklif qilishga ruxsatingiz yo'q.",
       "roleMember": "Rol: a'zo.",
       "sendInvite": "Taklifnomani yuborish",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "Xat yuborilmadi",
       "inviteCreated": "Taklifnoma yaratildi",
       "pendingInvitations": "Qabul qilinmagan taklifnomalar",
+      "ownRoleChange": "Siz o'z rolingizni o'zgartira olmaysiz.",
       "resendInvite": "Taklifnomani qayta yuborish",
       "shareInviteLink": "Taklifnoma havolasini ulashish"
     },

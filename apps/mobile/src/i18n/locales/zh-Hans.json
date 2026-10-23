@@ -66,6 +66,7 @@
     "message": "消息",
     "off": "关闭",
     "organization": "组织",
+    "organizationTrialEnded": "组织的试用期已结束，且没有生效的套餐。组织所有者可以在 kilo.ai 更新账单信息，然后重试。",
     "platform": "平台",
     "prReview": "PR 审查",
     "queued": "排队中",
@@ -3068,8 +3069,10 @@
       "renameTitle": "重命名组织"
     },
     "inviteMember": {
+      "alreadyMember": "此人已是该组织的成员。",
       "emailError": "请输入有效的邮箱地址。",
       "emailPlaceholder": "邮箱地址，如 name@company.com",
+      "pendingInvitation": "该邮箱已有待处理的邀请。",
       "permissionDenied": "你没有邀请成员的权限。",
       "roleMember": "角色为成员。",
       "sendInvite": "发送邀请",
@@ -3141,6 +3144,7 @@
       "emailStatusFailed": "邮件发送失败",
       "inviteCreated": "邀请已创建",
       "pendingInvitations": "待接受的邀请",
+      "ownRoleChange": "您无法更改自己的角色。",
       "resendInvite": "重新发送邀请",
       "shareInviteLink": "分享邀请链接"
     },

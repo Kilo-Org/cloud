@@ -66,6 +66,7 @@
     "message": "Viesti",
     "off": "Ei käytössä",
     "organization": "Organisaatio",
+    "organizationTrialEnded": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Organisaation omistaja voi päivittää laskutuksen osoitteessa kilo.ai ja yrittää sitten uudelleen.",
     "platform": "Alusta",
     "prReview": "PR-katselmointi",
     "queued": "Jonossa",
@@ -3069,8 +3070,10 @@
       "truncated": "Aiempia krediittitapahtumia on saatavilla."
     },
     "inviteMember": {
+      "alreadyMember": "Tämä henkilö on jo tämän organisaation jäsen.",
       "emailError": "Anna kelvollinen sähköpostiosoite.",
       "emailPlaceholder": "nimi@yritys.fi",
+      "pendingInvitation": "Tällä sähköpostiosoitteella on jo odottava kutsu.",
       "permissionDenied": "Sinulla ei ole oikeutta kutsua jäseniä.",
       "roleMember": "Rooli: jäsen",
       "sendInvite": "Lähetä kutsu",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "Sähköpostin lähetys epäonnistui",
       "inviteCreated": "Kutsu luotu",
       "pendingInvitations": "Odottavat kutsut",
+      "ownRoleChange": "Et voi vaihtaa omaa rooliasi.",
       "resendInvite": "Lähetä kutsu uudelleen",
       "shareInviteLink": "Jaa kutsulinkki"
     },

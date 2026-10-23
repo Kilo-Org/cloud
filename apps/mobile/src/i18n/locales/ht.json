@@ -66,6 +66,7 @@
     "message": "Mesaj",
     "off": "Dezaktive",
     "organization": "Òganizasyon",
+    "organizationTrialEnded": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Yon pwopriyetè òganizasyon ka mete ajou faktirasyon sou kilo.ai, epi eseye ankò.",
     "platform": "Platfòm",
     "prReview": "Revizyon PR",
     "queued": "Nan ke",
@@ -3069,8 +3070,10 @@
       "truncated": "Gen aktivite kredi ki pi ansyen ki disponib."
     },
     "inviteMember": {
+      "alreadyMember": "Moun sa a deja yon manm nan òganizasyon sa a.",
       "emailError": "Antre yon adrès imel ki valab.",
       "emailPlaceholder": "non@antrepriz.com",
+      "pendingInvitation": "Imel sa a deja gen yon envitasyon ki an atant.",
       "permissionDenied": "Ou pa gen pèmisyon pou envite manm.",
       "roleMember": "Wòl: manm",
       "sendInvite": "Voye envitasyon an",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "Imel la pa ale",
       "inviteCreated": "Envitasyon kreye",
       "pendingInvitations": "Envitasyon annatant",
+      "ownRoleChange": "Ou pa ka chanje pwòp wòl ou.",
       "resendInvite": "Revoye envitasyon an",
       "shareInviteLink": "Pataje lyen envitasyon an"
     },

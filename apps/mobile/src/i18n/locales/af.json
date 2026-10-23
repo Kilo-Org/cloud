@@ -66,6 +66,7 @@
     "message": "Boodskap",
     "off": "Af",
     "organization": "Organisasie",
+    "organizationTrialEnded": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. 'n Organisasie-eienaar kan die fakturering by kilo.ai opdateer en dan weer probeer.",
     "platform": "Kodeplatform",
     "prReview": "PR-hersiening",
     "queued": "In die tou",
@@ -3069,8 +3070,10 @@
       "truncated": "Ouer kredietaktiwiteit is beskikbaar."
     },
     "inviteMember": {
+      "alreadyMember": "Hierdie persoon is reeds 'n lid van hierdie organisasie.",
       "emailError": "Voer 'n geldige e-posadres in.",
       "emailPlaceholder": "naam@maatskappy.com",
+      "pendingInvitation": "Hierdie e-posadres het reeds 'n hangende uitnodiging.",
       "permissionDenied": "Jy het nie toestemming om lede te nooi nie.",
       "roleMember": "Jou rol is lid.",
       "sendInvite": "Stuur uitnodiging",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "E-pos het misluk",
       "inviteCreated": "Uitnodiging geskep",
       "pendingInvitations": "Hangende uitnodigings",
+      "ownRoleChange": "Jy kan nie jou eie rol verander nie.",
       "resendInvite": "Stuur uitnodiging weer",
       "shareInviteLink": "Deel uitnodigingskakel"
     },

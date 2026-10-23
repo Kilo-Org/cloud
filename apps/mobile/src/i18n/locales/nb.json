@@ -66,6 +66,7 @@
     "message": "Melding",
     "off": "Av",
     "organization": "Organisasjon",
+    "organizationTrialEnded": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. En organisasjonseier kan oppdatere faktureringen på kilo.ai og deretter prøve igjen.",
     "platform": "Plattform",
     "prReview": "PR-gjennomgang",
     "queued": "I kø",
@@ -3069,8 +3070,10 @@
       "truncated": "Eldre kredittbevegelser er tilgjengelige."
     },
     "inviteMember": {
+      "alreadyMember": "Denne personen er allerede medlem av denne organisasjonen.",
       "emailError": "Angi en gyldig e-postadresse.",
       "emailPlaceholder": "navn@firma.no",
+      "pendingInvitation": "Denne e-postadressen har allerede en ventende invitasjon.",
       "permissionDenied": "Du har ikke tillatelse til å invitere medlemmer.",
       "roleMember": "Rolle: medlem",
       "sendInvite": "Send invitasjon",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "E-posten ble ikke sendt",
       "inviteCreated": "Invitasjon opprettet",
       "pendingInvitations": "Ventende invitasjoner",
+      "ownRoleChange": "Du kan ikke endre din egen rolle.",
       "resendInvite": "Send invitasjon på nytt",
       "shareInviteLink": "Del invitasjonslenke"
     },

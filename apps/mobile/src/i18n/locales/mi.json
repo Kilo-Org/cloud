@@ -66,6 +66,7 @@
     "message": "Karere",
     "off": "Weto",
     "organization": "Whakahaerenga",
+    "organizationTrialEnded": "Kua mutu te whakamātautau o te whakahaerenga, ā, kāore ōna mahere kaha. Ka taea e te rangatira o te whakahaerenga te whakahou i te nama i kilo.ai, kātahi ka whakamātau anō.",
     "platform": "Pūhara",
     "prReview": "Arotake PR",
     "queued": "Kei te rārangi tatari",
@@ -3069,8 +3070,10 @@
       "truncated": "E wātea ana ngā tauwhitinga moni tōmua o mua."
     },
     "inviteMember": {
+      "alreadyMember": "He mema kē tēnei tangata o tēnei whakahaerenga.",
       "emailError": "Whakaurua he wāhitau īmēra tika.",
       "emailPlaceholder": "ingoa@kamupene.com",
+      "pendingInvitation": "Kua whai kē tēnei īmēra i tētahi pōwhiri e tatari ana.",
       "permissionDenied": "Kāore ō whakaaetanga ki te pōwhiri mema.",
       "roleMember": "Tūranga: mema.",
       "sendInvite": "Tukuna te pōwhiri",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "I rahua te tuku īmēra",
       "inviteCreated": "Kua hangaia te pōwhiri",
       "pendingInvitations": "Ngā pōwhiri e tatari ana",
+      "ownRoleChange": "Kāore e taea e koe te huri i tō ake tūranga.",
       "resendInvite": "Tukuna anō te pōwhiri",
       "shareInviteLink": "Tuaritia te hononga pōwhiri"
     },

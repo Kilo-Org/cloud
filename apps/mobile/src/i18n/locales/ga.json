@@ -66,6 +66,7 @@
     "message": "Teachtaireacht",
     "off": "As",
     "organization": "Eagraíocht",
+    "organizationTrialEnded": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir le húinéir eagraíochta an billeáil a nuashonrú ag kilo.ai agus ansin triail a bhaint as arís.",
     "platform": "Ardán",
     "prReview": "Athbhreithniú PR",
     "queued": "Sa scuaine",
@@ -3189,8 +3190,10 @@
       "truncated": "Tá gníomhaíocht chreidmheasa níos sine ar fáil."
     },
     "inviteMember": {
+      "alreadyMember": "Tá an duine seo ina bhall den eagraíocht seo cheana féin.",
       "emailError": "Iontráil seoladh ríomhphoist bailí.",
       "emailPlaceholder": "ainm@cuideachta.com",
+      "pendingInvitation": "Tá cuireadh ar feitheamh ag an seoladh ríomhphoist seo cheana féin.",
       "permissionDenied": "Níl cead agat cuireadh a thabhairt do bhaill.",
       "roleMember": "Is ball a bheidh ann.",
       "sendInvite": "Seol cuireadh",
@@ -3262,6 +3265,7 @@
       "emailStatusFailed": "Theip ar an ríomhphost",
       "inviteCreated": "Cuireadh cruthaithe",
       "pendingInvitations": "Cuirí ar feitheamh",
+      "ownRoleChange": "Ní féidir leat do ról féin a athrú.",
       "resendInvite": "Seol an cuireadh arís",
       "shareInviteLink": "Roinn nasc an chuiridh"
     },

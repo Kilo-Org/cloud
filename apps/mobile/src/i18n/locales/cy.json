@@ -66,6 +66,7 @@
     "message": "Neges",
     "off": "Wedi diffodd",
     "organization": "Sefydliad",
+    "organizationTrialEnded": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gall perchennog sefydliad ddiweddaru bilio ar kilo.ai, ac yna rhoi cynnig arall arni.",
     "platform": "Platfform",
     "prReview": "Adolygiad PR",
     "queued": "Mewn ciw",
@@ -3229,8 +3230,10 @@
       "truncated": "Mae gweithgaredd credyd cynharach ar gael."
     },
     "inviteMember": {
+      "alreadyMember": "Mae'r person hwn eisoes yn aelod o'r sefydliad hwn.",
       "emailError": "Nodwch gyfeiriad e-bost dilys.",
       "emailPlaceholder": "enw@example.com",
+      "pendingInvitation": "Mae gwahoddiad ar y gweill eisoes ar gyfer yr e-bost hwn.",
       "permissionDenied": "Nid oes gennych ganiatâd i wahodd aelodau.",
       "roleMember": "Rôl: aelod",
       "sendInvite": "Anfon gwahoddiad",
@@ -3302,6 +3305,7 @@
       "emailStatusFailed": "Methu anfon yr e-bost",
       "inviteCreated": "Crëwyd y gwahoddiad",
       "pendingInvitations": "Gwahoddiadau sy'n aros",
+      "ownRoleChange": "Ni allwch newid eich rôl eich hun.",
       "resendInvite": "Ailanfon y gwahoddiad",
       "shareInviteLink": "Rhannu dolen gwahoddiad"
     },

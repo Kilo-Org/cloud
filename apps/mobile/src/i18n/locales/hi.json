@@ -66,6 +66,7 @@
     "message": "संदेश",
     "off": "बंद",
     "organization": "संगठन",
+    "organizationTrialEnded": "संगठन का परीक्षण समाप्त हो गया है और इसकी कोई सक्रिय योजना नहीं है। एक संगठन मालिक kilo.ai पर बिलिंग अपडेट कर सकता है, फिर दोबारा प्रयास करें।",
     "platform": "प्लेटफ़ॉर्म",
     "prReview": "PR की समीक्षा",
     "queued": "कतार में",
@@ -3068,8 +3069,10 @@
       "renameTitle": "संगठन का नाम बदलें"
     },
     "inviteMember": {
+      "alreadyMember": "यह व्यक्ति पहले से ही इस संगठन का सदस्य है।",
       "emailError": "मान्य ईमेल पता दर्ज करें।",
       "emailPlaceholder": "आपका ईमेल पता",
+      "pendingInvitation": "इस ईमेल के लिए पहले से ही एक आमंत्रण लंबित है।",
       "permissionDenied": "आपको सदस्यों को आमंत्रित करने की अनुमति नहीं है।",
       "roleMember": "भूमिका: सदस्य",
       "sendInvite": "आमंत्रण भेजें",
@@ -3141,6 +3144,7 @@
       "emailStatusFailed": "ईमेल नहीं भेजा जा सका",
       "inviteCreated": "आमंत्रण बनाया गया",
       "pendingInvitations": "लंबित आमंत्रण",
+      "ownRoleChange": "आप अपनीस्वयं की भूमिका नहीं बदल सकते।",
       "resendInvite": "आमंत्रण फिर से भेजें",
       "shareInviteLink": "आमंत्रण का लिंक साझा करें"
     },

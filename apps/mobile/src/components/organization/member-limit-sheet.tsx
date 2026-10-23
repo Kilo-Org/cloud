@@ -24,6 +24,7 @@ import {
   useOrgBoundary,
   useOrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
+import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { firstNonEmpty } from '@/lib/utils';
 
 type MemberLimitFormProps = Readonly<{
@@ -92,9 +93,14 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
 
       {/* updateMember's toast is silenced for this caller, so AccessibleStatus
           is the single announcement owner: one announcement per platform,
-          visuals preserved (tone error). */}
+          visuals preserved (tone error). The server's sentence never reaches
+          the screen; a known rejection gets its own localized copy. */}
       <AccessibleStatus
-        message={mutations.updateMember.isError ? mutations.updateMember.error.message : null}
+        message={
+          mutations.updateMember.isError
+            ? organizationErrorMessage(mutations.updateMember.error)
+            : null
+        }
         className="text-sm"
       />
 

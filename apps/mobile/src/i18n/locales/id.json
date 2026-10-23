@@ -66,6 +66,7 @@
     "message": "Pesan",
     "off": "Nonaktif",
     "organization": "Organisasi",
+    "organizationTrialEnded": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Pemilik organisasi dapat memperbarui penagihan di kilo.ai, lalu coba lagi.",
     "platform": "Layanan repositori",
     "prReview": "Tinjauan PR",
     "queued": "Dalam antrean",
@@ -3068,8 +3069,10 @@
       "renameTitle": "Ganti nama organisasi"
     },
     "inviteMember": {
+      "alreadyMember": "Orang ini sudah menjadi anggota organisasi ini.",
       "emailError": "Masukkan alamat email yang valid.",
       "emailPlaceholder": "nama@perusahaan.com",
+      "pendingInvitation": "Email ini sudah memiliki undangan yang tertunda.",
       "permissionDenied": "Kamu tidak memiliki izin untuk mengundang anggota.",
       "roleMember": "Peran yang diberikan adalah anggota.",
       "sendInvite": "Kirim undangan",
@@ -3141,6 +3144,7 @@
       "emailStatusFailed": "Email gagal dikirim",
       "inviteCreated": "Undangan dibuat",
       "pendingInvitations": "Undangan yang belum diterima",
+      "ownRoleChange": "Anda tidak dapat mengubah peran Anda sendiri.",
       "resendInvite": "Kirim ulang undangan",
       "shareInviteLink": "Bagikan tautan undangan"
     },

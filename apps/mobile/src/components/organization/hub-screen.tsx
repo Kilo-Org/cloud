@@ -37,6 +37,7 @@ import {
 } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
+import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { cn } from '@/lib/utils';
 
 type OrganizationHubScreenProps = Readonly<{
@@ -247,6 +248,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           onClose={() => {
             setRenameVisible(false);
           }}
+          errorCopy={organizationErrorMessage}
         />
       )}
     </View>

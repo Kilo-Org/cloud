@@ -66,6 +66,7 @@
     "message": "Žinutė",
     "off": "Išjungta",
     "organization": "Organizacija",
+    "organizationTrialEnded": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Organizacijos savininkas gali atnaujinti atsiskaitymo duomenis adresu kilo.ai, tada bandykite dar kartą.",
     "platform": "Platforma",
     "prReview": "PR peržiūra",
     "queued": "Eilėje",
@@ -3149,8 +3150,10 @@
       "truncated": "Galite peržiūrėti ankstesnes kreditų operacijas."
     },
     "inviteMember": {
+      "alreadyMember": "Šis asmuo jau yra šios organizacijos narys.",
       "emailError": "Įveskite tinkamą el. pašto adresą.",
       "emailPlaceholder": "vardas@company.com",
+      "pendingInvitation": "Šiam el. pašto adresui jau išsiųstas laukiantis kvietimas.",
       "permissionDenied": "Neturite leidimo kviesti narių.",
       "roleMember": "Vaidmuo: narys.",
       "sendInvite": "Siųsti kvietimą",
@@ -3222,6 +3225,7 @@
       "emailStatusFailed": "Laiško išsiųsti nepavyko",
       "inviteCreated": "Kvietimas sukurtas",
       "pendingInvitations": "Nepriimti kvietimai",
+      "ownRoleChange": "Negalite pakeisti savo paties vaidmens.",
       "resendInvite": "Išsiųsti kvietimą dar kartą",
       "shareInviteLink": "Bendrinti kvietimo nuorodą"
     },

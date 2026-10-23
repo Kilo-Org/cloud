@@ -66,6 +66,7 @@
     "message": "Ziņojums",
     "off": "Izslēgts",
     "organization": "Organizācija",
+    "organizationTrialEnded": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Organizācijas īpašnieks var atjaunināt norēķinu informāciju vietnē kilo.ai un pēc tam mēģināt vēlreiz.",
     "platform": "Platforma",
     "prReview": "PR pārskatīšana",
     "queued": "Rindā",
@@ -3109,8 +3110,10 @@
       "truncated": "Ir pieejami arī iepriekšējie kredītu darījumi."
     },
     "inviteMember": {
+      "alreadyMember": "Šis cilvēks jau ir šīs organizācijas dalībnieks.",
       "emailError": "Ievadi derīgu e-pasta adresi.",
       "emailPlaceholder": "vards@uznemums.com",
+      "pendingInvitation": "Šai e-pasta adresei jau ir gaidošs uzaicinājums.",
       "permissionDenied": "Tev nav atļaujas uzaicināt dalībniekus.",
       "roleMember": "Loma: dalībnieks.",
       "sendInvite": "Nosūtīt uzaicinājumu",
@@ -3182,6 +3185,7 @@
       "emailStatusFailed": "E-pasta nosūtīšana neizdevās",
       "inviteCreated": "Uzaicinājums izveidots",
       "pendingInvitations": "Neapstiprinātie uzaicinājumi",
+      "ownRoleChange": "Jūs nevarat mainīt savu lomu.",
       "resendInvite": "Nosūtīt uzaicinājumu vēlreiz",
       "shareInviteLink": "Kopīgot uzaicinājuma saiti"
     },

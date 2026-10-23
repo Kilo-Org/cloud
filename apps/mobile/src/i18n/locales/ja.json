@@ -66,6 +66,7 @@
     "message": "メッセージ",
     "off": "オフ",
     "organization": "組織",
+    "organizationTrialEnded": "組織のトライアルは終了し、有効なプランがありません。組織のオーナーは kilo.ai で請求情報を更新してから、もう一度お試しください。",
     "platform": "プラットフォーム",
     "prReview": "PRレビュー",
     "queued": "順番待ち",
@@ -3068,8 +3069,10 @@
       "renameTitle": "組織名を変更"
     },
     "inviteMember": {
+      "alreadyMember": "このユーザーはすでにこの組織のメンバーです。",
       "emailError": "有効なメールアドレスを入力してください。",
       "emailPlaceholder": "例：name@company.com",
+      "pendingInvitation": "このメールアドレスには、すでに保留中の招待があります。",
       "permissionDenied": "メンバーを招待する権限がありません。",
       "roleMember": "役割はメンバーです。",
       "sendInvite": "招待を送信",
@@ -3141,6 +3144,7 @@
       "emailStatusFailed": "メール送信に失敗",
       "inviteCreated": "招待を作成しました",
       "pendingInvitations": "承諾待ちの招待",
+      "ownRoleChange": "自分の役割は変更できません。",
       "resendInvite": "招待を再送信",
       "shareInviteLink": "招待リンクを共有"
     },

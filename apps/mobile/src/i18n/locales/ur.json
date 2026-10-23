@@ -66,6 +66,7 @@
     "message": "پیغام",
     "off": "بند",
     "organization": "تنظیم",
+    "organizationTrialEnded": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ تنظیم کا مالک kilo.ai پر بلنگ اپ ڈیٹ کر سکتا ہے، پھر دوبارہ کوشش کریں۔",
     "platform": "پلیٹ فارم",
     "prReview": "PR کا جائزہ",
     "queued": "قطار میں",
@@ -3069,8 +3070,10 @@
       "truncated": "کریڈٹس کا پرانا ریکارڈ دستیاب ہے۔"
     },
     "inviteMember": {
+      "alreadyMember": "یہ شخص پہلے ہی اس تنظیم کا رکن ہے۔",
       "emailError": "درست ای میل پتہ درج کریں۔",
       "emailPlaceholder": "ای میل پتہ",
+      "pendingInvitation": "اس ای میل کے لیے پہلے ہی ایک زیرِ التوا دعوت موجود ہے۔",
       "permissionDenied": "آپ کو اراکین کو دعوت دینے کی اجازت نہیں ہے۔",
       "roleMember": "کردار: رکن",
       "sendInvite": "دعوت بھیجیں",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "ای میل نہیں بھیجی جا سکی",
       "inviteCreated": "دعوت بنائی گئی",
       "pendingInvitations": "زیر التواء دعوتیں",
+      "ownRoleChange": "آپ اپنا کردار تبدیل نہیں کر سکتے۔",
       "resendInvite": "دعوت دوبارہ بھیجیں",
       "shareInviteLink": "دعوت کا لنک شیئر کریں"
     },

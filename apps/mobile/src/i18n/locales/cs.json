@@ -66,6 +66,7 @@
     "message": "Zpráva",
     "off": "Vypnuto",
     "organization": "Organizace",
+    "organizationTrialEnded": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Vlastník organizace může aktualizovat fakturaci na kilo.ai a poté to zkuste znovu.",
     "platform": "Platforma",
     "prReview": "Kontrola PR",
     "queued": "Ve frontě",
@@ -3149,8 +3150,10 @@
       "truncated": "K dispozici jsou i starší pohyby kreditů."
     },
     "inviteMember": {
+      "alreadyMember": "Tato osoba je již členem této organizace.",
       "emailError": "Zadejte platnou e-mailovou adresu.",
       "emailPlaceholder": "jmeno@firma.cz",
+      "pendingInvitation": "Pro tento e-mail již existuje čekající pozvánka.",
       "permissionDenied": "Nemáte oprávnění zvát členy.",
       "roleMember": "Role: člen",
       "sendInvite": "Odeslat pozvánku",
@@ -3222,6 +3225,7 @@
       "emailStatusFailed": "E-mail se nepodařilo odeslat",
       "inviteCreated": "Pozvánka vytvořena",
       "pendingInvitations": "Čekající pozvánky",
+      "ownRoleChange": "Nemůžete změnit svou vlastní roli.",
       "resendInvite": "Poslat pozvánku znovu",
       "shareInviteLink": "Sdílet odkaz na pozvánku"
     },

@@ -66,6 +66,7 @@
     "message": "پیغام",
     "off": "بند",
     "organization": "سازمان",
+    "organizationTrialEnded": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. د سازمان مالک کولی شي په kilo.ai کې بیلنګ تازه کړي، بیا یو ځل بیا هڅه وکړي.",
     "platform": "پلیټ فارم",
     "prReview": "د PR بیاکتنه",
     "queued": "په کتار کې",
@@ -3069,8 +3070,10 @@
       "truncated": "د کریډیټ پخوانی فعالیت هم شته."
     },
     "inviteMember": {
+      "alreadyMember": "دا کس لا دمخه د دې سازمان غړی دی.",
       "emailError": "د برېښنالیک سمه پته ولیکئ.",
       "emailPlaceholder": "نوم@شرکت.com",
+      "pendingInvitation": "دا برېښنالیک لا دمخه یوه په تمه بلنه لري.",
       "permissionDenied": "تاسو غړو ته د بلنې ورکولو اجازه نه لرئ.",
       "roleMember": "دنده: غړی",
       "sendInvite": "بلنه واستوئ",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "برېښنالیک ونه لېږل شو",
       "inviteCreated": "بلنه جوړه شوه",
       "pendingInvitations": "په تمه بلنې",
+      "ownRoleChange": "تاسو نشئ کولی خپله دنده بدله کړئ.",
       "resendInvite": "بلنه بیا واستوئ",
       "shareInviteLink": "د بلنې لینک شریک کړئ"
     },

@@ -66,6 +66,7 @@
     "message": "Fariin",
     "off": "Daman",
     "organization": "Urur",
+    "organizationTrialEnded": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Milkiilaha ururku wuxuu cusboonaysiin karaa biilasha kilo.ai, ka dibna isku day mar kale.",
     "platform": "Madal",
     "prReview": "Dib-u-eegista PR",
     "queued": "Safan",
@@ -3069,8 +3070,10 @@
       "truncated": "Dhaqdhaqaaqii hore ee lacagta isticmaalka waa la heli karaa."
     },
     "inviteMember": {
+      "alreadyMember": "Qofkani horeyba waa xubin ka mid ah ururkan.",
       "emailError": "Geli cinwaan iimayl oo sax ah.",
       "emailPlaceholder": "magac@company.com",
+      "pendingInvitation": "Iimaylkani horeyba wuxuu leeyahay casuumaad sugaysa.",
       "permissionDenied": "Ma lihid oggolaansho aad ku casuunto xubno.",
       "roleMember": "Doorka: xubin",
       "sendInvite": "Dir casuumaad",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "Dirista iimaylka way fashilantay",
       "inviteCreated": "Casuumaad baa la abuuray",
       "pendingInvitations": "Casuumaadaha sugaya",
+      "ownRoleChange": "Ma beddeli kartid doorkaaga.",
       "resendInvite": "Dib u dir casuumaadda",
       "shareInviteLink": "Wadaag xiriiriyaha casuumaadda"
     },

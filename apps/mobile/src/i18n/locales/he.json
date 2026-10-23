@@ -66,6 +66,7 @@
     "message": "הודעה",
     "off": "כבוי",
     "organization": "ארגון",
+    "organizationTrialEnded": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. בעל הארגון יכול לעדכן את החיוב ב-kilo.ai, ואז לנסות שוב.",
     "platform": "פלטפורמה",
     "prReview": "סקירת PR",
     "queued": "בתור",
@@ -3108,8 +3109,10 @@
       "renameTitle": "שינוי שם הארגון"
     },
     "inviteMember": {
+      "alreadyMember": "אדם זה כבר חבר בארגון הזה.",
       "emailError": "הזן כתובת דוא״ל תקינה.",
       "emailPlaceholder": "israel@company.com",
+      "pendingInvitation": "לכתובת דוא״ל זו כבר יש הזמנה ממתינה.",
       "permissionDenied": "אין לך הרשאה להזמין חברים.",
       "roleMember": "התפקיד הוא חבר בארגון.",
       "sendInvite": "שליחת הזמנה",
@@ -3181,6 +3184,7 @@
       "emailStatusFailed": "שליחת הדוא״ל נכשלה",
       "inviteCreated": "ההזמנה נוצרה",
       "pendingInvitations": "הזמנות ממתינות",
+      "ownRoleChange": "אינך יכול לשנות את התפקיד שלך.",
       "resendInvite": "שליחת ההזמנה מחדש",
       "shareInviteLink": "שיתוף הקישור להזמנה"
     },

@@ -66,6 +66,7 @@
     "message": "Skilaboð",
     "off": "Slökkt",
     "organization": "Fyrirtæki",
+    "organizationTrialEnded": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Eigandi fyrirtækis getur uppfært greiðsluupplýsingar á kilo.ai og reynir síðan aftur.",
     "platform": "Vettvangur",
     "prReview": "PR-rýni",
     "queued": "Í biðröð",
@@ -3069,8 +3070,10 @@
       "truncated": "Hægt er að skoða eldri inneignarfærslur."
     },
     "inviteMember": {
+      "alreadyMember": "Þessi einstaklingur er þegar meðlimur í þessu fyrirtæki.",
       "emailError": "Sláðu inn gilt tölvupóstfang.",
       "emailPlaceholder": "nafn@fyrirtaeki.is",
+      "pendingInvitation": "Þetta tölvupóstfang er þegar með boð í bið.",
       "permissionDenied": "Þú hefur ekki heimild til að bjóða nýjum meðlimum að ganga í félagið.",
       "roleMember": "Hlutverkið er meðlimur.",
       "sendInvite": "Senda boð",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "Sending tölvupósts mistókst",
       "inviteCreated": "Boð búið til",
       "pendingInvitations": "Boð í bið",
+      "ownRoleChange": "Þú getur ekki breytt þínu eigin hlutverki.",
       "resendInvite": "Senda boð aftur",
       "shareInviteLink": "Deila boðstengli"
     },

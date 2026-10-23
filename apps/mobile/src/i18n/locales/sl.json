@@ -66,6 +66,7 @@
     "message": "Sporočilo",
     "off": "Izklopljeno",
     "organization": "Organizacija",
+    "organizationTrialEnded": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Lastnik organizacije lahko posodobi obračun na kilo.ai, nato poskusi znova.",
     "platform": "Platforma",
     "prReview": "Pregled PR",
     "queued": "V čakalni vrsti",
@@ -3149,8 +3150,10 @@
       "truncated": "Na voljo so starejše transakcije s krediti."
     },
     "inviteMember": {
+      "alreadyMember": "Ta oseba je že član te organizacije.",
       "emailError": "Vnesi veljaven e-poštni naslov.",
       "emailPlaceholder": "ime@podjetje.com",
+      "pendingInvitation": "Ta e-poštni naslov že ima čakajoče povabilo.",
       "permissionDenied": "Nimaš dovoljenja za vabljenje članov.",
       "roleMember": "Vloga: član",
       "sendInvite": "Pošlji povabilo",
@@ -3222,6 +3225,7 @@
       "emailStatusFailed": "Pošiljanje e-pošte ni uspelo",
       "inviteCreated": "Povabilo ustvarjeno",
       "pendingInvitations": "Čakajoča povabila",
+      "ownRoleChange": "Svoje vloge ne morete spremeniti.",
       "resendInvite": "Ponovno pošlji povabilo",
       "shareInviteLink": "Deli povezavo do povabila"
     },

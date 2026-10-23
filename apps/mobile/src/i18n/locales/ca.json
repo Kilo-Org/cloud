@@ -66,6 +66,7 @@
     "message": "Missatge",
     "off": "Desactivat",
     "organization": "Organització",
+    "organizationTrialEnded": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. El propietari de l'organització pot actualitzar la facturació a kilo.ai i tornar-ho a provar.",
     "platform": "Plataforma",
     "prReview": "Revisió de PR",
     "queued": "En cua",
@@ -3109,8 +3110,10 @@
       "truncated": "Hi ha moviments de crèdits anteriors disponibles."
     },
     "inviteMember": {
+      "alreadyMember": "Aquesta persona ja és membre d'aquesta organització.",
       "emailError": "Introdueix una adreça de correu electrònic vàlida.",
       "emailPlaceholder": "nom@empresa.com",
+      "pendingInvitation": "Aquest correu electrònic ja té una invitació pendent.",
       "permissionDenied": "No tens permís per convidar membres.",
       "roleMember": "El rol és de membre.",
       "sendInvite": "Envia la invitació",
@@ -3182,6 +3185,7 @@
       "emailStatusFailed": "Error en enviar el correu",
       "inviteCreated": "Invitació creada",
       "pendingInvitations": "Invitacions pendents",
+      "ownRoleChange": "No pots canviar el teu propi rol.",
       "resendInvite": "Torna a enviar la invitació",
       "shareInviteLink": "Comparteix l'enllaç d'invitació"
     },

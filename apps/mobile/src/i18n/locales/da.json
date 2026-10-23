@@ -66,6 +66,7 @@
     "message": "Besked",
     "off": "Fra",
     "organization": "Organisation",
+    "organizationTrialEnded": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. En ejer af organisationen kan opdatere betalingen på kilo.ai og derefter prøve igen.",
     "platform": "Kodeplatform",
     "prReview": "PR-gennemgang",
     "queued": "I kø",
@@ -3069,8 +3070,10 @@
       "truncated": "Du kan se ældre bevægelser på kreditsaldoen."
     },
     "inviteMember": {
+      "alreadyMember": "Denne person er allerede medlem af denne organisation.",
       "emailError": "Angiv en gyldig e-mailadresse.",
       "emailPlaceholder": "navn@virksomhed.dk",
+      "pendingInvitation": "Denne e-mailadresse har allerede en afventende invitation.",
       "permissionDenied": "Du har ikke tilladelse til at invitere medlemmer.",
       "roleMember": "Rolle: medlem",
       "sendInvite": "Send invitation",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "E-mailen kunne ikke sendes",
       "inviteCreated": "Invitation oprettet",
       "pendingInvitations": "Ubesvarede invitationer",
+      "ownRoleChange": "Du kan ikke ændre din egen rolle.",
       "resendInvite": "Send invitation igen",
       "shareInviteLink": "Del invitationslink"
     },

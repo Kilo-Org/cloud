@@ -66,6 +66,7 @@
     "message": "Saƙo",
     "off": "An kashe",
     "organization": "Ƙungiya",
+    "organizationTrialEnded": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Mai mallakar ƙungiyar zai iya sabunta lissafin kuɗi a kilo.ai, sannan ya sake gwadawa.",
     "platform": "Dandali",
     "prReview": "Bitar PR",
     "queued": "A layin jira",
@@ -3069,8 +3070,10 @@
       "truncated": "Ana samun ma'amalolin kuɗin amfani na baya."
     },
     "inviteMember": {
+      "alreadyMember": "Wannan mutumin ya riga ya zama memba na wannan ƙungiyar.",
       "emailError": "Shigar da adireshin imel mai inganci.",
       "emailPlaceholder": "suna@company.com",
+      "pendingInvitation": "Wannan adireshin imel ɗin ya riga yana da gayyata da ke jiran amsa.",
       "permissionDenied": "Ba ka da izinin gayyatar membobi.",
       "roleMember": "Matsayi: memba.",
       "sendInvite": "Aika gayyata",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "An kasa aika imel",
       "inviteCreated": "An ƙirƙira gayyata",
       "pendingInvitations": "Gayyatar da ke jiran amsa",
+      "ownRoleChange": "Ba za ka iya canza matsayin kanka ba.",
       "resendInvite": "Sake aika gayyata",
       "shareInviteLink": "Raba mahaɗin gayyata"
     },

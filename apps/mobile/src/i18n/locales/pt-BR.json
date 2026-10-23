@@ -66,6 +66,7 @@
     "message": "Mensagem",
     "off": "Desativado",
     "organization": "Organização",
+    "organizationTrialEnded": "O período de teste da organização terminou e ela não tem nenhum plano ativo. Um proprietário da organização pode atualizar o faturamento em kilo.ai e tentar novamente.",
     "platform": "Plataforma",
     "prReview": "Revisão de PR",
     "queued": "Na fila",
@@ -3108,8 +3109,10 @@
       "renameTitle": "Renomear organização"
     },
     "inviteMember": {
+      "alreadyMember": "Esta pessoa já é membro desta organização.",
       "emailError": "Digite um endereço de e-mail válido.",
       "emailPlaceholder": "nome@empresa.com",
+      "pendingInvitation": "Este e-mail já tem um convite pendente.",
       "permissionDenied": "Você não tem permissão para convidar membros.",
       "roleMember": "Sua função será membro.",
       "sendInvite": "Enviar convite",
@@ -3181,6 +3184,7 @@
       "emailStatusFailed": "Falha no envio do e-mail",
       "inviteCreated": "Convite criado",
       "pendingInvitations": "Convites pendentes",
+      "ownRoleChange": "Você não pode alterar sua própria função.",
       "resendInvite": "Reenviar convite",
       "shareInviteLink": "Compartilhar link de convite"
     },

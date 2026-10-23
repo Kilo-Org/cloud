@@ -66,6 +66,7 @@
     "message": "Mensahe",
     "off": "Naka-off",
     "organization": "Organisasyon",
+    "organizationTrialEnded": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update ng may-ari ng organisasyon ang billing sa kilo.ai, pagkatapos ay subukan muli.",
     "platform": "Plataporma",
     "prReview": "Pagsusuri ng PR",
     "queued": "Nakapila",
@@ -3069,8 +3070,10 @@
       "truncated": "May mas naunang aktibidad sa kredito na maaaring tingnan."
     },
     "inviteMember": {
+      "alreadyMember": "Miembro na ng organisasyong ito ang taong ito.",
       "emailError": "Maglagay ng wastong email address.",
       "emailPlaceholder": "pangalan@kumpanya.com",
+      "pendingInvitation": "May nakabinbing imbitasyon na ang email na ito.",
       "permissionDenied": "Wala kang pahintulot na mag-imbita ng mga miyembro.",
       "roleMember": "Tungkulin: Miyembro.",
       "sendInvite": "Ipadala ang imbitasyon",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "Hindi naipadala ang email",
       "inviteCreated": "Nalikha ang imbitasyon",
       "pendingInvitations": "Mga nakabinbing imbitasyon",
+      "ownRoleChange": "Hindi mo maaaring baguhin ang iyong sariling tungkulin.",
       "resendInvite": "Ipadala muli ang imbitasyon",
       "shareInviteLink": "Ibahagi ang link ng imbitasyon"
     },

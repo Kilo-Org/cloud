@@ -66,6 +66,7 @@
     "message": "Mesazh",
     "off": "Çaktivizuar",
     "organization": "Organizata",
+    "organizationTrialEnded": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv. Një pronar i organizatës mund të përditësojë faturimin në kilo.ai dhe më pas të provojë përsëri.",
     "platform": "Platforma",
     "prReview": "Shqyrtimi i PR-së",
     "queued": "Në radhë",
@@ -3069,8 +3070,10 @@
       "truncated": "Ka aktivitet të mëparshëm të krediteve."
     },
     "inviteMember": {
+      "alreadyMember": "Ky person është tashmë anëtar i kësaj organizate.",
       "emailError": "Shkruaj një adresë të vlefshme emaili.",
       "emailPlaceholder": "emri@kompania.com",
+      "pendingInvitation": "Ky email ka tashmë një ftesë në pritje.",
       "permissionDenied": "Nuk ke leje për të ftuar anëtarë.",
       "roleMember": "Roli është anëtar.",
       "sendInvite": "Dërgo ftesën",
@@ -3142,6 +3145,7 @@
       "emailStatusFailed": "Emaili nuk u dërgua",
       "inviteCreated": "Ftesa u krijua",
       "pendingInvitations": "Ftesat në pritje",
+      "ownRoleChange": "Nuk mund të ndryshosh rolin tënd.",
       "resendInvite": "Ridërgo ftesën",
       "shareInviteLink": "Ndaj lidhjen e ftesës"
     },

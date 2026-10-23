@@ -177,9 +177,9 @@ function EditTab() {
 
         <div className="text-muted-foreground text-xs">
           <p>
-            Domains and signup TLDs are stored in Redis for instant updates. Changes take effect
-            immediately without a deploy. The BLACKLIST_DOMAINS and BLOCKED_SIGNUP_TLDS env vars are
-            used as fallbacks if Redis has no data.
+            Domains and signup TLDs are stored in Redis, so changes apply without a deploy. Auth
+            checks cache the lists for up to a minute. The BLACKLIST_DOMAINS and BLOCKED_SIGNUP_TLDS
+            env vars are fallbacks when Redis has no data.
           </p>
         </div>
       </CardContent>

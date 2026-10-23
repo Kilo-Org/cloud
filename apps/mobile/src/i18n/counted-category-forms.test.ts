@@ -126,3 +126,24 @@ describe('plural forms that carry the count', () => {
     expect(SUPPORTED_LANGUAGES.flatMap(language => spelledCounts(language))).toEqual([]);
   });
 });
+
+describe('agreement-neutral duration copy', () => {
+  it('keeps the minutes unit before the interpolated number for singular, fractional, and plural values', () => {
+    const normalized = [1, 1.5, 2, 10].map(minutes => {
+      const rendered = i18n.t('agentBriefing.paidDisclosure', {
+        lng: 'el',
+        estimate: '$0.12',
+        maximum: '$0.30',
+        minutes,
+      });
+      const count = String(minutes);
+      const countIndex = rendered.lastIndexOf(count);
+      expect(countIndex).toBeGreaterThanOrEqual(0);
+      const suffix = rendered.slice(countIndex + count.length);
+      expect(suffix.startsWith('.')).toBe(true);
+      return `${rendered.slice(0, countIndex)}{{minutes}}${suffix}`;
+    });
+
+    expect(new Set(normalized).size).toBe(1);
+  });
+});

@@ -1,6 +1,6 @@
 import { eq, inArray, or } from 'drizzle-orm';
 import { cliSessions, sharedCliSessions } from '@kilocode/db/schema';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { sharedSessionCurrentCopyIds } from '@/lib/cli-sessions/session-copies';
 import { deleteBlobs, type FileName } from '@/lib/r2/cli-sessions';
 import { USER_DELETION_RESOURCE_BATCH_SIZE } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
@@ -11,6 +11,11 @@ import {
   providerAbortSignal,
   type DeletionHandler,
 } from '@/lib/user/deletion-queue/handlers/common';
+import type { UserDeletionTaskProgress } from '@kilocode/db/schema-types';
+import type {
+  DeletionHandlerContext,
+  DeletionHandlerOutcome,
+} from '@/lib/user/deletion-queue/deletion-types';
 
 const SESSION_BLOB_COLUMNS = [
   'api_conversation_history_blob_url',
@@ -162,12 +167,36 @@ async function loadCliV1Rows(userId: string): Promise<BlobRow[]> {
   return rows;
 }
 
-async function deleteRow(row: BlobRow): Promise<void> {
-  if (row.kind === 'shared') {
-    await db.delete(sharedCliSessions).where(eq(sharedCliSessions.share_id, row.id));
-    return;
+async function cleanupRow(
+  row: BlobRow,
+  connection: typeof db | DrizzleTransaction,
+  context: DeletionHandlerContext,
+  progress: UserDeletionTaskProgress
+): Promise<DeletionHandlerOutcome | undefined> {
+  for (const target of copyTargetsForRow(row)) {
+    if (target.blobs.length === 0) continue;
+    try {
+      await deleteBlobs(target.id, target.blobs, { signal: providerAbortSignal(context) });
+    } catch (error) {
+      if (!isMissingObjectError(error)) {
+        return {
+          kind: 'retry',
+          errorCode: 'blob_delete_failed',
+          httpStatusClass: 'error',
+        };
+      }
+    }
   }
-  await db.delete(cliSessions).where(eq(cliSessions.session_id, row.id));
+
+  const afterBlobs = continueIfLowTime(context, progress);
+  if (afterBlobs) return afterBlobs;
+
+  if (row.kind === 'shared') {
+    await connection.delete(sharedCliSessions).where(eq(sharedCliSessions.share_id, row.id));
+  } else {
+    await connection.delete(cliSessions).where(eq(cliSessions.session_id, row.id));
+  }
+  return undefined;
 }
 
 export const handleCliV1Blobs: DeletionHandler = async ({ request, step, context }) => {
@@ -192,25 +221,25 @@ export const handleCliV1Blobs: DeletionHandler = async ({ request, step, context
     const reserve = continueIfLowTime(context, progress);
     if (reserve) return reserve;
 
-    for (const target of copyTargetsForRow(row)) {
-      if (target.blobs.length === 0) continue;
-      try {
-        await deleteBlobs(target.id, target.blobs, { signal: providerAbortSignal(context) });
-      } catch (error) {
-        if (!isMissingObjectError(error)) {
-          return {
-            kind: 'retry',
-            errorCode: 'blob_delete_failed',
-            httpStatusClass: 'error',
-          };
-        }
-      }
-    }
+    const outcome =
+      row.kind === 'shared'
+        ? await db.transaction(async tx => {
+            const [lockedShare] = await tx
+              .select()
+              .from(sharedCliSessions)
+              .where(eq(sharedCliSessions.share_id, row.id))
+              .for('update');
 
-    const afterBlobs = continueIfLowTime(context, progress);
-    if (afterBlobs) return afterBlobs;
-
-    await deleteRow(row);
+            if (!lockedShare) return undefined;
+            return cleanupRow(
+              { ...lockedShare, kind: 'shared', id: lockedShare.share_id },
+              tx,
+              context,
+              progress
+            );
+          })
+        : await cleanupRow(row, db, context, progress);
+    if (outcome) return outcome;
     progress = incrementProcessed(progress);
   }
 

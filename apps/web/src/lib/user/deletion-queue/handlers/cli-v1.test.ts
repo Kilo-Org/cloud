@@ -100,6 +100,18 @@ describe('handleCliV1Blobs', () => {
       pending_copy_ids: ['prior-copy'],
     });
 
+    deleteBlobsMock.mockImplementationOnce(async () => {
+      await expect(
+        db.transaction(async tx => {
+          await tx
+            .select({ share_id: sharedCliSessions.share_id })
+            .from(sharedCliSessions)
+            .where(eq(sharedCliSessions.kilo_user_id, user.id))
+            .for('share', { noWait: true });
+        })
+      ).rejects.toMatchObject({ cause: { code: '55P03' } });
+    });
+
     const outcome = await handleCliV1Blobs({
       request: { user_id: user.id } as UserDeletionRequest,
       step: {

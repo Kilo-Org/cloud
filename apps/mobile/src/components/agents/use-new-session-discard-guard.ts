@@ -1,4 +1,4 @@
-import { usePreventRemove } from 'expo-router';
+import { useNavigation, usePreventRemove, useRouter } from 'expo-router';
 import {
   createElement,
   type ReactNode,
@@ -11,6 +11,8 @@ import { toast } from 'sonner-native';
 
 import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
 import { i18n } from '@/i18n';
+import { isLeaveAction } from '@/lib/navigation/leave-actions';
+import { pickerRouteOnTop } from '@/lib/picker-routes';
 
 type NewSessionDiscardGuard = {
   /**
@@ -19,20 +21,6 @@ type NewSessionDiscardGuard = {
    */
   discardConfirm: ReactNode;
 };
-
-/**
- * Navigation action types that mean "the user is leaving this screen": the
- * header back button and Android hardware back (`GO_BACK`), the iOS swipe-back
- * gesture and programmatic `router.back()` (`POP`). Every other action that
- * can remove this screen — a `NAVIGATE`/`PUSH` to another route (e.g. tapping
- * Preferences from the tab bar behind this screen), a `RESET` — is forward
- * navigation: the user is going somewhere else, not abandoning the prompt.
- * The draft is durable (saved on every change), so a forward leave loses
- * nothing and must not be blocked by a discard confirm (spot check
- * e12-tap-prefs: the confirm hijacked a Preferences push and the screen never
- * opened).
- */
-const LEAVE_ACTION_TYPES: ReadonlySet<string> = new Set(['GO_BACK', 'POP', 'POP_TO', 'POP_TO_TOP']);
 
 /**
  * New-session discard confirm. Registers a predictive-Back-safe guard via
@@ -141,17 +129,30 @@ export function useNewSessionDiscardGuard({
     });
   }, [closeConfirm, discardAndLeave, onSaveAsTodo]);
 
-  usePreventRemove(dirty && !leaveAllowed, ({ data, repeat }) => {
+  const navigation = useNavigation();
+  const router = useRouter();
+
+  // Armed for every removal, not only while the prompt is non-empty: a Back
+  // that lands while one of this screen's pickers is still presenting arrives
+  // before this screen has re-rendered, so the picker can only be read from the
+  // live navigation state at that moment. Every other removal is replayed.
+  usePreventRemove(!leaveAllowed, ({ data, repeat }) => {
     const leave = () => {
       setLeaveAllowed(true);
       repeat();
     };
+    if (isLeaveAction(data.action.type) && pickerRouteOnTop(navigation.getState())) {
+      // Back while the picker is still presenting: pop the picker, the path
+      // its own Done control uses. This screen and its draft stay.
+      router.back();
+      return;
+    }
     if (skipNextGuardRef.current) {
       skipNextGuardRef.current = false;
       leave();
       return;
     }
-    if (!LEAVE_ACTION_TYPES.has(data.action.type)) {
+    if (!dirty || !isLeaveAction(data.action.type)) {
       leave();
       return;
     }

@@ -197,6 +197,9 @@ vi.mock('@/components/agents/message-text-select-sheet', () => ({
 vi.mock('expo-router', () => ({
   useFocusEffect: vi.fn(),
   useIsFocused: () => true,
+  // No picker sheet is above this screen in these cases.
+  usePathname: () => '/',
+  usePreventRemove: vi.fn(),
   useRouter: () => ({ replace: vi.fn(), setParams: vi.fn() }),
 }));
 

@@ -49,6 +49,7 @@ import {
   getContextSheetMountState,
 } from '@/components/agents/context-usage-display';
 import { resolveSessionComposerDisabled } from '@/components/agents/session-composer-disabled';
+import { usePickerAboveLeaveGuard } from '@/components/agents/use-picker-above-guard';
 import {
   resolveComposerSendDisabledReason,
   resolveComposerSendDisabledReasonTone,
@@ -283,6 +284,9 @@ export function SessionDetailContent({
   // Session-route navigation only: `replace` in one native-stack commit crashes
   // Android Fabric (KILO-APP-25). Other `router` uses here are unaffected.
   const sessionRouter = useStackSafeReplace();
+  // A Back that lands while one of the composer's pickers is still opening is
+  // delivered to this screen by the native stack; it closes the picker instead.
+  usePickerAboveLeaveGuard();
   const [childSessionSheet, setChildSessionSheet] = useState<ChildSessionSheetMountState>({
     sheet: null,
     visible: false,

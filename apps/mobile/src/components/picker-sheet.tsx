@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
 import { SheetHeader, type SheetHeaderTopInset } from '@/components/sheet-header';
+import { useRouteFocused } from '@/lib/navigation/route-focus';
 
 export function PickerSheet({
   title,
@@ -50,6 +51,13 @@ export function PickerSheet({
 }) {
   const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
+  const routeFocused = useRouteFocused();
+  // A picker whose caller bridge is gone is a dead shell. It must only say so
+  // while its own route is the one on screen: painted over another screen it
+  // is a modal the user cannot leave through the screen they think they are on.
+  if (expired && !routeFocused) {
+    return null;
+  }
   const body = expired ? (
     <EmptyState
       icon={Info}

@@ -99,10 +99,9 @@ export default function InstancePickerScreen() {
       // actually describes, so refetch explicitly here too.
       void refetchInstances();
 
-      return () => {
-        instancePickerSlot.clear(UNFENCED_ROUTE_KEY);
-        bridgeRef.current = undefined;
-      };
+      // The bridge outlives a blur: `useRouteRegistry` clears this route's
+      // slots when the route unmounts, so a return to a sheet that is still on
+      // screen shows its options again instead of the "options expired" shell.
       // eslint-disable-next-line react-hooks/exhaustive-deps -- refetchInstances is a stable react-query function identity; including it would re-run this effect on every render because react-query does not memoize it across renders.
     }, [])
   );

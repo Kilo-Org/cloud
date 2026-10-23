@@ -43,6 +43,9 @@ describe('control-plane preparation attempt budget', () => {
     // repository startup bound, so that is the create step this covers.
     const createMs = Math.max(sandbox.providerCreateMs, DEADLINE_MS.repositoryStartup);
     const steps =
+      // A transient create failure creates again inside the same attempt.
+      createMs +
+      sandbox.providerCreateRetryMs +
       createMs +
       sandbox.wrapperFirstConnectMs +
       sandbox.wrapperHelloMs +

@@ -97,8 +97,15 @@ const KILO_SESSION_MS = 2 * MINUTE_MS;
  * the attempt deadline is their sum. A shorter deadline fails a slow but valid
  * preparation as `preparation_timeout` while each step stayed inside its own
  * budget — the failure names a timeout the plan never allowed to finish.
+ *
+ * A transient create failure pauses and creates again inside the same attempt
+ * (`control-plane/sandbox/allocation.ts`), so one retried create is counted
+ * too. Further retries stay bounded by this deadline, which is what stops a
+ * create that keeps failing.
  */
 const ROUTE_PREPARATION_MS =
+  PREPARATION_CREATE_MS +
+  PROVIDER_CREATE_RETRY_MS +
   PREPARATION_CREATE_MS +
   WRAPPER_FIRST_CONNECT_MS +
   WRAPPER_HELLO_MS +

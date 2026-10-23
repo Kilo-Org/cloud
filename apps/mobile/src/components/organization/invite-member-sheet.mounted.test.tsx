@@ -248,10 +248,13 @@ describe('InviteMemberSheet reopen', () => {
     expect(invite.reset).not.toHaveBeenCalled();
     expect(headerProps(rendered).doneDisabled).toBe(true);
 
-    // The earlier attempt fails after the reopen: its error belongs to the
-    // previous form, not to the one on screen now.
+    // The earlier attempt fails after the reopen: its rejection belongs to the
+    // previous form, not to the one on screen now, so neither the field nor the
+    // form announces it. A schema rejection would land on the field, so an
+    // address the field itself accepts is the case that can leak.
     invite.isPending = false;
     invite.isError = true;
+    invite.error = { data: { code: 'BAD_REQUEST', message: 'Invalid email address' } };
     act(() => {
       fieldProps(rendered).onChangeText('');
     });
@@ -259,6 +262,7 @@ describe('InviteMemberSheet reopen', () => {
       fieldProps(rendered).onChangeText('dev@example.com');
     });
 
+    expect(errorMessage(rendered)).toBeNull();
     expect(inviteMessage(rendered)).toBeNull();
     rendered.unmount();
   });

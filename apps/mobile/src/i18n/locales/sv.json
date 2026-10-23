@@ -3673,6 +3673,7 @@
     },
     "variablesEmpty": "Inga variabler ännu",
     "variablesSaveFailed": "Det gick inte att spara variabeln",
+    "variablesDeleteFailed": "Det gick inte att ta bort variabeln",
     "commandsTitle": "Installationskommandon",
     "addCommand": "Lägg till kommando",
     "commandLabel": "Kommando",

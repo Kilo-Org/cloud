@@ -3674,6 +3674,7 @@
     },
     "variablesEmpty": "Ei vielä muuttujia",
     "variablesSaveFailed": "Muuttujan tallentaminen epäonnistui",
+    "variablesDeleteFailed": "Muuttujaa ei voitu poistaa",
     "commandsTitle": "Asennuskomennot",
     "addCommand": "Lisää komento",
     "commandLabel": "Komento",

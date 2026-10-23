@@ -3764,6 +3764,7 @@
     },
     "variablesEmpty": "Зменных пакуль няма",
     "variablesSaveFailed": "Не ўдалося захаваць зменную",
+    "variablesDeleteFailed": "Не ўдалося выдаліць зменную",
     "commandsTitle": "Каманды наладкі",
     "addCommand": "Дадаць каманду",
     "commandLabel": "Камандаванне",

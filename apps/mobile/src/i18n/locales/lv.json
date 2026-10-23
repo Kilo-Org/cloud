@@ -3719,6 +3719,7 @@
     },
     "variablesEmpty": "Vēl nav mainīgo",
     "variablesSaveFailed": "Nevarēja saglabāt mainīgo",
+    "variablesDeleteFailed": "Nevarēja izdzēst mainīgo",
     "commandsTitle": "Iestatīšanas komandas",
     "addCommand": "Pievienot komandu",
     "commandLabel": "Pavēli",

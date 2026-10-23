@@ -1,3 +1,4 @@
+import { withDeadline } from '@kilocode/event-service';
 import { useQueryClient } from '@tanstack/react-query';
 import { Component, type ErrorInfo, type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -8,10 +9,20 @@ import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
 
+/**
+ * Bound on the recovery refetch. A read that cannot settle (a query paused
+ * while the device has no usable connection) must not leave the fallback's
+ * Retry spinning: the stack remounts when the deadline lands and the refetch
+ * continues in the background.
+ */
+const RECOVERY_REFETCH_DEADLINE_MS = 10_000;
+
 type BoundaryProps = {
   children: ReactNode;
   /** The local recovery action; the owner remounts the boundary through its `key` so the fallback resets. */
   onRetry: () => void;
+  /** Whether the recovery refetch is in flight, so the fallback's action shows progress. */
+  isRetrying: boolean;
 };
 
 type BoundaryState = {
@@ -23,18 +34,6 @@ const MAX_COMPONENT_STACK_LENGTH = 2000;
 
 /** Fallback fingerprint part for a throw that carries no name or message. */
 const UNKNOWN_FINGERPRINT_PART = 'unknown';
-
-/**
- * The reads the Profile stack renders from. Retry invalidates exactly these
- * prefixes, so a throw caused by a payload that settled into a shape the render
- * cannot read is re-fetched instead of re-rendered unchanged.
- */
-const PROFILE_QUERY_PREFIXES: readonly (readonly unknown[])[] = [
-  [['user']],
-  [['organizations']],
-  [['kiloPass']],
-  [['agentProfiles']],
-];
 
 function truncateComponentStack(componentStack: string): string {
   if (componentStack.length <= MAX_COMPONENT_STACK_LENGTH) {
@@ -63,7 +62,10 @@ function fingerprintPart(error: unknown, part: 'name' | 'message'): string {
  * inside the tab, so the bottom tab bar (owned by the tabs layout above this
  * stack) is untouched and every other tab stays reachable.
  */
-function ProfileStackErrorFallback({ onRetry }: Readonly<{ onRetry: () => void }>) {
+function ProfileStackErrorFallback({
+  onRetry,
+  isRetrying,
+}: Readonly<{ onRetry: () => void; isRetrying: boolean }>) {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
@@ -73,7 +75,7 @@ function ProfileStackErrorFallback({ onRetry }: Readonly<{ onRetry: () => void }
         contentContainerClassName="px-4 pt-4"
         showsVerticalScrollIndicator={false}
       >
-        <QueryError placement="top" onRetry={onRetry} />
+        <QueryError placement="top" onRetry={onRetry} isRetrying={isRetrying} />
       </TabScreenScrollView>
     </View>
   );
@@ -128,29 +130,49 @@ class ProfileStackRenderBoundary extends Component<BoundaryProps, BoundaryState>
 
   override render(): ReactNode {
     if (this.state.hasError) {
-      return <ProfileStackErrorFallback onRetry={this.props.onRetry} />;
+      return (
+        <ProfileStackErrorFallback
+          onRetry={this.props.onRetry}
+          isRetrying={this.props.isRetrying}
+        />
+      );
     }
     return this.props.children;
   }
 }
 
 /**
- * Owns the fallback's retry. A reset remounts the stack through the boundary's
- * key, and the Profile reads are invalidated first so the remount renders from
- * a fresh payload rather than the one that just failed to render.
+ * Owns the fallback's retry. The reads are refetched before the boundary is
+ * remounted: bumping the key in the same tick would mount the fresh boundary
+ * against the very cached payload that just threw, so it would throw again and
+ * pin the fallback through the refetch. Every cached read is refetched because
+ * the boundary covers the whole stack, and which of the stack's reads carried
+ * the bad payload is unknown; inactive observers are included so a screen that
+ * unmounted with the throw is refreshed too.
  */
 export function ProfileStackErrorBoundary({ children }: Readonly<{ children: ReactNode }>) {
   const queryClient = useQueryClient();
   const [attempt, setAttempt] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
   const retry = useCallback(() => {
-    for (const queryKey of PROFILE_QUERY_PREFIXES) {
-      void queryClient.invalidateQueries({ queryKey });
-    }
-    setAttempt(current => current + 1);
+    setIsRetrying(true);
+    void (async () => {
+      try {
+        await withDeadline(RECOVERY_REFETCH_DEADLINE_MS, async () => {
+          await queryClient.refetchQueries({ type: 'all' });
+        });
+      } catch {
+        // A read that cannot settle inside the deadline must not leave Retry
+        // spinning; the remount below still rebinds the stack to its reads.
+      } finally {
+        setIsRetrying(false);
+        setAttempt(current => current + 1);
+      }
+    })();
   }, [queryClient]);
 
   return (
-    <ProfileStackRenderBoundary key={attempt} onRetry={retry}>
+    <ProfileStackRenderBoundary key={attempt} onRetry={retry} isRetrying={isRetrying}>
       {children}
     </ProfileStackRenderBoundary>
   );

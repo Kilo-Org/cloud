@@ -61,7 +61,6 @@ function mount(children: ReactNode) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: Infinity } },
   });
-  const invalidate = vi.spyOn(client, 'invalidateQueries');
   const holder: { tree?: TestRenderer.ReactTestRenderer } = {};
   act(() => {
     holder.tree = TestRenderer.create(
@@ -72,7 +71,19 @@ function mount(children: ReactNode) {
   if (!tree) {
     throw new Error('boundary did not mount');
   }
-  return { tree, invalidate };
+  return { tree, client };
+}
+
+function deferred() {
+  const { promise, resolve } = Promise.withResolvers<undefined>();
+  return { promise, resolve };
+}
+
+function pressRetry(tree: TestRenderer.ReactTestRenderer) {
+  const fallbackRetry = tree.root.findByType(QueryError as never).props.onRetry as () => void;
+  act(() => {
+    fallbackRetry();
+  });
 }
 
 beforeEach(() => {
@@ -126,27 +137,30 @@ describe('ProfileStackErrorBoundary', () => {
     expect(events).toHaveLength(0);
   });
 
-  it('retries by refetching the Profile reads and re-rendering the stack in place', () => {
+  it('refetches the stack reads before it remounts, and clears once they settle', async () => {
     const throwFor = { current: true };
-    const { tree, invalidate } = mount(
+    const { tree, client } = mount(
       createElement(ProfileStackErrorBoundary, null, createElement(ThrowingStack, { throwFor }))
     );
+    const recovery = deferred();
+    const refetch = vi.spyOn(client, 'refetchQueries').mockReturnValue(recovery.promise);
 
-    // The payload that made the render throw is replaced before the retry, as
-    // the invalidated reads would do once they settle.
+    pressRetry(tree);
+
+    // The crashed payload is still cached while the recovery read runs, so the
+    // boundary must not remount yet: a fresh instance would throw again and
+    // pin the fallback through the refetch.
+    expect(tree.root.findByType(QueryError as never).props.isRetrying).toBe(true);
+    expect(tree.root.findAll(node => String(node.type) === 'ProfileStackContent')).toHaveLength(0);
+
+    // The read settles with a payload the render can handle.
     throwFor.current = false;
-    const fallbackRetry = tree.root.findByType(QueryError as never).props.onRetry as () => void;
-    act(() => {
-      fallbackRetry();
+    await act(async () => {
+      recovery.resolve(undefined);
+      await recovery.promise;
     });
 
-    expect(invalidate).toHaveBeenCalledTimes(4);
-    expect(invalidate.mock.calls.map(call => call[0]?.queryKey)).toEqual([
-      [['user']],
-      [['organizations']],
-      [['kiloPass']],
-      [['agentProfiles']],
-    ]);
+    expect(refetch).toHaveBeenCalledWith({ type: 'all' });
     expect(tree.root.findAllByType(QueryError as never)).toHaveLength(0);
     expect(tree.root.findAll(node => String(node.type) === 'ProfileStackContent')).toHaveLength(1);
   });

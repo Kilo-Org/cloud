@@ -1,4 +1,4 @@
-import { type Href, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -10,11 +10,13 @@ import {
   profileListCountItems,
 } from '@/components/profiles/profile-list-model';
 import { profileOrganizationId, profileOwnerType } from '@/components/profiles/profile-owner-model';
+import { selectProfilesListErrorView } from '@/components/profiles/profiles-list-error-view';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { IconButton } from '@/components/ui/icon-button';
 import {
   Building2,
   type LucideIcon,
@@ -28,12 +30,15 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatProfileCountItemsShort } from '@/lib/profile-count-labels';
 import { type AgentProfileListItem, useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
 import { useOrganization } from '@/lib/organization-context';
-import { getProfileOverviewPath } from '@/lib/profile-agent-navigation';
-
-const NEW_PROFILE_PATH = '/(app)/(tabs)/(3_profile)/profiles/new' as Href;
+import {
+  getNewProfilePath,
+  getProfileOverviewPath,
+  type ProfileManagementStack,
+} from '@/lib/profile-agent-navigation';
 
 /**
  * The row's leading icon names its owner, the same split the web list row
@@ -65,7 +70,12 @@ function ProfileListSkeleton() {
   );
 }
 
-export function ProfilesListScreen() {
+export function ProfilesListScreen({
+  stack,
+}: Readonly<{
+  /** The Stack this screen is mounted in; the rows it opens stay in it. */
+  stack: ProfileManagementStack;
+}>) {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -77,11 +87,18 @@ export function ProfilesListScreen() {
     effectiveDefaultId,
     isLoading,
     isError,
+    error,
     isRefetching,
     refetch,
   } = useAgentProfileList(organizationId ?? undefined);
   // Reactive: a connectivity commit re-renders the error variant selection.
   const committedConnectivity = useCommittedConnectivityStatus();
+  // An access outcome is terminal: naming it keeps the screen from reporting a
+  // server fault and offering a Retry that cannot succeed.
+  const listError = selectProfilesListErrorView({
+    error: isError ? error : undefined,
+    connectivity: committedConnectivity,
+  });
 
   const sections = buildProfileSections({ orgProfiles, personalProfiles, isOrgContext });
   // Wait for the stored organization before choosing the list context, so a
@@ -89,16 +106,25 @@ export function ProfilesListScreen() {
   const isListLoading = !isLoaded || isLoading;
 
   const openNewProfile = () => {
-    router.push(NEW_PROFILE_PATH);
+    router.push(getNewProfilePath(stack));
   };
 
   const openProfile = (profile: AgentProfileListItem) => {
-    router.push(getProfileOverviewPath(profile.id, profileOrganizationId(organizationId, profile)));
+    router.push(
+      getProfileOverviewPath(profile.id, profileOrganizationId(organizationId, profile), stack)
+    );
   };
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profiles.title')} />
+      <ScreenHeader
+        title={t('profiles.title')}
+        headerRight={
+          <IconButton onPress={openNewProfile} accessibilityLabel={t('profiles.newProfile')}>
+            <Plus size={22} color={colors.foreground} />
+          </IconButton>
+        }
+      />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-6 px-6 pt-4"
@@ -114,14 +140,15 @@ export function ProfilesListScreen() {
       >
         {/* A failed refetch keeps the cached rows usable: the error banner sits
             above the content and only replaces it when there is nothing to
-            show. A confirmed-offline device is a connectivity failure, not a
-            server one; `unknown` connectivity keeps the server variant. */}
+            show. The variant comes from the tRPC code, so an access denial is
+            never reported as a server fault, and a terminal code offers no
+            Retry action. */}
         {isError && (
           <QueryError
-            variant={committedConnectivity === 'offline' ? 'offline' : 'server'}
+            variant={listError.variant}
             placement="top"
-            title={t('profiles.loadFailed')}
-            onRetry={() => void refetch()}
+            title={listError.titleKey ? t(listError.titleKey) : undefined}
+            onRetry={listError.showRetry ? () => void refetch() : undefined}
             isRetrying={isRefetching}
           />
         )}
@@ -133,69 +160,60 @@ export function ProfilesListScreen() {
             description={t('profiles.emptyDescription')}
             placement="top"
             action={
-              <Button onPress={openNewProfile}>
+              <Button className={STATE_ACTION_CLASS} onPress={openNewProfile}>
                 <Text>{t('profiles.newProfile')}</Text>
               </Button>
             }
           />
         )}
-        {!isListLoading && sections.length > 0 && (
-          <>
-            {sections.map(section => (
-              <View key={section.key} className="gap-3">
-                {section.titleKey ? (
-                  <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-                    {t(section.titleKey, {
-                      // Reviewed English heading until the `profiles.list.*`
-                      // copy lands with the translation slice.
-                      defaultValue: t(
-                        section.key === 'organization' ? 'common.organization' : 'common.personal'
-                      ),
-                    })}
-                  </Text>
-                ) : null}
-                {section.profiles.map((profile, index) => {
-                  const subtitle = formatProfileCountItemsShort(
-                    t,
-                    profileListCountItems(profileCounts(profile))
-                  ).join(' · ');
-                  return (
-                    <ConfigureRow
-                      key={profile.id}
-                      icon={ownerIcon(profile)}
-                      title={profile.name}
-                      subtitle={subtitle || undefined}
-                      className="rounded-lg bg-secondary px-3"
-                      last={index === section.profiles.length - 1}
-                      trailing={
-                        isEffectiveDefault(profile, effectiveDefaultId) ? (
-                          // The row already announces the profile name; the
-                          // star adds only the state it marks.
-                          <Star
-                            size={16}
-                            color={colors.primary}
-                            fill={colors.primary}
-                            accessibilityLabel={t('profiles.defaultSectionTitle')}
-                          />
-                        ) : undefined
-                      }
-                      onPress={() => {
-                        openProfile(profile);
-                      }}
-                    />
-                  );
-                })}
-              </View>
-            ))}
-
-            {/* Persistent create entry: the list keeps a create CTA at the end
-                once profiles exist, so the flow never dead-ends. */}
-            <Button onPress={openNewProfile}>
-              <Plus size={16} color={colors.primaryForeground} />
-              <Text>{t('profiles.newProfile')}</Text>
-            </Button>
-          </>
-        )}
+        {!isListLoading &&
+          sections.length > 0 &&
+          sections.map(section => (
+            <View key={section.key} className="gap-3">
+              {section.titleKey ? (
+                <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+                  {t(section.titleKey, {
+                    // Reviewed English heading until the `profiles.list.*`
+                    // copy lands with the translation slice.
+                    defaultValue: t(
+                      section.key === 'organization' ? 'common.organization' : 'common.personal'
+                    ),
+                  })}
+                </Text>
+              ) : null}
+              {section.profiles.map((profile, index) => {
+                const subtitle = formatProfileCountItemsShort(
+                  t,
+                  profileListCountItems(profileCounts(profile))
+                ).join(' · ');
+                return (
+                  <ConfigureRow
+                    key={profile.id}
+                    icon={ownerIcon(profile)}
+                    title={profile.name}
+                    subtitle={subtitle || undefined}
+                    className="rounded-lg bg-secondary px-3"
+                    last={index === section.profiles.length - 1}
+                    trailing={
+                      isEffectiveDefault(profile, effectiveDefaultId) ? (
+                        // The row already announces the profile name; the
+                        // star adds only the state it marks.
+                        <Star
+                          size={16}
+                          color={colors.primary}
+                          fill={colors.primary}
+                          accessibilityLabel={t('profiles.defaultSectionTitle')}
+                        />
+                      ) : undefined
+                    }
+                    onPress={() => {
+                      openProfile(profile);
+                    }}
+                  />
+                );
+              })}
+            </View>
+          ))}
       </TabScreenScrollView>
     </View>
   );

@@ -22,6 +22,7 @@ vi.mock('react-native', async () => {
     useImperativeHandle,
   } = await import('react');
   return {
+    Platform: { OS: 'ios' },
     View: 'View',
     Switch: 'Switch',
     ScrollView: forwardRef(function ScrollViewStub(

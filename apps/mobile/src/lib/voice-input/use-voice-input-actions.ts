@@ -129,7 +129,7 @@ export function showFeedback(feedback: VoiceInputFeedback): void {
       Alert.alert(presentation.title, presentation.message, [
         { text: i18n.t('common.cancel'), style: 'cancel' },
         {
-          text: i18n.t('transcriptionModel.title'),
+          text: presentation.actionLabel,
           onPress: () => {
             router.push('/(app)/transcription-model-picker');
           },
@@ -139,7 +139,7 @@ export function showFeedback(feedback: VoiceInputFeedback): void {
     }
     Alert.alert(presentation.title, presentation.message, [
       { text: i18n.t('common.cancel'), style: 'cancel' },
-      { text: i18n.t('common.openSettings'), onPress: () => void Linking.openSettings() },
+      { text: presentation.actionLabel, onPress: () => void Linking.openSettings() },
     ]);
     return;
   }

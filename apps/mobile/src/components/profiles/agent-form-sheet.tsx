@@ -1,12 +1,13 @@
 /* eslint-disable max-lines -- the agent form keeps its validation, dirty check, and every field group in one sheet, so Save and the fields it saves stay together */
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, Switch, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
 import { AgentVariantPicker } from '@/components/profiles/agent-variant-picker';
 import {
+  AGENT_VISIBILITY_OPTIONS,
   type AgentFormError,
   type AgentFormState,
   type AgentSource,
@@ -18,6 +19,7 @@ import {
 } from '@/components/profiles/profile-agents-model';
 import { SheetHeader } from '@/components/sheet-header';
 import { FormField } from '@/components/ui/form-field';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
@@ -31,12 +33,6 @@ const ERROR_KEYS = {
   'slug-conflict': 'profiles.agents.slugConflict',
   'name-required': 'profiles.agents.nameRequired',
 } satisfies Record<AgentFormError, string>;
-
-const VISIBILITY_OPTIONS: readonly { value: AgentVisibility; labelKey: string }[] = [
-  { value: 'primary', labelKey: 'profiles.agents.visibilityPrimary' },
-  { value: 'subagent', labelKey: 'profiles.agents.visibilitySubagent' },
-  { value: 'all', labelKey: 'profiles.agents.visibilityAll' },
-];
 
 type AgentFormSheetProps = Readonly<{
   agent: AgentSource | null;
@@ -277,7 +273,7 @@ export function AgentFormSheet({
             {t('profiles.agents.visibility')}
           </Text>
           <View className="gap-1">
-            {VISIBILITY_OPTIONS.map(option => {
+            {AGENT_VISIBILITY_OPTIONS.map(option => {
               const selected = visibility === option.value;
               return (
                 <Pressable

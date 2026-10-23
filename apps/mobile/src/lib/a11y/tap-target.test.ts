@@ -23,17 +23,28 @@ import {
   INLINE_LINK_OUTER_HIT_SLOP_DP,
   INLINE_LINK_VERTICAL_HIT_SLOP_DP,
   inlineLinkHitSlop,
+  LEGAL_LINK_BOX_CLASS,
+  LEGAL_LINK_LINE_DP,
+  LEGAL_LINK_MIN_DP,
+  LEGAL_LINK_ROW_CLASS,
+  LEGAL_LINK_SENTENCE_BOX_CLASS,
+  LEGAL_LINK_SENTENCE_CANCEL_DP,
   MIN_TAP_TARGET_DP,
+  STATE_ACTION_CLASS,
+  STATE_ACTION_TARGET_DP,
   tapTargetReachDp,
+  textActionTargetClass,
   TOUCH_TARGET_DP,
   VOICE_INPUT_LG_HIT_SLOP_DP,
 } from './tap-target';
 
 // `inlineLinkHitSlop` resolves the sentence's ends through the interface
 // direction, and this project has no app build, so the native module is a
-// mutable stub the mirror case flips.
+// mutable stub the mirror case flips. `textActionTargetClass` reads the
+// platform at call time, so the stub carries it mutably too.
 const rtl = vi.hoisted(() => ({ isRTL: false }));
-vi.mock('react-native', () => ({ I18nManager: rtl }));
+const platform = vi.hoisted(() => ({ OS: 'ios' as string }));
+vi.mock('react-native', () => ({ I18nManager: rtl, Platform: platform }));
 
 const { compile } = createRequire(import.meta.url)(
   'react-native-css/compiler'
@@ -90,6 +101,38 @@ describe('shared tap-target geometry', () => {
     expect(ICON_TARGET_BOX_CLASS).toContain('w-[48px]');
     expect(ICON_TARGET_BOX_CLASS).toContain('items-center');
     expect(ICON_TARGET_BOX_CLASS).toContain('justify-center');
+  });
+
+  it('renders a text-only action frame at the platform minimum on both axes', async () => {
+    // The regression this guards: a text link whose only child is one label
+    // line reports that line's height as its own rect, and `hitSlop` never
+    // lifts the rect an audit reads. `min-h-11` would be 38.5pt on device. The
+    // width floor is needed because the caller drops its hit slop: a short
+    // label is only a couple of glyphs wide.
+    platform.OS = 'ios';
+    const ios = textActionTargetClass();
+    expect(ios).toContain('min-h-[44px]');
+    expect(await compiledDp(ios, 'minHeight')).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    expect(await compiledDp(ios, 'minWidth')).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+
+    platform.OS = 'android';
+    const android = textActionTargetClass();
+    expect(android).toContain('min-h-[48px]');
+    expect(await compiledDp(android, 'minHeight')).toBeGreaterThanOrEqual(ICON_TARGET_DP);
+    expect(await compiledDp(android, 'minWidth')).toBeGreaterThanOrEqual(ICON_TARGET_DP);
+
+    platform.OS = 'ios';
+  });
+
+  it('renders a state surface action on the Android 48dp minimum', async () => {
+    // Android's `<Button>` rule is 48dp on the pressed node's own rect, and the
+    // shared `Button` default frame is `min-h-[44px]`. `hitSlop` would widen
+    // the touch region without moving that rect, so the floor is the class.
+    expect(STATE_ACTION_TARGET_DP).toBe(48);
+    expect(STATE_ACTION_TARGET_DP).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    expect(STATE_ACTION_CLASS).toContain('min-h-[48px]');
+    // The compiled value is what the layout uses, through the app's pipeline.
+    expect(await compiledDp(STATE_ACTION_CLASS, 'minHeight')).toBe(STATE_ACTION_TARGET_DP);
   });
 
   it('reaches the design touch target with the compact box plus its slop', () => {
@@ -173,6 +216,43 @@ describe('shared tap-target geometry', () => {
     });
 
     rtl.isRTL = false;
+  });
+});
+
+describe('standalone legal link geometry', () => {
+  it('renders the 48dp box from whole dp', async () => {
+    // The regression this guards: the store and consent legal links rendered as
+    // bare `text-xs` Text nodes, so their whole target was the 14dp line.
+    expect(LEGAL_LINK_MIN_DP).toBe(48);
+    expect(await compiledDp(LEGAL_LINK_BOX_CLASS, 'minHeight')).toBe(LEGAL_LINK_MIN_DP);
+    expect(await compiledDp(LEGAL_LINK_BOX_CLASS, 'minWidth')).toBe(LEGAL_LINK_MIN_DP);
+    expect(await compiledDp(LEGAL_LINK_SENTENCE_BOX_CLASS, 'minHeight')).toBe(LEGAL_LINK_MIN_DP);
+    // The utilities are literal in the source so the class compiler can see
+    // them; these hold the literals to the dp constants beside them.
+    expect(LEGAL_LINK_BOX_CLASS).toContain(`min-h-[${LEGAL_LINK_MIN_DP}px]`);
+    expect(LEGAL_LINK_BOX_CLASS).toContain(`min-w-[${LEGAL_LINK_MIN_DP}px]`);
+    expect(LEGAL_LINK_SENTENCE_BOX_CLASS).toContain(`-my-[${LEGAL_LINK_SENTENCE_CANCEL_DP}px]`);
+  });
+
+  it('keeps the two store boxes apart when the row wraps', async () => {
+    // Each store link keeps its full 48dp height in the flow, so a wrapped row
+    // stacks two 48dp lines: the boxes sit a gutter apart and cannot overlap.
+    // Cancelling the height on the box instead (as the sentence's own box does)
+    // would leave each box reaching 17dp into the line below, where a tap
+    // between the lines would open the wrong document.
+    expect(LEGAL_LINK_BOX_CLASS).not.toContain('-my-');
+    // Horizontally the two boxes sit side by side with no sideways slop, so the
+    // row's `gap-x-4` is the whole separation (14dp at the app's 14pt rem).
+    expect(LEGAL_LINK_ROW_CLASS).toContain('gap-x-4');
+    expect(LEGAL_LINK_ROW_CLASS).toContain('flex-wrap');
+
+    // The sentence has no second link beside it, so its box cancels the
+    // overflow past the `text-xs` line and the sentence keeps its own height.
+    expect(LEGAL_LINK_LINE_DP).toBe(14);
+    expect(LEGAL_LINK_SENTENCE_CANCEL_DP).toBe((LEGAL_LINK_MIN_DP - LEGAL_LINK_LINE_DP) / 2);
+    expect(await compiledDp(LEGAL_LINK_SENTENCE_BOX_CLASS, 'marginBlock')).toBe(
+      -LEGAL_LINK_SENTENCE_CANCEL_DP
+    );
   });
 });
 

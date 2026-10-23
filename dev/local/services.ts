@@ -83,7 +83,6 @@ type ServiceMeta = {
 };
 
 const serviceMeta: Record<string, ServiceMeta> = {
-  // core
   // The web app mints web tickets from Session Ingest
   // (`activeSessions.createWebTicket` / `getToken` in
   // apps/web/src/routers/active-sessions-router.ts), so starting the web app
@@ -92,6 +91,12 @@ const serviceMeta: Record<string, ServiceMeta> = {
   // gets a 412 PRECONDITION_FAILED. Same precedent as mobile -> latency-ingest.
   // The web app rewrites its AI gateway routes to the ai-gateway app (see
   // apps/web/ai-gateway-rewrites.mjs), so it pulls that app in too.
+  // Every code-review read and write reaches git-token-service for the caller's
+  // provider credential (apps/web/src/lib/integrations/platforms/{github,gitlab,
+  // bitbucket}/ plus lib/provider-review/), so the web stack must pull the
+  // worker in transitively — otherwise those fetches hit a dead
+  // `GIT_TOKEN_SERVICE_API_URL` and a connected GitHub account renders as a
+  // service outage with no pull requests.
   nextjs: {
     group: 'core',
     dependsOn: [
@@ -101,6 +106,7 @@ const serviceMeta: Record<string, ServiceMeta> = {
       'stripe',
       'cloudflare-session-ingest',
       'ai-gateway',
+      'cloudflare-git-token-service',
     ],
   },
   postgres: { group: 'core', dependsOn: [] },
@@ -117,7 +123,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['postgres', 'nextjs'],
     dir: 'services/user-data-export',
   },
-  // auto-routing (kilo-auto/efficient decision engine + benchmark runner)
   'auto-routing': {
     group: 'auto-routing',
     dependsOn: [],
@@ -128,7 +133,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: [],
     dir: 'services/auto-routing-benchmark',
   },
-  // cloud-agent
   'cloud-agent-next': {
     group: 'cloud-agent',
     dependsOn: [
@@ -185,13 +189,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dir: 'services/cloud-agent-next',
   },
   'cloud-agent-public-tunnels': { group: 'cloud-agent-public-tunnels', dependsOn: [] },
-  // git-token-service (shared by cloud-agent, gastown)
   'cloudflare-git-token-service': {
     group: 'git-token-service',
     dependsOn: ['postgres'],
     dir: 'services/git-token-service',
   },
-  // code-review
   'bitbucket-webhook-tunnel': {
     group: 'code-review',
     dependsOn: ['nextjs'],
@@ -201,7 +203,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['cloud-agent-next', 'nextjs'],
     dir: 'services/code-review-infra',
   },
-  // security-agent
   'cloudflare-security-sync': {
     group: 'security-agent',
     dependsOn: ['postgres', 'cloudflare-git-token-service'],
@@ -218,7 +219,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     ],
     dir: 'services/security-auto-analysis',
   },
-  // kiloclaw
   'kiloclaw-tunnel': { group: 'kiloclaw', dependsOn: [] },
   'kiloclaw-docker-tcp': { group: 'kiloclaw', dependsOn: [] },
   notifications: {
@@ -256,7 +256,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['kiloclaw', 'event-service'],
     dir: 'services/kilo-chat',
   },
-  // observability
   'cloudflare-o11y': {
     group: 'observability',
     dependsOn: ['nextjs'],
@@ -278,22 +277,18 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dir: 'services/ai-attribution',
   },
   grafana: { group: 'observability', dependsOn: [] },
-  // mobile
   // The app POSTs its client-observed latency batches to the latency-ingest
   // worker in every dev session (`LATENCY_INGEST_URL` in the mobile env points
   // at its wrangler port), so a stack started for mobile work runs it;
   // otherwise the app POSTs to a dead listener and the ingest path cannot be
   // observed locally.
   mobile: { group: 'mobile', dependsOn: ['latency-ingest'], dir: 'apps/mobile' },
-  // storybook
   storybook: { group: 'storybook', dependsOn: [] },
-  // deletion-mock
   'deletion-mock': {
     group: 'deletion-mock',
     dependsOn: [],
     dir: 'dev/local/scripts',
   },
-  // gastown
   'cloudflare-gastown': {
     group: 'gastown',
     dependsOn: ['postgres', 'cloudflare-git-token-service', 'container-usage-meter', 'nextjs'],
@@ -509,10 +504,6 @@ export function resolveE2eInternalSecretSessionEnv(args: {
   return { E2E_INTERNAL_API_SECRET: resolveE2eInternalSecret(env) };
 }
 
-// ---------------------------------------------------------------------------
-// Wrangler config discovery
-// ---------------------------------------------------------------------------
-
 function stripJsonComments(text: string): string {
   let result = '';
   let i = 0;
@@ -571,10 +562,6 @@ export function resolveFakeLlmWorkerPort(): number {
     ) + portOffset
   );
 }
-
-// ---------------------------------------------------------------------------
-// Build service definitions from serviceMeta + wrangler.jsonc
-// ---------------------------------------------------------------------------
 
 // Base host ports for the Compose stack. A worktree with a port offset runs its
 // own Compose project on offset host ports, so its database, its data, and its

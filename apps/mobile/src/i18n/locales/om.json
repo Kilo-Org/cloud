@@ -4006,6 +4006,7 @@
     "history": "Seenaa gabaasaa",
     "historyHint": "Gabaasonni, kan cufaman dabalatee, guyyoota 30f ni kuufamu.",
     "settings": "Qindaa'ina gabaasaa",
+    "saved": "Qindaa'ina gabaasaa kuusamee jira",
     "empty": "Sochiin halkanii hin jiru",
     "emptyHint": "Yeroon koodii cloud fi CLI kee halkan sochii booda asitti ni mul'ata.",
     "loadError": "Gabaasota fe'uun hin danda'amne",

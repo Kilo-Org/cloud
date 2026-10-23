@@ -4006,6 +4006,7 @@
     "history": "Briefing-Verlauf",
     "historyHint": "Berichte werden 30 Tage lang aufbewahrt, auch ausgeblendete.",
     "settings": "Briefing-Einstellungen",
+    "saved": "Briefing-Einstellungen gespeichert",
     "empty": "Keine nächtliche Aktivität",
     "emptyHint": "Deine Cloud- und CLI-Coding-Sitzungen erscheinen hier nach einer aktiven Nacht.",
     "loadError": "Briefings konnten nicht geladen werden",

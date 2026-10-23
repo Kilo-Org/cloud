@@ -4006,6 +4006,7 @@
     "history": "Brifinq tarixçəsi",
     "historyHint": "Hesabatlar, o cümlədən bağlanmış hesabatlar, 30 gün saxlanılır.",
     "settings": "Brifinq ayarları",
+    "saved": "Brifinq ayarları yadda saxlanıldı.",
     "empty": "Gecə fəaliyyəti yoxdur",
     "emptyHint": "Aktiv gecədən sonra bulud və CLI kodlaşdırma sessiyalarınız burada görünəcək.",
     "loadError": "Brifinqləri yükləmək mümkün olmadı",

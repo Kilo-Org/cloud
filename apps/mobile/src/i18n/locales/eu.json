@@ -4006,6 +4006,7 @@
     "history": "Laburpenen historia",
     "historyHint": "Txostenak 30 egunez gordetzen dira, baztertutakoak barne.",
     "settings": "Laburpenaren ezarpenak",
+    "saved": "Laburpenaren ezarpenak gorde dira.",
     "empty": "Ez dago gaueko jarduerarik",
     "emptyHint": "Hodeiko eta CLIko kodetze-saioak hemen agertuko dira gau aktibo baten ondoren.",
     "loadError": "Ezin izan dira laburpenak kargatu",

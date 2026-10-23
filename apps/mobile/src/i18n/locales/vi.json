@@ -4006,6 +4006,7 @@
     "history": "Lịch sử bản tin",
     "historyHint": "Báo cáo được lưu trong 30 ngày, kể cả báo cáo đã bỏ qua.",
     "settings": "Cài đặt bản tin",
+    "saved": "Đã lưu cài đặt bản tin",
     "empty": "Không có hoạt động qua đêm",
     "emptyHint": "Các phiên lập trình trên đám mây và CLI của bạn sẽ hiển thị tại đây sau một đêm có hoạt động.",
     "loadError": "Không thể tải bản tin",

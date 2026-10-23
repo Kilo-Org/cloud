@@ -4006,6 +4006,7 @@
     "history": "Yfirlitssaga",
     "historyHint": "Skýrslur eru geymdar í 30 daga, þar á meðal hunsaðar skýrslur.",
     "settings": "Stillingar yfirlits",
+    "saved": "Stillingar yfirlits vistaðar",
     "empty": "Engin virkni í nótt",
     "emptyHint": "Forritunarlotur þínar í skýinu og CLI birtast hér eftir virka nótt.",
     "loadError": "Ekki tókst að hlaða yfirlitum",

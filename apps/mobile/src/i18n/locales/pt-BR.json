@@ -4055,6 +4055,7 @@
     "history": "Histórico de resumos",
     "historyHint": "Os relatórios ficam guardados por 30 dias, incluindo os dispensados.",
     "settings": "Configurações do resumo",
+    "saved": "Configurações do resumo salvas",
     "empty": "Nenhuma atividade durante a noite",
     "emptyHint": "Suas sessões de programação na nuvem e na CLI aparecerão aqui após uma noite ativa.",
     "loadError": "Não foi possível carregar os resumos",

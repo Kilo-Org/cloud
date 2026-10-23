@@ -4006,6 +4006,7 @@
     "history": "简报历史",
     "historyHint": "报告保留 30 天，包括已关闭的报告。",
     "settings": "简报设置",
+    "saved": "简报设置已保存",
     "empty": "夜间无活动",
     "emptyHint": "夜间有活动后，你的云端和 CLI 编码会话将显示在这里。",
     "loadError": "无法加载简报",

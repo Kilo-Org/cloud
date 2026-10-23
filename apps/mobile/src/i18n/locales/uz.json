@@ -4006,6 +4006,7 @@
     "history": "Brifinglar tarixi",
     "historyHint": "Hisobotlar, yopilganlari ham, 30 kun saqlanadi.",
     "settings": "Brifing sozlamalari",
+    "saved": "Brifing sozlamalari saqlandi",
     "empty": "Tungi faoliyat yo‘q",
     "emptyHint": "Faol tundan so‘ng bulut va CLI kodlash seanslaringiz shu yerda ko‘rinadi.",
     "loadError": "Brifinglarni yuklab bo‘lmadi",

@@ -4006,6 +4006,7 @@
     "history": "Historial de resumos",
     "historyHint": "Os informes gárdanse durante 30 días, incluídos os descartados.",
     "settings": "Configuración do resumo",
+    "saved": "Configuración do resumo gardada",
     "empty": "Sen actividade nocturna",
     "emptyHint": "As túas sesións de programación na nube e na CLI aparecerán aquí despois dunha noite activa.",
     "loadError": "Non se puideron cargar os resumos",

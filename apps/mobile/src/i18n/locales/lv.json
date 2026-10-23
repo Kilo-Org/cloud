@@ -4055,6 +4055,7 @@
     "history": "Kopsavilkumu vēsture",
     "historyHint": "Atskaites tiek glabātas 30 dienas, ieskaitot noraidītās.",
     "settings": "Kopsavilkuma iestatījumi",
+    "saved": "Kopsavilkuma iestatījumi saglabāti",
     "empty": "Nakts laikā nav aktivitātes",
     "emptyHint": "Jūsu mākoņa un CLI kodēšanas sesijas parādīsies šeit pēc aktīvas nakts.",
     "loadError": "Neizdevās ielādēt kopsavilkumus",

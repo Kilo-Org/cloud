@@ -4006,6 +4006,7 @@
     "history": "Tantaran'ny tatitra",
     "historyHint": "Tehirizina mandritra ny 30 andro ny tatitra, ao anatin'izany ireo nesorina.",
     "settings": "Fikirakirana tatitra",
+    "saved": "Voatahiry ny fikirakirana tatitra",
     "empty": "Tsy nisy hetsika tamin'ny alina",
     "emptyHint": "Hiseho eto ny fivoriana kaody cloud sy CLI rehefa avy nisy hetsika tamin'ny alina.",
     "loadError": "Tsy nahavita naka ny tatitra",

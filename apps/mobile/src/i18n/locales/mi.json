@@ -4006,6 +4006,7 @@
     "history": "Hītori whakamōhiotanga",
     "historyHint": "Ka puritia ngā pūrongo mō ngā rā 30, tae atu ki ngā pūrongo kua whakakorea.",
     "settings": "Ngā tautuhinga whakamōhiotanga",
+    "saved": "Kua tiakia ngā tautuhinga whakamōhiotanga",
     "empty": "Kāore he mahi i te pō",
     "emptyHint": "Ka puta mai ō wātū waehere kapua, CLI hoki ki konei i muri i tētahi pō hohe.",
     "loadError": "Kāore i taea te uta ngā whakamōhiotanga",

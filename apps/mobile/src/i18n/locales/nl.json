@@ -4006,6 +4006,7 @@
     "history": "Briefinggeschiedenis",
     "historyHint": "Rapporten worden 30 dagen bewaard, ook gesloten rapporten.",
     "settings": "Briefinginstellingen",
+    "saved": "Briefinginstellingen opgeslagen",
     "empty": "Geen nachtelijke activiteit",
     "emptyHint": "Je cloud- en CLI-codeersessies verschijnen hier na een actieve nacht.",
     "loadError": "Briefings konden niet worden geladen",

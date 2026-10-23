@@ -4006,6 +4006,7 @@
     "history": "Taariikhda warbixinnada",
     "historyHint": "Warbixinnada waxaa la hayaa 30 maalmood, oo ay ku jiraan kuwa la iska saaray.",
     "settings": "Dejinta warbixinta",
+    "saved": "Dejinta warbixinta waa la kaydiyay",
     "empty": "Ma jiro dhaqdhaqaaq habeenkii",
     "emptyHint": "Fadhiyadaada koodhka ee cloud iyo CLI halkan ayay ka muuqan doonaan habeen firfircoon kadib.",
     "loadError": "Lama soo rari karin warbixinnada",

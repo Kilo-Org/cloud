@@ -4006,6 +4006,7 @@
     "history": "Historia ya muhtasari",
     "historyHint": "Ripoti huhifadhiwa kwa siku 30, zikiwemo ripoti zilizoondolewa.",
     "settings": "Mipangilio ya muhtasari",
+    "saved": "Mipangilio ya muhtasari imehifadhika",
     "empty": "Hakuna shughuli za usiku",
     "emptyHint": "Vipindi vyako vya uandishi wa msimbo vya wingu na CLI vitaonekana hapa baada ya usiku wenye shughuli.",
     "loadError": "Imeshindwa kupakia muhtasari",

@@ -4006,6 +4006,7 @@
     "history": "Verslaggeskiedenis",
     "historyHint": "Verslae word 30 dae lank bewaar, insluitend verwerpte verslae.",
     "settings": "Verslaginstellings",
+    "saved": "Verslaginstellings gestoor",
     "empty": "Geen oornag-aktiwiteit nie",
     "emptyHint": "Jou wolk- en CLI-koderingsessies sal hier verskyn ná 'n aktiewe nag.",
     "loadError": "Kon nie verslae laai nie",

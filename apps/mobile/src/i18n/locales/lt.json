@@ -4104,6 +4104,7 @@
     "history": "Suvestinių istorija",
     "historyHint": "Ataskaitos saugomos 30 dienų, įskaitant atmestas.",
     "settings": "Suvestinės nustatymai",
+    "saved": "Suvestinės nustatymai išsaugoti",
     "empty": "Naktį veiklos nebuvo",
     "emptyHint": "Po aktyvios nakties čia bus rodomos jūsų debesies ir CLI programavimo sesijos.",
     "loadError": "Nepavyko įkelti suvestinių",

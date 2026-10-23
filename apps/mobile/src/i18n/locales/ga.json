@@ -4153,6 +4153,7 @@
     "history": "Stair na n-achoimrí",
     "historyHint": "Coinnítear tuarascálacha ar feadh 30 lá, tuarascálacha díbhe san áireamh.",
     "settings": "Socruithe achoimre",
+    "saved": "Sábháladh socruithe achoimre",
     "empty": "Gan aon ghníomhaíocht thar oíche",
     "emptyHint": "Taispeánfar do sheisiúin chódála scamaill agus CLI anseo tar éis oíche ghníomhach.",
     "loadError": "Níorbh fhéidir achoimrí a lódáil",

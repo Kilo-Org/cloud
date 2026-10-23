@@ -4055,6 +4055,7 @@
     "history": "Historial de resums",
     "historyHint": "Els informes es conserven 30 dies, inclosos els descartats.",
     "settings": "Configuració del resum",
+    "saved": "S'ha desat la configuració del resum",
     "empty": "Cap activitat durant la nit",
     "emptyHint": "Les teves sessions de programació al núvol i a la CLI apareixeran aquí després d'una nit activa.",
     "loadError": "No s'han pogut carregar els resums",

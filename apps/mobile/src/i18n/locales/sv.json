@@ -4005,6 +4005,7 @@
     "history": "Sammanfattningshistorik",
     "historyHint": "Rapporter sparas i 30 dagar, även avfärdade rapporter.",
     "settings": "Inställningar för sammanfattning",
+    "saved": "Inställningar för sammanfattning sparade.",
     "empty": "Ingen aktivitet under natten",
     "emptyHint": "Dina kodningssessioner i molnet och CLI visas här efter en aktiv natt.",
     "loadError": "Det gick inte att läsa in sammanfattningar",

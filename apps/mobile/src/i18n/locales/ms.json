@@ -4006,6 +4006,7 @@
     "history": "Sejarah taklimat",
     "historyHint": "Laporan disimpan selama 30 hari, termasuk laporan yang ditolak.",
     "settings": "Tetapan taklimat",
+    "saved": "Tetapan taklimat disimpan",
     "empty": "Tiada aktiviti semalaman",
     "emptyHint": "Sesi pengekodan awan dan CLI anda akan muncul di sini selepas malam yang aktif.",
     "loadError": "Tidak dapat memuatkan taklimat",

@@ -4006,6 +4006,7 @@
     "history": "Brief-historikk",
     "historyHint": "Rapporter lagres i 30 dager, også avviste rapporter.",
     "settings": "Brief-innstillinger",
+    "saved": "Brief-innstillinger lagret",
     "empty": "Ingen aktivitet i natt",
     "emptyHint": "Kodeøktene dine i skyen og CLI vises her etter en aktiv natt.",
     "loadError": "Kunne ikke laste briefer",

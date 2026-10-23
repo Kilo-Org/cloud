@@ -4006,6 +4006,7 @@
     "history": "Ülevaadete ajalugu",
     "historyHint": "Aruandeid säilitatakse 30 päeva, sh suletud aruandeid.",
     "settings": "Ülevaate seaded",
+    "saved": "Ülevaate seaded salvestatud",
     "empty": "Öist tegevust pole",
     "emptyHint": "Sinu pilve- ja CLI-koodimisseansid ilmuvad siia pärast aktiivset ööd.",
     "loadError": "Ülevaateid ei õnnestunud laadida",

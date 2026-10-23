@@ -21,7 +21,7 @@ import { readBoundedStream } from './bounded-stream-reader';
 import { parseDirectIngestConfig, selectDirectIngestUser } from './direct-ingest-rollout';
 import { applyMetadataChanges } from './metadata';
 import {
-  boundedRequestBody,
+  measuredStagingBody,
   StageAndEnqueueError,
   stageAndEnqueue,
   StagingOverflowError,
@@ -124,7 +124,8 @@ export async function handleDirectIngestRequest(
     metrics: DirectIngestMetrics
   ): Promise<DirectIngestResponse> => {
     // A declared length within the RPC byte budget crosses by value; larger
-    // or unmeasured bodies cross as a counting stream capped at the ceiling.
+    // bodies cross as a fixed-length stream and unmeasured bodies are read
+    // under the ceiling, so every staged body is measured before storage.
     stagingOverflowed = false;
     const declared = parseContentLength(request.contentLength);
     if (typeof declared === 'number' && declared !== 0 && declared <= INGEST_CHUNK_MAX_BYTES) {
@@ -135,14 +136,20 @@ export async function handleDirectIngestRequest(
       return legacy(request, r2Key, buffered.bytes, { reason, metrics, startedAt });
     }
     try {
-      const response = await legacy(
-        request,
-        r2Key,
-        boundedRequestBody(request.body, stagingCeiling, () => {
+      const stagedBody = await measuredStagingBody(
+        request.body,
+        typeof declared === 'number' ? declared : undefined,
+        stagingCeiling,
+        () => {
           stagingOverflowed = true;
-        }),
-        { reason, metrics, startedAt, overflowed: () => stagingOverflowed }
+        }
       );
+      const response = await legacy(request, r2Key, stagedBody, {
+        reason,
+        metrics,
+        startedAt,
+        overflowed: () => stagingOverflowed,
+      });
       // A tripped flag overrides the staging outcome: the body, not the
       // storage write, was the problem.
       if (stagingOverflowed) {
@@ -150,7 +157,7 @@ export async function handleDirectIngestRequest(
       }
       return response;
     } catch (error) {
-      if (stagingOverflowed) {
+      if (stagingOverflowed || error instanceof StagingOverflowError) {
         return tooLarge(null);
       }
       throw error;

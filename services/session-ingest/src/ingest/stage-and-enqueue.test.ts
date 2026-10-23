@@ -7,7 +7,7 @@ vi.mock('../dos/SessionIngestDO', () => ({
 import { getSessionIngestDO } from '../dos/SessionIngestDO';
 import type { Env } from '../env';
 import { INGEST_CHUNK_MAX_BYTES } from '../util/ingest-limits';
-import { boundedRequestBody, stageAndEnqueue, toRpcBody } from './stage-and-enqueue';
+import { measuredStagingBody, stageAndEnqueue, toRpcBody } from './stage-and-enqueue';
 
 const encoder = new TextEncoder();
 
@@ -82,58 +82,67 @@ describe('stageAndEnqueue', () => {
   });
 });
 
-describe('boundedRequestBody', () => {
-  it('delivers the body unchanged under the limit', async () => {
+describe('measuredStagingBody', () => {
+  it('reads a declared body within one RPC payload into bytes', async () => {
     const payload = encoder.encode('{"data":[]}');
-    const body = new Blob([payload]).stream();
-    const staged = boundedRequestBody(body, 1024, () => {
+    const staged = await measuredStagingBody(
+      new Blob([payload]).stream(),
+      payload.byteLength,
+      INGEST_CHUNK_MAX_BYTES * 2,
+      () => {
+        throw new Error('must not trip');
+      }
+    );
+
+    expect(staged).toBeInstanceOf(Uint8Array);
+    expect(new TextDecoder().decode(staged as Uint8Array)).toBe('{"data":[]}');
+  });
+
+  it('leaves a larger declared body as its own request stream', async () => {
+    const body = new Blob([new Uint8Array(8)]).stream();
+    const staged = await measuredStagingBody(body, INGEST_CHUNK_MAX_BYTES + 1, INGEST_CHUNK_MAX_BYTES * 2, () => {
       throw new Error('must not trip');
     });
 
-    await expect(new Response(staged).arrayBuffer()).resolves.toEqual(
-      await new Response(new Blob([payload]).stream()).arrayBuffer()
-    );
+    expect(staged).toBe(body);
   });
 
-  it('reports the limit when the body passes it', async () => {
+  it('rejects a declared length above the ceiling without reading the body', async () => {
+    const read = vi.fn(async () => ({ done: true, value: undefined }));
     let tripped = false;
-    const payload = new Uint8Array(64).fill(1);
-    const body = new Blob([payload, payload, payload]).stream();
-    const staged = boundedRequestBody(body, 100, () => {
-      tripped = true;
-    });
-
-    await expect(new Response(staged).text()).rejects.toThrow('staging byte budget');
-    expect(tripped).toBe(true);
-  });
-
-  it('carries the limit signal through the staging call', async () => {
-    const stageR2Object = vi.fn(
-      async (_params: { key: string }, body: ReadableStream<Uint8Array>) => {
-        try {
-          await new Response(body).arrayBuffer();
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          throw new Error(`upload failed: ${message}`);
-        }
-        return true;
-      }
-    );
-    vi.mocked(getSessionIngestDO).mockReturnValue({ stageR2Object } as never);
-
-    let tripped = false;
-    const payload = new Uint8Array(64).fill(1);
-    const body = new Blob([payload, payload, payload]).stream();
 
     await expect(
-      stageAndEnqueue(
-        makeEnv(),
-        params,
-        boundedRequestBody(body, 100, () => {
-          tripped = true;
-        }),
-        undefined
-      )
+      measuredStagingBody({ getReader: () => ({ read }) } as never, 2048, 1024, () => {
+        tripped = true;
+      })
+    ).rejects.toThrow('staging byte budget');
+    expect(tripped).toBe(true);
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it('reads an unmeasured body into bytes under the ceiling', async () => {
+    const payload = encoder.encode('{"data":[1]}');
+    const staged = await measuredStagingBody(
+      new Blob([payload]).stream(),
+      undefined,
+      1024,
+      () => {
+        throw new Error('must not trip');
+      }
+    );
+
+    expect(staged).toBeInstanceOf(Uint8Array);
+    expect(new TextDecoder().decode(staged as Uint8Array)).toBe('{"data":[1]}');
+  });
+
+  it('rejects an unmeasured body that overruns the ceiling', async () => {
+    const payload = new Uint8Array(64).fill(1);
+    let tripped = false;
+
+    await expect(
+      measuredStagingBody(new Blob([payload, payload, payload]).stream(), undefined, 100, () => {
+        tripped = true;
+      })
     ).rejects.toThrow('staging byte budget');
     expect(tripped).toBe(true);
   });

@@ -57,57 +57,33 @@ export async function toRpcBody(
 }
 
 /**
- * Caps a request stream at `maxBytes` without buffering it: a counting pass-through
- * that rejects (`StagingOverflowError`) as soon as the running total exceeds the
- * limit, so memory stays flat no matter how large the body claims to be. The
- * consumer of the returned stream observes the rejection when the DO uploads the
- * body to storage; nothing is written on overflow. `onOverflow` runs locally when
- * the limit trips — the RPC layer reconstructs stream errors, so the flag is the
- * reliable signal that the body, not staging, was too large.
+ * Prepares a staging body so every staged request is measured before storage.
+ * A body whose declared length is within the ceiling but larger than one RPC
+ * payload crosses untouched: request framing bounds it to that declared length,
+ * which is the form storage accepts for a streamed body. Every other body is
+ * read into memory under the ceiling, so an unmeasured or overrunning body is
+ * rejected by count instead of by declaration. `onOverflow` runs when the limit
+ * trips and `StagingOverflowError` is raised before anything is written.
  */
-export function boundedRequestBody(
+export async function measuredStagingBody(
   body: ReadableStream<Uint8Array>,
+  declaredBytes: number | undefined,
   maxBytes: number,
   onOverflow: () => void
-): ReadableStream<Uint8Array> {
-  let totalBytes = 0;
-  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
-  const stopUpstream = async (): Promise<void> => {
-    if (!reader) reader = body.getReader();
-    try {
-      await reader.cancel('ingest body exceeded the staging limit');
-    } catch {
-      // The overflow signal already surfaced through the stream.
-    } finally {
-      reader.releaseLock();
-      reader = null;
+): Promise<Uint8Array | ReadableStream<Uint8Array>> {
+  if (typeof declaredBytes === 'number') {
+    if (declaredBytes > maxBytes) {
+      onOverflow();
+      throw new StagingOverflowError();
     }
-  };
-  return new ReadableStream<Uint8Array>({
-    async pull(controller) {
-      try {
-        if (!reader) reader = body.getReader();
-        const result = await reader.read();
-        if (result.done) {
-          controller.close();
-          return;
-        }
-        totalBytes += result.value.byteLength;
-        if (totalBytes > maxBytes) {
-          onOverflow();
-          controller.error(new StagingOverflowError());
-          await stopUpstream();
-          return;
-        }
-        controller.enqueue(result.value);
-      } catch (error) {
-        controller.error(error);
-      }
-    },
-    cancel() {
-      void stopUpstream();
-    },
-  });
+    if (declaredBytes > INGEST_CHUNK_MAX_BYTES) return body;
+  }
+  const result = await readBoundedStream(body, maxBytes);
+  if (!result.ok) {
+    onOverflow();
+    throw new StagingOverflowError();
+  }
+  return result.bytes;
 }
 
 export async function stageAndEnqueue(

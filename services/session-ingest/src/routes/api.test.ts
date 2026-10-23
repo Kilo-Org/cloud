@@ -867,8 +867,11 @@ describe('api routes', () => {
         expect(ingest).not.toHaveBeenCalled();
         expect(env.SESSION_INGEST_R2.put).toHaveBeenCalledTimes(1);
         const staged = env.SESSION_INGEST_R2.put.mock.calls[0][1];
-        expect(staged).toBeInstanceOf(ReadableStream);
-        await expect(new Response(staged).text()).resolves.toBe('{}');
+        const stagedText =
+          staged instanceof Uint8Array
+            ? new TextDecoder().decode(staged)
+            : await new Response(staged).text();
+        expect(stagedText).toBe('{}');
         expect(info).toHaveBeenCalledWith(
           expect.objectContaining({ event: 'direct_ingest_legacy', reason })
         );

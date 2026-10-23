@@ -16,7 +16,7 @@ The Kilo Community is [on Discord](https://kilo.ai/discord).
 
 ## Prerequisites
 
-- **Node.js 24** (`.nvmrc` pins `24.14.1`) — required for all packages.
+- **Node.js 24** (`.nvmrc` pins `24.22.1`) — required for all packages.
 - **pnpm 11.1.2** — use Corepack so the active version matches `package.json` `packageManager`:
   ```bash
   corepack enable

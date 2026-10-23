@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { type Component, type RefObject } from 'react';
+import { type RefObject } from 'react';
+import { type HostInstance } from 'react-native';
 
 import {
   applyBlockingCardAppearance,
@@ -10,14 +11,14 @@ import {
 function makeDeps(): BlockingCardA11yDeps {
   return {
     announce: vi.fn<(message: string) => void>(),
-    focus: vi.fn<(ref: RefObject<Component | null>) => boolean>().mockReturnValue(true),
+    focus: vi.fn<(ref: RefObject<HostInstance | null>) => boolean>().mockReturnValue(true),
   };
 }
 
 describe('applyBlockingCardAppearance', () => {
   it('invokes the announce helper with the presentation announcement on appearance', () => {
     const deps = makeDeps();
-    const ref: RefObject<Component | null> = { current: null };
+    const ref: RefObject<HostInstance | null> = { current: null };
     const presentation = getBlockingCardPresentationForKind({
       kind: 'question',
       submissionError: null,
@@ -31,9 +32,8 @@ describe('applyBlockingCardAppearance', () => {
 
   it('moves a11y focus to the card ref on appearance', () => {
     const deps = makeDeps();
-    const ref: RefObject<Component | null> = {
-      current: { node: 'card' } as unknown as Component,
-    };
+    const node: Partial<HostInstance> = {};
+    const ref: RefObject<HostInstance | null> = { current: node as HostInstance };
     const presentation = getBlockingCardPresentationForKind({
       kind: 'permission',
       submissionError: null,
@@ -48,9 +48,9 @@ describe('applyBlockingCardAppearance', () => {
   it('still announces when the focus move cannot find a node handle', () => {
     const deps: BlockingCardA11yDeps = {
       announce: vi.fn<(message: string) => void>(),
-      focus: vi.fn<(ref: RefObject<Component | null>) => boolean>().mockReturnValue(false),
+      focus: vi.fn<(ref: RefObject<HostInstance | null>) => boolean>().mockReturnValue(false),
     };
-    const ref: RefObject<Component | null> = { current: null };
+    const ref: RefObject<HostInstance | null> = { current: null };
     const presentation = getBlockingCardPresentationForKind({
       kind: 'question',
       submissionError: { kind: 'retryable', message: 'Try again', action: 'answer' },
@@ -65,13 +65,13 @@ describe('applyBlockingCardAppearance', () => {
 
   it('retries focus once on the next tick when the first attempt misses the handle', () => {
     vi.useFakeTimers();
-    const focusMock = vi.fn<(ref: RefObject<Component | null>) => boolean>();
+    const focusMock = vi.fn<(ref: RefObject<HostInstance | null>) => boolean>();
     focusMock.mockReturnValueOnce(false).mockReturnValueOnce(true);
     const deps: BlockingCardA11yDeps = {
       announce: vi.fn<(message: string) => void>(),
       focus: focusMock,
     };
-    const ref: RefObject<Component | null> = { current: null };
+    const ref: RefObject<HostInstance | null> = { current: null };
     const presentation = getBlockingCardPresentationForKind({
       kind: 'question',
       submissionError: null,
@@ -89,12 +89,14 @@ describe('applyBlockingCardAppearance', () => {
 
   it('clears the pending retry when the cleanup function runs', () => {
     vi.useFakeTimers();
-    const focusMock = vi.fn<(ref: RefObject<Component | null>) => boolean>().mockReturnValue(false);
+    const focusMock = vi
+      .fn<(ref: RefObject<HostInstance | null>) => boolean>()
+      .mockReturnValue(false);
     const deps: BlockingCardA11yDeps = {
       announce: vi.fn<(message: string) => void>(),
       focus: focusMock,
     };
-    const ref: RefObject<Component | null> = { current: null };
+    const ref: RefObject<HostInstance | null> = { current: null };
     const presentation = getBlockingCardPresentationForKind({
       kind: 'permission',
       submissionError: null,

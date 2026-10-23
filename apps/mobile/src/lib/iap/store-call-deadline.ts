@@ -25,6 +25,16 @@ class StoreDeadlineError extends Error {
 }
 
 /**
+ * True when the caught value is the deadline itself, not a store that answered
+ * with a failure. Callers keep the two apart: a deadline is a bounded, expected
+ * outcome the screen reports its own way, and it must not be followed by more
+ * calls to the same store.
+ */
+export function isStoreDeadlineError(error: unknown): error is StoreDeadlineError {
+  return error instanceof StoreDeadlineError;
+}
+
+/**
  * Bounds a store call so a hung SDK never holds a recovery pass open.
  *
  * The underlying call keeps running — the store SDK has no cancellation — but

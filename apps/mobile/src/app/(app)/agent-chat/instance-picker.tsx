@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the picker's five presentations (expired, loading, error, zero instances, list) share one sheet chrome and one refetch, and the error and zero-instance actions both carry the shared state-action floor */
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -6,7 +7,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, View, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
@@ -15,10 +15,12 @@ import { radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatList } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { instancePickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import {
   dedupeInstanceLabels,
   type LabeledInstance,
@@ -46,8 +48,12 @@ type PickerListItem =
 export default function InstancePickerScreen() {
   const router = useRouter();
   const colors = useThemeColors();
-  const { bottom } = useSafeAreaInsets();
   const { t, i18n } = useTranslation();
+  // The sheet rides the full detent over the gesture-nav bar, so its content
+  // clears the bar with the non-tab detail floor, not the raw inset: devices
+  // that report a zero bottom inset still keep the bottom action visible and
+  // tappable.
+  const bottomClearance = useDetailScreenBottomPadding();
   const [bridge, setBridge] = useState(() => instancePickerSlot.get(UNFENCED_ROUTE_KEY));
   const bridgeRef = useRef(bridge);
   useRouteRegistry(UNFENCED_ROUTE_KEY);
@@ -95,10 +101,9 @@ export default function InstancePickerScreen() {
       // actually describes, so refetch explicitly here too.
       void refetchInstances();
 
-      return () => {
-        instancePickerSlot.clear(UNFENCED_ROUTE_KEY);
-        bridgeRef.current = undefined;
-      };
+      // The bridge outlives a blur: `useRouteRegistry` clears this route's
+      // slots when the route unmounts, so a return to a sheet that is still on
+      // screen shows its options again instead of the "options expired" shell.
       // eslint-disable-next-line react-hooks/exhaustive-deps -- refetchInstances is a stable react-query function identity; including it would re-run this effect on every render because react-query does not memoize it across renders.
     }, [])
   );
@@ -239,7 +244,7 @@ export default function InstancePickerScreen() {
         onDone={closePicker}
         scrollable={false}
       >
-        <View className="bg-background" style={{ paddingBottom: bottom }}>
+        <View className="bg-background" style={{ paddingBottom: bottomClearance }}>
           {Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => (
             <View key={i} className="px-4 py-3">
               <Skeleton className="h-5 w-2/3 rounded-md" />
@@ -268,6 +273,7 @@ export default function InstancePickerScreen() {
           description={t('organization.boundary.loadErrorMessage')}
           action={
             <Button
+              className={STATE_ACTION_CLASS}
               variant="outline"
               onPress={() => {
                 void refetchInstances();
@@ -304,7 +310,7 @@ export default function InstancePickerScreen() {
         data={listItems}
         keyExtractor={item => item.key}
         getItemType={item => item.type}
-        contentContainerStyle={{ paddingBottom: bottom }}
+        contentContainerStyle={{ paddingBottom: bottomClearance }}
         ListHeaderComponent={
           <Pressable
             className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary"
@@ -339,6 +345,7 @@ export default function InstancePickerScreen() {
               )}
               action={
                 <Button
+                  className={STATE_ACTION_CLASS}
                   variant="outline"
                   onPress={() => {
                     void refetchInstances();

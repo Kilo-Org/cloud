@@ -8,12 +8,7 @@ import type * as NativeCSSCompiler from 'react-native-css/compiler';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  COMPACT_CONTROL_HIT_SLOP_DP,
-  MIN_TAP_TARGET_DP,
-  tapTargetReachDp,
-  TOUCH_TARGET_DP,
-} from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS, ICON_TARGET_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 
 import { IconButton, type IconButtonProps } from './icon-button';
 
@@ -78,15 +73,6 @@ async function nativeBox(button: TestRenderer.ReactTestInstance) {
   return { height, width };
 }
 
-/** The per-side slop, whether the control passed a number or an insets object. */
-function perSideHitSlop(hitSlop: unknown): number {
-  if (typeof hitSlop === 'number') {
-    return hitSlop;
-  }
-  const insets = hitSlop as { top: number; right: number; bottom: number; left: number };
-  return Math.min(insets.top, insets.right, insets.bottom, insets.left);
-}
-
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
 });
@@ -98,20 +84,19 @@ afterEach(() => {
 
 describe('IconButton native target contract', () => {
   // These assertions protect compiled host dimensions; native F2 must still measure the target.
-  it('renders an own box that meets the control-size audit floor on both sides', async () => {
+  it('renders an own box that meets Android 48dp minimum on both sides', async () => {
     const box = await nativeBox(renderIconButton());
-    expect(box.height).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
-    expect(box.width).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
-    expect(box).toEqual({ height: 32, width: 32 });
+    expect(box.height).toBeGreaterThanOrEqual(ICON_TARGET_DP);
+    expect(box.width).toBeGreaterThanOrEqual(ICON_TARGET_DP);
+    expect(box).toEqual({ height: 48, width: 48 });
   });
 
-  it('reaches the design touch target from the box plus its per-side slop', async () => {
+  it('meets the design touch target from the box alone, with no default slop', async () => {
     const button = renderIconButton();
     const box = await nativeBox(button);
-    const slop = perSideHitSlop(button.props.hitSlop);
-    expect(slop).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
-    expect(tapTargetReachDp(box.height, slop)).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
-    expect(tapTargetReachDp(box.width, slop)).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    expect(box.height).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    expect(box.width).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    expect(button.props.hitSlop).toBeUndefined();
   });
 
   it('centres its child and keeps the caller identity', () => {
@@ -120,8 +105,7 @@ describe('IconButton native target contract', () => {
       testID: 'agents-new-session',
       className: 'bg-accent-soft',
     });
-    expect(button.props.className).toContain('items-center');
-    expect(button.props.className).toContain('justify-center');
+    expect(button.props.className).toContain(ICON_TARGET_BOX_CLASS);
     expect(button.props.className).toContain('bg-accent-soft');
     expect(button.props.accessibilityRole).toBe('button');
     expect(button.props.accessibilityLabel).toBe('New session');

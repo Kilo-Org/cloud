@@ -115,14 +115,15 @@ describe('authorizeProject — owner resolution', () => {
     expect(mockGetValidGitLabToken).not.toHaveBeenCalled();
   });
 
-  it('refuses a non-active integration', async () => {
+  it('refuses a non-active integration as a reconnect, not a missing one', async () => {
     mockGetIntegrationForOwner.mockResolvedValue(
       integrationRow({ gitlab_instance_url: 'https://gitlab.example.com', status: 'suspended' })
     );
 
-    await expect(authorizeProject(SELF_MANAGED_USER, 'group/sub/repo')).rejects.toBeInstanceOf(
-      GitLabReviewError
-    );
+    await expect(authorizeProject(SELF_MANAGED_USER, 'group/sub/repo')).rejects.toMatchObject({
+      name: 'GitLabReviewError',
+      kind: 'reconnect',
+    });
   });
 });
 
@@ -270,6 +271,10 @@ describe('classifyGitLabStatus / classifyGitLabError', () => {
     expect(classifyGitLabStatus(403).kind).toBe('forbidden');
     expect(classifyGitLabStatus(409).kind).toBe('stale_head');
     expect(classifyGitLabStatus(409).retryable).toBe(false);
+  });
+
+  it('classifies a rejected credential (401) as reconnect, not a permission refusal', () => {
+    expect(classifyGitLabStatus(401)).toMatchObject({ kind: 'reconnect', retryable: false });
   });
 
   it('classifies 5xx and 429 as retryable', () => {

@@ -7,7 +7,6 @@ import {
   useUpdateOrganizationName,
   useUpdateCompanyDomain,
   useOrganizationWithMembers,
-  useAdminToggleCodeIndexing,
   useUpdateSuppressTrialMessaging,
 } from '@/app/api/organizations/hooks';
 import type { OrganizationWithMembersResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
@@ -181,7 +180,6 @@ function Inner(props: InnerProps) {
   const [ossSponsorshipDialogOpen, setOssSponsorshipDialogOpen] = useState(false);
   const updateOrganizationName = useUpdateOrganizationName();
   const updateCompanyDomain = useUpdateCompanyDomain();
-  const adminToggleCodeIndexing = useAdminToggleCodeIndexing();
   const updateSuppressTrialMessaging = useUpdateSuppressTrialMessaging();
 
   const expiringCreditGroups = useExpiringCredits(id);
@@ -277,17 +275,6 @@ function Inner(props: InnerProps) {
 
   const handleTrialEndDateEdit = () => {
     setTrialEndDateDialogOpen(true);
-  };
-
-  const handleCodeIndexingToggle = async () => {
-    try {
-      await adminToggleCodeIndexing.mutateAsync({
-        organizationId: id,
-        code_indexing_enabled: !info.settings?.code_indexing_enabled,
-      });
-    } catch (error) {
-      console.error('Failed to toggle code indexing:', error);
-    }
   };
 
   const handleSuppressTrialMessagingToggle = async () => {
@@ -539,22 +526,6 @@ function Inner(props: InnerProps) {
                   onClick={handlePlanEdit}
                   className="hover:bg-muted inline-flex cursor-pointer items-center gap-1 rounded p-1 transition-all duration-200 focus:outline-none"
                   title="Edit plan"
-                >
-                  <Edit className="text-muted-foreground hover:text-foreground h-4 w-4" />
-                </button>
-              </div>
-            </div>
-            <div>
-              <label className="text-muted-foreground text-sm font-medium">Managed Indexing</label>
-              <div className="mt-1 flex items-center gap-2">
-                <BooleanBadge positive={info.settings?.code_indexing_enabled ?? false}>
-                  {info.settings?.code_indexing_enabled ? 'Enabled' : 'Disabled'}
-                </BooleanBadge>
-                <button
-                  onClick={handleCodeIndexingToggle}
-                  disabled={adminToggleCodeIndexing.isPending}
-                  className="hover:bg-muted inline-flex cursor-pointer items-center gap-1 rounded p-1 transition-all duration-200 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                  title="Toggle code indexing"
                 >
                   <Edit className="text-muted-foreground hover:text-foreground h-4 w-4" />
                 </button>

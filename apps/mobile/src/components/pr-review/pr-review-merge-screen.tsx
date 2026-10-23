@@ -162,12 +162,10 @@ export function PrReviewMergeScreen() {
         repoName={repo}
         number={number}
         headSha={pr.data.headSha}
-        headRef={pr.data.headRef}
         isCrossRepo={pr.data.isCrossRepo}
         prNodeId={pr.data.prNodeId}
         title={pr.data.title}
         bodyMarkdown={pr.data.bodyMarkdown}
-        baseRef={pr.data.baseRef}
         repo={pr.data.repo}
         initialMethod={method}
         mode={mode}

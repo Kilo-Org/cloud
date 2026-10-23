@@ -116,7 +116,7 @@ export function buildReplyToCommentParams(input: ReplyToCommentInput) {
 }
 
 // `pulls.updateReviewComment` / `issues.updateComment` body. Both endpoints
-// take the same field names, so one input type feeds the two builders.
+// take the same field names, so ONE builder feeds both call sites.
 export type UpdateCommentParamsInput = {
   owner: string;
   repo: string;
@@ -124,7 +124,7 @@ export type UpdateCommentParamsInput = {
   body: string;
 };
 
-export function buildUpdateReviewCommentParams(input: UpdateCommentParamsInput) {
+export function buildUpdateCommentParams(input: UpdateCommentParamsInput) {
   return {
     owner: input.owner,
     repo: input.repo,
@@ -133,31 +133,15 @@ export function buildUpdateReviewCommentParams(input: UpdateCommentParamsInput) 
   };
 }
 
-export function buildUpdateIssueCommentParams(input: UpdateCommentParamsInput) {
-  return {
-    owner: input.owner,
-    repo: input.repo,
-    comment_id: input.commentId,
-    body: input.body,
-  };
-}
-
-// `pulls.deleteReviewComment` / `issues.deleteComment` body.
+// `pulls.deleteReviewComment` / `issues.deleteComment` body. Same reasoning:
+// one builder for both endpoints.
 export type DeleteCommentParamsInput = {
   owner: string;
   repo: string;
   commentId: number;
 };
 
-export function buildDeleteReviewCommentParams(input: DeleteCommentParamsInput) {
-  return {
-    owner: input.owner,
-    repo: input.repo,
-    comment_id: input.commentId,
-  };
-}
-
-export function buildDeleteIssueCommentParams(input: DeleteCommentParamsInput) {
+export function buildDeleteCommentParams(input: DeleteCommentParamsInput) {
   return {
     owner: input.owner,
     repo: input.repo,

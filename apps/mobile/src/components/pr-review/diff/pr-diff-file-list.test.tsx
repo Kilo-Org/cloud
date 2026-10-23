@@ -5,6 +5,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
+import { i18n } from '@/i18n';
 
 import { PrReviewFileList } from './pr-diff-file-list';
 
@@ -215,19 +216,38 @@ describe('PrReviewFileList full-body states', () => {
     expect(bottomPaddedViews(renderer)).toHaveLength(0);
   });
 
-  it('lets QueryError own the retryable body and retry action', () => {
-    listQueryState.firstPageErrorState = { kind: 'retryable' };
+  it.each(['retryable', 'service-unavailable'] as const)(
+    'retries the %s body through the query',
+    kind => {
+      listQueryState.firstPageErrorState = { kind };
+      listQueryState.query.refetch.mockClear();
+      const renderer = mountList();
+      const error = renderer.root.find(node => String(node.type) === 'QueryError');
+      expect(error.props.placement).toBeUndefined();
+      expect(bottomPaddedViews(renderer)).toHaveLength(0);
+      act(() => {
+        (error.props.onRetry as () => void)();
+      });
+      expect(listQueryState.query.refetch).toHaveBeenCalledOnce();
+    }
+  );
+
+  it('names the outage cause instead of leaving the body to the server default', () => {
+    listQueryState.firstPageErrorState = { kind: 'service-unavailable' };
     const renderer = mountList();
     const error = renderer.root.find(node => String(node.type) === 'QueryError');
-    expect(error.props.placement).toBeUndefined();
-    expect(bottomPaddedViews(renderer)).toHaveLength(0);
+    expect(error.props.title).toBe(i18n.t('prReview.reviewServiceUnavailable'));
+    expect(error.props.message).toBe(i18n.t('prReview.reviewServiceUnavailableDescription'));
+
+    listQueryState.firstPageErrorState = { kind: 'retryable' };
     act(() => {
-      (error.props.onRetry as () => void)();
+      renderer.update(createElement(PrReviewFileList, BASE_PROPS));
     });
-    expect(listQueryState.query.refetch).toHaveBeenCalled();
+    const generic = renderer.root.find(node => String(node.type) === 'QueryError');
+    expect(generic.props.title).toBeUndefined();
   });
 
-  it.each([false, true])('refreshes the waiting body with fetching state %s', isFetching => {
+  it.each([false, true])('refreshes the waiting body with fetching state %s', async isFetching => {
     listQueryState.query.isFetching = isFetching;
     listQueryState.query.refetch.mockClear();
     const renderer = mountList();
@@ -240,8 +260,8 @@ describe('PrReviewFileList full-body states', () => {
         ['FlashList', 'ScrollView', 'CenteredState'].includes(String(node.type))
       )
     ).toHaveLength(0);
-    act(() => {
-      refreshControl.props.onRefresh?.();
+    await act(async () => {
+      await refreshControl.props.onRefresh?.();
     });
     expect(listQueryState.query.refetch).toHaveBeenCalledOnce();
   });

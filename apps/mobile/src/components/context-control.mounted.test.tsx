@@ -43,6 +43,14 @@ const LIGHT_COLORS = {
   border: 'rgba(20, 15, 10, 0.09)',
   primary: '#4F5A10',
 };
+// The provider now announces the lost-membership recovery through the
+// toast adapter, whose module graph reaches react-native's Flow source
+// the mounted transform cannot parse. Suites mock the adapter (not the
+// sonner package) so the mock sits at the edge that imports it.
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
+}));
+
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => auth }));
 vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
 vi.mock('expo-secure-store', () => ({
@@ -147,16 +155,39 @@ async function press(node: ReactTestInstance) {
   });
 }
 
-/** The open sheet's account rows, in option order, with their a11y state. */
+/** The selected state of an account action button, if it carries one. */
+function selectedState(node: ReactTestInstance): boolean | undefined {
+  const state: unknown = node.props.accessibilityState;
+  if (
+    typeof state !== 'object' ||
+    state === null ||
+    !('selected' in state) ||
+    typeof state.selected !== 'boolean'
+  ) {
+    return undefined;
+  }
+  return state.selected;
+}
+
+/** The open sheet's account action buttons, in option order. */
 function rows(ui: Mounted) {
   return ui.renderer.root
-    .findAll(node => node.type === Pressable && node.props.accessibilityRole === 'radio')
+    .findAll(
+      node =>
+        node.type === Pressable &&
+        node.props.accessibilityRole === 'button' &&
+        selectedState(node) !== undefined
+    )
     .map(node => {
+      const selected = selectedState(node);
+      if (selected === undefined) {
+        throw new Error('Account action button is missing its selected state');
+      }
       const checks = node.findAll(child => child.type === Check);
       return {
         label: node.props.accessibilityLabel as string,
         role: node.props.accessibilityRole as string,
-        checked: (node.props.accessibilityState as { checked: boolean }).checked,
+        selected,
         divider:
           typeof node.props.className === 'string' &&
           node.props.className.includes('border-hair-soft'),
@@ -166,8 +197,14 @@ function rows(ui: Mounted) {
     });
 }
 
-function radioRow(ui: Mounted, label: string) {
-  return ui.renderer.root.findByProps({ accessibilityLabel: label, accessibilityRole: 'radio' });
+function accountRow(ui: Mounted, label: string) {
+  return ui.renderer.root.find(
+    node =>
+      node.type === Pressable &&
+      node.props.accessibilityLabel === label &&
+      node.props.accessibilityRole === 'button' &&
+      selectedState(node) !== undefined
+  );
 }
 
 /** The native sheet wrapper of the open picker; its `onClose` is the dismiss. */
@@ -191,7 +228,7 @@ async function openSheet(ui: Mounted) {
 }
 
 async function chooseRow(ui: Mounted, label: string) {
-  await press(radioRow(ui, label));
+  await press(accountRow(ui, label));
 }
 
 beforeEach(() => {
@@ -259,7 +296,10 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
   it.each([
     { choice: 'Personal', expected: null },
     { choice: name, expected: 'org-a' },
-    { choice: 'Cancel', expected: 'org-missing' },
+    // The stored organization is missing from the list, so the provider
+    // recovers to the first listed membership before the sheet opens; a
+    // Cancel is then a plain dismissal of that recovered scope.
+    { choice: 'Cancel', expected: 'org-a' },
   ])(
     'applies the picked account $choice without an implicit reset',
     async ({ choice, expected }) => {
@@ -269,7 +309,7 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
       await openSheet(ui);
       expect(rows(ui).map(row => row.label)).toEqual(['Personal', name]);
       expect(texts(ui)).toContain('Cancel');
-      await press(choice === 'Cancel' ? cancelRow(ui) : radioRow(ui, choice));
+      await press(choice === 'Cancel' ? cancelRow(ui) : accountRow(ui, choice));
       expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe(expected);
     }
   );
@@ -278,28 +318,29 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     storage.read.mockResolvedValue('org-missing');
     const ui = await mount();
     await waitFor(() => !picker(ui).props.disabled);
+    // The stored organization is missing from the list, so the provider has
+    // already recovered to the first listed membership before the sheet opens.
+    await waitFor(
+      () => ui.renderer.root.findByType('GlobalScope' as ElementType).props.id === 'org-a'
+    );
     await openSheet(ui);
     // The native sheet's dismiss path, not a row: the scope stays as it was.
     await act(() => {
       (backdrop(ui).props.onClose as () => void)();
     });
     expect(rows(ui)).toHaveLength(0);
-    expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('org-missing');
+    expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('org-a');
   });
 
-  it('separates the rows and exposes the current account through the radio state', async () => {
+  it('exposes account buttons with the current selection state', async () => {
     storage.read.mockResolvedValue('org-a');
     const ui = await mount();
     await waitFor(() => !picker(ui).props.disabled);
     await openSheet(ui);
     const opened = rows(ui);
     expect(opened.map(row => row.label)).toEqual(['Personal', name]);
-    // A screen reader hears the current account through `checked`, the app's
-    // radio convention (`ui/radio-group.tsx`), not through icon colour alone.
-    expect(opened.map(row => row.checked)).toEqual([false, true]);
-    expect(opened.map(row => row.role)).toEqual(['radio', 'radio']);
-    // Each account row draws the shared divider, and only the current row
-    // carries the check; Cancel is a plain button with no radio state.
+    expect(opened.map(row => row.selected)).toEqual([false, true]);
+    expect(opened.map(row => row.role)).toEqual(['button', 'button']);
     expect(opened.map(row => row.divider)).toEqual([true, true]);
     expect(opened.map(row => row.check)).toEqual([false, true]);
     expect(cancelRow(ui).props.accessibilityState).toBeUndefined();
@@ -314,7 +355,7 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     // so the control must not name org-a.
     expect(picker(ui).props.accessibilityLabel).toBe('Personal');
     await openSheet(ui);
-    expect(rows(ui).map(row => row.checked)).toEqual([true, false]);
+    expect(rows(ui).map(row => row.selected)).toEqual([true, false]);
     await chooseRow(ui, name);
     expect(onSelectionChange).toHaveBeenCalledWith('org-a');
   });
@@ -332,12 +373,13 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
   it.each([
     // An absent stored choice is 'not chosen yet': the provider's login default
     // resolves to the first organization, so the picker must mark that row. A
-    // stored organization missing from the list marks no row at all.
-    { stored: null, checked: name },
-    { stored: 'org-missing', checked: undefined },
+    // stored organization missing from the list recovers to that first
+    // membership before the sheet opens, so its row is marked too.
+    { stored: null, selected: name },
+    { stored: 'org-missing', selected: name },
   ])(
     'marks the account the user is actually on when the stored one is missing (stored=$stored)',
-    async ({ stored, checked }) => {
+    async ({ stored, selected }) => {
       storage.read.mockResolvedValue(stored);
       const ui = await mount();
       await waitFor(() => !picker(ui).props.disabled);
@@ -345,9 +387,9 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
       expect(rows(ui).map(row => row.label)).toEqual(['Personal', name]);
       expect(
         rows(ui)
-          .filter(row => row.checked)
+          .filter(row => row.selected)
           .map(row => row.label)
-      ).toEqual(checked === undefined ? [] : [checked]);
+      ).toEqual([selected]);
     }
   );
 
@@ -357,8 +399,8 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     await waitFor(() => !picker(ui).props.disabled);
     await openSheet(ui);
     expect(
-      rows(ui).map(row => ({ label: row.label, checked: row.checked, check: row.check }))
-    ).toEqual([{ label: 'Personal', checked: true, check: true }]);
+      rows(ui).map(row => ({ label: row.label, selected: row.selected, check: row.check }))
+    ).toEqual([{ label: 'Personal', selected: true, check: true }]);
     expect(texts(ui)).toContain('Cancel');
   });
 
@@ -395,18 +437,19 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     });
   });
 
-  it('recovers an unavailable organization through Personal after an empty membership result', async () => {
+  it('recovers a stored organization missing from an empty membership list to Personal', async () => {
     storage.read.mockResolvedValue('org-missing');
     list.mockResolvedValue([]);
     const ui = await mount();
-    await waitFor(() => texts(ui).includes('Organization unavailable'));
-    expect(texts(ui)).not.toContain('Retry');
-    expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('org-missing');
+    // The stored organization is missing from the fetched list, so the
+    // provider switches to Personal (no membership remains) on the first
+    // snapshot instead of rendering the dead selection's error surface.
+    await waitFor(
+      () => ui.renderer.root.findByType('GlobalScope' as ElementType).props.id === null
+    );
+    expect(texts(ui)).not.toContain('Organization unavailable');
     await openSheet(ui);
     expect(rows(ui).map(row => row.label)).toEqual(['Personal']);
-    await chooseRow(ui, 'Personal');
-    expect(texts(ui)).toContain('Personal');
-    expect(texts(ui)).not.toContain('Organization unavailable');
   });
 
   it.each([false, true])('retries only the failed name query, read-only=%s', async readOnly => {
@@ -507,6 +550,9 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
   it.each([
     { organizationId: null, expected: 'Personal' },
     { organizationId: 'org-a', expected: name },
+    // The stored global scope ('global-org') is missing from the fetched
+    // list, so the provider recovers to the first listed membership; the
+    // explicit per-session scope stays read-only and independent of that.
     { organizationId: 'org-missing', expected: 'Organization unavailable' },
   ])(
     'keeps the resolved session scope $organizationId read-only and independent',
@@ -515,17 +561,22 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
       const ui = await mount({ scope: { organizationId, isResolved: true } });
       await waitFor(() => texts(ui).includes(expected));
       expect(ui.renderer.root.findAll(node => node.type === Pressable)).toHaveLength(0);
-      expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('global-org');
+      expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('org-a');
     }
   );
 
   it('does not infer Personal or offer a picker for unresolved session scope', async () => {
     storage.read.mockResolvedValue('global-org');
     const ui = await mount({ scope: { organizationId: null, isResolved: false } });
+    // The stored global scope is missing from the list, so the provider
+    // recovers to the first listed membership; the unresolved session scope
+    // still infers nothing and offers no picker.
+    await waitFor(
+      () => ui.renderer.root.findByType('GlobalScope' as ElementType).props.id === 'org-a'
+    );
     expect(texts(ui)).not.toContain('Personal');
     expect(ui.renderer.root.findAll(node => node.type === Skeleton)).toHaveLength(1);
     expect(ui.renderer.root.findAll(node => node.type === Pressable)).toHaveLength(0);
-    expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('global-org');
   });
 
   it.each(['pending', 'failed'])(

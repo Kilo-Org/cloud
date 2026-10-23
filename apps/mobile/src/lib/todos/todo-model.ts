@@ -1,5 +1,6 @@
 import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
+import { projectOptionKey } from '@/components/agents/session-list-helpers';
 import { parseGitHubPrUrl } from '@/lib/github-pr-url';
 
 export const TODO_TITLE_MAX_LENGTH = 500;
@@ -81,6 +82,25 @@ export function todoListRepoSelection(
   const matches = repositories.filter(repo => repo.fullName.toLowerCase() === lower);
   const match = matches.find(repo => repo.platform === 'github') ?? matches[0];
   return match ? `${match.platform}:${match.fullName}` : `github:${gitUrl}`;
+}
+
+/**
+ * Sessions offered for linking to a to-do: those in the list's repository when
+ * it names one, never the sessions already linked. Both sides compare through
+ * the project key, so the list and a session match when they name the same
+ * repository in any accepted form (https, ssh, a `.git` suffix, `owner/repo`).
+ */
+export function todoLinkCandidates<T extends { session_id: string; git_url: string | null }>(
+  sessions: readonly T[],
+  options: { repository: string | null; linkedSessionIds: ReadonlySet<string> }
+): T[] {
+  const repository = options.repository ? projectOptionKey(options.repository) : null;
+  return sessions.filter(
+    session =>
+      !options.linkedSessionIds.has(session.session_id) &&
+      (repository === null ||
+        (session.git_url !== null && projectOptionKey(session.git_url) === repository))
+  );
 }
 
 /** The `owner/repo` a list stores for a picker `platform:fullName` value. */

@@ -62,6 +62,20 @@ export async function ensureOrganizationAccess(
   roles?: OrganizationRole[]
 ): Promise<OrganizationRole> {
   if (ctx.user.is_admin) {
+    // An admin elevation applies only to an organization that exists and is
+    // live, matching getOrganizationById. A rejected request is not recorded
+    // as an elevation.
+    const [organization] = await db
+      .select({ id: organizations.id })
+      .from(organizations)
+      .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
+      .limit(1);
+    if (!organization) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Organization not found',
+      });
+    }
     return await elevateViaKiloAdmin(ctx, {
       reason: 'organization_access',
       target: organizationTarget(organizationId),
@@ -144,12 +158,23 @@ export async function getOrganizationsAccessRoles(
     return result;
   }
   if (ctx.user.is_admin) {
+    // Only organizations that exist and are live are elevated, matching
+    // getOrganizationById.
+    const liveIds = (
+      await db
+        .select({ id: organizations.id })
+        .from(organizations)
+        .where(and(inArray(organizations.id, uniqueIds), isNull(organizations.deleted_at)))
+    ).map(row => row.id);
+    if (liveIds.length === 0) {
+      return result;
+    }
     const grant = await elevateViaKiloAdmin(ctx, {
       reason: 'organization_access_batch',
-      target: organizationsTarget(uniqueIds),
+      target: organizationsTarget(liveIds),
       grant: 'owner',
     });
-    for (const id of uniqueIds) result.set(id, grant);
+    for (const id of liveIds) result.set(id, grant);
     return result;
   }
 
@@ -240,7 +265,10 @@ export async function ensureOrganizationAccessAndFetchOrg(
       reason: 'organization_fetch',
       target: organizationTarget(organizationId),
     });
-    const [org] = await db.select().from(organizations).where(eq(organizations.id, organizationId));
+    const [org] = await db
+      .select()
+      .from(organizations)
+      .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)));
 
     if (!org) {
       throw new TRPCError({

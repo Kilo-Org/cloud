@@ -402,6 +402,8 @@ export type RepositoryBranchesState = {
   /** The provider's default branch, or null when it reports none. */
   defaultBranch: string | null;
   branches: string[];
+  /** The provider holds more branches than `branches` includes. */
+  truncated: boolean;
   /** The query runs only for a selected repository in a scope that can serve it. */
   isEnabled: boolean;
   isLoading: boolean;
@@ -486,6 +488,7 @@ export function useRepositoryBranches(
   return {
     defaultBranch: branchQuery.data?.defaultBranch ?? null,
     branches: branchQuery.data?.branches ?? [],
+    truncated: branchQuery.data?.truncated === true,
     isEnabled,
     isLoading: isEnabled && branchQuery.isPending,
     isRetryableError: branchQuery.isError && !permanentFailure,

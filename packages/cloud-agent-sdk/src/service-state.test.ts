@@ -1,6 +1,7 @@
 import { createServiceState } from './service-state';
 import type { ServiceStateConfig } from './service-state';
 import type { Session, QuestionInfo } from '@kilocode/app-shared/opencode';
+import { PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
 import { autocommitCompletedDataSchema, preparingDataSchema } from './schemas';
 import type { SessionCommit, SessionGoal } from './types';
 
@@ -1400,6 +1401,102 @@ describe('createServiceState', () => {
       expect(reconnected.getCloudStatus()).toEqual({ type: 'ready' });
     });
 
+    it('keeps only the most recent step output and marks the step truncated', () => {
+      const state = createServiceState(makeConfig());
+      const base = {
+        type: 'preparing' as const,
+        version: 2 as const,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        step: 'setup_commands',
+        message: 'Running setup commands',
+      };
+      state.process({ ...base, action: 'attempt_started', revision: 1, timestamp: 1_000 });
+      state.process({
+        ...base,
+        action: 'step_started',
+        stepId: 'command:install',
+        kind: 'setup_command',
+        label: 'Install dependencies',
+        revision: 2,
+        timestamp: 2_000,
+      });
+      const chunk = (index: number): string =>
+        `${String(index).padStart(4, '0')}${'y'.repeat(2_043)}\n`;
+      let revision = 3;
+      for (let index = 0; index < 40; index += 1) {
+        state.process({
+          ...base,
+          action: 'step_output',
+          stepId: 'command:install',
+          revision,
+          timestamp: 3_000,
+          output: chunk(index),
+        });
+        revision += 1;
+      }
+
+      const truncated = state.getPreparationAttempts()[0]?.steps[0];
+      if (!truncated) throw new Error('Expected preparation step');
+      expect(truncated.outputTruncated).toBe(true);
+      expect(new TextEncoder().encode(truncated.outputTail ?? '').length).toBeLessThanOrEqual(
+        PREPARATION_OUTPUT_TAIL_MAX_BYTES
+      );
+      expect(truncated.outputTail?.endsWith(chunk(39))).toBe(true);
+      expect(truncated.outputTail?.startsWith(chunk(0))).toBe(false);
+
+      state.process({
+        ...base,
+        action: 'step_output',
+        stepId: 'command:install',
+        revision,
+        timestamp: 4_000,
+        output: 'done',
+      });
+      const appended = state.getPreparationAttempts()[0]?.steps[0];
+      expect(appended?.outputTruncated).toBe(true);
+      expect(appended?.outputTail?.endsWith('done')).toBe(true);
+    });
+
+    it('trims multi-byte step output on a code-point boundary', () => {
+      const state = createServiceState(makeConfig());
+      const base = {
+        type: 'preparing' as const,
+        version: 2 as const,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        step: 'setup_commands',
+        message: 'Running setup commands',
+      };
+      state.process({ ...base, action: 'attempt_started', revision: 1, timestamp: 1_000 });
+      state.process({
+        ...base,
+        action: 'step_started',
+        stepId: 'command:install',
+        kind: 'setup_command',
+        label: 'Install dependencies',
+        revision: 2,
+        timestamp: 2_000,
+      });
+      state.process({
+        ...base,
+        action: 'step_output',
+        stepId: 'command:install',
+        revision: 3,
+        timestamp: 3_000,
+        output: '€'.repeat(30_000),
+      });
+
+      const step = state.getPreparationAttempts()[0]?.steps[0];
+      if (!step) throw new Error('Expected preparation step');
+      expect(step.outputTruncated).toBe(true);
+      expect(new TextEncoder().encode(step.outputTail ?? '').length).toBeLessThanOrEqual(
+        PREPARATION_OUTPUT_TAIL_MAX_BYTES
+      );
+      expect(step.outputTail?.startsWith('€')).toBe(true);
+      expect(step.outputTail).not.toContain('\uFFFD');
+    });
+
     it.each([
       { arrival: ['L', 'A', 'C'] },
       { arrival: ['L', 'C', 'A'] },
@@ -1722,6 +1819,89 @@ describe('createServiceState', () => {
       expect(state.getActivity()).toEqual({ type: 'idle' });
     });
 
+    it.each([
+      { type: 'busy' as const },
+      { type: 'idle' as const },
+      { type: 'retry' as const, attempt: 2, message: 'Overloaded', next: 5_000 },
+      { type: 'scheduled' as const, scheduledAt: '2026-09-24T09:00:00.000Z' },
+      { type: 'scheduled' as const },
+    ])('reads $type on connect exactly as a live status event does', status => {
+      const live = createServiceState(makeConfig());
+      const connected = createServiceState(makeConfig());
+
+      live.process({ type: 'session.status', sessionId: 'root-1', status });
+      connected.process({ type: 'connected', sessionStatus: status });
+
+      expect(connected.getActivity()).toEqual(live.getActivity());
+      expect(connected.getStatus()).toEqual(live.getStatus());
+    });
+
+    it('sets idle activity and carries the wake time from a scheduled sessionStatus', () => {
+      const state = createServiceState(makeConfig());
+      state.process({
+        type: 'connected',
+        sessionStatus: { type: 'scheduled', scheduledAt: '2026-09-24T09:00:00.000Z' },
+      });
+
+      expect(state.getActivity()).toEqual({ type: 'idle' });
+      expect(state.getStatus()).toEqual({
+        type: 'scheduled',
+        scheduledAt: '2026-09-24T09:00:00.000Z',
+      });
+    });
+
+    it('leaves a scheduled status bare when the server reports no wake time', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'connected', sessionStatus: { type: 'scheduled' } });
+
+      expect(state.getStatus()).toEqual({ type: 'scheduled' });
+      expect(state.getStatus()).not.toHaveProperty('scheduledAt');
+    });
+
+    it('reports the retry attempt and leaves the lifecycle status to the turn', () => {
+      const state = createServiceState(makeConfig());
+      state.setStatus({ type: 'error', message: 'Assistant request failed' });
+
+      state.process({
+        type: 'connected',
+        sessionStatus: { type: 'retry', attempt: 2, message: 'Retrying', next: 5_000 },
+      });
+
+      expect(state.getActivity()).toEqual({ type: 'retrying', attempt: 2, message: 'Retrying' });
+      expect(state.getStatus()).toEqual({ type: 'error', message: 'Assistant request failed' });
+    });
+
+    it.each(['live', 'connect'] as const)(
+      'a retry from a %s report re-arms the lost-connection status after a completed turn',
+      source => {
+        const onError = jest.fn();
+        const state = createServiceState(makeConfig({ onError }));
+        const retry = { type: 'retry' as const, attempt: 2, message: 'Retrying', next: 5_000 };
+
+        state.process({ type: 'stopped', reason: 'complete' });
+        onError.mockClear();
+        if (source === 'live') {
+          state.process({ type: 'session.status', sessionId: 'root-1', status: retry });
+        } else {
+          state.process({ type: 'connected', sessionStatus: retry });
+        }
+        state.process({ type: 'stopped', reason: 'disconnected' });
+
+        expect(state.getStatus()).toEqual({ type: 'disconnected' });
+        expect(onError).toHaveBeenCalledWith('Connection to agent lost');
+      }
+    );
+
+    it('leaves activity and status alone for a status this SDK does not know', () => {
+      const state = createServiceState(makeConfig());
+      state.setActivity({ type: 'busy' });
+
+      state.process({ type: 'connected', sessionStatus: { type: 'offline' } });
+
+      expect(state.getActivity()).toEqual({ type: 'busy' });
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+    });
+
     it('defaults activity to idle when sessionStatus is absent', () => {
       const state = createServiceState(makeConfig());
       expect(state.getActivity()).toEqual({ type: 'connecting' });
@@ -1985,6 +2165,31 @@ describe('createServiceState', () => {
           committedAt: '2026-09-01T12:00:00+02:00',
           commitMessage: data.commitMessage,
           commitMessageTruncated: true,
+        }),
+      ]);
+    });
+
+    it('stores the commit when the wire event carries an explicit false truncation flag', () => {
+      const state = createServiceState(makeConfig());
+      const data = autocommitCompletedDataSchema.parse({
+        messageId: 'msg-1',
+        success: true,
+        commitHash: 'b'.repeat(40),
+        commitMessage: 'feat: add feature',
+        userMessageId: 'user-msg-1',
+        committedAt: '2026-09-01T12:00:00+02:00',
+        pushStatus: 'pushed',
+        commitMessageTruncated: false,
+      });
+
+      state.process({ type: 'autocommit_completed', ...data });
+
+      expect(state.getCommits()).toEqual([
+        expect.objectContaining({
+          commitHash: 'b'.repeat(40),
+          commitMessage: 'feat: add feature',
+          commitMessageTruncated: undefined,
+          pushStatus: 'pushed',
         }),
       ]);
     });
@@ -2889,6 +3094,28 @@ describe('createServiceState', () => {
         state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
 
         expect(failed(state, 'm1')).toEqual({
+          status: 'failed',
+          error: 'flush failed',
+          reason: 'exhausted',
+          attempts: 5,
+        });
+      });
+
+      it('connected keeps the failed entry and drops the queued one', () => {
+        const state = createServiceState(makeConfig());
+
+        state.process({ type: 'cloud.message.queued', messageId: 'queued-1' });
+        state.process({
+          type: 'cloud.message.failed',
+          messageId: 'failed-1',
+          error: 'flush failed',
+          reason: 'exhausted',
+          attempts: 5,
+        });
+        state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
+
+        expect(state.getPendingMessages().has('queued-1')).toBe(false);
+        expect(failed(state, 'failed-1')).toEqual({
           status: 'failed',
           error: 'flush failed',
           reason: 'exhausted',

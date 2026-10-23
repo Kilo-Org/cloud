@@ -117,7 +117,10 @@ export function useBackendFormActions({
                 void run(action, modelKey, true);
               },
             },
-          ]
+          ],
+          // Android back dismisses, which equals Cancel: the HTTP backend stays
+          // unapproved and the caller keeps the failure status.
+          { cancelable: true }
         );
       } else {
         setStatus(

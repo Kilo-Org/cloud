@@ -198,11 +198,7 @@ export function applyPreferredProvider(
  * back to a paid model and be served without being charged. OpenRouter accepts
  * them as `models` on every API and as `fallbacks` on the Messages API.
  */
-export function removeModelsFallback(
-  requestedModel: string,
-  requestToMutate: GatewayRequest,
-  userId: string
-) {
+export function removeModelsFallback(requestedModel: string, requestToMutate: GatewayRequest) {
   const { models, fallbacks } = requestToMutate.body;
   delete requestToMutate.body.models;
   delete requestToMutate.body.fallbacks;
@@ -211,17 +207,26 @@ export function removeModelsFallback(
     return;
   }
   console.warn('[applyProviderSpecificLogic] Removed caller-provided fallback models', {
-    userId,
     model: requestedModel,
     requestKind: requestToMutate.kind,
-    models,
-    fallbacks,
+    modelsPresent: hasFallbackModels(models),
+    modelsCount: Array.isArray(models) ? models.length : null,
+    fallbacksPresent: hasFallbackModels(fallbacks),
+    fallbacksCount: Array.isArray(fallbacks) ? fallbacks.length : null,
   });
 }
 
 function hasFallbackModels(value: unknown) {
   return value !== undefined && value !== null && !(Array.isArray(value) && value.length === 0);
 }
+
+const KNOWN_SERVICE_TIERS: Record<string, true> = {
+  auto: true,
+  default: true,
+  flex: true,
+  priority: true,
+  scale: true,
+};
 
 export function removeUnsupportedRequestServiceTier(
   requestedModel: string,
@@ -243,7 +248,10 @@ export function removeUnsupportedRequestServiceTier(
   console.warn('[applyProviderSpecificLogic] Removed unsupported request-level service tier', {
     model: requestedModel,
     requestKind: requestToMutate.kind,
-    serviceTier,
+    serviceTier:
+      typeof serviceTier === 'string' && KNOWN_SERVICE_TIERS[serviceTier]
+        ? serviceTier
+        : 'unrecognized',
     reason,
   });
   delete requestToMutate.body.service_tier;
@@ -287,7 +295,7 @@ export async function applyProviderSpecificLogic(
   taskId: string | null,
   isNonTrialEnterprise: boolean
 ) {
-  removeModelsFallback(requestedModel, requestToMutate, userId);
+  removeModelsFallback(requestedModel, requestToMutate);
   if (isFreeModelExcludingCustomLlms(requestedModel)) {
     removePaidServerFeatures(provider, requestedModel, requestToMutate, userId);
   }

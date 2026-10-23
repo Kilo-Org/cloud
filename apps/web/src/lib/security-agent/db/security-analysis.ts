@@ -178,7 +178,7 @@ export async function updateAnalysisStatus(
   } catch (error) {
     captureException(error, {
       tags: { operation: 'updateAnalysisStatus' },
-      extra: { findingId, status, updates },
+      extra: { findingId, status, updatedFields: Object.keys(updates) },
     });
     throw error;
   }

@@ -116,6 +116,27 @@ describe('removeUnsupportedRequestServiceTier', () => {
     }
   );
 
+  it('records only a recognized tier value', () => {
+    const model = GEMINI_FLASH_CURRENT_MODEL_ID;
+    const request = makeRequest(model);
+    request.body.service_tier = 'unrecognized-tier' as unknown as typeof request.body.service_tier;
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    removeUnsupportedRequestServiceTier(model, request, null);
+
+    expect(request.body.service_tier).toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(
+      '[applyProviderSpecificLogic] Removed unsupported request-level service tier',
+      {
+        model,
+        requestKind: 'chat_completions',
+        serviceTier: 'unrecognized',
+        reason: 'non-fallback custom pricing',
+      }
+    );
+    warn.mockRestore();
+  });
+
   it.each([
     ['moonshotai/kimi-k3', null],
     [flexExclusiveModel.public_id, flexExclusiveModel],
@@ -516,17 +537,18 @@ describe('removeModelsFallback', () => {
       const request = makeRequest(requestedModel, ['caller/fallback']);
       const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-      removeModelsFallback(requestedModel, request, 'user-1');
+      removeModelsFallback(requestedModel, request);
 
       expect(request.body.models).toBeUndefined();
       expect(warn).toHaveBeenCalledWith(
         '[applyProviderSpecificLogic] Removed caller-provided fallback models',
         {
-          userId: 'user-1',
           model: requestedModel,
           requestKind: 'chat_completions',
-          models: ['caller/fallback'],
-          fallbacks: undefined,
+          modelsPresent: true,
+          modelsCount: 1,
+          fallbacksPresent: false,
+          fallbacksCount: null,
         }
       );
       warn.mockRestore();
@@ -541,17 +563,18 @@ describe('removeModelsFallback', () => {
       request.body.fallbacks = fallbacks;
       const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-      removeModelsFallback(model, request, 'user-1');
+      removeModelsFallback(model, request);
 
       expect(request.body).not.toHaveProperty('fallbacks');
       expect(warn).toHaveBeenCalledWith(
         '[applyProviderSpecificLogic] Removed caller-provided fallback models',
         {
-          userId: 'user-1',
           model,
           requestKind: 'messages',
-          models: undefined,
-          fallbacks,
+          modelsPresent: false,
+          modelsCount: null,
+          fallbacksPresent: true,
+          fallbacksCount: Array.isArray(fallbacks) ? fallbacks.length : null,
         }
       );
       warn.mockRestore();
@@ -569,7 +592,7 @@ describe('removeModelsFallback', () => {
     Object.assign(request.body, fields);
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-    removeModelsFallback(model, request, 'user-1');
+    removeModelsFallback(model, request);
 
     expect(request.body).not.toHaveProperty('models');
     expect(request.body).not.toHaveProperty('fallbacks');
@@ -600,7 +623,12 @@ describe('removeModelsFallback', () => {
     expect(request.body).not.toHaveProperty('fallbacks');
     expect(warn).toHaveBeenCalledWith(
       '[applyProviderSpecificLogic] Removed caller-provided fallback models',
-      expect.objectContaining({ userId: 'user-1', model, requestKind: 'messages' })
+      expect.objectContaining({
+        model,
+        requestKind: 'messages',
+        fallbacksPresent: true,
+        fallbacksCount: 1,
+      })
     );
     warn.mockRestore();
   });

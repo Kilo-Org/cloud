@@ -426,10 +426,7 @@ export async function listActiveSessions({
             message: 'Failed to fetch active sessions',
           });
         }
-        console.warn(
-          `[active-sessions] fetch failed: ${response.status} ${response.statusText}`,
-          await response.text().catch(() => '')
-        );
+        console.warn(`[active-sessions] fetch failed: ${response.status} ${response.statusText}`);
         if (!includeCloudAgentSessions) {
           return { sessions: [] as ActiveSession[] };
         }

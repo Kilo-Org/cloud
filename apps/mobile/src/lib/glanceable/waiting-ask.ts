@@ -27,6 +27,13 @@ export type WaitingAsk = {
   kiloSessionId: string;
   /** 'permission' | 'question' — the tray row's status. */
   status: string;
+  /**
+   * ISO 8601 status time of the ask's row, the raise's own identity
+   * (`statusUpdatedAt ?? status`), so the ack an Approve writes names exactly
+   * the raise it answered. Absent on rows that never carried one, and on a
+   * record mirrored by a build that did not store it.
+   */
+  statusUpdatedAt?: string;
   /** True when the row came from the cloud-agent control plane. */
   isCloudAgent: boolean;
   /**
@@ -63,6 +70,7 @@ const WAITING_ASK_KEY = 'glanceable-waiting-ask';
 const waitingAskSchema = z.object({
   kiloSessionId: z.string().min(1),
   status: z.string(),
+  statusUpdatedAt: z.string().optional(),
   isCloudAgent: z.boolean(),
   scopeKey: z.string().min(1),
   organizationId: z.string().nullable(),
@@ -130,6 +138,7 @@ export function selectWaitingAsk(
   return {
     kiloSessionId: chosen.id,
     status: chosen.status,
+    statusUpdatedAt: chosen.statusUpdatedAt,
     isCloudAgent: chosen.connectionId === CLOUD_AGENT_CONNECTION_ID,
     // The snapshot's own scope key, so a sink can fence the ask against the
     // surface it belongs to without re-deriving the hash.

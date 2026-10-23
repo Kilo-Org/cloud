@@ -8,7 +8,7 @@
 import { createElement, type ElementType, type ReactNode } from 'react';
 import type * as ReactModule from 'react';
 import { Platform, Pressable } from 'react-native';
-import { act, type ReactTestRenderer } from '@/test/renderer';
+import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { onlineManager, type QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -235,32 +235,38 @@ async function openSheet(renderer: ReactTestRenderer) {
   });
 }
 
-/** The sheet's account rows, in option order. This suite mounts iOS, where a
- * picker row is a button that reports its choice through the selected trait. */
-function accountLabels(renderer: ReactTestRenderer) {
-  return renderer.root
-    .findAll(node => {
-      const state = node.props.accessibilityState as { selected?: boolean } | undefined;
-      return node.type === Pressable && state?.selected !== undefined;
-    })
-    .map(node => node.props.accessibilityLabel as string);
+/** The selected state an account action button carries, if it carries one. */
+function selectedState(node: ReactTestInstance): boolean | undefined {
+  const state: unknown = node.props.accessibilityState;
+  if (typeof state !== 'object' || state === null || !('selected' in state)) {
+    return undefined;
+  }
+  return typeof state.selected === 'boolean' ? state.selected : undefined;
 }
 
-/** Presses one row of the open sheet: an account or Cancel. */
+/** An account action button: the picker marks every row's selection. */
+function accountRow(node: ReactTestInstance) {
+  return (
+    node.type === Pressable &&
+    node.props.accessibilityRole === 'button' &&
+    selectedState(node) !== undefined
+  );
+}
+
+/** The sheet's account rows, in option order. */
+function accountLabels(renderer: ReactTestRenderer) {
+  return renderer.root.findAll(accountRow).map(node => node.props.accessibilityLabel as string);
+}
+
+/** Presses one row of the open sheet: an account row or Cancel (button). */
 async function choose(renderer: ReactTestRenderer, label: string) {
-  const target = renderer.root.find(node => {
-    if (node.type !== Pressable || node.props.accessibilityLabel !== label) {
-      return false;
-    }
-    if (node.props.onPress === undefined) {
-      return false;
-    }
-    const state = node.props.accessibilityState as { selected?: boolean } | undefined;
-    // An account row carries the selected trait; Cancel is the plain button
-    // without a hint. The card's own picker control shares an account label,
-    // so it is excluded by its hint.
-    return state?.selected !== undefined || node.props.accessibilityHint === undefined;
-  });
+  const target = renderer.root.find(
+    node =>
+      node.type === Pressable &&
+      node.props.accessibilityLabel === label &&
+      node.props.onPress !== undefined &&
+      (accountRow(node) ? true : node.props.accessibilityHint === undefined)
+  );
   await act(() => {
     (target.props.onPress as () => void)();
   });
@@ -330,8 +336,8 @@ describe('CreditsCard balance state', () => {
       const { texts, unmount } = await mountCard();
       try {
         await waitFor(() => texts().includes('$0.00') && !texts().includes('SKELETON'));
-        const notes = texts().filter(text => text.includes('in bonus credits'));
-        expect(notes).toEqual(future ? ['$2.00 in bonus credits expiring 12/17/2026'] : []);
+        const notes = texts().filter(text => text.includes('in credits expiring'));
+        expect(notes).toEqual(future ? ['$2.00 in credits expiring 12/17/2026'] : []);
       } finally {
         unmount();
       }
@@ -365,8 +371,8 @@ describe('CreditsCard balance state', () => {
       const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
       try {
         await waitFor(() => texts().includes('$0.00') && !texts().includes('SKELETON'));
-        expect(texts().filter(text => text.includes('in bonus credits'))).toEqual([
-          '$2.00 in bonus credits expiring 12/17/2026',
+        expect(texts().filter(text => text.includes('in credits expiring'))).toEqual([
+          '$2.00 in credits expiring 12/17/2026',
         ]);
       } finally {
         unmount();

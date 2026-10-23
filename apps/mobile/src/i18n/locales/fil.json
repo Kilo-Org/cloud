@@ -224,7 +224,7 @@
     "hideBalance": "Itago ang balanse",
     "showBalance": "Ipakita ang balanse",
     "balanceHidden": "Nakatago ang balanse",
-    "bonusCreditsExpiring": "Mawawalan ng bisa sa {{date}} ang {{amount}} na bonus na kredito.",
+    "bonusCreditsExpiring": "Mawawalan ng bisa sa {{date}} ang {{amount}} na kredito.",
     "signOutTitle": "Mag-sign out?",
     "signOutMessage": "Kailangan mong mag-sign in muli para mabuksan ang workspace mo.",
     "deleteAccountTitle": "Burahin ang akawnt?",
@@ -2241,6 +2241,7 @@
       "branchLoadError": "Hindi ma-load ang mga sangay",
       "branchUnavailable": "Walang available na sangay para sa repositoryong ito. Suriin ang access mo sa provider, tapos pumili ng ibang repositoryo.",
       "branchEmpty": "Walang available na sangay",
+      "branchListIncomplete": "Iilan lamang sa mga sangay ang ipinapakita. May mas maraming sangay ang repositoryo kaysa sa kayang isama ng listahang ito.",
       "branchPlaceholder": "Pumili ng sangay",
       "runOnWithTarget": "Patakbuhin sa: {{target}}",
       "environment": "Kapaligiran",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "{{count}} tool",
       "serverToolCount_other": "{{count}} tool",
       "serverUnreachable": "Hindi maabot ang server na ito",
-      "serverOff": "Naka-off ang server na ito"
+      "serverOff": "Naka-off ang server na ito",
+      "app": {
+        "label": "Interface ng tool",
+        "failed": "Hindi na-load ang interface ng tool na ito.",
+        "empty": "Walang maipapakita ang interface ng tool na ito."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Pagpapatunay",

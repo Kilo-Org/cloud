@@ -4,13 +4,11 @@ import { nextAnnouncement } from './status-announcement';
 
 const accessibilityMock = vi.hoisted(() => ({
   announceForAccessibility: vi.fn(),
-  setAccessibilityFocus: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   AccessibilityInfo: accessibilityMock,
-  findNodeHandle: vi.fn(),
 }));
 
 describe('nextAnnouncement', () => {

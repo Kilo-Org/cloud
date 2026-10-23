@@ -1,5 +1,5 @@
 // The account picker's sheet: it owns the themed surface, the row dividers,
-// the current-account check, and the radio state a screen reader reads. The
+// the current-account check, and the selected state a screen reader reads. The
 // consumer contracts (selection, palette, missing membership) live in
 // `context-control.mounted.test.tsx` and `profile-credits-card.mounted.test.tsx`.
 
@@ -59,29 +59,34 @@ async function mount(
   return ui.renderer;
 }
 
-function rows(renderer: ReactTestRenderer) {
+/** The selected state an account action button carries, if it carries one. */
+function selectedState(node: ReactTestInstance): boolean | undefined {
+  const state: unknown = node.props.accessibilityState;
+  if (typeof state !== 'object' || state === null || !('selected' in state)) {
+    return undefined;
+  }
+  return typeof state.selected === 'boolean' ? state.selected : undefined;
+}
+
+/** An account action button: the sheet marks every row's selection. */
+function accountRow(node: ReactTestInstance) {
   return (
-    renderer.root
-      // This suite mounts iOS, where a picker row is a button that reports its
-      // choice through the selected trait; Android keeps the radio role.
-      .findAll(node => node.type === Pressable && node.props.accessibilityRole === 'button')
-      .filter(node => node.props.accessibilityState !== undefined)
-      .map(node => {
-        // The mocked React Native tree types props loosely, so this suite reads
-        // the row's state through the shape `radioItemA11y` produces.
-        const state = node.props.accessibilityState as { selected: boolean };
-        return {
-          label: node.props.accessibilityLabel as string,
-          selected: state.selected,
-          divider:
-            typeof node.props.className === 'string' &&
-            node.props.className.includes('border-hair-soft'),
-          check: node.findAll(child => child.type === Check).length > 0,
-          // Every account row reserves one blank gutter View so the labels line up.
-          gutter: node.findAll(child => child.type === View).length === 1,
-        };
-      })
+    node.type === Pressable &&
+    node.props.accessibilityRole === 'button' &&
+    selectedState(node) !== undefined
   );
+}
+
+function rows(renderer: ReactTestRenderer) {
+  return renderer.root.findAll(accountRow).map(node => ({
+    label: node.props.accessibilityLabel as string,
+    selected: selectedState(node) === true,
+    divider:
+      typeof node.props.className === 'string' && node.props.className.includes('border-hair-soft'),
+    check: node.findAll(child => child.type === Check).length > 0,
+    // Every account row reserves one blank gutter View so the labels line up.
+    gutter: node.findAll(child => child.type === View).length === 1,
+  }));
 }
 
 /** The native sheet wrapper; its `onClose` is the dismiss path the sheet owns. */
@@ -107,8 +112,8 @@ describe('ContextPickerSheet', () => {
   it('renders nothing while it is closed', async () => {
     const renderer = await mount({ visible: false });
 
-    expect(renderer.root.findAllByProps({ accessibilityRole: 'radiogroup' })).toHaveLength(0);
-    expect(renderer.root.findAllByProps({ accessibilityRole: 'button' })).toHaveLength(0);
+    expect(renderer.root.findAllByProps({ accessibilityRole: 'header' })).toHaveLength(0);
+    expect(renderer.root.findAll(accountRow)).toHaveLength(0);
   });
 
   it('draws a divider on every account row and the check on the current one', async () => {
@@ -121,7 +126,7 @@ describe('ContextPickerSheet', () => {
       { label: 'Personal', selected: false, divider: true, check: false, gutter: true },
       { label: 'Acme Corp', selected: true, divider: true, check: true, gutter: true },
     ]);
-    // Cancel is the ordinary button below them: no selection state, no check.
+    // Cancel is the ordinary button below them: no selected state, no check.
     const cancel = renderer.root.find(
       node => node.type === Pressable && node.props.accessibilityLabel === 'Cancel'
     );

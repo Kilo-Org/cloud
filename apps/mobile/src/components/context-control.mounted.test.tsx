@@ -14,7 +14,7 @@ const list = vi.hoisted(() => vi.fn());
 const storage = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), remove: vi.fn() }));
 const auth = vi.hoisted(() => ({ token: 'token' as string | undefined }));
 // Mutable so the per-platform suite hands each platform the one sheet the picker
-// builds: the current-account mark rides the row's selection state, never a
+// builds: the current-account mark rides the row's checked state, never a
 // per-platform label branch.
 const platform = vi.hoisted(() => ({ OS: 'android' }));
 // Mutable so the theme test can prove the picker re-reads the active palette,
@@ -155,53 +155,56 @@ async function press(node: ReactTestInstance) {
   });
 }
 
-/** The account rows' role on the platform under test. */
-function accountRowRole() {
-  return platform.OS === 'ios' ? 'button' : 'radio';
-}
-
-/** An account row: the picker control shares a label with its current row, so
- * the row is the node that carries a selection state. */
-function isAccountRow(node: ReactTestInstance) {
-  const state = node.props.accessibilityState as
-    | { checked?: boolean; selected?: boolean }
-    | undefined;
-  return (
-    node.type === Pressable &&
-    node.props.accessibilityRole === accountRowRole() &&
-    (state?.selected !== undefined || state?.checked !== undefined)
-  );
-}
-
-/** The open sheet's account rows, in option order, with their a11y state. */
-function rows(ui: Mounted) {
-  return ui.renderer.root.findAll(isAccountRow).map(node => {
-    const checks = node.findAll(child => child.type === Check);
-    const state = node.props.accessibilityState as {
-      checked?: boolean;
-      selected?: boolean;
-    };
-    return {
-      label: node.props.accessibilityLabel as string,
-      role: node.props.accessibilityRole as string,
-      selected: Boolean(state.selected ?? state.checked),
-      divider:
-        typeof node.props.className === 'string' &&
-        node.props.className.includes('border-hair-soft'),
-      check: checks.length > 0,
-      checkColor: checks[0]?.props.color as string | undefined,
-    };
-  });
-}
-
-function radioRow(ui: Mounted, label: string) {
-  const row = ui.renderer.root
-    .findAll(isAccountRow)
-    .find(node => node.props.accessibilityLabel === label);
-  if (!row) {
-    throw new Error(`missing account row: ${label}`);
+/** The selected state of an account action button, if it carries one. */
+function selectedState(node: ReactTestInstance): boolean | undefined {
+  const state: unknown = node.props.accessibilityState;
+  if (
+    typeof state !== 'object' ||
+    state === null ||
+    !('selected' in state) ||
+    typeof state.selected !== 'boolean'
+  ) {
+    return undefined;
   }
-  return row;
+  return state.selected;
+}
+
+/** The open sheet's account action buttons, in option order. */
+function rows(ui: Mounted) {
+  return ui.renderer.root
+    .findAll(
+      node =>
+        node.type === Pressable &&
+        node.props.accessibilityRole === 'button' &&
+        selectedState(node) !== undefined
+    )
+    .map(node => {
+      const selected = selectedState(node);
+      if (selected === undefined) {
+        throw new Error('Account action button is missing its selected state');
+      }
+      const checks = node.findAll(child => child.type === Check);
+      return {
+        label: node.props.accessibilityLabel as string,
+        role: node.props.accessibilityRole as string,
+        selected,
+        divider:
+          typeof node.props.className === 'string' &&
+          node.props.className.includes('border-hair-soft'),
+        check: checks.length > 0,
+        checkColor: checks[0]?.props.color as string | undefined,
+      };
+    });
+}
+
+function accountRow(ui: Mounted, label: string) {
+  return ui.renderer.root.find(
+    node =>
+      node.type === Pressable &&
+      node.props.accessibilityLabel === label &&
+      node.props.accessibilityRole === 'button' &&
+      selectedState(node) !== undefined
+  );
 }
 
 /** The native sheet wrapper of the open picker; its `onClose` is the dismiss. */
@@ -225,7 +228,7 @@ async function openSheet(ui: Mounted) {
 }
 
 async function chooseRow(ui: Mounted, label: string) {
-  await press(radioRow(ui, label));
+  await press(accountRow(ui, label));
 }
 
 beforeEach(() => {
@@ -306,7 +309,7 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
       await openSheet(ui);
       expect(rows(ui).map(row => row.label)).toEqual(['Personal', name]);
       expect(texts(ui)).toContain('Cancel');
-      await press(choice === 'Cancel' ? cancelRow(ui) : radioRow(ui, choice));
+      await press(choice === 'Cancel' ? cancelRow(ui) : accountRow(ui, choice));
       expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe(expected);
     }
   );
@@ -329,20 +332,15 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('org-a');
   });
 
-  it('separates the rows and exposes the current account through the radio state', async () => {
+  it('exposes account buttons with the current selection state', async () => {
     storage.read.mockResolvedValue('org-a');
     const ui = await mount();
     await waitFor(() => !picker(ui).props.disabled);
     await openSheet(ui);
     const opened = rows(ui);
     expect(opened.map(row => row.label)).toEqual(['Personal', name]);
-    // A screen reader hears the current account through the row's selection
-    // state (`selectableRowA11y`): `checked` on Android's radio, the selected
-    // trait on iOS's button.
     expect(opened.map(row => row.selected)).toEqual([false, true]);
-    expect(opened.map(row => row.role)).toEqual([accountRowRole(), accountRowRole()]);
-    // Each account row draws the shared divider, and only the current row
-    // carries the check; Cancel is a plain button with no selection state.
+    expect(opened.map(row => row.role)).toEqual(['button', 'button']);
     expect(opened.map(row => row.divider)).toEqual([true, true]);
     expect(opened.map(row => row.check)).toEqual([false, true]);
     expect(cancelRow(ui).props.accessibilityState).toBeUndefined();

@@ -38,9 +38,10 @@ export const activeSessionSchema = z.object({
   /**
    * When this session's status last changed, from
    * `cli_sessions_v2.status_updated_at`, normalized to ISO 8601. Omitted when
-   * the column is NULL, unparseable, or the row was never enriched. The
-   * glanceable snapshot reads it to report how long the longest-waiting agent
-   * has needed input, and Hermes only parses the ISO form.
+   * the column is NULL, unparseable, dates a different status than the resolved
+   * status, or the row was never enriched. The glanceable snapshot reads it to
+   * report how long the longest-waiting agent has needed input, and Hermes only
+   * parses the ISO form.
    */
   statusUpdatedAt: z.string().optional(),
   /**
@@ -292,8 +293,11 @@ function mapEnrichedHeartbeatSession(
   if (row.last_activity_at != null) {
     mapped.lastActivityAt = row.last_activity_at;
   }
+  delete mapped.statusUpdatedAt;
   const statusUpdatedAt =
-    row.status_updated_at == null ? null : toIsoTimestamp(row.status_updated_at);
+    mapped.status !== row.status || row.status_updated_at == null
+      ? null
+      : toIsoTimestamp(row.status_updated_at);
   if (statusUpdatedAt !== null) {
     mapped.statusUpdatedAt = statusUpdatedAt;
   }
@@ -330,7 +334,9 @@ function mapCloudCandidateRow(row: CloudCandidateRow): ActiveSession {
     mapped.lastActivityAt = row.last_activity_at;
   }
   const statusUpdatedAt =
-    row.status_updated_at == null ? null : toIsoTimestamp(row.status_updated_at);
+    mapped.status !== row.status || row.status_updated_at == null
+      ? null
+      : toIsoTimestamp(row.status_updated_at);
   if (statusUpdatedAt !== null) {
     mapped.statusUpdatedAt = statusUpdatedAt;
   }

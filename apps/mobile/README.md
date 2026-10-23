@@ -47,6 +47,13 @@ native controls, encrypted storage, identity, and mutations replaced at their bo
 pnpm --filter kilo-app exec vitest run src/components/pr-review/merge
 ```
 
+## Remote session recovery
+
+A response that fails before producing any content still shows its failure and
+Retry action, including after reopening the session. Retry resends the original
+user prompt as a new turn in the same session; the original prompt remains in
+the transcript.
+
 ## Transcript action targets
 
 Standalone transcript continuation and recovery buttons use the shared

@@ -49,15 +49,11 @@ function TodoNotesBody({
 }: Readonly<{ hasNotes: boolean; notes: string; onEdit: () => void }>) {
   const { t } = useTranslation();
   if (hasNotes) {
-    return (
-      <Pressable
-        onPress={onEdit}
-        accessibilityRole="button"
-        accessibilityHint={t('chat.messageActions.edit')}
-      >
-        <MarkdownText value={notes} />
-      </Pressable>
-    );
+    // The saved notes stay plain markdown, one accessible text node per
+    // heading, paragraph, list item and table cell. A Pressable around the
+    // whole body merged them into a single unnamed button, so a screen reader
+    // could not read the note at all; editing is the section header's action.
+    return <MarkdownText value={notes} />;
   }
   return (
     <Pressable

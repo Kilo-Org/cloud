@@ -2275,7 +2275,7 @@ export function SessionDetailContent({
             {...(rename.isTitleInteractive
               ? {
                   onTitlePress: rename.openModal,
-                  onTitlePressAccessibilityLabel: t('agentChat.session.renameAccessibility', {
+                  onTitlePressAccessibilityHint: t('agentChat.session.renameAccessibility', {
                     title: rename.title,
                   }),
                 }

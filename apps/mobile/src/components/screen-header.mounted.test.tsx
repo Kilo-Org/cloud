@@ -554,18 +554,20 @@ describe('ScreenHeader mounted', () => {
     }
   );
 
-  it('labels the title with the override or the default open-menu label', () => {
+  it('labels the title with its own text and hints at the action', () => {
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
-    expect(findTitlePressable(renderer.root).props.accessibilityLabel).toBe(
-      'Open menu for Sessions'
-    );
+    const title = findTitlePressable(renderer.root);
+    expect(title.props.accessibilityLabel).toBe('Sessions');
+    expect(title.props.accessibilityHint).toBe('Open menu for Sessions');
 
     const customRenderer = renderHeader({
       title: 'Sessions',
       onTitlePress: () => undefined,
-      onTitlePressAccessibilityLabel: 'Rename session',
+      onTitlePressAccessibilityHint: 'Rename session',
     });
-    expect(findTitlePressable(customRenderer.root).props.accessibilityLabel).toBe('Rename session');
+    const custom = findTitlePressable(customRenderer.root);
+    expect(custom.props.accessibilityLabel).toBe('Sessions');
+    expect(custom.props.accessibilityHint).toBe('Rename session');
   });
 
   it('renders the close icon and label for backIcon="close"', () => {

@@ -9,7 +9,11 @@ import { createConnection, type Connection } from './cloud-agent-connection';
 import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
 import { normalize, isChatEvent } from './normalizer';
 import type { ServiceEvent } from './normalizer';
-import { replaySnapshot, replaySnapshotPage, sessionSnapshotFailureMessage } from './snapshot-page';
+import {
+  replaySnapshotPage,
+  sessionSnapshotFailureMessage,
+  snapshotPageFromSnapshot,
+} from './snapshot-page';
 import type {
   CloudAgentSessionId,
   KiloSessionId,
@@ -69,6 +73,25 @@ type CloudAgentTransportConfig = {
   websocketHeaders?: WebSocketHeaders | undefined;
 };
 
+// Snapshot reads run beside the live socket: a failed read costs the transcript
+// replay, never the live connection, so it is reported once and retried with a
+// short bounded backoff (500 ms, 1 s, 2 s) that stays well inside a
+// user-noticeable wait.
+const SNAPSHOT_READ_MAX_RETRIES = 3;
+const SNAPSHOT_READ_BASE_DELAY_MS = 500;
+
+/** One settled snapshot read. Reads never reject; a failure is a value. */
+type SnapshotRead =
+  | { kind: 'page'; page: SessionSnapshotPage }
+  | { kind: 'typed'; outcome: { kind: 'retryable_failure' | 'invalid_data' | 'too_large' } }
+  | { kind: 'missing' }
+  | { kind: 'rejected'; error: unknown };
+
+function snapshotReadFailureMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  return 'Session history temporarily unavailable';
+}
+
 function createCloudAgentTransport(config: CloudAgentTransportConfig): TransportFactory {
   const websocketBaseUrl = config.websocketBaseUrl;
 
@@ -83,6 +106,19 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
     // stored event after it, so content produced while the socket was dead is
     // re-delivered in order instead of being left to snapshot freshness.
     let lastEventId: number | null = null;
+    // True once the manager has been handed an initial page, so a reconnect
+    // catch-up can tell whether its page is still the session's only seed.
+    let initialPageRecorded = false;
+    // Pending bounded retry of a failed snapshot read, and whether this failure
+    // episode already reached the error callback (one report per episode).
+    let snapshotRetryTimer: ReturnType<typeof setTimeout> | null = null;
+    let snapshotFailureReported = false;
+
+    function cancelSnapshotRetry(): void {
+      clearTimeout(snapshotRetryTimer ?? undefined);
+      snapshotRetryTimer = null;
+      snapshotFailureReported = false;
+    }
 
     function startReplay(): void {
       replaying = true;
@@ -133,48 +169,138 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       connection = null;
     }
 
-    /** Fetch the initial bounded page (newest 50) and replay it. */
+    function replayInitialPage(page: SessionSnapshotPage): void {
+      // Seed lastEventId from the page's event-log watermark. A present
+      // watermark sets the cursor to 0 so the WebSocket connect uses
+      // `fromId=0` — the DO replays every stored event, closing the gap when
+      // SessionIngest materialization lags behind the event-log high-water
+      // mark. A cursor that live events already advanced is never regressed.
+      if (lastEventId === null && page.watermarkEventId != null) lastEventId = 0;
+      // Exactly one page per connect may seed the manager: a reconnect
+      // catch-up that lands first wins, and a slower initial retry must not
+      // reset the older-pages cursor back to the newest page afterwards.
+      if (!initialPageRecorded) {
+        initialPageRecorded = true;
+        config.onInitialPageLoaded?.(page);
+      }
+      replaySnapshotPage(sink, page);
+    }
+
+    /**
+     * One snapshot read. Never rejects: a failed read is a value the caller
+     * reports and retries, so it can never cost the live connection.
+     */
+    async function readSnapshot(): Promise<SnapshotRead> {
+      const fetchPage = config.fetchSnapshotPage;
+      if (fetchPage) {
+        let outcome: SessionSnapshotPageOutcome | null;
+        try {
+          outcome = await fetchPage(config.kiloSessionId, {});
+        } catch (error) {
+          return { kind: 'rejected', error };
+        }
+        if (outcome === null) return { kind: 'missing' };
+        if (outcome.kind === 'success') return { kind: 'page', page: outcome };
+        return { kind: 'typed', outcome };
+      }
+      try {
+        return {
+          kind: 'page',
+          page: snapshotPageFromSnapshot(await config.fetchSnapshot(config.kiloSessionId)),
+        };
+      } catch (error) {
+        return { kind: 'rejected', error };
+      }
+    }
+
+    function reportSnapshotFailure(message: string, expectedGeneration: number): void {
+      if (expectedGeneration !== lifecycleGeneration || snapshotFailureReported) return;
+      snapshotFailureReported = true;
+      config.onError?.(message);
+    }
+
+    /**
+     * Handle one settled snapshot read: replay a page, or report a transient
+     * failure once per episode while the retry chain keeps running. Returns true
+     * when the episode is over, false when the read is worth retrying. A
+     * terminal typed failure ends the episode unreported: only the initial read
+     * surfaces it, exactly as it did before the retry existed, so a reconnect
+     * never raises the session error for history that cannot be loaded at all.
+     */
+    function applySnapshotRead(
+      read: SnapshotRead,
+      onPage: (page: SessionSnapshotPage) => void,
+      expectedGeneration: number
+    ): boolean {
+      if (read.kind === 'page') {
+        onPage(read.page);
+        return true;
+      }
+      if (read.kind === 'missing') return true;
+      if (read.kind === 'typed' && read.outcome.kind !== 'retryable_failure') return true;
+      reportSnapshotFailure(
+        read.kind === 'rejected'
+          ? snapshotReadFailureMessage(read.error)
+          : sessionSnapshotFailureMessage(read.outcome.kind),
+        expectedGeneration
+      );
+      return false;
+    }
+
+    /**
+     * Retry a failed snapshot read with bounded exponential backoff while the
+     * lifecycle generation stands. A newer retry chain (a reconnect catch-up)
+     * replaces the pending one, so the transport never keeps two in flight.
+     */
+    function scheduleSnapshotRetry(
+      onPage: (page: SessionSnapshotPage) => void,
+      expectedGeneration: number,
+      retry: number
+    ): void {
+      if (retry >= SNAPSHOT_READ_MAX_RETRIES) return;
+      clearTimeout(snapshotRetryTimer ?? undefined);
+      snapshotRetryTimer = setTimeout(
+        () => {
+          snapshotRetryTimer = null;
+          if (expectedGeneration !== lifecycleGeneration) return;
+          void readSnapshot().then(read => {
+            if (expectedGeneration !== lifecycleGeneration) return;
+            if (applySnapshotRead(read, onPage, expectedGeneration)) return;
+            scheduleSnapshotRetry(onPage, expectedGeneration, retry + 1);
+          });
+        },
+        SNAPSHOT_READ_BASE_DELAY_MS * 2 ** retry
+      );
+    }
+
+    /**
+     * Read the initial bounded page (newest 50) and replay it. The ticket and
+     * the read start together, but only a failed ticket stops the connect: a
+     * failed read is reported, retried, and the socket opens without it.
+     */
     async function fetchAndReplayInitial(
       expectedGeneration: number
     ): Promise<{ ticket: CloudAgentStreamTicketResult } | null> {
-      const fetchPage = config.fetchSnapshotPage;
-      if (fetchPage) {
-        const [ticket, page] = await Promise.all([
-          Promise.resolve(config.getTicket(config.sessionId)),
-          fetchPage(config.kiloSessionId, {}),
-        ]);
-        if (expectedGeneration !== lifecycleGeneration) return null;
-        if (page === null) {
-          handleTicketError(new Error('Session not found'), expectedGeneration);
-          return null;
-        }
-        if (page.kind === 'success') {
-          // Seed lastEventId from the page's event-log watermark. A
-          // present watermark sets the cursor to 0 so the first
-          // WebSocket connect uses `fromId=0` — the DO replays every
-          // stored event, closing the gap when SessionIngest
-          // materialization lags behind the event-log high-water mark.
-          // On reconnect, wire events advance lastEventId past 0 and
-          // the live cursor takes over.
-          lastEventId = page.watermarkEventId != null ? 0 : null;
-          config.onInitialPageLoaded?.(page);
-          replaySnapshotPage(sink, page);
-          return { ticket };
-        }
-        // Typed failure on initial load — surface via the standard error
-        // channel (same path as a thrown fetch failure) and still try to
-        // connect so the user can recover via live events.
-        handleTicketError(new Error(sessionSnapshotFailureMessage(page.kind)), expectedGeneration);
-        // Even on a typed failure, the websocket is still useful — connect
-        // without a snapshot replay. The manager will surface the error.
-        return { ticket };
-      }
-      const [ticket, snapshot] = await Promise.all([
+      const [ticket, read] = await Promise.all([
         Promise.resolve(config.getTicket(config.sessionId)),
-        config.fetchSnapshot(config.kiloSessionId),
+        readSnapshot(),
       ]);
       if (expectedGeneration !== lifecycleGeneration) return null;
-      replaySnapshot(sink, snapshot);
+      if (read.kind === 'missing') {
+        handleTicketError(new Error('Session not found'), expectedGeneration);
+        return null;
+      }
+      // A terminal typed history failure is reported here, once per open, and
+      // still connects: the websocket remains useful for live events.
+      if (read.kind === 'typed' && read.outcome.kind !== 'retryable_failure') {
+        reportSnapshotFailure(sessionSnapshotFailureMessage(read.outcome.kind), expectedGeneration);
+      }
+      if (!applySnapshotRead(read, replayInitialPage, expectedGeneration)) {
+        scheduleSnapshotRetry(replayInitialPage, expectedGeneration, 0);
+      }
+      // Even on a failed read the websocket is still useful — connect without
+      // a snapshot replay. The manager surfaces the error and a retry fills the
+      // transcript when the read recovers.
       return { ticket };
     }
 
@@ -264,27 +390,16 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           // Reconnect replays use the bounded page fetch (newest 50) to
           // avoid overwriting older messages the user has already loaded via
           // `loadOlderMessages`. The manager already has the cursor from
-          // the initial connect, so we deliberately skip `onInitialPageLoaded`
-          // here — a reconnect must never reset the user's older-pages
-          // cursor back to the latest 50.
-          const replayRefetch = config.fetchSnapshotPage
-            ? config.fetchSnapshotPage(config.kiloSessionId, {}).then(
-                page => {
-                  if (expectedGeneration !== lifecycleGeneration) return;
-                  if (page && page.kind === 'success') {
-                    replaySnapshotPage(sink, page);
-                  }
-                },
-                () => undefined
-              )
-            : config.fetchSnapshot(config.kiloSessionId).then(
-                snapshot => {
-                  if (expectedGeneration !== lifecycleGeneration) return;
-                  replaySnapshot(sink, snapshot);
-                },
-                () => undefined
-              );
-          void replayRefetch;
+          // the initial connect, so `replayInitialPage` only hands this page to
+          // the manager when no page seeded the session yet — a reconnect must
+          // never reset the user's older-pages cursor back to the latest 50.
+          cancelSnapshotRetry();
+          void readSnapshot().then(read => {
+            if (expectedGeneration !== lifecycleGeneration) return;
+            if (!applySnapshotRead(read, replayInitialPage, expectedGeneration)) {
+              scheduleSnapshotRetry(replayInitialPage, expectedGeneration, 0);
+            }
+          });
         },
         onDisconnected: () => {
           if (expectedGeneration !== lifecycleGeneration || !replaying) return;
@@ -334,10 +449,12 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
     return {
       connect() {
         closeConnection('destroy');
+        cancelSnapshotRetry();
         lifecycleGeneration += 1;
         stoppedReceived = false;
         replaying = true;
         awaitingConnectedSnapshot = true;
+        initialPageRecorded = false;
         const expectedGeneration = lifecycleGeneration;
 
         void fetchAndReplayInitial(expectedGeneration)
@@ -352,12 +469,14 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
 
       disconnect() {
         cancelReplay();
+        cancelSnapshotRetry();
         lifecycleGeneration += 1;
         closeConnection('disconnect');
       },
 
       destroy() {
         cancelReplay();
+        cancelSnapshotRetry();
         lifecycleGeneration += 1;
         closeConnection('destroy');
       },

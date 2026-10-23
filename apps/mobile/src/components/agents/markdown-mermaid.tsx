@@ -70,7 +70,7 @@ async function prepareMermaidHost(): Promise<MermaidHost> {
     await new File(asset.localUri ?? asset.uri).copy(script);
   }
   const page = new File(directory, PAGE_FILE_NAME);
-  page.write(HOST_PAGE);
+  await page.write(HOST_PAGE);
   return { pageUri: page.uri, directoryUri: directory.uri };
 }
 
@@ -183,7 +183,7 @@ export function MarkdownMermaid({ source, palette }: Readonly<MarkdownMermaidPro
           onShouldStartLoadWithRequest={request =>
             request.url.startsWith('file://') && request.url.endsWith(`/${PAGE_FILE_NAME}`)
           }
-          onMessage={(event: WebViewMessageEvent) => {
+          onMessage={(event: WebViewMessageEvent): void => {
             const message = parseDiagramMessage(event.nativeEvent.data);
             if (message?.kind === 'height') {
               setHeight(Math.max(MIN_HEIGHT, message.height));

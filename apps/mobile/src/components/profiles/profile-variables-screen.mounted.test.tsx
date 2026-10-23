@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- one mounted harness pins the form, secret-masking, and delete flows for the variables screen */
+/* eslint-disable max-lines -- one mounted harness pins the form, secret-masking, delete flows, and the inline refusals for the variables screen */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -42,6 +42,7 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
@@ -206,6 +207,41 @@ describe('ProfileVariablesScreen', () => {
     unmount();
   });
 
+  it('non-retryable: clearing an existing value shows the required message instead of doing nothing', async () => {
+    h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'API_KEY');
+    changeText(renderer.root, 'Value', '');
+    pressButton(renderer.root, 'Save');
+
+    expect(h.mutations.setVar.mutateAsync).not.toHaveBeenCalled();
+    expect(findField(renderer.root, 'Value').props.error).toBe('Enter a value');
+
+    // Typing a value clears the message without another save attempt.
+    changeText(renderer.root, 'Value', '2');
+    expect(findField(renderer.root, 'Value').props.error).toBeUndefined();
+
+    unmount();
+  });
+
+  it('non-retryable: a new variable needs a value', async () => {
+    h.query.data = testProfile();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeText(renderer.root, 'Key', 'API_KEY');
+    pressButton(renderer.root, 'Save');
+
+    expect(h.mutations.setVar.mutateAsync).not.toHaveBeenCalled();
+    expect(findField(renderer.root, 'Value').props.error).toBe('Enter a value');
+    expect(findField(renderer.root, 'Key').props.error).toBeUndefined();
+
+    unmount();
+  });
+
   it('retryable: a failure with no message toasts the fallback and keeps the form', async () => {
     h.query.data = testProfile();
     h.query.isPending = false;
@@ -333,6 +369,45 @@ describe('ProfileVariablesScreen', () => {
     });
     await waitFor(() => findAll(renderer.root, 'Pressable').length === 0);
 
+    unmount();
+  });
+
+  it('keeps the row and shows a delete-specific fallback for an unreadable error', async () => {
+    h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
+    h.query.isPending = false;
+    h.mutations.deleteVar.mutateAsync.mockRejectedValueOnce(undefined);
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'Delete');
+    await act(async () => {
+      confirmRequest(h.confirm as TestConfirmMock);
+      await Promise.resolve();
+    });
+
+    expect(h.mutations.deleteVar.mutateAsync).toHaveBeenCalledWith({
+      profileId: 'profile-1',
+      key: 'API_KEY',
+    });
+    expect(findPressable(renderer.root, 'API_KEY')).toBeDefined();
+    expect(h.error).toHaveBeenCalledExactlyOnceWith("Couldn't delete variable");
+    unmount();
+  });
+
+  it('keeps the row without duplicating the mutation toast for a readable delete error', async () => {
+    h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
+    h.query.isPending = false;
+    h.mutations.deleteVar.mutateAsync.mockRejectedValueOnce(new Error('Permission denied'));
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'Delete');
+    await act(async () => {
+      confirmRequest(h.confirm as TestConfirmMock);
+      await Promise.resolve();
+    });
+
+    expect(h.mutations.deleteVar.mutateAsync).toHaveBeenCalledOnce();
+    expect(findPressable(renderer.root, 'API_KEY')).toBeDefined();
+    expect(h.error).not.toHaveBeenCalled();
     unmount();
   });
 

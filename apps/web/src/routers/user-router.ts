@@ -1347,7 +1347,9 @@ export const userRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await db
+      // A token belongs to the account that registered it. A device that
+      // switches accounts releases the token with unregisterPushToken first.
+      const registered = await db
         .insert(user_push_tokens)
         .values({
           user_id: ctx.user.id,
@@ -1359,13 +1361,22 @@ export const userRouter = createTRPCRouter({
         .onConflictDoUpdate({
           target: [user_push_tokens.token],
           set: {
-            user_id: ctx.user.id,
             platform: input.platform,
             app_version: input.appVersion ?? null,
             locale: input.locale ?? null,
             updated_at: sql`now()`,
           },
+          setWhere: eq(user_push_tokens.user_id, ctx.user.id),
+        })
+        .returning({ id: user_push_tokens.id });
+
+      if (registered.length === 0) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'Push token is registered to another account.',
         });
+      }
+
       return { success: true };
     }),
 

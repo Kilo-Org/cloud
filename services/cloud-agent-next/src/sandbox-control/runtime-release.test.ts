@@ -64,7 +64,7 @@ function descriptor(): RuntimeReleaseDescriptor {
     format: 1,
     bootstrap: 1,
     platform: { os: 'linux', arch: 'x64', libc: 'glibc', cpu: 'baseline' },
-    abi: 'bun-1.3.14',
+    abi: 'bun-1.4.4',
     cliVersion: '7.8.17',
     cliExecutable: 'package/bin/kilo',
     wrapperSdkVersion: '7.8.17',

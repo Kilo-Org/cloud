@@ -5,6 +5,7 @@ import { Pressable, View } from 'react-native';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { X } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import {
   BRIEFING_PATH,
   type BriefingReport,
@@ -151,13 +152,18 @@ export function BriefingCard({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('agentBriefing.dismiss')}
-          className="size-11 shrink-0 items-center justify-center rounded-full border border-border bg-secondary active:opacity-70"
+          // The frame is the tap target the audit measures, so it is the shared
+          // 48dp box: `size-11` renders 38.5pt at NativeWind's 14pt rem, under
+          // both minimums. The visible circle stays compact inside it.
+          className={cn(ICON_TARGET_BOX_CLASS, 'shrink-0 rounded-full active:opacity-70')}
           disabled={dismissals.save.isPending}
           onPress={() => {
             dismissals.dismiss(report);
           }}
         >
-          <X size={18} color={colors.foreground} />
+          <View className="size-11 items-center justify-center rounded-full border border-border bg-secondary">
+            <X size={18} color={colors.foreground} />
+          </View>
         </Pressable>
       </View>
     </View>

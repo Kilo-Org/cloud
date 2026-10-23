@@ -172,6 +172,7 @@ vi.mock('react-native', () => ({
     },
   },
   Keyboard: {
+    dismiss: vi.fn(),
     addListener: (
       event: string,
       listener: (event: { endCoordinates: { height: number } }) => void

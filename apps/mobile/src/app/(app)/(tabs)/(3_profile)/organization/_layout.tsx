@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import { Platform, useWindowDimensions } from 'react-native';
-import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
+
+import { appScreenLayout } from '@/components/app-screen-layout';
 
 import { organizationSheetDetents } from '@/lib/form-sheet-detents';
 import { useFormSheetScreenOptions } from '@/lib/form-sheet';
@@ -20,7 +21,7 @@ export default function OrganizationLayout() {
   };
 
   return (
-    <Stack screenLayout={appUnlockScreenLayout} screenOptions={{ headerShown: false }}>
+    <Stack screenLayout={appScreenLayout} screenOptions={{ headerShown: false }}>
       <Stack.Screen
         name="invite-member"
         options={{ ...organizationSheetOptions, gestureEnabled: false }}

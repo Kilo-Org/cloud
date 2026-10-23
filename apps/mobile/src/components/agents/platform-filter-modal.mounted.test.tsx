@@ -19,6 +19,8 @@ let insets = { top: 0, bottom: 0, left: 0, right: 0 };
 const platform = vi.hoisted(() => ({ OS: 'android' as 'android' | 'ios' }));
 
 vi.mock('react-native', () => ({
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   Modal: 'Modal',
   Platform: platform,
   Pressable: 'Pressable',

@@ -476,7 +476,7 @@ export function NewSessionPrompt({
           // the Start button's own spinner. An edit made mid-flight is not
           // discarded: the creator cancels the attempt before it dispatches
           // and keeps this draft (see `createSessionFromDraft`).
-          className="w-full px-2 py-2 text-base leading-6 text-foreground"
+          className="w-full px-2 py-2 text-base leading-[1.5rem] text-foreground"
           style={[
             promptInputStyle,
             { height: promptMeasure.height },

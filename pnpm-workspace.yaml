@@ -107,12 +107,12 @@ minimumReleaseAgeExclude:
   - '@typescript/native-preview-win32-arm64@7.0.0-dev.20251019.1'
   - '@typescript/native-preview-win32-x64@7.0.0-dev.20260514.1'
   - '@typescript/native-preview-win32-x64@7.0.0-dev.20251019.1'
-  # Anthropic adds new parameters regularly and we can't really wait for them to
-  # stabilize. 0.109.1 is openclaw's transitive pin; both locked versions are
-  # exempted.
+  # Provider SDKs add parameters regularly and we can't really wait for them to
+  # stabilize. Each locked version of the SDK carries its own exclusion below.
   - '@ai-sdk/anthropic@4.0.15'
   - '@anthropic-ai/sdk@0.104.1'
   - '@anthropic-ai/sdk@0.109.1'
+  - '@anthropic-ai/sdk@0.137.0'
   # Kilo SDK releases are owned internally and adopted with pinned runtime validation.
   - '@kilocode/sdk@7.2.14'
   - '@kilocode/sdk@7.2.52'

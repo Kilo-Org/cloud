@@ -39,6 +39,7 @@ const BASE_EXCLUDE_ENTRIES = [
   '@ai-sdk/anthropic@4.0.15',
   '@anthropic-ai/sdk@0.104.1',
   '@anthropic-ai/sdk@0.109.1',
+  '@anthropic-ai/sdk@0.137.0',
   '@kilocode/sdk@7.2.14',
   '@kilocode/sdk@7.2.52',
   '@kilocode/sdk@7.8.1',

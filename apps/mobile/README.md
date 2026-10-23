@@ -18,6 +18,14 @@ current render time. Elapsed grants and non-expiring credits do not contribute t
 its amount or earliest expiry, for both personal and organization accounts.
 The balance continues to come from the balance query.
 
+## Runtime recovery
+
+Retry on the runtime-error screen restores the last focused route for the
+current account. Route recording pauses while the root layout remounts, so its
+temporary Home route cannot replace the recovery destination. Credential
+preloads are used only for the first auth-provider mount; recovery reads the
+current stored credentials through the normal bounded retry path.
+
 ## New-session model choice
 
 Model resolution waits for stored preferences to load. An explicit model and
@@ -43,6 +51,14 @@ to the sheet at the top. Keep self-scrolling picker lists outside the shell's
 Shared `SheetHeader` actions use explicit 48px minimum width and height, not
 rem-based sizes: native rem is 14dp. Labels retain their intrinsic size as text
 scales; the title takes the remaining space.
+
+## Selectable row accessibility
+
+Use `selectableRowA11y` from `@/lib/a11y/selectable-row` for custom checkbox and
+radio rows. It exposes button/selected traits on iOS and checkbox or radio roles
+with checked state on Android. `ChoiceRow` and `radioItemA11y` use this mapping.
+Verify both the native role and state transitions in device accessibility trees;
+a rendered checkmark alone does not verify accessibility.
 
 ## PR merge sheet
 

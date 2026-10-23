@@ -2568,6 +2568,29 @@ describe('cached repository snapshot', () => {
     consoleError.mockRestore();
   });
 
+  it.each([
+    { snapshot: unreadableSnapshot, mode: 'all' as const, selectedIds: [] },
+    { snapshot: mixedSnapshot, mode: 'selected' as const, selectedIds: [2] },
+  ])('refuses enabling without a readable repository in $mode scope', async testCase => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await expect(
+        createHandlersWithRepositorySnapshot(testCase.snapshot).setEnabled.handler({
+          ctx: context,
+          input: {
+            isEnabled: true,
+            repositorySelectionMode: testCase.mode,
+            selectedRepositoryIds: testCase.selectedIds,
+          },
+        })
+      ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+      expect(mockSaveSecurityAgentConfigWithRevision).not.toHaveBeenCalled();
+      expect(mockSubmitManualSecuritySync).not.toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it('replaces an unreadable snapshot by refetching it for the repository list', async () => {
     const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
     const fetched = [{ id: 7, full_name: 'kilo/refetched', name: 'refetched', private: false }];

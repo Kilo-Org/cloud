@@ -729,7 +729,6 @@ describe('AgentSessionListScreen live presentation', () => {
 
     expect(header().parent?.children[0]).toBe(header());
     expect(header().props.headerRight).toBeUndefined();
-    expect(header().props.context).toBeUndefined();
     expect(emptyState.props.placement).toBeUndefined();
     expect(nodes('ScrollView')).toHaveLength(0);
     expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(60);
@@ -747,7 +746,7 @@ describe('AgentSessionListScreen live presentation', () => {
     const createAction = action('New session');
     const label = createAction.findByType(Text);
     expect(createAction.props.className).toContain('max-w-full');
-    expect(createAction.props.className).toContain('min-h-[44px]');
+    expect(createAction.props.className).toContain('min-h-[48px]');
     expect(label.props.className).toBe('shrink text-center');
     expect(label.props.numberOfLines).toBeUndefined();
     expect(label.props.allowFontScaling).not.toBe(false);
@@ -1331,7 +1330,6 @@ describe('AgentSessionListScreen header and admission', () => {
     // 480x1040 capture until "Agents" broke mid-word ("Age / nts") and this
     // label stacked ("SEE / ALL").
     expect(header().props.headerRight).toBeUndefined();
-    expect(header().props.context).toBeUndefined();
     expect(actionsWrapper?.parent).toBe(title.parent?.parent?.parent);
     expect(actionsWrapper?.props.className).toContain('min-w-0');
     expect(actionsWrapper?.props.className).toContain('shrink');
@@ -1429,7 +1427,6 @@ describe('AgentSessionListScreen header and admission', () => {
     expect(actions.props.className).toContain('min-h-11');
     expect(actions.props.className).toContain('shrink');
     expect(header().props.headerRight).toBeUndefined();
-    expect(header().props.context).toBeUndefined();
     expect(
       nodes('Pressable').filter(node => node.props.accessibilityHint === 'Select account')
     ).toHaveLength(0);

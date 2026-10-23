@@ -152,7 +152,6 @@ const defaultFetchedSession = {
   variant: null,
   repository: 'test/repo',
   isInitiated: true,
-  needsLegacyPrepare: false,
   isPreparingAsync: false,
   prompt: 'Initial prompt',
   initialMessageId: 'msg_0123456789abcdefghijklmnop',

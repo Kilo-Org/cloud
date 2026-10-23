@@ -1,6 +1,6 @@
-/* eslint-disable max-lines -- one layout renders the bar, its six tabs and their press behavior; splitting it would scatter the bar's single source of truth */
 import * as Haptics from 'expo-haptics';
 import { Tabs, usePathname, useRouter, useSegments } from 'expo-router';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { Bot, House, MessageCircle, MessageSquare, UserRound } from '@/components/ui/icons';
 import { useEffect } from 'react';
 import { Platform, useWindowDimensions, View, type ViewStyle } from 'react-native';
@@ -11,6 +11,7 @@ import { SessionPreviewOverlay } from '@/components/agents/session-preview-overl
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { TabBarButton } from '@/components/tab-bar-button';
 import { TabBarLabel } from '@/components/tab-bar-label';
+import { TabSwitchInputGate } from '@/components/tab-screen-input-gate';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Text } from '@/components/ui/text';
 import { usePendingAppAction } from '@/lib/app-actions/use-pending-app-action';
@@ -24,8 +25,8 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
-import { planProfileTabPress, type TabPressNavigation } from '@/lib/tab-press';
 import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
+import { profileTabPressListeners, tabPressListeners } from '@/lib/tab-press-listeners';
 import {
   getEffectiveTabBarHeight,
   getTabBarHorizontalInset,
@@ -44,9 +45,6 @@ const TAB_BAR_ICON_STYLE = {
   alignItems: 'center',
   justifyContent: 'center',
 } satisfies ViewStyle;
-
-/** The plain tab press: the same feedback for every tab without its own move. */
-const TAB_PRESS_HAPTICS = { tabPress: () => void Haptics.selectionAsync() };
 
 export const unstable_settings = {
   initialRouteName: '(0_home)',
@@ -108,7 +106,8 @@ export default function TabsLayout() {
   const router = useRouter();
   const colors = useThemeColors();
   const { bottom, left, right } = useSafeAreaInsets();
-  const { width, fontScale } = useWindowDimensions();
+  const { width } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
   const tabLabelLines = tabLabelLineCount(fontScale);
   const allowLabelWrap = tabLabelLines > 1;
   const hideTabs = shouldHideTabBar(pathname, segments);
@@ -166,7 +165,10 @@ export default function TabsLayout() {
   const needsInputRows = activeSessions.map(session => ({
     id: session.id,
     status: session.status,
-    isAcked: isAttentionAcked(session.id, session.status),
+    isAcked: isAttentionAcked(session.id, {
+      raiseId: session.statusUpdatedAt ?? session.status,
+      status: session.status,
+    }),
   }));
   const needsInputCount = needsInputRows.filter(session =>
     shouldShowNeedsInput({
@@ -250,7 +252,7 @@ export default function TabsLayout() {
               <House size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
           }}
-          listeners={TAB_PRESS_HAPTICS}
+          listeners={tabPressListeners}
         />
         <Tabs.Screen
           name="(1_kiloclaw)"
@@ -299,7 +301,7 @@ export default function TabsLayout() {
               <Bot size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
           }}
-          listeners={TAB_PRESS_HAPTICS}
+          listeners={tabPressListeners}
         />
         <Tabs.Screen
           name="(4_chat)"
@@ -317,7 +319,7 @@ export default function TabsLayout() {
               <MessageCircle size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
           }}
-          listeners={TAB_PRESS_HAPTICS}
+          listeners={tabPressListeners}
         />
         <Tabs.Screen
           name="(3_profile)"
@@ -335,41 +337,14 @@ export default function TabsLayout() {
               <UserRound size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
           }}
-          listeners={({ navigation }: { navigation: TabPressNavigation }) => ({
-            tabPress: event => {
-              void Haptics.selectionAsync();
-              const profileStack = navigation
-                .getState()
-                ?.routes.find(route => route.name === '(3_profile)')?.state;
-              // The typed route union does not carry the tab group for every
-              // route; the check is a plain segment membership test.
-              const segmentList: readonly string[] = segments;
-              const plan = planProfileTabPress({
-                profileFocused: segmentList.includes('(3_profile)'),
-                segments: segmentList,
-                profileStackIndex: profileStack?.index,
-              });
-              // A cross-tab press and a sheet re-press are left to the
-              // navigator: the switch keeps the tab's stack and sheet, and a
-              // focused no-op needs no interception. Only the re-press that
-              // moves the tab to its root is ours — a pop, so the shared
-              // unsaved-changes guard can intercept and replay it.
-              if (plan !== 'reset-to-root') {
-                return;
-              }
-              event.preventDefault();
-              if (profileStack?.key) {
-                navigation.dispatch({ type: 'POP_TO_TOP', target: profileStack.key });
-              }
-            },
-          })}
+          listeners={profileTabPressListeners(segments)}
         />
       </Tabs>
     </StateSurfaceInsets>
   );
   return (
     <TabBarLabelContext value={showTabLabel}>
-      {tabsLayout}
+      <TabSwitchInputGate>{tabsLayout}</TabSwitchInputGate>
       <SessionPreviewOverlay />
     </TabBarLabelContext>
   );

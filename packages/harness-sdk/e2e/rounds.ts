@@ -93,16 +93,13 @@ const watch = (
         }
       })
   );
-  return Effect.map(
-    Effect.forkScoped(reading),
-    (fiber): Watching => ({
-      rounds,
-      done: Effect.raceFirst(Fiber.await(fiber), Effect.sleep(within)).pipe(
-        Effect.andThen(Fiber.interrupt(fiber)),
-        Effect.as(rounds as readonly Round[])
-      ),
-    })
-  );
+  return Effect.map(Effect.forkScoped(reading), (fiber): Watching => ({
+    rounds,
+    done: Effect.raceFirst(Fiber.await(fiber), Effect.sleep(within)).pipe(
+      Effect.andThen(Fiber.interrupt(fiber)),
+      Effect.as(rounds as readonly Round[])
+    ),
+  }));
 };
 
 export type { Round, Watching };

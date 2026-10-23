@@ -16,7 +16,7 @@ import { Search, SearchX } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { applyLanguagePreference } from '@/i18n/apply-language';
-import { languagePickerItems } from '@/i18n/language-rows';
+import { type LanguagePickerItem, languagePickerItems } from '@/i18n/language-rows';
 import { LANGUAGE_ENDONYMS, type SupportedLanguage } from '@/i18n/languages';
 import { resolveDeviceLanguage } from '@/i18n/resolve-language';
 import { isRtlLanguage } from '@/i18n/rtl';
@@ -105,11 +105,39 @@ export function LanguagePickerSheet({
   const isRtl = I18nManager.isRTL;
   // The copy/fold/collate of the whole language table and the fresh row objects
   // are only valid while the query and the applied language stand. Keyed the
-  // same way so a `selected` or `busy` change keeps the list identity and does
-  // not re-render every mounted row.
+  // same way so a `selected` or `busy` change keeps the list identity and
+  // leaves the rows' props comparable.
   const items = useMemo(
     () => languagePickerItems(query, appliedLanguage, applied === 'device'),
     [query, appliedLanguage, applied]
+  );
+  // The list's memoized cells compare `renderItem` and `extraData` by identity
+  // before re-rendering a row (see the security-agent finding list). `selected`
+  // and the in-flight `busy` state therefore have to travel through `extraData`:
+  // without it a tapped row keeps the `checked` state and the check mark of the
+  // selection the sheet opened with, and the picker reads as inert.
+  const rowExtraData = useMemo(() => ({ selected, disabled: busy }), [selected, busy]);
+  // Hoisted so the cell keeps one renderer identity while only the selection or
+  // the busy state change, and memoized `LanguagePickerRow`s re-render only
+  // when their own flag moved.
+  const renderItem = useCallback(
+    ({ item, index }: { item: LanguagePickerItem; index: number }) => (
+      <LanguagePickerRow
+        item={item}
+        first={index === 0}
+        showDivider={items[index + 1]?.kind !== 'section'}
+        selected={
+          item.kind === 'device'
+            ? selected === 'device'
+            : item.kind === 'language' && selected === item.row.tag
+        }
+        disabled={busy}
+        deviceEndonym={deviceEndonym}
+        isRtl={isRtl}
+        onSelect={setSelected}
+      />
+    ),
+    [items, selected, busy, deviceEndonym, isRtl]
   );
 
   const handleDone = async () => {
@@ -277,22 +305,12 @@ export function LanguagePickerSheet({
           style={listStyle}
           contentContainerStyle={listContentContainerStyle}
           data={items}
+          extraData={rowExtraData}
           keyExtractor={item => item.key}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           ListFooterComponent={<View style={{ height: insets.bottom }} pointerEvents="none" />}
-          renderItem={({ item, index }) => (
-            <LanguagePickerRow
-              item={item}
-              first={index === 0}
-              showDivider={items[index + 1]?.kind !== 'section'}
-              selected={selected}
-              disabled={busy}
-              deviceEndonym={deviceEndonym}
-              isRtl={isRtl}
-              onSelect={setSelected}
-            />
-          )}
+          renderItem={renderItem}
         />
       )}
     </PickerSheet>

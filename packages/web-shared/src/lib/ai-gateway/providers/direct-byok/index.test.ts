@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { generateText } from 'ai';
-import { COMPATIBLE_USER_AGENT, type DirectByokModel } from './types';
+import { COMPATIBLE_USER_AGENT, type DirectByokModel, type DirectByokProvider } from './types';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   readDb: {},
@@ -211,6 +211,26 @@ describe('getDirectByokModel', () => {
     const models = await getDirectByokModelsForUser('user-id');
 
     expect(models.map(model => model.opencode.ai_sdk_provider)).toEqual(['anthropic', undefined]);
+  });
+
+  test('derives the AI SDK provider from the chat API a provider assigns each model', async () => {
+    const { directByokProviders, getDirectByokModelsForUser } = await loadDirectByokModule();
+    const { getUserByokProviderIds } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    const { getAiSdkProvider } =
+      await import('@kilocode/web-shared/lib/ai-gateway/providers/model-settings');
+    const provider: DirectByokProvider = directByokProviders[0];
+    provider.getModelChatApi = model =>
+      model.id === 'supported-model' ? 'responses' : 'chat_completions';
+    jest.mocked(getUserByokProviderIds).mockResolvedValueOnce(['chutes-byok']);
+
+    try {
+      const models = await getDirectByokModelsForUser('user-id');
+
+      expect(models.map(model => model.opencode.ai_sdk_provider)).toEqual(['openai', undefined]);
+      expect(getAiSdkProvider).not.toHaveBeenCalled();
+    } finally {
+      delete provider.getModelChatApi;
+    }
   });
 
   test('does not fall back to model-name variants when reasoning is unsupported', async () => {

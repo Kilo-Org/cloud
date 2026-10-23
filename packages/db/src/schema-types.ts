@@ -2190,6 +2190,11 @@ export const DirectByokModelSchema = z.object({
   reasoning_options: z.array(ReasoningOptionSchema).optional(),
   /** The OpenRouter catalog model ID that models.dev identifies as the same model. */
   catalog_model_id: z.string().optional(),
+  /**
+   * Provider-specific upstream endpoint for providers whose models are served
+   * by different endpoints, such as Amazon Bedrock runtime versus mantle.
+   */
+  endpoint: z.string().optional(),
 });
 
 export const DirectByokModelArraySchema = z.array(DirectByokModelSchema);

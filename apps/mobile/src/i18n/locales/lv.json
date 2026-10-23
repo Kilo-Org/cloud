@@ -1499,7 +1499,15 @@
       "instructions": "Norādījumi (neobligāti)",
       "instructionsPlaceholder": "Kam īpaši pievērst uzmanību…",
       "starting": "Tiek sākta koda pārskatīšana…",
-      "start": "Sākt koda pārskatīšanu"
+      "start": "Sākt koda pārskatīšanu",
+      "startNotFound": "Šis {{requestNoun}} no {{provider}} nav nolasāms. Pārbaudi URL un to, vai repozitorijs ir pieejams.",
+      "startRateLimited": "{{provider}} pašlaik ierobežo pieprasījumus. Pamēģini vēlreiz pēc dažām minūtēm.",
+      "startNotAllowed": "Tev nav piekļuves, lai sāktu pārskatīšanu. Šis {{requestNoun}} tev nav pieejams. Pārbaudi savas atļaujas un sava uzņēmuma plānu.",
+      "startProviderNeedsAttention": "Manuālai pārskatīšanai ir nepieciešams standarta {{provider}} savienojums. Pievieno to un mēģini vēlreiz.",
+      "startAlreadyRunning": "Šis {{requestNoun}} jau tiek pārskatīts.",
+      "startRejected": "Šis {{requestNoun}} nav pārskatāms. Pārliecinies, ka tas ir atvērts, nevis melnraksts, un ka URL ir pareizs.",
+      "startProviderUnavailable": "Neizdevās sazināties ar {{provider}}, lai {{requestNoun}} tiktu nolasīts. Mēģini vēlreiz.",
+      "startFailed": "Neizdevās sākt pārskatīšanu. Pārbaudi savienojumu un mēģini vēlreiz."
     },
     "notConnectedReadOnly": "{{platform}} nav pievienots. To var pievienot tikai organizācijas īpašnieki un administratori.",
     "gitlab": {

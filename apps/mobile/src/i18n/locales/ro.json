@@ -1499,7 +1499,15 @@
       "instructions": "Instrucțiuni (opțional)",
       "instructionsPlaceholder": "Aspecte specifice de urmărit la revizuire…",
       "starting": "Se începe revizuirea…",
-      "start": "Începe revizuirea"
+      "start": "Începe revizuirea",
+      "startNotFound": "Nu s-a putut citi acest {{requestNoun}} din {{provider}}. Verifică adresa URL și accesibilitatea depozitului.",
+      "startRateLimited": "{{provider}} limitează cererile în acest moment. Încearcă din nou în câteva minute.",
+      "startNotAllowed": "Nu ai acces să începi o revizuire pentru acest {{requestNoun}}. Verifică-ți permisiunile și planul organizației.",
+      "startProviderNeedsAttention": "Recenziile manuale necesită conexiunea standard {{provider}}. Conecteaz-o și încearcă din nou.",
+      "startAlreadyRunning": "O revizuire pentru acest {{requestNoun}} este deja în curs.",
+      "startRejected": "Acest {{requestNoun}} nu poate fi revizuit. Asigură-te că este deschis, că nu este ciornă și că adresa URL este corectă.",
+      "startProviderUnavailable": "Nu s-a putut accesa {{provider}} pentru a citi acest {{requestNoun}}. Încearcă din nou.",
+      "startFailed": "Nu s-a putut începe revizuirea. Verifică conexiunea și încearcă din nou."
     },
     "notConnectedReadOnly": "{{platform}} nu este conectat. Doar proprietarii și administratorii organizației îl pot conecta.",
     "gitlab": {

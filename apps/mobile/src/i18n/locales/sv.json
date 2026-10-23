@@ -1480,7 +1480,15 @@
       "instructions": "Instruktioner (valfritt)",
       "instructionsPlaceholder": "Särskilda områden för granskaren att fokusera på…",
       "starting": "Startar granskning…",
-      "start": "Starta granskning"
+      "start": "Starta granskning",
+      "startNotFound": "Kunde inte läsa den {{requestNoun}} från {{provider}}. Kontrollera URL:en och att arkivet är åtkomligt.",
+      "startRateLimited": "{{provider}} begränsar förfrågningar just nu. Försök igen om några minuter.",
+      "startNotAllowed": "Du har inte åtkomst att starta en granskning för den {{requestNoun}}. Kontrollera dina behörigheter och din organisations plan.",
+      "startProviderNeedsAttention": "Manuella granskningar kräver standardanslutningen till {{provider}}. Anslut den och försök igen.",
+      "startAlreadyRunning": "En granskning av {{requestNoun}} pågår redan.",
+      "startRejected": "{{requestNoun}} kan inte granskas. Kontrollera att den är öppen, inte ett utkast och att URL:en är korrekt.",
+      "startProviderUnavailable": "Kunde inte nå {{provider}} för att läsa {{requestNoun}}. Försök igen.",
+      "startFailed": "Det gick inte att starta granskningen. Kontrollera din anslutning och försök igen."
     },
     "notConnectedReadOnly": "Det finns ingen anslutning till {{platform}}. Endast organisationsägare och administratörer kan skapa anslutningen.",
     "gitlab": {

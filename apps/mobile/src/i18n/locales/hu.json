@@ -1480,7 +1480,15 @@
       "instructions": "Utasítások (nem kötelező)",
       "instructionsPlaceholder": "Az ellenőrzés kiemelt szempontjai…",
       "starting": "Kódellenőrzés indítása…",
-      "start": "Kódellenőrzés indítása"
+      "start": "Kódellenőrzés indítása",
+      "startNotFound": "Az adott {{requestNoun}} nem olvasható be a {{provider}} felületéről. Ellenőrizd az URL-t, és hogy a repozitórium elérhető-e.",
+      "startRateLimited": "A {{provider}} jelenleg korlátozza a kéréseket. Próbáld újra néhány perc múlva.",
+      "startNotAllowed": "Nincs hozzáférésed kódellenőrzés indításához az adott {{requestNoun}} esetében. Ellenőrizd a jogosultságaidat, valamint a szervezeted előfizetését.",
+      "startProviderNeedsAttention": "A kézi kódellenőrzéshez a {{provider}} alap kapcsolata szükséges. Csatlakoztasd, és próbáld újra.",
+      "startAlreadyRunning": "A {{requestNoun}} ellenőrzése már fut.",
+      "startRejected": "Ez a {{requestNoun}} nem ellenőrizhető. Győződj meg róla, hogy nyitott, nem vázlat, és hogy az URL helyes.",
+      "startProviderUnavailable": "A {{provider}} nem érhető el a {{requestNoun}} beolvasásához. Próbáld újra.",
+      "startFailed": "Nem sikerült elindítani az ellenőrzést. Ellenőrizd a kapcsolatot, és próbáld újra."
     },
     "notConnectedReadOnly": "Nincs kapcsolat ezzel a platformmal: {{platform}}. Csak a szervezet tulajdonosai és adminisztrátorai csatlakoztathatják.",
     "gitlab": {

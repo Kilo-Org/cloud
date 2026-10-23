@@ -1499,7 +1499,15 @@
       "instructions": "Upute (neobavezno)",
       "instructionsPlaceholder": "Posebne upute za pregled…",
       "starting": "Pokretanje pregleda…",
-      "start": "Pokreni pregled"
+      "start": "Pokreni pregled",
+      "startNotFound": "Nije moguće pročitati taj {{requestNoun}} iz {{provider}}. Provjeri URL i je li repozitorij dostupan.",
+      "startRateLimited": "{{provider}} trenutačno ograničava zahtjeve. Pokušaj ponovno za nekoliko minuta.",
+      "startNotAllowed": "Nemaš dozvolu za pokretanje pregleda za taj {{requestNoun}}. Provjeri svoje dozvole i plan svoje organizacije.",
+      "startProviderNeedsAttention": "Ručni pregledi zahtijevaju standardnu vezu s {{provider}}om. Poveži je i pokušaj ponovno.",
+      "startAlreadyRunning": "Pregled za taj {{requestNoun}} već je u tijeku.",
+      "startRejected": "Taj {{requestNoun}} nije moguće pregledati. Provjeri je li otvoren, nije li u nacrtu i je li URL ispravan.",
+      "startProviderUnavailable": "Nije moguće povezati se s {{provider}}om i pročitati taj {{requestNoun}}. Pokušaj ponovno.",
+      "startFailed": "Nije moguće pokrenuti pregled. Provjeri internetsku vezu i pokušaj ponovno."
     },
     "notConnectedReadOnly": "{{platform}} nije povezan. Samo vlasnici organizacije i administratori mogu ga povezati.",
     "gitlab": {

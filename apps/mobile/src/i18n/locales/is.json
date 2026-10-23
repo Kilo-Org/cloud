@@ -1480,7 +1480,15 @@
       "instructions": "Leiðbeiningar (valfrjálsar)",
       "instructionsPlaceholder": "Sérstök atriði til að leggja áherslu á…",
       "starting": "Hef yfirferð…",
-      "start": "Hefja yfirferð"
+      "start": "Hefja yfirferð",
+      "startNotFound": "Gat ekki lesið þessa {{requestNoun}} frá {{provider}}. Athugaðu URL-slóðina og að geymslan sé aðgengileg.",
+      "startRateLimited": "{{provider}} er að takmarka beiðnir eins og er. Reyndu aftur eftir nokkrar mínútur.",
+      "startNotAllowed": "Þú hefur ekki aðgang til að hefja yfirferð á þessari {{requestNoun}}. Athugaðu heimildir þínar og áætlun fyrirtækis þíns.",
+      "startProviderNeedsAttention": "Handvirk yfirferð krefst staðlaðrar tengingar við {{provider}}. Tengdu hana og reyndu aftur.",
+      "startAlreadyRunning": "Yfirferð á viðkomandi {{requestNoun}} er þegar í gangi.",
+      "startRejected": "Ekki er hægt að yfirfara viðkomandi {{requestNoun}}. Gakktu úr skugga um að hún sé opin og ekki drög og að URL-slóðin sé rétt.",
+      "startProviderUnavailable": "Ekki tókst að ná sambandi við {{provider}} til að lesa viðkomandi {{requestNoun}}. Reyndu aftur.",
+      "startFailed": "Ekki tókst að hefja yfirferð. Athugaðu nettenginguna þína og reyndu aftur."
     },
     "notConnectedReadOnly": "{{platform}} er ekki tengt. Aðeins eigendur fyrirtækisins og stjórnendur geta tengt það.",
     "gitlab": {

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { currentRouteHref } from '@/lib/current-route-href';
 import { LAST_ROUTE_KEY } from '@/lib/storage-keys';
 import { isConcreteLastRouteHref } from '@/lib/last-route-recordable';
 import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
@@ -84,7 +85,8 @@ function parseStoredRecord(raw: string): LastRouteRecord | null {
     // A record written before hrefs were concrete names a route pattern
     // (`profiles/[profileId]/variables`); restoring it opens a screen whose
     // data reads cannot resolve, so it is dropped instead of replayed once.
-    return isConcreteLastRouteHref(result.data.href) ? result.data : null;
+    const href = currentRouteHref(result.data.href);
+    return isConcreteLastRouteHref(href) ? { ...result.data, href } : null;
   } catch {
     return null;
   }

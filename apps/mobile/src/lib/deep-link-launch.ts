@@ -7,6 +7,7 @@ import {
   SESSION_RESUME_ANCHOR_PARAM,
 } from '@kilocode/app-shared/universal-links';
 
+import { currentRouteHref } from './current-route-href';
 import { PENDING_DEEP_LINK_KEY } from './storage-keys';
 import { APP_SCHEME, isSystemSearchFamilyLink } from './system-search-families';
 
@@ -454,7 +455,7 @@ function parsePendingDeepLinkRecord(raw: string): PendingDeepLinkRecord | null {
   try {
     const parsed: unknown = JSON.parse(raw);
     const result = pendingDeepLinkRecordSchema.safeParse(parsed);
-    return result.success ? result.data : null;
+    return result.success ? { ...result.data, href: currentRouteHref(result.data.href) } : null;
   } catch {
     return null;
   }

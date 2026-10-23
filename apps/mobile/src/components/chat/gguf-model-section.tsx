@@ -74,9 +74,10 @@ export function GgufDownloadControls({
   // A voice-control user asks for the row by what it shows, so the accessible
   // name starts with that visible label and appends the one detail that tells
   // the rows apart. Callers pass data (a quant label, a model name), never a
-  // whole sentence, so no wording can drop the visible label.
-  const downloadA11yLabel =
-    downloadDetail === undefined ? undefined : `${downloadText} (${downloadDetail})`;
+  // whole sentence, so no wording can drop the visible label. A blank detail
+  // names nothing, so the name stays the visible label alone.
+  const detail = downloadDetail?.trim();
+  const downloadA11yLabel = detail ? `${downloadText} (${detail})` : undefined;
   return (
     <>
       {record !== undefined && (

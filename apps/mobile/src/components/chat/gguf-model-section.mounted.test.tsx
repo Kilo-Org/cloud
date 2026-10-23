@@ -69,4 +69,11 @@ describe('the model download button name', () => {
     expect(label).toBeUndefined();
     expect(visible).not.toBe('');
   });
+
+  it('ignores a blank detail instead of naming the button with empty brackets', async () => {
+    const { label, visible } = await downloadButton('   ');
+
+    expect(label).toBeUndefined();
+    expect(visible).not.toBe('');
+  });
 });

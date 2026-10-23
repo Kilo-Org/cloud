@@ -828,7 +828,10 @@ describe('/api/auto-routing/custom-routers', () => {
       });
       const added = clientEntry('local-model');
       const response = await updateRouter(
-        request('/user/coding', { method: 'PATCH', body: { entries: [entry, added] } }),
+        request('/user/coding', {
+          method: 'PATCH',
+          body: { entries: [entry, added], defaultEntryKey: customRouterEntryKey(entry) },
+        }),
         params('user', 'coding')
       );
 
@@ -862,7 +865,10 @@ describe('/api/auto-routing/custom-routers', () => {
       mockedRegister.mockClear();
       const entry = { ...gateway(BYOK), measuredAs: SONNET };
       const response = await updateRouter(
-        request('/user/coding', { method: 'PATCH', body: { entries: [entry] } }),
+        request('/user/coding', {
+          method: 'PATCH',
+          body: { entries: [entry], defaultEntryKey: customRouterEntryKey(entry) },
+        }),
         params('user', 'coding')
       );
 

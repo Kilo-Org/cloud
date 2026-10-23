@@ -193,9 +193,13 @@ production and staging deployments. To deploy it individually, dispatch that
 workflow with `worker: services/usage-ingest` and `target_environment: production`
 or `staging`.
 
-Staging requires manually created, verified EU queues before deployment. Both CI
-upload attempts disable automatic provisioning; CI does not create EU resources
-or verify their jurisdiction. The existing private Frankfurt relay deploys first.
+Normal staging CI has one EU queue preparation step before any Worker upload.
+It reads queue names from `wrangler.jsonc` and jurisdiction/retention from
+[`queues.staging.json`](queues.staging.json), creates missing resources with
+explicit EU jurisdiction, and verifies/reuses compatible existing resources.
+Wrong/unknown metadata stops deployment. Then the existing Frankfurt relay
+and consumer deploy in order; both consumer upload attempts disable Wrangler's
+global auto-provisioning. See [setup and operational detachment](eu-queues.md).
 Production keeps automatic provisioning and its original names/policy.
 `USAGE_INGEST_QUEUE` binds the source and `USAGE_INGEST_DLQ` binds its matching DLQ;
 only the source has a consumer. Exhausted failures route to that DLQ.
@@ -204,7 +208,8 @@ To deploy directly from the repository root with Wrangler authenticated to the
 account in `wrangler.jsonc`:
 
 ```bash
-# Staging
+# Staging: use the same preparation entrypoint as CI, then existing deploy commands.
+pnpm --filter cloudflare-usage-ingest queues:prepare
 pnpm --filter cloudflare-usage-ingest exec wrangler deploy --config wrangler.writer-relay.jsonc
 pnpm --filter cloudflare-usage-ingest exec wrangler deploy --env staging --experimental-provision=false
 
@@ -241,6 +246,7 @@ pnpm install --frozen-lockfile
 pnpm --filter cloudflare-usage-ingest types
 pnpm --filter cloudflare-usage-ingest typecheck
 pnpm --filter cloudflare-usage-ingest lint
+pnpm --filter cloudflare-usage-ingest test:queues
 pnpm --filter cloudflare-usage-ingest test
 pnpm --filter cloudflare-usage-ingest exec wrangler deploy --dry-run
 pnpm --filter cloudflare-usage-ingest exec wrangler deploy --dry-run --env staging --experimental-provision=false

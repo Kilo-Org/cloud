@@ -31,6 +31,14 @@ test('both Worker deployment paths deploy the private relay before the staging u
     const checkIndex = steps.findIndex(step => step.id === 'usage_relay');
     const consumerIndex = steps.findIndex(step => step.name === 'Deploy to Cloudflare Workers');
     assert.ok(checkIndex > steps.findIndex(step => step.name === 'Install dependencies'));
+    const prepareIndex = steps.findIndex(step => step.name === 'Prepare staging EU queues');
+    assert.ok(checkIndex < prepareIndex && prepareIndex < relayIndex);
+    assert.equal(steps[prepareIndex].if, "steps.usage_relay.outputs.queues_required == 'true'");
+    assert.equal(steps[prepareIndex]['continue-on-error'], undefined);
+    assert.equal(
+      steps[prepareIndex].env.CLOUDFLARE_API_TOKEN,
+      '${{ secrets.CLOUDFLARE_API_TOKEN }}'
+    );
     assert.ok(checkIndex < relayIndex);
     assert.ok(relayIndex < consumerIndex);
     const relay = steps[relayIndex];
@@ -68,9 +76,7 @@ test('both Worker deployment paths deploy the private relay before the staging u
     assert.equal(
       steps[consumerIndex].with.command,
       "${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} " +
-        '${{ ' +
-        selector +
-        " == 'services/usage-ingest' && inputs.target_environment == 'staging' && '--experimental-provision=false' || '' }}"
+        "${{ steps.usage_relay.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}"
     );
   }
 });
@@ -89,7 +95,17 @@ test('initial and retry uploads disable auto-provisioning only for staging usage
               runInNewContext(expression, {
                 inputs: { worker, target_environment: environment },
                 matrix: { worker },
-                steps: { runtime: { outputs: { command: runtimeCommand } } },
+                steps: {
+                  runtime: { outputs: { command: runtimeCommand } },
+                  usage_relay: {
+                    outputs: {
+                      queues_required:
+                        worker === 'services/usage-ingest' && environment === 'staging'
+                          ? 'true'
+                          : '',
+                    },
+                  },
+                },
                 format: (_, value) => `deploy --env ${value}`,
               })
             );
@@ -106,6 +122,165 @@ test('initial and retry uploads disable auto-provisioning only for staging usage
         }
       }
     }
+  }
+});
+
+test('one EU preparation runs before uploads in both jobs; retries and historical sources keep their paths', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'usage-eu-ci-'));
+  const service = new URL('../services/usage-ingest/', import.meta.url);
+  try {
+    symlinkSync(fileURLToPath(new URL('node_modules', service)), join(directory, 'node_modules'));
+    mkdirSync(join(directory, 'scripts'));
+    writeFileSync(join(directory, 'package.json'), '{"scripts":{}}');
+    const config = readFileSync(new URL('wrangler.jsonc', service), 'utf8');
+    const helper = readFileSync(new URL('scripts/provision-queues.mjs', service));
+    const policy = readFileSync(new URL('queues.staging.json', service), 'utf8');
+    const output = join(directory, 'output');
+    const calls = join(directory, 'calls');
+    const preload = join(directory, 'api.mjs');
+    writeFileSync(
+      preload,
+      `import { appendFileSync } from 'node:fs';
+      globalThis.fetch = async (url, options) => {
+        if (!String(url).startsWith('https://api.cloudflare.com/client/v4/accounts/e115e769bcdd4c3d66af59d3332cb394/queues')) throw new Error('Unexpected hosted request');
+        if(options.headers.Authorization !== 'Bearer synthetic-ci-token' || options.method !== 'GET') throw new Error('Unexpected request');
+        appendFileSync(process.env.DEPLOY_CALLS, 'metadata\\n');
+        const queues = ['usage-ingest-processing-dlq-staging-eu','usage-ingest-processing-staging-eu'].map((queue_name,index)=>({queue_name,queue_id:String(index+1).padStart(32,'0'),jurisdiction:process.env.WRONG_JURISDICTION==='true'?'us':'eu',settings:{message_retention_period:345600},consumers:[],consumers_total_count:0}));
+        const parsed=new URL(url); const name=parsed.searchParams.get('name');
+        return Response.json({success:true,result:name?queues.filter(q=>q.queue_name===name):queues.find(q=>q.queue_id===parsed.pathname.split('/').at(-1)),result_info:{total_pages:1}});
+      };`
+    );
+    for (const job of ['deploy-manual', 'deploy-changed']) {
+      const steps = workers.jobs[job].steps;
+      const check = steps.find(step => step.id === 'usage_relay');
+      const prepare = steps.find(step => step.name === 'Prepare staging EU queues');
+      const relay = steps.find(step => step.name === 'Deploy private staging usage writer relay');
+      const first = steps.find(step => step.id === 'deploy');
+      const retry = steps.find(step => step.name === 'Deploy to Cloudflare Workers (retry)');
+      const command = (step, historical) =>
+        step.with.command.replace(/\$\{\{(.*?)\}\}/g, (_, expression) =>
+          runInNewContext(expression, {
+            inputs: { worker: 'services/usage-ingest', target_environment: 'staging' },
+            matrix: { worker: 'services/usage-ingest' },
+            steps: {
+              runtime: { outputs: {} },
+              usage_relay: { outputs: { queues_required: historical ? 'false' : 'true' } },
+            },
+            format: (_, value) => `deploy --env ${value}`,
+          })
+        );
+      for (const scenario of [
+        'current-retry',
+        'historical-direct',
+        'historical-relay',
+        'missing-helper',
+        'missing-policy',
+        'wrong-policy',
+        'wrong-jurisdiction',
+      ]) {
+        const historical = scenario.startsWith('historical');
+        let selected = historical
+          ? config
+              .replaceAll('usage-ingest-processing-staging-eu', 'usage-ingest-processing-staging')
+              .replaceAll(
+                'usage-ingest-processing-dlq-staging-eu',
+                'usage-ingest-processing-dlq-staging'
+              )
+          : config;
+        if (scenario === 'historical-direct')
+          selected = selected.replace(
+            '"services": [{ "binding": "USAGE_WRITER_RELAY", "service": "usage-writer-relay-staging" }]',
+            '"services": []'
+          );
+        writeFileSync(join(directory, 'wrangler.jsonc'), selected);
+        writeFileSync(join(directory, 'wrangler.writer-relay.jsonc'), '{}');
+        for (const path of ['scripts/provision-queues.mjs', 'queues.staging.json'])
+          rmSync(join(directory, path), { force: true });
+        if (!historical && scenario !== 'missing-helper')
+          writeFileSync(join(directory, 'scripts/provision-queues.mjs'), helper);
+        if (!historical && scenario !== 'missing-policy')
+          writeFileSync(
+            join(directory, 'queues.staging.json'),
+            scenario === 'wrong-policy' ? policy.replace('"eu"', '"us"') : policy
+          );
+        writeFileSync(output, '');
+        writeFileSync(calls, '');
+        const result = spawnSync(
+          'bash',
+          [
+            '-e',
+            '-c',
+            `
+          consumer_calls=0
+          wrangler() {
+            printf 'upload %s\\n' "$*" >> "$DEPLOY_CALLS"
+            if [ "$1 $2" != 'deploy --config' ]; then
+              consumer_calls=$((consumer_calls+1))
+              if [ "$FAIL_FIRST" = true ] && [ "$consumer_calls" = 1 ]; then return 17; fi
+            fi
+          }
+          ${check.run}
+          if grep -q '^queues_required=true$' "$GITHUB_OUTPUT"; then ${prepare.run}; fi
+          if grep -q '^required=true$' "$GITHUB_OUTPUT"; then wrangler ${relay.with.command}; fi
+          ${first.with.preCommands}
+          if wrangler ${command(first, historical)}; then :; else
+            ${retry.with.preCommands}
+            wrangler ${command(retry, historical)}
+          fi
+        `,
+          ],
+          {
+            cwd: directory,
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              GITHUB_OUTPUT: output,
+              DEPLOY_CALLS: calls,
+              FAIL_FIRST: String(scenario === 'current-retry'),
+              WRONG_JURISDICTION: String(scenario === 'wrong-jurisdiction'),
+              CLOUDFLARE_API_TOKEN: 'synthetic-ci-token',
+              NODE_OPTIONS: `--import=${preload}`,
+              WRANGLER_SEND_METRICS: 'false',
+              WRANGLER_LOG_PATH: join(directory, 'wrangler.log'),
+              XDG_CONFIG_HOME: directory,
+            },
+          }
+        );
+        const recorded = readFileSync(calls, 'utf8').trim().split('\n').filter(Boolean);
+        const uploads = recorded.filter(line => line.startsWith('upload'));
+        if (scenario === 'current-retry' || historical) {
+          assert.equal(result.status, 0, `${job}/${scenario}: ${result.stderr}`);
+          assert.equal(
+            uploads.length,
+            scenario === 'current-retry' ? 3 : scenario === 'historical-relay' ? 2 : 1
+          );
+          assert.equal(
+            uploads.at(-1).trim(),
+            historical
+              ? 'upload deploy --env staging'
+              : 'upload deploy --env staging --experimental-provision=false'
+          );
+          if (historical) assert.ok(recorded.every(line => line.startsWith('upload')));
+          else {
+            assert.equal(
+              recorded.filter(line => line === 'metadata').length,
+              8,
+              'one preparation for both upload attempts'
+            );
+            assert.ok(recorded.slice(0, 8).every(line => line === 'metadata'));
+          }
+        } else {
+          assert.notEqual(result.status, 0, `${job}/${scenario} must stop`);
+          assert.deepEqual(
+            uploads,
+            [],
+            `${job}/${scenario}: no Worker uploads before valid EU preparation`
+          );
+        }
+      }
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
   }
 });
 
@@ -141,6 +316,18 @@ test('selected source controls the relay requirement and failures stop consumer 
             env: {
               staging: {
                 name: 'usage-ingest-staging',
+                queues: {
+                  producers: [
+                    { binding: 'USAGE_INGEST_QUEUE', queue: 'usage-ingest-processing-staging' },
+                    { binding: 'USAGE_INGEST_DLQ', queue: 'usage-ingest-processing-dlq-staging' },
+                  ],
+                  consumers: [
+                    {
+                      queue: 'usage-ingest-processing-staging',
+                      dead_letter_queue: 'usage-ingest-processing-dlq-staging',
+                    },
+                  ],
+                },
                 ...(required
                   ? {
                       services: [

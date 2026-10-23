@@ -1,74 +1,64 @@
-# One-time staging EU queue setup
+# Staging EU queue provisioning
 
-Staging connects `usage-ingest-processing-staging-eu` and its matching DLQ
-`usage-ingest-processing-dlq-staging-eu`, with **one EU consumer: cap200, batch1**.
-The private Frankfurt relay and shared writer stay unchanged; production is untouched.
-The original global pair remains disconnected, with no drain/fallback consumer.
+Queue names and the single consumer are declared in `wrangler.jsonc`:
+`usage-ingest-processing-staging-eu` and `usage-ingest-processing-dlq-staging-eu`,
+**one consumer at cap200/batch1**. [`queues.staging.json`](queues.staging.json)
+declares `jurisdiction: eu` and four-day retention (`345600` seconds) for both.
+Production, the private Frankfurt relay, shared writer and retries stay unchanged.
 
-## Manual setup before deployment
+## Normal deployment
 
-An authorized operator performs this once; CI never provisions these EU queues.
-Pause staging intake and confirm the previous run is reconciled: no source/DLQ
-messages, pending retries, in-flight work or unresolved accepted usage IDs before
-switching. If anything remains, hold the switch and resolve it first.
-While paused and empty, manually disconnect `usage-ingest-staging` from the old
-source in the dashboard before deploying the EU consumer. Removing a Wrangler
-consumer entry alone does not guarantee its remote attachment is deleted.
+Existing staging CI performs one **Prepare staging EU queues** step before any
+Worker upload. The same [entrypoint](scripts/provision-queues.mjs) is available
+locally as `pnpm --filter cloudflare-usage-ingest queues:prepare`, followed by the
+existing relay and consumer deploy commands in README. It uses the already
+injected `CLOUDFLARE_API_TOKEN`; no credentials file or login flow is loaded.
 
-1. In account `e115e769bcdd4c3d66af59d3332cb394`, inspect both exact EU names in
-   the dashboard/API. Reuse existing resources only after checking their IDs,
-   `jurisdiction: eu`, four-day retention (`345600` seconds), and consumer ownership:
-   source unconsumed or owned only by `usage-ingest-staging` with the matching EU
-   DLQ; DLQ unconsumed. Unknown/mismatching metadata means stop. Never change a
-   jurisdiction or delete/recreate an existing queue.
-2. Only for a confirmed missing resource, use the dashboard's EU jurisdiction
-   selector or these REST requests with an already injected token. Create the DLQ
-   first, read it back, then create the source. Do not assume pinned Wrangler's
-   `queues create` supports a jurisdiction flag.
+Preparation looks up exact names and verifies both existing resources before
+creating anything. Only missing resources are created through the official REST
+API with explicit EU jurisdiction and retention, DLQ first and independently
+read back before source creation. Compatible resources are reused on redeploy;
+wrong/unknown jurisdiction, retention, identity or consumer metadata, ambiguous
+names, incomplete pagination and API/network errors stop before uploads.
+The source must have no consumer or the expected `usage-ingest-staging` Worker
+with the matching EU DLQ; the DLQ must be unconsumed. Nothing is deleted or patched.
+A failed/lost create response can leave an accepted resource intact: rerun normal
+deployment to discover and verify it. Do not delete/recreate it.
 
-```bash
-# Run each POST only if that exact resource is absent.
-curl --fail-with-body 'https://api.cloudflare.com/client/v4/accounts/e115e769bcdd4c3d66af59d3332cb394/queues' \
-  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H 'Content-Type: application/json' \
-  --data '{"queue_name":"usage-ingest-processing-dlq-staging-eu","jurisdiction":"eu","settings":{"message_retention_period":345600}}'
+Both initial/retry consumer uploads retain `--experimental-provision=false`.
+Pinned Wrangler4.135.0 has no native Queue jurisdiction config field and its
+normal auto-create omits jurisdiction. The extra step supplies this required
+creation parameter without upgrading Wrangler or wrapping deployment. Historical
+selected sources with the original global pair skip this step and keep native
+provisioning; production and other Workers keep their existing paths.
 
-# Read back the DLQ and confirm its metadata before this source POST.
-curl --fail-with-body 'https://api.cloudflare.com/client/v4/accounts/e115e769bcdd4c3d66af59d3332cb394/queues' \
-  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H 'Content-Type: application/json' \
-  --data '{"queue_name":"usage-ingest-processing-staging-eu","jurisdiction":"eu","settings":{"message_retention_period":345600}}'
+## One-time operational prerequisite: detach the old consumer
 
-# Repeat for each actual queue ID from lookup/create; check success and result.
-curl --fail-with-body "https://api.cloudflare.com/client/v4/accounts/e115e769bcdd4c3d66af59d3332cb394/queues/$QUEUE_ID" \
-  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"
-```
+Automatic queue creation does not detach an existing consumer. Before first EU
+cutover, pause staging intake and confirm no source/DLQ messages, pending retries,
+in-flight work or unresolved accepted IDs remain. While paused and reconciled
+empty, manually detach `usage-ingest-staging` from the original source in the
+dashboard. Removing its Wrangler config entry alone does not prove detachment.
+Then run normal staging deployment. Before resuming, read back actual queue
+jurisdictions/IDs and Worker bindings/attachments: only the EU source has the
+consumer at cap200/batch1; both old resources/messages stay intact and disconnected.
+Optional later deletion is a separate operational decision. No automated migration,
+drain, fallback or dual consumption is supplied.
 
-3. Independently GET both actual IDs and verify the metadata above before upload;
-   a name ending in `-eu` is insufficient. If a POST response is lost, inspect/reuse
-   the existing resource rather than blindly retrying creation.
-4. Use normal staging CI (relay first), or the guarded direct commands in README.
-   Both CI initial/retry consumer commands use `--experimental-provision=false`.
-   Pinned Wrangler4.135.0 otherwise creates missing producer queues without a
-   jurisdiction; the flag disables that provisioning path. It does **not** verify
-   existing jurisdiction. Do not omit the flag or bypass manual readback.
-5. Before resuming traffic, inspect the deployed version/bindings and confirm only
-   the EU source has the staging consumer at cap200/batch1 and the old source is
-   disconnected. Leave both old resources/messages intact; optional deletion is a
-   separate later operation after proving them empty and unreferenced.
+For observations, keep the Worker service, usage IDs and persistence metrics;
+use actual EU source/DLQ IDs for GraphQL `queueID`/backlog/DLQ selectors and EU
+queue names for processing-log filters. Queue jurisdiction is not Worker placement
+or evidence of a latency improvement.
 
-For later observations, keep the same Worker service, usage IDs and persistence
-metrics; switch processing-log queue filters and GraphQL `queueID`/backlog/DLQ
-selectors to the actual EU source/DLQ IDs. Do not reuse old IDs or rewrite history.
-EU jurisdiction restricts Queue storage/processing, not Worker placement, and is
-not evidence of a latency improvement.
+## Manual routing revert
 
-## Manual routing rollback
-
-Pause/reconcile EU work, then manually detach its only consumer in the dashboard.
-Change the two staging
-producer names and the single consumer source/DLQ back to the verified original
-pair, then redeploy reviewed config with provisioning disabled and verify bindings.
-This reconnects only the original consumer at cap200/batch1; no dual consumption,
-automatic drain, migration or deletion is provided. Preserve the relay and writer.
+Pause and reconcile the EU pair empty, manually detach its active consumer, revert
+both staging bindings and the single consumer source/DLQ to the verified original
+pair, and deploy reviewed config through normal staging CI. Keep the relay and
+both pairs intact; verify the resulting single attachment before resuming intake.
+This is an operational detach plus config redeploy, with no resource deletion or
+jurisdiction change. EU preparation is skipped for the original global topology.
 
 References: [jurisdiction and matching DLQ](https://developers.cloudflare.com/queues/configuration/data-location/),
-[Create Queue REST contract](https://developers.cloudflare.com/api/resources/queues/methods/create/).
+[Create Queue API](https://developers.cloudflare.com/api/resources/queues/methods/create/),
+[Get Queue API](https://developers.cloudflare.com/api/resources/queues/methods/get/).

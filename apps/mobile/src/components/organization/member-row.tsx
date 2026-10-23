@@ -1,16 +1,16 @@
-import { useActionSheet } from '@expo/react-native-action-sheet';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { useConfirmDialog } from '@/components/ui/dialog';
+import { MenuSheet, type MenuSheetOption } from '@/components/ui/menu-sheet';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatMoney } from '@/lib/format';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { type ActiveOrgMember, type OrgRole } from '@/lib/hooks/use-organization-queries';
-import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { cn, firstNonEmpty } from '@/lib/utils';
 
 type MemberRowProps = {
@@ -46,32 +46,52 @@ export function MemberRow({
   const router = useRouter();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
-  const { showActionSheetWithOptions } = useActionSheet();
-  const themedSheet = useThemedActionSheetOptions();
   const mutations = useOrganizationMutations(organizationId);
   const displayName = firstNonEmpty(member.name, member.email);
+  const [menu, setMenu] = useState<'actions' | 'role' | null>(null);
+  // The action a chosen row will run once its menu is gone. The menu's window
+  // owns the back key until it finishes dismissing, so running the choice only
+  // after that keeps a Back press in that window a real cancel instead of a
+  // race with the route it is opening.
+  const pendingActionRef = useRef<(() => void) | null>(null);
+  const menuDismissedItselfRef = useRef(false);
 
-  function openRoleSheet() {
-    const options = [...ROLE_OPTIONS.map(role => roleLabel(role)), t('common.cancel')];
-    showActionSheetWithOptions(
+  function runPendingAction() {
+    const action = pendingActionRef.current;
+    pendingActionRef.current = null;
+    const dismissedItself = menuDismissedItselfRef.current;
+    menuDismissedItselfRef.current = false;
+    if (action && !dismissedItself) {
+      action();
+    }
+  }
+
+  function chooseAction(action: () => void) {
+    pendingActionRef.current = action;
+    menuDismissedItselfRef.current = false;
+    setMenu(null);
+  }
+
+  function markMenuDismissedItself() {
+    menuDismissedItselfRef.current = true;
+    return true;
+  }
+
+  const roleOptions: MenuSheetOption[] = ROLE_OPTIONS.map(role => ({ label: roleLabel(role) }));
+
+  const actionOptions: MenuSheetOption[] = [
+    { label: t('organization.members.changeRole') },
+    ...(enableUsageLimits ? [{ label: t('organization.members.setDailyUsageLimit') }] : []),
+    { label: t('organization.members.removeMember'), destructive: true },
+  ];
+
+  function onSelectRole(role: OrgRole) {
+    mutations.updateMember.mutate(
+      { memberId: member.id, role },
       {
-        ...themedSheet,
-        options,
-        cancelButtonIndex: options.length - 1,
-      },
-      index => {
-        const role = index !== undefined ? ROLE_OPTIONS[index] : undefined;
-        if (!role) {
-          return;
-        }
-        mutations.updateMember.mutate(
-          { memberId: member.id, role },
-          {
-            onSuccess: () => {
-              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            },
-          }
-        );
+        onSuccess: () => {
+          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        },
       }
     );
   }
@@ -94,36 +114,24 @@ export function MemberRow({
     });
   }
 
-  function openActions() {
-    const changeRoleLabel = t('organization.members.changeRole');
-    const setDailyUsageLimitLabel = t('organization.members.setDailyUsageLimit');
-    const removeMemberLabel = t('organization.members.removeMember');
-    const options = [
-      changeRoleLabel,
-      ...(enableUsageLimits ? [setDailyUsageLimitLabel] : []),
-      removeMemberLabel,
-      t('common.cancel'),
-    ];
-    showActionSheetWithOptions(
-      {
-        ...themedSheet,
-        options,
-        cancelButtonIndex: options.length - 1,
-        destructiveButtonIndex: options.length - 2,
-      },
-      index => {
-        const label = index !== undefined ? options[index] : undefined;
-        if (label === changeRoleLabel) {
-          openRoleSheet();
-        } else if (label === setDailyUsageLimitLabel) {
-          router.push(
-            `/(app)/(tabs)/(3_profile)/organization/member-limit?memberId=${member.id}` as Href
-          );
-        } else if (label === removeMemberLabel) {
-          confirmRemove();
-        }
-      }
-    );
+  function actionFor(index: number): (() => void) | null {
+    const label = actionOptions[index]?.label;
+    if (label === t('organization.members.changeRole')) {
+      return () => {
+        setMenu('role');
+      };
+    }
+    if (label === t('organization.members.setDailyUsageLimit')) {
+      return () => {
+        router.push(
+          `/(app)/(tabs)/(3_profile)/organization/member-limit?memberId=${member.id}` as Href
+        );
+      };
+    }
+    if (label === t('organization.members.removeMember')) {
+      return confirmRemove;
+    }
+    return null;
   }
 
   const inner = (
@@ -168,14 +176,54 @@ export function MemberRow({
   }
 
   return (
-    <Pressable
-      onPress={openActions}
-      accessibilityRole="button"
-      accessibilityLabel={t('organization.members.manageA11y', { name: displayName })}
-      className="px-3 active:opacity-70"
-    >
-      {inner}
-      {dialog}
-    </Pressable>
+    <>
+      <Pressable
+        onPress={() => {
+          setMenu('actions');
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={t('organization.members.manageA11y', { name: displayName })}
+        className="px-3 active:opacity-70"
+      >
+        {inner}
+        {dialog}
+      </Pressable>
+      <MenuSheet
+        visible={menu === 'actions'}
+        title={displayName}
+        options={actionOptions}
+        cancelLabel={t('common.cancel')}
+        onClose={() => {
+          setMenu(null);
+        }}
+        onDismiss={runPendingAction}
+        onRequestDismiss={markMenuDismissedItself}
+        onSelect={index => {
+          const action = actionFor(index);
+          if (action) {
+            chooseAction(action);
+          }
+        }}
+      />
+      <MenuSheet
+        visible={menu === 'role'}
+        title={t('organization.members.changeRole')}
+        options={roleOptions}
+        cancelLabel={t('common.cancel')}
+        onClose={() => {
+          setMenu(null);
+        }}
+        onDismiss={runPendingAction}
+        onRequestDismiss={markMenuDismissedItself}
+        onSelect={index => {
+          const role = ROLE_OPTIONS[index];
+          if (role) {
+            chooseAction(() => {
+              onSelectRole(role);
+            });
+          }
+        }}
+      />
+    </>
   );
 }

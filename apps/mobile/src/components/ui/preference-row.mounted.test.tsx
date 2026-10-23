@@ -178,8 +178,7 @@ describe('PreferenceRow', () => {
 
     // Only the visible copy is painted.
     const overlay = root.find(
-      node =>
-        Object.is(node.type, 'View') && node.props.className === 'absolute inset-x-0 top-0'
+      node => Object.is(node.type, 'View') && node.props.className === 'absolute inset-x-0 top-0'
     );
     expect(textOf(overlay)).toEqual(['Applies now']);
 

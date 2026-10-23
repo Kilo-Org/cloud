@@ -314,9 +314,9 @@ describe('GeneralSettingsScreen', () => {
       'No effect while thinking details are hidden.',
     ]);
     // The row that hides thinking stays the independent switch the person uses to undo this.
-    expect(switchByLabel(renderer, 'Hide thinking details')?.props.accessibilityState).toMatchObject(
-      { checked: true, disabled: false }
-    );
+    expect(
+      switchByLabel(renderer, 'Hide thinking details')?.props.accessibilityState
+    ).toMatchObject({ checked: true, disabled: false });
   });
 
   it('restores the auto-expand row when thinking details are shown again', async () => {

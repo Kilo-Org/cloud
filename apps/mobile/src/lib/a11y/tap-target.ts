@@ -94,22 +94,29 @@ export function compactControlTargetDp(): number {
 }
 
 /**
- * The height class a text-only action renders so its own node carries the
- * platform's minimum touch target: `DESIGN.md:364`'s 44pt on iOS and
+ * The box a text-only action renders so its own node carries the platform's
+ * minimum touch target: `DESIGN.md:364`'s 44pt on iOS and
  * {@link ICON_TARGET_DP}'s 48dp on Android. The agents history link is one such
  * action: its label is a single eyebrow line, so without a box of its own the
  * node's rect is that line (measured 14.7pt on device) and a control-size audit
  * reads exactly that rect — `hitSlop` widens the touch region, not the rect.
  *
+ * Both axes are minimums because a caller drops its hit slop: a short label
+ * (`common.done` in Arabic or Japanese, `chat.messageActions.edit`) is only a
+ * couple of glyphs wide, so a height floor alone would leave the rect under
+ * {@link MIN_TAP_TARGET_DP} horizontally. The label centres in the wider box
+ * (`items-center justify-center`), the same form as the voice-test field's
+ * compact text control, so a long label is untouched.
+ *
  * Explicit px, because NativeWind's rem is 14pt here: `min-h-11` renders
- * 38.5pt, under both minimums. It is a minimum, not a fixed height, so a label
+ * 38.5pt, under both minimums. They are minimums, not fixed sizes, so a label
  * scaled by large Dynamic Type still grows the frame. Read at render time
  * rather than captured in a module constant, so it follows the platform (the
- * trap `attachment-preview-strip.tsx` documents); the two utilities stay
- * spelled out because NativeWind extracts them from the source text.
+ * trap `attachment-preview-strip.tsx` documents); the utilities stay spelled
+ * out because NativeWind extracts them from the source text.
  */
 export function textActionTargetClass(): string {
-  return Platform.OS === 'android' ? 'min-h-[48px]' : 'min-h-[44px]';
+  return Platform.OS === 'android' ? 'min-h-[48px] min-w-[48px]' : 'min-h-[44px] min-w-[44px]';
 }
 
 /**

@@ -73,6 +73,17 @@ describe('selectPrReviewGateView — GitLab (personal and org)', () => {
       expect(selectPrReviewGateView({ ...base, isError: true, connected: false })).toBe('error');
     });
 
+    it(`scope ${organizationId ?? 'personal'}: a failed check outranks a reconnect marker`, () => {
+      expect(
+        selectPrReviewGateView({
+          ...base,
+          isError: true,
+          connected: false,
+          reconnectRequired: true,
+        })
+      ).toBe('error');
+    });
+
     it(`scope ${organizationId ?? 'personal'}: a pending check is loading, not Connect`, () => {
       expect(selectPrReviewGateView({ ...base, isLoading: true, connected: false })).toBe(
         'loading'

@@ -37,7 +37,7 @@ export function AgentVariantPicker({
             <Pressable
               key={option}
               className={cn(
-                'min-h-11 items-center justify-center rounded-full px-4 active:opacity-70',
+                'min-h-[44px] items-center justify-center rounded-full px-4 active:opacity-70',
                 selected ? 'bg-foreground' : 'bg-secondary'
               )}
               disabled={disabled}

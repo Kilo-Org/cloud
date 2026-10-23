@@ -88,11 +88,20 @@ describe('getEmptyStateFullHeight', () => {
   });
 
   it('counts the live empty state’s stacked history link under the primary action', () => {
-    // The accepted-empty body renders the See-all history link under the New
-    // session button: a gap-3 block gap (10.5) plus one eyebrow line (17.5 at
-    // scale 1). A band that holds the single-action no-match state is then too
-    // short for the live one, and the estimate must say so.
-    expect(getEmptyStateFullHeight({ secondaryAction: true })).toBe(212);
+    // The accepted-empty body renders the history link under the New session
+    // button: a gap-3 block gap (10.5) plus the link's own box, which carries
+    // the platform touch target (44pt iOS, 48dp Android) as a px literal rather
+    // than a line of text. Modelling it as one 17.5 line under-counted the
+    // rendered control by 30dp and could keep the full form in a band that
+    // cannot hold it, leaving the link's target under the tab bar. A band that
+    // holds the single-action no-match state is then too short for the live
+    // one, and the estimate must say so.
+    expect(getEmptyStateFullHeight({ secondaryAction: true })).toBe(243);
+    // The gap plus the platform's target box, not one text line: the estimate
+    // has to carry the control's own frame.
+    expect(
+      getEmptyStateFullHeight({ secondaryAction: true }) - getEmptyStateFullHeight()
+    ).toBeGreaterThanOrEqual(58);
     expect(getEmptyStateFullHeight({ secondaryAction: true })).toBeGreaterThan(
       getEmptyStateFullHeight()
     );

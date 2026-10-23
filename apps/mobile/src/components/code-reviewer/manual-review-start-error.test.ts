@@ -76,7 +76,10 @@ describe('manualReviewStartFailureMessage', () => {
 
   it('uses the merge-request noun for GitLab', () => {
     const message = manualReviewStartFailureMessage(
-      trpcError('CONFLICT', 'A provider-publishing Code Reviewer job is already active for this change.'),
+      trpcError(
+        'CONFLICT',
+        'A provider-publishing Code Reviewer job is already active for this change.'
+      ),
       'gitlab'
     );
     expect(message).toBe('A review for that merge request is already running.');

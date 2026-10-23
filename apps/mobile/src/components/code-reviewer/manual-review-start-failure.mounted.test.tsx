@@ -227,7 +227,10 @@ describe('ManualReviewScreen start failure copy', () => {
     deadline.name = 'RequestDeadlineError';
     act(() =>
       handlers.onError?.(
-        Object.assign(new Error('TRPCClientError'), { cause: deadline, data: { code: 'NOT_FOUND' } })
+        Object.assign(new Error('TRPCClientError'), {
+          cause: deadline,
+          data: { code: 'NOT_FOUND' },
+        })
       )
     );
 

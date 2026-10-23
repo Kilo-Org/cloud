@@ -11,6 +11,7 @@ import {
   useColorScheme,
   useWindowDimensions,
   View,
+  type ViewInstance,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -19,7 +20,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 
 import { RenameModal } from '@/components/rename-modal';
 import { Text } from '@/components/ui/text';
-import { moveA11yFocus } from '@/lib/a11y/announce';
+import { requestA11yFocus } from '@/lib/a11y/announce';
 import { SESSION_TRANSCRIPT_STALE_TIME_MS } from '@/lib/agent-session-cache';
 import { useTRPC } from '@/lib/trpc';
 import { readTrpcErrorField } from '@/lib/trpc-error';
@@ -120,7 +121,7 @@ function SessionPreviewContent({
 
   const progress = useSharedValue(0);
   const dragY = useSharedValue(0);
-  const menuFirstItemRef = useRef<View>(null);
+  const menuFirstItemRef = useRef<ViewInstance>(null);
   // Read by the first row's ref callback so the callback can keep a stable
   // identity across renders (a new identity would re-fire it on every commit).
   const visibleRef = useRef(visible);
@@ -185,10 +186,10 @@ function SessionPreviewContent({
   // still null. The row's own ref callback fires exactly when the portal has
   // attached a node; the `visibleRef` guard keeps a later re-render from
   // stealing focus back after the user has moved on.
-  const setMenuFirstItem = useCallback((node: View | null) => {
+  const setMenuFirstItem = useCallback((node: ViewInstance | null) => {
     menuFirstItemRef.current = node;
     if (node && visibleRef.current) {
-      moveA11yFocus(menuFirstItemRef);
+      requestA11yFocus(menuFirstItemRef);
     }
   }, []);
 
@@ -198,7 +199,7 @@ function SessionPreviewContent({
   // mounted yet — the ref callback above owns that case.
   useEffect(() => {
     if (visible && menuFirstItemRef.current) {
-      moveA11yFocus(menuFirstItemRef);
+      requestA11yFocus(menuFirstItemRef);
     }
   }, [visible]);
 

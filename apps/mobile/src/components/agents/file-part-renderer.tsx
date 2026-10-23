@@ -44,7 +44,10 @@ function cacheFilenameForPart(part: Pick<FilePart, 'id' | 'mime' | 'filename'>):
 }
 
 /** Write a base64 `data:` payload to the cache and return the file. */
-function writeDataUrlToCache(url: string, part: Pick<FilePart, 'id' | 'mime' | 'filename'>): File {
+async function writeDataUrlToCache(
+  url: string,
+  part: Pick<FilePart, 'id' | 'mime' | 'filename'>
+): Promise<File> {
   const payload = stripDataUrlBase64Prefix(url, part.mime);
   if (payload === undefined) {
     throw new Error('decode-failed');
@@ -52,7 +55,7 @@ function writeDataUrlToCache(url: string, part: Pick<FilePart, 'id' | 'mime' | '
   const directory = new Directory(Paths.cache, CACHE_DIR_NAME);
   directory.create({ idempotent: true, intermediates: true });
   const file = new File(directory, cacheFilenameForPart(part));
-  file.write(payload, { encoding: 'base64' });
+  await file.write(payload, { encoding: 'base64' });
   return file;
 }
 
@@ -63,7 +66,7 @@ async function resolveFileText(url: string, part: Pick<FilePart, 'id' | 'mime' |
   }
 
   if (url.startsWith('data:')) {
-    const file = writeDataUrlToCache(url, part);
+    const file = await writeDataUrlToCache(url, part);
     return file.text();
   }
 
@@ -87,7 +90,7 @@ async function shareFilePart(url: string, part: FilePart): Promise<void> {
     return;
   }
   if (url.startsWith('data:')) {
-    const file = writeDataUrlToCache(url, part);
+    const file = await writeDataUrlToCache(url, part);
     await shareLocalFile(file.uri, { mimeType: part.mime });
     return;
   }

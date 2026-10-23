@@ -77,6 +77,7 @@ import {
   getCodeReviewDetailHref,
   type CodeReviewUiPlatform,
 } from '@/lib/code-reviews/code-review-links';
+import { getCodeReviewCancellationCopy } from '@/lib/code-reviews/cancellation-copy';
 import { getCodeReviewTerminalReasonCopy } from '@/lib/code-reviews/terminal-reason-copy';
 import {
   CODE_REVIEW_STATUS_LABELS,
@@ -919,13 +920,27 @@ export function CodeReviewJobsCard({
 
                       {/* Error Message. Reasons with customer-facing copy render
                           muted instead of destructive: the cause is stated
-                          plainly and nothing is broken on our side. */}
+                          plainly and nothing is broken on our side. Cancelled
+                          and interrupted rows get the same treatment. */}
                       {(() => {
                         const reasonCopy = getCodeReviewTerminalReasonCopy(review.terminal_reason);
                         if (reasonCopy) {
                           return (
                             <div className="text-muted-foreground mt-1 text-xs">
                               {reasonCopy.label}: {reasonCopy.message}
+                            </div>
+                          );
+                        }
+                        const cancellationCopy = getCodeReviewCancellationCopy({
+                          status: review.status,
+                          terminalReason: review.terminal_reason,
+                          errorMessage: review.error_message,
+                          platform: review.platform,
+                        });
+                        if (cancellationCopy) {
+                          return (
+                            <div className="text-muted-foreground mt-1 text-xs">
+                              {cancellationCopy.label}: {cancellationCopy.message}
                             </div>
                           );
                         }

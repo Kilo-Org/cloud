@@ -15,14 +15,17 @@ import { Button } from '@/components/ui/button';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { classifyProviderErrorCode } from '@/lib/code-reviewer-status';
 import { useGitHubStatus, useGitLabStatus, useReviewConfig } from '@/lib/hooks/use-code-reviewer';
 import { useCreateManualReview } from '@/lib/hooks/use-code-reviews';
 import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
 import { ManualReviewActionFooter } from './manual-review-action-footer';
 import { ManualReviewPlatformPicker } from './manual-review-platform-picker';
+import { manualReviewStartFailureMessage } from './manual-review-start-error';
 import { ManualReviewStartFeedback } from './manual-review-start-feedback';
 import { MANUAL_REVIEW_START_DEADLINE_MS, useDeadlineWatchedStart } from './deadline-watched-start';
 
@@ -119,25 +122,21 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
           onSuccess: ({ reviewId }) => {
             settle(null);
             void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            router.replace(
-              `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/reviews/${reviewId}` as Href
-            );
+            router.replace(`/(app)/code-reviewer/${scope}/reviews/${reviewId}` as Href);
           },
           onError: error => {
             // A client-deadline rejection is the stall, not a server reason:
             // render the localized wait copy instead of the raw timeout text.
             // Matched by error name, not instanceof: the deadline class can
             // cross a module boundary where its identity is lost. Anything
-            // else is the server's or transport's own message.
+            // else settles with the copy for its tRPC error code — the
+            // server's own message is English and must not reach this
+            // localized screen.
             if (isDeadlineStall(error)) {
               settle(t('common.takingLonger'));
               return;
             }
-            const message =
-              error instanceof Error && error.message
-                ? error.message
-                : t('codeReviewer.unknownError');
-            settle(message);
+            settle(manualReviewStartFailureMessage(error, platform));
           },
         }
       );
@@ -203,9 +202,9 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             // ProviderConnectCard, so the same Connect GitHub action is styled
             // the same wherever it appears.
             <Button
-              className="mt-3 w-full"
+              className={cn('mt-3 w-full', STATE_ACTION_CLASS)}
               onPress={() => {
-                router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/github` as Href);
+                router.push(`/(app)/code-reviewer/${scope}/github` as Href);
               }}
             >
               <Text>{t('common.connectGithub')}</Text>

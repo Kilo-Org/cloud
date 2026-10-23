@@ -208,9 +208,7 @@ async function render(
 ): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
-    ref.current = TestRenderer.create(
-      createElement(PlatformOverviewScreen, { scope, platform })
-    );
+    ref.current = TestRenderer.create(createElement(PlatformOverviewScreen, { scope, platform }));
     await Promise.resolve();
   });
   const renderer = ref.current;
@@ -396,7 +394,9 @@ describe('PlatformOverviewScreen actionRequired recovery', () => {
   }
 
   it('opens the GitHub App installation and re-reads the config on return', async () => {
-    config.data = makeConfig({ actionRequired: makeActionRequired('github_installation_required') });
+    config.data = makeConfig({
+      actionRequired: makeActionRequired('github_installation_required'),
+    });
 
     await pressRecovery('Update GitHub App');
 
@@ -412,7 +412,9 @@ describe('PlatformOverviewScreen actionRequired recovery', () => {
   });
 
   it('scopes the GitHub App installation to the organization', async () => {
-    config.data = makeConfig({ actionRequired: makeActionRequired('github_installation_required') });
+    config.data = makeConfig({
+      actionRequired: makeActionRequired('github_installation_required'),
+    });
 
     await pressRecovery('Update GitHub App', 'org-1');
 
@@ -473,7 +475,9 @@ describe('PlatformOverviewScreen actionRequired recovery', () => {
 
   it('keeps the label as plain text for a member who cannot edit the config', async () => {
     permission.canEdit = false;
-    config.data = makeConfig({ actionRequired: makeActionRequired('github_installation_required') });
+    config.data = makeConfig({
+      actionRequired: makeActionRequired('github_installation_required'),
+    });
 
     const renderer = await render();
     const texts = collectText(renderer.toJSON());

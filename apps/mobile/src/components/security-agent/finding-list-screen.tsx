@@ -134,15 +134,19 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   const scopedRepositories = getSecurityRepositoriesInScope(repositories.data ?? [], config.data);
   // Repos aren't known yet (still loading or the fetch failed) — the filter
   // stays disabled instead of silently offering a shrunken repository list.
+  // A failed fetch is recoverable: the inline retry above, pull-to-refresh,
+  // and the route-focus refresh all refetch the repositories query.
   const filterUnavailable = repositories.isLoading || repositories.isError;
 
   const handleRefresh = () => {
     void (async () => {
       setRefreshing(true);
       try {
-        // Refresh only — never triggers a new sync.
-        const result = await findings.refetch();
-        if (result.isError) {
+        // Refresh only — never triggers a new sync. The repositories fetch
+        // failure disables the filter control until a refetch succeeds, so
+        // every list refresh also retries it.
+        const [findingsResult] = await Promise.all([findings.refetch(), repositories.refetch()]);
+        if (findingsResult.isError) {
           toast.error(t('common.couldNotRefresh'));
         }
       } finally {
@@ -185,6 +189,15 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
           </Pressable>
         }
       />
+
+      {repositories.isError ? (
+        <QueryError
+          placement="top"
+          message={t('common.couldNotLoadRepositories')}
+          onRetry={() => void repositories.refetch()}
+          isRetrying={repositories.isFetching}
+        />
+      ) : null}
 
       {findings.isLoading && (
         <View className="flex-1 gap-3 px-6 pt-4">

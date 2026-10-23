@@ -28,7 +28,7 @@ import {
   REMOTE_SESSION_EXIT_NOT_SUPPORTED,
   REMOTE_SESSION_CREATION_NOT_SUPPORTED,
 } from './session';
-import type { CloudAgentSession } from './session';
+import type { CloudAgentSession, CloudAgentSessionConfig } from './session';
 import { createChatProcessor } from './chat-processor';
 import { partSettledAt } from './part-utils';
 import { createJotaiStorage } from './storage/jotai';
@@ -43,6 +43,7 @@ import type {
   ResolvedSession,
   SessionSnapshot,
   SessionSnapshotPage,
+  CachedSessionSnapshotPage,
   SessionSnapshotPageOutcome,
   SessionInfo,
   SessionActivity,
@@ -53,7 +54,6 @@ import type {
   PermissionState,
   SlashCommandInfo,
   SlashCommandCatalogStatus,
-  SuggestionAction,
   SuggestionState,
   MessageDeliveryState,
   MessageInfo,
@@ -64,9 +64,15 @@ import type {
   OlderMessagesError,
   PreparationAttempt,
   SessionCommit,
+  SessionConfig,
 } from './types';
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import { splitByContiguousPrefix } from './array-utils';
+import { sessionConfigFromFetchedSession } from './session-config';
+import { createTranscriptRowRestore } from './transcript-row-restore';
+import { readCachedPage } from './cached-page-read';
+import { indicatorForCloudStatus, indicatorForStatus } from './status-indicator';
+import type { SessionStatusIndicator } from './status-indicator';
 import type { UserWebConnection } from './user-web-connection';
 import { generateMessageId } from './message-id';
 import { findLatestContextUsage } from './context-usage';
@@ -81,30 +87,6 @@ type CloudAgentModelOverride = {
   model: string;
   variant?: string;
 };
-type SessionStatusIndicator = {
-  type: 'error' | 'warning' | 'info' | 'progress';
-  message: string;
-  timestamp: number;
-  commitHash?: string;
-  code?: SdkStatusMessageCode;
-};
-type SessionConfig = {
-  sessionId: CloudAgentSessionId | KiloSessionId;
-  repository: string;
-  mode: string;
-  model: string;
-  providerID?: string | null | undefined;
-  variant?: string | null | undefined;
-  /** Custom modes exposed by this session's profile stack (slug + name, plus optional model and thinking-effort overrides). */
-  runtimeAgents?:
-    | Array<{
-        slug: string;
-        name: string;
-        model?: string | undefined;
-        variant?: string | undefined;
-      }>
-    | undefined;
-};
 type WorktreeChangesRefresh = {
   cloudSessionId: string;
   revision?: number;
@@ -112,27 +94,23 @@ type WorktreeChangesRefresh = {
 };
 type ActiveSessionType = ResolvedSession['type'];
 type ObservedModelSource = 'session' | 'message' | 'catalog';
-type StandaloneQuestion = { requestId: string; questions: QuestionInfo[] };
-type StandalonePermission = {
-  requestId: string;
-  permission: string;
-  patterns: string[];
-  metadata: Record<string, unknown>;
-  always: string[];
-};
-type StandaloneSuggestion = {
-  requestId: string;
-  text: string;
-  actions: SuggestionAction[];
-  /** Tool call ID that emitted this suggestion, when available. */
-  callId?: string | undefined;
-};
+/**
+ * A pending question together with the options it offers. `question.asked` may
+ * arrive without options; the manager only raises this state when they are
+ * present, so the narrowing is guaranteed at the atom.
+ */
+type StandaloneQuestion = QuestionState & { questions: QuestionInfo[] };
+type StandalonePermission = PermissionState;
+type StandaloneSuggestion = SuggestionState;
 type ChildSessionHydrationState =
   | { status: 'idle' }
   | { status: 'loading' }
   | {
       status: 'ready';
-      /** Opaque cursor for the child's next older page, or null when fully read. */
+      /**
+       * Opaque cursor for the child's next older page, or null when fully read
+       * or when the next older page failed terminally.
+       */
       cursor: string | null;
       /** True when the child has more older history to load. */
       hasOlder: boolean;
@@ -174,10 +152,27 @@ const TRANSCRIPT_CLEARED_INDICATOR = 'View cleared — earlier messages are stil
 const RESOLVED_DELIVERY_MEMORY_MAX_SESSIONS = 20;
 
 /**
+ * Maximum number of sessions with an in-memory record of a prompt a failed send
+ * could not deliver. Bounded like the delivery-failure record: a long-lived
+ * manager would otherwise keep a prompt string for every session that ever
+ * failed a send.
+ */
+const FAILED_PROMPT_MEMORY_MAX_SESSIONS = 20;
+
+/**
  * Maximum number of retained messages. Once the loaded transcript exceeds this,
  * `trimRetainedHistory` drops the oldest loaded older-page from local storage.
  */
 const RETAINED_MESSAGE_WINDOW = 200;
+
+/**
+ * How long a matching `Aborted` error stays suppressed after an interrupt RPC
+ * settles. The service can deliver the abort before the HTTP acknowledgement or
+ * later, for example replayed after a reconnect (the transport backs off up to
+ * 30s per attempt). Past this window the error belongs to something else and
+ * must reach `errorAtom` again.
+ */
+export const INTERRUPT_ABORT_SUPPRESSION_MS = 30_000;
 
 /**
  * Shared empty-parts sentinel. `memoizedStoredMessage` compares `cached.parts
@@ -284,7 +279,6 @@ type FetchedSessionData = {
   variant: string | null;
   repository: string | null;
   isInitiated: boolean;
-  needsLegacyPrepare: boolean;
   isPreparingAsync: boolean;
   /**
    * Whether the session currently has a ready route that can own a terminal.
@@ -350,11 +344,15 @@ type SessionManagerConfig = {
    * replays the cache independently of the session-metadata round trip. It
    * never delays `connect()` or overwrites a live replay, and applies only
    * while the switch generation and session identity still match.
-   * A missing hook, a `null` result, or an empty page is a no-op: the
-   * loading skeleton stays up until the transport replays the transcript.
+   * A missing hook or a `null` result is a no-op: the loading skeleton stays
+   * up until the transport replays the transcript. A reader that answers
+   * synchronously has its page applied within `switchSession` itself, so the
+   * reopened session is on screen before the caller's next paint.
    */
-  readCachedSnapshotPage?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshotPage | null>;
-  writeCachedSnapshotPage?: (page: SessionSnapshotPage) => void;
+  readCachedSnapshotPage?: (
+    kiloSessionId: KiloSessionId
+  ) => CachedSessionSnapshotPage | null | Promise<CachedSessionSnapshotPage | null>;
+  writeCachedSnapshotPage?: (page: CachedSessionSnapshotPage) => void;
   /**
    * Optional classifier for a `fetchSession` failure that means "the request
    * never answered" — a client-side deadline abort — as opposed to the server
@@ -443,6 +441,15 @@ type SessionManagerAtoms = {
    * reader.
    */
   isRefreshingCachedTranscript: W<boolean>;
+  /** The session whose cached transcript is on screen while its live one loads. */
+  cachedTranscriptSessionId: Atom<string | null>;
+  /**
+   * True from a session switch (and each reconnect) until the live transport
+   * finishes replaying history. Service-state transcript rows, such as
+   * preparation attempts, arrive during that replay. Transports that never
+   * signal replay completion leave it true.
+   */
+  isReplayingLiveHistory: W<boolean>;
   /** Session structurally cannot accept input (no transport send). */
   isReadOnly: W<boolean>;
   /**
@@ -552,7 +559,9 @@ type SessionManager = {
    * that child's own cursor. Replays through the child apply path, updates
    * only per-child pagination state, and never touches the root session's
    * cursor or atoms. No-op when `fetchSnapshotPage` is absent, the child is
-   * not ready, or the child has no cursor.
+   * not ready, or the child has no cursor. A terminal older-page failure
+   * clears the child's cursor, so later calls are no-ops until the next
+   * `switchSession` resets the per-child hydration state.
    */
   loadOlderChildMessages(childSessionId: KiloSessionId): Promise<void>;
   /**
@@ -827,65 +836,6 @@ function insertOptimisticUserMessage(input: {
   }
 }
 
-function indicatorForCloudStatus(cs: CloudStatus): SessionStatusIndicator | null {
-  const now = Date.now();
-  if (cs.type === 'preparing') {
-    return {
-      type: 'progress',
-      message: cs.message ?? 'Setting up environment…',
-      timestamp: now,
-      ...(cs.message === undefined ? { code: 'setting-up-environment' } : {}),
-    };
-  }
-  if (cs.type === 'finalizing') {
-    return {
-      type: 'progress',
-      message: cs.message ?? 'Wrapping up…',
-      timestamp: now,
-      ...(cs.message === undefined ? { code: 'wrapping-up' } : {}),
-    };
-  }
-  if (cs.type === 'error') {
-    // The DO writes this text, so it carries no SDK copy code.
-    return { type: 'error', message: cs.message, timestamp: now };
-  }
-  return null; // 'ready' — no indicator
-}
-
-function indicatorForStatus(s: AgentStatus): SessionStatusIndicator | null {
-  const now = Date.now();
-  if (s.type === 'autocommit') {
-    const kind = s.step === 'failed' ? 'error' : s.step === 'completed' ? 'info' : 'progress';
-    return {
-      type: kind,
-      message: s.message,
-      timestamp: now,
-      ...(s.step === 'completed' && s.commitHash ? { commitHash: s.commitHash } : {}),
-      ...(s.code ? { code: s.code } : {}),
-    } satisfies SessionStatusIndicator;
-  }
-  if (s.type === 'disconnected')
-    return {
-      type: 'error',
-      message: 'Agent connection lost',
-      timestamp: now,
-      code: 'agent-connection-lost',
-    };
-  if (s.type === 'error')
-    return {
-      type: 'error',
-      message: s.message,
-      timestamp: now,
-      ...(s.code ? { code: s.code } : {}),
-    };
-  if (s.type === 'interrupted')
-    return { type: 'info', message: 'Session stopped', timestamp: now, code: 'session-stopped' };
-  // A scheduled session renders no bottom-bar indicator: the session-detail
-  // connection row owns that reading.
-  if (s.type === 'scheduled') return null;
-  return null;
-}
-
 function toModelSelection(model: ModelRef, variant?: string): ModelSelection {
   return { model, ...(variant ? { variant } : {}) };
 }
@@ -894,6 +844,51 @@ function modelSelectionsEqual(a: ModelSelection | null, b: ModelSelection | null
   if (a === b) return true;
   if (!a || !b) return false;
   return modelRefsEqual(a.model, b.model) && a.variant === b.variant;
+}
+
+function deliveryStatesEqual(a: MessageDeliveryState, b: MessageDeliveryState): boolean {
+  if (a === b) return true;
+  if (a.status !== b.status) return false;
+  if (a.status === 'queued' || b.status === 'queued') return true;
+  return (
+    a.error === b.error && a.reason === b.reason && (a.attempts ?? null) === (b.attempts ?? null)
+  );
+}
+
+/**
+ * Schedule a timer that must not keep a Node process alive on its own. The
+ * interrupt guard's expiry only withholds a possible error, so a host that is
+ * otherwise done must be able to shut down while it is pending. Browsers and
+ * React Native expose no `unref`, and there the choice is moot.
+ */
+function scheduleUnrefdTimer(callback: () => void, delayMs: number): ReturnType<typeof setTimeout> {
+  const timer = setTimeout(callback, delayMs);
+  const handle: unknown = timer;
+  if (typeof handle === 'object' && handle !== null && 'unref' in handle) {
+    const unref = handle.unref;
+    if (typeof unref === 'function') unref.call(handle);
+  }
+  return timer;
+}
+
+/**
+ * True when two delivery maps describe the same queue. The service state mutates
+ * one shared map in place, so its identity says nothing about change; only the
+ * entries do. Comparing them keeps unrelated notifications (a streamed step
+ * output, a stale preparation event) from replacing `pendingMessagesAtom` with
+ * an equivalent new map and invalidating every dependent atom.
+ */
+function pendingDeliveryStatesEqual(
+  a: ReadonlyMap<string, MessageDeliveryState>,
+  b: ReadonlyMap<string, MessageDeliveryState>
+): boolean {
+  if (a === b) return true;
+  if (a.size !== b.size) return false;
+  for (const [messageId, state] of a) {
+    const other = b.get(messageId);
+    if (other === undefined || !deliveryStatesEqual(state, other)) return false;
+  }
+  return true;
 }
 
 function upsertPendingRequest<T extends { requestId: string }>(
@@ -915,6 +910,48 @@ function removePendingRequest<T extends { requestId: string }>(
     ? list.filter(entry => entry.requestId !== requestId)
     : list;
 }
+
+/**
+ * Mutable state of one session open: the generations it checks, the storage it
+ * paints into, and the cache-read flags its metadata failure path and its
+ * deferred cache read share.
+ */
+type SessionOpen = {
+  kiloSessionId: KiloSessionId;
+  expectedGeneration: number;
+  preserveTranscript: boolean;
+  initialPageGeneration: number;
+  storage: JotaiSessionStorage;
+  resolvedFailures: Set<string>;
+  /** False once live replay can start, so a slower cache cannot overwrite it. */
+  acceptCachedPage: boolean;
+  cacheReadPending: boolean;
+  surfaceDeferredOpenFailure: (() => void) | null;
+};
+
+/** The per-open transport callbacks passed to `createCloudAgentSession`. */
+type OpenSessionCallbacks = Pick<
+  CloudAgentSessionConfig,
+  | 'onSessionCreated'
+  | 'onSessionUpdated'
+  | 'onQuestionAsked'
+  | 'onQuestionResolved'
+  | 'onPermissionAsked'
+  | 'onPermissionResolved'
+  | 'onSuggestionAsked'
+  | 'onSuggestionResolved'
+  | 'onResolved'
+  | 'onRemoteModelStateChange'
+  | 'onRemoteCommandStateChange'
+  | 'onTransportCapabilityChange'
+  | 'onTransportCapabilitiesChange'
+  | 'onReplayComplete'
+  | 'onBranchChanged'
+  | 'onError'
+  | 'onChildSessionError'
+  | 'onMessageFailed'
+  | 'onEvent'
+>;
 
 function createSessionManager(config: SessionManagerConfig): SessionManager {
   const { store } = config;
@@ -941,6 +978,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * — and on an error, a transcript clear, or a session reset.
    */
   const isRefreshingCachedTranscriptAtom = atom(false);
+  const cachedTranscriptSessionIdAtom = atom(get =>
+    get(isRefreshingCachedTranscriptAtom) ? get(rootSessionIdAtom) : null
+  );
+  const isReplayingLiveHistoryAtom = atom(true);
   const isReadOnlyAtom = atom(false);
   // False while no session is active; once a session resolves the gate is
   // computed optimistically (see `recomputeSupportsAttachments`), so a remote
@@ -968,6 +1009,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const setupLogAtom = atom<readonly string[]>([]);
   const preparationAttemptsAtom = atom<readonly PreparationAttempt[]>([]);
   const commitsAtom = atom<readonly SessionCommit[]>([]);
+  const transcriptRows = createTranscriptRowRestore(store, {
+    preparationAttempts: preparationAttemptsAtom,
+    commits: commitsAtom,
+  });
   const sessionConfigAtom = atom<SessionConfig | null>(null);
   const sessionTypeAtom = atom<ActiveSessionType | null>(null);
   const chatUIAtom = atom<{ shouldAutoScroll: boolean }>({ shouldAutoScroll: true });
@@ -1294,6 +1339,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * sessions with a re-send in flight and needs no eviction bound.
    */
   const supersededInFlightBySession = new Map<KiloSessionId, Set<string>>();
+  /**
+   * Prompt text a failed send removed from the transcript, keyed by the session
+   * that owned the optimistic row. The composer clears its draft when the row is
+   * inserted, so a failure has to hand the text back to the session that sent
+   * it — and `switchSession` may already have retargeted the manager to another
+   * session by then. The record is restored into the composer when that session
+   * becomes active again and is dropped by a send from it that the server
+   * accepts.
+   */
+  const failedPromptBySession = new Map<KiloSessionId, string>();
   let activeSessionType: ActiveSessionType | null = null;
   /**
    * Latest per-session capabilities reported by the live CLI transport's
@@ -1309,13 +1364,51 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // True while a connect/reconnect cycle is still replaying its message
   // history; false once live events are flowing. See clearOverrideIfDiverged.
   let remoteHistoryReplaying = true;
+  function setRemoteHistoryReplaying(replaying: boolean): void {
+    remoteHistoryReplaying = replaying;
+    store.set(isReplayingLiveHistoryAtom, replaying);
+  }
   /**
    * Session captured at the start of an interrupt call. While non-null, an
    * `onError("Aborted")` from this session is suppressed — it was produced by
    * the manager's own `interrupt()`. A real transport error or an Aborted from
-   * a different/late session still sets errorAtom normally.
+   * a different/late session still sets errorAtom normally. The guard lives
+   * until that Aborted arrives, the interrupt rejects, the session resets, or
+   * `INTERRUPT_ABORT_SUPPRESSION_MS` passes after the interrupt settled.
    */
   let pendingInterruptSession: CloudAgentSession | null = null;
+  let pendingInterruptClearTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * Drop the one-shot abort guard, including a scheduled expiry of it. Every
+   * path that ends the guard's relevance (the expected `Aborted`, a rejected
+   * interrupt, a session reset/destroy) goes through here so no timer outlives
+   * the state it would clear.
+   */
+  function clearPendingInterrupt(): void {
+    pendingInterruptSession = null;
+    if (pendingInterruptClearTimer !== null) {
+      clearTimeout(pendingInterruptClearTimer);
+      pendingInterruptClearTimer = null;
+    }
+  }
+
+  /**
+   * Start the suppression window for the guard currently armed. Overlapping
+   * interrupt calls re-arm the same guard, so the previous expiry is dropped
+   * here rather than left running: its callback would otherwise end a newer
+   * call's window early.
+   */
+  function armPendingInterruptExpiry(): void {
+    if (pendingInterruptClearTimer !== null) {
+      clearTimeout(pendingInterruptClearTimer);
+      pendingInterruptClearTimer = null;
+    }
+    pendingInterruptClearTimer = scheduleUnrefdTimer(
+      clearPendingInterrupt,
+      INTERRUPT_ABORT_SUPPRESSION_MS
+    );
+  }
   /**
    * Message ids already in local storage when a reconnect replay starts while
    * `/clear` is active. Those are live post-clear turns for this visit and
@@ -1345,7 +1438,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // Pagination state for `loadOlderMessages`. Reset on every switchSession.
   let olderMessagesCursor: string | null = null;
   // Monotonically increasing per-session generation; older-page results
-  // whose `expectedLoadOlderGeneration` doesn't match are dropped.
+  // whose captured `expectedGeneration` no longer matches are dropped.
   let loadOlderGeneration = 0;
   // In-flight older-page load, used to dedupe concurrent calls and to let
   // late callers await the same result.
@@ -1414,8 +1507,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(remoteCommandStateAtom, EMPTY_REMOTE_COMMAND_STATE);
     store.set(observedModelAtom, null);
     observedModelSource = null;
-    remoteHistoryReplaying = true;
+    setRemoteHistoryReplaying(true);
     postClearSurvivorIds = null;
+    transcriptRows.reset();
     postInterruptUnlock = false;
     interruptAwaitingIdleSession = null;
     store.set(remoteModelOverrideAtom, null);
@@ -1467,7 +1561,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     lastPromptMode = null;
     olderMessagesTerminal = false;
     currentCapabilities = undefined;
-    pendingInterruptSession = null;
+    clearPendingInterrupt();
   }
 
   function setChildSessionHydrationState(
@@ -1656,7 +1750,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
     const state = store.get(childSessionHydrationStatesAtom).get(childSessionId);
     if (!state || state.status !== 'ready') return;
-    if (state.cursor === null) return;
+    // A terminal older-page outcome clears the cursor and `hasOlder`, so a
+    // later call is a no-op instead of refetching a page already known to be
+    // unavailable. Like the root transcript's terminal latch, it holds until
+    // the next switchSession resets the per-child state.
+    if (state.cursor === null || !state.hasOlder) return;
     if (state.isLoadingOlder) return;
 
     const storage = store.get(sessionStorageAtom);
@@ -1690,9 +1788,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (!current || current.status !== 'ready') return;
 
     if (outcome === null) {
-      // Access-not-found (worker 404): terminal for this child.
+      // Access-not-found (worker 404): terminal for this child. Clearing the
+      // cursor alongside `hasOlder` keeps the state the guard reads honest.
       setChildSessionHydrationState(childSessionId, {
         ...current,
+        cursor: null,
         isLoadingOlder: false,
         hasOlder: false,
         olderError: { kind: 'invalid_data' },
@@ -1715,13 +1815,24 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
     // Typed failure. A later-page failure only writes `olderError`; it never
     // changes the hydration status (a first-page failure is handled by
-    // `hydrateChildSession`). `retryable_failure` maps to the retryable kind;
-    // `invalid_data` and `too_large` map directly.
+    // `hydrateChildSession`). `retryable_failure` keeps the cursor so a retry
+    // continues from the same page. `invalid_data` and `too_large` are
+    // terminal for this child: clear the cursor and `hasOlder` so a later call
+    // is a no-op until the next switchSession resets the per-child state.
+    if (outcome.kind === 'retryable_failure') {
+      setChildSessionHydrationState(childSessionId, {
+        ...current,
+        isLoadingOlder: false,
+        olderError: { kind: 'retryable' },
+      });
+      return;
+    }
     setChildSessionHydrationState(childSessionId, {
       ...current,
+      cursor: null,
+      hasOlder: false,
       isLoadingOlder: false,
-      olderError:
-        outcome.kind === 'retryable_failure' ? { kind: 'retryable' } : { kind: outcome.kind },
+      olderError: { kind: outcome.kind },
     });
   }
 
@@ -1905,17 +2016,19 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       store.set(agentStatusAtom, st);
       store.set(cloudStatusAtom, cs);
       store.set(setupLogAtom, session.state.getSetupLog());
-      store.set(
-        preparationAttemptsAtom,
-        'getPreparationAttempts' in session.state ? session.state.getPreparationAttempts() : []
+      transcriptRows.applyLive(
+        'getPreparationAttempts' in session.state ? session.state.getPreparationAttempts() : [],
+        session.state.getCommits()
       );
-      store.set(commitsAtom, session.state.getCommits());
       store.set(isStreamingAtom, act.type === 'busy');
       store.set(questionAtom, session.state.getQuestion());
       store.set(permissionAtom, session.state.getPermission());
       store.set(suggestionAtom, session.state.getSuggestion());
       store.set(sessionInfoAtom, session.state.getSessionInfo());
-      store.set(pendingMessagesAtom, new Map(session.state.getPendingMessages()));
+      const nextPendingMessages = session.state.getPendingMessages();
+      if (!pendingDeliveryStatesEqual(store.get(pendingMessagesAtom), nextPendingMessages)) {
+        store.set(pendingMessagesAtom, new Map(nextPendingMessages));
+      }
 
       // Disconnect clears the interrupt unlock latch so normal
       // (!session.canSend) semantics take over for unresolved/null sessions.
@@ -2074,7 +2187,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (olderMessagesTerminal) return;
     // `/clear` keeps the local view empty for this visit — do not page history back in.
     if (store.get(transcriptClearedAtom)) return;
-    // No cursor means nothing left to load.
     if (olderMessagesCursor === null) return;
     // Dedupe: if a load is already in flight, every caller awaits the
     // same result instead of starting a parallel backend request.
@@ -2260,34 +2372,161 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     bumpSupersededInFlight(ownerSessionId);
   }
 
-  async function switchSession(kiloSessionId: KiloSessionId): Promise<void> {
-    if (
-      config.writeCachedSnapshotPage &&
-      currentSession !== null &&
-      activeSessionId !== null &&
-      store.get(fetchedSessionDataAtom)?.kiloSessionId === activeSessionId &&
-      !store.get(isLoadingAtom) &&
-      !store.get(isRefreshingCachedTranscriptAtom)
-    ) {
-      try {
-        config.writeCachedSnapshotPage({
-          info: { id: activeSessionId },
-          messages: store.get(messagesListAtom),
-          nextCursor: olderMessagesCursor,
-          omittedItemCount: store.get(olderMessagesOmittedItemCountAtom),
-        });
-      } catch {
-        // A cache failure must not prevent navigation.
+  /**
+   * Remember a prompt a failed send could not deliver, under the session that
+   * owned the optimistic row (see `failedPromptBySession`). Refreshes insertion
+   * order so the most recently touched sessions survive eviction.
+   */
+  function recordFailedPrompt(kiloSessionId: KiloSessionId, messageText: string): void {
+    failedPromptBySession.delete(kiloSessionId);
+    failedPromptBySession.set(kiloSessionId, messageText);
+    if (failedPromptBySession.size <= FAILED_PROMPT_MEMORY_MAX_SESSIONS) return;
+    for (const key of failedPromptBySession.keys()) {
+      if (key !== kiloSessionId && key !== activeSessionId) {
+        failedPromptBySession.delete(key);
+        return;
       }
     }
-    // A retry of a failed metadata refresh must keep the transcript mounted.
-    // A real session switch (or a caller without caching) still starts clean.
-    const preserveTranscript = Boolean(
+  }
+
+  /**
+   * A switch away caches the outgoing session's page, and that cache write can
+   * already hold the optimistic row a send inserted before it settled. Drop the
+   * row from that session's cached first page so returning to it does not paint
+   * a prompt the server never received.
+   */
+  function forgetCachedOptimisticRow(kiloSessionId: KiloSessionId, messageId: string): void {
+    const read = config.readCachedSnapshotPage;
+    const write = config.writeCachedSnapshotPage;
+    if (!read || !write) return;
+    const drop = (page: CachedSessionSnapshotPage | null): void => {
+      if (!page || !page.messages.some(message => message.info.id === messageId)) return;
+      write({
+        ...page,
+        messages: page.messages.filter(message => message.info.id !== messageId),
+      });
+    };
+    try {
+      const page = read(kiloSessionId);
+      if (page instanceof Promise) {
+        void page.then(drop).catch(() => {
+          // An unreadable cache keeps its page; the row is still gone from the
+          // transcript that owned it.
+        });
+        return;
+      }
+      drop(page);
+    } catch {
+      // A cache failure must not turn a send failure into a thrown one.
+    }
+  }
+
+  /**
+   * Whether the chat's cached first page holds the confirmed record of a
+   * message. `switchSession` clears the storage of the session it leaves, so
+   * after a mid-send switch the cached page is the only place a confirmation
+   * that landed before the switch survives.
+   */
+  async function pageShowsConfirmedUserMessage(
+    kiloSessionId: KiloSessionId,
+    messageId: string
+  ): Promise<boolean> {
+    const read = config.readCachedSnapshotPage;
+    if (!read) return false;
+    try {
+      const page = await read(kiloSessionId);
+      return (
+        page?.messages.some(
+          message =>
+            message.info.id === messageId &&
+            message.info.role === 'user' &&
+            message.info.synthetic !== true
+        ) ?? false
+      );
+    } catch {
+      // An unreadable cache is a miss, never a failed send.
+      return false;
+    }
+  }
+
+  /** Caches the loaded session's page before it is left, so a return paints at once. */
+  function cacheActiveSessionPage(): void {
+    if (
+      !config.writeCachedSnapshotPage ||
+      currentSession === null ||
+      activeSessionId === null ||
+      store.get(fetchedSessionDataAtom)?.kiloSessionId !== activeSessionId ||
+      store.get(isLoadingAtom) ||
+      store.get(isRefreshingCachedTranscriptAtom)
+    ) {
+      return;
+    }
+    const sessionConfig = store.get(sessionConfigAtom);
+    try {
+      config.writeCachedSnapshotPage({
+        info: { id: activeSessionId },
+        messages: store.get(messagesListAtom),
+        nextCursor: olderMessagesCursor,
+        omittedItemCount: store.get(olderMessagesOmittedItemCountAtom),
+        preparationAttempts: store.get(preparationAttemptsAtom),
+        commits: store.get(commitsAtom),
+        ...(activeSessionType === 'cloud-agent' && sessionConfig ? { sessionConfig } : {}),
+      });
+    } catch {
+      // A cache failure must not prevent navigation.
+    }
+  }
+
+  async function switchSession(kiloSessionId: KiloSessionId): Promise<void> {
+    cacheActiveSessionPage();
+    const preserveTranscript = preserveTranscriptOnOpen(kiloSessionId);
+    const expectedGeneration = beginSessionOpen(kiloSessionId);
+    const resolvedFailures = seedResolvedDeliveryFailures(kiloSessionId, expectedGeneration);
+
+    const open = startCleanSessionOpen(
+      kiloSessionId,
+      expectedGeneration,
+      preserveTranscript,
+      resolvedFailures
+    );
+    startCachedPageRead(open);
+
+    const data = await fetchOpenSessionData(open);
+    if (!data) return;
+    store.set(fetchedSessionDataAtom, data);
+
+    // Populate session metadata and swap in the new storage eagerly.
+    // The storage starts empty; snapshot replay (inside session.connect)
+    // will populate it and the UI updates reactively.
+    store.set(sessionConfigAtom, sessionConfigFromFetchedSession(kiloSessionId, data));
+    store.set(sessionIdAtom, data.cloudAgentSessionId);
+
+    config.onKiloSessionCreated?.(kiloSessionId);
+
+    const session = createOpenSession(open);
+    if (expectedGeneration !== switchGeneration) {
+      session.destroy();
+      return;
+    }
+    currentSession = session;
+    connectOpenSession(open, session);
+  }
+
+  /**
+   * A retry of a failed metadata refresh must keep the transcript mounted.
+   * A real session switch (or a caller without caching) still starts clean.
+   */
+  function preserveTranscriptOnOpen(kiloSessionId: KiloSessionId): boolean {
+    return Boolean(
       config.readCachedSnapshotPage &&
       activeSessionId === kiloSessionId &&
       currentSession === null &&
       store.get(messagesListAtom).length > 0
     );
+  }
+
+  /** Retires the previous open and reserves the generations this open checks. */
+  function beginSessionOpen(kiloSessionId: KiloSessionId): number {
     for (const cleanup of metadataRecoveryCleanups) cleanup();
     metadataRecoveryCleanups = [];
     childSessionHydrationGeneration += 1;
@@ -2306,49 +2545,68 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     currentSession?.destroy();
     currentSession = null;
     setIndicator(null);
+    return expectedGeneration;
+  }
 
-    // Seed the durable memory of retried delivery failures for this session.
-    // The record already held for this session is reused, so a resolution
-    // recorded while another session was active suppresses the replay even if
-    // the durable read below returns the pre-write list. The read is not
-    // awaited: if it lands after the DO's replay already applied a resolved
-    // failure, the prune below removes the whole failure; if it lands first,
-    // the predicate suppresses it.
+  /**
+   * Seeds the durable memory of retried delivery failures for this session.
+   * The record already held for this session is reused, so a resolution
+   * recorded while another session was active suppresses the replay even if
+   * the durable read below returns the pre-write list. The read is not
+   * awaited: if it lands after the DO's replay already applied a resolved
+   * failure, the prune below removes the whole failure; if it lands first,
+   * the predicate suppresses it.
+   */
+  function seedResolvedDeliveryFailures(
+    kiloSessionId: KiloSessionId,
+    expectedGeneration: number
+  ): Set<string> {
     const resolvedFailures = resolvedFailuresForSession(kiloSessionId);
-    if (config.readResolvedDeliveryFailures) {
-      void config
-        .readResolvedDeliveryFailures(kiloSessionId)
-        .then(ids => {
-          if (expectedGeneration !== switchGeneration) return;
-          for (const id of ids) {
-            resolvedFailures.add(id);
+    if (!config.readResolvedDeliveryFailures) return resolvedFailures;
+    void config
+      .readResolvedDeliveryFailures(kiloSessionId)
+      .then(ids => {
+        if (expectedGeneration !== switchGeneration) return;
+        for (const id of ids) {
+          resolvedFailures.add(id);
+        }
+        if (ids.length > 0) {
+          store.set(
+            resolvedDeliveryFailuresRevisionAtom,
+            store.get(resolvedDeliveryFailuresRevisionAtom) + 1
+          );
+        }
+        for (const id of ids) {
+          // `clearFailedMessage` reports when the pruned entry was also the
+          // failure that set the terminal error and has undone it. That
+          // error reached `errorAtom` through `config.onError`, which the
+          // service state cannot reach, so clear it here: the predicate path
+          // never applies the failure at all, and the two must agree.
+          if (currentSession?.state.clearFailedMessage(id)) {
+            store.set(errorAtom, null);
           }
-          if (ids.length > 0) {
-            store.set(
-              resolvedDeliveryFailuresRevisionAtom,
-              store.get(resolvedDeliveryFailuresRevisionAtom) + 1
-            );
-          }
-          for (const id of ids) {
-            // `clearFailedMessage` reports when the pruned entry was also the
-            // failure that set the terminal error and has undone it. That
-            // error reached `errorAtom` through `config.onError`, which the
-            // service state cannot reach, so clear it here: the predicate path
-            // never applies the failure at all, and the two must agree.
-            if (currentSession?.state.clearFailedMessage(id)) {
-              store.set(errorAtom, null);
-            }
-          }
-        })
-        .catch(() => {
-          // An unreadable memory is a miss, never a failed open.
-        });
-    }
+        }
+      })
+      .catch(() => {
+        // An unreadable memory is a miss, never a failed open.
+      });
+    return resolvedFailures;
+  }
 
+  /** Resets the store for the new session and captures this open's flags. */
+  function startCleanSessionOpen(
+    kiloSessionId: KiloSessionId,
+    expectedGeneration: number,
+    preserveTranscript: boolean,
+    resolvedFailures: Set<string>
+  ): SessionOpen {
     // Clean slate immediately — the user asked to switch, so clear all
     // previous session state and show a loading indicator.
     clearAllAtoms(preserveTranscript);
     remoteOptimisticIds.clear();
+    // A prompt this session failed to deliver is this session's draft: restore
+    // it so returning to the chat offers the retry.
+    store.set(failedPromptAtom, failedPromptBySession.get(kiloSessionId) ?? null);
     store.set(rootSessionIdAtom, kiloSessionId);
     store.set(isLoadingAtom, true);
     // A retry that keeps the transcript mounted must also keep advertising that
@@ -2358,55 +2616,77 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
     const jotaiStorage = store.get(sessionStorageAtom) ?? createJotaiStorage(store);
     store.set(sessionStorageAtom, jotaiStorage);
-    const initialPageGeneration = loadOlderGeneration;
-    let acceptCachedPage = true;
-    // False while this open's cached-transcript read is still in flight. A
-    // retryable metadata failure must not decide the screen until the read
-    // settles, or a warm offline open would flash the terminal error over
-    // cached rows that were seconds from painting.
-    let cacheReadPending = false;
-    // Set when a retryable metadata failure landed while `cacheReadPending`
-    // was true; the read's `finally` runs it once the cache has had its say.
-    let surfaceDeferredOpenFailure: (() => void) | null = null;
-    if (config.readCachedSnapshotPage && !preserveTranscript) {
-      cacheReadPending = true;
-      void config
-        .readCachedSnapshotPage(kiloSessionId)
-        .then(cachedPage => {
-          if (!acceptCachedPage || expectedGeneration !== switchGeneration) return;
-          if (cachedPage && cachedPage.messages.length > 0) {
-            if (applyPage({ ...cachedPage, kind: 'success' }, initialPageGeneration, true)) {
-              store.set(isLoadingAtom, false);
-              // Rows are on screen but they are the cached page: the live
-              // transcript is still being fetched, so the open is refreshing,
-              // not done.
-              store.set(isRefreshingCachedTranscriptAtom, true);
-            }
-          }
-        })
-        .catch(() => {
-          // An unreadable cache is a miss, never a failed session load.
-        })
-        .finally(() => {
-          cacheReadPending = false;
-          const surface = surfaceDeferredOpenFailure;
-          surfaceDeferredOpenFailure = null;
-          surface?.();
-        });
-    }
+    return {
+      kiloSessionId,
+      expectedGeneration,
+      preserveTranscript,
+      initialPageGeneration: loadOlderGeneration,
+      storage: jotaiStorage,
+      resolvedFailures,
+      acceptCachedPage: true,
+      cacheReadPending: false,
+      surfaceDeferredOpenFailure: null,
+    };
+  }
 
+  /** Starts this open's cached-transcript read, when the caller keeps a cache. */
+  function startCachedPageRead(open: SessionOpen): void {
+    const applyCachedPage = (cachedPage: CachedSessionSnapshotPage | null) => {
+      if (!cachedPage || !open.acceptCachedPage || open.expectedGeneration !== switchGeneration) {
+        return;
+      }
+      if (!applyPage({ ...cachedPage, kind: 'success' }, open.initialPageGeneration, true)) return;
+      transcriptRows.restore(cachedPage);
+      // Settings are cached only for Cloud Agent sessions, so the composer can show
+      // that session's controls until the live metadata confirms them.
+      if (cachedPage.sessionConfig && store.get(sessionConfigAtom) === null) {
+        store.set(sessionConfigAtom, cachedPage.sessionConfig);
+        if (store.get(activeSessionTypeAtom) === null) {
+          store.set(activeSessionTypeAtom, 'cloud-agent');
+          store.set(supportsAttachmentsAtom, true);
+        }
+      }
+      store.set(isLoadingAtom, false);
+      // Rows are on screen but they are the cached page: the live transcript
+      // is still being fetched, so the open is refreshing, not done.
+      store.set(isRefreshingCachedTranscriptAtom, true);
+    };
+    const { readCachedSnapshotPage } = config;
+    const pendingCacheRead =
+      readCachedSnapshotPage && !open.preserveTranscript
+        ? readCachedPage(() => readCachedSnapshotPage(open.kiloSessionId), applyCachedPage)
+        : null;
+    if (!pendingCacheRead) return;
+    // While this open's cached-transcript read is in flight a retryable
+    // metadata failure must not decide the screen: a warm offline open would
+    // otherwise flash the terminal error over cached rows that were seconds
+    // from painting.
+    open.cacheReadPending = true;
+    void pendingCacheRead.finally(() => {
+      open.cacheReadPending = false;
+      const surface = open.surfaceDeferredOpenFailure;
+      open.surfaceDeferredOpenFailure = null;
+      surface?.();
+    });
+  }
+
+  /**
+   * Fetches this open's session metadata and classifies a failure into its
+   * outcome. Returns null when the open stops: denied, retryable, or stale.
+   */
+  async function fetchOpenSessionData(open: SessionOpen): Promise<FetchedSessionData | null> {
     let data: FetchedSessionData;
     try {
-      data = await config.fetchSession(kiloSessionId);
+      data = await config.fetchSession(open.kiloSessionId);
     } catch (err) {
-      if (expectedGeneration !== switchGeneration) return;
+      if (open.expectedGeneration !== switchGeneration) return null;
       const parsed = errorShapeSchema.safeParse(err);
       const code = parsed.success ? (parsed.data.data?.code ?? parsed.data.shape?.code) : undefined;
       const accessDenied = code === 'NOT_FOUND' || code === 'UNAUTHORIZED' || code === 'FORBIDDEN';
       if (accessDenied) {
         // An authoritative denial is terminal and must retire any cached
         // rows the moment it lands — never deferred behind the cache read.
-        acceptCachedPage = false;
+        open.acceptCachedPage = false;
         clearAllAtoms();
         store.set(isLoadingAtom, false);
         if (code === 'NOT_FOUND') {
@@ -2425,11 +2705,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
             code: detail.code,
           });
         }
-        return;
+        return null;
       }
       if (config.readCachedSnapshotPage) {
         const retry = () => {
-          if (expectedGeneration === switchGeneration) void switchSession(kiloSessionId);
+          if (open.expectedGeneration !== switchGeneration) return;
+          void switchSession(open.kiloSessionId);
         };
         const hooks = config.lifecycleHooks;
         if (hooks?.onOnline) metadataRecoveryCleanups.push(hooks.onOnline(retry));
@@ -2438,7 +2719,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         }
       }
       const surfaceFailure = () => {
-        if (expectedGeneration !== switchGeneration) return;
+        if (open.expectedGeneration !== switchGeneration) return;
         // A never-answering transport (client deadline, no server response)
         // is a stalled open, not a failed one: with nothing cached to paint,
         // keep the skeleton up so the slow-load state offers its message +
@@ -2456,73 +2737,26 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           code: detail.code,
         });
       };
-      if (!cacheReadPending) {
+      if (!open.cacheReadPending) {
         surfaceFailure();
       } else {
-        surfaceDeferredOpenFailure = surfaceFailure;
+        open.surfaceDeferredOpenFailure = surfaceFailure;
       }
-      return;
+      return null;
     }
-    if (expectedGeneration !== switchGeneration) return;
-    store.set(fetchedSessionDataAtom, data);
+    return open.expectedGeneration === switchGeneration ? data : null;
+  }
 
-    // Populate session metadata and swap in the new storage eagerly.
-    // The storage starts empty; snapshot replay (inside session.connect)
-    // will populate it and the UI updates reactively.
-    store.set(sessionConfigAtom, {
-      sessionId: data.cloudAgentSessionId ?? kiloSessionId,
-      repository: data.repository ?? '',
-      mode: data.mode ?? '',
-      model: data.model ?? '',
-      providerID: null,
-      variant: data.variant ?? null,
-      runtimeAgents: data.runtimeAgents,
-    });
-    store.set(sessionIdAtom, data.cloudAgentSessionId);
-
-    config.onKiloSessionCreated?.(kiloSessionId);
-
-    // Persist the bounded page's cursor / hasOlderMessages / omittedItemCount
-    // so `loadOlderMessages` can continue from where the transport left off.
-    // This is a no-op for stale (pre-switchSession) callbacks because
-    // `loadOlderGeneration` advances on every switch. The generation is
-    // captured synchronously here, at callback creation time: reading
-    // `loadOlderGeneration` from inside the callback would be tautological
-    // when the same session id is switched twice in a row, because the
-    // second switch's `clearAllAtoms()` advance lands before the first
-    // switch's `onInitialPageLoaded` callback runs, letting a stale page
-    // pass the generation check and clobber the active session's cursor
-    // and omitted-item count.
-    const recordInitialPage = (page: SessionSnapshotPage): void => {
-      if (applyPage({ ...page, kind: 'success' }, initialPageGeneration, true)) {
-        // A bounded page can lag the stream; omissions are not deletion evidence.
-        // Only an applied page can finish the current open's refresh.
-        store.set(isRefreshingCachedTranscriptAtom, false);
-      }
-    };
-
-    // Once live replay can start, a slower cache must not overwrite it. Do not
-    // await disk here: an unavailable cache must never delay a healthy open.
-    acceptCachedPage = false;
-
-    const session = createCloudAgentSession({
-      kiloSessionId,
-      resolveSession: config.resolveSession,
-      transport: {
-        getTicket: config.getTicket,
-        api: config.api,
-        fetchSnapshot: config.fetchSnapshot,
-        ...(config.fetchSnapshotPage ? { fetchSnapshotPage: config.fetchSnapshotPage } : {}),
-        onInitialPageLoaded: recordInitialPage,
-        userWebConnection: config.userWebConnection,
-        lifecycleHooks: config.lifecycleHooks,
-        websocketHeaders: config.websocketHeaders,
-      },
-      ...(config.websocketBaseUrl ? { websocketBaseUrl: config.websocketBaseUrl } : {}),
-      storage: jotaiStorage,
-      onToolAttachment: config.onToolAttachment,
-      onFilePart: config.onFilePart,
-      isDeliveryFailureResolved: messageId => resolvedFailures.has(messageId),
+  /**
+   * The transport callbacks of one open. The session they belong to is built
+   * from this object, so it is read through `getSession` at callback time.
+   */
+  function buildOpenSessionCallbacks(
+    open: SessionOpen,
+    getSession: () => CloudAgentSession
+  ): OpenSessionCallbacks {
+    const expectedGeneration = open.expectedGeneration;
+    return {
       onSessionCreated: info => {
         if (info.parentID == null) {
           // Adopt the server-reported root session ID so message
@@ -2543,10 +2777,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           }
           // A fresh replay is starting (initial connect or a reconnect);
           // onReplayComplete flips this back off once it's done.
-          remoteHistoryReplaying = true;
+          setRemoteHistoryReplaying(true);
           // Snapshot live post-clear ids before snapshot upserts land.
           postClearSurvivorIds = store.get(transcriptClearedAtom)
-            ? new Set(session.storage.getMessageIds())
+            ? new Set(getSession().storage.getMessageIds())
             : null;
           if (info.model) {
             updateObservedModel(
@@ -2622,7 +2856,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         // overwrite this, including an explicit downgrade.
         currentCapabilities = resolved.type === 'remote' ? resolved.capabilities : undefined;
         recomputeSupportsAttachments(resolved.type);
-        updateCapabilityAtoms(session);
+        updateCapabilityAtoms(getSession());
       },
       onRemoteModelStateChange: handleRemoteModelStateChange,
       onRemoteCommandStateChange: state => {
@@ -2631,7 +2865,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       },
       onTransportCapabilityChange: () => {
         if (expectedGeneration !== switchGeneration) return;
-        if (currentSession === session) updateCapabilityAtoms(session);
+        const activeSession = getSession();
+        if (currentSession === activeSession) updateCapabilityAtoms(activeSession);
       },
       onTransportCapabilitiesChange: capabilities => {
         if (expectedGeneration !== switchGeneration) return;
@@ -2640,7 +2875,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       },
       onReplayComplete: () => {
         if (expectedGeneration !== switchGeneration) return;
-        remoteHistoryReplaying = false;
+        setRemoteHistoryReplaying(false);
         store.set(isLoadingAtom, false);
         store.set(isRefreshingCachedTranscriptAtom, false);
         // `/clear` with no successful post-clear send: drop the replayed
@@ -2651,6 +2886,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         const survivors = postClearSurvivorIds;
         postClearSurvivorIds = null;
         if (!store.get(transcriptClearedAtom) || survivors === null) return;
+        const session = getSession();
         for (const messageId of session.storage.getMessageIds()) {
           if (!survivors.has(messageId)) {
             session.storage.deleteMessage(messageId);
@@ -2673,14 +2909,24 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         // composer despite canSend being correctly restored by
         // restoreAfterInterrupt. The guard is consumed on match (one-shot) so
         // unrelated or subsequent Aborted events still surface.
-        if (message === 'Aborted' && pendingInterruptSession === session) {
-          pendingInterruptSession = null;
+        if (message === 'Aborted' && pendingInterruptSession === getSession()) {
+          clearPendingInterrupt();
           return;
         }
+        // An open that fails before the stream connects (for example, a refused
+        // stream ticket) gets no replay to end its loading state, so the
+        // failure ends it and shows why.
+        const failedOpen =
+          expectedGeneration === switchGeneration &&
+          (store.get(isLoadingAtom) || store.get(isRefreshingCachedTranscriptAtom));
         store.set(errorAtom, message);
         // The live transcript will not replace the cached rows now: the error
         // indicator owns the stale-rows state, so the refresh indicator stops.
         store.set(isRefreshingCachedTranscriptAtom, false);
+        if (failedOpen) {
+          store.set(isLoadingAtom, false);
+          setIndicator({ type: 'error', message, timestamp: Date.now() });
+        }
       },
       onChildSessionError: (childSessionId, message) => {
         const next = new Map(store.get(childSessionErrorsAtom));
@@ -2698,6 +2944,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       },
       onEvent: event => {
         if (expectedGeneration !== switchGeneration) return;
+        const session = getSession();
         const eventSessionId = chatEventSessionId(event);
         if (eventSessionId !== null) {
           clearStaleChildSessionHydrationError(session.storage, eventSessionId);
@@ -2823,13 +3070,64 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           }
         }
       },
-    });
+    };
+  }
 
-    if (expectedGeneration !== switchGeneration) {
-      session.destroy();
-      return;
-    }
-    currentSession = session;
+  /** Builds the transport callbacks and the session for one prepared open. */
+  function createOpenSession(open: SessionOpen): CloudAgentSession {
+    const { kiloSessionId, initialPageGeneration, storage, resolvedFailures } = open;
+
+    // Persist the bounded page's cursor / hasOlderMessages / omittedItemCount
+    // so `loadOlderMessages` can continue from where the transport left off.
+    // This is a no-op for stale (pre-switchSession) callbacks because
+    // `loadOlderGeneration` advances on every switch. The generation is
+    // captured synchronously here, at callback creation time: reading
+    // `loadOlderGeneration` from inside the callback would be tautological
+    // when the same session id is switched twice in a row, because the
+    // second switch's `clearAllAtoms()` advance lands before the first
+    // switch's `onInitialPageLoaded` callback runs, letting a stale page
+    // pass the generation check and clobber the active session's cursor
+    // and omitted-item count.
+    const recordInitialPage = (page: SessionSnapshotPage): void => {
+      if (applyPage({ ...page, kind: 'success' }, initialPageGeneration, true)) {
+        // The stream replays these rows later; show them with the page's messages.
+        transcriptRows.restore(page);
+        // A bounded page can lag the stream; omissions are not deletion evidence.
+        // Only an applied page can finish the current open's refresh.
+        store.set(isRefreshingCachedTranscriptAtom, false);
+      }
+    };
+
+    // Once live replay can start, a slower cache must not overwrite it. Do not
+    // await disk here: an unavailable cache must never delay a healthy open.
+    open.acceptCachedPage = false;
+
+    const callbacks = buildOpenSessionCallbacks(open, () => session);
+    const session = createCloudAgentSession({
+      kiloSessionId,
+      resolveSession: config.resolveSession,
+      transport: {
+        getTicket: config.getTicket,
+        api: config.api,
+        fetchSnapshot: config.fetchSnapshot,
+        ...(config.fetchSnapshotPage ? { fetchSnapshotPage: config.fetchSnapshotPage } : {}),
+        onInitialPageLoaded: recordInitialPage,
+        userWebConnection: config.userWebConnection,
+        lifecycleHooks: config.lifecycleHooks,
+        websocketHeaders: config.websocketHeaders,
+      },
+      ...(config.websocketBaseUrl ? { websocketBaseUrl: config.websocketBaseUrl } : {}),
+      storage,
+      onToolAttachment: config.onToolAttachment,
+      onFilePart: config.onFilePart,
+      isDeliveryFailureResolved: messageId => resolvedFailures.has(messageId),
+      ...callbacks,
+    });
+    return session;
+  }
+
+  /** Subscribes the fresh session's service state and starts its transport. */
+  function connectOpenSession(open: SessionOpen, session: CloudAgentSession): void {
     subscribeToServiceState(session, {
       onFirstActivity: () => {
         // Fallback: clear loading when events flow even if no root
@@ -2841,7 +3139,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           store.set(isLoadingAtom, false);
         }
         if (activeSessionType === 'remote') {
-          config.onRemoteSessionOpened?.({ kiloSessionId });
+          config.onRemoteSessionOpened?.({ kiloSessionId: open.kiloSessionId });
         }
       },
     });
@@ -2939,6 +3237,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     //     authoritative user message lands (see the onEvent handler).
     const optimisticStorage = store.get(sessionStorageAtom);
     const optimisticSessionId = store.get(rootSessionIdAtom) ?? kiloSessionId;
+    const insertedOptimisticRow = Boolean(
+      sessionAtSend && optimisticStorage && optimisticSessionId
+    );
     try {
       if (sessionAtSend && optimisticStorage && optimisticSessionId) {
         insertOptimisticUserMessage({
@@ -2995,6 +3296,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           ? { attachmentParts: input.attachmentParts }
           : {}),
       });
+      // A prompt the server accepted is no longer a draft, whether or not the
+      // user is still on the session that sent it.
+      if (kiloSessionId) failedPromptBySession.delete(kiloSessionId);
       if (currentSession !== sessionAtSend || activeSessionId !== kiloSessionId) return true;
       store.set(billingFailureAtom, null);
       store.set(failedPromptAtom, null);
@@ -3012,11 +3316,49 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       }
       return true;
     } catch (err) {
-      if (currentSession !== sessionAtSend || activeSessionId !== kiloSessionId) return false;
-      // Delete the optimistic row on failure so the transcript does not keep a
-      // ghost prompt. The composer keeps the draft for a retry.
-      optimisticStorage?.deleteMessage(messageId);
+      // The optimistic row belongs to the chat that sent it, not to whichever
+      // chat is active by the time the send settles: a switch mid-send must not
+      // leave the row behind. The chat may also have been reopened while the
+      // send was in flight, so the mounted storage is cleaned too — its row can
+      // come back from the page cached on the way out. The composer cleared its
+      // draft when the row was inserted, so the text goes back to the sending
+      // chat as well. The atom writes and the callback speak for the chat the
+      // user is looking at, so they need that chat to still be the sending one;
+      // the session object identity is deliberately not part of that test,
+      // because reopening a chat replaces it.
+      const stillOnSendingChat = activeSessionId === kiloSessionId;
+      const mountedStorage = store.get(sessionStorageAtom);
+      const mountedRow = mountedStorage?.getMessageInfo(messageId);
+      // A confirmed record under this id is server history: the server accepted
+      // the prompt and only the response was lost, so there is nothing to retry.
+      // `switchSession` clears the storage it leaves, so after a switch the
+      // confirmation survives only in the page cached on the way out.
+      const delivered =
+        (stillOnSendingChat && mountedRow?.role === 'user' && mountedRow.synthetic !== true) ||
+        (!stillOnSendingChat &&
+          kiloSessionId !== null &&
+          (await pageShowsConfirmedUserMessage(kiloSessionId, messageId)));
+      if (optimisticStorage && optimisticStorage !== mountedStorage && !delivered) {
+        optimisticStorage.deleteMessage(messageId);
+      }
+      if (mountedStorage && mountedRow?.role === 'user' && mountedRow.synthetic === true) {
+        mountedStorage.deleteMessage(messageId);
+      }
       remoteOptimisticIds.delete(messageId);
+      if (insertedOptimisticRow && kiloSessionId) {
+        if (delivered) {
+          failedPromptBySession.delete(kiloSessionId);
+        } else {
+          recordFailedPrompt(kiloSessionId, messageText);
+          forgetCachedOptimisticRow(kiloSessionId, messageId);
+        }
+      }
+      if (!stillOnSendingChat) return false;
+      if (delivered) {
+        store.set(failedPromptAtom, null);
+        store.set(billingFailureAtom, null);
+        return false;
+      }
       store.set(failedPromptAtom, messageText);
       store.set(billingFailureAtom, parseCustomerBillingFailure(err));
       const detail = formatErrorDetail(err);
@@ -3086,8 +3428,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       if (session.canInterrupt) {
         // Mark this session as the expected source of any "Aborted" error
         // so onError can suppress it without hiding real transport failures.
+        // The guard expires on its own once this call settles: a service that
+        // acknowledges the stop without ever reporting the abort must not
+        // swallow a later genuine one.
+        clearPendingInterrupt();
         pendingInterruptSession = session;
         await session.interrupt();
+        if (pendingInterruptSession === session) {
+          armPendingInterruptExpiry();
+        }
       }
       if (currentSession === session) {
         const activityType = session.state.getActivity().type;
@@ -3103,6 +3452,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         });
       }
     } catch {
+      // A rejected interrupt never aborts the turn, so nothing will report it.
+      if (pendingInterruptSession === session) {
+        clearPendingInterrupt();
+      }
       if (currentSession === session) {
         // Prefer unlock over a stuck composer when the session is still writable.
         restoreAfterInterrupt(session);
@@ -3140,6 +3493,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     currentSession.state.clearCommits();
     olderMessagesCursor = null;
     store.set(hasOlderMessagesAtom, false);
+    // The cleared view holds nothing, so the omitted-history accounting starts
+    // from zero exactly as a non-preserved `clearAllAtoms` does: a stale count
+    // would keep the omitted banner up, and a stale initial-page baseline would
+    // subtract the wrong contribution from the next first page.
+    store.set(olderMessagesOmittedItemCountAtom, 0);
+    initialPageOmittedItemCount = 0;
     // Reset the retained-history stack so a later `trimRetainedHistory`
     // cannot restore a pre-clear cursor.
     retainedHistoryStack = [];
@@ -3193,7 +3552,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (owner === null) return;
     const ownerIsActive = owner === activeSessionId;
     if (ownerIsActive) {
-      currentSession?.state.clearFailedMessage(messageId);
+      // The service reports when the pruned entry held the terminal error and
+      // has undone it. That error reached `errorAtom` through `config.onError`,
+      // which the service state cannot reach, so a retry that resolves the
+      // failure must clear it here — the durable-seed path does the same.
+      if (currentSession?.state.clearFailedMessage(messageId)) {
+        store.set(errorAtom, null);
+      }
       // A client-materialised row is a local ghost: the accepted re-send
       // supersedes its content and materialises its own row, so leaving the
       // original would render the prompt twice — once for the failed
@@ -3306,6 +3671,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   function destroy(): void {
+    cacheActiveSessionPage();
     for (const cleanup of metadataRecoveryCleanups) cleanup();
     metadataRecoveryCleanups = [];
     childSessionHydrationGeneration += 1;
@@ -3323,6 +3689,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     remoteOptimisticIds.clear();
     resolvedDeliveryFailuresBySession.clear();
     supersededInFlightBySession.clear();
+    failedPromptBySession.clear();
     activeSessionId = null;
     activeSessionType = null;
     store.set(
@@ -3367,6 +3734,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       isStreaming: isStreamingAtom,
       isLoading: isLoadingAtom,
       isRefreshingCachedTranscript: isRefreshingCachedTranscriptAtom,
+      cachedTranscriptSessionId: cachedTranscriptSessionIdAtom,
+      isReplayingLiveHistory: isReplayingLiveHistoryAtom,
       isReadOnly: isReadOnlyAtom,
       supportsAttachments: supportsAttachmentsAtom,
       activeSessionType: activeSessionTypeAtom,

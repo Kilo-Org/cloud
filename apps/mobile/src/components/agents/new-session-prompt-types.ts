@@ -62,6 +62,19 @@ export type NewSessionPromptProps = {
    * the preferred floor.
    */
   cardTop?: number;
+  /**
+   * The block directly under the card that must stay inside the frame, in
+   * points, measured by the host: the Organization section when the entry
+   * renders one, then the Run on row (`mt-5`, its label, its `mb-2`, and the
+   * selector or target line). The frame fit reserves it — keeping a line of air
+   * under it — while the input still keeps its floor beside it, so a long draft
+   * cannot grow the card over the row. Measured at 167pt on the Android
+   * emulator with the keyboard up, the block needs a frame of 395pt beside the
+   * floor; a phone frame is shorter, so there the floor wins and the row comes
+   * into view with the form's own drag. Omitted or unmeasured keeps `0`, which
+   * owes nothing below the card.
+   */
+  belowCardHeight?: number;
   /** True for the Continue clone entry: hides the composer, paperclip, paste, and voice. */
   isCloneEntry?: boolean;
 };

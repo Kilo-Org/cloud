@@ -30,23 +30,22 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 
-import { QueryError } from '@/components/query-error';
 import {
   DiffFontMetricsContext,
   useBoundedDiffFontMetrics,
 } from '@/components/pr-review/diff/diff-font-metrics';
-import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import {
   PrDiffFileListHeader,
   useDiffViewMode,
 } from '@/components/pr-review/diff/pr-diff-file-list-header';
+import { PrDiffFileListState } from '@/components/pr-review/diff/pr-diff-file-list-state';
 import { PrDiffFileListLoading } from '@/components/pr-review/diff/pr-diff-file-list-loading';
 import { PrDiffFloatingActions } from '@/components/pr-review/diff/pr-diff-floating-actions';
 import { usePrDiffStateCopy } from '@/components/pr-review/diff/pr-diff-state-copy';
 import { providerPrRefKey, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useDiffRenderItem } from '@/components/pr-review/diff/pr-diff-file-list-render';
 import { useDiffSelection } from '@/components/pr-review/diff/use-diff-selection';
-import { EmptyFilesView, TabStateMessage } from '@/components/pr-review/diff/pr-diff-rows';
+import { EmptyFilesView } from '@/components/pr-review/diff/pr-diff-rows';
 import { buildFileItems, buildPaginationItem } from '@/lib/pr-review/diff/pr-diff-list-builder';
 import { itemTypeFor, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { stickyFileHeaderIndices } from '@/lib/pr-review/diff/sticky-file-headers';
@@ -60,7 +59,6 @@ import { usePrDiffListScroll } from '@/lib/pr-review/diff/use-pr-diff-list-scrol
 import { usePrDiffListContentPadding } from '@/lib/pr-review/diff/use-pr-diff-list-content-padding';
 import { usePrDiffPageGate } from '@/lib/pr-review/diff/use-pr-diff-page-gate';
 import { clearDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
-import { CenteredState } from '@/components/centered-state';
 import { useIsTablet } from '@/lib/hooks/use-is-tablet';
 
 type PrReviewFileListProps = {
@@ -272,33 +270,18 @@ export function PrReviewFileList({
     selection: selectionView,
   });
 
-  if (files.length === 0) {
-    if (firstPageErrorState?.kind === 'not-found') {
-      return <TabStateMessage title={copy.unavailableTitle} message={copy.unavailableMessage} />;
-    }
-    if (firstPageErrorState?.kind === 'permission') {
-      return (
-        <TabStateMessage title={t('common.accessDenied')} message={copy.accessDeniedMessage} />
-      );
-    }
-    if (firstPageErrorState?.kind === 'reconnect') {
-      return (
-        <CenteredState className="px-6">
-          <PrReviewReconnectNotice />
-        </CenteredState>
-      );
-    }
-    if (firstPageErrorState?.kind === 'retryable') {
-      return (
-        <QueryError
-          variant="server"
-          onRetry={() => {
-            void query.refetch();
-          }}
-          isRetrying={query.isFetching}
-        />
-      );
-    }
+  if (files.length === 0 && firstPageErrorState !== null) {
+    return (
+      <PrDiffFileListState
+        state={firstPageErrorState}
+        copy={copy}
+        isProviderScope={scope.ref.platform !== 'github'}
+        isRetrying={query.isFetching}
+        onRetry={() => {
+          void query.refetch();
+        }}
+      />
+    );
   }
 
   if (!query.isLoading && files.length === 0) {

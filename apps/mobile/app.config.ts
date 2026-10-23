@@ -91,6 +91,16 @@ if (isProductionBuild && !process.env.SENTRY_AUTH_TOKEN) {
   );
 }
 
+// Admission gate: the server issues native credentials only to a device that
+// proves Play Integrity or App Attest. A production build without the project
+// number ships an Android app that cannot attest, so the app would be unable
+// to sign in.
+if (isProductionBuild && !process.env[OPTIONAL_ENV_KEYS.playIntegrityProjectNumber]) {
+  throw new Error(
+    'Missing GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER: a production build requires it, or the Android app cannot attest and native sign-in is refused.'
+  );
+}
+
 // Google OAuth client IDs are public identifiers (committed .env, all EAS
 // environments). The conditional below tolerates their absence so the app still builds when a
 // checkout lacks them; the native Google button hides itself when undefined.
@@ -210,6 +220,13 @@ const config: ExpoConfig = {
       // disables both capabilities and the App Store profile loses them.
       'com.apple.developer.kernel.extended-virtual-addressing': true,
       'com.apple.developer.kernel.increased-memory-limit': true,
+      // Dev-only: the process that registers the artifacts File Provider domain
+      // and sets its automatically-enabled testing mode is the app itself, and
+      // iOS checks the calling process's entitlements. Apple does not grant
+      // this capability on distribution profiles, so production builds must
+      // not carry it (with the paired extension entitlement in
+      // plugins/withArtifactFileProvider.js).
+      ...(isProductionBuild ? {} : { 'com.apple.developer.fileprovider.testing-mode': true }),
     },
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
@@ -233,6 +250,13 @@ const config: ExpoConfig = {
       // composer) can be opened in place.
       UIFileSharingEnabled: true,
       LSSupportsOpeningDocumentsInPlace: true,
+      // Dev-only signal paired with the testing-mode entitlement above: the
+      // artifacts provider module reads it from the app bundle's Info.plist
+      // to decide whether to register the domain with the automatically-
+      // enabled testing mode. `#if DEBUG` is the wrong gate — EAS builds
+      // non-production profiles with the Release configuration — so the
+      // profile is the signal on both sides.
+      ...(isProductionBuild ? {} : { KiloArtifactsFileProviderTesting: true }),
     },
   },
   android: {
@@ -301,18 +325,11 @@ const config: ExpoConfig = {
         },
         ios: {
           ccacheEnabled: true,
-          // SDK 27 requires the scene lifecycle, including scene-based window and link handling.
-          enableSceneSupport: true,
           // iOS consumes React Native Core prebuilt by default, so the pnpm patch
           // over RCTComponentViewFactory.mm would never compile into the app.
           // The Expo Podfile maps this to ENV['RCT_USE_PREBUILT_RNCORE'] = '0'
           // (KILO-APP-6H; react/react-native#58299).
-          // Compile React Native from the patched source instead of linking the
-          // prebuilt core. The App Store core ships with assertions enabled
-          // (react/react-native#57454), so the Fabric unmount assert must carry
-          // the bounds guard from react/react-native#57865 or a stale child
-          // index SIGABRTs release builds (Kilo-Org/kilocode#14065; see
-          // patches/react-native@0.86.3.patch).
+          // Compile the registration and mounting guards in patches/react-native@0.88.0.patch.
           buildReactNativeFromSource: true,
           // GoogleSignIn is a Swift static lib that imports GoogleUtilities/RecaptchaInterop
           // (pulled transitively alongside expo-iap's AppCheckCore); those pods don't define
@@ -472,6 +489,11 @@ const config: ExpoConfig = {
     // Window background follows the app theme (values-night aware) so the
     // rotation surface resize never paints a foreign blank frame.
     './plugins/withAndroidRotationSurface',
+    // Android 15+ draws text from glyph bounds while React Native measures it
+    // from advances, which clips words in a script the fallback font supplies.
+    // Android-only by capability: iOS has one text layout for both jobs, so its
+    // half is nothing. See the plugin's doc comment.
+    './plugins/withAndroidTextViewBounds',
     // One implementation for iOS and Android: the discard confirm is the same
     // shared `Alert.alert` call on both platforms, and iOS's `UIAlertController`
     // already draws that copy as given (it exposes no casing transform to
@@ -485,6 +507,11 @@ const config: ExpoConfig = {
     // by capability — iOS's UIAlertController already follows the system
     // appearance and takes no app-token override (see the plugin's doc comment).
     './plugins/withAndroidAlertDialogTheme',
+    // Overrides androidx.compose.ui's `close_sheet` accessibility string — the
+    // label Material3 gives the dismiss scrim of every native sheet — with the
+    // app's own `common.close` for all 87 languages. Android-only: the resource
+    // exists only in the androidx compose artifacts.
+    './plugins/withAndroidSheetCloseLabel',
     './plugins/withAndroidExpoModuleRepos',
     // Writes the app target's single `Localizable.strings` per language: the
     // four App Intent actions and their parameters resolve their

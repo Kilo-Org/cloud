@@ -18,6 +18,7 @@ import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { modelLabelFromCatalogue } from '@/lib/auto-model-name';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import {
   useSecurityAgentSettingsRedirect,
@@ -132,7 +133,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     return <>{dialog}</>;
   }
 
-  const modelName = (slug: string) => models.find(model => model.id === slug)?.name ?? slug;
+  const modelName = (slug: string) => modelLabelFromCatalogue(models, slug);
   const modelRowOnPress = (value: string, onSelect: (modelSlug: string) => void) =>
     canManage && !modelsLoading && models.length > 0
       ? () => {

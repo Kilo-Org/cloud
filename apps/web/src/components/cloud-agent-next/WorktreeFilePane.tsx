@@ -90,6 +90,7 @@ function FilePaneStatus({
 export function WorktreeFilePane({
   cloudAgentSessionId,
   organizationId,
+  worktreeId,
   path,
   mode,
   onModeChange,
@@ -98,6 +99,7 @@ export function WorktreeFilePane({
 }: {
   cloudAgentSessionId: string;
   organizationId?: string;
+  worktreeId?: string;
   path: string;
   mode?: WorktreeFileViewMode;
   onModeChange: (mode: WorktreeFileViewMode) => void;
@@ -107,6 +109,7 @@ export function WorktreeFilePane({
   const { state, isFetching, reload } = useWorktreeFile({
     cloudAgentSessionId,
     organizationId,
+    worktreeId,
     path,
   });
   const [reloadGeneration, setReloadGeneration] = useState(0);
@@ -143,7 +146,7 @@ export function WorktreeFilePane({
         <RendererBoundary
           key={JSON.stringify([
             organizationId,
-            cloudAgentSessionId,
+            worktreeId ?? cloudAgentSessionId,
             path,
             state.file.revision,
             reloadGeneration,

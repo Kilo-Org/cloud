@@ -85,7 +85,7 @@ export function TodoListsScreen({ segmentControl }: Readonly<{ segmentControl: R
       void (async () => {
         // The count covers finished to-dos too, which `openCount` leaves out.
         const items = await queryClient
-          .fetchQuery(trpc.todos.items.list.queryOptions({ listId: list.id }))
+          .query(trpc.todos.items.list.queryOptions({ listId: list.id }))
           .catch(() => null);
         const deleteList = () => {
           void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

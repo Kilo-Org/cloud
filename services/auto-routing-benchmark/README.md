@@ -182,9 +182,15 @@ per-run scheduler markers instead of scanning the chunk, execution or run tables
 Completed cases are skipped, and all final CLI outputs are persisted before grading.
 A separate paid-execution ledger records when each paid case started and prevents automatic
 repetition if a worker disappears after inference may have started but before an output was
-saved. The container finishes a case whose caller is gone, posts the output back to the
-worker, and refuses the cases it had not started, so an interrupted lane resumes from
-recoverable output or repeats a case that provably made no paid call.
+saved. The container posts every completed case to the worker before returning its HTTP
+response, then posts `not_started` for accepted cases that provably did not spawn the CLI.
+Each callback carries the paid attempt's start time, so a stale callback cannot replace a
+newer empty-output retry.
+
+Output that arrives after its lane failed or its run became terminal is graded later by a
+single-case recovery message. Recovery never starts inference. A per-case grading lease
+prevents the live and recovery paths from grading the same output twice.
+Unbilled throttle and catalog-load failures are cleared and deferred instead of measured.
 
 A chunk that finds a ledgered case without output waits for it instead of failing its lane.
 It keeps its slot and provider lease, so the wait cannot oversubscribe providers, and its
@@ -200,14 +206,33 @@ and pending successful outputs are still reused.
 Terminal scheduler rows are pruned in bounded batches after 24 hours. Benchmark history,
 completed case results, and pending outputs remain available for compatible reuse.
 
-Rollout first exposes catalog provider metadata, then applies the additive D1 migration while
-the queue is paused. Wait for old consumers to quiesce and stop old run-scoped containers
-before enabling the new worker. Legacy queued chunk bodies are wakeups only: it materializes the run's
-entire remaining workload from its snapshot and schedules it under the same global caps.
-Old chunk/shard metadata cannot grant ownership. Do not run old and new consumers together
-or roll back while scheduler claims are active. Pause and quiesce first; complete or requeue
-affected runs before returning to an older worker. This change does not deploy or resume work.
+Production benchmark deploys use `pnpm run deploy`. The wrapper holds the scheduler dispatch
+lease, waits until no queued or active chunks remain, applies D1 migrations, deploys, then
+releases the lease. It renews the lease throughout and fails closed when draining exceeds
+its limit. It never pauses or resumes operator-controlled queues.
 
+An operator pauses dispatch by holding `scheduler_dispatch_lock` row 1 with a token that starts
+with `operator-pause-` and an unexpired lease. The wrapper treats that row as the dispatch hold:
+it never acquires, renews, releases or modifies it, still waits for queued and active chunks to
+drain, and verifies the same token with an unexpired lease before migrations, before the deploy,
+throughout the deploy and after it. It fails closed if the pause disappears, changes or expires,
+and logs `operator_pause_retained` without the token. Any other unexpired owner is contention.
+Resume dispatch after the deploy with:
+
+```sql
+UPDATE scheduler_dispatch_lock SET token=NULL, lease_until=0 WHERE id=1 AND token LIKE 'operator-pause-%'
+```
+
+Diagnostic events contain run, model, variant, repetition, case, chunk, slot, outcome and
+safe error categories. They never contain claim tokens, prompts, model output or raw stderr:
+
+| Event | Use |
+|---|---|
+| `benchmark_case_execution_started` / `benchmark_case_execution_retry_started` | Paid attempt start and output deadline |
+| `benchmark_scheduler_wait` | Retry, wait or lane-failure reason and `errorCategory` |
+| `benchmark_container_result_*` | Callback delivery and worker persistence |
+| `benchmark_output_recovery_*` / `benchmark_late_output_graded` | Late output handling |
+| `benchmark_decider_run_completed` | Expected, measured, missing, failed-lane and error coverage |
 
 Efficient publications invalidate `routing_table_v1`; frontier publications invalidate
 `routing_table_frontier_v1`. Router, engine/dataset identity, ranking settings, and contributing
@@ -292,8 +317,8 @@ Use `POST /admin/registry/refresh` with explicit concrete model/variant pairs:
 - Other profiles and ordinary retry reuse remain unchanged. No global engine-version bump occurs.
 
 The refresh endpoint handles affected `ready` rows directly. The failed-only requeue endpoint cannot repair them.
-Container recovery waits for response completion before suppressing its callback.
-Callback retries remain bounded, and exhausted delivery logs contain categories rather than credentials or result contents.
+Container callbacks are bounded by three attempts. Exhausted delivery logs contain categories,
+not credentials or result contents.
 
 Each pair uses its own CLI variant, results, cost, latency, and registry provenance.
 The worker admits bounded oldest-first registry batches independently of available execution slots.
@@ -875,7 +900,9 @@ the local database before `wrangler dev` starts, so a fresh stack has every tabl
   `localhost`).
 - **Secrets store** (seeded via `pnpm dev:env -y auto-routing-benchmark`, not
   `.dev.vars`): `INTERNAL_API_SECRET_PROD` (same value as the gateway's
-  `INTERNAL_API_SECRET`) and `OPENROUTER_API_KEY`.
+  `INTERNAL_API_SECRET`), `BOT_TOKEN_MINT_SECRET` (same value as the gateway's
+  `BOT_TOKEN_MINT_SECRET`; it authenticates only the decider CLI token mint)
+  and `OPENROUTER_API_KEY`.
 
 ### Hitting it locally
 
@@ -899,10 +926,13 @@ curl -s -X PUT 'http://localhost:8814/admin/config?router=efficient' \
        "updatedAt":null,"updatedBy":null}'
 ```
 
-Decider runs use the worker's default benchmark user and org unless
-`benchmarkUserId` / `benchmarkOrgId` overrides are saved in config. Any
-effective benchmark user must exist locally with credits and belong to the
-effective org. The dev seed provides `auto-routing-cli-local`.
+Decider runs use the worker's default benchmark user (`bot-internal-benchmark`)
+and org unless `benchmarkUserId` / `benchmarkOrgId` overrides are saved in
+config. Each queue message mints a one-hour CLI token from
+`POST /api/internal/bot-token`, which only issues for internal bot users
+(`bot-internal-*`) that belong to the org, so a non-bot override fails the run
+start with a clear error. Create the user locally from the admin
+**Internal Bot Users** page; it also needs credits.
 
 > Local KV/D1 writes from a *second* `wrangler` process are not seen by the
 > running dev process (miniflare holds its own view). After writing state out of
@@ -918,10 +948,9 @@ pnpm db:generate     # drizzle-kit generate
 pnpm typecheck && pnpm test
 ```
 
-Migrations apply on deploy via the `predeploy` hook
-(`wrangler d1 migrations apply auto-routing-benchmark --remote`), and to the local
-database via the `predev` hook (`--local`; `CI=1` skips wrangler's confirmation prompt,
-which would otherwise block the dev runner's tmux pane).
+Production migrations apply inside the guarded `pnpm run deploy` flow. The local database
+uses the `predev` hook (`--local`; `CI=1` skips wrangler's confirmation prompt, which would
+otherwise block the dev runner's tmux pane).
 
 Inspect local D1 by copying the sqlite out (direct reads often hit miniflare
 locks):
@@ -944,15 +973,12 @@ sqlite3 /tmp/<file>.sqlite 'select id, kind, status from benchmark_runs;'
   sends it verbatim as the user message.
 - The server handles SIGTERM and drains the CLI case it already accepted, then exits.
   A case still queued when SIGTERM arrives is refused with `503` instead of starting a new
-  paid call, so a rollout is never charged for work it interrupts. Idle containers therefore
-  release capacity instead of ignoring the inactivity stop.
-- A drained case whose caller disappeared is posted to the worker's `/container/case-result`
-  route, which stores it as pending output. A Durable Object request keeps running after its
-  caller is canceled, so `BenchRunnerContainer` relays the caller's `request.signal` (enabled
-  by the `enable_request_signal` compatibility flag) to the container request; without that,
-  the container would answer the Durable Object and never post. The route is authenticated
-  by the paid-execution claim token instead of the backend secret, which a container never
-  holds, and it only records outcomes for a claim token that actually opened the execution.
+  paid call, after its callback records `not_started`.
+- Every completed case is posted to the worker's `/container/case-result` route before the
+  HTTP response. A Durable Object request keeps running after its caller is canceled, so
+  `BenchRunnerContainer` relays the caller's `request.signal` (enabled by the
+  `enable_request_signal` compatibility flag) to the container request. The route accepts
+  only the exact paid-execution generation that opened the case.
 - Completed or failed runs reject queued work before starting another CLI case.
 - Smaller chunks leave time for an empty-output retry within the queue invocation limit.
 - `case_results` rows carry diagnostics: CLI exit code, output prefix, and an

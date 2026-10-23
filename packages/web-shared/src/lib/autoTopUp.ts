@@ -156,12 +156,10 @@ async function maybePerformAutoTopUpForEntity(entity: AutoTopUpEntity): Promise<
               entity.organization.microdollars_used) /
             1_000_000,
         };
-  // Only for users with auto-top-up enabled
   if (!auto_top_up_enabled) {
     return;
   }
 
-  // Only trigger if balance is below threshold
   const maxThreshold =
     entity.type === 'user'
       ? AUTO_TOP_UP_THRESHOLD_DOLLARS
@@ -201,7 +199,6 @@ async function maybePerformAutoTopUpForEntity(entity: AutoTopUpEntity): Promise<
     threshold_USD: threshold,
   });
 
-  // Perform the auto-top-up - only user.id is needed, fresh data is fetched inside
   const result = await performAutoTopUpForEntity(entity, traceId);
 
   if (!result.success && result.error === 'concurrent_attempt_in_progress') {

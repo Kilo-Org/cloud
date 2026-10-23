@@ -33,7 +33,6 @@ describe('sandbox image version parity', () => {
 
     expect(dockerfile).toContain(`FROM docker.io/cloudflare/sandbox:${sandboxVersion}`);
     expect(devDockerfile).toContain(`FROM docker.io/cloudflare/sandbox:${sandboxVersion}`);
-    expect(devDockerfile).toMatch(/apt-get install[^;]+\bgh\b/s);
     expect(dindDockerfile).toContain(`ARG SANDBOX_VERSION="${sandboxVersion}"`);
   });
 
@@ -69,10 +68,18 @@ describe('runtime distribution packaging', () => {
 
   it('pins the shared toolchain versions', () => {
     expect(RUNTIME_DISTRIBUTION.bun).toBe('1.3.14');
-    expect(RUNTIME_DISTRIBUTION.pnpm).toBe('11.1.2');
-    expect(RUNTIME_DISTRIBUTION.glab).toBe('1.93.0');
-    expect(RUNTIME_DISTRIBUTION.gh).toBe('2.82.1');
+    expect(RUNTIME_DISTRIBUTION.pnpm).toBe('12.14.0');
+    expect(RUNTIME_DISTRIBUTION.glab).toBe('1.124.0');
+    expect(RUNTIME_DISTRIBUTION.gh).toBe('2.102.0');
     expect(RUNTIME_DISTRIBUTION.nodeMajor).toBe('24');
+  });
+
+  it('keeps wrapper Bun types aligned with the runtime', () => {
+    const wrapperPackageJson = JSON.parse(readServiceFile('../wrapper/package.json')) as {
+      devDependencies: Record<string, string>;
+    };
+
+    expect(wrapperPackageJson.devDependencies['@types/bun']).toBe(RUNTIME_DISTRIBUTION.bun);
   });
 
   it('builds wrapper bundles from the shared entrypoint list instead of duplicate commands', () => {
@@ -87,25 +94,44 @@ describe('runtime distribution packaging', () => {
   });
 
   it('keeps Docker bootstrap ARG pins aligned with the contract', () => {
+    for (const file of [...dockerfiles, 'Dockerfile.containers.runtime-free']) {
+      const dockerfile = readServiceFile(`../${file}`);
+      expect(dockerfile).toContain(`ARG BUN_VERSION="${RUNTIME_DISTRIBUTION.bun}"`);
+      expect(dockerfile).toContain(`ARG PNPM_VERSION="${RUNTIME_DISTRIBUTION.pnpm}"`);
+      expect(dockerfile).toContain(`ARG GLAB_VERSION="${RUNTIME_DISTRIBUTION.glab}"`);
+      expect(dockerfile).toContain(`ARG GH_VERSION="${RUNTIME_DISTRIBUTION.gh}"`);
+    }
+    const runtimeFree = readServiceFile('../Dockerfile.containers.runtime-free');
     const containers = readServiceFile('../Dockerfile.containers');
-    expect(containers).toContain(`ARG BUN_VERSION="${RUNTIME_DISTRIBUTION.bun}"`);
-    expect(containers).toContain(`ARG PNPM_VERSION="${RUNTIME_DISTRIBUTION.pnpm}"`);
-    expect(containers).toContain(`ARG GLAB_VERSION="${RUNTIME_DISTRIBUTION.glab}"`);
-    expect(containers).toContain(`ARG GH_VERSION="${RUNTIME_DISTRIBUTION.gh}"`);
-
-    const dind = readServiceFile('../Dockerfile.dind');
-    expect(dind).toContain(`ARG BUN_VERSION="${RUNTIME_DISTRIBUTION.bun}"`);
-    expect(dind).toContain(`ARG PNPM_VERSION="${RUNTIME_DISTRIBUTION.pnpm}"`);
-    expect(dind).toContain(`ARG GLAB_VERSION="${RUNTIME_DISTRIBUTION.glab}"`);
-    expect(dind).toContain(`ARG GH_VERSION="${RUNTIME_DISTRIBUTION.gh}"`);
+    const nodeVersion = containers.match(/ARG NODE_VERSION="([^"]+)"/)?.[1];
+    expect(nodeVersion?.split('.')[0]).toBe(RUNTIME_DISTRIBUTION.nodeMajor);
+    expect(runtimeFree).toContain(`ARG NODE_VERSION="${nodeVersion}"`);
+    for (const file of ['Dockerfile', 'Dockerfile.dev']) {
+      const dockerfile = readServiceFile(`../${file}`);
+      expect(dockerfile).toContain(`ARG NODE_VERSION="${nodeVersion}"`);
+      expect(dockerfile).toContain(
+        'FROM docker.io/library/node:${NODE_VERSION}-slim AS node-runtime'
+      );
+      expect(dockerfile).toContain(
+        'COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node'
+      );
+      expect(dockerfile).toContain(
+        'RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack'
+      );
+      expect(dockerfile).toContain(
+        'COPY --from=node-runtime /usr/local/lib/node_modules /usr/local/lib/node_modules'
+      );
+    }
   });
 
   it('does not install gh from a legacy apt/dnf package in the pinned images', () => {
-    const containers = readServiceFile('../Dockerfile.containers');
-    expect(containers).not.toMatch(/apt-get install[^;]*\bgh\b/s);
-    expect(containers).toContain(
-      `https://github.com/cli/cli/releases/download/v\${GH_VERSION}/gh_\${GH_VERSION}_linux_amd64.tar.gz`
-    );
+    for (const file of [...dockerfiles, 'Dockerfile.containers.runtime-free']) {
+      const dockerfile = readServiceFile(`../${file}`);
+      expect(dockerfile).not.toMatch(/apt-get install[^;]*\bgh\b/s);
+      expect(dockerfile).toContain(
+        `https://github.com/cli/cli/releases/download/v\${GH_VERSION}/gh_\${GH_VERSION}_linux_amd64.tar.gz`
+      );
+    }
   });
 
   it('keeps the supervisor pointed at the contract control-plane install path', () => {

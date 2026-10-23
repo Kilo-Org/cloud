@@ -4,7 +4,7 @@
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { usePreventRemove } from '@/lib/navigation/prevent-remove';
+import { usePreventRemove } from 'expo-router';
 import { type ChatComposer } from './chat-composer';
 
 // The attachment-only send contract: a ready (`uploaded`) attachment with an
@@ -101,10 +101,6 @@ vi.mock('react-native-gesture-handler', () => ({
 }));
 
 vi.mock('expo-router', () => ({
-  useNavigation: () => ({ dispatch: leaveMock.dispatch }),
-}));
-
-vi.mock('@/lib/navigation/prevent-remove', () => ({
   usePreventRemove: vi.fn(),
 }));
 
@@ -493,13 +489,16 @@ describe('ChatComposer unclaimed-attachment leave', () => {
     const guard = vi.mocked(usePreventRemove).mock.calls.at(-1);
     expect(guard?.[0]).toBe(true);
     const action = { type: 'GO_BACK' };
-    const runGuard = guard?.[1] as
-      | ((options: { data: { action: { type: string } } }) => void)
-      | undefined;
+    const runGuard = guard?.[1];
     if (!runGuard) {
       throw new Error('composer did not register its leave guard');
     }
-    runGuard({ data: { action } });
+    runGuard({
+      data: { action },
+      repeat: () => {
+        leaveMock.dispatch(action);
+      },
+    });
 
     expect(leaveMock.confirm).toHaveBeenCalledWith({
       title: 'Discard attachments?',

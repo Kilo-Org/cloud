@@ -48,6 +48,13 @@ export function isDataCollectionExplicitlyDisallowed(
   return provider?.data_collection === 'deny' || provider?.zdr === true;
 }
 
+// https://openrouter.ai/docs/guides/features/plugins
+export type OpenRouterPlugin = {
+  id: string;
+  enabled?: boolean;
+  [option: string]: unknown;
+};
+
 export type OpenRouterReasoningConfig = {
   effort?: OpenAI.Chat.Completions.ChatCompletionReasoningEffort;
   max_tokens?: number;
@@ -70,6 +77,14 @@ export type SharedGatewayRequestProperties = {
   // OpenRouter specific field we do not support
   // https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request#request.body.models
   models?: string[];
+
+  // Messages API fallback models we do not support: OpenRouter tries them when the requested
+  // model fails, not only on Anthropic safety refusals
+  // https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback#server-side-fallback
+  fallbacks?: unknown;
+
+  // OpenRouter plugins (web search, PDF parsing with OCR, ...), stripped from free requests
+  plugins?: OpenRouterPlugin[];
 
   // Non-standard reasoning configuration
   enable_thinking?: boolean; // Alibaba

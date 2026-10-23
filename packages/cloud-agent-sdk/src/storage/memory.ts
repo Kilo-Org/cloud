@@ -147,20 +147,24 @@ function createMemoryStorage(): SessionStorage {
     },
 
     deleteMessage(messageId) {
-      if (!messages.has(messageId)) return;
+      // A part delta can create parts before the message row (see
+      // `applyPartDelta`), so part state is dropped regardless of the row.
+      const hadMessage = messages.delete(messageId);
+      if (hadMessage) {
+        messageIds = messageIds.filter(id => id !== messageId);
+      }
 
-      messages.delete(messageId);
-      messageIds = messageIds.filter(id => id !== messageId);
-
-      if (parts.has(messageId)) {
-        for (const part of parts.get(messageId) ?? []) {
-          forgetPartUpdateTime(partEvidence, messageId, part.id);
-        }
-        parts.delete(messageId);
-        partsSnapshot.delete(messageId);
+      const hadParts = parts.has(messageId);
+      for (const part of parts.get(messageId) ?? []) {
+        forgetPartUpdateTime(partEvidence, messageId, part.id);
+      }
+      parts.delete(messageId);
+      partsSnapshot.delete(messageId);
+      if (hadParts) {
         notify(subscribers, `parts:${messageId}`);
       }
 
+      if (!hadMessage) return;
       notify(subscribers, `message:${messageId}`);
       notify(subscribers, 'messageIds');
     },

@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
@@ -119,7 +119,11 @@ export function TrustedHostsScreen() {
             <Button
               variant="outline"
               onPress={() => {
-                router.back();
+                // The only caller pushes this screen from Account, so `back()`
+                // would land one row short of the Preferences hub the label
+                // names. POP_TO pops back to it, or replaces this screen with
+                // it when the stack was entered without it (deep link).
+                router.dismissTo('/(app)/(tabs)/(3_profile)/preferences' as Href);
               }}
             >
               <Text>{t('trustedHosts.backToPreferences')}</Text>

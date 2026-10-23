@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one gate harness runs the provider × platform matrix; the header Back test shares its mount and router mocks. */
 import * as React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as ReactI18next from 'react-i18next';
@@ -59,7 +60,14 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://web.example' }));
-vi.mock('expo-router', () => ({ usePathname: () => '/pr-review/github/owner/repo/1' }));
+const router = vi.hoisted(() => ({ dismissTo: vi.fn() }));
+vi.mock('expo-router', () => ({
+  usePathname: () => '/pr-review/github/owner/repo/1',
+  useRouter: () => router,
+  useFocusEffect: (effect: () => undefined | (() => void)) => {
+    React.useEffect(effect, [effect]);
+  },
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6F6A61', primaryForeground: '#FFFFFF' }),
 }));
@@ -77,16 +85,22 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/icons/github-icon', () => ({ GitHubIcon: 'GitHubIcon' }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/empty-state', () => ({
-  EmptyState: (props: { action?: React.ReactNode }) =>
-    React.createElement('EmptyState', props, props.action),
+  EmptyState: (props: { description?: React.ReactNode; action?: React.ReactNode }) =>
+    React.createElement('EmptyState', props, props.description, props.action),
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+// The context line owns its own org queries; the gate tests stub it and pin
+// only the props the gate passes (its content is covered by its own test).
+vi.mock('@/components/pr-review/pr-review-context-line', () => ({
+  PrReviewContextLine: 'PrReviewContextLine',
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   AppState: { addEventListener: appState.addEventListener },
+  BackHandler: { addEventListener: () => ({ remove: vi.fn() }) },
   Platform: platform,
   View: 'View',
 }));
@@ -135,6 +149,16 @@ function failLaunch(error: Error) {
   } else {
     vi.mocked(WebBrowser.openAuthSessionAsync).mockRejectedValueOnce(error);
   }
+}
+
+/** Presses the gate's Connect button and lets the launch promise settle one tick. */
+async function pressConnect(renderer: TestRenderer.ReactTestRenderer) {
+  const button = renderer.root.findByType('Button');
+  await act(async () => {
+    (button.props.onPress as () => void)();
+    await Promise.resolve();
+  });
+  return button;
 }
 
 let mounted: TestRenderer.ReactTestRenderer | undefined = undefined;
@@ -189,10 +213,7 @@ describe('Android connect gate unmount', () => {
       type: WebBrowser.WebBrowserResultType.OPENED,
     });
     const renderer = mount(provider);
-    await act(async () => {
-      (renderer.root.findByType('Button').props.onPress as () => void)();
-      await Promise.resolve();
-    });
+    await pressConnect(renderer);
     expect(appState.subscriptions).toHaveLength(1);
 
     await act(async () => {
@@ -218,13 +239,7 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
   it.each(providers)('%s waits for the launch to finish before refreshing', async provider => {
     const pending = beginPendingLaunch();
     const renderer = mount(provider);
-    const button = renderer.root.findByType('Button');
-    expect(button.props.disabled).toBe(false);
-
-    await act(async () => {
-      (button.props.onPress as () => void)();
-      await Promise.resolve();
-    });
+    const button = await pressConnect(renderer);
     expect(button.props.disabled).toBe(true);
     expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(1);
     expect(queryResult.refetch).not.toHaveBeenCalled();
@@ -236,16 +251,11 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
   });
 
   it.each(providers)(
-    '%s reports a failed launch, re-enables Connect, and refreshes once after retry',
+    '%s reports a failed launch, re-enables Connect, and refreshes',
     async provider => {
       failLaunch(new Error('no browser'));
       const renderer = mount(provider);
-      const button = renderer.root.findByType('Button');
-
-      await act(async () => {
-        (button.props.onPress as () => void)();
-        await Promise.resolve();
-      });
+      const button = await pressConnect(renderer);
       expect(toast.error).toHaveBeenCalledExactlyOnceWith(
         'Could not open browser. Please try again.'
       );
@@ -253,16 +263,13 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
       expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(0);
       expect(queryResult.refetch).not.toHaveBeenCalled();
 
-      // The failed launch must leave no listener that could stray-refetch, so
-      // the retry below is the only thing that refreshes.
+      // The failed launch leaves no stray listener: the retry below is the
+      // only thing that refreshes.
       emitForeground();
       expect(queryResult.refetch).not.toHaveBeenCalled();
 
       const retry = beginPendingLaunch();
-      await act(async () => {
-        (button.props.onPress as () => void)();
-        await Promise.resolve();
-      });
+      await pressConnect(renderer);
       expect(button.props.disabled).toBe(true);
 
       await settleLaunch(retry);
@@ -303,11 +310,7 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
       queryResult.refetch.mockRejectedValue(new Error('status refetch failed'));
       const pending = beginPendingLaunch();
       const renderer = mount(provider);
-      const button = renderer.root.findByType('Button');
-      await act(async () => {
-        (button.props.onPress as () => void)();
-        await Promise.resolve();
-      });
+      const button = await pressConnect(renderer);
       await settleLaunch(pending);
       expect(queryResult.refetch).toHaveBeenCalledOnce();
       expect(button.props.disabled).toBe(false);
@@ -326,5 +329,16 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
     const renderer = mount('github');
     expect(renderer.root.findAllByType('GitHubIcon')).toHaveLength(1);
     expect(renderer.root.findAllByType('RefreshCcw')).toHaveLength(0);
+  });
+
+  it.each(providers)('%s Back dismisses to the PR Review inbox, not the app root', provider => {
+    const onBack = mount(provider).root.findByType('ScreenHeader').props.onBack as () => void;
+    onBack();
+    expect(router.dismissTo).toHaveBeenCalledExactlyOnceWith('/(app)/pr-review');
+  });
+
+  it.each(providers)('%s names the active context on the connect view', provider => {
+    const renderer = mount(provider);
+    expect(renderer.root.findAllByType('PrReviewContextLine')).toHaveLength(1);
   });
 });

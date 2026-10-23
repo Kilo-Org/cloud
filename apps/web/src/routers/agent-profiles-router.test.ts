@@ -16,7 +16,9 @@ import type { User, Organization } from '@kilocode/db/schema';
 
 describe('Agent Profiles Router', () => {
   let ownerUser: User;
+  let adminUser: User;
   let memberUser: User;
+  let billingManagerUser: User;
   let otherUser: User;
   let organizationA: Organization;
 
@@ -27,9 +29,19 @@ describe('Agent Profiles Router', () => {
       google_user_name: 'Agent Profiles Owner',
     });
 
+    adminUser = await insertTestUser({
+      google_user_email: 'agent-profiles-admin@example.com',
+      google_user_name: 'Agent Profiles Admin',
+    });
+
     memberUser = await insertTestUser({
       google_user_email: 'agent-profiles-member@example.com',
       google_user_name: 'Agent Profiles Member',
+    });
+
+    billingManagerUser = await insertTestUser({
+      google_user_email: 'agent-profiles-billing@example.com',
+      google_user_name: 'Agent Profiles Billing Manager',
     });
 
     otherUser = await insertTestUser({
@@ -40,8 +52,10 @@ describe('Agent Profiles Router', () => {
     // Create test organization
     organizationA = await createTestOrganization('Agent Profiles Test Org', ownerUser.id, 100000);
 
-    // Add member to organization
+    // Add members to organization
+    await addUserToOrganization(organizationA.id, adminUser.id, 'admin');
     await addUserToOrganization(organizationA.id, memberUser.id, 'member');
+    await addUserToOrganization(organizationA.id, billingManagerUser.id, 'billing_manager');
   });
 
   afterEach(async () => {
@@ -115,6 +129,22 @@ describe('Agent Profiles Router', () => {
           .where(eq(agent_environment_profiles.id, result.id));
 
         expect(dbProfile.description).toBeNull();
+      });
+
+      test('should allow an organization member to create a personal profile', async () => {
+        const caller = await createCallerForUser(memberUser.id);
+
+        const result = await caller.agentProfiles.create({
+          name: 'Member Personal Profile',
+        });
+
+        const [dbProfile] = await db
+          .select()
+          .from(agent_environment_profiles)
+          .where(eq(agent_environment_profiles.id, result.id));
+
+        expect(dbProfile.owned_by_user_id).toBe(memberUser.id);
+        expect(dbProfile.owned_by_organization_id).toBeNull();
       });
     });
 
@@ -562,15 +592,47 @@ describe('Agent Profiles Router', () => {
         expect(dbProfile.owned_by_user_id).toBeNull();
       });
 
-      test('should allow org members to create profiles', async () => {
-        const caller = await createCallerForUser(memberUser.id);
+      test('should allow org admins to create profiles', async () => {
+        const caller = await createCallerForUser(adminUser.id);
 
         const result = await caller.agentProfiles.create({
           organizationId: organizationA.id,
-          name: 'Member Created Profile',
+          name: 'Admin Created Profile',
         });
 
-        expect(result.id).toBeDefined();
+        const [dbProfile] = await db
+          .select()
+          .from(agent_environment_profiles)
+          .where(eq(agent_environment_profiles.id, result.id));
+
+        expect(dbProfile.owned_by_organization_id).toBe(organizationA.id);
+        expect(dbProfile.owned_by_user_id).toBeNull();
+      });
+
+      test('should deny org members creating profiles', async () => {
+        const caller = await createCallerForUser(memberUser.id);
+
+        await expect(
+          caller.agentProfiles.create({
+            organizationId: organizationA.id,
+            name: 'Member Created Profile',
+          })
+        ).rejects.toThrow(
+          'You do not have the required organizational role to access this feature'
+        );
+      });
+
+      test('should deny billing managers creating profiles', async () => {
+        const caller = await createCallerForUser(billingManagerUser.id);
+
+        await expect(
+          caller.agentProfiles.create({
+            organizationId: organizationA.id,
+            name: 'Billing Created Profile',
+          })
+        ).rejects.toThrow(
+          'You do not have the required organizational role to access this feature'
+        );
       });
 
       test('should throw UNAUTHORIZED for non-members', async () => {
@@ -766,8 +828,9 @@ describe('Agent Profiles Router', () => {
     });
 
     test('lets a member delete an unbound profile', async () => {
+      const ownerCaller = await createCallerForUser(ownerUser.id);
       const memberCaller = await createCallerForUser(memberUser.id);
-      const { id: profileId } = await memberCaller.agentProfiles.create({
+      const { id: profileId } = await ownerCaller.agentProfiles.create({
         organizationId: organizationA.id,
         name: 'Unbound Org Profile',
       });

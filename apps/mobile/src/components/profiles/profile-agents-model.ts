@@ -82,6 +82,18 @@ export type AgentRow = Readonly<{
   model: string;
 }>;
 
+/**
+ * Catalog key for the short mode badge on an agent row. The picker in the add
+ * sheet names the key that carries the explanatory suffix; the row has room for
+ * the label alone. `satisfies` fails the build when a mode is added, so no row
+ * can fall back to the raw English config value.
+ */
+export const AGENT_VISIBILITY_LABEL_KEYS = {
+  primary: 'profiles.agents.modePrimary',
+  subagent: 'profiles.agents.modeSubagent',
+  all: 'profiles.agents.modeAll',
+} satisfies Record<AgentVisibility, string>;
+
 /** Project the profile's agents into the rows the list renders. */
 export function agentRows(agents: readonly AgentSource[]): AgentRow[] {
   return agents.map(agent => ({
@@ -205,8 +217,16 @@ export type AgentFormError = 'slug-required' | 'slug-invalid' | 'slug-conflict' 
  * valid. Mirrors the server's `agentSlugSchema`/`agentNameSchema`: a non-empty
  * display name, and a slug that starts with a lowercase letter, stays in
  * `[a-z0-9-]`, and does not collide with a built-in agent.
+ *
+ * `otherSlugs` carries the slugs of the profile's other agents. The server also
+ * holds one agent per slug per profile (`UQ_agent_env_profile_agents_profile_slug`),
+ * so a slug another agent already uses fails the insert; the form refuses it
+ * first with the same inline conflict message.
  */
-export function validateAgentForm(state: AgentFormState): AgentFormError | null {
+export function validateAgentForm(
+  state: AgentFormState,
+  otherSlugs: readonly string[] = []
+): AgentFormError | null {
   const slug = state.slug.trim();
   if (slug.length === 0) {
     return 'slug-required';
@@ -214,7 +234,7 @@ export function validateAgentForm(state: AgentFormState): AgentFormError | null 
   if (!AGENT_SLUG_PATTERN.test(slug)) {
     return 'slug-invalid';
   }
-  if (BUILTIN_AGENT_SLUGS.has(slug)) {
+  if (BUILTIN_AGENT_SLUGS.has(slug) || otherSlugs.some(item => item.toLowerCase() === slug)) {
     return 'slug-conflict';
   }
   if (state.name.trim().length === 0) {

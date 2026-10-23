@@ -4,17 +4,26 @@
 // (missing-configuration rejection, persistence failure) ends the intent — the
 // hook rotates the operation key, so both sync controls ("Sync now" header
 // button and the "Sync findings" empty-state action) must disable and the
-// inline copy must explain the state. The missing-configuration rejection shows
-// the state-specific configuration copy in place of the raw server message.
+// inline copy must explain the state. The hook maps every failure onto catalog
+// copy before it reaches the screen, so the banner renders the mapped message;
+// these cases feed the real mapper's output.
 // Retryable failures keep both controls enabled so the user can retry under the
 // same hoisted key.
 
-import { createElement } from 'react';
+import { createElement, type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import {
+  mapSecuritySyncOperationError,
+  SECURITY_AMBIGUOUS_MESSAGE,
+} from '@/lib/security-agent-ledger';
 import { buildLocalizedMetrics, DashboardScreen } from './dashboard-screen';
+
+// The ledger module imports the operation-key helpers, whose expo-crypto root
+// import loads a native binding this node project does not have.
+vi.mock('expo-crypto', () => ({ randomUUID: () => '00000000-0000-4000-8000-000000000000' }));
 
 const PERSISTENCE_FAILED_MESSAGE = vi.hoisted(
   () => 'We could not record this action. Please try again later.'
@@ -54,6 +63,7 @@ const repositories = vi.hoisted(() => ({
   isLoading: false,
   isError: false,
   data: [] as unknown[],
+  refetch: vi.fn(),
 }));
 const capability = vi.hoisted(() => ({
   canManage: false,
@@ -97,6 +107,11 @@ const focusEffect = vi.hoisted(() => ({
   effect: undefined as (() => void) | undefined,
 }));
 
+// Captures the refresh control element the dashboard passes to the scroll view.
+const tabScreen = vi.hoisted(() => ({
+  refreshControl: undefined as unknown,
+}));
+
 // Captures the retry-card props the dashboard renders per failure.
 const retryCards = vi.hoisted(() => ({
   cards: [] as {
@@ -124,6 +139,9 @@ vi.mock('expo-router', () => ({
     focusEffect.effect = effect;
   },
 }));
+vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({
+  useRouteForegroundRefresh: vi.fn(),
+}));
 vi.mock('@expo/react-native-action-sheet', () => ({
   useActionSheet: () => ({ showActionSheetWithOptions: sheet.show }),
 }));
@@ -144,6 +162,7 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
 }));
 vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
   useSecurityDismissFailures: () => dismissFailures,
+  securityDismissFailureCopy: (draft: { lastError: string }) => draft.lastError,
 }));
 vi.mock('@/lib/persist/use-mutation-outbox', () => ({
   useMutationOutbox: () => outbox,
@@ -159,25 +178,6 @@ vi.mock('@/components/security-agent/security-command-retry-card', () => ({
     return null;
   },
 }));
-// Faithful-enough mirror of the real classifier (covered by its own suite):
-// the persistence-failure and replay-failed markers and the
-// missing-configuration rejection are non-retryable, the rest (transport,
-// in-progress copy, ambiguous, settle-failed) are retryable.
-vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({
-  isSecurityConfigurationError: (error: unknown) =>
-    error instanceof Error && error.message === CONFIGURATION_ERROR_MESSAGE,
-  securityConfigurationCopy: () => CONFIGURATION_COPY,
-  securitySyncReconcileCopy: () => RECONCILE_COPY,
-  isSecuritySyncRetryable: (error: unknown) => {
-    const message = error instanceof Error ? error.message : '';
-    return !(
-      message === 'We could not record this action. Please try again later.' ||
-      message === 'This action did not complete. Please try again.' ||
-      message === 'operation_key_reuse_mismatch' ||
-      message === CONFIGURATION_ERROR_MESSAGE
-    );
-  },
-}));
 vi.mock('@kilocode/app-shared/security-agent', () => ({
   buildSecurityDashboardMetrics: sharedMetrics.build,
   getAnalysisIncompleteCount: (analysis: {
@@ -187,6 +187,7 @@ vi.mock('@kilocode/app-shared/security-agent', () => ({
     failed: number;
   }) => analysis.triageComplete + analysis.analyzing + analysis.notAnalyzed + analysis.failed,
   getSecurityRepositoriesInScope: () => [],
+  isPersonalSecurityScope: (scope: string) => scope === 'personal',
 }));
 vi.mock('@/lib/security-agent', () => ({
   getSecurityAgentPath: (scope: string, section: string) => `/security/${scope}/${section}`,
@@ -208,7 +209,10 @@ vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 vi.mock('@/components/ui/spinning-icon', () => ({ SpinningIcon: () => null }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/tab-screen', () => ({
-  TabScreenScrollView: (props: { children?: unknown }) => props.children,
+  TabScreenScrollView: (props: { children?: unknown; refreshControl?: unknown }) => {
+    tabScreen.refreshControl = props.refreshControl;
+    return props.children;
+  },
 }));
 
 type R = TestRenderer.ReactTestRenderer;
@@ -226,22 +230,40 @@ function renderScreen(): R {
   return r;
 }
 
+type SyncControlKey = 'securityAgent.dashboard.syncNow' | 'securityAgent.dashboard.syncFindings';
+
 function syncButtons(root: I): I[] {
+  const syncNow = i18n.t('securityAgent.dashboard.syncNow');
+  const syncFindings = i18n.t('securityAgent.dashboard.syncFindings');
   return root.findAll(
     n =>
       typeof n.type === 'string' &&
       (n.type as string) === 'Pressable' &&
-      (n.props.accessibilityLabel === 'Sync now' || n.props.accessibilityLabel === 'Sync findings')
+      (n.props.accessibilityLabel === syncNow || n.props.accessibilityLabel === syncFindings)
   );
 }
 
-function findSyncButton(root: I, label: 'Sync now' | 'Sync findings'): I {
+function findSyncButton(root: I, key: SyncControlKey): I {
+  const label = i18n.t(key);
   const nodes = syncButtons(root).filter(n => n.props.accessibilityLabel === label);
   const n = nodes[0];
   if (!n) {
     throw new Error(`expected 1 ${label} button, got ${nodes.length}`);
   }
   return n;
+}
+
+function findFilterControl(root: I): I {
+  const filter = root.findAll(
+    n =>
+      typeof n.type === 'string' &&
+      (n.type as string) === 'Pressable' &&
+      n.props.accessibilityLabel === 'Filter by repository'
+  )[0];
+  if (!filter) {
+    throw new Error('filter control not found');
+  }
+  return filter;
 }
 
 function syncDisabledStates(root: I): boolean[] {
@@ -278,6 +300,7 @@ describe('DashboardScreen sync control terminal states', () => {
     repositories.isLoading = false;
     repositories.isError = false;
     repositories.data = [];
+    repositories.refetch.mockClear();
     capability.canManage = false;
     dismissFailures.failures = [];
     dismissFailures.clear.mockClear();
@@ -299,16 +322,31 @@ describe('DashboardScreen sync control terminal states', () => {
 
   it('keeps both sync controls enabled after a retryable error and shows its copy', () => {
     triggerSync.isError = true;
-    triggerSync.error = new Error(IN_PROGRESS_COPY);
+    triggerSync.error = mapSecuritySyncOperationError(new Error('operation_in_progress'));
     const root = renderScreen();
 
     expect(syncDisabledStates(root.root)).toEqual([false, false]);
     expect(renderedTexts(root.root)).toContain(IN_PROGRESS_COPY);
   });
 
+  it('renders the translated ambiguous copy under ja and keeps both controls retryable', async () => {
+    await i18n.changeLanguage('ja');
+    try {
+      triggerSync.isError = true;
+      triggerSync.error = mapSecuritySyncOperationError(new Error(SECURITY_AMBIGUOUS_MESSAGE));
+      const root = renderScreen();
+
+      expect(syncDisabledStates(root.root)).toEqual([false, false]);
+      expect(renderedTexts(root.root)).toContain(i18n.t('securityAgent.mutations.ambiguous'));
+      expect(renderedTexts(root.root)).not.toContain(SECURITY_AMBIGUOUS_MESSAGE);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+
   it('disables both sync controls and shows configuration-specific copy after a missing-configuration error', () => {
     triggerSync.isError = true;
-    triggerSync.error = new Error(CONFIGURATION_ERROR_MESSAGE);
+    triggerSync.error = mapSecuritySyncOperationError(new Error(CONFIGURATION_ERROR_MESSAGE));
     const root = renderScreen();
 
     expect(syncDisabledStates(root.root)).toEqual([true, true]);
@@ -319,7 +357,7 @@ describe('DashboardScreen sync control terminal states', () => {
 
   it('disables both sync controls and shows the error copy after another non-retryable error', () => {
     triggerSync.isError = true;
-    triggerSync.error = new Error(PERSISTENCE_FAILED_MESSAGE);
+    triggerSync.error = mapSecuritySyncOperationError(new Error(PERSISTENCE_FAILED_MESSAGE));
     const root = renderScreen();
 
     expect(syncDisabledStates(root.root)).toEqual([true, true]);
@@ -335,7 +373,7 @@ describe('DashboardScreen sync control terminal states', () => {
 
   it('submits the sync through the header control with the current repo filter', () => {
     const root = renderScreen();
-    const syncNow = findSyncButton(root.root, 'Sync now');
+    const syncNow = findSyncButton(root.root, 'securityAgent.dashboard.syncNow');
 
     act(() => {
       (syncNow.props.onPress as () => void)();
@@ -353,21 +391,21 @@ describe('DashboardScreen repository filter sheet', () => {
     repositories.isLoading = false;
     repositories.isError = false;
     repositories.data = [];
+    repositories.refetch.mockReset();
+    repositories.refetch.mockResolvedValue({ isError: false });
+    // handleRefresh destructures { isError } from every refetch result.
+    dashboardStats.refetch.mockReset();
+    dashboardStats.refetch.mockResolvedValue({ isError: false });
+    lastSync.refetch.mockReset();
+    lastSync.refetch.mockResolvedValue({ isError: false });
     config.data = { slaEnabled: true };
     sheet.show.mockClear();
+    retryCards.cards = [];
   });
 
   it('opens the themed sheet with the repository options from the filter control', () => {
     const root = renderScreen();
-    const filter = root.root.findAll(
-      n =>
-        typeof n.type === 'string' &&
-        (n.type as string) === 'Pressable' &&
-        n.props.accessibilityLabel === 'Filter by repository'
-    )[0];
-    if (!filter) {
-      throw new Error('filter control not found');
-    }
+    const filter = findFilterControl(root.root);
 
     act(() => {
       (filter.props.onPress as () => void)();
@@ -382,6 +420,58 @@ describe('DashboardScreen repository filter sheet', () => {
       },
       expect.any(Function)
     );
+  });
+
+  it('disables the filter control while repositories are loading', () => {
+    repositories.isLoading = true;
+    const root = renderScreen();
+    const filter = findFilterControl(root.root);
+
+    expect(filter.props.disabled).toBe(true);
+  });
+
+  it('renders a retryable card for a failed repositories fetch and retries on tap', () => {
+    repositories.isError = true;
+    const root = renderScreen();
+    const filter = findFilterControl(root.root);
+
+    expect(filter.props.disabled).toBe(true);
+    expect(retryCards.cards).toHaveLength(1);
+    expect(retryCards.cards[0]?.retryable).toBe(true);
+    expect(retryCards.cards[0]?.lastError).toBe('Could not load repositories');
+
+    act(() => {
+      retryCards.cards[0]?.onRetry?.();
+    });
+
+    expect(repositories.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-enables the filter control and drops the card once the refetch succeeds', () => {
+    repositories.isError = true;
+    renderScreen();
+    expect(retryCards.cards).toHaveLength(1);
+
+    repositories.isError = false;
+    repositories.data = [{ fullName: 'kilo/repo' }];
+    retryCards.cards = [];
+    const root = renderScreen();
+    const filter = findFilterControl(root.root);
+
+    expect(filter.props.disabled).toBe(false);
+    expect(retryCards.cards).toHaveLength(0);
+  });
+
+  it('retries the repositories query on pull-to-refresh', async () => {
+    renderScreen();
+    const refreshControl = tabScreen.refreshControl as ReactElement<{ onRefresh: () => void }>;
+
+    await act(async () => {
+      refreshControl.props.onRefresh();
+      await Promise.resolve();
+    });
+
+    expect(repositories.refetch).toHaveBeenCalledTimes(1);
   });
 });
 

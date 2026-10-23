@@ -11,6 +11,7 @@ export function handleQueue(batch: MessageBatch<unknown>, env: Env): void | Prom
 }
 
 async function processQueue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
+  let writerOverloaded = false;
   for (const message of batch.messages) {
     const queueWaitMs = Math.max(0, Date.now() - message.timestamp.getTime());
     const parsed = UsageRecordRequestSchema.safeParse(message.body);
@@ -35,6 +36,12 @@ async function processQueue(batch: MessageBatch<unknown>, env: Env): Promise<voi
       }
     }
 
+    const writerStatus =
+      outcome.kind === 'unavailable' && outcome.reason === 'http_error'
+        ? outcome.status
+        : undefined;
+    const overloaded = writerStatus === 429 || writerStatus === 503;
+    writerOverloaded ||= overloaded;
     const acknowledged = outcome.kind === 'recorded' || outcome.kind === 'duplicate';
     const level = acknowledged ? 'info' : 'warn';
     console[level](
@@ -44,6 +51,9 @@ async function processQueue(batch: MessageBatch<unknown>, env: Env): Promise<voi
         outcome: outcome.kind,
         ...('reason' in outcome ? { reason: outcome.reason } : {}),
         queue_action: acknowledged ? 'ack' : 'retry',
+        ...(overloaded
+          ? { writer_status: writerStatus, invocation_failure: 'writer_overloaded' }
+          : {}),
         queue_message_id: message.id,
         delivery_attempts: message.attempts,
         queue_wait_ms: queueWaitMs,
@@ -59,4 +69,6 @@ async function processQueue(batch: MessageBatch<unknown>, env: Env): Promise<voi
     if (acknowledged) message.ack();
     else message.retry();
   }
+  // Explicit ACKs/retries survive the rejection; retry() alone is not an invocation failure.
+  if (writerOverloaded) throw new Error('Usage writer overloaded (HTTP 429/503)');
 }

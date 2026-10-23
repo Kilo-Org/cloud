@@ -494,7 +494,7 @@ function Dashboard({
 
       void (async () => {
         try {
-          // Resolve transitive group-level deps (e.g. app-builder → cloud-agent)
+          // Resolve transitive group-level deps (e.g. security-agent → cloud-agent)
           const allGroupIds = resolveGroupTransitiveDeps([groupId]);
           const allNeeded = resolveGroups(allGroupIds);
           const toStart = allNeeded.filter(name => !runningServices.has(name));

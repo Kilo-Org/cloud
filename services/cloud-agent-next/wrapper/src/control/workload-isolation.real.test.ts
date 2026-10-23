@@ -14,12 +14,13 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createKiloClient } from '@kilocode/sdk/v2/client';
 import { CONTROL_PLANE_TIMERS } from '../../../src/shared/control-plane-timers.js';
+import { KILO_CLI_VERSION } from '../../../src/shared/kilo-cli-version.js';
 import { createKiloRuntime } from '../control-plane/kilo-runtime.js';
 import { createOwnedProcessScope } from './owned-processes.js';
 import { closeControlWorkload, initializeControlWorkload } from './workload-cgroup.js';
 
 // Opt in only inside an isolated Linux container with a private, writable cgroup namespace.
-// Use a 4 GiB container, no swap, Kilo 7.8.1 and Bun 1.3.14. Never run on a shared host cgroup.
+// Use a 4 GiB container, no swap, the pinned Kilo CLI and Bun 1.3.14. Never run on a shared host cgroup.
 const suite = process.env.KILO_MEMORY_CGROUP_TEST === '1' ? describe : describe.skip;
 const MiB = 1024 * 1024;
 
@@ -101,7 +102,7 @@ suite('Linux workload memory isolation', () => {
 
   for (const migration of ['available', 'failed'] as const) {
     it(`keeps real Kilo usable after concurrent oversized shells with migration ${migration}`, async () => {
-      expect(Bun.spawnSync(['kilo', '--version']).stdout.toString().trim()).toBe('7.8.1');
+      expect(Bun.spawnSync(['kilo', '--version']).stdout.toString().trim()).toBe(KILO_CLI_VERSION);
       const control = workload();
       const root = mkdtempSync(path.join(tmpdir(), 'kilo-memory-'));
       const restarts: string[] = [];

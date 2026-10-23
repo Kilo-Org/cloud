@@ -2,6 +2,52 @@
 // unit-tested without mounting the screen or importing React Native / tRPC.
 
 import { i18n } from '@/i18n';
+import { ACTION_REQUIRED_KEYS } from '@/components/code-reviewer/action-required-keys';
+
+export function reviewFailureLabel(
+  t: typeof i18n.t,
+  errorMessage: string | null,
+  terminalReason?: string | null
+): string {
+  if (
+    terminalReason === 'github_installation_required' ||
+    terminalReason === 'github_ip_allow_list' ||
+    terminalReason === 'gitlab_project_access_required' ||
+    terminalReason === 'byok_invalid_key' ||
+    terminalReason === 'selected_model_unavailable' ||
+    terminalReason === 'repeated_repository_clone_timeout'
+  ) {
+    return t(ACTION_REQUIRED_KEYS[terminalReason].description);
+  }
+  if (
+    errorMessage ===
+    'Dispatch failed: could not reach the code review service. ' +
+      'It may be offline — retry the review once it is running.'
+  ) {
+    return t('codeReviewer.reviewDetail.serviceUnavailable');
+  }
+  return t('codeReviewer.reviewDetail.reviewFailed');
+}
+
+export function gateThresholdLabel(threshold: string): string {
+  switch (threshold) {
+    case 'off': {
+      return i18n.t('codeReviewer.gate.off');
+    }
+    case 'all': {
+      return i18n.t('codeReviewer.gate.all');
+    }
+    case 'critical': {
+      return i18n.t('codeReviewer.gate.critical');
+    }
+    case 'warning': {
+      return i18n.t('codeReviewer.gate.warning');
+    }
+    default: {
+      return i18n.t('common.unknown');
+    }
+  }
+}
 
 // Flatten the persisted council result into a single finding list. The council
 // result stores findings per specialist; the detail screen renders them as one

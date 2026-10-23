@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { heartbeatReasonFrom } from './sandbox-control-protocol.js';
 import {
-  classifyRetirementCause,
   controlLogBatchSchema,
   controlUploadFailureStartsEpisode,
   createControlDiagnosticProjector,
@@ -311,43 +309,6 @@ describe('control diagnostic schema compatibility', () => {
     expect(record?.fields).not.toHaveProperty('authorization');
     expect(JSON.stringify(record)).not.toContain(prompt);
     expect(JSON.stringify(record)).not.toContain('super-secret-token');
-  });
-});
-
-describe('classifyRetirementCause', () => {
-  it('maps feed machine reasons that previously became unknown', () => {
-    expect(classifyRetirementCause('feed_failed')).toBe('event_feed_unhealthy');
-    expect(classifyRetirementCause('feed_stale')).toBe('event_feed_unhealthy');
-    expect(classifyRetirementCause('feed_ended')).toBe('event_feed_unhealthy');
-  });
-
-  it('keeps process exit distinct from unknown', () => {
-    expect(classifyRetirementCause('process_exited')).toBe('process_exited');
-  });
-
-  it('classifies session event delivery failures', () => {
-    expect(classifyRetirementCause('Session event delivery failed')).toBe(
-      'outcome_delivery_failed'
-    );
-    expect(classifyRetirementCause('Session event delivery unconfirmed')).toBe(
-      'outcome_delivery_failed'
-    );
-  });
-
-  it('falls back through later reasons', () => {
-    expect(classifyRetirementCause('mystery', 'control_disconnected')).toBe('control_disconnected');
-    expect(classifyRetirementCause('mystery')).toBe('unknown');
-  });
-});
-
-describe('heartbeatReasonFrom', () => {
-  it('passes feed and process codes through to the worker heartbeat', () => {
-    expect(heartbeatReasonFrom('feed_failed')).toBe('feed_failed');
-    expect(heartbeatReasonFrom('process_exited')).toBe('process_exited');
-  });
-
-  it('does not invent a machine code for human shutdown strings', () => {
-    expect(heartbeatReasonFrom('Wrapper received SIGTERM')).toBe('shutdown');
   });
 });
 

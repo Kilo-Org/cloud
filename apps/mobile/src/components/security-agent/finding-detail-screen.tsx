@@ -10,6 +10,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { FindingAnalysisPanel } from '@/components/security-agent/finding-analysis-panel';
 import { FindingDetailsPanel } from '@/components/security-agent/finding-details-panel';
 import { FindingRemediationPanel } from '@/components/security-agent/finding-remediation-panel';
+import { PanelErrorBoundary } from '@/components/security-agent/panel-error-boundary';
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -19,7 +20,10 @@ import {
   useSecurityAgentCapability,
   useTrackSecurityAgentInteraction,
 } from '@/lib/hooks/use-security-agent';
-import { useSecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
+import {
+  securityDismissFailureCopy,
+  useSecurityDismissDraft,
+} from '@/lib/hooks/use-security-dismiss-draft';
 import { useSecurityAnalysis, useSecurityFinding } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { findingDetailBackTarget, findingDetailHasLocalHistory } from '@/lib/finding-detail-back';
@@ -58,6 +62,19 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   const [tab, setTab] = useState<FindingTab>('details');
   const findingQuery = useSecurityFinding(scope, findingId);
   const analysisQuery = useSecurityAnalysis(scope, findingId);
+  // Bumped once the boundary's recovery refetch settles, so the boundary
+  // remounts with clean state over the recovered payload. Bumping it in the
+  // same tick would mount the fresh boundary against the still-cached
+  // crashing payload: it would throw again and pin the fallback through the
+  // refetch.
+  const [panelRetryCount, setPanelRetryCount] = useState(0);
+  const retryAnalysisPanel = useCallback(() => {
+    const settle = async () => {
+      await analysisQuery.refetch();
+      setPanelRetryCount(count => count + 1);
+    };
+    void settle();
+  }, [analysisQuery]);
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
   const capability = useSecurityAgentCapability(scope);
   const dismissDraft = useSecurityDismissDraft(scope, findingId);
@@ -74,12 +91,15 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
 
   // The back control always renders. With local history it pops normally
   // (findings-list -> finding returns to the list). A push/deep-link open has
-  // no local history, so `router.back()` is a no-op and back replaces the
-  // whole profile-tab subtree with its root instead. The signal is the nested
-  // Stack's own state index, not `router.canGoBack()` (which is recursive and
-  // also reports parent history).
+  // no local history, so `router.back()` is a no-op and back replaces itself
+  // with the scope's findings list, a sibling route in the root stack. The
+  // signal is the nested Stack's own state index, not `router.canGoBack()`
+  // (which is recursive and also reports parent history).
   const handleBack = () => {
-    const target = findingDetailBackTarget(findingDetailHasLocalHistory(navigation.getState()));
+    const target = findingDetailBackTarget(
+      findingDetailHasLocalHistory(navigation.getState()),
+      scope
+    );
     if (target.kind === 'pop') {
       router.back();
     } else {
@@ -170,7 +190,8 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
 
   // A pre-accept dismissal failure (no command id) leaves a durable draft; the
   // retry card restores it until the user retries or discards it.
-  const dismissFailure = dismissDraft.draft?.lastError ?? null;
+  const draft = dismissDraft.draft;
+  const dismissFailure = draft?.lastError != null ? securityDismissFailureCopy(draft) : null;
 
   return (
     <View className="flex-1 bg-background">
@@ -251,24 +272,36 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
         </TabScreenScrollView>
       )}
       {tab === 'analysis' && (
-        <FindingAnalysisPanel
-          scope={scope}
-          findingId={findingId}
-          analysis={analysisQuery.data}
-          isLoading={analysisQuery.isLoading}
-          isError={analysisQuery.isError}
-          onRetry={() => void analysisQuery.refetch()}
-        />
+        <PanelErrorBoundary
+          key={`analysis-${panelRetryCount}`}
+          onRetry={retryAnalysisPanel}
+          fallbackMessage={t('securityAgent.analysis.couldNotLoad')}
+        >
+          <FindingAnalysisPanel
+            scope={scope}
+            findingId={findingId}
+            analysis={analysisQuery.data}
+            isLoading={analysisQuery.isLoading}
+            isError={analysisQuery.isError}
+            onRetry={() => void analysisQuery.refetch()}
+          />
+        </PanelErrorBoundary>
       )}
       {tab === 'remediation' && (
-        <FindingRemediationPanel
-          scope={scope}
-          findingId={findingId}
-          analysis={analysisQuery.data}
-          isLoading={analysisQuery.isLoading}
-          isError={analysisQuery.isError}
-          onRetry={() => void analysisQuery.refetch()}
-        />
+        <PanelErrorBoundary
+          key={`remediation-${panelRetryCount}`}
+          onRetry={retryAnalysisPanel}
+          fallbackMessage={t('securityAgent.remediation.couldNotLoad')}
+        >
+          <FindingRemediationPanel
+            scope={scope}
+            findingId={findingId}
+            analysis={analysisQuery.data}
+            isLoading={analysisQuery.isLoading}
+            isError={analysisQuery.isError}
+            onRetry={() => void analysisQuery.refetch()}
+          />
+        </PanelErrorBoundary>
       )}
     </View>
   );

@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp, Pencil, Terminal, Trash2 } from '@/components/u
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 
 type KiloCommandRowProps = Readonly<{
   name: string;
@@ -48,7 +49,7 @@ export function KiloCommandRowView({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const controlClass = (disabled: boolean) =>
-    cn('h-11 w-11 items-center justify-center active:opacity-70', disabled && 'opacity-40');
+    cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70', disabled && 'opacity-40');
   return (
     <View className="gap-1 rounded-lg bg-secondary px-3 py-2">
       <View className="flex-row items-center gap-1">
@@ -102,7 +103,7 @@ export function KiloCommandRowView({
           <ChevronDown size={20} color={colors.mutedForeground} />
         </Pressable>
         <Pressable
-          className="h-11 w-11 items-center justify-center active:opacity-70"
+          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
           accessibilityRole="button"
           accessibilityLabel={t('profiles.slashCommands.edit')}
           onPress={onEdit}
@@ -110,7 +111,7 @@ export function KiloCommandRowView({
           <Pencil size={18} color={colors.mutedForeground} />
         </Pressable>
         <Pressable
-          className="h-11 w-11 items-center justify-center active:opacity-70"
+          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
           accessibilityRole="button"
           accessibilityLabel={t('common.delete')}
           onPress={onDelete}

@@ -16,7 +16,7 @@ export function clearReasoningPreference() {
 
 /** The stored default-expanded value for callers with no React tree (the settings registry). */
 export function getAutoExpandThinking(): boolean {
-  return store.get();
+  return store.getRequested();
 }
 
 export function setAutoExpandThinking(value: boolean) {

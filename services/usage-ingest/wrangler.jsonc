@@ -48,7 +48,7 @@
             "max_batch_timeout": 0,
             "max_retries": 3,
             "retry_delay": 60,
-            "max_concurrency": 1,
+            "max_concurrency": 200,
             "dead_letter_queue": "usage-ingest-processing-dlq-staging",
           },
         ],

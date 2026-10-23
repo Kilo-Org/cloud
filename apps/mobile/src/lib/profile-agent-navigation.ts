@@ -14,13 +14,16 @@ export function getProfileAgentScope(
   if (!organizations || organizationsRefreshing) {
     return undefined;
   }
-  return organizations.some(org => org.organizationId === selectedOrganizationId)
-    ? selectedOrganizationId
-    : PERSONAL_SECURITY_SCOPE;
+  // A settled list that no longer contains the selection means the membership
+  // was lost, not that the reader chose Personal: substituting Personal here
+  // opened the agent's personal first-run state under an organization name the
+  // reader still has selected. Keep the id so the organization scope can say
+  // that access is gone and offer the way back.
+  return selectedOrganizationId;
 }
 
 export function getCodeReviewerProfilePath(scope: string): Href {
-  return `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}` as Href;
+  return `/(app)/code-reviewer/${scope}` as Href;
 }
 
 export function getPrReviewEntryPath(): Href {

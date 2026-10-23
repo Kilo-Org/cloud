@@ -128,9 +128,35 @@ export function extractVercelGenerationTime(
   return Number.isFinite(generationTime) && generationTime >= 0 ? generationTime : null;
 }
 
+/**
+ * Node's fetch (undici) fails a body read with `TypeError: terminated` when the
+ * upstream connection breaks mid-body. The cause tells an idle body timeout
+ * apart from a closed or reset socket.
+ */
+export function getUpstreamBodyTermination(error: unknown): 'timeout' | 'disconnect' | null {
+  if (
+    typeof error !== 'object' ||
+    error === null ||
+    !('name' in error) ||
+    !('message' in error) ||
+    error.name !== 'TypeError' ||
+    error.message !== 'terminated'
+  ) {
+    return null;
+  }
+  const cause = 'cause' in error ? error.cause : undefined;
+  const causeCode =
+    typeof cause === 'object' && cause !== null && 'code' in cause ? cause.code : undefined;
+  return causeCode === 'UND_ERR_BODY_TIMEOUT' ? 'timeout' : 'disconnect';
+}
+
 export function isResponseInterruptedError(error: unknown): boolean {
   if (typeof error !== 'object' || error === null || !('name' in error)) return false;
-  return error.name === 'ResponseAborted' || error.name === 'TimeoutError';
+  return (
+    error.name === 'ResponseAborted' ||
+    error.name === 'TimeoutError' ||
+    getUpstreamBodyTermination(error) !== null
+  );
 }
 
 /**

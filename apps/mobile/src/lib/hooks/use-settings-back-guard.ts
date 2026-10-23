@@ -1,10 +1,9 @@
 import { getSettingsBackGuardOptions } from '@kilocode/app-shared/security-agent';
-import { useNavigation, useRouter } from 'expo-router';
-import { type ReactNode, type RefObject, useEffect, useRef } from 'react';
+import { useNavigation, usePreventRemove, useRouter } from 'expo-router';
+import { type ReactNode, type RefObject, useEffect, useRef, useState } from 'react';
 
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { i18n } from '@/i18n';
-import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 
 const BUTTON_LABEL_KEY = {
@@ -63,7 +62,9 @@ export type SettingsBackGuardResult = {
  * so the native alert's destructive style would never reach the screen there
  * and Discard would lose its red affordance. It offers Keep editing
  * (the safe choice), Discard, and — while the draft is valid — Save, which
- * persists the draft and then replays the captured navigation action. The
+ * persists the draft and then replays the captured navigation action. An
+ * invalid draft has nothing valid to persist, so that confirmation offers
+ * only Keep editing and Discard and says so instead of asking to save. The
  * caller renders the returned `dialog` node in its own tree.
  *
  * Not a general form framework: it only classifies dirty/valid into that
@@ -96,27 +97,38 @@ export function useSettingsBackGuard({
   // popping a spurious "Unsaved changes" confirm whose own Save button would
   // save a second time.
   const skipNextGuardRef = useRef(false);
+  const [leaveAllowed, setLeaveAllowed] = useState(false);
 
-  usePreventRemove(dirty, ({ data }) => {
+  usePreventRemove(dirty && !leaveAllowed, ({ repeat }) => {
+    const leave = () => {
+      setLeaveAllowed(true);
+      repeat();
+    };
     if (skipNextGuardRef.current) {
       skipNextGuardRef.current = false;
-      navigation.dispatch(data.action);
+      leave();
       return;
     }
-    const action = data.action;
     const options = getSettingsBackGuardOptions(valid ? 'dirty-valid' : 'dirty-invalid');
+    // The message follows the buttons: a screen with nothing valid to persist
+    // would contradict a prompt that asks the user to save.
+    const saveOffered = options.includes('save');
     confirm({
       title: i18n.t('securityAgent.settingsSave.unsavedTitle'),
-      message: i18n.t('securityAgent.settingsSave.unsavedMessage'),
+      message: i18n.t(
+        saveOffered
+          ? 'securityAgent.settingsSave.unsavedMessage'
+          : 'securityAgent.settingsSave.unsavedInvalidMessage'
+      ),
       cancelLabel: i18n.t(BUTTON_LABEL_KEY['keep-editing']),
-      extraAction: options.includes('save')
+      extraAction: saveOffered
         ? {
             label: i18n.t(BUTTON_LABEL_KEY.save),
             onPress: () => {
               void (async () => {
                 try {
                   await onSaveRef.current();
-                  navigation.dispatch(action);
+                  leave();
                 } catch {
                   // The save mutation's centralized onError already toasted —
                   // stay on the screen so the user can retry or discard.
@@ -126,9 +138,7 @@ export function useSettingsBackGuard({
           }
         : undefined,
       confirmLabel: i18n.t(BUTTON_LABEL_KEY.discard),
-      onConfirm: () => {
-        navigation.dispatch(action);
-      },
+      onConfirm: leave,
       // These settings screens are plain stack screens with no sheet or modal
       // on them, so the portal dialog can never hide behind a presented surface.
     });

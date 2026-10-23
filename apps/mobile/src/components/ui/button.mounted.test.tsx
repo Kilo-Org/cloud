@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import tailwindcss from '@tailwindcss/postcss';
 import postcss from 'postcss';
 import { createElement, type ReactElement, useState } from 'react';
-import { Text as NativeText, Pressable } from 'react-native';
+import { Text as NativeText, Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import type * as NativeCSSCompiler from 'react-native-css/compiler';
 import { act, TestRenderer } from '@/test/renderer';
@@ -169,6 +169,41 @@ describe('Button native target contract', () => {
     }
   );
 
+  it('names a loading button from its visible text so the settled state reads the label again', () => {
+    // No caller label: Button derives one from the child text, so the
+    // `busy: true → false` transition rewrites the Android node's accessible
+    // name from the busy state back to the visible label. Passing
+    // `accessibilityLabel: undefined` overrides the default renderButton label
+    // so these assertions only pass when the derivation itself runs.
+    const busy = renderButton({ loading: true, accessibilityLabel: undefined });
+    expect(busy.props.accessibilityLabel).toBe('Retry');
+
+    const ready = renderButton({ loading: false, accessibilityLabel: undefined });
+    expect(ready.props.accessibilityState).toEqual({
+      disabled: false,
+      busy: false,
+    });
+    expect(ready.props.accessibilityLabel).toBe('Retry');
+
+    // An explicit caller label always wins.
+    const named = renderButton({ loading: true, accessibilityLabel: 'Retry request' });
+    expect(named.props.accessibilityLabel).toBe('Retry request');
+
+    // A button that never opted into loading is untouched: no derived label.
+    const plain = renderButton({ accessibilityLabel: undefined });
+    expect(plain.props.accessibilityLabel).toBeUndefined();
+  });
+
+  it('does not name an icon-only loading button from its non-text children', () => {
+    const button = renderButton({
+      size: 'icon',
+      children: null,
+      loading: true,
+      accessibilityLabel: undefined,
+    });
+    expect(button.props.accessibilityLabel).toBeUndefined();
+  });
+
   it('reserves a fixed-size slot for the busy spinner so the label never moves', async () => {
     const button = renderButton({ loading: true });
     const slots = button.findAllByProps({ className: BUTTON_BUSY_SLOT_CLASS });
@@ -205,6 +240,40 @@ describe('Button native target contract', () => {
     const button = renderButton({});
     expect(button.findAllByProps({ className: BUTTON_BUSY_SLOT_CLASS })).toHaveLength(0);
     expect(button.findByType(NativeText).children).toEqual(['Retry']);
+  });
+
+  it.each(['Retry', 3])('wraps a bare %p child in the themed label Text', child => {
+    // Pressable is a View: a raw scalar child draws nothing on device, so the
+    // button collapses to padding while the accessibility tree still names it.
+    const button = renderButton({ children: child });
+    const label = button.findByType(NativeText);
+    // Test renderer stringifies a number child; the host text is identical.
+    expect(label.children).toEqual([String(child)]);
+    // The wrapped label carries the button's themed label classes, not the
+    // plain Text default (variant ink varies, so assert the shared base).
+    expect(label.props.className).toContain('font-semibold');
+    expect(label.props.className).toContain('text-sm');
+  });
+
+  it('leaves element children unwrapped', () => {
+    const button = renderButton({
+      children: createElement(View, null, 'Retry'),
+    });
+    // No themed label Text is added around an element the caller provided.
+    expect(button.findAllByType(NativeText)).toHaveLength(0);
+  });
+
+  it('wraps scalar entries of an array while skipping whitespace-only strings', () => {
+    // Mixed icon-plus-label callers pass arrays; a JSX `{' '}` separator between
+    // them draws nothing in a View today and the row gap does the spacing, so
+    // it must not start rendering inside a Text.
+    const button = renderButton({
+      children: [createElement(View, { key: 'i' }), '  ', 'Save', 7],
+    });
+    const labels = button.findAllByType(NativeText);
+    expect(labels).toHaveLength(2);
+    expect(labels[0]?.props.children).toBe('Save');
+    expect(labels[1]?.props.children).toBe(7);
   });
 
   it('keeps an explicitly disabled control disabled after loading ends', () => {
@@ -248,6 +317,14 @@ describe('Button native target contract', () => {
     expect(classes).toContain('bg-primary');
     expect(classes).not.toContain('bg-primary-disabled');
     expect(classes).not.toContain('opacity-50');
+  });
+
+  it('centers the label so a wrapped label stays under its own lines', () => {
+    // Android can paint a wrapped label even when the layout reports one line;
+    // centered text keeps the wrapped lines aligned under each other instead
+    // of hanging from the start edge. Single-line labels are unaffected.
+    const label = renderButton({ variant: 'outline' }).findByType(NativeText);
+    expect((label.props.className as string).split(' ')).toContain('text-center');
   });
 
   it('keeps the dimmed treatment for a disabled non-primary variant', () => {

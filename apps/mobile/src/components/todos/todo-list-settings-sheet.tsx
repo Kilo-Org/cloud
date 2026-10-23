@@ -1,7 +1,7 @@
-import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { BackHandler, Pressable, View } from 'react-native';
 
 import { normalizeAgentMode } from '@/components/agents/mode-normalize';
 import { ModeSelector } from '@/components/agents/mode-selector';
@@ -12,6 +12,7 @@ import { QueryError } from '@/components/query-error';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
+import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useTodoListMutations, useTodoLists } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -51,6 +52,37 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
   const [variant, setVariant] = useState(list?.variant ?? null);
   const saving = create.isPending;
 
+  const { requestClose, dialog } = useSheetDismissGuard({
+    isDirty: () =>
+      nameRef.current !== (list?.name ?? '') ||
+      emojiRef.current !== (list?.emoji ?? '') ||
+      gitUrl !== (list?.gitUrl ?? null) ||
+      mode !== (list?.mode ?? null) ||
+      model !== (list?.model ?? null) ||
+      variant !== (list?.variant ?? null),
+    onDiscard: () => {
+      router.back();
+    },
+  });
+
+  // The screen is a native formSheet whose swipe is off, so Android Back is the
+  // one dismissal the platform still offers; it asks the same question. Scoped
+  // to focus: the repository, mode and model pickers push above this screen and
+  // own their own Back.
+  const requestCloseRef = useRef(requestClose);
+  requestCloseRef.current = requestClose;
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+        requestCloseRef.current();
+        return true;
+      });
+      return () => {
+        subscription.remove();
+      };
+    }, [])
+  );
+
   function save() {
     const name = nameRef.current.trim();
     if (name.length === 0) {
@@ -81,109 +113,111 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
   }
 
   return (
-    <PickerSheet
-      title={list ? t('todos.listSettings.title') : t('todos.lists.newList')}
-      doneLabel={t('common.save')}
-      onDone={save}
-      onCancel={() => {
-        router.back();
-      }}
-      disabled={!hasName || saving}
-    >
-      <View className="gap-5 px-4 pt-2">
-        <View className="flex-row gap-3">
-          <View className="w-20 gap-2">
-            <FieldLabel>{t('todos.listSettings.emoji')}</FieldLabel>
-            <Input
-              defaultValue={list?.emoji ?? ''}
-              onChangeText={text => {
-                emojiRef.current = text;
-              }}
-              maxLength={TODO_LIST_EMOJI_MAX_LENGTH}
-              accessibilityLabel={t('todos.listSettings.emoji')}
-              className="rounded-lg border border-border bg-secondary text-base text-foreground"
-            />
-          </View>
-          <View className="min-w-0 flex-1 gap-2">
-            <FieldLabel>{t('todos.listSettings.name')}</FieldLabel>
-            <Input
-              defaultValue={list?.name ?? ''}
-              autoFocus={!list}
-              onChangeText={text => {
-                nameRef.current = text;
-                const next = text.trim().length > 0;
-                setHasName(current => (current === next ? current : next));
-              }}
-              onSubmitEditing={save}
-              returnKeyType="done"
-              maxLength={TODO_LIST_NAME_MAX_LENGTH}
-              placeholder={t('todos.listSettings.namePlaceholder')}
-              accessibilityLabel={t('todos.listSettings.name')}
-              className="rounded-lg border border-border bg-secondary text-base text-foreground"
-            />
-          </View>
-        </View>
-
-        <Text className="text-sm text-muted-foreground">
-          {t('todos.listSettings.defaultsHint')}
-        </Text>
-
-        <View className="gap-2">
-          <View className="flex-row items-center justify-between">
-            <FieldLabel>{t('common.repository')}</FieldLabel>
-            {gitUrl ? (
-              <Pressable
-                onPress={() => {
-                  setGitUrl(null);
+    <>
+      <PickerSheet
+        title={list ? t('todos.listSettings.title') : t('todos.lists.newList')}
+        doneLabel={t('common.save')}
+        onDone={save}
+        onCancel={requestClose}
+        disabled={saving}
+        doneDisabled={!hasName || saving}
+      >
+        <View className="gap-5 px-4 pt-2">
+          <View className="flex-row gap-3">
+            <View className="w-20 gap-2">
+              <FieldLabel>{t('todos.listSettings.emoji')}</FieldLabel>
+              <Input
+                defaultValue={list?.emoji ?? ''}
+                onChangeText={text => {
+                  emojiRef.current = text;
                 }}
-                hitSlop={8}
-                accessibilityRole="button"
-                className="active:opacity-70"
-              >
-                <Text className="text-sm text-primary">{t('todos.lists.noRepository')}</Text>
-              </Pressable>
-            ) : null}
+                maxLength={TODO_LIST_EMOJI_MAX_LENGTH}
+                accessibilityLabel={t('todos.listSettings.emoji')}
+                className="rounded-lg border border-border bg-secondary text-base text-foreground"
+              />
+            </View>
+            <View className="min-w-0 flex-1 gap-2">
+              <FieldLabel>{t('todos.listSettings.name')}</FieldLabel>
+              <Input
+                defaultValue={list?.name ?? ''}
+                autoFocus={!list}
+                onChangeText={text => {
+                  nameRef.current = text;
+                  const next = text.trim().length > 0;
+                  setHasName(current => (current === next ? current : next));
+                }}
+                onSubmitEditing={save}
+                returnKeyType="done"
+                maxLength={TODO_LIST_NAME_MAX_LENGTH}
+                placeholder={t('todos.listSettings.namePlaceholder')}
+                accessibilityLabel={t('todos.listSettings.name')}
+                className="rounded-lg border border-border bg-secondary text-base text-foreground"
+              />
+            </View>
           </View>
-          <RepoSelector
-            value={todoListRepoSelection(gitUrl, repositories)}
-            repositories={repositories}
-            recents={recents}
-            isLoading={groups.some(group => group.status === 'loading')}
-            organizationId={organizationId}
-            onChange={selection => {
-              setGitUrl(todoListGitUrl(selection));
-            }}
-          />
-        </View>
 
-        <View className="flex-row items-center justify-between gap-3">
-          <FieldLabel>{t('todos.listSettings.mode')}</FieldLabel>
-          <ModeSelector
-            value={normalizeAgentMode(mode ?? undefined)}
-            onChange={next => {
-              setMode(next);
-            }}
-          />
-        </View>
+          <Text className="text-sm text-muted-foreground">
+            {t('todos.listSettings.defaultsHint')}
+          </Text>
 
-        <View className="flex-row items-center justify-between gap-3">
-          <FieldLabel>{t('common.model')}</FieldLabel>
-          <View className="min-w-0 shrink">
-            <ModelSelector
-              value={model ?? ''}
-              variant={variant ?? ''}
-              options={models}
-              isLoading={isLoadingModels}
-              onSelect={(modelId, nextVariant) => {
-                setModel(modelId);
-                setVariant(nextVariant || null);
+          <View className="gap-2">
+            <View className="flex-row items-center justify-between">
+              <FieldLabel>{t('common.repository')}</FieldLabel>
+              {gitUrl ? (
+                <Pressable
+                  onPress={() => {
+                    setGitUrl(null);
+                  }}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  className="active:opacity-70"
+                >
+                  <Text className="text-sm text-primary">{t('todos.lists.noRepository')}</Text>
+                </Pressable>
+              ) : null}
+            </View>
+            <RepoSelector
+              value={todoListRepoSelection(gitUrl, repositories)}
+              repositories={repositories}
+              recents={recents}
+              isLoading={groups.some(group => group.status === 'loading')}
+              organizationId={organizationId}
+              onChange={selection => {
+                setGitUrl(todoListGitUrl(selection));
               }}
             />
           </View>
+
+          <View className="flex-row items-center justify-between gap-3">
+            <FieldLabel>{t('todos.listSettings.mode')}</FieldLabel>
+            <ModeSelector
+              value={normalizeAgentMode(mode ?? undefined)}
+              onChange={next => {
+                setMode(next);
+              }}
+            />
+          </View>
+
+          <View className="flex-row items-center justify-between gap-3">
+            <FieldLabel>{t('common.model')}</FieldLabel>
+            <View className="min-w-0 shrink">
+              <ModelSelector
+                value={model ?? ''}
+                variant={variant ?? ''}
+                options={models}
+                isLoading={isLoadingModels}
+                onSelect={(modelId, nextVariant) => {
+                  setModel(modelId);
+                  setVariant(nextVariant || null);
+                }}
+              />
+            </View>
+          </View>
+          {saving ? <ActivityIndicator color={colors.mutedForeground} /> : null}
         </View>
-        {saving ? <ActivityIndicator color={colors.mutedForeground} /> : null}
-      </View>
-    </PickerSheet>
+      </PickerSheet>
+      {dialog}
+    </>
   );
 }
 

@@ -8,6 +8,7 @@ import {
   Pressable,
   ScrollView,
   View,
+  type ViewInstance,
 } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import {
@@ -22,7 +23,7 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useTranslation } from 'react-i18next';
 
 import { AlertCircle, File as FileIcon, RotateCcw, X } from '@/components/ui/icons';
-import { moveA11yFocus } from '@/lib/a11y/announce';
+import { requestA11yFocus } from '@/lib/a11y/announce';
 
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
@@ -167,7 +168,7 @@ function AttachmentChip({
 
   // The chip body is the single accessible element; focus restoration targets
   // it after a move so VoiceOver/TalkBack stays on the chip that changed slot.
-  const bodyRef = useRef<View>(null);
+  const bodyRef = useRef<ViewInstance>(null);
   const focusPendingRef = useRef(false);
   const [focusEpoch, setFocusEpoch] = useState(0);
 
@@ -179,7 +180,7 @@ function AttachmentChip({
   useEffect(() => {
     if (focusPendingRef.current) {
       focusPendingRef.current = false;
-      moveA11yFocus(bodyRef);
+      requestA11yFocus(bodyRef);
     }
   }, [focusEpoch]);
 

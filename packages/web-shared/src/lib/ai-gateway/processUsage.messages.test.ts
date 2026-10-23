@@ -286,6 +286,75 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
     expect(result.generation_time).toBeNull();
   });
 
+  test('records message_start input tokens when the stream ends before message_delta', async () => {
+    const stream = streamFromText(
+      'event: message_start\n' +
+        'data: {"type":"message_start","message":{"id":"generation-id","type":"message","role":"assistant","content":[],"model":"anthropic/claude-sonnet-4-6:optimized","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":1200,"cache_creation_input_tokens":300,"cache_read_input_tokens":500,"output_tokens":1}}}\n\n' +
+        'event: content_block_delta\n' +
+        'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}\n\n' +
+        'event: content_block_stop\n' +
+        'data: {"type":"content_block_stop","index":0}\n\n'
+    );
+
+    const result = await parseMessagesMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'martian',
+      200
+    );
+
+    expect(result).toMatchObject({
+      inputTokens: 2000,
+      cacheHitTokens: 500,
+      cacheWriteTokens: 300,
+      outputTokens: 1,
+    });
+  });
+
+  test('keeps message_start input tokens that message_delta omits', async () => {
+    const stream = streamFromText(
+      'event: message_start\n' +
+        'data: {"type":"message_start","message":{"id":"generation-id","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4-6","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":1200,"cache_creation_input_tokens":300,"cache_read_input_tokens":500,"output_tokens":1}}}\n\n' +
+        'event: message_delta\n' +
+        'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"input_tokens":null,"cache_creation_input_tokens":null,"cache_read_input_tokens":null,"output_tokens":42}}\n\n'
+    );
+
+    const result = await parseMessagesMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'martian',
+      200
+    );
+
+    expect(result).toMatchObject({
+      inputTokens: 2000,
+      cacheHitTokens: 500,
+      cacheWriteTokens: 300,
+      outputTokens: 42,
+    });
+  });
+
+  test('prefers message_delta input tokens over message_start', async () => {
+    const stream = streamFromText(
+      'event: message_start\n' +
+        'data: {"type":"message_start","message":{"id":"generation-id","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4-6","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":0,"output_tokens":0}}}\n\n' +
+        'event: message_delta\n' +
+        'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"input_tokens":25,"output_tokens":724}}\n\n'
+    );
+
+    const result = await parseMessagesMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'martian',
+      200
+    );
+
+    expect(result).toMatchObject({ inputTokens: 25, outputTokens: 724 });
+  });
+
   test('records stream error events as errored timeout usage', async () => {
     const stream = streamFromText(
       'event: error\n' +

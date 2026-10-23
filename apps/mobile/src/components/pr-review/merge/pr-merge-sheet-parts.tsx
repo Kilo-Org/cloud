@@ -24,12 +24,6 @@ import {
 import { type MergeMethodOption } from '@/components/pr-review/merge/pr-merge-icons';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 
-const METHOD_LABEL_KEYS = {
-  merge: 'prReview.merge.methods.merge',
-  squash: 'prReview.merge.methods.squash',
-  rebase: 'prReview.merge.methods.rebase',
-} as const satisfies Record<AllowedMergeMethod, string>;
-
 function MethodPicker({
   methodOptions,
   method,
@@ -59,7 +53,11 @@ function MethodPicker({
                 void Haptics.selectionAsync();
                 onChange(option.value);
               }}
-              {...radioItemA11y({ label: option.label, checked: active, disabled: isDisabled })}
+              {...radioItemA11y({
+                label: option.accessibilityLabel,
+                checked: active,
+                disabled: isDisabled,
+              })}
               accessibilityHint={prMergeDescription(option.value)}
               className={cn(
                 'min-h-11 items-center justify-center rounded-full border px-4 py-2 active:opacity-70',
@@ -76,7 +74,7 @@ function MethodPicker({
                   !active && !isDisabled && 'text-foreground'
                 )}
               >
-                {t(METHOD_LABEL_KEYS[option.value])}
+                {option.label}
               </Text>
             </Pressable>
           );

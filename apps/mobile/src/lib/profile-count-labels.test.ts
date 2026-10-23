@@ -15,7 +15,20 @@ describe('formatProfileCountItems', () => {
         { kind: 'mcp', count: 1 },
       ])
     ).toEqual(['3 vars', '1 MCP']);
-    expect(formatProfileCountItems(t, [{ kind: 'commands', count: 1 }])).toEqual(['1 cmds']);
+    expect(formatProfileCountItems(t, [{ kind: 'commands', count: 1 }])).toEqual(['1 cmd']);
+    expect(formatProfileCountItems(t, [{ kind: 'commands', count: 2 }])).toEqual(['2 cmds']);
+  });
+
+  it('selects the singular form at count 1 in Swedish', async () => {
+    await i18n.changeLanguage('sv');
+    try {
+      expect(i18n.t('profiles.counts.commands', { count: 1 })).toBe('1 kommando');
+      expect(i18n.t('profiles.counts.commands', { count: 2 })).toBe('2 kommandon');
+      expect(i18n.t('profiles.counts.vars', { count: 1 })).toBe('1 variabel');
+      expect(i18n.t('profiles.counts.skills', { count: 1 })).toBe('1 färdighet');
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 
   it('resolves nothing for an empty list', () => {

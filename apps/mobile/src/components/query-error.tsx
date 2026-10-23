@@ -7,6 +7,7 @@ import {
   WifiOff,
 } from '@/components/ui/icons';
 import { type TFunction } from 'i18next';
+import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type ScrollViewProps } from 'react-native';
 
@@ -57,6 +58,11 @@ type QueryErrorProps = {
    */
   retryLabel?: string;
   isRetrying?: boolean;
+  /**
+   * Replaces the built-in retry button entirely. A caller that composes its
+   * own recovery row (multiple actions) uses this and leaves `onRetry` unset.
+   */
+  action?: ReactNode;
   className?: string;
   placement?: 'center' | 'top' | 'static';
   refreshControl?: ScrollViewProps['refreshControl'];
@@ -72,6 +78,7 @@ export function QueryError({
   onRetry,
   retryLabel,
   isRetrying = false,
+  action,
   className,
   placement = 'center',
   refreshControl,
@@ -97,7 +104,8 @@ export function QueryError({
       iconStrokeWidth={2}
       titleAccessibilityRole="header"
       action={
-        onRetry && (
+        action ??
+        (onRetry && (
           <Button
             variant="outline"
             onPress={onRetry}
@@ -106,7 +114,7 @@ export function QueryError({
           >
             <Text>{retryText}</Text>
           </Button>
-        )
+        ))
       }
     />
   );

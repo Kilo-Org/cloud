@@ -18,15 +18,14 @@ describe('runtime distribution contract', () => {
     expect(RUNTIME_DISTRIBUTION).toEqual({
       nodeMajor: '24',
       bun: '1.3.14',
-      pnpm: '11.1.2',
-      glab: '1.93.0',
-      gh: '2.82.1',
+      pnpm: '12.14.0',
+      glab: '1.124.0',
+      gh: '2.102.0',
     });
   });
 
   it('lists every wrapper build entrypoint with a unique install name', () => {
     expect(WRAPPER_BUNDLES.map(bundle => bundle.entry)).toEqual([
-      'src/main.ts',
       'src/restore-session.ts',
       'src/bitbucket-review-cli.ts',
       'src/github-review-publish-mcp.ts',
@@ -40,7 +39,6 @@ describe('runtime distribution contract', () => {
   it('resolves the installed inventory under the shared install directory', () => {
     const files = runtimeDistributionSourceFiles('/pkg');
     expect(files.map(file => file.installName)).toEqual([
-      'kilocode-wrapper.js',
       'kilo-restore-session.js',
       'bb',
       'github-review-publish-mcp',
@@ -73,11 +71,11 @@ describe('runtime distribution contract', () => {
     );
     const script = runtimeVerificationScript(artifacts);
     expect(script).toContain(`test "$(bun --version)" = '1.3.14'`);
-    expect(script).toContain(`test "$(pnpm --version)" = '11.1.2'`);
+    expect(script).toContain(`test "$(pnpm --version)" = '12.14.0'`);
     expect(script).toContain('grep -oE');
     expect(script).not.toContain('grep -qF');
-    expect(script).toContain(`= '1.93.0'`);
-    expect(script).toContain(`= '2.82.1'`);
+    expect(script).toContain(`= '1.124.0'`);
+    expect(script).toContain(`= '2.102.0'`);
     for (const binary of RUNTIME_REQUIRED_BINARIES) {
       expect(script).toContain(`command -v ${binary} >/dev/null`);
     }
@@ -89,6 +87,6 @@ describe('runtime distribution contract', () => {
       `test -x '${runtimeInstallPath('kilocode-control-plane-supervisor.sh')}'`
     );
     expect(script).toContain(`test -L '${GIT_CREDENTIAL_HELPER.linkPath}'`);
-    expect(script).not.toContain(`test -x '${runtimeInstallPath('kilocode-wrapper.js')}'`);
+    expect(script).not.toContain('kilocode-wrapper.js');
   });
 });

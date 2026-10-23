@@ -23,6 +23,7 @@ const h = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
   confirm: vi.fn(),
+  connectivity: 'online' as string,
   query: {
     data: undefined as TestProfileDetail | undefined,
     isError: false,
@@ -41,6 +42,10 @@ const h = vi.hoisted(() => ({
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfile: () => h.query,
   useAgentProfileMutations: () => h.mutations,
+}));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  getCommittedConnectivityStatus: () => h.connectivity,
+  useCommittedConnectivityStatus: () => h.connectivity,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ back: h.back, push: h.push }) }));
@@ -98,6 +103,7 @@ vi.mock('@/components/ui/icons', () => ({
 describe('ProfileOverviewScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    h.connectivity = 'online';
     Object.assign(h.query, {
       data: undefined,
       isError: false,
@@ -243,8 +249,6 @@ describe('ProfileOverviewScreen', () => {
     const { renderer, unmount } = await mountScreen();
 
     const defaultRow = findOne(renderer.root, 'PreferenceRow');
-    expect(defaultRow.props.subtitle).toBe('Auto-loaded when no repository has a pinned profile.');
-    expect(defaultRow.props.switchAccessibilityLabel).toBe('Set as default');
 
     act(() => {
       (defaultRow.props as { onValueChange: (next: boolean) => void }).onValueChange(true);

@@ -106,7 +106,7 @@ function extractResponseContent(output: OpenAI.Responses.ResponseOutputItem[]): 
 }
 
 export async function parseResponsesMicrodollarUsageFromStream(
-  stream: ReadableStream,
+  stream: ReadableStream<Uint8Array>,
   kiloUserId: string,
   openrouterRequestSpan: Span | undefined,
   provider: ProviderId,
@@ -271,7 +271,7 @@ export function extractInputItemTextContent(
   if (Array.isArray(content)) {
     return content
       .filter(
-        (c): c is OpenAI.Responses.ResponseInputText =>
+        (c: unknown): c is OpenAI.Responses.ResponseInputText =>
           typeof c === 'object' &&
           c !== null &&
           'type' in c &&

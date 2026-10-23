@@ -217,3 +217,97 @@ test('rejects unknown placeholders in a locale-specific plural category', contex
     /mobile\/ru: "agents\.liveCount_few" uses placeholder \{\{total\}\}, which the English family does not/
   );
 });
+
+const COUNTED = {
+  counts: {
+    items: '{{count}} items',
+    itemsShort: '{{count}}i',
+  },
+};
+const COUNTED_SOURCE = "t('counts.items', { count: 2 });\nt('counts.itemsShort', { count: 2 });";
+
+test('accepts a locale-declared family for a flat counted English key', context => {
+  const result = runChecker(context, {
+    english: COUNTED,
+    translated: {
+      counts: {
+        items: '{{count}} lokal',
+        items_one: '{{count}} lokal',
+        items_few: '{{count}} lokala',
+        items_many: '{{count}} lokala',
+        items_other: '{{count}} lokala',
+        itemsShort: '{{count}}l',
+      },
+    },
+    source: COUNTED_SOURCE,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('accepts a flat counted key kept untranslated to a family in another locale', context => {
+  const result = runChecker(context, {
+    english: COUNTED,
+    translated: { counts: { items: '{{count}} lokala', itemsShort: '{{count}}l' } },
+    source: COUNTED_SOURCE,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('rejects an incomplete locale-declared family for a counted key', context => {
+  const result = runChecker(context, {
+    english: COUNTED,
+    translated: {
+      counts: {
+        items: '{{count}} lokal',
+        items_one: '{{count}} lokal',
+        itemsShort: '{{count}}l',
+      },
+    },
+    source: COUNTED_SOURCE,
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ru: plural family "counts\.items" lacks the other category of ru/
+  );
+});
+
+test('rejects a wrong placeholder in a locale-declared counted family', context => {
+  const result = runChecker(context, {
+    english: COUNTED,
+    translated: {
+      counts: {
+        items: '{{count}} lokal',
+        items_one: '{{total}} lokal',
+        items_other: '{{total}} lokala',
+        itemsShort: '{{count}}l',
+      },
+    },
+    source: COUNTED_SOURCE,
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ru: "counts\.items_one" uses placeholder \{\{total\}\}, which the English family does not/
+  );
+});
+
+test('still rejects an unrelated extra key beside a counted family', context => {
+  const result = runChecker(context, {
+    english: COUNTED,
+    translated: {
+      counts: {
+        items: '{{count}} lokal',
+        items_one: '{{count}} lokal',
+        items_other: '{{count}} lokala',
+        itemsShort: '{{count}}l',
+        stray: 'extra',
+      },
+    },
+    source: COUNTED_SOURCE,
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /mobile\/ru: extra key "counts\.stray" is not in en\.json/);
+});

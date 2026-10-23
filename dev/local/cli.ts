@@ -776,7 +776,6 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
   const captureServiceSet = new Set([
     'kiloclaw-tunnel',
     'stripe',
-    'app-builder-tunnel',
     'bitbucket-webhook-tunnel',
     'cloud-agent-public-tunnels',
     'fake-llm-worker',
@@ -802,11 +801,6 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
       const stripeEnvPath = path.join(repoRoot, 'apps/web/.env.development.local');
       oldValues.set('stripe', readEnvValue(stripeEnvPath, 'STRIPE_WEBHOOK_SECRET'));
       oldMtimes.set('stripe', readEnvMtime(stripeEnvPath));
-    }
-    if (captureServices.includes('app-builder-tunnel')) {
-      const appBuilderEnvPath = path.join(repoRoot, 'services/app-builder/.dev.vars');
-      oldValues.set('app-builder-tunnel', readEnvValue(appBuilderEnvPath, 'BUILDER_HOSTNAME'));
-      oldMtimes.set('app-builder-tunnel', readEnvMtime(appBuilderEnvPath));
     }
     if (captureServices.includes('bitbucket-webhook-tunnel')) {
       const appEnvPath = path.join(repoRoot, 'apps/web/.env.development.local');
@@ -906,27 +900,6 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
             console.log('  Stripe webhook secret captured');
           } else {
             console.warn('  Stripe secret not captured after 30s - check stripe window');
-          }
-        })
-      );
-    }
-
-    if (captureServices.includes('app-builder-tunnel')) {
-      waits.push(
-        waitForEnvValueChange(
-          path.join(repoRoot, 'services/app-builder/.dev.vars'),
-          'BUILDER_HOSTNAME',
-          oldValues.get('app-builder-tunnel'),
-          CAPTURE_TIMEOUT_MS,
-          oldMtimes.get('app-builder-tunnel'),
-          () => isCaptureServiceRunning(sessionName, 'app-builder-tunnel')
-        ).then(ready => {
-          if (ready) {
-            console.log('  App builder tunnel URL captured');
-          } else {
-            console.warn(
-              '  App builder tunnel URL not captured after 30s - check app-builder-tunnel window'
-            );
           }
         })
       );
@@ -1530,7 +1503,7 @@ Usage:
   dev:env --missing-secrets-only
                           Create missing Secrets Store entries without refreshing existing ones
 
-Targets: app, app-builder, agents, code-review, security-agent, mobile, all, or any service/group name
+Targets: app, agents, code-review, security-agent, mobile, all, or any service/group name
 Multiple targets can be specified: dev:start kiloclaw security-agent`);
 }
 

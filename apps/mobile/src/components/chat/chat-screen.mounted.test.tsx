@@ -3,12 +3,12 @@
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { ChatScreen } from '@/components/chat/chat-screen';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { type StoredChatBackend } from '@/lib/chat/backend-store';
-import { backendTargetId } from '@/lib/chat/backend-target';
+import { backendTargetId, localTargetId } from '@/lib/chat/backend-target';
 
 /**
  * What the chat screen draws while it is opening.
@@ -374,6 +374,43 @@ describe('the chat details', () => {
 });
 
 describe('backend context-transfer approval', () => {
+  it.each([
+    localTargetId('apple'),
+    localTargetId('android'),
+    localTargetId('gguf', 'qwen-test.gguf'),
+  ])('describes local processing and waits for approval before selecting %s', async target => {
+    state.status = 'idle';
+    const tree = await mount();
+    const composer = () =>
+      tree.root.find(node => (node.type as string) === 'ChatComposer').props as {
+        model: string;
+        onModelSelect: (model: string, variant: string) => void;
+      };
+
+    act(() => {
+      composer().onModelSelect(target, '');
+    });
+    expect(composer().model).toBe('m1');
+    const [title, message, actions] = backendUi.alert.mock.calls.at(-1) ?? [];
+    expect(title).toBe(i18n.t('modelChat.localModels.switchTitle'));
+    expect(message).toBe(i18n.t('modelChat.localModels.switchMessage', { name: target }));
+    expect(actions?.find(action => action.onPress)).toMatchObject({
+      text: i18n.t('modelChat.localModels.switchConfirm'),
+    });
+    act(() => {
+      actions?.find(action => action.onPress)?.onPress?.();
+    });
+    expect(composer().model).toBe(target);
+    act(() => {
+      composer().onModelSelect('m1', '');
+    });
+    expect(backendUi.alert.mock.calls.at(-1)?.slice(0, 2)).toEqual([
+      i18n.t('modelChat.backends.switchTitle'),
+      i18n.t('modelChat.backends.switchMessage', { name: 'm1' }),
+    ]);
+    expect(composer().model).toBe(target);
+  });
+
   it('requires approval when returning from a picked custom backend before its queued move finishes', async () => {
     state.status = 'working';
     const backend: StoredChatBackend = {

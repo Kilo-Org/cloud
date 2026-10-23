@@ -15,6 +15,7 @@ import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
 import { NewSessionRunTarget } from '@/components/agents/new-session-run-target';
 import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
+import { NewSessionRemoteSpawnFailure } from '@/components/agents/new-session-remote-spawn-failure';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 import { ChevronDown } from '@/components/ui/icons';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -53,6 +54,12 @@ type NewSessionProfileOverrideProps = {
   onManualCommandsChange: (next: string[]) => void;
   /** Opens the repo default-profile bindings screen from the advanced config. */
   onOpenRepoDefaults?: () => void;
+  /**
+   * The Organization section above Run on: the active account the create is
+   * attributed to. The body renders it for every entry point — switchable on
+   * the ordinary entry, a read-only scope row on the clone entry.
+   */
+  organizationSection?: React.ReactNode;
 };
 
 /**
@@ -94,6 +101,7 @@ export function NewSessionConfigureForm({
   isFetchingInstances,
   onRefreshInstances,
   onChangeRunOnInstance,
+  pendingComputer,
   showInstanceDisconnectedNote,
   folderPath,
   onChangeFolderPath,
@@ -121,6 +129,7 @@ export function NewSessionConfigureForm({
   onManualVarsChange,
   onManualCommandsChange,
   onOpenRepoDefaults,
+  organizationSection,
   autoCommit,
   onAutoCommitChange,
   isSpawningRemote,
@@ -129,6 +138,8 @@ export function NewSessionConfigureForm({
   onStartSession,
   cloudCreateError = null,
   onRetryCloudCreate,
+  remoteSpawnFailure = null,
+  onRetryRemoteSpawn,
 }: Readonly<NewSessionConfigureFormProps & NewSessionProfileOverrideProps>) {
   const { t } = useTranslation();
   const sideInsetStyle = useSideInsetStyle();
@@ -154,8 +165,20 @@ export function NewSessionConfigureForm({
   // `0` against that padding-free wrapper, dropping the content container's
   // `pt-4` gap and overstating the room the frame leaves for the input.
   const [composerTop, setComposerTop] = useState(0);
-  const isRemote = runOnInstance !== null;
-  const isStarting = isRemote ? isSpawningRemote : isCreating;
+  // The Run on block's height, reported by the wrapper below and threaded to
+  // the prompt as `belowCardHeight`, which reserves the row inside the frame
+  // while the composer can still keep its floor. The block starts at the
+  // Organization section (when the entry point renders one) and sits directly
+  // under the card, and its height does not depend on the card, so the frame
+  // fit converges without a second layout pass. Zero until it lays out, which
+  // owes nothing below the card; the corrected pass lands in the same commit
+  // chain.
+  const [runTargetHeight, setRunTargetHeight] = useState(0);
+  // The remote surface (launch folder, remote hint, no repository section)
+  // covers both a bound computer and the tour's computer target with none
+  // connected yet — the target is the computer either way.
+  const isRemote = runOnInstance !== null || pendingComputer === true;
+  const isStarting = runOnInstance !== null ? isSpawningRemote : isCreating;
   const runOnNote =
     runOnInlineNote ??
     (showInstanceDisconnectedNote ? remoteSpawnInstanceDisconnectedNote() : null);
@@ -208,21 +231,35 @@ export function NewSessionConfigureForm({
           initialPrompt={initialPrompt}
           frameHeight={frameHeight}
           cardTop={composerTop}
+          belowCardHeight={runTargetHeight}
           onStartSession={isStartDisabled ? undefined : onStartSession}
           isCloneEntry={isCloneEntry}
         />
       </View>
 
-      <NewSessionRunTarget
-        showRunOnSelector={showRunOnSelector}
-        runOnInstance={runOnInstance}
-        instanceList={instanceList}
-        isLoadingInstances={isLoadingInstances}
-        isFetchingInstances={isFetchingInstances}
-        onChangeRunOnInstance={onChangeRunOnInstance}
-        onRefreshInstances={onRefreshInstances}
-        disabled={isStarting}
-      />
+      {/* The block under the card the frame must still show: the Organization
+          section when the entry point renders one, then the Run on row and its
+          refresh control. Each child's own `mt-*` lives inside this wrapper, so
+          the prompt's frame fit reserves the block's whole footprint. */}
+      <View
+        onLayout={event => {
+          const next = Math.max(Math.round(event.nativeEvent.layout.height), 0);
+          setRunTargetHeight(current => (current === next ? current : next));
+        }}
+      >
+        {organizationSection}
+        <NewSessionRunTarget
+          showRunOnSelector={showRunOnSelector}
+          runOnInstance={runOnInstance}
+          instanceList={instanceList}
+          isLoadingInstances={isLoadingInstances}
+          isFetchingInstances={isFetchingInstances}
+          onChangeRunOnInstance={onChangeRunOnInstance}
+          onRefreshInstances={onRefreshInstances}
+          pendingComputer={pendingComputer}
+          disabled={isStarting}
+        />
+      </View>
 
       {isRemote ? (
         <LaunchFolderField
@@ -233,9 +270,11 @@ export function NewSessionConfigureForm({
         />
       ) : null}
 
-      <Text className="mt-2 text-xs text-muted-foreground">
-        {stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))}
-      </Text>
+      {isRemote ? (
+        <Text className="mt-2 text-xs text-muted-foreground">
+          {stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))}
+        </Text>
+      ) : null}
 
       {runOnNote ? <Text className="mt-2 text-sm text-muted-foreground">{runOnNote}</Text> : null}
 
@@ -321,6 +360,14 @@ export function NewSessionConfigureForm({
         <NewSessionCloudCreateError
           failure={cloudCreateError}
           onRetry={onRetryCloudCreate}
+          isRetryDisabled={isStartDisabled}
+        />
+      ) : null}
+
+      {isRemote && remoteSpawnFailure !== null ? (
+        <NewSessionRemoteSpawnFailure
+          failure={remoteSpawnFailure}
+          onRetry={onRetryRemoteSpawn}
           isRetryDisabled={isStartDisabled}
         />
       ) : null}

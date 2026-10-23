@@ -1,5 +1,6 @@
 import * as z from 'zod';
 import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
+import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import { sortRemoteModelCatalogProviders } from './remote-model-order';
 import type { KiloSessionId, SlashCommandCatalogStatus } from './types';
 
@@ -12,6 +13,15 @@ export const cloudAgentEventSchema = z.object({
   data: z.unknown(),
 });
 export type CloudAgentEvent = z.infer<typeof cloudAgentEventSchema>;
+
+/**
+ * Whether an untrusted WebSocket frame is a cloud agent event. The schema is
+ * the only definition of the envelope, so this guard cannot drift from the
+ * validation `normalize()` applies.
+ */
+export function isValidCloudAgentEvent(event: unknown): event is CloudAgentEvent {
+  return cloudAgentEventSchema.safeParse(event).success;
+}
 
 export const cloudWorktreeChangesReadyDataSchema = z
   .object({ revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) })
@@ -31,9 +41,37 @@ export const streamErrorSchema = z.object({
 });
 export type StreamError = z.infer<typeof streamErrorSchema>;
 
-export const sessionStatusSchema = z.discriminatedUnion('type', [
+/**
+ * Error code of a WebSocket protocol error. These match the WS_* codes from
+ * cloud-agent-next/src/websocket/types.ts, as the schema's enum does.
+ */
+export type StreamErrorCode = StreamError['code'];
+
+/** Whether an untrusted WebSocket frame carries a stream error. */
+export function isStreamError(data: unknown): data is StreamError {
+  return streamErrorSchema.safeParse(data).success;
+}
+
+const KNOWN_SESSION_STATUS_TYPES = [
+  'busy',
+  'idle',
+  'retry',
+  'scheduled',
+  'question',
+  'permission',
+] as const;
+
+/**
+ * The live status types this SDK reads precisely. `question` and `permission`
+ * carry no payload here: the pending interaction itself arrives on
+ * `question.asked` / `permission.asked`, and a status-only report names the
+ * state without repeating it.
+ */
+const knownSessionStatusSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('busy') }),
   z.object({ type: z.literal('idle') }),
+  z.object({ type: z.literal('question') }),
+  z.object({ type: z.literal('permission') }),
   z.object({
     type: z.literal('retry'),
     attempt: z.number(),
@@ -47,7 +85,34 @@ export const sessionStatusSchema = z.discriminatedUnion('type', [
   // absent instead of failing the parse.
   z.object({ type: z.literal('scheduled'), scheduledAt: z.string().optional().catch(undefined) }),
 ]);
+export type KnownSessionStatus = z.infer<typeof knownSessionStatusSchema>;
+
+/**
+ * A live status type this SDK does not know yet. It parses so the event is
+ * never dropped and the type is never re-labelled, and its payload is kept as
+ * sent. Known types are excluded so a malformed known variant fails instead of
+ * reading as unrecognized.
+ */
+const unrecognizedSessionStatusSchema = z
+  .object({ type: z.string() })
+  .passthrough()
+  .refine(status => !KNOWN_SESSION_STATUS_TYPES.some(type => type === status.type));
+
+export const sessionStatusSchema = z.union([
+  knownSessionStatusSchema,
+  unrecognizedSessionStatusSchema,
+]);
 export type SessionStatus = z.infer<typeof sessionStatusSchema>;
+
+/**
+ * Read a live status as one of the variants this SDK knows, so callers can use
+ * its payload fields. An unrecognized status still reaches consumers, but it
+ * has no variant payload to read and yields null here.
+ */
+export function knownSessionStatus(status: SessionStatus): KnownSessionStatus | null {
+  const parsed = knownSessionStatusSchema.safeParse(status);
+  return parsed.success ? parsed.data : null;
+}
 
 export const cloudStatusSchema = z.discriminatedUnion('type', [
   z.object({
@@ -64,27 +129,6 @@ export const cloudStatusSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('error'), message: z.string() }),
 ]);
 export type CloudStatus = z.infer<typeof cloudStatusSchema>;
-
-export const questionPayloadSchema = z
-  .object({
-    requestId: z.string(),
-    callId: z.string().optional(),
-    questions: z.array(z.record(z.string(), z.unknown())).optional(),
-  })
-  .passthrough();
-export type QuestionState = z.infer<typeof questionPayloadSchema>;
-
-export const permissionPayloadSchema = z
-  .object({
-    requestId: z.string(),
-    callId: z.string().optional(),
-    permission: z.string(),
-    patterns: z.array(z.string()),
-    metadata: z.record(z.string(), z.unknown()).optional().default({}),
-    always: z.array(z.string()).optional().default([]),
-  })
-  .passthrough();
-export type PermissionState = z.infer<typeof permissionPayloadSchema>;
 
 export const REMOTE_MODEL_MAX_PROVIDERS = 64;
 export const REMOTE_MODEL_MAX_MODELS_PER_PROVIDER = 512;
@@ -385,13 +429,7 @@ export const remoteCommandCatalogV1Schema = z
   .transform(catalog => ({
     protocolVersion: 1 as const,
     canExitSession: catalog.canExitSession,
-    commands: catalog.commands
-      // SlashCommandInfo requires a `hints` array; remote commands with no
-      // hints still have an empty array after the strict shape parse above.
-      .map(command => ({
-        ...command,
-        hints: command.hints,
-      })),
+    commands: catalog.commands,
   }));
 export type RemoteCommandCatalogV1 = z.output<typeof remoteCommandCatalogV1Schema>;
 
@@ -726,10 +764,62 @@ export const sessionQueueChangedDataSchema = z
   .passthrough();
 export type SessionQueueChangedData = z.infer<typeof sessionQueueChangedDataSchema>;
 
+/** Runtime mirror of `QuestionInfo` in `@kilocode/app-shared/opencode`. */
+const questionOptionSchema = z.object({
+  label: z.string(),
+  description: z.string(),
+  mode: z.string().optional(),
+});
+
+const questionInfoSchema = z.object({
+  question: z.string(),
+  header: z.string(),
+  options: z.array(questionOptionSchema),
+  multiple: z.boolean().optional(),
+  custom: z.boolean().optional(),
+});
+
+/**
+ * Convert a parsed entry to the shared type. Zod types an absent optional
+ * property as `T | undefined`, which `exactOptionalPropertyTypes` rejects
+ * against `QuestionInfo`, so the optionals are only added when present.
+ */
+function toQuestionInfo(parsed: z.infer<typeof questionInfoSchema>): QuestionInfo {
+  return {
+    question: parsed.question,
+    header: parsed.header,
+    options: parsed.options.map(option => ({
+      label: option.label,
+      description: option.description,
+      ...(option.mode === undefined ? {} : { mode: option.mode }),
+    })),
+    ...(parsed.multiple === undefined ? {} : { multiple: parsed.multiple }),
+    ...(parsed.custom === undefined ? {} : { custom: parsed.custom }),
+  };
+}
+
+/**
+ * A question list is positional: the answer payload mirrors the CLI's question
+ * indices (`answerQuestion(requestId, answers: string[][])`). Keep the longest
+ * run of entries that match `QuestionInfo` and stop at the first entry that
+ * does not, so a rendered question keeps its CLI index instead of every later
+ * answer sliding onto the wrong question. No usable entry means the payload
+ * carries no questions the client can render.
+ */
+const questionListSchema = z.array(z.unknown()).transform((entries): QuestionInfo[] | undefined => {
+  const questions: QuestionInfo[] = [];
+  for (const entry of entries) {
+    const parsed = questionInfoSchema.safeParse(entry);
+    if (!parsed.success) break;
+    questions.push(toQuestionInfo(parsed.data));
+  }
+  return questions.length > 0 ? questions : entries.length > 0 ? undefined : [];
+});
+
 export const questionAskedDataSchema = z.object({
   id: z.string(),
   tool: z.object({ callID: z.string() }).optional(),
-  questions: z.array(z.unknown()).optional().catch(undefined),
+  questions: questionListSchema.optional().catch(undefined),
 });
 export type QuestionAskedData = z.infer<typeof questionAskedDataSchema>;
 

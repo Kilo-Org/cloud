@@ -76,6 +76,31 @@ vi.mock('@/lib/voice-input/native-voice-input', () => ({
   voiceInputController: voiceInputControllerMock,
 }));
 
+// The per-language installed-model gate the row shares with the mic. Values
+// are set per-test with mockResolvedValue; the beforeEach default mirrors the
+// common emulator state: the model is installed, so the "On device" claim
+// stands.
+const voiceLanguageGateMock = vi.hoisted(() => ({
+  resolveVoiceInputSessionLanguageTag:
+    vi.fn<
+      (storedTag: string | null, mode: 'device' | 'gateway', appLanguage: string) => Promise<string>
+    >(),
+  isVoiceInputLanguageInstalledOnDevice: vi.fn<() => Promise<boolean>>(),
+  useVoiceInputLanguage: vi.fn(() => null as string | null),
+  languageLoaded: true,
+}));
+
+vi.mock('@/lib/voice-input/voice-input-language', () => ({
+  resolveVoiceInputSessionLanguageTag: voiceLanguageGateMock.resolveVoiceInputSessionLanguageTag,
+  isVoiceInputLanguageInstalledOnDevice:
+    voiceLanguageGateMock.isVoiceInputLanguageInstalledOnDevice,
+}));
+
+vi.mock('@/lib/voice-input/voice-input-language-preference', () => ({
+  useVoiceInputLanguage: voiceLanguageGateMock.useVoiceInputLanguage,
+  useVoiceInputLanguageLoaded: () => voiceLanguageGateMock.languageLoaded,
+}));
+
 const voiceNetworkConsentMock = vi.hoisted(() => ({
   readVoiceNetworkConsent: vi.fn<() => Promise<'granted' | 'declined' | 'unset'>>(),
   writeVoiceNetworkConsent: vi.fn(),
@@ -298,6 +323,10 @@ describe('Voice transcription section', () => {
     vi.clearAllMocks();
     voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
     voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
+    voiceLanguageGateMock.resolveVoiceInputSessionLanguageTag.mockResolvedValue('en-US');
+    voiceLanguageGateMock.isVoiceInputLanguageInstalledOnDevice.mockResolvedValue(true);
+    voiceLanguageGateMock.useVoiceInputLanguage.mockReturnValue(null);
+    voiceLanguageGateMock.languageLoaded = true;
     gatewayTranscriptionPreferenceMock.gatewayTranscriptionEnabled = false;
     gatewayTranscriptionPreferenceMock.hasLoaded = true;
     useCurrentUserIdMock.useCurrentUserId.mockReturnValue({
@@ -322,14 +351,83 @@ describe('Voice transcription section', () => {
     return renderer;
   }
 
-  it('shows On device with no switch when on-device is supported', () => {
+  it('shows On device with no switch when on-device is supported and the language model is installed', async () => {
     const renderer = mountVoiceControl();
+    // The on-device claim now waits for the per-language installed-model gate.
+    await TestRenderer.act(flush);
+
     const strings = findTextStrings(renderer.root);
     expect(strings).toContain('On device');
     // The row label is the neutral section name. "Online transcription" next
     // to an "On device" value contradicted itself (vr1 review, 2026-09-07).
     expect(strings).toContain('Voice transcription');
     expect(strings).not.toContain('Online transcription');
+    expect(findSwitches(renderer.root).length).toBe(0);
+    // The gate resolved the same session tag the mic would use.
+    expect(voiceLanguageGateMock.resolveVoiceInputSessionLanguageTag).toHaveBeenCalledWith(
+      null,
+      'device',
+      'en'
+    );
+    expect(voiceLanguageGateMock.isVoiceInputLanguageInstalledOnDevice).toHaveBeenCalledWith(
+      'en-US'
+    );
+  });
+
+  it('shows the online consent row instead of On device when the language model is missing', async () => {
+    // Regression (drain 2026-10-19): the row printed "On device" from the
+    // service-level supportsOnDevice() alone, while the mic refined that check
+    // with the offline model of the resolved language and raised the "Speech
+    // is processed online" disclosure for the same state. The row must
+    // present the online choice the start path actually requires.
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
+    voiceLanguageGateMock.isVoiceInputLanguageInstalledOnDevice.mockResolvedValue(false);
+    const renderer = mountVoiceControl();
+    await TestRenderer.act(flush);
+
+    const strings = findTextStrings(renderer.root);
+    expect(strings).not.toContain('On device');
+    expect(strings).toContain('Online, not allowed');
+    expect(findSwitches(renderer.root).length).toBe(1);
+  });
+
+  it('re-derives when the stored voice language changes', async () => {
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
+    voiceLanguageGateMock.isVoiceInputLanguageInstalledOnDevice.mockResolvedValue(false);
+    voiceLanguageGateMock.resolveVoiceInputSessionLanguageTag.mockResolvedValue('en-US');
+    const renderer = mountVoiceControl();
+    await TestRenderer.act(flush);
+    expect(findTextStrings(renderer.root)).toContain('Online, not allowed');
+
+    // The user installs the model / the choice changes; the gate re-runs and
+    // resolves the new session tag.
+    voiceLanguageGateMock.isVoiceInputLanguageInstalledOnDevice.mockResolvedValue(true);
+    voiceLanguageGateMock.resolveVoiceInputSessionLanguageTag.mockResolvedValue('de-DE');
+    await TestRenderer.act(async () => {
+      voiceLanguageGateMock.useVoiceInputLanguage.mockReturnValue('de-DE');
+      renderer.update(createElement(VoiceTranscriptionControl));
+      await flush();
+    });
+
+    const strings = findTextStrings(renderer.root);
+    expect(strings).toContain('On device');
+    expect(strings).not.toContain('Online, not allowed');
+    expect(voiceLanguageGateMock.isVoiceInputLanguageInstalledOnDevice).toHaveBeenCalledWith(
+      'de-DE'
+    );
+  });
+
+  it('shows the loading placeholder while the per-language gate is pending', () => {
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
+    voiceLanguageGateMock.isVoiceInputLanguageInstalledOnDevice.mockReturnValue(
+      new Promise<boolean>(() => undefined)
+    );
+    const renderer = mountVoiceControl();
+
+    const texts = findTextStrings(renderer.root);
+    expect(texts).toContain('Loading…');
+    expect(texts).not.toContain('On device');
+    expect(texts).not.toContain('Online, not allowed');
     expect(findSwitches(renderer.root).length).toBe(0);
   });
 
@@ -356,6 +454,29 @@ describe('Voice transcription section', () => {
     expect(texts).not.toContain('On device');
     expect(texts).not.toContain('Via the Kilo gateway');
     expect(findSwitches(renderer.root).length).toBe(0);
+  });
+
+  it('shows the loading placeholder while the stored voice-language read resolves', async () => {
+    // The SecureStore read can take seconds on a slow keychain; deriving from
+    // the app-language default in that window would claim a mode for a stored
+    // choice that may exist (vr2 review, 2026-10-19). The gate waits for it.
+    voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
+    voiceLanguageGateMock.languageLoaded = false;
+    const renderer = mountVoiceControl();
+
+    const texts = findTextStrings(renderer.root);
+    expect(texts).toContain('Loading…');
+    expect(texts).not.toContain('On device');
+    expect(texts).not.toContain('Online, not allowed');
+    expect(findSwitches(renderer.root).length).toBe(0);
+
+    // Once the read lands, the row derives from the stored tag.
+    voiceLanguageGateMock.languageLoaded = true;
+    await TestRenderer.act(async () => {
+      renderer.update(createElement(VoiceTranscriptionControl));
+      await flush();
+    });
+    expect(findTextStrings(renderer.root)).not.toContain('Loading…');
   });
 
   it('shows Online, allowed with the switch on when consent is granted', async () => {

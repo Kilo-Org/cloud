@@ -42,7 +42,7 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
 } from 'react-native-reanimated';
-import { useNavigation } from 'expo-router';
+import { usePreventRemove } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
@@ -53,7 +53,6 @@ import { pickAgentAttachments, pickAgentImages } from '@/components/agents/attac
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
-import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import {
   createMobileSlashCommandList,
   getSlashCommandCandidate,
@@ -144,7 +143,7 @@ const COMPOSER_COUNTER_VISIBLE_REMAINING = 1000;
 const TOOLBAR_ROW_UNCLAMPED_HEIGHT = 10_000;
 
 type AndroidDismissKeyboardGesture = {
-  identifier: string;
+  identifier: GestureResponderEvent['nativeEvent']['identifier'];
   startPageX: number;
   startPageY: number;
   dismissed: boolean;
@@ -400,18 +399,12 @@ export function ChatComposer({
   } satisfies { current: boolean };
   const upload = useAgentAttachmentUpload({ organizationId, delivery: attachmentDelivery });
 
-  // Leave confirm for unsent uploads. The composer registers its own
-  // `beforeRemove` listener so header back, the iOS swipe-back gesture, and
-  // Android back all confirm the same way. Slash-command navigation (/new,
-  // /restart, /exit) is already rejected while attachments are present, so no
-  // bypass flag is needed; a successful send clears the chips and disarms.
-  const navigation = useNavigation();
+  const [leaveAllowed, setLeaveAllowed] = useState(false);
   const { confirm, dialog } = useConfirmDialog();
   const { confirmExit, exitDialog } = useRemoteSessionExitConfirmation();
   const releaseUnclaimedRef = useRef(upload.releaseUnclaimedUploads);
   releaseUnclaimedRef.current = upload.releaseUnclaimedUploads;
-  usePreventRemove(upload.hasUnclaimedAttachments, ({ data }) => {
-    const action = data.action;
+  usePreventRemove(upload.hasUnclaimedAttachments && !leaveAllowed, ({ repeat }) => {
     confirm({
       title: i18n.t('agentChat.composer.discardAttachmentsTitle'),
       message: i18n.t('agentChat.composer.discardAttachmentsMessage'),
@@ -419,7 +412,8 @@ export function ChatComposer({
       cancelLabel: i18n.t('common.keepEditing'),
       onConfirm: () => {
         releaseUnclaimedRef.current();
-        navigation.dispatch(action);
+        setLeaveAllowed(true);
+        repeat();
       },
     });
   });
@@ -1294,6 +1288,9 @@ export function ChatComposer({
           userId,
           surface: 'agent-chat',
           sessionId: sessionId ?? null,
+          // Carried so a launch this composer loses to an Activity recreation
+          // reopens the same session in the same organization scope.
+          organizationId: organizationId ?? null,
         },
         themedSheet
       )
@@ -1304,6 +1301,7 @@ export function ChatComposer({
     showActionSheetWithOptions,
     userId,
     sessionId,
+    organizationId,
     themedSheet,
   ]);
 

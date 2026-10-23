@@ -376,6 +376,28 @@ function exclusiveLayoutInput(input: {
 }
 
 describe('computeExclusiveLayout directory guard', () => {
+  it('accepts the isolated container layout when it is exclusively owned', () => {
+    expect(
+      computeExclusiveLayout(exclusiveLayoutInput({ directory: '/workspace/app' })).exclusive
+    ).toBe(true);
+  });
+
+  it('refuses an isolated container with an unknown sibling directory', () => {
+    expect(
+      computeExclusiveLayout(
+        exclusiveLayoutInput({ directory: '/workspace/app', siblings: ['app', 'other'] })
+      ).exclusive
+    ).toBe(false);
+  });
+
+  it('refuses an isolated container with a foreign Kilo listener', () => {
+    expect(
+      computeExclusiveLayout(
+        exclusiveLayoutInput({ directory: '/workspace/app', listeners: ['/workspace/other'] })
+      ).exclusive
+    ).toBe(false);
+  });
+
   it('accepts the worktrees layout when the target is the only directory', () => {
     expect(
       computeExclusiveLayout(

@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { i18n } from '@/i18n';
 
 import {
   councilDecisionLabel,
   councilVoteLabel,
   flattenCouncilFindings,
+  gateThresholdLabel,
+  reviewFailureLabel,
   selectRetryAction,
 } from './review-detail-helpers';
 
@@ -63,6 +66,51 @@ describe('councilVoteLabel', () => {
   it('labels a null vote as no result', () => {
     expect(councilVoteLabel(null)).toBe('No result');
     expect(councilVoteLabel(undefined)).toBe('No result');
+  });
+});
+
+describe('reviewFailureLabel', () => {
+  it.each([
+    ['github_installation_required', 'githubInstallationRequired'],
+    ['github_ip_allow_list', 'githubIpAllowList'],
+    ['gitlab_project_access_required', 'gitlabProjectAccessRequired'],
+    ['byok_invalid_key', 'byokInvalidKey'],
+    ['selected_model_unavailable', 'selectedModelUnavailable'],
+    ['repeated_repository_clone_timeout', 'repeatedRepositoryCloneTimeout'],
+  ] as const)('uses localized action-required copy for %s', (reason, copyKey) => {
+    expect(reviewFailureLabel(i18n.t, 'Internal diagnostic', reason)).toBe(
+      i18n.t(`codeReviewer.actionRequired.${copyKey}.description`)
+    );
+  });
+
+  it.each([null, 'upstream_error', 'future-reason'])(
+    'does not expose unknown diagnostics for %s',
+    reason => {
+      expect(reviewFailureLabel(i18n.t, 'Internal diagnostic', reason)).toBe(
+        i18n.t('codeReviewer.reviewDetail.reviewFailed')
+      );
+    }
+  );
+
+  it('localizes the known service-unreachable dispatch message', () => {
+    expect(
+      reviewFailureLabel(
+        i18n.t,
+        'Dispatch failed: could not reach the code review service. ' +
+          'It may be offline — retry the review once it is running.',
+        'upstream_error'
+      )
+    ).toBe(i18n.t('codeReviewer.reviewDetail.serviceUnavailable'));
+  });
+});
+
+describe('gateThresholdLabel', () => {
+  it.each(['off', 'all', 'critical', 'warning'] as const)('localizes %s', threshold => {
+    expect(gateThresholdLabel(threshold)).toBe(i18n.t(`codeReviewer.gate.${threshold}`));
+  });
+
+  it.each(['future-threshold', 'constructor', ''])('labels unknown %s', threshold => {
+    expect(gateThresholdLabel(threshold)).toBe(i18n.t('common.unknown'));
   });
 });
 

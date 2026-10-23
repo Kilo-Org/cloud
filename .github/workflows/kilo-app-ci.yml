@@ -194,6 +194,8 @@ jobs:
         run: pnpm --filter kilo-app run check:i18n
       - name: Check for silently-dropped NativeWind classes
         run: pnpm --filter kilo-app run check:classes
+      - name: Test the NativeWind class checker
+        run: node --test tools/nativewind/check-classes.test.mjs
 
   format-check:
     needs: mobile-changes

@@ -10,7 +10,7 @@ import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
-import { Platform, type Text as RNText, View } from 'react-native';
+import { Platform, type TextInstance, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -134,6 +134,7 @@ import {
   SESSION_SLOW_LOAD_MS,
   useSessionSlowLoadPhase,
 } from '@/components/agents/session-slow-load';
+import { getLanguageSnapshot } from '@/i18n';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import {
   collectTranscriptItemKeysByPart,
@@ -184,7 +185,7 @@ import {
   MESSAGE_SENT_EVENT,
   SESSION_VIEWED_EVENT,
 } from '@/lib/analytics/posthog';
-import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
+import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { useMotionPolicy } from '@/lib/a11y/motion';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -206,11 +207,13 @@ import {
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
 import { useRemoteModelCatalogRetry } from '@/lib/hooks/use-remote-model-catalog-retry';
+import { useSessionRaiseReader } from '@/lib/hooks/use-session-raise-reader';
 import {
   buildContinueHref,
   buildContinuePrefillParams,
 } from '@/components/agents/new-session-prefill';
 import { type ForkCut, resolveForkCut } from '@/components/agents/fork-cut';
+import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
@@ -479,6 +482,7 @@ export function SessionDetailContent({
   const analyticsSurface: AnalyticsSurface = fetchedData?.cloudAgentSessionId
     ? 'cloud-agent'
     : 'remote-session';
+  const readObservedRaise = useSessionRaiseReader();
 
   const {
     isAnswering,
@@ -494,6 +498,7 @@ export function SessionDetailContent({
     activeQuestion,
     activePermission,
     surface: analyticsSurface,
+    readObservedRaise,
   });
 
   const autoApproveState = resolveSessionAutoApproveState({
@@ -1594,7 +1599,10 @@ export function SessionDetailContent({
   }, [manager, t]);
 
   const handleBackToSessions = useCallback(() => {
-    router.replace('/(app)/(tabs)/(2_agents)' as Href);
+    // POP_TO reuses the `(tabs)` route under this screen and truncates every
+    // `agent-chat` route above it, so a composer still on the stack under a
+    // missing session is gone with it.
+    router.dismissTo(AGENTS_SESSIONS_HREF);
   }, [router]);
 
   const handleModelSelect = useCallback(
@@ -1742,7 +1750,12 @@ export function SessionDetailContent({
         pendingMessages,
         canceledQueuedMessages,
       }),
-    [displayedMessages, messages, pendingMessages, canceledQueuedMessages]
+    // `getLanguageSnapshot()` re-resolves the captured copy (`selectMessageFailure`
+    // resolves titles through module-level `i18n.t`) when the app language
+    // changes while the session is mounted; the failure is otherwise stable on
+    // its message inputs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- language drives the resolved copy inside selectMessageFailure
+    [displayedMessages, messages, pendingMessages, canceledQueuedMessages, getLanguageSnapshot()]
   );
   const footerStatusIndicator =
     statusIndicator !== null &&
@@ -1888,7 +1901,7 @@ export function SessionDetailContent({
   // node that no longer exists. We track the previous blocking kind and
   // only fire on the non-none → none transition (i.e. the user satisfied
   // the card), not on the very first mount.
-  const transcriptRef = useRef<RNText | null>(null);
+  const transcriptRef = useRef<TextInstance | null>(null);
   const previousBlockingInteractionRef = useRef<typeof blockingInteraction>('none');
   useEffect(() => {
     const wasBlocking = previousBlockingInteractionRef.current !== 'none';
@@ -1897,11 +1910,13 @@ export function SessionDetailContent({
     if (!wasBlocking || isBlocking) {
       return undefined;
     }
-    if (moveA11yFocus(transcriptRef)) {
+    // `false` means the transcript had no node handle yet; retry once it has
+    // mounted. A dispatched request the platform ignores is not retryable.
+    if (requestA11yFocus(transcriptRef)) {
       return undefined;
     }
     const handle = setTimeout(() => {
-      moveA11yFocus(transcriptRef);
+      requestA11yFocus(transcriptRef);
     }, 50);
     return () => {
       clearTimeout(handle);
@@ -2255,7 +2270,7 @@ export function SessionDetailContent({
             // line ("Moving-average empty windo…").
             reserveTitleSpace
             titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
-            backFallback={'/(app)/(tabs)/(2_agents)' as Href}
+            backFallback={AGENTS_SESSIONS_HREF}
             headerRight={headerRight}
             headerRightShrinks
             className="pb-1"

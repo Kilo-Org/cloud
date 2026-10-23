@@ -3,22 +3,23 @@ import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Switch, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
 import { CenteredState } from '@/components/centered-state';
 import { openModelPicker } from '@/components/agents/model-selector';
 import { BitbucketOverview } from '@/components/code-reviewer/bitbucket-overview';
+import { connectNoticeKey } from '@/components/code-reviewer/connect-notice-key';
 import {
   buildOverviewRows,
   resolveRowOnPress,
 } from '@/components/code-reviewer/platform-overview-rows';
 import { ProviderConnectCard } from '@/components/code-reviewer/provider-connect-card';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
+import { PlatformOverviewSkeleton } from '@/components/code-reviewer/platform-overview-skeleton';
 import { ScreenHeader } from '@/components/screen-header';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
@@ -34,6 +35,7 @@ import {
 } from '@/lib/hooks/use-code-reviewer';
 import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { ACTION_REQUIRED_KEYS } from '@/components/code-reviewer/action-required-keys';
 
 export function PlatformOverviewScreen({
@@ -53,6 +55,8 @@ export function PlatformOverviewScreen({
   const canEdit = permission.status === 'ready' && permission.canEdit;
   const { hasWebhookSyncWarning } = useGitLabWebhookWarning(scope, platform);
   const { models, isLoading: modelsLoading } = useReviewerModels(scope);
+  // A successful probe can confirm online while NetInfo still pauses queries.
+  const isConnectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
 
   if (permission.status === 'error') {
     return (
@@ -113,15 +117,25 @@ export function PlatformOverviewScreen({
     providerState.status === 'loading' || config.isLoading || permission.status === 'loading';
   const connected = providerState.status === 'connected';
 
-  // A connected provider whose config fails to load (and has no stale cache
-  // to fall back on) has nothing to show — surface a retry instead of a
-  // header over blank space. A background refetch failure with data already
-  // cached falls through to the normal content below, unaffected.
-  if (!isLoading && connected && config.isError && config.data == null) {
+  // A connected provider whose config has nothing to show (no cached data and
+  // either a failed fetch or a paused one — `config.isLoading` is false while a
+  // query is paused by NetInfo, which used to render a header over blank space)
+  // surfaces a retry instead. A paused query with cached config data, and a
+  // background refetch failure with data already cached, both fall through to
+  // the normal content below, unaffected.
+  const configError = !isLoading && connected && config.data == null && config.isError;
+  const configPaused =
+    !isLoading && connected && config.data == null && config.fetchStatus === 'paused';
+  const configUnavailable = configError || (configPaused && isConnectivityKnown);
+  // While connectivity is unsettled a pause might clear at any moment, so the
+  // body keeps the skeleton instead of deciding between error and content.
+  const configPausedUnknown = configPaused && !isConnectivityKnown;
+  if (configUnavailable) {
     return (
       <PlatformErrorScreen
         title={capabilities.label}
         eyebrow={t('common.codeReviewer')}
+        variant={config.isError ? 'server' : 'offline'}
         onRetry={() => {
           void config.refetch();
         }}
@@ -135,12 +149,12 @@ export function PlatformOverviewScreen({
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
-        <CenteredState className="px-6">
+        <CenteredState contentContainerClassName="px-6">
           {canEdit ? (
             <ProviderConnectCard scope={scope} platform={platform} onConnected={handleConnected} />
           ) : (
             <Text className="text-center text-xs text-muted-foreground">
-              {t('codeReviewer.notConnectedReadOnly', { platform: capabilities.label })}
+              {t(connectNoticeKey(platform), { platform: capabilities.label })}
             </Text>
           )}
         </CenteredState>
@@ -149,7 +163,7 @@ export function PlatformOverviewScreen({
   }
 
   const pushField = (field: string) => {
-    router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/${platform}/${field}` as Href);
+    router.push(`/(app)/code-reviewer/${scope}/${platform}/${field}` as Href);
   };
 
   const data = config.data;
@@ -181,9 +195,7 @@ export function PlatformOverviewScreen({
           onOpenReviewMemory:
             platform === 'github'
               ? () => {
-                  router.push(
-                    `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/review-memory` as Href
-                  );
+                  router.push(`/(app)/code-reviewer/${scope}/review-memory` as Href);
                 }
               : undefined,
         });
@@ -196,16 +208,10 @@ export function PlatformOverviewScreen({
       <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <Animated.View layout={LinearTransition}>
-          {isLoading && (
-            <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
-              <Skeleton className="h-16 w-full rounded-lg" />
-              <View className="gap-2">
-                {Array.from({ length: 6 }, (_, index) => (
-                  <Skeleton key={index} className="h-12 w-full rounded-lg" />
-                ))}
-              </View>
-            </Animated.View>
-          )}
+          {/* A paused query with no cached data still waits: while connectivity is
+             unsettled the error branch above cannot know the pause is real, so the
+             skeleton keeps the body honest instead of rendering blank. */}
+          {(isLoading || configPausedUnknown) && <PlatformOverviewSkeleton />}
 
           {!isLoading && connected && config.data != null && rows != null && (
             <Animated.View entering={FadeIn.duration(200)} className="gap-6">

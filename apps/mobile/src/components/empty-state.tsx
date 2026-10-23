@@ -29,11 +29,12 @@ type EmptyStateProps = {
   iconStrokeWidth?: number;
   /** Set to 'header' when the title acts as the screen's heading (QueryError does). */
   titleAccessibilityRole?: 'header';
-  /** Renders the short presentation (no icon bubble, tighter block gaps) for a
-   *  caller whose clear region cannot hold the full height; the title, the
-   *  description and the action all stay. When omitted, the centered form
-   *  reads the band the `CenteredState` around it publishes and compacts on its
-   *  own, so the form cannot disagree with the reserve the caller set. */
+  /** Renders the short presentation (no icon bubble, tighter block gaps, and
+   *  no top pin air above a `top`-placed stack) for a caller whose clear region
+   *  cannot hold the full height; the title, the description and the action all
+   *  stay. When omitted, the centered form reads the band the `CenteredState`
+   *  around it publishes and compacts on its own, so the form cannot disagree
+   *  with the reserve the caller set. */
   compact?: boolean;
 };
 
@@ -74,7 +75,10 @@ function EmptyStateBody({
   // scroll brings them back. The bubble is decoration: a short band drops it
   // and halves the gaps, which keeps the copy and the action inside the band
   // with no scroll. `placement="top"` and `placement="static"` states are laid
-  // out by their own caller and keep the full stack.
+  // out by their own caller and keep the full stack, unless the caller says
+  // the band is short: then the top pin's fixed air goes too, because 64pt of
+  // it is a band's whole height when a footer above the tab bar already owns
+  // the rest of a landscape window.
   //
   // A caller that measured its own clear region passes `compact` and owns the
   // decision (the Agents screen does); otherwise the centered form reads the
@@ -87,7 +91,7 @@ function EmptyStateBody({
       className={cn(
         'items-center px-6',
         compact ? 'gap-2' : 'gap-4',
-        placement === 'top' && 'pt-16',
+        placement === 'top' && !compact && 'pt-16',
         className
       )}
     >

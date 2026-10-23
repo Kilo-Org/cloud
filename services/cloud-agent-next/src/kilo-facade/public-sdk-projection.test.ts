@@ -1,9 +1,188 @@
 import { describe, expect, it } from 'vitest';
 import { projectPrivateWorktreePaths } from '@kilocode/session-ingest-contracts';
+import type { KiloSdkStoredMessage } from '../session-ingest-binding.js';
 
-import { projectPublicStoredMessage } from './public-sdk-projection';
+import {
+  projectPublicMessageInfo,
+  projectPublicPart,
+  projectPublicStoredMessage,
+  projectPublicStructuredPaths,
+} from './public-sdk-projection';
 
 const kiloSessionId = 'ses_12345678901234567890123456';
+
+describe('projectPublicStructuredPaths', () => {
+  it('redacts only structured local file URI fields without touching text, external URLs or data URLs', () => {
+    const value = {
+      uri: 'file:///workspace/private/resource.txt',
+      metadata: {
+        url: 'FILE:///workspace/private/attachment.txt',
+        resources: [{ uri: 'file://localhost/workspace/private/resource.txt' }],
+        external: { uri: 'https://example.com/resource', url: 'http://example.com/attachment' },
+        embedded: { uri: 'data:text/plain,safe', url: 'data:text/plain,safe' },
+      },
+      text: 'Keep file:///workspace/private/resource.txt',
+      output: 'Read file:///workspace/private/attachment.txt',
+      input: { content: 'User file:///workspace/private/resource.txt' },
+    };
+    const original = structuredClone(value);
+    expect(projectPublicStructuredPaths(value, kiloSessionId)).toEqual({
+      ...value,
+      uri: '',
+      metadata: {
+        ...value.metadata,
+        url: '',
+        resources: [{ uri: '' }],
+      },
+    });
+    expect(value).toEqual(original);
+  });
+  it('projects structured diff objects inside SDK files arrays', () => {
+    const publicDirectory = `/cloud-agent/sessions/${kiloSessionId}`;
+    expect(
+      projectPublicStructuredPaths(
+        {
+          files: [
+            {
+              path: '/workspace/app/a.ts',
+              status: 'modified',
+              patch:
+                '--- /workspace/app/a.ts\n+++ /workspace/app/a.ts\n@@ -1 +1 @@\n+Keep /workspace/app/user-text',
+            },
+          ],
+        },
+        kiloSessionId
+      )
+    ).toEqual({
+      files: [
+        {
+          path: publicDirectory,
+          status: 'modified',
+          patch: `--- ${publicDirectory}\n+++ ${publicDirectory}\n@@ -1 +1 @@\n+Keep /workspace/app/user-text`,
+        },
+      ],
+    });
+  });
+  it('preserves CRLF diff headers and hunk contents', () => {
+    const publicDirectory = `/cloud-agent/sessions/${kiloSessionId}`;
+    expect(
+      projectPublicStructuredPaths(
+        {
+          patch:
+            '--- /workspace/app/a.ts\t2026-10-19\r\n+++ /workspace/app/a.ts\r\n@@ -1 +1 @@\r\n+/workspace/app/user-text\r\n',
+        },
+        kiloSessionId
+      )
+    ).toEqual({
+      patch: `--- ${publicDirectory}\t2026-10-19\r\n+++ ${publicDirectory}\r\n@@ -1 +1 @@\r\n+/workspace/app/user-text\r\n`,
+    });
+  });
+  it.each([
+    '/workspace/app',
+    '/workspace/private/worktrees/worktree_12345678-1234-4234-8234-123456789abc',
+  ])(
+    'projects structured paths from the actual root %s without masking arbitrary text',
+    privateDirectory => {
+      const publicDirectory = `/cloud-agent/sessions/${kiloSessionId}`;
+      const text = `Read ${privateDirectory}/file.txt`;
+      const value = {
+        info: { role: 'assistant', path: { cwd: privateDirectory, root: privateDirectory } },
+        nested: {
+          filepath: `${privateDirectory}/file.txt`,
+          filePath: `${privateDirectory}/nested.txt`,
+          file: 'relative.ts',
+          files: [`${privateDirectory}/file.txt`, 'src/a.ts'],
+          text,
+          output: text,
+          title: text,
+        },
+        input: { content: text },
+        directory: privateDirectory,
+      };
+      const original = structuredClone(value);
+      expect(projectPublicStructuredPaths(value, kiloSessionId)).toEqual({
+        ...value,
+        info: { role: 'assistant', path: { cwd: publicDirectory, root: publicDirectory } },
+        nested: {
+          ...value.nested,
+          filepath: `${publicDirectory}/file.txt`,
+          filePath: `${publicDirectory}/nested.txt`,
+          files: [`${publicDirectory}/file.txt`, 'src/a.ts'],
+        },
+        directory: publicDirectory,
+      });
+      expect(value).toEqual(original);
+    }
+  );
+
+  it('normalizes git headers, timestamps, quotes, renames and multiple files without modifying hunk contents', () => {
+    const publicDirectory = `/cloud-agent/sessions/${kiloSessionId}`;
+    const patch = [
+      'diff --git a//workspace/app/a.ts b//workspace/app/a.ts',
+      '--- /dev/null',
+      '+++ /workspace/app/a.ts\t2026-10-19',
+      '@@ -0,0 +1,2 @@',
+      '+Keep /workspace/app/a.ts',
+      '+++ /workspace/app/this-is-added-content.ts',
+      'diff --git "a//workspace/app/file name.ts" "b//workspace/app/new name.ts"',
+      'rename from /workspace/app/file name.ts',
+      'rename to /workspace/app/new name.ts',
+      '--- "a//workspace/app/file name.ts"',
+      '+++ "b//workspace/app/new name.ts"',
+      '@@ -1 +1 @@',
+      '-old /workspace/app/file name.ts',
+      '+new /workspace/app/new name.ts',
+      '',
+    ].join('\n');
+    const expected = [
+      `diff --git a/${publicDirectory}/a.ts b/${publicDirectory}/a.ts`,
+      '--- /dev/null',
+      `+++ ${publicDirectory}/a.ts\t2026-10-19`,
+      '@@ -0,0 +1,2 @@',
+      '+Keep /workspace/app/a.ts',
+      '+++ /workspace/app/this-is-added-content.ts',
+      `diff --git "a/${publicDirectory}/file name.ts" "b/${publicDirectory}/new name.ts"`,
+      `rename from ${publicDirectory}/file name.ts`,
+      `rename to ${publicDirectory}/new name.ts`,
+      `--- "a/${publicDirectory}/file name.ts"`,
+      `+++ "b/${publicDirectory}/new name.ts"`,
+      '@@ -1 +1 @@',
+      '-old /workspace/app/file name.ts',
+      '+new /workspace/app/new name.ts',
+      '',
+    ].join('\n');
+    expect(
+      projectPublicStructuredPaths(
+        { directory: '/workspace/app', metadata: { diff: patch, filediff: { patch } } },
+        kiloSessionId
+      )
+    ).toEqual({
+      directory: publicDirectory,
+      metadata: { diff: expected, filediff: { patch: expected } },
+    });
+  });
+
+  it('normalizes unknown absolute structured paths but preserves relative paths, public paths and user text', () => {
+    const publicDirectory = `/cloud-agent/sessions/${kiloSessionId}`;
+    const value = {
+      filepath: '/workspace/app/a.ts',
+      file: 'C:\\private\\a.ts',
+      root: '\\\\private\\share',
+      files: ['src/a.ts', '/private/a.ts', `${publicDirectory}/a.ts`],
+      metadata: {
+        patch: '--- src/a.ts\n+++ src/a.ts\n@@ -1 +1 @@\n-/private/a.ts\n+/private/b.ts',
+      },
+      text: '/workspace/app/a.ts',
+    };
+    expect(projectPublicStructuredPaths(value, kiloSessionId)).toEqual({
+      ...value,
+      filepath: publicDirectory,
+      file: publicDirectory,
+      root: publicDirectory,
+      files: ['src/a.ts', publicDirectory, `${publicDirectory}/a.ts`],
+    });
+  });
+});
 
 describe('projectPrivateWorktreePaths', () => {
   const privateDirectory =
@@ -45,6 +224,139 @@ describe('projectPrivateWorktreePaths', () => {
 });
 
 describe('projectPublicStoredMessage', () => {
+  it('retains already-public typed file and patch path suffixes', () => {
+    const file = `/cloud-agent/sessions/${kiloSessionId}/native-permission.txt`;
+    expect(
+      projectPublicPart(
+        {
+          id: 'prt_patch',
+          sessionID: kiloSessionId,
+          messageID: 'msg_patch',
+          type: 'patch',
+          hash: 'hash',
+          files: [file],
+        },
+        kiloSessionId
+      )
+    ).toMatchObject({ files: [file] });
+    expect(
+      projectPublicPart(
+        {
+          id: 'prt_file',
+          sessionID: kiloSessionId,
+          messageID: 'msg_file',
+          type: 'file',
+          mime: 'text/plain',
+          url: 'data:text/plain,safe',
+          source: { type: 'file', path: file, text: { value: 'file', start: 0, end: 4 } },
+        },
+        kiloSessionId
+      )
+    ).toMatchObject({ source: { path: file } });
+  });
+  it.each(['/workspace/app', `/cloud-agent/sessions/${kiloSessionId}`])(
+    'projects captured stored write metadata when assistant cwd is %s',
+    cwd => {
+      const publicDirectory = `/cloud-agent/sessions/${kiloSessionId}`;
+      const content =
+        'permission-e2e\n\n<system-reminder>\nKeep /workspace/app/native-permission.txt as user content\n</system-reminder>';
+      const patch = `Index: /workspace/app/native-permission.txt\n===================================================================\n--- /workspace/app/native-permission.txt\n+++ /workspace/app/native-permission.txt\n@@ -0,0 +1,5 @@\n+${content.replaceAll('\n', '\n+')}\n\\ No newline at end of file\n`;
+      const message = {
+        info: {
+          id: 'msg_captured_write',
+          sessionID: kiloSessionId,
+          role: 'assistant',
+          time: { created: 100, completed: 101 },
+          parentID: 'msg_user',
+          modelID: 'fake-deterministic',
+          providerID: 'kilo',
+          mode: 'native-probe',
+          agent: 'native-probe',
+          path: { cwd, root: cwd },
+          cost: 0,
+          tokens: { input: 10, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
+          finish: 'tool-calls',
+        },
+        parts: [
+          {
+            id: 'prt_captured_write',
+            sessionID: kiloSessionId,
+            messageID: 'msg_captured_write',
+            type: 'tool',
+            callID: 'call_write',
+            tool: 'write',
+            state: {
+              status: 'completed',
+              input: { filePath: 'native-permission.txt', content },
+              output: 'Wrote file successfully.',
+              title: 'native-permission.txt',
+              metadata: {
+                diagnostics: {},
+                filepath: '/workspace/app/native-permission.txt',
+                exists: false,
+                diff: patch,
+                filediff: {
+                  file: '/workspace/app/native-permission.txt',
+                  patch,
+                  additions: 5,
+                  deletions: 0,
+                },
+                truncated: false,
+                approval: { source: 'manual' },
+              },
+              time: { start: 100, end: 101 },
+            },
+          },
+        ],
+      } satisfies KiloSdkStoredMessage;
+      const original = structuredClone(message);
+      const publicFile =
+        cwd === '/workspace/app' ? `${publicDirectory}/native-permission.txt` : publicDirectory;
+      const publicPatch = patch
+        .replaceAll('Index: /workspace/app/native-permission.txt', `Index: ${publicFile}`)
+        .replaceAll('--- /workspace/app/native-permission.txt', `--- ${publicFile}`)
+        .replaceAll('+++ /workspace/app/native-permission.txt', `+++ ${publicFile}`);
+      expect(projectPublicStoredMessage(message, kiloSessionId)).toEqual({
+        info: { ...message.info, path: { cwd: publicDirectory, root: publicDirectory } },
+        parts: [
+          {
+            ...message.parts[0],
+            state: {
+              ...message.parts[0].state,
+              metadata: {
+                ...message.parts[0].state.metadata,
+                filepath: publicFile,
+                diff: publicPatch,
+                filediff: {
+                  ...message.parts[0].state.metadata.filediff,
+                  file: publicFile,
+                  patch: publicPatch,
+                },
+              },
+            },
+          },
+        ],
+      });
+      expect(projectPublicPart(message.parts[0], kiloSessionId)).toMatchObject({
+        state: {
+          input: { content },
+          metadata: {
+            filepath: publicDirectory,
+            diff: publicPatch.replaceAll(publicFile, publicDirectory),
+            filediff: { file: publicDirectory },
+          },
+        },
+      });
+      const infoWithMetadata = {
+        ...message.info,
+        filepath: '/workspace/app/native-permission.txt',
+      };
+      expect(projectPublicMessageInfo(infoWithMetadata, kiloSessionId)).toMatchObject({
+        filepath: publicFile,
+      });
+      expect(message).toEqual(original);
+    }
+  );
   it('redacts wrapper-local file URLs from typed stored file parts while preserving data URLs', () => {
     const projected = projectPublicStoredMessage(
       {
@@ -111,7 +423,7 @@ describe('projectPublicStoredMessage', () => {
     ]);
   });
 
-  it('rewrites grouped private checkout paths in tool outputs and nested metadata', () => {
+  it('rewrites grouped structured checkout paths while preserving text and tool outputs', () => {
     const privateDirectory =
       '/workspace/private/worktrees/worktree_12345678-1234-4234-8234-123456789abc';
     const publicDirectory = `/cloud-agent/sessions/${kiloSessionId}`;
@@ -172,12 +484,11 @@ describe('projectPublicStoredMessage', () => {
     );
 
     expect(projected.info).toMatchObject({ path: { cwd: publicDirectory, root: publicDirectory } });
-    expect(JSON.stringify(projected)).not.toContain(privateDirectory);
     expect(projected.parts).toMatchObject([
       {
         state: {
           input: { filePath: `${publicDirectory}/shared.txt`, unrelated: '/owner/project' },
-          output: `Read ${publicDirectory}/shared.txt without losing file contents`,
+          output: `Read ${privateDirectory}/shared.txt without losing file contents`,
           metadata: {
             filepath: `${publicDirectory}/shared.txt`,
             display: { path: `${publicDirectory}/shared.txt` },
@@ -186,13 +497,13 @@ describe('projectPublicStoredMessage', () => {
               patch: `--- ${publicDirectory}/shared.txt\n+file contents`,
             },
             outputs: [
-              `${publicDirectory}/nested.txt`,
-              { output: `Created ${publicDirectory}/other.txt`, relative: 'src/relative.ts' },
+              `${privateDirectory}/nested.txt`,
+              { output: `Created ${privateDirectory}/other.txt`, relative: 'src/relative.ts' },
             ],
           },
         },
       },
-      { text: `Updated ${publicDirectory}/shared.txt and src/relative.ts` },
+      { text: `Updated ${privateDirectory}/shared.txt and src/relative.ts` },
     ]);
   });
 
@@ -247,7 +558,12 @@ describe('projectPublicStoredMessage', () => {
     expect(userMessage.parts).toMatchObject([{ text }]);
   });
 
-  it('preserves owner-visible typed resource file URIs', () => {
+  it.each([
+    ['file:///workspace/private/resource.txt', ''],
+    ['FILE://localhost/workspace/private/resource.txt', ''],
+    ['https://example.com/resource.txt', 'https://example.com/resource.txt'],
+    ['data:text/plain,safe', 'data:text/plain,safe'],
+  ])('projects typed resource URI %s without changing SDK resource fields', (uri, publicUri) => {
     const projected = projectPublicStoredMessage(
       {
         info: {
@@ -270,7 +586,7 @@ describe('projectPublicStoredMessage', () => {
               type: 'resource',
               text: { value: 'private', start: 0, end: 7 },
               clientName: 'wrapper',
-              uri: 'file:///workspace/private/resource.txt',
+              uri,
             },
           },
         ],
@@ -279,7 +595,15 @@ describe('projectPublicStoredMessage', () => {
     );
 
     expect(projected.parts).toMatchObject([
-      { source: { type: 'resource', uri: 'file:///workspace/private/resource.txt' } },
+      {
+        url: 'data:text/plain,safe',
+        source: {
+          type: 'resource',
+          text: { value: 'private', start: 0, end: 7 },
+          clientName: 'wrapper',
+          uri: publicUri,
+        },
+      },
     ]);
   });
 });

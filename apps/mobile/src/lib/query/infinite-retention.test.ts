@@ -148,11 +148,11 @@ describe('reconcileFirstPage', () => {
   });
 });
 
-describe('infinite-query refetch fan-out', () => {
+describe('infinite-query refetch fan-out through withInfiniteRetention', () => {
   it('re-requests every retained page, so maxPages bounds a single refetch', async () => {
     const queryClient = new QueryClient();
     let calls = 0;
-    const observer = new InfiniteQueryObserver(queryClient, {
+    const baseOptions = {
       queryKey: ['refetch-fanout'],
       // eslint-disable-next-line require-await -- the recipe pins an async queryFn; the body needs no await.
       queryFn: async ({ pageParam }: { pageParam: number }) => {
@@ -160,10 +160,15 @@ describe('infinite-query refetch fan-out', () => {
         return page([{ id: String(pageParam), title: 'x' }]);
       },
       initialPageParam: 0,
-      getNextPageParam: (_last, pages) => pages.length,
-      maxPages: 3,
+      getNextPageParam: (_lastPage: Page, pages: Page[]) => pages.length,
       staleTime: Infinity,
       retry: false,
+    } as const;
+    // The observer options come from this module's own helper, so the
+    // retention bound the app actually uses is what this test exercises.
+    const observer = new InfiniteQueryObserver(queryClient, {
+      ...baseOptions,
+      ...withInfiniteRetention(baseOptions, 3),
     });
     // eslint-disable-next-line no-empty-function -- a real listener is required to activate the observer; the body is intentionally empty.
     const unsubscribe = observer.subscribe(() => {});
@@ -173,6 +178,13 @@ describe('infinite-query refetch fan-out', () => {
       // eslint-disable-next-line no-await-in-loop -- each page's cursor is the previous page's result.
       await observer.fetchNextPage();
     }
+    expect(observer.getCurrentResult().data?.pages).toHaveLength(3);
+
+    // A 4th page exists; the cap of 3 must evict the oldest page instead of
+    // retaining it. Without the helper's maxPages, the pages array would grow
+    // to 4 and the refetch below would fan out 4 requests.
+    // eslint-disable-next-line no-await-in-loop -- the cursor chain continues from page 3.
+    await observer.fetchNextPage();
     expect(observer.getCurrentResult().data?.pages).toHaveLength(3);
 
     calls = 0;

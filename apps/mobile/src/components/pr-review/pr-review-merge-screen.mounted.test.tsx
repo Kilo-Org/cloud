@@ -40,13 +40,11 @@ type MockState = {
   scope: ProviderPrScope | null;
 };
 
-const mock = vi.hoisted(
-  (): MockState => ({
-    results: {},
-    params: {},
-    scope: null,
-  })
-);
+const mock = vi.hoisted((): MockState => ({
+  results: {},
+  params: {},
+  scope: null,
+}));
 
 function mockResult(overrides: Partial<MockQueryResult> = {}): MockQueryResult {
   return {

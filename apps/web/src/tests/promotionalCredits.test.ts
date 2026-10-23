@@ -3,6 +3,7 @@ import {
   grantCreditForCategory,
   grantCreditForCategoryConfig,
   redeemSelfServicePromoCode,
+  SELF_SERVICE_PROMO_REDEMPTION_DISABLED_MESSAGE,
 } from '@kilocode/web-shared/lib/promotionalCredits';
 import type { PromoCreditCategoryConfig } from '@kilocode/web-shared/lib/PromoCreditCategoryConfig';
 import { type User, credit_transactions, kilocode_users } from '@kilocode/db/schema';
@@ -15,9 +16,10 @@ import { assertNoError } from '@kilocode/web-shared/lib/maybe-result';
 describe('grantCreditForCategory', () => {
   const mockUser: User = defineTestUser({});
 
-  it('should not allow a non-user-redeemable promo code on user redemption', async () => {
+  it('should refuse user redemption while the kill switch is off', async () => {
     const result = await redeemSelfServicePromoCode(mockUser, 'pull_request');
     expect(result.success).toBe(false);
+    expect(result.message).toBe(SELF_SERVICE_PROMO_REDEMPTION_DISABLED_MESSAGE);
   });
 
   it('should return error for non-existent credit category', async () => {

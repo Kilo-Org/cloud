@@ -385,6 +385,38 @@ describe('discoverSessionCards', () => {
     const records = await readSessionCardScopes();
     expect(records?.get('session-1')).toEqual(CTX);
   });
+
+  it('keeps the records when its own discovery failed but a later one read ActivityKit', async () => {
+    rememberSessionCardScope('session-1', CTX);
+    await _settleSessionCardScopeWritesForTests();
+    const gate = Promise.withResolvers<undefined>();
+    let firstRead = true;
+    _setSessionCardScopeStoreForTests({
+      getItemAsync: async (key: string) => {
+        if (firstRead) {
+          firstRead = false;
+          await gate.promise;
+        }
+        return storedScopes.get(key) ?? null;
+      },
+      setItemAsync: scopeStore.setItemAsync,
+    });
+    mocks.getInstances.mockImplementationOnce(() => {
+      throw new Error('ActivityKit unavailable');
+    });
+
+    const restoring = restoreFollowedSessionCards(CTX);
+    // A second discovery, as a foreground restore would run, reads ActivityKit
+    // successfully while the first restore still waits on its own record read.
+    mocks.instances = [fakeActivity('native-9', { sessionId: 'session-9' })];
+    discoverSessionCards();
+    gate.resolve(undefined);
+    await restoring;
+    await _settleSessionCardScopeWritesForTests();
+
+    const kept = await readSessionCardScopes();
+    expect(kept?.get('session-1')).toEqual(CTX);
+  });
 });
 
 describe('syncFollowedSessionCards', () => {

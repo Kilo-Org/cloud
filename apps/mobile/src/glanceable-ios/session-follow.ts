@@ -218,6 +218,9 @@ export async function restoreFollowedSessionCards(ctx: SessionFollowContext | nu
     return;
   }
   const live = discoverSessionCards();
+  // Capture this restore's own discovery result before the await: another
+  // restore or a Follow can run a different discovery in the meantime.
+  const discoveryRead = discoveryReadable;
   if (ctx === null) {
     return;
   }
@@ -243,7 +246,7 @@ export async function restoreFollowedSessionCards(ctx: SessionFollowContext | nu
   }
   // An unreadable ActivityKit read proves nothing about which cards are live, so
   // its empty result must not prune the records the cards still rely on.
-  if (discoveryReadable) {
+  if (discoveryRead) {
     cardScopes.pruneSessionCardScopes(kept, records);
   }
   retrySessionActivityTokens();

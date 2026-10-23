@@ -1,8 +1,9 @@
 /* eslint-disable max-lines -- The live list keeps its query, pull-refresh, keyboard container, and FAB orchestration together on one screen. */
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
-import { AppState, I18nManager, Pressable, useWindowDimensions, View } from 'react-native';
+import { AppState, I18nManager, Pressable, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -56,7 +57,7 @@ export function AgentSessionListScreen({
   // The empty state's own height grows with Dynamic Type, so the list chrome's
   // presentation decision needs the window's text scale (see
   // `useAgentsListChrome`).
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
 
   const context = useLiveSessionContext();
   const { organizationId, isError: isContextError, refetch: refetchContext } = context;

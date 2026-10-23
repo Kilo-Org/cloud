@@ -3,6 +3,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useState } from 'react';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { ChevronDown, Eye, EyeOff } from '@/components/ui/icons';
 import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
@@ -37,7 +38,8 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
   const router = useRouter();
-  const { width, fontScale } = useWindowDimensions();
+  const { width } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
   const [availableWidth, setAvailableWidth] = useState<number | null>(null);
   // Reserve room for the amount, visibility toggle and purchase action in
   // scaled text units, using the card's width rather than the display's.

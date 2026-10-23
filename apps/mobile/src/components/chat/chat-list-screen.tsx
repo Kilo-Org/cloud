@@ -1,11 +1,12 @@
 import { FlashList } from '@shopify/flash-list';
 import { type Href, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, useWindowDimensions, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
@@ -62,7 +63,7 @@ function ScopedChatListScreen() {
   const { organizationId } = useOrganization();
   const place = useChatPlace();
   const { bottom } = useSafeAreaInsets();
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
   const tabBarHeight = useMemo(
     () => getEffectiveTabBarHeight({ bottomInset: bottom, platform: Platform.OS, fontScale }),
     [bottom, fontScale]

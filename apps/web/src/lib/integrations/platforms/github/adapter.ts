@@ -394,8 +394,8 @@ export async function createPRComment(
 
 /**
  * Checks whether a comment containing the given marker already exists on a PR.
- * Reads only the most recent MAX_KILO_REVIEW_COMMENT_PAGES pages of comments
- * and counts comments attributed to the Kilo GitHub App only.
+ * Reads at most MAX_KILO_REVIEW_COMMENT_PAGES pages from both ends of the
+ * comment list and counts comments attributed to the Kilo GitHub App only.
  */
 export async function hasPRCommentWithMarker(
   installationId: string,
@@ -609,11 +609,14 @@ type PRIssueComment = {
 };
 
 /**
- * Reads the most recent MAX_KILO_REVIEW_COMMENT_PAGES pages of pull-request
- * issue comments. GitHub returns issue comments oldest first and has no
- * ordering parameter, so the last page number comes from the `Link` header and
- * the scan starts there. `reachedScanLimit` reports that older comments were
- * not read.
+ * Reads pull-request issue comments from both ends of the list within the
+ * MAX_KILO_REVIEW_COMMENT_PAGES budget: the first pages and the last pages.
+ * GitHub returns issue comments oldest first and accepts no ordering
+ * parameter, so a bounded scan has to choose which pages to skip. The comments
+ * Kilo writes once and then maintains in place — the review summary and the
+ * billing notice — stay where they were created, near the oldest end, while
+ * the newest discussion stays at the end; reading only one end would miss one
+ * of them. `reachedScanLimit` reports that older comments were not read.
  */
 async function scanPRIssueComments(
   octokit: Octokit,
@@ -630,16 +633,30 @@ async function scanPRIssueComments(
 
   const firstResponse = await octokit.issues.listComments({ ...base, page: 1 });
   const lastPage = lastIssueCommentPage(firstResponse.headers.link);
-  const firstPageToRead = Math.max(1, lastPage - (MAX_KILO_REVIEW_COMMENT_PAGES - 1));
+  const comments: PRIssueComment[] = [...firstResponse.data];
 
-  const comments: PRIssueComment[] = firstPageToRead === 1 ? [...firstResponse.data] : [];
+  if (lastPage <= MAX_KILO_REVIEW_COMMENT_PAGES) {
+    for (let page = 2; page <= lastPage; page++) {
+      const { data } = await octokit.issues.listComments({ ...base, page });
+      comments.push(...data);
+    }
+    return { comments, reachedScanLimit: false };
+  }
 
-  for (let page = Math.max(2, firstPageToRead); page <= lastPage; page++) {
+  const pagesAfterTheFirst = MAX_KILO_REVIEW_COMMENT_PAGES - 1;
+  const headPages = Math.ceil(pagesAfterTheFirst / 2);
+  const tailPages = pagesAfterTheFirst - headPages;
+
+  for (let page = 2; page <= 1 + headPages; page++) {
+    const { data } = await octokit.issues.listComments({ ...base, page });
+    comments.push(...data);
+  }
+  for (let page = lastPage - tailPages + 1; page <= lastPage; page++) {
     const { data } = await octokit.issues.listComments({ ...base, page });
     comments.push(...data);
   }
 
-  return { comments, reachedScanLimit: firstPageToRead > 1 };
+  return { comments, reachedScanLimit: true };
 }
 
 /**

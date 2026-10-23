@@ -80,13 +80,37 @@ describe('hasPRCommentWithMarker', () => {
     await expect(hasPRCommentWithMarker('42', 'acme', 'widgets', 7, MARKER)).resolves.toBe(false);
   });
 
-  it('reads only the most recent pages when the comment list is longer than the cap', async () => {
+  it('reads both ends of a long comment list within the page cap', async () => {
     mockListComments.mockResolvedValue({ headers: lastPageHeader(12), data: fullPage() });
 
     await expect(hasPRCommentWithMarker('42', 'acme', 'widgets', 7, MARKER)).resolves.toBe(false);
 
     const requestedPages = mockListComments.mock.calls.map(call => call[0].page);
-    expect(requestedPages).toEqual([1, 8, 9, 10, 11, 12]);
+    expect(requestedPages).toEqual([1, 2, 3, 11, 12]);
+  });
+
+  it('finds a marker posted early on a long comment list', async () => {
+    mockListComments
+      .mockResolvedValueOnce({
+        headers: lastPageHeader(12),
+        data: [
+          {
+            id: 3,
+            body: MARKER,
+            updated_at: '2026-05-02T00:00:00Z',
+            performed_via_github_app: { id: 'test-app-id' },
+          },
+          ...Array.from({ length: 99 }, (_, index) => ({
+            id: 100 + index,
+            body: 'ordinary discussion',
+            updated_at: '2026-05-01T00:00:00Z',
+          })),
+        ],
+      })
+      .mockResolvedValue({ headers: lastPageHeader(12), data: fullPage() });
+
+    await expect(hasPRCommentWithMarker('42', 'acme', 'widgets', 7, MARKER)).resolves.toBe(true);
+    expect(mockListComments).toHaveBeenCalledTimes(5);
   });
 
   it('finds the marker on a later page within the cap', async () => {

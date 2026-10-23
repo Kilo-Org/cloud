@@ -123,7 +123,7 @@ describe('findKiloReviewComment', () => {
     await expect(findKiloReviewComment('42', 'acme', 'widgets', 7)).resolves.toBeNull();
   });
 
-  it('reads only the most recent pages before stopping at the safe scan limit', async () => {
+  it('stops at the safe scan limit when the summary is not in the read pages', async () => {
     mockListComments.mockResolvedValue({
       headers: {
         link: '<https://api.github.com/repos/acme/widgets/issues/7/comments?per_page=100&page=12>; rel="last"',
@@ -140,6 +140,45 @@ describe('findKiloReviewComment', () => {
     );
 
     const requestedPages = mockListComments.mock.calls.map(call => call[0].page);
-    expect(requestedPages).toEqual([1, 8, 9, 10, 11, 12]);
+    expect(requestedPages).toEqual([1, 2, 3, 11, 12]);
+  });
+
+  it('finds the summary on the first page of a long comment list', async () => {
+    mockListComments
+      .mockResolvedValueOnce({
+        headers: {
+          link: '<https://api.github.com/repos/acme/widgets/issues/7/comments?per_page=100&page=12>; rel="last"',
+        },
+        data: [
+          {
+            id: 5,
+            body: '<!-- kilo-review -->\n## Code Review Summary\nMaintained in place',
+            updated_at: '2026-05-09T00:00:00Z',
+            performed_via_github_app: { id: 'test-app-id' },
+          },
+          ...Array.from({ length: 99 }, (_, index) => ({
+            id: 100 + index,
+            body: 'ordinary discussion',
+            updated_at: '2026-05-01T00:00:00Z',
+          })),
+        ],
+      })
+      .mockResolvedValue({
+        headers: {
+          link: '<https://api.github.com/repos/acme/widgets/issues/7/comments?per_page=100&page=12>; rel="last"',
+        },
+        data: Array.from({ length: 100 }, (_, index) => ({
+          id: 1000 + index,
+          body: 'ordinary discussion',
+          updated_at: '2026-05-01T00:00:00Z',
+        })),
+      });
+
+    await expect(findKiloReviewComment('42', 'acme', 'widgets', 7)).resolves.toEqual({
+      commentId: 5,
+      body: '<!-- kilo-review -->\n## Code Review Summary\nMaintained in place',
+    });
+
+    expect(mockListComments).toHaveBeenCalledTimes(5);
   });
 });

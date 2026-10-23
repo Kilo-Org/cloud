@@ -862,19 +862,22 @@ describe('merge request reads', () => {
     });
   });
 
-  it.each([undefined, null])(
-    'rejects missing diff refs instead of inventing positions (%s)',
-    async diffRefs => {
-      mockSelfHostedGitLabResponse({
-        status: 200,
-        json: { ...mergeRequest, diff_refs: diffRefs },
-      });
+  it.each([
+    undefined,
+    null,
+    { ...mergeRequest.diff_refs, base_sha: undefined },
+    { ...mergeRequest.diff_refs, head_sha: null },
+    { ...mergeRequest.diff_refs, start_sha: '' },
+  ])('rejects unavailable diff positions (%j)', async diffRefs => {
+    mockSelfHostedGitLabResponse({
+      status: 200,
+      json: { ...mergeRequest, diff_refs: diffRefs },
+    });
 
-      await expect(
-        getMRDiffRefs('test-token', 'group/project', 9, 'https://gitlab.example.com')
-      ).rejects.toThrow('GitLab merge request has no diff refs');
-    }
-  );
+    await expect(
+      getMRDiffRefs('test-token', 'group/project', 9, 'https://gitlab.example.com')
+    ).rejects.toThrow('GitLab merge request has no diff refs');
+  });
 
   it('reports a failed merge request fetch with its status', async () => {
     mockSelfHostedGitLabResponse({ status: 500, body: 'boom' });

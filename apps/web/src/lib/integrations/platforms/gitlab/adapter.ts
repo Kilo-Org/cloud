@@ -1479,7 +1479,7 @@ export async function getMRDiffRefs(
   instanceUrl: string = DEFAULT_GITLAB_URL
 ): Promise<{ baseSha: string; headSha: string; startSha: string }> {
   const mr = await fetchGitLabMergeRequest({ accessToken, projectId, mrIid, instanceUrl });
-  if (!mr.diff_refs) {
+  if (!mr.diff_refs?.base_sha || !mr.diff_refs.head_sha || !mr.diff_refs.start_sha) {
     throw new Error('GitLab merge request has no diff refs');
   }
 

@@ -1,6 +1,6 @@
 import { type ReactNode, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Switch, TextInput, View } from 'react-native';
+import { TextInput, View } from 'react-native';
 
 import {
   PrFormSheetFooter,
@@ -8,6 +8,7 @@ import {
 } from '@/components/pr-review/pr-form-sheet-chrome';
 import { Button } from '@/components/ui/button';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';

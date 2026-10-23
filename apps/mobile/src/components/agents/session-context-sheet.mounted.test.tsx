@@ -50,6 +50,7 @@ vi.mock('react-i18next', async importOriginal => {
   };
 });
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   Switch: 'Switch',

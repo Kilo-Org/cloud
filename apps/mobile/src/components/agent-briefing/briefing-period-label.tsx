@@ -3,6 +3,7 @@ import { View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { type BriefingReport } from '@/lib/agent-briefing';
+import { formatCalendarDate } from '@/lib/format';
 import { formatBriefingTimestamp } from './briefing-window';
 
 export function BriefingPeriodLabel({ report }: { readonly report: BriefingReport }) {
@@ -12,7 +13,9 @@ export function BriefingPeriodLabel({ report }: { readonly report: BriefingRepor
       {report.kind === 'one_off' ? (
         <Text className="text-sm text-muted-foreground">{t('agentBriefing.oneOff')}</Text>
       ) : (
-        <Text className="text-sm text-muted-foreground">{report.localDate}</Text>
+        <Text className="text-sm text-muted-foreground">
+          {formatCalendarDate(report.localDate, i18n.language)}
+        </Text>
       )}
       <Text className="text-xs text-muted-foreground">
         {t('agentBriefing.window', {

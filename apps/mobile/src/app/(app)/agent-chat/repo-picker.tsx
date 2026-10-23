@@ -42,10 +42,9 @@ export default function RepoPickerScreen() {
       setBridge(nextBridge);
       setSearch('');
 
-      return () => {
-        repoPickerSlot.clear(UNFENCED_ROUTE_KEY);
-        bridgeRef.current = undefined;
-      };
+      // The bridge outlives a blur: `useRouteRegistry` clears this route's
+      // slots when the route unmounts, so a return to a sheet that is still on
+      // screen shows its options again instead of the "options expired" shell.
     }, [])
   );
 

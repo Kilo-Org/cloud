@@ -1,5 +1,6 @@
 import * as z from 'zod';
 import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
+import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import { sortRemoteModelCatalogProviders } from './remote-model-order';
 import type { KiloSessionId, SlashCommandCatalogStatus } from './types';
 
@@ -763,10 +764,62 @@ export const sessionQueueChangedDataSchema = z
   .passthrough();
 export type SessionQueueChangedData = z.infer<typeof sessionQueueChangedDataSchema>;
 
+/** Runtime mirror of `QuestionInfo` in `@kilocode/app-shared/opencode`. */
+const questionOptionSchema = z.object({
+  label: z.string(),
+  description: z.string(),
+  mode: z.string().optional(),
+});
+
+const questionInfoSchema = z.object({
+  question: z.string(),
+  header: z.string(),
+  options: z.array(questionOptionSchema),
+  multiple: z.boolean().optional(),
+  custom: z.boolean().optional(),
+});
+
+/**
+ * Convert a parsed entry to the shared type. Zod types an absent optional
+ * property as `T | undefined`, which `exactOptionalPropertyTypes` rejects
+ * against `QuestionInfo`, so the optionals are only added when present.
+ */
+function toQuestionInfo(parsed: z.infer<typeof questionInfoSchema>): QuestionInfo {
+  return {
+    question: parsed.question,
+    header: parsed.header,
+    options: parsed.options.map(option => ({
+      label: option.label,
+      description: option.description,
+      ...(option.mode === undefined ? {} : { mode: option.mode }),
+    })),
+    ...(parsed.multiple === undefined ? {} : { multiple: parsed.multiple }),
+    ...(parsed.custom === undefined ? {} : { custom: parsed.custom }),
+  };
+}
+
+/**
+ * A question list is positional: the answer payload mirrors the CLI's question
+ * indices (`answerQuestion(requestId, answers: string[][])`). Keep the longest
+ * run of entries that match `QuestionInfo` and stop at the first entry that
+ * does not, so a rendered question keeps its CLI index instead of every later
+ * answer sliding onto the wrong question. No usable entry means the payload
+ * carries no questions the client can render.
+ */
+const questionListSchema = z.array(z.unknown()).transform((entries): QuestionInfo[] | undefined => {
+  const questions: QuestionInfo[] = [];
+  for (const entry of entries) {
+    const parsed = questionInfoSchema.safeParse(entry);
+    if (!parsed.success) break;
+    questions.push(toQuestionInfo(parsed.data));
+  }
+  return questions.length > 0 ? questions : entries.length > 0 ? undefined : [];
+});
+
 export const questionAskedDataSchema = z.object({
   id: z.string(),
   tool: z.object({ callID: z.string() }).optional(),
-  questions: z.array(z.unknown()).optional().catch(undefined),
+  questions: questionListSchema.optional().catch(undefined),
 });
 export type QuestionAskedData = z.infer<typeof questionAskedDataSchema>;
 
@@ -927,7 +980,13 @@ export type AutocommitStartedData = z.infer<typeof autocommitStartedDataSchema>;
 const commitPushStatusSchema = z.enum(['pushed', 'failed', 'not_attempted', 'unknown']);
 const maxCommitMessageBytes = 16 * 1024;
 
-export const sessionCommitDataSchema = z.object({
+/**
+ * The commit record, declared once. `sessionCommitDataSchema` is the strict
+ * record the SDK stores; `autocommitCompletedDataSchema` carries the same
+ * fields on the wire, so a new field reaches both paths instead of needing two
+ * synchronized declarations.
+ */
+const commitRecordShape = {
   commitHash: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/),
   commitMessage: z
     .string()
@@ -938,19 +997,27 @@ export const sessionCommitDataSchema = z.object({
   committedAt: z.iso.datetime({ offset: true }),
   pushStatus: commitPushStatusSchema,
   commitMessageTruncated: z.literal(true).optional(),
-});
+};
+
+export const sessionCommitDataSchema = z.object(commitRecordShape);
 
 export const autocommitCompletedDataSchema = z.object({
-  messageId: z.string(),
+  messageId: commitRecordShape.messageId,
   success: z.boolean().catch(false),
   message: z.string().optional(),
   skipped: z.boolean().optional(),
-  commitHash: z.string().optional(),
-  commitMessage: z.string().optional(),
-  userMessageId: z.string().optional().catch(undefined),
-  committedAt: sessionCommitDataSchema.shape.committedAt.optional().catch(undefined),
-  pushStatus: commitPushStatusSchema.optional().catch(undefined),
-  commitMessageTruncated: z.boolean().optional().catch(undefined),
+  // The commit half of the event: every field in `commitRecordShape` is
+  // required on a stored record, so a completion that has no commit (skipped,
+  // failed, metadata unavailable) omits them. A value that could not be stored
+  // is dropped by `.catch` instead of failing the event — the completion notice
+  // and the commit count must not depend on metadata quality, and storage still
+  // decides with `sessionCommitDataSchema` from the same definitions.
+  commitHash: commitRecordShape.commitHash.optional().catch(undefined),
+  commitMessage: commitRecordShape.commitMessage.optional().catch(undefined),
+  userMessageId: commitRecordShape.userMessageId.optional().catch(undefined),
+  committedAt: commitRecordShape.committedAt.optional().catch(undefined),
+  pushStatus: commitRecordShape.pushStatus.optional().catch(undefined),
+  commitMessageTruncated: commitRecordShape.commitMessageTruncated.optional().catch(undefined),
 });
 export type AutocommitCompletedData = z.infer<typeof autocommitCompletedDataSchema>;
 

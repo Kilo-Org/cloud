@@ -13,6 +13,7 @@ import { PrReviewGateHeader } from '@/components/pr-review/pr-review-gate-header
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { WEB_BASE_URL } from '@/lib/config';
 import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -20,6 +21,7 @@ import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform'
 import { selectPrReviewGateView } from '@/lib/pr-review/pr-review-connect-gate-view';
 import { type ProviderPrPlatform, useProviderPrScopeOrNull } from '@/lib/pr-review/provider-pr-ref';
 import { useTRPC } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
 
 /**
  * The pasted MR URL's origin, when the deep link carried one and it is worth
@@ -104,15 +106,22 @@ export function ProviderConnectGate({
       await launchConnectGateBrowser(integrationUrl, {
         signal: controller.signal,
         onOpenFailure: () => void toast.error(t('authErrors.couldNotOpenBrowser')),
-        onReturn: async () => {
-          await status.refetch();
+        onReturn: () => {
+          // Detached on purpose: the browser closing is the user's edge, so the
+          // CTA returns to idle as soon as it happens. A status read that stays
+          // pending (the default `networkMode: 'online'` never settles while the
+          // online manager reports offline) must not keep Connect disabled — the
+          // read's own states carry the outcome, and a real failure renders the
+          // retryable QueryError below.
+          void status.refetch().catch(() => undefined);
+          return Promise.resolve();
         },
       });
     } catch {
-      // The helper reports a failed launch itself, so a rejected `onReturn`
-      // refetch is the only error that reaches here. Keep the gate showing:
-      // the query's error state renders the retryable
-      // QueryError instead of letting `void handleConnect()` reject.
+      // `launchConnectGateBrowser` reports a failed launch through
+      // `onOpenFailure`; this keeps `void handleConnect()` from rejecting if the
+      // refresh helper throws before that. The status read's own error state
+      // renders the retryable QueryError.
     } finally {
       if (!controller.signal.aborted) {
         setConnecting(false);
@@ -203,7 +212,7 @@ export function ProviderConnectGate({
           }
           action={
             <Button
-              className="mt-3 w-full flex-row gap-2"
+              className={cn('mt-3 w-full flex-row gap-2', STATE_ACTION_CLASS)}
               disabled={connecting}
               onPress={() => {
                 void handleConnect();

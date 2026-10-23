@@ -107,7 +107,18 @@ type ManagerFactoryOptions = {
  * The session row this module needs: existence, the manager's org scope, and
  * the status that decides a proven-absent raise's outcome.
  */
-type SessionRow = { organization_id?: string | null; status?: string | null };
+/**
+ * The raise a notification action answered: its status, plus the stored row's
+ * own status time when that row still reported the answered status.
+ */
+type AnsweredRaise = { status: string; statusUpdatedAt: string | null };
+
+type SessionRow = {
+  organization_id?: string | null;
+  status?: string | null;
+  /** When the stored row's status last changed, the raise's own identity. */
+  status_updated_at?: string | null;
+};
 
 export type NeedsInputInteractionDeps = {
   /**
@@ -126,7 +137,7 @@ export type NeedsInputInteractionDeps = {
   /** Reads the authenticated user id that scopes the transcript cache. */
   getUserId?: () => Promise<string | null>;
   /** Records the session-attention ack after a successful interaction. */
-  ack?: (kiloSessionId: string) => void;
+  ack?: (kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void;
   /** Clock the wait for the raise is bounded by. */
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
@@ -181,15 +192,27 @@ export async function runNeedsInputInteraction({
   const pollIntervalMs = deps?.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
   const missingRaiseSettleMs = deps?.missingRaiseSettleMs ?? DEFAULT_MISSING_RAISE_SETTLE_MS;
 
+  // The raise the notification offered. A card's Approve answers a permission
+  // and a Reply answers a question, and the stored row's own status time names
+  // the raise when the row still reads that status.
+  const answeredStatus = action === 'approve' ? 'permission' : 'question';
   let organizationId: string | undefined = undefined;
+  let answeredRaise: AnsweredRaise = { status: answeredStatus, statusUpdatedAt: null };
   try {
     const session = await getSession(kiloSessionId);
     organizationId = session.organization_id ?? undefined;
+    answeredRaise = {
+      status: answeredStatus,
+      // A row already reporting a different status has moved on from this
+      // raise: its time names the next one, so the ack keeps the status alone.
+      statusUpdatedAt:
+        session.status === answeredStatus ? (session.status_updated_at ?? null) : null,
+    };
   } catch (error) {
     // A session the user can no longer see is stale, not retryable; every
     // other read failure (deadline, 5xx, offline) may succeed on a later tap.
     if (readTrpcErrorField(error, 'code') === 'NOT_FOUND') {
-      ack(kiloSessionId);
+      ack(kiloSessionId, answeredRaise.status, answeredRaise.statusUpdatedAt);
       return 'unavailable';
     }
     return 'retryable';
@@ -235,7 +258,7 @@ export async function runNeedsInputInteraction({
           // that can no longer do anything — the same clear a successful
           // answer performs.
           ackGone: () => {
-            ack(kiloSessionId);
+            ack(kiloSessionId, answeredRaise.status, answeredRaise.statusUpdatedAt);
           },
         });
         if (resolution.kind === 'answered') {
@@ -249,7 +272,7 @@ export async function runNeedsInputInteraction({
       await (action === 'approve'
         ? manager.respondToPermission(requestId, 'once')
         : manager.answerQuestion(requestId, [[replyText]]));
-      ack(kiloSessionId);
+      ack(kiloSessionId, answeredRaise.status, answeredRaise.statusUpdatedAt);
       return 'ok';
     } finally {
       manager.destroy();

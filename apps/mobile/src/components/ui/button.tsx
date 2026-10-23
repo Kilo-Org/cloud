@@ -23,11 +23,12 @@ const buttonVariants = cva(
       size: {
         // min-h (not fixed h) so the button grows to fit text scaled by large
         // Dynamic Type instead of clipping the label; the min still guarantees
-        // the 44pt (default/lg) / 36pt-plus-hitSlop (sm) touch target.
+        // the 48pt action / 44pt default/lg / 36pt-plus-hitSlop sm target.
         // Use px because native rem defaults to 14pt, not 16pt.
         default: 'min-h-[44px] px-4 py-2',
         sm: 'min-h-[36px] gap-1.5 rounded-md px-3 py-1.5',
         lg: 'min-h-[44px] rounded-md px-6 py-2',
+        action: 'min-h-[48px] px-4 py-2',
         icon: 'h-[44px] w-[44px]',
       },
     },
@@ -120,6 +121,7 @@ const buttonTextVariants = cva('text-foreground text-center text-sm font-semibol
       default: '',
       sm: '',
       lg: '',
+      action: '',
       icon: '',
     },
   },

@@ -62,16 +62,20 @@ vi.mock('@/components/agents/session-list-helpers', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#000', mutedForeground: '#666' }),
 }));
-vi.mock('@/lib/trpc', () => ({ useTRPC: () => ({}) }));
-vi.mock('@/lib/hooks/use-agent-sessions', () => ({
-  buildStoredSessionsQueryOptions: () => ({
-    queryKey: ['stored-sessions'],
-    queryFn: fetchSessions,
-    // TanStack v5 refuses an infinite query without an initial page param; the
-    // real builder gets one from `infiniteQueryOptions`.
-    initialPageParam: null,
-    getNextPageParam: () => undefined,
-    retryDelay: 0,
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({
+    cliSessionsV2: {
+      list: {
+        infiniteQueryOptions: () => ({
+          queryKey: ['stored-sessions'],
+          queryFn: fetchSessions,
+          // TanStack v5 refuses an infinite query without an initial page param.
+          initialPageParam: null,
+          getNextPageParam: () => undefined,
+          retryDelay: 0,
+        }),
+      },
+    },
   }),
 }));
 

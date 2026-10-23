@@ -29,6 +29,7 @@ import {
   normalizeGitLabInstanceUrl,
 } from '@/lib/integrations/platforms/gitlab/instance-url';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { providerReviewErrorToTrpcError } from './error-mapping';
 
 /**
  * The account that owns the GitLab integration. `userId` is the acting user
@@ -212,8 +213,24 @@ export type GitLabProjectAccess = {
   instanceUrl: string;
   /** The integration's repository full path, matched case-insensitively. */
   projectPath: string;
+  /** The integration the credential belongs to. */
+  integrationId: string;
+  /** The matched repository's provider id from that integration's cache. */
+  repositoryId: number;
   owner: GitLabReviewOwner;
 };
+
+/**
+ * Map one GitLab failure onto the router's error states. Classification is
+ * owner-aware first (a connection-level 403 is a reconnect, not the reader's
+ * permission), then every surface answers the kind with the shared code. A
+ * TRPCError is already an intentional refusal (invalid URL, closed or draft
+ * merge request) and passes through unchanged.
+ */
+export function gitlabReviewErrorToTrpcError(error: unknown, owner: GitLabReviewOwner): TRPCError {
+  if (error instanceof TRPCError) return error;
+  return providerReviewErrorToTrpcError(classifyGitLabErrorForOwner(error, owner));
+}
 
 function ownerToDbOwner(owner: GitLabReviewOwner): Owner {
   return owner.type === 'user'
@@ -334,7 +351,14 @@ export async function authorizeProject(
 
   try {
     const accessToken = await getValidGitLabToken(integration, actorFor(owner));
-    return { accessToken, instanceUrl, projectPath: match.full_name, owner };
+    return {
+      accessToken,
+      instanceUrl,
+      projectPath: match.full_name,
+      integrationId: integration.id,
+      repositoryId: match.id,
+      owner,
+    };
   } catch (error) {
     throw classifyGitLabErrorForOwner(error, owner);
   }

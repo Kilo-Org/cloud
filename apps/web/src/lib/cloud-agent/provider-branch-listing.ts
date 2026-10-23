@@ -35,6 +35,7 @@ import {
 import {
   authorizeProject,
   GitLabReviewError,
+  gitlabReviewErrorToTrpcError,
   type GitLabReviewOwner,
 } from '@/lib/provider-review/gitlab-authorization';
 import {
@@ -43,6 +44,7 @@ import {
   BitbucketReviewError,
   type BitbucketRepositoryAccess,
 } from '@/lib/provider-review/bitbucket-authorization';
+import { providerReviewErrorToTrpcError } from '@/lib/provider-review/error-mapping';
 import {
   fetchPage,
   repositoryPathGuard,
@@ -106,28 +108,6 @@ async function requireActiveIntegration(owner: Owner, platform: string, label: s
     throw new TRPCError({ code: 'NOT_FOUND', message: inactiveConnectionMessage(label) });
   }
   return integration;
-}
-
-/**
- * Map a classified Bitbucket refusal onto the router error states. The
- * message is the authorization layer's fixed copy — it never embeds a token
- * or a workspace identity.
- */
-function bitbucketErrorToTrpcError(error: BitbucketReviewError): TRPCError {
-  switch (error.kind) {
-    case 'not_found':
-      return new TRPCError({ code: 'NOT_FOUND', message: error.message });
-    case 'forbidden':
-      return new TRPCError({ code: 'FORBIDDEN', message: error.message });
-    case 'reconnect':
-      return new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message });
-    case 'bad_request':
-      return new TRPCError({ code: 'BAD_REQUEST', message: error.message });
-    default:
-      // stale_head cannot come from a read; retryable surfaces as a
-      // retryable gateway failure, never as an empty branch list.
-      return new TRPCError({ code: 'BAD_GATEWAY', message: error.message });
-  }
 }
 
 type GitHubBranchRef = { name: string; isDefault: boolean };
@@ -265,24 +245,6 @@ async function listGitHubBranches(
   }
 }
 
-/** A refusal meaning "this GitLab review call cannot proceed" — router worded. */
-function gitlabErrorToTrpcError(error: GitLabReviewError): TRPCError {
-  switch (error.kind) {
-    case 'not_found':
-      return new TRPCError({ code: 'NOT_FOUND', message: error.message });
-    case 'forbidden':
-      return new TRPCError({ code: 'FORBIDDEN', message: error.message });
-    case 'reconnect':
-      return new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message });
-    case 'bad_request':
-      return new TRPCError({ code: 'BAD_REQUEST', message: error.message });
-    default:
-      // stale_head cannot come from a read; retryable surfaces as a
-      // retryable gateway failure, never as an empty branch list.
-      return new TRPCError({ code: 'BAD_GATEWAY', message: error.message });
-  }
-}
-
 /**
  * Map a GitLab branches HTTP refusal onto the router error states. Only the
  * status is carried over; the adapter's message stays out of the copy.
@@ -357,7 +319,7 @@ async function listGitLabBranches(
     );
     return toListing(branches.map(branch => ({ name: branch.name, isDefault: branch.default })));
   } catch (error) {
-    if (error instanceof GitLabReviewError) throw gitlabErrorToTrpcError(error);
+    if (error instanceof GitLabReviewError) throw gitlabReviewErrorToTrpcError(error, reviewOwner);
     if (error instanceof GitLabBranchesFetchError)
       throw gitlabBranchesErrorToTrpcError(error, reviewOwner);
     throw error;
@@ -425,7 +387,7 @@ async function listBitbucketBranches(
       repoSlug
     );
   } catch (error) {
-    if (error instanceof BitbucketReviewError) throw bitbucketErrorToTrpcError(error);
+    if (error instanceof BitbucketReviewError) throw providerReviewErrorToTrpcError(error);
     throw error;
   }
 
@@ -468,7 +430,7 @@ async function listBitbucketBranches(
       if (page === MAX_BRANCH_PAGES - 1) truncated = true;
     }
   } catch (error) {
-    if (error instanceof BitbucketReviewError) throw bitbucketErrorToTrpcError(error);
+    if (error instanceof BitbucketReviewError) throw providerReviewErrorToTrpcError(error);
     throw error;
   }
 

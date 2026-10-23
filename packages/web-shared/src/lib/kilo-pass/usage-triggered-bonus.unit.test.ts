@@ -163,6 +163,9 @@ describe('usage-triggered-bonus (unit)', () => {
       [1, KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed, true, 0.05],
       [1, KiloPassWelcomePromoEligibilityReason.NoPositiveSettlement, true, 0.05],
       [1, KiloPassWelcomePromoEligibilityReason.SettlementUnresolved, true, 0.05],
+      [1, KiloPassWelcomePromoEligibilityReason.StorePayerFirstClaim, true, 0.1],
+      [1, KiloPassWelcomePromoEligibilityReason.StorePayerPreviouslyClaimed, true, 0.05],
+      [1, KiloPassWelcomePromoEligibilityReason.StorePayerUnresolved, true, 0.05],
       [1, null, true, 0.05],
       [1, KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim, false, 0.05],
       [2, KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim, true, 0.5],
@@ -171,6 +174,9 @@ describe('usage-triggered-bonus (unit)', () => {
       [2, KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed, true, 0.1],
       [2, KiloPassWelcomePromoEligibilityReason.NoPositiveSettlement, true, 0.1],
       [2, KiloPassWelcomePromoEligibilityReason.SettlementUnresolved, true, 0.1],
+      [2, KiloPassWelcomePromoEligibilityReason.StorePayerFirstClaim, true, 0.5],
+      [2, KiloPassWelcomePromoEligibilityReason.StorePayerPreviouslyClaimed, true, 0.1],
+      [2, KiloPassWelcomePromoEligibilityReason.StorePayerUnresolved, true, 0.1],
       [2, null, true, 0.1],
       [2, KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim, false, 0.1],
     ] as const)(
@@ -237,18 +243,40 @@ describe('usage-triggered-bonus (unit)', () => {
         getKiloPassWelcomePromoPolicy({
           paymentProvider: KiloPassPaymentProvider.Stripe,
           initialIssuanceCreatedAt: createdAt,
+          initialWelcomePromoEligibilityReason: null,
         })
       ).toBe(expectedPolicy);
     });
 
-    test('keeps App Store eligibility on account history when issuance context is missing', () => {
-      expect(
-        getKiloPassWelcomePromoPolicy({
-          paymentProvider: KiloPassPaymentProvider.AppStore,
-          initialIssuanceCreatedAt: null,
-        })
-      ).toBe('account-history-only');
-    });
+    test.each([
+      [KiloPassPaymentProvider.AppStore, null, 'account-history-only'],
+      [
+        KiloPassPaymentProvider.AppStore,
+        KiloPassWelcomePromoEligibilityReason.StorePayerFirstClaim,
+        'settled-payment-required',
+      ],
+      [
+        KiloPassPaymentProvider.GooglePlay,
+        KiloPassWelcomePromoEligibilityReason.StorePayerPreviouslyClaimed,
+        'settled-payment-required',
+      ],
+      [
+        KiloPassPaymentProvider.GooglePlay,
+        KiloPassWelcomePromoEligibilityReason.StorePayerUnresolved,
+        'settled-payment-required',
+      ],
+    ] as const)(
+      'classifies store %s issuance with reason %s as %s',
+      (paymentProvider, initialWelcomePromoEligibilityReason, expectedPolicy) => {
+        expect(
+          getKiloPassWelcomePromoPolicy({
+            paymentProvider,
+            initialIssuanceCreatedAt: null,
+            initialWelcomePromoEligibilityReason,
+          })
+        ).toBe(expectedPolicy);
+      }
+    );
   });
 
   describe('computeUsageTriggeredYearlyIssueMonth', () => {

@@ -30,13 +30,14 @@ export function computeKiloPassBonusUsd(params: {
   return bonusCents / 100;
 }
 
-function isAllowedStripeWelcomePromoReason(
+function isAllowedWelcomePromoReason(
   reason: KiloPassWelcomePromoEligibilityReason | null | undefined
 ): boolean {
   return (
     reason === KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim ||
     reason === KiloPassWelcomePromoEligibilityReason.MissingFingerprint ||
-    reason === KiloPassWelcomePromoEligibilityReason.NoSupportedFingerprint
+    reason === KiloPassWelcomePromoEligibilityReason.NoSupportedFingerprint ||
+    reason === KiloPassWelcomePromoEligibilityReason.StorePayerFirstClaim
   );
 }
 
@@ -52,7 +53,7 @@ export function computeMonthlyKiloPassBonusDecision(params: {
   const streakMonths = Math.max(1, params.streakMonths);
   const hasRequiredPaymentEligibility =
     params.welcomePromoPolicy === 'account-history-only' ||
-    isAllowedStripeWelcomePromoReason(params.welcomePromoEligibilityReason);
+    isAllowedWelcomePromoReason(params.welcomePromoEligibilityReason);
   const isEligibleForWelcomePromo =
     params.isFirstTimeSubscriberEver && hasRequiredPaymentEligibility;
   const bonusPercentApplied = computeMonthlyCadenceBonusPercent({

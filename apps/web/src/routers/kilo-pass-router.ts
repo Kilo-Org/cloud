@@ -879,6 +879,7 @@ async function buildActiveKiloPassSubscriptionState(params: {
   const welcomePromoPolicy = getKiloPassWelcomePromoPolicy({
     paymentProvider: params.subscription.paymentProvider,
     initialIssuanceCreatedAt: initialWelcomePromoContext?.createdAt ?? null,
+    initialWelcomePromoEligibilityReason: initialWelcomePromoContext?.eligibilityReason ?? null,
   });
   const welcomePromoEligibilityReason = initialWelcomePromoContext?.eligibilityReason ?? null;
   const usageStartInclusiveIso = getUsageStartInclusiveIso({

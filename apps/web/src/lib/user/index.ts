@@ -965,6 +965,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - credit_transactions, microdollar_usage (billing records)
  * - kilo_pass_subscriptions/issuances/issuance_items (financial)
  * - kilo_pass_welcome_promo_payment_fingerprint_claims (minimal retained payment anti-abuse evidence)
+ * - kilo_pass_welcome_promo_store_payer_claims (minimal retained store purchaser anti-abuse evidence)
  * - stytch_fingerprints and provider safety identifiers (abuse detection)
  * - referral_code_usages (financial, references anonymized user)
  * - kiloclaw_subscriptions, kiloclaw_earlybird_purchases, kiloclaw_email_log (retained records)

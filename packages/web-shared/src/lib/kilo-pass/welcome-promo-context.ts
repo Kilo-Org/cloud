@@ -24,9 +24,14 @@ export type InitialWelcomePromoContext = {
 export function getKiloPassWelcomePromoPolicy(params: {
   paymentProvider: KiloPassPaymentProvider;
   initialIssuanceCreatedAt: string | null;
+  initialWelcomePromoEligibilityReason: KiloPassWelcomePromoEligibilityReason | null;
 }): KiloPassWelcomePromoPolicy {
   if (params.paymentProvider !== KiloPassPaymentProvider.Stripe) {
-    return 'account-history-only';
+    // Store purchases store their purchaser decision on the earliest issuance. A subscription
+    // without one was created before store decisions existed and keeps account-history behavior.
+    return params.initialWelcomePromoEligibilityReason === null
+      ? 'account-history-only'
+      : 'settled-payment-required';
   }
 
   if (params.initialIssuanceCreatedAt == null) return 'settled-payment-required';
@@ -79,18 +84,16 @@ export async function getMonthlyWelcomePromoAccountContext(
       )
     )
     .limit(1);
-  const initialWelcomePromoContext =
-    params.paymentProvider === KiloPassPaymentProvider.Stripe
-      ? await getInitialWelcomePromoContextForSubscription(db, {
-          subscriptionId: params.subscriptionId,
-        })
-      : null;
+  const initialWelcomePromoContext = await getInitialWelcomePromoContextForSubscription(db, {
+    subscriptionId: params.subscriptionId,
+  });
 
   return {
     isFirstTimeSubscriberEver: otherSubscription.length === 0,
     welcomePromoPolicy: getKiloPassWelcomePromoPolicy({
       paymentProvider: params.paymentProvider,
       initialIssuanceCreatedAt: initialWelcomePromoContext?.createdAt ?? null,
+      initialWelcomePromoEligibilityReason: initialWelcomePromoContext?.eligibilityReason ?? null,
     }),
     welcomePromoEligibilityReason: initialWelcomePromoContext?.eligibilityReason ?? null,
   };

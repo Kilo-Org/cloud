@@ -41,6 +41,7 @@ import {
   issueBaseCreditsForIssuance,
 } from '@kilocode/web-shared/lib/kilo-pass/issuance';
 import { redactStoreAccountLinkedJson } from './store-payload-redaction';
+import { getOrCreateInitialStoreWelcomePromoReason } from './store-welcome-promo-claim';
 import {
   computeMonthlyKiloPassStreak,
   updateKiloPassThresholdAfterBaseCredits,
@@ -963,6 +964,18 @@ export async function completeStoreKiloPassPurchase(params: {
       source: getIssuanceSource(purchase.paymentProvider),
     });
 
+    // The subscription's earliest monthly issuance owns the welcome-promo decision.
+    const initialWelcomePromoEligibilityReason = await getOrCreateInitialStoreWelcomePromoReason(
+      tx,
+      {
+        purchase,
+        cadence: purchase.cadence,
+        kiloUserId: user.id,
+        kiloPassSubscriptionId: subscriptionId,
+        issuanceId: issuanceHeader.issuanceId,
+      }
+    );
+
     const baseAmountUsd = getMonthlyPriceUsd(purchase.tier);
     if (!isAppStoreSamePeriodUpgrade) {
       await releaseRefundedBaseIssuanceItem(tx, {
@@ -1028,6 +1041,7 @@ export async function completeStoreKiloPassPurchase(params: {
         providerTransactionId: purchase.providerTransactionId,
         issueMonth,
         issuanceHeaderWasCreated: issuanceHeader.wasCreated,
+        ...(initialWelcomePromoEligibilityReason ? { initialWelcomePromoEligibilityReason } : {}),
         baseCreditsIssued: baseCreditsResult.wasIssued,
         appStoreUpgradeApplied: isAppStoreSamePeriodUpgrade,
       },

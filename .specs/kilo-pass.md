@@ -59,12 +59,17 @@ rounding to whole cents uses round-half-up (ties round toward positive infinity)
   subscriptions store a streak of `0`.
 - **Welcome promo**: A 50% monthly bonus override for eligible first-time subscribers. New grants are recorded as
   `bonus` issuance items.
-- **Initial welcome-promo reason**: The nullable reason stored on the earliest issuance for a Stripe monthly
-  subscription. Values are `first_payment_fingerprint_claim`, `fingerprint_previously_claimed`, `missing_fingerprint`,
-  `no_supported_fingerprint`, `no_positive_settlement`, and `settlement_unresolved`.
+- **Initial welcome-promo reason**: The nullable reason stored on the earliest issuance of a monthly subscription.
+  Stripe values are `first_payment_fingerprint_claim`, `fingerprint_previously_claimed`, `missing_fingerprint`,
+  `no_supported_fingerprint`, `no_positive_settlement`, and `settlement_unresolved`. Store values are
+  `store_payer_first_claim`, `store_payer_previously_claimed`, and `store_payer_unresolved`.
 - **Welcome-promo fingerprint claim**: A permanent atomic Stripe claim keyed by payment-method type plus fingerprint. It
   stores the first source Stripe invoice and database claim timestamp and is never refreshed. Supported reusable types
   are `card`, `sepa_debit`, `us_bank_account`, `bacs_debit`, and `au_becs_debit`.
+- **Store purchaser claim**: A permanent atomic claim keyed by payment provider plus the durable purchaser reference the
+  store returns for the subscription lineage: the App Store original transaction identifier, or the first purchase token
+  of the Google Play replacement chain. It stores the claiming purchase, user, subscription, and database claim
+  timestamp and is never refreshed.
 - **Paid settlement**: One successful Stripe invoice payment resolved to the payment instrument that settled it and, when
   available, its refundable PaymentIntent or Charge identifier.
 - **Eligible duplicate-card purchase**: A first paid monthly or yearly Stripe subscription purchase settled by card.
@@ -192,8 +197,19 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
 25. `fingerprint_previously_claimed`, `no_positive_settlement`, and `settlement_unresolved` MUST disqualify the Stripe
     welcome promo.
 26. A Stripe subscription with no stored reason MUST use first-time subscriber status alone as a legacy fallback.
-27. A store subscription MUST use first-time subscriber status alone; store flows do not record a payment-fingerprint
-    eligibility reason.
+27a. A store monthly subscription MUST store its initial welcome-promo reason on its earliest issuance, in the same
+    transaction that persists the first paid period. The reason is `store_payer_first_claim` when that purchase claims
+    the store purchaser identity, `store_payer_previously_claimed` when a different subscription already claimed it, and
+    `store_payer_unresolved` when the purchase carries no durable purchaser identifier.
+27b. The store purchaser identity MUST be the App Store original transaction identifier for App Store purchases, and the
+    first purchase token of the Google Play replacement chain for Google Play purchases.
+27c. A store welcome promo MUST apply only when the user is a first-time subscriber and the stored reason is
+    `store_payer_first_claim`. `store_payer_previously_claimed` and `store_payer_unresolved` MUST use the ordinary
+    monthly ramp.
+27d. Store reasons are final once stored. A renewal, plan switch, or later purchase of the same subscription MUST NOT
+    replace the earliest issuance reason or claim a second purchaser identity.
+27e. A store subscription whose earliest issuance carries no stored reason MUST use first-time subscriber status alone
+    as a legacy fallback. A yearly store subscription MUST NOT claim a store purchaser identity.
 28. Welcome-promo fingerprint uniqueness MUST apply to the pair `(payment-method type, fingerprint)`. Concurrent claims
     for the same pair MUST resolve atomically so that one source invoice wins the claim. The same fingerprint under
     different supported payment-method types is not one shared claim.
@@ -432,7 +448,9 @@ The following behavior or stronger guarantees are not implemented by current cod
 8. Explicit ended-state streak reset for reactivated store subscriptions.
 9. Guaranteed expiry for every granted bonus credit.
 10. Independent durable audit recording for every failed provider or issuance operation.
-11. Store-provider welcome-promo anti-abuse signals equivalent to Stripe fingerprint claims.
+11. Durable cross-account purchaser signals for store providers that do not expose a lineage identifier, such as a
+    Google Play replacement chain whose earlier token never completed. Store purchaser claims cover the identifiers the
+    providers return today (Rules 27a-27e).
 12. Atomic prevention of concurrent or repeated active Kilo Pass purchases by the same user. Duplicate-card Rules 51-55
     intentionally exclude same-user purchases.
 

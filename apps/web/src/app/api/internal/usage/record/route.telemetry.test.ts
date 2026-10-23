@@ -117,17 +117,28 @@ describe('usage writer telemetry caller context', () => {
     expect(JSON.stringify(logs)).not.toContain('sensitive');
   });
 
-  it.each(['missing', 'incorrect'])(
-    'rejects a %s secret before body parsing or persistence',
-    async kind => {
-      const req = request('queue', 'wrong-secret');
-      if (kind === 'missing') req.headers.delete('x-internal-api-key');
-      const json = jest.spyOn(req, 'json');
-      expect((await POST(req)).status).toBe(401);
-      expect(json).not.toHaveBeenCalled();
-      expect(persist).not.toHaveBeenCalled();
-    }
-  );
+  describe.each([
+    'https://staging-app.kilo.ai/api/internal/usage/record',
+    'https://staging-app.kilo.ai/api/internal/usage/record/',
+    'https://staging-app.kilo.ai/api/internal/usage/record?source=editor',
+    'https://staging-app.kilo.ai/api/internal/usage/record/?source=editor',
+    'https://app.kilo.ai/api/internal/usage/record',
+  ])('authorization at %s', url => {
+    it.each(['missing', 'incorrect'])(
+      'rejects a %s secret before parsing or persistence',
+      async kind => {
+        const req = new NextRequest(url, {
+          method: 'POST',
+          headers: kind === 'missing' ? {} : { 'x-internal-api-key': 'wrong-secret' },
+          body: 'not-json',
+        });
+        const json = jest.spyOn(req, 'json');
+        expect((await POST(req)).status).toBe(401);
+        expect(json).not.toHaveBeenCalled();
+        expect(persist).not.toHaveBeenCalled();
+      }
+    );
+  });
 
   it.each([
     ['/api/internal/usage/record', 'x-internal-api-key'],
@@ -136,7 +147,7 @@ describe('usage writer telemetry caller context', () => {
     ['/api/internal/usage/record/?source=editor', 'x-internal-api-key'],
   ])('persists authenticated %s without proxy headers or cookies (%s)', async (path, header) => {
     const response = await POST(
-      new NextRequest(`http://localhost${path}`, {
+      new NextRequest(`https://staging-app.kilo.ai${path}`, {
         method: 'POST',
         headers: { [header]: 'synthetic-route-secret' },
         body: JSON.stringify(payload),

@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+import type { IncomingHttpHeaders } from 'node:http';
 import { beforeAll, afterEach, describe, expect, it } from '@jest/globals';
 import type { NextRequestWithAuth } from 'next-auth/middleware';
 import { NextRequest, type NextFetchEvent } from 'next/server';
@@ -6,13 +7,15 @@ import { unstable_doesMiddlewareMatch } from 'next/experimental/testing/server';
 import { getPageStaticInfo } from 'next/dist/build/analysis/get-page-static-info';
 import { loadBindings } from 'next/dist/build/swc';
 import type { PAGE_TYPES } from 'next/dist/lib/page-types';
+import { getMiddlewareRouteMatcher } from 'next/dist/shared/lib/router/utils/middleware-route-matcher';
+import { constructRequest } from 'next/dist/experimental/testing/server/utils';
 import { config, proxy } from './proxy';
 
-const cases: [string, boolean][] = [
-  ['/api/internal/usage/record', false],
-  ['/api/internal/usage/record/', false],
-  ['/api/internal/usage/record?source=editor&x=1', false],
-  ['/api/internal/usage/record/?source=editor', false],
+const cases: [string, boolean, boolean?][] = [
+  ['/api/internal/usage/record', false, true],
+  ['/api/internal/usage/record/', false, true],
+  ['/api/internal/usage/record?source=editor&x=1', false, true],
+  ['/api/internal/usage/record/?source=editor', false, true],
   ['/api/internal/usage/recording', true],
   ['/api/internal/usage/record-extra', true],
   ['/api/internal/usage/record.json', true],
@@ -37,7 +40,7 @@ const cases: [string, boolean][] = [
 ];
 
 describe('web proxy matcher', () => {
-  let buildMatches: (pathname: string) => boolean;
+  let buildMatches: (url: string, headers?: IncomingHttpHeaders) => boolean;
 
   beforeAll(async () => {
     // Use Next's production build analysis, including static config extraction and validation.
@@ -51,15 +54,55 @@ describe('web proxy matcher', () => {
     });
     expect(info.hadUnsupportedValue).toBe(false);
     const matchers = info.middleware?.matchers;
-    expect(matchers).toHaveLength(1);
+    expect(matchers).toHaveLength(2);
     if (!matchers) throw new Error('Next build did not extract the proxy matcher');
-    buildMatches = pathname => matchers.some(matcher => new RegExp(matcher.regexp).test(pathname));
+    const match = getMiddlewareRouteMatcher(matchers);
+    buildMatches = (url, headers) => {
+      const parsed = new URL(url);
+      return match(
+        parsed.pathname,
+        constructRequest({ url, headers: { ...headers } }),
+        Object.fromEntries(parsed.searchParams)
+      );
+    };
   });
 
-  it.each(cases)('matches %s: %s', (url, expected) => {
-    // The installed Next release exposes the testing helper under its legacy middleware name.
-    expect(unstable_doesMiddlewareMatch({ config, nextConfig: {}, url })).toBe(expected);
-    expect(buildMatches(new URL(url, 'https://example.test').pathname)).toBe(expected);
+  describe.each([
+    ['https://staging-app.kilo.ai', true],
+    ['https://app.kilo.ai', false],
+    ['https://global-app.kilo.ai', false],
+    ['https://preview-example.vercel.app', false],
+    ['http://localhost:3000', false],
+    ['http://127.0.0.1:3000', false],
+    ['https://staging-app.kilo.ai.example.test', false],
+    ['https://staging-appXkiloXai', false],
+  ])('host %s', (origin, staging) => {
+    it.each(cases)('matches %s', (path, stagingExpected, originalExpected = stagingExpected) => {
+      const url = `${origin}${path}`;
+      const expected = staging ? stagingExpected : originalExpected;
+      // The installed Next release exposes the testing helper under its legacy middleware name.
+      expect(unstable_doesMiddlewareMatch({ config, nextConfig: {}, url })).toBe(expected);
+      expect(buildMatches(url)).toBe(expected);
+    });
+  });
+
+  it.each([
+    ['app.kilo.ai', 'staging-app.kilo.ai', true],
+    ['global-app.kilo.ai', 'staging-app.kilo.ai', true],
+    ['preview-example.vercel.app', 'staging-app.kilo.ai', true],
+    ['localhost:3000', 'staging-app.kilo.ai', true],
+    ['staging-app.kilo.ai', 'app.kilo.ai', false],
+    ['STAGING-APP.KILO.AI:443', 'app.kilo.ai', false],
+  ])('uses Host %s independently of forwarded host %s', (host, forwardedHost, expected) => {
+    const url = 'https://example.test/api/internal/usage/record?source=editor';
+    const headers = {
+      host,
+      'x-forwarded-host': forwardedHost,
+      'x-original-host': forwardedHost,
+      forwarded: `host=${forwardedHost}`,
+    };
+    expect(unstable_doesMiddlewareMatch({ config, nextConfig: {}, url, headers })).toBe(expected);
+    expect(buildMatches(url, headers)).toBe(expected);
   });
 });
 

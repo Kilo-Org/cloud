@@ -66,6 +66,24 @@ describe('backendFailureKey', () => {
     );
   });
 
+  it('keeps a payment refusal relayed from the account own key generic', () => {
+    /* Kilo relays a 402 from the account's provider key with the same status;
+       the body names the key's failure rather than Kilo's credit block. */
+    const failure = new ModelError({
+      reason: 'status',
+      status: 402,
+      cause: '{"error":"provider says no","error_type":"byok_error","message":"provider says no"}',
+    });
+
+    expect(backendFailureKey(failure, 'kilo-auto/frontier')).toBe('common.somethingWentWrong');
+  });
+
+  it('keeps a 402 whose body names no error type generic', () => {
+    const failure = new ModelError({ reason: 'status', status: 402, cause: 'not json' });
+
+    expect(backendFailureKey(failure, 'kilo-auto/frontier')).toBe('common.somethingWentWrong');
+  });
+
   it('keeps another gateway status generic', () => {
     const failure = new ModelError({ reason: 'status', status: 429, cause: 'slow down' });
 

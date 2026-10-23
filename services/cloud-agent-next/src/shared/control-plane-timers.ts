@@ -72,52 +72,23 @@ export type ControlPlaneTimers = {
   };
 };
 
-// External-work bounds for one preparation attempt. They stay real (never
-// scaled) because they bound provider and container work.
-const PROVIDER_CREATE_MS = 2 * MINUTE_MS;
-const PROVIDER_CREATE_RETRY_MS = 10_000;
-const WRAPPER_FIRST_CONNECT_MS = 5 * MINUTE_MS;
-const WRAPPER_HELLO_MS = 30_000;
-const RESTORE_MS = 2 * MINUTE_MS;
-const CLONE_MS = 6 * MINUTE_MS;
-const KILO_RUNTIME_START_MS = 2 * MINUTE_MS;
-const KILO_SESSION_MS = 2 * MINUTE_MS;
-
-/**
- * One preparation attempt runs these steps in order: sandbox create, wrapper
- * first connect and hello, snapshot restore (falling back to a clone), Kilo
- * runtime start, then the session import. Every step keeps its own bound, so
- * the attempt deadline is their sum. A shorter deadline fails a slow but valid
- * preparation as `preparation_timeout` while each step stayed inside its own
- * budget — the failure names a timeout the plan never allowed to finish.
- */
-const ROUTE_PREPARATION_MS =
-  PROVIDER_CREATE_MS +
-  WRAPPER_FIRST_CONNECT_MS +
-  WRAPPER_HELLO_MS +
-  RESTORE_MS +
-  CLONE_MS +
-  KILO_RUNTIME_START_MS +
-  KILO_SESSION_MS;
-
 // The divisor shortens only internal deadlines whose partner also scales, so
 // their orderings hold (the 90-s reconnect window stays longer than the 30-s
 // max backoff). Timers that bound external work stay real: provider create and
-// container boot, the prep attempt that must outlast create+connect+clone+
-// runtime+session, the pause before a failed create is retried, clone/runtime/
-// session bounds, SSE silence (Kilo heartbeats every 10-15 s), health request,
-// the real-SSE reconnect window, credential grants and the provider stop
-// ladder.
+// container boot, the 12-min prep attempt that must outlast clone+runtime+
+// session, the pause before a failed create is retried, clone/runtime/session
+// bounds, SSE silence (Kilo heartbeats every 10-15 s), health request, the
+// real-SSE reconnect window, credential grants and the provider stop ladder.
 function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
   const ms = (value: number): number => Math.max(1, Math.round(value / divisor));
   const sandbox = {
-    providerCreateMs: PROVIDER_CREATE_MS,
-    providerCreateRetryMs: PROVIDER_CREATE_RETRY_MS,
-    wrapperFirstConnectMs: WRAPPER_FIRST_CONNECT_MS,
-    wrapperHelloMs: WRAPPER_HELLO_MS,
+    providerCreateMs: 2 * MINUTE_MS,
+    providerCreateRetryMs: 10_000,
+    wrapperFirstConnectMs: 5 * MINUTE_MS,
+    wrapperHelloMs: 30_000,
     heartbeatMs: ms(45_000),
     reconnectMs: ms(90_000),
-    routePreparationMs: ROUTE_PREPARATION_MS,
+    routePreparationMs: 12 * MINUTE_MS,
     idleMs: ms(10 * MINUTE_MS),
     unattendedIdleMs: ms(MINUTE_MS),
     // Bounds one Sandbox -> Session notification; real (not scaled) like the
@@ -137,11 +108,11 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     heartbeatNegotiationMs: ms(1_000),
     // Scales with the reconnect window it must stay inside.
     handshakeMs: ms(30_000),
-    cloneMs: CLONE_MS,
-    restoreMs: RESTORE_MS,
+    cloneMs: 6 * MINUTE_MS,
+    restoreMs: 2 * MINUTE_MS,
     captureMs: 5 * MINUTE_MS + 10_000,
-    kiloRuntimeStartMs: KILO_RUNTIME_START_MS,
-    kiloSessionMs: KILO_SESSION_MS,
+    kiloRuntimeStartMs: 2 * MINUTE_MS,
+    kiloSessionMs: 2 * MINUTE_MS,
     sseSilenceMs: 30_000,
     healthRequestMs: 5_000,
     sseReconnectLimit: 6,

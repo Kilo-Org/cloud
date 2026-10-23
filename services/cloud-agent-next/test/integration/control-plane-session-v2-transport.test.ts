@@ -125,7 +125,7 @@ describe('SandboxSessionV2 queued transport recovery', () => {
     const scaled = resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: '10' });
     expect(scaled.session.sandboxRpcDeadlineMs).toBe(2_000);
     expect(scaled.session.transportRecoveryMs).toBe(1_500);
-    expect(scaled.sandbox.routePreparationMs).toBe(CONTROL_PLANE_TIMERS.sandbox.routePreparationMs);
+    expect(scaled.sandbox.routePreparationMs).toBe(12 * 60_000);
     expect(resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: 'invalid' })).toBe(
       CONTROL_PLANE_TIMERS
     );

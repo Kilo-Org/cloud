@@ -23,7 +23,7 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useTranslation } from 'react-i18next';
 
 import { AlertCircle, File as FileIcon, RotateCcw, X } from '@/components/ui/icons';
-import { moveA11yFocus } from '@/lib/a11y/announce';
+import { requestA11yFocus } from '@/lib/a11y/announce';
 
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
@@ -180,7 +180,7 @@ function AttachmentChip({
   useEffect(() => {
     if (focusPendingRef.current) {
       focusPendingRef.current = false;
-      moveA11yFocus(bodyRef);
+      requestA11yFocus(bodyRef);
     }
   }, [focusEpoch]);
 

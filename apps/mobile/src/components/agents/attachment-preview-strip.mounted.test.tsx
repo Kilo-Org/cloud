@@ -74,7 +74,7 @@ const gestureHandlerMock = vi.hoisted(() => {
 
 const a11yMock = vi.hoisted(() => ({
   announceForA11y: vi.fn(),
-  moveA11yFocus: vi.fn(),
+  requestA11yFocus: vi.fn(),
 }));
 
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
@@ -308,7 +308,7 @@ function markdownAttachment(): AgentAttachment {
 beforeEach(() => {
   vi.clearAllMocks();
   gestureHandlerMock.reset();
-  a11yMock.moveA11yFocus.mockReset();
+  a11yMock.requestA11yFocus.mockReset();
   fileText.mockResolvedValue('# Hello');
   reactNativeMock.Platform.OS = 'ios';
   reactNativeMock.useWindowDimensions.mockReturnValue({ width: 390, height: 844 });
@@ -997,7 +997,7 @@ describe('AttachmentPreviewStrip — accessible move actions', () => {
       await Promise.resolve();
     });
     expect(onMove).toHaveBeenCalledWith('a1', 'right');
-    expect(a11yMock.moveA11yFocus).toHaveBeenCalledTimes(1);
+    expect(a11yMock.requestA11yFocus).toHaveBeenCalledTimes(1);
 
     const middleBody = bodies[1];
     if (!middleBody) {
@@ -1015,7 +1015,7 @@ describe('AttachmentPreviewStrip — accessible move actions', () => {
       await Promise.resolve();
     });
     expect(onMove).toHaveBeenLastCalledWith('a2', 'left');
-    expect(a11yMock.moveA11yFocus).toHaveBeenCalledTimes(2);
+    expect(a11yMock.requestA11yFocus).toHaveBeenCalledTimes(2);
 
     renderer.unmount();
   });
@@ -1066,7 +1066,7 @@ describe('AttachmentPreviewStrip — drag reorder', () => {
 
     expect(onReorder).toHaveBeenCalledTimes(1);
     expect(onReorder).toHaveBeenCalledWith(0, 1);
-    expect(a11yMock.moveA11yFocus).toHaveBeenCalledTimes(1);
+    expect(a11yMock.requestA11yFocus).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
   });
@@ -1096,7 +1096,7 @@ describe('AttachmentPreviewStrip — drag reorder', () => {
     });
 
     expect(onReorder).not.toHaveBeenCalled();
-    expect(a11yMock.moveA11yFocus).not.toHaveBeenCalled();
+    expect(a11yMock.requestA11yFocus).not.toHaveBeenCalled();
 
     renderer.unmount();
   });

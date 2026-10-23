@@ -557,6 +557,31 @@ describe('device-sessions', () => {
       expect(tokens).toHaveLength(1);
       expect(tokens[0]!.consumed_at).toBeNull();
     });
+    test('domain refusal revokes only the presented device session', async () => {
+      const presentedSessionId = await createDeviceSession({ userId: testUserId });
+      const siblingSessionId = await createDeviceSession({ userId: testUserId });
+      const presentedCredentials = await issueSessionCredentials(fakeUser, presentedSessionId);
+      const siblingCredentials = await issueSessionCredentials(fakeUser, siblingSessionId);
+
+      mockIsEmailBlacklistedByDomainAsync.mockResolvedValueOnce(true);
+
+      const result = await rotateRefreshToken(presentedCredentials.refreshToken);
+
+      expect(result).toEqual({ ok: false, error: 'USER_BLOCKED' });
+      const [presentedSession] = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, presentedSessionId));
+      const [siblingSession] = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, siblingSessionId));
+      expect(presentedSession!.revoked_reason).toBe('domain_ineligible');
+      expect(siblingSession!.revoked_at).toBeNull();
+
+      const siblingRetry = await rotateRefreshToken(siblingCredentials.refreshToken);
+      expect(siblingRetry.ok).toBe(true);
+    });
 
     test('refresh for a domain that requires SSO without an SSO link is refused and revokes the session', async () => {
       const ssoDomain = `sso-${Date.now()}.example`;

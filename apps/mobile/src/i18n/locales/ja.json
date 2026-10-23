@@ -224,7 +224,7 @@
     "hideBalance": "残高を非表示",
     "showBalance": "残高を表示",
     "balanceHidden": "残高は非表示です",
-    "bonusCreditsExpiring": "{{amount}}のボーナスクレジットが{{date}}に失効します。",
+    "bonusCreditsExpiring": "{{amount}}のクレジットが{{date}}に失効します。",
     "signOutTitle": "サインアウトしますか？",
     "signOutMessage": "ワークスペースにアクセスするには、もう一度サインインする必要があります。",
     "deleteAccountTitle": "アカウントを削除しますか？",
@@ -1724,6 +1724,7 @@
       "branchLoadError": "ブランチを読み込めませんでした",
       "branchUnavailable": "このリポジトリではブランチが利用できません。プロバイダーでのアクセスを確認し、別のリポジトリを選択してください。",
       "branchEmpty": "利用可能なブランチがありません",
+      "branchListIncomplete": "一部のブランチのみ表示されています。このリポジトリには、このリストに含めきれないブランチがあります。",
       "branchPlaceholder": "ブランチを選択",
       "runOnWithTarget": "実行先：{{target}}",
       "environment": "環境",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "{{count}} 個のツール",
       "serverToolCount_other": "{{count}} 個のツール",
       "serverUnreachable": "このサーバーに接続できませんでした",
-      "serverOff": "このサーバーはオフです"
+      "serverOff": "このサーバーはオフです",
+      "app": {
+        "label": "ツールインターフェース",
+        "failed": "このツールのインターフェースを読み込めませんでした。",
+        "empty": "このツールのインターフェースには表示するものがありません。"
+      }
     },
     "mcpOAuth": {
       "authMethod": "認証",
@@ -3687,6 +3693,8 @@
     "skillNameInvalid": "スキル名は文字または数字で始まり、小文字、数字、ダッシュのみを使用する必要があります",
     "skillContentRequired": "スキル内容は必須です",
     "skillSaveFailed": "スキルを保存できませんでした",
+    "skillSourceCustom": "カスタム",
+    "skillSourceMarketplace": "マーケットプレイス",
     "skillsHint": "SKILL.md を貼り付けると、その名前が入力されます。ドラッグ アンド ドロップせずにスマートフォンからスキルを追加します。",
     "skillEditTitle": "エディットスキル",
     "mcp": {

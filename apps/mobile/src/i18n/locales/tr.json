@@ -224,7 +224,7 @@
     "hideBalance": "Bakiyeyi gizle",
     "showBalance": "Bakiyeyi göster",
     "balanceHidden": "Bakiye gizli",
-    "bonusCreditsExpiring": "{{amount}} tutarındaki bonus kredinin süresi {{date}} tarihinde dolacak.",
+    "bonusCreditsExpiring": "{{amount}} tutarındaki kredinin süresi {{date}} tarihinde dolacak.",
     "signOutTitle": "Oturum kapatılsın mı?",
     "signOutMessage": "Çalışma alanına erişmek için tekrar oturum açman gerekecek.",
     "deleteAccountTitle": "Hesap silinsin mi?",
@@ -1724,6 +1724,7 @@
       "branchLoadError": "Dallar yüklenemedi",
       "branchUnavailable": "Bu depo için dal kullanılamıyor. Sağlayıcıdaki erişimini kontrol et, ardından başka bir depo seç.",
       "branchEmpty": "Kullanılabilir dal yok",
+      "branchListIncomplete": "Yalnızca bazı dallar gösteriliyor. Depoda bu listenin içerebileceğinden daha fazla dal var.",
       "branchPlaceholder": "Bir dal seç",
       "runOnWithTarget": "Çalıştırma yeri: {{target}}",
       "environment": "Ortam",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "{{count}} araç",
       "serverToolCount_other": "{{count}} araç",
       "serverUnreachable": "Bu sunucuya ulaşılamadı",
-      "serverOff": "Bu sunucu kapalı"
+      "serverOff": "Bu sunucu kapalı",
+      "app": {
+        "label": "Araç arayüzü",
+        "failed": "Bu aracın arayüzü yüklenemedi.",
+        "empty": "Bu aracın arayüzünde gösterilecek bir şey yok."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Kimlik doğrulama",
@@ -3687,6 +3693,8 @@
     "skillNameInvalid": "Beceri adı bir harf veya rakamla başlamalı ve yalnızca küçük harfler, rakamlar ve kısa çizgiler kullanmalıdır",
     "skillContentRequired": "Beceri içeriği gerekli",
     "skillSaveFailed": "Beceri kaydedilemedi",
+    "skillSourceCustom": "Özel",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Bir SKILL.md yapıştırın ve adı doldurun; Sürükleyip bırakmadan telefonunuzdan bir beceri ekleyin.",
     "skillEditTitle": "Beceriyi düzenle",
     "mcp": {

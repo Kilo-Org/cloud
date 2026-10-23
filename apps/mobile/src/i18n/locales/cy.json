@@ -224,7 +224,7 @@
     "hideBalance": "Cuddio'r balans",
     "showBalance": "Dangos y balans",
     "balanceHidden": "Balans wedi'i guddio",
-    "bonusCreditsExpiring": "Mae {{amount}} o gredydau bonws yn dod i ben ar {{date}}.",
+    "bonusCreditsExpiring": "Mae {{amount}} o gredydau yn dod i ben ar {{date}}.",
     "signOutTitle": "Allgofnodi?",
     "signOutMessage": "Bydd angen i ti fewngofnodi eto i gael mynediad i dy weithle.",
     "deleteAccountTitle": "Dileu cyfrif?",
@@ -2353,6 +2353,7 @@
       "branchLoadError": "Ni lwyddwyd i lwytho ceangau",
       "branchUnavailable": "Nid yw ceangau ar gael ar gyfer yr ystorfa hon. Gwiriwch eich mynediad gyda'r darparwr, yna dewiswch ystorfa arall.",
       "branchEmpty": "Dim ceangau ar gael",
+      "branchListIncomplete": "Dangosir rhai ceangau'n unig. Mae gan yr ystorfa hon fwy o geangau nag y gall y rhestr hon gynnwys.",
       "branchPlaceholder": "Dewiswch gangen",
       "runOnWithTarget": "Rhedeg ar: {{target}}",
       "environment": "Amgylchedd",
@@ -3554,7 +3555,12 @@
       "serverToolCount_two": "{{count}} offeryn",
       "serverToolCount_zero": "{{count}} offeryn",
       "serverUnreachable": "Ni ellid cyrraedd y gweinydd hwn",
-      "serverOff": "Mae'r gweinydd hwn i ffwrdd"
+      "serverOff": "Mae'r gweinydd hwn i ffwrdd",
+      "app": {
+        "label": "Rhyngwyneb yr offeryn",
+        "failed": "Methwyd llwytho rhyngwyneb yr offeryn hwn.",
+        "empty": "Does dim byd i'w ddangos yng rhyngwyneb yr offeryn hwn."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Dilysu",
@@ -3867,6 +3873,8 @@
     "skillNameInvalid": "Rhaid i enw sgil ddechrau gyda llythyren neu ddigid a defnyddio llythrennau bach, digidau a llinellau llinellau yn unig",
     "skillContentRequired": "Mae angen cynnwys sgil",
     "skillSaveFailed": "Methu arbed sgil",
+    "skillSourceCustom": "Personol",
+    "skillSourceMarketplace": "Marchnad",
     "skillsHint": "Gludwch SKILL.md ac mae ei enw yn llenwi; ychwanegu sgil o'ch ffôn heb lusgo a gollwng.",
     "skillEditTitle": "Sgil golygu",
     "mcp": {

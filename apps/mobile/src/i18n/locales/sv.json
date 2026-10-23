@@ -224,7 +224,7 @@
     "hideBalance": "Dölj saldo",
     "showBalance": "Visa saldo",
     "balanceHidden": "Saldo dolt",
-    "bonusCreditsExpiring": "{{amount}} i bonuskrediter går ut {{date}}.",
+    "bonusCreditsExpiring": "{{amount}} i krediter går ut {{date}}.",
     "signOutTitle": "Logga ut?",
     "signOutMessage": "Du måste logga in igen för att komma åt din arbetsyta.",
     "deleteAccountTitle": "Ta bort konto?",
@@ -2241,6 +2241,7 @@
       "branchLoadError": "Kunde inte läsa in grenar",
       "branchUnavailable": "Inga grenar är tillgängliga för det här kodarkivet. Kontrollera din åtkomst hos leverantören och välj ett annat kodarkiv.",
       "branchEmpty": "Inga grenar tillgängliga",
+      "branchListIncomplete": "Endast vissa grenar visas. Kodarkivet har fler grenar än den här listan kan innehålla.",
       "branchPlaceholder": "Välj en gren",
       "runOnWithTarget": "Kör på: {{target}}",
       "environment": "Miljö",
@@ -3385,7 +3386,12 @@
       "serverToolCount_one": "{{count}} verktyg",
       "serverToolCount_other": "{{count}} verktyg",
       "serverUnreachable": "Kunde inte nå denna server",
-      "serverOff": "Denna server är avstängd"
+      "serverOff": "Denna server är avstängd",
+      "app": {
+        "label": "Verktygsgränssnitt",
+        "failed": "Det här verktygets gränssnitt kunde inte läsas in.",
+        "empty": "Det här verktygets gränssnitt har inget att visa."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autentisering",
@@ -3686,6 +3692,8 @@
     "skillNameInvalid": "Färdighetsnamn måste börja med en bokstav eller siffra och endast använda små bokstäver, siffror och bindestreck",
     "skillContentRequired": "Färdighetsinnehåll krävs",
     "skillSaveFailed": "Det gick inte att spara färdigheten",
+    "skillSourceCustom": "Anpassad",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Klistra in en SKILL.md och dess namn fylls i; lägg till en färdighet från din telefon utan att dra och släppa.",
     "skillEditTitle": "Redigera färdighet",
     "mcp": {

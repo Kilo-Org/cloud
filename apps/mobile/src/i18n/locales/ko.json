@@ -224,7 +224,7 @@
     "hideBalance": "잔액 숨기기",
     "showBalance": "잔액 표시",
     "balanceHidden": "잔액이 숨겨짐",
-    "bonusCreditsExpiring": "{{date}}에 만료되는 보너스 크레딧은 {{amount}}입니다.",
+    "bonusCreditsExpiring": "{{date}}에 만료되는 크레딧은 {{amount}}입니다.",
     "signOutTitle": "로그아웃할까요?",
     "signOutMessage": "작업 영역을 이용하려면 다시 로그인해야 합니다.",
     "deleteAccountTitle": "계정을 삭제할까요?",
@@ -1724,6 +1724,7 @@
       "branchLoadError": "브랜치를 불러오지 못했습니다",
       "branchUnavailable": "이 저장소에서는 브랜치를 사용할 수 없습니다. 공급업체에서의 접근 권한을 확인한 후 다른 저장소를 선택하세요.",
       "branchEmpty": "사용 가능한 브랜치가 없습니다",
+      "branchListIncomplete": "일부 브랜치만 표시됩니다. 이 저장소에는 이 목록에 담을 수 있는 것보다 더 많은 브랜치가 있습니다.",
       "branchPlaceholder": "브랜치 선택",
       "runOnWithTarget": "실행 위치: {{target}}",
       "environment": "환경",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "도구 {{count}}개",
       "serverToolCount_other": "도구 {{count}}개",
       "serverUnreachable": "이 서버에 연결할 수 없습니다",
-      "serverOff": "이 서버는 꺼져 있습니다"
+      "serverOff": "이 서버는 꺼져 있습니다",
+      "app": {
+        "label": "도구 인터페이스",
+        "failed": "이 도구의 인터페이스를 불러올 수 없습니다.",
+        "empty": "이 도구의 인터페이스에 표시할 항목이 없습니다."
+      }
     },
     "mcpOAuth": {
       "authMethod": "인증",
@@ -3687,6 +3693,8 @@
     "skillNameInvalid": "스킬 이름은 문자 또는 숫자로 시작해야 하며 소문자, 숫자, 대시만 사용할 수 있습니다.",
     "skillContentRequired": "스킬 내용이 필요합니다",
     "skillSaveFailed": "스킬 저장이 안되네요",
+    "skillSourceCustom": "커스텀",
+    "skillSourceMarketplace": "마켓플레이스",
     "skillsHint": "SKILL.md를 붙여넣으면 이름이 채워집니다. 드래그 앤 드롭 없이 휴대폰에서 스킬을 추가하세요.",
     "skillEditTitle": "스킬 편집",
     "mcp": {

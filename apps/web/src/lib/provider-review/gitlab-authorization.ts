@@ -260,7 +260,10 @@ async function resolveIntegration(
     );
   }
   if (integration.integration_status !== INTEGRATION_STATUS.ACTIVE) {
-    throw new GitLabReviewError('not_found', 'The GitLab connection is no longer active.');
+    throw new GitLabReviewError(
+      'reconnect',
+      'The GitLab connection is no longer active. Reconnect GitLab to continue.'
+    );
   }
 
   const instanceUrl = readInstanceUrl(integration);

@@ -224,7 +224,7 @@
     "hideBalance": "شاردنەوەی باڵانس",
     "showBalance": "پیشاندانی باڵانس",
     "balanceHidden": "باڵانس شاردراوەتەوە",
-    "bonusCreditsExpiring": "{{amount}} کرێدیتی پاداشت لە {{date}} بەسەر دەچێت.",
+    "bonusCreditsExpiring": "{{amount}} کرێدیت لە {{date}} بەسەر دەچێت.",
     "signOutTitle": "دەرچوون؟",
     "signOutMessage": "بۆ دەستگەیشتن بە شوێنی کارەکەت، پێویستە دووبارە بچیتە ژوورەوە.",
     "deleteAccountTitle": "سڕینەوەی هەژمار؟",
@@ -2241,6 +2241,7 @@
       "branchLoadError": "نەتوانرا لقەکان بار بکرێن",
       "branchUnavailable": "لقەکان بۆ ئەم کۆگایە بەردەست نین. مۆڵەتەکانت لەگەڵ پێشکەشکار بپشکنە، پاشان کۆگایەکی تر هەڵبژێرە.",
       "branchEmpty": "هیچ لقێک بەردەست نییە",
+      "branchListIncomplete": "تەنها هەندێک لق پیشان دەدرێن. ئەم کۆگایە لقەکانێکی زیاتری هەیە کە ئەم لیستە ناتوانێت بیانگرێت.",
       "branchPlaceholder": "لقێک هەڵبژێرە",
       "runOnWithTarget": "جێبەجێکردن لەسەر: {{target}}",
       "environment": "ژینگە",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "{{count}} ئامراز",
       "serverToolCount_other": "{{count}} ئامراز",
       "serverUnreachable": "نەتوانرا بگەیت بەم سێرڤەرە",
-      "serverOff": "ئەم سێرڤەرە ناچالاکە"
+      "serverOff": "ئەم سێرڤەرە ناچالاکە",
+      "app": {
+        "label": "ڕووکاری ئامراز",
+        "failed": "ڕووکاری ئەم ئامرازە بار نەکرا.",
+        "empty": "ڕووکاری ئەم ئامرازە هیچ شتێکی نییە بۆ پیشاندان."
+      }
     },
     "mcpOAuth": {
       "authMethod": "ناسینەوە",
@@ -3687,6 +3693,8 @@
     "skillNameInvalid": "ناوی کارامەیی دەبێت بە پیت یان ژمارەیەک دەست پێبکات و تەنها پیتی بچووک و ژمارە و هێڵکاری بەکاربهێنێت",
     "skillContentRequired": "ناوەڕۆکی لێهاتوویی پێویستە",
     "skillSaveFailed": "نەیتوانی لێهاتوویی ڕزگار بکات",
+    "skillSourceCustom": "دەستکرد",
+    "skillSourceMarketplace": "بازاڕ",
     "skillsHint": "SKILL.md ێک لێبدە و ناوەکەی پڕ دەبێتەوە؛ لە مۆبایلەکەتەوە کارامەیییەک زیاد بکە بەبێ ڕاکێشان و دابەزاندن.",
     "skillEditTitle": "لێهاتوویی دەستکاریکردن",
     "mcp": {

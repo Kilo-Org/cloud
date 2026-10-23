@@ -224,7 +224,7 @@
     "hideBalance": "Saldo verbergen",
     "showBalance": "Saldo tonen",
     "balanceHidden": "Saldo verborgen",
-    "bonusCreditsExpiring": "{{amount}} aan bonustegoed verloopt op {{date}}.",
+    "bonusCreditsExpiring": "{{amount}} aan tegoed verloopt op {{date}}.",
     "signOutTitle": "Afmelden?",
     "signOutMessage": "Je moet je opnieuw aanmelden om toegang te krijgen tot je werkruimte.",
     "deleteAccountTitle": "Account verwijderen?",
@@ -1724,6 +1724,7 @@
       "branchLoadError": "Branches konden niet worden geladen",
       "branchUnavailable": "Er zijn geen branches beschikbaar voor deze repository. Controleer je toegang bij de provider en kies een andere repository.",
       "branchEmpty": "Geen branches beschikbaar",
+      "branchListIncomplete": "Slechts enkele branches worden weergegeven. De repository heeft meer branches dan deze lijst kan bevatten.",
       "branchPlaceholder": "Een branch selecteren",
       "runOnWithTarget": "Uitvoeren op: {{target}}",
       "environment": "Omgeving",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "{{count}} tool",
       "serverToolCount_other": "{{count}} tools",
       "serverUnreachable": "Kon deze server niet bereiken",
-      "serverOff": "Deze server staat uit"
+      "serverOff": "Deze server staat uit",
+      "app": {
+        "label": "Interface van de tool",
+        "failed": "De interface van deze tool kon niet worden geladen.",
+        "empty": "De interface van deze tool heeft niets te tonen."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Authenticatie",
@@ -3687,6 +3693,8 @@
     "skillNameInvalid": "De naam van de vaardigheid moet beginnen met een letter of cijfer en mag alleen kleine letters, cijfers en streepjes bevatten",
     "skillContentRequired": "Vaardigheidsinhoud is vereist",
     "skillSaveFailed": "Kan vaardigheid niet opslaan",
+    "skillSourceCustom": "Aangepast",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Plak een SKILL.md en de naam wordt ingevuld; voeg een vaardigheid toe vanaf je telefoon zonder slepen en neerzetten.",
     "skillEditTitle": "Vaardigheid bewerken",
     "mcp": {

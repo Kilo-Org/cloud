@@ -717,7 +717,7 @@ describe('handleNeedsInputNotificationResponse — session organization', () => 
     );
 
     expect(consumePendingDeepLink()).toEqual({
-      href: '/(app)/(tabs)/(3_profile)/security-agent/personal/findings/f1?via=push',
+      href: '/(app)/security-agent/personal/findings/f1?via=push',
       organizationId: null,
     });
   });

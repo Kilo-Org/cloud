@@ -224,7 +224,7 @@
     "hideBalance": "Zoo ego fọdụrụ",
     "showBalance": "Gosi ego fọdụrụ",
     "balanceHidden": "Ezoro ego fọdụrụ",
-    "bonusCreditsExpiring": "Ego ojiji mgbakwunye {{amount}} ga-agwụ na {{date}}.",
+    "bonusCreditsExpiring": "Ego ojiji {{amount}} ga-agwụ na {{date}}.",
     "signOutTitle": "Pụọ?",
     "signOutMessage": "Ị ga-abanyerịrị ọzọ iji nweta ebe ọrụ gị.",
     "deleteAccountTitle": "Hichapụ akaụntụ?",
@@ -2241,6 +2241,7 @@
       "branchLoadError": "Enweghị ike ibudata alaka",
       "branchUnavailable": "Alaka adịghị maka ebe nchekwa koodu a. Lelee ikike gị n'aka onye na-enye ọrụ, ma họrọ ebe nchekwa koodu ọzọ.",
       "branchEmpty": "Enweghị alaka dị",
+      "branchListIncomplete": "Naanị ụfọdụ alaka ka egosiri. Ebe nchekwa koodu a nwere alaka karịrị nke ndepụta a nwere ike ịgụnye.",
       "branchPlaceholder": "Họrọ otu alaka",
       "runOnWithTarget": "Rụọ ọrụ na: {{target}}",
       "environment": "Ebe ọrụ",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "ngwá ọrụ {{count}}",
       "serverToolCount_other": "ngwá ọrụ {{count}}",
       "serverUnreachable": "Enweghị ike iru sava a",
-      "serverOff": "Sava a agbanyụrụ"
+      "serverOff": "Sava a agbanyụrụ",
+      "app": {
+        "label": "Interface ngwá ọrụ",
+        "failed": "Enweghị ike ibu interface ngwá ọrụ a.",
+        "empty": "Interface ngwá ọrụ a enweghị ihe ọ ga-egosi."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Nkwenye njirimara",
@@ -3687,6 +3693,8 @@
     "skillNameInvalid": "Aha nka ga-ebidorịrị site na mkpụrụedemede ma ọ bụ mkpụrụọnụọgụgụ ma jiri naanị obere mkpụrụedemede, mkpụrụọnụọgụgụ na ngwucha",
     "skillContentRequired": "Achọrọ ọdịnaya nka",
     "skillSaveFailed": "Enweghị ike ichekwa nka",
+    "skillSourceCustom": "Nke onwe",
+    "skillSourceMarketplace": "Ahịa",
     "skillsHint": "Tapawa SKILL.md na aha ya juputara; tinye nka na ekwentị gị na-adọkpụrụghị na dobe.",
     "skillEditTitle": "Dezie nka",
     "mcp": {

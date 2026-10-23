@@ -3,7 +3,7 @@ import { createElement, type ReactElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
-import ReposRoute from '@/app/(app)/(tabs)/(3_profile)/code-reviewer/[scope]/[platform]/(edit)/repos';
+import ReposRoute from '@/app/(app)/code-reviewer/[scope]/[platform]/(edit)/repos';
 import { ReviewListScreen } from './review-list-screen';
 import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 
@@ -28,6 +28,7 @@ function review(id: string, prTitle = `Review ${id}`): ReviewStub {
 }
 
 const state = vi.hoisted(() => ({
+  insets: { left: 0, right: 0 },
   platform: 'gitlab',
   connected: false,
   scope: 'personal',
@@ -68,6 +69,14 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ push: state.push }),
 }));
 vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable' }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({
+    top: 0,
+    bottom: 0,
+    left: state.insets.left,
+    right: state.insets.right,
+  }),
+}));
 vi.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
@@ -120,6 +129,8 @@ vi.mock('@/lib/hooks/use-code-reviews', () => ({ useReviewList: () => state.revi
 vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({ useRouteForegroundRefresh: vi.fn() }));
 
 beforeEach(() => {
+  state.insets.left = 0;
+  state.insets.right = 0;
   state.platform = 'gitlab';
   state.connected = false;
   state.scope = 'personal';
@@ -245,6 +256,30 @@ describe('Reviewer repository bodies', () => {
 });
 
 describe('Recent review bodies', () => {
+  it.each([
+    { orientation: 'portrait', left: 0, right: 0, paddingLeft: 24, paddingRight: 24 },
+    { orientation: 'landscape', left: 47, right: 59, paddingLeft: 71, paddingRight: 83 },
+  ])(
+    'keeps the $orientation rows inside the side insets on top of the gutter',
+    async ({ left, right, paddingLeft, paddingRight }) => {
+      state.insets.left = left;
+      state.insets.right = right;
+      state.reviews.data = {
+        pages: [{ success: true, reviews: [review('r1'), review('r2')] }],
+        pageParams: [0],
+      };
+      const { renderer, unmount } = await renderWithProviders(
+        createElement(ReviewListScreen, { scope: 'personal' })
+      );
+      expect(firstList(renderer).props.contentContainerStyle).toEqual({
+        paddingTop: 16,
+        paddingLeft,
+        paddingRight,
+      });
+      unmount();
+    }
+  );
+
   it.each([false, true])(
     'keeps the correct empty action with provider connection %s',
     async connected => {
@@ -258,7 +293,7 @@ describe('Recent review bodies', () => {
       const action = empty.props.action as ReactElement<{ onPress: () => void }>;
       action.props.onPress();
       expect(state.push).toHaveBeenCalledWith(
-        `/(app)/(tabs)/(3_profile)/code-reviewer/personal${connected ? '/manual-review' : ''}`
+        `/(app)/code-reviewer/personal${connected ? '/manual-review' : ''}`
       );
       unmount();
     }

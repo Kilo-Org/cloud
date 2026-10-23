@@ -224,7 +224,7 @@
     "hideBalance": "Skrýt zůstatek",
     "showBalance": "Zobrazit zůstatek",
     "balanceHidden": "Zůstatek je skrytý",
-    "bonusCreditsExpiring": "Platnost bonusových kreditů v hodnotě {{amount}} vyprší {{date}}.",
+    "bonusCreditsExpiring": "Platnost kreditů v hodnotě {{amount}} vyprší {{date}}.",
     "signOutTitle": "Odhlásit se?",
     "signOutMessage": "Pro přístup do pracovního prostoru se budeš muset znovu přihlásit.",
     "deleteAccountTitle": "Smazat účet?",
@@ -2297,6 +2297,7 @@
       "branchLoadError": "Větve se nepodařilo načíst",
       "branchUnavailable": "Pro tento repozitář nejsou větve dostupné. Zkontroluj svůj přístup u poskytovatele a vyber jiný repozitář.",
       "branchEmpty": "Žádné dostupné větve",
+      "branchListIncomplete": "Zobrazeny jsou jen některé větve. Tento repozitář má více větví, než kolik jich tento seznam může obsahovat.",
       "branchPlaceholder": "Vybrat větev",
       "runOnWithTarget": "Spustit na: {{target}}",
       "environment": "Prostředí",
@@ -3470,7 +3471,12 @@
       "serverToolCount_one": "{{count}} nástroj",
       "serverToolCount_other": "{{count}} nástrojů",
       "serverUnreachable": "Nepodařilo se připojit k tomuto serveru",
-      "serverOff": "Tento server je vypnutý"
+      "serverOff": "Tento server je vypnutý",
+      "app": {
+        "label": "Rozhraní nástroje",
+        "failed": "Rozhraní tohoto nástroje se nepodařilo načíst.",
+        "empty": "Rozhraní tohoto nástroje nemá co zobrazit."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Ověření",
@@ -3777,6 +3783,8 @@
     "skillNameInvalid": "Název dovednosti musí začínat písmenem nebo číslicí a používat pouze malá písmena, číslice a pomlčky",
     "skillContentRequired": "Je vyžadován obsah dovedností",
     "skillSaveFailed": "Nepodařilo se zachránit dovednost",
+    "skillSourceCustom": "Vlastní",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Vložte SKILL.md a jeho název se vyplní; přidejte dovednost z telefonu bez přetahování.",
     "skillEditTitle": "Upravit dovednost",
     "mcp": {

@@ -224,7 +224,7 @@
     "hideBalance": "Slėpti likutį",
     "showBalance": "Rodyti likutį",
     "balanceHidden": "Likutis paslėptas",
-    "bonusCreditsExpiring": "Papildomi kreditai ({{amount}}) galioja iki {{date}}.",
+    "bonusCreditsExpiring": "Kreditai ({{amount}}) galioja iki {{date}}.",
     "signOutTitle": "Atsijungti?",
     "signOutMessage": "Kad galėtum pasiekti savo darbo sritį, turėsi prisijungti iš naujo.",
     "deleteAccountTitle": "Ištrinti paskyrą?",
@@ -2297,6 +2297,7 @@
       "branchLoadError": "Nepavyko įkelti šakų",
       "branchUnavailable": "Šiai saugyklai šakų nėra. Patikrink prieigos teises pas tiekėją ir pasirink kitą saugyklą.",
       "branchEmpty": "Nėra prieinamų šakų",
+      "branchListIncomplete": "Rodomos tik kai kurios šakos. Saugykloje yra daugiau šakų, nei gali tilpti į šį sąrašą.",
       "branchPlaceholder": "Pasirinkti šaką",
       "runOnWithTarget": "Vykdymo vieta: {{target}}",
       "environment": "Aplinka",
@@ -3467,6 +3468,11 @@
       "serverChecking": "Tikrinamas šis serveris…",
       "serverUnreachable": "Nepavyko pasiekti šio serverio",
       "serverOff": "Šis serveris išjungtas",
+      "app": {
+        "label": "Įrankio sąsaja",
+        "failed": "Nepavyko įkelti šio įrankio sąsajos.",
+        "empty": "Šio įrankio sąsajoje nėra ką rodyti."
+      },
       "serverToolCount_one": "{{count}} įrankis",
       "serverToolCount_few": "{{count}} įrankiai",
       "serverToolCount_many": "{{count}} įrankių",
@@ -3777,6 +3783,8 @@
     "skillNameInvalid": "Įgūdžio pavadinimas turi prasidėti raide arba skaitmeniu ir naudoti tik mažąsias raides, skaitmenis ir brūkšnelius",
     "skillContentRequired": "Reikalingas įgūdžių turinys",
     "skillSaveFailed": "Nepavyko išsaugoti įgūdžių",
+    "skillSourceCustom": "Pasirinktinis",
+    "skillSourceMarketplace": "Parduotuvė",
     "skillsHint": "Įklijuokite SKILL.md ir užpildysite jo pavadinimą; pridėkite įgūdžių iš savo telefono nevilkdami ir numesdami.",
     "skillEditTitle": "Redaguoti įgūdžius",
     "mcp": {

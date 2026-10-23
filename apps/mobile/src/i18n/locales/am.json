@@ -224,7 +224,7 @@
     "hideBalance": "ቀሪ ሂሳብ ደብቅ",
     "showBalance": "ቀሪ ሂሳብ አሳይ",
     "balanceHidden": "ቀሪ ሂሳብ ተደብቋል",
-    "bonusCreditsExpiring": "{{amount}} የጉርሻ ክሬዲት በ{{date}} ጊዜው ያበቃል።",
+    "bonusCreditsExpiring": "{{amount}} ክሬዲት በ{{date}} ጊዜው ያበቃል።",
     "signOutTitle": "ከመለያዎ መውጣት ይፈልጋሉ?",
     "signOutMessage": "የሥራ ቦታህን ለመጠቀም እንደገና መግባት ያስፈልግሃል።",
     "deleteAccountTitle": "መለያዎን መሰረዝ ይፈልጋሉ?",
@@ -2241,6 +2241,7 @@
       "branchLoadError": "ቅርንጫፎችን መጫን አልተቻለም",
       "branchUnavailable": "ለዚህ ማከማቻ ቅርንጫፎች አይገኙም። ከአቅራቢው ጋር ያለዎትን መዳረስ ያረጋግጡ፣ ከዚያ ሌላ ማከማቻ ይምረጡ።",
       "branchEmpty": "ምንም ቅርንጫፎች አይገኙም",
+      "branchListIncomplete": "የተዘረዘሩት የተወሰኑ ቅርንጫፎች ብቻ ናቸው። ይህ ዝርዝር የሚያካትታቸው በላይ ሆኖ ማከማቻው ተጨማሪ ቅርንጫፎች አሉት።",
       "branchPlaceholder": "አንድ ቅርንጫፍ ይምረጡ",
       "runOnWithTarget": "ማስኬጃ፦ {{target}}",
       "environment": "የሥራ አካባቢ",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "{{count}} መሳሪያ",
       "serverToolCount_other": "{{count}} መሳሪያዎች",
       "serverUnreachable": "ይህን ሰርቨር ማግኘት አልተቻለም",
-      "serverOff": "ይህ ሰርቨር ተዘግቷል"
+      "serverOff": "ይህ ሰርቨር ተዘግቷል",
+      "app": {
+        "label": "የመሣሪያ በይነገጽ",
+        "failed": "የዚህ መሣሪያ በይነገጽ መጫን አልተቻለም።",
+        "empty": "የዚህ መሣሪያ በይነገጽ የሚያሳየ ነገር የለውም።"
+      }
     },
     "mcpOAuth": {
       "authMethod": "ማረጋገጫ",
@@ -3687,6 +3693,8 @@
     "skillNameInvalid": "የክህሎት ስም በፊደል ወይም ዲጂት መጀመር አለበት እና ትንሽ ሆሄያትን፣ አሃዞችን እና ሰረዞችን ብቻ መጠቀም አለበት።",
     "skillContentRequired": "የክህሎት ይዘት ያስፈልጋል",
     "skillSaveFailed": "ችሎታ ማዳን አልተቻለም",
+    "skillSourceCustom": "ብጁ",
+    "skillSourceMarketplace": "መደብር",
     "skillsHint": "SKILL.md ይለጥፉ እና ስሙ ይሞላል; ሳይጎትቱ እና መጣል ሳይኖር ከስልክዎ ላይ ችሎታ ይጨምሩ።",
     "skillEditTitle": "ችሎታን ያርትዑ",
     "mcp": {

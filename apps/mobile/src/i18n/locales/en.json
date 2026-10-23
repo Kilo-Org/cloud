@@ -315,7 +315,7 @@
     "hideBalance": "Hide balance",
     "showBalance": "Show balance",
     "balanceHidden": "Balance hidden",
-    "bonusCreditsExpiring": "{{amount}} in bonus credits expiring {{date}}",
+    "bonusCreditsExpiring": "{{amount}} in credits expiring {{date}}",
     "signOutTitle": "Sign out?",
     "signOutMessage": "You will need to sign in again to access your workspace.",
     "deleteAccountTitle": "Delete account?",
@@ -2332,6 +2332,7 @@
       "branchLoadError": "Couldn't load branches",
       "branchUnavailable": "Branches aren't available for this repository. Check your access with the provider, then pick another repository.",
       "branchEmpty": "No branches available",
+      "branchListIncomplete": "Only some branches are shown. The repository has more branches than this list can include.",
       "branchPlaceholder": "Select a branch",
       "runOnWithTarget": "Run on: {{target}}",
       "environment": "Environment",
@@ -3645,7 +3646,12 @@
       "serverToolCount_one": "{{count}} tool",
       "serverToolCount_other": "{{count}} tools",
       "serverUnreachable": "Couldn't reach this server",
-      "serverOff": "This server is off"
+      "serverOff": "This server is off",
+      "app": {
+        "label": "Tool interface",
+        "failed": "This tool's interface couldn't load.",
+        "empty": "This tool's interface has nothing to show."
+      }
     },
     "reasoningEffort": {
       "modelFlag": "This model supports thinking effort"
@@ -3772,6 +3778,8 @@
     "skillNameInvalid": "Skill name must start with a letter or digit and use only lowercase letters, digits, and dashes",
     "skillContentRequired": "Skill content is required",
     "skillSaveFailed": "Couldn't save skill",
+    "skillSourceCustom": "Custom",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Paste a SKILL.md and its name fills in; add a skill from your phone without drag and drop.",
     "skillEditTitle": "Edit skill",
     "mcp": {

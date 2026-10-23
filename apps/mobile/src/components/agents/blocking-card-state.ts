@@ -5,7 +5,8 @@
 // lets the repo's `node` vitest env cover the selection + CTA rules without
 // rendering React Native.
 
-import { type Component, type RefObject } from 'react';
+import { type RefObject } from 'react';
+import { type HostInstance } from 'react-native';
 
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
@@ -53,7 +54,8 @@ type BlockingCardPresentation = {
 
 export type BlockingCardA11yDeps = {
   announce: (message: string) => void;
-  focus: (ref: RefObject<Component | null>) => boolean;
+  /** Reports dispatch, not confirmed focus; false allows a mount-race retry. */
+  focus: (ref: RefObject<HostInstance | null>) => boolean;
 };
 
 /**
@@ -129,15 +131,13 @@ export function getBlockingCardPresentationForKind(input: {
 }
 
 /**
- * Side-effect helper invoked from the card's mount effect. Centralises the
- * "announce + move focus" pair here so the React components execute the same
- * path the unit tests cover. If the focus target has no node handle yet
- * (first-paint race), a follow-up attempt is scheduled on the next tick and the
- * cleanup function clears that timeout on unmount/request change.
+ * Announce the card and request focus. If no request was dispatched, retry once
+ * after the first-paint race; cleanup cancels it on unmount or request change.
+ * A dispatched request is not confirmation that assistive focus moved.
  */
 export function applyBlockingCardAppearance(
   presentation: BlockingCardPresentation,
-  ref: RefObject<Component | null>,
+  ref: RefObject<HostInstance | null>,
   deps: BlockingCardA11yDeps
 ): (() => void) | undefined {
   deps.announce(presentation.announcement);

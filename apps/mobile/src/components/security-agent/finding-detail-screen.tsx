@@ -91,12 +91,15 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
 
   // The back control always renders. With local history it pops normally
   // (findings-list -> finding returns to the list). A push/deep-link open has
-  // no local history, so `router.back()` is a no-op and back replaces the
-  // whole profile-tab subtree with its root instead. The signal is the nested
-  // Stack's own state index, not `router.canGoBack()` (which is recursive and
-  // also reports parent history).
+  // no local history, so `router.back()` is a no-op and back replaces itself
+  // with the scope's findings list, a sibling route in the root stack. The
+  // signal is the nested Stack's own state index, not `router.canGoBack()`
+  // (which is recursive and also reports parent history).
   const handleBack = () => {
-    const target = findingDetailBackTarget(findingDetailHasLocalHistory(navigation.getState()));
+    const target = findingDetailBackTarget(
+      findingDetailHasLocalHistory(navigation.getState()),
+      scope
+    );
     if (target.kind === 'pop') {
       router.back();
     } else {

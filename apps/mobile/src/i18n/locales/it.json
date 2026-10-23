@@ -224,7 +224,7 @@
     "hideBalance": "Nascondi saldo",
     "showBalance": "Mostra saldo",
     "balanceHidden": "Saldo nascosto",
-    "bonusCreditsExpiring": "{{amount}} di crediti bonus scadono il {{date}}.",
+    "bonusCreditsExpiring": "{{amount}} di crediti scadono il {{date}}.",
     "signOutTitle": "Uscire?",
     "signOutMessage": "Per tornare al tuo spazio di lavoro, dovrai effettuare di nuovo l'accesso.",
     "deleteAccountTitle": "Eliminare l'account?",
@@ -1705,6 +1705,7 @@
       "branchLoadError": "Impossibile caricare i branch",
       "branchUnavailable": "Nessun branch disponibile per questo repository. Verifica i tuoi accessi con il provider, poi scegli un altro repository.",
       "branchEmpty": "Nessun branch disponibile",
+      "branchListIncomplete": "Vengono mostrati solo alcuni branch. Il repository contiene più branch di quanti questo elenco possa includerne.",
       "branchPlaceholder": "Seleziona un branch",
       "runOnWithTarget": "Esegui su: {{target}}",
       "environment": "Ambiente",
@@ -3428,7 +3429,12 @@
       "serverToolCount_one": "{{count}} strumento",
       "serverToolCount_other": "{{count}} strumenti",
       "serverUnreachable": "Impossibile raggiungere questo server",
-      "serverOff": "Questo server è disattivato"
+      "serverOff": "Questo server è disattivato",
+      "app": {
+        "label": "Interfaccia dello strumento",
+        "failed": "Impossibile caricare l'interfaccia di questo strumento.",
+        "empty": "L'interfaccia di questo strumento non ha nulla da mostrare."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autenticazione",
@@ -3732,6 +3738,8 @@
     "skillNameInvalid": "Il nome della competenza deve iniziare con una lettera o un numero e utilizzare solo lettere minuscole, numeri e trattini",
     "skillContentRequired": "È richiesto il contenuto delle competenze",
     "skillSaveFailed": "Impossibile salvare l'abilità",
+    "skillSourceCustom": "Personalizzata",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Incolla un SKILL.md e il suo nome si riempie; aggiungi un'abilità dal tuo telefono senza trascinare e rilasciare.",
     "skillEditTitle": "Modifica abilità",
     "mcp": {

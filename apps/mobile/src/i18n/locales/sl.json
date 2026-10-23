@@ -224,7 +224,7 @@
     "hideBalance": "Skrij stanje",
     "showBalance": "Prikaži stanje",
     "balanceHidden": "Stanje je skrito",
-    "bonusCreditsExpiring": "Veljavnost dodatnih kreditov v vrednosti {{amount}} poteče {{date}}.",
+    "bonusCreditsExpiring": "Veljavnost kreditov v vrednosti {{amount}} poteče {{date}}.",
     "signOutTitle": "Želiš se odjaviti?",
     "signOutMessage": "Za dostop do delovnega prostora se moraš znova prijaviti.",
     "deleteAccountTitle": "Želiš izbrisati račun?",
@@ -2297,6 +2297,7 @@
       "branchLoadError": "Vej ni bilo mogoče naložiti",
       "branchUnavailable": "Veje za to skladišče niso na voljo. Preveri svoj dostop pri ponudniku in izberi drugo skladišče.",
       "branchEmpty": "Ni razpoložljivih vej",
+      "branchListIncomplete": "Prikazane so le nekatere veje. Skladišče ima več vej, kot jih lahko ta seznam vključi.",
       "branchPlaceholder": "Izberi vejo",
       "runOnWithTarget": "Zaženi na: {{target}}",
       "environment": "Okolje",
@@ -3470,7 +3471,12 @@
       "serverToolCount_other": "{{count}} orodij",
       "serverToolCount_two": "{{count}} orodji",
       "serverUnreachable": "Ni bilo mogoče doseči tega strežnika",
-      "serverOff": "Ta strežnik je izklopljen"
+      "serverOff": "Ta strežnik je izklopljen",
+      "app": {
+        "label": "Vmesnik orodja",
+        "failed": "Vmesnika tega orodja ni bilo mogoče naložiti.",
+        "empty": "Vmesnik tega orodja nima ničesar za prikaz."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Preverjanje pristnosti",
@@ -3777,6 +3783,8 @@
     "skillNameInvalid": "Ime spretnosti se mora začeti s črko ali številko in uporabljati samo male črke, številke in pomišljaje",
     "skillContentRequired": "Potrebna je vsebina spretnosti",
     "skillSaveFailed": "Spretnosti ni bilo mogoče shraniti",
+    "skillSourceCustom": "Po meri",
+    "skillSourceMarketplace": "Tržnica",
     "skillsHint": "Prilepite SKILL.md in njegovo ime se izpolni; dodajte veščino iz telefona brez povleci in spusti.",
     "skillEditTitle": "Spretnost urejanja",
     "mcp": {

@@ -11,16 +11,6 @@ import {
 type UsageTableRow = UsageTable['rows'][number];
 
 /**
- * Prefixes values that could be interpreted as formulas by spreadsheet
- * applications (CSV injection). Leading single-quote forces plain-text
- * rendering in Excel/Google Sheets.
- */
-function escapeCsvFormula(value: string): string {
-  if (/^[=+\-@\t\r\n]/.test(value)) return `'${value}`;
-  return value;
-}
-
-/**
  * Render the bucket datetime for CSV. Hourly buckets keep the full ISO
  * timestamp; coarser buckets are trimmed to the relevant prefix so the
  * value stays readable and sorts lexically as chronologically in a
@@ -99,7 +89,7 @@ export function exportUsageTableToCsv({
       datetimeForCsv(row.datetime, granularity),
       ...groupBy.map(d => {
         const raw = dims[d] ?? '';
-        return raw ? escapeCsvFormula(labelForDimensionValue(d, raw)) : '';
+        return raw ? labelForDimensionValue(d, raw) : '';
       }),
       Number((row.costMicrodollars / 1_000_000).toFixed(6)).toString(),
       String(row.requestCount ?? 0),

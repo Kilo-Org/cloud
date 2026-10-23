@@ -1,9 +1,15 @@
-/** Wrap a CSV field value in quotes if it contains commas, quotes, or newlines. */
+const LITERAL_LEADING_CHARACTER = /^\s*[=+\-@\t\r]/;
+
+/**
+ * Format a value as one CSV field: prefix it for literal text when its leading
+ * character needs it, then quote it if it contains a comma, quote, or newline.
+ */
 export function csvField(value: string): string {
-  if (value.includes('"') || value.includes(',') || value.includes('\n')) {
-    return `"${value.replace(/"/g, '""')}"`;
+  const field = LITERAL_LEADING_CHARACTER.test(value) ? `'${value}` : value;
+  if (field.includes('"') || field.includes(',') || field.includes('\n')) {
+    return `"${field.replace(/"/g, '""')}"`;
   }
-  return value;
+  return field;
 }
 
 export type CsvTableData = {

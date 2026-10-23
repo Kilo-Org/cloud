@@ -156,12 +156,13 @@ type ScreenHeaderProps = {
   backFallback?: Href;
   onTitlePress?: () => void;
   /**
-   * Accessibility label for the pressable title. Defaults to a generic
-   * "Open menu" so list callers don't have to supply one. Detail screens
-   * (e.g. session rename) should override with a verb that describes the
+   * Accessibility hint for the pressable title: the action it opens. The
+   * title's own text stays the label, so a screen reader announces which
+   * screen it is on before the action. Defaults to the generic open-menu copy.
+   * Detail screens (e.g. session rename) supply a verb that describes their
    * action, not "open menu".
    */
-  onTitlePressAccessibilityLabel?: string;
+  onTitlePressAccessibilityHint?: string;
   backIcon?: 'back' | 'close';
   /**
    * Apply the status-bar safe-area inset. Form sheets already clear the
@@ -211,7 +212,7 @@ export function ScreenHeader({
   onBack,
   backFallback,
   onTitlePress,
-  onTitlePressAccessibilityLabel,
+  onTitlePressAccessibilityHint,
   backIcon,
   safeAreaTop = true,
   className,
@@ -284,6 +285,15 @@ export function ScreenHeader({
     ? { top: 13, right: 0, bottom: 13, left: 13 }
     : { top: 13, right: 13, bottom: 13, left: 0 };
 
+  // What pressing the title does. The pressable title itself is labelled with
+  // the title's own text, so this is the hint, never the label: a screen reader
+  // must hear which screen it is on before the action. It names the title it
+  // opens, or falls back to the generic menu copy for a header with no text
+  // title.
+  const titlePressHint =
+    onTitlePressAccessibilityHint ??
+    (title ? t('screenHeader.openMenuFor', { title }) : t('screenHeader.openMenu'));
+
   let titleNode: React.ReactNode = null;
   if (title != null) {
     const titleText = titleContent ? (
@@ -314,16 +324,17 @@ export function ScreenHeader({
     );
     // Title caret removed: rename stays available via the pressable title
     // itself. The backIcon === 'close' ChevronDown on the back control is
-    // unrelated and stays.
+    // unrelated and stays. The label is the title text, never the action: a
+    // screen reader must hear which screen it is on, and the action goes in
+    // the hint (a rename control announced in place of the title left the
+    // title unreadable on the to-do detail screen).
     titleNode = onTitlePress ? (
       <Pressable
         onPress={onTitlePress}
         hitSlop={titleHitSlop}
         accessibilityRole="button"
-        accessibilityLabel={
-          onTitlePressAccessibilityLabel ??
-          (title ? t('screenHeader.openMenuFor', { title }) : t('screenHeader.openMenu'))
-        }
+        accessibilityLabel={title}
+        accessibilityHint={titlePressHint}
         className="active:opacity-70"
       >
         {titleLayout}

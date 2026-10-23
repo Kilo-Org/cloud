@@ -241,7 +241,7 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
         {...(list
           ? {
               onTitlePress: openSettings,
-              onTitlePressAccessibilityLabel: t('todos.listSettings.title'),
+              onTitlePressAccessibilityHint: t('todos.listSettings.title'),
             }
           : {})}
       />

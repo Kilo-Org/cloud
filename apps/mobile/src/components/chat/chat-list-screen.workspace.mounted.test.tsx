@@ -120,6 +120,7 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 vi.mock('react-native', () => ({
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   // The picker's sheet is a native modal; honored like the real one so the
   // closed sheet renders nothing.
   Modal: (props: { visible?: boolean; children?: ReactNode }) =>
@@ -194,7 +195,10 @@ function accountControl(ui: RenderWithProvidersResult) {
 /** The open picker's account rows, in option order. */
 function optionRows(ui: RenderWithProvidersResult) {
   return ui.renderer.root.findAll(
-    node => (node.type as string) === 'Pressable' && node.props.accessibilityRole === 'radio'
+    node =>
+      (node.type as string) === 'Pressable' &&
+      node.props.accessibilityRole === 'button' &&
+      node.props.accessibilityState?.selected !== undefined
   );
 }
 

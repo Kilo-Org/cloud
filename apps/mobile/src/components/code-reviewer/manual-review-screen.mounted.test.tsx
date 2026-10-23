@@ -404,9 +404,9 @@ describe('ManualReviewScreen failed start', () => {
         .map(node => propOf(node, 'children'))
         .filter(child => typeof child === 'string')
     ).toContain(START_FAILURE);
-    expect(
-      findAllOfType(renderer.root, 'Button').map(node => propOf(node, 'variant'))
-    ).toContain('outline');
+    expect(findAllOfType(renderer.root, 'Button').map(node => propOf(node, 'variant'))).toContain(
+      'outline'
+    );
 
     act(() => {
       (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)('');

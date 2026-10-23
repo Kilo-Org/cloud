@@ -47,4 +47,10 @@ describe('login drafts across a remount', () => {
       ssoRecovery: { email: 'stored@example.com', ssoOrganizationId: 'org-2' },
     });
   });
+
+  it('ignores a corrupt stored draft instead of failing the mount', async () => {
+    stored.sso = '{not json';
+
+    await expect(restoreLoginDrafts()).resolves.toEqual({ email: '', ssoRecovery: null });
+  });
 });

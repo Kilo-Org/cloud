@@ -192,6 +192,7 @@ export function normalizeLocalizedNumber(value: string, locale: string): string 
   return normalized.split(group).join('').split(decimal).join('.');
 }
 
+/** The literal `normalizeLocalizedNumber` accepts, read as a finite number. */
 export function parseLocalizedNumber(value: string, locale: string): number | null {
   const normalized = normalizeLocalizedNumber(value, locale);
   if (normalized === null) {

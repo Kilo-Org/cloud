@@ -19,7 +19,7 @@ import { KILO_CLI_VERSION } from '../src/shared/kilo-cli-version.js';
 export const CLI_PACKAGE = '@kilocode/cli-linux-x64-baseline';
 export const PINNED_CLI_VERSION = KILO_CLI_VERSION;
 /** Measured SHA-256 of the pinned tarball; the release baseline. */
-export const PINNED_CLI_SHA256 = '2e0de8a1f786de31d27d7f8a1c0d35e468b1ee3af66826c1b5f15658acbb1f79';
+export const PINNED_CLI_SHA256 = 'dd4920830a587aaab8aec12f64afcff640538fba27c5eb645160e64ba5972217';
 
 const registryMetadataSchema = z.object({
   dist: z.object({

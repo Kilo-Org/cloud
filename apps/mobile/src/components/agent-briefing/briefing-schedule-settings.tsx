@@ -8,6 +8,7 @@ import { toast } from 'sonner-native';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { type BriefingPreferences } from '@/lib/agent-briefing';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { formatDate } from '@/lib/format';
@@ -44,6 +45,9 @@ export function ScheduleSettings({ preferences }: { readonly preferences: Briefi
           data => (data ? { ...data, ...input } : data)
         );
         return { previous };
+      },
+      onSuccess: () => {
+        announcingToast.success(t('agentBriefing.saved'));
       },
       onError: (_error, _input, context) => {
         for (const [key, value] of context?.previous ?? []) {

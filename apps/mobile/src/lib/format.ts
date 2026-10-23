@@ -126,11 +126,10 @@ export function firstGrapheme(value: string, locale: string): string {
  * Decimal-digit blocks a phone keyboard can produce for typed numbers. The
  * locale's numbering system is not enough on its own: ICU resolves a bare `ar`
  * to Latin digits and `ar-EG` to Arabic-Indic, so the blocks a user can type
- * are mapped explicitly.
+ * are mapped explicitly. The three bases start Arabic-Indic, Extended
+ * Arabic-Indic (Persian, Urdu) and Devanagari; each block holds ten digits.
  */
-const NATIVE_DIGIT_BASES = [
-  0x0660 /* Arabic-Indic */, 0x06f0 /* Extended */, 0x0966 /* Devanagari */,
-] as const;
+const NATIVE_DIGIT_BASES = [0x0660, 0x06f0, 0x0966] as const;
 const localeDigitMaps = new Map<string, Map<string, string>>();
 
 function localeDigitMap(locale: string): Map<string, string> {

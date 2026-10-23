@@ -133,9 +133,18 @@ function checkQueue(queue, name, worker, dlq, eu) {
   if (dlq === undefined) {
     if (queue.consumers.length) throw new Error(`DLQ ${name} must have no consumer.`);
   } else if (
-    queue.consumers.some(
-      c => c.type !== 'worker' || c.script_name !== worker || c.dead_letter_queue !== dlq
-    )
+    queue.consumers.some(c => {
+      if (!c || typeof c !== 'object' || Array.isArray(c)) return true;
+      // Wrangler reads script/service; API examples also use script_name. Every
+      // supplied alias must identify this Worker, so conflicts fail closed.
+      const owners = ['script', 'service', 'script_name'].filter(key => Object.hasOwn(c, key));
+      return (
+        c.type !== 'worker' ||
+        owners.length === 0 ||
+        owners.some(key => typeof c[key] !== 'string' || c[key] !== worker) ||
+        c.dead_letter_queue !== dlq
+      );
+    })
   ) {
     throw new Error(`Unexpected consumer type, owner, or DLQ: ${name}.`);
   }

@@ -19,6 +19,7 @@
     "@typescript/native-preview": "catalog:",
     "wrangler": "catalog:",
     "@types/node": "catalog:",
+    "js-yaml": "4.3.2",
     "vitest": "catalog:vitest5"
   },
   "dependencies": {

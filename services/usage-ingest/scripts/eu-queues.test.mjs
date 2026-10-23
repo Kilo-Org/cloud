@@ -9,9 +9,10 @@ function fixture(environment = 'staging', eu = true) {
   const plan = queuePlan(environment);
   const queues = new Map();
   const calls = [];
+  let nextQueueId = 0;
   function add(name, jurisdiction) {
     const queue = {
-      queue_id: (queues.size + 1).toString(16).padStart(32, '0'),
+      queue_id: (++nextQueueId).toString(16).padStart(32, '0'),
       queue_name: name,
       consumers: [],
       consumers_total_count: 0,
@@ -66,6 +67,95 @@ function fixture(environment = 'staging', eu = true) {
     api: queueApi(plan.account, 'synthetic-test-token', request),
   };
 }
+
+// Synthetic GET contracts: pinned Wrangler reads script/service; public API
+// examples use script_name. These fixtures do not assert an observed live shape.
+const ownerAliases = ['script', 'service', 'script_name'];
+for (let mask = 1; mask < 8; mask++) {
+  const aliases = ownerAliases.filter((_, index) => mask & (1 << index));
+  test(`matching consumer owner aliases ${aliases.join('+')} verify and reuse without writes`, async () => {
+    const f = fixture();
+    for (const [name, dlq] of [
+      [f.plan.oldSource, f.plan.oldDlq],
+      [f.plan.source, f.plan.dlq],
+    ]) {
+      Object.assign(f.queues.get(name), {
+        consumers: [
+          {
+            type: 'worker',
+            consumer_id: 'a'.repeat(32),
+            ...Object.fromEntries(aliases.map(key => [key, f.plan.worker])),
+            dead_letter_queue: dlq,
+            settings: { batch_size: 1, max_concurrency: 1 },
+          },
+        ],
+        consumers_total_count: 1,
+      });
+    }
+    const before = structuredClone([...f.queues]);
+    await prepareQueues(f.plan, f.api);
+    await prepareQueues(f.plan, f.api, true);
+    assert.ok(f.calls.every(c => c.method === 'GET'));
+    assert.deepEqual([...f.queues], before);
+  });
+}
+
+for (const alias of ownerAliases) {
+  test(`${alias} rejects foreign, malformed and conflicting ownership before any create`, async () => {
+    for (const source of ['source', 'oldSource']) {
+      for (const value of ['other-worker', '', ' usage-ingest-staging ', null, 1, true, {}, []]) {
+        // Also reject a malformed/foreign alias beside another valid alias;
+        // choosing the first non-null owner would hide contradictory metadata.
+        for (const includeValidAlias of [false, true]) {
+          const f = fixture();
+          const otherAlias = ownerAliases.find(key => key !== alias);
+          Object.assign(f.queues.get(f.plan[source]), {
+            consumers: [
+              {
+                type: 'worker',
+                ...(includeValidAlias ? { [otherAlias]: f.plan.worker } : {}),
+                [alias]: value,
+                dead_letter_queue: source === 'source' ? f.plan.dlq : f.plan.oldDlq,
+              },
+            ],
+            consumers_total_count: 1,
+          });
+          // One absent EU resource must not be created before inspecting all owners.
+          f.queues.delete(f.plan.dlq);
+          const before = structuredClone([...f.queues]);
+          await assert.rejects(prepareQueues(f.plan, f.api, true), /Unexpected consumer/);
+          assert.ok(f.calls.every(c => c.method === 'GET'));
+          assert.deepEqual([...f.queues], before);
+        }
+      }
+    }
+  });
+}
+
+test('missing or unknown owner fields and malformed consumer entries fail closed', async () => {
+  for (const source of ['source', 'oldSource']) {
+    for (const consumer of [null, [], 'worker', 1, {}, { owner: 'usage-ingest-staging' }]) {
+      const f = fixture();
+      const metadata =
+        consumer && typeof consumer === 'object' && !Array.isArray(consumer)
+          ? {
+              type: 'worker',
+              dead_letter_queue: source === 'source' ? f.plan.dlq : f.plan.oldDlq,
+              ...consumer,
+            }
+          : consumer;
+      Object.assign(f.queues.get(f.plan[source]), {
+        consumers: [metadata],
+        consumers_total_count: 1,
+      });
+      f.queues.delete(f.plan.dlq);
+      const before = structuredClone([...f.queues]);
+      await assert.rejects(prepareQueues(f.plan, f.api, true), /Unexpected consumer/);
+      assert.ok(f.calls.every(c => c.method === 'GET'));
+      assert.deepEqual([...f.queues], before);
+    }
+  }
+});
 
 for (const environment of ['staging']) {
   test(`${environment}: create EU DLQ before source, read back, then reuse without writes`, async () => {

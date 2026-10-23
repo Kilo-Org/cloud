@@ -669,14 +669,12 @@ export async function updateKiloReviewComment(
   });
 }
 
-/** Review comment fields this module reads. The app attribution is not in the octokit type. */
-type ReviewCommentRow = {
-  id: number;
-  path: string;
-  line?: number | null;
-  body: string;
+/**
+ * Fields the REST comment type omits but the API returns on every review comment.
+ * `position` is absent, not null, for comments on lines that no longer exist.
+ */
+type ReviewCommentExtras = {
   position?: number | null;
-  user?: { login?: string | null } | null;
   performed_via_github_app?: { id?: number | string | null } | null;
 };
 
@@ -721,21 +719,22 @@ export async function fetchPRInlineComments(
   const perPage = 100;
 
   while (true) {
-    const { data } = (await octokit.pulls.listReviewComments({
+    const { data } = await octokit.pulls.listReviewComments({
       owner,
       repo,
       pull_number: prNumber,
       per_page: perPage,
       page,
-    })) as { data: ReviewCommentRow[] };
+    });
+    const rows = data as Array<(typeof data)[number] & ReviewCommentExtras>;
 
     comments.push(
-      ...data.map(c => ({
+      ...rows.map(c => ({
         id: c.id,
         path: c.path,
         line: c.line ?? null,
         body: c.body,
-        isOutdated: c.position === null, // null position = outdated
+        isOutdated: c.position == null, // absent or null position = outdated
         authoredByKilo: String(c.performed_via_github_app?.id ?? '') === kiloAppId,
         user: { login: c.user?.login ?? 'unknown' },
       }))

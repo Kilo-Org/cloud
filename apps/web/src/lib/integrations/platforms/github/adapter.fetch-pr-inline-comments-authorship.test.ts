@@ -70,6 +70,24 @@ describe('fetchPRInlineComments authorship', () => {
     ]);
   });
 
+  it('treats a comment without a diff position as outdated', async () => {
+    const { position: _omitted, ...withoutPosition } = comment({
+      id: 1,
+      performed_via_github_app: { id: 'test-app-id' },
+    });
+    mockListReviewComments.mockResolvedValueOnce({
+      data: [withoutPosition, comment({ id: 2, position: null }), comment({ id: 3, position: 0 })],
+    });
+
+    const comments = await fetchPRInlineComments('42', 'acme', 'widgets', 7);
+
+    expect(comments.map(c => [c.id, c.isOutdated])).toEqual([
+      [1, true],
+      [2, true],
+      [3, false],
+    ]);
+  });
+
   it('marks comments authored through the lite app when the review uses the lite app', async () => {
     mockGetGitHubAppCredentials.mockReturnValue({ appId: 'test-lite-app-id', privateKey: 'key' });
     mockListReviewComments.mockResolvedValueOnce({

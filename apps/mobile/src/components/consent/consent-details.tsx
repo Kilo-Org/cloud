@@ -344,7 +344,11 @@ export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
 
           <Text className="mt-6 text-xs text-muted-foreground">
             {t('consent.retentionPrefix')}{' '}
-            <Text className="text-xs text-primary underline" onPress={handleOpenPrivacy}>
+            <Text
+              className="text-xs text-primary underline"
+              accessibilityRole="link"
+              onPress={handleOpenPrivacy}
+            >
               {t('consent.privacyPolicy')}
             </Text>
             .

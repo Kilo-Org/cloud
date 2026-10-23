@@ -101,7 +101,7 @@ function TodoDetailBody({ todo }: Readonly<{ todo: TodoItemDetail }>) {
         onTitlePress={() => {
           setRenaming(true);
         }}
-        onTitlePressAccessibilityLabel={t('todos.item.renameTitle')}
+        onTitlePressAccessibilityHint={t('todos.item.renameTitle')}
         inlineActions={<TodoCompletionCircle todo={todo} />}
       />
       <KeyboardAvoidingView className="flex-1" behavior="padding">

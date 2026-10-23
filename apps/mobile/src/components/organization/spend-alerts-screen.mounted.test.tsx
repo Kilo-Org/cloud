@@ -90,19 +90,27 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 // Everything the validators need from the formatter, in the en-US shape the
 // tests write values in.
-vi.mock('@/lib/format', () => ({
-  formatMoney: (amount: number) => `$${amount}`,
-  formatNumber: String,
-  formatList: (values: readonly string[]) => values.join(' and '),
-  parseLocalizedNumber: (value: string) => {
+vi.mock('@/lib/format', () => {
+  const normalizeLocalizedNumber = (value: string) => {
     const normalized = value.trim().replaceAll(',', '');
-    if (normalized === '') {
-      return null;
-    }
-    const parsed = Number(normalized);
-    return Number.isFinite(parsed) ? parsed : null;
-  },
-}));
+    return /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(normalized) ? normalized : null;
+  };
+  return {
+    formatMoney: (amount: number) => `$${amount}`,
+    formatCurrency: (amount: number) => `$${amount}`,
+    formatNumber: String,
+    formatList: (values: readonly string[]) => values.join(' and '),
+    normalizeLocalizedNumber,
+    parseLocalizedNumber: (value: string) => {
+      const normalized = normalizeLocalizedNumber(value);
+      if (normalized === null) {
+        return null;
+      }
+      const parsed = Number(normalized);
+      return Number.isFinite(parsed) ? parsed : null;
+    },
+  };
+});
 
 type RuleFixture = {
   kind: 'threshold' | 'anomaly';

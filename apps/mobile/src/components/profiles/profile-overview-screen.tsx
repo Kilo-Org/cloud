@@ -48,6 +48,7 @@ import {
   getProfileSkillsPath,
   getProfileSlashCommandsPath,
   getProfileVariablesPath,
+  type ProfileManagementStack,
 } from '@/lib/profile-agent-navigation';
 
 /** Icon per Overview section, matching the section's purpose. */
@@ -68,7 +69,10 @@ const SECTION_PATHS = {
   mcp: getProfileMcpPath,
   skills: getProfileSkillsPath,
   agents: getProfileAgentsPath,
-} satisfies Record<OverviewSectionKey, (profileId: string, organizationId?: string) => Href>;
+} satisfies Record<
+  OverviewSectionKey,
+  (profileId: string, organizationId: string | undefined, stack: ProfileManagementStack) => Href
+>;
 
 /**
  * The mutation hook toasts `error.message`; the screen only supplies a
@@ -159,7 +163,13 @@ function ProfileMetadataForm({ profile, isSaving, onSave }: MetadataFormProps) {
 export function ProfileOverviewScreen({
   profileId,
   organizationId,
-}: Readonly<{ profileId: string; organizationId?: string }>) {
+  stack,
+}: Readonly<{
+  profileId: string;
+  organizationId?: string;
+  /** The Stack this screen is mounted in; its section rows stay in it. */
+  stack: ProfileManagementStack;
+}>) {
   const router = useRouter();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
@@ -213,7 +223,12 @@ export function ProfileOverviewScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={profile?.name ?? t('profiles.title')} />
+      <ScreenHeader
+        title={profile?.name ?? t('profiles.title')}
+        // The profile name is user prose, not a UI label, so it keeps a second
+        // line for a natural break.
+        titleNumberOfLines={2}
+      />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-6 px-6 pt-4"
@@ -278,7 +293,7 @@ export function ProfileOverviewScreen({
                     subtitle={String(row.count)}
                     last={index === rows.length - 1}
                     onPress={() => {
-                      router.push(SECTION_PATHS[row.key](profileId, organizationId));
+                      router.push(SECTION_PATHS[row.key](profileId, organizationId, stack));
                     }}
                   />
                 ))}

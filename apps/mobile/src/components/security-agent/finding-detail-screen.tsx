@@ -134,6 +134,21 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   const errorCode = findingQuery.error?.data?.code;
   const notFound = findingQuery.isError && (errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN');
 
+  // React Query resets a failed query to pending when its retry starts, so a
+  // condition on `isError` alone tears the failure surface down — and the
+  // progress of the retry the user just asked for — for as long as the request
+  // runs. Hold the surface for the retry of the same finding; another finding's
+  // id never matches, so opening it starts clean. A not-found or forbidden
+  // answer keeps its own state instead of retrying into a generic failure.
+  const loadFailed = findingQuery.isError && !findingQuery.data && !notFound;
+  const [failedFindingId, setFailedFindingId] = useState<string | null>(null);
+  useEffect(() => {
+    if (loadFailed) {
+      setFailedFindingId(findingId);
+    }
+  }, [loadFailed, findingId]);
+  const showLoadFailure = !findingQuery.data && (loadFailed || failedFindingId === findingId);
+
   if (notFound) {
     return (
       <View className="flex-1 bg-background">
@@ -151,7 +166,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
     );
   }
 
-  if (findingQuery.isError && !findingQuery.data) {
+  if (showLoadFailure) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
@@ -162,6 +177,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
         <QueryError
           message={t('securityAgent.dismiss.couldNotLoad')}
           onRetry={() => void findingQuery.refetch()}
+          isRetrying={findingQuery.isFetching}
         />
       </View>
     );

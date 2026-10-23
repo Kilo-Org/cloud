@@ -211,11 +211,11 @@
     "linkedAccounts": "已关联账户",
     "couldNotLoadAccounts": "无法加载账户。",
     "app": "应用",
-    "preferencesSubtitle": "外观、通知、思考过程及屏幕设置",
+    "preferencesSubtitle": "外观、通知、思考过程及屏幕行为",
     "deviceSessionsSubtitle": "查看其他设备并退出其登录",
     "feedback": "反馈",
     "privacyChoices": "隐私选项",
-    "deleteAccount": "注销账号",
+    "deleteAccount": "删除账户",
     "confirmationCode": "验证码",
     "confirmationCodePlaceholder": "6 位验证码",
     "confirmDeletion": "确认删除",
@@ -229,7 +229,7 @@
     "signOutMessage": "退出后，需要重新登录才能访问工作区。",
     "deleteAccountTitle": "删除账户？",
     "deleteAccountMessage": "此操作将永久删除你的账户并退出登录。我们会通过邮件发送验证码。",
-    "deleteAccountConfirm": "注销账号",
+    "deleteAccountConfirm": "删除账户",
     "accountDeleted": "你的账户已删除。",
     "viewOrganization": "查看组织",
     "manageOrganization": "管理组织",
@@ -279,7 +279,7 @@
     "appearanceLight": "浅色",
     "appearanceDark": "深色",
     "account": "账户",
-    "accountSubtitle": "语言、受信任的网站和设备会话",
+    "accountSubtitle": "语言、受信任的主机和设备会话",
     "prReviewAttribution": "在 PR 审查中添加应用署名",
     "prReviewAttributionSubtitle": "提交审查时，在末尾添加“通过 Kilo 审查”的署名。",
     "returnSendsMessage": "回车键发送消息",
@@ -2224,7 +2224,7 @@
       "loadWithHost": "加载 {{host}}",
       "httpsOnly": "仅支持通过 HTTPS 加载图片。",
       "trustTitle": "从 {{host}} 加载图片？",
-      "trustMessage": "信任 {{host}} 后，其图片将不再每次询问即可加载。你可以稍后在受信任的网站中撤销。",
+      "trustMessage": "信任 {{host}} 后，其图片将不再每次询问即可加载。你可以稍后在受信任的主机中撤销。",
       "loadOnce": "仅加载一次"
     },
     "markdownLink": {
@@ -2232,7 +2232,7 @@
       "hostConfirmTitle": "打开外部链接？",
       "hostConfirmMessage": "此链接将在你的浏览器中打开 {{host}}。",
       "open": "开启",
-      "trustThisHost": "信任此网站"
+      "trustThisHost": "信任此主机"
     },
     "folderPicker": {
       "accessibility": "文件夹：{{label}}",
@@ -2313,7 +2313,7 @@
     "scroll": "滚动"
   },
   "offline": {
-    "noInternet": "未连接到互联网。",
+    "noInternet": "未连接到互联网",
     "internetRestored": "网络连接已恢复"
   },
   "queryError": {
@@ -3025,7 +3025,7 @@
       "loadErrorMessage": "请检查网络连接后重试。",
 
       "chooseAccount": "选择账户",
-      "loadErrorTitle": "无法加载你的组织列表。",
+      "loadErrorTitle": "无法加载你的组织列表",
       "membershipLostNotice": "你已无法访问此组织。已切换至 {{target}}。",
       "noOrganization": "无组织",
 
@@ -3033,11 +3033,11 @@
 
       "openWebOrganizations": "在网页版打开组织",
 
-      "organizationUnavailable": "此组织不可用。",
-      "selectDescriptionWithOrganizations": "您属于一个或多个组织。请选择此屏幕应使用的账户。",
+      "organizationUnavailable": "此组织不可用",
+      "selectDescriptionWithOrganizations": "你属于一个或多个组织。请选择此屏幕应使用的账户。",
 
       "selectOrganization": "选择组织",
-      "unavailableDescription": "此组织已不可用。请前往个人资料页面，选择其他组织后继续。",
+      "unavailableDescription": "此组织已不可用。请从账户选择器中选择其他账户后继续。",
 
       "unavailableSessionsDescription": "此组织已不可用。无法加载其会话。",
       "accessDeniedDescription": "你无权访问此组织。"
@@ -3071,7 +3071,7 @@
       "emailError": "请输入有效的邮箱地址。",
       "emailPlaceholder": "邮箱地址，如 name@company.com",
       "permissionDenied": "你没有邀请成员的权限。",
-      "roleMember": "角色为成员。",
+      "roleMember": "角色：成员",
       "sendInvite": "发送邀请",
       "title": "邀请成员"
     },
@@ -3085,7 +3085,7 @@
       "sharingUnavailable": "此设备不支持分享。",
       "status": {
         "paid": "已支付",
-        "open": "开启",
+        "open": "待支付",
         "void": "已作废",
         "uncollectible": "无法收款"
       },
@@ -3226,16 +3226,16 @@
     }
   },
   "trustedHosts": {
-    "title": "受信任的网站",
-    "subtitle": "打开链接时无需再次确认的网站",
-    "emptyTitle": "暂无受信任的网站",
-    "emptyDescription": "信任某个网站后，打开该网站的链接时将不再询问。",
-    "imagesSectionTitle": "受信任的图片网站",
-    "imagesSectionDescription": "来自这些网站的图片将不再询问即可加载。",
-    "imagesSectionEmpty": "暂无受信任的图片网站",
+    "title": "受信任的主机",
+    "subtitle": "打开链接时无需再次确认的主机",
+    "emptyTitle": "暂无受信任的主机",
+    "emptyDescription": "信任某个主机后，打开该主机的链接时将不再询问。",
+    "imagesSectionTitle": "受信任的图片主机",
+    "imagesSectionDescription": "来自这些主机的图片将不再询问即可加载。",
+    "imagesSectionEmpty": "暂无受信任的图片主机",
     "revoke": "撤销对 {{host}} 的信任",
-    "revokeMessage": "指向此网站的链接将再次请求确认。",
-    "revokeImageMessage": "来自此网站的图片将再次请求确认。",
+    "revokeMessage": "指向此主机的链接将再次请求确认。",
+    "revokeImageMessage": "来自此主机的图片将再次请求确认。",
     "backToPreferences": "返回偏好设置"
   },
   "glanceable": {

@@ -342,6 +342,21 @@ function metricOf(tree: ReactTestRenderer): Metric {
   return metric;
 }
 
+describe('the chat header', () => {
+  it('spaces its three controls so they never sit flush', async () => {
+    state.status = 'idle';
+    const tree = await mount();
+    const header = tree.root.find(node => (node.type as string) === 'ScreenHeader');
+    const cluster = header.props.headerRight as ReactElement<{ className: string; children: readonly ReactElement[] }>;
+    // Three controls share this row: the context pill, the backend button and
+    // the tools button. Without a gap they touch, which reads as one broken
+    // control rather than three. Every other multi-control header cluster in
+    // the app carries the same spacing.
+    expect(cluster.props.className).toContain('gap-2');
+    expect(cluster.props.children).toHaveLength(3);
+  });
+});
+
 function details(tree: ReactTestRenderer) {
   return tree.root.find(node => (node.type as string) === 'ChatDetailsSheet').props as {
     readonly visible: boolean;

@@ -297,7 +297,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
           />
         }
         headerRight={
-          <View className="flex-row items-center">
+          <View className="flex-row items-center gap-2">
             <SessionContextMetrics {...details.metrics} />
             <BackendSettingsControl selectedModel={model} onSelectModel={selectProviderModel} />
             <Pressable

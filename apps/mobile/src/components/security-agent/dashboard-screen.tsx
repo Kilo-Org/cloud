@@ -258,7 +258,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         className="px-6"
         title={t('common.securityAgent')}
         headerRight={
-          <View className="flex-row items-center">
+          <View className="flex-row items-center gap-2">
             <Pressable
               onPress={() => {
                 router.push(getSecurityAgentPath(scope, 'findings'));

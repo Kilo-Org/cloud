@@ -44,7 +44,7 @@ function CommitTitleField({
           titleRef.current = value;
         }}
         className={cn(
-          'min-h-11 rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 text-foreground',
+          'min-h-11 rounded-md border border-input bg-background px-3 py-2 text-sm leading-[1.25rem] text-foreground',
           'focus:border-ring'
         )}
         multiline
@@ -85,7 +85,7 @@ function CommitMessageField({
           messageRef.current = value;
         }}
         className={cn(
-          'rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 text-foreground',
+          'rounded-md border border-input bg-background px-3 py-2 text-sm leading-[1.25rem] text-foreground',
           'focus:border-ring',
           tight ? 'max-h-16 min-h-11' : 'min-h-24 max-h-40'
         )}

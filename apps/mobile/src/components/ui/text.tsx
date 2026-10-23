@@ -23,7 +23,7 @@ const textVariants = cva('text-foreground text-base font-medium', {
       h2: 'border-border border-b pb-2 text-3xl font-semibold tracking-tight',
       h3: 'text-2xl font-semibold tracking-tight',
       h4: 'text-xl font-semibold tracking-tight',
-      p: 'mt-3 leading-7',
+      p: 'mt-3 leading-[1.75rem]',
       blockquote: 'mt-4 border-l-2 pl-3 italic',
       code: 'bg-muted relative rounded px-[0.3rem] py-[0.2rem] font-mono-semibold text-sm',
       lead: 'text-muted-foreground text-xl',

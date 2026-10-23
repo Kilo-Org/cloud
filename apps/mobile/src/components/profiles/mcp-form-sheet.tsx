@@ -197,7 +197,7 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
           disabled={isSaving}
           multiline
           textAlignVertical="top"
-          className="min-h-28 leading-5"
+          className="min-h-28 leading-[1.25rem]"
           autoCapitalize="none"
           autoCorrect={false}
           placeholder={t('profiles.mcp.jsonPlaceholder')}

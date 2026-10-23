@@ -269,7 +269,6 @@
     "voiceInput": "Entrada de voz",
     "autoExpandThinking": "Despregar o razoamento automaticamente",
     "autoExpandThinkingSubtitle": "Mostrar o razoamento do axente despregado cando remate.",
-    "autoExpandThinkingInactiveSubtitle": "Non ten efecto mentres os detalles do razoamento estean ocultos.",
     "hideThinking": "Ocultar os detalles do razoamento",
     "hideThinkingSubtitle": "Non mostrar o razoamento do axente na páxina da sesión.",
     "keepScreenOn": "Manter a pantalla acesa ao ver a sesión",
@@ -294,7 +293,8 @@
     "condenseToolCallsSubtitle": "Agrupa as chamadas de ferramentas consecutivas nunha fila que poidas abrir.",
     "toolSummaryTranslation": "Traduce os resumos de ferramentas",
     "toolSummaryTranslationSubtitle": "Envía cada resumo de ferramenta a un modelo para traducilo á lingua da túa aplicación. Móstrase o orixinal se a tradución falla.",
-    "toolSummaryTranslationModelUnavailableNotice": "Este modelo xa non se ofrece. Toca $t(common.model) para escoller outro."
+    "toolSummaryTranslationModelUnavailableNotice": "Este modelo xa non se ofrece. Toca $t(common.model) para escoller outro.",
+    "autoExpandThinkingInactiveSubtitle": "Non ten efecto mentres os detalles do razoamento estean ocultos."
   },
   "prReview": {
     "pullRequestUnavailable": "Solicitude de integración non dispoñible",
@@ -1434,12 +1434,6 @@
       "findingsUnavailable": "Os resultados non están dispoñibles porque esta revisión fallou.",
       "serviceUnavailable": "Non se puido conectar co servizo de revisión de código. Tenta de novo a revisión cando o servizo estea dispoñible.",
       "reviewFailed": "A revisión fallou. Téntao de novo, por favor.",
-      "cancelReasonSuperseded": "Fíxose push dun commit máis recente, polo que esta revisión foi substituída.",
-      "cancelReasonIntegrationDisconnected": "{{platform}} está desconectado, polo que esta revisión foi cancelada. Volve conectalo e executa de novo a revisión.",
-      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer foi desactivado para Bitbucket, polo que esta revisión foi cancelada. Actívao de novo e executa de novo a revisión.",
-      "cancelReasonBitbucketPullRequestChanged": "O pull request de Bitbucket cambiou, polo que esta revisión foi substituída.",
-      "cancelReasonCancelled": "Esta revisión foi cancelada.",
-      "cancelReasonInterrupted": "Esta revisión foi interrompida.",
       "showMore": "Amosar máis",
       "created": "Creada",
       "started": "Iniciada",
@@ -1466,7 +1460,13 @@
       "sessionError": "Produciuse un erro na sesión: {{error}}.",
       "statusWithValue": "Estado: {{status}}",
       "toolName": "Ferramenta: {{name}}",
-      "toolNameError": "Produciuse un erro na ferramenta {{name}}."
+      "toolNameError": "Produciuse un erro na ferramenta {{name}}.",
+      "cancelReasonSuperseded": "Fíxose push dun commit máis recente, polo que esta revisión foi substituída.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} está desconectado, polo que esta revisión foi cancelada. Volve conectalo e executa de novo a revisión.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer foi desactivado para Bitbucket, polo que esta revisión foi cancelada. Actívao de novo e executa de novo a revisión.",
+      "cancelReasonBitbucketPullRequestChanged": "O pull request de Bitbucket cambiou, polo que esta revisión foi substituída.",
+      "cancelReasonCancelled": "Esta revisión foi cancelada.",
+      "cancelReasonInterrupted": "Esta revisión foi interrompida."
     },
     "reviewMemory": {
       "title": "Memoria das revisións",
@@ -2134,8 +2134,8 @@
       "dollar_other": "dólares",
       "costSpoken": "custo de {{cost}}",
       "costSpokenWithTime": "custo {{cost}}, {{time}}",
-      "spokenJoiner": "e",
-      "pullRequest": "solicitude de integración {{number}}"
+      "pullRequest": "solicitude de integración {{number}}",
+      "spokenJoiner": "e"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Non se puido abrir GitHub",
@@ -3117,22 +3117,16 @@
     "boundary": {
       "backToProfile": "Volver ao perfil",
       "loadErrorMessage": "Comproba a túa conexión e téntao de novo.",
-
       "chooseAccount": "Seleccionar unha conta",
       "loadErrorTitle": "Non se puideron cargar as túas organizacións.",
       "membershipLostNotice": "Xa non tes acceso a esta organización. Cambiado a {{target}}.",
       "noOrganization": "Sen organización",
-
       "noOrganizationDescription": "Esta conta non forma parte dunha organización. Crea unha ou únete a unha na web para usar funcións de organización como as invitacións de membros e as alertas de saldo baixo.",
-
       "openWebOrganizations": "Abrir as organizacións na web",
-
       "organizationUnavailable": "A organización non está dispoñible.",
       "selectDescriptionWithOrganizations": "Pertences a unha ou máis organizacións. Escolle a conta que debe usar esta pantalla.",
-
       "selectOrganization": "Seleccionar unha organización",
       "unavailableDescription": "Esta organización xa non está dispoñible. Escolle unha desde o teu perfil para continuar.",
-
       "unavailableSessionsDescription": "Esta organización xa non está dispoñible. Non se poden cargar as súas sesións.",
       "accessDeniedDescription": "Non tes acceso a esta organización."
     },
@@ -3155,14 +3149,14 @@
       "truncated": "Hai movementos de créditos anteriores dispoñibles."
     },
     "inviteMember": {
-      "alreadyInvited": "Xa está convidado ou xa é membro.",
       "emailError": "Introduce un enderezo de correo válido.",
       "emailPlaceholder": "nome@empresa.com",
       "permissionDenied": "Non tes permiso para invitar membros.",
       "roleMember": "O rol é de membro.",
-      "sendError": "Non se puido enviar a invitación.",
       "sendInvite": "Enviar invitación",
-      "title": "Convidar un membro"
+      "title": "Convidar un membro",
+      "alreadyInvited": "Xa está convidado ou xa é membro.",
+      "sendError": "Non se puido enviar a invitación."
     },
     "invoices": {
       "downloadA11y": "Descargar factura {{number}}",
@@ -3231,8 +3225,8 @@
       "inviteCreated": "Invitación creada",
       "pendingInvitations": "Invitacións pendentes",
       "resendInvite": "Reenviar invitación",
-      "resendInviteError": "Non se puido reenviar a invitación.",
-      "shareInviteLink": "Compartir ligazón de invitación"
+      "shareInviteLink": "Compartir ligazón de invitación",
+      "resendInviteError": "Non se puido reenviar a invitación."
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",
@@ -3377,11 +3371,11 @@
   },
   "transcriptionModel": {
     "title": "Modelo de transcrición",
-    "choose": "Escoller un modelo",
     "noneChosen": "Ningún seleccionado",
     "emptyTitle": "Non hai modelos de transcrición",
     "emptyDescription": "Kilo Gateway non ofrece modelos de transcrición neste momento.",
-    "loadFailed": "Non se puideron cargar os modelos de transcrición."
+    "loadFailed": "Non se puideron cargar os modelos de transcrición.",
+    "choose": "Escoller un modelo"
   },
   "voiceLanguage": {
     "title": "Idioma do ditado",
@@ -3403,7 +3397,6 @@
   },
   "modelChat": {
     "offlineFailure": "Este modelo necesita conexión a internet. Conéctate e téntao de novo, ou cambia a un modelo deste dispositivo.",
-    "creditsRequired": "Non hai créditos suficientes para enviar esta mensaxe. Engade créditos e téntao de novo.",
     "empty": {
       "title": "Inicia un chat",
       "description": "Envía unha mensaxe para falar cun modelo."
@@ -3672,7 +3665,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "Este modelo admite esforzo de razoamento"
-    }
+    },
+    "creditsRequired": "Non hai créditos suficientes para enviar esta mensaxe. Engade créditos e téntao de novo."
   },
   "settingsTools": {
     "confirmTitle": "Confirmar este cambio?"
@@ -3710,10 +3704,10 @@
     "noSpend": "Aínda non se rexistrou ningún gasto",
     "spend24h": "Gasto nas últimas 24 horas",
     "multiplierError": "Introduce un multiplicador de 1 ou máis",
-    "multiplierMaxError": "Introduce un multiplicador de {{max}} ou menos",
-    "thresholdMaxError": "Introduce unha cantidade de {{max}} ou menos.",
     "permissionDenied": "Non tes permiso para xestionar as alertas de gasto.",
-    "pushOffByCategory": "Desactivado en Notificacións"
+    "pushOffByCategory": "Desactivado en Notificacións",
+    "multiplierMaxError": "Introduce un multiplicador de {{max}} ou menos",
+    "thresholdMaxError": "Introduce unha cantidade de {{max}} ou menos."
   },
   "profiles": {
     "title": "Perfís",
@@ -3772,7 +3766,6 @@
     },
     "variablesEmpty": "Aínda non hai variables",
     "variablesSaveFailed": "Non se puido gardar a variable",
-    "variablesDeleteFailed": "Non se puido eliminar a variable",
     "commandsTitle": "Comandos de configuración",
     "addCommand": "Engadir comando",
     "commandLabel": "Comando",
@@ -3783,7 +3776,6 @@
     "moveDown": "Mover cara abaixo",
     "moveCommandUp": "Mover o comando {{position}} cara arriba",
     "moveCommandDown": "Mover o comando {{position}} cara abaixo",
-    "deleteCommand": "Eliminar o comando {{position}}",
     "skillsTitle": "Habilidades",
     "addSkill": "Engade habilidade",
     "skillNameLabel": "Nome da habilidade",
@@ -3905,7 +3897,9 @@
       "pinFailed": "Non se puido fixar o repositorio",
       "unboundToast": "Repo desvinculado",
       "unbindFailed": "Non se puido desvincular o repositorio"
-    }
+    },
+    "variablesDeleteFailed": "Non se puido eliminar a variable",
+    "deleteCommand": "Eliminar o comando {{position}}"
   },
   "credits": {
     "title": "Mercar créditos",
@@ -3932,7 +3926,6 @@
       "newList": "Nova lista",
       "empty": "Aínda non hai listas",
       "couldNotLoad": "Non se puideron cargar as listas",
-      "createFailed": "Non se puido crear a lista",
       "noRepository": "Sen repositorio",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} abertas",
@@ -3942,7 +3935,8 @@
       "archive": "Arquivar",
       "unarchive": "Desarquivar",
       "deleteTitle": "Eliminar {{name}}?",
-      "deleteMessage": "As súas tarefas tamén se eliminan. As sesións mantéñense."
+      "deleteMessage": "As súas tarefas tamén se eliminan. As sesións mantéñense.",
+      "createFailed": "Non se puido crear a lista"
     },
     "listSettings": {
       "title": "Axustes da lista",
@@ -4010,21 +4004,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Resumo matinal",
+    "title": "Resumo do axente",
     "atLeast": "≥{{value}}",
     "coverageHint": "Pode faltar algunha actividade histórica. ≥ significa polo menos esta cantidade; descoñecido non é cero.",
     "available": "Resumos dispoñibles",
     "history": "Historial de resumos",
-    "historyHint": "Os informes gárdanse durante 30 días, incluídos os descartados.",
+    "historyHint": "Os resumos gárdanse durante 30 días, incluídos os descartados.",
     "settings": "Configuración do resumo",
-    "saved": "Configuración do resumo gardada",
-    "empty": "Sen actividade nocturna",
-    "emptyHint": "As túas sesións de programación na nube e na CLI aparecerán aquí despois dunha noite activa.",
+    "empty": "Sen actividade nesta xanela do resumo",
+    "emptyHint": "As túas sesións de programación na nube e na CLI aparecerán aquí cando un resumo programado teña actividade.",
     "loadError": "Non se puideron cargar os resumos",
-    "sessions": "Activas durante a noite",
+    "sessions": "Activas na xanela",
     "pullRequests": "PRs abertas",
     "blockers": "Novos bloqueos",
-    "spend": "Gasto nocturno",
+    "spend": "Gasto na xanela",
     "view": "Ler resumo",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -4046,13 +4039,13 @@
     "sources": "Probas e artefactos",
     "timezone": "Fuso horario do resumo",
     "deviceTimezone": "Usar o fuso horario do dispositivo",
-    "timezoneHint": "Fuso horario IANA, por exemplo Europe/Berlin. Os cambios de horario aplícanse ás noites futuras.",
-    "nightStart": "Comeza a noite",
-    "morningStart": "Remata a noite / comeza a mañá",
-    "morningEnd": "Remata a mañá",
-    "timeHint": "A tarxeta de Inicio volve ao estado en directo cando remata a mañá, mesmo sen conexión.",
-    "invalidSchedule": "Escolle un fuso horario válido e períodos de noite e mañá non baleiros e que non se solapen.",
-    "notificationsHint": "Unha notificación xenérica cada mañá cando o teu primeiro informe estea listo. Independente dos resumos con AI de pago.",
+    "timezoneHint": "Fuso horario IANA, por exemplo Europe/Berlin. Os cambios de horario aplícanse aos resumos futuros.",
+    "nightStart": "Comeza a xanela do resumo",
+    "morningStart": "Resumo listo ás",
+    "morningEnd": "Resumo dispoñible ata",
+    "timeHint": "A tarxeta de Inicio volve ao estado en directo cando remata a xanela do resumo, mesmo sen conexión.",
+    "invalidSchedule": "Escolle un fuso horario válido e unha xanela do resumo non baleira.",
+    "notificationsHint": "Unha notificación xenérica por cada resumo programado. Independente dos resumos con AI de pago.",
     "notificationPermission": "Activa as notificacións do dispositivo en $t(common.notifications) para recibir o teu resumo.",
     "aiOptIn": "Resumos con AI de pago",
     "aiHint": "Opcional só para este contexto. Envíanse ao teu modelo fragmentos seleccionados e anonimizados e datos estruturados no idioma da app. Os cargos usan o saldo deste contexto.",
@@ -4070,7 +4063,7 @@
     "contextSettings": "Configuración de AI · {{context}}",
     "allContexts": "Os resumos persoais e da organización mantéñense separados.",
     "create": "Crear resumo",
-    "oneOff": "Puntual",
+    "oneOff": "A demanda",
     "createdAt": "Creado {{time}}",
     "chooseContext": "Escolle un contexto",
     "period": "Período do resumo",
@@ -4092,13 +4085,16 @@
     "emptyPeriod": "Non se atopou actividade neste período. Non se xerará ningún resumo con AI nin se aplicará ningún cargo.",
     "emptyHistory": "Non hai resumos gardados",
     "historicalStateHint": "O estado da sesión reflicte o final do período seleccionado, non o estado actual en tempo real.",
-    "oneOffHint": "A AI recibe evidencias seleccionadas cos datos sensibles ocultos no idioma da túa aplicación. Este informe puntual non cambia a túa programación matinal nin as túas preferencias de AI.",
+    "oneOffHint": "A AI recibe evidencias seleccionadas cos datos sensibles ocultos no idioma da túa aplicación. Este resumo a demanda non cambia o teu resumo programado nin as túas preferencias de AI.",
     "createOffline": "Conéctate á internet para revisar ou crear un resumo. As solicitudes de pago nunca se poñen en cola sen conexión.",
     "estimateInputTooLarge": "Este período contén demasiadas evidencias para o modelo seleccionado.",
     "estimatePermissionUnavailable": "Non tes permiso para usar o saldo deste contexto.",
+    "createFailed": "Non se puido crear este resumo.",
+    "reviewFailed": "Non se puido revisar este resumo.",
     "estimatePricingUnavailable": "Non está dispoñible o prezo deste modelo.",
     "estimateBalanceUnavailable": "Non hai saldo abondo para un resumo de pago.",
     "estimateModelNotAllowed": "Este modelo non está permitido aquí.",
-    "estimateSpendLimitTooLow": "Suba o límite de gasto para permitir este resumo."
+    "estimateSpendLimitTooLow": "Suba o límite de gasto para permitir este resumo.",
+    "saved": "Configuración do resumo gardada"
   }
 }

@@ -269,7 +269,6 @@
     "voiceInput": "صوتی ان پٹ",
     "autoExpandThinking": "سوچ کی تفصیل خود بخود دکھائیں",
     "autoExpandThinkingSubtitle": "ایجنٹ کی سوچ مکمل ہونے پر اس کی تفصیل کھول کر دکھائیں۔",
-    "autoExpandThinkingInactiveSubtitle": "سوچ کی تفصیلات چھپی ہوں تو کوئی اثر نہیں ہوگا۔",
     "hideThinking": "سوچ کی تفصیلات چھپائیں",
     "hideThinkingSubtitle": "سیشن کے صفحے پر ایجنٹ کی سوچ نہ دکھائیں۔",
     "keepScreenOn": "سیشن کے صفحے پر اسکرین روشن رکھیں",
@@ -294,7 +293,8 @@
     "condenseToolCallsSubtitle": "مسلسل ٹول کالز کو ایک قطار میں گروپ کریں جسے آپ کھول سکتے ہیں۔",
     "toolSummaryTranslation": "ٹول خلاصے ترجمہ کریں",
     "toolSummaryTranslationSubtitle": "ہر ٹول خلاصہ کو ایک ماڈل کو بھیجیں تاکہ اسے آپ کی ایپ کی زبان میں ترجمہ کر سکے۔ ترجمہ ناکام ہونے پر اصل دکھایا جاتا ہے۔",
-    "toolSummaryTranslationModelUnavailableNotice": "یہ ماڈل اب پیش نہیں کیا جاتا۔ کوئی دوسرا منتخب کرنے کے لیے $t(common.model) پر ٹیپ کریں۔"
+    "toolSummaryTranslationModelUnavailableNotice": "یہ ماڈل اب پیش نہیں کیا جاتا۔ کوئی دوسرا منتخب کرنے کے لیے $t(common.model) پر ٹیپ کریں۔",
+    "autoExpandThinkingInactiveSubtitle": "سوچ کی تفصیلات چھپی ہوں تو کوئی اثر نہیں ہوگا۔"
   },
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسٹ دستیاب نہیں",
@@ -1434,12 +1434,6 @@
       "findingsUnavailable": "اس جائزے کی ناکامی کی وجہ سے نتائج دستیاب نہیں ہیں۔",
       "serviceUnavailable": "کوڈ کے جائزے کی سروس سے رابطہ نہیں ہو سکا۔ سروس دستیاب ہونے پر جائزے کی دوبارہ کوشش کریں۔",
       "reviewFailed": "جائزہ ناکام ہو گیا۔ براہ کرم دوبارہ کوشش کریں۔",
-      "cancelReasonSuperseded": "ایک نیا کمٹ پُش کر دیا گیا تھا، اس لیے یہ جائزہ بدل دیا گیا۔",
-      "cancelReasonIntegrationDisconnected": "{{platform}} منقطع ہو گیا ہے، اس لیے یہ جائزہ منسوخ کر دیا گیا۔ اسے دوبارہ جوڑیں، پھر جائزے کی دوبارہ کوشش کریں۔",
-      "cancelReasonBitbucketReviewerDisabled": "Bitbucket کے لیے Code Reviewer بند کر دیا گیا تھا، اس لیے یہ جائزہ منسوخ کر دیا گیا۔ اسے دوبارہ فعال کریں، پھر جائزے کی دوبارہ کوشش کریں۔",
-      "cancelReasonBitbucketPullRequestChanged": "Bitbucket کا پُل ریکویسٹ تبدیل ہو گیا، اس لیے یہ جائزہ بدل دیا گیا۔",
-      "cancelReasonCancelled": "یہ جائزہ منسوخ کر دیا گیا۔",
-      "cancelReasonInterrupted": "یہ جائزہ درمیان میں بند ہو گیا۔",
       "showMore": "مزید دکھائیں",
       "created": "تخلیق شدہ",
       "started": "شروع ہوا",
@@ -1466,7 +1460,13 @@
       "sessionError": "سیشن میں خرابی پیش آئی: {{error}}۔",
       "statusWithValue": "حالت: {{status}}",
       "toolName": "ٹول: {{name}}",
-      "toolNameError": "ٹول {{name}} میں خرابی پیش آئی۔"
+      "toolNameError": "ٹول {{name}} میں خرابی پیش آئی۔",
+      "cancelReasonSuperseded": "ایک نیا کمٹ پُش کر دیا گیا تھا، اس لیے یہ جائزہ بدل دیا گیا۔",
+      "cancelReasonIntegrationDisconnected": "{{platform}} منقطع ہو گیا ہے، اس لیے یہ جائزہ منسوخ کر دیا گیا۔ اسے دوبارہ جوڑیں، پھر جائزے کی دوبارہ کوشش کریں۔",
+      "cancelReasonBitbucketReviewerDisabled": "Bitbucket کے لیے Code Reviewer بند کر دیا گیا تھا، اس لیے یہ جائزہ منسوخ کر دیا گیا۔ اسے دوبارہ فعال کریں، پھر جائزے کی دوبارہ کوشش کریں۔",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket کا پُل ریکویسٹ تبدیل ہو گیا، اس لیے یہ جائزہ بدل دیا گیا۔",
+      "cancelReasonCancelled": "یہ جائزہ منسوخ کر دیا گیا۔",
+      "cancelReasonInterrupted": "یہ جائزہ درمیان میں بند ہو گیا۔"
     },
     "reviewMemory": {
       "title": "جائزے کی یادداشت",
@@ -2134,8 +2134,8 @@
       "dollar_other": "ڈالر",
       "costSpoken": "لاگت {{cost}}",
       "costSpokenWithTime": "لاگت {{cost}}، {{time}}",
-      "spokenJoiner": "، اور",
-      "pullRequest": "پل ریکویسٹ {{number}}"
+      "pullRequest": "پل ریکویسٹ {{number}}",
+      "spokenJoiner": "، اور"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub نہیں کھل سکا",
@@ -3117,22 +3117,16 @@
     "boundary": {
       "backToProfile": "پروفائل پر واپس جائیں",
       "loadErrorMessage": "اپنا انٹرنیٹ کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
-
       "chooseAccount": "ایک اکاؤنٹ منتخب کریں",
       "loadErrorTitle": "آپ کی تنظیمیں لوڈ نہیں ہو سکیں۔",
       "membershipLostNotice": "آپ کو اب اس تنظیم تک رسائی حاصل نہیں ہے۔ {{target}} پر منتقل کر دیا گیا۔",
       "noOrganization": "کوئی تنظیم نہیں",
-
       "noOrganizationDescription": "یہ اکاؤنٹ کسی تنظیم کا حصہ نہیں ہے۔ ممبر دعوتیں اور کم بیلنس انتباہات جیسی تنظیمی خصوصیات استعمال کرنے کے لیے ویب پر ایک تنظیم بنائیں یا اس میں شامل ہوں۔",
-
       "openWebOrganizations": "ویب پر تنظیمیں کھولیں",
-
       "organizationUnavailable": "تنظیم دستیاب نہیں ہے۔",
       "selectDescriptionWithOrganizations": "آپ ایک یا زیادہ تنظیموں سے تعلق رکھتے ہیں۔ وہ اکاؤنٹ منتخب کریں جو یہ اسکرین استعمال کرے۔",
-
       "selectOrganization": "ایک تنظیم منتخب کریں",
       "unavailableDescription": "یہ تنظیم اب دستیاب نہیں ہے۔ جاری رکھنے کے لیے اپنے پروفائل سے کوئی اور تنظیم منتخب کریں۔",
-
       "unavailableSessionsDescription": "یہ تنظیم اب دستیاب نہیں ہے۔ اس کے سیشنز لوڈ نہیں ہو سکتے۔",
       "accessDeniedDescription": "آپ کو اس تنظیم تک رسائی حاصل نہیں ہے۔"
     },
@@ -3155,14 +3149,14 @@
       "truncated": "کریڈٹس کا پرانا ریکارڈ دستیاب ہے۔"
     },
     "inviteMember": {
-      "alreadyInvited": "انہیں پہلے ہی دعوت دے دی گئی ہے یا وہ پہلے سے ہی رکن ہیں۔",
       "emailError": "درست ای میل پتہ درج کریں۔",
       "emailPlaceholder": "ای میل پتہ",
       "permissionDenied": "آپ کو اراکین کو دعوت دینے کی اجازت نہیں ہے۔",
       "roleMember": "کردار: رکن",
-      "sendError": "دعوت نہیں بھیجی جا سکی۔",
       "sendInvite": "دعوت بھیجیں",
-      "title": "رکن کو دعوت دیں"
+      "title": "رکن کو دعوت دیں",
+      "alreadyInvited": "انہیں پہلے ہی دعوت دے دی گئی ہے یا وہ پہلے سے ہی رکن ہیں۔",
+      "sendError": "دعوت نہیں بھیجی جا سکی۔"
     },
     "invoices": {
       "downloadA11y": "انوائس {{number}} ڈاؤن لوڈ کریں",
@@ -3231,8 +3225,8 @@
       "inviteCreated": "دعوت بنائی گئی",
       "pendingInvitations": "زیر التواء دعوتیں",
       "resendInvite": "دعوت دوبارہ بھیجیں",
-      "resendInviteError": "دعوت دوبارہ نہیں بھیجی جا سکی۔",
-      "shareInviteLink": "دعوت کا لنک شیئر کریں"
+      "shareInviteLink": "دعوت کا لنک شیئر کریں",
+      "resendInviteError": "دعوت دوبارہ نہیں بھیجی جا سکی۔"
     },
     "usageStats": {
       "inputTokens": "ان پٹ ٹوکن",
@@ -3377,11 +3371,11 @@
   },
   "transcriptionModel": {
     "title": "متن میں بدلنے کا ماڈل",
-    "choose": "ماڈل منتخب کریں",
     "noneChosen": "کوئی نہیں چنا گیا",
     "emptyTitle": "متن میں بدلنے کا کوئی ماڈل موجود نہیں",
     "emptyDescription": "Kilo Gateway فی الحال متن میں بدلنے کا کوئی ماڈل نہیں دیتا۔",
-    "loadFailed": "متن میں بدلنے والے ماڈلز لوڈ نہیں ہو سکے۔"
+    "loadFailed": "متن میں بدلنے والے ماڈلز لوڈ نہیں ہو سکے۔",
+    "choose": "ماڈل منتخب کریں"
   },
   "voiceLanguage": {
     "title": "آواز سے لکھنے کی زبان",
@@ -3403,7 +3397,6 @@
   },
   "modelChat": {
     "offlineFailure": "اس ماڈل کو انٹرنیٹ کنکشن درکار ہے۔ کنیکٹ کریں اور دوبارہ کوشش کریں، یا اس ڈیوائس پر موجود کسی ماڈل پر سوئچ کریں۔",
-    "creditsRequired": "اس پیغام کو بھیجنے کے لیے کافی کریڈٹس نہیں ہیں۔ کریڈٹس شامل کریں اور دوبارہ کوشش کریں۔",
     "empty": {
       "title": "چیٹ شروع کریں",
       "description": "کسی ماڈل سے بات کرنے کے لیے پیغام بھیجیں۔"
@@ -3672,7 +3665,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "یہ ماڈل غور کی سطح کو سپورٹ کرتا ہے"
-    }
+    },
+    "creditsRequired": "اس پیغام کو بھیجنے کے لیے کافی کریڈٹس نہیں ہیں۔ کریڈٹس شامل کریں اور دوبارہ کوشش کریں۔"
   },
   "settingsTools": {
     "confirmTitle": "اس تبدیلی کی تصدیق کریں؟"
@@ -3710,10 +3704,10 @@
     "noSpend": "ابھی تک کوئی خرچ درج نہیں ہوا",
     "spend24h": "گزشتہ 24 گھنٹوں کا خرچ",
     "multiplierError": "1 یا اس سے زیادہ کا ضرب درج کریں",
-    "multiplierMaxError": "{{max}} یا اس سے کم کا ضرب درج کریں",
-    "thresholdMaxError": "{{max}} یا اس سے کم رقم درج کریں۔",
     "permissionDenied": "آپ کو اخراجات کی تنبیہات کا انتظام کرنے کی اجازت نہیں ہے۔",
-    "pushOffByCategory": "اطلاعات میں بند"
+    "pushOffByCategory": "اطلاعات میں بند",
+    "multiplierMaxError": "{{max}} یا اس سے کم کا ضرب درج کریں",
+    "thresholdMaxError": "{{max}} یا اس سے کم رقم درج کریں۔"
   },
   "profiles": {
     "title": "پروفائلز",
@@ -3772,7 +3766,6 @@
     },
     "variablesEmpty": "ابھی تک کوئی متغیر نہیں ہے۔",
     "variablesSaveFailed": "متغیر کو محفوظ نہیں کیا جا سکا",
-    "variablesDeleteFailed": "متغیر حذف نہیں کیا جا سکا",
     "commandsTitle": "سیٹ اپ کمانڈز",
     "addCommand": "کمانڈ شامل کریں۔",
     "commandLabel": "حکم",
@@ -3783,7 +3776,6 @@
     "moveDown": "نیچے کی طرف بڑھیں۔",
     "moveCommandUp": "کمانڈ {{position}} کو اوپر منتقل کریں",
     "moveCommandDown": "کمانڈ {{position}} کو نیچے منتقل کریں",
-    "deleteCommand": "کمانڈ {{position}} کو حذف کریں",
     "skillsTitle": "ہنر",
     "addSkill": "مہارت شامل کریں۔",
     "skillNameLabel": "ہنر کا نام",
@@ -3905,7 +3897,9 @@
       "pinFailed": "ریپو کو پن نہیں کیا جا سکا",
       "unboundToast": "ریپو انباؤنڈ",
       "unbindFailed": "ریپو کو بند نہیں کیا جا سکا"
-    }
+    },
+    "variablesDeleteFailed": "متغیر حذف نہیں کیا جا سکا",
+    "deleteCommand": "کمانڈ {{position}} کو حذف کریں"
   },
   "credits": {
     "title": "کریڈٹس خریدیں",
@@ -3932,7 +3926,6 @@
       "newList": "نئی فہرست",
       "empty": "ابھی تک کوئی فہرست نہیں",
       "couldNotLoad": "فہرستیں لوڈ نہیں ہو سکیں",
-      "createFailed": "فہرست نہیں بن سکی",
       "noRepository": "ریپوزٹری موجود نہیں",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "کھلے: {{count}}",
@@ -3942,7 +3935,8 @@
       "archive": "آرکائیو کریں",
       "unarchive": "آرکائیو سے نکالیں",
       "deleteTitle": "{{name}} حذف کریں؟",
-      "deleteMessage": "اس کے کام بھی حذف ہو جائیں گے۔ ان کے سیشن باقی رہیں گے۔"
+      "deleteMessage": "اس کے کام بھی حذف ہو جائیں گے۔ ان کے سیشن باقی رہیں گے۔",
+      "createFailed": "فہرست نہیں بن سکی"
     },
     "listSettings": {
       "title": "فہرست کی ترتیبات",
@@ -4010,21 +4004,20 @@
     }
   },
   "agentBriefing": {
-    "title": "صبح کی بریفنگ",
+    "title": "ایجنٹ بریفنگ",
     "atLeast": "≥{{value}}",
     "coverageHint": "کچھ پرانی سرگرمی غائب ہو سکتی ہے۔ ≥ کا مطلب ہے کم از کم اتنا؛ نامعلوم کا مطلب صفر نہیں۔",
     "available": "دستیاب بریفنگز",
     "history": "بریفنگ کی تاریخ",
-    "historyHint": "رپورٹس 30 دن تک رکھی جاتی ہیں، بشمول مسترد شدہ رپورٹس۔",
+    "historyHint": "بریفنگز 30 دن تک رکھی جاتی ہیں، بشمول مسترد شدہ بریفنگز۔",
     "settings": "بریفنگ کی ترتیبات",
-    "saved": "بریفنگ کی ترتیبات محفوظ کر لی گئیں۔",
-    "empty": "رات بھر کوئی سرگرمی نہیں",
-    "emptyHint": "فعال رات کے بعد آپ کے کلاؤڈ اور CLI کوڈنگ سیشن یہاں نظر آئیں گے۔",
+    "empty": "اس بریفنگ ونڈو میں کوئی سرگرمی نہیں",
+    "emptyHint": "جب کسی شیڈول شدہ بریفنگ میں سرگرمی ہو تو آپ کے کلاؤڈ اور CLI کوڈنگ سیشنز یہاں ظاہر ہوں گے۔",
     "loadError": "بریفنگز لوڈ نہیں ہو سکیں",
-    "sessions": "رات بھر فعال",
+    "sessions": "ونڈو میں فعال",
     "pullRequests": "کھولے گئے PRs",
     "blockers": "نئی رکاوٹیں",
-    "spend": "رات بھر کا خرچ",
+    "spend": "ونڈو میں خرچ",
     "view": "بریفنگ پڑھیں",
     "viewWithPreview": "$t(agentBriefing.view)۔ {{preview}}",
     "scheduleTimeLabel": "{{label}}، {{time}}",
@@ -4046,13 +4039,13 @@
     "sources": "شواہد اور آرٹیفیکٹس",
     "timezone": "بریفنگ کا ٹائم زون",
     "deviceTimezone": "ڈیوائس کا ٹائم زون استعمال کریں",
-    "timezoneHint": "IANA ٹائم زون، مثلاً Europe/Berlin۔ شیڈول کی تبدیلیاں آئندہ راتوں پر لاگو ہوں گی۔",
-    "nightStart": "رات کا آغاز",
-    "morningStart": "رات کا اختتام / صبح کا آغاز",
-    "morningEnd": "صبح کا اختتام",
-    "timeHint": "صبح ختم ہونے پر ہوم کارڈ لائیو اسٹیٹس بحال کر دیتا ہے، آف لائن بھی۔",
-    "invalidSchedule": "درست ٹائم زون اور غیر خالی، غیر متداخل رات اور صبح کے اوقات منتخب کریں۔",
-    "notificationsHint": "پہلی رپورٹ تیار ہونے پر ہر صبح ایک عمومی اطلاع۔ ادا شدہ AI خلاصوں سے آزاد۔",
+    "timezoneHint": "IANA ٹائم زون، مثلاً Europe/Berlin۔ شیڈول کی تبدیلیاں آئندہ بریفنگز پر لاگو ہوں گی۔",
+    "nightStart": "بریفنگ ونڈو کا آغاز",
+    "morningStart": "بریفنگ تیار ہونے کا وقت",
+    "morningEnd": "بریفنگ دستیاب رہنے کا وقت",
+    "timeHint": "بریفنگ ونڈو ختم ہونے پر ہوم کارڈ لائیو اسٹیٹس بحال کر دیتا ہے، آف لائن بھی۔",
+    "invalidSchedule": "درست ٹائم زون اور غیر خالی بریفنگ ونڈو منتخب کریں۔",
+    "notificationsHint": "ہر شیڈول شدہ بریفنگ پر ایک عمومی اطلاع۔ ادا شدہ AI خلاصوں سے آزاد۔",
     "notificationPermission": "اپنی بریفنگ وصول کرنے کے لیے $t(common.notifications) میں ڈیوائس اطلاعات فعال کریں۔",
     "aiOptIn": "ادا شدہ AI خلاصے",
     "aiHint": "صرف اس سیاق کے لیے اختیاری۔ منتخب، ترمیم شدہ اقتباسات اور منظم حقائق آپ کی ایپ کی زبان میں آپ کے ماڈل کو بھیجے جاتے ہیں۔ چارجز اس سیاق کے بیلنس سے کٹتے ہیں۔",
@@ -4070,7 +4063,7 @@
     "contextSettings": "AI ترتیبات · {{context}}",
     "allContexts": "ذاتی اور تنظیمی بریفنگز الگ الگ رہتی ہیں۔",
     "create": "بریفنگ بنائیں",
-    "oneOff": "صرف ایک بار",
+    "oneOff": "درخواست پر",
     "createdAt": "{{time}} کو بنائی گئی",
     "chooseContext": "ایک سیاق منتخب کریں",
     "period": "بریفنگ کی مدت",
@@ -4092,13 +4085,16 @@
     "emptyPeriod": "اس مدت میں کوئی سرگرمی نہیں ملی۔ نہ AI خلاصہ بنے گا، نہ چارجز لاگو ہوں گے۔",
     "emptyHistory": "کوئی محفوظ شدہ بریفنگ نہیں",
     "historicalStateHint": "سیشن کی حالت منتخب مدت کے اختتام کی عکاسی کرتی ہے، موجودہ براہ راست حالت کی نہیں۔",
-    "oneOffHint": "AI کو منتخب شواہد آپ کی ایپ کی زبان میں، حساس معلومات ہٹا کر دیے جاتے ہیں۔ صرف ایک بار بننے والی یہ رپورٹ آپ کے صبح کے شیڈول یا AI کی ترجیحات کو تبدیل نہیں کرتی۔",
+    "oneOffHint": "AI کو منتخب شواہد آپ کی ایپ کی زبان میں، حساس معلومات ہٹا کر دیے جاتے ہیں۔ یہ درخواست پر تیار ہونے والی بریفنگ آپ کی شیڈول شدہ بریفنگ یا AI کی ترجیحات کو تبدیل نہیں کرتی۔",
     "createOffline": "بریفنگ کا جائزہ لینے یا بنانے کے لیے آن لائن ہوں۔ معاوضے والی درخواستیں آف لائن ہونے پر کبھی قطار میں نہیں رکھی جاتیں۔",
     "estimateInputTooLarge": "اس مدت میں منتخب ماڈل کی گنجائش سے زیادہ شواہد ہیں۔",
     "estimatePermissionUnavailable": "آپ کو اس سیاق کا بیلنس استعمال کرنے کی اجازت نہیں ہے۔",
+    "createFailed": "یہ بریفنگ نہیں بن سکی۔",
+    "reviewFailed": "اس بریفنگ کا جائزہ نہیں لیا جا سکا۔",
     "estimatePricingUnavailable": "اس ماڈل کی قیمت دستیاب نہیں ہے۔",
     "estimateBalanceUnavailable": "ادائیگی والے خلاصے کے لیے بیلنس کافی نہیں ہے۔",
     "estimateModelNotAllowed": "یہ ماڈل یہاں کی اجازت نہیں رکھتا۔",
-    "estimateSpendLimitTooLow": "اس خلاصے کی اجازت کے لیے خرچ کی حفاظتی حد بڑھائیں۔"
+    "estimateSpendLimitTooLow": "اس خلاصے کی اجازت کے لیے خرچ کی حفاظتی حد بڑھائیں۔",
+    "saved": "بریفنگ کی ترتیبات محفوظ کر لی گئیں۔"
   }
 }

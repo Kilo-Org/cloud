@@ -269,7 +269,6 @@
     "voiceInput": "語音輸入",
     "autoExpandThinking": "自動展開思考內容",
     "autoExpandThinkingSubtitle": "智慧代理完成思考後，自動展開思考內容。",
-    "autoExpandThinkingInactiveSubtitle": "隱藏思考詳情時，此設定不會有任何效果。",
     "hideThinking": "隱藏思考詳情",
     "hideThinkingSubtitle": "不在工作階段頁面顯示智慧代理的思考內容。",
     "keepScreenOn": "在工作階段頁面保持螢幕亮起",
@@ -294,7 +293,8 @@
     "condenseToolCallsSubtitle": "將連續的工具呼叫合併為一列，點擊即可開啟。",
     "toolSummaryTranslation": "翻譯工具摘要",
     "toolSummaryTranslationSubtitle": "將每個工具摘要傳送給模型，翻譯成你的應用程式語言。翻譯失敗時會顯示原文。",
-    "toolSummaryTranslationModelUnavailableNotice": "這個模型已不再提供。點一下$t(common.model)選擇另一個。"
+    "toolSummaryTranslationModelUnavailableNotice": "這個模型已不再提供。點一下$t(common.model)選擇另一個。",
+    "autoExpandThinkingInactiveSubtitle": "隱藏思考詳情時，此設定不會有任何效果。"
   },
   "notifications": {
     "liveActivities": "即時動態",
@@ -916,6 +916,8 @@
       "invalidUrl": "請輸入有效的 PR URL。",
       "pullRequestUrl": "PR URL",
       "start": "開始審查",
+      "starting": "正在啟動審查…",
+      "title": "手動審查",
       "startNotFound": "無法從 {{provider}} 讀取該 {{requestNoun}}，請檢查 URL 以及儲存庫是否可存取。",
       "startRateLimited": "{{provider}} 目前正在限制請求。請在幾分鐘後再試一次。",
       "startNotAllowed": "你沒有權限為該 {{requestNoun}} 開始審查，請檢查你的權限以及組織的方案。",
@@ -923,9 +925,7 @@
       "startAlreadyRunning": "該{{requestNoun}}的審查已在進行中。",
       "startRejected": "該{{requestNoun}}無法接受審查。請確認它已開啟、並非草稿，且 URL 正確。",
       "startProviderUnavailable": "無法連上 {{provider}} 以讀取該{{requestNoun}}。請再試一次。",
-      "startFailed": "無法開始審查。請檢查你的連線，然後再試一次。",
-      "starting": "正在啟動審查…",
-      "title": "手動審查"
+      "startFailed": "無法開始審查。請檢查你的連線，然後再試一次。"
     },
     "notConnectedReadOnly": "尚未連結 {{platform}}。只有組織擁有者和管理員可以設定連結。",
     "gitlab": {
@@ -963,12 +963,6 @@
       "findingsUnavailable": "由於此次審查失敗，無法取得結果。",
       "serviceUnavailable": "無法連線至程式碼審查服務。請在服務可用時重新嘗試審查。",
       "reviewFailed": "審查失敗。請再試一次。",
-      "cancelReasonSuperseded": "已推送較新的提交，因此此審查已被取代。",
-      "cancelReasonIntegrationDisconnected": "{{platform}} 已中斷連線，因此此審查已取消。請重新連線，然後再次執行審查。",
-      "cancelReasonBitbucketReviewerDisabled": "Bitbucket 的 Code Reviewer 已關閉，因此此審查已取消。請重新啟用，然後再次執行審查。",
-      "cancelReasonBitbucketPullRequestChanged": "Bitbucket 提取要求已變更，因此此審查已被取代。",
-      "cancelReasonCancelled": "此審查已取消。",
-      "cancelReasonInterrupted": "此審查已中斷。",
       "retryMessage": "這會重新執行程式碼審查。",
       "retryReview": "重新嘗試審查",
       "retryNeedsSettings": "程式碼審查助手已關閉，或其設定需要處理。請修正設定，然後重新嘗試此審查。",
@@ -994,7 +988,13 @@
       "sessionError": "工作階段發生錯誤：{{error}}。",
       "statusWithValue": "狀態：{{status}}",
       "toolName": "工具：{{name}}",
-      "toolNameError": "工具 {{name}} 發生錯誤。"
+      "toolNameError": "工具 {{name}} 發生錯誤。",
+      "cancelReasonSuperseded": "已推送較新的提交，因此此審查已被取代。",
+      "cancelReasonIntegrationDisconnected": "{{platform}} 已中斷連線，因此此審查已取消。請重新連線，然後再次執行審查。",
+      "cancelReasonBitbucketReviewerDisabled": "Bitbucket 的 Code Reviewer 已關閉，因此此審查已取消。請重新啟用，然後再次執行審查。",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket 提取要求已變更，因此此審查已被取代。",
+      "cancelReasonCancelled": "此審查已取消。",
+      "cancelReasonInterrupted": "此審查已中斷。"
     },
     "reviewList": {
       "configureProvider": "設定平台",
@@ -1610,8 +1610,8 @@
       "dollar_other": "美元",
       "costSpoken": "費用 {{cost}}",
       "costSpokenWithTime": "費用 {{cost}}，{{time}}",
-      "spokenJoiner": "和",
-      "pullRequest": "提取請求 {{number}}"
+      "pullRequest": "提取請求 {{number}}",
+      "spokenJoiner": "和"
     },
     "githubInstall": {
       "couldNotOpenMessage": "無法開始設定 GitHub App。請再試一次。",
@@ -3109,22 +3109,16 @@
     "boundary": {
       "backToProfile": "返回個人資料",
       "loadErrorMessage": "請檢查網路連線後再試一次。",
-
       "chooseAccount": "選取帳戶",
       "loadErrorTitle": "無法載入你的組織清單。",
       "membershipLostNotice": "你已無法存取此組織。已切換至 {{target}}。",
       "noOrganization": "沒有組織",
-
       "noOrganizationDescription": "此帳戶不屬於任何組織。請在網頁版建立或加入組織，以使用成員邀請和低餘額提醒等組織功能。",
-
       "openWebOrganizations": "在網頁版開啟組織",
-
       "organizationUnavailable": "無法存取組織。",
       "selectDescriptionWithOrganizations": "您屬於一個或多個組織。請選取此畫面應使用的帳戶。",
-
       "selectOrganization": "選取組織",
       "unavailableDescription": "此組織已無法存取。請到個人資料頁面選取其他組織，即可繼續。",
-
       "unavailableSessionsDescription": "此組織已無法存取。無法載入其工作階段。",
       "accessDeniedDescription": "你沒有存取此組織的權限。"
     },
@@ -3154,14 +3148,14 @@
       "renameTitle": "重新命名組織"
     },
     "inviteMember": {
-      "alreadyInvited": "該電子郵件地址已有待處理的邀請，或已是成員。",
       "emailError": "請輸入有效的電子郵件地址。",
       "emailPlaceholder": "例如：name@company.com",
       "permissionDenied": "你沒有邀請成員的權限。",
       "roleMember": "角色：成員",
-      "sendError": "無法傳送邀請。",
       "sendInvite": "傳送邀請",
-      "title": "邀請成員"
+      "title": "邀請成員",
+      "alreadyInvited": "該電子郵件地址已有待處理的邀請，或已是成員。",
+      "sendError": "無法傳送邀請。"
     },
     "invoices": {
       "downloadA11y": "下載發票 {{number}}",
@@ -3230,8 +3224,8 @@
       "inviteCreated": "邀請已建立",
       "pendingInvitations": "待處理的邀請",
       "resendInvite": "重新傳送邀請",
-      "resendInviteError": "無法重新傳送邀請。",
-      "shareInviteLink": "分享邀請連結"
+      "shareInviteLink": "分享邀請連結",
+      "resendInviteError": "無法重新傳送邀請。"
     },
     "usageStats": {
       "inputTokens": "輸入詞元",
@@ -3377,11 +3371,11 @@
   },
   "transcriptionModel": {
     "title": "轉錄模型",
-    "choose": "選擇模型",
     "noneChosen": "未選擇",
     "emptyTitle": "沒有轉錄模型",
     "emptyDescription": "Kilo Gateway 目前沒有提供轉錄模型。",
-    "loadFailed": "無法載入轉錄模型。"
+    "loadFailed": "無法載入轉錄模型。",
+    "choose": "選擇模型"
   },
   "voiceLanguage": {
     "title": "語音輸入語言",
@@ -3403,7 +3397,6 @@
   },
   "modelChat": {
     "offlineFailure": "此模型需要網路連線。請連線後再試一次，或切換至此裝置上的模型。",
-    "creditsRequired": "點數不足，無法傳送此訊息。請加值點數後再試一次。",
     "empty": {
       "title": "開始聊天",
       "description": "傳送訊息以與模型對話。"
@@ -3672,7 +3665,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "此模型支援思考程度"
-    }
+    },
+    "creditsRequired": "點數不足，無法傳送此訊息。請加值點數後再試一次。"
   },
   "settingsTools": {
     "confirmTitle": "確認此變更？"
@@ -3710,10 +3704,10 @@
     "noSpend": "尚無支出記錄",
     "spend24h": "過去 24 小時的支出",
     "multiplierError": "請輸入 1 或更大的倍數",
-    "multiplierMaxError": "請輸入 {{max}} 或更小的倍數",
-    "thresholdMaxError": "請輸入不超過 {{max}} 的金額。",
     "permissionDenied": "你沒有管理支出提醒的權限。",
-    "pushOffByCategory": "已在通知中關閉"
+    "pushOffByCategory": "已在通知中關閉",
+    "multiplierMaxError": "請輸入 {{max}} 或更小的倍數",
+    "thresholdMaxError": "請輸入不超過 {{max}} 的金額。"
   },
   "profiles": {
     "title": "設定檔",
@@ -3772,7 +3766,6 @@
     },
     "variablesEmpty": "還沒有變數",
     "variablesSaveFailed": "無法保存變數",
-    "variablesDeleteFailed": "無法刪除變數",
     "commandsTitle": "設定命令",
     "addCommand": "新增命令",
     "commandLabel": "命令",
@@ -3783,7 +3776,6 @@
     "moveDown": "下移",
     "moveCommandUp": "上移命令 {{position}}",
     "moveCommandDown": "下移命令 {{position}}",
-    "deleteCommand": "刪除命令 {{position}}",
     "skillsTitle": "技能",
     "addSkill": "添加技能",
     "skillNameLabel": "技能名稱",
@@ -3905,7 +3897,9 @@
       "pinFailed": "無法固定儲存庫",
       "unboundToast": "倉庫已解除綁定",
       "unbindFailed": "無法解除倉庫綁定"
-    }
+    },
+    "variablesDeleteFailed": "無法刪除變數",
+    "deleteCommand": "刪除命令 {{position}}"
   },
   "credits": {
     "title": "購買點數",
@@ -3932,7 +3926,6 @@
       "newList": "新增清單",
       "empty": "尚無清單",
       "couldNotLoad": "無法載入清單",
-      "createFailed": "無法建立清單",
       "noRepository": "沒有儲存庫",
       "rowA11y": "{{name}}，{{openCount}}",
       "openCount_one": "未完成 {{count}} 項",
@@ -3942,7 +3935,8 @@
       "archive": "封存",
       "unarchive": "取消封存",
       "deleteTitle": "要刪除 {{name}} 嗎？",
-      "deleteMessage": "其中的待辦事項也會一併刪除。工作階段會保留。"
+      "deleteMessage": "其中的待辦事項也會一併刪除。工作階段會保留。",
+      "createFailed": "無法建立清單"
     },
     "listSettings": {
       "title": "清單設定",
@@ -4010,21 +4004,20 @@
     }
   },
   "agentBriefing": {
-    "title": "晨間簡報",
+    "title": "代理簡報",
     "atLeast": "≥{{value}}",
     "coverageHint": "部分歷史活動可能缺漏。≥ 表示至少此數量；未知不代表為零。",
     "available": "可用的簡報",
     "history": "簡報記錄",
-    "historyHint": "報告保留 30 天，包括已關閉的報告。",
+    "historyHint": "簡報保留 30 天，包括已忽略的簡報。",
     "settings": "簡報設定",
-    "saved": "簡報設定已儲存",
-    "empty": "夜間無活動",
-    "emptyHint": "有活動的夜晚過後，你的雲端與 CLI 程式設計工作階段會顯示在這裡。",
+    "empty": "此簡報時段無活動",
+    "emptyHint": "當排定的簡報有活動時，你的雲端與 CLI 程式設計工作階段會顯示在這裡。",
     "loadError": "無法載入簡報",
-    "sessions": "夜間執行",
+    "sessions": "時段內執行",
     "pullRequests": "已開啟的 PRs",
     "blockers": "新的阻礙",
-    "spend": "夜間花費",
+    "spend": "時段內花費",
     "view": "閱讀簡報",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}，{{time}}",
@@ -4046,13 +4039,13 @@
     "sources": "證據與產出物",
     "timezone": "簡報時區",
     "deviceTimezone": "使用裝置時區",
-    "timezoneHint": "IANA 時區，例如 Europe/Berlin。排程變更將套用於之後的夜晚。",
-    "nightStart": "夜間開始",
-    "morningStart": "夜間結束／早晨開始",
-    "morningEnd": "早晨結束",
-    "timeHint": "早晨結束時，首頁卡片會恢復顯示即時狀態，即使離線也一樣。",
-    "invalidSchedule": "請選擇有效的時區，以及不重疊且非空白的夜間與早晨時段。",
-    "notificationsHint": "每天早晨第一份報告就緒時，會傳送一則一般通知。與付費 AI 摘要無關。",
+    "timezoneHint": "IANA 時區，例如 Europe/Berlin。排程變更將套用於之後的簡報。",
+    "nightStart": "簡報時段開始",
+    "morningStart": "簡報就緒時間",
+    "morningEnd": "簡報可用至",
+    "timeHint": "簡報時段結束時，首頁卡片會恢復顯示即時狀態，即使離線也一樣。",
+    "invalidSchedule": "請選擇有效的時區，以及非空白的簡報時段。",
+    "notificationsHint": "每個排定的簡報會傳送一則一般通知。與付費 AI 摘要無關。",
     "notificationPermission": "請在$t(common.notifications)中啟用裝置通知以接收簡報。",
     "aiOptIn": "付費 AI 摘要",
     "aiHint": "僅適用於此情境，可選擇啟用。經挑選並遮蔽敏感資訊的摘錄與結構化資料會以你的 App 語言傳送至你的模型。費用從此情境的餘額扣除。",
@@ -4070,7 +4063,7 @@
     "contextSettings": "AI 設定 · {{context}}",
     "allContexts": "個人與組織的簡報會分開保存。",
     "create": "建立簡報",
-    "oneOff": "單次",
+    "oneOff": "隨需",
     "createdAt": "建立於 {{time}}",
     "chooseContext": "選擇一個使用情境",
     "period": "簡報期間",
@@ -4085,20 +4078,23 @@
     "invalidPeriod": "請選擇早於結束時間的開始時間。",
     "futurePeriod": "期間結束時間不能在未來。",
     "periodTooLong": "請選擇不超過 31 天的期間。",
-    "invalidLocalTime": "此本地時間在簡報時區中不存在。請選擇其他時間。",
+    "invalidLocalTime": "此本地時間在簡報的時區中不存在。請選擇其他時間。",
     "reviewBriefing": "檢視簡報",
     "reviewAgain": "準備新的檢視",
     "payer": "費用由 {{context}} 支付",
     "emptyPeriod": "此期間內沒有活動。不會產生 AI 摘要，也不會收費。",
     "emptyHistory": "沒有已儲存的簡報",
     "historicalStateHint": "工作階段狀態反映所選期間結束時的狀態，而非目前的即時狀態。",
-    "oneOffHint": "AI 會以你的應用程式語言接收經過挑選且已遮蔽敏感資訊的資料。此單次報告不會變更你的晨間排程或 AI 偏好設定。",
+    "oneOffHint": "AI 會以你的應用程式語言接收經過挑選且已遮蔽敏感資訊的資料。此隨需簡報不會變更你排定的簡報或 AI 偏好設定。",
     "createOffline": "請連線至網路以檢視或建立簡報。離線時，付費請求絕不會加入佇列。",
     "estimateInputTooLarge": "此期間的資料量超出所選模型可處理的範圍。",
     "estimatePermissionUnavailable": "你沒有使用此使用情境餘額的權限。",
+    "createFailed": "無法建立此簡報。",
+    "reviewFailed": "無法檢視此簡報。",
     "estimatePricingUnavailable": "此模型的定價無法取得。",
     "estimateBalanceUnavailable": "餘額不足以產生付費摘要。",
     "estimateModelNotAllowed": "此模型在此不受允許。",
-    "estimateSpendLimitTooLow": "請提高消費保障上限，才能允許此摘要。"
+    "estimateSpendLimitTooLow": "請提高消費保障上限，才能允許此摘要。",
+    "saved": "簡報設定已儲存"
   }
 }

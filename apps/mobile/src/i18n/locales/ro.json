@@ -269,7 +269,6 @@
     "voiceInput": "Introducere vocală",
     "autoExpandThinking": "Extindere automată a raționamentului",
     "autoExpandThinkingSubtitle": "Afișează raționamentul agentului în formă extinsă după finalizarea lui.",
-    "autoExpandThinkingInactiveSubtitle": "Nu are efect cât timp detaliile raționamentului sunt ascunse.",
     "hideThinking": "Ascunde detaliile raționamentului",
     "hideThinkingSubtitle": "Nu afișa raționamentul agentului pe pagina sesiunii.",
     "keepScreenOn": "Menține ecranul aprins pe pagina sesiunii",
@@ -294,7 +293,8 @@
     "condenseToolCallsSubtitle": "Grupează apelurile consecutive ale instrumentelor într-un singur rând pe care îl poți deschide.",
     "toolSummaryTranslation": "Tradu rezumatele instrumentelor",
     "toolSummaryTranslationSubtitle": "Trimite fiecare rezumat de instrument unui model pentru a-l traduce în limba aplicației tale. Originalul este afișat dacă traducerea eșuează.",
-    "toolSummaryTranslationModelUnavailableNotice": "Acest model nu mai este oferit. Atinge $t(common.model) pentru a alege altul."
+    "toolSummaryTranslationModelUnavailableNotice": "Acest model nu mai este oferit. Atinge $t(common.model) pentru a alege altul.",
+    "autoExpandThinkingInactiveSubtitle": "Nu are efect cât timp detaliile raționamentului sunt ascunse."
   },
   "prReview": {
     "pullRequestUnavailable": "PR indisponibil",
@@ -1456,12 +1456,6 @@
       "findingsUnavailable": "Rezultatele nu sunt disponibile deoarece această revizuire a eșuat.",
       "serviceUnavailable": "Nu s-a putut stabili conexiunea cu serviciul de revizuire a codului. Reîncearcă revizuirea când serviciul este disponibil.",
       "reviewFailed": "Revizuirea a eșuat. Te rugăm să încerci din nou.",
-      "cancelReasonSuperseded": "A fost pushat un commit mai nou, deci această revizuire a fost înlocuită.",
-      "cancelReasonIntegrationDisconnected": "{{platform}} este deconectat, deci această revizuire a fost anulată. Reconectează-l, apoi reia revizuirea.",
-      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer a fost dezactivat pentru Bitbucket, deci această revizuire a fost anulată. Activează-l din nou, apoi reia revizuirea.",
-      "cancelReasonBitbucketPullRequestChanged": "Cererea de pull Bitbucket s-a modificat, deci această revizuire a fost înlocuită.",
-      "cancelReasonCancelled": "Această revizuire a fost anulată.",
-      "cancelReasonInterrupted": "Această revizuire a fost întreruptă.",
       "showMore": "Afișează mai mult",
       "created": "Creată",
       "started": "Începută",
@@ -1488,7 +1482,13 @@
       "sessionError": "A apărut o eroare în sesiune: {{error}}.",
       "statusWithValue": "Stare: {{status}}",
       "toolName": "Instrument: {{name}}",
-      "toolNameError": "Instrumentul {{name}} a întâmpinat o eroare."
+      "toolNameError": "Instrumentul {{name}} a întâmpinat o eroare.",
+      "cancelReasonSuperseded": "A fost pushat un commit mai nou, deci această revizuire a fost înlocuită.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} este deconectat, deci această revizuire a fost anulată. Reconectează-l, apoi reia revizuirea.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer a fost dezactivat pentru Bitbucket, deci această revizuire a fost anulată. Activează-l din nou, apoi reia revizuirea.",
+      "cancelReasonBitbucketPullRequestChanged": "Cererea de pull Bitbucket s-a modificat, deci această revizuire a fost înlocuită.",
+      "cancelReasonCancelled": "Această revizuire a fost anulată.",
+      "cancelReasonInterrupted": "Această revizuire a fost întreruptă."
     },
     "reviewMemory": {
       "title": "Memoria revizuirilor",
@@ -2164,8 +2164,8 @@
       "dollar_few": "dolari",
       "costSpoken": "cost de {{cost}}",
       "costSpokenWithTime": "costul este {{cost}}, {{time}}",
-      "spokenJoiner": "și",
-      "pullRequest": "pR {{number}}"
+      "pullRequest": "pR {{number}}",
+      "spokenJoiner": "și"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nu s-a putut deschide GitHub",
@@ -3160,22 +3160,16 @@
     "boundary": {
       "backToProfile": "Înapoi la profil",
       "loadErrorMessage": "Verifică conexiunea și încearcă din nou.",
-
       "chooseAccount": "Selectează un cont",
       "loadErrorTitle": "Nu s-au putut încărca organizațiile tale.",
       "membershipLostNotice": "Nu mai ai acces la această organizație. S-a comutat la {{target}}.",
       "noOrganization": "Nicio organizație",
-
       "noOrganizationDescription": "Acest cont nu face parte dintr-o organizație. Creează sau alătură-te unei organizații pe site pentru a folosi funcții de organizație precum invitațiile pentru membri și alertele de sold scăzut.",
-
       "openWebOrganizations": "Deschide organizațiile pe site",
-
       "organizationUnavailable": "Organizația nu este disponibilă.",
       "selectDescriptionWithOrganizations": "Aparții unei sau mai multor organizații. Alege contul pe care ar trebui să îl folosească acest ecran.",
-
       "selectOrganization": "Selectează o organizație",
       "unavailableDescription": "Această organizație nu mai este disponibilă. Alege una din profilul tău pentru a continua.",
-
       "unavailableSessionsDescription": "Această organizație nu mai este disponibilă. Sesiunile ei nu pot fi încărcate.",
       "accessDeniedDescription": "Nu ai acces la această organizație."
     },
@@ -3198,14 +3192,14 @@
       "truncated": "Sunt disponibile operațiuni mai vechi cu credite."
     },
     "inviteMember": {
-      "alreadyInvited": "Această persoană este deja invitată sau este deja membru.",
       "emailError": "Introdu o adresă de e-mail validă.",
       "emailPlaceholder": "nume@companie.com",
       "permissionDenied": "Nu ai permisiunea de a invita membri.",
       "roleMember": "Rolul atribuit este cel de membru.",
-      "sendError": "Invitația nu a putut fi trimisă.",
       "sendInvite": "Trimite invitația",
-      "title": "Invită un membru"
+      "title": "Invită un membru",
+      "alreadyInvited": "Această persoană este deja invitată sau este deja membru.",
+      "sendError": "Invitația nu a putut fi trimisă."
     },
     "invoices": {
       "downloadA11y": "Descarcă factura {{number}}",
@@ -3274,8 +3268,8 @@
       "inviteCreated": "Invitație creată",
       "pendingInvitations": "Invitații în așteptare",
       "resendInvite": "Retrimite invitația",
-      "resendInviteError": "Invitația nu a putut fi retrimisă.",
-      "shareInviteLink": "Partajează linkul de invitație"
+      "shareInviteLink": "Partajează linkul de invitație",
+      "resendInviteError": "Invitația nu a putut fi retrimisă."
     },
     "usageStats": {
       "inputTokens": "Tokenuri de intrare",
@@ -3421,11 +3415,11 @@
   },
   "transcriptionModel": {
     "title": "Model de transcriere",
-    "choose": "Alege un model",
     "noneChosen": "Niciunul selectat",
     "emptyTitle": "Nu există modele de transcriere",
     "emptyDescription": "Kilo Gateway nu oferă modele de transcriere în acest moment.",
-    "loadFailed": "Nu s-au putut încărca modelele de transcriere."
+    "loadFailed": "Nu s-au putut încărca modelele de transcriere.",
+    "choose": "Alege un model"
   },
   "voiceLanguage": {
     "title": "Limba dictării",
@@ -3447,7 +3441,6 @@
   },
   "modelChat": {
     "offlineFailure": "Acest model necesită o conexiune la internet. Conectează-te și încearcă din nou sau comută la un model de pe acest dispozitiv.",
-    "creditsRequired": "Nu ai suficiente credite pentru a trimite acest mesaj. Adaugă credite și încearcă din nou.",
     "empty": {
       "title": "Începe un chat",
       "description": "Trimite un mesaj pentru a vorbi cu un model."
@@ -3717,7 +3710,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "Acest model acceptă efort de raționament"
-    }
+    },
+    "creditsRequired": "Nu ai suficiente credite pentru a trimite acest mesaj. Adaugă credite și încearcă din nou."
   },
   "settingsTools": {
     "confirmTitle": "Confirmi această modificare?"
@@ -3755,10 +3749,10 @@
     "noSpend": "Încă nu s-a înregistrat nicio cheltuială",
     "spend24h": "Cheltuieli din ultimele 24 de ore",
     "multiplierError": "Introdu un multiplicator de 1 sau mai mare",
-    "multiplierMaxError": "Introdu un multiplicator de {{max}} sau mai mic",
-    "thresholdMaxError": "Introdu o sumă de {{max}} sau mai puțin.",
     "permissionDenied": "Nu ai permisiunea de a gestiona alertele de cheltuieli.",
-    "pushOffByCategory": "Oprit în Notificări"
+    "pushOffByCategory": "Oprit în Notificări",
+    "multiplierMaxError": "Introdu un multiplicator de {{max}} sau mai mic",
+    "thresholdMaxError": "Introdu o sumă de {{max}} sau mai puțin."
   },
   "profiles": {
     "title": "Profiluri",
@@ -3822,7 +3816,6 @@
     },
     "variablesEmpty": "Încă nu există variabile",
     "variablesSaveFailed": "Variabila nu a putut fi salvată",
-    "variablesDeleteFailed": "Variabila nu a putut fi ștearsă",
     "commandsTitle": "Configurați comenzi",
     "addCommand": "Adăugați comanda",
     "commandLabel": "Comanda",
@@ -3833,7 +3826,6 @@
     "moveDown": "Deplasați-vă în jos",
     "moveCommandUp": "Mută comanda {{position}} în sus",
     "moveCommandDown": "Mută comanda {{position}} în jos",
-    "deleteCommand": "Șterge comanda {{position}}",
     "skillsTitle": "Abilități",
     "addSkill": "Adăugați abilitate",
     "skillNameLabel": "Numele aptitudinii",
@@ -3955,7 +3947,9 @@
       "pinFailed": "Nu s-a putut fixa repo",
       "unboundToast": "Repo nelegat",
       "unbindFailed": "Nu s-a putut dezlega repo"
-    }
+    },
+    "variablesDeleteFailed": "Variabila nu a putut fi ștearsă",
+    "deleteCommand": "Șterge comanda {{position}}"
   },
   "credits": {
     "title": "Cumpără credite",
@@ -3982,7 +3976,6 @@
       "newList": "Listă nouă",
       "empty": "Încă nu există liste",
       "couldNotLoad": "Nu s-au putut încărca listele",
-      "createFailed": "Nu s-a putut crea lista",
       "noRepository": "Niciun depozit",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} deschise",
@@ -3994,7 +3987,8 @@
       "archive": "Arhivează",
       "unarchive": "Scoate din arhivă",
       "deleteTitle": "Ștergi {{name}}?",
-      "deleteMessage": "Sarcinile ei se șterg și ele. Sesiunile rămân."
+      "deleteMessage": "Sarcinile ei se șterg și ele. Sesiunile rămân.",
+      "createFailed": "Nu s-a putut crea lista"
     },
     "listSettings": {
       "title": "Setările listei",
@@ -4064,21 +4058,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Rezumatul de dimineață",
+    "title": "Rezumatul agentului",
     "atLeast": "≥{{value}}",
     "coverageHint": "Este posibil să lipsească o parte din activitatea anterioară. ≥ înseamnă cel puțin această valoare; necunoscut nu înseamnă zero.",
     "available": "Rezumate disponibile",
     "history": "Istoricul rezumatelor",
-    "historyHint": "Rapoartele sunt păstrate 30 de zile, inclusiv cele închise.",
+    "historyHint": "Rezumatele sunt păstrate 30 de zile, inclusiv cele ignorate.",
     "settings": "Setări rezumat",
-    "saved": "Setări rezumat salvate",
-    "empty": "Nicio activitate peste noapte",
-    "emptyHint": "Sesiunile tale de programare din cloud și CLI vor apărea aici după o noapte activă.",
+    "empty": "Nicio activitate în acest interval de rezumat",
+    "emptyHint": "Sesiunile tale de programare din cloud și CLI apar aici când un rezumat programat are activitate.",
     "loadError": "Rezumatele nu au putut fi încărcate",
-    "sessions": "Active peste noapte",
+    "sessions": "Active în interval",
     "pullRequests": "PRs deschise",
     "blockers": "Blocaje noi",
-    "spend": "Cheltuieli peste noapte",
+    "spend": "Cheltuieli în interval",
     "view": "Citește rezumatul",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -4100,13 +4093,13 @@
     "sources": "Dovezi și artefacte",
     "timezone": "Fusul orar al rezumatului",
     "deviceTimezone": "Folosește fusul orar al dispozitivului",
-    "timezoneHint": "Fus orar IANA, de exemplu Europe/Berlin. Modificările programului se aplică nopților viitoare.",
-    "nightStart": "Începutul nopții",
-    "morningStart": "Sfârșitul nopții / începutul dimineții",
-    "morningEnd": "Sfârșitul dimineții",
-    "timeHint": "Cardul de pe ecranul principal revine la starea live când se termină dimineața, chiar și offline.",
-    "invalidSchedule": "Alege un fus orar valid și perioade de noapte și dimineață nesuprapuse și nevide.",
-    "notificationsHint": "O notificare generică pe dimineață, când primul raport este gata. Independent de rezumatele AI plătite.",
+    "timezoneHint": "Fus orar IANA, de exemplu Europe/Berlin. Modificările programului se aplică rezumatelor viitoare.",
+    "nightStart": "Începutul intervalului de rezumat",
+    "morningStart": "Rezumat gata la",
+    "morningEnd": "Rezumat disponibil până la",
+    "timeHint": "Cardul de pe ecranul principal revine la starea live când se încheie intervalul de rezumat, chiar și offline.",
+    "invalidSchedule": "Alege un fus orar valid și un interval de rezumat nevid.",
+    "notificationsHint": "O notificare generică pentru fiecare rezumat programat. Independent de rezumatele AI plătite.",
     "notificationPermission": "Activează notificările dispozitivului în $t(common.notifications) pentru a primi rezumatul.",
     "aiOptIn": "Rezumate AI plătite",
     "aiHint": "Opțional, doar pentru acest context. Fragmente selectate și anonimizate și date structurate sunt trimise modelului tău, în limba aplicației. Taxele folosesc soldul acestui context.",
@@ -4124,7 +4117,7 @@
     "contextSettings": "Setări AI · {{context}}",
     "allContexts": "Rezumatele personale și cele ale organizației rămân separate.",
     "create": "Creează un rezumat",
-    "oneOff": "Unic",
+    "oneOff": "La cerere",
     "createdAt": "Creat {{time}}",
     "chooseContext": "Alege un singur context",
     "period": "Perioada rezumatului",
@@ -4146,13 +4139,16 @@
     "emptyPeriod": "Nu s-a găsit activitate în această perioadă. Nu se generează un rezumat AI și nu se aplică taxe.",
     "emptyHistory": "Niciun rezumat salvat",
     "historicalStateHint": "Starea sesiunii reflectă sfârșitul perioadei selectate, nu starea actuală în timp real.",
-    "oneOffHint": "AI primește datele justificative selectate, cu informațiile sensibile eliminate, în limba aplicației tale. Acest raport unic nu îți modifică programul de dimineață sau preferințele AI.",
+    "oneOffHint": "AI primește datele justificative selectate, cu informațiile sensibile eliminate, în limba aplicației tale. Acest rezumat la cerere nu îți modifică rezumatul programat sau preferințele AI.",
     "createOffline": "Conectează-te la internet pentru a verifica sau a crea un rezumat. Solicitările contra cost nu sunt niciodată puse în așteptare fără conexiune la internet.",
     "estimateInputTooLarge": "Această perioadă conține prea multe date justificative pentru modelul selectat.",
     "estimatePermissionUnavailable": "Nu ai permisiunea de a folosi soldul acestui context.",
+    "createFailed": "Nu s-a putut crea acest rezumat.",
+    "reviewFailed": "Nu s-a putut verifica acest rezumat.",
     "estimatePricingUnavailable": "Prețurile pentru acest model nu sunt disponibile.",
     "estimateBalanceUnavailable": "Sold insuficient pentru un rezumat plătit.",
     "estimateModelNotAllowed": "Acest model nu este permis aici.",
-    "estimateSpendLimitTooLow": "Creșteți limita de cheltuieli pentru a permite acest rezumat."
+    "estimateSpendLimitTooLow": "Creșteți limita de cheltuieli pentru a permite acest rezumat.",
+    "saved": "Setări rezumat salvate"
   }
 }

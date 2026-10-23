@@ -269,7 +269,6 @@
     "voiceInput": "Input suara",
     "autoExpandThinking": "Tampilkan pemikiran secara otomatis",
     "autoExpandThinkingSubtitle": "Buka bagian pemikiran agen secara otomatis setelah agen selesai berpikir.",
-    "autoExpandThinkingInactiveSubtitle": "Tidak berpengaruh saat detail pemikiran disembunyikan.",
     "hideThinking": "Sembunyikan detail pemikiran",
     "hideThinkingSubtitle": "Jangan tampilkan pemikiran agen di halaman sesi.",
     "keepScreenOn": "Biarkan layar tetap menyala di halaman sesi",
@@ -294,7 +293,8 @@
     "condenseToolCallsSubtitle": "Kelompokkan panggilan alat yang berurutan ke dalam satu baris yang dapat Anda buka.",
     "toolSummaryTranslation": "Terjemahkan ringkasan alat",
     "toolSummaryTranslationSubtitle": "Kirim setiap ringkasan alat ke model untuk diterjemahkan ke bahasa aplikasi Anda. Teks asli ditampilkan jika terjemahan gagal.",
-    "toolSummaryTranslationModelUnavailableNotice": "Model ini tidak lagi ditawarkan. Ketuk $t(common.model) untuk memilih yang lain."
+    "toolSummaryTranslationModelUnavailableNotice": "Model ini tidak lagi ditawarkan. Ketuk $t(common.model) untuk memilih yang lain.",
+    "autoExpandThinkingInactiveSubtitle": "Tidak berpengaruh saat detail pemikiran disembunyikan."
   },
   "notifications": {
     "liveActivities": "Aktivitas langsung",
@@ -916,6 +916,8 @@
       "invalidUrl": "Masukkan URL PR yang valid.",
       "pullRequestUrl": "URL PR",
       "start": "Mulai tinjauan",
+      "starting": "Memulai tinjauan…",
+      "title": "Tinjauan manual",
       "startNotFound": "Tidak dapat membaca {{requestNoun}} tersebut dari {{provider}}. Periksa URL dan pastikan repositori dapat diakses.",
       "startRateLimited": "{{provider}} sedang membatasi permintaan saat ini. Coba lagi dalam beberapa menit.",
       "startNotAllowed": "Anda tidak memiliki akses untuk memulai tinjauan atas {{requestNoun}} tersebut. Periksa izin Anda, dan paket organisasi Anda.",
@@ -923,9 +925,7 @@
       "startAlreadyRunning": "Tinjauan atas {{requestNoun}} tersebut sudah berjalan.",
       "startRejected": "{{requestNoun}} tersebut tidak dapat ditinjau. Pastikan statusnya terbuka, bukan draf, dan URL-nya benar.",
       "startProviderUnavailable": "Tidak dapat menghubungi {{provider}} untuk membaca {{requestNoun}} tersebut. Coba lagi.",
-      "startFailed": "Tidak dapat memulai tinjauan. Periksa koneksi Anda dan coba lagi.",
-      "starting": "Memulai tinjauan…",
-      "title": "Tinjauan manual"
+      "startFailed": "Tidak dapat memulai tinjauan. Periksa koneksi Anda dan coba lagi."
     },
     "notConnectedReadOnly": "{{platform}} tidak terhubung. Hanya pemilik organisasi dan admin yang dapat menghubungkannya.",
     "gitlab": {
@@ -963,12 +963,6 @@
       "findingsUnavailable": "Hasil tidak tersedia karena tinjauan ini gagal.",
       "serviceUnavailable": "Tidak dapat terhubung ke layanan tinjauan kode. Coba tinjauan lagi saat layanan tersedia.",
       "reviewFailed": "Tinjauan gagal. Silakan coba lagi.",
-      "cancelReasonSuperseded": "Commit yang lebih baru telah di-push, sehingga tinjauan ini digantikan.",
-      "cancelReasonIntegrationDisconnected": "{{platform}} terputus, sehingga tinjauan ini dibatalkan. Hubungkan kembali, lalu jalankan tinjauan lagi.",
-      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer dimatikan untuk Bitbucket, sehingga tinjauan ini dibatalkan. Aktifkan kembali, lalu jalankan tinjauan lagi.",
-      "cancelReasonBitbucketPullRequestChanged": "Pull request Bitbucket berubah, sehingga tinjauan ini digantikan.",
-      "cancelReasonCancelled": "Tinjauan ini dibatalkan.",
-      "cancelReasonInterrupted": "Tinjauan ini terputus.",
       "retryMessage": "Ini akan menjalankan ulang tinjauan kode.",
       "retryReview": "Coba tinjauan lagi",
       "retryNeedsSettings": "Peninjau kode nonaktif atau pengaturannya perlu diperhatikan. Perbaiki pengaturan, lalu coba tinjauan ini lagi.",
@@ -994,7 +988,13 @@
       "sessionError": "Kesalahan sesi: {{error}}.",
       "statusWithValue": "Status saat ini: {{status}}",
       "toolName": "Alat: {{name}}",
-      "toolNameError": "Terjadi kesalahan pada alat {{name}}."
+      "toolNameError": "Terjadi kesalahan pada alat {{name}}.",
+      "cancelReasonSuperseded": "Commit yang lebih baru telah di-push, sehingga tinjauan ini digantikan.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} terputus, sehingga tinjauan ini dibatalkan. Hubungkan kembali, lalu jalankan tinjauan lagi.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer dimatikan untuk Bitbucket, sehingga tinjauan ini dibatalkan. Aktifkan kembali, lalu jalankan tinjauan lagi.",
+      "cancelReasonBitbucketPullRequestChanged": "Pull request Bitbucket berubah, sehingga tinjauan ini digantikan.",
+      "cancelReasonCancelled": "Tinjauan ini dibatalkan.",
+      "cancelReasonInterrupted": "Tinjauan ini terputus."
     },
     "reviewList": {
       "configureProvider": "Atur penyedia",
@@ -1610,8 +1610,8 @@
       "dollar_other": "dolar",
       "costSpoken": "biaya {{cost}}",
       "costSpokenWithTime": "biaya {{cost}}, {{time}}",
-      "spokenJoiner": ", dan",
-      "pullRequest": "pR {{number}}"
+      "pullRequest": "pR {{number}}",
+      "spokenJoiner": ", dan"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Kami tidak dapat memulai penyiapan aplikasi GitHub. Coba lagi.",
@@ -3109,22 +3109,16 @@
     "boundary": {
       "backToProfile": "Kembali ke profil",
       "loadErrorMessage": "Periksa koneksimu dan coba lagi.",
-
       "chooseAccount": "Pilih akun",
       "loadErrorTitle": "Tidak dapat memuat daftar organisasimu.",
       "membershipLostNotice": "Kamu tidak lagi memiliki akses ke organisasi ini. Beralih ke {{target}}.",
       "noOrganization": "Tidak ada organisasi",
-
       "noOrganizationDescription": "Akun ini bukan bagian dari organisasi. Buat atau gabung ke organisasi di web untuk menggunakan fitur organisasi seperti undangan anggota dan peringatan saldo rendah.",
-
       "openWebOrganizations": "Buka organisasi di web",
-
       "organizationUnavailable": "Organisasi tidak tersedia.",
       "selectDescriptionWithOrganizations": "Kamu termasuk dalam satu atau beberapa organisasi. Pilih akun yang harus digunakan layar ini.",
-
       "selectOrganization": "Pilih organisasi",
       "unavailableDescription": "Organisasi ini tidak lagi tersedia. Pilih organisasi lain dari profilmu untuk melanjutkan.",
-
       "unavailableSessionsDescription": "Organisasi ini tidak lagi tersedia. Sesi untuk organisasi ini tidak dapat dimuat.",
       "accessDeniedDescription": "Kamu tidak memiliki akses ke organisasi ini."
     },
@@ -3154,14 +3148,14 @@
       "renameTitle": "Ganti nama organisasi"
     },
     "inviteMember": {
-      "alreadyInvited": "Alamat email tersebut sudah diundang atau sudah menjadi anggota.",
       "emailError": "Masukkan alamat email yang valid.",
       "emailPlaceholder": "nama@perusahaan.com",
       "permissionDenied": "Kamu tidak memiliki izin untuk mengundang anggota.",
       "roleMember": "Peran yang diberikan adalah anggota.",
-      "sendError": "Tidak dapat mengirim undangan.",
       "sendInvite": "Kirim undangan",
-      "title": "Undang anggota"
+      "title": "Undang anggota",
+      "alreadyInvited": "Alamat email tersebut sudah diundang atau sudah menjadi anggota.",
+      "sendError": "Tidak dapat mengirim undangan."
     },
     "invoices": {
       "downloadA11y": "Unduh faktur {{number}}",
@@ -3230,8 +3224,8 @@
       "inviteCreated": "Undangan dibuat",
       "pendingInvitations": "Undangan yang belum diterima",
       "resendInvite": "Kirim ulang undangan",
-      "resendInviteError": "Tidak dapat mengirim ulang undangan.",
-      "shareInviteLink": "Bagikan tautan undangan"
+      "shareInviteLink": "Bagikan tautan undangan",
+      "resendInviteError": "Tidak dapat mengirim ulang undangan."
     },
     "usageStats": {
       "inputTokens": "Token masukan",
@@ -3377,11 +3371,11 @@
   },
   "transcriptionModel": {
     "title": "Model transkripsi",
-    "choose": "Pilih model",
     "noneChosen": "Belum ada yang dipilih",
     "emptyTitle": "Tidak ada model transkripsi",
     "emptyDescription": "Kilo Gateway tidak menawarkan model transkripsi saat ini.",
-    "loadFailed": "Tidak dapat memuat model transkripsi."
+    "loadFailed": "Tidak dapat memuat model transkripsi.",
+    "choose": "Pilih model"
   },
   "voiceLanguage": {
     "title": "Bahasa masukan suara",
@@ -3403,7 +3397,6 @@
   },
   "modelChat": {
     "offlineFailure": "Model ini memerlukan koneksi internet. Sambungkan dan coba lagi, atau beralih ke model di perangkat ini.",
-    "creditsRequired": "Kredit tidak cukup untuk mengirim pesan ini. Tambah kredit dan coba lagi.",
     "empty": {
       "title": "Mulai obrolan",
       "description": "Kirim pesan untuk berbicara dengan model."
@@ -3672,7 +3665,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "Model ini mendukung tingkat penalaran"
-    }
+    },
+    "creditsRequired": "Kredit tidak cukup untuk mengirim pesan ini. Tambah kredit dan coba lagi."
   },
   "settingsTools": {
     "confirmTitle": "Konfirmasi perubahan ini?"
@@ -3710,10 +3704,10 @@
     "noSpend": "Belum ada pengeluaran yang tercatat",
     "spend24h": "Pengeluaran dalam 24 jam terakhir",
     "multiplierError": "Masukkan pengali 1 atau lebih",
-    "multiplierMaxError": "Masukkan pengali {{max}} atau kurang",
-    "thresholdMaxError": "Masukkan jumlah {{max}} atau kurang.",
     "permissionDenied": "Kamu tidak memiliki izin untuk mengelola peringatan pengeluaran.",
-    "pushOffByCategory": "Nonaktif di Notifikasi"
+    "pushOffByCategory": "Nonaktif di Notifikasi",
+    "multiplierMaxError": "Masukkan pengali {{max}} atau kurang",
+    "thresholdMaxError": "Masukkan jumlah {{max}} atau kurang."
   },
   "profiles": {
     "title": "Profil",
@@ -3772,7 +3766,6 @@
     },
     "variablesEmpty": "Belum ada variabel",
     "variablesSaveFailed": "Tidak dapat menyimpan variabel",
-    "variablesDeleteFailed": "Tidak dapat menghapus variabel",
     "commandsTitle": "Perintah pengaturan",
     "addCommand": "Tambahkan perintah",
     "commandLabel": "Memerintah",
@@ -3783,7 +3776,6 @@
     "moveDown": "Pindah ke bawah",
     "moveCommandUp": "Pindahkan perintah {{position}} ke atas",
     "moveCommandDown": "Pindahkan perintah {{position}} ke bawah",
-    "deleteCommand": "Hapus perintah {{position}}",
     "skillsTitle": "Keterampilan",
     "addSkill": "Tambahkan keterampilan",
     "skillNameLabel": "Nama keterampilan",
@@ -3905,7 +3897,9 @@
       "pinFailed": "Tidak dapat menyematkan repo",
       "unboundToast": "Repo tidak terikat",
       "unbindFailed": "Tidak dapat melepaskan ikatan repo"
-    }
+    },
+    "variablesDeleteFailed": "Tidak dapat menghapus variabel",
+    "deleteCommand": "Hapus perintah {{position}}"
   },
   "credits": {
     "title": "Beli kredit",
@@ -3932,7 +3926,6 @@
       "newList": "Daftar baru",
       "empty": "Belum ada daftar",
       "couldNotLoad": "Tidak dapat memuat daftar",
-      "createFailed": "Tidak dapat membuat daftar",
       "noRepository": "Tanpa repositori",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} terbuka",
@@ -3942,7 +3935,8 @@
       "archive": "Arsipkan",
       "unarchive": "Batalkan arsip",
       "deleteTitle": "Hapus {{name}}?",
-      "deleteMessage": "Tugas di dalamnya juga dihapus. Sesi tetap tersimpan."
+      "deleteMessage": "Tugas di dalamnya juga dihapus. Sesi tetap tersimpan.",
+      "createFailed": "Tidak dapat membuat daftar"
     },
     "listSettings": {
       "title": "Pengaturan daftar",
@@ -4010,21 +4004,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Ringkasan pagi",
+    "title": "Ringkasan agen",
     "atLeast": "≥{{value}}",
     "coverageHint": "Sebagian aktivitas sebelumnya mungkin tidak tercatat. ≥ berarti setidaknya sebanyak ini; tidak diketahui bukan berarti nol.",
     "available": "Ringkasan tersedia",
     "history": "Riwayat ringkasan",
-    "historyHint": "Laporan disimpan selama 30 hari, termasuk laporan yang ditutup.",
+    "historyHint": "Ringkasan disimpan selama 30 hari, termasuk yang diabaikan.",
     "settings": "Pengaturan ringkasan",
-    "saved": "Pengaturan ringkasan tersimpan.",
-    "empty": "Tidak ada aktivitas semalam",
-    "emptyHint": "Sesi coding cloud dan CLI Anda akan muncul di sini setelah malam yang aktif.",
+    "empty": "Tidak ada aktivitas dalam periode ringkasan ini",
+    "emptyHint": "Sesi coding cloud dan CLI Anda muncul di sini saat ringkasan terjadwal memiliki aktivitas.",
     "loadError": "Tidak dapat memuat ringkasan",
-    "sessions": "Aktif semalam",
+    "sessions": "Aktif dalam periode",
     "pullRequests": "PRs dibuka",
     "blockers": "Hambatan baru",
-    "spend": "Biaya semalam",
+    "spend": "Biaya dalam periode",
     "view": "Baca ringkasan",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -4046,13 +4039,13 @@
     "sources": "Bukti dan artefak",
     "timezone": "Zona waktu ringkasan",
     "deviceTimezone": "Gunakan zona waktu perangkat",
-    "timezoneHint": "Zona waktu IANA, misalnya Europe/Berlin. Perubahan jadwal berlaku untuk malam berikutnya.",
-    "nightStart": "Malam dimulai",
-    "morningStart": "Malam berakhir / pagi dimulai",
-    "morningEnd": "Pagi berakhir",
-    "timeHint": "Kartu Beranda kembali menampilkan status langsung saat pagi berakhir, bahkan saat offline.",
-    "invalidSchedule": "Pilih zona waktu yang valid serta periode malam dan pagi yang tidak kosong dan tidak tumpang tindih.",
-    "notificationsHint": "Satu notifikasi umum setiap pagi saat laporan pertama Anda siap. Terpisah dari ringkasan AI berbayar.",
+    "timezoneHint": "Zona waktu IANA, misalnya Europe/Berlin. Perubahan jadwal berlaku untuk ringkasan berikutnya.",
+    "nightStart": "Periode ringkasan dimulai",
+    "morningStart": "Ringkasan siap pada",
+    "morningEnd": "Ringkasan tersedia hingga",
+    "timeHint": "Kartu Beranda kembali menampilkan status langsung saat periode ringkasan berakhir, bahkan saat offline.",
+    "invalidSchedule": "Pilih zona waktu yang valid dan periode ringkasan yang tidak kosong.",
+    "notificationsHint": "Satu notifikasi umum per ringkasan terjadwal. Terpisah dari ringkasan AI berbayar.",
     "notificationPermission": "Aktifkan notifikasi perangkat di $t(common.notifications) untuk menerima ringkasan Anda.",
     "aiOptIn": "Ringkasan AI berbayar",
     "aiHint": "Opsional hanya untuk konteks ini. Kutipan terpilih yang telah disensor dan fakta terstruktur dikirim ke model Anda dalam bahasa aplikasi Anda. Biaya menggunakan saldo konteks ini.",
@@ -4070,7 +4063,7 @@
     "contextSettings": "Pengaturan AI · {{context}}",
     "allContexts": "Ringkasan pribadi dan organisasi tetap terpisah.",
     "create": "Buat ringkasan",
-    "oneOff": "Sekali saja",
+    "oneOff": "Sesuai permintaan",
     "createdAt": "Dibuat {{time}}",
     "chooseContext": "Pilih satu konteks",
     "period": "Periode ringkasan",
@@ -4092,13 +4085,16 @@
     "emptyPeriod": "Tidak ada aktivitas dalam periode ini. Tidak ada ringkasan AI atau biaya yang dikenakan.",
     "emptyHistory": "Belum ada ringkasan tersimpan",
     "historicalStateHint": "Status sesi mencerminkan kondisi pada akhir periode yang dipilih, bukan status langsung saat ini.",
-    "oneOffHint": "AI menerima bukti terpilih yang informasi sensitifnya telah disamarkan, dalam bahasa aplikasi Anda. Laporan sekali pakai ini tidak mengubah jadwal pagi atau preferensi AI Anda.",
+    "oneOffHint": "AI menerima bukti terpilih yang informasi sensitifnya telah disamarkan, dalam bahasa aplikasi Anda. Ringkasan sesuai permintaan ini tidak mengubah ringkasan terjadwal atau preferensi AI Anda.",
     "createOffline": "Hubungkan ke internet untuk meninjau atau membuat ringkasan. Permintaan berbayar tidak pernah dimasukkan ke antrean saat luring.",
     "estimateInputTooLarge": "Periode ini berisi terlalu banyak bukti untuk model yang dipilih.",
     "estimatePermissionUnavailable": "Anda tidak memiliki izin untuk menggunakan saldo konteks ini.",
+    "createFailed": "Tidak dapat membuat ringkasan ini.",
+    "reviewFailed": "Tidak dapat meninjau ringkasan ini.",
     "estimatePricingUnavailable": "Harga untuk model ini tidak tersedia.",
     "estimateBalanceUnavailable": "Saldo tidak cukup untuk ringkasan berbayar.",
     "estimateModelNotAllowed": "Model ini tidak diizinkan di sini.",
-    "estimateSpendLimitTooLow": "Naikkan batas pengeluaran untuk mengizinkan ringkasan ini."
+    "estimateSpendLimitTooLow": "Naikkan batas pengeluaran untuk mengizinkan ringkasan ini.",
+    "saved": "Pengaturan ringkasan tersimpan."
   }
 }

@@ -37,7 +37,7 @@ function SettingsOverviewSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('securityAgent.dashboard.settings')} />
+      <ScreenHeader className="px-6" title={t('securityAgent.dashboard.settings')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-16 w-full rounded-lg" />
         <Skeleton className="h-12 w-full rounded-lg" />
@@ -232,6 +232,7 @@ export function SettingsOverviewScreen({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        className="px-6"
         title={t('securityAgent.dashboard.settings')}
         // One size-11 (44dp) audit icon; declaring it keeps the one-line
         // title's readable minimum when the row is narrow.

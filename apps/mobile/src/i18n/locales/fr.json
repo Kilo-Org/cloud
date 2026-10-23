@@ -887,6 +887,8 @@
       "invalidUrl": "Saisissez une URL de demande de fusion valide.",
       "pullRequestUrl": "URL de la demande de fusion",
       "start": "Démarrer la revue",
+      "starting": "Démarrage de la revue…",
+      "title": "Revue manuelle",
       "startNotFound": "Impossible de lire cette {{requestNoun}} sur {{provider}}. Vérifiez l'URL et l'accessibilité du dépôt.",
       "startRateLimited": "{{provider}} limite les requêtes pour le moment. Réessayez dans quelques minutes.",
       "startNotAllowed": "Vous n'avez pas les droits nécessaires pour lancer une revue de cette {{requestNoun}}. Vérifiez vos autorisations, ainsi que le plan de votre organisation.",
@@ -894,9 +896,7 @@
       "startAlreadyRunning": "Une revue pour cette {{requestNoun}} est déjà en cours.",
       "startRejected": "Cette {{requestNoun}} ne peut pas être passée en revue. Assurez-vous qu'elle est ouverte, qu'elle n'est pas un brouillon et que l'URL est correcte.",
       "startProviderUnavailable": "Impossible de contacter {{provider}} pour lire cette {{requestNoun}}. Réessayez.",
-      "startFailed": "Impossible de démarrer la revue. Vérifiez votre connexion et réessayez.",
-      "starting": "Démarrage de la revue…",
-      "title": "Revue manuelle"
+      "startFailed": "Impossible de démarrer la revue. Vérifiez votre connexion et réessayez."
     },
     "notConnectedReadOnly": "{{platform}} n'est pas connecté. Seuls les propriétaires et les administrateurs de l'organisation peuvent établir la connexion.",
     "gitlab": {
@@ -934,12 +934,6 @@
       "findingsUnavailable": "Les résultats ne sont pas disponibles, car cette revue a échoué.",
       "serviceUnavailable": "Impossible de joindre le service de revue de code. Relancez la revue lorsque le service sera disponible.",
       "reviewFailed": "La revue a échoué. Veuillez réessayer.",
-      "cancelReasonSuperseded": "Un nouveau commit a été poussé, cette revue a donc été remplacée.",
-      "cancelReasonIntegrationDisconnected": "{{platform}} est déconnecté, cette revue a donc été annulée. Reconnectez-le, puis relancez la revue.",
-      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer a été désactivé pour Bitbucket, cette revue a donc été annulée. Réactivez-le, puis relancez la revue.",
-      "cancelReasonBitbucketPullRequestChanged": "La pull request Bitbucket a changé, cette revue a donc été remplacée.",
-      "cancelReasonCancelled": "Cette revue a été annulée.",
-      "cancelReasonInterrupted": "Cette revue a été interrompue.",
       "retryMessage": "Cela relancera la revue de code.",
       "retryReview": "Relancer la revue",
       "retryNeedsSettings": "L'agent de revue de code est désactivé ou ses paramètres nécessitent votre attention. Corrigez les paramètres, puis relancez cette revue.",
@@ -965,7 +959,13 @@
       "sessionError": "La session a rencontré une erreur : {{error}}.",
       "statusWithValue": "État : {{status}}",
       "toolName": "Outil : {{name}}",
-      "toolNameError": "L'outil {{name}} a rencontré une erreur."
+      "toolNameError": "L'outil {{name}} a rencontré une erreur.",
+      "cancelReasonSuperseded": "Un nouveau commit a été poussé, cette revue a donc été remplacée.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} est déconnecté, cette revue a donc été annulée. Reconnectez-le, puis relancez la revue.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer a été désactivé pour Bitbucket, cette revue a donc été annulée. Réactivez-le, puis relancez la revue.",
+      "cancelReasonBitbucketPullRequestChanged": "La pull request Bitbucket a changé, cette revue a donc été remplacée.",
+      "cancelReasonCancelled": "Cette revue a été annulée.",
+      "cancelReasonInterrupted": "Cette revue a été interrompue."
     },
     "reviewList": {
       "configureProvider": "Configurer le fournisseur",
@@ -2266,7 +2266,6 @@
     "voiceInput": "Saisie vocale",
     "autoExpandThinking": "Développer automatiquement la réflexion",
     "autoExpandThinkingSubtitle": "Afficher le détail de la réflexion de l'agent une fois celle-ci terminée.",
-    "autoExpandThinkingInactiveSubtitle": "Aucun effet tant que les détails de la réflexion sont masqués.",
     "hideThinking": "Masquer les détails de la réflexion",
     "hideThinkingSubtitle": "Ne pas afficher la réflexion de l'agent sur la page de la session.",
     "keepScreenOn": "Garder l'écran allumé sur la page de la session",
@@ -2291,7 +2290,8 @@
     "condenseToolCallsSubtitle": "Regroupez les appels d’outils consécutifs dans une ligne que vous pouvez ouvrir.",
     "toolSummaryTranslation": "Traduire les résumés d'outils",
     "toolSummaryTranslationSubtitle": "Envoyez chaque résumé d'outil à un modèle pour le traduire dans la langue de votre application. L'original s'affiche si la traduction échoue.",
-    "toolSummaryTranslationModelUnavailableNotice": "Ce modèle n'est plus proposé. Touchez $t(common.model) pour en choisir un autre."
+    "toolSummaryTranslationModelUnavailableNotice": "Ce modèle n'est plus proposé. Touchez $t(common.model) pour en choisir un autre.",
+    "autoExpandThinkingInactiveSubtitle": "Aucun effet tant que les détails de la réflexion sont masqués."
   },
   "addCredits": {
     "cta": "Ajouter des crédits",
@@ -2576,8 +2576,8 @@
       "dollar_many": "dollars américains",
       "costSpoken": "coût de {{cost}}",
       "costSpokenWithTime": "coût : {{cost}}, {{time}}",
-      "spokenJoiner": "et",
-      "pullRequest": "demande de fusion {{number}}"
+      "pullRequest": "demande de fusion {{number}}",
+      "spokenJoiner": "et"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Impossible de lancer la configuration de l'application GitHub. Réessayez.",
@@ -3152,22 +3152,16 @@
     "boundary": {
       "backToProfile": "Retour au profil",
       "loadErrorMessage": "Vérifiez votre connexion et réessayez.",
-
       "chooseAccount": "Choisir un compte",
       "loadErrorTitle": "Impossible de charger vos organisations.",
       "membershipLostNotice": "Vous n'avez plus accès à cette organisation. Basculé vers {{target}}.",
       "noOrganization": "Aucune organisation",
-
       "noOrganizationDescription": "Ce compte ne fait partie d'aucune organisation. Créez une organisation ou rejoignez-en une sur le site web pour utiliser les fonctionnalités d'organisation telles que les invitations de membres et les alertes de solde faible.",
-
       "openWebOrganizations": "Ouvrir les organisations sur le site web",
-
       "organizationUnavailable": "L'organisation n'est pas disponible.",
       "selectDescriptionWithOrganizations": "Vous appartenez à une ou plusieurs organisations. Choisissez le compte que cet écran doit utiliser.",
-
       "selectOrganization": "Choix d'une organisation",
       "unavailableDescription": "Cette organisation n'est plus disponible. Choisissez-en une dans votre profil pour continuer.",
-
       "unavailableSessionsDescription": "Cette organisation n'est plus disponible. Ses sessions ne peuvent pas être chargées.",
       "accessDeniedDescription": "Vous n'avez pas accès à cette organisation."
     },
@@ -3197,14 +3191,14 @@
       "renameTitle": "Renommer l'organisation"
     },
     "inviteMember": {
-      "alreadyInvited": "Cette adresse a déjà reçu une invitation ou appartient déjà à un membre.",
       "emailError": "Saisissez une adresse e-mail valide.",
       "emailPlaceholder": "nom@entreprise.com",
       "permissionDenied": "Vous n'avez pas l'autorisation d'inviter des membres.",
       "roleMember": "Le rôle attribué est celui de membre.",
-      "sendError": "Impossible d'envoyer l'invitation.",
       "sendInvite": "Envoyer l'invitation",
-      "title": "Inviter un membre"
+      "title": "Inviter un membre",
+      "alreadyInvited": "Cette adresse a déjà reçu une invitation ou appartient déjà à un membre.",
+      "sendError": "Impossible d'envoyer l'invitation."
     },
     "invoices": {
       "downloadA11y": "Télécharger la facture {{number}}",
@@ -3273,8 +3267,8 @@
       "inviteCreated": "Invitation créée",
       "pendingInvitations": "Invitations en attente",
       "resendInvite": "Renvoyer l'invitation",
-      "resendInviteError": "Impossible de renvoyer l'invitation.",
-      "shareInviteLink": "Partager le lien d'invitation"
+      "shareInviteLink": "Partager le lien d'invitation",
+      "resendInviteError": "Impossible de renvoyer l'invitation."
     },
     "usageStats": {
       "inputTokens": "Jetons d'entrée",
@@ -3421,11 +3415,11 @@
   },
   "transcriptionModel": {
     "title": "Modèle de transcription",
-    "choose": "Choisissez un modèle",
     "noneChosen": "Aucun choisi",
     "emptyTitle": "Aucun modèle de transcription",
     "emptyDescription": "Kilo Gateway ne propose actuellement aucun modèle de transcription.",
-    "loadFailed": "Impossible de charger les modèles de transcription."
+    "loadFailed": "Impossible de charger les modèles de transcription.",
+    "choose": "Choisissez un modèle"
   },
   "voiceLanguage": {
     "title": "Langue de la saisie vocale",
@@ -3447,7 +3441,6 @@
   },
   "modelChat": {
     "offlineFailure": "Ce modèle nécessite une connexion Internet. Connectez-vous et réessayez, ou passez à un modèle sur cet appareil.",
-    "creditsRequired": "Pas assez de crédits pour envoyer ce message. Ajoutez des crédits et réessayez.",
     "empty": {
       "title": "Démarrer une discussion",
       "description": "Envoyez un message pour discuter avec un modèle."
@@ -3717,7 +3710,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "Ce modèle prend en charge le niveau de réflexion"
-    }
+    },
+    "creditsRequired": "Pas assez de crédits pour envoyer ce message. Ajoutez des crédits et réessayez."
   },
   "settingsTools": {
     "confirmTitle": "Confirmer cette modification ?"
@@ -3755,10 +3749,10 @@
     "noSpend": "Aucune dépense enregistrée pour l'instant",
     "spend24h": "Dépenses des dernières 24 heures",
     "multiplierError": "Saisissez un multiplicateur de 1 ou plus",
-    "multiplierMaxError": "Saisissez un multiplicateur de {{max}} ou moins",
-    "thresholdMaxError": "Saisissez un montant de {{max}} ou moins.",
     "permissionDenied": "Vous n'avez pas l'autorisation de gérer les alertes de dépenses.",
-    "pushOffByCategory": "Désactivé dans les notifications"
+    "pushOffByCategory": "Désactivé dans les notifications",
+    "multiplierMaxError": "Saisissez un multiplicateur de {{max}} ou moins",
+    "thresholdMaxError": "Saisissez un montant de {{max}} ou moins."
   },
   "profiles": {
     "title": "Profils",
@@ -3822,7 +3816,6 @@
     },
     "variablesEmpty": "Aucune variable pour l'instant",
     "variablesSaveFailed": "Impossible d'enregistrer la variable",
-    "variablesDeleteFailed": "Impossible de supprimer la variable",
     "commandsTitle": "Commandes de configuration",
     "addCommand": "Ajouter une commande",
     "commandLabel": "Commande",
@@ -3833,7 +3826,6 @@
     "moveDown": "Descendre",
     "moveCommandUp": "Déplacer la commande {{position}} vers le haut",
     "moveCommandDown": "Déplacer la commande {{position}} vers le bas",
-    "deleteCommand": "Supprimer la commande {{position}}",
     "skillsTitle": "Compétences",
     "addSkill": "Ajouter une compétence",
     "skillNameLabel": "Nom de la compétence",
@@ -3955,7 +3947,9 @@
       "pinFailed": "Impossible d'épingler le dépôt",
       "unboundToast": "Dépôt non lié",
       "unbindFailed": "Impossible de dissocier le dépôt"
-    }
+    },
+    "variablesDeleteFailed": "Impossible de supprimer la variable",
+    "deleteCommand": "Supprimer la commande {{position}}"
   },
   "credits": {
     "title": "Acheter des crédits",
@@ -3982,7 +3976,6 @@
       "newList": "Nouvelle liste",
       "empty": "Aucune liste pour l'instant",
       "couldNotLoad": "Impossible de charger les listes",
-      "createFailed": "Impossible de créer la liste",
       "noRepository": "Aucun dépôt",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} à faire",
@@ -3994,7 +3987,8 @@
       "archive": "Archiver",
       "unarchive": "Désarchiver",
       "deleteTitle": "Supprimer {{name}} ?",
-      "deleteMessage": "Ses tâches sont aussi supprimées. Ses sessions sont conservées."
+      "deleteMessage": "Ses tâches sont aussi supprimées. Ses sessions sont conservées.",
+      "createFailed": "Impossible de créer la liste"
     },
     "listSettings": {
       "title": "Paramètres de la liste",
@@ -4064,21 +4058,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Briefing du matin",
+    "title": "Briefing de l’agent",
     "atLeast": "≥{{value}}",
     "coverageHint": "Une partie de l’activité passée peut manquer. ≥ signifie au moins cette valeur ; inconnu ne signifie pas zéro.",
     "available": "Briefings disponibles",
     "history": "Historique des briefings",
-    "historyHint": "Les rapports sont conservés 30 jours, y compris ceux ignorés.",
+    "historyHint": "Les briefings sont conservés 30 jours, y compris ceux ignorés.",
     "settings": "Paramètres du briefing",
-    "saved": "Paramètres du briefing enregistrés",
-    "empty": "Aucune activité cette nuit",
-    "emptyHint": "Vos sessions de code cloud et CLI apparaîtront ici après une nuit active.",
+    "empty": "Aucune activité dans cette fenêtre de briefing",
+    "emptyHint": "Vos sessions de code cloud et CLI apparaissent ici lorsqu’un briefing planifié a de l’activité.",
     "loadError": "Impossible de charger les briefings",
-    "sessions": "Actives cette nuit",
+    "sessions": "Actives dans la fenêtre",
     "pullRequests": "PRs ouvertes",
     "blockers": "Nouveaux blocages",
-    "spend": "Dépenses de la nuit",
+    "spend": "Dépenses dans la fenêtre",
     "view": "Lire le briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -4100,13 +4093,13 @@
     "sources": "Preuves et artefacts",
     "timezone": "Fuseau horaire du briefing",
     "deviceTimezone": "Utiliser le fuseau de l’appareil",
-    "timezoneHint": "Fuseau horaire IANA, par exemple Europe/Berlin. Les changements s’appliquent aux nuits suivantes.",
-    "nightStart": "Début de la nuit",
-    "morningStart": "Fin de la nuit / début du matin",
-    "morningEnd": "Fin du matin",
-    "timeHint": "La carte d’accueil rétablit le statut en direct à la fin du matin, même hors ligne.",
-    "invalidSchedule": "Choisissez un fuseau horaire valide et des périodes de nuit et de matin non vides et sans chevauchement.",
-    "notificationsHint": "Une notification générique par matin quand votre premier rapport est prêt. Indépendante des résumés AI payants.",
+    "timezoneHint": "Fuseau horaire IANA, par exemple Europe/Berlin. Les changements de programmation s’appliquent aux briefings à venir.",
+    "nightStart": "Début de la fenêtre de briefing",
+    "morningStart": "Briefing prêt à",
+    "morningEnd": "Briefing disponible jusqu’à",
+    "timeHint": "La carte d’accueil rétablit le statut en direct à la fin de la fenêtre de briefing, même hors ligne.",
+    "invalidSchedule": "Choisissez un fuseau horaire valide et une fenêtre de briefing non vide.",
+    "notificationsHint": "Une notification générique par briefing planifié. Indépendante des résumés AI payants.",
     "notificationPermission": "Activez les notifications de l’appareil dans $t(common.notifications) pour recevoir votre briefing.",
     "aiOptIn": "Résumés AI payants",
     "aiHint": "Facultatif, pour ce contexte uniquement. Des extraits choisis et masqués ainsi que des faits structurés sont envoyés à votre modèle dans la langue de l’app. Les frais sont débités du solde de ce contexte.",
@@ -4128,7 +4121,7 @@
     "contextSettings": "Paramètres AI · {{context}}",
     "allContexts": "Les briefings personnels et d’organisation restent séparés.",
     "create": "Créer un briefing",
-    "oneOff": "Ponctuel",
+    "oneOff": "À la demande",
     "createdAt": "Créé {{time}}",
     "chooseContext": "Choisissez un contexte",
     "period": "Période du briefing",
@@ -4150,9 +4143,12 @@
     "emptyPeriod": "Aucune activité trouvée sur cette période. Aucun résumé AI ni aucuns frais.",
     "emptyHistory": "Aucun briefing enregistré",
     "historicalStateHint": "L’état de la session correspond à la fin de la période sélectionnée, et non à son état actuel en temps réel.",
-    "oneOffHint": "L’AI reçoit les éléments sélectionnés, dont les données sensibles ont été masquées, dans la langue de votre application. Ce rapport ponctuel ne modifie ni votre programmation matinale ni vos préférences AI.",
+    "oneOffHint": "L’AI reçoit les éléments sélectionnés, dont les données sensibles ont été masquées, dans la langue de votre application. Ce briefing à la demande ne modifie ni votre briefing planifié ni vos préférences AI.",
     "createOffline": "Connectez-vous à Internet pour examiner ou créer un briefing. Les demandes payantes ne sont jamais mises en attente hors ligne.",
     "estimateInputTooLarge": "Cette période contient trop d’éléments pour le modèle sélectionné.",
-    "estimatePermissionUnavailable": "Vous n’avez pas l’autorisation d’utiliser le solde de ce contexte."
+    "estimatePermissionUnavailable": "Vous n’avez pas l’autorisation d’utiliser le solde de ce contexte.",
+    "createFailed": "Impossible de créer ce briefing.",
+    "reviewFailed": "Impossible d'examiner ce briefing.",
+    "saved": "Paramètres du briefing enregistrés"
   }
 }

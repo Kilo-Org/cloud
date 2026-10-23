@@ -112,8 +112,12 @@ export function SharePayloadPreview({ payload, validation }: Readonly<SharePaylo
     }
     return (
       <View className="gap-0.5 px-4 pb-2">
-        {validation.failedCopies.map(name => (
-          <Text key={name} numberOfLines={1} className="text-xs text-muted-foreground">
+        {validation.failedCopies.map((name, index) => (
+          <Text
+            key={`${name}-${index}`}
+            numberOfLines={1}
+            className="text-xs text-muted-foreground"
+          >
             {name}
           </Text>
         ))}

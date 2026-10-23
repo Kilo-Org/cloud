@@ -7,7 +7,7 @@ vi.mock('../dos/SessionIngestDO', () => ({
 import { getSessionIngestDO } from '../dos/SessionIngestDO';
 import type { Env } from '../env';
 import { INGEST_CHUNK_MAX_BYTES } from '../util/ingest-limits';
-import { measuredStagingBody, stageAndEnqueue, toRpcBody } from './stage-and-enqueue';
+import { stageAndEnqueue, toRpcBody } from './stage-and-enqueue';
 
 const encoder = new TextEncoder();
 
@@ -82,68 +82,31 @@ describe('stageAndEnqueue', () => {
   });
 });
 
-describe('measuredStagingBody', () => {
-  it('reads a declared body within one RPC payload into bytes', async () => {
-    const payload = encoder.encode('{"data":[]}');
-    const staged = await measuredStagingBody(
-      new Blob([payload]).stream(),
-      payload.byteLength,
-      INGEST_CHUNK_MAX_BYTES * 2,
-      () => {
-        throw new Error('must not trip');
-      }
-    );
+describe('bounded stageAndEnqueue', () => {
+  it('sends a bounded stream to the storage method without buffering it', async () => {
+    const stageBoundedR2Object = vi.fn(async () => true);
+    vi.mocked(getSessionIngestDO).mockReturnValue({ stageBoundedR2Object } as never);
+    const body = new Blob([encoder.encode('streamed')]).stream();
 
-    expect(staged).toBeInstanceOf(Uint8Array);
-    expect(new TextDecoder().decode(staged as Uint8Array)).toBe('{"data":[]}');
-  });
+    await expect(stageAndEnqueue(makeEnv(), params, body, undefined, 1024)).resolves.toBe(true);
 
-  it('leaves a larger declared body as its own request stream', async () => {
-    const body = new Blob([new Uint8Array(8)]).stream();
-    const staged = await measuredStagingBody(
+    expect(stageBoundedR2Object).toHaveBeenCalledWith(
+      { kiloUserId: params.kiloUserId, sessionId: params.sessionId, key: params.r2Key },
       body,
-      INGEST_CHUNK_MAX_BYTES + 1,
-      INGEST_CHUNK_MAX_BYTES * 2,
-      () => {
-        throw new Error('must not trip');
-      }
+      1024
     );
-
-    expect(staged).toBe(body);
   });
 
-  it('rejects a declared length above the ceiling without reading the body', async () => {
-    const read = vi.fn(async () => ({ done: true, value: undefined }));
-    let tripped = false;
+  it('converts the storage byte-limit result into a staging overflow', async () => {
+    const stageBoundedR2Object = vi.fn(async () => 'too_large' as const);
+    const send = vi.fn(async () => undefined);
+    const env = { ...makeEnv(), INGEST_QUEUE: { send } } as unknown as Env;
+    vi.mocked(getSessionIngestDO).mockReturnValue({ stageBoundedR2Object } as never);
+    const body = new Blob([encoder.encode('streamed')]).stream();
 
-    await expect(
-      measuredStagingBody({ getReader: () => ({ read }) } as never, 2048, 1024, () => {
-        tripped = true;
-      })
-    ).rejects.toThrow('staging byte budget');
-    expect(tripped).toBe(true);
-    expect(read).not.toHaveBeenCalled();
-  });
-
-  it('reads an unmeasured body into bytes under the ceiling', async () => {
-    const payload = encoder.encode('{"data":[1]}');
-    const staged = await measuredStagingBody(new Blob([payload]).stream(), undefined, 1024, () => {
-      throw new Error('must not trip');
-    });
-
-    expect(staged).toBeInstanceOf(Uint8Array);
-    expect(new TextDecoder().decode(staged as Uint8Array)).toBe('{"data":[1]}');
-  });
-
-  it('rejects an unmeasured body that overruns the ceiling', async () => {
-    const payload = new Uint8Array(64).fill(1);
-    let tripped = false;
-
-    await expect(
-      measuredStagingBody(new Blob([payload, payload, payload]).stream(), undefined, 100, () => {
-        tripped = true;
-      })
-    ).rejects.toThrow('staging byte budget');
-    expect(tripped).toBe(true);
+    await expect(stageAndEnqueue(env, params, body, undefined, 4)).rejects.toThrow(
+      'Ingest body exceeds the staging byte budget'
+    );
+    expect(send).not.toHaveBeenCalled();
   });
 });

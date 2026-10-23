@@ -21,7 +21,6 @@ import { readBoundedStream } from './bounded-stream-reader';
 import { parseDirectIngestConfig, selectDirectIngestUser } from './direct-ingest-rollout';
 import { applyMetadataChanges } from './metadata';
 import {
-  measuredStagingBody,
   StageAndEnqueueError,
   stageAndEnqueue,
   StagingOverflowError,
@@ -71,8 +70,7 @@ type LegacyOptions = {
   reason: LegacyReason;
   metrics: DirectIngestMetrics;
   startedAt: number;
-  /** Set by the counting stream when a staged body outgrows the ceiling. */
-  overflowed?: () => boolean;
+  stagingMaxBytes?: number;
 };
 
 type DirectIngestResult =
@@ -101,7 +99,8 @@ export async function handleDirectIngestRequest(
   // rollout config is unreadable, the same ceiling applies. Declared lengths
   // above the direct cap still stage, measured against this ceiling, and the
   // queue consumer splits them into chunks. The ceiling matches the queue's
-  // per-item cap; large bodies cross as a counting stream with flat memory.
+  // per-item cap; bodies are counted during bounded multipart storage, keeping
+  // memory flat as the request is staged.
   const stagingCeiling = STAGING_MAX_BYTES;
   const stagingBudget = configResult.ok ? configResult.config.maxBytes : stagingCeiling;
 
@@ -118,47 +117,34 @@ export async function handleDirectIngestRequest(
     return { status: 413, body: { success: false, error: 'payload_too_large' } };
   };
 
-  let stagingOverflowed = false;
   const legacyWithBoundedBody = async (
     reason: LegacyReason,
     metrics: DirectIngestMetrics
   ): Promise<DirectIngestResponse> => {
-    // A declared length within the RPC byte budget crosses by value; larger
-    // bodies cross as a fixed-length stream and unmeasured bodies are read
-    // under the ceiling, so every staged body is measured before storage.
-    stagingOverflowed = false;
     const declared = parseContentLength(request.contentLength);
+    if (typeof declared === 'number' && declared > stagingCeiling) {
+      return tooLarge(declared);
+    }
     if (typeof declared === 'number' && declared !== 0 && declared <= INGEST_CHUNK_MAX_BYTES) {
       const buffered = await readBoundedStream(request.body, declared);
-      if (!buffered.ok) {
-        return tooLarge(declared);
-      }
-      return legacy(request, r2Key, buffered.bytes, { reason, metrics, startedAt });
-    }
-    try {
-      const stagedBody = await measuredStagingBody(
-        request.body,
-        typeof declared === 'number' ? declared : undefined,
-        stagingCeiling,
-        () => {
-          stagingOverflowed = true;
-        }
-      );
-      const response = await legacy(request, r2Key, stagedBody, {
+      if (!buffered.ok) return tooLarge(declared);
+      return legacy(request, r2Key, buffered.bytes, {
         reason,
         metrics,
         startedAt,
-        overflowed: () => stagingOverflowed,
+        stagingMaxBytes: stagingCeiling,
       });
-      // A tripped flag overrides the staging outcome: the body, not the
-      // storage write, was the problem.
-      if (stagingOverflowed) {
-        return tooLarge(null);
-      }
-      return response;
+    }
+    try {
+      return await legacy(request, r2Key, request.body, {
+        reason,
+        metrics,
+        startedAt,
+        stagingMaxBytes: stagingCeiling,
+      });
     } catch (error) {
-      if (stagingOverflowed || error instanceof StagingOverflowError) {
-        return tooLarge(null);
+      if (error instanceof StagingOverflowError) {
+        return tooLarge(typeof declared === 'number' ? declared : null);
       }
       throw error;
     }
@@ -196,6 +182,7 @@ export async function handleDirectIngestRequest(
       reason: 'empty_body',
       metrics: { declaredBytes: 0, actualBytes: null, items: null },
       startedAt,
+      stagingMaxBytes: stagingCeiling,
     });
   }
   if (contentLength > stagingCeiling) {
@@ -385,7 +372,7 @@ async function legacy(
         legacyQueueParams(request, r2Key),
         body,
         declaredBodyBytes(request),
-        options.overflowed
+        options.stagingMaxBytes
       ))
     ) {
       return { status: 404, body: { success: false, error: 'session_not_found' } };

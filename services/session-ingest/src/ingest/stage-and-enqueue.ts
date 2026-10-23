@@ -2,6 +2,7 @@ import type { Env } from '../env';
 import { withDORetry } from '@kilocode/worker-utils';
 import { getSessionIngestDO } from '../dos/SessionIngestDO';
 import type { IngestQueueMessage } from '../queue-consumer';
+import type { SessionIngestDO } from '../dos/SessionIngestDO';
 import { INGEST_CHUNK_MAX_BYTES } from '../util/ingest-limits';
 import { readBoundedStream } from './bounded-stream-reader';
 
@@ -12,10 +13,11 @@ type StageAndEnqueueParams = Omit<IngestQueueMessage, 'r2Key' | 'ingestedAt'> & 
 
 export type StageAndEnqueueFailureStage = 'staging_upload' | 'queue_send';
 
+type StagingStub = Pick<SessionIngestDO, 'stageR2Object' | 'stageBoundedR2Object'>;
+
 /**
- * The staged body outgrew the measured staging budget: the counting reader
- * stopped it before any storage write. The caller answers with the shared
- * too-large response instead of retrying or staging.
+ * The staged body exceeded its byte budget. The Durable Object aborts its
+ * multipart upload and returns this result before any object is published.
  */
 export class StagingOverflowError extends Error {
   constructor() {
@@ -56,69 +58,38 @@ export async function toRpcBody(
   return result.bytes;
 }
 
-/**
- * Prepares a staging body so every staged request is measured before storage.
- * A body whose declared length is within the ceiling but larger than one RPC
- * payload crosses untouched: request framing bounds it to that declared length,
- * which is the form storage accepts for a streamed body. Every other body is
- * read into memory under the ceiling, so an unmeasured or overrunning body is
- * rejected by count instead of by declaration. `onOverflow` runs when the limit
- * trips and `StagingOverflowError` is raised before anything is written.
- */
-export async function measuredStagingBody(
-  body: ReadableStream<Uint8Array>,
-  declaredBytes: number | undefined,
-  maxBytes: number,
-  onOverflow: () => void
-): Promise<Uint8Array | ReadableStream<Uint8Array>> {
-  if (typeof declaredBytes === 'number') {
-    if (declaredBytes > maxBytes) {
-      onOverflow();
-      throw new StagingOverflowError();
-    }
-    if (declaredBytes > INGEST_CHUNK_MAX_BYTES) return body;
-  }
-  const result = await readBoundedStream(body, maxBytes);
-  if (!result.ok) {
-    onOverflow();
-    throw new StagingOverflowError();
-  }
-  return result.bytes;
-}
-
 export async function stageAndEnqueue(
   env: Env,
   params: StageAndEnqueueParams,
   body: ReadableStream<Uint8Array> | Uint8Array,
   declaredBytes?: number,
-  overflowed?: () => boolean
+  maxBytes?: number
 ): Promise<boolean> {
   try {
     const rpcBody = await toRpcBody(body, declaredBytes);
-    const accepted = await withDORetry(
+    const result = await withDORetry<StagingStub, boolean | 'too_large'>(
       () => getSessionIngestDO(env, params),
       stub =>
-        stub.stageR2Object(
-          { kiloUserId: params.kiloUserId, sessionId: params.sessionId, key: params.r2Key },
-          rpcBody
-        ),
-      'SessionIngestDO.stageR2Object',
+        maxBytes === undefined
+          ? stub.stageR2Object(
+              { kiloUserId: params.kiloUserId, sessionId: params.sessionId, key: params.r2Key },
+              rpcBody
+            )
+          : stub.stageBoundedR2Object(
+              { kiloUserId: params.kiloUserId, sessionId: params.sessionId, key: params.r2Key },
+              rpcBody,
+              maxBytes
+            ),
+      maxBytes === undefined
+        ? 'SessionIngestDO.stageR2Object'
+        : 'SessionIngestDO.stageBoundedR2Object',
       { maxAttempts: 1, baseBackoffMs: 0, maxBackoffMs: 0 }
     );
-    if (!accepted) return false;
+    if (result === 'too_large') throw new StagingOverflowError();
+    if (!result) return false;
   } catch (error) {
-    // The counting stream surfaces its overflow directly: it is the request's
-    // own measure, not a staging failure, so the caller answers with the shared
-    // too-large response instead of a staging error.
     if (error instanceof StagingOverflowError) throw error;
     throw new StageAndEnqueueError('staging_upload', error);
-  }
-  // The storage boundary may swallow a stream error and report success for a
-  // body that was never fully written. A tripped overflow flag means no queue
-  // message may reference the key.
-  if (overflowed?.()) {
-    await env.SESSION_INGEST_R2.delete(params.r2Key).catch(() => {});
-    throw new StagingOverflowError();
   }
 
   const message: IngestQueueMessage = {

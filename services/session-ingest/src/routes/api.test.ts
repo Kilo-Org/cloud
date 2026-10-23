@@ -140,6 +140,42 @@ function r2StagingStub(env: Parameters<typeof getSessionIngestDO>[0]) {
       await env.SESSION_INGEST_R2.put(params.key, body);
       return true;
     },
+    stageBoundedR2Object: async (
+      params: { key: string },
+      body: ReadableStream<Uint8Array> | Uint8Array,
+      maxBytes: number
+    ) => {
+      if (body instanceof Uint8Array) {
+        if (body.byteLength > maxBytes) return 'too_large' as const;
+        await env.SESSION_INGEST_R2.put(params.key, body);
+        return true;
+      }
+      const reader = body.getReader();
+      const chunks: Uint8Array[] = [];
+      let total = 0;
+      try {
+        while (true) {
+          const result = await reader.read();
+          if (result.done) break;
+          total += result.value.byteLength;
+          if (total > maxBytes) {
+            await reader.cancel();
+            return 'too_large' as const;
+          }
+          chunks.push(result.value);
+        }
+      } finally {
+        reader.releaseLock();
+      }
+      const bytes = new Uint8Array(total);
+      let offset = 0;
+      for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      await env.SESSION_INGEST_R2.put(params.key, bytes);
+      return true;
+    },
   };
 }
 

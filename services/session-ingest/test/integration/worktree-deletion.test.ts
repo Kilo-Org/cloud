@@ -250,6 +250,34 @@ describe('worktree session cleanup in Workers', () => {
     await expect(stub.isDeleted()).resolves.toBe(true);
   });
 
+  it('streams bounded bodies through multipart storage and rejects over-limit bodies', async () => {
+    const { kiloUserId, sessionId, stub } = identity();
+    const key = `ingest/${kiloUserId}/${sessionId}/bounded`;
+    const bodySize = 5 * 1024 * 1024 + 17;
+    const acceptedBody = new Uint8Array(bodySize);
+
+    await expect(
+      stub.stageBoundedR2Object(
+        { kiloUserId, sessionId, key },
+        new Blob([acceptedBody]).stream(),
+        bodySize
+      )
+    ).resolves.toBe(true);
+    expect((await env.SESSION_INGEST_R2.head(key))?.size).toBe(bodySize);
+
+    const overflowKey = `${key}-overflow`;
+    const overflowBody = new Uint8Array(bodySize + 1);
+    await expect(
+      stub.stageBoundedR2Object(
+        { kiloUserId, sessionId, key: overflowKey },
+        new Blob([overflowBody]).stream(),
+        bodySize
+      )
+    ).resolves.toBe('too_large');
+    expect(await env.SESSION_INGEST_R2.head(overflowKey)).toBeNull();
+    await stub.clearForWorktree(kiloUserId, sessionId);
+  });
+
   it('does not let late public bootstrap overwrite an adopted child scope, including after invalidation', async () => {
     const owner = `oauth/cache-scope:${crypto.randomUUID()}`;
     const cache = env.SESSION_ACCESS_CACHE_DO.getByName(owner);

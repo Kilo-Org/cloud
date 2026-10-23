@@ -13,6 +13,5 @@ export const INGEST_CHUNK_MAX_ITEMS = 128;
 
 // Largest body the request handler accepts before staging. Matches the queue
 // consumer's per-item cap, so a payload the consumer is built to chunk is never
-// rejected at the edge; large bodies cross as a counting stream, so memory
-// stays flat regardless of size.
+// rejected at the edge; bodies are counted during multipart storage with flat memory.
 export const STAGING_MAX_BYTES = MAX_SINGLE_ITEM_BYTES;

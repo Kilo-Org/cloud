@@ -1281,7 +1281,7 @@
       "reasonNoBandwidth": "暂无资源处理",
       "reasonNotUsed": "未使用存在漏洞的代码",
       "reasonTolerableRisk": "风险可以接受",
-      "title": "忽略问题"
+      "title": "忽略安全问题"
     },
     "findingDetail": {
       "tabAnalysis": "分析",

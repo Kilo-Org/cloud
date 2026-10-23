@@ -3,6 +3,9 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 import { I18nManager, Text as RNText, type Role } from 'react-native';
 
+import { useSystemFontScale } from '@/lib/font-scale/system-font-scale';
+import { resolveFontScaleCap } from '@/lib/font-scale/text-scale-cap';
+
 import {
   containsJoinedScript,
   hasRtlScript,
@@ -82,6 +85,7 @@ function Text({
     asChild?: boolean;
   }) {
   const textClass = React.useContext(TextClassContext);
+  const fontScaleCap = resolveFontScaleCap(useSystemFontScale(), props.maxFontSizeMultiplier);
   const Component = asChild ? Slot.Text : RNText;
   const isRTL = I18nManager.isRTL;
   // The font family is the script's, not the interface's: JetBrains Mono ships
@@ -106,6 +110,7 @@ function Text({
       role={variant ? ROLE[variant as keyof typeof ROLE] : undefined}
       aria-level={variant ? ARIA_LEVEL[variant as keyof typeof ARIA_LEVEL] : undefined}
       {...props}
+      maxFontSizeMultiplier={fontScaleCap ?? props.maxFontSizeMultiplier}
       style={
         isRTL || resetsTracking
           ? [

@@ -1,5 +1,7 @@
 import { type StyleProp, TextInput, type TextInputProps, type TextStyle } from 'react-native';
 
+import { useSystemFontScale } from '@/lib/font-scale/system-font-scale';
+import { resolveFontScaleCap } from '@/lib/font-scale/text-scale-cap';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { withRtlInputAlignment } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
@@ -42,9 +44,11 @@ function Input({
   textAlignVertical,
   lineBreakModeIOS,
   numberOfLines,
+  maxFontSizeMultiplier,
   ...props
 }: Readonly<TextInputProps & React.RefAttributes<TextInput>>) {
   const colors = useThemeColors();
+  const fontScaleCap = resolveFontScaleCap(useSystemFontScale(), maxFontSizeMultiplier);
   // Fold the explicit `textAlign` prop into the style after the caller's own
   // style, so it lands after the RTL default too: RN flattens `style` after the
   // prop, so the prop alone would lose to `withRtlInputAlignment` in RTL.
@@ -55,6 +59,7 @@ function Input({
   return (
     <TextInput
       {...props}
+      maxFontSizeMultiplier={fontScaleCap ?? maxFontSizeMultiplier}
       multiline={multiline}
       numberOfLines={multiline ? numberOfLines : 1}
       className={cn(

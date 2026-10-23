@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { AppUnlockAnnouncements } from '@/components/app-unlock-screen';
 import { OfflineBanner } from '@/components/offline-banner';
 import { AppUnlockProvider } from '@/lib/app-unlock-context';
+import { SystemFontScaleProvider } from '@/lib/font-scale/system-font-scale';
 import { AuthProvider } from '@/lib/auth/auth-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { OrganizationProvider } from '@/lib/organization-context';
@@ -55,30 +56,31 @@ export function AppRootProviders({
     // bg-background: the gesture root is the first opaque surface above the
     // window — a rotation relayout gap behind any screen must show the app's
     // own background, never the platform window default (foreign white/black).
-    <GestureHandlerRootView className="flex-1 bg-background">
-      {/* `react-native-keyboard-controller` measures the keyboard once in native
+    <SystemFontScaleProvider>
+      <GestureHandlerRootView className="flex-1 bg-background">
+        {/* `react-native-keyboard-controller` measures the keyboard once in native
           code and hands the height and the insets to every consumer. The app's
           keyboard surfaces — `KeyboardAvoidingView` on the session, history,
           quick-chat and detail screens — read it from here instead of listening
           to React Native's keyboard events. */}
-      <KeyboardProvider>
-        <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
-          <QueryClientProvider client={queryClient}>
-            <QueryClientNativeLifecycle />
-            <AuthProvider>
-              <AppUnlockProvider
-                promptMessage={languageReady ? t('preferences.biometricUnlock') : null}
-              >
-                {languageReady ? <AppUnlockAnnouncements /> : null}
-                <OrganizationProvider>
-                  <ToolSummaryTranslationRuntimeBootstrap />
-                  {/* Use one renderer so iOS and Android both honor the app palette and safe area. */}
-                  <ActionSheetProvider useCustomActionSheet>
-                    <>
-                      {children}
-                      <OfflineBanner />
-                      <PortalHost />
-                      {/*
+        <KeyboardProvider>
+          <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
+            <QueryClientProvider client={queryClient}>
+              <QueryClientNativeLifecycle />
+              <AuthProvider>
+                <AppUnlockProvider
+                  promptMessage={languageReady ? t('preferences.biometricUnlock') : null}
+                >
+                  {languageReady ? <AppUnlockAnnouncements /> : null}
+                  <OrganizationProvider>
+                    <ToolSummaryTranslationRuntimeBootstrap />
+                    {/* Use one renderer so iOS and Android both honor the app palette and safe area. */}
+                    <ActionSheetProvider useCustomActionSheet>
+                      <>
+                        {children}
+                        <OfflineBanner />
+                        <PortalHost />
+                        {/*
                         Toaster mounts last so it renders above PortalHost overlays (sheets/dropdowns
                         built on @rn-primitives/portal) — last sibling wins for overlapping overlays.
                         Ground truth (D2): prior on-device testing (2026-07-07, iOS) found sonner-native
@@ -90,16 +92,17 @@ export function AppRootProviders({
                         lifetime (spot check e4-end). Bottom is the transient-message convention:
                         a toast may cover the composer briefly, never the navigation.
                       */}
-                      <AppToaster />
-                    </>
-                  </ActionSheetProvider>
-                </OrganizationProvider>
-              </AppUnlockProvider>
-            </AuthProvider>
-          </QueryClientProvider>
-        </TRPCProvider>
-      </KeyboardProvider>
-    </GestureHandlerRootView>
+                        <AppToaster />
+                      </>
+                    </ActionSheetProvider>
+                  </OrganizationProvider>
+                </AppUnlockProvider>
+              </AuthProvider>
+            </QueryClientProvider>
+          </TRPCProvider>
+        </KeyboardProvider>
+      </GestureHandlerRootView>
+    </SystemFontScaleProvider>
   );
 }
 

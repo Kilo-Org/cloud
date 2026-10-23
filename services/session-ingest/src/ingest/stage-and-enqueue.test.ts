@@ -100,9 +100,14 @@ describe('measuredStagingBody', () => {
 
   it('leaves a larger declared body as its own request stream', async () => {
     const body = new Blob([new Uint8Array(8)]).stream();
-    const staged = await measuredStagingBody(body, INGEST_CHUNK_MAX_BYTES + 1, INGEST_CHUNK_MAX_BYTES * 2, () => {
-      throw new Error('must not trip');
-    });
+    const staged = await measuredStagingBody(
+      body,
+      INGEST_CHUNK_MAX_BYTES + 1,
+      INGEST_CHUNK_MAX_BYTES * 2,
+      () => {
+        throw new Error('must not trip');
+      }
+    );
 
     expect(staged).toBe(body);
   });
@@ -122,14 +127,9 @@ describe('measuredStagingBody', () => {
 
   it('reads an unmeasured body into bytes under the ceiling', async () => {
     const payload = encoder.encode('{"data":[1]}');
-    const staged = await measuredStagingBody(
-      new Blob([payload]).stream(),
-      undefined,
-      1024,
-      () => {
-        throw new Error('must not trip');
-      }
-    );
+    const staged = await measuredStagingBody(new Blob([payload]).stream(), undefined, 1024, () => {
+      throw new Error('must not trip');
+    });
 
     expect(staged).toBeInstanceOf(Uint8Array);
     expect(new TextDecoder().decode(staged as Uint8Array)).toBe('{"data":[1]}');

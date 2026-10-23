@@ -141,7 +141,8 @@ export function AgentSessionListContent({
   const errorPullBusy = pullStartedFromHistoryError.current && pullBusy;
   const errorPullFailed = pullStartedFromHistoryError.current && pull.failed;
   const handleRefresh = () => {
-    pullStartedFromHistoryError.current = isError && !hasActiveQuery && !hasFreshHistory;
+    pullStartedFromHistoryError.current =
+      (isError || errorPullFailed) && !hasActiveQuery && !hasFreshHistory;
     pull.startPull();
   };
   const handlePullRetry = () => {

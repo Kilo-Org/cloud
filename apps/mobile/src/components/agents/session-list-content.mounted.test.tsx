@@ -10,7 +10,7 @@ import { AgentSessionListContent } from './session-list-content';
 import { RowsRefreshControl } from './rows-refresh-control';
 import { type SessionListRow } from './session-list-rows';
 import { type StoredSessionRow } from './session-row';
-import { PULL_FEEDBACK_BUDGET_MS } from './use-pull-refresh';
+import { PULL_FEEDBACK_BUDGET_MS, PULL_FEEDBACK_MIN_BEAT_MS } from './use-pull-refresh';
 
 type RowProps = Parameters<typeof StoredSessionRow>[0];
 type CellProps = {
@@ -522,6 +522,63 @@ describe('AgentSessionListContent liveness', () => {
       vi.useRealTimers();
     }
   });
+  it('keeps stale history behind repeated pulls from the preserved error', async () => {
+    const first = Promise.withResolvers<undefined>();
+    const second = Promise.withResolvers<undefined>();
+    const refetch = vi
+      .fn<ContentProps['refetch']>()
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+    vi.useFakeTimers();
+    try {
+      const props = contentProps({
+        isError: true,
+        hasFreshHistory: false,
+        sections: [{ title: 'Today', data: [session('cached')] }],
+        refetch,
+      });
+      const renderer = mount(props);
+      const pull = () =>
+        hosts(renderer, 'CenteredState')[0]?.props.refreshControl as
+          | { props: { onRefresh: () => void } }
+          | undefined;
+      act(() => {
+        pull()?.props.onRefresh();
+        renderer.update(createElement(AgentSessionListContent, { ...props, isError: false }));
+      });
+      await act(async () => {
+        first.reject(new Error('Local refresh failure'));
+        await Promise.resolve();
+      });
+      act(() => {
+        vi.advanceTimersByTime(PULL_FEEDBACK_MIN_BEAT_MS);
+      });
+      expect(hosts(renderer, 'AccessibleStatus').map(node => node.props.message)).toContain(
+        i18n.t('common.couldNotLoadSessions')
+      );
+
+      act(() => {
+        pull()?.props.onRefresh();
+      });
+      expect(hosts(renderer, 'StoredSessionRow')).toHaveLength(0);
+      expect(hosts(renderer, 'Button')[0]?.props.loading).toBe(true);
+      await act(async () => {
+        second.resolve(undefined);
+        await second.promise;
+        renderer.update(
+          createElement(AgentSessionListContent, {
+            ...props,
+            isError: false,
+            hasFreshHistory: true,
+          })
+        );
+      });
+      expect(rows(renderer).map(item => item.id)).toEqual(['cached']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps the true empty-history action during a pull', () => {
     const { promise } = Promise.withResolvers<undefined>();
     const renderer = mount(

@@ -126,8 +126,12 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const showBalanceSkeleton =
     (balanceLoading || balancePending || !hideBalanceLoaded) && !balanceFailed;
   const now = Date.now();
+  // Read the block list defensively: the persisted query cache can restore an
+  // entry written before this field existed, and that payload must leave the
+  // expiring row empty rather than throw out of the Profile render.
   const expiringBlocks =
-    creditData?.creditBlocks.filter(
+    // eslint-disable-next-line typescript/no-unnecessary-condition -- the static type cannot see a restored cache entry from an older payload
+    creditData?.creditBlocks?.filter(
       b => b.expiry_date !== null && parseTimestamp(b.expiry_date).getTime() > now
     ) ?? [];
   const expiringTotal = fromMicrodollars(

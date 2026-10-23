@@ -7,7 +7,7 @@ import {
   authorizeDebugUserAction,
   debugAccessMiddleware,
   debugOperatorFromAccessPayload,
-  debugRoutesEnabled,
+  debugSurfaceMode,
   parseDebugOperatorAllowlist,
 } from './debug.middleware';
 
@@ -102,11 +102,12 @@ function withConfig(config: { owner_user_id: string | null } | null) {
 }
 
 describe('debug surface helpers', () => {
-  it('serves the tree only when the flag is exactly enabled', () => {
-    expect(debugRoutesEnabled({ WASTELAND_DEBUG_ROUTES: 'enabled' })).toBe(true);
-    expect(debugRoutesEnabled({ WASTELAND_DEBUG_ROUTES: 'disabled' })).toBe(false);
-    expect(debugRoutesEnabled({ WASTELAND_DEBUG_ROUTES: 'ENABLED' })).toBe(false);
-    expect(debugRoutesEnabled({})).toBe(false);
+  it('serves the tree only for an explicit opt-in value', () => {
+    expect(debugSurfaceMode({ WASTELAND_DEBUG_ROUTES: 'enabled' })).toBe('deployed');
+    expect(debugSurfaceMode({ WASTELAND_DEBUG_ROUTES: 'local' })).toBe('local');
+    expect(debugSurfaceMode({ WASTELAND_DEBUG_ROUTES: 'disabled' })).toBe('disabled');
+    expect(debugSurfaceMode({ WASTELAND_DEBUG_ROUTES: 'ENABLED' })).toBe('disabled');
+    expect(debugSurfaceMode({})).toBe('disabled');
   });
 
   it('parses a case-insensitive operator allowlist and admits nobody when empty', () => {
@@ -166,11 +167,11 @@ describe('debugAccessMiddleware', () => {
     expect(response.status).toBe(404);
   });
 
-  it('serves local development with the flag and records the local operator', async () => {
+  it('serves local development with the local opt-in and records the local operator', async () => {
     const response = await createApp().request(
       '/debug/probe',
       {},
-      testEnv({ ENVIRONMENT: 'development' }) as never
+      testEnv({ ENVIRONMENT: 'development', WASTELAND_DEBUG_ROUTES: 'local' }) as never
     );
 
     expect(response.status).toBe(200);
@@ -186,6 +187,30 @@ describe('debugAccessMiddleware', () => {
         path: '/debug/probe',
       })
     );
+  });
+
+  it('requires Access in a development environment that only opts in', async () => {
+    cfAccess.validate.mockRejectedValue(new Error('Missing CF Access JWT'));
+    const response = await createApp().request(
+      '/debug/probe',
+      {},
+      testEnv({ ENVIRONMENT: 'development', WASTELAND_DEBUG_ROUTES: 'enabled' }) as never
+    );
+
+    expect(response.status).toBe(401);
+    expect(cfAccess.validate).toHaveBeenCalled();
+  });
+
+  it('requires Access when the local opt-in is deployed outside development', async () => {
+    cfAccess.validate.mockRejectedValue(new Error('Missing CF Access JWT'));
+    const response = await createApp().request(
+      '/debug/probe',
+      {},
+      testEnv({ ENVIRONMENT: 'production', WASTELAND_DEBUG_ROUTES: 'local' }) as never
+    );
+
+    expect(response.status).toBe(401);
+    expect(cfAccess.validate).toHaveBeenCalled();
   });
 
   it('rejects a deployed request without a valid Access assertion', async () => {
@@ -267,7 +292,7 @@ describe('authorizeDebugUserAction', () => {
     const response = await createApp().request(
       `/debug/wastelands/${WASTELAND_ID}/browse?userId=${OWNER_ID}`,
       {},
-      testEnv({ ENVIRONMENT: 'development' }) as never
+      testEnv({ ENVIRONMENT: 'development', WASTELAND_DEBUG_ROUTES: 'local' }) as never
     );
 
     expect(response.status).toBe(200);
@@ -288,7 +313,7 @@ describe('authorizeDebugUserAction', () => {
     const response = await createApp().request(
       `/debug/wastelands/${WASTELAND_ID}/browse?userId=${MEMBER_ID}`,
       {},
-      testEnv({ ENVIRONMENT: 'development' }) as never
+      testEnv({ ENVIRONMENT: 'development', WASTELAND_DEBUG_ROUTES: 'local' }) as never
     );
 
     expect(response.status).toBe(200);
@@ -299,7 +324,7 @@ describe('authorizeDebugUserAction', () => {
     const response = await createApp().request(
       `/debug/wastelands/${WASTELAND_ID}/browse?userId=${OUTSIDER_ID}`,
       {},
-      testEnv({ ENVIRONMENT: 'development' }) as never
+      testEnv({ ENVIRONMENT: 'development', WASTELAND_DEBUG_ROUTES: 'local' }) as never
     );
 
     expect(response.status).toBe(403);
@@ -322,10 +347,42 @@ describe('authorizeDebugUserAction', () => {
     const response = await createApp().request(
       `/debug/wastelands/${WASTELAND_ID}/browse?userId=${OWNER_ID}`,
       {},
-      testEnv({ ENVIRONMENT: 'development' }) as never
+      testEnv({ ENVIRONMENT: 'development', WASTELAND_DEBUG_ROUTES: 'local' }) as never
     );
 
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: 'Wasteland not found' });
+  });
+
+  it('rejects an action when no operator was established', async () => {
+    withConfig({ owner_user_id: OWNER_ID });
+    const app = new Hono<WastelandEnv>();
+    app.get('/debug/wastelands/:wastelandId/browse', async c => {
+      const denied = await authorizeDebugUserAction(c, {
+        wastelandId: c.req.param('wastelandId'),
+        userId: c.req.query('userId') ?? '',
+        operation: 'wanted.browse',
+      });
+      if (denied) return denied;
+      return c.json({ ok: true });
+    });
+
+    const response = await app.request(
+      `/debug/wastelands/${WASTELAND_ID}/browse?userId=${OWNER_ID}`,
+      {},
+      testEnv({ ENVIRONMENT: 'development', WASTELAND_DEBUG_ROUTES: 'local' }) as never
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ success: false, error: 'Unauthorized' });
+    expect(wasteland.getWastelandDOStub).not.toHaveBeenCalled();
+    expect(auditWarn).toHaveBeenCalledWith(
+      'debug.action unauthorized',
+      expect.objectContaining({
+        wastelandId: WASTELAND_ID,
+        userId: OWNER_ID,
+        operation: 'wanted.browse',
+      })
+    );
   });
 });

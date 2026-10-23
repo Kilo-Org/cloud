@@ -6,13 +6,24 @@ import { getWastelandDOStub } from '../dos/Wasteland.do';
 import { logger } from '../util/log.util';
 
 /**
- * The debug surface is opt-in per deployment: only an explicit
- * `WASTELAND_DEBUG_ROUTES=enabled` serves `/debug/*`. Deployments that do
- * not set it answer 404 for the whole tree, independently of
- * `ENVIRONMENT`.
+ * The debug surface is opt-in per deployment. `disabled` (and any other
+ * value) serves none of `/debug/*`. `enabled` requires a verified
+ * Cloudflare Access operator. `local` is passed only by the local
+ * development command, together with `ENVIRONMENT=development`, and skips
+ * Cloudflare Access. A deployed environment that is not explicitly local
+ * therefore always authenticates.
  */
-export function debugRoutesEnabled(env: { WASTELAND_DEBUG_ROUTES?: string }): boolean {
-  return env.WASTELAND_DEBUG_ROUTES === 'enabled';
+export type DebugSurfaceMode = 'disabled' | 'deployed' | 'local';
+
+export function debugSurfaceMode(env: { WASTELAND_DEBUG_ROUTES?: string }): DebugSurfaceMode {
+  switch (env.WASTELAND_DEBUG_ROUTES) {
+    case 'enabled':
+      return 'deployed';
+    case 'local':
+      return 'local';
+    default:
+      return 'disabled';
+  }
 }
 
 /**
@@ -43,17 +54,19 @@ const LOCAL_DEVELOPMENT_OPERATOR: DebugOperator = {
   id: 'local-development',
 };
 
-export function getDebugOperator(c: Context<WastelandEnv>): DebugOperator {
-  return c.get('debugOperator') ?? LOCAL_DEVELOPMENT_OPERATOR;
+export function getDebugOperator(c: Context<WastelandEnv>): DebugOperator | null {
+  return c.get('debugOperator') ?? null;
 }
 
 /**
  * Gate for the whole `/debug/*` tree.
  *
- * - The tree is absent unless the deployment sets
- *   `WASTELAND_DEBUG_ROUTES=enabled`.
- * - Local development keeps the documented bypass.
- * - Any deployed environment requires a verified Cloudflare Access
+ * - The tree is absent unless the deployment opts in with
+ *   `WASTELAND_DEBUG_ROUTES`.
+ * - `local` is accepted only with `ENVIRONMENT=development`, which the
+ *   local development command pairs with that value; it skips Cloudflare
+ *   Access.
+ * - Every other opt-in value requires a verified Cloudflare Access
  *   assertion whose user email or service-token common name is listed in
  *   `WASTELAND_DEBUG_OPERATORS`.
  *
@@ -64,14 +77,15 @@ export async function debugAccessMiddleware(
   c: Context<WastelandEnv>,
   next: () => Promise<void>
 ): Promise<Response | void> {
-  if (!debugRoutesEnabled(c.env)) {
+  const mode = debugSurfaceMode(c.env);
+  if (mode === 'disabled') {
     return c.notFound();
   }
 
   const method = c.req.method;
   const path = c.req.path;
 
-  if (c.env.ENVIRONMENT === 'development') {
+  if (mode === 'local' && c.env.ENVIRONMENT === 'development') {
     c.set('debugOperator', LOCAL_DEVELOPMENT_OPERATOR);
     logger.info('debug.access', {
       operator: describeDebugOperator(LOCAL_DEVELOPMENT_OPERATOR),
@@ -137,6 +151,11 @@ export async function authorizeDebugUserAction(
 ): Promise<Response | null> {
   const { wastelandId, userId, operation } = action;
   const operator = getDebugOperator(c);
+  if (!operator) {
+    logger.warn('debug.action unauthorized', { wastelandId, userId, operation });
+    return c.json({ success: false, error: 'Unauthorized' }, 401);
+  }
+
   const doStub = getWastelandDOStub(c.env, wastelandId);
   const config = await doStub.getConfig();
   if (!config) {

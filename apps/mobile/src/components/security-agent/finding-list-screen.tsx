@@ -165,9 +165,9 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={t('common.findings')}
-        // One size-11 (44dp) filter icon; declaring it keeps the one-line
-        // title's readable minimum when the row is narrow.
-        headerRightWidth={44}
+        // One 48dp icon target from IconButton; declaring its width keeps the
+        // one-line title's readable minimum when the row is narrow.
+        headerRightWidth={48}
         headerRight={
           <IconButton
             onPress={() => {
@@ -176,9 +176,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
                 params: { scope, ...toSecurityFindingParams(filters) },
               });
             }}
-            accessibilityRole="button"
             accessibilityLabel={t('securityAgent.filter.title')}
-            className="size-11 items-center justify-center active:opacity-70"
           >
             <SlidersHorizontal
               size={20}

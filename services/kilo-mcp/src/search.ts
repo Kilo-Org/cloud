@@ -11,11 +11,12 @@ export const DEFAULT_SEARCH_LIMIT = 10;
 export const MAX_SEARCH_LIMIT = 50;
 
 /**
- * Published upper bound on `search.query` characters; the tool schema and the
- * argument parser enforce the same value. Every query is tokenized for the
- * lexical pass and embedded for the semantic one, so the bound keeps a request's
- * work proportional to one interactive query while leaving room for a pasted
- * task description.
+ * Published upper bound on `search.query` characters (Unicode code points, the
+ * unit JSON Schema's `maxLength` uses); the tool schema and the argument parser
+ * enforce the same value. Every query is tokenized for the lexical pass and
+ * embedded for the semantic one, so the bound keeps a request's work
+ * proportional to one interactive query while leaving room for a pasted task
+ * description.
  */
 export const MAX_SEARCH_QUERY_LENGTH = 1024;
 

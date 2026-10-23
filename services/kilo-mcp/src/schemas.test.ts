@@ -132,6 +132,17 @@ describe('searchArgsSchema', () => {
     );
   });
 
+  it('measures the bound in code points, matching the published JSON Schema maxLength', () => {
+    // An astral character is two UTF-16 code units and one code point; the
+    // published `maxLength` counts code points, so the parser must too.
+    expect(
+      searchArgsSchema.safeParse({ query: '😀'.repeat(MAX_SEARCH_QUERY_LENGTH) }).success
+    ).toBe(true);
+    expect(
+      searchArgsSchema.safeParse({ query: '😀'.repeat(MAX_SEARCH_QUERY_LENGTH + 1) }).success
+    ).toBe(false);
+  });
+
   it('rejects a limit outside the range or not an integer', () => {
     expect(searchArgsSchema.safeParse({ query: 'q', limit: 0 }).success).toBe(false);
     expect(searchArgsSchema.safeParse({ query: 'q', limit: MAX_SEARCH_LIMIT + 1 }).success).toBe(

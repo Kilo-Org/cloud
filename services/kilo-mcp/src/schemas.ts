@@ -17,14 +17,36 @@ import { MAX_SEARCH_LIMIT, MAX_SEARCH_QUERY_LENGTH } from './search';
 export const MAX_CLIENT_HEADER_LENGTH = 1024;
 
 /**
+ * Whether `value` is longer than `maxLength` Unicode code points. JSON Schema's
+ * `maxLength` counts code points, while `String.length` counts UTF-16 code
+ * units, so the published schema and this check agree for non-BMP input. The
+ * walk stops one code point past the bound instead of materializing the whole
+ * string as an array.
+ */
+function exceedsCodePoints(value: string, maxLength: number): boolean {
+  let count = 0;
+  for (const _codePoint of value) {
+    count += 1;
+    if (count > maxLength) return true;
+  }
+  return false;
+}
+
+/**
  * A caller-supplied string that must carry at least one non-whitespace
- * character, optionally bounded in length.
+ * character, optionally bounded in Unicode code points (the unit the published
+ * JSON Schema `maxLength` uses).
  */
 const nonWhitespaceString = (field: string, maxLength?: number): z.ZodType<string> => {
   const base =
     maxLength === undefined
       ? z.string()
-      : z.string().max(maxLength, `${field} must be at most ${maxLength} characters`);
+      : z
+          .string()
+          .refine(
+            value => !exceedsCodePoints(value, maxLength),
+            `${field} must be at most ${maxLength} characters`
+          );
   return base.refine(value => value.trim().length > 0, `${field} must be a non-empty string`);
 };
 

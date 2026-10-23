@@ -63,6 +63,11 @@
     "ENVIRONMENT": "production",
     "CF_ACCESS_TEAM": "engineering-e11",
     "CF_ACCESS_AUD": "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be",
+    // The debug surface is opt-in. Production serves none of `/debug/*`;
+    // a deployment that enables it must also list the Cloudflare Access
+    // identities allowed to use it. See src/middleware/debug.middleware.ts.
+    "WASTELAND_DEBUG_ROUTES": "disabled",
+    "WASTELAND_DEBUG_OPERATORS": "",
     "KILO_API_URL": "https://api.kilo.ai",
     // KILO_INTERNAL_API_URL is the URL the *worker* uses for direct
     // outbound calls to apps/web's `/api/internal/*` routes. In prod
@@ -101,6 +106,9 @@
         "ENVIRONMENT": "development",
         "CF_ACCESS_TEAM": "engineering-e11",
         "CF_ACCESS_AUD": "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be",
+        // Local development serves the `/debug/*` playbook routes.
+        "WASTELAND_DEBUG_ROUTES": "enabled",
+        "WASTELAND_DEBUG_OPERATORS": "",
         // Wrangler's workerd-network doesn't get Docker Desktop's
         // host.docker.internal → host proxy mapping. Use the Docker
         // Desktop VM host gateway IP directly so containers can reach

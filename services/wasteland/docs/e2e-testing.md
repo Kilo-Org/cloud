@@ -1,8 +1,14 @@
 # Wasteland E2E Testing Guide
 
 Step-by-step playbooks for verifying every wasteland flow against a real
-DoltHub upstream using the unauthenticated `/debug/*` endpoints exposed by
-the wasteland worker.
+DoltHub upstream using the `/debug/*` endpoints exposed by the wasteland
+worker. The debug surface is opt-in: the local `dev` environment
+(`pnpm dev`, which runs `wrangler dev --env dev` and sets
+`WASTELAND_DEBUG_ROUTES=enabled`) serves it, and deployments that do not
+enable it answer `404` for the whole tree.
+Routes that act for a user also require that user to be the wasteland
+owner or a member, and log the operator, wasteland, target user and
+provider operation.
 
 Companion reference: [`wl-cli-reference.md`](./wl-cli-reference.md).
 

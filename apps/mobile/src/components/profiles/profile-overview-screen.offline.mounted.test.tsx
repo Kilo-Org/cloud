@@ -39,8 +39,19 @@ vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
   useCanManageOrganizationProfiles: () => true,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ back: vi.fn(), push: vi.fn() }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ back: vi.fn(), push: vi.fn(), replace: vi.fn() }),
+}));
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({
+    agentProfiles: {
+      list: { pathFilter: () => ({ queryKey: ['agentProfiles', 'list'] }) },
+      listCombined: { pathFilter: () => ({ queryKey: ['agentProfiles', 'listCombined'] }) },
+    },
+  }),
+}));
 vi.mock('@/lib/profile-agent-navigation', () => ({
+  getProfilesPath: () => '/(app)/(tabs)/(3_profile)/profiles',
   getProfileVariablesPath: (id: string) => `/profiles/${id}/variables`,
   getProfileCommandsPath: (id: string) => `/profiles/${id}/commands`,
   getProfileSlashCommandsPath: (id: string) => `/profiles/${id}/slash-commands`,

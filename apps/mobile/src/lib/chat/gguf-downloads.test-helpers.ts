@@ -39,6 +39,8 @@ export function harness(
     readonly checksums?: Readonly<Record<string, string>>;
     /** A file the native hash cannot read. */
     readonly unreadable?: string;
+    /** A task that refuses pause the way expo-file-system does once it is cancelled. */
+    readonly refusePause?: boolean;
   } = {}
 ) {
   const freeBytes = options.freeBytes ?? 8_000_000_000;
@@ -104,6 +106,9 @@ export function harness(
           return current.promise;
         },
         pause: () => {
+          if (options.refusePause === true) {
+            throw new Error('Cannot call pause() in state "cancelled"');
+          }
           paused();
         },
         cancel: () => {

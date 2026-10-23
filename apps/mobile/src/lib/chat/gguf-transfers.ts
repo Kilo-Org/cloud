@@ -43,6 +43,8 @@ export type GgufActiveDownload = {
   stop: 'cancel' | 'space' | undefined;
   /** Set while a paused download resumes; a refused resume starts once more from zero. */
   resuming: boolean;
+  /** Set between a pause request and the task reporting itself paused. */
+  pausing: boolean;
   restarted: boolean;
 };
 
@@ -62,6 +64,7 @@ export function activeDownload(input: {
     total: input.transfers[0]?.expected ?? 0,
     stop: undefined,
     resuming: false,
+    pausing: false,
     restarted: false,
   };
 }
@@ -166,6 +169,57 @@ export function expectedBytes(transfers: readonly GgufTransfer[]): number | unde
   return sum;
 }
 
+/** A transfer a pause can still act on: running, and not already stopping. */
+function pausable(download: GgufActiveDownload): boolean {
+  return download.phase === 'downloading' && download.stop === undefined && !download.pausing;
+}
+
+/** A transfer a resume can act on: paused, and not stopping. */
+function resumable(download: GgufActiveDownload): boolean {
+  return download.phase === 'paused' && download.stop === undefined;
+}
+
+/**
+ * Asks the task to pause once. A task that refuses the call — it is already
+ * stopping — leaves the request cleared, so the next press tries again instead
+ * of the controls staying dead. True when the download's state changed.
+ */
+export function requestPause(download: GgufActiveDownload): boolean {
+  if (!pausable(download)) {
+    return false;
+  }
+  download.pausing = true;
+  try {
+    download.task.pause();
+  } catch {
+    download.pausing = false;
+  }
+  return true;
+}
+
+/**
+ * Puts the current transfer back at its first byte, with no pause or resume in
+ * flight on it, and answers where it writes and what it expects to read.
+ */
+export function transferStart(download: GgufActiveDownload): GgufTransfer {
+  const transfer = currentTransfer(download);
+  download.written = 0;
+  download.total = transfer.expected ?? 0;
+  download.resuming = false;
+  download.pausing = false;
+  return transfer;
+}
+
+/** Moves a paused download back to downloading. False when it cannot resume. */
+export function requestResume(download: GgufActiveDownload): boolean {
+  if (!resumable(download)) {
+    return false;
+  }
+  download.phase = 'downloading';
+  download.resuming = true;
+  return true;
+}
+
 /** One bar for the whole model: the finished transfers, the current one, and those to come. */
 export function downloadProgress(download: GgufActiveDownload): GgufDownload {
   const later = download.transfers
@@ -175,6 +229,8 @@ export function downloadProgress(download: GgufActiveDownload): GgufDownload {
     fileId: download.fileId,
     name: download.name,
     phase: download.phase,
+    // A pause or a cancel the task has not answered yet: the buttons that ask for it are spent.
+    pending: download.pausing || download.stop !== undefined,
     written: download.done + download.written,
     total: download.total > 0 ? download.done + download.total + later : 0,
   };

@@ -23,7 +23,10 @@ import {
   expectedBytes,
   moveIntoPlace,
   readVerified,
+  requestPause,
+  requestResume,
   transfersOf,
+  transferStart,
 } from './gguf-transfers';
 
 /**
@@ -82,10 +85,7 @@ export function ggufDownloads({
 
   /** Starts the transfer at the current step from zero. */
   const begin = (download: Active) => {
-    const { url, part, expected } = currentTransfer(download);
-    download.written = 0;
-    download.total = expected ?? 0;
-    download.resuming = false;
+    const { url, part } = transferStart(download);
     const progress = onProgress(() => download);
     download.task = storage.createDownload(url, part, progress);
     publish();
@@ -206,6 +206,7 @@ export function ggufDownloads({
     }
     if (outcome.value === null) {
       download.phase = 'paused';
+      download.pausing = false;
       publish();
       return;
     }
@@ -285,17 +286,15 @@ export function ggufDownloads({
     },
     pause: (fileId: string) => {
       const download = active;
-      if (download?.fileId === fileId && download.phase === 'downloading') {
-        download.task.pause();
+      if (download?.fileId === fileId && requestPause(download)) {
+        publish();
       }
     },
     resume: (fileId: string) => {
       const download = active;
-      if (download?.fileId !== fileId || download.phase !== 'paused') {
+      if (download?.fileId !== fileId || !requestResume(download)) {
         return;
       }
-      download.phase = 'downloading';
-      download.resuming = true;
       publish();
       void settle(download, download.task.resumeAsync());
     },

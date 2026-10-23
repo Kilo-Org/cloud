@@ -105,6 +105,7 @@ export function GgufDownloadControls({
             <View className="flex-row gap-2">
               <Button
                 variant="outline"
+                disabled={download.pending}
                 onPress={() => {
                   if (download.phase === 'paused') {
                     ggufDownloadActions.resume(fileId);

@@ -65,29 +65,24 @@ function renderButton({
   return render(createElement(Button, { accessibilityLabel: 'Retry', ...props }, children));
 }
 
-async function nativeDimensions(button: TestRenderer.ReactTestInstance) {
-  const dimensions = (button.props.className as string)
-    .split(' ')
-    .filter(className => /^(?:min-h|h|w)-/.test(className))
-    .join(' ');
-  // Use the app's theme and installed compilers, not a hand-written utility-to-point map.
-  const { css } = await postcss([tailwindcss()]).process(
-    `@reference "../../global.css"; .target { @apply ${dimensions}; }`,
-    { from: import.meta.filename }
-  );
-  // Match metro.config.js. The compiler keeps its default 14-point inlineRem.
-  const rules = compile(css, { inlineVariables: false }).stylesheet().s;
-  return rules?.find(([name]) => name === 'target')?.[1].flatMap(rule => rule.d ?? []);
-}
-
-/** The native style a single className compiles to, through the app's pipeline. */
+/** The native style a className compiles to, through the app's theme and installed compilers. */
 async function compiledStyles(className: string) {
   const { css } = await postcss([tailwindcss()]).process(
     `@reference "../../global.css"; .target { @apply ${className}; }`,
     { from: import.meta.filename }
   );
+  // Match metro.config.js. The compiler keeps its default 14-point inlineRem.
   const rules = compile(css, { inlineVariables: false }).stylesheet().s;
   return rules?.find(([name]) => name === 'target')?.[1].flatMap(rule => rule.d ?? []) ?? [];
+}
+
+function nativeDimensions(button: TestRenderer.ReactTestInstance) {
+  return compiledStyles(
+    (button.props.className as string)
+      .split(' ')
+      .filter(className => /^(?:min-h|h|w)-/.test(className))
+      .join(' ')
+  );
 }
 
 beforeEach(() => {

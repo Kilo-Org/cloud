@@ -47,6 +47,7 @@ const buttonGapVariants = cva('', {
       default: 'gap-2',
       sm: 'gap-1.5',
       lg: 'gap-2',
+      action: 'gap-2',
       icon: '',
     },
   },

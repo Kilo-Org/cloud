@@ -35,6 +35,11 @@ import {
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
+import {
+  awaitVercelSettlement,
+  installAckingUsageMeter,
+  vercelSandboxSelection,
+} from './helpers/fake-vercel-billing.js';
 import { waitFor } from './wait-for.js';
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
@@ -184,6 +189,7 @@ async function installSandbox(
       createProviderAdapter: () => provider.adapter,
       provider: provider.adapter,
     });
+    installAckingUsageMeter(instance);
   });
   return sandboxStub;
 }
@@ -213,7 +219,12 @@ async function createSession(input: {
       turn: { type: 'prompt', prompt: 'hello' },
       agent: { mode: 'code', model: 'test/model' },
     },
-    sandboxSelection: { provider: 'vercel' },
+    sandboxSelection: vercelSandboxSelection({
+      sandboxId: input.sandboxId,
+      sessionId: input.sessionId,
+      userId: USER_ID,
+      orgId: ORG_ID,
+    }),
     ...(input.seal ? { runtimeAuthorizationSeal: input.seal } : {}),
   });
   return sessionStub;
@@ -464,6 +475,7 @@ describe('rolling runtime compatibility', () => {
       );
     });
     await sandbox.reportProviderGone();
+    await awaitVercelSettlement(sandbox);
     await sandbox.prepare(inputs[0]!);
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
     const launch = provider.launchEnvs[1]!;

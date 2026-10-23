@@ -204,7 +204,6 @@ semantics.
 | Callback-queue producer and consumer renamed to `cloud-agent-next-callback-queue-e2e-test` | The e2e Worker can never consume production callback messages. |
 | Only the `Sandbox` container class kept, `max_instances = 20`, `ssh.enabled = true` | The stack only runs normal non-contained `ses-` sessions, which route to `Sandbox`; `20` is a cap rather than a reservation and leaves parallelism headroom for later parallel runs. Enables SSH inspection. |
 | The other container classes removed from `containers`, `durable_objects.bindings` and `migrations` | A container class is all three entries; keeping a binding or migration without its class fails the deploy. Removing them removes unused capacity and deploy cost. |
-| Billing flags off (`CLOUD_AGENT_CONTAINER_BILLING_*`) | Matches the dev profile. |
 | `CREDENTIAL_CONTAINMENT_ENABLED=false` | Non-contained dispatch; see plan sections 5 and 11.6. |
 | `NEXTAUTH_SECRET` Secrets Store binding added | Verifies the ticket and API token, and seals runtime authorization. |
 | `SHARED_SANDBOX_OVERRIDES` KV binding pinned to the e2e namespace id | An id-less binding makes wrangler auto-provision the namespace and fail with `code: 10014` because the title already exists. |

@@ -80,7 +80,8 @@ export class BillingScheduleTable {
   private readonly now: () => number;
 
   constructor(private readonly deps: BillingScheduleDeps) {
-    this.now = deps.now ?? Date.now;
+    // Read `Date.now` per call, like the rest of the Durable Object, so one clock sets every due time.
+    this.now = deps.now ?? (() => Date.now());
   }
 
   /** Serialize table reads and writes; never holds `recompose`. */

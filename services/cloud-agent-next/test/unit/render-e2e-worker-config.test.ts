@@ -350,9 +350,6 @@ describe('buildE2eWorkerConfig', () => {
     expect(config.vars.TOOL_CGROUP_RESERVE_MB).toBe('1024');
     expect(config.vars.TOOL_CGROUP_CPU_WEIGHT).toBe('50');
     expect(config.vars.WORKTREE_CREATION_ENABLED_IDS).toBeUndefined();
-    expect(config.vars.CLOUD_AGENT_CONTAINER_BILLING_ENABLED).toBe('false');
-    expect(config.vars.CLOUD_AGENT_CONTAINER_BILLING_USER_IDS).toBe('');
-    expect(config.vars.CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS).toBe('');
     expect(config.vars.CREDENTIAL_CONTAINMENT_ENABLED).toBe('false');
     expect(config.vars.KILO_SESSION_INGEST_URL).toBe('https://ingest.kilosessions.ai');
   });

@@ -1,5 +1,6 @@
 import { createElement } from 'react';
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { afterEach } from 'vitest';
 import * as z from 'zod';
 
 import { ProfileOverviewScreen } from '@/components/profiles/profile-overview-screen';
@@ -128,11 +129,38 @@ function confirmRequest(confirm: TestConfirmMock): void {
   request.onConfirm();
 }
 
-// eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
-export function mountScreen(organizationId?: string, stack: 'app' | 'profileTab' = 'profileTab') {
-  return renderWithProviders(
+/**
+ * Renderers each test left open. A test that fails mid-assertion still releases
+ * its tree, and `mountScreen`'s `unmount` stays safe to call twice so a test can
+ * unmount as early as it likes.
+ */
+const openRenderers = new Set<() => void>();
+
+afterEach(() => {
+  for (const unmount of openRenderers) {
+    unmount();
+  }
+  openRenderers.clear();
+});
+
+export async function mountScreen(
+  organizationId?: string,
+  stack: 'app' | 'profileTab' = 'profileTab'
+) {
+  const mounted = await renderWithProviders(
     createElement(ProfileOverviewScreen, { profileId: 'profile-1', organizationId, stack })
   );
+  let open = true;
+  const unmount = () => {
+    if (!open) {
+      return;
+    }
+    open = false;
+    openRenderers.delete(unmount);
+    mounted.unmount();
+  };
+  openRenderers.add(unmount);
+  return { ...mounted, unmount };
 }
 
 /** Re-render the mounted screen against fresh mock data, keeping the providers. */

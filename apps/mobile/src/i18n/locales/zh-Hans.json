@@ -205,7 +205,7 @@
     "codeReviewerSubtitle": "自动 PR 审查",
     "securityAgentSubtitle": "查找并修复漏洞",
     "reviews": "审查",
-    "prReviewSubtitle": "在移动端审查拉取请求",
+    "prReviewSubtitle": "在手机上审查拉取请求",
     "couldNotLoadOrganization": "无法加载组织。",
     "couldNotLoadOrganizationDescription": "加载完成前，无法使用组织和智能体设置。",
     "linkedAccounts": "已关联账户",
@@ -2397,10 +2397,10 @@
   },
   "queryError": {
     "neutralDescription": "请重试。",
-    "offlineTitle": "加载失败。",
+    "offlineTitle": "加载失败",
     "permissionDescription": "你无权查看此内容。",
     "notFoundDescription": "此内容可能已被移除或已无法访问。",
-    "serverTitle": "无法加载内容。",
+    "serverTitle": "无法加载内容",
     "serverDescription": "服务出现问题。请重试。"
   },
   "screenHeader": {
@@ -2607,14 +2607,14 @@
       "addToReview": "添加到审查",
       "comment": "评论",
       "commentBody": "评论内容",
-      "commentBodyPlaceholder": "评论内容",
+      "commentBodyPlaceholder": "写下评论",
       "commentNow": "立即评论",
       "discardMessage": "放弃后，草稿将丢失。",
       "discardTitle": "放弃评论？",
       "editTitle": "编辑评论",
       "insertSuggestion": "插入建议",
       "insertSuggestionA11y": "插入代码建议",
-      "loadFailedTitle": "无法加载评论编辑器。",
+      "loadFailedTitle": "无法加载评论编辑器",
       "ok": "确定",
       "unavailableMessage": "这条待提交的评论已被删除或提交。",
       "unavailableTitle": "评论已不可用",
@@ -2623,37 +2623,37 @@
       "tapDiffLineToSuggest": "点按差异中的一行，即可添加代码建议。"
     },
     "connect": {
-      "checkFailedTitle": "无法检查 GitHub 连接。",
+      "checkFailedTitle": "无法检查 GitHub 连接",
       "checkFailedMessage": "加载完成前，无法确认登录状态。",
-      "checkFailedTitleGitLab": "无法检查 GitLab 连接。",
-      "checkFailedTitleBitbucket": "无法检查 Bitbucket 连接。",
+      "checkFailedTitleGitLab": "无法检查 GitLab 连接",
+      "checkFailedTitleBitbucket": "无法检查 Bitbucket 连接",
       "providerCheckFailedMessage": "加载完成前无法获取连接状态。",
       "reconnectTitle": "重新连接 GitHub",
-      "reconnectDescription": "GitHub 连接授权已被撤销。请重新连接，继续在手机上审查拉取请求。",
-      "description": "连接 GitHub 账号，即可在手机上审查拉取请求。",
-      "gitlabDescription": "连接你的 GitLab 账户，以便在移动端审查合并请求。",
-      "bitbucketDescription": "将 Bitbucket 连接到此组织，以便在移动端审查拉取请求。",
+      "reconnectDescription": "你的 GitHub 连接授权已被撤销。请重新连接，继续在手机上审查拉取请求。",
+      "description": "连接你的 GitHub 账户，即可在手机上审查拉取请求。",
+      "gitlabDescription": "连接你的 GitLab 账户，即可在手机上审查合并请求。",
+      "bitbucketDescription": "将 Bitbucket 连接到此组织，以便在手机上审查拉取请求。",
       "bitbucketOrgOnlyDescription": "将上方的账户切换为某个组织，以便审查其 Bitbucket 拉取请求。",
       "contextLine": "适用于 {{organization}}",
       "contextLinePersonal": "适用于个人账户"
     },
     "connectionExpired": "GitHub 连接已过期。",
-    "couldNotLoadPullRequest": "无法加载拉取请求。",
-    "reviewServiceUnavailable": "评审服务不可用",
-    "reviewServiceUnavailableDescription": "评审服务暂时不可用。请稍后重试。",
-    "couldNotOpenGitHubAppSettings": "无法打开 GitHub 应用设置。",
+    "couldNotLoadPullRequest": "无法加载拉取请求",
+    "reviewServiceUnavailable": "审查服务不可用",
+    "reviewServiceUnavailableDescription": "审查服务暂时不可用。请稍后重试。",
+    "couldNotOpenGitHubAppSettings": "无法打开 GitHub 应用设置",
     "description": "描述",
     "discussion": {
       "acceptTerms": "同意",
       "accessDeniedMessage": "你无权查看此 PR 的讨论。",
       "addReaction": "添加表情回应",
-      "block": "阻止",
+      "block": "屏蔽",
       "blockedUser": "已屏蔽 {{login}}",
       "collapseThread": "折叠讨论串",
       "commentActions": "评论操作",
       "comment": "{{displayCount}} 条评论",
       "comment_other": "{{displayCount}} 条评论",
-      "couldNotLoad": "无法加载讨论。",
+      "couldNotLoad": "无法加载讨论",
       "couldNotLoadMore": "无法加载更多评论。",
       "loadMoreComments": "加载更多评论",
       "loading": "正在加载讨论",
@@ -2675,7 +2675,7 @@
           "terminal": "无法举报此用户。"
         }
       },
-      "moreLinesAbove": "上方还有 {{displayCount}} 行。",
+      "moreLinesAbove": "上方还有 {{displayCount}} 行",
       "mute": "静音",
       "mutedUser": "已静音 {{login}}",
       "noDiscussion": "暂无讨论",
@@ -2684,8 +2684,8 @@
       "outdated": "已过时",
       "quotedDiffSnippet": "引用的差异片段",
       "reactionPill": "{{emoji}} 表情回应，{{displayCount}} {{countLabel}}",
-      "reaction": "表情回应",
-      "reaction_other": "表情回应",
+      "reaction": "个表情回应",
+      "reaction_other": "个表情回应",
       "reaction_one": "个表情回应",
       "replyBadRequest": "无法发布此回复。讨论串可能已发生变化。",
       "replyBody": "回复正文",
@@ -2708,7 +2708,7 @@
       "termsCopy": "年满 13 岁才能发布内容。",
       "termsTitle": "服务条款",
       "threadAccessibilityLabel": "讨论串 {{anchorLabel}}",
-      "unavailable": "无法查看讨论。",
+      "unavailable": "无法查看讨论",
       "unavailableMessage": "此拉取请求可能已被删除。",
       "unresolveThread": "将讨论串标记为未解决",
       "viewTerms": "查看服务条款",
@@ -2734,8 +2734,8 @@
       },
       "deletedUser": "已删除的用户",
       "replyForbiddenTerm": "你无权回复此{{term}}。",
-      "moreLinesAbove_one": "上方还有 {{displayCount}} 行。",
-      "moreLinesAbove_other": "上方还有 {{displayCount}} 行。",
+      "moreLinesAbove_one": "上方还有 {{displayCount}} 行",
+      "moreLinesAbove_other": "上方还有 {{displayCount}} 行",
       "deleteComment": "删除评论",
       "deleteCommentTitle": "删除评论？",
       "deleteCommentMessage": "此评论将从拉取请求中删除。",
@@ -2747,7 +2747,7 @@
     "entry": {
       "noRecentPrs": "暂无最近审查",
       "noRecentPrsDescription": "在上方粘贴链接即可开始审查，下次就能在这里找到它。",
-      "couldNotLoad": "无法加载。",
+      "couldNotLoad": "无法加载",
       "removeFromRecentsTitle": "从最近记录中移除？",
       "removeFromRecentsMessage": "此审查将从你的最近记录中移除。",
       "removeRecentAccessibility": "从最近记录中移除 {{repo}}",
@@ -2756,7 +2756,7 @@
       "openAccessibility": "打开拉取请求或合并请求",
       "clearLink": "清除链接",
       "pasteLink": "粘贴拉取请求或合并请求链接",
-      "open": "开启"
+      "open": "打开"
     },
     "eventChips": {
       "comment": "评论",
@@ -2774,13 +2774,13 @@
       "unified": "单栏"
     },
     "fileNavigator": {
-      "couldNotLoadFiles": "无法加载文件。",
-      "couldNotLoadMoreFiles": "无法加载更多文件。",
+      "couldNotLoadFiles": "无法加载文件",
+      "couldNotLoadMoreFiles": "无法加载更多文件",
       "diffTooLarge": "差异过大",
-      "failedToLoadAllFiles": "未能加载全部文件。",
+      "failedToLoadAllFiles": "未能加载全部文件",
       "filterPlaceholder": "按路径筛选文件",
       "loadingFiles": "正在加载 {{loaded}}/{{total}}…",
-      "noMatches": "没有与“{{query}}”匹配的文件。",
+      "noMatches": "没有与“{{query}}”匹配的文件",
       "openFile": "打开 {{path}}",
       "openFileViewed": "打开 {{path}}（已查看）",
       "retryLoadingAllFiles": "重新加载全部文件",
@@ -2792,7 +2792,7 @@
     },
     "fileRows": {
       "collapseFile": "折叠文件",
-      "diffTooLarge": "差异过大，无法显示。",
+      "diffTooLarge": "差异过大，无法显示",
       "noPreview": "此文件无法预览",
       "expandFile": "展开文件",
       "markViewed": "将 {{path}} 标记为已查看",
@@ -2810,7 +2810,7 @@
     },
     "headLine": "{{counts}} · 最新提交 {{sha}}",
     "hunkRows": {
-      "contextUnavailable": "无法获取此引用对应的上下文。",
+      "contextUnavailable": "无法获取此引用对应的上下文",
       "expandAll": "全部展开",
       "expandAllLines": "展开全部 {{displayCount}} 行",
       "expandContext": "展开上下文",
@@ -2852,7 +2852,7 @@
       "loadedOfTotalFiles_other": "已加载 {{loaded}}/{{total}} 个文件"
     },
     "inbox": {
-      "couldNotLoad": "无法加载收件箱。",
+      "couldNotLoad": "无法加载收件箱",
       "loading": "正在加载收件箱",
       "noReviewRequests": "暂无审查请求",
       "noReviewRequestsDescription": "等待你审查的拉取请求会显示在这里。你也可以在上方粘贴任意 PR 链接。",
@@ -2903,9 +2903,9 @@
       },
       "partialSuccessBanner": {
         "accessibility": "已合并。无法删除分支：{{reason}}",
-        "body": "无法删除分支：{{reason}}。"
+        "body": "无法删除分支：{{reason}}"
       },
-      "loadFailedTitle": "无法加载合并选项。",
+      "loadFailedTitle": "无法加载合并选项",
       "blocked": {
         "unknownStateTitle": "GitHub 尚未返回合并状态",
         "unknownStateDetail": "请稍后刷新概览。",
@@ -2959,10 +2959,10 @@
       "file_other": "文件",
       "file_one": "文件",
       "stateMerged": "已合并",
-      "stateOpen": "开启",
-      "stateOpenApproved": "未关闭 · 已批准",
-      "stateOpenChangesRequested": "未关闭 · 已要求更改",
-      "stateOpenReviewRequired": "未关闭 · 待审查",
+      "stateOpen": "开放中",
+      "stateOpenApproved": "开放中 · 已批准",
+      "stateOpenChangesRequested": "开放中 · 已要求更改",
+      "stateOpenReviewRequired": "开放中 · 待审查",
       "unknownAuthor": "未知作者",
       "openedAgo": "{{time}}创建",
       "updatedAgo": "{{time}}更新",
@@ -2994,10 +2994,10 @@
     "pullRequestUnavailable": "无法打开拉取请求",
     "pullRequestUnavailableDescription": "无法打开此 PR。可能是 PR 已被删除、仓库为私有仓库，或仓库尚未安装 Kilo GitHub 应用。",
     "reconnectNotice": {
-      "title": "GitHub 连接已过期。",
+      "title": "GitHub 连接已过期",
       "message": "GitHub 连接已失效。请重新检查连接；如需重新连接，系统会提示你。",
-      "gitlabTitle": "GitLab 连接已过期。",
-      "bitbucketTitle": "Bitbucket 连接已过期。",
+      "gitlabTitle": "GitLab 连接已过期",
+      "bitbucketTitle": "Bitbucket 连接已过期",
       "providerMessage": "{{provider}} 连接已失效。请重新检查连接；如需重新连接，系统会提示你。"
     },
     "review": "审查",
@@ -3017,7 +3017,7 @@
     "submit": {
       "deletePendingMessage": "此评论将从审查队列中移除。",
       "deletePendingTitle": "删除待提交的评论？",
-      "loadFailedTitle": "无法加载审查提交页面。",
+      "loadFailedTitle": "无法加载审查提交页面",
       "pendingComment": "条待提交评论",
       "pendingComment_other": "条待提交评论",
       "pendingComment_one": "条待提交的评论",
@@ -3042,15 +3042,15 @@
     "diff": {
       "selectedTapToChange": "已选择 {{label}}，点按更改选择",
       "tapToComment": "{{label}}，点按发表评论",
-      "truncationBanner": "受 GitHub API 限制，仅显示 {{total}} 个变更文件中的前 {{limit}} 个。",
+      "truncationBanner": "受 GitHub API 限制，仅显示 {{total}} 个变更文件中的前 {{limit}} 个",
       "statusContext": "上下文",
       "lineLabel": "第 {{line}} 行，{{status}}：{{text}}",
       "lineLabelNoNumber": "{{status}}：{{text}}",
       "emptyLine": "（空）",
-      "truncationBanner_one": "受 GitHub API 限制，仅显示 {{total}} 个变更文件中的前 {{limit}} 个。",
-      "truncationBanner_other": "受 GitHub API 限制，仅显示 {{total}} 个变更文件中的前 {{limit}} 个。"
+      "truncationBanner_one": "受 GitHub API 限制，仅显示 {{total}} 个变更文件中的前 {{limit}} 个",
+      "truncationBanner_other": "受 GitHub API 限制，仅显示 {{total}} 个变更文件中的前 {{limit}} 个"
     },
-    "linkPasteClipboardEmpty": "剪贴板为空。",
+    "linkPasteClipboardEmpty": "剪贴板为空",
     "linkPasteDenied": "粘贴访问被拒绝。请允许粘贴后重试。",
     "linkPasteNotAPullRequest": "不是拉取请求或合并请求链接",
     "announce": {
@@ -3062,12 +3062,12 @@
     },
     "mutationError": {
       "commentNotPosted": "无法发布此评论。所选行可能已更改，或 PR 可能已更新。",
-      "reviewNotSubmitted": "当前无法提交此审查。可能是 PR 已有更新，或你正在审查自己创建的拉取请求。",
+      "reviewNotSubmitted": "此审查无法按现状提交。可能是 PR 已有更新，或你正在审查自己创建的拉取请求。",
       "reviewNotSubmittedTerm": "此审查无法按现状提交。{{term}}可能已变更，或者你不能审查自己的{{term}}。",
       "couldNotPostComment": "无法发布评论。",
       "couldNotSubmitReview": "无法提交审查。请检查网络连接后重试。",
       "rateLimited": "请求过多。请稍后重试。",
-      "conflict": "此项在您编辑时已被更改。请重新加载并重试。"
+      "conflict": "此项在你编辑时已被更改。请重新加载并重试。"
     },
     "operation": {
       "couldNotReply": "无法回复。",
@@ -3075,7 +3075,7 @@
       "mergeResultDefaultError": "GitHub 未完成合并。",
       "mergeResultNotCompleted": "{{term}}未合并。检查其状态后重试。",
       "ambiguous": "无法确认操作结果，请先检查 PR 再重试。",
-      "forbidden": "无权执行此操作。"
+      "forbidden": "无权执行此操作"
     },
     "capabilities": {
       "banner": {
@@ -3086,13 +3086,13 @@
     "terms": {
       "pullRequest": "拉取请求",
       "mergeRequest": "合并请求",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "合并请求 !{{number}}",
       "shareMergeRequest": "分享合并请求",
       "viewOnProvider": "在 {{provider}} 上查看",
       "mergeRequestUnavailable": "无法打开合并请求",
       "unavailableDescription": "它可能已被删除，或者你可能没有访问权限。",
       "accessDeniedMergeRequest": "你无权查看此合并请求。",
-      "couldNotLoadMergeRequest": "无法加载合并请求。",
+      "couldNotLoadMergeRequest": "无法加载合并请求",
       "discussionAccessDenied": "你无权查看此合并请求的讨论。",
       "discussionUnavailableMessage": "此合并请求可能已被删除。",
       "noDiscussionDescription": "此合并请求暂无审查讨论串或评论。",

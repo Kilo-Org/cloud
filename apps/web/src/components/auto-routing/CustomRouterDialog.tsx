@@ -107,11 +107,18 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
   const [submitted, setSubmitted] = useState(false);
   const modelsQuery = useModelSelectorList(organizationId);
   const measurementsQuery = useQuery({
-    queryKey: ['auto-routing-platform-measurements', draft.baseRouter, organizationId ?? 'personal'],
+    queryKey: [
+      'auto-routing-platform-measurements',
+      draft.baseRouter,
+      organizationId ?? 'personal',
+    ],
     queryFn: () => fetchPlatformMeasurements(draft.baseRouter, organizationId),
   });
   const measuredModels = measurementsQuery.data?.models.map(item => item.model) ?? [];
-  const measurementOptions: ModelOption[] = measuredModels.map(model => ({ id: model, name: model }));
+  const measurementOptions: ModelOption[] = measuredModels.map(model => ({
+    id: model,
+    name: model,
+  }));
 
   const entryKeys = useMemo(() => new Set(draft.entries.map(customRouterEntryKey)), [draft]);
   const modelOptions = useMemo<ModelOption[]>(
@@ -365,14 +372,13 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
                       ? [{ id: entry.measuredAs, name: entry.measuredAs }, ...measurementOptions]
                       : measurementOptions;
                   return (
-                    <li
-                      key={key}
-                      className="bg-card space-y-3 rounded-md border px-3 py-2"
-                    >
+                    <li key={key} className="bg-card space-y-3 rounded-md border px-3 py-2">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex min-w-0 flex-wrap items-center gap-2">
                           <span className="truncate font-mono text-sm">{entryLabel(entry)}</span>
-                          {entry.kind === 'client' ? <Badge variant="secondary">Client</Badge> : null}
+                          {entry.kind === 'client' ? (
+                            <Badge variant="secondary">Client</Badge>
+                          ) : null}
                           {entry.measuredAs ? (
                             <Badge
                               variant="outline"

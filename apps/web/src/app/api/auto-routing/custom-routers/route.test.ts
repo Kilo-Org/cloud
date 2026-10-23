@@ -820,9 +820,7 @@ describe('/api/auto-routing/custom-routers', () => {
 
     test('preserves an unchanged link when its model disappears from measurements', async () => {
       const entry = { ...gateway(BYOK), measuredAs: SONNET };
-      await create(
-        routerBody({ entries: [entry], defaultEntryKey: customRouterEntryKey(entry) })
-      );
+      await create(routerBody({ entries: [entry], defaultEntryKey: customRouterEntryKey(entry) }));
       mockedGetPlatformMeasurements.mockClear();
       mockedGetPlatformMeasurements.mockResolvedValue({
         status: 200,
@@ -842,9 +840,7 @@ describe('/api/auto-routing/custom-routers', () => {
 
     test('revalidates existing links when the benchmark base changes', async () => {
       const entry = { ...gateway(BYOK), measuredAs: SONNET };
-      await create(
-        routerBody({ entries: [entry], defaultEntryKey: customRouterEntryKey(entry) })
-      );
+      await create(routerBody({ entries: [entry], defaultEntryKey: customRouterEntryKey(entry) }));
       mockedGetPlatformMeasurements.mockClear();
       mockedGetPlatformMeasurements.mockResolvedValue({
         status: 200,

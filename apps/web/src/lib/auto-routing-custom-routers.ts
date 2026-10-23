@@ -212,7 +212,9 @@ export function needsClientEval(
 ): boolean {
   return (
     clientEval &&
-    !(variants.length > 0 && variants.every(variant => variant.linked || variant.status === 'ready'))
+    !(
+      variants.length > 0 && variants.every(variant => variant.linked || variant.status === 'ready')
+    )
   );
 }
 

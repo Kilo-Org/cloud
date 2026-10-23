@@ -16,6 +16,7 @@ describe('csvLiteral', () => {
     expect(csvLiteral('analyst@example.test')).toBe('analyst@example.test');
     expect(csvLiteral('')).toBe('');
     expect(csvLiteral('a=b')).toBe('a=b');
+    expect(csvLiteral('\nvalue')).toBe('\nvalue');
   });
 });
 

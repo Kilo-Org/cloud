@@ -43,6 +43,15 @@ several. Before the upstream inference request is sent:
 - `readDb` falls back to the primary when `POSTGRES_REPLICA_US_URL` is unset, so
   that variable must stay set on the `kilocode-ai-gateway` Vercel project.
 
+## Data collection versus ZDR
+
+`provider.data_collection: 'deny'` only excludes providers that store prompts
+for feedback or training; they may still store prompts for compliance. Only
+`zdr: true` excludes all prompt retention. The organization Data Collection
+Policy maps to `data_collection`, never `zdr`. Provider `training` and
+`retainsPrompts` follow the same split. See
+[OpenRouter's ZDR guide](https://openrouter.ai/docs/guides/features/zdr).
+
 ## Runtime files
 
 - `src/lib/email.ts` reads `src/emails/*.html` from disk, relative to the app's

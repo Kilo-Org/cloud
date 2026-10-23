@@ -5,8 +5,9 @@ import { allFixtures } from './__fixtures__';
 // and use a numeric body. The check reads the parsed fixture data rather than
 // the source text, so it also covers values the fixture helpers compose at
 // import time.
-const IDENTIFIER_PREFIX = /^(?:agent|exc|exec|msg|prt|sandbox|sbx|ses|workspace)_/;
-const SAMPLE_IDENTIFIER = /^(?:agent|exc|exec|msg|prt|sandbox|sbx|ses|workspace)_[0-9-]+$/;
+const IDENTIFIER_PREFIX = /^(?:agent|exc|exec|msg|prt|sandbox|sbx|ses|toolu|workspace)_/;
+const SAMPLE_IDENTIFIER =
+  /^(?:agent|exc|exec|msg|prt|sandbox|sbx|ses|toolu|workspace)_(?:[a-z]+_)?[0-9-]+$/;
 
 type FixtureString = { path: string; value: string };
 

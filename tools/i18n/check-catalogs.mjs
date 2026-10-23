@@ -462,6 +462,26 @@ function pluralBaseKey(key) {
   return key.replace(/_(?:zero|one|two|few|many|other)$/, '');
 }
 
+/**
+ * The visible-count placeholders an English family declares, e.g.
+ * `displayCount`. A translated form must carry each one unless a reviewed
+ * worded form spells the number out instead.
+ */
+function familyVisibleCounts(english, base) {
+  const names = new Set();
+  for (const [key, value] of english) {
+    if (key !== base && pluralBaseKey(key) !== base) {
+      continue;
+    }
+    for (const name of placeholders(value).split(',').filter(Boolean)) {
+      if (name === 'displayCount' || name === 'itemCount') {
+        names.add(name);
+      }
+    }
+  }
+  return names;
+}
+
 /** Split a dotted key into its family base and plural category, if any. */
 function pluralParts(key) {
   const match = PLURAL_SUFFIX_RE.exec(key);
@@ -659,6 +679,23 @@ for (const catalog of CATALOGS) {
       for (const ph of placeholders(value).split(',').filter(Boolean)) {
         if (!allowed.has(ph)) {
           fail(`${label}: "${key}" uses placeholder {{${ph}}}, which the English family does not`);
+        }
+      }
+      // Every form keeps the family's visible count unless the reviewed list
+      // names it: a form without a numeral reads as an age only when the
+      // language spells the number out. A zero form is the exception — "none
+      // required" reads better than a numeral beside a noun, and several
+      // catalogs already word it that way.
+      if (
+        parts.category !== 'zero' &&
+        !WORDED_COUNTS.has(`${parts.base}:${parts.category}:${tag}`)
+      ) {
+        for (const ph of familyVisibleCounts(english, parts.base)) {
+          if (!placeholders(value).split(',').includes(ph)) {
+            fail(
+              `${label}: "${key}" drops {{${ph}}} without a reviewed worded form (WORDED_COUNTS)`
+            );
+          }
         }
       }
     }

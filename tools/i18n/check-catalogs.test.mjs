@@ -260,6 +260,27 @@ test('accepts the reviewed plural forms that say their count in a word', context
   assert.equal(result.stderr, '');
 });
 
+test('rejects a dropped count in an unreviewed locale-only plural form', context => {
+  const result = runChecker(context, {
+    english: WORDED_ENGLISH,
+    translated: {
+      securityAgent: {
+        dashboard: {
+          ...WORDED_TRANSLATED.securityAgent.dashboard,
+          daysOverdue_few: 'متأخرة أيام',
+        },
+      },
+    },
+    source: WORDED_SOURCE,
+    language: 'ar',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ar: "securityAgent\.dashboard\.daysOverdue_few" drops \{\{displayCount\}\} without a reviewed worded form/
+  );
+});
+
 test('rejects a dropped count in a plural form the allowlist does not name', context => {
   const result = runChecker(context, {
     english: WORDED_ENGLISH,

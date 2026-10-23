@@ -42,6 +42,7 @@ import {
   authorizeOwner,
   authorizeProject,
   classifyGitLabError,
+  classifyGitLabErrorForOwner,
   GitLabApiStatusError,
   GitLabReviewError,
   type GitLabProjectAccess,
@@ -52,6 +53,8 @@ const GITLAB_PAGE_SIZE = 50;
 const GITLAB_REQUEST_TIMEOUT_MS = 30_000;
 /** Same response cap the adapter applies, so a hostile instance cannot stream unbounded bytes. */
 const MAX_GITLAB_RESPONSE_BYTES = 10 * 1024 * 1024;
+/** The message both transports use when a reply exceeds the limit. */
+const GITLAB_RESPONSE_TOO_LARGE_MESSAGE = 'GitLab response exceeded size limit';
 /**
  * The diff-page bound for the summary's change counts: GitLab caps a merge
  * request's diff collection at the project's `diff_max_files` setting (1000
@@ -155,6 +158,8 @@ export async function requestGitLabJson<T>(
     }
     return (await response.json()) as T;
   } catch (error) {
+    // This layer has no owner: the status travels on the classified error so
+    // the owner-aware caller can weigh a 403 against the connection's owner.
     throw classifyGitLabError(error);
   }
 }
@@ -162,14 +167,65 @@ export async function requestGitLabJson<T>(
 /**
  * Resolve the URL once (refusing unsafe hosts), then send the request bound
  * to the resolved address. Only an IP literal or gitlab.com keeps the plain
- * transport — the same split the adapter's fetchGitLabOnce makes.
+ * transport — the same split the adapter's fetchGitLabOnce makes. Both
+ * transports read the reply within MAX_GITLAB_RESPONSE_BYTES; the plain
+ * transport returns it buffered within that limit.
  */
 async function fetchGitLabValidated(url: string, init: RequestInit): Promise<Response> {
   const resolvedUrl = await resolveGitLabUrlSafely(url);
   if (!resolvedUrl.address) {
-    return fetch(url, { ...init, redirect: 'manual' });
+    return readBoundedGitLabResponse(await fetch(url, { ...init, redirect: 'manual' }));
   }
   return fetchGitLabBoundToAddress({ ...resolvedUrl, address: resolvedUrl.address }, init);
+}
+
+/**
+ * Read the plain transport's reply within MAX_GITLAB_RESPONSE_BYTES, mirroring
+ * fetchGitLabBoundToAddress: a declared length above the limit is answered
+ * without reading the body, and the reply is otherwise returned buffered
+ * within the limit.
+ */
+async function readBoundedGitLabResponse(response: Response): Promise<Response> {
+  // Response rejects a body for these statuses, so they keep their own object.
+  if (response.body === null || [204, 205, 304].includes(response.status)) {
+    return response;
+  }
+
+  const declaredLength = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_GITLAB_RESPONSE_BYTES) {
+    await response.body.cancel().catch(() => undefined);
+    throw new Error(GITLAB_RESPONSE_TOO_LARGE_MESSAGE);
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let responseBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      responseBytes += value.byteLength;
+      if (responseBytes > MAX_GITLAB_RESPONSE_BYTES) {
+        await reader.cancel().catch(() => undefined);
+        throw new Error(GITLAB_RESPONSE_TOO_LARGE_MESSAGE);
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const body = new Uint8Array(responseBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
 }
 
 /**
@@ -209,7 +265,7 @@ function fetchGitLabBoundToAddress(
           const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
           responseBytes += buffer.byteLength;
           if (responseBytes > MAX_GITLAB_RESPONSE_BYTES) {
-            const error = new Error('GitLab response exceeded size limit');
+            const error = new Error(GITLAB_RESPONSE_TOO_LARGE_MESSAGE);
             response.destroy(error);
             req.destroy(error);
             reject(error);
@@ -409,9 +465,9 @@ export async function getMergeRequest(
     // Counts come from the diffs. Fold every page GitLab will serve — it caps
     // a merge request's diff collection at the project's `diff_max_files`
     // (1000 by default), which the page bound covers — so a large merge
-    // request reports complete totals instead of its first 150 files. Each page
-    // is folded into the running counters the moment it arrives and dropped, so
-    // the walk never holds the parsed diff text it only reads once.
+    // request reports complete totals. Each page is folded into the running
+    // counters the moment it arrives and dropped, so the walk never holds the
+    // parsed diff text it only reads once.
     let diffFileCount = 0;
     let additions = 0;
     let deletions = 0;
@@ -458,7 +514,7 @@ export async function getMergeRequest(
       updatedAt: detail.updated_at ?? '',
     };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, owner);
   }
 }
 
@@ -479,7 +535,7 @@ export async function listChangedFiles(
       nextCursor: cursorForPage(access.projectPath, page, diffs.length),
     };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, owner);
   }
 }
 
@@ -522,7 +578,7 @@ export async function getFileLines(
     const end = Math.max(start, Math.min(cappedEnd, allLines.length));
     return { lines: allLines.slice(start - 1, end), totalLines: allLines.length };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, owner);
   }
 }
 
@@ -587,7 +643,7 @@ export async function listDiscussions(
       nextCursor: cursorForPage(access.projectPath, page, discussions.length),
     };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, owner);
   }
 }
 
@@ -629,8 +685,29 @@ export async function listChecks(
     }
     return { checks };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, owner);
   }
+}
+
+/**
+ * The inbox lists the acting account's own review requests, so a provider 403
+ * on that read is the CONNECTION's — there is no merge-request role in play.
+ * `classifyGitLabErrorForOwner` already resolves an organization connection's
+ * 403 to `reconnect`; this adds the personal arm and, for both, copy that
+ * names the inbox the person was reading instead of a merge request, which
+ * the list request never mentioned.
+ */
+function classifyInboxError(error: unknown, owner: GitLabReviewOwner): GitLabReviewError {
+  // The provider status has to be read before the owner-aware step: that step
+  // rewrites an organization connection's 403 into a reconnect whose copy
+  // names a merge request, which this list request never mentioned.
+  if (classifyGitLabError(error).providerStatus !== 403) {
+    return classifyGitLabErrorForOwner(error, owner);
+  }
+  return new GitLabReviewError(
+    'reconnect',
+    'Your GitLab connection cannot read your review requests. Reconnect GitLab and try again.'
+  );
 }
 
 /**
@@ -643,8 +720,8 @@ export async function listInbox(
   cursor?: string,
   instanceHint?: string
 ): Promise<ProviderPrInboxPage> {
-  const access = await authorizeOwner(owner, instanceHint);
   try {
+    const access = await authorizeOwner(owner, instanceHint);
     const me = await fetchGitLabUser(access.accessToken, access.instanceUrl);
     const identity = `gitlab-inbox:${owner.type === 'user' ? owner.userId : `${owner.organizationId}:${owner.userId}`}`;
     const page = decodePageCursor(cursor, identity);
@@ -672,13 +749,19 @@ export async function listInbox(
     for (const mr of mergeRequests) {
       const ref = inboxRefFrom(mr, access.instanceUrl);
       if (!ref) continue;
+      // The adapter's author type omits `avatar_url`, but the list API
+      // returns it; narrow instead of asserting the field into existence.
+      const avatarUrl =
+        mr.author && 'avatar_url' in mr.author && typeof mr.author.avatar_url === 'string'
+          ? mr.author.avatar_url
+          : null;
       items.push({
         ref,
         title: mr.title,
         author: mr.author
           ? {
               login: mr.author.username,
-              avatarUrl: (mr.author as { avatar_url?: string | null }).avatar_url ?? null,
+              avatarUrl,
             }
           : null,
         state: mapMergeRequestState(mr.state),
@@ -688,7 +771,7 @@ export async function listInbox(
     }
     return { items, nextCursor: cursorForPage(identity, page, mergeRequests.length) };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyInboxError(error, owner);
   }
 }
 
@@ -830,7 +913,7 @@ export async function getMergeState(
       blockedReasons,
     };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, owner);
   }
 }
 

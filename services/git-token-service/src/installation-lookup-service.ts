@@ -530,16 +530,48 @@ export class InstallationLookupService {
     }
   }
 
+  /**
+   * Resolves an active workflow integration that belongs to `owner`: a
+   * personal integration of `owner.userId`, or, with `owner.orgId`, an
+   * organization integration of an org that `owner.userId` belongs to.
+   */
   async findActiveAssociationById(
-    integrationId: string
+    integrationId: string,
+    owner: { userId: string; orgId?: string }
   ): Promise<
     | { success: true; installationId: string; githubAppType: 'standard' | 'lite' }
     | { success: false }
   > {
-    if (!this.isConfigured() || !z.string().uuid().safeParse(integrationId).success) {
+    if (
+      !this.isConfigured() ||
+      !z.string().uuid().safeParse(integrationId).success ||
+      owner.userId.length === 0 ||
+      (owner.orgId !== undefined && !z.string().uuid().safeParse(owner.orgId).success)
+    ) {
       return { success: false };
     }
     const db = this.getDb();
+    const integrationOwner =
+      owner.orgId === undefined
+        ? and(
+            eq(platform_integrations.owned_by_user_id, owner.userId),
+            isNull(platform_integrations.owned_by_organization_id)
+          )
+        : and(
+            eq(platform_integrations.owned_by_organization_id, sql`${owner.orgId}::uuid`),
+            isNull(platform_integrations.owned_by_user_id),
+            exists(
+              db
+                .select({ id: organization_memberships.id })
+                .from(organization_memberships)
+                .where(
+                  and(
+                    eq(organization_memberships.organization_id, sql`${owner.orgId}::uuid`),
+                    eq(organization_memberships.kilo_user_id, owner.userId)
+                  )
+                )
+            )
+          );
     const rows = await db
       .select({
         installationId: sql<
@@ -559,6 +591,7 @@ export class InstallationLookupService {
       .where(
         and(
           eq(platform_integrations.id, integrationId),
+          integrationOwner,
           eq(platform_integrations.github_connection_role, 'workflow'),
           eq(platform_integrations.platform, 'github'),
           eq(platform_integrations.integration_type, 'app'),

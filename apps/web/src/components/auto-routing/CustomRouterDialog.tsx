@@ -18,7 +18,6 @@ import {
 import { useMutation } from '@tanstack/react-query';
 import { Trash2 } from 'lucide-react';
 import React, { useId, useMemo, useState } from 'react';
-import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -112,7 +111,7 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
         .filter(
           model =>
             !isVirtualAutoModelId(model.id) &&
-            !model.id.startsWith(CUSTOM_LLM_PREFIX) &&
+            !model.isCustomLlm &&
             !entryKeys.has(customRouterEntryKey({ kind: 'gateway', model: model.id }))
         )
         .map(model => ({

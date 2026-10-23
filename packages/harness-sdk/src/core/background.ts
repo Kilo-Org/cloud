@@ -29,11 +29,25 @@ import type { Wiring } from './wiring.js';
  * waits for it. Nothing is lost by waiting: what it will say is already in
  * hand, and the round is built fresh on each attempt.
  */
-const whenBusy = Schedule.spaced(Duration.millis(50)).pipe(Schedule.upTo(Duration.minutes(5)));
+const whenBusy = Schedule.spaced(Duration.millis(50)).pipe(
+  Schedule.upTo({ duration: Duration.minutes(5) })
+);
 
 const partsIn = (run: readonly Waiting[]) => run.flatMap(one => one.parts);
 
 const idsIn = (run: readonly Waiting[]) => run.map(one => one.id);
+
+/**
+ * What the caller is told on `continued` when a round the session started fails.
+ *
+ * The round is what failed, and the failure goes out on the same stream that
+ * carries every other round: a caller who lost their subscription to the first
+ * refused round would never hear about any round after it.
+ */
+const sayFailed =
+  (wiring: Wiring, answering: readonly string[]) =>
+  (failed: ModelError | StoreError): Effect.Effect<void> =>
+    Effect.asVoid(PubSub.publish(wiring.continued, { answering, failed }));
 
 /**
  * One round: what waited goes in as a turn, the model answers, and everything
@@ -57,15 +71,21 @@ const attempt = (wiring: Wiring): Effect.Effect<void, SessionBusyError> =>
         ? Effect.void
         : Stream.runForEach(askHeld(wiring)(partsIn(run), run[0]?.options), event =>
             say({ answering, event })
-          ).pipe(
-            /* The round is what failed, and the caller is told so on the same
-               stream that carries every other round. */
-            Effect.catchAll((failed: ModelError | StoreError) =>
-              Effect.asVoid(say({ answering, failed }))
-            )
-          );
+          ).pipe(Effect.catch(sayFailed(wiring, answering)));
     })
   );
+
+/**
+ * What the driver does with a round it never got to run: tells the caller, and
+ * rings the bell again for the line that still holds the message.
+ */
+const giveUp =
+  (wiring: Wiring) =>
+  (failed: SessionBusyError): Effect.Effect<void> =>
+    Effect.andThen(
+      PubSub.publish(wiring.continued, { answering: [], failed }),
+      wake(wiring.pending)
+    );
 
 /**
  * Waits on the line for as long as the session lives.
@@ -83,7 +103,7 @@ const attempt = (wiring: Wiring): Effect.Effect<void, SessionBusyError> =>
  */
 const drivePending = (wiring: Wiring): Effect.Effect<void> =>
   Effect.forever(
-    Effect.zipRight(
+    Effect.andThen(
       Queue.take(wiring.pending.arrived),
       attempt(wiring).pipe(
         Effect.retry({ while: () => true, schedule: whenBusy }),
@@ -93,12 +113,7 @@ const drivePending = (wiring: Wiring): Effect.Effect<void> =>
            them is spent, though, so the bell is rung again — otherwise the line
            waits on the next thing to join it, and a caller's last message is
            never asked. */
-        Effect.catchAll(failed =>
-          Effect.zipRight(
-            PubSub.publish(wiring.continued, { answering: [], failed }),
-            wake(wiring.pending)
-          )
-        )
+        Effect.catch(giveUp(wiring))
       )
     )
   );

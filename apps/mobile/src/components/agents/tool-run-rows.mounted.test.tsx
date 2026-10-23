@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { setConfig } from '@/lib/tool-summary-translation/tool-summary-translation-runtime';
 
-import { textWithContent } from './fixed-part-row.mounted.test-helpers';
+import { findHost, textWithContent } from './fixed-part-row.mounted.test-helpers';
 import { CondensedToolRunRow } from './tool-run-rows';
 
 const { requestMock, readMock, writeMock } = vi.hoisted(() => ({
@@ -35,6 +35,7 @@ vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'Activ
 // The Flow-sourced react-native runtime cannot parse under vitest, so the icon
 // module is stubbed with sentinels; the row only reads the mappings.
 vi.mock('@/components/ui/icons', () => ({
+  AlertTriangle: 'AlertTriangle',
   Cpu: 'Cpu',
   Eye: 'Eye',
   FileDiff: 'FileDiff',
@@ -210,6 +211,32 @@ describe('CondensedToolRunRow label', () => {
     await advance(RETRY_WINDOW_MS);
     expect(requestMock).toHaveBeenCalledTimes(2);
     expect(textWithContent(renderer.root, '3 items; Nouveau fichier')).toHaveLength(1);
+    renderer.unmount();
+  });
+
+  it('settles on count plus summary with the icon-only failure badge once the retry budget is spent', async () => {
+    // Every batch fails: the first request, then two shared-retry replays.
+    requestMock.mockRejectedValue(new Error('gateway down'));
+    setConfig({ enabled: true, model: MODEL });
+    vi.useFakeTimers();
+    const renderer = renderCondensed(runOf('exhausted.ts'));
+
+    await advance(BATCH_WINDOW_SETTLE_MS);
+    await advance(RETRY_WINDOW_MS);
+    await advance(RETRY_WINDOW_MS);
+    // Three failed outcomes exhaust the budget: the row stops waiting, so the
+    // label carries the count plus the last summary instead of staying
+    // count-only, and the icon-only badge replaces the text badge. The shared
+    // retry below keeps replaying in the background (its budget was spent but
+    // the row-level wait is what the failure state ends), so pin exactly the
+    // three exhaustion outcomes before asserting the settled label.
+    expect(requestMock.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(textWithContent(renderer.root, '3 items; exhausted.ts')).toHaveLength(1);
+    expect(textWithContent(renderer.root, 'Translation failed')).toHaveLength(0);
+    expect(findHost(renderer.root, 'AlertTriangle')).toHaveLength(1);
+    // The spoken failure state rides the row's accessible label.
+    const pressable = renderer.root.findByProps({ accessibilityRole: 'button' });
+    expect(pressable.props.accessibilityLabel).toBe('3 items; exhausted.ts, Translation failed');
     renderer.unmount();
   });
 

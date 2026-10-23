@@ -939,6 +939,22 @@ export async function listChecks(
 }
 
 /**
+ * The inbox lists the workspace's open pull requests, so a provider permission
+ * refusal on that read is the CONNECTION's — no pull-request role is involved.
+ * Left as `forbidden` it becomes the member's "you don't have permission"
+ * state, which is wrong for someone who does have organization access; the
+ * connection needs reconnecting.
+ */
+function classifyInboxError(error: unknown): BitbucketReviewError {
+  const classified = classifyBitbucketError(error);
+  if (classified.kind !== 'forbidden') return classified;
+  return new BitbucketReviewError(
+    'reconnect',
+    'Your Bitbucket connection cannot read your review requests. Reconnect Bitbucket and try again.'
+  );
+}
+
+/**
  * Open pull requests across the connected workspace, for the PR Review inbox.
  * Each item carries platform, workspace, and repository identity, so the list
  * can never navigate into a different provider's repo.
@@ -962,8 +978,8 @@ export async function listInbox(
   owner: BitbucketReviewOwner,
   cursor?: string
 ): Promise<ProviderPrInboxPage> {
-  const access = await authorizeWorkspace(owner);
   try {
+    const access = await authorizeWorkspace(owner);
     const identity = `bitbucket-inbox:${access.workspace.slug}`;
     const page = decodeInboxPageCursor(cursor, identity);
     if (page > MAX_INBOX_PROVIDER_PAGES) {
@@ -1034,7 +1050,7 @@ export async function listInbox(
           : null,
     };
   } catch (error) {
-    throw classifyBitbucketError(error);
+    throw classifyInboxError(error);
   }
 }
 
@@ -1349,9 +1365,7 @@ async function latestBuildStateFor(
 export type BitbucketReviewStatusParticipant = {
   login: string;
   avatarUrl: string | null;
-  /** Whether the participant has approved the pull request. */
   approved: boolean;
-  /** True when the participant holds the REVIEWER role. */
   reviewer: boolean;
 };
 

@@ -1,4 +1,16 @@
 import { i18n } from '@/i18n';
+import type en from '@/i18n/locales/en.json';
+
+/** `Object.hasOwn` under a short name so the map lookup stays one line. */
+const hasOwn = Object.hasOwn;
+
+/**
+ * Every catalog key a translated-at-render auth error may carry. Derived from
+ * the English catalog's `authErrors` section, so a typo or a key the catalog
+ * dropped is a compile error instead of a raw key rendered to the user.
+ */
+type AuthErrorsSection = (typeof en)['authErrors'];
+export type AuthErrorMessageKey = `authErrors.${keyof AuthErrorsSection & string}`;
 
 /**
  * Server error code to catalog key. The map holds keys, never English: a code
@@ -25,7 +37,7 @@ const AUTH_ERROR_KEYS = {
   TIMEOUT: 'authErrors.signInTimedOut',
   // Admission: server refuses the device under enforce mode — non-retryable.
   ADMISSION_REQUIRED: 'authErrors.admissionRequired',
-} satisfies Record<string, string>;
+} satisfies Record<string, AuthErrorMessageKey>;
 
 /** The message shown when no code matched, in the active language. */
 export function defaultErrorMessage(): string {
@@ -37,9 +49,23 @@ export function retryableAdmissionError(): string {
   return i18n.t('authErrors.retryableAdmission');
 }
 
+/**
+ * Server error code to catalog key, untranslated. Render-time translation (an
+ * inline field error or a banner that survives a language switch) must call
+ * `t` on this key when it renders, not store `mapError`'s output — an already
+ * translated string freezes the language it was mapped in.
+ */
+export function mapErrorKey(errorCode: string | undefined): AuthErrorMessageKey {
+  if (!errorCode) {
+    return 'authErrors.default';
+  }
+  return hasOwn(AUTH_ERROR_KEYS, errorCode)
+    ? AUTH_ERROR_KEYS[errorCode as keyof typeof AUTH_ERROR_KEYS]
+    : 'authErrors.default';
+}
+
 export function mapError(errorCode: string | undefined): string {
-  const key = errorCode && AUTH_ERROR_KEYS[errorCode as keyof typeof AUTH_ERROR_KEYS];
-  return key ? i18n.t(key) : defaultErrorMessage();
+  return i18n.t(mapErrorKey(errorCode));
 }
 
 /**

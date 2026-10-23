@@ -1538,7 +1538,6 @@ describe('createExtensionAgentSessionManager', () => {
         kiloSessionId: SESSION_ID,
         mode: 'code',
         model: 'gpt-4',
-        needsLegacyPrepare: false,
         organizationId: null,
         prompt: 'do stuff',
         repository: 'user/repo',
@@ -1547,46 +1546,6 @@ describe('createExtensionAgentSessionManager', () => {
         variant: 'thinking',
       });
       expect(data.runtimeAgents).toStrictEqual([{ name: 'Ask', slug: 'ask' }]);
-    });
-
-    it('maps needsLegacyPrepare when cloud_agent_session_id exists but no runtimeState', async () => {
-      const trpc = makeTrpcMock();
-      trpc.cliSessionsV2.getWithRuntimeState.query = mockQuery({
-        associatedPr: null,
-        cloud_agent_session_id: CLOUD_AGENT_ID,
-        created_on_platform: 'cli',
-        git_branch: null,
-        git_url: null,
-        organization_id: null,
-        runtimeState: null,
-        session_id: SESSION_ID,
-        title: null,
-        total_cost_microdollars: null,
-      });
-      const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
-      createExtensionAgentSessionManager(opts);
-      const data = await capturedConfig!.fetchSession(SESSION_ID);
-      expect(data.needsLegacyPrepare).toBe(true);
-    });
-
-    it('sets needsLegacyPrepare false when cloud_agent_session_id is empty string', async () => {
-      const trpc = makeTrpcMock();
-      trpc.cliSessionsV2.getWithRuntimeState.query = mockQuery({
-        associatedPr: null,
-        cloud_agent_session_id: '',
-        created_on_platform: 'cli',
-        git_branch: null,
-        git_url: null,
-        organization_id: null,
-        runtimeState: null,
-        session_id: SESSION_ID,
-        title: null,
-        total_cost_microdollars: null,
-      });
-      const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
-      createExtensionAgentSessionManager(opts);
-      const data = await capturedConfig!.fetchSession(SESSION_ID);
-      expect(data.needsLegacyPrepare).toBe(false);
     });
 
     it('sets isPreparingAsync true when runtimeState exists but preparedAt is missing', async () => {

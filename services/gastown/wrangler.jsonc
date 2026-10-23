@@ -75,6 +75,8 @@
     "GASTOWN_API_URL": "https://gastown.kiloapps.io",
     "WASTELAND_API_URL": "https://wasteland.kiloapps.io",
     "GASTOWN_BILLING_ENABLED": "true",
+    // PostHog project token (public, safe to commit) for the gastown-access flag.
+    "NEXT_PUBLIC_POSTHOG_KEY": "phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z",
   },
 
   // Hyperdrive binding for Postgres (user lookups, token generation)
@@ -141,6 +143,7 @@
         "GASTOWN_API_URL": "http://192.168.65.254:8803",
         "WASTELAND_API_URL": "http://192.168.65.254:8788",
         "GASTOWN_BILLING_ENABLED": "true",
+        "NEXT_PUBLIC_POSTHOG_KEY": "phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z",
       },
       "containers": [
         {

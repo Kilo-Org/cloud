@@ -8,6 +8,8 @@ import { z } from 'zod';
  * provider would answer it.
  */
 import { REFRESH_HISTORY_TTL_MS } from './session-lifetime';
+import { REFRESH_TOKEN_REUSE_DETAIL } from '../analytics';
+import type { McpAnalytics } from '../analytics';
 
 export const TOKEN_ENDPOINT_PATH = '/token';
 
@@ -28,6 +30,13 @@ export type RefreshReuseStore = {
 export type RefreshReuseDeps = {
   store: RefreshReuseStore;
   revokeGrant(grantId: string, userId: string): Promise<void>;
+  /**
+   * Sign-in telemetry, created lazily because only a reuse rejection emits.
+   * The rejection answers from the Durable Object before the provider runs, so
+   * it never reaches the provider's `onError` hook; without this the one path
+   * that destroys a session is the only one invisible in production logs.
+   */
+  analytics?: () => McpAnalytics;
 };
 
 const tokenPartsSchema = z.tuple([z.string().min(1), z.string().min(1), z.string().min(1)]);
@@ -107,6 +116,15 @@ export async function detectRefreshTokenReuse(
   // The grant is revoked now, so no hash of it can authenticate another replay:
   // forget the history rather than leaving it for the history TTL.
   await deps.store.forgetRefreshTokens({ userId: issued.userId, grantId: issued.grantId });
+  // The provider never sees this request, so this event is the only record that
+  // a live session was destroyed and why. It carries the account the grant
+  // belonged to, never the grant id or either token.
+  deps.analytics?.().oauthSignIn({
+    phase: 'failed',
+    identity: { kiloUserId: issued.userId, organizationId: null },
+    reason: 'invalid_grant',
+    detail: REFRESH_TOKEN_REUSE_DETAIL,
+  });
   return reuseDetectedResponse(request);
 }
 

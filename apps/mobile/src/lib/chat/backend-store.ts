@@ -222,7 +222,7 @@ const store = createSecureStorePreference<StoredChatBackend[]>({
 });
 store.preload();
 
-export const listChatBackends = store.get;
+export const listChatBackends = store.getRequested;
 export const subscribeChatBackends = store.subscribe;
 export const getChatBackendsHasLoaded = store.getHasLoaded;
 export const waitForChatBackends = store.whenLoaded;
@@ -236,7 +236,7 @@ export function addChatBackend(draft: ChatBackendDraft): StoredChatBackend {
     id: randomUUID(),
     revision: 1,
   });
-  const profiles = [...store.get(), backend];
+  const profiles = [...store.getRequested(), backend];
   Object.freeze(profiles);
   store.set(profiles);
   return backend;
@@ -246,7 +246,7 @@ export function updateChatBackend(id: string, draft: ChatBackendDraft): StoredCh
   if (!store.getHasLoaded()) {
     throw new BackendInputError('notLoaded');
   }
-  const profiles = store.get();
+  const profiles = store.getRequested();
   const previous = profiles.find(profile => profile.id === id);
   if (!previous || previous.revision >= Number.MAX_SAFE_INTEGER) {
     throw new BackendInputError('staleBackend');
@@ -266,7 +266,7 @@ export function deleteChatBackend(id: string): void {
   if (!store.getHasLoaded()) {
     throw new BackendInputError('notLoaded');
   }
-  const profiles = store.get().filter(profile => profile.id !== id);
+  const profiles = store.getRequested().filter(profile => profile.id !== id);
   Object.freeze(profiles);
   store.set(profiles);
 }

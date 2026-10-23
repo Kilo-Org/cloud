@@ -2,8 +2,10 @@ import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { DECIDER_CASES } from './datasets/decider-cases';
+import { DeciderGraderRetryError } from './grading';
 import {
   acceptContainerCaseResult,
+  computeEngineIdentity,
   PAID_OUTPUT_WAIT_MS,
   processJob,
   type BenchmarkJobMessage,
@@ -12,6 +14,7 @@ import {
   claimScheduledChunks,
   scheduleRunChunks,
   schedulerConfig,
+  type PaidExecutionKey,
   type SchedulerClaim,
 } from './scheduler';
 
@@ -27,6 +30,8 @@ describe('a paid case whose queue invocation is canceled (production migrations 
   let sent: Sent[];
   let runRequests: Request[];
   let runStarted: PromiseWithResolvers<void>;
+  let retryStarted: PromiseWithResolvers<void>;
+  let runResponses: PromiseWithResolvers<Response>[];
   let claim: SchedulerClaim;
   let delivery: BenchmarkJobMessage;
   let answer: string;
@@ -42,15 +47,19 @@ describe('a paid case whose queue invocation is canceled (production migrations 
     sent = [];
     runRequests = [];
     runStarted = Promise.withResolvers<void>();
+    retryStarted = Promise.withResolvers<void>();
+    runResponses = [];
     const container = {
       async fetch(request: Request): Promise<Response> {
         if (new URL(request.url).pathname === '/warmup') {
           return Response.json({ exitCode: 0, durationMs: 1 });
         }
         runRequests.push(request);
-        runStarted.resolve();
-        // The invocation awaiting this case is canceled, so its answer never arrives.
-        return Promise.withResolvers<Response>().promise;
+        const response = Promise.withResolvers<Response>();
+        runResponses.push(response);
+        if (runRequests.length === 1) runStarted.resolve();
+        else retryStarted.resolve();
+        return response.promise;
       },
     };
     env = {
@@ -73,9 +82,9 @@ describe('a paid case whose queue invocation is canceled (production migrations 
       INSERT INTO benchmark_runs (
         id, router, kind, purpose, status, started_at, min_accuracy, switch_cost_factor,
         max_concurrency, repetitions, engine_identity, benchmark_user_id, benchmark_org_id
-      ) VALUES (?, 'efficient', 'decider', 'platform', 'running', ?, 0.7, 3, 0, 1, 'redelivery-test', 'bot-internal-benchmark', 'benchmark-org')
+      ) VALUES (?, 'efficient', 'decider', 'platform', 'running', ?, 0.7, 3, 0, 1, ?, 'bot-internal-benchmark', 'benchmark-org')
     `)
-      .run(RUN_ID, new Date(NOW).toISOString());
+      .run(RUN_ID, new Date(NOW).toISOString(), computeEngineIdentity('decider', 'efficient'));
     const models = ['lane/model', 'other/model'];
     for (const model of models) {
       sqlite
@@ -122,6 +131,56 @@ describe('a paid case whose queue invocation is canceled (production migrations 
     return sqlite
       .prepare('SELECT model, case_id, score, latency_ms, exit_code FROM case_results')
       .all();
+  }
+
+  async function callbackExecution(index = 0) {
+    const { resultCallback } = await runRequests[index].clone().json<{
+      resultCallback: { execution: PaidExecutionKey };
+    }>();
+    return resultCallback.execution;
+  }
+
+  function completedOutcome(text = answer) {
+    return {
+      kind: 'completed',
+      response: {
+        exitCode: 0,
+        durationMs: 4_000,
+        stdoutLines: text
+          ? [JSON.stringify({ type: 'text', part: { text, time: { end: 1 } } })]
+          : [],
+        stderrTail: '',
+      },
+    };
+  }
+
+  function expectedCaseResult() {
+    return {
+      model: claim.model,
+      case_id: JSON.parse(claim.case_ids)[0],
+      score: 1,
+      latency_ms: 4_000,
+      exit_code: 0,
+    };
+  }
+
+  function outputRecoveryMessage() {
+    expect(sent).toEqual([
+      {
+        body: {
+          runId: RUN_ID,
+          kind: 'decider',
+          model: claim.model,
+          variant: null,
+          rep: claim.rep,
+          caseIds: JSON.parse(claim.case_ids),
+          recoverOutput: true,
+        },
+      },
+    ]);
+    const recovery = sent[0]?.body;
+    if (!recovery) throw new Error('Expected an output recovery message');
+    return recovery;
   }
 
   async function cancelDuringPaidCase() {
@@ -193,6 +252,155 @@ describe('a paid case whose queue invocation is canceled (production migrations 
     expect(sent[0]?.body.claimId).not.toBe(claim.id);
   });
 
+  it('grades output arriving after the lane deadline through its recovery message without another CLI call', async () => {
+    await cancelDuringPaidCase();
+    await redeliverAt(NOW + PAID_OUTPUT_WAIT_MS);
+    expect(storedChunk(claim.id)).toEqual({ status: 'failed', token: claim.token, slot: null });
+    expect(caseResults()).toEqual([]);
+    sent = [];
+    vi.setSystemTime(NOW + PAID_OUTPUT_WAIT_MS + 60_000);
+
+    await expect(
+      acceptContainerCaseResult(env, {
+        execution: await callbackExecution(),
+        outcome: completedOutcome(),
+      })
+    ).resolves.toBe(true);
+    const recovery = outputRecoveryMessage();
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM pending_decider_outputs').get()?.n).toBe(1);
+
+    await processJob(env, recovery);
+
+    expect(caseResults()).toEqual([expectedCaseResult()]);
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM pending_decider_outputs').get()?.n).toBe(0);
+    expect(laneFailures()).toEqual([
+      { model: claim.model, variant: claim.variant, rep: claim.rep, chunk: claim.chunk },
+    ]);
+    expect(storedChunk(claim.id)).toEqual({ status: 'failed', token: claim.token, slot: null });
+    expect(runRequests).toHaveLength(1);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['completed', 'failed'])(
+    'grades late output through its recovery message after the source run is %s',
+    async status => {
+      await cancelDuringPaidCase();
+      vi.setSystemTime(NOW + PAID_OUTPUT_WAIT_MS + 60_000);
+      const completedAt = new Date().toISOString();
+      sqlite
+        .prepare('UPDATE benchmark_runs SET status = ?, completed_at = ? WHERE id = ?')
+        .run(status, completedAt, RUN_ID);
+
+      await expect(
+        acceptContainerCaseResult(env, {
+          execution: await callbackExecution(),
+          outcome: completedOutcome(),
+        })
+      ).resolves.toBe(true);
+      await processJob(env, outputRecoveryMessage());
+
+      expect(caseResults()).toEqual([expectedCaseResult()]);
+      expect(sqlite.prepare('SELECT COUNT(*) AS n FROM pending_decider_outputs').get()?.n).toBe(0);
+      expect(
+        sqlite.prepare('SELECT status, completed_at FROM benchmark_runs WHERE id = ?').get(RUN_ID)
+      ).toEqual({ status, completed_at: completedAt });
+      expect(laneFailures()).toEqual([]);
+      expect(runRequests).toHaveLength(1);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('does not write a second measurement for concurrent or redelivered output recovery messages', async () => {
+    await cancelDuringPaidCase();
+    await redeliverAt(NOW + PAID_OUTPUT_WAIT_MS);
+    sent = [];
+    await expect(
+      acceptContainerCaseResult(env, {
+        execution: await callbackExecution(),
+        outcome: completedOutcome(),
+      })
+    ).resolves.toBe(true);
+    const recovery = outputRecoveryMessage();
+    sqlite.exec(`
+      CREATE TEMP TABLE measurement_writes (operation TEXT NOT NULL);
+      CREATE TEMP TRIGGER record_measurement_insert AFTER INSERT ON case_results
+      BEGIN
+        INSERT INTO measurement_writes VALUES ('insert');
+      END;
+      CREATE TEMP TRIGGER record_measurement_update AFTER UPDATE ON case_results
+      BEGIN
+        INSERT INTO measurement_writes VALUES ('update');
+      END;
+    `);
+
+    const deliveries = await Promise.allSettled([
+      processJob(env, recovery),
+      processJob(env, recovery),
+    ]);
+    expect(deliveries.some(result => result.status === 'fulfilled')).toBe(true);
+    for (const result of deliveries) {
+      if (result.status === 'rejected') {
+        expect(result.reason).toBeInstanceOf(DeciderGraderRetryError);
+      }
+    }
+    await processJob(env, recovery);
+
+    expect(caseResults()).toEqual([expectedCaseResult()]);
+    expect(sqlite.prepare('SELECT operation FROM measurement_writes').all()).toEqual([
+      { operation: 'insert' },
+    ]);
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM pending_decider_outputs').get()?.n).toBe(0);
+    expect(runRequests).toHaveLength(1);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects the first attempt callback after an empty-output retry advances the execution generation', async () => {
+    await cancelDuringPaidCase();
+    const firstExecution = await callbackExecution();
+    const firstResponse = runResponses[0];
+    if (!firstResponse) throw new Error('Expected the first CLI response to be pending');
+    firstResponse.resolve(Response.json(completedOutcome('').response));
+    await retryStarted.promise;
+    const retryExecution = await callbackExecution(1);
+    expect(firstExecution.attemptStartedAt).toBe(NOW);
+    expect(retryExecution.attemptStartedAt).toBe(NOW + 1);
+    expect(retryExecution.token).toBe(firstExecution.token);
+
+    await expect(
+      acceptContainerCaseResult(env, {
+        execution: firstExecution,
+        outcome: completedOutcome('stale output'),
+      })
+    ).resolves.toBe(false);
+    await expect(
+      acceptContainerCaseResult(env, {
+        execution: firstExecution,
+        outcome: { kind: 'not_started' },
+      })
+    ).resolves.toBe(false);
+    expect(sqlite.prepare('SELECT started_at FROM scheduler_executions').all()).toEqual([
+      { started_at: NOW + 1 },
+    ]);
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM pending_decider_outputs').get()?.n).toBe(0);
+    expect(sent).toEqual([]);
+
+    await expect(
+      acceptContainerCaseResult(env, {
+        execution: retryExecution,
+        outcome: completedOutcome(),
+      })
+    ).resolves.toBe(true);
+    await redeliverAt(NOW + 30_000);
+
+    expect(caseResults()).toEqual([expectedCaseResult()]);
+    expect(sqlite.prepare('SELECT retried FROM case_results').all()).toEqual([{ retried: 1 }]);
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM pending_decider_outputs').get()?.n).toBe(0);
+    expect(laneFailures()).toEqual([]);
+    expect(storedChunk(claim.id)).toEqual({ status: 'completed', token: claim.token, slot: null });
+    expect(runRequests).toHaveLength(2);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it('fails the lane only once the output deadline passes with nothing posted', async () => {
     await cancelDuringPaidCase();
 
@@ -213,5 +421,19 @@ describe('a paid case whose queue invocation is canceled (production migrations 
       { body: expect.objectContaining({ runId: RUN_ID, claimId: expect.any(String) }) },
     ]);
     expect(sent[0]?.body.model).not.toBe(claim.model);
+
+    await redeliverAt(NOW + PAID_OUTPUT_WAIT_MS + 24 * 60 * 60_000);
+    expect(laneFailures()).toEqual([
+      { model: claim.model, variant: claim.variant, rep: claim.rep, chunk: claim.chunk },
+    ]);
+    expect(storedChunk(claim.id)).toEqual({ status: 'failed', token: claim.token, slot: null });
+    expect(sqlite.prepare('SELECT started_at FROM scheduler_executions').all()).toEqual([
+      { started_at: NOW },
+    ]);
+    expect(caseResults()).toEqual([]);
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM pending_decider_outputs').get()?.n).toBe(0);
+    expect(sent).toEqual([]);
+    expect(runRequests).toHaveLength(1);
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });

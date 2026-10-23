@@ -1,6 +1,7 @@
 import * as Haptics from 'expo-haptics';
-import { Switch, View } from 'react-native';
+import { View } from 'react-native';
 
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 
 /**
@@ -10,12 +11,15 @@ import { Text } from '@/components/ui/text';
  */
 export function ToggleRow({
   title,
+  accessibilityLabel,
   subtitle,
   value,
   disabled,
   onValueChange,
 }: Readonly<{
   title: string;
+  /** Names the switch when rows on one screen share a title. Defaults to `title`. */
+  accessibilityLabel?: string;
   subtitle: string;
   value: boolean;
   disabled: boolean;
@@ -30,7 +34,7 @@ export function ToggleRow({
         </Text>
       </View>
       <Switch
-        accessibilityLabel={title}
+        accessibilityLabel={accessibilityLabel ?? title}
         value={value}
         disabled={disabled}
         onValueChange={next => {

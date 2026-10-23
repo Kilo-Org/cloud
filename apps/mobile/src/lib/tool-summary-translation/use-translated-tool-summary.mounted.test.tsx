@@ -357,7 +357,7 @@ function PendingProbe({
 }
 
 function mountPending(text: string): { latest: () => ToolSummaryTranslation; unmount: () => void } {
-  let current: ToolSummaryTranslation = { text: '', pending: false };
+  let current: ToolSummaryTranslation = { text: '', pending: false, failed: false };
   const ref: { renderer: TestRenderer.ReactTestRenderer | undefined } = { renderer: undefined };
   act(() => {
     ref.renderer = TestRenderer.create(
@@ -416,11 +416,11 @@ describe('useToolSummaryTranslation retries an unresolved summary', () => {
 
     await advance(BATCH_WINDOW_SETTLE_MS);
     expect(requestMock).toHaveBeenCalledTimes(1);
-    expect(latest()).toEqual({ text: 'Retry target summary', pending: true });
+    expect(latest()).toEqual({ text: 'Retry target summary', pending: true, failed: false });
 
     await advance(TOOL_SUMMARY_TRANSLATION_RETRY_MS);
     expect(requestMock).toHaveBeenCalledTimes(2);
-    expect(latest()).toEqual({ text: 'Bonjour', pending: false });
+    expect(latest()).toEqual({ text: 'Bonjour', pending: false, failed: false });
     unmount();
   });
 
@@ -446,7 +446,7 @@ describe('useToolSummaryTranslation retries an unresolved summary', () => {
 
     await advance(TOOL_SUMMARY_TRANSLATION_RETRY_MS + BATCH_WINDOW_SETTLE_MS);
     expect(requestMock).toHaveBeenCalledTimes(2);
-    expect(latest()).toEqual({ text: 'Unmounted target summary', pending: true });
+    expect(latest()).toEqual({ text: 'Unmounted target summary', pending: true, failed: false });
 
     unmount();
     await advance(TOOL_SUMMARY_TRANSLATION_RETRY_MS * 3);
@@ -484,7 +484,7 @@ describe('useToolSummaryTranslation retries an unresolved summary', () => {
     // The first replay is still at the base delay.
     await advance(TOOL_SUMMARY_TRANSLATION_RETRY_MS);
     expect(requestMock).toHaveBeenCalledTimes(2);
-    expect(latest()).toEqual({ text: 'Backoff target summary', pending: true });
+    expect(latest()).toEqual({ text: 'Backoff target summary', pending: true, failed: false });
 
     // The next wake is at 2x the base: one base window later nothing new.
     await advance(TOOL_SUMMARY_TRANSLATION_RETRY_MS);
@@ -509,7 +509,7 @@ describe('useToolSummaryTranslation retries an unresolved summary', () => {
     await advance(TOOL_SUMMARY_TRANSLATION_RETRY_MS * 2);
     // No wakeup and no gateway call while offline: only the mount request.
     expect(requestMock).toHaveBeenCalledTimes(1);
-    expect(latest()).toEqual({ text: 'Offline target summary', pending: true });
+    expect(latest()).toEqual({ text: 'Offline target summary', pending: true, failed: false });
 
     onlineManager.setOnline(true);
     await advance(TOOL_SUMMARY_TRANSLATION_RETRY_MS + BATCH_WINDOW_SETTLE_MS);

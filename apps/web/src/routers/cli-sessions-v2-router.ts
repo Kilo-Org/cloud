@@ -1,5 +1,4 @@
 import 'server-only';
-import { recordElevatedOrganizationAdminAction } from '@/lib/admin/admin-action-audit';
 import { createHash } from 'node:crypto';
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import * as z from 'zod';
@@ -34,11 +33,16 @@ import {
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
 import {
+  readFirstPageStreamState,
+  type FirstPageStreamState,
+} from '@/lib/cloud-agent-next/first-page-stream-state';
+import {
   fetchSessionSnapshot,
   fetchSessionMessagesPage,
   fetchSessionDiff,
   deleteSession as deleteSessionIngest,
   shareSession as shareSessionIngest,
+  SessionShareTooLargeError,
   unshareSession as unshareSessionIngest,
 } from '@/lib/session-ingest-client';
 import {
@@ -46,15 +50,17 @@ import {
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
   cloudAgentWorktreeIdSchema,
   isDefaultSessionTitle,
+  sessionShareOptionsSchema,
   projectPrivateWorktreePaths,
   validateKiloSdkMessagesCursor,
   type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
 import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
 import { projectSessionGoal } from '@kilocode/cloud-agent-sdk';
+import { SESSION_ID_RE } from '../../../../services/cloud-agent-next/src/shared/protocol';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
-import { verifyWebhookTriggerAccess } from '@/lib/webhook-trigger-ownership';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { activeOrganizationAccessSql } from '@kilocode/worker-utils/organization-membership';
 import {
   recordKiloAdminElevation,
   UNSCOPED_TARGET,
@@ -108,8 +114,8 @@ const privateTranscriptPathFields = new Set([
 ]);
 const privateTranscriptPathArrays = new Set(['files', 'visibleFiles', 'openTabs']);
 
-function isAbsoluteTranscriptPath(value: string): boolean {
-  return /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(value);
+function isPrivateTranscriptPath(value: string, directory: string): boolean {
+  return /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(value) && !value.startsWith(`${directory}/`);
 }
 
 function projectGroupedTranscriptPaths(value: unknown, directory: string): void {
@@ -130,7 +136,7 @@ function projectGroupedTranscriptPaths(value: unknown, directory: string): void 
         key === 'directory' ||
         key === 'cwd' ||
         key === 'root' ||
-        (privateTranscriptPathFields.has(key) && isAbsoluteTranscriptPath(current))
+        (privateTranscriptPathFields.has(key) && isPrivateTranscriptPath(current, directory))
       ) {
         Reflect.set(value, key, directory);
       } else if ((key === 'url' || key === 'uri') && /^file:/i.test(current)) {
@@ -142,7 +148,7 @@ function projectGroupedTranscriptPaths(value: unknown, directory: string): void 
     if (Array.isArray(current) && privateTranscriptPathArrays.has(key)) {
       for (let index = 0; index < current.length; index += 1) {
         const path = current[index];
-        if (typeof path === 'string' && isAbsoluteTranscriptPath(path)) {
+        if (typeof path === 'string' && isPrivateTranscriptPath(path, directory)) {
           current[index] = directory;
         } else {
           projectGroupedTranscriptPaths(path, directory);
@@ -815,9 +821,10 @@ const RenameSessionInputSchema = z.object({
   title: z.string().trim().min(1).max(200),
 });
 
-const ShareSessionInputSchema = z.object({
+const UnshareSessionInputSchema = z.object({
   session_id: sessionIdField,
 });
+const ShareSessionInputSchema = UnshareSessionInputSchema.extend(sessionShareOptionsSchema.shape);
 
 function addCreatedOnPlatformConditions(
   whereConditions: SQL[],
@@ -891,15 +898,9 @@ async function addOrganizationCondition(
         target: UNSCOPED_TARGET,
       });
     } else {
-      whereConditions.push(sql`(
-        ${cli_sessions_v2.organization_id} IS NULL
-        OR EXISTS (
-          SELECT 1
-          FROM ${organization_memberships}
-          WHERE ${organization_memberships.organization_id} = ${cli_sessions_v2.organization_id}
-            AND ${organization_memberships.kilo_user_id} = ${ctx.user.id}
-        )
-      )`);
+      whereConditions.push(
+        activeOrganizationAccessSql(cli_sessions_v2.organization_id, ctx.user.id)
+      );
     }
     return;
   }
@@ -1561,40 +1562,20 @@ export const cliSessionsV2Router = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const session = await getSessionWithAccessCheck(input.session_id, ctx);
 
-      // Read the event-log watermark from the existing getSession response
-      // for the initial history page, so the transport can use `fromId` on
-      // its first WebSocket connect instead of `replay=false`. Cursor pages
-      // skip the Cloud Agent read — the watermark is only seeded once.
-      // Failures are swallowed and return null so the page endpoint is
-      // never blocked on an optional watermark read. The page response does
-      // not depend on the watermark, so the read runs concurrently with the
-      // worker page fetch rather than serially ahead of it.
+      // The first page also carries what the stream would replay first: the
+      // event-log watermark, so the transport can use `fromId` on its first
+      // WebSocket connect instead of `replay=false`, and the preparation
+      // attempts, so the transcript shows those rows before the stream does.
+      // Cursor pages skip the Cloud Agent reads. Each read fails open to an
+      // empty value, so these optional reads never block the page, and they
+      // run concurrently with the worker page fetch rather than serially.
       const cloudAgentSessionId = !input.cursor ? session.cloud_agent_session_id : null;
-      const watermarkPromise: Promise<number | null> = cloudAgentSessionId
-        ? (async () => {
-            try {
-              const authToken = (
-                await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
-                  headers: ctx.headersList,
-                  organizationId: session.organization_id ?? undefined,
-                  tokenSource: 'cloud-agent',
-                })
-              ).token;
-              const client = createCloudAgentNextClient(authToken);
-              const sessionState = await client.getSession(cloudAgentSessionId);
-              return sessionState.latestEventId ?? null;
-            } catch (error) {
-              console.warn(
-                `Failed to fetch watermark for session ${input.session_id}:`,
-                error instanceof Error ? error.message : error
-              );
-              return null;
-            }
-          })()
-        : Promise.resolve(null);
+      const streamStatePromise: Promise<FirstPageStreamState> = cloudAgentSessionId
+        ? readFirstPageStreamState(ctx, session.organization_id, cloudAgentSessionId)
+        : Promise.resolve({ watermarkEventId: null, preparationAttempts: [] });
 
       // Start the page fetch first so it is in flight before the optional
-      // watermark read above resolves.
+      // stream-state reads above resolve.
       const pagePromise = (async () => {
         try {
           return await fetchSessionMessagesPage(input.session_id, ctx.user.id, {
@@ -1619,9 +1600,13 @@ export const cliSessionsV2Router = createTRPCRouter({
         }
       })();
 
-      // The watermark promise never rejects (it resolves to null on failure),
-      // so a rejecting page promise cannot leave it as an unhandled rejection.
-      const [result, watermarkEventId] = await Promise.all([pagePromise, watermarkPromise]);
+      // The stream-state promise never rejects (each read resolves to an empty
+      // value on failure), so a rejecting page promise cannot leave it as an
+      // unhandled rejection.
+      const [result, { watermarkEventId, preparationAttempts }] = await Promise.all([
+        pagePromise,
+        streamStatePromise,
+      ]);
 
       // The worker returns `null` only for sessions the user cannot read; the
       // router's own access check above already enforces this, so the only
@@ -1653,6 +1638,7 @@ export const cliSessionsV2Router = createTRPCRouter({
             )
           : pageResult),
         watermarkEventId,
+        preparationAttempts,
         ...(sessionGoal === undefined ? {} : { sessionGoal }),
       };
     }),
@@ -1699,9 +1685,9 @@ export const cliSessionsV2Router = createTRPCRouter({
    * This combines the DB fetch (ownership check + metadata) with the DO fetch
    * (mode, model, repository, execution state) in a single call.
    *
-   * For V2 sessions (those with cloud_agent_session_id), this also fetches
-   * runtime state from the cloud-agent DO. For CLI sessions without a
-   * cloud_agent_session_id, runtimeState will be null.
+   * Runtime state is null when no cloud runtime is recorded, its stored ID
+   * is unsupported by the current runtime, or the runtime no longer exists.
+   * Failures reading a supported runtime ID still propagate to the caller.
    */
   getWithRuntimeState: baseProcedure
     .input(GetSessionInputSchema)
@@ -1777,7 +1763,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       // 2. If session has cloud_agent_session_id, fetch runtime state from DO
       let runtimeState: z.infer<typeof baseGetSessionNextOutputSchema> | null = null;
 
-      if (session.cloud_agent_session_id) {
+      if (session.cloud_agent_session_id && SESSION_ID_RE.test(session.cloud_agent_session_id)) {
         try {
           const authToken = (
             await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
@@ -1808,6 +1794,8 @@ export const cliSessionsV2Router = createTRPCRouter({
             });
           }
         }
+      } else if (session.cloud_agent_session_id) {
+        console.debug('Stored runtime identifier is unsupported; returning historical metadata');
       }
 
       return {
@@ -1862,12 +1850,14 @@ export const cliSessionsV2Router = createTRPCRouter({
    * (`platform`/`pr_url`/`pr_number` plus `pr_head_ref`/`pr_head_sha`). The
    * fetched PR is accepted only when `verifySessionPullRequestLink` confirms
    * the link names the session's repo, the PR base and head repositories are
-   * that same repo, the PR head ref is the session's branch, and (when
-   * reported) the session head SHA is the PR head or one of its commits. On
-   * failure the link is left unverified and no live PR is returned (the read
-   * path still shows the session's own pending partial); there is no
-   * branch-name fallback. On success `pr_link_verified_at` is set and the
-   * state cache is upserted by PR identity `(git_url, pr_number, tenant)`.
+   * that same repo, the PR head ref is the branch the session reported pushing
+   * (its `pr_head_ref`, or the stored session branch when the link carries no
+   * head ref), and (when reported) the session head SHA is the PR head or one
+   * of its commits. On failure the link is left unverified and no live PR is
+   * returned (the read path still shows the session's own pending partial);
+   * there is no branch-name fallback. On success `pr_link_verified_at` is set
+   * and the state cache is upserted by PR identity `(git_url, pr_number,
+   * tenant)`.
    */
   refreshAssociatedPullRequest: baseProcedure
     .input(z.object({ sessionId: z.string().min(1) }))
@@ -2244,7 +2234,7 @@ export const cliSessionsV2Router = createTRPCRouter({
     const { session_id } = input;
     const session = await getSessionWithAccessCheck(session_id, ctx);
 
-    if (session.cloud_agent_session_id) {
+    if (session.cloud_agent_session_id && SESSION_ID_RE.test(session.cloud_agent_session_id)) {
       const authToken = (
         await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
           headers: ctx.headersList,
@@ -2335,17 +2325,21 @@ export const cliSessionsV2Router = createTRPCRouter({
   /**
    * Share a V2 session by issuing an opaque JWT share token.
    *
-   * Delegates to the session-ingest worker which is idempotent — if the session
-   * already has an active share generation, the existing one is reused.
+   * Delegates to the session-ingest worker, which rotates the public
+   * capability. Each call issues a fresh share generation and invalidates the
+   * previous link.
    */
   share: baseProcedure.input(ShareSessionInputSchema).mutation(async ({ ctx, input }) => {
-    const { session_id } = input;
+    const { session_id, ...shareOptions } = input;
     await getSessionWithAccessCheck(session_id, ctx);
 
     try {
-      const result = await shareSessionIngest(session_id, ctx.user.id);
+      const result = await shareSessionIngest(session_id, ctx.user.id, shareOptions);
       return { share_token: result.share_token };
     } catch (error) {
+      if (error instanceof SessionShareTooLargeError) {
+        throw new TRPCError({ code: 'PAYLOAD_TOO_LARGE', message: error.message, cause: error });
+      }
       captureException(error, {
         tags: { source: 'cli-sessions-v2-router', endpoint: 'share' },
         extra: { session_id },
@@ -2364,7 +2358,7 @@ export const cliSessionsV2Router = createTRPCRouter({
    * Owner-only, matching the session-ingest worker. A missing or inaccessible
    * session is NOT_FOUND. Worker 404 is mapped the same way.
    */
-  unshare: baseProcedure.input(ShareSessionInputSchema).mutation(async ({ ctx, input }) => {
+  unshare: baseProcedure.input(UnshareSessionInputSchema).mutation(async ({ ctx, input }) => {
     const { session_id } = input;
     await getSessionWithAccessCheck(session_id, ctx);
 
@@ -2386,66 +2380,4 @@ export const cliSessionsV2Router = createTRPCRouter({
       });
     }
   }),
-
-  /**
-   * Share a v2 CLI session from a webhook trigger request.
-   * Creates a read-only public snapshot via the session-ingest worker.
-   *
-   * For org triggers, any org member can share; for personal triggers, only the owner.
-   */
-  shareForWebhookTrigger: baseProcedure
-    .input(
-      z.object({
-        kilo_session_id: z.string().startsWith('ses_'),
-        trigger_id: z.string().min(1),
-        organization_id: z.string().uuid().optional(),
-      })
-    )
-    .mutation(async ({ ctx, input }) => {
-      await verifyWebhookTriggerAccess(ctx, input.trigger_id, input.organization_id);
-
-      // For org triggers, verify the session belongs to the same org.
-      // For personal triggers, verify the session belongs to the requesting user.
-      const ownerCondition = input.organization_id
-        ? eq(cli_sessions_v2.organization_id, input.organization_id)
-        : eq(cli_sessions_v2.kilo_user_id, ctx.user.id);
-
-      const [session] = await db
-        .select({ kilo_user_id: cli_sessions_v2.kilo_user_id })
-        .from(cli_sessions_v2)
-        .where(and(eq(cli_sessions_v2.session_id, input.kilo_session_id), ownerCondition))
-        .limit(1);
-
-      if (!session) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Session not found',
-        });
-      }
-
-      try {
-        const result = await shareSessionIngest(input.kilo_session_id, session.kilo_user_id);
-        if (input.organization_id) {
-          // A public snapshot exposes the transcript; record shares made by a
-          // Kilo admin who is not a member. The share token is never logged.
-          await recordElevatedOrganizationAdminAction(ctx, {
-            organizationId: input.organization_id,
-            requiredRoles: ['owner', 'admin', 'billing_manager', 'member'],
-            action: 'organization.webhook_session.share',
-            message: 'Created public share of a webhook-trigger session',
-            metadata: {
-              sessionId: input.kilo_session_id,
-              triggerId: input.trigger_id,
-              sessionOwnerKiloUserId: session.kilo_user_id,
-            },
-          });
-        }
-        return { share_token: result.share_token, session_id: input.kilo_session_id };
-      } catch (error) {
-        if (error instanceof Error && error.message === 'Session not found') {
-          throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
-        }
-        throw error;
-      }
-    }),
 });

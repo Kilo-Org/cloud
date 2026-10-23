@@ -16,6 +16,18 @@ import type {
  * `prepare`/`deliver` results deterministically.
  */
 export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
+  async getWorktreeChanges() {
+    return { snapshot: null };
+  }
+  async getWorktreeFile() {
+    return { status: 'not_captured' as const };
+  }
+  async refreshWorktreeChanges() {
+    return { status: 'offline' as const, snapshot: null };
+  }
+  async getWorktreeRecovery() {
+    return undefined;
+  }
   readonly fetchCalls: Request[] = [];
   async fetch(request: Request): Promise<Response> {
     this.fetchCalls.push(request);

@@ -21,9 +21,17 @@ writer endpoint and queue policy for both runs.
 Apply server environment settings through the gateway deployment. Queue-only is
 staging-restricted; this recipe does not activate production. Disabling queue-only
 while retaining shadow publishing sends events to both writers and contaminates
-the direct baseline with duplicate database attempts. Queued publication failures
-can fall back to direct writing: count `usage accounting direct fallback` events
-and report them with that run.
+the direct baseline with duplicate database attempts. Queue-only never falls back
+to a gateway billing writer. Count `usage accounting publication failed` errors
+and report their usage IDs and categories with the run. These return null
+accounting results after the bounded retries, not queued or recorded success.
+`usage enqueue retrying` counts failed attempts, not distinct events: retries
+reuse the same event and may create duplicate deliveries after ambiguous acceptance.
+Include the publisher retry/backoff budget (up to seven seconds plus runtime
+scheduling overhead, excluding subsequent Bouncer reporting) in accounting
+completion deadlines. There is no durable recovery
+for unaccepted events in this path; an ambiguous failure such as a timeout may
+still be followed by consumer persistence, so reconcile those IDs separately.
 
 Wait for the source queue backlog to drain before each run. Record deployment
 commit, settings, start/end timestamps, generated event count, offered rate, and

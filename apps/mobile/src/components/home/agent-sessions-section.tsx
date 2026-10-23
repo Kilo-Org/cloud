@@ -130,7 +130,7 @@ export function LiveSessionFeedback({
     let message: string | undefined = undefined;
     if (unavailable && context.organizationId !== null) {
       title = t('organization.boundary.organizationUnavailable');
-      message = t('organization.boundary.unavailableDescription');
+      message = t('organization.boundary.unavailableSessionsDescription');
     } else if (denied && code === 'NOT_FOUND') {
       variant = 'not-found';
     } else if (denied && code !== 'FORBIDDEN' && code !== 'UNAUTHORIZED') {

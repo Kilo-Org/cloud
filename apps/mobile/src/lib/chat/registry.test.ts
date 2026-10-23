@@ -1,8 +1,8 @@
 /* eslint-disable max-lines -- the registry suite pins one question at a time, the moves onto another model or tool set, and the MCP discovery around an open on one fake SDK harness. */
 import { type ModelEvent, type ModelUsage, type PartDraft, type Turn } from '@kilocode/harness-sdk';
-import { Effect, Layer, Stream } from 'effect';
+import { Effect, Layer, Queue, Stream } from 'effect';
 import { type StoredChatBackend } from './backend-store';
-import { backendTargetId } from './backend-target';
+import { backendTargetId, CREDITS_FAILURE_KEY } from './backend-target';
 import { asMessages } from './turns';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -57,6 +57,35 @@ let failHistoryFor: string | undefined = undefined;
 /** A cleanup failure after a move installed its session, before onto returned. */
 let failForgetFor: string | undefined = undefined;
 let failAnswerFor: string | undefined = undefined;
+/** A session whose answer the gateway refuses for the account's balance. */
+let creditsFailureFor: string | undefined = undefined;
+/** What Kilo's gateway answers when the account cannot pay for the call. */
+const PAYMENT_REQUIRED_BODY =
+  '{"error":{"message":"Add credits to continue"},"error_type":"usage_limit_exceeded"}';
+/**
+ * The failure the gateway plugin raises: a status and the body that came with
+ * it. The registry reads its fields, and recognises it by type, so the fake
+ * wears the prototype of the constructor the module exports. A plain function
+ * carries it, which keeps this file to the one class the lint rule allows.
+ */
+const modelError = vi.hoisted(() => {
+  function ModelError(this: { message?: string }) {
+    // Only a prototype for `failed()` to wear; nothing constructs one directly.
+  }
+  return {
+    ModelError: ModelError as unknown as new (...args: never[]) => Error,
+    failed: (fields: {
+      readonly reason: string;
+      readonly status?: number;
+      readonly cause?: unknown;
+    }) =>
+      Object.assign(Object.create(ModelError.prototype as object) as Error, {
+        name: 'ModelError',
+        message: fields.reason,
+        ...fields,
+      }),
+  };
+});
 /** What one answer costs in the fake, the way the gateway reports a paid call. */
 const CALL: ModelUsage = {
   inputTokens: 10,
@@ -129,13 +158,19 @@ const handleFor = (id: string) => {
         asked.push(said);
         return Stream.fail(new Error('custom answer failed'));
       }
-      return Stream.asyncPush<ModelEvent>(emit =>
+      if (creditsFailureFor === id) {
+        asked.push(said);
+        return Stream.fail(
+          modelError.failed({ reason: 'status', status: 402, cause: PAYMENT_REQUIRED_BODY })
+        );
+      }
+      return Stream.callback<ModelEvent>(queue =>
         Effect.sync(() => {
           asked.push(said);
           emitEvent = event => {
-            emit.single(event);
+            Queue.offerUnsafe(queue, event);
           };
-          emit.single({ kind: 'delta', text: 'ok' });
+          Queue.offerUnsafe(queue, { kind: 'delta', text: 'ok' });
           finish = () => {
             const held = totals.get(id);
             totals.set(id, {
@@ -145,8 +180,8 @@ const handleFor = (id: string) => {
               cacheWriteTokens: 0,
               cost: (held?.cost ?? 0) + (CALL.cost ?? 0),
             });
-            emit.single({ kind: 'done', usage: CALL, stop: 'end' });
-            emit.end();
+            Queue.offerUnsafe(queue, { kind: 'done', usage: CALL, stop: 'end' });
+            Queue.endUnsafe(queue);
           };
           return Effect.void;
         })
@@ -187,7 +222,7 @@ vi.mock('@kilocode/harness-sdk', () => {
   return {
     ToolMissingError: FakeToolMissingError,
     // Failure copy is read from the error itself before any model error cause.
-    ModelError: Error,
+    ModelError: modelError.ModelError,
     zeroUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
     openSession: (options: { readonly tools?: readonly string[] }) => {
       openedWith = options;
@@ -843,6 +878,41 @@ describe('a question with images', () => {
   });
 });
 
+describe('a send the account cannot pay for', () => {
+  it('keeps the first question of a chat and says why it did not go', async () => {
+    storedHistory = [];
+    creditsFailureFor = 's1';
+
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    const held = snapshotOf(opened);
+    expect(held).toMatchObject({
+      status: 'idle',
+      asked: 'first',
+      askedModel: 'kilo/one',
+      failureKey: CREDITS_FAILURE_KEY,
+      turns: [],
+    });
+
+    /* Nothing was written for the chat yet, so the question on screen is the
+       remembered one — the bubble its Retry and Copy to composer hang off. */
+    const drawn = asMessages(held);
+    expect(drawn.map(one => one.info.id)).toEqual([`${held.sessionId}:asked`]);
+    expect(drawn[0]?.parts).toEqual([expect.objectContaining({ type: 'text', text: 'first' })]);
+
+    creditsFailureFor = undefined;
+    await retryChat(opened);
+    await settled();
+
+    expect(asked.map(one => one.text)).toEqual(['first', 'first']);
+
+    finish?.();
+    await settled();
+    expect(snapshotOf(opened)).toMatchObject({ asked: null, failureKey: null });
+  });
+});
+
 describe('a chat that moved', () => {
   it('leaves the chat it moved off pointing at the one it became', async () => {
     await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
@@ -1024,6 +1094,22 @@ describe('the effort a chat asks with', () => {
     expect(clonedWith).toEqual({ effort: 'high' });
     expect(snapshotOf(opened)).toMatchObject({ sessionId: 's2', effort: 'high' });
     expect(asked.at(-1)).toEqual({ sessionId: 's2', text: 'think hard' });
+  });
+
+  it('reports the effort it moved onto in the record the details sheet reads', async () => {
+    await say(opened, { text: 'think hard', images: [] }, { model: 'kilo/one', effort: 'high' });
+    await settled();
+
+    expect(snapshotOf(opened).record.effort).toBe('high');
+  });
+
+  it('reports the model default after a move back onto it', async () => {
+    change(opened, { effort: 'high', record: { ...snapshotOf(opened).record, effort: 'high' } });
+
+    await say(opened, { text: 'plain', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    expect(snapshotOf(opened).record.effort).toBeNull();
   });
 
   it('moves back onto the model default when the effort is cleared', async () => {

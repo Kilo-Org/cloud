@@ -222,19 +222,21 @@ describe('POST /api/edit/completions', () => {
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
-  it('rejects direct Inception requests when organization data collection is denied', async () => {
+  it('forwards a direct Inception request', async () => {
     setOrganizationAuth({ data_collection: 'deny' } satisfies OrganizationSettings);
+    mockedFetch.mockResolvedValue(makeUpstreamResponse());
 
     const { handleEditCompletionsRequest } = await import('./edit-completions');
-    const response = await handleEditCompletionsRequest(
-      makeRequest(makeValidRequestBody()) as never
-    );
+    const requestBody = makeValidRequestBody();
+    const response = await handleEditCompletionsRequest(makeRequest(requestBody) as never);
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(200);
+    const [url, init] = mockedFetch.mock.calls[0];
+    expect(url).toBe('https://api.inceptionlabs.ai/v1/edit/completions');
+    expect(JSON.parse(init?.body as string).messages).toEqual(requestBody.messages);
     expect(await response.json()).toMatchObject({
-      error_type: ProxyErrorType.data_collection_required,
+      choices: [{ message: { role: 'assistant', content: 'edited' } }],
     });
-    expect(mockedFetch).not.toHaveBeenCalled();
   });
 
   it.each([

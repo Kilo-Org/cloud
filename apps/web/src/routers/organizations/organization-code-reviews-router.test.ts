@@ -1,5 +1,6 @@
 const mockSyncWebhooksForRepositories = jest.fn();
 const mockGetValidGitLabToken = jest.fn();
+const mockIsGitLabCredentialConnected = jest.fn();
 const mockGetBitbucketCodeReviewerReadiness = jest.fn();
 
 jest.mock('@/lib/integrations/platforms/gitlab/webhook-sync', () => ({
@@ -8,6 +9,7 @@ jest.mock('@/lib/integrations/platforms/gitlab/webhook-sync', () => ({
 
 jest.mock('@/lib/integrations/gitlab-service', () => ({
   getValidGitLabToken: (...args: unknown[]) => mockGetValidGitLabToken(...args),
+  isGitLabCredentialConnected: (...args: unknown[]) => mockIsGitLabCredentialConnected(...args),
 }));
 
 jest.mock('@/lib/integrations/platforms/bitbucket/workspace-access-token-repository-cache', () => ({
@@ -894,5 +896,91 @@ describe('organization review agent router: skip bot pull requests', () => {
       platform: 'github',
     });
     expect(cfg.skipBotPullRequests).toBe(false);
+  });
+});
+
+describe('organization review agent router: getGitHubStatus connection rule', () => {
+  afterAll(async () => {
+    for (const organizationId of createdOrganizationIds) {
+      await db
+        .delete(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationId));
+      await db
+        .delete(agent_configs)
+        .where(eq(agent_configs.owned_by_organization_id, organizationId));
+      await db.delete(organizations).where(eq(organizations.id, organizationId));
+    }
+  });
+
+  async function seedOrgGitHubIntegration(
+    organizationId: string,
+    overrides: Partial<typeof platform_integrations.$inferInsert> = {}
+  ) {
+    const [row] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organizationId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: `inst-${crypto.randomUUID()}`,
+        github_app_type: 'standard',
+        github_connection_role: 'workflow',
+        integration_status: 'active',
+        repository_access: 'all',
+        platform_account_login: 'octo-org',
+        installed_at: '2026-01-01T00:00:00Z',
+        ...overrides,
+      })
+      .returning();
+    return row;
+  }
+
+  it('reports the healthy active workflow installation as connected', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    await seedOrgGitHubIntegration(organization.id);
+
+    const caller = await createCallerForUser(owner.id);
+    const status = await caller.organizations.reviewAgent.getGitHubStatus({
+      organizationId: organization.id,
+    });
+
+    expect(status).toEqual({
+      connected: true,
+      integration: {
+        accountLogin: 'octo-org',
+        repositorySelection: 'all',
+        installedAt: '2026-01-01 00:00:00+00',
+        isValid: true,
+      },
+    });
+  });
+
+  it('reports a suspended installation as not connected', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    await seedOrgGitHubIntegration(organization.id, {
+      integration_status: 'suspended',
+      suspended_at: '2026-02-01T00:00:00Z',
+    });
+
+    const caller = await createCallerForUser(owner.id);
+    const status = await caller.organizations.reviewAgent.getGitHubStatus({
+      organizationId: organization.id,
+    });
+
+    expect(status).toEqual({ connected: false, integration: null });
+  });
+
+  it('reports a locally disconnected installation as not connected', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    await seedOrgGitHubIntegration(organization.id, {
+      github_disconnected_at: '2026-02-01T00:00:00Z',
+    });
+
+    const caller = await createCallerForUser(owner.id);
+    const status = await caller.organizations.reviewAgent.getGitHubStatus({
+      organizationId: organization.id,
+    });
+
+    expect(status).toEqual({ connected: false, integration: null });
   });
 });

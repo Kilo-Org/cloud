@@ -30,6 +30,7 @@ export function visibleHomeBriefing(
   return reports.find(
     report =>
       report.context.organizationId === organizationId &&
+      report.kind !== 'one_off' &&
       isBriefingVisible(report, now) &&
       Date.parse(report.morningEndAt) > now &&
       !dismissedReportIds.includes(report.id)
@@ -74,6 +75,12 @@ export function briefingEstimateUnavailableKey(reason: string | null | undefined
     }
     case 'spend_limit_too_low': {
       return 'agentBriefing.estimateSpendLimitTooLow';
+    }
+    case 'input_too_large': {
+      return 'agentBriefing.estimateInputTooLarge';
+    }
+    case 'permission_unavailable': {
+      return 'agentBriefing.estimatePermissionUnavailable';
     }
     case null:
     case undefined: {

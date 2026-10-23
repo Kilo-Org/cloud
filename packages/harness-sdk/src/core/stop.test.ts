@@ -1,4 +1,4 @@
-import { Chunk, Effect, Option, Stream } from 'effect';
+import { Effect, Stream } from 'effect';
 import { expect, it } from 'vitest';
 import { completionsWire } from '../plugins/gateway/wire/completions.js';
 import { messagesWire } from '../plugins/gateway/wire/messages.js';
@@ -12,8 +12,8 @@ import { run } from './session-fixture.js';
  * thought and builds every later request on it.
  */
 
-const stopOf = (events: Chunk.Chunk<ModelEvent>): StopReason | undefined => {
-  const last = Chunk.last(events).pipe(Option.getOrUndefined);
+const stopOf = (events: readonly ModelEvent[]): StopReason | undefined => {
+  const last = events.at(-1);
   return last?.kind === 'done' ? last.stop : undefined;
 };
 
@@ -88,7 +88,7 @@ it('keeps the answer of a call the ceiling cut off', async () => {
   /* A truncated answer is still the model's turn. Dropping it would lose what
      was paid for and shorten every prompt that follows. */
   const { value } = await run([{ deltas: ['half a th'], stop: 'maxTokens' }], session =>
-    Effect.zipRight(Stream.runDrain(session.ask('why')), session.history)
+    Effect.andThen(Stream.runDrain(session.ask('why')), session.history)
   );
   expect(value[1]?.parts).toMatchObject([{ kind: 'text', body: 'half a th' }]);
 });

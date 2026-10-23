@@ -5,7 +5,7 @@
   },
   "build": {
     "base": {
-      "node": "24.14.1",
+      "node": "24.22.1",
       "pnpm": "11.1.2"
     },
     "development": {

@@ -1,4 +1,4 @@
-import { I18nManager } from 'react-native';
+import { I18nManager, Platform } from 'react-native';
 
 // The one place the mobile tap-target geometry lives. Components import these
 // numbers and classes instead of re-spelling them, so the audit floor, the
@@ -16,6 +16,37 @@ export const MIN_TAP_TARGET_DP = 28;
  * visual control is compact.
  */
 export const TOUCH_TARGET_DP = 44;
+
+/**
+ * Android's minimum touch-target size (`<Button>` 48dp rule, the size the
+ * control-size audit reports from the node's own view rect). `hitSlop` widens
+ * the touch region but not the rect, so an icon-only control meets this only
+ * with a real 48dp box.
+ */
+export const ICON_TARGET_DP = 48;
+
+/**
+ * The box an interactive icon-only control renders: its own node carries the
+ * whole {@link ICON_TARGET_DP} target. Explicit px, because NativeWind's rem
+ * is 14pt here — `h-11` measures 38.5pt on device, under Android's 48dp
+ * minimum. Icon glyphs inside stay at their designed size; the box only
+ * centres them on the larger target.
+ */
+export const ICON_TARGET_BOX_CLASS = 'h-[48px] w-[48px] items-center justify-center';
+
+/**
+ * The minimum an action's own node renders inside a state surface — an empty
+ * or error state's way out. Android's `<Button>` rule is 48dp, and a
+ * control-size audit reads the pressed node's view rect, so the shared
+ * `Button` default frame (`min-h-[44px]`) lands 4dp under it; `hitSlop` widens
+ * the touch region without moving that rect. 48 clears iOS's 44pt on the same
+ * node, so one class serves both platforms and no `Platform` branch is needed.
+ * Explicit px, because NativeWind's rem is 14pt here.
+ */
+export const STATE_ACTION_TARGET_DP = 48;
+
+/** The floor every state surface's action renders, as {@link STATE_ACTION_TARGET_DP}. */
+export const STATE_ACTION_CLASS = 'min-h-[48px]';
 
 /**
  * The box every icon-only control renders. Its own node carries the target, as
@@ -60,6 +91,32 @@ export const COMPACT_H11_HIT_SLOP_DP = 3;
 /** Width and height of an `h-11` compact control's tap area, in pt. */
 export function compactControlTargetDp(): number {
   return tapTargetReachDp(COMPACT_H11_FRAME_DP, COMPACT_H11_HIT_SLOP_DP);
+}
+
+/**
+ * The box a text-only action renders so its own node carries the platform's
+ * minimum touch target: `DESIGN.md:364`'s 44pt on iOS and
+ * {@link ICON_TARGET_DP}'s 48dp on Android. The agents history link is one such
+ * action: its label is a single eyebrow line, so without a box of its own the
+ * node's rect is that line (measured 14.7pt on device) and a control-size audit
+ * reads exactly that rect — `hitSlop` widens the touch region, not the rect.
+ *
+ * Both axes are minimums because a caller drops its hit slop: a short label
+ * (`common.done` in Arabic or Japanese, `chat.messageActions.edit`) is only a
+ * couple of glyphs wide, so a height floor alone would leave the rect under
+ * {@link MIN_TAP_TARGET_DP} horizontally. The label centres in the wider box
+ * (`items-center justify-center`), the same form as the voice-test field's
+ * compact text control, so a long label is untouched.
+ *
+ * Explicit px, because NativeWind's rem is 14pt here: `min-h-11` renders
+ * 38.5pt, under both minimums. They are minimums, not fixed sizes, so a label
+ * scaled by large Dynamic Type still grows the frame. Read at render time
+ * rather than captured in a module constant, so it follows the platform (the
+ * trap `attachment-preview-strip.tsx` documents); the utilities stay spelled
+ * out because NativeWind extracts them from the source text.
+ */
+export function textActionTargetClass(): string {
+  return Platform.OS === 'android' ? 'min-h-[48px] min-w-[48px]' : 'min-h-[44px] min-w-[44px]';
 }
 
 /**
@@ -162,6 +219,61 @@ export const INLINE_LINK_ROW_CLASS = 'my-[5px]';
  * connectors centred on the space they reserve.
  */
 export const INLINE_LINK_CONNECTOR_CLASS = 'min-w-[10px] text-center';
+
+/**
+ * The box a legal link renders — the two store links under the credit packs,
+ * and the privacy-policy link each consent sentence ends with — rather than a
+ * word inside a sentence with a neighbour {@link INLINE_LINK_BOX_CLASS} has to
+ * stay clear of.
+ *
+ * The whole target is the box, {@link ICON_TARGET_DP} 48dp tall and wide, the
+ * size the control-size audit reads from a node's own rect (Android's
+ * `<Button>` minimum). `hitSlop` cannot reach it: the audit measures the rect,
+ * not the touch region.
+ *
+ * The utilities below are spelled out rather than interpolated from the dp
+ * constants beside them: the class compiler reads class names out of the source
+ * files, so an interpolated name can miss the generated stylesheet and silently
+ * apply nothing. The tests hold the literals to the constants.
+ */
+export const LEGAL_LINK_MIN_DP = 48;
+
+/**
+ * The box two store legal links render in a wrapping row. Both keep their full
+ * {@link LEGAL_LINK_MIN_DP} height in the flow, so the row's lines are 48dp
+ * tall: when a long locale wraps the second link onto its own line the two
+ * boxes sit one gutter apart and can never overlap, so a tap between the lines
+ * opens the link it points at. The footer pays one 48dp line for that, which is
+ * what keeps the geometry honest: a box that cancelled its own height would
+ * reach 17dp into the line below.
+ */
+export const LEGAL_LINK_BOX_CLASS = 'min-h-[48px] min-w-[48px] items-center justify-center';
+
+/**
+ * The `text-xs` line a legal link centres on, in dp: line-height
+ * `calc(1 / 0.75)` of 10.5dp.
+ */
+export const LEGAL_LINK_LINE_DP = 14;
+
+/**
+ * The vertical margin a legal link cancels inside a running sentence: the box's
+ * overflow past the `text-xs` line it centres on, `(48 - 14) / 2`. A sentence
+ * has no second link beside it, so the overflow only ever lands on prose, and
+ * cancelling it keeps the sentence on its own line exactly as the sign-in
+ * sentence's {@link INLINE_LINK_BOX_CLASS} does.
+ */
+export const LEGAL_LINK_SENTENCE_CANCEL_DP = (LEGAL_LINK_MIN_DP - LEGAL_LINK_LINE_DP) / 2;
+
+/** The box a legal link renders as the last word of a consent sentence. */
+export const LEGAL_LINK_SENTENCE_BOX_CLASS = `${LEGAL_LINK_BOX_CLASS} -my-[17px]`;
+
+/**
+ * The row the two store legal links share: side by side when they fit, one per
+ * line when a long locale wraps them. `gap-x-4` separates two boxes on one line
+ * (14dp, and no slop points sideways); the boxes' own height separates the
+ * wrapped lines.
+ */
+export const LEGAL_LINK_ROW_CLASS = 'flex-row flex-wrap items-center gap-x-4';
 
 /**
  * The reach a box plus its per-side slop offers. This is the number the tests

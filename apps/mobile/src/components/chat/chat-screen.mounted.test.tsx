@@ -3,12 +3,12 @@
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { ChatScreen } from '@/components/chat/chat-screen';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { type StoredChatBackend } from '@/lib/chat/backend-store';
-import { backendTargetId } from '@/lib/chat/backend-target';
+import { backendTargetId, CREDITS_FAILURE_KEY, localTargetId } from '@/lib/chat/backend-target';
 
 /**
  * What the chat screen draws while it is opening.
@@ -40,6 +40,8 @@ const state = vi.hoisted(() => ({
 }));
 
 type AlertAction = { onPress?: () => void };
+const router = vi.hoisted(() => ({ push: vi.fn<(href: string) => void>() }));
+vi.mock('expo-router', () => ({ useRouter: () => router }));
 const backendUi = vi.hoisted(() => ({
   profiles: [] as StoredChatBackend[],
   loaded: true,
@@ -223,6 +225,7 @@ beforeEach(() => {
   state.failed = null;
   state.failureKey = null;
   state.retry.mockClear();
+  router.push.mockClear();
   backendUi.profiles = [];
   backendUi.alert.mockClear();
   backendUi.loaded = true;
@@ -342,6 +345,24 @@ function metricOf(tree: ReactTestRenderer): Metric {
   return metric;
 }
 
+describe('the chat header', () => {
+  it('spaces its three controls so they never sit flush', async () => {
+    state.status = 'idle';
+    const tree = await mount();
+    const header = tree.root.find(node => (node.type as string) === 'ScreenHeader');
+    const cluster = header.props.headerRight as ReactElement<{
+      className: string;
+      children: readonly ReactElement[];
+    }>;
+    // Three controls share this row: the context pill, the backend button and
+    // the tools button. Without a gap they touch, which reads as one broken
+    // control rather than three. Every other multi-control header cluster in
+    // the app carries the same spacing.
+    expect(cluster.props.className).toContain('gap-2');
+    expect(cluster.props.children).toHaveLength(3);
+  });
+});
+
 function details(tree: ReactTestRenderer) {
   return tree.root.find(node => (node.type as string) === 'ChatDetailsSheet').props as {
     readonly visible: boolean;
@@ -374,6 +395,43 @@ describe('the chat details', () => {
 });
 
 describe('backend context-transfer approval', () => {
+  it.each([
+    localTargetId('apple'),
+    localTargetId('android'),
+    localTargetId('gguf', 'qwen-test.gguf'),
+  ])('describes local processing and waits for approval before selecting %s', async target => {
+    state.status = 'idle';
+    const tree = await mount();
+    const composer = () =>
+      tree.root.find(node => (node.type as string) === 'ChatComposer').props as {
+        model: string;
+        onModelSelect: (model: string, variant: string) => void;
+      };
+
+    act(() => {
+      composer().onModelSelect(target, '');
+    });
+    expect(composer().model).toBe('m1');
+    const [title, message, actions] = backendUi.alert.mock.calls.at(-1) ?? [];
+    expect(title).toBe(i18n.t('modelChat.localModels.switchTitle'));
+    expect(message).toBe(i18n.t('modelChat.localModels.switchMessage', { name: target }));
+    expect(actions?.find(action => action.onPress)).toMatchObject({
+      text: i18n.t('modelChat.localModels.switchConfirm'),
+    });
+    act(() => {
+      actions?.find(action => action.onPress)?.onPress?.();
+    });
+    expect(composer().model).toBe(target);
+    act(() => {
+      composer().onModelSelect('m1', '');
+    });
+    expect(backendUi.alert.mock.calls.at(-1)?.slice(0, 2)).toEqual([
+      i18n.t('modelChat.backends.switchTitle'),
+      i18n.t('modelChat.backends.switchMessage', { name: 'm1' }),
+    ]);
+    expect(composer().model).toBe(target);
+  });
+
   it('requires approval when returning from a picked custom backend before its queued move finishes', async () => {
     state.status = 'working';
     const backend: StoredChatBackend = {
@@ -561,6 +619,47 @@ describe('a retained chat failure', () => {
       onPress();
     });
     expect(state.retry).toHaveBeenCalledOnce();
+  });
+
+  it('says the balance blocked the send and opens where the credit is bought', async () => {
+    state.status = 'idle';
+    state.asked = 'what is a monad';
+    state.failureKey = CREDITS_FAILURE_KEY;
+    state.messages = [{ info: { id: 's1:asked', role: 'user' } }];
+    const tree = await mount();
+
+    expect(tree.root.find(node => (node.type as string) === 'AccessibleStatus').props.message).toBe(
+      'Not enough credits to send this message. Add credits and try again.'
+    );
+    /* The question kept in the transcript carries the only Retry; the row adds
+       the one action the message cannot offer. */
+    expect(count(tree, 'Button')).toBe(1);
+    const { onPress } = tree.root.find(node => (node.type as string) === 'Button').props;
+    if (!isHandler(onPress)) {
+      throw new TypeError('Add credits button has no press handler');
+    }
+    act(() => {
+      onPress();
+    });
+    expect(router.push).toHaveBeenCalledWith('/(app)/credits');
+    expect(state.retry).not.toHaveBeenCalled();
+  });
+
+  it('offers no Add credits for a failure a balance did not cause', async () => {
+    state.status = 'idle';
+    state.failureKey = 'common.somethingWentWrong';
+    const tree = await mount();
+
+    expect(count(tree, 'Button')).toBe(1);
+    const { onPress } = tree.root.find(node => (node.type as string) === 'Button').props;
+    if (!isHandler(onPress)) {
+      throw new TypeError('Retry button has no press handler');
+    }
+    act(() => {
+      onPress();
+    });
+    expect(state.retry).toHaveBeenCalledOnce();
+    expect(router.push).not.toHaveBeenCalled();
   });
 });
 

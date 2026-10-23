@@ -46,6 +46,7 @@ import { usePreventRemove } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { i18n } from '@/i18n';
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
 import { ChatToolbar, type ChatToolbarModeControl } from '@/components/agents/chat-toolbar';
@@ -62,6 +63,7 @@ import {
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
 import { executeChatComposerSubmission } from '@/components/agents/chat-composer-submission';
+import { clearComposerInput } from '@/components/agents/composer-input-clear';
 import {
   type ComposerSelection,
   pasteTextIntoComposer,
@@ -302,7 +304,8 @@ export function ChatComposer({
   const colors = useThemeColors();
   const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
-  const { height: windowHeight, fontScale } = useWindowDimensions();
+  const { height: windowHeight } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
   const insets = useSafeAreaInsets();
   const { reducedMotion } = useMotionPolicy();
   const { returnSendsMessage } = useReturnSendsMessagePreference();
@@ -1007,7 +1010,7 @@ export function ChatComposer({
     publishDerivedState('', null);
     setGoalComposeActive(false);
     measureHandleRef.current?.reset();
-    inputRef.current?.clear();
+    clearComposerInput(inputRef.current);
     // Clear the persisted draft only on successful send / explicit clear,
     // never on navigation-away, process kill, or sign-out.
     if (draftKey && userId) {

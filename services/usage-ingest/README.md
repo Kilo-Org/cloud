@@ -248,3 +248,52 @@ service's ignored `.dev.vars`, then run `pnpm --filter cloudflare-usage-ingest d
 The queue is simulated locally and delivered to the shipped `queue()` handler in
 the same Worker. Runtime tests cover HTTP publishing, receipt consumption, and opt-in processing
 in both environments.
+
+## Staging Frankfurt writer relay
+
+The existing `staging` configuration sends queued writes through a private
+service binding's **fetch** method to `usage-writer-relay-staging`. The relay's
+fetch handler forwards to the same staging Vercel writer with a placement hint
+of `aws:eu-central-1`. Production keeps direct writes. The writer, middleware,
+database and queue policy stay unchanged.
+
+This is an outbound-request placement experiment. [Placement's shared limitations](https://developers.cloudflare.com/workers/configuration/placement/#review-limitations-1)
+apply to fetch handlers and do not pin the queue consumer. The hint selects a
+Cloudflare data center near Frankfurt, not an AWS-hosted Worker. A US consumer
+still crosses to Europe and waits for the return; the relay adds a hop and may
+be neutral or slower. The hypothesis is that a Frankfurt-origin request avoids
+an extra Vercel middleware/routing trip. Actual relay placement, Vercel ingress
+and latency need measurement. EU queue jurisdiction does not place the consumer.
+
+The relay has no public routes, workers.dev or preview URL. It streams to a fixed
+configured staging target, forwards only the existing internal key and optional
+Vercel protection bypass, and leaves authentication to the existing writer. It
+needs no additional secrets. Redirects are not followed, the client retains its
+160-second budget and response/identity validation, and only recorded/duplicate
+responses ACK. The relay adds no retries or persistence.
+
+### Deployment and verification
+
+Normal staging CI uses `--env staging`. Both the single-worker and changed-worker
+paths in `deploy-workers.yml` deploy `wrangler.writer-relay.jsonc` **first**, then
+deploy the existing consumer when the selected source's staging binding requires
+the relay. Historical direct-path revisions skip it. A required relay's missing
+config or failed deployment stops the consumer deploy.
+The relay's nonstandard config filename keeps it out of independent discovery;
+its deployment is owned by usage-ingest. Other Workers and production skip this
+relay step. There is no separate `staging-relay` environment or manual activation.
+
+Record both Worker revisions and the unchanged writer deployment SHA. Send one
+authenticated smoke event, verify its stable usage ID/ACK/persistence, then inspect
+the relay's actual placement and the Vercel ingress/function trace. Compute region
+is `executionRegion`/`proxy.lambdaRegion`; `proxy.region` is the ingress hop.
+For a subsequent approved comparison, keep queue cap/workload and cold/warm
+conditions fixed and capture aligned event age, full consumer HTTP p95/p99, queue
+backlog/retries/DLQ and DB pool/lock limits. Accounting creation → persistence
+excludes return/ACK; the full consumer HTTP duration includes the return leg.
+Local runtime tests prove the service-binding path and ACK/retry behavior, not
+geographical placement or speedup.
+
+Rollback by reverting the relay change and deploying the reviewed direct-path
+revision through staging CI. The consumer retains the same queue and usage IDs;
+no data migration or writer rollback is needed. The unused relay can remain private.

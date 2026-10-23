@@ -72,11 +72,13 @@ export function IdleAuth({
   const { t } = useTranslation();
   const colors = useThemeColors();
   // The wrapper's label: the translated parts joined the way the row renders
-  // them. `termsConnector` carries its own leading/trailing spaces and the
-  // suffix is the sentence's period; the join below reproduces the visible
-  // "prefix Terms , connector Privacy ." spacing with single word spaces.
+  // them, so the catalog owns every space in the sentence. `termsPrefix` ends
+  // with whatever separator the locale puts before the Terms link — a space
+  // where words are space-separated, nothing in Chinese — `termsConnector`
+  // carries the conjunction with its own spacing, and the suffix is the
+  // sentence's final punctuation.
   const legalSentence =
-    `${t('login.termsPrefix')} ${t('login.terms')}${t('login.termsConnector')}` +
+    `${t('login.termsPrefix')}${t('login.terms')}${t('login.termsConnector')}` +
     `${t('common.privacyPolicy')}${t('login.termsSuffix')}`;
   const [view, setView] = useState<'main' | 'otp'>('main');
   const [appleAvailable, setAppleAvailable] = useState(false);
@@ -449,7 +451,7 @@ export function IdleAuth({
           accessibilityElementsHidden
           className="text-xs text-muted-foreground"
         >
-          {t('login.termsPrefix')}{' '}
+          {t('login.termsPrefix')}
         </Text>
         <Pressable
           importantForAccessibility="no-hide-descendants"

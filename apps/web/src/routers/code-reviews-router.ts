@@ -191,9 +191,23 @@ export const personalReviewAgentRouter = createTRPCRouter({
     const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
     const integration = await getIntegrationForOwner(owner, PLATFORM.GITLAB);
 
-    if (!integration || integration.integration_status !== 'active') {
+    // An existing row that cannot serve a review is a different state from
+    // "never connected": the account already authorized this integration, so
+    // the connect gate must explain that the connection has to be
+    // re-authorized instead of asking for a first-time connect that the user
+    // already completed.
+    if (!integration) {
       return {
         connected: false,
+        reconnectRequired: false,
+        integration: null,
+      };
+    }
+
+    if (integration.integration_status !== 'active') {
+      return {
+        connected: false,
+        reconnectRequired: true,
         integration: null,
       };
     }
@@ -209,6 +223,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
     ) {
       return {
         connected: false,
+        reconnectRequired: true,
         integration: null,
       };
     }
@@ -222,6 +237,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
 
     return {
       connected: true,
+      reconnectRequired: false,
       integration: {
         accountLogin: integration.platform_account_login,
         repositorySelection: integration.repository_access,

@@ -27,6 +27,7 @@ import {
 import { collectBriefingEvidence } from './evidence';
 import { nextBriefingTime, validateBriefingSchedule } from './schedule';
 const DEFAULT_BRIEFING_MODEL = '~deepseek/deepseek-flash-latest';
+const BRIEFING_LIST_MAX_RESPONSE_BYTES = 3_000_000;
 
 export type BriefingReportRow = typeof agent_briefing_reports.$inferSelect;
 const factsSchema = briefingReportSchema.pick({
@@ -347,7 +348,7 @@ export async function listBriefings(
   const contexts = await briefingContexts(userId);
   if (input.organizationId) await requireBriefingContext(userId, input.organizationId);
   const now = new Date().toISOString();
-  const limit = input.limit ?? 30;
+  const limit = Math.max(1, Math.min(100, Math.trunc(input.limit ?? 30)));
   const scopeFilter =
     input.scope === 'personal'
       ? isNull(agent_briefing_reports.organization_id)
@@ -393,18 +394,37 @@ export async function listBriefings(
     .orderBy(desc(agent_briefing_reports.cutoff_at), desc(agent_briefing_reports.id))
     .limit(limit + 1);
   const reports: BriefingReport[] = [];
-  let responseBytes = 0;
+  const cursorBytes = rows.reduce(
+    (maximum, row) => Math.max(maximum, Buffer.byteLength(JSON.stringify(row.id), 'utf8')),
+    Buffer.byteLength('null', 'utf8')
+  );
+  const envelopeBytes =
+    Buffer.byteLength(JSON.stringify({ reports: [], nextCursor: null }), 'utf8') -
+    Buffer.byteLength('null', 'utf8') +
+    cursorBytes;
+  let responseBytes = envelopeBytes;
   let nextCursor = rows.length > limit ? (rows[limit - 1]?.id ?? null) : null;
+  let processedCursor: string | null = null;
   for (const row of rows.slice(0, limit)) {
+    const previousCursor = processedCursor;
+    processedCursor = row.id;
     try {
       const report = await serializeBriefing(await briefingReportRow(userId, row.id));
       const bytes = Buffer.byteLength(JSON.stringify(report), 'utf8');
-      if (reports.length > 0 && responseBytes + bytes > 3_000_000) {
-        nextCursor = reports.at(-1)?.id ?? null;
+      if (envelopeBytes + bytes > BRIEFING_LIST_MAX_RESPONSE_BYTES) {
+        console.error('Agent briefing report skipped', {
+          reportId: row.id,
+          failure: 'Report exceeds list response budget',
+        });
+        continue;
+      }
+      const separatorBytes = reports.length > 0 ? 1 : 0;
+      if (responseBytes + separatorBytes + bytes > BRIEFING_LIST_MAX_RESPONSE_BYTES) {
+        nextCursor = previousCursor;
         break;
       }
       reports.push(report);
-      responseBytes += bytes;
+      responseBytes += separatorBytes + bytes;
     } catch (error) {
       if (error instanceof TRPCError && ['NOT_FOUND', 'FORBIDDEN'].includes(error.code)) continue;
       // A stored payload that no longer parses is the report's own fault, and
@@ -440,12 +460,13 @@ export async function refreshBriefingEvidence(row: BriefingReportRow): Promise<B
       .for('update');
     if (!current || hash === current.evidence_hash) return current ?? row;
     const summary = briefingSummarySchema.parse(current.summary);
-    const previousFacts = factsSchema.parse(current.facts);
+    const previousFacts = factsSchema.safeParse(current.facts);
     const sourcesById = new Map(facts.sources.map(source => [source.id, source]));
     const sessionIds = new Set(facts.sessions.map(session => session.sessionId));
     const removedSource =
-      previousFacts.sessions.some(session => !sessionIds.has(session.sessionId)) ||
-      previousFacts.sources.some(source => {
+      !previousFacts.success ||
+      previousFacts.data.sessions.some(session => !sessionIds.has(session.sessionId)) ||
+      previousFacts.data.sources.some(source => {
         const next = sourcesById.get(source.id);
         return (
           next === undefined || (source.excerpt !== undefined && source.excerpt !== next.excerpt)

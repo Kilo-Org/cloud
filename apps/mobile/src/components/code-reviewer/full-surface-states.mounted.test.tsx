@@ -3,7 +3,9 @@ import { createElement, type ReactElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
-import ReposRoute from '@/app/(app)/(tabs)/(3_profile)/code-reviewer/[scope]/[platform]/(edit)/repos';
+import ReposRoute from '@/app/(app)/code-reviewer/[scope]/[platform]/(edit)/repos';
+import { type ReviewerPlatform, type ReviewerScopePlatform } from '@/lib/code-reviewer-config';
+import { ReviewerRouteParamsProvider } from '@/lib/hooks/use-reviewer-route-params';
 import { ReviewListScreen } from './review-list-screen';
 import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 
@@ -65,7 +67,7 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({ scope: state.scope, platform: state.platform }),
+  useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: state.push }),
 }));
 vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable' }));
@@ -85,6 +87,7 @@ vi.mock('react-native-reanimated', () => ({
 vi.mock('sonner-native', () => ({ toast: { error: state.toastError } }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({
@@ -151,6 +154,26 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+/** The `[platform]` layout validates the pair and publishes it to the screen. */
+function reposRoute() {
+  // Bitbucket is org-only, so a personal+bitbucket pair is not one the layout
+  // could accept; those cases run under an organization scope instead.
+  const platform = state.platform as ReviewerPlatform;
+  const personal = state.scope === 'personal' && platform !== 'bitbucket';
+  const params: ReviewerScopePlatform = personal
+    ? { kind: 'personal', platform: platform as 'github' | 'gitlab' }
+    : {
+        kind: 'org',
+        organizationId: state.scope === 'personal' ? 'org-1' : state.scope,
+        platform,
+      };
+  return (
+    <ReviewerRouteParamsProvider params={params}>
+      <ReposRoute />
+    </ReviewerRouteParamsProvider>
+  );
+}
+
 function firstList(renderer: Awaited<ReturnType<typeof renderWithProviders>>['renderer']) {
   return renderer.root.find(node => String(node.type) === 'FlashList');
 }
@@ -168,7 +191,7 @@ describe('Reviewer repository bodies', () => {
     'centers the %s empty body outside its scroller',
     async platform => {
       state.platform = platform;
-      const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+      const { renderer, unmount } = await renderWithProviders(reposRoute());
       expect(renderer.root.findAll(node => String(node.type) === 'ScrollView')).toHaveLength(0);
       expect(renderer.root.find(node => String(node.type) === 'EmptyState').props.placement).toBe(
         'center'
@@ -179,7 +202,7 @@ describe('Reviewer repository bodies', () => {
 
   it('keeps the GitHub empty state beside its selection controls', async () => {
     state.platform = 'github';
-    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+    const { renderer, unmount } = await renderWithProviders(reposRoute());
     const scroll = renderer.root.find(node => String(node.type) === 'ScrollView');
     expect(scroll.find(node => String(node.type) === 'RadioGroup')).toBeDefined();
     expect(scroll.find(node => String(node.type) === 'EmptyState').props.placement).toBe('top');
@@ -189,7 +212,7 @@ describe('Reviewer repository bodies', () => {
   it('opens the install page with a minted token', async () => {
     state.platform = 'github';
     state.mintInstallState.mockResolvedValue({ token: 'token-1' });
-    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+    const { renderer, unmount } = await renderWithProviders(reposRoute());
     pressManageAccess(renderer);
     await vi.waitFor(() => {
       expect(state.openExternalUrl).toHaveBeenCalledWith(
@@ -209,7 +232,7 @@ describe('Reviewer repository bodies', () => {
         data: { code: 'FORBIDDEN', httpStatus: 403 },
       })
     );
-    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+    const { renderer, unmount } = await renderWithProviders(reposRoute());
     pressManageAccess(renderer);
     await vi.waitFor(() => {
       expect(state.openExternalUrl).toHaveBeenCalledWith(
@@ -226,7 +249,7 @@ describe('Reviewer repository bodies', () => {
     state.mintInstallState.mockRejectedValue(
       Object.assign(new Error('offline'), { data: { code: 'INTERNAL_SERVER_ERROR' } })
     );
-    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+    const { renderer, unmount } = await renderWithProviders(reposRoute());
     pressManageAccess(renderer);
     await vi.waitFor(() => {
       expect(state.toastError).toHaveBeenCalledWith('Could not open GitHub App settings');
@@ -238,7 +261,7 @@ describe('Reviewer repository bodies', () => {
   it('centers missing Bitbucket setup', async () => {
     state.platform = 'bitbucket';
     state.bitbucket.data = { repositoryCache: { status: 'unavailable' } };
-    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+    const { renderer, unmount } = await renderWithProviders(reposRoute());
     expect(renderer.root.findAll(node => String(node.type) === 'ScrollView')).toHaveLength(0);
     expect(renderer.root.find(node => String(node.type) === 'CenteredState')).toBeDefined();
     unmount();
@@ -247,7 +270,7 @@ describe('Reviewer repository bodies', () => {
   it('keeps cached repositories beside a partial error', async () => {
     state.repositories.isError = true;
     state.repositories.data = { repositories: [{ id: 1, fullName: 'org/repo', private: false }] };
-    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+    const { renderer, unmount } = await renderWithProviders(reposRoute());
     const scroll = renderer.root.find(node => String(node.type) === 'ScrollView');
     expect(scroll.find(node => String(node.type) === 'RepoToggleRow')).toBeDefined();
     expect(scroll.find(node => String(node.type) === 'QueryError').props.placement).toBe('top');
@@ -293,7 +316,7 @@ describe('Recent review bodies', () => {
       const action = empty.props.action as ReactElement<{ onPress: () => void }>;
       action.props.onPress();
       expect(state.push).toHaveBeenCalledWith(
-        `/(app)/(tabs)/(3_profile)/code-reviewer/personal${connected ? '/manual-review' : ''}`
+        `/(app)/code-reviewer/personal${connected ? '/manual-review' : ''}`
       );
       unmount();
     }

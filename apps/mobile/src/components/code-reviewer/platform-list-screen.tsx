@@ -117,7 +117,13 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={scopeTitle} eyebrow={t('common.codeReviewer')} />
+      <ScreenHeader
+        title={scopeTitle}
+        // An organization name is user prose, not a UI label, so it keeps a
+        // second line for a natural break.
+        titleNumberOfLines={2}
+        eyebrow={t('common.codeReviewer')}
+      />
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
@@ -134,9 +140,7 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
                   subtitle={connectionSubtitle(status)}
                   last={index === platforms.length - 1}
                   onPress={() => {
-                    router.push(
-                      `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/${platform}` as Href
-                    );
+                    router.push(`/(app)/code-reviewer/${scope}/${platform}` as Href);
                   }}
                 />
               );
@@ -153,7 +157,7 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
               icon={History}
               title={t('codeReviewer.reviewList.title')}
               onPress={() => {
-                router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/reviews` as Href);
+                router.push(`/(app)/code-reviewer/${scope}/reviews` as Href);
               }}
             />
             <ConfigureRow
@@ -161,9 +165,7 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
               title={t('codeReviewer.manualReview.title')}
               last
               onPress={() => {
-                router.push(
-                  `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/manual-review` as Href
-                );
+                router.push(`/(app)/code-reviewer/${scope}/manual-review` as Href);
               }}
             />
           </View>

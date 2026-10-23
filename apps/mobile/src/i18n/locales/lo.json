@@ -3621,8 +3621,6 @@
       "quantizations": "ການຫຼຸດຂະໜາດ (Quantization)",
       "quantizationsHelp": "ໄຟລ໌ທີ່ນ້ອຍກວ່າໃຊ້ໜ່ວຍຄວາມຈຳ ແລະ ບ່ອນເກັບຂໍ້ມູນໜ້ອຍກວ່າ. ໄຟລ໌ທີ່ໃຫຍ່ກວ່າມັກຈະໃຫ້ຄຳຕອບທີ່ດີກວ່າ.",
       "quantDetail": "ດາວໂຫຼດ {{size}} · ໃຊ້ໜ່ວຍຄວາມຈຳປະມານ {{memory}}",
-      "downloadQuant": "ດາວໂຫຼດ {{quant}}",
-      "downloadModelA11y": "ດາວໂຫຼດ {{name}}",
       "detailsA11y": "ລາຍລະອຽດ: {{name}}",
       "loadingModel": "ກຳລັງໂຫຼດລາຍລະອຽດໂມເດວ",
       "couldNotLoadModel": "ບໍ່ສາມາດໂຫຼດໂມເດວນີ້ໄດ້",

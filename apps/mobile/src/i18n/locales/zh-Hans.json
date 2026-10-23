@@ -3621,8 +3621,6 @@
       "quantizations": "量化版本",
       "quantizationsHelp": "较小的文件占用更少的内存和存储空间。较大的文件通常能给出更好的回答。",
       "quantDetail": "下载大小 {{size}} · 约需 {{memory}} 内存",
-      "downloadQuant": "下载 {{quant}}",
-      "downloadModelA11y": "下载 {{name}}",
       "detailsA11y": "详情：{{name}}",
       "loadingModel": "正在加载模型详情",
       "couldNotLoadModel": "无法加载此模型",

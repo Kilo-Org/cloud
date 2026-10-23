@@ -3705,8 +3705,6 @@
       "quantizations": "Kvantizace",
       "quantizationsHelp": "Menší soubory zabírají méně paměti a úložiště. Větší soubory obvykle dávají lepší odpovědi.",
       "quantDetail": "Stažení {{size}} · asi {{memory}} paměti",
-      "downloadQuant": "Stáhnout {{quant}}",
-      "downloadModelA11y": "Stáhnout {{name}}",
       "detailsA11y": "Podrobnosti: {{name}}",
       "loadingModel": "Načítání podrobností o modelu",
       "couldNotLoadModel": "Tento model se nepodařilo načíst",

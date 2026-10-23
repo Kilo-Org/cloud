@@ -3621,8 +3621,6 @@
       "quantizations": "Kvantiseringer",
       "quantizationsHelp": "Mindre filer bruger mindre hukommelse og lagerplads. Større filer giver som regel bedre svar.",
       "quantDetail": "{{size}} download · cirka {{memory}} hukommelse",
-      "downloadQuant": "Download {{quant}}",
-      "downloadModelA11y": "Download {{name}}",
       "detailsA11y": "Detaljer: {{name}}",
       "loadingModel": "Indlæser modeldetaljer",
       "couldNotLoadModel": "Kunne ikke indlæse denne model",

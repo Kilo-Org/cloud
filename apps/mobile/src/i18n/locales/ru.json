@@ -3705,8 +3705,6 @@
       "quantizations": "Квантования",
       "quantizationsHelp": "Файлы меньшего размера занимают меньше памяти и места. Более крупные файлы обычно дают лучшие ответы.",
       "quantDetail": "Скачивание: {{size}} · около {{memory}} памяти",
-      "downloadQuant": "Скачать {{quant}}",
-      "downloadModelA11y": "Скачать {{name}}",
       "detailsA11y": "Подробности: {{name}}",
       "loadingModel": "Загрузка сведений о модели",
       "couldNotLoadModel": "Не удалось загрузить эту модель",

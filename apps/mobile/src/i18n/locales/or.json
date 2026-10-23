@@ -3621,8 +3621,6 @@
       "quantizations": "କ୍ୱାଣ୍ଟାଇଜେସନ",
       "quantizationsHelp": "ଛୋଟ ଫାଇଲଗୁଡ଼ିକ କମ ମେମୋରୀ ଓ ଷ୍ଟୋରେଜ ବ୍ୟବହାର କରେ। ବଡ଼ ଫାଇଲଗୁଡ଼ିକ ସାଧାରଣତଃ ଭଲ ଉତ୍ତର ଦିଏ।",
       "quantDetail": "{{size}} ଡାଉନଲୋଡ଼ · ପ୍ରାୟ {{memory}} ମେମୋରୀ",
-      "downloadQuant": "{{quant}} ଡାଉନଲୋଡ଼ କରନ୍ତୁ",
-      "downloadModelA11y": "{{name}} ଡାଉନଲୋଡ଼ କରନ୍ତୁ",
       "detailsA11y": "ବିବରଣୀ: {{name}}",
       "loadingModel": "ମଡେଲ ବିବରଣୀ ଲୋଡ଼ ହେଉଛି",
       "couldNotLoadModel": "ଏହି ମଡେଲ ଲୋଡ଼ କରାଯାଇପାରିଲା ନାହିଁ",

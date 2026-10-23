@@ -3621,8 +3621,6 @@
       "quantizations": "Quantisierungen",
       "quantizationsHelp": "Kleinere Dateien benötigen weniger Arbeitsspeicher und Speicherplatz. Größere Dateien liefern meist bessere Antworten.",
       "quantDetail": "{{size}} Download · ca. {{memory}} Arbeitsspeicher",
-      "downloadQuant": "{{quant}} herunterladen",
-      "downloadModelA11y": "{{name}} herunterladen",
       "detailsA11y": "Einzelheiten: {{name}}",
       "loadingModel": "Modelldetails werden geladen",
       "couldNotLoadModel": "Dieses Modell konnte nicht geladen werden",

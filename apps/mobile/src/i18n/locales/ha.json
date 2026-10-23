@@ -3621,8 +3621,6 @@
       "quantizations": "Nau'ikan matsawa",
       "quantizationsHelp": "Ƙananan fayiloli suna amfani da ƙarancin ƙwaƙwalwa da ma'ajiya. Manyan fayiloli yawanci suna ba da amsoshi mafi kyau.",
       "quantDetail": "Saukewar {{size}} · kusan {{memory}} na ƙwaƙwalwa",
-      "downloadQuant": "Sauke {{quant}}",
-      "downloadModelA11y": "Sauke {{name}}",
       "detailsA11y": "Cikakkun bayanai: {{name}}",
       "loadingModel": "Ana loda bayanan samfuri",
       "couldNotLoadModel": "An kasa loda wannan samfurin",

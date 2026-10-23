@@ -3621,8 +3621,6 @@
       "quantizations": "Kuwaantaayizeeshinoota",
       "quantizationsHelp": "Faayiloonni xixiqqaan yaadannoo fi kuusaa xiqqaa fayyadamu. Faayiloonni gurguddaan yeroo baay'ee deebii fooyya'aa kennu.",
       "quantDetail": "Buufamni {{size}} · yaadannoo gara {{memory}}",
-      "downloadQuant": "{{quant}} buufi",
-      "downloadModelA11y": "{{name}} buufi",
       "detailsA11y": "Bal'ina: {{name}}",
       "loadingModel": "Bal'ina moodeelaa fe'aa jira",
       "couldNotLoadModel": "Moodeela kana fe'uun hin danda'amne",

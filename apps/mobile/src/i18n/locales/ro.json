@@ -3663,8 +3663,6 @@
       "quantizations": "Cuantizări",
       "quantizationsHelp": "Fișierele mai mici folosesc mai puțină memorie și spațiu de stocare. Fișierele mai mari oferă de obicei răspunsuri mai bune.",
       "quantDetail": "Descărcare de {{size}} · aproximativ {{memory}} de memorie",
-      "downloadQuant": "Descarcă {{quant}}",
-      "downloadModelA11y": "Descarcă {{name}}",
       "detailsA11y": "Detalii: {{name}}",
       "loadingModel": "Se încarcă detaliile modelului",
       "couldNotLoadModel": "Acest model nu a putut fi încărcat",

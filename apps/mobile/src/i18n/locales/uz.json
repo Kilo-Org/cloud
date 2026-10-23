@@ -3621,8 +3621,6 @@
       "quantizations": "Kvantlashlar",
       "quantizationsHelp": "Kichikroq fayllar kamroq operativ va doimiy xotira egallaydi. Kattaroq fayllar odatda yaxshiroq javob beradi.",
       "quantDetail": "Yuklab olish: {{size}} · taxminan {{memory}} operativ xotira",
-      "downloadQuant": "{{quant}} yuklab olish",
-      "downloadModelA11y": "{{name}} yuklab olish",
       "detailsA11y": "Tafsilotlar: {{name}}",
       "loadingModel": "Model tafsilotlari yuklanmoqda",
       "couldNotLoadModel": "Bu modelni yuklab bo‘lmadi",

@@ -3621,8 +3621,6 @@
       "quantizations": "Квантизации",
       "quantizationsHelp": "По-малките файлове използват по-малко памет и място. По-големите файлове обикновено дават по-добри отговори.",
       "quantDetail": "Изтегляне: {{size}} · около {{memory}} памет",
-      "downloadQuant": "Изтегли {{quant}}",
-      "downloadModelA11y": "Изтегли {{name}}",
       "detailsA11y": "Подробности: {{name}}",
       "loadingModel": "Зареждане на данни за модела",
       "couldNotLoadModel": "Този модел не може да се зареди",

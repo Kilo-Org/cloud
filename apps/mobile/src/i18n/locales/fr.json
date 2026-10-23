@@ -3663,8 +3663,6 @@
       "quantizations": "Quantifications",
       "quantizationsHelp": "Les fichiers plus petits utilisent moins de mémoire et de stockage. Les fichiers plus volumineux donnent généralement de meilleures réponses.",
       "quantDetail": "Téléchargement de {{size}} · environ {{memory}} de mémoire",
-      "downloadQuant": "Télécharger {{quant}}",
-      "downloadModelA11y": "Télécharger {{name}}",
       "detailsA11y": "Détails : {{name}}",
       "loadingModel": "Chargement des détails du modèle",
       "couldNotLoadModel": "Impossible de charger ce modèle",

@@ -3621,8 +3621,6 @@
       "quantizations": "کوانټیزېشنونه",
       "quantizationsHelp": "کوچنۍ فایلونه لږ حافظه او ځای کاروي. لوی فایلونه معمولاً ښه ځوابونه ورکوي.",
       "quantDetail": "{{size}} ډاونلوډ · شاوخوا {{memory}} حافظه",
-      "downloadQuant": "{{quant}} ډاونلوډ کړئ",
-      "downloadModelA11y": "{{name}} ډاونلوډ کړئ",
       "detailsA11y": "جزئیات: {{name}}",
       "loadingModel": "د ماډل جزئیات پورته کېږي",
       "couldNotLoadModel": "دا ماډل پورته نه شو",

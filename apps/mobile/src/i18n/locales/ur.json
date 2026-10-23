@@ -3621,8 +3621,6 @@
       "quantizations": "کوانٹائزیشنز",
       "quantizationsHelp": "چھوٹی فائلیں کم میموری اور اسٹوریج استعمال کرتی ہیں۔ بڑی فائلیں عموماً بہتر جوابات دیتی ہیں۔",
       "quantDetail": "{{size}} ڈاؤن لوڈ · تقریباً {{memory}} میموری",
-      "downloadQuant": "{{quant}} ڈاؤن لوڈ کریں",
-      "downloadModelA11y": "{{name}} ڈاؤن لوڈ کریں",
       "detailsA11y": "تفصیلات: {{name}}",
       "loadingModel": "ماڈل کی تفصیلات لوڈ ہو رہی ہیں",
       "couldNotLoadModel": "یہ ماڈل لوڈ نہیں ہو سکا",

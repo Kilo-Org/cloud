@@ -3621,8 +3621,6 @@
       "quantizations": "Kvantálások",
       "quantizationsHelp": "A kisebb fájlok kevesebb memóriát és tárhelyet használnak. A nagyobb fájlok általában jobb válaszokat adnak.",
       "quantDetail": "{{size}} letöltés · kb. {{memory}} memória",
-      "downloadQuant": "{{quant}} letöltése",
-      "downloadModelA11y": "{{name}} letöltése",
       "detailsA11y": "Részletek: {{name}}",
       "loadingModel": "Modell részleteinek betöltése",
       "couldNotLoadModel": "Nem sikerült betölteni ezt a modellt",

@@ -3663,8 +3663,6 @@
       "quantizations": "Quantitzacions",
       "quantizationsHelp": "Els fitxers més petits fan servir menys memòria i espai. Els més grans solen donar millors respostes.",
       "quantDetail": "Descàrrega de {{size}} · uns {{memory}} de memòria",
-      "downloadQuant": "Descarrega {{quant}}",
-      "downloadModelA11y": "Descarrega {{name}}",
       "detailsA11y": "Detalls: {{name}}",
       "loadingModel": "S'estan carregant els detalls del model",
       "couldNotLoadModel": "No s'ha pogut carregar aquest model",

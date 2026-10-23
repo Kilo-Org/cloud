@@ -3621,8 +3621,6 @@
       "quantizations": "ควอนไทซ์",
       "quantizationsHelp": "ไฟล์ที่เล็กกว่าใช้หน่วยความจำและพื้นที่จัดเก็บน้อยกว่า ไฟล์ที่ใหญ่กว่ามักให้คำตอบที่ดีกว่า",
       "quantDetail": "ดาวน์โหลด {{size}} · ใช้หน่วยความจำประมาณ {{memory}}",
-      "downloadQuant": "ดาวน์โหลด {{quant}}",
-      "downloadModelA11y": "ดาวน์โหลด {{name}}",
       "detailsA11y": "รายละเอียด: {{name}}",
       "loadingModel": "กำลังโหลดรายละเอียดโมเดล",
       "couldNotLoadModel": "โหลดโมเดลนี้ไม่ได้",

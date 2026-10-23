@@ -3621,8 +3621,6 @@
       "quantizations": "Kvantimised",
       "quantizationsHelp": "Väiksemad failid kasutavad vähem mälu ja salvestusruumi. Suuremad failid annavad tavaliselt paremaid vastuseid.",
       "quantDetail": "Allalaadimine {{size}} · umbes {{memory}} mälu",
-      "downloadQuant": "Laadi alla {{quant}}",
-      "downloadModelA11y": "Laadi alla {{name}}",
       "detailsA11y": "Üksikasjad: {{name}}",
       "loadingModel": "Mudeli üksikasjade laadimine",
       "couldNotLoadModel": "Seda mudelit ei õnnestunud laadida",

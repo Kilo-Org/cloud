@@ -3621,8 +3621,6 @@
       "quantizations": "Kvantisoinnit",
       "quantizationsHelp": "Pienemmät tiedostot vievät vähemmän muistia ja tallennustilaa. Suuremmat tiedostot antavat yleensä parempia vastauksia.",
       "quantDetail": "Lataus {{size}} · noin {{memory}} muistia",
-      "downloadQuant": "Lataa {{quant}}",
-      "downloadModelA11y": "Lataa {{name}}",
       "detailsA11y": "Tiedot: {{name}}",
       "loadingModel": "Ladataan mallin tietoja",
       "couldNotLoadModel": "Tämän mallin lataaminen epäonnistui",

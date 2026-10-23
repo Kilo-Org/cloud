@@ -3621,8 +3621,6 @@
       "quantizations": "Kwantisaties",
       "quantizationsHelp": "Kleinere bestanden gebruiken minder geheugen en opslag. Grotere bestanden geven meestal betere antwoorden.",
       "quantDetail": "Download van {{size}} · ongeveer {{memory}} geheugen",
-      "downloadQuant": "{{quant}} downloaden",
-      "downloadModelA11y": "{{name}} downloaden",
       "detailsA11y": "Gegevens: {{name}}",
       "loadingModel": "Modeldetails laden",
       "couldNotLoadModel": "Kan dit model niet laden",

@@ -3705,8 +3705,6 @@
       "quantizations": "Квантаванні",
       "quantizationsHelp": "Меншыя файлы выкарыстоўваюць менш памяці і месца. Большыя файлы звычайна даюць лепшыя адказы.",
       "quantDetail": "Спампоўка {{size}} · каля {{memory}} памяці",
-      "downloadQuant": "Спампаваць {{quant}}",
-      "downloadModelA11y": "Спампаваць {{name}}",
       "detailsA11y": "Падрабязнасці: {{name}}",
       "loadingModel": "Загрузка звестак пра мадэль",
       "couldNotLoadModel": "Не ўдалося загрузіць гэту мадэль",

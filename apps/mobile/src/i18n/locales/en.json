@@ -3642,8 +3642,6 @@
       "quantizations": "Quantizations",
       "quantizationsHelp": "Smaller files use less memory and storage. Larger files usually give better answers.",
       "quantDetail": "{{size}} download · about {{memory}} of memory",
-      "downloadQuant": "Download {{quant}}",
-      "downloadModelA11y": "Download {{name}}",
       "detailsA11y": "Details: {{name}}",
       "loadingModel": "Loading model details",
       "couldNotLoadModel": "Couldn't load this model",

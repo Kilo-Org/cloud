@@ -3663,8 +3663,6 @@
       "quantizations": "Quantizações",
       "quantizationsHelp": "Arquivos menores usam menos memória e armazenamento. Arquivos maiores geralmente dão respostas melhores.",
       "quantDetail": "Download de {{size}} · cerca de {{memory}} de memória",
-      "downloadQuant": "Baixar {{quant}}",
-      "downloadModelA11y": "Baixar {{name}}",
       "detailsA11y": "Detalhes: {{name}}",
       "loadingModel": "Carregando detalhes do modelo",
       "couldNotLoadModel": "Não foi possível carregar este modelo",

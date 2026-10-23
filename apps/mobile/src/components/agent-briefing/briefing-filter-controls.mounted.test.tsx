@@ -56,9 +56,11 @@ function optionByText(
   root: TestRenderer.ReactTestInstance,
   label: string
 ): TestRenderer.ReactTestInstance {
-  const option = root.findAll(node => isHostType(node, 'Pressable')).find(node =>
-    node.findAll(inner => isHostType(inner, 'Text')).some(text => text.props.children === label)
-  );
+  const option = root
+    .findAll(node => isHostType(node, 'Pressable'))
+    .find(node =>
+      node.findAll(inner => isHostType(inner, 'Text')).some(text => text.props.children === label)
+    );
   if (!option) {
     throw new Error(`Missing option ${label}`);
   }

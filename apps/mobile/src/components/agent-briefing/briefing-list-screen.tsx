@@ -113,9 +113,7 @@ export function BriefingListScreen() {
           history={history}
           onSelectHistory={setHistory}
           organizationId={organizationId}
-          organizations={
-            memberships.data?.filter(org => access.canRead(org.organizationId)) ?? []
-          }
+          organizations={memberships.data?.filter(org => access.canRead(org.organizationId)) ?? []}
           onSelectOrganization={setOrganizationId}
         />
         <Text className="text-xs text-muted-foreground">

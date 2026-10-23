@@ -105,14 +105,20 @@ export function ProviderConnectGate({
         signal: controller.signal,
         onOpenFailure: () => void toast.error(t('authErrors.couldNotOpenBrowser')),
         onReturn: async () => {
-          await status.refetch();
+          // Detached on purpose: the browser closing is the user's edge, so the
+          // CTA returns to idle as soon as it happens. A status read that stays
+          // pending (the default `networkMode: 'online'` never settles while the
+          // online manager reports offline) must not keep Connect disabled — the
+          // read's own states carry the outcome, and a real failure renders the
+          // retryable QueryError below.
+          void status.refetch().catch(() => undefined);
         },
       });
     } catch {
-      // The helper reports a failed launch itself, so a rejected `onReturn`
-      // refetch is the only error that reaches here. Keep the gate showing:
-      // the query's error state renders the retryable
-      // QueryError instead of letting `void handleConnect()` reject.
+      // `launchConnectGateBrowser` reports a failed launch through
+      // `onOpenFailure`; this keeps `void handleConnect()` from rejecting if the
+      // refresh helper throws before that. The status read's own error state
+      // renders the retryable QueryError.
     } finally {
       if (!controller.signal.aborted) {
         setConnecting(false);

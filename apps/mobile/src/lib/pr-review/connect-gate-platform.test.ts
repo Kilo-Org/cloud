@@ -248,6 +248,9 @@ describe.each(['ios', 'android'])('shared launch contract on %s', os => {
     }
 
     const launch = launchConnectGateBrowser('https://example.com/connect', handlers);
+    // Let the browser's own report land first: this test isolates the abort
+    // listener's cleanup, not the foreground race below.
+    await Promise.resolve();
     emitAppState('active');
     await launch;
     expect(removeAbortListener).toHaveBeenCalledExactlyOnceWith(
@@ -259,6 +262,44 @@ describe.each(['ios', 'android'])('shared launch contract on %s', os => {
     controller.abort();
     // Registered on both platforms, removed on both.
     expect(mocks.subscriptions[0]?.remove).toHaveBeenCalledOnce();
+  });
+
+  it('ends the wait when the app is back even if the launch never reports', async () => {
+    // The reported failure: the sheet closes, the app is foreground again, and
+    // the platform's completion never arrives. The caller must not stay in its
+    // "in progress" state waiting for that report.
+    const pending = Promise.withResolvers<{ type: string }>();
+    const open = os === 'android' ? mocks.openBrowserAsync : mocks.openAuthSessionAsync;
+    open.mockReturnValue(pending.promise);
+    const handlers = { onReturn: vi.fn().mockResolvedValue(undefined), onOpenFailure: vi.fn() };
+
+    const launch = launchConnectGateBrowser('https://example.com/connect', handlers);
+    emitAppState('background');
+    emitAppState('active');
+    await expect(launch).resolves.toBeUndefined();
+
+    expect(handlers.onReturn).toHaveBeenCalledOnce();
+    expect(handlers.onOpenFailure).not.toHaveBeenCalled();
+    expect(mocks.subscriptions[0]?.remove).toHaveBeenCalledOnce();
+  });
+
+  it('ignores a launch failure that lands after the foreground ended the wait', async () => {
+    const pending = Promise.withResolvers<{ type: string }>();
+    const open = os === 'android' ? mocks.openBrowserAsync : mocks.openAuthSessionAsync;
+    open.mockReturnValue(pending.promise);
+    const handlers = { onReturn: vi.fn().mockResolvedValue(undefined), onOpenFailure: vi.fn() };
+
+    const launch = launchConnectGateBrowser('https://example.com/connect', handlers);
+    emitAppState('active');
+    await launch;
+
+    // Settled union: a late rejection of the losing branch must not surface as
+    // a browser error or an unhandled rejection.
+    pending.reject(new Error('late launch failure'));
+    await Promise.resolve();
+
+    expect(handlers.onReturn).toHaveBeenCalledOnce();
+    expect(handlers.onOpenFailure).not.toHaveBeenCalled();
   });
 });
 

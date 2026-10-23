@@ -22,10 +22,16 @@ function waitForForeground() {
 /**
  * Opens the authorization URL and resolves once the user is back in the app.
  *
- * The foreground subscription is registered on both platforms; it completes the
- * wait wherever the browser cannot report its own dismissal. A plain browser
- * resolves `opened` as soon as it launches, while the native iOS auth session
- * only resolves when the sheet closes.
+ * The wait ends on whichever comes first: the browser reporting its own
+ * dismissal, the app coming back to the foreground, or the caller aborting.
+ *
+ * The foreground subscription is what makes the wait bounded. On both platforms
+ * it is the only edge the app itself produces when the user leaves the sheet;
+ * the launch promise is the browser's report and the platform may never deliver
+ * it (a sign-in sheet whose system consent was dismissed, a completion iOS
+ * drops). Waiting on that report alone left callers in their "in progress"
+ * state with no error and no retry. A plain browser resolves `opened` as soon as
+ * it launches, so Android keeps awaiting the foreground edge afterwards.
  *
  * Android is the one platform branch left, and it exists because the platform
  * is missing a capability: it has no native auth-session completion callback.
@@ -50,16 +56,30 @@ export async function openAuthorizationAndWaitForReturn(
   signal?.addEventListener('abort', onAbort);
   const foreground = waitForForeground();
   try {
-    const opened =
+    // Settled rather than awaited directly: a launch failure that loses the race
+    // still has to reach the caller when it is the edge that ended the wait, and
+    // a late one must not escape as an unhandled rejection.
+    const launched = (
       Platform.OS === 'android'
         ? WebBrowser.openBrowserAsync(authorizationUrl)
-        : WebBrowser.openAuthSessionAsync(authorizationUrl);
-    await Promise.race([opened, cancelled]);
-    if (!signal?.aborted) {
-      const result = await opened;
-      if (result.type === WebBrowser.WebBrowserResultType.OPENED) {
-        await Promise.race([foreground.returned, cancelled]);
-      }
+        : WebBrowser.openAuthSessionAsync(authorizationUrl)
+    ).then(
+      result => ({ edge: 'launched' as const, result }),
+      (error: unknown) => ({ edge: 'failed' as const, error })
+    );
+    const first = await Promise.race([
+      launched,
+      cancelled.then(() => ({ edge: 'aborted' as const })),
+      foreground.returned.then(() => ({ edge: 'foreground' as const })),
+    ]);
+    if (first.edge === 'aborted' || first.edge === 'foreground') {
+      return;
+    }
+    if (first.edge === 'failed') {
+      throw first.error;
+    }
+    if (first.result.type === WebBrowser.WebBrowserResultType.OPENED) {
+      await Promise.race([foreground.returned, cancelled]);
     }
   } finally {
     foreground.subscription.remove();

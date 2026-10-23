@@ -318,6 +318,28 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
     }
   );
 
+  it.each(providers)(
+    '%s returns Connect to idle when the return refetch never settles',
+    async provider => {
+      // Default `networkMode: 'online'`: while the online manager reports
+      // offline the awaited read stays pending for good. The CTA must not wait
+      // on it — the user already backed out of the sign-in sheet.
+      const neverSettles = Promise.withResolvers<void>();
+      queryResult.refetch.mockReturnValue(neverSettles.promise);
+      const pending = beginPendingLaunch();
+      const renderer = mount(provider);
+      const button = await pressConnect(renderer);
+      expect(button.props.disabled).toBe(true);
+
+      await settleLaunch(pending);
+
+      expect(queryResult.refetch).toHaveBeenCalledOnce();
+      expect(button.props.disabled).toBe(false);
+      expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(0);
+      expect(toast.error).not.toHaveBeenCalled();
+    }
+  );
+
   it('explains the personal Bitbucket restriction without a Connect CTA', () => {
     const renderer = mount('bitbucket', null);
     expect(renderer.root.findByType('EmptyState').props.description).toBeTruthy();

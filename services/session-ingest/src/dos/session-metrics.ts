@@ -152,62 +152,17 @@ function nonNegative(value: number): number {
 }
 
 /**
- * A single assistant message cannot report more than this cost (USD). Far above
- * any real assistant message cost; bounds the running total and the microdollar
- * conversion inside the Postgres bigint range.
+ * Maximum accepted cost contribution for one assistant message, in USD.
  */
 export const MAX_ASSISTANT_COST_USD = 1000;
 
 /**
- * Clamp one assistant message's cost contribution to [0, MAX_ASSISTANT_COST_USD].
- * Non-finite or negative costs contribute 0, never an offset against genuine costs.
- * Shared by aggregate metrics, the live running total, and the DO upsert correction
- * so every cost consumer applies the same bound.
+ * Clamps one assistant-message cost to [0, MAX_ASSISTANT_COST_USD].
+ * Every cost consumer uses this same contribution rule.
  */
 export function clampAssistantCostUsd(cost: number): number {
   if (!Number.isFinite(cost) || cost <= 0) return 0;
   return Math.min(cost, MAX_ASSISTANT_COST_USD);
-}
-
-/**
- * Convert a clamped USD cost to microdollars. Each message's cost is clamped to
- * MAX_ASSISTANT_COST_USD first, so the conversion stays finite and inside the
- * Postgres bigint range; the returned value is always a non-negative integer.
- */
-export function assistantCostUsdToMicrodollars(costUsd: number): number {
-  if (!Number.isFinite(costUsd)) return 0;
-  return Math.max(0, Math.round(clampAssistantCostUsd(costUsd) * 1_000_000));
-}
-
-/**
- * Upper bound for the running cost total in microdollars. MAX_SAFE_INTEGER
- * microdollars is far inside the Postgres bigint range, so a bounded total can
- * never fail the write with an out-of-range value.
- */
-export const MAX_RUNNING_COST_MICRODOLLARS = Number.MAX_SAFE_INTEGER;
-
-/**
- * Cap the running cost total so repeated clamped contributions cannot overflow.
- */
-export function capRunningCostMicrodollars(totalMicrodollars: number): number {
-  return Math.min(Math.max(0, totalMicrodollars), MAX_RUNNING_COST_MICRODOLLARS);
-}
-
-/**
- * A stored assistant message's clamped cost contribution in microdollars, read
- * from its item_data. Returns 0 for malformed, non-assistant, or R2-offloaded
- * rows ('{}'), matching computeSessionMetrics' per-message handling.
- */
-export function assistantMessageCostMicrodollars(itemData: string): number {
-  let raw: unknown;
-  try {
-    raw = JSON.parse(itemData);
-  } catch {
-    return 0;
-  }
-  const parsed = AssistantMessageSchema.safeParse(raw);
-  if (!parsed.success) return 0;
-  return assistantCostUsdToMicrodollars(parsed.data.cost);
 }
 
 function processKiloMeta(acc: Accumulator, raw: unknown) {
@@ -380,6 +335,22 @@ export function computeSessionMetrics(
     platform: acc.platform,
     organizationId: acc.organizationId,
   };
+}
+
+export function computeRunningAssistantCostUsd(rows: Array<{ item_data: string }>): number {
+  let total = 0;
+  for (const row of rows) {
+    let raw: unknown;
+    try {
+      raw = JSON.parse(row.item_data);
+    } catch {
+      continue;
+    }
+    const parsed = AssistantMessageSchema.safeParse(raw);
+    if (!parsed.success) continue;
+    total += clampAssistantCostUsd(parsed.data.cost);
+  }
+  return nonNegative(total);
 }
 
 const ACTIVITY_PERSIST_THROTTLE_MS = 15_000;

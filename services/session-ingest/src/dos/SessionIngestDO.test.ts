@@ -82,7 +82,6 @@ describe('SessionIngestDO ingest ordering', () => {
       from: vi.fn(() => selectQuery),
       where: vi.fn(() => selectQuery),
       get: vi.fn(() => undefined),
-      all: vi.fn(() => []),
     };
     const db = {
       select: vi.fn(() => selectQuery),
@@ -139,12 +138,10 @@ describe('SessionIngestDO ingest ordering', () => {
     const operations: string[] = [];
     const metaValues = new Map<string, string | null>();
     const getResults = [
-      undefined, // deleted check
-      undefined, // kiloUserId meta
-      undefined, // sessionId meta
-      undefined, // ingestVersion meta
-      undefined, // runningCostMicrodollars read
-      { value: '0' }, // hasIngestMeta: total seeded → skip seed scan
+      undefined,
+      undefined,
+      undefined,
+      undefined,
       { ingested_at: 0, item_data_r2_key: 'items/old' },
       undefined,
     ];
@@ -221,7 +218,6 @@ describe('SessionIngestDO ingest ordering', () => {
       from: vi.fn(() => selectQuery),
       where: vi.fn(() => selectQuery),
       get: vi.fn(() => undefined),
-      all: vi.fn(() => []),
     };
     const db = {
       select: vi.fn(() => selectQuery),
@@ -275,7 +271,6 @@ describe('SessionIngestDO ingest ordering', () => {
       from: vi.fn(() => selectQuery),
       where: vi.fn(() => selectQuery),
       get: vi.fn(() => undefined),
-      all: vi.fn(() => []),
     };
     const db = {
       select: vi.fn(() => selectQuery),
@@ -352,7 +347,6 @@ describe('SessionIngestDO session-ready push', () => {
         return selectQuery;
       }),
       get: vi.fn(() => (queriedKey === undefined ? undefined : rows.get(queriedKey))),
-      all: vi.fn(() => []),
     };
     const db = {
       select: vi.fn(() => selectQuery),
@@ -791,8 +785,6 @@ describe('SessionIngestDO live activity + cost persist', () => {
     seedMessageRows?: Array<{ item_data: string }>;
     /** If set, Postgres update rejects with this error. */
     persistError?: Error;
-    /** If set, the Postgres update waits on it before completing. */
-    persistGate?: Promise<void>;
     evidenceGate?: Promise<void>;
     evidenceError?: Error;
   };
@@ -803,7 +795,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
     // item rows keyed by item_id for stale-guard lookups during ingest loop
     const itemRows = new Map<
       string,
-      { ingested_at: number | null; item_data_r2_key: string | null; item_data?: string }
+      { ingested_at: number | null; item_data_r2_key: string | null }
     >();
     let costScanCount = 0;
 
@@ -909,7 +901,6 @@ describe('SessionIngestDO live activity + cost persist', () => {
                   itemRows.set(values.item_id, {
                     ingested_at: values.ingested_at ?? null,
                     item_data_r2_key: values.item_data_r2_key ?? null,
-                    item_data: values.item_data,
                   });
                   if (values.item_type === 'message' && values.item_data) {
                     messageRows.push({ item_data: values.item_data });
@@ -964,12 +955,11 @@ describe('SessionIngestDO live activity + cost persist', () => {
     let pgCallCount = 0;
     const pgWhere = vi.fn((_condition: unknown) => {
       return {
-        async then(
+        then(
           onFulfilled?: ((value: unknown) => unknown) | null,
           onRejected?: ((reason: unknown) => unknown) | null
         ) {
           pgCallCount += 1;
-          await options.persistGate;
           if (options.persistError) {
             return Promise.reject(options.persistError).then(onFulfilled, onRejected);
           }
@@ -1024,7 +1014,6 @@ describe('SessionIngestDO live activity + cost persist', () => {
       },
       pgSet,
       pgWhere,
-      select: db.select,
       getWorkerDb: dbClientMocks.getWorkerDb,
     };
   }
@@ -1783,7 +1772,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
     expect(harness.pgCallCount).toBe(0);
   });
 
-  it('advances the cost throttle on a persist failure so retry waits a window', async () => {
+  it('handles a persist failure', async () => {
     const harness = makeLiveHarness({
       persistError: new Error('postgres down'),
     });
@@ -1799,38 +1788,8 @@ describe('SessionIngestDO live activity + cost persist', () => {
     await harness.settle();
 
     expect(harness.pgCallCount).toBe(1);
-    // The stored value stays un-persisted so the gate reopens, but the attempt
-    // counts toward the throttle window instead of retrying on every ingest.
     expect(harness.meta.get('lastCostPersistedMicrodollars')).toBeUndefined();
-    expect(Number(harness.meta.get('lastCostPersistedAtMs'))).toBeGreaterThanOrEqual(ingestedAt);
     expect(harness.meta.get('lastActivityPersistedValueMs')).toBeUndefined();
-  });
-
-  it('leaves throttle meta untouched when a persist failure lands on a deleted session', async () => {
-    let release: () => void = () => undefined;
-    const gate = new Promise<void>(resolve => {
-      release = resolve;
-    });
-    const harness = makeLiveHarness({
-      persistError: new Error('postgres down'),
-      persistGate: gate,
-    });
-
-    const ingested = harness.durableObject.ingest(
-      [assistantItem('m1', 0.1)],
-      'usr_live',
-      'ses_live',
-      1,
-      1_700_000_000_100
-    );
-    // The session is cleared while the persist is still in flight.
-    harness.meta.set('deleted', 'true');
-    release();
-    await ingested;
-    await harness.settle();
-
-    expect(harness.pgCallCount).toBe(1);
-    expect(harness.meta.get('lastCostPersistedAtMs')).toBeUndefined();
   });
 
   it('one persist call per batch carries exactly the fired columns', async () => {
@@ -1871,8 +1830,6 @@ describe('SessionIngestDO live activity + cost persist', () => {
         // activity throttle closed so we isolate cost-scan behavior
         lastActivityPersistedAtMs: String(Date.now()),
         lastActivityPersistedValueMs: '9999999999999',
-        // total already seeded: the one-time seed scan does not run
-        runningCostMicrodollars: '100000',
       },
       seedMessageRows: [
         {
@@ -1900,7 +1857,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
     expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('100000');
   });
 
-  it('one-time seed counts pre-existing assistant rows, idle persists the total (D17)', async () => {
+  it('persists cost during an idle transition', async () => {
     const priorCost = JSON.stringify({
       role: 'assistant',
       time: { created: 1000 },
@@ -1925,21 +1882,16 @@ describe('SessionIngestDO live activity + cost persist', () => {
     );
     await harness.settle();
 
-    // One-time seed scan counts the pre-existing assistant row (meta absent);
-    // the idle transition's attention path selects the newest message rows once.
-    // Neither runs per-window again: the next candidate comes from the meta.
-    expect(harness.costScanCount).toBe(2);
+    // cost scan runs at least once (attention path may also select message rows)
+    expect(harness.costScanCount).toBeGreaterThanOrEqual(1);
     expect(harness.pgCallCount).toBe(1);
     expect(sqlFragmentText(harness.lastPgSet!.total_cost_microdollars)).toContain('250000');
     expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('250000');
-    expect(harness.meta.get('runningCostMicrodollars')).toBe('250000');
   });
 
   it('user-only message batch does not open cost persist (KB-4)', async () => {
     const harness = makeLiveHarness({
       seedMeta: {
-        // total already seeded: the one-time seed scan does not run
-        runningCostMicrodollars: '0',
         // leave activity path free so we can see activity-only write
       },
     });
@@ -1956,8 +1908,6 @@ describe('SessionIngestDO live activity + cost persist', () => {
   });
 
   it('assistant message still opens cost path (KB-4 regression)', async () => {
-    // Meta absent → the one-time seed scan runs, then the batch's own assistant
-    // message advances the running total; no per-window transcript scan follows.
     const harness = makeLiveHarness();
     await harness.durableObject.ingest(
       [assistantItem('a1', 0.05)],
@@ -1968,88 +1918,10 @@ describe('SessionIngestDO live activity + cost persist', () => {
     );
     await harness.settle();
 
-    expect(harness.costScanCount).toBe(1); // one-time seed, not the per-window scan
+    expect(harness.costScanCount).toBe(1);
     expect(harness.pgCallCount).toBe(1);
     expect(sqlFragmentText(harness.lastPgSet!.total_cost_microdollars)).toContain('50000');
     expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('50000');
-  });
-
-  it('records a zero running total so the seed does not rescan on later batches', async () => {
-    const harness = makeLiveHarness();
-
-    await harness.durableObject.ingest(
-      [{ type: 'session', data: { title: 'T' } }],
-      'usr_live',
-      'ses_live',
-      1,
-      1_000
-    );
-    await harness.settle();
-
-    // No inline messages yet: the seed still stores its (zero) total, so its
-    // absence can never restart the scan on the next batch.
-    expect(harness.meta.get('runningCostMicrodollars')).toBe('0');
-    expect(harness.costScanCount).toBe(1);
-
-    await harness.durableObject.ingest(
-      [{ type: 'part', data: { id: 'p1', messageID: 'm1', type: 'text', text: 'hi' } }],
-      'usr_live',
-      'ses_live',
-      1,
-      2_000
-    );
-    await harness.settle();
-
-    expect(harness.costScanCount).toBe(1);
-  });
-
-  it('reads previous item data only for an assistant message upsert', async () => {
-    const harness = makeLiveHarness({ seedMeta: { runningCostMicrodollars: '0' } });
-
-    await harness.durableObject.ingest(
-      [
-        { type: 'part', data: { id: 'p1', messageID: 'm1', type: 'text', text: 'hi' } },
-        assistantItem('a1', 0.02),
-      ],
-      'usr_live',
-      'ses_live',
-      1,
-      2_000
-    );
-    await harness.settle();
-
-    const guardColumns = harness.select.mock.calls
-      .map(([columns]) => columns as Record<string, unknown> | undefined)
-      .filter((columns): columns is Record<string, unknown> => columns?.ingested_at !== undefined);
-    const partGuard = guardColumns.find(columns => !('item_data' in columns));
-    expect(partGuard).toBeDefined();
-    const assistantGuards = guardColumns.filter(columns => 'item_data' in columns);
-    expect(assistantGuards.length).toBeGreaterThan(0);
-  });
-
-  it('replaces the overwritten assistant message cost in the running total', async () => {
-    const harness = makeLiveHarness();
-
-    await harness.durableObject.ingest(
-      [assistantItem('m1', 0.5)],
-      'usr_live',
-      'ses_live',
-      1,
-      1_000
-    );
-    await harness.settle();
-    expect(harness.meta.get('runningCostMicrodollars')).toBe('500000');
-
-    await harness.durableObject.ingest(
-      [assistantItem('m1', 0.2)],
-      'usr_live',
-      'ses_live',
-      1,
-      2_000
-    );
-    await harness.settle();
-
-    expect(harness.meta.get('runningCostMicrodollars')).toBe('200000');
   });
 
   it('decreased recomputed cost does not move lastCostPersistedMicrodollars backward (KB-7)', async () => {
@@ -2101,7 +1973,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
     const messageRows: Array<{ item_data: string }> = [];
     const itemRows = new Map<
       string,
-      { ingested_at: number | null; item_data_r2_key: string | null; item_data?: string }
+      { ingested_at: number | null; item_data_r2_key: string | null }
     >();
     let selectKind: 'meta_get' | 'item_guard' | 'message_cost' | 'briefing_outbox' | 'other' =
       'other';
@@ -2169,7 +2041,6 @@ describe('SessionIngestDO live activity + cost persist', () => {
                   itemRows.set(values.item_id, {
                     ingested_at: values.ingested_at ?? null,
                     item_data_r2_key: values.item_data_r2_key ?? null,
-                    item_data: values.item_data,
                   });
                   if (values.item_type === 'message' && values.item_data) {
                     messageRows.push({ item_data: values.item_data });

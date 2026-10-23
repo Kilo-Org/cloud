@@ -27,6 +27,15 @@ import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 import { cn } from '@/lib/utils';
 
+const ERROR_FIELDS = {
+  'slug-required': 'slug',
+  'slug-invalid': 'slug',
+  'slug-conflict': 'slug',
+  'name-required': 'name',
+  'name-too-long': 'name',
+  'description-too-long': 'description',
+} as const satisfies Record<AgentFormError, string>;
+
 type AgentFormSheetProps = Readonly<{
   agent: AgentSource | null;
   /** Slugs of the profile's other agents, so a duplicate fails validation inline. */
@@ -126,13 +135,7 @@ export function AgentFormSheet({
     const problem = validateAgentForm(state, existingSlugs);
     if (problem !== null) {
       setError(problem);
-      scrollToField(
-        problem === 'description-too-long'
-          ? 'description'
-          : problem.startsWith('slug-')
-            ? 'slug'
-            : 'name'
-      );
+      scrollToField(ERROR_FIELDS[problem]);
       return;
     }
     setError(null);

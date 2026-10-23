@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- keeps the mounted agent form behavior and refused-save scroll checks together */
 import { createElement, type ReactNode, type Ref } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

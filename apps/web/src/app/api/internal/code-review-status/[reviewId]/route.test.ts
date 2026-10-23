@@ -2013,6 +2013,52 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
     });
 
+    it('allows one fresh retry for a pre-dispatch workspace setup failure when usage is unavailable', async () => {
+      const retryFlow = mockCreatedInfraRetryFlow({
+        sessionId: 'agent-workspace-setup-failed',
+        cliSessionId: 'ses_workspace_setup_failed',
+      });
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: retryFlow.sessionId })
+      );
+      mockGetSessionUsageFromBilling.mockResolvedValue(null);
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: retryFlow.sessionId,
+          kiloSessionId: retryFlow.cliSessionId,
+          errorMessage: 'Workspace setup failed',
+          terminalReason: 'sandbox_error',
+          failure: {
+            stage: 'pre_dispatch',
+            code: 'workspace_setup_failed',
+            message: 'Workspace setup failed',
+          },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ success: true, retried: true });
+      expect(mockGetSessionUsageFromBilling).toHaveBeenCalledWith(
+        'ses_workspace_setup_failed',
+        '2025-01-01T00:00:00Z'
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).toHaveBeenCalledWith({
+        codeReviewId: REVIEW_ID,
+        retryOfAttemptId: retryFlow.failedAttemptId,
+      });
+      expect(mockRetryReviewFresh).toHaveBeenCalledWith(REVIEW_ID, {
+        sessionId: retryFlow.sessionId,
+        reason: 'Workspace setup failed',
+        failedAttemptId: retryFlow.failedAttemptId,
+        retryAttemptId: retryFlow.retryAttemptId,
+      });
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+      expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+    });
+
     it('does not infer the unavailable-usage exception from sandbox connection error text', async () => {
       const retryFlow = mockCreatedInfraRetryFlow({
         sessionId: 'agent-sandbox-connect-text-only',
@@ -2054,8 +2100,8 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         failure: { stage: 'agent_activity', code: 'sandbox_connect_failed' },
       },
       {
-        name: 'different pre-dispatch failure code',
-        failure: { stage: 'pre_dispatch', code: 'workspace_setup_failed' },
+        name: 'workspace setup failure after dispatch',
+        failure: { stage: 'post_dispatch_no_activity', code: 'workspace_setup_failed' },
       },
       {
         name: 'incomplete failure data',

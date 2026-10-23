@@ -1,4 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { ChevronDown } from '@/components/ui/icons';
 import { DirectionalChevronLeft } from '@/components/ui/directional-icons';
 import { I18nManager, Platform, Pressable, useWindowDimensions, View } from 'react-native';
@@ -86,7 +87,16 @@ type ScreenHeaderProps = {
   /** Omit to render a bare back-button bar (e.g. when the screen body provides its own title). */
   title?: string;
   titleContent?: React.ReactNode;
-  /** Line cap for the title, at most {@link MAX_TITLE_LINES}. */
+  /**
+   * Line cap for the title, at most {@link MAX_TITLE_LINES}. The default is
+   * one line: a header title that does not fit ellipsizes at its tail instead
+   * of wrapping. Android breaks CJK strings between any two characters, so a
+   * two-line cap orphans the string's last characters (ja-JP
+   * セキュリティエージェント rendered as 「…ジェン」 / 「ト」) — a tail
+   * ellipsis is the only natural boundary a CJK title has. Callers whose
+   * titles are real prose opt back into wrapping with an explicit cap
+   * (session headers: `SESSION_HEADER_TITLE_LINES`, todos: 2).
+   */
   titleNumberOfLines?: number;
   /**
    * Cap the eyebrow to this many lines, overriding the header's default single
@@ -140,9 +150,15 @@ type ScreenHeaderProps = {
    * wider than the title can spare.
    */
   inlineActionsWidth?: number;
-  /** Home, Quick Chat, and session headers supply context below the title.
-   * Other callers keep their existing title-only layout when this slot is absent. */
-  context?: React.ReactNode;
+  /**
+   * Keep the `inlineActions` cluster on the title row even when the shared-row
+   * check would reflow it. That check reserves a readable title, and the home
+   * header's heading is a fixed 40dp mark with no text, so the reserve does not
+   * apply: at a 2.5x accessibility font scale the account picker would drop
+   * under the mark on a phone wide enough to hold both. Leave it on for a
+   * heading that carries text.
+   */
+  allowInlineActionsStacking?: boolean;
   modal?: boolean;
   showBackButton?: boolean;
   onBack?: () => void;
@@ -150,12 +166,13 @@ type ScreenHeaderProps = {
   backFallback?: Href;
   onTitlePress?: () => void;
   /**
-   * Accessibility label for the pressable title. Defaults to a generic
-   * "Open menu" so list callers don't have to supply one. Detail screens
-   * (e.g. session rename) should override with a verb that describes the
+   * Accessibility hint for the pressable title: the action it opens. The
+   * title's own text stays the label, so a screen reader announces which
+   * screen it is on before the action. Defaults to the generic open-menu copy.
+   * Detail screens (e.g. session rename) supply a verb that describes their
    * action, not "open menu".
    */
-  onTitlePressAccessibilityLabel?: string;
+  onTitlePressAccessibilityHint?: string;
   backIcon?: 'back' | 'close';
   /**
    * Apply the status-bar safe-area inset. Form sheets already clear the
@@ -174,19 +191,30 @@ type ScreenHeaderProps = {
  * height is `1.75rem`, the large 30px variant's is 36px. Class names must be
  * static because NativeWind extracts them at build time. The reserve tracks the
  * line cap so a title that grows a line (loading -> loaded, rename) cannot move
- * the body below the header.
+ * the body below the header — and a one-line cap reserves one line, not the
+ * two-line default it replaced, or the header keeps a blank line it can never
+ * fill.
+ *
+ * The large branches stay in px: NativeWind's rem is 14pt, so `min-h-9` would
+ * be 31.5pt under the 36px the large title paints.
  */
 function reservedTitleHeightClass(size: ScreenHeaderProps['size'], titleLines: number): string {
   if (size === 'large') {
-    return titleLines > 2 ? 'min-h-[108px]' : 'min-h-[72px]';
+    if (titleLines > 2) {
+      return 'min-h-[108px]';
+    }
+    return titleLines === 1 ? 'min-h-[36px]' : 'min-h-[72px]';
   }
-  return titleLines > 2 ? 'min-h-21' : 'min-h-14';
+  if (titleLines > 2) {
+    return 'min-h-21';
+  }
+  return titleLines === 1 ? 'min-h-7' : 'min-h-14';
 }
 
 export function ScreenHeader({
   title,
   titleContent,
-  titleNumberOfLines = 2,
+  titleNumberOfLines = 1,
   eyebrowNumberOfLines,
   reserveTitleSpace = false,
   eyebrow,
@@ -198,14 +226,14 @@ export function ScreenHeader({
   headerRightShrinks = false,
   inlineActions,
   inlineActionsWidth,
-  context,
+  allowInlineActionsStacking = true,
   modal,
   centerTitle = modal ?? false,
   showBackButton,
   onBack,
   backFallback,
   onTitlePress,
-  onTitlePressAccessibilityLabel,
+  onTitlePressAccessibilityHint,
   backIcon,
   safeAreaTop = true,
   className,
@@ -214,7 +242,8 @@ export function ScreenHeader({
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { width: windowWidth, fontScale } = useWindowDimensions();
+  const { width: windowWidth } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
   const canGoBack = showBackButton ?? (router.canGoBack() || backFallback !== undefined);
   const isOfflineBannerVisible = useOfflineBannerSpace();
   // A window too narrow to hold the title beside its actions drops the actions
@@ -230,6 +259,7 @@ export function ScreenHeader({
   // width drops it beneath the title before it squeezes the title's own
   // readable minimum, so the 30px Agents title never breaks inside a word.
   const stackInlineActions =
+    allowInlineActionsStacking &&
     inlineActions != null &&
     shouldStackHeaderActions(windowWidth, fontScale, inlineActionsWidth ?? 0);
 
@@ -277,6 +307,15 @@ export function ScreenHeader({
     ? { top: 13, right: 0, bottom: 13, left: 13 }
     : { top: 13, right: 13, bottom: 13, left: 0 };
 
+  // What pressing the title does. The pressable title itself is labelled with
+  // the title's own text, so this is the hint, never the label: a screen reader
+  // must hear which screen it is on before the action. It names the title it
+  // opens, or falls back to the generic menu copy for a header with no text
+  // title.
+  const titlePressHint =
+    onTitlePressAccessibilityHint ??
+    (title ? t('screenHeader.openMenuFor', { title }) : t('screenHeader.openMenu'));
+
   let titleNode: React.ReactNode = null;
   if (title != null) {
     const titleText = titleContent ? (
@@ -307,16 +346,17 @@ export function ScreenHeader({
     );
     // Title caret removed: rename stays available via the pressable title
     // itself. The backIcon === 'close' ChevronDown on the back control is
-    // unrelated and stays.
+    // unrelated and stays. The label is the title text, never the action: a
+    // screen reader must hear which screen it is on, and the action goes in
+    // the hint (a rename control announced in place of the title left the
+    // title unreadable on the to-do detail screen).
     titleNode = onTitlePress ? (
       <Pressable
         onPress={onTitlePress}
         hitSlop={titleHitSlop}
         accessibilityRole="button"
-        accessibilityLabel={
-          onTitlePressAccessibilityLabel ??
-          (title ? t('screenHeader.openMenuFor', { title }) : t('screenHeader.openMenu'))
-        }
+        accessibilityLabel={title}
+        accessibilityHint={titlePressHint}
         className="active:opacity-70"
       >
         {titleLayout}
@@ -345,7 +385,6 @@ export function ScreenHeader({
         </Eyebrow>
       ) : null}
       {titleNode}
-      {context}
     </View>
   );
   // A centered title shares its row with the leading and trailing controls.
@@ -430,9 +469,18 @@ export function ScreenHeader({
   // they keep the header's full width, so a long translation (Croatian
   // "TRENUTAČNO AKTIVNO" / "PRETHODNE SESIJE" beside the filter) stays legible
   // instead of squeezing the 30px title into a mid-word break.
+  //
+  // A caller that turns the reflow off has to cap the slot instead: the heading
+  // is `flex-1` over a zero basis, so an unbounded trailing cluster resolves
+  // all negative free space on itself and leaves the heading at zero width,
+  // where a fixed-size child such as the Home mark paints under the cluster.
+  // The half-row cap is the same one `headerRightShrinks` uses; with it the
+  // free space can never go negative, so the heading always keeps its share.
   const inlineActionsSlot =
     inlineActions && !stackInlineActions ? (
-      <View className="ms-3 min-w-0 shrink">{inlineActions}</View>
+      <View className={cn('ms-3 min-w-0 shrink', !allowInlineActionsStacking && 'max-w-[50%]')}>
+        {inlineActions}
+      </View>
     ) : null;
   const stackedInlineActionsRow =
     inlineActions && stackInlineActions ? (

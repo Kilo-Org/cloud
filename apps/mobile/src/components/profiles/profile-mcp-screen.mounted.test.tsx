@@ -43,6 +43,7 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
@@ -278,6 +279,25 @@ describe('ProfileMcpScreen', () => {
     await waitFor(() => h.error.mock.calls.length > 0);
     expect(h.error).toHaveBeenCalledWith("Couldn't save MCP server");
     expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
+
+    unmount();
+  });
+
+  it('a11y: the secret badge is one counted node and the lock glyph is hidden', async () => {
+    h.query.data = testProfile([testServer()]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    const badge = findAll(renderer.root, 'View').find(node =>
+      String(node.props.accessibilityLabel ?? '').startsWith('Secret count:')
+    );
+    expect(badge?.props.accessibilityLabel).toBe('Secret count: 1');
+    expect(badge?.props.accessible).toBe(true);
+    expect(findOne(renderer.root, 'Lock').parent?.props).toMatchObject({
+      accessibilityElementsHidden: true,
+      importantForAccessibility: 'no-hide-descendants',
+    });
 
     unmount();
   });

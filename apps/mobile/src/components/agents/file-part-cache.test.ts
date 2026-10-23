@@ -20,7 +20,8 @@ import {
 
 type FileInstance = {
   uri: string;
-  write: ReturnType<typeof vi.fn>;
+  written?: { content: string; encoding?: string };
+  writeSync: (content: string, options?: { encoding?: string }) => void;
   filename: string;
 };
 
@@ -38,9 +39,11 @@ const expoFileSystemMock = vi.hoisted(() => {
     };
   });
   const File = vi.fn(function FileMock(_directory: { name?: string }, filename: string) {
-    const instance = {
+    const instance: FileInstance = {
       uri: `file:///cache/session-file-parts/${filename}`,
-      write: vi.fn(),
+      writeSync(content, options) {
+        this.written = { content, encoding: options?.encoding };
+      },
       filename,
     };
     fileInstances.push(instance);
@@ -123,7 +126,7 @@ describe('cacheFilePart', () => {
     });
     const file = fileInstances[0];
     expect(file?.filename).toBe('part-1-report.pdf');
-    expect(file?.write).toHaveBeenCalledWith('QUJD', { encoding: 'base64' });
+    expect(file?.written).toEqual({ content: 'QUJD', encoding: 'base64' });
     expect(getFilePartCacheEntry('part-1')?.url).toBe(
       'file:///cache/session-file-parts/part-1-report.pdf'
     );
@@ -158,7 +161,7 @@ describe('cacheFilePart', () => {
     ) {
       const instance = {
         uri: `file:///cache/session-file-parts/${filename}`,
-        write: vi.fn(() => {
+        writeSync: vi.fn(() => {
           throw new Error('disk full');
         }),
         filename,

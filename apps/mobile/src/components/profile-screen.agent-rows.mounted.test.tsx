@@ -6,7 +6,7 @@ import {
   authState,
   findConfigureRows,
   getProfileAgentScopeMock,
-  interactionState,
+  idleState,
   keys,
   mountProfile,
   organizationsQueryFn,
@@ -32,8 +32,8 @@ describe('ProfileScreen agent rows', () => {
     signOutFn.mockReset();
     routerPush.mockReset();
     authState.token = 'token-1';
-    interactionState.storedCallback = undefined;
-    interactionState.cancel.mockReset();
+    idleState.storedCallback = undefined;
+    idleState.cancel.mockReset();
     getProfileAgentScopeMock.mockReset();
   });
 

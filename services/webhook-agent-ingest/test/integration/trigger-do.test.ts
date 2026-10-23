@@ -3,15 +3,16 @@ import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { describe, it, expect, vi } from 'vitest';
 import { requests, triggerConfig } from '../../src/db/sqlite-schema';
 import type { TriggerDO } from '../../src/dos/TriggerDO';
+import type { SandboxAllocation } from '@kilocode/worker-utils/sandbox-allocation';
 
 async function expectSandboxAllocation(
   stub: DurableObjectStub<TriggerDO>,
-  sandboxAllocation: 'isolated-standard' | undefined
+  sandboxAllocation: SandboxAllocation | undefined
 ): Promise<void> {
   expect((await stub.getConfig())?.sandboxAllocation).toBe(sandboxAllocation);
   expect((await stub.getConfigForResponse())?.sandboxAllocation).toBe(sandboxAllocation);
   await runInDurableObject(stub, async (_instance, state) => {
-    const config = await state.storage.get<{ sandboxAllocation?: 'isolated-standard' }>('config');
+    const config = await state.storage.get<{ sandboxAllocation?: SandboxAllocation }>('config');
     expect(config?.sandboxAllocation).toBe(sandboxAllocation);
     const row = drizzle(state.storage)
       .select({ sandboxAllocation: triggerConfig.sandbox_allocation })
@@ -186,7 +187,7 @@ describe('TriggerDO', () => {
         });
 
         await runInDurableObject(stub, async (_instance, state) => {
-          const config = await state.storage.get<{ sandboxAllocation?: 'isolated-standard' }>(
+          const config = await state.storage.get<{ sandboxAllocation?: SandboxAllocation }>(
             'config'
           );
           expect(config?.sandboxAllocation).toBe('isolated-standard');
@@ -228,6 +229,37 @@ describe('TriggerDO', () => {
 
         await stub.updateConfig({ sandboxAllocation: undefined });
         await expectSandboxAllocation(stub, 'isolated-standard');
+
+        await stub.updateConfig({ sandboxAllocation: null });
+        await expectSandboxAllocation(stub, undefined);
+      }
+    );
+
+    it.each([
+      'cloudflare-containers-standard-3',
+      'cloudflare-containers-standard-4',
+      'vercel-large',
+    ] as const)(
+      'persists the %s allocation, preserves it on unrelated updates, and clears it on null',
+      async sandboxAllocation => {
+        const triggerId = `sandbox-allocation-${sandboxAllocation}`;
+        const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`);
+        const stub = env.TRIGGER_DO.get(id);
+
+        await stub.configure(testUserNamespace, triggerId, {
+          githubRepo: 'owner/repo',
+          mode: 'code',
+          model: 'openai/gpt-4.1',
+          promptTemplate: 'Process {{body}}',
+          sandboxAllocation,
+        });
+        await expectSandboxAllocation(stub, sandboxAllocation);
+
+        await stub.updateConfig({ promptTemplate: 'Updated {{body}}' });
+        await expectSandboxAllocation(stub, sandboxAllocation);
+
+        await stub.updateConfig({ sandboxAllocation: undefined });
+        await expectSandboxAllocation(stub, sandboxAllocation);
 
         await stub.updateConfig({ sandboxAllocation: null });
         await expectSandboxAllocation(stub, undefined);

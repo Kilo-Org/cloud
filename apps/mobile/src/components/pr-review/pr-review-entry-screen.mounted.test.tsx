@@ -130,6 +130,15 @@ async function press(node: ReactTestInstance) {
   });
 }
 
+/** The selected state an account action button carries, if it carries one. */
+function selectedState(node: ReactTestInstance): boolean | undefined {
+  const state: unknown = node.props.accessibilityState;
+  if (typeof state !== 'object' || state === null || !('selected' in state)) {
+    return undefined;
+  }
+  return typeof state.selected === 'boolean' ? state.selected : undefined;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   auth.token = 'token';
@@ -170,8 +179,13 @@ describe('PrReviewEntryScreen context line', () => {
     }
     await press(control);
 
+    // Every account row is an action button that reports whether it is the
+    // current account.
     const rows = ui.renderer.root.findAll(
-      node => node.type === Pressable && node.props.accessibilityRole === 'radio'
+      node =>
+        node.type === Pressable &&
+        node.props.accessibilityRole === 'button' &&
+        selectedState(node) !== undefined
     );
     expect(rows.map(row => row.props.accessibilityLabel)).toEqual(['Personal', 'Acme', 'Umbrella']);
 

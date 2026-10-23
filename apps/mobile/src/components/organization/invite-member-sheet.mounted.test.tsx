@@ -1,6 +1,7 @@
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
 import { act } from '@/test/renderer';
 import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 import { InviteMemberSheet } from './invite-member-sheet';
@@ -23,7 +24,9 @@ const invite = vi.hoisted(() => ({
   reset: vi.fn(),
   isPending: false,
   isError: false,
-  error: { message: 'Seat limit reached' },
+  // A taken address, as the procedure rejects it: the sheet renders localized
+  // copy for the code, not the server's sentence.
+  error: { data: { code: 'CONFLICT', message: 'This email already has a pending invitation' } },
 }));
 // The route's focus effects: the sheet registers its form reset and its Back
 // handler on every render, and the test re-runs them to present the sheet
@@ -270,7 +273,7 @@ describe('InviteMemberSheet reopen', () => {
       fieldProps(rendered).onChangeText('dev@example.com');
     });
 
-    expect(inviteMessage(rendered)).toBe('Seat limit reached');
+    expect(inviteMessage(rendered)).toBe(i18n.t('organization.inviteMember.alreadyInvited'));
     rendered.unmount();
   });
 

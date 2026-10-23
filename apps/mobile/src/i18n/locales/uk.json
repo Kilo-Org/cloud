@@ -889,7 +889,6 @@
       "installGithubApp": "Установіть застосунок GitHub для репозиторіїв",
       "installGithubAppDescription": "Надайте застосунку Kilo для GitHub доступ до репозиторіїв, які потрібно перевіряти.",
       "noRepositoriesFound": "Репозиторіїв не знайдено",
-      "lastSynced": "Востаннє синхронізовано {{time}}",
       "repositoryAccess": "доступ до репозиторію"
     },
     "style": {

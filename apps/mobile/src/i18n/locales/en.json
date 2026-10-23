@@ -1491,7 +1491,6 @@
       "installGithubApp": "Install the GitHub app on repositories",
       "installGithubAppDescription": "Grant the Kilo GitHub App access to the repositories you want reviewed.",
       "noRepositoriesFound": "No repositories found",
-      "lastSynced": "Last synced {{time}}",
       "repositoryAccess": "repository access"
     },
     "style": {

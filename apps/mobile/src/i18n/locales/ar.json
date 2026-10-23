@@ -895,7 +895,6 @@
       "installGithubApp": "ثبّت تطبيق GitHub على المستودعات",
       "installGithubAppDescription": "امنح تطبيق Kilo على GitHub صلاحية الوصول إلى المستودعات التي تريد مراجعتها.",
       "noRepositoriesFound": "لم يتم العثور على مستودعات",
-      "lastSynced": "آخر مزامنة: {{time}}",
       "repositoryAccess": "الوصول إلى المستودع"
     },
     "style": {

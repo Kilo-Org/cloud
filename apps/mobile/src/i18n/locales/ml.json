@@ -1400,7 +1400,6 @@
       "installGithubApp": "റിപ്പോസിറ്ററികളിൽ GitHub ആപ്പ് ഇൻസ്റ്റാൾ ചെയ്യുക",
       "installGithubAppDescription": "അവലോകനം ചെയ്യേണ്ട റിപ്പോസിറ്ററികൾ ഉപയോഗിക്കാൻ Kilo GitHub ആപ്പിന് അനുമതി നൽകുക.",
       "noRepositoriesFound": "റിപ്പോസിറ്ററികൾ കണ്ടെത്തിയില്ല",
-      "lastSynced": "അവസാനം സമന്വയിപ്പിച്ചത് {{time}}",
       "repositoryAccess": "റിപ്പോസിറ്ററി ഉപയോഗിക്കാനുള്ള അനുമതി"
     },
     "style": {

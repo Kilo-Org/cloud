@@ -1400,7 +1400,6 @@
       "installGithubApp": "Abka GitHub ku rakib kaydadka",
       "installGithubAppDescription": "U oggolow abka Kilo ee GitHub inuu galo kaydadka aad rabto in dib loo eego.",
       "noRepositoriesFound": "Ma jiraan kaydad la helay",
-      "lastSynced": "Markii ugu dambaysay ee la isku waafajiyay: {{time}}",
       "repositoryAccess": "oggolaanshaha gelitaanka kaydka"
     },
     "style": {

@@ -883,7 +883,6 @@
       "installGithubApp": "Pasang aplikasi GitHub di repositori",
       "installGithubAppDescription": "Izinkan aplikasi GitHub Kilo mengakses repositori yang ingin kamu tinjau.",
       "noRepositoriesFound": "Tidak ada repositori yang ditemukan",
-      "lastSynced": "Terakhir disinkronkan {{time}}",
       "repositoryAccess": "akses repositori"
     },
     "style": {

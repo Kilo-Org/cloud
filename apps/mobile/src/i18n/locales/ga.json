@@ -1457,7 +1457,6 @@
       "installGithubApp": "Suiteáil an aip GitHub ar stórtha",
       "installGithubAppDescription": "Tabhair rochtain d'aip GitHub Kilo ar na stórtha ar mhaith leat go ndéanfaí athbhreithniú orthu.",
       "noRepositoriesFound": "Níor aimsíodh aon stór",
-      "lastSynced": "An sioncronú deireanach: {{time}}",
       "repositoryAccess": "rochtain ar stórtha"
     },
     "style": {

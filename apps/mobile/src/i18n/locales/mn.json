@@ -1400,7 +1400,6 @@
       "installGithubApp": "Репозиториудад GitHub апп суулгах",
       "installGithubAppDescription": "Kilo GitHub аппад шалгуулах репозиториуддаа хандах эрх олгоно уу.",
       "noRepositoriesFound": "Репозитори олдсонгүй",
-      "lastSynced": "Сүүлд синхрончилсон: {{time}}",
       "repositoryAccess": "репозиторийн хандах эрх"
     },
     "style": {

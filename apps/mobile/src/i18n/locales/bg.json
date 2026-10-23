@@ -1400,7 +1400,6 @@
       "installGithubApp": "Инсталирай приложението за GitHub в хранилищата",
       "installGithubAppDescription": "Предостави на приложението на Kilo за GitHub достъп до хранилищата, които искаш да бъдат преглеждани.",
       "noRepositoriesFound": "Не са намерени хранилища",
-      "lastSynced": "Последна синхронизация: {{time}}",
       "repositoryAccess": "достъп до хранилища"
     },
     "style": {

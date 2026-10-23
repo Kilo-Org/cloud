@@ -1400,7 +1400,6 @@
       "installGithubApp": "Sakinisha programu ya GitHub kwenye hazina",
       "installGithubAppDescription": "Ipe programu ya Kilo ya GitHub ruhusa ya kufikia hazina unazotaka zikaguliwe.",
       "noRepositoriesFound": "Hakuna hazina zilizopatikana",
-      "lastSynced": "Ilisawazishwa mwisho {{time}}",
       "repositoryAccess": "ufikiaji wa hazina"
     },
     "style": {

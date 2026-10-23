@@ -32,6 +32,7 @@ import {
   useReviewerRepositoriesResync,
 } from '@/lib/hooks/use-code-reviewer-repo-sync';
 import { useRepoSelectionToggle } from '@/lib/hooks/use-code-reviewer-repo-selection';
+import { useNowTicker } from '@/lib/hooks/use-now-ticker';
 import { getBitbucketIntegrationUrl } from '@/lib/integration-urls';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -118,8 +119,14 @@ export default function ReposRoute() {
     }
     void resync();
   };
+  // The label is relative, so it must be derived from a clock the render
+  // traces: a live `Date.now()` read inside render is memoized with unchanged
+  // props and the on-screen text freezes at its first value.
+  const now = useNowTicker(10_000);
   const syncedLabel = syncedAt
-    ? t('codeReviewer.repos.lastSynced', { time: timeAgo(parseTimestamp(syncedAt)) })
+    ? t('securityAgent.dashboard.lastSynced', {
+        time: timeAgo(parseTimestamp(syncedAt), undefined, now),
+      })
     : null;
   const emptyStateCopyByPlatform = {
     github: {

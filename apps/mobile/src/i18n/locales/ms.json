@@ -1400,7 +1400,6 @@
       "installGithubApp": "Pasang apl GitHub pada repositori",
       "installGithubAppDescription": "Benarkan apl GitHub Kilo mengakses repositori yang anda mahu disemak.",
       "noRepositoriesFound": "Tiada repositori ditemui",
-      "lastSynced": "Kali terakhir disegerakkan: {{time}}",
       "repositoryAccess": "akses repositori"
     },
     "style": {

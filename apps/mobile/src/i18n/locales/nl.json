@@ -883,7 +883,6 @@
       "installGithubApp": "Installeer de GitHub-app op repositories",
       "installGithubAppDescription": "Geef de Kilo GitHub-app toegang tot de repositories die je wilt laten beoordelen.",
       "noRepositoriesFound": "Geen repositories gevonden",
-      "lastSynced": "Laatst gesynchroniseerd: {{time}}",
       "repositoryAccess": "toegang tot repositories"
     },
     "style": {

@@ -1400,7 +1400,6 @@
       "installGithubApp": "Faka uhlelo lokusebenza lwe-GitHub ezinqolobaneni zekhodi",
       "installGithubAppDescription": "Nika uhlelo lokusebenza lwe-Kilo ku-GitHub imvume yokufinyelela ezinqolobaneni zekhodi ofuna zihlolwe.",
       "noRepositoriesFound": "Azikho izinqolobane zekhodi ezitholakele",
-      "lastSynced": "Kuvumelaniswe okokugcina {{time}}",
       "repositoryAccess": "ukufinyelela enqolobaneni yekhodi"
     },
     "style": {

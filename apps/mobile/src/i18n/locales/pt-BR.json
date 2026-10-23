@@ -855,7 +855,6 @@
       "installGithubApp": "Instalar o app do GitHub nos repositórios",
       "installGithubAppDescription": "Conceda ao app do Kilo no GitHub acesso aos repositórios que você quer revisar.",
       "noRepositoriesFound": "Nenhum repositório encontrado",
-      "lastSynced": "Última sincronização: {{time}}",
       "repositoryAccess": "acesso ao repositório"
     },
     "style": {

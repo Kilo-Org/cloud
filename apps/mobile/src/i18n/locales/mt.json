@@ -1457,7 +1457,6 @@
       "installGithubApp": "Installa l-app ta' GitHub fuq ir-repożitorji",
       "installGithubAppDescription": "Agħti lill-app ta' Kilo fuq GitHub aċċess għar-repożitorji li trid jiġu riveduti.",
       "noRepositoriesFound": "L-ebda repożitorju misjub",
-      "lastSynced": "L-aħħar sinkronizzazzjoni: {{time}}",
       "repositoryAccess": "aċċess għar-repożitorju"
     },
     "style": {

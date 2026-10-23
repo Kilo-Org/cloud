@@ -1400,7 +1400,6 @@
       "installGithubApp": "ਰਿਪੋਜ਼ਟਰੀਆਂ 'ਤੇ GitHub ਐਪ ਸਥਾਪਤ ਕਰੋ",
       "installGithubAppDescription": "Kilo GitHub ਐਪ ਨੂੰ ਉਨ੍ਹਾਂ ਰਿਪੋਜ਼ਟਰੀਆਂ ਤੱਕ ਪਹੁੰਚ ਦਿਓ ਜਿਨ੍ਹਾਂ ਦੀ ਤੁਸੀਂ ਸਮੀਖਿਆ ਕਰਵਾਉਣੀ ਚਾਹੁੰਦੇ ਹੋ।",
       "noRepositoriesFound": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਨਹੀਂ ਮਿਲੀ",
-      "lastSynced": "ਆਖ਼ਰੀ ਵਾਰ ਸਿੰਕ ਕੀਤਾ: {{time}}",
       "repositoryAccess": "ਰਿਪੋਜ਼ਟਰੀ ਤੱਕ ਪਹੁੰਚ"
     },
     "style": {

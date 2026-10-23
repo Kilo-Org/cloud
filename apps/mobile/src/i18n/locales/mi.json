@@ -1400,7 +1400,6 @@
       "installGithubApp": "Tāutahia te taupānga GitHub ki ngā pūranga",
       "installGithubAppDescription": "Tukua te taupānga GitHub a Kilo kia uru ki ngā pūranga e hiahia ana koe kia arotakehia.",
       "noRepositoriesFound": "Kāore he pūranga i kitea",
-      "lastSynced": "I tukutahitia whakamutungatia {{time}}",
       "repositoryAccess": "te uru ki ngā pūranga"
     },
     "style": {

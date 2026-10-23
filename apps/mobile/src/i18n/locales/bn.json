@@ -1400,7 +1400,6 @@
       "installGithubApp": "রিপোজিটরিতে GitHub অ্যাপ ইনস্টল করুন",
       "installGithubAppDescription": "যেসব রিপোজিটরি পর্যালোচনা করাতে চান, সেগুলোতে Kilo GitHub অ্যাপকে অ্যাক্সেস দিন।",
       "noRepositoriesFound": "কোনো রিপোজিটরি পাওয়া যায়নি",
-      "lastSynced": "শেষ সিঙ্ক: {{time}}",
       "repositoryAccess": "রিপোজিটরির অ্যাক্সেস"
     },
     "style": {

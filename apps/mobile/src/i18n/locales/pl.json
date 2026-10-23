@@ -889,7 +889,6 @@
       "installGithubApp": "Zainstaluj aplikację GitHub dla repozytoriów",
       "installGithubAppDescription": "Przyznaj aplikacji Kilo w serwisie GitHub dostęp do repozytoriów, które chcesz poddać przeglądowi.",
       "noRepositoriesFound": "Nie znaleziono repozytoriów",
-      "lastSynced": "Ostatnia synchronizacja: {{time}}",
       "repositoryAccess": "dostęp do repozytorium"
     },
     "style": {

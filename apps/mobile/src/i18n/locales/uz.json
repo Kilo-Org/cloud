@@ -1400,7 +1400,6 @@
       "installGithubApp": "GitHub ilovasini repozitoriyalarga o'rnating",
       "installGithubAppDescription": "Kilo GitHub ilovasiga ko'rib chiqilishini xohlagan repozitoriyalaringizga kirish huquqini bering.",
       "noRepositoriesFound": "Repozitoriyalar topilmadi",
-      "lastSynced": "Oxirgi sinxronlash: {{time}}",
       "repositoryAccess": "repozitoriyaga kirish huquqi"
     },
     "style": {

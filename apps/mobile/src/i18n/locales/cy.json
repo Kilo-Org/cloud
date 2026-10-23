@@ -1476,7 +1476,6 @@
       "installGithubApp": "Gosod yr ap GitHub ar ystorfeydd",
       "installGithubAppDescription": "Rhowch fynediad i ap GitHub Kilo at yr ystorfeydd rydych am eu hadolygu.",
       "noRepositoriesFound": "Heb ddod o hyd i unrhyw ystorfeydd",
-      "lastSynced": "Cysonwyd ddiwethaf {{time}}",
       "repositoryAccess": "mynediad i ystorfa"
     },
     "style": {

@@ -883,7 +883,6 @@
       "installGithubApp": "रिपॉज़िटरी पर GitHub ऐप इंस्टॉल करें",
       "installGithubAppDescription": "जिन रिपॉज़िटरी की समीक्षा करानी है, उन तक Kilo GitHub ऐप को पहुँच दें।",
       "noRepositoriesFound": "कोई रिपॉज़िटरी नहीं मिली",
-      "lastSynced": "आखिरी बार सिंक: {{time}}",
       "repositoryAccess": "रिपॉज़िटरी तक पहुँच"
     },
     "style": {

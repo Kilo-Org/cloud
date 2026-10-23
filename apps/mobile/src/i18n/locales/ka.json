@@ -1400,7 +1400,6 @@
       "installGithubApp": "GitHub აპის დაყენება რეპოზიტორებზე",
       "installGithubAppDescription": "მიანიჭე Kilo-ს GitHub აპს წვდომა იმ რეპოზიტორებზე, რომელთა შემოწმებაც გსურს.",
       "noRepositoriesFound": "რეპოზიტორები ვერ მოიძებნა",
-      "lastSynced": "ბოლო სინქრონიზაცია: {{time}}",
       "repositoryAccess": "რეპოზიტორზე წვდომა"
     },
     "style": {

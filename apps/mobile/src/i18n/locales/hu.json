@@ -1400,7 +1400,6 @@
       "installGithubApp": "GitHub-alkalmazás telepítése a kódtárakhoz",
       "installGithubAppDescription": "Adj hozzáférést a Kilo GitHub-alkalmazásnak az ellenőrizni kívánt kódtárakhoz.",
       "noRepositoriesFound": "Nem találhatók kódtárak",
-      "lastSynced": "Utoljára szinkronizálva: {{time}}",
       "repositoryAccess": "hozzáférés a kódtárakhoz"
     },
     "style": {

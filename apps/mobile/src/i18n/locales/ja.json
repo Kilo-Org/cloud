@@ -883,7 +883,6 @@
       "installGithubApp": "リポジトリにGitHub Appをインストール",
       "installGithubAppDescription": "レビュー対象のリポジトリへのアクセスをKilo GitHub Appに許可してください。",
       "noRepositoriesFound": "リポジトリが見つかりません",
-      "lastSynced": "最終同期：{{time}}",
       "repositoryAccess": "リポジトリへのアクセス権"
     },
     "style": {

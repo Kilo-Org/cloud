@@ -883,7 +883,6 @@
       "installGithubApp": "Cài đặt ứng dụng GitHub cho các kho lưu trữ",
       "installGithubAppDescription": "Cấp quyền truy cập cho ứng dụng Kilo trên GitHub vào các kho lưu trữ bạn muốn rà soát.",
       "noRepositoriesFound": "Không tìm thấy kho lưu trữ",
-      "lastSynced": "Lần đồng bộ gần nhất: {{time}}",
       "repositoryAccess": "quyền truy cập kho lưu trữ"
     },
     "style": {

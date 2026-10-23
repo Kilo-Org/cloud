@@ -1400,7 +1400,6 @@
       "installGithubApp": "Инсталирај ја апликацијата на GitHub за складиштата",
       "installGithubAppDescription": "Дозволи ѝ на апликацијата Kilo за GitHub да пристапи до складиштата што сакаш да се прегледуваат.",
       "noRepositoriesFound": "Не се пронајдени складишта",
-      "lastSynced": "Последна синхронизација: {{time}}",
       "repositoryAccess": "пристап до складиштето"
     },
     "style": {

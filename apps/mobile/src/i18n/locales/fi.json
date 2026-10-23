@@ -1400,7 +1400,6 @@
       "installGithubApp": "Asenna GitHub-sovellus koodivarastoihin",
       "installGithubAppDescription": "Anna Kilon GitHub-sovellukselle käyttöoikeus koodivarastoihin, jotka haluat katselmoida.",
       "noRepositoriesFound": "Koodivarastoja ei löytynyt",
-      "lastSynced": "Viimeksi synkronoitu {{time}}",
       "repositoryAccess": "koodivaraston käyttöoikeus"
     },
     "style": {

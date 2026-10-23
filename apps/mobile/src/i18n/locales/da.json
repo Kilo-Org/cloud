@@ -1400,7 +1400,6 @@
       "installGithubApp": "Installér GitHub-appen på kodelagre",
       "installGithubAppDescription": "Giv Kilos GitHub-app adgang til de kodelagre, du vil have gennemgået.",
       "noRepositoriesFound": "Ingen kodelagre fundet",
-      "lastSynced": "Sidst synkroniseret {{time}}",
       "repositoryAccess": "adgang til kodelagre"
     },
     "style": {

@@ -1400,7 +1400,6 @@
       "installGithubApp": "రిపోజిటరీల్లో GitHub యాప్‌ను ఇన్‌స్టాల్ చేయండి",
       "installGithubAppDescription": "మీరు సమీక్ష చేయించాలనుకునే రిపోజిటరీలను యాక్సెస్ చేయడానికి Kilo GitHub యాప్‌కు అనుమతి ఇవ్వండి.",
       "noRepositoriesFound": "రిపోజిటరీలు కనుగొనబడలేదు",
-      "lastSynced": "చివరిసారి సింక్ చేసిన సమయం: {{time}}",
       "repositoryAccess": "రిపోజిటరీ యాక్సెస్"
     },
     "style": {

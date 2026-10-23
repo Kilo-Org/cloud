@@ -1419,7 +1419,6 @@
       "installGithubApp": "Instalează aplicația GitHub pe depozite",
       "installGithubAppDescription": "Acordă aplicației Kilo pentru GitHub acces la depozitele pe care vrei să le revizuiască.",
       "noRepositoriesFound": "Niciun depozit găsit",
-      "lastSynced": "Ultima sincronizare: {{time}}",
       "repositoryAccess": "acces la depozit"
     },
     "style": {

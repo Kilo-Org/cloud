@@ -1400,7 +1400,6 @@
       "installGithubApp": "ติดตั้ง GitHub App สำหรับคลังโค้ด",
       "installGithubAppDescription": "ให้สิทธิ์ Kilo GitHub App เข้าถึงคลังโค้ดที่คุณต้องการให้ตรวจสอบ",
       "noRepositoriesFound": "ไม่พบคลังโค้ด",
-      "lastSynced": "ซิงค์ล่าสุด {{time}}",
       "repositoryAccess": "สิทธิ์เข้าถึงคลังโค้ด"
     },
     "style": {

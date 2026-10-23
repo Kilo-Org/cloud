@@ -1400,7 +1400,6 @@
       "installGithubApp": "ରିପୋଜିଟୋରୀଗୁଡ଼ିକରେ GitHub ଆପ୍ ସଂସ୍ଥାପନ କରନ୍ତୁ",
       "installGithubAppDescription": "ଆପଣ ସମୀକ୍ଷା କରାଇବାକୁ ଚାହୁଁଥିବା ରିପୋଜିଟୋରୀଗୁଡ଼ିକୁ ବ୍ୟବହାର କରିବା ପାଇଁ Kilo GitHub ଆପ୍‌କୁ ଅନୁମତି ଦିଅନ୍ତୁ।",
       "noRepositoriesFound": "କୌଣସି ରିପୋଜିଟୋରୀ ମିଳିଲା ନାହିଁ",
-      "lastSynced": "ଶେଷ ଥର ସିଙ୍କ୍: {{time}}",
       "repositoryAccess": "ରିପୋଜିଟୋରୀ ବ୍ୟବହାରର ଅନୁମତି"
     },
     "style": {

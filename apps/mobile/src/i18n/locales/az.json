@@ -1400,7 +1400,6 @@
       "installGithubApp": "GitHub tətbiqini repozitoriyalarda quraşdır",
       "installGithubAppDescription": "Kilo GitHub tətbiqinə yoxlanmasını istədiyin repozitoriyalara giriş icazəsi ver.",
       "noRepositoriesFound": "Repozitoriya tapılmadı",
-      "lastSynced": "Son sinxronlaşdırma: {{time}}",
       "repositoryAccess": "repozitoriyaya giriş"
     },
     "style": {

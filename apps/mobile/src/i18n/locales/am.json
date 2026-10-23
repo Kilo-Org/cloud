@@ -1400,7 +1400,6 @@
       "installGithubApp": "የGitHub መተግበሪያን በማከማቻዎች ላይ ይጫኑ",
       "installGithubAppDescription": "ለKilo የGitHub መተግበሪያ እንዲገመገሙ ወደሚፈልጓቸው ማከማቻዎች የመድረስ ፈቃድ ይስጡ።",
       "noRepositoriesFound": "ምንም ማከማቻዎች አልተገኙም",
-      "lastSynced": "ለመጨረሻ ጊዜ የተመሳሰለው {{time}}",
       "repositoryAccess": "የማከማቻ መዳረሻ"
     },
     "style": {

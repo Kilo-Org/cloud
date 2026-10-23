@@ -1400,7 +1400,6 @@
       "installGithubApp": "Aplikeeshinii GitHub kuusaawwan koodii irratti fe'i",
       "installGithubAppDescription": "Aplikeeshinii GitHub kan Kilo kuusaawwan koodii akka sakatta'aman barbaaddu argachuuf hayyama kenniif.",
       "noRepositoriesFound": "Kuusaan koodii hin argamne",
-      "lastSynced": "Yeroo dhumaaf walsimsiifame: {{time}}",
       "repositoryAccess": "hayyama kuusaa koodii"
     },
     "style": {

@@ -1438,7 +1438,6 @@
       "installGithubApp": "Inštalácia aplikácie GitHub pre repozitáre",
       "installGithubAppDescription": "Udeľte aplikácii Kilo na platforme GitHub prístup k repozitárom, ktoré chcete kontrolovať.",
       "noRepositoriesFound": "Nenašli sa žiadne repozitáre",
-      "lastSynced": "Naposledy synchronizované {{time}}",
       "repositoryAccess": "prístup k repozitárom"
     },
     "style": {

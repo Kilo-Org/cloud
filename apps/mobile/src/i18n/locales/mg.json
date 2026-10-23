@@ -1400,7 +1400,6 @@
       "installGithubApp": "Apetraho amin'ny tahirin-kaody ny rindranasa GitHub",
       "installGithubAppDescription": "Omeo alalana hiditra amin'ny tahirin-kaody tianao hohamarinina ny rindranasa Kilo ao amin'ny GitHub.",
       "noRepositoriesFound": "Tsy nisy tahirin-kaody hita",
-      "lastSynced": "Fampifanarahana farany: {{time}}",
       "repositoryAccess": "alalana hidirana amin'ny tahirin-kaody"
     },
     "style": {

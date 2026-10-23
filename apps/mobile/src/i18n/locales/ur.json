@@ -1400,7 +1400,6 @@
       "installGithubApp": "ریپوزٹریز پر GitHub ایپ انسٹال کریں",
       "installGithubAppDescription": "Kilo کی GitHub ایپ کو ان ریپوزٹریز تک رسائی دیں جن کا آپ جائزہ کروانا چاہتے ہیں۔",
       "noRepositoriesFound": "کوئی ریپوزٹری نہیں ملی",
-      "lastSynced": "آخری بار ہم آہنگ کیا گیا: {{time}}",
       "repositoryAccess": "ریپوزٹری تک رسائی"
     },
     "style": {

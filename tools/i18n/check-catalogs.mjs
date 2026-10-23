@@ -65,10 +65,6 @@ const TWO_SENSE_COPY = new Map([
   ['medium', 'the severity of a finding, versus the thinking effort of a model'],
   ['low', 'the severity of a finding, versus the thinking effort of a model'],
   [
-    'last synced {{time}}',
-    'the Security Agent findings dashboard sync, versus the reviewer repository snapshot sync',
-  ],
-  [
     'manual review',
     'the suggested action for a security finding, versus the manual-review pull request feature',
   ],

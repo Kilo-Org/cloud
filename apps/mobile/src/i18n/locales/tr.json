@@ -883,7 +883,6 @@
       "installGithubApp": "GitHub uygulamasını depolara yükle",
       "installGithubAppDescription": "Kilo GitHub uygulamasına, incelenmesini istediğin depolara erişim izni ver.",
       "noRepositoriesFound": "Depo bulunamadı",
-      "lastSynced": "Son eşitleme: {{time}}",
       "repositoryAccess": "depo erişimi"
     },
     "style": {

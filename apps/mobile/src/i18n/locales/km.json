@@ -1400,7 +1400,6 @@
       "installGithubApp": "ដំឡើងកម្មវិធី GitHub សម្រាប់ឃ្លាំងកូដ",
       "installGithubAppDescription": "ផ្តល់សិទ្ធិឱ្យកម្មវិធី GitHub របស់ Kilo ចូលប្រើឃ្លាំងកូដដែលអ្នកចង់ឱ្យត្រួតពិនិត្យ។",
       "noRepositoriesFound": "រកមិនឃើញឃ្លាំងកូដ",
-      "lastSynced": "បានធ្វើសមកាលកម្មចុងក្រោយ {{time}}",
       "repositoryAccess": "សិទ្ធិចូលប្រើឃ្លាំងកូដ"
     },
     "style": {

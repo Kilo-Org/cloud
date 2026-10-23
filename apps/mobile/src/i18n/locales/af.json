@@ -1400,7 +1400,6 @@
       "installGithubApp": "Installeer die GitHub-app op bewaarplekke",
       "installGithubAppDescription": "Gee die Kilo GitHub-app toegang tot die bewaarplekke wat jy wil laat hersien.",
       "noRepositoriesFound": "Geen bewaarplekke gevind nie",
-      "lastSynced": "Laas gesinkroniseer: {{time}}",
       "repositoryAccess": "bewaarplektoegang"
     },
     "style": {

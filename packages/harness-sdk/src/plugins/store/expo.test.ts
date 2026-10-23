@@ -1,120 +1,13 @@
-import { DatabaseSync } from 'node:sqlite';
+import { setTimeout as delay } from 'node:timers/promises';
 import { Effect, Layer } from 'effect';
 import { expect, it } from 'vitest';
 import { SessionStore, StoreError, type SessionStoreService } from '../../core/storage.js';
-import { expoDriver, type ExpoDatabase, type ExpoStatement } from './expo.js';
-import type { SqlValue } from './driver.js';
+import { expoDriver, type ExpoDatabase } from './expo.js';
 import { layerSqliteStore } from './sqlite.js';
+import { standIn } from './expo-fixture.js';
 import { textOf } from '../../core/turn.js';
 
-/**
- * Expo's SQLite is a native module, so it cannot run here. What can run is the
- * adapter: a database of the same shape, backed by Node's SQLite, proves that
- * the raw rows land in the right columns, that a prepared statement is reused,
- * and that none is left open when the store is released.
- *
- * The shapes cannot drift apart unnoticed. `layerExpoStore` takes Expo's own
- * `SQLiteDatabase`, so the compiler checks a real database against the same
- * interface this double implements.
- *
- * The double also keeps the two rules the native module keeps, because they are
- * what the adapter exists to respect: one cursor per prepared statement, so a
- * run refuses a result an earlier run was still reading, and one connection, so
- * a write that runs while a read holds its cursor is recorded rather than
- * answered with rows that moved underneath it.
- */
-interface StandIn {
-  readonly database: ExpoDatabase;
-  /** Statements prepared and not finalized. */
-  readonly open: () => number;
-  /** How many statements were prepared for the SQL texts holding this text. */
-  readonly prepared: (holding: string) => number;
-  /** Whether a write ran while a read was between its run and its rows. */
-  readonly wroteDuringRead: () => boolean;
-}
-
-/** What the double shares with every statement it prepares. */
-interface Backing {
-  readonly sqlite: DatabaseSync;
-  readonly counting: {
-    readonly live: { count: number };
-    readonly perText: Map<string, number>;
-  };
-  readonly connection: {
-    reading: number;
-    wrote: boolean;
-  };
-}
-
-/** One prepared statement, with the two rules expo-sqlite holds it to. */
-const statementOf = (backing: Backing, source: string): ExpoStatement => {
-  const { sqlite, counting, connection } = backing;
-  const statement = sqlite.prepare(source);
-  counting.live.count += 1;
-  counting.perText.set(source, (counting.perText.get(source) ?? 0) + 1);
-  let generation = 0;
-  return {
-    executeAsync: (params: SqlValue[]) => {
-      if (connection.reading > 0) {
-        connection.wrote = true;
-      }
-      generation += 1;
-      statement.run(...params);
-      return Promise.resolve();
-    },
-    executeForRawResultAsync: (params: SqlValue[]) => {
-      generation += 1;
-      const mine = generation;
-      connection.reading += 1;
-      const rows = statement.iterate(...params);
-      const first = rows.next();
-      return Promise.resolve({
-        getAllAsync: () => {
-          connection.reading -= 1;
-          if (mine !== generation) {
-            return Promise.reject(
-              new Error('this result is no longer readable because the statement ran again')
-            );
-          }
-          const read: unknown[][] = [];
-          if (first.done !== true) {
-            read.push(Object.values(first.value));
-          }
-          for (let row = rows.next(); row.done !== true; row = rows.next()) {
-            read.push(Object.values(row.value));
-          }
-          return Promise.resolve(read);
-        },
-      });
-    },
-    finalizeAsync: () => {
-      counting.live.count -= 1;
-      return Promise.resolve();
-    },
-  };
-};
-
-const standIn = (): StandIn => {
-  const backing: Backing = {
-    sqlite: new DatabaseSync(':memory:'),
-    counting: { live: { count: 0 }, perText: new Map() },
-    connection: { reading: 0, wrote: false },
-  };
-  const { counting, connection } = backing;
-
-  return {
-    database: {
-      prepareAsync: (source: string) => Promise.resolve(statementOf(backing, source)),
-    },
-    open: () => counting.live.count,
-    prepared: holding =>
-      [...counting.perText].reduce(
-        (sum, [source, count]) => (source.includes(holding) ? sum + count : sum),
-        0
-      ),
-    wroteDuringRead: () => connection.wrote,
-  };
-};
+/** The double in `expo-fixture.ts` keeps the two rules expo-sqlite keeps. */
 
 const session = { id: 'ses_1', system: 'sys', model: 'claude-opus-5', effort: 'high' } as const;
 
@@ -212,21 +105,43 @@ it('runs two reads of one SQL text at once without either losing its rows', asyn
   expect(open()).toBe(0);
 });
 
+// eslint-disable-next-line max-statements -- one scenario end to end: park the read, attempt the write, release, assert
 it('keeps a write out of a read that is between its run and its rows', async () => {
-  const { database, open, wroteDuringRead } = standIn();
+  const { database, open, parkReads, wroteDuringRead } = standIn();
   const driver = expoDriver(database);
   await driver('CREATE TABLE probe (a integer)', [], 'run');
   await driver('INSERT INTO probe VALUES (1)', [], 'run');
 
-  /* Started in this order, a read is between its run and its rows before the
-     write reaches the database, which is the window the gate exists for. */
-  const [read] = await Promise.all([
-    driver('SELECT a FROM probe', [], 'all'),
-    driver('INSERT INTO probe VALUES (2)', [], 'run'),
-  ]);
+  /* The read is held exactly where the adapter yields: its statement has run
+     and its rows are not taken yet, which is the window a write would land in
+     without the connection gate. */
+  const parked = parkReads();
+  const read = driver('SELECT a FROM probe', [], 'all');
+  await parked.reached;
+  const write = driver('INSERT INTO probe VALUES (2)', [], 'run');
+  await delay(0);
+  parked.release();
+  const [rows] = await Promise.all([read, write]);
 
-  expect(read.rows).toEqual([[1]]);
+  expect(rows.rows).toEqual([[1]]);
   expect(wroteDuringRead()).toBeFalsy();
+  await driver.close?.();
+  expect(open()).toBe(0);
+});
+
+it('keeps at most four idle statements for one SQL text', async () => {
+  const { database, open, prepared } = standIn();
+  const driver = expoDriver(database);
+  await driver('CREATE TABLE probe (a integer)', [], 'run');
+  const before = prepared('SELECT a FROM probe');
+
+  /* Six reads of one text in flight at once find no idle statement, so each of
+     them prepares one; the two that come back past the cap are finalized. */
+  await Promise.all(Array.from({ length: 6 }, () => driver('SELECT a FROM probe', [], 'all')));
+
+  expect(prepared('SELECT a FROM probe') - before).toBe(6);
+  /* Four kept for the reads, plus the statement the DDL left behind. */
+  expect(open()).toBe(5);
   await driver.close?.();
   expect(open()).toBe(0);
 });

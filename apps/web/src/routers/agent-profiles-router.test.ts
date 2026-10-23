@@ -9,6 +9,7 @@ import {
   agent_environment_profile_vars,
   agent_environment_profile_commands,
   agent_environment_profile_repo_bindings,
+  cloud_agent_webhook_triggers,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { bindProfileToRepo } from '@kilocode/cloud-agent-profile';
@@ -59,6 +60,11 @@ describe('Agent Profiles Router', () => {
   });
 
   afterEach(async () => {
+    // Trigger rows hold the profile FK (`ON DELETE RESTRICT`), so they go first.
+    await db
+      .delete(cloud_agent_webhook_triggers)
+      .where(eq(cloud_agent_webhook_triggers.user_id, ownerUser.id));
+
     // Clean up profiles after each test
     // First delete vars and commands (due to FK constraints)
     const profiles = await db
@@ -343,6 +349,33 @@ describe('Agent Profiles Router', () => {
           .where(eq(agent_environment_profile_commands.profile_id, profileId));
 
         expect(commands).toHaveLength(0);
+      });
+
+      test('should refuse to delete a profile a webhook trigger references', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+
+        const { id: profileId } = await caller.agentProfiles.create({
+          name: 'Triggered Profile',
+        });
+
+        await db.insert(cloud_agent_webhook_triggers).values({
+          trigger_id: 'agent-profiles-test-trigger',
+          user_id: ownerUser.id,
+          github_repo: 'kilo-org/test-repo',
+          profile_id: profileId,
+        });
+
+        await expect(caller.agentProfiles.delete({ profileId })).rejects.toMatchObject({
+          code: 'PRECONDITION_FAILED',
+        });
+
+        // The profile survives the refusal, so the caller can detach the trigger.
+        const profiles = await db
+          .select()
+          .from(agent_environment_profiles)
+          .where(eq(agent_environment_profiles.id, profileId));
+
+        expect(profiles).toHaveLength(1);
       });
     });
 

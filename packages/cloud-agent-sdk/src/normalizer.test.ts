@@ -967,27 +967,79 @@ describe('normalize', () => {
   });
 
   describe('question.asked', () => {
+    const question = {
+      question: 'Continue?',
+      header: 'Approval',
+      options: [{ label: 'Yes', description: 'Run the command' }],
+    };
+
     it('extracts requestId and questions from tool.callID', () => {
       const data = {
         id: 'q-1',
         tool: { callID: 'call-1' },
-        questions: [{ text: 'Continue?' }],
+        questions: [question],
       };
       const result = normalize(createRaw('question.asked', data));
       expect(result).toEqual({
         type: 'question.asked',
         requestId: 'q-1',
-        questions: [{ text: 'Continue?' }],
+        questions: [question],
       });
     });
 
     it('works when tool is absent', () => {
-      const data = { id: 'q-1', questions: [{ text: 'Yes?' }] };
+      const data = { id: 'q-1', questions: [question] };
       const result = normalize(createRaw('question.asked', data));
       expect(result).toEqual({
         type: 'question.asked',
         requestId: 'q-1',
-        questions: [{ text: 'Yes?' }],
+        questions: [question],
+      });
+    });
+
+    it('keeps the valid prefix and stops at the first malformed entry', () => {
+      const data = {
+        id: 'q-1',
+        questions: [question, { text: 'Continue?' }, question],
+      };
+      const result = normalize(createRaw('question.asked', data));
+      expect(result).toEqual({
+        type: 'question.asked',
+        requestId: 'q-1',
+        questions: [question],
+      });
+    });
+
+    it('keeps only the shared QuestionInfo fields', () => {
+      const data = {
+        id: 'q-1',
+        questions: [{ ...question, extra: 'ignored' }],
+      };
+      const result = normalize(createRaw('question.asked', data));
+      expect(result).toEqual({
+        type: 'question.asked',
+        requestId: 'q-1',
+        questions: [question],
+      });
+    });
+
+    it('treats a list whose first entry is malformed as carrying no questions', () => {
+      const data = { id: 'q-1', questions: [{ header: 'Approval' }, question] };
+      const result = normalize(createRaw('question.asked', data));
+      expect(result).toEqual({
+        type: 'question.asked',
+        requestId: 'q-1',
+        questions: undefined,
+      });
+    });
+
+    it('keeps an explicitly empty questions array', () => {
+      const data = { id: 'q-1', questions: [] };
+      const result = normalize(createRaw('question.asked', data));
+      expect(result).toEqual({
+        type: 'question.asked',
+        requestId: 'q-1',
+        questions: [],
       });
     });
 
@@ -1459,8 +1511,12 @@ describe('normalize', () => {
         success: true,
         message: 'Done',
         skipped: false,
-        commitHash: 'abc123',
+        commitHash: 'a'.repeat(40),
         commitMessage: 'feat: add feature',
+        userMessageId: 'user-msg-1',
+        committedAt: '2026-09-01T12:00:00+02:00',
+        pushStatus: 'pushed',
+        commitMessageTruncated: true,
       };
       const result = normalize(createRaw('autocommit_completed', data));
       expect(result).toEqual({
@@ -1469,8 +1525,13 @@ describe('normalize', () => {
         success: true,
         message: 'Done',
         skipped: false,
-        commitHash: 'abc123',
+        commitHash: 'a'.repeat(40),
         commitMessage: 'feat: add feature',
+        userMessageId: 'user-msg-1',
+        committedAt: '2026-09-01T12:00:00+02:00',
+        pushStatus: 'pushed',
+        commitMessageTruncated: true,
+        timestamp: expect.any(String),
       });
     });
 
@@ -1511,6 +1572,47 @@ describe('normalize', () => {
         commitHash: undefined,
         commitMessage: undefined,
       });
+    });
+
+    it('drops a commit field that cannot be stored and keeps the completion', () => {
+      const data = {
+        messageId: 'msg-1',
+        success: true,
+        message: 'Done',
+        commitHash: 'abc123',
+        commitMessage: 'feat: add feature',
+      };
+      const result = normalize(createRaw('autocommit_completed', data));
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          type: 'autocommit_completed',
+          messageId: 'msg-1',
+          success: true,
+          message: 'Done',
+          commitHash: undefined,
+          commitMessage: 'feat: add feature',
+        })
+      );
+    });
+
+    it('reads an explicit false truncation flag as absent', () => {
+      const data = {
+        messageId: 'msg-1',
+        success: true,
+        commitHash: 'a'.repeat(40),
+        commitMessage: 'feat: add feature',
+        commitMessageTruncated: false,
+      };
+      const result = normalize(createRaw('autocommit_completed', data));
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          type: 'autocommit_completed',
+          commitHash: 'a'.repeat(40),
+          commitMessageTruncated: undefined,
+        })
+      );
     });
 
     it('returns null when messageId is missing', () => {
@@ -2332,12 +2434,24 @@ describe('normalizeCliEvent', () => {
       const data = {
         id: 'q-1',
         tool: { callID: 'call-1' },
-        questions: [{ text: 'Continue?' }],
+        questions: [
+          {
+            question: 'Continue?',
+            header: 'Approval',
+            options: [{ label: 'Yes', description: '' }],
+          },
+        ],
       };
       expect(normalizeCliEvent('question.asked', data)).toEqual({
         type: 'question.asked',
         requestId: 'q-1',
-        questions: [{ text: 'Continue?' }],
+        questions: [
+          {
+            question: 'Continue?',
+            header: 'Approval',
+            options: [{ label: 'Yes', description: '' }],
+          },
+        ],
       });
     });
   });

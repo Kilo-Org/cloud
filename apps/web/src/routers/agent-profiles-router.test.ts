@@ -9,6 +9,7 @@ import {
   agent_environment_profile_vars,
   agent_environment_profile_commands,
   agent_environment_profile_repo_bindings,
+  cloud_agent_webhook_triggers,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { bindProfileToRepo } from '@kilocode/cloud-agent-profile';
@@ -59,6 +60,11 @@ describe('Agent Profiles Router', () => {
   });
 
   afterEach(async () => {
+    // Trigger rows hold the profile FK (`ON DELETE RESTRICT`), so they go first.
+    await db
+      .delete(cloud_agent_webhook_triggers)
+      .where(eq(cloud_agent_webhook_triggers.user_id, ownerUser.id));
+
     // Clean up profiles after each test
     // First delete vars and commands (due to FK constraints)
     const profiles = await db
@@ -343,6 +349,33 @@ describe('Agent Profiles Router', () => {
           .where(eq(agent_environment_profile_commands.profile_id, profileId));
 
         expect(commands).toHaveLength(0);
+      });
+
+      test('should refuse to delete a profile a webhook trigger references', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+
+        const { id: profileId } = await caller.agentProfiles.create({
+          name: 'Triggered Profile',
+        });
+
+        await db.insert(cloud_agent_webhook_triggers).values({
+          trigger_id: 'agent-profiles-test-trigger',
+          user_id: ownerUser.id,
+          github_repo: 'kilo-org/test-repo',
+          profile_id: profileId,
+        });
+
+        await expect(caller.agentProfiles.delete({ profileId })).rejects.toMatchObject({
+          code: 'PRECONDITION_FAILED',
+        });
+
+        // The profile survives the refusal, so the caller can detach the trigger.
+        const profiles = await db
+          .select()
+          .from(agent_environment_profiles)
+          .where(eq(agent_environment_profiles.id, profileId));
+
+        expect(profiles).toHaveLength(1);
       });
     });
 
@@ -730,6 +763,78 @@ describe('Agent Profiles Router', () => {
             profileId,
           })
         ).rejects.toThrow('You do not have access to this organization');
+      });
+
+      /**
+       * Every row `listCombined` returns opens with the scope its bucket
+       * implies, and only that scope: the mobile Profiles list navigates with
+       * the scope `ownerType` implies, so a row the list shows must read back
+       * through `get`. The opposite scope is NOT_FOUND rather than a
+       * different profile, which is what the client's stale-row state reports.
+       */
+      test('every listed profile reads back with its own bucket scope', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+
+        const { id: orgProfileId } = await caller.agentProfiles.create({
+          organizationId: organizationA.id,
+          name: 'Listed Org Profile',
+        });
+        const { id: personalProfileId } = await caller.agentProfiles.create({
+          name: 'Listed Personal Profile',
+        });
+
+        const combined = await caller.agentProfiles.listCombined({
+          organizationId: organizationA.id,
+        });
+        // Each bucket holds only its own owner, tagged so the client can derive
+        // the scope to send.
+        expect(combined.orgProfiles).toHaveLength(1);
+        expect(combined.orgProfiles[0]?.id).toBe(orgProfileId);
+        expect(combined.orgProfiles[0]?.ownerType).toBe('organization');
+        expect(combined.personalProfiles).toHaveLength(1);
+        expect(combined.personalProfiles[0]?.id).toBe(personalProfileId);
+        expect(combined.personalProfiles[0]?.ownerType).toBe('user');
+
+        // A full profile's collections survive the read the list's counts came
+        // from: the overview renders those counts, so a listed profile that
+        // fails to read back is the reported defect.
+        await caller.agentProfiles.setCommands({
+          organizationId: organizationA.id,
+          profileId: orgProfileId,
+          commands: Array.from({ length: 20 }, (_, index) => `${'x'.repeat(480)}-${index}`),
+        });
+
+        // Read back every listed row with the scope its owner tag implies.
+        for (const row of combined.orgProfiles) {
+          const detail = await caller.agentProfiles.get({
+            organizationId: organizationA.id,
+            profileId: row.id,
+          });
+          expect(detail.id).toBe(row.id);
+          expect(detail.name).toBe(row.name);
+        }
+        for (const row of combined.personalProfiles) {
+          const detail = await caller.agentProfiles.get({ profileId: row.id });
+          expect(detail.id).toBe(row.id);
+          expect(detail.name).toBe(row.name);
+        }
+
+        const withCommands = await caller.agentProfiles.get({
+          organizationId: organizationA.id,
+          profileId: orgProfileId,
+        });
+        expect(withCommands.commands).toHaveLength(20);
+
+        // The opposite scope never resolves to that row.
+        await expect(caller.agentProfiles.get({ profileId: orgProfileId })).rejects.toThrow(
+          'Profile not found'
+        );
+        await expect(
+          caller.agentProfiles.get({
+            organizationId: organizationA.id,
+            profileId: personalProfileId,
+          })
+        ).rejects.toThrow('Profile not found');
       });
     });
   });

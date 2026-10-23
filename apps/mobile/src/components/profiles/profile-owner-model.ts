@@ -13,8 +13,9 @@
 export type ProfileOwnerChoice = 'personal' | 'organization';
 
 /**
- * The owner tag a profile list item carries. The server tags organization rows
- * `organization` and personal rows `user` (`ProfilesListDialog.tsx:95-98`).
+ * The owner tag a profile list item carries. `agentProfiles.listCombined` tags
+ * its rows `organization` or `user`; `agentProfiles.list` leaves the tag off,
+ * and an untagged row is personal.
  */
 type ProfileOwnerType = 'user' | 'organization';
 

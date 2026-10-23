@@ -81,7 +81,12 @@ export function useAgentProfileMutations(organizationId?: string) {
   const toastError = (error: { message: string }) => {
     toast.error(error.message);
   };
+  // `networkMode: 'always'` keeps a save settling while the online manager is
+  // offline (NetInfo can misreport while the backend is reachable): the request
+  // either succeeds or fails fast, so `isPending` can never stick and the save
+  // button always returns to idle.
   const callbacks = {
+    networkMode: 'always' as const,
     onSuccess: invalidateProfiles,
     onError: (error: { message: string }) => {
       toastError(error);
@@ -236,8 +241,9 @@ export function useAgentProfileMutations(organizationId?: string) {
           const previous = queryClient.getQueriesData<AgentProfileDetail>({
             queryKey: detailFilter.queryKey,
           });
-          queryClient.setQueriesData<AgentProfileDetail>({ queryKey: detailFilter.queryKey }, old =>
-            old ? withSkillEnabled(old, variables.skillId, variables.enabled) : old
+          queryClient.setQueriesData<AgentProfileDetail>(
+            { queryKey: detailFilter.queryKey },
+            old => (old ? withSkillEnabled(old, variables.skillId, variables.enabled) : old)
           );
           return { generation, previous };
         },

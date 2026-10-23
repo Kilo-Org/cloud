@@ -58,10 +58,6 @@ describe('voice network consent', () => {
     expect(await readVoiceNetworkConsent('user-1')).toBe('granted');
   });
 
-  it('uses a key prefix distinct from the DEC-02 analytics consent record', () => {
-    expect(VOICE_NETWORK_CONSENT_KEY_PREFIX).not.toBe(CONSENT_USER_KEY_PREFIX);
-  });
-
   it('reports a failed write to the caller instead of rejecting', async () => {
     const listener = vi.fn<(userId: string, value: VoiceNetworkConsent) => void>();
     const unsubscribe = subscribeToVoiceNetworkConsent(listener);

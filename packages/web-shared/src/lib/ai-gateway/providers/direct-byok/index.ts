@@ -64,7 +64,7 @@ function convertModel(
     hugging_face_id: '',
     name,
     created: 631148400, // our clients do not care about this field, we can fix it later if that changes
-    description: '',
+    description: model.description ?? '',
     context_length: model.context_length,
     architecture: {
       modality: model.flags?.includes('vision') ? 'text+image-\u003Etext' : 'text-\u003Etext',
@@ -104,17 +104,17 @@ function convertModel(
 }
 
 async function getDirectByokModels(byokProviders: UserByokProviderId[]) {
-  let nextPreferredId = (await getPreferredModels()).length;
-  const providers: ReadonlyArray<DirectByokProvider> = DIRECT_BYOK_PROVIDERS;
-  return (
-    await Promise.all(
-      providers
-        .filter(provider => byokProviders.includes(provider.id))
-        .map(async provider =>
-          (await provider.models()).map(model => convertModel(provider, model, nextPreferredId++))
-        )
-    )
-  ).flat();
+  const firstPreferredId = (await getPreferredModels()).length;
+  const enabledProviders = DIRECT_BYOK_PROVIDERS.filter(provider =>
+    byokProviders.includes(provider.id)
+  );
+  const modelsByProvider = await Promise.all(
+    enabledProviders.map(async provider => ({ provider, models: await provider.models() }))
+  );
+  let nextPreferredId = firstPreferredId;
+  return modelsByProvider.flatMap(({ provider, models }) =>
+    models.map(model => convertModel(provider, model, nextPreferredId++))
+  );
 }
 
 export async function getDirectByokModel(requestedModel: string): Promise<{

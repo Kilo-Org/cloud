@@ -498,7 +498,7 @@ describe('getProvider direct BYOK routing', () => {
     }));
     jest.mocked(getDirectByokModel).mockResolvedValue({
       provider: {
-        id: 'aws-bedrock',
+        id: 'nvidia-byok',
         base_url: 'https://unused.example/v1',
         base_url_overrides: {},
         supported_chat_apis: ['chat_completions', 'responses', 'messages'],
@@ -518,10 +518,10 @@ describe('getProvider direct BYOK routing', () => {
     jest
       .mocked(getBYOKforUser)
       .mockResolvedValue([
-        { decryptedAPIKey: '{"stored":"credential"}', providerId: 'aws-bedrock' },
+        { decryptedAPIKey: '{"stored":"credential"}', providerId: 'nvidia-byok' },
       ]);
 
-    const input = providerInput('aws-bedrock/zai.glm-5');
+    const input = providerInput('nvidia-byok/zai.glm-5');
     const result = await getProvider({
       ...input,
       request: { kind: 'chat_completions', body: { ...input.request.body, stream: true } },
@@ -546,7 +546,7 @@ describe('getProvider direct BYOK routing', () => {
   test('reports unusable stored credentials instead of falling through to another route', async () => {
     jest.mocked(getDirectByokModel).mockResolvedValue({
       provider: {
-        id: 'gcp-vertex',
+        id: 'synthetic',
         base_url: 'https://unused.example/v1',
         base_url_overrides: {},
         supported_chat_apis: ['chat_completions', 'messages'],
@@ -566,12 +566,12 @@ describe('getProvider direct BYOK routing', () => {
     });
     jest
       .mocked(getBYOKforUser)
-      .mockResolvedValue([{ decryptedAPIKey: 'not json', providerId: 'gcp-vertex' }]);
+      .mockResolvedValue([{ decryptedAPIKey: 'not json', providerId: 'synthetic' }]);
     const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-    const result = await getProvider(providerInput('gcp-vertex/gemini-3.5-flash'));
+    const result = await getProvider(providerInput('synthetic/gemini-3.5-flash'));
 
-    expect(result).toEqual({ kind: 'direct-byok-credential-error', providerId: 'gcp-vertex' });
+    expect(result).toEqual({ kind: 'direct-byok-credential-error', providerId: 'synthetic' });
     expect(JSON.stringify(consoleError.mock.calls)).not.toContain('not json');
     consoleError.mockRestore();
   });

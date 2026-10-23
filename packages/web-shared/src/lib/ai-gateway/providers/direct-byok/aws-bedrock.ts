@@ -94,6 +94,7 @@ export function resolveAwsBedrockUpstream(
 
 export default {
   id: 'aws-bedrock',
+  models_dev_id: 'amazon-bedrock',
   base_url: AWS_BEDROCK_ENDPOINTS['runtime-openai'].url('us-east-1'),
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions', 'messages', 'responses'],

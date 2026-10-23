@@ -1,9 +1,10 @@
 import { z } from 'zod';
 import { getAlertConfigDO } from './AlertConfigDO';
 import type { AlertConfigDO } from './AlertConfigDO';
+import { ModelIdSchema } from './query';
 
 const alertingConfigInputSchema = z.object({
-  model: z.string().trim().min(1),
+  model: ModelIdSchema,
   enabled: z.boolean(),
   errorRateSlo: z.number().gt(0).lt(1),
   minRequestsPerWindow: z.number().int().positive(),

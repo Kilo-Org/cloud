@@ -1,5 +1,6 @@
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { github_app_installations, platform_integrations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
@@ -50,7 +51,9 @@ describe('InstallationLookupService database authorization', () => {
     await expect(
       service().assertActiveAssociationForInstallation(installationId, 'standard')
     ).resolves.toBeUndefined();
-    await expect(service().findActiveAssociationById(legacy.id)).resolves.toMatchObject({
+    await expect(
+      service().findActiveAssociationById(legacy.id, { userId: user.id })
+    ).resolves.toMatchObject({
       success: true,
       installationId,
       githubAppType: 'standard',
@@ -65,7 +68,9 @@ describe('InstallationLookupService database authorization', () => {
     await expect(
       service().assertActiveAssociationForInstallation(installationId, 'standard')
     ).rejects.toBeInstanceOf(GitHubInstallationAccessDeniedError);
-    await expect(service().findActiveAssociationById(legacy.id)).resolves.toEqual({
+    await expect(
+      service().findActiveAssociationById(legacy.id, { userId: user.id })
+    ).resolves.toEqual({
       success: false,
     });
   });
@@ -123,5 +128,65 @@ describe('InstallationLookupService database authorization', () => {
         accessPurpose: 'agent',
       })
     ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
+  });
+
+  it('resolves a stored integration only for its owner', async () => {
+    const owner = await insertTestUser();
+    const member = await insertTestUser();
+    const outsider = await insertTestUser();
+    const organization = await createTestOrganization('Integration owner org', member.id, 0);
+    const [personal] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: owner.id,
+        platform: 'github',
+        github_connection_role: 'workflow',
+        integration_type: 'app',
+        platform_installation_id: installationId,
+        github_app_type: 'standard',
+        integration_status: 'active',
+      })
+      .returning();
+    const [orgOwned] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        github_connection_role: 'workflow',
+        integration_type: 'app',
+        platform_installation_id: '880100',
+        github_app_type: 'standard',
+        integration_status: 'active',
+      })
+      .returning();
+
+    await expect(
+      service().findActiveAssociationById(personal.id, { userId: owner.id })
+    ).resolves.toMatchObject({ success: true, installationId });
+    await expect(
+      service().findActiveAssociationById(personal.id, { userId: outsider.id })
+    ).resolves.toEqual({ success: false });
+    await expect(
+      service().findActiveAssociationById(personal.id, {
+        userId: owner.id,
+        orgId: organization.id,
+      })
+    ).resolves.toEqual({ success: false });
+
+    await expect(
+      service().findActiveAssociationById(orgOwned.id, {
+        userId: member.id,
+        orgId: organization.id,
+      })
+    ).resolves.toMatchObject({ success: true, installationId: '880100' });
+    await expect(
+      service().findActiveAssociationById(orgOwned.id, {
+        userId: outsider.id,
+        orgId: organization.id,
+      })
+    ).resolves.toEqual({ success: false });
+    await expect(
+      service().findActiveAssociationById(orgOwned.id, { userId: member.id })
+    ).resolves.toEqual({ success: false });
   });
 });

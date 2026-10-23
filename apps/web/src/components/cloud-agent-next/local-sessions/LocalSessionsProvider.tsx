@@ -81,11 +81,13 @@ function newAttempt(): LocalSessionAttempt {
   return { kiloSessionId: generateKiloSessionId(), operationKey: uuidv4() };
 }
 
-function failedSync(error: unknown): LocalSessionSync {
+function failedSync(error: unknown, canReleaseUploads: boolean): LocalSessionSync {
+  const retrySameAttempt = isAmbiguousCloudSessionCreationError(error);
   return {
     state: 'failed',
     message: formatSessionError(error),
-    retrySameAttempt: isAmbiguousCloudSessionCreationError(error),
+    retrySameAttempt,
+    canReleaseUploads: canReleaseUploads && !retrySameAttempt,
     billingFailure: parseCustomerBillingFailure(error),
   };
 }
@@ -96,12 +98,14 @@ export function LocalSessionsProvider({
   storageKey,
   send,
   onAdopted,
+  onDiscard,
   children,
 }: {
   storageKey: string;
   send: SendLocalSession;
   /** The server created a session under its own id (an older server). */
   onAdopted: (localId: string, serverId: string) => void;
+  onDiscard: (session: LocalSession) => void;
   children: ReactNode;
 }) {
   const [localSessions, setLocalSessions] = useState<readonly LocalSession[]>([]);
@@ -113,35 +117,41 @@ export function LocalSessionsProvider({
   sendRef.current = send;
   const onAdoptedRef = useRef(onAdopted);
   onAdoptedRef.current = onAdopted;
+  const onDiscardRef = useRef(onDiscard);
+  onDiscardRef.current = onDiscard;
 
-  const run = useCallback(async (session: LocalSession, attempt: LocalSessionAttempt) => {
-    const isCurrent = (item: LocalSession) =>
-      item.kiloSessionId === attempt.kiloSessionId && item.operationKey === attempt.operationKey;
-    const settle = (next: LocalSessionSync) =>
-      setLocalSessions(previous =>
-        previous.map(item => (isCurrent(item) ? { ...item, sync: next } : item))
-      );
-    for (let tries = 0; ; tries++) {
-      try {
-        const serverId = await sendRef.current(session, attempt);
-        if (serverId === attempt.kiloSessionId) {
-          settle({ state: 'synced' });
-        } else {
-          setLocalSessions(previous => previous.filter(item => !isCurrent(item)));
-          onAdoptedRef.current(attempt.kiloSessionId, serverId);
-        }
-        return;
-      } catch (error) {
-        const delay = IN_PROGRESS_RETRY_DELAYS_MS[tries];
-        if (delay === undefined || !isCloudSessionCreationInProgressError(error)) {
-          settle(failedSync(error));
+  const run = useCallback(
+    async (session: LocalSession, attempt: LocalSessionAttempt, canReleaseUploads = false) => {
+      const isCurrent = (item: LocalSession) =>
+        item.kiloSessionId === attempt.kiloSessionId && item.operationKey === attempt.operationKey;
+      const settle = (next: LocalSessionSync) =>
+        setLocalSessions(previous =>
+          previous.map(item => (isCurrent(item) ? { ...item, sync: next } : item))
+        );
+      for (let tries = 0; ; tries++) {
+        try {
+          const serverId = await sendRef.current(session, attempt);
+          if (serverId === attempt.kiloSessionId) {
+            settle({ state: 'synced' });
+          } else {
+            setLocalSessions(previous => previous.filter(item => !isCurrent(item)));
+            onAdoptedRef.current(attempt.kiloSessionId, serverId);
+          }
           return;
+        } catch (error) {
+          const delay = IN_PROGRESS_RETRY_DELAYS_MS[tries];
+          if (delay === undefined || !isCloudSessionCreationInProgressError(error)) {
+            settle(failedSync(error, canReleaseUploads));
+            return;
+          }
+          canReleaseUploads = false;
+          await wait(delay);
+          if (!localSessionsRef.current.some(isCurrent)) return;
         }
-        await wait(delay);
-        if (!localSessionsRef.current.some(isCurrent)) return;
       }
-    }
-  }, []);
+    },
+    []
+  );
 
   // Runs before the page's next layout effects, so a reloaded page sees its local
   // session before it decides whether to connect.
@@ -172,7 +182,7 @@ export function LocalSessionsProvider({
       };
       localSessionsRef.current = [...localSessionsRef.current, session];
       setLocalSessions(previous => [...previous, session]);
-      void run(session, attempt);
+      void run(session, attempt, true);
       return attempt.kiloSessionId;
     },
     [run]
@@ -187,10 +197,13 @@ export function LocalSessionsProvider({
         ? { kiloSessionId, operationKey: session.operationKey }
         : newAttempt();
       const retried: LocalSession = { ...session, ...attempt, sync: { state: 'syncing' } };
+      localSessionsRef.current = localSessionsRef.current.map(item =>
+        item.kiloSessionId === kiloSessionId ? retried : item
+      );
       setLocalSessions(previous =>
         previous.map(item => (item.kiloSessionId === kiloSessionId ? retried : item))
       );
-      void run(retried, attempt);
+      void run(retried, attempt, session.sync.canReleaseUploads === true);
       return attempt.kiloSessionId;
     },
     [run]
@@ -198,8 +211,16 @@ export function LocalSessionsProvider({
 
   const discardLocalSession = useCallback((kiloSessionId: string) => {
     const session = localSessionsRef.current.find(item => item.kiloSessionId === kiloSessionId);
-    if (session?.firstMessage) setDiscardedPrompt(session.firstMessage.prompt);
+    if (!session) return;
+    localSessionsRef.current = localSessionsRef.current.filter(
+      item => item.kiloSessionId !== kiloSessionId
+    );
+    if (session.firstMessage) setDiscardedPrompt(session.firstMessage.prompt);
     setLocalSessions(previous => previous.filter(item => item.kiloSessionId !== kiloSessionId));
+    // An earlier ambiguous or restored attempt may still be linking uploads.
+    if (session.sync.state === 'failed' && session.sync.canReleaseUploads === true) {
+      onDiscardRef.current(session);
+    }
   }, []);
 
   const clearDiscardedPrompt = useCallback(() => setDiscardedPrompt(null), []);

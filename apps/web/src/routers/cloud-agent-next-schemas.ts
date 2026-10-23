@@ -146,7 +146,6 @@ export const cloudAgentGetAttachmentUploadUrlSchema = z
   })
   .superRefine((data, ctx) => {
     if (data.extension) {
-      // Relaxed surface: contentType only needs the type/subtype shape.
       if (!CLOUD_AGENT_ATTACHMENT_RELAXED_CONTENT_TYPE_REGEX.test(data.contentType)) {
         ctx.addIssue({
           code: 'custom',
@@ -349,11 +348,14 @@ export const agentModeSendMessageSchema = z
  * Discriminated execution payload for follow-up messages and prepared-session
  * initialization. Mirrors the worker's SendMessageV2Payload schema; both
  * variants ride the same execution pipeline on the cloud-agent-next side.
+ * Free-text fields are bounded by `CLOUD_AGENT_PROMPT_MAX_LENGTH` so both
+ * entry paths enforce one limit: `arguments` expands into the prompt through
+ * `$1`/`$ARGUMENTS`, and `command` stays a bare catalog name.
  */
 export const sendMessageNextPayloadSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('prompt'),
-    prompt: z.string().min(1),
+    prompt: z.string().min(1).max(CLOUD_AGENT_PROMPT_MAX_LENGTH),
     mode: agentModeSendMessageSchema,
     model: z.string().min(1),
     variant: z
@@ -365,14 +367,15 @@ export const sendMessageNextPayloadSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('command'),
     command: z.string().min(1),
-    arguments: z.string().default(''),
+    arguments: z.string().max(CLOUD_AGENT_PROMPT_MAX_LENGTH).default(''),
   }),
 ]);
 
 /**
  * Send-only execution payload for follow-up messages. Mirrors
  * `sendMessageNextPayloadSchema` but allows an empty prompt, because a
- * follow-up send may carry attachments or images with no text. Used only by
+ * follow-up send may carry attachments or images with no text; that is the
+ * only difference, since both paths keep the shared length cap. Used only by
  * `baseSendMessageNextSchema.payload`; prepare `initialPayload` keeps the
  * `.min(1)` prompt via `sendMessageNextPayloadSchema`.
  */
@@ -461,7 +464,7 @@ const PrepareSessionSharedFields = {
 };
 
 const PrepareSessionNonCloneVariant = z.object({
-  prompt: z.string().min(1).max(100_000),
+  prompt: z.string().min(1).max(CLOUD_AGENT_PROMPT_MAX_LENGTH),
   initialMessageId: messageIdNextSchema.optional(),
   initialPayload: sendMessageNextPayloadSchema.optional(),
   autoInitiate: z.boolean().optional(),

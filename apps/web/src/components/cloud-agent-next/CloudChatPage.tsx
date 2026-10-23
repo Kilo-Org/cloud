@@ -978,7 +978,7 @@ export default function CloudChatPage({
   const fetchRouteReady = useCallback(
     async (kiloSessionId: string): Promise<boolean | undefined> => {
       try {
-        const data = await queryClient.fetchQuery({
+        const data = await queryClient.query({
           ...trpc.cliSessionsV2.getWithRuntimeState.queryOptions({ session_id: kiloSessionId }),
           staleTime: 0,
           retry: false,
@@ -1713,13 +1713,20 @@ export default function CloudChatPage({
     composerTextareaDisabled
   );
 
+  // Feedback context carries the session the server resolved for this route.
   const sessionActions = (
     <ChatHeader
       cloudAgentSessionId={workspaceCloudSessionId ?? 'Starting session…'}
       changesCloudAgentSessionId={changesCloudSessionId ?? undefined}
       worktreeId={selectedWorktreeId ?? undefined}
       sandboxScopeId={selectedWorktreeId ?? workspaceCloudSessionId ?? 'Starting session…'}
-      kiloSessionId={sessionIdFromParams ?? workspaceControlSession?.sessionId}
+      kiloSessionId={
+        sessionIdFromParams
+          ? fetchedSessionData?.kiloSessionId === sessionIdFromParams
+            ? sessionIdFromParams
+            : undefined
+          : workspaceControlSession?.sessionId
+      }
       organizationId={organizationId}
       repository={workspaceControlSession?.repository ?? sessionConfig?.repository ?? ''}
       branch={

@@ -12,6 +12,7 @@
 
 import { i18n } from '@/i18n';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
+import { type ProviderPrPlatform } from '@/lib/pr-review/provider-pr-ref';
 import {
   isPrOperationAmbiguous,
   isPrOperationPersistenceFailed,
@@ -49,7 +50,29 @@ type MutationErrorDisplayOptions = {
    * GitHub copy. Absent (GitHub), the exact pre-s6 copy stays.
    */
   readonly term?: string;
+  /**
+   * The surface's connected provider: the reconnect copy names it so a GitLab
+   * or Bitbucket surface never announces a GitHub connection. Absent (GitHub)
+   * keeps `prReview.connectionExpired` byte-for-byte.
+   */
+  readonly platform?: ProviderPrPlatform;
 };
+
+/**
+ * The reconnect message for a surface's connected provider. GitHub (and an
+ * unknown platform) keeps `prReview.connectionExpired`; the provider arms
+ * reuse the reconnect notice's own titles, which every catalog already
+ * translates, so the announced status and the visible notice agree.
+ */
+export function reconnectExpiredMessage(platform: ProviderPrPlatform | undefined): string {
+  if (platform === 'gitlab') {
+    return i18n.t('prReview.reconnectNotice.gitlabTitle');
+  }
+  if (platform === 'bitbucket') {
+    return i18n.t('prReview.reconnectNotice.bitbucketTitle');
+  }
+  return i18n.t('prReview.connectionExpired');
+}
 
 /**
  * The bad-request inline copy per surface. The submit surface words the
@@ -87,7 +110,7 @@ export function mutationErrorDisplay(
   // `reconcile_pending`. Use the bad-request kind (no retry CTA) with the
   // honest server copy, not the surface-specific validation copy.
   if (isPrOperationPersistenceFailed(rawError)) {
-    return { kind: 'bad-request', message: i18n.t('prReview.operation.persistenceFailed') };
+    return { kind: 'bad-request', message: i18n.t('common.actionNotRecorded') };
   }
   if (classification.kind === 'forbidden') {
     return { kind: 'forbidden', message: classification.message };
@@ -104,7 +127,7 @@ export function mutationErrorDisplay(
     return { kind: 'not-found', message: i18n.t('prReview.discussion.commentEditUnavailable') };
   }
   if (classification.kind === 'reconnect') {
-    return { kind: 'reconnect', message: i18n.t('prReview.connectionExpired') };
+    return { kind: 'reconnect', message: reconnectExpiredMessage(options?.platform) };
   }
   // The server's raw text never reaches the inline box, whatever the
   // retryable carrier was. A rate limit gets the localized wait copy (the

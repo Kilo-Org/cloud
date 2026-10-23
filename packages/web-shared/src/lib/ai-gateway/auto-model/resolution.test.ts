@@ -979,12 +979,10 @@ describe('resolveAutoModel — custom routers', () => {
     defaultEntryKey: `gateway:${haiku}`,
   };
   const okDecide = () =>
-    jest.fn(
-      async (_reference: CustomRouterReference): Promise<CustomRouterResolution> => ({
-        kind: 'ok',
-        decision: customDecision,
-      })
-    );
+    jest.fn(async (_reference: CustomRouterReference): Promise<CustomRouterResolution> => ({
+      kind: 'ok',
+      decision: customDecision,
+    }));
 
   function resolveCustom(
     model: string,

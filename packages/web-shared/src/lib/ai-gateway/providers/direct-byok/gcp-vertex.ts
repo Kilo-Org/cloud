@@ -127,6 +127,7 @@ export async function resolveGcpVertexUpstream(
 
 export default {
   id: 'gcp-vertex',
+  models_dev_id: 'google-vertex',
   base_url: 'https://aiplatform.googleapis.com/v1',
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions', 'messages'],

@@ -48,6 +48,8 @@ export type DirectByokResolveUpstreamInput = {
 
 export type DirectByokProvider = {
   id: DirectByokProviderMetaId;
+  /** models.dev provider key; omitted for providers models.dev does not list. */
+  models_dev_id?: string;
   base_url: string;
   base_url_overrides: ProviderApiUrlOverrides;
   models: () => Promise<ReadonlyArray<DirectByokModel>>;

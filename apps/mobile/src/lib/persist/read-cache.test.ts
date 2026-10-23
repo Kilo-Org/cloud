@@ -515,7 +515,9 @@ describe('bounded serialization', () => {
       // Five query-cache changes inside one throttle window. The un-throttled
       // wrapper path must serialize none of them: only the throttled save
       // already running has serialized, exactly once for the whole burst.
-      const inFlight = burst.map(client => persister.persistClient(client));
+      const inFlight = burst
+        .map(client => persister.persistClient(client))
+        .filter((pending): pending is Promise<void> => pending !== undefined);
       expect(blobSerializations()).toBe(1);
 
       await Promise.all(inFlight);

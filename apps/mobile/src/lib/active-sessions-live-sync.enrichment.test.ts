@@ -65,7 +65,6 @@ describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
     await sync.getWriteQueue();
     await sync.getFetchQueue();
     expect(sync.getPendingReasons().has('enrichment')).toBe(true);
-    // The enrichment fetch fails. The reason stays pending for now.
     qc.__triggerFetchReject(new Error('network down'));
     await sync.getFetchCompletion();
     expect(sync.getPendingReasons().has('enrichment')).toBe(true);

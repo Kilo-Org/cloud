@@ -150,16 +150,13 @@ describe('startup selection and preflight', () => {
     large.caps.maxFileCount = 20;
     large.inventory = [
       large.inventory[0]!,
-      ...Array.from(
-        { length: 14 },
-        (_, index): RuntimeInventoryEntry => [
-          'control',
-          `usr/local/bin/${index}-${"'".repeat(4000)}`,
-          0o755,
-          1,
-          hashes[1],
-        ]
-      ),
+      ...Array.from({ length: 14 }, (_, index): RuntimeInventoryEntry => [
+        'control',
+        `usr/local/bin/${index}-${"'".repeat(4000)}`,
+        0o755,
+        1,
+        hashes[1],
+      ]),
     ];
     const bytes = serializeRuntimeRelease(large);
     expect(bytes.byteLength).toBeLessThanOrEqual(65536);

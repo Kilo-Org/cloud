@@ -507,7 +507,7 @@ export async function rewriteModelResponse_ChatCompletions({
   // Shared with the stream's cancel() callback so a client disconnect still
   // logs the partially received response body.
   const capturedChunks: string[] | null = capture ? [] : null;
-  const stream = new ReadableStream({
+  const stream = new ReadableStream<string>({
     async start(controller) {
       const reader = response.body?.getReader();
       if (!reader) {
@@ -608,7 +608,7 @@ export async function rewriteModelResponse_ChatCompletions({
             },
           }) +
           '\n\n',
-        progress.stop,
+        () => progress.stop(),
         vercelRequestId,
         capture,
         capturedChunks,
@@ -711,7 +711,7 @@ export async function rewriteModelResponse_Messages({
   // Shared with the stream's cancel() callback so a client disconnect still
   // logs the partially received response body.
   const capturedChunks: string[] | null = capture ? [] : null;
-  const stream = new ReadableStream({
+  const stream = new ReadableStream<string>({
     async start(controller) {
       const reader = response.body?.getReader();
       if (!reader) {
@@ -796,7 +796,7 @@ export async function rewriteModelResponse_Messages({
             },
           }) +
           '\n\n',
-        progress.stop,
+        () => progress.stop(),
         vercelRequestId,
         capture,
         capturedChunks,
@@ -888,7 +888,7 @@ export async function rewriteModelResponse_Responses({
   // Shared with the stream's cancel() callback so a client disconnect still
   // logs the partially received response body.
   const capturedChunks: string[] | null = capture ? [] : null;
-  const stream = new ReadableStream({
+  const stream = new ReadableStream<string>({
     async start(controller) {
       const reader = response.body?.getReader();
       if (!reader) {
@@ -972,7 +972,7 @@ export async function rewriteModelResponse_Responses({
             },
           }) +
           '\n\n',
-        progress.stop,
+        () => progress.stop(),
         vercelRequestId,
         capture,
         capturedChunks,

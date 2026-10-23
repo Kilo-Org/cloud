@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { LEGAL_LINK_BOX_CLASS, LEGAL_LINK_ROW_CLASS } from '@/lib/a11y/tap-target';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { CreditPurchaseScreen } from './credit-purchase-screen';
@@ -35,6 +36,10 @@ const balance = vi.hoisted(() => ({ balance: 1234 }));
 
 const toastMock = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }));
 
+// The legal links are the only caller of this module on the screen, so the mock
+// is the destination each link opened.
+const externalLink = vi.hoisted(() => ({ openExternalUrl: vi.fn() }));
+
 // The iOS announcement channel behind AccessibleStatus. The screen renders the
 // purchase error inline and suppresses the error toast, so this hook (plus
 // Android's live region) is the only thing a screen reader can hear.
@@ -64,7 +69,7 @@ vi.mock('@/lib/a11y/status-announcement', () => ({
 }));
 
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.com' }));
-vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+vi.mock('@/lib/external-link', () => externalLink);
 vi.mock('@/lib/iap/legal-links', () => ({
   getStoreLegalLinks: () => [
     { url: 'https://example.com/privacy-app', label: 'Privacy Policy' },
@@ -280,13 +285,18 @@ describe('CreditPurchaseScreen', () => {
     await waitFor(() => allText(renderer).includes('App Store products unavailable'));
 
     expect(packRows(renderer)).toHaveLength(4);
-    expect(allText(renderer)).toContain('No matching credit packs were returned by App Store.');
+    expect(allText(renderer)).toContain(
+      'Could not connect to the App Store. Check your connection and try again.'
+    );
     // The iOS card names the App Store for both its title and its body; the
     // Google Play copy must never leak onto it.
     expect(allText(renderer)).not.toContain('Google Play products unavailable');
     expect(allText(renderer)).not.toContain(
-      'No matching credit packs were returned by Google Play.'
+      'Could not connect to Google Play. Check your connection and try again.'
     );
+    // A store failure is not a catalog claim: the no-match body belongs to a
+    // store that answered and priced no pack.
+    expect(allText(renderer)).not.toContain('No matching credit packs were returned by App Store.');
     expect(allText(renderer)).toContain('Price unavailable');
     // The store SDK's own wording never reaches the screen.
     expect(allText(renderer)).not.toContain('Failed to query product');
@@ -313,10 +323,60 @@ describe('CreditPurchaseScreen', () => {
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
     await waitFor(() => allText(renderer).includes('Google Play products unavailable'));
 
-    expect(allText(renderer)).toContain('No matching credit packs were returned by Google Play.');
+    expect(allText(renderer)).toContain(
+      'Could not connect to Google Play. Check your connection and try again.'
+    );
     // The App Store copy must never leak onto the Android card.
     expect(allText(renderer)).not.toContain('App Store products unavailable');
-    expect(allText(renderer)).not.toContain('No matching credit packs were returned by App Store.');
+    expect(allText(renderer)).not.toContain(
+      'Could not connect to the App Store. Check your connection and try again.'
+    );
+    expect(packRows(renderer)).toHaveLength(4);
+    unmount();
+  });
+
+  it('timeout: a store that never answers shows the timeout copy, not a catalog claim', async () => {
+    mockedPlatform.OS = 'android';
+    owner.fetchStoreProducts.mockImplementation(
+      // eslint-disable-next-line @typescript-eslint/promise-function-async -- the store never answers, which is the scenario under test
+      () => new Promise<never>(() => undefined)
+    );
+    vi.useFakeTimers();
+    try {
+      const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+      // Let the mount reach the store call and arm the loader's deadline.
+      await settleTimers(() => owner.fetchStoreProducts.mock.calls.length === 1);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(15_000);
+      });
+      await settleTimers(() => allText(renderer).includes('Google Play products unavailable'));
+
+      expect(allText(renderer)).toContain('Google Play products unavailable');
+      expect(allText(renderer)).toContain("Google Play didn't respond in time. Try again.");
+      expect(allText(renderer)).not.toContain(
+        'No matching credit packs were returned by Google Play.'
+      );
+      expect(allText(renderer)).not.toContain(
+        'Could not connect to Google Play. Check your connection and try again.'
+      );
+      // The backend amounts stay on screen, unpriced, with a retry to offer.
+      expect(packRows(renderer)).toHaveLength(4);
+      expect(allText(renderer)).toContain('Price unavailable');
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('no match: a store that answers without pricing a pack keeps the catalog claim', async () => {
+    mockedPlatform.OS = 'android';
+    owner.fetchStoreProducts.mockResolvedValue([{ id: 'credits_usd250', displayPrice: '$249.99' }]);
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => allText(renderer).includes('Google Play products unavailable'));
+
+    expect(allText(renderer)).toContain('No matching credit packs were returned by Google Play.');
+    expect(allText(renderer)).not.toContain("Google Play didn't respond in time. Try again.");
     expect(packRows(renderer)).toHaveLength(4);
     unmount();
   });
@@ -390,7 +450,9 @@ describe('CreditPurchaseScreen', () => {
     expect(owner.fetchStoreProducts.mock.calls.length).toBe(2);
     expect(packRows(renderer)).toHaveLength(4);
     expect(allText(renderer)).toContain('App Store products unavailable');
-    expect(allText(renderer)).toContain('No matching credit packs were returned by App Store.');
+    expect(allText(renderer)).toContain(
+      'Could not connect to the App Store. Check your connection and try again.'
+    );
     expect(allText(renderer)).toContain('Price unavailable');
     expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(0);
     // The button that started the retry stays on screen, busy and disabled.
@@ -628,6 +690,55 @@ describe('CreditPurchaseScreen', () => {
 
     expect(toastMock.success).toHaveBeenCalledWith('Credits added to your balance.');
     expect(packRows(renderer)).toHaveLength(4);
+    unmount();
+  });
+
+  it('gives each store legal link a full legal-link target and its own destination', async () => {
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const legalLinks = renderer.root.findAll(
+      node =>
+        String(node.type) === 'Pressable' &&
+        (node.props as { accessibilityRole?: string }).accessibilityRole === 'link'
+    );
+    expect(legalLinks).toHaveLength(2);
+    const [termsLink, privacyLink] = legalLinks;
+    if (!termsLink || !privacyLink) {
+      throw new Error('store legal links not found');
+    }
+    for (const link of [termsLink, privacyLink]) {
+      const className = String((link.props as { className?: string }).className);
+      // A real 48dp box: the control-size audit reads the node's own rect, so a
+      // 14dp text line with slop around it is still reported as too small.
+      expect(className).toContain(LEGAL_LINK_BOX_CLASS);
+      expect(className).toContain('active:opacity-70');
+    }
+
+    const row = termsLink.parent;
+    expect(String((row?.props as { className?: string } | undefined)?.className)).toContain(
+      LEGAL_LINK_ROW_CLASS
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      (termsLink.props as { onPress: () => void }).onPress();
+      (privacyLink.props as { onPress: () => void }).onPress();
+    });
+
+    expect(externalLink.openExternalUrl).toHaveBeenCalledTimes(2);
+    expect(externalLink.openExternalUrl).toHaveBeenNthCalledWith(
+      1,
+      'https://example.com/terms-app',
+      {
+        label: 'Terms of Use (EULA)',
+      }
+    );
+    expect(externalLink.openExternalUrl).toHaveBeenNthCalledWith(
+      2,
+      'https://example.com/privacy-app',
+      { label: 'Privacy Policy' }
+    );
     unmount();
   });
 });

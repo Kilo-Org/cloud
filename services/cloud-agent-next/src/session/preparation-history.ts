@@ -6,7 +6,6 @@ import type {
 } from '../shared/protocol.js';
 import type { EventQueries } from './queries/index.js';
 import type { StoredEvent } from '../websocket/types.js';
-import type { EventId } from '../types/ids.js';
 import { logger } from '../logger.js';
 
 const OUTPUT_TAIL_MAX_BYTES = 65_536;
@@ -386,7 +385,7 @@ export function finalizePreparationAttempt(
   const events: StoredEvent[] = [];
   const emit = (data: PreparingEventDataV2): void => {
     const stored: StoredEvent = {
-      id: 0 as EventId,
+      id: 0,
       execution_id: row.execution_id,
       session_id: row.session_id,
       stream_event_type: 'preparing',

@@ -59,6 +59,24 @@ describe('cloudPrepareFailureMessage', () => {
     );
   });
 
+  it('maps a missing profile record to the removed-or-unavailable copy', () => {
+    const missing = makeError('NOT_FOUND', "Profile 'profile-42' not found");
+    const message = cloudPrepareFailureMessage(missing);
+    expect(message).toBe('This item may have been removed or is no longer available.');
+    expect(message).not.toContain('profile-42');
+  });
+
+  it('maps the shaped form of a missing record too', () => {
+    const missing = {
+      shape: {
+        data: { code: 'NOT_FOUND', message: "Profile 'profile-42' not found" },
+      },
+    };
+    expect(cloudPrepareFailureMessage(missing)).toBe(
+      'This item may have been removed or is no longer available.'
+    );
+  });
+
   it('never shows the raw server detail for an unclassified rejection', () => {
     const raw = makeError('BAD_REQUEST', 'Runtime credential proxy configuration is unavailable');
     const message = cloudPrepareFailureMessage(raw);

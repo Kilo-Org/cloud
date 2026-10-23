@@ -1,4 +1,5 @@
 import { type Href, Stack } from 'expo-router';
+import { appSceneLayout } from '@/components/app-screen-layout';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { type ReviewerPlatform } from '@/lib/code-reviewer-config';
@@ -24,5 +25,5 @@ export default function CodeReviewerEditLayout() {
 function EditStack({ scope, platform }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   useReviewerEditGuard(scope, platform);
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return <Stack screenLayout={appSceneLayout} screenOptions={{ headerShown: false }} />;
 }

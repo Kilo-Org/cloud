@@ -132,6 +132,26 @@ const BIDI_MARK = /[\u061C\u200E\u200F]/g;
 const SPACE_VARIANTS = /[ \u00A0\u202F]/gu;
 /** Characters a locale's separator could contain that mean something in a RegExp body. */
 const REGEXP_SPECIAL_CHARACTERS = /[.*+?^${}()|[\]\\]/g;
+const DECIMAL_DIGIT = /\p{Nd}/u;
+
+/**
+ * Fold every Unicode decimal digit to ASCII. A keypad's digits follow its own
+ * script, not the active app language: an Arabic keyboard types `٢٥` while the
+ * `ar` locale formats with Latin digits. Unicode encodes each decimal digit set
+ * as ten consecutive code points in ascending order, but adjacent sets share no
+ * separator (the mathematical alphabets form one 50-code-point run), so a
+ * digit's value is its offset from the start of its run modulo ten.
+ */
+function foldDecimalDigits(value: string): string {
+  return value.replaceAll(/\p{Nd}/gu, digit => {
+    const codePoint = digit.codePointAt(0) ?? 0;
+    let start = codePoint;
+    while (DECIMAL_DIGIT.test(String.fromCodePoint(start - 1))) {
+      start -= 1;
+    }
+    return String((codePoint - start) % 10);
+  });
+}
 
 /**
  * A number typed in the active locale as a plain ASCII decimal literal, or
@@ -165,16 +185,7 @@ export function normalizeLocalizedNumber(value: string, locale: string): string 
     .map(item => item.value.replaceAll(BIDI_MARK, '').length);
   const lastSize = groupSizes.at(-1) ?? 1;
   const firstSize = groupSizes.at(-2) ?? lastSize;
-  const digits = new Map(
-    Array.from({ length: 10 }, (_, digit) => [
-      numberFormat(locale, { useGrouping: false }).format(digit),
-      String(digit),
-    ])
-  );
-  let normalized = value.trim().replaceAll(BIDI_MARK, '');
-  for (const [local, ascii] of digits) {
-    normalized = normalized.split(local).join(ascii);
-  }
+  let normalized = foldDecimalDigits(value.trim().replaceAll(BIDI_MARK, ''));
   if (/^[\s\u00A0\u202F]+$/u.test(group)) {
     normalized = normalized.replaceAll(SPACE_VARIANTS, group);
   }

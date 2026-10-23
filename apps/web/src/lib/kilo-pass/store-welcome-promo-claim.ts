@@ -2,6 +2,7 @@ import 'server-only';
 
 import {
   kilo_pass_issuances,
+  kilo_pass_store_purchases,
   kilo_pass_welcome_promo_store_payer_claims,
 } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
@@ -59,7 +60,7 @@ async function resolveStorePayerId(
   const linkedPurchaseToken = trimmedOrNull(purchase.googlePlayReplacement?.linkedPurchaseToken);
   if (linkedPurchaseToken === null) return sourceSubscriptionId;
 
-  const inherited = await tx
+  const claimedByToken = await tx
     .select({
       providerPayerId: kilo_pass_welcome_promo_store_payer_claims.provider_payer_id,
     })
@@ -77,8 +78,48 @@ async function resolveStorePayerId(
       )
     )
     .limit(1);
+  const inherited = claimedByToken[0]?.providerPayerId;
+  if (inherited) return inherited;
 
-  return inherited[0]?.providerPayerId ?? linkedPurchaseToken;
+  // An earlier token of the chain may have claimed under a different source token after a rename,
+  // so follow the purchase that carried it to its subscription's claim.
+  const linkedPurchase = await tx
+    .select({
+      kiloPassSubscriptionId: kilo_pass_store_purchases.kilo_pass_subscription_id,
+    })
+    .from(kilo_pass_store_purchases)
+    .where(
+      and(
+        eq(kilo_pass_store_purchases.payment_provider, KiloPassPaymentProvider.GooglePlay),
+        eq(kilo_pass_store_purchases.purchase_token, linkedPurchaseToken)
+      )
+    )
+    .orderBy(asc(kilo_pass_store_purchases.purchased_at))
+    .limit(1);
+  const linkedSubscriptionId = linkedPurchase[0]?.kiloPassSubscriptionId;
+  if (!linkedSubscriptionId) return null;
+
+  const claimedBySubscription = await tx
+    .select({
+      providerPayerId: kilo_pass_welcome_promo_store_payer_claims.provider_payer_id,
+    })
+    .from(kilo_pass_welcome_promo_store_payer_claims)
+    .where(
+      and(
+        eq(
+          kilo_pass_welcome_promo_store_payer_claims.payment_provider,
+          KiloPassPaymentProvider.GooglePlay
+        ),
+        eq(
+          kilo_pass_welcome_promo_store_payer_claims.kilo_pass_subscription_id,
+          linkedSubscriptionId
+        )
+      )
+    )
+    .limit(1);
+
+  // No claim reached through the chain leaves the lineage root unknown; the caller denies the promo.
+  return claimedBySubscription[0]?.providerPayerId ?? null;
 }
 
 /**

@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 
 import {
   kilo_pass_issuances,
+  kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   kilo_pass_welcome_promo_store_payer_claims,
 } from '@kilocode/db/schema';
@@ -264,6 +265,125 @@ describe('store welcome-promo purchaser claims', () => {
       .where(eq(kilo_pass_welcome_promo_store_payer_claims.provider_payer_id, rootToken));
     expect(claims).toHaveLength(1);
     expect(claims[0]?.kilo_pass_subscription_id).toBe(first.subscriptionId);
+  });
+
+  it('follows an intermediate replacement token back to the claimed lineage', async () => {
+    const firstUser = await insertTestUser({
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+    });
+    const secondUser = await insertTestUser({
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+    });
+    const rootToken = `play-token-${crypto.randomUUID()}`;
+    const middleToken = `play-token-${crypto.randomUUID()}`;
+    const lastToken = `play-token-${crypto.randomUUID()}`;
+
+    const first = await insertSubscription({
+      kiloUserId: firstUser.id,
+      paymentProvider: KiloPassPaymentProvider.GooglePlay,
+      providerSubscriptionId: rootToken,
+    });
+    const firstClaim = await db.transaction(tx =>
+      claimStoreWelcomePromoPayer(tx, {
+        purchase: {
+          paymentProvider: KiloPassPaymentProvider.GooglePlay,
+          providerTransactionId: `GPA.${crypto.randomUUID()}`,
+          providerOriginalTransactionId: rootToken,
+          providerSubscriptionId: rootToken,
+          purchaseToken: rootToken,
+        },
+        kiloUserId: firstUser.id,
+        kiloPassSubscriptionId: first.subscriptionId,
+      })
+    );
+    expect(firstClaim.welcomePromoReason).toBe(
+      KiloPassWelcomePromoEligibilityReason.StorePayerFirstClaim
+    );
+
+    // A plan change renames the subscription to the middle token and records its purchase.
+    await db
+      .update(kilo_pass_subscriptions)
+      .set({ provider_subscription_id: middleToken })
+      .where(eq(kilo_pass_subscriptions.id, first.subscriptionId));
+    await db.insert(kilo_pass_store_purchases).values({
+      kilo_pass_subscription_id: first.subscriptionId,
+      kilo_user_id: firstUser.id,
+      payment_provider: KiloPassPaymentProvider.GooglePlay,
+      product_id: 'kilopass_tier49',
+      provider_subscription_id: middleToken,
+      provider_transaction_id: `GPA.${crypto.randomUUID()}`,
+      app_account_token: null,
+      purchase_token: middleToken,
+      environment: 'Production',
+      purchased_at: '2026-05-15T09:00:00.000Z',
+      expires_at: '2026-06-15T09:00:00.000Z',
+      raw_payload_json: {},
+    });
+
+    const second = await insertSubscription({
+      kiloUserId: secondUser.id,
+      paymentProvider: KiloPassPaymentProvider.GooglePlay,
+      providerSubscriptionId: lastToken,
+    });
+    const secondClaim = await db.transaction(tx =>
+      claimStoreWelcomePromoPayer(tx, {
+        purchase: {
+          paymentProvider: KiloPassPaymentProvider.GooglePlay,
+          providerTransactionId: `GPA.${crypto.randomUUID()}`,
+          providerOriginalTransactionId: lastToken,
+          providerSubscriptionId: lastToken,
+          purchaseToken: lastToken,
+          googlePlayReplacement: { linkedPurchaseToken: middleToken },
+        },
+        kiloUserId: secondUser.id,
+        kiloPassSubscriptionId: second.subscriptionId,
+      })
+    );
+    expect(secondClaim.welcomePromoReason).toBe(
+      KiloPassWelcomePromoEligibilityReason.StorePayerPreviouslyClaimed
+    );
+
+    const claims = await db
+      .select()
+      .from(kilo_pass_welcome_promo_store_payer_claims)
+      .where(eq(kilo_pass_welcome_promo_store_payer_claims.provider_payer_id, rootToken));
+    expect(claims).toHaveLength(1);
+  });
+
+  it('fails closed when the replacement chain has no traceable root', async () => {
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const token = `play-token-${crypto.randomUUID()}`;
+    const subscription = await insertSubscription({
+      kiloUserId: user.id,
+      paymentProvider: KiloPassPaymentProvider.GooglePlay,
+      providerSubscriptionId: token,
+    });
+
+    const claim = await db.transaction(tx =>
+      claimStoreWelcomePromoPayer(tx, {
+        purchase: {
+          paymentProvider: KiloPassPaymentProvider.GooglePlay,
+          providerTransactionId: `GPA.${crypto.randomUUID()}`,
+          providerOriginalTransactionId: token,
+          providerSubscriptionId: token,
+          purchaseToken: token,
+          googlePlayReplacement: { linkedPurchaseToken: `play-token-${crypto.randomUUID()}` },
+        },
+        kiloUserId: user.id,
+        kiloPassSubscriptionId: subscription.subscriptionId,
+      })
+    );
+
+    expect(claim.welcomePromoReason).toBe(
+      KiloPassWelcomePromoEligibilityReason.StorePayerUnresolved
+    );
+    const claims = await db
+      .select({ paymentProvider: kilo_pass_welcome_promo_store_payer_claims.payment_provider })
+      .from(kilo_pass_welcome_promo_store_payer_claims)
+      .where(eq(kilo_pass_welcome_promo_store_payer_claims.kilo_user_id, user.id));
+    expect(claims).toHaveLength(0);
   });
 
   it('fails closed when a purchase carries no durable purchaser identifier', async () => {

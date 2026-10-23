@@ -92,7 +92,8 @@ describe('Stripe webhook responses', () => {
     expect(response.status).toBe(500);
     expect(await response.text()).toBe('Missing STRIPE_WEBHOOK_SECRET');
     expect(processStripePaymentEventHook).not.toHaveBeenCalled();
-    expect(captureException).not.toHaveBeenCalled();
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledWith(new Error('STRIPE_WEBHOOK_SECRET is not set'));
     expect(consoleError).toHaveBeenCalledWith('STRIPE_WEBHOOK_SECRET is not set');
   });
 

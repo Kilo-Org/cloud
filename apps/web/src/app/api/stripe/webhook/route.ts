@@ -15,7 +15,9 @@ export async function POST(req: Request): Promise<NextResponse<unknown>> {
   }
 
   if (!getEnvVariable('STRIPE_WEBHOOK_SECRET')) {
-    console.error('STRIPE_WEBHOOK_SECRET is not set');
+    const error = new Error('STRIPE_WEBHOOK_SECRET is not set');
+    console.error(error.message);
+    captureException(error);
     return new NextResponse('Missing STRIPE_WEBHOOK_SECRET', { status: 500 });
   }
 

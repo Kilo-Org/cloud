@@ -182,7 +182,7 @@
     "codeArrivalHint": "Ikiwa anwani hii inastahiki, msimbo utafika ndani ya dakika moja.",
     "verifyCode": "Thibitisha msimbo",
     "resendCode": "Tuma msimbo tena",
-    "termsPrefix": "Kwa kuendelea unakubali",
+    "termsPrefix": "Kwa kuendelea unakubali ",
     "terms": "Masharti",
     "termsConnector": " na ",
     "termsSuffix": ".",
@@ -293,7 +293,8 @@
     "condenseToolCallsSubtitle": "Kusanya miito ya zana inayofuatana katika safu moja unayoweza kufungua.",
     "toolSummaryTranslation": "Tafsiri muhtasari wa zana",
     "toolSummaryTranslationSubtitle": "Tuma muhtasari wa kila zana kwa modeli ili kuutafsiri katika lugha ya programu yako. Ikiwa tafsiri itashindwa, asili itaonyeshwa.",
-    "toolSummaryTranslationModelUnavailableNotice": "Modeli hii haitolewi tena. Gusa $t(common.model) kuchagua nyingine."
+    "toolSummaryTranslationModelUnavailableNotice": "Modeli hii haitolewi tena. Gusa $t(common.model) kuchagua nyingine.",
+    "autoExpandThinkingInactiveSubtitle": "Hakuna athari wakati maelezo ya mawazo yamefichwa."
   },
   "prReview": {
     "pullRequestUnavailable": "Ombi la kuunganisha halipatikani",
@@ -622,9 +623,15 @@
       "viewOnGitHub": "Angalia PR kwenye GitHub",
       "noChecksReported": "Hakuna vipimo vilivyoripotiwa",
       "passed": "{{displayCount}} vimefaulu",
+      "passed_one": "{{displayCount}} vimefaulu",
+      "passed_other": "{{displayCount}} vimefaulu",
       "failed": "{{displayCount}} vimeshindwa",
+      "failed_one": "{{displayCount}} vimeshindwa",
+      "failed_other": "{{displayCount}} vimeshindwa",
       "pending": "{{displayCount}} vinasubiri",
       "skipped": "{{displayCount}} vimerukwa",
+      "skipped_one": "{{displayCount}} vimerukwa",
+      "skipped_other": "{{displayCount}} vimerukwa",
       "checksCount": "vipimo {{displayCount}}",
       "checksCount_one": "kipimo {{displayCount}}",
       "checksCount_other": "vipimo {{displayCount}}",
@@ -669,7 +676,8 @@
       "gitlabDescription": "Unganisha akaunti yako ya GitLab ili kukagua maombi ya kuunganisha kwenye simu.",
       "bitbucketDescription": "Unganisha Bitbucket na shirika hili ili kukagua maombi ya kuunganisha kwenye simu.",
       "bitbucketOrgOnlyDescription": "Badilisha akaunti iliyo juu kuwa shirika ili kukagua maombi yake ya kuunganisha kwenye Bitbucket.",
-      "contextLine": "Kwa {{organization}}"
+      "contextLine": "Kwa {{organization}}",
+      "contextLinePersonal": "Kwa akaunti yako binafsi"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1429,6 +1437,8 @@
       "showMore": "Onyesha zaidi",
       "created": "Uliundwa",
       "started": "Ulianza",
+      "reviewEnded": "Umeisha",
+      "severityNitpick": "Kidokezo",
       "tokens": "Tokeni",
       "tokensInOut": "{{input}} ingizo / {{output}} tokeo",
       "council": "Baraza",
@@ -1452,7 +1462,13 @@
       "sessionError": "Kikao kimepata hitilafu: {{error}}",
       "statusWithValue": "Hali: {{status}}",
       "toolName": "Zana: {{name}}",
-      "toolNameError": "Zana ya {{name}} imepata hitilafu."
+      "toolNameError": "Zana ya {{name}} imepata hitilafu.",
+      "cancelReasonSuperseded": "Commit mpya imepushiwa, kwa hivyo ukaguzi huu umebadilishwa.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} imekatika, kwa hivyo ukaguzi huu umeghairiwa. Unganisha tena, kisha endesha ukaguzi tena.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer imezimwa kwa Bitbucket, kwa hivyo ukaguzi huu umeghairiwa. Washa tena, kisha endesha ukaguzi tena.",
+      "cancelReasonBitbucketPullRequestChanged": "Ombi la kuvuta la Bitbucket limebadilika, kwa hivyo ukaguzi huu umebadilishwa.",
+      "cancelReasonCancelled": "Ukaguzi huu umeghairiwa.",
+      "cancelReasonInterrupted": "Ukaguzi huu umekatizwa."
     },
     "reviewMemory": {
       "title": "Kumbukumbu ya ukaguzi",
@@ -1479,7 +1495,15 @@
       "instructions": "Maagizo (si lazima)",
       "instructionsPlaceholder": "Jambo mahususi ambalo mkaguzi azingatie…",
       "starting": "Inaanza ukaguzi…",
-      "start": "Anza ukaguzi"
+      "start": "Anza ukaguzi",
+      "startNotFound": "Hatukuweza kusoma {{requestNoun}} hiyo kutoka {{provider}}. Angalia URL na uhakikishe kwamba hifadhi inapatikana.",
+      "startRateLimited": "{{provider}} inapunguza maombi kwa sasa. Jaribu tena baada ya dakika chache.",
+      "startNotAllowed": "Hauna kibali cha kuanzisha ukaguzi wa {{requestNoun}} hiyo. Angalia ruhusa zako na mpango wa shirika lako.",
+      "startProviderNeedsAttention": "Ukaguzi unaoanzishwa na mtumiaji unahitaji muunganisho wa kawaida wa {{provider}}. Unganisha na ujaribu tena.",
+      "startAlreadyRunning": "Ukaguzi wa {{requestNoun}} hilo tayari unaendelea.",
+      "startRejected": "{{requestNoun}} hilo haliwezi kukaguliwa. Hakikisha limefunguliwa, sio rasimu, na kwamba URL ni sahihi.",
+      "startProviderUnavailable": "Imeshindikana kufikia {{provider}} ili kusoma {{requestNoun}} hilo. Jaribu tena.",
+      "startFailed": "Hatukuweza kuanzisha ukaguzi. Angalia muunganisho wako na ujaribu tena."
     },
     "notConnectedReadOnly": "{{platform}} haijaunganishwa. Wamiliki na wasimamizi wa shirika pekee wanaweza kuiunganisha.",
     "gitlab": {
@@ -1731,7 +1755,7 @@
       "deadlinePassed": "Muda wa mwisho umepita",
       "deadlinePassedDetail": "Hatari sana: {{critical}}, juu: {{high}}",
       "dueThisWeek": "Muda unaisha wiki hii",
-      "dueThisWeekDetail": "Matatizo {{exploitable}} yamethibitishwa kuwa yanaweza kutumiwa vibaya",
+      "dueThisWeekDetail": "{{exploitable}} ya matatizo haya yamethibitishwa kuwa yanaweza kutumiwa vibaya",
       "noDeadline": "Hakuna muda wa mwisho",
       "reviewSlaAssignment": "Kagua upangaji wa muda wa SLA",
       "allOpenFindingsTracked": "Matatizo yote ambayo hayajafungwa yanafuatiliwa"
@@ -1891,11 +1915,17 @@
       "actorSystem": "Mfumo wa Kilo",
       "couldNotLoad": "Imeshindikana kupakia ripoti ya ukaguzi.",
       "events": "Matukio",
+      "eventConfidence": "Uhakika: {{confidence}}",
+      "eventReason": "Sababu: {{reason}}",
+      "eventsCount_one": "{{displayCount}} tukio",
+      "eventsCount_other": "{{displayCount}} matukio",
       "generated": "Ripoti imetengenezwa {{generatedAt}}.",
       "noActivity": "Hakuna shughuli iliyorekodiwa",
       "noActivityDescription": "Kilo haina shughuli zinazoweza kuripotiwa kuhusu matatizo ya usalama kuanzia {{start}} hadi {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Hazina haikurekodiwa",
+      "reasonUnknown": "Sababu isiyotambulika",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Muhtasari wa ripoti",
       "title": "Ripoti ya ukaguzi",
       "unavailable": "Ripoti ya ukaguzi haipatikani",
@@ -1948,8 +1978,9 @@
       "couldNotLoad": "Imeshindikana kupakia wakala wa usalama.",
       "installApp": "Sakinisha programu ya GitHub",
       "reauthorizeButton": "Idhinisha upya programu ya GitHub",
-      "reauthorizeDescription": "Wakala wa usalama anahitaji ruhusa ya vulnerability_alerts ili kufikia arifa za Dependabot. Idhinisha upya programu ya GitHub ili kutoa ruhusa hii.",
+      "reauthorizeDescription": "Wakala wa usalama anahitaji ruhusa ya kusoma arifa za Dependabot. Idhinisha upya programu ya GitHub ili kutoa ruhusa hii.",
       "reauthorizeTitle": "Ruhusa za ziada zinahitajika",
+      "retryFailed": "Bado imeshindikana kupakia wakala wa usalama. Tafadhali angalia muunganisho wako kisha ujaribu tena.",
       "setupFailed": "Imeshindikana kuanza usanidi wa GitHub. Tafadhali jaribu tena."
     },
     "queuedActionUntracked": "Hatua iliyoongezwa kwenye foleni haiwezi kufuatiliwa tena. Onyesha upya ili kuona hali ya sasa.",
@@ -2112,7 +2143,8 @@
       "dollar_other": "dola",
       "costSpoken": "gharama {{cost}}",
       "costSpokenWithTime": "gharama {{cost}}, {{time}}",
-      "pullRequest": "ombi la kuunganisha {{number}}"
+      "pullRequest": "ombi la kuunganisha {{number}}",
+      "spokenJoiner": "na"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Imeshindikana kufungua GitHub",
@@ -2248,7 +2280,6 @@
       "couldNotLoadEnvironment": "Imeshindikana kupakia mazingira yako.",
       "retryLoadingEnvironment": "Jaribu tena kupakia mazingira",
       "defaultEnvironment": "Mazingira chaguomsingi",
-      "environmentSummary": "amri {{commands}} · MCP {{mcp}} · ujuzi {{skills}} · mawakala {{agents}}",
       "leaveChanges": "Acha mabadiliko",
       "commitAndPush": "Hifadhi na utume",
       "startSession": "Anza kikao",
@@ -2467,7 +2498,71 @@
       "preparationComplete": "Utayarishaji umekamilika",
       "preparationFailed": "Utayarishaji umeshindikana",
       "setupCommand": "Amri ya usanidi {{index}}",
-      "setupCommandOf": "Amri ya usanidi {{index}} kati ya {{displayCount}}"
+      "setupCommandOf": "Amri ya usanidi {{index}} kati ya {{displayCount}}",
+      "stepWorkspaceSetup": "Usanidi wa eneo la kazi",
+      "stepDiskCheck": "Ukaguzi wa diski",
+      "stepCloning": "Inanakili hazina",
+      "stepBranch": "Inasanidi tawi",
+      "stepDevcontainerSetup": "Usanidi wa kontena la dev",
+      "stepWorkspaceRestore": "Inarejesha eneo la kazi",
+      "stepWorkspaceBackup": "Inahifadhi eneo la kazi",
+      "stepSandboxProvision": "Inatayarisha sandbox",
+      "stepSandboxBoot": "Inaanzisha sandbox",
+      "stepSnapshotFallback": "Inajaribu tena bila snapshot",
+      "stepKiloServer": "Inaanzisha Kilo",
+      "stepKiloSession": "Inatayarisha kikao",
+      "stepRestoreIncomplete": "Urejeshi wa kikao haujakamilika",
+      "stepReady": "Mazingira yako tayari",
+      "stepFailed": "Usanidi wa mazingira umeshindikana",
+      "stepUnknown": "Usanidi wa mazingira",
+      "detailCreatingSandbox": "Inaunda sandbox",
+      "detailUpdatingRepository": "Inasasisha hazina",
+      "detailCheckingOutBranch": "Inachukua tawi",
+      "detailRunningSetupCommands": "Inatekeleza amri za usanidi",
+      "detailSavingRepository": "Inahifadhi hazina kwa kuanza kwa haraka",
+      "detailStartingKiloRuntime": "Inaanzisha runtime ya Kilo",
+      "detailPreparingKiloSession": "Inatayarisha kikao cha Kilo",
+      "detailWaitingForPreviousSandbox": "Inasubiri sandbox iliyopita isimamishe",
+      "detailRetryingSandboxCreation": "Inajaribu tena kuunda sandbox",
+      "detailPreviousSnapshotFailed": "Uanzishaji wa snapshot iliyopita umeshindikana. Inajaribu tena bila snapshot.",
+      "detailSnapshotStartupFailed": "Uanzishaji wa snapshot umeshindikana. Inajaribu tena bila snapshot.",
+      "detailStartingSandboxWithoutSnapshot": "Inaanzisha sandbox bila snapshot",
+      "detailSettingUpWorkspace": "Inasanidi eneo la kazi",
+      "detailRestoringSession": "Inarejesha kikao",
+      "detailWarmWorkspaceReused": "Eneo la kazi la joto limetumika tena",
+      "detailRetryingClone": "Inajaribu kunakili tena (jaribio la {{attempt}} kati ya {{total}})",
+      "detailSetupCommandFailed": "Amri ya usanidi {{index}} imeshindikana",
+      "detailSetupCommandTimedOut": "Amri ya usanidi {{index}} imeisha muda",
+      "detailColdRestore": "Urejeshi wa baridi, snapshot imetumika, faili {{applied}} kati ya {{total}} zimerejeshwa",
+      "detailProgressPercent": "{{percent}}% imekamilika",
+      "detailRestoreIncompleteReport": "Urejeshi wa kikao haujakamilika: faili {{skipped}} kati ya {{total}} hazikurejeshwa ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Zinazokosekana: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} na nyingine {{omitted}}",
+      "detailReasonPatchFailed": "patch haikutumika",
+      "detailReasonOutsideWorkspace": "njia iko nje ya eneo la kazi",
+      "detailReasonMissingContent": "snapshot haikuwa na maudhui ya faili",
+      "detailReasonIndexResetFailed": "faharasa haikuweza kuwekwa upya baada ya utekelezaji ulioshindikana",
+      "detailReasonUnlinkFailed": "faili haikuweza kuondolewa",
+      "detailReasonWriteFailed": "faili haikuweza kuandikwa",
+      "detailReasonUnknown": "sababu isiyojulikana",
+      "detailUnknown": "Inaendelea kutayarisha",
+      "errorPreparationTimeout": "Utayarishaji wa mazingira umeisha muda",
+      "errorWorkspaceSetupFailed": "Usanidi wa eneo la kazi umeshindikana",
+      "errorCredentialUpgradeRequired": "Kikao hiki hakina upandishaji wa hati-tambulishi unaohitajika. Anza kikao kipya ili uendelee.",
+      "errorAgentUnavailable": "Wakala hapatiki tena",
+      "errorBillingBlocked": "Malipo ya sandbox yanahitaji mikopo zaidi",
+      "errorBillingUnavailable": "Malipo ya sandbox au uthibitishaji wa uwezo hayapatikani. Jaribu tena baada ya muda mfupi.",
+      "errorContainerLimitReached": "Kikomo cha kontena kimefikiwa. Simamisha kontena iliyopo kabla ya kuanza nyingine.",
+      "errorInvalidConfiguration": "Mipangilio ya sandbox si sahihi au haijaungwa mkono",
+      "errorRuntimeArtifactUnauthorized": "Upakuaji wa runtime haukuruhusiwa",
+      "errorRuntimeArtifactInvalid": "Uthibitishaji wa kipengee cha runtime umeshindikana",
+      "errorRuntimeCliProbeFailed": "Uthibitishaji wa CLI ya runtime umeshindikana",
+      "errorRuntimeSupervisorMissing": "Msimamizi wa runtime anakosekana",
+      "errorConnectionLost": "Muunganisho wa sandbox umepotea",
+      "errorSandboxLost": "Sandbox imepotea",
+      "errorAgentRestarted": "Wakala imeanza upya",
+      "errorSandboxOutOfMemory": "Kumbukumbu za sandbox zimeisha",
+      "errorPreparationDidNotComplete": "Utayarishaji haukukamilika"
     },
     "permissionCard": {
       "title": "Ruhusa inahitajika",
@@ -2479,7 +2574,10 @@
       "allowOnceAccessibility": "Ruhusu mara moja",
       "alwaysAllow": "Ruhusu daima",
       "alwaysAllowAccessibility": "Ruhusu daima",
-      "retrying": "Inajaribu tena…"
+      "retrying": "Inajaribu tena…",
+      "retryDeny": "Jaribu tena kukataa",
+      "retryAllowOnce": "Jaribu tena kuruhusu mara moja",
+      "retryAlwaysAllow": "Jaribu tena kuruhusu daima"
     },
     "questionCard": {
       "title": "Wakala anahitaji jibu",
@@ -3030,22 +3128,16 @@
     "boundary": {
       "backToProfile": "Rudi kwenye wasifu",
       "loadErrorMessage": "Angalia muunganisho wako wa intaneti na ujaribu tena.",
-
       "chooseAccount": "Chagua akaunti",
       "loadErrorTitle": "Imeshindikana kupakia mashirika yako.",
       "membershipLostNotice": "Huna tena ruhusa ya kufikia shirika hili. Imebadilishwa kwenda {{target}}.",
       "noOrganization": "Hakuna shirika",
-
       "noOrganizationDescription": "Akaunti hii si sehemu ya shirika. Unda au jiunge na shirika kwenye wavuti ili kutumia vipengele vya shirika kama vile mialiko ya wanachama na arifa za salio la chini.",
-
       "openWebOrganizations": "Fungua mashirika kwenye wavuti",
-
       "organizationUnavailable": "Shirika halipatikani.",
       "selectDescriptionWithOrganizations": "Wewe ni mwanachama wa shirika moja au zaidi. Chagua akaunti ambayo skrini hii inapaswa kutumia.",
-
       "selectOrganization": "Chagua shirika",
       "unavailableDescription": "Shirika hili halipatikani tena. Chagua moja kutoka kwenye wasifu wako ili uendelee.",
-
       "unavailableSessionsDescription": "Shirika hili halipatikani tena. Vikao vyake haviwezi kupakiwa.",
       "accessDeniedDescription": "Huna ruhusa ya kufikia shirika hili."
     },
@@ -3073,7 +3165,9 @@
       "permissionDenied": "Huna ruhusa ya kualika wanachama.",
       "roleMember": "Jukumu: mwanachama",
       "sendInvite": "Tuma mwaliko",
-      "title": "Alika mwanachama"
+      "title": "Alika mwanachama",
+      "alreadyInvited": "Wamekwishaalikwa au ni wanachama tayari.",
+      "sendError": "Imeshindikana kutuma mwaliko."
     },
     "invoices": {
       "downloadA11y": "Pakua ankara {{number}}",
@@ -3142,7 +3236,8 @@
       "inviteCreated": "Mwaliko umeundwa",
       "pendingInvitations": "Mialiko inayosubiri",
       "resendInvite": "Tuma mwaliko tena",
-      "shareInviteLink": "Shiriki kiungo cha mwaliko"
+      "shareInviteLink": "Shiriki kiungo cha mwaliko",
+      "resendInviteError": "Imeshindikana kutuma mwaliko tena."
     },
     "usageStats": {
       "inputTokens": "Tokeni za ingizo",
@@ -3290,7 +3385,8 @@
     "noneChosen": "Hakuna iliyochaguliwa",
     "emptyTitle": "Hakuna modeli za unukuzi",
     "emptyDescription": "Kilo Gateway haina modeli za unukuzi kwa sasa.",
-    "loadFailed": "Imeshindikana kupakia modeli za unukuzi."
+    "loadFailed": "Imeshindikana kupakia modeli za unukuzi.",
+    "choose": "Chagua modeli"
   },
   "voiceLanguage": {
     "title": "Lugha ya kuingiza kwa sauti",
@@ -3505,6 +3601,7 @@
       "fromHuggingFace": "Kutoka Hugging Face",
       "loading": "Inapakia modeli",
       "noResults": "Hakuna modeli zilizopatikana",
+      "noResultsForQuery": "Hakuna modeli zilizopatikana kwa \"{{query}}\"",
       "noFits": "Hakuna modeli zinazotosha kifaa hiki",
       "noFitsDescription": "Modeli kubwa zaidi ziko kwenye kichupo cha $t(common.all).",
       "fit": {
@@ -3535,8 +3632,6 @@
       "quantizations": "Ukwantishaji",
       "quantizationsHelp": "Faili ndogo hutumia kumbukumbu na hifadhi kidogo. Faili kubwa kwa kawaida hutoa majibu bora zaidi.",
       "quantDetail": "Upakuaji wa {{size}} · takriban {{memory}} za kumbukumbu",
-      "downloadQuant": "Pakua {{quant}}",
-      "downloadModelA11y": "Pakua {{name}}",
       "detailsA11y": "Maelezo: {{name}}",
       "loadingModel": "Inapakia maelezo ya modeli",
       "couldNotLoadModel": "Imeshindwa kupakia modeli hii",
@@ -3581,13 +3676,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "Modeli hii inaauni juhudi za kufikiri"
-    }
+    },
+    "creditsRequired": "Salio halitoshi kutuma ujumbe huu, ongeza salio kisha ujaribu tena."
   },
   "settingsTools": {
     "confirmTitle": "Thibitisha mabadiliko haya?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "hazina yako ya hivi karibuni",
+      "confirmMessage": "Hazina: {{repository}}. Ombi: {{prompt}}",
+      "confirmTitle": "Anzisha wakala huyu?",
       "promptRequired": "Anzisha wakala inahitaji maagizo. Ongeza maagizo na uiendeshe tena.",
       "repositoryRequired": "Anzisha wakala inahitaji hazina. Fungua Kilo na uchague moja, kisha uiendeshe tena.",
       "repositoryUnknown": "Kilo haitambui {{repository}} kama hazina ya GitHub au GitLab. Chagua hazina nyingine katika Kilo.",
@@ -3617,7 +3716,9 @@
     "spend24h": "Matumizi katika saa 24 zilizopita",
     "multiplierError": "Weka kizidishi cha 1 au zaidi",
     "permissionDenied": "Huna ruhusa ya kusimamia tahadhari za matumizi.",
-    "pushOffByCategory": "Imezimwa katika Arifa"
+    "pushOffByCategory": "Imezimwa katika Arifa",
+    "multiplierMaxError": "Weka kizidishi cha {{max}} au chini",
+    "thresholdMaxError": "Weka kiasi cha {{max}} au chini."
   },
   "profiles": {
     "title": "Wasifu",
@@ -3634,9 +3735,10 @@
       "skills_other": "{{count}} ujuzi",
       "commands_one": "{{count}} amri",
       "commands_other": "{{count}} amri",
-      "varsShort": "{{count}}v",
-      "skillsShort": "{{count}}u",
-      "commandsShort": "{{count}}a"
+      "setupCommands_one": "{{count}} amri ya kuanzisha",
+      "setupCommands_other": "{{count}} amri za kuanzisha",
+      "agents_one": "{{count}} wakala",
+      "agents_other": "{{count}} mawakala"
     },
     "nameLabel": "Jina la wasifu",
     "namePlaceholder": "k.m. Utatuzi wa nyuma",
@@ -3664,6 +3766,8 @@
     "keyTooLong": "Ufunguo lazima uwe na vibambo 256 au chini yake",
     "keyDuplicate": "Ufunguo huu tayari upo katika wasifu",
     "valueLabel": "Thamani",
+    "valueRequired": "Ingiza thamani",
+    "tooLong": "Tumia vibambo {{max}} au chini yake",
     "secrets": {
       "markSecret": "Weka alama kuwa siri",
       "masked": "Thamani iliyofichwa",
@@ -3714,7 +3818,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Ingiza jina la seva",
-      "nameInvalid": "Jina linaweza kutumia herufi, nambari, mistari chini na deshi pekee",
+      "nameInvalid": "Jina linaweza kutumia herufi za ASCII, nambari, mistari chini na deshi pekee, hadi vibambo 100",
       "commandRequired": "Ingiza amri",
       "commandTooLong": "Tumia hoja 50 au chini, kila moja vibambo 500",
       "urlRequired": "Weka URL",
@@ -3742,16 +3846,16 @@
       "stepsPlaceholder": "kmf. 50",
       "temperature": "Halijoto",
       "temperaturePlaceholder": "kmf. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "kmf. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Wakala Wangu",
       "promptPlaceholder": "Wewe ni...",
       "tools": "Zana",
       "visibility": "Mwonekano",
-      "visibilityPrimary": "Msingi - imeonyeshwa kwenye kiteua",
-      "visibilitySubagent": "Subagent - inaitwa tu kutoka kwa wengine",
-      "visibilityAll": "Wote - wote wawili",
+      "visibilityPrimary": "Msingi — imeonyeshwa kwenye kiteua",
+      "visibilitySubagent": "Subagent — inaitwa tu kutoka kwa wengine",
+      "visibilityAll": "Wote — wote wawili",
       "modePrimary": "Msingi tu",
       "modeSubagent": "Subagent tu",
       "modeAll": "Hali zote",
@@ -3759,7 +3863,7 @@
       "deleteFailed": "Haikuweza kufuta wakala",
       "nameRequired": "Weka jina la wakala",
       "slugRequired": "Ingiza koa wa wakala",
-      "slugInvalid": "Slug lazima aanze na herufi na atumie herufi ndogo, tarakimu na deshi pekee",
+      "slugInvalid": "Slug lazima aanze na herufi ndogo ya ASCII na atumie herufi ndogo za ASCII, tarakimu na deshi pekee, hadi vibambo 50",
       "slugConflict": "Slug hiyo tayari inatumika na wakala iliyojengwa ndani au wakala mwingine katika Wasifi huu",
       "edit": "Hariri wakala"
     },
@@ -3804,7 +3908,9 @@
       "pinFailed": "Haikuweza kubandika repo",
       "unboundToast": "Repo huru",
       "unbindFailed": "Haikuweza kubandua repo"
-    }
+    },
+    "variablesDeleteFailed": "Haikuweza kufuta kigeu",
+    "deleteCommand": "Futa amri {{position}}"
   },
   "credits": {
     "title": "Nunua salio",
@@ -3840,7 +3946,8 @@
       "archive": "Weka kwenye kumbukumbu",
       "unarchive": "Toa kwenye kumbukumbu",
       "deleteTitle": "Futa {{name}}?",
-      "deleteMessage": "Kazi zake pia zitafutwa. Vikao vyake vinabaki."
+      "deleteMessage": "Kazi zake pia zitafutwa. Vikao vyake vinabaki.",
+      "createFailed": "Imeshindikana kuunda orodha"
     },
     "listSettings": {
       "title": "Mipangilio ya orodha",
@@ -3908,20 +4015,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Muhtasari wa asubuhi",
+    "title": "Muhtasari wa wakala",
     "atLeast": "≥{{value}}",
     "coverageHint": "Baadhi ya shughuli za awali huenda hazipo. ≥ inamaanisha angalau kiasi hiki; isiyojulikana si sifuri.",
     "available": "Muhtasari unaopatikana",
     "history": "Historia ya muhtasari",
-    "historyHint": "Ripoti huhifadhiwa kwa siku 30, zikiwemo ripoti zilizoondolewa.",
+    "historyHint": "Mihtasari huhifadhiwa kwa siku 30, zikiwemo zilizopuuzwa.",
     "settings": "Mipangilio ya muhtasari",
-    "empty": "Hakuna shughuli za usiku",
-    "emptyHint": "Vipindi vyako vya uandishi wa msimbo vya wingu na CLI vitaonekana hapa baada ya usiku wenye shughuli.",
-    "loadError": "Imeshindwa kupakia muhtasari",
-    "sessions": "Vilivyokuwa hai usiku",
+    "empty": "Hakuna shughuli katika kipindi hiki cha muhtasari",
+    "emptyHint": "Vipindi vyako vya uandishi wa msimbo vya wingu na CLI huonekana hapa wakati muhtasari ulioratibiwa una shughuli.",
+    "loadError": "Imeshindwa kupakia mihtasari",
+    "sessions": "Vilivyo hai katika kipindi",
     "pullRequests": "PRs zilizofunguliwa",
     "blockers": "Vizuizi vipya",
-    "spend": "Matumizi ya usiku",
+    "spend": "Matumizi katika kipindi",
     "view": "Soma muhtasari",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -3943,13 +4050,13 @@
     "sources": "Ushahidi na vielelezo",
     "timezone": "Saa za eneo za muhtasari",
     "deviceTimezone": "Tumia saa za eneo za kifaa",
-    "timezoneHint": "Saa za eneo za IANA, kwa mfano Europe/Berlin. Mabadiliko ya ratiba yanatumika kwa usiku ujao.",
-    "nightStart": "Usiku unaanza",
-    "morningStart": "Usiku unaisha / asubuhi inaanza",
-    "morningEnd": "Asubuhi inaisha",
-    "timeHint": "Kadi ya Mwanzo hurejesha hali ya sasa asubuhi inapoisha, hata nje ya mtandao.",
-    "invalidSchedule": "Chagua saa za eneo sahihi na vipindi vya usiku na asubuhi visivyopishana wala kuwa tupu.",
-    "notificationsHint": "Arifa moja ya jumla kila asubuhi ripoti yako ya kwanza ikiwa tayari. Haitegemei muhtasari wa AI wa kulipia.",
+    "timezoneHint": "Saa za eneo za IANA, kwa mfano Europe/Berlin. Mabadiliko ya ratiba yanatumika kwa mihtasari ijayo.",
+    "nightStart": "Kipindi cha muhtasari kinaanza",
+    "morningStart": "Muhtasari uko tayari saa",
+    "morningEnd": "Muhtasari unapatikana hadi",
+    "timeHint": "Kadi ya Mwanzo hurejesha hali ya sasa wakati kipindi cha muhtasari kinapoisha, hata nje ya mtandao.",
+    "invalidSchedule": "Chagua saa za eneo sahihi na kipindi cha muhtasari kisichokuwa tupu.",
+    "notificationsHint": "Arifa moja ya jumla kwa kila muhtasari ulioratibiwa. Haitegemei muhtasari wa AI wa kulipia.",
     "notificationPermission": "Washa arifa za kifaa katika $t(common.notifications) ili kupokea muhtasari wako.",
     "aiOptIn": "Muhtasari wa AI wa kulipia",
     "aiHint": "Ni hiari kwa muktadha huu pekee. Vipande vilivyochaguliwa na kufichwa pamoja na taarifa zilizopangwa hutumwa kwa modeli yako katika lugha ya programu. Malipo hutumia salio la muktadha huu.",
@@ -3967,7 +4074,7 @@
     "contextSettings": "Mipangilio ya AI · {{context}}",
     "allContexts": "Muhtasari wa binafsi na wa shirika hubaki tofauti.",
     "create": "Unda muhtasari",
-    "oneOff": "Mara moja tu",
+    "oneOff": "Inapohitajika",
     "createdAt": "Uliundwa {{time}}",
     "chooseContext": "Chagua muktadha mmoja",
     "period": "Kipindi cha muhtasari",
@@ -3989,13 +4096,16 @@
     "emptyPeriod": "Hakuna shughuli zilizopatikana katika kipindi hiki. Hakutakuwa na muhtasari wa AI wala malipo.",
     "emptyHistory": "Hakuna mihtasari iliyohifadhiwa",
     "historicalStateHint": "Hali ya kipindi cha kazi inaonyesha mwisho wa kipindi kilichochaguliwa, si hali ya sasa.",
-    "oneOffHint": "AI hupokea ushahidi uliochaguliwa na kufichwa taarifa nyeti, katika lugha ya programu yako. Ripoti hii ya mara moja tu haibadilishi ratiba yako ya asubuhi wala mapendeleo yako ya AI.",
+    "oneOffHint": "AI hupokea ushahidi uliochaguliwa na kufichwa taarifa nyeti, katika lugha ya programu yako. Muhtasari huu unaotolewa inapohitajika haubadilishi muhtasari wako ulioratibiwa wala mapendeleo yako ya AI.",
     "createOffline": "Unganisha kwenye intaneti ili kupitia au kuunda muhtasari. Maombi ya kulipia hayawekwi kamwe kwenye foleni ukiwa nje ya mtandao.",
     "estimateInputTooLarge": "Kipindi hiki kina ushahidi mwingi mno kwa modeli iliyochaguliwa.",
     "estimatePermissionUnavailable": "Huna ruhusa ya kutumia salio la muktadha huu.",
+    "createFailed": "Imeshindwa kuunda muhtasari huu.",
+    "reviewFailed": "Imeshindwa kupitia muhtasari huu.",
     "estimatePricingUnavailable": "Bei ya modeli hii haipatikani.",
     "estimateBalanceUnavailable": "Salio halitoshi kwa muhtasari wenye malipo.",
     "estimateModelNotAllowed": "Modeli hii hairuhusiwa hapa.",
-    "estimateSpendLimitTooLow": "Ongeza kikomo cha matumizi ili kuruhusu muhtasari huu."
+    "estimateSpendLimitTooLow": "Ongeza kikomo cha matumizi ili kuruhusu muhtasari huu.",
+    "saved": "Mipangilio ya muhtasari imehifadhika"
   }
 }

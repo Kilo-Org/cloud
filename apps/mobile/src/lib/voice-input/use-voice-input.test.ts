@@ -533,7 +533,8 @@ describe('useVoiceInput integration', () => {
         expect(alertMock.alert).toHaveBeenCalledWith(
           'Speech is processed online',
           expect.stringContaining('This device cannot transcribe offline'),
-          expect.any(Array)
+          expect.any(Array),
+          { cancelable: true }
         );
         expect(toastMock.error).not.toHaveBeenCalled();
       });
@@ -623,7 +624,8 @@ describe('useVoiceInput integration', () => {
         expect(alertMock.alert).toHaveBeenCalledWith(
           i18n.t('voiceInput.onlineTitle'),
           i18n.t('voiceInput.onlineMessage', { provider: 'Apple' }),
-          expect.any(Array)
+          expect.any(Array),
+          { cancelable: true }
         );
 
         const buttons = alertMock.alert.mock.calls[0]?.[2] as
@@ -659,7 +661,8 @@ describe('useVoiceInput integration', () => {
         expect(alertMock.alert).toHaveBeenCalledWith(
           i18n.t('voiceInput.languageNotInstalledTitle', { language: 'Deutsch' }),
           i18n.t('voiceInput.languageNotInstalledMessage', { language: 'Deutsch' }),
-          expect.any(Array)
+          expect.any(Array),
+          { cancelable: true }
         );
 
         const buttons = alertMock.alert.mock.calls[0]?.[2] as
@@ -695,7 +698,8 @@ describe('useVoiceInput integration', () => {
         expect(alertMock.alert).toHaveBeenCalledWith(
           i18n.t('voiceInput.languageNotInstalledTitle', { language: 'Deutsch' }),
           i18n.t('voiceInput.languageNotInstalledMessage', { language: 'Deutsch' }),
-          expect.any(Array)
+          expect.any(Array),
+          { cancelable: true }
         );
 
         const buttons = alertMock.alert.mock.calls[0]?.[2] as

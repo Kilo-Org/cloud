@@ -160,7 +160,7 @@ export function PrDiffFileNavigator({
 
   const handleSelectFile = useCallback(
     (path: string) => {
-      requestScrollToFile({ owner, repo, number, path });
+      requestScrollToFile({ owner, repo, number, ref: scope.ref, path });
       if (onDismiss) {
         onDismiss();
         return;
@@ -169,7 +169,7 @@ export function PrDiffFileNavigator({
         router.back();
       }
     },
-    [owner, repo, number, onDismiss, router]
+    [owner, repo, number, scope.ref, onDismiss, router]
   );
 
   const handleToggleViewed = useCallback(

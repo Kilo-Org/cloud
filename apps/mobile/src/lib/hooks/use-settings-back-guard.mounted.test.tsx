@@ -186,6 +186,30 @@ describe('useSettingsBackGuard', () => {
     });
   });
 
+  it('replays a second confirmed leave after the guard is already open', () => {
+    const { renderer } = mountGuard(true, true, noOpSave);
+    triggerPreventRemove();
+
+    const dialog = currentDialog();
+    expect(dialog?.onConfirm).toBeDefined();
+
+    act(() => {
+      dialog?.onConfirm();
+    });
+    expect(dispatchMock).toHaveBeenCalledTimes(1);
+
+    // A leave that lands after the first replay must not be swallowed while
+    // the screen is still mounted.
+    act(() => {
+      dialog?.onConfirm();
+    });
+    expect(dispatchMock).toHaveBeenCalledTimes(2);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
   it('shows Save / Discard / Keep editing for a dirty-valid screen', () => {
     const { renderer } = mountGuard(true, true, noOpSave);
 

@@ -97,7 +97,11 @@ export function useSettingsBackGuard({
   // popping a spurious "Unsaved changes" confirm whose own Save button would
   // save a second time.
   const skipNextGuardRef = useRef(false);
-  const [leaveAllowed, setLeaveAllowed] = useState(false);
+  // Counts every confirmed leave rather than a boolean: a leave that lands
+  // after the guard is already open must still replay its own action instead
+  // of overwriting a pending one the effect has already consumed.
+  const [leaveCount, setLeaveCount] = useState(0);
+  const leaveAllowed = leaveCount > 0;
   // The removal this screen walked back, replayed once the guard below has
   // actually disabled itself. `repeat()` clears the prevention through a React
   // state setter and then dispatches the action immediately, so calling it from
@@ -110,7 +114,7 @@ export function useSettingsBackGuard({
   usePreventRemove(dirty && !leaveAllowed, ({ repeat }) => {
     const leave = () => {
       pendingLeaveRef.current = repeat;
-      setLeaveAllowed(true);
+      setLeaveCount(count => count + 1);
     };
     if (skipNextGuardRef.current) {
       skipNextGuardRef.current = false;
@@ -153,13 +157,16 @@ export function useSettingsBackGuard({
   });
 
   useEffect(() => {
+    if (leaveCount === 0) {
+      return;
+    }
     const replay = pendingLeaveRef.current;
-    if (!leaveAllowed || !replay) {
+    if (!replay) {
       return;
     }
     pendingLeaveRef.current = null;
     replay();
-  }, [leaveAllowed]);
+  }, [leaveCount]);
 
   return {
     onBack: () => {

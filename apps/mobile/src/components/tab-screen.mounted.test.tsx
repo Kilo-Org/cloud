@@ -1,7 +1,7 @@
 import { act, createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
+import { TabBarBandContext, TabBarLabelContext } from '@/lib/tab-bar-clearance';
 import { getTabBarIconForwardHeight, getTabBarOverlayHeight } from '@/lib/tab-bar-layout';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -110,6 +110,20 @@ describe('tab screen bottom clearance', () => {
       getTabBarIconForwardHeight(layout.bottom, 'android') + TAB_SCREEN_BOTTOM_GAP
     );
   });
+
+  it('keeps only the safe-area edge when the screen declares no tab bar below it', async () => {
+    layout.bottom = 34;
+    const mounted = await renderWithProviders(
+      createElement(TabBarBandContext, { value: false }, createElement(Probe))
+    );
+
+    // A tab screen reused on the root stack sits over the tabs: there is no bar
+    // to clear, only the gesture inset.
+    expect(mounted.renderer.root.findByType('Probe').props.padding).toBe(
+      layout.bottom + TAB_SCREEN_BOTTOM_GAP
+    );
+    mounted.unmount();
+  });
 });
 
 describe('TabScreenScrollView', () => {
@@ -137,6 +151,25 @@ describe('TabScreenScrollView', () => {
     expect(childTypes).toEqual(['Content', 'View']);
     const [spacer] = findByType('View');
     expect(spacer?.props.style).toEqual({ height: 16 });
+    unmount();
+  });
+
+  it('ends the viewport at the safe-area edge where no tab bar renders', async () => {
+    layout.platform = 'ios';
+    layout.bottom = 34;
+    layout.fontScale = 1;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(
+        TabBarBandContext,
+        { value: false },
+        createElement(TabScreenScrollView, null, createElement('Content'))
+      )
+    );
+    const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
+
+    // No bar to clear: the reserved band is the gesture inset alone, not a
+    // bar-sized empty strip nothing draws in.
+    expect(scroll?.props.style).toEqual([undefined, { marginBottom: 34 }]);
     unmount();
   });
 });

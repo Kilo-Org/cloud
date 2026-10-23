@@ -16,6 +16,15 @@ import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 export const TabBarLabelContext = createContext<boolean | null>(null);
 
 /**
+ * Whether a tab bar is rendered below the screen. The tabs navigator leaves the
+ * default; a route that reuses a tab screen on the root `(app)` Stack — where
+ * the tabs, and their bar, are underneath instead of beside the screen —
+ * provides `false`, so the viewport ends at the safe-area edge instead of
+ * reserving a band nothing draws in.
+ */
+export const TabBarBandContext = createContext(true);
+
+/**
  * Effective rendered tab bar height for a screen's content clearance: the tabs
  * layout's label decision (`TabBarLabelContext`), the safe-area bottom inset and
  * the platform.

@@ -1,4 +1,5 @@
 import { ProfilesListScreen } from '@/components/profiles/profiles-list-screen';
+import { RootStackProfileScreen } from '@/components/profiles/root-stack-profile-screen';
 
 /**
  * Profile management opened from the root `(app)` Stack (the new-session form,
@@ -7,5 +8,9 @@ import { ProfilesListScreen } from '@/components/profiles/profiles-list-screen';
  * `(tabs)/(3_profile)/profiles`.
  */
 export default function AppStackProfilesListRoute() {
-  return <ProfilesListScreen stack="app" />;
+  return (
+    <RootStackProfileScreen>
+      <ProfilesListScreen stack="app" />
+    </RootStackProfileScreen>
+  );
 }

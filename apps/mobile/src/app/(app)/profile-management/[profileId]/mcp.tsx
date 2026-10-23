@@ -2,6 +2,7 @@ import { useLocalSearchParams } from 'expo-router';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { ProfileMcpScreen } from '@/components/profiles/profile-mcp-screen';
+import { RootStackProfileScreen } from '@/components/profiles/root-stack-profile-screen';
 import { getProfilesPath } from '@/lib/profile-agent-navigation';
 import { parseParam } from '@/lib/route-params';
 
@@ -15,9 +16,11 @@ export default function AppStackProfileMcpRoute() {
     return <InvalidRouteState backTo={getProfilesPath('app')} />;
   }
   return (
-    <ProfileMcpScreen
-      profileId={profileId}
-      organizationId={parseParam(rawOrganizationId) ?? undefined}
-    />
+    <RootStackProfileScreen>
+      <ProfileMcpScreen
+        profileId={profileId}
+        organizationId={parseParam(rawOrganizationId) ?? undefined}
+      />
+    </RootStackProfileScreen>
   );
 }

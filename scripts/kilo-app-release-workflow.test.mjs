@@ -24,15 +24,20 @@ function step(workflow, jobName, id) {
 
 const mobilePackagePath = 'apps/mobile/package.json';
 const easConfigPath = 'apps/mobile/eas.json';
+const lockfilePath = 'pnpm-lock.yaml';
 
 function readJson(rel) {
   return JSON.parse(readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8'));
 }
 
+function readLockfile() {
+  return load(readFileSync(new URL(`../${lockfilePath}`, import.meta.url), 'utf8'));
+}
+
 // A build or a submission runs the EAS CLI the workspace installs, so the
 // version recorded in the lockfile is the version that drives it. The manifest,
-// eas.json and the workflow all have to name that same tool.
-function validateEasCli(workflow, mobilePackage, easConfig) {
+// eas.json, the lockfile and the workflow all have to name that same tool.
+function validateEasCli(workflow, mobilePackage, easConfig, lockfile) {
   const declared = mobilePackage.devDependencies?.['eas-cli'];
   assert.match(
     declared ?? '',
@@ -43,6 +48,25 @@ function validateEasCli(workflow, mobilePackage, easConfig) {
     easConfig.cli?.version,
     declared,
     'eas.json must select the CLI version the workspace declares'
+  );
+
+  // A frozen install refuses a manifest the graph does not carry, so the
+  // recorded specifier has to be the exact version and the resolution has to
+  // be that same release, not a peer-suffixed variant of another one.
+  const recorded = lockfile.importers?.['apps/mobile']?.devDependencies?.['eas-cli'];
+  assert.equal(
+    recorded?.specifier,
+    declared,
+    'the lockfile must record the exact CLI version the manifest declares'
+  );
+  assert.equal(
+    recorded?.version?.split('(')[0],
+    declared,
+    'the lockfile must resolve the CLI version the manifest declares'
+  );
+  assert.ok(
+    lockfile.packages?.[`eas-cli@${declared}`],
+    'the lockfile must resolve the CLI package the manifest declares'
   );
 
   for (const [name, command] of Object.entries(mobilePackage.scripts ?? {})) {
@@ -339,7 +363,7 @@ test('the release workflow gates the build on the upload cap and lands the chang
 });
 
 test('the mobile build tooling runs the EAS CLI the workspace installs', () => {
-  validateEasCli(readWorkflow(), readJson(mobilePackagePath), readJson(easConfigPath));
+  validateEasCli(readWorkflow(), readJson(mobilePackagePath), readJson(easConfigPath), readLockfile());
 });
 
 const mutations = {
@@ -596,6 +620,16 @@ const toolchainMutations = {
   'a mobile script bypasses the installed CLI': ({ mobilePackage }) => {
     mobilePackage.scripts.build = `pnpx eas-cli@${mobilePackage.devDependencies['eas-cli']} ${mobilePackage.scripts.build}`;
   },
+  'the lockfile records another CLI version': ({ lockfile }) => {
+    lockfile.importers['apps/mobile'].devDependencies['eas-cli'].version = '24.8.0';
+  },
+  'the lockfile records a range for the CLI': ({ lockfile, mobilePackage }) => {
+    lockfile.importers['apps/mobile'].devDependencies['eas-cli'].specifier =
+      `^${mobilePackage.devDependencies['eas-cli']}`;
+  },
+  'the lockfile drops the CLI package': ({ lockfile, mobilePackage }) => {
+    delete lockfile.packages[`eas-cli@${mobilePackage.devDependencies['eas-cli']}`];
+  },
 };
 
 for (const [name, mutate] of Object.entries(toolchainMutations)) {
@@ -603,7 +637,11 @@ for (const [name, mutate] of Object.entries(toolchainMutations)) {
     const workflow = readWorkflow();
     const mobilePackage = readJson(mobilePackagePath);
     const easConfig = readJson(easConfigPath);
-    mutate({ workflow, mobilePackage, easConfig });
-    assert.throws(() => validateEasCli(workflow, mobilePackage, easConfig), assert.AssertionError);
+    const lockfile = readLockfile();
+    mutate({ workflow, mobilePackage, easConfig, lockfile });
+    assert.throws(
+      () => validateEasCli(workflow, mobilePackage, easConfig, lockfile),
+      assert.AssertionError
+    );
   });
 }

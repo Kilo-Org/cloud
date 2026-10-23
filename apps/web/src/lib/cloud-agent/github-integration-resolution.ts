@@ -19,6 +19,12 @@ export async function resolveGitHubIntegrationIdForRepository(
   owner: Owner,
   repositoryFullName: string
 ): Promise<string | null> {
-  const choice = await resolveGitHubRepositoryForOwner(owner, repositoryFullName, 'agent');
-  return choice?.githubIntegrationId ?? null;
+  try {
+    const choice = await resolveGitHubRepositoryForOwner(owner, repositoryFullName, 'agent');
+    return choice?.githubIntegrationId ?? null;
+  } catch {
+    // Enrichment must never fail a create on its own: a read failure here
+    // leaves the request unqualified, which is what it was before.
+    return null;
+  }
 }

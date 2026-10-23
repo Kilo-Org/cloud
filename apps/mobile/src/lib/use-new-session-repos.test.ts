@@ -508,11 +508,20 @@ describe('useRepositoryBranches settle bound', () => {
       expect(settled?.isLoading).toBe(false);
       expect(settled?.isRetryableError).toBe(true);
       expect(settled?.isPermanentError).toBe(false);
-      // The request is still running, so the retry reports its own progress.
-      expect(settled?.isRetrying).toBe(true);
+      // The stuck request is still in flight, so the retry stays pressable
+      // rather than reporting progress it cannot make; a refetch cancels it.
+      expect(settled?.isRetrying).toBe(false);
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('reports retry progress only for a retry after a real failure', () => {
+    mocks.branchQueryResult = { isError: true, isFetching: true, error: { data: {} } };
+    const result = mountBound(githubRepo).result;
+
+    expect(result?.isRetryableError).toBe(true);
+    expect(result?.isRetrying).toBe(true);
   });
 
   it('re-arms the bound for a different repository', () => {

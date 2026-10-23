@@ -495,26 +495,29 @@ export function useRepositoryBranches(
   // A request can stay pending forever — a stalled connection, a paused query,
   // a provider that never answers. Loading is therefore a bounded state: after
   // `BRANCH_SETTLE_BOUND_MS` the row stops presenting a request that may never
-  // land as progress and offers the retry instead. The query itself keeps
-  // running, so its answer still replaces the row when it arrives.
+  // land as progress and offers the retry instead. The expiry records the
+  // question it was armed for, so a repository or scope change starts loading
+  // again without a frame of the previous expiry. The query itself keeps
+  // running, and the retry cancels it before starting a fresh request.
   const isPending = isEnabled && branchQuery.isPending;
   const isFetching = isEnabled && branchQuery.isFetching;
-  const [boundExpired, setBoundExpired] = useState(false);
+  const [expiredFor, setExpiredFor] = useState<string | null>(null);
   useEffect(() => {
-    setBoundExpired(false);
     if (!isPending && !isFetching) {
       return undefined;
     }
     const timer = setTimeout(() => {
-      setBoundExpired(true);
+      setExpiredFor(settleKey);
     }, BRANCH_SETTLE_BOUND_MS);
     return () => {
       clearTimeout(timer);
     };
   }, [settleKey, isPending, isFetching]);
-  const overBound = isPending && boundExpired;
+  const overBound = isPending && expiredFor === settleKey;
 
   const retry = useCallback(() => {
+    // A refetch cancels the request that is still running, so the retry works
+    // while the bounded request is stuck instead of waiting behind it.
     void branchQuery.refetch();
   }, [branchQuery]);
 
@@ -526,7 +529,9 @@ export function useRepositoryBranches(
     isLoading: isPending && !overBound,
     isRetryableError: (branchQuery.isError && !permanentFailure) || overBound,
     isPermanentError: branchQuery.isError && permanentFailure,
-    isRetrying: isFetching && (branchQuery.isError || overBound),
+    // Only a retry after a real failure reports progress. A request that
+    // outlived the bound keeps the retry enabled, so it can replace it.
+    isRetrying: isFetching && branchQuery.isError,
     retry,
   };
 }

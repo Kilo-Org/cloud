@@ -116,7 +116,10 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   // The capacity notice explains a blocked action, so it only appears when a
   // rendered row actually offers one — never over a list of already-analyzed
   // findings.
-  const hasAnalyzableRow = useMemo(() => items.some(isSecurityFindingAnalyzable), [items]);
+  const hasAnalyzableRow = useMemo(
+    () => items.some(item => isSecurityFindingAnalyzable(item)),
+    [items]
+  );
   const hasListContent = items.length > 0 || findings.isFetchNextPageError;
   // Hoisted so the list keeps one renderer identity across unrelated screen
   // renders (refresh, filter sheet). FlashList's memoized ViewHolder compares

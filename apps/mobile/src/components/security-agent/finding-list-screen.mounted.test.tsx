@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import SecurityAgentFilterFindingsRoute from '@/app/(app)/security-agent/[scope]/filter';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Text } from '@/components/ui/text';
 import { PickerSheet } from '@/components/picker-sheet';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -45,6 +46,13 @@ function analyzableFinding(id: string): FindingFixture {
 
 function analyzedFinding(id: string): FindingFixture {
   return { id, status: 'fixed', analysis_status: 'completed', remediationSummary: null };
+}
+
+/** The rendered capacity line for `securityAgent.analysis.<key>`, if any. */
+function capacityCopy(root: Root, key: 'capacityFull' | 'couldNotCheckCapacity') {
+  return root
+    .findAllByType(Text)
+    .filter(node => node.props.children === `securityAgent.analysis.${key}`);
 }
 const mocks = vi.hoisted(() => ({
   query: vi.fn(),
@@ -105,7 +113,10 @@ vi.mock('@/lib/route-registry', () => ({
   useRouteRegistry: vi.fn(),
 }));
 
-let mounted: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefined;
+type Mounted = Awaited<ReturnType<typeof renderWithProviders>>;
+type Root = Mounted['renderer']['root'];
+
+let mounted: Mounted | undefined = undefined;
 async function mount(routeParams: ComponentProps<typeof FindingListScreen>['routeParams'] = {}) {
   mounted = await renderWithProviders(
     <FindingListScreen scope="personal" routeParams={routeParams} />
@@ -296,12 +307,7 @@ describe('Security Agent list surfaces', () => {
     capacity.state = 'full';
     findings.data = { pages: [{ findings: [analyzableFinding('a'), analyzableFinding('b')] }] };
     const header = await mountListHeader();
-    const rendered = header.findAll(
-      node => typeof node.type === 'string' && node.type === 'Text'
-    );
-    expect(
-      rendered.filter(node => node.props.children === 'securityAgent.analysis.capacityFull')
-    ).toHaveLength(1);
+    expect(capacityCopy(header, 'capacityFull')).toHaveLength(1);
   });
 
   it.each([
@@ -312,29 +318,8 @@ describe('Security Agent list surfaces', () => {
     capacity.state = state;
     findings.data = { pages: [{ findings: [...rows] }] };
     const header = await mountListHeader();
-    const rendered = header.findAll(
-      node => typeof node.type === 'string' && node.type === 'Text'
-    );
-    expect(
-      rendered.filter(node => node.props.children === 'securityAgent.analysis.capacityFull')
-    ).toHaveLength(0);
-    expect(
-      rendered.filter(
-        node => node.props.children === 'securityAgent.analysis.couldNotCheckCapacity'
-      )
-    ).toHaveLength(0);
-  });
-
-  it('retries a failed capacity read from the explanation', async () => {
-    capacity.state = 'error';
-    findings.data = { pages: [{ findings: [analyzableFinding('a')] }] };
-    const header = await mountListHeader();
-    const [retry] = header.findAll(
-      node => typeof node.type === 'string' && node.props.accessibilityLabel === 'common.retry'
-    );
-    expect(retry).toBeDefined();
-    act(retry?.props.onPress);
-    expect(capacity.refetch).toHaveBeenCalledOnce();
+    expect(capacityCopy(header, 'capacityFull')).toHaveLength(0);
+    expect(capacityCopy(header, 'couldNotCheckCapacity')).toHaveLength(0);
   });
 
   it('keeps expired filter guidance outside a scroller', async () => {

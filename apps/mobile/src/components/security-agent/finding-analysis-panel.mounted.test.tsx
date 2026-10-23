@@ -13,6 +13,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { MarkdownText } from '@/components/agents/markdown-text';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Text } from '@/components/ui/text';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -239,9 +240,7 @@ describe('FindingAnalysisPanel completion-copy gate', () => {
   it('explains a full capacity under the disabled action', () => {
     capacity.state = 'full';
     const tree = renderPanel(analysisFixture({ status: null }));
-    const rendered = tree.root.findAll(
-      node => typeof node.type === 'string' && node.type === 'Text'
-    );
+    const rendered = tree.root.findAllByType(Text);
     expect(
       rendered.filter(node => node.props.children === i18n.t('securityAgent.analysis.capacityFull'))
     ).toHaveLength(1);
@@ -250,9 +249,7 @@ describe('FindingAnalysisPanel completion-copy gate', () => {
   it('keeps the capacity explanation off an already analyzed finding', () => {
     capacity.state = 'full';
     const tree = renderPanel(analysisFixture({ status: 'completed' }));
-    const rendered = tree.root.findAll(
-      node => typeof node.type === 'string' && node.type === 'Text'
-    );
+    const rendered = tree.root.findAllByType(Text);
     expect(
       rendered.filter(node => node.props.children === i18n.t('securityAgent.analysis.capacityFull'))
     ).toHaveLength(0);
@@ -267,7 +264,9 @@ describe('FindingAnalysisPanel completion-copy gate', () => {
         node.props.accessibilityLabel === i18n.t('common.retry')
     );
     expect(retry).toBeDefined();
-    act(retry?.props.onPress);
+    const onRetry: unknown = retry?.props.onPress;
+    expect(typeof onRetry).toBe('function');
+    act(onRetry as () => void);
     expect(capacity.refetch).toHaveBeenCalledOnce();
   });
 

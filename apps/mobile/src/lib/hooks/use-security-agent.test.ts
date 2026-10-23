@@ -18,8 +18,11 @@ vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({
 
 type OrgListEntry = { organizationId: string; role: string };
 
+/** The `listFindings` counters the analysis-capacity hook reads. */
+type CapacityCounts = { runningCount?: number; concurrencyLimit?: number };
+
 const queryState = vi.hoisted(() => ({
-  data: undefined as OrgListEntry[] | undefined,
+  data: undefined as OrgListEntry[] | CapacityCounts | undefined,
   isLoading: false,
   isError: false,
   isFetching: false,

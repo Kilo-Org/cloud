@@ -13,13 +13,17 @@
 # A finished artifact is the only thing the gate can see, and one native build
 # takes longer than the gap between two pushes of the same native inputs.
 # Two mechanisms keep that from multiplying the work:
-# - Each heavy job takes a job-level concurrency slot keyed on the nativeHash
-#   and the event, and re-checks its artifact (`mobile-native-gate.ts
-#   --published`) before it builds. A run that arrives while the first build of
-#   that hash is running waits for the slot, then exits in seconds instead of
-#   spending a second runner. The event name is part of the key so a push build
-#   is never the pending job that a later pull_request job cancels, which would
-#   leave main without the durable artifact.
+# - Each heavy job re-checks its artifact (`mobile-native-gate.ts --published`)
+#   before it builds, so a run that arrives after another published that hash
+#   exits in seconds instead of spending a second runner.
+# - A pull_request run takes its own job-level concurrency slot, keyed on the
+#   ref. One slot per nativeHash across pull requests made siblings cancel each
+#   other: GitHub keeps a single pending job per group, so a queue of pull
+#   requests with the same native inputs cancelled the pending build every
+#   time, and a platform looked failed without running. A push or
+#   workflow_dispatch run keeps the nativeHash slot, keyed on
+#   the event as well, so a push build is never the pending job that a later
+#   pull_request job cancels and main keeps its durable artifact.
 # - A run that must publish the durable artifact (push, workflow_dispatch) but
 #   finds only the one-day pull_request artifact promotes it: the promote job
 #   copies the artifact under the same name with the durable retention, which
@@ -199,14 +203,14 @@ jobs:
        (needs.gate.outputs.promote_ios == 'true' && needs.promote_ios.result != 'success'))
     runs-on: macos-26
     timeout-minutes: 90
-    # Serialized on the nativeHash so a sibling build of the same inputs makes
-    # this job wait and then exit at the re-check. The event name is part of the
-    # key so a push build is never the pending job that a later pull_request
-    # job cancels: main would then keep no durable artifact for that hash. The
-    # measured duplicates were all pull_request runs, and those still share one
-    # group.
+    # A pull_request run takes one slot per ref, so pull requests with the same
+    # native inputs never cancel each other's pending build; the artifact
+    # re-check below still turns a duplicate into a no-op. A push or
+    # workflow_dispatch run keeps one slot per nativeHash, keyed on the event so
+    # a push build is never the pending job a later pull_request job cancels:
+    # main would then keep no durable artifact for that hash.
     concurrency:
-      group: ${{ github.workflow }}-${{ github.event_name }}-ios-${{ needs.gate.outputs.ios_hash }}
+      group: ${{ github.workflow }}-${{ github.event_name }}-ios-${{ github.event_name == 'pull_request' && github.ref || needs.gate.outputs.ios_hash }}
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -311,11 +315,10 @@ jobs:
        (needs.gate.outputs.promote_android == 'true' && needs.promote_android.result != 'success'))
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    # Same serialization as the ios job: pull_request runs of one nativeHash
-    # queue behind each other, and a push build keeps its own group so a later
-    # pull_request job cannot cancel it while it waits.
+    # Same slot rule as the ios job: one per ref for a pull_request run, one
+    # per nativeHash for a push or workflow_dispatch run.
     concurrency:
-      group: ${{ github.workflow }}-${{ github.event_name }}-android-${{ needs.gate.outputs.android_hash }}
+      group: ${{ github.workflow }}-${{ github.event_name }}-android-${{ github.event_name == 'pull_request' && github.ref || needs.gate.outputs.android_hash }}
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

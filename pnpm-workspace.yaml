@@ -135,8 +135,18 @@ overrides:
   '@babel/plugin-transform-modules-systemjs': 7.29.7
   '@babel/core': 7.29.7
   mdast-util-to-hast: 13.2.1
-  storybook: 10.4.6
-  next: 16.3.8
+  storybook: 10.6.2
+  '@storybook/addon-docs>react': 19.2.6
+  '@storybook/addon-docs>react-dom': 19.2.6
+  'is-core-module>hasown': 2.0.2
+  'is-regex>hasown': 2.0.2
+  'jest-runtime@30.5.2>cjs-module-lexer': 2.2.0
+  'jest-runtime@30.5.2>es-module-lexer': 2.3.1
+  'tsconfig-paths-webpack-plugin>enhanced-resolve': 5.20.1
+  'tsconfig-paths-webpack-plugin>tapable': 2.3.0
+  'fork-ts-checker-webpack-plugin>tapable': 2.3.0
+  'html-webpack-plugin>tapable': 2.3.0
+  next: 16.4.1
   preact: 10.28.4
   adm-zip: 0.6.1
   baseline-browser-mapping: 2.11.20
@@ -153,9 +163,9 @@ overrides:
   form-data: 4.0.6
   follow-redirects: 1.16.1
   ws@^7: 7.5.11
-  ws@^8: 8.21.0
+  ws@^8: 8.21.1
   tmp: 0.2.7
-  dompurify: 3.4.16
+  dompurify: 3.4.17
   handlebars: 4.7.10
   brace-expansion: 5.0.12
   node-forge: 1.4.0
@@ -175,7 +185,7 @@ overrides:
   yaml: 2.8.4
   undici@^7: 7.29.1
   path-to-regexp: 8.4.2
-  ip-address: 10.7.1
+  ip-address: 10.7.4
   image-size@^1: npm:image-size-next@1.2.2
   image-size@^2: npm:image-size-next@2.1.1
   drizzle-orm: 0.45.2
@@ -209,7 +219,7 @@ overrides:
   postcss-selector-parser@^7.0.0: 7.1.6
   postcss-selector-parser@6.0.10: 7.1.6
   webpack-dev-middleware@^6: 7.4.6
-  toml: 4.2.0
+  toml: 5.0.1
   '@opentelemetry/core': 2.8.0
   body-parser: 2.3.0
   js-yaml: 4.3.2

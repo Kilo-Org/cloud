@@ -1,3 +1,4 @@
+import { decryptWithPrivateKey, type EncryptedEnvelope } from '@kilocode/encryption';
 import { describe, test, expect } from 'vitest';
 import type { WorkerDb } from '@kilocode/db';
 import {
@@ -17,7 +18,8 @@ const OWNER: ProfileOwner = { type: 'user', id: 'user_test' };
 const PROFILE_ID = '11111111-1111-4111-8111-111111111111';
 const SERVER_ID = '22222222-2222-4222-8222-222222222222';
 
-const { publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+const PRIVATE_KEY = privateKey.export({ type: 'pkcs8', format: 'pem' });
 const PUBLIC_KEY = Buffer.from(publicKey.export({ type: 'spki', format: 'pem' })).toString(
   'base64'
 );
@@ -238,9 +240,10 @@ describe('updateMcpServer secret reuse', () => {
       environment?: Record<string, StoredMcpSecretValue>;
     };
     expect(config.environment?.API_KEY).toEqual(stored);
-    const rotated = config.environment?.BASE_URL as { algorithm?: string; encryptedData?: string };
+    const rotated = config.environment?.BASE_URL as EncryptedEnvelope;
     expect(rotated.algorithm).toBe('rsa-aes-256-gcm');
-    expect(rotated.encryptedData?.length).toBeGreaterThan(0);
+    expect(rotated.encryptedData.length).toBeGreaterThan(0);
+    expect(decryptWithPrivateKey(rotated, PRIVATE_KEY)).toBe('https://other.example.com');
   });
 
   test('requires values for new environment entries', async () => {
@@ -301,9 +304,10 @@ describe('updateMcpServer secret reuse', () => {
       headers?: Record<string, StoredMcpSecretValue>;
     };
     expect(config.headers?.Authorization).toEqual(stored);
-    const rotated = config.headers?.['X-Trace'] as { algorithm?: string; encryptedData?: string };
+    const rotated = config.headers?.['X-Trace'] as EncryptedEnvelope;
     expect(rotated.algorithm).toBe('rsa-aes-256-gcm');
-    expect(rotated.encryptedData?.length).toBeGreaterThan(0);
+    expect(rotated.encryptedData.length).toBeGreaterThan(0);
+    expect(decryptWithPrivateKey(rotated, PRIVATE_KEY)).toBe('trace-1');
   });
 
   test('rejects masked values when the server type changes', async () => {

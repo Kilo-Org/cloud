@@ -486,6 +486,10 @@ const config: ExpoConfig = {
       },
     ],
     './plugins/withAndroidManifestFix',
+    // Font size, display size, language and direction changes are handled in
+    // place by the running activity, like rotation and dark mode. Without them
+    // Android recreates MainActivity and the app restarts at its first route.
+    './plugins/withAndroidConfigChanges',
     // Window background follows the app theme (values-night aware) so the
     // rotation surface resize never paints a foreign blank frame.
     './plugins/withAndroidRotationSurface',

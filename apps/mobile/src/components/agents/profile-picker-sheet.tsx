@@ -9,6 +9,7 @@ import { Check, Settings2 } from '@/components/ui/icons';
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { formatProfileCountItems, profileCountItems } from '@/lib/profile-count-labels';
 
@@ -87,7 +88,12 @@ export function ProfilePickerSheet({
           title={t('agentChat.newSession.couldNotLoadEnvironment')}
           description={t('organization.boundary.loadErrorMessage')}
           action={
-            <Button variant="outline" onPress={onRetry} accessibilityLabel={t('common.retry')}>
+            <Button
+              variant="outline"
+              onPress={onRetry}
+              accessibilityLabel={t('common.retry')}
+              className={STATE_ACTION_CLASS}
+            >
               <Text>{t('common.retry')}</Text>
             </Button>
           }
@@ -108,6 +114,7 @@ export function ProfilePickerSheet({
               variant="outline"
               onPress={onManageProfiles}
               accessibilityLabel={t('agentChat.newSession.manageProfiles')}
+              className={STATE_ACTION_CLASS}
             >
               <Text>{t('agentChat.newSession.manageProfiles')}</Text>
             </Button>

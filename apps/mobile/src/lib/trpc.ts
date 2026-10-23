@@ -104,7 +104,9 @@ export const deadlineFetch: typeof fetch = async (url, init) => {
 // Reports every failed (or >=400) tRPC request once at warning level. The
 // global fetch wrapper skips `/api/trpc` URLs so this is the only reporter.
 // A batched call answers 207 when it mixes results and errors; the body is
-// parsed (via a clone) so the failing procedure's code is reported.
+// parsed (via a clone) so the failing procedure's code is reported. A batch
+// that yields no error status or code records nothing: all items succeeded, the
+// error detail is unreadable, or the body cannot be read.
 const observedFetch = createNetworkErrorFetch(deadlineFetch, {
   source: 'trpc',
   isResponseError: status => status >= 400 || status === 207,

@@ -329,10 +329,11 @@ function countedCall(text, keyStart) {
     return null;
   }
   const options = argsText.slice(comma + 1).trim();
-  if (
-    !options.startsWith('{') ||
-    !COUNTED_OPTIONS.some(name => optionsPropertyNames(options).has(name))
-  ) {
+  if (!options.startsWith('{')) {
+    return null;
+  }
+  const optionNames = optionsPropertyNames(options);
+  if (!COUNTED_OPTIONS.some(name => optionNames.has(name))) {
     return null;
   }
   const first = argsText.slice(0, comma).replace(/\s+/g, ' ').trim();
@@ -343,13 +344,7 @@ function countedCall(text, keyStart) {
 
 /** Every static counted key: `t('key', { … count … })` and its quoted variants. */
 export function collectCountedKeys(rootDir = SOURCE_DIR) {
-  const keys = new Set();
-  for (const call of collectCountedCalls(rootDir)) {
-    if (call.key !== undefined) {
-      keys.add(call.key);
-    }
-  }
-  return [...keys].sort();
+  return countedKeysFrom(collectCountedCalls(rootDir));
 }
 
 /**
@@ -359,8 +354,24 @@ export function collectCountedKeys(rootDir = SOURCE_DIR) {
  * audit problem, because the audit cannot see which messages a count reaches.
  */
 export function collectDynamicCountedCalls(rootDir = SOURCE_DIR) {
+  return dynamicCallsFrom(collectCountedCalls(rootDir));
+}
+
+/** The literal-key view of one collection of counted calls. */
+function countedKeysFrom(calls) {
+  const keys = new Set();
+  for (const call of calls) {
+    if (call.key !== undefined) {
+      keys.add(call.key);
+    }
+  }
+  return [...keys].sort();
+}
+
+/** The dynamic-expression view of one collection of counted calls. */
+function dynamicCallsFrom(calls) {
   const dynamic = new Set();
-  for (const call of collectCountedCalls(rootDir)) {
+  for (const call of calls) {
     if (call.dynamic !== undefined) {
       dynamic.add(call.dynamic);
     }
@@ -368,6 +379,7 @@ export function collectDynamicCountedCalls(rootDir = SOURCE_DIR) {
   return [...dynamic].sort();
 }
 
+/** One traversal of the source tree: every counted call the audit found. */
 function collectCountedCalls(rootDir) {
   const calls = [];
   const callPattern = /(?<![\w.$])(?:i18n\.)?t\s*\(/g;
@@ -504,9 +516,9 @@ function hasFamily(english, key) {
  * Every counted key the audit is responsible for: the literal ones and every
  * key a reviewed dynamic call can produce.
  */
-function auditKeys(rootDir) {
-  const keys = new Set(collectCountedKeys(rootDir));
-  for (const expression of collectDynamicCountedCalls(rootDir)) {
+function auditKeys(calls) {
+  const keys = new Set(countedKeysFrom(calls));
+  for (const expression of dynamicCallsFrom(calls)) {
     const listed = DYNAMIC_COUNTED_KEYS.get(expression);
     if (listed !== undefined) {
       for (const key of listed.keys) {
@@ -517,14 +529,22 @@ function auditKeys(rootDir) {
   return [...keys].sort();
 }
 
+/** The unlisted dynamic calls among one collection of counted calls. */
+function unlistedDynamicCalls(calls) {
+  return dynamicCallsFrom(calls).filter(expression => !DYNAMIC_COUNTED_KEYS.has(expression));
+}
+
+/** The countless counted keys among one collection, checked against `english`. */
+function countlessFamilies(calls, english) {
+  return auditKeys(calls).filter(key => !NO_AGREEMENT.has(key) && !hasFamily(english, key));
+}
+
 /**
  * The variable-key counted calls that are not in `DYNAMIC_COUNTED_KEYS`. Each
  * one is a call whose possible messages the audit cannot see.
  */
 export function findUnlistedDynamicCalls(rootDir = SOURCE_DIR) {
-  return collectDynamicCountedCalls(rootDir).filter(
-    expression => !DYNAMIC_COUNTED_KEYS.has(expression)
-  );
+  return unlistedDynamicCalls(collectCountedCalls(rootDir));
 }
 
 /**
@@ -534,8 +554,7 @@ export function findUnlistedDynamicCalls(rootDir = SOURCE_DIR) {
  * a form.
  */
 export function findCountlessFamilies(rootDir = SOURCE_DIR, localesDir = LOCALES_DIR) {
-  const english = readEnglishCatalog(localesDir);
-  return auditKeys(rootDir).filter(key => !NO_AGREEMENT.has(key) && !hasFamily(english, key));
+  return countlessFamilies(collectCountedCalls(rootDir), readEnglishCatalog(localesDir));
 }
 
 /** The locale tags present on disk, without the `.json` extension. */
@@ -549,15 +568,16 @@ function localeTags(localesDir = LOCALES_DIR) {
 function run() {
   const sourceOnly = process.argv.includes('--source-only');
   const problems = [];
+  const calls = collectCountedCalls(SOURCE_DIR);
   const english = readEnglishCatalog();
 
-  for (const key of findCountlessFamilies()) {
+  for (const key of countlessFamilies(calls, english)) {
     problems.push(
       `en: counted key "${key}" has no plural family; add _one/_other or list it in NO_AGREEMENT`
     );
   }
 
-  for (const expression of findUnlistedDynamicCalls()) {
+  for (const expression of unlistedDynamicCalls(calls)) {
     problems.push(
       `en: counted call with variable key "${expression}" is not listed in DYNAMIC_COUNTED_KEYS; name its possible keys or add the call site's expression`
     );
@@ -578,12 +598,19 @@ function run() {
       }
       const catalog = flatten(JSON.parse(readFileSync(join(LOCALES_DIR, `${tag}.json`), 'utf8')));
       const categories = new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
+      const localeFamilyBases = new Set();
+      for (const key of catalog.keys()) {
+        const base = pluralFamilyBase(key);
+        if (base !== null) {
+          localeFamilyBases.add(base);
+        }
+      }
       let flagged = 0;
       for (const family of families) {
         // A locale may keep the flat counted key and fall back to it when the
         // copy inflects no word of its own; it only owes categories once it
         // (or the audit's own rule) declares the family.
-        const localeDeclared = [...catalog.keys()].some(key => pluralFamilyBase(key) === family);
+        const localeDeclared = localeFamilyBases.has(family);
         const mandatory =
           localeDeclared || (hasFamily(english, family) && !countedBases.has(family));
         if (!mandatory) {

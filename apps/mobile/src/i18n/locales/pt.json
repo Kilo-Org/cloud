@@ -1998,6 +1998,7 @@
       "reauthorizeButton": "Renovar autorização da aplicação do GitHub",
       "reauthorizeDescription": "O agente de segurança precisa de permissão para ler os alertas do Dependabot. Volta a autorizar a aplicação do GitHub para conceder esta permissão.",
       "reauthorizeTitle": "Permissões adicionais necessárias",
+      "retryFailed": "Ainda não foi possível carregar o agente de segurança. Verifica a tua ligação e tenta novamente.",
       "setupFailed": "Não foi possível iniciar a configuração do GitHub. Tenta novamente."
     },
     "queuedActionUntracked": "Deixou de ser possível acompanhar uma ação na fila. Atualiza para ver o estado mais recente.",

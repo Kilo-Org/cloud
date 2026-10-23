@@ -1998,6 +1998,7 @@
       "reauthorizeButton": "Atkārtoti autorizēt GitHub lietotni",
       "reauthorizeDescription": "Drošības aģentam vajadzīga atļauja lasīt Dependabot brīdinājumus. Atkārtoti autorizē GitHub lietotni, lai piešķirtu šo atļauju.",
       "reauthorizeTitle": "Nepieciešamas papildu atļaujas",
+      "retryFailed": "Joprojām neizdevās ielādēt drošības aģentu. Pārbaudi savienojumu un mēģini vēlreiz.",
       "setupFailed": "Neizdevās sākt GitHub iestatīšanu. Lūdzu, mēģini vēlreiz."
     },
     "queuedActionUntracked": "Rindai pievienoto darbību vairs nevar izsekot. Atsvaidzini datus, lai redzētu aktuālo stāvokli.",

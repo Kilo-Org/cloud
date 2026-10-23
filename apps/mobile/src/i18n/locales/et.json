@@ -1972,6 +1972,7 @@
       "reauthorizeButton": "Volita GitHubi rakendus uuesti",
       "reauthorizeDescription": "Turvaagent vajab õigust Dependaboti hoiatusi lugeda. Selle õiguse andmiseks volita GitHubi rakendus uuesti.",
       "reauthorizeTitle": "Vaja on täiendavaid õigusi",
+      "retryFailed": "Turvaagenti ei õnnestunud endiselt laadida. Kontrolli ühendust ja proovi uuesti.",
       "setupFailed": "GitHubi seadistamist ei õnnestunud alustada. Proovi uuesti."
     },
     "queuedActionUntracked": "Järjekorras olevat toimingut ei õnnestunud enam jälgida. Värskenda, et näha uusimat olekut.",

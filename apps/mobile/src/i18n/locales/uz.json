@@ -1972,6 +1972,7 @@
       "reauthorizeButton": "GitHub ilovasiga qayta ruxsat berish",
       "reauthorizeDescription": "Xavfsizlik agentiga Dependabot ogohlantirishlarini o'qish uchun ruxsat kerak. Bu ruxsatni berish uchun GitHub ilovasiga qayta ruxsat bering.",
       "reauthorizeTitle": "Qo'shimcha ruxsatlar talab qilinadi",
+      "retryFailed": "Xavfsizlik agentini hali ham yuklab bo'lmadi. Iltimos, aloqani tekshirib, qayta urinib ko'ring.",
       "setupFailed": "GitHubni sozlashni boshlab bo'lmadi. Iltimos, qayta urinib ko'ring."
     },
     "queuedActionUntracked": "Navbatga qo'yilgan amalni kuzatish imkoni yo'qoldi. Eng so'nggi holatni ko'rish uchun yangilang.",

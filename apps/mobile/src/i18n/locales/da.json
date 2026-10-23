@@ -1972,6 +1972,7 @@
       "reauthorizeButton": "Godkend GitHub-appen igen",
       "reauthorizeDescription": "Security Agent har brug for tilladelse til at læse Dependabot-advarsler. Godkend GitHub-appen igen for at give denne tilladelse.",
       "reauthorizeTitle": "Yderligere tilladelser påkrævet",
+      "retryFailed": "Security Agent kunne stadig ikke indlæses. Kontroller din forbindelse, og prøv igen.",
       "setupFailed": "Opsætningen af GitHub kunne ikke startes. Prøv igen."
     },
     "queuedActionUntracked": "Status for en handling i kø kunne ikke længere følges. Opdatér for at se den seneste status.",

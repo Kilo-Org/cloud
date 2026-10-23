@@ -1972,6 +1972,7 @@
       "reauthorizeButton": "Autoriser GitHub-appen på nytt",
       "reauthorizeDescription": "Sikkerhetsagenten trenger tillatelse til å lese Dependabot-varsler. Autoriser GitHub-appen på nytt for å gi denne tillatelsen.",
       "reauthorizeTitle": "Flere tillatelser kreves",
+      "retryFailed": "Kunne fortsatt ikke laste inn sikkerhetsagenten. Sjekk tilkoblingen din og prøv igjen.",
       "setupFailed": "Kunne ikke starte GitHub-oppsettet. Prøv igjen."
     },
     "queuedActionUntracked": "Kunne ikke lenger følge statusen til en handling i kø. Oppdater for å se gjeldende status.",

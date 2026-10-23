@@ -1405,6 +1405,7 @@
       "reauthorizeButton": "GitHub-app opnieuw toegang geven",
       "reauthorizeDescription": "Security Agent heeft toestemming nodig om Dependabot-waarschuwingen te lezen. Geef de GitHub-app opnieuw toegang om deze toestemming te verlenen.",
       "reauthorizeTitle": "Extra rechten vereist",
+      "retryFailed": "Security Agent kon nog steeds niet worden geladen. Controleer je verbinding en probeer het opnieuw.",
       "setupFailed": "Het instellen van GitHub kon niet worden gestart. Probeer het opnieuw."
     },
     "settingsOverview": {

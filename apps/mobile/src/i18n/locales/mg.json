@@ -1972,6 +1972,7 @@
       "reauthorizeButton": "Omeo alalana indray ny rindranasa GitHub",
       "reauthorizeDescription": "Mila ny alalana ny Security Agent hamaky ny fampandrenesan'ny Dependabot. Omeo alalana indray ny rindranasa GitHub mba hanomezana azy io alalana io.",
       "reauthorizeTitle": "Ilaina ny alalana fanampiny",
+      "retryFailed": "Tsy nety nampidirina ny Security Agent. Jereo ny fifandraisanao dia andramo indray azafady.",
       "setupFailed": "Tsy nety natomboka ny fametrahana ny GitHub. Andramo indray azafady."
     },
     "queuedActionUntracked": "Tsy azo arahi-maso intsony ny asa iray voalahatra. Havaozy ny angona hijerena ny sata farany.",

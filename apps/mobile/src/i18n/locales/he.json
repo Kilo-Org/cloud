@@ -1411,6 +1411,7 @@
       "reauthorizeButton": "חידוש ההרשאה לאפליקציית GitHub",
       "reauthorizeDescription": "סוכן האבטחה זקוק להרשאה כדי לקרוא את התראות Dependabot. חדש את ההרשאה לאפליקציית GitHub כדי להעניק לו את ההרשאה.",
       "reauthorizeTitle": "נדרשות הרשאות נוספות",
+      "retryFailed": "עדיין לא ניתן לטעון את סוכן האבטחה. בדוק את החיבור ונסה שוב.",
       "setupFailed": "לא ניתן להתחיל את הגדרת GitHub. נסה שוב."
     },
     "settingsOverview": {

@@ -1972,6 +1972,7 @@
       "reauthorizeButton": "Valtuuta GitHub-sovellus uudelleen",
       "reauthorizeDescription": "Tietoturva-agentti tarvitsee käyttöoikeuden Dependabot-hälytysten lukemiseen. Myönnä käyttöoikeus valtuuttamalla GitHub-sovellus uudelleen.",
       "reauthorizeTitle": "Lisäkäyttöoikeuksia tarvitaan",
+      "retryFailed": "Tietoturva-agenttia ei yhä voitu ladata. Tarkista internetyhteytesi ja yritä uudelleen.",
       "setupFailed": "GitHubin käyttöönottoa ei voitu aloittaa. Yritä uudelleen."
     },
     "queuedActionUntracked": "Jonoon lisätyn toiminnon seuranta katkesi. Näet ajantasaisen tilan päivittämällä näkymän.",

@@ -1972,6 +1972,7 @@
       "reauthorizeButton": "Aplikeeshinii GitHub irra deebi'ii hayyami",
       "reauthorizeDescription": "Gargaaraan nageenyaa akeekkachiisa Dependabot dubbisuu hayyama barbaada. Hayyama kana kennuuf aplikeeshinii GitHub irra deebi'ii hayyami.",
       "reauthorizeTitle": "Hayyamoonni dabalataa barbaachisu",
+      "retryFailed": "Gargaaraa nageenyaa ammaallee fe'uun hin danda'amne. Walqunnaa kee mirkaneessi irra deebi'ii yaali.",
       "setupFailed": "Qophii GitHub jalqabuun hin danda'amne. Irra deebi'ii yaali."
     },
     "queuedActionUntracked": "Tarkaanfii tarree eegumsaa keessa jiru hordofuun kana booda hin danda'amne. Haala ammaa ilaaluuf haaromsi.",

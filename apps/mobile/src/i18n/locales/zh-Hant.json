@@ -1405,6 +1405,7 @@
       "reauthorizeButton": "重新授權 GitHub App",
       "reauthorizeDescription": "資安代理需要讀取 Dependabot 警報的權限。請重新授權 GitHub App 以授予此權限。",
       "reauthorizeTitle": "需要額外權限",
+      "retryFailed": "仍然無法載入資安代理。請檢查您的網路連線並再試一次。",
       "setupFailed": "無法開始 GitHub 設定。請再試一次。"
     },
     "settingsOverview": {

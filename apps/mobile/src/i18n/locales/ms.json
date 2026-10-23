@@ -1972,6 +1972,7 @@
       "reauthorizeButton": "Berikan semula kebenaran kepada apl GitHub",
       "reauthorizeDescription": "Ejen Keselamatan memerlukan kebenaran untuk membaca amaran Dependabot. Berikan semula kebenaran kepada apl GitHub untuk memberikan kebenaran ini.",
       "reauthorizeTitle": "Kebenaran tambahan diperlukan",
+      "retryFailed": "Masih tidak dapat memuatkan Ejen Keselamatan. Sila semak sambungan anda dan cuba lagi.",
       "setupFailed": "Tidak dapat memulakan persediaan GitHub. Sila cuba lagi."
     },
     "queuedActionUntracked": "Tindakan dalam baris gilir tidak lagi dapat dijejaki. Muat semula untuk melihat status terkini.",

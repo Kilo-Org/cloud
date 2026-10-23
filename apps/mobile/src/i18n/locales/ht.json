@@ -1972,6 +1972,7 @@
       "reauthorizeButton": "Otorize aplikasyon GitHub la ankò",
       "reauthorizeDescription": "Ajan sekirite a bezwen pèmisyon pou li alèt Dependabot yo. Otorize aplikasyon GitHub la ankò pou bay pèmisyon sa a.",
       "reauthorizeTitle": "Plis pèmisyon nesesè",
+      "retryFailed": "Nou pa t ka chaje Ajan sekirite a. Tanpri verifye koneksyon ou an epi eseye ankò.",
       "setupFailed": "Nou pa t ka kòmanse konfigirasyon GitHub la. Tanpri eseye ankò."
     },
     "queuedActionUntracked": "Nou pa ka swiv yon aksyon ki te nan lis datant lan ankò. Rafrechi pou wè dènye eta a.",

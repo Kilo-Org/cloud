@@ -1379,6 +1379,7 @@
       "reauthorizeButton": "Réautoriser l'application GitHub",
       "reauthorizeDescription": "L'agent de sécurité a besoin de l'autorisation de lire les alertes Dependabot. Réautorisez l'application GitHub pour lui accorder cette autorisation.",
       "reauthorizeTitle": "Autorisations supplémentaires requises",
+      "retryFailed": "L'agent de sécurité n'a toujours pas pu être chargé. Vérifiez votre connexion et réessayez.",
       "setupFailed": "Impossible de lancer la configuration de GitHub. Réessayez."
     },
     "settingsOverview": {

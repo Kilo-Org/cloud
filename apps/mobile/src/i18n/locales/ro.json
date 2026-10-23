@@ -1998,6 +1998,7 @@
       "reauthorizeButton": "Autorizează din nou aplicația GitHub",
       "reauthorizeDescription": "Agentul de securitate are nevoie de permisiunea de a citi alertele Dependabot. Autorizează din nou aplicația GitHub pentru a acorda această permisiune.",
       "reauthorizeTitle": "Sunt necesare permisiuni suplimentare",
+      "retryFailed": "Nu s-a putut încărca agentul de securitate. Verifică conexiunea și încearcă din nou.",
       "setupFailed": "Nu s-a putut începe configurarea GitHub. Încearcă din nou."
     },
     "queuedActionUntracked": "O acțiune din coada de așteptare nu a mai putut fi urmărită. Actualizează pentru a vedea starea curentă.",

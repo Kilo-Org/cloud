@@ -1972,6 +1972,7 @@
       "reauthorizeButton": "Nye ngwa GitHub ikike ọzọ",
       "reauthorizeDescription": "Onye nnọchi anya nchebe chọrọ ikike ịgụ ọkwa Dependabot. Nye ngwa GitHub ikike ọzọ iji nye ikike a.",
       "reauthorizeTitle": "Achọrọ ikike ndị ọzọ",
+      "retryFailed": "Enweghị ike ibudata onye nnọchi anya nchebe ka ọ bụla. Lelee njikọ gị ma nwaa ọzọ.",
       "setupFailed": "Enweghị ike ịmalite nhazi GitHub. Biko nwaa ọzọ."
     },
     "queuedActionUntracked": "Enweghịzi ike ịsochi ọrụ e tinyere n'ahịrị nchere. Mee ka data dị ọhụrụ ka ị hụ ọnọdụ kacha ọhụrụ.",

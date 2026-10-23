@@ -2050,6 +2050,7 @@
       "reauthorizeButton": "Athúdaraigh an aip GitHub",
       "reauthorizeDescription": "Teastaíonn cead ón nGníomhaire slándála chun foláirimh Dependabot a léamh. Athúdaraigh an aip GitHub chun an cead seo a thabhairt.",
       "reauthorizeTitle": "Teastaíonn ceadanna breise",
+      "retryFailed": "Fós níorbh fhéidir an Gníomhaire slándála a lódáil. Seiceáil do cheangal agus bain triail as arís.",
       "setupFailed": "Níorbh fhéidir socrú GitHub a thosú. Bain triail as arís le do thoil."
     },
     "queuedActionUntracked": "Níorbh fhéidir gníomh i scuaine a rianú a thuilleadh. Athnuaigh chun an staid is déanaí a fheiceáil.",

@@ -1972,6 +1972,7 @@
       "reauthorizeButton": "Pahintulutan muli ang GitHub App",
       "reauthorizeDescription": "Kailangan ng Security Agent ng pahintulot para basahin ang mga alerto ng Dependabot. Pahintulutan muli ang GitHub App para ibigay ang pahintulot na ito.",
       "reauthorizeTitle": "Kailangan ng mga karagdagang pahintulot",
+      "retryFailed": "Hindi pa rin ma-load ang Security Agent. Pakisuri ang iyong koneksyon at subukang muli.",
       "setupFailed": "Hindi masimulan ang setup ng GitHub. Pakisubukang muli."
     },
     "queuedActionUntracked": "Hindi na masubaybayan ang isang nakapilang aksiyon. I-refresh para makita ang pinakabagong katayuan.",

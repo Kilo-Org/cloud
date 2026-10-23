@@ -1152,6 +1152,30 @@ describe('NewSessionConfigureForm', () => {
     expect(findElementByType(settingsColumn, 'NewSessionPrompt')).toBeNull();
   });
 
+  it('puts the launch folder of a remote target in the setting rows column in landscape', async () => {
+    windowState.width = 914;
+    windowState.height = 411;
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const remote = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+    }) as Node;
+    const columns = collectElementNodes(remote, 'ScrollView');
+    const settingsColumn = columns.find(column =>
+      Boolean(findElementByType(column, 'NewSessionRunTarget'))
+    );
+
+    // A remote target starts in a folder instead of a repository, so the folder
+    // row is the one that has to stay on screen beside the card: it rides the
+    // same column as the run target, and the repository section is absent.
+    expect(columns).toHaveLength(2);
+    expect(settingsColumn).not.toBeUndefined();
+    expect(findElementByType(settingsColumn, 'LaunchFolderField')).not.toBeNull();
+    expect(findElementByType(settingsColumn, 'NewSessionRepositorySection')).toBeNull();
+  });
+
   it('returns to the single column when the window turns back to portrait', async () => {
     windowState.width = 914;
     windowState.height = 411;

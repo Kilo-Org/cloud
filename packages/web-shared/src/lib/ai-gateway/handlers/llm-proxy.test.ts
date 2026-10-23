@@ -115,6 +115,14 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => ({
     ].includes(modelId)
   ),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config', () => ({
+  getPreferredProviderOrderConfig: jest.fn(async () => ({
+    rules: [
+      { includes: ['openai', 'gpt'], excludes: ['gpt-oss'], providers: ['openai'] },
+      { includes: ['claude'], providers: ['google-vertex', 'amazon-bedrock'] },
+    ],
+  })),
+}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit');
 jest.mock(
   '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server',

@@ -262,23 +262,6 @@ export function dispatchUnblockedBeads(ctx: SchedulingContext, closedBeadId: str
  * before).
  */
 export function hasActiveWork(sql: SqlStorage): boolean {
-  // Stalled agents older than 30min no longer count as active work: they
-  // typically represent stuck rows (container crashed hard, /status keeps
-  // returning running/unknown). Keeping them in the active set would pin
-  // the alarm at its 5s fast cadence indefinitely. The stalled->idle
-  // auto-transition in reconcileAgents cleans them up after 2h 30min.
-  const hasActiveAgents = (): boolean =>
-    countOf([
-      ...query(
-        sql,
-        /* sql */ `SELECT COUNT(*) as cnt FROM ${agent_metadata}
-          WHERE ${agent_metadata.status} = 'working'
-             OR (${agent_metadata.status} = 'stalled'
-                 AND ${agent_metadata.last_activity_at} > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 minutes'))`,
-        []
-      ),
-    ]) > 0;
-
   // Idle agents that already hold a hook — the reconciler should dispatch
   // them on the next tick.
   const hasHookedIdleAgents = (): boolean =>
@@ -333,11 +316,37 @@ export function hasActiveWork(sql: SqlStorage): boolean {
     ]) > 0;
 
   return (
-    hasActiveAgents() ||
+    hasRunningAgents(sql) ||
     hasHookedIdleAgents() ||
     hasOpenMergeRequests() ||
     hasOpenTriageBeads() ||
     hasUnassignedIssues()
+  );
+}
+
+/**
+ * Returns true if an agent process should be running in the container. Only
+ * this keeps the container awake: other active work starts the container
+ * when the reconciler dispatches it, and work it never dispatches must not
+ * hold the container forever.
+ */
+export function hasRunningAgents(sql: SqlStorage): boolean {
+  // Stalled agents older than 30min no longer count as active work: they
+  // typically represent stuck rows (container crashed hard, /status keeps
+  // returning running/unknown). Keeping them in the active set would pin
+  // the alarm at its 5s fast cadence indefinitely. The stalled->idle
+  // auto-transition in reconcileAgents cleans them up after 2h 30min.
+  return (
+    countOf([
+      ...query(
+        sql,
+        /* sql */ `SELECT COUNT(*) as cnt FROM ${agent_metadata}
+          WHERE ${agent_metadata.status} = 'working'
+             OR (${agent_metadata.status} = 'stalled'
+                 AND ${agent_metadata.last_activity_at} > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 minutes'))`,
+        []
+      ),
+    ]) > 0
   );
 }
 

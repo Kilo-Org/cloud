@@ -59,12 +59,6 @@ const appState = vi.hoisted(() => ({
 
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
-  InteractionManager: {
-    runAfterInteractions: (run: () => void) => {
-      run();
-      return { cancel: () => undefined };
-    },
-  },
   Platform: { OS: 'ios' },
   KeyboardAvoidingView: 'KeyboardAvoidingView',
   Modal: 'Modal',
@@ -76,6 +70,11 @@ vi.mock('react-native', () => ({
   TextInput: 'TextInput',
   useWindowDimensions: () => ({ fontScale: 1 }),
   AppState: appState,
+}));
+vi.mock('@/lib/query/schedule-cache-maintenance', () => ({
+  scheduleCacheMaintenance: (run: () => void) => {
+    run();
+  },
 }));
 vi.mock('@shopify/flash-list', async () => {
   const React = await import('react');
@@ -165,7 +164,7 @@ vi.mock('@/lib/organization-context', () => ({
 vi.mock('@/lib/hooks/use-session-mutations', () => ({
   useSessionMutations: () => ({ deleteSession: vi.fn(), renameSession: vi.fn() }),
 }));
-vi.mock('@/lib/a11y/announce', () => ({ moveA11yFocus: vi.fn() }));
+vi.mock('@/lib/a11y/announce', () => ({ requestA11yFocus: vi.fn() }));
 vi.mock('@/lib/a11y/status-announcement', () => ({
   useStatusAnnouncement: vi.fn(),
 }));

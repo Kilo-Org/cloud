@@ -98,13 +98,27 @@ jobs:
         run: pnpm run deploy
 
       - name: Deploy to Cloudflare Workers
+        id: deploy
         if: inputs.worker != 'services/auto-routing-benchmark' || inputs.target_environment != 'production'
+        # One bounded retry for Cloudflare's flaky upload validation; the matrix
+        # job below carries the evidence. A real failure fails both attempts.
+        continue-on-error: true
         uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: ${{ inputs.worker }}
           # Workers that define a `predeploy` script (e.g. D1 migrations) run it
           # right before deploy; all other workers are unaffected.
+          preCommands: |
+            if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
+          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }}
+
+      - name: Deploy to Cloudflare Workers (retry)
+        if: steps.deploy.outcome == 'failure'
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: ${{ inputs.worker }}
           preCommands: |
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
           command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }}
@@ -208,14 +222,10 @@ jobs:
 
           # Workers excluded from automatic deployment:
           EXCLUDED=(
-            services/app-builder
-            services/deploy-infra/builder
-            services/deploy-infra/dispatcher
             services/kiloclaw  # Docker-based deploy in deploy-kiloclaw.yml (manual-only)
             services/gastown   # Deployed separately
             services/wasteland # Deployed separately
             services/user-data-export # Automatic deploy suspended
-            services/deploy-infra/builder-docker-container/container-files  # Build artifact template, not a deployable worker
           )
 
           # Discover all workers with a wrangler.jsonc
@@ -335,13 +345,31 @@ jobs:
         run: pnpm run deploy
 
       - name: Deploy to Cloudflare Workers
+        id: deploy
         if: matrix.worker != 'services/auto-routing-benchmark' || inputs.target_environment != 'production'
+        # Cloudflare's upload validation is flaky for a script that sits close to
+        # its startup budget: a byte-identical cloud-agent-next bundle reported
+        # widely different startup times, and a rejection with "Script startup
+        # exceeded CPU time limit" or "Pipeline binding error" cleared on the next
+        # attempt. The retry below absorbs that noise. A real failure fails both
+        # attempts, so the job still fails.
+        continue-on-error: true
         uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: ${{ matrix.worker }}
           # Workers that define a `predeploy` script (e.g. D1 migrations) run it
           # right before deploy; all other workers are unaffected.
+          preCommands: |
+            if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
+          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }}
+
+      - name: Deploy to Cloudflare Workers (retry)
+        if: steps.deploy.outcome == 'failure'
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: ${{ matrix.worker }}
           preCommands: |
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
           command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }}

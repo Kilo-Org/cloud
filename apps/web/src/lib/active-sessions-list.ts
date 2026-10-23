@@ -38,9 +38,10 @@ export const activeSessionSchema = z.object({
   /**
    * When this session's status last changed, from
    * `cli_sessions_v2.status_updated_at`, normalized to ISO 8601. Omitted when
-   * the column is NULL, unparseable, or the row was never enriched. The
-   * glanceable snapshot reads it to report how long the longest-waiting agent
-   * has needed input, and Hermes only parses the ISO form.
+   * the column is NULL, unparseable, dates a different status than the resolved
+   * status, or the row was never enriched. The glanceable snapshot reads it to
+   * report how long the longest-waiting agent has needed input, and Hermes only
+   * parses the ISO form.
    */
   statusUpdatedAt: z.string().optional(),
   /**
@@ -97,12 +98,12 @@ export type ActiveSession = z.infer<typeof activeSessionSchema> & {
 export const CLOUD_AGENT_CONNECTION_ID = 'cloud-agent';
 
 /**
- * Warm-idle window for live cloud sessions. Mirrors
- * `KILO_SERVER_IDLE_TIMEOUT_MS_DEFAULT` in
- * services/cloud-agent-next/src/persistence/CloudAgentSession.ts:189-190.
- * Env override drift is accepted (A2).
+ * Recency window shared by the two time-bounded liveness proofs for a cloud
+ * session: a warm `idle` session that just finished, and session activity that
+ * session-ingest recorded in `last_activity_at`. Recent cloud sessions stay
+ * visible in the tray for 15 minutes.
  */
-const CLOUD_AGENT_WARM_IDLE_CUTOFF = sql`now() - interval '15 minutes'`;
+const CLOUD_AGENT_LIVE_CUTOFF = sql`now() - interval '15 minutes'`;
 
 /**
  * Ceiling on the cloud-candidate rows the tray returns: 5x the product target
@@ -110,11 +111,12 @@ const CLOUD_AGENT_WARM_IDLE_CUTOFF = sql`now() - interval '15 minutes'`;
  * render. It is a backstop against an unbounded query, NOT a bound that
  * guarantees every live row survives — see the accepted tradeoff below.
  *
- * A ceiling is needed because only one branch of `livePredicate` is
- * time-bounded: the warm-idle branch by `CLOUD_AGENT_WARM_IDLE_CUTOFF`, but the
- * open-run branch (`cloud_agent_session_runs.terminal_at IS NULL`) by nothing —
- * an orphaned run keeps its session a candidate until the 90-day session
- * cascade, so the candidate set can exceed this ceiling.
+ * A ceiling is needed because not every branch of `livePredicate` is
+ * time-bounded: the warm-idle and recorded-activity branches are bounded by
+ * `CLOUD_AGENT_LIVE_CUTOFF`, but the open-run branch
+ * (`cloud_agent_session_runs.terminal_at IS NULL`) by nothing — an orphaned run
+ * keeps its session a candidate until the 90-day session cascade, so the
+ * candidate set can exceed this ceiling.
  *
  * Accepted tradeoff: past the ceiling the dropped tail is the oldest
  * *candidates*, which the newest-first order makes the orphaned-run
@@ -291,8 +293,11 @@ function mapEnrichedHeartbeatSession(
   if (row.last_activity_at != null) {
     mapped.lastActivityAt = row.last_activity_at;
   }
+  delete mapped.statusUpdatedAt;
   const statusUpdatedAt =
-    row.status_updated_at == null ? null : toIsoTimestamp(row.status_updated_at);
+    mapped.status !== row.status || row.status_updated_at == null
+      ? null
+      : toIsoTimestamp(row.status_updated_at);
   if (statusUpdatedAt !== null) {
     mapped.statusUpdatedAt = statusUpdatedAt;
   }
@@ -329,7 +334,9 @@ function mapCloudCandidateRow(row: CloudCandidateRow): ActiveSession {
     mapped.lastActivityAt = row.last_activity_at;
   }
   const statusUpdatedAt =
-    row.status_updated_at == null ? null : toIsoTimestamp(row.status_updated_at);
+    mapped.status !== row.status || row.status_updated_at == null
+      ? null
+      : toIsoTimestamp(row.status_updated_at);
   if (statusUpdatedAt !== null) {
     mapped.statusUpdatedAt = statusUpdatedAt;
   }
@@ -547,6 +554,20 @@ export async function listActiveSessions({
             ? eq(cli_sessions_v2.organization_id, organizationId)
             : undefined;
 
+      // Three proofs of life, because no single one covers a cloud session's
+      // whole working life:
+      // 1. An open run. `cloud_agent_session_runs` is written per message turn,
+      //    so this is the strongest proof, and it is unbounded in time.
+      // 2. A warm `idle` status. The status syncs asynchronously and reads
+      //    `idle` while the agent works, so it is only a proof once the session
+      //    has settled and within the recency window.
+      // 3. Recorded session activity. A session between turns — or one whose
+      //    current turn never got a run row — keeps a non-idle status (`busy`,
+      //    `question`, `permission`) with no open run, so proofs 1 and 2 both
+      //    fail while the agent is demonstrably working: `last_activity_at` is
+      //    seconds old. Without this branch Active now drops such a session
+      //    until it flips to idle and reappears in the warm-idle window, i.e.
+      //    it shows up only "temporarily when finished".
       const livePredicate = or(
         sql`EXISTS (
           SELECT 1 FROM ${cloud_agent_session_runs}
@@ -555,8 +576,9 @@ export async function listActiveSessions({
         )`,
         and(
           eq(cli_sessions_v2.status, 'idle'),
-          gt(cli_sessions_v2.status_updated_at, CLOUD_AGENT_WARM_IDLE_CUTOFF)
-        )
+          gt(cli_sessions_v2.status_updated_at, CLOUD_AGENT_LIVE_CUTOFF)
+        ),
+        gt(cli_sessions_v2.last_activity_at, CLOUD_AGENT_LIVE_CUTOFF)
       );
 
       const cloudRows: CloudCandidateRow[] = await db
@@ -574,8 +596,10 @@ export async function listActiveSessions({
           status_updated_at: cli_sessions_v2.status_updated_at,
           total_cost_microdollars: cli_sessions_v2.total_cost_microdollars,
           cloud_agent_session_id: cli_sessions_v2.cloud_agent_session_id,
-          // Same EXISTS clause the WHERE livePredicate uses, so the row
-          // carries the proof of its own liveness into the mapping.
+          // The open-run proof alone, carried into the mapping: it is what
+          // upgrades a non-attention stored status to `busy`
+          // (`resolveCloudCandidateStatus`). The recency branches of
+          // `livePredicate` admit rows whose stored status already reads busy.
           run_open: sql<boolean>`EXISTS (
             SELECT 1 FROM ${cloud_agent_session_runs}
             WHERE ${cloud_agent_session_runs.cloud_agent_session_id} = ${cli_sessions_v2.cloud_agent_session_id}
@@ -610,14 +634,14 @@ export async function listActiveSessions({
         )
         // Newest-first, then capped at a ceiling far above the 100-agent
         // target (`CLOUD_AGENT_CANDIDATE_LIMIT`; its doc comment states the
-        // accepted tradeoff). The warm-idle branch is time-bounded, but an open
-        // `cloud_agent_session_runs` row with no `terminal_at` keeps its
-        // session a candidate until the 90-day session cascade, so the tail
-        // this drops is the oldest candidates — in practice the orphaned-run
-        // accumulation, which the order does not guarantee. The
-        // `(kilo_user_id, created_at)` index backs both the filter and this
-        // order, so the cap also stops the scan once it has 500 matches instead
-        // of walking every orphaned candidate.
+        // accepted tradeoff). The warm-idle and recorded-activity branches are
+        // time-bounded, but an open `cloud_agent_session_runs` row with no
+        // `terminal_at` keeps its session a candidate until the 90-day session
+        // cascade, so the tail this drops is the oldest candidates — in
+        // practice the orphaned-run accumulation, which the order does not
+        // guarantee. The `(kilo_user_id, created_at)` index backs both the
+        // filter and this order, so the cap also stops the scan once it has 500
+        // matches instead of walking every orphaned candidate.
         .orderBy(desc(cli_sessions_v2.created_at))
         .limit(CLOUD_AGENT_CANDIDATE_LIMIT);
 

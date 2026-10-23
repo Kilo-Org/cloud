@@ -40,6 +40,11 @@ export default defineConfig({
     name: 'integration',
     globals: true,
     include: ['test/integration/**/*.test.ts'],
+    // Each test drives real Durable Objects through workerd, and the suite
+    // polls for up to its own 10 s budget (test/integration/wait-for.ts).
+    // A smaller test budget fails a healthy wait before that budget ends.
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
     deps: {
       optimizer: {
         ssr: {

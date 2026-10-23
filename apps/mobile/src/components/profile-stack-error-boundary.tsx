@@ -17,6 +17,27 @@ import { captureTelemetry } from '@/lib/telemetry/error-sink';
  */
 const RECOVERY_REFETCH_DEADLINE_MS = 10_000;
 
+/**
+ * The reads the screens under this stack render. A render throw can come from
+ * any of their payloads, and the crashed screen is unmounted by the time Retry
+ * runs, so the recovery refetches each prefix with `type: 'all'` (inactive
+ * observers included) instead of rebuilding the payload that broke the render.
+ * The list is every tRPC root the stack's screens read: the tab itself (user,
+ * organizations, the pass and agent-profile reads) plus the code-reviewer,
+ * profile-management, security-agent and spend-alert screens.
+ */
+const PROFILE_STACK_QUERY_PREFIXES: readonly (readonly unknown[])[] = [
+  [['user']],
+  [['organizations']],
+  [['kiloPass']],
+  [['agentProfiles']],
+  [['personalReviewAgent']],
+  [['securityAgent']],
+  [['codeReviews']],
+  [['reviewMemory']],
+  [['spendAlerts']],
+];
+
 type BoundaryProps = {
   children: ReactNode;
   /** The local recovery action; the owner remounts the boundary through its `key` so the fallback resets. */
@@ -142,13 +163,13 @@ class ProfileStackRenderBoundary extends Component<BoundaryProps, BoundaryState>
 }
 
 /**
- * Owns the fallback's retry. The reads are refetched before the boundary is
- * remounted: bumping the key in the same tick would mount the fresh boundary
- * against the very cached payload that just threw, so it would throw again and
- * pin the fallback through the refetch. Every cached read is refetched because
- * the boundary covers the whole stack, and which of the stack's reads carried
- * the bad payload is unknown; inactive observers are included so a screen that
- * unmounted with the throw is refreshed too.
+ * Owns the fallback's retry. The stack's reads are refetched before the
+ * boundary is remounted: bumping the key in the same tick would mount the fresh
+ * boundary against the very cached payload that just threw, so it would throw
+ * again and pin the fallback through the refetch. Only the prefixes the stack's
+ * screens read are refetched, so a crash on this tab never bursts the rest of
+ * the app's cache; inactive observers are included, so a screen that unmounted
+ * with the throw is refreshed too.
  */
 export function ProfileStackErrorBoundary({ children }: Readonly<{ children: ReactNode }>) {
   const queryClient = useQueryClient();
@@ -159,7 +180,11 @@ export function ProfileStackErrorBoundary({ children }: Readonly<{ children: Rea
     void (async () => {
       try {
         await withDeadline(RECOVERY_REFETCH_DEADLINE_MS, async () => {
-          await queryClient.refetchQueries({ type: 'all' });
+          await Promise.all(
+            PROFILE_STACK_QUERY_PREFIXES.map(queryKey =>
+              queryClient.refetchQueries({ queryKey, type: 'all' })
+            )
+          );
         });
       } catch {
         // A read that cannot settle inside the deadline must not leave Retry

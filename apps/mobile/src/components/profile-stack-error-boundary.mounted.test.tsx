@@ -160,7 +160,20 @@ describe('ProfileStackErrorBoundary', () => {
       await recovery.promise;
     });
 
-    expect(refetch).toHaveBeenCalledWith({ type: 'all' });
+    expect(refetch).toHaveBeenCalledTimes(9);
+    const refetchedKeys = refetch.mock.calls.map(call => call[0]?.queryKey);
+    // Scoped to the stack's reads: nothing outside the Profile tab is refetched.
+    expect(refetchedKeys).toEqual(
+      expect.arrayContaining([
+        [['user']],
+        [['organizations']],
+        [['securityAgent']],
+        [['codeReviews']],
+        [['spendAlerts']],
+      ])
+    );
+    expect(refetchedKeys).not.toContain(undefined);
+    expect(refetch.mock.calls.every(call => call[0]?.type === 'all')).toBe(true);
     expect(tree.root.findAllByType(QueryError as never)).toHaveLength(0);
     expect(tree.root.findAll(node => String(node.type) === 'ProfileStackContent')).toHaveLength(1);
   });

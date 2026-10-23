@@ -2551,8 +2551,6 @@
       "providerCheckFailedMessage": "加载完成前无法获取连接状态。",
       "reconnectTitle": "重新连接 GitHub",
       "reconnectDescription": "GitHub 连接授权已被撤销。请重新连接，继续在手机上审查拉取请求。",
-      "reconnectProviderTitle": "重新连接 {{provider}}",
-      "reconnectProviderDescription": "{{provider}} 连接需要重新授权，然后才能在手机上审查合并请求。",
       "description": "连接 GitHub 账号，即可在手机上审查拉取请求。",
       "gitlabDescription": "连接你的 GitLab 账户，以便在移动端审查合并请求。",
       "bitbucketDescription": "将 Bitbucket 连接到此组织，以便在移动端审查拉取请求。",

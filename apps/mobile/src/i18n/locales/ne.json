@@ -665,8 +665,6 @@
       "providerCheckFailedMessage": "यो लोड नभएसम्म जडानको अवस्था उपलब्ध छैन।",
       "reconnectTitle": "GitHub मा पुनः जडान",
       "reconnectDescription": "तपाईंको GitHub जडानको अनुमति रद्द भएको छ। मोबाइलमा पुल रिक्वेस्टको समीक्षा जारी राख्न पुनः जडान गर्नुहोस्।",
-      "reconnectProviderTitle": "{{provider}} मा पुनः जडान",
-      "reconnectProviderDescription": "तपाईंले मोबाइलमा मर्ज रिक्वेस्टहरू समीक्षा गर्नु अघि तपाईंको {{provider}} जडान पुनः अनुमति गर्नुपर्छ।",
       "description": "मोबाइलमा पुल रिक्वेस्टको समीक्षा गर्न आफ्नो GitHub खाता जडान गर्नुहोस्।",
       "gitlabDescription": "मोबाइलमा मर्ज रिक्वेस्टहरू समीक्षा गर्न आफ्नो GitLab खाता जडान गर्नुहोस्।",
       "bitbucketDescription": "मोबाइलमा पुल रिक्वेस्टहरू समीक्षा गर्न यो संस्थालाई Bitbucket सँग जडान गर्नुहोस्।",

@@ -187,8 +187,9 @@ export function ProviderConnectGate({
 
   if (view === 'connect' || view === 'reconnect') {
     const reconnect = view === 'reconnect';
-    // The provider noun is substituted into provider-neutral copy, so one new
-    // string pair serves both providers of this shared gate.
+    // Reused translated copy: the mid-session reconnect notice already names
+    // the expired provider connection and asks the reader to re-check it, so
+    // the gate needs no new catalog keys.
     const provider =
       platform === 'gitlab' ? t('common.gitlab') : t('agentChat.repoPicker.platformBitbucket');
     const connectTitle =
@@ -197,11 +198,13 @@ export function ProviderConnectGate({
       platform === 'gitlab'
         ? t('prReview.connect.gitlabDescription')
         : t('prReview.connect.bitbucketDescription');
-    const title = reconnect
-      ? t('prReview.connect.reconnectProviderTitle', { provider })
-      : connectTitle;
+    const reconnectTitle =
+      platform === 'gitlab'
+        ? t('prReview.reconnectNotice.gitlabTitle')
+        : t('prReview.reconnectNotice.bitbucketTitle');
+    const title = reconnect ? reconnectTitle : connectTitle;
     const description = reconnect
-      ? t('prReview.connect.reconnectProviderDescription', { provider })
+      ? t('prReview.reconnectNotice.providerMessage', { provider })
       : connectDescription;
     return (
       <View className="flex-1 bg-background">
@@ -230,7 +233,7 @@ export function ProviderConnectGate({
               ) : (
                 <RefreshCcw size={16} color={colors.primaryForeground} />
               )}
-              <Text>{title}</Text>
+              <Text>{connectTitle}</Text>
             </Button>
           }
         />

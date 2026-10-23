@@ -665,8 +665,6 @@
       "providerCheckFailedMessage": "ਇਸ ਦੇ ਲੋਡ ਹੋਣ ਤੱਕ ਕਨੈਕਸ਼ਨ ਦੀ ਸਥਿਤੀ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
       "reconnectTitle": "GitHub ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰੋ",
       "reconnectDescription": "ਤੁਹਾਡਾ GitHub ਕਨੈਕਸ਼ਨ ਰੱਦ ਕਰ ਦਿੱਤਾ ਗਿਆ ਹੈ। ਮੋਬਾਈਲ 'ਤੇ ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਜਾਰੀ ਰੱਖਣ ਲਈ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰੋ।",
-      "reconnectProviderTitle": "{{provider}} ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰੋ",
-      "reconnectProviderDescription": "ਮੋਬਾਈਲ 'ਤੇ ਮਰਜ਼ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਤੁਹਾਡੇ {{provider}} ਕਨੈਕਸ਼ਨ ਨੂੰ ਦੁਬਾਰਾ ਅਧਿਕਾਰਤ ਕਰਨ ਦੀ ਲੋੜ ਹੈ।",
       "description": "ਮੋਬਾਈਲ 'ਤੇ ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਆਪਣਾ GitHub ਖਾਤਾ ਕਨੈਕਟ ਕਰੋ।",
       "gitlabDescription": "ਮੋਬਾਈਲ ਉੱਤੇ ਮਰਜ਼ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਆਪਣਾ GitLab ਖਾਤਾ ਕਨੈਕਟ ਕਰੋ।",
       "bitbucketDescription": "ਮੋਬਾਈਲ ਉੱਤੇ ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਇਸ ਸੰਗਠਨ ਨੂੰ Bitbucket ਨਾਲ ਕਨੈਕਟ ਕਰੋ।",

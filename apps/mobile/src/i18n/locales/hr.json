@@ -677,8 +677,6 @@
       "providerCheckFailedMessage": "Status povezavanja dostupan je nakon učitavanja.",
       "reconnectTitle": "Ponovno poveži GitHub",
       "reconnectDescription": "Tvoja veza s GitHubom je opozvana. Ponovno se poveži za nastavak pregleda zahtjeva za spajanje na mobitelu.",
-      "reconnectProviderTitle": "Ponovno poveži {{provider}}",
-      "reconnectProviderDescription": "Tvoja veza s {{provider}}om treba biti ponovno odobrena prije nego što na mobitelu možeš pregledavati merge requeste.",
       "description": "Poveži svoj račun za GitHub za pregled zahtjeva za spajanje na mobitelu.",
       "gitlabDescription": "Poveži svoj GitLab račun za pregled merge requesta na mobitelu.",
       "bitbucketDescription": "Poveži Bitbucket s ovom organizacijom za pregled zahtjeva za spajanje na mobitelu.",

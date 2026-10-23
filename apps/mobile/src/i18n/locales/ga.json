@@ -701,8 +701,6 @@
       "providerCheckFailedMessage": "Níl stádas an naisc ar fáil go dtí go mbeidh sé lódáilte.",
       "reconnectTitle": "Athnasc GitHub",
       "reconnectDescription": "Cúlghaireadh do nasc GitHub. Athnasc chun leanúint d'athbhreithniú a dhéanamh ar iarratais tarraingthe ar do ghuthán.",
-      "reconnectProviderTitle": "Athnasc {{provider}}",
-      "reconnectProviderDescription": "Caithfear do nasc {{provider}} a athnascadh sula mbeidh tú in ann athbhreithniú a dhéanamh ar iarratais chumaisc ar an ngléas soghluaiste.",
       "description": "Nasc do chuntas GitHub chun iarratais tarraingthe a athbhreithniú ar do ghuthán.",
       "gitlabDescription": "Ceangail do chuntas GitLab chun iarratais chumaisc a athbhreithniú ar an ngléas soghluaiste.",
       "bitbucketDescription": "Ceangail Bitbucket leis an eagraíocht seo chun iarratais tharraingthe a athbhreithniú ar an ngléas soghluaiste.",

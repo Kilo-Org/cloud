@@ -677,8 +677,6 @@
       "providerCheckFailedMessage": "Status veze nije dostupan dok se ovo ne učita.",
       "reconnectTitle": "Ponovo poveži GitHub",
       "reconnectDescription": "Tvoja veza sa GitHub-om je opozvana. Ponovo se poveži da nastaviš da pregledaš zahteve za spajanje na telefonu.",
-      "reconnectProviderTitle": "Ponovo poveži {{provider}}",
-      "reconnectProviderDescription": "Tvoju vezu sa {{provider}}-om potrebno je ponovo autorizovati pre nego što pregledaš merge requeste na telefonu.",
       "description": "Poveži svoj GitHub nalog da pregledaš zahteve za spajanje na telefonu.",
       "gitlabDescription": "Poveži svoj GitLab nalog da pregledaš merge requeste na telefonu.",
       "bitbucketDescription": "Poveži Bitbucket sa ovom organizacijom da pregledaš zahteve za spajanje na telefonu.",

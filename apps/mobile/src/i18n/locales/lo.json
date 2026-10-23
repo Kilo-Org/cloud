@@ -665,8 +665,6 @@
       "providerCheckFailedMessage": "ສະຖານະການເຊື່ອມຕໍ່ຈະບໍ່ພ້ອມໃຊ້ຈົນກວ່າຈະໂຫຼດເສັຣຈ",
       "reconnectTitle": "ເຊື່ອມຕໍ່ GitHub ໃໝ່",
       "reconnectDescription": "ສິດການເຊື່ອມຕໍ່ GitHub ຂອງທ່ານຖືກຖອນແລ້ວ. ເຊື່ອມຕໍ່ໃໝ່ເພື່ອກວດທານຄຳຂໍລວມໂຄດໃນມືຖືຕໍ່ໄປ.",
-      "reconnectProviderTitle": "ເຊື່ອມຕໍ່ {{provider}} ໃໝ່",
-      "reconnectProviderDescription": "ສິດການເຊື່ອມຕໍ່ {{provider}} ຂອງທ່ານຕ້ອງໄດ້ຮັບການອະນຸມັດໃໝ່ກ່ອນທີ່ທ່ານຈະສາມາດກວດທານ merge request ເທິງມືຖືໄດ້.",
       "description": "ເຊື່ອມຕໍ່ບັນຊີ GitHub ຂອງທ່ານເພື່ອກວດທານຄຳຂໍລວມໂຄດໃນມືຖື.",
       "gitlabDescription": "ເຊື່ອມຕໍ່ບັນຊີ GitLab ຂອງທ່ານເພື່ອກວດທານ merge request ເທິງມືຖື",
       "bitbucketDescription": "ເຊື່ອມຕໍ່ Bitbucket ກັບອົງກອນນີ້ເພື່ອກວດທານຄຳຂໍລວມໂຄ້ດເທິງມືຖື",

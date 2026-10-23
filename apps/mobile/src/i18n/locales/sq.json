@@ -665,8 +665,6 @@
       "providerCheckFailedMessage": "Gjendja e lidhjes nuk është e disponueshme derisa të ngarkohet.",
       "reconnectTitle": "Rilidhu me GitHub",
       "reconnectDescription": "Lidhja jote me GitHub është revokuar. Rilidhu për të vazhduar rishikimin e kërkesave për bashkim në telefon.",
-      "reconnectProviderTitle": "Rilidhu me {{provider}}",
-      "reconnectProviderDescription": "Lidhja jote me {{provider}} duhet të autorizohet sërish para se të mund të rishikosh kërkesat për bashkim në telefon.",
       "description": "Lidh llogarinë tënde të GitHub për të rishikuar kërkesat për bashkim në telefon.",
       "gitlabDescription": "Lidho llogarinë tënde GitLab për të rishikuar kërkesat e integrimit në celular.",
       "bitbucketDescription": "Lidho Bitbucket me këtë organizatë për të rishikuar kërkesat për bashkim në celular.",

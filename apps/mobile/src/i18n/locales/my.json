@@ -665,8 +665,6 @@
       "providerCheckFailedMessage": "၎င်းတိုင် လိုက်ဒ်မဖြစ်မီ ချိတ်ဆက်မှုအခြေအနေ မရရှိနိုင်ပါ။",
       "reconnectTitle": "GitHub ပြန်ချိတ်ဆက်ခြင်း",
       "reconnectDescription": "သင့် GitHub ချိတ်ဆက်ခွင့်ကို ရုပ်သိမ်းထားပါသည်။ ဖုန်းပေါ်တွင် PR များကို ဆက်သုံးသပ်ရန် ပြန်ချိတ်ဆက်ပါ။",
-      "reconnectProviderTitle": "{{provider}} ပြန်ချိတ်ဆက်ပါ",
-      "reconnectProviderDescription": "ဖုန်းပေါ်တွင် merge request များကို ဆက်သုံးသပ်နိုင်ရန် သင့် {{provider}} ချိတ်ဆက်မှုကို ပြန်အတည်ပြုရန် လိုအပ်ပါသည်။",
       "description": "ဖုန်းပေါ်တွင် PR များကို သုံးသပ်ရန် သင့် GitHub အကောင့်ကို ချိတ်ဆက်ပါ။",
       "gitlabDescription": "ဖုန်းပေါ်တွင် merge request များကို သုံးသပ်ရန် သင့် GitLab အကောင့်ကို ချိတ်ဆက်ပါ။",
       "bitbucketDescription": "ဖုန်းပေါ်တွင် PR များကို သုံးသပ်ရန် ဤအဖွဲ့ကို Bitbucket နှင့် ချိတ်ဆက်ပါ။",

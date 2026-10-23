@@ -665,8 +665,6 @@
       "providerCheckFailedMessage": "Konexio-egoera ez dago eskuragarri kargatu arte.",
       "reconnectTitle": "Konektatu GitHub berriro",
       "reconnectDescription": "GitHub-ekiko konexioa baliogabetu da. Konektatu berriro bateratze-eskaerak mugikorrean berrikusten jarraitzeko.",
-      "reconnectProviderTitle": "Konektatu {{provider}} berriro",
-      "reconnectProviderDescription": "Zure {{provider}}-ekiko konexioak berriro baimendu behar da mugikorrean bateratze-eskaerak berrikusi ahal izateko.",
       "description": "Konektatu zure GitHub kontua bateratze-eskaerak mugikorrean berrikusteko.",
       "gitlabDescription": "Konektatu zure GitLab kontua merge-eskaerak mugikorrean berrikusteko.",
       "bitbucketDescription": "Konektatu Bitbucket erakunde honetara bateratze-eskaerak mugikorrean berrikusteko.",

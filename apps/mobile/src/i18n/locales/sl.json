@@ -689,8 +689,6 @@
       "providerCheckFailedMessage": "Stanje povezave bo na voljo po končanem nalaganju.",
       "reconnectTitle": "Ponovna povezava z GitHubom",
       "reconnectDescription": "Tvoja povezava z GitHubom je bila preklicana. Znova poveži račun, da lahko še naprej pregleduješ zahtevke za združitev na mobilni napravi.",
-      "reconnectProviderTitle": "Znova poveži {{provider}}",
-      "reconnectProviderDescription": "Tvoja povezava z {{provider}} mora biti znova odobrena, preden lahko pregleduješ merge requeste na mobilni napravi.",
       "description": "Poveži svoj račun GitHub, da lahko pregleduješ zahtevke za združitev na mobilni napravi.",
       "gitlabDescription": "Poveži svoj račun GitLab, da lahko pregleduješ merge requeste na mobilni napravi.",
       "bitbucketDescription": "Poveži Bitbucket s to organizacijo, da lahko pregleduješ zahtevke za združitev na mobilni napravi.",

@@ -701,8 +701,6 @@
       "providerCheckFailedMessage": "L-istat tal-konnessjoni mhux disponibbli sakemm jitgħabba.",
       "reconnectTitle": "Erġa' kkonnetta GitHub",
       "reconnectDescription": "L-aċċess tiegħek għal GitHub ġie revokat. Erġa' kkonnetta biex tkompli tirrevedi t-talbiet għall-għaqda fuq il-mowbajl.",
-      "reconnectProviderTitle": "Erġa' kkonnetta {{provider}}",
-      "reconnectProviderDescription": "Il-konnessjoni tiegħek ma' {{provider}} trid terġa' tiġi awtorizzata qabel tkun tista' tirrevedi l-merge requests fuq il-mowbajl.",
       "description": "Ikkonnetta l-kont ta' GitHub tiegħek biex tirrevedi t-talbiet għall-għaqda fuq il-mowbajl.",
       "gitlabDescription": "Ikkonnettja l-kont GitLab tiegħek biex tirrevedi l-merge requests fuq il-mowbajl.",
       "bitbucketDescription": "Ikkonnettja Bitbucket ma' din l-organizzazzjoni biex tirrevedi l-PRs fuq il-mowbajl.",

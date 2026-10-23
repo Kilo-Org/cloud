@@ -665,8 +665,6 @@
       "providerCheckFailedMessage": "وضعیت اتصال تا بارگذاری در دسترس نیست.",
       "reconnectTitle": "اتصال مجدد به GitHub",
       "reconnectDescription": "مجوز اتصال شما به GitHub لغو شده است. برای ادامهٔ بازبینی درخواست‌های ادغام در موبایل، دوباره متصل شوید.",
-      "reconnectProviderTitle": "اتصال مجدد به {{provider}}",
-      "reconnectProviderDescription": "برای بازبینی درخواست‌های ادغام در موبایل، باید اتصال شما به {{provider}} را دوباره مجوزدهی کنید.",
       "description": "برای بازبینی درخواست‌های ادغام در موبایل، حساب GitHub خود را متصل کنید.",
       "gitlabDescription": "حساب GitLab خود را وصل کنید تا درخواست‌های ادغام را در موبایل بازبینی کنید.",
       "bitbucketDescription": "Bitbucket را به این سازمان وصل کنید تا پول ریکوئست‌ها را در موبایل بازبینی کنید.",

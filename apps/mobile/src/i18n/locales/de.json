@@ -2551,8 +2551,6 @@
       "providerCheckFailedMessage": "Der Verbindungsstatus ist erst verfügbar, wenn die Prüfung abgeschlossen ist.",
       "reconnectTitle": "GitHub erneut verbinden",
       "reconnectDescription": "Deine GitHub-Verbindung wurde widerrufen. Stelle sie erneut her, um Pull-Requests weiterhin in der App zu prüfen.",
-      "reconnectProviderTitle": "{{provider}} erneut verbinden",
-      "reconnectProviderDescription": "Deine {{provider}}-Verbindung muss erneut autorisiert werden, bevor du Merge-Requests in der App prüfen kannst.",
       "description": "Verbinde dein GitHub-Konto, um Pull-Requests in der App zu prüfen.",
       "gitlabDescription": "Verbinde dein GitLab-Konto, um Merge-Requests in der App zu prüfen.",
       "bitbucketDescription": "Verbinde Bitbucket mit dieser Organisation, um Pull-Requests in der App zu prüfen.",

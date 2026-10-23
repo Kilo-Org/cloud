@@ -665,8 +665,6 @@
       "providerCheckFailedMessage": "Estati koneksyon an pa disponib jiskaske li chaje.",
       "reconnectTitle": "Rekonekte GitHub",
       "reconnectDescription": "Yo revoke koneksyon GitHub ou a. Rekonekte pou kontinye revize demann fizyon sou mobil.",
-      "reconnectProviderTitle": "Rekonekte {{provider}}",
-      "reconnectProviderDescription": "Koneksyon {{provider}} ou a dwe reyotorize anvan ou ka revize demann fizyon sou mobil.",
       "description": "Konekte kont GitHub ou a pou revize demann fizyon sou mobil.",
       "gitlabDescription": "Konekte kont GitLab ou pou w revize merge request sou mobil ou.",
       "bitbucketDescription": "Konekte Bitbucket ak òganizasyon sa a pou w revize demann fizyon sou mobil ou.",

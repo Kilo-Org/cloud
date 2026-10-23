@@ -665,8 +665,6 @@
       "providerCheckFailedMessage": "Tilkoblingsstatusen er ikke tilgjengelig før innlastingen er fullført.",
       "reconnectTitle": "Koble til GitHub på nytt",
       "reconnectDescription": "Tilgangen til GitHub-kontoen din er trukket tilbake. Koble til på nytt for å fortsette med kodegjennomganger av PR-er på mobilen.",
-      "reconnectProviderTitle": "Koble til {{provider}} på nytt",
-      "reconnectProviderDescription": "Tilgangen til {{provider}}-kontoen din må autoriseres på nytt før du kan gå gjennom merge requests på mobilen.",
       "description": "Koble til GitHub-kontoen din for å gå gjennom PR-er på mobilen.",
       "gitlabDescription": "Koble til GitLab-kontoen din for å gå gjennom merge requests på mobilen.",
       "bitbucketDescription": "Koble Bitbucket til denne organisasjonen for å gå gjennom PR-er på mobilen.",

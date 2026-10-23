@@ -2551,8 +2551,6 @@
       "providerCheckFailedMessage": "लोड होने तक कनेक्शन की स्थिति उपलब्ध नहीं है।",
       "reconnectTitle": "GitHub को फिर से कनेक्ट करें",
       "reconnectDescription": "आपका GitHub कनेक्शन रद्द कर दिया गया। मोबाइल पर पुल रिक्वेस्ट की समीक्षा जारी रखने के लिए फिर से कनेक्ट करें।",
-      "reconnectProviderTitle": "{{provider}} को फिर से कनेक्ट करें",
-      "reconnectProviderDescription": "मोबाइल पर मर्ज रिक्वेस्ट समीक्षित करने से पहले आपके {{provider}} कनेक्शन को फिर से अधिकृत करने की ज़रूरत है।",
       "description": "मोबाइल पर पुल रिक्वेस्ट की समीक्षा करने के लिए अपना GitHub खाता कनेक्ट करें।",
       "gitlabDescription": "मोबाइल पर मर्ज रिक्वेस्ट समीक्षित करने के लिए अपना GitLab खाता कनेक्ट करें।",
       "bitbucketDescription": "मोबाइल पर पुल रिक्वेस्ट समीक्षित करने के लिए इस संगठन को Bitbucket से कनेक्ट करें।",

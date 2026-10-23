@@ -2576,8 +2576,6 @@
       "providerCheckFailedMessage": "Lo stato della connessione sarà disponibile al termine del caricamento.",
       "reconnectTitle": "Riconnetti GitHub",
       "reconnectDescription": "L'autorizzazione a connetterti a GitHub è stata revocata. Riconnettiti per continuare a revisionare le pull request dall'app.",
-      "reconnectProviderTitle": "Riconnetti {{provider}}",
-      "reconnectProviderDescription": "La tua connessione a {{provider}} deve essere riautorizzata prima di poter revisionare le merge request dall'app.",
       "description": "Connetti il tuo account GitHub per revisionare le pull request dall'app.",
       "gitlabDescription": "Connetti il tuo account GitLab per revisionare le merge request dall'app.",
       "bitbucketDescription": "Connetti Bitbucket a questa organizzazione per revisionare le pull request dall'app.",

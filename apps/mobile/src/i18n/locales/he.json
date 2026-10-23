@@ -2576,8 +2576,6 @@
       "providerCheckFailedMessage": "מצב החיבור אינו זמין עד לסיום הטעימה.",
       "reconnectTitle": "חיבור מחדש ל-GitHub",
       "reconnectDescription": "החיבור שלך ל-GitHub בוטל. התחבר מחדש כדי להמשיך לסקור בקשות משיכה בנייד.",
-      "reconnectProviderTitle": "חיבור מחדש ל-{{provider}}",
-      "reconnectProviderDescription": "החיבור שלך ל-{{provider}} צריך אישור מחדש לפני שתוכל לסקור בקשות מיזוג בנייד.",
       "description": "חבר את חשבון ה-GitHub שלך כדי לסקור בקשות משיכה בנייד.",
       "gitlabDescription": "חברו את חשבון GitLab שלכם כדי לסקור בקשות מיזוג בנייד.",
       "bitbucketDescription": "חברו את Bitbucket לארגון הזה כדי לסקור בקשות משיכה בנייד.",

@@ -689,8 +689,6 @@
       "providerCheckFailedMessage": "Stav pripojenia bude dostupný po načítaní.",
       "reconnectTitle": "Opätovné pripojenie k službe GitHub",
       "reconnectDescription": "Prístup k tvojmu účtu GitHub bol odvolaný. Znova pripoj účet, aby si mohol pokračovať v kontrole žiadostí o zlúčenie v mobile.",
-      "reconnectProviderTitle": "Znova pripoj {{provider}}",
-      "reconnectProviderDescription": "Tvoje pripojenie k službe {{provider}} je potrebné znova autorizovať, aby si mohol kontrolovať merge requesty v mobile.",
       "description": "Pripoj svoj účet GitHub a kontroluj žiadosti o zlúčenie v mobile.",
       "gitlabDescription": "Pripoj svoj účet GitLab a kontroluj merge requesty v mobile.",
       "bitbucketDescription": "Pripoj Bitbucket k tejto organizácii a kontroluj žiadosti o zlúčenie v mobile.",

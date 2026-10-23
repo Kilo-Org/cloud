@@ -665,8 +665,6 @@
       "providerCheckFailedMessage": "Din forbindelsesstatus kan først vises, når indlæsningen er færdig.",
       "reconnectTitle": "Opret forbindelse til GitHub igen",
       "reconnectDescription": "Adgangen til din GitHub-konto er blevet tilbagekaldt. Opret forbindelse igen for at fortsætte med at gennemgå pull requests på mobilen.",
-      "reconnectProviderTitle": "Opret forbindelse til {{provider}} igen",
-      "reconnectProviderDescription": "Din {{provider}}-forbindelse skal godkendes igen, før du kan gennemgå merge requests på mobilen.",
       "description": "Tilslut din GitHub-konto for at gennemgå pull requests på mobilen.",
       "gitlabDescription": "Tilslut din GitLab-konto for at gennemgå merge requests på mobilen.",
       "bitbucketDescription": "Tilslut Bitbucket til denne organisation for at gennemgå pull requests på mobilen.",

@@ -2551,8 +2551,6 @@
       "providerCheckFailedMessage": "Trạng thái kết nối chưa khả dụng cho đến khi tải xong.",
       "reconnectTitle": "Kết nối lại GitHub",
       "reconnectDescription": "Quyền kết nối với GitHub của bạn đã bị thu hồi. Kết nối lại để tiếp tục đánh giá PR trên thiết bị di động.",
-      "reconnectProviderTitle": "Kết nối lại {{provider}}",
-      "reconnectProviderDescription": "Kết nối {{provider}} của bạn cần được cấp quyền lại trước khi bạn có thể xem xét merge request trên thiết bị di động.",
       "description": "Kết nối tài khoản GitHub của bạn để đánh giá PR trên thiết bị di động.",
       "gitlabDescription": "Kết nối tài khoản GitLab để xem merge request trên thiết bị di động.",
       "bitbucketDescription": "Kết nối Bitbucket với tổ chức này để xem PR trên thiết bị di động.",

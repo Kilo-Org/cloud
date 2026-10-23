@@ -2576,8 +2576,6 @@
       "providerCheckFailedMessage": "No se puede consultar el estado de la conexión hasta que termine la carga.",
       "reconnectTitle": "Volver a conectar GitHub",
       "reconnectDescription": "Se revocó tu conexión con GitHub. Vuelve a conectar tu cuenta para seguir revisando PR en el móvil.",
-      "reconnectProviderTitle": "Volver a conectar {{provider}}",
-      "reconnectProviderDescription": "Tu conexión con {{provider}} debe reautorizarse antes de que puedas revisar merge requests en el móvil.",
       "description": "Conecta tu cuenta de GitHub para revisar PR en el móvil.",
       "gitlabDescription": "Conecta tu cuenta de GitLab para revisar merge requests en el móvil.",
       "bitbucketDescription": "Conecta Bitbucket a esta organización para revisar PR en el móvil.",

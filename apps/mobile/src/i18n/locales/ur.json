@@ -665,8 +665,6 @@
       "providerCheckFailedMessage": "لوڈ ہونے تک کنکشن کی حالت دستیاب نہیں۔",
       "reconnectTitle": "GitHub سے دوبارہ رابطہ",
       "reconnectDescription": "آپ کا GitHub کنکشن منسوخ کر دیا گیا ہے۔ موبائل پر پل ریکویسٹ کا جائزہ جاری رکھنے کے لیے اسے دوبارہ منسلک کریں۔",
-      "reconnectProviderTitle": "{{provider}} سے دوبارہ رابطہ",
-      "reconnectProviderDescription": "موبائل پر مرج ریکویسٹس کا جائزہ لینے سے پہلے آپ کا {{provider}} کنکشن دوبارہ مجاز ہونا ضروری ہے۔",
       "description": "موبائل پر پل ریکویسٹ کا جائزہ لینے کے لیے اپنا GitHub اکاؤنٹ منسلک کریں۔",
       "gitlabDescription": "موبائل پر مرج ریکویسٹس کا جائزہ لینے کے لیے اپنا GitLab اکاؤنٹ منسلک کریں۔",
       "bitbucketDescription": "موبائل پر پل ریکویسٹس کا جائزہ لینے کے لیے Bitbucket کو اس تنظیم سے منسلک کریں۔",

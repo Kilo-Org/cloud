@@ -665,8 +665,6 @@
       "providerCheckFailedMessage": "A kapcsolódási állapot csak a betöltés után érhető el.",
       "reconnectTitle": "Újracsatlakozás a GitHubhoz",
       "reconnectDescription": "Visszavonták a GitHub-kapcsolatod engedélyét. Csatlakozz újra, hogy mobilon is folytathasd a módosítási kérelmek kódellenőrzését.",
-      "reconnectProviderTitle": "Újracsatlakozás ehhez: {{provider}}",
-      "reconnectProviderDescription": "A {{provider}}-kapcsolatodat újra engedélyezni kell, mielőtt mobilon kódellenőrizhetnéd a merge requesteket.",
       "description": "Csatlakoztasd a GitHub-fiókodat a módosítási kérelmek mobilos kódellenőrzéséhez.",
       "gitlabDescription": "Csatlakoztasd a GitLab-fiókodat a merge requestek kódellenőrzéséhez mobilon.",
       "bitbucketDescription": "Csatlakoztasd a Bitbucketot ehhez a szervezethez a módosítási kérelmek mobilos kódellenőrzéséhez.",

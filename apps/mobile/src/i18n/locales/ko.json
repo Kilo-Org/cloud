@@ -2551,8 +2551,6 @@
       "providerCheckFailedMessage": "로드될 때까지 연결 상태를 사용할 수 없습니다.",
       "reconnectTitle": "GitHub 다시 연결",
       "reconnectDescription": "GitHub 연결이 해제되었습니다. 모바일에서 풀 리퀘스트를 계속 리뷰하려면 다시 연결하세요.",
-      "reconnectProviderTitle": "{{provider}} 다시 연결",
-      "reconnectProviderDescription": "모바일에서 머지 요청을 검토하려면 {{provider}} 연결을 다시 인증해야 합니다.",
       "description": "모바일에서 풀 리퀘스트를 리뷰하려면 GitHub 계정을 연결하세요.",
       "gitlabDescription": "모바일에서 머지 요청을 검토하려면 GitLab 계정을 연결하세요.",
       "bitbucketDescription": "모바일에서 풀 리퀘스트를 검토하려면 이 조직을 Bitbucket에 연결하세요.",

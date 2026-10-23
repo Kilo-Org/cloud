@@ -677,8 +677,6 @@
       "providerCheckFailedMessage": "L'estat de la connexió no està disponible fins que es carregui.",
       "reconnectTitle": "Torna a connectar GitHub",
       "reconnectDescription": "S'ha revocat la teva connexió amb GitHub. Torna a connectar-te per continuar revisant sol·licituds d'integració al mòbil.",
-      "reconnectProviderTitle": "Torna a connectar {{provider}}",
-      "reconnectProviderDescription": "La teva connexió amb {{provider}} s'ha de tornar a autoritzar abans que puguis revisar sol·licituds d'integració al mòbil.",
       "description": "Connecta el teu compte de GitHub per revisar sol·licituds d'integració al mòbil.",
       "gitlabDescription": "Connecta el teu compte de GitLab per revisar sol·licituds de fusió des del mòbil.",
       "bitbucketDescription": "Connecta Bitbucket a aquesta organització per revisar sol·licituds d'integració des del mòbil.",

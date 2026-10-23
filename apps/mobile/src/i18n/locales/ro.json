@@ -677,8 +677,6 @@
       "providerCheckFailedMessage": "Starea conexiunii nu este disponibilă până când se încarcă.",
       "reconnectTitle": "Reconectare la GitHub",
       "reconnectDescription": "Accesul la contul tău GitHub a fost revocat. Reconectează-te pentru a continua să revizuiești PR-uri pe mobil.",
-      "reconnectProviderTitle": "Reconectare la {{provider}}",
-      "reconnectProviderDescription": "Conexiunea ta la {{provider}} trebuie reautorizată înainte de a putea revizui merge requesturi pe mobil.",
       "description": "Conectează-ți contul GitHub pentru a revizui PR-uri pe mobil.",
       "gitlabDescription": "Conectează-ți contul GitLab pentru a revizui merge requesturi de pe mobil.",
       "bitbucketDescription": "Conectează Bitbucket la această organizație pentru a revizui PR-uri de pe mobil.",

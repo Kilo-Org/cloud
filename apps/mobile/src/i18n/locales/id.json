@@ -2551,8 +2551,6 @@
       "providerCheckFailedMessage": "Status koneksi tidak tersedia hingga bagian ini termuat.",
       "reconnectTitle": "Hubungkan ulang GitHub",
       "reconnectDescription": "Akses ke akun GitHub kamu telah dicabut. Hubungkan ulang untuk terus meninjau PR di ponsel.",
-      "reconnectProviderTitle": "Hubungkan ulang {{provider}}",
-      "reconnectProviderDescription": "Koneksi {{provider}} kamu perlu dihubungkan ulang sebelum kamu bisa meninjau merge request di ponsel.",
       "description": "Hubungkan akun GitHub kamu untuk meninjau PR di ponsel.",
       "gitlabDescription": "Hubungkan akun GitLab kamu untuk meninjau merge request di ponsel.",
       "bitbucketDescription": "Hubungkan Bitbucket ke organisasi ini untuk meninjau PR di ponsel.",

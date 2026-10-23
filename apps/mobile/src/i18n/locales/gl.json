@@ -665,8 +665,6 @@
       "providerCheckFailedMessage": "O estado da conexión non está dispoñible ata que cargue.",
       "reconnectTitle": "Volver conectar con GitHub",
       "reconnectDescription": "Revogouse a túa conexión con GitHub. Volve conectarte para seguir revisando solicitudes de integración no móbil.",
-      "reconnectProviderTitle": "Volver conectar con {{provider}}",
-      "reconnectProviderDescription": "A túa conexión con {{provider}} necesita volver a autorizarse para poder revisar solicitudes de fusión no móbil.",
       "description": "Conecta a túa conta de GitHub para revisar solicitudes de integración no móbil.",
       "gitlabDescription": "Conecta a túa conta de GitLab para revisar solicitudes de fusión no móbil.",
       "bitbucketDescription": "Conecta Bitbucket a esta organización para revisar solicitudes de integración no móbil.",

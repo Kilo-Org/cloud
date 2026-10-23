@@ -665,8 +665,6 @@
       "providerCheckFailedMessage": "Ekki er hægt að sýna tengistöðu fyrr en hleðslu lýkur.",
       "reconnectTitle": "Tengja GitHub aftur",
       "reconnectDescription": "Heimild fyrir GitHub-tengingunni þinni var afturkölluð. Tengdu aftur til að halda áfram að yfirfara sameiningarbeiðnir í símanum.",
-      "reconnectProviderTitle": "Tengja {{provider}} aftur",
-      "reconnectProviderDescription": "{{provider}}-tengingin þín verður að fá heimild aftur áður en þú getur yfirfarið merge requests í símanum.",
       "description": "Tengdu GitHub-reikninginn þinn til að yfirfara sameiningarbeiðnir í símanum.",
       "gitlabDescription": "Tengdu GitLab-reikninginn þinn til að yfirfara merge requests í símanum.",
       "bitbucketDescription": "Tengdu Bitbucket við þessa stofnun til að yfirfara sameiningarbeiðnir í símanum.",

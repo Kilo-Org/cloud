@@ -1,5 +1,5 @@
 import { type ComponentPropsWithRef, createElement, useImperativeHandle } from 'react';
-import { type ScrollView } from 'react-native';
+import { type ScrollView, type ScrollViewInstance } from 'react-native';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -37,14 +37,13 @@ vi.mock('react-native', () => ({
   View: 'View',
   ScrollView: (props: ComponentPropsWithRef<typeof ScrollView>) => {
     const { ref, ...rest } = props;
-    useImperativeHandle(
-      ref,
-      () =>
-        ({
-          getNativeScrollRef: () => ({ measureInWindow: () => undefined }),
-        }) as unknown as ScrollView,
-      []
-    );
+    useImperativeHandle(ref, () => {
+      const node: Partial<ScrollViewInstance> = { measureInWindow: () => undefined };
+      const scroll: Partial<ScrollViewInstance> = {
+        getNativeScrollRef: () => node as ScrollViewInstance,
+      };
+      return scroll as ScrollViewInstance;
+    }, []);
     return createElement('ScrollView', rest);
   },
 }));

@@ -574,6 +574,22 @@ export function verifyGitLabWebhookToken(token: string, expectedToken?: string):
 }
 
 /**
+ * GitLab rejected the credential itself (HTTP 401), before any role or
+ * permission check. Callers must send the user to reconnect the integration;
+ * role guidance cannot fix it.
+ */
+export class GitLabAuthenticationError extends Error {
+  constructor(
+    public projectId: string | number,
+    readonly statusCode: number,
+    message: string
+  ) {
+    super(message);
+    this.name = 'GitLabAuthenticationError';
+  }
+}
+
+/**
  * Custom error class for webhook permission issues
  * Thrown when user doesn't have Maintainer+ role on a project
  */
@@ -612,12 +628,39 @@ export type GitLabWebhook = {
 };
 
 /**
+ * The event configuration Kilo needs on a project hook. Create and update send
+ * the same properties so a project is configured identically either way.
+ */
+function buildProjectWebhookPayload(webhookUrl: string, webhookSecret: string) {
+  return {
+    name: 'Kilo Code Reviews',
+    description: 'Auto-configured webhook for Kilo AI code reviews',
+    url: webhookUrl,
+    token: webhookSecret,
+    merge_requests_events: true,
+    push_events: false,
+    issues_events: false,
+    confidential_issues_events: false,
+    tag_push_events: false,
+    note_events: false,
+    confidential_note_events: false,
+    job_events: false,
+    pipeline_events: false,
+    wiki_page_events: false,
+    deployment_events: false,
+    releases_events: false,
+    enable_ssl_verification: true,
+  };
+}
+
+/**
  * Lists all webhooks for a GitLab project
  *
  * @param accessToken - OAuth access token
  * @param projectId - GitLab project ID or path (URL-encoded)
  * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
- * @throws {GitLabWebhookPermissionError} When user doesn't have Maintainer+ role on the project
+ * @throws {GitLabAuthenticationError} When GitLab rejects the credential (HTTP 401)
+ * @throws {GitLabWebhookPermissionError} When user doesn't have Maintainer+ role on the project (HTTP 403)
  */
 export async function listProjectWebhooks(
   accessToken: string,
@@ -644,7 +687,15 @@ export async function listProjectWebhooks(
       projectId,
     });
 
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
+      throw new GitLabAuthenticationError(
+        projectId,
+        401,
+        `GitLab rejected the credential while listing webhooks for project ${projectId} (HTTP 401). Reconnect the GitLab integration and try again.`
+      );
+    }
+
+    if (response.status === 403) {
       throw new GitLabWebhookPermissionError(
         projectId,
         response.status,
@@ -666,7 +717,8 @@ export async function listProjectWebhooks(
  * @param webhookUrl - URL to receive webhook events
  * @param webhookSecret - Secret token for webhook verification
  * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
- * @throws {GitLabWebhookPermissionError} When user doesn't have Maintainer+ role on the project
+ * @throws {GitLabAuthenticationError} When GitLab rejects the credential (HTTP 401)
+ * @throws {GitLabWebhookPermissionError} When user doesn't have Maintainer+ role on the project (HTTP 403)
  */
 export async function createProjectWebhook(
   accessToken: string,
@@ -686,25 +738,7 @@ export async function createProjectWebhook(
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        name: 'Kilo Code Reviews',
-        description: 'Auto-configured webhook for Kilo AI code reviews',
-        url: webhookUrl,
-        token: webhookSecret,
-        merge_requests_events: true,
-        push_events: false,
-        issues_events: false,
-        confidential_issues_events: false,
-        tag_push_events: false,
-        note_events: false,
-        confidential_note_events: false,
-        job_events: false,
-        pipeline_events: false,
-        wiki_page_events: false,
-        deployment_events: false,
-        releases_events: false,
-        enable_ssl_verification: true,
-      }),
+      body: JSON.stringify(buildProjectWebhookPayload(webhookUrl, webhookSecret)),
     }
   );
 
@@ -716,7 +750,15 @@ export async function createProjectWebhook(
       projectId,
     });
 
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
+      throw new GitLabAuthenticationError(
+        projectId,
+        401,
+        `GitLab rejected the credential while creating a webhook for project ${projectId} (HTTP 401). Reconnect the GitLab integration and try again.`
+      );
+    }
+
+    if (response.status === 403) {
       throw new GitLabWebhookPermissionError(
         projectId,
         response.status,
@@ -747,7 +789,8 @@ export async function createProjectWebhook(
  * @param webhookUrl - URL to receive webhook events
  * @param webhookSecret - Secret token for webhook verification
  * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
- * @throws {GitLabWebhookPermissionError} When user doesn't have Maintainer+ role on the project
+ * @throws {GitLabAuthenticationError} When GitLab rejects the credential (HTTP 401)
+ * @throws {GitLabWebhookPermissionError} When user doesn't have Maintainer+ role on the project (HTTP 403)
  */
 export async function updateProjectWebhook(
   accessToken: string,
@@ -768,25 +811,7 @@ export async function updateProjectWebhook(
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        name: 'Kilo Code Reviews',
-        description: 'Auto-configured webhook for Kilo AI code reviews',
-        url: webhookUrl,
-        token: webhookSecret,
-        merge_requests_events: true,
-        push_events: false,
-        issues_events: false,
-        confidential_issues_events: false,
-        tag_push_events: false,
-        note_events: false,
-        confidential_note_events: false,
-        job_events: false,
-        pipeline_events: false,
-        wiki_page_events: false,
-        deployment_events: false,
-        releases_events: false,
-        enable_ssl_verification: true,
-      }),
+      body: JSON.stringify(buildProjectWebhookPayload(webhookUrl, webhookSecret)),
     }
   );
 
@@ -799,7 +824,15 @@ export async function updateProjectWebhook(
       hookId,
     });
 
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
+      throw new GitLabAuthenticationError(
+        projectId,
+        401,
+        `GitLab rejected the credential while updating a webhook for project ${projectId} (HTTP 401). Reconnect the GitLab integration and try again.`
+      );
+    }
+
+    if (response.status === 403) {
       throw new GitLabWebhookPermissionError(
         projectId,
         response.status,
@@ -1351,25 +1384,7 @@ export async function getMRHeadCommit(
   mrIid: number,
   instanceUrl: string = DEFAULT_GITLAB_URL
 ): Promise<string> {
-  const encodedProjectId =
-    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
-
-  const response = await fetchGitLab(
-    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}`),
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
-  );
-
-  if (!response.ok) {
-    const error = await response.text();
-    logExceptInTest('GitLab MR fetch failed:', { status: response.status, error });
-    throw new Error(`GitLab MR fetch failed: ${response.status}`);
-  }
-
-  const mr = (await response.json()) as GitLabMergeRequest;
+  const mr = await fetchGitLabMergeRequest({ accessToken, projectId, mrIid, instanceUrl });
 
   logExceptInTest('[getMRHeadCommit] Got HEAD commit', {
     projectId,
@@ -1389,25 +1404,7 @@ export async function getMRDiffRefs(
   mrIid: number,
   instanceUrl: string = DEFAULT_GITLAB_URL
 ): Promise<{ baseSha: string; headSha: string; startSha: string }> {
-  const encodedProjectId =
-    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
-
-  const response = await fetchGitLab(
-    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}`),
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
-  );
-
-  if (!response.ok) {
-    const error = await response.text();
-    logExceptInTest('GitLab MR fetch failed:', { status: response.status, error });
-    throw new Error(`GitLab MR fetch failed: ${response.status}`);
-  }
-
-  const mr = (await response.json()) as GitLabMergeRequest;
+  const mr = await fetchGitLabMergeRequest({ accessToken, projectId, mrIid, instanceUrl });
 
   logExceptInTest('[getMRDiffRefs] Got diff refs', {
     projectId,
@@ -1740,7 +1737,8 @@ export class GitLabProjectAccessTokenPermissionError extends Error {
  * @param scopes - Token scopes (default: ['api', 'self_rotate'])
  * @param accessLevel - Access level for the token (default: DEVELOPER = 30)
  * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
- * @throws {GitLabProjectAccessTokenPermissionError} When user doesn't have Maintainer+ role
+ * @throws {GitLabAuthenticationError} When GitLab rejects the credential (HTTP 401)
+ * @throws {GitLabProjectAccessTokenPermissionError} When user doesn't have Maintainer+ role (HTTP 403)
  *
  * @see https://docs.gitlab.com/ee/api/project_access_tokens.html#create-a-project-access-token
  */
@@ -1781,7 +1779,15 @@ export async function createProjectAccessToken(
       projectId,
     });
 
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
+      throw new GitLabAuthenticationError(
+        projectId,
+        401,
+        `GitLab rejected the credential while creating a Project Access Token for project ${projectId} (HTTP 401). Reconnect the GitLab integration and try again.`
+      );
+    }
+
+    if (response.status === 403) {
       throw new GitLabProjectAccessTokenPermissionError(
         projectId,
         response.status,
@@ -1819,7 +1825,8 @@ export async function createProjectAccessToken(
  * @param accessToken - OAuth access token (requires Maintainer+ role)
  * @param projectId - GitLab project ID or path (URL-encoded)
  * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
- * @throws {GitLabProjectAccessTokenPermissionError} When user doesn't have Maintainer+ role
+ * @throws {GitLabAuthenticationError} When GitLab rejects the credential (HTTP 401)
+ * @throws {GitLabProjectAccessTokenPermissionError} When user doesn't have Maintainer+ role (HTTP 403)
  *
  * @see https://docs.gitlab.com/ee/api/project_access_tokens.html#list-project-access-tokens
  */
@@ -1848,7 +1855,15 @@ export async function listProjectAccessTokens(
       projectId,
     });
 
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
+      throw new GitLabAuthenticationError(
+        projectId,
+        401,
+        `GitLab rejected the credential while listing Project Access Tokens for project ${projectId} (HTTP 401). Reconnect the GitLab integration and try again.`
+      );
+    }
+
+    if (response.status === 403) {
       throw new GitLabProjectAccessTokenPermissionError(
         projectId,
         response.status,
@@ -1931,6 +1946,8 @@ export async function getProjectAccessToken(
  * @param tokenId - ID of the Project Access Token to rotate
  * @param expiresAt - New expiration date in YYYY-MM-DD format (max 1 year from now)
  * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ * @throws {GitLabAuthenticationError} When GitLab rejects the credential (HTTP 401)
+ * @throws {GitLabProjectAccessTokenPermissionError} When user doesn't have Maintainer+ role (HTTP 403)
  *
  * @see https://docs.gitlab.com/ee/api/project_access_tokens.html#rotate-a-project-access-token
  */
@@ -1970,7 +1987,15 @@ export async function rotateProjectAccessToken(
       tokenId,
     });
 
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
+      throw new GitLabAuthenticationError(
+        projectId,
+        401,
+        `GitLab rejected the credential while rotating a Project Access Token for project ${projectId} (HTTP 401). Reconnect the GitLab integration and try again.`
+      );
+    }
+
+    if (response.status === 403) {
       throw new GitLabProjectAccessTokenPermissionError(
         projectId,
         response.status,
@@ -2005,6 +2030,8 @@ export async function rotateProjectAccessToken(
  * @param projectId - GitLab project ID or path (URL-encoded)
  * @param tokenId - ID of the Project Access Token to revoke
  * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ * @throws {GitLabAuthenticationError} When GitLab rejects the credential (HTTP 401)
+ * @throws {GitLabProjectAccessTokenPermissionError} When user doesn't have Maintainer+ role (HTTP 403)
  *
  * @see https://docs.gitlab.com/ee/api/project_access_tokens.html#revoke-a-project-access-token
  */
@@ -2037,7 +2064,15 @@ export async function revokeProjectAccessToken(
       tokenId,
     });
 
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
+      throw new GitLabAuthenticationError(
+        projectId,
+        401,
+        `GitLab rejected the credential while revoking a Project Access Token for project ${projectId} (HTTP 401). Reconnect the GitLab integration and try again.`
+      );
+    }
+
+    if (response.status === 403) {
       throw new GitLabProjectAccessTokenPermissionError(
         projectId,
         response.status,

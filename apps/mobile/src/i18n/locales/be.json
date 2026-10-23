@@ -224,7 +224,7 @@
     "hideBalance": "Схаваць баланс",
     "showBalance": "Паказаць баланс",
     "balanceHidden": "Баланс схаваны",
-    "bonusCreditsExpiring": "Тэрмін дзеяння бонусных крэдытаў на суму {{amount}} скончыцца {{date}}.",
+    "bonusCreditsExpiring": "Тэрмін дзеяння крэдытаў на суму {{amount}} скончыцца {{date}}.",
     "signOutTitle": "Выйсці?",
     "signOutMessage": "Каб вярнуцца ў сваю працоўную прастору, трэба будзе ўвайсці зноў.",
     "deleteAccountTitle": "Выдаліць уліковы запіс?",
@@ -2287,6 +2287,9 @@
       "noRepositoriesVisibleGitlab": "Рэпазіторыі не адлюстроўваюцца. Праверце доступ да рэпазіторыяў GitLab і абнавіце спіс.",
       "noRepositoriesVisibleBitbucket": "Рэпазіторыі не адлюстроўваюцца. Праверце доступ да рэпазіторыяў Bitbucket і абнавіце спіс.",
       "bitbucketOrganizationsOnly": "Bitbucket даступны толькі для арганізацый.",
+      "githubNeedsAttention": "GitHub патрабуе паўторнага падключэння",
+      "githubNeedsAttentionDescription": "Паўторна падключыце праграму Kilo для GitHub, а потым абнавіце спіс, каб загрузіць яе рэпазіторыі.",
+      "partialRepositories": "Некаторыя рэпазіторыі GitHub не загрузіліся.",
       "branchPickerTitle": "Выбраць галіну",
       "branchDefault": "Прадвызначаная",
       "branchAccessibility": "Галіна: {{label}}",
@@ -2294,6 +2297,7 @@
       "branchLoadError": "Не ўдалося загрузіць галіны",
       "branchUnavailable": "Галіны недаступныя для гэтага рэпазіторыя. Праверце доступ у правайдара, затым выберыце іншы рэпазіторый.",
       "branchEmpty": "Няма даступных галін",
+      "branchListIncomplete": "Паказаны толькі некаторыя галіны. У гэтым рэпазіторыі больш галін, чым можа змясціць гэты спіс.",
       "branchPlaceholder": "Выберыце галіну",
       "runOnWithTarget": "Асяроддзе запуску: {{target}}",
       "environment": "Асяроддзе",
@@ -3467,7 +3471,12 @@
       "serverToolCount_one": "{{count}} інструмент",
       "serverToolCount_other": "{{count}} інструментаў",
       "serverUnreachable": "Не ўдалося дасягнуць гэтага сервера",
-      "serverOff": "Гэты сервер выключаны"
+      "serverOff": "Гэты сервер выключаны",
+      "app": {
+        "label": "Інтэрфейс інструмента",
+        "failed": "Не ўдалося загрузіць інтэрфейс гэтага інструмента.",
+        "empty": "Інтэрфейс гэтага інструмента не мае чаго паказваць."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Аўтэнтыфікацыя",
@@ -3774,6 +3783,8 @@
     "skillNameInvalid": "Назва навыку павінна пачынацца з літары або лічбы і выкарыстоўваць толькі малыя літары, лічбы і працяжнікі",
     "skillContentRequired": "Змест навыкаў патрабуецца",
     "skillSaveFailed": "Не ўдалося захаваць навык",
+    "skillSourceCustom": "Карыстацкі",
+    "skillSourceMarketplace": "Маркетплэйс",
     "skillsHint": "Устаўце SKILL.md і запоўніце яго імя; дадаць навык са свайго тэлефона без перацягвання.",
     "skillEditTitle": "Майстэрства рэдагавання",
     "mcp": {

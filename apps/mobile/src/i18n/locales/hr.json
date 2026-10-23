@@ -224,7 +224,7 @@
     "hideBalance": "Sakrij saldo",
     "showBalance": "Prikaži saldo",
     "balanceHidden": "Saldo je skriven",
-    "bonusCreditsExpiring": "Bonus krediti u iznosu od {{amount}} istječu {{date}}.",
+    "bonusCreditsExpiring": "Krediti u iznosu od {{amount}} istječu {{date}}.",
     "signOutTitle": "Odjaviti se?",
     "signOutMessage": "Za pristup svom radnom prostoru morat ćeš se ponovno prijaviti.",
     "deleteAccountTitle": "Izbrisati račun?",
@@ -2259,6 +2259,9 @@
       "noRepositoriesVisibleGitlab": "Nema vidljivih repozitorija. Provjeri pristup repozitorijima na GitLabu, a zatim osvježi popis.",
       "noRepositoriesVisibleBitbucket": "Nema vidljivih repozitorija. Provjeri pristup repozitorijima na Bitbucketu, a zatim osvježi popis.",
       "bitbucketOrganizationsOnly": "Bitbucket je dostupan samo za organizacije.",
+      "githubNeedsAttention": "GitHub treba ponovno povezati",
+      "githubNeedsAttentionDescription": "Ponovno poveži Kilo GitHub aplikaciju, a zatim osvježi popis da se učitaju njezini repozitoriji.",
+      "partialRepositories": "Neki GitHub repozitoriji se nisu učitali.",
       "branchPickerTitle": "Odaberi granu",
       "branchDefault": "Zadano",
       "branchAccessibility": "Grana: {{label}}",
@@ -2266,6 +2269,7 @@
       "branchLoadError": "Nije moguće učitati grane",
       "branchUnavailable": "Grene nisu dostupne za ovaj repozitorij. Provjeri svoj pristup kod pružatelja usluge, pa odaberi drugi repozitorij.",
       "branchEmpty": "Nema dostupnih grana",
+      "branchListIncomplete": "Prikazane su samo neke grane. Ovaj repozitorij ima više grana nego što ih ova lista može uključiti.",
       "branchPlaceholder": "Odaberi granu",
       "runOnWithTarget": "Mjesto pokretanja: {{target}}",
       "environment": "Okruženje",
@@ -3425,7 +3429,12 @@
       "serverToolCount_one": "{{count}} alat",
       "serverToolCount_other": "{{count}} alata",
       "serverUnreachable": "Nije bilo moguće doći do ovog poslužitelja",
-      "serverOff": "Ovaj poslužitelj je isključen"
+      "serverOff": "Ovaj poslužitelj je isključen",
+      "app": {
+        "label": "Sučelje alata",
+        "failed": "Sučelje ovog alata nije se moglo učitati.",
+        "empty": "Sučelje ovog alata nema ništa za prikaz."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autentifikacija",
@@ -3729,6 +3738,8 @@
     "skillNameInvalid": "Naziv vještine mora započeti slovom ili znamenkom i koristiti samo mala slova, znamenke i crtice",
     "skillContentRequired": "Potreban je sadržaj vještina",
     "skillSaveFailed": "Nije moguće spremiti vještinu",
+    "skillSourceCustom": "Prilagođeno",
+    "skillSourceMarketplace": "Trgovina",
     "skillsHint": "Zalijepite SKILL.md i popunite njegovo ime; dodajte vještinu sa svog telefona bez povlačenja i ispuštanja.",
     "skillEditTitle": "Uredi vještinu",
     "mcp": {

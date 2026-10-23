@@ -59,12 +59,6 @@ const appState = vi.hoisted(() => ({
 
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
-  InteractionManager: {
-    runAfterInteractions: (run: () => void) => {
-      run();
-      return { cancel: () => undefined };
-    },
-  },
   Platform: { OS: 'ios' },
   KeyboardAvoidingView: 'KeyboardAvoidingView',
   Modal: 'Modal',
@@ -76,6 +70,11 @@ vi.mock('react-native', () => ({
   TextInput: 'TextInput',
   useWindowDimensions: () => ({ fontScale: 1 }),
   AppState: appState,
+}));
+vi.mock('@/lib/query/schedule-cache-maintenance', () => ({
+  scheduleCacheMaintenance: (run: () => void) => {
+    run();
+  },
 }));
 vi.mock('@shopify/flash-list', async () => {
   const React = await import('react');

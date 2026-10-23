@@ -224,7 +224,7 @@
     "hideBalance": "Ocultar saldo",
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
-    "bonusCreditsExpiring": "Os créditos de bónus no valor de {{amount}} expiram em {{date}}.",
+    "bonusCreditsExpiring": "Os créditos no valor de {{amount}} expiram em {{date}}.",
     "signOutTitle": "Terminar sessão?",
     "signOutMessage": "Terás de iniciar sessão novamente para aceder ao teu espaço de trabalho.",
     "deleteAccountTitle": "Eliminar conta?",
@@ -2259,6 +2259,9 @@
       "noRepositoriesVisibleGitlab": "Não há repositórios visíveis. Verifique as permissões de acesso aos repositórios do GitLab e atualize a lista.",
       "noRepositoriesVisibleBitbucket": "Não há repositórios visíveis. Verifique as permissões de acesso aos repositórios do Bitbucket e atualize a lista.",
       "bitbucketOrganizationsOnly": "O Bitbucket está disponível apenas para organizações.",
+      "githubNeedsAttention": "O GitHub tem de ser religado",
+      "githubNeedsAttentionDescription": "Reconecte a aplicação Kilo para GitHub e, em seguida, atualize para carregar os respetivos repositórios.",
+      "partialRepositories": "Alguns repositórios do GitHub não foram carregados.",
       "branchPickerTitle": "Selecionar ramo",
       "branchDefault": "Predefinido",
       "branchAccessibility": "Ramo: {{label}}",
@@ -2266,6 +2269,7 @@
       "branchLoadError": "Não foi possível carregar os ramos",
       "branchUnavailable": "Não há ramos disponíveis para este repositório. Verifica o teu acesso junto do fornecedor e escolhe outro repositório.",
       "branchEmpty": "Nenhum ramo disponível",
+      "branchListIncomplete": "Apenas alguns ramos são mostrados. O repositório tem mais ramos do que esta lista pode incluir.",
       "branchPlaceholder": "Selecionar um ramo",
       "runOnWithTarget": "Executar em: {{target}}",
       "environment": "Ambiente",
@@ -3425,7 +3429,12 @@
       "serverToolCount_one": "{{count}} ferramenta",
       "serverToolCount_other": "{{count}} ferramentas",
       "serverUnreachable": "Não foi possível contactar este servidor",
-      "serverOff": "Este servidor está desativado"
+      "serverOff": "Este servidor está desativado",
+      "app": {
+        "label": "Interface da ferramenta",
+        "failed": "Não foi possível carregar a interface desta ferramenta.",
+        "empty": "A interface desta ferramenta não tem nada para mostrar."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autenticação",
@@ -3729,6 +3738,8 @@
     "skillNameInvalid": "O nome da competência deve começar por uma letra ou dígito e usar apenas letras minúsculas, dígitos e hífenes",
     "skillContentRequired": "O conteúdo da competência é obrigatório",
     "skillSaveFailed": "Não foi possível guardar a competência",
+    "skillSourceCustom": "Personalizado",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Cole um SKILL.md e o nome é preenchido automaticamente; adicione uma competência a partir do telemóvel, sem arrastar e largar.",
     "skillEditTitle": "Editar competência",
     "mcp": {

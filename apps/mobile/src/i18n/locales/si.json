@@ -224,7 +224,7 @@
     "hideBalance": "ශේෂය සඟවන්න",
     "showBalance": "ශේෂය පෙන්වන්න",
     "balanceHidden": "ශේෂය සඟවා ඇත",
-    "bonusCreditsExpiring": "{{amount}} ක ප්‍රසාද ක්‍රෙඩිට් {{date}} දින කල් ඉකුත් වේ.",
+    "bonusCreditsExpiring": "{{amount}} ක්‍රෙඩිට් {{date}} දින කල් ඉකුත් වේ.",
     "signOutTitle": "පිටවන්නද?",
     "signOutMessage": "ඔබේ වැඩබිමට පිවිසීමට නැවත පුරනය විය යුතුය.",
     "deleteAccountTitle": "ගිණුම මකන්නද?",
@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "ගබඩා නොපෙනේ. GitLab ගබඩා වෙත ප්‍රවේශ වීමට අවසර තිබේදැයි පරීක්ෂා කර නැවුම් කරන්න.",
       "noRepositoriesVisibleBitbucket": "ගබඩා නොපෙනේ. Bitbucket ගබඩා වෙත ප්‍රවේශ වීමට අවසර තිබේදැයි පරීක්ෂා කර නැවුම් කරන්න.",
       "bitbucketOrganizationsOnly": "සංවිධාන සඳහා පමණක් Bitbucket ලබා ගත හැක.",
+      "githubNeedsAttention": "GitHub නැවත සම්බන්ධ කළ යුතුය",
+      "githubNeedsAttentionDescription": "Kilo GitHub App නැවත සම්බන්ධ කර, එහි ගබඩා පූරණය කිරීමට නැවුම් කරන්න.",
+      "partialRepositories": "සමහර GitHub ගබඩා පූරණය නොවීය.",
       "branchPickerTitle": "ශාඛාව තෝරන්න",
       "branchDefault": "පෙරනිමිය",
       "branchAccessibility": "ශාඛාව: {{label}}",
@@ -2238,6 +2241,7 @@
       "branchLoadError": "ශාඛා පූරණය කළ නොහැකි විය",
       "branchUnavailable": "මෙම ගබඩාව සඳහා ශාඛා ලබා ගත නොහැක. සැපයුම්කරු සමඟ ඔබේ ප්‍රවේශය පරීක්ෂා කර, පසුව තවත් ගබඩාවක් තෝරන්න.",
       "branchEmpty": "ශාඛා නොමැත",
+      "branchListIncomplete": "ශාඛා කිහිපයක් පමණක් පෙන්වා ඇත. මෙම ලැයිස්තුවට ඇතුළත් කළ හැකි ප්‍රමාණයට වඩා ගබඩාවේ ශාඛා ඇත.",
       "branchPlaceholder": "ශාඛාවක් තෝරන්න",
       "runOnWithTarget": "ධාවනය වන ස්ථානය: {{target}}",
       "environment": "පරිසරය",
@@ -3383,7 +3387,12 @@
       "serverToolCount_one": "මෙවලම {{count}}",
       "serverToolCount_other": "මෙවලම් {{count}}",
       "serverUnreachable": "මෙම සේවාදායකය වෙත ළඟා විය නොහැකි විය",
-      "serverOff": "මෙම සේවාදායකය ක්‍රියා විරහිතයි"
+      "serverOff": "මෙම සේවාදායකය ක්‍රියා විරහිතයි",
+      "app": {
+        "label": "මෙවලම් අතුරුමුහුණත",
+        "failed": "මෙම මෙවලමේ අතුරුමුහුණත පූරණය කළ නොහැකි විය.",
+        "empty": "මෙම මෙවලමේ අතුරුමුහුණතේ පෙන්වීමට කිසිවක් නොමැත."
+      }
     },
     "mcpOAuth": {
       "authMethod": "සත්‍යාපනය",
@@ -3684,6 +3693,8 @@
     "skillNameInvalid": "කුසලතා නාමය අකුරකින් හෝ ඉලක්කමකින් ආරම්භ විය යුතු අතර කුඩා අකුරු, ඉලක්කම් සහ ඉරි පමණක් භාවිතා කළ යුතුය",
     "skillContentRequired": "නිපුණතා අන්තර්ගතය අවශ්ය වේ",
     "skillSaveFailed": "කුසලතා සුරැකීමට නොහැකි විය",
+    "skillSourceCustom": "අභිරුචි",
+    "skillSourceMarketplace": "වෙළඳපොළ",
     "skillsHint": "SKILL.md එකක් අලවන්න සහ එහි නම පුරවයි; ඇදගෙන යාමකින් තොරව ඔබගේ දුරකථනයෙන් කුසලතා එක් කරන්න.",
     "skillEditTitle": "සංස්කරණ කුසලතා",
     "mcp": {

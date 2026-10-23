@@ -224,7 +224,7 @@
     "hideBalance": "הסתר יתרה",
     "showBalance": "הצג יתרה",
     "balanceHidden": "היתרה מוסתרת",
-    "bonusCreditsExpiring": "תוקפם של קרדיטי בונוס בסך {{amount}} יפוג ב-{{date}}.",
+    "bonusCreditsExpiring": "תוקפם של קרדיטים בסך {{amount}} יפוג ב-{{date}}.",
     "signOutTitle": "להתנתק?",
     "signOutMessage": "כדי לגשת לסביבת העבודה שלך, צריך להתחבר שוב.",
     "deleteAccountTitle": "למחוק את החשבון?",
@@ -1726,6 +1726,9 @@
       "noRepositoriesVisibleGitlab": "לא מוצגים מאגרים. בדוק את הרשאות הגישה למאגרים ב-GitLab, ואז רענן את הרשימה.",
       "noRepositoriesVisibleBitbucket": "לא מוצגים מאגרים. בדוק את הרשאות הגישה למאגרים ב-Bitbucket, ואז רענן את הרשימה.",
       "bitbucketOrganizationsOnly": "Bitbucket זמין לארגונים בלבד.",
+      "githubNeedsAttention": "נדרש לחבר מחדש את GitHub",
+      "githubNeedsAttentionDescription": "חבר מחדש את אפליקציית Kilo ב-GitHub, ואז רענן כדי לטעון את המאגרים שלה.",
+      "partialRepositories": "חלק מהמאגרים ב-GitHub לא נטענו.",
       "branchPickerTitle": "בחירת ענף",
       "branchDefault": "ברירת מחדל",
       "branchAccessibility": "ענף: {{label}}",
@@ -1733,6 +1736,7 @@
       "branchLoadError": "לא ניתן היה לטעון את הענפים",
       "branchUnavailable": "הענפים אינם זמינים למאגר הזה. בדקו את הגישה שלך מול הספק, ואז בחרו מאגר אחר.",
       "branchEmpty": "אין ענפים זמינים",
+      "branchListIncomplete": "מוצגים רק חלק מהענפים. במאגר הזה יש יותר ענפים ממה שהרשימה הזו יכולה לכלול.",
       "branchPlaceholder": "בחרו ענף",
       "runOnWithTarget": "יעד ההרצה: {{target}}",
       "environment": "סביבה",
@@ -3425,7 +3429,12 @@
       "serverToolCount_other": "{{count}} כלים",
       "serverToolCount_two": "{{count}} כלים",
       "serverUnreachable": "לא ניתן היה להגיע לשרת הזה",
-      "serverOff": "השרת הזה כבוי"
+      "serverOff": "השרת הזה כבוי",
+      "app": {
+        "label": "ממשק הכלי",
+        "failed": "לא הייתה אפשרות לטעון את הממשק של הכלי הזה.",
+        "empty": "אין מה להציג בממשק של הכלי הזה."
+      }
     },
     "mcpOAuth": {
       "authMethod": "אימות",
@@ -3729,6 +3738,8 @@
     "skillNameInvalid": "שם המיומנות חייב להתחיל באות או ספרה ולהשתמש רק באותיות קטנות, ספרות ומקפים",
     "skillContentRequired": "נדרש תוכן מיומנות",
     "skillSaveFailed": "לא ניתן היה לשמור את המיומנות",
+    "skillSourceCustom": "מותאם אישית",
+    "skillSourceMarketplace": "חנות",
     "skillsHint": "הדבק SKILL.md ושמו ימלא; הוסף מיומנות מהטלפון שלך ללא גרירה ושחרור.",
     "skillEditTitle": "ערוך מיומנות",
     "mcp": {

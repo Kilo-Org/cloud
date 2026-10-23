@@ -132,7 +132,17 @@ export function RepositoryBranchSelector({
     if (branches.branches.length === 0) {
       return renderNote(t('agentChat.newSession.branchEmpty'));
     }
-    return renderTrigger();
+    return (
+      <>
+        {renderTrigger()}
+        {/* The provider holds branches this list cannot include: say so here,
+            before the sheet is opened, rather than presenting a partial list
+            as the repository's whole set. */}
+        {branches.truncated ? (
+          <View className="mt-2">{renderNote(t('agentChat.newSession.branchListIncomplete'))}</View>
+        ) : null}
+      </>
+    );
   }
 
   function renderNote(message: string) {
@@ -192,6 +202,7 @@ export function RepositoryBranchSelector({
       branches: branches.branches,
       defaultBranch: branches.defaultBranch,
       selectedBranch,
+      truncated: branches.truncated,
       onSelect: branch => {
         // The provider default is stored as "no override", so the create body
         // only carries `upstreamBranch` for a real, non-default choice.

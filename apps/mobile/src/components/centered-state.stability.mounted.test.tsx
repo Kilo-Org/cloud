@@ -2,6 +2,7 @@ import { act, type ComponentPropsWithRef, createElement, useImperativeHandle } f
 import {
   type LayoutChangeEvent,
   ScrollView,
+  type ScrollViewInstance,
   type ScrollViewProps,
   type ViewProps,
 } from 'react-native';
@@ -11,7 +12,7 @@ import { renderWithProviders } from '@/test/render-with-providers';
 import { CenteredState } from './centered-state';
 import { type useStateSurface } from './centered-state-surface';
 
-type ScrollNode = NonNullable<ReturnType<ScrollView['getNativeScrollRef']>>;
+type ScrollNode = ScrollViewInstance;
 const native = vi.hoisted(() => {
   const surface: NonNullable<ReturnType<typeof useStateSurface>> = {
     frame: { top: 0, bottom: 800 },
@@ -48,8 +49,8 @@ vi.mock('react-native', () => ({
           onMeasure(0, native.viewportTop, 400, native.viewportBottom - native.viewportTop);
         },
       };
-      const scroll: Partial<ScrollView> = { getNativeScrollRef: () => node as ScrollNode };
-      return scroll as ScrollView;
+      const scroll: Partial<ScrollViewInstance> = { getNativeScrollRef: () => node as ScrollNode };
+      return scroll as ScrollViewInstance;
     }, []);
     return createElement('ScrollView', rest);
   },
@@ -70,12 +71,12 @@ afterEach(() => vi.unstubAllGlobals());
 
 async function mount() {
   const mounted = await renderWithProviders(<CenteredState testID="state">{null}</CenteredState>);
-  const measure = (height: number) => {
+  const measure = async (height: number) => {
     const props = mounted.renderer.root.findByProps({ testID: 'state-content' }).props as ViewProps;
     const event: Partial<LayoutChangeEvent> = {
       nativeEvent: { layout: { x: 0, y: 0, width: 400, height } },
     };
-    act(() => props.onLayout?.(event as LayoutChangeEvent));
+    await act(() => props.onLayout?.(event as LayoutChangeEvent));
   };
   const layout = () => {
     const props = mounted.renderer.root.findByType(ScrollView).props as ScrollViewProps;
@@ -98,14 +99,15 @@ it.each([
     const round = (value: number) => Math.round(value * native.scale);
     native.viewportTop = round(origin) / scale;
     const mounted = await mount();
-    mounted.measure((round(origin + intrinsicHeight) - round(origin)) / native.scale);
+    await mounted.measure((round(origin + intrinsicHeight) - round(origin)) / native.scale);
     const positions: number[] = [];
     for (let frame = 0; frame < 8; frame += 1) {
       const { paddingTop } = mounted.layout();
       positions.push(paddingTop);
       const height =
         (round(origin + paddingTop + intrinsicHeight) - round(origin + paddingTop)) / native.scale;
-      mounted.measure(height);
+      // eslint-disable-next-line no-await-in-loop -- the next frame uses the previous frame's measured padding
+      await mounted.measure(height);
     }
     expect(new Set(positions.slice(-4)).size).toBe(1);
     expect(mounted.layout().paddingTop * native.scale).toBeCloseTo(
@@ -134,15 +136,15 @@ it.each([
     native.surface.bottomInset = 800 - bottom;
   }
   const mounted = await mount();
-  mounted.measure(height);
+  await mounted.measure(height);
   const fitted = mounted.layout();
   expect(fitted.paddingTop).toBe(0);
   expect(
     Math.round((fitted.paddingTop + 532 / native.scale + fitted.paddingBottom) * native.scale)
   ).toBe(Math.round((native.viewportBottom - native.viewportTop) * native.scale));
-  mounted.measure(Math.fround(533 / native.scale));
+  await mounted.measure(Math.fround(533 / native.scale));
   expect(mounted.layout().paddingTop).toBe(16);
-  mounted.measure(height);
+  await mounted.measure(height);
   expect(mounted.layout()).toEqual(fitted);
   mounted.unmount();
 });
@@ -156,7 +158,7 @@ it.each([
   native.viewportBottom = geometry.bottom;
   native.surface.frame = { top: geometry.top, bottom: geometry.bottom };
   const mounted = await mount();
-  mounted.measure(geometry.height);
+  await mounted.measure(geometry.height);
   const layout = mounted.layout();
   expect(layout.paddingTop).toBe(geometry.paddingTop);
   expect(layout.minHeight).toBe(geometry.bottom - geometry.viewportTop);
@@ -210,7 +212,7 @@ it.each([
   native.surface.bounds = { top: 0, bottom: geometry.nativeBottom };
   native.surface.nativeViewportFillsSurface = geometry.nativeFill;
   const mounted = await mount();
-  mounted.measure(geometry.height);
+  await mounted.measure(geometry.height);
   expect(mounted.layout()).toMatchObject(geometry.expected);
   mounted.unmount();
 });
@@ -219,11 +221,11 @@ it('normalizes fractional-pixel measurement noise but still responds to real hei
   native.scale = 3;
   native.viewportTop = 1 / 3;
   const mounted = await mount();
-  mounted.measure(200.333_328_247_070_3);
+  await mounted.measure(200.333_328_247_070_3);
   const first = mounted.layout();
-  mounted.measure(200.333_343_505_859_38);
+  await mounted.measure(200.333_343_505_859_38);
   expect(mounted.layout()).toEqual(first);
-  mounted.measure(200.333_343_505_859_38 + 1 / native.scale);
+  await mounted.measure(200.333_343_505_859_38 + 1 / native.scale);
   expect(mounted.layout().paddingTop).toBeLessThan(first.paddingTop);
   mounted.unmount();
 });

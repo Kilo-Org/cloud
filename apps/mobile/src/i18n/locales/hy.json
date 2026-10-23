@@ -224,7 +224,7 @@
     "hideBalance": "Թաքցնել մնացորդը",
     "showBalance": "Ցուցադրել մնացորդը",
     "balanceHidden": "Մնացորդը թաքցված է",
-    "bonusCreditsExpiring": "{{amount}} բոնուսային կրեդիտի ժամկետը լրանում է՝ {{date}}։",
+    "bonusCreditsExpiring": "{{amount}} կրեդիտի ժամկետը լրանում է՝ {{date}}։",
     "signOutTitle": "Դո՞ւրս գալ հաշվից",
     "signOutMessage": "Աշխատանքային տարածքից օգտվելու համար պետք է նորից մուտք գործես։",
     "deleteAccountTitle": "Ջնջե՞լ հաշիվը",
@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Պահոցներ չեն երևում։ Ստուգեք GitLab-ի պահոցների մուտքի թույլտվությունները, ապա թարմացրեք ցանկը։",
       "noRepositoriesVisibleBitbucket": "Պահոցներ չեն երևում։ Ստուգեք Bitbucket-ի պահոցների մուտքի թույլտվությունները, ապա թարմացրեք ցանկը։",
       "bitbucketOrganizationsOnly": "Bitbucket-ը հասանելի է միայն կազմակերպությունների համար։",
+      "githubNeedsAttention": "GitHub-ը պետք է վերամիացվի",
+      "githubNeedsAttentionDescription": "Վերամիացրեք Kilo-ի GitHub հավելվածը, ապա թարմացրեք՝ բեռնելու դրա պահոցները։",
+      "partialRepositories": "GitHub-ի որոշ պահոցներ չբեռնվեցին։",
       "branchPickerTitle": "Ընտրել ճյուղը",
       "branchDefault": "Կանխադրված",
       "branchAccessibility": "Ճյուղ՝ {{label}}",
@@ -2238,6 +2241,7 @@
       "branchLoadError": "Չհաջողվեց բեռնել ճյուղերը",
       "branchUnavailable": "Այս պահոցի համար ճյուղեր հասանելի չեն։ Ստուգեք Ձեր հասանելիությունը մատակարարի մոտ, ապա ընտրեք այլ պահոց։",
       "branchEmpty": "Ճյուղեր հասանելի չեն",
+      "branchListIncomplete": "Ցուցադրվում են միայն որոշ ճյուղեր։ Պահոցում ավելի շատ ճյուղեր կան, քան այս ցանկը կարող է ներառել։",
       "branchPlaceholder": "Ընտրեք ճյուղ",
       "runOnWithTarget": "Գործարկման միջավայր՝ {{target}}",
       "environment": "Միջավայր",
@@ -3383,7 +3387,12 @@
       "serverToolCount_one": "{{count}} գործիք",
       "serverToolCount_other": "{{count}} գործիք",
       "serverUnreachable": "Չհաջողվեց հասնել այս սերվերին",
-      "serverOff": "Այս սերվերն անջատված է"
+      "serverOff": "Այս սերվերն անջատված է",
+      "app": {
+        "label": "Գործիքի միջերես",
+        "failed": "Այս գործիքի միջերեսը չհաջողվեց բեռնել.",
+        "empty": "Այս գործիքի միջերեսում ցուցադրելու ոչինչ չկա."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Նույնականացում",
@@ -3684,6 +3693,8 @@
     "skillNameInvalid": "Հմտության անունը պետք է սկսվի տառով կամ թվանշանով և օգտագործի միայն փոքրատառեր, թվանշաններ և գծիկներ",
     "skillContentRequired": "Հմտությունների բովանդակությունը պարտադիր է",
     "skillSaveFailed": "Չհաջողվեց պահպանել հմտությունը",
+    "skillSourceCustom": "սեփական",
+    "skillSourceMarketplace": "շուկա",
     "skillsHint": "Տեղադրեք SKILL.md-ը և լրացվում է դրա անունը; ավելացնել հմտություն ձեր հեռախոսից՝ առանց քաշելու և թողնելու:",
     "skillEditTitle": "Խմբագրման հմտություն",
     "mcp": {

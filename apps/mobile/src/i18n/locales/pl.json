@@ -224,7 +224,7 @@
     "hideBalance": "Ukryj saldo",
     "showBalance": "Pokaż saldo",
     "balanceHidden": "Saldo ukryte",
-    "bonusCreditsExpiring": "Środki promocyjne w kwocie {{amount}} stracą ważność {{date}}.",
+    "bonusCreditsExpiring": "Środki w kwocie {{amount}} stracą ważność {{date}}.",
     "signOutTitle": "Wylogować się?",
     "signOutMessage": "Aby wrócić do swojego obszaru roboczego, musisz zalogować się ponownie.",
     "deleteAccountTitle": "Usunąć konto?",
@@ -1738,6 +1738,9 @@
       "noRepositoriesVisibleGitlab": "Nie widać żadnych repozytoriów. Sprawdź uprawnienia dostępu do repozytoriów w GitLab, a następnie odśwież listę.",
       "noRepositoriesVisibleBitbucket": "Nie widać żadnych repozytoriów. Sprawdź uprawnienia dostępu do repozytoriów w Bitbucket, a następnie odśwież listę.",
       "bitbucketOrganizationsOnly": "Bitbucket jest dostępny tylko dla organizacji.",
+      "githubNeedsAttention": "GitHub wymaga ponownego połączenia",
+      "githubNeedsAttentionDescription": "Połącz ponownie aplikację Kilo w GitHub, a następnie odśwież listę, aby wczytać jej repozytoria.",
+      "partialRepositories": "Nie udało się wczytać niektórych repozytoriów z GitHub.",
       "branchPickerTitle": "Wybierz gałąź",
       "branchDefault": "Domyślna",
       "branchAccessibility": "Gałąź: {{label}}",
@@ -1745,6 +1748,7 @@
       "branchLoadError": "Nie udało się wczytać gałęzi",
       "branchUnavailable": "Gałęzie nie są dostępne dla tego repozytorium. Sprawdź swój dostęp u dostawcy, a potem wybierz inne repozytorium.",
       "branchEmpty": "Brak dostępnych gałęzi",
+      "branchListIncomplete": "Wyświetlono tylko niektóre gałęzie. Repozytorium ma więcej gałęzi, niż może pomieścić ta lista.",
       "branchPlaceholder": "Wybierz gałąź",
       "runOnWithTarget": "Miejsce uruchomienia: {{target}}",
       "environment": "Środowisko",
@@ -3467,7 +3471,12 @@
       "serverToolCount_one": "{{count}} narzędzie",
       "serverToolCount_other": "{{count}} narzędzi",
       "serverUnreachable": "Nie udało się połączyć z tym serwerem",
-      "serverOff": "Ten serwer jest wyłączony"
+      "serverOff": "Ten serwer jest wyłączony",
+      "app": {
+        "label": "Interfejs narzędzia",
+        "failed": "Nie udało się załadować interfejsu tego narzędzia.",
+        "empty": "Interfejs tego narzędzia nie ma nic do pokazania."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Uwierzytelnianie",
@@ -3774,6 +3783,8 @@
     "skillNameInvalid": "Nazwa umiejętności musi zaczynać się od litery lub cyfry i zawierać wyłącznie małe litery, cyfry i myślniki",
     "skillContentRequired": "Wymagane są umiejętności",
     "skillSaveFailed": "Nie udało się zapisać umiejętności",
+    "skillSourceCustom": "Własne",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Wklej SKILL.md, a jego nazwa zostanie wypełniona; dodaj umiejętność ze swojego telefonu bez przeciągania i upuszczania.",
     "skillEditTitle": "Edytuj umiejętność",
     "mcp": {

@@ -224,7 +224,7 @@
     "hideBalance": "Fela inneign",
     "showBalance": "Sýna inneign",
     "balanceHidden": "Inneign falin",
-    "bonusCreditsExpiring": "Bónusinneign að upphæð {{amount}} rennur út {{date}}.",
+    "bonusCreditsExpiring": "Inneign að upphæð {{amount}} rennur út {{date}}.",
     "signOutTitle": "Skrá út?",
     "signOutMessage": "Þú þarft að skrá þig aftur inn til að fá aðgang að vinnusvæðinu þínu.",
     "deleteAccountTitle": "Eyða reikningi?",
@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Engin kóðasöfn sjást. Athugaðu aðgang að kóðasöfnum í GitLab og endurnýjaðu svo.",
       "noRepositoriesVisibleBitbucket": "Engin kóðasöfn sjást. Athugaðu aðgang að kóðasöfnum í Bitbucket og endurnýjaðu svo.",
       "bitbucketOrganizationsOnly": "Bitbucket er aðeins í boði fyrir stofnanir.",
+      "githubNeedsAttention": "GitHub þarf að endurtengjast",
+      "githubNeedsAttentionDescription": "Endurtengdu GitHub-forritið frá Kilo og endurnýjaðu svo til að hlaða kóðasöfnum þess.",
+      "partialRepositories": "Ekki tókst að hlaða öllum kóðasöfnum frá GitHub.",
       "branchPickerTitle": "Velja kvist",
       "branchDefault": "Sjálfgefið",
       "branchAccessibility": "Kvistur: {{label}}",
@@ -2238,6 +2241,7 @@
       "branchLoadError": "Ekki tókst að hlaða kvistum",
       "branchUnavailable": "Engir kvistar eru tiltækir fyrir þetta kóðasafn. Athugaðu aðganginn þinn hjá veitunni og veldu annað kóðasafn.",
       "branchEmpty": "Engir kvistar tiltækir",
+      "branchListIncomplete": "Aðeins sumir kvistar eru sýndir. Kóðasafnið hefur fleiri kvista en þessi listi getur innihaldið.",
       "branchPlaceholder": "Veldu kvist",
       "runOnWithTarget": "Keyra á: {{target}}",
       "environment": "Umhverfi",
@@ -3383,7 +3387,12 @@
       "serverToolCount_one": "{{count}} verkfæri",
       "serverToolCount_other": "{{count}} verkfæri",
       "serverUnreachable": "Náði ekki sambandi við þennan þjón",
-      "serverOff": "Þessi þjónn er óvirkur"
+      "serverOff": "Þessi þjónn er óvirkur",
+      "app": {
+        "label": "Viðmót tóls",
+        "failed": "Ekki tókst að hlaða viðmóti tólsins.",
+        "empty": "Viðmót tólsins hefur ekkert til að sýna."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Auðkenning",
@@ -3684,6 +3693,8 @@
     "skillNameInvalid": "Hæfniheiti verður að byrja á bókstaf eða tölustaf og nota aðeins lágstafi, tölustafi og bandstrik",
     "skillContentRequired": "Færniefni er krafist",
     "skillSaveFailed": "Ekki tókst að bjarga kunnáttu",
+    "skillSourceCustom": "Sérsniðið",
+    "skillSourceMarketplace": "Markaður",
     "skillsHint": "Límdu SKILL.md og nafn þess fyllir út; bættu við færni úr símanum þínum án þess að draga og sleppa.",
     "skillEditTitle": "Breyta færni",
     "mcp": {

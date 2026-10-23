@@ -224,7 +224,7 @@
     "hideBalance": "Fihla ibhalansi",
     "showBalance": "Bonisa ibhalansi",
     "balanceHidden": "Ibhalansi ifihliwe",
-    "bonusCreditsExpiring": "Amakhredithi ebhonasi angu-{{amount}} aphelelwa yisikhathi ngo-{{date}}.",
+    "bonusCreditsExpiring": "Amakhredithi angu-{{amount}} aphelelwa yisikhathi ngo-{{date}}.",
     "signOutTitle": "Uyafuna ukuphuma ngemvume?",
     "signOutMessage": "Uzodinga ukungena futhi ukuze ufinyelele indawo yakho yokusebenza.",
     "deleteAccountTitle": "Uyafuna ukususa i-akhawunti?",
@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Azikho izinqolobane zekhodi ezibonakalayo. Hlola imvume yokufinyelela ezinqolobaneni zekhodi ku-GitLab, bese uvuselela.",
       "noRepositoriesVisibleBitbucket": "Azikho izinqolobane zekhodi ezibonakalayo. Hlola imvume yokufinyelela ezinqolobaneni zekhodi ku-Bitbucket, bese uvuselela.",
       "bitbucketOrganizationsOnly": "I-Bitbucket itholakala ezinhlanganweni kuphela.",
+      "githubNeedsAttention": "I-GitHub kumele ixhunywe kabusha",
+      "githubNeedsAttentionDescription": "Phinda uxhume i-Kilo GitHub App, bese uvuselela ukulayisha izinqolobane zayo zekhodi.",
+      "partialRepositories": "Ezinye izinqolobane zekhodi ze-GitHub azikwazanga ukulayisha.",
       "branchPickerTitle": "Khetha igatsha",
       "branchDefault": "Okuzenzakalelayo",
       "branchAccessibility": "Igatsha: {{label}}",
@@ -2238,6 +2241,7 @@
       "branchLoadError": "Kwehlulekile ukulayisha amagatsha",
       "branchUnavailable": "Amagatsha awatholakali kule nqolobane yekhodi. Hlola ukufinyelela kwakho kumhlinzeki, bese ukhetha enye inqolobane yekhodi.",
       "branchEmpty": "Akukho gatsha elitholakalayo",
+      "branchListIncomplete": "Kuboniswa amanye amagatsha kuphela. Le nqolobane yekhodi inamagatsha amaningi kunalokho uhlu lungakufaka.",
       "branchPlaceholder": "Khetha igatsha",
       "runOnWithTarget": "Qalisa ku: {{target}}",
       "environment": "Indawo yokusebenza",
@@ -3383,7 +3387,12 @@
       "serverToolCount_one": "ithuluzi elingu-{{count}}",
       "serverToolCount_other": "amathuluzi angu-{{count}}",
       "serverUnreachable": "Ayikwazanga ukufinyelela le seve",
-      "serverOff": "Le seve ivaliwe"
+      "serverOff": "Le seve ivaliwe",
+      "app": {
+        "label": "Isixhumi esibonakalayo sethuluzi",
+        "failed": "Ayikwazanga ukulayisha isixhumi esibonakalayo salesi thuluzi.",
+        "empty": "Isixhumi esibonakalayo salesi thuluzi asinakho okufanele kuboniswe."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Ukuqinisekisa",
@@ -3684,6 +3693,8 @@
     "skillNameInvalid": "Igama lekhono kufanele liqale ngohlamvu noma idijithi futhi lisebenzise kuphela izinhlamvu ezincane, amadijithi, namadeshi.",
     "skillContentRequired": "Okuqukethwe kwekhono kuyadingeka",
     "skillSaveFailed": "Ayikwazanga ukulondoloza ikhono",
+    "skillSourceCustom": "Ngokwezifiso",
+    "skillSourceMarketplace": "Imakethe",
     "skillsHint": "Namathisela i-SKILL.md futhi igama layo ligcwalise; engeza ikhono kusuka kufoni yakho ngaphandle kokuhudula nokuwisa.",
     "skillEditTitle": "Hlela ikhono",
     "mcp": {

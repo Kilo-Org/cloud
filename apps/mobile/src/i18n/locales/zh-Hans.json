@@ -224,7 +224,7 @@
     "hideBalance": "隐藏余额",
     "showBalance": "显示余额",
     "balanceHidden": "余额已隐藏",
-    "bonusCreditsExpiring": "{{amount}} 的奖励额度将于 {{date}} 到期。",
+    "bonusCreditsExpiring": "{{amount}} 的额度将于 {{date}} 到期。",
     "signOutTitle": "退出登录？",
     "signOutMessage": "退出后，需要重新登录才能访问工作区。",
     "deleteAccountTitle": "删除账户？",
@@ -1714,6 +1714,9 @@
       "noRepositoriesVisibleGitlab": "未显示任何仓库。请检查 GitLab 的仓库访问权限，然后刷新。",
       "noRepositoriesVisibleBitbucket": "未显示任何仓库。请检查 Bitbucket 的仓库访问权限，然后刷新。",
       "bitbucketOrganizationsOnly": "Bitbucket 仅对组织可用。",
+      "githubNeedsAttention": "GitHub 需要重新连接",
+      "githubNeedsAttentionDescription": "请重新连接 Kilo GitHub 应用，然后刷新以加载其仓库。",
+      "partialRepositories": "部分 GitHub 仓库未能加载。",
       "branchPickerTitle": "选择分支",
       "branchDefault": "默认",
       "branchAccessibility": "分支: {{label}}",
@@ -1721,6 +1724,7 @@
       "branchLoadError": "无法加载分支",
       "branchUnavailable": "此仓库没有可用的分支。检查你在提供商处的访问权限，然后选择另一个仓库。",
       "branchEmpty": "没有可用的分支",
+      "branchListIncomplete": "仅显示部分分支。此仓库的分支数量超过此列表所能包含的范围。",
       "branchPlaceholder": "选择一个分支",
       "runOnWithTarget": "运行位置：{{target}}",
       "environment": "环境",
@@ -3383,7 +3387,12 @@
       "serverToolCount_one": "{{count}} 个工具",
       "serverToolCount_other": "{{count}} 个工具",
       "serverUnreachable": "无法连接此服务器",
-      "serverOff": "此服务器已关闭"
+      "serverOff": "此服务器已关闭",
+      "app": {
+        "label": "工具界面",
+        "failed": "无法加载此工具的界面。",
+        "empty": "此工具的界面没有可显示的内容。"
+      }
     },
     "mcpOAuth": {
       "authMethod": "身份验证",
@@ -3684,6 +3693,8 @@
     "skillNameInvalid": "技能名称必须以字母或数字开头，并且只能使用小写字母、数字和破折号",
     "skillContentRequired": "技能内容为必填项",
     "skillSaveFailed": "无法保存技能",
+    "skillSourceCustom": "自定义",
+    "skillSourceMarketplace": "市场",
     "skillsHint": "粘贴一个SKILL.md并填写其名称；从手机添加技能，无需拖放。",
     "skillEditTitle": "编辑技能",
     "mcp": {

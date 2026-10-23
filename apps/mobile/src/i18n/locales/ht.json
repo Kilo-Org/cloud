@@ -224,7 +224,7 @@
     "hideBalance": "Kache balans",
     "showBalance": "Montre balans",
     "balanceHidden": "Balans kache",
-    "bonusCreditsExpiring": "{{amount}} nan kredi bonis ap ekspire {{date}}.",
+    "bonusCreditsExpiring": "{{amount}} nan kredi ap ekspire {{date}}.",
     "signOutTitle": "Dekonekte?",
     "signOutMessage": "W ap bezwen konekte ankò pou jwenn aksè nan espas travay ou.",
     "deleteAccountTitle": "Efase kont?",
@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Pa gen depo ki parèt. Tcheke aksè nan depo yo pou GitLab, epi rafrechi lis la.",
       "noRepositoriesVisibleBitbucket": "Pa gen depo ki parèt. Tcheke aksè nan depo yo pou Bitbucket, epi rafrechi lis la.",
       "bitbucketOrganizationsOnly": "Bitbucket disponib sèlman pou òganizasyon.",
+      "githubNeedsAttention": "GitHub bezwen rekonekte",
+      "githubNeedsAttentionDescription": "Rekonekte aplikasyon Kilo pou GitHub la, apre sa rafrechi pou w chaje depo yo.",
+      "partialRepositories": "Gen kèk depo GitHub ki pa t chaje.",
       "branchPickerTitle": "Chwazi branch",
       "branchDefault": "Pa defo",
       "branchAccessibility": "Branch: {{label}}",
@@ -2238,6 +2241,7 @@
       "branchLoadError": "Pa t ka chaje branch yo",
       "branchUnavailable": "Pa gen branch disponib pou depo sa a. Tcheke aksè ou ak founisè a, epi chwazi yon lòt depo.",
       "branchEmpty": "Pa gen branch disponib",
+      "branchListIncomplete": "Se sèlman kèk branch ki montre. Depo a gen plis branch pase sa lis sa a ka enkli.",
       "branchPlaceholder": "Chwazi yon branch",
       "runOnWithTarget": "Egzekite sou: {{target}}",
       "environment": "Anviwònman",
@@ -3383,7 +3387,12 @@
       "serverToolCount_one": "{{count}} zouti",
       "serverToolCount_other": "{{count}} zouti",
       "serverUnreachable": "Nou pa t kapab rive jwenn sèvè sa a",
-      "serverOff": "Sèvè sa a etenn"
+      "serverOff": "Sèvè sa a etenn",
+      "app": {
+        "label": "Entèfas zouti a",
+        "failed": "Entèfas zouti sa a pa ka chaje.",
+        "empty": "Entèfas zouti sa a pa gen anyen pou montre."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Otantifikasyon",
@@ -3684,6 +3693,8 @@
     "skillNameInvalid": "Non konpetans yo dwe kòmanse ak yon lèt oswa yon chif epi sèvi ak sèlman lèt miniskil, chif, ak tire",
     "skillContentRequired": "Kontni konpetans obligatwa",
     "skillSaveFailed": "Pa t 'kapab sove konpetans",
+    "skillSourceCustom": "Pèsonalize",
+    "skillSourceMarketplace": "Mache",
     "skillsHint": "Kole yon SKILL.md epi non li ranpli; ajoute yon konpetans nan telefòn ou san yo pa trennen ak gout.",
     "skillEditTitle": "Edit konpetans",
     "mcp": {

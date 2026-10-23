@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  discoveryOf,
   type RemoteMcpDiscovery,
   remoteServerStates,
   remoteServerToolsFor,
+  remoteServerViewsFor,
 } from './remote-mcp-state';
-import { server, stateOf, tool } from './remote-mcp.test-helpers';
+import { server, stateOf, tool, viewTool } from './remote-mcp.test-helpers';
 
 /**
  * The join between the stored list and the discovery, proven directly: an
@@ -17,7 +19,7 @@ describe('the pure helpers', () => {
   it('merges an enabled server’s tools, named for the server', () => {
     const alpha = server({ id: 'alpha' });
     const discovered = new Map<string, RemoteMcpDiscovery>([
-      ['alpha', { tools: [tool('mcp_alpha_read'), tool('mcp_alpha_write')] }],
+      ['alpha', discoveryOf('alpha', [tool('mcp_alpha_read'), tool('mcp_alpha_write')])],
     ]);
 
     expect(remoteServerToolsFor([alpha], discovered).map(entry => entry.definition.name)).toEqual([
@@ -32,7 +34,7 @@ describe('the pure helpers', () => {
   it('contributes nothing from a disabled server, whatever was cached', () => {
     const alpha = server({ id: 'alpha', enabled: false });
     const discovered = new Map<string, RemoteMcpDiscovery>([
-      ['alpha', { tools: [tool('mcp_alpha_read')] }],
+      ['alpha', discoveryOf('alpha', [tool('mcp_alpha_read')])],
     ]);
 
     expect(remoteServerToolsFor([alpha], discovered)).toEqual([]);
@@ -45,8 +47,8 @@ describe('the pure helpers', () => {
     const alpha = server({ id: 'alpha' });
     const beta = server({ id: 'beta' });
     const discovered = new Map<string, RemoteMcpDiscovery>([
-      ['alpha', { tools: [tool('mcp_alpha_read')] }],
-      ['beta', { tools: [tool('mcp_beta_read')] }],
+      ['alpha', discoveryOf('alpha', [tool('mcp_alpha_read')])],
+      ['beta', discoveryOf('beta', [tool('mcp_beta_read')])],
     ]);
 
     expect(
@@ -57,7 +59,7 @@ describe('the pure helpers', () => {
   it('leaves a failed discovery failed and offers none of its tools', () => {
     const alpha = server({ id: 'alpha' });
     const discovered = new Map<string, RemoteMcpDiscovery>([
-      ['alpha', { tools: [tool('mcp_alpha_read')], failed: true }],
+      ['alpha', { ...discoveryOf('alpha', [tool('mcp_alpha_read')]), failed: true }],
     ]);
 
     expect(remoteServerToolsFor([alpha], discovered)).toEqual([]);
@@ -74,9 +76,25 @@ describe('the pure helpers', () => {
     ]);
   });
 
+  it('keeps a view only for the tools that carry one', () => {
+    const alpha = server({ id: 'alpha' });
+    const beta = server({ id: 'beta', enabled: false });
+    const discovered = new Map<string, RemoteMcpDiscovery>([
+      [
+        'alpha',
+        discoveryOf('alpha', [viewTool('mcp_alpha_chart', 'chart', 'ui://alpha/chart.html')]),
+      ],
+      ['beta', discoveryOf('beta', [viewTool('mcp_beta_chart', 'chart', 'ui://beta/chart.html')])],
+    ]);
+
+    expect([...remoteServerViewsFor([alpha, beta], discovered).keys()]).toEqual([
+      'mcp_alpha_chart',
+    ]);
+  });
+
   it('offers a Retry on a server that answered with no tools', () => {
     const alpha = server({ id: 'alpha' });
-    const discovered = new Map<string, RemoteMcpDiscovery>([['alpha', { tools: [] }]]);
+    const discovered = new Map<string, RemoteMcpDiscovery>([['alpha', discoveryOf('alpha', [])]]);
 
     expect(remoteServerStates([alpha], discovered)).toEqual([
       stateOf(alpha, { status: 'ready', toolCount: 0, retryable: true }),

@@ -8,7 +8,7 @@ import {
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { TRPCError } from '@trpc/server';
-import { GeneratePortalLinkIntent, WorkOS, OrganizationDomainState } from '@workos-inc/node';
+import { GenerateLinkIntent, WorkOS, OrganizationDomainState } from '@workos-inc/node';
 import * as z from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { organizations } from '@kilocode/db/schema';
@@ -131,11 +131,9 @@ export const organizationSsoRouter = createTRPCRouter({
     }
 
     const intent =
-      linkType === 'sso'
-        ? GeneratePortalLinkIntent.SSO
-        : GeneratePortalLinkIntent.DomainVerification;
+      linkType === 'sso' ? GenerateLinkIntent.SSO : GenerateLinkIntent.DomainVerification;
 
-    const link = await workos.portal.generateLink({
+    const link = await workos.adminPortal.generateLink({
       organization: workOSOrg.id,
       intent,
     });

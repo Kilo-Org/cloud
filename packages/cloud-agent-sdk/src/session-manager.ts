@@ -30,7 +30,7 @@ import {
 } from './session';
 import type { CloudAgentSession, CloudAgentSessionConfig } from './session';
 import { createChatProcessor } from './chat-processor';
-import { partSettledAt } from './part-utils';
+import { replayStoredMessages } from './snapshot-page';
 import { createJotaiStorage } from './storage/jotai';
 import type { JotaiSessionStorage, JotaiStore } from './storage/jotai';
 import type { SessionStorage } from './storage/types';
@@ -1642,6 +1642,17 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     );
   }
 
+  function replayMessagesIntoStorage(
+    storage: SessionStorage,
+    messages: SessionSnapshot['messages']
+  ): void {
+    const chatProcessor = createChatProcessor(storage, {
+      onToolAttachment: config.onToolAttachment,
+      onFilePart: config.onFilePart,
+    });
+    replayStoredMessages(messages, event => chatProcessor.process(event));
+  }
+
   /**
    * Replay a child page/snapshot's messages into the active storage through
    * the chat processor. Child pages must never go through `applyPage`: that
@@ -1652,21 +1663,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     storage: JotaiSessionStorage,
     messages: SessionSnapshot['messages']
   ): void {
-    const chatProcessor = createChatProcessor(storage, {
-      onToolAttachment: config.onToolAttachment,
-      onFilePart: config.onFilePart,
-    });
-    for (const message of messages) {
-      chatProcessor.process({ type: 'message.updated', info: message.info });
-      for (const part of message.parts) {
-        const settledAt = partSettledAt(part);
-        chatProcessor.process({
-          type: 'message.part.updated',
-          part,
-          ...(settledAt === undefined ? {} : { time: settledAt }),
-        });
-      }
-    }
+    replayMessagesIntoStorage(storage, messages);
   }
 
   async function hydrateChildSession(childSessionId: KiloSessionId): Promise<void> {
@@ -2150,21 +2147,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const storage = store.get(sessionStorageAtom);
     if (!storage) return false;
 
-    const chatProcessor = createChatProcessor(storage, {
-      onToolAttachment: config.onToolAttachment,
-      onFilePart: config.onFilePart,
-    });
-    for (const message of outcome.messages) {
-      chatProcessor.process({ type: 'message.updated', info: message.info });
-      for (const part of message.parts) {
-        const settledAt = partSettledAt(part);
-        chatProcessor.process({
-          type: 'message.part.updated',
-          part,
-          ...(settledAt === undefined ? {} : { time: settledAt }),
-        });
-      }
-    }
+    replayMessagesIntoStorage(storage, outcome.messages);
 
     olderMessagesCursor = outcome.nextCursor;
     store.set(hasOlderMessagesAtom, outcome.nextCursor !== null);
@@ -3650,16 +3633,26 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const model = input?.model ?? inherited.model;
     const orgId = input?.orgId ?? inherited.orgId;
     const merged: CreateRemoteSessionInput = {
+      ...(input?.mutationId !== undefined ? { mutationId: input.mutationId } : {}),
       ...(agent !== undefined ? { agent } : {}),
       ...(model !== undefined ? { model } : {}),
       ...(orgId !== undefined ? { orgId } : {}),
       ...(input?.directory !== undefined ? { directory: input.directory } : {}),
+      ...(input?.cloneFromKiloSessionId !== undefined
+        ? { cloneFromKiloSessionId: input.cloneFromKiloSessionId }
+        : {}),
+      ...(input?.cloneUpToMessageId !== undefined
+        ? { cloneUpToMessageId: input.cloneUpToMessageId }
+        : {}),
     };
     const hasFields =
+      merged.mutationId !== undefined ||
       merged.agent !== undefined ||
       merged.model !== undefined ||
       merged.orgId !== undefined ||
-      merged.directory !== undefined;
+      merged.directory !== undefined ||
+      merged.cloneFromKiloSessionId !== undefined ||
+      merged.cloneUpToMessageId !== undefined;
     return currentSession.createRemoteSession(hasFields ? merged : undefined);
   }
 

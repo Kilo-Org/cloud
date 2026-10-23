@@ -1,5 +1,10 @@
 import { parse as parseJsonc, parseTree, type Node, type ParseError } from 'jsonc-parser';
 import type { ArchiveEntry } from './archive';
+import {
+  MAX_IMPORT_INSTRUCTION_GLOB_LENGTH,
+  MAX_IMPORT_INSTRUCTION_GLOB_WILDCARDS,
+  MAX_IMPORT_INSTRUCTION_GLOBS,
+} from './limits';
 import { makeIssue, type ParseState } from './parse-state';
 
 export type ConfigSections = {
@@ -72,6 +77,52 @@ function reportMalformedSection(
       configEntry.path,
       key,
       `Section "${key}" is present but ${expected}`
+    )
+  );
+}
+
+/** Longest glob echoed back in an issue message. */
+const GLOB_ECHO_LENGTH = 64;
+
+/** Count `*` and `**` tokens the way the matcher reads them: `**` counts once. */
+function countStarTokens(glob: string): number {
+  let count = 0;
+  for (let index = 0; index < glob.length; index += 1) {
+    if (glob[index] !== '*') continue;
+    count += 1;
+    if (glob[index + 1] === '*') index += 1;
+  }
+  return count;
+}
+
+/**
+ * Keep one `instructions` glob when it is within the import bounds. A glob over
+ * either bound is reported and ignored.
+ */
+function collectInstructionGlob(
+  sections: ConfigSections,
+  state: ParseState,
+  configEntry: ArchiveEntry,
+  glob: string,
+  index: number | null
+): void {
+  if (
+    glob.length <= MAX_IMPORT_INSTRUCTION_GLOB_LENGTH &&
+    countStarTokens(glob) <= MAX_IMPORT_INSTRUCTION_GLOB_WILDCARDS
+  ) {
+    sections.instructionGlobs.push(glob);
+    return;
+  }
+
+  const echo = glob.length > GLOB_ECHO_LENGTH ? `${glob.slice(0, GLOB_ECHO_LENGTH)}...` : glob;
+  state.issues.push(
+    makeIssue(
+      'error',
+      'instruction-glob-limit',
+      'config',
+      configEntry.path,
+      index === null ? 'instructions' : `instructions.${index}`,
+      `Instruction glob "${echo}" is over the import limit of ${MAX_IMPORT_INSTRUCTION_GLOB_LENGTH} characters or ${MAX_IMPORT_INSTRUCTION_GLOB_WILDCARDS} * tokens and is ignored`
     )
   );
 }
@@ -189,12 +240,28 @@ export function readConfigSections(configEntry: ArchiveEntry, state: ParseState)
   }
 
   const instructions = parsed.instructions;
-  if (Array.isArray(instructions)) {
-    for (const glob of instructions) {
-      if (typeof glob === 'string') sections.instructionGlobs.push(glob);
+  if (typeof instructions === 'string') {
+    collectInstructionGlob(sections, state, configEntry, instructions, null);
+  } else if (Array.isArray(instructions)) {
+    const read = Math.min(instructions.length, MAX_IMPORT_INSTRUCTION_GLOBS);
+    for (let index = 0; index < read; index += 1) {
+      const glob: unknown = instructions[index];
+      if (typeof glob === 'string') {
+        collectInstructionGlob(sections, state, configEntry, glob, index);
+      }
     }
-  } else if (typeof instructions === 'string') {
-    sections.instructionGlobs.push(instructions);
+    if (instructions.length > read) {
+      state.issues.push(
+        makeIssue(
+          'error',
+          'instruction-globs-exceeded',
+          'config',
+          configEntry.path,
+          'instructions',
+          `Only the first ${MAX_IMPORT_INSTRUCTION_GLOBS} instruction globs are read; the other ${instructions.length - read} are ignored`
+        )
+      );
+    }
   } else if (instructions !== undefined) {
     reportMalformedSection(
       state,

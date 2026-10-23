@@ -1,16 +1,24 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Switch, View } from 'react-native';
+import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { type BriefingPreferences, useBriefingPreferences } from '@/lib/agent-briefing';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useTRPC } from '@/lib/trpc';
 
-export function BriefingNotificationToggle() {
+/**
+ * The notification switch for the agent brief, plus the way to the device's
+ * notification permission. The link is suppressed on the Notifications screen
+ * itself, where it would open the page it is already on.
+ */
+export function BriefingNotificationToggle({
+  showSettingsLink = true,
+}: Readonly<{ showSettingsLink?: boolean }>) {
   const trpc = useTRPC();
   const client = useQueryClient();
   const router = useRouter();
@@ -65,15 +73,17 @@ export function BriefingNotificationToggle() {
           <Text>{t('common.retry')}</Text>
         </Button>
       ) : null}
-      <Button
-        variant="ghost"
-        size="sm"
-        onPress={() => {
-          router.push('/(app)/notifications' as Href);
-        }}
-      >
-        <Text>{t('agentBriefing.notificationPermission')}</Text>
-      </Button>
+      {showSettingsLink ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          onPress={() => {
+            router.push('/(app)/notifications' as Href);
+          }}
+        >
+          <Text>{t('agentBriefing.notificationPermission')}</Text>
+        </Button>
+      ) : null}
     </View>
   );
 }

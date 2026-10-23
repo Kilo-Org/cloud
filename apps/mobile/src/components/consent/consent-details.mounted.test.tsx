@@ -1,10 +1,12 @@
 /* oxlint-disable @typescript-eslint/no-unsafe-member-access @typescript-eslint/no-unsafe-argument -- footer prop inspection walks raw React element tree */
 /* oxlint-disable eslint/max-lines -- loading and error state coverage grows the file past 300 lines */
 import { createElement } from 'react';
+import * as WebBrowser from 'expo-web-browser';
 import { TestRenderer } from '@/test/renderer';
 import { toast } from 'sonner-native';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
+import { LEGAL_LINK_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { ConsentDetails, VoiceTranscriptionControl } from './consent-details';
 
 // ---- mocks ----
@@ -23,6 +25,7 @@ vi.mock('react-native-safe-area-context', () => ({
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   Switch: 'Switch',
   View: 'View',
@@ -314,6 +317,34 @@ describe('ConsentDetails copy', () => {
     );
     expect(gateway?.what).toBe(
       'Account ID, request metadata, token usage, and the prompts and voice recordings the app sends through it.'
+    );
+  });
+
+  it('gives the retention sentence privacy link a full target and opens the policy', async () => {
+    const renderer = mount();
+    const links = renderer.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Pressable' &&
+        (n.props as { accessibilityRole?: string }).accessibilityRole === 'link'
+    );
+    expect(links).toHaveLength(1);
+    const link = links[0];
+    if (!link) {
+      throw new Error('privacy link not found');
+    }
+    // A real 48dp box: the control-size audit reads the node's own rect, so the
+    // 14dp text line alone was reported as too small to tap.
+    expect(String((link.props as { className?: string }).className)).toContain(
+      LEGAL_LINK_BOX_CLASS
+    );
+
+    await TestRenderer.act(async () => {
+      await Promise.resolve();
+      (link.props as { onPress: () => void }).onPress();
+    });
+    expect(vi.mocked(WebBrowser.openBrowserAsync)).toHaveBeenCalledWith(
+      'https://kilo.ai/privacy-app'
     );
   });
 });

@@ -1101,7 +1101,7 @@
       "analyzed": "已分析",
       "capacityFull": "同时进行的分析任务已达上限。请等待其中一个任务完成。",
       "couldNotCheckCapacity": "无法检查可用的分析名额。",
-      "couldNotLoad": "无法加载分析结果。",
+      "couldNotLoad": "无法加载分析结果",
       "exploitabilityReasoning": "可利用性判断依据",
       "exploitable": "可利用",
       "fullReport": "生成的完整报告",
@@ -1131,7 +1131,7 @@
     },
     "analysisSettings": {
       "analysisModel": "分析模型",
-      "couldNotLoad": "无法加载分析设置。",
+      "couldNotLoad": "无法加载分析设置",
       "depth": "分析深度",
       "remediationModel": "修复模型",
       "title": "模型与分析",
@@ -1141,7 +1141,7 @@
       "actorMaskedKiloAdmin": "Kilo 管理员",
       "actorMaskedUser": "已隐藏用户",
       "actorSystem": "Kilo 系统",
-      "couldNotLoad": "无法加载审计报告。",
+      "couldNotLoad": "无法加载审计报告",
       "events": "事件",
       "generated": "已于 {{generatedAt}} 生成",
       "noActivity": "暂无活动记录",
@@ -1182,7 +1182,7 @@
       "confidenceHighOnly": "仅高置信度",
       "confidenceMediumOrHigher": "中等及以上",
       "confidenceThreshold": "置信度阈值",
-      "couldNotLoad": "无法加载自动化设置。",
+      "couldNotLoad": "无法加载自动化设置",
       "enable": "启用",
       "enableAutoAnalysis": "启用自动分析",
       "enableAutoAnalysisSubtitle": "同步安全问题时自动进行分析。",
@@ -1271,7 +1271,7 @@
       "commentAccessibility": "忽略备注",
       "commentLabel": "备注（可选）",
       "commentPlaceholder": "本次忽略操作的补充说明…",
-      "couldNotCheckPermissions": "无法检查忽略操作的权限。",
+      "couldNotCheckPermissions": "无法检查忽略操作的权限",
       "couldNotLoad": "无法加载此安全问题",
       "notFoundDescription": "此安全问题可能已被移除，或你已无权访问。",
       "notFoundTitle": "未找到该安全问题",
@@ -1316,8 +1316,8 @@
       "reasonAfterReview": "经审查"
     },
     "findingList": {
-      "couldNotLoad": "无法加载安全问题。",
-      "couldNotLoadMore": "无法加载更多安全问题。",
+      "couldNotLoad": "无法加载安全问题",
+      "couldNotLoadMore": "无法加载更多安全问题",
       "emptyDescription": "目前没有需要关注的未解决安全问题。",
       "emptyTitle": "暂无未解决的安全问题",
       "noMatchesDescription": "请尝试调整或清除已选的筛选条件。",
@@ -1336,7 +1336,7 @@
       "viewPr": "查看 PR"
     },
     "notifications": {
-      "couldNotLoad": "无法加载通知设置。",
+      "couldNotLoad": "无法加载通知设置",
       "emailOwners": "通过邮件通知组织所有者",
       "newFindingPersonalTitle": "有新安全问题时通过邮件通知我",
       "newFindingSection": "新安全问题通知",
@@ -1375,7 +1375,7 @@
       "unavailable": "此安全问题无法进行修复。"
     },
     "repositories": {
-      "couldNotLoad": "无法加载仓库设置。",
+      "couldNotLoad": "无法加载仓库设置",
       "githubAppSettings": "GitHub 应用设置",
       "manageAccess": "管理 GitHub 应用访问权限",
       "noRepositories": "暂无仓库",
@@ -1396,8 +1396,8 @@
       "analysisModeSubtitle": "{{mode}} 分析",
       "automationAllOff": "全部关闭",
       "automationCount": "已启用 {{displayCount}}/3 项",
-      "couldNotLoadPermissions": "无法加载权限信息。",
-      "couldNotLoadSettings": "无法加载安全智能体设置。",
+      "couldNotLoadPermissions": "无法加载权限信息",
+      "couldNotLoadSettings": "无法加载安全智能体设置",
       "disabledNoManage": "安全智能体已禁用。只有组织所有者、管理员和账单管理员可以启用。",
       "disabledNoRepo": "启用安全智能体前，请至少选择一个仓库。",
       "disabledPrompt": "启用安全智能体，即可同步 Dependabot 警报、选择仓库并配置自动化。",
@@ -1418,7 +1418,7 @@
       "couldNotOpenGithub": "无法打开 GitHub。请重试。"
     },
     "sla": {
-      "couldNotLoad": "无法加载 SLA 设置。",
+      "couldNotLoad": "无法加载 SLA 设置",
       "criticalDescription": "无需身份验证即可远程利用。",
       "deadlinesHeading": "修复期限（天）",
       "enableTracking": "启用 SLA 跟踪",

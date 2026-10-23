@@ -735,9 +735,9 @@ describe('Agent Profiles Router', () => {
       /**
        * Every row `listCombined` returns opens with the scope its bucket
        * implies, and only that scope: the mobile Profiles list navigates with
-       * the bucket's `organizationId`, so a row the list shows must read back
-       * through `get`. The opposite scope is NOT_FOUND rather than a different
-       * profile, which is what the client's stale-row state reports.
+       * the scope `ownerType` implies, so a row the list shows must read back
+       * through `get`. The opposite scope is NOT_FOUND rather than a
+       * different profile, which is what the client's stale-row state reports.
        */
       test('every listed profile reads back with its own bucket scope', async () => {
         const caller = await createCallerForUser(ownerUser.id);
@@ -753,32 +753,46 @@ describe('Agent Profiles Router', () => {
         const combined = await caller.agentProfiles.listCombined({
           organizationId: organizationA.id,
         });
-        expect(combined.orgProfiles.map(profile => profile.id)).toContain(orgProfileId);
-        expect(combined.personalProfiles.map(profile => profile.id)).toContain(personalProfileId);
-
-        const orgProfile = await caller.agentProfiles.get({
-          organizationId: organizationA.id,
-          profileId: orgProfileId,
-        });
-        expect(orgProfile.name).toBe('Listed Org Profile');
-
-        const personalProfile = await caller.agentProfiles.get({ profileId: personalProfileId });
-        expect(personalProfile.name).toBe('Listed Personal Profile');
+        // Each bucket holds only its own owner, tagged so the client can derive
+        // the scope to send.
+        expect(combined.orgProfiles).toHaveLength(1);
+        expect(combined.orgProfiles[0]?.id).toBe(orgProfileId);
+        expect(combined.orgProfiles[0]?.ownerType).toBe('organization');
+        expect(combined.personalProfiles).toHaveLength(1);
+        expect(combined.personalProfiles[0]?.id).toBe(personalProfileId);
+        expect(combined.personalProfiles[0]?.ownerType).toBe('user');
 
         // A full profile's collections survive the read the list's counts came
-        // from: the overview renders those counts, so a listing profile that
+        // from: the overview renders those counts, so a listed profile that
         // fails to read back is the reported defect.
         await caller.agentProfiles.setCommands({
           organizationId: organizationA.id,
           profileId: orgProfileId,
           commands: Array.from({ length: 20 }, (_, index) => `${'x'.repeat(480)}-${index}`),
         });
+
+        // Read back every listed row with the scope its owner tag implies.
+        for (const row of combined.orgProfiles) {
+          const detail = await caller.agentProfiles.get({
+            organizationId: organizationA.id,
+            profileId: row.id,
+          });
+          expect(detail.id).toBe(row.id);
+          expect(detail.name).toBe(row.name);
+        }
+        for (const row of combined.personalProfiles) {
+          const detail = await caller.agentProfiles.get({ profileId: row.id });
+          expect(detail.id).toBe(row.id);
+          expect(detail.name).toBe(row.name);
+        }
+
         const withCommands = await caller.agentProfiles.get({
           organizationId: organizationA.id,
           profileId: orgProfileId,
         });
         expect(withCommands.commands).toHaveLength(20);
 
+        // The opposite scope never resolves to that row.
         await expect(caller.agentProfiles.get({ profileId: orgProfileId })).rejects.toThrow(
           'Profile not found'
         );

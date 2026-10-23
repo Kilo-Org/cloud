@@ -3,12 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import {
+  findAll,
+  findOne,
   mountScreen,
   queryErrorProps,
   testProfile,
   type TestProfileDetail,
 } from '@/components/profiles/profile-overview-screen.test-helpers';
-import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 
 const h = vi.hoisted(() => ({
@@ -117,6 +118,7 @@ describe('ProfileOverviewScreen terminal error states', () => {
 
   it('stale row: NOT_FOUND names the missing profile, offers no Retry, and refreshes the lists', async () => {
     Object.assign(h.query, {
+      data: testProfile(),
       isError: true,
       isPending: false,
       error: { data: { code: 'NOT_FOUND', httpStatus: 404 } },
@@ -130,14 +132,17 @@ describe('ProfileOverviewScreen terminal error states', () => {
     // The not-found variant's own copy names the removal; the screen's generic
     // load-failure title would claim the app broke.
     expect(props.title).toBeUndefined();
-    // Retry would re-issue the same answer: the state offers a way back.
+    // Retry would re-issue the same answer, and the header's back control is
+    // already the way out, so no second control is composed here.
     expect(props.onRetry).toBeUndefined();
-    expect(props.action?.props.children.props.children).toBe('Go back');
-
-    act(() => {
-      props.action?.props.onPress();
-    });
-    expect(h.replace).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/profiles');
+    expect(props.action).toBeUndefined();
+    // A cached profile must not stay editable once the server refuses it.
+    expect(findAll(renderer.root, 'FormField')).toHaveLength(0);
+    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+    // Without history the header back lands on the Profiles list.
+    expect(findOne(renderer.root, 'ScreenHeader').props.backFallback).toBe(
+      '/(app)/(tabs)/(3_profile)/profiles'
+    );
 
     // The dead row leaves the lists; the failed detail read is not refetched.
     await waitFor(() =>
@@ -151,6 +156,7 @@ describe('ProfileOverviewScreen terminal error states', () => {
 
   it('permission: a refused read shows the permission state without Retry', async () => {
     Object.assign(h.query, {
+      data: testProfile(),
       isError: true,
       isPending: false,
       error: { data: { code: 'FORBIDDEN', httpStatus: 403 } },
@@ -161,12 +167,13 @@ describe('ProfileOverviewScreen terminal error states', () => {
     const props = queryErrorProps(renderer.root);
     expect(props.variant).toBe('permission');
     expect(props.onRetry).toBeUndefined();
-    expect(props.action).toBeDefined();
+    expect(props.action).toBeUndefined();
+    expect(findAll(renderer.root, 'FormField')).toHaveLength(0);
 
     unmount();
   });
 
-  it('retryable: a failure without a code keeps the banner and the Retry action', async () => {
+  it('retryable: a failure without a code keeps the banner, the Retry action and the cached editor', async () => {
     Object.assign(h.query, {
       data: testProfile(),
       isError: true,
@@ -180,7 +187,7 @@ describe('ProfileOverviewScreen terminal error states', () => {
     expect(props.variant).toBe('server');
     expect(props.title).toBe("Couldn't load profiles");
     expect(props.onRetry).toBeDefined();
-    expect(props.action).toBeUndefined();
+    expect(findAll(renderer.root, 'FormField').length).toBeGreaterThan(0);
 
     unmount();
   });

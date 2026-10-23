@@ -194,9 +194,11 @@ export function ProfileOverviewScreen({
     void queryClient.invalidateQueries(trpc.agentProfiles.listCombined.pathFilter());
   }, [staleRow, queryClient, trpc]);
 
-  const backToProfiles = () => {
-    router.replace(getProfilesPath());
-  };
+  // A terminal refusal replaces the editor: a cached profile the server says
+  // cannot be read must not stay editable (Save and Delete would only fail the
+  // same way). A retryable failure keeps the cached profile usable under the
+  // banner.
+  const showContent = profile !== undefined && (errorView === null || errorView.showRetry);
 
   const saveMetadata = async ({ name, description }: { name: string; description: string }) => {
     try {
@@ -238,7 +240,13 @@ export function ProfileOverviewScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={profile?.name ?? t('profiles.title')} />
+      {/* Back keeps the route it was opened from (the Profiles list, or the
+          session whose profile chip opened it); `backFallback` still lands on
+          Profiles when the app has no history, as a cold deep link does. */}
+      <ScreenHeader
+        title={profile?.name ?? t('profiles.title')}
+        backFallback={getProfilesPath()}
+      />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-6 px-6 pt-4"
@@ -249,9 +257,9 @@ export function ProfileOverviewScreen({
             above the content and only takes over when there is nothing to
             show. A confirmed-offline device is a connectivity failure, not a
             server one; `unknown` connectivity keeps the server variant. A
-            profile the server no longer serves (NOT_FOUND) or refuses
-            (FORBIDDEN) gets its own state with a way back instead of a Retry
-            that re-issues the same refusal. */}
+            profile the server refuses (NOT_FOUND, FORBIDDEN) gets its own
+            state, drops the Retry that would re-issue the same refusal, and
+            replaces the editor. */}
         {errorView ? (
           <QueryError
             variant={errorView.variant}
@@ -263,19 +271,12 @@ export function ProfileOverviewScreen({
             }
             onRetry={errorView.showRetry ? () => void profileQuery.refetch() : undefined}
             isRetrying={profileQuery.isRefetching}
-            action={
-              errorView.showRetry ? undefined : (
-                <Button variant="outline" onPress={backToProfiles}>
-                  <Text>{t('common.goBack')}</Text>
-                </Button>
-              )
-            }
           />
         ) : null}
 
         {!profileQuery.isError && profile === undefined ? <ProfileOverviewSkeleton /> : null}
 
-        {profile !== undefined ? (
+        {showContent ? (
           <>
             <ProfileMetadataForm
               key={metadataFormKey(profile)}

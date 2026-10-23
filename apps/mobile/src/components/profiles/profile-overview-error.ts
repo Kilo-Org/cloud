@@ -35,7 +35,11 @@ export function selectProfileOverviewErrorView(
     return { variant: 'permission', showRetry: false, staleRow: false };
   }
   if (isTerminalTrpcCode(code)) {
-    return { variant: 'server', showRetry: false, staleRow: false };
+    // Any other terminal refusal (a malformed id in a deep link, an
+    // unprocessable read) means the same thing to the reader: this profile
+    // cannot be opened. The not-found copy states that without the server
+    // variant's "please try again", which no control offers.
+    return { variant: 'not-found', showRetry: false, staleRow: false };
   }
   return {
     variant: connectivity === 'offline' ? 'offline' : 'server',

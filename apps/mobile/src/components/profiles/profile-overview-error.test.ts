@@ -21,10 +21,10 @@ describe('selectProfileOverviewErrorView', () => {
     ).toEqual({ variant: 'permission', showRetry: false, staleRow: false });
   });
 
-  it('keeps other terminal codes out of the retry loop', () => {
+  it('keeps other terminal codes out of the retry loop without claiming a stale row', () => {
     expect(
       selectProfileOverviewErrorView({ data: { code: 'BAD_REQUEST', httpStatus: 400 } }, 'online')
-    ).toEqual({ variant: 'server', showRetry: false, staleRow: false });
+    ).toEqual({ variant: 'not-found', showRetry: false, staleRow: false });
   });
 
   it('offers retry for an error without a code while the device is confirmed offline', () => {

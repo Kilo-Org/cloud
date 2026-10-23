@@ -7,7 +7,7 @@ import { QuestionCard } from './question-card';
 
 const a11yMocks = vi.hoisted(() => ({
   announceForA11y: vi.fn<(message: string) => void>(),
-  moveA11yFocus: vi.fn<() => boolean>(() => true),
+  requestA11yFocus: vi.fn<() => boolean>(() => true),
 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
@@ -173,8 +173,8 @@ function optionTextLines(root: TestRenderer.ReactTestInstance, label: string): s
 describe('QuestionCard custom answer selection', () => {
   beforeEach(() => {
     a11yMocks.announceForA11y.mockReset();
-    a11yMocks.moveA11yFocus.mockReset();
-    a11yMocks.moveA11yFocus.mockReturnValue(true);
+    a11yMocks.requestA11yFocus.mockReset();
+    a11yMocks.requestA11yFocus.mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -271,7 +271,7 @@ describe('QuestionCard custom answer selection', () => {
     // First mount misses the node handle (schedules a retry); the replacement
     // mount finds it (no new retry). If the effect dropped the shared cleanup,
     // the first retry would still fire after 50ms and focus the stale node.
-    a11yMocks.moveA11yFocus.mockReturnValueOnce(false).mockReturnValue(true);
+    a11yMocks.requestA11yFocus.mockReturnValueOnce(false).mockReturnValue(true);
 
     const renderer = await renderCard(makeQuestion());
 
@@ -287,14 +287,14 @@ describe('QuestionCard custom answer selection', () => {
     });
 
     vi.advanceTimersByTime(100);
-    expect(a11yMocks.moveA11yFocus).toHaveBeenCalledTimes(2);
+    expect(a11yMocks.requestA11yFocus).toHaveBeenCalledTimes(2);
   });
 
   it('cancels the delayed focus retry on unmount', async () => {
     vi.useFakeTimers();
     // The first focus attempt misses the node handle, so a retry is scheduled.
     // The effect cleanup must clear it before it can focus an unmounted node.
-    a11yMocks.moveA11yFocus.mockReturnValueOnce(false).mockReturnValue(true);
+    a11yMocks.requestA11yFocus.mockReturnValueOnce(false).mockReturnValue(true);
 
     const renderer = await renderCard(makeQuestion());
 
@@ -303,7 +303,7 @@ describe('QuestionCard custom answer selection', () => {
     });
 
     vi.advanceTimersByTime(100);
-    expect(a11yMocks.moveA11yFocus).toHaveBeenCalledTimes(1);
+    expect(a11yMocks.requestA11yFocus).toHaveBeenCalledTimes(1);
   });
 });
 

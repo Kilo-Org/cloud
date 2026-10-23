@@ -36,6 +36,7 @@ vi.mock('@/components/empty-state', () => ({
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/lib/a11y/tap-target', () => ({ STATE_ACTION_CLASS: 'min-h-[48px]' }));
 
 let mounted: TestRenderer.ReactTestRenderer | undefined = undefined;
 

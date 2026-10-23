@@ -427,6 +427,10 @@ describe('login route language refresh', () => {
 
   it('remounts the sign-in screen and re-labels it in the applied language', async () => {
     vi.mocked(restoreLoginDrafts).mockClear();
+    vi.mocked(restoreLoginDrafts).mockResolvedValue({
+      email: 'typed@example.com',
+      ssoRecovery: null,
+    });
     const renderer = await mountLoginRoute();
     const mountsBeforeSwitch = vi.mocked(restoreLoginDrafts).mock.calls.length;
     expect(mountsBeforeSwitch).toBeGreaterThan(0);
@@ -449,9 +453,17 @@ describe('login route language refresh', () => {
         .map(node => node.props.accessibilityLabel);
       expect(pressableLabels).toContain(i18n.t('common.language'));
       expect(pressableLabels).not.toContain('Language');
+      // The remount keeps the address the person had typed, so a language
+      // change does not blank the field it re-labels.
+      const idleAuth = findByType(renderer.root, 'IdleAuth')[0];
+      expect(idleAuth?.props.initialEmail).toBe('typed@example.com');
     } finally {
       await act(async () => {
         await i18n.changeLanguage('en');
+      });
+      vi.mocked(restoreLoginDrafts).mockResolvedValue({
+        email: '',
+        ssoRecovery: null,
       });
     }
 

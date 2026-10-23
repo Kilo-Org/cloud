@@ -1,8 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { type Href, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, useWindowDimensions, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
@@ -28,7 +27,7 @@ import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
-import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
+import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 
 import { BetaPill } from './beta-pill';
 import { ChatRow } from './chat-row';
@@ -60,12 +59,7 @@ function ScopedChatListScreen() {
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
   const place = useChatPlace();
-  const { bottom } = useSafeAreaInsets();
-  const { fontScale } = useWindowDimensions();
-  const tabBarHeight = useMemo(
-    () => getEffectiveTabBarHeight({ bottomInset: bottom, platform: Platform.OS, fontScale }),
-    [bottom, fontScale]
-  );
+  const tabBarHeight = useEffectiveTabBarHeight();
 
   const {
     models,

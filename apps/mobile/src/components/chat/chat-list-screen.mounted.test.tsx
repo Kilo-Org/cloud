@@ -54,6 +54,7 @@ vi.mock('@/lib/hooks/use-available-models', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ primaryForeground: '#fff' }),
 }));
+vi.mock('@/lib/tab-bar-clearance', () => ({ useEffectiveTabBarHeight: () => 0 }));
 vi.mock('@/lib/tab-bar-layout', () => ({ getEffectiveTabBarHeight: () => 0 }));
 vi.mock('sonner-native', () => ({
   toast: { error: state.toastError, dismiss: state.toastDismiss },

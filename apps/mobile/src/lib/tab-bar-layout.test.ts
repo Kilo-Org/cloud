@@ -22,6 +22,7 @@ import {
   tabBarPosition,
   tabLabelFits,
   tabLabelLineCount,
+  tabLabelLines,
   tabLabelNumberOfLines,
   tabLabelWidth,
   visibleTabCount,
@@ -38,19 +39,19 @@ const LABEL_SOURCE = readFileSync(
 
 describe('getTabBarOverlayHeight', () => {
   it('includes the bottom safe area on iOS', () => {
-    expect(getTabBarOverlayHeight(34, 'ios')).toBe(84);
+    expect(getTabBarOverlayHeight({ bottomInset: 34, platform: 'ios' })).toBe(84);
   });
 
   it('includes the Android extra padding used by the tab bar', () => {
-    expect(getTabBarOverlayHeight(16, 'android')).toBe(70);
+    expect(getTabBarOverlayHeight({ bottomInset: 16, platform: 'android' })).toBe(70);
   });
 
   it('ignores negative insets', () => {
-    expect(getTabBarOverlayHeight(-1, 'ios')).toBe(50);
+    expect(getTabBarOverlayHeight({ bottomInset: -1, platform: 'ios' })).toBe(50);
   });
 
   it('grows to preserve scaled tab labels', () => {
-    expect(getTabBarOverlayHeight(34, 'ios', 3)).toBe(164);
+    expect(getTabBarOverlayHeight({ bottomInset: 34, platform: 'ios', fontScale: 3 })).toBe(164);
   });
 });
 
@@ -68,22 +69,22 @@ describe('tabLabelLineCount', () => {
   it('agrees with the height the bar reserves', () => {
     // The bar reserves one label line below the wrap threshold and two above
     // it; the label is never allowed to render more lines than that.
-    expect(getTabBarOverlayHeight(0, 'android', 1)).toBeCloseTo(
-      34 + 16 * 1 * tabLabelLineCount(1) + 4
-    );
-    expect(getTabBarOverlayHeight(0, 'android', 1.9)).toBeCloseTo(
-      34 + 16 * 1.9 * tabLabelLineCount(1.9) + 4
-    );
+    expect(
+      getTabBarOverlayHeight({ bottomInset: 0, platform: 'android', fontScale: 1 })
+    ).toBeCloseTo(34 + 16 * 1 * tabLabelLineCount(1) + 4);
+    expect(
+      getTabBarOverlayHeight({ bottomInset: 0, platform: 'android', fontScale: 1.9 })
+    ).toBeCloseTo(34 + 16 * 1.9 * tabLabelLineCount(1.9) + 4);
   });
 });
 
 describe('getEffectiveTabBarHeight', () => {
   it('uses the label-inclusive overlay height below the icon-forward threshold', () => {
     expect(getEffectiveTabBarHeight({ bottomInset: 34, platform: 'ios', fontScale: 1 })).toBe(
-      getTabBarOverlayHeight(34, 'ios', 1)
+      getTabBarOverlayHeight({ bottomInset: 34, platform: 'ios', fontScale: 1 })
     );
     expect(getEffectiveTabBarHeight({ bottomInset: 34, platform: 'ios', fontScale: 1.8 })).toBe(
-      getTabBarOverlayHeight(34, 'ios', 1.8)
+      getTabBarOverlayHeight({ bottomInset: 34, platform: 'ios', fontScale: 1.8 })
     );
   });
 
@@ -268,122 +269,56 @@ describe('shouldShowTabLabel', () => {
     expect(shouldShowTabLabel(3)).toBe(false);
   });
 
-  it('drops the labels when any label is too wide for its tab', () => {
-    // Reported geometry: 160dp / 5 tabs = 32dp per tab, 22dp for the label
-    expect(shouldShowTabLabel(1, 160 / 5, ['Home', 'KiloClaw', 'Agents', 'Chat', 'Profile'])).toBe(
-      false
-    );
+  it('never hides the labels because of the window width', () => {
+    // The reported bar: 160dp over five tabs leaves a 22dp box that no label
+    // fits, and the old width rule dropped every label. Width now decides how
+    // many lines a label takes, never whether the row exists.
+    expect(shouldShowTabLabel(1)).toBe(true);
+  });
+});
+
+describe('tabLabelLines', () => {
+  it('keeps a label that fits its tab on one line', () => {
+    expect(tabLabelLines('Profile', 360 / 3)).toBe(1);
+    expect(tabLabelLines('Home', 360 / 5)).toBe(1);
   });
 
-  it('keeps the labels when every label fits its tab', () => {
-    expect(shouldShowTabLabel(1, 360 / 5, ['Home', 'KiloClaw', 'Agents', 'Chat', 'Profile'])).toBe(
-      true
-    );
+  it('gives a space-separated label a second line when it does not fit', () => {
+    expect(tabLabelLines('الملف الشخصي', 360 / 5)).toBe(2);
+    expect(tabLabelLines('Bogga shakhsiga', 160 / 3)).toBe(2);
+    expect(tabLabelLines('Quick Chat', 160 / 3)).toBe(2);
   });
 
-  it('drops the labels when a space-separated label overflows its single line', () => {
-    // `so` `common.profile` = "Bogga shakhsiga" (15 glyphs = 102dp) does not
-    // fit a 43.3dp label box at 160dp, so the bar goes icon-only instead of
-    // rendering a tail-ellipsized label.
-    expect(shouldShowTabLabel(1, 160 / 3, ['Home', 'Agents', 'Bogga shakhsiga'])).toBe(false);
-    // "Quick Chat" (10 glyphs = 68dp) overflows even though each word alone
-    // fits, so the widest-word measure would wrongly keep the labels.
-    expect(shouldShowTabLabel(1, 160 / 3, ['Home', 'Agents', 'Quick Chat'])).toBe(false);
+  it('keeps a single word on one line so it shrinks instead of breaking mid-word', () => {
+    expect(tabLabelLines('Conversazioni', 60)).toBe(1);
+    expect(tabLabelLines('設定', 20)).toBe(1);
   });
 
-  it('keeps a space-separated label once its whole line fits the tab', () => {
-    expect(shouldShowTabLabel(1, 360 / 3, ['Home', 'Agents', 'Bogga shakhsiga'])).toBe(true);
+  it('keeps the two lines of copy that carries its own break', () => {
+    expect(tabLabelLines('Kilo\nClaw', 400)).toBe(2);
   });
 
-  it('keeps the width rule from overriding the font-scale rule', () => {
-    expect(shouldShowTabLabel(2, 160 / 5, ['Home'])).toBe(false);
-  });
-
-  it('keeps the Arabic labels at the narrow phone width that used to drop them', () => {
-    // The reported geometry: a 360dp window with four tabs gives each tab
-    // 90dp and the label an 80dp box. The old mono-advance measure estimated
-    // الملف الشخصي at 81.6dp, so that bar dropped its whole label row — the
-    // visible labels and their focused/unfocused colour emphasis with it —
-    // while the same window kept its (narrower) Japanese labels. The
-    // RTL-script advance measures the widest Arabic label at 75.55dp, so the
-    // row stays.
-    const arabicLabels = ['الرئيسية', 'الوكلاء', 'الدردشة', 'الملف الشخصي'];
-    const widestArabicLabel = 'الملف الشخصي';
-    expect(tabLabelWidth(widestArabicLabel)).toBeLessThan(360 / 4 - 10);
-    expect(shouldShowTabLabel(1, 360 / 4, arabicLabels)).toBe(true);
-    // The same labels genuinely cannot fit a five-tab box (62dp), so the
-    // width rule still does its job in Arabic.
-    expect(shouldShowTabLabel(1, 360 / 5, arabicLabels)).toBe(false);
-  });
-
-  it('drops an Arabic label row that genuinely cannot fit its tab', () => {
-    // 160dp / 3 tabs leaves a 43.3dp box; الوكلاء needs ~43.75dp.
-    expect(shouldShowTabLabel(1, 160 / 3, ['الرئيسية', 'الوكلاء', 'الدردشة'])).toBe(false);
+  it('keeps every label that fits at phone width on one line', () => {
+    for (const label of ['Home', 'Agents', 'Profile', 'Chat']) {
+      expect(tabLabelFits(label, 360 / 5)).toBe(true);
+      expect(tabLabelLines(label, 360 / 5)).toBe(1);
+    }
   });
 });
 
 describe('tab label shrink floor', () => {
-  // `TabLabel` asks the platform to shrink an overflowing label and caps the
-  // shrink at `TAB_LABEL_MINIMUM_FONT_SCALE` on iOS; RN implements
-  // `minimumFontScale` on iOS only, so Android's `adjustsFontSizeToFit` floors
-  // at RN's own platform minimum instead. The cap is therefore a residual
-  // guard, and the legibility guarantee has to come from the width rule: the
-  // bar drops the whole label row as soon as one full-size label would not fit
-  // its tab, so every label that renders already fits at scale 1 and no label
-  // can reach either platform's floor. This suite pins that contract — the
-  // platform cap may not be the thing that keeps the labels legible.
-  const LABEL_SETS: readonly (readonly string[])[] = [
-    ['Home', 'Agents', 'Profile'],
-    ['Home', 'KiloClaw', 'Agents', 'Chat', 'Profile'],
-    ['Home', 'Agents', 'Bogga shakhsiga'],
-    ['الرئيسية', 'الوكلاء', 'الدردشة', 'الملف الشخصي'],
-  ];
-  // The label box is the tab item minus its 10dp horizontal padding.
-  const TAB_ITEM_PADDING = 10;
-  const TAB_WIDTHS = [40, 50, 72, 80, 90, 106.67, 120, 200];
-
-  it('renders every label at the full size that already fits its tab', () => {
-    const renderedRows: { labels: readonly string[]; tabWidth: number }[] = [];
-    for (const labels of LABEL_SETS) {
-      for (const tabWidth of TAB_WIDTHS) {
-        if (shouldShowTabLabel(1, tabWidth, labels)) {
-          renderedRows.push({ labels, tabWidth });
-        }
-      }
+  // A one-line label asks the platform to shrink it and caps the shrink at
+  // TAB_LABEL_MINIMUM_FONT_SCALE on iOS (Android floors at RN's own minimum).
+  // The bar no longer drops the row when the cap cannot save a label: the label
+  // tail-truncates, so the row stays and the tab keeps its visible name.
+  it('keeps one line for a word that cannot fit its tab even at the floor', () => {
+    // Profile is 47.6dp wide; a 30dp label box would need a 0.63 shrink, below
+    // the 0.75 cap, so the label tail-truncates instead of wrapping mid-word.
+    expect(tabLabelWidth('Profile')).toBeGreaterThan((40 - 10) / TAB_LABEL_MINIMUM_FONT_SCALE);
+    expect(tabLabelLines('Profile', 40)).toBe(1);
+    for (const label of ['Conversazioni', '設定']) {
+      expect(tabLabelLines(label, 20)).toBe(1);
     }
-    // Guard against a vacuous sweep that never renders a label row.
-    expect(renderedRows.length).toBeGreaterThan(0);
-    for (const { labels, tabWidth } of renderedRows) {
-      const box = tabWidth - TAB_ITEM_PADDING;
-      for (const label of labels) {
-        expect(tabLabelFits(label, tabWidth)).toBe(true);
-        // A full-size render fits, so the shrink the platform is asked for
-        // stays a sub-1.0 margin, above `TAB_LABEL_MINIMUM_FONT_SCALE`.
-        expect(box / tabLabelWidth(label)).toBeGreaterThanOrEqual(TAB_LABEL_MINIMUM_FONT_SCALE);
-      }
-    }
-  });
-
-  it('drops the label row before a label could need a shrink below the floor', () => {
-    const floorBoundLabels = ['Profile', 'Kilo Claw', 'Bogga shakhsiga', '設定'];
-    // The long Arabic profile label: at a narrow tab it also only fits by
-    // shrinking below the floor, so the row must drop rather than clip.
-    const floorBoundJoinedLabels = ['الملف الشخصي'];
-    let checkedWidths = 0;
-    for (const label of [...floorBoundLabels, ...floorBoundJoinedLabels]) {
-      for (const tabWidth of TAB_WIDTHS) {
-        const box = tabWidth - TAB_ITEM_PADDING;
-        // The label would only fit by shrinking below the floor, so the bar
-        // must drop the row rather than lean on the iOS-only cap to keep it
-        // legible.
-        if (tabLabelWidth(label) > box / TAB_LABEL_MINIMUM_FONT_SCALE) {
-          checkedWidths += 1;
-          expect(shouldShowTabLabel(1, tabWidth, [label])).toBe(false);
-        }
-      }
-    }
-    // The sweep must actually cross the floor boundary.
-    expect(checkedWidths).toBeGreaterThan(0);
   });
 });
 
@@ -414,11 +349,11 @@ describe('mirrored tab label metrics', () => {
   it('mirrors the component font size and tracking in the width estimate', () => {
     // JetBrains Mono advances 0.6em per glyph; the label adds 0.2px tracking.
     // `tabLabelWidth` must use the same 11px/0.2px the component's class sets,
-    // and the component must render one line via `tabLabelNumberOfLines`.
+    // and the component renders that line count (its own break rule first).
     expect(LABEL_SOURCE).toContain(
       'font-mono-medium text-[11px] leading-4 uppercase tracking-[0.2px]'
     );
-    expect(LABEL_SOURCE).toContain('numberOfLines={tabLabelNumberOfLines(label)}');
+    expect(LABEL_SOURCE).toContain('numberOfLines={resolvedLines}');
     expect(tabLabelWidth('A')).toBeCloseTo(0.6 * 11 + 0.2);
   });
 });

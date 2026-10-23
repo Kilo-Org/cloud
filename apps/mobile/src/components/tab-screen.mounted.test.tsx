@@ -61,7 +61,9 @@ function Probe() {
 async function clearanceFor(showLabel: boolean | null): Promise<number> {
   const probe = createElement(Probe);
   const ui =
-    showLabel === null ? probe : createElement(TabBarLabelContext, { value: showLabel }, probe);
+    showLabel === null
+      ? probe
+      : createElement(TabBarLabelContext, { value: { showLabel, labelLines: 1 } }, probe);
   const mounted = await renderWithProviders(ui);
   try {
     return mounted.renderer.root.findByType('Probe').props.padding as number;
@@ -100,7 +102,11 @@ describe('tab screen bottom clearance', () => {
 
   it('keeps the label-inclusive height when the layout keeps the labels', async () => {
     await expect(clearanceFor(true)).resolves.toBe(
-      getTabBarOverlayHeight(layout.bottom, 'android', layout.fontScale) + TAB_SCREEN_BOTTOM_GAP
+      getTabBarOverlayHeight({
+        bottomInset: layout.bottom,
+        platform: 'android',
+        fontScale: layout.fontScale,
+      }) + TAB_SCREEN_BOTTOM_GAP
     );
   });
 

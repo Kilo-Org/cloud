@@ -75,17 +75,39 @@ type TabBarPlatform = 'android' | 'ios' | 'macos' | 'windows' | 'web';
  * ("PROFIL E", 480x1000 @ 480 = 160 dp, e1, 2026-09-21). Above the threshold the
  * bar grows the second line for the two-line `tabs.kiloclawWrapped` label.
  */
-export function tabLabelLineCount(fontScale = 1): 1 | 2 {
-  return fontScale > TAB_LABEL_WRAP_FONT_SCALE ? 2 : 1;
+export function tabLabelLineCount(fontScale = 1, needsWrap = false): 1 | 2 {
+  return fontScale > TAB_LABEL_WRAP_FONT_SCALE || needsWrap ? 2 : 1;
 }
 
-export function getTabBarOverlayHeight(
-  bottomInset: number,
-  platform: TabBarPlatform,
-  fontScale = 1
-): number {
-  const labelLines = tabLabelLineCount(fontScale);
-  const tabContentHeight = 34 + 16 * fontScale * labelLines;
+/**
+ * Lines one tab's label needs at the current window width. Copy that carries
+ * its own break keeps two lines. A label that fits its tab keeps one. A label
+ * that does not fit takes a second line only when it can break between words:
+ * a single word wider than its tab stays on one line and shrinks, because a
+ * mid-word wrap leaves the bar unreadable (155c33b5).
+ */
+export function tabLabelLines(label: string, tabWidth: number, fontScale = 1): 1 | 2 {
+  if (tabLabelNumberOfLines(label) === 2) {
+    return 2;
+  }
+  if (fontScale > TAB_LABEL_WRAP_FONT_SCALE || tabLabelFits(label, tabWidth, fontScale)) {
+    return 1;
+  }
+  return label.includes(' ') ? 2 : 1;
+}
+
+export function getTabBarOverlayHeight({
+  bottomInset,
+  platform,
+  fontScale = 1,
+  lines = tabLabelLineCount(fontScale),
+}: {
+  bottomInset: number;
+  platform: TabBarPlatform;
+  fontScale?: number;
+  lines?: 1 | 2;
+}): number {
+  const tabContentHeight = 34 + 16 * fontScale * lines;
   return (
     Math.max(TAB_BAR_BASE_HEIGHT, tabContentHeight) +
     Math.max(bottomInset, 0) +
@@ -121,24 +143,27 @@ export function getTabBarIconSize(fontScale = 1): number {
  * is the single source of truth for both the tab bar itself and the content
  * clearance below it: it switches to the compact icon-forward height once labels
  * are hidden, and otherwise uses the label-inclusive overlay height. Callers
- * that already decided the label state (from the window width) pass it as
- * `showLabel`; the default keeps the font-scale-only answer. Tab screens use
- * `useEffectiveTabBarHeight` (`tab-bar-clearance.ts`), which supplies the tab
- * layout's decision so the clearance cannot drift from the rendered height.
+ * that already decided the label state and the reserved line count pass them as
+ * `showLabel` and `labelLines`; the defaults keep the font-scale-only answer.
+ * Tab screens use `useEffectiveTabBarHeight` (`tab-bar-clearance.ts`), which
+ * supplies the tab layout's decision so the clearance cannot drift from the
+ * rendered height.
  */
 export function getEffectiveTabBarHeight({
   bottomInset,
   platform,
   fontScale = 1,
   showLabel = shouldShowTabLabel(fontScale),
+  labelLines = tabLabelLineCount(fontScale),
 }: {
   bottomInset: number;
   platform: TabBarPlatform;
   fontScale?: number;
   showLabel?: boolean;
+  labelLines?: 1 | 2;
 }): number {
   return showLabel
-    ? getTabBarOverlayHeight(bottomInset, platform, fontScale)
+    ? getTabBarOverlayHeight({ bottomInset, platform, fontScale, lines: labelLines })
     : getTabBarIconForwardHeight(bottomInset, platform);
 }
 
@@ -162,25 +187,14 @@ export function getTabBarHorizontalInset({
 }
 
 /**
- * Whether the tab bar shows visible labels. Labels are dropped at and above
- * `TAB_ICON_FORWARD_FONT_SCALE` (the bar would balloon with the scaled label),
- * and when any label is too wide for its tab at the current window width (RN
- * would tail-ellipsize it, or wrap a `\n` line mid-word). With no `labels` the
- * per-tab width is unknown, so only the font-scale rule applies — the previous
- * behaviour, unchanged for callers that do not pass a tab width.
+ * Whether the tab bar shows visible labels at all. Labels are dropped only at
+ * and above `TAB_ICON_FORWARD_FONT_SCALE`, where the bar would balloon with the
+ * scaled label; assistive tech still names every tab. Width never hides the
+ * labels: one label too wide for its tab takes a second line, or shrinks on its
+ * own, while the others keep their full-size label (`tabLabelLines`).
  */
-export function shouldShowTabLabel(
-  fontScale = 1,
-  tabWidth = Number.POSITIVE_INFINITY,
-  labels: readonly string[] = []
-): boolean {
-  if (fontScale >= TAB_ICON_FORWARD_FONT_SCALE) {
-    return false;
-  }
-  if (labels.length === 0) {
-    return true;
-  }
-  return labels.every(label => tabLabelFits(label, tabWidth, fontScale));
+export function shouldShowTabLabel(fontScale = 1): boolean {
+  return fontScale < TAB_ICON_FORWARD_FONT_SCALE;
 }
 
 /**

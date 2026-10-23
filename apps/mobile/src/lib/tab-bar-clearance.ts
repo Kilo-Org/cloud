@@ -6,14 +6,15 @@ import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 
 /**
  * The tab layout's label decision for the current window, published to the tab
- * screens so their content clearance matches the rendered bar height. The
- * decision turns on the window width, which a clearance caller cannot see from
- * `fontScale` alone: without it a caller reserves the label-inclusive height
- * while the bar renders compact (labels dropped for width). `null` outside the
- * tabs navigator, where `getEffectiveTabBarHeight` keeps its font-scale-only
- * default.
+ * screens so their content clearance matches the rendered bar height. Both the
+ * visible/hidden decision and the reserved line count can change without the
+ * font scale: one label too wide for its tab takes a second line, which makes
+ * the bar taller. `null` outside the tabs navigator, where
+ * `getEffectiveTabBarHeight` keeps its font-scale-only default.
  */
-export const TabBarLabelContext = createContext<boolean | null>(null);
+export type TabBarLabelState = { showLabel: boolean; labelLines: 1 | 2 };
+
+export const TabBarLabelContext = createContext<TabBarLabelState | null>(null);
 
 /**
  * Effective rendered tab bar height for a screen's content clearance: the tabs
@@ -23,11 +24,12 @@ export const TabBarLabelContext = createContext<boolean | null>(null);
 export function useEffectiveTabBarHeight(): number {
   const { bottom } = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
-  const showLabel = useContext(TabBarLabelContext) ?? undefined;
+  const state = useContext(TabBarLabelContext) ?? undefined;
   return getEffectiveTabBarHeight({
     bottomInset: bottom,
     platform: Platform.OS,
     fontScale,
-    showLabel,
+    showLabel: state?.showLabel,
+    labelLines: state?.labelLines,
   });
 }

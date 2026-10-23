@@ -12,6 +12,7 @@ import { SessionListSearchHeader } from './session-list-search-header';
 import {
   COMPACT_CONTROL_HIT_SLOP_DP,
   MIN_TAP_TARGET_DP,
+  SEARCH_FIELD_CLEAR_FACING_HIT_SLOP_DP,
   TOUCH_TARGET_DP,
 } from '@/lib/a11y/tap-target';
 
@@ -34,8 +35,12 @@ function slopInsets(hitSlop: unknown): Insets {
   return { top: insets.top, right: insets.right, bottom: insets.bottom, left: insets.left };
 }
 
+// The clear control's facing side resolves through the interface direction at
+// render time, so the native module is a mutable stub the RTL case flips.
+const layoutDirection = vi.hoisted(() => ({ isRTL: false }));
+
 vi.mock('react-native', () => ({
-  I18nManager: { isRTL: false },
+  I18nManager: layoutDirection,
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
@@ -102,13 +107,17 @@ describe('SessionListSearchHeader clear button touch target', () => {
     // behind the order Tailwind emits its rules in.
     expect(clear.props.className).toContain('h-[38px] w-[38px]');
     expect(clear.props.className).toContain('items-center');
+    // The glyph keeps its old inset through a logical margin, so the box ends
+    // where `-mr-2` put it in LTR and mirrors with the row in RTL.
+    expect(clear.props.className).toContain('-me-2');
+    expect(clear.props.className).not.toContain('-mr-2');
     const slop = slopInsets(clear.props.hitSlop);
     expect(slop.top).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
     expect(slop.right).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
     expect(slop.bottom).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
     // The left side stops at the row's `gap-2` (7pt at the app's 14pt rem) so
     // the control's touch region meets the input's instead of covering it.
-    expect(slop.left).toBe(7);
+    expect(slop.left).toBe(SEARCH_FIELD_CLEAR_FACING_HIT_SLOP_DP);
 
     const declarations = (await compiledDimensions(clear.props.className as string)) as {
       height?: number;
@@ -123,6 +132,31 @@ describe('SessionListSearchHeader clear button touch target', () => {
     expect(box.width + slop.left + slop.right).toBeGreaterThan(TOUCH_TARGET_DP);
 
     renderer.unmount();
+  });
+
+  it('caps the side facing the input in RTL, where the row mirrors', () => {
+    layoutDirection.isRTL = true;
+    try {
+      const renderer = mount(true);
+      const clear = renderer.root.find(
+        node =>
+          typeof node.type === 'string' &&
+          (node.type as string) === 'Pressable' &&
+          node.props.accessibilityLabel === 'common.clearSearch'
+      );
+      const slop = slopInsets(clear.props.hitSlop);
+      // The control is still at the field's logical end, which RTL draws on
+      // the left, so the input is on its right: the gap-capped side is the
+      // right one and the outer side keeps the full slop.
+      expect(slop.right).toBe(SEARCH_FIELD_CLEAR_FACING_HIT_SLOP_DP);
+      expect(slop.left).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
+      expect(slop.top).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
+      expect(slop.bottom).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
+
+      renderer.unmount();
+    } finally {
+      layoutDirection.isRTL = false;
+    }
   });
 
   it('reserves the target height in the field so the button never grows it', () => {

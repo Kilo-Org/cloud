@@ -1,9 +1,16 @@
 /* eslint-disable max-lines -- The picker's search, empty-state and bottom-inset contracts share one mount harness. */
 import { createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
+import { compiledDimensions } from '@/test/native-dimensions';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import {
+  COMPACT_CONTROL_HIT_SLOP_DP,
+  MIN_TAP_TARGET_DP,
+  SEARCH_FIELD_CLEAR_FACING_HIT_SLOP_DP,
+  TOUCH_TARGET_DP,
+} from '@/lib/a11y/tap-target';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { type ModelPickerRow } from '@/lib/model-picker-rows';
 import { type ModelPickerBridge } from '@/lib/picker-bridge';
@@ -484,6 +491,55 @@ describe('ModelPickerContent deferred search', () => {
     // Clearing drops the query the rows derive from and hides the affordance.
     expect(listedDisplayIds(renderer)).toHaveLength(TOTAL_OPTIONS);
     expect(clearSearchButtons(renderer)).toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('gives the in-field clear control a frame the size audit can measure', async () => {
+    const renderer = await mount();
+
+    await act(async () => {
+      typeSearch(renderer, FINAL_QUERY);
+      await Promise.resolve();
+    });
+
+    const [clear] = clearSearchButtons(renderer);
+    if (!clear) {
+      throw new Error('clear affordance not found');
+    }
+
+    // The regression this guards: the control was a bare 16pt glyph with only
+    // `hitSlop`, and the size audit reads the node's own rect.
+    expect(clear.props.className).toContain('h-[38px] w-[38px]');
+    expect(clear.props.className).toContain('items-center');
+    expect(clear.props.className).toContain('-me-2');
+    expect(clear.props.hitSlop).toEqual({
+      top: COMPACT_CONTROL_HIT_SLOP_DP,
+      bottom: COMPACT_CONTROL_HIT_SLOP_DP,
+      left: SEARCH_FIELD_CLEAR_FACING_HIT_SLOP_DP,
+      right: COMPACT_CONTROL_HIT_SLOP_DP,
+    });
+
+    const declarations = (await compiledDimensions(clear.props.className as string)) as {
+      height?: number;
+      width?: number;
+    }[];
+    const box = Object.assign({}, ...declarations) as { height: number; width: number };
+    expect(box.height).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+    expect(box.width).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+    expect(box.height + 2 * COMPACT_CONTROL_HIT_SLOP_DP).toBeGreaterThan(TOUCH_TARGET_DP);
+    expect(
+      box.width + SEARCH_FIELD_CLEAR_FACING_HIT_SLOP_DP + COMPACT_CONTROL_HIT_SLOP_DP
+    ).toBeGreaterThan(TOUCH_TARGET_DP);
+    // The field row keeps its height: the box sits under the input's 44pt
+    // floor, so revealing the control cannot grow the row the list sits below.
+    const inputDeclarations = (await compiledDimensions(
+      searchInput(renderer).props.className as string
+    )) as { minHeight?: number }[];
+    const inputBox = Object.assign({}, ...inputDeclarations) as { minHeight?: number };
+    expect(inputBox.minHeight ?? 0).toBeGreaterThan(box.height);
 
     act(() => {
       renderer.unmount();

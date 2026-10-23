@@ -24,6 +24,9 @@ import {
   INLINE_LINK_VERTICAL_HIT_SLOP_DP,
   inlineLinkHitSlop,
   MIN_TAP_TARGET_DP,
+  SEARCH_FIELD_CLEAR_BOX_CLASS,
+  SEARCH_FIELD_CLEAR_FACING_HIT_SLOP_DP,
+  searchFieldClearHitSlop,
   tapTargetReachDp,
   TOUCH_TARGET_DP,
   VOICE_INPUT_LG_HIT_SLOP_DP,
@@ -166,6 +169,65 @@ describe('shared tap-target geometry', () => {
       right: outer,
     });
     expect(inlineLinkHitSlop('end')).toEqual({
+      top: vertical,
+      bottom: vertical,
+      left: outer,
+      right: facing,
+    });
+
+    rtl.isRTL = false;
+  });
+});
+
+describe('search field clear control geometry', () => {
+  it('renders a 38pt box that clears the audit floor from whole pixels', async () => {
+    expect(SEARCH_FIELD_CLEAR_BOX_CLASS).toContain('h-[38px]');
+    expect(SEARCH_FIELD_CLEAR_BOX_CLASS).toContain('w-[38px]');
+    expect(SEARCH_FIELD_CLEAR_BOX_CLASS).toContain('items-center');
+    expect(SEARCH_FIELD_CLEAR_BOX_CLASS).toContain('justify-center');
+    // The regression this guards: the control was sized to its 16pt glyph and
+    // the size audit reported a 16dp target.
+    const box = await compiledDp(SEARCH_FIELD_CLEAR_BOX_CLASS, 'height');
+    expect(box).toBe(38);
+    expect(box).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+  });
+
+  it('caps the facing side at the row gap the control actually sits beside', () => {
+    // `gap-2` is 0.5rem, and NativeWind's rem measures 14pt on device, so the
+    // constant and the row's class have to move together: a wider facing slop
+    // than the gap would cover the input's own tap area.
+    expect(SEARCH_FIELD_CLEAR_FACING_HIT_SLOP_DP).toBe(0.5 * 14);
+    expect(SEARCH_FIELD_CLEAR_FACING_HIT_SLOP_DP).toBeLessThan(COMPACT_CONTROL_HIT_SLOP_DP);
+  });
+
+  it('reaches past the design target with the capped slop', async () => {
+    const box = await compiledDp(SEARCH_FIELD_CLEAR_BOX_CLASS, 'height');
+    const across = box + SEARCH_FIELD_CLEAR_FACING_HIT_SLOP_DP + COMPACT_CONTROL_HIT_SLOP_DP;
+    const down = box + 2 * COMPACT_CONTROL_HIT_SLOP_DP;
+    // Past 44pt, not onto it: a 44dp target measured 43.81dp at density 420.
+    expect(across).toBeGreaterThan(TOUCH_TARGET_DP);
+    expect(down).toBeGreaterThan(TOUCH_TARGET_DP);
+  });
+
+  it('resolves the facing side through the interface direction', () => {
+    const vertical = COMPACT_CONTROL_HIT_SLOP_DP;
+    const facing = SEARCH_FIELD_CLEAR_FACING_HIT_SLOP_DP;
+    const outer = COMPACT_CONTROL_HIT_SLOP_DP;
+
+    // LTR: the control sits at the row's end and faces the input on its left.
+    rtl.isRTL = false;
+    expect(searchFieldClearHitSlop()).toEqual({
+      top: vertical,
+      bottom: vertical,
+      left: facing,
+      right: outer,
+    });
+
+    // RTL: the flex-row mirrors, so the same control faces the input on its
+    // right. A hardcoded left cap would put the wide side against the input
+    // and the narrow side on the field's outer edge.
+    rtl.isRTL = true;
+    expect(searchFieldClearHitSlop()).toEqual({
       top: vertical,
       bottom: vertical,
       left: outer,

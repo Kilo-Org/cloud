@@ -13,6 +13,7 @@ import { PickerSheet } from '@/components/picker-sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
+import { SEARCH_FIELD_CLEAR_BOX_CLASS, searchFieldClearHitSlop } from '@/lib/a11y/tap-target';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -260,14 +261,20 @@ export function ModelPickerContent() {
               ) : null}
             </View>
             {/* In-field clear, on every platform: `clearButtonMode` is iOS
-                only, so Android rendered the query with no way to reset it. */}
+                only, so Android rendered the query with no way to reset it.
+                The frame, not the 16pt glyph, is what the size audit
+                measures: the shared 38pt box clears the 28dp floor and sits
+                under the field's 44pt input, so revealing the control never
+                grows the row. `-me-2` keeps the glyph near its old inset in
+                either writing direction, and the shared slop caps the side
+                facing the input at the row's gap. */}
             {search.length > 0 ? (
               <Pressable
                 onPress={handleClearSearch}
                 accessibilityLabel={t('common.clearSearch')}
                 accessibilityRole="button"
-                hitSlop={12}
-                className="active:opacity-70"
+                hitSlop={searchFieldClearHitSlop()}
+                className={`${SEARCH_FIELD_CLEAR_BOX_CLASS} -me-2 active:opacity-70`}
               >
                 <X size={16} color={colors.mutedForeground} />
               </Pressable>

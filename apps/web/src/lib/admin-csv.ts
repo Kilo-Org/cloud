@@ -6,7 +6,7 @@ export function csvLiteral(value: string): string {
   return LITERAL_LEADING_CHARACTER.test(value) ? `'${value}` : value;
 }
 
-/** Wrap a CSV field value in quotes if it contains commas, quotes, or newlines. */
+/** Format one CSV field: apply the literal-text prefix, then quote when needed. */
 export function csvField(value: string): string {
   const field = csvLiteral(value);
   if (field.includes('"') || field.includes(',') || field.includes('\n')) {

@@ -940,6 +940,8 @@
       "retryTitle": "Relancer la revue ?",
       "showMore": "Afficher la suite",
       "started": "Date de début",
+      "reviewEnded": "Fin de la revue",
+      "severityNitpick": "Détail",
       "threshold": "Seuil",
       "title": "Revue",
       "tokens": "Jetons",
@@ -1128,12 +1130,19 @@
       "actorSystem": "Système Kilo",
       "couldNotLoad": "Impossible de charger le rapport d'audit.",
       "events": "Événements",
+      "eventConfidence": "Confiance : {{confidence}}",
+      "eventReason": "Motif : {{reason}}",
+      "eventsCount_one": "{{displayCount}} événement",
+      "eventsCount_many": "{{displayCount}} événements",
+      "eventsCount_other": "{{displayCount}} événements",
       "generated": "Ce rapport a été généré le {{generatedAt}}.",
       "noActivity": "Aucune activité enregistrée",
       "noActivityDescription": "Kilo n'a aucune activité liée aux signalements de sécurité à rapporter du {{start}} au {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "La requête de génération du rapport n'a pas abouti. Réessayez.",
       "repositoryNotRecorded": "Dépôt non enregistré",
+      "reasonUnknown": "Motif non reconnu",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Résumé du rapport",
       "title": "Rapport d'audit",
       "unavailable": "Rapport d'audit indisponible",
@@ -1378,6 +1387,7 @@
       "reauthorizeButton": "Réautoriser l'application GitHub",
       "reauthorizeDescription": "L'agent de sécurité a besoin de l'autorisation de lire les alertes Dependabot. Réautorisez l'application GitHub pour lui accorder cette autorisation.",
       "reauthorizeTitle": "Autorisations supplémentaires requises",
+      "retryFailed": "L'agent de sécurité n'a toujours pas pu être chargé. Vérifiez votre connexion et réessayez.",
       "setupFailed": "Impossible de lancer la configuration de GitHub. Réessayez."
     },
     "settingsOverview": {
@@ -1955,7 +1965,10 @@
       "allowOnceAccessibility": "Autoriser une fois",
       "alwaysAllow": "Toujours autoriser",
       "alwaysAllowAccessibility": "Toujours autoriser",
-      "retrying": "Nouvel essai…"
+      "retrying": "Nouvel essai…",
+      "retryDeny": "Réessayer de refuser",
+      "retryAllowOnce": "Réessayer d'autoriser une fois",
+      "retryAlwaysAllow": "Réessayer de toujours autoriser"
     },
     "questionCard": {
       "title": "Réponse attendue par l'agent",

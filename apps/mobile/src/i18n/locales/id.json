@@ -969,6 +969,8 @@
       "retryTitle": "Coba tinjauan lagi?",
       "showMore": "Tampilkan lebih banyak",
       "started": "Dimulai",
+      "reviewEnded": "Berakhir",
+      "severityNitpick": "Catatan kecil",
       "threshold": "Ambang batas",
       "title": "Tinjauan",
       "tokens": "Token",
@@ -1157,12 +1159,18 @@
       "actorSystem": "Sistem Kilo",
       "couldNotLoad": "Tidak dapat memuat laporan audit.",
       "events": "Peristiwa",
+      "eventConfidence": "Keyakinan: {{confidence}}",
+      "eventReason": "Alasan: {{reason}}",
+      "eventsCount_one": "{{displayCount}} peristiwa",
+      "eventsCount_other": "{{displayCount}} peristiwa",
       "generated": "Laporan dibuat pada {{generatedAt}}.",
       "noActivity": "Tidak ada aktivitas yang tercatat",
       "noActivityDescription": "Tidak ada aktivitas temuan keamanan di Kilo yang dapat dilaporkan dari {{start}} hingga {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "Kueri laporan tidak selesai. Coba lagi.",
       "repositoryNotRecorded": "Repositori tidak tercatat",
+      "reasonUnknown": "Alasan tidak dikenali",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Ringkasan laporan",
       "title": "Laporan audit",
       "unavailable": "Laporan audit tidak tersedia",
@@ -1404,6 +1412,7 @@
       "reauthorizeButton": "Otorisasi ulang aplikasi GitHub",
       "reauthorizeDescription": "Agen keamanan memerlukan izin untuk membaca peringatan Dependabot. Otorisasi ulang aplikasi GitHub untuk memberikan izin ini.",
       "reauthorizeTitle": "Perlu izin tambahan",
+      "retryFailed": "Masih tidak dapat memuat Agen keamanan. Periksa koneksi Anda dan coba lagi.",
       "setupFailed": "Tidak dapat memulai penyiapan GitHub. Coba lagi."
     },
     "settingsOverview": {
@@ -2040,7 +2049,10 @@
       "allowOnceAccessibility": "Izinkan sekali",
       "alwaysAllow": "Selalu izinkan",
       "alwaysAllowAccessibility": "Selalu izinkan",
-      "retrying": "Mencoba lagi…"
+      "retrying": "Mencoba lagi…",
+      "retryDeny": "Coba tolak lagi",
+      "retryAllowOnce": "Coba izinkan sekali lagi",
+      "retryAlwaysAllow": "Coba selalu izinkan lagi"
     },
     "questionCard": {
       "title": "Agen membutuhkan masukan",

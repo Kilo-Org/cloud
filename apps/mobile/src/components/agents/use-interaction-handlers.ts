@@ -5,6 +5,7 @@ import { announceForA11y } from '@/lib/a11y/announce';
 import {
   type BlockingCardSubmissionError,
   classifyBlockingSubmissionError,
+  classifyPermissionSubmissionError,
 } from '@/components/agents/blocking-card-state';
 import {
   type AnalyticsSurface,
@@ -132,7 +133,7 @@ export function useInteractionHandlers({
         captureEvent(PERMISSION_RESPONDED_EVENT, { surface, response });
         return 'ok';
       } catch (error) {
-        const submissionError = classifyBlockingSubmissionError(error, 'permission', 'respond');
+        const submissionError = classifyPermissionSubmissionError(error, response);
         setPermissionSubmissionError({
           requestId,
           error: submissionError,

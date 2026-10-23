@@ -972,6 +972,8 @@
       "retryTitle": "להריץ את הסקירה שוב?",
       "showMore": "הצגת עוד",
       "started": "התחילה",
+      "reviewEnded": "הסתיימה",
+      "severityNitpick": "הערה",
       "threshold": "סף",
       "title": "סקירה",
       "tokens": "טוקנים",
@@ -1160,12 +1162,19 @@
       "actorSystem": "מערכת Kilo",
       "couldNotLoad": "לא ניתן לטעון את דוח הביקורת.",
       "events": "אירועים",
+      "eventConfidence": "רמת ביטחון: {{confidence}}",
+      "eventReason": "סיבה: {{reason}}",
+      "eventsCount_one": "{{displayCount}} אירוע",
+      "eventsCount_two": "{{displayCount}} אירועים",
+      "eventsCount_other": "{{displayCount}} אירועים",
       "generated": "מועד יצירת הדוח: {{generatedAt}}.",
       "noActivity": "אין פעילות מתועדת",
       "noActivityDescription": "אין ב-Kilo פעילות לדיווח הקשורה לממצאי אבטחה בתקופה שבין {{start}} ל-{{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "השאילתה להפקת הדוח לא הושלמה. נסה שוב.",
       "repositoryNotRecorded": "המאגר לא תועד",
+      "reasonUnknown": "סיבה לא מזוהה",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "סיכום הדוח",
       "title": "דוח ביקורת",
       "unavailable": "דוח הביקורת אינו זמין",
@@ -1410,6 +1419,7 @@
       "reauthorizeButton": "חידוש ההרשאה לאפליקציית GitHub",
       "reauthorizeDescription": "סוכן האבטחה זקוק להרשאה כדי לקרוא את התראות Dependabot. חדש את ההרשאה לאפליקציית GitHub כדי להעניק לו את ההרשאה.",
       "reauthorizeTitle": "נדרשות הרשאות נוספות",
+      "retryFailed": "עדיין לא ניתן לטעון את סוכן האבטחה. בדוק את החיבור ונסה שוב.",
       "setupFailed": "לא ניתן להתחיל את הגדרת GitHub. נסה שוב."
     },
     "settingsOverview": {
@@ -2056,7 +2066,10 @@
       "allowOnceAccessibility": "הרשאה חד-פעמית",
       "alwaysAllow": "הרשאה קבועה",
       "alwaysAllowAccessibility": "הרשאה קבועה",
-      "retrying": "מנסה שוב…"
+      "retrying": "מנסה שוב…",
+      "retryDeny": "ניסיון דחייה נוסף",
+      "retryAllowOnce": "ניסיון הרשאה חד-פעמית נוסף",
+      "retryAlwaysAllow": "ניסיון הרשאה קבועה נוסף"
     },
     "questionCard": {
       "title": "הסוכן ממתין לתשובה",

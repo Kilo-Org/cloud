@@ -24,14 +24,14 @@ import { useIdentityConfirmation } from '@/components/agents/user-web-connection
 import { buildTerminalErrorCopyText } from '@/components/agents/session-terminal-error';
 import { performCopy } from '@/components/agents/use-message-copy';
 import { InvalidRouteState } from '@/components/invalid-route-state';
-import { NewSessionModelProvider } from '@/components/agents/new-session-model-provider';
-import { NewSessionScreenBody } from '@/components/agents/new-session-screen-body';
+import { NewSessionRoute } from '@/components/agents/new-session-route';
 import { CenteredState } from '@/components/centered-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { parseParam } from '@/lib/route-params';
+import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
 import { isPlausibleKiloSessionId } from '@/lib/session-id-shape';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { parseResumeAnchor } from '@/lib/session-resume';
@@ -253,12 +253,9 @@ export default function SessionDetailScreen() {
     // here would land on the permanent "Not found" screen. Such an id renders
     // the New-session screen instead — the composer the user asked for — with
     // the route's organization context carried through, exactly as
-    // `agent-chat/new` renders it.
-    return (
-      <NewSessionModelProvider organizationId={routeOrganizationId}>
-        <NewSessionScreenBody />
-      </NewSessionModelProvider>
-    );
+    // `agent-chat/new` renders it: the same component, so the composer waits
+    // for the account scope there too.
+    return <NewSessionRoute />;
   }
 
   if (
@@ -280,7 +277,7 @@ export default function SessionDetailScreen() {
           title={t('agentChat.session.title')}
           reserveTitleSpace
           titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
-          backFallback={'/(app)/(tabs)/(2_agents)' as Href}
+          backFallback={AGENTS_SESSIONS_HREF}
           headerRight={
             <View className="min-w-0 shrink flex-row items-center gap-2">
               <SessionContextMetrics
@@ -362,7 +359,7 @@ export default function SessionDetailScreen() {
           title={t('agentChat.session.title')}
           reserveTitleSpace
           titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
-          backFallback={'/(app)/(tabs)/(2_agents)' as Href}
+          backFallback={AGENTS_SESSIONS_HREF}
         />
         <CenteredState>
           <View className="items-center gap-3 px-6">
@@ -388,7 +385,10 @@ export default function SessionDetailScreen() {
               <Button
                 variant="ghost"
                 onPress={() => {
-                  router.replace('/(app)/(tabs)/(2_agents)' as Href);
+                  // POP_TO reuses the `(tabs)` route under this screen and
+                  // truncates every `agent-chat` route above it, so a composer
+                  // still on the stack under a missing session is gone with it.
+                  router.dismissTo(AGENTS_SESSIONS_HREF);
                 }}
               >
                 <Text>{t('agentChat.session.backToSessions')}</Text>

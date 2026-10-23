@@ -17,9 +17,12 @@ const MODEL_UNAVAILABLE_MESSAGE = 'Selected model is not available for this clou
 
 /**
  * The localized failure copy for a rejected cloud prepare. Only failures the
- * message names precisely get actionable copy; every other rejection — an
- * unclassified server detail, an unknown transport failure — gets the generic
- * service line, because the tRPC code alone does not identify the failure.
+ * message names precisely, plus the missing-selection code, get actionable
+ * copy; every other rejection — an unclassified server detail, an unknown
+ * transport failure — gets the generic service line, because the tRPC code
+ * alone does not identify the failure. Prepare resolves the requested profile
+ * before it registers the session, so its only `NOT_FOUND` is a profile that
+ * no longer exists: the reader refreshes the selection instead of retrying.
  */
 export function cloudPrepareFailureMessage(error: unknown): string {
   const message = readTrpcErrorField(error, 'message');
@@ -28,6 +31,9 @@ export function cloudPrepareFailureMessage(error: unknown): string {
   }
   if (message === MODEL_UNAVAILABLE_MESSAGE) {
     return i18n.t('agentChat.session.modelUnavailable');
+  }
+  if (readTrpcErrorField(error, 'code') === 'NOT_FOUND') {
+    return i18n.t('queryError.notFoundDescription');
   }
   if (readTrpcErrorField(error, 'code') === 'PAYMENT_REQUIRED') {
     return i18n.t('agentChat.session.notEnoughCredits');

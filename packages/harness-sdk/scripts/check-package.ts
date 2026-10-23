@@ -157,8 +157,10 @@ try {
     Effect.scoped(
       Effect.provide(
         Effect.flatMap(openSession({ system: 'sys', model: 'm', maxTokens: 8 }), session =>
-          Stream.runFold(session.ask('hi'), '', (held: string, event: ModelEvent) =>
-            event.kind === 'delta' ? held + event.text : held
+          Stream.runFold(
+            session.ask('hi'),
+            () => '',
+            (held: string, event: ModelEvent) => (event.kind === 'delta' ? held + event.text : held)
           )
         ),
         layerKilo({

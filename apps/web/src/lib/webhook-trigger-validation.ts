@@ -43,6 +43,11 @@ export const triggerIdCreateSchema = triggerIdSchema.refine(
   'Trigger ID must be at least 8 characters'
 );
 
+// Creator-run webhooks act as a person and the inbound URL is not secret, so the
+// shared secret is the only barrier against impersonation.
+export const MIN_CREATOR_WEBHOOK_SECRET_LENGTH = 16;
+export const CREATOR_WEBHOOK_SECRET_LENGTH_MESSAGE = `Webhook auth secret must be at least ${MIN_CREATOR_WEBHOOK_SECRET_LENGTH} characters when running as the creator`;
+
 /**
  * Transform user input to a valid trigger ID format.
  * - Converts to lowercase

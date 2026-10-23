@@ -11,19 +11,25 @@ import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { capitalize } from '@/lib/utils';
 
 import { MonoScrollBlock } from './mono-scroll-block';
+import {
+  preparationDetailText,
+  preparationErrorText,
+  preparationStepLabel,
+} from './preparation-copy';
 import {
   incompleteRestoreText,
   preparationGroupExpandedByDefault,
 } from './preparation-group-state';
 
 export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
-  const incomplete = incompleteRestoreText(attempt);
+  const { t } = useTranslation();
+  const incompleteText = incompleteRestoreText(attempt);
+  const incomplete =
+    incompleteText === undefined ? undefined : preparationErrorText(incompleteText, t);
   const [expanded, setExpanded] = useState(() => preparationGroupExpandedByDefault(attempt));
   const colors = useThemeColors();
-  const { t } = useTranslation();
   useEffect(() => {
     setExpanded(attempt.status !== 'completed' || incomplete !== undefined);
   }, [attempt.id, attempt.status, incomplete]);
@@ -55,7 +61,7 @@ export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
         <View className="gap-2 border-t border-border px-3 py-2">
           {attempt.safeError && attempt.steps.length === 0 ? (
             <Text selectable className="text-sm text-destructive">
-              {attempt.safeError}
+              {preparationErrorText(attempt.safeError, t)}
             </Text>
           ) : null}
           {attempt.steps.map(step => (
@@ -85,17 +91,6 @@ function AttemptIcon({
     return <Check size={16} color={colors.good} />;
   }
   return <AlertCircle size={16} color={colors.destructive} />;
-}
-
-/**
- * The server emits raw phase keys as labels (`workspace_setup` ->
- * `workspace setup`), so phase rows need the same humanizing web applies at
- * render. Setup-command rows keep their catalog copy and never reach here.
- * `capitalize` uses the active locale's casing, unlike the web helper's bare
- * `toUpperCase`, which the mobile case guard rejects for display text.
- */
-export function humanizePreparationStepLabel(label: string): string {
-  return capitalize(label.replaceAll('_', ' '));
 }
 
 function attemptTitle(status: PreparationAttempt['status'], t: TFunction): string {
@@ -138,7 +133,7 @@ function PreparationStepRow({ step }: { step: PreparationStepSnapshot }) {
     step.safeError,
     step.exitCode,
   ].some(value => value !== undefined && value !== '');
-  const label = setupCommandLabel(step, t) ?? humanizePreparationStepLabel(step.label);
+  const label = setupCommandLabel(step, t) ?? preparationStepLabel(step, t);
   const DetailsIcon = expanded ? ChevronDown : DirectionalChevronRight;
   return (
     <View className="overflow-hidden rounded border border-border">
@@ -174,11 +169,13 @@ function PreparationStepRow({ step }: { step: PreparationStepSnapshot }) {
             </Text>
           ) : null}
           {step.latestDetail ? (
-            <Text className="text-sm text-muted-foreground">{step.latestDetail}</Text>
+            <Text className="text-sm text-muted-foreground">
+              {preparationDetailText(step.latestDetail, t)}
+            </Text>
           ) : null}
           {step.safeError ? (
             <Text selectable className="text-sm text-destructive">
-              {step.safeError}
+              {preparationErrorText(step.safeError, t)}
             </Text>
           ) : null}
           {step.exitCode !== undefined ? (

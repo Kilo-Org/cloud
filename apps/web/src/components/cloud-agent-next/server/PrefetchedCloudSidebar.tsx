@@ -70,10 +70,10 @@ async function prefetchSidebar(
   };
   const foldersOptions = trpc.workspaceFolders.list.queryOptions({ organizationId });
   const [list, folders] = await Promise.all([
-    queryClient.fetchQuery(
+    queryClient.query(
       trpc.cliSessionsV2.list.queryOptions(sidebarListInput({ updatedSince, ...filters }))
     ),
-    queryClient.fetchQuery({
+    queryClient.query({
       ...foldersOptions,
       queryKey: workspaceFoldersQueryKey(foldersOptions.queryKey, userId),
     }),
@@ -87,7 +87,7 @@ async function prefetchSidebar(
       return [
         limit(() => {
           if (Date.now() >= deadlineAt) return undefined;
-          return queryClient.fetchQuery(
+          return queryClient.query(
             trpc.cliSessionsV2.list.queryOptions(sidebarFolderListInput(parsed.data, filters))
           );
         }),
@@ -100,9 +100,9 @@ async function prefetchSidebar(
       worktreeIds =>
         limit(() => {
           if (Date.now() >= deadlineAt) return;
-          return queryClient.prefetchQuery(
-            trpc.cliSessionsV2.worktreeDetails.queryOptions({ worktreeIds, organizationId })
-          );
+          return queryClient
+            .query(trpc.cliSessionsV2.worktreeDetails.queryOptions({ worktreeIds, organizationId }))
+            .catch(() => undefined);
         })
     )
   );

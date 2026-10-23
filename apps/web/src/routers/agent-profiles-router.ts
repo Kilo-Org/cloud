@@ -28,16 +28,7 @@ import { AgentConfigSchema } from '@kilocode/db/schema-types';
 import type { ProfileOwner } from '@kilocode/cloud-agent-profile';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { AGENT_ENV_VARS_PUBLIC_KEY } from '@kilocode/web-shared/lib/config.server';
-import { isUniqueViolation } from '@/lib/db-errors';
-
-function isForeignKeyViolation(error: unknown): boolean {
-  return (
-    error !== null &&
-    typeof error === 'object' &&
-    'code' in error &&
-    (error as { code: string }).code === '23503'
-  );
-}
+import { getPostgresErrorCode, isUniqueViolation } from '@/lib/db-errors';
 
 // Input schemas
 const ProfileIdSchema = z.object({
@@ -336,7 +327,6 @@ export const agentProfilesRouter = createTRPCRouter({
         profileService.listProfiles(db, { type: 'user', id: ctx.user.id }),
       ]);
 
-      // Effective default: personal default takes precedence over org default
       const effectiveDefault =
         personalProfiles.find(p => p.isDefault) ?? orgProfiles.find(p => p.isDefault);
 
@@ -415,8 +405,11 @@ export const agentProfilesRouter = createTRPCRouter({
         await profileService.deleteProfile(db, input.profileId, owner, canManage);
         return { success: true };
       } catch (error) {
-        // Check for FK violation (profile referenced by webhook triggers)
-        if (isForeignKeyViolation(error)) {
+        // The profile FK is `ON DELETE RESTRICT`, and Drizzle wraps the driver
+        // error, so read the wrapped SQLSTATE: PostgreSQL raises 23001
+        // (restrict_violation) for RESTRICT and 23503 for NO ACTION.
+        const sqlState = getPostgresErrorCode(error);
+        if (sqlState === '23001' || sqlState === '23503') {
           throw new TRPCError({
             code: 'PRECONDITION_FAILED',
             message:

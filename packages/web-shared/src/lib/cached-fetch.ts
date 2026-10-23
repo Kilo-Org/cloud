@@ -1,5 +1,5 @@
 /**
- * In-process stale-while-revalidate cache for async fetchers.
+ * In-process TTL cache for async fetchers with single-flight refresh and failure backoff.
  *
  * Returns the cached value immediately if it's younger than `ttlMs`,
  * otherwise calls `fetcher` to refresh. If calling or awaiting the fetcher

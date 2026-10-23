@@ -282,7 +282,6 @@ export function useAgentAttachmentUpload(
       // rejection in `uploadOne` is suppressed by the catch's `liveIdsRef`
       // guard: unmount must emit no toast and flip no state.
       liveIds.clear();
-      // Cancel every in-flight upload on unmount.
       for (const id of handles.keys()) {
         cancelUpload(id);
       }

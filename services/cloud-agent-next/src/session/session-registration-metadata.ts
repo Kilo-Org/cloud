@@ -1,13 +1,4 @@
-/**
- * Plane-neutral session-metadata construction for session registration.
- *
- * The JSON shape here is the one both planes persist: the legacy
- * `CloudAgentSession` DO builds its stored metadata through
- * `buildSessionMetadataFromRegistration`, and the control-plane Worker builds
- * the `createSessionWithInitialAdmission`/`registerSessionFromMetadata` input
- * through the same function. One owner means a registration field can never
- * mean two different things depending on the plane.
- */
+/** Builds the grouped metadata used by control-plane session registration. */
 import { generateBranchSlug } from '@kilocode/worker-utils/deployment-slug';
 import { serializeSessionMetadata, type SessionMetadata } from '../persistence/session-metadata.js';
 import { deriveSharedSandboxId } from '../sandbox-id.js';

@@ -1,5 +1,6 @@
 import { type ListRenderItem } from '@shopify/flash-list';
 import { type RemoteModelState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { type Href, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
@@ -30,6 +31,8 @@ import { chatTargetKind, resolveChatTarget } from '@/lib/chat/backend-target';
 import { useLocalModels } from '@/lib/chat/local-models';
 import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
 import { type EffortChoices, effortOfVariant, variantOfEffort } from '@/lib/chat/effort';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 import { ChatTitle } from './chat-title';
 import { ChatComposerArea } from './chat-composer-area';
@@ -64,6 +67,7 @@ type ChatScreenProps = {
 
 export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const { t } = useTranslation();
+  const router = useRouter();
   const { organizationId } = useOrganization();
   const place = useChatPlace();
   const { state, send, stop, retry } = useChat(place, opened);
@@ -154,7 +158,9 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
             }
           },
         },
-      ]
+      ],
+      // Android back dismisses, which equals Cancel: the model stays as is.
+      { cancelable: true }
     );
   };
 
@@ -194,7 +200,10 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
       } catch (error) {
         Alert.alert(
           t('modelChat.backends.title'),
-          error instanceof Error ? error.message : t('modelChat.backends.invalidTarget')
+          error instanceof Error ? error.message : t('modelChat.backends.invalidTarget'),
+          // Android back dismisses the error; the composer keeps the draft.
+          undefined,
+          { cancelable: true }
         );
         throw error;
       }
@@ -265,6 +274,9 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
           failureKey={state.failureKey}
           retryable={!actions.hasUnanswered}
           onRetry={() => void retry()}
+          onAddCredits={() => {
+            router.push('/(app)/credits' as Href);
+          }}
           onSend={handleSend}
           composerControlRef={actions.composerControlRef}
           onStop={handleStop}
@@ -295,7 +307,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
           />
         }
         headerRight={
-          <View className="flex-row items-center">
+          <View className="flex-row items-center gap-2">
             <SessionContextMetrics {...details.metrics} />
             <BackendSettingsControl selectedModel={model} onSelectModel={selectProviderModel} />
             <Pressable
@@ -308,7 +320,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
               // state it stood for is named here and drawn in full by the sheet
               // this control opens.
               accessibilityValue={{ text: mcpStatusText }}
-              className="h-11 w-11 items-center justify-center active:opacity-70"
+              className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
             >
               <Wrench size={22} color={colors.foreground} />
             </Pressable>

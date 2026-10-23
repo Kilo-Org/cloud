@@ -63,6 +63,8 @@ export type GetProviderProviderResult = {
 export type DirectByokCredentialErrorResult = {
   kind: 'direct-byok-credential-error';
   providerId: DirectByokProviderMetaId;
+  /** Set when the credential belongs to an organization rather than the user. */
+  organizationId: string | undefined;
 };
 
 export type GetProviderResult =
@@ -111,7 +113,7 @@ async function checkDirectBYOK(
         providerId: directByok.id,
         errorName: error instanceof Error ? error.name : typeof error,
       });
-      return { kind: 'direct-byok-credential-error', providerId: directByok.id };
+      return { kind: 'direct-byok-credential-error', providerId: directByok.id, organizationId };
     }
   }
 

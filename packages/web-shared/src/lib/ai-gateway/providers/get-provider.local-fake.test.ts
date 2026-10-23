@@ -571,7 +571,11 @@ describe('getProvider direct BYOK routing', () => {
 
     const result = await getProvider(providerInput('synthetic/gemini-3.5-flash'));
 
-    expect(result).toEqual({ kind: 'direct-byok-credential-error', providerId: 'synthetic' });
+    expect(result).toEqual({
+      kind: 'direct-byok-credential-error',
+      providerId: 'synthetic',
+      organizationId: undefined,
+    });
     expect(JSON.stringify(consoleError.mock.calls)).not.toContain('not json');
     consoleError.mockRestore();
   });

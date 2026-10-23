@@ -104,7 +104,19 @@ export function SharePayloadPreview({ payload, validation }: Readonly<SharePaylo
   }
 
   if (validation.kind === 'all-rejected') {
-    return null;
+    // Nothing survived, but the names of files whose copy failed are still
+    // worth showing above the terminal message: they say which file the
+    // device could not read. Other all-rejected outcomes stay a bare message.
+    if (validation.failedCopies.length === 0) {
+      return null;
+    }
+    return (
+      <View className="px-4 pb-2">
+        <RejectionNotes
+          notes={validation.failedCopies.map(name => ({ name, reason: 'unreadable' as const }))}
+        />
+      </View>
+    );
   }
 
   const text = payload.text.trim();

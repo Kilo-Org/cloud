@@ -6,7 +6,7 @@ import {
   type ModelUsage,
   type StopReason,
 } from '@kilocode/harness-sdk';
-import { Chunk, Effect, Stream } from 'effect';
+import { Cause, Effect, Queue, Stream } from 'effect';
 import { z } from 'zod';
 
 import { nativeModelFailure } from './native-model-error';
@@ -93,7 +93,7 @@ function answer(
   availability: NativeAvailability,
   request: ModelRequest
 ): Stream.Stream<ModelEvent, ModelError> {
-  return Stream.async<ModelEvent, ModelError>(emit => {
+  return Stream.callback<ModelEvent, ModelError>(queue => {
     const tools = availability.tools === true && bridge.resume !== undefined;
     const offersTools = tools && request.tools !== undefined && request.tools.length > 0;
     const native = nativeRequest(request, {
@@ -124,7 +124,10 @@ function answer(
     let retries = resumption === undefined ? 1 : 0;
     const fail = (reason: string | undefined) => {
       state = 'over';
-      void emit.fail(nativeModelFailure(reason, hasPreviousText || output !== ''));
+      Queue.failCauseUnsafe(
+        queue,
+        Cause.fail(nativeModelFailure(reason, hasPreviousText || output !== ''))
+      );
     };
     const failOrRetry = (reason: string | undefined) => {
       if (
@@ -156,8 +159,8 @@ function answer(
         done.stop === 'end' || done.stop === 'maxTokens' || done.stop === 'refusal'
           ? done.stop
           : 'unknown';
-      await emit.single({ kind: 'done', usage, stop });
-      await emit.end();
+      Queue.offerUnsafe(queue, { kind: 'done', usage, stop });
+      Queue.endUnsafe(queue);
     };
     // The round ends here; the native generation waits for the next round's results.
     const pause = async (calls: readonly NativeToolCall[]) => {
@@ -168,15 +171,12 @@ function answer(
         hasText: hasPreviousText || output.trim() !== '',
       };
       output += calls.map(call => call.name + call.arguments).join('');
-      await emit.chunk(
-        Chunk.fromIterable(
-          calls.map(
-            (call): ModelEvent => ({
-              kind: 'toolCall',
-              call: { id: call.id, name: call.name, arguments: call.arguments },
-            })
-          )
-        )
+      Queue.offerAllUnsafe(
+        queue,
+        calls.map((call): ModelEvent => ({
+          kind: 'toolCall',
+          call: { id: call.id, name: call.name, arguments: call.arguments },
+        }))
       );
       const usage: ModelUsage = {
         inputTokens: await inputTokensOf(bridge, availability, native),
@@ -184,8 +184,8 @@ function answer(
         cacheReadTokens: 0,
         cacheWriteTokens: 0,
       };
-      await emit.single({ kind: 'done', usage, stop: 'tools' });
-      await emit.end();
+      Queue.offerUnsafe(queue, { kind: 'done', usage, stop: 'tools' });
+      Queue.endUnsafe(queue);
     };
     const stopNative = async (stopped: string) => {
       try {
@@ -226,7 +226,7 @@ function answer(
       }
       if (event.kind === 'delta') {
         output += event.text;
-        void emit.single({ kind: 'delta', text: event.text });
+        Queue.offerUnsafe(queue, { kind: 'delta', text: event.text });
       } else if (event.kind === 'toolCalls') {
         void (offersTools ? pause(event.calls) : refuse(event.calls));
       } else if (event.kind === 'error') {
@@ -276,15 +276,19 @@ function answer(
         await generate();
       }
     };
-    void run();
-    return Effect.sync(() => {
-      subscription.remove();
-      if (state === 'running' || state === 'retrying') {
-        // Interrupted mid-answer: stop the native task. Its late events are ignored.
-        state = 'over';
-        void stopNative(id);
-      }
-    });
+    return Effect.andThen(
+      Effect.addFinalizer(() =>
+        Effect.sync(() => {
+          subscription.remove();
+          if (state === 'running' || state === 'retrying') {
+            // Interrupted mid-answer: stop the native task. Its late events are ignored.
+            state = 'over';
+            void stopNative(id);
+          }
+        })
+      ),
+      () => Effect.sync(() => void run())
+    );
   });
 }
 

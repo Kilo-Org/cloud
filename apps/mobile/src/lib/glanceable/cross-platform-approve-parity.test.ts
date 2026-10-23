@@ -91,7 +91,7 @@ vi.mock('@/glanceable-ios/ios-sink', () => ({
 vi.mock('@/glanceable-ios/active-agents-live-activity', () => ({
   LIVE_ACTIVITY_NAME: 'ActiveAgentsLiveActivity',
   OPEN_AGENTS_URL: 'kiloapp:///cloud/sessions',
-  ActiveAgentsLiveActivity: { getInstances: mocks.getInstances },
+  getActiveAgentsLiveActivity: () => ({ getInstances: mocks.getInstances }),
 }));
 // The press here comes from the aggregate card; no session card exists.
 vi.mock('@/glanceable-ios/session-card-press', () => ({

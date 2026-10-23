@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import AppSidebar from './components/AppSidebar';
 import { AppTopbar } from './components/AppTopbar';
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import { Sidebar, SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { RoleTestingProvider } from '@/contexts/RoleTestingContext';
 import { PageTitleProvider } from '@/contexts/PageTitleContext';
 import { EventServiceProvider } from '@/contexts/EventServiceContext';
@@ -25,7 +25,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <SidebarProvider>
               <AppShellSkipLink />
               <div className="flex min-h-screen w-full">
-                <Suspense fallback={null}>
+                {/* An empty sidebar holds its width so the page does not shift when it streams in. */}
+                <Suspense fallback={<Sidebar />}>
                   <AppSidebar />
                 </Suspense>
                 <SidebarInset>

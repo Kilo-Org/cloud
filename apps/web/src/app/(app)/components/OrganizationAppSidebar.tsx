@@ -11,15 +11,12 @@ import {
   Sliders,
   Sparkles,
   Cable,
-  Rocket,
-  Database,
   Users,
   CreditCard,
   Cloud,
   Key,
   List,
   Shield,
-  Plus,
   Webhook,
   Settings,
   MessageSquare,
@@ -57,10 +54,7 @@ export default function OrganizationAppSidebar({
   const kiloClawNavStateQuery = useOrgKiloClawNavState(organizationId);
 
   // Feature flags
-  const isAppBuilderEnabled = useFeatureFlagEnabled('app-builder-feature');
-  const isDeployEnabled = useFeatureFlagEnabled('deploy-feature');
   const isChatGptSignInEnabled = useFeatureFlagEnabled(CHATGPT_ACCESS_FLAG);
-  const isDevelopment = process.env.NODE_ENV === 'development';
 
   // Get current organization role and data
   const currentOrg = organizationData;
@@ -178,15 +172,6 @@ export default function OrganizationAppSidebar({
     url: string;
     className?: string;
   }> = [
-    ...(isAppBuilderEnabled || isDevelopment
-      ? [
-          {
-            title: 'App Builder',
-            icon: Plus,
-            url: `/organizations/${organizationId}/app-builder`,
-          },
-        ]
-      : []),
     {
       title: 'Cloud Agent',
       icon: Cloud,
@@ -222,33 +207,6 @@ export default function OrganizationAppSidebar({
       icon: Shield,
       url: `/organizations/${organizationId}/security-agent`,
     },
-    ...(isDeployEnabled || isDevelopment
-      ? [
-          {
-            title: 'Deploy',
-            icon: Rocket,
-            url: `/organizations/${organizationId}/deploy`,
-          },
-        ]
-      : []),
-    ...(organizationData?.settings?.code_indexing_enabled
-      ? [
-          {
-            title: 'Managed Indexing',
-            icon: Database,
-            url: `/organizations/${organizationId}/code-indexing`,
-          },
-        ]
-      : []),
-    ...(user?.is_admin
-      ? [
-          {
-            title: 'MCP Gateway',
-            icon: Cable,
-            url: `/organizations/${organizationId}/cloud/mcp-gateway`,
-          },
-        ]
-      : []),
   ];
 
   // Account group

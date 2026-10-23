@@ -35,6 +35,8 @@ const BASE_EXCLUDE_ENTRIES = [
   'openclaw',
 ] as const;
 
+const CLOUDFLARE_SANDBOX_EXACT_EXCLUDE_ENTRIES = ['@cloudflare/sandbox@0.12.12'] as const;
+
 // The DO-managed Cloudflare containers runtime needs wrangler 4.134.0+, and
 // 4.135.0 exact-pins its own workerd/miniflare runtime, so each is exempted by
 // exact version. Approved early-access exception; remove this group when 4.135.0
@@ -50,17 +52,12 @@ const CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES = [
   '@cloudflare/workerd-windows-64@1.20260918.1',
 ] as const;
 
-// Four mobile pins must move without waiting out the gate: FlashList 2.3.3
+// Two mobile pins must move without waiting out the gate: FlashList 2.3.3
 // carries the EngagedIndicesTracker scroll-window fix the agent transcript list
-// depends on, react-native-keyboard-controller 1.22.6 carries the
-// KeyboardChatScrollView fixes the keyboard phase depends on (SDK 57 pins
-// 1.21.9), react-native-enriched-markdown 1.1.0 adds the image and code block
-// press events the transcript markdown wires, and react-native-reanimated 4.7.1
-// carries the stability fixes the app needs. One exact package@version each.
+// depends on, and react-native-reanimated 4.7.1 carries the stability fixes the
+// app needs. One exact package@version each.
 const MOBILE_EXACT_EXCLUDE_ENTRIES = [
   '@shopify/flash-list@2.3.3',
-  'react-native-keyboard-controller@1.22.6',
-  'react-native-enriched-markdown@1.1.0',
   'react-native-reanimated@4.7.1',
 ] as const;
 // Exact pnpm syntax for one pinned package version: bare or @scoped name, then
@@ -107,11 +104,9 @@ describe('minimum release age policy contract', () => {
   });
 
   it('excludes exactly the base list plus the container-runtime and mobile exact versions', () => {
-    // Order as written: tsx, the container-runtime exemptions, then the
-    // remaining base entries, then the mobile exemptions — the base list with
-    // nothing dropped or changed.
     const expected = [
       BASE_EXCLUDE_ENTRIES[0],
+      ...CLOUDFLARE_SANDBOX_EXACT_EXCLUDE_ENTRIES,
       ...CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES,
       ...BASE_EXCLUDE_ENTRIES.slice(1),
       ...MOBILE_EXACT_EXCLUDE_ENTRIES,
@@ -121,6 +116,7 @@ describe('minimum release age policy contract', () => {
 
   it('scopes every new exclusion to one exact package@version', () => {
     expect(newExclusions).toEqual([
+      ...CLOUDFLARE_SANDBOX_EXACT_EXCLUDE_ENTRIES,
       ...CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES,
       ...MOBILE_EXACT_EXCLUDE_ENTRIES,
     ]);

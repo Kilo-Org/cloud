@@ -25,7 +25,7 @@ import { getLocalScopeKey } from './persist';
 
 export type WaitingAsk = {
   kiloSessionId: string;
-  /** 'permission' | 'question' | 'retry' — the tray row's status. */
+  /** 'permission' | 'question' — the tray row's status. */
   status: string;
   /** True when the row came from the cloud-agent control plane. */
   isCloudAgent: boolean;
@@ -40,9 +40,10 @@ export type WaitingAsk = {
   /**
    * The selected row's status time, the ask's identity beside the session and
    * status: a changed wait carries a new time, so a binding is never carried
-   * onto a different request.
+   * onto a different request. Absent on rows that never carried one, and on a
+   * record mirrored by a build that did not store it.
    */
-  statusUpdatedAt: string | null;
+  statusUpdatedAt?: string | null;
   /**
    * The pending permission id this ask's surface names, or null while the ask
    * has no binding (a record made before the control-plane read lands, a read
@@ -81,10 +82,10 @@ const waitingAskSchema = z.object({
   organizationId: z.string().nullable(),
   userId: z.string(),
   recordedAt: z.number(),
-  // Both are absent from a mirror a release without bindings wrote: it parses,
+  // A mirror a release without bindings wrote carries neither key: it parses,
   // and it reads as an ask with no identity time and no binding, so Approve
   // stays hidden until a live select binds it.
-  statusUpdatedAt: z.string().nullable().default(null),
+  statusUpdatedAt: z.string().nullable().optional(),
   boundPermissionId: z.string().nullable().default(null),
 });
 
@@ -155,7 +156,7 @@ export function selectWaitingAsk(
     organizationId: ctx.organizationId,
     userId: ctx.userId,
     recordedAt: now,
-    statusUpdatedAt: chosen.statusUpdatedAt ?? null,
+    statusUpdatedAt: chosen.statusUpdatedAt,
     // Selection is pure: the answer path's binding comes from the control-plane
     // read the recording step runs, never from the trace.
     boundPermissionId: null,

@@ -1,5 +1,5 @@
 import { normalize, normalizeCliEvent, isChatEvent } from './normalizer';
-import type { CloudAgentEvent } from './event-types';
+import type { CloudAgentEvent } from './schemas';
 
 function createRaw(streamEventType: string, data: unknown, sessionId = 'ses-1'): CloudAgentEvent {
   return {
@@ -498,6 +498,35 @@ describe('normalize', () => {
       });
     });
 
+    it('keeps a question status so the live transition reaches consumers', () => {
+      const result = normalize(
+        createRaw('session.status', {
+          sessionID: 'ses-1',
+          status: { type: 'question' },
+        })
+      );
+      expect(result).toEqual({
+        type: 'session.status',
+        sessionId: 'ses-1',
+        status: { type: 'question' },
+      });
+    });
+
+    it('keeps a status type this SDK does not know yet', () => {
+      const status = { type: 'offline', requestID: 'que_1', message: 'Kilo is offline' };
+      const result = normalize(
+        createRaw('session.status', {
+          sessionID: 'ses-1',
+          status,
+        })
+      );
+      expect(result).toEqual({
+        type: 'session.status',
+        sessionId: 'ses-1',
+        status,
+      });
+    });
+
     it('returns null when sessionID is missing', () => {
       expect(normalize(createRaw('session.status', { status: 'busy' }))).toBeNull();
     });
@@ -938,27 +967,79 @@ describe('normalize', () => {
   });
 
   describe('question.asked', () => {
+    const question = {
+      question: 'Continue?',
+      header: 'Approval',
+      options: [{ label: 'Yes', description: 'Run the command' }],
+    };
+
     it('extracts requestId and questions from tool.callID', () => {
       const data = {
         id: 'q-1',
         tool: { callID: 'call-1' },
-        questions: [{ text: 'Continue?' }],
+        questions: [question],
       };
       const result = normalize(createRaw('question.asked', data));
       expect(result).toEqual({
         type: 'question.asked',
         requestId: 'q-1',
-        questions: [{ text: 'Continue?' }],
+        questions: [question],
       });
     });
 
     it('works when tool is absent', () => {
-      const data = { id: 'q-1', questions: [{ text: 'Yes?' }] };
+      const data = { id: 'q-1', questions: [question] };
       const result = normalize(createRaw('question.asked', data));
       expect(result).toEqual({
         type: 'question.asked',
         requestId: 'q-1',
-        questions: [{ text: 'Yes?' }],
+        questions: [question],
+      });
+    });
+
+    it('keeps the valid prefix and stops at the first malformed entry', () => {
+      const data = {
+        id: 'q-1',
+        questions: [question, { text: 'Continue?' }, question],
+      };
+      const result = normalize(createRaw('question.asked', data));
+      expect(result).toEqual({
+        type: 'question.asked',
+        requestId: 'q-1',
+        questions: [question],
+      });
+    });
+
+    it('keeps only the shared QuestionInfo fields', () => {
+      const data = {
+        id: 'q-1',
+        questions: [{ ...question, extra: 'ignored' }],
+      };
+      const result = normalize(createRaw('question.asked', data));
+      expect(result).toEqual({
+        type: 'question.asked',
+        requestId: 'q-1',
+        questions: [question],
+      });
+    });
+
+    it('treats a list whose first entry is malformed as carrying no questions', () => {
+      const data = { id: 'q-1', questions: [{ header: 'Approval' }, question] };
+      const result = normalize(createRaw('question.asked', data));
+      expect(result).toEqual({
+        type: 'question.asked',
+        requestId: 'q-1',
+        questions: undefined,
+      });
+    });
+
+    it('keeps an explicitly empty questions array', () => {
+      const data = { id: 'q-1', questions: [] };
+      const result = normalize(createRaw('question.asked', data));
+      expect(result).toEqual({
+        type: 'question.asked',
+        requestId: 'q-1',
+        questions: [],
       });
     });
 
@@ -1744,6 +1825,15 @@ describe('normalize', () => {
       expect(result).not.toHaveProperty('sessionStatus');
     });
 
+    it('keeps a permission sessionStatus instead of discarding it', () => {
+      const result = normalize(createRaw('connected', { sessionStatus: { type: 'permission' } }));
+      expect(result).toEqual({
+        type: 'connected',
+        cloudSessionId: 'ses-1',
+        sessionStatus: { type: 'permission' },
+      });
+    });
+
     it('ignores invalid cloudStatus', () => {
       const result = normalize(
         createRaw('connected', {
@@ -2294,12 +2384,24 @@ describe('normalizeCliEvent', () => {
       const data = {
         id: 'q-1',
         tool: { callID: 'call-1' },
-        questions: [{ text: 'Continue?' }],
+        questions: [
+          {
+            question: 'Continue?',
+            header: 'Approval',
+            options: [{ label: 'Yes', description: '' }],
+          },
+        ],
       };
       expect(normalizeCliEvent('question.asked', data)).toEqual({
         type: 'question.asked',
         requestId: 'q-1',
-        questions: [{ text: 'Continue?' }],
+        questions: [
+          {
+            question: 'Continue?',
+            header: 'Approval',
+            options: [{ label: 'Yes', description: '' }],
+          },
+        ],
       });
     });
   });

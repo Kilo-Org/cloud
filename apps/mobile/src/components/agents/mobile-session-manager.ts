@@ -523,7 +523,6 @@ export function createMobileAgentSessionManager({
         variant: rs?.variant ?? null,
         repository: rs?.githubRepo ?? null,
         isInitiated: Boolean(rs?.initiatedAt),
-        needsLegacyPrepare: Boolean(sessionResult.cloud_agent_session_id && !rs),
         isPreparingAsync: Boolean(rs && !rs.preparedAt),
         prompt: rs?.prompt ?? null,
         initialMessageId: rs?.initialMessageId ?? null,

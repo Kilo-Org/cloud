@@ -619,7 +619,7 @@ describe('ConversationMessages', () => {
     expect(html).not.toContain('Running command');
   });
 
-  it('does not show completed-answer metadata while the last message is streaming', () => {
+  it('hides completed-answer metadata while the last message is streaming', () => {
     const html = renderConversation(
       [assistantMessage('assistant-1', [reasoningPart('completed-reasoning')])],
       {
@@ -638,7 +638,9 @@ describe('ConversationMessages', () => {
     expect(buttons(html)[0]).toContain('Thought: 1ms');
     expect(buttons(html)[0]).toContain('aria-expanded="false"');
     expect(html).toContain('Here is the result so far');
-    expect(html).not.toContain('Message timestamp');
+    // The metadata row keeps its height hidden while streaming so it cannot push
+    // the transcript when the answer completes.
+    expect(html).toMatch(/<div class="[^"]*\binvisible\b[^"]*">(?:(?!<\/div>).)*Message timestamp/);
     expect(html).not.toContain('Reasoning details');
   });
 
@@ -741,14 +743,26 @@ describe('ConversationMessages', () => {
       SessionManager['atoms'],
       'activeQuestion' | 'isStreaming' | 'activeSuggestion'
     > = {
-      activeQuestion: atom<StandaloneQuestion | null>(null),
-      isStreaming: atom(true),
-      activeSuggestion: atom<StandaloneSuggestion | null>({
-        requestId: 'suggestion-1',
-        callId: 'suggest-1',
-        text: 'Run the focused checks next?',
-        actions: [{ label: 'Run checks', prompt: 'Run the focused verification' }],
+      activeQuestion: atom<StandaloneQuestion | null, [StandaloneQuestion | null], void>(
+        null,
+        (_get, set, value) => {
+          set(atoms.activeQuestion, value);
+        }
+      ),
+      isStreaming: atom<boolean, [boolean], void>(true, (_get, set, value) => {
+        set(atoms.isStreaming, value);
       }),
+      activeSuggestion: atom<StandaloneSuggestion | null, [StandaloneSuggestion | null], void>(
+        {
+          requestId: 'suggestion-1',
+          callId: 'suggest-1',
+          text: 'Run the focused checks next?',
+          actions: [{ label: 'Run checks', prompt: 'Run the focused verification' }],
+        },
+        (_get, set, value) => {
+          set(atoms.activeSuggestion, value);
+        }
+      ),
     };
     jest.mocked(useOptionalManager).mockReturnValue({ atoms } as SessionManager);
     const childSessionId = `ses_${'a'.repeat(26)}`;

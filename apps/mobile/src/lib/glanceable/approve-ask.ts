@@ -189,7 +189,8 @@ export async function runGlanceableApprove(
 ): Promise<GlanceableApproveResult> {
   if (options.target !== undefined) {
     // A session card names its own session and request; the recorded ask is
-    // the aggregate card's and stays as it is.
+    // the aggregate card's and stays as it is. A card's Approve answers a
+    // permission, and the card carries no status time.
     const result = await answerPendingPermission(
       { ...options.target, permissionId: null },
       options
@@ -197,7 +198,7 @@ export async function runGlanceableApprove(
     // A request replaced by another one leaves the session waiting, so its
     // raise is not the one that ended: only the terminal outcomes ack.
     if (result.kind === 'approved' || (result.kind === 'gone' && result.replaced !== true)) {
-      ackSessionAttention(options.target.kiloSessionId);
+      ackSessionAttention(options.target.kiloSessionId, 'permission');
     }
     return result;
   }
@@ -220,7 +221,7 @@ export async function runGlanceableApprove(
   }
   // As on the card path: a replaced request is not an answered raise.
   if (result.kind === 'approved' || (result.kind === 'gone' && result.replaced !== true)) {
-    ackSessionAttention(ask.kiloSessionId);
+    ackSessionAttention(ask.kiloSessionId, ask.status, ask.statusUpdatedAt);
   }
   return result;
 }

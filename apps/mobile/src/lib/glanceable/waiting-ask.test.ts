@@ -98,6 +98,20 @@ describe('selectWaitingAsk', () => {
     });
   });
 
+  it("carries the row's status time so the answer can name its raise", () => {
+    const ask = selectWaitingAsk(
+      [{ id: 's9', status: 'permission', statusUpdatedAt: at(-60_000) }],
+      CTX,
+      NOW
+    );
+    expect(ask).toMatchObject({ kiloSessionId: 's9', statusUpdatedAt: at(-60_000) });
+  });
+
+  it('leaves the status time absent when the row carries none', () => {
+    const ask = selectWaitingAsk([{ id: 's9', status: 'permission' }], CTX, NOW);
+    expect(ask?.statusUpdatedAt).toBeUndefined();
+  });
+
   it('breaks a tie on tray order', () => {
     const ask = selectWaitingAsk(
       [
@@ -281,7 +295,11 @@ describe('waiting ask store', () => {
   });
 
   it('survives a JS restart through the SecureStore mirror', async () => {
-    const ask = askFor({ kiloSessionId: 's7', status: 'question' });
+    const ask = askFor({
+      kiloSessionId: 's7',
+      status: 'question',
+      statusUpdatedAt: at(-60_000),
+    });
     recordWaitingAsk(ask);
 
     // A JS restart drops every module-local value; only the mirror remains.
@@ -340,11 +358,14 @@ describe('waiting ask store', () => {
       })
     );
 
-    await expect(readWaitingAsk()).resolves.toMatchObject({
+    const ask = await readWaitingAsk();
+    expect(ask).toMatchObject({
       kiloSessionId: 's1',
-      statusUpdatedAt: null,
       boundPermissionId: null,
     });
+    // No time was written, so the record keeps none: its binding key is the
+    // session and status alone.
+    expect(ask?.statusUpdatedAt).toBeUndefined();
   });
 
   it('drops a mirrored ask recorded for another scope', async () => {

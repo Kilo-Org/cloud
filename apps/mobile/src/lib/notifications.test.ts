@@ -168,21 +168,22 @@ vi.mock('@/glanceable-ios/active-agents-live-activity', async () => {
   // Keep the real expo-widgets wrapper between the sink and the native handles.
   const { LiveActivityFactory } = await import('expo-widgets/src/Widgets');
   return {
-    ActiveAgentsLiveActivity: new LiveActivityFactory('ActiveAgentsLiveActivity', () => ({
-      banner: null,
-    })),
+    getActiveAgentsLiveActivity: () =>
+      new LiveActivityFactory('ActiveAgentsLiveActivity', () => ({
+        banner: null,
+      })),
   };
 });
 // The session card layout pulls in @expo/ui's native views. This suite follows
 // no session, so the factory lists no card and never starts one.
 vi.mock('@/glanceable-ios/session-live-activity', () => ({
   SESSION_LIVE_ACTIVITY_NAME: 'SessionLiveActivity',
-  SessionLiveActivity: {
+  getSessionLiveActivity: () => ({
     getInstances: () => [],
     start: () => {
       throw new Error('This suite starts no session card');
     },
-  },
+  }),
   refreshSessionLiveActivityCopy: vi.fn(),
 }));
 vi.mock('@/glanceable-ios/active-agents-widget', () => ({
@@ -707,7 +708,7 @@ const securityResponses = ['personal', 'org-example'].flatMap(scope =>
     ] as const
   ).map(payload => ({
     data: { ...payload, scope, findingId: 'finding-123' } satisfies Notifications.PushData,
-    path: `/(app)/(tabs)/(3_profile)/security-agent/${scope}/findings/finding-123?via=push`,
+    path: `/(app)/security-agent/${scope}/findings/finding-123?via=push`,
   }))
 );
 const responseCases = [
@@ -890,6 +891,7 @@ function glanceableSnapshot(
     status: 'happy',
     running: 1,
     needsInput: 0,
+    needsApproval: 0,
     idle: 0,
     scheduled: 0,
     needsInputSince: '2026-01-01T00:00:00.000Z',

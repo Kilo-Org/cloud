@@ -31,7 +31,7 @@ const run = <A, E>(use: Effect.Effect<A, E, ResumeContext>): Promise<A> =>
 const ask = (session: SessionHandle, text: string) =>
   Stream.runFold(
     session.ask(text, { maxTokens: room }),
-    { said: '', usage: undefined as ModelUsage | undefined },
+    () => ({ said: '', usage: undefined as ModelUsage | undefined }),
     (held, event) =>
       event.kind === 'delta'
         ? { ...held, said: held.said + event.text }

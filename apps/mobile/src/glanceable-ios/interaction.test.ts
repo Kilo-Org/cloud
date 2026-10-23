@@ -32,7 +32,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('./active-agents-live-activity', () => ({
   LIVE_ACTIVITY_NAME: 'ActiveAgentsLiveActivity',
-  ActiveAgentsLiveActivity: { getInstances: mocks.getInstances },
+  getActiveAgentsLiveActivity: () => ({ getInstances: mocks.getInstances }),
 }));
 vi.mock('./ios-sink', () => ({
   setGlanceableActionNotice: mocks.setGlanceableActionNotice,

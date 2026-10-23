@@ -40,7 +40,7 @@ import {
 } from '@/lib/glanceable/live-activity-switch';
 import { getWaitingAsk, type WaitingAsk } from '@/lib/glanceable/waiting-ask';
 
-import { ActiveAgentsLiveActivity, OPEN_AGENTS_URL } from './active-agents-live-activity';
+import { getActiveAgentsLiveActivity, OPEN_AGENTS_URL } from './active-agents-live-activity';
 import {
   type Activity,
   endExtra,
@@ -142,7 +142,7 @@ function subtractFollowed(
     ...snapshot,
     running: Math.max(0, snapshot.running - followed.running),
     needsInput,
-    needsApproval: Math.max(0, (snapshot.needsApproval ?? 0) - followed.needsApproval),
+    needsApproval: Math.max(0, snapshot.needsApproval - followed.needsApproval),
     idle: Math.max(0, snapshot.idle - followed.idle),
     scheduled,
     needsInputSince: needsInput === 0 ? null : snapshot.needsInputSince,
@@ -278,9 +278,9 @@ function startCard(
       );
       return;
     }
-    const remaining = ActiveAgentsLiveActivity.getInstances(true).filter(
-      instance => instance.getInfo().state !== 'dismissed'
-    );
+    const remaining = getActiveAgentsLiveActivity()
+      .getInstances(true)
+      .filter(instance => instance.getInfo().state !== 'dismissed');
     if (remaining.length > 0) {
       return;
     }
@@ -289,7 +289,7 @@ function startCard(
     if (!getNotificationPermissionGranted()) {
       return;
     }
-    const started = ActiveAgentsLiveActivity.start(
+    const started = getActiveAgentsLiveActivity().start(
       contentState,
       OPEN_AGENTS_URL,
       STALE_AFTER_SECONDS,
@@ -300,7 +300,7 @@ function startCard(
     lastProps = contentState;
     revision = snapshot.revision;
     getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId, ctx.userId, started);
-    endOtherVisible(started.getInfo().id, ActiveAgentsLiveActivity.getInstances(true));
+    endOtherVisible(started.getInfo().id, getActiveAgentsLiveActivity().getInstances(true));
   } catch (error) {
     // Only ActivityKit unavailability is permanent; transient starts retry later.
     if (isActivityKitUnavailable(error)) {
@@ -324,10 +324,12 @@ function refreshActivity(): boolean {
     }
     // Wrappers change on discovery; only native IDs identify pending ends.
     // Include ended-but-visible cards so a later start cannot stack beside them.
-    const visible = ActiveAgentsLiveActivity.getInstances(true).filter(instance => {
-      const info = instance.getInfo();
-      return info.state !== 'dismissed' && !endingActivities.has(info.id);
-    });
+    const visible = getActiveAgentsLiveActivity()
+      .getInstances(true)
+      .filter(instance => {
+        const info = instance.getInfo();
+        return info.state !== 'dismissed' && !endingActivities.has(info.id);
+      });
     const live = visible.filter(instance => {
       const state = instance.getInfo().state;
       return state === 'active' || state === 'stale';
@@ -368,7 +370,7 @@ function endNow(
   if (reachEnded) {
     try {
       // Privacy must include terminal content, even after JS state was discarded.
-      for (const instance of ActiveAgentsLiveActivity.getInstances(true)) {
+      for (const instance of getActiveAgentsLiveActivity().getInstances(true)) {
         targets.set(instance.getInfo().id, instance);
       }
     } catch (error) {
@@ -560,7 +562,7 @@ export function clearActivityKitDeniedIfAvailable(): boolean {
     return false;
   }
   try {
-    ActiveAgentsLiveActivity.getInstances();
+    getActiveAgentsLiveActivity().getInstances();
     activityKitDeniedState = false;
     return true;
   } catch {
@@ -612,7 +614,9 @@ export function republishAggregateCard(): void {
 export const iosSink: GlanceableSink = {
   async waitForNativeTerminal() {
     await Promise.all(
-      [...endingActivities.values()].map((ending): Promise<void> | null => ending.pending)
+      [...endingActivities.values()]
+        .map(ending => ending.pending)
+        .filter((pending): pending is Promise<void> => pending !== null)
     );
     // A replacement card deferred behind a dismissal is part of that terminal work.
     await pendingStart;

@@ -181,30 +181,17 @@ describe('cleanup', () => {
   });
 
   it('blanks to privacy only after a successful list misses the selection', () => {
-    expect(
-      planOrgFenceAction({
-        organizationId: 'missing-org',
-        orgs: [{ organizationId: 'kept-org' }],
-        isLoading: false,
-        isError: false,
-      })
-    ).toBe('privacy');
-    expect(
-      planOrgFenceAction({
-        organizationId: 'missing-org',
-        orgs: [{ organizationId: 'kept-org' }],
-        isLoading: true,
-        isError: false,
-      })
-    ).toBe('none');
-    expect(
-      planOrgFenceAction({
-        organizationId: 'kept-org',
-        orgs: [{ organizationId: 'kept-org' }],
-        isLoading: false,
-        isError: false,
-      })
-    ).toBe('confirmed');
+    const fence = {
+      organizationId: 'missing-org',
+      orgs: [{ organizationId: 'kept-org' }],
+      isLoading: false,
+      isError: false,
+    };
+    expect(planOrgFenceAction(fence)).toBe('privacy');
+    expect(planOrgFenceAction({ ...fence, isLoading: true })).toBe('none');
+    expect(planOrgFenceAction({ ...fence, organizationId: 'kept-org', orgs: fence.orgs })).toBe(
+      'confirmed'
+    );
     expect(
       planOrgFenceAction({ organizationId: null, orgs: [], isLoading: false, isError: false })
     ).toBe('confirmed');
@@ -241,6 +228,7 @@ describe('cleanup', () => {
       status: 'happy',
       running: 2,
       needsInput: 1,
+      needsApproval: 1,
       idle: 1,
       scheduled: 0,
       needsInputSince: '2026-08-26T23:00:00.000Z',
@@ -253,18 +241,14 @@ describe('cleanup', () => {
     const { sink, calls } = makeSink();
     registerGlanceableSink(sink);
     try {
-      for (const [index, now] of [
-        '2026-08-27T01:00:00.000Z',
-        '2026-08-27T07:59:59.999Z',
-      ].entries()) {
+      const staleAt = ['2026-08-27T01:00:00.000Z', '2026-08-27T07:59:59.999Z'];
+      const expiredAt = ['2026-08-27T08:00:00.000Z', '2026-08-27T09:00:00.000Z'];
+      for (const [index, now] of staleAt.entries()) {
         vi.setSystemTime(new Date(now));
         republishLastSnapshotStale();
         expect(lastSnapshot(calls)).toEqual({ ...seeded, revision: index + 4, status: 'stale' });
       }
-      for (const [index, now] of [
-        '2026-08-27T08:00:00.000Z',
-        '2026-08-27T09:00:00.000Z',
-      ].entries()) {
+      for (const [index, now] of expiredAt.entries()) {
         vi.setSystemTime(new Date(now));
         republishLastSnapshotStale();
         expect(lastSnapshot(calls)).toEqual({
@@ -273,6 +257,7 @@ describe('cleanup', () => {
           status: 'expired',
           running: 0,
           needsInput: 0,
+          needsApproval: 0,
           idle: 0,
           needsInputSince: null,
         });
@@ -296,6 +281,7 @@ describe('cleanup', () => {
         status,
         running: 0,
         needsInput: 0,
+        needsApproval: 0,
         idle: 0,
         scheduled: 0,
         needsInputSince: null,
@@ -315,9 +301,9 @@ describe('cleanup', () => {
             status,
             scopeKey: terminal.scopeKey,
             updatedAt: terminal.updatedAt,
-            expiresAt: terminal.expiresAt,
             running: 0,
             needsInput: 0,
+            needsApproval: 0,
             idle: 0,
             needsInputSince: null,
           });

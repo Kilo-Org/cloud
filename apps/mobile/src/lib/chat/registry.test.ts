@@ -64,28 +64,23 @@ const PAYMENT_REQUIRED_BODY =
   '{"error":{"message":"Add credits to continue"},"error_type":"usage_limit_exceeded"}';
 /**
  * The failure the gateway plugin raises: a status and the body that came with
- * it. The registry reads its fields, so the fake carries the same ones.
+ * it. The registry reads its fields, and recognises it by type, so the fake
+ * wears the prototype of the constructor the module exports. A plain function
+ * carries it, which keeps this file to the one class the lint rule allows.
  */
 const modelError = vi.hoisted(() => {
-  class FakeModelError extends Error {
-    readonly reason: string;
-    readonly status: number | undefined;
-
-    constructor(fields: {
-      readonly reason: string;
-      readonly status?: number;
-      readonly cause?: unknown;
-    }) {
-      super(fields.reason);
-      this.name = 'ModelError';
-      this.reason = fields.reason;
-      this.status = fields.status;
-      if (fields.cause !== undefined) {
-        this.cause = fields.cause;
-      }
-    }
+  function ModelError(this: { message?: string }) {
+    // Only a prototype for `failed()` to wear; nothing constructs one directly.
   }
-  return { ModelError: FakeModelError };
+  return {
+    ModelError: ModelError as unknown as new (...args: never[]) => Error,
+    failed: (fields: { readonly reason: string; readonly status?: number; readonly cause?: unknown }) =>
+      Object.assign(Object.create(ModelError.prototype as object) as Error, {
+        name: 'ModelError',
+        message: fields.reason,
+        ...fields,
+      }),
+  };
 });
 /** What one answer costs in the fake, the way the gateway reports a paid call. */
 const CALL: ModelUsage = {
@@ -162,7 +157,7 @@ const handleFor = (id: string) => {
       if (creditsFailureFor === id) {
         asked.push(said);
         return Stream.fail(
-          new modelError.ModelError({ reason: 'status', status: 402, cause: PAYMENT_REQUIRED_BODY })
+          modelError.failed({ reason: 'status', status: 402, cause: PAYMENT_REQUIRED_BODY })
         );
       }
       return Stream.callback<ModelEvent>(queue =>

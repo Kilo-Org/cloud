@@ -214,6 +214,61 @@ export const INLINE_LINK_ROW_CLASS = 'my-[5px]';
 export const INLINE_LINK_CONNECTOR_CLASS = 'min-w-[10px] text-center';
 
 /**
+ * The box a legal link renders — the two store links under the credit packs,
+ * and the privacy-policy link each consent sentence ends with — rather than a
+ * word inside a sentence with a neighbour {@link INLINE_LINK_BOX_CLASS} has to
+ * stay clear of.
+ *
+ * The whole target is the box, {@link ICON_TARGET_DP} 48dp tall and wide, the
+ * size the control-size audit reads from a node's own rect (Android's
+ * `<Button>` minimum). `hitSlop` cannot reach it: the audit measures the rect,
+ * not the touch region.
+ *
+ * The utilities below are spelled out rather than interpolated from the dp
+ * constants beside them: the class compiler reads class names out of the source
+ * files, so an interpolated name can miss the generated stylesheet and silently
+ * apply nothing. The tests hold the literals to the constants.
+ */
+export const LEGAL_LINK_MIN_DP = 48;
+
+/**
+ * The box two store legal links render in a wrapping row. Both keep their full
+ * {@link LEGAL_LINK_MIN_DP} height in the flow, so the row's lines are 48dp
+ * tall: when a long locale wraps the second link onto its own line the two
+ * boxes sit one gutter apart and can never overlap, so a tap between the lines
+ * opens the link it points at. The footer pays one 48dp line for that, which is
+ * what keeps the geometry honest: a box that cancelled its own height would
+ * reach 17dp into the line below.
+ */
+export const LEGAL_LINK_BOX_CLASS = 'min-h-[48px] min-w-[48px] items-center justify-center';
+
+/**
+ * The `text-xs` line a legal link centres on, in dp: line-height
+ * `calc(1 / 0.75)` of 10.5dp.
+ */
+export const LEGAL_LINK_LINE_DP = 14;
+
+/**
+ * The vertical margin a legal link cancels inside a running sentence: the box's
+ * overflow past the `text-xs` line it centres on, `(48 - 14) / 2`. A sentence
+ * has no second link beside it, so the overflow only ever lands on prose, and
+ * cancelling it keeps the sentence on its own line exactly as the sign-in
+ * sentence's {@link INLINE_LINK_BOX_CLASS} does.
+ */
+export const LEGAL_LINK_SENTENCE_CANCEL_DP = (LEGAL_LINK_MIN_DP - LEGAL_LINK_LINE_DP) / 2;
+
+/** The box a legal link renders as the last word of a consent sentence. */
+export const LEGAL_LINK_SENTENCE_BOX_CLASS = `${LEGAL_LINK_BOX_CLASS} -my-[17px]`;
+
+/**
+ * The row the two store legal links share: side by side when they fit, one per
+ * line when a long locale wraps them. `gap-x-4` separates two boxes on one line
+ * (14dp, and no slop points sideways); the boxes' own height separates the
+ * wrapped lines.
+ */
+export const LEGAL_LINK_ROW_CLASS = 'flex-row flex-wrap items-center gap-x-4';
+
+/**
  * The reach a box plus its per-side slop offers. This is the number the tests
  * assert against {@link TOUCH_TARGET_DP} and the control-size audit floor.
  */

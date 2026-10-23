@@ -227,16 +227,98 @@ function textPrefix(value: unknown): string | null {
   return text.slice(0, TEXT_PREFIX_MAX_LENGTH);
 }
 
-function cleanPromptText(text: string): string {
-  const taskText = text.match(/<task>\s*([\s\S]*?)\s*<\/task>/i)?.[1] ?? text;
+// Message content is client-supplied and this runs synchronously on the
+// gateway request path, so extraction walks the text with forward-only
+// cursors: the opener search and the closer search cover ranges no earlier
+// search covered, and the cost stays linear in the length of the text. A
+// missing closing tag leaves the remaining text untouched and ends the pass.
+type BlockPass = {
+  // Opener scan. A literal opener includes the `>`; an attribute opener stops
+  // at the tag name and is completed by the `>` search in `nextOpener`.
+  open: RegExp;
+  close: RegExp;
+  attributes: boolean;
+};
 
-  return taskText
-    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, ' ')
-    .replace(/<environment_details>[\s\S]*?<\/environment_details>/gi, ' ')
-    .replace(/<file(?:\s[^>]*)?>[\s\S]*?<\/file>/gi, ' ')
-    .replace(/<file_content(?:\s[^>]*)?>[\s\S]*?<\/file_content>/gi, ' ')
-    .replace(/<read_file>[\s\S]*?<\/read_file>/gi, ' ')
-    .replace(/<search_files>[\s\S]*?<\/search_files>/gi, ' ')
+const BLOCK_PASSES: BlockPass[] = [
+  { open: /<thinking>/gi, close: /<\/thinking>/gi, attributes: false },
+  { open: /<environment_details>/gi, close: /<\/environment_details>/gi, attributes: false },
+  { open: /<file/gi, close: /<\/file>/gi, attributes: true },
+  { open: /<file_content/gi, close: /<\/file_content>/gi, attributes: true },
+  { open: /<read_file>/gi, close: /<\/read_file>/gi, attributes: false },
+  { open: /<search_files>/gi, close: /<\/search_files>/gi, attributes: false },
+];
+
+const TASK_OPEN = /<task>/i;
+const TASK_CLOSE = /<\/task>/gi;
+// Same character set as `\s`, and as the set `String.prototype.trim` strips.
+const WHITESPACE = /\s/;
+
+type OpenerMatch = { start: number; end: number };
+
+// Next opener at or after `from`, or null when none can match. An attribute
+// opener is the tag name, then `>`, or one whitespace character and the next
+// `>` anywhere after it.
+function nextOpener(pass: BlockPass, text: string, from: number): OpenerMatch | null {
+  pass.open.lastIndex = from;
+  for (;;) {
+    const open = pass.open.exec(text);
+    if (!open) return null;
+
+    const end = open.index + open[0].length;
+    if (!pass.attributes) return { start: open.index, end };
+
+    const following = text[end];
+    if (following === '>') return { start: open.index, end: end + 1 };
+    if (following !== undefined && WHITESPACE.test(following)) {
+      const bracket = text.indexOf('>', end + 1);
+      // No `>` left in the text: this opener fails, so every later one does.
+      return bracket < 0 ? null : { start: open.index, end: bracket + 1 };
+    }
+
+    pass.open.lastIndex = end;
+  }
+}
+
+// Replaces every `open ... close` block with a single space: left to right,
+// non-overlapping, nearest closer. A block whose closer is missing, and the
+// text before the first opener, are kept as they are.
+function stripBlocks(text: string, pass: BlockPass): string {
+  let stripped = '';
+  let cursor = 0;
+  for (;;) {
+    const open = nextOpener(pass, text, cursor);
+    if (!open) break;
+
+    pass.close.lastIndex = open.end;
+    const close = pass.close.exec(text);
+    if (!close) break;
+
+    stripped += text.slice(cursor, open.start) + ' ';
+    cursor = close.index + close[0].length;
+  }
+
+  return stripped + text.slice(cursor);
+}
+
+function extractTaskText(text: string): string {
+  const open = TASK_OPEN.exec(text);
+  if (!open) return text;
+
+  TASK_CLOSE.lastIndex = open.index + open[0].length;
+  const close = TASK_CLOSE.exec(text);
+  if (!close) return text;
+
+  return text.slice(open.index + open[0].length, close.index).trim();
+}
+
+function cleanPromptText(text: string): string {
+  let cleaned = extractTaskText(text);
+  for (const pass of BLOCK_PASSES) {
+    cleaned = stripBlocks(cleaned, pass);
+  }
+
+  return cleaned
     .replace(/^\[[^\]]+\]\s+Result:\s*/i, ' ')
     .replace(/\[ERROR\][\s\S]*/i, ' ')
     .replace(/\s+/g, ' ')

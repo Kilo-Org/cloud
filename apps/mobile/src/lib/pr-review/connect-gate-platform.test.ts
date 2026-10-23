@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one helper's whole launch contract: both platforms, the abort edges and the foreground return. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -10,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   openAuthSessionAsync: vi.fn<(url: string) => Promise<{ type: string }>>(),
   openBrowserAsync: vi.fn<(url: string) => Promise<unknown>>(),
   addAppStateListener: vi.fn(),
+  appState: { currentState: undefined as string | undefined },
   subscriptions: [] as {
     remove: ReturnType<typeof vi.fn>;
     listener: (state: string) => void;
@@ -18,7 +20,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('react-native', () => ({
   Platform: mocks.platform,
-  AppState: { addEventListener: mocks.addAppStateListener },
+  AppState: {
+    addEventListener: mocks.addAppStateListener,
+    get currentState() {
+      return mocks.appState.currentState;
+    },
+  },
 }));
 vi.mock('expo-web-browser', () => ({
   openAuthSessionAsync: mocks.openAuthSessionAsync,
@@ -35,6 +42,7 @@ function emitAppState(state: string) {
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.subscriptions.length = 0;
+  mocks.appState.currentState = undefined;
   mocks.addAppStateListener.mockImplementation(
     (_event: string, listener: (state: string) => void) => {
       const subscription = { remove: vi.fn(), listener };
@@ -44,6 +52,10 @@ beforeEach(() => {
   );
 });
 
+function returnHandlers() {
+  return { onReturn: vi.fn().mockResolvedValue(undefined), onOpenFailure: vi.fn() };
+}
+
 describe('iOS launch', () => {
   beforeEach(() => {
     mocks.platform.OS = 'ios';
@@ -51,7 +63,7 @@ describe('iOS launch', () => {
 
   it('opens the native auth session and refetches when it resolves', async () => {
     mocks.openAuthSessionAsync.mockResolvedValue({ type: 'cancel' });
-    const handlers = { onReturn: vi.fn().mockResolvedValue(undefined), onOpenFailure: vi.fn() };
+    const handlers = returnHandlers();
 
     await launchConnectGateBrowser('https://example.com/connect', handlers);
 
@@ -76,7 +88,7 @@ describe('Android launch', () => {
 
   it('opens a plain browser and refetches when the app returns to the foreground', async () => {
     mocks.openBrowserAsync.mockResolvedValue({ type: 'opened' });
-    const handlers = { onReturn: vi.fn().mockResolvedValue(undefined), onOpenFailure: vi.fn() };
+    const handlers = returnHandlers();
 
     const launch = launchConnectGateBrowser('https://example.com/connect', handlers);
     await Promise.resolve();
@@ -118,7 +130,7 @@ describe('Android launch', () => {
     mocks.openBrowserAsync
       .mockRejectedValueOnce(new Error('no browser'))
       .mockResolvedValueOnce({ type: 'opened' });
-    const handlers = { onReturn: vi.fn().mockResolvedValue(undefined), onOpenFailure: vi.fn() };
+    const handlers = returnHandlers();
 
     await launchConnectGateBrowser('https://example.com/connect', handlers);
     expect(handlers.onOpenFailure).toHaveBeenCalledOnce();
@@ -160,6 +172,15 @@ describe('Android launch', () => {
 });
 
 describe.each(['ios', 'android'])('shared launch contract on %s', os => {
+  const openFn = () => (os === 'android' ? mocks.openBrowserAsync : mocks.openAuthSessionAsync);
+
+  /** A launch that stays open until the test settles it. */
+  function pendingLaunch() {
+    const pending = Promise.withResolvers<{ type: string }>();
+    openFn().mockReturnValue(pending.promise);
+    return pending;
+  }
+
   beforeEach(() => {
     mocks.platform.OS = os;
   });
@@ -240,8 +261,7 @@ describe.each(['ios', 'android'])('shared launch contract on %s', os => {
       onOpenFailure: vi.fn(),
     };
     if (outcome === 'failure') {
-      const open = os === 'android' ? mocks.openBrowserAsync : mocks.openAuthSessionAsync;
-      open.mockRejectedValue(new Error('no browser'));
+      openFn().mockRejectedValue(new Error('no browser'));
     } else {
       mocks.openBrowserAsync.mockResolvedValue({ type: 'opened' });
       mocks.openAuthSessionAsync.mockResolvedValue({ type: 'cancel' });
@@ -268,10 +288,8 @@ describe.each(['ios', 'android'])('shared launch contract on %s', os => {
     // The reported failure: the sheet closes, the app is foreground again, and
     // the platform's completion never arrives. The caller must not stay in its
     // "in progress" state waiting for that report.
-    const pending = Promise.withResolvers<{ type: string }>();
-    const open = os === 'android' ? mocks.openBrowserAsync : mocks.openAuthSessionAsync;
-    open.mockReturnValue(pending.promise);
-    const handlers = { onReturn: vi.fn().mockResolvedValue(undefined), onOpenFailure: vi.fn() };
+    pendingLaunch();
+    const handlers = returnHandlers();
 
     const launch = launchConnectGateBrowser('https://example.com/connect', handlers);
     emitAppState('background');
@@ -284,10 +302,8 @@ describe.each(['ios', 'android'])('shared launch contract on %s', os => {
   });
 
   it('ignores a launch failure that lands after the foreground ended the wait', async () => {
-    const pending = Promise.withResolvers<{ type: string }>();
-    const open = os === 'android' ? mocks.openBrowserAsync : mocks.openAuthSessionAsync;
-    open.mockReturnValue(pending.promise);
-    const handlers = { onReturn: vi.fn().mockResolvedValue(undefined), onOpenFailure: vi.fn() };
+    const pending = pendingLaunch();
+    const handlers = returnHandlers();
 
     const launch = launchConnectGateBrowser('https://example.com/connect', handlers);
     emitAppState('active');
@@ -300,6 +316,42 @@ describe.each(['ios', 'android'])('shared launch contract on %s', os => {
 
     expect(handlers.onReturn).toHaveBeenCalledOnce();
     expect(handlers.onOpenFailure).not.toHaveBeenCalled();
+  });
+
+  it('needs a real return, not an active delivery while the app never left', async () => {
+    mocks.appState.currentState = 'active';
+    pendingLaunch();
+    const handlers = returnHandlers();
+
+    const launch = launchConnectGateBrowser('https://example.com/connect', handlers);
+    // An `active` that follows another `active` is not a return to the app.
+    emitAppState('active');
+    await Promise.resolve();
+    expect(handlers.onReturn).not.toHaveBeenCalled();
+
+    emitAppState('background');
+    emitAppState('active');
+    await expect(launch).resolves.toBeUndefined();
+    expect(handlers.onReturn).toHaveBeenCalledOnce();
+  });
+
+  it('refreshes again when the sheet completes after the app already came back', async () => {
+    mocks.appState.currentState = 'active';
+    const pending = pendingLaunch();
+    const handlers = returnHandlers();
+
+    const launch = launchConnectGateBrowser('https://example.com/connect', handlers);
+    emitAppState('background');
+    emitAppState('active');
+    await launch;
+    expect(handlers.onReturn).toHaveBeenCalledOnce();
+
+    // The sign-in completed after the return edge: the status must be read
+    // again, or a completed connection would leave the gate on Connect.
+    pending.resolve({ type: 'cancel' });
+    await vi.waitFor(() => {
+      expect(handlers.onReturn).toHaveBeenCalledTimes(2);
+    });
   });
 });
 

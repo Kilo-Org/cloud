@@ -30,7 +30,6 @@ import {
 } from '@/components/agents/session-list-chrome';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { useAgentsListChrome } from '@/components/agents/use-agents-list-chrome';
-import { ContextControl } from '@/components/context-control';
 import { Button } from '@/components/ui/button';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
@@ -42,10 +41,8 @@ import { cn } from '@/lib/utils';
 
 import { type Href, useFocusEffect, useNavigation, useRouter, useScrollToTop } from 'expo-router';
 
-/** `segmentControl` renders under the header: the Agents tab's Sessions | To-dos switch. */
-export function AgentSessionListScreen({
-  segmentControl,
-}: Readonly<{ segmentControl?: ReactNode }> = {}) {
+/** `tabHeader` renders under the header: the account scope line and the Agents tab's Sessions | To-dos switch. */
+export function AgentSessionListScreen({ tabHeader }: Readonly<{ tabHeader?: ReactNode }> = {}) {
   const router = useRouter();
   const navigation = useNavigation();
   const { t } = useTranslation();
@@ -504,16 +501,7 @@ export function AgentSessionListScreen({
           inlineActions={content === 'empty' ? undefined : headerActions}
           inlineActionsWidth={inlineActionsWidth}
         />
-        {/* The live list, the history it links to, and the To-dos beside it are
-            all scoped to the selected account, so the scope belongs above the
-            switch instead of inside a list state: an organization scope with no
-            rows otherwise reads as "no sessions" while the user's personal CLI
-            sessions sit one switch away. `ContextControl` is the same
-            switchable control the Home header carries. */}
-        <View className="px-[22px] pb-1">
-          <ContextControl />
-        </View>
-        {segmentControl}
+        {tabHeader}
         {hasLiveRows || isSearching ? (
           <SessionListSearchHeader
             inputRef={query.searchInputRef}

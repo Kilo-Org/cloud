@@ -61,24 +61,27 @@ describe('localized format helpers', () => {
 
 describe('toAsciiDigits', () => {
   it('converts the Arabic-Indic digits a phone keyboard types for a code', () => {
-    expect(toAsciiDigits('٢٤٦٨١٠', 'ar')).toBe('246810');
+    expect(toAsciiDigits('٢٤٦٨١٠')).toBe('246810');
   });
 
   it.each([
-    ['Extended Arabic-Indic', '۲۴۶۸۱۰', 'fa'],
-    ['Devanagari', '२४६८१०', 'hi'],
-  ])('converts %s digits', (_script, digits, locale) => {
-    expect(toAsciiDigits(digits, locale)).toBe('246810');
+    ['Extended Arabic-Indic', '۲۴۶۸۱۰'],
+    ['Devanagari', '२४६८१०'],
+    ['Bengali', '২৪৬৮১০'],
+    ['Myanmar', '၂၄၆၈၁၀'],
+  ])('converts %s digits', (_script, digits) => {
+    expect(toAsciiDigits(digits)).toBe('246810');
   });
 
-  it('converts the active numbering system of a locale', () => {
-    expect(toAsciiDigits('২৪৬৮১০', 'bn')).toBe('246810');
-    expect(toAsciiDigits('၇', 'my')).toBe('7');
+  it('converts digits a Latin-numbering locale formats as Latin', () => {
+    expect(toAsciiDigits('๒๔๖๘๑๐')).toBe('246810');
+    expect(toAsciiDigits('໒໔໖໘໑໐')).toBe('246810');
+    expect(toAsciiDigits('２４６８１０')).toBe('246810');
   });
 
   it('converts each digit of a mixed-script value and leaves other characters alone', () => {
-    expect(toAsciiDigits('٢٤6٨١0', 'ar')).toBe('246810');
-    expect(toAsciiDigits('24a6', 'en')).toBe('24a6');
-    expect(toAsciiDigits('', 'ar')).toBe('');
+    expect(toAsciiDigits('٢٤6٨๑0')).toBe('246810');
+    expect(toAsciiDigits('24a6')).toBe('24a6');
+    expect(toAsciiDigits('')).toBe('');
   });
 });

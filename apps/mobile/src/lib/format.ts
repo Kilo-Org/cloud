@@ -122,51 +122,40 @@ export function firstGrapheme(value: string, locale: string): string {
   );
 }
 
-/**
- * Decimal-digit blocks a phone keyboard can produce for typed numbers. The
- * locale's numbering system is not enough on its own: ICU resolves a bare `ar`
- * to Latin digits and `ar-EG` to Arabic-Indic, so the blocks a user can type
- * are mapped explicitly. The bases are U+0660 (Arabic-Indic), U+06F0 (Extended
- * Arabic-Indic: Persian, Urdu) and U+0966 (Devanagari), written in decimal
- * because oxfmt normalizes hex literals to lowercase, which
- * `unicorn/number-literal-case` rejects.
- */
-const NATIVE_DIGIT_BASES = [1632, 1776, 2406] as const;
-const localeDigitMaps = new Map<string, Map<string, string>>();
+const DECIMAL_DIGIT = /\p{Nd}/u;
 
-function localeDigitMap(locale: string): Map<string, string> {
-  const cached = localeDigitMaps.get(locale);
-  if (cached) {
-    return cached;
+/**
+ * The ASCII form of one decimal digit, or `null` when the character is not one.
+ * The locale's numbering system is not enough to find it: ICU formats `th`,
+ * `lo` and `ja` numbers with Latin digits, while a keyboard in those scripts
+ * types ๐, ໐ and ２. Unicode gives every decimal digit a contiguous ten-code-point
+ * run that starts at zero, so the value is the distance from the run's start and
+ * every script — Arabic-Indic, Extended Arabic-Indic, Devanagari, full-width,
+ * the locale's own — comes from the same rule.
+ */
+function asciiDigit(char: string): string | null {
+  if (!DECIMAL_DIGIT.test(char)) {
+    return null;
   }
-  const format = numberFormat(locale, { useGrouping: false });
-  const map = new Map(
-    Array.from({ length: 10 }, (_, digit) => [format.format(digit), String(digit)])
-  );
-  localeDigitMaps.set(locale, map);
-  return map;
+  const code = char.codePointAt(0) ?? 0;
+  let start = code;
+  while (start > 0 && DECIMAL_DIGIT.test(String.fromCodePoint(start - 1))) {
+    start -= 1;
+  }
+  return String(code - start);
 }
 
 /**
  * Converts digits typed in another script to ASCII so a value can be validated
- * and sent as the ASCII form the server stores. Characters that are not digits
- * pass through unchanged.
+ * and sent in the form the server stores. Characters that are not digits pass
+ * through unchanged.
  */
-export function toAsciiDigits(value: string, locale: string): string {
-  const digits = localeDigitMap(locale);
-  let normalized = '';
+export function toAsciiDigits(value: string): string {
+  let ascii = '';
   for (const char of value) {
-    const code = char.codePointAt(0) ?? 0;
-    let base = -1;
-    for (const candidate of NATIVE_DIGIT_BASES) {
-      if (code >= candidate && code <= candidate + 9) {
-        base = candidate;
-        break;
-      }
-    }
-    normalized += base === -1 ? (digits.get(char) ?? char) : String(code - base);
+    ascii += asciiDigit(char) ?? char;
   }
-  return normalized;
+  return ascii;
 }
 
 /**
@@ -182,7 +171,7 @@ export function normalizeLocalizedNumber(value: string, locale: string): string 
   const group = part('group', ',');
   const decimal = part('decimal', '.');
   const minus = part('minusSign', '-');
-  let normalized = toAsciiDigits(value.trim().replaceAll(/[\u061C\u200E\u200F]/g, ''), locale);
+  let normalized = toAsciiDigits(value.trim().replaceAll(/[\u061C\u200E\u200F]/g, ''));
   if (/^[\s\u00A0\u202F]+$/u.test(group)) {
     normalized = normalized.replaceAll(/[ \u00A0\u202F]/gu, group);
   }

@@ -47,7 +47,7 @@ export function EmailOtpForm({
   onBack: () => void;
 }>) {
   const colors = useThemeColors();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const codeRef = useRef('');
   const [hasCompleteCode, setHasCompleteCode] = useState(false);
   const authBusy = busy !== undefined;
@@ -84,9 +84,8 @@ export function EmailOtpForm({
         onChangeText={value => {
           // The field keeps what was typed, but validation and the code sent to
           // the server work on ASCII: the sign-in code is issued in ASCII, and a
-          // keyboard in an Arabic, Persian or Devanagari script types the same
-          // code in its own digits.
-          const digits = toAsciiDigits(value, i18n.language);
+          // keyboard in another script types the same code in its own digits.
+          const digits = toAsciiDigits(value);
           codeRef.current = digits;
           setHasCompleteCode(/^\d{6}$/.test(digits));
         }}
@@ -98,7 +97,7 @@ export function EmailOtpForm({
         disabled={!hasCompleteCode || authBusy}
         loading={busy === 'otp-verify'}
         onPress={() => {
-          if (canSubmitEmailCode(codeRef.current, i18n.language, busy)) {
+          if (canSubmitEmailCode(codeRef.current, busy)) {
             onVerify(codeRef.current);
           }
         }}

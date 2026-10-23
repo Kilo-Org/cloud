@@ -40,6 +40,12 @@ radio rows. It exposes button/selected traits on iOS and checkbox or radio roles
 with checked state on Android. `ChoiceRow` and `radioItemA11y` use this mapping.
 Verify both the native role and state transitions in device accessibility trees;
 a rendered checkmark alone does not verify accessibility.
+## Remote session recovery
+
+A response that fails before producing any content still shows its failure and
+Retry action, including after reopening the session. Retry resends the original
+user prompt as a new turn in the same session; the original prompt remains in
+the transcript.
 
 ## Transcript action targets
 

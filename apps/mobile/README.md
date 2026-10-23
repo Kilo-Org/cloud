@@ -18,6 +18,14 @@ current render time. Elapsed grants and non-expiring credits do not contribute t
 its amount or earliest expiry, for both personal and organization accounts.
 The balance continues to come from the balance query.
 
+## New-session model choice
+
+Model resolution waits for stored preferences to load. An explicit model and
+effort pick updates the current account scope's preference cache before its
+server save finishes, so reopening the form does not restore an older cached
+choice. Older in-flight preference reads are cancelled before that update.
+The existing server, local, and default-model fallback order is unchanged.
+
 ## Organization hub connectivity
 
 Usage tiles retain labels and show cached totals or em dash placeholders.
@@ -32,6 +40,14 @@ radio rows. It exposes button/selected traits on iOS and checkbox or radio roles
 with checked state on Android. `ChoiceRow` and `radioItemA11y` use this mapping.
 Verify both the native role and state transitions in device accessibility trees;
 a rendered checkmark alone does not verify accessibility.
+
+## Transcript action targets
+
+Standalone transcript continuation and recovery buttons use the shared
+`Button size="action"`: a 48dp minimum height that can grow with the label.
+Compact, default, and large button sizes remain unchanged for other controls.
+Verify Android targets using the clickable accessibility node bounds, not
+hitSlop alone; keep the translated label fully visible.
 
 ## Getting started
 

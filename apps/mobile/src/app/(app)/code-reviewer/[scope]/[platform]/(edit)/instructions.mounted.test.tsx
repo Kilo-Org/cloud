@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 
+import { ReviewerRouteParamsProvider } from '@/lib/hooks/use-reviewer-route-params';
 import InstructionsRoute from './instructions';
 
 const config = vi.hoisted(() => ({
@@ -53,7 +54,7 @@ const confirmDialog = vi.hoisted(() => ({
 }));
 
 vi.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({ scope: 'personal', platform: 'github' }),
+  useLocalSearchParams: () => ({}),
   useRouter: () => router,
   useNavigation: () => navigation,
   usePreventRemove: (enabled: boolean, handler: (options: { repeat: () => void }) => void) => {
@@ -108,6 +109,7 @@ vi.mock('@/components/destructive-confirm-dialog', () => ({
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
 vi.mock('@/components/screen-header', () => ({
   ScreenHeader: (props: Record<string, unknown>): ReactNode => createElement('ScreenHeader', props),
 }));
@@ -125,7 +127,12 @@ function Harness() {
   invalidate = () => {
     setVersion(version => version + 1);
   };
-  return createElement(InstructionsRoute);
+  // The `[platform]` layout validates the pair and publishes it to the screen.
+  return (
+    <ReviewerRouteParamsProvider params={{ kind: 'personal', platform: 'github' }}>
+      <InstructionsRoute />
+    </ReviewerRouteParamsProvider>
+  );
 }
 
 function mount(): TestRenderer.ReactTestRenderer {

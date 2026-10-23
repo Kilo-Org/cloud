@@ -392,9 +392,21 @@ async function expireOpenCheckoutSessionsForDeclinedCharge(params: {
       },
       { timeout: CHARGE_GATE_STRIPE_TIMEOUT_MS }
     );
-    for (const session of listed.data) {
-      if (session.status !== 'open') continue;
-      await client.checkout.sessions.expire(session.id, { timeout: CHARGE_GATE_STRIPE_TIMEOUT_MS });
+    // In parallel and settled one by one: a session that closed meanwhile or a slow call cannot
+    // keep the other sessions open, and the batch is bounded by one call's timeout.
+    const expired = await Promise.allSettled(
+      listed.data
+        .filter(session => session.status === 'open')
+        .map(session =>
+          client.checkout.sessions.expire(session.id, { timeout: CHARGE_GATE_STRIPE_TIMEOUT_MS })
+        )
+    );
+    const failed = expired.filter(result => result.status === 'rejected').length;
+    if (failed > 0) {
+      warnExceptInTest('Bouncer decline gate could not expire some open checkout sessions', {
+        failed,
+        listed: expired.length,
+      });
     }
     return;
   }

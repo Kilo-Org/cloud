@@ -5654,6 +5654,34 @@ describe('processStripePaymentEventHook bouncer decline gate', () => {
     );
   });
 
+  test('one session that fails to expire does not keep the other open sessions alive', async () => {
+    mockChargeDecide.mockResolvedValue({ enforced: true, code: 'charge_blocked', flags: [] });
+    listSpy.mockResolvedValue({
+      object: 'list',
+      data: [
+        { id: 'cs_gate_closed_meanwhile', status: 'open' },
+        { id: 'cs_gate_second', status: 'open' },
+      ],
+      has_more: false,
+      url: '/v1/checkout/sessions',
+    } as unknown as Stripe.Response<Stripe.ApiList<Stripe.Checkout.Session>>);
+    expireSpy.mockImplementation(async id => {
+      if (id === 'cs_gate_closed_meanwhile') throw new Error('session is not open');
+      return {
+        id,
+        object: 'checkout.session',
+        status: 'expired',
+      } as unknown as Stripe.Response<Stripe.Checkout.Session>;
+    });
+
+    await processStripePaymentEventHook(failedPaymentIntentEvent('ch_gate_two', 'pi_gate_two'));
+
+    expect(expireSpy).toHaveBeenCalledWith(
+      'cs_gate_second',
+      expect.objectContaining({ timeout: 5_000 })
+    );
+  });
+
   test('a failed immediate delivery leaves the open checkout session alone', async () => {
     mockDeliver.mockResolvedValue({
       delivered: false,

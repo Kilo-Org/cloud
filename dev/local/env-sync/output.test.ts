@@ -64,3 +64,60 @@ test('creates planned secrets concurrently across stores without re-listing them
     fs.rmSync(repoRoot, { recursive: true, force: true });
   }
 });
+
+test('writes planned env files owner-only and keeps a stricter existing mode', async () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'env-sync-output-'));
+  const existingWorker = 'services/existing-service';
+  const newWorker = 'services/new-service';
+  fs.mkdirSync(path.join(repoRoot, existingWorker), { recursive: true });
+  fs.mkdirSync(path.join(repoRoot, newWorker), { recursive: true });
+  fs.mkdirSync(path.join(repoRoot, 'apps', 'web'), { recursive: true });
+  const existingDevVars = path.join(repoRoot, existingWorker, '.dev.vars');
+  fs.writeFileSync(existingDevVars, 'PORT=1\nSECRET=old\n');
+  fs.chmodSync(existingDevVars, 0o600);
+
+  const plan: EnvSyncPlan = {
+    lanIp: undefined,
+    devVarsChanges: [
+      {
+        workerDir: existingWorker,
+        isNew: false,
+        keyChanges: [{ key: 'SECRET', oldValue: 'old', newValue: 'new' }],
+        missingValues: [],
+        newFileContent: undefined,
+      },
+      {
+        workerDir: newWorker,
+        isNew: true,
+        keyChanges: [],
+        missingValues: [],
+        newFileContent: 'SECRET=new\n',
+      },
+    ],
+    envDevLocalChanges: [{ key: 'NEXTAUTH_SECRET', oldValue: undefined, newValue: 'generated' }],
+    envLocalAutoCreates: [],
+    secretStoreWarnings: [],
+    secretStoreAutoCreates: [],
+    consistencyWarnings: [],
+    execWarnings: [],
+    missingEnvLocal: false,
+  };
+
+  try {
+    await applyPlan(plan, repoRoot);
+
+    assert.equal(fs.statSync(existingDevVars).mode & 0o777, 0o600);
+    assert.equal(fs.readFileSync(existingDevVars, 'utf-8'), 'PORT=1\nSECRET=new\n');
+    assert.equal(fs.statSync(path.join(repoRoot, newWorker, '.dev.vars')).mode & 0o777, 0o600);
+    assert.equal(
+      fs.statSync(path.join(repoRoot, 'apps/web/.env.development.local')).mode & 0o777,
+      0o600
+    );
+    const leftovers = [existingWorker, newWorker, 'apps/web'].flatMap(dir =>
+      fs.readdirSync(path.join(repoRoot, dir)).filter(name => name.endsWith('.tmp'))
+    );
+    assert.deepEqual(leftovers, []);
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});

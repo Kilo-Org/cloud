@@ -1,7 +1,8 @@
 import { type LucideIcon } from '@/components/ui/icons';
-import { Pressable, Switch, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';

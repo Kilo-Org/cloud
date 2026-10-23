@@ -162,13 +162,18 @@ describe('useSecurityAnalysisCapacity', () => {
     return useSecurityAnalysisCapacity(scope);
   }
 
-  function pollFor(runningCount: number, concurrencyLimit: number) {
+  function pollFor(runningCount: number, concurrencyLimit: number, failed = false) {
     const options = queryState.options.at(-1) as {
       refetchInterval: (query: {
-        state: { data?: { runningCount?: number; concurrencyLimit?: number } };
+        state: {
+          data?: { runningCount?: number; concurrencyLimit?: number };
+          error?: unknown;
+        };
       }) => unknown;
     };
-    return options.refetchInterval({ state: { data: { runningCount, concurrencyLimit } } });
+    return options.refetchInterval({
+      state: { data: { runningCount, concurrencyLimit }, error: failed ? new Error('read') : null },
+    });
   }
 
   it('exposes the derived state next to the raw counters', () => {
@@ -193,5 +198,8 @@ describe('useSecurityAnalysisCapacity', () => {
     // analysis finishes, so the read repeats until a slot frees.
     expect(pollFor(3, 3)).toBe(SECURITY_ANALYSIS_CAPACITY_POLL_MS);
     expect(pollFor(2, 3)).toBe(false);
+    // A failed read keeps the last counts; the notice's retry owns recovery, so
+    // the silent poll must stop rather than re-read every few seconds.
+    expect(pollFor(3, 3, true)).toBe(false);
   });
 });

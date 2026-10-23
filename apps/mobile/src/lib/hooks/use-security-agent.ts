@@ -246,13 +246,18 @@ export function useSecurityAnalysisCapacity(scope: string) {
   // running analysis finishes, and the list does not poll its own result set —
   // so re-read the counters until a slot frees up, then stop.
   const refetchInterval = (query: {
-    state: { data?: { runningCount?: number; concurrencyLimit?: number } };
+    state: {
+      data?: { runningCount?: number; concurrencyLimit?: number };
+      error?: unknown;
+    };
   }) =>
     getSecurityAnalysisCapacityState({
       runningCount: query.state.data?.runningCount,
       concurrencyLimit: query.state.data?.concurrencyLimit,
       isLoading: false,
-      isError: false,
+      // A failed read keeps the last counts, so the full state must not win
+      // here: the notice's explicit retry owns recovery, not a silent poll.
+      isError: Boolean(query.state.error),
     }) === 'full'
       ? SECURITY_ANALYSIS_CAPACITY_POLL_MS
       : false;

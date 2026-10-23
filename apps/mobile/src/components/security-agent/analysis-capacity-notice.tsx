@@ -45,10 +45,10 @@ export function AnalysisCapacityNotice({
           onPress={onRetry}
           accessibilityRole="button"
           accessibilityLabel={t('common.retry')}
-          // The label is a 12pt line; the slop brings the target to the app's
-          // 44pt floor without growing the notice above the rows.
-          hitSlop={16}
-          className="px-1 py-1"
+          // React Native clips hit slop to the parent's bounds, and the notice
+          // row is only as tall as its text, so the control carries the app's
+          // 44px floor itself instead of relying on a slop it cannot use.
+          className="min-h-[44px] items-center justify-center px-2"
         >
           <Text className="text-xs font-medium text-primary">{t('common.retry')}</Text>
         </Pressable>

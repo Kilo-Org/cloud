@@ -5,29 +5,30 @@ const { kilocode } = createEventHelpers();
 
 const prompt = 'Build a sample project overview with two sections.';
 const messageId = 'msg_00000000000000000000000001';
-const syntheticPartId = `${messageId}-text`;
-const realPartId = 'prt_00000000000000000000000001';
+const optimisticPartId = 'prt_00000000000000000000000002';
+const authoritativePartId = 'prt_00000000000000000000000001';
 
 const optimisticUserTextReconciliation: Fixture = {
   name: 'optimistic-user-text-reconciliation',
-  description:
-    'authoritative user text part replaces synthetic optimistic text part with different id',
+  description: 'authoritative user text part replaces an optimistic text part with a different id',
   events: [
     kilocode('session.created', { info: sessionInfo('ses-1') }),
     kilocode('message.updated', {
       info: userMsg(messageId, 'ses-1', { time: { created: 1772214640111 } }),
     }),
     kilocode('message.part.updated', {
-      part: { ...textPart(syntheticPartId, messageId, prompt), synthetic: true },
+      part: { ...textPart(optimisticPartId, messageId, prompt), synthetic: true },
     }),
     kilocode('message.part.updated', {
-      part: { ...textPart(realPartId, messageId, prompt), time: { start: 1772214640152 } },
+      part: { ...textPart(authoritativePartId, messageId, prompt), time: { start: 1772214640152 } },
     }),
   ],
   expected: {
     messageIds: [messageId],
     parts: {
-      [messageId]: [{ id: realPartId, type: 'text', text: prompt, time: { start: 1772214640152 } }],
+      [messageId]: [
+        { id: authoritativePartId, type: 'text', text: prompt, time: { start: 1772214640152 } },
+      ],
     },
   },
 };

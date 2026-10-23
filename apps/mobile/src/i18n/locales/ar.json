@@ -182,7 +182,7 @@
     "codeArrivalHint": "إذا كان هذا العنوان مؤهلًا لتسجيل الدخول، فسيصل الرمز خلال دقيقة.",
     "verifyCode": "التحقق من الرمز",
     "resendCode": "إعادة إرسال الرمز",
-    "termsPrefix": "بالمتابعة، توافق على",
+    "termsPrefix": "بالمتابعة، توافق على ",
     "terms": "الشروط",
     "termsConnector": " و ",
     "termsSuffix": ".",

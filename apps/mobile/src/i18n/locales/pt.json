@@ -182,7 +182,7 @@
     "codeArrivalHint": "Se este endereço cumprir os requisitos, o código chega no prazo de um minuto.",
     "verifyCode": "Verificar código",
     "resendCode": "Reenviar código",
-    "termsPrefix": "Ao continuar, aceitas os nossos",
+    "termsPrefix": "Ao continuar, aceitas os nossos ",
     "terms": "Termos",
     "termsConnector": " e ",
     "termsSuffix": ".",

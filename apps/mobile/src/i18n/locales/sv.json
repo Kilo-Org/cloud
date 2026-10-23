@@ -182,7 +182,7 @@
     "codeArrivalHint": "Om adressen uppfyller kraven kommer koden inom en minut.",
     "verifyCode": "Verifiera kod",
     "resendCode": "Skicka koden igen",
-    "termsPrefix": "Genom att fortsätta godkänner du våra",
+    "termsPrefix": "Genom att fortsätta godkänner du våra ",
     "terms": "Villkor",
     "termsConnector": " och ",
     "termsSuffix": ".",

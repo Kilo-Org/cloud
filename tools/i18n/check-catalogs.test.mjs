@@ -181,6 +181,47 @@ test('rejects an empty translated value', context => {
   assert.match(result.stderr, /mobile\/ru: "agents\.title" is empty/);
 });
 
+test('rejects a trailing space that English does not carry', context => {
+  const result = runChecker(context, {
+    translated: { agents: { ...TRANSLATED.agents, title: 'Localized agents ' } },
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /mobile\/ru: "agents\.title" leading or trailing space differs/);
+});
+
+test('accepts a locale-owned separator in the login legal sentence', context => {
+  // A catalog that does not separate words with spaces abuts the prefix, the
+  // Terms link and the conjunction, so its values carry no edge whitespace
+  // where English has one.
+  const english = {
+    login: {
+      termsPrefix: 'By continuing you agree to our ',
+      terms: 'Terms',
+      termsConnector: ' and ',
+    },
+  };
+  const result = runChecker(context, {
+    language: 'zh-Hans',
+    english,
+    translated: { login: { termsPrefix: '继续即表示你同意我们的', terms: '条款', termsConnector: '和' } },
+    source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('still rejects separator whitespace elsewhere in the same catalog', context => {
+  const english = { login: { termsPrefix: 'By continuing you agree to our ', terms: 'Terms' } };
+  const result = runChecker(context, {
+    language: 'zh-Hans',
+    english,
+    translated: { login: { termsPrefix: '继续即表示你同意我们的', terms: '条款 ' } },
+    source: "t('login.termsPrefix'); t('login.terms');",
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /mobile\/zh-Hans: "login\.terms" leading or trailing space differs/);
+});
+
 test('rejects a translated $TOKEN expansion token', context => {
   const result = runChecker(context, {
     english: { agents: { template: 'Explain $ARGUMENTS' } },

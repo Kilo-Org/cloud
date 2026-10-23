@@ -267,6 +267,16 @@ function edges(value) {
   return JSON.stringify([/^\s*/.exec(value)[0], /\s*$/.exec(value)[0]]);
 }
 
+/**
+ * Keys whose surrounding whitespace is the sentence's own separator rather than
+ * part of a word. The login screen joins `login.termsPrefix` straight to its
+ * Terms link and puts `login.termsConnector` between the two links, so the
+ * separator belongs to the locale: a catalog that separates words with a space
+ * keeps that space in the value, and Chinese abuts the segments. Every other
+ * key keeps English's edges exactly.
+ */
+const LOCALE_SEPARATED_KEYS = new Set(['login.termsPrefix', 'login.termsConnector']);
+
 const QUOTE_PAIRS = [
   ['\u201c', '\u201d'],
   ['\u201e', '\u201c'],
@@ -674,7 +684,7 @@ for (const catalog of CATALOGS) {
           `${label}: "${key}" $TOKEN expansion tokens differ from English (${expectedTokens || 'none'})`
         );
       }
-      if (edges(value) !== edges(englishValue)) {
+      if (!LOCALE_SEPARATED_KEYS.has(key) && edges(value) !== edges(englishValue)) {
         fail(`${label}: "${key}" leading or trailing space differs from English`);
       }
       if (/ {2}/.test(value) && !/ {2}/.test(englishValue)) {

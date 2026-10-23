@@ -182,7 +182,7 @@
     "codeArrivalHint": "Bu ünvana kod göndərmək mümkündürsə, kod bir dəqiqə ərzində çatacaq.",
     "verifyCode": "Kodu yoxla",
     "resendCode": "Kodu yenidən göndər",
-    "termsPrefix": "Davam etməklə bu sənədlərlə razılaşırsan:",
+    "termsPrefix": "Davam etməklə bu sənədlərlə razılaşırsan: ",
     "terms": "Şərtlər",
     "termsConnector": " və ",
     "termsSuffix": ".",

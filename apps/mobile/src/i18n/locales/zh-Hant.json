@@ -182,7 +182,7 @@
     "codeArrivalHint": "如果此電子郵件地址符合資格，驗證碼會在一分鐘內送達。",
     "verifyCode": "驗證",
     "resendCode": "重新傳送驗證碼",
-    "termsPrefix": "繼續即表示你同意我們的",
+    "termsPrefix": "繼續即表示你同意我們的 ",
     "terms": "條款",
     "termsConnector": " 和 ",
     "termsSuffix": "。",

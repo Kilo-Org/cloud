@@ -182,7 +182,7 @@
     "codeArrivalHint": "Če je ta naslov primeren za prijavo, bo koda prispela v eni minuti.",
     "verifyCode": "Preveri kodo",
     "resendCode": "Znova pošlji kodo",
-    "termsPrefix": "Z nadaljevanjem sprejemaš naslednja dokumenta:",
+    "termsPrefix": "Z nadaljevanjem sprejemaš naslednja dokumenta: ",
     "terms": "Pogoji",
     "termsConnector": " in ",
     "termsSuffix": ".",

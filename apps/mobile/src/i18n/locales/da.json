@@ -182,7 +182,7 @@
     "codeArrivalHint": "Hvis adressen opfylder betingelserne, modtager du koden inden for et minut.",
     "verifyCode": "Bekræft kode",
     "resendCode": "Send kode igen",
-    "termsPrefix": "Ved at fortsætte accepterer du vores",
+    "termsPrefix": "Ved at fortsætte accepterer du vores ",
     "terms": "Vilkår",
     "termsConnector": " og ",
     "termsSuffix": ".",

@@ -182,7 +182,7 @@
     "codeArrivalHint": "Se este endereço puder receber um código de acesso, ele chegará em até um minuto.",
     "verifyCode": "Verificar código",
     "resendCode": "Reenviar código",
-    "termsPrefix": "Ao continuar, você concorda com nossos",
+    "termsPrefix": "Ao continuar, você concorda com nossos ",
     "terms": "Termos",
     "termsConnector": " e ",
     "termsSuffix": ".",

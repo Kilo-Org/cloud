@@ -182,7 +182,7 @@
     "codeArrivalHint": "このアドレスが対象の場合、コードは1分以内に届きます。",
     "verifyCode": "コードを確認",
     "resendCode": "コードを再送信",
-    "termsPrefix": "続行すると、",
+    "termsPrefix": "続行すると、 ",
     "terms": "利用規約",
     "termsConnector": " および ",
     "termsSuffix": "に同意したことになります。",

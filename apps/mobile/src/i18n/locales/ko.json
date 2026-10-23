@@ -182,7 +182,7 @@
     "codeArrivalHint": "코드를 받을 수 있는 이메일 주소라면 1분 이내에 코드가 도착합니다.",
     "verifyCode": "코드 확인",
     "resendCode": "코드 다시 보내기",
-    "termsPrefix": "계속하면 다음",
+    "termsPrefix": "계속하면 다음 ",
     "terms": "약관",
     "termsConnector": " 및 ",
     "termsSuffix": "에 동의합니다.",

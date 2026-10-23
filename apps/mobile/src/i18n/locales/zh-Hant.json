@@ -1679,7 +1679,7 @@
       "restartExitFailed": "已開始新的工作階段，但上一個工作階段仍未結束。",
       "exitNotSupported": "目前的工作階段不支援遠端結束功能。",
       "exitUnavailable": "目前無法從遠端結束此工作階段。",
-      "exitNeedsNewerCli": "遠端斜線指令需要較新版本的 Kilo CLI。請更新 Kilo CLI 後重新連線。"
+      "exitNeedsNewerCli": "遠端斜槓命令需要較新版本的 Kilo CLI。請更新 Kilo CLI 後重新連線。"
     },
     "sessionConnection": {
       "label": "連線",
@@ -2179,7 +2179,7 @@
     "composer": {
       "addAttachment": "新增附件",
       "removeOrRetryFailed": "請先移除上傳失敗的附件，或重新上傳。",
-      "attachmentsWithSlashCommands": "附件無法與斜線指令一起傳送。",
+      "attachmentsWithSlashCommands": "附件無法與斜槓命令一起傳送。",
       "photoMetadataNotRemoved": "無法移除附件中的照片中繼資料。",
       "waitForUploads": "請等待附件上傳完成。",
       "pasteFromClipboard": "從剪貼簿貼上",
@@ -3779,7 +3779,7 @@
     "skillMarkdownLabel": "技能內容",
     "skillsEmpty": "還沒有技能",
     "skillNameRequired": "輸入技能名稱",
-    "skillNameInvalid": "技能名稱必須以字母或數字開頭，且只能使用小寫字母、數字和破折號",
+    "skillNameInvalid": "技能名稱必須以字母或數字開頭，且只能使用小寫字母、數字和連字符",
     "skillContentRequired": "技能內容為必填項",
     "skillSaveFailed": "無法保存技能",
     "skillSourceCustom": "自訂",
@@ -3804,7 +3804,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "輸入伺服器名稱",
-      "nameInvalid": "名稱只能使用字母、數字、底線和破折號",
+      "nameInvalid": "名稱只能使用字母、數字、底線和連字符",
       "commandRequired": "輸入命令",
       "commandTooLong": "最多使用 50 個引數，每個引數 500 個字元",
       "urlRequired": "輸入網址",
@@ -3849,14 +3849,14 @@
       "deleteFailed": "無法刪除代理",
       "nameRequired": "輸入代理名稱",
       "slugRequired": "輸入代理 slug",
-      "slugInvalid": "Slug 必須以字母開頭，且只能使用小寫字母、數字和破折號",
+      "slugInvalid": "Slug 必須以字母開頭，且只能使用小寫字母、數字和連字符",
       "slugConflict": "該 slug 已被內建代理或此設定檔中的另一個代理使用",
       "edit": "編輯代理"
     },
     "slashCommands": {
       "title": "斜槓命令",
-      "add": "添加斜杠命令",
-      "empty": "還沒有斜線指令",
+      "add": "新增斜槓命令",
+      "empty": "還沒有斜槓命令",
       "name": "命令名稱",
       "description": "命令說明",
       "template": "範本",
@@ -3868,7 +3868,7 @@
       "saveFailed": "無法保存命令",
       "deleteFailed": "無法刪除命令",
       "nameRequired": "輸入命令名稱",
-      "nameInvalid": "名稱必須以小寫字母開頭，且只能使用小寫字母、數字和破折號",
+      "nameInvalid": "名稱必須以小寫字母開頭，且只能使用小寫字母、數字和連字符",
       "templateRequired": "輸入命令模板",
       "nameConflict": "該名稱由內建指令保留"
     },

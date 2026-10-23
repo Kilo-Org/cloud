@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { KILO_API_AUDIENCE } from './internal-service-token-audiences';
 import { KILO_TOKEN_VERSION, kiloTokenPayload } from './kilo-token';
 import type { KiloTokenPayload } from './kilo-token';
+import { validateCloudAgentAuthorityClaims } from './cloud-agent-authority';
 
 const audienceName = z
   .string()
@@ -33,6 +34,16 @@ const policyClaims = kiloTokenPayload
     credentialExchange: z.boolean().optional(),
   })
   .superRefine((claims, ctx) => {
+    if (claims.cloudAgentAuthority !== undefined) {
+      const serialized = Object.fromEntries(
+        Object.entries(claims).filter(([, value]) => value !== undefined)
+      );
+      try {
+        validateCloudAgentAuthorityClaims(serialized);
+      } catch {
+        ctx.addIssue({ code: 'custom', message: 'Invalid Cloud Agent authority claims' });
+      }
+    }
     if (claims.exp <= claims.iat) {
       ctx.addIssue({ code: 'custom', message: 'Expiration must follow issuance', path: ['exp'] });
     }
@@ -115,6 +126,13 @@ export async function verifyKiloTokenForResource(
   if (!isKiloResourceAudienceAllowed(payload.aud, audiencePolicy)) {
     throw new Error('Unexpected token audience');
   }
+  if (Object.hasOwn(payload, 'cloudAgentAuthority')) {
+    validateCloudAgentAuthorityClaims(payload);
+    policyClaims.parse(payload);
+    if (typeof payload.iat !== 'number' || payload.iat > Math.floor(Date.now() / 1000)) {
+      throw new Error('Token issued in the future');
+    }
+  }
   return kiloTokenPayload.parse(payload);
 }
 
@@ -159,6 +177,7 @@ export async function verifyKiloTokenForPolicy(
     currentDate,
   });
   const claims = policyClaims.parse(payload);
+  if (Object.hasOwn(payload, 'cloudAgentAuthority')) validateCloudAgentAuthorityClaims(payload);
   if (claims.iat > Math.floor(currentDate.getTime() / 1000)) {
     throw new Error('Token issued in the future');
   }
@@ -215,6 +234,19 @@ function hasOnlyExchangeSafeClaims(claimNames: readonly string[]): boolean {
   return claimNames.every(name => exchangeSafeClaimNames.has(name));
 }
 
+/** `kilo-api` on its own, as a scalar audience or a single-element array. */
+function hasSoleKiloApiAudience(audience: unknown): boolean {
+  if (typeof audience === 'string') return audience === KILO_API_AUDIENCE;
+  return Array.isArray(audience) && audience.length === 1 && audience[0] === KILO_API_AUDIENCE;
+}
+
+function hasExchangeSafeCredentialClaims(
+  claims: { apiTokenPepper?: unknown },
+  claimNames: readonly string[]
+): boolean {
+  return claims.apiTokenPepper !== undefined && hasOnlyExchangeSafeClaims(claimNames);
+}
+
 export function isKiloCredentialExchangeEligible(
   auth: VerifiedKiloAuthContext,
   policy: KiloCredentialExchangeEligibilityPolicy
@@ -224,19 +256,12 @@ export function isKiloCredentialExchangeEligible(
   const { claims } = auth;
   const now = Math.floor(Date.now() / 1000);
   if (claims.iat > now || claims.exp <= now || claims.exp <= claims.iat) return false;
-  if (claims.apiTokenPepper === undefined) return false;
-  if (!hasOnlyExchangeSafeClaims(auth.claimNames)) return false;
+  if (!hasExchangeSafeCredentialClaims(claims, auth.claimNames)) return false;
   if (claims.tokenPurpose !== undefined || claims.credentialExchange !== undefined) {
-    const soleAudience =
-      typeof claims.aud === 'string'
-        ? claims.aud
-        : claims.aud?.length === 1
-          ? claims.aud[0]
-          : undefined;
     return (
       claims.tokenPurpose === 'human-api' &&
       claims.credentialExchange === true &&
-      soleAudience === KILO_API_AUDIENCE
+      hasSoleKiloApiAudience(claims.aud)
     );
   }
   return (
@@ -280,11 +305,8 @@ const modernClaims = policyClaims
       .filter(([, value]) => value !== undefined)
       .map(([name]) => name);
     if (
-      (typeof claims.aud === 'string'
-        ? claims.aud !== KILO_API_AUDIENCE
-        : claims.aud.length !== 1 || claims.aud[0] !== KILO_API_AUDIENCE) ||
-      claims.apiTokenPepper === undefined ||
-      !hasOnlyExchangeSafeClaims(serializedClaimNames)
+      !hasSoleKiloApiAudience(claims.aud) ||
+      !hasExchangeSafeCredentialClaims(claims, serializedClaimNames)
     ) {
       ctx.addIssue({
         code: 'custom',

@@ -20,6 +20,13 @@ const onError = (error: { message: string }) => {
 // Favorites are stored per user (not per organization), so one chain key
 // covers every picker instance.
 const FAVORITES_CHAIN_KEY = 'model-preferences-favorites';
+// Last-selected is per user too, so rapid picks in two org scopes still land in
+// the order the user made them.
+const LAST_SELECTED_CHAIN_KEY = 'model-preferences-last-selected';
+
+type LastSelectedSelection = { model: string; variant?: string };
+/** The cache write this save owns, so an older save's refetch cannot replace it. */
+type LastSelectedContext = { generation: number; hash: string };
 
 export function useModelPreferences(organizationId: string | undefined) {
   const trpc = useTRPC();
@@ -70,12 +77,52 @@ export function useModelPreferences(organizationId: string | undefined) {
     [queryClient, trpc.modelPreferences.get, input]
   );
 
-  const setLastSelected = useMutation(
-    trpc.modelPreferences.setLastSelected.mutationOptions({
-      onSuccess: invalidate,
-      onError,
-    })
-  );
+  // Reopened forms resolve the server preference before the local saved pick,
+  // so an explicit pick is published to this scope's cache immediately. Saves
+  // are serialized and the settle-time refetch is generation-fenced: two rapid
+  // picks must not let the older save's refetch restore the older model, and
+  // must not reach the server out of order.
+  const setLastSelected = useMutation({
+    ...trpc.modelPreferences.setLastSelected.mutationOptions(),
+    // The base settle hook is typed for an absent optimistic context; this
+    // mutation owns a generation, and its fenced onSuccess/onError below
+    // replace that reconcile.
+    onSettled: undefined,
+    mutationFn: (selection: LastSelectedSelection) =>
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+      chainSave(LAST_SELECTED_CHAIN_KEY, () =>
+        trpcClient.modelPreferences.setLastSelected.mutate(selection)
+      ),
+    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+    onMutate: async (selection: LastSelectedSelection): Promise<LastSelectedContext> => {
+      const queryKey = trpc.modelPreferences.get.queryKey(input);
+      const hash = hashKey(queryKey);
+      const generation = nextMutationGeneration(hash);
+      await queryClient.cancelQueries({ queryKey });
+      // Publish even before the first read settles. A scope with no entry has
+      // shown no favorites yet, so seeding the list empty invents nothing the
+      // user could see disappear; a successful save refetches, and the failure
+      // path deliberately keeps the pick (see onError).
+      queryClient.setQueryData(queryKey, previous => ({
+        favorites: previous?.favorites ?? [],
+        lastSelected: selection,
+      }));
+      return { generation, hash };
+    },
+    onSuccess: async (_data, _selection, context) => {
+      if (!isLatestMutationGeneration(context.hash, context.generation)) {
+        return;
+      }
+      await invalidate();
+    },
+    onError: error => {
+      // Do not refetch here: the server still holds the previous selection,
+      // and the model resolves from that cache first, so a failed sync must
+      // not silently switch the form back to the older model. The local
+      // preference already holds this pick; the toast reports the failure.
+      onError(error);
+    },
+  });
 
   const clearLastSelected = useMutation(
     trpc.modelPreferences.clearLastSelected.mutationOptions({

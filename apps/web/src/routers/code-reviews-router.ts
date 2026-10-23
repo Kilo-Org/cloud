@@ -2,6 +2,7 @@ import { createTRPCRouter, baseProcedure } from '@kilocode/web-shared/lib/trpc/i
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import {
+  getGitHubConnectionStatusForOwner,
   getIntegrationForOwner,
   updateIntegrationMetadataForOwner,
 } from '@/lib/integrations/db/platform-integrations';
@@ -19,7 +20,10 @@ import {
   syncWebhooksForRepositories,
   type ConfiguredWebhook,
 } from '@/lib/integrations/platforms/gitlab/webhook-sync';
-import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
+import {
+  getValidGitLabToken,
+  isGitLabCredentialConnected,
+} from '@/lib/integrations/gitlab-service';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   clearCodeReviewActionRequiredState,
@@ -168,24 +172,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
    */
   getGitHubStatus: baseProcedure.query(async ({ ctx }) => {
     const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
-    const integration = await getIntegrationForOwner(owner, 'github');
-
-    if (!integration || integration.integration_status !== 'active') {
-      return {
-        connected: false,
-        integration: null,
-      };
-    }
-
-    return {
-      connected: true,
-      integration: {
-        accountLogin: integration.platform_account_login,
-        repositorySelection: integration.repository_access,
-        installedAt: integration.installed_at,
-        isValid: !integration.suspended_at,
-      },
-    };
+    return await getGitHubConnectionStatusForOwner(owner);
   }),
 
   /**
@@ -205,6 +192,21 @@ export const personalReviewAgentRouter = createTRPCRouter({
     const integration = await getIntegrationForOwner(owner, PLATFORM.GITLAB);
 
     if (!integration || integration.integration_status !== 'active') {
+      return {
+        connected: false,
+        integration: null,
+      };
+    }
+
+    // The row being active says nothing about the stored credential. Ask the
+    // token service to resolve it, exactly as a review read would, so an
+    // expired or revoked credential reports as not connected instead of
+    // sending the settings surface into review-only content.
+    if (
+      !(await isGitLabCredentialConnected(integration, {
+        userId: ctx.user.id,
+      }))
+    ) {
       return {
         connected: false,
         integration: null,

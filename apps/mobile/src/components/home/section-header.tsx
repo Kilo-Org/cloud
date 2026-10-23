@@ -20,10 +20,11 @@ type SectionHeaderProps = {
    */
   actionHidden?: boolean;
   /**
-   * Optional one-line status between the label and the action. It takes only
-   * the free space on the label's line (zero basis), so it can never wrap the
-   * row or change the header's height when it appears. A divider separates it
-   * from a visible action. Pass null while there is nothing to report.
+   * Optional status between the label and the action. It takes only the free
+   * space on the label's line (zero basis), so it never pushes the action off
+   * the row; a long message wraps inside the slot instead of clipping, which
+   * grows the header by the wrapped line. A divider separates it from a
+   * visible action. Pass null while there is nothing to report.
    */
   notice?: ReactNode;
 };

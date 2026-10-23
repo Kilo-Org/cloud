@@ -1,5 +1,6 @@
 import { type ListRenderItem } from '@shopify/flash-list';
 import { type RemoteModelState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { type Href, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
@@ -26,10 +27,12 @@ import { getChatBackendsHasLoaded, useChatBackends } from '@/lib/chat/backend-st
 import { useTargetSupportsImages } from '@/lib/chat/backend-capabilities';
 import { rememberModelFacts } from '@/lib/chat/layers';
 import { requiresBackendDisclosure } from '@/lib/chat/backend-model-options';
-import { resolveChatTarget } from '@/lib/chat/backend-target';
+import { chatTargetKind, resolveChatTarget } from '@/lib/chat/backend-target';
 import { useLocalModels } from '@/lib/chat/local-models';
 import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
 import { type EffortChoices, effortOfVariant, variantOfEffort } from '@/lib/chat/effort';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 import { ChatTitle } from './chat-title';
 import { ChatComposerArea } from './chat-composer-area';
@@ -64,6 +67,7 @@ type ChatScreenProps = {
 
 export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const { t } = useTranslation();
+  const router = useRouter();
   const { organizationId } = useOrganization();
   const place = useChatPlace();
   const { state, send, stop, retry } = useChat(place, opened);
@@ -136,13 +140,18 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
     }
     const epoch = currentAuthEpoch();
     const name = availableOptions.find(option => option.id === modelId)?.name ?? modelId;
+    const local = chatTargetKind(modelId) === 'local';
     Alert.alert(
-      t('modelChat.backends.switchTitle'),
-      t('modelChat.backends.switchMessage', { name }),
+      t(local ? 'modelChat.localModels.switchTitle' : 'modelChat.backends.switchTitle'),
+      t(local ? 'modelChat.localModels.switchMessage' : 'modelChat.backends.switchMessage', {
+        name,
+      }),
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('modelChat.backends.switchConfirm'),
+          text: t(
+            local ? 'modelChat.localModels.switchConfirm' : 'modelChat.backends.switchConfirm'
+          ),
           onPress: () => {
             if (isCurrentAuthEpoch(epoch)) {
               accept();
@@ -260,6 +269,9 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
           failureKey={state.failureKey}
           retryable={!actions.hasUnanswered}
           onRetry={() => void retry()}
+          onAddCredits={() => {
+            router.push('/(app)/credits' as Href);
+          }}
           onSend={handleSend}
           composerControlRef={actions.composerControlRef}
           onStop={handleStop}
@@ -303,7 +315,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
               // state it stood for is named here and drawn in full by the sheet
               // this control opens.
               accessibilityValue={{ text: mcpStatusText }}
-              className="h-11 w-11 items-center justify-center active:opacity-70"
+              className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
             >
               <Wrench size={22} color={colors.foreground} />
             </Pressable>

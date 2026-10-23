@@ -1,11 +1,12 @@
 import { DirectUserByokInferenceProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { direct_byok_model_lists } from '@kilocode/db/schema';
+import { ai_gateway_sync_providers_state, direct_byok_model_lists } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import type { DirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import {
   parseModelsDevProviderModels,
   parseOpenAICompatibleProviderModels,
+  syncAndStoreDirectByokProviders,
   syncDirectByokModels,
 } from './sync-direct-byok';
 
@@ -542,5 +543,50 @@ describe('syncDirectByokModels database snapshots', () => {
     );
 
     expect(await readSnapshot()).toStrictEqual(previousSnapshot);
+  });
+
+  describe('syncAndStoreDirectByokProviders', () => {
+    const providersCompletedAt = '2020-01-01T00:00:00.000Z';
+
+    beforeEach(async () => {
+      await db
+        .delete(ai_gateway_sync_providers_state)
+        .where(eq(ai_gateway_sync_providers_state.id, 1));
+      await db
+        .insert(ai_gateway_sync_providers_state)
+        .values({ id: 1, last_completed_at: providersCompletedAt });
+    });
+
+    async function readSyncState() {
+      const [row] = await db.select().from(ai_gateway_sync_providers_state);
+      return row;
+    }
+
+    test('records direct BYOK completion separately from the full provider sync', async () => {
+      const startedAt = Date.now();
+      const summary = await syncAndStoreDirectByokProviders();
+      const state = await readSyncState();
+
+      expect(summary.direct_byok_model_counts[providerId]).toBe(normalizedModels.length);
+      expect(summary.total_providers).toBe(Object.keys(summary.direct_byok_model_counts).length);
+      expect(summary.total_models).toBe(normalizedModels.length);
+      expect(state.direct_byok_last_completed_at).not.toBeNull();
+      expect(new Date(state.direct_byok_last_completed_at ?? '').toISOString()).toBe(
+        summary.completed_at
+      );
+      expect(Date.parse(summary.completed_at)).toBeGreaterThanOrEqual(startedAt);
+      expect(new Date(state.last_completed_at ?? '').toISOString()).toBe(providersCompletedAt);
+    });
+
+    test('does not record completion when a provider fetch fails', async () => {
+      fetchAvailableModels = async () =>
+        new Response(null, { status: 503, statusText: 'Service Unavailable' });
+
+      await expect(syncAndStoreDirectByokProviders()).rejects.toThrow(
+        'Failed to fetch nvidia-byok available models: 503 Service Unavailable'
+      );
+
+      expect((await readSyncState()).direct_byok_last_completed_at).toBeNull();
+    });
   });
 });

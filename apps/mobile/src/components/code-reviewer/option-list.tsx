@@ -1,13 +1,16 @@
-import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { Button } from '@/components/ui/button';
+import { Text } from '@/components/ui/text';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { RadioGroup } from '@/components/ui/radio-group';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { usePopWhenFocused } from '@/lib/navigation/pop-when-focused';
 
 type OptionListProps<T extends string, TSaveResult> = {
   title: string;
@@ -34,19 +37,25 @@ export function OptionList<T extends string, TSaveResult>({
   descriptions,
   disabled,
 }: Readonly<OptionListProps<T, TSaveResult>>) {
-  const router = useRouter();
+  const popWhenFocused = usePopWhenFocused();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const [pending, setPending] = useState<T | null>(null);
+  const [failedOption, setFailedOption] = useState<T | null>(null);
 
   const handleSelect = async (option: T) => {
     setPending(option);
+    setFailedOption(null);
     try {
       await onSelect(option);
-      router.back();
+      // A Back pressed while the save was in flight already left this screen;
+      // popping again would remove the screen beneath it.
+      popWhenFocused();
     } catch {
       // The save hook already surfaces the failure (toast + cache
-      // rollback) — just stop showing this row as pending so the user can
-      // retry or pick something else.
+      // rollback) — keep the screen up, clear the busy state, and hand the
+      // row to the inline retry below so the user can retry in place.
+      setFailedOption(option);
     } finally {
       setPending(null);
     }
@@ -78,6 +87,22 @@ export function OptionList<T extends string, TSaveResult>({
             </View>
           ))}
         </RadioGroup>
+        {failedOption !== null && (
+          <View className="mt-4 rounded-lg bg-warn-tile-bg p-4" accessibilityLiveRegion="polite">
+            <Text className="text-sm font-medium">{t('codeReviewer.configSaveFailed')}</Text>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3 self-start"
+              accessibilityLabel={t('common.retry')}
+              onPress={() => {
+                void handleSelect(failedOption);
+              }}
+            >
+              <Text>{t('common.retry')}</Text>
+            </Button>
+          </View>
+        )}
       </TabScreenScrollView>
     </View>
   );

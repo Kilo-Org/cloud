@@ -13,6 +13,7 @@
 export type ProviderReviewErrorKind =
   | 'not_found'
   | 'forbidden'
+  | 'reconnect'
   | 'stale_head'
   | 'bad_request'
   | 'retryable';

@@ -1,11 +1,13 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, Switch, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
+import { agentErrorText, slugFieldError } from '@/components/profiles/agent-form-errors';
 import { AgentVariantPicker } from '@/components/profiles/agent-variant-picker';
 import {
+  AGENT_VISIBILITY_OPTIONS,
   type AgentFormError,
   type AgentFormState,
   type AgentSource,
@@ -17,23 +19,11 @@ import {
 } from '@/components/profiles/profile-agents-model';
 import { SheetHeader } from '@/components/sheet-header';
 import { FormField } from '@/components/ui/form-field';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { cn } from '@/lib/utils';
-
-/** Catalog key for each refused field, so the message lands under the input at fault. */
-const ERROR_KEYS = {
-  'slug-required': 'profiles.agents.slugRequired',
-  'slug-invalid': 'profiles.agents.slugInvalid',
-  'slug-conflict': 'profiles.agents.slugConflict',
-  'name-required': 'profiles.agents.nameRequired',
-} satisfies Record<AgentFormError, string>;
-
-const VISIBILITY_OPTIONS: readonly { value: AgentVisibility; labelKey: string }[] = [
-  { value: 'primary', labelKey: 'profiles.agents.visibilityPrimary' },
-  { value: 'subagent', labelKey: 'profiles.agents.visibilitySubagent' },
-  { value: 'all', labelKey: 'profiles.agents.visibilityAll' },
-];
 
 type AgentFormSheetProps = Readonly<{
   agent: AgentSource | null;
@@ -53,7 +43,9 @@ type AgentFormSheetProps = Readonly<{
  * app's iOS text-input rule; visibility and the tool toggles are state.
  *
  * Save validates through `validateAgentForm`; a refused input shows the
- * matching `profiles.agents.*` message under the field at fault. Every tool is
+ * matching `profiles.agents.*` message — or, for an over-long name or
+ * description, the `profiles.tooLong` bound — under the field at fault, and the
+ * typed values stay in the sheet. Every tool is
  * allowed unless its switch is off, which writes `deny` for that tool only.
  *
  * Sampling (max steps, temperature, top_p) mirrors the web editor. The effort
@@ -94,6 +86,24 @@ export function AgentFormSheet({
     models.find(option => option.id === model.trim())?.variants ?? [];
   const variants = variantsFor(modelValue);
 
+  const hasUnsavedEdits = () =>
+    slugRef.current !== initial.slug ||
+    nameRef.current !== initial.name ||
+    descriptionRef.current !== initial.description ||
+    promptRef.current !== initial.prompt ||
+    modelRef.current !== initial.model ||
+    stepsRef.current !== initial.steps ||
+    temperatureRef.current !== initial.temperature ||
+    topPRef.current !== initial.topP ||
+    visibility !== initial.visibility ||
+    variant !== initial.variant ||
+    disabledTools.length !== initial.disabledTools.length ||
+    disabledTools.some(tool => !initial.disabledTools.includes(tool));
+  const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({
+    isDirty: hasUnsavedEdits,
+    onDiscard: onClose,
+  });
+
   const submit = () => {
     const state: AgentFormState = {
       slug: slugRef.current,
@@ -118,13 +128,13 @@ export function AgentFormSheet({
   };
 
   return (
-    <SessionPageSheet visible onClose={onClose}>
+    <SessionPageSheet visible onClose={onClose} onRequestDismiss={requestDismiss}>
       <SheetHeader
         title={agent === null ? t('profiles.agents.add') : agent.name}
         onDone={submit}
-        onCancel={onClose}
+        onCancel={requestClose}
         doneLabel={t('common.save')}
-        disabled={isSaving}
+        doneDisabled={isSaving}
         topInset="ios-page-sheet"
       />
       <ScrollView
@@ -137,28 +147,27 @@ export function AgentFormSheet({
         <FormField
           label={t('profiles.agents.slug')}
           defaultValue={initial.slug}
-          error={
-            error === 'slug-required' ||
-            error === 'slug-invalid' ||
-            error === 'slug-conflict' ||
-            (slugConflictFromServer && error === null)
-              ? t(ERROR_KEYS[error ?? 'slug-conflict'])
-              : undefined
-          }
+          error={slugFieldError(t, error, slugConflictFromServer)}
           disabled={isSaving}
           required
           autoCapitalize="none"
           autoCorrect={false}
           placeholder={t('profiles.agents.slugPlaceholder')}
           onChangeText={value => {
-            slugRef.current = value.toLowerCase().replaceAll(/[^a-z0-9-]/g, '');
+            // Kept exactly as typed: a silent rewrite would save a slug the
+            // reader never entered, and an invalid one is refused with the rule.
+            slugRef.current = value;
             setError(null);
           }}
         />
         <FormField
           label={t('profiles.agents.name')}
           defaultValue={initial.name}
-          error={error === 'name-required' ? t(ERROR_KEYS[error]) : undefined}
+          error={
+            error === 'name-required' || error === 'name-too-long'
+              ? agentErrorText(t, error)
+              : undefined
+          }
           disabled={isSaving}
           required
           placeholder={t('profiles.agents.namePlaceholder')}
@@ -170,10 +179,12 @@ export function AgentFormSheet({
         <FormField
           label={t('profiles.agents.description')}
           defaultValue={initial.description}
+          error={error === 'description-too-long' ? agentErrorText(t, error) : undefined}
           disabled={isSaving}
           placeholder={t('profiles.descriptionPlaceholder')}
           onChangeText={value => {
             descriptionRef.current = value;
+            setError(null);
           }}
         />
         <FormField
@@ -251,7 +262,7 @@ export function AgentFormSheet({
             {t('profiles.agents.visibility')}
           </Text>
           <View className="gap-1">
-            {VISIBILITY_OPTIONS.map(option => {
+            {AGENT_VISIBILITY_OPTIONS.map(option => {
               const selected = visibility === option.value;
               return (
                 <Pressable
@@ -308,6 +319,7 @@ export function AgentFormSheet({
         </View>
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
+      {dialog}
     </SessionPageSheet>
   );
 }

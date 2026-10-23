@@ -114,7 +114,7 @@ export async function handleEmbeddingsRequest(
   debugSaveProxyRequest(requestBodyText);
   let requestBodyParsed: EmbeddingProxyRequest;
   try {
-    requestBodyParsed = JSON.parse(requestBodyText);
+    requestBodyParsed = JSON.parse(requestBodyText) as EmbeddingProxyRequest;
   } catch (e) {
     captureException(e, {
       extra: { requestBodyText },
@@ -202,7 +202,7 @@ export async function handleEmbeddingsRequest(
   // Extract fraud/project headers
   const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
 
-  const { provider, userByok } = await getEmbeddingProvider(
+  const { provider, userByok, isFree } = await getEmbeddingProvider(
     requestedModelLowerCased,
     user,
     organizationId
@@ -227,6 +227,7 @@ export async function handleEmbeddingsRequest(
     kiloUserId: user.id,
     provider: provider.id,
     requested_model: requestedModelLowerCased,
+    is_free: isFree,
     promptInfo,
     max_tokens: null,
     has_middle_out_transform: null,
@@ -278,11 +279,7 @@ export async function handleEmbeddingsRequest(
     accountPayer = payer;
     organizationDataCollection = settings?.data_collection;
 
-    if (
-      !canSpendPaidUsage(balance) &&
-      !(await isFreeModel(requestedModelLowerCased)) &&
-      !userByok
-    ) {
+    if (!canSpendPaidUsage(balance) && !usageContext.is_free && !userByok) {
       return await creditsBlockedResponse({
         user,
         balance,

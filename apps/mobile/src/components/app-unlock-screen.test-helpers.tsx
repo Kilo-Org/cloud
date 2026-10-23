@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Use the repository's DOM-free mounted renderer; one shared harness mocks every native module the five layouts reach. */
-import { createElement, type ElementType, type ReactElement, useState } from 'react';
+import { createElement, type ElementType, type ReactElement, useEffect, useState } from 'react';
 import { type AppStateStatus } from 'react-native';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { expect, vi } from 'vitest';
@@ -203,9 +203,15 @@ vi.mock('expo-router', () => ({
     { Screen: 'StackScreen' }
   ),
   useRouter: () => ({ push: vi.fn() }),
+  useNavigation: () => ({ addListener: () => () => undefined }),
   usePathname: () => route.pathname,
   useLocalSearchParams: () => ({ owner: 'owner', repo: 'repo', number: '1', scope: 'personal' }),
   useSegments: () => route.segments,
+  // The General settings screen retires its attempt feedback on blur; the
+  // announcement suites keep it focused, so the cleanup never runs here.
+  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
+    useEffect(effect, [effect]);
+  },
 }));
 vi.mock('@expo/react-native-action-sheet', () => ({ ActionSheetProvider: 'ActionSheetProvider' }));
 vi.mock('@rn-primitives/portal', () => ({ PortalHost: 'PortalHost' }));

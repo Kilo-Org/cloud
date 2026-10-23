@@ -1,5 +1,5 @@
-import { FlashList } from '@shopify/flash-list';
-import { useMemo, useState } from 'react';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -12,8 +12,9 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import { SearchX } from '@/components/ui/icons';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
-import { deviceFit } from '@/lib/chat/device-fit';
+import { deviceFit, fitsDevice } from '@/lib/chat/device-fit';
 import { GGUF_CATALOG } from '@/lib/chat/gguf-catalog';
+import { type HfListedModel } from '@/lib/chat/hf-catalog';
 import { useDeviceBudget, useHfModelSearch } from '@/lib/chat/use-hf-catalog';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -29,6 +30,14 @@ export function ModelCatalogScreen() {
   const budget = useDeviceBudget();
   const [tab, setTab] = useState<Tab>('fits');
   const search = useModelSearch();
+  const listRef = useRef<FlashListRef<HfListedModel>>(null);
+  // Changing the filter or the paused search text swaps the search query's
+  // key, so the list briefly empties while the fresh pages load. The stale
+  // offset would otherwise land the regrown list mid-card, hiding the
+  // recommended section above it.
+  useEffect(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [tab, search.query]);
   const models = useHfModelSearch({
     search: search.query,
     fitsOnly: tab === 'fits',
@@ -42,7 +51,7 @@ export function ModelCatalogScreen() {
     search.query === ''
       ? GGUF_CATALOG.filter(model => {
           const fit = deviceFit(downloadBytes(model), budget);
-          return tab === 'all' || fit === 'fits' || fit === 'tight' || fit === undefined;
+          return tab === 'all' || fitsDevice(fit);
         })
       : [];
   const hasPages = (models.data?.pages.length ?? 0) > 0;
@@ -109,7 +118,9 @@ export function ModelCatalogScreen() {
           accessibilityLabel={t('modelChat.catalog.tabs')}
         />
       </View>
-      <FlashList
+      <FlashList<HfListedModel>
+        ref={listRef}
+        maintainVisibleContentPosition={{ disabled: true }}
         data={hasPages ? rows : []}
         keyExtractor={model => model.id}
         renderItem={({ item }) => (

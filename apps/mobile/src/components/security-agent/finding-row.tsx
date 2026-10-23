@@ -6,7 +6,6 @@ import {
 import { useRouter } from 'expo-router';
 import { ExternalLink } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -20,9 +19,18 @@ import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
-import { getDeadlineCopy, getSecurityAnalysisLabel } from '@/lib/security-agent-copy';
+import {
+  getSecurityAgentPath,
+  isSecurityFindingAnalyzable,
+  type SecurityFinding,
+} from '@/lib/security-agent';
+import {
+  getAnalysisCapacityBlockedHint,
+  getDeadlineCopy,
+  getSecurityAnalysisLabel,
+} from '@/lib/security-agent-copy';
 import { openFindingLink } from '@/lib/security-agent-link';
+import { type SecurityAnalysisCapacityState } from '@/lib/security-analysis-capacity';
 import { cn } from '@/lib/utils';
 
 const SEVERITY_KEYS = {
@@ -85,22 +93,21 @@ type FindingRowQuickActionProps = {
   scope: string;
   prUrl: string | null;
   isAnalyzable: boolean;
-  hasAnalysisCapacity: boolean;
+  capacityState: SecurityAnalysisCapacityState;
   nextAction: string | null;
 };
 
 // Extracted to avoid a nested ternary (prUrl / isAnalyzable / nextAction
 // fallback) while keeping FindingRow's render body flat. `isAnalyzable`
-// (eligibility) and `hasAnalysisCapacity` (loaded-and-not-full) are kept
-// separate so the Analyze button's presence never depends on capacity still
-// loading — only its disabled state does, avoiding a button/text layout
-// shift once capacity resolves.
+// (eligibility) and `capacityState` are separate so the button's presence never
+// depends on capacity still loading — only its state does, avoiding a
+// button/text layout shift once capacity resolves.
 function FindingRowQuickAction({
   finding,
   scope,
   prUrl,
   isAnalyzable,
-  hasAnalysisCapacity,
+  capacityState,
   nextAction,
 }: Readonly<FindingRowQuickActionProps>) {
   const colors = useThemeColors();
@@ -131,7 +138,11 @@ function FindingRowQuickAction({
         variant="secondary"
         size="sm"
         className="mt-1 self-start px-3"
-        disabled={startAnalysis.isPending || !hasAnalysisCapacity}
+        // Loading covers both the in-flight start and the capacity read, so the
+        // control never looks idle while the action cannot run yet.
+        loading={startAnalysis.isPending || capacityState === 'loading'}
+        disabled={capacityState !== 'available'}
+        accessibilityHint={getAnalysisCapacityBlockedHint(capacityState)}
         onPress={() => {
           startAnalysis.mutate({
             findingId: finding.id,
@@ -139,9 +150,6 @@ function FindingRowQuickAction({
           });
         }}
       >
-        {startAnalysis.isPending ? (
-          <ActivityIndicator size="small" color={colors.foreground} />
-        ) : null}
         <Text className="text-xs font-medium">
           {analysisFailed
             ? t('securityAgent.analysis.retryAnalysis')
@@ -167,14 +175,14 @@ type FindingRowProps = {
   scope: string;
   slaEnabled: boolean;
   /** From useSecurityAnalysisCapacity(scope) — disables (not hides) the row's quick Analyze action. */
-  hasAnalysisCapacity: boolean;
+  capacityState: SecurityAnalysisCapacityState;
 };
 
 export function FindingRow({
   finding,
   scope,
   slaEnabled,
-  hasAnalysisCapacity,
+  capacityState,
 }: Readonly<FindingRowProps>) {
   const router = useRouter();
   const colors = useThemeColors();
@@ -195,12 +203,9 @@ export function FindingRow({
   const prUrl =
     finding.remediationSummary?.status === 'pr_opened' ? finding.remediationSummary.prUrl : null;
   // Eligibility is independent of capacity — the button stays visible
-  // (disabled via hasAnalysisCapacity) instead of swapping for the
-  // nextAction text once capacity resolves.
-  const isAnalyzable =
-    !prUrl &&
-    finding.status === 'open' &&
-    (!finding.analysis_status || finding.analysis_status === 'failed');
+  // (disabled via capacityState) instead of swapping for the nextAction text
+  // once capacity resolves.
+  const isAnalyzable = isSecurityFindingAnalyzable(finding);
 
   const accessibilityLabel = deadline
     ? t('securityAgent.findingRow.a11yWithDeadline', {
@@ -273,7 +278,7 @@ export function FindingRow({
         scope={scope}
         prUrl={prUrl}
         isAnalyzable={isAnalyzable}
-        hasAnalysisCapacity={hasAnalysisCapacity}
+        capacityState={capacityState}
         nextAction={nextAction}
       />
     </View>

@@ -707,6 +707,40 @@ happened and decides what to do about it. A caller wiring the client by hand
 gets the same failures as a tagged `RemoteMcpError`, whose `kind` tells
 `unreachable`, `unauthorized`, `missing` and `protocol` apart.
 
+A tool may carry an MCP Apps view: the server names a `ui://` resource in the
+tool's `_meta`, and the host renders it beside the conversation. Discovery
+carries each tool's `_meta` as it stands, and `uiResourceUriOf(tool)` reads the
+uri out of it — the nested form the Apps specification defines, with the
+deprecated flat `_meta['ui/resourceUri']` beside it — or answers `undefined`
+when the tool names no view. An offered tool carries what a surface drawing the
+call needs and the model does not: `uiResourceUri`, and `serverToolName`, which
+is the name the view calls the tool by. Neither is in `definition`, so nothing
+new sits in the cached prefix.
+
+`remoteMcpClient(...).resource(uri)` reads the resource off the same server,
+under the same deadline and credential rules as a call, and answers its first
+content: the `mimeType` and, for an app, the HTML in `text`, with the content's
+`_meta` carrying the policy the document is to be held to. `call` answers the
+whole result — the `text` the model reads, plus the server's `content` and
+`structuredContent` — and `deps.onCallResult` is told what it answered, because
+a view renders those and they do not survive the text. Nothing in the harness
+keeps them.
+
+`remoteMcpApp(server, deps, { tools, context, openLink })` is the host half of
+one view. It builds the official `AppBridge`, answers initialization with the
+host's identity, capabilities and context, sends the call's input and result,
+reports size changes, opens links, and forwards a view's `tools/call` through
+the same client a model's call uses — refusing any name its own server was not
+discovered to offer. The surface supplies one transport (`send`) and hands the
+bytes that arrive back through `receive`; it names no method. Sampling, model
+context updates, messages and downloads are not advertised, so a view does not
+offer them.
+
+The View side of the Apps metadata is the official
+`@modelcontextprotocol/ext-apps` bridge package, pinned to the 1.x line that
+speaks this package's `@modelcontextprotocol/sdk`; its 2.x peers on the v2 SDK
+split and moves when the client does.
+
 ## Entry points
 
 | Import | Holds |
@@ -717,7 +751,7 @@ gets the same failures as a tagged `RemoteMcpError`, whose `kind` tells
 | `@kilocode/harness-sdk/plugins/gateway` | The gateway plugin on its own |
 | `@kilocode/harness-sdk/plugins/remote-model` | Direct Chat Completions, Responses and Messages: `remoteModelClient`, `layerRemoteModel` |
 | `@kilocode/harness-sdk/plugins/prompt` | The assembler on its own |
-| `@kilocode/harness-sdk/plugins/remote-mcp` | Remote MCP servers: `remoteMcpTools`, and the Streamable HTTP client under it |
+| `@kilocode/harness-sdk/plugins/remote-mcp` | Remote MCP servers: `remoteMcpTools`, `uiResourceUriOf`, `remoteMcpApp`, and the Streamable HTTP client under them |
 | `@kilocode/harness-sdk/plugins/tools` | The tools the package ships |
 | `@kilocode/harness-sdk/plugins/store/node` | The store on `node:sqlite` |
 | `@kilocode/harness-sdk/plugins/store/expo` | The store on `expo-sqlite` |

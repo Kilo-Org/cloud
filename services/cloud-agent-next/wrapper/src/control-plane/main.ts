@@ -255,7 +255,9 @@ export function createControlPlaneFrameDispatcher(
         deps.capture.current?.onCaptured(frame.sessionId, frame.ok);
         return;
       case 'session.credentials':
-        void deps.preparation.current?.installCredentials(frame);
+        void deps.preparation.current?.installCredentials(frame).catch(() => {
+          deps.log('control-plane session credential refresh failed');
+        });
         return;
       case 'session.prompt':
         deps.turns.current?.submit(frame.sessionId, frame.payload);
@@ -430,8 +432,8 @@ export async function runControlPlaneWrapper(
     capture: captureRef.current,
     runtimes: {
       ensure: input => runtimes.ensure(input),
-      installCredentials: async (key, nextEnv) => {
-        await runtimes.get(key)?.installCredentials(nextEnv);
+      installCredentials: async (key, nextEnv, cloudAgentMcp) => {
+        await runtimes.get(key)?.installCredentials(nextEnv, cloudAgentMcp);
         turnsRef.current?.credentialsInstalled(key);
       },
       isUnavailable: key => {

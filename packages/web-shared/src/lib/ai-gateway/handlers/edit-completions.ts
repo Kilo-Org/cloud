@@ -7,7 +7,7 @@ import z from 'zod';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
@@ -16,7 +16,6 @@ import {
   extractEditPromptInfo,
   extractFraudAndProjectHeaders,
   invalidRequestResponse,
-  dataCollectionRequiredResponse,
   temporarilyUnavailableResponse,
   wrapInSafeNextResponse,
   captureProxyError,
@@ -179,6 +178,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     kiloUserId: user.id,
     provider: editProvider,
     requested_model: requestBody.model,
+    is_free: isFreeModelExcludingCustomLlms(requestBody.model),
     promptInfo,
     max_tokens: requestBody.max_tokens ?? null,
     has_middle_out_transform: null,
@@ -216,13 +216,9 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
 
   // Use read replica for balance check - this is a read-only operation that can tolerate
   // slight replication lag, and provides lower latency for US users.
-  const { balance, settings, plan, payer } = await getBalanceAndOrgSettings(
-    organizationId,
-    user,
-    readDb
-  );
+  const { balance, plan, payer } = await getBalanceAndOrgSettings(organizationId, user, readDb);
 
-  if (!canSpendPaidUsage(balance) && !(await isFreeModel(requestBody.model)) && !userByok) {
+  if (!canSpendPaidUsage(balance) && !usageContext.is_free && !userByok) {
     return NextResponse.json(
       {
         error: { message: 'Insufficient credits' },
@@ -247,23 +243,10 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     }
   }
 
-  // Org-level "do not collect my data" opt-out. The OpenRouter/Vercel paths
-  // honor this by setting `provider.data_collection = 'deny'` on the upstream
-  // request body, which causes the gateway to route to a sub-provider with a
-  // no-training/no-retention contract. This route bypasses both gateways and
-  // POSTs straight to Inception, and Inception's edit endpoint exposes no
-  // per-request opt-out flag. Their public privacy policy
-  // (https://www.inceptionlabs.ai/docs/privacy-policy) lists "Personal Data
-  // contained in prompts, inputs and uploaded content processed by our models"
-  // among the data they collect for purposes including "training and refining
-  // our models"; "no training / no retention" is only offered as an enterprise
-  // feature (https://www.inceptionlabs.ai/enterprise), not as the default for
-  // the standard API tier we call here. Until we sign an enterprise agreement
-  // or Inception adds a per-request flag, refusing is the only way to honor
-  // the org's stated intent.
-  if (settings?.data_collection === 'deny') {
-    return dataCollectionRequiredResponse();
-  }
+  // Data-use contract for this route: edit goes straight to Inception, which the gateway's
+  // provider data policy classifies as not training on prompts and not retaining them
+  // (https://openrouter.ai/docs/guides/privacy/provider-logging). A new supported model must
+  // carry the same classification.
 
   const systemKey = getSystemApiKey(editProvider);
   const userByokEntry = userByok?.at(0);

@@ -154,7 +154,6 @@ export async function fetchGitLabRepositoriesForOrganization(
       };
     }
 
-    // Return cached repos
     return {
       integrationInstalled: true,
       repositories: mapRepositories(cachedRepositories ?? []),
@@ -213,7 +212,6 @@ export async function fetchGitLabRepositoriesForUser(
       };
     }
 
-    // Return cached repos
     return {
       integrationInstalled: true,
       repositories: mapRepositories(cachedRepositories ?? []),

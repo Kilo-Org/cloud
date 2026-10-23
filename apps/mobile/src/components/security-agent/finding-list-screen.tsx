@@ -11,7 +11,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
 import { ShieldCheck, SlidersHorizontal } from '@/components/ui/icons';
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, View, type ViewStyle } from 'react-native';
+import { View, type ViewStyle } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { useTranslation } from 'react-i18next';
@@ -20,11 +20,14 @@ import { toast } from 'sonner-native';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { AnalysisCapacityNotice } from '@/components/security-agent/analysis-capacity-notice';
 import { FindingRow } from '@/components/security-agent/finding-row';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import {
   useSecurityAgentConfig,
   useSecurityAgentRepositories,
@@ -32,7 +35,11 @@ import {
 } from '@/lib/hooks/use-security-agent';
 import { useSecurityFindings } from '@/lib/hooks/use-security-findings';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
-import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
+import {
+  getSecurityAgentPath,
+  isSecurityFindingAnalyzable,
+  type SecurityFinding,
+} from '@/lib/security-agent';
 import { setSecurityFindingFilterBridge } from '@/lib/security-finding-filter-bridge';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -101,16 +108,19 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   );
 
   const slaEnabled = config.data?.slaEnabled ?? true;
-  const hasAnalysisCapacity =
-    capacity.runningCount !== undefined &&
-    capacity.concurrencyLimit !== undefined &&
-    capacity.runningCount < capacity.concurrencyLimit;
   const filtersActive = hasActiveSecurityFindingFilters(filters);
   // Memoized so a pull-to-refresh (`refreshing`) or a filter change does not
   // hand the list a new `data` identity while `pages` is unchanged.
   const items = useMemo(
     () => findings.data?.pages.flatMap(page => page.findings) ?? [],
     [findings.data?.pages]
+  );
+  // The capacity notice explains a blocked action, so it only appears when a
+  // rendered row actually offers one — never over a list of already-analyzed
+  // findings.
+  const hasAnalyzableRow = useMemo(
+    () => items.some(item => isSecurityFindingAnalyzable(item)),
+    [items]
   );
   const hasListContent = items.length > 0 || findings.isFetchNextPageError;
   // Hoisted so the list keeps one renderer identity across unrelated screen
@@ -122,27 +132,37 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
         finding={item}
         scope={scope}
         slaEnabled={slaEnabled}
-        hasAnalysisCapacity={hasAnalysisCapacity}
+        capacityState={capacity.state}
       />
     ),
-    [scope, slaEnabled, hasAnalysisCapacity]
+    [scope, slaEnabled, capacity.state]
   );
   const rowExtraData = useMemo(
-    () => ({ scope, slaEnabled, hasAnalysisCapacity }),
-    [scope, slaEnabled, hasAnalysisCapacity]
+    () => ({ scope, slaEnabled, capacityState: capacity.state }),
+    [scope, slaEnabled, capacity.state]
   );
   const scopedRepositories = getSecurityRepositoriesInScope(repositories.data ?? [], config.data);
   // Repos aren't known yet (still loading or the fetch failed) — the filter
   // stays disabled instead of silently offering a shrunken repository list.
+  // A failed fetch is recoverable: the inline retry above, pull-to-refresh,
+  // and the route-focus refresh all refetch the repositories query.
   const filterUnavailable = repositories.isLoading || repositories.isError;
 
   const handleRefresh = () => {
     void (async () => {
       setRefreshing(true);
       try {
-        // Refresh only — never triggers a new sync.
-        const result = await findings.refetch();
-        if (result.isError) {
+        // Refresh only — never triggers a new sync. The repositories fetch
+        // failure disables the filter control until a refetch succeeds, so
+        // every list refresh also retries it. The capacity counters are on
+        // screen, so a pull refreshes them too instead of leaving the notice
+        // and the actions on an older read.
+        const [findingsResult] = await Promise.all([
+          findings.refetch(),
+          repositories.refetch(),
+          capacity.refetch(),
+        ]);
+        if (findingsResult.isError) {
           toast.error(t('common.couldNotRefresh'));
         }
       } finally {
@@ -156,8 +176,11 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={t('common.findings')}
+        // One size-11 (44dp) filter icon; declaring it keeps the one-line
+        // title's readable minimum when the row is narrow.
+        headerRightWidth={44}
         headerRight={
-          <Pressable
+          <IconButton
             onPress={() => {
               if (filterUnavailable) {
                 return;
@@ -170,21 +193,26 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
               router.push(getSecurityAgentPath(scope, 'filter'));
             }}
             disabled={filterUnavailable}
-            accessibilityRole="button"
             accessibilityLabel={t('securityAgent.filter.title')}
             accessibilityState={{ disabled: filterUnavailable }}
-            className={cn(
-              'size-11 items-center justify-center active:opacity-70',
-              filterUnavailable && 'opacity-50'
-            )}
+            className={cn(filterUnavailable && 'opacity-50')}
           >
             <SlidersHorizontal
               size={20}
               color={filtersActive ? colors.foreground : colors.mutedForeground}
             />
-          </Pressable>
+          </IconButton>
         }
       />
+
+      {repositories.isError ? (
+        <QueryError
+          placement="top"
+          message={t('common.couldNotLoadRepositories')}
+          onRetry={() => void repositories.refetch()}
+          isRetrying={repositories.isFetching}
+        />
+      ) : null}
 
       {findings.isLoading && (
         <View className="flex-1 gap-3 px-6 pt-4">
@@ -219,6 +247,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
           action={
             filtersActive ? (
               <Button
+                className={STATE_ACTION_CLASS}
                 variant="outline"
                 onPress={() => {
                   setFilters(DEFAULT_SECURITY_FINDING_FILTERS);
@@ -246,6 +275,13 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
             // row, which the item separator does not cover.
             <View className="pb-3">
               <RefreshProgress refreshControl={refreshControl} />
+              {hasAnalyzableRow ? (
+                <AnalysisCapacityNotice
+                  className="pt-2"
+                  state={capacity.state}
+                  onRetry={() => void capacity.refetch()}
+                />
+              ) : null}
             </View>
           }
           refreshControl={refreshControl}

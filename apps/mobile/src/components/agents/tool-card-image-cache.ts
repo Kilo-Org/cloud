@@ -144,7 +144,7 @@ export function cacheToolAttachment(
       return;
     }
 
-    file.write(payload, { encoding: 'base64' });
+    file.writeSync(payload, { encoding: 'base64' });
     recordUri(partId, file.uri);
   } catch {
     inFlightOrDone.delete(partId);

@@ -1,20 +1,26 @@
-// The finding row's quick action follows the same link route as the
-// remediation panel: a supported review link navigates in-app, everything
-// else goes through the shared external-link helper.
+// The row's quick action is the only place the findings list offers Analyze,
+// and it is also where an opened remediation PR is offered. These cases pin the
+// enablement contract for Analyze — available runs, every unavailable capacity
+// state keeps it disabled and names the reason for assistive tech — and the
+// link route it shares with the remediation panel: a supported review link
+// navigates in-app, everything else goes through the shared external-link
+// helper.
 
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { Button } from '@/components/ui/button';
 import { FindingRow } from './finding-row';
 import { type SecurityFinding } from '@/lib/security-agent';
+import { type SecurityAnalysisCapacityState } from '@/lib/security-analysis-capacity';
 
 const mocks = vi.hoisted(() => ({
   routerPush: vi.fn(),
-  startAnalysis: vi.fn(),
   openBrowser: vi.fn(),
   linkingOpenUrl: vi.fn(),
   toastError: vi.fn(),
+  startAnalysis: { mutate: vi.fn(), isPending: false },
 }));
 
 vi.mock('react-native', () => ({
@@ -24,46 +30,27 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('expo-web-browser', () => ({ openBrowserAsync: mocks.openBrowser }));
 vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
-vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: mocks.routerPush }),
-}));
+vi.mock('expo-router', () => ({ useRouter: () => ({ push: mocks.routerPush }) }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key } }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
-vi.mock('@/components/ui/spinning-icon', () => ({ SpinningIcon: () => null }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/ui/icons', () => ({
-  AlertTriangle: 'AlertTriangle',
-  Brain: 'Brain',
-  CheckCircle2: 'CheckCircle2',
-  Clock3: 'Clock3',
-  ExternalLink: 'ExternalLink',
-  Eye: 'Eye',
-  Loader2: 'Loader2',
-  Shield: 'Shield',
-  ShieldAlert: 'ShieldAlert',
-  ShieldCheck: 'ShieldCheck',
-  XCircle: 'XCircle',
+vi.mock('@/components/ui/spinning-icon', () => ({ SpinningIcon: 'SpinningIcon' }));
+vi.mock('@/components/ui/icons', () => ({ ExternalLink: 'ExternalLink' }));
+vi.mock('@/components/security-agent/finding-tone', () => ({
+  FINDING_ICONS: new Proxy({}, { get: () => 'Icon' }),
+  FINDING_TONE_TEXT_CLASS: { muted: 'text-muted-foreground' },
+  findingToneColor: () => '#000',
 }));
 vi.mock('@/lib/hooks/use-security-findings', () => ({
-  useStartSecurityAnalysis: () => ({ mutate: mocks.startAnalysis, isPending: false }),
+  useStartSecurityAnalysis: () => mocks.startAnalysis,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({
-    foreground: '#000',
-    mutedForeground: '#666',
-    good: '#090',
-    warn: '#a60',
-    destructive: '#c00',
-  }),
+  useThemeColors: () => ({ foreground: '#000', mutedForeground: '#666' }),
 }));
-vi.mock('@/lib/security-agent-copy', () => ({
-  getSecurityAnalysisLabel: () => 'Not analyzed',
-  getDeadlineCopy: () => ({ label: '', detail: '' }),
-}));
+vi.mock('@/lib/utils', () => ({ cn: (...values: unknown[]) => values.filter(Boolean).join(' ') }));
 vi.mock('@kilocode/app-shared/security-agent', () => ({
-  getSecurityAnalysisPresentation: () => ({ icon: 'shield', tone: 'neutral', spinning: false }),
+  getSecurityAnalysisPresentation: () => ({ icon: 'scan', tone: 'muted', spinning: false }),
   getSecurityDeadlinePresentation: () => null,
   getSecurityFindingAnalysisState: () => 'not-analyzed',
 }));
@@ -77,46 +64,97 @@ function findingFixture(overrides: Record<string, unknown> = {}): SecurityFindin
     id: 'finding-1',
     status: 'open',
     severity: 'high',
-    title: 'Prototype pollution in left-pad',
-    repo_full_name: 'kilo/kilo',
+    title: 'Unsanitized input in handler',
+    repo_full_name: 'kilo/demo',
     analysis_status: null,
     analysis: null,
-    sla_due_at: null,
-    remediationSummary: { ...PR_OPENED, prUrl: 'https://github.com/kilo/kilo/pull/123' },
+    remediationSummary: null,
+    remediationCapability: { canStart: false, canRetry: false, canCancel: false },
     ...overrides,
   } as unknown as SecurityFinding;
 }
 
-function renderRow(finding: SecurityFinding): R {
+function renderRow(
+  capacityState: SecurityAnalysisCapacityState,
+  finding: SecurityFinding = findingFixture()
+): R {
   const ref: { current: R | undefined } = { current: undefined };
   act(() => {
     ref.current = TestRenderer.create(
-      createElement(FindingRow, {
-        finding,
-        scope: 'personal',
-        slaEnabled: false,
-        hasAnalysisCapacity: true,
-      })
+      createElement(FindingRow, { finding, scope: 'personal', slaEnabled: false, capacityState })
     );
   });
-  const r = ref.current;
-  if (!r) {
+  const renderer = ref.current;
+  if (!renderer) {
     throw new Error('renderer was not created');
   }
-  return r;
+  return renderer;
 }
 
-function pressQuickAction(r: R): void {
-  const buttons = r.root.findAll(
-    n => typeof n.type === 'string' && (n.type as string) === 'Button'
-  );
-  const button = buttons[0];
-  if (!button) {
-    throw new Error('no quick action rendered');
-  }
-  act(() => {
-    (button.props.onPress as () => void)();
+function pressQuickAction(tree: R): void {
+  const button = tree.root.findByType(Button);
+  act(button.props.onPress as () => void);
+}
+
+describe('FindingRow quick Analyze action', () => {
+  beforeEach(() => {
+    mocks.startAnalysis.isPending = false;
+    mocks.startAnalysis.mutate.mockClear();
   });
+
+  it('starts the analysis while capacity is available', () => {
+    const tree = renderRow('available');
+    const button = tree.root.findByType(Button);
+    expect(button.props.disabled).toBe(false);
+    expect(button.props.loading).toBe(false);
+    expect(button.props.accessibilityHint).toBeUndefined();
+    act(button.props.onPress as () => void);
+    expect(mocks.startAnalysis.mutate).toHaveBeenCalledWith({
+      findingId: 'finding-1',
+      retrySandboxOnly: false,
+    });
+  });
+
+  it.each([
+    { state: 'full', hint: 'securityAgent.analysis.capacityFull' },
+    { state: 'error', hint: 'securityAgent.analysis.couldNotCheckCapacity' },
+    { state: 'loading', hint: undefined },
+  ] as const)('keeps the action disabled and explained while $state', ({ state, hint }) => {
+    const tree = renderRow(state);
+    const button = tree.root.findByType(Button);
+    expect(button.props.disabled).toBe(true);
+    expect(button.props.accessibilityHint).toBe(hint);
+    // Only the capacity read itself reads as busy; a full or failed read must
+    // not spin forever.
+    expect(button.props.loading).toBe(state === 'loading');
+  });
+
+  it('reads as busy while the start request is in flight', () => {
+    mocks.startAnalysis.isPending = true;
+    const tree = renderRow('available');
+    expect(tree.root.findByType(Button).props.loading).toBe(true);
+  });
+
+  it('offers no Analyze action once the finding is analyzed', () => {
+    const tree = renderRow('available', findingFixture({ analysis_status: 'completed' }));
+    expect(tree.root.findAllByType(Button)).toHaveLength(0);
+  });
+
+  it('shows the remediation PR instead of Analyze when one is open', () => {
+    const tree = renderRow(
+      'available',
+      findingFixture({
+        remediationSummary: { ...PR_OPENED, prUrl: 'https://example.com/pr/1' },
+      })
+    );
+    const button = tree.root.findByType(Button);
+    expect(button.props.disabled).toBeUndefined();
+    expect(button.props.accessibilityHint).toBeUndefined();
+  });
+});
+
+function prOpened(prUrl: string): Record<string, unknown> {
+  return { remediationSummary: { ...PR_OPENED, prUrl } };
 }
 
 describe('FindingRow quick action link routing', () => {
@@ -128,18 +166,16 @@ describe('FindingRow quick action link routing', () => {
   });
 
   it('opens a supported review link on the in-app review route', () => {
-    pressQuickAction(renderRow(findingFixture()));
+    pressQuickAction(renderRow('available', findingFixture(prOpened('https://github.com/kilo/demo/pull/123'))));
 
-    expect(mocks.routerPush).toHaveBeenCalledWith('/(app)/pr-review/kilo/kilo/123');
+    expect(mocks.routerPush).toHaveBeenCalledWith('/(app)/pr-review/kilo/demo/123');
     expect(mocks.openBrowser).not.toHaveBeenCalled();
     expect(mocks.linkingOpenUrl).not.toHaveBeenCalled();
   });
 
   it('opens a review link its provider does not serve in the browser', async () => {
-    const url = 'https://github.example.com/kilo/kilo/pull/123';
-    pressQuickAction(
-      renderRow(findingFixture({ remediationSummary: { ...PR_OPENED, prUrl: url } }))
-    );
+    const url = 'https://github.example.com/kilo/demo/pull/123';
+    pressQuickAction(renderRow('available', findingFixture(prOpened(url))));
 
     await vi.waitFor(() => {
       expect(mocks.openBrowser).toHaveBeenCalledWith(url);
@@ -149,10 +185,7 @@ describe('FindingRow quick action link routing', () => {
   });
 
   it('keeps an unsupported destination out of the OS opener', async () => {
-    const url = 'ftp://example.com/kilo/kilo/pull/123';
-    pressQuickAction(
-      renderRow(findingFixture({ remediationSummary: { ...PR_OPENED, prUrl: url } }))
-    );
+    pressQuickAction(renderRow('available', findingFixture(prOpened('ftp://example.com/pr/123'))));
 
     await vi.waitFor(() => {
       expect(mocks.toastError).toHaveBeenCalledWith('common.couldNotOpen');

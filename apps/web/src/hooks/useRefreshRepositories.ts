@@ -39,7 +39,7 @@ export function useRefreshRepositories({
   const refresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const freshData = await queryClient.fetchQuery({
+      const freshData = await queryClient.query({
         ...getRefreshQueryOptions(),
         staleTime: 0,
       });

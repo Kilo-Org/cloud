@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
+
+import { getLanguageSnapshot } from '@/i18n';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { announcingToast } from '@/lib/a11y/announcing-toast';
@@ -70,7 +72,11 @@ export function MessageDetailsSheet({
   const [selectVisible, setSelectVisible] = useState(false);
   const content = useMemo(
     () => (message ? getMessageDetailsContent(message, modelOptions, deliveryState) : null),
-    [message, modelOptions, deliveryState]
+    // `getLanguageSnapshot()` re-resolves the captured copy (role labels,
+    // token rows) when the app language changes while the sheet is mounted;
+    // the content is otherwise stable on its message inputs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- language drives the resolved copy inside getMessageDetailsContent
+    [message, modelOptions, deliveryState, getLanguageSnapshot()]
   );
   const copyFeedback = useMessageDetailsCopyFeedback(visible, message?.info.id ?? null);
 

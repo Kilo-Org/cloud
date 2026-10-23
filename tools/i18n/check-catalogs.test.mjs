@@ -203,7 +203,9 @@ test('accepts a locale-owned separator in the login legal sentence', context => 
   const result = runChecker(context, {
     language: 'zh-Hans',
     english,
-    translated: { login: { termsPrefix: '继续即表示你同意我们的', terms: '条款', termsConnector: '和' } },
+    translated: {
+      login: { termsPrefix: '继续即表示你同意我们的', terms: '条款', termsConnector: '和' },
+    },
     source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
   });
   assert.equal(result.status, 0, result.stderr);

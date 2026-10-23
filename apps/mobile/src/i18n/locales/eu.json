@@ -3391,6 +3391,7 @@
   },
   "modelChat": {
     "offlineFailure": "Modelo honek interneteko konexioa behar du. Konektatu eta saiatu berriro, edo aldatu gailu honetako modelo batera.",
+    "creditsRequired": "Ez dago kreditu nahiko mezu hau bidaltzeko. Gehitu kredituak eta saiatu berriro.",
     "empty": {
       "title": "Hasi txat bat",
       "description": "Bidali mezu bat modelo batekin hitz egiteko."

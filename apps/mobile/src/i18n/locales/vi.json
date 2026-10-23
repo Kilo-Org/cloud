@@ -3391,6 +3391,7 @@
   },
   "modelChat": {
     "offlineFailure": "Mô hình này cần kết nối internet. Hãy kết nối và thử lại, hoặc chuyển sang một mô hình trên thiết bị này.",
+    "creditsRequired": "Không đủ tín dụng để gửi tin nhắn này, hãy nạp tiền và thử lại.",
     "empty": {
       "title": "Bắt đầu trò chuyện",
       "description": "Gửi tin nhắn để trò chuyện với mô hình."

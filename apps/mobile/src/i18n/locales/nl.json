@@ -3391,6 +3391,7 @@
   },
   "modelChat": {
     "offlineFailure": "Dit model heeft een internetverbinding nodig. Maak verbinding en probeer het opnieuw, of schakel over naar een model op dit apparaat.",
+    "creditsRequired": "Niet genoeg tegoed om dit bericht te verzenden. Vul je tegoed aan en probeer het opnieuw.",
     "empty": {
       "title": "Start een chat",
       "description": "Stuur een bericht om met een model te praten."

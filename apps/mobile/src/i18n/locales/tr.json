@@ -3391,6 +3391,7 @@
   },
   "modelChat": {
     "offlineFailure": "Bu model internet bağlantısı gerektiriyor. Bağlan ve tekrar dene ya da bu cihazdaki bir modele geç.",
+    "creditsRequired": "Bu mesajı göndermek için yeterli kredi yok. Kredi ekle ve tekrar dene.",
     "empty": {
       "title": "Bir sohbet başlat",
       "description": "Bir modelle konuşmak için mesaj gönder."

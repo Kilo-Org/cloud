@@ -3432,6 +3432,7 @@
   },
   "modelChat": {
     "offlineFailure": "Questo modello richiede una connessione a Internet. Connettiti e riprova, oppure passa a un modello su questo dispositivo.",
+    "creditsRequired": "Crediti insufficienti per inviare questo messaggio: aggiungi crediti e riprova.",
     "empty": {
       "title": "Avvia una chat",
       "description": "Invia un messaggio per parlare con un modello."

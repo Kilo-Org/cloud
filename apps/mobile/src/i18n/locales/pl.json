@@ -3473,6 +3473,7 @@
   },
   "modelChat": {
     "offlineFailure": "Ten model wymaga połączenia z internetem. Połącz się i spróbuj ponownie lub przełącz się na model na tym urządzeniu.",
+    "creditsRequired": "Brak wystarczającej liczby kredytów, aby wysłać tę wiadomość. Doładuj konto i spróbuj ponownie.",
     "empty": {
       "title": "Rozpocznij czat",
       "description": "Wyślij wiadomość, aby porozmawiać z modelem."

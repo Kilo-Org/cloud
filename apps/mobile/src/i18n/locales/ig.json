@@ -3391,6 +3391,7 @@
   },
   "modelChat": {
     "offlineFailure": "Ihe nlereanya a chọrọ njikọ ịntanetị. Jikọọ ma nwaa ọzọ, ma ọ bụ gbanwee gaa n'ihe nlereanya dị na ngwaọrụ a.",
+    "creditsRequired": "Ego ojiji ezughị oke izipu ozi a. Tinye ego ojiji ma nwaa ọzọ.",
     "empty": {
       "title": "Malite nkata",
       "description": "Ziga ozi ka ị soro ihe nlereanya kparịta ụka."

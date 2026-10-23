@@ -3473,6 +3473,7 @@
   },
   "modelChat": {
     "offlineFailure": "Ta model potrebuje internetno povezavo. Poveži se in poskusi znova ali preklopi na model v tej napravi.",
+    "creditsRequired": "Ni dovolj kreditov za pošiljanje tega sporočila. Dodaj kredite in poskusi znova.",
     "empty": {
       "title": "Začni klepet",
       "description": "Pošlji sporočilo za pogovor z modelom."

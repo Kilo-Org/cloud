@@ -3391,6 +3391,7 @@
   },
   "modelChat": {
     "offlineFailure": "此模型需要網路連線。請連線後再試一次，或切換至此裝置上的模型。",
+    "creditsRequired": "點數不足，無法傳送此訊息。請加值點數後再試一次。",
     "empty": {
       "title": "開始聊天",
       "description": "傳送訊息以與模型對話。"

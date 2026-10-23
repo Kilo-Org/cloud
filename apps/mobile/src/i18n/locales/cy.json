@@ -3555,6 +3555,7 @@
   },
   "modelChat": {
     "offlineFailure": "Mae angen cysylltiad rhyngrwyd ar y model hwn. Cysylltwch a rhowch gynnig arall arni, neu newidiwch i fodel ar y ddyfais hon.",
+    "creditsRequired": "Dim digon o gredydau i anfon y neges hon. Ychwanegwch gredydau a rhowch gynnig arall arni.",
     "empty": {
       "title": "Dechrau sgwrs",
       "description": "Anfonwch neges i siarad â model."

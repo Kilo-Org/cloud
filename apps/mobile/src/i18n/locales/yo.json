@@ -3391,6 +3391,7 @@
   },
   "modelChat": {
     "offlineFailure": "Awoṣe yìí nílò ìsopọ̀ íntánẹ́ẹ̀tì. Sopọ̀ kí o sì gbìyànjú lẹ́ẹ̀kan sí i, tàbí yí padà sí awoṣe kan tó wà lórí ẹ̀rọ yìí.",
+    "creditsRequired": "Kirẹ́dítì kò tó láti fi ìfiránṣẹ́ yìí ránṣẹ́, fi kirẹ́dítì kún un kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
     "empty": {
       "title": "Bẹ̀rẹ̀ iwiregbe kan",
       "description": "Fi ifiranṣẹ ranṣẹ láti bá awoṣe kan sọ̀rọ̀."

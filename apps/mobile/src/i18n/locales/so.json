@@ -3391,6 +3391,7 @@
   },
   "modelChat": {
     "offlineFailure": "Model-kan wuxuu u baahan yahay xiriir internet. Ku xirmo oo isku day mar kale, ama u beddel model ku jira qalabkan.",
+    "creditsRequired": "Lacagta isticmaalka kuma filna farriintan la soo diray. Ku dar lacagta isticmaalka oo isku day mar kale.",
     "empty": {
       "title": "Bilow wada sheekaysi",
       "description": "Dir fariin si aad ula hadasho model."

@@ -3391,6 +3391,7 @@
   },
   "modelChat": {
     "offlineFailure": "Ky model ka nevojë për lidhje interneti. Lidhu dhe provo sërish, ose kalo te një model në këtë pajisje.",
+    "creditsRequired": "Nuk ka kredi të mjaftueshme për të dërguar këtë mesazh. Shto kredite dhe provo sërish.",
     "empty": {
       "title": "Filloni një bisedë",
       "description": "Dërgo një mesazh për të biseduar me një model."

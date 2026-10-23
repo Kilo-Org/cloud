@@ -3390,6 +3390,7 @@
   },
   "modelChat": {
     "offlineFailure": "Den här modellen kräver en internetanslutning. Anslut och försök igen, eller byt till en modell på den här enheten.",
+    "creditsRequired": "Det räcker inte med krediter för att skicka det här meddelandet. Fyll på krediter och försök igen.",
     "empty": {
       "title": "Starta en chatt",
       "description": "Skicka ett meddelande för att prata med en modell."

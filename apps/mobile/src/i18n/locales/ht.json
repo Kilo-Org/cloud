@@ -3391,6 +3391,7 @@
   },
   "modelChat": {
     "offlineFailure": "Modèl sa a bezwen yon koneksyon entènèt. Konekte epi eseye ankò, oswa chanje pou yon modèl ki sou aparèy sa a.",
+    "creditsRequired": "Ou pa gen ase kredi pou voye mesaj sa a. Ajoute kredi epi eseye ankò.",
     "empty": {
       "title": "Kòmanse yon chat",
       "description": "Voye yon mesaj pou pale ak yon modèl."

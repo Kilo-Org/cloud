@@ -521,6 +521,72 @@ describe('processLocalExpirations', () => {
     expect(expirationTxns[0].original_transaction_id).toBe(initialId);
   });
 
+  it('applies the expiration only while the persisted usage matches the snapshot', async () => {
+    const user = await insertMigratedTestUser({
+      microdollars_used: 500,
+      total_microdollars_acquired: 1000,
+      next_credit_expiration_at: '2024-01-10T00:00:00Z',
+    });
+
+    const initialId = randomUUID();
+    await db.insert(creditTransactionsTable).values({
+      kilo_user_id: user.id,
+      amount_microdollars: 1000,
+      is_free: true,
+      expiry_date: '2024-01-10T00:00:00Z',
+      expiration_baseline_microdollars_used: 0,
+      original_baseline_microdollars_used: 0,
+      id: initialId,
+      description: 'Test credits',
+    });
+
+    await db
+      .update(kilocode_users)
+      .set({ microdollars_used: 900 })
+      .where(eq(kilocode_users.id, user.id));
+
+    const now = new Date('2024-01-15');
+    const staleResult = await processLocalExpirations(user, now);
+
+    expect(staleResult).toBeNull();
+
+    const expirationTxns = await db
+      .select()
+      .from(creditTransactionsTable)
+      .where(eq(creditTransactionsTable.credit_category, 'credits_expired'));
+    expect(expirationTxns).toHaveLength(0);
+
+    const unchangedUser = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(unchangedUser!.total_microdollars_acquired).toBe(1000);
+    expect(new Date(unchangedUser!.next_credit_expiration_at!).getTime()).toBe(
+      new Date('2024-01-10T00:00:00Z').getTime()
+    );
+
+    // The next read sees the new usage and expires only the unconsumed 100.
+    const freshUser = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    const result = await processLocalExpirations(freshUser!, now);
+
+    expect(result).toEqual({ total_microdollars_acquired: 900 });
+
+    const committed = await db
+      .select()
+      .from(creditTransactionsTable)
+      .where(eq(creditTransactionsTable.credit_category, 'credits_expired'));
+    expect(committed).toHaveLength(1);
+    expect(committed[0].amount_microdollars).toBe(-100);
+
+    const updatedUser = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(updatedUser!.total_microdollars_acquired).toBe(900);
+    expect(updatedUser!.microdollars_used).toBe(900);
+    expect(updatedUser!.next_credit_expiration_at).toBeNull();
+  });
+
   it('is idempotent - calling twice does not create duplicate expirations', async () => {
     const user = await insertMigratedTestUser({
       microdollars_used: 0,

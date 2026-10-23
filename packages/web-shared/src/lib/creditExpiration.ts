@@ -191,6 +191,7 @@ export async function processLocalExpirations(
         and(
           eq(kilocode_users.id, user.id),
           eq(kilocode_users.total_microdollars_acquired, user.total_microdollars_acquired),
+          eq(kilocode_users.microdollars_used, user.microdollars_used),
           next_credit_expiration_at
             ? eq(kilocode_users.next_credit_expiration_at, next_credit_expiration_at)
             : isNull(kilocode_users.next_credit_expiration_at)
@@ -637,6 +638,7 @@ export async function processOrganizationExpirations(
         and(
           eq(organizations.id, org.id),
           eq(organizations.total_microdollars_acquired, org.total_microdollars_acquired),
+          eq(organizations.microdollars_used, org.microdollars_used),
           next_credit_expiration_at
             ? eq(organizations.next_credit_expiration_at, next_credit_expiration_at)
             : isNull(organizations.next_credit_expiration_at)

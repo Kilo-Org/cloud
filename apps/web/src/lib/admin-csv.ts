@@ -1,9 +1,18 @@
+/** Leading characters that call for a literal-text prefix. */
+const LITERAL_LEADING_CHARACTER = /^\s*[=+\-@\t\r]/;
+
+/** Prefix the value with a single quote when its first visible character calls for it. */
+export function csvLiteral(value: string): string {
+  return LITERAL_LEADING_CHARACTER.test(value) ? `'${value}` : value;
+}
+
 /** Wrap a CSV field value in quotes if it contains commas, quotes, or newlines. */
 export function csvField(value: string): string {
-  if (value.includes('"') || value.includes(',') || value.includes('\n')) {
-    return `"${value.replace(/"/g, '""')}"`;
+  const field = csvLiteral(value);
+  if (field.includes('"') || field.includes(',') || field.includes('\n')) {
+    return `"${field.replace(/"/g, '""')}"`;
   }
-  return value;
+  return field;
 }
 
 export type CsvTableData = {

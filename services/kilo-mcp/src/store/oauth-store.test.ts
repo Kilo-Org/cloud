@@ -242,8 +242,12 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
         expiresAt: LATER,
       });
       expect(record?.authRequest).toEqual(authRequest);
+      const appliedMigrations = db.prepare('SELECT * FROM __drizzle_migrations ORDER BY id').all();
       const recreated = createStore(db);
       expect(await recreated.getPendingAuthorization('pa-1')).toEqual(record);
+      expect(db.prepare('SELECT * FROM __drizzle_migrations ORDER BY id').all()).toEqual(
+        appliedMigrations
+      );
       expect(await store.getPendingAuthorization('pa-ghost')).toBeNull();
     });
 

@@ -7,7 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { briefingMoney } from '@/lib/agent-briefing-format';
 import { briefingEstimateUnavailableKey } from '@/lib/agent-briefing-state';
+import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { type PreparedBriefing } from '@/lib/hooks/use-create-briefing';
+import { resolveCatalogModelName } from '@/lib/model-display-name';
 
 export function BriefingCreateReview({
   prepared,
@@ -24,6 +26,7 @@ export function BriefingCreateReview({
 }) {
   const { t, i18n } = useTranslation();
   const { report, estimate } = prepared;
+  const catalog = useAvailableModels(report.context.organizationId ?? undefined);
   const contextName =
     report.context.organizationId === null ? t('common.personal') : report.context.name;
   return (
@@ -45,7 +48,7 @@ export function BriefingCreateReview({
           <Text className="font-semibold">{t('agentBriefing.summary')}</Text>
           <Text className="text-sm">{t('agentBriefing.payer', { context: contextName })}</Text>
           <Text className="text-sm">
-            {t('common.model')}: {estimate.model}
+            {t('common.model')}: {resolveCatalogModelName(estimate.model, catalog.models)}
           </Text>
           {estimate.canGenerate ? (
             <Text className="text-sm">

@@ -9,7 +9,7 @@ export function csvLiteral(value: string): string {
 /** Format one CSV field: apply the literal-text prefix, then quote when needed. */
 export function csvField(value: string): string {
   const field = csvLiteral(value);
-  if (field.includes('"') || field.includes(',') || field.includes('\n')) {
+  if (field.includes('"') || field.includes(',') || /[\r\n]/.test(field)) {
     return `"${field.replace(/"/g, '""')}"`;
   }
   return field;

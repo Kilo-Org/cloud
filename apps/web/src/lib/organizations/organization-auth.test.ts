@@ -7,6 +7,10 @@ import { NextResponse } from 'next/server';
 import { eq, isNotNull } from 'drizzle-orm';
 import type { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
+import {
+  setAdminAccessSinkForTest,
+  type AdminAccessEvent,
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
 
 describe('getAuthorizedOrgContext', () => {
   let testOrganizationId: string;
@@ -43,17 +47,39 @@ describe('getAuthorizedOrgContext', () => {
         authFailedResponse: null,
       });
 
-      const result = await getAuthorizedOrgContext(
-        testOrganizationId,
-        undefined,
-        mockGetUserFromAuth
-      );
+      const result = await getAuthorizedOrgContext(testOrganizationId, undefined, {
+        getUserFromAuthOverride: mockGetUserFromAuth,
+      });
 
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.user).toEqual({ ...adminUser, role: 'owner' });
         expect(result.data.organization.id).toBe(testOrganizationId);
       }
+    });
+
+    test('labels the admin elevation with the surface the caller reports', async () => {
+      const adminUser = await insertTestUser({ is_admin: true });
+      const events: AdminAccessEvent[] = [];
+      setAdminAccessSinkForTest(event => events.push(event));
+
+      try {
+        const result = await getAuthorizedOrgContext(testOrganizationId, undefined, {
+          getUserFromAuthOverride: async () => ({ user: adminUser, authFailedResponse: null }),
+          surface: 'server-component',
+        });
+        expect(result.success).toBe(true);
+      } finally {
+        setAdminAccessSinkForTest(null);
+      }
+
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        kind: 'kilo_admin_elevation',
+        reason: 'organization_access_rest',
+        surface: 'server-component',
+        target: `organization:${testOrganizationId}`,
+      });
     });
 
     test('should allow admin users even if they are not in organization_memberships', async () => {
@@ -70,11 +96,9 @@ describe('getAuthorizedOrgContext', () => {
         .where(eq(organization_memberships.kilo_user_id, adminUser.id));
       expect(memberships).toHaveLength(0);
 
-      const result = await getAuthorizedOrgContext(
-        testOrganizationId,
-        undefined,
-        mockGetUserFromAuth
-      );
+      const result = await getAuthorizedOrgContext(testOrganizationId, undefined, {
+        getUserFromAuthOverride: mockGetUserFromAuth,
+      });
 
       expect(result.success).toBe(true);
       if (result.success) {
@@ -91,11 +115,9 @@ describe('getAuthorizedOrgContext', () => {
         authFailedResponse: null,
       });
 
-      const result = await getAuthorizedOrgContext(
-        testOrganizationId,
-        ['owner'],
-        mockGetUserFromAuth
-      );
+      const result = await getAuthorizedOrgContext(testOrganizationId, ['owner'], {
+        getUserFromAuthOverride: mockGetUserFromAuth,
+      });
 
       expect(result.success).toBe(true);
       if (result.success) {
@@ -121,11 +143,9 @@ describe('getAuthorizedOrgContext', () => {
         authFailedResponse: null,
       });
 
-      const result = await getAuthorizedOrgContext(
-        testOrganizationId,
-        undefined,
-        mockGetUserFromAuth
-      );
+      const result = await getAuthorizedOrgContext(testOrganizationId, undefined, {
+        getUserFromAuthOverride: mockGetUserFromAuth,
+      });
 
       expect(result.success).toBe(true);
       if (result.success) {
@@ -142,11 +162,9 @@ describe('getAuthorizedOrgContext', () => {
         authFailedResponse: null,
       });
 
-      const result = await getAuthorizedOrgContext(
-        testOrganizationId,
-        undefined,
-        mockGetUserFromAuth
-      );
+      const result = await getAuthorizedOrgContext(testOrganizationId, undefined, {
+        getUserFromAuthOverride: mockGetUserFromAuth,
+      });
 
       expect(result.success).toBe(false);
       if (!result.success) {
@@ -171,11 +189,9 @@ describe('getAuthorizedOrgContext', () => {
         authFailedResponse: null,
       });
 
-      const result = await getAuthorizedOrgContext(
-        testOrganizationId,
-        ['owner'],
-        mockGetUserFromAuth
-      );
+      const result = await getAuthorizedOrgContext(testOrganizationId, ['owner'], {
+        getUserFromAuthOverride: mockGetUserFromAuth,
+      });
 
       expect(result.success).toBe(true);
       if (result.success) {
@@ -199,11 +215,9 @@ describe('getAuthorizedOrgContext', () => {
         authFailedResponse: null,
       });
 
-      const result = await getAuthorizedOrgContext(
-        testOrganizationId,
-        ['owner'],
-        mockGetUserFromAuth
-      );
+      const result = await getAuthorizedOrgContext(testOrganizationId, ['owner'], {
+        getUserFromAuthOverride: mockGetUserFromAuth,
+      });
 
       expect(result.success).toBe(false);
       if (!result.success) {
@@ -237,11 +251,9 @@ describe('getAuthorizedOrgContext', () => {
         authFailedResponse: null,
       });
 
-      const result = await getAuthorizedOrgContext(
-        testOrganizationId,
-        undefined,
-        mockGetUserFromAuth
-      );
+      const result = await getAuthorizedOrgContext(testOrganizationId, undefined, {
+        getUserFromAuthOverride: mockGetUserFromAuth,
+      });
 
       expect(result.success).toBe(false);
       if (!result.success) {
@@ -277,11 +289,9 @@ describe('getAuthorizedOrgContext', () => {
         authFailedResponse: null,
       });
 
-      const result = await getAuthorizedOrgContext(
-        childOrganization.id,
-        undefined,
-        mockGetUserFromAuth
-      );
+      const result = await getAuthorizedOrgContext(childOrganization.id, undefined, {
+        getUserFromAuthOverride: mockGetUserFromAuth,
+      });
 
       expect(result.success).toBe(true);
       if (result.success) {
@@ -312,7 +322,7 @@ describe('getAuthorizedOrgContext', () => {
       const result = await getAuthorizedOrgContext(
         childOrganization.id,
         ['owner', 'billing_manager'],
-        mockGetUserFromAuth
+        { getUserFromAuthOverride: mockGetUserFromAuth }
       );
 
       expect(result.success).toBe(true);
@@ -341,11 +351,9 @@ describe('getAuthorizedOrgContext', () => {
         authFailedResponse: null,
       });
 
-      const result = await getAuthorizedOrgContext(
-        childOrganization.id,
-        undefined,
-        mockGetUserFromAuth
-      );
+      const result = await getAuthorizedOrgContext(childOrganization.id, undefined, {
+        getUserFromAuthOverride: mockGetUserFromAuth,
+      });
 
       expect(result.success).toBe(false);
       if (!result.success) {
@@ -363,11 +371,9 @@ describe('getAuthorizedOrgContext', () => {
         authFailedResponse,
       });
 
-      const result = await getAuthorizedOrgContext(
-        testOrganizationId,
-        undefined,
-        mockGetUserFromAuth
-      );
+      const result = await getAuthorizedOrgContext(testOrganizationId, undefined, {
+        getUserFromAuthOverride: mockGetUserFromAuth,
+      });
 
       expect(result.success).toBe(false);
       if (!result.success) {
@@ -385,7 +391,9 @@ describe('getAuthorizedOrgContext', () => {
         authFailedResponse: null,
       });
 
-      const result = await getAuthorizedOrgContext('invalid-uuid', undefined, mockGetUserFromAuth);
+      const result = await getAuthorizedOrgContext('invalid-uuid', undefined, {
+        getUserFromAuthOverride: mockGetUserFromAuth,
+      });
 
       expect(result.success).toBe(false);
       if (!result.success) {
@@ -401,7 +409,9 @@ describe('getAuthorizedOrgContext', () => {
         authFailedResponse: null,
       });
 
-      const result = await getAuthorizedOrgContext('', undefined, mockGetUserFromAuth);
+      const result = await getAuthorizedOrgContext('', undefined, {
+        getUserFromAuthOverride: mockGetUserFromAuth,
+      });
 
       expect(result.success).toBe(false);
       if (!result.success) {
@@ -426,11 +436,9 @@ describe('getAuthorizedOrgContext', () => {
         authFailedResponse: null,
       });
 
-      const result = await getAuthorizedOrgContext(
-        testOrganizationId,
-        ['member'],
-        mockGetUserFromAuth
-      );
+      const result = await getAuthorizedOrgContext(testOrganizationId, ['member'], {
+        getUserFromAuthOverride: mockGetUserFromAuth,
+      });
 
       expect(result.success).toBe(true);
       if (result.success) {
@@ -454,11 +462,9 @@ describe('getAuthorizedOrgContext', () => {
         authFailedResponse: null,
       });
 
-      const result = await getAuthorizedOrgContext(
-        testOrganizationId,
-        ['owner', 'member'],
-        mockGetUserFromAuth
-      );
+      const result = await getAuthorizedOrgContext(testOrganizationId, ['owner', 'member'], {
+        getUserFromAuthOverride: mockGetUserFromAuth,
+      });
 
       expect(result.success).toBe(true);
       if (result.success) {
@@ -482,7 +488,9 @@ describe('getAuthorizedOrgContext', () => {
         authFailedResponse: null,
       });
 
-      const result = await getAuthorizedOrgContext(testOrganizationId, [], mockGetUserFromAuth);
+      const result = await getAuthorizedOrgContext(testOrganizationId, [], {
+        getUserFromAuthOverride: mockGetUserFromAuth,
+      });
 
       expect(result.success).toBe(true);
       if (result.success) {

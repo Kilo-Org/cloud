@@ -422,28 +422,6 @@ export async function hasPRCommentWithMarker(
 }
 
 /**
- * Used to acknowledge @kilo fix mentions on inline review comments.
- */
-export async function addReactionToPRReviewComment(
-  installationId: string,
-  owner: string,
-  repo: string,
-  commentId: number,
-  reaction: 'eyes' | '+1' | '-1' | 'laugh' | 'confused' | 'heart' | 'hooray' | 'rocket',
-  appType: GitHubAppType = 'standard'
-): Promise<void> {
-  const tokenData = await generateGitHubInstallationToken(installationId, appType);
-  const octokit = new Octokit({ auth: tokenData.token });
-
-  await octokit.reactions.createForPullRequestReviewComment({
-    owner,
-    repo,
-    comment_id: commentId,
-    content: reaction,
-  });
-}
-
-/**
  * Returns the permission string ('admin' | 'write' | 'read' | 'none') or null
  * if the lookup fails (e.g. the App lacks permission to query collaborators).
  */
@@ -595,7 +573,6 @@ const MAX_KILO_REVIEW_COMMENT_PAGES = 5;
 
 /**
  * Looks for the <!-- kilo-review --> marker in issue comments.
- * Falls back to detecting older Kilo comments by patterns if no marker found.
  */
 export async function findKiloReviewComment(
   installationId: string,
@@ -1013,6 +990,7 @@ export type AssociatedPullRequest = {
   title: string;
   headSha: string;
   updatedAt: string; // ISO
+  createdAt?: string;
   /**
    * `owner/name` of the PR's base repository, as reported by GitHub. Used to
    * verify that a session's stored link actually names this repository rather
@@ -1208,6 +1186,7 @@ export async function fetchPullRequestByNumber(params: {
       title: pr.title,
       headSha: pr.head.sha,
       updatedAt: pr.updated_at,
+      createdAt: pr.created_at,
       baseRepoFullName: pr.base.repo?.full_name ?? `${owner}/${repo}`,
       headRepoFullName: pr.head.repo?.full_name ?? '',
       headRef: pr.head.ref,

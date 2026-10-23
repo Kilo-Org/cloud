@@ -32,9 +32,16 @@ type HookDispatcher = {
 };
 
 type InteractionHandlersArgs = Parameters<typeof useInteractionHandlers>[0];
+/** The cases here never read a live row, so they may omit the raise reader. */
+type HandlerArgs = Omit<InteractionHandlersArgs, 'readObservedRaise'>;
 type InteractionHandlersResult = ReturnType<typeof useInteractionHandlers>;
 
-function renderInteractionHandlers(args: InteractionHandlersArgs) {
+function renderInteractionHandlers(
+  args: Omit<InteractionHandlersArgs, 'readObservedRaise'> &
+    Partial<Pick<InteractionHandlersArgs, 'readObservedRaise'>>
+) {
+  // Read per render: the scoping cases mutate `args` between renders.
+  const readObservedRaise = args.readObservedRaise ?? (() => null);
   const reactInternals = React as typeof React & ReactInternals;
   const hookState: unknown[] = [];
   let hookIndex = 0;
@@ -71,7 +78,7 @@ function renderInteractionHandlers(args: InteractionHandlersArgs) {
     reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H = dispatcher;
     try {
       const mountHandlers = useInteractionHandlers;
-      return mountHandlers(args);
+      return mountHandlers({ ...args, readObservedRaise });
     } finally {
       reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H =
         previousDispatcher;
@@ -92,7 +99,7 @@ describe('useInteractionHandlers request-id scoping', () => {
       rejectQuestion: vi.fn(),
       respondToPermission: vi.fn(),
     };
-    const args: InteractionHandlersArgs = {
+    const args: HandlerArgs = {
       manager: manager as never,
       kiloSessionId: 'kilo-session-1',
       activeQuestion: { requestId: 'q-req-1' },
@@ -125,7 +132,7 @@ describe('useInteractionHandlers request-id scoping', () => {
       rejectQuestion: vi.fn(),
       respondToPermission: vi.fn(),
     };
-    const args: InteractionHandlersArgs = {
+    const args: HandlerArgs = {
       manager: manager as never,
       kiloSessionId: 'kilo-session-1',
       activeQuestion: { requestId: 'q-req-1' },
@@ -168,7 +175,7 @@ describe('useInteractionHandlers request-id scoping', () => {
       rejectQuestion: vi.fn(),
       respondToPermission: vi.fn(),
     };
-    const args: InteractionHandlersArgs = {
+    const args: HandlerArgs = {
       manager: manager as never,
       kiloSessionId: 'kilo-session-1',
       activeQuestion: { requestId: 'q-req-1' },
@@ -207,7 +214,7 @@ describe('useInteractionHandlers request-id scoping', () => {
       rejectQuestion: vi.fn(),
       respondToPermission: vi.fn().mockReturnValue(respondPromise),
     };
-    const args: InteractionHandlersArgs = {
+    const args: HandlerArgs = {
       manager: manager as never,
       kiloSessionId: 'kilo-session-1',
       activeQuestion: null,
@@ -240,7 +247,7 @@ describe('useInteractionHandlers request-id scoping', () => {
       rejectQuestion: vi.fn(),
       respondToPermission: vi.fn().mockReturnValue(respondPromise),
     };
-    const args: InteractionHandlersArgs = {
+    const args: HandlerArgs = {
       manager: manager as never,
       kiloSessionId: 'kilo-session-1',
       activeQuestion: null,
@@ -283,7 +290,7 @@ describe('useInteractionHandlers request-id scoping', () => {
       rejectQuestion: vi.fn(),
       respondToPermission,
     };
-    const args: InteractionHandlersArgs = {
+    const args: HandlerArgs = {
       manager: manager as never,
       kiloSessionId: 'kilo-session-1',
       activeQuestion: null,

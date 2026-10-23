@@ -9,6 +9,7 @@ import { Command, CommandList, CommandItem, CommandEmpty } from '@/components/ui
 import { Send, Square, Paperclip, Upload, LoaderCircle } from 'lucide-react';
 import type { SlashCommand } from '@/lib/cloud-agent/slash-commands';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useSlashCommandAutocomplete } from '@/hooks/useSlashCommandAutocomplete';
 import { BrowseCommandsDialog } from './BrowseCommandsDialog';
 import { ModeCombobox, NEXT_MODE_OPTIONS, type ModeOption } from '@/components/shared/ModeCombobox';
@@ -76,7 +77,7 @@ type ChatInputProps = {
     args: string,
     attachments?: CloudAgentAttachments
   ) => Promise<boolean>;
-  onNewChat?: () => Promise<boolean>;
+  onNewChat?: () => boolean;
   onStop?: () => void;
   canInterrupt?: boolean;
   disabled?: boolean;
@@ -84,6 +85,8 @@ type ChatInputProps = {
   inputRef?: React.RefObject<HTMLTextAreaElement | null>;
   isStreaming?: boolean;
   placeholder?: string;
+  /** Why sending waits while typing is open, such as a chat that still loads; shown on the send button. */
+  sendUnavailableReason?: string;
   slashCommands?: SlashCommand[];
   /** Options passed to the Cloud Agent attachment uploader. */
   attachmentUploadOptions: UseCloudAgentAttachmentUploadOptions;
@@ -142,6 +145,7 @@ export function ChatInput({
   inputRef,
   isStreaming = false,
   placeholder = 'Type your message...',
+  sendUnavailableReason,
   slashCommands = [],
   mode,
   model,
@@ -366,7 +370,7 @@ export function ChatInput({
 
       try {
         if (createsWorktreeChat && onNewChat) {
-          accepted = await onNewChat();
+          accepted = onNewChat();
         } else if (slashCommand && onSendCommand) {
           accepted = await onSendCommand(slashCommand.command, slashCommand.args, attachmentsData);
         } else {
@@ -547,9 +551,11 @@ export function ChatInput({
       }
     : undefined;
 
-  // Check if toolbar should be rendered (has callbacks and options)
   const hasToolbar =
-    showToolbar && onModeChange && onModelChange && (modelOptions.length > 0 || pinnedModelOption);
+    showToolbar &&
+    onModeChange &&
+    onModelChange &&
+    (modelOptions.length > 0 || pinnedModelOption || isLoadingModels);
 
   return (
     <div className="px-[max(1rem,calc(50%_-_27rem))] py-2">
@@ -681,8 +687,8 @@ export function ChatInput({
           </div>
         )}
 
-        {/* Toolbar below textarea */}
-        <div className="flex min-w-0 items-center gap-2 overflow-hidden px-3 py-1.5">
+        {/* Toolbar below textarea; sized for the pickers so they can load in without a shift */}
+        <div className="flex min-h-12 min-w-0 items-center gap-2 overflow-hidden px-3 py-1.5">
           {hasToolbar && (
             <>
               {/* Mobile: single trigger that opens Mode + Model + Variant */}
@@ -707,15 +713,21 @@ export function ChatInput({
               />
               {/* Desktop: individual pickers */}
               <div className="hidden md:contents">
-                <ModeCombobox
-                  value={mode}
-                  onValueChange={onModeChange}
-                  options={NEXT_MODE_OPTIONS}
-                  customOptions={customModeOptions}
-                  variant="compact"
-                  disabled={disabled || isStreaming}
-                  className="min-w-0"
-                />
+                {/* The mode arrives with the session; until then hold the default
+                    Code picker's width instead of a wider "Select mode" label. */}
+                {!mode && isLoadingModels ? (
+                  <Skeleton className="h-9 w-[77px] shrink-0 motion-reduce:animate-none" />
+                ) : (
+                  <ModeCombobox
+                    value={mode}
+                    onValueChange={onModeChange}
+                    options={NEXT_MODE_OPTIONS}
+                    customOptions={customModeOptions}
+                    variant="compact"
+                    disabled={disabled || isStreaming}
+                    className="min-w-0"
+                  />
+                )}
                 {modelPickerDisabled ? (
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -809,33 +821,46 @@ export function ChatInput({
               <Square className="h-4 w-4" />
             </UIButton>
           )}
-          <UIButton
-            type="button"
-            variant="primary"
-            size="icon"
-            onClick={handleSend}
-            disabled={
-              (!isNewChatDraft && (disabled || isAttachmentSubmissionPending)) ||
-              !value.trim() ||
-              value.length > CLOUD_AGENT_PROMPT_MAX_LENGTH ||
-              (attachmentsEnabled && attachmentUpload.hasUploadingAttachments)
-            }
-            className="relative h-8 w-8 rounded-lg before:absolute before:-inset-1.5"
-            aria-label={
-              isNewChatDraft
-                ? 'New chat'
-                : isAttachmentSubmissionPending
-                  ? 'Sending message'
-                  : 'Send message'
-            }
-            aria-busy={(!isNewChatDraft && isAttachmentSubmissionPending) || undefined}
-          >
-            {isAttachmentSubmissionPending && !isNewChatDraft ? (
-              <LoaderCircle className="h-4 w-4 animate-spin motion-reduce:animate-none" />
-            ) : (
-              <Send className="h-4 w-4" />
+          {/* A disabled button gets no hover events, so the span carries the hint. */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex">
+                <UIButton
+                  type="button"
+                  variant="primary"
+                  size="icon"
+                  onClick={handleSend}
+                  disabled={
+                    (!isNewChatDraft && (disabled || isAttachmentSubmissionPending)) ||
+                    !value.trim() ||
+                    value.length > CLOUD_AGENT_PROMPT_MAX_LENGTH ||
+                    (attachmentsEnabled && attachmentUpload.hasUploadingAttachments)
+                  }
+                  className="relative h-8 w-8 rounded-lg before:absolute before:-inset-1.5"
+                  aria-label={
+                    isNewChatDraft
+                      ? 'New chat'
+                      : isAttachmentSubmissionPending
+                        ? 'Sending message'
+                        : 'Send message'
+                  }
+                  aria-description={sendUnavailableReason}
+                  aria-busy={(!isNewChatDraft && isAttachmentSubmissionPending) || undefined}
+                >
+                  {isAttachmentSubmissionPending && !isNewChatDraft ? (
+                    <LoaderCircle className="h-4 w-4 animate-spin motion-reduce:animate-none" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </UIButton>
+              </span>
+            </TooltipTrigger>
+            {sendUnavailableReason && (
+              <TooltipContent side="top" className="text-xs">
+                {sendUnavailableReason}
+              </TooltipContent>
             )}
-          </UIButton>
+          </Tooltip>
         </div>
       </div>
     </div>

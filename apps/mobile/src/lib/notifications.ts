@@ -28,6 +28,7 @@ import { EMPTY_HOME_WIDGET_DETAILS } from '@kilocode/app-shared/home-widget';
 
 import { captureEvent } from '@/lib/analytics/posthog';
 import { refreshActiveSessionsFromPush } from '@/lib/active-sessions-live-sync';
+import { SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS } from '@/lib/android-notification-channels';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
 import { releaseAndroidSessionToken } from '@/lib/glanceable/session-activity-tokens-android';
@@ -263,7 +264,9 @@ export async function applyGlanceablePushData(
     // asynchronous surface submission landed. A native failure rejects here,
     // which the background path relies on so the OS retries the push.
     await Promise.all(
-      getGlanceableSinks().map((sink): Promise<void> | undefined => sink.waitForNativeStart?.())
+      getGlanceableSinks()
+        .map(sink => sink.waitForNativeStart?.())
+        .filter((pending): pending is Promise<void> => pending !== undefined)
     );
   } else {
     for (const sink of getGlanceableSinks()) {
@@ -280,7 +283,9 @@ export async function applyGlanceablePushData(
   // Idle work keeps the same card, so only ineligible snapshots wait here.
   if (!eligible) {
     await Promise.all(
-      getGlanceableSinks().map((sink): Promise<void> | undefined => sink.waitForNativeTerminal?.())
+      getGlanceableSinks()
+        .map(sink => sink.waitForNativeTerminal?.())
+        .filter((pending): pending is Promise<void> => pending !== undefined)
     );
   }
   return true;
@@ -669,17 +674,6 @@ const LEGACY_ANDROID_NOTIFICATION_CHANNELS = [
   'followed-sessions',
 ] as const;
 
-// Android plays a channel-based post's sound from the channel (the builder's
-// `setSound(null)` is a no-op for a channel post on API 26+), and the framework
-// keeps the sound a channel was created with — so the progress kind is silent
-// here at creation, while needs-input keeps the default sound for its alert.
-// A channel's vibration is independent of its sound: Android defaults it to
-// enabled, so silence also has to disable it explicitly.
-const SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS = new Set<AndroidNotificationChannelId>([
-  'agent-progress',
-  'followed-sessions-lock-screen',
-]);
-
 /** What one Android channel write asks the framework for. */
 export type AndroidChannelWritePlan = {
   /** The Do Not Disturb override to ask the framework for. */
@@ -730,7 +724,7 @@ function androidChannelConfiguration(
     bypassDnd,
     // An absent sound is the system default; an explicit null is silence, and a
     // silent channel must not vibrate either (the default is enabled).
-    ...(SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS.has(channel.id)
+    ...(SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS.includes(channel.id)
       ? { sound: null, enableVibrate: false }
       : {}),
   };

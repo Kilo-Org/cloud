@@ -13,11 +13,11 @@ import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  InteractionManager,
   Keyboard,
   Platform,
   Pressable,
   ScrollView,
+  type ScrollViewInstance,
   type TextInput,
   View,
 } from 'react-native';
@@ -208,7 +208,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
 
   const bodyRef = useRef<string>('');
   const bodyInputRef = useRef<TextInput | null>(null);
-  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
 
   // Seed the summary refs from the default-on footer preference once it
   // resolves, before the summary field mounts, so a prefilled footer survives
@@ -268,6 +268,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
       const display = mutationErrorDisplay('submit', classification, {
         rawError: submitReview.error,
         term: providerPlatform ? i18n.t(providerPrNounKey(providerPlatform)) : undefined,
+        platform: providerPlatform,
       });
       setInlineError(display.message);
       setInlineErrorKind(display.kind);
@@ -340,8 +341,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
         );
       } else {
         onDismiss();
-        // eslint-disable-next-line typescript-eslint/no-deprecated -- InteractionManager.runAfterInteractions is the documented API for deferring work past the current interaction frame.
-        InteractionManager.runAfterInteractions(() => {
+        requestIdleCallback(() => {
           void maybeAskAfterSuccessfulOutcome(userId, requestFeedbackPrompt);
         });
       }

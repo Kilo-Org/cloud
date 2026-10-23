@@ -57,6 +57,7 @@ export default function ModePickerScreen() {
           router.back();
         }}
         scrollable={false}
+        topInset="never"
         expired
       />
     );
@@ -109,6 +110,7 @@ export default function ModePickerScreen() {
         router.back();
       }}
       scrollable={false}
+      topInset="never"
     >
       {custom.length === 0 ? (
         <FlashList

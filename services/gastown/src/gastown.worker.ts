@@ -4,6 +4,7 @@ import { TRPCError } from '@trpc/server';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { cors } from 'hono/cors';
+import { every } from 'hono/combine';
 import { z } from 'zod';
 import { getTownContainerStub } from './dos/TownContainer.do';
 import { getTownDOStub } from './dos/Town.do';
@@ -137,6 +138,11 @@ import {
 import { mayorAuthMiddleware } from './middleware/mayor-auth.middleware';
 import { townAuthMiddleware } from './middleware/town-auth.middleware';
 import { orgAuthMiddleware } from './middleware/org-auth.middleware';
+import { userAuthMiddleware } from './middleware/user-auth.middleware';
+import {
+  gastownAccessMiddleware,
+  gastownRouteAccessMiddleware,
+} from './middleware/gastown-access.middleware';
 import { adminAuditMiddleware } from './middleware/admin-audit.middleware';
 import { timingMiddleware, instrumented } from './middleware/analytics.middleware';
 import { useWorkersLogger } from 'workers-tagged-logger';
@@ -879,8 +885,16 @@ app.post('/api/towns/:townId/container-events', async c => {
 app.use('/api/users/*', async (c: Context<GastownEnv, string>, next) =>
   kiloAuthMiddleware(c, next)
 );
-// Town routes: kilo auth + admin audit + town ownership check (supports both personal and org-owned towns).
+app.use('/api/users/*', gastownRouteAccessMiddleware);
+app.use('/api/users/:userId/*', userAuthMiddleware);
+// Town routes: kilo auth + Gastown access + admin audit + town ownership check (supports both personal and org-owned towns).
 // Skip for container-registry and db-snapshot routes which use authMiddleware with container JWT support.
+const townRouteAuthMiddleware = every(
+  kiloAuthMiddleware,
+  gastownRouteAccessMiddleware,
+  adminAuditMiddleware,
+  townAuthMiddleware
+);
 app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => {
   const path = c.req.path;
   if (
@@ -891,18 +905,15 @@ app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => 
   ) {
     return next();
   }
-  await kiloAuthMiddleware(c, async () => {
-    await adminAuditMiddleware(c, async () => {
-      await townAuthMiddleware(c, next);
-    });
-  });
+  return townRouteAuthMiddleware(c, next);
 });
 
-// Kilo user auth + org membership check for all org routes.
+// Kilo user auth + Gastown access + org membership check for all org routes.
 
 app.use('/api/orgs/:orgId/*', async (c: Context<GastownEnv, string>, next) =>
   kiloAuthMiddleware(c, next)
 );
+app.use('/api/orgs/:orgId/*', gastownRouteAccessMiddleware);
 app.use('/api/orgs/:orgId/*', async (c: Context<GastownEnv, string>, next) =>
   orgAuthMiddleware(c, next)
 );
@@ -910,7 +921,7 @@ app.use('/api/orgs/:orgId/*', async (c: Context<GastownEnv, string>, next) =>
 // GastownOrgDO instances are keyed by orgId. One DO instance per org stores
 // all towns and rigs the org owns.
 
-app.post('/api/orgs/:orgId/towns', c =>
+app.post('/api/orgs/:orgId/towns', gastownAccessMiddleware, c =>
   instrumented(c, 'POST /api/orgs/:orgId/towns', () => handleCreateOrgTown(c, c.req.param()))
 );
 app.get('/api/orgs/:orgId/towns', c =>
@@ -942,7 +953,7 @@ app.delete('/api/orgs/:orgId/rigs/:rigId', c =>
 // Town DO instances are keyed by owner_user_id. The userId path param routes
 // to the correct DO instance so each user's towns are isolated.
 
-app.post('/api/users/:userId/towns', c =>
+app.post('/api/users/:userId/towns', gastownAccessMiddleware, c =>
   instrumented(c, 'POST /api/users/:userId/towns', () => handleCreateTown(c, c.req.param()))
 );
 app.get('/api/users/:userId/towns', c =>

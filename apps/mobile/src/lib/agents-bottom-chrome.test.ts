@@ -88,7 +88,7 @@ describe('getEmptyStateFullHeight', () => {
   });
 
   it('counts the live empty state’s stacked history link under the primary action', () => {
-// The accepted-empty body renders the history link under the New session
+    // The accepted-empty body renders the history link under the New session
     // button: a gap-3 block gap (10.5) plus the link's own box, which carries
     // the platform touch target (44pt iOS, 48dp Android) as a px literal rather
     // than a line of text. Modelling it as one 17.5 line under-counted the

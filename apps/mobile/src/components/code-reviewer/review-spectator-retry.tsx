@@ -8,7 +8,7 @@ export function CompactRetry({ onPress }: Readonly<{ onPress: () => void }>) {
   const { t } = useTranslation();
   return (
     <View className="items-center px-4 pt-2">
-      <Button variant="outline" size="sm" onPress={onPress}>
+      <Button variant="outline" size="action" onPress={onPress}>
         <Text>{t('common.retry')}</Text>
       </Button>
     </View>

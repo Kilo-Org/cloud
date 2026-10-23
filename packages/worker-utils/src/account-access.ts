@@ -8,7 +8,7 @@ import {
   type OrganizationUserLimitType,
 } from '@kilocode/db/schema';
 import type { OrganizationRole } from '@kilocode/db/schema-types';
-import { and, eq, not, sql } from 'drizzle-orm';
+import { and, eq, isNull, not, sql } from 'drizzle-orm';
 import * as z from 'zod';
 
 // Account access rules shared by the Next.js gateway and Workers that authenticate Kilo users.
@@ -40,10 +40,12 @@ export async function findOrganizationMemberRole(
   const [membership] = await db
     .select({ role: organization_memberships.role })
     .from(organization_memberships)
+    .innerJoin(organizations, eq(organizations.id, organization_memberships.organization_id))
     .where(
       and(
         eq(organization_memberships.organization_id, organizationId),
-        eq(organization_memberships.kilo_user_id, userId)
+        eq(organization_memberships.kilo_user_id, userId),
+        isNull(organizations.deleted_at)
       )
     )
     .limit(1);

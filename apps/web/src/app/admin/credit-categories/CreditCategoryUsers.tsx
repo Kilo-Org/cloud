@@ -18,6 +18,11 @@ import { UserSearchInput } from '../components/UserSearchInput';
 import { UserAvatarLink } from '../components/UserAvatarLink';
 import type { SortConfig, SortableField } from '@/types/admin';
 import type { PageSize } from '@kilocode/web-shared/types/pagination';
+import {
+  DEFAULT_PAGE_SIZE,
+  MAX_PAGE_NUMBER,
+  PAGE_SIZE_OPTIONS,
+} from '@kilocode/web-shared/types/pagination';
 import { formatMicrodollars } from '@/lib/admin-utils';
 import { formatIsoDateTime_IsoOrderNoSeconds } from '@/lib/utils';
 import type { CreditCategoryUsersApiResponse } from '@kilocode/web-shared/lib/PromoCreditCategoryConfig';
@@ -71,9 +76,15 @@ export function CreditCategoryUsersTable({ creditCategoryKey }: CreditCategoryUs
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Parse URL parameters
-  const currentPage = parseInt(searchParams.get('page') || '1');
-  const currentPageSize = parseInt(searchParams.get('limit') || '25') as PageSize;
+  // Parse URL parameters, falling back to defaults for unsupported values
+  const requestedPage = Number(searchParams.get('page') ?? '');
+  const currentPage =
+    Number.isInteger(requestedPage) && requestedPage > 0 && requestedPage <= MAX_PAGE_NUMBER
+      ? requestedPage
+      : 1;
+  const currentPageSize: PageSize =
+    PAGE_SIZE_OPTIONS.find(option => option === Number(searchParams.get('limit') ?? '')) ??
+    DEFAULT_PAGE_SIZE;
   const currentSearch = searchParams.get('search') || '';
   const currentSortBy = (searchParams.get('sortBy') || 'created_at') as SortableField;
   const currentSortOrder = searchParams.get('sortOrder') || 'desc';

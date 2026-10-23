@@ -329,6 +329,79 @@ describe('aggregateBriefingEvidence', () => {
     expect(newest.sessions[0]?.status).toBe('idle');
   });
 
+  it('applies the report display contract', () => {
+    const sessionRows = Array.from({ length: 65 }, (_, index) => ({
+      session_id: `session-${String(index).padStart(3, '0')}`,
+      parent_session_id: null,
+      title: 'Title '.repeat(40),
+    }));
+    const events = sessionRows.flatMap(row =>
+      Array.from({ length: 33 }, (_, index) =>
+        event(`${row.session_id}-${index}`, {
+          session_id: row.session_id,
+          kind: 'artifact',
+          title: 'Artifact '.repeat(40),
+          url: `https://example.com/${'path/'.repeat(500)}`,
+          occurred_at: row.session_id === 'session-064' ? '2026-10-15T03:00:00.000Z' : night,
+        })
+      )
+    );
+    const report = aggregateBriefingEvidence(sessionRows, events, [], start, cutoff, {
+      collectionStartedAt: collectedBeforeNight,
+    });
+    expect(report.scorecard.sessions).toBe(65);
+    expect(report.sessions).toHaveLength(64);
+    expect(report.sessions.some(session => session.sessionId === 'session-064')).toBe(true);
+    expect(report.sessions.some(session => session.sessionId === 'session-063')).toBe(false);
+    expect(report.sources).toHaveLength(256);
+    expect(report.sessions.every(session => session.sources.length <= 32)).toBe(true);
+    expect(report.sessions.every(session => session.title.length <= 160)).toBe(true);
+    expect(
+      report.sources.every(source => source.title.length <= 160 && source.url.length <= 2048)
+    ).toBe(true);
+    expect(
+      report.sessions
+        .flatMap(session => session.sources)
+        .map(source => source.id)
+        .sort()
+    ).toEqual(report.sources.map(source => source.id).sort());
+    expect(report.coverage).toEqual({
+      activity: 'partial',
+      spend: 'partial',
+      blockers: 'partial',
+      pullRequests: 'partial',
+    });
+  });
+
+  it('clips display text without marking the report partial', () => {
+    const report = aggregateBriefingEvidence(
+      [{ session_id: 'root', parent_session_id: null, title: 'T'.repeat(400) }],
+      [
+        event('busy', { kind: 'status', status: 'busy', occurred_at: start }),
+        event('long', {
+          title: 'A'.repeat(400),
+          occurred_at: night,
+          payload: { excerpt: 'Details '.repeat(200) },
+        }),
+      ],
+      [{ id: 'charge', sessionId: 'root', cost: 1200, occurredAt: night }],
+      start,
+      cutoff,
+      { collectionStartedAt: collectedBeforeNight }
+    );
+    expect(report.coverage).toEqual({
+      activity: 'complete',
+      spend: 'complete',
+      blockers: 'complete',
+      pullRequests: 'complete',
+    });
+    expect(report.sessions[0]?.status).toBe('busy');
+    expect(report.sessions[0]?.title.length).toBe(160);
+    expect(report.sources.every(source => source.title.length <= 160)).toBe(true);
+    const excerpt = report.sources.find(source => source.excerpt !== undefined)?.excerpt;
+    expect(excerpt?.length).toBeLessThanOrEqual(600);
+  });
+
   describe('coverage', () => {
     const charged = { id: 'charge', sessionId: 'root', cost: 290_000, occurredAt: night };
     const timestampedBlocker = event('blocked', {

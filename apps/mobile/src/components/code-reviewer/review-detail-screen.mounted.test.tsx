@@ -63,6 +63,11 @@ const statusHelpers = vi.hoisted(() => ({
   cancellable: false,
   retriggerable: false,
 }));
+const alertMock = vi.hoisted(() => ({ alert: vi.fn() }));
+const retrigger = vi.hoisted(() => ({
+  isPending: false,
+  mutate: vi.fn(),
+}));
 const reviewConfig = vi.hoisted(() => ({
   query: { isPending: false, data: undefined as unknown },
   calls: [] as { scope: string; platform: string; enabled: boolean | undefined }[],
@@ -83,7 +88,7 @@ vi.mock('react-native', () => ({
   // the form-sheet detents do (src/lib/form-sheet.ts).
   StatusBar: { currentHeight: 24 },
   AppState: { addEventListener: () => ({ remove: vi.fn() }) },
-  Alert: { alert: vi.fn() },
+  Alert: alertMock,
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 24, bottom: 34, left: 0, right: 0 }),
@@ -150,7 +155,7 @@ vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/lib/hooks/use-code-reviews', () => ({
   useReviewDetail: () => detail,
   useCancelReview: () => ({ isPending: false, mutate: vi.fn() }),
-  useRetriggerReview: () => ({ isPending: false, mutate: vi.fn() }),
+  useRetriggerReview: () => ({ isPending: retrigger.isPending, mutate: retrigger.mutate }),
 }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   isPersonal: (scope: string) => scope === 'personal',
@@ -311,6 +316,9 @@ beforeEach(() => {
   composerRenders.list = [];
   statusHelpers.cancellable = false;
   statusHelpers.retriggerable = false;
+  retrigger.isPending = false;
+  retrigger.mutate.mockClear();
+  alertMock.alert.mockClear();
   spectatorQueries.streamInfo.isLoading = false;
   spectatorQueries.streamInfo.isError = false;
   spectatorQueries.streamInfo.data = {
@@ -1407,5 +1415,104 @@ describe('ReviewDetailScreen retry when Code Reviewer cannot run', () => {
       platform: 'bitbucket',
       enabled: false,
     });
+  });
+});
+
+describe('ReviewDetailScreen retry confirmation', () => {
+  function renderRetryableReview(over: Record<string, unknown> = {}) {
+    statusHelpers.retriggerable = true;
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status: 'failed',
+        manual_config: { agentConfig: {} },
+        error_message: null,
+        ...over,
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    renderScreen();
+    const button = buttons.rendered.findLast(entry => buttonText(entry) === 'Retry review');
+    if (!button?.onPress) {
+      throw new Error('Retry button was not rendered');
+    }
+    return button;
+  }
+
+  type AlertAction = { text?: string; onPress?: () => void };
+
+  function confirmAction() {
+    const actions = (alertMock.alert.mock.calls.at(-1)?.[2] ?? []) as AlertAction[];
+    const confirm = actions.find(action => action.text === i18n.t('common.retry'));
+    if (!confirm?.onPress) {
+      throw new Error('Retry confirmation was not rendered');
+    }
+    return confirm;
+  }
+
+  it('sends one retrigger when the confirmation is accepted twice', () => {
+    const button = renderRetryableReview();
+    act(() => button.onPress?.());
+    const confirm = confirmAction();
+
+    act(() => {
+      confirm.onPress?.();
+      confirm.onPress?.();
+    });
+
+    expect(retrigger.mutate).toHaveBeenCalledTimes(1);
+    expect(retrigger.mutate).toHaveBeenCalledWith({ reviewId: 'rev-1' }, expect.any(Object));
+  });
+
+  it('shows the button busy and opens no second confirmation while the request runs', () => {
+    const button = renderRetryableReview();
+    act(() => button.onPress?.());
+    act(() => confirmAction().onPress?.());
+
+    retrigger.isPending = true;
+    renderScreen();
+    const busy = buttons.rendered.findLast(entry => buttonText(entry) === 'Retry review');
+
+    expect(busy).toMatchObject({ loading: true, disabled: true });
+    act(() => busy?.onPress?.());
+    expect(alertMock.alert).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts a new confirmation once the request settles', () => {
+    const button = renderRetryableReview();
+    act(() => button.onPress?.());
+    act(() => confirmAction().onPress?.());
+
+    const options = retrigger.mutate.mock.calls[0]?.[1] as { onSettled?: () => void } | undefined;
+    act(() => options?.onSettled?.());
+
+    const again = buttons.rendered.findLast(entry => buttonText(entry) === 'Retry review');
+    act(() => again?.onPress?.());
+    act(() => confirmAction().onPress?.());
+
+    expect(retrigger.mutate).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the detail screen when the reset moves the review to pending', () => {
+    renderRetryableReview();
+
+    statusHelpers.retriggerable = false;
+    statusHelpers.cancellable = true;
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status: 'pending',
+        manual_config: { agentConfig: {} },
+        error_message: null,
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const labels = renderScreen();
+
+    expect(labels).toContain('pending');
+    expect(labels).toContain('Cancel review');
+    expect(labels).not.toContain('Retry review');
+    expect(queryErrors.errors).toEqual([]);
   });
 });

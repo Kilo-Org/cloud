@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   backfillBlockBlacklistedDomainsBatch,
-  blacklistedDomainCondition,
+  findBlacklistedEmailDomains,
 } from './block-blacklisted-domains';
 
 beforeEach(async () => {
@@ -13,14 +13,28 @@ beforeEach(async () => {
 });
 
 async function unblockedMatches(domains: string[]): Promise<string[]> {
+  const matchedDomains = (await findBlacklistedEmailDomains(domains)).map(
+    row => row.email_domain
+  );
+  if (matchedDomains.length === 0) return [];
   const rows = await db
     .select({ id: kilocode_users.id })
     .from(kilocode_users)
-    .where(and(isNull(kilocode_users.blocked_reason), blacklistedDomainCondition(domains)));
+    .where(inArray(kilocode_users.email_domain, matchedDomains));
   return rows.map(r => r.id);
 }
 
-describe('blacklistedDomainCondition', () => {
+describe('findBlacklistedEmailDomains', () => {
+  it('returns each matching domain once with its unblocked user count', async () => {
+    await insertTestUser({ google_user_email: 'a@mailinator.com', email_domain: 'mailinator.com' });
+    await insertTestUser({ google_user_email: 'b@mailinator.com', email_domain: 'mailinator.com' });
+    await insertTestUser({ google_user_email: 'c@legit.com', email_domain: 'legit.com' });
+
+    const rows = await findBlacklistedEmailDomains(['mailinator.com']);
+
+    expect(rows).toEqual([{ email_domain: 'mailinator.com', count: 2 }]);
+  });
+
   it('matches users whose email_domain equals a blacklist entry', async () => {
     const user = await insertTestUser({
       google_user_email: 'a@mailinator.com',

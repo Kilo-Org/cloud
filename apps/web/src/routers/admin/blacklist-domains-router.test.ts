@@ -489,4 +489,46 @@ describe('admin.blacklistDomains.set', () => {
     expect(mockedBackfill).not.toHaveBeenCalled();
     expect(mockedRedisSet).toHaveBeenCalled();
   });
+
+  it('stores normalized signup TLDs and never backfills on a TLD change', async () => {
+    const onDomain = await insertTestUser({
+      google_user_email: 'a@example.asia',
+      email_domain: 'example.asia',
+    });
+
+    const caller = await createCallerForUser(admin.id);
+    const result = await caller.admin.blacklistDomains.set({
+      domains: [],
+      blocked_tlds: ['  .ASIA  ', 'shop', 'asia'],
+    });
+
+    expect(result.blocked_signup_tlds).toEqual(['asia', 'shop']);
+    const [, written] = mockedRedisSet.mock.calls.at(-1) ?? [];
+    expect(JSON.parse(String(written)).blocked_signup_tlds).toEqual(['asia', 'shop']);
+
+    // A TLD gates new signups only, so existing accounts stay untouched.
+    expect(mockedBackfill).not.toHaveBeenCalled();
+    const [row] = await db
+      .select({ blocked_reason: kilocode_users.blocked_reason })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, onDomain.id));
+    expect(row.blocked_reason).toBeNull();
+  });
+
+  it('keeps the stored signup TLDs when the field is omitted', async () => {
+    mockedRedisGet.mockResolvedValue(
+      JSON.stringify({
+        domains: ['mailinator.com'],
+        blocked_signup_tlds: ['asia'],
+        updated_at: null,
+        updated_by: null,
+        updated_by_email: null,
+      })
+    );
+
+    const caller = await createCallerForUser(admin.id);
+    const result = await caller.admin.blacklistDomains.set({ domains: ['mailinator.com'] });
+
+    expect(result.blocked_signup_tlds).toEqual(['asia']);
+  });
 });

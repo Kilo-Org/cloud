@@ -1,33 +1,67 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
-import { and, eq, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
+
+/** A distinct email domain whose users match the blacklist, with its count. */
+export type BlacklistedEmailDomain = {
+  email_domain: string;
+  count: number;
+};
 
 /**
- * Builds a WHERE condition that matches users whose `email_domain` is on the
- * blacklist. Mirrors the suffix semantics of `isDomainOnBlacklist` — an entry
- * matches when the stored domain equals it or is a strict subdomain of it.
- *
- * Operates on the indexed `email_domain` column rather than a LIKE scan of
- * `google_user_email`, so counts and updates stay fast on a large users table.
- *
- * Both domain lists are bound as single array parameters. An imported list can
- * hold tens of thousands of entries, which would otherwise exceed PostgreSQL's
- * 65,535-bind-parameter limit.
+ * Matches one email domain against blacklist entries. An entry matches the
+ * domain itself or any of its parent domains, so blocking `example.com` also
+ * matches `sub.example.com` while `notexample.com` stays unmatched. Domains
+ * are compared on label boundaries, never as raw string suffixes.
  */
-export function blacklistedDomainCondition(domains: string[]): SQL {
-  const normalized = [...new Set(domains.map(d => d.toLowerCase().trim()).filter(Boolean))];
-  if (normalized.length === 0) {
-    // Always-false guard so the caller doesn't have to special-case an empty
-    // blacklist. `or()` with no args returns undefined, which would accidentally
-    // drop the condition entirely.
-    return sql`false`;
+export function emailDomainMatchesBlacklist(
+  domain: string,
+  blacklistedDomains: ReadonlySet<string>
+): boolean {
+  const labels = domain.toLowerCase().split('.');
+  for (let i = 0; i < labels.length; i++) {
+    if (blacklistedDomains.has(labels.slice(i).join('.'))) return true;
   }
-  const subdomainPatterns = normalized.map(d => `%.${d}`);
-  const combined = or(
-    sql`${kilocode_users.email_domain} = ANY(${sql.param(normalized)}::text[])`,
-    sql`${kilocode_users.email_domain} LIKE ANY(${sql.param(subdomainPatterns)}::text[])`
+  return false;
+}
+
+/**
+ * Blockable, unblocked users grouped by email domain, limited to domains that
+ * match the blacklist.
+ *
+ * Matching every blacklist entry against every user is not viable: an imported
+ * list of ~137k entries pushed `email_domain LIKE ANY (patterns)` past a
+ * two-minute statement timeout. The users table holds far fewer distinct email
+ * domains (~65k) than rows, so one grouped scan plus an in-process label match
+ * returns in well under a second and hands the callers a small domain list for
+ * the indexed `email_domain` lookups that follow.
+ */
+export async function findBlacklistedEmailDomains(
+  domains: string[]
+): Promise<BlacklistedEmailDomain[]> {
+  const blacklist = new Set(domains.map(domain => domain.toLowerCase().trim()).filter(Boolean));
+  if (blacklist.size === 0) return [];
+
+  const rows = await db
+    .select({
+      email_domain: kilocode_users.email_domain,
+      count: sql<number>`count(*)`.mapWith(Number),
+    })
+    .from(kilocode_users)
+    .where(
+      and(
+        isNull(kilocode_users.blocked_reason),
+        blockableUserCondition(),
+        isNotNull(kilocode_users.email_domain)
+      )
+    )
+    .groupBy(kilocode_users.email_domain);
+
+  return rows.flatMap(row =>
+    row.email_domain !== null && emailDomainMatchesBlacklist(row.email_domain, blacklist)
+      ? [{ email_domain: row.email_domain, count: row.count }]
+      : []
   );
-  return combined ?? sql`false`;
 }
 
 /**
@@ -56,7 +90,13 @@ export async function backfillBlockBlacklistedDomainsBatch(params: {
     return { processed: 0, remaining: false };
   }
 
-  const condition = blacklistedDomainCondition(params.domains);
+  const matchingDomains = (await findBlacklistedEmailDomains(params.domains)).map(
+    row => row.email_domain
+  );
+  if (matchingDomains.length === 0) {
+    return { processed: 0, remaining: false };
+  }
+  const condition = inArray(kilocode_users.email_domain, matchingDomains);
   let totalProcessed = 0;
   // Track whether we ever hit a short select, which is the only reliable
   // signal that the result set is exhausted. Basing `remaining` on

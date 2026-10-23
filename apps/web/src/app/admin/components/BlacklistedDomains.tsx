@@ -29,11 +29,13 @@ function EditTab() {
   const { data, isLoading } = useQuery(trpc.admin.blacklistDomains.get.queryOptions());
 
   const [inputValue, setInputValue] = useState('');
+  const [tldInputValue, setTldInputValue] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
     if (data) {
       setInputValue(data.domains.join('\n'));
+      setTldInputValue((data.blocked_signup_tlds ?? []).join('\n'));
       setHasChanges(false);
     }
   }, [data]);
@@ -82,7 +84,12 @@ function EditTab() {
       .map(part => part.trim().toLowerCase())
       .filter(Boolean);
 
-    mutation.mutate({ domains });
+    const blocked_tlds = tldInputValue
+      .split(/[\n|]/)
+      .map(part => part.trim().toLowerCase().replace(/^\.+/, ''))
+      .filter(Boolean);
+
+    mutation.mutate({ domains, blocked_tlds });
   }
 
   if (isLoading) {
@@ -124,6 +131,33 @@ function EditTab() {
           className="font-mono text-sm"
         />
 
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <Label htmlFor="blocked-signup-tlds">Blocked signup TLDs</Label>
+              <p className="text-muted-foreground text-xs">
+                New accounts on these top-level domains are refused for every sign-in method.
+                Existing accounts keep signing in. Enter one TLD per line, with or without the
+                leading dot. An entry here never blocks existing accounts.
+              </p>
+            </div>
+            <Badge variant="secondary" className="px-3 py-1">
+              {(data?.blocked_signup_tlds ?? []).length} TLDs
+            </Badge>
+          </div>
+          <Textarea
+            id="blocked-signup-tlds"
+            placeholder={'shop\ntop\nasia'}
+            value={tldInputValue}
+            onChange={e => {
+              setTldInputValue(e.target.value);
+              setHasChanges(true);
+            }}
+            rows={4}
+            className="font-mono text-sm"
+          />
+        </div>
+
         <div className="flex items-center gap-3">
           <Button onClick={handleSave} disabled={mutation.isPending || !hasChanges} size="sm">
             {mutation.isPending ? 'Saving...' : 'Save'}
@@ -138,8 +172,9 @@ function EditTab() {
 
         <div className="text-muted-foreground text-xs">
           <p>
-            Domains are stored in Redis for instant updates. Changes take effect immediately without
-            a deploy. The BLACKLIST_DOMAINS env var is used as a fallback if Redis has no data.
+            Domains and signup TLDs are stored in Redis for instant updates. Changes take effect
+            immediately without a deploy. The BLACKLIST_DOMAINS and BLOCKED_SIGNUP_TLDS env vars
+            are used as fallbacks if Redis has no data.
           </p>
         </div>
       </CardContent>

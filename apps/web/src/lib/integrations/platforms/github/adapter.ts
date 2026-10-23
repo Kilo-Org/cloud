@@ -394,6 +394,8 @@ export async function createPRComment(
 
 /**
  * Checks whether a comment containing the given marker already exists on a PR.
+ * Reads at most MAX_KILO_REVIEW_COMMENT_PAGES pages of comments, newest first,
+ * and only counts comments attributed to the Kilo GitHub App.
  */
 export async function hasPRCommentWithMarker(
   installationId: string,
@@ -405,15 +407,24 @@ export async function hasPRCommentWithMarker(
 ): Promise<boolean> {
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
   const octokit = new Octokit({ auth: tokenData.token });
+  const appId = String(getGitHubAppCredentials(appType).appId);
 
-  const comments = await octokit.paginate(octokit.issues.listComments, {
+  const { comments, reachedScanLimit } = await scanPRIssueComments(octokit, owner, repo, prNumber);
+
+  const found = comments.some(
+    c => c.body?.includes(marker) && String(c.performed_via_github_app?.id ?? '') === appId
+  );
+
+  logExceptInTest('[hasPRCommentWithMarker] Scanned comments', {
     owner,
     repo,
-    issue_number: prNumber,
-    per_page: 100,
+    prNumber,
+    scannedComments: comments.length,
+    found,
+    reachedScanLimit,
   });
 
-  return comments.some(c => c.body?.includes(marker));
+  return found;
 }
 
 /**
@@ -590,6 +601,47 @@ const MAX_KILO_REVIEW_COMMENT_PAGES = 5;
 const MAX_PR_INLINE_COMMENT_BODY_BYTES = 64 * 1024;
 const MAX_PR_INLINE_COMMENT_BODY_CHARS = 60;
 
+type PRIssueComment = {
+  id: number;
+  body?: string | null;
+  updated_at: string;
+  performed_via_github_app?: { id?: number | string } | null;
+};
+
+/**
+ * Reads at most MAX_KILO_REVIEW_COMMENT_PAGES pages of pull-request issue
+ * comments, newest first, so no single lookup follows the whole comment list of
+ * a pull request. `reachedScanLimit` reports that the cap was hit while more
+ * comments may exist.
+ */
+async function scanPRIssueComments(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  prNumber: number
+): Promise<{ comments: PRIssueComment[]; reachedScanLimit: boolean }> {
+  const comments: PRIssueComment[] = [];
+  let reachedScanLimit = false;
+
+  for (let page = 1; page <= MAX_KILO_REVIEW_COMMENT_PAGES; page++) {
+    const { data } = await octokit.issues.listComments({
+      owner,
+      repo,
+      issue_number: prNumber,
+      per_page: KILO_REVIEW_COMMENTS_PER_PAGE,
+      page,
+      sort: 'created',
+      direction: 'desc',
+    });
+    comments.push(...data);
+
+    if (data.length < KILO_REVIEW_COMMENTS_PER_PAGE) break;
+    reachedScanLimit = page === MAX_KILO_REVIEW_COMMENT_PAGES;
+  }
+
+  return { comments, reachedScanLimit };
+}
+
 /**
  * Looks for the <!-- kilo-review --> marker in issue comments.
  * Falls back to detecting older Kilo comments by patterns if no marker found.
@@ -605,27 +657,7 @@ export async function findKiloReviewComment(
   const octokit = new Octokit({ auth: tokenData.token });
   const appId = String(getGitHubAppCredentials(appType).appId);
 
-  const comments: Array<{
-    id: number;
-    body?: string | null;
-    updated_at: string;
-    performed_via_github_app?: { id?: number | string } | null;
-  }> = [];
-  let reachedScanLimit = false;
-
-  for (let page = 1; page <= MAX_KILO_REVIEW_COMMENT_PAGES; page++) {
-    const { data: pageComments } = await octokit.issues.listComments({
-      owner,
-      repo,
-      issue_number: prNumber,
-      per_page: KILO_REVIEW_COMMENTS_PER_PAGE,
-      page,
-    });
-    comments.push(...pageComments);
-
-    if (pageComments.length < KILO_REVIEW_COMMENTS_PER_PAGE) break;
-    reachedScanLimit = page === MAX_KILO_REVIEW_COMMENT_PAGES;
-  }
+  const { comments, reachedScanLimit } = await scanPRIssueComments(octokit, owner, repo, prNumber);
 
   logExceptInTest('[findKiloReviewComment] Fetched comments', {
     owner,

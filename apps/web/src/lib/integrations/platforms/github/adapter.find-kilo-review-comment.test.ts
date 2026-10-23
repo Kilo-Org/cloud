@@ -68,6 +68,8 @@ describe('findKiloReviewComment', () => {
       issue_number: 7,
       per_page: 100,
       page: 1,
+      sort: 'created',
+      direction: 'desc',
     });
     expect(mockListComments).toHaveBeenNthCalledWith(2, {
       owner: 'acme',
@@ -75,6 +77,8 @@ describe('findKiloReviewComment', () => {
       issue_number: 7,
       per_page: 100,
       page: 2,
+      sort: 'created',
+      direction: 'desc',
     });
   });
 

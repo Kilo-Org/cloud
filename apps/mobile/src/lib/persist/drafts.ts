@@ -190,18 +190,18 @@ export function resolvePrefillOverDraft(
   return draftText;
 }
 
-/** The epoch-fenced write payload for one draft write. */
+/** The epoch-fenced write payload for one draft write, serialized at write time. */
 type DraftWritePayload = {
   epoch: number;
   userId: string;
   entityKey: string;
-  serialized: string;
+  value: unknown;
 };
 
 type PendingSave = {
   timer: ReturnType<typeof setTimeout>;
   epoch: number;
-  serialized: string;
+  value: unknown;
 };
 
 // One pending debounced write per full storage key. The timer, epoch, and
@@ -275,8 +275,12 @@ async function writeDraft({
   epoch,
   userId,
   entityKey,
-  serialized,
+  value,
 }: DraftWritePayload): Promise<void> {
+  const serialized = serializeDraft(value);
+  if (serialized === null) {
+    return;
+  }
   const key = fullKey(userId, entityKey);
   await chainSave(key, async () => {
     // The authoritative fence lives inside the chained run: a write queued
@@ -320,17 +324,17 @@ async function evictOldestBeyondCap(scope: string): Promise<void> {
 }
 
 /**
- * Schedules a debounced save of one JSON-serializable draft value, keyed on
- * the full storage key. Values over 64 KB are skipped (never written
- * partially; a previously stored draft stays untouched). Unserializable
- * values (circular references, top-level undefined) are reported to Sentry
- * and skipped. Returns nothing — the write is fire-and-forget; use
- * {@link flushDraft} to force it.
+ * Serializes one draft value at write time, or answers null when there is
+ * nothing safe to write.
+ *
+ * This runs when the debounce fires rather than on every keystroke that resets
+ * it: the composer saves the whole draft on every text change, so serializing
+ * there multiplied the work by the length of the text on each character typed.
+ * Values over 64 KB are skipped (never written partially; a previously stored
+ * draft stays untouched), and unserializable values (circular references,
+ * top-level undefined) are reported to Sentry and skipped.
  */
-export function saveDraft(userId: string, entityKey: string, value: unknown): void {
-  if (!userId) {
-    return;
-  }
+function serializeDraft(value: unknown): string | null {
   try {
     // JSON.stringify produces no string for a top-level undefined, function,
     // or symbol; reject those before the byte-cap check, which needs a string.
@@ -341,27 +345,40 @@ export function saveDraft(userId: string, entityKey: string, value: unknown): vo
         'write',
         'draft-write-unsupported-value'
       );
-      return;
+      return null;
     }
     if (utf8ByteLength(serialized) > DRAFT_MAX_BYTES) {
-      return;
+      return null;
     }
-    const key = fullKey(userId, entityKey);
-    const previous = pendingSaves.get(key);
-    if (previous) {
-      clearTimeout(previous.timer);
-    }
-    const epoch = currentAuthEpoch();
-    const timer = setTimeout(() => {
-      pendingSaves.delete(key);
-      void writeDraftSafely({ epoch, userId, entityKey, serialized });
-    }, DRAFT_DEBOUNCE_MS);
-    pendingSaves.set(key, { timer, epoch, serialized });
+    return serialized;
   } catch (error) {
-    // Serialization and byte sizing run before any timer exists; contain
-    // every failure here so saveDraft never throws synchronously.
     reportDraftFailure(error, 'write');
+    return null;
   }
+}
+
+/**
+ * Schedules a debounced save of one JSON-serializable draft value, keyed on
+ * the full storage key. The value is serialized and byte-capped when the
+ * debounce fires (see {@link serializeDraft}), so a keystroke costs one timer
+ * reset whatever the text's length. Returns nothing — the write is
+ * fire-and-forget; use {@link flushDraft} to force it.
+ */
+export function saveDraft(userId: string, entityKey: string, value: unknown): void {
+  if (!userId) {
+    return;
+  }
+  const key = fullKey(userId, entityKey);
+  const previous = pendingSaves.get(key);
+  if (previous) {
+    clearTimeout(previous.timer);
+  }
+  const epoch = currentAuthEpoch();
+  const timer = setTimeout(() => {
+    pendingSaves.delete(key);
+    void writeDraftSafely({ epoch, userId, entityKey, value });
+  }, DRAFT_DEBOUNCE_MS);
+  pendingSaves.set(key, { timer, epoch, value });
 }
 
 /**

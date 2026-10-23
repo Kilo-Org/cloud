@@ -1,5 +1,6 @@
 import {
   getGitHubUserAccessToken,
+  evictGitHubUserAccessTokenCache,
   __resetGitHubUserAccessTokenClientForTests,
 } from './user-token-client';
 
@@ -449,5 +450,60 @@ describe('getGitHubUserAccessToken', () => {
 
     resolveReport!(makeDisconnectedResponse('revoked'));
     await reportPromise;
+  });
+
+  it('re-consults the service after an eviction instead of serving the cached credential', async () => {
+    fetchMock.mockResolvedValueOnce(
+      makeConnectedResponse({ token: 'ghs_cached', authorizationId: 'auth-1' })
+    );
+    await getGitHubUserAccessToken('kilo-user-1', { op: 'fetch' });
+
+    evictGitHubUserAccessTokenCache('kilo-user-1');
+
+    fetchMock.mockResolvedValueOnce(makeDisconnectedResponse('revoked'));
+    const after = await getGitHubUserAccessToken('kilo-user-1', { op: 'fetch' });
+
+    expect(after).toEqual({ status: 'disconnected', reason: 'revoked' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps only the evicted user out of the cache', async () => {
+    fetchMock.mockResolvedValueOnce(makeConnectedResponse({ token: 'ghs_one' }));
+    fetchMock.mockResolvedValueOnce(makeConnectedResponse({ token: 'ghs_two' }));
+    await getGitHubUserAccessToken('kilo-user-1', { op: 'fetch' });
+    await getGitHubUserAccessToken('kilo-user-2', { op: 'fetch' });
+
+    evictGitHubUserAccessTokenCache('kilo-user-1');
+
+    const other = await getGitHubUserAccessToken('kilo-user-2', { op: 'fetch' });
+    if (other.status !== 'connected') throw new Error('expected connected');
+    expect(other.credential.token).toBe('ghs_two');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not let a fetch that started before the eviction put the credential back', async () => {
+    // The service call is in flight when the eviction happens; it settles with
+    // the pre-eviction credential and must not leave it readable.
+    const inFlightResponse = Promise.withResolvers<Response>();
+    fetchMock.mockImplementationOnce(() => inFlightResponse.promise);
+
+    const inFlight = getGitHubUserAccessToken('kilo-user-1', { op: 'fetch' });
+    await new Promise<void>(resolve => setImmediate(resolve));
+    evictGitHubUserAccessTokenCache('kilo-user-1');
+    inFlightResponse.resolve(
+      makeConnectedResponse({ token: 'ghs_stale', authorizationId: 'auth-1' })
+    );
+    const stale = await inFlight;
+    if (stale.status !== 'connected') throw new Error('expected connected');
+    expect(stale.credential.token).toBe('ghs_stale');
+
+    fetchMock.mockResolvedValueOnce(
+      makeConnectedResponse({ token: 'ghs_fresh', authorizationId: 'auth-2', credentialVersion: 2 })
+    );
+    const after = await getGitHubUserAccessToken('kilo-user-1', { op: 'fetch' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    if (after.status !== 'connected') throw new Error('expected connected');
+    expect(after.credential.token).toBe('ghs_fresh');
   });
 });

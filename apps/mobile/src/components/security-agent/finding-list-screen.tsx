@@ -20,6 +20,7 @@ import { toast } from 'sonner-native';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { AnalysisCapacityNotice } from '@/components/security-agent/analysis-capacity-notice';
 import { FindingRow } from '@/components/security-agent/finding-row';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
@@ -32,7 +33,11 @@ import {
 } from '@/lib/hooks/use-security-agent';
 import { useSecurityFindings } from '@/lib/hooks/use-security-findings';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
-import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
+import {
+  getSecurityAgentPath,
+  isSecurityFindingAnalyzable,
+  type SecurityFinding,
+} from '@/lib/security-agent';
 import { setSecurityFindingFilterBridge } from '@/lib/security-finding-filter-bridge';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -101,10 +106,6 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   );
 
   const slaEnabled = config.data?.slaEnabled ?? true;
-  const hasAnalysisCapacity =
-    capacity.runningCount !== undefined &&
-    capacity.concurrencyLimit !== undefined &&
-    capacity.runningCount < capacity.concurrencyLimit;
   const filtersActive = hasActiveSecurityFindingFilters(filters);
   // Memoized so a pull-to-refresh (`refreshing`) or a filter change does not
   // hand the list a new `data` identity while `pages` is unchanged.
@@ -112,6 +113,10 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
     () => findings.data?.pages.flatMap(page => page.findings) ?? [],
     [findings.data?.pages]
   );
+  // The capacity notice explains a blocked action, so it only appears when a
+  // rendered row actually offers one — never over a list of already-analyzed
+  // findings.
+  const hasAnalyzableRow = useMemo(() => items.some(isSecurityFindingAnalyzable), [items]);
   const hasListContent = items.length > 0 || findings.isFetchNextPageError;
   // Hoisted so the list keeps one renderer identity across unrelated screen
   // renders (refresh, filter sheet). FlashList's memoized ViewHolder compares
@@ -122,14 +127,14 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
         finding={item}
         scope={scope}
         slaEnabled={slaEnabled}
-        hasAnalysisCapacity={hasAnalysisCapacity}
+        capacityState={capacity.state}
       />
     ),
-    [scope, slaEnabled, hasAnalysisCapacity]
+    [scope, slaEnabled, capacity.state]
   );
   const rowExtraData = useMemo(
-    () => ({ scope, slaEnabled, hasAnalysisCapacity }),
-    [scope, slaEnabled, hasAnalysisCapacity]
+    () => ({ scope, slaEnabled, capacityState: capacity.state }),
+    [scope, slaEnabled, capacity.state]
   );
   const scopedRepositories = getSecurityRepositoriesInScope(repositories.data ?? [], config.data);
   // Repos aren't known yet (still loading or the fetch failed) — the filter
@@ -259,6 +264,13 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
             // row, which the item separator does not cover.
             <View className="pb-3">
               <RefreshProgress refreshControl={refreshControl} />
+              {hasAnalyzableRow ? (
+                <AnalysisCapacityNotice
+                  className="pt-2"
+                  state={capacity.state}
+                  onRetry={() => void capacity.refetch()}
+                />
+              ) : null}
             </View>
           }
           refreshControl={refreshControl}

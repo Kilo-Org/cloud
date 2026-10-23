@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useSecurityAgentCapability } from './use-security-agent';
+import {
+  useSecurityAgentCapability,
+  useSecurityAnalysisCapacity,
+} from './use-security-agent';
+import { SECURITY_ANALYSIS_CAPACITY_POLL_MS } from '@/lib/security-analysis-capacity';
 
 // use-security-agent.ts re-exports the mutation hooks from
 // use-security-agent-mutations.ts; stub that module so loading this file in
@@ -22,17 +26,23 @@ const queryState = vi.hoisted(() => ({
   isPending: false,
   fetchStatus: 'idle' as 'idle' | 'fetching' | 'paused',
   refetch: vi.fn(),
+  options: [] as { refetchInterval?: unknown }[],
 }));
 
 vi.mock('@tanstack/react-query', () => ({
-  useQuery: () => queryState,
+  useQuery: (options: { refetchInterval?: unknown }) => {
+    queryState.options.push(options);
+    return queryState;
+  },
 }));
 
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     organizations: {
       list: { queryOptions: () => ({}) },
+      securityAgent: { listFindings: { queryOptions: () => ({}) } },
     },
+    securityAgent: { listFindings: { queryOptions: () => ({}) } },
   }),
 }));
 
@@ -49,6 +59,7 @@ beforeEach(() => {
   queryState.isPending = false;
   queryState.fetchStatus = 'idle';
   queryState.refetch.mockReset();
+  queryState.options.length = 0;
 });
 
 afterEach(() => {
@@ -142,5 +153,45 @@ describe('useSecurityAgentCapability status derivation', () => {
 
     expect(capability.status).toBe('denied');
     expect(capability.canManage).toBe(false);
+  });
+});
+
+describe('useSecurityAnalysisCapacity', () => {
+  function capacityFor(scope: string) {
+    // eslint-disable-next-line react-hooks/rules-of-hooks -- the mocked hooks have no React state; this mirrors capabilityFor above
+    return useSecurityAnalysisCapacity(scope);
+  }
+
+  function pollFor(runningCount: number, concurrencyLimit: number) {
+    const options = queryState.options.at(-1) as {
+      refetchInterval: (query: {
+        state: { data?: { runningCount?: number; concurrencyLimit?: number } };
+      }) => unknown;
+    };
+    return options.refetchInterval({ state: { data: { runningCount, concurrencyLimit } } });
+  }
+
+  it('exposes the derived state next to the raw counters', () => {
+    queryState.data = { runningCount: 1, concurrencyLimit: 3 };
+    expect(capacityFor('personal').state).toBe('available');
+
+    queryState.data = { runningCount: 3, concurrencyLimit: 3 };
+    expect(capacityFor('personal').state).toBe('full');
+
+    queryState.data = undefined;
+    queryState.isLoading = true;
+    expect(capacityFor('personal').state).toBe('loading');
+
+    queryState.isError = true;
+    expect(capacityFor('personal').state).toBe('error');
+  });
+
+  it('re-reads the counters only while the owner is at the limit', () => {
+    queryState.data = { runningCount: 3, concurrencyLimit: 3 };
+    capacityFor('personal');
+    // A blocked list has nothing that changes on its own when a running
+    // analysis finishes, so the read repeats until a slot frees.
+    expect(pollFor(3, 3)).toBe(SECURITY_ANALYSIS_CAPACITY_POLL_MS);
+    expect(pollFor(2, 3)).toBe(false);
   });
 });

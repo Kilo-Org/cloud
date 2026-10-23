@@ -17,6 +17,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FindingAnalysisPanel } from './finding-analysis-panel';
+import { i18n } from '@/i18n';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 
 const capacity = vi.hoisted(() => ({
@@ -24,6 +25,7 @@ const capacity = vi.hoisted(() => ({
   concurrencyLimit: 3,
   isLoading: false,
   isError: false,
+  state: 'available' as 'loading' | 'error' | 'available' | 'full',
   refetch: vi.fn(),
 }));
 const startAnalysis = vi.hoisted(() => ({
@@ -156,6 +158,7 @@ describe('FindingAnalysisPanel completion-copy gate', () => {
     capacity.concurrencyLimit = 3;
     capacity.isLoading = false;
     capacity.isError = false;
+    capacity.state = 'available';
     startAnalysis.isPending = false;
     startAnalysis.mutate.mockClear();
   });
@@ -215,9 +218,7 @@ describe('FindingAnalysisPanel completion-copy gate', () => {
   it.each(['loading', 'error', 'full'] as const)(
     'keeps analysis disabled when capacity is %s',
     state => {
-      capacity.isLoading = state === 'loading';
-      capacity.isError = state === 'error';
-      capacity.runningCount = state === 'full' ? 3 : undefined;
+      capacity.state = state;
       const tree = renderPanel(analysisFixture({ status: null }));
       expect(tree.root.findByType(Button).props.disabled).toBe(true);
       expect(tree.root.findAllByType(CenteredState)).toHaveLength(1);
@@ -233,6 +234,41 @@ describe('FindingAnalysisPanel completion-copy gate', () => {
       findingId: 'finding-1',
       retrySandboxOnly: false,
     });
+  });
+
+  it('explains a full capacity under the disabled action', () => {
+    capacity.state = 'full';
+    const tree = renderPanel(analysisFixture({ status: null }));
+    const rendered = tree.root.findAll(
+      node => typeof node.type === 'string' && node.type === 'Text'
+    );
+    expect(
+      rendered.filter(node => node.props.children === i18n.t('securityAgent.analysis.capacityFull'))
+    ).toHaveLength(1);
+  });
+
+  it('keeps the capacity explanation off an already analyzed finding', () => {
+    capacity.state = 'full';
+    const tree = renderPanel(analysisFixture({ status: 'completed' }));
+    const rendered = tree.root.findAll(
+      node => typeof node.type === 'string' && node.type === 'Text'
+    );
+    expect(
+      rendered.filter(node => node.props.children === i18n.t('securityAgent.analysis.capacityFull'))
+    ).toHaveLength(0);
+  });
+
+  it('retries a failed capacity read from the explanation', () => {
+    capacity.state = 'error';
+    const tree = renderPanel(analysisFixture({ status: null }));
+    const [retry] = tree.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    expect(retry).toBeDefined();
+    act(retry?.props.onPress);
+    expect(capacity.refetch).toHaveBeenCalledOnce();
   });
 
   it('hides stale sandbox and triage evidence while the analysis is running', () => {

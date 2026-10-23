@@ -12,7 +12,13 @@ import { ScreenHeader } from '@/components/screen-header';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { FindingListScreen } from './finding-list-screen';
 
-type FindingPages = { pages: { findings: { id: string }[] }[] };
+type FindingFixture = {
+  id: string;
+  status?: string;
+  analysis_status?: string | null;
+  remediationSummary?: { status: string; prUrl: string | null } | null;
+};
+type FindingPages = { pages: { findings: FindingFixture[] }[] };
 const findings = vi.hoisted(() => ({
   data: undefined as FindingPages | undefined,
   isLoading: false,
@@ -28,6 +34,18 @@ const repositories = vi.hoisted(() => ({
   isError: false,
   refetch: vi.fn(),
 }));
+const capacity = vi.hoisted(() => ({
+  state: 'available' as 'loading' | 'error' | 'available' | 'full',
+  refetch: vi.fn(),
+}));
+
+function analyzableFinding(id: string): FindingFixture {
+  return { id, status: 'open', analysis_status: null, remediationSummary: null };
+}
+
+function analyzedFinding(id: string): FindingFixture {
+  return { id, status: 'fixed', analysis_status: 'completed', remediationSummary: null };
+}
 const mocks = vi.hoisted(() => ({
   query: vi.fn(),
   push: vi.fn(),
@@ -67,7 +85,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentConfig: () => ({ data: { repositorySelectionMode: 'all' } }),
   useSecurityAgentRepositories: () => repositories,
-  useSecurityAnalysisCapacity: () => ({ runningCount: 0, concurrencyLimit: 3 }),
+  useSecurityAnalysisCapacity: () => capacity,
 }));
 vi.mock('@/lib/hooks/use-security-findings', () => ({
   useSecurityFindings: (...args: unknown[]) => {
@@ -115,6 +133,8 @@ beforeEach(() => {
   repositories.isLoading = false;
   repositories.isError = false;
   repositories.refetch.mockResolvedValue({});
+  capacity.state = 'available';
+  capacity.refetch.mockReset();
 });
 afterEach(() => {
   mounted?.unmount();
@@ -261,6 +281,60 @@ describe('Security Agent list surfaces', () => {
     const footer = list.props.ListFooterComponent as ReactElement<{ className: string }>;
     expect(header.props.className).toBe('pb-3');
     expect(footer.props.className).toBe('pt-3');
+  });
+
+  async function mountListHeader() {
+    const root = await mount();
+    const list = root.findByType(FlashList);
+    const header = list.props.ListHeaderComponent as ReactNode;
+    mounted?.unmount();
+    mounted = await renderWithProviders(createElement('Header', null, header));
+    return mounted.renderer.root;
+  }
+
+  it('explains a full analysis capacity once above the analyzable rows', async () => {
+    capacity.state = 'full';
+    findings.data = { pages: [{ findings: [analyzableFinding('a'), analyzableFinding('b')] }] };
+    const header = await mountListHeader();
+    const rendered = header.findAll(
+      node => typeof node.type === 'string' && node.type === 'Text'
+    );
+    expect(
+      rendered.filter(node => node.props.children === 'securityAgent.analysis.capacityFull')
+    ).toHaveLength(1);
+  });
+
+  it.each([
+    { state: 'full', rows: [analyzedFinding('a')] },
+    { state: 'loading', rows: [analyzableFinding('a')] },
+    { state: 'available', rows: [analyzableFinding('a')] },
+  ] as const)('keeps the capacity explanation hidden while $state', async ({ state, rows }) => {
+    capacity.state = state;
+    findings.data = { pages: [{ findings: [...rows] }] };
+    const header = await mountListHeader();
+    const rendered = header.findAll(
+      node => typeof node.type === 'string' && node.type === 'Text'
+    );
+    expect(
+      rendered.filter(node => node.props.children === 'securityAgent.analysis.capacityFull')
+    ).toHaveLength(0);
+    expect(
+      rendered.filter(
+        node => node.props.children === 'securityAgent.analysis.couldNotCheckCapacity'
+      )
+    ).toHaveLength(0);
+  });
+
+  it('retries a failed capacity read from the explanation', async () => {
+    capacity.state = 'error';
+    findings.data = { pages: [{ findings: [analyzableFinding('a')] }] };
+    const header = await mountListHeader();
+    const [retry] = header.findAll(
+      node => typeof node.type === 'string' && node.props.accessibilityLabel === 'common.retry'
+    );
+    expect(retry).toBeDefined();
+    act(retry?.props.onPress);
+    expect(capacity.refetch).toHaveBeenCalledOnce();
   });
 
   it('keeps expired filter guidance outside a scroller', async () => {

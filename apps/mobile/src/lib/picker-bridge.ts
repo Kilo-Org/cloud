@@ -93,6 +93,8 @@ export type BranchPickerBridge = {
   defaultBranch: string | null;
   /** The branch the trigger row shows as selected (override or default). */
   selectedBranch: string | null;
+  /** The provider holds more branches than `branches` includes. */
+  truncated: boolean;
   onSelect: (branch: string) => void;
 };
 
@@ -103,6 +105,12 @@ export type InstancePickerInstance =
 export type InstancePickerBridge = {
   instances: InstancePickerInstance[];
   currentValue: InstancePickerInstance | null;
+  /**
+   * The computer target is selected with no computer bound yet (the tour's
+   * computer path with zero connected computers): the picker shows neither
+   * row checked, since the Cloud Agent default is not the current target.
+   */
+  pendingComputer?: boolean;
   onSelect: (instance: InstancePickerInstance | null) => void;
 };
 

@@ -1,5 +1,4 @@
 import * as z from 'zod';
-import { isGptOssModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 
 export const OpenRouterInferenceProviderIdSchema = z.enum([
   'ai21',
@@ -88,6 +87,7 @@ export const VercelUserByokInferenceProviderIdSchema = z.enum([
   'bedrock',
   'deepseek',
   'fireworks',
+  'gmicloud',
   'google', // Google AI Studio
   'inception',
   'openai',
@@ -144,6 +144,7 @@ export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.bedrock]: 'anthropic/claude-haiku-4.5',
   [VercelUserByokInferenceProviderIdSchema.enum.deepseek]: 'deepseek/deepseek-v3.2',
   [VercelUserByokInferenceProviderIdSchema.enum.fireworks]: 'openai/gpt-oss-20b',
+  [VercelUserByokInferenceProviderIdSchema.enum.gmicloud]: 'zai/glm-5.3-flash',
   [VercelUserByokInferenceProviderIdSchema.enum.inception]: 'inception/mercury-2',
   [VercelUserByokInferenceProviderIdSchema.enum.moonshotai]: 'moonshotai/kimi-k2.5',
   [VercelUserByokInferenceProviderIdSchema.enum.nebius]: 'openai/gpt-oss-120b',
@@ -269,25 +270,6 @@ export function normalizeVercelInferenceProviderIdForRouting(providerId: string 
   return providerId === VercelNonUserByokInferenceProviderIdSchema.enum.vertexAnthropic
     ? VercelUserByokInferenceProviderIdSchema.enum.vertex
     : providerId;
-}
-
-const modelPrefixToVercelInferenceProviderMapping = {
-  anthropic: VercelUserByokInferenceProviderIdSchema.enum.anthropic,
-  google: VercelUserByokInferenceProviderIdSchema.enum.google,
-  openai: VercelUserByokInferenceProviderIdSchema.enum.openai,
-  minimax: VercelUserByokInferenceProviderIdSchema.enum.minimax,
-  mistralai: VercelUserByokInferenceProviderIdSchema.enum.mistral,
-  qwen: VercelNonUserByokInferenceProviderIdSchema.enum.alibaba,
-  'x-ai': VercelUserByokInferenceProviderIdSchema.enum.xai,
-  'z-ai': VercelUserByokInferenceProviderIdSchema.enum.zai,
-} as Record<string, VercelInferenceProviderId | undefined>;
-
-export function inferVercelFirstPartyInferenceProviderForModel(
-  model: string
-): VercelInferenceProviderId | null {
-  return isGptOssModel(model)
-    ? null
-    : (modelPrefixToVercelInferenceProviderMapping[model.split('/')[0]] ?? null);
 }
 
 export const AwsCredentialsSchema = z.object({

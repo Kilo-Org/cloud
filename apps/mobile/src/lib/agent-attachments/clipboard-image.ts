@@ -151,7 +151,7 @@ export async function readClipboardImageFile(
     directory.create({ idempotent: true, intermediates: true });
     const filename = `pasted-image-${Crypto.randomUUID()}.${parsed.extension}`;
     const file = new File(directory, filename);
-    file.write(parsed.base64, { encoding: 'base64' });
+    await file.write(parsed.base64, { encoding: 'base64' });
     return {
       uri: file.uri,
       name: `pasted-image.${parsed.extension}`,

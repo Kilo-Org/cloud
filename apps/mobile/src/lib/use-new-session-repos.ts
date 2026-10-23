@@ -8,6 +8,7 @@ import {
   detectRepositoryPlatform,
   type NewSessionRepository,
   type RepositoryGroup,
+  type RepositoryGroupNotice,
   type RepositoryGroups,
   repositoryIdentityKey,
   type RepositoryPlatform,
@@ -199,7 +200,11 @@ export function useNewSessionRepos({
     isError: githubQuery.isError,
     integrationInstalled: githubQuery.data?.integrationInstalled,
     repositoryCount: githubRepositories.length,
+    unavailableReason: githubQuery.data?.unavailableReason,
   });
+  const githubNotice: RepositoryGroupNotice | undefined = githubQuery.data?.partial
+    ? 'partial'
+    : undefined;
   const gitlabStatus = resolveProviderStatus({
     isLoading: gitlabQuery.isLoading,
     isError: gitlabQuery.isError,
@@ -217,7 +222,12 @@ export function useNewSessionRepos({
     () =>
       resolveRepositoryGroups({
         organizationId,
-        github: { key: 'github', status: githubStatus, repositories: githubRepositories },
+        github: {
+          key: 'github',
+          status: githubStatus,
+          repositories: githubRepositories,
+          notice: githubNotice,
+        },
         gitlab: { key: 'gitlab', status: gitlabStatus, repositories: gitlabRepositories },
         bitbucket: {
           key: 'bitbucket',
@@ -230,6 +240,7 @@ export function useNewSessionRepos({
       organizationId,
       githubStatus,
       githubRepositories,
+      githubNotice,
       gitlabStatus,
       gitlabRepositories,
       bitbucketStatus,
@@ -242,7 +253,7 @@ export function useNewSessionRepos({
   const [isRefreshingProviders, setIsRefreshingProviders] = useState(false);
 
   const forceFreshGitLab = useCallback(async () => {
-    const fresh = await queryClient.fetchQuery({
+    const fresh = await queryClient.query({
       ...(organizationId
         ? trpc.organizations.cloudAgentNext.listGitLabRepositories.queryOptions({
             organizationId,
@@ -270,7 +281,7 @@ export function useNewSessionRepos({
     if (!organizationId) {
       return;
     }
-    const fresh = await queryClient.fetchQuery({
+    const fresh = await queryClient.query({
       ...trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryOptions({
         organizationId,
         forceRefresh: true,
@@ -391,12 +402,14 @@ export type RepositoryBranchesState = {
   /** The provider's default branch, or null when it reports none. */
   defaultBranch: string | null;
   branches: string[];
+  /** The provider holds more branches than `branches` includes. */
+  truncated: boolean;
   /** The query runs only for a selected repository in a scope that can serve it. */
   isEnabled: boolean;
   isLoading: boolean;
   /** A transient failure: the caller offers a retry. */
   isRetryableError: boolean;
-  /** FORBIDDEN/UNAUTHORIZED/NOT_FOUND — a retry cannot fix it, so no retry CTA. */
+  /** A refusal a retry cannot fix (permission, not found, or a refused connection). */
   isPermanentError: boolean;
   isRetrying: boolean;
   retry: () => void;
@@ -462,6 +475,11 @@ export function useRepositoryBranches(
       (branchQuery.error as { data?: { code?: string } } | null)?.data?.code
     : undefined;
   const { permanent } = classifyProviderErrorCode(errorCode);
+  // The reconnect state (PRECONDITION_FAILED) is a refused provider
+  // connection: this selector has no reconnect control, so it takes the same
+  // permanent note as a permission refusal instead of a retry that cannot
+  // succeed.
+  const permanentFailure = permanent || errorCode === 'PRECONDITION_FAILED';
 
   const retry = useCallback(() => {
     void branchQuery.refetch();
@@ -470,10 +488,11 @@ export function useRepositoryBranches(
   return {
     defaultBranch: branchQuery.data?.defaultBranch ?? null,
     branches: branchQuery.data?.branches ?? [],
+    truncated: branchQuery.data?.truncated === true,
     isEnabled,
     isLoading: isEnabled && branchQuery.isPending,
-    isRetryableError: branchQuery.isError && !permanent,
-    isPermanentError: branchQuery.isError && permanent,
+    isRetryableError: branchQuery.isError && !permanentFailure,
+    isPermanentError: branchQuery.isError && permanentFailure,
     isRetrying: branchQuery.isFetching && branchQuery.isError,
     retry,
   };

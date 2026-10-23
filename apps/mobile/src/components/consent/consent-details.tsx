@@ -17,6 +17,15 @@ import { useSideInsetStyle } from '@/lib/screen-insets';
 import { useGatewayTranscriptionPreference } from '@/lib/voice-input/gateway/gateway-transcription-preference';
 import { voiceInputController } from '@/lib/voice-input/native-voice-input';
 import {
+  useVoiceInputLanguage,
+  useVoiceInputLanguageLoaded,
+} from '@/lib/voice-input/voice-input-language-preference';
+import {
+  isVoiceInputLanguageInstalledOnDevice,
+  resolveVoiceInputSessionLanguageTag,
+} from '@/lib/voice-input/voice-input-language';
+import { resolveVoiceTranscriptionReviewMode } from '@/lib/voice-input/voice-input-recognition-mode';
+import {
   readVoiceNetworkConsent,
   subscribeToVoiceNetworkConsent,
   type VoiceNetworkConsent,
@@ -32,7 +41,56 @@ export function VoiceTranscriptionControl() {
   const { gatewayTranscriptionEnabled, hasLoaded } = useGatewayTranscriptionPreference();
   const supportsOnDevice = voiceInputController.supportsOnDevice();
   const [consent, setConsent] = useState<VoiceNetworkConsent>('unset');
-  const { t } = useTranslation();
+  const storedLanguageTag = useVoiceInputLanguage();
+  // The stored tag is the SecureStore default (`null`) until the module-scope
+  // read settles, which can take seconds on a slow keychain read; deriving the
+  // session tag from the app language in that window would claim a mode for a
+  // choice that may exist (voice-input-settings-screen.tsx gates this exact
+  // read the same way). Keep the row on the loading placeholder until it lands.
+  const languageLoaded = useVoiceInputLanguageLoaded();
+  const { t, i18n } = useTranslation();
+
+  // The mic refines the service-level on-device check with the offline model
+  // of the language a dictation would actually use (use-voice-input-actions.ts):
+  // a device whose service supports on-device recognition but lacks the model
+  // for the resolved language raises the online disclosure on every start, so
+  // this row must not claim "On device" there. Resolve the same session tag
+  // the mic does, then run the same installed-model gate, and re-derive when
+  // the stored choice or the app language changes. The gate never errors:
+  // `isVoiceInputLanguageInstalledOnDevice` treats a failed probe as
+  // installed, matching the mic's fail-open start path. `null` is the pending
+  // gate; the sync modes (gateway on, no service support) branch before it.
+  const [languageInstalled, setLanguageInstalled] = useState<boolean | null>(null);
+  const appLanguage = i18n.language;
+
+  useEffect(() => {
+    if (gatewayTranscriptionEnabled || !supportsOnDevice || !languageLoaded) {
+      return undefined;
+    }
+    let active = true;
+    setLanguageInstalled(null);
+    void (async () => {
+      const languageTag = await resolveVoiceInputSessionLanguageTag(
+        storedLanguageTag,
+        'device',
+        appLanguage
+      );
+      const installed = await isVoiceInputLanguageInstalledOnDevice(languageTag);
+      // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- active is cleared on unmount
+      if (active) {
+        setLanguageInstalled(installed);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [
+    gatewayTranscriptionEnabled,
+    supportsOnDevice,
+    languageLoaded,
+    storedLanguageTag,
+    appLanguage,
+  ]);
 
   useEffect(() => {
     if (!userId) {
@@ -91,7 +149,21 @@ export function VoiceTranscriptionControl() {
     );
   }
 
-  if (gatewayTranscriptionEnabled) {
+  // The mode gate owns the on-device claim: the review never prints "On
+  // device" from the service-level support alone — the mic refines that check
+  // with the offline model of the resolved language, and a device without the
+  // model raises the online disclosure on every start. `languageInstalled`
+  // stays `null` while that per-language gate is pending; the row shows the
+  // loading placeholder instead of a state it has not read (same rule as the
+  // account read). Devices without service support skip the gate entirely and
+  // fall through to the online consent row.
+  const reviewMode = resolveVoiceTranscriptionReviewMode({
+    gatewayTranscriptionEnabled,
+    serviceSupportsOnDevice: supportsOnDevice,
+    languageInstalledOnDevice: languageInstalled === true,
+  });
+
+  if (reviewMode === 'gateway') {
     // Status row only: the engine is chosen in Preferences, so this row carries
     // no switch — matching the on-device row below.
     return (
@@ -104,7 +176,11 @@ export function VoiceTranscriptionControl() {
     );
   }
 
-  if (supportsOnDevice) {
+  if (supportsOnDevice && languageInstalled === null) {
+    return <Text className="mt-3 text-sm text-muted-foreground">{t('common.loading')}</Text>;
+  }
+
+  if (reviewMode === 'on-device') {
     // Status row in the toggle row's geometry (label left, value right) so it
     // reads as the transcription state, not a stray fragment under the Who
     // line (e4 spot check, 2026-09-07). The label is the neutral section

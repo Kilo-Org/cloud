@@ -64,6 +64,9 @@ jobs:
       - name: Install root dependencies
         run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
 
+      - name: Check runtime publication workflow admission
+        run: pnpm --filter cloud-agent-next test:runtime-ci
+
       # dorny/paths-filter has no built-in retry: one dropped connection to
       # api.github.com ("other side closed" while listing the PR's changed
       # files) fails the step and, with it, every check that needs this job.
@@ -95,7 +98,6 @@ jobs:
               - 'packages/trpc/**'
               - 'packages/web-shared/**'
               - 'packages/worker-utils/**'
-              - 'services/deploy-infra/builder/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
             cloud_agent_next:
@@ -139,7 +141,6 @@ jobs:
               - 'packages/trpc/**'
               - 'packages/web-shared/**'
               - 'packages/worker-utils/**'
-              - 'services/deploy-infra/builder/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
             cloud_agent_next:
@@ -643,9 +644,6 @@ jobs:
 
       - name: Run script tests
         run: pnpm run test:scripts
-
-      - name: Run builder Postgres repository tests
-        run: pnpm --filter kilo-deploy-builder test:postgres
 
       - name: Run container usage Postgres tests
         # The meter suite connects to POSTGRES_URL directly. Avoid the Jest worker

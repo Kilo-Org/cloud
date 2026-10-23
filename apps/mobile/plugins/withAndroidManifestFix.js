@@ -1,7 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 
-const { withAndroidManifest, withDangerousMod } = require('expo/config-plugins');
+const {
+  withAndroidManifest,
+  withDangerousMod,
+  withGradleProperties,
+} = require('expo/config-plugins');
 
 const BACKUP_RULES_RES = '@xml/kilo_backup_rules';
 const DATA_EXTRACTION_RULES_RES = '@xml/kilo_data_extraction_rules';
@@ -47,6 +51,14 @@ const OPTIONAL_FEATURES = [
  */
 function withAndroidManifestFix(config) {
   config = withAndroidResources(config);
+  config = withGradleProperties(config, cfg => {
+    // AppsFlyer's SDK and purchase connector share a namespace. AGP 9 enables
+    // uniqueness validation by default; retain AGP 8's policy for this vendor pair.
+    const key = 'android.uniquePackageNames';
+    cfg.modResults = cfg.modResults.filter(entry => entry.type !== 'property' || entry.key !== key);
+    cfg.modResults.push({ type: 'property', key, value: 'false' });
+    return cfg;
+  });
   return withAndroidManifest(config, config => {
     const manifest = config.modResults.manifest;
     const application = manifest.application?.[0];

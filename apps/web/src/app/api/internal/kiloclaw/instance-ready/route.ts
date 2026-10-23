@@ -9,12 +9,12 @@
  * Protected by X-Internal-Secret header
  */
 
-import { timingSafeEqual } from '@kilocode/encryption';
+import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { and, eq, isNull, or } from 'drizzle-orm';
-import { INTERNAL_API_SECRET, NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
+import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
 import { send as sendEmail } from '@kilocode/web-shared/lib/email';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -85,10 +85,8 @@ async function hasSentCompatibleInstanceReadyEmail(
 }
 
 export async function POST(req: NextRequest) {
-  const secret = req.headers.get('X-Internal-Secret');
-  if (!INTERNAL_API_SECRET || !secret || !timingSafeEqual(secret, INTERNAL_API_SECRET)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const unauthorized = authorizeInternalApiRequest(req);
+  if (unauthorized) return unauthorized;
 
   const rawBody: unknown = await req.json().catch(() => null);
   const parsed = BodySchema.safeParse(rawBody);

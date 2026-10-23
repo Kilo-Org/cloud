@@ -42,6 +42,7 @@ import {
   authorizeOwner,
   authorizeProject,
   classifyGitLabError,
+  classifyGitLabErrorForOwner,
   GitLabApiStatusError,
   GitLabReviewError,
   type GitLabProjectAccess,
@@ -155,6 +156,8 @@ export async function requestGitLabJson<T>(
     }
     return (await response.json()) as T;
   } catch (error) {
+    // This layer has no owner: the status travels on the classified error so
+    // the owner-aware caller can weigh a 403 against the connection's owner.
     throw classifyGitLabError(error);
   }
 }
@@ -409,9 +412,9 @@ export async function getMergeRequest(
     // Counts come from the diffs. Fold every page GitLab will serve — it caps
     // a merge request's diff collection at the project's `diff_max_files`
     // (1000 by default), which the page bound covers — so a large merge
-    // request reports complete totals instead of its first 150 files. Each page
-    // is folded into the running counters the moment it arrives and dropped, so
-    // the walk never holds the parsed diff text it only reads once.
+    // request reports complete totals. Each page is folded into the running
+    // counters the moment it arrives and dropped, so the walk never holds the
+    // parsed diff text it only reads once.
     let diffFileCount = 0;
     let additions = 0;
     let deletions = 0;
@@ -458,7 +461,7 @@ export async function getMergeRequest(
       updatedAt: detail.updated_at ?? '',
     };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, owner);
   }
 }
 
@@ -479,7 +482,7 @@ export async function listChangedFiles(
       nextCursor: cursorForPage(access.projectPath, page, diffs.length),
     };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, owner);
   }
 }
 
@@ -522,7 +525,7 @@ export async function getFileLines(
     const end = Math.max(start, Math.min(cappedEnd, allLines.length));
     return { lines: allLines.slice(start - 1, end), totalLines: allLines.length };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, owner);
   }
 }
 
@@ -587,7 +590,7 @@ export async function listDiscussions(
       nextCursor: cursorForPage(access.projectPath, page, discussions.length),
     };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, owner);
   }
 }
 
@@ -629,8 +632,29 @@ export async function listChecks(
     }
     return { checks };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, owner);
   }
+}
+
+/**
+ * The inbox lists the acting account's own review requests, so a provider 403
+ * on that read is the CONNECTION's — there is no merge-request role in play.
+ * `classifyGitLabErrorForOwner` already resolves an organization connection's
+ * 403 to `reconnect`; this adds the personal arm and, for both, copy that
+ * names the inbox the person was reading instead of a merge request, which
+ * the list request never mentioned.
+ */
+function classifyInboxError(error: unknown, owner: GitLabReviewOwner): GitLabReviewError {
+  // The provider status has to be read before the owner-aware step: that step
+  // rewrites an organization connection's 403 into a reconnect whose copy
+  // names a merge request, which this list request never mentioned.
+  if (classifyGitLabError(error).providerStatus !== 403) {
+    return classifyGitLabErrorForOwner(error, owner);
+  }
+  return new GitLabReviewError(
+    'reconnect',
+    'Your GitLab connection cannot read your review requests. Reconnect GitLab and try again.'
+  );
 }
 
 /**
@@ -643,8 +667,8 @@ export async function listInbox(
   cursor?: string,
   instanceHint?: string
 ): Promise<ProviderPrInboxPage> {
-  const access = await authorizeOwner(owner, instanceHint);
   try {
+    const access = await authorizeOwner(owner, instanceHint);
     const me = await fetchGitLabUser(access.accessToken, access.instanceUrl);
     const identity = `gitlab-inbox:${owner.type === 'user' ? owner.userId : `${owner.organizationId}:${owner.userId}`}`;
     const page = decodePageCursor(cursor, identity);
@@ -672,13 +696,19 @@ export async function listInbox(
     for (const mr of mergeRequests) {
       const ref = inboxRefFrom(mr, access.instanceUrl);
       if (!ref) continue;
+      // The adapter's author type omits `avatar_url`, but the list API
+      // returns it; narrow instead of asserting the field into existence.
+      const avatarUrl =
+        mr.author && 'avatar_url' in mr.author && typeof mr.author.avatar_url === 'string'
+          ? mr.author.avatar_url
+          : null;
       items.push({
         ref,
         title: mr.title,
         author: mr.author
           ? {
               login: mr.author.username,
-              avatarUrl: (mr.author as { avatar_url?: string | null }).avatar_url ?? null,
+              avatarUrl,
             }
           : null,
         state: mapMergeRequestState(mr.state),
@@ -688,7 +718,7 @@ export async function listInbox(
     }
     return { items, nextCursor: cursorForPage(identity, page, mergeRequests.length) };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyInboxError(error, owner);
   }
 }
 
@@ -830,7 +860,7 @@ export async function getMergeState(
       blockedReasons,
     };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifyGitLabErrorForOwner(error, owner);
   }
 }
 

@@ -13,7 +13,7 @@ import { prefetchSessionTranscript } from '@/lib/agent-session-cache';
 import { createKiloAppQueryClient } from '@/lib/query-client';
 import { i18n } from '@/i18n';
 import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
-import { __resetSessionAttentionForTests } from '@/lib/session-attention';
+import { __resetSessionAttentionForTests, ackSessionAttention } from '@/lib/session-attention';
 import { RemoteSessionRow } from './remote-session-row';
 import { formatScheduledWake } from './session-list-helpers';
 import {
@@ -293,6 +293,41 @@ describe('StoredSessionRow live speech', () => {
       expect(texts(renderer)).not.toContain('$0.12 · 5 MINUTES AGO');
     }
   );
+
+  it('brings the badge back for a raise the user has not answered', () => {
+    const answered = {
+      ...session,
+      status: 'permission',
+      status_updated_at: '2026-09-18T21:00:00.000Z',
+    };
+    const renderer = mount(row({ session: answered, live: true }));
+
+    expect(texts(renderer)).toContain('NEEDS INPUT');
+
+    // The answer path acks the raise it answered.
+    act(() => {
+      ackSessionAttention('stored-1', 'permission', '2026-09-18T21:00:00.000Z');
+    });
+    expect(texts(renderer)).not.toContain('NEEDS INPUT');
+
+    // A permission raised after the answered one reaches the row before the
+    // answered status round-trip lands: it must show again.
+    act(() => {
+      renderer.update(
+        wrapped(
+          row({
+            session: { ...answered, status_updated_at: '2026-09-18T21:30:00.000Z' },
+            live: true,
+          })
+        )
+      );
+    });
+
+    expect(texts(renderer)).toContain('NEEDS INPUT');
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
+      'Fix login bug, needs input, feature/live, and CLI'
+    );
+  });
 
   it('reads SCHEDULED (label only) for a stored scheduled row instead of Idle', () => {
     // The scheduled branch keys off the status, not the live flag: a stored

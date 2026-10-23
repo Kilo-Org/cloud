@@ -5,6 +5,7 @@ import {
   CUSTOM_ROUTER_EVAL_CASE_PATH,
   CUSTOM_ROUTER_EVAL_PLAN_PATH,
   CUSTOM_ROUTER_EVAL_RESULT_PATH,
+  OWNER_POOL_CONVERSION_SCAN_PATH,
 } from '@kilocode/auto-routing-contracts';
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { authMiddleware } from './auth';
@@ -14,6 +15,7 @@ import { getRoutingModeHandler, putRoutingModeHandler } from './admin-routing-mo
 import { getRoutingSettingsHandler, putRoutingSettingsHandler } from './admin-routing-settings';
 import { decideHandler } from './decide';
 import type { HonoEnv } from './hono-env';
+import { ownerPoolConversionScanHandler } from './owner-pool-conversion';
 import {
   evalCaseHandler,
   evalPlanHandler,
@@ -49,6 +51,7 @@ app.put('/admin/routing-mode', putRoutingModeHandler);
 app.get('/admin/routing-settings', getRoutingSettingsHandler);
 app.put('/admin/routing-settings', putRoutingSettingsHandler);
 app.get('/admin/classifier-analytics', classifierAnalyticsHandler);
+app.post(OWNER_POOL_CONVERSION_SCAN_PATH, ownerPoolConversionScanHandler);
 
 app.post('/decide', decideHandler);
 

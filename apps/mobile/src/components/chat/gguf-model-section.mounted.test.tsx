@@ -2,7 +2,11 @@ import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
-import { type GgufDownloadsSnapshot } from '@/lib/chat/gguf-records';
+import {
+  type GgufDownload,
+  type GgufDownloadsSnapshot,
+  type GgufModelRecord,
+} from '@/lib/chat/gguf-records';
 import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 
 import { GgufDownloadControls } from './gguf-model-section';
@@ -27,7 +31,24 @@ vi.mock('@/lib/chat/gguf-models', () => ({
   useGgufModels: () => ({ models: [], download: null, failure: null }),
 }));
 
-const IDLE: GgufDownloadsSnapshot = { models: [], download: null, failure: null };
+const FILE_ID = 'q2_k-file';
+const RECORD: GgufModelRecord = {
+  fileId: FILE_ID,
+  name: 'Qwen2.5 0.5B Instruct',
+  url: 'https://example.com/model.gguf',
+  sizeBytes: 1_000,
+  contextWindow: 8_192,
+  tools: true,
+  vision: false,
+  thinking: false,
+};
+const PAUSED: GgufDownload = {
+  fileId: FILE_ID,
+  name: 'Qwen2.5 0.5B Instruct',
+  phase: 'paused',
+  written: 250,
+  total: 1_000,
+};
 
 let view: RenderWithProvidersResult | undefined = undefined;
 afterEach(() => {
@@ -35,45 +56,63 @@ afterEach(() => {
   view = undefined;
 });
 
-/** Mount one download button and return its name and the text it renders. */
-async function downloadButton(downloadDetail: string | undefined) {
+type RenderedControl = { label: string | undefined; visible: string };
+
+/** Mount one row's controls and read every button's name and rendered text. */
+async function mountRow(
+  snapshot: GgufDownloadsSnapshot,
+  downloadDetail?: string
+): Promise<RenderedControl[]> {
+  view?.unmount();
   view = await renderWithProviders(
     createElement(GgufDownloadControls, {
-      fileId: 'q2_k-file',
+      fileId: FILE_ID,
       name: 'Qwen2.5 0.5B Instruct',
-      snapshot: IDLE,
+      snapshot,
       onDownload: () => undefined,
       ...(downloadDetail === undefined ? {} : { downloadDetail }),
     })
   );
-  const button = view.renderer.root.find(node => (node.type as string) === 'Button');
-  const text = button.find(node => (node.type as string) === 'Text');
-  return {
-    label: button.props.accessibilityLabel as string | undefined,
-    visible: text.props.children as string,
-  };
+  return view.renderer.root
+    .findAll(node => (node.type as string) === 'Button')
+    .map(button => ({
+      label: button.props.accessibilityLabel as string | undefined,
+      visible: button.find(node => (node.type as string) === 'Text').props.children as string,
+    }));
 }
 
-describe('the model download button name', () => {
-  it('starts with the visible label and adds the row detail', async () => {
-    const { label, visible } = await downloadButton('q2_k');
+describe('the model row control names', () => {
+  it('starts the download name with the visible label and adds the row detail', async () => {
+    const [download] = await mountRow({ models: [], download: null, failure: null }, 'q2_k');
 
-    expect(visible).not.toBe('');
-    expect(label?.startsWith(visible)).toBe(true);
-    expect(label).toContain('q2_k');
+    expect(download?.visible).not.toBe('');
+    expect(download?.label?.startsWith(download.visible)).toBe(true);
+    expect(download?.label).toContain('q2_k');
+  });
+
+  it('uses the row detail on the delete and transfer controls too', async () => {
+    const downloaded = await mountRow({ models: [RECORD], download: null, failure: null }, 'q2_k');
+    const transferring = await mountRow({ models: [], download: PAUSED, failure: null }, 'q2_k');
+
+    expect([...downloaded, ...transferring]).toHaveLength(3);
+    for (const control of [...downloaded, ...transferring]) {
+      expect(control.label?.startsWith(control.visible)).toBe(true);
+      expect(control.label).toContain('q2_k');
+    }
   });
 
   it('leaves the name to the visible text when no detail distinguishes the row', async () => {
-    const { label, visible } = await downloadButton(undefined);
+    const controls = await mountRow({ models: [RECORD], download: null, failure: null });
 
-    expect(label).toBeUndefined();
-    expect(visible).not.toBe('');
+    expect(controls).toHaveLength(1);
+    expect(controls[0]?.label).toBeUndefined();
+    expect(controls[0]?.visible).not.toBe('');
   });
 
-  it('ignores a blank detail instead of naming the button with empty brackets', async () => {
-    const { label, visible } = await downloadButton('   ');
+  it('ignores a blank detail instead of naming the control with empty brackets', async () => {
+    const controls = await mountRow({ models: [], download: null, failure: null }, '   ');
 
-    expect(label).toBeUndefined();
-    expect(visible).not.toBe('');
+    expect(controls[0]?.label).toBeUndefined();
+    expect(controls[0]?.visible).not.toBe('');
   });
 });

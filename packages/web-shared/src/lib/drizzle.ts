@@ -98,14 +98,6 @@ const sharedPoolConfig: Partial<pg.PoolConfig> = {
   idleTimeoutMillis,
 };
 
-// The validated request-path query budget, applied only to the read pool.
-// Write paths on the primary carry their own explicit budgets, and pg
-// transmits `statement_timeout` in the startup packet, which connection
-// poolers may reject (see lib/replication-health.ts), so the bound is
-// client side. pg closes the connection on timeout; the pool replenishes
-// it on the next request.
-const replicaQueryTimeoutMillis = Number.parseInt(POSTGRES_MAX_QUERY_TIME || '20000');
-
 // Primary pool - writes go here; script runs (IS_SCRIPT) connect to POSTGRES_SCRIPT_URL
 const primary = createDrizzleClient({
   connectionString: postgresUrl,
@@ -122,11 +114,7 @@ export const usesSeparateReplica = replicaUrl !== postgresUrl;
 const replica = usesSeparateReplica
   ? createDrizzleClient({
       connectionString: replicaUrl,
-      poolConfig: {
-        ...sharedPoolConfig,
-        application_name: `${appName}-replica`,
-        query_timeout: replicaQueryTimeoutMillis,
-      },
+      poolConfig: { ...sharedPoolConfig, application_name: `${appName}-replica` },
       logger: !!DEBUG_QUERY_LOGGING,
     })
   : primary;

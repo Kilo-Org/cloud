@@ -33,9 +33,11 @@ export async function persistLoginDrafts(): Promise<void> {
   }
 }
 
-/** Read the persisted drafts on login mount. The caller deletes only after it
- * applies the restored values, because a cancelled mount must not lose the
- * drafts. */
+/** Read the persisted drafts on login mount. A draft the form is holding in
+ * memory wins over the stored copy: a remount inside the same app process, such
+ * as the one a language change causes, must not drop what the person already
+ * typed. The caller deletes the stored copies only after it applies the
+ * restored values, because a cancelled mount must not lose them. */
 export async function restoreLoginDrafts(): Promise<{
   email: string;
   ssoRecovery: SsoRecoveryDraft | null;
@@ -59,7 +61,8 @@ export async function restoreLoginDrafts(): Promise<{
       // Corrupt draft: ignore it.
     }
   }
-  return { email: email ?? '', ssoRecovery };
+  const restoredEmail = emailDraft.length > 0 ? emailDraft : (email ?? '');
+  return { email: restoredEmail, ssoRecovery: ssoRecoveryDraft ?? ssoRecovery };
 }
 
 /** Delete the persisted drafts after the caller applies the restored values. */

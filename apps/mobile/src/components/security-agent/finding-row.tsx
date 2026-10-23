@@ -24,7 +24,11 @@ import {
   isSecurityFindingAnalyzable,
   type SecurityFinding,
 } from '@/lib/security-agent';
-import { getDeadlineCopy, getSecurityAnalysisLabel } from '@/lib/security-agent-copy';
+import {
+  getAnalysisCapacityBlockedHint,
+  getDeadlineCopy,
+  getSecurityAnalysisLabel,
+} from '@/lib/security-agent-copy';
 import { type SecurityAnalysisCapacityState } from '@/lib/security-analysis-capacity';
 import { cn } from '@/lib/utils';
 
@@ -92,20 +96,6 @@ type FindingRowQuickActionProps = {
   nextAction: string | null;
 };
 
-/**
- * Why the Analyze action cannot run right now, for the accessibility layer.
- * `available` has no reason; `loading` reads as busy through the button state.
- */
-function capacityBlockedHint(state: SecurityAnalysisCapacityState): string | undefined {
-  if (state === 'full') {
-    return i18n.t('securityAgent.analysis.capacityFull');
-  }
-  if (state === 'error') {
-    return i18n.t('securityAgent.analysis.couldNotCheckCapacity');
-  }
-  return undefined;
-}
-
 // Extracted to avoid a nested ternary (prUrl / isAnalyzable / nextAction
 // fallback) while keeping FindingRow's render body flat. `isAnalyzable`
 // (eligibility) and `capacityState` are separate so the button's presence never
@@ -150,7 +140,7 @@ function FindingRowQuickAction({
         // control never looks idle while the action cannot run yet.
         loading={startAnalysis.isPending || capacityState === 'loading'}
         disabled={capacityState !== 'available'}
-        accessibilityHint={capacityBlockedHint(capacityState)}
+        accessibilityHint={getAnalysisCapacityBlockedHint(capacityState)}
         onPress={() => {
           startAnalysis.mutate({
             findingId: finding.id,

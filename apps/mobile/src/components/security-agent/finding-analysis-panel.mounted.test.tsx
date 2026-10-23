@@ -221,7 +221,14 @@ describe('FindingAnalysisPanel completion-copy gate', () => {
     state => {
       capacity.state = state;
       const tree = renderPanel(analysisFixture({ status: null }));
-      expect(tree.root.findByType(Button).props.disabled).toBe(true);
+      const button = tree.root.findByType(Button);
+      expect(button.props.disabled).toBe(true);
+      const hints = {
+        full: i18n.t('securityAgent.analysis.capacityFull'),
+        error: i18n.t('securityAgent.analysis.couldNotCheckCapacity'),
+        loading: undefined,
+      };
+      expect(button.props.accessibilityHint).toBe(hints[state]);
       expect(tree.root.findAllByType(CenteredState)).toHaveLength(1);
     }
   );

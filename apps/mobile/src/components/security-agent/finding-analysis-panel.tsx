@@ -34,6 +34,7 @@ import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 import {
+  getAnalysisCapacityBlockedHint,
   getSecurityAnalysisDetailDescription,
   getSecurityAnalysisDetailTitle,
 } from '@/lib/security-agent-copy';
@@ -182,6 +183,7 @@ export function FindingAnalysisPanel({
           {canStartAnalysis ? (
             <Button
               disabled={startAnalysis.isPending || !hasCapacity}
+              accessibilityHint={getAnalysisCapacityBlockedHint(capacity.state)}
               onPress={handleStartAnalysis}
             >
               {startAnalysis.isPending ? (

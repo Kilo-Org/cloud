@@ -6236,7 +6236,8 @@
                     },
                     "prompt": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "maxLength": 100000
                     },
                     "mode": {
                       "type": "string",
@@ -6274,7 +6275,8 @@
                     },
                     "arguments": {
                       "default": "",
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 100000
                     }
                   },
                   "required": [
@@ -7669,7 +7671,8 @@
                 },
                 "arguments": {
                   "default": "",
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 100000
                 }
               },
               "required": [
@@ -7774,8 +7777,7 @@
           "pattern": "^(agent|workspace)_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
         },
         "kilo_session_id": {
-          "type": "string",
-          "pattern": "^ses_[A-Za-z0-9]{26}$"
+          "type": "string"
         },
         "session_type": {
           "type": "string",
@@ -16791,7 +16793,8 @@
                         },
                         "prompt": {
                           "type": "string",
-                          "minLength": 1
+                          "minLength": 1,
+                          "maxLength": 100000
                         },
                         "mode": {
                           "type": "string",
@@ -16829,7 +16832,8 @@
                         },
                         "arguments": {
                           "default": "",
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 100000
                         }
                       },
                       "required": [
@@ -18297,7 +18301,8 @@
                 },
                 "arguments": {
                   "default": "",
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 100000
                 }
               },
               "required": [
@@ -34403,9 +34408,24 @@
           ]
         },
         "profileId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "bodySchema": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
         },
         "promptTemplate": {
           "type": "string",
@@ -34472,6 +34492,7 @@
       "variant",
       "sandboxallocation",
       "profileid",
+      "bodyschema",
       "prompttemplate",
       "autocommit",
       "condenseoncomplete",
@@ -34480,7 +34501,7 @@
       "cronexpression",
       "crontimezone"
     ],
-    "searchBlob": "webhookTriggers.create Create a new webhook or scheduled trigger that runs a Cloud Agent or KiloClaw Chat on an incoming request or cron schedule. Use this to set up an automation that fires when a GitHub event or webhook arrives. webhooktriggers create triggerid organizationid runascreator targettype kiloclawinstanceid githubrepo mode model variant sandboxallocation profileid prompttemplate autocommit condenseoncomplete webhookauth activationmode cronexpression crontimezone triggerId organizationId runAsCreator targetType kiloclawInstanceId githubRepo mode model variant sandboxAllocation profileId promptTemplate autoCommit condenseOnComplete webhookAuth activationMode cronExpression cronTimezone"
+    "searchBlob": "webhookTriggers.create Create a new webhook or scheduled trigger that runs a Cloud Agent or KiloClaw Chat on an incoming request or cron schedule. Use this to set up an automation that fires when a GitHub event or webhook arrives. webhooktriggers create triggerid organizationid runascreator targettype kiloclawinstanceid githubrepo mode model variant sandboxallocation profileid bodyschema prompttemplate autocommit condenseoncomplete webhookauth activationmode cronexpression crontimezone triggerId organizationId runAsCreator targetType kiloclawInstanceId githubRepo mode model variant sandboxAllocation profileId bodySchema promptTemplate autoCommit condenseOnComplete webhookAuth activationMode cronExpression cronTimezone"
   },
   "webhookTriggers.delete": {
     "path": "webhookTriggers.delete",
@@ -34766,9 +34787,24 @@
           "maxLength": 10000
         },
         "profileId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "bodySchema": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
         },
         "autoCommit": {
           "type": [
@@ -34836,6 +34872,7 @@
       "sandboxallocation",
       "prompttemplate",
       "profileid",
+      "bodyschema",
       "autocommit",
       "condenseoncomplete",
       "isactive",
@@ -34843,7 +34880,7 @@
       "cronexpression",
       "crontimezone"
     ],
-    "searchBlob": "webhookTriggers.update Update an existing trigger's settings, such as its model, prompt template, profile, active state, webhook authentication, or cron schedule. Use this to change or disable a trigger. webhooktriggers update triggerid organizationid mode model variant sandboxallocation prompttemplate profileid autocommit condenseoncomplete isactive webhookauth cronexpression crontimezone triggerId organizationId mode model variant sandboxAllocation promptTemplate profileId autoCommit condenseOnComplete isActive webhookAuth cronExpression cronTimezone"
+    "searchBlob": "webhookTriggers.update Update an existing trigger's settings, such as its model, prompt template, profile, active state, webhook authentication, or cron schedule. Use this to change or disable a trigger. webhooktriggers update triggerid organizationid mode model variant sandboxallocation prompttemplate profileid bodyschema autocommit condenseoncomplete isactive webhookauth cronexpression crontimezone triggerId organizationId mode model variant sandboxAllocation promptTemplate profileId bodySchema autoCommit condenseOnComplete isActive webhookAuth cronExpression cronTimezone"
   },
   "workspaceFolders.create": {
     "path": "workspaceFolders.create",

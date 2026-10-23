@@ -1388,7 +1388,7 @@
       "couldNotLoad": "Tidak dapat memuat Agen keamanan.",
       "installApp": "Pasang aplikasi GitHub",
       "reauthorizeButton": "Otorisasi ulang aplikasi GitHub",
-      "reauthorizeDescription": "Agen keamanan memerlukan izin vulnerability_alerts untuk mengakses peringatan Dependabot. Otorisasi ulang aplikasi GitHub untuk memberikan izin ini.",
+      "reauthorizeDescription": "Agen keamanan memerlukan izin untuk membaca peringatan Dependabot. Otorisasi ulang aplikasi GitHub untuk memberikan izin ini.",
       "reauthorizeTitle": "Perlu izin tambahan",
       "setupFailed": "Tidak dapat memulai penyiapan GitHub. Coba lagi."
     },

@@ -1948,7 +1948,7 @@
       "couldNotLoad": "Die Sekuriteitsagent kon nie gelaai word nie.",
       "installApp": "Installeer die GitHub-app",
       "reauthorizeButton": "Magtig die GitHub-app weer",
-      "reauthorizeDescription": "Die Sekuriteitsagent benodig die vulnerability_alerts-toestemming vir toegang tot Dependabot-waarskuwings. Magtig die GitHub-app weer om hierdie toestemming te verleen.",
+      "reauthorizeDescription": "Die Sekuriteitsagent benodig toestemming om Dependabot-waarskuwings te lees. Magtig die GitHub-app weer om hierdie toestemming te verleen.",
       "reauthorizeTitle": "Bykomende toestemmings vereis",
       "setupFailed": "Kon nie GitHub-opstelling begin nie. Probeer asseblief weer."
     },

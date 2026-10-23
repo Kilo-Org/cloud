@@ -2017,7 +2017,7 @@
       "couldNotLoad": "Ma setax jitgħabba l-aġent tas-sigurtà.",
       "installApp": "Installa l-app ta' GitHub",
       "reauthorizeButton": "Erġa' awtorizza l-app ta' GitHub",
-      "reauthorizeDescription": "L-aġent tas-sigurtà jeħtieġ il-permess vulnerability_alerts biex jaċċessa l-allerti ta' Dependabot. Erġa' awtorizza l-app ta' GitHub biex tagħti dan il-permess.",
+      "reauthorizeDescription": "L-aġent tas-sigurtà jeħtieġ il-permess biex jaqra l-allerti ta' Dependabot. Erġa' awtorizza l-app ta' GitHub biex tagħti dan il-permess.",
       "reauthorizeTitle": "Permessi addizzjonali meħtieġa",
       "setupFailed": "Ma setgħetx tinbeda l-konfigurazzjoni ta' GitHub. Jekk jogħġbok erġa' pprova."
     },

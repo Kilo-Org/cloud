@@ -1948,7 +1948,7 @@
       "couldNotLoad": "نەتوانرا ئەجێنتی ئاسایش بار بکرێت.",
       "installApp": "ئەپی GitHub دابمەزرێنە",
       "reauthorizeButton": "دووبارە مۆڵەت بدە بە ئەپی GitHub",
-      "reauthorizeDescription": "ئەجێنتی ئاسایش بۆ دەستگەیشتن بە ئاگادارکردنەوەکانی Dependabot پێویستی بە مۆڵەتی vulnerability_alerts هەیە. بۆ پێدانی ئەم مۆڵەتە، دووبارە مۆڵەت بدە بە ئەپی GitHub.",
+      "reauthorizeDescription": "ئەجێنتی ئاسایش پێویستی بە مۆڵەت هەیە بۆ خوێندنەوەی ئاگادارکردنەوەکانی Dependabot. بۆ پێدانی ئەم مۆڵەتە، دووبارە مۆڵەت بدە بە ئەپی GitHub.",
       "reauthorizeTitle": "مۆڵەتی زیاتر پێویستە",
       "setupFailed": "نەتوانرا ڕێکخستنی GitHub دەست پێ بکرێت. تکایە دووبارە هەوڵ بدە."
     },

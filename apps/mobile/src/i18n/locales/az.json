@@ -1948,7 +1948,7 @@
       "couldNotLoad": "Təhlükəsizlik agentini yükləmək mümkün olmadı.",
       "installApp": "GitHub tətbiqini quraşdır",
       "reauthorizeButton": "GitHub tətbiqinə yenidən icazə ver",
-      "reauthorizeDescription": "Təhlükəsizlik agentinə Dependabot bildirişlərinə giriş üçün vulnerability_alerts icazəsi lazımdır. Bu icazəni vermək üçün GitHub tətbiqinə yenidən icazə ver.",
+      "reauthorizeDescription": "Təhlükəsizlik agentinə Dependabot bildirişlərini oxumaq üçün icazə lazımdır. Bu icazəni vermək üçün GitHub tətbiqinə yenidən icazə ver.",
       "reauthorizeTitle": "Əlavə icazələr tələb olunur",
       "setupFailed": "GitHub quraşdırmasını başlatmaq mümkün olmadı. Yenidən cəhd et."
     },

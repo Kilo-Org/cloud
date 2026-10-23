@@ -1948,7 +1948,7 @@
       "couldNotLoad": "የደህንነት ወኪሉን መጫን አልተቻለም።",
       "installApp": "የGitHub መተግበሪያን ይጫኑ",
       "reauthorizeButton": "ለGitHub መተግበሪያ እንደገና ፈቃድ ይስጡ",
-      "reauthorizeDescription": "የደህንነት ወኪሉ የDependabot ማስጠንቀቂያዎችን ለማግኘት የvulnerability_alerts ፈቃድ ያስፈልገዋል። ይህን ፈቃድ ለመስጠት የGitHub መተግበሪያን እንደገና ይፍቀዱ።",
+      "reauthorizeDescription": "የደህንነት ወኪሉ የDependabot ማስጠንቀቂያዎችን ለማንበብ ፈቃድ ያስፈልገዋል። ይህን ፈቃድ ለመስጠት የGitHub መተግበሪያን እንደገና ይፍቀዱ።",
       "reauthorizeTitle": "ተጨማሪ ፈቃዶች ያስፈልጋሉ",
       "setupFailed": "GitHubን የማዋቀር ሂደት መጀመር አልተቻለም። እባክዎ እንደገና ይሞክሩ።"
     },

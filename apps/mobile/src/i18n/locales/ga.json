@@ -2017,7 +2017,7 @@
       "couldNotLoad": "Níorbh fhéidir an Gníomhaire slándála a lódáil.",
       "installApp": "Suiteáil an aip GitHub",
       "reauthorizeButton": "Athúdaraigh an aip GitHub",
-      "reauthorizeDescription": "Teastaíonn an cead vulnerability_alerts ón nGníomhaire slándála chun rochtain a fháil ar fholáirimh Dependabot. Athúdaraigh an aip GitHub chun an cead seo a thabhairt.",
+      "reauthorizeDescription": "Teastaíonn cead ón nGníomhaire slándála chun foláirimh Dependabot a léamh. Athúdaraigh an aip GitHub chun an cead seo a thabhairt.",
       "reauthorizeTitle": "Teastaíonn ceadanna breise",
       "setupFailed": "Níorbh fhéidir socrú GitHub a thosú. Bain triail as arís le do thoil."
     },

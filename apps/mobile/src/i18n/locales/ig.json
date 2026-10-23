@@ -1948,7 +1948,7 @@
       "couldNotLoad": "Enweghị ike ibudata onye nnọchi anya nchebe.",
       "installApp": "Wụnye ngwa GitHub",
       "reauthorizeButton": "Nye ngwa GitHub ikike ọzọ",
-      "reauthorizeDescription": "Onye nnọchi anya nchebe chọrọ ikike vulnerability_alerts iji nweta ọkwa Dependabot. Nye ngwa GitHub ikike ọzọ iji nye ikike a.",
+      "reauthorizeDescription": "Onye nnọchi anya nchebe chọrọ ikike ịgụ ọkwa Dependabot. Nye ngwa GitHub ikike ọzọ iji nye ikike a.",
       "reauthorizeTitle": "Achọrọ ikike ndị ọzọ",
       "setupFailed": "Enweghị ike ịmalite nhazi GitHub. Biko nwaa ọzọ."
     },

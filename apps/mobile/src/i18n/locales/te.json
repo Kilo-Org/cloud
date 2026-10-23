@@ -1948,7 +1948,7 @@
       "couldNotLoad": "భద్రతా ఏజెంట్‌ను లోడ్ చేయలేకపోయాము.",
       "installApp": "GitHub యాప్‌ను ఇన్‌స్టాల్ చేయండి",
       "reauthorizeButton": "GitHub యాప్‌కు మళ్లీ అనుమతి ఇవ్వండి",
-      "reauthorizeDescription": "Dependabot హెచ్చరికలను యాక్సెస్ చేయడానికి భద్రతా ఏజెంట్‌కు vulnerability_alerts అనుమతి అవసరం. ఈ అనుమతి ఇవ్వడానికి GitHub యాప్‌కు మళ్లీ అనుమతి ఇవ్వండి.",
+      "reauthorizeDescription": "Dependabot హెచ్చరికలను చదవడానికి భద్రతా ఏజెంట్‌కు అనుమతి అవసరం. ఈ అనుమతి ఇవ్వడానికి GitHub యాప్‌కు మళ్లీ అనుమతి ఇవ్వండి.",
       "reauthorizeTitle": "అదనపు అనుమతులు అవసరం",
       "setupFailed": "GitHub సెటప్‌ను ప్రారంభించలేకపోయాము. దయచేసి మళ్లీ ప్రయత్నించండి."
     },

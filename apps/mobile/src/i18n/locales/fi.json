@@ -1948,7 +1948,7 @@
       "couldNotLoad": "Tietoturva-agenttia ei voitu ladata",
       "installApp": "Asenna GitHub-sovellus",
       "reauthorizeButton": "Valtuuta GitHub-sovellus uudelleen",
-      "reauthorizeDescription": "Tietoturva-agentti tarvitsee vulnerability_alerts-käyttöoikeuden Dependabot-hälytysten lukemiseen. Myönnä käyttöoikeus valtuuttamalla GitHub-sovellus uudelleen.",
+      "reauthorizeDescription": "Tietoturva-agentti tarvitsee käyttöoikeuden Dependabot-hälytysten lukemiseen. Myönnä käyttöoikeus valtuuttamalla GitHub-sovellus uudelleen.",
       "reauthorizeTitle": "Lisäkäyttöoikeuksia tarvitaan",
       "setupFailed": "GitHubin käyttöönottoa ei voitu aloittaa. Yritä uudelleen."
     },

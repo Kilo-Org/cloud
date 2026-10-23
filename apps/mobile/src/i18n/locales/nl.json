@@ -1388,7 +1388,7 @@
       "couldNotLoad": "Security Agent kon niet worden geladen.",
       "installApp": "GitHub-app installeren",
       "reauthorizeButton": "GitHub-app opnieuw toegang geven",
-      "reauthorizeDescription": "Security Agent heeft het recht vulnerability_alerts nodig om Dependabot-waarschuwingen te bekijken. Geef de GitHub-app opnieuw toegang om dit recht te verlenen.",
+      "reauthorizeDescription": "Security Agent heeft toestemming nodig om Dependabot-waarschuwingen te lezen. Geef de GitHub-app opnieuw toegang om deze toestemming te verlenen.",
       "reauthorizeTitle": "Extra rechten vereist",
       "setupFailed": "Het instellen van GitHub kon niet worden gestart. Probeer het opnieuw."
     },

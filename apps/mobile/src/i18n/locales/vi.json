@@ -1388,7 +1388,7 @@
       "couldNotLoad": "Không thể tải Trợ lý bảo mật.",
       "installApp": "Cài đặt ứng dụng GitHub",
       "reauthorizeButton": "Cấp quyền lại cho ứng dụng GitHub",
-      "reauthorizeDescription": "Trợ lý bảo mật cần quyền vulnerability_alerts để truy cập cảnh báo Dependabot. Hãy cấp quyền lại cho ứng dụng GitHub để bổ sung quyền này.",
+      "reauthorizeDescription": "Trợ lý bảo mật cần quyền đọc cảnh báo Dependabot. Hãy cấp quyền lại cho ứng dụng GitHub để trao quyền này.",
       "reauthorizeTitle": "Cần thêm quyền",
       "setupFailed": "Không thể bắt đầu thiết lập GitHub. Vui lòng thử lại."
     },

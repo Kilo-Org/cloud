@@ -132,7 +132,7 @@ export function SharePayloadPreview({ payload, validation }: Readonly<SharePaylo
   return (
     <View className="gap-2 px-4 pb-2">
       {hasText ? (
-        <Text numberOfLines={3} className="text-sm leading-5 text-foreground">
+        <Text numberOfLines={3} className="text-sm leading-[1.25rem] text-foreground">
           {text}
         </Text>
       ) : null}

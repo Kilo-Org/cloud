@@ -154,6 +154,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
+          className="px-6"
           title={t('securityAgent.findingDetail.title')}
           showBackButton
           onBack={handleBack}
@@ -171,6 +172,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
+          className="px-6"
           title={t('securityAgent.findingDetail.title')}
           showBackButton
           onBack={handleBack}
@@ -188,6 +190,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
+          className="px-6"
           title={t('securityAgent.findingDetail.title')}
           showBackButton
           onBack={handleBack}
@@ -213,6 +216,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        className="px-6"
         title={t('securityAgent.findingDetail.title')}
         eyebrow={finding.repo_full_name}
         showBackButton

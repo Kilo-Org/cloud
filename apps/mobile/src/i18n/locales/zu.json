@@ -1479,7 +1479,15 @@
       "instructions": "Imiyalo (ayidingekile)",
       "instructionsPlaceholder": "Okuthile umhloli okumele agxile kukho…",
       "starting": "Kuqaliswa ukuhlolwa…",
-      "start": "Qala ukuhlola"
+      "start": "Qala ukuhlola",
+      "startNotFound": "Asikwazanga ukuthola {{requestNoun}} ku-{{provider}}. Hlola i-URL, noma qinisekisa ukuthi indawo yokugcina ikhodi ivulekile kumphakathi.",
+      "startRateLimited": "Kukhona imikhawulo yezicelo ku-{{provider}} njengamanje. Zama futhi ngemizuzu embalwa.",
+      "startNotAllowed": "Awunayo imvume yokuqalisa ukuhlolwa {{requestNoun}}.",
+      "startProviderNeedsAttention": "Ukuhlolwa okwenziwa ngesandla kudinga unxibelelwano olujwayelekile kwi-{{provider}}. Xhuma bese uzama futhi.",
+      "startAlreadyRunning": "Ukuhlolwa {{requestNoun}} sekuyaqhubeka.",
+      "startRejected": "Akukwazeki ukuhlolwa {{requestNoun}}. Qinisekisa ukuthi kuvulekile, akukho idrafu, futhi i-URL ilungile.",
+      "startProviderUnavailable": "Asikwazanga ukufinyelela ku-{{provider}} ukufunda {{requestNoun}}. Zama futhi.",
+      "startFailed": "Asikwazanga ukuqalisa ukuhlolwa. Hlola unxibelelwano lwakho bese uzama futhi."
     },
     "notConnectedReadOnly": "{{platform}} ayixhunyiwe. Abanikazi benhlangano nabalawuli kuphela abangayixhuma.",
     "gitlab": {

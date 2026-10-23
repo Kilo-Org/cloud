@@ -1517,7 +1517,15 @@
       "instructions": "Pokyny (voliteľné)",
       "instructionsPlaceholder": "Konkrétne oblasti, na ktoré sa má kontrola zamerať…",
       "starting": "Spúšťa sa kontrola…",
-      "start": "Spustiť kontrolu"
+      "start": "Spustiť kontrolu",
+      "startNotFound": "{{provider}} nenašiel {{requestNoun}}. Skontrolujte URL adresu alebo sa uistite, že repozitár je verejný.",
+      "startRateLimited": "{{provider}} momentálne obmedzuje požiadavky. Skúste to znova o niekoľko minút.",
+      "startNotAllowed": "Nemáte povolenie spustiť kontrolu pre {{requestNoun}}.",
+      "startProviderNeedsAttention": "Manuálne kontroly vyžadujú štandardné pripojenie {{provider}}. Pripojte ho a skúste to znova.",
+      "startAlreadyRunning": "Kontrola pre {{requestNoun}} už prebieha.",
+      "startRejected": "Tento {{requestNoun}} nie je možné skontrolovať. Uistite sa, že je otvorený, nie je koncept, a že URL adresa je správna.",
+      "startProviderUnavailable": "{{provider}} nie je dostupný, preto sa nepodarilo prečítať {{requestNoun}}. Skúste to znova.",
+      "startFailed": "Kontrolu sa nepodarilo spustiť. Skontrolujte pripojenie a skúste to znova."
     },
     "notConnectedReadOnly": "Platforma {{platform}} nie je pripojená. Pripojiť ju môžu iba vlastníci organizácie a správcovia.",
     "gitlab": {

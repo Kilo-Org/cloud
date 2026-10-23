@@ -1517,7 +1517,15 @@
       "instructions": "Navodila (neobvezno)",
       "instructionsPlaceholder": "Posebne zahteve za pregled…",
       "starting": "Zaganjanje pregleda…",
-      "start": "Začni pregled"
+      "start": "Začni pregled",
+      "startNotFound": "Pri {{provider}} ta {{requestNoun}} ne obstaja. Preveri URL ali pa se prepričaj, da je repozitorij javen.",
+      "startRateLimited": "{{provider}} trenutno omejuje število zahtev. Poskusi znova v nekaj minutah.",
+      "startNotAllowed": "Ta {{requestNoun}} se ne more pregledati, ker nimaš dovoljenja.",
+      "startProviderNeedsAttention": "Ročni pregledi potrebujejo običajno povezavo z {{provider}}. Poveži ga in poskusi znova.",
+      "startAlreadyRunning": "Ta {{requestNoun}} je že v postopku pregleda.",
+      "startRejected": "Ta {{requestNoun}} ne ustreza pogojem za pregled. Preveri, ali je status »odprt« in ne »osnutek«, ter ali je URL pravilen.",
+      "startProviderUnavailable": "Povezave z {{provider}} ni bilo mogoče vzpostaviti, zato ta {{requestNoun}} trenutno ni na voljo. Poskusi znova.",
+      "startFailed": "Pregleda ni bilo mogoče zagnati. Preveri svojo povezavo in poskusi znova."
     },
     "notConnectedReadOnly": "Povezava s platformo {{platform}} ni vzpostavljena. Vzpostavijo jo lahko samo lastniki organizacije in skrbniki.",
     "gitlab": {

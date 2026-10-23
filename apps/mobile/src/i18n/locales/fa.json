@@ -1479,7 +1479,15 @@
       "instructions": "دستورالعمل‌ها (اختیاری)",
       "instructionsPlaceholder": "نکات خاصی که بررسی‌کننده باید روی آن‌ها تمرکز کند…",
       "starting": "در حال شروع بررسی…",
-      "start": "شروع بررسی"
+      "start": "شروع بررسی",
+      "startNotFound": "{{provider}} آن {{requestNoun}} را پیدا نکرد. URL را بررسی کنید یا مطمئن شوید مخزن عمومی است.",
+      "startRateLimited": "{{provider}} در حال حاضر درخواست‌ها را محدود کرده است. چند دقیقه دیگر دوباره تلاش کنید.",
+      "startNotAllowed": "شما مجوز شروع بررسی برای آن {{requestNoun}} را ندارید.",
+      "startProviderNeedsAttention": "بررسی‌های دستی به اتصال استاندارد {{provider}} نیاز دارند. آن را متصل کنید و دوباره تلاش کنید.",
+      "startAlreadyRunning": "یک بررسی برای آن {{requestNoun}} از قبل در حال اجراست.",
+      "startRejected": "آن {{requestNoun}} قابل بررسی نیست. مطمئن شوید باز است، پیش‌نویس نیست و URL درست است.",
+      "startProviderUnavailable": "اتصال به {{provider}} برای خواندن آن {{requestNoun}} ممکن نشد. دوباره تلاش کنید.",
+      "startFailed": "نتوانستیم بررسی را شروع کنیم. اتصال خود را بررسی کنید و دوباره تلاش کنید."
     },
     "notConnectedReadOnly": "{{platform}} متصل نیست. فقط مالکان سازمان و مدیران می‌توانند آن را متصل کنند.",
     "gitlab": {

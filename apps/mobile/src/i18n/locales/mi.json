@@ -1479,7 +1479,15 @@
       "instructions": "Ngā tohutohu (he kōwhiringa)",
       "instructionsPlaceholder": "Tētahi mea motuhake hei arotahi mā te kaiarotake…",
       "starting": "Kei te tīmata i te arotake…",
-      "start": "Tīmatahia te arotake"
+      "start": "Tīmatahia te arotake",
+      "startNotFound": "Kāore a {{provider}} i te kite i taua {{requestNoun}}. Tirohia te URL, whakamōhiohia rānei he tūmatanui te repo.",
+      "startRateLimited": "Kei te whakawhāiti a {{provider}} i ngā tono i tēnei wā. Whakamātau anō i roto i ētahi meneti.",
+      "startNotAllowed": "Kāore he whakaaetanga āu ki te tīmata i tētahi arotake mō taua {{requestNoun}}.",
+      "startProviderNeedsAttention": "Me te hononga {{provider}} noa e taea ai ngā arotake ā-ringa. Honohia ā, ka ngana anō.",
+      "startAlreadyRunning": "Kei te rere tonu tētahi arotake mō taua {{requestNoun}}.",
+      "startRejected": "Kāore e taea te arotake i taua {{requestNoun}}. Whakamōhiohia kei te tuwhera, ehara i te huka, me te tika hoki te URL.",
+      "startProviderUnavailable": "Kāore i taea te tae atu ki a {{provider}} hei pānui i taua {{requestNoun}}. Whakamātau anō.",
+      "startFailed": "Kāore i taea te tīmata i te arotake. Tirohia tō hononga, kātahi ka whakamātau anō."
     },
     "notConnectedReadOnly": "Kāore anō kia honoa a {{platform}}. Ko ngā rangatira o te rōpū me ngā kaiwhakahaere anake ka āhei ki te hono.",
     "gitlab": {

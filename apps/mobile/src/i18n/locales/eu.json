@@ -1479,7 +1479,15 @@
       "instructions": "Argibideak (aukerakoak)",
       "instructionsPlaceholder": "Berrikusleak aztertu beharreko zerbait zehatza…",
       "starting": "Berrikuspena hasten…",
-      "start": "Hasi berrikuspena"
+      "start": "Hasi berrikuspena",
+      "startNotFound": "{{provider}} ezin izan du {{requestNoun}} hori aurkitu. Egiaztatu URLa, edo ziurtatu biltegia publikoa dela.",
+      "startRateLimited": "{{provider}} eskaerak mugatzen ari da une honetan. Saiatu berriro minutu batzuen buruan.",
+      "startNotAllowed": "Ez duzu baimenik {{requestNoun}} horren berrikuspena hasteko.",
+      "startProviderNeedsAttention": "Eskuzko berrikusek {{provider}} konexio estandarra behar dute. Konektatu eta saiatu berriro.",
+      "startAlreadyRunning": "{{requestNoun}} horren berrikuspen bat dagoeneko abian da.",
+      "startRejected": "Ezin da {{requestNoun}} hori berrikusi. Ziurtatu irekia dagoela, zirriborroa ez dela eta URLa zuzena dela.",
+      "startProviderUnavailable": "Ezin izan da {{provider}} atzitu {{requestNoun}} hori irakurtzeko. Saiatu berriro.",
+      "startFailed": "Ezin izan da berrikuspena hasi. Egiaztatu zure konexioa eta saiatu berriro."
     },
     "notConnectedReadOnly": "{{platform}} ez dago konektatuta. Erakundeko jabeek eta administratzaileek soilik konekta dezakete.",
     "gitlab": {

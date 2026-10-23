@@ -1570,7 +1570,15 @@
       "instructions": "Instructions (optional)",
       "instructionsPlaceholder": "Anything specific the reviewer should focus on…",
       "starting": "Starting review…",
-      "start": "Start review"
+      "start": "Start review",
+      "startNotFound": "{{provider}} could not find that {{requestNoun}}. Check the URL, or make sure the repository is public.",
+      "startRateLimited": "{{provider}} is limiting requests right now. Try again in a few minutes.",
+      "startNotAllowed": "You don't have permission to start a review for that {{requestNoun}}.",
+      "startProviderNeedsAttention": "Manual reviews need the standard {{provider}} connection. Connect it and try again.",
+      "startAlreadyRunning": "A review for that {{requestNoun}} is already running.",
+      "startRejected": "That {{requestNoun}} can't be reviewed. Make sure it is open, not a draft, and that the URL is correct.",
+      "startProviderUnavailable": "Could not reach {{provider}} to read that {{requestNoun}}. Try again.",
+      "startFailed": "Couldn't start the review. Check your connection and try again."
     },
     "notConnectedReadOnly": "{{platform}} isn't connected. Only organization owners and admins can connect it.",
     "gitlab": {

@@ -1479,7 +1479,15 @@
       "instructions": "Torolalana (tsy voatery)",
       "instructionsPlaceholder": "Zavatra manokana hifantohan'ny mpanamarina…",
       "starting": "Manomboka ny fanamarinana…",
-      "start": "Atombohy ny fanamarinana"
+      "start": "Atombohy ny fanamarinana",
+      "startNotFound": "Tsy hitan'ny {{provider}} ilay {{requestNoun}}. Jereo ny URL, na harenao fa malalaka ny tahiry.",
+      "startRateLimited": "Mametra fangatahana ny {{provider}} amin'izao fotoana izao. Andramo indray afaka minutra vitsivitsy.",
+      "startNotAllowed": "Tsy manana alalana hanomboka fanamarinana amin'io {{requestNoun}} io ianao.",
+      "startProviderNeedsAttention": "Ny fanamarinana atomboka mivantana dia mila ny fifandraisana {{provider}} mahazatra. Ampifandraiso izy ary andramo indray.",
+      "startAlreadyRunning": "Fanamarinana amin'io {{requestNoun}} io no efa mandeha.",
+      "startRejected": "Tsy azo amarinina io {{requestNoun}} io. Harenao fa misokatra, tsy andrafotsy izy, ary fa marina ny URL.",
+      "startProviderUnavailable": "Tsy nahatratra ny {{provider}} hamaky io {{requestNoun}} io. Andramo indray.",
+      "startFailed": "Tsy voatombohy ny fanamarinana. Jereo ny fifandraisanao ary andramo indray."
     },
     "notConnectedReadOnly": "Tsy mifandray ny {{platform}}. Ny tompon'ny fikambanana sy ny mpitantana ihany no afaka mampifandray azy.",
     "gitlab": {

@@ -1479,7 +1479,15 @@
       "instructions": "Udhëzimet (opsionale)",
       "instructionsPlaceholder": "Çështje të veçanta ku duhet të përqendrohet shqyrtuesi…",
       "starting": "Po nis shqyrtimi…",
-      "start": "Fillo shqyrtimin"
+      "start": "Fillo shqyrtimin",
+      "startNotFound": "{{provider}} nuk gjeti dot atë {{requestNoun}}. Kontrollo URL-në ose sigurohu që deposs-i është publik.",
+      "startRateLimited": "{{provider}} po kufizon kërkesat në këtë moment. Provo përsëri pas disa minutash.",
+      "startNotAllowed": "Nuk ke leje të nisësh një shqyrtim për atë {{requestNoun}}.",
+      "startProviderNeedsAttention": "Shqyrtimet manuale kërkojnë lidhjen standarde të {{provider}}. Lidhe atë dhe provo përsëri.",
+      "startAlreadyRunning": "Një shqyrtim për atë {{requestNoun}} tashmë po ekzekutohet.",
+      "startRejected": "Kjo {{requestNoun}} nuk mund të shqyrtohet. Sigurohu që është e hapur, jo draft, dhe që URL-ja është e saktë.",
+      "startProviderUnavailable": "Nuk u arrit të kontaktohej {{provider}} për të lexuar atë {{requestNoun}}. Provo përsëri.",
+      "startFailed": "Shqyrtimi nuk u nis. Kontrollo lidhjen dhe provo përsëri."
     },
     "notConnectedReadOnly": "{{platform}} nuk është i lidhur. Vetëm pronarët e organizatës dhe administratorët mund ta lidhin.",
     "gitlab": {

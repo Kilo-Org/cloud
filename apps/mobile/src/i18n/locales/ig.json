@@ -1479,7 +1479,15 @@
       "instructions": "Ntụziaka (ọ bụghị iwu)",
       "instructionsPlaceholder": "Ihe a kapịrị ọnụ ị chọrọ ka onye nyocha lekwasị anya na ya…",
       "starting": "Na-amalite nyocha…",
-      "start": "Malite nyocha"
+      "start": "Malite nyocha",
+      "startNotFound": "{{provider}} enweghị ike ịchọta {{requestNoun}} ahụ. Lelee URL ahụ, ma ọ bụ jide n'aka na ebe nchekwa koodu ahụ dị n'ihu ọha.",
+      "startRateLimited": "{{provider}} na-amachi arịrịọ ugbu a. Nwaa ọzọ n'ime nkeji ole na ole.",
+      "startNotAllowed": "Ị nweghị ikike ịmalite nyocha maka {{requestNoun}} ahụ.",
+      "startProviderNeedsAttention": "Nyocha a na-eme n'aka chọrọ njikọ {{provider}} nkịtị. Jikọọ ya ma nwaa ọzọ.",
+      "startAlreadyRunning": "Nyocha maka {{requestNoun}} ahụ na-agakwa n'ihu ugbu a.",
+      "startRejected": "Enweghị ike nyochaa {{requestNoun}} ahụ. Jide n'aka na ọ meghere, na ọ bụghị edetu, nakwa na URL ahụ ziri ezi.",
+      "startProviderUnavailable": "Anyị enweghị ike irute {{provider}} iji gụọ {{requestNoun}} ahụ. Nwaa ọzọ.",
+      "startFailed": "Enweghị ike ịmalite nyocha ahụ. Lelee njikọ ịntanetị gị ma nwaa ọzọ."
     },
     "notConnectedReadOnly": "E jikọghị {{platform}}. Naanị ndị nwe nzukọ na ndị nchịkwa nwere ike ijikọ ya.",
     "gitlab": {

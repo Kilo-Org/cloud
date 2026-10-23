@@ -1479,7 +1479,15 @@
       "instructions": "સૂચનાઓ (વૈકલ્પિક)",
       "instructionsPlaceholder": "સમીક્ષકે ખાસ ધ્યાન આપવાના મુદ્દા…",
       "starting": "સમીક્ષા શરૂ થઈ રહી છે…",
-      "start": "સમીક્ષા શરૂ કરો"
+      "start": "સમીક્ષા શરૂ કરો",
+      "startNotFound": "{{provider}} પર આ {{requestNoun}} મળ્યો નહીં. URL તપાસો, અથવા ખાતરી કરો કે રિપોઝિટરી જાહેર છે.",
+      "startRateLimited": "{{provider}} અત્યારે વિનંતીઓ પર મર્યાદા લાગુ કરી રહ્યું છે. થોડી મિનિટમાં ફરી પ્રયાસ કરો.",
+      "startNotAllowed": "તમારે આ {{requestNoun}} માટે સમીક્ષા શરૂ કરવાની પરવાનગી નથી.",
+      "startProviderNeedsAttention": "જાતે કરેલી સમીક્ષાઓ માટે પ્રમાણભૂત {{provider}} જોડાણ જરૂરી છે. તે જોડો અને ફરી પ્રયાસ કરો.",
+      "startAlreadyRunning": "આ {{requestNoun}} માટે સમીક્ષા પહેલેથી ચાલી રહી છે.",
+      "startRejected": "આ {{requestNoun}}ની સમીક્ષા કરી શકાતી નથી. ખાતરી કરો કે તે ખુલ્લી છે, ડ્રાફ્ટ નથી અને URL સાચો છે.",
+      "startProviderUnavailable": "આ {{requestNoun}} વાંચવા માટે {{provider}} સાથે સંપર્ક કરી શકાયો નહીં. ફરી પ્રયાસ કરો.",
+      "startFailed": "સમીક્ષા શરૂ કરી શકાઈ નહીં. તમારું જોડાણ તપાસો અને ફરી પ્રયાસ કરો."
     },
     "notConnectedReadOnly": "{{platform}} જોડાયેલું નથી. માત્ર સંસ્થાના માલિકો અને એડમિનો જ તેને જોડી શકે છે.",
     "gitlab": {

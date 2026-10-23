@@ -1479,7 +1479,15 @@
       "instructions": "Àwọn ìtọ́sọ́nà (kò pọn dandan)",
       "instructionsPlaceholder": "Ohun pàtó tí olùṣàtúnyẹ̀wò gbọdọ̀ dojú kọ…",
       "starting": "Àtúnyẹ̀wò ń bẹ̀rẹ̀…",
-      "start": "Bẹ̀rẹ̀ àtúnyẹ̀wò"
+      "start": "Bẹ̀rẹ̀ àtúnyẹ̀wò",
+      "startNotFound": "{{provider}} kò rí {{requestNoun}} yẹn. Ṣàyẹ̀wò URL náà, tàbí dá lójú pé ìkànnì ìkójọpọ̀ náà wà fún gbogbo ènìyàn.",
+      "startRateLimited": "{{provider}} ń dín kù àwọn ìbéèrè fún ìgbà yìí. Tún gbìyànjú lẹ́yìn ìṣẹ́jú díẹ̀.",
+      "startNotAllowed": "O kò ní àṣẹ láti bẹ̀rẹ̀ àtúnyẹ̀wò fún {{requestNoun}} yẹn.",
+      "startProviderNeedsAttention": "Àtúnyẹ̀wò tí o bẹ̀rẹ̀ fúnra rẹ máa ń nilo ìjápọ̀ {{provider}} tó péye. So ó pọ̀, kí o sì tún gbìyànjú.",
+      "startAlreadyRunning": "Àtúnyẹ̀wò fún {{requestNoun}} yẹn ti ń ṣiṣẹ́ tẹ́lẹ̀.",
+      "startRejected": "A kò lè ṣe àtúnyẹ̀wò {{requestNoun}} yẹn. Dá lójú pé ó sí, kì í ṣe àkọsílẹ̀ àgbékalẹ̀, àti pé URL náà tọ́.",
+      "startProviderUnavailable": "A kò lè dé {{provider}} láti ka {{requestNoun}} yẹn. Tún gbìyànjú.",
+      "startFailed": "A kò lè bẹ̀rẹ̀ àtúnyẹ̀wò náà. Ṣàyẹ̀wò ìjápọ̀ rẹ, kí o sì tún gbìyànjú."
     },
     "notConnectedReadOnly": "A kò tíì so {{platform}} pọ̀. Àwọn ẹni tó ni àjọ àti àwọn alákòóso nìkan ló lè so ó pọ̀.",
     "gitlab": {

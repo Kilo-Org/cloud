@@ -1479,7 +1479,15 @@
       "instructions": "Təlimatlar (istəyə bağlı)",
       "instructionsPlaceholder": "Yoxlama zamanı xüsusi diqqət tələb edən məqamlar…",
       "starting": "Kod yoxlaması başlayır…",
-      "start": "Yoxlamaya başla"
+      "start": "Yoxlamaya başla",
+      "startNotFound": "{{provider}} belə bir {{requestNoun}} tapa bilmədi. URL-ni yoxla və ya deponun ictimai olduğundan əmin ol.",
+      "startRateLimited": "{{provider}} hazırda sorğuları məhdudlaşdırır. Bir neçə dəqiqədən sonra yenidən cəhd et.",
+      "startNotAllowed": "Bu {{requestNoun}} üçün yoxlama başlatmağa icazən yoxdur.",
+      "startProviderNeedsAttention": "Əl ilə yoxlamalar standart {{provider}} bağlantısı tələb edir. Onu qoş və yenidən cəhd et.",
+      "startAlreadyRunning": "Həmin {{requestNoun}} üçün yoxlama artıq davam edir.",
+      "startRejected": "Bu {{requestNoun}} yoxlana bilməz. Onun açıq, qaralama olmadığından və URL-nin düzgün olduğundan əmin ol.",
+      "startProviderUnavailable": "Həmin {{requestNoun}} məlumatlarını {{provider}}-dan oxumaq mümkün olmadı. Yenidən cəhd et.",
+      "startFailed": "Yoxlamanı başlatmaq mümkün olmadı. Bağlantını yoxla və yenidən cəhd et."
     },
     "notConnectedReadOnly": "{{platform}} qoşulmayıb. Onu yalnız təşkilat sahibləri və inzibatçılar qoşa bilər.",
     "gitlab": {

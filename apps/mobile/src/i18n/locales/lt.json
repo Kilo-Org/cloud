@@ -1517,7 +1517,15 @@
       "instructions": "Instrukcijos (neprivaloma)",
       "instructionsPlaceholder": "Konkretūs dalykai, į kuriuos reikia atkreipti dėmesį…",
       "starting": "Pradedama peržiūra…",
-      "start": "Pradėti peržiūrą"
+      "start": "Pradėti peržiūrą",
+      "startNotFound": "Tokia {{requestNoun}} {{provider}} neegzistuoja. Patikrink URL arba įsitikink, kad saugykla yra vieša.",
+      "startRateLimited": "{{provider}} šiuo metu riboja užklausas. Bandyk dar kartą po kelių minučių.",
+      "startNotAllowed": "Neturi leidimo pradėti peržiūros — ši {{requestNoun}} tau neprieinama.",
+      "startProviderNeedsAttention": "Rankinėms peržiūroms reikia įprasto {{provider}} ryšio. Prijunk jį ir bandyk dar kartą.",
+      "startAlreadyRunning": "Tokia {{requestNoun}} jau turi vykstančią peržiūrą.",
+      "startRejected": "Tokia {{requestNoun}} negali būti peržiūrima. Įsitikink, kad ji yra atvira, o ne juodraštinė, ir kad URL yra teisingas.",
+      "startProviderUnavailable": "Nepavyko pasiekti {{provider}}, kad būtų perskaityta ši {{requestNoun}}. Bandyk dar kartą.",
+      "startFailed": "Nepavyko pradėti peržiūros. Patikrink interneto ryšį ir bandyk dar kartą."
     },
     "notConnectedReadOnly": "Platforma {{platform}} neprijungta. Ją prijungti gali tik organizacijos savininkai ir administratoriai.",
     "gitlab": {

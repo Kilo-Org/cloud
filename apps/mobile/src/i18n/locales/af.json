@@ -1479,7 +1479,15 @@
       "instructions": "Instruksies (opsioneel)",
       "instructionsPlaceholder": "Enigiets spesifieks waarop die hersiener moet fokus…",
       "starting": "Hersiening begin…",
-      "start": "Begin hersiening"
+      "start": "Begin hersiening",
+      "startNotFound": "Daardie {{requestNoun}} kon nie by {{provider}} gevind word nie. Kontroleer die URL, of maak seker die bewaarplek is publiek.",
+      "startRateLimited": "{{provider}} beperk tans versoeke. Probeer oor 'n paar minute weer.",
+      "startNotAllowed": "Jy het nie toestemming om 'n hersiening vir daardie {{requestNoun}} te begin nie.",
+      "startProviderNeedsAttention": "Handmatige hersienings benodig die standaard {{provider}}-koppeling. Koppel dit en probeer weer.",
+      "startAlreadyRunning": "'n Hersiening vir daardie {{requestNoun}} loop reeds.",
+      "startRejected": "Daardie {{requestNoun}} kan nie hersien word nie. Maak seker dit is oop, nie 'n konsep nie, en dat die URL korrek is.",
+      "startProviderUnavailable": "{{provider}} kon nie bereik word om daardie {{requestNoun}} te lees nie. Probeer weer.",
+      "startFailed": "Die hersiening kon nie begin word nie. Kontroleer jou verbinding en probeer weer."
     },
     "notConnectedReadOnly": "{{platform}} is nie gekoppel nie. Slegs organisasie-eienaars en administrateurs kan dit koppel.",
     "gitlab": {

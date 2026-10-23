@@ -1536,7 +1536,15 @@
       "instructions": "Struzzjonijiet (mhux obbligatorji)",
       "instructionsPlaceholder": "Xi ħaġa speċifika li r-reviżur għandu jiffoka fuqha…",
       "starting": "Qed tibda r-reviżjoni…",
-      "start": "Ibda r-reviżjoni"
+      "start": "Ibda r-reviżjoni",
+      "startNotFound": "{{provider}} ma setax isib {{requestNoun}}. Iċċekkja l-URL jew kun żgur li r-repożitorju huwa pubbliku.",
+      "startRateLimited": "{{provider}} qed tillimita r-rikjesti bħalissa. Erġa' pprova f'ftit minuti.",
+      "startNotAllowed": "M'għandekx permess biex tibda reviżjoni għal {{requestNoun}}.",
+      "startProviderNeedsAttention": "Ir-reviżjonijiet manwalji jeħtieġu l-konnessjoni standard ta' {{provider}}. Ikkonnettjaha u erġa' pprova.",
+      "startAlreadyRunning": "Reviżjoni għal {{requestNoun}} diġà għadha għaddejja.",
+      "startRejected": "{{requestNoun}} ma jistax jiġi rrevedut. Kun żgur li huwa miftuħ, mhux abbozz, u li l-URL huwa korrett.",
+      "startProviderUnavailable": "Ma stajniex inilħqu {{provider}} biex naqraw {{requestNoun}}. Erġa' pprova.",
+      "startFailed": "Ir-reviżjoni ma setgħetx tibda. Iċċekkja l-konnessjoni tiegħek u erġa' pprova."
     },
     "notConnectedReadOnly": "{{platform}} mhux konness. Is-sidien u l-amministraturi tal-organizzazzjoni biss jistgħu jikkonnettjawh.",
     "gitlab": {

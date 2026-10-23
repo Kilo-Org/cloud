@@ -1498,7 +1498,15 @@
       "instructions": "Instruções (opcionais)",
       "instructionsPlaceholder": "Aspetos específicos a rever…",
       "starting": "A iniciar a revisão…",
-      "start": "Iniciar revisão"
+      "start": "Iniciar revisão",
+      "startNotFound": "{{provider}} não conseguiu encontrar esse {{requestNoun}}. Verifica o URL ou certifica-te de que o repositório é público.",
+      "startRateLimited": "O {{provider}} está a limitar pedidos neste momento. Tenta novamente dentro de alguns minutos.",
+      "startNotAllowed": "Não tens permissão para iniciar uma revisão desse {{requestNoun}}.",
+      "startProviderNeedsAttention": "As revisões manuais precisam da ligação normal ao {{provider}}. Liga-o e tenta novamente.",
+      "startAlreadyRunning": "Já está a decorrer uma revisão desse {{requestNoun}}.",
+      "startRejected": "Esse {{requestNoun}} não pode ser revisto. Certifica-te de que está aberto, que não é um rascunho e de que o URL está correto.",
+      "startProviderUnavailable": "Não foi possível contactar o {{provider}} para ler esse {{requestNoun}}. Tenta novamente.",
+      "startFailed": "Não foi possível iniciar a revisão. Verifica a tua ligação e tenta novamente."
     },
     "notConnectedReadOnly": "O {{platform}} não está ligado. Apenas os proprietários da organização e os administradores o podem ligar.",
     "gitlab": {

@@ -23,6 +23,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { ManualReviewActionFooter } from './manual-review-action-footer';
 import { ManualReviewPlatformPicker } from './manual-review-platform-picker';
+import { manualReviewStartFailureMessage } from './manual-review-start-error';
 import { ManualReviewStartFeedback } from './manual-review-start-feedback';
 import { MANUAL_REVIEW_START_DEADLINE_MS, useDeadlineWatchedStart } from './deadline-watched-start';
 
@@ -126,16 +127,14 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             // render the localized wait copy instead of the raw timeout text.
             // Matched by error name, not instanceof: the deadline class can
             // cross a module boundary where its identity is lost. Anything
-            // else is the server's or transport's own message.
+            // else settles with the copy for its tRPC error code — the
+            // server's own message is English and must not reach this
+            // localized screen.
             if (isDeadlineStall(error)) {
               settle(t('common.takingLonger'));
               return;
             }
-            const message =
-              error instanceof Error && error.message
-                ? error.message
-                : t('codeReviewer.unknownError');
-            settle(message);
+            settle(manualReviewStartFailureMessage(error, platform));
           },
         }
       );

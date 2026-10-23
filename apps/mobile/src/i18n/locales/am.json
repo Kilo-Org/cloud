@@ -1479,7 +1479,15 @@
       "instructions": "መመሪያዎች (አማራጭ)",
       "instructionsPlaceholder": "ገምጋሚው በተለይ ትኩረት እንዲሰጠው የሚፈልጉት ነገር…",
       "starting": "ግምገማን በመጀመር ላይ…",
-      "start": "ግምገማ ይጀምሩ"
+      "start": "ግምገማ ይጀምሩ",
+      "startNotFound": "{{provider}} ያንን {{requestNoun}} ማግኘት አልቻለም። URLውን ይፈትሹ፣ ወይም መጋዘኑ ይፋዊ መሆኑን ያረጋግጡ።",
+      "startRateLimited": "{{provider}} አሁን ጥያቄዎችን እየገደበ ነው። ከጥቂት ደቂቃዎች በኋላ እንደገና ይሞክሩ።",
+      "startNotAllowed": "ያንን {{requestNoun}} ግምገማ ለመጀመር ፈቃድ የለዎትም።",
+      "startProviderNeedsAttention": "በተጠቃሚ የሚጀመሩ ግምገማዎች መደበኛ የ{{provider}} ግንኙነት ያስፈልጋቸዋል። ያገናኙት እና እንደገና ይሞክሩ።",
+      "startAlreadyRunning": "ለዚያ {{requestNoun}} ግምገማ ቀድሞውኑ በሂደት ላይ ነው።",
+      "startRejected": "ያንን {{requestNoun}} መገምገም አይቻልም። ክፍት መሆኑን፣ ረቂቅ እንዳልሆነ እና URLው ትክክለኛ መሆኑን ያረጋግጡ።",
+      "startProviderUnavailable": "ያንን {{requestNoun}} ለማንበብ {{provider}} ላይ መድረስ አልተቻለም። እንደገና ይሞክሩ።",
+      "startFailed": "ግምገማውን ማስጀመር አልተቻለም። ግንኙነትዎን ይፈትሹ እና እንደገና ይሞክሩ።"
     },
     "notConnectedReadOnly": "{{platform}} አልተገናኘም። ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች እና አስተዳዳሪዎች ብቻ ናቸው።",
     "gitlab": {

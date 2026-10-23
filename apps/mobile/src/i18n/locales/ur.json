@@ -1479,7 +1479,15 @@
       "instructions": "ہدایات (اختیاری)",
       "instructionsPlaceholder": "جائزے میں توجہ طلب کوئی خاص بات…",
       "starting": "جائزہ شروع ہو رہا ہے…",
-      "start": "جائزہ شروع کریں"
+      "start": "جائزہ شروع کریں",
+      "startNotFound": "{{provider}} کو وہ {{requestNoun}} نہیں ملی۔ URL چیک کریں، یا یقینی بنائیں کہ ریپوزٹری پبلک ہے۔",
+      "startRateLimited": "فی الحال {{provider}} پر درخواستوں کی حد لگی ہے۔ چند منٹ بعد دوبارہ کوشش کریں۔",
+      "startNotAllowed": "آپ کو اس {{requestNoun}} کا جائزہ شروع کرنے کی اجازت نہیں ہے۔",
+      "startProviderNeedsAttention": "دستی جائزوں کے لیے معیاری {{provider}} کنکشن درکار ہے۔ اسے منسلک کریں اور دوبارہ کوشش کریں۔",
+      "startAlreadyRunning": "اس {{requestNoun}} کا جائزہ پہلے ہی جاری ہے۔",
+      "startRejected": "اس {{requestNoun}} کا جائزہ نہیں لیا جا سکتا۔ یقینی بنائیں کہ یہ اوپن ہے، ڈرافٹ نہیں ہے، اور URL درست ہے۔",
+      "startProviderUnavailable": "{{provider}} سے اس {{requestNoun}} کو پڑھنے کے لیے رابطہ نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
+      "startFailed": "جائزہ شروع نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔"
     },
     "notConnectedReadOnly": "{{platform}} منسلک نہیں ہے۔ صرف تنظیم کے مالک اور منتظم اسے منسلک کر سکتے ہیں۔",
     "gitlab": {

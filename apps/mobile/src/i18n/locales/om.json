@@ -1479,7 +1479,15 @@
       "instructions": "Qajeelfamoota (filannoodhaan)",
       "instructionsPlaceholder": "Waan addaa sakatta'aan irratti xiyyeeffatu…",
       "starting": "Sakatta'a jalqabaa jira…",
-      "start": "Sakatta'a jalqabi"
+      "start": "Sakatta'a jalqabi",
+      "startNotFound": "{{provider}} {{requestNoun}} sana arguu hin danda'u. URL ilaali, ykn repozitoriin ummata akka ta'u mirkaneessi.",
+      "startRateLimited": "{{provider}} yeroo ammaa gaaffii daangeffamaa jira. Minitii muraasa booda irratti deebi'ii yaali.",
+      "startNotAllowed": "{{requestNoun}} sanaaf sakatta'a jalqabuuf hayyama hin qabdu.",
+      "startProviderNeedsAttention": "Sakatta'an harkaa walqabsiisa {{provider}} idilee barbaada. Waltajjii walqabsiisii irratti deebi'ii yaali.",
+      "startAlreadyRunning": "Sakatta'a {{requestNoun}} sanaaf duran hojjachaa jira.",
+      "startRejected": "{{requestNoun}} sana sakatta'uu hin danda'u. Baname ta'uu isaa, walaloo hin taane ta'uu isaa fi URL'n sirrii ta'uu isaa mirkaneessi.",
+      "startProviderUnavailable": "{{requestNoun}} sana dubbisuuf {{provider}} gahuu hin dandeenye. Irra deebi'ii yaali.",
+      "startFailed": "Sakatta'a jalqabuu hin dandeenye. Walqabsiisa kee mirkaneessii irratti deebi'ii yaali."
     },
     "notConnectedReadOnly": "{{platform}} hin walqabsiifamne. Abbootiin dhaabbataa fi bulchitootaa qofa isa walqabsiisuu danda'u.",
     "gitlab": {

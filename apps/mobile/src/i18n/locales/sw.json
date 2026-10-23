@@ -1479,7 +1479,15 @@
       "instructions": "Maagizo (si lazima)",
       "instructionsPlaceholder": "Jambo mahususi ambalo mkaguzi azingatie…",
       "starting": "Inaanza ukaguzi…",
-      "start": "Anza ukaguzi"
+      "start": "Anza ukaguzi",
+      "startNotFound": "{{provider}} haikuweza kupata {{requestNoun}} hilo. Angalia URL, au hakikisha hifadhi ni ya hadharani.",
+      "startRateLimited": "{{provider}} inapunguza maombi kwa sasa. Jaribu tena baada ya dakika chache.",
+      "startNotAllowed": "Huna ruhusa ya kuanzisha ukaguzi wa {{requestNoun}} hilo.",
+      "startProviderNeedsAttention": "Ukaguzi unaoanzishwa na mtumiaji unahitaji muunganisho wa kawaida wa {{provider}}. Unganisha na ujaribu tena.",
+      "startAlreadyRunning": "Ukaguzi wa {{requestNoun}} hilo tayari unaendelea.",
+      "startRejected": "{{requestNoun}} hilo haliwezi kukaguliwa. Hakikisha limefunguliwa, sio rasimu, na kwamba URL ni sahihi.",
+      "startProviderUnavailable": "Imeshindikana kufikia {{provider}} ili kusoma {{requestNoun}} hilo. Jaribu tena.",
+      "startFailed": "Hatukuweza kuanzisha ukaguzi. Angalia muunganisho wako na ujaribu tena."
     },
     "notConnectedReadOnly": "{{platform}} haijaunganishwa. Wamiliki na wasimamizi wa shirika pekee wanaweza kuiunganisha.",
     "gitlab": {

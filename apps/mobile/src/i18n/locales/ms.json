@@ -1479,7 +1479,15 @@
       "instructions": "Arahan (pilihan)",
       "instructionsPlaceholder": "Perkara khusus untuk diberi perhatian oleh penyemak…",
       "starting": "Memulakan semakan…",
-      "start": "Mulakan semakan"
+      "start": "Mulakan semakan",
+      "startNotFound": "{{provider}} tidak dapat menemui {{requestNoun}} tersebut. Semak URL, atau pastikan repositori adalah awam.",
+      "startRateLimited": "{{provider}} mengehadkan permintaan pada masa ini. Cuba lagi dalam beberapa minit.",
+      "startNotAllowed": "Anda tidak mempunyai kebenaran untuk memulakan semakan bagi {{requestNoun}} tersebut.",
+      "startProviderNeedsAttention": "Semakan manual memerlukan sambungan {{provider}} standard. Sambungkannya dan cuba lagi.",
+      "startAlreadyRunning": "Semakan bagi {{requestNoun}} tersebut sedang berjalan.",
+      "startRejected": "{{requestNoun}} tersebut tidak boleh disemak. Pastikan ia terbuka, bukan draf, dan URL adalah betul.",
+      "startProviderUnavailable": "Tidak dapat menghubungi {{provider}} untuk membaca {{requestNoun}} tersebut. Cuba lagi.",
+      "startFailed": "Tidak dapat memulakan semakan. Semak sambungan anda dan cuba lagi."
     },
     "notConnectedReadOnly": "{{platform}} tidak disambungkan. Hanya pemilik organisasi dan pentadbir boleh menyambungkannya.",
     "gitlab": {

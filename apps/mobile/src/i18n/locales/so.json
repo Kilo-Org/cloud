@@ -1479,7 +1479,15 @@
       "instructions": "Tilmaamo (ikhtiyaari)",
       "instructionsPlaceholder": "Wax gaar ah oo dib-u-eeguhu xoogga saaro…",
       "starting": "Waa la bilaabayaa dib-u-eegista...",
-      "start": "Bilow dib-u-eegista"
+      "start": "Bilow dib-u-eegista",
+      "startNotFound": "{{provider}} {{requestNoun}}kaas uma helin. Hubi URL-ka, ama hubi in kaydka uu khuseys yahay.",
+      "startRateLimited": "{{provider}} hadda wuu xannibayaa codsiyada. Dhowr daqiiqo ka dib mar kale isku day.",
+      "startNotAllowed": "Ma haysato ogolaanshaha inaad u bilowdo dib-u-eegis {{requestNoun}}kaas.",
+      "startProviderNeedsAttention": "Dib-u-eegisyada gacmeed waxay u baahan yihiin xiriirka caadada ah ee {{provider}}. Ku xidh oo mar kale isku day.",
+      "startAlreadyRunning": "Dib-u-eegis {{requestNoun}}kaas horeyba wuu socdaa.",
+      "startRejected": "{{requestNoun}}kaas dib-u-eegis lama samayn karin. Hubi in uu furan yahay, in aanu draft ahayn, iyo in URL-ka uu sax yahay.",
+      "startProviderUnavailable": "{{provider}} lama gaadhi karin si loo akhriyo {{requestNoun}}kaas. Mar kale isku day.",
+      "startFailed": "Dib-u-eegista lama bilaabi karin. Hubi xiriirkaaga oo mar kale isku day."
     },
     "notConnectedReadOnly": "{{platform}} kuma xidhna. Milkiilayaasha ururka iyo maamulayaasha oo keliya ayaa ku xidhi kara.",
     "gitlab": {

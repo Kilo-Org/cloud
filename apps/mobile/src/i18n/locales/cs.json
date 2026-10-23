@@ -1517,7 +1517,15 @@
       "instructions": "Pokyny (nepovinné)",
       "instructionsPlaceholder": "Na co se má kontrola zaměřit…",
       "starting": "Zahajuje se kontrola…",
-      "start": "Zahájit kontrolu"
+      "start": "Zahájit kontrolu",
+      "startNotFound": "Službě {{provider}} se nepodařilo najít daný {{requestNoun}}. Zkontrolujte URL adresu, případně se ujistěte, že je repozitář veřejný.",
+      "startRateLimited": "Služba {{provider}} právě omezuje požadavky. Zkuste to znovu za pár minut.",
+      "startNotAllowed": "Nemáte oprávnění zahájit kontrolu pro daný {{requestNoun}}.",
+      "startProviderNeedsAttention": "Ruční kontrola vyžaduje standardní připojení {{provider}}. Připojte ho a zkuste to znovu.",
+      "startAlreadyRunning": "Kontrola pro daný {{requestNoun}} už běží.",
+      "startRejected": "Daný {{requestNoun}} nelze zkontrolovat. Ujistěte se, že je otevřený, není draft, a že URL adresa je správná.",
+      "startProviderUnavailable": "Daný {{requestNoun}} se ze služby {{provider}} nepodařilo načíst. Zkuste to znovu.",
+      "startFailed": "Kontrolu se nepodařilo zahájit. Zkontrolujte připojení a zkuste to znovu."
     },
     "notConnectedReadOnly": "Služba {{platform}} není připojená. Připojit ji mohou pouze vlastníci organizace a správci.",
     "gitlab": {

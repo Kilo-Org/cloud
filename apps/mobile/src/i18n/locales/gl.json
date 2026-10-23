@@ -1479,7 +1479,15 @@
       "instructions": "Instrucións (opcionais)",
       "instructionsPlaceholder": "Aspectos concretos nos que centrar a revisión…",
       "starting": "Iniciando a revisión…",
-      "start": "Iniciar a revisión"
+      "start": "Iniciar a revisión",
+      "startNotFound": "{{provider}} non atopou esa {{requestNoun}}. Comproba o URL ou asegúrate de que o repositorio é público.",
+      "startRateLimited": "{{provider}} está a limitar as peticións neste momento. Téntao de novo nuns minutos.",
+      "startNotAllowed": "Non tes permiso para iniciar unha revisión desa {{requestNoun}}.",
+      "startProviderNeedsAttention": "As revisións manuais precisan a conexión estándar de {{provider}}. Conéctaa e téntao de novo.",
+      "startAlreadyRunning": "Xa hai unha revisión en curso para esa {{requestNoun}}.",
+      "startRejected": "Non se pode revisar esa {{requestNoun}}. Asegúrate de que está aberta, de que non é un borrador e de que o URL é correcto.",
+      "startProviderUnavailable": "Non se puido conectar con {{provider}} para ler esa {{requestNoun}}. Téntao de novo.",
+      "startFailed": "Non se puido iniciar a revisión. Comproba a túa conexión e téntao de novo."
     },
     "notConnectedReadOnly": "{{platform}} non está conectado. Só os propietarios da organización e os administradores poden conectalo.",
     "gitlab": {

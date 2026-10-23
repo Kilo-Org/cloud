@@ -1498,7 +1498,15 @@
       "instructions": "Uputstva (opciono)",
       "instructionsPlaceholder": "Na šta posebno obratiti pažnju pri pregledu…",
       "starting": "Pokretanje pregleda…",
-      "start": "Pokreni pregled"
+      "start": "Pokreni pregled",
+      "startNotFound": "{{provider}} nije mogao da pronađe taj {{requestNoun}}. Proveri URL ili se uveri da je repozitorijum javan.",
+      "startRateLimited": "{{provider}} trenutno ograničava zahteve. Pokušaj ponovo za nekoliko minuta.",
+      "startNotAllowed": "Nemaš dozvolu da započneš pregled za taj {{requestNoun}}.",
+      "startProviderNeedsAttention": "Ručni pregledi zahtevaju standardnu {{provider}} vezu. Poveži je i pokušaj ponovo.",
+      "startAlreadyRunning": "Pregled za taj {{requestNoun}} je već u toku.",
+      "startRejected": "Taj {{requestNoun}} ne može da se pregleda. Uveri se da je otvoren, da nije draft i da je URL ispravan.",
+      "startProviderUnavailable": "Nije moguće povezati se sa {{provider}} da bi se učitao taj {{requestNoun}}. Pokušaj ponovo.",
+      "startFailed": "Nije moguće pokrenuti pregled. Proveri internet vezu i pokušaj ponovo."
     },
     "notConnectedReadOnly": "{{platform}} nije povezan. Samo vlasnici organizacije i administratori mogu da ga povežu.",
     "gitlab": {

@@ -1555,7 +1555,15 @@
       "instructions": "Cyfarwyddiadau (dewisol)",
       "instructionsPlaceholder": "Unrhyw beth penodol y dylai'r adolygydd ganolbwyntio arno…",
       "starting": "Yn dechrau adolygiad…",
-      "start": "Dechrau adolygiad"
+      "start": "Dechrau adolygiad",
+      "startNotFound": "Ni allai {{provider}} ganfod y {{requestNoun}} hwnnw. Gwiriwch yr URL, neu gwnewch yn siŵr bod ystorfa'n gyhoeddus.",
+      "startRateLimited": "Mae {{provider}} yn cyfyngu ar geisiadau ar hyn o bryd. Ceisiwch eto mewn ychydig funudau.",
+      "startNotAllowed": "Nid oes gennych ganiatâd i ddechrau adolygiad ar gyfer y {{requestNoun}} hwnnw.",
+      "startProviderNeedsAttention": "Mae adolygiadau â llaw angen y cysylltiad {{provider}} safonol. Cysylltwch ef a cheisiwch eto.",
+      "startAlreadyRunning": "Mae adolygiad ar gyfer y {{requestNoun}} hwnnw eisoes yn rhedeg.",
+      "startRejected": "Ni ellir adolygu'r {{requestNoun}} hwnnw. Gwnewch yn siŵr ei fod ar agor, nad yw'n ddrafft, a bod yr URL yn gywir.",
+      "startProviderUnavailable": "Doedd dim modd cyrraedd {{provider}} i ddarllen y {{requestNoun}} hwnnw. Ceisiwch eto.",
+      "startFailed": "Doedd dim modd dechrau'r adolygiad. Gwiriwch eich cysylltiad a cheisiwch eto."
     },
     "notConnectedReadOnly": "Nid yw {{platform}} wedi'i gysylltu. Dim ond perchnogion a gweinyddwyr y sefydliad sy'n gallu ei gysylltu.",
     "gitlab": {

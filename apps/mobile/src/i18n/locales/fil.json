@@ -1479,7 +1479,15 @@
       "instructions": "Mga tagubilin (opsyonal)",
       "instructionsPlaceholder": "Mga partikular na bagay na dapat pagtuunan ng pansin sa pagsusuri…",
       "starting": "Sinisimulan ang pagsusuri...",
-      "start": "Simulan ang pagsusuri"
+      "start": "Simulan ang pagsusuri",
+      "startNotFound": "Hindi mahanap ng {{provider}} ang {{requestNoun}} na iyan. Suriin ang URL, o tiyaking pampubliko ang repository.",
+      "startRateLimited": "Naglilimita ng mga request ang {{provider}} sa ngayon. Subukan ulit pagkalipas ng ilang minuto.",
+      "startNotAllowed": "Wala kang pahintulot na simulan ang pagsusuri ng {{requestNoun}} na iyan.",
+      "startProviderNeedsAttention": "Kailangan ng manu-manong pagsusuri ang karaniwang koneksyon sa {{provider}}. Ikonekta ito at subukan muli.",
+      "startAlreadyRunning": "Tumatakbo na ang pagsusuri ng {{requestNoun}} na iyan.",
+      "startRejected": "Hindi masusuri ang {{requestNoun}} na iyan. Tiyaking bukas ito, hindi draft, at tama ang URL.",
+      "startProviderUnavailable": "Hindi maabot ang {{provider}} para basahin ang {{requestNoun}} na iyan. Subukan muli.",
+      "startFailed": "Hindi masimulan ang pagsusuri. Suriin ang iyong koneksyon at subukan muli."
     },
     "notConnectedReadOnly": "Hindi nakakonekta ang {{platform}}. Mga may-ari ng organisasyon at admin lang ang maaaring magkonekta nito.",
     "gitlab": {

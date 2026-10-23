@@ -1479,7 +1479,15 @@
       "instructions": "Ohjeet (valinnaiset)",
       "instructionsPlaceholder": "Katselmoinnin erityiset painopisteet…",
       "starting": "Käynnistetään katselmointia…",
-      "start": "Aloita katselmointi"
+      "start": "Aloita katselmointi",
+      "startNotFound": "Kyseinen {{requestNoun}} ei ole olemassa tai sitä ei löydy {{provider}}-palvelusta. Tarkista URL-osoite tai varmista, että arkisto on julkinen.",
+      "startRateLimited": "{{provider}} rajoittaa pyyntöjä juuri nyt. Yritä uudelleen muutaman minuutin kuluttua.",
+      "startNotAllowed": "Kyseinen {{requestNoun}} vaatii katselmoinnin käynnistämiseen käyttöoikeuksia, joita sinulla ei ole.",
+      "startProviderNeedsAttention": "Manuaalinen katselmointi vaatii tavallisen {{provider}}-yhteyden. Yhdistä se ja yritä uudelleen.",
+      "startAlreadyRunning": "Kyseinen {{requestNoun}} on jo katselmoitavana.",
+      "startRejected": "Kyseinen {{requestNoun}} ei ole katselmoitavissa. Varmista, että se on avoin eikä luonnos, ja että URL-osoite on oikein.",
+      "startProviderUnavailable": "Yhteyttä {{provider}}-palveluun ei saatu, joten kyseinen {{requestNoun}} ei ole juuri nyt luettavissa. Yritä uudelleen.",
+      "startFailed": "Katselmointia ei voitu käynnistää. Tarkista internetyhteys ja yritä uudelleen."
     },
     "notConnectedReadOnly": "Palvelua {{platform}} ei ole yhdistetty. Vain organisaation omistajat ja ylläpitäjät voivat yhdistää sen.",
     "gitlab": {

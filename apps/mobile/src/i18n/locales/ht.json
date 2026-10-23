@@ -1479,7 +1479,15 @@
       "instructions": "Enstriksyon (opsyonèl)",
       "instructionsPlaceholder": "Pwen espesifik pou revizè a egzamine…",
       "starting": "Ap kòmanse revizyon an…",
-      "start": "Kòmanse revizyon an"
+      "start": "Kòmanse revizyon an",
+      "startNotFound": "{{provider}} pa t ka jwenn {{requestNoun}} sa a. Verifye URL la, oswa asire w repozitwa a piblik.",
+      "startRateLimited": "{{provider}} ap limite demann yo kounye a. Eseye ankò nan kèk minit.",
+      "startNotAllowed": "Ou pa gen pèmisyon pou kòmanse yon revizyon sou {{requestNoun}} sa a.",
+      "startProviderNeedsAttention": "Revizyon manyèl yo gen bezwen koneksyon {{provider}} estanda a. Konekte l epi eseye ankò.",
+      "startAlreadyRunning": "Gen yon revizyon k ap kouri deja pou {{requestNoun}} sa a.",
+      "startRejected": "{{requestNoun}} sa a pa ka revize. Asire w li louvri, li pa yon draft, epi ke URL la kòrèk.",
+      "startProviderUnavailable": "Nou pa t ka jwenn aksè nan {{provider}} pou wè {{requestNoun}} sa a. Eseye ankò.",
+      "startFailed": "Nou pa t ka kòmanse revizyon an. Verifye koneksyon ou epi eseye ankò."
     },
     "notConnectedReadOnly": "{{platform}} pa konekte. Se sèlman pwopriyetè òganizasyon an ak administratè yo ki ka konekte li.",
     "gitlab": {

@@ -1479,7 +1479,15 @@
       "instructions": "لارښوونې (اختیاري)",
       "instructionsPlaceholder": "هغه ځانګړي ټکي چې بیاکتونکی باید ورته پام وکړي…",
       "starting": "بیاکتنه پیلېږي…",
-      "start": "بیاکتنه پیل کړئ"
+      "start": "بیاکتنه پیل کړئ",
+      "startNotFound": "{{provider}} هغه {{requestNoun}} و نه موندل. URL وګورئ، یا ډاډ ترلاسه کړئ چې زېرمه (repository) عامه ده.",
+      "startRateLimited": "{{provider}} اوس مهال غوښتنې محدودوي. څو دقیقې وروسته بیا هڅه وکړئ.",
+      "startNotAllowed": "تاسو د هغه {{requestNoun}} د بیاکتنې د پیل اجازه نلرئ.",
+      "startProviderNeedsAttention": "د لاسي بیاکتنې لپاره {{provider}} معیاري اتصال اړین دی. نښلوي یې او بیا هڅه وکړئ.",
+      "startAlreadyRunning": "د هغه {{requestNoun}} بیاکتنه دمخه روانه ده.",
+      "startRejected": "هغه {{requestNoun}} بیاکتنه نه شي کېدلی. ډاډ ترلاسه کړئ چې خلاص دی، مسوده (draft) نه دی، او URL سم دی.",
+      "startProviderUnavailable": "د هغه {{requestNoun}} د لوستلو لپاره {{provider}} ته لاسرسی و نه شو. بیا هڅه وکړئ.",
+      "startFailed": "بیاکتنه پیل نه شوه. خپله اتصال وګورئ او بیا هڅه وکړئ."
     },
     "notConnectedReadOnly": "{{platform}} نښلول شوی نه دی. یوازې د سازمان مالکان او مدیران کولی شي دا ونښلوي.",
     "gitlab": {

@@ -1479,7 +1479,15 @@
       "instructions": "ਹਦਾਇਤਾਂ (ਵਿਕਲਪਿਕ)",
       "instructionsPlaceholder": "ਸਮੀਖਿਅਕ ਲਈ ਖ਼ਾਸ ਧਿਆਨ ਦੇਣ ਵਾਲੀਆਂ ਗੱਲਾਂ…",
       "starting": "ਸਮੀਖਿਆ ਸ਼ੁਰੂ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ…",
-      "start": "ਸਮੀਖਿਆ ਸ਼ੁਰੂ ਕਰੋ"
+      "start": "ਸਮੀਖਿਆ ਸ਼ੁਰੂ ਕਰੋ",
+      "startNotFound": "{{provider}} ਨੂੰ ਉਹ {{requestNoun}} ਨਹੀਂ ਲੱਭਾ। URL ਦੀ ਜਾਂਚ ਕਰੋ, ਜਾਂ ਯਕੀਨੀ ਬਣਾਓ ਕਿ ਰਿਪੋਜ਼ਟਰੀ ਜਨਤਕ ਹੈ।",
+      "startRateLimited": "{{provider}} ਇਸ ਸਮੇਂ ਬੇਨਤੀਆਂ ਸੀਮਤ ਕਰ ਰਿਹਾ ਹੈ। ਕੁਝ ਮਿੰਟਾਂ ਬਾਅਦ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "startNotAllowed": "ਤੁਹਾਨੂੰ ਉਸ {{requestNoun}} ਲਈ ਸਮੀਖਿਆ ਸ਼ੁਰੂ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
+      "startProviderNeedsAttention": "ਦਸਤੀ ਸਮੀਖਿਆ ਲਈ ਮਿਆਰੀ {{provider}} ਕੁਨੈਕਸ਼ਨ ਚਾਹੀਦਾ ਹੈ। ਇਸਨੂੰ ਕੁਨੈਕਟ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "startAlreadyRunning": "ਉਸ {{requestNoun}} ਦੀ ਸਮੀਖਿਆ ਪਹਿਲਾਂ ਹੀ ਚੱਲ ਰਹੀ ਹੈ।",
+      "startRejected": "ਉਸ {{requestNoun}} ਦੀ ਸਮੀਖਿਆ ਨਹੀਂ ਹੋ ਸਕਦੀ। ਯਕੀਨੀ ਬਣਾਓ ਕਿ ਇਹ ਖੁੱਲ੍ਹੀ ਹੈ, ਡਰਾਫਟ ਨਹੀਂ ਹੈ, ਅਤੇ URL ਸਹੀ ਹੈ।",
+      "startProviderUnavailable": "ਉਸ {{requestNoun}} ਨੂੰ ਪੜ੍ਹਨ ਲਈ {{provider}} ਤੱਕ ਪਹੁੰਚ ਨਹੀਂ ਹੋ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "startFailed": "ਸਮੀਖਿਆ ਸ਼ੁਰੂ ਨਹੀਂ ਹੋ ਸਕੀ। ਆਪਣਾ ਕੁਨੈਕਸ਼ਨ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
     },
     "notConnectedReadOnly": "{{platform}} ਕਨੈਕਟ ਨਹੀਂ ਹੈ। ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਅਤੇ ਐਡਮਿਨ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦੇ ਹਨ।",
     "gitlab": {

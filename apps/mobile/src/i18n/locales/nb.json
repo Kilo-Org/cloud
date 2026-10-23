@@ -1479,7 +1479,15 @@
       "instructions": "Instruksjoner (valgfritt)",
       "instructionsPlaceholder": "Noe gjennomgangen skal fokusere spesielt på…",
       "starting": "Starter gjennomgang…",
-      "start": "Start gjennomgang"
+      "start": "Start gjennomgang",
+      "startNotFound": "{{provider}} klarte ikke å finne {{requestNoun}}. Kontroller URL-en, eller sørg for at repositoriet er offentlig.",
+      "startRateLimited": "{{provider}} begrenser forespørsler akkurat nå. Prøv igjen om noen minutter.",
+      "startNotAllowed": "Du har ikke tillatelse til å starte en gjennomgang av {{requestNoun}}.",
+      "startProviderNeedsAttention": "Manuelle gjennomganger krever den vanlige {{provider}}-tilkoblingen. Koble den til og prøv igjen.",
+      "startAlreadyRunning": "En gjennomgang av {{requestNoun}} pågår allerede.",
+      "startRejected": "{{requestNoun}} kan ikke gjennomgås. Sørg for at den er åpen, ikke et utkast, og at URL-en er riktig.",
+      "startProviderUnavailable": "Kunne ikke nå {{provider}} for å lese {{requestNoun}}. Prøv igjen.",
+      "startFailed": "Kunne ikke starte gjennomgangen. Kontroller tilkoblingen din og prøv igjen."
     },
     "notConnectedReadOnly": "{{platform}} er ikke tilkoblet. Bare organisasjonseiere og administratorer kan opprette tilkoblingen.",
     "gitlab": {

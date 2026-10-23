@@ -1479,7 +1479,15 @@
       "instructions": "Ko'rsatmalar (ixtiyoriy)",
       "instructionsPlaceholder": "Ko'rib chiqishda alohida e'tibor beriladigan jihatlar…",
       "starting": "Ko'rib chiqish boshlanmoqda…",
-      "start": "Ko'rib chiqishni boshlash"
+      "start": "Ko'rib chiqishni boshlash",
+      "startNotFound": "{{provider}} ushbu {{requestNoun}}ni topa olmadi. URL manzilini tekshiring yoki repozitoriyaning ochiq (public) ekaniga ishonch hosil qiling.",
+      "startRateLimited": "{{provider}} hozirda so'rovlarni cheklamoqda. Bir necha daqiqadan so'ng qayta urinib ko'ring.",
+      "startNotAllowed": "Ushbu {{requestNoun}} uchun ko'rib chiqishni boshlash huquqingiz yo'q.",
+      "startProviderNeedsAttention": "Qo'lda ko'rib chiqish standart {{provider}} ulanishini talab qiladi. Uni ulang va qayta urinib ko'ring.",
+      "startAlreadyRunning": "Ushbu {{requestNoun}} uchun ko'rib chiqish allaqachon davom etmoqda.",
+      "startRejected": "Ushbu {{requestNoun}}ni ko'rib chiqish mumkin emas. Uning ochiq ekanini, qoralama emasligini va URL manzil to'g'ri ekanini tekshiring.",
+      "startProviderUnavailable": "Ushbu {{requestNoun}}ni o'qish uchun {{provider}}ga ulanib bo'lmadi. Qayta urinib ko'ring.",
+      "startFailed": "Ko'rib chiqishni boshlab bo'lmadi. Internetingizni tekshirib, qayta urinib ko'ring."
     },
     "notConnectedReadOnly": "{{platform}} ulanmagan. Faqat tashkilot egalar va administratorlar uni ulashi mumkin.",
     "gitlab": {

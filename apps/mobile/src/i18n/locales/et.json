@@ -1479,7 +1479,15 @@
       "instructions": "Juhised (valikulised)",
       "instructionsPlaceholder": "Millele ülevaataja peab keskenduma…",
       "starting": "Ülevaatuse alustamine…",
-      "start": "Alusta ülevaatust"
+      "start": "Alusta ülevaatust",
+      "startNotFound": "Antud {{requestNoun}} ei olnud {{provider}}-is leitav. Kontrolli URL-i või veendu, et hoidla on avalik.",
+      "startRateLimited": "{{provider}} piirab praegu päringuid. Proovi mõne minuti pärast uuesti.",
+      "startNotAllowed": "Sul pole õigust ülevaatust alustada: see {{requestNoun}} pole sinu jaoks ülevaatamiseks lubatud.",
+      "startProviderNeedsAttention": "Käsitsi ülevaatamiseks on vaja tavapärast ühendust {{provider}}-iga. Ühenda see ja proovi uuesti.",
+      "startAlreadyRunning": "See {{requestNoun}} on juba ülevaatamisel.",
+      "startRejected": "See {{requestNoun}} ei ole ülevaatamiseks sobiv. Veendu, et see on avatud, mitte mustand, ning et URL on õige.",
+      "startProviderUnavailable": "Ühendust {{provider}}-iga ei õnnestunud saada ja see {{requestNoun}} jäi lugemata. Proovi uuesti.",
+      "startFailed": "Ülevaatust ei õnnestunud alustada. Kontrolli internetiühendust ja proovi uuesti."
     },
     "notConnectedReadOnly": "{{platform}} pole ühendatud. Selle saavad ühendada ainult organisatsiooni omanikud ja administraatorid.",
     "gitlab": {

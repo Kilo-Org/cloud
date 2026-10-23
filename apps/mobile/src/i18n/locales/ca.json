@@ -1498,7 +1498,15 @@
       "instructions": "Instruccions (opcionals)",
       "instructionsPlaceholder": "Aspectes concrets en què s'ha de centrar el revisor…",
       "starting": "S'està iniciant la revisió…",
-      "start": "Inicia la revisió"
+      "start": "Inicia la revisió",
+      "startNotFound": "A {{provider}} no s'ha trobat cap {{requestNoun}}. Comprova la URL o assegura't que el repositori és públic.",
+      "startRateLimited": "{{provider}} està limitant les sol·licituds ara mateix. Torna-ho a provar d'aquí a uns minuts.",
+      "startNotAllowed": "No tens permís per iniciar una revisió de {{requestNoun}}.",
+      "startProviderNeedsAttention": "Les revisions manuals necessiten la connexió estàndard de {{provider}}. Connecta-la i torna-ho a provar.",
+      "startAlreadyRunning": "Ja hi ha una revisió en curs per a {{requestNoun}}.",
+      "startRejected": "No es pot revisar {{requestNoun}}. Comprova que l'estat sigui obert, que no sigui un esborrany i que la URL sigui correcta.",
+      "startProviderUnavailable": "No s'ha pogut contactar amb {{provider}} per llegir {{requestNoun}}. Torna-ho a provar.",
+      "startFailed": "No s'ha pogut iniciar la revisió. Comprova la teva connexió i torna-ho a provar."
     },
     "notConnectedReadOnly": "{{platform}} no està connectat. Només els propietaris i els administradors de l'organització poden connectar-lo.",
     "gitlab": {

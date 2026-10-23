@@ -1479,7 +1479,15 @@
       "instructions": "Umarni (na zaɓi)",
       "instructionsPlaceholder": "Abu na musamman da mai bita zai fi mayar da hankali a kansa…",
       "starting": "Ana fara bita…",
-      "start": "Fara bita"
+      "start": "Fara bita",
+      "startNotFound": "{{provider}} bai sami wannan {{requestNoun}} ba. Duba URL, ko tabbatar da cewa ma'ajiyar a bayyane take.",
+      "startRateLimited": "{{provider}} na iyakance buƙatun a halin yanzu. Sake gwadawa bayan 'yan mintoci.",
+      "startNotAllowed": "Ba ka da izinin fara bita ga wannan {{requestNoun}}.",
+      "startProviderNeedsAttention": "Bita da hannu na buƙatar daidaitaccen haɗin {{provider}}. Haɗa shi ka sake gwadawa.",
+      "startAlreadyRunning": "Bita ga wannan {{requestNoun}} riga yana gudana.",
+      "startRejected": "Ba za a iya yin bita da wannan {{requestNoun}} ba. Tabbatar cewa tana buɗe, ba daftarewa ba ce, kuma URL din daidai yake.",
+      "startProviderUnavailable": "An kasa isa {{provider}} don karanta wannan {{requestNoun}}. Sake gwadawa.",
+      "startFailed": "An kasa fara bita. Duba haɗin intanet ka sake gwadawa."
     },
     "notConnectedReadOnly": "Ba a haɗa {{platform}} ba. Masu ƙungiya da masu gudanarwa kawai za su iya haɗa shi.",
     "gitlab": {

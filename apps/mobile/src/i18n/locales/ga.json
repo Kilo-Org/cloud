@@ -1536,7 +1536,15 @@
       "instructions": "Treoracha (roghnach)",
       "instructionsPlaceholder": "Aon rud ar leith ar cheart don athbhreithneoir díriú air…",
       "starting": "Ag tosú an athbhreithnithe…",
-      "start": "Tosaigh athbhreithniú"
+      "start": "Tosaigh athbhreithniú",
+      "startNotFound": "Níor aimsigh {{provider}} an {{requestNoun}} sin. Seiceáil an URL, nó déan cinnte go bhfuil an taisce poiblí.",
+      "startRateLimited": "Tá {{provider}} ag teorannú iarratasanna faoi láthair. Bain triail as arís i gceann cúpla nóiméad.",
+      "startNotAllowed": "Níl cead agat athbhreithniú a thosú ar an {{requestNoun}} sin.",
+      "startProviderNeedsAttention": "Tá an nasc caighdeánach le {{provider}} de dhíth ar athbhreithnithe de láimh. Ceangail é agus bain triail as arís.",
+      "startAlreadyRunning": "Tá athbhreithniú ar an {{requestNoun}} sin ar siúl cheana féin.",
+      "startRejected": "Ní féidir an {{requestNoun}} sin a athbhreithniú. Déan cinnte go bhfuil sé oscailte, nach dréacht é, agus go bhfuil an URL ceart.",
+      "startProviderUnavailable": "Níorbh fhéidir {{provider}} a shroichint chun an {{requestNoun}} sin a léamh. Bain triail as arís.",
+      "startFailed": "Níorbh fhéidir an t-athbhreithniú a thosú. Seiceáil do cheangal agus bain triail as arís."
     },
     "notConnectedReadOnly": "Níl {{platform}} nasctha. Ní féidir ach le húinéirí agus riarthóirí eagraíochta é a cheangal.",
     "gitlab": {

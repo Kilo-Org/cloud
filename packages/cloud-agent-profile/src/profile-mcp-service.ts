@@ -165,7 +165,7 @@ function buildStoredConfig(
     if (existing !== undefined && !environmentReusable && carriesPlaceholder) {
       throw new TRPCError({
         code: 'BAD_REQUEST',
-        message: 'Supply every environment value when the command or any environment value changes',
+        message: 'Every environment value is required when the command line or any value changes',
       });
     }
     return {

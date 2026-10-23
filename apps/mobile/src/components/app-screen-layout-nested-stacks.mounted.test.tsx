@@ -18,6 +18,13 @@ vi.mock('@/components/app-unlock-screen', () => ({
   appUnlockScreenLayout: ({ children }: { children: ReactElement }) => children,
 }));
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
+// The Profile stack wraps its navigator in the tab's own recovery boundary,
+// which reads the query client and renders the full error surface. Recovery is
+// covered by that boundary's suite; here it only needs to pass the scene
+// through so the gate under the Stack stays the subject.
+vi.mock('@/components/profile-stack-error-boundary', () => ({
+  ProfileStackErrorBoundary: ({ children }: { children: ReactElement }) => children,
+}));
 vi.mock('@/components/security-agent/security-agent-command-observer', () => ({
   SecurityAgentCommandObserver: 'SecurityAgentCommandObserver',
 }));

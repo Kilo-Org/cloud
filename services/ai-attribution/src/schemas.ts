@@ -10,47 +10,7 @@ export const MAX_TRACK_ID_LENGTH = 256;
 // length, so the track schema must admit the same values.
 export const MAX_TRACK_PROJECT_ID_LENGTH = 512;
 export const MAX_TRACK_FILE_PATH_LENGTH = 1024;
-// Upper bound on the path length accepted before normalization.
-export const MAX_TRACK_RAW_PATH_LENGTH = MAX_TRACK_FILE_PATH_LENGTH * 4;
 export const MAX_TRACK_BODY_BYTES = 256 * 1024;
-
-// Attribution identity fields resolve to a Durable Object name, so each is a
-// bounded canonical path.
-export function canonicalizeAttributionPath(value: string): string {
-  const segments: string[] = [];
-  for (const segment of value.replace(/\\/g, '/').split('/')) {
-    if (segment === '' || segment === '.') continue;
-    if (segment === '..') {
-      segments.pop();
-      continue;
-    }
-    segments.push(segment);
-  }
-  return segments.join('/');
-}
-
-// Attribution identity fields resolve to a Durable Object name, so they are
-// kept to a bounded canonical path with the character classes below.
-const attributionPathSchema = (maxLength: number) =>
-  z
-    .string()
-    .min(1)
-    .max(MAX_TRACK_RAW_PATH_LENGTH)
-    .transform(canonicalizeAttributionPath)
-    .pipe(
-      z
-        .string()
-        .min(1)
-        .max(maxLength)
-        .refine(
-          value =>
-            [...value].every(character => {
-              const codePoint = character.codePointAt(0) ?? 0;
-              return codePoint > 0x1f && codePoint !== 0x7f;
-            }),
-          'must not contain control characters'
-        )
-    );
 
 const trackLineSchema = z.object({
   line_number: z.number().int().min(0),
@@ -59,9 +19,11 @@ const trackLineSchema = z.object({
 
 export type AttributionsTrackRequestBody = z.infer<typeof AttributionsTrackRequestBody>;
 export const AttributionsTrackRequestBody = z.object({
-  project_id: attributionPathSchema(MAX_TRACK_PROJECT_ID_LENGTH),
+  // project_id and file_path name the Durable Object, so they are kept exactly
+  // as the client sends them and only bounded in length.
+  project_id: z.string().min(1).max(MAX_TRACK_PROJECT_ID_LENGTH),
   branch: z.string().min(1).max(MAX_TRACK_ID_LENGTH),
-  file_path: attributionPathSchema(MAX_TRACK_FILE_PATH_LENGTH),
+  file_path: z.string().min(1).max(MAX_TRACK_FILE_PATH_LENGTH),
   status: z.enum(['accepted', 'rejected']),
   task_id: z.string().max(MAX_TRACK_ID_LENGTH).nullable(),
   lines_added: trackLineSchema.array().max(MAX_TRACK_LINE_ENTRIES),
@@ -78,13 +40,13 @@ export const OrganizationJWTPayload = z.object({
   exp: z.number().optional(),
 });
 
-// Admin reads resolve identity from the same fields, so they use the same
-// path schema as tracking.
+// Admin reads resolve identity from the same fields, so they are left exactly
+// as stored.
 export type AdminAttributionsQueryParams = z.infer<typeof AdminAttributionsQueryParams>;
 export const AdminAttributionsQueryParams = z.object({
   organization_id: z.string().min(1),
-  project_id: attributionPathSchema(MAX_TRACK_PROJECT_ID_LENGTH),
-  file_path: attributionPathSchema(MAX_TRACK_FILE_PATH_LENGTH),
+  project_id: z.string().min(1),
+  file_path: z.string().min(1),
   branch: z.string().min(1).optional(),
 });
 
@@ -98,7 +60,7 @@ export const AttributionEventResponse = z.object({
 export type AdminDeleteAttributionParams = z.infer<typeof AdminDeleteAttributionParams>;
 export const AdminDeleteAttributionParams = z.object({
   organization_id: z.string().min(1),
-  project_id: attributionPathSchema(MAX_TRACK_PROJECT_ID_LENGTH),
-  file_path: attributionPathSchema(MAX_TRACK_FILE_PATH_LENGTH),
+  project_id: z.string().min(1),
+  file_path: z.string().min(1),
   attribution_id: z.coerce.number().int().positive(),
 });

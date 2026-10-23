@@ -517,7 +517,7 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
     act(() => {
       (field.props.onChangeText as (value: string) => void)('admission@example.com');
     });
-    await act(async () => {
+    await act(() => {
       (continueButton(renderer.root).props.onPress as () => void)();
     });
     const otpForm = findAll(renderer.root, 'EmailOtpForm')[0];
@@ -527,7 +527,7 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
 
     mockGetAdmission.mockRejectedValueOnce(new Error('Device proof unavailable'));
     mockPostAuth.mockClear();
-    await act(async () => {
+    await act(() => {
       (otpForm.props.onVerify as (code: string) => void)('123456');
     });
 
@@ -541,7 +541,7 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
       ok: true,
       data: { token: 'at', refreshToken: 'rt', expiresIn: 3600 },
     });
-    await act(async () => {
+    await act(() => {
       (otpForm.props.onVerify as (code: string) => void)('123456');
     });
     expect(authMock.signIn).toHaveBeenCalledExactlyOnceWith('at', 'rt', 3600);

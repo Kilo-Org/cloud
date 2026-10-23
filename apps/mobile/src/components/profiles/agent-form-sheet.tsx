@@ -25,14 +25,6 @@ import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { cn } from '@/lib/utils';
 
-/** Catalog key for each refused field, so the message lands under the input at fault. */
-const ERROR_KEYS = {
-  'slug-required': 'profiles.agents.slugRequired',
-  'slug-invalid': 'profiles.agents.slugInvalid',
-  'slug-conflict': 'profiles.agents.slugConflict',
-  'name-required': 'profiles.agents.nameRequired',
-} satisfies Record<AgentFormError, string>;
-
 type AgentFormSheetProps = Readonly<{
   agent: AgentSource | null;
   /** Slugs of the profile's other agents, so a duplicate fails validation inline. */

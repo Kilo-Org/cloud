@@ -83,18 +83,19 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
   const [autoDismissEnabled, setAutoDismissEnabled] = useState(false);
   const [autoDismissConfidenceThreshold, setAutoDismissConfidenceThreshold] =
     useState<ConfidenceThreshold>('high');
-  const hydratedRef = useRef(false);
-  const initialConfigRef = useRef<Partial<FlattenedSecurityAgentConfig>>({});
+  // The saved baseline the draft is compared against. State rather than a ref:
+  // a successful save must re-render, so `dirty` (and the back guard that
+  // reads it) reflects the saved values by the time the header action leaves.
+  const [baseline, setBaseline] = useState<Partial<FlattenedSecurityAgentConfig> | null>(null);
 
   // Local state initialized from the loaded config exactly once — later
   // config refetches (e.g. after this screen's own save) shouldn't clobber
   // in-progress edits.
   useEffect(() => {
-    if (hydratedRef.current || !config.data) {
+    if (baseline !== null || !config.data) {
       return;
     }
-    hydratedRef.current = true;
-    initialConfigRef.current = config.data;
+    setBaseline(config.data);
     setAutoAnalysisEnabled(config.data.autoAnalysisEnabled);
     setAutoAnalysisMinSeverity(config.data.autoAnalysisMinSeverity);
     setAutoAnalysisIncludeExisting(config.data.autoAnalysisIncludeExisting);
@@ -104,7 +105,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
     setAutoRemediationRequireApproval(config.data.autoRemediationRequireApproval);
     setAutoDismissEnabled(config.data.autoDismissEnabled);
     setAutoDismissConfidenceThreshold(config.data.autoDismissConfidenceThreshold);
-  }, [config.data]);
+  }, [baseline, config.data]);
 
   // Ref indirection keeps the tracking effect independent of the mutation
   // object's identity (a new object every render) — fires once per mount,
@@ -134,14 +135,12 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
     autoDismissEnabled,
     autoDismissConfidenceThreshold,
   };
-  const dirty =
-    hydratedRef.current &&
-    getSettingsDirtyState(initialConfigRef.current, patch, valid) !== 'clean';
+  const dirty = baseline !== null && getSettingsDirtyState(baseline, patch, valid) !== 'clean';
   useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, { dirty });
 
   const handleSave = async () => {
     const result = await save.mutateAsync(patch);
-    initialConfigRef.current = { ...initialConfigRef.current, ...patch };
+    setBaseline(previous => ({ ...previous, ...patch }));
     if (result.existingFindingsQueuedCount) {
       const count = result.existingFindingsQueuedCount;
       toast.success(

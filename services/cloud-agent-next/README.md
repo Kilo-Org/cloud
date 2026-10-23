@@ -2,7 +2,7 @@
 
 A Cloudflare Worker that provides a secure, scalable API for running [Kilocode](https://kilo.ai) AI coding tasks in isolated sandbox environments with GitHub integration.
 
-`workspace_*` sessions use the control plane in [`docs/control-plane.md`](docs/control-plane.md): the Session DO (`src/control-plane/session/`), the Sandbox DO (`src/control-plane/sandbox/`), and `wrapper/src/control-plane/`. The Worker exports those DOs as `SandboxSession` and `SandboxControl`. `agent_*` sessions still use `CloudAgentSession` and `wrapper/src/main.ts`. The prepare/initiate API below is that legacy plane.
+Every session uses the control plane in [`docs/control-plane.md`](docs/control-plane.md): the Session DO (`src/control-plane/session/`), the Sandbox DO (`src/control-plane/sandbox/`), and `wrapper/src/control-plane/`. The Worker exports those DOs as `SandboxSession` and `SandboxControl`. New sessions are `workspace_*` IDs. The split prepare/initiate API below is a retained public adapter over the same control plane, not a separate runtime.
 
 ## Development Setup
 
@@ -41,7 +41,7 @@ The `Dockerfile.dev` is used for local development and testing. It requires a pr
 # Set the path to your kilo-cli checkout (required)
 export KILO_CLI_DIR=/path/to/kilo-cli
 
-# From the cloud-agent directory
+# From services/cloud-agent-next
 ./cloud-agent-build.sh
 
 # Use it
@@ -66,23 +66,25 @@ By default, the script looks for kilo-cli at `$HOME/projects/kilo-cli`. Override
 
 ### Overview
 
-The recommended V2 flow is:
+The preferred flow is the unified `start` / `send` API. The split prepare/initiate flow remains supported as a public adapter:
 
-1. **Prepare Session** - Pre-create session with all configuration (supports prompts up to 100KB)
-2. **Initiate Prepared Session (V2)** - Start execution using stored configuration (ack + WebSocket)
-3. **Send Messages (V2)** - Queue follow-up messages to the same session
+1. **Start** - Create a session and durably admit the initial turn in one call
+2. **Send** - Queue follow-up messages to the same session
+3. **Split adapter** - `prepareSession` + `initiateFromKilocodeSessionV2` + `sendMessageV2`
 
 **Endpoints:**
 
+- `start` - Create a session and admit its initial turn
+- `send` - Queue a follow-up message
 - `prepareSession` - Create a fully prepared session with workspace, git clone, and configuration
 - `updateSession` - Update a prepared (not yet initiated) session
 - `getSession` - Query session metadata (no secrets)
+- `getSessionHealth` - Get sandbox health for a session
 - `getMessageResult` - Poll lifecycle state and terminal assistant text for one submitted turn
 - `initiateFromKilocodeSessionV2` - Start execution on a prepared session
 - `sendMessageV2` - Send follow-up messages (output via `/stream` WebSocket)
 - `deleteSession` - Delete a session and clean up resources
 - `interruptSession` - Interrupt running execution
-- `getWrapperLogs` - Get wrapper logs for debugging
 - `health` - Health check endpoint
 
 ### Authentication
@@ -94,7 +96,7 @@ All endpoints require a kilocode api token except `/stream` which uses short liv
 Use the bearer-protected `GET /trpc/getMessageResult` query to poll one durably submitted Cloud Agent turn. Supply `cloudAgentSessionId` and the submitted `messageId`.
 
 ```text
-GET /trpc/getMessageResult?input={"cloudAgentSessionId":"agent_<uuid>","messageId":"msg_<id>"}
+GET /trpc/getMessageResult?input={"cloudAgentSessionId":"workspace_<uuid>","messageId":"msg_<id>"}
 Authorization: Bearer <kilocode-api-token>
 ```
 
@@ -340,7 +342,7 @@ const result = await client.prepareSession.mutate({
 });
 
 console.log('Session prepared:', result.cloudAgentSessionId);
-// cloudAgentSessionId: 'agent_123e4567-e89b-12d3-a456-426614174000'
+// cloudAgentSessionId: 'workspace_123e4567-e89b-12d3-a456-426614174000'
 ```
 
 **Input:**
@@ -372,7 +374,7 @@ Updates a prepared (but not yet initiated) session.
 
 ```typescript
 await client.updateSession.mutate({
-  cloudAgentSessionId: 'agent_123e4567-e89b-12d3-a456-426614174000',
+  cloudAgentSessionId: 'workspace_123e4567-e89b-12d3-a456-426614174000',
   mode: 'architect', // Update mode
   envVars: { NEW_VAR: 'value' }, // Add/update env vars
   // Or clear fields:
@@ -457,7 +459,7 @@ Wraps JSON events from the Kilocode CLI, preserving all original fields:
     tool: 'read_file',           // Tool name
     input: { path: 'test.ts' }   // Tool arguments
   },
-  sessionId?: 'agent_123e4567-e89b-12d3-a456-426614174000'  // Optional session binding
+  sessionId?: 'workspace_123e4567-e89b-12d3-a456-426614174000'  // Optional session binding
 }
 ```
 
@@ -477,7 +479,7 @@ Infrastructure status messages (initialization, branch operations, configuration
   streamEventType: 'status',
   message: 'Cloning repository facebook/react...',
   timestamp: '2025-11-03T22:00:00.000Z',
-  sessionId?: 'agent_123e4567-e89b-12d3-a456-426614174000'
+  sessionId?: 'workspace_123e4567-e89b-12d3-a456-426614174000'
 }
 ```
 
@@ -491,7 +493,7 @@ Non-JSON stdout/stderr from CLI execution (ANSI escape sequences automatically s
   content: 'Installing dependencies...',
   source: 'stdout' | 'stderr',
   timestamp: '2025-11-03T22:00:00.000Z',
-  sessionId?: 'agent_123e4567-e89b-12d3-a456-426614174000'
+  sessionId?: 'workspace_123e4567-e89b-12d3-a456-426614174000'
 }
 ```
 
@@ -505,7 +507,7 @@ System-level error events (exit codes, stream failures):
   error: 'CLI exited with code 1',
   details?: any,                         // Optional error context
   timestamp: '2025-11-03T22:00:00.000Z',
-  sessionId?: 'agent_123e4567-e89b-12d3-a456-426614174000'
+  sessionId?: 'workspace_123e4567-e89b-12d3-a456-426614174000'
 }
 ```
 
@@ -517,11 +519,11 @@ Final event with execution results (no task history included in streaming):
 {
   streamEventType: 'complete',
   taskId: 'task_abc123',
-  sessionId: 'agent_123e4567-e89b-12d3-a456-426614174000',  // Always present
+  sessionId: 'workspace_123e4567-e89b-12d3-a456-426614174000',  // Always present
   exitCode: 0,
   metadata: {
     executionTimeMs: 45230,
-    workspace: '/workspace/org-id/user-id/sessions/agent_123e4567-e89b-12d3-a456-426614174000',
+    workspace: '/workspace/org-id/user-id/sessions/workspace_123e4567-e89b-12d3-a456-426614174000',
     userId: 'user-id',
     startedAt: '2025-11-03T22:00:00.000Z',
     completedAt: '2025-11-03T22:00:45.230Z'
@@ -546,7 +548,7 @@ Retrieves session metadata without secrets. This query enables the frontend to c
 ```typescript
 // Check if session has already been initiated
 const session = await client.getSession.query({
-  cloudAgentSessionId: 'agent_123e4567-e89b-12d3-a456-426614174000',
+  cloudAgentSessionId: 'workspace_123e4567-e89b-12d3-a456-426614174000',
 });
 
 if (session.initiatedAt) {
@@ -622,7 +624,7 @@ Kills all running Kilocode processes associated with a session. The session rema
 ```typescript
 // Interrupt a running session
 const result = await client.interruptSession.mutate({
-  sessionId: 'agent_123e4567-e89b-12d3-a456-426614174000',
+  sessionId: 'workspace_123e4567-e89b-12d3-a456-426614174000',
 });
 
 console.log('Interrupt result:', result);
@@ -678,7 +680,7 @@ cp .dev.vars.example .dev.vars
 3. Run locally:
 
 ```bash
-pnpm --filter cloud-agent
+pnpm --filter cloud-agent-next dev
 ```
 
 ### Local Development with Dockerfile.dev
@@ -698,10 +700,10 @@ cd cli && npm pack ./dist
 mv kilocode-cli-*.tgz ../kilocode-cli.tgz
 ```
 
-2. Copy the CLI tarball to the cloud-agent directory:
+2. Copy the CLI tarball to the service directory:
 
 ```bash
-cp kilocode/kilocode-cli.tgz cloud-agent/
+cp kilocode/kilocode-cli.tgz services/cloud-agent-next/
 ```
 
 #### The Dev Environment
@@ -727,10 +729,10 @@ cp .dev.vars.example .dev.vars
 
 ```bash
 # Start the worker in dev mode with the dev environment
-pnpm --filter cloud-agent dev -- --env dev
+pnpm --filter cloud-agent-next dev -- --env dev
 
 # Or directly with wrangler:
-cd cloud-agent && wrangler dev --env dev
+cd services/cloud-agent-next && wrangler dev --env dev
 ```
 
 ### GitHub Actions Deployment
@@ -741,7 +743,7 @@ This project also ships with an on-demand GitHub Action (`Deploy Cloud Agent`) l
 1. In GitHub, open the **Actions** tab and select **Deploy Cloud Agent**.
 2. Click **Run workflow**, choose the target environment (`dev` or `prod`), and confirm.
 3. The workflow checks out the repo, installs dependencies with pnpm, and runs
-   `wrangler deploy --env <environment>` inside `cloud-agent/`.
+   `wrangler deploy --env <environment>` inside `services/cloud-agent-next/`.
 
 Required secrets:
 
@@ -759,10 +761,10 @@ Fast tests that run in Node.js with full mocking support. Use these for testing 
 
 ```bash
 # Run unit tests (src/**/*.test.ts)
-pnpm --filter cloud-agent test
+pnpm --filter cloud-agent-next test
 
 # Watch mode
-pnpm --filter cloud-agent test:watch
+pnpm --filter cloud-agent-next test:watch
 ```
 
 **When to use:** Testing pure TypeScript logic, utility functions, type guards, data transformations, and any code that doesn't directly interact with Cloudflare Workers APIs (Durable Objects, queues, KV, etc.).
@@ -773,13 +775,13 @@ Tests that run in the actual Cloudflare Workers runtime via Miniflare using `@cl
 
 ```bash
 # Run integration tests (test/**/*.test.ts)
-pnpm --filter cloud-agent test:integration
+pnpm --filter cloud-agent-next test:integration
 
 # Watch mode
-pnpm --filter cloud-agent test:integration:watch
+pnpm --filter cloud-agent-next test:integration:watch
 
 # Run both unit and integration tests
-pnpm --filter cloud-agent test:all
+pnpm --filter cloud-agent-next test:all
 ```
 
 **When to use:** Testing Durable Object behavior, queue consumers, WebSocket handling, SQLite storage, alarms, and any functionality that depends on the Cloudflare Workers runtime. Integration tests use utilities like `runInDurableObject`, `createMessageBatch`, and `getQueueResult` from `cloudflare:test`.
@@ -788,89 +790,52 @@ pnpm --filter cloud-agent test:all
 
 ```bash
 # Type checking
-pnpm --filter cloud-agent typecheck
+pnpm --filter cloud-agent-next typecheck
 
 # Linting
-pnpm --filter cloud-agent lint
-pnpm --filter cloud-agent lint:fix
+pnpm --filter cloud-agent-next lint
+pnpm --filter cloud-agent-next lint:fix
 ```
 
 ## Architecture
 
-### Multi-Session Model
+### Sandbox and Session Model
 
-The cloud agent uses a **one sandbox (container) per organization/user** architecture with **N sessions per sandbox**:
+- **Session**: one Session DO per `workspace_*` session ID. It owns the message queue and states, route view, event log, questions, callbacks and the client stream.
+- **Sandbox**: one Sandbox DO per sandbox ID. It owns the physical allocation, provider lease, wrapper socket, credentials and idle stop.
+  - The default control-plane allocation is an isolated per-session `ses-*` sandbox.
+  - A shared allocation (`org-*`, `usr-*`, `bot-*`, `ubt-*`) hosts multiple worktrees and chats in one runtime.
+- **Worktree**: a shared checkout and chat group. A worktree chat gets a `worktree_*` ID and the path `/workspace/<org>/<user>/worktrees/<worktreeId>`; isolated sessions use `/workspace/app`.
+- **Wrapper**: one control wrapper per sandbox. It connects to the Sandbox DO, prepares routes, supervises Kilo, submits prompts and reports turn outcomes.
 
-- **Sandbox**: Isolated container with scope based on account type:
-  - **Organization accounts**: `${organizationId}__${userId}` (e.g., `org-123__user-456`)
-  - **Personal accounts**: `user:${userId}__${userId}` (e.g., `user:abc-123__abc-123`)
-  - **Bot/service isolation**: Optional `__bot:${botId}` suffix (e.g., `org-123__user-456__bot:reviewer`)
-  - One sandbox per unique org/user or user/bot combination
-  - Multiple users in same org get separate sandboxes
-  - Sandboxes persist across HTTP requests and share filesystem
-- **Sessions**: Like bash shell execution contexts within a sandbox. Think of them like terminal tabs or panes in the same container.
-  - Multiple sessions can run concurrently in the same sandbox
-  - Each session has its own working directory, HOME, and git workspace
-  - Sessions maintain separate shell state (env vars, cwd) but share the container filesystem
+### Session Lifecycle
 
-This architecture enables efficient resource utilization while maintaining strong isolation between organizations, users, bots, and sessions.
-
-### Session Management
-
-The `SessionService` orchestrates session lifecycle:
-
-- **Initiate (V2: `prepareSession` + `initiateFromKilocodeSessionV2`)**
-  - Creates a session-specific HOME (`/home/<sessionId>`) so the Kilocode CLI keeps config/logs/tasks per session
-  - Calls `setupWorkspace` to build `/workspace/${organizationId}/${userId}/sessions/${sessionId}`
-  - Clones the requested repository directly into the workspace path using the session service
-  - Ensures a git branch (either `session/<sessionId>` or the specified `upstreamBranch`)
-  - Runs setup commands and configures MCP servers if provided
-- **Resume (V2: `sendMessageV2`)**
-  - Rehydrates the `SessionContext` for an existing workspace
-  - Refreshes runtime config for the requested model/token
-  - Reattaches/creates the Cloudflare session
-  - **Warm start** (workspace `.git` exists): no additional setup needed
-  - **Cold start** (sandbox recycled, workspace gone):
-    1. Restores Kilo CLI session snapshot from the session-ingest service (`kilo import`)
-    2. Reclones the repository using stored metadata (prefers fresh tokens over stale ones)
-    3. Checks out the correct branch via `restoreWorkspace` — if the branch exists on the remote it creates a local tracking branch, otherwise creates a new local branch
-    4. Re-runs setup commands (lenient — failures warn instead of aborting)
-    5. Re-writes MCP server settings
+- **Create (`start`)**: creates the ownership row, registers metadata, and durably admits the canonical initial turn in one Session DO call.
+- **Split adapters**: `prepareSession` registers a session without initiating it. `initiateFromKilocodeSessionV2` reconstructs the stored initial turn and admits it. `sendMessageV2` queues follow-ups. They use the same Session DO and control plane.
+- **Prepare (`send`)**: the Session DO queues the message and asks the Sandbox DO to prepare an allocation. The Sandbox DO launches the wrapper; the wrapper clones the repository, checks out the branch, runs setup commands, configures MCP servers, starts Kilo and reports ready.
+- **Deliver**: the Session DO sends queued messages to the Sandbox DO, which writes them to the wrapper socket. The wrapper submits them to Kilo; events and the turn outcome flow back through the Sandbox DO to the Session DO and `/stream`.
+- **Recovery**: after sandbox loss, the next message prepares a new sandbox. A cold start restores the Kilo session snapshot, reclones the repository, checks out the branch, re-runs setup commands and rewrites MCP settings.
+- **Idle**: the wrapper socket is the liveness signal. After a close or 45 seconds without a heartbeat the allocation is `disconnected`; it stops at the earlier of the reconnect window and the idle deadline, and the next message prepares a new sandbox.
 
 ### Session Linking
 
-Cloud-agent sessions are bidirectionally linked to Kilocode CLI sessions:
+Cloud-agent sessions are linked to Kilocode CLI sessions:
 
-- **Cloud → Kilo**: `prepareSession` creates a CLI session and links IDs.
-- **Kilo → Cloud**: The `cloud_agent_session_id` is stored in the backend's `cli_sessions` table for reverse lookup.
-
-This enables:
-
-- Resuming local Kilocode sessions in the cloud
-- Finding which cloud-agent session corresponds to a Kilocode session
-- Seamless transition between local and cloud development
-
-**Identifiers:**
-
-- **Cloud-Agent Session ID**: `agent_${uuid}` (e.g., `agent_123e4567-e89b-12d3-a456-426614174000`)
-- **Kilocode CLI Session ID**: `${uuid}` (e.g., `601313d3-0dd7-4d4c-af24-5e0014398a86`)
+- **Cloud → Kilo**: session creation stores the Kilo session ID and lineage.
+- **Kilo → Cloud**: the backend's `cli_sessions_v2.cloud_agent_session_id` column provides reverse lookup.
 
 ### Identifiers & Paths
 
-- **Session ID**: `agent_${uuid}` (e.g., `agent_123e4567-e89b-12d3-a456-426614174000`)
-- **Sandbox ID**:
-  - Organization accounts: `${organizationId}__${userId}`
-  - Personal accounts: `user:${userId}__${userId}`
-  - With bot isolation: `${organizationId}__${userId}__bot:${botId}`
-- **Workspace Path**:
-  - Organization accounts: `/workspace/${organizationId}/${userId}/sessions/${sessionId}`
-  - Personal accounts: `/workspace/${userId}/sessions/${sessionId}`
-- **Session HOME**: `/home/${sessionId}` (exported as `HOME` for all CLI invocations)
-- **Branch**: `session/${sessionId}` (default) or specified upstream branch
+- **Session ID**: `workspace_${uuid}`
+- **Worktree ID**: `worktree_${uuid}`
+- **Message ID**: durable `msg_*` identity, also passed to Kilo as the user message ID
+- **Sandbox ID**: isolated `ses-*` or a shared `org-*`, `usr-*`, `bot-*`, `ubt-*` key
+- **Workspace Path**: `/workspace/<org>/<user>/sessions/<sessionId>` for isolated sessions, or `/workspace/<org>/<user>/worktrees/<worktreeId>` for worktree sessions
+- **Branch**: `session/${sessionId}` (default) or the specified upstream branch
 
 ### GitHub Integration
 
-- Repository preparation/cloning occurs during wrapper readiness using the session service/workspace helpers. Devcontainer support is retired; stored devcontainer sessions can be stopped or deleted but cannot start or resume.
+- Repository preparation/cloning occurs during wrapper preparation using `src/workspace.ts` helpers. Devcontainer support is retired; stored devcontainer sessions can be stopped or deleted but cannot start or resume.
 - Branch handling:
   - **Default**: Creates isolated `session/<sessionId>` branches for each session
   - **Upstream branches**: Use `upstreamBranch` to work on existing branches (e.g., `main`, `develop`)

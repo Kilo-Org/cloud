@@ -58,10 +58,13 @@ vi.mock('react', async () => {
   const actual = await vi.importActual<typeof React>('react');
   return {
     ...actual,
-    useState: vi.fn(<T,>(initial: T) => {
+    useState: vi.fn(<T,>(initial: T | (() => T)) => {
       const setter = vi.fn();
       stateSetters.push(setter);
-      return [initial, setter as () => void] as [T, (value: T) => void];
+      // React runs a function initializer once, on the first render; the sheet
+      // seeds its method that way, so the harness must too.
+      const value = typeof initial === 'function' ? (initial as () => T)() : initial;
+      return [value, setter as () => void] as [T, (value: T) => void];
     }),
     useMemo: vi.fn(<T,>(factory: () => T) => factory()),
     useRef: vi.fn(<T,>(initial: T) => {
@@ -150,9 +153,9 @@ vi.mock('@/components/pr-review/pr-form-sheet-chrome', () => ({
 vi.mock('@/components/pr-review/merge/pr-merge-icons', () => ({
   defaultMergeMethodOptionFor: () => 'squash',
   mergeMethodOptionsFor: () => [
-    { value: 'merge', label: 'Merge', icon: 'merge' },
-    { value: 'squash', label: 'Squash', icon: 'squash' },
-    { value: 'rebase', label: 'Rebase', icon: 'rebase' },
+    { value: 'merge', label: 'Merge', accessibilityLabel: 'Create a merge commit' },
+    { value: 'squash', label: 'Squash', accessibilityLabel: 'Squash and merge' },
+    { value: 'rebase', label: 'Rebase', accessibilityLabel: 'Rebase and merge' },
   ],
 }));
 vi.mock('@/components/pr-review/merge/pr-merge-sheet-parts', () => ({
@@ -213,12 +216,10 @@ const baseProps = {
   repoName: 'hello',
   number: 1,
   headSha: 'a'.repeat(40),
-  headRef: 'feature/x',
   isCrossRepo: false,
   prNodeId: 'pr-node-1',
   title: 'Feature',
   bodyMarkdown: null,
-  baseRef: 'main',
   repo: repoSettings,
   initialMethod: 'squash' as const,
   mode: 'merge' as const,
@@ -653,6 +654,10 @@ function forbiddenError(): Error {
   return Object.assign(new Error('403 Forbidden'), { data: { code: 'FORBIDDEN' } });
 }
 
+function revokedError(): Error {
+  return Object.assign(new Error('revoked'), { data: { code: 'PRECONDITION_FAILED' } });
+}
+
 /** True when the error effect wrote `value` into any state slot. */
 function stateValueWritten(value: string): boolean {
   return stateSetters.some(setter => setter.mock.calls.some(call => call[0] === value));
@@ -731,6 +736,41 @@ describe('PrMergeSheet refused-merge wording (s6f)', () => {
     // eslint-disable-next-line new-cap
     PrMergeSheet(baseProps);
     expect(stateValueWritten("You don't have permission to merge this pull request.")).toBe(true);
+  });
+});
+
+describe('PrMergeSheet reconnect wording', () => {
+  beforeEach(() => {
+    stateSetters.length = 0;
+    mergeMutationMocks.mutateAsync.mockReset();
+    mergeMutationMocks.isPending = false;
+    mergeMutationMocks.error = null;
+    vi.clearAllMocks();
+  });
+
+  it('names the merge-request provider in the status line above the notice', () => {
+    mergeMutationMocks.error = revokedError();
+    // eslint-disable-next-line new-cap
+    PrMergeSheet({ ...baseProps, prRef: GITLAB_REF, mergeState: mergeState() });
+    // The status line sits above the GitLab reconnect notice, so it must not
+    // announce a GitHub connection on a merge request.
+    expect(stateValueWritten('GitLab connection expired')).toBe(true);
+    expect(stateValueWritten('GitHub connection expired.')).toBe(false);
+  });
+
+  it('names the Bitbucket provider in the status line above the notice', () => {
+    mergeMutationMocks.error = revokedError();
+    // eslint-disable-next-line new-cap
+    PrMergeSheet({ ...baseProps, prRef: BITBUCKET_REF, mergeState: mergeState() });
+    expect(stateValueWritten('Bitbucket connection expired')).toBe(true);
+    expect(stateValueWritten('GitHub connection expired.')).toBe(false);
+  });
+
+  it('keeps the GitHub copy on the GitHub arm', () => {
+    mergeMutationMocks.error = revokedError();
+    // eslint-disable-next-line new-cap
+    PrMergeSheet(baseProps);
+    expect(stateValueWritten('GitHub connection expired.')).toBe(true);
   });
 });
 

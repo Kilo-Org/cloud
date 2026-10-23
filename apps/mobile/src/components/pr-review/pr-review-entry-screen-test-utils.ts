@@ -22,6 +22,7 @@ const harnessMocks = vi.hoisted(() => ({
   confirm: vi.fn(),
   toastError: vi.fn(),
   clipboard: { current: '' as string },
+  clipboardHasString: { current: false },
 }));
 
 // A hoisted binding cannot be exported directly; alias it for the test files.
@@ -53,6 +54,10 @@ vi.mock('expo-clipboard', () => ({
   getStringAsync: async () => {
     await Promise.resolve();
     return harnessMocks.clipboard.current;
+  },
+  hasStringAsync: async () => {
+    await Promise.resolve();
+    return harnessMocks.clipboardHasString.current;
   },
 }));
 

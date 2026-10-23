@@ -9,10 +9,11 @@ import { EmptyState } from '@/components/empty-state';
 import { toast } from 'sonner-native';
 
 import { PrReviewContextLine } from '@/components/pr-review/pr-review-context-line';
+import { PrReviewGateHeader } from '@/components/pr-review/pr-review-gate-header';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { WEB_BASE_URL } from '@/lib/config';
 import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -20,13 +21,7 @@ import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform'
 import { selectPrReviewGateView } from '@/lib/pr-review/pr-review-connect-gate-view';
 import { type ProviderPrPlatform, useProviderPrScopeOrNull } from '@/lib/pr-review/provider-pr-ref';
 import { useTRPC } from '@/lib/trpc';
-
-/**
- * Cold deep links land straight on a gate state with no navigation history,
- * so `ScreenHeader` would render without a back control. The provider-neutral
- * inbox is the one exit every PR-review surface shares.
- */
-export const PR_REVIEW_ENTRY_HREF = '/(app)/pr-review' as const;
+import { cn } from '@/lib/utils';
 
 /**
  * The pasted MR URL's origin, when the deep link carried one and it is worth
@@ -111,15 +106,22 @@ export function ProviderConnectGate({
       await launchConnectGateBrowser(integrationUrl, {
         signal: controller.signal,
         onOpenFailure: () => void toast.error(t('authErrors.couldNotOpenBrowser')),
-        onReturn: async () => {
-          await status.refetch();
+        onReturn: () => {
+          // Detached on purpose: the browser closing is the user's edge, so the
+          // CTA returns to idle as soon as it happens. A status read that stays
+          // pending (the default `networkMode: 'online'` never settles while the
+          // online manager reports offline) must not keep Connect disabled — the
+          // read's own states carry the outcome, and a real failure renders the
+          // retryable QueryError below.
+          void status.refetch().catch(() => undefined);
+          return Promise.resolve();
         },
       });
     } catch {
-      // The helper reports a failed launch itself, so a rejected `onReturn`
-      // refetch is the only error that reaches here. Keep the gate showing:
-      // the query's error state renders the retryable
-      // QueryError instead of letting `void handleConnect()` reject.
+      // `launchConnectGateBrowser` reports a failed launch through
+      // `onOpenFailure`; this keeps `void handleConnect()` from rejecting if the
+      // refresh helper throws before that. The status read's own error state
+      // renders the retryable QueryError.
     } finally {
       if (!controller.signal.aborted) {
         setConnecting(false);
@@ -141,7 +143,7 @@ export function ProviderConnectGate({
   if (view === 'org-only') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('common.prReview')} backFallback={PR_REVIEW_ENTRY_HREF} />
+        <PrReviewGateHeader />
         <EmptyState
           icon={ShieldAlert}
           title={t('agentChat.newSession.bitbucketOrganizationsOnly')}
@@ -161,7 +163,7 @@ export function ProviderConnectGate({
   if (view === 'error') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('common.prReview')} backFallback={PR_REVIEW_ENTRY_HREF} />
+        <PrReviewGateHeader />
         <QueryError
           variant="server"
           title={
@@ -182,7 +184,7 @@ export function ProviderConnectGate({
   if (view === 'loading') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('common.prReview')} backFallback={PR_REVIEW_ENTRY_HREF} />
+        <PrReviewGateHeader />
         <CenteredState>
           <ActivityIndicator size="small" color={colors.mutedForeground} />
         </CenteredState>
@@ -194,7 +196,7 @@ export function ProviderConnectGate({
     const title = platform === 'gitlab' ? t('common.connectGitlab') : t('common.connectBitbucket');
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('common.prReview')} backFallback={PR_REVIEW_ENTRY_HREF} />
+        <PrReviewGateHeader />
         <EmptyState
           icon={PlugZap}
           title={title}
@@ -210,7 +212,7 @@ export function ProviderConnectGate({
           }
           action={
             <Button
-              className="mt-3 w-full flex-row gap-2"
+              className={cn('mt-3 w-full flex-row gap-2', STATE_ACTION_CLASS)}
               disabled={connecting}
               onPress={() => {
                 void handleConnect();

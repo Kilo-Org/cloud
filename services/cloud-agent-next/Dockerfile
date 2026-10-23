@@ -1,4 +1,4 @@
-ARG NODE_VERSION="24.22.0"
+ARG NODE_VERSION="24.22.1"
 FROM docker.io/library/node:${NODE_VERSION}-slim AS node-runtime
 
 FROM docker.io/cloudflare/sandbox:0.12.12
@@ -10,8 +10,8 @@ COPY --from=node-runtime /usr/local/lib/node_modules /usr/local/lib/node_modules
 # Build arguments for metadata (all optional with defaults)
 ARG BUILD_DATE=""
 ARG VCS_REF=""
-ARG KILOCODE_CLI_VERSION="7.8.1"
-ARG BUN_VERSION="1.3.14"
+ARG KILOCODE_CLI_VERSION="7.8.17"
+ARG BUN_VERSION="1.4.4"
 ARG PNPM_VERSION="12.14.0"
 ARG GLAB_VERSION="1.124.0"
 ARG GH_VERSION="2.102.0"

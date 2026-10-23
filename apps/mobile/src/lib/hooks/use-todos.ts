@@ -138,13 +138,19 @@ export function useTodoListMutations(
 ) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const optimistic = useOptimisticArray<TodoList>(
-    trpc.todos.lists.list.queryKey({ organizationId, includeArchived: true })
-  );
+  const listsKey = trpc.todos.lists.list.queryKey({ organizationId, includeArchived: true });
+  const optimistic = useOptimisticArray<TodoList>(listsKey);
 
   const create = useMutation(
     trpc.todos.lists.create.mutationOptions({
       onError: reportFailure,
+      onSuccess: created => {
+        // The created list's screen reads this cache as it mounts, before the
+        // invalidation below lands; without the row it renders its not-found state.
+        queryClient.setQueryData<TodoList[]>(listsKey, lists =>
+          lists ? [...lists.filter(list => list.id !== created.id), created] : [created]
+        );
+      },
       onSettled: async () => {
         await invalidateTodoQueries(queryClient, trpc);
       },

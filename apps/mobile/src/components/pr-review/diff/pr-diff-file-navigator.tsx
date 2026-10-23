@@ -31,6 +31,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { NavigatorFileRow } from '@/components/pr-review/diff/pr-diff-navigator-file-row';
+import { usePrDiffStateCopy } from '@/components/pr-review/diff/pr-diff-state-copy';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -117,6 +118,11 @@ export function PrDiffFileNavigator({
   const scope = useProviderPrScope({ owner, repo, number });
   const viewed = usePrReviewViewedFiles(scope.ref, headSha);
   const fetchAll = useFetchToCompletion(query, changedFiles);
+  // The terminal states speak the scope's provider: a GitLab merge request
+  // never says "pull request", and only GitHub can blame a missing Kilo
+  // GitHub App. Same selector the Files tab uses, so the two surfaces cannot
+  // drift.
+  const copy = usePrDiffStateCopy({ owner, repo, number });
 
   const hasActiveSearch = searchRef.current.trim().length > 0;
 
@@ -225,10 +231,10 @@ export function PrDiffFileNavigator({
       <CenteredState>
         <View className="items-center px-6">
           <Text className="text-center text-lg font-semibold text-foreground">
-            {t('prReview.pullRequestUnavailable')}
+            {copy.unavailableTitle}
           </Text>
           <Text variant="muted" className="mt-1 text-center">
-            {t('prReview.pullRequestUnavailableDescription')}
+            {copy.unavailableMessage}
           </Text>
           {isProviderScope ? (
             <PrReviewUnavailableActions
@@ -249,7 +255,7 @@ export function PrDiffFileNavigator({
             {t('common.accessDenied')}
           </Text>
           <Text variant="muted" className="mt-1 text-center">
-            {t('prReview.accessDeniedDescription')}
+            {copy.accessDeniedMessage}
           </Text>
         </View>
       </CenteredState>

@@ -11,7 +11,7 @@ import {
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 
-import { NewSessionProfileRow } from './new-session-configure-form';
+import { NewSessionProfileRow } from './new-session-environment-row';
 
 import '@/i18n';
 import type * as ReactI18next from 'react-i18next';
@@ -523,6 +523,12 @@ describe('NewSessionConfigureForm', () => {
     expect(findElementByType(element, 'NewSessionRepositorySection')).not.toBeNull();
     expect(findTextContent(element, t => t === 'Run on')).toBe(false);
     expect(findTextContent(element, t => t === 'Run on: ')).toBe(false);
+    expect(
+      findTextContent(
+        element,
+        t => t === 'To run on your computer, start Kilo there and leave it running.'
+      )
+    ).toBe(false);
   });
 
   // ── Case 3: Remote, selector shown ──
@@ -542,6 +548,12 @@ describe('NewSessionConfigureForm', () => {
       showRunOnSelector: true,
       runOnInstance: INSTANCE,
     });
+    expect(
+      findTextContent(
+        element,
+        t => t === 'To run on your computer, start Kilo there and leave it running.'
+      )
+    ).toBe(true);
   });
 
   // ── Case 4: Remote, selector hidden ──
@@ -738,9 +750,12 @@ describe('NewSessionConfigureForm', () => {
     const element = renderRow({ profile: PROFILE });
 
     expect(findTextContent(element, t => t === 'Production')).toBe(true);
-    expect(findTextContent(element, t => t === '3 commands · 1 MCP · 2 skills · 4 agents')).toBe(
-      true
-    );
+    expect(
+      findTextContent(
+        element,
+        t => t === '2 vars · 1 MCP · 2 skills · 4 cmds · 3 setup cmds · 4 agents'
+      )
+    ).toBe(true);
   });
 
   it('renders "Default environment" when no profile resolves', () => {
@@ -774,6 +789,48 @@ describe('NewSessionConfigureForm', () => {
     expect(findElementByType(element, 'Skeleton')).not.toBeNull();
     expect(findTextContent(element, t => t === 'Default environment')).toBe(false);
     expect(findTextContent(element, t => t === 'Production')).toBe(false);
+  });
+
+  it('keeps the summary slot when a resolved profile has nothing configured', () => {
+    const element = renderRow({
+      profile: {
+        ...PROFILE,
+        varCount: 0,
+        mcpServerCount: 0,
+        skillCount: 0,
+        kiloCommandCount: 0,
+        commandCount: 0,
+        agentCount: 0,
+      },
+    });
+
+    // The empty count list keeps the two-line placeholder, so the card holds the
+    // height the loading state reserves instead of collapsing.
+    expect(findTextContent(element, t => t === '\u00A0\n\u00A0')).toBe(true);
+    const slots = collectElementsByType(element, 'View').filter(
+      view => view.importantForAccessibility === 'no-hide-descendants'
+    );
+    expect(slots).toHaveLength(1);
+    expect(slots[0]?.accessibilityElementsHidden).toBe(true);
+  });
+
+  it('renders every Environment row state inside the same card', () => {
+    const chrome = 'min-h-11 flex-row items-center gap-3 rounded-lg border border-border bg-card';
+
+    for (const row of [
+      renderRow({ isProfileLoading: true }),
+      renderRow({ isProfileError: true }),
+      renderRow({ profile: PROFILE }),
+      renderRow(),
+    ]) {
+      const cards = [
+        ...collectElementsByType(row, 'View'),
+        ...collectElementsByType(row, 'Pressable'),
+      ]
+        .map(element => element.className)
+        .filter(className => typeof className === 'string' && className.includes(chrome));
+      expect(cards).toEqual([expect.stringContaining(chrome)]);
+    }
   });
 
   it('opens the profile picker when the row is pressed', () => {
@@ -928,8 +985,8 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(element, t => t === 'Changes')).toBe(false);
   });
 
-  // ── Case 12: the Run on helper sentence stays in plain language ──
-  it('renders the plain help sentence, without CLI jargon, for cloud and remote targets', async () => {
+  // ── Case 12: the Run on helper sentence stays in plain language, on a remote target only ──
+  it('renders the plain help sentence for a remote target and never for the cloud target', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
     const helpSentence = 'To run on your computer, start Kilo there and leave it running.';
@@ -941,15 +998,13 @@ describe('NewSessionConfigureForm', () => {
       runOnInstance: null,
       showRunOnSelector: true,
     }) as Node;
-    expect(findTextContent(cloud, t => t === helpSentence)).toBe(true);
+    expect(findTextContent(cloud, t => t === helpSentence)).toBe(false);
     for (const term of cliTerms) {
       expect(
         findTextContent(cloud, t => t.includes(term)),
         term
       ).toBe(false);
     }
-    // The help draws the sentence as prose: the authoring markers must not
-    // reach the screen.
     expect(findTextContent(cloud, t => t.includes('`'))).toBe(false);
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention

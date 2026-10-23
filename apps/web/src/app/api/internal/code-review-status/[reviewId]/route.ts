@@ -547,10 +547,6 @@ function isInfraRetryAttempt(attempt: CloudAgentCodeReviewAttempt): boolean {
   return attempt.retry_reason === 'infra_failure' || attempt.retry_of_attempt_id !== null;
 }
 
-function isPreDispatchSandboxConnectFailure(failure?: CloudAgentSafeFailure): boolean {
-  return failure?.stage === 'pre_dispatch' && failure.code === 'sandbox_connect_failed';
-}
-
 type FailedSessionUsage = NonNullable<Awaited<ReturnType<typeof getSessionUsageFromBilling>>>;
 
 function failedSessionTokenCount(usage: FailedSessionUsage): number {
@@ -582,7 +578,13 @@ async function shouldSkipAutoRetryForFailedSessionUsage(params: {
 
   const usage = await getSessionUsageFromBilling(params.failedCliSessionId, params.reviewCreatedAt);
   if (!usage) {
-    const allowUnavailableUsage = isPreDispatchSandboxConnectFailure(params.failure);
+    // A pre-dispatch sandbox or workspace setup failure means the agent never
+    // ran, so an unmeasurable attempt cannot have spent model usage and the
+    // spend guard must not block the single infra retry.
+    const allowUnavailableUsage =
+      params.failure?.stage === 'pre_dispatch' &&
+      (params.failure.code === 'sandbox_connect_failed' ||
+        params.failure.code === 'workspace_setup_failed');
     logExceptInTest('[code-review-status] Auto-retry token guard could not measure usage', {
       reviewId: params.reviewId,
       failedAttemptId: params.failedAttemptId,

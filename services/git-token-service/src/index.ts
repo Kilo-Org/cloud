@@ -126,6 +126,15 @@ export type GetTokenForRepoFailure = {
 };
 
 export type GetTokenForRepoResult = GetTokenForRepoSuccess | GetTokenForRepoFailure;
+
+const GetTokenForIntegrationParamsSchema = z.object({
+  integrationId: z.string().uuid(),
+  userId: z.string().min(1),
+  orgId: z.string().uuid().optional(),
+});
+
+export type GetTokenForIntegrationParams = z.infer<typeof GetTokenForIntegrationParamsSchema>;
+
 export type {
   GetGitLabTokenParams,
   GetGitLabTokenSuccess,
@@ -1143,11 +1152,21 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     return this.githubService.getToken(installationId, appType);
   }
 
+  /**
+   * Mint a token for a stored integration on behalf of its owner. Callers pass
+   * the owning user (and org, for org-owned resources); an integration that
+   * belongs to anyone else is reported as unavailable.
+   */
   async getTokenForIntegration(
-    integrationId: string
+    params: GetTokenForIntegrationParams
   ): Promise<{ success: true; token: string } | { success: false; reason: 'unavailable' }> {
-    const association =
-      await this.installationLookupService.findActiveAssociationById(integrationId);
+    const parsed = GetTokenForIntegrationParamsSchema.safeParse(params);
+    if (!parsed.success) return { success: false, reason: 'unavailable' };
+    const { integrationId, userId, orgId } = parsed.data;
+    const association = await this.installationLookupService.findActiveAssociationById(
+      integrationId,
+      orgId === undefined ? { userId } : { userId, orgId }
+    );
     if (!association.success) return { success: false, reason: 'unavailable' };
     const token = await this.githubService.getToken(
       association.installationId,

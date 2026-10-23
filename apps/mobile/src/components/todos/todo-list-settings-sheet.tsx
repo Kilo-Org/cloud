@@ -23,19 +23,22 @@ import {
   todoListGitUrl,
   todoListRepoSelection,
 } from '@/lib/todos/todo-model';
+import { todoListPath } from '@/lib/todos/todo-routes';
 import { type TodoList } from '@/lib/todos/todo-types';
 import { useNewSessionRepos } from '@/lib/use-new-session-repos';
 
 type ListSettingsFormProps = {
   list: TodoList | null;
   organizationId: string | null;
+  /** `'back'` returns to the sheet that opened this one instead of opening the new list. */
+  afterCreate: 'open' | 'back';
 };
 
 function FieldLabel({ children }: Readonly<{ children: string }>) {
   return <Text className="text-sm font-medium text-foreground">{children}</Text>;
 }
 
-function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormProps>) {
+function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSettingsFormProps>) {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -109,10 +112,19 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
     try {
       // An existing list updates in place; a new one is created in the route's
       // context. Either way the sheet closes only once the write succeeded.
-      await (list
-        ? update.mutateAsync({ id: list.id, ...fields })
-        : create.mutateAsync({ organizationId, ...fields }));
-      router.back();
+      if (list) {
+        await update.mutateAsync({ id: list.id, ...fields });
+        router.back();
+      } else {
+        const created = await create.mutateAsync({ organizationId, ...fields });
+        if (afterCreate === 'back') {
+          router.back();
+        } else {
+          // Replace the form sheet with the created list: Back from the list then
+          // lands on the lists view the sheet was opened from.
+          router.replace(todoListPath(created.id));
+        }
+      }
     } catch {
       // The fields and the sheet stay, so the user can retry in place; the
       // status line below the fields is this save's only error surface.
@@ -247,17 +259,31 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
 export function TodoListSettingsSheet({
   listId,
   organizationId,
-}: Readonly<{ listId: string | null; organizationId: string | null }>) {
+  afterCreate = 'open',
+}: Readonly<{
+  listId: string | null;
+  organizationId: string | null;
+  afterCreate?: 'open' | 'back';
+}>) {
   const router = useRouter();
   const { t } = useTranslation();
   const lists = useTodoLists(organizationId, listId !== null);
 
   if (listId === null) {
-    return <ListSettingsForm list={null} organizationId={organizationId} />;
+    return (
+      <ListSettingsForm list={null} organizationId={organizationId} afterCreate={afterCreate} />
+    );
   }
   const list = lists.data?.find(candidate => candidate.id === listId);
   if (list) {
-    return <ListSettingsForm key={list.id} list={list} organizationId={organizationId} />;
+    return (
+      <ListSettingsForm
+        key={list.id}
+        list={list}
+        organizationId={organizationId}
+        afterCreate={afterCreate}
+      />
+    );
   }
   return (
     <PickerSheet

@@ -15,10 +15,21 @@ import {
   validateGitLabInstance,
   validatePersonalAccessToken,
   createProjectWebhook,
+  createProjectAccessToken,
   deleteProjectWebhook,
   fetchGitLabProjects,
   fetchGitLabRootTextFileAtRef,
   fetchGitLabRepositorySize,
+  GitLabAuthenticationError,
+  GitLabProjectAccessTokenPermissionError,
+  GitLabWebhookPermissionError,
+  getMRDiffRefs,
+  getMRHeadCommit,
+  listProjectAccessTokens,
+  listProjectWebhooks,
+  revokeProjectAccessToken,
+  rotateProjectAccessToken,
+  updateProjectWebhook,
 } from './adapter';
 
 // Mock fetch globally
@@ -328,7 +339,7 @@ describe('validateGitLabInstance', () => {
   });
 
   it('should return invalid for unsafe hosts before fetching', async () => {
-    const result = await validateGitLabInstance('http://127.0.0.1:8080');
+    const result = await validateGitLabInstance('https://127.0.0.1:8080');
 
     expect(result.valid).toBe(false);
     expect(result.error).toContain('host is not allowed');
@@ -642,6 +653,106 @@ describe('createProjectWebhook', () => {
 
     expect(mockHttpsRequest).toHaveBeenCalledTimes(1);
   });
+
+  it('configures the same events when creating and when updating a webhook', async () => {
+    mockSelfHostedGitLabResponse({ status: 201, json: { id: 7 } });
+    await createProjectWebhook(
+      'test-token',
+      123,
+      'https://example.com/webhook',
+      'webhook-secret',
+      'https://gitlab.example.com'
+    );
+
+    mockSelfHostedGitLabResponse({ status: 200, json: { id: 7 } });
+    await updateProjectWebhook(
+      'test-token',
+      123,
+      7,
+      'https://example.com/webhook',
+      'webhook-secret',
+      'https://gitlab.example.com'
+    );
+
+    const [createOptions, updateOptions] = mockHttpsRequest.mock.calls.map(call => call[0]);
+    const [createBody, updateBody] = mockHttpsRequest.mock.results.map(result =>
+      String(result.value.write.mock.calls[0][0])
+    );
+
+    expect(createOptions).toMatchObject({ method: 'POST', path: '/api/v4/projects/123/hooks' });
+    expect(updateOptions).toMatchObject({ method: 'PUT', path: '/api/v4/projects/123/hooks/7' });
+    expect(createBody).toBe(updateBody);
+    expect(JSON.parse(createBody)).toEqual({
+      name: 'Kilo Code Reviews',
+      description: 'Auto-configured webhook for Kilo AI code reviews',
+      url: 'https://example.com/webhook',
+      token: 'webhook-secret',
+      merge_requests_events: true,
+      push_events: false,
+      issues_events: false,
+      confidential_issues_events: false,
+      tag_push_events: false,
+      note_events: false,
+      confidential_note_events: false,
+      job_events: false,
+      pipeline_events: false,
+      wiki_page_events: false,
+      deployment_events: false,
+      releases_events: false,
+      enable_ssl_verification: true,
+    });
+  });
+});
+
+describe('merge request reads', () => {
+  const mergeRequest = {
+    sha: 'abc123def456',
+    diff_refs: { base_sha: 'base00000000', head_sha: 'head00000000', start_sha: 'start000000' },
+  };
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('reads the head commit from one merge request fetch', async () => {
+    mockSelfHostedGitLabResponse({ status: 200, json: mergeRequest });
+
+    await expect(getMRHeadCommit('test-token', 123, 9, 'https://gitlab.example.com')).resolves.toBe(
+      'abc123def456'
+    );
+
+    expect(mockHttpsRequest).toHaveBeenCalledTimes(1);
+    expect(mockHttpsRequest.mock.calls[0][0]).toMatchObject({
+      method: 'GET',
+      path: '/api/v4/projects/123/merge_requests/9',
+    });
+  });
+
+  it('reads the diff refs from one merge request fetch', async () => {
+    mockSelfHostedGitLabResponse({ status: 200, json: mergeRequest });
+
+    await expect(
+      getMRDiffRefs('test-token', 'group/project', 9, 'https://gitlab.example.com')
+    ).resolves.toEqual({
+      baseSha: 'base00000000',
+      headSha: 'head00000000',
+      startSha: 'start000000',
+    });
+
+    expect(mockHttpsRequest).toHaveBeenCalledTimes(1);
+    expect(mockHttpsRequest.mock.calls[0][0]).toMatchObject({
+      method: 'GET',
+      path: '/api/v4/projects/group%2Fproject/merge_requests/9',
+    });
+  });
+
+  it('reports a failed merge request fetch with its status', async () => {
+    mockSelfHostedGitLabResponse({ status: 500, body: 'boom' });
+
+    await expect(getMRDiffRefs('test-token', 123, 9, 'https://gitlab.example.com')).rejects.toThrow(
+      'GitLab MR fetch failed: 500'
+    );
+  });
 });
 
 describe('validatePersonalAccessToken', () => {
@@ -660,7 +771,7 @@ describe('validatePersonalAccessToken', () => {
   });
 
   it('rejects unsafe instance URLs before fetching', async () => {
-    const result = await validatePersonalAccessToken('pat-token', 'http://169.254.169.254');
+    const result = await validatePersonalAccessToken('pat-token', 'https://169.254.169.254');
 
     expect(result).toEqual({
       valid: false,
@@ -679,5 +790,72 @@ describe('validatePersonalAccessToken', () => {
       error: 'GitLab instance URL host resolves to an address that is not allowed.',
     });
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('webhook and project access token refusals', () => {
+  const webhookOperations = [
+    ['listProjectWebhooks', () => listProjectWebhooks('token', 123)],
+    [
+      'createProjectWebhook',
+      () => createProjectWebhook('token', 123, 'https://example.com/webhook', 'webhook-secret'),
+    ],
+    [
+      'updateProjectWebhook',
+      () => updateProjectWebhook('token', 123, 456, 'https://example.com/webhook', 'secret'),
+    ],
+  ] as const;
+
+  const projectAccessTokenOperations = [
+    [
+      'createProjectAccessToken',
+      () => createProjectAccessToken('token', 123, 'Kilo bot', '2027-01-01'),
+    ],
+    ['listProjectAccessTokens', () => listProjectAccessTokens('token', 123)],
+    ['rotateProjectAccessToken', () => rotateProjectAccessToken('token', 123, 456, '2027-01-01')],
+    ['revokeProjectAccessToken', () => revokeProjectAccessToken('token', 123, 456)],
+  ] as const;
+
+  const allOperations = [...webhookOperations, ...projectAccessTokenOperations] as const;
+
+  function mockRefusal(status: number) {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status,
+      headers: new Headers(),
+      text: async () => `refused: ${status}`,
+      json: async () => ({}),
+    });
+  }
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it.each(allOperations)(
+    '%s reports a 401 as an authentication failure that needs a reconnect',
+    async (_name, run) => {
+      mockRefusal(401);
+
+      const refusal = await run().catch((error: unknown) => error);
+
+      expect(refusal).toBeInstanceOf(GitLabAuthenticationError);
+      expect(refusal).toMatchObject({ statusCode: 401, projectId: 123 });
+      expect((refusal as Error).message).toContain('Reconnect the GitLab integration');
+      expect((refusal as Error).message).not.toContain('Maintainer');
+    }
+  );
+
+  it.each(allOperations)('%s keeps a 403 as a permission failure', async (name, run) => {
+    const expectedError = webhookOperations.some(([operation]) => operation === name)
+      ? GitLabWebhookPermissionError
+      : GitLabProjectAccessTokenPermissionError;
+    mockRefusal(403);
+
+    const refusal = await run().catch((error: unknown) => error);
+
+    expect(refusal).toBeInstanceOf(expectedError);
+    expect(refusal).toMatchObject({ statusCode: 403, projectId: 123 });
+    expect((refusal as Error).message).toContain('Requires Maintainer role or higher');
   });
 });

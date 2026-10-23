@@ -25,12 +25,49 @@ export class EncryptionFormatError extends Error {
 /**
  * Envelope encryption structure for RSA + AES encryption
  */
+export const ENCRYPTED_ENVELOPE_ALGORITHM = 'rsa-aes-256-gcm';
+export const ENCRYPTED_ENVELOPE_VERSION = 1;
+
 export type EncryptedEnvelope = {
   encryptedData: string; // AES-encrypted value (base64)
   encryptedDEK: string; // RSA-encrypted DEK (base64)
-  algorithm: 'rsa-aes-256-gcm';
-  version: 1;
+  algorithm: typeof ENCRYPTED_ENVELOPE_ALGORITHM;
+  version: typeof ENCRYPTED_ENVELOPE_VERSION;
 };
+
+/**
+ * Validates the serialized envelope shape, naming the field that is wrong.
+ * Parsing and decryption validate through it; construction builds from the same
+ * constants, so the accepted and decryptable shapes cannot diverge.
+ */
+export function assertEncryptedEnvelope(value: unknown): asserts value is EncryptedEnvelope {
+  if (value === null || typeof value !== 'object') {
+    throw new EncryptionFormatError('Invalid envelope: must be an object');
+  }
+
+  const envelope = value as Record<string, unknown>;
+
+  if (envelope.algorithm !== ENCRYPTED_ENVELOPE_ALGORITHM) {
+    throw new EncryptionFormatError(
+      `Unsupported algorithm: ${String(envelope.algorithm)}. Expected: ${ENCRYPTED_ENVELOPE_ALGORITHM}`
+    );
+  }
+
+  if (envelope.version !== ENCRYPTED_ENVELOPE_VERSION) {
+    throw new EncryptionFormatError(
+      `Unsupported version: ${String(envelope.version)}. Expected: ${ENCRYPTED_ENVELOPE_VERSION}`
+    );
+  }
+
+  if (
+    typeof envelope.encryptedData !== 'string' ||
+    envelope.encryptedData.length === 0 ||
+    typeof envelope.encryptedDEK !== 'string' ||
+    envelope.encryptedDEK.length === 0
+  ) {
+    throw new EncryptionFormatError('Invalid envelope: missing encryptedData or encryptedDEK');
+  }
+}
 
 // ---- RSA envelope encryption (asymmetric) ----
 
@@ -81,8 +118,8 @@ export function encryptWithPublicKey(
     return {
       encryptedData,
       encryptedDEK,
-      algorithm: 'rsa-aes-256-gcm',
-      version: 1,
+      algorithm: ENCRYPTED_ENVELOPE_ALGORITHM,
+      version: ENCRYPTED_ENVELOPE_VERSION,
     };
   } catch (error) {
     if (error instanceof Error) {
@@ -108,25 +145,7 @@ export function decryptWithPrivateKey(
     throw new EncryptionConfigurationError('Private key parameter is required');
   }
 
-  if (!envelope || typeof envelope !== 'object') {
-    throw new EncryptionFormatError('Invalid envelope: must be an object');
-  }
-
-  if (envelope.algorithm !== 'rsa-aes-256-gcm') {
-    throw new EncryptionFormatError(
-      `Unsupported algorithm: ${String(envelope.algorithm)}. Expected: rsa-aes-256-gcm`
-    );
-  }
-
-  if (envelope.version !== 1) {
-    throw new EncryptionFormatError(
-      `Unsupported version: ${String(envelope.version)}. Expected: 1`
-    );
-  }
-
-  if (!envelope.encryptedData || !envelope.encryptedDEK) {
-    throw new EncryptionFormatError('Invalid envelope: missing encryptedData or encryptedDEK');
-  }
+  assertEncryptedEnvelope(envelope);
 
   try {
     const encryptedDEKBuffer = Buffer.from(envelope.encryptedDEK, 'base64');

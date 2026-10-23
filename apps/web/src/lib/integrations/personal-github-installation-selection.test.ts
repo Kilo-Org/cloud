@@ -271,12 +271,14 @@ describe('personal GitHub workspace without a healthy installation', () => {
       lifecycleState: 'deleted' as const,
       state: deletedBeforeReinstall,
       message: 'GitHub integration is suspended',
+      reason: 'suspended' as const,
     },
     {
       name: 'locally disconnected',
       lifecycleState: 'active' as const,
       state: { github_disconnected_at: '2026-03-01T00:00:00.000Z' },
       message: 'GitHub integration is disconnected',
+      reason: 'disconnected' as const,
     },
     {
       name: 'auth-invalid',
@@ -286,6 +288,7 @@ describe('personal GitHub workspace without a healthy installation', () => {
         auth_invalid_reason: 'installation_token_auth_failed',
       },
       message: 'GitHub integration requires reauthorization',
+      reason: 'reauth_required' as const,
     },
   ])('stays unavailable when the only installation is $name', async testCase => {
     const user = await insertTestUser();
@@ -304,6 +307,7 @@ describe('personal GitHub workspace without a healthy installation', () => {
       repositories: [],
       syncedAt: null,
       errorMessage: testCase.message,
+      unavailableReason: testCase.reason,
     });
     expect(await getGitHubTokenForUser(user.id)).toBeUndefined();
     expect(await getGitHubInstallationIdForUser(user.id)).toBeUndefined();

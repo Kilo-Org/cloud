@@ -12,6 +12,7 @@ const state = vi.hoisted(() => ({
   update: vi.fn(),
   create: vi.fn(),
   back: vi.fn(),
+  replace: vi.fn(),
 }));
 
 // The mutations this sheet consumes are pure state machines here: `isPending`
@@ -48,7 +49,7 @@ vi.mock('@/lib/hooks/use-todos', async () => {
   };
 });
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ back: state.back, push: vi.fn() }),
+  useRouter: () => ({ back: state.back, replace: state.replace, push: vi.fn() }),
   useFocusEffect: () => undefined,
 }));
 vi.mock('react-native', async () => {
@@ -227,6 +228,7 @@ beforeEach(async () => {
   state.update.mockReset();
   state.create.mockReset();
   state.back.mockReset();
+  state.replace.mockReset();
 });
 
 afterEach(() => {
@@ -304,8 +306,10 @@ describe('To-do list settings save', () => {
     expect(state.back).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps a failed new list on the form and saves it on retry', async () => {
-    state.create.mockRejectedValueOnce(new Error('offline'));
+  it('keeps a failed new list on the form and opens it after the retry succeeds', async () => {
+    state.create
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValue({ ...list, id: 'list-new' });
     mount(null);
     act(() => {
       nameInput().onChangeText('New list');
@@ -323,12 +327,13 @@ describe('To-do list settings save', () => {
       variant: null,
     });
     expect(state.back).not.toHaveBeenCalled();
+    expect(state.replace).not.toHaveBeenCalled();
     expect(errorLine()).toBe(i18n.t('todos.listSettings.saveFailed'));
 
     await pressDone();
 
     expect(state.create).toHaveBeenCalledTimes(2);
-    expect(state.back).toHaveBeenCalledTimes(1);
+    expect(state.replace).toHaveBeenCalledExactlyOnceWith('/(app)/todos/list-new');
     expect(errorLine()).toBeNull();
   });
 });

@@ -6,6 +6,7 @@ const hapticsMock = vi.hoisted(() => ({ impactAsync: vi.fn().mockResolvedValue(u
 const accessibilityMock = vi.hoisted(() => ({ announceForAccessibility: vi.fn() }));
 const alertMock = vi.hoisted(() => ({ alert: vi.fn() }));
 const linkingMock = vi.hoisted(() => ({ openSettings: vi.fn() }));
+const routerMock = vi.hoisted(() => ({ push: vi.fn() }));
 const toastMock = vi.hoisted(() => ({
   error: vi.fn(),
   dismiss: vi.fn(),
@@ -23,7 +24,7 @@ vi.mock('expo-speech-recognition', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: toastMock }));
 vi.mock('expo-secure-store', () => ({}));
-vi.mock('expo-router', () => ({ router: { push: vi.fn() } }));
+vi.mock('expo-router', () => ({ router: routerMock }));
 vi.mock('./gateway/gateway-transcription-preference', () => ({
   isGatewayTranscriptionEnabled: () => false,
   readGatewayTranscriptionModel: () => null,
@@ -60,6 +61,29 @@ describe('voice input feedback side effects', () => {
     );
     buttons?.find(button => button.text === 'Open Settings')?.onPress?.();
     expect(linkingMock.openSettings).toHaveBeenCalled();
+  });
+
+  it('presents gateway picker feedback with an action that names the picker, not the title', () => {
+    showFeedback({
+      action: 'open-transcription-settings',
+      availability: 'available',
+      message: "This transcription model isn't available. Pick another one in Preferences.",
+      retryable: false,
+    });
+
+    const buttons = alertMock.alert.mock.calls[0]?.[2] as
+      | { text: string; onPress?: () => void }[]
+      | undefined;
+    expect(alertMock.alert).toHaveBeenCalledWith(
+      'Transcription model',
+      "This transcription model isn't available. Pick another one in Preferences.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Choose a model', onPress: expect.any(Function) },
+      ]
+    );
+    buttons?.find(button => button.text === 'Choose a model')?.onPress?.();
+    expect(routerMock.push).toHaveBeenCalledWith('/(app)/transcription-model-picker');
   });
 
   it('presents feedback without an action as a toast', () => {

@@ -345,6 +345,29 @@ check(
   appExtensions.some(extension => extension.targetName === 'ArtifactsFileProvider'),
   'extra.eas.build.experimental.ios.appExtensions must carry the ArtifactsFileProvider target'
 );
+// Dev-only capability, asserted where it would break a release: Apple rejects
+// the capability sync for `FILEPROVIDER_TESTINGMODE` on the extension's App ID,
+// and App Store review rejects the entitlement itself. The release build and
+// this assertion share one evaluation, so a production config that carried it
+// would fail here before Apple sees it.
+if (process.env.EAS_BUILD_PROFILE === 'production') {
+  const FILE_PROVIDER_TESTING_MODE = 'com.apple.developer.fileprovider.testing-mode';
+  const fileProviderExtension = appExtensions.find(
+    extension => extension.targetName === 'ArtifactsFileProvider'
+  );
+  check(
+    !(FILE_PROVIDER_TESTING_MODE in (config.ios?.entitlements ?? {})),
+    `a production build must not carry the ${FILE_PROVIDER_TESTING_MODE} app entitlement`
+  );
+  check(
+    !('KiloArtifactsFileProviderTesting' in (config.ios?.infoPlist ?? {})),
+    'a production build must not carry the KiloArtifactsFileProviderTesting Info.plist key'
+  );
+  check(
+    !(FILE_PROVIDER_TESTING_MODE in (fileProviderExtension?.entitlements ?? {})),
+    `a production build must not carry the ${FILE_PROVIDER_TESTING_MODE} extension entitlement`
+  );
+}
 // The app target's one `Localizable.strings` (the App Intent copy plus the
 // appended Focus-filter catalog) is written by this plugin; without it the
 // Shortcuts actions and the Focus filter stay English on a localized device.
@@ -397,6 +420,17 @@ for (const key of Object.keys(ENV_KEYS)) {
   if (value === undefined || value === null || value === '') {
     failures.push(`extra.${key} must be present and non-empty`);
   }
+}
+
+// Admission contract: the server issues native credentials only to an attested
+// device, and Play Integrity is the Android proof. An optional key would
+// otherwise bake an empty value into a release that then cannot sign in.
+if (process.env.EAS_BUILD_PROFILE === 'production') {
+  check(
+    typeof extra.playIntegrityProjectNumber === 'string' &&
+      extra.playIntegrityProjectNumber.length > 0,
+    'a production build must carry extra.playIntegrityProjectNumber (Android cannot attest without it)'
+  );
 }
 
 if (failures.length > 0) {

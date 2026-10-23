@@ -44,7 +44,14 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://web.example' }));
-vi.mock('expo-router', () => ({ usePathname: () => '/pr-review/gitlab/group/repo/3' }));
+const router = vi.hoisted(() => ({ dismissTo: vi.fn() }));
+vi.mock('expo-router', () => ({
+  usePathname: () => '/pr-review/gitlab/group/repo/3',
+  useRouter: () => router,
+  useFocusEffect: (effect: () => undefined | (() => void)) => {
+    React.useEffect(effect, [effect]);
+  },
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6F6A61', primaryForeground: '#FFFFFF' }),
 }));
@@ -75,6 +82,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   AppState: { addEventListener: vi.fn() },
+  BackHandler: { addEventListener: () => ({ remove: vi.fn() }) },
   Platform: { OS: 'android' },
   View: 'View',
 }));

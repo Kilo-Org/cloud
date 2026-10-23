@@ -3965,6 +3965,7 @@
     "history": "Historija pregleda",
     "historyHint": "Izvještaji se čuvaju 30 dana, uključujući odbačene.",
     "settings": "Postavke pregleda",
+    "saved": "Postavke pregleda su sačuvane",
     "empty": "Nema noćne aktivnosti",
     "emptyHint": "Vaše cloud i CLI sesije kodiranja pojavit će se ovdje nakon aktivne noći.",
     "loadError": "Nije moguće učitati preglede",

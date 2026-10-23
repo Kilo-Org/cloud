@@ -3916,6 +3916,7 @@
     "history": "Riwayat ringkasan",
     "historyHint": "Laporan disimpan selama 30 hari, termasuk laporan yang ditutup.",
     "settings": "Pengaturan ringkasan",
+    "saved": "Pengaturan ringkasan tersimpan.",
     "empty": "Tidak ada aktivitas semalam",
     "emptyHint": "Sesi coding cloud dan CLI Anda akan muncul di sini setelah malam yang aktif.",
     "loadError": "Tidak dapat memuat ringkasan",

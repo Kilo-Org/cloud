@@ -7,6 +7,7 @@
     "history": "Briefing history",
     "historyHint": "Reports are kept for 30 days, including dismissed reports.",
     "settings": "Briefing settings",
+    "saved": "Briefing settings saved",
     "empty": "No overnight activity",
     "emptyHint": "Your cloud and CLI coding sessions will appear here after an active night.",
     "loadError": "Could not load briefings",

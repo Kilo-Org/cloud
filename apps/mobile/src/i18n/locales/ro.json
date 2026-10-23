@@ -3965,6 +3965,7 @@
     "history": "Istoricul rezumatelor",
     "historyHint": "Rapoartele sunt păstrate 30 de zile, inclusiv cele închise.",
     "settings": "Setări rezumat",
+    "saved": "Setări rezumat salvate",
     "empty": "Nicio activitate peste noapte",
     "emptyHint": "Sesiunile tale de programare din cloud și CLI vor apărea aici după o noapte activă.",
     "loadError": "Rezumatele nu au putut fi încărcate",

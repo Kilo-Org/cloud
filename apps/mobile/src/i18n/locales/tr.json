@@ -3916,6 +3916,7 @@
     "history": "Özet geçmişi",
     "historyHint": "Kapatılanlar dahil raporlar 30 gün saklanır.",
     "settings": "Özet ayarları",
+    "saved": "Özet ayarları kaydedildi",
     "empty": "Gece etkinliği yok",
     "emptyHint": "Bulut ve CLI kodlama oturumlarınız etkin bir gecenin ardından burada görünür.",
     "loadError": "Özetler yüklenemedi",

@@ -4014,6 +4014,7 @@
     "history": "Historie přehledů",
     "historyHint": "Reporty se uchovávají 30 dní, včetně zavřených.",
     "settings": "Nastavení přehledu",
+    "saved": "Nastavení přehledu bylo uloženo.",
     "empty": "Žádná noční aktivita",
     "emptyHint": "Vaše cloudové a CLI relace programování se zde zobrazí po aktivní noci.",
     "loadError": "Přehledy se nepodařilo načíst",

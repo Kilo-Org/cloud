@@ -3916,6 +3916,7 @@
     "history": "Korábbi összefoglalók",
     "historyHint": "A jelentéseket 30 napig őrizzük meg, az elvetetteket is.",
     "settings": "Összefoglaló beállításai",
+    "saved": "Összefoglaló beállításai mentve",
     "empty": "Nem volt éjszakai tevékenység",
     "emptyHint": "A felhőben és CLI-ben futó kódolási munkamenetek egy aktív éjszaka után itt jelennek meg.",
     "loadError": "Nem sikerült betölteni az összefoglalókat",

@@ -3916,6 +3916,7 @@
     "history": "Historiku i përmbledhjeve",
     "historyHint": "Raportet ruhen për 30 ditë, përfshirë raportet e mbyllura.",
     "settings": "Cilësimet e përmbledhjes",
+    "saved": "Cilësimet e përmbledhjes u ruajtën",
     "empty": "Asnjë aktivitet gjatë natës",
     "emptyHint": "Seancat e kodimit në cloud dhe CLI do të shfaqen këtu pas një nate aktive.",
     "loadError": "Përmbledhjet nuk u ngarkuan",

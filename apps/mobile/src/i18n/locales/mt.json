@@ -4063,6 +4063,7 @@
     "history": "Storja tal-briefings",
     "historyHint": "Ir-rapporti jinżammu għal 30 jum, inklużi r-rapporti mwarrba.",
     "settings": "Settings tal-briefing",
+    "saved": "Is-settings tal-briefing ġew issejvjati",
     "empty": "L-ebda attività matul il-lejl",
     "emptyHint": "Is-sessjonijiet tal-ikkowdjar tiegħek fil-cloud u CLI jidhru hawn wara lejl attiv.",
     "loadError": "Ma setgħux jitgħabbew il-briefings",

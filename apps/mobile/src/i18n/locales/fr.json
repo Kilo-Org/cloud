@@ -3965,6 +3965,7 @@
     "history": "Historique des briefings",
     "historyHint": "Les rapports sont conservés 30 jours, y compris ceux ignorés.",
     "settings": "Paramètres du briefing",
+    "saved": "Paramètres du briefing enregistrés",
     "empty": "Aucune activité cette nuit",
     "emptyHint": "Vos sessions de code cloud et CLI apparaîtront ici après une nuit active.",
     "loadError": "Impossible de charger les briefings",

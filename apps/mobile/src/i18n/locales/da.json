@@ -3916,6 +3916,7 @@
     "history": "Briefinghistorik",
     "historyHint": "Rapporter gemmes i 30 dage, også afviste rapporter.",
     "settings": "Briefingindstillinger",
+    "saved": "Briefingindstillinger gemt",
     "empty": "Ingen aktivitet i nat",
     "emptyHint": "Dine cloud- og CLI-kodesessioner vises her efter en aktiv nat.",
     "loadError": "Kunne ikke indlæse briefinger",

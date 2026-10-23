@@ -4014,6 +4014,7 @@
     "history": "História prehľadov",
     "historyHint": "Správy sa uchovávajú 30 dní vrátane zrušených správ.",
     "settings": "Nastavenia prehľadu",
+    "saved": "Nastavenia prehľadu boli uložené",
     "empty": "Žiadna nočná aktivita",
     "emptyHint": "Vaše cloudové a CLI relácie programovania sa tu zobrazia po aktívnej noci.",
     "loadError": "Prehľady sa nepodarilo načítať",

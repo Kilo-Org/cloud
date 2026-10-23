@@ -4112,6 +4112,7 @@
     "history": "Hanes briffiau",
     "historyHint": "Caiff adroddiadau eu cadw am 30 diwrnod, gan gynnwys adroddiadau a gaewyd.",
     "settings": "Gosodiadau briffio",
+    "saved": "Mae gosodiadau briffio wedi'u cadw",
     "empty": "Dim gweithgarwch dros nos",
     "emptyHint": "Bydd eich sesiynau codio cwmwl a CLI yn ymddangos yma ar ôl noson brysur.",
     "loadError": "Methu llwytho briffiau",

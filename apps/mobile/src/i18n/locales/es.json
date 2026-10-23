@@ -3965,6 +3965,7 @@
     "history": "Historial de resúmenes",
     "historyHint": "Los informes se conservan durante 30 días, incluidos los descartados.",
     "settings": "Ajustes del resumen",
+    "saved": "Ajustes del resumen guardados",
     "empty": "Sin actividad nocturna",
     "emptyHint": "Tus sesiones de programación en la nube y en la CLI aparecerán aquí tras una noche activa.",
     "loadError": "No se pudieron cargar los resúmenes",

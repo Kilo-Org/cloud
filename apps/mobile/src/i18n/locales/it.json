@@ -3965,6 +3965,7 @@
     "history": "Cronologia briefing",
     "historyHint": "I report vengono conservati per 30 giorni, inclusi quelli ignorati.",
     "settings": "Impostazioni briefing",
+    "saved": "Impostazioni briefing salvate",
     "empty": "Nessuna attività notturna",
     "emptyHint": "Le tue sessioni di coding cloud e CLI appariranno qui dopo una notte di attività.",
     "loadError": "Impossibile caricare i briefing",

@@ -3916,6 +3916,7 @@
     "history": "Katsaushistoria",
     "historyHint": "Raportit säilytetään 30 päivää, myös hylätyt raportit.",
     "settings": "Katsauksen asetukset",
+    "saved": "Katsauksen asetukset tallennettu",
     "empty": "Ei yöllistä toimintaa",
     "emptyHint": "Pilvi- ja CLI-koodausistuntosi näkyvät täällä aktiivisen yön jälkeen.",
     "loadError": "Katsauksia ei voitu ladata",

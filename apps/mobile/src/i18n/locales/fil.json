@@ -3916,6 +3916,7 @@
     "history": "Kasaysayan ng briefing",
     "historyHint": "Itinatago ang mga ulat nang 30 araw, kasama ang mga na-dismiss.",
     "settings": "Mga setting ng briefing",
+    "saved": "Na-save na ang mga setting ng briefing",
     "empty": "Walang aktibidad magdamag",
     "emptyHint": "Lalabas dito ang iyong mga cloud at CLI coding session pagkatapos ng aktibong gabi.",
     "loadError": "Hindi ma-load ang mga briefing",

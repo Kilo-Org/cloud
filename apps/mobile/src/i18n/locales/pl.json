@@ -4014,6 +4014,7 @@
     "history": "Historia raportów",
     "historyHint": "Raporty są przechowywane przez 30 dni, także odrzucone.",
     "settings": "Ustawienia raportu",
+    "saved": "Zapisano ustawienia raportu",
     "empty": "Brak aktywności w nocy",
     "emptyHint": "Twoje sesje kodowania w chmurze i CLI pojawią się tutaj po aktywnej nocy.",
     "loadError": "Nie udało się wczytać raportów",

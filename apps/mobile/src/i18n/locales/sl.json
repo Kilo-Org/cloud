@@ -4014,6 +4014,7 @@
     "history": "Zgodovina povzetkov",
     "historyHint": "Poročila se hranijo 30 dni, vključno z opuščenimi.",
     "settings": "Nastavitve povzetka",
+    "saved": "Nastavitve povzetka so shranjene",
     "empty": "Ni nočne dejavnosti",
     "emptyHint": "Vaše seje kodiranja v oblaku in CLI bodo tukaj prikazane po aktivni noči.",
     "loadError": "Povzetkov ni bilo mogoče naložiti",

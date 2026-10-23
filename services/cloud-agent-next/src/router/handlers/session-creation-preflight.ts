@@ -29,7 +29,6 @@ const IMPLICIT_PROFILE_RESOLUTION_ORIGINS: ReadonlySet<string> = new Set([
   'github',
   'linear',
   'discord',
-  'app-builder',
   'webhook',
   'scheduled',
 ]);

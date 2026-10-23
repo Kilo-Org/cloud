@@ -1,5 +1,5 @@
-export { isStreamError, isValidCloudAgentEvent } from './event-types';
-export type { CloudAgentEvent, StreamError, StreamErrorCode } from './event-types';
+export { isStreamError, isValidCloudAgentEvent } from './schemas';
+export type { CloudAgentEvent, StreamError, StreamErrorCode } from './schemas';
 
 export { formatError as formatSessionError } from './session-manager';
 export { createSessionManager } from './session-manager';

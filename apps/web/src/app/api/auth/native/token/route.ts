@@ -29,13 +29,11 @@ import {
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 import {
-  checkNativeAdmission,
-  validateAdmissionPayload,
+  requireAdmissionPayload,
+  countAdmissionCondition,
   verifyAdmissionAsync,
   persistAttestedKey,
-  shouldRefuseAsyncFailure,
   KeyCollisionError,
-  type AdmissionPayload,
   type VerifyAdmissionOk,
 } from '@/lib/auth/native-admission';
 import {
@@ -48,8 +46,6 @@ import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 
 const posthogClient = PostHogClient();
-
-class NativeAdmissionUnavailableError extends Error {}
 
 // Bad/expired ID tokens are a 401; JWKS-fetch or network failures during verification are
 // server faults and must surface as 500, not be misreported as an invalid token.
@@ -150,14 +146,16 @@ const requestSchema = z.discriminatedUnion('provider', [
  * email sign-in code, or a passkey sign-in ticket, creates or updates the user,
  * and mints an API token.
  *
- * Verification order per plan:
- *   1. Sync admission gate (checkNativeAdmission).
- *   2. Provider identity verification.
- *   3. Async admission verification (BEFORE user settlement).
+ * Every request must prove the device is attested. The order is:
+ *   1. Admission gate: a missing or malformed proof is refused with 403.
+ *   2. Admission verification: the App Attest or Play Integrity proof is
+ *      verified before any provider call, OTP reservation, ticket consumption,
+ *      or user settlement, so a refusal precedes every side effect.
+ *   3. Provider identity verification.
  *   4. User settlement (createOrUpdateUser).
  *   5. Key persistence (after settlement, binds key to user id).
  *
- * A passkey ticket skips steps 3, 4 and 5: the ticket is a live proof that a
+ * A passkey ticket skips steps 4 and 5: the ticket is a live proof that a
  * WebAuthn assertion verified server-side, so the user exists already and no
  * account settlement or attested-key binding applies.
  *
@@ -172,7 +170,7 @@ const requestSchema = z.discriminatedUnion('provider', [
  *   403 { error: AuthErrorType }
  *   403 { error: 'ADMISSION_REQUIRED' }
  *   400 invalid request body
- *   500 provider infrastructure error
+ *   500 admission provider or identity provider infrastructure error
  */
 export const POST = withRestTiming('/api/auth/native/token', async (request: Request) => {
   const body = await request.json().catch(() => undefined);
@@ -184,46 +182,36 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
 
   const data = validation.data;
 
-  // ── Step 1: Sync admission gate ──────────────────────────────────────────
-  const admissionGate = checkNativeAdmission(body);
-  if (!admissionGate.admission.ok) {
-    return NextResponse.json({ error: admissionGate.admission.errorCode }, { status: 403 });
+  // ── Step 1: Admission gate ───────────────────────────────────────────────
+  // Credentials are issued only to an attested device. A missing or malformed
+  // proof is refused before any provider call, OTP reservation, ticket
+  // consumption, or user settlement, so no side effect precedes the gate.
+  const admissionPayload = requireAdmissionPayload(body);
+  if (!admissionPayload) {
+    countAdmissionCondition('native_admission_missing');
+    return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
   }
 
-  // ── Step 2: Extract and validate admission payload ───────────────────────
-  // Only extract when async verification is needed (enforce or report mode).
-  let admissionPayload: AdmissionPayload | undefined;
-  if (admissionGate.verifyAsync && body['admission'] && typeof body['admission'] === 'object') {
-    admissionPayload = validateAdmissionPayload(body['admission']);
-  }
-  let admissionVerification: VerifyAdmissionOk | undefined;
-  let admissionVerificationFailed = false;
-  const verifyNewAccountAdmission = async () => {
-    if (admissionVerification) {
-      return (
-        !admissionVerification.existingKeyUserId &&
-        (admissionVerification.platform !== 'ios' || Boolean(admissionVerification.publicKey))
-      );
-    }
-    if (admissionVerificationFailed) return false;
-    const payload = admissionPayload ?? validateAdmissionPayload(body['admission']);
-    if (!payload) return false;
-    let verified;
-    try {
-      verified = await verifyAdmissionAsync(payload);
-    } catch {
-      throw new NativeAdmissionUnavailableError();
-    }
-    if (
-      !verified.ok ||
-      verified.existingKeyUserId ||
-      (verified.platform === 'ios' && !verified.publicKey)
-    ) {
-      return false;
+  // ── Step 2: Verify the proof ─────────────────────────────────────────────
+  // A refused verdict is a 403. A provider fault is retryable, so it must not
+  // be reported as a refusal of the device.
+  let admissionVerification: VerifyAdmissionOk;
+  try {
+    const verified = await verifyAdmissionAsync(admissionPayload);
+    if (!verified.ok) {
+      countAdmissionCondition('native_admission_refused');
+      return NextResponse.json({ error: verified.errorCode }, { status: 403 });
     }
     admissionVerification = verified;
-    return true;
-  };
+  } catch {
+    captureMessage('native_admission_unavailable');
+    return NextResponse.json({ error: 'INTERNAL_ERROR' }, { status: 500 });
+  }
+
+  // A proof bound to a key that already belongs to an account cannot create a
+  // second one. Checked before settlement so a collision never leaves a user
+  // row or a Stripe customer behind.
+  const verifyNewAccountAdmission = () => Promise.resolve(!admissionVerification.existingKeyUserId);
 
   // ── Step 3: Provider identity verification ───────────────────────────────
   let args: CreateOrUpdateUserArgs;
@@ -389,27 +377,6 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       };
       autoLinkToExistingUser = true;
 
-      // ── Step 3b: Async admission verification BEFORE settlement ────────
-      if (admissionPayload) {
-        try {
-          const verified = await verifyAdmissionAsync(admissionPayload);
-          if (!verified.ok) {
-            admissionVerificationFailed = true;
-            // Under report mode, evaluate but still admit.
-            if (shouldRefuseAsyncFailure()) {
-              phase = 'release';
-              return NextResponse.json({ error: verified.errorCode }, { status: 403 });
-            }
-          } else {
-            admissionVerification = verified;
-          }
-        } catch {
-          // Provider infrastructure failure — surface as 5xx.
-          phase = 'release';
-          return NextResponse.json({ error: 'INTERNAL_ERROR' }, { status: 500 });
-        }
-      }
-
       // ── Step 4: User settlement ──────────────────────────────────────
       const result = await createOrUpdateUser(
         args,
@@ -442,30 +409,24 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       // another user): enforce → refuse without consuming the code so a
       // legitimate retry remains possible. Report → log, skip persistence,
       // and issue credentials.
-      if (admissionVerification) {
-        const hasOwnershipMismatch =
-          admissionVerification.existingKeyUserId &&
-          admissionVerification.existingKeyUserId !== result.user.id;
-        if (hasOwnershipMismatch) {
-          captureMessage('native_attested_key_ownership_mismatch');
-          if (shouldRefuseAsyncFailure()) {
-            phase = 'release';
-            return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
-          }
-          // Report mode: skip key persistence, admit, and issue credentials.
-          admissionVerification = undefined;
-        }
+      if (
+        admissionVerification.existingKeyUserId &&
+        admissionVerification.existingKeyUserId !== result.user.id
+      ) {
+        captureMessage('native_attested_key_ownership_mismatch');
+        phase = 'release';
+        return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
       }
 
       // ── Step 5: Persist attested key after settlement ─────────────────
-      // Must run BEFORE code commit so a key collision under enforce does
-      // not burn the sign-in code without issuing a credential.
+      // Must run BEFORE code commit so a key collision does not burn the
+      // sign-in code without issuing a credential.
       let sessionId: string | undefined;
       let refreshCredentials:
         | { token: string; refreshToken: string; expiresIn: number }
         | undefined;
 
-      if (admissionVerification && data.supportsRefresh) {
+      if (data.supportsRefresh) {
         // Bind key persistence and session creation in one transaction.
         try {
           const combined = await createDeviceSessionWithAttestedKey({
@@ -483,30 +444,22 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         } catch (err) {
           if (err instanceof KeyCollisionError) {
             captureMessage('native_attested_key_cross_user_collision');
-            if (shouldRefuseAsyncFailure()) {
-              phase = 'release';
-              return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
-            }
-            // Report mode: log, admit, and issue credentials without binding the key.
-          } else {
-            // Bookkeeping failure — log and fall through to legacy token.
-            captureMessage('native_attested_key_persist_failed_after_settlement');
+            phase = 'release';
+            return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
           }
+          // Bookkeeping failure — log and fall through to the legacy token.
+          captureMessage('native_attested_key_persist_failed_after_settlement');
         }
-      } else if (admissionVerification) {
+      } else {
         try {
           await persistAttestedKey(result.user.id, admissionVerification);
         } catch (err) {
           if (err instanceof KeyCollisionError) {
             captureMessage('native_attested_key_cross_user_collision');
-            if (shouldRefuseAsyncFailure()) {
-              phase = 'release';
-              return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
-            }
-            // Report mode: log, admit, and issue credentials without binding the key.
-          } else {
-            captureMessage('native_attested_key_persist_failed_after_settlement');
+            phase = 'release';
+            return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
           }
+          captureMessage('native_attested_key_persist_failed_after_settlement');
         }
       }
 
@@ -564,9 +517,6 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       return NextResponse.json({ token, created: result.isNew }, { status: 200 });
     } catch (error) {
       phase = 'release';
-      if (error instanceof NativeAdmissionUnavailableError) {
-        return NextResponse.json({ error: 'INTERNAL_ERROR' }, { status: 500 });
-      }
       throw error;
     } finally {
       if (phase === 'release') {
@@ -577,43 +527,17 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
 
   // Apple/Google path.
 
-  // ── Step 3c: Async admission verification BEFORE settlement ──────────────
-  if (admissionPayload) {
-    try {
-      const verified = await verifyAdmissionAsync(admissionPayload);
-      if (!verified.ok) {
-        admissionVerificationFailed = true;
-        if (shouldRefuseAsyncFailure()) {
-          return NextResponse.json({ error: verified.errorCode }, { status: 403 });
-        }
-      } else {
-        admissionVerification = verified;
-      }
-    } catch {
-      // Provider infrastructure failure — surface as 5xx.
-      return NextResponse.json({ error: 'INTERNAL_ERROR' }, { status: 500 });
-    }
-  }
-
   // ── Step 4: User settlement ──────────────────────────────────────────────
-  let result: CreateOrUpdateUserResult;
-  try {
-    result = await createOrUpdateUser(
-      args,
-      undefined,
-      autoLinkToExistingUser,
-      request.headers,
-      undefined,
-      undefined,
-      true,
-      verifyNewAccountAdmission
-    );
-  } catch (error) {
-    if (error instanceof NativeAdmissionUnavailableError) {
-      return NextResponse.json({ error: 'INTERNAL_ERROR' }, { status: 500 });
-    }
-    throw error;
-  }
+  const result = await createOrUpdateUser(
+    args,
+    undefined,
+    autoLinkToExistingUser,
+    request.headers,
+    undefined,
+    undefined,
+    true,
+    verifyNewAccountAdmission
+  );
   if (!result.success) {
     return settlementFailureResponse(result);
   }
@@ -635,62 +559,47 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
   let sessionId: string | undefined;
   let refreshCredentials: { token: string; refreshToken: string; expiresIn: number } | undefined;
 
-  if (admissionVerification) {
-    // Cross-user ownership: enforce → refuse, report → log and skip persistence.
-    if (
-      admissionVerification.existingKeyUserId &&
-      admissionVerification.existingKeyUserId !== result.user.id
-    ) {
-      captureMessage('native_attested_key_ownership_mismatch');
-      if (shouldRefuseAsyncFailure()) {
+  // Cross-user ownership: a key bound to another account cannot sign this one
+  // in. Refuse before any credential is issued.
+  if (
+    admissionVerification.existingKeyUserId &&
+    admissionVerification.existingKeyUserId !== result.user.id
+  ) {
+    captureMessage('native_attested_key_ownership_mismatch');
+    return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
+  }
+
+  if (data.supportsRefresh) {
+    // Bind key persistence and session creation in one transaction.
+    try {
+      const combined = await createDeviceSessionWithAttestedKey({
+        userId: result.user.id,
+        userAgent: request.headers.get('user-agent') ?? undefined,
+        user: result.user,
+        verification: admissionVerification,
+      });
+      sessionId = combined.sessionId;
+      refreshCredentials = {
+        token: combined.token,
+        refreshToken: combined.refreshToken,
+        expiresIn: combined.expiresIn,
+      };
+    } catch (err) {
+      if (err instanceof KeyCollisionError) {
+        captureMessage('native_attested_key_cross_user_collision');
         return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
       }
-      // Report mode: skip key persistence, admit, and issue credentials.
-      admissionVerification = undefined;
+      captureMessage('native_attested_key_persist_failed_after_settlement');
     }
-
-    if (admissionVerification) {
-      if (data.supportsRefresh) {
-        // Bind key persistence and session creation in one transaction.
-        try {
-          const combined = await createDeviceSessionWithAttestedKey({
-            userId: result.user.id,
-            userAgent: request.headers.get('user-agent') ?? undefined,
-            user: result.user,
-            verification: admissionVerification,
-          });
-          sessionId = combined.sessionId;
-          refreshCredentials = {
-            token: combined.token,
-            refreshToken: combined.refreshToken,
-            expiresIn: combined.expiresIn,
-          };
-        } catch (err) {
-          if (err instanceof KeyCollisionError) {
-            captureMessage('native_attested_key_cross_user_collision');
-            if (shouldRefuseAsyncFailure()) {
-              return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
-            }
-            // Report mode: log, admit, and issue credentials without binding the key.
-          } else {
-            captureMessage('native_attested_key_persist_failed_after_settlement');
-          }
-        }
-      } else {
-        try {
-          await persistAttestedKey(result.user.id, admissionVerification);
-        } catch (err) {
-          if (err instanceof KeyCollisionError) {
-            captureMessage('native_attested_key_cross_user_collision');
-            if (shouldRefuseAsyncFailure()) {
-              return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
-            }
-            // Report mode: log, admit, and issue credentials without binding the key.
-          } else {
-            captureMessage('native_attested_key_persist_failed_after_settlement');
-          }
-        }
+  } else {
+    try {
+      await persistAttestedKey(result.user.id, admissionVerification);
+    } catch (err) {
+      if (err instanceof KeyCollisionError) {
+        captureMessage('native_attested_key_cross_user_collision');
+        return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
       }
+      captureMessage('native_attested_key_persist_failed_after_settlement');
     }
   }
 

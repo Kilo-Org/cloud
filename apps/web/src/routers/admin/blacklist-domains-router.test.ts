@@ -1,14 +1,53 @@
+jest.mock('@/lib/abuse/block-blacklisted-domains', () => {
+  const actual = jest.requireActual('@/lib/abuse/block-blacklisted-domains');
+  return {
+    ...actual,
+    backfillBlockBlacklistedDomainsBatch: jest.fn(),
+  };
+});
+
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
+  redisClient: {
+    get: jest.fn(),
+    set: jest.fn(),
+  },
+}));
+
 import { describe, expect, it, beforeEach } from '@jest/globals';
-import { cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
+import { kilocode_users } from '@kilocode/db';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
+import { eq, inArray } from 'drizzle-orm';
 import { createCallerForUser } from '@/routers/test-utils';
 import { computeBlacklistStats, isDomainOnBlacklist } from './blacklist-domains-router';
+import { backfillBlockBlacklistedDomainsBatch } from '@/lib/abuse/block-blacklisted-domains';
+import type { BlockBlacklistedDomainsBackfillResponse } from '@/lib/abuse/block-blacklisted-domains';
+import { BLACKLIST_DOMAINS_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
 import type { User } from '@kilocode/db/schema';
+
+type BackfillBatch = (params: {
+  actorId: string;
+  domains: string[];
+}) => Promise<BlockBlacklistedDomainsBackfillResponse>;
+
+const actualBackfillModule = jest.requireActual<{
+  backfillBlockBlacklistedDomainsBatch: BackfillBatch;
+}>('@/lib/abuse/block-blacklisted-domains');
+const mockedBackfill = jest.mocked(backfillBlockBlacklistedDomainsBatch);
+const mockedRedisGet = jest.mocked(redisClient.get);
+const mockedRedisSet = jest.mocked(redisClient.set);
 
 let admin: User;
 
 beforeEach(async () => {
   await cleanupDbForTest();
+  mockedRedisGet.mockReset();
+  mockedRedisGet.mockResolvedValue(null);
+  mockedRedisSet.mockReset();
+  mockedRedisSet.mockResolvedValue('OK');
+  mockedBackfill.mockReset();
+  mockedBackfill.mockImplementation(actualBackfillModule.backfillBlockBlacklistedDomainsBatch);
   admin = await insertTestUser({
     google_user_email: `admin-${Math.random()}@admin.example.com`,
     is_admin: true,
@@ -352,5 +391,102 @@ describe('admin.blacklistDomains.suspicious', () => {
     expect(example).toBeDefined();
     expect(typeof example!.firstSeen).toBe('string');
     expect(typeof example!.lastSeen).toBe('string');
+  });
+});
+
+describe('admin.blacklistDomains.set', () => {
+  it('blocks existing accounts on a newly added domain', async () => {
+    const target = await insertTestUser({
+      google_user_email: 'a@mailinator.com',
+      email_domain: 'mailinator.com',
+      api_token_pepper: 'initial-pepper',
+    });
+    const safe = await insertTestUser({
+      google_user_email: 'b@legit.com',
+      email_domain: 'legit.com',
+      api_token_pepper: 'safe-pepper',
+    });
+
+    const caller = await createCallerForUser(admin.id);
+    const result = await caller.admin.blacklistDomains.set({ domains: ['mailinator.com'] });
+
+    expect(result.domains).toEqual(['mailinator.com']);
+    expect(result.backfill).toEqual({ blocked: 1, remaining: false, failed: false });
+    expect(mockedRedisSet).toHaveBeenCalledWith(
+      BLACKLIST_DOMAINS_REDIS_KEY,
+      expect.stringContaining('mailinator.com')
+    );
+
+    const rows = await db
+      .select({
+        id: kilocode_users.id,
+        blocked_reason: kilocode_users.blocked_reason,
+        blocked_by_kilo_user_id: kilocode_users.blocked_by_kilo_user_id,
+        api_token_pepper: kilocode_users.api_token_pepper,
+      })
+      .from(kilocode_users)
+      .where(inArray(kilocode_users.id, [target.id, safe.id]));
+    const byId = new Map(rows.map(row => [row.id, row]));
+
+    const blocked = byId.get(target.id);
+    expect(blocked?.blocked_reason).toBe('domainblocked');
+    expect(blocked?.blocked_by_kilo_user_id).toBe(admin.id);
+    expect(blocked?.api_token_pepper).not.toBe('initial-pepper');
+
+    const untouched = byId.get(safe.id);
+    expect(untouched?.blocked_reason).toBeNull();
+    expect(untouched?.api_token_pepper).toBe('safe-pepper');
+  });
+
+  it('only backfills domains that were not already on the list', async () => {
+    mockedRedisGet.mockResolvedValue(
+      JSON.stringify({
+        domains: ['mailinator.com'],
+        updated_at: null,
+        updated_by: null,
+        updated_by_email: null,
+      })
+    );
+    const existing = await insertTestUser({
+      google_user_email: 'a@mailinator.com',
+      email_domain: 'mailinator.com',
+    });
+
+    const caller = await createCallerForUser(admin.id);
+    const result = await caller.admin.blacklistDomains.set({
+      domains: ['mailinator.com', 'spam.org'],
+    });
+
+    expect(result.backfill).toEqual({ blocked: 0, remaining: false, failed: false });
+    expect(mockedBackfill).toHaveBeenCalledWith({ actorId: admin.id, domains: ['spam.org'] });
+
+    const [row] = await db
+      .select({ blocked_reason: kilocode_users.blocked_reason })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, existing.id));
+    expect(row.blocked_reason).toBeNull();
+  });
+
+  it('keeps the saved list when the automatic block fails', async () => {
+    mockedBackfill.mockRejectedValue(new Error('database unavailable'));
+
+    const caller = await createCallerForUser(admin.id);
+    const result = await caller.admin.blacklistDomains.set({ domains: ['mailinator.com'] });
+
+    expect(result.domains).toEqual(['mailinator.com']);
+    expect(result.backfill).toEqual({ blocked: 0, remaining: false, failed: true });
+    expect(mockedRedisSet).toHaveBeenCalled();
+  });
+
+  it('does not backfill the whole list when the previous config cannot be read', async () => {
+    mockedRedisGet.mockRejectedValue(new Error('redis unavailable'));
+
+    const caller = await createCallerForUser(admin.id);
+    const result = await caller.admin.blacklistDomains.set({ domains: ['mailinator.com'] });
+
+    expect(result.domains).toEqual(['mailinator.com']);
+    expect(result.backfill).toEqual({ blocked: 0, remaining: false, failed: true });
+    expect(mockedBackfill).not.toHaveBeenCalled();
+    expect(mockedRedisSet).toHaveBeenCalled();
   });
 });

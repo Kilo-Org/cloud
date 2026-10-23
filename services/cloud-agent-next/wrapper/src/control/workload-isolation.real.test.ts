@@ -20,7 +20,7 @@ import { createOwnedProcessScope } from './owned-processes.js';
 import { closeControlWorkload, initializeControlWorkload } from './workload-cgroup.js';
 
 // Opt in only inside an isolated Linux container with a private, writable cgroup namespace.
-// Use a 4 GiB container, no swap, the pinned Kilo CLI and Bun 1.3.14. Never run on a shared host cgroup.
+// Use a 4 GiB container, no swap, the pinned Kilo CLI and Bun 1.4.4. Never run on a shared host cgroup.
 const suite = process.env.KILO_MEMORY_CGROUP_TEST === '1' ? describe : describe.skip;
 const MiB = 1024 * 1024;
 

@@ -96,9 +96,20 @@ export function GeneralSettingsScreen() {
         <PreferenceRow
           icon={Brain}
           title={t('preferences.autoExpandThinking')}
-          subtitle={t('preferences.autoExpandThinkingSubtitle')}
+          subtitle={
+            hideThinking
+              ? t('preferences.autoExpandThinkingInactiveSubtitle')
+              : t('preferences.autoExpandThinkingSubtitle')
+          }
+          inactiveSubtitle={
+            hideThinking
+              ? t('preferences.autoExpandThinkingSubtitle')
+              : t('preferences.autoExpandThinkingInactiveSubtitle')
+          }
           value={defaultExpanded}
-          disabled={!reasoningLoaded}
+          // The row states a dependency on the hide-thinking preference, so it
+          // stays inert until both stored values are known.
+          disabled={!reasoningLoaded || !hideThinkingLoaded || hideThinking}
           onValueChange={setDefaultExpanded}
         />
         <PreferenceRow

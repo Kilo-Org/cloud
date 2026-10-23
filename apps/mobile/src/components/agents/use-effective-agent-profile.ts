@@ -10,8 +10,6 @@ import { type AgentProfileListItem } from '@/lib/hooks/agent-profile-types';
 
 /** The read-only capability view the new-session form renders. */
 export type EffectiveAgentProfile = SessionProfilePickerProfile & {
-  commandCount: number;
-  agentCount: number;
   ownerType?: AgentProfileListItem['ownerType'];
 };
 

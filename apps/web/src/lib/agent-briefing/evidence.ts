@@ -3,8 +3,8 @@ import {
   asc,
   desc,
   eq,
+  getTableColumns,
   gte,
-  inArray,
   isNull,
   isNotNull,
   lt,
@@ -13,6 +13,7 @@ import {
   or,
   sql,
 } from 'drizzle-orm';
+import { unionAll } from 'drizzle-orm/pg-core';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_briefing_events,
@@ -21,7 +22,29 @@ import {
   microdollar_usage,
   microdollar_usage_metadata,
 } from '@kilocode/db/schema';
-import { redactBriefingExcerpt, type BriefingSource } from '@kilocode/app-shared/agent-briefing';
+import {
+  BRIEFING_MAX_SESSIONS,
+  BRIEFING_MAX_SOURCES,
+  BRIEFING_MAX_SOURCES_PER_SESSION,
+  BRIEFING_MAX_TITLE_LENGTH,
+  BRIEFING_MAX_URL_LENGTH,
+  redactBriefingExcerpt,
+  type BriefingSource,
+} from '@kilocode/app-shared/agent-briefing';
+import {
+  boundBriefingSlices,
+  freezeBriefingEvidence,
+  ONE_OFF_ANCESTRY_LIMIT,
+  ONE_OFF_BUCKETS,
+  ONE_OFF_ROWS_PER_BUCKET,
+  ONE_OFF_SESSION_LIMIT,
+  sampleBriefingItems,
+} from './one-off-evidence';
+
+export const BRIEFING_MAX_EVENT_ROWS = 2048;
+export const BRIEFING_MAX_USAGE_ROWS = 2048;
+const BRIEFING_MAX_ACTIVE_SESSIONS = 256;
+const BRIEFING_MAX_ANCESTRY_ROWS = 512;
 
 type Session = Pick<
   typeof cli_sessions_v2.$inferSelect,
@@ -47,6 +70,7 @@ export type BriefingEvidenceCoverage = {
 export type BriefingCoverageContext = {
   collectionStartedAt?: string | null;
   legacyStatusInWindow?: boolean;
+  truncated?: boolean;
 };
 
 const transitionIdOf = (event: Event) =>
@@ -72,6 +96,7 @@ export function aggregateBriefingEvidence(
   const collectionCovered =
     collectionStartedAt !== null && Date.parse(collectionStartedAt) <= start;
   let untimestampedStatus = coverageContext.legacyStatusInWindow === true;
+  let truncated = coverageContext.truncated === true;
   const activityRoots = new Set<string>();
   const spendRoots = new Set<string>();
   const byId = new Map(rows.map(row => [row.session_id, row]));
@@ -105,8 +130,11 @@ export function aggregateBriefingEvidence(
     if (!group) {
       group = {
         sessionId: root.session_id,
-        title: root.title ?? 'Coding session',
-        url: `/cloud/sessions/${encodeURIComponent(root.session_id)}`,
+        title: (root.title ?? 'Coding session').slice(0, BRIEFING_MAX_TITLE_LENGTH),
+        url: `/cloud/sessions/${encodeURIComponent(root.session_id)}`.slice(
+          0,
+          BRIEFING_MAX_URL_LENGTH
+        ),
         status: null,
         spendMicrodollars: 0,
         sources: [],
@@ -114,6 +142,11 @@ export function aggregateBriefingEvidence(
       groups.set(root.session_id, group);
     }
     return group;
+  };
+  const addSource = (group: { sources: BriefingSource[] }, source: BriefingSource) => {
+    source.title = source.title.slice(0, BRIEFING_MAX_TITLE_LENGTH);
+    source.url = source.url.slice(0, BRIEFING_MAX_URL_LENGTH);
+    group.sources.push(source);
   };
   const statuses = new Map<string, { latest: Event; blockedSince: Event | null }>();
   const uniqueEvents = new Map(events.map(event => [event.id, event]));
@@ -163,7 +196,7 @@ export function aggregateBriefingEvidence(
         const group = groupFor(event.session_id);
         if (group) {
           activeRoots.add(group.sessionId);
-          group.sources.push({
+          addSource(group, {
             id: `status:${event.id}`,
             sessionId: event.session_id,
             kind: 'activity',
@@ -201,7 +234,7 @@ export function aggregateBriefingEvidence(
       source.title = event.title;
       source.url = event.url;
     } else if (event.kind !== 'activity') continue;
-    group.sources.push(source);
+    addSource(group, source);
     activeRoots.add(group.sessionId);
     if (event.kind === 'activity') activityRoots.add(group.sessionId);
   }
@@ -214,7 +247,7 @@ export function aggregateBriefingEvidence(
     if (!group) continue;
     blockers += 1;
     activeRoots.add(group.sessionId);
-    group.sources.push({
+    addSource(group, {
       id: since.id,
       sessionId,
       kind: 'blocker',
@@ -235,7 +268,7 @@ export function aggregateBriefingEvidence(
     spendMicrodollars += item.cost;
     activeRoots.add(group.sessionId);
     spendRoots.add(group.sessionId);
-    group.sources.push({
+    addSource(group, {
       id: `usage:${item.id}`,
       sessionId: item.sessionId,
       kind: 'cost',
@@ -262,28 +295,48 @@ export function aggregateBriefingEvidence(
     group.sources.sort(
       (a, b) => a.occurredAt.localeCompare(b.occurredAt) || a.id.localeCompare(b.id)
     );
+    truncated ||= group.sources.length > BRIEFING_MAX_SOURCES_PER_SESSION;
+    group.sources = sampleBriefingItems(group.sources, BRIEFING_MAX_SOURCES_PER_SESSION);
   }
-  const sessions = [...groups.values()].filter(group => activeRoots.has(group.sessionId));
+  const activeSessions = [...groups.values()].filter(group => activeRoots.has(group.sessionId));
+  activeSessions.sort(
+    (a, b) =>
+      (b.sources.at(-1)?.occurredAt ?? '').localeCompare(a.sources.at(-1)?.occurredAt ?? '') ||
+      a.sessionId.localeCompare(b.sessionId)
+  );
+  const sessions = activeSessions.slice(0, BRIEFING_MAX_SESSIONS);
   sessions.sort((a, b) => a.sessionId.localeCompare(b.sessionId));
-  const sources = sessions.flatMap(session => session.sources);
-  sources.sort((a, b) => a.occurredAt.localeCompare(b.occurredAt) || a.id.localeCompare(b.id));
+  truncated ||= sessions.length !== activeSessions.length;
+  const allSources = sessions.flatMap(session => session.sources);
+  allSources.sort((a, b) => a.occurredAt.localeCompare(b.occurredAt) || a.id.localeCompare(b.id));
+  const sources = sampleBriefingItems(allSources, BRIEFING_MAX_SOURCES);
+  truncated ||= sources.length !== allSources.length;
+  const selectedSources = new Set(sources);
+  for (const session of sessions) {
+    session.sources = session.sources.filter(source => selectedSources.has(source));
+    if (truncated && session.status !== 'question' && session.status !== 'permission') {
+      session.status = null;
+    }
+  }
   const everyActiveSessionCharged = [...activityRoots].every(root => spendRoots.has(root));
+  let spendCoverage: BriefingEvidenceCoverage['spend'];
+  if (used.size > 0) {
+    spendCoverage =
+      collectionCovered && everyActiveSessionCharged && !truncated ? 'complete' : 'partial';
+  } else if (collectionCovered && activityRoots.size === 0) {
+    spendCoverage = truncated ? 'partial' : 'complete';
+  } else {
+    spendCoverage = 'unavailable';
+  }
   const coverage: BriefingEvidenceCoverage = {
-    activity: collectionCovered ? 'complete' : 'partial',
-    spend:
-      used.size === 0
-        ? collectionCovered && activityRoots.size === 0
-          ? 'complete'
-          : 'unavailable'
-        : collectionCovered && everyActiveSessionCharged
-          ? 'complete'
-          : 'partial',
-    blockers: collectionCovered && !untimestampedStatus ? 'complete' : 'partial',
-    pullRequests: collectionCovered ? 'complete' : 'partial',
+    activity: collectionCovered && !truncated ? 'complete' : 'partial',
+    spend: spendCoverage,
+    blockers: collectionCovered && !untimestampedStatus && !truncated ? 'complete' : 'partial',
+    pullRequests: collectionCovered && !truncated ? 'complete' : 'partial',
   };
   return {
     scorecard: {
-      sessions: sessions.length,
+      sessions: activeSessions.length,
       pullRequests: pullRequests.size,
       blockers,
       spendMicrodollars,
@@ -299,7 +352,8 @@ export async function collectBriefingEvidence(
   organizationId: string | null,
   nightStartAt: string,
   cutoffAt: string,
-  recordedBefore?: string
+  recordedBefore?: string,
+  freeze = false
 ) {
   const start = Date.parse(nightStartAt);
   const cutoff = Date.parse(cutoffAt);
@@ -334,56 +388,129 @@ export async function collectBriefingEvidence(
         .select({ createdAt: agent_briefing_preferences.created_at })
         .from(agent_briefing_preferences)
         .where(eq(agent_briefing_preferences.kilo_user_id, userId));
-      const events = await tx
-        .select()
-        .from(agent_briefing_events)
-        .where(
-          and(
-            eventScope,
-            gte(agent_briefing_events.occurred_at, nightStartAt),
-            lte(agent_briefing_events.occurred_at, cutoffAt)
+      const sliceCount = freeze ? ONE_OFF_BUCKETS : 1;
+      const ranges = Array.from({ length: sliceCount }, (_, slice) => ({
+        slice,
+        startAt: new Date(start + ((cutoff - start) * slice) / sliceCount).toISOString(),
+        endAt: new Date(start + ((cutoff - start) * (slice + 1)) / sliceCount).toISOString(),
+      }));
+      const eventQueries = ranges.flatMap(range => {
+        const query = (reverse: boolean) => {
+          const order = reverse ? desc : asc;
+          return tx
+            .select({
+              ...getTableColumns(agent_briefing_events),
+              slice: sql<number>`${range.slice}::integer`.as('slice'),
+            })
+            .from(agent_briefing_events)
+            .where(
+              and(
+                eventScope,
+                gte(agent_briefing_events.occurred_at, range.startAt),
+                lt(agent_briefing_events.occurred_at, range.endAt)
+              )
+            )
+            .orderBy(order(agent_briefing_events.occurred_at), order(agent_briefing_events.id));
+        };
+        return freeze
+          ? [
+              query(false).limit(ONE_OFF_ROWS_PER_BUCKET / 2 + 1),
+              query(true).limit(ONE_OFF_ROWS_PER_BUCKET / 2 + 1),
+            ]
+          : [query(true).limit(BRIEFING_MAX_EVENT_ROWS + 1)];
+      });
+      const [firstEvents, secondEvents, ...remainingEvents] = eventQueries;
+      if (firstEvents === undefined) throw new Error('Missing briefing event range');
+      const eventRows =
+        secondEvents !== undefined
+          ? await unionAll(firstEvents, secondEvents, ...remainingEvents)
+          : await firstEvents;
+      const eventSample = freeze
+        ? boundBriefingSlices(eventRows, compareEvents)
+        : {
+            records: eventRows.slice(0, BRIEFING_MAX_EVENT_ROWS),
+            truncated: eventRows.length > BRIEFING_MAX_EVENT_ROWS,
+          };
+      const events = eventSample.records;
+      const usageQueries = ranges.flatMap(range => {
+        const query = (reverse: boolean) => {
+          const order = reverse ? desc : asc;
+          return tx
+            .select({
+              id: microdollar_usage.id,
+              sessionId: cli_sessions_v2.session_id,
+              cost: microdollar_usage.cost,
+              occurredAt: microdollar_usage.created_at,
+              slice: sql<number>`${range.slice}::integer`.as('slice'),
+            })
+            .from(microdollar_usage)
+            .innerJoin(
+              microdollar_usage_metadata,
+              eq(microdollar_usage_metadata.id, microdollar_usage.id)
+            )
+            .innerJoin(
+              cli_sessions_v2,
+              and(
+                or(
+                  eq(cli_sessions_v2.session_id, microdollar_usage_metadata.session_id),
+                  eq(cli_sessions_v2.cloud_agent_session_id, microdollar_usage_metadata.session_id)
+                ),
+                scope
+              )
+            )
+            .where(
+              and(
+                eq(microdollar_usage.kilo_user_id, userId),
+                notLike(microdollar_usage_metadata.session_id, 'agent-briefing:%'),
+                organizationId === null
+                  ? isNull(microdollar_usage.organization_id)
+                  : eq(microdollar_usage.organization_id, organizationId),
+                gte(microdollar_usage.created_at, range.startAt),
+                lt(microdollar_usage.created_at, range.endAt)
+              )
+            )
+            .orderBy(order(microdollar_usage.created_at), order(microdollar_usage.id));
+        };
+        return freeze
+          ? [
+              query(false).limit(ONE_OFF_ROWS_PER_BUCKET / 2 + 1),
+              query(true).limit(ONE_OFF_ROWS_PER_BUCKET / 2 + 1),
+            ]
+          : [query(true).limit(BRIEFING_MAX_USAGE_ROWS + 1)];
+      });
+      const [firstUsage, secondUsage, ...remainingUsage] = usageQueries;
+      if (firstUsage === undefined) throw new Error('Missing briefing usage range');
+      const usageRows =
+        secondUsage !== undefined
+          ? await unionAll(firstUsage, secondUsage, ...remainingUsage)
+          : await firstUsage;
+      const usageSample = freeze
+        ? boundBriefingSlices(
+            usageRows,
+            (a, b) =>
+              Date.parse(a.occurredAt) - Date.parse(b.occurredAt) || a.id.localeCompare(b.id)
           )
-        )
-        .orderBy(asc(agent_briefing_events.occurred_at), asc(agent_briefing_events.id));
-      const usage = await tx
-        .select({
-          id: microdollar_usage.id,
-          sessionId: cli_sessions_v2.session_id,
-          cost: microdollar_usage.cost,
-          occurredAt: microdollar_usage.created_at,
-        })
-        .from(microdollar_usage)
-        .innerJoin(
-          microdollar_usage_metadata,
-          eq(microdollar_usage_metadata.id, microdollar_usage.id)
-        )
-        .innerJoin(
-          cli_sessions_v2,
-          and(
-            or(
-              eq(cli_sessions_v2.session_id, microdollar_usage_metadata.session_id),
-              eq(cli_sessions_v2.cloud_agent_session_id, microdollar_usage_metadata.session_id)
-            ),
-            scope
-          )
-        )
-        .where(
-          and(
-            eq(microdollar_usage.kilo_user_id, userId),
-            notLike(microdollar_usage_metadata.session_id, 'agent-briefing:%'),
-            organizationId === null
-              ? isNull(microdollar_usage.organization_id)
-              : eq(microdollar_usage.organization_id, organizationId),
-            gte(microdollar_usage.created_at, nightStartAt),
-            lt(microdollar_usage.created_at, cutoffAt)
-          )
-        );
-      const activeSessionIds = [
-        ...new Set([
-          ...events.map(event => event.session_id),
-          ...usage.map(item => item.sessionId),
-        ]),
-      ];
+        : {
+            records: usageRows.slice(0, BRIEFING_MAX_USAGE_ROWS),
+            truncated: usageRows.length > BRIEFING_MAX_USAGE_ROWS,
+          };
+      const usage = usageSample.records;
+      const activity = [
+        ...events.map(event => ({ sessionId: event.session_id, occurredAt: event.occurred_at })),
+        ...usage.map(item => ({ sessionId: item.sessionId, occurredAt: item.occurredAt })),
+      ].sort((a, b) =>
+        freeze
+          ? Date.parse(a.occurredAt) - Date.parse(b.occurredAt)
+          : Date.parse(b.occurredAt) - Date.parse(a.occurredAt)
+      );
+      const allActiveSessionIds = [...new Set(activity.map(item => item.sessionId))];
+      const activeSessionIds = freeze
+        ? sampleBriefingItems(allActiveSessionIds, ONE_OFF_SESSION_LIMIT)
+        : allActiveSessionIds.slice(0, BRIEFING_MAX_ACTIVE_SESSIONS);
+      let truncated =
+        eventSample.truncated ||
+        usageSample.truncated ||
+        activeSessionIds.length !== allActiveSessionIds.length;
       const baseline =
         activeSessionIds.length === 0
           ? []
@@ -394,7 +521,7 @@ export async function collectBriefingEvidence(
                 and(
                   eventScope,
                   eq(agent_briefing_events.kind, 'status'),
-                  inArray(agent_briefing_events.session_id, activeSessionIds),
+                  sql`${agent_briefing_events.session_id} = ANY(${sql.param(activeSessionIds)}::text[])`,
                   lt(agent_briefing_events.occurred_at, nightStartAt)
                 )
               )
@@ -409,8 +536,18 @@ export async function collectBriefingEvidence(
         { session_id: string; parent_session_id: string | null; title: string | null }
       >();
       const requested = new Set(activeSessionIds);
+      const queried = new Set<string>();
+      let ancestryReads = 0;
       let pending = activeSessionIds;
       while (pending.length > 0) {
+        const ancestryLimit = freeze ? ONE_OFF_ANCESTRY_LIMIT : BRIEFING_MAX_ANCESTRY_ROWS;
+        const queryIds = pending.slice(0, Math.max(0, ancestryLimit - ancestryReads));
+        if (queryIds.length === 0) {
+          truncated = true;
+          break;
+        }
+        ancestryReads += queryIds.length;
+        for (const id of queryIds) queried.add(id);
         const found = await tx
           .select({
             session_id: cli_sessions_v2.session_id,
@@ -418,8 +555,10 @@ export async function collectBriefingEvidence(
             title: cli_sessions_v2.title,
           })
           .from(cli_sessions_v2)
-          .where(and(scope, inArray(cli_sessions_v2.session_id, pending)));
-        pending = [];
+          .where(
+            and(scope, sql`${cli_sessions_v2.session_id} = ANY(${sql.param(queryIds)}::text[])`)
+          );
+        pending = pending.slice(queryIds.length);
         for (const row of found) {
           rows.set(row.session_id, row);
           if (row.parent_session_id !== null && !requested.has(row.parent_session_id)) {
@@ -442,17 +581,69 @@ export async function collectBriefingEvidence(
           )
         )
         .limit(1);
-      return aggregateBriefingEvidence(
-        [...rows.values()],
-        [...baseline, ...events],
+      const completeRows = [...rows.values()].filter(row => {
+        let current = row;
+        const seen = new Set([row.session_id]);
+        while (current.parent_session_id) {
+          const parent = rows.get(current.parent_session_id);
+          if (!parent) return queried.has(current.parent_session_id);
+          if (seen.has(parent.session_id)) return false;
+          seen.add(parent.session_id);
+          current = parent;
+        }
+        return true;
+      });
+      truncated ||= completeRows.length !== rows.size;
+      const latest =
+        (freeze || truncated) && completeRows.length > 0
+          ? await tx
+              .selectDistinctOn([agent_briefing_events.session_id])
+              .from(agent_briefing_events)
+              .where(
+                and(
+                  eventScope,
+                  eq(agent_briefing_events.kind, 'status'),
+                  sql`${agent_briefing_events.session_id} = ANY(${sql.param(completeRows.map(row => row.session_id))}::text[])`,
+                  lte(agent_briefing_events.occurred_at, cutoffAt)
+                )
+              )
+              .orderBy(
+                agent_briefing_events.session_id,
+                desc(agent_briefing_events.occurred_at),
+                desc(sql`coalesce(${agent_briefing_events.payload}->>'transitionId', '')`),
+                desc(agent_briefing_events.id)
+              )
+          : [];
+      const allEvents = [...baseline, ...events, ...latest];
+      const facts = aggregateBriefingEvidence(
+        completeRows,
+        allEvents,
         usage,
         nightStartAt,
         cutoffAt,
         {
           collectionStartedAt: preferences?.createdAt ?? null,
           legacyStatusInWindow: legacyStatus !== undefined,
+          truncated,
         }
       );
+      if (!freeze) return facts;
+      const readableSessions = new Set(completeRows.map(row => row.session_id));
+      return freezeBriefingEvidence(facts, {
+        eventIds: [
+          ...new Set(
+            allEvents.filter(event => readableSessions.has(event.session_id)).map(event => event.id)
+          ),
+        ],
+        sessionIds: [...readableSessions],
+        usage: usage
+          .filter(item => readableSessions.has(item.sessionId))
+          .map(item => ({
+            id: item.id,
+            sessionId: item.sessionId,
+          })),
+        partial: truncated,
+      });
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' }
   );

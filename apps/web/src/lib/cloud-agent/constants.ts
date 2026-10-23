@@ -26,7 +26,7 @@ export const CLOUD_AGENT_IMAGE_PRESIGNED_URL_EXPIRY_SECONDS = 900; // 15 min
 
 /**
  * File upload constraints for Cloud Agent prompts. Kept separate from the
- * image-only contract used by App Builder and older Cloud Agent upload flows.
+ * image-only contract used by older Cloud Agent upload flows.
  */
 export const CLOUD_AGENT_ATTACHMENT_ALLOWED_TYPES = [
   ...CLOUD_AGENT_IMAGE_ALLOWED_TYPES,

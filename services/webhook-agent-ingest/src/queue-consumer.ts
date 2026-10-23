@@ -12,6 +12,7 @@ import { findActiveSandboxIdForInstance, getWorkerDb } from './db/queries';
 import { getKiloChat } from './kilo-chat-binding';
 import type { PostMessageAsUserResult } from '@kilocode/kilo-chat';
 import { deriveCallbackToken } from '@kilocode/worker-utils';
+import type { SandboxAllocation } from '@kilocode/worker-utils/sandbox-allocation';
 import { z } from 'zod';
 import { getSecretValue } from './util/secret';
 
@@ -437,7 +438,7 @@ async function processWebhookMessage(
         mode: string;
         model: string;
         variant?: string;
-        sandboxAllocation?: 'isolated-standard';
+        sandboxAllocation?: SandboxAllocation;
         githubRepo: string;
         kilocodeOrganizationId?: string;
         callbackTarget: { url: string; headers: Record<string, string> };

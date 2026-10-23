@@ -10,6 +10,7 @@ vi.mock('../util/do-retry', () => ({
 
 import { api, TriggerConfigInput, TriggerConfigUpdateInput } from './api';
 import type { CapturedRequest } from '../dos/TriggerDO';
+import type { SandboxAllocation } from '@kilocode/worker-utils/sandbox-allocation';
 
 describe('trigger variant validation', () => {
   const createInput = {
@@ -92,6 +93,17 @@ describe('trigger sandbox allocation validation', () => {
   });
 
   it.each([
+    'cloudflare-containers-standard-3',
+    'cloudflare-containers-standard-4',
+    'vercel-small',
+    'vercel-large',
+  ] as const)('accepts the %s allocation on create', sandboxAllocation => {
+    expect(
+      TriggerConfigInput.parse({ ...cloudAgentInput, sandboxAllocation }).sandboxAllocation
+    ).toBe(sandboxAllocation);
+  });
+
+  it.each([
     { activationMode: 'webhook' as const },
     { activationMode: 'scheduled' as const, cronExpression: '* * * * *' },
   ])('rejects allocation for $activationMode KiloClaw triggers', input => {
@@ -113,6 +125,16 @@ describe('trigger sandbox allocation validation', () => {
       false
     );
   });
+
+  it.each([
+    'cloudflare-containers-standard-3',
+    'cloudflare-containers-standard-4',
+    'vercel-small',
+  ] as const)('accepts the %s allocation on update', sandboxAllocation => {
+    expect(TriggerConfigUpdateInput.parse({ sandboxAllocation }).sandboxAllocation).toBe(
+      sandboxAllocation
+    );
+  });
 });
 
 const INTERNAL_API_SECRET = 'test-internal-secret';
@@ -122,7 +144,7 @@ const TRIGGER_ID = 'trigger-1';
 type StoredConfig = {
   targetType: 'cloud_agent' | 'kiloclaw_chat';
   activationMode: string;
-  sandboxAllocation?: 'isolated-standard';
+  sandboxAllocation?: SandboxAllocation;
   isActive?: boolean;
 };
 
@@ -153,18 +175,16 @@ function createRouteHarness(initialConfig: StoredConfig | null) {
   }));
   const getRequest = vi.fn(async (_requestId: string): Promise<CapturedRequest | null> => null);
   const deleteTrigger = vi.fn(async () => ({ success: true }));
-  const updateConfig = vi.fn(
-    async (updates: { sandboxAllocation?: 'isolated-standard' | null }) => {
-      if (config && updates.sandboxAllocation !== undefined) {
-        if (updates.sandboxAllocation === null) {
-          delete config.sandboxAllocation;
-        } else {
-          config.sandboxAllocation = updates.sandboxAllocation;
-        }
+  const updateConfig = vi.fn(async (updates: { sandboxAllocation?: SandboxAllocation | null }) => {
+    if (config && updates.sandboxAllocation !== undefined) {
+      if (updates.sandboxAllocation === null) {
+        delete config.sandboxAllocation;
+      } else {
+        config.sandboxAllocation = updates.sandboxAllocation;
       }
-      return { success: true };
     }
-  );
+    return { success: true };
+  });
   const getConfigForResponse = vi.fn(async () => config);
   const idFromName = vi.fn((name: string) => name);
   const invokeScheduled = vi.fn(async (): Promise<ScheduledInvocation> => ({
@@ -332,6 +352,46 @@ describe('trigger sandbox allocation routes', () => {
     }
   );
 
+  it('passes a native containers allocation through trigger creation', async () => {
+    const { configure, env } = createRouteHarness(null);
+
+    const response = await requestTrigger(env, 'POST', {
+      githubRepo: 'owner/repo',
+      mode: 'code',
+      model: 'openai/gpt-4.1',
+      promptTemplate: 'Process {{body}}',
+      profileId: '5d08c60b-7755-4dd3-b3fc-7ae96bf50e22',
+      sandboxAllocation: 'cloudflare-containers-standard-4',
+    });
+
+    expect(response.status).toBe(201);
+    expect(configure).toHaveBeenCalledWith(
+      NAMESPACE,
+      TRIGGER_ID,
+      expect.objectContaining({ sandboxAllocation: 'cloudflare-containers-standard-4' })
+    );
+  });
+
+  it('passes a Vercel allocation through trigger creation', async () => {
+    const { configure, env } = createRouteHarness(null);
+
+    const response = await requestTrigger(env, 'POST', {
+      githubRepo: 'owner/repo',
+      mode: 'code',
+      model: 'openai/gpt-4.1',
+      promptTemplate: 'Process {{body}}',
+      profileId: '5d08c60b-7755-4dd3-b3fc-7ae96bf50e22',
+      sandboxAllocation: 'vercel-large',
+    });
+
+    expect(response.status).toBe(201);
+    expect(configure).toHaveBeenCalledWith(
+      NAMESPACE,
+      TRIGGER_ID,
+      expect.objectContaining({ sandboxAllocation: 'vercel-large' })
+    );
+  });
+
   it('rejects KiloClaw allocation before configuring a trigger', async () => {
     const { configure, env } = createRouteHarness(null);
 
@@ -387,8 +447,11 @@ describe('trigger sandbox allocation routes', () => {
 
   it.each([
     { activationMode: 'webhook', sandboxAllocation: 'isolated-standard' as const },
+    { activationMode: 'webhook', sandboxAllocation: 'cloudflare-containers-standard-3' as const },
+    { activationMode: 'webhook', sandboxAllocation: 'vercel-small' as const },
     { activationMode: 'webhook', sandboxAllocation: null },
     { activationMode: 'scheduled', sandboxAllocation: 'isolated-standard' as const },
+    { activationMode: 'scheduled', sandboxAllocation: 'cloudflare-containers-standard-4' as const },
     { activationMode: 'scheduled', sandboxAllocation: null },
   ])('updates allocation for stored $activationMode cloud triggers', async updates => {
     const { env, updateConfig } = createRouteHarness(
@@ -404,7 +467,7 @@ describe('trigger sandbox allocation routes', () => {
       expect(body).toMatchObject({ data: {} });
       expect(body.data).not.toHaveProperty('sandboxAllocation');
     } else {
-      expect(body).toMatchObject({ data: { sandboxAllocation: 'isolated-standard' } });
+      expect(body).toMatchObject({ data: { sandboxAllocation: updates.sandboxAllocation } });
     }
   });
 });

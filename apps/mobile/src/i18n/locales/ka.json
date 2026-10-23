@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "ამ პერიოდში არჩეული მოდელისთვის მეტისმეტად ბევრი მასალაა.",
     "estimatePermissionUnavailable": "ამ კონტექსტის ბალანსის გამოყენების უფლება არ გაქვთ.",
     "createFailed": "ამ მიმოხილვის შექმნა ვერ მოხერხდა.",
+    "reviewFailed": "ამ მიმოხილვის გადახედვა ვერ მოხერხდა.",
     "estimatePricingUnavailable": "ამ მოდელის ფასები ხელმისაწვდომი არ არის.",
     "estimateBalanceUnavailable": "ბალანსი არ არის საკმარისი ფასიანი შეჯამებისთვის.",
     "estimateModelNotAllowed": "ეს მოდელი აქ ნებადართული არ არის.",

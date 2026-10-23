@@ -4093,6 +4093,7 @@
     "estimateInputTooLarge": "За этот период слишком много материалов для выбранной модели.",
     "estimatePermissionUnavailable": "У вас нет разрешения использовать баланс этого контекста.",
     "createFailed": "Не удалось создать эту сводку.",
+    "reviewFailed": "Не удалось проверить эту сводку.",
     "estimatePricingUnavailable": "Цены для этой модели недоступны.",
     "estimateBalanceUnavailable": "Недостаточно средств для платного резюме.",
     "estimateModelNotAllowed": "Эта модель здесь недоступна.",

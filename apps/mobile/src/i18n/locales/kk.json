@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "Бұл кезеңдегі деректер көлемі таңдалған модель үшін тым үлкен.",
     "estimatePermissionUnavailable": "Бұл контекстің балансын пайдалануға рұқсатыңыз жоқ.",
     "createFailed": "Бұл шолуды жасау мүмкін болмады.",
+    "reviewFailed": "Бұл шолуды тексеру мүмкін болмады.",
     "estimatePricingUnavailable": "Бұл модельдің бағасы қолжетімді емес.",
     "estimateBalanceUnavailable": "Ақылы жиынтақ үшін баланс жеткіліксіз.",
     "estimateModelNotAllowed": "Бұл модель мұнда рұқсат етілмейді.",

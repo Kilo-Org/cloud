@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "Энэ хугацааны баримтын хэмжээ сонгосон загварт хэт их байна.",
     "estimatePermissionUnavailable": "Та энэ контекстийн үлдэгдлийг ашиглах эрхгүй.",
     "createFailed": "Энэ тоймыг үүсгэж чадсангүй.",
+    "reviewFailed": "Энэ тоймыг хянаж чадсангүй.",
     "estimatePricingUnavailable": "Энэ загварын үнийн мэдээлэл байхгүй.",
     "estimateBalanceUnavailable": "Төлбөрт хураангуй авахад үлдэгдэл хүрэлцэхгүй байна.",
     "estimateModelNotAllowed": "Энэ загварыг энд ашиглах боломжгүй.",

@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "এই সময়কালে নির্বাচিত মডেলের জন্য অতিরিক্ত পরিমাণে প্রমাণ রয়েছে।",
     "estimatePermissionUnavailable": "এই প্রসঙ্গের ব্যালেন্স ব্যবহার করার অনুমতি আপনার নেই।",
     "createFailed": "এই ব্রিফিং তৈরি করা যায়নি।",
+    "reviewFailed": "এই ব্রিফিং পর্যালোচনা করা যায়নি।",
     "estimatePricingUnavailable": "এই মডেলের মূল্য পাওয়া যাচ্ছে না।",
     "estimateBalanceUnavailable": "পেইড সারাংশের জন্য পর্যাপ্ত ব্যালেন্স নেই।",
     "estimateModelNotAllowed": "এই মডেলটি এখানে অনুমোদিত নয়।",

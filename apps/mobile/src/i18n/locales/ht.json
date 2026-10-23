@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "Peryòd sa a gen twòp done pou modèl ou chwazi a.",
     "estimatePermissionUnavailable": "Ou pa gen pèmisyon pou itilize balans kontèks sa a.",
     "createFailed": "Nou pa t kapab kreye rezime sa a.",
+    "reviewFailed": "Nou pa t kapab revize rezime sa a.",
     "estimatePricingUnavailable": "Pri pou modèl sa a pa disponib.",
     "estimateBalanceUnavailable": "Balans pa ase pou yon rezime ki pou peye.",
     "estimateModelNotAllowed": "Modèl sa a pa otorize isit la.",

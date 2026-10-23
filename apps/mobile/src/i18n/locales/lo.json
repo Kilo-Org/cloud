@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "ຊ່ວງເວລານີ້ມີຫຼັກຖານຫຼາຍເກີນໄປສຳລັບໂມເດວທີ່ເລືອກ.",
     "estimatePermissionUnavailable": "ທ່ານບໍ່ມີສິດໃຊ້ຍອດເງິນຄົງເຫຼືອຂອງບໍລິບົດນີ້.",
     "createFailed": "ບໍ່ສາມາດສ້າງສະຫຼຸບນີ້ໄດ້.",
+    "reviewFailed": "ບໍ່ສາມາດກວດທານສະຫຼຸບນີ້ໄດ້.",
     "estimatePricingUnavailable": "ບໍ່ມີຂໍ້ມູນລາຄາສຳລັບໂມເດນີ້.",
     "estimateBalanceUnavailable": "ຍອດເງິນບໍ່ພຽງພໍສຳລັບບົດສະຫຼຸບແບບຈ່າຍຄ່າ.",
     "estimateModelNotAllowed": "ໂມເດນີ້ບໍ່ອະນຸຍາດໃຫ້ໃຊ້ຢູ່ນີ້.",

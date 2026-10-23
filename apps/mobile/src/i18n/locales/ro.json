@@ -4044,6 +4044,7 @@
     "estimateInputTooLarge": "Această perioadă conține prea multe date justificative pentru modelul selectat.",
     "estimatePermissionUnavailable": "Nu ai permisiunea de a folosi soldul acestui context.",
     "createFailed": "Nu s-a putut crea acest rezumat.",
+    "reviewFailed": "Nu s-a putut verifica acest rezumat.",
     "estimatePricingUnavailable": "Prețurile pentru acest model nu sunt disponibile.",
     "estimateBalanceUnavailable": "Sold insuficient pentru un rezumat plătit.",
     "estimateModelNotAllowed": "Acest model nu este permis aici.",

@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "या कालावधीतील पुरावे निवडलेल्या मॉडेलसाठी खूप जास्त आहेत.",
     "estimatePermissionUnavailable": "तुम्हाला या संदर्भातील शिल्लक रक्कम वापरण्याची परवानगी नाही.",
     "createFailed": "हा आढावा तयार करता आला नाही.",
+    "reviewFailed": "हा आढावा तपासता आला नाही.",
     "estimatePricingUnavailable": "या मॉडेलचे मूल्यनिर्धारण उपलब्ध नाही.",
     "estimateBalanceUnavailable": "सशुल्क सारांशासाठी पुरेशी शिल्लक नाही.",
     "estimateModelNotAllowed": "या मॉडेलला येथे परवानगी नाही.",

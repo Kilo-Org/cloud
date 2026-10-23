@@ -4142,6 +4142,7 @@
     "estimateInputTooLarge": "Dan il-perjodu fih wisq evidenza għall-mudell magħżul.",
     "estimatePermissionUnavailable": "M'għandekx permess tuża l-bilanċ ta' dan il-kuntest.",
     "createFailed": "Ma setax jinħoloq dan il-briefing.",
+    "reviewFailed": "Ma setax jiġi rivedut dan il-briefing.",
     "estimatePricingUnavailable": "Il-prezzijiet għal dan il-model mhuwiex disponibbli.",
     "estimateBalanceUnavailable": "Mhemmx bilans biżżejjed għal sommarju li jitħallas.",
     "estimateModelNotAllowed": "Dan il-model mhuwiex permess hawn.",

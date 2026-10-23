@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "ਇਸ ਮਿਆਦ ਵਿੱਚ ਚੁਣੇ ਹੋਏ ਮਾਡਲ ਲਈ ਬਹੁਤ ਜ਼ਿਆਦਾ ਸਬੂਤ ਹਨ।",
     "estimatePermissionUnavailable": "ਤੁਹਾਨੂੰ ਇਸ ਸੰਦਰਭ ਦੀ ਬਕਾਇਆ ਰਕਮ ਵਰਤਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
     "createFailed": "ਇਹ ਬ੍ਰੀਫਿੰਗ ਨਹੀਂ ਬਣਾਈ ਜਾ ਸਕੀ।",
+    "reviewFailed": "ਇਹ ਬ੍ਰੀਫਿੰਗ ਦੀ ਸਮੀਖਿਆ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
     "estimatePricingUnavailable": "ਇਸ ਮਾਡਲ ਲਈ ਕੀਮਤ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
     "estimateBalanceUnavailable": "ਭੁਗਤਾਨ ਵਾਲੇ ਸਾਰ ਲਈ ਲੋੜੀਂਦਾ ਬੈਲੈਂਸ ਨਹੀਂ ਹੈ।",
     "estimateModelNotAllowed": "ਇਹ ਮਾਡਲ ਇੱਥੇ ਮਨਜ਼ੂਰ ਨਹੀਂ ਹੈ।",

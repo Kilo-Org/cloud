@@ -3998,6 +3998,7 @@
     "createOffline": "Kumonekta sa internet para suriin o gumawa ng briefing. Hindi kailanman ipinipila ang mga may bayad na kahilingan kapag walang koneksyon sa internet.",
     "estimateInputTooLarge": "Masyadong maraming ebidensiya sa panahong ito para sa napiling modelo.",
     "estimatePermissionUnavailable": "Wala kang pahintulot na gamitin ang balanse ng kontekstong ito.",
-    "createFailed": "Hindi magawa ang briefing na ito."
+    "createFailed": "Hindi magawa ang briefing na ito.",
+    "reviewFailed": "Hindi masuri ang briefing na ito."
   }
 }

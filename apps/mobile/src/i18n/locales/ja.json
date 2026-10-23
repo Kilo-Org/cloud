@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "この期間の根拠データは、選択したモデルで処理できる量を超えています。",
     "estimatePermissionUnavailable": "このコンテキストの残高を使用する権限がありません。",
     "createFailed": "このブリーフィングを作成できませんでした。",
+    "reviewFailed": "このブリーフィングを確認できませんでした。",
     "estimatePricingUnavailable": "このモデルの価格情報はご利用いただけません。",
     "estimateBalanceUnavailable": "有料サマリーには残高が不足しています。",
     "estimateModelNotAllowed": "このモデルはここでは使用できません。",

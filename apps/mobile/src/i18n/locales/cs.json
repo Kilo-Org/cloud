@@ -4093,6 +4093,7 @@
     "estimateInputTooLarge": "Toto období obsahuje příliš mnoho podkladů pro vybraný model.",
     "estimatePermissionUnavailable": "Nemáte oprávnění používat zůstatek tohoto kontextu.",
     "createFailed": "Tento přehled se nepodařilo vytvořit.",
+    "reviewFailed": "Tento přehled se nepodařilo zkontrolovat.",
     "estimatePricingUnavailable": "Ceny pro tento model nejsou dostupné.",
     "estimateBalanceUnavailable": "Nedostatečný zůstatek pro placené shrnutí.",
     "estimateModelNotAllowed": "Tento model zde není povolen.",

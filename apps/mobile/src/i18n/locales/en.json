@@ -89,7 +89,8 @@
     "createOffline": "Go online to review or create a brief. Paid requests are never queued offline.",
     "estimateInputTooLarge": "This period has too much evidence for the selected model.",
     "estimatePermissionUnavailable": "You do not have permission to use this context’s balance.",
-    "createFailed": "Could not create this brief."
+    "createFailed": "Could not create this brief.",
+    "reviewFailed": "Could not review this brief."
   },
   "common": {
     "cancel": "Cancel",

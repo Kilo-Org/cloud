@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "Tempoh ini mempunyai terlalu banyak bukti untuk model yang dipilih.",
     "estimatePermissionUnavailable": "Anda tidak mempunyai kebenaran untuk menggunakan baki konteks ini.",
     "createFailed": "Tidak dapat mencipta taklimat ini.",
+    "reviewFailed": "Tidak dapat menyemak taklimat ini.",
     "estimatePricingUnavailable": "Harga untuk model ini tidak tersedia.",
     "estimateBalanceUnavailable": "Baki tidak mencukupi untuk ringkasan berbayar.",
     "estimateModelNotAllowed": "Model ini tidak dibenarkan di sini.",

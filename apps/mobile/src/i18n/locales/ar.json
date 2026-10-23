@@ -4191,6 +4191,7 @@
     "estimateInputTooLarge": "تحتوي هذه الفترة على أدلة أكثر مما يمكن للنموذج المحدد استيعابه.",
     "estimatePermissionUnavailable": "ليس لديك إذن باستخدام رصيد هذا السياق.",
     "createFailed": "تعذّر إنشاء هذا الملخص.",
+    "reviewFailed": "تعذّر مراجعة هذا الملخص.",
     "estimatePricingUnavailable": "تسعير هذا النموذج غير متاح.",
     "estimateBalanceUnavailable": "لا يوجد رصيد كافٍ لملخص مدفوع.",
     "estimateModelNotAllowed": "هذا النموذج غير مسموح به هنا.",

@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "په دې موده کې د ټاکل شوي ماډل لپاره شواهد ډېر زیات دي.",
     "estimatePermissionUnavailable": "تاسو د دې چوکاټ د حساب د پاتې پیسو د کارولو اجازه نه لرئ.",
     "createFailed": "دا لنډیز جوړ نه شو.",
+    "reviewFailed": "دا لنډیز وڅېړل نه شو.",
     "estimatePricingUnavailable": "د دې موډل بیې نه دی معلومې.",
     "estimateBalanceUnavailable": "د باشخه لنډیز لپاره بیلانس کافي نه دی.",
     "estimateModelNotAllowed": "دا موډل دلته اجازه نه لري.",

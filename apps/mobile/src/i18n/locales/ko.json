@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "이 기간의 근거 자료가 선택한 모델이 처리하기에 너무 많습니다.",
     "estimatePermissionUnavailable": "이 컨텍스트의 잔액을 사용할 권한이 없습니다.",
     "createFailed": "이 브리핑을 만들 수 없습니다.",
+    "reviewFailed": "이 브리핑을 검토할 수 없습니다.",
     "estimatePricingUnavailable": "이 모델의 가격 정보를 사용할 수 없습니다.",
     "estimateBalanceUnavailable": "유료 요약을 위한 잔액이 부족합니다.",
     "estimateModelNotAllowed": "이 모델은 여기서 사용할 수 없습니다.",

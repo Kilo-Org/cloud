@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "Muddadan waxaa ku jira caddaymo aad ugu badan qaabka AI ee la doortay.",
     "estimatePermissionUnavailable": "Ma lihid oggolaansho aad ku isticmaasho haraaga lacageed ee macnahan guud.",
     "createFailed": "Lama samayn karin warbixintan.",
+    "reviewFailed": "Lama dib u eegi karin warbixintan.",
     "estimatePricingUnavailable": "Qiimaha noocan aan la helin.",
     "estimateBalanceUnavailable": "Haaru lacag kuma filna kooban lacag lagu qiimaystay.",
     "estimateModelNotAllowed": "Noocan laguma ogola halkan.",

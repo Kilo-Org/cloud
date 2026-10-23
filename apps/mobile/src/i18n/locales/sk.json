@@ -4093,6 +4093,7 @@
     "estimateInputTooLarge": "Toto obdobie obsahuje príliš veľa podkladov pre vybraný model.",
     "estimatePermissionUnavailable": "Nemáte oprávnenie používať zostatok tohto kontextu.",
     "createFailed": "Tento prehľad sa nepodarilo vytvoriť.",
+    "reviewFailed": "Tento prehľad sa nepodarilo skontrolovať.",
     "estimatePricingUnavailable": "Ceny pre tento model nie sú dostupné.",
     "estimateBalanceUnavailable": "Nedostatočný zostatok na platený súhrn.",
     "estimateModelNotAllowed": "Tento model tu nie je povolený.",

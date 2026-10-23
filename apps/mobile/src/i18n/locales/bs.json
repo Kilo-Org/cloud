@@ -4044,6 +4044,7 @@
     "estimateInputTooLarge": "Ovaj period sadrži previše podataka za odabrani model.",
     "estimatePermissionUnavailable": "Nemaš dozvolu za korištenje salda ovog konteksta.",
     "createFailed": "Nije moguće kreirati ovaj pregled.",
+    "reviewFailed": "Nije moguće pregledati ovaj pregled.",
     "estimatePricingUnavailable": "Cijene za ovaj model nisu dostupne.",
     "estimateBalanceUnavailable": "Nema dovoljno sredstava za plaćeni sažetak.",
     "estimateModelNotAllowed": "Ovaj model ovdje nije dozvoljen.",

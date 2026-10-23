@@ -4044,6 +4044,7 @@
     "estimateInputTooLarge": "Questo periodo contiene troppi dati per il modello selezionato.",
     "estimatePermissionUnavailable": "Non hai il permesso di utilizzare il saldo di questo contesto.",
     "createFailed": "Impossibile creare questo briefing.",
+    "reviewFailed": "Impossibile rivedere questo briefing.",
     "estimatePricingUnavailable": "Prezzi non disponibili per questo modello.",
     "estimateBalanceUnavailable": "Saldo insufficiente per un riepilogo a pagamento.",
     "estimateModelNotAllowed": "Questo modello non è consentito qui.",

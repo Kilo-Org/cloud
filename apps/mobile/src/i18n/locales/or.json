@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "ଏହି ଅବଧିରେ ଚୟନିତ ମଡେଲ୍ ପାଇଁ ଅତ୍ୟଧିକ ପ୍ରମାଣ ଅଛି।",
     "estimatePermissionUnavailable": "ଏହି ପ୍ରସଙ୍ଗର ଉପଲବ୍ଧ ଅର୍ଥରାଶି ବ୍ୟବହାର କରିବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
     "createFailed": "ଏହି ସାରାଂଶ ତିଆରି କରାଯାଇପାରିଲା ନାହିଁ।",
+    "reviewFailed": "ଏହି ସାରାଂଶ ସମୀକ୍ଷା କରାଯାଇପାରିଲା ନାହିଁ।",
     "estimatePricingUnavailable": "ଏହି ମଡେଲ ପାଇଁ ମୂଲ୍ୟ ନିର୍ଧାରଣ ଉପଲବ୍ଧ ନାହିଁ।",
     "estimateBalanceUnavailable": "ମିଳିତ ସାରାଂଶ ପାଇଁ ଯଥେଷ୍ଟ ବ୍ୟାଲାନ୍ସ ନାହିଁ।",
     "estimateModelNotAllowed": "ଏହି ମଡେଲ ଏଠାରେ ଅନୁମୋଦିତ ନୁହେଁ।",

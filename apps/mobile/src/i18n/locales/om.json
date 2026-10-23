@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "Yeroon kun moodeela filatameef ragaa baay'ee qaba.",
     "estimatePermissionUnavailable": "Maallaqa haala kana keessatti hafe fayyadamuuf hayyama hin qabdu.",
     "createFailed": "Gabaasa kana uumuu hin danda'amne.",
+    "reviewFailed": "Gabaasa kana gamaaggamuu hin danda'amne.",
     "estimatePricingUnavailable": "Gatii moodelii kanaa hin argamu.",
     "estimateBalanceUnavailable": "Hanga baalansii waaloo bu'aa argachuuf hin ga'u.",
     "estimateModelNotAllowed": "Moodelii kun asitti hin hayyamamu.",

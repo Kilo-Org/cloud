@@ -4047,6 +4047,7 @@
     "createOffline": "Connectez-vous à Internet pour examiner ou créer un briefing. Les demandes payantes ne sont jamais mises en attente hors ligne.",
     "estimateInputTooLarge": "Cette période contient trop d’éléments pour le modèle sélectionné.",
     "estimatePermissionUnavailable": "Vous n’avez pas l’autorisation d’utiliser le solde de ce contexte.",
-    "createFailed": "Impossible de créer ce briefing."
+    "createFailed": "Impossible de créer ce briefing.",
+    "reviewFailed": "Impossible d'examiner ce briefing."
   }
 }

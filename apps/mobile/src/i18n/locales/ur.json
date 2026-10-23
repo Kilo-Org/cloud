@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "اس مدت میں منتخب ماڈل کی گنجائش سے زیادہ شواہد ہیں۔",
     "estimatePermissionUnavailable": "آپ کو اس سیاق کا بیلنس استعمال کرنے کی اجازت نہیں ہے۔",
     "createFailed": "یہ بریفنگ نہیں بن سکی۔",
+    "reviewFailed": "اس بریفنگ کا جائزہ نہیں لیا جا سکا۔",
     "estimatePricingUnavailable": "اس ماڈل کی قیمت دستیاب نہیں ہے۔",
     "estimateBalanceUnavailable": "ادائیگی والے خلاصے کے لیے بیلنس کافی نہیں ہے۔",
     "estimateModelNotAllowed": "یہ ماڈل یہاں کی اجازت نہیں رکھتا۔",

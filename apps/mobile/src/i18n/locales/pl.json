@@ -4093,6 +4093,7 @@
     "estimateInputTooLarge": "Ten okres zawiera zbyt dużo materiałów dla wybranego modelu.",
     "estimatePermissionUnavailable": "Nie masz uprawnień do korzystania ze środków w tym kontekście.",
     "createFailed": "Nie udało się utworzyć tego raportu.",
+    "reviewFailed": "Nie udało się przejrzeć tego raportu.",
     "estimatePricingUnavailable": "Cennik tego modelu jest niedostępny.",
     "estimateBalanceUnavailable": "Brak wystarczających środków na płatne podsumowanie.",
     "estimateModelNotAllowed": "Ten model nie jest tu dozwolony.",

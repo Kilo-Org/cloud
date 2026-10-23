@@ -4047,6 +4047,7 @@
     "createOffline": "Conéctate a internet para revisar o crear un resumen. Las solicitudes de pago nunca se ponen en cola sin conexión.",
     "estimateInputTooLarge": "Este periodo contiene demasiados datos para el modelo seleccionado.",
     "estimatePermissionUnavailable": "No tienes permiso para usar el saldo de este contexto.",
-    "createFailed": "No se pudo crear este resumen."
+    "createFailed": "No se pudo crear este resumen.",
+    "reviewFailed": "No se pudo revisar este resumen."
   }
 }

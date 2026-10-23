@@ -4093,6 +4093,7 @@
     "estimateInputTooLarge": "За цей період забагато матеріалів для вибраної моделі.",
     "estimatePermissionUnavailable": "У вас немає дозволу використовувати баланс цього контексту.",
     "createFailed": "Не вдалося створити цей брифінг.",
+    "reviewFailed": "Не вдалося переглянути цей брифінг.",
     "estimatePricingUnavailable": "Ціни для цієї моделі недоступні.",
     "estimateBalanceUnavailable": "Недостатньо коштів для платного звіту.",
     "estimateModelNotAllowed": "Ця модель тут недоступна.",

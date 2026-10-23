@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "Bu davrdagi dalillar hajmi tanlangan model uchun juda katta.",
     "estimatePermissionUnavailable": "Sizda bu kontekst balansidan foydalanish ruxsati yo‘q.",
     "createFailed": "Bu brifingni yaratib bo‘lmadi.",
+    "reviewFailed": "Bu brifingni ko‘rib chiqib bo‘lmadi.",
     "estimatePricingUnavailable": "Bu model uchun narxlar mavjud emas.",
     "estimateBalanceUnavailable": "Pullik xuloma uchun balans yetarli emas.",
     "estimateModelNotAllowed": "Bu model bu yerda ruxsat etilmagan.",

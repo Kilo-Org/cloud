@@ -4044,6 +4044,7 @@
     "estimateInputTooLarge": "Šajā periodā ir pārāk daudz datu izvēlētajam modelim.",
     "estimatePermissionUnavailable": "Jums nav atļaujas izmantot šī konteksta atlikumu.",
     "createFailed": "Neizdevās izveidot šo kopsavilkumu.",
+    "reviewFailed": "Neizdevās pārskatīt šo kopsavilkumu.",
     "estimatePricingUnavailable": "Šī modeļa cenu informācija nav pieejama.",
     "estimateBalanceUnavailable": "Nepietiek līdzekļu apmaksātam kopsavilkumam.",
     "estimateModelNotAllowed": "Šis modelis šeit nav atļauts.",

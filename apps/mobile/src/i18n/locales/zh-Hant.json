@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "此期間的資料量超出所選模型可處理的範圍。",
     "estimatePermissionUnavailable": "你沒有使用此使用情境餘額的權限。",
     "createFailed": "無法建立此簡報。",
+    "reviewFailed": "無法檢視此簡報。",
     "estimatePricingUnavailable": "此模型的定價無法取得。",
     "estimateBalanceUnavailable": "餘額不足以產生付費摘要。",
     "estimateModelNotAllowed": "此模型在此不受允許。",

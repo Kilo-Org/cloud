@@ -4142,6 +4142,7 @@
     "estimateInputTooLarge": "Tá an iomarca fianaise sa tréimhse seo don tsamhail roghnaithe.",
     "estimatePermissionUnavailable": "Níl cead agat iarmhéid an chomhthéacs seo a úsáid.",
     "createFailed": "Níorbh fhéidir an achoimre seo a chruthú.",
+    "reviewFailed": "Níorbh fhéidir an achoimre seo a athbhreithniú.",
     "estimatePricingUnavailable": "Níl praghsáil ar fáil le haghaidh an tsamhail seo.",
     "estimateBalanceUnavailable": "Níl cothromaíocht dhóthainach le haghaidh achoimre íoctha.",
     "estimateModelNotAllowed": "Níl cead an tsamhail seo a úsáid anseo.",

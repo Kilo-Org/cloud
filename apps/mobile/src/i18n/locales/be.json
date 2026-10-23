@@ -4093,6 +4093,7 @@
     "estimateInputTooLarge": "У гэтым перыядзе занадта шмат даных для выбранай мадэлі.",
     "estimatePermissionUnavailable": "У вас няма дазволу на выкарыстанне балансу гэтага кантэксту.",
     "createFailed": "Не ўдалося стварыць гэтую зводку.",
+    "reviewFailed": "Не ўдалося прагледзець гэтую зводку.",
     "estimatePricingUnavailable": "Цэны для гэтай мадэлі недаступныя.",
     "estimateBalanceUnavailable": "Недастаткова сродкаў для платнага рэзюмэ.",
     "estimateModelNotAllowed": "Гэтая мадэль тут не дазволена.",

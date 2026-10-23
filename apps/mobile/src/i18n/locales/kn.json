@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "ಈ ಅವಧಿಯಲ್ಲಿನ ಆಧಾರಗಳ ಪ್ರಮಾಣವು ಆಯ್ಕೆಮಾಡಿದ ಮಾದರಿಗೆ ತುಂಬಾ ಹೆಚ್ಚಾಗಿದೆ.",
     "estimatePermissionUnavailable": "ಈ ಸಂದರ್ಭದ ಬಾಕಿ ಮೊತ್ತವನ್ನು ಬಳಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
     "createFailed": "ಈ ಸಾರಾಂಶವನ್ನು ರಚಿಸಲಾಗಲಿಲ್ಲ.",
+    "reviewFailed": "ಈ ಸಾರಾಂಶವನ್ನು ಪರಿಶೀಲಿಸಲಾಗಲಿಲ್ಲ.",
     "estimatePricingUnavailable": "ಈ ಮಾದರಿಯ ಬೆಲೆ ಲಭ್ಯವಿಲ್ಲ.",
     "estimateBalanceUnavailable": "ಪಾವತಿಸಿದ ಸಾರಾಂಶಕ್ಕೆ ಸಾಕಷ್ಟು ಬ್ಯಾಲೆನ್ಸ್ ಇಲ್ಲ.",
     "estimateModelNotAllowed": "ಈ ಮಾದರಿಗೆ ಇಲ್ಲಿ ಅನುಮತಿ ಇಲ್ಲ.",

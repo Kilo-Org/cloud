@@ -58,7 +58,7 @@ describe('one-off briefing request state', () => {
       await Promise.all([state().prepare(input), state().prepare(input)]);
     });
     expect(mocks.prepare).toHaveBeenCalledTimes(1);
-    expect(state().error).toBe('agentBriefing.createFailed');
+    expect(state().error).toBe('agentBriefing.reviewFailed');
     await act(async () => {
       await state().prepare({ ...input, endAt: '2026-10-20T12:10:00.000Z' });
     });

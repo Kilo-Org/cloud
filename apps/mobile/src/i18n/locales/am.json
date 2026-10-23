@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "ይህ የጊዜ ክልል ለተመረጠው ሞዴል ከመጠን በላይ መረጃ ይዟል።",
     "estimatePermissionUnavailable": "የዚህን አውድ ቀሪ ሂሳብ ለመጠቀም ፈቃድ የለህም።",
     "createFailed": "ይህን ማጠቃለያ መፍጠር አልተቻለም።",
+    "reviewFailed": "ይህን ማጠቃለያ መገምገም አልተቻለም።",
     "estimatePricingUnavailable": "ለዚህ ሞዴል የዋጋ መረጃ አይገኝም።",
     "estimateBalanceUnavailable": "ለክፍያ ማጠቃለያ በቂ ሂሳብ የለም።",
     "estimateModelNotAllowed": "ይህ ሞዴል እዚህ አይፈቀድም።",

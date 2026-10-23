@@ -3998,6 +3998,7 @@
     "createOffline": "Konektatu Internetera laburpen bat berrikusteko edo sortzeko. Ordaindu beharreko eskaerak ez dira inoiz ilaran jartzen konexiorik gabe.",
     "estimateInputTooLarge": "Epe honek ebidentzia gehiegi ditu hautatutako eredurako.",
     "estimatePermissionUnavailable": "Ez duzu testuinguru honen saldoa erabiltzeko baimenik.",
-    "createFailed": "Ezin izan da laburpen hau sortu."
+    "createFailed": "Ezin izan da laburpen hau sortu.",
+    "reviewFailed": "Ezin izan da laburpen hau berrikusi."
   }
 }

@@ -4044,6 +4044,7 @@
     "estimateInputTooLarge": "התקופה הזו מכילה יותר מדי נתוני מקור עבור המודל שנבחר.",
     "estimatePermissionUnavailable": "אין לך הרשאה להשתמש ביתרה של ההקשר הזה.",
     "createFailed": "לא ניתן ליצור את התדריך הזה.",
+    "reviewFailed": "לא ניתן לסקור את התדריך הזה.",
     "estimatePricingUnavailable": "מחיר עבור המודל הזה אינו זמין.",
     "estimateBalanceUnavailable": "אין מספיק יתרה לסיכום בתשלום.",
     "estimateModelNotAllowed": "המודל הזה אינו מותר כאן.",

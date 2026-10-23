@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "He nui rawa ngā taunakitanga i tēnei wā mō te tauira kua kōwhiria.",
     "estimatePermissionUnavailable": "Kāore ō whakaaetanga ki te whakamahi i te toenga pūtea o tēnei horopaki.",
     "createFailed": "Kāore i taea te waihanga i tēnei whakamōhiotanga.",
+    "reviewFailed": "Kāore i taea te arotake i tēnei whakamōhiotanga.",
     "estimatePricingUnavailable": "Kāore he utu wātea mō tēnei tauira.",
     "estimateBalanceUnavailable": "Kāore i te nui te moni mō tētahi whakarāpopototanga utu.",
     "estimateModelNotAllowed": "Kāore e taea tēnei tauira i konei.",

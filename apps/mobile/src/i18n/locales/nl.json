@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "Deze periode bevat te veel bewijsmateriaal voor het geselecteerde model.",
     "estimatePermissionUnavailable": "Je hebt geen toestemming om het saldo van deze context te gebruiken.",
     "createFailed": "Deze briefing kon niet worden gemaakt.",
+    "reviewFailed": "Deze briefing kon niet worden bekeken.",
     "estimatePricingUnavailable": "De prijs van dit model is niet beschikbaar.",
     "estimateBalanceUnavailable": "Onvoldoende saldo voor een betaalde samenvatting.",
     "estimateModelNotAllowed": "Dit model is hier niet toegestaan.",

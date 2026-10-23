@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "Bu dönemde seçilen modelin işleyebileceğinden fazla kanıt var.",
     "estimatePermissionUnavailable": "Bu bağlamın bakiyesini kullanma izniniz yok.",
     "createFailed": "Bu özet oluşturulamadı.",
+    "reviewFailed": "Bu özet gözden geçirilemedi.",
     "estimatePricingUnavailable": "Bu model için fiyatlandırma mevcut değil.",
     "estimateBalanceUnavailable": "Ücretli özet için bakiye yetersiz.",
     "estimateModelNotAllowed": "Bu model burada kullanılamaz.",

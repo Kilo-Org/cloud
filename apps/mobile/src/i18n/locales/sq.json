@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "Kjo periudhë përmban tepër prova për modelin e zgjedhur.",
     "estimatePermissionUnavailable": "Nuk ke leje të përdorësh gjendjen e llogarisë së këtij konteksti.",
     "createFailed": "Kjo përmbledhje nuk mund të krijohet.",
+    "reviewFailed": "Kjo përmbledhje nuk mund të shqyrtohet.",
     "estimatePricingUnavailable": "Çmimi për këtë model nuk është i disponueshëm.",
     "estimateBalanceUnavailable": "Balanca nuk mjafton për një përmbledhje me pagesë.",
     "estimateModelNotAllowed": "Ky model nuk lejohet këtu.",

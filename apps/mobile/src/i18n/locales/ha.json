@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "Wannan lokacin yana da shaidu da yawa fiye da abin da samfurin da aka zaɓa zai iya ɗauka.",
     "estimatePermissionUnavailable": "Ba ka da izinin amfani da kuɗin da ya rage a wannan mahallin.",
     "createFailed": "An kasa ƙirƙirar wannan taƙaitaccen bayani.",
+    "reviewFailed": "An kasa duba wannan taƙaitaccen bayani.",
     "estimatePricingUnavailable": "Farashin wannan abin ƙira ba a samu ba.",
     "estimateBalanceUnavailable": "Ma'aunin kuɗi bai isa ba don taƙaitaccen biyan kudi.",
     "estimateModelNotAllowed": "Wannan abin ƙira ba a yarda da shi a nan ba.",

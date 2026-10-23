@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "Khoảng thời gian này có quá nhiều dữ liệu minh chứng cho mô hình đã chọn.",
     "estimatePermissionUnavailable": "Bạn không có quyền sử dụng số dư của ngữ cảnh này.",
     "createFailed": "Không thể tạo bản tin này.",
+    "reviewFailed": "Không thể xem lại bản tin này.",
     "estimatePricingUnavailable": "Không có thông tin giá cho mô hình này.",
     "estimateBalanceUnavailable": "Số dư không đủ để tóm tắt trả phí.",
     "estimateModelNotAllowed": "Mô hình này không được phép ở đây.",

@@ -4093,6 +4093,7 @@
     "estimateInputTooLarge": "Šio laikotarpio duomenų per daug pasirinktam modeliui.",
     "estimatePermissionUnavailable": "Neturite leidimo naudoti šio konteksto likučio.",
     "createFailed": "Nepavyko sukurti šios suvestinės.",
+    "reviewFailed": "Nepavyko peržiūrėti šios suvestinės.",
     "estimatePricingUnavailable": "Šio modelio kainos neprieinamos.",
     "estimateBalanceUnavailable": "Nepakanka balanso mokamai santrukai.",
     "estimateModelNotAllowed": "Šis modelis čia neleidžiamas.",

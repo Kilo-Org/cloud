@@ -65,8 +65,8 @@ export function useCreateBriefing(): CreateBriefingState {
   // screen never renders it. Known reasons arrive as structured data (the
   // estimate) and are already localized; anything else gets one localized line
   // and the raw message stays out of the UI.
-  const onError = () => {
-    const message = i18n.t('agentBriefing.createFailed');
+  const onError = (key: 'agentBriefing.reviewFailed' | 'agentBriefing.createFailed') => {
+    const message = i18n.t(key);
     toast.error(message);
     if (mounted.current) {
       setError(message);
@@ -147,7 +147,7 @@ export function useCreateBriefing(): CreateBriefingState {
       }
     } catch {
       if (isCurrentAuthEpoch(epoch) && !isSignOutActive()) {
-        onError();
+        onError('agentBriefing.reviewFailed');
       }
     } finally {
       busy.current = false;
@@ -185,7 +185,7 @@ export function useCreateBriefing(): CreateBriefingState {
       return mounted.current && revision.current === version ? report : null;
     } catch {
       if (isCurrentAuthEpoch(epoch) && !isSignOutActive()) {
-        onError();
+        onError('agentBriefing.createFailed');
       }
       return null;
     } finally {

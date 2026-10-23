@@ -3998,6 +3998,7 @@
     "createOffline": "Muodosta verkkoyhteys, jotta voit tarkistaa tai luoda katsauksen. Maksullisia pyyntöjä ei koskaan lisätä jonoon ilman verkkoyhteyttä.",
     "estimateInputTooLarge": "Tällä ajanjaksolla on liikaa aineistoa valitulle mallille.",
     "estimatePermissionUnavailable": "Sinulla ei ole oikeutta käyttää tämän kontekstin saldoa.",
-    "createFailed": "Tätä katsausta ei voitu luoda."
+    "createFailed": "Tätä katsausta ei voitu luoda.",
+    "reviewFailed": "Tätä katsausta ei voitu tarkistaa."
   }
 }

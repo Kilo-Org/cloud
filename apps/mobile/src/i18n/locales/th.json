@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "ช่วงเวลานี้มีหลักฐานมากเกินกว่าที่โมเดลที่เลือกจะรองรับได้",
     "estimatePermissionUnavailable": "คุณไม่มีสิทธิ์ใช้ยอดเงินของบริบทนี้",
     "createFailed": "ไม่สามารถสร้างสรุปนี้ได้",
+    "reviewFailed": "ไม่สามารถตรวจสอบสรุปนี้ได้.",
     "estimatePricingUnavailable": "ไม่มีข้อมูลราคาสำหรับโมเดลนี้",
     "estimateBalanceUnavailable": "ยอดเงินไม่เพียงพอสำหรับสรุปแบบเสียเงิน",
     "estimateModelNotAllowed": "โมเดลนี้ไม่ได้รับอนุญาตให้ใช้ที่นี่",

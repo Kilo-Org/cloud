@@ -3998,6 +3998,7 @@
     "createOffline": "Gehe online, um ein Briefing zu prüfen oder zu erstellen. Kostenpflichtige Anfragen werden offline niemals zur späteren Ausführung vorgemerkt.",
     "estimateInputTooLarge": "Dieser Zeitraum enthält zu viele Belege für das ausgewählte Modell.",
     "estimatePermissionUnavailable": "Du hast keine Berechtigung, das Guthaben dieses Kontexts zu nutzen.",
-    "createFailed": "Dieses Briefing konnte nicht erstellt werden."
+    "createFailed": "Dieses Briefing konnte nicht erstellt werden.",
+    "reviewFailed": "Dieses Briefing konnte nicht geprüft werden."
   }
 }

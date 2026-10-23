@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "यस अवधिमा छानिएको मोडेलले सम्हाल्न सक्नेभन्दा बढी प्रमाणहरू छन्।",
     "estimatePermissionUnavailable": "तपाईंलाई यस सन्दर्भको मौज्दात प्रयोग गर्ने अनुमति छैन।",
     "createFailed": "यो ब्रिफिङ बनाउन सकिएन।",
+    "reviewFailed": "यो ब्रिफिङ समीक्षा गर्न सकिएन।",
     "estimatePricingUnavailable": "यो मोडेलको मूल्य उपलब्ध छैन।",
     "estimateBalanceUnavailable": "भुक्तानी सारांशका लागि पर्याप्त ब्यालेन्स छैन।",
     "estimateModelNotAllowed": "यो मोडेल यहाँ अनुमति छैन।",

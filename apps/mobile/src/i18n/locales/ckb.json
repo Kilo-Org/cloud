@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "بەڵگەکانی ئەم ماوەیە بۆ مۆدێلی هەڵبژێردراو زۆر لە ڕادەبەدەرن.",
     "estimatePermissionUnavailable": "مۆڵەتی بەکارهێنانی باڵانسی ئەم چوارچێوەیەت نییە.",
     "createFailed": "نەتوانرا ئەم کورتەیە دروست بکرێت.",
+    "reviewFailed": "نەتوانرا پێداچوونەوە بەم کورتەیە بکرێت.",
     "estimatePricingUnavailable": "نرخی ئەم مۆدێلە بەردەست نییە.",
     "estimateBalanceUnavailable": "باڵانس بۆ کورتەی پارەدار پێویست نییە.",
     "estimateModelNotAllowed": "ئەم مۆدێلە لێرە ڕێپێدراو نییە.",

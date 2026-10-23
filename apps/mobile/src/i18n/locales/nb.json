@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "Denne perioden har for mye kildemateriale for den valgte modellen.",
     "estimatePermissionUnavailable": "Du har ikke tillatelse til å bruke saldoen til denne konteksten.",
     "createFailed": "Kunne ikke opprette denne briefen.",
+    "reviewFailed": "Kunne ikke se gjennom denne briefen.",
     "estimatePricingUnavailable": "Prising for denne modellen er utilgjengelig.",
     "estimateBalanceUnavailable": "Ikke nok saldo for en betalt oppsummering.",
     "estimateModelNotAllowed": "Denne modellen er ikke tillatt her.",

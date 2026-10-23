@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "Hierdie tydperk bevat te veel bewyse vir die gekose model.",
     "estimatePermissionUnavailable": "Jy het nie toestemming om hierdie konteks se saldo te gebruik nie.",
     "createFailed": "Kon nie hierdie verslag skep nie.",
+    "reviewFailed": "Kon nie hierdie verslag hersien nie.",
     "estimatePricingUnavailable": "Prysinligting vir hierdie model is nie beskikbaar nie.",
     "estimateBalanceUnavailable": "Nie genoeg saldo vir ’n betaalde opsomming nie.",
     "estimateModelNotAllowed": "Hierdie model is hier nie toegelaat nie.",

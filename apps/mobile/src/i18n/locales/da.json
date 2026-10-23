@@ -3998,6 +3998,7 @@
     "createOffline": "Opret forbindelse til internettet for at gennemgå eller oprette en briefing. Betalte anmodninger sættes aldrig i kø, når du er offline.",
     "estimateInputTooLarge": "Denne periode indeholder for meget dokumentation til den valgte model.",
     "estimatePermissionUnavailable": "Du har ikke tilladelse til at bruge denne konteksts saldo.",
-    "createFailed": "Kunne ikke oprette denne briefing."
+    "createFailed": "Kunne ikke oprette denne briefing.",
+    "reviewFailed": "Kunne ikke gennemgå denne briefing."
   }
 }

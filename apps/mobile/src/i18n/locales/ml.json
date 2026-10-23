@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "തിരഞ്ഞെടുത്ത മോഡലിന് കൈകാര്യം ചെയ്യാനാകുന്നതിലും കൂടുതൽ തെളിവുകൾ ഈ കാലയളവിലുണ്ട്.",
     "estimatePermissionUnavailable": "ഈ സന്ദർഭത്തിന്റെ ബാലൻസ് ഉപയോഗിക്കാൻ നിങ്ങൾക്ക് അനുമതിയില്ല.",
     "createFailed": "ഈ ബ്രീഫിംഗ് സൃഷ്ടിക്കാനായില്ല.",
+    "reviewFailed": "ഈ ബ്രീഫിംഗ് അവലോകനം ചെയ്യാനായില്ല.",
     "estimatePricingUnavailable": "ഈ മോഡലിനുള്ള വിലനിർണ്ണയം ലഭ്യമല്ല.",
     "estimateBalanceUnavailable": "പണമടച്ചുള്ള സാരാംശത്തിന് തികഞ്ഞ ബാലൻസ് ഇല്ല.",
     "estimateModelNotAllowed": "ഇവിടെ ഈ മോഡൽ അനുവദനീയമല്ല.",

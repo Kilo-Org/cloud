@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "මෙම කාල සීමාවේ තෝරාගත් ආකෘතියට සැකසිය හැකි ප්‍රමාණයට වඩා සාක්ෂි ඇත.",
     "estimatePermissionUnavailable": "මෙම සන්දර්භයේ ශේෂය භාවිත කිරීමට ඔබට අවසර නැත.",
     "createFailed": "මෙම සාරාංශය සෑදිය නොහැකි විය.",
+    "reviewFailed": "මෙම සාරාංශය සමාලෝචනය කළ නොහැකි විය.",
     "estimatePricingUnavailable": "මෙම ආකෘතියේ මිල ගණන් ලබාගත නොහැක.",
     "estimateBalanceUnavailable": "ගෙවූ සාරාංශයක් සඳහා ප්‍රමාණවත් ශේෂයක් නොමැත.",
     "estimateModelNotAllowed": "මෙම ආකෘතිය මෙහි භාවිත කළ නොහැක.",

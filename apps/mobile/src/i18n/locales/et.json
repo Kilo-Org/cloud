@@ -3998,6 +3998,7 @@
     "createOffline": "Ülevaate kontrollimiseks või loomiseks loo internetiühendus. Tasulisi päringuid ei panda kunagi võrguühenduseta järjekorda.",
     "estimateInputTooLarge": "Selle perioodi kohta on valitud mudeli jaoks liiga palju alusandmeid.",
     "estimatePermissionUnavailable": "Sul pole õigust selle konteksti saldot kasutada.",
-    "createFailed": "Seda ülevaadet ei õnnestunud luua."
+    "createFailed": "Seda ülevaadet ei õnnestunud luua.",
+    "reviewFailed": "Seda ülevaadet ei õnnestunud üle vaadata."
   }
 }

@@ -4044,6 +4044,7 @@
     "estimateInputTooLarge": "Este período contém demasiados dados de suporte para o modelo selecionado.",
     "estimatePermissionUnavailable": "Não tem permissão para utilizar o saldo deste contexto.",
     "createFailed": "Não foi possível criar este resumo.",
+    "reviewFailed": "Não foi possível rever este resumo.",
     "estimatePricingUnavailable": "O preço deste modelo não está disponível.",
     "estimateBalanceUnavailable": "Saldo insuficiente para um resumo pago.",
     "estimateModelNotAllowed": "Este modelo não é permitido aqui.",

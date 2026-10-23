@@ -4194,6 +4194,7 @@
     "createOffline": "Cysylltwch â'r rhyngrwyd i adolygu neu greu briff. Ni chaiff ceisiadau y codir tâl amdanynt byth eu rhoi mewn ciw all-lein.",
     "estimateInputTooLarge": "Mae gormod o dystiolaeth yn y cyfnod hwn ar gyfer y model a ddewiswyd.",
     "estimatePermissionUnavailable": "Nid oes gennych ganiatâd i ddefnyddio balans y cyd-destun hwn.",
-    "createFailed": "Methu creu'r briff hwn."
+    "createFailed": "Methu creu'r briff hwn.",
+    "reviewFailed": "Methu adolygu'r briff hwn."
   }
 }

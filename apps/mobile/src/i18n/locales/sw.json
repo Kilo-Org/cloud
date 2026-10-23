@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "Kipindi hiki kina ushahidi mwingi mno kwa modeli iliyochaguliwa.",
     "estimatePermissionUnavailable": "Huna ruhusa ya kutumia salio la muktadha huu.",
     "createFailed": "Imeshindwa kuunda muhtasari huu.",
+    "reviewFailed": "Imeshindwa kupitia muhtasari huu.",
     "estimatePricingUnavailable": "Bei ya modeli hii haipatikani.",
     "estimateBalanceUnavailable": "Salio halitoshi kwa muhtasari wenye malipo.",
     "estimateModelNotAllowed": "Modeli hii hairuhusiwa hapa.",

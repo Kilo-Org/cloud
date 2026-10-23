@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "Bu dövrdə seçilmiş model üçün həddindən artıq çox material var.",
     "estimatePermissionUnavailable": "Bu kontekstin balansından istifadə etmək icazəniz yoxdur.",
     "createFailed": "Bu brifinqi yaratmaq mümkün olmadı.",
+    "reviewFailed": "Bu brifinqi nəzərdən keçirmək mümkün olmadı.",
     "estimatePricingUnavailable": "Bu model üçün qiymətləndirmə mövcud deyil.",
     "estimateBalanceUnavailable": "Ödənişli icmal üçün balans kifayət etmir.",
     "estimateModelNotAllowed": "Bu model burada icazə verilmir.",

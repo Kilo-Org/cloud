@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "Be loatra ny porofo ao anatin'ity vanim-potoana ity ho an'ny maodely voafantina.",
     "estimatePermissionUnavailable": "Tsy manana alalana hampiasa ny vola tavela amin'ity sehatra ity ianao.",
     "createFailed": "Tsy nahavita namorona ity tatitra ity.",
+    "reviewFailed": "Tsy nahavita nandinika ity tatitra ity.",
     "estimatePricingUnavailable": "Tsy misy ny vidin'ity modely ity.",
     "estimateBalanceUnavailable": "Tsy ampy ny fandanjana ho an'ny famintinana kando iyou.",
     "estimateModelNotAllowed": "Tsy azo ekena ity modely ity eto.",

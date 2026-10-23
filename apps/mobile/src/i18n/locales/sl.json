@@ -4093,6 +4093,7 @@
     "estimateInputTooLarge": "To obdobje vsebuje preveč dokaznega gradiva za izbrani model.",
     "estimatePermissionUnavailable": "Nimaš dovoljenja za uporabo razpoložljivih sredstev tega konteksta.",
     "createFailed": "Tega povzetka ni bilo mogoče ustvariti.",
+    "reviewFailed": "Tega povzetka ni bilo mogoče pregledati.",
     "estimatePricingUnavailable": "Cene za ta model niso na voljo.",
     "estimateBalanceUnavailable": "Ni dovolj sredstev za plačljiv povzetek.",
     "estimateModelNotAllowed": "Ta model tu ni dovoljen.",

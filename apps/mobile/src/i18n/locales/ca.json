@@ -4044,6 +4044,7 @@
     "estimateInputTooLarge": "Aquest període conté massa proves per al model seleccionat.",
     "estimatePermissionUnavailable": "No tens permís per utilitzar el saldo d'aquest context.",
     "createFailed": "No s'ha pogut crear aquest resum.",
+    "reviewFailed": "No s'ha pogut revisar aquest resum.",
     "estimatePricingUnavailable": "El preu d'aquest model no està disponible.",
     "estimateBalanceUnavailable": "No hi ha prou saldo per a un resum de pagament.",
     "estimateModelNotAllowed": "Aquest model no està permès aquí.",

@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "Periode ini berisi terlalu banyak bukti untuk model yang dipilih.",
     "estimatePermissionUnavailable": "Anda tidak memiliki izin untuk menggunakan saldo konteks ini.",
     "createFailed": "Tidak dapat membuat ringkasan ini.",
+    "reviewFailed": "Tidak dapat meninjau ringkasan ini.",
     "estimatePricingUnavailable": "Harga untuk model ini tidak tersedia.",
     "estimateBalanceUnavailable": "Saldo tidak cukup untuk ringkasan berbayar.",
     "estimateModelNotAllowed": "Model ini tidak diizinkan di sini.",

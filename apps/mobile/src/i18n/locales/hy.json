@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "Այս ժամանակահատվածի տվյալների ծավալը չափազանց մեծ է ընտրված մոդելի համար։",
     "estimatePermissionUnavailable": "Դուք այս համատեքստի մնացորդն օգտագործելու թույլտվություն չունեք։",
     "createFailed": "Չհաջողվեց ստեղծել այս ամփոփումը։",
+    "reviewFailed": "Չհաջողվեց վերանայել այս ամփոփումը։",
     "estimatePricingUnavailable": "Այս մոդելի գնագոյացումը հասանելի չէ։",
     "estimateBalanceUnavailable": "Բավարար մնացորդ չկա վճարովի ամփոփման համար։",
     "estimateModelNotAllowed": "Այս մոդելը թույլատրված չէ այստեղ։",

@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "Ebben az időszakban túl sok forrásadat van a kiválasztott modell számára.",
     "estimatePermissionUnavailable": "Nincs jogosultsága ennek a kontextusnak az egyenlegét használni.",
     "createFailed": "Nem sikerült létrehozni ezt az összefoglalót.",
+    "reviewFailed": "Nem sikerült áttekinteni ezt az összefoglalót.",
     "estimatePricingUnavailable": "A modell árazása nem elérhető.",
     "estimateBalanceUnavailable": "Nincs elég egyenleg a fizetett összefoglalóhoz.",
     "estimateModelNotAllowed": "Ez a modell itt nem engedélyezett.",

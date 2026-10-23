@@ -3994,6 +3994,7 @@
     "estimateInputTooLarge": "Den här perioden innehåller för mycket underlag för den valda modellen.",
     "estimatePermissionUnavailable": "Du har inte behörighet att använda saldot för den här kontexten.",
     "createFailed": "Det gick inte att skapa den här sammanfattningen.",
+    "reviewFailed": "Det gick inte att granska den här sammanfattningen.",
     "estimatePricingUnavailable": "Prissättning för denna modell är inte tillgänglig.",
     "estimateBalanceUnavailable": "Inte tillräcklig saldo för en betald sammanfattning.",
     "estimateModelNotAllowed": "Denna modell är inte tillåten här.",

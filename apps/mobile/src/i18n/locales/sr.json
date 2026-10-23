@@ -4044,6 +4044,7 @@
     "estimateInputTooLarge": "Ovaj period sadrži previše dokaza za izabrani model.",
     "estimatePermissionUnavailable": "Nemaš dozvolu da koristiš raspoloživa sredstva ovog konteksta.",
     "createFailed": "Nije moguće napraviti ovaj pregled.",
+    "reviewFailed": "Nije moguće proveriti ovaj pregled.",
     "estimatePricingUnavailable": "Cene za ovaj model nisu dostupne.",
     "estimateBalanceUnavailable": "Nedovoljno sredstava za plaćeni rezime.",
     "estimateModelNotAllowed": "Ovaj model ovde nije dozvoljen.",

@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "इस अवधि में चुने गए मॉडल के लिए बहुत अधिक साक्ष्य है।",
     "estimatePermissionUnavailable": "आपको इस संदर्भ की शेष राशि का उपयोग करने की अनुमति नहीं है।",
     "createFailed": "यह ब्रीफ़िंग नहीं बनाई जा सकी।",
+    "reviewFailed": "इस ब्रीफ़िंग की समीक्षा नहीं की जा सकी।",
     "estimatePricingUnavailable": "इस मॉडल की कीमत उपलब्ध नहीं है।",
     "estimateBalanceUnavailable": "सशुल्क सारांश के लिए पर्याप्त बैलेंस नहीं है।",
     "estimateModelNotAllowed": "यह मॉडल यहाँ अनुमत नहीं है।",

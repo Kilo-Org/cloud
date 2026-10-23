@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "Of mikið er af gögnum á þessu tímabili fyrir valið líkan.",
     "estimatePermissionUnavailable": "Þú hefur ekki heimild til að nota inneign þessa samhengis.",
     "createFailed": "Ekki tókst að búa til þetta yfirlit.",
+    "reviewFailed": "Ekki tókst að fara yfir þetta yfirlit.",
     "estimatePricingUnavailable": "Verð fyrir þetta líkan er ekki tiltækt.",
     "estimateBalanceUnavailable": "Ekki nóg innistæða fyrir greidda samantekt.",
     "estimateModelNotAllowed": "Þetta líkan er ekki heimilað hér.",

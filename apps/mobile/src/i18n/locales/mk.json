@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "Овој период содржи премногу докази за избраниот модел.",
     "estimatePermissionUnavailable": "Немате дозвола да ги користите средствата на овој контекст.",
     "createFailed": "Прегледот не можеше да се создаде.",
+    "reviewFailed": "Прегледот не можеше да се прегледа.",
     "estimatePricingUnavailable": "Цените за овој модел не се достапни.",
     "estimateBalanceUnavailable": "Нема доволно средства за платен резиме.",
     "estimateModelNotAllowed": "Овој модел не е дозволен тука.",

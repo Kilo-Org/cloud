@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "આ સમયગાળામાં પસંદ કરેલા મોડેલની ક્ષમતા કરતાં વધુ પુરાવા છે.",
     "estimatePermissionUnavailable": "તમને આ સંદર્ભનું બેલેન્સ વાપરવાની પરવાનગી નથી.",
     "createFailed": "આ સારાંશ બનાવી શકાયો નહીં.",
+    "reviewFailed": "આ સારાંશની સમીક્ષા કરી શકાઈ નહીં.",
     "estimatePricingUnavailable": "આ મોડેલ માટે પ્રાઇસિંગ ઉપલબ્ધ નથી.",
     "estimateBalanceUnavailable": "પેઇડ સારાંશ માટે પૂરતી બેલેન્સ નથી.",
     "estimateModelNotAllowed": "આ મોડેલ અહીં મંજૂર નથી.",

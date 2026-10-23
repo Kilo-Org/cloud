@@ -3995,6 +3995,7 @@
     "estimateInputTooLarge": "Lesi sikhathi sinobufakazi obuningi kakhulu kunalokho imodeli ekhethiwe engakusingatha.",
     "estimatePermissionUnavailable": "Awunayo imvume yokusebenzisa ibhalansi yalo mongo.",
     "createFailed": "Ayikwazanga ukudala lesi sifinyezo.",
+    "reviewFailed": "Ayikwazanga ukubuyekeza lesi sifinyezo.",
     "estimatePricingUnavailable": "Intengo yale modeli ayitholakali.",
     "estimateBalanceUnavailable": "Ibalansi ayanele ngokwanele ukuthola isifinyezo esikhokhelwayo.",
     "estimateModelNotAllowed": "Le modeli ayivunyelwe lapha.",

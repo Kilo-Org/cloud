@@ -30,7 +30,7 @@ import { fetchGitLabMergeRequest } from '@/lib/integrations/platforms/gitlab/ada
 import {
   authorizeProject,
   gitlabReviewErrorToTrpcError,
-  type GitLabReviewOwner,
+  gitlabReviewOwnerFor,
 } from '@/lib/provider-review/gitlab-authorization';
 import type { CodeReviewPlatform, Owner } from './core';
 import { createCodeReview, findActiveProviderPublishingReview } from './db/code-reviews';
@@ -526,10 +526,7 @@ async function resolveConnectedGitLabSource(
     });
   }
 
-  const reviewOwner: GitLabReviewOwner =
-    owner.type === 'org'
-      ? { type: 'organization', organizationId: owner.id, userId: owner.userId }
-      : { type: 'user', userId: owner.userId };
+  const reviewOwner = gitlabReviewOwnerFor(owner, owner.userId);
 
   try {
     // The same boundary GitLab branch listing and the provider-review reads

@@ -36,6 +36,7 @@ import {
   authorizeProject,
   GitLabReviewError,
   gitlabReviewErrorToTrpcError,
+  gitlabReviewOwnerFor,
   type GitLabReviewOwner,
 } from '@/lib/provider-review/gitlab-authorization';
 import {
@@ -306,10 +307,7 @@ async function listGitLabBranches(
   // authorization boundary the Bitbucket path enforces through
   // authorizeRepository. Without it, any project path the connected token
   // can reach would be listable.
-  const reviewOwner: GitLabReviewOwner =
-    owner.type === 'org'
-      ? { type: 'organization', organizationId: owner.id, userId: actor.userId }
-      : { type: 'user', userId: actor.userId };
+  const reviewOwner = gitlabReviewOwnerFor(owner, actor.userId);
   try {
     const access = await authorizeProject(reviewOwner, repositoryFullName);
     const branches = await fetchGitLabBranches(

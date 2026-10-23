@@ -232,6 +232,18 @@ export function gitlabReviewErrorToTrpcError(error: unknown, owner: GitLabReview
   return providerReviewErrorToTrpcError(classifyGitLabErrorForOwner(error, owner));
 }
 
+/**
+ * The review-layer owner for a Kilo owner plus the acting user whose
+ * credential the token broker releases. Organization-owned connections keep
+ * the organization as the owner and name the acting user separately, so the
+ * broker can release the organization's credential for that user.
+ */
+export function gitlabReviewOwnerFor(owner: Owner, actingUserId: string): GitLabReviewOwner {
+  return owner.type === 'org'
+    ? { type: 'organization', organizationId: owner.id, userId: actingUserId }
+    : { type: 'user', userId: actingUserId };
+}
+
 function ownerToDbOwner(owner: GitLabReviewOwner): Owner {
   return owner.type === 'user'
     ? { type: 'user', id: owner.userId }

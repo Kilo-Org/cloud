@@ -126,13 +126,18 @@ export function TabScreenScrollView({
   // focused content under the IME with no scroll range to drag it clear.
   //
   // Both bands are margins on a `flex-1` frame, so a window shorter than the
-  // band collapses the frame to zero height. `viewportBandLimit` is that
-  // window's answer: the band is clamped to keep `TAB_SCREEN_MIN_VIEWPORT`
-  // scrollable, and is restored whenever the window can afford all of it.
+  // band collapses the frame to zero height. `availableHeight` is that window's
+  // answer: the band is clamped to keep `TAB_SCREEN_MIN_VIEWPORT` scrollable,
+  // and is restored whenever the window can afford all of it. The measured
+  // room, not the band it was measured under, is what is kept: the band itself
+  // changes with the keyboard, and a limit derived from the tab-bar band would
+  // otherwise outlive it and truncate the IME reservation.
   const reservedBand = keyboardOcclusion > 0 ? keyboardOcclusion : tabBarHeight;
-  const [viewportBandLimit, setViewportBandLimit] = useState<number | null>(null);
+  const [availableHeight, setAvailableHeight] = useState<number | null>(null);
   const frameMargin =
-    viewportBandLimit === null ? reservedBand : Math.min(reservedBand, viewportBandLimit);
+    availableHeight === null
+      ? reservedBand
+      : Math.min(reservedBand, Math.max(0, availableHeight - TAB_SCREEN_MIN_VIEWPORT));
   // The scroll view's own focused-field reveal runs on focus only. Two
   // re-layouts leave the focused row (and whatever sits under it) parked behind
   // the IME, and content that ends near the field may not leave enough slack to
@@ -179,12 +184,9 @@ export function TabScreenScrollView({
     // collapsed frame reports 0, so the first pass over-estimates the room and
     // can only release band; the pass after it measures the real room and
     // settles on the floor.
-    const bandLimit = Math.min(
-      reservedBand,
-      Math.max(0, height + frameMargin - TAB_SCREEN_MIN_VIEWPORT)
-    );
-    if (bandLimit !== frameMargin) {
-      setViewportBandLimit(bandLimit);
+    const room = height + frameMargin;
+    if (room !== availableHeight) {
+      setAvailableHeight(room);
     }
     if (keyboardOcclusion > 0 && last != null && (last.width !== width || last.height !== height)) {
       // The layout event fires before the scroll view has re-laid out its

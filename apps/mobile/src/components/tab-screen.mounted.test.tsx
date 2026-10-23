@@ -1,4 +1,5 @@
-import { act, createElement } from 'react';
+/* eslint-disable max-lines -- the bottom-clearance, viewport-floor and keyboard cases share this file's real ScrollView mock harness */
+import { act, createElement, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
@@ -235,6 +236,38 @@ describe('TabScreenScrollView viewport floor', () => {
     // at the floor instead of shrinking further.
     layoutFrame(renderer, 402, 88);
     expect(reservedMargin(renderer)).toBe(212);
+    unmount();
+  });
+  it('re-reserves the keyboard band from the measured room, not the tab-bar clamp', async () => {
+    // The room is what is kept: a limit derived from the tab-bar band outlives
+    // the band and truncates the IME reservation, leaving the focused field
+    // under the keyboard with no scroll range (the frame keeps the same height,
+    // so no layout event would correct it).
+    layout.platform = 'ios';
+    layout.bottom = 0;
+    layout.fontScale = 1;
+    let rerender: (() => void) | undefined = undefined;
+    function Host() {
+      const [, setTick] = useState(0);
+      rerender = () => {
+        setTick(tick => tick + 1);
+      };
+      return createElement(TabScreenScrollView, null, createElement('Content'));
+    }
+    const { renderer, unmount } = await renderWithProviders(createElement(Host));
+    // A 200pt window first collapses the frame under the tab-bar band.
+    layoutFrame(renderer, 402, 0);
+    expect(reservedMargin(renderer)).toBe(0);
+    layoutFrame(renderer, 402, 200);
+    expect(reservedMargin(renderer)).toBe(BAND);
+    keyboard.occlusion = 300;
+    act(() => {
+      rerender?.();
+    });
+    // The IME band is reserved up to the floor: 200 - 88, not the tab-bar band.
+    expect(reservedMargin(renderer)).toBe(112);
+    layoutFrame(renderer, 402, 88);
+    expect(reservedMargin(renderer)).toBe(112);
     unmount();
   });
 });

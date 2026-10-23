@@ -55,6 +55,7 @@ import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-
 import { resolveSecret } from '../auth.js';
 import { CONTROL_PLANE_ALLOCATION_ID_ENV } from '../shared/control-plane-protocol.js';
 import { CONTROL_SUPERVISOR_PATH } from '../sandbox-control/container-paths.js';
+import { VERCEL_BASE_SYSTEM_SETUP, VERCEL_BASE_NODE_SETUP } from '../byoc/vercel-runtime-base.js';
 import { withDORetry } from '../utils/do-retry.js';
 
 const BUILD_ALARM_DELAY_MS = 1_000;
@@ -532,7 +533,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
       const identity = terminalConfirmed
         ? await this.external(ownershipFromRow(next), async () => {
             try {
-              return await getVercelRuntimeIdentity();
+              return await getVercelRuntimeIdentity(this.env);
             } catch {
               return undefined;
             }
@@ -625,7 +626,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
         );
         await this.runCommand(state, client, builderSessionId, 'bash', [
           '-lc',
-          'set -euo pipefail; sudo dnf install -y git git-lfs jq tar gzip; sudo mkdir -p /workspace /usr/local/share/kilo /opt/git/etc; sudo chown "$(id -u):$(id -g)" /workspace; test -w /workspace; sudo git lfs install --system --skip-repo',
+          VERCEL_BASE_SYSTEM_SETUP,
         ]);
         return this.next(state, { step: 'install_node_dependencies' });
       }
@@ -636,7 +637,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
         );
         await this.runCommand(state, client, builderSessionId, 'bash', [
           '-lc',
-          `set -euo pipefail; curl -fsSL https://bun.sh/install | bash -s bun-v${PINNED_BUN_VERSION}; sudo install -m 0755 "$HOME/.bun/bin/bun" /usr/local/bin/bun; sudo npm install -g @kilocode/cli@${PINNED_KILO_VERSION}; test "$(bun --version)" = ${JSON.stringify(PINNED_BUN_VERSION)}; case "$(node --version)" in v24.*) ;; *) exit 1 ;; esac; git --version >/dev/null; kilo --version >/dev/null`,
+          `${VERCEL_BASE_NODE_SETUP}; sudo npm install -g @kilocode/cli@${PINNED_KILO_VERSION}; test "$(bun --version)" = ${JSON.stringify(PINNED_BUN_VERSION)}; case "$(node --version)" in v24.*) ;; *) exit 1 ;; esac; git --version >/dev/null; kilo --version >/dev/null`,
         ]);
         return this.next(state, { step: 'upload_runtime_artifacts' });
       }

@@ -236,7 +236,7 @@ export function createVercelProviderAdapter(deps: {
           PROVIDER_INSTANCE_ID: ref,
           WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
         },
-        sudo: false,
+        sudo: command.user === 'root',
         wait: false,
       });
       return { startSource: 'image' };

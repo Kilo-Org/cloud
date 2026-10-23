@@ -25,6 +25,13 @@ export default defineConfig({
         configPath: './wrangler.test.jsonc',
       },
       miniflare: {
+        // Lifecycle fixtures own their startup mode. Do not inherit a local
+        // developer's downloaded release or runtime-free image selection.
+        bindings: {
+          RUNTIME_STARTUP_MODE: 'preinstalled',
+          RUNTIME_RELEASE_DESCRIPTOR: '',
+          NATIVE_RUNTIME_IMAGE: 'all-in-one',
+        },
         // Faster queue processing in tests
         queueConsumers: {
           EXECUTION_QUEUE: {

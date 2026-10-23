@@ -2,6 +2,8 @@ import { KILO_CLI_VERSION } from '../shared/kilo-cli-version.js';
 import { RUNTIME_DISTRIBUTION } from '../shared/runtime-distribution.js';
 import { WRAPPER_RELEASED_AT, WRAPPER_VERSION } from '../shared/wrapper-version.js';
 import { getVercelRuntimeArtifacts } from './vercel-runtime-artifacts.js';
+import { vercelRuntimeBaseDigest } from './vercel-runtime-base.js';
+import type { Env } from '../types.js';
 
 export const VERCEL_RUNTIME_BUN_VERSION = RUNTIME_DISTRIBUTION.bun;
 export const VERCEL_RUNTIME_KILO_CLI_VERSION = KILO_CLI_VERSION;
@@ -30,7 +32,16 @@ export function vercelRuntimeDigest(input: {
   ].join('|');
 }
 
-export async function getVercelRuntimeIdentity(): Promise<VercelRuntimeIdentity> {
+export async function getVercelRuntimeIdentity(
+  env: Pick<Env, 'RUNTIME_STARTUP_MODE'> = {}
+): Promise<VercelRuntimeIdentity> {
+  if (env.RUNTIME_STARTUP_MODE === 'downloaded') {
+    return {
+      wrapperVersion: 'downloaded-base-v1',
+      releasedAt: '2026-10-23',
+      digest: await vercelRuntimeBaseDigest(),
+    };
+  }
   const artifacts = await getVercelRuntimeArtifacts();
   const controlWrapper = artifacts.find(
     artifact => artifact.path === 'usr/local/bin/kilocode-control-plane-wrapper.js'

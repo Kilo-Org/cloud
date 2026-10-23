@@ -340,7 +340,7 @@ app.get('/internal/byoc/vercel-runtime-identity', async (c: Context<HonoContext>
   if (unauthorized) return unauthorized;
 
   try {
-    return c.json(await getVercelRuntimeIdentity(), 200, { 'Cache-Control': 'no-store' });
+    return c.json(await getVercelRuntimeIdentity(c.env), 200, { 'Cache-Control': 'no-store' });
   } catch {
     return c.text('Vercel runtime identity could not be resolved', 502);
   }

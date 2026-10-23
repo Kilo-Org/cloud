@@ -7,6 +7,18 @@ const userId = 'oauth/google/personal-owner';
 const credentialId = '22222222-2222-4222-8222-222222222222';
 
 describe('Vercel BYOC ownership', () => {
+  it('enrolls listed users and organizations through the same environment variable', () => {
+    const env = { BYOC_VERCEL_IDS: ` , ${userId}, ${orgId}, ` };
+    expect(enrolledByocVercelOwner(env, { userId })).toEqual({ userId });
+    expect(enrolledByocVercelOwner(env, { userId, orgId })).toEqual({ organizationId: orgId });
+    expect(enrolledByocVercelOwner(env, { userId: 'another-user' })).toBeUndefined();
+    expect(
+      enrolledByocVercelOwner(env, {
+        userId,
+        orgId: '33333333-3333-4333-8333-333333333333',
+      })
+    ).toBeUndefined();
+  });
   it('uses the organization owner whenever an organization is present', () => {
     expect(enrolledByocVercelOwner({ BYOC_VERCEL_IDS: userId }, { userId, orgId })).toBeUndefined();
     expect(enrolledByocVercelOwner({ BYOC_VERCEL_IDS: orgId }, { userId })).toBeUndefined();

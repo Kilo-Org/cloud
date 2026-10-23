@@ -244,7 +244,9 @@ test('building a module from source re-keys the native build', () => {
     JSON.stringify({
       name: 'kilo-app',
       dependencies: ['one'],
-      expo: { autolinking: { android: { buildFromSource: ['expo-notifications', 'expo-localization'] } } },
+      expo: {
+        autolinking: { android: { buildFromSource: ['expo-notifications', 'expo-localization'] } },
+      },
     })
   );
   assert.equal(hashRootNativeInputs(root), fromSource);

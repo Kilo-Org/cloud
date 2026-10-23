@@ -5,6 +5,7 @@ import {
 
 import { i18n } from '@/i18n';
 import { formatDate } from '@/lib/format';
+import { type SecurityAnalysisCapacityState } from '@/lib/security-analysis-capacity';
 import { firstNonEmpty } from '@/lib/utils';
 
 // Analysis-state copy keys, translated at render time. English wording must
@@ -65,6 +66,22 @@ type SecurityAnalysisDynamicText = {
   sandboxReasoning?: string | null;
   triageReasoning?: string | null;
 };
+
+/**
+ * Why an Analyze action cannot run right now, for the accessibility layer.
+ * `available` has no reason; `loading` reads as busy through the button state.
+ */
+export function getAnalysisCapacityBlockedHint(
+  state: SecurityAnalysisCapacityState
+): string | undefined {
+  if (state === 'full') {
+    return i18n.t('securityAgent.analysis.capacityFull');
+  }
+  if (state === 'error') {
+    return i18n.t('securityAgent.analysis.couldNotCheckCapacity');
+  }
+  return undefined;
+}
 
 export function getSecurityAnalysisLabel(state: SecurityFindingAnalysisState): string {
   return i18n.t(LABEL_KEYS[state]);

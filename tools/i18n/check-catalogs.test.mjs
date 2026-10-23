@@ -311,6 +311,119 @@ test('rejects unknown placeholders in a locale-specific plural category', contex
   );
 });
 
+/**
+ * A counted form may say its number in a word instead of the placeholder, but
+ * only where the allowlist names that key, category and locale: Arabic names
+ * one day and two days with their own word forms. Every other form of the same
+ * family still has to keep its count, so a deleted number stays visible.
+ */
+const WORDED_ENGLISH = {
+  securityAgent: {
+    dashboard: {
+      title: 'Dashboard',
+      daysOverdue_one: '{{displayCount}} day overdue',
+      daysOverdue_other: '{{displayCount}} days overdue',
+    },
+  },
+};
+const WORDED_SOURCE =
+  "t('securityAgent.dashboard.title');\nt('securityAgent.dashboard.daysOverdue', { count: 2 });";
+const WORDED_TRANSLATED = {
+  securityAgent: {
+    dashboard: {
+      title: 'لوحة المعلومات',
+      daysOverdue_zero: 'لا تأخير',
+      daysOverdue_one: 'متأخرة يومًا واحدًا',
+      daysOverdue_two: 'متأخرة يومين',
+      daysOverdue_few: 'متأخرة {{displayCount}} أيام',
+      daysOverdue_many: 'متأخرة {{displayCount}} يومًا',
+      daysOverdue_other: 'متأخرة {{displayCount}} يوم',
+    },
+  },
+};
+
+test('accepts the reviewed plural forms that say their count in a word', context => {
+  const result = runChecker(context, {
+    english: WORDED_ENGLISH,
+    translated: WORDED_TRANSLATED,
+    source: WORDED_SOURCE,
+    language: 'ar',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('rejects a dropped count in an unreviewed locale-only plural form', context => {
+  const result = runChecker(context, {
+    english: WORDED_ENGLISH,
+    translated: {
+      securityAgent: {
+        dashboard: {
+          ...WORDED_TRANSLATED.securityAgent.dashboard,
+          daysOverdue_few: 'متأخرة أيام',
+        },
+      },
+    },
+    source: WORDED_SOURCE,
+    language: 'ar',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ar: "securityAgent\.dashboard\.daysOverdue_few" drops \{\{displayCount\}\} without a reviewed worded form/
+  );
+});
+
+test('rejects a dropped count in a plural form the allowlist does not name', context => {
+  const result = runChecker(context, {
+    english: WORDED_ENGLISH,
+    translated: {
+      securityAgent: {
+        dashboard: {
+          ...WORDED_TRANSLATED.securityAgent.dashboard,
+          daysOverdue_other: 'متأخرة يوم',
+        },
+      },
+    },
+    source: WORDED_SOURCE,
+    language: 'ar',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ar: "securityAgent\.dashboard\.daysOverdue_other" placeholders differ from English \(displayCount\)/
+  );
+});
+
+test('rejects a plural sibling that drops a value other than its count', context => {
+  const result = runChecker(context, {
+    english: {
+      agents: {
+        title: 'Agents',
+        window: '{{displayCount}} days from {{start}}',
+        window_one: '{{displayCount}} day from {{start}}',
+        window_other: '{{displayCount}} days from {{start}}',
+      },
+    },
+    translated: {
+      agents: {
+        title: 'Localized agents',
+        window: '{{displayCount}} дней с {{start}}',
+        window_one: 'один день ({{displayCount}})',
+        window_few: '{{displayCount}} дня с {{start}}',
+        window_many: '{{displayCount}} дней с {{start}}',
+        window_other: '{{displayCount}} дней с {{start}}',
+      },
+    },
+    source: "t('agents.title');\nt('agents.window', { count: 2 });",
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ru: "agents\.window_one" placeholders differ from English \(displayCount,start\)/
+  );
+});
+
 const COUNTED = {
   counts: {
     items: '{{count}} items',

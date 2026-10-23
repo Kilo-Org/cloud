@@ -60,6 +60,9 @@ vi.mock('@/components/organization/invited-member-row-state', () => ({
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/input', () => ({ Input: 'Input' }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
+// The real clearance reads the tab bar and the keyboard, neither of which this
+// suite models: the sheet still renders its body as the ScrollView host.
+vi.mock('@/components/tab-screen', () => ({ SheetScrollView: 'ScrollView' }));
 // The sheet's own dirty check: what Cancel and Back would ask about.
 const guard = vi.hoisted(() => ({ isDirty: (): boolean => false }));
 vi.mock('@/components/ui/use-sheet-dismiss-guard', () => ({

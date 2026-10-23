@@ -22,6 +22,7 @@ import {
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
+import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { waitFor } from './wait-for.js';
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
@@ -118,6 +119,7 @@ async function injectProvider(
       KILO_OPENROUTER_BASE: 'https://control.test',
       KILO_SESSION_INGEST_URL: 'https://control.test',
     });
+    installFakeRuntimeProxyPeer(instance);
     Object.assign(instance, {
       createProviderAdapter: () => provider.adapter,
       provider: provider.adapter,
@@ -305,6 +307,7 @@ async function markRouteReady(
   wrapper: FakeWrapper,
   sessionId: string
 ): Promise<void> {
+  expect(await awaitFrame(wrapper, 'session.prepare')).toMatchObject({ spec: { sessionId } });
   wrapper.send({ type: 'session.ready', sessionId });
   await waitFor(async () => {
     const snapshot = await sessionStub.getSession();

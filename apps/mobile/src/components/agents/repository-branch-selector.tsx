@@ -11,6 +11,7 @@ import {
   getNewSessionBranchState,
   type NewSessionRepository,
   repositoryIdentityKey,
+  resolveBranchSectionState,
   setSelectedBranchOverride,
   subscribeNewSessionBranchState,
 } from '@/components/agents/new-session-repository-state';
@@ -74,75 +75,97 @@ export function RepositoryBranchSelector({
 
   const override = branchState.overrides.get(repositoryIdentityKey(repository)) ?? null;
   const selectedBranch = override ?? branches.defaultBranch;
+  // One discriminant drives the row: exactly one of these nodes renders.
+  const section = resolveBranchSectionState({
+    platform: repository.platform,
+    isEnabled: branches.isEnabled,
+    isLoading: branches.isLoading,
+    isPermanentError: branches.isPermanentError,
+    isRetryableError: branches.isRetryableError,
+    isRetrying: branches.isRetrying,
+    branches: branches.branches,
+    defaultBranch: branches.defaultBranch,
+    truncated: branches.truncated,
+  });
 
   return (
     <View className="mt-3">
       <Text className="mb-2 text-sm font-medium text-muted-foreground">{t('common.branch')}</Text>
-      {renderBody()}
+      {/*
+        Each state is its own native view. React would otherwise recycle the
+        loading wrapper — the only one that carries an accessibility label —
+        into the next state's row and keep the stale "Loading branches"
+        description on it, so assistive tech announced loading together with the
+        error (or the list) underneath. The key makes every state a fresh view.
+      */}
+      <View key={section.kind}>{renderBody()}</View>
     </View>
   );
 
   function renderBody() {
-    if (!repository) {
-      return null;
-    }
-    // Bitbucket is organization-only. A personal Bitbucket row never queries
-    // branches, and a retry could not change that — say so instead of
-    // offering one.
-    if (!branches.isEnabled && repository.platform === 'bitbucket') {
-      return renderNote(t('agentChat.newSession.bitbucketOrganizationsOnly'));
-    }
-    if (branches.isLoading || !branches.isEnabled) {
-      return (
-        <View accessible accessibilityLabel={t('agentChat.newSession.branchLoading')}>
-          <Skeleton className={cn(ROW_HEIGHT, 'w-full')} />
-        </View>
-      );
-    }
-    // A refusal a retry cannot fix (no access, repository gone): explain it,
-    // and leave the repository selected on its provider default.
-    if (branches.isPermanentError) {
-      return renderNote(t('agentChat.newSession.branchUnavailable'));
-    }
-    if (branches.isRetryableError) {
-      return (
-        <View
-          className={cn(
-            ROW_HEIGHT,
-            'flex-row items-center justify-between gap-2 rounded-lg border border-border bg-card px-3'
-          )}
-        >
-          <Text className="flex-1 text-sm text-muted-foreground" numberOfLines={2}>
-            {t('agentChat.newSession.branchLoadError')}
-          </Text>
-          <Button
-            variant="outline"
-            size="sm"
-            onPress={handleRetry}
-            disabled={branches.isRetrying}
-            loading={branches.isRetrying}
+    switch (section.kind) {
+      case 'bitbucket-organizations-only': {
+        // A retry could not fix it, and the row never queried: say so instead
+        // of offering one.
+        return renderNote(t('agentChat.newSession.bitbucketOrganizationsOnly'));
+      }
+      case 'loading': {
+        return (
+          <View accessible accessibilityLabel={t('agentChat.newSession.branchLoading')}>
+            <Skeleton className={cn(ROW_HEIGHT, 'w-full')} />
+          </View>
+        );
+      }
+      case 'unavailable': {
+        // A refusal a retry cannot fix (no access, repository gone): explain it,
+        // and leave the repository selected on its provider default.
+        return renderNote(t('agentChat.newSession.branchUnavailable'));
+      }
+      case 'retryable': {
+        return (
+          <View
+            className={cn(
+              ROW_HEIGHT,
+              'flex-row items-center justify-between gap-2 rounded-lg border border-border bg-card px-3'
+            )}
           >
-            <Text>{t('common.retry')}</Text>
-          </Button>
-        </View>
-      );
+            <Text className="flex-1 text-sm text-muted-foreground" numberOfLines={2}>
+              {t('agentChat.newSession.branchLoadError')}
+            </Text>
+            <Button
+              variant="outline"
+              size="sm"
+              onPress={handleRetry}
+              disabled={section.isRetrying}
+              loading={section.isRetrying}
+            >
+              <Text>{t('common.retry')}</Text>
+            </Button>
+          </View>
+        );
+      }
+      case 'empty': {
+        // The repository stays selected and the session starts on whatever the
+        // provider checks out — there is no override to offer.
+        return renderNote(t('agentChat.newSession.branchEmpty'));
+      }
+      case 'list': {
+        return (
+          <>
+            {renderTrigger()}
+            {/* The provider holds branches this list cannot include: say so here,
+                before the sheet is opened, rather than presenting a partial list
+                as the repository's whole set. */}
+            {section.truncated ? (
+              <View className="mt-2">{renderNote(t('agentChat.newSession.branchListIncomplete'))}</View>
+            ) : null}
+          </>
+        );
+      }
+      default: {
+        return null;
+      }
     }
-    // Empty: the repository stays selected and the session starts on whatever
-    // the provider checks out — there is no override to offer.
-    if (branches.branches.length === 0) {
-      return renderNote(t('agentChat.newSession.branchEmpty'));
-    }
-    return (
-      <>
-        {renderTrigger()}
-        {/* The provider holds branches this list cannot include: say so here,
-            before the sheet is opened, rather than presenting a partial list
-            as the repository's whole set. */}
-        {branches.truncated ? (
-          <View className="mt-2">{renderNote(t('agentChat.newSession.branchListIncomplete'))}</View>
-        ) : null}
-      </>
-    );
   }
 
   function renderNote(message: string) {

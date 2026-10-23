@@ -16,6 +16,16 @@ const ORGANIZATION_ACCESS_MESSAGE = 'You do not have access to this organization
 const MODEL_UNAVAILABLE_MESSAGE = 'Selected model is not available for this cloud agent session';
 
 /**
+ * The runtime's repository preflight refusal: the caller selected a GitHub
+ * repository the connected installation cannot reach, so no session can be
+ * created for it. Only the reasons a different repository (or a fixed
+ * installation) can resolve are matched; a credential-service failure keeps the
+ * generic, retryable line.
+ */
+const REPOSITORY_AUTHORIZATION_REFUSAL_MESSAGE =
+  /^GitHub repository authorization failed \((?:integration_mismatch|no_installation_found|repository_not_installed)\)$/;
+
+/**
  * The localized failure copy for a rejected cloud prepare. Only failures the
  * message names precisely, plus the missing-selection code, get actionable
  * copy; every other rejection — an unclassified server detail, an unknown
@@ -31,6 +41,11 @@ export function cloudPrepareFailureMessage(error: unknown): string {
   }
   if (message === MODEL_UNAVAILABLE_MESSAGE) {
     return i18n.t('agentChat.session.modelUnavailable');
+  }
+  if (message !== undefined && REPOSITORY_AUTHORIZATION_REFUSAL_MESSAGE.test(message)) {
+    // The same guidance the branch row gives for the same refusal: check the
+    // provider access, then pick another repository.
+    return i18n.t('agentChat.newSession.branchUnavailable');
   }
   if (readTrpcErrorField(error, 'code') === 'NOT_FOUND') {
     return i18n.t('queryError.notFoundDescription');

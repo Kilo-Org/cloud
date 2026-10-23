@@ -332,3 +332,70 @@ export function resetSelectedBranchOverrides(): void {
   }
   publishBranchSnapshot({ ...branchSnapshot, overrides: EMPTY_OVERRIDES });
 }
+
+/**
+ * The one state the branch row shows, as a single discriminant. The row renders
+ * from this value alone, so "loading" and a message can never be on screen
+ * together: there is no second node to keep in sync, and no flag combination
+ * that renders two of them.
+ */
+export type BranchSectionState =
+  /** Bitbucket is organization-only: a personal row never queries branches. */
+  | { kind: 'bitbucket-organizations-only' }
+  /** The request is still in flight (bounded by the hook's settle bound). */
+  | { kind: 'loading' }
+  /** A refusal a retry cannot fix (no access, repository gone). */
+  | { kind: 'unavailable' }
+  /** A transient failure, or a request that outlived the settle bound. */
+  | { kind: 'retryable'; isRetrying: boolean }
+  /** The provider listed no branches. */
+  | { kind: 'empty' }
+  /** The provider's branches, with the default the create checks out. */
+  | {
+      kind: 'list';
+      branches: readonly string[];
+      defaultBranch: string | null;
+      truncated: boolean;
+    };
+
+export type BranchSectionInput = {
+  platform: RepositoryPlatform;
+  isEnabled: boolean;
+  isLoading: boolean;
+  isPermanentError: boolean;
+  isRetryableError: boolean;
+  isRetrying: boolean;
+  branches: readonly string[];
+  defaultBranch: string | null;
+  truncated: boolean;
+};
+
+/**
+ * Resolve the branch row's single state. The order is the priority: a provider
+ * that cannot be queried at all is explained before any request state, a
+ * running request beats a stale result, and a refusal beats an empty list.
+ */
+export function resolveBranchSectionState(input: BranchSectionInput): BranchSectionState {
+  if (!input.isEnabled && input.platform === 'bitbucket') {
+    return { kind: 'bitbucket-organizations-only' };
+  }
+  if (input.isLoading || !input.isEnabled) {
+    return { kind: 'loading' };
+  }
+  if (input.isPermanentError) {
+    return { kind: 'unavailable' };
+  }
+  if (input.isRetryableError) {
+    return { kind: 'retryable', isRetrying: input.isRetrying };
+  }
+  if (input.branches.length === 0) {
+    return { kind: 'empty' };
+  }
+  return {
+    kind: 'list',
+    branches: input.branches,
+    defaultBranch: input.defaultBranch,
+    truncated: input.truncated,
+  };
+}
+

@@ -53,6 +53,34 @@ describe('cloudPrepareFailureMessage', () => {
     );
   });
 
+  it.each(['integration_mismatch', 'no_installation_found', 'repository_not_installed'] as const)(
+    'maps the %s repository refusal to the actionable repository copy',
+    reason => {
+      // The runtime refuses a repository the selected installation cannot
+      // reach before it allocates anything; the copy is the same guidance the
+      // branch row gives for the same refusal.
+      const refusal = makeError(
+        'BAD_REQUEST',
+        `GitHub repository authorization failed (${reason})`
+      );
+      expect(cloudPrepareFailureMessage(refusal)).toBe(
+        "Branches aren't available for this repository. Check your access with the provider, then pick another repository."
+      );
+    }
+  );
+
+  it('keeps the generic copy for a credential-service failure worded the same way', () => {
+    // The same message prefix also covers a temporarily unavailable credential
+    // service, which retrying does fix.
+    const service = makeError(
+      'SERVICE_UNAVAILABLE',
+      'GitHub repository authorization failed (rpc_error)'
+    );
+    expect(cloudPrepareFailureMessage(service)).toBe(
+      'Something went wrong on our end. Please try again.'
+    );
+  });
+
   it('maps PAYMENT_REQUIRED to the credits copy', () => {
     expect(cloudPrepareFailureMessage(makeError('PAYMENT_REQUIRED', 'add credits'))).toBe(
       'Not enough credits to run Cloud Agent. Add credits and try again.'

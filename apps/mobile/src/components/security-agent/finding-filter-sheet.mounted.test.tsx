@@ -211,4 +211,18 @@ describe('Security Agent findings filter sheet', () => {
     });
     expect(mocks.retry).toHaveBeenCalledTimes(1);
   });
+
+  it('leaves the sheet from a render failure without applying anything', async () => {
+    const result = await renderWithProviders(
+      <ErrorBoundary error={new Error('boom')} retry={mocks.retry} />
+    );
+    mounted = result;
+    const goBack = result.renderer.root.findByType('Button').props as { onPress: () => void };
+    await act(async () => {
+      goBack.onPress();
+      await Promise.resolve();
+    });
+    expect(mocks.back).toHaveBeenCalledTimes(1);
+    expect(mocks.dismissTo).not.toHaveBeenCalled();
+  });
 });

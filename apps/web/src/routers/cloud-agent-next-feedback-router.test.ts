@@ -40,7 +40,7 @@ describe('Cloud Agent feedback Slack notification', () => {
   });
 
   it.each([
-    ['ses_35fc6b339ffeaf91IozzdnLtJ7', 'ses_35fc6b339ffeaf91IozzdnLtJ7'],
+    ['ses_00000000000000000000000001', 'ses_00000000000000000000000001'],
     [undefined, 'unknown'],
   ])('renders session %s and feedback only as plain text', async (sessionId, expectedSession) => {
     const feedback = '``` <https://attacker.invalid|admin> <!channel> :smile:';
@@ -99,7 +99,7 @@ describe('Cloud Agent feedback Slack notification', () => {
     async sessionType => {
       await expect(
         caller.create({
-          kilo_session_id: 'ses_35fc6b339ffeaf91IozzdnLtJ7',
+          kilo_session_id: 'ses_00000000000000000000000001',
           session_type: sessionType,
           feedback_text: 'feedback',
         })

@@ -224,7 +224,7 @@
     "hideBalance": "Skjul saldo",
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
-    "bonusCreditsExpiring": "{{amount}} i bonuskreditter udløber {{date}}.",
+    "bonusCreditsExpiring": "{{amount}} i kreditter udløber {{date}}.",
     "signOutTitle": "Log ud?",
     "signOutMessage": "Du skal logge ind igen for at få adgang til dit arbejdsområde.",
     "deleteAccountTitle": "Slet konto?",
@@ -2241,6 +2241,7 @@
       "branchLoadError": "Grene kunne ikke indlæses",
       "branchUnavailable": "For dette kodelager er der ingen tilgængelige grene. Tjek din adgang hos udbyderen, og vælg et andet kodelager.",
       "branchEmpty": "Ingen tilgængelige grene",
+      "branchListIncomplete": "Der vises kun nogle grene. Kodelageret har flere grene, end denne liste kan indeholde.",
       "branchPlaceholder": "Vælg en gren",
       "runOnWithTarget": "Kør på: {{target}}",
       "environment": "Miljø",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "{{count}} værktøj",
       "serverToolCount_other": "{{count}} værktøjer",
       "serverUnreachable": "Kunne ikke nå denne server",
-      "serverOff": "Denne server er slået fra"
+      "serverOff": "Denne server er slået fra",
+      "app": {
+        "label": "Værktøjsgrænseflade",
+        "failed": "Grænsefladen til dette værktøj kunne ikke indlæses.",
+        "empty": "Grænsefladen til dette værktøj har intet at vise."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Godkendelse",

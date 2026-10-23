@@ -224,7 +224,7 @@
     "hideBalance": "Skryť zostatok",
     "showBalance": "Zobraziť zostatok",
     "balanceHidden": "Zostatok je skrytý",
-    "bonusCreditsExpiring": "Platnosť bonusových kreditov v hodnote {{amount}} sa skončí {{date}}.",
+    "bonusCreditsExpiring": "Platnosť kreditov v hodnote {{amount}} sa skončí {{date}}.",
     "signOutTitle": "Odhlásiť sa?",
     "signOutMessage": "Na prístup do svojho pracovného priestoru sa budeš musieť znova prihlásiť.",
     "deleteAccountTitle": "Odstrániť účet?",
@@ -2297,6 +2297,7 @@
       "branchLoadError": "Vetvy sa nepodarilo načítať",
       "branchUnavailable": "Pre tento repozitár nie sú vetvy dostupné. Skontroluj svoj prístup u poskytovateľa a vyber iný repozitár.",
       "branchEmpty": "Žiadne dostupné vetvy",
+      "branchListIncomplete": "Zobrazujú sa len niektoré vetvy. Repozitár má viac vetiev, než dokáže tento zoznam zahrnúť.",
       "branchPlaceholder": "Vybrať vetvu",
       "runOnWithTarget": "Spustiť na: {{target}}",
       "environment": "Prostredie",
@@ -3470,7 +3471,12 @@
       "serverToolCount_one": "{{count}} nástroj",
       "serverToolCount_other": "{{count}} nástrojov",
       "serverUnreachable": "Nepodarilo sa pripojiť k tomuto serveru",
-      "serverOff": "Tento server je vypnutý"
+      "serverOff": "Tento server je vypnutý",
+      "app": {
+        "label": "Rozhranie nástroja",
+        "failed": "Rozhranie tohto nástroja sa nepodarilo načítať.",
+        "empty": "Rozhranie tohto nástroja nemá čo zobraziť."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Overenie",

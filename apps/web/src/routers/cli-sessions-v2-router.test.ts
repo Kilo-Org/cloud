@@ -3860,6 +3860,39 @@ describe('cli-sessions-v2-router', () => {
     });
   });
 
+  describe('share size result', () => {
+    const sessionId = 'ses_share_oversized_info_0001';
+
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values({
+        session_id: sessionId,
+        kilo_user_id: regularUser.id,
+        title: 'Large session',
+      });
+    });
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    });
+
+    it('returns PAYLOAD_TOO_LARGE with the size message from an HTTP 413', async () => {
+      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ success: false, error: 'share_snapshot_too_large' }), {
+          status: 413,
+        })
+      );
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        await expect(caller.cliSessionsV2.share({ session_id: sessionId })).rejects.toMatchObject({
+          code: 'PAYLOAD_TOO_LARGE',
+          message: 'Session details are too large to share. Existing links are unchanged.',
+        });
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+  });
+
   describe('unshare', () => {
     const sessionId = 'ses_unshare_owner_only_0001';
 

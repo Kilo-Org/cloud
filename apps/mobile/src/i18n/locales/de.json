@@ -224,7 +224,7 @@
     "hideBalance": "Guthaben ausblenden",
     "showBalance": "Guthaben anzeigen",
     "balanceHidden": "Guthaben ausgeblendet",
-    "bonusCreditsExpiring": "Dein Bonusguthaben von {{amount}} verfällt am {{date}}.",
+    "bonusCreditsExpiring": "Dein Guthaben von {{amount}} verfällt am {{date}}.",
     "signOutTitle": "Abmelden?",
     "signOutMessage": "Du musst dich erneut anmelden, um auf deinen Arbeitsbereich zuzugreifen.",
     "deleteAccountTitle": "Konto löschen?",
@@ -1724,6 +1724,7 @@
       "branchLoadError": "Branches konnten nicht geladen werden",
       "branchUnavailable": "Für dieses Repository sind keine Branches verfügbar. Prüfe deinen Zugriff beim Anbieter und wähle dann ein anderes Repository.",
       "branchEmpty": "Keine Branches verfügbar",
+      "branchListIncomplete": "Es werden nur einige Branches angezeigt. Dieses Repository hat mehr Branches, als diese Liste enthalten kann.",
       "branchPlaceholder": "Branch auswählen",
       "runOnWithTarget": "Ausführen auf: {{target}}",
       "environment": "Umgebung",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "{{count}} Tool",
       "serverToolCount_other": "{{count}} Tools",
       "serverUnreachable": "Dieser Server konnte nicht erreicht werden",
-      "serverOff": "Dieser Server ist ausgeschaltet"
+      "serverOff": "Dieser Server ist ausgeschaltet",
+      "app": {
+        "label": "Tool-Oberfläche",
+        "failed": "Die Oberfläche dieses Tools konnte nicht geladen werden.",
+        "empty": "Die Oberfläche dieses Tools hat nichts anzuzeigen."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Authentifizierung",

@@ -2572,7 +2572,10 @@
       "allowOnceAccessibility": "တစ်ကြိမ်သာ ခွင့်ပြုပါ",
       "alwaysAllow": "အမြဲ ခွင့်ပြုပါ",
       "alwaysAllowAccessibility": "အမြဲ ခွင့်ပြုပါ",
-      "retrying": "ထပ်ကြိုးစားနေသည်…"
+      "retrying": "ထပ်ကြိုးစားနေသည်…",
+      "retryDeny": "ငြင်းပယ်ရန် ထပ်ကြိုးစားပါ",
+      "retryAllowOnce": "တစ်ကြိမ်သာ ခွင့်ပြုရန် ထပ်ကြိုးစားပါ",
+      "retryAlwaysAllow": "အမြဲ ခွင့်ပြုရန် ထပ်ကြိုးစားပါ"
     },
     "questionCard": {
       "title": "အေးဂျင့်က အဖြေလိုအပ်နေသည်",

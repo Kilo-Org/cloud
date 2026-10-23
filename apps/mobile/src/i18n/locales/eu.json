@@ -2572,7 +2572,10 @@
       "allowOnceAccessibility": "Baimendu behin bakarrik",
       "alwaysAllow": "Baimendu beti",
       "alwaysAllowAccessibility": "Baimendu beti",
-      "retrying": "Berriro saiatzen…"
+      "retrying": "Berriro saiatzen…",
+      "retryDeny": "Saiatu berriro ukatzen",
+      "retryAllowOnce": "Saiatu berriro behin bakarrik baimetzen",
+      "retryAlwaysAllow": "Saiatu berriro beti baimetzen"
     },
     "questionCard": {
       "title": "Agenteak zure erantzuna behar du",

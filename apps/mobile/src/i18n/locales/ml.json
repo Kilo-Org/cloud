@@ -2572,7 +2572,10 @@
       "allowOnceAccessibility": "ഈ തവണ അനുവദിക്കുക",
       "alwaysAllow": "എപ്പോഴും അനുവദിക്കുക",
       "alwaysAllowAccessibility": "എപ്പോഴും അനുവദിക്കുക",
-      "retrying": "വീണ്ടും ശ്രമിക്കുന്നു…"
+      "retrying": "വീണ്ടും ശ്രമിക്കുന്നു…",
+      "retryDeny": "നിഷേധിക്കാൻ വീണ്ടും ശ്രമിക്കുക",
+      "retryAllowOnce": "ഈ തവണ അനുവദിക്കാൻ വീണ്ടും ശ്രമിക്കുക",
+      "retryAlwaysAllow": "എപ്പോഴും അനുവദിക്കാൻ വീണ്ടും ശ്രമിക്കുക"
     },
     "questionCard": {
       "title": "ഏജന്റിന് മറുപടി ആവശ്യമാണ്",

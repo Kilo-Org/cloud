@@ -2608,7 +2608,10 @@
       "allowOnceAccessibility": "Permitir uma vez",
       "alwaysAllow": "Permitir sempre",
       "alwaysAllowAccessibility": "Permitir sempre",
-      "retrying": "A tentar novamente…"
+      "retrying": "A tentar novamente…",
+      "retryDeny": "Tentar negar novamente",
+      "retryAllowOnce": "Tentar permitir uma vez novamente",
+      "retryAlwaysAllow": "Tentar permitir sempre novamente"
     },
     "questionCard": {
       "title": "Resposta necessária",

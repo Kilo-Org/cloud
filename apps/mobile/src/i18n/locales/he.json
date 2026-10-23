@@ -2065,7 +2065,10 @@
       "allowOnceAccessibility": "הרשאה חד-פעמית",
       "alwaysAllow": "הרשאה קבועה",
       "alwaysAllowAccessibility": "הרשאה קבועה",
-      "retrying": "מנסה שוב…"
+      "retrying": "מנסה שוב…",
+      "retryDeny": "ניסיון דחייה נוסף",
+      "retryAllowOnce": "ניסיון הרשאה חד-פעמית נוסף",
+      "retryAlwaysAllow": "ניסיון הרשאה קבועה נוסף"
     },
     "questionCard": {
       "title": "הסוכן ממתין לתשובה",

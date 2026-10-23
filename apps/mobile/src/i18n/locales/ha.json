@@ -2572,7 +2572,10 @@
       "allowOnceAccessibility": "Ba da izini sau ɗaya",
       "alwaysAllow": "Ba da izini koyaushe",
       "alwaysAllowAccessibility": "Ba da izini koyaushe",
-      "retrying": "Ana sake gwadawa…"
+      "retrying": "Ana sake gwadawa…",
+      "retryDeny": "Sake gwada ƙi",
+      "retryAllowOnce": "Sake gwada ba da izini sau ɗaya",
+      "retryAlwaysAllow": "Sake gwada ba da izini koyaushe"
     },
     "questionCard": {
       "title": "Wakili yana buƙatar bayani",

@@ -2572,7 +2572,10 @@
       "allowOnceAccessibility": "Pèmèt yon sèl fwa",
       "alwaysAllow": "Toujou pèmèt",
       "alwaysAllowAccessibility": "Toujou pèmèt",
-      "retrying": "Ap eseye ankò…"
+      "retrying": "Ap eseye ankò…",
+      "retryDeny": "Eseye refize ankò",
+      "retryAllowOnce": "Eseye pèmèt yon sèl fwa ankò",
+      "retryAlwaysAllow": "Eseye toujou pèmèt ankò"
     },
     "questionCard": {
       "title": "Ajan an bezwen yon repons",

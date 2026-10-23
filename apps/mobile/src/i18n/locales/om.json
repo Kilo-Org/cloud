@@ -2572,7 +2572,10 @@
       "allowOnceAccessibility": "Al tokko hayyami",
       "alwaysAllow": "Yeroo hunda hayyami",
       "alwaysAllowAccessibility": "Yeroo hunda hayyami",
-      "retrying": "Deebi'ee yaalaa jira…"
+      "retrying": "Deebi'ee yaalaa jira…",
+      "retryDeny": "Diduuf deebi'ii yaali",
+      "retryAllowOnce": "Al tokko hayyamuuf deebi'ii yaali",
+      "retryAlwaysAllow": "Yeroo hunda hayyamuuf deebi'ii yaali"
     },
     "questionCard": {
       "title": "Ergamaan deebii barbaada",

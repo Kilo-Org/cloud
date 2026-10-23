@@ -2572,7 +2572,10 @@
       "allowOnceAccessibility": "อนุญาตเฉพาะครั้งนี้",
       "alwaysAllow": "อนุญาตเสมอ",
       "alwaysAllowAccessibility": "อนุญาตเสมอ",
-      "retrying": "กำลังลองอีกครั้ง…"
+      "retrying": "กำลังลองอีกครั้ง…",
+      "retryDeny": "ลองปฏิเสธอีกครั้ง",
+      "retryAllowOnce": "ลองอนุญาตเฉพาะครั้งนี้อีกครั้ง",
+      "retryAlwaysAllow": "ลองอนุญาตเสมออีกครั้ง"
     },
     "questionCard": {
       "title": "เอเจนต์ต้องการข้อมูลเพิ่มเติม",

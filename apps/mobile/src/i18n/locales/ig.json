@@ -2572,7 +2572,10 @@
       "allowOnceAccessibility": "Kwe naanị otu ugboro",
       "alwaysAllow": "Kwe mgbe niile",
       "alwaysAllowAccessibility": "Kwe mgbe niile",
-      "retrying": "Na-anwa ọzọ…"
+      "retrying": "Na-anwa ọzọ…",
+      "retryDeny": "Nwaa ịjụ ọzọ",
+      "retryAllowOnce": "Nwaa ikwe naanị otu ugboro ọzọ",
+      "retryAlwaysAllow": "Nwaa ikwe mgbe niile ọzọ"
     },
     "questionCard": {
       "title": "Onye nnọchi anya chọrọ azịza",

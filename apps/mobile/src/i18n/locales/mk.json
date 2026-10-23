@@ -2572,7 +2572,10 @@
       "allowOnceAccessibility": "Дозволи еднаш",
       "alwaysAllow": "Секогаш дозволи",
       "alwaysAllowAccessibility": "Секогаш дозволи",
-      "retrying": "Повторен обид…"
+      "retrying": "Повторен обид…",
+      "retryDeny": "Повтори го одбивањето",
+      "retryAllowOnce": "Повтори го дозволувањето еднаш",
+      "retryAlwaysAllow": "Повтори го дозволувањето секогаш"
     },
     "questionCard": {
       "title": "Агентот чека одговор",

@@ -2644,7 +2644,10 @@
       "allowOnceAccessibility": "Leisti vieną kartą",
       "alwaysAllow": "Visada leisti",
       "alwaysAllowAccessibility": "Visada leisti",
-      "retrying": "Bandoma iš naujo…"
+      "retrying": "Bandoma iš naujo…",
+      "retryDeny": "Bandyti neleisti iš naujo",
+      "retryAllowOnce": "Bandyti leisti vieną kartą iš naujo",
+      "retryAlwaysAllow": "Bandyti visada leisti iš naujo"
     },
     "questionCard": {
       "title": "Agentui reikia atsakymo",

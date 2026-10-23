@@ -2048,7 +2048,10 @@
       "allowOnceAccessibility": "仅允许一次",
       "alwaysAllow": "始终允许",
       "alwaysAllowAccessibility": "始终允许",
-      "retrying": "正在重试……"
+      "retrying": "正在重试……",
+      "retryDeny": "再次尝试拒绝",
+      "retryAllowOnce": "再次尝试仅允许一次",
+      "retryAlwaysAllow": "再次尝试始终允许"
     },
     "questionCard": {
       "title": "智能体需要你的输入",

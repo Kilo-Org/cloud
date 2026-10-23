@@ -2021,7 +2021,10 @@
       "allowOnceAccessibility": "एक बार अनुमति दें",
       "alwaysAllow": "हमेशा अनुमति दें",
       "alwaysAllowAccessibility": "हमेशा अनुमति दें",
-      "retrying": "फिर से कोशिश हो रही है…"
+      "retrying": "फिर से कोशिश हो रही है…",
+      "retryDeny": "अस्वीकार करने की फिर से कोशिश करें",
+      "retryAllowOnce": "एक बार अनुमति देने की फिर से कोशिश करें",
+      "retryAlwaysAllow": "हमेशा अनुमति देने की फिर से कोशिश करें"
     },
     "questionCard": {
       "title": "एजेंट को आपका उत्तर चाहिए",

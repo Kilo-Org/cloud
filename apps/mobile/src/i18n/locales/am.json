@@ -2572,7 +2572,10 @@
       "allowOnceAccessibility": "አንድ ጊዜ ፍቀድ",
       "alwaysAllow": "ሁልጊዜ ፍቀድ",
       "alwaysAllowAccessibility": "ሁልጊዜ ፍቀድ",
-      "retrying": "እንደገና በመሞከር ላይ…"
+      "retrying": "እንደገና በመሞከር ላይ…",
+      "retryDeny": "ላለመፍቀድ እንደገና ይሞክሩ",
+      "retryAllowOnce": "አንድ ጊዜ ለመፍቀድ እንደገና ይሞክሩ",
+      "retryAlwaysAllow": "ሁልጊዜ ለመፍቀድ እንደገና ይሞክሩ"
     },
     "questionCard": {
       "title": "ወኪሉ መልስ ይፈልጋል",

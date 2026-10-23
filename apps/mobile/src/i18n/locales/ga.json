@@ -2680,7 +2680,10 @@
       "allowOnceAccessibility": "Ceadaigh uair amháin",
       "alwaysAllow": "Ceadaigh i gcónaí",
       "alwaysAllowAccessibility": "Ceadaigh i gcónaí",
-      "retrying": "Ag triail arís…"
+      "retrying": "Ag triail arís…",
+      "retryDeny": "Bain triail eile as diúltú",
+      "retryAllowOnce": "Bain triail eile as ceadú uair amháin",
+      "retryAlwaysAllow": "Bain triail eile as ceadú i gcónaí"
     },
     "questionCard": {
       "title": "Tá ionchur ag teastáil ón ngníomhaire",

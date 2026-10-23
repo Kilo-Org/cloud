@@ -2572,7 +2572,10 @@
       "allowOnceAccessibility": "Разреши веднъж",
       "alwaysAllow": "Винаги разрешавай",
       "alwaysAllowAccessibility": "Винаги разрешавай",
-      "retrying": "Повторен опит…"
+      "retrying": "Повторен опит…",
+      "retryDeny": "Опитай да откажеш отново",
+      "retryAllowOnce": "Опитай да разрешиш веднъж отново",
+      "retryAlwaysAllow": "Опитай да разрешаваш винаги отново"
     },
     "questionCard": {
       "title": "Агентът очаква отговор",

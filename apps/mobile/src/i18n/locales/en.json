@@ -2685,7 +2685,10 @@
       "allowOnceAccessibility": "Allow once",
       "alwaysAllow": "Always Allow",
       "alwaysAllowAccessibility": "Always allow",
-      "retrying": "Retrying…"
+      "retrying": "Retrying…",
+      "retryDeny": "Retry deny",
+      "retryAllowOnce": "Retry allow once",
+      "retryAlwaysAllow": "Retry always allow"
     },
     "questionCard": {
       "title": "Agent needs input",

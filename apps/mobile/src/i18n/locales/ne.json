@@ -2572,7 +2572,10 @@
       "allowOnceAccessibility": "एक पटक अनुमति दिनुहोस्",
       "alwaysAllow": "सधैँ अनुमति दिनुहोस्",
       "alwaysAllowAccessibility": "सधैँ अनुमति दिनुहोस्",
-      "retrying": "पुनः प्रयास गर्दै…"
+      "retrying": "पुनः प्रयास गर्दै…",
+      "retryDeny": "अस्वीकार गर्न पुनः प्रयास गर्नुहोस्",
+      "retryAllowOnce": "एक पटक अनुमति दिन पुनः प्रयास गर्नुहोस्",
+      "retryAlwaysAllow": "सधैँ अनुमति दिन पुनः प्रयास गर्नुहोस्"
     },
     "questionCard": {
       "title": "एजेन्टलाई उत्तर चाहिएको छ",

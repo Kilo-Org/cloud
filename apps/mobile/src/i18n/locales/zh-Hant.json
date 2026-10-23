@@ -2048,7 +2048,10 @@
       "allowOnceAccessibility": "僅允許這次",
       "alwaysAllow": "一律允許",
       "alwaysAllowAccessibility": "一律允許",
-      "retrying": "重試中…"
+      "retrying": "重試中…",
+      "retryDeny": "再次嘗試拒絕",
+      "retryAllowOnce": "再次嘗試僅允許這次",
+      "retryAlwaysAllow": "再次嘗試一律允許"
     },
     "questionCard": {
       "title": "智慧代理需要你的回覆",

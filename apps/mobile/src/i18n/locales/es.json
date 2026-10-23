@@ -2065,7 +2065,10 @@
       "allowOnceAccessibility": "Permitir una vez",
       "alwaysAllow": "Permitir siempre",
       "alwaysAllowAccessibility": "Permitir siempre",
-      "retrying": "Reintentando…"
+      "retrying": "Reintentando…",
+      "retryDeny": "Volver a intentar denegar",
+      "retryAllowOnce": "Volver a intentar permitir una vez",
+      "retryAlwaysAllow": "Volver a intentar permitir siempre"
     },
     "questionCard": {
       "title": "El agente necesita una respuesta",

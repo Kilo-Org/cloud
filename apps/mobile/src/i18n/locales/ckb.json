@@ -2572,7 +2572,10 @@
       "allowOnceAccessibility": "ڕێگەپێدان بۆ یەک جار",
       "alwaysAllow": "ڕێگەپێدانی هەمیشەیی",
       "alwaysAllowAccessibility": "ڕێگەپێدانی هەمیشەیی",
-      "retrying": "دووبارە هەوڵدان…"
+      "retrying": "دووبارە هەوڵدان…",
+      "retryDeny": "دووبارە هەوڵدان بۆ ڕەتکردنەوە",
+      "retryAllowOnce": "دووبارە هەوڵدان بۆ ڕێگەپێدان بۆ یەک جار",
+      "retryAlwaysAllow": "دووبارە هەوڵدان بۆ ڕێگەپێدانی هەمیشەیی"
     },
     "questionCard": {
       "title": "ئەجێنتەکە پێویستی بە وەڵامە",

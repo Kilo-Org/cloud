@@ -2572,7 +2572,10 @@
       "allowOnceAccessibility": "Permitir unha vez",
       "alwaysAllow": "Permitir sempre",
       "alwaysAllowAccessibility": "Permitir sempre",
-      "retrying": "Tentándoo de novo…"
+      "retrying": "Tentándoo de novo…",
+      "retryDeny": "Volver tentar denegar",
+      "retryAllowOnce": "Volver tentar permitir unha vez",
+      "retryAlwaysAllow": "Volver tentar permitir sempre"
     },
     "questionCard": {
       "title": "O axente precisa unha resposta",

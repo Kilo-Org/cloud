@@ -2644,7 +2644,10 @@
       "allowOnceAccessibility": "Povolit jen tentokrát",
       "alwaysAllow": "Vždy povolit",
       "alwaysAllowAccessibility": "Vždy povolit",
-      "retrying": "Opakování…"
+      "retrying": "Opakování…",
+      "retryDeny": "Zamítnout znovu",
+      "retryAllowOnce": "Povolit jen tentokrát znovu",
+      "retryAlwaysAllow": "Vždy povolit znovu"
     },
     "questionCard": {
       "title": "Agent potřebuje odpověď",

@@ -2048,7 +2048,10 @@
       "allowOnceAccessibility": "1回だけ許可",
       "alwaysAllow": "常に許可",
       "alwaysAllowAccessibility": "常に許可",
-      "retrying": "再試行中…"
+      "retrying": "再試行中…",
+      "retryDeny": "拒否を再試行",
+      "retryAllowOnce": "1回だけ許可を再試行",
+      "retryAlwaysAllow": "常に許可を再試行"
     },
     "questionCard": {
       "title": "エージェントからの質問",

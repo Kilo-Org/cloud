@@ -2572,7 +2572,10 @@
       "allowOnceAccessibility": "Luba üks kord",
       "alwaysAllow": "Luba alati",
       "alwaysAllowAccessibility": "Luba alati",
-      "retrying": "Uuesti proovimine…"
+      "retrying": "Uuesti proovimine…",
+      "retryDeny": "Proovi keelamist uuesti",
+      "retryAllowOnce": "Proovi lubamist üks kord uuesti",
+      "retryAlwaysAllow": "Proovi lubamist alati uuesti"
     },
     "questionCard": {
       "title": "Agent vajab vastust",

@@ -2572,7 +2572,10 @@
       "allowOnceAccessibility": "Oggolow hal mar",
       "alwaysAllow": "Had iyo jeer oggolow",
       "alwaysAllowAccessibility": "Had iyo jeer oggolow",
-      "retrying": "Mar kale ayaa la isku dayayaa…"
+      "retrying": "Mar kale ayaa la isku dayayaa…",
+      "retryDeny": "Mar kale isku day inaad diiddo",
+      "retryAllowOnce": "Mar kale isku day inaad oggolaato hal mar",
+      "retryAlwaysAllow": "Mar kale isku day inaad had iyo jeer oggolaato"
     },
     "questionCard": {
       "title": "Wakiilku wuxuu u baahan yahay jawaab",

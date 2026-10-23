@@ -2572,7 +2572,10 @@
       "allowOnceAccessibility": "អនុញ្ញាតតែម្តង",
       "alwaysAllow": "អនុញ្ញាតជានិច្ច",
       "alwaysAllowAccessibility": "អនុញ្ញាតជានិច្ច",
-      "retrying": "កំពុងព្យាយាមម្តងទៀត…"
+      "retrying": "កំពុងព្យាយាមម្តងទៀត…",
+      "retryDeny": "ព្យាយាមបដិសេធម្តងទៀត",
+      "retryAllowOnce": "ព្យាយាមអនុញ្ញាតតែម្តងម្តងទៀត",
+      "retryAlwaysAllow": "ព្យាយាមអនុញ្ញាតជានិច្ចម្តងទៀត"
     },
     "questionCard": {
       "title": "ភ្នាក់ងារត្រូវការការបញ្ចូលពីអ្នក",

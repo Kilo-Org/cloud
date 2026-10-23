@@ -2048,7 +2048,10 @@
       "allowOnceAccessibility": "이번만 허용",
       "alwaysAllow": "항상 허용",
       "alwaysAllowAccessibility": "항상 허용",
-      "retrying": "다시 시도 중…"
+      "retrying": "다시 시도 중…",
+      "retryDeny": "거부 다시 시도",
+      "retryAllowOnce": "이번만 허용 다시 시도",
+      "retryAlwaysAllow": "항상 허용 다시 시도"
     },
     "questionCard": {
       "title": "에이전트의 질문",

@@ -2716,7 +2716,10 @@
       "allowOnceAccessibility": "Caniatáu unwaith",
       "alwaysAllow": "Caniatáu bob tro",
       "alwaysAllowAccessibility": "Caniatáu bob tro",
-      "retrying": "Yn ceisio eto…"
+      "retrying": "Yn ceisio eto…",
+      "retryDeny": "Ceisio gwrthod eto",
+      "retryAllowOnce": "Ceisio caniatáu unwaith eto",
+      "retryAlwaysAllow": "Ceisio caniatáu bob tro eto"
     },
     "questionCard": {
       "title": "Mae angen mewnbwn ar yr asiant",

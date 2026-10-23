@@ -2572,7 +2572,10 @@
       "allowOnceAccessibility": "Payagan nang isang beses",
       "alwaysAllow": "Laging payagan",
       "alwaysAllowAccessibility": "Laging payagan",
-      "retrying": "Muling sinusubukan…"
+      "retrying": "Muling sinusubukan…",
+      "retryDeny": "Subukang tanggihan muli",
+      "retryAllowOnce": "Subukang payagan nang isang beses muli",
+      "retryAlwaysAllow": "Subukang laging payagan muli"
     },
     "questionCard": {
       "title": "Kailangan ng ahente ng sagot",

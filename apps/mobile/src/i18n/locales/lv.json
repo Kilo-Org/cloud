@@ -2608,7 +2608,10 @@
       "allowOnceAccessibility": "Atļaut vienreiz",
       "alwaysAllow": "Vienmēr atļaut",
       "alwaysAllowAccessibility": "Vienmēr atļaut",
-      "retrying": "Mēģina vēlreiz…"
+      "retrying": "Mēģina vēlreiz…",
+      "retryDeny": "Mēģināt liegt vēlreiz",
+      "retryAllowOnce": "Mēģināt atļaut vienreiz vēlreiz",
+      "retryAlwaysAllow": "Mēģināt vienmēr atļaut vēlreiz"
     },
     "questionCard": {
       "title": "Aģents gaida atbildi",

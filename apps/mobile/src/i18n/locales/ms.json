@@ -2572,7 +2572,10 @@
       "allowOnceAccessibility": "Benarkan sekali",
       "alwaysAllow": "Sentiasa benarkan",
       "alwaysAllowAccessibility": "Sentiasa benarkan",
-      "retrying": "Mencuba semula…"
+      "retrying": "Mencuba semula…",
+      "retryDeny": "Cuba tolak semula",
+      "retryAllowOnce": "Cuba benarkan sekali semula",
+      "retryAlwaysAllow": "Cuba sentiasa benarkan semula"
     },
     "questionCard": {
       "title": "Ejen memerlukan maklumat",

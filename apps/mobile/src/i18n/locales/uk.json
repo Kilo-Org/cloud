@@ -2082,7 +2082,10 @@
       "allowOnceAccessibility": "Дозволити один раз",
       "alwaysAllow": "Завжди дозволяти",
       "alwaysAllowAccessibility": "Завжди дозволяти",
-      "retrying": "Повторна спроба…"
+      "retrying": "Повторна спроба…",
+      "retryDeny": "Спробувати не дозволяти ще раз",
+      "retryAllowOnce": "Спробувати дозволити один раз ще раз",
+      "retryAlwaysAllow": "Спробувати завжди дозволяти ще раз"
     },
     "questionCard": {
       "title": "Агенту потрібна відповідь",

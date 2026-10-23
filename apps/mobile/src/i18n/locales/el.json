@@ -2572,7 +2572,10 @@
       "allowOnceAccessibility": "Άδεια για μία φορά",
       "alwaysAllow": "Άδεια πάντα",
       "alwaysAllowAccessibility": "Άδεια πάντα",
-      "retrying": "Επανάληψη…"
+      "retrying": "Επανάληψη…",
+      "retryDeny": "Επανάληψη άρνησης",
+      "retryAllowOnce": "Επανάληψη άδειας για μία φορά",
+      "retryAlwaysAllow": "Επανάληψη άδειας πάντα"
     },
     "questionCard": {
       "title": "Ο πράκτορας χρειάζεται απάντηση",

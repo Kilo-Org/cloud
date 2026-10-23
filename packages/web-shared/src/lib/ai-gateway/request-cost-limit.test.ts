@@ -3,7 +3,7 @@ import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/org
 import { getOpenRouterModelsMetadataFromDatabase } from './providers/gateway-models-cache';
 import { getRawOpenRouterModels, pickerModelPricing } from './providers/openrouter';
 import { getPreferredProviderOrderConfig } from './providers/preferred-provider-order-config';
-import { enforceRequestCostLimit } from './request-cost-limit';
+import { enforceRequestCostLimit as enforceRequestCostLimitDecision } from './request-cost-limit';
 import { addCacheBreakpoints } from './providers/openrouter/request-helpers';
 import type { GatewayRequest } from './providers/openrouter/types';
 import { getVercelModelIdOverrides } from './providers/vercel/mapModelIdToVercel';
@@ -43,6 +43,22 @@ const model: StoredModel = {
   ],
 };
 const body = { messages: [{ role: 'user', content: 'Evidence' }], max_tokens: 64, stream: false };
+async function enforceRequestCostLimit(
+  header: string | null,
+  modelId: string,
+  requestBody: unknown,
+  availableBalanceMicrodollars: number
+) {
+  return (
+    await enforceRequestCostLimitDecision(
+      header,
+      modelId,
+      requestBody,
+      availableBalanceMicrodollars,
+      'openrouter'
+    )
+  ).refusal;
+}
 const catalogModel = (id: string, pricing: OpenRouterModel['pricing']): OpenRouterModel =>
   ({
     id,
@@ -128,6 +144,74 @@ describe('request cost admission', () => {
     expect(pickerPrice).toEqual(routeModel.endpoints[0]?.pricing);
 
     await expect(enforceRequestCostLimit('500', id, body, 2_000_000)).resolves.toBeNull();
+  });
+  it('pins bounded OpenRouter requests to the picker-priced route', async () => {
+    const id = 'test/preferred';
+    const routeModel: StoredModel = {
+      id,
+      name: 'Preferred model',
+      endpoints: [
+        { tag: 'preferred-route', pricing: { prompt: '0.0000001', completion: '0.0000002' } },
+        { tag: 'other-route', pricing: { prompt: '0.000002', completion: '0.000004' } },
+      ],
+    };
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({ [id]: routeModel });
+    jest.mocked(getRawOpenRouterModels).mockResolvedValue({
+      data: [catalogModel(id, { prompt: '0.0000003', completion: '0.0000005' })],
+    });
+    jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue({
+      rules: [{ includes: ['test/'], providers: ['preferred-route', 'other-route'] }],
+    });
+    const decision = await enforceRequestCostLimitDecision(
+      '500',
+      id,
+      { ...body, provider: { order: ['preferred-route', 'other-route'] } },
+      2_000_000,
+      'openrouter'
+    );
+
+    expect(decision).toMatchObject({
+      refusal: null,
+      providerConfig: {
+        order: ['preferred-route'],
+        only: ['preferred-route'],
+        allow_fallbacks: false,
+      },
+    });
+  });
+  it('rejects provider overrides that differ from the priced route', async () => {
+    await expect(
+      enforceRequestCostLimitDecision(
+        '2000000',
+        model.id,
+        { ...body, provider: { order: ['second-route'] } },
+        2_000_000,
+        'openrouter'
+      )
+    ).resolves.toMatchObject({ refusal: 'Provider routing conflicts with the spend safeguard' });
+    await expect(
+      enforceRequestCostLimitDecision(
+        '2000000',
+        model.id,
+        { ...body, provider: { only: ['second-route'] } },
+        2_000_000,
+        'openrouter'
+      )
+    ).resolves.toMatchObject({ refusal: 'Provider routing conflicts with the spend safeguard' });
+  });
+  it('uses the tier reachable by the bounded input length for exclusive models', async () => {
+    const longRequest = {
+      ...body,
+      messages: [{ role: 'user' as const, content: 'x'.repeat(265_000) }],
+    };
+    const decision = await enforceRequestCostLimitDecision(
+      '500000',
+      'stealth/qwen3.6-plus',
+      longRequest,
+      2_000_000,
+      'openrouter'
+    );
+    expect(decision.refusal).toBe('Request exceeds its spend safeguard before generation');
   });
   it('rejects before upstream spend for an insufficient ceiling or balance', async () => {
     await expect(enforceRequestCostLimit('1', model.id, body, 2_000_000)).resolves.toMatch(

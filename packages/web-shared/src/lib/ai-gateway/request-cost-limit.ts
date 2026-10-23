@@ -8,30 +8,128 @@ import {
   pickerModelPricing,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
+import { resolvePreferredProviderOrder } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
+import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import {
+  formatPricePerToken,
+  getCustomPricing,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { EndpointPricing } from './providers/openrouter/display-pricing';
+import type { OpenRouterProviderConfig } from './providers/openrouter/types';
 import {
   getVercelModelIdOverrides,
   mapResolvedModelIdToVercel,
 } from './providers/vercel/mapModelIdToVercel';
 import { applyCustomPricingToPricing } from './custom-pricing';
 
+type RateTier = {
+  start_context_length: number;
+  pricing: {
+    prompt_per_million: number;
+    completion_per_million: number;
+    input_cache_read_per_million: number | null;
+    input_cache_write_per_million: number | null;
+  };
+};
+
+function ratesForTier(tier: RateTier, requestCost: number): TextPricingRates {
+  const { pricing } = tier;
+  const rates = textPricingRates({
+    prompt: formatPricePerToken(pricing.prompt_per_million),
+    completion: formatPricePerToken(pricing.completion_per_million),
+    input_cache_read: formatPricePerToken(
+      pricing.input_cache_read_per_million ?? pricing.prompt_per_million
+    ),
+    input_cache_write: formatPricePerToken(
+      pricing.input_cache_write_per_million ?? pricing.prompt_per_million
+    ),
+    request: '0',
+  });
+  return { ...rates, requestCost };
+}
+function tierAtInputLength(
+  tiers: readonly RateTier[],
+  inputTokenCeiling: number
+): RateTier | undefined {
+  let selected: RateTier | undefined;
+  for (const tier of tiers) {
+    if (tier.start_context_length <= inputTokenCeiling) selected = tier;
+  }
+  return selected;
+}
+
+function combineRates(a: TextPricingRates, b: TextPricingRates): TextPricingRates {
+  return {
+    inputRate: Math.max(a.inputRate, b.inputRate),
+    outputRate: Math.max(a.outputRate, b.outputRate),
+    requestCost: Math.max(a.requestCost, b.requestCost),
+  };
+}
+
 function pickerRequestPrice(
   modelId: string,
   models: Record<string, StoredModel>,
   catalog: OpenRouterModel[],
-  preferredProviderOrderConfig: PreferredProviderOrderConfig
-) {
+  preferredProviderOrderConfig: PreferredProviderOrderConfig,
+  inputTokenCeiling: number
+): TextPricingRates {
   const extra = pickerExtraModel(modelId);
   const model = extra ?? catalog.find(entry => entry.id === modelId);
   if (!model) throw new Error('Model pricing is unavailable');
-  const pricing = applyCustomPricingToPricing(
+  const pickerPricing = applyCustomPricingToPricing(
     model.id,
-    pickerExtraModel(modelId)
-      ? model.pricing
-      : pickerModelPricing(model, models, preferredProviderOrderConfig)
+    extra ? model.pricing : pickerModelPricing(model, models, preferredProviderOrderConfig)
   );
-  return textPricingRates(pricing);
+  let rates = textPricingRates(pickerPricing);
+  const exclusivePricing = findKiloExclusiveModel(modelId)?.pricing;
+  const customPricing = getCustomPricing(modelId);
+  const exclusiveTier = exclusivePricing
+    ? tierAtInputLength(exclusivePricing.tiers, inputTokenCeiling)
+    : undefined;
+  const customTier = customPricing
+    ? tierAtInputLength(customPricing.pricing, inputTokenCeiling)
+    : undefined;
+  if (exclusiveTier) {
+    const tierRates = ratesForTier(exclusiveTier, rates.requestCost);
+    rates = exclusivePricing?.fallbackOnly ? combineRates(rates, tierRates) : tierRates;
+  }
+  if (customTier) {
+    const tierRates = ratesForTier(customTier, rates.requestCost);
+    rates = customPricing?.fallbackOnly ? combineRates(rates, tierRates) : tierRates;
+  }
+  return rates;
+}
+
+function pickerProvider(
+  modelId: string,
+  models: Record<string, StoredModel>,
+  preferredProviderOrderConfig: PreferredProviderOrderConfig
+): { selected: string | undefined; configuredOrder: string[] } {
+  const configuredOrder = resolvePreferredProviderOrder(preferredProviderOrderConfig, modelId);
+  const extra = pickerExtraModel(modelId);
+  const exclusiveProviders = extra
+    ? (findKiloExclusiveModel(modelId)?.inference_providers ?? [])
+    : [];
+  const selected =
+    configuredOrder[0] ??
+    (exclusiveProviders.length === 1
+      ? exclusiveProviders[0]
+      : extra
+        ? undefined
+        : (models[modelId]?.endpoints[0]?.tag ??
+          (models[modelId]?.alias_target
+            ? models[models[modelId].alias_target.slug]?.endpoints[0]?.tag
+            : undefined)));
+  return { selected, configuredOrder };
+}
+export type RequestCostLimitResult = {
+  refusal: string | null;
+  providerConfig: OpenRouterProviderConfig | null;
+};
+
+function refused(message: string): RequestCostLimitResult {
+  return { refusal: message, providerConfig: null };
 }
 export type TextPricingRates = {
   inputRate: number;
@@ -80,11 +178,13 @@ export async function enforceRequestCostLimit(
   header: string | null,
   model: string,
   body: unknown,
-  availableBalanceMicrodollars: number
-): Promise<string | null> {
-  if (header === null) return null;
+  availableBalanceMicrodollars: number,
+  providerId: string
+): Promise<RequestCostLimitResult> {
+  if (header === null) return { refusal: null, providerConfig: null };
   const maximum = Number(header);
-  if (!Number.isSafeInteger(maximum) || maximum <= 0) return 'Invalid request spend safeguard';
+  if (!Number.isSafeInteger(maximum) || maximum <= 0)
+    return refused('Invalid request spend safeguard');
   const parsed = z
     .object({
       model: z.string().optional(),
@@ -110,11 +210,21 @@ export async function enforceRequestCostLimit(
           ]),
         })
       ),
+      provider: z
+        .object({
+          order: z.array(z.string()).optional(),
+          only: z.array(z.string()).optional(),
+          allow_fallbacks: z.boolean().optional(),
+        })
+        .passthrough()
+        .optional(),
       tools: z.never().optional(),
     })
     .safeParse(body);
   if (!parsed.success)
-    return 'Bounded spending requires a text-only request with explicit max_tokens and no tools';
+    return refused(
+      'Bounded spending requires a text-only request with explicit max_tokens and no tools'
+    );
   try {
     const [models, rawCatalog, preferredProviderOrderConfig] = await Promise.all([
       getOpenRouterModelsMetadataFromDatabase(),
@@ -137,24 +247,33 @@ export async function enforceRequestCostLimit(
       !rawCatalog.data.some(entry => entry.id === model) &&
       !requestedMetadata.success
     )
-      return 'Current model pricing is unavailable for bounded spending';
+      return refused('Current model pricing is unavailable for bounded spending');
     if (aliasTarget && !targetMetadata?.success && !targetCatalogEntry)
-      return 'Current model pricing is unavailable for bounded spending';
+      return refused('Current model pricing is unavailable for bounded spending');
     if (
       aliasTarget &&
       parsed.data.model !== model &&
       parsed.data.model !==
         mapResolvedModelIdToVercel(aliasTarget, await getVercelModelIdOverrides())
     )
-      return 'Model alias target changed before bounded spending admission';
+      return refused('Model alias target changed before bounded spending admission');
+
+    const inputTokenCeiling = requestTextBytes(body) + 2048;
     const requestedPrice = pickerRequestPrice(
       model,
       models,
       rawCatalog.data,
-      preferredProviderOrderConfig
+      preferredProviderOrderConfig,
+      inputTokenCeiling
     );
     const targetPrice = aliasTarget
-      ? pickerRequestPrice(aliasTarget, models, rawCatalog.data, preferredProviderOrderConfig)
+      ? pickerRequestPrice(
+          aliasTarget,
+          models,
+          rawCatalog.data,
+          preferredProviderOrderConfig,
+          inputTokenCeiling
+        )
       : undefined;
     const price = targetPrice
       ? {
@@ -163,18 +282,47 @@ export async function enforceRequestCostLimit(
           requestCost: Math.max(requestedPrice.requestCost, targetPrice.requestCost),
         }
       : requestedPrice;
-    const inputTokenCeiling = requestTextBytes(body) + 2048;
     const bound = Math.ceil(
       (inputTokenCeiling * price.inputRate +
         parsed.data.max_tokens * price.outputRate +
         price.requestCost) *
         1_000_000
     );
-    if (bound > maximum) return 'Request exceeds its spend safeguard before generation';
+    if (bound > maximum) return refused('Request exceeds its spend safeguard before generation');
     if (bound > availableBalanceMicrodollars)
-      return 'Request exceeds the available context balance or allowance';
-    return null;
+      return refused('Request exceeds the available context balance or allowance');
+
+    let providerConfig: OpenRouterProviderConfig | null = null;
+    if (providerId === 'openrouter') {
+      const route = pickerProvider(model, models, preferredProviderOrderConfig);
+      const requestedOrder = parsed.data.provider?.order ?? [];
+      const matchesConfiguredOrder =
+        route.configuredOrder.length > 0 &&
+        requestedOrder.length === route.configuredOrder.length &&
+        requestedOrder.every((provider, index) => provider === route.configuredOrder[index]);
+      const matchesSelectedOrder =
+        route.selected !== undefined &&
+        requestedOrder.length === 1 &&
+        requestedOrder[0] === route.selected;
+      const requestedOnly = parsed.data.provider?.only ?? [];
+      const matchesOnly =
+        requestedOnly.length === 0 ||
+        (route.selected !== undefined &&
+          requestedOnly.length === 1 &&
+          requestedOnly[0] === route.selected);
+      if (
+        (requestedOrder.length > 0 && !matchesConfiguredOrder && !matchesSelectedOrder) ||
+        !matchesOnly
+      )
+        return refused('Provider routing conflicts with the spend safeguard');
+      providerConfig = {
+        ...parsed.data.provider,
+        ...(route.selected ? { order: [route.selected], only: [route.selected] } : {}),
+        allow_fallbacks: false,
+      };
+    }
+    return { refusal: null, providerConfig };
   } catch (error) {
-    return error instanceof Error ? error.message : 'Request pricing unavailable';
+    return refused(error instanceof Error ? error.message : 'Request pricing unavailable');
   }
 }

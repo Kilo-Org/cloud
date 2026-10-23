@@ -20,6 +20,7 @@ export type OpenRouterProviderConfig = {
   data_collection?: 'allow' | 'deny';
   zdr?: boolean;
   require_parameters?: boolean;
+  allow_fallbacks?: boolean;
 };
 
 export function isOpenRouterProviderConfig(value: unknown): value is OpenRouterProviderConfig {

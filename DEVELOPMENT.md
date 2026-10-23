@@ -593,6 +593,8 @@ The backend owns scheduling, report revisions, optional paid summaries, and noti
 AI summaries and briefing notifications require separate opt-ins.
 Summary settings include a model override and finite generation time and spend limits.
 Summary estimates and gateway spend admission use the model picker’s configured preferred-provider price, falling back to catalog pricing when no matching route exists.
+For bounded OpenRouter requests, admission pins the request to the priced provider and disables fallback; conflicting provider overrides are refused.
+Tiered custom and Kilo-exclusive pricing uses the highest tier reachable from the request’s bounded input length.
 The default summary model is `~deepseek/deepseek-flash-latest`.
 Pricing estimates and gateway spend checks resolve latest-model aliases through the stored catalog target.
 An alias remains unavailable when its target is missing or has no usable pricing.

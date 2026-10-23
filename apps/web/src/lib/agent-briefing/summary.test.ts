@@ -69,9 +69,10 @@ describe('briefing model pricing', () => {
           max_tokens: quote.maxTokens,
           stream: false,
         },
-        2_000_000
+        2_000_000,
+        'openrouter'
       )
-    ).resolves.toBeNull();
+    ).resolves.toMatchObject({ refusal: null });
     await expect(briefingPriceBound(aion.id, 'Overnight activity', 1)).rejects.toThrow(
       'spend_limit_too_low'
     );
@@ -106,9 +107,10 @@ describe('briefing model pricing', () => {
           max_tokens: quote.maxTokens,
           stream: false,
         },
-        2_000_000
+        2_000_000,
+        'openrouter'
       )
-    ).resolves.toBeNull();
+    ).resolves.toMatchObject({ refusal: null });
   });
 
   it('rejects a model the picker does not price', async () => {

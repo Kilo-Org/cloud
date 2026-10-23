@@ -13,6 +13,7 @@ import { View } from 'react-native';
 import { PickerSheet } from '@/components/picker-sheet';
 import { QueryError } from '@/components/query-error';
 import { FindingFilterModal } from '@/components/security-agent/finding-filter-modal';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -24,8 +25,13 @@ import {
 const FINDINGS_ROUTE = '/(app)/security-agent/[scope]/findings' as const;
 
 function FilterOptionsSkeleton() {
+  const { t } = useTranslation();
   return (
     <View className="gap-3 px-3 pt-2">
+      {/* Skeleton rows carry the shape of the list; the status line says in
+          words what the sheet is waiting for, so the same progress reaches a
+          screen reader. */}
+      <AccessibleStatus message={t('common.loading')} tone="status" className="text-sm" />
       <Skeleton className="h-4 w-24 rounded" />
       {Array.from({ length: 6 }, (_, index) => (
         <Skeleton key={index} className="h-10 w-full rounded-lg" />

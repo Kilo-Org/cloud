@@ -59,6 +59,7 @@ vi.mock('@/components/security-agent/finding-filter-modal', () => ({
   FindingFilterModal: 'FindingFilterModal',
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-security-agent', () => ({
@@ -167,6 +168,8 @@ describe('Security Agent findings filter sheet', () => {
     const root = await mount();
     expect(root.findAllByType(Skeleton).length).toBeGreaterThan(0);
     expect(root.findAllByType(FindingFilterModal)).toHaveLength(0);
+    // The progress is also announced, not only drawn.
+    expect(root.findByType('AccessibleStatus').props.message).toBe('common.loading');
     // The header controls stay usable while the options are prepared.
     expect((root.findByType(PickerSheet).props as SheetProps).onDone).toBeTypeOf('function');
   });

@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
+import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
+
 import {
   firstGrapheme,
   formatCalendarDate,
   formatFileSize,
   formatList,
   formatMoney,
+  formatNumber,
   normalizeLocalizedNumber,
   parseLocalizedNumber,
-  toAsciiDigits,
+  foldDecimalDigits,
 } from './format';
 
 describe('formatMoney', () => {
@@ -43,6 +46,46 @@ describe('localized format helpers', () => {
     expect(parseLocalizedNumber('twelve', 'en')).toBeNull();
   });
 
+  it('parses the digits a native-script keypad types in any locale', () => {
+    expect(parseLocalizedNumber('٢٥', 'ar')).toBe(25);
+    expect(parseLocalizedNumber('۲۵', 'ar')).toBe(25);
+    expect(parseLocalizedNumber('२५', 'hi')).toBe(25);
+    expect(parseLocalizedNumber('২৫', 'bn')).toBe(25);
+    expect(parseLocalizedNumber('၂၅', 'my')).toBe(25);
+  });
+
+  it('parses ASCII digits typed in a locale that formats with its own digits', () => {
+    expect(parseLocalizedNumber('25', 'ar-EG')).toBe(25);
+    expect(parseLocalizedNumber('٢٥', 'ar-EG')).toBe(25);
+  });
+
+  it('keeps the locale separators around folded digits', () => {
+    expect(parseLocalizedNumber('١٬٢٣٤٫٥', 'ar-EG')).toBe(1234.5);
+    expect(parseLocalizedNumber('1,234.5', 'ar')).toBe(1234.5);
+  });
+
+  it('folds a value whose digits come from two scripts', () => {
+    expect(parseLocalizedNumber('٢5', 'ar')).toBe(25);
+  });
+
+  it('folds digits whose sets are adjacent in the code chart', () => {
+    // Mathematical double-struck digits (U+1D7D8) follow the bold set with no
+    // gap, and the Myanmar Pao set (U+116D0) touches the Eastern Pwo Karen one.
+    expect(parseLocalizedNumber('𝟚𝟝', 'en')).toBe(25);
+    expect(parseLocalizedNumber('𝟘', 'en')).toBe(0);
+    expect(parseLocalizedNumber('𑛚𑛟', 'en')).toBe(5);
+  });
+
+  it('still rejects a value with a non-digit left in it', () => {
+    expect(parseLocalizedNumber('٢٥x', 'ar')).toBeNull();
+    expect(parseLocalizedNumber('٢٥٫٥٫٥', 'ar-EG')).toBeNull();
+  });
+
+  it.each(SUPPORTED_LANGUAGES)('round-trips its own formatted amount in %s', tag => {
+    expect(parseLocalizedNumber(formatNumber(25.5, tag), tag)).toBe(25.5);
+    expect(parseLocalizedNumber(formatNumber(1234.5, tag), tag)).toBe(1234.5);
+  });
+
   it('normalizes to an ASCII literal so callers can compare magnitudes', () => {
     expect(normalizeLocalizedNumber('1.234,5', 'de-DE')).toBe('1234.5');
     expect(normalizeLocalizedNumber(' 1 234,5 ', 'ru')).toBe('1234.5');
@@ -59,9 +102,9 @@ describe('localized format helpers', () => {
   });
 });
 
-describe('toAsciiDigits', () => {
+describe('foldDecimalDigits', () => {
   it('converts the Arabic-Indic digits a phone keyboard types for a code', () => {
-    expect(toAsciiDigits('٢٤٦٨١٠')).toBe('246810');
+    expect(foldDecimalDigits('٢٤٦٨١٠')).toBe('246810');
   });
 
   it.each([
@@ -70,26 +113,26 @@ describe('toAsciiDigits', () => {
     ['Bengali', '২৪৬৮১০'],
     ['Myanmar', '၂၄၆၈၁၀'],
   ])('converts %s digits', (_script, digits) => {
-    expect(toAsciiDigits(digits)).toBe('246810');
+    expect(foldDecimalDigits(digits)).toBe('246810');
   });
 
   it('converts digits a Latin-numbering locale formats as Latin', () => {
-    expect(toAsciiDigits('๒๔๖๘๑๐')).toBe('246810');
-    expect(toAsciiDigits('໒໔໖໘໑໐')).toBe('246810');
-    expect(toAsciiDigits('２４６８１０')).toBe('246810');
+    expect(foldDecimalDigits('๒๔๖๘๑๐')).toBe('246810');
+    expect(foldDecimalDigits('໒໔໖໘໑໐')).toBe('246810');
+    expect(foldDecimalDigits('２４６８１０')).toBe('246810');
   });
 
   it('reads one digit from a run that holds several digit sets', () => {
-    // U+1D7CE–U+1D7FF is one run of five sets; the value is the distance back
-    // to the digit's own zero, not to the start of the run.
-    expect(toAsciiDigits('𝟚𝟜𝟞𝟠𝟙𝟘')).toBe('246810');
-    expect(toAsciiDigits('𝟘')).toBe('0');
-    expect(toAsciiDigits('𝟡')).toBe('9');
+    // U+1D7CE–U+1D7FF is one run of five sets: the value is the offset from the
+    // run start modulo ten, so double-struck zero reads as 0, not 10.
+    expect(foldDecimalDigits('𝟚𝟜𝟞𝟠𝟙𝟘')).toBe('246810');
+    expect(foldDecimalDigits('𝟘')).toBe('0');
+    expect(foldDecimalDigits('𝟡')).toBe('9');
   });
 
   it('converts each digit of a mixed-script value and leaves other characters alone', () => {
-    expect(toAsciiDigits('٢٤6٨๑0')).toBe('246810');
-    expect(toAsciiDigits('24a6')).toBe('24a6');
-    expect(toAsciiDigits('')).toBe('');
+    expect(foldDecimalDigits('٢٤6٨๑0')).toBe('246810');
+    expect(foldDecimalDigits('24a6')).toBe('24a6');
+    expect(foldDecimalDigits('')).toBe('');
   });
 });

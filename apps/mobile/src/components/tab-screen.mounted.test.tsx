@@ -3,11 +3,15 @@ import { act, createElement, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
-import { getTabBarIconForwardHeight, getTabBarOverlayHeight } from '@/lib/tab-bar-layout';
+import {
+  getEffectiveTabBarHeight,
+  getTabBarIconForwardHeight,
+  getTabBarOverlayHeight,
+} from '@/lib/tab-bar-layout';
 import { type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
-import { TabScreenScrollView, useTabBarBottomPadding } from './tab-screen';
+import { SheetScrollView, TabScreenScrollView, useTabBarBottomPadding } from './tab-screen';
 
 /** Mirrors `TAB_SCREEN_BOTTOM_GAP` in `tab-screen.tsx`. */
 const TAB_SCREEN_BOTTOM_GAP = 16;
@@ -60,16 +64,20 @@ function Probe() {
 }
 
 /**
- * The clearance `useTabBarBottomPadding` reserves under a tab-bar context:
- * `true`/`false` are the tabs layout's label decisions, `null` is the root
- * stack (no bar), `undefined` is a screen rendered under neither layout.
+ * The clearance `useTabBarBottomPadding` reserves under a tab-bar context: a
+ * boolean is the tabs layout's label decision, `null` is the root stack (no
+ * bar), `undefined` is a screen rendered under neither layout.
  */
 async function clearanceFor(showLabel: boolean | null | undefined): Promise<number> {
   const probe = createElement(Probe);
   const ui =
     showLabel === undefined
       ? probe
-      : createElement(TabBarLabelContext, { value: showLabel }, probe);
+      : createElement(
+          TabBarLabelContext,
+          { value: showLabel === null ? null : { showLabel, labelLines: 1 } },
+          probe
+        );
   const mounted = await renderWithProviders(ui);
   try {
     return mounted.renderer.root.findByType('Probe').props.padding as number;
@@ -127,7 +135,11 @@ describe('tab screen bottom clearance', () => {
 
   it('keeps the label-inclusive height when the layout keeps the labels', async () => {
     await expect(clearanceFor(true)).resolves.toBe(
-      getTabBarOverlayHeight(layout.bottom, 'android', layout.fontScale) + TAB_SCREEN_BOTTOM_GAP
+      getTabBarOverlayHeight({
+        bottomInset: layout.bottom,
+        platform: 'android',
+        fontScale: layout.fontScale,
+      }) + TAB_SCREEN_BOTTOM_GAP
     );
   });
 
@@ -141,7 +153,11 @@ describe('tab screen bottom clearance', () => {
   it('keeps the font-scale rule for a screen rendered under neither layout', async () => {
     layout.fontScale = 1.5;
     await expect(clearanceFor(undefined)).resolves.toBe(
-      getTabBarOverlayHeight(layout.bottom, 'android', layout.fontScale) + TAB_SCREEN_BOTTOM_GAP
+      getTabBarOverlayHeight({
+        bottomInset: layout.bottom,
+        platform: 'android',
+        fontScale: layout.fontScale,
+      }) + TAB_SCREEN_BOTTOM_GAP
     );
   });
 });
@@ -158,7 +174,7 @@ describe('TabScreenScrollView', () => {
     const { renderer, unmount } = await renderWithProviders(
       createElement(
         TabBarLabelContext,
-        { value: true },
+        { value: { showLabel: true, labelLines: 1 } },
         createElement(TabScreenScrollView, null, createElement('Content'))
       )
     );
@@ -325,6 +341,81 @@ describe('TabScreenScrollView viewport floor', () => {
     expect(reservedMargin(renderer)).toBe(112);
     layoutFrame(renderer, 402, 88);
     expect(reservedMargin(renderer)).toBe(112);
+    unmount();
+  });
+});
+
+describe('SheetScrollView', () => {
+  it('ends a sheet body at the tab bar top so no control is parked under the bar', async () => {
+    // A route sheet opened from a tab reaches the window bottom, and the bar is
+    // drawn over it: the daily-limit sheet's Save button sat inside the bar's
+    // band and a tap on it selected a tab. The viewport has to stop at the bar's
+    // top edge, so the sheet's last control can never be drawn or tapped there.
+    layout.platform = 'android';
+    layout.bottom = 16;
+    layout.fontScale = 1.5;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(
+        SheetScrollView,
+        { style: { backgroundColor: '#000' } },
+        createElement('Content')
+      )
+    );
+    const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
+
+    expect(scroll?.props.style).toEqual([
+      { backgroundColor: '#000' },
+      {
+        marginBottom: getEffectiveTabBarHeight({
+          bottomInset: 16,
+          platform: 'android',
+          fontScale: 1.5,
+        }),
+      },
+    ]);
+    // The 16pt breathing room rides on a trailing spacer, as on a tab screen.
+    const childTypes = scroll?.children.map(child =>
+      typeof child === 'string' ? child : child.type
+    );
+    expect(childTypes).toEqual(['Content', 'View']);
+    unmount();
+  });
+
+  it('reserves the IME in the frame on Android while the tab bar is hidden', async () => {
+    layout.platform = 'android';
+    layout.bottom = 16;
+    layout.fontScale = 1;
+    keyboard.occlusion = 300;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(
+        SheetScrollView,
+        { automaticallyAdjustKeyboardInsets: true },
+        createElement('Content')
+      )
+    );
+    const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
+
+    expect(scroll?.props.style).toEqual([undefined, { marginBottom: 300 }]);
+    expect(scroll?.props.automaticallyAdjustKeyboardInsets).toBe(true);
+    unmount();
+  });
+
+  it('does not reserve tab-bar space for an iOS formSheet', async () => {
+    layout.platform = 'ios';
+    layout.bottom = 34;
+    layout.fontScale = 1;
+    keyboard.occlusion = 300;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(
+        SheetScrollView,
+        { automaticallyAdjustKeyboardInsets: true },
+        createElement('Content')
+      )
+    );
+    const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
+
+    expect(scroll?.props.style).toEqual([undefined, { marginBottom: 0 }]);
+    expect(scroll?.props.automaticallyAdjustKeyboardInsets).toBe(true);
     unmount();
   });
 });

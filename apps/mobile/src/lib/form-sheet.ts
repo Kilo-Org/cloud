@@ -1,6 +1,8 @@
 import { Platform, StatusBar, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+
 // Android formSheets can't hit 1.0 without clipping under the status bar, so
 // the "full" detent is capped just below the top inset there; iOS can use 1.
 export function useFormSheetDetents() {
@@ -28,6 +30,7 @@ export function useFormSheetDetents() {
  */
 export function useFormSheetScreenOptions() {
   const { fullSheetDetent } = useFormSheetDetents();
+  const colors = useThemeColors();
 
   return {
     presentation: 'formSheet' as const,
@@ -35,5 +38,9 @@ export function useFormSheetScreenOptions() {
     sheetGrabberVisible: true,
     headerShown: false,
     sheetShouldOverflowTopInset: true,
+    // iOS lifts this background out of `contentStyle` and paints the presented
+    // sheet view with it. Without it the sheet surface is transparent, so the
+    // dimmed screen shows through as a grey card until the route paints.
+    contentStyle: { backgroundColor: colors.background },
   };
 }

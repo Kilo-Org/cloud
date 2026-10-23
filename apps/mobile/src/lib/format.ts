@@ -125,38 +125,22 @@ export function firstGrapheme(value: string, locale: string): string {
 const DECIMAL_DIGIT = /\p{Nd}/u;
 
 /**
- * The ASCII form of one decimal digit, or `null` when the character is not one.
- * The locale's numbering system is not enough to find it: ICU formats `th`,
- * `lo` and `ja` numbers with Latin digits, while a keyboard in those scripts
- * types ๐, ໐ and ２. Unicode assigns decimal digits in contiguous runs that
- * begin at zero and hold whole sets of ten, so a digit's value is its offset
- * from the start of its run modulo ten. The modulo matters: Mathematical
- * Alphanumeric Symbols (U+1D7CE–U+1D7FF) is one fifty-code-point run holding
- * five sets, so double-struck zero sits at offset ten.
+ * Fold every Unicode decimal digit to ASCII. A keypad's digits follow its own
+ * script, not the active app language: an Arabic keyboard types `٢٥` while the
+ * `ar` locale formats with Latin digits. Unicode encodes each decimal digit set
+ * as ten consecutive code points in ascending order, but adjacent sets share no
+ * separator (the mathematical alphabets form one 50-code-point run), so a
+ * digit's value is its offset from the start of its run modulo ten.
  */
-function asciiDigit(char: string): string | null {
-  if (!DECIMAL_DIGIT.test(char)) {
-    return null;
-  }
-  const code = char.codePointAt(0) ?? 0;
-  let start = code;
-  while (start > 0 && DECIMAL_DIGIT.test(String.fromCodePoint(start - 1))) {
-    start -= 1;
-  }
-  return String((code - start) % 10);
-}
-
-/**
- * Converts digits typed in another script to ASCII so a value can be validated
- * and sent in the form the server stores. Characters that are not digits pass
- * through unchanged.
- */
-export function toAsciiDigits(value: string): string {
-  let ascii = '';
-  for (const char of value) {
-    ascii += asciiDigit(char) ?? char;
-  }
-  return ascii;
+export function foldDecimalDigits(value: string): string {
+  return value.replaceAll(/\p{Nd}/gu, digit => {
+    const codePoint = digit.codePointAt(0) ?? 0;
+    let start = codePoint;
+    while (DECIMAL_DIGIT.test(String.fromCodePoint(start - 1))) {
+      start -= 1;
+    }
+    return String((codePoint - start) % 10);
+  });
 }
 
 /**
@@ -172,7 +156,7 @@ export function normalizeLocalizedNumber(value: string, locale: string): string 
   const group = part('group', ',');
   const decimal = part('decimal', '.');
   const minus = part('minusSign', '-');
-  let normalized = toAsciiDigits(value.trim().replaceAll(/[\u061C\u200E\u200F]/g, ''));
+  let normalized = foldDecimalDigits(value.trim().replaceAll(/[\u061C\u200E\u200F]/g, ''));
   if (/^[\s\u00A0\u202F]+$/u.test(group)) {
     normalized = normalized.replaceAll(/[ \u00A0\u202F]/gu, group);
   }

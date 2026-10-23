@@ -1,25 +1,24 @@
 {
   "agentBriefing": {
-    "title": "Morning briefing",
+    "title": "Agent brief",
     "atLeast": "≥{{value}}",
     "coverageHint": "Some historical activity may be missing. ≥ means at least this much; unknown is not zero.",
-    "available": "Available briefings",
-    "history": "Briefing history",
-    "historyHint": "Reports are kept for 30 days, including dismissed reports.",
-    "settings": "Briefing settings",
-    "saved": "Briefing settings saved",
-    "empty": "No overnight activity",
-    "emptyHint": "Your cloud and CLI coding sessions will appear here after an active night.",
-    "loadError": "Could not load briefings",
-    "sessions": "Active overnight",
+    "available": "Available briefs",
+    "history": "Brief history",
+    "historyHint": "Briefs are kept for 30 days, including dismissed ones.",
+    "settings": "Brief settings",
+    "empty": "No activity in this brief window",
+    "emptyHint": "Your cloud and CLI coding sessions appear here when a scheduled brief has activity.",
+    "loadError": "Could not load briefs",
+    "sessions": "Active in window",
     "pullRequests": "PRs opened",
     "blockers": "New blockers",
-    "spend": "Overnight spend",
-    "view": "Read briefing",
+    "spend": "Spend in window",
+    "view": "Read brief",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Dismiss briefing",
-    "offline": "Offline · saved briefing",
+    "dismiss": "Dismiss brief",
+    "offline": "Offline · saved brief",
     "cached": "Saved report · refresh unavailable",
     "revised": "Revised · {{revision}}",
     "window": "{{start}} – {{end}}",
@@ -34,16 +33,16 @@
     "generate": "Generate summary",
     "retrySummary": "Retry paid summary",
     "sources": "Evidence and artifacts",
-    "timezone": "Briefing time zone",
+    "timezone": "Brief time zone",
     "deviceTimezone": "Use device time zone",
-    "timezoneHint": "IANA time zone, for example Europe/Berlin. Schedule changes apply to future nights.",
-    "nightStart": "Night starts",
-    "morningStart": "Night ends / morning starts",
-    "morningEnd": "Morning ends",
-    "timeHint": "The Home card restores live status when morning ends, even offline.",
-    "invalidSchedule": "Choose a valid time zone and non-overlapping, non-empty night and morning periods.",
-    "notificationsHint": "One generic notification per morning when your first report is ready. Independent of paid AI summaries.",
-    "notificationPermission": "Enable device notifications in $t(common.notifications) to receive your briefing.",
+    "timezoneHint": "IANA time zone, for example Europe/Berlin. Schedule changes apply to future briefs.",
+    "nightStart": "Brief window starts",
+    "morningStart": "Brief ready at",
+    "morningEnd": "Brief available until",
+    "timeHint": "The Home card restores live status when the brief window ends, even offline.",
+    "invalidSchedule": "Choose a valid time zone and a non-empty brief window.",
+    "notificationsHint": "One generic notification per scheduled brief. Independent of paid AI summaries.",
+    "notificationPermission": "Enable device notifications in $t(common.notifications) to receive your brief.",
     "aiOptIn": "Paid AI summaries",
     "aiHint": "Optional for this context only. Selected, redacted excerpts and structured facts are sent to your model in your app language. Charges use this context’s balance.",
     "defaultModel": "Use Kilo’s default model",
@@ -62,12 +61,12 @@
     "paidDisclosure": "{{estimate}} estimated, up to {{maximum}}, with a {{minutes}} minute limit. Charges apply even if generation fails.",
     "enable": "Enable paid summaries",
     "contextSettings": "AI settings · {{context}}",
-    "allContexts": "Personal and organization briefings stay separate.",
-    "create": "Create briefing",
-    "oneOff": "One-off",
+    "allContexts": "Personal and organization briefs stay separate.",
+    "create": "Create brief",
+    "oneOff": "On demand",
     "createdAt": "Created {{time}}",
     "chooseContext": "Choose one context",
-    "period": "Briefing period",
+    "period": "Brief period",
     "last24Hours": "Last 24 hours",
     "last7Days": "Last 7 days",
     "customPeriod": "Custom period",
@@ -79,17 +78,20 @@
     "invalidPeriod": "Choose a start before the end.",
     "futurePeriod": "The period cannot end in the future.",
     "periodTooLong": "Choose a period of 31 days or less.",
-    "invalidLocalTime": "This local time does not exist in the briefing time zone. Choose another time.",
-    "reviewBriefing": "Review briefing",
+    "invalidLocalTime": "This local time does not exist in the brief’s time zone. Choose another time.",
+    "reviewBriefing": "Review brief",
     "reviewAgain": "Prepare a new review",
     "payer": "Charged to {{context}}",
     "emptyPeriod": "No activity found in this period. No AI summary or charge.",
-    "emptyHistory": "No saved briefings",
+    "emptyHistory": "No saved briefs",
     "historicalStateHint": "Session state reflects the end of the selected period, not current live status.",
-    "oneOffHint": "AI receives selected, redacted evidence in your app language. This one-off report does not change your morning schedule or AI preferences.",
-    "createOffline": "Go online to review or create a briefing. Paid requests are never queued offline.",
+    "oneOffHint": "AI receives selected, redacted evidence in your app language. This on-demand brief does not change your scheduled brief or AI preferences.",
+    "createOffline": "Go online to review or create a brief. Paid requests are never queued offline.",
     "estimateInputTooLarge": "This period has too much evidence for the selected model.",
-    "estimatePermissionUnavailable": "You do not have permission to use this context’s balance."
+    "estimatePermissionUnavailable": "You do not have permission to use this context’s balance.",
+    "createFailed": "Could not create this brief.",
+    "reviewFailed": "Could not review this brief.",
+    "saved": "Briefing settings saved"
   },
   "common": {
     "cancel": "Cancel",
@@ -361,7 +363,6 @@
     "biometricUnlockSubtitle": "Unlock at launch and after five minutes in the background.",
     "autoExpandThinking": "Auto expand thinking",
     "autoExpandThinkingSubtitle": "Show the agent's thinking expanded when it finishes.",
-    "autoExpandThinkingInactiveSubtitle": "No effect while thinking details are hidden.",
     "hideThinking": "Hide thinking details",
     "hideThinkingSubtitle": "Don't show the agent's thinking on the session page.",
     "keepScreenOn": "Keep screen on while on session page",
@@ -386,7 +387,8 @@
     "condenseToolCallsSubtitle": "Group consecutive tool calls into one row you can open.",
     "toolSummaryTranslation": "Translate tool summaries",
     "toolSummaryTranslationSubtitle": "Send each tool summary to a model to translate it into your app language. The original is shown if translation fails.",
-    "toolSummaryTranslationModelUnavailableNotice": "This model is no longer offered. Tap $t(common.model) to choose another."
+    "toolSummaryTranslationModelUnavailableNotice": "This model is no longer offered. Tap $t(common.model) to choose another.",
+    "autoExpandThinkingInactiveSubtitle": "No effect while thinking details are hidden."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request unavailable",
@@ -715,9 +717,15 @@
       "viewOnGitHub": "View PR on GitHub",
       "noChecksReported": "No checks reported",
       "passed": "{{displayCount}} passed",
+      "passed_one": "{{displayCount}} passed",
+      "passed_other": "{{displayCount}} passed",
       "failed": "{{displayCount}} failed",
+      "failed_one": "{{displayCount}} failed",
+      "failed_other": "{{displayCount}} failed",
       "pending": "{{displayCount}} pending",
       "skipped": "{{displayCount}} skipped",
+      "skipped_one": "{{displayCount}} skipped",
+      "skipped_other": "{{displayCount}} skipped",
       "checksCount": "{{displayCount}} checks",
       "checksCount_one": "{{displayCount}} check",
       "checksCount_other": "{{displayCount}} checks",
@@ -1520,12 +1528,6 @@
       "findingsUnavailable": "Results are unavailable because this review failed.",
       "serviceUnavailable": "Could not reach the code review service. Retry the review when the service is available.",
       "reviewFailed": "The review failed. Please try again.",
-      "cancelReasonSuperseded": "A newer commit was pushed, so this review was replaced.",
-      "cancelReasonIntegrationDisconnected": "{{platform}} is disconnected, so this review was cancelled. Reconnect it, then re-run the review.",
-      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer was turned off for Bitbucket, so this review was cancelled. Enable it again, then re-run the review.",
-      "cancelReasonBitbucketPullRequestChanged": "The Bitbucket pull request changed, so this review was replaced.",
-      "cancelReasonCancelled": "This review was cancelled.",
-      "cancelReasonInterrupted": "This review was interrupted.",
       "showMore": "Show more",
       "created": "Created",
       "started": "Started",
@@ -1552,7 +1554,13 @@
       "reviewInterrupted": "Review interrupted",
       "errorWithMessage": "Error: {{message}}",
       "anErrorOccurred": "An error occurred",
-      "statusWithValue": "Status: {{status}}"
+      "statusWithValue": "Status: {{status}}",
+      "cancelReasonSuperseded": "A newer commit was pushed, so this review was replaced.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} is disconnected, so this review was cancelled. Reconnect it, then re-run the review.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer was turned off for Bitbucket, so this review was cancelled. Enable it again, then re-run the review.",
+      "cancelReasonBitbucketPullRequestChanged": "The Bitbucket pull request changed, so this review was replaced.",
+      "cancelReasonCancelled": "This review was cancelled.",
+      "cancelReasonInterrupted": "This review was interrupted."
     },
     "reviewMemory": {
       "title": "Review memory",
@@ -1839,7 +1847,7 @@
       "deadlinePassed": "Deadline passed",
       "deadlinePassedDetail": "{{critical}} critical, {{high}} high",
       "dueThisWeek": "Due this week",
-      "dueThisWeekDetail": "{{exploitable}} confirmed exploitable",
+      "dueThisWeekDetail": "{{exploitable}} of these confirmed exploitable",
       "noDeadline": "No deadline",
       "reviewSlaAssignment": "Review SLA assignment",
       "allOpenFindingsTracked": "All open findings tracked"
@@ -2222,8 +2230,8 @@
       "dollar_other": "dollars",
       "costSpoken": "cost {{cost}}",
       "costSpokenWithTime": "cost {{cost}}, {{time}}",
-      "spokenJoiner": ", and",
-      "pullRequest": "pull request {{number}}"
+      "pullRequest": "pull request {{number}}",
+      "spokenJoiner": ", and"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Could not open GitHub",
@@ -3248,14 +3256,14 @@
       }
     },
     "inviteMember": {
-      "alreadyInvited": "They're already invited or already a member.",
       "emailError": "Enter a valid email address",
       "emailPlaceholder": "name@company.com",
       "permissionDenied": "You don't have permission to invite members.",
       "roleMember": "Role: Member",
-      "sendError": "Couldn't send the invite.",
       "sendInvite": "Send invite",
-      "title": "Invite member"
+      "title": "Invite member",
+      "alreadyInvited": "They're already invited or already a member.",
+      "sendError": "Couldn't send the invite."
     },
     "invoices": {
       "downloadA11y": "Download invoice {{number}}",
@@ -3324,8 +3332,8 @@
       "inviteCreated": "Invite created",
       "pendingInvitations": "Pending invitations",
       "resendInvite": "Resend invite",
-      "resendInviteError": "Couldn't resend the invite.",
-      "shareInviteLink": "Share invite link"
+      "shareInviteLink": "Share invite link",
+      "resendInviteError": "Couldn't resend the invite."
     },
     "usageStats": {
       "inputTokens": "Input Tokens",
@@ -3457,11 +3465,11 @@
   },
   "transcriptionModel": {
     "title": "Transcription model",
-    "choose": "Choose a model",
     "noneChosen": "None chosen",
     "emptyTitle": "No transcription models",
     "emptyDescription": "The gateway offers no transcription models right now.",
-    "loadFailed": "Couldn't load transcription models."
+    "loadFailed": "Couldn't load transcription models.",
+    "choose": "Choose a model"
   },
   "voiceLanguage": {
     "title": "Voice language",
@@ -3483,7 +3491,6 @@
   },
   "modelChat": {
     "offlineFailure": "This model needs an internet connection. Connect and try again, or switch to a model on this device.",
-    "creditsRequired": "Not enough credits to send this message. Add credits and try again.",
     "empty": {
       "title": "Start a chat",
       "description": "Send a message to talk to a model."
@@ -3612,6 +3619,7 @@
       "fromHuggingFace": "From Hugging Face",
       "loading": "Loading models",
       "noResults": "No models found",
+      "noResultsForQuery": "No models found for \"{{query}}\"",
       "noFits": "No models fit this device",
       "noFitsDescription": "Larger models are on the $t(common.all) tab.",
       "fit": {
@@ -3751,13 +3759,17 @@
       "signIn": "Sign in",
       "signInA11y": "Sign in to this server: {{name}}",
       "signInFailed": "Couldn't sign in to {{name}}. Try again."
-    }
+    },
+    "creditsRequired": "Not enough credits to send this message. Add credits and try again."
   },
   "settingsTools": {
     "confirmTitle": "Confirm this change?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "your most recent repository",
+      "confirmMessage": "Repository: {{repository}}. Request: {{prompt}}",
+      "confirmTitle": "Start this agent?",
       "promptRequired": "Start agent needs a prompt. Add a prompt and run it again.",
       "repositoryRequired": "Start agent needs a repository. Open Kilo and choose one, then run it again.",
       "repositoryUnknown": "Kilo doesn't recognize {{repository}} as a GitHub or GitLab repository. Choose another repository in Kilo.",
@@ -3786,10 +3798,10 @@
     "noSpend": "No spend recorded yet",
     "spend24h": "Spend in the last 24 hours",
     "multiplierError": "Enter a multiplier of 1 or more",
-    "multiplierMaxError": "Enter a multiplier of {{max}} or less",
-    "thresholdMaxError": "Enter an amount of {{max}} or less",
     "permissionDenied": "You don't have permission to manage spend alerts.",
-    "pushOffByCategory": "Off in Notifications"
+    "pushOffByCategory": "Off in Notifications",
+    "multiplierMaxError": "Enter a multiplier of {{max}} or less",
+    "thresholdMaxError": "Enter an amount of {{max}} or less"
   },
   "profiles": {
     "title": "Profiles",
@@ -3837,6 +3849,8 @@
     "keyTooLong": "Key must be 256 characters or fewer",
     "keyDuplicate": "This key already exists in the profile",
     "valueLabel": "Value",
+    "valueRequired": "Enter a value",
+    "tooLong": "Use at most {{max}} characters",
     "secrets": {
       "markSecret": "Mark as secret",
       "masked": "Hidden value",
@@ -3846,7 +3860,6 @@
     },
     "variablesEmpty": "No variables yet",
     "variablesSaveFailed": "Couldn't save variable",
-    "variablesDeleteFailed": "Couldn't delete variable",
     "commandsTitle": "Setup commands",
     "addCommand": "Add command",
     "commandLabel": "Command",
@@ -3857,7 +3870,6 @@
     "moveDown": "Move down",
     "moveCommandUp": "Move command {{position}} up",
     "moveCommandDown": "Move command {{position}} down",
-    "deleteCommand": "Delete command {{position}}",
     "skillsTitle": "Skills",
     "addSkill": "Add skill",
     "skillNameLabel": "Skill name",
@@ -3889,7 +3901,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Enter a server name",
-      "nameInvalid": "Name can use only letters, numbers, underscores, and dashes",
+      "nameInvalid": "Name can use only ASCII letters, numbers, underscores, and dashes, up to 100 characters",
       "commandRequired": "Enter a command",
       "commandTooLong": "Use at most 50 arguments of 500 characters each",
       "urlRequired": "Enter a URL",
@@ -3934,7 +3946,7 @@
       "deleteFailed": "Couldn't delete agent",
       "nameRequired": "Enter an agent name",
       "slugRequired": "Enter an agent slug",
-      "slugInvalid": "Slug must start with a letter and use only lowercase letters, digits, and dashes",
+      "slugInvalid": "Slug must start with a lowercase ASCII letter and use only ASCII lowercase letters, digits, and dashes, up to 50 characters",
       "slugConflict": "That slug is already taken by a built-in or another agent in this profile",
       "edit": "Edit agent"
     },
@@ -3979,7 +3991,9 @@
       "pinFailed": "Couldn't pin repo",
       "unboundToast": "Repo unbound",
       "unbindFailed": "Couldn't unbind repo"
-    }
+    },
+    "variablesDeleteFailed": "Couldn't delete variable",
+    "deleteCommand": "Delete command {{position}}"
   },
   "credits": {
     "title": "Buy credits",
@@ -4006,7 +4020,6 @@
       "newList": "New list",
       "empty": "No lists yet",
       "couldNotLoad": "Couldn’t load lists",
-      "createFailed": "Couldn’t create the list",
       "noRepository": "No repository",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} open",
@@ -4016,7 +4029,8 @@
       "archive": "Archive",
       "unarchive": "Unarchive",
       "deleteTitle": "Delete {{name}}?",
-      "deleteMessage": "Its to-dos are deleted too. Their sessions stay."
+      "deleteMessage": "Its to-dos are deleted too. Their sessions stay.",
+      "createFailed": "Couldn’t create the list"
     },
     "listSettings": {
       "title": "List settings",

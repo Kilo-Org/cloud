@@ -269,7 +269,6 @@
     "voiceInput": "Häälsisestus",
     "autoExpandThinking": "Ava mõttekäik automaatselt",
     "autoExpandThinkingSubtitle": "Näita agendi mõttekäiku avatuna, kui mõtlemine lõpeb.",
-    "autoExpandThinkingInactiveSubtitle": "Ei oma mõju, kui mõttekäigu üksikasjad on peidetud.",
     "hideThinking": "Peida mõttekäigu üksikasjad",
     "hideThinkingSubtitle": "Ära näita agendi mõttekäiku seansi lehel.",
     "keepScreenOn": "Hoia ekraan seansi lehel sisselülitatuna",
@@ -294,7 +293,8 @@
     "condenseToolCallsSubtitle": "Rühmita järjestikused tööriistakutsed ühte ritta, mille saad avada.",
     "toolSummaryTranslation": "Tõlgi tööriistade kokkuvõtted",
     "toolSummaryTranslationSubtitle": "Saada iga tööriista kokkuvõte mudelile, et see sinu rakenduse keelde tõlkida. Tõlke ebaõnnestumisel kuvatakse originaal.",
-    "toolSummaryTranslationModelUnavailableNotice": "Seda mudelit enam ei pakuta. Puuduta $t(common.model), et valida teine."
+    "toolSummaryTranslationModelUnavailableNotice": "Seda mudelit enam ei pakuta. Puuduta $t(common.model), et valida teine.",
+    "autoExpandThinkingInactiveSubtitle": "Ei oma mõju, kui mõttekäigu üksikasjad on peidetud."
   },
   "prReview": {
     "pullRequestUnavailable": "Tõmbetaotlus pole saadaval",
@@ -623,9 +623,15 @@
       "viewOnGitHub": "Vaata PR-i GitHubis",
       "noChecksReported": "Kontrollidest pole teatatud",
       "passed": "{{displayCount}} edukalt läbitud",
+      "passed_one": "{{displayCount}} edukalt läbitud",
+      "passed_other": "{{displayCount}} edukalt läbitud",
       "failed": "{{displayCount}} ebaõnnestunud",
+      "failed_one": "{{displayCount}} ebaõnnestunud",
+      "failed_other": "{{displayCount}} ebaõnnestunud",
       "pending": "{{displayCount}} ootel",
       "skipped": "{{displayCount}} vahele jäetud",
+      "skipped_one": "{{displayCount}} vahele jäetud",
+      "skipped_other": "{{displayCount}} vahele jäetud",
       "checksCount": "{{displayCount}} kontrolli",
       "checksCount_one": "{{displayCount}} kontrolli",
       "checksCount_other": "{{displayCount}} kontrolli",
@@ -1428,12 +1434,6 @@
       "findingsUnavailable": "Tulemused pole saadaval, sest see ülevaatus ebaõnnestus.",
       "serviceUnavailable": "Koodi ülevaatuse teenusega ei õnnestunud ühendust luua. Proovi ülevaatust uuesti, kui teenus on saadaval.",
       "reviewFailed": "Ülevaatus ebaõnnestus. Palun proovi uuesti.",
-      "cancelReasonSuperseded": "Lükati sisse uuem commit, seega see ülevaatus asendati.",
-      "cancelReasonIntegrationDisconnected": "{{platform}} on lahti ühendatud, seega see ülevaatus tühistati. Ühenda see uuesti ja seejärel käivita ülevaatus uuesti.",
-      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer oli Bitbucketi jaoks välja lülitatud, seega see ülevaatus tühistati. Lülita see uuesti sisse ja seejärel käivita ülevaatus uuesti.",
-      "cancelReasonBitbucketPullRequestChanged": "Bitbucketi pull request muutus, seega see ülevaatus asendati.",
-      "cancelReasonCancelled": "See ülevaatus tühistati.",
-      "cancelReasonInterrupted": "See ülevaatus katkestati.",
       "showMore": "Kuva rohkem",
       "created": "Loodud",
       "started": "Alustatud",
@@ -1460,7 +1460,13 @@
       "sessionError": "Seansis tekkis viga: {{error}}.",
       "statusWithValue": "Olek: {{status}}",
       "toolName": "Tööriist: {{name}}",
-      "toolNameError": "Tööriistaga {{name}} tekkis viga."
+      "toolNameError": "Tööriistaga {{name}} tekkis viga.",
+      "cancelReasonSuperseded": "Lükati sisse uuem commit, seega see ülevaatus asendati.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} on lahti ühendatud, seega see ülevaatus tühistati. Ühenda see uuesti ja seejärel käivita ülevaatus uuesti.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer oli Bitbucketi jaoks välja lülitatud, seega see ülevaatus tühistati. Lülita see uuesti sisse ja seejärel käivita ülevaatus uuesti.",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucketi pull request muutus, seega see ülevaatus asendati.",
+      "cancelReasonCancelled": "See ülevaatus tühistati.",
+      "cancelReasonInterrupted": "See ülevaatus katkestati."
     },
     "reviewMemory": {
       "title": "Ülevaatuste mälu",
@@ -1747,7 +1753,7 @@
       "deadlinePassed": "Tähtaeg möödunud",
       "deadlinePassedDetail": "{{critical}} kriitilise, {{high}} kõrge raskusastmega",
       "dueThisWeek": "Tähtajaga sel nädalal",
-      "dueThisWeekDetail": "{{exploitable}} kinnitatud ärakasutatavat leidu",
+      "dueThisWeekDetail": "{{exploitable}} neist on kinnitatud ärakasutatavad",
       "noDeadline": "Tähtaega pole",
       "reviewSlaAssignment": "Vaata üle SLA tähtaegade määramine",
       "allOpenFindingsTracked": "Kõiki avatud leide jälgitakse"
@@ -2128,8 +2134,8 @@
       "dollar_other": "dollarit",
       "costSpoken": "kulu {{cost}}",
       "costSpokenWithTime": "kulu {{cost}}, {{time}}",
-      "spokenJoiner": "ja",
-      "pullRequest": "tõmbetaotlus {{number}}"
+      "pullRequest": "tõmbetaotlus {{number}}",
+      "spokenJoiner": "ja"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubi ei õnnestunud avada",
@@ -3111,22 +3117,16 @@
     "boundary": {
       "backToProfile": "Tagasi profiilile",
       "loadErrorMessage": "Kontrolli ühendust ja proovi uuesti.",
-
       "chooseAccount": "Vali konto",
       "loadErrorTitle": "Sinu organisatsioone ei õnnestunud laadida.",
       "membershipLostNotice": "Sul puudub enam juurdepääs sellele organisatsioonile. Vahetatud {{target}}-le.",
       "noOrganization": "Organisatsioon puudub",
-
       "noOrganizationDescription": "See konto ei kuulu ühtegi organisatsiooni. Organisatsiooni funktsioonide, nagu liikmekutsed ja väikese saldo hoiatused, kasutamiseks loo organisatsioon või liitu sellega veebis.",
-
       "openWebOrganizations": "Ava organisatsioonid veebis",
-
       "organizationUnavailable": "Organisatsioon pole saadaval.",
       "selectDescriptionWithOrganizations": "Kuulud ühte või mitmesse organisatsiooni. Vali konto, mida see ekraan peaks kasutama.",
-
       "selectOrganization": "Vali organisatsioon",
       "unavailableDescription": "See organisatsioon pole enam saadaval. Jätkamiseks vali oma profiililt teine organisatsioon.",
-
       "unavailableSessionsDescription": "See organisatsioon pole enam saadaval. Selle seansse ei saa laadida.",
       "accessDeniedDescription": "Sul puudub juurdepääs sellele organisatsioonile."
     },
@@ -3149,14 +3149,14 @@
       "truncated": "Saadaval on ka varasemad krediiditehingud."
     },
     "inviteMember": {
-      "alreadyInvited": "Ta on juba kutsutud või juba liige.",
       "emailError": "Sisesta kehtiv e-posti aadress.",
       "emailPlaceholder": "nimi@ettevote.ee",
       "permissionDenied": "Sul puudub õigus liikmeid kutsuda.",
       "roleMember": "Roll: liige",
-      "sendError": "Kutset ei õnnestunud saata.",
       "sendInvite": "Saada kutse",
-      "title": "Kutsu liige"
+      "title": "Kutsu liige",
+      "alreadyInvited": "Ta on juba kutsutud või juba liige.",
+      "sendError": "Kutset ei õnnestunud saata."
     },
     "invoices": {
       "downloadA11y": "Laadi alla arve {{number}}",
@@ -3225,8 +3225,8 @@
       "inviteCreated": "Kutse loodud",
       "pendingInvitations": "Ootel kutsed",
       "resendInvite": "Saada kutse uuesti",
-      "resendInviteError": "Kutset ei õnnestunud uuesti saata.",
-      "shareInviteLink": "Jaga kutselinki"
+      "shareInviteLink": "Jaga kutselinki",
+      "resendInviteError": "Kutset ei õnnestunud uuesti saata."
     },
     "usageStats": {
       "inputTokens": "Sisendtokenid",
@@ -3371,11 +3371,11 @@
   },
   "transcriptionModel": {
     "title": "Kõnetuvastuse mudel",
-    "choose": "Vali mudel",
     "noneChosen": "Pole valitud",
     "emptyTitle": "Kõnetuvastuse mudelid puuduvad",
     "emptyDescription": "Kilo Gateway ei paku praegu ühtegi kõnetuvastuse mudelit.",
-    "loadFailed": "Kõnetuvastuse mudeleid ei õnnestunud laadida."
+    "loadFailed": "Kõnetuvastuse mudeleid ei õnnestunud laadida.",
+    "choose": "Vali mudel"
   },
   "voiceLanguage": {
     "title": "Häälsisestuse keel",
@@ -3397,7 +3397,6 @@
   },
   "modelChat": {
     "offlineFailure": "See mudel vajab internetiühendust. Loo ühendus ja proovi uuesti või lülitu selle seadme mudelile.",
-    "creditsRequired": "Krediiti ei piisa selle sõnumi saatmiseks. Lisa krediiti ja proovi uuesti.",
     "empty": {
       "title": "Alusta vestlust",
       "description": "Mudeliga vestlemiseks saada sõnum."
@@ -3591,6 +3590,7 @@
       "fromHuggingFace": "Hugging Face'ist",
       "loading": "Mudelite laadimine",
       "noResults": "Mudeleid ei leitud",
+      "noResultsForQuery": "Päringuga \"{{query}}\" ei leitud mudeleid",
       "noFits": "Ükski mudel ei sobi sellele seadmele",
       "noFitsDescription": "Suuremad mudelid on vahekaardil $t(common.all).",
       "fit": {
@@ -3665,13 +3665,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "See mudel toetab mõtlemise põhjalikkust"
-    }
+    },
+    "creditsRequired": "Krediiti ei piisa selle sõnumi saatmiseks. Lisa krediiti ja proovi uuesti."
   },
   "settingsTools": {
     "confirmTitle": "Kas kinnitada see muudatus?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "sinu kõige hiljutisem hoidla",
+      "confirmMessage": "Hoidla: {{repository}}. Viip: {{prompt}}",
+      "confirmTitle": "Kas käivitada see agent?",
       "promptRequired": "Agendi käivitamiseks on vaja viipa. Lisa viip ja käivita see uuesti.",
       "repositoryRequired": "Agendi käivitamiseks on vaja hoidlat. Ava Kilo, vali hoidla ja käivita see uuesti.",
       "repositoryUnknown": "Kilo ei tunne {{repository}} ära GitHubi ega GitLabi hoidlana. Vali Kilos teine hoidla.",
@@ -3700,10 +3704,10 @@
     "noSpend": "Kulutusi pole veel registreeritud",
     "spend24h": "Viimase 24 tunni kulutus",
     "multiplierError": "Sisesta kordaja 1 või suurem",
-    "multiplierMaxError": "Sisesta kordaja {{max}} või väiksem",
-    "thresholdMaxError": "Sisesta summa {{max}} või väiksem.",
     "permissionDenied": "Sul puudub õigus kulutushoiatusi hallata.",
-    "pushOffByCategory": "Teavitustes väljas"
+    "pushOffByCategory": "Teavitustes väljas",
+    "multiplierMaxError": "Sisesta kordaja {{max}} või väiksem",
+    "thresholdMaxError": "Sisesta summa {{max}} või väiksem."
   },
   "profiles": {
     "title": "Profiilid",
@@ -3751,6 +3755,8 @@
     "keyTooLong": "Võti võib olla kuni 256 tähemärki",
     "keyDuplicate": "See võti on profiilis juba olemas",
     "valueLabel": "Väärtus",
+    "valueRequired": "Sisestage väärtus",
+    "tooLong": "Kasutage kuni {{max}} tähemärki",
     "secrets": {
       "markSecret": "Märgi salajaseks",
       "masked": "Varjatud väärtus",
@@ -3760,7 +3766,6 @@
     },
     "variablesEmpty": "Muutujaid veel pole",
     "variablesSaveFailed": "Muutujat ei saanud salvestada",
-    "variablesDeleteFailed": "Muutujat ei õnnestunud kustutada",
     "commandsTitle": "Seadistuskäsud",
     "addCommand": "Lisa käsk",
     "commandLabel": "Käsk",
@@ -3771,7 +3776,6 @@
     "moveDown": "Liigu alla",
     "moveCommandUp": "Liiguta käsk {{position}} üles",
     "moveCommandDown": "Liiguta käsk {{position}} alla",
-    "deleteCommand": "Kustuta käsk {{position}}",
     "skillsTitle": "Oskused",
     "addSkill": "Lisa oskusi",
     "skillNameLabel": "Oskuste nimi",
@@ -3803,7 +3807,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Sisestage serveri nimi",
-      "nameInvalid": "Nimes võib kasutada ainult tähti, numbreid, allkriipse ja sidekriipse",
+      "nameInvalid": "Nimes võib kasutada ainult ASCII tähti, numbreid, allkriipse ja sidekriipse, kuni 100 tähemärki",
       "commandRequired": "Sisestage käsk",
       "commandTooLong": "Kasuta kõige rohkem 50 argumenti, igaüks kuni 500 tähemärki",
       "urlRequired": "Sisestage URL",
@@ -3848,7 +3852,7 @@
       "deleteFailed": "Agenti ei õnnestunud kustutada",
       "nameRequired": "Sisestage agendi nimi",
       "slugRequired": "Sisestage agent nälkjas",
-      "slugInvalid": "Slug peab algama tähega ja kasutama ainult väiketähti, numbreid ja sidekriipse",
+      "slugInvalid": "Slug peab algama ASCII väiketähega ja kasutama ainult ASCII väiketähti, numbreid ja sidekriipse, kuni 50 tähemärki",
       "slugConflict": "Seda slugi kasutab juba sisseehitatud agent või muu agent selles profiilis",
       "edit": "Redigeeri agenti"
     },
@@ -3893,7 +3897,9 @@
       "pinFailed": "Repot ei saanud kinnitada",
       "unboundToast": "Repo sidumata",
       "unbindFailed": "Repot ei saanud lahti siduda"
-    }
+    },
+    "variablesDeleteFailed": "Muutujat ei õnnestunud kustutada",
+    "deleteCommand": "Kustuta käsk {{position}}"
   },
   "credits": {
     "title": "Osta krediiti",
@@ -3920,7 +3926,6 @@
       "newList": "Uus loend",
       "empty": "Loendeid veel pole",
       "couldNotLoad": "Loendeid ei õnnestunud laadida",
-      "createFailed": "Loendit ei õnnestunud luua",
       "noRepository": "Hoidlat pole",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} avatud",
@@ -3930,7 +3935,8 @@
       "archive": "Arhiveeri",
       "unarchive": "Taasta arhiivist",
       "deleteTitle": "Kas kustutada {{name}}?",
-      "deleteMessage": "Selle ülesanded kustutatakse samuti. Seansid jäävad alles."
+      "deleteMessage": "Selle ülesanded kustutatakse samuti. Seansid jäävad alles.",
+      "createFailed": "Loendit ei õnnestunud luua"
     },
     "listSettings": {
       "title": "Loendi sätted",
@@ -3998,21 +4004,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Hommikune ülevaade",
+    "title": "Agendi ülevaade",
     "atLeast": "≥{{value}}",
     "coverageHint": "Osa varasemast tegevusest võib puududa. ≥ tähendab vähemalt nii palju; teadmata ei tähenda null.",
     "available": "Saadaolevad ülevaated",
     "history": "Ülevaadete ajalugu",
-    "historyHint": "Aruandeid säilitatakse 30 päeva, sh suletud aruandeid.",
+    "historyHint": "Ülevaateid säilitatakse 30 päeva, sh kõrvale jäetud ülevaateid.",
     "settings": "Ülevaate seaded",
-    "saved": "Ülevaate seaded salvestatud",
-    "empty": "Öist tegevust pole",
-    "emptyHint": "Sinu pilve- ja CLI-koodimisseansid ilmuvad siia pärast aktiivset ööd.",
+    "empty": "Selles ülevaatevahemikus tegevust pole",
+    "emptyHint": "Sinu pilve- ja CLI-koodimisseansid ilmuvad siia, kui ajastatud ülevaates on tegevust.",
     "loadError": "Ülevaateid ei õnnestunud laadida",
-    "sessions": "Öösel aktiivsed",
+    "sessions": "Aktiivsed ülevaatevahemikus",
     "pullRequests": "Avatud PRs",
     "blockers": "Uued takistused",
-    "spend": "Öised kulud",
+    "spend": "Ülevaatevahemiku kulud",
     "view": "Loe ülevaadet",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -4034,13 +4039,13 @@
     "sources": "Tõendid ja artefaktid",
     "timezone": "Ülevaate ajavöönd",
     "deviceTimezone": "Kasuta seadme ajavööndit",
-    "timezoneHint": "IANA ajavöönd, näiteks Europe/Berlin. Ajakava muudatused kehtivad järgmistest öödest.",
-    "nightStart": "Öö algab",
-    "morningStart": "Öö lõpeb / hommik algab",
-    "morningEnd": "Hommik lõpeb",
-    "timeHint": "Avakuva kaart taastab hommiku lõppedes reaalajas oleku, ka võrguühenduseta.",
-    "invalidSchedule": "Vali kehtiv ajavöönd ning mittekattuvad ja mittetühjad öö- ja hommikuperioodid.",
-    "notificationsHint": "Üks üldine teavitus hommikus, kui esimene aruanne on valmis. Ei sõltu tasulistest AI kokkuvõtetest.",
+    "timezoneHint": "IANA ajavöönd, näiteks Europe/Berlin. Ajakava muudatused kehtivad tulevastele ülevaadetele.",
+    "nightStart": "Ülevaatevahemik algab",
+    "morningStart": "Ülevaade valmis kell",
+    "morningEnd": "Ülevaade saadaval kuni",
+    "timeHint": "Avakuva kaart taastab reaalajas oleku, kui ülevaatevahemik lõpeb, isegi võrguühenduseta.",
+    "invalidSchedule": "Vali kehtiv ajavöönd ja mittetühi ülevaatevahemik.",
+    "notificationsHint": "Üks üldine teavitus iga ajastatud ülevaate kohta. Ei sõltu tasulistest AI kokkuvõtetest.",
     "notificationPermission": "Ülevaate saamiseks luba seadme teavitused jaotises $t(common.notifications).",
     "aiOptIn": "Tasulised AI kokkuvõtted",
     "aiHint": "Valikuline ainult selles kontekstis. Valitud, redigeeritud väljavõtted ja struktureeritud faktid saadetakse sinu mudelile rakenduse keeles. Tasud arvestatakse selle konteksti saldost.",
@@ -4062,7 +4067,7 @@
     "contextSettings": "AI seaded · {{context}}",
     "allContexts": "Isiklikud ja organisatsiooni ülevaated hoitakse eraldi.",
     "create": "Loo ülevaade",
-    "oneOff": "Ühekordne",
+    "oneOff": "Nõudmisel",
     "createdAt": "Loodud {{time}}",
     "chooseContext": "Vali üks kontekst",
     "period": "Ülevaate periood",
@@ -4084,9 +4089,12 @@
     "emptyPeriod": "Sellel perioodil tegevust ei leitud. AI kokkuvõtet ei looda ja tasu ei võeta.",
     "emptyHistory": "Salvestatud ülevaateid pole",
     "historicalStateHint": "Seansi olek kajastab valitud perioodi lõpu seisu, mitte praegust reaalajas olekut.",
-    "oneOffHint": "AI saab valitud alusandmed sinu rakenduse keeles, tundlikud andmed on eemaldatud. See ühekordne aruanne ei muuda sinu hommikust ajakava ega AI eelistusi.",
+    "oneOffHint": "AI saab valitud alusandmed sinu rakenduse keeles, tundlikud andmed on eemaldatud. See nõudmisel loodav ülevaade ei muuda sinu ajastatud ülevaadet ega AI eelistusi.",
     "createOffline": "Ülevaate kontrollimiseks või loomiseks loo internetiühendus. Tasulisi päringuid ei panda kunagi võrguühenduseta järjekorda.",
     "estimateInputTooLarge": "Selle perioodi kohta on valitud mudeli jaoks liiga palju alusandmeid.",
-    "estimatePermissionUnavailable": "Sul pole õigust selle konteksti saldot kasutada."
+    "estimatePermissionUnavailable": "Sul pole õigust selle konteksti saldot kasutada.",
+    "createFailed": "Seda ülevaadet ei õnnestunud luua.",
+    "reviewFailed": "Seda ülevaadet ei õnnestunud üle vaadata.",
+    "saved": "Ülevaate seaded salvestatud"
   }
 }

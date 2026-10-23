@@ -31,6 +31,7 @@ import {
   revokeProjectAccessToken,
   rotateProjectAccessToken,
   updateProjectWebhook,
+  fetchMRInlineComments,
 } from './adapter';
 
 // Mock fetch globally
@@ -908,6 +909,39 @@ describe('validatePersonalAccessToken', () => {
   });
 });
 
+function discussionWithNote(input: {
+  discussionId: string;
+  noteId: number;
+  authorId: number;
+  authorUsername: string;
+  body?: string;
+}) {
+  return {
+    id: input.discussionId,
+    individual_note: false,
+    notes: [
+      {
+        id: input.noteId,
+        body: input.body ?? 'comment body',
+        author: { id: input.authorId, username: input.authorUsername, name: 'Author' },
+        system: false,
+        resolvable: true,
+        resolved: false,
+        position: {
+          base_sha: 'base',
+          start_sha: 'start',
+          head_sha: 'head',
+          old_path: 'src/file.ts',
+          new_path: 'src/file.ts',
+          position_type: 'text',
+          old_line: null,
+          new_line: 12,
+        },
+      },
+    ],
+  };
+}
+
 describe('webhook and project access token refusals', () => {
   const webhookOperations = [
     ['listProjectWebhooks', () => listProjectWebhooks('token', 123)],
@@ -942,7 +976,6 @@ describe('webhook and project access token refusals', () => {
       json: async () => ({}),
     });
   }
-
   beforeEach(() => {
     mockFetch.mockReset();
   });
@@ -972,5 +1005,95 @@ describe('webhook and project access token refusals', () => {
     expect(refusal).toBeInstanceOf(expectedError);
     expect(refusal).toMatchObject({ statusCode: 403, projectId: 123 });
     expect((refusal as Error).message).toContain('Requires Maintainer role or higher');
+  });
+});
+
+describe('fetchMRInlineComments authorship', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('marks notes written by the token user as Kilo-authored', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          discussionWithNote({
+            discussionId: 'd1',
+            noteId: 1,
+            authorId: 7,
+            authorUsername: 'project_42_bot',
+          }),
+          discussionWithNote({
+            discussionId: 'd2',
+            noteId: 2,
+            authorId: 300,
+            authorUsername: 'contributor',
+          }),
+        ],
+        headers: { get: () => null },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: 7, username: 'project_42_bot' }),
+        headers: { get: () => null },
+      });
+
+    const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
+
+    expect(comments.map(c => [c.id, c.authoredByKilo, c.user.username])).toEqual([
+      [1, true, 'project_42_bot'],
+      [2, false, 'contributor'],
+    ]);
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      2,
+      'https://gitlab.com/api/v4/user',
+      expect.anything()
+    );
+  });
+
+  it('does not look up the token user when the MR has no inline notes', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => [{ id: 'd1', individual_note: true, notes: [] }],
+      headers: { get: () => null },
+    });
+
+    const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
+
+    expect(comments).toEqual([]);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns unattributed comments when the token-user lookup fails', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          discussionWithNote({
+            discussionId: 'd1',
+            noteId: 1,
+            authorId: 7,
+            authorUsername: 'project_42_bot',
+          }),
+        ],
+        headers: { get: () => null },
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        text: async () => 'Unauthorized',
+        headers: { get: () => null },
+      });
+
+    const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
+
+    expect(comments).toEqual([
+      expect.objectContaining({
+        id: 1,
+        authoredByKilo: false,
+        user: { username: 'project_42_bot' },
+      }),
+    ]);
   });
 });

@@ -145,6 +145,9 @@ function CreditsPageContent() {
       { enabled: transactionIdIsValid, retry: false }
     )
   );
+  const { data: paidCreditPolicy, isError: isPaidCreditPolicyError } = useQuery(
+    trpc.user.getPaidCreditPolicy.queryOptions()
+  );
   const receiptMutation = useMutation(trpc.user.getCreditPurchaseReceipt.mutationOptions());
 
   useEffect(() => {
@@ -308,6 +311,15 @@ function CreditsPageContent() {
   );
   const showUnverifiedConfirmation =
     transactionIdIsValid && isPurchaseConfirmationError && !confirmation;
+  // New paid credits follow the live policy; a claim shown before the policy
+  // loads, or after it fails, would repeat the old non-expiration promise.
+  const purchasedCreditTerms = isPaidCreditPolicyError
+    ? 'Terms unavailable'
+    : paidCreditPolicy === undefined
+      ? 'Loading terms...'
+      : paidCreditPolicy.creditExpiryPolicy === 'one_year'
+        ? 'Expire one year after purchase'
+        : 'Do not expire';
 
   return (
     <PageLayout
@@ -425,12 +437,19 @@ function CreditsPageContent() {
             <CardTitle>Your credit balance</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1px_1fr]">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1px_1fr_1px_1fr]">
               <div>
                 <div className="type-title text-foreground tabular-nums">
                   {formatMicrodollars(currentBalance)}
                 </div>
                 <div className="type-label text-muted-foreground mt-1">available</div>
+              </div>
+
+              <div className="bg-border hidden w-px self-stretch lg:block" />
+
+              <div>
+                <p className="type-body text-muted-foreground">Purchased credits</p>
+                <p className="type-body font-medium">{purchasedCreditTerms}</p>
               </div>
 
               <div className="bg-border hidden w-px self-stretch lg:block" />

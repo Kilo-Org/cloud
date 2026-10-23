@@ -354,15 +354,15 @@ export async function resolveAutoModel(
       : { kind: 'no_free_models_available' };
   }
   if (model === KILO_AUTO_SMALL_MODEL.id) {
-    return {
-      kind: 'ok',
-      resolved: {
-        model:
-          (await balancePromise) > 0
-            ? AUTO_SMALL_TARGET_MODELS.paid
-            : AUTO_SMALL_TARGET_MODELS.free,
-      },
-    };
+    if ((await balancePromise) > 0) {
+      // Mercury 3 reasons by default, which adds hundreds of hidden tokens and doubles latency
+      // for short utility replies such as session titles.
+      return {
+        kind: 'ok',
+        resolved: { model: AUTO_SMALL_TARGET_MODELS.paid, reasoning: { enabled: false } },
+      };
+    }
+    return { kind: 'ok', resolved: { model: AUTO_SMALL_TARGET_MODELS.free } };
   }
   if (model === KILO_AUTO_EFFICIENT_MODEL.id || model === KILO_AUTO_BALANCED_MODEL.id) {
     if (params.legacyPoolRouter) {

@@ -5602,7 +5602,7 @@ describe('processStripePaymentEventHook bouncer decline gate', () => {
     } as unknown as Stripe.Response<Stripe.Checkout.Session>);
   });
 
-  test('an enforced failure verdict expires the open checkout session', async () => {
+  test('an enforced failure verdict expires the open checkout session of the customer', async () => {
     mockChargeDecide.mockResolvedValue({
       enforced: true,
       code: 'charge_blocked',
@@ -5619,11 +5619,37 @@ describe('processStripePaymentEventHook bouncer decline gate', () => {
       })
     );
     expect(listSpy).toHaveBeenCalledWith(
-      { payment_intent: 'pi_gate_stop', limit: 1 },
+      { customer: testUser.stripe_customer_id, status: 'open', limit: 10 },
       expect.objectContaining({ timeout: 5_000 })
     );
     expect(expireSpy).toHaveBeenCalledWith(
       'cs_gate_open',
+      expect.objectContaining({ timeout: 5_000 })
+    );
+  });
+
+  test('an enforced decline expires an open subscription-mode session', async () => {
+    mockChargeDecide.mockResolvedValue({ enforced: true, code: 'charge_blocked', flags: [] });
+    listSpy.mockResolvedValue({
+      object: 'list',
+      // A `mode: 'subscription'` session carries no payment intent; only the customer finds it.
+      data: [
+        { id: 'cs_gate_kilo_pass', mode: 'subscription', status: 'open', payment_intent: null },
+        { id: 'cs_gate_closed_pass', mode: 'subscription', status: 'complete' },
+      ],
+      has_more: false,
+      url: '/v1/checkout/sessions',
+    } as unknown as Stripe.Response<Stripe.ApiList<Stripe.Checkout.Session>>);
+
+    await processStripePaymentEventHook(failedPaymentIntentEvent('ch_gate_sub', 'pi_gate_sub'));
+
+    expect(listSpy).toHaveBeenCalledWith(
+      { customer: testUser.stripe_customer_id, status: 'open', limit: 10 },
+      expect.objectContaining({ timeout: 5_000 })
+    );
+    expect(expireSpy).toHaveBeenCalledTimes(1);
+    expect(expireSpy).toHaveBeenCalledWith(
+      'cs_gate_kilo_pass',
       expect.objectContaining({ timeout: 5_000 })
     );
   });

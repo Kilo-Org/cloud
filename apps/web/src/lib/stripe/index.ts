@@ -368,13 +368,39 @@ function isAuthenticationFailureCharge(charge: Stripe.Charge): boolean {
 /** Bounds each Stripe call the failure gate makes from a webhook. */
 const CHARGE_GATE_STRIPE_TIMEOUT_MS = 5_000;
 
+/** At most this many open sessions one declined charge expires. */
+const CHARGE_GATE_MAX_EXPIRED_SESSIONS = 10;
+
 /**
- * Expires the checkout session behind a failed payment intent, when it is still open, so a card
- * tester cannot keep cycling cards inside one session. Best-effort: the caller logs and continues.
+ * Expires the open checkout sessions behind a declined charge, so a card tester cannot keep cycling
+ * cards inside one session. Stripe populates `payment_intent` only on payment-mode sessions, while
+ * a subscription checkout (Kilo Pass, KiloClaw, seats, organization Kilo Pass) is found by its
+ * customer instead; every checkout session this app creates sets `customer`, so the customer
+ * lookup covers both modes. The payment-intent lookup stays as the fallback for a session created
+ * without a customer. Best-effort: the caller logs and continues.
  */
-async function expireOpenCheckoutSessionForPaymentIntent(paymentIntentId: string): Promise<void> {
+async function expireOpenCheckoutSessionsForDeclinedCharge(params: {
+  customerId: string | null;
+  paymentIntentId: string | null;
+}): Promise<void> {
+  if (params.customerId) {
+    const listed = await client.checkout.sessions.list(
+      {
+        customer: params.customerId,
+        status: 'open',
+        limit: CHARGE_GATE_MAX_EXPIRED_SESSIONS,
+      },
+      { timeout: CHARGE_GATE_STRIPE_TIMEOUT_MS }
+    );
+    for (const session of listed.data) {
+      if (session.status !== 'open') continue;
+      await client.checkout.sessions.expire(session.id, { timeout: CHARGE_GATE_STRIPE_TIMEOUT_MS });
+    }
+    return;
+  }
+  if (!params.paymentIntentId) return;
   const listed = await client.checkout.sessions.list(
-    { payment_intent: paymentIntentId, limit: 1 },
+    { payment_intent: params.paymentIntentId, limit: 1 },
     { timeout: CHARGE_GATE_STRIPE_TIMEOUT_MS }
   );
   const session = listed.data[0];
@@ -384,7 +410,7 @@ async function expireOpenCheckoutSessionForPaymentIntent(paymentIntentId: string
 
 /**
  * After a decline is durably enqueued, sends it to bouncer now and asks for the failure-stage
- * verdict. A refusal expires the payer's open checkout session. Every step is best-effort and
+ * verdict. A refusal expires the payer's open checkout sessions. Every step is best-effort and
  * bounded: an error is logged and the webhook still succeeds, so Stripe never retries because of
  * this gate.
  */
@@ -392,6 +418,7 @@ async function enforceDeclinedChargeStanding(params: {
   payer: BouncerCreditOwner;
   wireEventId: string;
   requestId: string;
+  customerId: string | null;
   paymentIntentId: string | null;
 }): Promise<void> {
   try {
@@ -404,10 +431,13 @@ async function enforceDeclinedChargeStanding(params: {
       accountId: bouncerAccountId(params.payer.userId, params.payer.orgId),
       userId: params.payer.userId,
     });
-    if (!verdict?.enforced || !params.paymentIntentId) return;
-    await expireOpenCheckoutSessionForPaymentIntent(params.paymentIntentId);
+    if (!verdict?.enforced) return;
+    await expireOpenCheckoutSessionsForDeclinedCharge({
+      customerId: params.customerId,
+      paymentIntentId: params.paymentIntentId,
+    });
   } catch (error) {
-    warnExceptInTest('Bouncer decline gate failed; the decline stays in the outbox', {
+    warnExceptInTest('Bouncer decline gate could not expire the open checkout session', {
       error: error instanceof Error ? error.message : String(error),
     });
   }
@@ -428,9 +458,9 @@ async function enforceDeclinedChargeStanding(params: {
  * ledger and files a `missing_card` review instead.
  *
  * After the durable enqueue, the attempt is delivered to bouncer immediately and the failure-stage
- * verdict is applied, so an enforced standing expires the open checkout session behind the payment
- * intent. A redelivered second event for the same attempt finds the row already delivered and
- * leaves the session alone.
+ * verdict is applied, so an enforced standing expires the open checkout sessions of the charge's
+ * customer, whether the session is payment- or subscription-mode. A redelivered second event for
+ * the same attempt finds the row already delivered and leaves the sessions alone.
  */
 async function reportDeclinedCharge(params: {
   owner: Parameters<typeof resolveBouncerCreditOwner>[0];
@@ -472,6 +502,7 @@ async function reportDeclinedCharge(params: {
     payer: reported.payer,
     wireEventId: reported.wireEventId,
     requestId: chargeId ?? paymentIntentId ?? eventId,
+    customerId: stripeReferenceId(params.owner.customer) ?? null,
     paymentIntentId,
   });
 }

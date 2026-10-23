@@ -250,11 +250,16 @@ export type DecideFlag = DecideResponse['flags'][number];
 /**
  * A charge verdict. `enforced: true` refuses a checkout or expires the payer's open sessions;
  * `flags` are internal and are logged, never returned to a client.
+ *
+ * `enforced` is the only field that decides, so it is the only required one: a new block `code`, a
+ * renamed one, or a flag shape from a newer bouncer must never turn an enforced verdict into a
+ * fail-open. `code` and the whole `flags` list are log-only metadata, kept when they match the
+ * known shape and dropped otherwise.
  */
 const chargeDecideResponseSchema = z.object({
   enforced: z.boolean(),
-  code: z.literal('charge_blocked').optional(),
-  flags: z.array(bouncerFlagSchema),
+  code: z.literal('charge_blocked').optional().catch(undefined),
+  flags: z.array(bouncerFlagSchema).catch([]),
 });
 
 export type ChargeDecideResponse = z.infer<typeof chargeDecideResponseSchema>;

@@ -263,10 +263,32 @@ describe('chargeDecide', () => {
   });
 
   it.each([
-    ['a missing flags list', { enforced: false }],
+    ['an unknown code and a malformed flag', { enforced: true, code: 'banned', flags: [{}] }],
+    ['a non-string code and no flags', { enforced: true, code: 7 }],
+  ])('keeps an enforced verdict with %s', async (_name, body) => {
+    mockFetch.mockResolvedValue(Response.json(body));
+    await expect(chargeDecide(request)).resolves.toEqual({ enforced: true, flags: [] });
+  });
+
+  it('keeps the known flags of an enforced verdict whose code is unknown', async () => {
+    const flag = { name: 'card_testing', decision: 'block', enforced: true, until: null };
+    mockFetch.mockResolvedValue(
+      Response.json({ enforced: true, code: 'something_new', flags: [flag] })
+    );
+    await expect(chargeDecide(request)).resolves.toEqual({ enforced: true, flags: [flag] });
+  });
+
+  it('drops the flags list when any entry has an unknown shape', async () => {
+    mockFetch.mockResolvedValue(
+      Response.json({ enforced: true, flags: [{ name: 'card_testing', decision: 'block' }] })
+    );
+    await expect(chargeDecide(request)).resolves.toEqual({ enforced: true, flags: [] });
+  });
+
+  it.each([
     ['a non-boolean enforced', { enforced: 'yes', flags: [] }],
-    ['an unknown code', { enforced: true, code: 'banned', flags: [] }],
     ['a non-object body', 'allow'],
+    ['a body without enforced', { code: 'charge_blocked', flags: [] }],
   ])('fails open on %s', async (_name, body) => {
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
     mockFetch.mockResolvedValue(Response.json(body));

@@ -48,9 +48,9 @@ import {
   getProfileAgentsPath,
   getProfileCommandsPath,
   getProfileMcpPath,
-  getProfilesPath,
   getProfileSkillsPath,
   getProfileSlashCommandsPath,
+  getProfilesPath,
   getProfileVariablesPath,
 } from '@/lib/profile-agent-navigation';
 

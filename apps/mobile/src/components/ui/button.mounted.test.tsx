@@ -9,7 +9,12 @@ import type * as NativeCSSCompiler from 'react-native-css/compiler';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { Button, BUTTON_BUSY_SLOT_CLASS, type ButtonProps } from './button';
+import {
+  Button,
+  BUTTON_BUSY_LABEL_CLASS,
+  BUTTON_BUSY_OVERLAY_CLASS,
+  type ButtonProps,
+} from './button';
 import { Text } from './text';
 
 vi.mock('react-native', () => ({
@@ -204,41 +209,36 @@ describe('Button native target contract', () => {
     expect(button.props.accessibilityLabel).toBeUndefined();
   });
 
-  it('reserves a fixed-size slot for the busy spinner so the label never moves', async () => {
+  it('replaces the label with a centred spinner and keeps the label in layout', async () => {
+    const label = renderButton({ loading: false }).findByType(NativeText);
     const button = renderButton({ loading: true });
-    const slots = button.findAllByProps({ className: BUTTON_BUSY_SLOT_CLASS });
-    // One leading slot holds the spinner; an equal trailing spacer mirrors it so
-    // the label keeps the button's centre. Both stay in flow for the same two
-    // reasons: the spinner sits beside a content-sized label instead of over it,
-    // and neither is added or removed when `loading` flips.
-    expect(slots).toHaveLength(2);
-    for (const slot of slots) {
-      expect(slot.type).toBe('View');
-    }
-    const slotStyles = await compiledStyles(BUTTON_BUSY_SLOT_CLASS);
-    expect(slotStyles).toContainEqual(expect.objectContaining({ width: 20 }));
-    expect(slotStyles).toContainEqual(expect.objectContaining({ height: 20 }));
-    // The reservation must not shrink: a flex child defaults to flex-shrink 1,
-    // and a compressed slot collapses the spinner while the label stays put.
-    expect(slotStyles).toContainEqual(expect.objectContaining({ flexShrink: 0 }));
-
+    // The label stays in the row, so a content-sized button keeps exactly the
+    // width its label needs and nothing shifts when the request starts.
+    expect(button.findByType(NativeText)).toBe(label);
+    const wrappers = button.findAllByProps({ className: `${BUTTON_BUSY_LABEL_CLASS} opacity-0` });
+    expect(wrappers).toHaveLength(1);
+    expect(wrappers[0]?.props.accessibilityElementsHidden).toBe(true);
+    expect(wrappers[0]?.props.importantForAccessibility).toBe('no-hide-descendants');
+    // The spinner is out of flow, so it adds no width of its own and sits on
+    // the button's centre rather than beside the label.
     const spinner = button.findByType(ActivityIndicator);
     expect(spinner.props.size).toBe('small');
-    expect(spinner.parent).toBe(slots[0]);
+    expect(spinner.parent?.props.className).toBe(BUTTON_BUSY_OVERLAY_CLASS);
+    const overlayStyles = await compiledStyles(BUTTON_BUSY_OVERLAY_CLASS);
+    expect(overlayStyles).toContainEqual(expect.objectContaining({ position: 'absolute' }));
 
-    // The label is the same element, in the same row, once loading ends: the
-    // reserved slots stay and only the indicator leaves its slot.
-    const label = button.findByType(NativeText);
-    expect(label.children).toEqual(['Retry']);
+    // The wrapper and the label are the same elements once loading ends; only
+    // the opacity, the accessibility hiding and the indicator change.
     const ready = renderButton({ loading: false });
     expect(ready.findByType(NativeText)).toBe(label);
-    expect(ready.findAllByProps({ className: BUTTON_BUSY_SLOT_CLASS })).toHaveLength(2);
     expect(ready.findAllByType(ActivityIndicator)).toHaveLength(0);
+    expect(ready.findAllByProps({ className: BUTTON_BUSY_LABEL_CLASS })).toHaveLength(1);
   });
 
-  it('leaves a button that never loads without a reserved slot', () => {
+  it('leaves a button that never loads without a busy wrapper', () => {
     const button = renderButton({});
-    expect(button.findAllByProps({ className: BUTTON_BUSY_SLOT_CLASS })).toHaveLength(0);
+    expect(button.findAllByProps({ className: BUTTON_BUSY_LABEL_CLASS })).toHaveLength(0);
+    expect(button.findAllByProps({ className: BUTTON_BUSY_OVERLAY_CLASS })).toHaveLength(0);
     expect(button.findByType(NativeText).children).toEqual(['Retry']);
   });
 

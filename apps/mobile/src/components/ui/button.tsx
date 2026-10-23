@@ -42,18 +42,14 @@ const buttonVariants = cva(
 // without changing the compact visual size.
 const SM_HIT_SLOP = { top: 4, bottom: 4, left: 4, right: 4 };
 
-// The busy spinner is drawn inside a fixed-size slot before the label. The slot
-// is rendered in both states - an empty 20pt box at rest, the spinner while
-// `loading` is on - so flipping `loading` only swaps its contents: no box is
-// added or removed and the label never shifts. An in-flow slot (rather than an
-// absolute overlay pinned to the content edge) keeps the spinner beside a
-// content-sized button's label instead of drawing it on top of the label.
-// `shrink-0` is what makes the reservation hold: a flex child defaults to
-// `flex-shrink: 1`, so a long or large-type label could compress the 20pt slot
-// to a sliver and collapse the spinner inside it while the centered label
-// stayed put (the 2026-09-29 device proof: identical label ink, near-zero busy
-// ink in flight). The slot never gives up its box, in either motion branch.
-export const BUTTON_BUSY_SLOT_CLASS = 'h-[20px] w-[20px] shrink-0 items-center justify-center';
+// While `loading` is on, the spinner replaces the label instead of sitting
+// beside it. The label stays in the row at zero opacity, so a content-sized
+// button keeps exactly the width its label needs and nothing shifts when the
+// request starts or ends; the spinner is painted over the button's centre, out
+// of flow, so it adds no width of its own. The hidden label also leaves the
+// accessibility tree, because the button carries its own busy name.
+export const BUTTON_BUSY_LABEL_CLASS = 'min-w-0 shrink flex-row items-center justify-center gap-2';
+export const BUTTON_BUSY_OVERLAY_CLASS = 'absolute inset-0 items-center justify-center';
 
 /**
  * The visible text of the button's children, for a label a loading button can
@@ -170,12 +166,12 @@ function Button({
   // matches what is on screen.
   const resolvedLabel =
     accessibilityLabel ?? (loading !== undefined ? flattenChildrenText(children) : undefined);
-  // Reserve the busy slot whenever the caller opted into `loading` (even when
-  // it is false), so the row has the same geometry before and during a request.
-  // A button that never loads keeps its original layout. The fixed `icon` size
-  // has no label to keep in place, so it shows the indicator inline instead of
-  // reserving a slot that would overflow its 44pt box.
-  const rendersBusySlot = loading !== undefined && size !== 'icon';
+  // The label lives in a wrapper whenever the caller opted into `loading` (even
+  // when it is false), so the wrapper element and its geometry stay identical
+  // across a request; only its opacity changes. A button that never loads keeps
+  // its original children untouched. The fixed `icon` size has no label to
+  // replace, so it draws the indicator inline instead.
+  const usesBusyLayout = loading !== undefined && size !== 'icon';
   const busyIndicator = loading ? (
     <ActivityIndicator size="small" color={spinnerColor(variant, colors)} />
   ) : null;
@@ -220,17 +216,23 @@ function Button({
         hitSlop={hitSlop ?? (size === 'sm' ? SM_HIT_SLOP : undefined)}
         {...props}
       >
-        {rendersBusySlot ? (
-          <View className={BUTTON_BUSY_SLOT_CLASS}>{busyIndicator}</View>
+        {usesBusyLayout ? (
+          <View
+            className={cn(BUTTON_BUSY_LABEL_CLASS, loading && 'opacity-0')}
+            accessibilityElementsHidden={loading}
+            importantForAccessibility={loading ? 'no-hide-descendants' : 'auto'}
+          >
+            {normalizedChildren}
+          </View>
         ) : (
-          busyIndicator
+          normalizedChildren
         )}
-        {normalizedChildren}
-        {rendersBusySlot ? (
-          // Mirrors the leading slot (and the row's own gap), so the label keeps
-          // the button's centre instead of drifting toward the trailing edge.
-          <View className={BUTTON_BUSY_SLOT_CLASS} />
+        {loading && size !== 'icon' ? (
+          <View className={BUTTON_BUSY_OVERLAY_CLASS}>
+            <ActivityIndicator size="small" color={spinnerColor(variant, colors)} />
+          </View>
         ) : null}
+        {size === 'icon' ? busyIndicator : null}
       </Pressable>
     </TextClassContext.Provider>
   );

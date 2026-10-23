@@ -82,7 +82,6 @@ function hasUsableMessage(error: unknown): boolean {
   return error instanceof Error && error.message.trim().length > 0;
 }
 
-
 export function ProfileOverviewScreen({
   profileId,
   organizationId,

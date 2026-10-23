@@ -1,11 +1,17 @@
-import { act, createElement } from 'react';
+/* eslint-disable max-lines -- the bottom-clearance, viewport-floor and keyboard cases share this file's real ScrollView mock harness */
+import { act, createElement, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
-import { getTabBarIconForwardHeight, getTabBarOverlayHeight } from '@/lib/tab-bar-layout';
+import {
+  getEffectiveTabBarHeight,
+  getTabBarIconForwardHeight,
+  getTabBarOverlayHeight,
+} from '@/lib/tab-bar-layout';
+import { type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
-import { TabScreenScrollView, useTabBarBottomPadding } from './tab-screen';
+import { SheetScrollView, TabScreenScrollView, useTabBarBottomPadding } from './tab-screen';
 
 /** Mirrors `TAB_SCREEN_BOTTOM_GAP` in `tab-screen.tsx`. */
 const TAB_SCREEN_BOTTOM_GAP = 16;
@@ -58,16 +64,20 @@ function Probe() {
 }
 
 /**
- * The clearance `useTabBarBottomPadding` reserves under a tab-bar context:
- * `true`/`false` are the tabs layout's label decisions, `null` is the root
- * stack (no bar), `undefined` is a screen rendered under neither layout.
+ * The clearance `useTabBarBottomPadding` reserves under a tab-bar context: a
+ * boolean is the tabs layout's label decision, `null` is the root stack (no
+ * bar), `undefined` is a screen rendered under neither layout.
  */
 async function clearanceFor(showLabel: boolean | null | undefined): Promise<number> {
   const probe = createElement(Probe);
   const ui =
     showLabel === undefined
       ? probe
-      : createElement(TabBarLabelContext, { value: showLabel }, probe);
+      : createElement(
+          TabBarLabelContext,
+          { value: showLabel === null ? null : { showLabel, labelLines: 1 } },
+          probe
+        );
   const mounted = await renderWithProviders(ui);
   try {
     return mounted.renderer.root.findByType('Probe').props.padding as number;
@@ -80,6 +90,25 @@ async function clearanceFor(showLabel: boolean | null | undefined): Promise<numb
 const frame = (width: number, height: number) => ({
   nativeEvent: { layout: { width, height, x: 0, y: 0 } },
 });
+
+/** The viewport margin (`marginBottom`) the mounted scroll view reserves. */
+function reservedMargin(renderer: ReactTestRenderer): number | undefined {
+  const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
+  const style = scroll?.props.style as [{ marginBottom?: number } | undefined];
+  return style.at(-1)?.marginBottom;
+}
+
+/** Feeds one frame layout pass through the mounted scroll view's own handler. */
+function layoutFrame(renderer: ReactTestRenderer, width: number, height: number) {
+  act(() => {
+    layoutHandlerOf(renderer)?.(frame(width, height));
+  });
+}
+
+function layoutHandlerOf(renderer: ReactTestRenderer) {
+  const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
+  return (scroll as { props: { onLayout?: (event: unknown) => void } } | undefined)?.props.onLayout;
+}
 
 beforeEach(() => {
   // The reveal fires through a 400ms settle timer; fake timers drive it.
@@ -106,7 +135,11 @@ describe('tab screen bottom clearance', () => {
 
   it('keeps the label-inclusive height when the layout keeps the labels', async () => {
     await expect(clearanceFor(true)).resolves.toBe(
-      getTabBarOverlayHeight(layout.bottom, 'android', layout.fontScale) + TAB_SCREEN_BOTTOM_GAP
+      getTabBarOverlayHeight({
+        bottomInset: layout.bottom,
+        platform: 'android',
+        fontScale: layout.fontScale,
+      }) + TAB_SCREEN_BOTTOM_GAP
     );
   });
 
@@ -120,7 +153,11 @@ describe('tab screen bottom clearance', () => {
   it('keeps the font-scale rule for a screen rendered under neither layout', async () => {
     layout.fontScale = 1.5;
     await expect(clearanceFor(undefined)).resolves.toBe(
-      getTabBarOverlayHeight(layout.bottom, 'android', layout.fontScale) + TAB_SCREEN_BOTTOM_GAP
+      getTabBarOverlayHeight({
+        bottomInset: layout.bottom,
+        platform: 'android',
+        fontScale: layout.fontScale,
+      }) + TAB_SCREEN_BOTTOM_GAP
     );
   });
 });
@@ -137,7 +174,7 @@ describe('TabScreenScrollView', () => {
     const { renderer, unmount } = await renderWithProviders(
       createElement(
         TabBarLabelContext,
-        { value: true },
+        { value: { showLabel: true, labelLines: 1 } },
         createElement(TabScreenScrollView, null, createElement('Content'))
       )
     );
@@ -173,6 +210,212 @@ describe('TabScreenScrollView', () => {
     );
     const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
     expect(scroll?.props.style).toEqual([undefined, { marginBottom: 34 }]);
+    unmount();
+  });
+});
+
+describe('TabScreenScrollView viewport floor', () => {
+  // iOS, no bottom inset, font scale 1: the bar is its 50pt base, so the band
+  // below is exact and easy to read.
+  const BAND = 50;
+
+  it('keeps the whole tab-bar band while the window has room for it', async () => {
+    layout.platform = 'ios';
+    layout.bottom = 0;
+    layout.fontScale = 1;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(TabScreenScrollView, null, createElement('Content'))
+    );
+    layoutFrame(renderer, 874, 600);
+    expect(reservedMargin(renderer)).toBe(BAND);
+    layoutFrame(renderer, 402, 300);
+    expect(reservedMargin(renderer)).toBe(BAND);
+    unmount();
+  });
+
+  it('clamps the band so a collapsed viewport becomes scrollable', async () => {
+    // The reported short landscape window: the band is a margin on a flex-1
+    // frame, so a 100pt screen with 54pt of band first reports a 0pt frame and
+    // nothing on the screen can be reached. The floor releases band until 88pt
+    // of viewport is left.
+    layout.platform = 'ios';
+    layout.bottom = 0;
+    layout.fontScale = 1;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(TabScreenScrollView, null, createElement('Content'))
+    );
+    layoutFrame(renderer, 402, 0);
+    expect(reservedMargin(renderer)).toBe(0);
+    // The next pass measures the room the released band exposed.
+    layoutFrame(renderer, 402, 100);
+    expect(reservedMargin(renderer)).toBe(12);
+    // Settled: the frame keeps the floor and the band no longer moves.
+    layoutFrame(renderer, 402, 88);
+    expect(reservedMargin(renderer)).toBe(12);
+    unmount();
+  });
+
+  it('restores the whole band once the window grows again', async () => {
+    layout.platform = 'ios';
+    layout.bottom = 0;
+    layout.fontScale = 1;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(TabScreenScrollView, null, createElement('Content'))
+    );
+    layoutFrame(renderer, 402, 0);
+    expect(reservedMargin(renderer)).toBe(0);
+    layoutFrame(renderer, 402, 100);
+    expect(reservedMargin(renderer)).toBe(12);
+    layoutFrame(renderer, 874, 600);
+    expect(reservedMargin(renderer)).toBe(BAND);
+    unmount();
+  });
+
+  it('floors the viewport under a keyboard taller than the frame', async () => {
+    // The IME band collapses the frame the same way in a short landscape
+    // window. The floor releases band until an 88pt strip of content is left,
+    // instead of the screen showing nothing at all while the user types.
+    layout.platform = 'ios';
+    layout.bottom = 0;
+    layout.fontScale = 1;
+    keyboard.occlusion = 300;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(TabScreenScrollView, null, createElement('Content'))
+    );
+    layoutFrame(renderer, 402, 0);
+    expect(reservedMargin(renderer)).toBe(212);
+    // A 300pt frame is the wrapper the released band exposed; the band settles
+    // at the floor instead of shrinking further.
+    layoutFrame(renderer, 402, 88);
+    expect(reservedMargin(renderer)).toBe(212);
+    unmount();
+  });
+  it('keeps the floor in front of the safe-area band on a root-stack screen', async () => {
+    // A root-stack screen draws no bar, so its band is the bottom inset alone.
+    // The floor still never reserves more than the room the screen has.
+    layout.platform = 'ios';
+    layout.bottom = 34;
+    layout.fontScale = 1;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(
+        TabBarLabelContext,
+        { value: null },
+        createElement(TabScreenScrollView, null, createElement('Content'))
+      )
+    );
+    layoutFrame(renderer, 402, 166);
+    expect(reservedMargin(renderer)).toBe(34);
+    // A room shorter than the floor releases the inset instead of overflowing.
+    layoutFrame(renderer, 402, 0);
+    expect(reservedMargin(renderer)).toBe(0);
+    unmount();
+  });
+
+  it('re-reserves the keyboard band from the measured room, not the tab-bar clamp', async () => {
+    // The room is what is kept: a limit derived from the tab-bar band outlives
+    // the band and truncates the IME reservation, leaving the focused field
+    // under the keyboard with no scroll range (the frame keeps the same height,
+    // so no layout event would correct it).
+    layout.platform = 'ios';
+    layout.bottom = 0;
+    layout.fontScale = 1;
+    let rerender: (() => void) | undefined = undefined;
+    function Host() {
+      const [, setTick] = useState(0);
+      rerender = () => {
+        setTick(tick => tick + 1);
+      };
+      return createElement(TabScreenScrollView, null, createElement('Content'));
+    }
+    const { renderer, unmount } = await renderWithProviders(createElement(Host));
+    // A 200pt window first collapses the frame under the tab-bar band.
+    layoutFrame(renderer, 402, 0);
+    expect(reservedMargin(renderer)).toBe(0);
+    layoutFrame(renderer, 402, 200);
+    expect(reservedMargin(renderer)).toBe(BAND);
+    keyboard.occlusion = 300;
+    act(() => {
+      rerender?.();
+    });
+    // The IME band is reserved up to the floor: 200 - 88, not the tab-bar band.
+    expect(reservedMargin(renderer)).toBe(112);
+    layoutFrame(renderer, 402, 88);
+    expect(reservedMargin(renderer)).toBe(112);
+    unmount();
+  });
+});
+
+describe('SheetScrollView', () => {
+  it('ends a sheet body at the tab bar top so no control is parked under the bar', async () => {
+    // A route sheet opened from a tab reaches the window bottom, and the bar is
+    // drawn over it: the daily-limit sheet's Save button sat inside the bar's
+    // band and a tap on it selected a tab. The viewport has to stop at the bar's
+    // top edge, so the sheet's last control can never be drawn or tapped there.
+    layout.platform = 'android';
+    layout.bottom = 16;
+    layout.fontScale = 1.5;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(
+        SheetScrollView,
+        { style: { backgroundColor: '#000' } },
+        createElement('Content')
+      )
+    );
+    const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
+
+    expect(scroll?.props.style).toEqual([
+      { backgroundColor: '#000' },
+      {
+        marginBottom: getEffectiveTabBarHeight({
+          bottomInset: 16,
+          platform: 'android',
+          fontScale: 1.5,
+        }),
+      },
+    ]);
+    // The 16pt breathing room rides on a trailing spacer, as on a tab screen.
+    const childTypes = scroll?.children.map(child =>
+      typeof child === 'string' ? child : child.type
+    );
+    expect(childTypes).toEqual(['Content', 'View']);
+    unmount();
+  });
+
+  it('reserves the IME in the frame on Android while the tab bar is hidden', async () => {
+    layout.platform = 'android';
+    layout.bottom = 16;
+    layout.fontScale = 1;
+    keyboard.occlusion = 300;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(
+        SheetScrollView,
+        { automaticallyAdjustKeyboardInsets: true },
+        createElement('Content')
+      )
+    );
+    const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
+
+    expect(scroll?.props.style).toEqual([undefined, { marginBottom: 300 }]);
+    expect(scroll?.props.automaticallyAdjustKeyboardInsets).toBe(true);
+    unmount();
+  });
+
+  it('does not reserve tab-bar space for an iOS formSheet', async () => {
+    layout.platform = 'ios';
+    layout.bottom = 34;
+    layout.fontScale = 1;
+    keyboard.occlusion = 300;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(
+        SheetScrollView,
+        { automaticallyAdjustKeyboardInsets: true },
+        createElement('Content')
+      )
+    );
+    const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
+
+    expect(scroll?.props.style).toEqual([undefined, { marginBottom: 0 }]);
+    expect(scroll?.props.automaticallyAdjustKeyboardInsets).toBe(true);
     unmount();
   });
 });

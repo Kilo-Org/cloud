@@ -208,7 +208,42 @@ describe('updateMcpServer secret reuse', () => {
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 
-  test('rejects masked environment values when the environment key set changes', async () => {
+  test('keeps stored environment entries and encrypts replacements', async () => {
+    const stored = storedEnvelope('secret-1');
+    const { db, state } = createMcpServiceDb({
+      type: 'local',
+      command: ['node', 'server.js'],
+      environment: { API_KEY: stored },
+    });
+
+    await updateMcpServer(
+      db,
+      PUBLIC_KEY,
+      PROFILE_ID,
+      SERVER_ID,
+      parseInput({
+        name: 'test-server',
+        type: 'local',
+        config: {
+          command: ['node', 'server.js'],
+          environment: { API_KEY: MASKED_SECRET_VALUE, BASE_URL: 'https://other.example.com' },
+        },
+      }),
+      OWNER
+    );
+
+    expect(state.updateSets).toHaveLength(1);
+    const config = state.updateSets[0]!.config as {
+      command: string[];
+      environment?: Record<string, StoredMcpSecretValue>;
+    };
+    expect(config.environment?.API_KEY).toEqual(stored);
+    const rotated = config.environment?.BASE_URL as { algorithm?: string; encryptedData?: string };
+    expect(rotated.algorithm).toBe('rsa-aes-256-gcm');
+    expect(rotated.encryptedData?.length).toBeGreaterThan(0);
+  });
+
+  test('requires values for new environment entries', async () => {
     const stored = storedEnvelope('secret-1');
     const { db, state } = createMcpServiceDb({
       type: 'local',
@@ -227,7 +262,7 @@ describe('updateMcpServer secret reuse', () => {
           type: 'local',
           config: {
             command: ['node', 'server.js'],
-            environment: { API_KEY: MASKED_SECRET_VALUE, BASE_URL: 'https://other.example.com' },
+            environment: { API_KEY: MASKED_SECRET_VALUE, TOKEN: MASKED_SECRET_VALUE },
           },
         }),
         OWNER
@@ -236,62 +271,39 @@ describe('updateMcpServer secret reuse', () => {
     expect(state.updateSets).toHaveLength(0);
   });
 
-  test('rejects masked environment values when a key is renamed with the same count', async () => {
-    const stored = storedEnvelope('secret-1');
+  test('keeps stored header entries and encrypts replacements', async () => {
+    const stored = storedEnvelope('token-1');
     const { db, state } = createMcpServiceDb({
-      type: 'local',
-      command: ['node', 'server.js'],
-      environment: { API_KEY: stored },
+      type: 'remote',
+      url: 'https://mcp.example.com',
+      headers: { Authorization: stored },
     });
 
-    await expect(
-      updateMcpServer(
-        db,
-        PUBLIC_KEY,
-        PROFILE_ID,
-        SERVER_ID,
-        parseInput({
-          name: 'test-server',
-          type: 'local',
-          config: {
-            command: ['node', 'server.js'],
-            environment: { TOKEN: MASKED_SECRET_VALUE },
-          },
-        }),
-        OWNER
-      )
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
-    expect(state.updateSets).toHaveLength(0);
-  });
+    await updateMcpServer(
+      db,
+      PUBLIC_KEY,
+      PROFILE_ID,
+      SERVER_ID,
+      parseInput({
+        name: 'test-server',
+        type: 'remote',
+        config: {
+          url: 'https://mcp.example.com',
+          headers: { Authorization: MASKED_SECRET_VALUE, 'X-Trace': 'trace-1' },
+        },
+      }),
+      OWNER
+    );
 
-  test('requires every environment value when one value changes', async () => {
-    const { db, state } = createMcpServiceDb({
-      type: 'local',
-      command: ['node', 'server.js'],
-      environment: {
-        BASE_URL: storedEnvelope('https://mcp.example.com'),
-        API_KEY: storedEnvelope('secret-1'),
-      },
-    });
-
-    await expect(
-      updateMcpServer(
-        db,
-        PUBLIC_KEY,
-        PROFILE_ID,
-        SERVER_ID,
-        parseInput({
-          name: 'test-server',
-          type: 'local',
-          config: {
-            command: ['node', 'server.js'],
-            environment: { BASE_URL: 'https://other.example.com', API_KEY: MASKED_SECRET_VALUE },
-          },
-        }),
-        OWNER
-      )
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
-    expect(state.updateSets).toEqual([]);
+    expect(state.updateSets).toHaveLength(1);
+    const config = state.updateSets[0]!.config as {
+      url: string;
+      headers?: Record<string, StoredMcpSecretValue>;
+    };
+    expect(config.headers?.Authorization).toEqual(stored);
+    const rotated = config.headers?.['X-Trace'] as { algorithm?: string; encryptedData?: string };
+    expect(rotated.algorithm).toBe('rsa-aes-256-gcm');
+    expect(rotated.encryptedData?.length).toBeGreaterThan(0);
   });
 
   test('rejects masked values when the server type changes', async () => {

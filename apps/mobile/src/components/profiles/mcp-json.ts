@@ -63,9 +63,7 @@ export function parseRecord(raw: string): ParsedRecord {
   return { ok: true, value: Object.keys(out).length > 0 ? out : undefined };
 }
 
-/**
- * Render the record back into the text area.
- */
+/** Render the record back into the text area. */
 export function formatRecord(record: Record<string, string> | undefined): string {
   if (record === undefined || Object.keys(record).length === 0) {
     return '';

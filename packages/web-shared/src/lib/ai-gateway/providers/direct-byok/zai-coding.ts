@@ -8,6 +8,7 @@ import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-g
 
 export default {
   id: 'zai-coding',
+  models_dev_id: 'zai-coding-plan',
   base_url: 'https://api.z.ai/api/coding/paas/v4',
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions'],

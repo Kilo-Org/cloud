@@ -12,16 +12,6 @@ const DESTRUCTIVE_TONE_THRESHOLD = 90;
 
 const INDETERMINATE_ARC_FRACTION = 0.25;
 
-export function formatCompactTokens(tokens: number): string {
-  if (!Number.isFinite(tokens) || tokens < 0) {
-    return '0';
-  }
-  return formatNumber(Math.trunc(tokens), i18n.language, {
-    notation: 'compact',
-    maximumFractionDigits: 1,
-  });
-}
-
 export function formatExactTokens(tokens: number): string {
   if (!Number.isFinite(tokens) || tokens < 0) {
     return '0';
@@ -121,10 +111,13 @@ export function getHeaderPillContent({
 }): HeaderPillContent {
   if (info) {
     const tone = getContextTone(info.percentage);
+    // The pill reports context usage as a percentage only. While the model's
+    // context window is unresolved there is no honest denominator, so the slot
+    // keeps the dash instead of a token count; the sheet still shows the tokens.
     const primary =
-      info.percentage !== undefined
-        ? formatPercent(info.percentage, i18n.language)
-        : formatCompactTokens(info.contextTokens);
+      info.percentage === undefined
+        ? UNKNOWN_USAGE_LABEL
+        : formatPercent(info.percentage, i18n.language);
     const secondary = formatSessionTotalCost(totalCostMicrodollars);
     return {
       primary,

@@ -69,6 +69,12 @@ export const SESSION_FINISHED_DISMISS_MS = 15 * 60 * 1000;
 const cards = new Map<string, SessionActivity>();
 const listeners = new Set<() => void>();
 let revision = 0;
+/**
+ * True when the last `discoverSessionCards` read ActivityKit itself. While it
+ * is false the returned cards are only the ones this process already knew, so a
+ * restore must not treat the result as the whole live set.
+ */
+let discoveryReadable = true;
 
 function emit(): void {
   revision += 1;
@@ -127,17 +133,14 @@ function endCard(
 
 /**
  * Stop following one session in this process: its card, its press state, and
- * the scope record it was followed under. Returns false when this process did
- * not follow it.
+ * the scope record it was followed under.
  */
-function forgetFollow(sessionId: string): boolean {
+function forgetFollow(sessionId: string): void {
   clearSessionCardPress(sessionId);
   cardScopes.forgetSessionCardScopes([sessionId]);
-  if (!cards.delete(sessionId)) {
-    return false;
+  if (cards.delete(sessionId)) {
+    emit();
   }
-  emit();
-  return true;
 }
 
 /**
@@ -150,8 +153,10 @@ function forgetFollow(sessionId: string): boolean {
 export function discoverSessionCards(): SessionActivity[] {
   const instances = readSessionCards(false);
   if (instances === null) {
+    discoveryReadable = false;
     return [...cards.values()];
   }
+  discoveryReadable = true;
   const liveIds = new Set(instances.map(activity => activity.getId()));
   const known = new Set([
     ...[...cards.values()].map(activity => activity.getId()),
@@ -224,19 +229,23 @@ export async function restoreFollowedSessionCards(ctx: SessionFollowContext | nu
   for (const activity of live) {
     const sessionId = activity.getProps()?.sessionId;
     const scope = sessionId === undefined ? undefined : records.get(sessionId);
-    if (sessionId === undefined || scope === undefined) {
-      // A card no session or no record names (an earlier build kept none).
+    if (sessionId === undefined) {
       endCard(activity, 'immediate');
-    } else if (scope.userId !== ctx.userId || scope.organizationId !== ctx.organizationId) {
-      // Followed under another account or organization: it is out of scope.
-      forgetFollow(sessionId);
-      endCard(activity, 'immediate');
-    } else {
+    } else if (scope !== undefined && cardScopes.isSessionCardScopeCurrent(scope, ctx)) {
       kept.push(sessionId);
       registerSessionActivityToken(activity.getId(), activity, { sessionId, ...scope });
+    } else {
+      // A card no record names (an earlier build kept none), or one followed
+      // under another account or organization: it is out of scope.
+      forgetFollow(sessionId);
+      endCard(activity, 'immediate');
     }
   }
-  cardScopes.pruneSessionCardScopes(kept, records);
+  // An unreadable ActivityKit read proves nothing about which cards are live, so
+  // its empty result must not prune the records the cards still rely on.
+  if (discoveryReadable) {
+    cardScopes.pruneSessionCardScopes(kept, records);
+  }
   retrySessionActivityTokens();
 }
 

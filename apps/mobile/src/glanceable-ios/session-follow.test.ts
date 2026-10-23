@@ -354,6 +354,9 @@ describe('discoverSessionCards', () => {
       undefined
     );
     expect(mocks.registerSessionActivityToken).not.toHaveBeenCalled();
+    // The ended card must leave the followed set, or the session screen keeps
+    // offering Unfollow for a card that is gone.
+    expect(isSessionFollowed('session-1')).toBe(false);
 
     // A locked keychain is not a scope: nothing is ended, nothing is registered.
     const card = fakeActivity('native-2', { sessionId: 'session-2' });
@@ -366,6 +369,21 @@ describe('discoverSessionCards', () => {
 
     expect(card.end).not.toHaveBeenCalled();
     expect(mocks.registerSessionActivityToken).not.toHaveBeenCalled();
+  });
+
+  it('keeps the scope records when ActivityKit cannot be read', async () => {
+    rememberSessionCardScope('session-1', CTX);
+    await _settleSessionCardScopeWritesForTests();
+    mocks.getInstances.mockImplementation(() => {
+      throw new Error('ActivityKit unavailable');
+    });
+
+    await restoreFollowedSessionCards(CTX);
+    await _settleSessionCardScopeWritesForTests();
+
+    // A read that proved nothing must not cost the card its record.
+    const records = await readSessionCardScopes();
+    expect(records?.get('session-1')).toEqual(CTX);
   });
 });
 

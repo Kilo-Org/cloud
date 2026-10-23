@@ -33,6 +33,21 @@ const storedScopesSchema = z.object({
 
 export type SessionCardScope = z.infer<typeof storedScopeSchema>;
 
+/**
+ * True when a card's recorded scope is the given account and organization. A
+ * card with no record has no scope, so it is never current.
+ */
+export function isSessionCardScopeCurrent(
+  scope: SessionCardScope | undefined,
+  ctx: SessionCardScope
+): boolean {
+  return (
+    scope !== undefined &&
+    scope.userId === ctx.userId &&
+    scope.organizationId === ctx.organizationId
+  );
+}
+
 export type SessionCardScopeStore = {
   setItemAsync: (key: string, value: string) => Promise<void>;
   getItemAsync: (key: string) => Promise<string | null>;

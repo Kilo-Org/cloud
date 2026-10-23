@@ -30,6 +30,7 @@ describe('resolveDirectionReload', () => {
         targetIsRtl: true,
         attemptId: arabic,
         previousAttempt: null,
+        canRecordAttempt: true,
       })
     ).toBe('in-sync');
   });
@@ -41,6 +42,7 @@ describe('resolveDirectionReload', () => {
         targetIsRtl: true,
         attemptId: arabic,
         previousAttempt: null,
+        canRecordAttempt: true,
       })
     ).toBe('reload');
   });
@@ -52,6 +54,7 @@ describe('resolveDirectionReload', () => {
         targetIsRtl: false,
         attemptId: english,
         previousAttempt: arabic,
+        canRecordAttempt: true,
       })
     ).toBe('reload');
   });
@@ -63,6 +66,22 @@ describe('resolveDirectionReload', () => {
         targetIsRtl: true,
         attemptId: arabic,
         previousAttempt: arabic,
+        canRecordAttempt: true,
+      })
+    ).toBe('give-up');
+  });
+
+  it('gives up when the attempt cannot be recorded, so the reload cannot repeat unbounded', () => {
+    // A locked device refuses the keychain: reading the marker answers null and
+    // a write would not survive the reload, so every launch would look like the
+    // first mismatch and reload again.
+    expect(
+      resolveDirectionReload({
+        nativeIsRtl: false,
+        targetIsRtl: true,
+        attemptId: arabic,
+        previousAttempt: null,
+        canRecordAttempt: false,
       })
     ).toBe('give-up');
   });
@@ -74,6 +93,7 @@ describe('resolveDirectionReload', () => {
         targetIsRtl: true,
         attemptId: arabic,
         previousAttempt: arabic,
+        canRecordAttempt: false,
       })
     ).toBe('in-sync');
   });

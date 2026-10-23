@@ -103,6 +103,7 @@ import {
 } from '@/lib/hooks/use-language-preference';
 import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission-prompt';
 import { prewarmIntl } from '@/lib/intl-cache';
+import { isProtectedDataAvailable } from '@/lib/protected-data';
 import {
   captureLaunchDeepLink,
   clearPendingDeepLink,
@@ -465,23 +466,29 @@ function RootLayoutNav({
         targetIsRtl: isRtlLanguage(resolved),
         attemptId,
         previousAttempt: await readDirectionReloadAttempt(),
+        // A locked device refuses the keychain, so an attempt recorded now
+        // would not survive the reload and the next launch would repeat it.
+        canRecordAttempt: isProtectedDataAvailable(),
       });
       if (decision === 'in-sync') {
         // The persisted direction reached the native side. Drop the spent
         // attempt so a later language change starts with a fresh one.
         void clearDirectionReloadAttempt();
       } else {
+        let recorded = false;
         if (decision === 'reload') {
           // Record the attempt before the reload: the next start reads this
           // marker and stops instead of reloading the same mismatch again.
-          await writeDirectionReloadAttempt(attemptId);
+          recorded = await writeDirectionReloadAttempt(attemptId);
         }
-        // 'give-up': the previous start already spent its reload on this exact
-        // language and direction and the native side still disagrees, so
-        // another reload would repeat the same launch. Keep the forced write
-        // (it is what the next start reads) and settle on the error surface.
+        // 'give-up', or a write the keychain refused: the previous start
+        // already spent its reload on this exact language and direction and
+        // the native side still disagrees (or the attempt cannot be recorded),
+        // so another reload would repeat the same launch. Keep the forced
+        // write (it is what the next start reads) and settle on the error
+        // surface.
         syncRtl(resolved);
-        if (decision === 'reload') {
+        if (recorded) {
           try {
             await reloadAppAsync();
             // The native reload tears down this JS context; nothing below runs.

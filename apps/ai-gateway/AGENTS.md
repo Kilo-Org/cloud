@@ -36,6 +36,17 @@ through those paths and that no `apps/web` route is shadowed by a rewrite.
   release is only recorded as complete once the gateway is live too.
   `redeploy-web.yml` does not touch this app. Crons stay on the web app; do not
   add them to this app's `vercel.json`.
+- Vercel request cancellation is off: `vercel.json` sets no `supportsCancellation`,
+  so on Vercel `request.signal` never fires when a client disconnects. The
+  function keeps running, the upstream call (which takes `request.signal`) runs
+  to completion, and usage is counted in `after()` from a `Response.clone()`
+  branch, which keeps reading when the client's branch is cancelled. So
+  disconnecting cannot be used to avoid billing. An interrupted upstream body
+  that records no usage comes from the gateway's own duration budget or an
+  upstream disconnect, not from the client. Local `next dev`/`next start` does
+  abort `request.signal` on disconnect. Do not enable `supportsCancellation` for
+  gateway routes until usage capture handles the abort: it cancels the upstream
+  body before its usage object arrives, so the request would record no usage.
 - Server-side Sentry and OpenTelemetry come from
   `packages/web-shared/src/lib/observability`, registered in
   `src/instrumentation.ts` with the `kilocode-ai-gateway` service name. The app

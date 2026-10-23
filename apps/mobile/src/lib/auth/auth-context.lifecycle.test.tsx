@@ -3052,11 +3052,22 @@ describe('session restoration after provider remount', () => {
     store.set(AUTH_TOKEN_KEY, 'second-token');
     store.set(REFRESH_TOKEN_KEY, 'second-refresh');
     const third = await mountAndGetContext(mod);
-    onTestFinished(() => {
+    expect(third.getCtx().token).toBe('second-token');
+    await act(() => {
       third.unmount();
     });
-    expect(third.getCtx().token).toBe('second-token');
-    expect(third.getCtx().restoreFailed).toBe(false);
+
+    // Remounting repeatedly keeps using secure storage rather than a
+    // one-time refresh snapshot from an earlier provider.
+    store.set(AUTH_TOKEN_KEY, 'third-token');
+    store.set(REFRESH_TOKEN_KEY, 'third-refresh');
+    const fourth = await mountAndGetContext(mod);
+    onTestFinished(() => {
+      fourth.unmount();
+    });
+    expect(fourth.getCtx().token).toBe('third-token');
+    expect(fourth.getCtx().restoreFailed).toBe(false);
+
   });
 
   it('does not restore an initial session after explicit sign-out', async () => {

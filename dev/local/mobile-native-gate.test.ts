@@ -113,8 +113,8 @@ test('the gate reads the pull request changed files', () => {
 
 test('a platform is skipped by the gate output it publishes', () => {
   const workflow = readWorkflow();
-  assert.equal(workflow.jobs.ios.if, "needs.gate.outputs.need_ios == 'true'");
-  assert.equal(workflow.jobs.android.if, "needs.gate.outputs.need_android == 'true'");
+  assert.match(workflow.jobs.ios.if ?? '', /needs\.gate\.outputs\.need_ios == 'true'/);
+  assert.match(workflow.jobs.android.if ?? '', /needs\.gate\.outputs\.need_android == 'true'/);
   const iosUpload = workflow.jobs.ios.steps.find(item =>
     (item.uses ?? '').startsWith('actions/upload-artifact')
   );

@@ -30,29 +30,35 @@ export function useCheckProviderConnection() {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
 
-  const fetchProviderStatus = (input: CheckProviderConnectionInput) => {
-    // The two providers answer with different status shapes, so each arm
-    // fetches its own options — a union of the two queryOptions types is
-    // not assignable to a single query call.
+  const fetchProviderStatus = async (
+    input: CheckProviderConnectionInput
+  ): Promise<{ connected: boolean }> => {
     if (input.platform === 'gitlab') {
-      return queryClient.query({
-        ...(input.organizationId
-          ? trpc.organizations.reviewAgent.getGitLabStatus.queryOptions({
-              organizationId: input.organizationId,
-            })
-          : trpc.personalReviewAgent.getGitLabStatus.queryOptions()),
+      if (input.organizationId) {
+        const status = await queryClient.query({
+          ...trpc.organizations.reviewAgent.getGitLabStatus.queryOptions({
+            organizationId: input.organizationId,
+          }),
+          staleTime: 0,
+        });
+        return { connected: status.connected };
+      }
+      const status = await queryClient.query({
+        ...trpc.personalReviewAgent.getGitLabStatus.queryOptions(),
         staleTime: 0,
       });
+      return { connected: status.connected };
     }
     if (!input.organizationId) {
-      return Promise.resolve({ connected: false });
+      return { connected: false };
     }
-    return queryClient.query({
+    const status = await queryClient.query({
       ...trpc.organizations.reviewAgent.getBitbucketReadiness.queryOptions({
         organizationId: input.organizationId,
       }),
       staleTime: 0,
     });
+    return { connected: status.connected };
   };
 
   return useMutation({

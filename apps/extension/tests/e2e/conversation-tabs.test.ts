@@ -809,8 +809,8 @@ test('conversation remount loads current storage instead of cached query history
       route.fulfill({
         json: {
           code: 'request-value',
-          user_code: 'ABCD-2345',
           device_code: 'base64url-device-secret',
+          user_code: 'ABCD-2345',
           verificationUrl: 'https://example.com/device-auth?code=ABCD-2345',
         },
         status: 200,

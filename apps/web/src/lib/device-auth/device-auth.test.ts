@@ -9,6 +9,7 @@ import {
   hashDeviceSecret,
   createDeviceAuthRequest,
   getDeviceAuthRequest,
+  getDeviceAuthRequestByPollCode,
   approveDeviceAuthRequest,
   denyDeviceAuthRequest,
   consumeDeviceAuthByDeviceCode,
@@ -209,6 +210,8 @@ describe('Device Auth', () => {
       expect(request?.status).toBe('pending');
       expect(request?.code).toBe(result.code);
       expect(request?.user_code).toBe(result.userCode);
+      expect((await getDeviceAuthRequestByPollCode(result.code))?.id).toBe(request?.id);
+      expect(await getDeviceAuthRequestByPollCode(result.userCode)).toBeUndefined();
       expect(request?.device_code_hash).toBe(hashDeviceSecret(result.deviceCode));
       expect(request?.user_agent).toBe('test-agent');
       expect(request?.ip_address).toBe('127.0.0.1');

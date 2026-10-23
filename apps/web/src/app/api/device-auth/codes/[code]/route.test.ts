@@ -10,7 +10,7 @@ jest.mock('@sentry/nextjs');
 
 import {
   denyDeviceAuthRequest,
-  getDeviceAuthRequest,
+  getDeviceAuthRequestByPollCode,
   isDeviceAuthRequestExpired,
 } from '@/lib/device-auth/device-auth';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
@@ -18,7 +18,7 @@ import { verifyDeviceAuthViewerToken } from '@/lib/device-auth/device-auth-viewe
 import { checkRateLimit } from '@vercel/firewall';
 import { GET, DELETE } from './route';
 
-const mockGet = jest.mocked(getDeviceAuthRequest);
+const mockGet = jest.mocked(getDeviceAuthRequestByPollCode);
 const mockDeny = jest.mocked(denyDeviceAuthRequest);
 const mockGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockVerifyToken = jest.mocked(verifyDeviceAuthViewerToken);

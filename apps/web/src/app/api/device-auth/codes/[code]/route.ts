@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   denyDeviceAuthRequest,
-  getDeviceAuthRequest,
+  getDeviceAuthRequestByPollCode,
   isDeviceAuthRequestExpired,
 } from '@/lib/device-auth/device-auth';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
@@ -28,7 +28,7 @@ export const GET = withRestTiming(
       return NextResponse.json({ error: 'Code parameter is required' }, { status: 400 });
     }
 
-    const request = await getDeviceAuthRequest(code);
+    const request = await getDeviceAuthRequestByPollCode(code);
     if (!request) {
       return NextResponse.json({ status: 'expired' }, { status: 410 });
     }

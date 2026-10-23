@@ -138,8 +138,8 @@ describe('device auth API client', () => {
       return jsonResponse(
         {
           code: 'request-value',
-          user_code: 'ABCD-2345',
           device_code: 'base64url-device-secret',
+          user_code: 'ABCD-2345',
           verificationUrl: 'https://app.kilo.ai/device-auth?code=ABCD-2345&app=1',
         },
         { status: 200 }

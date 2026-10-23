@@ -131,6 +131,15 @@ export async function getDeviceAuthRequest(userCode: string) {
 
   return request;
 }
+export async function getDeviceAuthRequestByPollCode(pollCode: string) {
+  const [request] = await db
+    .select()
+    .from(device_auth_requests)
+    .where(eq(device_auth_requests.code, pollCode))
+    .limit(1);
+
+  return request;
+}
 
 /**
  * Check if a device auth request has expired.

@@ -15,7 +15,7 @@ jest.mock('@/lib/device-auth/device-auth', () => {
   return {
     DeviceAuthPendingLimitError,
     createDeviceAuthRequest: jest.fn(),
-    getDeviceAuthRequest: jest.fn(),
+    getDeviceAuthRequestByPollCode: jest.fn(),
     isDeviceAuthRequestExpired: jest.fn(),
     denyDeviceAuthRequest: jest.fn(),
     consumeDeviceAuthByDeviceCode: jest.fn(),
@@ -43,7 +43,7 @@ jest.mock('@sentry/nextjs', () => ({
 
 import {
   createDeviceAuthRequest,
-  getDeviceAuthRequest,
+  getDeviceAuthRequestByPollCode,
   isDeviceAuthRequestExpired,
 } from '@/lib/device-auth/device-auth';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
@@ -61,7 +61,7 @@ const MOBILE_HEADERS = {
 };
 
 const mockCreateDeviceAuthRequest = jest.mocked(createDeviceAuthRequest);
-const mockGetDeviceAuthRequest = jest.mocked(getDeviceAuthRequest);
+const mockGetByPollCode = jest.mocked(getDeviceAuthRequestByPollCode);
 const mockIsDeviceAuthRequestExpired = jest.mocked(isDeviceAuthRequestExpired);
 const mockGetUserFromAuth = jest.mocked(getUserFromAuth);
 
@@ -142,7 +142,7 @@ describe('REST data routes emit one api_timing line', () => {
   });
 
   test('GET /api/device-auth/codes/[code]', async () => {
-    mockGetDeviceAuthRequest.mockResolvedValue({
+    mockGetByPollCode.mockResolvedValue({
       status: 'pending',
       expires_at: new Date(Date.now() + 60_000).toISOString(),
     } as never);

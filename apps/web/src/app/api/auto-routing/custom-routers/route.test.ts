@@ -744,11 +744,29 @@ describe('/api/auto-routing/custom-routers', () => {
   });
 
   describe('linked entries', () => {
+    test('rejects a link on a gateway entry the platform can serve', async () => {
+      const entry = { ...gateway(FLASH), measuredAs: SONNET };
+      const created = await create(
+        routerBody({ entries: [entry], defaultEntryKey: customRouterEntryKey(entry) })
+      );
+
+      expect(created.status).toBe(400);
+      expect(created.body).toMatchObject({
+        error: {
+          code: 'invalid_request',
+          message: 'measuredAs is only for entries the platform cannot serve',
+        },
+      });
+      expect(mockedGetPlatformMeasurements).not.toHaveBeenCalled();
+      expect(mockedRegister).not.toHaveBeenCalled();
+      expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
+    });
+
     test.each(['gateway', 'client'] as const)(
       'accepts a listed platform measurement for a %s entry',
       async kind => {
         const entry = {
-          ...(kind === 'gateway' ? gateway(FLASH) : clientEntry('local-sonnet')),
+          ...(kind === 'gateway' ? gateway(BYOK) : clientEntry('local-sonnet')),
           measuredAs: SONNET,
         };
         const created = await create(
@@ -763,7 +781,7 @@ describe('/api/auto-routing/custom-routers', () => {
     );
 
     test('rejects a link absent from the platform measurements list before admission', async () => {
-      const entry = { ...gateway(FLASH), measuredAs: DENIED };
+      const entry = { ...gateway(BYOK), measuredAs: DENIED };
       const created = await create(
         routerBody({ entries: [entry], defaultEntryKey: customRouterEntryKey(entry) })
       );
@@ -779,7 +797,7 @@ describe('/api/auto-routing/custom-routers', () => {
         status: 503,
         body: { error: 'Measurements unavailable' },
       });
-      const entry = { ...gateway(FLASH), measuredAs: SONNET };
+      const entry = { ...gateway(BYOK), measuredAs: SONNET };
       const created = await create(
         routerBody({ entries: [entry], defaultEntryKey: customRouterEntryKey(entry) })
       );
@@ -791,7 +809,7 @@ describe('/api/auto-routing/custom-routers', () => {
     });
 
     test('does not admit a linked gateway entry for platform inference', async () => {
-      const entry = { ...gateway(FLASH), measuredAs: SONNET };
+      const entry = { ...gateway(BYOK), measuredAs: SONNET };
       const created = await create(
         routerBody({ entries: [entry], defaultEntryKey: customRouterEntryKey(entry) })
       );
@@ -801,7 +819,7 @@ describe('/api/auto-routing/custom-routers', () => {
     });
 
     test('preserves an unchanged link when its model disappears from measurements', async () => {
-      const entry = { ...gateway(FLASH), measuredAs: SONNET };
+      const entry = { ...gateway(BYOK), measuredAs: SONNET };
       await create(
         routerBody({ entries: [entry], defaultEntryKey: customRouterEntryKey(entry) })
       );
@@ -823,7 +841,7 @@ describe('/api/auto-routing/custom-routers', () => {
     });
 
     test('revalidates existing links when the benchmark base changes', async () => {
-      const entry = { ...gateway(FLASH), measuredAs: SONNET };
+      const entry = { ...gateway(BYOK), measuredAs: SONNET };
       await create(
         routerBody({ entries: [entry], defaultEntryKey: customRouterEntryKey(entry) })
       );
@@ -844,16 +862,17 @@ describe('/api/auto-routing/custom-routers', () => {
     });
 
     test('persists an update that changes only the measurement link', async () => {
-      await create(routerBody());
+      await create(routerBody({ entries: [gateway(BYOK)], defaultEntryKey: `gateway:${BYOK}` }));
       mockedRegister.mockClear();
-      const entry = { ...gateway(SONNET), measuredAs: SONNET };
+      const entry = { ...gateway(BYOK), measuredAs: SONNET };
       const response = await updateRouter(
         request('/user/coding', { method: 'PATCH', body: { entries: [entry] } }),
         params('user', 'coding')
       );
 
       expect(response.status).toBe(200);
-      expect(((await response.json()) as CustomRouterResponse).router.entries).toEqual([entry]);
+      const summary = ((await response.json()) as CustomRouterResponse).router;
+      expect(summary.entries.map(item => item.entry)).toEqual([entry]);
       const [row] = await db.select().from(auto_routing_custom_routers);
       expect(row?.entries).toEqual([entry]);
       expect(mockedRegister).not.toHaveBeenCalled();

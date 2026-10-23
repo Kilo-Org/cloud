@@ -293,6 +293,14 @@ async function gatewayEntryRejections(params: {
   entries: CustomRouterEntry[];
 }): Promise<ReadonlyMap<string, string>> {
   const rejections = new Map<string, string>();
+  for (const entry of params.entries) {
+    if (entry.kind === 'gateway' && !requiresClientEval(entry) && entry.measuredAs) {
+      throw new CustomRouterApiError(
+        'invalid_request',
+        'measuredAs is only for entries the platform cannot serve'
+      );
+    }
+  }
   if (!params.entries.some(entry => entry.kind === 'gateway')) return rejections;
   const catalog = await buildEligibleCatalog({
     userId: params.userId,
@@ -366,9 +374,7 @@ async function requestPlatformBenchmarks(params: {
   entries: CustomRouterEntry[];
 }): Promise<void> {
   const models = params.entries.flatMap(entry =>
-    entry.kind === 'gateway' && !entry.measuredAs && !requiresClientEval(entry)
-      ? [{ model: entry.model }]
-      : []
+    entry.kind === 'gateway' && !requiresClientEval(entry) ? [{ model: entry.model }] : []
   );
   if (models.length === 0) return;
   const signal = AbortSignal.timeout(BENCHMARK_ADMISSION_TIMEOUT_MS);

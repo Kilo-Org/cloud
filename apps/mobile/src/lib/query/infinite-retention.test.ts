@@ -2,6 +2,7 @@ import { InfiniteQueryObserver, QueryClient } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  hasRetentionBudget,
   INFINITE_QUERY_MAX_PAGES,
   reconcileFirstPage,
   withInfiniteRetention,
@@ -32,6 +33,25 @@ describe('withInfiniteRetention', () => {
     const result = withInfiniteRetention({ staleTime: 1000 }, 10);
 
     expect(result.maxPages).toBe(10);
+  });
+});
+
+describe('hasRetentionBudget', () => {
+  it('allows a page while the retained count is below the bound', () => {
+    expect(hasRetentionBudget(0, 5)).toBe(true);
+    expect(hasRetentionBudget(4, 5)).toBe(true);
+  });
+
+  it('refuses a page at or past the bound', () => {
+    // At the bound the next page would push the cache past `maxPages`, and the
+    // forward-fetch trim drops index 0 — page one, the newest page.
+    expect(hasRetentionBudget(5, 5)).toBe(false);
+    expect(hasRetentionBudget(6, 5)).toBe(false);
+  });
+
+  it('defaults to the shared retention constant', () => {
+    expect(hasRetentionBudget(INFINITE_QUERY_MAX_PAGES - 1)).toBe(true);
+    expect(hasRetentionBudget(INFINITE_QUERY_MAX_PAGES)).toBe(false);
   });
 });
 

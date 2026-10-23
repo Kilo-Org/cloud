@@ -270,11 +270,4 @@ describe('the module hand-off', () => {
     expect(ACTIVITY_SOURCE).not.toContain('EXTRA_RESULT');
     expect(MODULE_SOURCE).not.toContain('completeAppAction');
   });
-
-  it('declares that a StartAgent this entry point delivers asks the user first', () => {
-    // This entry point is exported to every installed app, and an intent
-    // carries no proof of which app sent it, so the shared dispatcher asks in
-    // the app before a session is created.
-    expect(MODULE_SOURCE).toContain('Function("startAgentNeedsConfirmation") { true }');
-  });
 });

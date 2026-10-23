@@ -39,26 +39,12 @@ type KiloAppActionsModule = InstanceType<typeof NativeModule> & {
    */
   // oxlint-disable-next-line anti-slop/no-unknown-returns -- raw native buffer, normalized on the next line of this module
   registerAppActionDispatcher: (handler: NativeAppActionHandler) => unknown;
-  /**
-   * Whether a `StartAgent` this platform's entry point delivers asks the user
-   * first. Android declares it; iOS does not, because its intents run with no
-   * screen.
-   */
-  startAgentNeedsConfirmation?: () => boolean;
 };
 
 const nativeModule = requireOptionalNativeModule<KiloAppActionsModule>('KiloAppActions');
 
 /** Whether this binary has the native app-action surface built in. */
 export const isNativeAppActionsAvailable = nativeModule !== null;
-
-/**
- * Whether this binary's entry point asks the user before a `StartAgent` starts:
- * the platform's own answer, and `false` for a binary that does not declare one.
- */
-export function startAgentNeedsConfirmation(): boolean {
-  return nativeModule?.startAgentNeedsConfirmation?.() === true;
-}
 
 /**
  * Hand the JS dispatcher to the native module and return the handler it drives

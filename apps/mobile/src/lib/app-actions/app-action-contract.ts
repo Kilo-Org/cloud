@@ -1,7 +1,5 @@
 // The four app actions the OS surfaces (Siri, Spotlight, Shortcuts, the Action
-// button, Control Center, widget buttons) can ask for. A session start asks the
-// signed-in user in the app before it runs, so the app comes forward for it;
-// the open actions land on their destination.
+// button, Control Center, widget buttons) can run without opening the app.
 //
 // This module is the single description of them: their ids, their URL grammar,
 // the JSON-object payload the native bridge sends, the destination each one
@@ -59,9 +57,6 @@ export type AppActionRequest =
   | { action: 'OpenSession'; sessionId: string }
   | { action: 'OpenPullRequest'; pullRequest: string };
 
-/** A `StartAgent` request, without its discriminant. */
-export type StartAgentRequest = Extract<AppActionRequest, { action: 'StartAgent' }>;
-
 /**
  * What a run reports back to its caller. `message` is filled by the caller
  * from the existing catalog keys; this contract never carries copy.
@@ -79,7 +74,7 @@ export type AppActionResult =
         | 'no-repository'
         | 'not-a-pull-request'
         | 'unknown-session'
-        | 'declined'
+        | 'start-cancelled'
         | 'start-failed';
       message: string;
     };

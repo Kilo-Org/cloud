@@ -56,6 +56,9 @@ vi.mock('@/components/organization/invited-member-row-state', () => ({
   getInviteSuccessMessage: () => '',
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+// The real clearance reads the tab bar and the keyboard, neither of which this
+// suite models: the surface still renders its body as the ScrollView host.
+vi.mock('@/components/tab-screen', () => ({ SheetScrollView: 'ScrollView' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -262,6 +265,23 @@ describe('MemberLimitSheet validation', () => {
     expect(formField(renderer).error).toBeUndefined();
     expect(saveButton(renderer).disabled).toBe(false);
     unmount();
+  });
+
+  it('enables save for an amount typed with Arabic-Indic digits under the Arabic UI', async () => {
+    await i18n.changeLanguage('ar');
+    try {
+      const { renderer, unmount } = await mountLimitForm(1200);
+
+      act(() => {
+        (formField(renderer).onChangeText as (value: string) => void)('٢٥');
+      });
+
+      expect(formField(renderer).error).toBeUndefined();
+      expect(saveButton(renderer).disabled).toBe(false);
+      unmount();
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 
   it('explains a blank field on a member with no limit only after interaction', async () => {

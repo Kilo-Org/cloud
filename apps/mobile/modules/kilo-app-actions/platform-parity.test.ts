@@ -336,17 +336,6 @@ describe('the same payload and result surface', () => {
 });
 
 describe('the mechanism each platform has', () => {
-  it('asks before a StartAgent starts on the entry point any app can reach', () => {
-    // Android's entry point is exported to every installed app and its intents
-    // carry no proof of the caller, so it declares that the pipeline asks the
-    // signed-in user before a session is created. The iOS intent runs with the
-    // app closed, where no dialog can appear, so it declares nothing and the
-    // request the OS already obtained runs as given.
-    expect(androidModuleSource).toContain('Function("startAgentNeedsConfirmation") { true }');
-    expect(iosModuleSource).not.toContain('startAgentNeedsConfirmation');
-    expect(swiftStruct('StartAgentIntent')).toContain('static var openAppWhenRun: Bool = false');
-  });
-
   it('declares the Shortcuts-app gallery exactly once and only on iOS', () => {
     // The statement the pull request must carry, as an assertion: the
     // AppShortcutsProvider — the Shortcuts-app gallery — is iOS's mechanism

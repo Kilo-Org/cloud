@@ -8,6 +8,7 @@ import {
 
 export default {
   id: 'edenai',
+  models_dev_id: 'edenai',
   base_url: 'https://api.edenai.run/v3',
   base_url_overrides: { messages: 'https://api.edenai.run/v3/v1' },
   supported_chat_apis: ['chat_completions', 'messages', 'responses'],

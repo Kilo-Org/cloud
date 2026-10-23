@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one cohesive mounted suite: rendering states, reorder and delete labels, and the save/reconcile paths share the screen's mock harness */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -9,6 +10,7 @@ import {
   findOne,
   mountScreen,
   pressableDisabled,
+  pressButton,
   pressMove,
   pressPressable,
   rerenderScreen,
@@ -37,7 +39,10 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfile: () => h.query,
   useAgentProfileMutations: () => h.mutations,
 }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ back: h.back }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ back: h.back }),
+  usePreventRemove: () => undefined,
+}));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
 vi.mock('react-native', () => ({
   View: 'View',
@@ -194,6 +199,52 @@ describe('ProfileCommandsScreen', () => {
     unmount();
   });
 
+  it('names each delete control by its one-based position', async () => {
+    h.query.data = testProfile(['a', 'b', 'c']);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    const trash = findAll(renderer.root, 'Pressable').filter(
+      node => typeof node.props.accessibilityLabel === 'string'
+    );
+    expect(
+      trash
+        .map(node => node.props.accessibilityLabel as string)
+        .filter(label => label.startsWith('Delete'))
+    ).toEqual(['Delete command 1', 'Delete command 2', 'Delete command 3']);
+    // Each destructive control also carries the row's place in the list, like
+    // the move controls beside it.
+    expect(
+      trash
+        .filter(node => String(node.props.accessibilityLabel).startsWith('Delete'))
+        .map(node => node.props.accessibilityHint)
+    ).toEqual(['1 / 3', '2 / 3', '3 / 3']);
+
+    unmount();
+  });
+
+  it('keeps the plain delete label on a blank draft row', async () => {
+    h.query.data = testProfile(['a']);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    pressButton(renderer.root);
+
+    // A blank row is not a command, so it claims no position — the same
+    // fallback the move controls use.
+    expect(findAll(renderer.root, 'Pressable').map(node => node.props.accessibilityLabel)).toEqual([
+      'Move command 1 up',
+      'Move command 1 down',
+      'Delete command 1',
+      'Move up',
+      'Move down',
+      'Delete',
+    ]);
+
+    unmount();
+  });
+
   it('edge: the move buttons are disabled at both ends', async () => {
     h.query.data = testProfile(['a', 'b', 'c']);
     h.query.isPending = false;
@@ -214,7 +265,7 @@ describe('ProfileCommandsScreen', () => {
     h.mutations.setCommands.mutateAsync.mockResolvedValue({ success: true });
 
     const { renderer, unmount } = await mountScreen();
-    pressPressable(renderer.root, 'Delete', 0);
+    pressPressable(renderer.root, 'Delete command 1', 0);
 
     await waitFor(() => h.mutations.setCommands.mutateAsync.mock.calls.length > 0);
     expect(h.mutations.setCommands.mutateAsync.mock.calls[0]?.[0]).toEqual({
@@ -235,7 +286,7 @@ describe('ProfileCommandsScreen', () => {
     act(() => {
       (addButton.props as { onPress: () => void }).onPress();
     });
-    pressPressable(renderer.root, 'Delete', 0);
+    pressPressable(renderer.root, 'Delete command 1', 0);
 
     await waitFor(() => h.mutations.setCommands.mutateAsync.mock.calls.length > 0);
     expect(h.mutations.setCommands.mutateAsync.mock.calls[0]?.[0]).toEqual({

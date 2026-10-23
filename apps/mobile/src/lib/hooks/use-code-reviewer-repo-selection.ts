@@ -3,7 +3,15 @@ import { hashKey, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { type ReviewConfigData, type ReviewerPlatform } from '@/lib/code-reviewer-config';
+import {
+  getRepoSelectionSender,
+  isRepoSelectionEpochCurrent,
+  type RepoSelectionSaveVars,
+  sameSelection,
+  scheduleSend,
+} from '@/lib/hooks/repo-selection-senders';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { trpcClient } from '@/lib/trpc';
 
@@ -15,80 +23,6 @@ import {
   useReviewConfigCacheReader,
   useReviewConfigQueryKey,
 } from './use-code-reviewer';
-
-export const REPO_SELECTION_DEBOUNCE_MS = 500;
-
-type RepoSelectionDelta = {
-  add: (number | string)[];
-  remove: (number | string)[];
-};
-
-type RepoSelectionSaveVars = RepoSelectionDelta & {
-  optimisticSelection: (number | string)[];
-};
-
-type RepoSelectionSender = {
-  timer: ReturnType<typeof setTimeout> | null;
-  // The latest user-intended selection. Null means no toggle is pending.
-  pendingSelection: (number | string)[] | null;
-  // The last server-confirmed selection. Null means the server state is not
-  // yet known (no toggle and no refetch have synced it).
-  serverSelection: (number | string)[] | null;
-  // The mutation trigger of the hook instance that currently owns this key.
-  mutate: ((vars: RepoSelectionSaveVars) => void) | null;
-};
-
-// One pending debounced send per scope+platform. The timer closes over the
-// sender state, so a remount never retargets an older timer. `serverSelection`
-// is the last server-confirmed selection; `pendingSelection` is the latest
-// user-intended selection and is null while nothing is pending.
-const repoSelectionSenders = new Map<string, RepoSelectionSender>();
-
-function getRepoSelectionSender(key: string): RepoSelectionSender {
-  let sender = repoSelectionSenders.get(key);
-  if (!sender) {
-    sender = { timer: null, pendingSelection: null, serverSelection: null, mutate: null };
-    repoSelectionSenders.set(key, sender);
-  }
-  return sender;
-}
-
-function sameSelection(a: (number | string)[] | null, b: (number | string)[] | null): boolean {
-  if (a === null || b === null) {
-    return a === b;
-  }
-  if (a.length !== b.length) {
-    return false;
-  }
-  return a.every(id => b.includes(id));
-}
-
-// Schedules the trailing-edge 500ms send. The delta is computed at fire time
-// from the module-level pending/server selections, so no intermediate rapid
-// toggle is lost and a refetch that clobbers the optimistic cache cannot
-// collapse the send to an empty delta.
-function scheduleSend(sender: RepoSelectionSender): void {
-  if (sender.timer) {
-    clearTimeout(sender.timer);
-  }
-  sender.timer = setTimeout(() => {
-    sender.timer = null;
-    const pending = sender.pendingSelection;
-    const server = sender.serverSelection ?? [];
-    if (pending === null) {
-      return;
-    }
-    const add = pending.filter(id => !server.includes(id));
-    const remove = server.filter(id => !pending.includes(id));
-    if (add.length === 0 && remove.length === 0) {
-      // The intent now equals the server state, so nothing is left to send.
-      // Clear it so a later refetch does not mistake it for live user intent.
-      sender.pendingSelection = null;
-      return;
-    }
-    sender.mutate?.({ add, remove, optimisticSelection: pending });
-  }, REPO_SELECTION_DEBOUNCE_MS);
-}
 
 /**
  * Sends a `selectedRepositoryDelta` patch without touching the optimistic
@@ -137,7 +71,10 @@ function useSaveReviewConfigDelta(scope: string, platform: ReviewerPlatform) {
         return result;
       }),
     onError: (error, vars) => {
-      const sender = getRepoSelectionSender(saveChainKey);
+      if (!isRepoSelectionEpochCurrent(vars.authEpoch)) {
+        return;
+      }
+      const sender = getRepoSelectionSender(saveChainKey, vars.authEpoch);
       // Roll back only when no newer toggle superseded this failed save. A
       // newer toggle's own debounced send reconciles against the unchanged
       // server state, so clobbering it here would lose that selection.
@@ -156,7 +93,10 @@ function useSaveReviewConfigDelta(scope: string, platform: ReviewerPlatform) {
       announcingToast.error(error.message);
     },
     onSuccess: (_result, vars) => {
-      const sender = getRepoSelectionSender(saveChainKey);
+      if (!isRepoSelectionEpochCurrent(vars.authEpoch)) {
+        return;
+      }
+      const sender = getRepoSelectionSender(saveChainKey, vars.authEpoch);
       sender.serverSelection = vars.optimisticSelection;
       // Clear the pending intent only when it matches what this save just
       // confirmed; a newer toggle keeps its own pending send alive.
@@ -167,8 +107,13 @@ function useSaveReviewConfigDelta(scope: string, platform: ReviewerPlatform) {
         sender.pendingSelection = null;
       }
     },
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    onSettled: () => queryClient.invalidateQueries({ queryKey }),
+    onSettled: async (_data, _error, vars) => {
+      // The invalidation runs only while the save's epoch is current.
+      if (!isRepoSelectionEpochCurrent(vars.authEpoch)) {
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey });
+    },
   });
 }
 
@@ -184,10 +129,12 @@ export function useRepoSelectionToggle(scope: string, platform: ReviewerPlatform
   const senderKey = `${scope}:${platform}`;
   const readConfig = useReviewConfigCacheReader(scope, platform);
   const deltaSave = useSaveReviewConfigDelta(scope, platform);
+  const epoch = currentAuthEpoch();
 
-  const sender = getRepoSelectionSender(senderKey);
-  sender.mutate = deltaSave.mutate;
-
+  // The mutate trigger is published only while the mount's epoch is current.
+  if (isRepoSelectionEpochCurrent(epoch)) {
+    getRepoSelectionSender(senderKey, epoch).mutate = deltaSave.mutate;
+  }
   const queryKeyHash = hashKey(queryKey);
 
   useEffect(() => {
@@ -208,11 +155,15 @@ export function useRepoSelectionToggle(scope: string, platform: ReviewerPlatform
       if (fetched === undefined) {
         return;
       }
+      // The resync runs only while the mount's epoch is current.
+      if (!isRepoSelectionEpochCurrent(epoch)) {
+        return;
+      }
       // Resync the baseline with the refetched server selection. If a user
       // toggle is still pending and differs from the fetched state, re-apply
       // it to the cache and re-schedule the send so the toggle reaches the
       // server and stays visible.
-      const refetchedSender = getRepoSelectionSender(senderKey);
+      const refetchedSender = getRepoSelectionSender(senderKey, epoch);
       refetchedSender.serverSelection = fetched;
       const pending = refetchedSender.pendingSelection;
       if (pending !== null && !sameSelection(pending, fetched)) {
@@ -223,15 +174,19 @@ export function useRepoSelectionToggle(scope: string, platform: ReviewerPlatform
       }
     });
     // eslint-disable-next-line react/exhaustive-deps -- queryKey is derived from queryKeyHash; re-subscribing on every render would churn the cache listener
-  }, [queryClient, queryKeyHash, senderKey]);
+  }, [queryClient, queryKeyHash, senderKey, epoch]);
 
   return (id: number | string) => {
+    // The toggle writes only while its epoch is current.
+    if (!isRepoSelectionEpochCurrent(epoch)) {
+      return;
+    }
     const current = readConfig()?.selectedRepositoryIds ?? [];
     const next = current.includes(id)
       ? current.filter(existing => existing !== id)
       : [...current, id];
 
-    const currentSender = getRepoSelectionSender(senderKey);
+    const currentSender = getRepoSelectionSender(senderKey, epoch);
     // First toggle: the pre-optimistic cache is the server-confirmed value.
     currentSender.serverSelection ??= current;
     currentSender.pendingSelection = next;
@@ -242,16 +197,4 @@ export function useRepoSelectionToggle(scope: string, platform: ReviewerPlatform
 
     scheduleSend(currentSender);
   };
-}
-
-// Test-only: cancels every pending debounced timer and clears the sender
-// state so a test never leaks a fire into a later case (same pattern as
-// resetDraftTimersForTests in drafts.ts).
-export function resetRepoSelectionSendersForTests(): void {
-  for (const sender of repoSelectionSenders.values()) {
-    if (sender.timer) {
-      clearTimeout(sender.timer);
-    }
-  }
-  repoSelectionSenders.clear();
 }

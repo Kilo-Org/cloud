@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+
 import org.json.JSONObject
 
 /**
@@ -104,6 +105,11 @@ internal object KiloActionContract {
     }
     return slug?.takeIf(SLUG_BY_ACTION::containsValue)
   }
+
+  /** True when the intent asks for `StartAgent`, the action confirmed in the app. */
+  fun isStartAgent(intent: Intent?): Boolean =
+    intent != null && slugOf(intent) == SLUG_BY_ACTION[ACTION_START_AGENT]
+
 }
 
 /**
@@ -114,8 +120,7 @@ internal object KiloActionContract {
  * contract payload and hands it to the shared JS dispatcher, which runs the
  * action and is the surface that reports the outcome in the app.
  *
- * A `StartAgent` asks the signed-in user in the app before it starts a session
- * (`start-agent-confirmation.ts`); the open actions navigate as they always do.
+ * Session starts use `confirm-app-action-start.ts`.
  */
 class KiloActionActivity : Activity() {
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -135,14 +140,18 @@ class KiloActionActivity : Activity() {
       finish()
       return
     }
-    // A false answer means the JS runtime is not up yet and the dispatcher
-    // buffered the payload: bring the app up, and registration drains the same
-    // payload through that same dispatcher.
+    if (KiloActionContract.isStartAgent(intent)) {
+      showInApp()
+    }
     if (!AppActionDispatcher.dispatch(payload)) {
-      packageManager.getLaunchIntentForPackage(packageName)?.let { launched ->
-        startActivity(launched)
-      }
+      showInApp()
     }
     finish()
+  }
+
+  private fun showInApp() {
+    packageManager.getLaunchIntentForPackage(packageName)?.let { launched ->
+      startActivity(launched)
+    }
   }
 }

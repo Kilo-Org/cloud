@@ -5,7 +5,6 @@ import { type NativeAppActionHandler } from './native-bridge';
 const native = vi.hoisted(() => ({
   requireOptionalNativeModule: vi.fn(),
   registerAppActionDispatcher: vi.fn(),
-  startAgentNeedsConfirmation: vi.fn(),
 }));
 
 vi.mock('expo', () => ({ requireOptionalNativeModule: native.requireOptionalNativeModule }));
@@ -77,28 +76,6 @@ describe('native app actions bridge', () => {
     const bridge = await import('./native-bridge');
     const { buffered } = await bridge.registerNativeAppActionDispatcher(handler());
     expect(buffered).toEqual([]);
-  });
-
-  it('takes the confirmation requirement from the platform that declares one', async () => {
-    native.startAgentNeedsConfirmation.mockReturnValue(true);
-    const bridge = await import('./native-bridge');
-    expect(bridge.startAgentNeedsConfirmation()).toBe(true);
-  });
-
-  it('asks nothing on a platform that runs its intents without a screen', async () => {
-    // iOS registers a dispatcher and declares no confirmation: its App Intent
-    // hands the request over with the app closed, where no dialog can appear.
-    native.requireOptionalNativeModule.mockReturnValue({
-      registerAppActionDispatcher: native.registerAppActionDispatcher,
-    });
-    const bridge = await import('./native-bridge');
-    expect(bridge.startAgentNeedsConfirmation()).toBe(false);
-  });
-
-  it('asks nothing when the binary has no app-action surface at all', async () => {
-    native.requireOptionalNativeModule.mockReturnValue(null);
-    const bridge = await import('./native-bridge');
-    expect(bridge.startAgentNeedsConfirmation()).toBe(false);
   });
 
   it('keeps the dispatch result on a platform whose entry points read the promise', async () => {

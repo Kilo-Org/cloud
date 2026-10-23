@@ -38,6 +38,8 @@ export type ImportIssueCode =
   | 'invalid-config-json'
   | 'invalid-config-section'
   | 'duplicate-config-file'
+  | 'instruction-glob-limit'
+  | 'instruction-globs-exceeded'
   | 'invalid-frontmatter'
   | 'empty-import'
   | 'missing-skill-manifest'

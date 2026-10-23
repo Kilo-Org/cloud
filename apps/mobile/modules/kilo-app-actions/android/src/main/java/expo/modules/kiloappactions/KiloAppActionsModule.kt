@@ -34,14 +34,6 @@ class KiloAppActionsModule : Module() {
       }
     }
 
-    /**
-     * Whether a `StartAgent` delivered through this entry point asks the user
-     * first. It does: the shared dispatcher shows the prompt and the user
-     * confirms it before a session starts. iOS does not declare it, because its
-     * intents run with no screen.
-     */
-    Function("startAgentNeedsConfirmation") { true }
-
     OnDestroy {
       AppActionDispatcher.clear()
     }

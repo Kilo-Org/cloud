@@ -92,10 +92,11 @@ export function renderProfileRowBody({
           accessibilityElementsHidden={!summary}
           importantForAccessibility={summary ? 'auto' : 'no-hide-descendants'}
         >
-          {/* Two lines keep every count visible in long locales; the block
-              reserves the taller summary even in the loading state. */}
+          {/* The summary may wrap to a second line in long locales, so every
+              state reserves both lines. A one-line placeholder would let the
+              row grow as soon as the profile resolves. */}
           <Text className="text-sm leading-5 text-muted-foreground" numberOfLines={2}>
-            {summary ?? '\u00A0'}
+            {summary ?? '\u00A0\n\u00A0'}
           </Text>
           {isProfileLoading ? (
             <Skeleton className="absolute inset-y-0 left-0 w-2/3 rounded" />

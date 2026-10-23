@@ -95,7 +95,7 @@ describe('new-session environment feedback', () => {
   it('renders loading feedback immediately without a false default, stale profile, or Retry', () => {
     const root = renderRow({ isProfileLoading: true, profile: PROFILE });
 
-    expect(text(root)).toEqual(['Environment', 'Loading…', '\u00A0']);
+    expect(text(root)).toEqual(['Environment', 'Loading…', '\u00A0\n\u00A0']);
     expect(root.findByProps({ children: 'Loading…' }).props).toMatchObject({
       accessibilityLiveRegion: 'polite',
       accessibilityState: { busy: true },
@@ -119,7 +119,7 @@ describe('new-session environment feedback', () => {
   it('shows the default only after the query settles empty and hides the blank slot from accessibility', () => {
     const root = renderRow();
 
-    expect(text(root)).toEqual(['Environment', 'Default environment', '\u00A0']);
+    expect(text(root)).toEqual(['Environment', 'Default environment', '\u00A0\n\u00A0']);
     expect(
       root.findByProps({ importantForAccessibility: 'no-hide-descendants' }).props
     ).toMatchObject({
@@ -155,8 +155,19 @@ describe('new-session environment feedback', () => {
     });
   });
 
+  it.each([{ isProfileLoading: true }, { isProfileError: true }, {}])(
+    'reserves the two-line summary slot before a profile resolves: %j',
+    next => {
+      const root = renderRow(next);
+      const summary = body(root).findAllByType('Text')[1];
+      expect(summary?.props.numberOfLines).toBe(2);
+      // A one-line placeholder would let the row grow when the profile lands.
+      expect(summary?.props.children).toBe('\u00A0\n\u00A0');
+    }
+  );
+
   it.each([{ isProfileLoading: true }, { profile: PROFILE }, { isProfileError: true }, {}])(
-    'keeps two font-scaled text lines reserved across a state swap: %j',
+    'keeps the summary slot across a state swap: %j',
     next => {
       const pending = renderRow({ isProfileLoading: true });
       const slot = body(pending);
@@ -171,8 +182,6 @@ describe('new-session environment feedback', () => {
       expect(lines).toHaveLength(2);
       const [title, summary] = lines;
       expect(title?.props.numberOfLines).toBe(1);
-      // The summary may take a second line so long locales keep every count;
-      // the block still reserves that height in every state.
       expect(summary?.props.numberOfLines).toBe(2);
       for (const line of lines) {
         expect(line.props.className).toContain('text-sm leading-5');

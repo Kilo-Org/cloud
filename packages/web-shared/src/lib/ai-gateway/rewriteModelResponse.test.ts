@@ -1484,7 +1484,35 @@ describe('rewriteModelResponse_Responses', () => {
     expect(json.usage.prompt_tokens_details.cached_tokens).toBe(0);
   });
 
-  test('restores the id of output items that only carry item_id', async () => {
+  test('restores the id of output items that only carry item_id in JSON responses', async () => {
+    const upstream = jsonResponse({
+      id: 'resp_1',
+      output: [
+        {
+          type: 'function_call',
+          item_id: 'fc_1',
+          call_id: 'call_1',
+          name: 'read',
+          arguments: '{}',
+        },
+        { type: 'message', id: 'msg_1', content: [] },
+      ],
+    });
+
+    const result = await rewriteModelResponse_Responses({
+      response: upstream,
+      removeCost: true,
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+
+    expect(await result.json()).toMatchObject({
+      output: [{ id: 'fc_1', item_id: 'fc_1' }, { id: 'msg_1' }],
+    });
+  });
+
+  test('restores the id of output items that only carry item_id in streams', async () => {
     const upstream = sseResponse(
       'data: {"type":"response.output_item.done","item":{"type":"function_call","item_id":"fc_1","call_id":"call_1","name":"read","arguments":"{}"}}\n\n' +
         'data: {"type":"response.completed","response":{"output":[{"type":"function_call","item_id":"fc_1","call_id":"call_1"},{"type":"message","id":"msg_1"}]}}\n\n'

@@ -828,7 +828,7 @@ type ResponsesApiEvent = {
 /**
  * Amazon Bedrock's mantle `/v1` endpoint names a completed output item's id
  * `item_id`, so the AI SDK cannot match the finished tool call to the one it
- * started. Restore `id` from it.
+ * started, or rejects the item outright. Restore `id` from it.
  */
 function restoreResponsesOutputItemId(item: unknown) {
   if (typeof item !== 'object' || item === null || Array.isArray(item)) return;
@@ -875,6 +875,9 @@ export async function rewriteModelResponse_Responses({
     }
     if (json.usage) {
       rewriteUsage(json.usage, removeCost);
+    }
+    for (const item of Array.isArray(json.output) ? json.output : []) {
+      restoreResponsesOutputItemId(item);
     }
     return NextResponse.json(json, {
       status: response.status,

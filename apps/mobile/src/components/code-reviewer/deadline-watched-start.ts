@@ -34,12 +34,18 @@ export type DeadlineWatchedStart = {
  *
  * `begin` reports whether it admitted the attempt (the caller's own gate may
  * refuse before anything is pending; the watchdog then never arms).
+ *
+ * `reset` withdraws the failure of the attempt in flight: the caller invokes it
+ * when the input that produced that attempt changes, so the feedback and its
+ * retry describe the current input only. The withdrawn attempt's own settle is
+ * ignored; an operation that still succeeds reports through the caller's own
+ * callback.
  */
 export function useDeadlineWatchedStart(
   deadlineMs: number,
   isPendingNow: () => boolean,
   run: (settle: (failureMessage: string | null) => void) => boolean
-): DeadlineWatchedStart & { begin: () => void } {
+): DeadlineWatchedStart & { begin: () => void; reset: () => void } {
   const [stalled, setStalled] = useState(false);
   const [failureMessage, setFailureMessage] = useState<string | null>(null);
   const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -89,8 +95,18 @@ export function useDeadlineWatchedStart(
     }, deadlineMs);
   }, [clearWatchdog, deadlineMs, run]);
 
+  const reset = useCallback(() => {
+    // Bumping the token first makes the withdrawn attempt's pending settle a
+    // no-op, so it cannot publish a result for input it no longer describes.
+    attemptRef.current += 1;
+    clearWatchdog();
+    setStalled(false);
+    setFailureMessage(null);
+  }, [clearWatchdog]);
+
   return {
     begin,
+    reset,
     // Read at render time from the caller's getter: a mutation's isPending
     // flips in the same commit that re-renders this hook, so the direct call
     // is current without a ref round-trip.

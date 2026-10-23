@@ -3502,11 +3502,11 @@
       "title": "模型目录",
       "search": "搜索 Hugging Face 模型",
       "tabs": "模型筛选",
-      "fitsTab": "适合此设备",
+      "fitsTab": "适配此设备",
       "fromHuggingFace": "来自 Hugging Face",
       "loading": "正在加载模型",
       "noResults": "未找到模型",
-      "noFits": "没有适合此设备的模型",
+      "noFits": "没有适配此设备的模型",
       "noFitsDescription": "更大的模型位于“$t(common.all)”标签页中。",
       "fit": {
         "fits": "适配",

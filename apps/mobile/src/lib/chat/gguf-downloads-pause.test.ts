@@ -39,4 +39,15 @@ describe('pausing one download', () => {
     await finish(taskAt(h.tasks, 0), 1000);
     expect(h.store.model('small')).toBeDefined();
   });
+
+  it('stops the download when a cancel arrives while the pause is still landing', async () => {
+    const h = harness({ cancelRacesPause: true });
+    h.store.start(CATALOG);
+    taskAt(h.tasks, 0).progress({ bytesWritten: 100, totalBytes: 1000 });
+    h.store.pause('small');
+    h.store.cancel('small');
+    await flush();
+    expect(h.store.snapshot()).toMatchObject({ download: null, failure: null });
+    expect(h.files.size).toBe(0);
+  });
 });

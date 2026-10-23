@@ -43,6 +43,8 @@ export function harness(
     readonly unreadable?: string;
     /** A task that refuses pause the way expo-file-system does once it is cancelled. */
     readonly refusePause?: boolean;
+    /** A task whose cancel loses to a pause already under way: it reports itself paused. */
+    readonly cancelRacesPause?: boolean;
   } = {}
 ) {
   const freeBytes = options.freeBytes ?? 8_000_000_000;
@@ -119,6 +121,11 @@ export function harness(
           paused();
         },
         cancel: () => {
+          // A pause already under way answers the cancel: the task reports itself paused.
+          if (options.cancelRacesPause === true) {
+            current.resolve(null);
+            return;
+          }
           current.reject(new Error('download cancelled'));
         },
       } satisfies GgufDownloadTask;

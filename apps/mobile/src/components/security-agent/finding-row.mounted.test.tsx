@@ -166,7 +166,9 @@ describe('FindingRow quick action link routing', () => {
   });
 
   it('opens a supported review link on the in-app review route', () => {
-    pressQuickAction(renderRow('available', findingFixture(prOpened('https://github.com/kilo/demo/pull/123'))));
+    pressQuickAction(
+      renderRow('available', findingFixture(prOpened('https://github.com/kilo/demo/pull/123')))
+    );
 
     expect(mocks.routerPush).toHaveBeenCalledWith('/(app)/pr-review/kilo/demo/123');
     expect(mocks.openBrowser).not.toHaveBeenCalled();

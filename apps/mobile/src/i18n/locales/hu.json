@@ -224,7 +224,7 @@
     "hideBalance": "Egyenleg elrejtése",
     "showBalance": "Egyenleg megjelenítése",
     "balanceHidden": "Egyenleg elrejtve",
-    "bonusCreditsExpiring": "{{amount}} értékű bónuszkredit lejárati ideje: {{date}}.",
+    "bonusCreditsExpiring": "{{amount}} értékű kredit lejárati ideje: {{date}}.",
     "signOutTitle": "Kijelentkezel?",
     "signOutMessage": "A munkaterületed eléréséhez újra be kell jelentkezned.",
     "deleteAccountTitle": "Törlöd a fiókodat?",
@@ -669,7 +669,8 @@
       "gitlabDescription": "Csatlakoztasd a GitLab-fiókodat a merge requestek kódellenőrzéséhez mobilon.",
       "bitbucketDescription": "Csatlakoztasd a Bitbucketot ehhez a szervezethez a módosítási kérelmek mobilos kódellenőrzéséhez.",
       "bitbucketOrgOnlyDescription": "Váltsd a fenti fiókot egy szervezetre a Bitbucket-módosítási kérelmek kódellenőrzéséhez.",
-      "contextLine": "{{organization}} számára"
+      "contextLine": "{{organization}} számára",
+      "contextLinePersonal": "Személyes fiókodhoz"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1479,7 +1480,15 @@
       "instructions": "Utasítások (nem kötelező)",
       "instructionsPlaceholder": "Az ellenőrzés kiemelt szempontjai…",
       "starting": "Kódellenőrzés indítása…",
-      "start": "Kódellenőrzés indítása"
+      "start": "Kódellenőrzés indítása",
+      "startNotFound": "Az adott {{requestNoun}} nem olvasható be a {{provider}} felületéről. Ellenőrizd az URL-t, és hogy a repozitórium elérhető-e.",
+      "startRateLimited": "A {{provider}} jelenleg korlátozza a kéréseket. Próbáld újra néhány perc múlva.",
+      "startNotAllowed": "Nincs hozzáférésed kódellenőrzés indításához az adott {{requestNoun}} esetében. Ellenőrizd a jogosultságaidat, valamint a szervezeted előfizetését.",
+      "startProviderNeedsAttention": "A kézi kódellenőrzéshez a {{provider}} alap kapcsolata szükséges. Csatlakoztasd, és próbáld újra.",
+      "startAlreadyRunning": "A {{requestNoun}} ellenőrzése már fut.",
+      "startRejected": "Ez a {{requestNoun}} nem ellenőrizhető. Győződj meg róla, hogy nyitott, nem vázlat, és hogy az URL helyes.",
+      "startProviderUnavailable": "A {{provider}} nem érhető el a {{requestNoun}} beolvasásához. Próbáld újra.",
+      "startFailed": "Nem sikerült elindítani az ellenőrzést. Ellenőrizd a kapcsolatot, és próbáld újra."
     },
     "notConnectedReadOnly": "Nincs kapcsolat ezzel a platformmal: {{platform}}. Csak a szervezet tulajdonosai és adminisztrátorai csatlakoztathatják.",
     "gitlab": {
@@ -2112,6 +2121,7 @@
       "dollar_other": "dollár",
       "costSpoken": "költség: {{cost}}",
       "costSpokenWithTime": "költség: {{cost}}, {{time}}",
+      "spokenJoiner": "és",
       "pullRequest": "{{number}}. módosítási kérelem"
     },
     "githubInstall": {
@@ -2241,6 +2251,7 @@
       "branchLoadError": "Nem sikerült betölteni az ágakat",
       "branchUnavailable": "Ehhez az adattárhoz nem érhetők el ágak. Ellenőrizd a jogosultságodat a szolgáltatónál, majd válassz másik adattárat.",
       "branchEmpty": "Nincs elérhető ág",
+      "branchListIncomplete": "Csak néhány ág látható. Az adattárban több ág van, mint amennyit ez a lista tartalmazhat.",
       "branchPlaceholder": "Válassz ágat",
       "runOnWithTarget": "Futtatás helye: {{target}}",
       "environment": "Környezet",
@@ -2466,7 +2477,71 @@
       "preparationComplete": "Az előkészítés befejeződött",
       "preparationFailed": "Az előkészítés meghiúsult",
       "setupCommand": "{{index}}. beállítási parancs",
-      "setupCommandOf": "{{index}}. beállítási parancs (összesen {{displayCount}})"
+      "setupCommandOf": "{{index}}. beállítási parancs (összesen {{displayCount}})",
+      "stepWorkspaceSetup": "Munkaterület beállítása",
+      "stepDiskCheck": "Lemezellenőrzés",
+      "stepCloning": "Repó klónozása",
+      "stepBranch": "Branch beállítása",
+      "stepDevcontainerSetup": "Fejlesztői konténer beállítása",
+      "stepWorkspaceRestore": "Munkaterület visszaállítása",
+      "stepWorkspaceBackup": "Munkaterület mentése",
+      "stepSandboxProvision": "Homokozó kiosztása",
+      "stepSandboxBoot": "Homokozó indítása",
+      "stepSnapshotFallback": "Újrapróbálkozás pillanatkép nélkül",
+      "stepKiloServer": "Kilo indítása",
+      "stepKiloSession": "Munkamenet előkészítése",
+      "stepRestoreIncomplete": "A munkamenet visszaállítása nem fejeződött be",
+      "stepReady": "A környezet kész",
+      "stepFailed": "A környezet beállítása meghiúsult",
+      "stepUnknown": "Környezet beállítása",
+      "detailCreatingSandbox": "Homokozó létrehozása",
+      "detailUpdatingRepository": "Repó frissítése",
+      "detailCheckingOutBranch": "Branch kicserélése",
+      "detailRunningSetupCommands": "Beállítási parancsok futtatása",
+      "detailSavingRepository": "Repó mentése a gyorsabb indításhoz",
+      "detailStartingKiloRuntime": "Kilo-futtatókörnyezet indítása",
+      "detailPreparingKiloSession": "Kilo-munkamenet előkészítése",
+      "detailWaitingForPreviousSandbox": "Várakozás a korábbi homokozó leállására",
+      "detailRetryingSandboxCreation": "Homokozó létrehozásának újrapróbálása",
+      "detailPreviousSnapshotFailed": "A korábbi pillanatképes indítás meghiúsult. Újrapróbálkozás pillanatkép nélkül.",
+      "detailSnapshotStartupFailed": "A pillanatképes indítás meghiúsult. Újrapróbálkozás pillanatkép nélkül.",
+      "detailStartingSandboxWithoutSnapshot": "Homokozó indítása pillanatkép nélkül",
+      "detailSettingUpWorkspace": "Munkaterület beállítása",
+      "detailRestoringSession": "Munkamenet visszaállítása",
+      "detailWarmWorkspaceReused": "Előkészített munkaterület újrahasználva",
+      "detailRetryingClone": "Klónozás újrapróbálása ({{total}}. kísérletből a(z) {{attempt}}.)",
+      "detailSetupCommandFailed": "{{index}}. beállítási parancs meghiúsult",
+      "detailSetupCommandTimedOut": "{{index}}. beállítási parancs időtúllépés miatt megszakadt",
+      "detailColdRestore": "Hideg visszaállítás, pillanatkép alkalmazva, {{total}} fájlból {{applied}} helyreállítva",
+      "detailProgressPercent": "{{percent}}% kész",
+      "detailRestoreIncompleteReport": "A munkamenet visszaállítása nem fejeződött be: {{total}} fájlból {{skipped}} nem lett visszaállítva ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Hiányzó: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} és további {{omitted}}",
+      "detailReasonPatchFailed": "a javítás nem alkalmazható",
+      "detailReasonOutsideWorkspace": "az útvonal a munkaterületen kívül van",
+      "detailReasonMissingContent": "a pillanatkép nem tartalmazott tartalmat a fájlhoz",
+      "detailReasonIndexResetFailed": "az indexet nem sikerült visszaállítani sikertelen alkalmazás után",
+      "detailReasonUnlinkFailed": "a fájlt nem sikerült törölni",
+      "detailReasonWriteFailed": "a fájlt nem sikerült kiírni",
+      "detailReasonUnknown": "ismeretlen ok",
+      "detailUnknown": "Még folyik az előkészítés",
+      "errorPreparationTimeout": "A környezet előkészítése időtúllépés miatt megszakadt",
+      "errorWorkspaceSetupFailed": "A munkaterület beállítása meghiúsult",
+      "errorCredentialUpgradeRequired": "Ehhez a munkamenethez hiányzik egy szükséges hitelesítőadat-frissítés. A folytatáshoz indíts új munkamenetet.",
+      "errorAgentUnavailable": "Az agent elérhetetlenné vált",
+      "errorBillingBlocked": "A homokozó számlázása további krediteket igényel",
+      "errorBillingUnavailable": "A homokozó számlázási vagy kapacitásellenőrzése nem érhető el. Próbáld újra hamarosan.",
+      "errorContainerLimitReached": "Elérted a konténerlimitet. Állíts le egy meglévő konténert, mielőtt újat indítanál.",
+      "errorInvalidConfiguration": "A homokozó konfigurációja érvénytelen vagy nem támogatott",
+      "errorRuntimeArtifactUnauthorized": "A futtatókörnyezet letöltése nem volt engedélyezve",
+      "errorRuntimeArtifactInvalid": "A futtatókörnyezet-összetevő ellenőrzése meghiúsult",
+      "errorRuntimeCliProbeFailed": "A futtatókörnyezet CLI-ellenőrzése meghiúsult",
+      "errorRuntimeSupervisorMissing": "A futtatókörnyezet felügyelője hiányzik",
+      "errorConnectionLost": "A homokozóval való kapcsolat megszakadt",
+      "errorSandboxLost": "A homokozó elveszett",
+      "errorAgentRestarted": "Az agent újraindult",
+      "errorSandboxOutOfMemory": "A homokozó elfogyott a memória",
+      "errorPreparationDidNotComplete": "Az előkészítés nem fejeződött be"
     },
     "permissionCard": {
       "title": "Engedély szükséges",
@@ -3068,10 +3143,12 @@
       "truncated": "Korábbi kreditműveletek is elérhetők."
     },
     "inviteMember": {
+      "alreadyInvited": "Már meg van hívva, vagy már tag.",
       "emailError": "Adj meg egy érvényes e-mail-címet.",
       "emailPlaceholder": "nev@ceg.hu",
       "permissionDenied": "Nincs jogosultságod tagok meghívására.",
       "roleMember": "Szerepkör: tag.",
+      "sendError": "Nem sikerült elküldeni a meghívót.",
       "sendInvite": "Meghívó küldése",
       "title": "Tag meghívása"
     },
@@ -3142,6 +3219,7 @@
       "inviteCreated": "Meghívó létrehozva",
       "pendingInvitations": "Függőben lévő meghívók",
       "resendInvite": "Meghívó újraküldése",
+      "resendInviteError": "Nem sikerült újraküldeni a meghívót.",
       "shareInviteLink": "Meghívóhivatkozás megosztása"
     },
     "usageStats": {
@@ -3287,6 +3365,7 @@
   },
   "transcriptionModel": {
     "title": "Átírási modell",
+    "choose": "Válassz modellt",
     "noneChosen": "Nincs kiválasztva",
     "emptyTitle": "Nincsenek átírási modellek",
     "emptyDescription": "A Kilo Gateway jelenleg nem kínál átírási modelleket.",
@@ -3312,6 +3391,7 @@
   },
   "modelChat": {
     "offlineFailure": "Ehhez a modellhez internetkapcsolat szükséges. Csatlakozz, és próbáld újra, vagy válts egy ezen az eszközön lévő modellre.",
+    "creditsRequired": "Nincs elég egyenleged ennek az üzenetnek az elküldéséhez. Töltsd fel az egyenleged, és próbáld újra.",
     "empty": {
       "title": "Kezdjen csevegést",
       "description": "Küldjön egy üzenetet, hogy beszélgessen egy modellel."
@@ -3386,7 +3466,12 @@
       "serverToolCount_one": "{{count}} eszköz",
       "serverToolCount_other": "{{count}} eszköz",
       "serverUnreachable": "Nem sikerült elérni ezt a szervert",
-      "serverOff": "Ez a szerver ki van kapcsolva"
+      "serverOff": "Ez a szerver ki van kapcsolva",
+      "app": {
+        "label": "Eszköz felülete",
+        "failed": "Az eszköz felületét nem sikerült betölteni.",
+        "empty": "Az eszköz felületén nincs mit megjeleníteni."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Hitelesítés",
@@ -3611,6 +3696,8 @@
     "noSpend": "Még nincs rögzített költés",
     "spend24h": "Költés az elmúlt 24 órában",
     "multiplierError": "Adj meg 1 vagy nagyobb szorzót",
+    "multiplierMaxError": "Adj meg {{max}} vagy kisebb szorzót",
+    "thresholdMaxError": "Adj meg {{max}} vagy kisebb összeget.",
     "permissionDenied": "Nincs jogosultságod a költésfigyelmeztetések kezelésére.",
     "pushOffByCategory": "Értesítésekben kikapcsolva"
   },
@@ -3668,6 +3755,7 @@
     },
     "variablesEmpty": "Még nincsenek változók",
     "variablesSaveFailed": "Nem sikerült menteni a változót",
+    "variablesDeleteFailed": "Nem sikerült törölni a változót",
     "commandsTitle": "Beállítási parancsok",
     "addCommand": "Parancs hozzáadása",
     "commandLabel": "Parancs",
@@ -3678,6 +3766,7 @@
     "moveDown": "Mozgassa le",
     "moveCommandUp": "{{position}}. parancs áthelyezése feljebb",
     "moveCommandDown": "{{position}}. parancs áthelyezése lejjebb",
+    "deleteCommand": "{{position}}. parancs törlése",
     "skillsTitle": "Készségek",
     "addSkill": "Készség hozzáadása",
     "skillNameLabel": "Készség neve",

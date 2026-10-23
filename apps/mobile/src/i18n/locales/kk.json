@@ -224,7 +224,7 @@
     "hideBalance": "Теңгерімді жасыру",
     "showBalance": "Теңгерімді көрсету",
     "balanceHidden": "Теңгерім жасырылған",
-    "bonusCreditsExpiring": "{{amount}} көлеміндегі бонустық кредиттердің мерзімі {{date}} күні аяқталады.",
+    "bonusCreditsExpiring": "{{amount}} көлеміндегі кредиттердің мерзімі {{date}} күні аяқталады.",
     "signOutTitle": "Шығу керек пе?",
     "signOutMessage": "Жұмыс кеңістігіңізді пайдалану үшін аккаунтыңызға қайта кіру қажет болады.",
     "deleteAccountTitle": "Тіркелгіні жою керек пе?",
@@ -669,7 +669,8 @@
       "gitlabDescription": "Мобильдіде біріктіру сұрауларын қарау үшін GitLab тіркелгіңізді қосыңыз.",
       "bitbucketDescription": "Мобильдіде тарту сұрауларын қарау үшін Bitbucket-ты осы ұйымға қосыңыз.",
       "bitbucketOrgOnlyDescription": "Жоғарыдағы тіркелгіні ұйымға ауыстырыңыз, оның Bitbucket тарту сұрауларын қарау үшін.",
-      "contextLine": "{{organization}} үшін"
+      "contextLine": "{{organization}} үшін",
+      "contextLinePersonal": "Жеке аккаунтыңыз үшін"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1479,7 +1480,15 @@
       "instructions": "Нұсқаулар (міндетті емес)",
       "instructionsPlaceholder": "Тексеру кезінде ерекше назар аударатын тұстар…",
       "starting": "Тексеру басталуда…",
-      "start": "Тексеруді бастау"
+      "start": "Тексеруді бастау",
+      "startNotFound": "Бұл {{requestNoun}} {{provider}} ішінен оқу мүмкін болмады. URL мекенжайын және репозиторийдің қолжетімді екенін тексеріңіз.",
+      "startRateLimited": "{{provider}} қазір сұраныстарды шектеп тұр. Бірнеше минуттан кейін қайталап көріңіз.",
+      "startNotAllowed": "Бұл {{requestNoun}} үшін тексеруді бастауға рұқсатыңыз жоқ. Рұқсаттарыңызды және ұйымыңыздың жоспарын тексеріңіз.",
+      "startProviderNeedsAttention": "Қолмен тексеру стандартты {{provider}} қосылымын қажет етеді. Оны қосыңыз да, қайталап көріңіз.",
+      "startAlreadyRunning": "Сол {{requestNoun}} бойынша тексеру қазірдің өзінде жүріп тұр.",
+      "startRejected": "Сол {{requestNoun}} бойынша тексеруді жүргізу мүмкін емес. Оның ашық, әлі жоба күйінде емес екенін және URL мекенжайының дұрыс екенін тексеріңіз.",
+      "startProviderUnavailable": "Сол {{requestNoun}} оқу үшін {{provider}} серверіне қол жеткізу мүмкін болмады. Қайталап көріңіз.",
+      "startFailed": "Тексеруді бастау мүмкін болмады. Қосылымыңызды тексеріңіз де, қайталап көріңіз."
     },
     "notConnectedReadOnly": "{{platform}} қосылмаған. Оны тек ұйым иелері мен әкімшілері қоса алады.",
     "gitlab": {
@@ -2112,6 +2121,7 @@
       "dollar_other": "доллар",
       "costSpoken": "құны {{cost}}",
       "costSpokenWithTime": "құны {{cost}}, {{time}}",
+      "spokenJoiner": ",",
       "pullRequest": "№{{number}} біріктіру сұрауы"
     },
     "githubInstall": {
@@ -2241,6 +2251,7 @@
       "branchLoadError": "Тармақтарды жүктеу мүмкін болмады",
       "branchUnavailable": "Бұл репозиторий үшін тармақтар қолжетімсіз. Провайдердегі рұқсатыңызды тексеріңіз, содан кейін басқа репозиторийді таңдаңыз.",
       "branchEmpty": "Тармақтар жоқ",
+      "branchListIncomplete": "Тек кейбір тармақтар көрсетілген. Репозиторийде бұл тізімге сыймайтын тармақтар бар.",
       "branchPlaceholder": "Тармақты таңдаңыз",
       "runOnWithTarget": "Іске қосу орны: {{target}}",
       "environment": "Орта",
@@ -2466,7 +2477,71 @@
       "preparationComplete": "Дайындық аяқталды",
       "preparationFailed": "Дайындық сәтсіз аяқталды",
       "setupCommand": "Баптау пәрмені: {{index}}",
-      "setupCommandOf": "Баптау пәрмені: {{index}} / {{displayCount}}"
+      "setupCommandOf": "Баптау пәрмені: {{index}} / {{displayCount}}",
+      "stepWorkspaceSetup": "Жұмыс кеңістігін баптау",
+      "stepDiskCheck": "Дискіні тексеру",
+      "stepCloning": "Репозиторий клондалуда",
+      "stepBranch": "Бранш бапталуда",
+      "stepDevcontainerSetup": "Dev контейнері бапталуда",
+      "stepWorkspaceRestore": "Жұмыс кеңістігі қалпына келтірілуде",
+      "stepWorkspaceBackup": "Жұмыс кеңістігі сақталуда",
+      "stepSandboxProvision": "Құмсәт ұсынылуда",
+      "stepSandboxBoot": "Құмсәт іске қосылуда",
+      "stepSnapshotFallback": "Снапшотсыз қайта талаптану",
+      "stepKiloServer": "Kilo іске қосылуда",
+      "stepKiloSession": "Сессия дайындалуда",
+      "stepRestoreIncomplete": "Сессияны қалпына келтіру аяқталмады",
+      "stepReady": "Орта дайын",
+      "stepFailed": "Ортаны баптау сәтсіз аяқталды",
+      "stepUnknown": "Ортаны баптау",
+      "detailCreatingSandbox": "Құмсәт құрылуда",
+      "detailUpdatingRepository": "Репозиторий жаңартылуда",
+      "detailCheckingOutBranch": "Бранш ауыстырылуда",
+      "detailRunningSetupCommands": "Баптау пәрмендері орындалуда",
+      "detailSavingRepository": "Репозиторий жылдам іске қосу үшін сақталуда",
+      "detailStartingKiloRuntime": "Kilo ортасы іске қосылуда",
+      "detailPreparingKiloSession": "Kilo сессиясы дайындалуда",
+      "detailWaitingForPreviousSandbox": "Алдыңғы құмсәттің тоқтауы күтілуде",
+      "detailRetryingSandboxCreation": "Құмсәт құруды қайта талаптану",
+      "detailPreviousSnapshotFailed": "Снапшотпен іске қосу сәтсіз аяқталды. Снапшотсыз қайта талаптанылуда.",
+      "detailSnapshotStartupFailed": "Снапшотпен іске қосу сәтсіз аяқталды. Снапшотсыз қайта талаптанылуда.",
+      "detailStartingSandboxWithoutSnapshot": "Құмсәт снапшотсыз іске қосылуда",
+      "detailSettingUpWorkspace": "Жұмыс кеңістігі бапталуда",
+      "detailRestoringSession": "Сессия қалпына келтірілуде",
+      "detailWarmWorkspaceReused": "Ыстық жұмыс кеңістігі қайта пайдаланылды",
+      "detailRetryingClone": "Клондауды қайта талаптану ({{total}} әрекеттің {{attempt}}-і)",
+      "detailSetupCommandFailed": "{{index}} баптау пәрмені сәтсіз аяқталды",
+      "detailSetupCommandTimedOut": "{{index}} баптау пәрменінің уақыты бітті",
+      "detailColdRestore": "Салқын қалпына келтіру, снапшот қолданылды, {{total}} файлдың {{applied}}-і қалпына келтірілді",
+      "detailProgressPercent": "{{percent}}% аяқталды",
+      "detailRestoreIncompleteReport": "Сессияны қалпына келтіру аяқталмады: {{total}} файлдың {{skipped}}-і қалпына келтірілмеді ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Жетіспейді: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} және тағы {{omitted}}",
+      "detailReasonPatchFailed": "патч қолданылмады",
+      "detailReasonOutsideWorkspace": "жол жұмыс кеңістігінен тыс жерде орналасқан",
+      "detailReasonMissingContent": "снапшотта файлдың мазмұны болмады",
+      "detailReasonIndexResetFailed": "сәтсіз қолданудан кейін индексті қайтара орнату мүмкін болмады",
+      "detailReasonUnlinkFailed": "файлды жою мүмкін болмады",
+      "detailReasonWriteFailed": "файлды жазу мүмкін болмады",
+      "detailReasonUnknown": "белгісіз себеп",
+      "detailUnknown": "Әлі дайындалуда",
+      "errorPreparationTimeout": "Ортаны дайындау уақыты бітті",
+      "errorWorkspaceSetupFailed": "Жұмыс кеңістігін баптау сәтсіз аяқталды",
+      "errorCredentialUpgradeRequired": "Бұл сессияда қажетті тіркелгі деректерін жаңарту жоқ. Жалғастыру үшін жаңа сессия бастаңыз.",
+      "errorAgentUnavailable": "Агент қолжетімсіз болып қалды",
+      "errorBillingBlocked": "Құмсәттің төленуі қосымша кредиттерді қажет етеді",
+      "errorBillingUnavailable": "Құмсәттің төленуін немесе сыйымдылығын тексеру қолжетімсіз. Жақын арада қайта байқап көріңіз.",
+      "errorContainerLimitReached": "Контейнерлер шегіне жетілді. Жаңасын іске қосудан бұрын бар контейнерді тоқтатыңыз.",
+      "errorInvalidConfiguration": "Құмсәт конфигурациясы жарамсыз немесе қолдау көрсетілмейді",
+      "errorRuntimeArtifactUnauthorized": "Ортаны жүктеп алуға рұқсат болмады",
+      "errorRuntimeArtifactInvalid": "Орта артефактісін тексеру сәтсіз аяқталды",
+      "errorRuntimeCliProbeFailed": "Орта CLI-ін тексеру сәтсіз аяқталды",
+      "errorRuntimeSupervisorMissing": "Орта супервайзері жоқ",
+      "errorConnectionLost": "Құмсәт байланысы үзілді",
+      "errorSandboxLost": "Құмсәт жоғалды",
+      "errorAgentRestarted": "Агент қайта іске қосылды",
+      "errorSandboxOutOfMemory": "Құмсәт жадысы таусылды",
+      "errorPreparationDidNotComplete": "Дайындық аяқталмады"
     },
     "permissionCard": {
       "title": "Рұқсат қажет",
@@ -3068,10 +3143,12 @@
       "truncated": "Бұрынғы кредит операцияларын да көруге болады."
     },
     "inviteMember": {
+      "alreadyInvited": "Бұл мекенжайға шақыру бұрын жіберілген немесе ол әлдеқашан ұйым мүшесі болып табылады.",
       "emailError": "Жарамды электрондық пошта мекенжайын енгізіңіз.",
       "emailPlaceholder": "at@kompaniya.kz",
       "permissionDenied": "Мүшелерді шақыруға рұқсатыңыз жоқ.",
       "roleMember": "Рөлі: мүше.",
+      "sendError": "Шақыруды жіберу мүмкін болмады.",
       "sendInvite": "Шақыру жіберу",
       "title": "Мүшені шақыру"
     },
@@ -3142,6 +3219,7 @@
       "inviteCreated": "Шақыру жасалды",
       "pendingInvitations": "Жауап күтілген шақырулар",
       "resendInvite": "Шақыруды қайта жіберу",
+      "resendInviteError": "Шақыруды қайта жіберу мүмкін болмады.",
       "shareInviteLink": "Шақыру сілтемесімен бөлісу"
     },
     "usageStats": {
@@ -3287,6 +3365,7 @@
   },
   "transcriptionModel": {
     "title": "Дауысты мәтінге айналдыру моделі",
+    "choose": "Модельді таңдау",
     "noneChosen": "Ештеңе таңдалмаған",
     "emptyTitle": "Дауысты мәтінге айналдыру модельдері жоқ",
     "emptyDescription": "Kilo Gateway қазір дауысты мәтінге айналдыру модельдерін ұсынбайды.",
@@ -3312,6 +3391,7 @@
   },
   "modelChat": {
     "offlineFailure": "Бұл модельге интернет байланысы қажет. Қосылып, қайталап көріңіз немесе осы құрылғыдағы модельге ауысыңыз.",
+    "creditsRequired": "Бұл хабарламаны жіберу үшін кредит жеткіліксіз. Кредит қосыңыз да, қайталап көріңіз.",
     "empty": {
       "title": "Чатты бастаңыз",
       "description": "Модельмен сөйлесу үшін хабарлама жіберіңіз."
@@ -3386,7 +3466,12 @@
       "serverToolCount_one": "{{count}} құрал",
       "serverToolCount_other": "{{count}} құрал",
       "serverUnreachable": "Осы серверге қосылу мүмкін болмады",
-      "serverOff": "Осы сервер өшірулі"
+      "serverOff": "Осы сервер өшірулі",
+      "app": {
+        "label": "Құрал интерфейсі",
+        "failed": "Бұл құралдың интерфейсін жүктеу мүмкін болмады.",
+        "empty": "Бұл құралдың интерфейсінде көрсететін ештеңе жоқ."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Аутентификация",
@@ -3611,6 +3696,8 @@
     "noSpend": "Әзірге шығыс тіркелмеген",
     "spend24h": "Соңғы 24 сағаттағы шығыс",
     "multiplierError": "1 немесе одан үлкен көбейткіш енгіз",
+    "multiplierMaxError": "{{max}} немесе одан кіші көбейткіш енгіз",
+    "thresholdMaxError": "{{max}} немесе одан кіші соманы енгізіңіз.",
     "permissionDenied": "Шығыс ескертулерін басқаруға рұқсатыңыз жоқ.",
     "pushOffByCategory": "Хабарландыруларда өшірулі"
   },
@@ -3668,6 +3755,7 @@
     },
     "variablesEmpty": "Айнымалылар әлі жоқ",
     "variablesSaveFailed": "Айнымалы мәнді сақтау мүмкін болмады",
+    "variablesDeleteFailed": "Айнымалы мәнді өшіру мүмкін болмады",
     "commandsTitle": "Орнату пәрмендері",
     "addCommand": "Пәрменді қосу",
     "commandLabel": "Пәрмен",
@@ -3678,6 +3766,7 @@
     "moveDown": "Төмен жылжытыңыз",
     "moveCommandUp": "{{position}} пәрменін жоғары жылжыту",
     "moveCommandDown": "{{position}} пәрменін төмен жылжыту",
+    "deleteCommand": "{{position}} пәрменін жою",
     "skillsTitle": "Дағдылар",
     "addSkill": "Шеберлікті қосыңыз",
     "skillNameLabel": "Дағды атауы",

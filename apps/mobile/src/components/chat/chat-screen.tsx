@@ -1,5 +1,6 @@
 import { type ListRenderItem } from '@shopify/flash-list';
 import { type RemoteModelState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { type Href, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
@@ -66,6 +67,7 @@ type ChatScreenProps = {
 
 export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const { t } = useTranslation();
+  const router = useRouter();
   const { organizationId } = useOrganization();
   const place = useChatPlace();
   const { state, send, stop, retry } = useChat(place, opened);
@@ -272,6 +274,9 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
           failureKey={state.failureKey}
           retryable={!actions.hasUnanswered}
           onRetry={() => void retry()}
+          onAddCredits={() => {
+            router.push('/(app)/credits' as Href);
+          }}
           onSend={handleSend}
           composerControlRef={actions.composerControlRef}
           onStop={handleStop}

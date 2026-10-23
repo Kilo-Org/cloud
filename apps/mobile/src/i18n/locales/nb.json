@@ -224,7 +224,7 @@
     "hideBalance": "Skjul saldo",
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
-    "bonusCreditsExpiring": "{{amount}} i bonuskreditter utløper {{date}}.",
+    "bonusCreditsExpiring": "{{amount}} i kreditter utløper {{date}}.",
     "signOutTitle": "Logge ut?",
     "signOutMessage": "Du må logge inn igjen for å få tilgang til arbeidsområdet ditt.",
     "deleteAccountTitle": "Slette kontoen?",
@@ -669,7 +669,8 @@
       "gitlabDescription": "Koble til GitLab-kontoen din for å gå gjennom merge requests på mobilen.",
       "bitbucketDescription": "Koble Bitbucket til denne organisasjonen for å gå gjennom PR-er på mobilen.",
       "bitbucketOrgOnlyDescription": "Bytt kontoen over til en organisasjon for å gå gjennom dens PR-er på Bitbucket.",
-      "contextLine": "For {{organization}}"
+      "contextLine": "For {{organization}}",
+      "contextLinePersonal": "For personlig konto"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1479,7 +1480,15 @@
       "instructions": "Instruksjoner (valgfritt)",
       "instructionsPlaceholder": "Noe gjennomgangen skal fokusere spesielt på…",
       "starting": "Starter gjennomgang…",
-      "start": "Start gjennomgang"
+      "start": "Start gjennomgang",
+      "startNotFound": "Kunne ikke lese {{requestNoun}} fra {{provider}}. Kontroller URL-en og at repositoriet er tilgjengelig.",
+      "startRateLimited": "{{provider}} begrenser forespørsler akkurat nå. Prøv igjen om noen minutter.",
+      "startNotAllowed": "Du har ikke tilgang til å starte en gjennomgang av {{requestNoun}}. Kontroller tillatelsene dine og organisasjonens plan.",
+      "startProviderNeedsAttention": "Manuelle gjennomganger krever den vanlige {{provider}}-tilkoblingen. Koble den til og prøv igjen.",
+      "startAlreadyRunning": "En gjennomgang av {{requestNoun}} pågår allerede.",
+      "startRejected": "{{requestNoun}} kan ikke gjennomgås. Sørg for at den er åpen, ikke et utkast, og at URL-en er riktig.",
+      "startProviderUnavailable": "Kunne ikke nå {{provider}} for å lese {{requestNoun}}. Prøv igjen.",
+      "startFailed": "Kunne ikke starte gjennomgangen. Kontroller tilkoblingen din og prøv igjen."
     },
     "notConnectedReadOnly": "{{platform}} er ikke tilkoblet. Bare organisasjonseiere og administratorer kan opprette tilkoblingen.",
     "gitlab": {
@@ -2112,6 +2121,7 @@
       "dollar_other": "dollarer",
       "costSpoken": "kostnad {{cost}}",
       "costSpokenWithTime": "kostnad {{cost}}, {{time}}",
+      "spokenJoiner": "og",
       "pullRequest": "pR {{number}}"
     },
     "githubInstall": {
@@ -2241,6 +2251,7 @@
       "branchLoadError": "Kunne ikke laste inn grener",
       "branchUnavailable": "Ingen grener er tilgjengelige for dette kodelageret. Sjekk tilgangen din hos leverandøren og velg et annet kodelager.",
       "branchEmpty": "Ingen tilgjengelige grener",
+      "branchListIncomplete": "Bare noen grener vises. Kodelageret har flere grener enn denne listen kan inneholde.",
       "branchPlaceholder": "Velg en gren",
       "runOnWithTarget": "Kjør på: {{target}}",
       "environment": "Miljø",
@@ -2466,7 +2477,71 @@
       "preparationComplete": "Forberedelsen er fullført",
       "preparationFailed": "Forberedelsen mislyktes",
       "setupCommand": "Oppsettskommando {{index}}",
-      "setupCommandOf": "Oppsettskommando {{index}} av {{displayCount}}"
+      "setupCommandOf": "Oppsettskommando {{index}} av {{displayCount}}",
+      "stepWorkspaceSetup": "Oppsett av arbeidsområde",
+      "stepDiskCheck": "Diskkontroll",
+      "stepCloning": "Kloner repositoriet",
+      "stepBranch": "Setter opp gren",
+      "stepDevcontainerSetup": "Devcontainer-oppsett",
+      "stepWorkspaceRestore": "Gjenoppretter arbeidsområdet",
+      "stepWorkspaceBackup": "Lagrer arbeidsområdet",
+      "stepSandboxProvision": "Klargjør sandkasse",
+      "stepSandboxBoot": "Starter sandkasse",
+      "stepSnapshotFallback": "Prøver på nytt uten snapshot",
+      "stepKiloServer": "Starter Kilo",
+      "stepKiloSession": "Forbereder økt",
+      "stepRestoreIncomplete": "Øktgjenoppretting ufullstendig",
+      "stepReady": "Miljøet er klart",
+      "stepFailed": "Miljøoppsettet mislyktes",
+      "stepUnknown": "Miljøoppsett",
+      "detailCreatingSandbox": "Oppretter sandkasse",
+      "detailUpdatingRepository": "Oppdaterer repositoriet",
+      "detailCheckingOutBranch": "Sjekker ut gren",
+      "detailRunningSetupCommands": "Kjører oppsettskommandoer",
+      "detailSavingRepository": "Lagrer repositoriet for raskere oppstart",
+      "detailStartingKiloRuntime": "Starter Kilo-kjøretid",
+      "detailPreparingKiloSession": "Forbereder Kilo-økt",
+      "detailWaitingForPreviousSandbox": "Venter på at den forrige sandkassen stopper",
+      "detailRetryingSandboxCreation": "Prøver å opprette sandkassen på nytt",
+      "detailPreviousSnapshotFailed": "Oppstart med forrige snapshot mislyktes. Prøver på nytt uten snapshot.",
+      "detailSnapshotStartupFailed": "Oppstart med snapshot mislyktes. Prøver på nytt uten snapshot.",
+      "detailStartingSandboxWithoutSnapshot": "Starter sandkasse uten snapshot",
+      "detailSettingUpWorkspace": "Setter opp arbeidsområdet",
+      "detailRestoringSession": "Gjenoppretter økt",
+      "detailWarmWorkspaceReused": "Varmt arbeidsområde gjenbrukt",
+      "detailRetryingClone": "Prøver kloning på nytt (forsøk {{attempt}} av {{total}})",
+      "detailSetupCommandFailed": "Oppsettskommando {{index}} mislyktes",
+      "detailSetupCommandTimedOut": "Oppsettskommando {{index}} fikk tidsavbrudd",
+      "detailColdRestore": "Kald gjenoppretting, snapshot anvendt, {{applied}} av {{total}} filer gjenopprettet",
+      "detailProgressPercent": "{{percent}} % fullført",
+      "detailRestoreIncompleteReport": "Øktgjenoppretting ufullstendig: {{skipped}} av {{total}} filer ble ikke gjenopprettet ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Mangler: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} og {{omitted}} til",
+      "detailReasonPatchFailed": "patchen ble ikke anvendt",
+      "detailReasonOutsideWorkspace": "stien ligger utenfor arbeidsområdet",
+      "detailReasonMissingContent": "snapshotet inneholdt ikke innhold for filen",
+      "detailReasonIndexResetFailed": "indeksen kunne ikke tilbakestilles etter en mislykket anvendelse",
+      "detailReasonUnlinkFailed": "filen kunne ikke fjernes",
+      "detailReasonWriteFailed": "filen kunne ikke skrives",
+      "detailReasonUnknown": "en ukjent årsak",
+      "detailUnknown": "Forbereder fortsatt",
+      "errorPreparationTimeout": "Forberedelsen fikk tidsavbrudd",
+      "errorWorkspaceSetupFailed": "Oppsettet av arbeidsområdet mislyktes",
+      "errorCredentialUpgradeRequired": "Denne økten mangler en påkrevd legitimasjonsoppgradering. Start en ny økt for å fortsette.",
+      "errorAgentUnavailable": "Agenten ble utilgjengelig",
+      "errorBillingBlocked": "Sandkassefakturering krever flere kreditter",
+      "errorBillingUnavailable": "Verifisering av sandkassefakturering eller kapasitet er utilgjengelig. Prøv igjen om kort tid.",
+      "errorContainerLimitReached": "Containergrensen er nådd. Stopp en eksisterende container før du starter en ny.",
+      "errorInvalidConfiguration": "Sandkassekonfigurasjonen er ugyldig eller støttes ikke",
+      "errorRuntimeArtifactUnauthorized": "Nedlasting av kjøretiden ble ikke autorisert",
+      "errorRuntimeArtifactInvalid": "Verifisering av kjøretidsartefakten mislyktes",
+      "errorRuntimeCliProbeFailed": "Validering av kjøretids-CLI mislyktes",
+      "errorRuntimeSupervisorMissing": "Supervisoren for kjøretiden mangler",
+      "errorConnectionLost": "Tilkoblingen til sandkassen gikk tapt",
+      "errorSandboxLost": "Sandkassen gikk tapt",
+      "errorAgentRestarted": "Agenten startet på nytt",
+      "errorSandboxOutOfMemory": "Sandkassen gikk tom for minne",
+      "errorPreparationDidNotComplete": "Forberedelsen ble ikke fullført"
     },
     "permissionCard": {
       "title": "Tillatelse kreves",
@@ -3068,10 +3143,12 @@
       "truncated": "Eldre kredittbevegelser er tilgjengelige."
     },
     "inviteMember": {
+      "alreadyInvited": "Personen er allerede invitert eller allerede medlem.",
       "emailError": "Angi en gyldig e-postadresse.",
       "emailPlaceholder": "navn@firma.no",
       "permissionDenied": "Du har ikke tillatelse til å invitere medlemmer.",
       "roleMember": "Rolle: medlem",
+      "sendError": "Kunne ikke sende invitasjonen.",
       "sendInvite": "Send invitasjon",
       "title": "Inviter medlem"
     },
@@ -3142,6 +3219,7 @@
       "inviteCreated": "Invitasjon opprettet",
       "pendingInvitations": "Ventende invitasjoner",
       "resendInvite": "Send invitasjon på nytt",
+      "resendInviteError": "Kunne ikke sende invitasjonen på nytt.",
       "shareInviteLink": "Del invitasjonslenke"
     },
     "usageStats": {
@@ -3287,6 +3365,7 @@
   },
   "transcriptionModel": {
     "title": "Transkripsjonsmodell",
+    "choose": "Velg en modell",
     "noneChosen": "Ingen valgt",
     "emptyTitle": "Ingen transkripsjonsmodeller",
     "emptyDescription": "Kilo Gateway tilbyr ingen transkripsjonsmodeller akkurat nå.",
@@ -3312,6 +3391,7 @@
   },
   "modelChat": {
     "offlineFailure": "Denne modellen trenger internettilkobling. Koble til og prøv igjen, eller bytt til en modell på denne enheten.",
+    "creditsRequired": "Ikke nok kreditter til å sende denne meldingen – fyll på kreditter og prøv igjen.",
     "empty": {
       "title": "Start en chat",
       "description": "Send en melding for å snakke med en modell."
@@ -3386,7 +3466,12 @@
       "serverToolCount_one": "{{count}} verktøy",
       "serverToolCount_other": "{{count}} verktøy",
       "serverUnreachable": "Kunne ikke nå denne serveren",
-      "serverOff": "Denne serveren er av"
+      "serverOff": "Denne serveren er av",
+      "app": {
+        "label": "Verktøygrensesnitt",
+        "failed": "Kunne ikke laste inn grensesnittet for dette verktøyet.",
+        "empty": "Grensesnittet for dette verktøyet har ingenting å vise."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autentisering",
@@ -3611,6 +3696,8 @@
     "noSpend": "Ingen forbruk registrert ennå",
     "spend24h": "Forbruk de siste 24 timene",
     "multiplierError": "Angi en multiplikator på 1 eller mer",
+    "multiplierMaxError": "Angi en multiplikator på {{max}} eller mindre",
+    "thresholdMaxError": "Angi et beløp på {{max}} eller mindre.",
     "permissionDenied": "Du har ikke tillatelse til å administrere forbruksvarsler.",
     "pushOffByCategory": "Av i Varsler"
   },
@@ -3668,6 +3755,7 @@
     },
     "variablesEmpty": "Ingen variabler ennå",
     "variablesSaveFailed": "Kunne ikke lagre variabelen",
+    "variablesDeleteFailed": "Kunne ikke slette variabelen",
     "commandsTitle": "Oppsettkommandoer",
     "addCommand": "Legg til kommando",
     "commandLabel": "Kommando",
@@ -3678,6 +3766,7 @@
     "moveDown": "Flytt ned",
     "moveCommandUp": "Flytt kommando {{position}} opp",
     "moveCommandDown": "Flytt kommando {{position}} ned",
+    "deleteCommand": "Slett kommando {{position}}",
     "skillsTitle": "Ferdigheter",
     "addSkill": "Legg til ferdigheter",
     "skillNameLabel": "Ferdighetsnavn",

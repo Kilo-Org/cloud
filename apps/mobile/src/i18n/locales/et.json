@@ -224,7 +224,7 @@
     "hideBalance": "Peida saldo",
     "showBalance": "Näita saldot",
     "balanceHidden": "Saldo on peidetud",
-    "bonusCreditsExpiring": "Boonuskrediit summas {{amount}} aegub {{date}}.",
+    "bonusCreditsExpiring": "Krediit summas {{amount}} aegub {{date}}.",
     "signOutTitle": "Kas logida välja?",
     "signOutMessage": "Tööruumi kasutamiseks pead uuesti sisse logima.",
     "deleteAccountTitle": "Kas kustutada konto?",
@@ -669,7 +669,8 @@
       "gitlabDescription": "Ühenda oma GitLab konto, et liitmistaotlusi mobiilis üle vaadata.",
       "bitbucketDescription": "Ühenda Bitbucket selle organisatsiooniga, et tõmbetaotlusi mobiilis üle vaadata.",
       "bitbucketOrgOnlyDescription": "Vaheta ülalolev konto organisatsioonile, et selle Bitbucketi tõmbetaotlusi üle vaadata.",
-      "contextLine": "{{organization}} jaoks"
+      "contextLine": "{{organization}} jaoks",
+      "contextLinePersonal": "Sinu isikliku konto jaoks"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1479,7 +1480,15 @@
       "instructions": "Juhised (valikulised)",
       "instructionsPlaceholder": "Millele ülevaataja peab keskenduma…",
       "starting": "Ülevaatuse alustamine…",
-      "start": "Alusta ülevaatust"
+      "start": "Alusta ülevaatust",
+      "startNotFound": "Ülevaatust ei õnnestunud alustada: see {{requestNoun}} ei ole teenusepakkujast {{provider}} kättesaadav. Kontrolli URL-i ja seda, kas hoidla on ligipääsetav.",
+      "startRateLimited": "{{provider}} piirab praegu päringuid. Proovi mõne minuti pärast uuesti.",
+      "startNotAllowed": "Sul ei ole õigust seda ülevaatust alustada: see {{requestNoun}} ei ole sinu jaoks saadaval. Kontrolli oma õigusi ja oma organisatsiooni plaani.",
+      "startProviderNeedsAttention": "Käsitsi ülevaatamiseks on vaja tavapärast ühendust {{provider}}-iga. Ühenda see ja proovi uuesti.",
+      "startAlreadyRunning": "See {{requestNoun}} on juba ülevaatamisel.",
+      "startRejected": "See {{requestNoun}} ei ole ülevaatamiseks sobiv. Veendu, et see on avatud, mitte mustand, ning et URL on õige.",
+      "startProviderUnavailable": "Ühendust {{provider}}-iga ei õnnestunud saada ja see {{requestNoun}} jäi lugemata. Proovi uuesti.",
+      "startFailed": "Ülevaatust ei õnnestunud alustada. Kontrolli internetiühendust ja proovi uuesti."
     },
     "notConnectedReadOnly": "{{platform}} pole ühendatud. Selle saavad ühendada ainult organisatsiooni omanikud ja administraatorid.",
     "gitlab": {
@@ -2112,6 +2121,7 @@
       "dollar_other": "dollarit",
       "costSpoken": "kulu {{cost}}",
       "costSpokenWithTime": "kulu {{cost}}, {{time}}",
+      "spokenJoiner": "ja",
       "pullRequest": "tõmbetaotlus {{number}}"
     },
     "githubInstall": {
@@ -2241,6 +2251,7 @@
       "branchLoadError": "Harude laadimine ebaõnnestus",
       "branchUnavailable": "Selle hoidla harud pole saadaval. Kontrolli oma õigusi pakkujas ja vali mõni teine hoidla.",
       "branchEmpty": "Ühtegi haru pole saadaval",
+      "branchListIncomplete": "Kuvatakse ainult mõned harud. Selles hoidlas on rohkem harusid, kui see loend võib sisaldada.",
       "branchPlaceholder": "Vali haru",
       "runOnWithTarget": "Käivituskoht: {{target}}",
       "environment": "Keskkond",
@@ -2466,7 +2477,71 @@
       "preparationComplete": "Ettevalmistus on valmis",
       "preparationFailed": "Ettevalmistamine ebaõnnestus",
       "setupCommand": "Seadistamiskäsk {{index}}",
-      "setupCommandOf": "Seadistamiskäsk {{index}} (kokku {{displayCount}})"
+      "setupCommandOf": "Seadistamiskäsk {{index}} (kokku {{displayCount}})",
+      "stepWorkspaceSetup": "Tööruumi seadistamine",
+      "stepDiskCheck": "Ketta kontroll",
+      "stepCloning": "Repositooriumi kloonimine",
+      "stepBranch": "Haru seadistamine",
+      "stepDevcontainerSetup": "Dev-konteimeri seadistamine",
+      "stepWorkspaceRestore": "Tööruumi taastamine",
+      "stepWorkspaceBackup": "Tööruumi salvestamine",
+      "stepSandboxProvision": "Liivakosti ettevalmistamine",
+      "stepSandboxBoot": "Liivakasti käivitamine",
+      "stepSnapshotFallback": "Uus katse ilma hetktõmmiseta",
+      "stepKiloServer": "Kilo käivitamine",
+      "stepKiloSession": "Seansi ettevalmistamine",
+      "stepRestoreIncomplete": "Seansi taastamine jäi ebatäielikuks",
+      "stepReady": "Keskkond on valmis",
+      "stepFailed": "Keskkonna seadistamine ebaõnnestus",
+      "stepUnknown": "Keskkonna seadistamine",
+      "detailCreatingSandbox": "Liivakasti loomine",
+      "detailUpdatingRepository": "Repositooriumi värskendamine",
+      "detailCheckingOutBranch": "Haru väljaloimine",
+      "detailRunningSetupCommands": "Seadistamiskäskude käivitamine",
+      "detailSavingRepository": "Repositooriumi salvestamine kiirema käivitamise jaoks",
+      "detailStartingKiloRuntime": "Kilo käitusaja käivitamine",
+      "detailPreparingKiloSession": "Kilo seansi ettevalmistamine",
+      "detailWaitingForPreviousSandbox": "Eelmise liivakasti peatumise ootamine",
+      "detailRetryingSandboxCreation": "Liivakasti loomise korduskatse",
+      "detailPreviousSnapshotFailed": "Eelmise hetktõmmisega käivitamine ebaõnnestus. Proovin uuesti ilma hetktõmmiseta.",
+      "detailSnapshotStartupFailed": "Hetktõmmisega käivitamine ebaõnnestus. Proovin uuesti ilma hetktõmmiseta.",
+      "detailStartingSandboxWithoutSnapshot": "Liivakasti käivitamine ilma hetktõmmiseta",
+      "detailSettingUpWorkspace": "Tööruumi seadistamine",
+      "detailRestoringSession": "Seansi taastamine",
+      "detailWarmWorkspaceReused": "Soe tööruum taaskasutati",
+      "detailRetryingClone": "Kloonimise korduskatse (katse {{attempt}}/{{total}})",
+      "detailSetupCommandFailed": "Seadistamiskäsk {{index}} ebaõnnestus",
+      "detailSetupCommandTimedOut": "Seadistamiskäsk {{index}} aegus",
+      "detailColdRestore": "Külm taastamine, hetktõmmis rakendatud, {{applied}}/{{total}} faili taastatud",
+      "detailProgressPercent": "{{percent}}% valmis",
+      "detailRestoreIncompleteReport": "Seansi taastamine jäi ebatäielikuks: {{skipped}}/{{total}} faili ei taastatud ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Puuduvad: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} ja veel {{omitted}}",
+      "detailReasonPatchFailed": "patchi ei rakendatud",
+      "detailReasonOutsideWorkspace": "tee asub tööruumist väljaspool",
+      "detailReasonMissingContent": "hetktõmmis ei sisaldanud faili sisu",
+      "detailReasonIndexResetFailed": "indeksit ei õnnestunud pärast ebaõnnestunud rakendamist lähtestada",
+      "detailReasonUnlinkFailed": "faili ei õnnestunud eemaldada",
+      "detailReasonWriteFailed": "faili ei õnnestunud kirjutada",
+      "detailReasonUnknown": "tundmatu põhjus",
+      "detailUnknown": "Ikka ettevalmistamisel",
+      "errorPreparationTimeout": "Keskkonna ettevalmistus aegus",
+      "errorWorkspaceSetupFailed": "Tööruumi seadistamine ebaõnnestus",
+      "errorCredentialUpgradeRequired": "Selles seansist puudub nõutav volituse uuendus. Jätkamiseks alusta uus seanss.",
+      "errorAgentUnavailable": "Agent pole enam saadaval",
+      "errorBillingBlocked": "Liivakasti arveldus nõuab täiendavaid krediite",
+      "errorBillingUnavailable": "Liivakasti arvelduse või mahutavuse kontroll pole saadaval. Proovi varsti uuesti.",
+      "errorContainerLimitReached": "Konteimerite piirang on täis. Peata olemasolev konteimer enne uue käivitamist.",
+      "errorInvalidConfiguration": "Liivakasti konfiguratsioon on vale või toetamata",
+      "errorRuntimeArtifactUnauthorized": "Käitusaja allalaadimine pole autoriseeritud",
+      "errorRuntimeArtifactInvalid": "Käitusaja artefakti kontroll ebaõnnestus",
+      "errorRuntimeCliProbeFailed": "Käitusaja CLI valideerimine ebaõnnestus",
+      "errorRuntimeSupervisorMissing": "Käitusaja järelevaataja puudub",
+      "errorConnectionLost": "Liivakasti ühendus katkes",
+      "errorSandboxLost": "Liivakott kaotsi läinud",
+      "errorAgentRestarted": "Agent käivitus uuesti",
+      "errorSandboxOutOfMemory": "Liivakotil sai mälu otsa",
+      "errorPreparationDidNotComplete": "Ettevalmistus ei lõppenud"
     },
     "permissionCard": {
       "title": "Vaja on luba",
@@ -3068,10 +3143,12 @@
       "truncated": "Saadaval on ka varasemad krediiditehingud."
     },
     "inviteMember": {
+      "alreadyInvited": "Ta on juba kutsutud või juba liige.",
       "emailError": "Sisesta kehtiv e-posti aadress.",
       "emailPlaceholder": "nimi@ettevote.ee",
       "permissionDenied": "Sul puudub õigus liikmeid kutsuda.",
       "roleMember": "Roll: liige",
+      "sendError": "Kutset ei õnnestunud saata.",
       "sendInvite": "Saada kutse",
       "title": "Kutsu liige"
     },
@@ -3142,6 +3219,7 @@
       "inviteCreated": "Kutse loodud",
       "pendingInvitations": "Ootel kutsed",
       "resendInvite": "Saada kutse uuesti",
+      "resendInviteError": "Kutset ei õnnestunud uuesti saata.",
       "shareInviteLink": "Jaga kutselinki"
     },
     "usageStats": {
@@ -3287,6 +3365,7 @@
   },
   "transcriptionModel": {
     "title": "Kõnetuvastuse mudel",
+    "choose": "Vali mudel",
     "noneChosen": "Pole valitud",
     "emptyTitle": "Kõnetuvastuse mudelid puuduvad",
     "emptyDescription": "Kilo Gateway ei paku praegu ühtegi kõnetuvastuse mudelit.",
@@ -3312,6 +3391,7 @@
   },
   "modelChat": {
     "offlineFailure": "See mudel vajab internetiühendust. Loo ühendus ja proovi uuesti või lülitu selle seadme mudelile.",
+    "creditsRequired": "Krediiti ei piisa selle sõnumi saatmiseks. Lisa krediiti ja proovi uuesti.",
     "empty": {
       "title": "Alusta vestlust",
       "description": "Mudeliga vestlemiseks saada sõnum."
@@ -3386,7 +3466,12 @@
       "serverToolCount_one": "{{count}} tööriist",
       "serverToolCount_other": "{{count}} tööriista",
       "serverUnreachable": "Selle serverini ei õnnestunud jõuda",
-      "serverOff": "See server on välja lülitatud"
+      "serverOff": "See server on välja lülitatud",
+      "app": {
+        "label": "Tööriista liides",
+        "failed": "Selle tööriista liidest ei õnnestunud laadida.",
+        "empty": "Selle tööriista liidesel pole midagi näidata."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autentimine",
@@ -3611,6 +3696,8 @@
     "noSpend": "Kulutusi pole veel registreeritud",
     "spend24h": "Viimase 24 tunni kulutus",
     "multiplierError": "Sisesta kordaja 1 või suurem",
+    "multiplierMaxError": "Sisesta kordaja {{max}} või väiksem",
+    "thresholdMaxError": "Sisesta summa {{max}} või väiksem.",
     "permissionDenied": "Sul puudub õigus kulutushoiatusi hallata.",
     "pushOffByCategory": "Teavitustes väljas"
   },
@@ -3668,6 +3755,7 @@
     },
     "variablesEmpty": "Muutujaid veel pole",
     "variablesSaveFailed": "Muutujat ei saanud salvestada",
+    "variablesDeleteFailed": "Muutujat ei õnnestunud kustutada",
     "commandsTitle": "Seadistuskäsud",
     "addCommand": "Lisa käsk",
     "commandLabel": "Käsk",
@@ -3678,6 +3766,7 @@
     "moveDown": "Liigu alla",
     "moveCommandUp": "Liiguta käsk {{position}} üles",
     "moveCommandDown": "Liiguta käsk {{position}} alla",
+    "deleteCommand": "Kustuta käsk {{position}}",
     "skillsTitle": "Oskused",
     "addSkill": "Lisa oskusi",
     "skillNameLabel": "Oskuste nimi",

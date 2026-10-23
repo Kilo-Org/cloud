@@ -1,10 +1,11 @@
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
-import { briefingMoney, BriefingScorecard } from './briefing-card';
+import { BriefingScorecard } from './briefing-card';
 import { BriefingPeriodLabel } from './briefing-period-label';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { briefingMoney } from '@/lib/agent-briefing-format';
 import { briefingEstimateUnavailableKey } from '@/lib/agent-briefing-state';
 import { type PreparedBriefing } from '@/lib/hooks/use-create-briefing';
 

@@ -224,7 +224,7 @@
     "hideBalance": "Ocultar saldo",
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
-    "bonusCreditsExpiring": "Os créditos de bónus no valor de {{amount}} expiram em {{date}}.",
+    "bonusCreditsExpiring": "Os créditos no valor de {{amount}} expiram em {{date}}.",
     "signOutTitle": "Terminar sessão?",
     "signOutMessage": "Terás de iniciar sessão novamente para aceder ao teu espaço de trabalho.",
     "deleteAccountTitle": "Eliminar conta?",
@@ -681,7 +681,8 @@
       "gitlabDescription": "Liga a tua conta do GitLab para rever merge requests no telemóvel.",
       "bitbucketDescription": "Liga o Bitbucket a esta organização para rever PRs no telemóvel.",
       "bitbucketOrgOnlyDescription": "Muda a conta acima para uma organização para rever os respetivos PRs no Bitbucket.",
-      "contextLine": "Para {{organization}}"
+      "contextLine": "Para {{organization}}",
+      "contextLinePersonal": "Para a sua conta pessoal"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1498,7 +1499,15 @@
       "instructions": "Instruções (opcionais)",
       "instructionsPlaceholder": "Aspetos específicos a rever…",
       "starting": "A iniciar a revisão…",
-      "start": "Iniciar revisão"
+      "start": "Iniciar revisão",
+      "startNotFound": "Não foi possível ler esse {{requestNoun}} do {{provider}}. Verifica o URL e se o repositório está acessível.",
+      "startRateLimited": "O {{provider}} está a limitar pedidos neste momento. Tenta novamente dentro de alguns minutos.",
+      "startNotAllowed": "Não tens acesso para iniciar uma revisão desse {{requestNoun}}. Verifica as tuas permissões e o plano da tua organização.",
+      "startProviderNeedsAttention": "As revisões manuais precisam da ligação normal ao {{provider}}. Liga-o e tenta novamente.",
+      "startAlreadyRunning": "Já está a decorrer uma revisão desse {{requestNoun}}.",
+      "startRejected": "Esse {{requestNoun}} não pode ser revisto. Certifica-te de que está aberto, que não é um rascunho e de que o URL está correto.",
+      "startProviderUnavailable": "Não foi possível contactar o {{provider}} para ler esse {{requestNoun}}. Tenta novamente.",
+      "startFailed": "Não foi possível iniciar a revisão. Verifica a tua ligação e tenta novamente."
     },
     "notConnectedReadOnly": "O {{platform}} não está ligado. Apenas os proprietários da organização e os administradores o podem ligar.",
     "gitlab": {
@@ -2139,6 +2148,7 @@
       "dollar_many": "dólares",
       "costSpoken": "custo de {{cost}}",
       "costSpokenWithTime": "custo de {{cost}}, {{time}}",
+      "spokenJoiner": "e",
       "pullRequest": "pR {{number}}"
     },
     "githubInstall": {
@@ -2269,6 +2279,7 @@
       "branchLoadError": "Não foi possível carregar os ramos",
       "branchUnavailable": "Não há ramos disponíveis para este repositório. Verifica o teu acesso junto do fornecedor e escolhe outro repositório.",
       "branchEmpty": "Nenhum ramo disponível",
+      "branchListIncomplete": "Apenas alguns ramos são mostrados. O repositório tem mais ramos do que esta lista pode incluir.",
       "branchPlaceholder": "Selecionar um ramo",
       "runOnWithTarget": "Executar em: {{target}}",
       "environment": "Ambiente",
@@ -2498,7 +2509,71 @@
       "preparationComplete": "Preparação concluída",
       "preparationFailed": "Falha na preparação",
       "setupCommand": "Comando de configuração {{index}}",
-      "setupCommandOf": "Comando de configuração {{index}} de {{displayCount}}"
+      "setupCommandOf": "Comando de configuração {{index}} de {{displayCount}}",
+      "stepWorkspaceSetup": "Configuração da área de trabalho",
+      "stepDiskCheck": "Verificação do disco",
+      "stepCloning": "A clonar o repositório",
+      "stepBranch": "A configurar o ramo",
+      "stepDevcontainerSetup": "Configuração do dev container",
+      "stepWorkspaceRestore": "A restaurar a área de trabalho",
+      "stepWorkspaceBackup": "A guardar a área de trabalho",
+      "stepSandboxProvision": "A aprovisionar a sandbox",
+      "stepSandboxBoot": "A iniciar a sandbox",
+      "stepSnapshotFallback": "A tentar novamente sem um snapshot",
+      "stepKiloServer": "A iniciar o Kilo",
+      "stepKiloSession": "A preparar a sessão",
+      "stepRestoreIncomplete": "Restauro da sessão incompleto",
+      "stepReady": "Ambiente pronto",
+      "stepFailed": "Falha na configuração do ambiente",
+      "stepUnknown": "Configuração do ambiente",
+      "detailCreatingSandbox": "A criar a sandbox",
+      "detailUpdatingRepository": "A atualizar o repositório",
+      "detailCheckingOutBranch": "A mudar para o ramo",
+      "detailRunningSetupCommands": "A executar comandos de configuração",
+      "detailSavingRepository": "A guardar o repositório para arranques mais rápidos",
+      "detailStartingKiloRuntime": "A iniciar o runtime do Kilo",
+      "detailPreparingKiloSession": "A preparar a sessão do Kilo",
+      "detailWaitingForPreviousSandbox": "A aguardar que a sandbox anterior pare",
+      "detailRetryingSandboxCreation": "A tentar novamente a criação da sandbox",
+      "detailPreviousSnapshotFailed": "O arranque com o snapshot anterior falhou. A tentar novamente sem um snapshot.",
+      "detailSnapshotStartupFailed": "O arranque com o snapshot falhou. A tentar novamente sem um snapshot.",
+      "detailStartingSandboxWithoutSnapshot": "A iniciar a sandbox sem um snapshot",
+      "detailSettingUpWorkspace": "A configurar a área de trabalho",
+      "detailRestoringSession": "A restaurar a sessão",
+      "detailWarmWorkspaceReused": "Área de trabalho anterior reutilizada",
+      "detailRetryingClone": "A tentar novamente a clonagem (tentativa {{attempt}} de {{total}})",
+      "detailSetupCommandFailed": "O comando de configuração {{index}} falhou",
+      "detailSetupCommandTimedOut": "O comando de configuração {{index}} excedeu o tempo limite",
+      "detailColdRestore": "Restauro a frio, snapshot aplicado, {{applied}} de {{total}} ficheiros restaurados",
+      "detailProgressPercent": "{{percent}}% concluído",
+      "detailRestoreIncompleteReport": "Restauro da sessão incompleto: {{skipped}} de {{total}} ficheiros não foram restaurados ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Em falta: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} e mais {{omitted}}",
+      "detailReasonPatchFailed": "a correção não foi aplicada",
+      "detailReasonOutsideWorkspace": "o caminho está fora da área de trabalho",
+      "detailReasonMissingContent": "o snapshot não continha conteúdo para o ficheiro",
+      "detailReasonIndexResetFailed": "não foi possível repor o índice após uma aplicação falhada",
+      "detailReasonUnlinkFailed": "não foi possível remover o ficheiro",
+      "detailReasonWriteFailed": "não foi possível escrever o ficheiro",
+      "detailReasonUnknown": "por um motivo desconhecido",
+      "detailUnknown": "Ainda a preparar",
+      "errorPreparationTimeout": "O tempo limite da preparação do ambiente foi excedido",
+      "errorWorkspaceSetupFailed": "Falha na configuração da área de trabalho",
+      "errorCredentialUpgradeRequired": "Falta uma atualização de credenciais obrigatória nesta sessão. Inicie uma nova sessão para continuar.",
+      "errorAgentUnavailable": "O agente ficou indisponível",
+      "errorBillingBlocked": "A faturação da sandbox exige créditos adicionais",
+      "errorBillingUnavailable": "A verificação de faturação ou capacidade da sandbox está indisponível. Tente novamente em breve.",
+      "errorContainerLimitReached": "Limite de contentores atingido. Pare um contentor existente antes de iniciar outro.",
+      "errorInvalidConfiguration": "A configuração da sandbox é inválida ou não suportada",
+      "errorRuntimeArtifactUnauthorized": "A transferência do runtime não foi autorizada",
+      "errorRuntimeArtifactInvalid": "Falha na verificação do artefacto do runtime",
+      "errorRuntimeCliProbeFailed": "Falha na validação da CLI do runtime",
+      "errorRuntimeSupervisorMissing": "O supervisor do runtime está em falta",
+      "errorConnectionLost": "A ligação à sandbox foi perdida",
+      "errorSandboxLost": "A sandbox foi perdida",
+      "errorAgentRestarted": "O agente foi reiniciado",
+      "errorSandboxOutOfMemory": "A sandbox ficou sem memória",
+      "errorPreparationDidNotComplete": "A preparação não foi concluída"
     },
     "permissionCard": {
       "title": "Permissão necessária",
@@ -3108,10 +3183,12 @@
       "truncated": "Há movimentos de créditos mais antigos disponíveis."
     },
     "inviteMember": {
+      "alreadyInvited": "O utilizador já foi convidado ou já é membro.",
       "emailError": "Introduza um endereço de email válido.",
       "emailPlaceholder": "nome@empresa.com",
       "permissionDenied": "Não tem permissão para convidar membros.",
       "roleMember": "A função é membro.",
+      "sendError": "Não foi possível enviar o convite.",
       "sendInvite": "Enviar convite",
       "title": "Convidar membro"
     },
@@ -3182,6 +3259,7 @@
       "inviteCreated": "Convite criado",
       "pendingInvitations": "Convites pendentes",
       "resendInvite": "Reenviar convite",
+      "resendInviteError": "Não foi possível reenviar o convite.",
       "shareInviteLink": "Partilhar ligação de convite"
     },
     "usageStats": {
@@ -3328,6 +3406,7 @@
   },
   "transcriptionModel": {
     "title": "Modelo de transcrição",
+    "choose": "Escolher um modelo",
     "noneChosen": "Nenhum selecionado",
     "emptyTitle": "Sem modelos de transcrição",
     "emptyDescription": "O Kilo Gateway não oferece modelos de transcrição de momento.",
@@ -3353,6 +3432,7 @@
   },
   "modelChat": {
     "offlineFailure": "Este modelo precisa de ligação à internet. Ligue-se e tente novamente, ou mude para um modelo neste dispositivo.",
+    "creditsRequired": "Não há créditos suficientes para enviar esta mensagem; adicione créditos e tente novamente.",
     "empty": {
       "title": "Inicie uma conversa",
       "description": "Envie uma mensagem para falar com um modelo."
@@ -3428,7 +3508,12 @@
       "serverToolCount_one": "{{count}} ferramenta",
       "serverToolCount_other": "{{count}} ferramentas",
       "serverUnreachable": "Não foi possível contactar este servidor",
-      "serverOff": "Este servidor está desativado"
+      "serverOff": "Este servidor está desativado",
+      "app": {
+        "label": "Interface da ferramenta",
+        "failed": "Não foi possível carregar a interface desta ferramenta.",
+        "empty": "A interface desta ferramenta não tem nada para mostrar."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autenticação",
@@ -3653,6 +3738,8 @@
     "noSpend": "Ainda não há gastos registados",
     "spend24h": "Gastos nas últimas 24 horas",
     "multiplierError": "Introduza um multiplicador de 1 ou mais",
+    "multiplierMaxError": "Introduza um multiplicador de {{max}} ou menos",
+    "thresholdMaxError": "Introduza um valor de {{max}} ou menos.",
     "permissionDenied": "Não tem permissão para gerir os alertas de gastos.",
     "pushOffByCategory": "Desativado em Notificações"
   },
@@ -3713,6 +3800,7 @@
     },
     "variablesEmpty": "Ainda não há variáveis",
     "variablesSaveFailed": "Não foi possível guardar a variável",
+    "variablesDeleteFailed": "Não foi possível eliminar a variável",
     "commandsTitle": "Comandos de configuração",
     "addCommand": "Adicionar comando",
     "commandLabel": "Comando",
@@ -3723,6 +3811,7 @@
     "moveDown": "Mover para baixo",
     "moveCommandUp": "Mover o comando {{position}} para cima",
     "moveCommandDown": "Mover o comando {{position}} para baixo",
+    "deleteCommand": "Eliminar o comando {{position}}",
     "skillsTitle": "Competências",
     "addSkill": "Adicionar competência",
     "skillNameLabel": "Nome da competência",

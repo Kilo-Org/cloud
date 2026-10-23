@@ -132,7 +132,7 @@ export function showFeedback(feedback: VoiceInputFeedback): void {
         [
           { text: i18n.t('common.cancel'), style: 'cancel' },
           {
-            text: i18n.t('transcriptionModel.title'),
+            text: presentation.actionLabel,
             onPress: () => {
               router.push('/(app)/transcription-model-picker');
             },
@@ -148,7 +148,7 @@ export function showFeedback(feedback: VoiceInputFeedback): void {
       presentation.message,
       [
         { text: i18n.t('common.cancel'), style: 'cancel' },
-        { text: i18n.t('common.openSettings'), onPress: () => void Linking.openSettings() },
+        { text: presentation.actionLabel, onPress: () => void Linking.openSettings() },
       ],
       // Android back dismisses, which equals the no-op Cancel.
       { cancelable: true }

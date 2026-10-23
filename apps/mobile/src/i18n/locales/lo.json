@@ -224,7 +224,7 @@
     "hideBalance": "ເຊື່ອງຍອດເງິນຄົງເຫຼືອ",
     "showBalance": "ສະແດງຍອດເງິນຄົງເຫຼືອ",
     "balanceHidden": "ເຊື່ອງຍອດເງິນຄົງເຫຼືອແລ້ວ",
-    "bonusCreditsExpiring": "ເຄຣດິດໂບນັດ {{amount}} ຈະໝົດອາຍຸ {{date}}.",
+    "bonusCreditsExpiring": "ເຄຣດິດ {{amount}} ຈະໝົດອາຍຸ {{date}}.",
     "signOutTitle": "ອອກຈາກລະບົບບໍ?",
     "signOutMessage": "ທ່ານຈະຕ້ອງເຂົ້າສູ່ລະບົບໃໝ່ ເພື່ອໃຊ້ພື້ນທີ່ເຮັດວຽກຂອງທ່ານ.",
     "deleteAccountTitle": "ລຶບບັນຊີບໍ?",
@@ -669,7 +669,8 @@
       "gitlabDescription": "ເຊື່ອມຕໍ່ບັນຊີ GitLab ຂອງທ່ານເພື່ອກວດທານ merge request ເທິງມືຖື",
       "bitbucketDescription": "ເຊື່ອມຕໍ່ Bitbucket ກັບອົງກອນນີ້ເພື່ອກວດທານຄຳຂໍລວມໂຄ້ດເທິງມືຖື",
       "bitbucketOrgOnlyDescription": "ປ່ຽນບັນຊີຂ້າງເທິງໄປຫາອົງກອນເພື່ອກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ຂອງມັນ.",
-      "contextLine": "ສຳລັບ {{organization}}"
+      "contextLine": "ສຳລັບ {{organization}}",
+      "contextLinePersonal": "ສຳລັບບັນຊີສ່ວນຕົວຂອງທ່ານ"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1479,7 +1480,15 @@
       "instructions": "ຄຳແນະນຳ (ບໍ່ຈຳເປັນຕ້ອງໃສ່)",
       "instructionsPlaceholder": "ຈຸດທີ່ຕ້ອງການໃຫ້ກວດສອບເປັນພິເສດ…",
       "starting": "ກຳລັງເລີ່ມການກວດສອບ…",
-      "start": "ເລີ່ມກວດສອບ"
+      "start": "ເລີ່ມກວດສອບ",
+      "startNotFound": "ບໍ່ສາມາດອ່ານ {{requestNoun}} ນັ້ນຈາກ {{provider}} ໄດ້. ກະລຸນາກວດສອບ URL ແລະວ່າຄັງລະຫັດສາມາດເຂົ້າເຖິງໄດ້.",
+      "startRateLimited": "{{provider}} ກຳລັງຈຳກັດຄຳຂໍໃນຂະນະນີ້. ກະລຸນາລອງອີກຄັ້ງໃນອີກສອງສາມນາທີ.",
+      "startNotAllowed": "ທ່ານບໍ່ມີສິດເຂົ້າເຖິງໃນການເລີ່ມກວດສອບ {{requestNoun}} ນັ້ນ. ກະລຸນາກວດສອບສິດການໃຊ້ງານຂອງທ່ານ ແລະ ແຜນການຂອງອົງກອນຂອງທ່ານ.",
+      "startProviderNeedsAttention": "ການກວດສອບດ້ວຍຕົນເອງຕ້ອງການການເຊື່ອມຕໍ່ {{provider}} ມາດຕະຖານ. ກະລຸນາເຊື່ອມຕໍ່ແລ້ວລອງອີກຄັ້ງ.",
+      "startAlreadyRunning": "ການກວດສອບ {{requestNoun}} ນັ້ນກຳລັງດຳເນີນຢູ່ແລ້ວ.",
+      "startRejected": "{{requestNoun}} ນັ້ນບໍ່ສາມາດກວດສອບໄດ້. ກະລຸນາໃຫ້ແນ່ໃຈວ່າມັນເປີດຢູ່, ບໍ່ແມ່ນຮ່າງທຳອິດ, ແລະວ່າ URL ຖືກຕ້ອງ.",
+      "startProviderUnavailable": "ບໍ່ສາມາດຕິດຕໍ່ {{provider}} ເພື່ອອ່ານ {{requestNoun}} ນັ້ນໄດ້. ກະລຸນາລອງອີກຄັ້ງ.",
+      "startFailed": "ບໍ່ສາມາດເລີ່ມການກວດສອບໄດ້. ກະລຸນາກວດສອບການເຊື່ອມຕໍ່ຂອງທ່ານແລ້ວລອງອີກຄັ້ງ."
     },
     "notConnectedReadOnly": "ຍັງບໍ່ໄດ້ເຊື່ອມຕໍ່ {{platform}}. ມີພຽງເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ດູແລລະບົບທີ່ສາມາດເຊື່ອມຕໍ່ໄດ້.",
     "gitlab": {
@@ -2112,6 +2121,7 @@
       "dollar_other": "ໂດລາ",
       "costSpoken": "ຄ່າໃຊ້ຈ່າຍ {{cost}}",
       "costSpokenWithTime": "ຄ່າໃຊ້ຈ່າຍ {{cost}}, {{time}}",
+      "spokenJoiner": ",",
       "pullRequest": "ຄຳຂໍລວມໂຄ້ດ {{number}}"
     },
     "githubInstall": {
@@ -2241,6 +2251,7 @@
       "branchLoadError": "ໂຫຼດສາຂາໂຄ້ດບໍ່ໄດ້",
       "branchUnavailable": "ບໍ່ມີສາຂາໂຄ້ດພ້ອມໃຊ້ສຳລັບຄັງໂຄ້ດນີ້. ກວດສອບສິດເຂົ້າເຖິງຂອງທ່ານກັບຜູ້ໃຫ້ບໍລິການ, ແລ້ວເລືອກຄັງໂຄ້ດອື່ນ.",
       "branchEmpty": "ບໍ່ມີສາຂາໂຄ້ດພ້ອມໃຊ້",
+      "branchListIncomplete": "ສະແດງພຽງບາງສາຂາໂຄ້ດເທົ່ານັ້ນ. ຄັງໂຄ້ດມີສາຂາໂຄ້ດຫຼາຍກວ່າທີ່ລາຍການນີ້ສາມາດບັນຈຸໄດ້.",
       "branchPlaceholder": "ເລືອກສາຂາໂຄ້ດໜຶ່ງ",
       "runOnWithTarget": "ເຮັດວຽກເທິງ: {{target}}",
       "environment": "ສະພາບແວດລ້ອມ",
@@ -2466,7 +2477,71 @@
       "preparationComplete": "ກຽມພ້ອມແລ້ວ",
       "preparationFailed": "ກຽມບໍ່ສຳເລັດ",
       "setupCommand": "ຄຳສັ່ງຕັ້ງຄ່າທີ {{index}}",
-      "setupCommandOf": "ຄຳສັ່ງຕັ້ງຄ່າທີ {{index}} ຈາກທັງໝົດ {{displayCount}}"
+      "setupCommandOf": "ຄຳສັ່ງຕັ້ງຄ່າທີ {{index}} ຈາກທັງໝົດ {{displayCount}}",
+      "stepWorkspaceSetup": "ການຕັ້ງຄ່າ Workspace",
+      "stepDiskCheck": "ການກວດສອບດິສກ໌",
+      "stepCloning": "ກຳລັງໂຄນ repository",
+      "stepBranch": "ກຳລັງຕັ້ງຄ່າ branch",
+      "stepDevcontainerSetup": "ການຕັ້ງຄ່າ Dev container",
+      "stepWorkspaceRestore": "ກຳລັງກູ້ຄືນ Workspace",
+      "stepWorkspaceBackup": "ກຳລັງບັນທຶກ Workspace",
+      "stepSandboxProvision": "ການຈັດສະພາບ sandbox",
+      "stepSandboxBoot": "ການເລີ່ມຕົ້ນ sandbox",
+      "stepSnapshotFallback": "ກຳລັງລອງໃໝ່ໂດຍບໍ່ໃຊ້ snapshot",
+      "stepKiloServer": "ກຳລັງເລີ່ມ Kilo",
+      "stepKiloSession": "ກຳລັງກຽມ session",
+      "stepRestoreIncomplete": "ການກູ້ຄືນ session ບໍ່ສົມບູນ",
+      "stepReady": "ສະພາບແວດລ້ອມພ້ອມແລ້ວ",
+      "stepFailed": "ຕັ້ງຄ່າສະພາບແວດລ້ອມບໍ່ສຳເລັດ",
+      "stepUnknown": "ການຕັ້ງຄ່າສະພາບແວດລ້ອມ",
+      "detailCreatingSandbox": "ກຳລັງສ້າງ sandbox",
+      "detailUpdatingRepository": "ກຳລັງອັບເດດ repository",
+      "detailCheckingOutBranch": "ກຳລັງ checkout branch",
+      "detailRunningSetupCommands": "ກຳລັງດຳເນີນການຄຳສັ່ງຕັ້ງຄ່າ",
+      "detailSavingRepository": "ກຳລັງບັນທຶກ repository ເພື່ອໃຫ້ເລີ່ມໄວຂຶ້ນ",
+      "detailStartingKiloRuntime": "ກຳລັງເລີ່ມ runtime ຂອງ Kilo",
+      "detailPreparingKiloSession": "ກຳລັງກຽມ session ຂອງ Kilo",
+      "detailWaitingForPreviousSandbox": "ກຳລັງລໍຖ້າໃຫ້ sandbox ກ່ອນໜ້າຢຸດລົງ",
+      "detailRetryingSandboxCreation": "ກຳລັງລອງສ້າງ sandbox ໃໝ່",
+      "detailPreviousSnapshotFailed": "ເລີ່ມຕົ້ນດ້ວຍ snapshot ກ່ອນໜ້າບໍ່ສຳເລັດ. ກຳລັງລອງໃໝ່ໂດຍບໍ່ໃຊ້ snapshot.",
+      "detailSnapshotStartupFailed": "ເລີ່ມຕົ້ນດ້ວຍ snapshot ບໍ່ສຳເລັດ. ກຳລັງລອງໃໝ່ໂດຍບໍ່ໃຊ້ snapshot.",
+      "detailStartingSandboxWithoutSnapshot": "ກຳລັງເລີ່ມ sandbox ໂດຍບໍ່ໃຊ້ snapshot",
+      "detailSettingUpWorkspace": "ກຳລັງຕັ້ງຄ່າ Workspace",
+      "detailRestoringSession": "ກຳລັງກູ້ຄືນ session",
+      "detailWarmWorkspaceReused": "ນຳ Workspace ທີ່ຍັງອົບອຸ່ນກັບມາໃຊ້",
+      "detailRetryingClone": "ກຳລັງລອງ clone ໃໝ່ (ຄັ້ງທີ {{attempt}} ຈາກ {{total}})",
+      "detailSetupCommandFailed": "ຄຳສັ່ງຕັ້ງຄ່າ {{index}} ລົ້ມເຫຼວ",
+      "detailSetupCommandTimedOut": "ຄຳສັ່ງຕັ້ງຄ່າ {{index}} ໝົດເວລາ",
+      "detailColdRestore": "ການກູ້ຄືນແບບ cold, ນຳໃຊ້ snapshot ແລ້ວ, ກູ້ຄືນໄດ້ {{applied}} ຈາກ {{total}} ໄຟລ໌",
+      "detailProgressPercent": "{{percent}}% ສຳເລັດ",
+      "detailRestoreIncompleteReport": "ການກູ້ຄືນ session ບໍ່ສົມບູນ: ບໍ່ໄດ້ກູ້ຄືນ {{skipped}} ຈາກ {{total}} ໄຟລ໌ ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "ຂາດ: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} ແລະອີກ {{omitted}} ອັນ",
+      "detailReasonPatchFailed": "ແພັດບໍ່ສາມາດນຳໃຊ້ໄດ້",
+      "detailReasonOutsideWorkspace": "ເສັ້ນທາງຢູ່ນອກ Workspace",
+      "detailReasonMissingContent": "snapshot ບໍ່ມີເນື້ອໃນຂອງໄຟລ໌",
+      "detailReasonIndexResetFailed": "ບໍ່ສາມາດຕັ້ງຄ່າ index ຄືນໃໝ່ຫຼັງການນຳໃຊ້ລົ້ມເຫຼວ",
+      "detailReasonUnlinkFailed": "ບໍ່ສາມາດລຶບໄຟລ໌ອອກ",
+      "detailReasonWriteFailed": "ບໍ່ສາມາດຂຽນໄຟລ໌",
+      "detailReasonUnknown": "ສາເຫດທີ່ບໍ່ຮູ້",
+      "detailUnknown": "ຍັງກຳລັງກຽມຢູ່",
+      "errorPreparationTimeout": "ການກຽມສະພາບແວດລ້ອມໝົດເວລາ",
+      "errorWorkspaceSetupFailed": "ຕັ້ງຄ່າ Workspace ບໍ່ສຳເລັດ",
+      "errorCredentialUpgradeRequired": "session ນີ້ຂາດການອັບເກຣດ credential ທີ່ຕ້ອງການ. ເລີ່ມ session ໃໝ່ເພື່ອສືບຕໍ່.",
+      "errorAgentUnavailable": "agent ບໍ່ສາມາດໃຊ້ງານໄດ້ອີກ",
+      "errorBillingBlocked": "ການຊຳລະຄ່າ sandbox ຕ້ອງການເຄຣດິດເພີ່ມ",
+      "errorBillingUnavailable": "ບໍ່ສາມາດກວດສອບການຊຳລະຄ່າ ຫຼື ຄວາມສາມາດຂອງ sandbox ໄດ້. ລອງໃໝ່ອີກບໍ່ດົນ.",
+      "errorContainerLimitReached": "ຮອດຂີດຈຳນວນ container ແລ້ວ. ຢຸດ container ທີ່ມີຢູ່ກ່ອນຈະເລີ່ມອັນໃໝ່.",
+      "errorInvalidConfiguration": "ການຕັ້ງຄ່າ sandbox ບໍ່ຖືກຕ້ອງ ຫຼື ບໍ່ຮອງຮັບ",
+      "errorRuntimeArtifactUnauthorized": "ບໍ່ໄດ້ຮັບອະນຸຍາດໃຫ້ດາວໂຫຼດ runtime",
+      "errorRuntimeArtifactInvalid": "ກວດສອບ runtime artifact ບໍ່ສຳເລັດ",
+      "errorRuntimeCliProbeFailed": "ກວດສອບ runtime CLI ບໍ່ສຳເລັດ",
+      "errorRuntimeSupervisorMissing": "ຂາດ runtime supervisor",
+      "errorConnectionLost": "ການເຊື່ອມຕໍ່ກັບ sandbox ຂາດໄປ",
+      "errorSandboxLost": "sandbox ໄດ້ສູນໄປ",
+      "errorAgentRestarted": "agent ໄດ້ເລີ່ມຕົ້ນໃໝ່",
+      "errorSandboxOutOfMemory": "sandbox ໝົດໜ່ວຍຄວາມຈຳ",
+      "errorPreparationDidNotComplete": "ການກຽມບໍ່ສຳເລັດ"
     },
     "permissionCard": {
       "title": "ຕ້ອງໄດ້ຮັບອະນຸຍາດ",
@@ -3068,10 +3143,12 @@
       "truncated": "ຍັງມີປະຫວັດເຄຣດິດກ່ອນໜ້ານີ້ໃຫ້ເບິ່ງ."
     },
     "inviteMember": {
+      "alreadyInvited": "ພວກເຂົາຖືກເຊີນແລ້ວ ຫຼື ເປັນສະມາຊິກແລ້ວ.",
       "emailError": "ໃສ່ທີ່ຢູ່ອີເມວທີ່ຖືກຕ້ອງ.",
       "emailPlaceholder": "ຕົວຢ່າງ: name@company.com",
       "permissionDenied": "ທ່ານບໍ່ມີສິດເຊີນສະມາຊິກ.",
       "roleMember": "ບົດບາດ: ສະມາຊິກ",
+      "sendError": "ບໍ່ສາມາດສົ່ງຄຳເຊີນໄດ້.",
       "sendInvite": "ສົ່ງຄຳເຊີນ",
       "title": "ເຊີນສະມາຊິກ"
     },
@@ -3142,6 +3219,7 @@
       "inviteCreated": "ສ້າງຄຳເຊີນແລ້ວ",
       "pendingInvitations": "ຄຳເຊີນທີ່ລໍຖ້າການຕອບຮັບ",
       "resendInvite": "ສົ່ງຄຳເຊີນອີກຄັ້ງ",
+      "resendInviteError": "ບໍ່ສາມາດສົ່ງຄຳເຊີນອີກຄັ້ງໄດ້.",
       "shareInviteLink": "ແບ່ງປັນລິ້ງເຊີນ"
     },
     "usageStats": {
@@ -3287,6 +3365,7 @@
   },
   "transcriptionModel": {
     "title": "ໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ",
+    "choose": "ເລືອກໂມເດວ",
     "noneChosen": "ຍັງບໍ່ໄດ້ເລືອກ",
     "emptyTitle": "ບໍ່ມີໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ",
     "emptyDescription": "ຕອນນີ້ Kilo Gateway ບໍ່ມີໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ.",
@@ -3312,6 +3391,7 @@
   },
   "modelChat": {
     "offlineFailure": "ໂມເດວນີ້ຕ້ອງການການເຊື່ອມຕໍ່ອິນເຕີເນັດ. ເຊື່ອມຕໍ່ແລ້ວລອງໃໝ່, ຫຼື ສະຫຼັບໄປໃຊ້ໂມເດວໃນອຸປະກອນນີ້.",
+    "creditsRequired": "ເຄຣດິດບໍ່ພຽງພໍທີ່ຈະສົ່ງຂໍ້ຄວາມນີ້. ເຕີມເຄຣດິດແລ້ວລອງອີກຄັ້ງ.",
     "empty": {
       "title": "ເລີ່ມການສົນທະນາ",
       "description": "ສົ່ງຂໍ້ຄວາມເພື່ອສົນທະນາກັບໂມເດວ."
@@ -3386,7 +3466,12 @@
       "serverToolCount_one": "ເຄື່ອງມື {{count}}",
       "serverToolCount_other": "ເຄື່ອງມື {{count}}",
       "serverUnreachable": "ບໍ່ສາມາດເຂົ້າເຖິງເຊີບເວີນີ້ໄດ້",
-      "serverOff": "ເຊີບເວີນີ້ປິດຢູ່"
+      "serverOff": "ເຊີບເວີນີ້ປິດຢູ່",
+      "app": {
+        "label": "ອິນເຕີເຟດຂອງເຄື່ອງມື",
+        "failed": "ບໍ່ສາມາດໂຫຼດອິນເຕີເຟດຂອງເຄື່ອງມືນີ້ໄດ້.",
+        "empty": "ອິນເຕີເຟດຂອງເຄື່ອງມືນີ້ບໍ່ມີຫຍັງໃຫ້ສະແດງ."
+      }
     },
     "mcpOAuth": {
       "authMethod": "ການຢືນຢັນຕົວຕົນ",
@@ -3611,6 +3696,8 @@
     "noSpend": "ຍັງບໍ່ມີການບັນທຶກການໃຊ້ຈ່າຍ",
     "spend24h": "ການໃຊ້ຈ່າຍໃນ 24 ຊົ່ວໂມງຜ່ານມາ",
     "multiplierError": "ໃສ່ຕົວຄູນ 1 ຫຼື ຫຼາຍກວ່າ",
+    "multiplierMaxError": "ໃສ່ຕົວຄູນ {{max}} ຫຼື ໜ້ອຍກວ່າ",
+    "thresholdMaxError": "ໃສ່ຈຳນວນເງິນ {{max}} ຫຼື ໜ້ອຍກວ່າ.",
     "permissionDenied": "ທ່ານບໍ່ມີສິດຈັດການການແຈ້ງເຕືອນການໃຊ້ຈ່າຍ.",
     "pushOffByCategory": "ປິດໃນການແຈ້ງເຕືອນ"
   },
@@ -3668,6 +3755,7 @@
     },
     "variablesEmpty": "ບໍ່ມີຕົວແປເທື່ອ",
     "variablesSaveFailed": "ບໍ່ສາມາດບັນທຶກຕົວແປໄດ້",
+    "variablesDeleteFailed": "ບໍ່ສາມາດລຶບຕົວແປໄດ້",
     "commandsTitle": "ຕັ້ງຄ່າຄໍາສັ່ງ",
     "addCommand": "ເພີ່ມຄໍາສັ່ງ",
     "commandLabel": "ຄໍາສັ່ງ",
@@ -3678,6 +3766,7 @@
     "moveDown": "ຍ້າຍລົງ",
     "moveCommandUp": "ຍ້າຍຄໍາສັ່ງ {{position}} ຂຶ້ນ",
     "moveCommandDown": "ຍ້າຍຄໍາສັ່ງ {{position}} ລົງ",
+    "deleteCommand": "ລຶບຄໍາສັ່ງ {{position}}",
     "skillsTitle": "ທັກສະ",
     "addSkill": "ເພີ່ມທັກສະ",
     "skillNameLabel": "ຊື່ທັກສະ",

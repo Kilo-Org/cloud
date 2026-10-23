@@ -1,9 +1,10 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { InputAccessoryView, Keyboard, Pressable, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
+import { InvalidRouteState } from '@/components/invalid-route-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -19,6 +20,7 @@ import {
   type SettingsBackGuardResult,
   useSettingsBackGuard,
 } from '@/lib/hooks/use-settings-back-guard';
+import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 
 // The multiline editor's keyboard has no Done key on iOS (return inserts a
 // newline), so a covered Save left no keyboard-adjacent way out. The accessory
@@ -50,8 +52,11 @@ function InstructionsEditor({
       <Text className="text-sm text-muted-foreground">
         {t('codeReviewer.instructions.deprecation')}
       </Text>
+      {/* A multiline field takes the platform's generic text-view name on iOS,
+          so the accessible name is the localized heading this screen renders. */}
       <TextInput
         className="min-h-32 rounded-lg bg-secondary p-3 text-sm leading-5 text-foreground"
+        accessibilityLabel={t('codeReviewer.instructions.title')}
         multiline
         textAlignVertical="top"
         inputAccessoryViewID={INSTRUCTIONS_DONE_ACCESSORY_ID}
@@ -101,7 +106,17 @@ function InstructionsEditor({
 }
 
 export default function InstructionsRoute() {
-  const { scope, platform } = useLocalSearchParams<{ scope: string; platform: ReviewerPlatform }>();
+  const params = useReviewerRouteParams();
+  if (!params) {
+    return <InvalidRouteState backTo={'/(app)/code-reviewer' as Href} />;
+  }
+  return <InstructionsScreen scope={params.scope} platform={params.platform} />;
+}
+
+function InstructionsScreen({
+  scope,
+  platform,
+}: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   const router = useRouter();
   const { data } = useReviewConfig(scope, platform);
   const save = useSaveReviewConfig(scope, platform);

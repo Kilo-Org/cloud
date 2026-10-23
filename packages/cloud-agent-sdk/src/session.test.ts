@@ -299,14 +299,14 @@ describe('session pipeline integration', () => {
         createEvent('autocommit_completed', {
           messageId: 'msg-1',
           success: true,
-          commitHash: 'abc123',
+          commitHash: 'a'.repeat(40),
           commitMessage: 'fix: bug',
         })
       );
       expect(serviceState.getStatus()).toEqual({
         type: 'autocommit',
         step: 'completed',
-        message: 'abc123 fix: bug',
+        message: `${'a'.repeat(40)} fix: bug`,
       });
     });
 

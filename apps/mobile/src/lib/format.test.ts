@@ -6,6 +6,7 @@ import {
   formatFileSize,
   formatList,
   formatMoney,
+  normalizeLocalizedNumber,
   parseLocalizedNumber,
   toAsciiDigits,
 } from './format';
@@ -40,6 +41,17 @@ describe('localized format helpers', () => {
     expect(parseLocalizedNumber('1 234,5', 'ru')).toBe(1234.5);
     expect(parseLocalizedNumber('١٢٣٤', 'ar-EG')).toBe(1234);
     expect(parseLocalizedNumber('twelve', 'en')).toBeNull();
+  });
+
+  it('normalizes to an ASCII literal so callers can compare magnitudes', () => {
+    expect(normalizeLocalizedNumber('1.234,5', 'de-DE')).toBe('1234.5');
+    expect(normalizeLocalizedNumber(' 1 234,5 ', 'ru')).toBe('1234.5');
+    expect(normalizeLocalizedNumber('-12', 'en')).toBe('-12');
+    expect(normalizeLocalizedNumber('twelve', 'en')).toBeNull();
+    expect(normalizeLocalizedNumber('', 'en')).toBeNull();
+    // Longer than a JS number can hold: the literal survives, the parse does not.
+    expect(normalizeLocalizedNumber('9'.repeat(950), 'en')).toBe('9'.repeat(950));
+    expect(parseLocalizedNumber('9'.repeat(950), 'en')).toBeNull();
   });
 
   it('formats a calendar date without a time-zone shift', () => {

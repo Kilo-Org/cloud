@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 
+import { ReviewerRouteParamsProvider } from '@/lib/hooks/use-reviewer-route-params';
 import InstructionsRoute from './instructions';
 
 const config = vi.hoisted(() => ({
@@ -37,6 +38,7 @@ const textInputs = vi.hoisted(() => ({
     value?: string;
     defaultValue?: string;
     placeholder?: string;
+    accessibilityLabel?: string;
     onChangeText: (text: string) => void;
     multiline?: boolean;
   }[],
@@ -52,7 +54,7 @@ const confirmDialog = vi.hoisted(() => ({
 }));
 
 vi.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({ scope: 'personal', platform: 'github' }),
+  useLocalSearchParams: () => ({}),
   useRouter: () => router,
   useNavigation: () => navigation,
   usePreventRemove: (enabled: boolean, handler: (options: { repeat: () => void }) => void) => {
@@ -107,6 +109,7 @@ vi.mock('@/components/destructive-confirm-dialog', () => ({
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
 vi.mock('@/components/screen-header', () => ({
   ScreenHeader: (props: Record<string, unknown>): ReactNode => createElement('ScreenHeader', props),
 }));
@@ -124,7 +127,12 @@ function Harness() {
   invalidate = () => {
     setVersion(version => version + 1);
   };
-  return createElement(InstructionsRoute);
+  // The `[platform]` layout validates the pair and publishes it to the screen.
+  return (
+    <ReviewerRouteParamsProvider params={{ kind: 'personal', platform: 'github' }}>
+      <InstructionsRoute />
+    </ReviewerRouteParamsProvider>
+  );
 }
 
 function mount(): TestRenderer.ReactTestRenderer {
@@ -193,9 +201,12 @@ beforeEach(() => {
   invalidate = () => undefined;
 });
 
-afterEach(() => {
+afterEach(async () => {
   act(() => {
     TestRenderer.act(() => undefined);
+  });
+  await act(async () => {
+    await i18n.changeLanguage('en');
   });
 });
 
@@ -397,5 +408,24 @@ describe('InstructionsRoute editor', () => {
 
     expect(textInputs.inputs).toHaveLength(0);
     expect(findByHostType(renderer, 'Skeleton')).toHaveLength(2);
+  });
+
+  it('names the editor with the localized instructions title', () => {
+    config.data = { customInstructions: STORED };
+    mount();
+
+    expect(latestInput().accessibilityLabel).toBe(i18n.t('codeReviewer.instructions.title'));
+  });
+
+  it('reads the editor name from the active catalog', async () => {
+    await act(async () => {
+      await i18n.changeLanguage('ar');
+    });
+    config.data = { customInstructions: STORED };
+    mount();
+
+    const input = latestInput();
+    expect(input.accessibilityLabel).toBe(i18n.t('codeReviewer.instructions.title'));
+    expect(input.accessibilityLabel).not.toBe('Custom instructions');
   });
 });

@@ -3729,7 +3729,7 @@
     "moveDown": "Pomeri se dole",
     "moveCommandUp": "Premesti komandu {{position}} gore",
     "moveCommandDown": "Premesti komandu {{position}} dole",
-    "deleteCommand": "{\"value\": \"Obriši komandu {{position}}\"}",
+    "deleteCommand": "Obriši komandu {{position}}",
     "skillsTitle": "Veštine",
     "addSkill": "Dodajte veštinu",
     "skillNameLabel": "Naziv veštine",

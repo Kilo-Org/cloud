@@ -358,6 +358,28 @@ describe('createManualCodeReviewJob connected GitLab source', () => {
     expect(mockGetValidGitLabToken).not.toHaveBeenCalled();
   });
 
+  it('maps a refused merge request read to a client error instead of a 500', async () => {
+    mockFetchGitLabMergeRequest.mockRejectedValue(new Error('GitLab MR fetch failed: 404'));
+
+    const error = await captureError(gitlabJob(MR_URL));
+
+    expect(error).toBeInstanceOf(TRPCError);
+    expect((error as TRPCError).code).toBe('NOT_FOUND');
+    expect(mockCreateCodeReview).not.toHaveBeenCalled();
+    expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+  });
+
+  it('maps a refused credential on the merge request read to the reconnect state', async () => {
+    mockFetchGitLabMergeRequest.mockRejectedValue(new Error('GitLab MR fetch failed: 401'));
+
+    const error = await captureError(gitlabJob(MR_URL));
+
+    expect(error).toBeInstanceOf(TRPCError);
+    expect((error as TRPCError).code).toBe('PRECONDITION_FAILED');
+    expect((error as TRPCError).message).toMatch(/reconnect/i);
+    expect(mockCreateCodeReview).not.toHaveBeenCalled();
+  });
+
   it('passes the organization credential actor for an organization-owned connection', async () => {
     mockGetAllIntegrationsForOwner.mockResolvedValue([
       { ...gitlabIntegration(), owned_by_user_id: null, owned_by_organization_id: 'org-1' },

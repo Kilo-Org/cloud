@@ -3871,7 +3871,7 @@
     "slashCommands": {
       "title": "斜杠命令",
       "add": "添加斜杠命令",
-      "empty": "还没有斜线命令",
+      "empty": "还没有斜杠命令",
       "name": "命令名称",
       "description": "命令说明",
       "template": "模板",

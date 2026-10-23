@@ -24,7 +24,8 @@ const RECOVERY_REFETCH_DEADLINE_MS = 10_000;
  * observers included) instead of rebuilding the payload that broke the render.
  * The list is every tRPC root the stack's screens read: the tab itself (user,
  * organizations, the pass and agent-profile reads) plus the code-reviewer,
- * profile-management, security-agent and spend-alert screens.
+ * profile-management (including its GitHub and GitLab repository reads),
+ * security-agent and spend-alert screens.
  */
 const PROFILE_STACK_QUERY_PREFIXES: readonly (readonly unknown[])[] = [
   [['user']],
@@ -36,6 +37,7 @@ const PROFILE_STACK_QUERY_PREFIXES: readonly (readonly unknown[])[] = [
   [['codeReviews']],
   [['reviewMemory']],
   [['spendAlerts']],
+  [['cloudAgentNext']],
 ];
 
 type BoundaryProps = {

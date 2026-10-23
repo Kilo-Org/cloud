@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
 import { getTabBarIconForwardHeight, getTabBarOverlayHeight } from '@/lib/tab-bar-layout';
+import { type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { TabScreenScrollView, useTabBarBottomPadding } from './tab-screen';
@@ -75,6 +76,25 @@ const frame = (width: number, height: number) => ({
   nativeEvent: { layout: { width, height, x: 0, y: 0 } },
 });
 
+/** The viewport margin (`marginBottom`) the mounted scroll view reserves. */
+function reservedMargin(renderer: ReactTestRenderer): number | undefined {
+  const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
+  const style = scroll?.props.style as [{ marginBottom?: number } | undefined];
+  return style.at(-1)?.marginBottom;
+}
+
+/** Feeds one frame layout pass through the mounted scroll view's own handler. */
+function layoutFrame(renderer: ReactTestRenderer, width: number, height: number) {
+  act(() => {
+    layoutHandlerOf(renderer)?.(frame(width, height));
+  });
+}
+
+function layoutHandlerOf(renderer: ReactTestRenderer) {
+  const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
+  return (scroll as { props: { onLayout?: (event: unknown) => void } } | undefined)?.props.onLayout;
+}
+
 beforeEach(() => {
   // The reveal fires through a 400ms settle timer; fake timers drive it.
   vi.useFakeTimers();
@@ -137,6 +157,84 @@ describe('TabScreenScrollView', () => {
     expect(childTypes).toEqual(['Content', 'View']);
     const [spacer] = findByType('View');
     expect(spacer?.props.style).toEqual({ height: 16 });
+    unmount();
+  });
+});
+
+describe('TabScreenScrollView viewport floor', () => {
+  // iOS, no bottom inset, font scale 1: the bar is its 50pt base, so the band
+  // below is exact and easy to read.
+  const BAND = 50;
+
+  it('keeps the whole tab-bar band while the window has room for it', async () => {
+    layout.platform = 'ios';
+    layout.bottom = 0;
+    layout.fontScale = 1;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(TabScreenScrollView, null, createElement('Content'))
+    );
+    layoutFrame(renderer, 874, 600);
+    expect(reservedMargin(renderer)).toBe(BAND);
+    layoutFrame(renderer, 402, 300);
+    expect(reservedMargin(renderer)).toBe(BAND);
+    unmount();
+  });
+
+  it('clamps the band so a collapsed viewport becomes scrollable', async () => {
+    // The reported short landscape window: the band is a margin on a flex-1
+    // frame, so a 100pt screen with 54pt of band first reports a 0pt frame and
+    // nothing on the screen can be reached. The floor releases band until 88pt
+    // of viewport is left.
+    layout.platform = 'ios';
+    layout.bottom = 0;
+    layout.fontScale = 1;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(TabScreenScrollView, null, createElement('Content'))
+    );
+    layoutFrame(renderer, 402, 0);
+    expect(reservedMargin(renderer)).toBe(0);
+    // The next pass measures the room the released band exposed.
+    layoutFrame(renderer, 402, 100);
+    expect(reservedMargin(renderer)).toBe(12);
+    // Settled: the frame keeps the floor and the band no longer moves.
+    layoutFrame(renderer, 402, 88);
+    expect(reservedMargin(renderer)).toBe(12);
+    unmount();
+  });
+
+  it('restores the whole band once the window grows again', async () => {
+    layout.platform = 'ios';
+    layout.bottom = 0;
+    layout.fontScale = 1;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(TabScreenScrollView, null, createElement('Content'))
+    );
+    layoutFrame(renderer, 402, 0);
+    expect(reservedMargin(renderer)).toBe(0);
+    layoutFrame(renderer, 402, 100);
+    expect(reservedMargin(renderer)).toBe(12);
+    layoutFrame(renderer, 874, 600);
+    expect(reservedMargin(renderer)).toBe(BAND);
+    unmount();
+  });
+
+  it('floors the viewport under a keyboard taller than the frame', async () => {
+    // The IME band collapses the frame the same way in a short landscape
+    // window. The floor releases band until an 88pt strip of content is left,
+    // instead of the screen showing nothing at all while the user types.
+    layout.platform = 'ios';
+    layout.bottom = 0;
+    layout.fontScale = 1;
+    keyboard.occlusion = 300;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(TabScreenScrollView, null, createElement('Content'))
+    );
+    layoutFrame(renderer, 402, 0);
+    expect(reservedMargin(renderer)).toBe(212);
+    // A 300pt frame is the wrapper the released band exposed; the band settles
+    // at the floor instead of shrinking further.
+    layoutFrame(renderer, 402, 88);
+    expect(reservedMargin(renderer)).toBe(212);
     unmount();
   });
 });

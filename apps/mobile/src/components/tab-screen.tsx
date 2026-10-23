@@ -1,4 +1,4 @@
-import { type Ref, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
+import { type Ref, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
@@ -18,6 +18,20 @@ import { useScreenInsets } from '@/lib/screen-insets';
 type ScrollEvent = NativeSyntheticEvent<NativeScrollEvent>;
 
 const TAB_SCREEN_BOTTOM_GAP = 16;
+
+/**
+ * The smallest scroll viewport the tab screens keep on screen. The reserved
+ * band (the tab bar's height, or the IME occlusion while the keyboard is up) is
+ * a margin on a `flex-1` frame, so a window shorter than the band leaves the
+ * frame zero points tall: nothing below the header renders and nothing can be
+ * scrolled, which made a short landscape window unusable (frame height 0 with
+ * 577 points of content on Home). The floor gives up part of the reserved band
+ * in that window instead: the lowest 88 points of the viewport (about two list
+ * rows, or a section header and one row) can then sit under the translucent
+ * bar, which is the lesser cost. Any window that can afford the whole band
+ * keeps it unchanged.
+ */
+const TAB_SCREEN_MIN_VIEWPORT = 88;
 
 /**
  * The tab bar's rendered height for this screen's clearance:
@@ -110,10 +124,15 @@ export function TabScreenScrollView({
   // always reserved in the frame (never left to the native inset): the native
   // inset does not clamp programmatic scrolls to the keyboard top, leaving
   // focused content under the IME with no scroll range to drag it clear.
-  let frameMargin = tabBarHeight;
-  if (keyboardOcclusion > 0) {
-    frameMargin = keyboardOcclusion;
-  }
+  //
+  // Both bands are margins on a `flex-1` frame, so a window shorter than the
+  // band collapses the frame to zero height. `viewportBandLimit` is that
+  // window's answer: the band is clamped to keep `TAB_SCREEN_MIN_VIEWPORT`
+  // scrollable, and is restored whenever the window can afford all of it.
+  const reservedBand = keyboardOcclusion > 0 ? keyboardOcclusion : tabBarHeight;
+  const [viewportBandLimit, setViewportBandLimit] = useState<number | null>(null);
+  const frameMargin =
+    viewportBandLimit === null ? reservedBand : Math.min(reservedBand, viewportBandLimit);
   // The scroll view's own focused-field reveal runs on focus only. Two
   // re-layouts leave the focused row (and whatever sits under it) parked behind
   // the IME, and content that ends near the field may not leave enough slack to
@@ -155,6 +174,18 @@ export function TabScreenScrollView({
     const { width, height } = event.nativeEvent.layout;
     const last = lastFrameRef.current;
     lastFrameRef.current = { width, height };
+    // The reserved band is a margin, so this frame is the wrapper's height
+    // minus the band: `height + frameMargin` is the room the screen has. A
+    // collapsed frame reports 0, so the first pass over-estimates the room and
+    // can only release band; the pass after it measures the real room and
+    // settles on the floor.
+    const bandLimit = Math.min(
+      reservedBand,
+      Math.max(0, height + frameMargin - TAB_SCREEN_MIN_VIEWPORT)
+    );
+    if (bandLimit !== frameMargin) {
+      setViewportBandLimit(bandLimit);
+    }
     if (keyboardOcclusion > 0 && last != null && (last.width !== width || last.height !== height)) {
       // The layout event fires before the scroll view has re-laid out its
       // content at the new frame, so revealing synchronously scrolls against

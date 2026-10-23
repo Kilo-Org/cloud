@@ -108,3 +108,36 @@ it('mounts a covered scene hidden until it becomes the visible one', async () =>
     importantForAccessibility: 'auto',
   });
 });
+
+it('follows the scene navigation it is replaced with instead of the old one', async () => {
+  const first = fakeSceneNavigation(true);
+  const second = fakeSceneNavigation(true);
+  const sceneElement = (navigation: unknown) =>
+    createElement(appScreenLayout, {
+      navigation,
+      children: createElement('Draft'),
+    } as unknown as ScreenLayoutProps);
+  const view = await renderWithProviders(sceneElement(first.navigation));
+  const gate = () =>
+    view.renderer.root.find(
+      node => (node.type as string) === 'View' && node.props.collapsable === false
+    );
+
+  act(() => {
+    view.renderer.update(sceneElement(second.navigation));
+  });
+
+  // A leftover listener on the replaced navigator would hide or expose this
+  // scene for another scene's focus change.
+  expect(first.listenerCount()).toBe(0);
+  act(() => {
+    second.setFocused(false);
+  });
+  expect(gate().props).toMatchObject({
+    accessibilityElementsHidden: true,
+    importantForAccessibility: 'no-hide-descendants',
+  });
+
+  view.unmount();
+  expect(second.listenerCount()).toBe(0);
+});

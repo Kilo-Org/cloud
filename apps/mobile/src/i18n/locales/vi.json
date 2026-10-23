@@ -1259,7 +1259,7 @@
       "deadlinePassed": "Đã quá hạn",
       "deadlinePassedDetail": "{{critical}} nghiêm trọng, {{high}} cao",
       "dueThisWeek": "Đến hạn trong tuần này",
-      "dueThisWeekDetail": "{{exploitable}} vấn đề đã được xác nhận là có thể bị khai thác",
+      "dueThisWeekDetail": "{{exploitable}} trong số này đã được xác nhận là có thể bị khai thác",
       "noDeadline": "Không có hạn chót",
       "reviewSlaAssignment": "Rà soát việc đặt hạn chót SLA",
       "allOpenFindingsTracked": "Đang theo dõi tất cả vấn đề chưa xử lý"

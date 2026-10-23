@@ -1259,7 +1259,7 @@
       "deadlinePassed": "Frist abgelaufen",
       "deadlinePassedDetail": "{{critical}} kritisch, {{high}} hoch",
       "dueThisWeek": "Diese Woche fällig",
-      "dueThisWeekDetail": "{{exploitable}} nachweislich ausnutzbar",
+      "dueThisWeekDetail": "{{exploitable}} davon nachweislich ausnutzbar",
       "noDeadline": "Keine Frist",
       "reviewSlaAssignment": "SLA-Zuweisung prüfen",
       "allOpenFindingsTracked": "Alle offenen Befunde erfasst"

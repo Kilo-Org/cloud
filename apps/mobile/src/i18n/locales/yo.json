@@ -1731,7 +1731,7 @@
       "deadlinePassed": "Ọjọ́ ìparí ti kọjá",
       "deadlinePassedDetail": "{{critical}} tó le jù lọ, {{high}} tó ga",
       "dueThisWeek": "Ọjọ́ ìparí dé lọ́sẹ̀ yìí",
-      "dueThisWeekDetail": "a ti jẹ́rìí pé a lè lo {{exploitable}} fún ìkọlù",
+      "dueThisWeekDetail": "{{exploitable}} nínú wọn ni a ti jẹ́rìí pé a lè lo fún ìkọlù",
       "noDeadline": "Kò sí ọjọ́ ìparí",
       "reviewSlaAssignment": "Ṣàtúnyẹ̀wò bí a ṣe yan SLA",
       "allOpenFindingsTracked": "A ń tọpinpin gbogbo àbùkù tó ṣì ṣí"

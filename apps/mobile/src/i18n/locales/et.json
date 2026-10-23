@@ -1731,7 +1731,7 @@
       "deadlinePassed": "Tähtaeg möödunud",
       "deadlinePassedDetail": "{{critical}} kriitilise, {{high}} kõrge raskusastmega",
       "dueThisWeek": "Tähtajaga sel nädalal",
-      "dueThisWeekDetail": "{{exploitable}} kinnitatud ärakasutatavat leidu",
+      "dueThisWeekDetail": "{{exploitable}} neist on kinnitatud ärakasutatavad",
       "noDeadline": "Tähtaega pole",
       "reviewSlaAssignment": "Vaata üle SLA tähtaegade määramine",
       "allOpenFindingsTracked": "Kõiki avatud leide jälgitakse"

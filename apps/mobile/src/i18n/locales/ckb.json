@@ -1731,7 +1731,7 @@
       "deadlinePassed": "مۆڵەت تێپەڕیوە",
       "deadlinePassedDetail": "{{critical}} زۆر مەترسیدار، {{high}} بەرز",
       "dueThisWeek": "مۆڵەتیان ئەم هەفتەیە تەواو دەبێت",
-      "dueThisWeekDetail": "خراپ بەکارهێنانی {{exploitable}} پشتڕاست کراوەتەوە",
+      "dueThisWeekDetail": "{{exploitable}} لە ئەمانە خراپ بەکارهێنانیان پشتڕاست کراوەتەوە",
       "noDeadline": "مۆڵەت نییە",
       "reviewSlaAssignment": "پێداچوونەوە بە دیاریکردنی SLA بکە",
       "allOpenFindingsTracked": "هەموو دۆزینەوە کراوەکان چاودێری دەکرێن"

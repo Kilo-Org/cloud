@@ -1265,7 +1265,7 @@
       "deadlinePassed": "המועד האחרון חלף",
       "deadlinePassedDetail": "{{critical}} בדרגת חומרה קריטית, {{high}} בדרגת חומרה גבוהה",
       "dueThisWeek": "המועד האחרון חל השבוע",
-      "dueThisWeekDetail": "{{exploitable}} אושרו כניתנים לניצול",
+      "dueThisWeekDetail": "{{exploitable}} מהם אושרו כניתנים לניצול",
       "noDeadline": "אין מועד אחרון",
       "reviewSlaAssignment": "בדיקת המועדים שנקבעו לפי SLA",
       "allOpenFindingsTracked": "כל הממצאים הפתוחים במעקב"

@@ -1271,7 +1271,7 @@
       "deadlinePassed": "Термін минув",
       "deadlinePassedDetail": "Критичний рівень: {{critical}}, високий: {{high}}",
       "dueThisWeek": "Термін спливає цього тижня",
-      "dueThisWeekDetail": "Підтверджена можливість атаки: {{exploitable}}",
+      "dueThisWeekDetail": "З них {{exploitable}} з підтвердженою можливістю атаки",
       "noDeadline": "Терміну немає",
       "reviewSlaAssignment": "Перевірити встановлені терміни за SLA",
       "allOpenFindingsTracked": "Усі відкриті проблеми відстежуються"

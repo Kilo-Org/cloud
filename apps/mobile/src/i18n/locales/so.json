@@ -1731,7 +1731,7 @@
       "deadlinePassed": "Waqtiga kama dambaysta ah wuu dhaafay",
       "deadlinePassedDetail": "{{critical}} halis daran, {{high}} sare",
       "dueThisWeek": "Waqtigoodu wuxuu dhammaanayaa toddobaadkan",
-      "dueThisWeekDetail": "{{exploitable}} ayaa la xaqiijiyay in weerar lagu adeegsan karo",
+      "dueThisWeekDetail": "{{exploitable}} ka mid ah kuwaas ayaa la xaqiijiyay in weerar lagu adeegsan karo",
       "noDeadline": "Ma jiro waqti kama-dambays ah",
       "reviewSlaAssignment": "Dib u eeg qoondaynta SLA",
       "allOpenFindingsTracked": "Dhammaan natiijooyinka furan waa lala socdaa"

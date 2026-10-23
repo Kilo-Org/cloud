@@ -1731,7 +1731,7 @@
       "deadlinePassed": "ಗಡುವು ಕಳೆದಿದೆ",
       "deadlinePassedDetail": "{{critical}} ಗಂಭೀರ, {{high}} ಹೆಚ್ಚು",
       "dueThisWeek": "ಈ ವಾರ ಗಡುವು",
-      "dueThisWeekDetail": "{{exploitable}} ಸಮಸ್ಯೆಗಳನ್ನು ದುರ್ಬಳಕೆ ಮಾಡಬಹುದೆಂದು ದೃಢಪಟ್ಟಿದೆ",
+      "dueThisWeekDetail": "ಇವುಗಳಲ್ಲಿ {{exploitable}} ಸಮಸ್ಯೆಗಳನ್ನು ದುರ್ಬಳಕೆ ಮಾಡಬಹುದೆಂದು ದೃಢಪಟ್ಟಿದೆ",
       "noDeadline": "ಗಡುವು ಇಲ್ಲ",
       "reviewSlaAssignment": "SLA ಗಡುವಿನ ನಿಗದಿಯನ್ನು ಪರಿಶೀಲಿಸಿ",
       "allOpenFindingsTracked": "ಎಲ್ಲ ಬಾಕಿ ಸಮಸ್ಯೆಗಳ ಮೇಲ್ವಿಚಾರಣೆ ನಡೆಯುತ್ತಿದೆ"

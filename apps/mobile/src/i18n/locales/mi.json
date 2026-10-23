@@ -1731,7 +1731,7 @@
       "deadlinePassed": "Kua hipa te wā kati",
       "deadlinePassedDetail": "{{critical}} tino kino, {{high}} teitei",
       "dueThisWeek": "Me whakatutuki i tēnei wiki",
-      "dueThisWeekDetail": "{{exploitable}} kua whakaūngia ka taea te whakamahi kino",
+      "dueThisWeekDetail": "{{exploitable}} o ēnei kua whakaūngia ka taea te whakamahi kino",
       "noDeadline": "Kāore he wā kati",
       "reviewSlaAssignment": "Arotakehia te tohanga SLA",
       "allOpenFindingsTracked": "Kei te aroturukihia ngā kitenga tūwhera katoa"

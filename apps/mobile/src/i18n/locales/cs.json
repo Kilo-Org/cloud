@@ -1775,7 +1775,7 @@
       "deadlinePassed": "Termín uplynul",
       "deadlinePassedDetail": "Kritické: {{critical}}, vysoké: {{high}}",
       "dueThisWeek": "Termín tento týden",
-      "dueThisWeekDetail": "Potvrzeně zneužitelné: {{exploitable}}",
+      "dueThisWeekDetail": "{{exploitable}} z nich je potvrzeně zneužitelných",
       "noDeadline": "Bez termínu",
       "reviewSlaAssignment": "Zkontrolovat přiřazení SLA",
       "allOpenFindingsTracked": "Všechny otevřené nálezy jsou sledovány"

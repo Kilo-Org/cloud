@@ -1731,7 +1731,7 @@
       "deadlinePassed": "Η προθεσμία έληξε",
       "deadlinePassedDetail": "{{critical}} κρίσιμης, {{high}} υψηλής σοβαρότητας",
       "dueThisWeek": "Λήγουν αυτή την εβδομάδα",
-      "dueThisWeekDetail": "{{exploitable}} επιβεβαιωμένα εκμεταλλεύσιμα",
+      "dueThisWeekDetail": "Από αυτά {{exploitable}} επιβεβαιωμένα εκμεταλλεύσιμα",
       "noDeadline": "Χωρίς προθεσμία",
       "reviewSlaAssignment": "Έλεγχος ορισμού προθεσμιών SLA",
       "allOpenFindingsTracked": "Όλα τα ανοιχτά ευρήματα παρακολουθούνται"

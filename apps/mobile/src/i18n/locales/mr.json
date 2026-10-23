@@ -1731,7 +1731,7 @@
       "deadlinePassed": "मुदत संपली",
       "deadlinePassedDetail": "{{critical}} गंभीर, {{high}} उच्च",
       "dueThisWeek": "या आठवड्यात मुदत",
-      "dueThisWeekDetail": "{{exploitable}} निष्कर्षांचा गैरफायदा घेता येत असल्याचे निश्चित",
+      "dueThisWeekDetail": "{{exploitable}} यापैकी गैरफायदा घेता येत असल्याचे निश्चित",
       "noDeadline": "मुदत नाही",
       "reviewSlaAssignment": "ठरवलेल्या SLA मुदतींचे पुनरावलोकन करा",
       "allOpenFindingsTracked": "सर्व प्रलंबित निष्कर्षांचा मागोवा घेतला जात आहे"

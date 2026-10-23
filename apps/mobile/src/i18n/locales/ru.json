@@ -1271,7 +1271,7 @@
       "deadlinePassed": "Срок истек",
       "deadlinePassedDetail": "Критический уровень: {{critical}}, высокий: {{high}}",
       "dueThisWeek": "Срок истекает на этой неделе",
-      "dueThisWeekDetail": "Возможность эксплуатации подтверждена: {{exploitable}}",
+      "dueThisWeekDetail": "Возможность эксплуатации подтверждена у {{exploitable}} из этих уязвимостей",
       "noDeadline": "Без срока",
       "reviewSlaAssignment": "Проверить назначенные сроки SLA",
       "allOpenFindingsTracked": "Все открытые уязвимости отслеживаются"

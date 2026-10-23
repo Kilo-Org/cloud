@@ -1259,7 +1259,7 @@
       "deadlinePassed": "Deadline verstreken",
       "deadlinePassedDetail": "{{critical}} kritiek, {{high}} hoog",
       "dueThisWeek": "Deadline deze week",
-      "dueThisWeekDetail": "Misbruik bevestigd bij {{exploitable}} bevindingen",
+      "dueThisWeekDetail": "Waarvan misbruik bevestigd bij {{exploitable}} bevindingen",
       "noDeadline": "Geen deadline",
       "reviewSlaAssignment": "SLA-toewijzing controleren",
       "allOpenFindingsTracked": "Alle open bevindingen bijgehouden"

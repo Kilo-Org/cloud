@@ -1731,7 +1731,7 @@
       "deadlinePassed": "مهلت گذشته است",
       "deadlinePassedDetail": "{{critical}} بحرانی، {{high}} بالا",
       "dueThisWeek": "سررسید این هفته",
-      "dueThisWeekDetail": "{{exploitable}} مورد با قابلیت بهره‌برداری تأییدشده",
+      "dueThisWeekDetail": "{{exploitable}} مورد از این‌ها با قابلیت بهره‌برداری تأییدشده",
       "noDeadline": "بدون مهلت",
       "reviewSlaAssignment": "بررسی مهلت‌های تعیین‌شده در SLA",
       "allOpenFindingsTracked": "همه یافته‌های باز ردیابی می‌شوند"

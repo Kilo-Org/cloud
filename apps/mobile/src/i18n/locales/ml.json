@@ -1731,7 +1731,7 @@
       "deadlinePassed": "സമയപരിധി കഴിഞ്ഞു",
       "deadlinePassedDetail": "{{critical}} ഗുരുതരം, {{high}} ഉയർന്നത്",
       "dueThisWeek": "ഈ ആഴ്ച സമയപരിധി അവസാനിക്കുന്നവ",
-      "dueThisWeekDetail": "{{exploitable}} എണ്ണം ചൂഷണം ചെയ്യാവുന്നതെന്ന് സ്ഥിരീകരിച്ചു",
+      "dueThisWeekDetail": "ഇവയിൽ {{exploitable}} എണ്ണം ചൂഷണം ചെയ്യാവുന്നതെന്ന് സ്ഥിരീകരിച്ചു",
       "noDeadline": "സമയപരിധിയില്ല",
       "reviewSlaAssignment": "നൽകിയ SLA സമയപരിധികൾ പരിശോധിക്കുക",
       "allOpenFindingsTracked": "തീർപ്പാകാത്ത എല്ലാ കണ്ടെത്തലുകളും നിരീക്ഷണത്തിലാണ്"

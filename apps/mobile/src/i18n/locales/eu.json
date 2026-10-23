@@ -1731,7 +1731,7 @@
       "deadlinePassed": "Epea gainditu da",
       "deadlinePassedDetail": "{{critical}} kritiko, {{high}} larritasun altuko",
       "dueThisWeek": "Aste honetan amaitzen da",
-      "dueThisWeekDetail": "{{exploitable}} ustiagarri direla baieztatuta",
+      "dueThisWeekDetail": "Horietatik {{exploitable}} ustiagarri direla baieztatuta",
       "noDeadline": "Eperik gabe",
       "reviewSlaAssignment": "Berrikusi SLAren esleipena",
       "allOpenFindingsTracked": "Aurkikuntza ireki guztien jarraipena egiten da"

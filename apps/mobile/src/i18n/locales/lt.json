@@ -1775,7 +1775,7 @@
       "deadlinePassed": "Terminas pasibaigęs",
       "deadlinePassedDetail": "Kritinio lygio: {{critical}}, aukšto lygio: {{high}}",
       "dueThisWeek": "Terminas šią savaitę",
-      "dueThisWeekDetail": "Patvirtinta galimybė išnaudoti: {{exploitable}}",
+      "dueThisWeekDetail": "{{exploitable}} iš šių patvirtinti kaip išnaudojami",
       "noDeadline": "Nėra termino",
       "reviewSlaAssignment": "Peržiūrėti SLA terminų priskyrimą",
       "allOpenFindingsTracked": "Visi atviri radiniai stebimi"

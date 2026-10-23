@@ -1731,7 +1731,7 @@
       "deadlinePassed": "သတ်မှတ်ရက် ကျော်လွန်ပြီး",
       "deadlinePassedDetail": "အလွန်ပြင်းထန် {{critical}} ခု၊ မြင့် {{high}} ခု",
       "dueThisWeek": "ယခုအပတ်အတွင်း သတ်မှတ်ရက်စေ့မည်",
-      "dueThisWeekDetail": "{{exploitable}} ခုကို တိုက်ခိုက်အသုံးချနိုင်ကြောင်း အတည်ပြုပြီး",
+      "dueThisWeekDetail": "ယင်းအနက် {{exploitable}} ခုကို တိုက်ခိုက်အသုံးချနိုင်ကြောင်း အတည်ပြုပြီး",
       "noDeadline": "သတ်မှတ်ရက် မရှိ",
       "reviewSlaAssignment": "SLA သတ်မှတ်ရက် ပေးထားမှုကို ပြန်လည်သုံးသပ်ပါ",
       "allOpenFindingsTracked": "မဖြေရှင်းရသေးသော တွေ့ရှိချက်အားလုံးကို စောင့်ကြည့်နေ"

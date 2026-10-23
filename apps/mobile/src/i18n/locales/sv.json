@@ -1731,7 +1731,7 @@
       "deadlinePassed": "Tidsfristen har passerat",
       "deadlinePassedDetail": "Kritisk: {{critical}}, Hög: {{high}}",
       "dueThisWeek": "Tidsfristen löper ut denna vecka",
-      "dueThisWeekDetail": "{{exploitable}} har bekräftats kunna utnyttjas",
+      "dueThisWeekDetail": "{{exploitable}} av dessa har bekräftats kunna utnyttjas",
       "noDeadline": "Ingen tidsfrist",
       "reviewSlaAssignment": "Granska SLA-tilldelningen",
       "allOpenFindingsTracked": "Alla öppna fynd följs upp"

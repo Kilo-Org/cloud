@@ -1259,7 +1259,7 @@
       "deadlinePassed": "समय सीमा बीत गई",
       "deadlinePassedDetail": "{{critical}} अति गंभीर, {{high}} उच्च",
       "dueThisWeek": "अंतिम तारीख इस सप्ताह",
-      "dueThisWeekDetail": "{{exploitable}} समस्याओं का फ़ायदा उठाकर हमला संभव होने की पुष्टि",
+      "dueThisWeekDetail": "इनमें से {{exploitable}} का फ़ायदा उठाकर हमला संभव होने की पुष्टि",
       "noDeadline": "कोई समय सीमा नहीं",
       "reviewSlaAssignment": "तय की गई SLA समय सीमाओं की समीक्षा करें",
       "allOpenFindingsTracked": "सभी अनसुलझी समस्याओं की निगरानी जारी"

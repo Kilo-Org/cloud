@@ -1259,7 +1259,7 @@
       "deadlinePassed": "已超過期限",
       "deadlinePassedDetail": "嚴重：{{critical}} 項，高：{{high}} 項",
       "dueThisWeek": "本週到期",
-      "dueThisWeekDetail": "{{exploitable}} 項已確認可遭利用",
+      "dueThisWeekDetail": "其中 {{exploitable}} 項已確認可遭利用",
       "noDeadline": "無期限",
       "reviewSlaAssignment": "檢視 SLA 期限設定",
       "allOpenFindingsTracked": "所有未解決的資安問題均已納入追蹤"

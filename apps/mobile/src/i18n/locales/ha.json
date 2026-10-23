@@ -1731,7 +1731,7 @@
       "deadlinePassed": "Wa'adin ya wuce",
       "deadlinePassedDetail": "Masu tsanani: {{critical}}, manya: {{high}}",
       "dueThisWeek": "Wa'adi zai cika wannan makon",
-      "dueThisWeekDetail": "An tabbatar da yiwuwar amfani da {{exploitable}} wajen kai hari",
+      "dueThisWeekDetail": "An tabbatar da yiwuwar amfani da {{exploitable}} daga cikin waɗannan wajen kai hari",
       "noDeadline": "Babu wa'adi",
       "reviewSlaAssignment": "Duba yadda aka saita wa'adin SLA",
       "allOpenFindingsTracked": "Ana bin diddigin duk matsalolin da ba a warware ba"

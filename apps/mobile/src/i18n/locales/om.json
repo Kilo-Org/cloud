@@ -1731,7 +1731,7 @@
       "deadlinePassed": "Guyyaan xumuraa darbeera",
       "deadlinePassedDetail": "baay'ee hamaa {{critical}}, olaanaa {{high}}",
       "dueThisWeek": "Torban kana xumuramuu qabu",
-      "dueThisWeekDetail": "{{exploitable}} haleellaaf saaxilamuu isaanii mirkanaa'e",
+      "dueThisWeekDetail": "Kana keessaa {{exploitable}} haleellaaf saaxilamuu isaanii mirkanaa'e",
       "noDeadline": "Guyyaan xumuraa hin jiru",
       "reviewSlaAssignment": "Ramaddii SLA sakatta'i",
       "allOpenFindingsTracked": "Argamoonni banaan hundi hordofamaa jiru"

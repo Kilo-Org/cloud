@@ -1731,7 +1731,7 @@
       "deadlinePassed": "గడువు దాటిపోయింది",
       "deadlinePassedDetail": "అత్యంత తీవ్రమైనవి {{critical}}, అధిక తీవ్రత గలవి {{high}}",
       "dueThisWeek": "ఈ వారం గడువు",
-      "dueThisWeekDetail": "{{exploitable}} సమస్యల్లో దుర్వినియోగానికి అవకాశం ఉందని నిర్ధారణ అయింది",
+      "dueThisWeekDetail": "వీటిలో {{exploitable}} సమస్యల్లో దుర్వినియోగానికి అవకాశం ఉందని నిర్ధారణ అయింది",
       "noDeadline": "గడువు లేదు",
       "reviewSlaAssignment": "SLA కేటాయింపును సమీక్షించండి",
       "allOpenFindingsTracked": "అన్ని పెండింగ్ సమస్యల గడువులను పర్యవేక్షిస్తున్నాము"

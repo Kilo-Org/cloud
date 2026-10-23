@@ -1731,7 +1731,7 @@
       "deadlinePassed": "Dat limit la pase",
       "deadlinePassedDetail": "{{critical}} kritik, {{high}} wo",
       "dueThisWeek": "Dat limit semèn sa a",
-      "dueThisWeekDetail": "{{exploitable}} konfime kòm eksplwatab",
+      "dueThisWeekDetail": "Pami yo, {{exploitable}} konfime kòm eksplwatab",
       "noDeadline": "Pa gen dat limit",
       "reviewSlaAssignment": "Revize SLA ki asiyen yo",
       "allOpenFindingsTracked": "Tout konsta ouvè yo gen swivi"

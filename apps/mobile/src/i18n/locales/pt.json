@@ -1753,7 +1753,7 @@
       "deadlinePassed": "Prazo expirado",
       "deadlinePassedDetail": "{{critical}} de nível crítico, {{high}} de nível alto",
       "dueThisWeek": "Prazo termina esta semana",
-      "dueThisWeekDetail": "{{exploitable}} com exploração possível confirmada",
+      "dueThisWeekDetail": "{{exploitable}} destas com exploração possível confirmada",
       "noDeadline": "Sem prazo",
       "reviewSlaAssignment": "Rever a atribuição de prazos do SLA",
       "allOpenFindingsTracked": "Todas as ocorrências abertas acompanhadas"

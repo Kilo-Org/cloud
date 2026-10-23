@@ -1731,7 +1731,7 @@
       "deadlinePassed": "Müddət başa çatıb",
       "deadlinePassedDetail": "{{critical}} kritik, {{high}} yüksək",
       "dueThisWeek": "Bu həftə bitir",
-      "dueThisWeekDetail": "{{exploitable}} tapıntının istismar edilə bildiyi təsdiqlənib",
+      "dueThisWeekDetail": "Bunlardan {{exploitable}} tapıntının istismar edilə bildiyi təsdiqlənib",
       "noDeadline": "Müddət yoxdur",
       "reviewSlaAssignment": "SLA müddətinin təyinatını yoxla",
       "allOpenFindingsTracked": "Bütün açıq tapıntılar izlənir"

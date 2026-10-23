@@ -1731,7 +1731,7 @@
       "deadlinePassed": "Ժամկետը լրացել է",
       "deadlinePassedDetail": "{{critical}} կրիտիկական, {{high}} բարձր",
       "dueThisWeek": "Վերջնաժամկետն այս շաբաթ է",
-      "dueThisWeekDetail": "{{exploitable}} խնդիր հաստատված է որպես հարձակման համար օգտագործելի",
+      "dueThisWeekDetail": "Դրանցից {{exploitable}} խնդիր հաստատված է որպես հարձակման համար օգտագործելի",
       "noDeadline": "Վերջնաժամկետ չկա",
       "reviewSlaAssignment": "Վերանայել SLA-ի վերջնաժամկետերի սահմանումը",
       "allOpenFindingsTracked": "Բոլոր բաց խնդիրները վերահսկվում են"

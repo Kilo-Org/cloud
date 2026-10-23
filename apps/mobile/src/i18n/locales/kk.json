@@ -1731,7 +1731,7 @@
       "deadlinePassed": "Мерзім өтті",
       "deadlinePassedDetail": "{{critical}} өте жоғары, {{high}} жоғары",
       "dueThisWeek": "Мерзімі осы аптада",
-      "dueThisWeekDetail": "{{exploitable}} мәселені шабуылға пайдалануға болатыны расталды",
+      "dueThisWeekDetail": "Осы мәселелердің {{exploitable}}-і шабуылға пайдалануға болатыны расталды",
       "noDeadline": "Мерзім жоқ",
       "reviewSlaAssignment": "SLA мерзімдерінің белгіленуін тексеру",
       "allOpenFindingsTracked": "Барлық ашық мәселелер қадағаланады"

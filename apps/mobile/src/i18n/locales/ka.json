@@ -1731,7 +1731,7 @@
       "deadlinePassed": "ვადა ამოიწურა",
       "deadlinePassedDetail": "{{critical}} კრიტიკული, {{high}} მაღალი",
       "dueThisWeek": "ვადა ამ კვირაშია",
-      "dueThisWeekDetail": "{{exploitable}} მიგნების ბოროტად გამოყენების შესაძლებლობა დადასტურებულია",
+      "dueThisWeekDetail": "{{exploitable}} ამათგან ბოროტად გამოყენების შესაძლებლობა დადასტურებულია",
       "noDeadline": "ვადის გარეშე",
       "reviewSlaAssignment": "SLA-ის ვადების მინიჭების შემოწმება",
       "allOpenFindingsTracked": "ყველა ღია მიგნება კონტროლდება"

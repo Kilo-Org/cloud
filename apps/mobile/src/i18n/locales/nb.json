@@ -1731,7 +1731,7 @@
       "deadlinePassed": "Fristen er overskredet",
       "deadlinePassedDetail": "{{critical}} kritiske, {{high}} med høy alvorlighetsgrad",
       "dueThisWeek": "Frist denne uken",
-      "dueThisWeekDetail": "{{exploitable}} bekreftet utnyttbare",
+      "dueThisWeekDetail": "{{exploitable}} av disse er bekreftet utnyttbare",
       "noDeadline": "Ingen frist",
       "reviewSlaAssignment": "Gjennomgå tildelingen av SLA-frister",
       "allOpenFindingsTracked": "Alle åpne funn følges opp"

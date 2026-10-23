@@ -1731,7 +1731,7 @@
       "deadlinePassed": "म्याद नाघेको",
       "deadlinePassedDetail": "{{critical}} अति गम्भीर, {{high}} उच्च",
       "dueThisWeek": "यस हप्ता म्याद सकिने",
-      "dueThisWeekDetail": "{{exploitable}} वटा दुरुपयोग हुन सक्ने पुष्टि भएका",
+      "dueThisWeekDetail": "यसमध्ये {{exploitable}} वटा दुरुपयोग हुन सक्ने पुष्टि भएका",
       "noDeadline": "म्याद छैन",
       "reviewSlaAssignment": "तोकिएको SLA समीक्षा गर्नुहोस्",
       "allOpenFindingsTracked": "सबै खुला सुरक्षा समस्याको निगरानी भइरहेको"

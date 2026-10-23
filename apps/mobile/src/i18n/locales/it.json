@@ -1234,7 +1234,7 @@
       "deadlinePassed": "Scadenza superata",
       "deadlinePassedDetail": "{{critical}} di gravità critica, {{high}} di gravità alta",
       "dueThisWeek": "In scadenza questa settimana",
-      "dueThisWeekDetail": "{{exploitable}} con sfruttabilità confermata",
+      "dueThisWeekDetail": "{{exploitable}} di queste con sfruttabilità confermata",
       "noDeadline": "Nessuna scadenza",
       "reviewSlaAssignment": "Verifica l'assegnazione degli SLA",
       "allOpenFindingsTracked": "Tutte le segnalazioni aperte sono monitorate"

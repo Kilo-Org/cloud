@@ -1753,7 +1753,7 @@
       "deadlinePassed": "Termini vençut",
       "deadlinePassedDetail": "{{critical}} de nivell crític, {{high}} de nivell alt",
       "dueThisWeek": "Vencen aquesta setmana",
-      "dueThisWeekDetail": "{{exploitable}} confirmades com a explotables",
+      "dueThisWeekDetail": "{{exploitable}} d'aquestes confirmades com a explotables",
       "noDeadline": "Sense termini",
       "reviewSlaAssignment": "Revisa l'assignació de l'SLA",
       "allOpenFindingsTracked": "Es fa el seguiment de totes les incidències obertes"

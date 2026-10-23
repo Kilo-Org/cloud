@@ -1731,7 +1731,7 @@
       "deadlinePassed": "સમયમર્યાદા વટાવી",
       "deadlinePassedDetail": "{{critical}} ગંભીર, {{high}} ઉચ્ચ",
       "dueThisWeek": "આ અઠવાડિયે સમયમર્યાદા",
-      "dueThisWeekDetail": "{{exploitable}} તારણોમાં દુરુપયોગ શક્ય હોવાની પુષ્ટિ થઈ",
+      "dueThisWeekDetail": "આમાંથી {{exploitable}} તારણોમાં દુરુપયોગ શક્ય હોવાની પુષ્ટિ થઈ",
       "noDeadline": "કોઈ સમયમર્યાદા નથી",
       "reviewSlaAssignment": "નક્કી કરેલી SLA સમયમર્યાદાની સમીક્ષા કરો",
       "allOpenFindingsTracked": "બધાં ખુલ્લાં તારણો પર નજર રખાય છે"

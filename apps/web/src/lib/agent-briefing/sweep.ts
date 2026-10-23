@@ -4,13 +4,19 @@ import { TRPCError } from '@trpc/server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { agent_briefing_preferences, agent_briefing_reports } from '@kilocode/db/schema';
 import { dispatchAgentBriefingPush } from '@kilocode/web-shared/lib/notifications-worker-client';
-import { briefingSummarySchema } from '@kilocode/app-shared/agent-briefing';
+import {
+  briefingCoverageSchema,
+  briefingHasActivity,
+  briefingScorecardSchema,
+  briefingSummarySchema,
+} from '@kilocode/app-shared/agent-briefing';
 import {
   briefingContexts,
   briefingContextSettings,
   emptySummary,
   refreshBriefingEvidence,
   requireBriefingContext,
+  type BriefingReportRow,
 } from './store';
 import { briefingWindow, nextBriefingTime, type BriefingWindow } from './schedule';
 import { reconcileBriefingCharge, runBriefingSummary } from './summary';
@@ -47,6 +53,58 @@ async function freezeBriefingContexts(userId: string, window: BriefingWindow, ti
       })
       .onConflictDoNothing();
   }
+}
+
+/**
+ * A quiet night is publishable only when the evidence proves the zero: no session, pull request
+ * or blocker, and every evidence dimension collected for the whole window. Partial coverage
+ * cannot prove a zero, so those reports stay unpublished and unreadable.
+ */
+function quietBriefingProven(facts: Record<string, unknown>): boolean {
+  const scorecard = briefingScorecardSchema.safeParse(facts.scorecard);
+  const coverage = briefingCoverageSchema.safeParse(facts.coverage);
+  return (
+    scorecard.success &&
+    !briefingHasActivity(scorecard.data) &&
+    coverage.success &&
+    Object.values(coverage.data).every(value => value === 'complete')
+  );
+}
+
+/**
+ * A quiet night has nothing to summarize, so it never starts a paid generation: an AI-enabled
+ * context publishes `unavailable` instead of the `disabled` state that offers a Generate button.
+ */
+async function publishQuietBriefing(row: BriefingReportRow, iso: string) {
+  if (row.published_at) return;
+  const summary = briefingSummarySchema.parse(row.summary);
+  const settings = await briefingContextSettings(row.kilo_user_id, row.organization_id);
+  const quietSummary =
+    settings.aiEnabled &&
+    row.generation_id === null &&
+    summary.text === null &&
+    (summary.status === 'disabled' || summary.status === 'pending')
+      ? briefingSummarySchema.parse({
+          ...summary,
+          status: 'unavailable',
+          error: null,
+          canRetry: false,
+        })
+      : null;
+  await db
+    .update(agent_briefing_reports)
+    .set({ published_at: iso, ...(quietSummary ? { summary: quietSummary } : {}) })
+    .where(and(eq(agent_briefing_reports.id, row.id), isNull(agent_briefing_reports.published_at)));
+}
+
+async function deferBriefingRefresh(row: BriefingReportRow, now: Date) {
+  await db
+    .update(agent_briefing_reports)
+    .set({
+      next_refresh_at:
+        new Date(row.morning_end_at) <= now ? null : new Date(now.getTime() + 60_000).toISOString(),
+    })
+    .where(eq(agent_briefing_reports.id, row.id));
 }
 
 export async function sweepAgentBriefings(now = new Date()) {
@@ -114,26 +172,29 @@ export async function sweepAgentBriefings(now = new Date()) {
     let row = await refreshBriefingEvidence(original);
     row = await reconcileBriefingCharge(row);
     const facts = row.facts;
-    const scorecard =
-      typeof facts.scorecard === 'object' &&
-      facts.scorecard !== null &&
-      'sessions' in facts.scorecard
-        ? facts.scorecard.sessions
-        : 0;
-    if (typeof scorecard !== 'number' || scorecard <= 0) {
-      await db
-        .update(agent_briefing_reports)
-        .set({
-          next_refresh_at:
-            new Date(original.morning_end_at) <= now
-              ? null
-              : new Date(now.getTime() + 60_000).toISOString(),
-        })
-        .where(eq(agent_briefing_reports.id, original.id));
+    if (quietBriefingProven(facts)) {
+      await publishQuietBriefing(row, iso);
+      await deferBriefingRefresh(row, now);
+      continue;
+    }
+    const scorecard = briefingScorecardSchema.safeParse(facts.scorecard);
+    if (!scorecard.success || !briefingHasActivity(scorecard.data)) {
+      await deferBriefingRefresh(row, now);
       continue;
     }
     let summary = briefingSummarySchema.parse(row.summary);
-    if (!row.published_at && summary.status === 'disabled') {
+    /**
+     * The `unavailable` state a quiet publish writes before any generation ran. Late evidence can
+     * still make the night active, and that report may then enter generation like any other.
+     */
+    const quietSummaryOnly =
+      summary.status === 'unavailable' &&
+      summary.error === null &&
+      summary.text === null &&
+      summary.costMicrodollars === 0 &&
+      summary.startedAt === null &&
+      row.generation_id === null;
+    if ((!row.published_at && summary.status === 'disabled') || quietSummaryOnly) {
       const settings = await briefingContextSettings(row.kilo_user_id, row.organization_id);
       if (settings.aiEnabled && new Date(row.morning_end_at) > now) {
         const [updated] = await db
@@ -145,12 +206,12 @@ export async function sweepAgentBriefings(now = new Date()) {
           .where(
             and(
               eq(agent_briefing_reports.id, row.id),
-              sql`${agent_briefing_reports.summary}->>'status' = 'disabled'`
+              sql`${agent_briefing_reports.summary}->>'status' = ${summary.status}`
             )
           )
           .returning();
         if (updated) row = updated;
-      } else {
+      } else if (!row.published_at) {
         const [published] = await db
           .update(agent_briefing_reports)
           .set({
@@ -251,15 +312,7 @@ export async function sweepAgentBriefings(now = new Date()) {
         .set({ notification_sent_at: iso })
         .where(eq(agent_briefing_reports.id, row.id));
     }
-    await db
-      .update(agent_briefing_reports)
-      .set({
-        next_refresh_at:
-          new Date(original.morning_end_at) <= now
-            ? null
-            : new Date(now.getTime() + 60_000).toISOString(),
-      })
-      .where(eq(agent_briefing_reports.id, original.id));
+    await deferBriefingRefresh(row, now);
   }
   await db
     .update(agent_briefing_reports)

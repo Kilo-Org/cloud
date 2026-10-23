@@ -3069,10 +3069,12 @@
       "truncated": "क्रेडिटचे जुने व्यवहार उपलब्ध आहेत."
     },
     "inviteMember": {
+      "alreadyInvited": "त्यांना आधीच आमंत्रित केले आहे किंवा ते आधीपासूनच सदस्य आहेत.",
       "emailError": "वैध ईमेल पत्ता द्या.",
       "emailPlaceholder": "नाव@company.com",
       "permissionDenied": "तुम्हाला सदस्यांना आमंत्रित करण्याची परवानगी नाही.",
       "roleMember": "भूमिका: सदस्य",
+      "sendError": "आमंत्रण पाठवता आले नाही.",
       "sendInvite": "आमंत्रण पाठवा",
       "title": "सदस्याला आमंत्रित करा"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "आमंत्रण तयार केले",
       "pendingInvitations": "प्रलंबित आमंत्रणे",
       "resendInvite": "आमंत्रण पुन्हा पाठवा",
+      "resendInviteError": "आमंत्रण पुन्हा पाठवता आले नाही.",
       "shareInviteLink": "आमंत्रणाची लिंक शेअर करा"
     },
     "usageStats": {

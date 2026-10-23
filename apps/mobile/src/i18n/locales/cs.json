@@ -3149,10 +3149,12 @@
       "truncated": "K dispozici jsou i starší pohyby kreditů."
     },
     "inviteMember": {
+      "alreadyInvited": "Tento uživatel už byl pozván nebo už je členem.",
       "emailError": "Zadejte platnou e-mailovou adresu.",
       "emailPlaceholder": "jmeno@firma.cz",
       "permissionDenied": "Nemáte oprávnění zvát členy.",
       "roleMember": "Role: člen",
+      "sendError": "Pozvánku se nepodařilo odeslat.",
       "sendInvite": "Odeslat pozvánku",
       "title": "Pozvat člena"
     },
@@ -3223,6 +3225,7 @@
       "inviteCreated": "Pozvánka vytvořena",
       "pendingInvitations": "Čekající pozvánky",
       "resendInvite": "Poslat pozvánku znovu",
+      "resendInviteError": "Pozvánku se nepodařilo odeslat znovu.",
       "shareInviteLink": "Sdílet odkaz na pozvánku"
     },
     "usageStats": {

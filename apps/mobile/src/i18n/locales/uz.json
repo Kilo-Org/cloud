@@ -3069,10 +3069,12 @@
       "truncated": "Kreditlar bo'yicha oldingi amallar ham mavjud."
     },
     "inviteMember": {
+      "alreadyInvited": "Bu elektron pochta manzili allaqachon taklif qilingan yoki allaqachon a'zo.",
       "emailError": "To'g'ri elektron pochta manzilini kiriting.",
       "emailPlaceholder": "ism@kompaniya.com",
       "permissionDenied": "A'zolarni taklif qilishga ruxsatingiz yo'q.",
       "roleMember": "Rol: a'zo.",
+      "sendError": "Taklifnomani yuborib bo'lmadi.",
       "sendInvite": "Taklifnomani yuborish",
       "title": "A’zo taklif qilish"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "Taklifnoma yaratildi",
       "pendingInvitations": "Qabul qilinmagan taklifnomalar",
       "resendInvite": "Taklifnomani qayta yuborish",
+      "resendInviteError": "Taklifnomani qayta yuborib bo'lmadi.",
       "shareInviteLink": "Taklifnoma havolasini ulashish"
     },
     "usageStats": {

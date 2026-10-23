@@ -3068,10 +3068,12 @@
       "renameTitle": "Đổi tên tổ chức"
     },
     "inviteMember": {
+      "alreadyInvited": "Địa chỉ email này đã được mời hoặc đã là thành viên.",
       "emailError": "Hãy nhập địa chỉ email hợp lệ.",
       "emailPlaceholder": "ten@congty.com",
       "permissionDenied": "Bạn không có quyền mời thành viên.",
       "roleMember": "Vai trò của người được mời là thành viên.",
+      "sendError": "Không gửi được lời mời.",
       "sendInvite": "Gửi lời mời",
       "title": "Mời thành viên"
     },
@@ -3142,6 +3144,7 @@
       "inviteCreated": "Đã tạo lời mời",
       "pendingInvitations": "Lời mời chờ phản hồi",
       "resendInvite": "Gửi lại lời mời",
+      "resendInviteError": "Không gửi lại được lời mời.",
       "shareInviteLink": "Chia sẻ liên kết lời mời"
     },
     "usageStats": {

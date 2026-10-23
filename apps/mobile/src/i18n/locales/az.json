@@ -3069,10 +3069,12 @@
       "truncated": "Əvvəlki kredit əməliyyatlarına da baxmaq olar."
     },
     "inviteMember": {
+      "alreadyInvited": "Bu e-poçt ünvanı artıq dəvət olunub və ya artıq üzvdür.",
       "emailError": "Düzgün e-poçt ünvanı daxil et.",
       "emailPlaceholder": "ad@sirket.com",
       "permissionDenied": "Üzv dəvət etmək icazən yoxdur.",
       "roleMember": "Rol: üzv",
+      "sendError": "Dəvət göndərilmədi.",
       "sendInvite": "Dəvət göndər",
       "title": "Üzv dəvət et"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "Dəvət yaradıldı",
       "pendingInvitations": "Gözləyən dəvətlər",
       "resendInvite": "Dəvəti yenidən göndər",
+      "resendInviteError": "Dəvət yenidən göndərilmədi.",
       "shareInviteLink": "Dəvət keçidini paylaş"
     },
     "usageStats": {

@@ -3189,10 +3189,12 @@
       "truncated": "Tá gníomhaíocht chreidmheasa níos sine ar fáil."
     },
     "inviteMember": {
+      "alreadyInvited": "Tá cuireadh acu cheana féin nó is ball den eagraíocht iad cheana féin.",
       "emailError": "Iontráil seoladh ríomhphoist bailí.",
       "emailPlaceholder": "ainm@cuideachta.com",
       "permissionDenied": "Níl cead agat cuireadh a thabhairt do bhaill.",
       "roleMember": "Is ball a bheidh ann.",
+      "sendError": "Níorbh fhéidir an cuireadh a sheoladh.",
       "sendInvite": "Seol cuireadh",
       "title": "Tabhair cuireadh do bhall"
     },
@@ -3263,6 +3265,7 @@
       "inviteCreated": "Cuireadh cruthaithe",
       "pendingInvitations": "Cuirí ar feitheamh",
       "resendInvite": "Seol an cuireadh arís",
+      "resendInviteError": "Níorbh fhéidir an cuireadh a sheoladh arís.",
       "shareInviteLink": "Roinn nasc an chuiridh"
     },
     "usageStats": {

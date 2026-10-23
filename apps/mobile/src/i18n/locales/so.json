@@ -3069,10 +3069,12 @@
       "truncated": "Dhaqdhaqaaqii hore ee lacagta isticmaalka waa la heli karaa."
     },
     "inviteMember": {
+      "alreadyInvited": "Isaga ama iyadu horeba waa la casuumay ama horeba waa xubin.",
       "emailError": "Geli cinwaan iimayl oo sax ah.",
       "emailPlaceholder": "magac@company.com",
       "permissionDenied": "Ma lihid oggolaansho aad ku casuunto xubno.",
       "roleMember": "Doorka: xubin",
+      "sendError": "Casuumaadda lama diri karin.",
       "sendInvite": "Dir casuumaad",
       "title": "Casuum xubin"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "Casuumaad baa la abuuray",
       "pendingInvitations": "Casuumaadaha sugaya",
       "resendInvite": "Dib u dir casuumaadda",
+      "resendInviteError": "Casuumaadda dib lama diri karin.",
       "shareInviteLink": "Wadaag xiriiriyaha casuumaadda"
     },
     "usageStats": {

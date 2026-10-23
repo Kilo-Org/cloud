@@ -3069,10 +3069,12 @@
       "truncated": "Hægt er að skoða eldri inneignarfærslur."
     },
     "inviteMember": {
+      "alreadyInvited": "Tölvupóstfangið er þegar boðið eða meðlimurinn er þegar í félaginu.",
       "emailError": "Sláðu inn gilt tölvupóstfang.",
       "emailPlaceholder": "nafn@fyrirtaeki.is",
       "permissionDenied": "Þú hefur ekki heimild til að bjóða nýjum meðlimum að ganga í félagið.",
       "roleMember": "Hlutverkið er meðlimur.",
+      "sendError": "Ekki tókst að senda boðið.",
       "sendInvite": "Senda boð",
       "title": "Bjóða meðlim að taka þátt"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "Boð búið til",
       "pendingInvitations": "Boð í bið",
       "resendInvite": "Senda boð aftur",
+      "resendInviteError": "Ekki tókst að senda boðið aftur.",
       "shareInviteLink": "Deila boðstengli"
     },
     "usageStats": {

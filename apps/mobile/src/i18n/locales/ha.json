@@ -3069,10 +3069,12 @@
       "truncated": "Ana samun ma'amalolin kuɗin amfani na baya."
     },
     "inviteMember": {
+      "alreadyInvited": "An riga an aika musu gayyata ko kuma sun riga zama memba.",
       "emailError": "Shigar da adireshin imel mai inganci.",
       "emailPlaceholder": "suna@company.com",
       "permissionDenied": "Ba ka da izinin gayyatar membobi.",
       "roleMember": "Matsayi: memba.",
+      "sendError": "Ba a iya aika gayyata ba.",
       "sendInvite": "Aika gayyata",
       "title": "Gayyaci memba"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "An ƙirƙira gayyata",
       "pendingInvitations": "Gayyatar da ke jiran amsa",
       "resendInvite": "Sake aika gayyata",
+      "resendInviteError": "Ba a iya sake aika gayyata ba.",
       "shareInviteLink": "Raba mahaɗin gayyata"
     },
     "usageStats": {

@@ -3069,10 +3069,12 @@
       "truncated": "Umnyakazo wamakhredithi wangaphambili uyatholakala."
     },
     "inviteMember": {
+      "alreadyInvited": "Isimemo sabo sesivele sikhona noma bese belilungu leqembu.",
       "emailError": "Faka ikheli le-imeyili elivumelekile.",
       "emailPlaceholder": "igama@inkampani.com",
       "permissionDenied": "Awunayo imvume yokumema amalungu.",
       "roleMember": "Iqhaza lakho ngelokuba ilungu.",
+      "sendError": "Asikwazanga ukuthumela isimemo.",
       "sendInvite": "Thumela isimemo",
       "title": "Mema ilungu"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "Isimemo sakhiwe",
       "pendingInvitations": "Izimemo ezilindile",
       "resendInvite": "Thumela kabusha isimemo",
+      "resendInviteError": "Asikwazanga ukuthumela kabusha isimemo.",
       "shareInviteLink": "Yabelana ngesixhumanisi sesimemo"
     },
     "usageStats": {

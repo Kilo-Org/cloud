@@ -3229,10 +3229,12 @@
       "truncated": "Mae gweithgaredd credyd cynharach ar gael."
     },
     "inviteMember": {
+      "alreadyInvited": "Mae'r cyfeiriad e-bost hwn eisoes wedi cael gwahoddiad neu'n eisoes yn perthyn i aelod.",
       "emailError": "Nodwch gyfeiriad e-bost dilys.",
       "emailPlaceholder": "enw@example.com",
       "permissionDenied": "Nid oes gennych ganiatâd i wahodd aelodau.",
       "roleMember": "Rôl: aelod",
+      "sendError": "Ni lwyddwyd i anfon y gwahoddiad.",
       "sendInvite": "Anfon gwahoddiad",
       "title": "Gwahodd aelod"
     },
@@ -3303,6 +3305,7 @@
       "inviteCreated": "Crëwyd y gwahoddiad",
       "pendingInvitations": "Gwahoddiadau sy'n aros",
       "resendInvite": "Ailanfon y gwahoddiad",
+      "resendInviteError": "Ni lwyddwyd i ailanfon y gwahoddiad.",
       "shareInviteLink": "Rhannu dolen gwahoddiad"
     },
     "usageStats": {

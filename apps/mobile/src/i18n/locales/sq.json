@@ -3069,10 +3069,12 @@
       "truncated": "Ka aktivitet të mëparshëm të krediteve."
     },
     "inviteMember": {
+      "alreadyInvited": "Ky person është ftuar tashmë ose është tashmë anëtar.",
       "emailError": "Shkruaj një adresë të vlefshme emaili.",
       "emailPlaceholder": "emri@kompania.com",
       "permissionDenied": "Nuk ke leje për të ftuar anëtarë.",
       "roleMember": "Roli është anëtar.",
+      "sendError": "Ftesa nuk u dërgua.",
       "sendInvite": "Dërgo ftesën",
       "title": "Fto anëtar"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "Ftesa u krijua",
       "pendingInvitations": "Ftesat në pritje",
       "resendInvite": "Ridërgo ftesën",
+      "resendInviteError": "Ftesa nuk u ridërgua.",
       "shareInviteLink": "Ndaj lidhjen e ftesës"
     },
     "usageStats": {

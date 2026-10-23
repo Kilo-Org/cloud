@@ -3069,10 +3069,12 @@
       "truncated": "E wātea ana ngā tauwhitinga moni tōmua o mua."
     },
     "inviteMember": {
+      "alreadyInvited": "Kua pōwhiritia kē, kua mema kē rānei.",
       "emailError": "Whakaurua he wāhitau īmēra tika.",
       "emailPlaceholder": "ingoa@kamupene.com",
       "permissionDenied": "Kāore ō whakaaetanga ki te pōwhiri mema.",
       "roleMember": "Tūranga: mema.",
+      "sendError": "Kāore i taea te tuku i te pōwhiri.",
       "sendInvite": "Tukuna te pōwhiri",
       "title": "Pōwhiritia he mema"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "Kua hangaia te pōwhiri",
       "pendingInvitations": "Ngā pōwhiri e tatari ana",
       "resendInvite": "Tukuna anō te pōwhiri",
+      "resendInviteError": "Kāore i taea te tuku anō i te pōwhiri.",
       "shareInviteLink": "Tuaritia te hononga pōwhiri"
     },
     "usageStats": {

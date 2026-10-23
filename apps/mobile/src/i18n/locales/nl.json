@@ -3068,10 +3068,12 @@
       "renameTitle": "Organisatie hernoemen"
     },
     "inviteMember": {
+      "alreadyInvited": "Dit e-mailadres is al uitgenodigd of is al lid.",
       "emailError": "Voer een geldig e-mailadres in.",
       "emailPlaceholder": "naam@bedrijf.nl",
       "permissionDenied": "Je hebt geen toestemming om leden uit te nodigen.",
       "roleMember": "Rol: lid",
+      "sendError": "De uitnodiging kon niet worden verzonden.",
       "sendInvite": "Uitnodiging verzenden",
       "title": "Lid uitnodigen"
     },
@@ -3142,6 +3144,7 @@
       "inviteCreated": "Uitnodiging aangemaakt",
       "pendingInvitations": "Openstaande uitnodigingen",
       "resendInvite": "Uitnodiging opnieuw verzenden",
+      "resendInviteError": "De uitnodiging kon niet opnieuw worden verzonden.",
       "shareInviteLink": "Uitnodigingslink delen"
     },
     "usageStats": {

@@ -3069,10 +3069,12 @@
       "truncated": "Ndekọ ego ojiji gara aga dị."
     },
     "inviteMember": {
+      "alreadyInvited": "Ha etinyela òkụ ma ọ bụ ha abụrụla onye otu.",
       "emailError": "Tinye adreesị ozi ịntanetị ziri ezi.",
       "emailPlaceholder": "aha@company.com",
       "permissionDenied": "Ị nweghị ikike ịkpọ ndị otu òkù.",
       "roleMember": "Ọrụ: onye otu",
+      "sendError": "Enweghị ike iziga òkụ.",
       "sendInvite": "Ziga òkù",
       "title": "Kpọ onye otu"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "Emepụtala òkù",
       "pendingInvitations": "Òkù ndị na-echere",
       "resendInvite": "Ziga òkù ọzọ",
+      "resendInviteError": "Enweghị ike iziga òkụ ọzọ.",
       "shareInviteLink": "Kekọrịta njikọ òkù"
     },
     "usageStats": {

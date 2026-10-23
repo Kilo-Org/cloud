@@ -3069,10 +3069,12 @@
       "truncated": "ยังมีรายการเครดิตก่อนหน้านี้ให้ดู"
     },
     "inviteMember": {
+      "alreadyInvited": "ได้รับคำเชิญอยู่แล้วหรือเป็นสมาชิกอยู่แล้ว",
       "emailError": "ป้อนที่อยู่อีเมลที่ถูกต้อง",
       "emailPlaceholder": "ชื่อ@บริษัท.com",
       "permissionDenied": "คุณไม่มีสิทธิ์เชิญสมาชิก",
       "roleMember": "บทบาท: สมาชิก",
+      "sendError": "ส่งคำเชิญไม่สำเร็จ",
       "sendInvite": "ส่งคำเชิญ",
       "title": "เชิญสมาชิก"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "สร้างคำเชิญแล้ว",
       "pendingInvitations": "คำเชิญที่รอตอบรับ",
       "resendInvite": "ส่งคำเชิญอีกครั้ง",
+      "resendInviteError": "ส่งคำเชิญอีกครั้งไม่สำเร็จ",
       "shareInviteLink": "แชร์ลิงก์คำเชิญ"
     },
     "usageStats": {

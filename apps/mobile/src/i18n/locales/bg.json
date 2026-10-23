@@ -3069,10 +3069,12 @@
       "truncated": "Има и по-стари движения по кредитите."
     },
     "inviteMember": {
+      "alreadyInvited": "Вече е поканен или вече е член.",
       "emailError": "Въведи валиден имейл адрес.",
       "emailPlaceholder": "име@фирма.bg",
       "permissionDenied": "Нямаш разрешение да каниш членове.",
       "roleMember": "Роля: член",
+      "sendError": "Не можахме да изпратим поканата.",
       "sendInvite": "Изпрати покана",
       "title": "Покани член"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "Поканата е създадена",
       "pendingInvitations": "Покани в изчакване",
       "resendInvite": "Изпрати поканата отново",
+      "resendInviteError": "Не можахме да изпратим поканата отново.",
       "shareInviteLink": "Сподели връзката за покана"
     },
     "usageStats": {

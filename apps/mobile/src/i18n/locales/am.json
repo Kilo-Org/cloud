@@ -3069,10 +3069,12 @@
       "truncated": "የቆዩ የክሬዲት እንቅስቃሴዎች ይገኛሉ።"
     },
     "inviteMember": {
+      "alreadyInvited": "አስቀድሞ ግብዣ ተልኳል ወይም አስቀድሞ አባል ነው።",
       "emailError": "ትክክለኛ የኢሜይል አድራሻ ያስገቡ።",
       "emailPlaceholder": "ስም@company.com",
       "permissionDenied": "አባላትን ለመጋበዝ ፈቃድ የለዎትም።",
       "roleMember": "ሚና፦ አባል",
+      "sendError": "ግብዣውን መላክ አልተቻለም።",
       "sendInvite": "ግብዣ ይላኩ",
       "title": "አባል ጋብዝ"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "ግብዣው ተፈጥሯል",
       "pendingInvitations": "ምላሽ የሚጠብቁ ግብዣዎች",
       "resendInvite": "ግብዣውን እንደገና ይላኩ",
+      "resendInviteError": "ግብዣውን እንደገና መላክ አልተቻለም።",
       "shareInviteLink": "የግብዣውን አገናኝ ያጋሩ"
     },
     "usageStats": {

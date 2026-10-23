@@ -23,7 +23,9 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
     /**
      * Owns blur-validation: runs on blur, and re-runs live once an error is
      * showing so it clears the moment the value becomes valid again. When
-     * set, this replaces `error` as the source of the displayed message.
+     * set, its message replaces `error` while it reports one; an `error`
+     * passed alongside shows whenever the field's own rule has nothing to say,
+     * which is how a rejected submit is reported without a blur.
      */
     validate?: (value: string) => string | null;
   };
@@ -54,7 +56,10 @@ function FormField({
   const [validationError, setValidationError] = useState<string | null>(null);
   const valueRef = useRef(defaultValue ?? '');
   const nativeInput = useRef<TextInput>(null);
-  const displayedError = validate ? validationError : error;
+  // `validate` owns what this field's own rule reports; `error` carries an
+  // error known from elsewhere (a rejected submit). Either one marks the field
+  // invalid; the field's own rule wins while it has something to say.
+  const displayedError = (validate ? validationError : null) ?? error;
 
   // Write the default only on attach; later prop changes must not move the caret
   // while the person edits an uncontrolled field.

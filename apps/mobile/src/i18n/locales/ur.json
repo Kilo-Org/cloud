@@ -3069,10 +3069,12 @@
       "truncated": "کریڈٹس کا پرانا ریکارڈ دستیاب ہے۔"
     },
     "inviteMember": {
+      "alreadyInvited": "انہیں پہلے ہی دعوت دے دی گئی ہے یا وہ پہلے سے ہی رکن ہیں۔",
       "emailError": "درست ای میل پتہ درج کریں۔",
       "emailPlaceholder": "ای میل پتہ",
       "permissionDenied": "آپ کو اراکین کو دعوت دینے کی اجازت نہیں ہے۔",
       "roleMember": "کردار: رکن",
+      "sendError": "دعوت نہیں بھیجی جا سکی۔",
       "sendInvite": "دعوت بھیجیں",
       "title": "رکن کو دعوت دیں"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "دعوت بنائی گئی",
       "pendingInvitations": "زیر التواء دعوتیں",
       "resendInvite": "دعوت دوبارہ بھیجیں",
+      "resendInviteError": "دعوت دوبارہ نہیں بھیجی جا سکی۔",
       "shareInviteLink": "دعوت کا لنک شیئر کریں"
     },
     "usageStats": {

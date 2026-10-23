@@ -3069,10 +3069,12 @@
       "truncated": "Gen aktivite kredi ki pi ansyen ki disponib."
     },
     "inviteMember": {
+      "alreadyInvited": "Yo deja gen yon envitasyon oswa yo deja se yon manm.",
       "emailError": "Antre yon adrès imel ki valab.",
       "emailPlaceholder": "non@antrepriz.com",
       "permissionDenied": "Ou pa gen pèmisyon pou envite manm.",
       "roleMember": "Wòl: manm",
+      "sendError": "Pa t ka voye envitasyon an.",
       "sendInvite": "Voye envitasyon an",
       "title": "Envite yon manm"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "Envitasyon kreye",
       "pendingInvitations": "Envitasyon annatant",
       "resendInvite": "Revoye envitasyon an",
+      "resendInviteError": "Pa t ka revoye envitasyon an.",
       "shareInviteLink": "Pataje lyen envitasyon an"
     },
     "usageStats": {

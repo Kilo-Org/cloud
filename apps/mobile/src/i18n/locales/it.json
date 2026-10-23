@@ -3108,10 +3108,12 @@
       "renameTitle": "Rinomina l'organizzazione"
     },
     "inviteMember": {
+      "alreadyInvited": "Questo indirizzo ha già un invito in sospeso o appartiene già a un membro.",
       "emailError": "Inserisci un indirizzo email valido.",
       "emailPlaceholder": "nome@azienda.com",
       "permissionDenied": "Non hai l'autorizzazione per invitare membri.",
       "roleMember": "L'invito assegna il ruolo di membro.",
+      "sendError": "Impossibile inviare l'invito.",
       "sendInvite": "Invia l'invito",
       "title": "Invita un membro"
     },
@@ -3182,6 +3184,7 @@
       "inviteCreated": "Invito creato",
       "pendingInvitations": "Inviti in sospeso",
       "resendInvite": "Invia di nuovo l'invito",
+      "resendInviteError": "Impossibile inviare di nuovo l'invito.",
       "shareInviteLink": "Condividi il link di invito"
     },
     "usageStats": {

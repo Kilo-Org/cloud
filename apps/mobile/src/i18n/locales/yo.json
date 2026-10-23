@@ -3069,10 +3069,12 @@
       "truncated": "Àwọn ìṣe kirẹ́dítì tó ṣáájú ṣì wà."
     },
     "inviteMember": {
+      "alreadyInvited": "A ti pe wọ́n tẹ́lẹ̀ tàbí wọ́n ti jẹ́ ọmọ ẹgbẹ́ tẹ́lẹ̀.",
       "emailError": "Tẹ àdírẹ́sì ímeèlì tó péye.",
       "emailPlaceholder": "oruko@ileise.com",
       "permissionDenied": "O kò ní ìyọ̀ǹda láti pe àwọn ọmọ ẹgbẹ́.",
       "roleMember": "Ipò: Ọmọ ẹgbẹ́",
+      "sendError": "A kò lè fi ìkésíni ránṣẹ́.",
       "sendInvite": "Fi ìkésíni ránṣẹ́",
       "title": "Pe ọmọ ẹgbẹ́"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "A ti ṣẹ̀dá ìkésíni",
       "pendingInvitations": "Àwọn ìkésíni tó ń dúró",
       "resendInvite": "Tún ìkésíni fi ránṣẹ́",
+      "resendInviteError": "A kò lè tún ìkésíni fi ránṣẹ́.",
       "shareInviteLink": "Pín ọ̀nà àsopọ̀ ìkésíni"
     },
     "usageStats": {

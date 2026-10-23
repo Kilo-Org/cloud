@@ -3069,10 +3069,12 @@
       "truncated": "Du kan se ældre bevægelser på kreditsaldoen."
     },
     "inviteMember": {
+      "alreadyInvited": "Personen er allerede inviteret eller allerede medlem.",
       "emailError": "Angiv en gyldig e-mailadresse.",
       "emailPlaceholder": "navn@virksomhed.dk",
       "permissionDenied": "Du har ikke tilladelse til at invitere medlemmer.",
       "roleMember": "Rolle: medlem",
+      "sendError": "Invitationen kunne ikke sendes.",
       "sendInvite": "Send invitation",
       "title": "Invitér medlem"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "Invitation oprettet",
       "pendingInvitations": "Ubesvarede invitationer",
       "resendInvite": "Send invitation igen",
+      "resendInviteError": "Invitationen kunne ikke sendes igen.",
       "shareInviteLink": "Del invitationslink"
     },
     "usageStats": {

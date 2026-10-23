@@ -3069,10 +3069,12 @@
       "truncated": "د کریډیټ پخوانی فعالیت هم شته."
     },
     "inviteMember": {
+      "alreadyInvited": "هغوی ته دمخه بلنه ورکړل شوې یا دمخه غړی دی.",
       "emailError": "د برېښنالیک سمه پته ولیکئ.",
       "emailPlaceholder": "نوم@شرکت.com",
       "permissionDenied": "تاسو غړو ته د بلنې ورکولو اجازه نه لرئ.",
       "roleMember": "دنده: غړی",
+      "sendError": "بلنه ونه لېږل شوه.",
       "sendInvite": "بلنه واستوئ",
       "title": "غړي ته بلنه ورکړئ"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "بلنه جوړه شوه",
       "pendingInvitations": "په تمه بلنې",
       "resendInvite": "بلنه بیا واستوئ",
+      "resendInviteError": "بلنه بیا ونه لېږل شوه.",
       "shareInviteLink": "د بلنې لینک شریک کړئ"
     },
     "usageStats": {

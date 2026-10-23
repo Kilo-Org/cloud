@@ -3069,10 +3069,12 @@
       "truncated": "Ouer kredietaktiwiteit is beskikbaar."
     },
     "inviteMember": {
+      "alreadyInvited": "Hulle is reeds genooi of is reeds 'n lid.",
       "emailError": "Voer 'n geldige e-posadres in.",
       "emailPlaceholder": "naam@maatskappy.com",
       "permissionDenied": "Jy het nie toestemming om lede te nooi nie.",
       "roleMember": "Jou rol is lid.",
+      "sendError": "Kon nie die uitnodiging stuur nie.",
       "sendInvite": "Stuur uitnodiging",
       "title": "Nooi lid uit"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "Uitnodiging geskep",
       "pendingInvitations": "Hangende uitnodigings",
       "resendInvite": "Stuur uitnodiging weer",
+      "resendInviteError": "Kon nie die uitnodiging weer stuur nie.",
       "shareInviteLink": "Deel uitnodigingskakel"
     },
     "usageStats": {

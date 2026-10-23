@@ -3069,10 +3069,12 @@
       "truncated": "Sochiin kiriiditii duraanii ni argama."
     },
     "inviteMember": {
+      "alreadyInvited": "Duraan ni affeeramaniiru ykn miseensa dha.",
       "emailError": "Teessoo imeelii sirrii galchi.",
       "emailPlaceholder": "maqaa@company.com",
       "permissionDenied": "Miseensoota affeeruuf hayyama hin qabdu.",
       "roleMember": "Gahee: Miseensa",
+      "sendError": "Affeerraa erguun hin danda'amne.",
       "sendInvite": "Affeerraa ergi",
       "title": "Miseensa afeeri"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "Affeerraan uumamteera",
       "pendingInvitations": "Affeerraawwan deebii eegaa jiran",
       "resendInvite": "Affeerraa deebi'ii ergi",
+      "resendInviteError": "Affeerraa deebi'ii erguun hin danda'amne.",
       "shareInviteLink": "Geessituu affeerraa qoodi"
     },
     "usageStats": {

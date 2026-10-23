@@ -3068,10 +3068,12 @@
       "renameTitle": "संगठन का नाम बदलें"
     },
     "inviteMember": {
+      "alreadyInvited": "वे पहले से आमंत्रित हैं या पहले से ही सदस्य हैं।",
       "emailError": "मान्य ईमेल पता दर्ज करें।",
       "emailPlaceholder": "आपका ईमेल पता",
       "permissionDenied": "आपको सदस्यों को आमंत्रित करने की अनुमति नहीं है।",
       "roleMember": "भूमिका: सदस्य",
+      "sendError": "आमंत्रण नहीं भेजा जा सका।",
       "sendInvite": "आमंत्रण भेजें",
       "title": "सदस्य को आमंत्रित करें"
     },
@@ -3142,6 +3144,7 @@
       "inviteCreated": "आमंत्रण बनाया गया",
       "pendingInvitations": "लंबित आमंत्रण",
       "resendInvite": "आमंत्रण फिर से भेजें",
+      "resendInviteError": "आमंत्रण फिर से नहीं भेजा जा सका।",
       "shareInviteLink": "आमंत्रण का लिंक साझा करें"
     },
     "usageStats": {

@@ -3069,10 +3069,12 @@
       "truncated": "Eldre kredittbevegelser er tilgjengelige."
     },
     "inviteMember": {
+      "alreadyInvited": "Personen er allerede invitert eller allerede medlem.",
       "emailError": "Angi en gyldig e-postadresse.",
       "emailPlaceholder": "navn@firma.no",
       "permissionDenied": "Du har ikke tillatelse til å invitere medlemmer.",
       "roleMember": "Rolle: medlem",
+      "sendError": "Kunne ikke sende invitasjonen.",
       "sendInvite": "Send invitasjon",
       "title": "Inviter medlem"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "Invitasjon opprettet",
       "pendingInvitations": "Ventende invitasjoner",
       "resendInvite": "Send invitasjon på nytt",
+      "resendInviteError": "Kunne ikke sende invitasjonen på nytt.",
       "shareInviteLink": "Del invitasjonslenke"
     },
     "usageStats": {

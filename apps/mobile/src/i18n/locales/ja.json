@@ -3068,10 +3068,12 @@
       "renameTitle": "組織名を変更"
     },
     "inviteMember": {
+      "alreadyInvited": "このメールアドレスは、すでに招待済みか、すでにメンバーに追加されています。",
       "emailError": "有効なメールアドレスを入力してください。",
       "emailPlaceholder": "例：name@company.com",
       "permissionDenied": "メンバーを招待する権限がありません。",
       "roleMember": "役割はメンバーです。",
+      "sendError": "招待を送信できませんでした。",
       "sendInvite": "招待を送信",
       "title": "メンバーを招待"
     },
@@ -3142,6 +3144,7 @@
       "inviteCreated": "招待を作成しました",
       "pendingInvitations": "承諾待ちの招待",
       "resendInvite": "招待を再送信",
+      "resendInviteError": "招待を再送信できませんでした。",
       "shareInviteLink": "招待リンクを共有"
     },
     "usageStats": {

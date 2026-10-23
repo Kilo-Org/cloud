@@ -3149,10 +3149,12 @@
       "truncated": "Na voljo so starejše transakcije s krediti."
     },
     "inviteMember": {
+      "alreadyInvited": "Ta oseba je že povabljena ali že član organizacije.",
       "emailError": "Vnesi veljaven e-poštni naslov.",
       "emailPlaceholder": "ime@podjetje.com",
       "permissionDenied": "Nimaš dovoljenja za vabljenje članov.",
       "roleMember": "Vloga: član",
+      "sendError": "Povabila ni bilo mogoče poslati.",
       "sendInvite": "Pošlji povabilo",
       "title": "Povabi člana"
     },
@@ -3223,6 +3225,7 @@
       "inviteCreated": "Povabilo ustvarjeno",
       "pendingInvitations": "Čakajoča povabila",
       "resendInvite": "Ponovno pošlji povabilo",
+      "resendInviteError": "Povabila ni bilo mogoče ponovno poslati.",
       "shareInviteLink": "Deli povezavo do povabila"
     },
     "usageStats": {

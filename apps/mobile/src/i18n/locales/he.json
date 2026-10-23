@@ -3108,10 +3108,12 @@
       "renameTitle": "שינוי שם הארגון"
     },
     "inviteMember": {
+      "alreadyInvited": "כתובת זו כבר הוזמנה או שהיא שייכת לחבר קיים בארגון.",
       "emailError": "הזן כתובת דוא״ל תקינה.",
       "emailPlaceholder": "israel@company.com",
       "permissionDenied": "אין לך הרשאה להזמין חברים.",
       "roleMember": "התפקיד הוא חבר בארגון.",
+      "sendError": "שליחת ההזמנה נכשלה.",
       "sendInvite": "שליחת הזמנה",
       "title": "הזמנת חבר לארגון"
     },
@@ -3182,6 +3184,7 @@
       "inviteCreated": "ההזמנה נוצרה",
       "pendingInvitations": "הזמנות ממתינות",
       "resendInvite": "שליחת ההזמנה מחדש",
+      "resendInviteError": "שליחת ההזמנה מחדש נכשלה.",
       "shareInviteLink": "שיתוף הקישור להזמנה"
     },
     "usageStats": {

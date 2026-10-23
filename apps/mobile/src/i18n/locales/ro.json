@@ -3109,10 +3109,12 @@
       "truncated": "Sunt disponibile operațiuni mai vechi cu credite."
     },
     "inviteMember": {
+      "alreadyInvited": "Această persoană este deja invitată sau este deja membru.",
       "emailError": "Introdu o adresă de e-mail validă.",
       "emailPlaceholder": "nume@companie.com",
       "permissionDenied": "Nu ai permisiunea de a invita membri.",
       "roleMember": "Rolul atribuit este cel de membru.",
+      "sendError": "Invitația nu a putut fi trimisă.",
       "sendInvite": "Trimite invitația",
       "title": "Invită un membru"
     },
@@ -3183,6 +3185,7 @@
       "inviteCreated": "Invitație creată",
       "pendingInvitations": "Invitații în așteptare",
       "resendInvite": "Retrimite invitația",
+      "resendInviteError": "Invitația nu a putut fi retrimisă.",
       "shareInviteLink": "Partajează linkul de invitație"
     },
     "usageStats": {

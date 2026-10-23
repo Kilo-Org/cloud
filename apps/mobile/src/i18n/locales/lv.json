@@ -3109,10 +3109,12 @@
       "truncated": "Ir pieejami arī iepriekšējie kredītu darījumi."
     },
     "inviteMember": {
+      "alreadyInvited": "Šī e-pasta adrese jau ir uzaicināta vai jau pieder dalībniekam.",
       "emailError": "Ievadi derīgu e-pasta adresi.",
       "emailPlaceholder": "vards@uznemums.com",
       "permissionDenied": "Tev nav atļaujas uzaicināt dalībniekus.",
       "roleMember": "Loma: dalībnieks.",
+      "sendError": "Neizdevās nosūtīt uzaicinājumu.",
       "sendInvite": "Nosūtīt uzaicinājumu",
       "title": "Uzaicināt dalībnieku"
     },
@@ -3183,6 +3185,7 @@
       "inviteCreated": "Uzaicinājums izveidots",
       "pendingInvitations": "Neapstiprinātie uzaicinājumi",
       "resendInvite": "Nosūtīt uzaicinājumu vēlreiz",
+      "resendInviteError": "Neizdevās nosūtīt uzaicinājumu vēlreiz.",
       "shareInviteLink": "Kopīgot uzaicinājuma saiti"
     },
     "usageStats": {

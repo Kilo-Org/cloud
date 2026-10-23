@@ -3149,10 +3149,12 @@
       "truncated": "K dispozícii sú aj staršie pohyby kreditov."
     },
     "inviteMember": {
+      "alreadyInvited": "Táto osoba už bola pozvaná alebo už je členom.",
       "emailError": "Zadaj platnú e-mailovú adresu.",
       "emailPlaceholder": "meno@firma.sk",
       "permissionDenied": "Nemáš povolenie pozývať členov.",
       "roleMember": "Rola: člen",
+      "sendError": "Pozvánku sa nepodarilo odoslať.",
       "sendInvite": "Odoslať pozvánku",
       "title": "Pozvať člena"
     },
@@ -3223,6 +3225,7 @@
       "inviteCreated": "Pozvánka vytvorená",
       "pendingInvitations": "Čakajúce pozvánky",
       "resendInvite": "Znova odoslať pozvánku",
+      "resendInviteError": "Pozvánku sa nepodarilo odoslať znova.",
       "shareInviteLink": "Zdieľať odkaz na pozvánku"
     },
     "usageStats": {

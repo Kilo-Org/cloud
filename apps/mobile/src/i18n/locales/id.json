@@ -3068,10 +3068,12 @@
       "renameTitle": "Ganti nama organisasi"
     },
     "inviteMember": {
+      "alreadyInvited": "Alamat email tersebut sudah diundang atau sudah menjadi anggota.",
       "emailError": "Masukkan alamat email yang valid.",
       "emailPlaceholder": "nama@perusahaan.com",
       "permissionDenied": "Kamu tidak memiliki izin untuk mengundang anggota.",
       "roleMember": "Peran yang diberikan adalah anggota.",
+      "sendError": "Tidak dapat mengirim undangan.",
       "sendInvite": "Kirim undangan",
       "title": "Undang anggota"
     },
@@ -3142,6 +3144,7 @@
       "inviteCreated": "Undangan dibuat",
       "pendingInvitations": "Undangan yang belum diterima",
       "resendInvite": "Kirim ulang undangan",
+      "resendInviteError": "Tidak dapat mengirim ulang undangan.",
       "shareInviteLink": "Bagikan tautan undangan"
     },
     "usageStats": {

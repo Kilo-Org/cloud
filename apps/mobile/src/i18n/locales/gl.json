@@ -3069,10 +3069,12 @@
       "truncated": "Hai movementos de créditos anteriores dispoñibles."
     },
     "inviteMember": {
+      "alreadyInvited": "Xa está convidado ou xa é membro.",
       "emailError": "Introduce un enderezo de correo válido.",
       "emailPlaceholder": "nome@empresa.com",
       "permissionDenied": "Non tes permiso para invitar membros.",
       "roleMember": "O rol é de membro.",
+      "sendError": "Non se puido enviar a invitación.",
       "sendInvite": "Enviar invitación",
       "title": "Convidar un membro"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "Invitación creada",
       "pendingInvitations": "Invitacións pendentes",
       "resendInvite": "Reenviar invitación",
+      "resendInviteError": "Non se puido reenviar a invitación.",
       "shareInviteLink": "Compartir ligazón de invitación"
     },
     "usageStats": {

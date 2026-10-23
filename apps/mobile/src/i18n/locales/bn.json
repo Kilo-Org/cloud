@@ -3069,10 +3069,12 @@
       "truncated": "ক্রেডিটের আরও পুরোনো লেনদেন দেখা যাবে।"
     },
     "inviteMember": {
+      "alreadyInvited": "এই ব্যক্তি ইতোমধ্যে আমন্ত্রিত অথবা সদস্য।",
       "emailError": "একটি সঠিক ইমেইল ঠিকানা লিখুন।",
       "emailPlaceholder": "ইমেইল ঠিকানা",
       "permissionDenied": "সদস্যদের আমন্ত্রণ জানানোর অনুমতি আপনার নেই।",
       "roleMember": "ভূমিকা: সদস্য",
+      "sendError": "আমন্ত্রণ পাঠানো যায়নি।",
       "sendInvite": "আমন্ত্রণ পাঠান",
       "title": "সদস্যকে আমন্ত্রণ জানান"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "আমন্ত্রণ তৈরি হয়েছে",
       "pendingInvitations": "অপেক্ষমাণ আমন্ত্রণ",
       "resendInvite": "আমন্ত্রণ পুনরায় পাঠান",
+      "resendInviteError": "আমন্ত্রণ পুনরায় পাঠানো যায়নি।",
       "shareInviteLink": "আমন্ত্রণের লিঙ্ক শেয়ার করুন"
     },
     "usageStats": {

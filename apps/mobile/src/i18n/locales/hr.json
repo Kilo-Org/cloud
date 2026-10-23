@@ -3109,10 +3109,12 @@
       "truncated": "Dostupan je raniji promet po kreditima."
     },
     "inviteMember": {
+      "alreadyInvited": "Taj je korisnik već pozvan ili je već član.",
       "emailError": "Unesi valjanu adresu e-pošte.",
       "emailPlaceholder": "ime@tvrtka.com",
       "permissionDenied": "Nemaš dopuštenje za pozivanje članova.",
       "roleMember": "Dodijeljena je uloga člana.",
+      "sendError": "Nije moguće poslati pozivnicu.",
       "sendInvite": "Pošalji pozivnicu",
       "title": "Pozovi člana"
     },
@@ -3183,6 +3185,7 @@
       "inviteCreated": "Pozivnica stvorena",
       "pendingInvitations": "Pozivnice na čekanju",
       "resendInvite": "Ponovno pošalji pozivnicu",
+      "resendInviteError": "Nije moguće ponovno poslati pozivnicu.",
       "shareInviteLink": "Podijeli poveznicu pozivnice"
     },
     "usageStats": {

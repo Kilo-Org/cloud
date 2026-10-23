@@ -3167,10 +3167,12 @@
       }
     },
     "inviteMember": {
+      "alreadyInvited": "They're already invited or already a member.",
       "emailError": "Enter a valid email address",
       "emailPlaceholder": "name@company.com",
       "permissionDenied": "You don't have permission to invite members.",
       "roleMember": "Role: Member",
+      "sendError": "Couldn't send the invite.",
       "sendInvite": "Send invite",
       "title": "Invite member"
     },
@@ -3241,6 +3243,7 @@
       "inviteCreated": "Invite created",
       "pendingInvitations": "Pending invitations",
       "resendInvite": "Resend invite",
+      "resendInviteError": "Couldn't resend the invite.",
       "shareInviteLink": "Share invite link"
     },
     "usageStats": {

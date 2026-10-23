@@ -3069,10 +3069,12 @@
       "truncated": "Aurreko kreditu-jarduera eskuragarri dago."
     },
     "inviteMember": {
+      "alreadyInvited": "Dagoeneko gonbidatuta dago edo dagoeneko kidea da.",
       "emailError": "Sartu baliozko helbide elektroniko bat.",
       "emailPlaceholder": "izena@enpresa.eus",
       "permissionDenied": "Ez duzu kideak gonbidatzeko baimenik.",
       "roleMember": "Rola: kidea",
+      "sendError": "Ezin izan da gonbidapena bidali.",
       "sendInvite": "Bidali gonbidapena",
       "title": "Gonbidatu kidea"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "Gonbidapena sortuta",
       "pendingInvitations": "Onartzeko zain dauden gonbidapenak",
       "resendInvite": "Bidali gonbidapena berriro",
+      "resendInviteError": "Ezin izan da gonbidapena berriro bidali.",
       "shareInviteLink": "Partekatu gonbidapen-esteka"
     },
     "usageStats": {

@@ -3068,10 +3068,12 @@
       "renameTitle": "重命名组织"
     },
     "inviteMember": {
+      "alreadyInvited": "该邮箱已被邀请或已是成员。",
       "emailError": "请输入有效的邮箱地址。",
       "emailPlaceholder": "邮箱地址，如 name@company.com",
       "permissionDenied": "你没有邀请成员的权限。",
       "roleMember": "角色为成员。",
+      "sendError": "无法发送邀请。",
       "sendInvite": "发送邀请",
       "title": "邀请成员"
     },
@@ -3142,6 +3144,7 @@
       "inviteCreated": "邀请已创建",
       "pendingInvitations": "待接受的邀请",
       "resendInvite": "重新发送邀请",
+      "resendInviteError": "无法重新发送邀请。",
       "shareInviteLink": "分享邀请链接"
     },
     "usageStats": {

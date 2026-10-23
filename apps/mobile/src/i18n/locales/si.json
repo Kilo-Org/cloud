@@ -3069,10 +3069,12 @@
       "truncated": "පෙර ක්‍රෙඩිට් ගනුදෙනු ද බැලිය හැක."
     },
     "inviteMember": {
+      "alreadyInvited": "දැනටමත් ආරාධනා කර ඇත හෝ දැනටමත් සාමාජිකයෙකි.",
       "emailError": "වලංගු ඊමේල් ලිපිනයක් ඇතුළත් කරන්න.",
       "emailPlaceholder": "ඔබේ ඊමේල් ලිපිනය",
       "permissionDenied": "සාමාජිකයන්ට ආරාධනා කිරීමට ඔබට අවසර නොමැත.",
       "roleMember": "භූමිකාව: සාමාජිකයා",
+      "sendError": "ආරාධනය යැවීමට නොහැකි විය.",
       "sendInvite": "ආරාධනය යවන්න",
       "title": "සාමාජිකයකුට ආරාධනා කරන්න"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "ආරාධනය සාදන ලදී",
       "pendingInvitations": "පිළිගැනීමට ඉතිරි ආරාධනා",
       "resendInvite": "ආරාධනය නැවත යවන්න",
+      "resendInviteError": "ආරාධනය නැවත යැවීමට නොහැකි විය.",
       "shareInviteLink": "ආරාධන සබැඳිය බෙදාගන්න"
     },
     "usageStats": {

@@ -3109,10 +3109,12 @@
       "truncated": "Hi ha moviments de crèdits anteriors disponibles."
     },
     "inviteMember": {
+      "alreadyInvited": "Ja té una invitació pendent o ja és membre.",
       "emailError": "Introdueix una adreça de correu electrònic vàlida.",
       "emailPlaceholder": "nom@empresa.com",
       "permissionDenied": "No tens permís per convidar membres.",
       "roleMember": "El rol és de membre.",
+      "sendError": "No s'ha pogut enviar la invitació.",
       "sendInvite": "Envia la invitació",
       "title": "Convida un membre"
     },
@@ -3183,6 +3185,7 @@
       "inviteCreated": "Invitació creada",
       "pendingInvitations": "Invitacions pendents",
       "resendInvite": "Torna a enviar la invitació",
+      "resendInviteError": "No s'ha pogut tornar a enviar la invitació.",
       "shareInviteLink": "Comparteix l'enllaç d'invitació"
     },
     "usageStats": {

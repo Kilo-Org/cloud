@@ -3189,10 +3189,12 @@
       "truncated": "Hemm attività tal-krediti ta' qabel disponibbli."
     },
     "inviteMember": {
+      "alreadyInvited": "Din il-persuna diġà hija mistiedna jew diġà membru.",
       "emailError": "Daħħal indirizz tal-posta elettronika validu.",
       "emailPlaceholder": "isem@company.com",
       "permissionDenied": "M'għandekx permess biex tistieden membri.",
       "roleMember": "Rwol: membru",
+      "sendError": "L-istedina ma setgħetx tintbagħat.",
       "sendInvite": "Ibgħat stedina",
       "title": "Stieden membru"
     },
@@ -3263,6 +3265,7 @@
       "inviteCreated": "L-istedina nħolqot",
       "pendingInvitations": "Stediniet pendenti",
       "resendInvite": "Erġa' ibgħat l-istedina",
+      "resendInviteError": "L-istedina ma setgħetx tintbagħat mill-ġdid.",
       "shareInviteLink": "Aqsam ir-rabta tal-istedina"
     },
     "usageStats": {

@@ -3108,10 +3108,12 @@
       "renameTitle": "Cambiar nombre de la organización"
     },
     "inviteMember": {
+      "alreadyInvited": "Ya está invitado o ya es miembro.",
       "emailError": "Introduce una dirección de correo electrónico válida.",
       "emailPlaceholder": "nombre@empresa.com",
       "permissionDenied": "No tienes permiso para invitar miembros.",
       "roleMember": "Se asignará el rol de miembro.",
+      "sendError": "No se pudo enviar la invitación.",
       "sendInvite": "Enviar invitación",
       "title": "Invitar a un miembro"
     },
@@ -3182,6 +3184,7 @@
       "inviteCreated": "Invitación creada",
       "pendingInvitations": "Invitaciones pendientes",
       "resendInvite": "Reenviar invitación",
+      "resendInviteError": "No se pudo reenviar la invitación.",
       "shareInviteLink": "Compartir enlace de invitación"
     },
     "usageStats": {

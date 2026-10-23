@@ -3069,10 +3069,12 @@
       "truncated": "May mas naunang aktibidad sa kredito na maaaring tingnan."
     },
     "inviteMember": {
+      "alreadyInvited": "Imbitado na sila o miyembro na.",
       "emailError": "Maglagay ng wastong email address.",
       "emailPlaceholder": "pangalan@kumpanya.com",
       "permissionDenied": "Wala kang pahintulot na mag-imbita ng mga miyembro.",
       "roleMember": "Tungkulin: Miyembro.",
+      "sendError": "Hindi naipadala ang imbitasyon.",
       "sendInvite": "Ipadala ang imbitasyon",
       "title": "Mag-imbita ng miyembro"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "Nalikha ang imbitasyon",
       "pendingInvitations": "Mga nakabinbing imbitasyon",
       "resendInvite": "Ipadala muli ang imbitasyon",
+      "resendInviteError": "Hindi naipadala muli ang imbitasyon.",
       "shareInviteLink": "Ibahagi ang link ng imbitasyon"
     },
     "usageStats": {

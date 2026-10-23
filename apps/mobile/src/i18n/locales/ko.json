@@ -3068,10 +3068,12 @@
       "renameTitle": "조직 이름 변경"
     },
     "inviteMember": {
+      "alreadyInvited": "이미 초대되었거나 이미 멤버입니다.",
       "emailError": "올바른 이메일 주소를 입력하세요.",
       "emailPlaceholder": "이름@회사.com",
       "permissionDenied": "멤버를 초대할 권한이 없습니다.",
       "roleMember": "멤버 역할로 초대합니다.",
+      "sendError": "초대를 보내지 못했습니다.",
       "sendInvite": "초대 보내기",
       "title": "멤버 초대"
     },
@@ -3142,6 +3144,7 @@
       "inviteCreated": "초대를 만들었습니다.",
       "pendingInvitations": "수락 대기 중인 초대",
       "resendInvite": "초대 다시 보내기",
+      "resendInviteError": "초대를 다시 보내지 못했습니다.",
       "shareInviteLink": "초대 링크 공유"
     },
     "usageStats": {

@@ -3068,10 +3068,12 @@
       "renameTitle": "Kuruluşu yeniden adlandır"
     },
     "inviteMember": {
+      "alreadyInvited": "Bu kişi zaten davet edilmiş veya zaten üye.",
       "emailError": "Geçerli bir e-posta adresi gir.",
       "emailPlaceholder": "ad@sirket.com",
       "permissionDenied": "Üye davet etme iznin yok.",
       "roleMember": "Rol: Üye",
+      "sendError": "Davet gönderilemedi.",
       "sendInvite": "Davet gönder",
       "title": "Üye davet et"
     },
@@ -3142,6 +3144,7 @@
       "inviteCreated": "Davet oluşturuldu",
       "pendingInvitations": "Bekleyen davetler",
       "resendInvite": "Daveti yeniden gönder",
+      "resendInviteError": "Davet yeniden gönderilemedi.",
       "shareInviteLink": "Davet bağlantısını paylaş"
     },
     "usageStats": {

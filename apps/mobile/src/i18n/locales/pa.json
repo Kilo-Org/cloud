@@ -3069,10 +3069,12 @@
       "truncated": "ਕ੍ਰੈਡਿਟ ਦਾ ਪੁਰਾਣਾ ਲੇਖਾ-ਜੋਖਾ ਵੀ ਉਪਲਬਧ ਹੈ।"
     },
     "inviteMember": {
+      "alreadyInvited": "ਉਹ ਪਹਿਲਾਂ ਹੀ ਸੱਦਿਆ ਹੋਇਆ ਹੈ ਜਾਂ ਪਹਿਲਾਂ ਹੀ ਮੈਂਬਰ ਹੈ।",
       "emailError": "ਸਹੀ ਈਮੇਲ ਪਤਾ ਦਰਜ ਕਰੋ।",
       "emailPlaceholder": "ਨਾਮ@ਕੰਪਨੀ.com",
       "permissionDenied": "ਤੁਹਾਡੇ ਕੋਲ ਮੈਂਬਰਾਂ ਨੂੰ ਸੱਦਾ ਦੇਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
       "roleMember": "ਭੂਮਿਕਾ: ਮੈਂਬਰ",
+      "sendError": "ਸੱਦਾ ਭੇਜਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
       "sendInvite": "ਸੱਦਾ ਭੇਜੋ",
       "title": "ਮੈਂਬਰ ਨੂੰ ਸੱਦਾ ਦਿਓ"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "ਸੱਦਾ ਬਣਾਇਆ ਗਿਆ",
       "pendingInvitations": "ਜਵਾਬ ਦੀ ਉਡੀਕ ਵਾਲੇ ਸੱਦੇ",
       "resendInvite": "ਸੱਦਾ ਦੁਬਾਰਾ ਭੇਜੋ",
+      "resendInviteError": "ਸੱਦਾ ਦੁਬਾਰਾ ਭੇਜਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
       "shareInviteLink": "ਸੱਦੇ ਦਾ ਲਿੰਕ ਸਾਂਝਾ ਕਰੋ"
     },
     "usageStats": {

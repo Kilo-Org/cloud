@@ -3149,10 +3149,12 @@
       "truncated": "Galite peržiūrėti ankstesnes kreditų operacijas."
     },
     "inviteMember": {
+      "alreadyInvited": "Vartotojas jau pakviestas arba jau yra narys.",
       "emailError": "Įveskite tinkamą el. pašto adresą.",
       "emailPlaceholder": "vardas@company.com",
       "permissionDenied": "Neturite leidimo kviesti narių.",
       "roleMember": "Vaidmuo: narys.",
+      "sendError": "Nepavyko išsiųsti kvietimo.",
       "sendInvite": "Siųsti kvietimą",
       "title": "Pakviesti narį"
     },
@@ -3223,6 +3225,7 @@
       "inviteCreated": "Kvietimas sukurtas",
       "pendingInvitations": "Nepriimti kvietimai",
       "resendInvite": "Išsiųsti kvietimą dar kartą",
+      "resendInviteError": "Nepavyko išsiųsti kvietimo dar kartą.",
       "shareInviteLink": "Bendrinti kvietimo nuorodą"
     },
     "usageStats": {

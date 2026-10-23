@@ -3068,10 +3068,12 @@
       "truncated": "Det finns äldre kreditaktivitet att visa."
     },
     "inviteMember": {
+      "alreadyInvited": "Personen är redan inbjuden eller redan medlem.",
       "emailError": "Ange en giltig e-postadress",
       "emailPlaceholder": "namn@foretag.se",
       "permissionDenied": "Du har inte behörighet att bjuda in medlemmar.",
       "roleMember": "Roll: Medlem",
+      "sendError": "Inbjudan kunde inte skickas.",
       "sendInvite": "Skicka inbjudan",
       "title": "Bjud in medlem"
     },
@@ -3142,6 +3144,7 @@
       "inviteCreated": "Inbjudan skapad",
       "pendingInvitations": "Väntande inbjudningar",
       "resendInvite": "Skicka inbjudan igen",
+      "resendInviteError": "Inbjudan kunde inte skickas igen.",
       "shareInviteLink": "Dela inbjudningslänk"
     },
     "usageStats": {

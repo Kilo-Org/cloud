@@ -3069,10 +3069,12 @@
       "truncated": "Aiempia krediittitapahtumia on saatavilla."
     },
     "inviteMember": {
+      "alreadyInvited": "Tämä sähköpostiosoite on jo kutsuttu tai kuuluu jo jäsenelle.",
       "emailError": "Anna kelvollinen sähköpostiosoite.",
       "emailPlaceholder": "nimi@yritys.fi",
       "permissionDenied": "Sinulla ei ole oikeutta kutsua jäseniä.",
       "roleMember": "Rooli: jäsen",
+      "sendError": "Kutsun lähettäminen epäonnistui.",
       "sendInvite": "Lähetä kutsu",
       "title": "Kutsu jäsen"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "Kutsu luotu",
       "pendingInvitations": "Odottavat kutsut",
       "resendInvite": "Lähetä kutsu uudelleen",
+      "resendInviteError": "Kutsun lähettäminen uudelleen epäonnistui.",
       "shareInviteLink": "Jaa kutsulinkki"
     },
     "usageStats": {

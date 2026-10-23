@@ -3069,10 +3069,12 @@
       "truncated": "Korábbi kreditműveletek is elérhetők."
     },
     "inviteMember": {
+      "alreadyInvited": "Már meg van hívva, vagy már tag.",
       "emailError": "Adj meg egy érvényes e-mail-címet.",
       "emailPlaceholder": "nev@ceg.hu",
       "permissionDenied": "Nincs jogosultságod tagok meghívására.",
       "roleMember": "Szerepkör: tag.",
+      "sendError": "Nem sikerült elküldeni a meghívót.",
       "sendInvite": "Meghívó küldése",
       "title": "Tag meghívása"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "Meghívó létrehozva",
       "pendingInvitations": "Függőben lévő meghívók",
       "resendInvite": "Meghívó újraküldése",
+      "resendInviteError": "Nem sikerült újraküldeni a meghívót.",
       "shareInviteLink": "Meghívóhivatkozás megosztása"
     },
     "usageStats": {

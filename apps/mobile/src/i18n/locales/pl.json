@@ -3148,10 +3148,12 @@
       "renameTitle": "Zmień nazwę organizacji"
     },
     "inviteMember": {
+      "alreadyInvited": "Ten adres e-mail ma już oczekujące zaproszenie lub należy już do członka tej organizacji.",
       "emailError": "Wpisz prawidłowy adres e-mail.",
       "emailPlaceholder": "imie@example.com",
       "permissionDenied": "Nie masz uprawnień do zapraszania członków.",
       "roleMember": "Przypisana rola: członek.",
+      "sendError": "Nie udało się wysłać zaproszenia.",
       "sendInvite": "Wyślij zaproszenie",
       "title": "Zaproś członka"
     },
@@ -3222,6 +3224,7 @@
       "inviteCreated": "Utworzono zaproszenie",
       "pendingInvitations": "Oczekujące zaproszenia",
       "resendInvite": "Wyślij zaproszenie ponownie",
+      "resendInviteError": "Nie udało się wysłać zaproszenia ponownie.",
       "shareInviteLink": "Udostępnij link do zaproszenia"
     },
     "usageStats": {

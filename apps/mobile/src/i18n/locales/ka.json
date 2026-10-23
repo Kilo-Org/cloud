@@ -3069,10 +3069,12 @@
       "truncated": "ხელმისაწვდომია კრედიტების უფრო ძველი ოპერაციებიც."
     },
     "inviteMember": {
+      "alreadyInvited": "ის უკვე მოწვეულია ან უკვე არის წევრი.",
       "emailError": "შეიყვანეთ ელფოსტის სწორი მისამართი.",
       "emailPlaceholder": "user@example.com",
       "permissionDenied": "წევრების მოწვევის უფლება არ გაქვთ.",
       "roleMember": "როლი: წევრი",
+      "sendError": "მოწვევის გაგზავნა ვერ მოხერხდა.",
       "sendInvite": "მოწვევის გაგზავნა",
       "title": "წევრის მოწვევა"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "მოწვევა შეიქმნა",
       "pendingInvitations": "დაუდასტურებელი მოწვევები",
       "resendInvite": "მოწვევის ხელახლა გაგზავნა",
+      "resendInviteError": "მოწვევის ხელახლა გაგზავნა ვერ მოხერხდა.",
       "shareInviteLink": "მოწვევის ბმულის გაზიარება"
     },
     "usageStats": {

@@ -3069,10 +3069,12 @@
       "truncated": "Saadaval on ka varasemad krediiditehingud."
     },
     "inviteMember": {
+      "alreadyInvited": "Ta on juba kutsutud või juba liige.",
       "emailError": "Sisesta kehtiv e-posti aadress.",
       "emailPlaceholder": "nimi@ettevote.ee",
       "permissionDenied": "Sul puudub õigus liikmeid kutsuda.",
       "roleMember": "Roll: liige",
+      "sendError": "Kutset ei õnnestunud saata.",
       "sendInvite": "Saada kutse",
       "title": "Kutsu liige"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "Kutse loodud",
       "pendingInvitations": "Ootel kutsed",
       "resendInvite": "Saada kutse uuesti",
+      "resendInviteError": "Kutset ei õnnestunud uuesti saata.",
       "shareInviteLink": "Jaga kutselinki"
     },
     "usageStats": {

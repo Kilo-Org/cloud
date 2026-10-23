@@ -3069,10 +3069,12 @@
       "truncated": "Aktiviti kredit terdahulu tersedia."
     },
     "inviteMember": {
+      "alreadyInvited": "E-mel itu sudah dijemput atau sudah menjadi ahli.",
       "emailError": "Masukkan alamat e-mel yang sah.",
       "emailPlaceholder": "nama@syarikat.com",
       "permissionDenied": "Anda tidak mempunyai kebenaran untuk menjemput ahli.",
       "roleMember": "Peranan: Ahli",
+      "sendError": "Tidak dapat menghantar jemputan.",
       "sendInvite": "Hantar jemputan",
       "title": "Jemput ahli"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "Jemputan dicipta",
       "pendingInvitations": "Jemputan menunggu jawapan",
       "resendInvite": "Hantar semula jemputan",
+      "resendInviteError": "Tidak dapat menghantar semula jemputan.",
       "shareInviteLink": "Kongsi pautan jemputan"
     },
     "usageStats": {

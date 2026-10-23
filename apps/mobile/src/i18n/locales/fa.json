@@ -3069,10 +3069,12 @@
       "truncated": "سوابق قبلی گردش اعتبار در دسترس است."
     },
     "inviteMember": {
+      "alreadyInvited": "این آدرس ایمیل قبلاً دعوت شده است یا از قبل عضو است.",
       "emailError": "یک آدرس ایمیل معتبر وارد کنید.",
       "emailPlaceholder": "ایمیل، مثلاً name@company.com",
       "permissionDenied": "شما اجازه دعوت اعضا را ندارید.",
       "roleMember": "نقش: عضو",
+      "sendError": "ارسال دعوت‌نامه ممکن نشد.",
       "sendInvite": "ارسال دعوت‌نامه",
       "title": "دعوت از عضو"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "دعوت‌نامه ایجاد شد",
       "pendingInvitations": "دعوت‌نامه‌های در انتظار پذیرش",
       "resendInvite": "ارسال دوبارهٔ دعوت‌نامه",
+      "resendInviteError": "ارسال دوبارهٔ دعوت‌نامه ممکن نشد.",
       "shareInviteLink": "اشتراک‌گذاری پیوند دعوت"
     },
     "usageStats": {

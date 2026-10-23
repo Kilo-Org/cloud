@@ -3069,10 +3069,12 @@
       "truncated": "Misy hetsika taloha kokoa momba ny kireditra."
     },
     "inviteMember": {
+      "alreadyInvited": "Efa voasa na efa mpikambana izy.",
       "emailError": "Mampidira adiresy mailaka manan-kery.",
       "emailPlaceholder": "anarana@orinasa.com",
       "permissionDenied": "Tsy manana alalana hanasa mpikambana ianao.",
       "roleMember": "Andraikitra: mpikambana",
+      "sendError": "Tsy azo nalefa ny fanasana.",
       "sendInvite": "Alefaso ny fanasana",
       "title": "Manasà mpikambana"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "Noforonina ny fanasana",
       "pendingInvitations": "Fanasana miandry",
       "resendInvite": "Alefaso indray ny fanasana",
+      "resendInviteError": "Tsy azo nalefa indray ny fanasana.",
       "shareInviteLink": "Zarao ny rohy fanasana"
     },
     "usageStats": {

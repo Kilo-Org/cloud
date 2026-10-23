@@ -3069,10 +3069,12 @@
       "truncated": "Shughuli za awali za salio zinapatikana."
     },
     "inviteMember": {
+      "alreadyInvited": "Wamekwishaalikwa au ni wanachama tayari.",
       "emailError": "Weka anwani halali ya barua pepe.",
       "emailPlaceholder": "jina@company.com",
       "permissionDenied": "Huna ruhusa ya kualika wanachama.",
       "roleMember": "Jukumu: mwanachama",
+      "sendError": "Imeshindikana kutuma mwaliko.",
       "sendInvite": "Tuma mwaliko",
       "title": "Alika mwanachama"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "Mwaliko umeundwa",
       "pendingInvitations": "Mialiko inayosubiri",
       "resendInvite": "Tuma mwaliko tena",
+      "resendInviteError": "Imeshindikana kutuma mwaliko tena.",
       "shareInviteLink": "Shiriki kiungo cha mwaliko"
     },
     "usageStats": {

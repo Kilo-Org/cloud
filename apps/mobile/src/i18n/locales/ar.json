@@ -3228,10 +3228,12 @@
       "renameTitle": "إعادة تسمية المؤسسة"
     },
     "inviteMember": {
+      "alreadyInvited": "سبق إرسال دعوة لهذا البريد الإلكتروني أو أنه يعود إلى عضو بالفعل.",
       "emailError": "أدخل عنوان بريد إلكتروني صالحًا.",
       "emailPlaceholder": "user@example.com",
       "permissionDenied": "ليست لديك صلاحية لدعوة الأعضاء.",
       "roleMember": "الدور هو عضو.",
+      "sendError": "تعذّر إرسال الدعوة.",
       "sendInvite": "إرسال الدعوة",
       "title": "دعوة عضو"
     },
@@ -3302,6 +3304,7 @@
       "inviteCreated": "تم إنشاء الدعوة",
       "pendingInvitations": "الدعوات المعلّقة",
       "resendInvite": "إعادة إرسال الدعوة",
+      "resendInviteError": "تعذّر إعادة إرسال الدعوة.",
       "shareInviteLink": "مشاركة رابط الدعوة"
     },
     "usageStats": {

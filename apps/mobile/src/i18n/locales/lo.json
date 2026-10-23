@@ -3069,10 +3069,12 @@
       "truncated": "ຍັງມີປະຫວັດເຄຣດິດກ່ອນໜ້ານີ້ໃຫ້ເບິ່ງ."
     },
     "inviteMember": {
+      "alreadyInvited": "ພວກເຂົາຖືກເຊີນແລ້ວ ຫຼື ເປັນສະມາຊິກແລ້ວ.",
       "emailError": "ໃສ່ທີ່ຢູ່ອີເມວທີ່ຖືກຕ້ອງ.",
       "emailPlaceholder": "ຕົວຢ່າງ: name@company.com",
       "permissionDenied": "ທ່ານບໍ່ມີສິດເຊີນສະມາຊິກ.",
       "roleMember": "ບົດບາດ: ສະມາຊິກ",
+      "sendError": "ບໍ່ສາມາດສົ່ງຄຳເຊີນໄດ້.",
       "sendInvite": "ສົ່ງຄຳເຊີນ",
       "title": "ເຊີນສະມາຊິກ"
     },
@@ -3143,6 +3145,7 @@
       "inviteCreated": "ສ້າງຄຳເຊີນແລ້ວ",
       "pendingInvitations": "ຄຳເຊີນທີ່ລໍຖ້າການຕອບຮັບ",
       "resendInvite": "ສົ່ງຄຳເຊີນອີກຄັ້ງ",
+      "resendInviteError": "ບໍ່ສາມາດສົ່ງຄຳເຊີນອີກຄັ້ງໄດ້.",
       "shareInviteLink": "ແບ່ງປັນລິ້ງເຊີນ"
     },
     "usageStats": {

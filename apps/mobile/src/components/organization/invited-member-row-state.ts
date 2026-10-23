@@ -72,7 +72,9 @@ export function invitedMemberActionOptions(
 /**
  * Resend mutation for a failed invite. Delegates to
  * `trpcClient.organizations.members.resendInvite` and re-fetches the member
- * list on success.
+ * list on success. A failure is announced in localized copy: the server's own
+ * sentence is English-only, and no part of a rejected request belongs on a
+ * translated screen.
  */
 export function useResendInvite(organizationId: string) {
   const trpc = useTRPC();
@@ -86,8 +88,8 @@ export function useResendInvite(organizationId: string) {
         queryKey: trpc.organizations.withMembers.queryKey({ organizationId }),
       });
     },
-    onError: (error: { message: string }) => {
-      announcingToast.error(error.message || i18n.t('common.somethingWentWrong'));
+    onError: () => {
+      announcingToast.error(i18n.t('organization.members.resendInviteError'));
     },
   });
 }

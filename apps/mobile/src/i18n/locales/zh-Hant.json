@@ -3068,10 +3068,12 @@
       "renameTitle": "重新命名組織"
     },
     "inviteMember": {
+      "alreadyInvited": "該電子郵件地址已有待處理的邀請，或已是成員。",
       "emailError": "請輸入有效的電子郵件地址。",
       "emailPlaceholder": "例如：name@company.com",
       "permissionDenied": "你沒有邀請成員的權限。",
       "roleMember": "角色：成員",
+      "sendError": "無法傳送邀請。",
       "sendInvite": "傳送邀請",
       "title": "邀請成員"
     },
@@ -3142,6 +3144,7 @@
       "inviteCreated": "邀請已建立",
       "pendingInvitations": "待處理的邀請",
       "resendInvite": "重新傳送邀請",
+      "resendInviteError": "無法重新傳送邀請。",
       "shareInviteLink": "分享邀請連結"
     },
     "usageStats": {

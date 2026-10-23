@@ -1,5 +1,5 @@
 {
-  "id": "9dfd8a38-dfe3-4cd4-891f-93c5b7e6389b",
+  "id": "2d61ccea-6389-4ab3-a6fd-492cc75f6550",
   "prevId": "9f79dabe-58e7-4e83-ad12-3a271b4d0d7f",
   "version": "7",
   "dialect": "postgresql",
@@ -5518,22 +5518,6 @@
           "method": "btree",
           "with": {}
         },
-        "idx_cloud_agent_code_reviews_started_at_effective": {
-          "name": "idx_cloud_agent_code_reviews_started_at_effective",
-          "columns": [
-            {
-              "expression": "COALESCE(\"started_at\", \"updated_at\", \"created_at\")",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"cloud_agent_code_reviews\".\"status\" NOT IN ('pending', 'queued') AND COALESCE(\"cloud_agent_code_reviews\".\"terminal_reason\", '') <> 'abandoned'",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
         "idx_cloud_agent_code_reviews_terminal_missing_completed_at": {
           "name": "idx_cloud_agent_code_reviews_terminal_missing_completed_at",
           "columns": [
@@ -11011,8 +10995,8 @@
           "method": "btree",
           "with": {}
         },
-        "IDX_device_auth_requests_user_code": {
-          "name": "IDX_device_auth_requests_user_code",
+        "UQ_device_auth_requests_user_code": {
+          "name": "UQ_device_auth_requests_user_code",
           "columns": [
             {
               "expression": "user_code",
@@ -11021,7 +11005,7 @@
               "nulls": "last"
             }
           ],
-          "isUnique": false,
+          "isUnique": true,
           "where": "\"device_auth_requests\".\"user_code\" IS NOT NULL",
           "concurrently": true,
           "method": "btree",

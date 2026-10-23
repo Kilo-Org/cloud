@@ -1,11 +1,28 @@
 import { DurableObject } from 'cloudflare:workers';
 import {
+  getSessionShareExpiresAt,
   sessionIdSchema,
+  sessionShareDurationSchema,
   sessionLiveSummarySchema,
+  type SessionShareDuration,
   type SessionLiveSummary,
 } from '@kilocode/session-ingest-contracts';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
-import { desc, eq, ne, gt, gte, lt, and, or, inArray, isNull, isNotNull, sql } from 'drizzle-orm';
+import {
+  desc,
+  eq,
+  ne,
+  gt,
+  gte,
+  lt,
+  and,
+  or,
+  inArray,
+  isNull,
+  isNotNull,
+  like,
+  sql,
+} from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
@@ -13,6 +30,7 @@ import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { ingestItems, ingestMeta, agentNotificationDispatch } from '../db/sqlite-schema';
 import type { Env } from '../env';
+import { MAX_INGEST_ITEM_BYTES } from '../util/ingest-limits';
 import type { IngestBatch } from '../types/session-sync';
 import type { SessionDataItem } from '../types/session-sync';
 import { getItemIdentity, getPartItemIdentityRange } from '../util/compaction';
@@ -70,6 +88,13 @@ import {
   persistBriefingEvidence,
   type BriefingIngestEvent,
 } from '../ingest/briefing-evidence';
+import {
+  SHARE_INFO_KEY_PREFIX,
+  shareInfoKey,
+  readShareInfo,
+  projectSharedSessionInfo,
+  type ShareInfoMetaKey,
+} from './session-share-info';
 
 type LiveThrottleMetaKey =
   | 'lastActivityValueMs'
@@ -97,7 +122,10 @@ type IngestMetaKey =
   | 'lastLiveSummaryPersisted'
   | 'briefingEvidencePending'
   | LiveThrottleMetaKey
-  | AlarmMetaKey;
+  | AlarmMetaKey
+  | ShareInfoMetaKey;
+
+export const SHARE_INFO_TOO_LARGE_ERROR = 'Share snapshot is too large';
 
 type ExtractableMetaKey =
   | 'title'
@@ -1196,27 +1224,132 @@ export class SessionIngestDO extends DurableObject<Env> {
    * `sessionDiff`; without it the output is the full export.
    */
   async getAllStream(upToMessageId?: string): Promise<ReadableStream<Uint8Array>> {
+    return this.buildSessionExportStream({ upToMessageId });
+  }
+
+  /** Include later messages using the same session-info projection as snapshot shares. */
+  async getLiveSharedSessionStream(): Promise<ReadableStream<Uint8Array>> {
+    const snapshot = await readKiloSdkSessionSnapshot(this.db, this.env.SESSION_INGEST_R2);
+    // Session details are optional for reading an existing transcript.
+    const shareInfo = snapshot.kind === 'value' ? projectSharedSessionInfo(snapshot.info) : '{}';
+    return this.buildSessionExportStream({ includeSessionDiff: false, shareInfo });
+  }
+
+  /**
+   * Freeze the session info a public share exposes. Snapshots are keyed by the
+   * public generation so a later share cannot replace an earlier snapshot while
+   * its capability is still valid. Snapshot retention matches the link lifetime.
+   */
+  async captureShareInfo(publicId: string, duration: SessionShareDuration = '7d'): Promise<number> {
+    const shareDuration = sessionShareDurationSchema.parse(duration);
+    if (this.isDeleted()) throw new Error('Session deleted');
+    const snapshot = await readKiloSdkSessionSnapshot(this.db, this.env.SESSION_INGEST_R2);
+    if (snapshot.kind === 'too_large') throw new Error(SHARE_INFO_TOO_LARGE_ERROR);
+    if (snapshot.kind !== 'value' && snapshot.kind !== 'pending') {
+      throw new Error('Share snapshot is unavailable');
+    }
+    if (this.isDeleted()) throw new Error('Session deleted');
+    const info = snapshot.kind === 'value' ? projectSharedSessionInfo(snapshot.info) : '{}';
+    const now = Date.now();
+    const expiresAtSeconds = getSessionShareExpiresAt(shareDuration, Math.floor(now / 1000));
+    const expiresAt = expiresAtSeconds === null ? null : expiresAtSeconds * 1000;
+    const value = JSON.stringify({ capturedAt: now, expiresAt, info });
+    if (new TextEncoder().encode(value).byteLength > MAX_INGEST_ITEM_BYTES) {
+      throw new Error(SHARE_INFO_TOO_LARGE_ERROR);
+    }
+
+    this.db
+      .insert(ingestMeta)
+      .values({ key: shareInfoKey(publicId), value })
+      .onConflictDoUpdate({ target: ingestMeta.key, set: { value } })
+      .run();
+    this.pruneShareInfo(now);
+    return now;
+  }
+
+  async deleteShareInfo(publicId: string): Promise<void> {
+    this.db
+      .delete(ingestMeta)
+      .where(eq(ingestMeta.key, shareInfoKey(publicId)))
+      .run();
+  }
+
+  private pruneShareInfo(now: number): void {
+    const rows = this.db
+      .select({ key: ingestMeta.key, value: ingestMeta.value })
+      .from(ingestMeta)
+      .where(like(ingestMeta.key, `${SHARE_INFO_KEY_PREFIX}%`))
+      .all();
+    for (const row of rows) {
+      if (readShareInfo(row.value, now) === null) {
+        this.db.delete(ingestMeta).where(eq(ingestMeta.key, row.key)).run();
+      }
+    }
+  }
+
+  /**
+   * Stream the frozen boundary of a public share. Only items persisted strictly
+   * before `ingestedBeforeMs` are included, the session info is the snapshot
+   * captured when the share was created, and the cumulative whole-session diff
+   * is never exposed. Message-summary diffs remain part of the transcript so
+   * `kilo import` can still restore intentional file changes.
+   */
+  async getSharedSessionStream(params: {
+    publicId: string;
+    ingestedBeforeMs: number;
+  }): Promise<ReadableStream<Uint8Array>> {
+    return this.buildSessionExportStream({
+      ingestedBeforeMs: params.ingestedBeforeMs,
+      includeSessionDiff: false,
+      shareInfo: this.readShareInfo(params.publicId),
+    });
+  }
+
+  private readShareInfo(publicId: string): string | null {
+    const row = this.db
+      .select({ value: ingestMeta.value })
+      .from(ingestMeta)
+      .where(eq(ingestMeta.key, shareInfoKey(publicId)))
+      .get();
+    return readShareInfo(row?.value ?? null, Date.now());
+  }
+
+  private buildSessionExportStream(options: {
+    upToMessageId?: string;
+    ingestedBeforeMs?: number;
+    includeSessionDiff?: boolean;
+    shareInfo?: string | null;
+  }): ReadableStream<Uint8Array> {
     const db = this.db;
     const r2 = this.env.SESSION_INGEST_R2;
     const encoder = new TextEncoder();
+    const upToMessageId = options.upToMessageId;
+    const ingestedBeforeCondition =
+      options.ingestedBeforeMs === undefined
+        ? undefined
+        : lt(ingestItems.ingested_at, options.ingestedBeforeMs);
 
     return new ReadableStream<Uint8Array>({
       async start(controller) {
         try {
           controller.enqueue(encoder.encode('{"info":'));
-          const sessionRow = db
-            .select({
-              item_data: ingestItems.item_data,
-              item_data_r2_key: ingestItems.item_data_r2_key,
-            })
-            .from(ingestItems)
-            .where(eq(ingestItems.item_type, 'session'))
-            .limit(1)
-            .get();
-          if (sessionRow) {
-            await enqueueItemData(controller, sessionRow, r2, encoder);
+          if (options.shareInfo !== undefined) {
+            controller.enqueue(encoder.encode(options.shareInfo ?? '{}'));
           } else {
-            controller.enqueue(encoder.encode('{}'));
+            const sessionRow = db
+              .select({
+                item_data: ingestItems.item_data,
+                item_data_r2_key: ingestItems.item_data_r2_key,
+              })
+              .from(ingestItems)
+              .where(eq(ingestItems.item_type, 'session'))
+              .limit(1)
+              .get();
+            if (sessionRow) {
+              await enqueueItemData(controller, sessionRow, r2, encoder);
+            } else {
+              controller.enqueue(encoder.encode('{}'));
+            }
           }
 
           const CURSOR_BATCH = 10;
@@ -1237,6 +1370,7 @@ export class SessionIngestDO extends DurableObject<Env> {
               .where(
                 and(
                   eq(ingestItems.item_type, 'message'),
+                  ingestedBeforeCondition,
                   msgCursor ? afterIngestOrderCursor(msgCursor) : undefined
                 )
               )
@@ -1284,6 +1418,7 @@ export class SessionIngestDO extends DurableObject<Env> {
                       eq(ingestItems.item_type, 'part'),
                       gte(ingestItems.item_id, partRange.start),
                       lt(ingestItems.item_id, partRange.end),
+                      ingestedBeforeCondition,
                       partCursor ? afterIngestOrderCursor(partCursor) : undefined
                     )
                   )
@@ -1309,14 +1444,14 @@ export class SessionIngestDO extends DurableObject<Env> {
           controller.enqueue(encoder.encode(']'));
           controller.enqueue(encoder.encode(',"sessionDiff":'));
           const diffRow =
-            upToMessageId === undefined
+            upToMessageId === undefined && options.includeSessionDiff !== false
               ? db
                   .select({
                     item_data: ingestItems.item_data,
                     item_data_r2_key: ingestItems.item_data_r2_key,
                   })
                   .from(ingestItems)
-                  .where(eq(ingestItems.item_type, 'session_diff'))
+                  .where(and(eq(ingestItems.item_type, 'session_diff'), ingestedBeforeCondition))
                   .limit(1)
                   .get()
               : undefined;

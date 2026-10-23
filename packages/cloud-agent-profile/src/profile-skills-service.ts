@@ -1,6 +1,7 @@
 import type { WorkerDb } from '@kilocode/db';
 import {
   agent_environment_profile_skills,
+  agent_environment_profiles,
   type AgentEnvironmentProfileSkill,
 } from '@kilocode/db/schema';
 import { and, eq, count } from 'drizzle-orm';
@@ -42,6 +43,8 @@ export {
 };
 export type { SkillCustomInput, SkillUpdateInput };
 
+type SkillWriteTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
+
 function toResponse(skill: AgentEnvironmentProfileSkill): ProfileSkillResponse {
   return {
     id: skill.id,
@@ -57,8 +60,8 @@ function toResponse(skill: AgentEnvironmentProfileSkill): ProfileSkillResponse {
   };
 }
 
-async function assertSkillLimit(db: WorkerDb, profileId: string): Promise<void> {
-  const [row] = await db
+async function assertSkillLimit(tx: SkillWriteTransaction, profileId: string): Promise<void> {
+  const [row] = await tx
     .select({ n: count() })
     .from(agent_environment_profile_skills)
     .where(eq(agent_environment_profile_skills.profile_id, profileId));
@@ -114,23 +117,34 @@ export async function createCustomSkill(
   owner: ProfileOwner
 ): Promise<{ id: string }> {
   await verifyProfileOwnership(db, profileId, owner);
-  await assertSkillLimit(db, profileId);
 
-  const [row] = await db
-    .insert(agent_environment_profile_skills)
-    .values({
-      profile_id: profileId,
-      name: input.name,
-      description: input.description ?? null,
-      source_type: 'custom',
-      source_url: null,
-      raw_markdown: input.rawMarkdown,
-      files: input.files ?? {},
-      enabled: input.enabled ?? true,
-    })
-    .returning({ id: agent_environment_profile_skills.id });
+  return await db.transaction(async tx => {
+    // Lock the owning profile row so the cap count and the insert are one
+    // serialized unit, keeping concurrent creates within the per-profile cap.
+    await tx
+      .select({ id: agent_environment_profiles.id })
+      .from(agent_environment_profiles)
+      .where(eq(agent_environment_profiles.id, profileId))
+      .for('update');
 
-  return { id: row.id };
+    await assertSkillLimit(tx, profileId);
+
+    const [row] = await tx
+      .insert(agent_environment_profile_skills)
+      .values({
+        profile_id: profileId,
+        name: input.name,
+        description: input.description ?? null,
+        source_type: 'custom',
+        source_url: null,
+        raw_markdown: input.rawMarkdown,
+        files: input.files ?? {},
+        enabled: input.enabled ?? true,
+      })
+      .returning({ id: agent_environment_profile_skills.id });
+
+    return { id: row.id };
+  });
 }
 
 export async function updateSkill(

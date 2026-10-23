@@ -1,3 +1,4 @@
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { type LucideIcon } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { IconTile } from '@/components/ui/icon-tile';
@@ -85,7 +86,8 @@ export function ConfigureRow({
   className,
 }: Readonly<ConfigureRowProps>) {
   const colors = useThemeColors();
-  const { fontScale, width } = useWindowDimensions();
+  const { width } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
   // A narrow window squeezes the flexible text block between the fixed icon
   // tile and the chevron exactly as a large font scale does, until a whole word
   // no longer fits and Android breaks it mid-word ("Gene ral", 160 dp, e1,

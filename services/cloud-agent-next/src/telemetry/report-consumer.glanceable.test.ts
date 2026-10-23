@@ -95,7 +95,7 @@ function setup(options: { beforeCommit?: () => Promise<void>; refreshError?: Err
       query
         .replace(/\$\d+/g, '?')
         .replace(/\bdefault\b/gi, 'null')
-        .replace(
+        .replaceAll(
           "now() - interval '15 minutes'",
           `'${new Date(Date.now() - 15 * 60_000).toISOString()}'`
         )

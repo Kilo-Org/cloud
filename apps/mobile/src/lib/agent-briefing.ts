@@ -131,14 +131,18 @@ export function useBriefingDismissals() {
   };
 }
 
-export function useBriefingPreferences() {
+export function useBriefingPreferences(readOnly = false) {
   const trpc = useTRPC();
   const access = useBriefingAccess();
+  const input = {
+    timezone: dateTimeFormat(undefined, {}).resolvedOptions().timeZone,
+    language: getResolvedLanguage(),
+  };
+  const options = readOnly
+    ? trpc.agentBriefing.oneOffPreferences.queryOptions(input)
+    : trpc.agentBriefing.preferences.queryOptions(input);
   return useQuery({
-    ...trpc.agentBriefing.preferences.queryOptions({
-      timezone: dateTimeFormat(undefined, {}).resolvedOptions().timeZone,
-      language: getResolvedLanguage(),
-    }),
+    ...options,
     enabled: access.enabled,
     staleTime: 60_000,
   });

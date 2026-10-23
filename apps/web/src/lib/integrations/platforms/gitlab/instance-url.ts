@@ -23,8 +23,8 @@ export function normalizeGitLabInstanceUrl(instanceUrl?: string): string {
     throw new GitLabInstanceUrlError('Invalid URL format.');
   }
 
-  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-    throw new GitLabInstanceUrlError('Invalid URL protocol. Must be http or https.');
+  if (url.protocol !== 'https:') {
+    throw new GitLabInstanceUrlError('Invalid URL protocol. GitLab instance URLs must use https.');
   }
 
   if (url.username || url.password) {
@@ -40,10 +40,6 @@ export function normalizeGitLabInstanceUrl(instanceUrl?: string): string {
   const hostname = stripIpv6Brackets(url.hostname.toLowerCase());
   if (isUnsafeHostname(hostname)) {
     throw new GitLabInstanceUrlError('GitLab instance URL host is not allowed.');
-  }
-
-  if (url.protocol !== 'https:') {
-    throw new GitLabInstanceUrlError('Invalid URL protocol. GitLab instance URLs must use https.');
   }
 
   const path = normalizeBasePath(url.pathname);

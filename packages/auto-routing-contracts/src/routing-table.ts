@@ -167,13 +167,26 @@ function refineTaxonomyRouteKeys(routes: Record<string, unknown>, ctx: z.Refinem
   }
 }
 
-/** Platform default routing table: every published route has ≥1 candidate. */
-export const RoutingTableSchema = z.object({
-  ...routingTableFields,
-  routes: z.record(z.string(), z.array(RankedCandidateSchema).min(1)).superRefine((routes, ctx) => {
+const routingTableRoutesSchema = z
+  .record(z.string(), z.array(RankedCandidateSchema).min(1))
+  .superRefine((routes, ctx) => {
     refineTaxonomyRouteKeys(routes, ctx);
-  }),
-});
+  });
+
+const routingTableShape = {
+  ...routingTableFields,
+  routes: routingTableRoutesSchema,
+};
+
+/**
+ * Platform default routing table. Its producer builds an entry for every
+ * taxonomy route and refuses to publish one whose candidate list is empty, so a
+ * published platform table covers the route set of the taxonomy it was built
+ * from. The schema does not require that coverage: a table published before a
+ * taxonomy route was added still validates, and a route a table omits falls back
+ * to balanced, same as for a custom table.
+ */
+export const RoutingTableSchema = z.object(routingTableShape);
 export type RoutingTable = z.infer<typeof RoutingTableSchema>;
 
 /**
@@ -181,13 +194,12 @@ export type RoutingTable = z.infer<typeof RoutingTableSchema>;
  * Route keys with no graded candidates are omitted (not empty arrays).
  * Consumers must return no decision for an omitted route (balanced fallback);
  * existing `computeDecision` already does this.
+ *
+ * Validates the same documents as {@link RoutingTableSchema}: the platform and
+ * custom difference is which routes each producer writes, not what one schema
+ * accepts over the other.
  */
-export const CustomRoutingTableSchema = z.object({
-  ...routingTableFields,
-  routes: z.record(z.string(), z.array(RankedCandidateSchema).min(1)).superRefine((routes, ctx) => {
-    refineTaxonomyRouteKeys(routes, ctx);
-  }),
-});
+export const CustomRoutingTableSchema = z.object(routingTableShape);
 export type CustomRoutingTable = z.infer<typeof CustomRoutingTableSchema>;
 
 export const ROUTING_TABLE_KV_KEY = 'routing_table_v1';

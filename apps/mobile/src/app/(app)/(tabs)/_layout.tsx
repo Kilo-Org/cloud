@@ -23,7 +23,7 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
-import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
+import { publishRenderedTabBarHeight, TabBarLabelContext } from '@/lib/tab-bar-clearance';
 import { profileTabPressListeners, tabPressListeners } from '@/lib/tab-press-listeners';
 import {
   getEffectiveTabBarHeight,
@@ -105,6 +105,15 @@ export default function TabsLayout() {
     labelLines,
   });
   const tabBarHorizontalInset = getTabBarHorizontalInset({ left, right });
+  // The toaster sits above this navigator, so it cannot read the label context:
+  // publish the bar it must clear, and withdraw it when the bar is off screen or
+  // this navigator unmounts.
+  useEffect(() => {
+    publishRenderedTabBarHeight(hideTabs ? null : tabBarHeight);
+    return () => {
+      publishRenderedTabBarHeight(null);
+    };
+  }, [hideTabs, tabBarHeight]);
   const tabIconSize = getTabBarIconSize(fontScale);
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
   const { activeSessions, isLoading, isError } = useLiveAgentSessions({

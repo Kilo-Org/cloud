@@ -6,7 +6,7 @@
 // also covers BAD_REQUEST and UNPROCESSABLE_CONTENT, so a Retry is never
 // offered on a permanent error.
 
-import { isTerminalTrpcCode, readTrpcErrorField } from '@/lib/trpc-error';
+import { isTerminalTrpcCode, readTrpcErrorField, trpcErrorVariant } from '@/lib/trpc-error';
 
 export type OrgListErrorView = {
   variant: 'permission' | 'not-found' | 'server';
@@ -15,13 +15,5 @@ export type OrgListErrorView = {
 
 export function selectOrgListErrorView(error: unknown): OrgListErrorView {
   const code = readTrpcErrorField(error, 'code');
-
-  let variant: 'permission' | 'not-found' | 'server' = 'server';
-  if (code === 'FORBIDDEN' || code === 'UNAUTHORIZED') {
-    variant = 'permission';
-  } else if (code === 'NOT_FOUND') {
-    variant = 'not-found';
-  }
-
-  return { variant, showRetry: !isTerminalTrpcCode(code) };
+  return { variant: trpcErrorVariant(code), showRetry: !isTerminalTrpcCode(code) };
 }

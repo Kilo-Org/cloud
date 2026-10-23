@@ -55,6 +55,25 @@ export function isTerminalTrpcCode(code: string | undefined): boolean {
   return TERMINAL_TRPC_CODES.includes(code as (typeof TERMINAL_TRPC_CODES)[number]);
 }
 
+/** The user-facing state a tRPC code maps to, shared by the list screens. */
+export type TrpcErrorVariant = 'permission' | 'not-found' | 'server';
+
+/**
+ * Maps a tRPC code to the state the screen must show. A terminal code that is
+ * not an access outcome (a bad request, an unprocessable payload) stays a
+ * server state: it is a contract failure, not a permission one, and no retry
+ * is offered for it either (`isTerminalTrpcCode`).
+ */
+export function trpcErrorVariant(code: string | undefined): TrpcErrorVariant {
+  if (code === 'FORBIDDEN' || code === 'UNAUTHORIZED') {
+    return 'permission';
+  }
+  if (code === 'NOT_FOUND') {
+    return 'not-found';
+  }
+  return 'server';
+}
+
 type TrpcErrorData = {
   code?: string;
   authRequired?: boolean;

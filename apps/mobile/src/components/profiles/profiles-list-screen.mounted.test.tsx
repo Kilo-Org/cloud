@@ -14,6 +14,7 @@ type ListResult = {
   effectiveDefaultId: string | null;
   isLoading: boolean;
   isError: boolean;
+  error?: unknown;
   isRefetching: boolean;
   refetch: () => void;
 };
@@ -151,6 +152,7 @@ describe('ProfilesListScreen', () => {
       effectiveDefaultId: null,
       isLoading: false,
       isError: false,
+      error: undefined,
       isRefetching: false,
     });
   });
@@ -174,10 +176,39 @@ describe('ProfilesListScreen', () => {
 
     const queryError = findOne(renderer.root, 'QueryError');
     expect(queryError.props.title).toBe("Couldn't load profiles");
+    expect(queryError.props.variant).toBe('server');
     act(() => {
       (queryError.props as { onRetry: () => void }).onRetry();
     });
     expect(refetchFn).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('a lost organization access renders the permission state without a retry', async () => {
+    listState.isError = true;
+    listState.error = { data: { code: 'UNAUTHORIZED' } };
+
+    const { renderer, unmount } = await mount();
+
+    const queryError = findOne(renderer.root, 'QueryError');
+    expect(queryError.props.variant).toBe('permission');
+    // The variant's own copy names the cause; the load-failure title would not.
+    expect(queryError.props.title).toBeUndefined();
+    expect(queryError.props.onRetry).toBeUndefined();
+
+    unmount();
+  });
+
+  it('a deleted organization renders the not-found state without a retry', async () => {
+    listState.isError = true;
+    listState.error = { data: { code: 'NOT_FOUND' } };
+
+    const { renderer, unmount } = await mount();
+
+    const queryError = findOne(renderer.root, 'QueryError');
+    expect(queryError.props.variant).toBe('not-found');
+    expect(queryError.props.onRetry).toBeUndefined();
 
     unmount();
   });

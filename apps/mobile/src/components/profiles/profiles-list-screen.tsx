@@ -10,6 +10,7 @@ import {
   profileListCountItems,
 } from '@/components/profiles/profile-list-model';
 import { profileOrganizationId, profileOwnerType } from '@/components/profiles/profile-owner-model';
+import { selectProfilesListErrorView } from '@/components/profiles/profiles-list-error-view';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -77,11 +78,18 @@ export function ProfilesListScreen() {
     effectiveDefaultId,
     isLoading,
     isError,
+    error,
     isRefetching,
     refetch,
   } = useAgentProfileList(organizationId ?? undefined);
   // Reactive: a connectivity commit re-renders the error variant selection.
   const committedConnectivity = useCommittedConnectivityStatus();
+  // An access outcome is terminal: naming it keeps the screen from reporting a
+  // server fault and offering a Retry that cannot succeed.
+  const listError = selectProfilesListErrorView({
+    error: isError ? error : undefined,
+    connectivity: committedConnectivity,
+  });
 
   const sections = buildProfileSections({ orgProfiles, personalProfiles, isOrgContext });
   // Wait for the stored organization before choosing the list context, so a
@@ -114,14 +122,15 @@ export function ProfilesListScreen() {
       >
         {/* A failed refetch keeps the cached rows usable: the error banner sits
             above the content and only replaces it when there is nothing to
-            show. A confirmed-offline device is a connectivity failure, not a
-            server one; `unknown` connectivity keeps the server variant. */}
+            show. The variant comes from the tRPC code, so an access denial is
+            never reported as a server fault, and a terminal code offers no
+            Retry action. */}
         {isError && (
           <QueryError
-            variant={committedConnectivity === 'offline' ? 'offline' : 'server'}
+            variant={listError.variant}
             placement="top"
-            title={t('profiles.loadFailed')}
-            onRetry={() => void refetch()}
+            title={listError.titleKey ? t(listError.titleKey) : undefined}
+            onRetry={listError.showRetry ? () => void refetch() : undefined}
             isRetrying={isRefetching}
           />
         )}

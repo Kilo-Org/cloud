@@ -55,6 +55,7 @@ import {
   recordOfChat,
   recordUsage,
   rememberChat,
+  scopeOfChat,
   toolsOfSession,
   touchChat,
 } from './store';
@@ -279,6 +280,9 @@ export async function startChat(
  * A chat that is still answering is the whole reason this registry exists, so
  * entering one twice must not restart it — and two screens entering at once
  * must not open two sessions onto one conversation.
+ *
+ * Which place a chat belongs to is part of the answer: the row records it, and
+ * a chat is handed to that place and no other.
  */
 export async function enterChat(place: ChatPlace, sessionId: string): Promise<void> {
   /* A route can name the id a chat moved off, and reading it resolves to the
@@ -289,12 +293,18 @@ export async function enterChat(place: ChatPlace, sessionId: string): Promise<vo
     await enterChat(place, followed);
     return;
   }
-  if (chats.has(sessionId)) {
-    return;
-  }
   const already = opening.get(sessionId);
   if (already !== undefined) {
     await already;
+  }
+  const held = chats.get(sessionId);
+  if (held !== undefined) {
+    /* Reading after the open above rather than before it, so a chat another
+       place opened while this one waited is read too. */
+    if (held.chatScope === place.chatScope) {
+      return;
+    }
+    await settleUnavailable(sessionId);
     return;
   }
   const work = (async () => {
@@ -316,6 +326,30 @@ export async function enterChat(place: ChatPlace, sessionId: string): Promise<vo
   })();
   opening.set(sessionId, work);
   await work;
+}
+
+/**
+ * Settles a chat this place may not read: a live one is ended first, so the
+ * conversation is written down and nothing goes on answering under it.
+ *
+ * What is left is idle with nothing in it and the app's copy for something that
+ * is no longer here, so a screen shows no transcript and a question asked of it
+ * stops at the registry rather than reaching a session.
+ */
+async function settleUnavailable(sessionId: string): Promise<void> {
+  if (chats.has(sessionId)) {
+    /* Closing the scope is what writes the conversation down, so the place the
+       chat belongs to reads it back when it opens the chat again. */
+    await releaseChat(sessionId);
+  }
+  change(sessionId, {
+    status: 'idle',
+    model: '',
+    effort: null,
+    ...NOTHING,
+    failed: 'the chat does not belong to this place',
+    failureKey: 'queryError.notFoundDescription',
+  });
 }
 
 /** A session that opened, or nothing when the names it was opened with no longer resolve. */
@@ -357,6 +391,14 @@ async function openOrMissing<E>(
 }
 
 async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
+  /* The row is what says whose chat this is. It is read on the same handle the
+     rest of the open reads, before the session, its servers or its history are
+     asked for anything: a chat this place did not record is settled as not
+     here, and nothing of it is opened. */
+  if (scopeOfChat(await open(), sessionId) !== place.chatScope) {
+    await settleUnavailable(sessionId);
+    return;
+  }
   const runtime = await runtimeFor(place);
   const storedModel = modelOfSession(await open(), sessionId);
   if (storedModel !== null) {

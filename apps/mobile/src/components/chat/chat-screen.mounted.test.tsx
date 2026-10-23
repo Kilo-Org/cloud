@@ -347,7 +347,10 @@ describe('the chat header', () => {
     state.status = 'idle';
     const tree = await mount();
     const header = tree.root.find(node => (node.type as string) === 'ScreenHeader');
-    const cluster = header.props.headerRight as ReactElement<{ className: string; children: readonly ReactElement[] }>;
+    const cluster = header.props.headerRight as ReactElement<{
+      className: string;
+      children: readonly ReactElement[];
+    }>;
     // Three controls share this row: the context pill, the backend button and
     // the tools button. Without a gap they touch, which reads as one broken
     // control rather than three. Every other multi-control header cluster in

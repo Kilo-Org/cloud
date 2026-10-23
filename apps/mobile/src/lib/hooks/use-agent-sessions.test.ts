@@ -1,3 +1,4 @@
+import { InfiniteQueryObserver, QueryClient } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -5,10 +6,11 @@ import {
   buildAgentSessionListInput,
   buildAgentSessionSearchInput,
 } from '@/lib/agent-session-input';
+import { SESSION_HISTORY_MAX_PAGES } from '@/lib/agent-session-pages';
 import {
   buildAgentSessionSearchQueryOptions,
   buildStoredSessionsQueryOptions,
-} from '@/lib/hooks/use-agent-sessions';
+} from '@/lib/agent-session-queries';
 import { INFINITE_QUERY_MAX_PAGES } from '@/lib/query/infinite-retention';
 
 // The hook module transitively imports react-native (via the user-web-
@@ -275,5 +277,101 @@ describe('buildAgentSessionSearchQueryOptions', () => {
     });
 
     expect(result.enabled).toBe(true);
+  });
+});
+
+type SessionPage = {
+  cliSessions: { session_id: string }[];
+  nextCursor: string;
+};
+
+const echoInfiniteQueryOptions = (input: unknown, options: object) => ({ ...options, input });
+
+type StoredOptions = {
+  maxPages: number;
+  getNextPageParam: (lastPage: SessionPage, pages: SessionPage[]) => string | undefined;
+};
+
+function readStoredOptions(options: object): StoredOptions {
+  return options as unknown as StoredOptions;
+}
+
+/**
+ * Drive a builder's real options through React Query's infinite-query
+ * behavior, paging forward past the retention bound. React Query trims index 0
+ * of the pages array on a forward fetch (`addToEnd`), and index 0 is page one —
+ * the newest page — so this walk is what proves the head stays cached.
+ */
+async function walkPastRetentionBound(options: StoredOptions) {
+  const queryClient = new QueryClient();
+  let fetched = 0;
+  const observer = new InfiniteQueryObserver(queryClient, {
+    queryKey: ['session-history-retention'],
+    initialPageParam: 'cursor-0',
+    // eslint-disable-next-line require-await -- the recipe pins an async queryFn; the body needs no await.
+    queryFn: async ({ pageParam }: { pageParam: string }) => {
+      const index = Number(pageParam.replace('cursor-', ''));
+      fetched += 1;
+      return { cliSessions: [{ session_id: `ses-${index}` }], nextCursor: `cursor-${index + 1}` };
+    },
+    getNextPageParam: options.getNextPageParam,
+    maxPages: options.maxPages,
+    staleTime: Infinity,
+    retry: false,
+  });
+  // eslint-disable-next-line no-empty-function -- a real listener is required to activate the observer; the body is intentionally empty.
+  const unsubscribe = observer.subscribe(() => {});
+
+  await observer.refetch();
+  for (let loaded = 1; loaded <= SESSION_HISTORY_MAX_PAGES + 2; loaded += 1) {
+    // eslint-disable-next-line no-await-in-loop -- each page's cursor is the previous page's result.
+    await observer.fetchNextPage();
+  }
+
+  const result = observer.getCurrentResult();
+  const ids = (result.data?.pages ?? []).flatMap(page =>
+    page.cliSessions.map(session => session.session_id)
+  );
+  unsubscribe();
+  return { ids, fetched, hasNextPage: result.hasNextPage };
+}
+
+describe('newest-first session paging at the retention bound', () => {
+  it('refuses the page after the bound in the stored history query', () => {
+    const { getNextPageParam } = readStoredOptions(
+      buildStoredSessionsQueryOptions(createTrpcStub(echoInfiniteQueryOptions), {})
+    );
+    const page: SessionPage = { cliSessions: [], nextCursor: 'cursor-1' };
+    const atBound = Array.from({ length: SESSION_HISTORY_MAX_PAGES }, () => page);
+    const belowBound = atBound.slice(0, SESSION_HISTORY_MAX_PAGES - 1);
+
+    expect(getNextPageParam(page, belowBound)).toBe('cursor-1');
+    expect(getNextPageParam(page, atBound)).toBeUndefined();
+  });
+
+  it('refuses the page after the bound in the search query', () => {
+    const searchOptions = buildAgentSessionSearchQueryOptions(
+      createSearchTrpcStub(echoInfiniteQueryOptions),
+      { searchQuery: 'hello' }
+    ) as unknown as { getNextPageParam: (lastPage: unknown, pages: unknown[]) => unknown };
+    const page = { results: [], nextCursor: 30 };
+    const atBound = Array.from({ length: SESSION_HISTORY_MAX_PAGES }, () => page);
+    const belowBound = atBound.slice(0, SESSION_HISTORY_MAX_PAGES - 1);
+
+    expect(searchOptions.getNextPageParam(page, belowBound)).toBe(30);
+    expect(searchOptions.getNextPageParam(page, atBound)).toBeUndefined();
+  });
+
+  it('keeps page one cached when the list pages past the bound', async () => {
+    const { ids, fetched, hasNextPage } = await walkPastRetentionBound(
+      readStoredOptions(buildStoredSessionsQueryOptions(createTrpcStub(echoInfiniteQueryOptions), {}))
+    );
+
+    // The newest page (`ses-0`) is still at the front, the walk stopped at the
+    // bound, and the list reports no next page so the footer cannot page on.
+    expect(ids[0]).toBe('ses-0');
+    expect(ids).toHaveLength(SESSION_HISTORY_MAX_PAGES);
+    expect(fetched).toBe(SESSION_HISTORY_MAX_PAGES);
+    expect(hasNextPage).toBe(false);
   });
 });

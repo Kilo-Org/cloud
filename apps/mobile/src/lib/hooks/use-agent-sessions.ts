@@ -1,10 +1,5 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
-import {
-  keepPreviousData,
-  useInfiniteQuery,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { useActiveSessions } from '@/lib/active-sessions-query';
@@ -21,11 +16,14 @@ import {
   filterActiveSessionsByOrganization,
   selectActiveExclusionIds,
 } from '@/lib/active-sessions-live';
-import {
-  buildAgentSessionListInput,
-  buildAgentSessionSearchInput,
-} from '@/lib/agent-session-input';
+import { buildAgentSessionListInput } from '@/lib/agent-session-input';
 import { collectSearchPages, collectUnfilteredPages } from '@/lib/agent-session-pages';
+import {
+  buildAgentSessionSearchQueryOptions,
+  buildStoredSessionsQueryOptions,
+  type UseAgentSessionSearchOptions,
+  type UseAgentSessionsOptions,
+} from '@/lib/agent-session-queries';
 import {
   resolveStoredSessionsHold,
   type StoredSessionsHold,
@@ -38,7 +36,7 @@ import {
 } from '@/lib/agent-session-sort';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useLiveSessionsHold } from '@/lib/hooks/use-live-sessions-hold';
-import { reconcileFirstPage, withInfiniteRetention } from '@/lib/query/infinite-retention';
+import { reconcileFirstPage } from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { useTRPC } from '@/lib/trpc';
 
@@ -49,33 +47,6 @@ type RouterOutputs = inferRouterOutputs<MobileRouter>;
 export type StoredSession = RouterOutputs['cliSessionsV2']['list']['cliSessions'][number];
 
 export type ActiveSession = RouterOutputs['activeSessions']['list']['sessions'][number];
-
-export type UseAgentSessionsOptions = {
-  createdOnPlatform?: string | string[];
-  gitUrl?: string | string[];
-  organizationId?: string | null;
-  enabled?: boolean;
-  /**
-   * Field to order by. Defaults to `updated_at` so callers that don't
-   * care (e.g. Home's session surface) keep the legacy behavior bit-for-bit.
-   */
-  sortBy?: AgentSessionSortBy;
-  /**
-   * Foreground reconcile ownership for the stored-sessions query.
-   *
-   * The hook owns the OS app-foreground refresh: on the shared
-   * `useAppLifecycle` false -> true edge it reconciles page one (resets the
-   * cached pages and refetches from `initialPageParam`) instead of letting
-   * React Query's native window-focus refetch fan out over every retained
-   * page. That edge is registered unless the caller passes `false`; the native
-   * query option stays off by default for the same reason.
-   *
-   * The Agents list passes `false`: its screen drives app-foreground refresh
-   * through its own AppState callback that runs the wrapped `refetch`, so the
-   * hook must not reconcile a second time.
-   */
-  refetchOnWindowFocus?: boolean;
-};
 
 type UseRecentAgentRepositoriesOptions = {
   organizationId?: string | null;
@@ -113,53 +84,6 @@ function getUpdatedSince(days: number): string {
 
 // ── Queries ──────────────────────────────────────────────────────────
 
-/**
- * Retention bound for the session-history infinite queries.
- *
- * The history browser pages the stored-sessions query forward and the user
- * scrolls back over everything already loaded. The shared
- * `INFINITE_QUERY_MAX_PAGES` (5) trims the oldest page from the front on every
- * forward fetch (`addToEnd(..., max)` slices index 0), so past five pages the
- * top of the history is evicted and the list can never scroll back to it: the
- * oldest date header becomes the top of the list. This bound holds the
- * e2e history (8 pages of 30 sessions) with headroom while still stopping a
- * server that keeps handing out cursors from growing the cache without bound.
- *
- * `maxPages` also bounds a single refetch: React Query re-requests every page
- * retained in the cache on `refetch()`. The foreground and refresh paths
- * reconcile page one instead (see `storedReconcile`), but the bound still caps
- * the fan-out of any full refetch and the memory the history holds. Staying
- * near the browsable requirement (instead of a 100-page bound) keeps that
- * fan-out small, matching `INBOX_MAX_PAGES`.
- */
-const SESSION_HISTORY_MAX_PAGES = 20;
-
-/**
- * Build the stored-sessions infinite-query options shared by every stored
- * refetch path on the Agents screen (focus return, pull-to-refresh, retry,
- * departure trigger, backfill). Kept as a pure builder so the query options
- * are executable-tested without mounting the hook.
- */
-export function buildStoredSessionsQueryOptions(
-  trpc: ReturnType<typeof useTRPC>,
-  options?: UseAgentSessionsOptions
-) {
-  const base = trpc.cliSessionsV2.list.infiniteQueryOptions(
-    buildAgentSessionListInput(options ?? {}),
-    {
-      staleTime: 30_000,
-      enabled: options?.enabled,
-      getNextPageParam: lastPage => lastPage.nextCursor,
-      // The hook owns the OS-foreground refresh through its `useAppLifecycle`
-      // edge (see `storedReconcile`), so the native window-focus refetch stays
-      // off by default: React Query's native path re-requests every retained
-      // page, which is exactly the burst the page-one reconcile replaces.
-      refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
-    }
-  );
-  return withInfiniteRetention(base, SESSION_HISTORY_MAX_PAGES);
-}
-
 function useStoredSessions(options?: UseAgentSessionsOptions) {
   const trpc = useTRPC();
 
@@ -182,30 +106,6 @@ export function useRecentAgentRepositories(options?: UseRecentAgentRepositoriesO
 }
 
 // ── Search ───────────────────────────────────────────────────────────
-
-type UseAgentSessionSearchOptions = UseAgentSessionsOptions & {
-  searchQuery: string;
-};
-
-/**
- * Build the server-side session-search infinite-query options. Extracted as a
- * pure builder (mirroring `buildStoredSessionsQueryOptions`) so the options
- * are executable-tested without mounting the hook.
- */
-export function buildAgentSessionSearchQueryOptions(
-  trpc: ReturnType<typeof useTRPC>,
-  options: UseAgentSessionSearchOptions
-) {
-  return withInfiniteRetention(
-    trpc.cliSessionsV2.search.infiniteQueryOptions(buildAgentSessionSearchInput(options), {
-      staleTime: 30_000,
-      enabled: (options.enabled ?? true) && options.searchQuery.length > 0,
-      placeholderData: keepPreviousData,
-      getNextPageParam: lastPage => lastPage.nextCursor,
-    }),
-    SESSION_HISTORY_MAX_PAGES
-  );
-}
 
 /**
  * Server-side session search, now cursor-paginated for consistent

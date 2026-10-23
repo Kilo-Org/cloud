@@ -1,3 +1,5 @@
+import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
+
 export const CONTROL_PLANE_TIMER_OVERRIDE_ENV = 'CONTROL_PLANE_TIMER_DIVISOR';
 
 const MINUTE_MS = 60_000;
@@ -76,6 +78,10 @@ export type ControlPlaneTimers = {
 // scaled) because they bound provider and container work.
 const PROVIDER_CREATE_MS = 2 * MINUTE_MS;
 const PROVIDER_CREATE_RETRY_MS = 10_000;
+// A repository-backed container allocation widens its create bound to
+// DEADLINE_MS.repositoryStartup (`control-plane/sandbox/sandbox-do.ts`), which
+// is the create path every preparation attempt with a repository takes.
+const PREPARATION_CREATE_MS = Math.max(PROVIDER_CREATE_MS, DEADLINE_MS.repositoryStartup);
 const WRAPPER_FIRST_CONNECT_MS = 5 * MINUTE_MS;
 const WRAPPER_HELLO_MS = 30_000;
 const RESTORE_MS = 2 * MINUTE_MS;
@@ -92,7 +98,7 @@ const KILO_SESSION_MS = 2 * MINUTE_MS;
  * budget — the failure names a timeout the plan never allowed to finish.
  */
 const ROUTE_PREPARATION_MS =
-  PROVIDER_CREATE_MS +
+  PREPARATION_CREATE_MS +
   WRAPPER_FIRST_CONNECT_MS +
   WRAPPER_HELLO_MS +
   RESTORE_MS +

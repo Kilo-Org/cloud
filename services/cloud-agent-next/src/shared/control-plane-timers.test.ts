@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import {
   CONTROL_PLANE_TIMERS,
   resolveControlPlaneTimers,
@@ -38,8 +39,11 @@ describe('control-plane idle timers', () => {
 describe('control-plane preparation attempt budget', () => {
   it('outlasts every step of one preparation attempt in sequence', () => {
     const { sandbox, wrapper } = CONTROL_PLANE_TIMERS;
+    // A repository-backed container allocation runs its create under the wider
+    // repository startup bound, so that is the create step this covers.
+    const createMs = Math.max(sandbox.providerCreateMs, DEADLINE_MS.repositoryStartup);
     const steps =
-      sandbox.providerCreateMs +
+      createMs +
       sandbox.wrapperFirstConnectMs +
       sandbox.wrapperHelloMs +
       wrapper.restoreMs +

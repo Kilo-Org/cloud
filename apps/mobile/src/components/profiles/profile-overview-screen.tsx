@@ -240,7 +240,11 @@ export function ProfileOverviewScreen({
               }}
             />
 
-            <ProfileRepoPinsSection profileId={profileId} organizationId={organizationId} />
+            <ProfileRepoPinsSection
+              profileId={profileId}
+              organizationId={organizationId}
+              canManage={canManage}
+            />
 
             <View className="gap-1">
               <Text variant="small" className="uppercase tracking-wide text-muted-foreground">

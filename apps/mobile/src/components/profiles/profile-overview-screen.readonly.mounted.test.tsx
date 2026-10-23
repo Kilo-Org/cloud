@@ -130,6 +130,7 @@ describe('ProfileOverviewScreen without the manage role', () => {
 
     // The default toggle is disabled.
     expect(findAll(renderer.root, 'PreferenceRow')[0]?.props.disabled).toBe(true);
+    expect(findAll(renderer.root, 'ProfileRepoPinsSection')[0]?.props.canManage).toBe(false);
 
     unmount();
   });

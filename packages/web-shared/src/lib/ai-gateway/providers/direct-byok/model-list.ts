@@ -56,6 +56,7 @@ function enhanceDirectByokModelList({
         ...model,
         flags: flags.size > 0 ? [...flags] : undefined,
         reasoning_options: model.reasoning_options ?? syncedModels.get(model.id)?.reasoning_options,
+        catalog_model_id: model.catalog_model_id ?? syncedModels.get(model.id)?.catalog_model_id,
       };
     });
 }

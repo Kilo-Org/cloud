@@ -47,6 +47,8 @@ type ScreenLayoutProps = Omit<
   >;
 };
 
+export type { ScreenLayoutProps };
+
 const StateSurfaceContext = createContext<SurfaceGeometry | null>(null);
 
 export function useStateSurface() {

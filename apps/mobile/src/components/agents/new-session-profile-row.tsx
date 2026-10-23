@@ -80,7 +80,7 @@ export function renderProfileRowBody({
       <View className="min-w-0 flex-1 gap-1">
         <Text
           className={cn(
-            'text-sm leading-5 text-foreground',
+            'text-sm leading-[1.25rem] text-foreground',
             isProfileLoading && 'text-muted-foreground',
             showError && 'text-destructive',
             summary && 'font-semibold'
@@ -98,7 +98,10 @@ export function renderProfileRowBody({
           {/* The summary may wrap to a second line in long locales, so every
               state holds both lines: `min-h-10` keeps a one-line summary at the
               placeholder's height, and the placeholder itself spans two lines. */}
-          <Text className="min-h-10 text-sm leading-5 text-muted-foreground" numberOfLines={2}>
+          <Text
+            className="min-h-10 text-sm leading-[1.25rem] text-muted-foreground"
+            numberOfLines={2}
+          >
             {summary ?? '\u00A0\n\u00A0'}
           </Text>
           {isProfileLoading ? (

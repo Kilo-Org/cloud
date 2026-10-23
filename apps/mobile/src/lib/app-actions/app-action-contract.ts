@@ -74,6 +74,7 @@ export type AppActionResult =
         | 'no-repository'
         | 'not-a-pull-request'
         | 'unknown-session'
+        | 'start-cancelled'
         | 'start-failed';
       message: string;
     };

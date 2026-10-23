@@ -44,6 +44,20 @@ Shared `SheetHeader` actions use explicit 48px minimum width and height, not
 rem-based sizes: native rem is 14dp. Labels retain their intrinsic size as text
 scales; the title takes the remaining space.
 
+## PR merge sheet
+
+The merge sheet composes the form and provider-specific bodies. `usePrMergeDraft`
+owns identity-scoped loading, seeding, saving, background flushing, and clearing;
+`usePrMergeSubmit` owns confirmation, mutation inputs, errors, and success effects.
+Header back retains the draft. Footer Cancel and a successful submission clear it.
+
+The mounted suites keep React, form sections, and draft persistence real, with
+native controls, encrypted storage, identity, and mutations replaced at their boundaries:
+
+```bash
+pnpm --filter kilo-app exec vitest run src/components/pr-review/merge
+```
+
 ## Remote session recovery
 
 A response that fails before producing any content still shows its failure and

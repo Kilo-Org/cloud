@@ -10,7 +10,8 @@ import { z } from 'zod';
 
 import { PrReviewFileList } from '@/components/pr-review/diff/pr-diff-file-list';
 import { PrDiffFileNavigator } from '@/components/pr-review/diff/pr-diff-file-navigator';
-import { PrMergeSheet, providerPrNounKey } from '@/components/pr-review/merge/pr-merge-sheet';
+import { PrMergeSheet } from '@/components/pr-review/merge/pr-merge-sheet';
+import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
 import { PrReviewChecksSection } from '@/components/pr-review/pr-review-checks-section';
 import { ScreenHeader } from '@/components/screen-header';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';

@@ -52,6 +52,10 @@ export default function SecurityAgentFilterFindingsRoute() {
   const { scope, ...routeParams } = useLocalSearchParams<
     { scope: string } & SecurityFindingRouteParams
   >();
+  // Seeded once, deliberately: the route params describe the filters the list
+  // is showing when the sheet opens. Re-syncing them on every render would
+  // overwrite edits with the committed filters while the reader is still
+  // choosing, and the sheet is the only writer while it is on screen.
   const [draft, setDraft] = useState<SecurityFindingFilters>(() =>
     parseSecurityFindingFilters(routeParams)
   );

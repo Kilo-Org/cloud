@@ -36,6 +36,7 @@ import {
   updateCodeReviewAttemptForCallback,
   findPreviousCompletedReview,
   updateCodeReviewStatus,
+  updateCodeReviewStatusIfNonTerminal,
   resetCodeReviewForRetry,
   failReservedQueuedReview,
   updatePreviousReviewSummary,
@@ -2393,5 +2394,213 @@ describe('claimCodeReviewAttemptPublicationOutcome', () => {
       })
     ).resolves.toBe('write_failed');
     await expect(getCodeReviewAttemptPublicationStatus(attemptId)).resolves.toBeNull();
+  });
+});
+
+describe('code review status writes', () => {
+  let testUser: User;
+  const reviewIds: string[] = [];
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  afterEach(async () => {
+    if (reviewIds.length === 0) return;
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(inArray(cloud_agent_code_reviews.id, reviewIds));
+    reviewIds.length = 0;
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  async function insertReview(overrides: Record<string, unknown> = {}) {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_user_id: testUser.id,
+        repo_full_name: REPO,
+        pr_number: 1,
+        pr_url: `https://github.com/${REPO}/pull/1`,
+        pr_title: 'Test PR',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/test',
+        head_sha: `sha-${crypto.randomUUID()}`,
+        ...overrides,
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+    reviewIds.push(review.id);
+    return review.id;
+  }
+
+  async function readReview(reviewId: string) {
+    const stored = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+    if (!stored) throw new Error('Expected stored review');
+    return stored;
+  }
+
+  it('maps every optional field to its column and stamps started_at for a running review', async () => {
+    const reviewId = await insertReview();
+
+    await updateCodeReviewStatus(reviewId, 'running', {
+      sessionId: 'agent_status_fields',
+      cliSessionId: 'ses_status_fields',
+      errorMessage: 'still going',
+      terminalReason: 'timeout',
+      agentVersion: 'v2',
+      model: 'anthropic/claude-sonnet-4.6',
+      totalTokensIn: 1200,
+      totalTokensOut: 340,
+      totalCostMusd: 5678,
+    });
+
+    const stored = await readReview(reviewId);
+    expect(stored.status).toBe('running');
+    expect(stored.session_id).toBe('agent_status_fields');
+    expect(stored.cli_session_id).toBe('ses_status_fields');
+    expect(stored.error_message).toBe('still going');
+    expect(stored.terminal_reason).toBe('timeout');
+    expect(stored.agent_version).toBe('v2');
+    expect(stored.model).toBe('anthropic/claude-sonnet-4.6');
+    expect(stored.total_tokens_in).toBe(1200);
+    expect(stored.total_tokens_out).toBe(340);
+    expect(stored.total_cost_musd).toBe(5678);
+    expect(stored.started_at).not.toBeNull();
+    expect(stored.completed_at).toBeNull();
+  });
+
+  it('maps the same columns and stamps completed_at for a terminal review', async () => {
+    const reviewId = await insertReview();
+
+    await expect(
+      updateCodeReviewStatusIfNonTerminal(reviewId, 'failed', {
+        sessionId: 'agent_status_failed',
+        cliSessionId: 'ses_status_failed',
+        errorMessage: 'gateway refused',
+        terminalReason: 'upstream_error',
+        agentVersion: 'v2',
+        model: 'openai/gpt-5',
+        totalTokensIn: 10,
+        totalTokensOut: 20,
+        totalCostMusd: 30,
+      })
+    ).resolves.toBe(true);
+
+    const stored = await readReview(reviewId);
+    expect(stored.status).toBe('failed');
+    expect(stored.session_id).toBe('agent_status_failed');
+    expect(stored.cli_session_id).toBe('ses_status_failed');
+    expect(stored.error_message).toBe('gateway refused');
+    expect(stored.terminal_reason).toBe('upstream_error');
+    expect(stored.agent_version).toBe('v2');
+    expect(stored.model).toBe('openai/gpt-5');
+    expect(stored.total_tokens_in).toBe(10);
+    expect(stored.total_tokens_out).toBe(20);
+    expect(stored.total_cost_musd).toBe(30);
+    expect(stored.started_at).toBeNull();
+    expect(stored.completed_at).not.toBeNull();
+  });
+
+  it('keeps caller-supplied timestamps and refuses a write past a terminal status', async () => {
+    const startedAt = new Date('2026-01-02T03:04:05.000Z');
+    const completedAt = new Date('2026-01-02T04:05:06.000Z');
+    const reviewId = await insertReview();
+
+    await updateCodeReviewStatus(reviewId, 'running', { startedAt });
+    await updateCodeReviewStatus(reviewId, 'completed', { completedAt });
+
+    const completed = await readReview(reviewId);
+    expect(new Date(completed.started_at ?? '').toISOString()).toBe(startedAt.toISOString());
+    expect(new Date(completed.completed_at ?? '').toISOString()).toBe(completedAt.toISOString());
+
+    await expect(updateCodeReviewStatusIfNonTerminal(reviewId, 'running')).resolves.toBe(false);
+
+    const unchanged = await readReview(reviewId);
+    expect(unchanged.status).toBe('completed');
+  });
+});
+
+describe('ensureCurrentCodeReviewAttemptFromReview', () => {
+  let testUser: User;
+  const reviewIds: string[] = [];
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  afterEach(async () => {
+    if (reviewIds.length === 0) return;
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(inArray(cloud_agent_code_reviews.id, reviewIds));
+    reviewIds.length = 0;
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  async function insertReview(overrides: Record<string, unknown> = {}) {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_user_id: testUser.id,
+        repo_full_name: REPO,
+        pr_number: 1,
+        pr_url: `https://github.com/${REPO}/pull/1`,
+        pr_title: 'Test PR',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/test',
+        head_sha: `sha-${crypto.randomUUID()}`,
+        ...overrides,
+      })
+      .returning();
+    reviewIds.push(review.id);
+    return review;
+  }
+
+  it('mirrors a running review onto a new attempt', async () => {
+    const startedAt = new Date('2026-02-03T04:05:06.000Z');
+    const review = await insertReview({
+      status: 'running',
+      session_id: 'agent_attempt_mirror',
+      cli_session_id: 'ses_attempt_mirror',
+      started_at: startedAt.toISOString(),
+    });
+
+    const attempt = await ensureCurrentCodeReviewAttemptFromReview(review);
+
+    expect(attempt.status).toBe('running');
+    expect(attempt.session_id).toBe('agent_attempt_mirror');
+    expect(attempt.cli_session_id).toBe('ses_attempt_mirror');
+    expect(new Date(attempt.started_at ?? '').toISOString()).toBe(startedAt.toISOString());
+  });
+
+  it('throws instead of copying an unexpected persisted status', async () => {
+    const review = await insertReview({ status: 'not_a_status' });
+
+    await expect(ensureCurrentCodeReviewAttemptFromReview(review)).rejects.toThrow(
+      `Code review ${review.id} has an unexpected persisted status 'not_a_status'`
+    );
+
+    await expect(listCodeReviewAttempts(review.id)).resolves.toEqual([]);
+  });
+
+  it('throws instead of copying an unexpected persisted terminal reason', async () => {
+    const review = await insertReview({
+      status: 'failed',
+      terminal_reason: 'not_a_reason',
+    });
+
+    await expect(ensureCurrentCodeReviewAttemptFromReview(review)).rejects.toThrow(
+      `Code review ${review.id} has an unexpected persisted terminal reason 'not_a_reason'`
+    );
   });
 });

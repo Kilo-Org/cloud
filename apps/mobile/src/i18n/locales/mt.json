@@ -2325,6 +2325,7 @@
       "branchLoadError": "Ma setgħetx titgħabba l-fergħat",
       "branchUnavailable": "M'hemmx fergħat disponibbli għal dan ir-repożitorju. Iċċekkja l-aċċess tiegħek mal-fornitur, imbagħad agħżel repożitorju ieħor.",
       "branchEmpty": "Ebda fergħa disponibbli",
+      "branchListIncomplete": "Qed jintwerew biss xi fergħat. Ir-repożitorju għandu aktar fergħat milli din il-lista tista' tinkludi.",
       "branchPlaceholder": "Agħżel fergħa",
       "runOnWithTarget": "Ħaddem fuq: {{target}}",
       "environment": "Ambjent",
@@ -3512,7 +3513,12 @@
       "serverToolCount_other": "{{count}} għodod",
       "serverToolCount_two": "{{count}} għodod",
       "serverUnreachable": "Ma setax jintlaħaq dan is-server",
-      "serverOff": "Dan is-server huwa mitfi"
+      "serverOff": "Dan is-server huwa mitfi",
+      "app": {
+        "label": "Interfaċċa tal-għodda",
+        "failed": "L-interfaċċa ta' din l-għodda ma rnexxietx tgħabba.",
+        "empty": "L-interfaċċa ta' din l-għodda m'għandha xejn li turi."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Awtentikazzjoni",

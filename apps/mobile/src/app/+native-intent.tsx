@@ -49,6 +49,12 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/question-card-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(auth)/question-card-fixture';
     }
+    const reauthorizeFixtureMatch =
+      /(?:^|\/)dev\/security-agent-reauthorize-fixture\/?(\?.*)?$/.exec(path);
+    if (reauthorizeFixtureMatch) {
+      // Keep the optional `?lang=` that the fixture reads to choose its capture language.
+      return `/(auth)/security-agent-reauthorize-fixture${reauthorizeFixtureMatch[1] ?? ''}`;
+    }
     const fixtureRoute = modelPickerFixtureRoute(path);
     if (fixtureRoute) {
       return fixtureRoute;

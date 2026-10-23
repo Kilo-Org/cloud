@@ -24,6 +24,8 @@ import {
   INLINE_LINK_VERTICAL_HIT_SLOP_DP,
   inlineLinkHitSlop,
   MIN_TAP_TARGET_DP,
+  STATE_ACTION_CLASS,
+  STATE_ACTION_TARGET_DP,
   tapTargetReachDp,
   textActionTargetClass,
   TOUCH_TARGET_DP,
@@ -110,6 +112,17 @@ describe('shared tap-target geometry', () => {
     expect(await compiledDp(android, 'minHeight')).toBeGreaterThanOrEqual(ICON_TARGET_DP);
 
     platform.OS = 'ios';
+  });
+
+  it('renders a state surface action on the Android 48dp minimum', async () => {
+    // Android's `<Button>` rule is 48dp on the pressed node's own rect, and the
+    // shared `Button` default frame is `min-h-[44px]`. `hitSlop` would widen
+    // the touch region without moving that rect, so the floor is the class.
+    expect(STATE_ACTION_TARGET_DP).toBe(48);
+    expect(STATE_ACTION_TARGET_DP).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    expect(STATE_ACTION_CLASS).toContain('min-h-[48px]');
+    // The compiled value is what the layout uses, through the app's pipeline.
+    expect(await compiledDp(STATE_ACTION_CLASS, 'minHeight')).toBe(STATE_ACTION_TARGET_DP);
   });
 
   it('reaches the design touch target with the compact box plus its slop', () => {

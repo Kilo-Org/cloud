@@ -25,15 +25,18 @@ import {
   inlineLinkHitSlop,
   MIN_TAP_TARGET_DP,
   tapTargetReachDp,
+  textActionTargetClass,
   TOUCH_TARGET_DP,
   VOICE_INPUT_LG_HIT_SLOP_DP,
 } from './tap-target';
 
 // `inlineLinkHitSlop` resolves the sentence's ends through the interface
 // direction, and this project has no app build, so the native module is a
-// mutable stub the mirror case flips.
+// mutable stub the mirror case flips. `textActionTargetClass` reads the
+// platform at call time, so the stub carries it mutably too.
 const rtl = vi.hoisted(() => ({ isRTL: false }));
-vi.mock('react-native', () => ({ I18nManager: rtl }));
+const platform = vi.hoisted(() => ({ OS: 'ios' as string }));
+vi.mock('react-native', () => ({ I18nManager: rtl, Platform: platform }));
 
 const { compile } = createRequire(import.meta.url)(
   'react-native-css/compiler'
@@ -90,6 +93,23 @@ describe('shared tap-target geometry', () => {
     expect(ICON_TARGET_BOX_CLASS).toContain('w-[48px]');
     expect(ICON_TARGET_BOX_CLASS).toContain('items-center');
     expect(ICON_TARGET_BOX_CLASS).toContain('justify-center');
+  });
+
+  it('renders a text-only action frame at the platform minimum from whole pixels', async () => {
+    // The regression this guards: a text link whose only child is one label
+    // line reports that line's height as its own rect, and `hitSlop` never
+    // lifts the rect an audit reads. `min-h-11` would be 38.5pt on device.
+    platform.OS = 'ios';
+    const ios = textActionTargetClass();
+    expect(ios).toContain('min-h-[44px]');
+    expect(await compiledDp(ios, 'minHeight')).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+
+    platform.OS = 'android';
+    const android = textActionTargetClass();
+    expect(android).toContain('min-h-[48px]');
+    expect(await compiledDp(android, 'minHeight')).toBeGreaterThanOrEqual(ICON_TARGET_DP);
+
+    platform.OS = 'ios';
   });
 
   it('reaches the design touch target with the compact box plus its slop', () => {

@@ -711,6 +711,30 @@ describe('AgentSessionListScreen live presentation', () => {
     ).toHaveLength(0);
   });
 
+  it.each([
+    ['ios', 'min-h-[44px]'],
+    ['android', 'min-h-[48px]'],
+  ])(
+    'gives the history link its own %s touch-target frame in both placements',
+    async (os, frame) => {
+      // The link's only child is one eyebrow line, so its own rect used to be
+      // that line (14.7pt on device) and a control-size audit reads exactly
+      // that rect: `hitSlop` widens the touch region, never the rect. Both
+      // placements share the control, so both carry the same frame.
+      state.platform.OS = os;
+      await renderScreen();
+      expect(action('Session history').props.className).toContain(frame);
+      expect(action('Session history').props.hitSlop).toBeUndefined();
+
+      state.live.activeSessions = [row];
+      await renderScreen();
+      const headerLink = action(i18n.t('agents.sessionList.pastSessions'));
+      expect(headerLink.props.testID).toBe('agents-view-history');
+      expect(headerLink.props.className).toContain(frame);
+      expect(headerLink.props.hitSlop).toBeUndefined();
+    }
+  );
+
   it('uses shared scrolling and refresh while preserving the large-text creation action', async () => {
     state.topInset = 44;
     // The full controls row exists only over a non-empty live list (the

@@ -8,7 +8,7 @@ import { withDORetry } from '../util/do-retry';
 import { compareWebhookSecret, type StoredWebhookAuth } from '../util/webhook-auth';
 import { decodeUserIdFromPath } from '@kilocode/worker-utils/user-id-encoding';
 
-type CaptureResult = { success: true; requestId: string } | { success: false; error: string };
+type CaptureResult = Awaited<ReturnType<TriggerDO['captureRequest']>>;
 
 const inbound = new Hono<HonoContext>();
 
@@ -121,6 +121,9 @@ async function handleWebhookCapture(
     );
 
     if (!result.success) {
+      if (result.error === 'Unauthorized') return c.json(resError('Unauthorized'), 401);
+      if (result.issues)
+        return c.json({ success: false, error: result.error, issues: result.issues }, 400);
       if (result.error === 'Trigger not configured or inactive') {
         return c.json(resError('Trigger not found'), 404);
       }

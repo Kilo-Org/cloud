@@ -26,6 +26,63 @@ afterAll(async () => {
   await schemaTestDb.pool.end();
 });
 
+it('webhook profile migration preserves saved rows and only relaxes the explicit profile requirement', async () => {
+  const migration = fs.readFileSync(
+    path.join(__dirname, 'migrations/0297_white_lenny_balinger.sql'),
+    'utf8'
+  );
+  await schemaTestDb.db.transaction(async tx => {
+    // A temporary clone isolates the migration from the real shared table.
+    await tx.execute(
+      sql.raw(
+        'CREATE TEMP TABLE cloud_agent_webhook_triggers (LIKE public.cloud_agent_webhook_triggers INCLUDING ALL) ON COMMIT DROP'
+      )
+    );
+    await tx.execute(
+      sql.raw(
+        'ALTER TABLE cloud_agent_webhook_triggers DROP CONSTRAINT "CHK_cloud_agent_webhook_triggers_cloud_agent_fields"'
+      )
+    );
+    await tx.execute(
+      sql.raw(
+        `ALTER TABLE cloud_agent_webhook_triggers ADD CONSTRAINT "CHK_cloud_agent_webhook_triggers_cloud_agent_fields" CHECK (target_type != 'cloud_agent' OR (github_repo IS NOT NULL AND profile_id IS NOT NULL))`
+      )
+    );
+    await tx.execute(sql`INSERT INTO cloud_agent_webhook_triggers (trigger_id, user_id, github_repo, profile_id)
+      VALUES ('saved-trigger', 'oauth/migration-user', 'owner/repo', '00000000-0000-4000-8000-000000000001')`);
+    const before = await tx.execute(sql`SELECT * FROM cloud_agent_webhook_triggers`);
+    for (const statement of migration.split('--> statement-breakpoint')) {
+      if (statement.trim()) await tx.execute(sql.raw(statement));
+    }
+    const after = await tx.execute(sql`SELECT * FROM cloud_agent_webhook_triggers`);
+    expect(after.rows).toEqual(before.rows);
+    await tx.execute(sql`INSERT INTO cloud_agent_webhook_triggers (trigger_id, user_id, github_repo)
+      VALUES ('no-profile', 'oauth/migration-user', 'owner/repo')`);
+    const optional = await tx.execute(
+      sql`SELECT profile_id FROM cloud_agent_webhook_triggers WHERE trigger_id = 'no-profile'`
+    );
+    expect(optional.rows).toEqual([{ profile_id: null }]);
+    await expect(
+      tx.transaction(async nested => {
+        await nested.execute(sql`INSERT INTO cloud_agent_webhook_triggers (trigger_id, user_id)
+        VALUES ('no-repo', 'oauth/migration-user')`);
+      })
+    ).rejects.toThrow();
+    await expect(
+      tx.transaction(async nested => {
+        await nested.execute(sql`INSERT INTO cloud_agent_webhook_triggers (trigger_id, github_repo)
+        VALUES ('no-owner', 'owner/repo')`);
+      })
+    ).rejects.toThrow();
+    await expect(
+      tx.transaction(async nested => {
+        await nested.execute(sql`INSERT INTO cloud_agent_webhook_triggers (trigger_id, user_id, target_type)
+        VALUES ('no-instance', 'oauth/migration-user', 'kiloclaw_chat')`);
+      })
+    ).rejects.toThrow();
+  });
+});
+
 it('migration 0239 executes the deterministic GitHub installation backfill idempotently', async () => {
   const migration = fs.readFileSync(
     path.join(__dirname, 'migrations/0239_old_hemingway.sql'),

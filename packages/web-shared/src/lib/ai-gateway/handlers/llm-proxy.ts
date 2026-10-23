@@ -847,7 +847,10 @@ export async function handleLlmProxyRequest(
     return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
   }
   if (providerResult.kind === 'direct-byok-credential-error') {
-    return directByokCredentialErrorResponse(DIRECT_BYOK_PROVIDERS_META[providerResult.providerId]);
+    return directByokCredentialErrorResponse(
+      DIRECT_BYOK_PROVIDERS_META[providerResult.providerId],
+      providerResult.organizationId
+    );
   }
   const effectiveProviderContext = providerResult;
 

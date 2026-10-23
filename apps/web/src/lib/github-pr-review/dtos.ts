@@ -114,6 +114,9 @@ export const GitHubPrReviewChecksResultSchema = z
         skipped: z.number().int().nonnegative(),
       })
       .strict(),
+    // Present only when the result is partial; omitted for complete listings
+    // so refs under the ceiling keep the existing result shape.
+    truncated: z.boolean().optional(),
   })
   .strict();
 export type GitHubPrReviewChecksResult = z.infer<typeof GitHubPrReviewChecksResultSchema>;
@@ -231,6 +234,10 @@ export const FILE_LINES_MAX = 500;
 export const FILE_READ_MAX_BYTES = 1024 * 1024;
 /** Fixed copy for a file above FILE_READ_MAX_BYTES; safe to show to a caller. */
 export const FILE_READ_TOO_LARGE_MESSAGE = `The file exceeds the ${FILE_READ_MAX_BYTES}-byte review read limit.`;
+// One listChecks leg reads at most CHECKS_MAX_PAGES × CHECKS_PAGE_SIZE entries
+// (5 × 100, GitHub's maximum page size).
+export const CHECKS_PAGE_SIZE = 100;
+export const CHECKS_MAX_PAGES = 5;
 export const REVIEW_THREADS_PAGE_SIZE = 50;
 export const REVIEW_THREAD_COMMENTS_PAGE_SIZE = 50;
 // Conversation (issue) comments on the first listReviewThreads page only.

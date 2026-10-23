@@ -12,6 +12,7 @@ import type * as ReactI18next from 'react-i18next';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as ComposerInlineErrorModule from '@/components/pr-review/composer-inline-error';
+import type * as ProviderPrRefModule from '@/lib/pr-review/provider-pr-ref';
 import '@/i18n';
 import * as Haptics from 'expo-haptics';
 import { PrCommentEditSheet } from './pr-comment-edit-sheet';
@@ -187,6 +188,14 @@ vi.mock('@/lib/trpc', () => ({
 vi.mock('@/components/pr-review/composer-inline-error', async importOriginal => {
   const actual = await importOriginal<typeof ComposerInlineErrorModule>();
   return { ...actual, ComposerInlineError: 'ComposerInlineError' };
+});
+
+// The hook reads the route's provider scope. This suite calls the sheet as a
+// plain function (no React tree), so the reader reports the GitHub route; the
+// provider arms are covered by the composer-inline-error suite.
+vi.mock('@/lib/pr-review/provider-pr-ref', async importOriginal => {
+  const actual = await importOriginal<typeof ProviderPrRefModule>();
+  return { ...actual, useProviderPrScopeOrNull: () => null };
 });
 
 const baseProps = {

@@ -166,9 +166,13 @@ function radio(
   root: TestRenderer.ReactTestInstance,
   label: string
 ): TestRenderer.ReactTestInstance | undefined {
+  // This suite mounts iOS, where `radioItemA11y` renders each choice as a
+  // button whose state rides the selected trait.
   return findByType(root, 'Pressable').find(
     node =>
-      propOf(node, 'accessibilityRole') === 'radio' && propOf(node, 'accessibilityLabel') === label
+      propOf(node, 'accessibilityRole') === 'button' &&
+      propOf(node, 'accessibilityState') !== undefined &&
+      propOf(node, 'accessibilityLabel') === label
   );
 }
 
@@ -318,16 +322,15 @@ describe('PartDetailSheetHost mounted', () => {
       capturedOpener?.('bash-1');
     });
 
-    // Opens wrapped by default. A React Native radio reports its current
-    // choice through `checked`, not `selected` — see `radioItemA11y` in
-    // @/components/ui/radio-group.
+    // Opens wrapped by default. On iOS `radioItemA11y` reports the current
+    // choice through the selected trait.
     expect(propOf(radio(renderer.root, 'Wrap'), 'accessibilityState')).toEqual({
-      checked: true,
+      selected: true,
       disabled: false,
       busy: false,
     });
     expect(propOf(radio(renderer.root, 'Scroll'), 'accessibilityState')).toEqual({
-      checked: false,
+      selected: false,
       disabled: false,
       busy: false,
     });
@@ -337,7 +340,7 @@ describe('PartDetailSheetHost mounted', () => {
       pressRadio(renderer.root, 'Scroll');
     });
     expect(propOf(radio(renderer.root, 'Scroll'), 'accessibilityState')).toEqual({
-      checked: true,
+      selected: true,
       disabled: false,
       busy: false,
     });
@@ -356,7 +359,7 @@ describe('PartDetailSheetHost mounted', () => {
       capturedOpener?.('bash-1');
     });
     expect(propOf(radio(renderer.root, 'Wrap'), 'accessibilityState')).toEqual({
-      checked: true,
+      selected: true,
       disabled: false,
       busy: false,
     });

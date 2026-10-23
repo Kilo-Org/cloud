@@ -36,6 +36,7 @@ jest.mock('./direct-byok-definitions', () => ({
         {
           id: 'supported-model',
           name: 'Supported Model',
+          description: 'Curated provider copy.',
           flags: ['reasoning'],
           context_length: 4096,
           max_completion_tokens: 1024,
@@ -258,6 +259,19 @@ describe('getDirectByokModel', () => {
     expect(organizationModels.map(model => model.id)).toEqual(['orcarouter/other-model']);
     expect(getBYOKforUser).not.toHaveBeenCalled();
     expect(getBYOKforOrganization).not.toHaveBeenCalled();
+  });
+
+  test('carries a provider description into the catalog entry and leaves others empty', async () => {
+    const { getDirectByokModelsForUser } = await loadDirectByokModule();
+    const { getUserByokProviderIds } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    jest.mocked(getUserByokProviderIds).mockResolvedValueOnce(['chutes-byok']);
+
+    const models = await getDirectByokModelsForUser('user-id');
+
+    expect(models.map(model => ({ id: model.id, description: model.description }))).toEqual([
+      { id: 'chutes-byok/supported-model', description: 'Curated provider copy.' },
+      { id: 'chutes-byok/non-reasoning-model', description: '' },
+    ]);
   });
 });
 

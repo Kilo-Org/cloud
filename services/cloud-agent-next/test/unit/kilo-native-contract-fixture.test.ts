@@ -78,7 +78,7 @@ async function loadContract(): Promise<{
 }
 
 const kiloSessionId = 'ses_12345678901234567890123456';
-const cloudAgentSessionId = 'agent_fixture';
+const cloudAgentSessionId = 'workspace_12345678-1234-4234-8234-123456789abc';
 const userId = 'usr_fixture';
 const listedSession: CloudAgentRootSessionSummary = {
   kiloSessionId,
@@ -135,15 +135,10 @@ function facadeFixture() {
         },
       })),
     },
-    CLOUD_AGENT_SESSION: {
-      idFromName: vi.fn(),
-      get: vi.fn(() => ({ hasMessageAdmission: vi.fn(async () => false) })),
-    },
     SANDBOX_SESSION: { idFromName: vi.fn(), get: vi.fn(() => ({ answer })) },
   } as unknown as Env;
   const deps = {
     resolveRootSessionForKiloSession: vi.fn(async () => ({ cloudAgentSessionId })),
-    resolveLiveWrapper: vi.fn(async () => null),
     nativeLiveRead: vi.fn<NonNullable<KiloFacadeRequestDeps['nativeLiveRead']>>(
       async ({ operation }) => ({
         ok: true,
@@ -160,6 +155,9 @@ function facadeFixture() {
       messageId: 'msg_user_1',
     })),
     interruptPrompt: vi.fn(async () => ({ success: true })),
+    openNativeAttachment: vi.fn<NonNullable<KiloFacadeRequestDeps['openNativeAttachment']>>(
+      async () => ({ kind: 'resnapshot' })
+    ),
     globalEvents: {
       openPublicGlobalEventStream: vi.fn(
         () => new Response('', { headers: { 'Content-Type': 'text/event-stream' } })

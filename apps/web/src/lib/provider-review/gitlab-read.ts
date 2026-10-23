@@ -56,6 +56,8 @@ const GITLAB_PAGE_SIZE = 50;
 const GITLAB_REQUEST_TIMEOUT_MS = 30_000;
 /** Same response cap the adapter applies, so a hostile instance cannot stream unbounded bytes. */
 const MAX_GITLAB_RESPONSE_BYTES = 10 * 1024 * 1024;
+/** The message both transports use when a reply exceeds the limit. */
+const GITLAB_RESPONSE_TOO_LARGE_MESSAGE = 'GitLab response exceeded size limit';
 /**
  * The diff-page bound for the summary's change counts: GitLab caps a merge
  * request's diff collection at the project's `diff_max_files` setting (1000
@@ -177,17 +179,74 @@ type GitLabFetchInit = RequestInit & {
 /**
  * Resolve the URL once (refusing unsafe hosts), then send the request bound
  * to the resolved address. Only an IP literal or gitlab.com keeps the plain
- * transport — the same split the adapter's fetchGitLabOnce makes.
+ * transport — the same split the adapter's fetchGitLabOnce makes. Both
+ * transports bound the body; the shared file-read budget is tighter when set.
  */
 async function fetchGitLabValidated(url: string, init: GitLabFetchInit): Promise<Response> {
-  // The byte limit belongs to the bound transport; the plain fetch path keeps
-  // its own read limit in readBodyWithinReadBudget.
-  const { maxResponseBytes: _maxResponseBytes, ...requestInit } = init;
+  const { maxResponseBytes, ...requestInit } = init;
   const resolvedUrl = await resolveGitLabUrlSafely(url);
   if (!resolvedUrl.address) {
-    return fetch(url, { ...requestInit, redirect: 'manual' });
+    return readBoundedGitLabResponse(
+      await fetch(url, { ...requestInit, redirect: 'manual' }),
+      maxResponseBytes
+    );
   }
   return fetchGitLabBoundToAddress({ ...resolvedUrl, address: resolvedUrl.address }, init);
+}
+
+/**
+ * Read the plain transport's reply within the tighter request limit when
+ * present, otherwise within MAX_GITLAB_RESPONSE_BYTES.
+ */
+async function readBoundedGitLabResponse(
+  response: Response,
+  maxResponseBytes?: number
+): Promise<Response> {
+  const limit = maxResponseBytes ?? MAX_GITLAB_RESPONSE_BYTES;
+  const tooLargeError =
+    maxResponseBytes === undefined
+      ? new Error(GITLAB_RESPONSE_TOO_LARGE_MESSAGE)
+      : new GitLabReviewError('too_large', FILE_READ_TOO_LARGE_MESSAGE);
+  // Response rejects a body for these statuses, so they keep their own object.
+  if (response.body === null || [204, 205, 304].includes(response.status)) {
+    return response;
+  }
+
+  const declaredLength = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declaredLength) && declaredLength > limit) {
+    await response.body.cancel().catch(() => undefined);
+    throw tooLargeError;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let responseBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      responseBytes += value.byteLength;
+      if (responseBytes > limit) {
+        await reader.cancel().catch(() => undefined);
+        throw tooLargeError;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const body = new Uint8Array(responseBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
 }
 
 /**
@@ -721,6 +780,27 @@ export async function listChecks(
 }
 
 /**
+ * The inbox lists the acting account's own review requests, so a provider 403
+ * on that read is the CONNECTION's — there is no merge-request role in play.
+ * `classifyGitLabErrorForOwner` already resolves an organization connection's
+ * 403 to `reconnect`; this adds the personal arm and, for both, copy that
+ * names the inbox the person was reading instead of a merge request, which
+ * the list request never mentioned.
+ */
+function classifyInboxError(error: unknown, owner: GitLabReviewOwner): GitLabReviewError {
+  // The provider status has to be read before the owner-aware step: that step
+  // rewrites an organization connection's 403 into a reconnect whose copy
+  // names a merge request, which this list request never mentioned.
+  if (classifyGitLabError(error).providerStatus !== 403) {
+    return classifyGitLabErrorForOwner(error, owner);
+  }
+  return new GitLabReviewError(
+    'reconnect',
+    'Your GitLab connection cannot read your review requests. Reconnect GitLab and try again.'
+  );
+}
+
+/**
  * Open merge requests awaiting the acting user's review. Each item carries
  * platform, project path, and the connected instance origin, so the list can
  * never navigate into a different provider's repo.
@@ -730,8 +810,8 @@ export async function listInbox(
   cursor?: string,
   instanceHint?: string
 ): Promise<ProviderPrInboxPage> {
-  const access = await authorizeOwner(owner, instanceHint);
   try {
+    const access = await authorizeOwner(owner, instanceHint);
     const me = await fetchGitLabUser(access.accessToken, access.instanceUrl);
     const identity = `gitlab-inbox:${owner.type === 'user' ? owner.userId : `${owner.organizationId}:${owner.userId}`}`;
     const page = decodePageCursor(cursor, identity);
@@ -759,13 +839,19 @@ export async function listInbox(
     for (const mr of mergeRequests) {
       const ref = inboxRefFrom(mr, access.instanceUrl);
       if (!ref) continue;
+      // The adapter's author type omits `avatar_url`, but the list API
+      // returns it; narrow instead of asserting the field into existence.
+      const avatarUrl =
+        mr.author && 'avatar_url' in mr.author && typeof mr.author.avatar_url === 'string'
+          ? mr.author.avatar_url
+          : null;
       items.push({
         ref,
         title: mr.title,
         author: mr.author
           ? {
               login: mr.author.username,
-              avatarUrl: (mr.author as { avatar_url?: string | null }).avatar_url ?? null,
+              avatarUrl,
             }
           : null,
         state: mapMergeRequestState(mr.state),
@@ -775,7 +861,7 @@ export async function listInbox(
     }
     return { items, nextCursor: cursorForPage(identity, page, mergeRequests.length) };
   } catch (error) {
-    throw classifyGitLabErrorForOwner(error, owner);
+    throw classifyInboxError(error, owner);
   }
 }
 

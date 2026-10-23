@@ -94,7 +94,7 @@
     { "code": "KILO_SESSION_SNAPSHOT_PENDING", "status": 503 },
     { "code": "KILO_LIVE_RUNTIME_UNAVAILABLE", "status": 503 },
     { "code": "KILO_INTERACTION_UNAVAILABLE", "status": 409 },
-    { "code": "KILO_BILLING_PAYMENT_REQUIRED", "status": 402 },
+    { "code": "KILO_PROMPT_PAYMENT_REQUIRED", "status": 402 },
     { "code": "KILO_BILLING_BLOCKED", "status": 409 },
     { "code": "KILO_BILLING_UNAVAILABLE", "status": 503 }
   ],

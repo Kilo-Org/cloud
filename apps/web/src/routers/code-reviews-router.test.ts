@@ -3753,12 +3753,16 @@ describe('personalReviewAgent.patchReviewConfig', () => {
 //      webhooks kept carrying the old secret and stopped validating.
 // ============================================================================
 
-async function seedPersonalGitLabIntegration(userId: string, metadata: Record<string, unknown>) {
+async function seedPersonalGitLabIntegration(
+  userId: string,
+  metadata: Record<string, unknown>,
+  integrationStatus: 'active' | 'pending' | 'suspended' = 'active'
+) {
   await db.insert(platform_integrations).values({
     owned_by_user_id: userId,
     platform: 'gitlab',
     integration_type: 'oauth',
-    integration_status: 'active',
+    integration_status: integrationStatus,
     platform_installation_id: `inst-${crypto.randomUUID()}`,
     metadata: { ...metadata, webhook_secret: 'old-secret-do-not-leak' },
   });
@@ -3816,7 +3820,7 @@ describe('personalReviewAgent.getGitLabStatus P1-D-32 (omits webhook secret)', (
     await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
   });
 
-  it('reports not connected when the stored credential is unusable despite an active row', async () => {
+  it('asks for re-authorization when the stored credential is unusable despite an active row', async () => {
     await seedPersonalGitLabIntegration(testUser.id, {
       gitlab_instance_url: 'https://gitlab.example.com',
     });
@@ -3825,7 +3829,35 @@ describe('personalReviewAgent.getGitLabStatus P1-D-32 (omits webhook secret)', (
     const caller = await createCallerForUser(testUser.id);
     const status = await caller.personalReviewAgent.getGitLabStatus();
 
-    expect(status).toEqual({ connected: false, integration: null });
+    // The row exists and the account already authorized it, so the gate must
+    // offer a re-authorization, not a first-time connect.
+    expect(status).toEqual({ connected: false, reconnectRequired: true, integration: null });
+  });
+
+  it.each(['pending', 'suspended'] as const)(
+    'asks for re-authorization when the existing row is %s',
+    async integrationStatus => {
+      await seedPersonalGitLabIntegration(
+        testUser.id,
+        { gitlab_instance_url: 'https://gitlab.example.com' },
+        integrationStatus
+      );
+
+      const caller = await createCallerForUser(testUser.id);
+      const status = await caller.personalReviewAgent.getGitLabStatus();
+
+      expect(status).toEqual({ connected: false, reconnectRequired: true, integration: null });
+      // A row that cannot serve a review never reaches the credential broker.
+      expect(mockIsGitLabCredentialConnected).not.toHaveBeenCalled();
+    }
+  );
+
+  it('keeps the first-time connect state when the user has no integration', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitLabStatus();
+
+    expect(status).toEqual({ connected: false, reconnectRequired: false, integration: null });
+    expect(mockIsGitLabCredentialConnected).not.toHaveBeenCalled();
   });
 
   it('returns the integration shape WITHOUT webhookSecret for the self caller', async () => {
@@ -3838,6 +3870,7 @@ describe('personalReviewAgent.getGitLabStatus P1-D-32 (omits webhook secret)', (
     const status = await caller.personalReviewAgent.getGitLabStatus();
 
     expect(status.connected).toBe(true);
+    expect(status.reconnectRequired).toBe(false);
     expect(status.integration).toBeDefined();
     // Regression guard: the secret must NEVER appear in the status
     // payload, even for the secret's owner. If this assertion fails,

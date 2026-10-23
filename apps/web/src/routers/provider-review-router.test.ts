@@ -396,6 +396,37 @@ describe('providerReviewRouter connection failures', () => {
   });
 });
 
+// The inbox reads every enabled provider, so each provider's connection
+// failure has to reach the same mobile state; a refusal of the reader's own
+// role stays FORBIDDEN.
+describe('providerReviewRouter inbox connection failures', () => {
+  it('maps a reconnect-classified GitLab inbox failure to PRECONDITION_FAILED', async () => {
+    gitlabRead.listInbox.mockRejectedValueOnce(new GitLabReviewError('reconnect', 'reconnect it'));
+
+    await expect(
+      caller.listInbox({ platform: 'gitlab', organizationId: ORG_ID })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', message: 'reconnect it' });
+  });
+
+  it('maps a reconnect-classified Bitbucket inbox failure to PRECONDITION_FAILED', async () => {
+    bitbucketRead.listInbox.mockRejectedValueOnce(
+      new BitbucketReviewError('reconnect', 'reconnect it')
+    );
+
+    await expect(
+      caller.listInbox({ platform: 'bitbucket', organizationId: ORG_ID })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', message: 'reconnect it' });
+  });
+
+  it('still maps a genuine permission refusal to FORBIDDEN', async () => {
+    gitlabRead.listInbox.mockRejectedValueOnce(new GitLabReviewError('forbidden', 'denied'));
+
+    await expect(
+      caller.listInbox({ platform: 'gitlab', organizationId: ORG_ID })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+});
+
 // ----- the shared operation ledger ------------------------------------------------
 
 describe('providerReviewRouter file line reads', () => {

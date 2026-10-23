@@ -93,7 +93,7 @@ describe('ActiveSessionsLiveSync — manual refresh', () => {
     sync.attach();
 
     let settled = false;
-    const fetchSpy = vi.spyOn(qc, 'fetchQuery');
+    const fetchSpy = vi.spyOn(qc, 'query');
     const pending = (async () => {
       const result = await refreshActiveSessionsNow(QUERY_KEY);
       settled = true;

@@ -1,4 +1,5 @@
 /* oxlint-disable @typescript-eslint/no-unsafe-call @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable max-lines -- selection persistence and membership recovery share one provider harness */
 import { type QueryClient } from '@tanstack/react-query';
 import { createElement } from 'react';
 import { act } from '@/test/renderer';
@@ -151,10 +152,12 @@ describe('OrganizationProvider.setOrganizationId', () => {
     const stored = new Map<string, string>();
     const gates: (() => void)[] = [];
     /** Parks one storage call until the test releases it. */
-    function nextGate(): Promise<void> {
-      const { promise, resolve } = Promise.withResolvers<void>();
-      gates.push(resolve);
-      return promise;
+    async function nextGate(): Promise<void> {
+      const { promise, resolve } = Promise.withResolvers<undefined>();
+      gates.push(() => {
+        resolve(undefined);
+      });
+      await promise;
     }
     // Every storage call parks until released, so the test decides when each
     // write completes: the first selection completes last.
@@ -180,16 +183,20 @@ describe('OrganizationProvider.setOrganizationId', () => {
     expect(hoisted.setAccountMetadata).toHaveBeenCalledTimes(1);
     expect(hoisted.setAccountMetadata).toHaveBeenCalledWith(ORGANIZATION_STORAGE_KEY, 'org-a');
 
-    // Release the writes as they arrive until both selections have landed.
-    for (let round = 0; round < 6 && gates.length > 0; round += 1) {
-      await act(async () => {
-        const batch = gates.splice(0);
-        batch.forEach(release => {
+    async function releaseNext(): Promise<void> {
+      const release = gates.shift();
+      if (release) {
+        await act(async () => {
           release();
+          await Promise.resolve();
         });
-        await Promise.resolve();
-      });
+      }
     }
+    await releaseNext();
+    await releaseNext();
+    await releaseNext();
+    await releaseNext();
+    await releaseNext();
 
     expect(stored.get(ORGANIZATION_STORAGE_KEY)).toBe('org-b');
     expect(stored.has(ORGANIZATION_PERSONAL_STORAGE_KEY)).toBe(false);

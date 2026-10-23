@@ -21,6 +21,7 @@ import { AuditReportButton } from '@/components/security-agent/audit-report-butt
 import { ScreenHeader } from '@/components/screen-header';
 import { DashboardSections } from '@/components/security-agent/dashboard-sections';
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
+import { IconButton } from '@/components/ui/icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
@@ -258,26 +259,22 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         title={t('common.securityAgent')}
         headerRight={
           <View className="flex-row items-center">
-            <Pressable
+            <IconButton
               onPress={() => {
                 router.push(getSecurityAgentPath(scope, 'findings'));
               }}
-              accessibilityRole="button"
               accessibilityLabel={t('common.findings')}
-              className="size-11 items-center justify-center active:opacity-70"
             >
               <ShieldAlert size={20} color={colors.foreground} />
-            </Pressable>
-            <Pressable
+            </IconButton>
+            <IconButton
               onPress={() => {
                 router.push(getSecurityAgentPath(scope, 'settings'));
               }}
-              accessibilityRole="button"
               accessibilityLabel={t('securityAgent.dashboard.settings')}
-              className="size-11 items-center justify-center active:opacity-70"
             >
               <Settings size={20} color={colors.foreground} />
-            </Pressable>
+            </IconButton>
             {canManage ? <AuditReportButton scope={scope} /> : null}
           </View>
         }
@@ -304,7 +301,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
               {lastSyncLabel}
             </Text>
           </Pressable>
-          <Pressable
+          <IconButton
             onPress={() => {
               triggerSync.mutate(
                 { repoFullName },
@@ -319,13 +316,9 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
               );
             }}
             disabled={syncDisabled}
-            accessibilityRole="button"
             accessibilityLabel={t('securityAgent.dashboard.syncNow')}
             accessibilityState={{ disabled: syncDisabled, busy: triggerSync.isPending }}
-            className={cn(
-              'size-11 items-center justify-center active:opacity-70',
-              syncBlocked && 'opacity-50'
-            )}
+            className={cn(syncBlocked && 'opacity-50')}
           >
             <SpinningIcon
               icon={RefreshCw}
@@ -333,7 +326,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
               color={colors.mutedForeground}
               spinning={triggerSync.isPending}
             />
-          </Pressable>
+          </IconButton>
         </View>
 
         {repositories.isError ? (

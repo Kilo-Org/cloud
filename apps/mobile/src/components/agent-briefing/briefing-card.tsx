@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { X } from '@/components/ui/icons';
+import { IconButton } from '@/components/ui/icon-button';
 import { Text } from '@/components/ui/text';
 import {
   BRIEFING_PATH,
@@ -148,17 +149,16 @@ export function BriefingCard({
           </Text>
           <DirectionalChevronRight size={18} color={colors.foreground} />
         </Pressable>
-        <Pressable
-          accessibilityRole="button"
+        <IconButton
           accessibilityLabel={t('agentBriefing.dismiss')}
-          className="size-11 shrink-0 items-center justify-center rounded-full border border-border bg-secondary active:opacity-70"
+          className="shrink-0 rounded-full border border-border bg-secondary"
           disabled={dismissals.save.isPending}
           onPress={() => {
             dismissals.dismiss(report);
           }}
         >
           <X size={18} color={colors.foreground} />
-        </Pressable>
+        </IconButton>
       </View>
     </View>
   );

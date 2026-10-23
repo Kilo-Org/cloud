@@ -14,6 +14,7 @@ import { TodoNotesSection } from '@/components/todos/todo-notes-section';
 import { TodoSessionRow } from '@/components/todos/todo-session-row';
 import { TodoStartActions } from '@/components/todos/todo-start-actions';
 import { Circle, CircleCheck } from '@/components/ui/icons';
+import { IconButton } from '@/components/ui/icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useNowTicker } from '@/lib/hooks/use-now-ticker';
@@ -32,25 +33,23 @@ function TodoCompletionCircle({ todo }: Readonly<{ todo: TodoItemDetail }>) {
   const done = todo.doneAt !== null;
 
   return (
-    <Pressable
+    <IconButton
       onPress={() => {
         if (!done) {
           void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
         update.mutate({ id: todo.id, done: !done });
       }}
-      hitSlop={8}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: done }}
       accessibilityLabel={done ? t('todos.item.markOpen') : t('todos.item.markDone')}
-      className="size-11 items-center justify-center active:opacity-70"
     >
       {done ? (
         <CircleCheck size={24} color={colors.primary} />
       ) : (
         <Circle size={24} color={colors.mutedForeground} />
       )}
-    </Pressable>
+    </IconButton>
   );
 }
 

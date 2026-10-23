@@ -15,6 +15,7 @@ import { TodoListRow } from '@/components/todos/todo-list-row';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { ChevronDown, ChevronRight, ListTodo, Plus } from '@/components/ui/icons';
+import { IconButton } from '@/components/ui/icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useTodoListMutations, useTodoLists } from '@/lib/hooks/use-todos';
@@ -211,15 +212,9 @@ export function TodoListsScreen({ segmentControl }: Readonly<{ segmentControl: R
         className="px-[22px]"
         headerRight={
           context.isReady ? (
-            <Pressable
-              onPress={openNewList}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel={t('todos.lists.newList')}
-              className="size-11 items-center justify-center active:opacity-70"
-            >
+            <IconButton onPress={openNewList} accessibilityLabel={t('todos.lists.newList')}>
               <Plus size={22} color={colors.foreground} />
-            </Pressable>
+            </IconButton>
           ) : undefined
         }
       />

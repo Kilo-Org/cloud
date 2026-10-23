@@ -11,7 +11,7 @@ import {
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 
-import { NewSessionProfileRow } from './new-session-configure-form';
+import { NewSessionProfileRow } from './new-session-environment-row';
 
 import '@/i18n';
 import type * as ReactI18next from 'react-i18next';
@@ -789,6 +789,48 @@ describe('NewSessionConfigureForm', () => {
     expect(findElementByType(element, 'Skeleton')).not.toBeNull();
     expect(findTextContent(element, t => t === 'Default environment')).toBe(false);
     expect(findTextContent(element, t => t === 'Production')).toBe(false);
+  });
+
+  it('keeps the summary slot when a resolved profile has nothing configured', () => {
+    const element = renderRow({
+      profile: {
+        ...PROFILE,
+        varCount: 0,
+        mcpServerCount: 0,
+        skillCount: 0,
+        kiloCommandCount: 0,
+        commandCount: 0,
+        agentCount: 0,
+      },
+    });
+
+    // The empty count list keeps the two-line placeholder, so the card holds the
+    // height the loading state reserves instead of collapsing.
+    expect(findTextContent(element, t => t === '\u00A0\n\u00A0')).toBe(true);
+    const slots = collectElementsByType(element, 'View').filter(
+      view => view.importantForAccessibility === 'no-hide-descendants'
+    );
+    expect(slots).toHaveLength(1);
+    expect(slots[0]?.accessibilityElementsHidden).toBe(true);
+  });
+
+  it('renders every Environment row state inside the same card', () => {
+    const chrome = 'min-h-11 flex-row items-center gap-3 rounded-lg border border-border bg-card';
+
+    for (const row of [
+      renderRow({ isProfileLoading: true }),
+      renderRow({ isProfileError: true }),
+      renderRow({ profile: PROFILE }),
+      renderRow(),
+    ]) {
+      const cards = [
+        ...collectElementsByType(row, 'View'),
+        ...collectElementsByType(row, 'Pressable'),
+      ]
+        .map(element => element.className)
+        .filter(className => typeof className === 'string' && className.includes(chrome));
+      expect(cards).toEqual([expect.stringContaining(chrome)]);
+    }
   });
 
   it('opens the profile picker when the row is pressed', () => {

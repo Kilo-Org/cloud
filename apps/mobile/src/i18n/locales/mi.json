@@ -3146,6 +3146,10 @@
       "inviteCreated": "Kua hangaia te pōwhiri",
       "pendingInvitations": "Ngā pōwhiri e tatari ana",
       "ownRoleChange": "Kāore e taea e koe te huri i tō ake tūranga.",
+      "ownerAuthority": "Mā te rangatira anake o te whakahaere e taea te whakahaere i ngā rangatira.",
+      "inviteExpired": "Kua pau te wā o tēnei pōwhiri.",
+      "inviteAccepted": "Kua whakaaetia kētia tēnei pōwhiri.",
+      "inviteNotResendable": "Kua kore e taea tēnei pōwhiri te tuku anō.",
       "resendInvite": "Tukuna anō te pōwhiri",
       "shareInviteLink": "Tuaritia te hononga pōwhiri"
     },

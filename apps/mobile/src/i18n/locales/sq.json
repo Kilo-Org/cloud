@@ -3146,6 +3146,10 @@
       "inviteCreated": "Ftesa u krijua",
       "pendingInvitations": "Ftesat në pritje",
       "ownRoleChange": "Nuk mund të ndryshosh rolin tënd.",
+      "ownerAuthority": "Vetëm pronari i organizatës mund të menaxhojë pronarët.",
+      "inviteExpired": "Kjo ftesë ka skaduar.",
+      "inviteAccepted": "Kjo ftesë është pranuar tashmë.",
+      "inviteNotResendable": "Kjo ftesë nuk mund të ridërgohet më.",
       "resendInvite": "Ridërgo ftesën",
       "shareInviteLink": "Ndaj lidhjen e ftesës"
     },

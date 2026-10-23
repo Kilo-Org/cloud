@@ -3145,6 +3145,10 @@
       "inviteCreated": "Davet oluşturuldu",
       "pendingInvitations": "Bekleyen davetler",
       "ownRoleChange": "Kendi rolünüzü değiştiremezsiniz.",
+      "ownerAuthority": "Yalnızca bir organizasyon sahibi sahipleri yönetebilir.",
+      "inviteExpired": "Bu davetin süresi dolmuş.",
+      "inviteAccepted": "Bu davet zaten kabul edilmiş.",
+      "inviteNotResendable": "Bu davet artık yeniden gönderilemez.",
       "resendInvite": "Daveti yeniden gönder",
       "shareInviteLink": "Davet bağlantısını paylaş"
     },

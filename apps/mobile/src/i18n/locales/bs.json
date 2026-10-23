@@ -3186,6 +3186,10 @@
       "inviteCreated": "Pozivnica kreirana",
       "pendingInvitations": "Pozivnice na čekanju",
       "ownRoleChange": "Ne možeš promijeniti svoju ulogu.",
+      "ownerAuthority": "Samo vlasnik organizacije može upravljati vlasnicima.",
+      "inviteExpired": "Ova pozivnica je istekla.",
+      "inviteAccepted": "Ova pozivnica je već prihvaćena.",
+      "inviteNotResendable": "Ova pozivnica se više ne može ponovo poslati.",
       "resendInvite": "Ponovo pošalji pozivnicu",
       "shareInviteLink": "Podijeli link pozivnice"
     },

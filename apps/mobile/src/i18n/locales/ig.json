@@ -3146,6 +3146,10 @@
       "inviteCreated": "Emepụtala òkù",
       "pendingInvitations": "Òkù ndị na-echere",
       "ownRoleChange": "Ị nweghị ike ịgbanwe ọrụ gị.",
+      "ownerAuthority": "Naanị onye nwe òtù nwere ike ijikwa ndị nwe.",
+      "inviteExpired": "Òkù a agwụla.",
+      "inviteAccepted": "A nakweelarị òkù a.",
+      "inviteNotResendable": "A pụghịzi iziga òkù a ọzọ.",
       "resendInvite": "Ziga òkù ọzọ",
       "shareInviteLink": "Kekọrịta njikọ òkù"
     },

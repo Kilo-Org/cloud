@@ -3146,6 +3146,10 @@
       "inviteCreated": "ආරාධනය සාදන ලදී",
       "pendingInvitations": "පිළිගැනීමට ඉතිරි ආරාධනා",
       "ownRoleChange": "ඔබට ඔබේම භූමිකාව වෙනස් කළ නොහැක.",
+      "ownerAuthority": "හිමිකරුවන් කළමනාකරණය කළ හැක්කේ සංවිධානයේ හිමිකරුට පමණි.",
+      "inviteExpired": "මෙම ආරාධනය කල් ඉකුත් වී ඇත.",
+      "inviteAccepted": "මෙම ආරාධනය දැනටමත් පිළිගෙන ඇත.",
+      "inviteNotResendable": "මෙම ආරාධනය තවදුරටත් නැවත යැවිය නොහැක.",
       "resendInvite": "ආරාධනය නැවත යවන්න",
       "shareInviteLink": "ආරාධන සබැඳිය බෙදාගන්න"
     },

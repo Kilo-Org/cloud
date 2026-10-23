@@ -3226,6 +3226,10 @@
       "inviteCreated": "Povabilo ustvarjeno",
       "pendingInvitations": "Čakajoča povabila",
       "ownRoleChange": "Svoje vloge ne morete spremeniti.",
+      "ownerAuthority": "Samo lastnik organizacije lahko upravlja z lastniki.",
+      "inviteExpired": "To povabilo je poteklo.",
+      "inviteAccepted": "To povabilo je bilo že sprejeto.",
+      "inviteNotResendable": "Tega povabila ni več mogoče ponovno poslati.",
       "resendInvite": "Ponovno pošlji povabilo",
       "shareInviteLink": "Deli povezavo do povabila"
     },

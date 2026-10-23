@@ -3306,6 +3306,10 @@
       "inviteCreated": "Crëwyd y gwahoddiad",
       "pendingInvitations": "Gwahoddiadau sy'n aros",
       "ownRoleChange": "Ni allwch newid eich rôl eich hun.",
+      "ownerAuthority": "Dim ond perchennog sefydliad sy'n gallu rheoli perchnogion.",
+      "inviteExpired": "Mae'r gwahoddiad hwn wedi dod i ben.",
+      "inviteAccepted": "Mae'r gwahoddiad hwn eisoes wedi'i dderbyn.",
+      "inviteNotResendable": "Ni ellir ailanfon y gwahoddiad hwn mwyach.",
       "resendInvite": "Ailanfon y gwahoddiad",
       "shareInviteLink": "Rhannu dolen gwahoddiad"
     },

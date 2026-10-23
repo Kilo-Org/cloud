@@ -3266,6 +3266,10 @@
       "inviteCreated": "Cuireadh cruthaithe",
       "pendingInvitations": "Cuirí ar feitheamh",
       "ownRoleChange": "Ní féidir leat do ról féin a athrú.",
+      "ownerAuthority": "Ní féidir ach le húinéir eagraíochta úinéirí a bhainistiú.",
+      "inviteExpired": "Tá an cuireadh seo imithe in éag.",
+      "inviteAccepted": "Tá an cuireadh seo glactha cheana féin.",
+      "inviteNotResendable": "Ní féidir an cuireadh seo a sheoladh arís a thuilleadh.",
       "resendInvite": "Seol an cuireadh arís",
       "shareInviteLink": "Roinn nasc an chuiridh"
     },

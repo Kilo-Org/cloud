@@ -3146,6 +3146,10 @@
       "inviteCreated": "ግብዣው ተፈጥሯል",
       "pendingInvitations": "ምላሽ የሚጠብቁ ግብዣዎች",
       "ownRoleChange": "የራስዎን ሚና መቀየር አይችሉም።",
+      "ownerAuthority": "የድርጅት ባለቤት ብቻ ባለቤቶችን ማስተዳደር ይችላል።",
+      "inviteExpired": "ይህ ግብዣ ጊዜው አልፎበታል።",
+      "inviteAccepted": "ይህ ግብዣ አስቀድሞ ተቀብሏል።",
+      "inviteNotResendable": "ይህ ግብዣ ከአሁን በኋላ እንደገና መላክ አይቻልም።",
       "resendInvite": "ግብዣውን እንደገና ይላኩ",
       "shareInviteLink": "የግብዣውን አገናኝ ያጋሩ"
     },

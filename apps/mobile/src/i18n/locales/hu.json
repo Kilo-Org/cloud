@@ -3146,6 +3146,10 @@
       "inviteCreated": "Meghívó létrehozva",
       "pendingInvitations": "Függőben lévő meghívók",
       "ownRoleChange": "Nem módosíthatja a saját szerepkörét.",
+      "ownerAuthority": "Csak a szervezet tulajdonosa kezelheti a tulajdonosokat.",
+      "inviteExpired": "Ez a meghívó lejárt.",
+      "inviteAccepted": "Ezt a meghívót már elfogadták.",
+      "inviteNotResendable": "Ez a meghívó már nem küldhető újra.",
       "resendInvite": "Meghívó újraküldése",
       "shareInviteLink": "Meghívóhivatkozás megosztása"
     },

@@ -3225,6 +3225,10 @@
       "inviteCreated": "Utworzono zaproszenie",
       "pendingInvitations": "Oczekujące zaproszenia",
       "ownRoleChange": "Nie możesz zmienić własnej roli.",
+      "ownerAuthority": "Tylko właściciel organizacji może zarządzać właścicielami.",
+      "inviteExpired": "To zaproszenie wygasło.",
+      "inviteAccepted": "To zaproszenie zostało już przyjęte.",
+      "inviteNotResendable": "Tego zaproszenia nie można już wysłać ponownie.",
       "resendInvite": "Wyślij zaproszenie ponownie",
       "shareInviteLink": "Udostępnij link do zaproszenia"
     },

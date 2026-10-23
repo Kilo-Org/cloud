@@ -3226,6 +3226,10 @@
       "inviteCreated": "Pozvánka vytvořena",
       "pendingInvitations": "Čekající pozvánky",
       "ownRoleChange": "Nemůžete změnit svou vlastní roli.",
+      "ownerAuthority": "Pouze vlastník organizace může spravovat vlastníky.",
+      "inviteExpired": "Tato pozvánka vypršela.",
+      "inviteAccepted": "Tato pozvánka již byla přijata.",
+      "inviteNotResendable": "Tuto pozvánku již nelze znovu poslat.",
       "resendInvite": "Poslat pozvánku znovu",
       "shareInviteLink": "Sdílet odkaz na pozvánku"
     },

@@ -3146,6 +3146,10 @@
       "inviteCreated": "A ti ṣẹ̀dá ìkésíni",
       "pendingInvitations": "Àwọn ìkésíni tó ń dúró",
       "ownRoleChange": "O kò lè yí ipò tirẹ padà.",
+      "ownerAuthority": "Olówó àjọ nìkan ni ó lè ṣàkóso àwọn olówó.",
+      "inviteExpired": "Ìkésíni yìí ti parí.",
+      "inviteAccepted": "A ti gba ìkésíni yìí.",
+      "inviteNotResendable": "A kò lè tún ìkésíni yìí fi ránṣẹ́ mọ́.",
       "resendInvite": "Tún ìkésíni fi ránṣẹ́",
       "shareInviteLink": "Pín ọ̀nà àsopọ̀ ìkésíni"
     },

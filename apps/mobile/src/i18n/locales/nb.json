@@ -3146,6 +3146,10 @@
       "inviteCreated": "Invitasjon opprettet",
       "pendingInvitations": "Ventende invitasjoner",
       "ownRoleChange": "Du kan ikke endre din egen rolle.",
+      "ownerAuthority": "Bare en organisasjonseier kan administrere eiere.",
+      "inviteExpired": "Denne invitasjonen er utløpt.",
+      "inviteAccepted": "Denne invitasjonen er allerede akseptert.",
+      "inviteNotResendable": "Denne invitasjonen kan ikke lenger sendes på nytt.",
       "resendInvite": "Send invitasjon på nytt",
       "shareInviteLink": "Del invitasjonslenke"
     },

@@ -3146,6 +3146,10 @@
       "inviteCreated": "Kutse loodud",
       "pendingInvitations": "Ootel kutsed",
       "ownRoleChange": "Sa ei saa oma rolli muuta.",
+      "ownerAuthority": "Ainult organisatsiooni omanik saab omanikke hallata.",
+      "inviteExpired": "See kutse on aegunud.",
+      "inviteAccepted": "See kutse on juba vastu võetud.",
+      "inviteNotResendable": "Seda kutset ei saa enam uuesti saata.",
       "resendInvite": "Saada kutse uuesti",
       "shareInviteLink": "Jaga kutselinki"
     },

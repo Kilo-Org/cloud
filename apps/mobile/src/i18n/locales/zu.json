@@ -3146,6 +3146,10 @@
       "inviteCreated": "Isimemo sakhiwe",
       "pendingInvitations": "Izimemo ezilindile",
       "ownRoleChange": "Awukwazi ukushintsha iqhaza lakho.",
+      "ownerAuthority": "Kuphela umnikazi wenhlangano ongakwazi ukuphatha abanikazi.",
+      "inviteExpired": "Lesi simemo sesiphelelwe yisikhathi.",
+      "inviteAccepted": "Lesi simemo sesamukelwe kakade.",
+      "inviteNotResendable": "Lesi simemo asisenakuthunyelwa kabusha.",
       "resendInvite": "Thumela kabusha isimemo",
       "shareInviteLink": "Yabelana ngesixhumanisi sesimemo"
     },

@@ -3146,6 +3146,10 @@
       "inviteCreated": "Noforonina ny fanasana",
       "pendingInvitations": "Fanasana miandry",
       "ownRoleChange": "Tsy afaka manova ny andraikitrao ianao.",
+      "ownerAuthority": "Ny tompon'ny fikambanana ihany no afaka mitantana ny tompony.",
+      "inviteExpired": "Efa lany andro io fanasana io.",
+      "inviteAccepted": "Efa nekena io fanasana io.",
+      "inviteNotResendable": "Tsy afaka alefa indray intsony io fanasana io.",
       "resendInvite": "Alefaso indray ny fanasana",
       "shareInviteLink": "Zarao ny rohy fanasana"
     },

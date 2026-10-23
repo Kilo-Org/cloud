@@ -3146,6 +3146,10 @@
       "inviteCreated": "Invitation oprettet",
       "pendingInvitations": "Ubesvarede invitationer",
       "ownRoleChange": "Du kan ikke ændre din egen rolle.",
+      "ownerAuthority": "Kun en organisationsejer kan administrere ejere.",
+      "inviteExpired": "Denne invitation er udløbet.",
+      "inviteAccepted": "Denne invitation er allerede blevet accepteret.",
+      "inviteNotResendable": "Denne invitation kan ikke længere sendes igen.",
       "resendInvite": "Send invitation igen",
       "shareInviteLink": "Del invitationslink"
     },

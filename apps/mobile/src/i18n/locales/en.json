@@ -3244,6 +3244,10 @@
       "inviteCreated": "Invite created",
       "pendingInvitations": "Pending invitations",
       "ownRoleChange": "You cannot change your own role.",
+      "ownerAuthority": "Only an organization owner can manage owners.",
+      "inviteExpired": "This invitation has expired.",
+      "inviteAccepted": "This invitation has already been accepted.",
+      "inviteNotResendable": "This invitation can no longer be resent.",
       "resendInvite": "Resend invite",
       "shareInviteLink": "Share invite link"
     },

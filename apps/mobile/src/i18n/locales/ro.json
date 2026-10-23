@@ -3186,6 +3186,10 @@
       "inviteCreated": "Invitație creată",
       "pendingInvitations": "Invitații în așteptare",
       "ownRoleChange": "Nu îți poți schimba propriul rol.",
+      "ownerAuthority": "Doar un proprietar al organizației poate gestiona proprietarii.",
+      "inviteExpired": "Această invitație a expirat.",
+      "inviteAccepted": "Această invitație a fost deja acceptată.",
+      "inviteNotResendable": "Această invitație nu mai poate fi retrimisă.",
       "resendInvite": "Retrimite invitația",
       "shareInviteLink": "Partajează linkul de invitație"
     },

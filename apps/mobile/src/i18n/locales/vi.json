@@ -3145,6 +3145,10 @@
       "inviteCreated": "Đã tạo lời mời",
       "pendingInvitations": "Lời mời chờ phản hồi",
       "ownRoleChange": "Bạn không thể thay đổi vai trò của chính mình.",
+      "ownerAuthority": "Chỉ chủ sở hữu tổ chức mới có thể quản lý các chủ sở hữu.",
+      "inviteExpired": "Lời mời này đã hết hạn.",
+      "inviteAccepted": "Lời mời này đã được chấp nhận rồi.",
+      "inviteNotResendable": "Không thể gửi lại lời mời này nữa.",
       "resendInvite": "Gửi lại lời mời",
       "shareInviteLink": "Chia sẻ liên kết lời mời"
     },

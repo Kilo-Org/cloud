@@ -3146,6 +3146,10 @@
       "inviteCreated": "આમંત્રણ બનાવ્યું",
       "pendingInvitations": "બાકી આમંત્રણો",
       "ownRoleChange": "તમે તમારી પોતાની ભૂમિકા બદલી શકતા નથી.",
+      "ownerAuthority": "ફક્ત સંસ્થાના માલિક જ માલિકોનું સંચાલન કરી શકે છે.",
+      "inviteExpired": "આ આમંત્રણની મુદત પૂરી થઈ ગઈ છે.",
+      "inviteAccepted": "આ આમંત્રણ પહેલેથી જ સ્વીકારવામાં આવ્યું છે.",
+      "inviteNotResendable": "આ આમંત્રણ હવે ફરી મોકલી શકાતું નથી.",
       "resendInvite": "આમંત્રણ ફરી મોકલો",
       "shareInviteLink": "આમંત્રણની લિંક શેર કરો"
     },

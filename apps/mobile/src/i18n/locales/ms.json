@@ -3146,6 +3146,10 @@
       "inviteCreated": "Jemputan dicipta",
       "pendingInvitations": "Jemputan menunggu jawapan",
       "ownRoleChange": "Anda tidak boleh menukar peranan anda sendiri.",
+      "ownerAuthority": "Hanya pemilik organisasi boleh mengurus pemilik.",
+      "inviteExpired": "Jemputan ini telah tamat tempoh.",
+      "inviteAccepted": "Jemputan ini telah pun diterima.",
+      "inviteNotResendable": "Jemputan ini tidak boleh dihantar semula lagi.",
       "resendInvite": "Hantar semula jemputan",
       "shareInviteLink": "Kongsi pautan jemputan"
     },

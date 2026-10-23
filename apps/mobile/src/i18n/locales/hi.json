@@ -3144,7 +3144,11 @@
       "emailStatusFailed": "ईमेल नहीं भेजा जा सका",
       "inviteCreated": "आमंत्रण बनाया गया",
       "pendingInvitations": "लंबित आमंत्रण",
-      "ownRoleChange": "आप अपनीस्वयं की भूमिका नहीं बदल सकते।",
+      "ownRoleChange": "आप अपनी स्वयं की भूमिका नहीं बदल सकते।",
+      "ownerAuthority": "केवल संगठन का मालिक ही मालिकों को प्रबंधित कर सकता है।",
+      "inviteExpired": "यह आमंत्रण समाप्त हो चुका है।",
+      "inviteAccepted": "यह आमंत्रण पहले ही स्वीकार किया जा चुका है।",
+      "inviteNotResendable": "यह आमंत्रण अब फिर से नहीं भेजा जा सकता।",
       "resendInvite": "आमंत्रण फिर से भेजें",
       "shareInviteLink": "आमंत्रण का लिंक साझा करें"
     },

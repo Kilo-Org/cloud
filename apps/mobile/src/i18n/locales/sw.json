@@ -3146,6 +3146,10 @@
       "inviteCreated": "Mwaliko umeundwa",
       "pendingInvitations": "Mialiko inayosubiri",
       "ownRoleChange": "Huwezi kubadilisha jukumu lako mwenyewe.",
+      "ownerAuthority": "Ni mmiliki wa shirika pekee anayeweza kusimamia wamiliki.",
+      "inviteExpired": "Mwaliko huu umeisha muda wake.",
+      "inviteAccepted": "Mwaliko huu tayari umekubaliwa.",
+      "inviteNotResendable": "Mwaliko huu hauwezi kutumwa tena.",
       "resendInvite": "Tuma mwaliko tena",
       "shareInviteLink": "Shiriki kiungo cha mwaliko"
     },

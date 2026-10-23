@@ -3145,6 +3145,10 @@
       "inviteCreated": "Inbjudan skapad",
       "pendingInvitations": "Väntande inbjudningar",
       "ownRoleChange": "Du kan inte ändra din egen roll.",
+      "ownerAuthority": "Endast en organisationsägare kan hantera ägare.",
+      "inviteExpired": "Den här inbjudan har gått ut.",
+      "inviteAccepted": "Den här inbjudan har redan accepterats.",
+      "inviteNotResendable": "Den här inbjudan kan inte längre skickas igen.",
       "resendInvite": "Skicka inbjudan igen",
       "shareInviteLink": "Dela inbjudningslänk"
     },

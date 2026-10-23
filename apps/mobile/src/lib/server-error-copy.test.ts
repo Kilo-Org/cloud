@@ -35,6 +35,23 @@ describe('knownServerErrorMessage', () => {
     );
   });
 
+  it('explains the owner-authority refusal and the invitation refusals', () => {
+    expect(
+      knownServerErrorMessage(
+        makeError('FORBIDDEN', 'Only an organization owner can manage owners')
+      )
+    ).toBe(i18n.t('organization.members.ownerAuthority'));
+    expect(knownServerErrorMessage(makeError('CONFLICT', 'This invitation has expired'))).toBe(
+      i18n.t('organization.members.inviteExpired')
+    );
+    expect(
+      knownServerErrorMessage(makeError('CONFLICT', 'This invitation has already been accepted'))
+    ).toBe(i18n.t('organization.members.inviteAccepted'));
+    expect(
+      knownServerErrorMessage(makeError('CONFLICT', 'This invitation can no longer be resent'))
+    ).toBe(i18n.t('organization.members.inviteNotResendable'));
+  });
+
   it('reads a shaped client error too', () => {
     const shaped = {
       shape: { data: { code: 'FORBIDDEN', message: ORGANIZATION_TRIAL_EXPIRED_MESSAGE } },

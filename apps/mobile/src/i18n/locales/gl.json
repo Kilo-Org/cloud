@@ -3146,6 +3146,10 @@
       "inviteCreated": "Invitación creada",
       "pendingInvitations": "Invitacións pendentes",
       "ownRoleChange": "Non podes cambiar o teu propio rol.",
+      "ownerAuthority": "Só un propietario da organización pode xestionar os propietarios.",
+      "inviteExpired": "Esta invitación caducou.",
+      "inviteAccepted": "Esta invitación xa foi aceptada.",
+      "inviteNotResendable": "Xa non se pode reenviar esta invitación.",
       "resendInvite": "Reenviar invitación",
       "shareInviteLink": "Compartir ligazón de invitación"
     },

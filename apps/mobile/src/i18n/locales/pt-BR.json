@@ -3185,6 +3185,10 @@
       "inviteCreated": "Convite criado",
       "pendingInvitations": "Convites pendentes",
       "ownRoleChange": "Você não pode alterar sua própria função.",
+      "ownerAuthority": "Apenas um proprietário da organização pode gerenciar proprietários.",
+      "inviteExpired": "Este convite expirou.",
+      "inviteAccepted": "Este convite já foi aceito.",
+      "inviteNotResendable": "Este convite não pode mais ser reenviado.",
       "resendInvite": "Reenviar convite",
       "shareInviteLink": "Compartilhar link de convite"
     },

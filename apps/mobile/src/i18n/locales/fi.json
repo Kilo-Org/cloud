@@ -3146,6 +3146,10 @@
       "inviteCreated": "Kutsu luotu",
       "pendingInvitations": "Odottavat kutsut",
       "ownRoleChange": "Et voi vaihtaa omaa rooliasi.",
+      "ownerAuthority": "Vain organisaation omistaja voi hallita omistajia.",
+      "inviteExpired": "Tämä kutsu on vanhentunut.",
+      "inviteAccepted": "Tämä kutsu on jo hyväksytty.",
+      "inviteNotResendable": "Tätä kutsua ei voi enää lähettää uudelleen.",
       "resendInvite": "Lähetä kutsu uudelleen",
       "shareInviteLink": "Jaa kutsulinkki"
     },

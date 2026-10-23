@@ -3146,6 +3146,10 @@
       "inviteCreated": "بلنه جوړه شوه",
       "pendingInvitations": "په تمه بلنې",
       "ownRoleChange": "تاسو نشئ کولی خپله دنده بدله کړئ.",
+      "ownerAuthority": "یوازې د سازمان مالک کولی شي مالکان مدیریت کړي.",
+      "inviteExpired": "دا بلنه پای ته رسېدلې ده.",
+      "inviteAccepted": "دا بلنه دمخه منل شوې ده.",
+      "inviteNotResendable": "دا بلنه نوره بیا نه شي استول کېدای.",
       "resendInvite": "بلنه بیا واستوئ",
       "shareInviteLink": "د بلنې لینک شریک کړئ"
     },

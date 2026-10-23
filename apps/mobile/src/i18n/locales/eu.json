@@ -3146,6 +3146,10 @@
       "inviteCreated": "Gonbidapena sortuta",
       "pendingInvitations": "Onartzeko zain dauden gonbidapenak",
       "ownRoleChange": "Ezin duzu zure rola aldatu.",
+      "ownerAuthority": "Erakunde baten jabeak soilik kudea ditzake beste jabeak.",
+      "inviteExpired": "Gonbidapen hau iraungi da.",
+      "inviteAccepted": "Gonbidapen hau dagoeneko onartu da.",
+      "inviteNotResendable": "Gonbidapen hau ezin da berriro bidali.",
       "resendInvite": "Bidali gonbidapena berriro",
       "shareInviteLink": "Partekatu gonbidapen-esteka"
     },

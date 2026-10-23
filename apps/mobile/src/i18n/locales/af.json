@@ -3146,6 +3146,10 @@
       "inviteCreated": "Uitnodiging geskep",
       "pendingInvitations": "Hangende uitnodigings",
       "ownRoleChange": "Jy kan nie jou eie rol verander nie.",
+      "ownerAuthority": "Slegs 'n organisasie-eienaar kan eienaars bestuur.",
+      "inviteExpired": "Hierdie uitnodiging het verval.",
+      "inviteAccepted": "Hierdie uitnodiging is reeds aanvaar.",
+      "inviteNotResendable": "Hierdie uitnodiging kan nie meer weer gestuur word nie.",
       "resendInvite": "Stuur uitnodiging weer",
       "shareInviteLink": "Deel uitnodigingskakel"
     },

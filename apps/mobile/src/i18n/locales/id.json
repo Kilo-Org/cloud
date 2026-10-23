@@ -3145,6 +3145,10 @@
       "inviteCreated": "Undangan dibuat",
       "pendingInvitations": "Undangan yang belum diterima",
       "ownRoleChange": "Anda tidak dapat mengubah peran Anda sendiri.",
+      "ownerAuthority": "Hanya pemilik organisasi yang dapat mengelola pemilik.",
+      "inviteExpired": "Undangan ini telah kedaluwarsa.",
+      "inviteAccepted": "Undangan ini sudah diterima.",
+      "inviteNotResendable": "Undangan ini tidak dapat dikirim ulang lagi.",
       "resendInvite": "Kirim ulang undangan",
       "shareInviteLink": "Bagikan tautan undangan"
     },

@@ -3146,6 +3146,10 @@
       "inviteCreated": "Boð búið til",
       "pendingInvitations": "Boð í bið",
       "ownRoleChange": "Þú getur ekki breytt þínu eigin hlutverki.",
+      "ownerAuthority": "Aðeins eigandi stofnunar getur stýrt eigendum.",
+      "inviteExpired": "Þetta boð er útrunnið.",
+      "inviteAccepted": "Þetta boð hefur þegar verið samþykkt.",
+      "inviteNotResendable": "Ekki er lengur hægt að senda þetta boð aftur.",
       "resendInvite": "Senda boð aftur",
       "shareInviteLink": "Deila boðstengli"
     },

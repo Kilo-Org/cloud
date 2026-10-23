@@ -3146,6 +3146,10 @@
       "inviteCreated": "Casuumaad baa la abuuray",
       "pendingInvitations": "Casuumaadaha sugaya",
       "ownRoleChange": "Ma beddeli kartid doorkaaga.",
+      "ownerAuthority": "Kaliya milkiilaha ururka ayaa maamuli kara milkiilayaasha.",
+      "inviteExpired": "Casuumaaddan waqtigeedii wuu dhammaaday.",
+      "inviteAccepted": "Casuumaaddan mar hore ayaa la aqbalay.",
+      "inviteNotResendable": "Casuumaaddan mar dambe dib looma diri karo.",
       "resendInvite": "Dib u dir casuumaadda",
       "shareInviteLink": "Wadaag xiriiriyaha casuumaadda"
     },

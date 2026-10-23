@@ -3185,6 +3185,10 @@
       "inviteCreated": "ההזמנה נוצרה",
       "pendingInvitations": "הזמנות ממתינות",
       "ownRoleChange": "אינך יכול לשנות את התפקיד שלך.",
+      "ownerAuthority": "רק בעל ארגון יכול לנהל בעלים.",
+      "inviteExpired": "ההזמנה הזו פגה.",
+      "inviteAccepted": "ההזמנה הזו כבר התקבלה.",
+      "inviteNotResendable": "לא ניתן עוד לשלוח את ההזמנה הזו מחדש.",
       "resendInvite": "שליחת ההזמנה מחדש",
       "shareInviteLink": "שיתוף הקישור להזמנה"
     },

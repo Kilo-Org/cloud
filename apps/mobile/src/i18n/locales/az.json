@@ -3146,6 +3146,10 @@
       "inviteCreated": "Dəvət yaradıldı",
       "pendingInvitations": "Gözləyən dəvətlər",
       "ownRoleChange": "Öz rolunu dəyişə bilməzsən.",
+      "ownerAuthority": "Yalnız təşkilat sahibi sahibləri idarə edə bilər.",
+      "inviteExpired": "Bu dəvətin müddəti bitib.",
+      "inviteAccepted": "Bu dəvət artıq qəbul edilib.",
+      "inviteNotResendable": "Bu dəvət artıq yenidən göndərilə bilməz.",
       "resendInvite": "Dəvəti yenidən göndər",
       "shareInviteLink": "Dəvət keçidini paylaş"
     },

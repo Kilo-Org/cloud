@@ -33,6 +33,21 @@ export const ORGANIZATION_PENDING_INVITATION_MESSAGE =
 /** `organizations.members.update`: the server refuses a role change on yourself. */
 const ORGANIZATION_SELF_ROLE_MESSAGE = 'You cannot change your own role';
 
+/** Owner-only authority (`assertOwnerAuthority`): an admin touched an owner. */
+const ORGANIZATION_OWNER_AUTHORITY_MESSAGE = 'Only an organization owner can manage owners';
+
+/** `organizations.members.resendInvite`: the invitation lapsed. */
+const ORGANIZATION_INVITE_EXPIRED_MESSAGE = 'This invitation has expired';
+
+/** `organizations.members.resendInvite`: the address already joined. */
+const ORGANIZATION_INVITE_ACCEPTED_MESSAGE = 'This invitation has already been accepted';
+
+/** `organizations.members.resendInvite`: the invitation is terminal. */
+const ORGANIZATION_INVITE_NOT_RESENDABLE_MESSAGE = 'This invitation can no longer be resent';
+
+/** `organizations.members.*Invite`: the row the action read is gone. */
+const ORGANIZATION_INVITE_MISSING_MESSAGE = 'Invitation not found';
+
 /**
  * The i18n key for a server sentence the app explains, or `undefined` when it
  * has none. A `switch` keeps the mapping exhaustive and typo-free without an
@@ -57,6 +72,21 @@ function copyKeyFor(message: string): string | undefined {
     }
     case ORGANIZATION_SELF_ROLE_MESSAGE: {
       return 'organization.members.ownRoleChange';
+    }
+    case ORGANIZATION_OWNER_AUTHORITY_MESSAGE: {
+      return 'organization.members.ownerAuthority';
+    }
+    case ORGANIZATION_INVITE_EXPIRED_MESSAGE: {
+      return 'organization.members.inviteExpired';
+    }
+    case ORGANIZATION_INVITE_ACCEPTED_MESSAGE: {
+      return 'organization.members.inviteAccepted';
+    }
+    case ORGANIZATION_INVITE_NOT_RESENDABLE_MESSAGE: {
+      return 'organization.members.inviteNotResendable';
+    }
+    case ORGANIZATION_INVITE_MISSING_MESSAGE: {
+      return 'queryError.notFoundDescription';
     }
     default: {
       return undefined;

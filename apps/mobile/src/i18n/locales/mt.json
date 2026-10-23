@@ -3266,6 +3266,10 @@
       "inviteCreated": "L-istedina nħolqot",
       "pendingInvitations": "Stediniet pendenti",
       "ownRoleChange": "Ma tistax tibdel ir-rwol tiegħek.",
+      "ownerAuthority": "Biss min huwa sid tal-organizzazzjoni jista' jamministra lis-sidien.",
+      "inviteExpired": "Din l-istedina skadiet.",
+      "inviteAccepted": "Din l-istedina diġà ġiet aċċettata.",
+      "inviteNotResendable": "Din l-istedina ma tistax terġa' tintbagħat.",
       "resendInvite": "Erġa' ibgħat l-istedina",
       "shareInviteLink": "Aqsam ir-rabta tal-istedina"
     },

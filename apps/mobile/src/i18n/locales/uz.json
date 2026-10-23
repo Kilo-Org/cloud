@@ -3146,6 +3146,10 @@
       "inviteCreated": "Taklifnoma yaratildi",
       "pendingInvitations": "Qabul qilinmagan taklifnomalar",
       "ownRoleChange": "Siz o'z rolingizni o'zgartira olmaysiz.",
+      "ownerAuthority": "Faqat tashkilot egasi egalarni boshqarishi mumkin.",
+      "inviteExpired": "Ushbu taklifnomaning muddati tugagan.",
+      "inviteAccepted": "Ushbu taklifnoma allaqachon qabul qilingan.",
+      "inviteNotResendable": "Ushbu taklifnomani endi qayta yuborib bo'lmaydi.",
       "resendInvite": "Taklifnomani qayta yuborish",
       "shareInviteLink": "Taklifnoma havolasini ulashish"
     },

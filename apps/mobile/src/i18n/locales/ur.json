@@ -3146,6 +3146,10 @@
       "inviteCreated": "دعوت بنائی گئی",
       "pendingInvitations": "زیر التواء دعوتیں",
       "ownRoleChange": "آپ اپنا کردار تبدیل نہیں کر سکتے۔",
+      "ownerAuthority": "صرف تنظیم کا مالک ہی مالکان کا انتظام کر سکتا ہے۔",
+      "inviteExpired": "یہ دعوت کی میعاد ختم ہو گئی ہے۔",
+      "inviteAccepted": "یہ دعوت پہلے ہی قبول کی جا چکی ہے۔",
+      "inviteNotResendable": "یہ دعوت اب دوبارہ نہیں بھیجی جا سکتی۔",
       "resendInvite": "دعوت دوبارہ بھیجیں",
       "shareInviteLink": "دعوت کا لنک شیئر کریں"
     },

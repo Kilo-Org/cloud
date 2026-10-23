@@ -7,7 +7,7 @@ import { DialogCard } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { withUiDeadline } from '@/lib/ui-deadline';
+import { isUiDeadlineError, withUiDeadline } from '@/lib/ui-deadline';
 import { cn } from '@/lib/utils';
 
 const SAVE_UI_DEADLINE_MS = 15_000;
@@ -95,9 +95,14 @@ export function RenameModal<TSaveResult>({
       await withUiDeadline(operation, SAVE_UI_DEADLINE_MS);
       onClose();
     } catch (error) {
+      // The deadline is the app's own message, already localized; only a
+      // rejection from the save itself goes through the caller's mapper.
       setErrorText(
-        errorCopy?.(error) ??
-          (error instanceof Error ? error.message : t('common.somethingWentWrong'))
+        !isUiDeadlineError(error) && errorCopy
+          ? errorCopy(error)
+          : error instanceof Error
+            ? error.message
+            : t('common.somethingWentWrong')
       );
     } finally {
       setPending(false);

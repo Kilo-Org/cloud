@@ -3145,6 +3145,10 @@
       "inviteCreated": "招待を作成しました",
       "pendingInvitations": "承諾待ちの招待",
       "ownRoleChange": "自分の役割は変更できません。",
+      "ownerAuthority": "組織のオーナーのみがオーナーを管理できます。",
+      "inviteExpired": "この招待は有効期限が切れています。",
+      "inviteAccepted": "この招待はすでに承諾されています。",
+      "inviteNotResendable": "この招待は再送信できなくなりました。",
       "resendInvite": "招待を再送信",
       "shareInviteLink": "招待リンクを共有"
     },

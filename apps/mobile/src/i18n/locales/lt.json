@@ -3226,6 +3226,10 @@
       "inviteCreated": "Kvietimas sukurtas",
       "pendingInvitations": "Nepriimti kvietimai",
       "ownRoleChange": "Negalite pakeisti savo paties vaidmens.",
+      "ownerAuthority": "Tik organizacijos savininkas gali valdyti savininkus.",
+      "inviteExpired": "Šio kvietimo galiojimas baigėsi.",
+      "inviteAccepted": "Šis kvietimas jau buvo priimtas.",
+      "inviteNotResendable": "Šio kvietimo nebegalima išsiųsti dar kartą.",
       "resendInvite": "Išsiųsti kvietimą dar kartą",
       "shareInviteLink": "Bendrinti kvietimo nuorodą"
     },

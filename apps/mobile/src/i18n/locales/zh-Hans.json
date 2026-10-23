@@ -3145,6 +3145,10 @@
       "inviteCreated": "邀请已创建",
       "pendingInvitations": "待接受的邀请",
       "ownRoleChange": "您无法更改自己的角色。",
+      "ownerAuthority": "只有组织所有者才能管理所有者。",
+      "inviteExpired": "该邀请已过期。",
+      "inviteAccepted": "该邀请已被接受。",
+      "inviteNotResendable": "该邀请无法重新发送。",
       "resendInvite": "重新发送邀请",
       "shareInviteLink": "分享邀请链接"
     },

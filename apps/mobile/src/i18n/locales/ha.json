@@ -3146,6 +3146,10 @@
       "inviteCreated": "An ƙirƙira gayyata",
       "pendingInvitations": "Gayyatar da ke jiran amsa",
       "ownRoleChange": "Ba za ka iya canza matsayin kanka ba.",
+      "ownerAuthority": "Mai mulkin ƙungiya ne kaɗai zai iya sarrafa masu mulki.",
+      "inviteExpired": "Wannan gayyatar ta ƙare.",
+      "inviteAccepted": "An riga an karɓi wannan gayyatar.",
+      "inviteNotResendable": "Ba za a iya sake aika wannan gayyatar ba.",
       "resendInvite": "Sake aika gayyata",
       "shareInviteLink": "Raba mahaɗin gayyata"
     },

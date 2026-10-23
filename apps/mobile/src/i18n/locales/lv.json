@@ -3186,6 +3186,10 @@
       "inviteCreated": "Uzaicinājums izveidots",
       "pendingInvitations": "Neapstiprinātie uzaicinājumi",
       "ownRoleChange": "Jūs nevarat mainīt savu lomu.",
+      "ownerAuthority": "Tikai organizācijas īpašnieks var pārvaldīt īpašniekus.",
+      "inviteExpired": "Šis uzaicinājums ir zaudējis derīgumu.",
+      "inviteAccepted": "Šis uzaicinājums jau ir apstiprināts.",
+      "inviteNotResendable": "Šo uzaicinājumu vairs nevar nosūtīt vēlreiz.",
       "resendInvite": "Nosūtīt uzaicinājumu vēlreiz",
       "shareInviteLink": "Kopīgot uzaicinājuma saiti"
     },

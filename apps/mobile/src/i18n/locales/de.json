@@ -3145,6 +3145,10 @@
       "inviteCreated": "Einladung erstellt",
       "pendingInvitations": "Ausstehende Einladungen",
       "ownRoleChange": "Sie können Ihre eigene Rolle nicht ändern.",
+      "ownerAuthority": "Nur ein Organisationsinhaber kann Inhaber verwalten.",
+      "inviteExpired": "Diese Einladung ist abgelaufen.",
+      "inviteAccepted": "Diese Einladung wurde bereits angenommen.",
+      "inviteNotResendable": "Diese Einladung kann nicht mehr erneut gesendet werden.",
       "resendInvite": "Einladung erneut senden",
       "shareInviteLink": "Einladungslink teilen"
     },

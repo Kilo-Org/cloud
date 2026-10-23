@@ -3146,6 +3146,10 @@
       "inviteCreated": "Affeerraan uumamteera",
       "pendingInvitations": "Affeerraawwan deebii eegaa jiran",
       "ownRoleChange": "Gahee mataa kee jijjiiruu hin dandeessu.",
+      "ownerAuthority": "Abbaa dhaabbataa qofatu abbootii bulchuu danda'a.",
+      "inviteExpired": "Affeerraan kun yeroon isaa darbe.",
+      "inviteAccepted": "Affeerraan kun duraan fudhatameera.",
+      "inviteNotResendable": "Affeerraan kun ammas deebi'ii ergamuu hin danda'u.",
       "resendInvite": "Affeerraa deebi'ii ergi",
       "shareInviteLink": "Geessituu affeerraa qoodi"
     },

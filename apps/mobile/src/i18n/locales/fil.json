@@ -3146,6 +3146,10 @@
       "inviteCreated": "Nalikha ang imbitasyon",
       "pendingInvitations": "Mga nakabinbing imbitasyon",
       "ownRoleChange": "Hindi mo maaaring baguhin ang iyong sariling tungkulin.",
+      "ownerAuthority": "Ang may-ari lamang ng organisasyon ang maaaring mamahala ng mga may-ari.",
+      "inviteExpired": "Nag-expire na ang imbitasyong ito.",
+      "inviteAccepted": "Tinanggap na ang imbitasyong ito.",
+      "inviteNotResendable": "Hindi na maaaring ipadala muli ang imbitasyong ito.",
       "resendInvite": "Ipadala muli ang imbitasyon",
       "shareInviteLink": "Ibahagi ang link ng imbitasyon"
     },

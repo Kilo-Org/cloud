@@ -3146,6 +3146,10 @@
       "inviteCreated": "ਸੱਦਾ ਬਣਾਇਆ ਗਿਆ",
       "pendingInvitations": "ਜਵਾਬ ਦੀ ਉਡੀਕ ਵਾਲੇ ਸੱਦੇ",
       "ownRoleChange": "ਤੁਸੀਂ ਆਪਣੀ ਭੂਮਿਕਾ ਨਹੀਂ ਬਦਲ ਸਕਦੇ।",
+      "ownerAuthority": "ਸਿਰਫ਼ ਸੰਗਠਨ ਦਾ ਮਾਲਕ ਹੀ ਮਾਲਕਾਂ ਦਾ ਪ੍ਰਬੰਧਨ ਕਰ ਸਕਦਾ ਹੈ।",
+      "inviteExpired": "ਇਹ ਸੱਦਾ ਮਿਆਦ ਪੁੱਗ ਗਿਆ ਹੈ।",
+      "inviteAccepted": "ਇਹ ਸੱਦਾ ਪਹਿਲਾਂ ਹੀ ਸਵੀਕਾਰ ਕੀਤਾ ਜਾ ਚੁੱਕਾ ਹੈ।",
+      "inviteNotResendable": "ਇਹ ਸੱਦਾ ਹੁਣ ਦੁਬਾਰਾ ਨਹੀਂ ਭੇਜਿਆ ਜਾ ਸਕਦਾ।",
       "resendInvite": "ਸੱਦਾ ਦੁਬਾਰਾ ਭੇਜੋ",
       "shareInviteLink": "ਸੱਦੇ ਦਾ ਲਿੰਕ ਸਾਂਝਾ ਕਰੋ"
     },

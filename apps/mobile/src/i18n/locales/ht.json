@@ -3146,6 +3146,10 @@
       "inviteCreated": "Envitasyon kreye",
       "pendingInvitations": "Envitasyon annatant",
       "ownRoleChange": "Ou pa ka chanje pwòp wòl ou.",
+      "ownerAuthority": "Se yon pwopriyetè òganizasyon sèlman ki ka jere pwopriyetè yo.",
+      "inviteExpired": "Envitasyon sa a ekspire.",
+      "inviteAccepted": "Yo deja aksepte envitasyon sa a.",
+      "inviteNotResendable": "Yo pa ka revoye envitasyon sa a ankò.",
       "resendInvite": "Revoye envitasyon an",
       "shareInviteLink": "Pataje lyen envitasyon an"
     },

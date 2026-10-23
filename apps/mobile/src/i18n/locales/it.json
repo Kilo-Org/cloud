@@ -3185,6 +3185,10 @@
       "inviteCreated": "Invito creato",
       "pendingInvitations": "Inviti in sospeso",
       "ownRoleChange": "Non puoi modificare il tuo ruolo.",
+      "ownerAuthority": "Solo un proprietario dell'organizzazione può gestire i proprietari.",
+      "inviteExpired": "Questo invito è scaduto.",
+      "inviteAccepted": "Questo invito è già stato accettato.",
+      "inviteNotResendable": "Questo invito non può più essere inviato di nuovo.",
       "resendInvite": "Invia di nuovo l'invito",
       "shareInviteLink": "Condividi il link di invito"
     },

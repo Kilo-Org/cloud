@@ -105,6 +105,9 @@ vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+// The account scope line under the Agents header reads the membership list; the
+// badge and live-count assertions are not about it.
+vi.mock('@/components/context-control', () => ({ ContextControl: 'ContextControl' }));
 vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
 vi.mock('@/components/agents/session-preview-overlay', () => ({
   SessionPreviewOverlay: () => null,

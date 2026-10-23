@@ -30,6 +30,7 @@ import {
 } from '@/components/agents/session-list-chrome';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { useAgentsListChrome } from '@/components/agents/use-agents-list-chrome';
+import { ContextControl } from '@/components/context-control';
 import { Button } from '@/components/ui/button';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
@@ -503,6 +504,15 @@ export function AgentSessionListScreen({
           inlineActions={content === 'empty' ? undefined : headerActions}
           inlineActionsWidth={inlineActionsWidth}
         />
+        {/* The live list, the history it links to, and the To-dos beside it are
+            all scoped to the selected account, so the scope belongs above the
+            switch instead of inside a list state: an organization scope with no
+            rows otherwise reads as "no sessions" while the user's personal CLI
+            sessions sit one switch away. `ContextControl` is the same
+            switchable control the Home header carries. */}
+        <View className="px-[22px] pb-1">
+          <ContextControl />
+        </View>
         {segmentControl}
         {hasLiveRows || isSearching ? (
           <SessionListSearchHeader

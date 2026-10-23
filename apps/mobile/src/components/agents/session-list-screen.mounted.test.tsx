@@ -1350,10 +1350,16 @@ describe('AgentSessionListScreen header and admission', () => {
     expect(label.props.adjustsFontSizeToFit).not.toBe(true);
     expect(header().props.reserveEyebrow).toBe(true);
     expect(header().props.eyebrow).toBe(i18n.t('agents.liveCount', { count: 1 }));
-    expect(text()).not.toContain(organizationName);
+    // The scope line names the selected account under the title; the header row
+    // above keeps the title and its controls, so the long name is truncated in
+    // the scope line's own single-line box rather than squeezing the title.
+    const scopeLabel = nodes('Text').find(node => node.children.includes(organizationName));
+    expect(scopeLabel?.props.numberOfLines).toBe(1);
     expect(
-      nodes('Pressable').filter(node => node.props.accessibilityHint === 'Select account')
-    ).toHaveLength(0);
+      nodes('Pressable').filter(
+        node => node.props.accessibilityHint === i18n.t('profile.selectAccount')
+      )
+    ).toHaveLength(1);
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: true });
     expect(
       nodes('Pressable').filter(node => node.props.testID === 'agents-open-filters')
@@ -1415,7 +1421,7 @@ describe('AgentSessionListScreen header and admission', () => {
     expect(header().props.eyebrow).toBe('1 LIVE');
   });
 
-  it('renders the list controls in the title row with no account control above search', async () => {
+  it('renders the list controls in the title row above the account scope line', async () => {
     state.live.activeSessions = [{ ...row, gitUrl: 'https://github.com/kilo/cloud.git' }];
     await renderScreen();
     // The controls share the title's row through `inlineActions`, trailing the
@@ -1427,10 +1433,21 @@ describe('AgentSessionListScreen header and admission', () => {
     expect(actions.props.className).toContain('min-h-11');
     expect(actions.props.className).toContain('shrink');
     expect(header().props.headerRight).toBeUndefined();
+    // The account the list is scoped to sits under the title instead of in the
+    // controls row: the header keeps its width math, and the scope stays visible
+    // in the empty, loading and error states too.
     expect(
       nodes('Pressable').filter(node => node.props.accessibilityHint === 'Select account')
-    ).toHaveLength(0);
-    expect(text()).not.toContain('Personal');
+    ).toHaveLength(1);
+    const scopeRow = root().findAll(
+      node => typeof node.type === 'string' && node.props.className === 'px-[22px] pb-1'
+    )[0];
+    expect(scopeRow?.parent).toBe(header().parent);
+    const scopeControl = nodes('Pressable').find(
+      node => node.props.accessibilityHint === 'Select account'
+    );
+    expect(scopeRow?.findAll(node => node === scopeControl)).toHaveLength(1);
+    expect(text()).toContain('Personal');
     expect(nodes('SessionListSearchHeader')).toHaveLength(1);
     const history = nodes('Pressable').find(node => node.props.testID === 'agents-view-history');
     const filters = nodes('Pressable').find(node => node.props.testID === 'agents-open-filters');
@@ -1947,10 +1964,11 @@ describe('AgentSessionListScreen live filtering', () => {
       expect(header().parent?.children[0]).toBe(header());
       const tree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
       expect(
-        // The keyboard container is the third child; the feedback band and the
-        // body (the rows list inside its measuring wrapper) share it.
-        tree.children.slice(0, 3).map(child => (typeof child === 'string' ? child : child.type))
-      ).toEqual(['View', 'SessionListSearchHeader', 'KeyboardAvoidingView']);
+        // The keyboard container is the fourth child: the header, the account
+        // scope line under it, the feedback band, and the body (the rows list
+        // inside its measuring wrapper) share it.
+        tree.children.slice(0, 4).map(child => (typeof child === 'string' ? child : child.type))
+      ).toEqual(['View', 'View', 'SessionListSearchHeader', 'KeyboardAvoidingView']);
       const rows = descendantsOf(requireNode('KeyboardAvoidingView'), 'FlashList');
       expect(rows).toHaveLength(1);
       // The body wrapper that measures the list's available height is the
@@ -2290,7 +2308,7 @@ describe('Live list admission and lifecycle', () => {
       expect(nodes('Pressable').some(node => node.props.testID === 'agents-new-session-fab')).toBe(
         false
       );
-      expect(text()).not.toContain('Engineering');
+      expect(text()).not.toContain(row.title);
     }
     if (mode === 'membership paused') {
       expect(listSkeletons()).toHaveLength(8);

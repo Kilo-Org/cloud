@@ -13,6 +13,7 @@ import { SessionListSearchHeader } from '@/components/agents/session-list-search
 import { useAgentSessionListData } from '@/components/agents/use-agent-session-list-data';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { useSessionSearchInput } from '@/components/agents/use-session-search-input';
+import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { shouldLoadMoreSessions } from '@/lib/agent-session-pages';
 import { usePersistedAgentSessionFilters } from '@/lib/hooks/use-persisted-agent-session-filters';
@@ -225,6 +226,13 @@ export function SessionHistoryScreen() {
           />
         }
       />
+      {/* The stored list is scoped to the selected account, so the scope is
+          named above it (and above the search field it filters) instead of
+          only in an empty-state sentence. `ContextControl` is the same
+          switchable control the Agents tab and Home carry. */}
+      <View className="px-4">
+        <ContextControl />
+      </View>
       {showSearchHeader ? (
         <SessionListSearchHeader
           inputRef={searchInputRef}

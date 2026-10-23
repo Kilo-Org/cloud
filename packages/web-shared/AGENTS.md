@@ -26,20 +26,20 @@ The usage wire contract lives in `@kilocode/usage-contracts`. Import it directly
 ## AI gateway database access
 
 AI gateway handlers (`src/lib/ai-gateway/**` and everything they call) also run
-in `sfo1`, but `db` from `lib/drizzle` always connects to the Frankfurt primary.
-Each primary query from `sfo1` is a transatlantic round trip; a transaction is
-several. Before the upstream inference request is sent:
+in `sfo1`, but the read-write `db` from `lib/drizzle` always connects to the
+Frankfurt primary. Do not use it before the upstream inference request starts:
+each query adds an `sfo1` -> `fra1` round trip (a transaction several) and holds
+a primary pool connection that long, contributing to pool exhaustion. Async
+work, work after the upstream request starts, and exceptional paths may use it.
 
-- Read through `readDb`, which uses the US replica in `sfo1`. Many helpers
-  default to `fromDb = db`; pass `readDb` explicitly. Omitting the argument
-  silently selects the primary.
-- Do not open `db` transactions, take row locks, or write. Defer writes with
-  `after()`, or forward them to `fra1` like `recordUsageInPrimaryRegion` does.
-- Keep primary access only where correctness needs it (read-after-write, a row
-  lock, or an optimistic write such as lazy credit expiry), on a rare path, with
-  a comment saying why.
-- Shared helpers that the web app also calls keep their primary default and take
-  a `fromDb` argument; gateway callers pass `readDb`.
+- Read through `readDb`, which uses the US replica in `sfo1`. Its lag is
+  acceptable for auth. Shared helpers keep their `fromDb = db` default for the
+  web app; gateway callers must pass `readDb`, since omitting it selects the
+  primary.
+- Defer writes with `after()`, or forward them to `fra1` like
+  `recordUsageInPrimaryRegion` does.
+- Where correctness needs the primary on a rare path (read-after-write, a row
+  lock, or an optimistic write such as lazy credit expiry), comment why.
 - `readDb` falls back to the primary when `POSTGRES_REPLICA_US_URL` is unset, so
   that variable must stay set on the `kilocode-ai-gateway` Vercel project.
 

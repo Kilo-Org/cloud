@@ -178,7 +178,7 @@
     "emailAddress": "邮箱地址",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "通过邮箱继续",
-    "enterCodeSentTo": "请输入发送至 {{email}} 的验证码。",
+    "enterCodeSentTo": "请输入发送至 {{email}} 的验证码",
     "codeArrivalHint": "如果此邮箱地址符合条件，你将在一分钟内收到验证码。",
     "verifyCode": "验证",
     "resendCode": "重新发送验证码",

@@ -41,8 +41,10 @@ const mockListSecurityFindings = jest.fn<() => Promise<unknown>>();
 const mockCanStartAnalysis = jest.fn<(owner: unknown) => Promise<unknown>>();
 const mockEnqueueBacklogFindings = jest.fn<() => Promise<number>>();
 const mockGetSecurityAgentConfigWithStatus = jest.fn<() => Promise<unknown>>();
-const mockDecorateFindingWithRemediation = jest.fn<() => Promise<unknown>>();
-const mockDecorateFindingsWithRemediation = jest.fn<() => Promise<unknown>>();
+const mockDecorateFindingWithRemediation =
+  jest.fn<(params: unknown) => Promise<unknown>>();
+const mockDecorateFindingsWithRemediation =
+  jest.fn<(params: unknown) => Promise<unknown>>();
 const mockGetRemediationAttemptHistory = jest.fn<() => Promise<unknown>>();
 const mockDeleteFindingsByRepository =
   jest.fn<(params: unknown) => Promise<{ deletedCount: number }>>();
@@ -2124,6 +2126,8 @@ function createHandlersWithRepositorySnapshot(repositories: unknown[]) {
   });
 }
 
+// Only the fields the decorator and the DTO narrowing touch; the handlers are
+// asserted on the decorated payload the mocks return.
 const snapshotFinding = {
   id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
   owned_by_organization_id: ORGANIZATION_ID,
@@ -2131,7 +2135,7 @@ const snapshotFinding = {
   repo_full_name: 'kilo/repo',
   status: 'open',
   raw_data: { number: 42 },
-} as never;
+} as unknown as SecurityFindingWithRemediation;
 
 const unreadableSnapshot = [{ id: '1', full_name: 'kilo/repo', name: 'repo', private: true }];
 const mixedSnapshot = [

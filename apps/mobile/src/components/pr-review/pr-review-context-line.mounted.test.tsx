@@ -131,8 +131,8 @@ describe('PrReviewContextLine', () => {
       key === ORGANIZATION_PERSONAL_STORAGE_KEY ? 'personal' : null
     );
     const ui = await mount();
-    await waitFor(() => texts(ui).includes('For Personal'));
-    expect(texts(ui)).toContain('For Personal');
+    await waitFor(() => texts(ui).includes('For your personal account'));
+    expect(texts(ui)).toContain('For your personal account');
   });
 
   it('switches organization through the picker sheet', async () => {
@@ -168,7 +168,7 @@ describe('PrReviewContextLine', () => {
   it('renders plain text with no chevron when there is nothing to switch to', async () => {
     list.mockResolvedValue([]);
     const ui = await mount();
-    await waitFor(() => texts(ui).includes('For Personal'));
+    await waitFor(() => texts(ui).includes('For your personal account'));
     expect(line(ui)).toBeUndefined();
     expect(ui.renderer.root.findAllByType(ChevronDown)).toHaveLength(0);
   });
@@ -212,7 +212,7 @@ describe('PrReviewContextLine', () => {
   it('offers a retry on the personal scope when the memberships query fails', async () => {
     list.mockRejectedValue(new Error('list failed'));
     const ui = await mount();
-    await waitFor(() => texts(ui).includes('For Personal'));
+    await waitFor(() => texts(ui).includes('For your personal account'));
     const retry = ui.renderer.root.find(node => node.props.accessibilityLabel === 'Retry');
     list.mockResolvedValue([ORG_A, ORG_B]);
     await press(retry);

@@ -281,3 +281,29 @@ export function orphanedModelFiles(input: {
   const mentioned = modelIndexMentionedNames(index);
   return names.filter(name => name.includes('.gguf') && !keep.has(name) && !mentioned.has(name));
 }
+
+/**
+ * The saved models whose every file is still on the device, after deleting the
+ * files the saved list never names. A model whose projector is gone is not the
+ * model that was verified. The download in progress owns its partial files.
+ */
+export function keepStoredModels(input: {
+  readonly storage: GgufStorage;
+  readonly index: string | null;
+  readonly partialNames: readonly string[];
+}): readonly GgufModelRecord[] {
+  const names = input.storage.list();
+  const kept = readModelIndex(input.index).filter(model =>
+    recordFileNames(model).every(name => names.includes(name))
+  );
+  const orphans = orphanedModelFiles({
+    names,
+    index: input.index,
+    kept,
+    partialNames: input.partialNames,
+  });
+  for (const name of orphans) {
+    input.storage.remove(name);
+  }
+  return kept;
+}

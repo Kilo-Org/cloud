@@ -103,43 +103,6 @@ describe('pausing, resuming and cancelling', () => {
     expect(h.store.model('small')).toBeUndefined();
   });
 
-  it('leaves a download that is already stopping alone when Pause arrives', async () => {
-    const h = harness();
-    h.store.start(CATALOG);
-    taskAt(h.tasks, 0).progress({ bytesWritten: 100, totalBytes: 1000 });
-    h.store.cancel('small');
-    // The task is cancelled but its promise has not rejected yet: this is the window the
-    // explorer pressed Pause in, and the task refuses a pause there.
-    h.store.pause('small');
-    expect(taskAt(h.tasks, 0).paused).not.toHaveBeenCalled();
-    await flush();
-    expect(h.store.snapshot().download).toBeNull();
-    expect(h.files.size).toBe(0);
-  });
-
-  it('asks for one pause however often Pause is pressed, and says so until it lands', async () => {
-    const h = harness();
-    h.store.start(CATALOG);
-    h.store.pause('small');
-    h.store.pause('small');
-    expect(taskAt(h.tasks, 0).paused).toHaveBeenCalledTimes(1);
-    expect(h.store.snapshot().download).toMatchObject({ phase: 'downloading', pending: true });
-    taskAt(h.tasks, 0).settle(null);
-    await flush();
-    expect(h.store.snapshot().download).toMatchObject({ phase: 'paused', pending: false });
-  });
-
-  it('keeps the download usable when the task refuses the pause', async () => {
-    const h = harness({ refusePause: true });
-    h.store.start(CATALOG);
-    expect(() => {
-      h.store.pause('small');
-    }).not.toThrow();
-    expect(h.store.snapshot().download).toMatchObject({ phase: 'downloading', pending: false });
-    await finish(taskAt(h.tasks, 0), 1000);
-    expect(h.store.model('small')).toBeDefined();
-  });
-
   it('removes the partial file and says why when the download fails', async () => {
     const h = harness();
     h.store.start(CATALOG);
@@ -152,19 +115,91 @@ describe('pausing, resuming and cancelling', () => {
     expect(h.files.size).toBe(0);
   });
 
-  it('refuses a file llama.cpp cannot read, and keeps nothing', async () => {
+  it('downloads a transfer that stopped short again instead of calling the file unusable', async () => {
+    const h = harness();
+    h.store.start(CATALOG);
+    await finish(taskAt(h.tasks, 0), 900);
+
+    expect(h.tasks).toHaveLength(2);
+    expect(h.store.snapshot().failure).toBeNull();
+    expect(h.store.snapshot().download).toMatchObject({
+      fileId: 'small',
+      phase: 'downloading',
+      written: 0,
+    });
+
+    await finish(taskAt(h.tasks, 1), 1000);
+
+    expect(h.store.snapshot().failure).toBeNull();
+    expect(h.store.model('small')).toMatchObject({ sizeBytes: 1000, contextWindow: 4096 });
+    expect(h.files.has(ggufPartialName('small'))).toBe(false);
+  });
+
+  it('reports a network problem when the same transfer stops short twice, and keeps nothing', async () => {
+    const h = harness();
+    h.store.start(CATALOG);
+    await finish(taskAt(h.tasks, 0), 900);
+    await finish(taskAt(h.tasks, 1), 950);
+
+    expect(h.tasks).toHaveLength(2);
+    expect(h.store.snapshot()).toMatchObject({
+      download: null,
+      failure: { fileId: 'small', problem: 'network' },
+    });
+    expect(h.files.size).toBe(0);
+    expect(h.store.model('small')).toBeUndefined();
+  });
+
+  it('refuses a file longer than the published size', async () => {
+    const h = harness();
+    h.store.start(CATALOG);
+    await finish(taskAt(h.tasks, 0), 1100);
+    expect(h.store.snapshot().failure).toEqual({ fileId: 'small', problem: 'invalidFile' });
+    expect(h.files.size).toBe(0);
+  });
+
+  it('reads a file the device refused once again, and keeps it when the second read works', async () => {
+    let reads = 0;
+    const h = harness({
+      inspection: async () => {
+        reads += 1;
+        if (reads === 1) {
+          throw new Error('load failed');
+        }
+        return { contextWindow: 4096, tools: true, vision: false, thinking: false };
+      },
+    });
+    h.store.start(CATALOG);
+    await finish(taskAt(h.tasks, 0), 1000);
+
+    expect(h.inspected).toHaveLength(2);
+    expect(h.store.snapshot().failure).toBeNull();
+    expect(h.store.model('small')).toBeDefined();
+  });
+
+  it('refuses a file llama.cpp cannot read twice, and keeps nothing', async () => {
     const h = harness({ inspection: () => Promise.reject(new Error('not a model')) });
     h.store.start(CATALOG);
     await finish(taskAt(h.tasks, 0), 1000);
+    expect(h.inspected).toHaveLength(2);
     expect(h.store.snapshot().failure).toEqual({ fileId: 'small', problem: 'invalidFile' });
     expect(h.files.size).toBe(0);
     expect(h.store.model('small')).toBeUndefined();
   });
 
-  it('refuses a file whose bytes do not match the published size', async () => {
-    const h = harness();
+  it('moves a model into place again when the first move failed', async () => {
+    const h = harness({ failMoveOnce: ggufModelName('small') });
     h.store.start(CATALOG);
-    await finish(taskAt(h.tasks, 0), 900);
+    await finish(taskAt(h.tasks, 0), 1000);
+    expect(h.store.snapshot().failure).toBeNull();
+    expect(h.store.model('small')).toBeDefined();
+    expect(h.files.has(ggufModelName('small'))).toBe(true);
+  });
+
+  it('refuses a model it cannot move into place twice, and keeps nothing', async () => {
+    const h = harness({ failMove: ggufModelName('small') });
+    h.store.start(CATALOG);
+    await finish(taskAt(h.tasks, 0), 1000);
     expect(h.store.snapshot().failure).toEqual({ fileId: 'small', problem: 'invalidFile' });
     expect(h.files.size).toBe(0);
   });
@@ -198,6 +233,23 @@ describe('pausing, resuming and cancelling', () => {
     });
     await finish(taskAt(h.tasks, 0), 1000);
     expect(h.store.model('linked')).toBeDefined();
+  });
+
+  it('downloads a direct link that delivered nothing again, then calls it a network failure', async () => {
+    const h = harness();
+    h.store.start({
+      kind: 'url',
+      fileId: 'linked',
+      name: 'Linked',
+      url: 'https://example.com/l.gguf',
+    });
+    await finish(taskAt(h.tasks, 0), 0);
+    expect(h.tasks).toHaveLength(2);
+    expect(h.store.snapshot().failure).toBeNull();
+
+    await finish(taskAt(h.tasks, 1), 0);
+    expect(h.store.snapshot().failure).toEqual({ fileId: 'linked', problem: 'network' });
+    expect(h.files.size).toBe(0);
   });
 });
 

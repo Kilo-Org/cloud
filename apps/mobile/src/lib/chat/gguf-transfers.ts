@@ -46,6 +46,8 @@ export type GgufActiveDownload = {
   /** Set between a pause request and the task reporting itself paused. */
   pausing: boolean;
   restarted: boolean;
+  /** How many times the transfer in progress has been started from zero. */
+  attempts: number;
 };
 
 /** A download about to run its first transfer. */
@@ -66,28 +68,73 @@ export function activeDownload(input: {
     resuming: false,
     pausing: false,
     restarted: false,
+    attempts: 1,
   };
 }
 
 /**
- * Moves every finished transfer to its model name, or none: a model without its
- * projector is not the model that was verified. False when a move failed.
+ * Moves every finished transfer that is still a partial file to its model name.
+ * A move that failed is no verdict on the bytes, so a file an earlier attempt
+ * left at a model name is cleared and the remaining moves run once more. False
+ * when a file is neither a partial nor in place afterwards.
  */
 export function moveIntoPlace(storage: GgufStorage, transfers: readonly GgufTransfer[]): boolean {
-  const moved: string[] = [];
+  if (moveAll(storage, transfers)) {
+    return true;
+  }
+  const names = new Set(storage.list());
+  for (const transfer of transfers) {
+    // A destination is only in the way while its own partial file is still waiting.
+    if (names.has(transfer.part)) {
+      removeQuietly(storage, transfer.name);
+    }
+  }
+  return moveAll(storage, transfers);
+}
+
+function moveAll(storage: GgufStorage, transfers: readonly GgufTransfer[]): boolean {
+  const names = new Set(storage.list());
   try {
     for (const transfer of transfers) {
-      storage.move(transfer.part, transfer.name);
-      moved.push(transfer.name);
+      // A move that already happened is never repeated or undone: its partial is gone.
+      if (!names.has(transfer.part) && !names.has(transfer.name)) {
+        return false;
+      }
+      if (names.has(transfer.part)) {
+        storage.move(transfer.part, transfer.name);
+      }
     }
     return true;
   } catch {
-    for (const name of moved) {
-      removeQuietly(storage, name);
-    }
     return false;
   }
 }
+
+/**
+ * What a finished transfer delivered, measured against the size it promised.
+ * Undefined means the server never stated a length, so only an empty file is short.
+ */
+export function transferResult(
+  size: number,
+  expected: number | undefined
+): 'whole' | 'short' | 'long' {
+  if (expected === undefined) {
+    return size === 0 ? 'short' : 'whole';
+  }
+  if (size === expected) {
+    return 'whole';
+  }
+  return size < expected ? 'short' : 'long';
+}
+
+/** Whether a finished transfer may run once more before the download is called failed. */
+export function mayRetryTransfer(download: GgufActiveDownload): boolean {
+  return download.attempts < ATTEMPTS;
+}
+
+/** A transfer that stopped short is started from zero once more, and a file that was refused is read once more. */
+const ATTEMPTS = 2;
+export const PASSES = 2;
 
 export function currentTransfer(download: GgufActiveDownload): GgufTransfer {
   const transfer = download.transfers[download.step];

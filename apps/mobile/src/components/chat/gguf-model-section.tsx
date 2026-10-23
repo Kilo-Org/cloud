@@ -48,9 +48,61 @@ type ControlsProps = {
   readonly name: string;
   readonly snapshot: GgufDownloadsSnapshot;
   readonly onDownload: (() => void) | undefined;
-  /** Tells one download button from the others on the same screen. */
-  readonly downloadLabel?: string;
+  /**
+   * The quant or model name that tells this row from the others on the same
+   * screen. Every control on the row appends it to its visible label, so a
+   * spoken label still matches what the control shows.
+   */
+  readonly downloadDetail?: string;
 };
+
+/**
+ * The visible label of one control, followed by the row detail that tells the
+ * rows apart. A blank detail names nothing, so the control keeps its visible
+ * text as the name.
+ */
+function namedWithDetail(text: string, detail: string | undefined): string | undefined {
+  return detail ? `${text} (${detail})` : undefined;
+}
+
+/** Pause or resume, and cancel, for one row's transfer. */
+function TransferControls({
+  download,
+  detail,
+}: Readonly<{ download: GgufDownload; detail: string | undefined }>) {
+  const { t } = useTranslation();
+  const transferText = t(
+    download.phase === 'paused' ? 'modelChat.gguf.resume' : 'modelChat.gguf.pause'
+  );
+  const cancelText = t('common.cancel');
+  return (
+    <View className="flex-row gap-2">
+      <Button
+        variant="outline"
+        disabled={download.pending}
+        accessibilityLabel={namedWithDetail(transferText, detail)}
+        onPress={() => {
+          if (download.phase === 'paused') {
+            ggufDownloadActions.resume(download.fileId);
+          } else {
+            ggufDownloadActions.pause(download.fileId);
+          }
+        }}
+      >
+        <Text>{transferText}</Text>
+      </Button>
+      <Button
+        variant="ghost"
+        accessibilityLabel={namedWithDetail(cancelText, detail)}
+        onPress={() => {
+          ggufDownloadActions.cancel(download.fileId);
+        }}
+      >
+        <Text>{cancelText}</Text>
+      </Button>
+    </View>
+  );
+}
 
 /** One model's state on the device: downloaded, downloading, or ready to download. */
 export function GgufDownloadControls({
@@ -58,7 +110,7 @@ export function GgufDownloadControls({
   name,
   snapshot,
   onDownload,
-  downloadLabel,
+  downloadDetail,
 }: ControlsProps) {
   const { t, i18n } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
@@ -66,6 +118,13 @@ export function GgufDownloadControls({
   const download = snapshot.download?.fileId === fileId ? snapshot.download : undefined;
   const failure = snapshot.failure?.fileId === fileId ? snapshot.failure : undefined;
   const size = (bytes: number) => formatFileSize(bytes, i18n.language);
+  const downloadText = t('modelChat.gguf.download');
+  const deleteText = t('common.delete');
+  // A voice-control user asks for the row by what it shows, so every control's
+  // name starts with that visible label and appends the one detail that tells
+  // the rows apart. Callers pass data (a quant label, a model name), never a
+  // whole sentence, so no wording can drop the visible label.
+  const detail = downloadDetail?.trim();
   return (
     <>
       {record !== undefined && (
@@ -78,18 +137,19 @@ export function GgufDownloadControls({
           </Text>
           <Button
             variant="ghost"
+            accessibilityLabel={namedWithDetail(deleteText, detail)}
             onPress={() => {
               confirm({
                 title: t('modelChat.gguf.deleteTitle'),
                 message: t('modelChat.gguf.deleteMessage', { name }),
-                confirmLabel: t('common.delete'),
+                confirmLabel: deleteText,
                 onConfirm: () => {
                   void ggufDownloadActions.remove(fileId);
                 },
               });
             }}
           >
-            <Text>{t('common.delete')}</Text>
+            <Text>{deleteText}</Text>
           </Button>
         </>
       )}
@@ -102,33 +162,7 @@ export function GgufDownloadControls({
             })}
           </Text>
           {download.phase !== 'verifying' && (
-            <View className="flex-row gap-2">
-              <Button
-                variant="outline"
-                disabled={download.pending}
-                onPress={() => {
-                  if (download.phase === 'paused') {
-                    ggufDownloadActions.resume(fileId);
-                  } else {
-                    ggufDownloadActions.pause(fileId);
-                  }
-                }}
-              >
-                <Text>
-                  {t(
-                    download.phase === 'paused' ? 'modelChat.gguf.resume' : 'modelChat.gguf.pause'
-                  )}
-                </Text>
-              </Button>
-              <Button
-                variant="ghost"
-                onPress={() => {
-                  ggufDownloadActions.cancel(fileId);
-                }}
-              >
-                <Text>{t('common.cancel')}</Text>
-              </Button>
-            </View>
+            <TransferControls download={download} detail={detail} />
           )}
         </>
       )}
@@ -137,9 +171,9 @@ export function GgufDownloadControls({
           variant="outline"
           disabled={snapshot.download !== null}
           onPress={onDownload}
-          accessibilityLabel={downloadLabel}
+          accessibilityLabel={namedWithDetail(downloadText, detail)}
         >
-          <Text>{t('modelChat.gguf.download')}</Text>
+          <Text>{downloadText}</Text>
         </Button>
       )}
       {failure !== undefined && (
@@ -241,6 +275,7 @@ export function GgufModelSection({
             fileId={row.fileId}
             name={row.name}
             snapshot={snapshot}
+            downloadDetail={row.name}
             onDownload={undefined}
           />
         </View>

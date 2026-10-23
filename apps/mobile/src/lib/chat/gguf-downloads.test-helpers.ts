@@ -35,6 +35,8 @@ export function harness(
     readonly freeBytes?: number;
     readonly inspection?: () => Promise<GgufInspection>;
     readonly failMove?: string;
+    /** A destination the first move attempt to it cannot reach. */
+    readonly failMoveOnce?: string;
     /** Hashes by file name; any other file hashes to the fixture's published value. */
     readonly checksums?: Readonly<Record<string, string>>;
     /** A file the native hash cannot read. */
@@ -50,6 +52,7 @@ export function harness(
   const inspected: string[] = [];
   const released: string[] = [];
   const projectors: (string | undefined)[] = [];
+  let failedMoveOnce = false;
 
   const storage: GgufStorage = {
     freeBytes: () => freeBytes,
@@ -66,6 +69,10 @@ export function harness(
     },
     move: (from, to) => {
       if (to === options.failMove) {
+        throw new Error('move failed');
+      }
+      if (to === options.failMoveOnce && !failedMoveOnce) {
+        failedMoveOnce = true;
         throw new Error('move failed');
       }
       const size = files.get(from) ?? 0;

@@ -69,7 +69,7 @@ async function renderRow(overrides: Partial<Parameters<typeof MemberRow>[0]> = {
 type MenuProps = {
   visible: boolean;
   title?: string;
-  options: { label: string; destructive?: boolean }[];
+  options: { label: string; destructive?: boolean; selected?: boolean }[];
   cancelLabel: string;
   onSelect: (index: number) => void;
   onClose: () => void;

@@ -669,7 +669,8 @@
       "gitlabDescription": "Tilslut din GitLab-konto for at gennemgå merge requests på mobilen.",
       "bitbucketDescription": "Tilslut Bitbucket til denne organisation for at gennemgå pull requests på mobilen.",
       "bitbucketOrgOnlyDescription": "Skift kontoen ovenfor til en organisation for at gennemgå dens pull requests i Bitbucket.",
-      "contextLine": "Til {{organization}}"
+      "contextLine": "Til {{organization}}",
+      "contextLinePersonal": "Til din personlige konto"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "dollar",
       "costSpoken": "pris {{cost}}",
       "costSpokenWithTime": "pris {{cost}}, {{time}}",
+      "spokenJoiner": "og",
       "pullRequest": "pR {{number}}"
     },
     "githubInstall": {

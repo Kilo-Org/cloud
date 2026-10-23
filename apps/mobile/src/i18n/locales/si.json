@@ -669,7 +669,8 @@
       "gitlabDescription": "ජංගම දුරකථනයෙන් මර්ජ ඉල්ලීම් සමාලෝචනය කිරීමට ඔබේ GitLab ගිණුම සම්බන්ධ කරන්න.",
       "bitbucketDescription": "ජංගම දුරකථනයෙන් පුල් ඉල්ලීම් සමාලෝචනය කිරීමට Bitbucket මෙම සංවිධානයට සම්බන්ධ කරන්න.",
       "bitbucketOrgOnlyDescription": "එහි Bitbucket පුල් ඉල්ලීම් සමාලෝචනය කිරීමට ඉහත ගිණුම සංවිධානයකට මාරු කරන්න.",
-      "contextLine": "{{organization}} සඳහා"
+      "contextLine": "{{organization}} සඳහා",
+      "contextLinePersonal": "ඔබේ පෞද්ගලික ගිණුම සඳහා"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "ඩොලර්",
       "costSpoken": "පිරිවැය {{cost}}",
       "costSpokenWithTime": "පිරිවැය {{cost}}, {{time}}",
+      "spokenJoiner": ", සහ",
       "pullRequest": "පුල් ඉල්ලීම {{number}}"
     },
     "githubInstall": {

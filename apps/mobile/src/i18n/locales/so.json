@@ -669,7 +669,8 @@
       "gitlabDescription": "Ku xir xisaabtaada GitLab si aad mobilka ugu eegto merge request-yada.",
       "bitbucketDescription": "Bitbucket ku xir hay'addan si aad mobilka ugu eegto PR-yada.",
       "bitbucketOrgOnlyDescription": "Beddel xisaabta kor ku qoran hay'ad si aad u eegto PR-yadeeda Bitbucket.",
-      "contextLine": "{{organization}} u"
+      "contextLine": "{{organization}} u",
+      "contextLinePersonal": "Akoonkaaga shakhsiyeed u"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "doolar",
       "costSpoken": "kharashka {{cost}}",
       "costSpokenWithTime": "qiimaha {{cost}}, {{time}}",
+      "spokenJoiner": "iyo",
       "pullRequest": "codsiga isku-darka {{number}}"
     },
     "githubInstall": {

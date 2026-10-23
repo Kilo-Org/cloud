@@ -669,7 +669,8 @@
       "gitlabDescription": "ဖုန်းပေါ်တွင် merge request များကို သုံးသပ်ရန် သင့် GitLab အကောင့်ကို ချိတ်ဆက်ပါ။",
       "bitbucketDescription": "ဖုန်းပေါ်တွင် PR များကို သုံးသပ်ရန် ဤအဖွဲ့ကို Bitbucket နှင့် ချိတ်ဆက်ပါ။",
       "bitbucketOrgOnlyDescription": "၎င်း၏ Bitbucket PR များကို သုံးသပ်ရန် အပေါ်ရှိ အကောင့်ကို အဖွဲ့တစ်ခုသို့ ပြောင်းပါ။",
-      "contextLine": "{{organization}} အတွက်"
+      "contextLine": "{{organization}} အတွက်",
+      "contextLinePersonal": "ကိုယ်ပိုင်အကောင့်အတွက်"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "ဒေါ်လာ",
       "costSpoken": "ကုန်ကျစရိတ် {{cost}}",
       "costSpokenWithTime": "ကုန်ကျစရိတ် {{cost}}၊ {{time}}",
+      "spokenJoiner": "နှင့်",
       "pullRequest": "pR အမှတ် {{number}}"
     },
     "githubInstall": {

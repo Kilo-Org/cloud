@@ -669,7 +669,8 @@
       "gitlabDescription": "Mobil cihazda merge sorğularına baxış keçirmək üçün GitLab hesabını qoş.",
       "bitbucketDescription": "Mobil cihazda birləşdirmə sorğularına baxış keçirmək üçün Bitbucket-ı bu təşkilata qoş.",
       "bitbucketOrgOnlyDescription": "Yuxarıdakı hesabı təşkilata keçir ki, onun Bitbucket birləşdirmə sorğularına baxış keçirəsən.",
-      "contextLine": "{{organization}} üçün"
+      "contextLine": "{{organization}} üçün",
+      "contextLinePersonal": "Şəxsi hesabınız üçün"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "dollar",
       "costSpoken": "xərc: {{cost}}",
       "costSpokenWithTime": "xərc {{cost}}, {{time}}",
+      "spokenJoiner": "və",
       "pullRequest": "birləşdirmə sorğusu {{number}}"
     },
     "githubInstall": {

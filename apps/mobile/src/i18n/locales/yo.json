@@ -669,7 +669,8 @@
       "gitlabDescription": "So àkọọ́lẹ̀ GitLab rẹ pọ̀ láti ṣàtúnyẹ̀wò àwọn ìbéèrè ìṣọ̀kan lórí fónù.",
       "bitbucketDescription": "So Bitbucket pọ̀ mọ́ àjọ yìí láti ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ lórí fónù.",
       "bitbucketOrgOnlyDescription": "Yí àkọọ́lẹ̀ tí ó wà lókè padà sí àjọ láti ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ Bitbucket rẹ̀.",
-      "contextLine": "Fún {{organization}}"
+      "contextLine": "Fún {{organization}}",
+      "contextLinePersonal": "Fún ti ara ẹni"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "dọ́là",
       "costSpoken": "iye owó {{cost}}",
       "costSpokenWithTime": "owó {{cost}}, {{time}}",
+      "spokenJoiner": ",",
       "pullRequest": "ìbéèrè ìṣọ̀kan {{number}}"
     },
     "githubInstall": {

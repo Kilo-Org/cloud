@@ -669,7 +669,8 @@
       "gitlabDescription": "დააკავშირეთ თქვენი GitLab ანგარიში, შერწყმის მოთხოვნების მობილურში განსახილველად.",
       "bitbucketDescription": "დააკავშირეთ Bitbucket ამ ორგანიზაციას, PR-ების მობილურში განსახილველად.",
       "bitbucketOrgOnlyDescription": "ზემოთ მყოფი ანგარიში გადართეთ ორგანიზაციაზე, მისი Bitbucket-ის PR-ების განსახილველად.",
-      "contextLine": "{{organization}}-სთვის"
+      "contextLine": "{{organization}}-სთვის",
+      "contextLinePersonal": "პირადი ანგარიშისთვის"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "დოლარი",
       "costSpoken": "ღირებულება {{cost}}",
       "costSpokenWithTime": "ღირებულება {{cost}}, {{time}}",
+      "spokenJoiner": "და",
       "pullRequest": "შერწყმის მოთხოვნა {{number}}"
     },
     "githubInstall": {

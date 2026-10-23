@@ -669,7 +669,8 @@
       "gitlabDescription": "Telefonda merge so‘rovlarini ko‘rib chiqish uchun GitLab hisobingizni ulang.",
       "bitbucketDescription": "Telefonda PRlarni ko‘rib chiqish uchun Bitbucketni ushbu tashkilotga ulang.",
       "bitbucketOrgOnlyDescription": "Yuqoridagi hisobni tashkilotga oʻtkazing, uning Bitbucket PRlarini koʻrib chiqish uchun.",
-      "contextLine": "{{organization}} uchun"
+      "contextLine": "{{organization}} uchun",
+      "contextLinePersonal": "Shaxsiy hisob uchun"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "dollar",
       "costSpoken": "xarajati {{cost}}",
       "costSpokenWithTime": "xarajat {{cost}}, {{time}}",
+      "spokenJoiner": "va",
       "pullRequest": "{{number}}-sonli PR"
     },
     "githubInstall": {

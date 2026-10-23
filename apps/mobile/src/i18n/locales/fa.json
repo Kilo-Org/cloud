@@ -669,7 +669,8 @@
       "gitlabDescription": "حساب GitLab خود را وصل کنید تا درخواست‌های ادغام را در موبایل بازبینی کنید.",
       "bitbucketDescription": "Bitbucket را به این سازمان وصل کنید تا پول ریکوئست‌ها را در موبایل بازبینی کنید.",
       "bitbucketOrgOnlyDescription": "حساب بالا را به یک سازمان تغییر دهید تا پول ریکوئست‌های Bitbucket آن را بازبینی کنید.",
-      "contextLine": "برای {{organization}}"
+      "contextLine": "برای {{organization}}",
+      "contextLinePersonal": "برای حساب شخصی شما"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "دلار",
       "costSpoken": "هزینه {{cost}}",
       "costSpokenWithTime": "هزینه {{cost}}، {{time}}",
+      "spokenJoiner": "، و",
       "pullRequest": "درخواست ادغام {{number}}"
     },
     "githubInstall": {

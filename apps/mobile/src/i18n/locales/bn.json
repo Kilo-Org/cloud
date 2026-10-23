@@ -669,7 +669,8 @@
       "gitlabDescription": "মোবাইলে মার্জ রিকোয়েস্ট রিভিউ করতে আপনার GitLab অ্যাকাউন্ট সংযুক্ত করুন।",
       "bitbucketDescription": "মোবাইলে পুল রিকোয়েস্ট রিভিউ করতে এই অর্গানাইজেশনটিকে Bitbucket-এর সঙ্গে সংযুক্ত করুন।",
       "bitbucketOrgOnlyDescription": "উপরে থাকা অ্যাকাউন্ট একটি অর্গানাইজেশনে সুইচ করুন তার Bitbucket পুল রিকোয়েস্ট রিভিউ করতে।",
-      "contextLine": "{{organization}}-এর জন্য"
+      "contextLine": "{{organization}}-এর জন্য",
+      "contextLinePersonal": "আপনার ব্যক্তিগত অ্যাকাউন্টের জন্য"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "ডলার",
       "costSpoken": "খরচ {{cost}}",
       "costSpokenWithTime": "খরচ {{cost}}, {{time}}",
+      "spokenJoiner": "এবং",
       "pullRequest": "পুল রিকোয়েস্ট {{number}}"
     },
     "githubInstall": {

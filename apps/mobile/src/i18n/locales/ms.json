@@ -669,7 +669,8 @@
       "gitlabDescription": "Sambungkan akaun GitLab anda untuk menyemak permintaan gabungan pada mudah alih.",
       "bitbucketDescription": "Sambungkan Bitbucket ke organisasi ini untuk menyemak permintaan tarik pada mudah alih.",
       "bitbucketOrgOnlyDescription": "Tukar akaun di atas kepada organisasi untuk menyemak permintaan tarik Bitbucket-nya.",
-      "contextLine": "Untuk {{organization}}"
+      "contextLine": "Untuk {{organization}}",
+      "contextLinePersonal": "Untuk akaun peribadi anda"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "dolar",
       "costSpoken": "kos {{cost}}",
       "costSpokenWithTime": "kos {{cost}}, {{time}}",
+      "spokenJoiner": "dan",
       "pullRequest": "permintaan tarik {{number}}"
     },
     "githubInstall": {

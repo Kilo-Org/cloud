@@ -669,7 +669,8 @@
       "gitlabDescription": "Jikọọ akaụntụ GitLab gị iji nyochaa arịrịọ njikọta na ekwentị.",
       "bitbucketDescription": "Jikọọ Bitbucket na òtù a iji nyochaa arịrịọ ijikọ koodu na ekwentị.",
       "bitbucketOrgOnlyDescription": "Gbanwee akaụntụ dị n'elu gaa n'òtụ iji nyochaa arịrịọ ijikọ koodu Bitbucket ya.",
-      "contextLine": "Maka {{organization}}"
+      "contextLine": "Maka {{organization}}",
+      "contextLinePersonal": "Maka nkeonwe"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "dọla",
       "costSpoken": "ọnụ ahịa {{cost}}",
       "costSpokenWithTime": "ọnụ ahịa {{cost}}, {{time}}",
+      "spokenJoiner": ", na",
       "pullRequest": "arịrịọ njikọta {{number}}"
     },
     "githubInstall": {

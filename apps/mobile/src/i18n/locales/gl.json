@@ -669,7 +669,8 @@
       "gitlabDescription": "Conecta a túa conta de GitLab para revisar solicitudes de fusión no móbil.",
       "bitbucketDescription": "Conecta Bitbucket a esta organización para revisar solicitudes de integración no móbil.",
       "bitbucketOrgOnlyDescription": "Cambia a conta de arriba a unha organización para revisar as súas solicitudes de integración en Bitbucket.",
-      "contextLine": "Para {{organization}}"
+      "contextLine": "Para {{organization}}",
+      "contextLinePersonal": "Para a túa conta persoal"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "dólares",
       "costSpoken": "custo de {{cost}}",
       "costSpokenWithTime": "custo {{cost}}, {{time}}",
+      "spokenJoiner": "e",
       "pullRequest": "solicitude de integración {{number}}"
     },
     "githubInstall": {

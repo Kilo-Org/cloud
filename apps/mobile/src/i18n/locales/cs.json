@@ -693,7 +693,8 @@
       "gitlabDescription": "Připoj svůj účet GitLab a kontroluj merge requesty na mobilu.",
       "bitbucketDescription": "Připoj Bitbucket k této organizaci a kontroluj PR na mobilu.",
       "bitbucketOrgOnlyDescription": "Přepni účet nahoře na organizaci a kontroluj její PR na Bitbucketu.",
-      "contextLine": "Pro {{organization}}"
+      "contextLine": "Pro {{organization}}",
+      "contextLinePersonal": "Pro osobní účet"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2166,6 +2167,7 @@
       "dollar_many": "dolaru",
       "costSpoken": "náklady {{cost}}",
       "costSpokenWithTime": "náklady {{cost}}, {{time}}",
+      "spokenJoiner": "a",
       "pullRequest": "pR {{number}}"
     },
     "githubInstall": {

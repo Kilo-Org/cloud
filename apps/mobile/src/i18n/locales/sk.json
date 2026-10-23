@@ -693,7 +693,8 @@
       "gitlabDescription": "Pripoj svoj účet GitLab a kontroluj merge requesty v mobile.",
       "bitbucketDescription": "Pripoj Bitbucket k tejto organizácii a kontroluj žiadosti o zlúčenie v mobile.",
       "bitbucketOrgOnlyDescription": "Prepni účet hore na organizáciu a kontroluj jej žiadosti o zlúčenie na Bitbucku.",
-      "contextLine": "Pre {{organization}}"
+      "contextLine": "Pre {{organization}}",
+      "contextLinePersonal": "Pre osobný účet"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2166,6 +2167,7 @@
       "dollar_many": "dolára",
       "costSpoken": "cena {{cost}}",
       "costSpokenWithTime": "cena {{cost}}, {{time}}",
+      "spokenJoiner": "a",
       "pullRequest": "žiadosť o zlúčenie {{number}}"
     },
     "githubInstall": {

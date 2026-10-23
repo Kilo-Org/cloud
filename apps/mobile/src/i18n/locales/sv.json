@@ -669,7 +669,8 @@
       "gitlabDescription": "Anslut ditt GitLab-konto för att granska merge requests i mobilen.",
       "bitbucketDescription": "Anslut Bitbucket till den här organisationen för att granska PR:er i mobilen.",
       "bitbucketOrgOnlyDescription": "Växla kontot ovan till en organisation för att granska dess PR:er i Bitbucket.",
-      "contextLine": "För {{organization}}"
+      "contextLine": "För {{organization}}",
+      "contextLinePersonal": "För ditt personliga konto"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "dollar",
       "costSpoken": "kostnad {{cost}}",
       "costSpokenWithTime": "kostnad {{cost}}, {{time}}",
+      "spokenJoiner": "och",
       "pullRequest": "PR {{number}}"
     },
     "githubInstall": {

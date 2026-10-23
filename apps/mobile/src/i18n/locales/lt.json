@@ -693,7 +693,8 @@
       "gitlabDescription": "Prijunk savo GitLab paskyrą, kad galėtum peržiūrėti merge requests mobiliajame įrenginyje.",
       "bitbucketDescription": "Prijunk Bitbucket prie šios organizacijos, kad galėtum peržiūrėti pakeitimų užklausas mobiliajame įrenginyje.",
       "bitbucketOrgOnlyDescription": "Perjunk aukščiau esančią paskyrą į organizaciją, kad galėtum peržiūrėti jos Bitbucket pakeitimų užklausas.",
-      "contextLine": "Skirta {{organization}}"
+      "contextLine": "Skirta {{organization}}",
+      "contextLinePersonal": "Skirta asmeninei paskyrai"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2166,6 +2167,7 @@
       "dollar_many": "dolerio",
       "costSpoken": "kaina {{cost}}",
       "costSpokenWithTime": "kaina {{cost}}, {{time}}",
+      "spokenJoiner": "ir",
       "pullRequest": "pakeitimų užklausa {{number}}"
     },
     "githubInstall": {

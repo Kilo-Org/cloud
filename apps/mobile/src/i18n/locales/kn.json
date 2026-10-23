@@ -669,7 +669,8 @@
       "gitlabDescription": "ಮೊಬೈಲ್‌ನಲ್ಲಿ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಲು ನಿಮ್ಮ GitLab ಖಾತೆಯನ್ನು ಸಂಪರ್ಕಿಸಿ.",
       "bitbucketDescription": "ಮೊಬೈಲ್‌ನಲ್ಲಿ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಲು ಈ ಸಂಸ್ಥೆಯನ್ನು Bitbucketಗೆ ಸಂಪರ್ಕಿಸಿ.",
       "bitbucketOrgOnlyDescription": "ಅದರ Bitbucket ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಲು ಮೇಲಿನ ಖಾತೆಯನ್ನು ಒಂದು ಸಂಸ್ಥೆಗೆ ಬದಲಾಯಿಸಿ.",
-      "contextLine": "{{organization}} ಗಾಗಿ"
+      "contextLine": "{{organization}} ಗಾಗಿ",
+      "contextLinePersonal": "ನಿಮ್ಮ ವೈಯಕ್ತಿಕ ಖಾತೆಗಾಗಿ"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "ಡಾಲರ್‌ಗಳು",
       "costSpoken": "ವೆಚ್ಚ {{cost}}",
       "costSpokenWithTime": "ವೆಚ್ಚ {{cost}}, {{time}}",
+      "spokenJoiner": ", ಮತ್ತು",
       "pullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ {{number}}"
     },
     "githubInstall": {

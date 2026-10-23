@@ -705,7 +705,8 @@
       "gitlabDescription": "Ikkonnettja l-kont GitLab tiegħek biex tirrevedi l-merge requests fuq il-mowbajl.",
       "bitbucketDescription": "Ikkonnettja Bitbucket ma' din l-organizzazzjoni biex tirrevedi l-PRs fuq il-mowbajl.",
       "bitbucketOrgOnlyDescription": "Ibdel il-kont ta' fuq għal organizzazzjoni biex tirrevedi l-PRs Bitbucket tagħha.",
-      "contextLine": "Għal {{organization}}"
+      "contextLine": "Għal {{organization}}",
+      "contextLinePersonal": "Għall-kont personali tiegħek"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2193,6 +2194,7 @@
       "dollar_many": "dollaru",
       "costSpoken": "spiża ta' {{cost}}",
       "costSpokenWithTime": "spiża {{cost}}, {{time}}",
+      "spokenJoiner": ", u",
       "pullRequest": "talba għall-għaqda {{number}}"
     },
     "githubInstall": {

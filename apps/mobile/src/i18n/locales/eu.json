@@ -669,7 +669,8 @@
       "gitlabDescription": "Konektatu zure GitLab kontua merge-eskaerak mugikorrean berrikusteko.",
       "bitbucketDescription": "Konektatu Bitbucket erakunde honetara bateratze-eskaerak mugikorrean berrikusteko.",
       "bitbucketOrgOnlyDescription": "Aldatu goiko kontua erakunde batera haren Bitbucket bateratze-eskaerak berrikusteko.",
-      "contextLine": "{{organization}}-rako"
+      "contextLine": "{{organization}}-rako",
+      "contextLinePersonal": "Zure kontu pertsonalerako"
     },
     "screen": {
       "title": "#{{number}}",
@@ -2112,6 +2113,7 @@
       "dollar_other": "dolar",
       "costSpoken": "kostua: {{cost}}",
       "costSpokenWithTime": "kostua: {{cost}}, {{time}}",
+      "spokenJoiner": "eta",
       "pullRequest": "{{number}}. bateratze-eskaera"
     },
     "githubInstall": {

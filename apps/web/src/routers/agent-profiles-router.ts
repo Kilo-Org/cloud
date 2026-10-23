@@ -1004,7 +1004,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .input(
       ProfileIdSchema.extend({
         organizationId: z.uuid().optional(),
-        orderedIds: z.array(z.uuid()),
+        orderedIds: profileKiloCommandsService.kiloCommandReorderIdsSchema,
       })
     )
     .output(z.object({ success: z.boolean() }))

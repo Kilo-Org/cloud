@@ -3,7 +3,7 @@ import {
   agent_environment_profile_kilo_commands,
   type AgentEnvironmentProfileKiloCommand,
 } from '@kilocode/db/schema';
-import { and, eq, count, asc } from 'drizzle-orm';
+import { and, eq, count, asc, inArray, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { ProfileOwner, ProfileKiloCommandResponse } from './types';
 import { verifyProfileOwnership } from './profile-utils';
@@ -14,6 +14,7 @@ import {
   MAX_KILO_COMMAND_DESCRIPTION_LENGTH,
   BUILTIN_COMMAND_NAMES,
   kiloCommandNameSchema,
+  kiloCommandReorderIdsSchema,
   kiloCommandCreateInputSchema,
   kiloCommandUpdateInputSchema,
   type KiloCommandCreateInput,
@@ -27,6 +28,7 @@ export {
   MAX_KILO_COMMAND_DESCRIPTION_LENGTH,
   BUILTIN_COMMAND_NAMES,
   kiloCommandNameSchema,
+  kiloCommandReorderIdsSchema,
   kiloCommandCreateInputSchema,
   kiloCommandUpdateInputSchema,
 };
@@ -184,18 +186,51 @@ export async function reorderKiloCommands(
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, owner);
 
+  if (orderedIds.length > MAX_PROFILE_KILO_COMMANDS) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `At most ${MAX_PROFILE_KILO_COMMANDS} commands can be reordered`,
+    });
+  }
+  if (new Set(orderedIds).size !== orderedIds.length) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Command IDs must be unique' });
+  }
+  if (orderedIds.length === 0) {
+    return;
+  }
+
   await db.transaction(async tx => {
-    for (let i = 0; i < orderedIds.length; i++) {
-      await tx
-        .update(agent_environment_profile_kilo_commands)
-        .set({ sort_order: i })
-        .where(
-          and(
-            eq(agent_environment_profile_kilo_commands.id, orderedIds[i]),
-            eq(agent_environment_profile_kilo_commands.profile_id, profileId)
-          )
-        );
+    const rows = await tx
+      .select({ id: agent_environment_profile_kilo_commands.id })
+      .from(agent_environment_profile_kilo_commands)
+      .where(
+        and(
+          eq(agent_environment_profile_kilo_commands.profile_id, profileId),
+          inArray(agent_environment_profile_kilo_commands.id, orderedIds)
+        )
+      );
+    const ownedIds = new Set(rows.map(row => row.id));
+    if (orderedIds.some(id => !ownedIds.has(id))) {
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: 'Command order changed. Refresh and try again.',
+      });
     }
+
+    await tx
+      .update(agent_environment_profile_kilo_commands)
+      .set({
+        sort_order: sql`CASE ${agent_environment_profile_kilo_commands.id} ${sql.join(
+          orderedIds.map((id, position) => sql`WHEN ${id}::uuid THEN ${position}::integer`),
+          sql` `
+        )} END`,
+      })
+      .where(
+        and(
+          eq(agent_environment_profile_kilo_commands.profile_id, profileId),
+          inArray(agent_environment_profile_kilo_commands.id, orderedIds)
+        )
+      );
   });
 }
 

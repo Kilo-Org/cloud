@@ -420,6 +420,7 @@ export async function listActiveSessions({
       });
 
       if (!response.ok) {
+        await response.body?.cancel().catch(() => undefined);
         if (requireCompleteSnapshot) {
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',

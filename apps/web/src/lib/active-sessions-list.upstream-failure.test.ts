@@ -8,11 +8,13 @@
 /* eslint-disable import/first -- the fakes must be installed before the module under test loads */
 
 const bodyText = jest.fn(async () => 'upstream failure detail');
+const cancelBody = jest.fn(async () => undefined);
 const mockFetchWithinBudget = jest.fn(async () => ({
   ok: false,
   status: 503,
   statusText: 'Service Unavailable',
   json: async () => ({}),
+  body: { cancel: cancelBody },
   text: bodyText,
 }));
 
@@ -49,6 +51,7 @@ import { listActiveSessions } from './active-sessions-list';
 
 beforeEach(() => {
   bodyText.mockClear();
+  cancelBody.mockClear();
   mockFetchWithinBudget.mockClear();
 });
 
@@ -68,6 +71,7 @@ describe('listActiveSessions upstream failure', () => {
     expect(call).toHaveLength(1);
     expect(call[0]).toBe('[active-sessions] fetch failed: 503 Service Unavailable');
     expect(bodyText).not.toHaveBeenCalled();
+    expect(cancelBody).toHaveBeenCalledTimes(1);
     warn.mockRestore();
   });
 });

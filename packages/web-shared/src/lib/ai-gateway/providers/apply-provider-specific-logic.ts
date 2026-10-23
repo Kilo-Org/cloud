@@ -249,7 +249,7 @@ export function removeUnsupportedRequestServiceTier(
     model: requestedModel,
     requestKind: requestToMutate.kind,
     serviceTier:
-      typeof serviceTier === 'string' && KNOWN_SERVICE_TIERS[serviceTier]
+      typeof serviceTier === 'string' && Object.hasOwn(KNOWN_SERVICE_TIERS, serviceTier)
         ? serviceTier
         : 'unrecognized',
     reason,

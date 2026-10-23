@@ -116,26 +116,29 @@ describe('removeUnsupportedRequestServiceTier', () => {
     }
   );
 
-  it('records only a recognized tier value', () => {
-    const model = GEMINI_FLASH_CURRENT_MODEL_ID;
-    const request = makeRequest(model);
-    request.body.service_tier = 'unrecognized-tier' as unknown as typeof request.body.service_tier;
-    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+  it.each(['unrecognized-tier', 'constructor', '__proto__'])(
+    'records only a recognized tier value (%s)',
+    tier => {
+      const model = GEMINI_FLASH_CURRENT_MODEL_ID;
+      const request = makeRequest(model);
+      request.body.service_tier = tier as unknown as typeof request.body.service_tier;
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-    removeUnsupportedRequestServiceTier(model, request, null);
+      removeUnsupportedRequestServiceTier(model, request, null);
 
-    expect(request.body.service_tier).toBeUndefined();
-    expect(warn).toHaveBeenCalledWith(
-      '[applyProviderSpecificLogic] Removed unsupported request-level service tier',
-      {
-        model,
-        requestKind: 'chat_completions',
-        serviceTier: 'unrecognized',
-        reason: 'non-fallback custom pricing',
-      }
-    );
-    warn.mockRestore();
-  });
+      expect(request.body.service_tier).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(
+        '[applyProviderSpecificLogic] Removed unsupported request-level service tier',
+        {
+          model,
+          requestKind: 'chat_completions',
+          serviceTier: 'unrecognized',
+          reason: 'non-fallback custom pricing',
+        }
+      );
+      warn.mockRestore();
+    }
+  );
 
   it.each([
     ['moonshotai/kimi-k3', null],

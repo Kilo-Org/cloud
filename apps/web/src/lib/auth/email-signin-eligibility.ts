@@ -16,18 +16,15 @@ import type { AuthErrorType } from '@kilocode/web-shared/lib/auth/constants';
 
 const MAGIC_LINK_EMAIL_RATE_LIMIT_ID = 'magic-link-email';
 const SIGN_IN_CODE_EMAIL_IP_RATE_LIMIT_ID = 'sign-in-code-email-ip';
-const SIGN_IN_CODE_EMAIL_GLOBAL_RATE_LIMIT_ID = 'sign-in-code-email-global';
 
 /**
- * Vercel Firewall rate limits that bound sign-in code email volume. Each rule
- * lives in the project's firewall configuration; `checkRateLimit` reports an
- * unknown id as "not rate limited", so a missing rule is treated as an
- * unavailable eligibility check and fails closed with 503 instead of sending.
+ * Vercel Firewall rate limits that apply to sign-in code email volume. Each
+ * rule lives in the project's firewall configuration; a rule that is not
+ * configured is skipped and the gap is reported to Sentry at most once a
+ * minute.
  *
- * - `magic-link-email` caps sends per normalized address.
- * - `sign-in-code-email-ip` caps sends per caller address.
- * - `sign-in-code-email-global` caps total sends, keying every instance onto
- *   one shared bucket.
+ * - `magic-link-email` counts sends per normalized address.
+ * - `sign-in-code-email-ip` counts sends per caller address.
  */
 function getMagicLinkEmailRateLimitKey(email: string): string {
   const emailHash = createHmac('sha256', NEXTAUTH_SECRET)
@@ -52,10 +49,6 @@ function clientIpAddress(request: NextRequest): string {
   return request.headers.get('x-real-ip') || 'unknown';
 }
 
-type SendBudgetCheck =
-  | { ok: true }
-  | { ok: false; status: 429 | 503; errorCode: 'SIGNUP-RATE-LIMITED' | 'SIGNUP-UNAVAILABLE' };
-
 const missingRuleReportedAt: Record<string, number> = {};
 const MISSING_RULE_REPORT_INTERVAL_MS = 60_000;
 
@@ -76,12 +69,11 @@ function reportMissingRule(ruleId: string): void {
 }
 
 /**
- * Counts one send against the per-address and per-caller firewall rules.
- * Returns 429 when an allowance is exhausted and 503 when a rule is missing
- * from the firewall configuration.
+ * Applies the per-address and per-caller firewall rules and reports whether a
+ * count is exhausted. A rule that is not configured is skipped.
  * Runs before the eligibility rules: these refusals cost nothing downstream.
  */
-async function checkCallerBudget(email: string, request: NextRequest): Promise<SendBudgetCheck> {
+async function isSendBudgetExhausted(email: string, request: NextRequest): Promise<boolean> {
   const checks = [
     {
       id: MAGIC_LINK_EMAIL_RATE_LIMIT_ID,
@@ -100,34 +92,13 @@ async function checkCallerBudget(email: string, request: NextRequest): Promise<S
     });
     if (error === 'not-found') {
       reportMissingRule(check.id);
-      return { ok: false, status: 503, errorCode: 'SIGNUP-UNAVAILABLE' };
+      continue;
     }
     if (rateLimited) {
-      return { ok: false, status: 429, errorCode: 'SIGNUP-RATE-LIMITED' };
+      return true;
     }
   }
-  return { ok: true };
-}
-
-/**
- * Counts one approved send against the shared global firewall rule so every
- * instance draws from one bucket. Checked only after the address passed
- * eligibility, so refusals that never send cannot spend the allowance.
- */
-export async function checkGlobalSendBudget(request: NextRequest): Promise<SendBudgetCheck> {
-  const { rateLimited, error } = await checkRateLimit(SIGN_IN_CODE_EMAIL_GLOBAL_RATE_LIMIT_ID, {
-    request,
-    rateLimitKey: `${SIGN_IN_CODE_EMAIL_GLOBAL_RATE_LIMIT_ID}:total`,
-  });
-
-  if (error === 'not-found') {
-    reportMissingRule(SIGN_IN_CODE_EMAIL_GLOBAL_RATE_LIMIT_ID);
-    return { ok: false, status: 503, errorCode: 'SIGNUP-UNAVAILABLE' };
-  }
-  if (rateLimited) {
-    return { ok: false, status: 429, errorCode: 'SIGNUP-RATE-LIMITED' };
-  }
-  return { ok: true };
+  return false;
 }
 
 export type DomainSignInEligibility =
@@ -200,7 +171,6 @@ export type EmailSignInEligibility =
         | 'EMAIL-SIGNUP-DISABLED'
         | 'INVALID_EMAIL'
         | 'SIGNUP-RATE-LIMITED'
-        | 'SIGNUP-UNAVAILABLE'
         | 'SSO_ERROR';
       body: Record<string, unknown>;
     };
@@ -237,19 +207,7 @@ export async function checkEmailSignInEligibility(
   email: string,
   request: NextRequest
 ): Promise<EmailSignInEligibility> {
-  const callerBudget = await checkCallerBudget(email, request);
-  if (!callerBudget.ok) {
-    if (callerBudget.status === 503) {
-      return {
-        ok: false,
-        status: 503,
-        errorCode: 'SIGNUP-UNAVAILABLE',
-        body: {
-          success: false,
-          error: 'Sign-in is temporarily unavailable. Please try again later.',
-        },
-      };
-    }
+  if (await isSendBudgetExhausted(email, request)) {
     return {
       ok: false,
       status: 429,

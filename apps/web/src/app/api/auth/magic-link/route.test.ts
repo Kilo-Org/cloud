@@ -10,7 +10,6 @@ import { checkRateLimit } from '@vercel/firewall';
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
-import { checkGlobalSendBudget } from '@/lib/auth/email-signin-eligibility';
 
 jest.mock('@vercel/firewall');
 jest.mock('@/lib/auth/verify-turnstile-jwt');
@@ -18,10 +17,6 @@ jest.mock('@kilocode/web-shared/lib/auth/magic-link-tokens');
 jest.mock('@kilocode/web-shared/lib/email');
 jest.mock('@/lib/user');
 jest.mock('@kilocode/web-shared/lib/organizations/organization-sso-policy');
-jest.mock('@/lib/auth/email-signin-eligibility', () => ({
-  ...jest.requireActual('@/lib/auth/email-signin-eligibility'),
-  checkGlobalSendBudget: jest.fn(),
-}));
 
 import { POST } from './route';
 
@@ -32,7 +27,6 @@ const mockFindUserByNormalizedEmail = jest.mocked(findUserByNormalizedEmail);
 const mockGetWorkOSOrganization = jest.mocked(getWorkOSOrganization);
 const mockCheckRateLimit = jest.mocked(checkRateLimit);
 const mockResolveSsoAuthorityForDomain = jest.mocked(resolveSsoAuthorityForDomain);
-const mockCheckGlobalSendBudget = jest.mocked(checkGlobalSendBudget);
 
 describe('POST /api/auth/magic-link', () => {
   const createRequest = (body: unknown) =>
@@ -74,7 +68,6 @@ describe('POST /api/auth/magic-link', () => {
     mockFindUserByNormalizedEmail.mockResolvedValue(undefined);
 
     mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
-    mockCheckGlobalSendBudget.mockResolvedValue({ ok: true });
     mockResolveSsoAuthorityForDomain.mockImplementation(async domain => ({
       status: 'not_required',
       domain,

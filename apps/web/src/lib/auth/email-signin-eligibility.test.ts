@@ -30,7 +30,6 @@ import {
   checkDomainSignInEligibility,
   isNewAccountEligibleForMagicLink,
   checkEmailSignInEligibility,
-  checkGlobalSendBudget,
 } from './email-signin-eligibility';
 
 const mockCheckRateLimit = jest.mocked(checkRateLimit);
@@ -178,35 +177,38 @@ describe('checkEmailSignInEligibility send budgets', () => {
     });
   });
 
-  it('returns 503 SIGNUP-UNAVAILABLE when a caller rule is missing from the firewall configuration', async () => {
+  it('reports a rule that is not configured once per interval and continues', async () => {
     mockCheckRateLimit.mockImplementation(async id => {
       if (id === 'sign-in-code-email-ip') return { rateLimited: false, error: 'not-found' };
       return { rateLimited: false };
     });
 
     await expect(checkEmailSignInEligibility('user@example.com', request())).resolves.toEqual({
-      ok: false,
-      status: 503,
-      errorCode: 'SIGNUP-UNAVAILABLE',
-      body: {
-        success: false,
-        error: 'Sign-in is temporarily unavailable. Please try again later.',
-      },
+      ok: true,
     });
+    await checkEmailSignInEligibility('user@example.com', request());
+
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
     expect(mockCaptureMessage).toHaveBeenCalledWith(
       "Firewall rate limit 'sign-in-code-email-ip' is not configured",
       expect.objectContaining({ level: 'error' })
     );
   });
 
-  it('returns 503 when the per-address rule is missing, before any send', async () => {
+  it('continues when the per-address rule is not configured and still applies the caller rule', async () => {
     mockCheckRateLimit.mockImplementation(async id => {
       if (id === 'magic-link-email') return { rateLimited: false, error: 'not-found' };
       return { rateLimited: false };
     });
 
-    await expect(checkEmailSignInEligibility('user@example.com', request())).resolves.toEqual(
-      expect.objectContaining({ ok: false, status: 503, errorCode: 'SIGNUP-UNAVAILABLE' })
+    await expect(checkEmailSignInEligibility('user@example.com', request())).resolves.toEqual({
+      ok: true,
+    });
+
+    expect(mockCheckRateLimit).toHaveBeenCalledTimes(2);
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      "Firewall rate limit 'magic-link-email' is not configured",
+      expect.objectContaining({ level: 'error' })
     );
   });
 
@@ -216,45 +218,5 @@ describe('checkEmailSignInEligibility send budgets', () => {
     await checkEmailSignInEligibility('user@example.com', request());
 
     expect(mockCheckRateLimit).toHaveBeenCalled();
-  });
-});
-
-describe('checkGlobalSendBudget', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
-  });
-
-  it('counts the shared total bucket', async () => {
-    await checkGlobalSendBudget(request());
-
-    expect(mockCheckRateLimit).toHaveBeenCalledWith('sign-in-code-email-global', {
-      request: request(),
-      rateLimitKey: 'sign-in-code-email-global:total',
-    });
-  });
-
-  it('returns 429 when the total bucket is exhausted', async () => {
-    mockCheckRateLimit.mockResolvedValue({ rateLimited: true });
-
-    await expect(checkGlobalSendBudget(request())).resolves.toEqual({
-      ok: false,
-      status: 429,
-      errorCode: 'SIGNUP-RATE-LIMITED',
-    });
-  });
-
-  it('returns 503 and reports when the rule is missing from the firewall configuration', async () => {
-    mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error: 'not-found' });
-
-    await expect(checkGlobalSendBudget(request())).resolves.toEqual({
-      ok: false,
-      status: 503,
-      errorCode: 'SIGNUP-UNAVAILABLE',
-    });
-    expect(mockCaptureMessage).toHaveBeenCalledWith(
-      "Firewall rate limit 'sign-in-code-email-global' is not configured",
-      expect.objectContaining({ level: 'error' })
-    );
   });
 });

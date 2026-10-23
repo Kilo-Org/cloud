@@ -7,10 +7,7 @@ import {
 } from '@kilocode/web-shared/lib/auth/magic-link-tokens';
 import { sendSignInCodeEmail } from '@kilocode/web-shared/lib/email';
 import * as z from 'zod';
-import {
-  checkEmailSignInEligibility,
-  checkGlobalSendBudget,
-} from '@/lib/auth/email-signin-eligibility';
+import { checkEmailSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 
 const requestSchema = z.object({
@@ -43,10 +40,10 @@ async function enforceResponseFloor(startTime: number): Promise<void> {
  *
  * The response diverges only where the client must act on the outcome: 400
  * INVALID_REQUEST when the body carries no valid email, 429 when the address
- * is rate limited, 403 with ssoOrganizationId (or 503 when the domain's SSO
- * is misconfigured) when the domain requires SSO, and, for an eligible
- * address whose email cannot be sent, 400 INVALID_EMAIL when NeverBounce
- * rejects the address or 500 EMAIL_DELIVERY_FAILED otherwise.
+ * or the caller is rate limited, 403 with ssoOrganizationId (or 503 when the
+ * domain's SSO is misconfigured) when the domain requires SSO, and, for an
+ * eligible address whose email cannot be sent, 400 INVALID_EMAIL when
+ * NeverBounce rejects the address or 500 EMAIL_DELIVERY_FAILED otherwise.
  */
 export const POST = withRestTiming('/api/auth/native/otp', async (request: Request) => {
   const startTime = Date.now();
@@ -83,15 +80,6 @@ export const POST = withRestTiming('/api/auth/native/otp', async (request: Reque
           : {}),
       },
       { status: eligibility.status }
-    );
-  }
-
-  const globalBudget = await checkGlobalSendBudget(request as NextRequest);
-  if (!globalBudget.ok) {
-    await enforceResponseFloor(startTime);
-    return NextResponse.json(
-      { success: false, error: globalBudget.errorCode },
-      { status: globalBudget.status }
     );
   }
 

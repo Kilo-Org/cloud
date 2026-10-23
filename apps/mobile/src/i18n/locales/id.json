@@ -3695,6 +3695,8 @@
     "noSpend": "Belum ada pengeluaran yang tercatat",
     "spend24h": "Pengeluaran dalam 24 jam terakhir",
     "multiplierError": "Masukkan pengali 1 atau lebih",
+    "multiplierMaxError": "Masukkan pengali {{max}} atau kurang",
+    "thresholdMaxError": "Masukkan jumlah {{max}} atau kurang.",
     "permissionDenied": "Kamu tidak memiliki izin untuk mengelola peringatan pengeluaran.",
     "pushOffByCategory": "Nonaktif di Notifikasi"
   },

@@ -3695,6 +3695,8 @@
     "noSpend": "まだ支出が記録されていません",
     "spend24h": "過去24時間の支出",
     "multiplierError": "1以上の倍率を入力してください",
+    "multiplierMaxError": "{{max}}以下の倍率を入力してください",
+    "thresholdMaxError": "{{max}}以下の金額を入力してください。",
     "permissionDenied": "支出アラートを管理する権限がありません。",
     "pushOffByCategory": "通知でオフ"
   },

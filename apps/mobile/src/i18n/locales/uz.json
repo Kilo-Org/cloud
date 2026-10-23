@@ -3695,6 +3695,8 @@
     "noSpend": "Hozircha xarajat qayd etilmagan",
     "spend24h": "Oxirgi 24 soatdagi xarajat",
     "multiplierError": "1 yoki undan katta koeffitsiyent kiriting",
+    "multiplierMaxError": "{{max}} yoki undan kichik koeffitsiyent kiriting",
+    "thresholdMaxError": "{{max}} yoki undan kichik miqdorni kiriting.",
     "permissionDenied": "Xarajat bildirishnomalarini boshqarishga ruxsatingiz yo'q.",
     "pushOffByCategory": "Bildirishnomalarda o'chirilgan"
   },

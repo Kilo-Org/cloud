@@ -3863,6 +3863,8 @@
     "noSpend": "Dim gwariant wedi'i gofnodi eto",
     "spend24h": "Gwariant yn y 24 awr diwethaf",
     "multiplierError": "Nodwch luosydd o 1 neu fwy",
+    "multiplierMaxError": "Nodwch luosydd o {{max}} neu lai",
+    "thresholdMaxError": "Nodwch swm o {{max}} neu lai.",
     "permissionDenied": "Nid oes gennyt ganiatâd i reoli rhybuddion gwariant.",
     "pushOffByCategory": "I ffwrdd yn Hysbysiadau"
   },

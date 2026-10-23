@@ -3779,6 +3779,8 @@
     "noSpend": "Zatím není zaznamenána žádná útrata",
     "spend24h": "Útrata za posledních 24 hodin",
     "multiplierError": "Zadej násobitel 1 nebo větší",
+    "multiplierMaxError": "Zadej násobitel {{max}} nebo menší",
+    "thresholdMaxError": "Zadejte částku {{max}} nebo menší.",
     "permissionDenied": "Nemáš oprávnění spravovat upozornění na útratu.",
     "pushOffByCategory": "Vypnuto v Oznámeních"
   },

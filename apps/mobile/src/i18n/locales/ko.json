@@ -3695,6 +3695,8 @@
     "noSpend": "아직 기록된 지출이 없습니다",
     "spend24h": "최근 24시간 지출",
     "multiplierError": "1 이상의 배수를 입력하세요",
+    "multiplierMaxError": "{{max}} 이하의 배수를 입력하세요",
+    "thresholdMaxError": "{{max}} 이하의 금액을 입력하세요.",
     "permissionDenied": "지출 알림을 관리할 권한이 없습니다.",
     "pushOffByCategory": "알림에서 꺼짐"
   },

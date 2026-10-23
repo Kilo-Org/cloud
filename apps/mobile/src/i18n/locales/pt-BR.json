@@ -3737,6 +3737,8 @@
     "noSpend": "Nenhum gasto registrado ainda",
     "spend24h": "Gastos nas últimas 24 horas",
     "multiplierError": "Insira um multiplicador de 1 ou mais",
+    "multiplierMaxError": "Insira um multiplicador de {{max}} ou menos",
+    "thresholdMaxError": "Digite um valor de {{max}} ou menos.",
     "permissionDenied": "Você não tem permissão para gerenciar os alertas de gastos.",
     "pushOffByCategory": "Desativado em Notificações"
   },

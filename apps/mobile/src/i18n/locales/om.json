@@ -3695,6 +3695,8 @@
     "noSpend": "Amma ammaatti baasiin galmeeffame hin jiru",
     "spend24h": "Baasii sa'aatii 24 darban keessatti",
     "multiplierError": "Baay'isaa 1 ykn isaa ol galchi",
+    "multiplierMaxError": "Baay'isaa {{max}} ykn isaa gadii galchi",
+    "thresholdMaxError": "Hamma {{max}} ykn isaa gadii galchi.",
     "permissionDenied": "Akeekkachiisa baasii bulchuuf hayyamni sitti hin jiru.",
     "pushOffByCategory": "Beeksisota keessatti cufaa"
   },

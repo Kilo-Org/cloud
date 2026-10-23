@@ -3695,6 +3695,8 @@
     "noSpend": "Akukho kusetshenziswa kwemali okurekhodiwe okwamanje",
     "spend24h": "Ukusetshenziswa kwemali emahoreni angu-24 edlule",
     "multiplierError": "Faka isiphindaphindi esingu-1 noma ngaphezulu",
+    "multiplierMaxError": "Faka isiphindaphindi esingu-{{max}} noma ngaphansi",
+    "thresholdMaxError": "Faka inani elingaphansi kuka-{{max}}.",
     "permissionDenied": "Awunayo imvume yokuphatha izexwayiso zokusetshenziswa kwemali.",
     "pushOffByCategory": "Kucishiwe kuzaziso"
   },

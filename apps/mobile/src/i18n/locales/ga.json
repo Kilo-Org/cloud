@@ -3821,6 +3821,8 @@
     "noSpend": "Níor taifeadadh aon chaiteachas fós",
     "spend24h": "Caiteachas sna 24 uair an chloig seo caite",
     "multiplierError": "Iontráil iolraitheoir 1 nó níos mó",
+    "multiplierMaxError": "Iontráil iolraitheoir {{max}} nó níos lú",
+    "thresholdMaxError": "Iontráil méid níos lú ná nó cothrom le {{max}}.",
     "permissionDenied": "Níl cead agat foláirimh chaiteachais a bhainistiú.",
     "pushOffByCategory": "As i bhFógraí"
   },

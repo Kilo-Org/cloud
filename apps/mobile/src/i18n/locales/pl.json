@@ -3779,6 +3779,8 @@
     "noSpend": "Nie zarejestrowano jeszcze żadnych wydatków",
     "spend24h": "Wydatki z ostatnich 24 godzin",
     "multiplierError": "Podaj mnożnik równy 1 lub większy",
+    "multiplierMaxError": "Podaj mnożnik równy {{max}} lub mniejszy",
+    "thresholdMaxError": "Wpisz kwotę {{max}} lub mniejszą.",
     "permissionDenied": "Nie masz uprawnień do zarządzania alertami o wydatkach.",
     "pushOffByCategory": "Wyłączone w Powiadomieniach"
   },

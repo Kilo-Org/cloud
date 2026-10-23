@@ -3695,6 +3695,8 @@
     "noSpend": "A kò tíì ṣe àkọsílẹ̀ ìnáwó kankan",
     "spend24h": "Ìnáwó ní wákàtí 24 sẹ́yìn",
     "multiplierError": "Tẹ ìlọ́po 1 tàbí jù bẹ́ẹ̀ lọ",
+    "multiplierMaxError": "Tẹ ìlọ́po {{max}} tàbí kéré jù bẹ́ẹ̀ lọ",
+    "thresholdMaxError": "Tẹ iye owó {{max}} tàbí kéré jù bẹ́ẹ̀ lọ.",
     "permissionDenied": "O kò ní ìyọ̀ǹda láti ṣàkóso àwọn ìkìlọ̀ ìnáwó.",
     "pushOffByCategory": "Ti pa nínú Àwọn ìfitónilétí"
   },

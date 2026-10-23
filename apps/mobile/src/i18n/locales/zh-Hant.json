@@ -3695,6 +3695,8 @@
     "noSpend": "尚無支出記錄",
     "spend24h": "過去 24 小時的支出",
     "multiplierError": "請輸入 1 或更大的倍數",
+    "multiplierMaxError": "請輸入 {{max}} 或更小的倍數",
+    "thresholdMaxError": "請輸入不超過 {{max}} 的金額。",
     "permissionDenied": "你沒有管理支出提醒的權限。",
     "pushOffByCategory": "已在通知中關閉"
   },

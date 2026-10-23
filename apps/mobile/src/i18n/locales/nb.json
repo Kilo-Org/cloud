@@ -3695,6 +3695,8 @@
     "noSpend": "Ingen forbruk registrert ennå",
     "spend24h": "Forbruk de siste 24 timene",
     "multiplierError": "Angi en multiplikator på 1 eller mer",
+    "multiplierMaxError": "Angi en multiplikator på {{max}} eller mindre",
+    "thresholdMaxError": "Angi et beløp på {{max}} eller mindre.",
     "permissionDenied": "Du har ikke tillatelse til å administrere forbruksvarsler.",
     "pushOffByCategory": "Av i Varsler"
   },

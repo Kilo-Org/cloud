@@ -3695,6 +3695,8 @@
     "noSpend": "Kulutusi pole veel registreeritud",
     "spend24h": "Viimase 24 tunni kulutus",
     "multiplierError": "Sisesta kordaja 1 või suurem",
+    "multiplierMaxError": "Sisesta kordaja {{max}} või väiksem",
+    "thresholdMaxError": "Sisesta summa {{max}} või väiksem.",
     "permissionDenied": "Sul puudub õigus kulutushoiatusi hallata.",
     "pushOffByCategory": "Teavitustes väljas"
   },

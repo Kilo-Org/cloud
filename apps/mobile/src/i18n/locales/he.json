@@ -3737,6 +3737,8 @@
     "noSpend": "עדיין לא נרשמה הוצאה",
     "spend24h": "הוצאה ב־24 השעות האחרונות",
     "multiplierError": "הזן מכפיל של 1 או יותר",
+    "multiplierMaxError": "הזן מכפיל של {{max}} או פחות",
+    "thresholdMaxError": "הזן סכום של {{max}} או פחות.",
     "permissionDenied": "אין לך הרשאה לנהל התראות הוצאות.",
     "pushOffByCategory": "כבוי בהתראות"
   },

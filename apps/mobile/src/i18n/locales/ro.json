@@ -3737,6 +3737,8 @@
     "noSpend": "Încă nu s-a înregistrat nicio cheltuială",
     "spend24h": "Cheltuieli din ultimele 24 de ore",
     "multiplierError": "Introdu un multiplicator de 1 sau mai mare",
+    "multiplierMaxError": "Introdu un multiplicator de {{max}} sau mai mic",
+    "thresholdMaxError": "Introdu o sumă de {{max}} sau mai puțin.",
     "permissionDenied": "Nu ai permisiunea de a gestiona alertele de cheltuieli.",
     "pushOffByCategory": "Oprit în Notificări"
   },

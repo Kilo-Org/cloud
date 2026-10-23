@@ -3695,6 +3695,8 @@
     "noSpend": "હજી કોઈ ખર્ચ નોંધાયો નથી",
     "spend24h": "છેલ્લા 24 કલાકનો ખર્ચ",
     "multiplierError": "1 કે તેથી વધુ ગુણક દાખલ કરો",
+    "multiplierMaxError": "{{max}} કે તેથી ઓછો ગુણક દાખલ કરો",
+    "thresholdMaxError": "{{max}} કે તેથી ઓછી રકમ દાખલ કરો.",
     "permissionDenied": "તમને ખર્ચની ચેતવણીઓનું સંચાલન કરવાની પરવાનગી નથી.",
     "pushOffByCategory": "સૂચનાઓમાં બંધ"
   },

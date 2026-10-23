@@ -3695,6 +3695,8 @@
     "noSpend": "Noch keine Ausgaben erfasst",
     "spend24h": "Ausgaben der letzten 24 Stunden",
     "multiplierError": "Gib einen Multiplikator von 1 oder mehr ein",
+    "multiplierMaxError": "Gib einen Multiplikator von {{max}} oder weniger ein",
+    "thresholdMaxError": "Gib einen Betrag von {{max}} oder weniger ein.",
     "permissionDenied": "Du hast keine Berechtigung, Ausgaben-Warnungen zu verwalten.",
     "pushOffByCategory": "In Benachrichtigungen aus"
   },

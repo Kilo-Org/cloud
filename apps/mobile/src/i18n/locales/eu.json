@@ -3695,6 +3695,8 @@
     "noSpend": "Oraindik ez da gasturik erregistratu",
     "spend24h": "Azken 24 orduetako gastua",
     "multiplierError": "Sartu 1 edo handiagoa den biderkatzaile bat",
+    "multiplierMaxError": "Sartu {{max}} edo txikiagoa den biderkatzaile bat",
+    "thresholdMaxError": "Sartu {{max}} edo txikiagoa den zenbateko bat.",
     "permissionDenied": "Ez duzu gastu-alertak kudeatzeko baimenik.",
     "pushOffByCategory": "Jakinarazpenetan itzalita"
   },

@@ -3695,6 +3695,8 @@
     "noSpend": "Hələ heç bir xərc qeydə alınmayıb",
     "spend24h": "Son 24 saatda xərc",
     "multiplierError": "1 və ya daha böyük əmsal daxil et",
+    "multiplierMaxError": "{{max}} və ya daha az əmsal daxil et",
+    "thresholdMaxError": "{{max}} və ya daha az məbləğ daxil et.",
     "permissionDenied": "Xərc bildirişlərini idarə etmək icazən yoxdur.",
     "pushOffByCategory": "Bildirişlərdə söndürülüb"
   },

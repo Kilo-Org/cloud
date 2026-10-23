@@ -3695,6 +3695,8 @@
     "noSpend": "Weli lama diiwaangelin kharash",
     "spend24h": "Kharashka 24-kii saacadood ee ugu dambeeyay",
     "multiplierError": "Geli isku-dhufasho 1 ama ka badan",
+    "multiplierMaxError": "Geli isku-dhufasho {{max}} ama ka yar",
+    "thresholdMaxError": "Geli qaddar {{max}} ama ka yar.",
     "permissionDenied": "Ma lihid oggolaansho aad ku maamusho digniinaha kharashka.",
     "pushOffByCategory": "Waa damman Ogeysiisyada"
   },

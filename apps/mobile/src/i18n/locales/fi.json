@@ -3695,6 +3695,8 @@
     "noSpend": "Kulutusta ei ole vielä kirjattu",
     "spend24h": "Kulutus viimeisten 24 tunnin aikana",
     "multiplierError": "Anna kerroin, joka on 1 tai suurempi",
+    "multiplierMaxError": "Anna kerroin, joka on {{max}} tai pienempi",
+    "thresholdMaxError": "Anna summa, joka on {{max}} tai pienempi.",
     "permissionDenied": "Sinulla ei ole oikeutta hallita kulutusvaroituksia.",
     "pushOffByCategory": "Pois päältä Ilmoituksissa"
   },

@@ -1026,6 +1026,22 @@ describe('the effort a chat asks with', () => {
     expect(asked.at(-1)).toEqual({ sessionId: 's2', text: 'think hard' });
   });
 
+  it('reports the effort it moved onto in the record the details sheet reads', async () => {
+    await say(opened, { text: 'think hard', images: [] }, { model: 'kilo/one', effort: 'high' });
+    await settled();
+
+    expect(snapshotOf(opened).record.effort).toBe('high');
+  });
+
+  it('reports the model default after a move back onto it', async () => {
+    change(opened, { effort: 'high', record: { ...snapshotOf(opened).record, effort: 'high' } });
+
+    await say(opened, { text: 'plain', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    expect(snapshotOf(opened).record.effort).toBeNull();
+  });
+
   it('moves back onto the model default when the effort is cleared', async () => {
     change(opened, { effort: 'high' });
 

@@ -812,7 +812,17 @@ async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<st
         }
       : { ...chat, handle, scope, answering: undefined, counted: new Map() }
   );
-  change(handle.id, { ...held, sessionId: handle.id, model, effort, turns });
+  /* The record describes the session the chat is now, and the move changed its
+     effort: carrying the one it moved off would make the details sheet report
+     the effort of a session the conversation is no longer on. */
+  change(handle.id, {
+    ...held,
+    sessionId: handle.id,
+    model,
+    effort,
+    turns,
+    record: { ...held.record, effort },
+  });
   /* The chat it moved off is left pointing at the one it became, rather than
      forgotten. Whoever asked for the move is not always the screen — a question
      queued on another model moves the chat from inside the registry — so the

@@ -181,16 +181,12 @@ test('renders a data image shape', async ({ page, host }) => {
 test('keeps page subresources off the network', async ({ page, host }) => {
   await renderDiagram(page, 'flowchart TD\n  A[Start] --> B[Finish]');
   await expectRenderedDiagram(page);
-  const outcome = await page.evaluate(async recorderUrl => {
-    const violations: string[] = [];
-    document.addEventListener('securitypolicyviolation', event => {
-      violations.push(`${event.effectiveDirective} ${event.blockedURI}`);
-    });
-    let fetchRefused = false;
+  const fetchRefused = await page.evaluate(async recorderUrl => {
+    let refused = false;
     try {
       await fetch(`${recorderUrl}/probe`);
     } catch {
-      fetchRefused = true;
+      refused = true;
     }
     const image = new Image();
     const settled = Promise.withResolvers<void>();
@@ -198,12 +194,18 @@ test('keeps page subresources off the network', async ({ page, host }) => {
     image.addEventListener('error', () => settled.resolve(), { once: true });
     image.src = `${recorderUrl}/probe.svg`;
     await settled.promise;
-    return { fetchRefused, violations };
+    return refused;
   }, host.recorderUrl);
-  expect(outcome.fetchRefused).toBe(true);
-  expect(outcome.violations).toEqual([
-    `connect-src ${host.recorderUrl}/probe`,
-    `img-src ${host.recorderUrl}/probe.svg`,
-  ]);
+  expect(fetchRefused).toBe(true);
+  // The page reports each refusal as an asynchronous event, so wait for both.
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        (window as HostWindow).policyViolations
+          .map(({ directive, blockedURI }) => `${directive} ${blockedURI}`)
+          .sort()
+      )
+    )
+    .toEqual([`connect-src ${host.recorderUrl}/probe`, `img-src ${host.recorderUrl}/probe.svg`]);
   expect(host.requests).toEqual([]);
 });

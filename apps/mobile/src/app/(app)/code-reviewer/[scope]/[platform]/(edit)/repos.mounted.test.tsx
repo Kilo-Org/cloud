@@ -7,6 +7,7 @@ import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
+import { act } from '@/test/renderer';
 import ReposRoute from './repos';
 import {
   renderWithProviders,
@@ -29,7 +30,7 @@ const state = vi.hoisted(() => ({
   readinessRefetch: vi.fn(),
   readinessFetching: false,
   readiness: null as unknown,
-  openManageAccess: undefined as (() => void) | undefined,
+  openManageAccess: undefined as (() => Promise<void>) | undefined,
   appStateHandler: null as AppStateHandler | null,
 }));
 
@@ -185,7 +186,7 @@ beforeEach(() => {
   state.readinessRefetch.mockClear();
   state.readinessFetching = false;
   state.readiness = null;
-  state.openManageAccess = vi.fn<() => void>();
+  state.openManageAccess = vi.fn<() => Promise<void>>(() => Promise.resolve());
   state.appStateHandler = null;
 });
 
@@ -250,19 +251,41 @@ describe('repository picker resync affordance', () => {
     unmount();
   });
 
-  it('forces a sync when the app returns after the access page opened', async () => {
+  it('forces one sync when the settings page reports its return', async () => {
     const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
     await waitFor(() => buttons(renderer).length > 0);
 
+    // Nothing pending: a foreground return on its own syncs nothing.
     state.appStateHandler?.('active');
     expect(state.resync).not.toHaveBeenCalled();
 
     button(renderer, 'Manage access')?.onPress?.();
     expect(state.openManageAccess).toHaveBeenCalledTimes(1);
+    await waitFor(() => state.resync.mock.calls.length === 1);
+
+    // Android then also reports the next foreground; the first signal consumed
+    // the pending change, so this one must not sync again.
+    state.appStateHandler?.('active');
+    expect(state.resync).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('forces a sync on the foreground when the settings page never reports its dismissal', async () => {
+    const pending = Promise.withResolvers<undefined>();
+    state.openManageAccess = vi.fn(() => pending.promise);
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+    await waitFor(() => buttons(renderer).length > 0);
+
+    button(renderer, 'Manage access')?.onPress?.();
+    expect(state.resync).not.toHaveBeenCalled();
+
     state.appStateHandler?.('active');
     expect(state.resync).toHaveBeenCalledTimes(1);
 
-    state.appStateHandler?.('active');
+    await act(async () => {
+      pending.resolve(undefined);
+      await pending.promise;
+    });
     expect(state.resync).toHaveBeenCalledTimes(1);
     unmount();
   });

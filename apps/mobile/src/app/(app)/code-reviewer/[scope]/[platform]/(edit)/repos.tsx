@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { FolderGit2 } from '@/components/ui/icons';
-import { type ReactNode, useEffect, useRef } from 'react';
+import { type ReactNode, useCallback, useEffect, useRef } from 'react';
 import { AppState, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -105,10 +105,26 @@ export default function ReposRoute() {
   // is the moment installation access may have widened, so it forces a sync.
   const pendingAccessChange = useRef(false);
   const navigation = useNavigation();
+  const flushPendingSync = useCallback(() => {
+    if (!pendingAccessChange.current) {
+      return;
+    }
+    pendingAccessChange.current = false;
+    void resync();
+  }, [resync]);
   const manageAccess = openManageAccess
     ? () => {
         pendingAccessChange.current = true;
-        openManageAccess();
+        // Two return signals reach here and only the first one syncs: the
+        // awaited browser dismissal (the only one iOS reports, because its
+        // settings page opens in-app) and the next foreground (Android).
+        void (async () => {
+          try {
+            await openManageAccess();
+          } finally {
+            flushPendingSync();
+          }
+        })();
       }
     : undefined;
   const refreshing = platform === 'bitbucket' ? reposFetching : resyncing;
@@ -146,19 +162,15 @@ export default function ReposRoute() {
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextState => {
-      if (nextState !== 'active' || !pendingAccessChange.current) {
+      if (nextState !== 'active' || !navigation.isFocused()) {
         return;
       }
-      if (!navigation.isFocused()) {
-        return;
-      }
-      pendingAccessChange.current = false;
-      void resync();
+      flushPendingSync();
     });
     return () => {
       subscription.remove();
     };
-  }, [navigation, resync]);
+  }, [flushPendingSync, navigation]);
 
   const setMode = (nextMode: 'all' | 'selected') => {
     save.mutate({ repositorySelectionMode: nextMode });

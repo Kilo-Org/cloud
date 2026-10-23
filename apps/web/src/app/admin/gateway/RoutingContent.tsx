@@ -108,7 +108,12 @@ export function RoutingContent() {
             <Label htmlFor="routing-opt-out-models">Opt-out models</Label>
             <Textarea
               id="routing-opt-out-models"
-              aria-describedby="routing-opt-out-models-description"
+              aria-describedby={
+                validationError
+                  ? 'routing-opt-out-models-description routing-opt-out-models-error'
+                  : 'routing-opt-out-models-description'
+              }
+              aria-invalid={validationError ? true : undefined}
               placeholder={'moonshotai/kimi-k3\nprovider/another-model'}
               value={optOutModelsValue}
               onChange={e => {
@@ -123,6 +128,15 @@ export function RoutingContent() {
               One model ID per line. Matching is exact after entries are lowercased; matching models
               are never routed to Vercel. Changes take effect within one minute on warm instances.
             </p>
+            {validationError && (
+              <pre
+                id="routing-opt-out-models-error"
+                className="bg-destructive/10 text-destructive rounded-md p-3 text-sm whitespace-pre-wrap"
+                role="alert"
+              >
+                {validationError}
+              </pre>
+            )}
           </div>
 
           <div className="flex flex-col gap-2">
@@ -139,15 +153,6 @@ export function RoutingContent() {
               className="min-h-20"
             />
           </div>
-
-          {validationError && (
-            <pre
-              className="bg-destructive/10 text-destructive rounded-md p-3 text-sm whitespace-pre-wrap"
-              role="alert"
-            >
-              {validationError}
-            </pre>
-          )}
 
           <div>
             <Button onClick={handleSave} disabled={mutation.isPending || !hasChanges} size="sm">

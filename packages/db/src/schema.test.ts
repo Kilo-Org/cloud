@@ -690,6 +690,9 @@ describe('database schema', () => {
         'no_supported_fingerprint',
         'no_positive_settlement',
         'settlement_unresolved',
+        'store_payer_first_claim',
+        'store_payer_previously_claimed',
+        'store_payer_unresolved',
       ],
       KiloPassAuditLogAction: [
         'stripe_webhook_received',

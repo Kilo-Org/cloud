@@ -2325,6 +2325,53 @@ export type KiloPassWelcomePromoPaymentFingerprintClaim =
 export type NewKiloPassWelcomePromoPaymentFingerprintClaim =
   typeof kilo_pass_welcome_promo_payment_fingerprint_claims.$inferInsert;
 
+/**
+ * One permanent welcome-promo claim per store purchaser identity. The identity is the durable
+ * purchaser reference the provider returns for the subscription lineage: the App Store original
+ * transaction identifier, or the first Google Play purchase token of a replacement chain.
+ *
+ * The user and subscription columns attribute the claim; they carry no foreign key so the claim
+ * survives subscription or account deletion, like the Stripe fingerprint claim.
+ */
+export const kilo_pass_welcome_promo_store_payer_claims = pgTable(
+  'kilo_pass_welcome_promo_store_payer_claims',
+  {
+    payment_provider: text().notNull().$type<KiloPassPaymentProvider>(),
+    provider_payer_id: text().notNull(),
+    source_provider_transaction_id: text().notNull(),
+    source_provider_subscription_id: text().notNull(),
+    kilo_user_id: text().notNull(),
+    kilo_pass_subscription_id: uuid().notNull(),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.payment_provider, table.provider_payer_id] }),
+    unique('UQ_kilo_pass_welcome_promo_store_payer_claims_source_transaction').on(
+      table.payment_provider,
+      table.source_provider_transaction_id
+    ),
+    unique('UQ_kilo_pass_welcome_promo_store_payer_claims_source_subscription').on(
+      table.payment_provider,
+      table.source_provider_subscription_id
+    ),
+    index('IDX_kilo_pass_welcome_promo_store_payer_claims_user').on(table.kilo_user_id),
+    check(
+      'kilo_pass_welcome_promo_store_payer_claims_store_provider_check',
+      sql`${table.payment_provider} IN ('app_store', 'google_play')`
+    ),
+    enumCheck(
+      'kilo_pass_welcome_promo_store_payer_claims_payment_provider_check',
+      table.payment_provider,
+      KiloPassPaymentProvider
+    ),
+  ]
+);
+
+export type KiloPassWelcomePromoStorePayerClaim =
+  typeof kilo_pass_welcome_promo_store_payer_claims.$inferSelect;
+export type NewKiloPassWelcomePromoStorePayerClaim =
+  typeof kilo_pass_welcome_promo_store_payer_claims.$inferInsert;
+
 export const kilo_pass_pause_events = pgTable(
   'kilo_pass_pause_events',
   {

@@ -54,6 +54,9 @@ export enum KiloPassWelcomePromoEligibilityReason {
   NoSupportedFingerprint = 'no_supported_fingerprint',
   NoPositiveSettlement = 'no_positive_settlement',
   SettlementUnresolved = 'settlement_unresolved',
+  StorePayerFirstClaim = 'store_payer_first_claim',
+  StorePayerPreviouslyClaimed = 'store_payer_previously_claimed',
+  StorePayerUnresolved = 'store_payer_unresolved',
 }
 
 export enum KiloPassAuditLogAction {

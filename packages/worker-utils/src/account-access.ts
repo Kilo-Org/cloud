@@ -192,10 +192,7 @@ export function blacklistedDomainsFromConfig(
   return domains.length > 0 ? domains : fallbackDomains;
 }
 
-export function blockedSignupTldsFromConfig(
-  raw: string | null,
-  fallbackTlds: string[]
-): string[] {
+export function blockedSignupTldsFromConfig(raw: string | null, fallbackTlds: string[]): string[] {
   if (!raw) return fallbackTlds;
   const { blocked_signup_tlds } = BlacklistDomainsConfigSchema.parse(JSON.parse(raw));
   return blocked_signup_tlds ?? fallbackTlds;

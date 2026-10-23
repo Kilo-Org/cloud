@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   backfillBlockBlacklistedDomainsBatch,
@@ -13,14 +13,17 @@ beforeEach(async () => {
 });
 
 async function unblockedMatches(domains: string[]): Promise<string[]> {
-  const matchedDomains = (await findBlacklistedEmailDomains(domains)).map(
-    row => row.email_domain
-  );
+  const matchedDomains = (await findBlacklistedEmailDomains(domains)).map(row => row.email_domain);
   if (matchedDomains.length === 0) return [];
   const rows = await db
     .select({ id: kilocode_users.id })
     .from(kilocode_users)
-    .where(inArray(kilocode_users.email_domain, matchedDomains));
+    .where(
+      and(
+        isNull(kilocode_users.blocked_reason),
+        inArray(kilocode_users.email_domain, matchedDomains)
+      )
+    );
   return rows.map(r => r.id);
 }
 

@@ -31,12 +31,14 @@ function EditTab() {
   const [inputValue, setInputValue] = useState('');
   const [tldInputValue, setTldInputValue] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
+  const [tldHasChanges, setTldHasChanges] = useState(false);
 
   useEffect(() => {
     if (data) {
       setInputValue(data.domains.join('\n'));
       setTldInputValue((data.blocked_signup_tlds ?? []).join('\n'));
       setHasChanges(false);
+      setTldHasChanges(false);
     }
   }, [data]);
 
@@ -89,7 +91,9 @@ function EditTab() {
       .map(part => part.trim().toLowerCase().replace(/^\.+/, ''))
       .filter(Boolean);
 
-    mutation.mutate({ domains, blocked_tlds });
+    // Only send the TLD list when it was edited, so a tab opened before a
+    // deploy cannot reset a list it never loaded.
+    mutation.mutate({ domains, ...(tldHasChanges ? { blocked_tlds } : {}) });
   }
 
   if (isLoading) {
@@ -151,6 +155,7 @@ function EditTab() {
             value={tldInputValue}
             onChange={e => {
               setTldInputValue(e.target.value);
+              setTldHasChanges(true);
               setHasChanges(true);
             }}
             rows={4}
@@ -173,8 +178,8 @@ function EditTab() {
         <div className="text-muted-foreground text-xs">
           <p>
             Domains and signup TLDs are stored in Redis for instant updates. Changes take effect
-            immediately without a deploy. The BLACKLIST_DOMAINS and BLOCKED_SIGNUP_TLDS env vars
-            are used as fallbacks if Redis has no data.
+            immediately without a deploy. The BLACKLIST_DOMAINS and BLOCKED_SIGNUP_TLDS env vars are
+            used as fallbacks if Redis has no data.
           </p>
         </div>
       </CardContent>

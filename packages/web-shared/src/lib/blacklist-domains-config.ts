@@ -56,9 +56,7 @@ function getEnvFallbackDomains(): string[] {
 
 function getEnvFallbackSignupTlds(): string[] {
   const envVal = getEnvVariable('BLOCKED_SIGNUP_TLDS');
-  return envVal
-    ? normalizeSignupTlds(envVal.split('|'))
-    : DEFAULT_BLOCKED_SIGNUP_TLDS;
+  return envVal ? normalizeSignupTlds(envVal.split('|')) : DEFAULT_BLOCKED_SIGNUP_TLDS;
 }
 
 /**

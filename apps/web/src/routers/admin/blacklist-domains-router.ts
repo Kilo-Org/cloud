@@ -3,8 +3,8 @@ import { redisClient } from '@kilocode/web-shared/lib/redis';
 import {
   BlacklistDomainsInputSchema,
   DEFAULT_BLACKLIST_DOMAINS_CONFIG,
-  DEFAULT_BLOCKED_SIGNUP_TLDS,
   getBlacklistedDomains,
+  getBlockedSignupTlds,
   normalizeSignupTlds,
 } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { BlacklistDomainsConfigSchema } from '@kilocode/worker-utils/account-access';
@@ -48,9 +48,10 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
     const config = await readConfig();
     return {
       ...config,
-      // The editor always shows an editable list, including the deployment
-      // default when the stored config predates the field.
-      blocked_signup_tlds: config.blocked_signup_tlds ?? DEFAULT_BLOCKED_SIGNUP_TLDS,
+      // The editor always shows an editable list: the stored one, or the
+      // effective fallback (env or built-in) when the stored config predates
+      // the field.
+      blocked_signup_tlds: config.blocked_signup_tlds ?? (await getBlockedSignupTlds()),
     };
   }),
 
@@ -76,11 +77,12 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
       : null;
 
     // An omitted field keeps the stored list so a stale admin tab cannot
-    // silently disable TLD blocking. A TLD never triggers a backfill: it only
-    // gates new signups.
+    // silently disable TLD blocking. A failed previous read falls back to the
+    // cached effective list rather than overwriting with the built-in default.
+    // A TLD never triggers a backfill: it only gates new signups.
     const blockedSignupTlds =
       input.blocked_tlds === undefined
-        ? (previous?.blocked_signup_tlds ?? DEFAULT_BLOCKED_SIGNUP_TLDS)
+        ? (previous?.blocked_signup_tlds ?? (await getBlockedSignupTlds()))
         : normalizeSignupTlds(input.blocked_tlds);
 
     const config: BlacklistDomainsConfig = {

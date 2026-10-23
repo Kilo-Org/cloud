@@ -1,6 +1,6 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
-import { and, eq, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 
 /** A distinct email domain whose users match the blacklist, with its count. */
 export type BlacklistedEmailDomain = {

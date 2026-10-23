@@ -68,7 +68,7 @@ catalogs:
 
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
-  - tsx@4.21.0
+  - tsx@4.23.15
   - '@cloudflare/sandbox@0.12.12'
   # Cloudflare's DO-managed container runtime (ctx.container, snapshotContainer).
   # wrangler 4.134.0 is the first release with local development support for
@@ -91,21 +91,21 @@ minimumReleaseAgeExclude:
   - expo-manifests@58.0.1
   - expo-updates-interface@58.0.1
   - '@expo/schema-utils@58.0.2'
-  - '@typescript/native-preview@7.0.0-dev.20260514.1'
+  - '@typescript/native-preview@7.0.0-dev.20260707.2'
   - '@typescript/native-preview@7.0.0-dev.20251019.1'
-  - '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260514.1'
+  - '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260707.2'
   - '@typescript/native-preview-darwin-arm64@7.0.0-dev.20251019.1'
-  - '@typescript/native-preview-darwin-x64@7.0.0-dev.20260514.1'
+  - '@typescript/native-preview-darwin-x64@7.0.0-dev.20260707.2'
   - '@typescript/native-preview-darwin-x64@7.0.0-dev.20251019.1'
-  - '@typescript/native-preview-linux-arm@7.0.0-dev.20260514.1'
+  - '@typescript/native-preview-linux-arm@7.0.0-dev.20260707.2'
   - '@typescript/native-preview-linux-arm@7.0.0-dev.20251019.1'
-  - '@typescript/native-preview-linux-arm64@7.0.0-dev.20260514.1'
+  - '@typescript/native-preview-linux-arm64@7.0.0-dev.20260707.2'
   - '@typescript/native-preview-linux-arm64@7.0.0-dev.20251019.1'
-  - '@typescript/native-preview-linux-x64@7.0.0-dev.20260514.1'
+  - '@typescript/native-preview-linux-x64@7.0.0-dev.20260707.2'
   - '@typescript/native-preview-linux-x64@7.0.0-dev.20251019.1'
-  - '@typescript/native-preview-win32-arm64@7.0.0-dev.20260514.1'
+  - '@typescript/native-preview-win32-arm64@7.0.0-dev.20260707.2'
   - '@typescript/native-preview-win32-arm64@7.0.0-dev.20251019.1'
-  - '@typescript/native-preview-win32-x64@7.0.0-dev.20260514.1'
+  - '@typescript/native-preview-win32-x64@7.0.0-dev.20260707.2'
   - '@typescript/native-preview-win32-x64@7.0.0-dev.20251019.1'
   # Provider SDKs add parameters regularly and we can't really wait for them to
   # stabilize. Each locked version of the SDK carries its own exclusion below.

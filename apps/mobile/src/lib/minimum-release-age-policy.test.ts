@@ -8,11 +8,13 @@ import { describe, expect, it } from 'vitest';
 // Dependency-contract guard for the repository release-age policy in
 // pnpm-workspace.yaml. The global minimumReleaseAge gate must stay intact, and
 // every exclusion must name one exact package@version, matching the workspace
-// config's convention for every entry.
+// config's convention for every entry. Each of those versions must also be one
+// the committed pnpm-lock.yaml resolves, so an exclusion cannot outlive the
+// resolution it was written for.
 const EXPECTED_MINIMUM_RELEASE_AGE_MINUTES = 6842;
 
 const BASE_EXCLUDE_ENTRIES = [
-  'tsx@4.21.0',
+  'tsx@4.23.15',
   'expo-dev-client@58.0.14',
   'expo-dev-launcher@58.0.14',
   'expo-dev-menu@58.0.11',
@@ -20,21 +22,21 @@ const BASE_EXCLUDE_ENTRIES = [
   'expo-manifests@58.0.1',
   'expo-updates-interface@58.0.1',
   '@expo/schema-utils@58.0.2',
-  '@typescript/native-preview@7.0.0-dev.20260514.1',
+  '@typescript/native-preview@7.0.0-dev.20260707.2',
   '@typescript/native-preview@7.0.0-dev.20251019.1',
-  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260514.1',
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260707.2',
   '@typescript/native-preview-darwin-arm64@7.0.0-dev.20251019.1',
-  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260514.1',
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260707.2',
   '@typescript/native-preview-darwin-x64@7.0.0-dev.20251019.1',
-  '@typescript/native-preview-linux-arm@7.0.0-dev.20260514.1',
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20260707.2',
   '@typescript/native-preview-linux-arm@7.0.0-dev.20251019.1',
-  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260514.1',
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260707.2',
   '@typescript/native-preview-linux-arm64@7.0.0-dev.20251019.1',
-  '@typescript/native-preview-linux-x64@7.0.0-dev.20260514.1',
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20260707.2',
   '@typescript/native-preview-linux-x64@7.0.0-dev.20251019.1',
-  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260514.1',
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260707.2',
   '@typescript/native-preview-win32-arm64@7.0.0-dev.20251019.1',
-  '@typescript/native-preview-win32-x64@7.0.0-dev.20260514.1',
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20260707.2',
   '@typescript/native-preview-win32-x64@7.0.0-dev.20251019.1',
   '@ai-sdk/anthropic@4.0.15',
   '@anthropic-ai/sdk@0.104.1',
@@ -80,6 +82,9 @@ const workspaceYamlPath = fileURLToPath(
   new URL('../../../../pnpm-workspace.yaml', import.meta.url)
 );
 const workspaceYaml = readFileSync(workspaceYamlPath, 'utf8');
+
+const lockfilePath = fileURLToPath(new URL('../../../../pnpm-lock.yaml', import.meta.url));
+const lockfile = readFileSync(lockfilePath, 'utf8');
 
 function parseExcludeEntries(source: string): string[] {
   const lines = source.split('\n');
@@ -139,6 +144,13 @@ describe('minimum release age policy contract', () => {
   it('preserves every base exclusion unchanged', () => {
     for (const base of BASE_EXCLUDE_ENTRIES) {
       expect(excludeEntries).toContain(base);
+    }
+  });
+
+  it('names only versions the committed lockfile resolves', () => {
+    for (const entry of excludeEntries) {
+      expect(entry).toMatch(EXACT_VERSION_PATTERN);
+      expect(lockfile).toContain(entry);
     }
   });
 });

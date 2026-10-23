@@ -30,7 +30,7 @@
     "link": "链接",
     "takingLonger": "用时比预期更长。你可以关闭此页面，稍后再查看。",
     "model": "模型",
-    "accessDenied": "无权访问。",
+    "accessDenied": "无权访问",
     "allRepositories": "全部仓库",
     "personal": "个人",
     "connectGithub": "连接 GitHub",
@@ -49,7 +49,7 @@
     "added": "已添加",
     "cancelled": "已取消",
     "close": "关闭",
-    "codeReviewer": "代码审查助手",
+    "codeReviewer": "代码审查器",
     "connected": "已连接",
     "couldNotLoadModels": "无法加载模型。",
     "couldNotLoadRepositories": "无法加载仓库。",
@@ -142,7 +142,7 @@
     "working": "处理中",
     "yourOwnRepositories": "你自己的仓库",
     "dismissed": "已忽略",
-    "agent": "代理人",
+    "agent": "智能体",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "更改"
@@ -870,7 +870,7 @@
       "warning": "发现警告或严重问题即判定检查失败"
     },
     "instructions": {
-      "title": "自定义指令",
+      "title": "自定义说明",
       "deprecation": "自定义说明功能计划停用。请将这些准则移至仓库中的 REVIEW.md 文件。",
       "placeholder": "例如：遵循我们的错误处理规范…"
     },
@@ -908,7 +908,7 @@
     "manualReview": {
       "connectProvider": "连接代码托管平台",
       "connectProviderDescription": "连接 GitHub，即可手动发起拉取请求审查。",
-      "couldNotCheckProviderStatus": "无法检查代码托管平台的状态。",
+      "couldNotCheckProviderStatus": "无法检查代码托管平台的状态",
       "couldNotLoadProviders": "无法加载已连接的代码托管平台。请重试。",
       "instructions": "说明（可选）",
       "instructionsPlaceholder": "本次审查需要特别关注的内容…",
@@ -951,14 +951,14 @@
       "cancelTitle": "取消审查？",
       "checkRun": "检查任务",
       "couldNotGetLatest": "无法获取最新内容。",
-      "couldNotLoad": "无法加载审查详情。",
+      "couldNotLoad": "无法加载审查详情",
       "council": "评审团",
       "created": "创建时间",
       "decision": "判定结果",
-      "gate": "质量检查",
+      "gate": "质量门禁",
       "gateHidden": "已隐藏",
       "gateNone": "无",
-      "noFindings": "未发现问题。",
+      "noFindings": "未发现问题",
       "findingsUnavailable": "由于本次审查失败，结果不可用。",
       "serviceUnavailable": "无法连接到代码审查服务。请在服务可用时重试审查。",
       "reviewFailed": "审查失败。请重试。",
@@ -970,7 +970,7 @@
       "cancelReasonInterrupted": "此审查已被中断。",
       "retryMessage": "这将重新执行代码审查。",
       "retryReview": "重试审查",
-      "retryNeedsSettings": "代码审查助手已关闭，或其设置需要处理。请修复设置，然后重试此审查。",
+      "retryNeedsSettings": "代码审查器已关闭，或其设置需要处理。请修复设置，然后重试此审查。",
       "fixSettings": "修复设置",
       "retryTitle": "重试审查？",
       "showMore": "显示更多",
@@ -986,7 +986,7 @@
       "agentIdle": "智能体空闲",
       "agentWorking": "智能体工作中…",
       "anErrorOccurred": "发生错误",
-      "errorWithMessage": "出错了：{{message}}。",
+      "errorWithMessage": "出错了：{{message}}",
       "executionStarted": "执行已开始",
       "reviewCompleted": "审查已完成",
       "reviewInterrupted": "审查已中断",
@@ -1022,7 +1022,7 @@
       "viewOnly": "仅查看"
     },
     "selectRepository": "请至少选择一个仓库，以启用自动审查。",
-    "webhookSetup": "Webhook 配置尚未完成。",
+    "webhookSetup": "Webhook 配置尚未完成",
     "webhookSetupDescription": "部分仓库可能无法进行自动审查。",
     "decision": {
       "block": "阻止",
@@ -1032,7 +1032,7 @@
     },
     "overview": {
       "allAreas": "所有方面",
-      "customInstructions": "自定义指令",
+      "customInstructions": "自定义说明",
       "focusAreas": "审查重点",
       "nSelected": "已选 {{displayCount}} 项",
       "proposedReviewMdGuidance": "REVIEW.md 审查准则建议",
@@ -1083,7 +1083,7 @@
       "repeatedRepositoryCloneTimeout": {
         "description": "今天仓库克隆已超时三次，因此代码审查器已禁用。请联系 {{supportEmail}} 获取帮助，然后重新启用代码审查器。"
       },
-      "title": "代码审查助手有问题需要处理。",
+      "title": "代码审查器有问题需要处理",
       "recoveryLabel": "联系技术支持"
     },
     "unknownError": "未知错误"
@@ -1574,14 +1574,14 @@
       "searchSessionsPlaceholder": "搜索会话"
     },
     "sessionList": {
-      "couldNotLoadActive": "无法加载进行中的会话。",
+      "couldNotLoadActive": "无法加载进行中的会话",
       "couldNotRefresh": "无法刷新",
       "noSessionsYetDescription": "在手机上发起编程任务，会话就会显示在这里。",
       "viewHistory": "会话历史",
       "noMatches": "暂无匹配的会话",
       "tryDifferentSearch": "请尝试其他搜索词。",
       "tryAdjustFilters": "请尝试调整或清除筛选条件。",
-      "couldNotSearch": "无法搜索会话。",
+      "couldNotSearch": "无法搜索会话",
       "completedWillAppear": "已完成的会话将显示在这里。",
       "noPastSessions": "暂无历史会话",
       "pastSessions": "历史会话",
@@ -1595,7 +1595,7 @@
       "renameMessage": "请输入此会话的新名称。",
       "copyId": "复制会话 ID",
       "idCopied": "会话 ID 已复制",
-      "couldNotCopyId": "无法复制会话 ID。",
+      "couldNotCopyId": "无法复制会话 ID",
       "untitled": "无标题会话",
       "actions": "会话操作",
       "sessionDeleted": "会话已删除",
@@ -1623,12 +1623,12 @@
       "accountMismatchMessage": "发起此连接时，Kilo App 登录的是另一个账号。请使用那个账号登录网页端，或从应用中重新发起连接。",
       "cannotCompleteTitle": "无法完成安装",
       "notAdminMessage": "只有该账号的 GitHub 管理员才能建立连接。请联系组织管理员安装 Kilo。",
-      "alreadyClaimedMessage": "此 GitHub 应用已关联另一个 Kilo 账号。请先在那个账号中断开连接。",
+      "alreadyClaimedMessage": "此 GitHub 应用安装已关联另一个 Kilo 账号。请先在那个账号中断开连接。",
       "didNotCompleteTitle": "安装未完成",
       "didNotCompleteMessage": "GitHub 应用安装未完成。请从应用中重试。"
     },
     "remoteSpawnRetryable": "无法连接到实例，实例可能已断开连接。",
-    "remoteSpawnNonRetryable": "实例未能启动会话。请检查设备或更新 CLI。",
+    "remoteSpawnNonRetryable": "实例未能启动会话。请检查主机或更新 CLI。",
     "remoteSpawnInstanceDisconnected": "所选实例已断开连接。请在 Cloud Agent 上启动会话，或选择其他实例。",
     "liveCount_one": "{{count}} 个实时会话",
     "liveCount_other": "{{count}} 个实时会话"

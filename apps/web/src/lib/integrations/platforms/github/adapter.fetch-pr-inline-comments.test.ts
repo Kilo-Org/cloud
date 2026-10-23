@@ -106,6 +106,54 @@ describe('fetchPRInlineComments', () => {
     );
   });
 
+  it('retains review identity across result pages', async () => {
+    mockListReviewComments.mockResolvedValueOnce(fullPage(1));
+    mockListReviewComments.mockResolvedValueOnce({
+      data: [
+        {
+          id: 201,
+          path: 'src/file.ts',
+          line: 10,
+          body: 'a'.repeat(MAX_INLINE_COMMENT_BODY_CHARS + 100),
+          position: 0,
+          performed_via_github_app: { id: 'test-app-id' },
+          user: { login: 'reviewer' },
+        },
+        {
+          id: 202,
+          path: 'src/file.ts',
+          line: 11,
+          body: 'b'.repeat(MAX_INLINE_COMMENT_BODY_CHARS + 100),
+          performed_via_github_app: { id: 'another-app' },
+          user: { login: 'reviewer' },
+        },
+      ],
+    });
+
+    const comments = await fetchPRInlineComments('42', 'acme', 'widgets', 7);
+
+    expect(comments.slice(PER_PAGE)).toEqual([
+      {
+        id: 201,
+        path: 'src/file.ts',
+        line: 10,
+        body: 'a'.repeat(MAX_INLINE_COMMENT_BODY_CHARS),
+        isOutdated: false,
+        authoredByKilo: true,
+        user: { login: 'reviewer' },
+      },
+      {
+        id: 202,
+        path: 'src/file.ts',
+        line: 11,
+        body: 'b'.repeat(MAX_INLINE_COMMENT_BODY_CHARS),
+        isOutdated: true,
+        authoredByKilo: false,
+        user: { login: 'reviewer' },
+      },
+    ]);
+  });
+
   it('truncates each stored body to the rendered length', async () => {
     const longBody = 'x'.repeat(600) + '\nsecond line';
     mockListReviewComments.mockResolvedValueOnce({

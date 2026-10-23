@@ -66,8 +66,12 @@ vi.mock('expo-router', () => ({
 }));
 
 vi.mock('@/lib/profile-agent-navigation', () => ({
-  getProfileOverviewPath: (profileId: string, organizationId?: string) =>
-    organizationId ? `/profiles/${profileId}?org=${organizationId}` : `/profiles/${profileId}`,
+  getNewProfilePath: (stack: 'app' | 'profileTab') =>
+    stack === 'app' ? '/app-stack/profiles/new' : '/(app)/(tabs)/(3_profile)/profiles/new',
+  getProfileOverviewPath: (profileId: string, organizationId?: string, stack?: string) =>
+    `${stack === 'app' ? '/app-stack' : ''}/profiles/${profileId}${
+      organizationId ? `?org=${organizationId}` : ''
+    }`,
 }));
 
 vi.mock('react-native', () => ({
@@ -133,8 +137,8 @@ function textChildren(root: ReactTestInstance): string[] {
   return findAll(root, 'Text').map(node => String(node.props.children));
 }
 
-async function mount() {
-  const result = await renderWithProviders(createElement(ProfilesListScreen));
+async function mount(stack: 'app' | 'profileTab' = 'profileTab') {
+  const result = await renderWithProviders(createElement(ProfilesListScreen, { stack }));
   return result;
 }
 
@@ -308,6 +312,20 @@ describe('ProfilesListScreen', () => {
 
     expect(findOne(renderer.root, 'QueryError').props.variant).toBe('server');
     expect(findAll(renderer.root, 'ConfigureRow')).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('opens the profile it is mounted in the root stack for, not the Profile tab one', async () => {
+    listState.personalProfiles = [profile({ id: 'personal-1', name: 'Personal profile' })];
+
+    const { renderer, unmount } = await mount('app');
+
+    const row = findOne(renderer.root, 'ConfigureRow');
+    act(() => {
+      (row.props as { onPress: () => void }).onPress();
+    });
+    expect(routerPush).toHaveBeenCalledWith('/app-stack/profiles/personal-1');
 
     unmount();
   });

@@ -3,6 +3,23 @@ import { type Href } from 'expo-router';
 
 type ProfileOrganization = { organizationId: string };
 
+/**
+ * Which Stack renders the profile-management screens.
+ *
+ * `profileTab` is the Profile tab's own stack: the Profile tab's rows push the
+ * screens there, and the tab bar stays visible. `app` is the root `(app)` Stack
+ * that also holds `agent-chat/new` and the agent session screens. A screen
+ * entered from one of those must be pushed on `app`: a push that crosses into
+ * the tabs navigator leaves the composer behind it, so Back lands on the tab
+ * root instead of the screen that opened the profile screen.
+ */
+export type ProfileManagementStack = 'app' | 'profileTab';
+
+const PROFILE_ROOTS = {
+  app: '/(app)/profile-management',
+  profileTab: '/(app)/(tabs)/(3_profile)/profiles',
+} as const;
+
 export function getProfileAgentScope(
   selectedOrganizationId: string | null,
   organizations: readonly ProfileOrganization[] | undefined,
@@ -40,46 +57,82 @@ function profileContextQuery(organizationId?: string): string {
 }
 
 /** The Manage Profiles entry on the Profile tab. */
-export function getProfilesPath(): Href {
-  return '/(app)/(tabs)/(3_profile)/profiles' as Href;
+export function getProfilesPath(stack: ProfileManagementStack = 'profileTab'): Href {
+  return PROFILE_ROOTS[stack] as Href;
 }
 
 /** The repo-to-profile default bindings screen. */
-export function getRepoBindingsPath(organizationId?: string): Href {
-  return `/(app)/(tabs)/(3_profile)/profiles/repo-bindings${profileContextQuery(organizationId)}` as Href;
+export function getRepoBindingsPath(
+  organizationId?: string,
+  stack: ProfileManagementStack = 'profileTab'
+): Href {
+  return `${PROFILE_ROOTS[stack]}/repo-bindings${profileContextQuery(organizationId)}` as Href;
+}
+
+/** The profile editor's create screen. */
+export function getNewProfilePath(stack: ProfileManagementStack = 'profileTab'): Href {
+  return `${PROFILE_ROOTS[stack]}/new` as Href;
 }
 
 /** The profile editor's Overview tab (the profile's own route). */
-export function getProfileOverviewPath(profileId: string, organizationId?: string): Href {
-  return `/(app)/(tabs)/(3_profile)/profiles/${profileId}${profileContextQuery(organizationId)}` as Href;
+export function getProfileOverviewPath(
+  profileId: string,
+  organizationId?: string,
+  stack: ProfileManagementStack = 'profileTab'
+): Href {
+  return `${PROFILE_ROOTS[stack]}/${profileId}${profileContextQuery(organizationId)}` as Href;
 }
 
 /** The profile editor's Variables tab. */
-export function getProfileVariablesPath(profileId: string, organizationId?: string): Href {
-  return `/(app)/(tabs)/(3_profile)/profiles/${profileId}/variables${profileContextQuery(organizationId)}` as Href;
+export function getProfileVariablesPath(
+  profileId: string,
+  organizationId?: string,
+  stack: ProfileManagementStack = 'profileTab'
+): Href {
+  return `${PROFILE_ROOTS[stack]}/${profileId}/variables${profileContextQuery(organizationId)}` as Href;
 }
 
 /** The profile editor's Setup Commands tab. */
-export function getProfileCommandsPath(profileId: string, organizationId?: string): Href {
-  return `/(app)/(tabs)/(3_profile)/profiles/${profileId}/commands${profileContextQuery(organizationId)}` as Href;
+export function getProfileCommandsPath(
+  profileId: string,
+  organizationId?: string,
+  stack: ProfileManagementStack = 'profileTab'
+): Href {
+  return `${PROFILE_ROOTS[stack]}/${profileId}/commands${profileContextQuery(organizationId)}` as Href;
 }
 
 /** The profile editor's Slash Commands tab. */
-export function getProfileSlashCommandsPath(profileId: string, organizationId?: string): Href {
-  return `/(app)/(tabs)/(3_profile)/profiles/${profileId}/slash-commands${profileContextQuery(organizationId)}` as Href;
+export function getProfileSlashCommandsPath(
+  profileId: string,
+  organizationId?: string,
+  stack: ProfileManagementStack = 'profileTab'
+): Href {
+  return `${PROFILE_ROOTS[stack]}/${profileId}/slash-commands${profileContextQuery(organizationId)}` as Href;
 }
 
 /** The profile editor's MCP Servers tab. */
-export function getProfileMcpPath(profileId: string, organizationId?: string): Href {
-  return `/(app)/(tabs)/(3_profile)/profiles/${profileId}/mcp${profileContextQuery(organizationId)}` as Href;
+export function getProfileMcpPath(
+  profileId: string,
+  organizationId?: string,
+  stack: ProfileManagementStack = 'profileTab'
+): Href {
+  return `${PROFILE_ROOTS[stack]}/${profileId}/mcp${profileContextQuery(organizationId)}` as Href;
 }
 
 /** The profile editor's Agents tab. */
-export function getProfileAgentsPath(profileId: string, organizationId?: string): Href {
-  return `/(app)/(tabs)/(3_profile)/profiles/${profileId}/agents${profileContextQuery(organizationId)}` as Href;
+export function getProfileAgentsPath(
+  profileId: string,
+  organizationId?: string,
+  stack: ProfileManagementStack = 'profileTab'
+): Href {
+  return `${PROFILE_ROOTS[stack]}/${profileId}/agents${profileContextQuery(organizationId)}` as Href;
 }
 
 /** The profile editor's Skills tab. */
-export function getProfileSkillsPath(profileId: string, organizationId?: string): Href {
-  return `/(app)/(tabs)/(3_profile)/profiles/${profileId}/skills${profileContextQuery(organizationId)}` as Href;
+export function getProfileSkillsPath(
+  profileId: string,
+  organizationId?: string,
+  stack: ProfileManagementStack = 'profileTab'
+): Href {
+  return `${PROFILE_ROOTS[stack]}/${profileId}/skills${profileContextQuery(organizationId)}` as Href;
 }

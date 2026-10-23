@@ -18,6 +18,7 @@ export default function ProfileOverviewRoute() {
     <ProfileOverviewScreen
       profileId={profileId}
       organizationId={parseParam(rawOrganizationId) ?? undefined}
+      stack="profileTab"
     />
   );
 }

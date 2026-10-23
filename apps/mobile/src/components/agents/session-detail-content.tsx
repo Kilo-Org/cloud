@@ -557,10 +557,14 @@ export function SessionDetailContent({
   });
   const openSessionProfileEditor = () => {
     if (sessionProfile) {
+      // The session screen is on the root `(app)` Stack: the profile editor has
+      // to join it there, or Back would land on the Profile tab root instead of
+      // this session.
       router.push(
         getProfileOverviewPath(
           sessionProfile.id,
-          profileOrganizationId(organizationId, sessionProfile)
+          profileOrganizationId(organizationId, sessionProfile),
+          'app'
         )
       );
     }

@@ -86,14 +86,16 @@ function typeName(root: ReactTestInstance, name: string): void {
 }
 
 async function mount() {
-  const result = await renderWithProviders(createElement(NewProfileScreen));
+  const result = await renderWithProviders(
+    createElement(NewProfileScreen, { stack: 'profileTab' })
+  );
   const rerender = () => {
     act(() => {
       result.renderer.update(
         createElement(
           QueryClientProvider,
           { client: result.queryClient },
-          createElement(NewProfileScreen)
+          createElement(NewProfileScreen, { stack: 'profileTab' })
         )
       );
     });

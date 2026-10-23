@@ -244,19 +244,13 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
       : pr.data.state === 'open');
 
   let body: ReactNode = null;
-  // A failed first read leaves nothing for the Files and Discussion tabs to
-  // render from — they take their `headSha`/page data from this query — so the
-  // screen keeps the Overview body, whose own error arm owns the reason and the
-  // Retry. The selector above is disabled in this state, so the tab it shows as
-  // selected is the one actually painted.
-  const activeTab: PrReviewTabId = loadFailed ? 'overview' : tab;
   if (!queries.isReady) {
     // Non-retryable: Bitbucket Cloud review is organization-scoped and no
     // organization is selected. The shared organization boundary owns the
     // recovery states: it opens the context picker when memberships exist
     // and sends accounts with no organization to the web organizations page.
     body = <OrganizationBoundary icon={GitPullRequest} />;
-  } else if (activeTab === 'overview') {
+  } else if (tab === 'overview') {
     body = (
       <>
         {partialMergeReason ? <PrMergePartialSuccessBanner reason={partialMergeReason} /> : null}
@@ -269,7 +263,7 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
         />
       </>
     );
-  } else if (activeTab === 'files') {
+  } else if (tab === 'files') {
     body = (
       <PrReviewFilesTab
         owner={owner}
@@ -348,7 +342,7 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
       {queries.isReady ? (
         <View className="px-4 pb-2 pt-3">
           <PrReviewTabSelector
-            activeTab={activeTab}
+            activeTab={tab}
             onChange={setTab}
             discussionCount={pr.data?.commentCount}
             disabled={loadFailed}

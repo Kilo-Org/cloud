@@ -109,12 +109,9 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={org.organizationName}
-        // The organization name is user prose, not a UI label, so it keeps a
-        // second line for a natural break.
-        titleNumberOfLines={2}
-      />
+      {/* The organization name is user prose, not a UI label, so it keeps a
+          second line for a natural break. */}
+      <ScreenHeader title={org.organizationName} titleNumberOfLines={2} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-6 gap-6 pt-4"

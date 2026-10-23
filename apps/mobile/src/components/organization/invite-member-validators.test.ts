@@ -62,9 +62,7 @@ describe('inviteErrorCopy', () => {
 
   it('keeps the shared already-invited line for a conflict the app does not name', () => {
     expect(
-      inviteErrorCopy(Object.assign(new Error('Child organizations cannot invite members'), {
-        data: { code: 'CONFLICT' },
-      }))
+      inviteErrorCopy(Object.assign(new Error('Invite conflict'), { data: { code: 'CONFLICT' } }))
     ).toEqual({ field: 'form', message: i18n.t('organization.inviteMember.alreadyInvited') });
   });
 

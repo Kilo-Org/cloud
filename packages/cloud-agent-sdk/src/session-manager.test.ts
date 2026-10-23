@@ -1361,6 +1361,49 @@ describe('createSessionManager', () => {
         expect(mockSession.connect).not.toHaveBeenCalled();
       });
 
+      it('keeps the newest unconfirmed sessions inside the record limit and frees the oldest', async () => {
+        const cache = new Map<string, CachedSessionSnapshotPage>();
+        for (let index = 1; index <= 21; index += 1) {
+          const id = `ses-unconfirmed-${index}`;
+          cache.set(id, cachedPage(id, [`msg-${index}`]));
+        }
+        const unconfirmed = new Set<string>();
+        const reads = new Map<string, number>();
+        const config = createMockConfig({
+          fetchSession: async (id: KiloSessionId) => {
+            if (unconfirmed.has(id)) throw { data: { code: 'NOT_FOUND' } };
+            return { ...defaultFetchedSession, kiloSessionId: id };
+          },
+          readCachedSnapshotPage: async (id: KiloSessionId) => {
+            reads.set(id, (reads.get(id) ?? 0) + 1);
+            return cache.get(id) ?? null;
+          },
+        });
+        const mgr = createSessionManager(config);
+
+        for (let index = 1; index <= 21; index += 1) {
+          const id = kiloId(`ses-unconfirmed-${index}`);
+          unconfirmed.add(id);
+          await mgr.switchSession(id);
+          await new Promise<void>(resolve => setImmediate(resolve));
+          // The first open of an id happens before the server answers for it,
+          // so it reads the page the consumer holds for that id.
+          expect(reads.get(id)).toBe(1);
+        }
+
+        // The oldest record made room for the newer ones, so its page is read
+        // again on the next open, while the newest record keeps its page
+        // unused until the server answers.
+        await mgr.switchSession(kiloId('ses-unconfirmed-1'));
+        await new Promise<void>(resolve => setImmediate(resolve));
+        expect(reads.get('ses-unconfirmed-1')).toBe(2);
+
+        await mgr.switchSession(kiloId('ses-unconfirmed-21'));
+        await new Promise<void>(resolve => setImmediate(resolve));
+        expect(reads.get('ses-unconfirmed-21')).toBe(1);
+        mgr.destroy();
+      });
+
       it('retries on network return without blanking cached rows, and removes recovery listeners', async () => {
         let online: (() => void) | undefined;
         const unsubscribe = jest.fn();

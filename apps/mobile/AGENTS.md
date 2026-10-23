@@ -76,24 +76,24 @@ reason.
 
 One element per concern. `no-restricted-imports` in `.oxlintrc.json` enforces the "Use instead" column.
 
-| Concern                               | Element                                                                                                                                                | Use instead of                                                                                     |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
-| Bottom sheet, imperative / non-route  | `Sheet` from `@/components/ui/sheet`                                                                                                                   | `Modal` from `react-native`, `@gorhom/bottom-sheet`, `react-native-modal`, `react-native-modalize` |
-| Bottom sheet, route                   | expo-router `formSheet` via `useFormSheetScreenOptions()`                                                                                              | a JS bottom-sheet library                                                                          |
-| Confirm that needs the red affordance | `useConfirmDialog()` from `@/components/ui/dialog` (a native sheet)                                                                                    | `Alert.alert` for a destructive confirm; a direct `@rn-primitives/dialog` import                   |
-| Dialog form (a field, a form)         | `DialogCard` from `@/components/ui/dialog`                                                                                                             | a direct `@rn-primitives/dialog` import                                                            |
-| System confirm, non-destructive       | `Alert.alert`                                                                                                                                          | —                                                                                                  |
-| Keyboard avoidance                    | `react-native-keyboard-controller`                                                                                                                     | `KeyboardAvoidingView` from `react-native`                                                         |
-| Lists                                 | `@shopify/flash-list`                                                                                                                                  | `FlatList`, `VirtualizedList`, `SectionList`, `@legendapp/list`                                    |
-| Image viewer                          | `@/components/ui/image-viewer`                                                                                                                         | `react-native-image-viewing`, `react-native-awesome-gallery`                                       |
-| Video                                 | `expo-video`                                                                                                                                           | `react-native-video`, `expo-av`                                                                    |
-| Blur                                  | `expo-blur`                                                                                                                                            | `expo-glass-effect`, `@callstack/liquid-glass` (no Liquid Glass)                                   |
-| Toast                                 | `sonner-native`                                                                                                                                        | `react-native-toast-message`, `burnt`                                                              |
-| Images                                | `@/components/ui/image`                                                                                                                                | `Image` from `react-native`, `expo-image`                                                          |
-| Icons                                 | `@/components/ui/icons`                                                                                                                                | `lucide-react-native`                                                                              |
-| Markdown                              | `MarkdownText` from `@/components/agents/markdown-text`, rendered by `react-native-enriched-markdown`                                                  | `react-native-marked`, `react-native-markdown-display`                                             |
-| HTML in markdown                      | `MarkdownText`: `markdown-html-convert` turns HTML markdown can express into markdown; the rest renders through `MarkdownHtml` (`@native-html/render`) | `react-native-render-html`                                                                         |
-| Diagram                               | ` ```mermaid ` fences → `MarkdownMermaid` (`react-native-webview`)                                                                                     | —                                                                                                  |
+| Concern | Element | Use instead of |
+|---|---|---|
+| Bottom sheet, imperative / non-route | `Sheet` from `@/components/ui/sheet` | `Modal` from `react-native`, `@gorhom/bottom-sheet`, `react-native-modal`, `react-native-modalize` |
+| Bottom sheet, route | expo-router `formSheet` via `useFormSheetScreenOptions()` | a JS bottom-sheet library |
+| Confirm that needs the red affordance | `useConfirmDialog()` from `@/components/ui/dialog` (a native sheet) | `Alert.alert` for a destructive confirm; a direct `@rn-primitives/dialog` import |
+| Dialog form (a field, a form) | `DialogCard` from `@/components/ui/dialog` | a direct `@rn-primitives/dialog` import |
+| System confirm, non-destructive | `Alert.alert` | — |
+| Keyboard avoidance | `react-native-keyboard-controller` | `KeyboardAvoidingView` from `react-native` |
+| Lists | `@shopify/flash-list` | `FlatList`, `VirtualizedList`, `SectionList`, `@legendapp/list` |
+| Image viewer | `@/components/ui/image-viewer` | `react-native-image-viewing`, `react-native-awesome-gallery` |
+| Video | `expo-video` | `react-native-video`, `expo-av` |
+| Blur | `expo-blur` | `expo-glass-effect`, `@callstack/liquid-glass` (no Liquid Glass) |
+| Toast | `sonner-native` | `react-native-toast-message`, `burnt` |
+| Images | `@/components/ui/image` | `Image` from `react-native`, `expo-image` |
+| Icons | `@/components/ui/icons` | `lucide-react-native` |
+| Markdown | `MarkdownText` from `@/components/agents/markdown-text`, rendered by `react-native-enriched-markdown` | `react-native-marked`, `react-native-markdown-display` |
+| HTML in markdown | `MarkdownText`: `markdown-html-convert` turns HTML markdown can express into markdown; the rest renders through `MarkdownHtml` (`@native-html/render`) | `react-native-render-html` |
+| Diagram | ` ```mermaid ` fences → `MarkdownMermaid` (`react-native-webview`) | — |
 
 No file imports `Modal` from `react-native`, `@expo/ui/community/bottom-sheet` or `@rn-primitives/dialog`
 outside `@/components/ui/sheet` and `@/components/ui/dialog`. A sheet or a confirm must be able to stack

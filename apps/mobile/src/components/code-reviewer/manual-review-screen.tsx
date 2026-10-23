@@ -4,7 +4,7 @@ import { type Href, useRouter } from 'expo-router';
 import { GitPullRequest } from '@/components/ui/icons';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, TextInput, View } from 'react-native';
+import { ScrollView, type ScrollViewInstance, TextInput, View } from 'react-native';
 
 import { matchesCodeReviewUrlSuffix } from '@kilocode/app-shared/code-review';
 import { ModelSelector } from '@/components/agents/model-selector';
@@ -94,7 +94,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const platform = platformChoice ?? firstConnected ?? 'github';
   const urlRef = useRef('');
   const instructionsRef = useRef('');
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
   const urlSectionY = useRef(0);
   const [urlError, setUrlError] = useState<string | null>(null);
   const config = useReviewConfig(scope, platform);

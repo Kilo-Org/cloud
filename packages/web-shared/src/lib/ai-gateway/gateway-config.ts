@@ -4,6 +4,9 @@ export const DEFAULT_VERCEL_ROUTING_ENABLED = true;
 
 export const NOTE_MAX_LENGTH = 500;
 
+export const VERCEL_ROUTING_OPT_OUT_MODEL_MAX_LENGTH = 200;
+export const VERCEL_ROUTING_OPT_OUT_MODELS_MAX_COUNT = 200;
+
 const note = z.string().max(NOTE_MAX_LENGTH);
 
 /**
@@ -38,9 +41,20 @@ export const GatewayRoutingConfigSchema = z.object({
   vercel_routing_opt_out_models: z.array(z.string().min(1)).default([]),
 });
 
+/**
+ * The admin form submits one model ID per line, so the write schema owns the
+ * stored form: trimmed, lowercase, non-empty, bounded and duplicate-free. Every
+ * accepted input therefore stays parseable by the stored-config and hot-path
+ * schemas, and a saved list never carries an entry the readers reject.
+ */
+const vercelRoutingOptOutModels = z
+  .array(z.string().trim().toLowerCase().min(1).max(VERCEL_ROUTING_OPT_OUT_MODEL_MAX_LENGTH))
+  .max(VERCEL_ROUTING_OPT_OUT_MODELS_MAX_COUNT)
+  .transform(models => [...new Set(models)]);
+
 /** Schema for the admin set-mutation input. */
 export const GatewayConfigInputSchema = z.object({
   vercel_routing_enabled: z.boolean(),
-  vercel_routing_opt_out_models: z.array(z.string()),
+  vercel_routing_opt_out_models: vercelRoutingOptOutModels,
   note: note.nullable(),
 });

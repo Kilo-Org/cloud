@@ -969,6 +969,8 @@
       "retryTitle": "重试审查？",
       "showMore": "显示更多",
       "started": "开始时间",
+      "reviewEnded": "结束时间",
+      "severityNitpick": "吹毛求疵",
       "threshold": "阈值",
       "title": "审查",
       "tokens": "词元",
@@ -1157,12 +1159,18 @@
       "actorSystem": "Kilo 系统",
       "couldNotLoad": "无法加载审计报告",
       "events": "事件",
+      "eventConfidence": "置信度：{{confidence}}",
+      "eventReason": "原因：{{reason}}",
+      "eventsCount_one": "{{displayCount}} 个事件",
+      "eventsCount_other": "{{displayCount}} 个事件",
       "generated": "已于 {{generatedAt}} 生成",
       "noActivity": "暂无活动记录",
       "noActivityDescription": "从 {{start}} 到 {{end}}，Kilo 没有可纳入报告的安全问题活动记录。",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "报告查询未完成。请重试。",
       "repositoryNotRecorded": "未记录仓库",
+      "reasonUnknown": "未识别的原因",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "报告摘要",
       "title": "审计报告",
       "unavailable": "审计报告不可用",
@@ -1404,6 +1412,7 @@
       "reauthorizeButton": "重新授权 GitHub 应用",
       "reauthorizeDescription": "安全智能体需要读取 Dependabot 警报的权限。请重新授权 GitHub 应用以授予此权限。",
       "reauthorizeTitle": "需要额外权限",
+      "retryFailed": "仍然无法加载安全智能体。请检查网络连接，然后重试。",
       "setupFailed": "无法启动 GitHub 配置流程。请重试。"
     },
     "settingsOverview": {
@@ -2040,7 +2049,10 @@
       "allowOnceAccessibility": "仅允许一次",
       "alwaysAllow": "始终允许",
       "alwaysAllowAccessibility": "始终允许",
-      "retrying": "正在重试……"
+      "retrying": "正在重试……",
+      "retryDeny": "再次尝试拒绝",
+      "retryAllowOnce": "再次尝试仅允许一次",
+      "retryAlwaysAllow": "再次尝试始终允许"
     },
     "questionCard": {
       "title": "智能体需要你的输入",
@@ -3858,7 +3870,7 @@
     "slashCommands": {
       "title": "斜杠命令",
       "add": "添加斜杠命令",
-      "empty": "还没有斜线命令",
+      "empty": "还没有斜杠命令",
       "name": "命令名称",
       "description": "命令说明",
       "template": "模板",

@@ -1377,7 +1377,9 @@ describe('AgentSessionListScreen header and admission', () => {
     expect(header().props.eyebrow).toBe(i18n.t('agents.liveCount', { count: 1 }));
     expect(text()).not.toContain(organizationName);
     expect(
-      nodes('Pressable').filter(node => node.props.accessibilityHint === 'Select account')
+      nodes('Pressable').filter(
+        node => node.props.accessibilityHint === i18n.t('profile.selectAccount')
+      )
     ).toHaveLength(0);
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: true });
     expect(
@@ -1452,6 +1454,8 @@ describe('AgentSessionListScreen header and admission', () => {
     expect(actions.props.className).toContain('min-h-11');
     expect(actions.props.className).toContain('shrink');
     expect(header().props.headerRight).toBeUndefined();
+    // The account scope line is the tab's (rendered through `tabHeader`), not
+    // this screen's: the screen itself never draws an account control.
     expect(
       nodes('Pressable').filter(node => node.props.accessibilityHint === 'Select account')
     ).toHaveLength(0);
@@ -2315,7 +2319,7 @@ describe('Live list admission and lifecycle', () => {
       expect(nodes('Pressable').some(node => node.props.testID === 'agents-new-session-fab')).toBe(
         false
       );
-      expect(text()).not.toContain('Engineering');
+      expect(text()).not.toContain(row.title);
     }
     if (mode === 'membership paused') {
       expect(listSkeletons()).toHaveLength(8);

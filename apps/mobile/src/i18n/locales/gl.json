@@ -3313,6 +3313,7 @@
   },
   "modelChat": {
     "offlineFailure": "Este modelo necesita conexión a internet. Conéctate e téntao de novo, ou cambia a un modelo deste dispositivo.",
+    "creditsRequired": "Non hai créditos suficientes para enviar esta mensaxe. Engade créditos e téntao de novo.",
     "empty": {
       "title": "Inicia un chat",
       "description": "Envía unha mensaxe para falar cun modelo."

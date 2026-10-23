@@ -3313,6 +3313,7 @@
   },
   "modelChat": {
     "offlineFailure": "此模型需要联网。请连接网络后重试，或切换到此设备上的模型。",
+    "creditsRequired": "额度不足，无法发送此消息。请充值额度后重试。",
     "empty": {
       "title": "开始聊天",
       "description": "发送消息以与模型对话。"

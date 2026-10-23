@@ -3313,6 +3313,7 @@
   },
   "modelChat": {
     "offlineFailure": "Denne model kræver en internetforbindelse. Opret forbindelse, og prøv igen, eller skift til en model på denne enhed.",
+    "creditsRequired": "Ikke nok kreditter til at sende denne besked. Tilføj kreditter, og prøv igen.",
     "empty": {
       "title": "Start en chat",
       "description": "Send en besked for at tale med en model."

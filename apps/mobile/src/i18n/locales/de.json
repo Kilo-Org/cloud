@@ -3313,6 +3313,7 @@
   },
   "modelChat": {
     "offlineFailure": "Dieses Modell benötigt eine Internetverbindung. Stelle eine Verbindung her und versuche es erneut, oder wechsle zu einem Modell auf diesem Gerät.",
+    "creditsRequired": "Nicht genug Guthaben, um diese Nachricht zu senden. Lade Guthaben auf und versuche es erneut.",
     "empty": {
       "title": "Chat starten",
       "description": "Sende eine Nachricht, um mit einem Modell zu sprechen."

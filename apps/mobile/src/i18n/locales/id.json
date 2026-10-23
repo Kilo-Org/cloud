@@ -3313,6 +3313,7 @@
   },
   "modelChat": {
     "offlineFailure": "Model ini memerlukan koneksi internet. Sambungkan dan coba lagi, atau beralih ke model di perangkat ini.",
+    "creditsRequired": "Kredit tidak cukup untuk mengirim pesan ini. Tambah kredit dan coba lagi.",
     "empty": {
       "title": "Mulai obrolan",
       "description": "Kirim pesan untuk berbicara dengan model."

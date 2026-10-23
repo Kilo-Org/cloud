@@ -3313,6 +3313,7 @@
   },
   "modelChat": {
     "offlineFailure": "Ehhez a modellhez internetkapcsolat szükséges. Csatlakozz, és próbáld újra, vagy válts egy ezen az eszközön lévő modellre.",
+    "creditsRequired": "Nincs elég egyenleged ennek az üzenetnek az elküldéséhez. Töltsd fel az egyenleged, és próbáld újra.",
     "empty": {
       "title": "Kezdjen csevegést",
       "description": "Küldjön egy üzenetet, hogy beszélgessen egy modellel."

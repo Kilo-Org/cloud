@@ -3354,6 +3354,7 @@
   },
   "modelChat": {
     "offlineFailure": "Acest model necesită o conexiune la internet. Conectează-te și încearcă din nou sau comută la un model de pe acest dispozitiv.",
+    "creditsRequired": "Nu ai suficiente credite pentru a trimite acest mesaj. Adaugă credite și încearcă din nou.",
     "empty": {
       "title": "Începe un chat",
       "description": "Trimite un mesaj pentru a vorbi cu un model."

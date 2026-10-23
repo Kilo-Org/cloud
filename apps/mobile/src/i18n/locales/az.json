@@ -3313,6 +3313,7 @@
   },
   "modelChat": {
     "offlineFailure": "Bu model internet bağlantısı tələb edir. Qoşulun və yenidən cəhd edin və ya bu cihazdakı modelə keçin.",
+    "creditsRequired": "Bu mesajı göndərmək üçün kifayət qədər kredit yoxdur. Kredit əlavə edin və yenidən cəhd edin.",
     "empty": {
       "title": "Söhbətə başlayın",
       "description": "Bir modellə danışmaq üçün mesaj göndərin."

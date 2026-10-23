@@ -2,7 +2,7 @@
 import { type ModelEvent, type ModelUsage, type PartDraft, type Turn } from '@kilocode/harness-sdk';
 import { Effect, Layer, Queue, Stream } from 'effect';
 import { type StoredChatBackend } from './backend-store';
-import { backendTargetId } from './backend-target';
+import { backendTargetId, CREDITS_FAILURE_KEY } from './backend-target';
 import { asMessages } from './turns';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -57,6 +57,36 @@ let failHistoryFor: string | undefined = undefined;
 /** A cleanup failure after a move installed its session, before onto returned. */
 let failForgetFor: string | undefined = undefined;
 let failAnswerFor: string | undefined = undefined;
+/** A session whose answer the gateway refuses for the account's balance. */
+let creditsFailureFor: string | undefined = undefined;
+/** What Kilo's gateway answers when the account cannot pay for the call. */
+const PAYMENT_REQUIRED_BODY =
+  '{"error":{"message":"Add credits to continue"},"error_type":"usage_limit_exceeded"}';
+/**
+ * The failure the gateway plugin raises: a status and the body that came with
+ * it. The registry reads its fields, so the fake carries the same ones.
+ */
+const modelError = vi.hoisted(() => {
+  class FakeModelError extends Error {
+    readonly reason: string;
+    readonly status: number | undefined;
+
+    constructor(fields: {
+      readonly reason: string;
+      readonly status?: number;
+      readonly cause?: unknown;
+    }) {
+      super(fields.reason);
+      this.name = 'ModelError';
+      this.reason = fields.reason;
+      this.status = fields.status;
+      if (fields.cause !== undefined) {
+        this.cause = fields.cause;
+      }
+    }
+  }
+  return { ModelError: FakeModelError };
+});
 /** What one answer costs in the fake, the way the gateway reports a paid call. */
 const CALL: ModelUsage = {
   inputTokens: 10,
@@ -129,6 +159,12 @@ const handleFor = (id: string) => {
         asked.push(said);
         return Stream.fail(new Error('custom answer failed'));
       }
+      if (creditsFailureFor === id) {
+        asked.push(said);
+        return Stream.fail(
+          new modelError.ModelError({ reason: 'status', status: 402, cause: PAYMENT_REQUIRED_BODY })
+        );
+      }
       return Stream.callback<ModelEvent>(queue =>
         Effect.sync(() => {
           asked.push(said);
@@ -187,7 +223,7 @@ vi.mock('@kilocode/harness-sdk', () => {
   return {
     ToolMissingError: FakeToolMissingError,
     // Failure copy is read from the error itself before any model error cause.
-    ModelError: Error,
+    ModelError: modelError.ModelError,
     zeroUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
     openSession: (options: { readonly tools?: readonly string[] }) => {
       openedWith = options;
@@ -840,6 +876,41 @@ describe('a question with images', () => {
       { kind: 'image', body: 'AAAA', media: 'image/jpeg' },
       { kind: 'text', body: 'and this' },
     ]);
+  });
+});
+
+describe('a send the account cannot pay for', () => {
+  it('keeps the first question of a chat and says why it did not go', async () => {
+    storedHistory = [];
+    creditsFailureFor = 's1';
+
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    const held = snapshotOf(opened);
+    expect(held).toMatchObject({
+      status: 'idle',
+      asked: 'first',
+      askedModel: 'kilo/one',
+      failureKey: CREDITS_FAILURE_KEY,
+      turns: [],
+    });
+
+    /* Nothing was written for the chat yet, so the question on screen is the
+       remembered one — the bubble its Retry and Copy to composer hang off. */
+    const drawn = asMessages(held);
+    expect(drawn.map(one => one.info.id)).toEqual([`${held.sessionId}:asked`]);
+    expect(drawn[0]?.parts).toEqual([expect.objectContaining({ type: 'text', text: 'first' })]);
+
+    creditsFailureFor = undefined;
+    await retryChat(opened);
+    await settled();
+
+    expect(asked.map(one => one.text)).toEqual(['first', 'first']);
+
+    finish?.();
+    await settled();
+    expect(snapshotOf(opened)).toMatchObject({ asked: null, failureKey: null });
   });
 });
 

@@ -30,8 +30,42 @@ class BackendTargetError extends Error {
   }
 }
 
-/** Fixed UI copy only: provider failures may contain credentials or response bodies. */
-export function backendFailureKey(error: unknown): string {
+/** The copy a send blocked by the account's balance says instead of a generic failure. */
+export const CREDITS_FAILURE_KEY = 'modelChat.creditsRequired';
+
+/** The gateway's answer when the account cannot pay for the request. */
+const PAYMENT_REQUIRED = 402;
+
+/**
+ * Whether a call failed because the account could not pay for it.
+ *
+ * Kilo's own gateway answers a paid request from an account with no credit with
+ * 402 and says where to buy more. Another provider's 402 is its own billing, and
+ * the app cannot settle it, so it keeps the generic copy.
+ */
+function paymentRequired(error: unknown, model: string | undefined): boolean {
+  if (model === undefined || chatTargetKind(model) !== 'kilo') {
+    return false;
+  }
+  for (const failure of [error, error instanceof ModelError ? error.cause : undefined]) {
+    if (
+      failure instanceof ModelError &&
+      failure.reason === 'status' &&
+      failure.status === PAYMENT_REQUIRED
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Fixed UI copy only: provider failures may contain credentials or response bodies.
+ *
+ * `model` is the model whose call failed. It is what tells a bill the person can
+ * settle in this app from one they can only settle elsewhere.
+ */
+export function backendFailureKey(error: unknown, model?: string): string {
   // The routed model client reports target and local failures as a ModelError cause.
   for (const failure of [error, error instanceof ModelError ? error.cause : undefined]) {
     if (failure instanceof BackendTargetError) {
@@ -40,6 +74,9 @@ export function backendFailureKey(error: unknown): string {
     if (failure instanceof LocalModelError) {
       return failure.key;
     }
+  }
+  if (paymentRequired(error, model)) {
+    return CREDITS_FAILURE_KEY;
   }
   // A remote model fails with no connection, and an on-device one does not.
   // Saying so tells the person what to change instead of only that it failed.

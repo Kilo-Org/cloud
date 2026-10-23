@@ -3354,6 +3354,7 @@
   },
   "modelChat": {
     "offlineFailure": "Ovaj model zahteva internet vezu. Povežite se i pokušajte ponovo ili pređite na model na ovom uređaju.",
+    "creditsRequired": "Nema dovoljno kredita za slanje ove poruke. Dodajte kredite i pokušajte ponovo.",
     "empty": {
       "title": "Započnite ćaskanje",
       "description": "Pošaljite poruku da razgovarate sa modelom."

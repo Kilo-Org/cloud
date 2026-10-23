@@ -3313,6 +3313,7 @@
   },
   "modelChat": {
     "offlineFailure": "Hierdie model het 'n internetverbinding nodig. Koppel en probeer weer, of skakel oor na 'n model op hierdie toestel.",
+    "creditsRequired": "Nie genoeg krediete om hierdie boodskap te stuur nie. Voeg krediete by en probeer weer.",
     "empty": {
       "title": "Begin 'n klets",
       "description": "Stuur 'n boodskap om met 'n model te gesels."

@@ -3436,6 +3436,7 @@
   },
   "modelChat": {
     "offlineFailure": "Teastaíonn nasc idirlín ón tsamhail seo. Ceangail agus bain triail eile as, nó athraigh go samhail ar an ngléas seo.",
+    "creditsRequired": "Níl creidmheasanna go leor chun an teachtaireacht seo a sheoladh. Cuir creidmheasanna leis agus bain triail eile as.",
     "empty": {
       "title": "Tosaigh comhrá",
       "description": "Seol teachtaireacht chun labhairt le samhail."

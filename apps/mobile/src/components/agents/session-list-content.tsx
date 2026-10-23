@@ -175,6 +175,7 @@ export function AgentSessionListContent({
   const surface = selectSessionListContentSurface({
     isLoading,
     isError,
+    isRetrying,
     hasAnySessions,
     hasHistoryContent: sections.length > 0,
     hasActiveQuery,
@@ -371,10 +372,9 @@ export function AgentSessionListContent({
     );
   }
 
-  // No stored rows and no active query: render the history-empty body ("No
-  // past sessions" with no create CTA) full-screen, skipping the list.
-  // Gated on !isLoading (via surface) so a cold open with an empty cache does
-  // not flash this while queries run.
+  // No stored rows and no active query: render the history-empty body with its
+  // new-session action full-screen. The surface selector gates this on !isLoading
+  // so a cold open with an empty cache does not flash before queries settle.
   if (surface.kind === 'history-empty') {
     return (
       <Animated.View entering={FadeIn.duration(200)} className="flex-1">

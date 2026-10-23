@@ -695,12 +695,33 @@ describe('AgentSessionListContent liveness', () => {
     expect(hosts(renderer, 'SessionListSectionHeader')).toHaveLength(2);
   });
 
-  it('shows the retry in flight while the history refetch runs', () => {
+  it('keeps stale history behind the busy Retry control until refetch completes', () => {
     const renderer = mount(
-      contentProps({ hasAnySessions: false, isError: true, isRetrying: true })
+      contentProps({
+        sections: [{ title: 'Today', data: [session('cached')] }],
+        isError: false,
+        hasAnySessions: true,
+        hasFreshHistory: false,
+        isRetrying: true,
+      })
     );
     const retry = hosts(renderer, 'Button')[0];
     expect(retry?.props.loading).toBe(true);
+    expect(hosts(renderer, 'StoredSessionRow')).toHaveLength(0);
+    act(() => {
+      renderer.update(
+        createElement(
+          AgentSessionListContent,
+          contentProps({
+            sections: [{ title: 'Today', data: [session('recovered')] }],
+            hasFreshHistory: true,
+            isRetrying: false,
+          })
+        )
+      );
+    });
+    expect(rows(renderer).map(item => item.id)).toEqual(['recovered']);
+    expect(hosts(renderer, 'Button')).toHaveLength(0);
   });
 
   it('starts a session from the empty history body instead of dead-ending', () => {

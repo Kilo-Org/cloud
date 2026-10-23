@@ -92,12 +92,14 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// Mutable because one row's state depends on the other: the auto-expand row
+// reads the hide-thinking value. Reset in beforeEach.
+const thinkingPreference = vi.hoisted(() => ({
+  reasoning: { defaultExpanded: false, hasLoaded: true, setDefaultExpanded: vi.fn() },
+  hide: { hideThinking: false, hasLoaded: true, setHideThinking: vi.fn() },
+}));
 vi.mock('@/lib/hooks/use-hide-thinking-preference', () => ({
-  useHideThinkingPreference: () => ({
-    hideThinking: false,
-    hasLoaded: true,
-    setHideThinking: vi.fn(),
-  }),
+  useHideThinkingPreference: () => thinkingPreference.hide,
 }));
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
   useKeepScreenOnPreference: () => ({
@@ -114,11 +116,7 @@ vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({
   }),
 }));
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({
-  useReasoningPreference: () => ({
-    defaultExpanded: false,
-    hasLoaded: true,
-    setDefaultExpanded: vi.fn(),
-  }),
+  useReasoningPreference: () => thinkingPreference.reasoning,
 }));
 vi.mock('@/lib/hooks/use-return-sends-message-preference', () => ({
   useReturnSendsMessagePreference: () => ({
@@ -176,6 +174,34 @@ function biometricToggle(renderer: RenderWithProvidersResult) {
     ? (found.props.onValueChange as (next: boolean) => void)
     : undefined;
 }
+function switchByLabel(renderer: RenderWithProvidersResult, label: string) {
+  return renderer.renderer.root
+    .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Switch')
+    .find(sw => sw.props.accessibilityLabel === label);
+}
+/** The tappable half of the row that shows `title`, which carries the same disabled state. */
+function rowPressable(renderer: RenderWithProvidersResult, title: string) {
+  return renderer.renderer.root
+    .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Pressable')
+    .find(
+      pressable =>
+        pressable.findAll(
+          node =>
+            typeof node.type === 'string' &&
+            (node.type as string) === 'Text' &&
+            node.props.children === title
+        ).length > 0
+    );
+}
+/** Which of the two subtitles the row paints, versus only reserves. */
+function paintedSubtitle(renderer: RenderWithProvidersResult, rowTitle: string) {
+  const overlay = rowPressable(renderer, rowTitle)?.find(
+    node => typeof node.type === 'string' && node.props.className === 'absolute inset-x-0 top-0'
+  );
+  return overlay
+    ?.findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
+    .map(node => node.props.children as string);
+}
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('__DEV__', false);
@@ -187,6 +213,10 @@ beforeEach(() => {
   native.authenticateAsync.mockResolvedValue({ success: true });
   condensePreference.condenseToolCalls = false;
   condensePreference.hasLoaded = true;
+  thinkingPreference.reasoning.defaultExpanded = false;
+  thinkingPreference.reasoning.hasLoaded = true;
+  thinkingPreference.hide.hideThinking = false;
+  thinkingPreference.hide.hasLoaded = true;
 });
 afterEach(() => {
   view?.unmount();
@@ -265,6 +295,51 @@ describe('GeneralSettingsScreen', () => {
       checked: false,
       disabled: true,
     });
+  });
+
+  it('makes the auto-expand row inert and says why while thinking details are hidden', async () => {
+    // The stored auto-expand value survives: hiding thinking stops it from
+    // applying, it does not throw the choice away.
+    thinkingPreference.reasoning.defaultExpanded = true;
+    thinkingPreference.hide.hideThinking = true;
+    const renderer = await mountGeneral();
+
+    const autoExpand = switchByLabel(renderer, 'Auto expand thinking');
+    expect(autoExpand?.props.accessibilityState).toMatchObject({ checked: true, disabled: true });
+    expect(autoExpand?.props.accessibilityHint).toBe(
+      'No effect while thinking details are hidden.'
+    );
+    expect(rowPressable(renderer, 'Auto expand thinking')?.props.disabled).toBe(true);
+    expect(paintedSubtitle(renderer, 'Auto expand thinking')).toEqual([
+      'No effect while thinking details are hidden.',
+    ]);
+    // The row that hides thinking stays the independent switch the person uses to undo this.
+    expect(switchByLabel(renderer, 'Hide thinking details')?.props.accessibilityState).toMatchObject(
+      { checked: true, disabled: false }
+    );
+  });
+
+  it('restores the auto-expand row when thinking details are shown again', async () => {
+    thinkingPreference.reasoning.defaultExpanded = true;
+    const renderer = await mountGeneral();
+
+    const autoExpand = switchByLabel(renderer, 'Auto expand thinking');
+    expect(autoExpand?.props.accessibilityState).toMatchObject({ checked: true, disabled: false });
+    expect(autoExpand?.props.accessibilityHint).toBe(
+      "Show the agent's thinking expanded when it finishes."
+    );
+    expect(paintedSubtitle(renderer, 'Auto expand thinking')).toEqual([
+      "Show the agent's thinking expanded when it finishes.",
+    ]);
+  });
+
+  it('keeps the auto-expand row inert until both thinking preferences have loaded', async () => {
+    thinkingPreference.hide.hasLoaded = false;
+    const renderer = await mountGeneral();
+
+    expect(switchByLabel(renderer, 'Auto expand thinking')?.props.accessibilityState).toMatchObject(
+      { disabled: true }
+    );
   });
 
   it('does not prompt for native authentication when opening settings', async () => {

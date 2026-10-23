@@ -30,6 +30,7 @@ const COPY: Readonly<Record<string, string>> = {
 
 vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
+  Platform: { OS: 'android' },
   Switch: 'Switch',
   View: 'View',
 }));

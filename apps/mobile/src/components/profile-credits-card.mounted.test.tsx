@@ -366,6 +366,24 @@ describe('CreditsCard balance state', () => {
     }
   });
 
+  it('renders without the block list when a credits payload settles without one', async () => {
+    currentUser.userId = 'user-a';
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 0 });
+    orgCreditBlocksQueryFn.mockResolvedValue({});
+    const orgs = [
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+    ] as OrgListEntry[];
+    listState.payload = orgs;
+    const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+    try {
+      await waitFor(() => texts().includes('$0.00') && !texts().includes('SKELETON'));
+      expect(texts().filter(text => text.includes('in credits expiring'))).toEqual([]);
+    } finally {
+      unmount();
+    }
+  });
+
   it.each([
     { orgs: [], options: ['Personal', 'Cancel'], choice: 0, expected: null, label: 'Personal' },
     {

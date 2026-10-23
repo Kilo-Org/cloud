@@ -33,20 +33,6 @@ export interface IngestQueueMessage {
 
 export const QUEUE_RETRY_DELAY_SECONDS = 5 * 60;
 
-/**
- * Reports a staged body whose JSON did not parse completely. The consumer
- * removes the staging object and completes the message instead of retrying.
- */
-class StagingParseError extends Error {
-  constructor(
-    readonly r2Key: string,
-    cause: Error
-  ) {
-    super(`Malformed JSON in staging object ${r2Key}: ${cause.message}`);
-    this.name = 'StagingParseError';
-  }
-}
-
 // A queue message is an envelope for one POST's R2 payload for one session.
 // That payload can contain many session items. Batch those items into chunked
 // ingest() RPCs to that session's DO instead of one RPC per item. Prod snapshot
@@ -63,56 +49,24 @@ async function processMessage(
   const body = await getStagingObjectBody(env, msg.r2Key);
   const mergedChanges = new Map<string, string | null>();
   const mergedAttentionSignals: AttentionSignal[] = [];
-  const chunker = createIngestChunker(env, msg, mergedChanges, mergedAttentionSignals);
 
   try {
-    const accepted = await ingestStagedSessionItems(chunker, msg, body);
+    const accepted = await ingestStagedSessionItems(
+      env,
+      msg,
+      body,
+      mergedChanges,
+      mergedAttentionSignals
+    );
     if (accepted) {
       await applyMetadataChanges(env, msg.kiloUserId, msg.sessionId, mergedChanges, ctx);
     }
   } catch (err) {
-    if (err instanceof StagingParseError) {
-      // Items that parsed before the malformed tail may still be buffered in
-      // the chunker; flush them so the catch-up below observes their changes.
-      // The flush splices the buffered items out before its DO RPC, so a failed
-      // flush leaves those items only in the staging object: keep it and retry
-      // the message so the buffered prefix is replayed, instead of removing it.
-      let flushed = true;
-      try {
-        await chunker.flushChunkToSessionDO();
-      } catch (flushError) {
-        flushed = false;
-        console.error('Failed to flush buffered items after an incomplete parse', {
-          r2Key: msg.r2Key,
-          sessionId: msg.sessionId,
-          error: flushError instanceof Error ? flushError.message : String(flushError),
-        });
-      }
-      await flushPartialMetadataChanges(env, msg, mergedChanges, ctx);
-      scheduleAttentionSignalDispatch(
-        env,
-        msg,
-        sessionRow,
-        mergedChanges,
-        mergedAttentionSignals,
-        ctx
-      );
-      if (!flushed) {
-        throw err;
-      }
-      console.error('Removing staging object after an incomplete parse', {
-        r2Key: msg.r2Key,
-        sessionId: msg.sessionId,
-        error: err.message,
-      });
-      await env.SESSION_INGEST_R2.delete(msg.r2Key);
-      return;
-    }
-    // An earlier chunk may have committed to the DO before a later chunk
-    // failed. The DO reports a metadata change only when its stored value
-    // differs, so on retry those already-persisted values won't be re-emitted —
-    // Postgres would never catch up. Flush what we have now so the two stores
-    // stay in sync. Best-effort: never mask the original error.
+    // An earlier chunk may have committed to the DO before a later chunk (or the
+    // JSON parse) failed. The DO reports a metadata change only when its stored
+    // value differs, so on retry those already-persisted values won't be
+    // re-emitted — Postgres would never catch up. Flush what we have now so the
+    // two stores stay in sync. Best-effort: never mask the original error.
     await flushPartialMetadataChanges(env, msg, mergedChanges, ctx);
     // Same reasoning for attention signals: a committed status transition won't
     // re-emit on retry, so dispatch what was collected before the failure.
@@ -178,14 +132,17 @@ async function getStagingObjectBody(env: Env, r2Key: string): Promise<ReadableSt
 }
 
 async function ingestStagedSessionItems(
-  chunker: IngestChunker,
+  env: Env,
   msg: IngestQueueMessage,
-  body: ReadableStream<Uint8Array>
+  body: ReadableStream<Uint8Array>,
+  mergedChanges: Map<string, string | null>,
+  mergedAttentionSignals: AttentionSignal[]
 ): Promise<boolean> {
+  const chunker = createIngestChunker(env, msg, mergedChanges, mergedAttentionSignals);
   const parseError = await streamSessionItems(msg.r2Key, body, rawItem => chunker.stage(rawItem));
 
   if (parseError) {
-    throw new StagingParseError(msg.r2Key, parseError);
+    throw new Error(`Malformed JSON in staging object ${msg.r2Key}: ${parseError.message}`);
   }
 
   // Handle any remaining items not flushed yet.
@@ -265,18 +222,12 @@ function slimItemForR2Reference(item: SessionDataItem): SessionDataItem {
   }
 }
 
-type IngestChunker = {
-  stage(rawItem: Record<string, unknown>): Promise<boolean>;
-  flushChunkToSessionDO(): Promise<void>;
-  wasAccepted(): boolean;
-};
-
 function createIngestChunker(
   env: Env,
   msg: IngestQueueMessage,
   mergedChanges: Map<string, string | null>,
   mergedAttentionSignals: AttentionSignal[]
-): IngestChunker {
+) {
   const { r2Key, kiloUserId, sessionId, ingestVersion, ingestedAt } = msg;
   const encoder = new TextEncoder();
   const chunk: SessionDataItem[] = [];

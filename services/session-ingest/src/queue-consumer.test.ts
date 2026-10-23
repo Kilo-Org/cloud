@@ -759,8 +759,7 @@ describe('queue', () => {
     expect(deleteObject).not.toHaveBeenCalled();
   });
 
-  it('persists the valid prefix and removes staging after an incomplete parse', async () => {
-    const items = [{ type: 'message', data: { id: 'msg_1' } }];
+  it('does not flush buffered items when malformed JSON forces a retry', async () => {
     const ingest = vi.fn(async () => ({ changes: [] }));
     mockIngestWithR2(ingest);
 
@@ -771,7 +770,7 @@ describe('queue', () => {
     const select = vi.fn(() => ({ from }));
     vi.mocked(getWorkerDb).mockReturnValue({ select, transaction } as never);
 
-    const body = `{"data":[${items.map(item => JSON.stringify(item)).join(',')},broken`;
+    const body = '{"data":[{"type":"message","data":{"id":"msg_1"}},broken';
     const deleteObject = vi.fn(async () => undefined);
     const env = {
       HYPERDRIVE: { connectionString: 'postgres://unused' },
@@ -804,72 +803,11 @@ describe('queue', () => {
       { waitUntil: vi.fn() } as unknown as ExecutionContext
     );
 
-    // Items that parsed before the malformed tail are flushed to the DO so the
-    // valid prefix is persisted.
-    expect(ingest).toHaveBeenCalledTimes(1);
-    expect(ingest).toHaveBeenCalledWith(items, 'usr_malformed', 'ses_malformed', 1, 1, undefined);
-    // The message completes and the staging object is removed.
-    expect(retry).not.toHaveBeenCalled();
-    expect(ack).toHaveBeenCalledTimes(1);
-    expect(deleteObject).toHaveBeenCalledWith('staging/malformed');
-  });
-
-  it('keeps staging and retries when the buffered flush fails after an incomplete parse', async () => {
-    const items = [{ type: 'message', data: { id: 'msg_1' } }];
-    const ingest = vi
-      .fn()
-      .mockRejectedValueOnce(new Error('do rpc failed'))
-      .mockResolvedValueOnce({ changes: [] });
-    mockIngestWithR2(ingest);
-
-    const transaction = vi.fn(async () => null);
-    const limit = vi.fn(async () => [{ session_id: 'ses_malformed' }]);
-    const where = vi.fn(() => ({ limit }));
-    const from = vi.fn(() => ({ where }));
-    const select = vi.fn(() => ({ from }));
-    vi.mocked(getWorkerDb).mockReturnValue({ select, transaction } as never);
-
-    const body = `{"data":[${items.map(item => JSON.stringify(item)).join(',')},broken`;
-    const deleteObject = vi.fn(async () => undefined);
-    const env = {
-      HYPERDRIVE: { connectionString: 'postgres://unused' },
-      SESSION_INGEST_R2: {
-        get: vi.fn(async () => new Response(body)),
-        put: vi.fn(async () => undefined),
-        delete: deleteObject,
-      },
-    } as never;
-    const ack = vi.fn();
-    const retry = vi.fn();
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    await queue(
-      {
-        messages: [
-          {
-            body: {
-              r2Key: 'staging/malformed',
-              kiloUserId: 'usr_malformed',
-              sessionId: 'ses_malformed',
-              ingestVersion: 1,
-              ingestedAt: 1,
-            },
-            ack,
-            retry,
-          },
-        ],
-      } as never,
-      env,
-      { waitUntil: vi.fn() } as unknown as ExecutionContext
-    );
-
-    // The buffered flush failed, so the staging object is kept for replay and
-    // the message retries; the collected metadata catch-up still ran.
-    expect(ingest).toHaveBeenCalledTimes(1);
+    expect(ingest).not.toHaveBeenCalled();
+    expect(transaction).not.toHaveBeenCalled();
     expect(retry).toHaveBeenCalledWith({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
     expect(ack).not.toHaveBeenCalled();
     expect(deleteObject).not.toHaveBeenCalled();
-    errorSpy.mockRestore();
   });
 
   it('flushes already-committed metadata changes when a later chunk fails', async () => {

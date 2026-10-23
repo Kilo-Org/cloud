@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { act, TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
-import { humanizePreparationStepLabel, PreparationGroup } from './preparation-group';
+import { PreparationGroup } from './preparation-group';
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
@@ -78,19 +78,8 @@ function textValues(root: TestRenderer.ReactTestInstance): unknown[] {
     .map(node => node.props.children);
 }
 
-describe('humanizePreparationStepLabel', () => {
-  it('title-cases a raw server phase label', () => {
-    expect(humanizePreparationStepLabel('workspace setup')).toBe('Workspace setup');
-    expect(humanizePreparationStepLabel('disk_check')).toBe('Disk check');
-  });
-
-  it('leaves an already title-cased label unchanged', () => {
-    expect(humanizePreparationStepLabel('Setup command 1')).toBe('Setup command 1');
-  });
-});
-
 describe('PreparationGroup phase label', () => {
-  it('renders a title-cased phase label instead of the raw server string', async () => {
+  it('renders the catalog name for the phase key, not the server label', async () => {
     const renderer = await mountGroup(attemptWithStep(phaseStep()));
 
     const texts = textValues(renderer.root);
@@ -101,10 +90,24 @@ describe('PreparationGroup phase label', () => {
       renderer.unmount();
     });
   });
+
+  it('renders a generic name for a phase key the app does not know', async () => {
+    const renderer = await mountGroup(
+      attemptWithStep(phaseStep({ key: 'a_new_phase', label: 'a new phase' }))
+    );
+
+    const texts = textValues(renderer.root);
+    expect(texts).toContain('Environment setup');
+    expect(texts).not.toContain('a new phase');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
 });
 
 const INCOMPLETE_TEXT =
-  'Session restore incomplete: 2 of 5 files were not restored (binary file). Missing: a.ts, b.ts';
+  'Session restore incomplete: 2 of 5 files were not restored (the patch did not apply). Missing: a.ts, b.ts';
 
 function incompleteStep(overrides: Partial<PreparationStepSnapshot>): PreparationStepSnapshot {
   return {
@@ -211,10 +214,13 @@ describe('PreparationGroup incomplete restore', () => {
     expect(running.renderer.root.findAllByType('ActivityIndicator')).toHaveLength(1);
     running.unmount();
 
-    const failed = await mount(restoreAttempt({ status: 'failed', safeError: 'clone failed' }));
+    const failed = await mount(
+      restoreAttempt({ status: 'failed', safeError: 'preparation_timeout' })
+    );
     expect(failed.group().props.accessibilityLabel).toBe('Preparation failed');
     expect(failed.renderer.root.findAllByType('Check')).toHaveLength(0);
-    expect(failed.renderedTextValues()).toContain('clone failed');
+    expect(failed.renderedTextValues()).toContain('Environment preparation timed out');
+    expect(failed.renderedTextValues()).not.toContain('preparation_timeout');
     failed.unmount();
   });
 

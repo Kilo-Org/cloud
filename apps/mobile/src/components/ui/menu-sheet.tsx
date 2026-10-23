@@ -1,8 +1,11 @@
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Check } from '@/components/ui/icons';
+import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 export type MenuSheetOption = Readonly<{
@@ -12,6 +15,12 @@ export type MenuSheetOption = Readonly<{
    * platform's red affordance on the row.
    */
   destructive?: boolean;
+  /**
+   * The option is the current choice of a single-select menu. Defining it on
+   * the options makes the menu a radio group: each row exposes its checked
+   * state and only the current one paints a check.
+   */
+  selected?: boolean;
 }>;
 
 type MenuSheetProps = Readonly<{
@@ -70,6 +79,41 @@ function MenuSheetBody({
   onRequestDismiss,
 }: MenuSheetProps) {
   const { bottom } = useSafeAreaInsets();
+  const colors = useThemeColors();
+  // A menu whose options name a current choice is a radio group, so a screen
+  // reader hears which role (or value) is already set.
+  const isSingleSelect = options.some(option => option.selected !== undefined);
+
+  const rows = options.map((option, index) => (
+    <Pressable
+      key={option.label}
+      {...(isSingleSelect
+        ? radioItemA11y({ label: option.label, checked: option.selected === true })
+        : { accessibilityRole: 'button' as const, accessibilityLabel: option.label })}
+      className={cn(
+        'min-h-11 flex-row items-center gap-2 px-4 py-3 active:bg-secondary',
+        index < options.length - 1 && 'border-b-[0.5px] border-hair-soft'
+      )}
+      onPress={() => {
+        onSelect(index);
+      }}
+    >
+      {isSingleSelect ? (
+        <View className="w-4 items-center">
+          {option.selected ? <Check size={16} color={colors.primary} /> : null}
+        </View>
+      ) : null}
+      <Text
+        className={cn(
+          'min-w-0 flex-1 text-sm font-medium',
+          option.destructive ? 'text-destructive' : 'text-foreground'
+        )}
+        numberOfLines={1}
+      >
+        {option.label}
+      </Text>
+    </Pressable>
+  ));
 
   return (
     <Sheet
@@ -88,29 +132,7 @@ function MenuSheetBody({
             {title}
           </Text>
         ) : null}
-        {options.map((option, index) => (
-          <Pressable
-            key={option.label}
-            accessibilityRole="button"
-            accessibilityLabel={option.label}
-            className={cn(
-              'min-h-11 justify-center px-4 py-3 active:bg-secondary',
-              index < options.length - 1 && 'border-b-[0.5px] border-hair-soft'
-            )}
-            onPress={() => {
-              onSelect(index);
-            }}
-          >
-            <Text
-              className={cn(
-                'text-sm font-medium',
-                option.destructive ? 'text-destructive' : 'text-foreground'
-              )}
-            >
-              {option.label}
-            </Text>
-          </Pressable>
-        ))}
+        {isSingleSelect && title ? <RadioGroup label={title}>{rows}</RadioGroup> : rows}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={cancelLabel}

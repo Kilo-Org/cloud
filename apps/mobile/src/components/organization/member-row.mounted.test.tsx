@@ -239,6 +239,7 @@ describe('MemberRow menu', () => {
     expect(actionsMenu().visible).toBe(false);
     expect(roleMenu().visible).toBe(true);
     expect(roleMenu().title).toBe(i18n.t('organization.members.changeRole'));
+    expect(roleMenu().options.map(option => option.selected)).toEqual([false, false, true, false]);
     expect(roleMenu().options.map(option => option.label)).toEqual([
       i18n.t('organization.members.roles.owner'),
       i18n.t('organization.members.roles.admin'),

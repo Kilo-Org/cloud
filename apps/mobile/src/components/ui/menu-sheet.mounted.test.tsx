@@ -29,6 +29,8 @@ vi.mock('@/components/ui/text', () => ({
   Text: 'Text',
   TextClassContext: createContext(''),
 }));
+vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({ primary: '#0f0' }) }));
 
 const mounted: Mounted[] = [];
 
@@ -90,6 +92,36 @@ describe('MenuSheet', () => {
     );
     expect(destructive).toHaveLength(1);
     expect(destructive[0]?.children).toBe('Remove member');
+  });
+
+  it('exposes a single-select menu as a radio group with one checked row', async () => {
+    const { renderer } = await renderMenu({
+      title: 'Role',
+      options: [{ label: 'Owner' }, { label: 'Admin', selected: true }],
+    });
+    const group = renderer.root
+      .findAllByType('View')
+      .find(node => node.props.accessibilityRole === 'radiogroup');
+    expect(group?.props.accessibilityLabel).toBe('Role');
+
+    const rows = pressables(renderer);
+    expect(rows.map(row => row.props.accessibilityRole)).toEqual(['radio', 'radio', 'button']);
+    const checked = rows.map(row => {
+      const state = row.props.accessibilityState as { checked?: boolean } | undefined;
+      return state?.checked ?? null;
+    });
+    expect(checked).toEqual([false, true, null]);
+    expect(renderer.root.findAllByType('Check')).toHaveLength(1);
+  });
+
+  it('keeps a plain action menu as buttons', async () => {
+    const { renderer } = await renderMenu();
+    expect(pressables(renderer).map(row => row.props.accessibilityRole)).toEqual([
+      'button',
+      'button',
+      'button',
+    ]);
+    expect(renderer.root.findAllByType('Check')).toHaveLength(0);
   });
 
   it('reports the chosen row by index', async () => {

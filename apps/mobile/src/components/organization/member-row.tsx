@@ -77,7 +77,10 @@ export function MemberRow({
     return true;
   }
 
-  const roleOptions: MenuSheetOption[] = ROLE_OPTIONS.map(role => ({ label: roleLabel(role) }));
+  const roleOptions: MenuSheetOption[] = ROLE_OPTIONS.map(role => ({
+    label: roleLabel(role),
+    selected: role === member.role,
+  }));
 
   const actionOptions: MenuSheetOption[] = [
     { label: t('organization.members.changeRole') },

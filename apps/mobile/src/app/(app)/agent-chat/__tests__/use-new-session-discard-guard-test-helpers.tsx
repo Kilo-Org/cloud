@@ -89,7 +89,10 @@ vi.mock('sonner-native', () => ({
 
 vi.mock('expo-router', () => ({
   useNavigation: () => ({
-    getState: () => ({ index: 1, routes: [{ name: 'agent-chat/new' }, { name: navigationState.topRoute }] }),
+    getState: () => ({
+      index: 1,
+      routes: [{ name: 'agent-chat/new' }, { name: navigationState.topRoute }],
+    }),
   }),
   usePreventRemove: usePreventRemoveMock,
   useRouter: () => ({ back: backMock }),

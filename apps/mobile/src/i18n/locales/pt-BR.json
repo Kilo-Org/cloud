@@ -3329,7 +3329,7 @@
   },
   "transcriptionModel": {
     "title": "Modelo de transcrição",
-    "choose": "Escolha outro modelo",
+    "choose": "Escolha um modelo",
     "noneChosen": "Nenhum selecionado",
     "emptyTitle": "Nenhum modelo de transcrição",
     "emptyDescription": "O Kilo Gateway não oferece modelos de transcrição no momento.",

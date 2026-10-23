@@ -3288,7 +3288,7 @@
   },
   "transcriptionModel": {
     "title": "Tauira tuhi ā-reo",
-    "choose": "Kōwhiria tētahi atu tauira",
+    "choose": "Kōwhiria he tauira",
     "noneChosen": "Kāore i kōwhiria",
     "emptyTitle": "Kāore he tauira tuhi ā-reo",
     "emptyDescription": "I tēnei wā, kāore he tauira tuhi ā-reo e wātea ana i te Kilo Gateway.",

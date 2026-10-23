@@ -3288,7 +3288,7 @@
   },
   "transcriptionModel": {
     "title": "음성 텍스트 변환 모델",
-    "choose": "다른 모델 선택",
+    "choose": "모델 선택",
     "noneChosen": "선택 안 됨",
     "emptyTitle": "음성 텍스트 변환 모델 없음",
     "emptyDescription": "지금 Kilo Gateway에서 제공하는 음성 텍스트 변환 모델이 없습니다.",

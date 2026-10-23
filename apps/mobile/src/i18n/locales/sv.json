@@ -3287,7 +3287,7 @@
   },
   "transcriptionModel": {
     "title": "Transkriberingsmodell",
-    "choose": "Välj en annan modell",
+    "choose": "Välj en modell",
     "noneChosen": "Ingen vald",
     "emptyTitle": "Inga transkriberingsmodeller",
     "emptyDescription": "Kilo Gateway erbjuder inga transkriberingsmodeller just nu.",

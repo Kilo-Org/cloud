@@ -79,10 +79,10 @@ describe('voice input feedback side effects', () => {
       "This transcription model isn't available. Pick another one in Preferences.",
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Choose another model', onPress: expect.any(Function) },
+        { text: 'Choose a model', onPress: expect.any(Function) },
       ]
     );
-    buttons?.find(button => button.text === 'Choose another model')?.onPress?.();
+    buttons?.find(button => button.text === 'Choose a model')?.onPress?.();
     expect(routerMock.push).toHaveBeenCalledWith('/(app)/transcription-model-picker');
   });
 

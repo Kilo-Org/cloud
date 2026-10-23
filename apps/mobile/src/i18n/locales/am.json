@@ -3288,7 +3288,7 @@
   },
   "transcriptionModel": {
     "title": "የድምጽ ወደ ጽሑፍ ሞዴል",
-    "choose": "ሌላ ሞዴል ይምረጡ",
+    "choose": "ሞዴል ይምረጡ",
     "noneChosen": "ምንም አልተመረጠም",
     "emptyTitle": "ምንም የድምጽ ወደ ጽሑፍ ሞዴሎች የሉም",
     "emptyDescription": "Kilo Gateway በአሁኑ ሰዓት ምንም የድምጽ ወደ ጽሑፍ ሞዴሎችን አያቀርብም።",

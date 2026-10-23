@@ -3288,7 +3288,7 @@
   },
   "transcriptionModel": {
     "title": "Matnga aylantirish modeli",
-    "choose": "Boshqa modelni tanlang",
+    "choose": "Modelni tanlang",
     "noneChosen": "Hech narsa tanlanmagan",
     "emptyTitle": "Matnga aylantirish modellari yo'q",
     "emptyDescription": "Kilo Gateway hozircha matnga aylantirish modellarini taklif qilmayapti.",

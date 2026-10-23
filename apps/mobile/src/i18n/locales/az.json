@@ -3288,7 +3288,7 @@
   },
   "transcriptionModel": {
     "title": "Səsin mətnə çevrilməsi modeli",
-    "choose": "Başqa model seçin",
+    "choose": "Model seçin",
     "noneChosen": "Seçilməyib",
     "emptyTitle": "Səsin mətnə çevrilməsi modeli yoxdur",
     "emptyDescription": "Kilo Gateway hazırda səsin mətnə çevrilməsi modeli təklif etmir.",

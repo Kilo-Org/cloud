@@ -3329,7 +3329,7 @@
   },
   "transcriptionModel": {
     "title": "Modèle de transcription",
-    "choose": "Choisissez un autre modèle",
+    "choose": "Choisissez un modèle",
     "noneChosen": "Aucun choisi",
     "emptyTitle": "Aucun modèle de transcription",
     "emptyDescription": "Kilo Gateway ne propose actuellement aucun modèle de transcription.",

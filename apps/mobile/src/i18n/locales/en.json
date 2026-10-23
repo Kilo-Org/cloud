@@ -3373,7 +3373,7 @@
   },
   "transcriptionModel": {
     "title": "Transcription model",
-    "choose": "Choose another model",
+    "choose": "Choose a model",
     "noneChosen": "None chosen",
     "emptyTitle": "No transcription models",
     "emptyDescription": "The gateway offers no transcription models right now.",

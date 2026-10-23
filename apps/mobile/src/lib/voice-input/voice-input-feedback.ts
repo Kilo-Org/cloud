@@ -34,7 +34,8 @@ export function resolveVoiceInputFeedbackPresentation(
       title: i18n.t('transcriptionModel.title'),
       message: feedback.message,
       // The title already names the transcription model, so the button must
-      // name the tap instead: it opens the picker for a different model.
+      // name the tap instead: it opens the picker to pick a model. The same
+      // label serves the unavailable-model and no-model-chosen states.
       actionLabel: i18n.t('transcriptionModel.choose'),
       destination: 'transcription-model-picker',
     };

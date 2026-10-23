@@ -3370,7 +3370,7 @@
   },
   "transcriptionModel": {
     "title": "Model transkrypcji",
-    "choose": "Wybierz inny model",
+    "choose": "Wybierz model",
     "noneChosen": "Nie wybrano",
     "emptyTitle": "Brak modeli transkrypcji",
     "emptyDescription": "Kilo Gateway nie oferuje teraz żadnych modeli transkrypcji.",

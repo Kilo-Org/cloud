@@ -3288,7 +3288,7 @@
   },
   "transcriptionModel": {
     "title": "Imodeli yokuguqula inkulumo",
-    "choose": "Khetha enye imodeli",
+    "choose": "Khetha imodeli",
     "noneChosen": "Akukho okukhethiwe",
     "emptyTitle": "Azikho izimodeli zokuguqula inkulumo",
     "emptyDescription": "I-Kilo Gateway ayinikezi zimodeli zokuguqula inkulumo okwamanje.",

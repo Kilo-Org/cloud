@@ -3329,7 +3329,7 @@
   },
   "transcriptionModel": {
     "title": "Model de transcriere",
-    "choose": "Alege alt model",
+    "choose": "Alege un model",
     "noneChosen": "Niciunul selectat",
     "emptyTitle": "Nu există modele de transcriere",
     "emptyDescription": "Kilo Gateway nu oferă modele de transcriere în acest moment.",

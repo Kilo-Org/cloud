@@ -3288,7 +3288,7 @@
   },
   "transcriptionModel": {
     "title": "Model transkripsi",
-    "choose": "Pilih model lain",
+    "choose": "Pilih model",
     "noneChosen": "Belum ada yang dipilih",
     "emptyTitle": "Tidak ada model transkripsi",
     "emptyDescription": "Kilo Gateway tidak menawarkan model transkripsi saat ini.",

@@ -3411,7 +3411,7 @@
   },
   "transcriptionModel": {
     "title": "Samhail tras-scríobh",
-    "choose": "Roghnaigh samhail eile",
+    "choose": "Roghnaigh samhail",
     "noneChosen": "Níor roghnaíadh aon cheann",
     "emptyTitle": "Níl samhail tras-scríobh ar bith ann",
     "emptyDescription": "Níl aon shamhail tras-scríobh ar fáil ón Kilo Gateway faoi láthair.",

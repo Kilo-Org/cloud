@@ -3288,7 +3288,7 @@
   },
   "transcriptionModel": {
     "title": "लिप्यंतरण मॉडेल",
-    "choose": "दुसरे मॉडेल निवडा",
+    "choose": "मॉडेल निवडा",
     "noneChosen": "काहीही निवडले नाही",
     "emptyTitle": "लिप्यंतरणासाठी मॉडेल्स नाहीत",
     "emptyDescription": "Kilo Gateway सध्या लिप्यंतरणासाठी कोणतीही मॉडेल्स देत नाही.",

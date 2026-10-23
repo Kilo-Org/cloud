@@ -49,7 +49,7 @@ describe('resolveVoiceInputFeedbackPresentation', () => {
       kind: 'alert',
       title: 'Transcription model',
       message: "This transcription model isn't available. Pick another one in Preferences.",
-      actionLabel: 'Choose another model',
+      actionLabel: 'Choose a model',
       destination: 'transcription-model-picker',
     });
   });

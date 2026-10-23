@@ -3288,7 +3288,7 @@
   },
   "transcriptionModel": {
     "title": "Umritunarlíkan",
-    "choose": "Veldu annað líkan",
+    "choose": "Veldu líkan",
     "noneChosen": "Ekkert valið",
     "emptyTitle": "Engin umritunarlíkan",
     "emptyDescription": "Kilo Gateway býður ekki upp á umritunarlíkan um þessar mundir.",

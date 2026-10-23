@@ -195,7 +195,10 @@ export function FindingAnalysisPanel({
             </Button>
           ) : null}
           {canStartAnalysis ? (
-            <AnalysisCapacityNotice state={capacity.state} onRetry={() => void capacity.refetch()} />
+            <AnalysisCapacityNotice
+              state={capacity.state}
+              onRetry={() => void capacity.refetch()}
+            />
           ) : null}
           {canRestartAnalysis ? (
             <Button

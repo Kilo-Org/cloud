@@ -260,8 +260,7 @@ describe('FindingAnalysisPanel completion-copy gate', () => {
     const tree = renderPanel(analysisFixture({ status: null }));
     const [retry] = tree.root.findAll(
       node =>
-        typeof node.type === 'string' &&
-        node.props.accessibilityLabel === i18n.t('common.retry')
+        typeof node.type === 'string' && node.props.accessibilityLabel === i18n.t('common.retry')
     );
     expect(retry).toBeDefined();
     const onRetry: unknown = retry?.props.onPress;

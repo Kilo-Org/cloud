@@ -1,9 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  useSecurityAgentCapability,
-  useSecurityAnalysisCapacity,
-} from './use-security-agent';
+import { useSecurityAgentCapability, useSecurityAnalysisCapacity } from './use-security-agent';
 import { SECURITY_ANALYSIS_CAPACITY_POLL_MS } from '@/lib/security-analysis-capacity';
 
 // use-security-agent.ts re-exports the mutation hooks from

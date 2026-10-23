@@ -68,6 +68,7 @@ export const VERCEL_BYOK_PROVIDER_NAMES = {
   openai: 'OpenAI API key',
   inception: 'Inception',
   fireworks: 'Fireworks',
+  gmicloud: 'GMI Cloud',
   google: 'Google AI Studio',
   minimax: 'MiniMax',
   mistral: 'Mistral AI',

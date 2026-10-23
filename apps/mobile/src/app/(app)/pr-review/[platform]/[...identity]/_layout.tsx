@@ -1,7 +1,7 @@
 import { type Href, Redirect, Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
 
-import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
+import { appScreenLayout } from '@/components/app-screen-layout';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { PrReviewConnectGate } from '@/components/pr-review/pr-review-connect-gate';
 import { FeedbackPromptProvider } from '@/components/use-feedback-prompt';
@@ -106,7 +106,7 @@ export default function ProviderPrReviewLayout() {
               Bitbucket personal scope gets the terminal org-only explanation
               instead of a retry that could not succeed. */}
           <PrReviewConnectGate platform={ref.platform} organizationId={organizationId}>
-            <Stack screenLayout={appUnlockScreenLayout} screenOptions={{ headerShown: false }}>
+            <Stack screenLayout={appScreenLayout} screenOptions={{ headerShown: false }}>
               {/* Register the overview first, exactly like the GitHub layout:
                   unregistered routes sort after registered siblings, so without
                   this the initial screen is the comment-composer formSheet

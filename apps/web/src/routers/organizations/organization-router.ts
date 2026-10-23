@@ -69,11 +69,9 @@ import { organizationAuditLogRouter } from '@/routers/organizations/organization
 import { organizationAdminRouter } from '@/routers/organizations/organization-admin-router';
 import { organizationModesRouter } from '@/routers/organizations/organization-modes-router';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
-import { organizationDeploymentsRouter } from '@/routers/organizations/organization-deployments-router';
 import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import { organizationReviewAgentRouter } from '@/routers/organizations/organization-code-reviews-router';
 import { organizationCloudAgentNextRouter } from '@/routers/organizations/organization-cloud-agent-next-router';
-import { organizationAppBuilderRouter } from '@/routers/organizations/organization-app-builder-router';
 import { organizationSecurityAgentRouter } from '@/routers/organizations/organization-security-agent-router';
 import { organizationSecurityAuditLogRouter } from '@/routers/organizations/organization-security-audit-log-router';
 import { organizationAutoTopUpRouter } from '@/routers/organizations/organization-auto-top-up-router';
@@ -145,10 +143,8 @@ export const organizationsRouter = createTRPCRouter({
   auditLogs: organizationAuditLogRouter,
   admin: organizationAdminRouter,
   modes: organizationModesRouter,
-  deployments: organizationDeploymentsRouter,
   reviewAgent: organizationReviewAgentRouter,
   cloudAgentNext: organizationCloudAgentNextRouter,
-  appBuilder: organizationAppBuilderRouter,
   securityAgent: organizationSecurityAgentRouter,
   securityAuditLog: organizationSecurityAuditLogRouter,
   autoTopUp: organizationAutoTopUpRouter,

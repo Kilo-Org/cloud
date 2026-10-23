@@ -5,7 +5,6 @@ import type {
 } from '../shared/control-plane-protocol.js';
 import type { SandboxSessionV2 } from '../control-plane/session/session-do.js';
 import type { Env } from '../types.js';
-import type { SessionId } from '../types/ids.js';
 import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
 import { withDORetry } from '../utils/do-retry.js';
 import {
@@ -193,7 +192,7 @@ export type DefaultNativeLiveReaderDeps = {
 export function defaultNativeLiveReader(deps: DefaultNativeLiveReaderDeps): NativeLiveReader {
   return operation =>
     withDORetry<DurableObjectStub<SandboxSessionV2>, ControlPlaneControlResult>(
-      () => getSandboxSessionStub(deps.env, deps.userId, deps.cloudAgentSessionId as SessionId),
+      () => getSandboxSessionStub(deps.env, deps.userId, deps.cloudAgentSessionId),
       stub => stub.kiloRequest(operation),
       'kiloRequest'
     );

@@ -22,19 +22,22 @@ import {
   todoListGitUrl,
   todoListRepoSelection,
 } from '@/lib/todos/todo-model';
+import { todoListPath } from '@/lib/todos/todo-routes';
 import { type TodoList } from '@/lib/todos/todo-types';
 import { useNewSessionRepos } from '@/lib/use-new-session-repos';
 
 type ListSettingsFormProps = {
   list: TodoList | null;
   organizationId: string | null;
+  /** `'back'` returns to the sheet that opened this one instead of opening the new list. */
+  afterCreate: 'open' | 'back';
 };
 
 function FieldLabel({ children }: Readonly<{ children: string }>) {
   return <Text className="text-sm font-medium text-foreground">{children}</Text>;
 }
 
-function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormProps>) {
+function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSettingsFormProps>) {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -50,6 +53,9 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
   const [mode, setMode] = useState(list?.mode ?? null);
   const [model, setModel] = useState(list?.model ?? null);
   const [variant, setVariant] = useState(list?.variant ?? null);
+  // A failed create keeps the form open with the typed values; the toast the hook
+  // raises renders behind this sheet, so the failure is also stated on the sheet.
+  const [createFailed, setCreateFailed] = useState(false);
   const saving = create.isPending;
 
   const { requestClose, dialog } = useSheetDismissGuard({
@@ -102,11 +108,21 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
       router.back();
       return;
     }
+    setCreateFailed(false);
     create.mutate(
       { organizationId, ...fields },
       {
-        onSuccess: () => {
-          router.back();
+        onSuccess: created => {
+          if (afterCreate === 'back') {
+            router.back();
+            return;
+          }
+          // Replace the form sheet with the created list: Back from the list then
+          // lands on the lists view the sheet was opened from.
+          router.replace(todoListPath(created.id));
+        },
+        onError: () => {
+          setCreateFailed(true);
         },
       }
     );
@@ -123,6 +139,11 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
         doneDisabled={!hasName || saving}
       >
         <View className="gap-5 px-4 pt-2">
+          {createFailed ? (
+            <Text accessibilityRole="alert" className="text-sm text-destructive">
+              {t('todos.lists.createFailed')}
+            </Text>
+          ) : null}
           <View className="flex-row gap-3">
             <View className="w-20 gap-2">
               <FieldLabel>{t('todos.listSettings.emoji')}</FieldLabel>
@@ -130,6 +151,7 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
                 defaultValue={list?.emoji ?? ''}
                 onChangeText={text => {
                   emojiRef.current = text;
+                  setCreateFailed(false);
                 }}
                 maxLength={TODO_LIST_EMOJI_MAX_LENGTH}
                 accessibilityLabel={t('todos.listSettings.emoji')}
@@ -143,6 +165,7 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
                 autoFocus={!list}
                 onChangeText={text => {
                   nameRef.current = text;
+                  setCreateFailed(false);
                   const next = text.trim().length > 0;
                   setHasName(current => (current === next ? current : next));
                 }}
@@ -229,17 +252,31 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
 export function TodoListSettingsSheet({
   listId,
   organizationId,
-}: Readonly<{ listId: string | null; organizationId: string | null }>) {
+  afterCreate = 'open',
+}: Readonly<{
+  listId: string | null;
+  organizationId: string | null;
+  afterCreate?: 'open' | 'back';
+}>) {
   const router = useRouter();
   const { t } = useTranslation();
   const lists = useTodoLists(organizationId, listId !== null);
 
   if (listId === null) {
-    return <ListSettingsForm list={null} organizationId={organizationId} />;
+    return (
+      <ListSettingsForm list={null} organizationId={organizationId} afterCreate={afterCreate} />
+    );
   }
   const list = lists.data?.find(candidate => candidate.id === listId);
   if (list) {
-    return <ListSettingsForm key={list.id} list={list} organizationId={organizationId} />;
+    return (
+      <ListSettingsForm
+        key={list.id}
+        list={list}
+        organizationId={organizationId}
+        afterCreate={afterCreate}
+      />
+    );
   }
   return (
     <PickerSheet

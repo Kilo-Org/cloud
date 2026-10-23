@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { type Href, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams, usePreventRemove, useRouter } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
@@ -81,7 +81,6 @@ import {
   resolveNewSessionStartDisabled,
   resolveRemoteStartMissingContent,
 } from '@/lib/new-session-submit';
-import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import { getRepoBindingsPath } from '@/lib/profile-agent-navigation';
 import {
   clearDraft,
@@ -260,19 +259,23 @@ export function NewSessionScreenBody() {
     },
     [stackSafeRouter, searchParams, userId, isCloneEntry]
   );
+  // One line, label left and control right: the organization is a value the
+  // user changes in place, not a section with a control under its title.
   const organizationSection = (
-    <View className="mt-5">
-      <Text className="mb-2 text-sm font-medium text-muted-foreground">
+    <View className="mt-5 min-h-11 flex-row items-center justify-between gap-3">
+      <Text className="shrink-0 text-sm font-medium text-muted-foreground">
         {t('common.organization')}
       </Text>
-      {isCloneEntry ? (
-        <ContextControl scope={{ organizationId: organizationId ?? null, isResolved: true }} />
-      ) : (
-        <ContextControl
-          value={organizationId ?? null}
-          onSelectionChange={handleOrganizationSwitch}
-        />
-      )}
+      <View className="min-w-0 shrink flex-row items-center justify-end">
+        {isCloneEntry ? (
+          <ContextControl scope={{ organizationId: organizationId ?? null, isResolved: true }} />
+        ) : (
+          <ContextControl
+            value={organizationId ?? null}
+            onSelectionChange={handleOrganizationSwitch}
+          />
+        )}
+      </View>
     </View>
   );
 
@@ -487,7 +490,9 @@ export function NewSessionScreenBody() {
   }, [organizationId, overrideProfileId, router]);
 
   const handleOpenRepoDefaults = useCallback(() => {
-    router.push(getRepoBindingsPath(organizationId));
+    // The composer's own Stack, so Back returns here with the draft instead of
+    // landing on the Profile tab root.
+    router.push(getRepoBindingsPath(organizationId, 'app'));
   }, [organizationId, router]);
 
   // Keep the inline selector and picker list in sync.
@@ -875,12 +880,13 @@ export function NewSessionScreenBody() {
   // swipe are blocked with no discard alert. The one-shot bypass, armed by the
   // success callbacks right before the replace, lets the success navigation
   // through so back from the new session returns to the source session.
-  const navigation = useNavigation();
+  const [cloneLeaveAllowed, setCloneLeaveAllowed] = useState(false);
   const isStarting = runOnInstance !== null ? remoteSpawn.isSpawningRemote : isCreating;
-  usePreventRemove(isCloneEntry && isStarting, ({ data }) => {
+  usePreventRemove(isCloneEntry && isStarting && !cloneLeaveAllowed, ({ repeat }) => {
     if (cloneNavigateBypassRef.current) {
       cloneNavigateBypassRef.current = false;
-      navigation.dispatch(data.action);
+      setCloneLeaveAllowed(true);
+      repeat();
     }
   });
 

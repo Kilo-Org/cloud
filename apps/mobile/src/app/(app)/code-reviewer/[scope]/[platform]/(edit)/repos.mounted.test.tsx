@@ -35,8 +35,11 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({ scope: 'org-1', platform: state.platform }),
   useNavigation: () => ({ isFocused: () => true }),
+}));
+
+vi.mock('@/lib/hooks/use-reviewer-route-params', () => ({
+  useReviewerRouteParams: () => ({ scope: 'org-1', platform: state.platform }),
 }));
 
 vi.mock('react-native', () => ({

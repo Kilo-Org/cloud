@@ -1,11 +1,13 @@
-import { useLocalSearchParams, useNavigation } from 'expo-router';
+import { type Href, useNavigation } from 'expo-router';
 import { FolderGit2 } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useEffect, useRef } from 'react';
 import { AppState, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { CenteredState } from '@/components/centered-state';
+import { RepositorySyncFooter } from '@/components/code-reviewer/repository-sync-footer';
 import { EmptyState } from '@/components/empty-state';
+import { InvalidRouteState } from '@/components/invalid-route-state';
 import { QueryError } from '@/components/query-error';
 import { RepoToggleRow } from '@/components/repo-toggle-row';
 import { ScreenHeader } from '@/components/screen-header';
@@ -16,6 +18,7 @@ import { RefreshControl } from '@/components/ui/refresh-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
@@ -33,11 +36,19 @@ import {
 } from '@/lib/hooks/use-code-reviewer-repo-sync';
 import { useRepoSelectionToggle } from '@/lib/hooks/use-code-reviewer-repo-selection';
 import { useNowTicker } from '@/lib/hooks/use-now-ticker';
+import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 import { getBitbucketIntegrationUrl } from '@/lib/integration-urls';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 export default function ReposRoute() {
-  const { scope, platform } = useLocalSearchParams<{ scope: string; platform: ReviewerPlatform }>();
+  const params = useReviewerRouteParams();
+  if (!params) {
+    return <InvalidRouteState backTo={'/(app)/code-reviewer' as Href} />;
+  }
+  return <ReposScreen scope={params.scope} platform={params.platform} />;
+}
+
+function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   const { data } = useReviewConfig(scope, platform);
   const save = useSaveReviewConfig(scope, platform);
   const toggleRepo = useRepoSelectionToggle(scope, platform);
@@ -218,7 +229,7 @@ export default function ReposRoute() {
         description={emptyStateCopy.description}
         action={
           manageAccess ? (
-            <Button variant="outline" onPress={manageAccess}>
+            <Button className={STATE_ACTION_CLASS} variant="outline" onPress={manageAccess}>
               <Text>{t('codeReviewer.repos.manageAccess')}</Text>
             </Button>
           ) : undefined
@@ -292,26 +303,12 @@ export default function ReposRoute() {
               ))}
 
               {showRepositoryFooter && (
-                <View className="mt-6 gap-3">
-                  {syncedLabel && (
-                    <Text variant="muted" className="text-xs">
-                      {syncedLabel}
-                    </Text>
-                  )}
-                  <Button
-                    variant="outline"
-                    loading={refreshing}
-                    disabled={refreshing}
-                    onPress={refreshRepositories}
-                  >
-                    <Text>{t('common.refresh')}</Text>
-                  </Button>
-                  {manageAccess && (
-                    <Button variant="outline" onPress={manageAccess}>
-                      <Text>{t('codeReviewer.repos.manageAccess')}</Text>
-                    </Button>
-                  )}
-                </View>
+                <RepositorySyncFooter
+                  syncedLabel={syncedLabel}
+                  refreshing={refreshing}
+                  onRefresh={refreshRepositories}
+                  manageAccess={manageAccess}
+                />
               )}
             </View>
           )}

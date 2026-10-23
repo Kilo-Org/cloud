@@ -103,9 +103,9 @@ function confirmRequest(confirm: TestConfirmMock): void {
 }
 
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
-export function mountScreen(organizationId?: string) {
+export function mountScreen(organizationId?: string, stack: 'app' | 'profileTab' = 'profileTab') {
   return renderWithProviders(
-    createElement(ProfileOverviewScreen, { profileId: 'profile-1', organizationId })
+    createElement(ProfileOverviewScreen, { profileId: 'profile-1', organizationId, stack })
   );
 }
 
@@ -119,7 +119,13 @@ export function rerenderScreen(
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(ProfileOverviewScreen, { profileId: 'profile-1', organizationId })
+      // The rerender helpers serve the Profile tab stack; an app-stack mount is
+      // a single-shot read, so it never needs one.
+      createElement(ProfileOverviewScreen, {
+        profileId: 'profile-1',
+        organizationId,
+        stack: 'profileTab',
+      })
     )
   );
 }

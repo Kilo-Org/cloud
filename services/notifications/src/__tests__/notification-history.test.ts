@@ -167,7 +167,7 @@ describe('recordNotificationHistory', () => {
         push: {
           title: 'T',
           body: 'B',
-          data: { type: 'instance-lifecycle', event: 'started', sandboxId: 'sb' },
+          data: { type: 'instance-lifecycle', event: 'ready', sandboxId: 'sb' },
         },
       })
     );

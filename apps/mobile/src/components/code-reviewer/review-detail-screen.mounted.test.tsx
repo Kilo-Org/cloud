@@ -63,6 +63,11 @@ const statusHelpers = vi.hoisted(() => ({
   cancellable: false,
   retriggerable: false,
 }));
+const alertMock = vi.hoisted(() => ({ alert: vi.fn() }));
+const retrigger = vi.hoisted(() => ({
+  isPending: false,
+  mutate: vi.fn(),
+}));
 const reviewConfig = vi.hoisted(() => ({
   query: { isPending: false, data: undefined as unknown },
   calls: [] as { scope: string; platform: string; enabled: boolean | undefined }[],
@@ -73,6 +78,8 @@ const spectatorStream = vi.hoisted(() => ({
 }));
 
 vi.mock('react-native', () => ({
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   View: (props: { style?: unknown; className?: string; children?: ReactNode }) => {
     viewRenders.list.push(props);
     return createElement('View', props, props.children);
@@ -83,7 +90,7 @@ vi.mock('react-native', () => ({
   // the form-sheet detents do (src/lib/form-sheet.ts).
   StatusBar: { currentHeight: 24 },
   AppState: { addEventListener: () => ({ remove: vi.fn() }) },
-  Alert: { alert: vi.fn() },
+  Alert: alertMock,
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 24, bottom: 34, left: 0, right: 0 }),
@@ -150,7 +157,7 @@ vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/lib/hooks/use-code-reviews', () => ({
   useReviewDetail: () => detail,
   useCancelReview: () => ({ isPending: false, mutate: vi.fn() }),
-  useRetriggerReview: () => ({ isPending: false, mutate: vi.fn() }),
+  useRetriggerReview: () => ({ isPending: retrigger.isPending, mutate: retrigger.mutate }),
 }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   isPersonal: (scope: string) => scope === 'personal',
@@ -311,6 +318,9 @@ beforeEach(() => {
   composerRenders.list = [];
   statusHelpers.cancellable = false;
   statusHelpers.retriggerable = false;
+  retrigger.isPending = false;
+  retrigger.mutate.mockClear();
+  alertMock.alert.mockClear();
   spectatorQueries.streamInfo.isLoading = false;
   spectatorQueries.streamInfo.isError = false;
   spectatorQueries.streamInfo.data = {
@@ -413,19 +423,57 @@ describe('ReviewDetailScreen outcome-first order', () => {
     expect(renderScreen()).toContain(i18n.t('codeReviewer.reviewDetail.reviewFailed'));
   });
 
-  it.each(['cancelled', 'interrupted'])('preserves the reason for a %s review', status => {
+  it.each(['cancelled', 'interrupted'])(
+    'explains a %s review instead of echoing the stored diagnostic',
+    status => {
+      detail.data = {
+        success: true,
+        review: makeReview({
+          status,
+          terminal_reason: 'superseded',
+          error_message: 'Superseded by new push',
+        }),
+        tokenUsage: { input: 0, output: 0 },
+      };
+      const texts = renderScreen();
+      expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.cancelReasonSuperseded'));
+      expect(texts.join(' ')).not.toContain('Superseded by new push');
+      expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.reviewFailed'));
+    }
+  );
+
+  it('names the platform to reconnect after an integration disconnect', () => {
     detail.data = {
       success: true,
       review: makeReview({
-        status,
-        terminal_reason: 'superseded',
-        error_message: 'Superseded by new push',
+        status: 'cancelled',
+        terminal_reason: 'user_cancelled',
+        error_message: 'Platform integration disconnected',
       }),
       tokenUsage: { input: 0, output: 0 },
     };
     const texts = renderScreen();
-    expect(texts).toContain('Superseded by new push');
-    expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.reviewFailed'));
+    expect(texts).toContain(
+      i18n.t('codeReviewer.reviewDetail.cancelReasonIntegrationDisconnected', {
+        platform: 'GitHub',
+      })
+    );
+    expect(texts.join(' ')).not.toContain('Platform integration disconnected');
+  });
+
+  it('falls back to the outcome for a cancellation it cannot attribute', () => {
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status: 'cancelled',
+        terminal_reason: 'user_cancelled',
+        error_message: 'Cancelled by user',
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    const texts = renderScreen();
+    expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.cancelReasonCancelled'));
+    expect(texts.join(' ')).not.toContain('Cancelled by user');
   });
 
   it('uses existing localized copy for a typed action-required failure', () => {
@@ -488,6 +536,37 @@ describe('ReviewDetailScreen details metadata', () => {
     expect(detailsHeaderIndex).toBeGreaterThanOrEqual(0);
     expect(completionRowIndex).toBeGreaterThan(detailsHeaderIndex);
   });
+
+  it.each(['failed', 'cancelled', 'interrupted'] as const)(
+    'labels the end time of a %s review without claiming it completed',
+    status => {
+      // The top of the screen already says the review stopped short, so the
+      // Details row must not repeat the success word as its label.
+      detail.data = {
+        success: true,
+        review: makeReview({
+          status,
+          started_at: '2024-01-01T00:00:00.000Z',
+          completed_at: '2024-01-01T00:05:00.000Z',
+        }),
+        tokenUsage: { input: 0, output: 0 },
+      };
+
+      const renderer = mountScreen();
+      const endedLabel = i18n.t('codeReviewer.reviewDetail.reviewEnded');
+
+      const endRows = renderer.root.findAll(
+        node => node.type === MetaRow && node.props.label === endedLabel
+      );
+      expect(endRows).toHaveLength(1);
+      expect(collectText(endRows[0]?.children ?? [])).toEqual([endedLabel, 'now']);
+      expect(
+        renderer.root.findAll(
+          node => node.type === MetaRow && node.props.label === i18n.t('common.completed')
+        )
+      ).toHaveLength(0);
+    }
+  );
 
   it('omits the completion row when the review was never completed', () => {
     // The row is a function of `completed_at`: with no completion time the
@@ -715,6 +794,48 @@ describe('ReviewDetailScreen findings pagination', () => {
     expect(after).toContain('f0.ts');
     expect(after).toContain('f19.ts');
     expect(after).toContain('f20.ts');
+  });
+});
+
+describe('ReviewDetailScreen finding severities', () => {
+  it('labels every severity with localized copy, never the raw token', () => {
+    const severities = ['critical', 'warning', 'suggestion', 'nitpick', 'future-tier'];
+    detail.data = {
+      success: true,
+      review: makeReview({
+        council_result: {
+          decision: 'block',
+          aggregationStrategy: 'unanimous',
+          specialists: [
+            {
+              id: 'sec',
+              name: 'Security',
+              vote: 'block',
+              findings: severities.map((severity, i) => ({
+                path: `f${i}.ts`,
+                line: i + 1,
+                severity,
+                rationale: `r${i}`,
+              })),
+            },
+          ],
+        },
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen();
+
+    expect(texts).toContain(i18n.t('common.critical'));
+    expect(texts).toContain(i18n.t('codeReviewer.gateThreshold.warning'));
+    expect(texts).toContain(i18n.t('agentChat.suggestion.title'));
+    expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.severityNitpick'));
+    // A severity the council does not define yet reads as generic copy rather
+    // than leaking its identifier into a translated screen.
+    expect(texts).toContain(i18n.t('common.unknown'));
+    for (const severity of severities) {
+      expect(texts).not.toContain(severity);
+    }
   });
 });
 
@@ -1354,9 +1475,7 @@ describe('ReviewDetailScreen retry when Code Reviewer cannot run', () => {
     act(() => {
       fixSettings?.onPress?.();
     });
-    expect(routerMock.push).toHaveBeenCalledWith(
-      '/(app)/(tabs)/(3_profile)/code-reviewer/personal/github'
-    );
+    expect(routerMock.push).toHaveBeenCalledWith('/(app)/code-reviewer/personal/github');
   });
 
   it('links to the settings when the configuration needs attention', () => {
@@ -1409,5 +1528,104 @@ describe('ReviewDetailScreen retry when Code Reviewer cannot run', () => {
       platform: 'bitbucket',
       enabled: false,
     });
+  });
+});
+
+describe('ReviewDetailScreen retry confirmation', () => {
+  function renderRetryableReview(over: Record<string, unknown> = {}) {
+    statusHelpers.retriggerable = true;
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status: 'failed',
+        manual_config: { agentConfig: {} },
+        error_message: null,
+        ...over,
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    renderScreen();
+    const button = buttons.rendered.findLast(entry => buttonText(entry) === 'Retry review');
+    if (!button?.onPress) {
+      throw new Error('Retry button was not rendered');
+    }
+    return button;
+  }
+
+  type AlertAction = { text?: string; onPress?: () => void };
+
+  function confirmAction() {
+    const actions = (alertMock.alert.mock.calls.at(-1)?.[2] ?? []) as AlertAction[];
+    const confirm = actions.find(action => action.text === i18n.t('common.retry'));
+    if (!confirm?.onPress) {
+      throw new Error('Retry confirmation was not rendered');
+    }
+    return confirm;
+  }
+
+  it('sends one retrigger when the confirmation is accepted twice', () => {
+    const button = renderRetryableReview();
+    act(() => button.onPress?.());
+    const confirm = confirmAction();
+
+    act(() => {
+      confirm.onPress?.();
+      confirm.onPress?.();
+    });
+
+    expect(retrigger.mutate).toHaveBeenCalledTimes(1);
+    expect(retrigger.mutate).toHaveBeenCalledWith({ reviewId: 'rev-1' }, expect.any(Object));
+  });
+
+  it('shows the button busy and opens no second confirmation while the request runs', () => {
+    const button = renderRetryableReview();
+    act(() => button.onPress?.());
+    act(() => confirmAction().onPress?.());
+
+    retrigger.isPending = true;
+    renderScreen();
+    const busy = buttons.rendered.findLast(entry => buttonText(entry) === 'Retry review');
+
+    expect(busy).toMatchObject({ loading: true, disabled: true });
+    act(() => busy?.onPress?.());
+    expect(alertMock.alert).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts a new confirmation once the request settles', () => {
+    const button = renderRetryableReview();
+    act(() => button.onPress?.());
+    act(() => confirmAction().onPress?.());
+
+    const options = retrigger.mutate.mock.calls[0]?.[1] as { onSettled?: () => void } | undefined;
+    act(() => options?.onSettled?.());
+
+    const again = buttons.rendered.findLast(entry => buttonText(entry) === 'Retry review');
+    act(() => again?.onPress?.());
+    act(() => confirmAction().onPress?.());
+
+    expect(retrigger.mutate).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the detail screen when the reset moves the review to pending', () => {
+    renderRetryableReview();
+
+    statusHelpers.retriggerable = false;
+    statusHelpers.cancellable = true;
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status: 'pending',
+        manual_config: { agentConfig: {} },
+        error_message: null,
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const labels = renderScreen();
+
+    expect(labels).toContain('pending');
+    expect(labels).toContain('Cancel review');
+    expect(labels).not.toContain('Retry review');
+    expect(queryErrors.errors).toEqual([]);
   });
 });

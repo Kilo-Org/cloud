@@ -6766,7 +6766,7 @@ export const device_auth_requests = pgTable(
       .on(table.device_code_hash)
       .concurrently()
       .where(sql`${table.device_code_hash} IS NOT NULL`),
-    index('IDX_device_auth_requests_user_code')
+    uniqueIndex('UQ_device_auth_requests_user_code')
       .on(table.user_code)
       .concurrently()
       .where(sql`${table.user_code} IS NOT NULL`),

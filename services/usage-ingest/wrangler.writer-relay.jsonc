@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "usage-writer-relay-staging",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "main": "src/writer-relay.ts",
+  // Match the pinned workerd runtime used by usage-ingest's local checks.
+  "compatibility_date": "2026-09-18",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [],
+  "observability": { "enabled": true },
+  "placement": { "region": "aws:eu-central-1" },
+  "vars": {
+    "USAGE_WRITER_URL": "https://staging-app.kilo.ai/api/internal/usage/record",
+  },
+}

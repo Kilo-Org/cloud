@@ -26,6 +26,24 @@ describe('derivedChatText', () => {
     expect(derivedChatText(text)).toBe(text);
   });
 
+  it('keeps a message that fits the cap in characters but not in code units', () => {
+    // Half the cap in characters, twice the cap in UTF-16 units: it still fits,
+    // so no ellipsis belongs on it.
+    const families = '👨‍👩‍👧‍👦'.repeat(DERIVED_CHAT_TEXT_MAX_LENGTH / 2);
+    const stacked = '😀'.repeat(DERIVED_CHAT_TEXT_MAX_LENGTH / 2);
+
+    expect(derivedChatText(families)).toBe(families);
+    expect(derivedChatText(stacked)).toBe(stacked);
+  });
+
+  it('adds the ellipsis only once the characters themselves run past the cap', () => {
+    const justFits = '😀'.repeat(DERIVED_CHAT_TEXT_MAX_LENGTH);
+    const justOver = '😀'.repeat(DERIVED_CHAT_TEXT_MAX_LENGTH + 1);
+
+    expect(derivedChatText(justFits)).toBe(justFits);
+    expect(derivedChatText(justOver)).toBe(cutTo('😀', DERIVED_CHAT_TEXT_MAX_LENGTH - 1));
+  });
+
   it('cuts a longer message at the cap and marks the cut with an ellipsis', () => {
     const derived = derivedChatText('word '.repeat(2_000));
 
@@ -37,9 +55,7 @@ describe('derivedChatText', () => {
 
   it('never splits a character the reader sees as one', () => {
     // A family is four code points joined by three zero-width joiners.
-    expect(derivedChatText('👨‍👩‍👧‍👦'.repeat(200))).toBe(
-      cutTo('👨‍👩‍👧‍👦', DERIVED_CHAT_TEXT_MAX_LENGTH - 1)
-    );
+    expect(derivedChatText('👨‍👩‍👧‍👦'.repeat(200))).toBe(cutTo('👨‍👩‍👧‍👦', DERIVED_CHAT_TEXT_MAX_LENGTH - 1));
     // A syllable and its vowel sign are one grapheme and two code points.
     expect(derivedChatText('चै'.repeat(200))).toBe(cutTo('चै', DERIVED_CHAT_TEXT_MAX_LENGTH - 1));
   });

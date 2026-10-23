@@ -31,9 +31,10 @@ import * as encryptedKv from '@/lib/persist/encrypted-kv';
  * boundary: a storage failure is reported to Sentry and swallowed, so the
  * fire-and-forget `void` call sites can never leak an unhandled rejection.
  *
- * Serialization is contained before any timer exists: a value that cannot be
- * JSON-serialized (a circular reference, or a top-level undefined) is
- * reported to Sentry and skipped without scheduling a write.
+ * Serialization runs when the debounce fires, not on the keystroke that reset
+ * it: a value that cannot be JSON-serialized (a circular reference, or a
+ * top-level undefined) is reported to Sentry then and skipped, and a value over
+ * the byte cap is skipped the same way, so neither ever reaches storage.
  */
 
 export const DRAFT_DEBOUNCE_MS = 500;
@@ -271,12 +272,7 @@ export async function loadDraft<T>(
   }
 }
 
-async function writeDraft({
-  epoch,
-  userId,
-  entityKey,
-  value,
-}: DraftWritePayload): Promise<void> {
+async function writeDraft({ epoch, userId, entityKey, value }: DraftWritePayload): Promise<void> {
   const serialized = serializeDraft(value);
   if (serialized === null) {
     return;

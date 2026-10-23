@@ -19,35 +19,44 @@ const ELLIPSIS = '…';
 /**
  * A message reduced to one short line: whitespace runs (line breaks included)
  * collapse to single spaces, the ends are trimmed, and a line longer than
- * {@link DERIVED_CHAT_TEXT_MAX_LENGTH} is cut short at that cap with a trailing
- * ellipsis.
+ * {@link DERIVED_CHAT_TEXT_MAX_LENGTH} characters is cut short at that cap with
+ * a trailing ellipsis. A line that fits keeps its characters: the ellipsis
+ * means a cut happened, never that the cap was counted in a different unit.
  */
 export function derivedChatText(text: string): string {
   const oneLine = text.replaceAll(/\s+/gu, ' ').trim();
+  // A string no longer than the cap in code units holds no more characters
+  // than that, so the common short message never reaches the segmenter.
   if (oneLine.length <= DERIVED_CHAT_TEXT_MAX_LENGTH) {
     return oneLine;
   }
-  return `${cutGraphemes(oneLine, DERIVED_CHAT_TEXT_MAX_LENGTH - 1).trimEnd()}${ELLIPSIS}`;
+  const head = firstGraphemes(oneLine, DERIVED_CHAT_TEXT_MAX_LENGTH);
+  if (!head.more) {
+    return oneLine;
+  }
+  const cut = firstGraphemes(oneLine, DERIVED_CHAT_TEXT_MAX_LENGTH - 1).text;
+  return `${cut.trimEnd()}${ELLIPSIS}`;
 }
 
 /**
- * The first `count` user-perceived characters of `value`.
+ * The first `count` user-perceived characters of `value`, and whether the value
+ * holds more.
  *
  * Cutting by code unit could end a label on half a surrogate pair; cutting by
  * code point could still split a character this reader sees as one, such as a
  * family emoji or a Devanagari syllable with its vowel sign. The segmenter is
- * iterated only as far as the cut, so a long message costs the cap rather than
- * its own length.
+ * iterated only as far as `count` plus one, so a long message costs the cap
+ * rather than its own length.
  */
-function cutGraphemes(value: string, count: number): string {
-  let taken = '';
+function firstGraphemes(value: string, count: number) {
+  let text = '';
   let seen = 0;
   for (const { segment } of segmenter(i18n.language, { granularity: 'grapheme' }).segment(value)) {
     if (seen === count) {
-      break;
+      return { text, more: true };
     }
-    taken += segment;
+    text += segment;
     seen += 1;
   }
-  return taken;
+  return { text, more: false };
 }

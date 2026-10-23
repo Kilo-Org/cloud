@@ -34,8 +34,7 @@ function getEnvFallbackDomains(): string[] {
 
 /**
  * Reads blacklisted domains from Redis, falling back to the BLACKLIST_DOMAINS env var.
- * Cached in-process for 60 seconds (stale-while-revalidate) to avoid hitting Redis on
- * every auth check.
+ * Cached in-process for 60 seconds to avoid hitting Redis on every auth check.
  */
 export const getBlacklistedDomains = createCachedFetch(
   async (): Promise<string[]> =>

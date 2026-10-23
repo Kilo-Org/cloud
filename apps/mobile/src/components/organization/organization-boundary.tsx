@@ -11,6 +11,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useContextPicker } from '@/components/context-control';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { openExternalUrl } from '@/lib/external-link';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -42,8 +43,11 @@ type OrganizationBoundaryProps = Readonly<{
  *      to profile stays as the plain exit.
  *    - memberships exist but nothing is selected → the action opens the
  *      context picker sheet, the same account switcher the composer uses.
- *    - a deep-link override absent from the list is access-denied; a stale
- *      persisted selection keeps the older "unavailable" copy.
+ *    - a deep-link override absent from a non-empty member list is
+ *      access-denied; a stale persisted selection keeps the older
+ *      "unavailable" copy. An absent override with zero memberships is the
+ *      no-organization state above, not access-denied: the account has no
+ *      organization to be denied access to.
  * Calls `useOrgBoundary()` itself — cheap, context/query-cache backed — so
  * callers only need to pass a `title` for full screens (sheets omit it).
  */
@@ -92,6 +96,7 @@ export function OrganizationBoundary({
     const backToProfileAction = (
       <Button
         variant="outline"
+        className={STATE_ACTION_CLASS}
         onPress={() => {
           router.replace(PROFILE_HREF);
         }}
@@ -100,8 +105,7 @@ export function OrganizationBoundary({
       </Button>
     );
     const hasOrganizations = (orgs?.length ?? 0) > 0;
-    const isAbsentOverride = organizationIdOverride != null && org == null;
-    if (!hasOrganizations && !isAbsentOverride) {
+    if (!hasOrganizations) {
       const openWebOrganizations = () => {
         void openExternalUrl(`${WEB_BASE_URL}/organizations`, {
           label: t('organization.boundary.openWebOrganizations'),
@@ -114,7 +118,7 @@ export function OrganizationBoundary({
           description={t('organization.boundary.noOrganizationDescription')}
           action={
             <View className="gap-3">
-              <Button onPress={openWebOrganizations}>
+              <Button className={STATE_ACTION_CLASS} onPress={openWebOrganizations}>
                 <View className="flex-row items-center gap-2">
                   <Globe size={18} color={colors.primaryForeground} />
                   <Text>{t('organization.boundary.openWebOrganizations')}</Text>
@@ -185,6 +189,7 @@ function OrganizationPickerBoundaryState({
         action={
           <View className="gap-3">
             <Button
+              className={STATE_ACTION_CLASS}
               onPress={() => {
                 openPicker();
               }}

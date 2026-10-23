@@ -20,6 +20,9 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
 }));
 
 vi.mock('@/lib/agent-attachments/picker-launch-context', () => ({
+  // The hook reads the shared TTL from this module; the mock has to carry it or
+  // the expiry branch compares against undefined.
+  PICKER_LAUNCH_CONTEXT_TTL_MS: 10 * 60 * 1000,
   readPickerLaunchContext: mocks.readPickerLaunchContext,
   clearPickerLaunchContext: mocks.clearPickerLaunchContext,
 }));

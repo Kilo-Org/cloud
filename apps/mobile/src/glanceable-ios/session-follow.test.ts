@@ -87,7 +87,7 @@ function fakeActivity(id: string, props: Props): FakeActivity {
 
 vi.mock('expo-widgets', () => ({ after: (date: Date) => ({ after: date }) }));
 vi.mock('./session-live-activity', () => ({
-  SessionLiveActivity: { start: mocks.start, getInstances: mocks.getInstances },
+  getSessionLiveActivity: () => ({ start: mocks.start, getInstances: mocks.getInstances }),
 }));
 vi.mock('./system-switch', () => ({ liveActivitiesAllowedBySystem: () => mocks.systemAllowed }));
 vi.mock('@/lib/glanceable/session-activity-tokens', () => ({

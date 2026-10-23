@@ -11,6 +11,7 @@ import { buildAgentSessionListInput } from '@/lib/agent-session-input';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
 import { isSignOutActive, setSignOutActive } from '@/lib/auth/sign-out-state';
+import { READ_CACHE_SCOPE_PREFIX, readCacheScope } from '@/lib/persist/cache-scope';
 import * as encryptedKv from '@/lib/persist/encrypted-kv';
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 import { utf8ByteLength } from '@/lib/utf8-utils';
@@ -27,19 +28,17 @@ import { utf8ByteLength } from '@/lib/utf8-utils';
  * and the previous blob for the scope is removed), and expires after 24 h.
  */
 
-/** Bump on any breaking change to a persisted query shape. */
-export const SCHEMA_VERSION = 1;
+// Scope derivation and the schema-version constant live in a module with no
+// native dependency, so the briefing surfaces (and anything else that keys its
+// own persisted records into this scope) never pull the SQLCipher store into
+// their import graph. Re-exported here: the existing callers import them from
+// this module.
+export { readCacheScope, SCHEMA_VERSION } from '@/lib/persist/cache-scope';
 
 export const READ_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 export const READ_CACHE_MAX_BYTES = 2 * 1024 * 1024;
 
 const READ_CACHE_KEY = 'read-cache';
-const CACHE_SCOPE_PREFIX = 'cache:';
-
-/** One scope holds one user's read-cache blob for the current schema. */
-export function readCacheScope(userId: string): string {
-  return `${CACHE_SCOPE_PREFIX}${userId}:${SCHEMA_VERSION}`;
-}
 
 // Test-only: resets the cold-start restore state and the shared sign-out flag
 // so a test can drive each lifecycle from a clean module (the same pattern as
@@ -96,9 +95,37 @@ type AllowedProcedure = {
 const DEFAULT_SESSION_LIST_INPUT = buildAgentSessionListInput({ organizationId: null });
 const DEFAULT_SESSION_LIST_KEY_COUNT = Object.keys(DEFAULT_SESSION_LIST_INPUT).length;
 
+const briefingListCacheInputSchema = z
+  .object({
+    scope: z.enum(['all', 'personal', 'organization']).optional(),
+    organizationId: z.string().min(1).optional(),
+    currentOnly: z.boolean(),
+    limit: z.union([z.literal(1), z.literal(30), z.literal(100)]),
+    cursor: z.undefined().optional(),
+  })
+  .strict()
+  .refine(input =>
+    input.scope === 'organization'
+      ? input.organizationId !== undefined
+      : input.organizationId === undefined
+  );
+const briefingDetailCacheInputSchema = z.object({ reportId: z.string().min(1) }).strict();
+
 // Initial allowlist. Verified against the mobile tRPC router
 // (`packages/trpc/src/mobile.ts`) before coding.
 const ALLOWED_PROCEDURES: readonly AllowedProcedure[] = [
+  {
+    path: 'agentBriefing.list',
+    isAllowedInput: meta => briefingListCacheInputSchema.safeParse(metaInput(meta)).success,
+  },
+  {
+    path: 'agentBriefing.get',
+    isAllowedInput: meta => briefingDetailCacheInputSchema.safeParse(metaInput(meta)).success,
+  },
+  {
+    path: 'agentBriefing.preferences',
+    isAllowedInput: () => true,
+  },
   {
     path: 'user.getMe',
     isAllowedInput: meta => metaInput(meta) === undefined,
@@ -353,7 +380,7 @@ export function takeOverColdStartRestore(): string | null {
 export async function clearCacheScopeForSignOut(knownUserId: string | null): Promise<void> {
   try {
     await encryptedKv.clearScopePrefix(
-      knownUserId ? `${CACHE_SCOPE_PREFIX}${knownUserId}:` : CACHE_SCOPE_PREFIX
+      knownUserId ? `${READ_CACHE_SCOPE_PREFIX}${knownUserId}:` : READ_CACHE_SCOPE_PREFIX
     );
   } catch {
     // Best effort: query and auth state reset still run after this returns.

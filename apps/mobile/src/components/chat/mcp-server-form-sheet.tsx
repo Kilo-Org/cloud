@@ -1,8 +1,10 @@
-import { ScrollView } from 'react-native';
+import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ScrollView } from 'react-native';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
 import { SheetHeader } from '@/components/sheet-header';
+import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { type RemoteMcpServerDraft, type StoredRemoteMcpServer } from '@/lib/chat/remote-mcp-store';
 
 import { RemoteMcpServerForm } from './remote-mcp-server-form';
@@ -35,8 +37,14 @@ export function McpServerFormSheet({
   onClose,
 }: Readonly<McpServerFormSheetProps>) {
   const { t } = useTranslation();
+  const dirtyRef = useRef(false);
+  const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({
+    isDirty: () => dirtyRef.current,
+    onDiscard: onClose,
+  });
+
   return (
-    <SessionPageSheet visible onClose={onClose}>
+    <SessionPageSheet visible onClose={onClose} onRequestDismiss={requestDismiss}>
       <SheetHeader
         title={t(
           target.kind === 'edit' ? 'modelChat.mcp.editServerTitle' : 'modelChat.mcp.addServerTitle'
@@ -44,7 +52,7 @@ export function McpServerFormSheet({
         // The form's own Save is the only commit; the header closes the sheet
         // without writing, so it is a Close and not a second Done.
         doneLabel={t('common.close')}
-        onDone={onClose}
+        onDone={requestClose}
         topInset="ios-page-sheet"
       />
       {/* The form's fields live in a scroll view with the keyboard insets
@@ -60,8 +68,12 @@ export function McpServerFormSheet({
           server={target.kind === 'edit' ? target.server : undefined}
           onSave={onSubmit}
           saving={saving}
+          onDirtyChange={dirty => {
+            dirtyRef.current = dirty;
+          }}
         />
       </ScrollView>
+      {dialog}
     </SessionPageSheet>
   );
 }

@@ -32,9 +32,9 @@ git lfs install --skip-repo
 
 The `--skip-repo` flag avoids conflicts with the project's Husky hooks. Git LFS is used for large binary files (videos).
 
-### Node.js 24.14.1 (via nvm)
+### Node.js 24.22.1 (via nvm)
 
-The project requires Node.js 24.14.1 locally (see `.nvmrc`) and accepts any Node.js 24.x runtime in `package.json` `engines`.
+The project requires Node.js 24.22.1 locally (see `.nvmrc`) and accepts any Node.js 24.x runtime in `package.json` `engines`.
 
 ```bash
 brew install nvm
@@ -148,6 +148,8 @@ pnpm dev:env
 
 The setup covers: `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `POSTGRES_URL`, `CALLBACK_TOKEN_SECRET`, `BYOK_ENCRYPTION_KEY`, `INTERNAL_API_SECRET`, `STRIPE_SECRET_KEY`, and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`.
 
+It also provisions the credential-envelope keypairs that the code-review providers need. The GitHub user-token and Bitbucket/GitLab platform-credential envelopes each keep a public half in the web app and a private half in `git-token-service`, so setup generates a local 4096-bit RSA keypair for each one that is unconfigured and writes the key ID plus both halves into `.env.local`; `pnpm dev:env` copies the private halves into the Worker's `.dev.vars`. Values that already exist are kept, read from `.env.local` first and from the Worker's `.dev.vars` second, so re-running setup neither rotates a keypair the Worker already stored credentials under nor drops a half that lives only in the Worker file. Without a complete pair the web app still reports a connected provider, but every review read answers 503 from the Worker.
+
 These changes will allow you to do local testing with a fake account.
 
 #### c. Add or rotate shared web environment variables
@@ -160,9 +162,9 @@ pnpm web:env set EXAMPLE_API_TOKEN
 
 Prerequisites:
 
-- Sign in with `vercel login` and have access to the projects in the `kilocode` scope.
+- Sign in with `pnpm exec vercel login` and have access to the projects in the `kilocode` scope.
 - Install the 1Password CLI and have write access to the `Kilo Web ENV Production` vault. If needed, the CLI prompts you to sign in with Touch ID.
-- Have `pnpm` available; the command runs the pinned Vercel CLI with `pnpm dlx`.
+- Run `pnpm install --frozen-lockfile` in the checkout first. The command uses the workspace Vercel CLI via `pnpm exec vercel`; verify access with `pnpm exec vercel whoami --scope kilocode --format=json`.
 
 The command asks whether the variable is sensitive, defaulting to yes. Sensitive Production and Staging values use Vercel's sensitive type, while Development remains encrypted but exportable through `vercel env pull`. The Production and Staging values are also stored in one concealed, exact-name item in `Kilo Web ENV Production`: Production uses the built-in `password` field and Staging uses `password (staging)`. Either field can be created before the other. The item's notes identify the local user and computer that last updated it.
 
@@ -222,6 +224,7 @@ pnpm dev:start
 ```
 
 This generates the local environment files and launches a tmux dashboard with the Next.js app and local infrastructure. It does not run database migrations.
+It also starts `git-token-service`, because every code-review read and write resolves the caller's GitHub, GitLab or Bitbucket credential through that Worker; without it the web app reports a connected provider while the review inbox and overview fail as a service outage.
 Port offset selection is automatic by default, keeping secondary worktrees from colliding with the root checkout. This setup order assumes no port conflicts; if startup selects a different offset, run `pnpm test:db` again in another terminal in the same worktree.
 When the Stripe CLI is installed, the command also starts the Stripe webhook forwarder. Run `pnpm dev:status` to get the web app's port.
 
@@ -489,12 +492,12 @@ If `CF_AE_TOKEN` is missing, Grafana will still boot — only dashboard queries 
 
 - **Service bindings** resolve locally for Workers launched together by `pnpm dev:start` when the bound target is running. Bindings to optional services remain unavailable unless their owning group is started (for example, session-ingest -> o11y requires the `observability` group).
 - **Webhook → KiloClaw Chat** triggers require the KiloClaw worker running on port 8795. The webhook worker calls it via `KILOCLAW_API_URL` (HTTP, not a service binding) to deliver messages to Stream Chat. Stream Chat credentials (`STREAM_CHAT_API_KEY`, `STREAM_CHAT_API_SECRET`) must be in `kiloclaw/.dev.vars`.
-- **Cloudflare Containers** (used by Cloud Agent Next and App Builder) always run on Cloudflare's remote infrastructure, even in dev mode. Purely local execution is not possible.
+- **Cloudflare Containers** (used by Cloud Agent Next) always run on Cloudflare's remote infrastructure, even in dev mode. Purely local execution is not possible.
 - **Analytics Engine writes** are no-ops in `wrangler dev` — there is no local AE simulator. Reads against the real prod datasets still work via the local Grafana above. **Pipelines** and **dispatch namespaces** don't work locally.
 
 ### What works without running any workers
 
-The core Next.js app handles profiles, organizations, usage tracking, billing, and the OpenRouter inference proxy without any workers. Features that require a specific worker (e.g., Cloud Agent sessions, code reviews, app builder) will fail gracefully or show connection errors if that worker isn't running.
+The core Next.js app handles profiles, organizations, usage tracking, billing, and the OpenRouter inference proxy without any workers. Features that require a specific worker (e.g., Cloud Agent sessions, code reviews) will fail gracefully or show connection errors if that worker isn't running.
 
 ### Multi-worktree support
 
@@ -522,6 +525,13 @@ Infrastructure containers (`postgres` on 5432, `redis` on 6379, `redis-http` on 
 - Every worker command gets `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`, because each `wrangler.jsonc` commits a `localConnectionString` on the default port.
 
 The Next.js dev script reads `REDIS_URL` and `UPSTASH_REDIS_REST_URL` from the shell, then from the env files, and falls back to `redis://localhost:6379` and `http://localhost:8079`. It also exports `UPSTASH_REDIS_REST_TOKEN=example_token` for the shared `@upstash/redis` REST helper; `REDIS_URL` serves Chat SDK state because `@chat-adapter/state-redis` uses the Redis TCP protocol.
+
+## Admin webhook inspection
+
+Webhook request records and request logs use the session-viewer permission contract
+(`is_admin` and `can_view_sessions`). Local admin fixtures used to inspect these
+records must have both flags enabled. This applies to personal and organization
+triggers.
 
 ## First credit-pack purchase email
 
@@ -553,7 +563,7 @@ If you see errors about unsupported Node.js versions, ensure you're using the pi
 
 ```bash
 nvm use
-node --version  # Should output v24.14.1
+node --version  # Should output v24.22.1
 ```
 
 ### Database connection errors
@@ -582,3 +592,36 @@ If image/video files appear as small text files with `oid sha256:...`, run:
 ```bash
 git lfs pull
 ```
+
+## Agent morning briefings
+
+The mobile Home briefing summarizes overnight coding sessions separately for Personal and each organization.
+Users configure a saved timezone, night start, shared night-end/morning-start, and morning end.
+Dismissal restores live status across devices; report history remains available.
+
+The backend owns scheduling, report revisions, optional paid summaries, and notification dispatch.
+AI summaries and briefing notifications require separate opt-ins.
+Summary settings include a model override and finite generation time and spend limits.
+The default summary model is `~deepseek/deepseek-flash-latest`.
+Pricing estimates and gateway spend checks resolve latest-model aliases through the stored catalog target.
+An alias remains unavailable when its target is missing or has no usable pricing.
+The gateway rejects an alias request if provider routing selects a different target from the priced catalog target.
+The structured report remains available when generation fails or reaches a limit.
+
+Apply database migrations before deploying the session-ingest, notification, gateway, and web changes.
+The CLI status producer must send occurrence timestamps and transition identities for reliable historical blocker counts.
+Legacy activity remains readable with partial coverage; unknown values must not appear as confirmed zeroes.
+
+Report display contracts allow 64 sessions, 256 sources, and 32 sources per session.
+Titles use 160 characters, URLs 2048, and excerpts 600. Scheduled collection selects
+the latest 2048 activity events and 2048 usage records, with up to 256 session ancestry lookups.
+Session selection favors recent activity and sampled evidence carries partial coverage.
+Scorecards describe the collected evidence. Scheduled refresh replaces facts using current collection.
+One-off period sampling and the summary model's 16-source/24-session selection remain independent.
+History pages allow up to 100 reports within a 3 MB JSON response budget.
+Stored reports must satisfy the shared contract; unreadable records are skipped during pagination.
+
+The protected cron routes are `/api/cron/agent-briefing` and `/api/cron/agent-briefing-summaries`.
+They use the existing cron authorization, database, gateway, and notification configuration.
+Local verification must use an isolated database and fake accounts.
+Use a local notification sink and fixture inference provider to avoid real pushes or upstream charges.

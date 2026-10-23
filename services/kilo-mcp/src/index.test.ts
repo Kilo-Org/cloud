@@ -1879,7 +1879,7 @@ describe('api handler (props-based auth)', () => {
    * publishes admin-guarded procedures only under non-internal paths), so an
    * actual catalog row is used to exercise the guard end to end.
    */
-  const REAL_ADMIN_PATH = 'mcpGateway.listPersonal';
+  const REAL_ADMIN_PATH = 'debug.handledTrpcError';
 
   it('refuses a bundled admin path for a grant without the admin opt-in, before any upstream request', async () => {
     const upstream = vi.fn();
@@ -1948,7 +1948,7 @@ describe('api handler (props-based auth)', () => {
     expect(created[0]).toMatchObject({
       sessionId: 'sess-1',
       path: REAL_ADMIN_PATH,
-      kind: 'admin',
+      kind: 'debug',
     });
     expect(upstream).not.toHaveBeenCalled();
   });

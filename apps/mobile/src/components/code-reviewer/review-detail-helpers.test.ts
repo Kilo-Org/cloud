@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import { i18n } from '@/i18n';
 
 import {
   councilDecisionLabel,
   councilVoteLabel,
   flattenCouncilFindings,
+  gateThresholdLabel,
+  reviewCancellationLabel,
+  reviewFailureLabel,
   selectRetryAction,
+  severityLabelKey,
 } from './review-detail-helpers';
 
 type Finding = { path: string; severity: string };
@@ -66,6 +71,66 @@ describe('councilVoteLabel', () => {
   });
 });
 
+describe('reviewFailureLabel', () => {
+  it.each([
+    ['github_installation_required', 'githubInstallationRequired'],
+    ['github_ip_allow_list', 'githubIpAllowList'],
+    ['gitlab_project_access_required', 'gitlabProjectAccessRequired'],
+    ['byok_invalid_key', 'byokInvalidKey'],
+    ['selected_model_unavailable', 'selectedModelUnavailable'],
+    ['repeated_repository_clone_timeout', 'repeatedRepositoryCloneTimeout'],
+  ] as const)('uses localized action-required copy for %s', (reason, copyKey) => {
+    expect(reviewFailureLabel(i18n.t, 'Internal diagnostic', reason)).toBe(
+      i18n.t(`codeReviewer.actionRequired.${copyKey}.description`)
+    );
+  });
+
+  it.each([null, 'upstream_error', 'future-reason'])(
+    'does not expose unknown diagnostics for %s',
+    reason => {
+      expect(reviewFailureLabel(i18n.t, 'Internal diagnostic', reason)).toBe(
+        i18n.t('codeReviewer.reviewDetail.reviewFailed')
+      );
+    }
+  );
+
+  it('localizes the known service-unreachable dispatch message', () => {
+    expect(
+      reviewFailureLabel(
+        i18n.t,
+        'Dispatch failed: could not reach the code review service. ' +
+          'It may be offline — retry the review once it is running.',
+        'upstream_error'
+      )
+    ).toBe(i18n.t('codeReviewer.reviewDetail.serviceUnavailable'));
+  });
+});
+
+describe('gateThresholdLabel', () => {
+  it.each(['off', 'all', 'critical', 'warning'] as const)('localizes %s', threshold => {
+    expect(gateThresholdLabel(threshold)).toBe(i18n.t(`codeReviewer.gate.${threshold}`));
+  });
+
+  it.each(['future-threshold', 'constructor', ''])('labels unknown %s', threshold => {
+    expect(gateThresholdLabel(threshold)).toBe(i18n.t('common.unknown'));
+  });
+});
+
+describe('severityLabelKey', () => {
+  it.each([
+    ['critical', 'common.critical'],
+    ['warning', 'codeReviewer.gateThreshold.warning'],
+    ['suggestion', 'agentChat.suggestion.title'],
+    ['nitpick', 'codeReviewer.reviewDetail.severityNitpick'],
+  ] as const)('names the copy of %s', (severity, key) => {
+    expect(i18n.t(severityLabelKey(severity))).toBe(i18n.t(key));
+  });
+
+  it.each(['future-tier', 'constructor', ''])('falls back for an unknown %s', severity => {
+    expect(i18n.t(severityLabelKey(severity))).toBe(i18n.t('common.unknown'));
+  });
+});
+
 describe('selectRetryAction', () => {
   const enabled = { isEnabled: true, actionRequired: null };
 
@@ -115,5 +180,82 @@ describe('selectRetryAction', () => {
         config: { ...enabled, actionRequired: { reason: 'byok_invalid_key' } },
       })
     ).toBe('fix-settings');
+  });
+});
+
+describe('reviewCancellationLabel', () => {
+  const label = (over: {
+    status: string;
+    errorMessage: string | null;
+    terminalReason?: string | null;
+    platformLabel?: string;
+  }) =>
+    reviewCancellationLabel(i18n.t, {
+      platformLabel: 'GitHub',
+      ...over,
+    });
+
+  it('leaves reviews that did not end cancelled or interrupted alone', () => {
+    expect(
+      label({ status: 'completed', errorMessage: 'Superseded by new push', terminalReason: null })
+    ).toBeNull();
+  });
+
+  it('shows nothing when there is no stored message to explain', () => {
+    expect(label({ status: 'cancelled', errorMessage: null })).toBeNull();
+  });
+
+  it('explains a review replaced by a newer commit, by reason or by message', () => {
+    const expected = i18n.t('codeReviewer.reviewDetail.cancelReasonSuperseded');
+    expect(label({ status: 'cancelled', errorMessage: 'Superseded by new push' })).toBe(expected);
+    expect(
+      label({
+        status: 'cancelled',
+        errorMessage: 'Superseded by duplicate merge-commit continuation',
+      })
+    ).toBe(expected);
+    expect(
+      label({ status: 'cancelled', errorMessage: 'worker stopped', terminalReason: 'superseded' })
+    ).toBe(expected);
+  });
+
+  it('names the disconnected platform in the recovery step', () => {
+    const message = 'Platform integration disconnected';
+    expect(label({ status: 'cancelled', errorMessage: message, platformLabel: 'GitLab' })).toBe(
+      i18n.t('codeReviewer.reviewDetail.cancelReasonIntegrationDisconnected', {
+        platform: 'GitLab',
+      })
+    );
+  });
+
+  it('explains both Bitbucket cancellation causes', () => {
+    expect(label({ status: 'cancelled', errorMessage: 'Bitbucket Code Reviewer disabled' })).toBe(
+      i18n.t('codeReviewer.reviewDetail.cancelReasonBitbucketReviewerDisabled')
+    );
+    expect(
+      label({
+        status: 'cancelled',
+        errorMessage: 'Bitbucket pull request state superseded this review',
+      })
+    ).toBe(i18n.t('codeReviewer.reviewDetail.cancelReasonBitbucketPullRequestChanged'));
+  });
+
+  it('falls back to the outcome for a cause the row cannot tell apart', () => {
+    expect(label({ status: 'cancelled', errorMessage: 'Cancelled by user' })).toBe(
+      i18n.t('codeReviewer.reviewDetail.cancelReasonCancelled')
+    );
+    expect(label({ status: 'interrupted', errorMessage: 'container restarted' })).toBe(
+      i18n.t('codeReviewer.reviewDetail.cancelReasonInterrupted')
+    );
+  });
+
+  it('reads an interrupt persisted as cancelled by its reason', () => {
+    expect(
+      label({
+        status: 'cancelled',
+        errorMessage: 'container restarted',
+        terminalReason: 'interrupted',
+      })
+    ).toBe(i18n.t('codeReviewer.reviewDetail.cancelReasonInterrupted'));
   });
 });

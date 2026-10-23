@@ -5,6 +5,7 @@
 
 import type { Event } from '@sentry/nextjs';
 import { consoleLoggingIntegration, httpIntegration, init } from '@sentry/nextjs';
+import { RESTRICTED_DATA_COLLECTION } from '@kilocode/web-shared/lib/observability/sentry-data-collection';
 import { sanitizeAnalyticsPathname } from '@kilocode/web-shared/lib/sanitize-analytics-url';
 
 type DrizzleQueryError = Error & {
@@ -189,12 +190,15 @@ export function initServerSentry(): void {
     debug: false,
     normalizeDepth: 5,
 
-    // Skip Sentry's OTEL setup because we are using Vercel's OTEL with SentrySpanProcessor
-    skipOpenTelemetrySetup: true,
+    // The Vercel OTel setup in node-instrumentation.ts owns the tracer provider, so Sentry
+    // must not install one of its own.
+    enableOpenTelemetrySetup: false,
+
+    dataCollection: RESTRICTED_DATA_COLLECTION,
 
     integrations: [
-      // Keep Sentry's httpIntegration for correct request isolation, but do not
-      // emit spans here because tracing spans are produced by Vercel's OTel.
+      // Keep Sentry's httpIntegration for correct request isolation. It emits no spans
+      // because Sentry tracing is disabled.
       httpIntegration({ spans: false }),
       // send console.log, console.error, and console.warn calls as logs to Sentry
       consoleLoggingIntegration({ levels: ['log', 'error', 'warn'] }),

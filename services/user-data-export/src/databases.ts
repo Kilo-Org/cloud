@@ -1,4 +1,4 @@
-import { getWorkerDb, pg } from '@kilocode/db/client';
+import { databaseTypeParsers, getWorkerDb, pg } from '@kilocode/db/client';
 import { organizationExportAccess } from '@kilocode/db/organization-export-access';
 import { sql } from 'drizzle-orm';
 import { logExportEvent, safeError, setSpanFields, withSpan } from './observability';
@@ -447,6 +447,7 @@ export function createReplicaDatabase(
     connectionString: binding.connectionString,
     max: 1,
     statement_timeout: 30_000,
+    types: databaseTypeParsers,
   });
   return {
     query: (text, values) =>

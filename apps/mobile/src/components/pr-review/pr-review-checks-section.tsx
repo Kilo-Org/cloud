@@ -321,14 +321,20 @@ export function PrReviewChecksSection({
       );
     }
 
-    // Retryable (server/offline) — section-level retry button.
+    // Retryable / service-unavailable (server/offline) — section-level retry
+    // button. A BAD_GATEWAY names its own cause; every other failure keeps
+    // the generic could-not-load copy.
     return (
       <View className="gap-2">
         <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
           {t('prReview.checks.title')}
         </Text>
         <View key={CONTENT_CARD_KEY} className="gap-3 rounded-lg bg-secondary p-4">
-          <Text className="text-sm text-muted-foreground">{t('prReview.checks.couldNotLoad')}</Text>
+          <Text className="text-sm text-muted-foreground">
+            {state.kind === 'service-unavailable'
+              ? t('prReview.reviewServiceUnavailableDescription')
+              : t('prReview.checks.couldNotLoad')}
+          </Text>
           <Button
             variant="outline"
             onPress={() => {
@@ -352,6 +358,13 @@ export function PrReviewChecksSection({
   const data = checks.data;
   const runList = data?.checkRuns ?? [];
   const groups = groupRunsByStatus(runList);
+  // The server reads each listing up to a fixed page ceiling and flags the
+  // response when entries were left behind, so the header prints a lower bound
+  // instead of a total the rows would contradict. The "+" rides inside the
+  // formatted number of the existing count copy, so no locale needs new text.
+  const displayCount = `${formatNumber(runList.length, i18n.language)}${
+    data?.truncated ? '+' : ''
+  }`;
 
   if (runList.length === 0) {
     return (
@@ -396,7 +409,7 @@ export function PrReviewChecksSection({
           <Text variant="muted" className="text-xs">
             {t('prReview.checks.checksCount', {
               count: runList.length,
-              displayCount: formatNumber(runList.length, i18n.language),
+              displayCount,
             })}
           </Text>
         </View>

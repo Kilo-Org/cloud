@@ -18,6 +18,7 @@ const BYTES_PER_GIGABYTE = 1024 * 1024 * 1024;
 export default function ApiRequestLogPage() {
   const [id, setId] = useState('');
   const [userId, setUserId] = useState('');
+  const [organizationId, setOrganizationId] = useState('');
   const [startDate, setStartDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -36,6 +37,9 @@ export default function ApiRequestLogPage() {
     }
     if (userId.trim()) {
       params.set('userId', userId.trim());
+    }
+    if (organizationId.trim()) {
+      params.set('organizationId', organizationId.trim());
     }
     if (startDate) {
       params.set('startDate', startDate);
@@ -113,10 +117,20 @@ export default function ApiRequestLogPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="model">Model (optional)</Label>
+              <Label htmlFor="organizationId">Organization ID (optional)</Label>
+              <Input
+                id="organizationId"
+                placeholder="Enter organization ID"
+                value={organizationId}
+                onChange={e => setOrganizationId(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="model">Model prefix (optional)</Label>
               <Input
                 id="model"
-                placeholder="e.g. claude-sonnet-4-20250514"
+                placeholder="e.g. anthropic/"
                 value={model}
                 onChange={e => setModel(e.target.value)}
               />

@@ -33,12 +33,11 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
     description: 'stub for unit tests',
     context_length: 8192,
     max_completion_tokens: 4096,
-    status: 'public',
     flags: [],
     provider: { ...OPENROUTER, id: 'dev-tools', supportedChatApis: ['chat_completions'] },
     internal_id: 'stub-internal',
     pricing: null,
-    inference_provider_restriction: [],
+    inference_providers: [],
   };
   return {
     ...actual,

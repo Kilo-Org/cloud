@@ -285,7 +285,7 @@ export class ActiveSessionsLiveSync {
     try {
       await queryClient.cancelQueries({ queryKey, exact: true });
       if (this.isCurrentAttachment(attachmentEpoch) && refresh.isCurrent()) {
-        const fetchPromise = queryClient.fetchQuery({
+        const fetchPromise = queryClient.query({
           queryKey,
           queryFn: fenceActiveSessionsQuery(queryFn, () =>
             this.isCurrentAttachment(attachmentEpoch)

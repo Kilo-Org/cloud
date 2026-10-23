@@ -52,12 +52,15 @@ const list = vi.hoisted(() => ({
   supported: vi.fn(() => true),
 }));
 const store = vi.hoisted(() => ({ rows: [] as unknown[] }));
+/** The window the screen lays out in; a test sets a landscape size to read the
+ *  short-window presentation and restores it afterwards. */
+const windowSize = vi.hoisted(() => ({ width: 411, height: 914 }));
 const toastSuccess = vi.hoisted(() => vi.fn());
 const toastError = vi.hoisted(() => vi.fn());
 const confirmSpy = vi.hoisted(() => vi.fn());
 // `vi.hoisted` results cannot be exported at their declaration (vitest hoists
 // them above the export), so they are exported after the declaration instead.
-export { confirmSpy, list, store, toastError, toastSuccess };
+export { confirmSpy, list, store, toastError, toastSuccess, windowSize };
 
 /**
  * The confirmation the stubbed `useConfirmDialog` captured; mirrors the
@@ -101,6 +104,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   TextInput: 'TextInput',
+  useWindowDimensions: () => windowSize,
   View: 'View',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({

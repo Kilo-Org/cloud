@@ -178,6 +178,51 @@ describe('SessionItemSchema session_pr_link validation', () => {
 });
 
 describe('SessionItemSchema session_status validation', () => {
+  it('preserves the original transition tuple without dropping its causal identity', () => {
+    const item = {
+      type: 'session_status',
+      data: {
+        status: 'question',
+        previousStatus: 'busy',
+        occurredAt: '2026-07-24T07:59:00.000Z',
+        transitionId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+      },
+    };
+    expect(SessionItemSchema.parse(item)).toEqual(item);
+  });
+
+  it.each(['not-an-id', 'Z1ARZ3NDEKTSV4RRFFQ69G5FAV', '01arz3ndektsv4rrffq69g5fav'])(
+    'rejects noncanonical or overflowing transition identity %s',
+    transitionId => {
+      expect(
+        SessionItemSchema.safeParse({
+          type: 'session_status',
+          data: { status: 'question', transitionId },
+        }).success
+      ).toBe(false);
+    }
+  );
+
+  it('preserves an originating historical transition timestamp independently from scheduledAt', () => {
+    const item = {
+      type: 'session_status',
+      data: {
+        status: 'question',
+        occurredAt: '2026-07-24T07:59:00.000Z',
+      },
+    };
+    expect(SessionItemSchema.parse(item)).toEqual(item);
+  });
+
+  it('rejects malformed originating timestamps instead of treating them as history', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'session_status',
+        data: { status: 'question', occurredAt: 'yesterday' },
+      }).success
+    ).toBe(false);
+  });
+
   it.each(['idle', 'busy', 'question', 'permission', 'retry'])(
     'parses the known %s status',
     status => {

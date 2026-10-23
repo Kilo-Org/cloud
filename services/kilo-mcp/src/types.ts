@@ -9,6 +9,8 @@
  * `kind` is the procedure's own kind: a `query` reads data, a `mutation`
  * changes it. The transport, and what a failure means, differ per kind.
  */
+import type { CloudAgentAuthority } from '../../../packages/worker-utils/src/cloud-agent-authority';
+
 export type CatalogRow = {
   path: string;
   kind: 'query' | 'mutation';
@@ -42,6 +44,7 @@ export type Catalog = Record<string, CatalogRow>;
  * credential without re-verifying anything.
  */
 export type GrantProps = {
+  cloudAgentAuthority?: CloudAgentAuthority;
   kiloUserId: string;
   organizationId: string | null;
   kiloToken: string;
@@ -70,6 +73,7 @@ export type GrantProps = {
  * props. apps/web resolves identity and org membership.
  */
 export type ForwardedAuth = {
+  cloudAgentAuthority?: CloudAgentAuthority;
   /**
    * The raw `Authorization` header value to pass through: the Kilo API token
    * bound to the verified grant. A caller-supplied bearer is never consulted —
@@ -114,8 +118,7 @@ export type SearchResult = {
    */
   requiresApproval?: true;
   /**
-   * The endpoint's published input schema, byte-identical to the catalog row —
-   * exactly what `call` validates an input against.
+   * The catalog input schema, narrowed to the bound launch contract for scoped callers.
    */
   inputSchema: Record<string, unknown>;
 };

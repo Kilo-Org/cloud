@@ -8,7 +8,6 @@
 // Review Configuration
 // ============================================================================
 
-/** Default model for code reviews */
 export const DEFAULT_CODE_REVIEW_MODEL = 'anthropic/claude-sonnet-4.6';
 
 /**
@@ -31,19 +30,10 @@ export const REVIEW_MD_CONVERSION_RATE_WINDOW_SECONDS = 60 * 60;
 // Pagination
 // ============================================================================
 
-/**
- * Default limit for listing code reviews
- */
 export const DEFAULT_LIST_LIMIT = 50;
 
-/**
- * Maximum limit for listing code reviews
- */
 export const MAX_LIST_LIMIT = 100;
 
-/**
- * Default offset for pagination
- */
 export const DEFAULT_LIST_OFFSET = 0;
 
 // ============================================================================

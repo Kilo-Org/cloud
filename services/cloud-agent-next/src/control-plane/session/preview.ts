@@ -1,5 +1,5 @@
 import type { SessionMetadata } from '../../persistence/session-metadata.js';
-import { isControlSession } from '../../session-plane.js';
+import { isControlSession } from '../../session-identity.js';
 import { isTerminalSessionPlatform } from '../../terminal/access.js';
 import type { ResolvedPreviewTarget, PreviewTargetResult } from '../sandbox/preview-target.js';
 

@@ -25,7 +25,7 @@ export function setHideBalance(value: boolean) {
 
 /** The stored hide-balance value for callers with no React tree (the settings registry). */
 export function getHideBalance(): boolean {
-  return store.get();
+  return store.getRequested();
 }
 
 export function useHideBalancePreference() {

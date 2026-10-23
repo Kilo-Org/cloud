@@ -2,7 +2,6 @@ import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organiza
 import {
   AUTO_SMALL_TARGET_MODELS,
   customRouterAutoModel,
-  FRONTIER_MODE_TO_MODEL,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   KILO_AUTO_FREE_MODEL,
@@ -37,8 +36,9 @@ export async function addAutoRoutingModels(
     return models;
   }
 
-  const [table, autoFreeCandidates] = await Promise.all([
+  const [table, frontierTable, autoFreeCandidates] = await Promise.all([
     getCachedRoutingTable(),
+    getCachedRoutingTable('frontier'),
     getAutoFreeCandidates(null).catch(() => null),
   ]);
 
@@ -49,7 +49,9 @@ export async function addAutoRoutingModels(
     availableModelIds
   );
   const frontierModelIds = visibleConcreteModelIds(
-    Object.values(FRONTIER_MODE_TO_MODEL).map(({ model }) => model),
+    Object.values(frontierTable?.routes ?? {})
+      .flat()
+      .map(candidate => candidate.model),
     availableModelIds
   );
   const freeModelIds = visibleConcreteModelIds(autoFreeCandidates ?? [], availableModelIds);

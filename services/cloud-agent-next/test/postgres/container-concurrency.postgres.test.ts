@@ -204,7 +204,7 @@ describe('container capacity against PostgreSQL', () => {
   });
 
   it('retains subject limits for bots without treating bot IDs as users', async () => {
-    const actor = { type: 'bot', id: 'auto-triage' } as const;
+    const actor = { type: 'bot', id: 'code-review' } as const;
     await interval({ actor_type: 'bot', actor_id: actor.id });
     expect(await readContainerCapacity(reader, { ...request(), actor })).toEqual([
       { subject: { type: 'user', id: userId }, live: 1, limit: 20 },

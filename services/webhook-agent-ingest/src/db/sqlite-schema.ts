@@ -43,6 +43,7 @@ export const triggerConfig = sqliteTable('trigger_config', {
   namespace: text('namespace').notNull(),
   user_id: text('user_id'),
   org_id: text('org_id'),
+  execution_user_id: text('execution_user_id'),
   created_at: text('created_at').notNull(),
   is_active: integer('is_active').notNull().default(1),
   target_type: text('target_type').notNull().default('cloud_agent'),

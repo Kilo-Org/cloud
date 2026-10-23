@@ -1,0 +1,1 @@
+ALTER TABLE "shared_cli_sessions" ADD COLUMN "pending_copy_ids" jsonb DEFAULT '[]'::jsonb NOT NULL;

@@ -35,6 +35,7 @@ import {
   reserveForkedSession,
   sessionBlobRefs,
   sharedSessionCopyIds,
+  sharedSessionCurrentCopyId,
 } from '@/lib/cli-sessions/session-copies';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { getCodeReviewById } from '@/lib/code-reviews/db/code-reviews';
@@ -236,6 +237,11 @@ async function getForkableSession(
       share_id: sharedCliSessions.share_id,
       session_id: sharedCliSessions.session_id,
       shared_state: sharedCliSessions.shared_state,
+      api_conversation_history_blob_url: sharedCliSessions.api_conversation_history_blob_url,
+      task_metadata_blob_url: sharedCliSessions.task_metadata_blob_url,
+      ui_messages_blob_url: sharedCliSessions.ui_messages_blob_url,
+      git_state_blob_url: sharedCliSessions.git_state_blob_url,
+      pending_copy_ids: sharedCliSessions.pending_copy_ids,
       title: cliSessions.title,
       version: cliSessions.version,
     })
@@ -257,7 +263,7 @@ async function getForkableSession(
       title: sharedSession.title,
       version: sharedSession.version ?? 0,
       // fields used for copying blobs
-      source_id: input.share_or_session_id,
+      source_id: sharedSessionCurrentCopyId(sharedSession),
       source_folder: 'shared-sessions' as const,
     };
   }
@@ -536,6 +542,7 @@ export const cliSessionsRouter = createTRPCRouter({
             task_metadata_blob_url: sharedCliSessions.task_metadata_blob_url,
             ui_messages_blob_url: sharedCliSessions.ui_messages_blob_url,
             git_state_blob_url: sharedCliSessions.git_state_blob_url,
+            pending_copy_ids: sharedCliSessions.pending_copy_ids,
           })
           .from(sharedCliSessions)
           .where(eq(sharedCliSessions.share_id, share.share_id))

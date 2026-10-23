@@ -6068,6 +6068,7 @@ export const sharedCliSessions = pgTable(
     task_metadata_blob_url: text(),
     ui_messages_blob_url: text(),
     git_state_blob_url: text(),
+    pending_copy_ids: jsonb().$type<string[]>().notNull().default([]),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()

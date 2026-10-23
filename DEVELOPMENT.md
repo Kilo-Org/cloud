@@ -245,6 +245,21 @@ pnpm test
 This runs the web, web environment, and local development-tool tests. They
 should pass against the local PostgreSQL database.
 
+### CLI session storage verification
+
+After migrating the local database, run the session-copy and account-cleanup
+regressions with:
+
+```bash
+pnpm --filter web exec jest --runInBand src/routers/cli-sessions-router.test.ts src/lib/r2/cli-sessions.test.ts src/lib/user/deletion-queue/handlers/cli-v1.test.ts
+```
+
+Share publication refreshes a stable link with the current session snapshot.
+The blob URL columns identify the current copy folder. `pending_copy_ids`
+records folders awaiting deletion; later publication and deletion lifecycle
+calls retry that work before admitting another copy.
+
+
 ## Common Development Commands
 
 | Command | Description |

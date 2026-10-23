@@ -1816,6 +1816,67 @@ describe('cli-sessions-router', () => {
       expect(failedCopyId).not.toBe(first.share_id);
     });
 
+    it('retains a copy folder for cleanup retry after a delete failure', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const { copyBlobs, deleteBlobs } = await import('@/lib/r2/cli-sessions');
+      jest.mocked(copyBlobs).mockClear();
+      jest.mocked(deleteBlobs).mockClear();
+      jest
+        .mocked(copyBlobs)
+        .mockResolvedValueOnce({
+          ui_messages_blob_url: 'shared-sessions/first-copy/ui_messages.json',
+        })
+        .mockResolvedValueOnce({
+          ui_messages_blob_url: 'shared-sessions/second-copy/ui_messages.json',
+        })
+        .mockResolvedValueOnce({
+          ui_messages_blob_url: 'shared-sessions/third-copy/ui_messages.json',
+        });
+
+      const first = await caller.cliSessions.share({
+        session_id: shareSessionId,
+        shared_state: CliSessionSharedState.Public,
+      });
+
+      jest.mocked(deleteBlobs).mockRejectedValueOnce(new Error('temporary delete failure'));
+      const second = await caller.cliSessions.share({
+        session_id: shareSessionId,
+        shared_state: CliSessionSharedState.Public,
+      });
+
+      expect(second.share_id).toBe(first.share_id);
+
+      const [pending] = await db
+        .select({ pending_copy_ids: sharedCliSessions.pending_copy_ids })
+        .from(sharedCliSessions)
+        .where(eq(sharedCliSessions.share_id, first.share_id));
+
+      expect(pending.pending_copy_ids).toEqual(['first-copy']);
+
+      jest.mocked(deleteBlobs).mockRejectedValueOnce(new Error('cleanup still unavailable'));
+      await expect(
+        caller.cliSessions.share({
+          session_id: shareSessionId,
+          shared_state: CliSessionSharedState.Public,
+        })
+      ).rejects.toThrow('cleanup still unavailable');
+      expect(copyBlobs).toHaveBeenCalledTimes(2);
+
+      await caller.cliSessions.share({
+        session_id: shareSessionId,
+        shared_state: CliSessionSharedState.Public,
+      });
+
+      const [completed] = await db
+        .select({ pending_copy_ids: sharedCliSessions.pending_copy_ids })
+        .from(sharedCliSessions)
+        .where(eq(sharedCliSessions.share_id, first.share_id));
+
+      expect(completed.pending_copy_ids).toEqual([]);
+      expect(deleteBlobs).toHaveBeenCalledWith('first-copy', expect.any(Array));
+      expect(deleteBlobs).toHaveBeenCalledWith('second-copy', expect.any(Array));
+    });
+
     it('stores a share of a session that has no blobs', async () => {
       const caller = await createCallerForUser(regularUser.id);
       const { copyBlobs } = await import('@/lib/r2/cli-sessions');
@@ -1967,6 +2028,7 @@ describe('cli-sessions-router', () => {
           session_id: originalSessionId,
           kilo_user_id: regularUser.id,
           shared_state: 'public',
+          ui_messages_blob_url: 'shared-sessions/share-copy/ui_messages.json',
         })
         .returning({ share_id: sharedCliSessions.share_id });
 
@@ -2003,6 +2065,14 @@ describe('cli-sessions-router', () => {
       });
 
       expect(copyBlobs).toHaveBeenCalled();
+      expect(copyBlobs).toHaveBeenCalledWith(
+        'share-copy',
+        'shared-sessions',
+        expect.any(String),
+        'sessions',
+        expect.any(Array),
+        { maxBytes: expect.any(Number) }
+      );
 
       const [forkedSession] = await db
         .select()

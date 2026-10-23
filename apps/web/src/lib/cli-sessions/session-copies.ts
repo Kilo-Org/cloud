@@ -70,17 +70,17 @@ export function blobUrlColumns(copiedBlobs: Partial<Record<BlobUrlKeys, string>>
   };
 }
 
-/** Copy-folder ids referenced by a shared-session row. */
-export function sharedSessionCopyIds(
-  share: Pick<
-    typeof sharedCliSessions.$inferSelect,
-    | 'share_id'
-    | 'api_conversation_history_blob_url'
-    | 'task_metadata_blob_url'
-    | 'ui_messages_blob_url'
-    | 'git_state_blob_url'
-  >
-): string[] {
+type SharedSessionCopyRow = Pick<
+  typeof sharedCliSessions.$inferSelect,
+  | 'share_id'
+  | 'api_conversation_history_blob_url'
+  | 'task_metadata_blob_url'
+  | 'ui_messages_blob_url'
+  | 'git_state_blob_url'
+  | 'pending_copy_ids'
+>;
+
+export function sharedSessionCurrentCopyIds(share: SharedSessionCopyRow): string[] {
   const copyIds = new Set<string>();
 
   for (const blobUrl of [
@@ -100,6 +100,16 @@ export function sharedSessionCopyIds(
   }
 
   return [...copyIds];
+}
+
+/** Current storage folder for a link, used when copying it into a fork. */
+export function sharedSessionCurrentCopyId(share: SharedSessionCopyRow): string {
+  return sharedSessionCurrentCopyIds(share)[0];
+}
+
+/** Current and pending shared-session folders, used by cleanup paths. */
+export function sharedSessionCopyIds(share: SharedSessionCopyRow): string[] {
+  return [...new Set([...sharedSessionCurrentCopyIds(share), ...share.pending_copy_ids])];
 }
 
 /**
@@ -187,6 +197,7 @@ export async function publishSharedSessionCopy({
           task_metadata_blob_url: sharedCliSessions.task_metadata_blob_url,
           ui_messages_blob_url: sharedCliSessions.ui_messages_blob_url,
           git_state_blob_url: sharedCliSessions.git_state_blob_url,
+          pending_copy_ids: sharedCliSessions.pending_copy_ids,
         })
         .from(sharedCliSessions)
         .where(
@@ -218,15 +229,22 @@ export async function publishSharedSessionCopy({
         }
       }
 
+      if (existing && existing.pending_copy_ids.length > 0) {
+        await deleteSharedSessionCopies(existing.pending_copy_ids);
+      }
+
       shareId = existing?.share_id ?? crypto.randomUUID();
       copyId = crypto.randomUUID();
       const copiedBlobs = await copySessionBlobs(sessionId, 'sessions', copyId, 'shared-sessions');
 
       if (existing) {
-        previousCopyIds = sharedSessionCopyIds(existing);
+        previousCopyIds = sharedSessionCurrentCopyIds(existing);
         await tx
           .update(sharedCliSessions)
-          .set(blobUrlColumns(copiedBlobs))
+          .set({
+            ...blobUrlColumns(copiedBlobs),
+            pending_copy_ids: previousCopyIds,
+          })
           .where(eq(sharedCliSessions.share_id, shareId));
       } else {
         await tx.insert(sharedCliSessions).values({
@@ -251,8 +269,13 @@ export async function publishSharedSessionCopy({
     throw error;
   }
 
-  if (previousCopyIds.length > 0) {
-    await deleteSharedSessionCopies(previousCopyIds);
+  for (const previousCopyId of previousCopyIds) {
+    try {
+      await deleteSharedSessionCopies([previousCopyId]);
+      await clearPendingSharedSessionCopy(shareId, previousCopyId);
+    } catch {
+      // The row retains this folder id so a later refresh or account cleanup can retry it.
+    }
   }
 
   return { share_id: shareId, session_id: sessionId };
@@ -278,4 +301,23 @@ export async function deleteSharedSessionCopies(copyIds: string[]): Promise<void
   for (const copyId of copyIds) {
     await deleteBlobs(copyId, sessionBlobRefs('shared-sessions'));
   }
+}
+
+async function clearPendingSharedSessionCopy(shareId: string, copyId: string): Promise<void> {
+  await db.transaction(async tx => {
+    const [share] = await tx
+      .select({ pending_copy_ids: sharedCliSessions.pending_copy_ids })
+      .from(sharedCliSessions)
+      .where(eq(sharedCliSessions.share_id, shareId))
+      .for('update');
+
+    if (!share) return;
+
+    await tx
+      .update(sharedCliSessions)
+      .set({
+        pending_copy_ids: share.pending_copy_ids.filter(pendingId => pendingId !== copyId),
+      })
+      .where(eq(sharedCliSessions.share_id, shareId));
+  });
 }

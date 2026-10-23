@@ -1,6 +1,7 @@
 import { eq, inArray, or } from 'drizzle-orm';
 import { cliSessions, sharedCliSessions } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { sharedSessionCurrentCopyIds } from '@/lib/cli-sessions/session-copies';
 import { deleteBlobs, type FileName } from '@/lib/r2/cli-sessions';
 import { USER_DELETION_RESOURCE_BATCH_SIZE } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import { userIdKeyedAbsenceOutcome } from '@/lib/user/deletion-queue/deletion-subject';
@@ -44,6 +45,7 @@ type SharedRow = {
   task_metadata_blob_url: string | null;
   ui_messages_blob_url: string | null;
   git_state_blob_url: string | null;
+  pending_copy_ids: string[];
 };
 
 type BlobRow = SessionRow | SharedRow;
@@ -59,6 +61,38 @@ function blobsForRow(
     }
   }
   return blobs;
+}
+
+type BlobCopyTarget = {
+  id: string;
+  blobs: { folderName: 'sessions' | 'shared-sessions'; filename: FileName }[];
+};
+
+function copyTargetsForRow(row: BlobRow): BlobCopyTarget[] {
+  const rowBlobs = blobsForRow(row);
+  if (row.kind === 'session') return [{ id: row.id, blobs: rowBlobs }];
+
+  const currentCopyIds = sharedSessionCurrentCopyIds({
+    share_id: row.id,
+    api_conversation_history_blob_url: row.api_conversation_history_blob_url,
+    task_metadata_blob_url: row.task_metadata_blob_url,
+    ui_messages_blob_url: row.ui_messages_blob_url,
+    git_state_blob_url: row.git_state_blob_url,
+    pending_copy_ids: row.pending_copy_ids,
+  });
+  const pendingCopyIds = row.pending_copy_ids.filter(id => !currentCopyIds.includes(id));
+  const allSharedBlobs = SESSION_BLOB_COLUMNS.map(
+    column =>
+      ({
+        folderName: 'shared-sessions',
+        filename: FILENAME_BY_COLUMN[column],
+      }) satisfies BlobCopyTarget['blobs'][number]
+  );
+
+  return [
+    ...currentCopyIds.map(id => ({ id, blobs: rowBlobs })),
+    ...pendingCopyIds.map(id => ({ id, blobs: allSharedBlobs })),
+  ];
 }
 
 function isMissingObjectError(error: unknown): boolean {
@@ -96,6 +130,7 @@ async function loadCliV1Rows(userId: string): Promise<BlobRow[]> {
       task_metadata_blob_url: sharedCliSessions.task_metadata_blob_url,
       ui_messages_blob_url: sharedCliSessions.ui_messages_blob_url,
       git_state_blob_url: sharedCliSessions.git_state_blob_url,
+      pending_copy_ids: sharedCliSessions.pending_copy_ids,
     })
     .from(sharedCliSessions)
     .where(
@@ -157,10 +192,10 @@ export const handleCliV1Blobs: DeletionHandler = async ({ request, step, context
     const reserve = continueIfLowTime(context, progress);
     if (reserve) return reserve;
 
-    const blobs = blobsForRow(row);
-    if (blobs.length > 0) {
+    for (const target of copyTargetsForRow(row)) {
+      if (target.blobs.length === 0) continue;
       try {
-        await deleteBlobs(row.id, blobs, { signal: providerAbortSignal(context) });
+        await deleteBlobs(target.id, target.blobs, { signal: providerAbortSignal(context) });
       } catch (error) {
         if (!isMissingObjectError(error)) {
           return {

@@ -26,6 +26,8 @@ type ProfileSummary = {
   commandCount: number;
   mcpServerCount: number;
   skillCount: number;
+  kiloCommandCount: number;
+  agentCount: number;
   ownerType?: 'organization' | 'user';
 };
 
@@ -109,6 +111,8 @@ function profile(overrides: Partial<ProfileSummary> & { id: string }): ProfileSu
     commandCount: 0,
     mcpServerCount: 0,
     skillCount: 0,
+    kiloCommandCount: 0,
+    agentCount: 0,
     ...overrides,
   };
 }
@@ -226,7 +230,7 @@ describe('ProfilesListScreen', () => {
     if (!personalRow) {
       throw new Error('personal row missing');
     }
-    expect(personalRow.props.subtitle).toBe('2 MCP');
+    expect(personalRow.props.subtitle).toBe('2 MCP · 9 setup cmds');
     const star = personalRow.props.trailing as {
       type: string;
       props: { accessibilityLabel: string };
@@ -240,7 +244,7 @@ describe('ProfilesListScreen', () => {
     if (!orgRow) {
       throw new Error('org row missing');
     }
-    expect(orgRow.props.subtitle).toBe('1v');
+    expect(orgRow.props.subtitle).toBe('1 var');
     // The row's leading icon names its owner.
     expect(orgRow.props.icon).toBe('Building2');
     expect(personalRow.props.icon).toBe('User');

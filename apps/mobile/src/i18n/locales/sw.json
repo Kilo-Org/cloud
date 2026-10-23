@@ -2248,7 +2248,6 @@
       "couldNotLoadEnvironment": "Imeshindikana kupakia mazingira yako.",
       "retryLoadingEnvironment": "Jaribu tena kupakia mazingira",
       "defaultEnvironment": "Mazingira chaguomsingi",
-      "environmentSummary": "amri {{commands}} · MCP {{mcp}} · ujuzi {{skills}} · mawakala {{agents}}",
       "leaveChanges": "Acha mabadiliko",
       "commitAndPush": "Hifadhi na utume",
       "startSession": "Anza kikao",
@@ -3635,9 +3634,10 @@
       "skills_other": "{{count}} ujuzi",
       "commands_one": "{{count}} amri",
       "commands_other": "{{count}} amri",
-      "varsShort": "{{count}}v",
-      "skillsShort": "{{count}}u",
-      "commandsShort": "{{count}}a"
+      "setupCommands_one": "{{count}} amri ya kuanzisha",
+      "setupCommands_other": "{{count}} amri za kuanzisha",
+      "agents_one": "{{count}} wakala",
+      "agents_other": "{{count}} mawakala"
     },
     "nameLabel": "Jina la wasifu",
     "namePlaceholder": "k.m. Utatuzi wa nyuma",

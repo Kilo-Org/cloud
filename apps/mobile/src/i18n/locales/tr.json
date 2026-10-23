@@ -1731,7 +1731,6 @@
       "couldNotLoadEnvironment": "Ortamın yüklenemedi.",
       "retryLoadingEnvironment": "Ortamı yüklemeyi tekrar dene",
       "defaultEnvironment": "Varsayılan ortam",
-      "environmentSummary": "{{commands}} komut · {{mcp}} MCP · {{skills}} beceri · {{agents}} ajan",
       "leaveChanges": "Değişiklikleri koru",
       "commitAndPush": "İşle ve gönder",
       "startSession": "Oturumu başlat",
@@ -3635,9 +3634,10 @@
       "skills_other": "{{count}} yetenek",
       "commands_one": "{{count}} komut",
       "commands_other": "{{count}} komut",
-      "varsShort": "{{count}}d",
-      "skillsShort": "{{count}}y",
-      "commandsShort": "{{count}}k"
+      "setupCommands_one": "{{count}} kurulum komutu",
+      "setupCommands_other": "{{count}} kurulum komutu",
+      "agents_one": "{{count}} aracı",
+      "agents_other": "{{count}} aracı"
     },
     "nameLabel": "Profil adı",
     "namePlaceholder": "örneğin Arka uç hata ayıklaması",

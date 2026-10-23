@@ -26,9 +26,11 @@ type RowProps = Parameters<typeof renderProfileRow>[0];
 const PROFILE = {
   id: 'profile-1',
   name: 'Production',
-  commandCount: 3,
+  varCount: 2,
+  commandCount: 2,
   mcpServerCount: 1,
   skillCount: 2,
+  kiloCommandCount: 1,
   agentCount: 4,
 };
 
@@ -108,7 +110,7 @@ describe('new-session environment feedback', () => {
     expect(text(root)).toEqual([
       'Environment',
       'Production',
-      '3 commands · 1 MCP · 2 skills · 4 agents',
+      '2 vars · 1 MCP · 2 skills · 1 cmd · 2 setup cmds · 4 agents',
     ]);
     expect(root.findAllByType('Skeleton')).toHaveLength(0);
     expect(root.findAllByType('Button')).toHaveLength(0);
@@ -167,8 +169,12 @@ describe('new-session environment feedback', () => {
       ).toBeTruthy();
       const lines = slot.findAllByType('Text');
       expect(lines).toHaveLength(2);
+      const [title, summary] = lines;
+      expect(title?.props.numberOfLines).toBe(1);
+      // The summary may take a second line so long locales keep every count;
+      // the block still reserves that height in every state.
+      expect(summary?.props.numberOfLines).toBe(2);
       for (const line of lines) {
-        expect(line.props.numberOfLines).toBe(1);
         expect(line.props.className).toContain('text-sm leading-5');
         expect(line.props.children).not.toBe('');
       }

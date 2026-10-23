@@ -2248,7 +2248,6 @@
       "couldNotLoadEnvironment": "Не успяхме да заредим средата ти.",
       "retryLoadingEnvironment": "Опитай отново да заредиш средата",
       "defaultEnvironment": "Среда по подразбиране",
-      "environmentSummary": "{{commands}} команди · {{mcp}} MCP · {{skills}} умения · {{agents}} агенти",
       "leaveChanges": "Остави промените",
       "commitAndPush": "Комитни и изпрати",
       "startSession": "Започни сесия",
@@ -3635,9 +3634,10 @@
       "skills_other": "{{count}} умения",
       "commands_one": "{{count}} команда",
       "commands_other": "{{count}} команди",
-      "varsShort": "{{count}}п",
-      "skillsShort": "{{count}}у",
-      "commandsShort": "{{count}}к"
+      "setupCommands_one": "{{count}} команда за настройка",
+      "setupCommands_other": "{{count}} команди за настройка",
+      "agents_one": "{{count}} агент",
+      "agents_other": "{{count}} агенти"
     },
     "nameLabel": "Име на профила",
     "namePlaceholder": "напр. Отстраняване на грешки в задната част",

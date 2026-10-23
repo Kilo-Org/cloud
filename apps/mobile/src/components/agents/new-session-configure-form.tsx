@@ -22,6 +22,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { formatProfileCountItems, profileCountItems } from '@/lib/profile-count-labels';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 import { keyboardInsetOffset } from '@/lib/keyboard-inset-offset';
 import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-insets';
@@ -454,13 +455,8 @@ export function NewSessionProfileRow({
               {profile?.name ?? t('agentChat.newSession.defaultEnvironment')}
             </Text>
             {profile ? (
-              <Text className="text-sm text-muted-foreground" numberOfLines={1}>
-                {t('agentChat.newSession.environmentSummary', {
-                  commands: profile.commandCount,
-                  mcp: profile.mcpServerCount,
-                  skills: profile.skillCount,
-                  agents: profile.agentCount,
-                })}
+              <Text className="text-sm text-muted-foreground" numberOfLines={2}>
+                {formatProfileCountItems(t, profileCountItems(profile)).join(' · ')}
               </Text>
             ) : null}
           </View>

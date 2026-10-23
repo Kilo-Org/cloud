@@ -2248,7 +2248,6 @@
       "couldNotLoadEnvironment": "Ортаңызды жүктеу мүмкін болмады.",
       "retryLoadingEnvironment": "Ортаны жүктеуді қайталау",
       "defaultEnvironment": "Әдепкі орта",
-      "environmentSummary": "{{commands}} пәрмен · {{mcp}} MCP · {{skills}} дағды · {{agents}} агент",
       "leaveChanges": "Өзгерістерді қалдыру",
       "commitAndPush": "Коммит жасап, жіберу",
       "startSession": "Сессияны бастау",
@@ -3635,9 +3634,10 @@
       "skills_other": "{{count}} дағды",
       "commands_one": "{{count}} пәрмен",
       "commands_other": "{{count}} пәрмен",
-      "varsShort": "{{count}}а",
-      "skillsShort": "{{count}}д",
-      "commandsShort": "{{count}}п"
+      "setupCommands_one": "{{count}} орнату пәрмені",
+      "setupCommands_other": "{{count}} орнату пәрмені",
+      "agents_one": "{{count}} агент",
+      "agents_other": "{{count}} агент"
     },
     "nameLabel": "Профиль аты",
     "namePlaceholder": "мысалы Backend жөндеу",

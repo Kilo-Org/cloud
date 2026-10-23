@@ -2248,7 +2248,6 @@
       "couldNotLoadEnvironment": "Hindi ma-load ang iyong kapaligiran.",
       "retryLoadingEnvironment": "Subukang i-load muli ang kapaligiran",
       "defaultEnvironment": "Paunang itinakdang kapaligiran",
-      "environmentSummary": "{{commands}} utos · {{mcp}} MCP · {{skills}} kasanayan · {{agents}} ahente",
       "leaveChanges": "Iwan ang mga pagbabago",
       "commitAndPush": "I-commit at i-push",
       "startSession": "Simulan ang sesyon",
@@ -3635,9 +3634,10 @@
       "skills_other": "{{count}} kasanayan",
       "commands_one": "{{count}} utos",
       "commands_other": "{{count}} utos",
-      "varsShort": "{{count}}v",
-      "skillsShort": "{{count}}k",
-      "commandsShort": "{{count}}u"
+      "setupCommands_one": "{{count}} utos sa pag-setup",
+      "setupCommands_other": "{{count}} utos sa pag-setup",
+      "agents_one": "{{count}} ahente",
+      "agents_other": "{{count}} ahente"
     },
     "nameLabel": "Pangalan ng profile",
     "namePlaceholder": "hal. Backend debugging",

@@ -143,18 +143,6 @@ export const NO_AGREEMENT = new Map([
   ],
   ['profiles.counts.mcp', 'initialism, not agreement: "{{count}} MCP" names no inflected word'],
   [
-    'profiles.counts.varsShort',
-    'compact suffix, not agreement: "{{count}}v" names no inflected word',
-  ],
-  [
-    'profiles.counts.skillsShort',
-    'compact suffix, not agreement: "{{count}}s" names no inflected word',
-  ],
-  [
-    'profiles.counts.commandsShort',
-    'compact suffix, not agreement: "{{count}}c" names no inflected word',
-  ],
-  [
     'profiles.mcp.secretCount',
     'bare count after a label: "Secret count: {{count}}" names no inflected word',
   ],
@@ -453,8 +441,11 @@ export const DYNAMIC_COUNTED_KEYS = new Map([
         'profiles.counts.mcp',
         'profiles.counts.skills',
         'profiles.counts.commands',
+        'profiles.counts.setupCommands',
+        'profiles.counts.agents',
       ],
-      reason: 'COUNT_KEYS map in profile-count-labels.ts; vars, skills and commands inflect',
+      reason:
+        'COUNT_KEYS map in profile-count-labels.ts; every unit word but MCP inflects',
     },
   ],
   [
@@ -468,21 +459,6 @@ export const DYNAMIC_COUNTED_KEYS = new Map([
       ],
       reason:
         'STATUS_LABEL_KEY map in pr-review-checks-status-row.tsx; participles, no inflected word',
-    },
-  ],
-  [
-    'SHORT_COUNT_KEYS.get(item.kind) ?? COUNT_KEYS[item.kind]',
-    {
-      keys: [
-        'profiles.counts.varsShort',
-        'profiles.counts.skillsShort',
-        'profiles.counts.commandsShort',
-        'profiles.counts.vars',
-        'profiles.counts.mcp',
-        'profiles.counts.skills',
-        'profiles.counts.commands',
-      ],
-      reason: 'SHORT_COUNT_KEYS fallback in profile-count-labels.ts; all four unit words',
     },
   ],
 ]);

@@ -2248,7 +2248,6 @@
       "couldNotLoadEnvironment": "ไม่สามารถโหลดสภาพแวดล้อมของคุณได้",
       "retryLoadingEnvironment": "ลองโหลดสภาพแวดล้อมใหม่",
       "defaultEnvironment": "สภาพแวดล้อมเริ่มต้น",
-      "environmentSummary": "{{commands}} คำสั่ง · {{mcp}} MCP · {{skills}} ทักษะ · {{agents}} เอเจนต์",
       "leaveChanges": "เก็บการแก้ไขไว้",
       "commitAndPush": "คอมมิตและพุช",
       "startSession": "เริ่มเซสชัน",
@@ -3635,9 +3634,10 @@
       "skills_other": "{{count}} ทักษะ",
       "commands_one": "{{count}} คำสั่ง",
       "commands_other": "{{count}} คำสั่ง",
-      "varsShort": "{{count}}ต",
-      "skillsShort": "{{count}}ท",
-      "commandsShort": "{{count}}ค"
+      "setupCommands_one": "{{count}} คำสั่งการตั้งค่า",
+      "setupCommands_other": "{{count}} คำสั่งการตั้งค่า",
+      "agents_one": "{{count}} เอเจนต์",
+      "agents_other": "{{count}} เอเจนต์"
     },
     "nameLabel": "ชื่อโปรไฟล์",
     "namePlaceholder": "เช่น การแก้ไขข้อบกพร่องแบ็กเอนด์",

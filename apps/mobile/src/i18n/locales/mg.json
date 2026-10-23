@@ -2248,7 +2248,6 @@
       "couldNotLoadEnvironment": "Tsy voaray ny tontolo fiasanao.",
       "retryLoadingEnvironment": "Andramo alaina indray ny tontolo fiasana",
       "defaultEnvironment": "Tontolo fiasana voafidy mialoha",
-      "environmentSummary": "baiko {{commands}} · MCP {{mcp}} · fahaiza-manao {{skills}} · mpanampy {{agents}}",
       "leaveChanges": "Avelao ny fiovana",
       "commitAndPush": "Raketo sy alefaso",
       "startSession": "Atombohy ny fotoam-piasana",
@@ -3635,9 +3634,10 @@
       "skills_other": "{{count}} fahaiza-manao",
       "commands_one": "{{count}} baiko",
       "commands_other": "{{count}} baiko",
-      "varsShort": "{{count}}m",
-      "skillsShort": "{{count}}f",
-      "commandsShort": "{{count}}b"
+      "setupCommands_one": "{{count}} baiko fametrahana",
+      "setupCommands_other": "{{count}} baiko fametrahana",
+      "agents_one": "{{count}} mpampiasa",
+      "agents_other": "{{count}} mpampiasa"
     },
     "nameLabel": "Anaran'ny mombamomba",
     "namePlaceholder": "oh. Backend debugging",

@@ -2248,7 +2248,6 @@
       "couldNotLoadEnvironment": "Det gick inte att läsa in din miljö.",
       "retryLoadingEnvironment": "Försök läsa in miljön igen",
       "defaultEnvironment": "Standardmiljö",
-      "environmentSummary": "{{commands}} kommandon · {{mcp}} MCP · {{skills}} färdigheter · {{agents}} agenter",
       "leaveChanges": "Behåll ändringar",
       "commitAndPush": "Committa och pusha",
       "startSession": "Starta session",
@@ -3634,9 +3633,10 @@
       "skills_other": "{{count}} färdigheter",
       "commands_one": "{{count}} kommando",
       "commands_other": "{{count}} kommandon",
-      "varsShort": "{{count}}var",
-      "skillsShort": "{{count}}fär",
-      "commandsShort": "{{count}}kom"
+      "setupCommands_one": "{{count}} installationskommando",
+      "setupCommands_other": "{{count}} installationskommandon",
+      "agents_one": "{{count}} agent",
+      "agents_other": "{{count}} agenter"
     },
     "nameLabel": "Profilnamn",
     "namePlaceholder": "till exempel Backend-felsökning",

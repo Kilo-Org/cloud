@@ -750,9 +750,12 @@ describe('NewSessionConfigureForm', () => {
     const element = renderRow({ profile: PROFILE });
 
     expect(findTextContent(element, t => t === 'Production')).toBe(true);
-    expect(findTextContent(element, t => t === '3 commands · 1 MCP · 2 skills · 4 agents')).toBe(
-      true
-    );
+    expect(
+      findTextContent(
+        element,
+        t => t === '2 vars · 1 MCP · 2 skills · 4 cmds · 3 setup cmds · 4 agents'
+      )
+    ).toBe(true);
   });
 
   it('renders "Default environment" when no profile resolves', () => {

@@ -3,12 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
-import {
-  buildProfileSections,
-  isEffectiveDefault,
-  profileCounts,
-  profileListCountItems,
-} from '@/components/profiles/profile-list-model';
+import { buildProfileSections, isEffectiveDefault } from '@/components/profiles/profile-list-model';
 import { profileOrganizationId, profileOwnerType } from '@/components/profiles/profile-owner-model';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -28,7 +23,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
-import { formatProfileCountItemsShort } from '@/lib/profile-count-labels';
+import { formatProfileCountItems, profileCountItems } from '@/lib/profile-count-labels';
 import { type AgentProfileListItem, useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
 import { useOrganization } from '@/lib/organization-context';
 import { getProfileOverviewPath } from '@/lib/profile-agent-navigation';
@@ -155,10 +150,9 @@ export function ProfilesListScreen() {
                   </Text>
                 ) : null}
                 {section.profiles.map((profile, index) => {
-                  const subtitle = formatProfileCountItemsShort(
-                    t,
-                    profileListCountItems(profileCounts(profile))
-                  ).join(' · ');
+                  const subtitle = formatProfileCountItems(t, profileCountItems(profile)).join(
+                    ' · '
+                  );
                   return (
                     <ConfigureRow
                       key={profile.id}

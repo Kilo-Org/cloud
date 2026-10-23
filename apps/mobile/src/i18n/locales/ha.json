@@ -2248,7 +2248,6 @@
       "couldNotLoadEnvironment": "An kasa loda muhallin aikinka.",
       "retryLoadingEnvironment": "Sake gwada loda muhallin aiki",
       "defaultEnvironment": "Muhallin aiki na asali",
-      "environmentSummary": "umarni {{commands}} · MCP {{mcp}} · ƙwarewa {{skills}} · wakilai {{agents}}",
       "leaveChanges": "Bar canje-canje",
       "commitAndPush": "Adana ka tura",
       "startSession": "Fara zama",
@@ -3635,9 +3634,10 @@
       "skills_other": "{{count}} ƙwarewa",
       "commands_one": "{{count}} umarni",
       "commands_other": "{{count}} umarni",
-      "varsShort": "{{count}}m",
-      "skillsShort": "{{count}}ƙ",
-      "commandsShort": "{{count}}u"
+      "setupCommands_one": "{{count}} umarnin saita",
+      "setupCommands_other": "{{count}} umarnin saita",
+      "agents_one": "{{count}} wakili",
+      "agents_other": "{{count}} wakilai"
     },
     "nameLabel": "Sunan bayanin martaba",
     "namePlaceholder": "misali Gyaran baya",

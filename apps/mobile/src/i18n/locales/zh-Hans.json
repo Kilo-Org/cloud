@@ -1731,7 +1731,6 @@
       "couldNotLoadEnvironment": "无法加载你的环境。",
       "retryLoadingEnvironment": "重新加载环境",
       "defaultEnvironment": "默认环境",
-      "environmentSummary": "{{commands}} 条命令 · {{mcp}} 个 MCP · {{skills}} 项技能 · {{agents}} 个智能体",
       "leaveChanges": "保留更改",
       "commitAndPush": "提交并推送",
       "startSession": "开始会话",
@@ -3635,9 +3634,10 @@
       "skills_other": "{{count}} 个技能",
       "commands_one": "{{count}} 个命令",
       "commands_other": "{{count}} 个命令",
-      "varsShort": "{{count}}变",
-      "skillsShort": "{{count}}技",
-      "commandsShort": "{{count}}命"
+      "setupCommands_one": "{{count}} 个设置命令",
+      "setupCommands_other": "{{count}} 个设置命令",
+      "agents_one": "{{count}} 个代理",
+      "agents_other": "{{count}} 个代理"
     },
     "nameLabel": "配置文件名称",
     "namePlaceholder": "例如后端调试",

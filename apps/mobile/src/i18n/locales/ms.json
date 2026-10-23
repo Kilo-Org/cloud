@@ -2248,7 +2248,6 @@
       "couldNotLoadEnvironment": "Tidak dapat memuatkan persekitaran anda.",
       "retryLoadingEnvironment": "Cuba muatkan semula persekitaran",
       "defaultEnvironment": "Persekitaran lalai",
-      "environmentSummary": "{{commands}} arahan · {{mcp}} MCP · {{skills}} kemahiran · {{agents}} ejen",
       "leaveChanges": "Biarkan perubahan",
       "commitAndPush": "Komit dan hantar",
       "startSession": "Mulakan sesi",
@@ -3635,9 +3634,10 @@
       "skills_other": "{{count}} kemahiran",
       "commands_one": "{{count}} perintah",
       "commands_other": "{{count}} perintah",
-      "varsShort": "{{count}}pb",
-      "skillsShort": "{{count}}k",
-      "commandsShort": "{{count}}pr"
+      "setupCommands_one": "{{count}} perintah persediaan",
+      "setupCommands_other": "{{count}} perintah persediaan",
+      "agents_one": "{{count}} ejen",
+      "agents_other": "{{count}} ejen"
     },
     "nameLabel": "Nama profil",
     "namePlaceholder": "cth. Penyahpepijatan bahagian belakang",

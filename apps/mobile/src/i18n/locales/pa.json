@@ -2248,7 +2248,6 @@
       "couldNotLoadEnvironment": "ਤੁਹਾਡਾ ਵਾਤਾਵਰਣ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
       "retryLoadingEnvironment": "ਵਾਤਾਵਰਣ ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
       "defaultEnvironment": "ਪੂਰਵ-ਨਿਰਧਾਰਤ ਵਾਤਾਵਰਣ",
-      "environmentSummary": "{{commands}} ਕਮਾਂਡਾਂ · {{mcp}} MCP · {{skills}} ਹੁਨਰ · {{agents}} ਏਜੰਟ",
       "leaveChanges": "ਤਬਦੀਲੀਆਂ ਰਹਿਣ ਦਿਓ",
       "commitAndPush": "ਕਮਿਟ ਤੇ ਪੁਸ਼ ਕਰੋ",
       "startSession": "ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰੋ",
@@ -3635,9 +3634,10 @@
       "skills_other": "{{count}} ਹੁਨਰ",
       "commands_one": "{{count}} ਕਮਾਂਡ",
       "commands_other": "{{count}} ਕਮਾਂਡਾਂ",
-      "varsShort": "{{count}}ਵ",
-      "skillsShort": "{{count}}ਹ",
-      "commandsShort": "{{count}}ਕ"
+      "setupCommands_one": "{{count}} ਸੈੱਟਅੱਪ ਕਮਾਂਡ",
+      "setupCommands_other": "{{count}} ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ",
+      "agents_one": "{{count}} ਏਜੰਟ",
+      "agents_other": "{{count}} ਏਜੰਟ"
     },
     "nameLabel": "ਪ੍ਰੋਫਾਈਲ ਨਾਮ",
     "namePlaceholder": "ਜਿਵੇਂ ਕਿ ਬੈਕਐਂਡ ਡੀਬੱਗਿੰਗ",

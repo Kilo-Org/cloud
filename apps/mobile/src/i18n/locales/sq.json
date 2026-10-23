@@ -2248,7 +2248,6 @@
       "couldNotLoadEnvironment": "Nuk u ngarkua mjedisi yt.",
       "retryLoadingEnvironment": "Provo ta ngarkosh përsëri mjedisin",
       "defaultEnvironment": "Mjedisi i parazgjedhur",
-      "environmentSummary": "{{commands}} komanda · {{mcp}} MCP · {{skills}} aftësi · {{agents}} agjentë",
       "leaveChanges": "Lër ndryshimet",
       "commitAndPush": "Regjistro dhe dërgo",
       "startSession": "Nis seancën",
@@ -3635,9 +3634,10 @@
       "skills_other": "{{count}} aftësi",
       "commands_one": "{{count}} komandë",
       "commands_other": "{{count}} komanda",
-      "varsShort": "{{count}}v",
-      "skillsShort": "{{count}}a",
-      "commandsShort": "{{count}}k"
+      "setupCommands_one": "{{count}} komandë konfigurimi",
+      "setupCommands_other": "{{count}} komanda konfigurimi",
+      "agents_one": "{{count}} agjent",
+      "agents_other": "{{count}} agjentë"
     },
     "nameLabel": "Emri i profilit",
     "namePlaceholder": "p.sh. Korrigjimi i backend-it",

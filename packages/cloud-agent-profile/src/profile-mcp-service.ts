@@ -110,20 +110,6 @@ function encryptValue(publicKeyBase64: string, value: string): EncryptedEnvelope
   return encryptWithPublicKey(value, publicKey);
 }
 
-/**
- * Encrypt plaintext values, but reuse an existing stored value for any key
- * whose input value is exactly `MASKED_SECRET_VALUE`. This lets the edit UI
- * surface existing keys with the placeholder so the user can decide per-key
- * whether to rotate or keep the secret — a replace-everything update would
- * otherwise force re-entering all values.
- *
- * Today the user-facing tRPC schema treats every value as a secret (see
- * `mcpLocalConfigInputSchema.environment`), so this function always emits
- * envelopes for fresh values. The `existing` record is typed as the
- * persisted union (`string | EncryptedEnvelope`) because legacy rows or a
- * future "non-secret" code path may have plaintext entries that need to
- * round-trip past the masked placeholder unchanged.
- */
 function encryptRecord(
   publicKeyBase64: string,
   values: Record<string, string> | undefined,

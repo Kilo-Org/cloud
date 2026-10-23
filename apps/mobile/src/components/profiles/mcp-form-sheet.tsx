@@ -56,11 +56,6 @@ type McpFormSheetProps = Readonly<{
  * The add/edit MCP server sheet. Mounted only while open, so every open seeds
  * fresh fields from the server it edits. Text fields are uncontrolled (refs),
  * per the app's iOS text-input rule; the type and enabled controls are state.
- *
- * Save validates through `validateMcpForm`; a refused input shows the matching
- * `profiles.mcp.*` message under the field at fault and persists nothing. A
- * local server's env values arrive masked, so the untouched keys round-trip and
- * only retyped values rotate.
  */
 export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<McpFormSheetProps>) {
   const { t } = useTranslation();

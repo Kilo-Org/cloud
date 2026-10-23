@@ -469,7 +469,7 @@ function McpForm(props: McpFormProps) {
                   {MASKED_SECRET_VALUE}
                 </code>
                 {form.type === 'local'
-                  ? '; supply every value to change any of them.'
+                  ? '; a local server takes the complete environment on every save.'
                   : '; leave them to keep the secret, or replace to rotate.'}
               </>
             )}

@@ -224,7 +224,7 @@
     "hideBalance": "پنهان کردن موجودی",
     "showBalance": "نمایش موجودی",
     "balanceHidden": "موجودی پنهان است",
-    "bonusCreditsExpiring": "{{amount}} اعتبار هدیه در {{date}} منقضی می‌شود.",
+    "bonusCreditsExpiring": "{{amount}} اعتبار در {{date}} منقضی می‌شود.",
     "signOutTitle": "از حساب خود خارج می‌شوید؟",
     "signOutMessage": "برای دسترسی به فضای کاری خود باید دوباره وارد شوید.",
     "deleteAccountTitle": "حساب حذف شود؟",
@@ -2241,6 +2241,7 @@
       "branchLoadError": "شاخه‌ها بارگذاری نشدند",
       "branchUnavailable": "شاخه‌ها برای این مخزن در دسترس نیستند. دسترسی خود را با ارائه‌دهنده بررسی کنید، سپس مخزن دیگری را انتخاب کنید.",
       "branchEmpty": "هیچ شاخه‌ای در دسترس نیست",
+      "branchListIncomplete": "فقط برخی از شاخه‌ها نمایش داده می‌شوند. مخزن شاخه‌های بیشتری دارد که در این فهرست نمی‌گنجند.",
       "branchPlaceholder": "یک شاخه انتخاب کنید",
       "runOnWithTarget": "اجرا روی: {{target}}",
       "environment": "محیط",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "{{count}} ابزار",
       "serverToolCount_other": "{{count}} ابزار",
       "serverUnreachable": "دسترسی به این سرور ممکن نشد",
-      "serverOff": "این سرور خاموش است"
+      "serverOff": "این سرور خاموش است",
+      "app": {
+        "label": "رابط ابزار",
+        "failed": "رابط این ابزار بارگذاری نشد.",
+        "empty": "رابط این ابزار چیزی برای نمایش ندارد."
+      }
     },
     "mcpOAuth": {
       "authMethod": "احراز هویت",

@@ -224,7 +224,7 @@
     "hideBalance": "ශේෂය සඟවන්න",
     "showBalance": "ශේෂය පෙන්වන්න",
     "balanceHidden": "ශේෂය සඟවා ඇත",
-    "bonusCreditsExpiring": "{{amount}} ක ප්‍රසාද ක්‍රෙඩිට් {{date}} දින කල් ඉකුත් වේ.",
+    "bonusCreditsExpiring": "{{amount}} ක්‍රෙඩිට් {{date}} දින කල් ඉකුත් වේ.",
     "signOutTitle": "පිටවන්නද?",
     "signOutMessage": "ඔබේ වැඩබිමට පිවිසීමට නැවත පුරනය විය යුතුය.",
     "deleteAccountTitle": "ගිණුම මකන්නද?",
@@ -2241,6 +2241,7 @@
       "branchLoadError": "ශාඛා පූරණය කළ නොහැකි විය",
       "branchUnavailable": "මෙම ගබඩාව සඳහා ශාඛා ලබා ගත නොහැක. සැපයුම්කරු සමඟ ඔබේ ප්‍රවේශය පරීක්ෂා කර, පසුව තවත් ගබඩාවක් තෝරන්න.",
       "branchEmpty": "ශාඛා නොමැත",
+      "branchListIncomplete": "ශාඛා කිහිපයක් පමණක් පෙන්වා ඇත. මෙම ලැයිස්තුවට ඇතුළත් කළ හැකි ප්‍රමාණයට වඩා ගබඩාවේ ශාඛා ඇත.",
       "branchPlaceholder": "ශාඛාවක් තෝරන්න",
       "runOnWithTarget": "ධාවනය වන ස්ථානය: {{target}}",
       "environment": "පරිසරය",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "මෙවලම {{count}}",
       "serverToolCount_other": "මෙවලම් {{count}}",
       "serverUnreachable": "මෙම සේවාදායකය වෙත ළඟා විය නොහැකි විය",
-      "serverOff": "මෙම සේවාදායකය ක්‍රියා විරහිතයි"
+      "serverOff": "මෙම සේවාදායකය ක්‍රියා විරහිතයි",
+      "app": {
+        "label": "මෙවලම් අතුරුමුහුණත",
+        "failed": "මෙම මෙවලමේ අතුරුමුහුණත පූරණය කළ නොහැකි විය.",
+        "empty": "මෙම මෙවලමේ අතුරුමුහුණතේ පෙන්වීමට කිසිවක් නොමැත."
+      }
     },
     "mcpOAuth": {
       "authMethod": "සත්‍යාපනය",

@@ -224,7 +224,7 @@
     "hideBalance": "બેલેન્સ છુપાવો",
     "showBalance": "બેલેન્સ બતાવો",
     "balanceHidden": "બેલેન્સ છુપાયેલ છે",
-    "bonusCreditsExpiring": "{{amount}}ના બોનસ ક્રેડિટની મુદત {{date}}ના રોજ પૂરી થાય છે.",
+    "bonusCreditsExpiring": "{{amount}}ના ક્રેડિટની મુદત {{date}}ના રોજ પૂરી થાય છે.",
     "signOutTitle": "સાઇન આઉટ કરવું છે?",
     "signOutMessage": "તમારા વર્કસ્પેસનો ઉપયોગ કરવા માટે તમારે ફરી સાઇન ઇન કરવું પડશે.",
     "deleteAccountTitle": "એકાઉન્ટ કાઢી નાખવું છે?",
@@ -2241,6 +2241,7 @@
       "branchLoadError": "બ્રાંચ લોડ થઈ શક્યાં નહીં",
       "branchUnavailable": "આ રિપોઝિટરી માટે બ્રાંચ ઉપલબ્ધ નથી. પ્રદાતા પાસે તમારી એક્સેસ તપાસો, પછી બીજી રિપોઝિટરી પસંદ કરો.",
       "branchEmpty": "કોઈ બ્રાંચ ઉપલબ્ધ નથી",
+      "branchListIncomplete": "માત્ર અમુક બ્રાંચ બતાવવામાં આવી છે. આ રિપોઝિટરીમાં આ યાદીમાં સમાવી શકાય તેથી વધુ બ્રાંચ છે.",
       "branchPlaceholder": "એક બ્રાંચ પસંદ કરો",
       "runOnWithTarget": "{{target}} પર ચલાવો",
       "environment": "કાર્યપરિસર",
@@ -3385,6 +3386,11 @@
       "serverChecking": "આ સર્વર તપાસી રહ્યું છે…",
       "serverUnreachable": "આ સર્વર સુધી પહોંચી શકાયું નથી",
       "serverOff": "આ સર્વર બંધ છે",
+      "app": {
+        "label": "ટૂલ ઇન્ટરફેસ",
+        "failed": "આ ટૂલનું ઇન્ટરફેસ લોડ થઈ શક્યું નથી.",
+        "empty": "આ ટૂલના ઇન્ટરફેસમાં બતાવવા માટે કંઈ નથી."
+      },
       "serverToolCount_one": "{{count}} સાધન",
       "serverToolCount_other": "{{count}} સાધનો"
     },

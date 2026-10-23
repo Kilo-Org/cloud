@@ -26,3 +26,24 @@ index 207eecd..f36128c 100644
       * Both configs are identical in specificity and segments count/type
       * Try and sort by initial instead.
       *
+diff --git a/build/react-navigation/bottom-tabs/views/BottomTabBar.js b/build/react-navigation/bottom-tabs/views/BottomTabBar.js
+--- a/build/react-navigation/bottom-tabs/views/BottomTabBar.js
++++ b/build/react-navigation/bottom-tabs/views/BottomTabBar.js
+@@ -247,6 +247,7 @@
+     const minSidebarWidth = (0, _elements.useFrameSize)((size)=>sidebar && hasHorizontalLabels ? (0, _elements.getDefaultSidebarWidth)(size) : 0);
+     const tabBarBackgroundElement = tabBarBackground?.();
+     return /*#__PURE__*/ (0, _jsxruntime().jsxs)(_reactnative().Animated.View, {
++        accessible: false,
+         style: [
+             {
+                 pointerEvents: isTabBarHidden ? 'none' : 'auto'
+@@ -310,7 +311,8 @@
+                 children: tabBarBackgroundElement
+             }),
+             /*#__PURE__*/ (0, _jsxruntime().jsx)(_reactnative().View, {
+-                role: "tablist",
++                role: "none",
++                accessible: false,
+                 style: sidebar ? styles.sideContent : styles.bottomContent,
+                 children: routes.map((route, index)=>{
+                     const focused = index === state.index;

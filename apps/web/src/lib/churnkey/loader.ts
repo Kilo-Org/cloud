@@ -21,7 +21,7 @@ type ChurnkeyInitOptions = {
 declare global {
   interface Window {
     churnkey?: {
-      init: (action: 'show', options: ChurnkeyInitOptions) => void;
+      init: (action: 'show' | 'restart', options: ChurnkeyInitOptions) => void;
       created?: boolean;
     };
   }
@@ -69,7 +69,9 @@ export async function showCancelFlow(params: ShowCancelFlowParams): Promise<void
 
   const isProd = process.env.NODE_ENV === 'production';
 
-  window.churnkey.init('show', {
+  // 'restart' clears Churnkey's in-page flow state first. With 'show', a flow completed earlier
+  // in the same page session is replayed as its confirmation screen instead of starting over.
+  window.churnkey.init('restart', {
     appId: CHURNKEY_APP_ID,
     authHash: params.authHash,
     customerId: params.customerId,

@@ -10,7 +10,7 @@ import { QueryError } from '@/components/query-error';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
-import { buildStoredSessionsQueryOptions } from '@/lib/hooks/use-agent-sessions';
+import { buildStoredSessionsQueryOptions } from '@/lib/agent-session-queries';
 import { todoLinkCandidates } from '@/lib/todos/todo-model';
 import { type TodoItem, type TodoList } from '@/lib/todos/todo-types';
 import { useTRPC } from '@/lib/trpc';

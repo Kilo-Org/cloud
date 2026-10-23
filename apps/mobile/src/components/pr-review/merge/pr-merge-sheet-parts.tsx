@@ -4,7 +4,7 @@
 
 import { type ReactNode, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, Switch, TextInput, View } from 'react-native';
+import { Pressable, TextInput, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 import {
@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';

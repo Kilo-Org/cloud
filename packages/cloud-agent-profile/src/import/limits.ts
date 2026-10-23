@@ -29,6 +29,23 @@ export const MAX_IMPORT_ENTRY_EXPANDED_BYTES = 1024 * 1024;
 /** Aggregate expanded size allowed for one archive; crossing it aborts the decode. */
 export const MAX_IMPORT_ARCHIVE_EXPANDED_BYTES = 32 * 1024 * 1024;
 
+/**
+ * Per-glob bounds for `kilo.json` instruction globs. A glob over either bound
+ * produces an `instruction-glob-limit` issue and is skipped, and a config with
+ * more globs than {@link MAX_IMPORT_INSTRUCTION_GLOBS} keeps the first ones
+ * with an `instruction-globs-exceeded` issue.
+ */
+export const MAX_IMPORT_INSTRUCTION_GLOBS = 32;
+export const MAX_IMPORT_INSTRUCTION_GLOB_LENGTH = 256;
+export const MAX_IMPORT_INSTRUCTION_GLOB_WILDCARDS = 16;
+
+/**
+ * Upper bound for `sum(glob token counts) x sum(candidate .md path lengths)`
+ * during one import. Over it the instruction globs are skipped with an
+ * `instruction-globs-exceeded` issue.
+ */
+export const MAX_IMPORT_INSTRUCTION_GLOB_WORK = 16 * 1024 * 1024;
+
 export function isImportEncodedWithinLimit(encoded: string): boolean {
   return encoded.length <= MAX_IMPORT_ENCODED_LENGTH;
 }

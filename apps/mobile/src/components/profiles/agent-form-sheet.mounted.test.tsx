@@ -167,7 +167,7 @@ describe('AgentFormSheet parity fields', () => {
 
     expect(findField(renderer.root, 'Max steps')).toBeTruthy();
     expect(findField(renderer.root, 'Temperature')).toBeTruthy();
-    expect(findField(renderer.root, 'top_p')).toBeTruthy();
+    expect(findField(renderer.root, 'Top P')).toBeTruthy();
 
     unmount();
   });
@@ -205,7 +205,7 @@ describe('AgentFormSheet parity fields', () => {
 
     changeText(renderer.root, 'Max steps', '50');
     changeText(renderer.root, 'Temperature', '0.2');
-    changeText(renderer.root, 'top_p', '0.95');
+    changeText(renderer.root, 'Top P', '0.95');
     pressDone(renderer.root);
 
     expect(h.onSave).toHaveBeenCalledTimes(1);

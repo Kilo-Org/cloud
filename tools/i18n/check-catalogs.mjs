@@ -153,8 +153,9 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'profiles.mcp.commandPlaceholder',
   'profiles.mcp.jsonPlaceholder',
   'profiles.agents.slugPlaceholder',
-  // The sampling parameter's technical name: `top_p` is the knob's own
-  // identifier, so every catalog keeps it verbatim.
+  // The sampling parameter's published name. `Top P` is what the provider docs
+  // and every model dashboard call this knob, so no locale translates it — a
+  // translated word would hide which parameter the field sets.
   'profiles.agents.topP',
   'profiles.slashCommands.namePlaceholder',
   'profiles.slashCommands.agentPlaceholder',
@@ -238,6 +239,27 @@ function flatten(value, prefix = '', out = new Map()) {
     }
   }
   return out;
+}
+
+/**
+ * The agent editor's three visibility options each read `label — description`.
+ * A catalog that separates one option with an en dash, a hyphen, a colon, or no
+ * space at all draws one radio group in three shapes, and the reader has to
+ * compare the labels to see that they are the same kind of thing.
+ */
+const VISIBILITY_KEYS = [
+  'profiles.agents.visibilityPrimary',
+  'profiles.agents.visibilitySubagent',
+  'profiles.agents.visibilityAll',
+];
+
+function checkVisibilitySeparators(values, label) {
+  for (const key of VISIBILITY_KEYS) {
+    const value = values.get(key);
+    if (value !== undefined && value.split(' — ').length !== 2) {
+      fail(`${label}: "${key}" must join its label and description with " — "`);
+    }
+  }
 }
 
 /** The `{{token}}` set of one string, as a sorted, counted signature. */
@@ -558,6 +580,8 @@ for (const catalog of CATALOGS) {
     }
   }
 
+  checkVisibilitySeparators(english, `${catalog.name}/en`);
+
   const localeValues = new Map();
 
   for (const tag of present) {
@@ -567,6 +591,7 @@ for (const catalog of CATALOGS) {
     const label = `${catalog.name}/${tag}`;
     const translated = flatten(parseCatalog(join(catalog.dir, `${tag}.json`), label));
     localeValues.set(tag, translated);
+    checkVisibilitySeparators(translated, label);
     const ownValues = new Set(translated.values());
 
     // A locale-driven plural family: the English base interpolates {{count}}

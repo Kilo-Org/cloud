@@ -3828,7 +3828,7 @@
       "stepsPlaceholder": "e.g. 50",
       "temperature": "Temperature",
       "temperaturePlaceholder": "e.g. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "e.g. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "My Agent",

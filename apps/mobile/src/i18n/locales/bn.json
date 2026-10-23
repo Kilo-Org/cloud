@@ -3743,7 +3743,7 @@
       "stepsPlaceholder": "যেমন 50",
       "temperature": "তাপমাত্রা",
       "temperaturePlaceholder": "যেমন 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "যেমন 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "আমার এজেন্ট",

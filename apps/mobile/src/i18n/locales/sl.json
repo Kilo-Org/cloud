@@ -3833,7 +3833,7 @@
       "stepsPlaceholder": "npr. 50",
       "temperature": "Temperatura",
       "temperaturePlaceholder": "npr. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "npr. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Moj agent",

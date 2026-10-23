@@ -3743,7 +3743,7 @@
       "stepsPlaceholder": "fakkeenyaaf 50",
       "temperature": "Ho'a",
       "temperaturePlaceholder": "fakkeenyaaf 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "fakkeenyaaf 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Bakka bu'aa koo",

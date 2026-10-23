@@ -3743,7 +3743,7 @@
       "stepsPlaceholder": "π.χ. 50",
       "temperature": "Θερμοκρασία",
       "temperaturePlaceholder": "π.χ. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "π.χ. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Ο πράκτοράς μου",

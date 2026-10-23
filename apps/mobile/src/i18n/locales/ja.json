@@ -3743,7 +3743,7 @@
       "stepsPlaceholder": "例: 50",
       "temperature": "温度",
       "temperaturePlaceholder": "例: 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "例: 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "私のエージェント",

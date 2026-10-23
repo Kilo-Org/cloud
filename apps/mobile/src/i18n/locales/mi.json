@@ -3743,7 +3743,7 @@
       "stepsPlaceholder": "hei tauira 50",
       "temperature": "Pāmahana",
       "temperaturePlaceholder": "hei tauira 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "hei tauira 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Taku Kaihoko",

@@ -3743,7 +3743,7 @@
       "stepsPlaceholder": "بۆ نموونە 50",
       "temperature": "پلەی گەرمی",
       "temperaturePlaceholder": "بۆ نموونە 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "بۆ نموونە 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "بریکاری من",

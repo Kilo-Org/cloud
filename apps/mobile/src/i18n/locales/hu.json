@@ -1753,7 +1753,7 @@
       "deadlinePassed": "Határidő lejárt",
       "deadlinePassedDetail": "{{critical}} kritikus, {{high}} magas",
       "dueThisWeek": "Ezen a héten esedékes",
-      "dueThisWeekDetail": "{{exploitable}} igazoltan kihasználható",
+      "dueThisWeekDetail": "ezek közül {{exploitable}} igazoltan kihasználható",
       "noDeadline": "Nincs határidő",
       "reviewSlaAssignment": "SLA-hozzárendelés felülvizsgálata",
       "allOpenFindingsTracked": "Minden nyitott találat nyomon követve"

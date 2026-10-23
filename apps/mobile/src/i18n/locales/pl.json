@@ -1286,7 +1286,7 @@
       "deadlinePassed": "Termin minął",
       "deadlinePassedDetail": "Poziom krytyczny: {{critical}}, wysoki: {{high}}",
       "dueThisWeek": "Termin w tym tygodniu",
-      "dueThisWeekDetail": "Możliwość wykorzystania w ataku potwierdzona: {{exploitable}}",
+      "dueThisWeekDetail": "W tym {{exploitable}} z potwierdzoną możliwością wykorzystania w ataku",
       "noDeadline": "Brak terminu",
       "reviewSlaAssignment": "Sprawdź przypisane terminy SLA",
       "allOpenFindingsTracked": "Wszystkie otwarte problemy są monitorowane"

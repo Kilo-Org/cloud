@@ -1845,7 +1845,7 @@
       "deadlinePassed": "Deadline passed",
       "deadlinePassedDetail": "{{critical}} critical, {{high}} high",
       "dueThisWeek": "Due this week",
-      "dueThisWeekDetail": "{{exploitable}} confirmed exploitable",
+      "dueThisWeekDetail": "{{exploitable}} of these confirmed exploitable",
       "noDeadline": "No deadline",
       "reviewSlaAssignment": "Review SLA assignment",
       "allOpenFindingsTracked": "All open findings tracked"

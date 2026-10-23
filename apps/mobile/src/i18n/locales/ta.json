@@ -1753,7 +1753,7 @@
       "deadlinePassed": "காலக்கெடு கடந்துவிட்டது",
       "deadlinePassedDetail": "{{critical}} மிகக் கடுமை, {{high}} அதிகம்",
       "dueThisWeek": "இந்த வாரம் காலக்கெடு",
-      "dueThisWeekDetail": "{{exploitable}} சிக்கல்களைத் தாக்குதலுக்குப் பயன்படுத்த முடியும் என உறுதிசெய்யப்பட்டது",
+      "dueThisWeekDetail": "இவற்றில் {{exploitable}} சிக்கல்கள் தாக்குதலுக்குப் பயன்படுத்த முடியும் என உறுதிசெய்யப்பட்டவை",
       "noDeadline": "காலக்கெடு இல்லை",
       "reviewSlaAssignment": "SLA ஒதுக்கீட்டை மதிப்பாய்வு செய்யவும்",
       "allOpenFindingsTracked": "அனைத்து நிலுவைச் சிக்கல்களும் கண்காணிக்கப்படுகின்றன"

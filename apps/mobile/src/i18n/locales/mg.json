@@ -1753,7 +1753,7 @@
       "deadlinePassed": "Nihoatra ny fe-potoana",
       "deadlinePassedDetail": "{{critical}} tena avo, {{high}} avo",
       "dueThisWeek": "Fe-potoana farany amin'ity herinandro ity",
-      "dueThisWeekDetail": "{{exploitable}} voamarina fa azo hararaotina",
+      "dueThisWeekDetail": "{{exploitable}} amin'ireto no voamarina fa azo hararaotina",
       "noDeadline": "Tsy misy fe-potoana",
       "reviewSlaAssignment": "Hamarino ny famaritana ny SLA",
       "allOpenFindingsTracked": "Arahi-maso ny olana hita rehetra mbola misokatra"

@@ -1753,7 +1753,7 @@
       "deadlinePassed": "Крайният срок изтече",
       "deadlinePassedDetail": "{{critical}} критични, {{high}} с висока тежест",
       "dueThisWeek": "С краен срок тази седмица",
-      "dueThisWeekDetail": "{{exploitable}} с потвърдена възможност за атака",
+      "dueThisWeekDetail": "От тях {{exploitable}} с потвърдена възможност за атака",
       "noDeadline": "Няма краен срок",
       "reviewSlaAssignment": "Прегледай зададените срокове по SLA",
       "allOpenFindingsTracked": "Всички отворени проблеми се проследяват"

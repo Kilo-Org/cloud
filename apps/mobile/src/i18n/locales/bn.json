@@ -1753,7 +1753,7 @@
       "deadlinePassed": "সময়সীমা পেরিয়ে গেছে",
       "deadlinePassedDetail": "{{critical}}টি অতি গুরুতর, {{high}}টি উচ্চ",
       "dueThisWeek": "এই সপ্তাহে সময়সীমা শেষ",
-      "dueThisWeekDetail": "{{exploitable}}টি আক্রমণে কাজে লাগানো যায় বলে নিশ্চিত হয়েছে",
+      "dueThisWeekDetail": "এগুলোর মধ্যে {{exploitable}}টি আক্রমণে কাজে লাগানো যায় বলে নিশ্চিত হয়েছে",
       "noDeadline": "কোনো সময়সীমা নেই",
       "reviewSlaAssignment": "নির্ধারিত SLA পর্যালোচনা করুন",
       "allOpenFindingsTracked": "সব অমীমাংসিত ত্রুটি নজরদারিতে আছে"

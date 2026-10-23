@@ -1274,7 +1274,7 @@
       "deadlinePassed": "Tenggat terlewati",
       "deadlinePassedDetail": "{{critical}} kritis, {{high}} tinggi",
       "dueThisWeek": "Jatuh tempo minggu ini",
-      "dueThisWeekDetail": "{{exploitable}} terkonfirmasi dapat dieksploitasi",
+      "dueThisWeekDetail": "{{exploitable}} di antaranya terkonfirmasi dapat dieksploitasi",
       "noDeadline": "Tanpa tenggat",
       "reviewSlaAssignment": "Tinjau penetapan SLA",
       "allOpenFindingsTracked": "Semua temuan terbuka sudah dilacak"

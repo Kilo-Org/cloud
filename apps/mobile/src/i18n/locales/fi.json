@@ -1753,7 +1753,7 @@
       "deadlinePassed": "Määräaika umpeutunut",
       "deadlinePassedDetail": "{{critical}} kriittistä, {{high}} vakavaa",
       "dueThisWeek": "Määräaika tällä viikolla",
-      "dueThisWeekDetail": "{{exploitable}} hyödynnettäväksi vahvistettua havaintoa",
+      "dueThisWeekDetail": "{{exploitable}} näistä hyödynnettäväksi vahvistettua",
       "noDeadline": "Ei määräaikaa",
       "reviewSlaAssignment": "Tarkista SLA-määräajan asetus",
       "allOpenFindingsTracked": "Kaikki avoimet havainnot seurannassa"

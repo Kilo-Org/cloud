@@ -1753,7 +1753,7 @@
       "deadlinePassed": "مهلت تېر شوی",
       "deadlinePassedDetail": "{{critical}} خورا جدي، {{high}} لوړ",
       "dueThisWeek": "مهلت یې دا اوونۍ پای ته رسېږي",
-      "dueThisWeekDetail": "له {{exploitable}} موندنو څخه د ناوړه ګټې اخیستنې امکان تایید شوی",
+      "dueThisWeekDetail": "له دې څخه {{exploitable}} موندنو کې د ناوړه ګټې اخیستنې امکان تایید شوی",
       "noDeadline": "وروستۍ نېټه نشته",
       "reviewSlaAssignment": "د SLA ټاکنه بیا وګورئ",
       "allOpenFindingsTracked": "ټولې پرانیستې موندنې څارل کېږي"

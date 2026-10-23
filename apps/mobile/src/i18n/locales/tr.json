@@ -1274,7 +1274,7 @@
       "deadlinePassed": "Son tarih geçti",
       "deadlinePassedDetail": "{{critical}} kritik, {{high}} yüksek",
       "dueThisWeek": "Süresi bu hafta doluyor",
-      "dueThisWeekDetail": "{{exploitable}} bulgunun istismar edilebilirliği doğrulandı",
+      "dueThisWeekDetail": "Bunlardan {{exploitable}} bulgunun istismar edilebilirliği doğrulandı",
       "noDeadline": "Son tarih yok",
       "reviewSlaAssignment": "SLA atamasını incele",
       "allOpenFindingsTracked": "Tüm açık bulgular takip ediliyor"

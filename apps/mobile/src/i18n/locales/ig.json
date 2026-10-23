@@ -1753,7 +1753,7 @@
       "deadlinePassed": "Oge njedebe agafeela",
       "deadlinePassedDetail": "{{critical}} dị oké njọ, {{high}} dị elu",
       "dueThisWeek": "Oge ga-eru n'izu a",
-      "dueThisWeekDetail": "E kwadoro na a pụrụ iji {{exploitable}} wakpo sistemụ",
+      "dueThisWeekDetail": "{{exploitable}} n'ime ha ka e kwadoro na a pụrụ iji ya wakpo sistemụ",
       "noDeadline": "Enweghị oge njedebe",
       "reviewSlaAssignment": "Nyochaa oge SLA e kenyere",
       "allOpenFindingsTracked": "A na-esochi ihe achọpụtara niile a ka na-arụ na ya"

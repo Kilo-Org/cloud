@@ -1753,7 +1753,7 @@
       "deadlinePassed": "ସମୟସୀମା ପାର ହୋଇଛି",
       "deadlinePassedDetail": "{{critical}} ଗୁରୁତର, {{high}} ଉଚ୍ଚ",
       "dueThisWeek": "ଏହି ସପ୍ତାହରେ ସମୟସୀମା ଶେଷ",
-      "dueThisWeekDetail": "{{exploitable}}ଟି ଆକ୍ରମଣରେ ବ୍ୟବହାରଯୋଗ୍ୟ ବୋଲି ନିଶ୍ଚିତ",
+      "dueThisWeekDetail": "ଏହା ମଧ୍ୟରୁ {{exploitable}}ଟି ଆକ୍ରମଣରେ ବ୍ୟବହାରଯୋଗ୍ୟ ବୋଲି ନିଶ୍ଚିତ",
       "noDeadline": "କୌଣସି ସମୟସୀମା ନାହିଁ",
       "reviewSlaAssignment": "ଧାର୍ଯ୍ୟ SLA ସମୟସୀମା ସମୀକ୍ଷା କରନ୍ତୁ",
       "allOpenFindingsTracked": "ସମସ୍ତ ଅସମାପ୍ତ ଚିହ୍ନଟ ସମସ୍ୟାର ସ୍ଥିତି ନଜରରେ ଅଛି"

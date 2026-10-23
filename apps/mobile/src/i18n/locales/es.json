@@ -1280,7 +1280,7 @@
       "deadlinePassed": "Plazo vencido",
       "deadlinePassedDetail": "{{critical}} de nivel crítico, {{high}} de nivel alto",
       "dueThisWeek": "Vencen esta semana",
-      "dueThisWeekDetail": "{{exploitable}} explotables confirmados",
+      "dueThisWeekDetail": "{{exploitable}} de ellos son explotables confirmados",
       "noDeadline": "Sin plazo",
       "reviewSlaAssignment": "Revisar la asignación del SLA",
       "allOpenFindingsTracked": "Todos los hallazgos abiertos tienen seguimiento"

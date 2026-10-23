@@ -1753,7 +1753,7 @@
       "deadlinePassed": "Frist overskredet",
       "deadlinePassedDetail": "{{critical}} med kritisk risiko, {{high}} med høj risiko",
       "dueThisWeek": "Frist i denne uge",
-      "dueThisWeekDetail": "{{exploitable}} fund kan bekræftet udnyttes",
+      "dueThisWeekDetail": "{{exploitable}} af disse fund er bekræftet udnyttelige",
       "noDeadline": "Ingen frist",
       "reviewSlaAssignment": "Gennemgå tildelingen af SLA-frister",
       "allOpenFindingsTracked": "Alle åbne fund har en frist"

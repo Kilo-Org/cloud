@@ -1753,7 +1753,7 @@
       "deadlinePassed": "Muda wa mwisho umepita",
       "deadlinePassedDetail": "Hatari sana: {{critical}}, juu: {{high}}",
       "dueThisWeek": "Muda unaisha wiki hii",
-      "dueThisWeekDetail": "Matatizo {{exploitable}} yamethibitishwa kuwa yanaweza kutumiwa vibaya",
+      "dueThisWeekDetail": "{{exploitable}} ya matatizo haya yamethibitishwa kuwa yanaweza kutumiwa vibaya",
       "noDeadline": "Hakuna muda wa mwisho",
       "reviewSlaAssignment": "Kagua upangaji wa muda wa SLA",
       "allOpenFindingsTracked": "Matatizo yote ambayo hayajafungwa yanafuatiliwa"

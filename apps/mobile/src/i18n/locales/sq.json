@@ -1753,7 +1753,7 @@
       "deadlinePassed": "Afati kaloi",
       "deadlinePassedDetail": "{{critical}} kritike, {{high}} me rrezik të lartë",
       "dueThisWeek": "Afati këtë javë",
-      "dueThisWeekDetail": "{{exploitable}} të konfirmuara si të shfrytëzueshme",
+      "dueThisWeekDetail": "{{exploitable}} prej tyre të konfirmuara si të shfrytëzueshme",
       "noDeadline": "Pa afat",
       "reviewSlaAssignment": "Shqyrto caktimin e SLA-së",
       "allOpenFindingsTracked": "Të gjitha gjetjet e hapura gjurmohen"

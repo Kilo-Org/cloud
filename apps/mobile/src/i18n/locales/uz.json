@@ -1753,7 +1753,7 @@
       "deadlinePassed": "Muddat o'tdi",
       "deadlinePassedDetail": "{{critical}} ta o‘ta yuqori, {{high}} ta yuqori",
       "dueThisWeek": "Muddati shu hafta tugaydi",
-      "dueThisWeekDetail": "{{exploitable}} ta muammodan hujumda foydalanish mumkinligi tasdiqlangan",
+      "dueThisWeekDetail": "{{exploitable}} tasida hujumda foydalanish mumkinligi tasdiqlangan",
       "noDeadline": "Muddat yo'q",
       "reviewSlaAssignment": "SLA muddati belgilanishini ko'rib chiqish",
       "allOpenFindingsTracked": "Barcha ochiq muammolar kuzatilmoqda"

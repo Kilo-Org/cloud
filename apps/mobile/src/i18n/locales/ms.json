@@ -1753,7 +1753,7 @@
       "deadlinePassed": "Tarikh akhir telah berlalu",
       "deadlinePassedDetail": "{{critical}} kritikal, {{high}} tinggi",
       "dueThisWeek": "Tarikh akhir minggu ini",
-      "dueThisWeekDetail": "{{exploitable}} disahkan boleh dieksploitasi",
+      "dueThisWeekDetail": "{{exploitable}} daripada ini disahkan boleh dieksploitasi",
       "noDeadline": "Tiada tarikh akhir",
       "reviewSlaAssignment": "Semak penetapan SLA",
       "allOpenFindingsTracked": "Semua penemuan terbuka dijejaki"

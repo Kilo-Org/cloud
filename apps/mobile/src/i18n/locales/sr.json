@@ -1778,7 +1778,7 @@
       "deadlinePassed": "Rok je istekao",
       "deadlinePassedDetail": "Kritično: {{critical}}, visoko: {{high}}",
       "dueThisWeek": "Rok ističe ove nedelje",
-      "dueThisWeekDetail": "Potvrđeno iskoristivi: {{exploitable}}",
+      "dueThisWeekDetail": "{{exploitable}} od njih potvrđeno iskoristivi",
       "noDeadline": "Bez roka",
       "reviewSlaAssignment": "Proveri dodeljene rokove prema SLA",
       "allOpenFindingsTracked": "Prate se svi otvoreni nalazi"

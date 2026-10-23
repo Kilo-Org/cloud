@@ -1828,7 +1828,7 @@
       "deadlinePassed": "Spriocdháta rite",
       "deadlinePassedDetail": "{{critical}} criticiúil, {{high}} ard",
       "dueThisWeek": "Dlite an tseachtain seo",
-      "dueThisWeekDetail": "Deimhnithe mar inshaothraithe: {{exploitable}}",
+      "dueThisWeekDetail": "{{exploitable}} den chuid seo deimhnithe mar inshaothraithe",
       "noDeadline": "Gan spriocdháta",
       "reviewSlaAssignment": "Athbhreithnigh sannadh SLA",
       "allOpenFindingsTracked": "Gach toradh oscailte á rianú"

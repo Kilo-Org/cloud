@@ -1274,7 +1274,7 @@
       "deadlinePassed": "期限超過",
       "deadlinePassedDetail": "重大：{{critical}}件、高：{{high}}件",
       "dueThisWeek": "今週が期限",
-      "dueThisWeekDetail": "悪用可能と確認済み：{{exploitable}}件",
+      "dueThisWeekDetail": "このうち{{exploitable}}件が悪用可能と確認済み",
       "noDeadline": "期限なし",
       "reviewSlaAssignment": "SLA期限の設定を確認",
       "allOpenFindingsTracked": "未解決の検出結果はすべて追跡中"

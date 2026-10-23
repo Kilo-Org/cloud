@@ -1778,7 +1778,7 @@
       "deadlinePassed": "Termiņš beidzies",
       "deadlinePassedDetail": "Kritiski: {{critical}}, ar augstu riska līmeni: {{high}}",
       "dueThisWeek": "Termiņš šonedēļ",
-      "dueThisWeekDetail": "Apstiprināti izmantojami uzbrukumā: {{exploitable}}",
+      "dueThisWeekDetail": "{{exploitable}} no tiem ir apstiprināti izmantojami uzbrukumā",
       "noDeadline": "Nav termiņa",
       "reviewSlaAssignment": "Pārskatīt SLA termiņu piešķiršanu",
       "allOpenFindingsTracked": "Visiem atvērtajiem konstatējumiem tiek uzraudzīti termiņi"

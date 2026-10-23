@@ -1753,7 +1753,7 @@
       "deadlinePassed": "Lampas na sa takdang petsa",
       "deadlinePassedDetail": "{{critical}} na kritikal, {{high}} na mataas",
       "dueThisWeek": "Takdang petsa ngayong linggo",
-      "dueThisWeekDetail": "{{exploitable}} kumpirmadong maaaring samantalahin",
+      "dueThisWeekDetail": "{{exploitable}} sa mga ito ang kumpirmadong maaaring samantalahin",
       "noDeadline": "Walang takdang petsa",
       "reviewSlaAssignment": "Suriin ang pagtatalaga ng SLA",
       "allOpenFindingsTracked": "Sinusubaybayan ang lahat ng bukas na isyu"

@@ -1828,7 +1828,7 @@
       "deadlinePassed": "L-iskadenza għaddiet",
       "deadlinePassedDetail": "{{critical}} kritiċi, {{high}} għoljin",
       "dueThisWeek": "Jiskadu din il-ġimgħa",
-      "dueThisWeekDetail": "{{exploitable}} ikkonfermati li jistgħu jiġu sfruttati",
+      "dueThisWeekDetail": "{{exploitable}} minn dawn ikkonfermati li jistgħu jiġu sfruttati",
       "noDeadline": "L-ebda skadenza",
       "reviewSlaAssignment": "Irrevedi l-assenjazzjoni tas-SLA",
       "allOpenFindingsTracked": "Is-sejbiet miftuħa kollha ssorveljati"

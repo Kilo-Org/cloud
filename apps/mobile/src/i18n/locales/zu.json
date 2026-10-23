@@ -1753,7 +1753,7 @@
       "deadlinePassed": "Umnqamulajuqu usudlulile",
       "deadlinePassedDetail": "{{critical}} okubucayi, {{high}} okuphezulu",
       "dueThisWeek": "Kufanele kwenziwe kuleli sonto",
-      "dueThisWeekDetail": "Okungu-{{exploitable}} kuqinisekiswe ukuthi kungasetshenziswa ekuhlaseleni",
+      "dueThisWeekDetail": "Okungu-{{exploitable}} kulawa kuqinisekiswe ukuthi kungasetshenziswa ekuhlaseleni",
       "noDeadline": "Awukho umnqamulajuqu",
       "reviewSlaAssignment": "Hlola ukwabiwa kwe-SLA",
       "allOpenFindingsTracked": "Konke okutholakele okungakaxazululwa kuyalandelwa"

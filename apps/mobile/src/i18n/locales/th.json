@@ -1753,7 +1753,7 @@
       "deadlinePassed": "เลยกำหนดเวลา",
       "deadlinePassedDetail": "ระดับวิกฤต {{critical}} รายการ ระดับสูง {{high}} รายการ",
       "dueThisWeek": "ถึงกำหนดสัปดาห์นี้",
-      "dueThisWeekDetail": "ยืนยันว่าผู้โจมตีนำไปใช้ได้ {{exploitable}} รายการ",
+      "dueThisWeekDetail": "จากจำนวนนี้ยืนยันว่าผู้โจมตีนำไปใช้ได้ {{exploitable}} รายการ",
       "noDeadline": "ไม่มีกำหนดเวลา",
       "reviewSlaAssignment": "ตรวจสอบการกำหนด SLA",
       "allOpenFindingsTracked": "ติดตามข้อค้นพบที่ยังเปิดอยู่ครบแล้ว"

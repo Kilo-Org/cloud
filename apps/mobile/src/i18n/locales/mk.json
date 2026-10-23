@@ -1753,7 +1753,7 @@
       "deadlinePassed": "Рокот помина",
       "deadlinePassedDetail": "{{critical}} со критична, {{high}} со висока сериозност",
       "dueThisWeek": "Со рок оваа недела",
-      "dueThisWeekDetail": "За {{exploitable}} е потврдено дека можат да се искористат за напад",
+      "dueThisWeekDetail": "Од нив за {{exploitable}} е потврдено дека можат да се искористат за напад",
       "noDeadline": "Нема рок",
       "reviewSlaAssignment": "Провери ги доделените рокови според SLA",
       "allOpenFindingsTracked": "Се следат сите отворени наоди"

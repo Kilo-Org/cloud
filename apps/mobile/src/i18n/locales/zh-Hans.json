@@ -1274,7 +1274,7 @@
       "deadlinePassed": "截止时间已过",
       "deadlinePassedDetail": "严重：{{critical}} 个，高危：{{high}} 个",
       "dueThisWeek": "本周到期",
-      "dueThisWeekDetail": "{{exploitable}} 个已确认可利用",
+      "dueThisWeekDetail": "其中 {{exploitable}} 个已确认可利用",
       "noDeadline": "无截止时间",
       "reviewSlaAssignment": "检查 SLA 设置",
       "allOpenFindingsTracked": "所有未解决的安全问题均已纳入跟踪"

@@ -1853,7 +1853,7 @@
       "deadlinePassed": "Dyddiad terfyn wedi mynd heibio",
       "deadlinePassedDetail": "{{critical}} critigol, {{high}} uchel",
       "dueThisWeek": "I'w cwblhau'r wythnos hon",
-      "dueThisWeekDetail": "{{exploitable}} y cadarnhawyd y gellir manteisio arnynt",
+      "dueThisWeekDetail": "{{exploitable}} o'r rhain y cadarnhawyd y gellir manteisio arnynt",
       "noDeadline": "Dim dyddiad terfyn",
       "reviewSlaAssignment": "Adolygu'r dyddiadau terfyn SLA a bennwyd",
       "allOpenFindingsTracked": "Pob canfyddiad agored yn cael ei olrhain"

@@ -1753,7 +1753,7 @@
       "deadlinePassed": "បានហួសកាលកំណត់",
       "deadlinePassedDetail": "ធ្ងន់ធ្ងរ {{critical}} និងខ្ពស់ {{high}}",
       "dueThisWeek": "ដល់កំណត់សប្តាហ៍នេះ",
-      "dueThisWeekDetail": "បានបញ្ជាក់ថាអាចត្រូវបានកេងប្រវ័ញ្ចចំនួន {{exploitable}}",
+      "dueThisWeekDetail": "ក្នុងចំណោមទាំងនេះ មាន {{exploitable}} ត្រូវបានបញ្ជាក់ថាអាចត្រូវបានកេងប្រវ័ញ្ច",
       "noDeadline": "គ្មានកាលកំណត់",
       "reviewSlaAssignment": "ពិនិត្យការកំណត់ SLA",
       "allOpenFindingsTracked": "បានតាមដានបញ្ហាដែលរកឃើញនៅបើកទាំងអស់"

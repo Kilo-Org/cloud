@@ -1753,7 +1753,7 @@
       "deadlinePassed": "නියමිත කාලය ඉක්මවා ඇත",
       "deadlinePassedDetail": "බරපතළ {{critical}}, ඉහළ {{high}}",
       "dueThisWeek": "මෙම සතිය තුළ නිම කළ යුතුයි",
-      "dueThisWeekDetail": "{{exploitable}} ක් ප්‍රහාරයකට යොදාගත හැකි බව තහවුරුයි",
+      "dueThisWeekDetail": "මේවායින් {{exploitable}} ක් ප්‍රහාරයකට යොදාගත හැකි බව තහවුරුයි",
       "noDeadline": "නියමිත කාලයක් නැත",
       "reviewSlaAssignment": "SLA පැවරීම සමාලෝචනය කරන්න",
       "allOpenFindingsTracked": "සියලුම විවෘත සොයාගැනීම් නිරීක්ෂණය වේ"

@@ -1753,7 +1753,7 @@
       "deadlinePassed": "Sperdatum verby",
       "deadlinePassedDetail": "{{critical}} krities, {{high}} hoog",
       "dueThisWeek": "Sperdatum hierdie week",
-      "dueThisWeekDetail": "{{exploitable}} as uitbuitbaar bevestig",
+      "dueThisWeekDetail": "{{exploitable}} hiervan is bevestig as uitbuitbaar",
       "noDeadline": "Geen sperdatum nie",
       "reviewSlaAssignment": "Hersien SLA-toewysing",
       "allOpenFindingsTracked": "Alle oop bevindings word gemonitor"

@@ -1778,7 +1778,7 @@
       "deadlinePassed": "Termenul limită a expirat",
       "deadlinePassedDetail": "{{critical}} critice, {{high}} cu severitate ridicată",
       "dueThisWeek": "Cu termen săptămâna aceasta",
-      "dueThisWeekDetail": "{{exploitable}} confirmate ca exploatabile",
+      "dueThisWeekDetail": "{{exploitable}} dintre acestea confirmate ca exploatabile",
       "noDeadline": "Fără termen limită",
       "reviewSlaAssignment": "Verifică atribuirea termenelor SLA",
       "allOpenFindingsTracked": "Toate constatările deschise sunt urmărite"

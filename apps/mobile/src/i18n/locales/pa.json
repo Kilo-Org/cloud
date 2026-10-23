@@ -1753,7 +1753,7 @@
       "deadlinePassed": "ਸਮਾਂ ਸੀਮਾ ਲੰਘ ਗਈ",
       "deadlinePassedDetail": "{{critical}} ਅਤਿ ਗੰਭੀਰ, {{high}} ਉੱਚ",
       "dueThisWeek": "ਇਸ ਹਫ਼ਤੇ ਆਖ਼ਰੀ ਮਿਤੀ",
-      "dueThisWeekDetail": "{{exploitable}} ਸਮੱਸਿਆਵਾਂ ਦੀ ਦੁਰਵਰਤੋਂ ਸੰਭਵ ਹੋਣ ਦੀ ਪੁਸ਼ਟੀ",
+      "dueThisWeekDetail": "ਇਹਨਾਂ ਵਿੱਚੋਂ {{exploitable}} ਦੀ ਦੁਰਵਰਤੋਂ ਸੰਭਵ ਹੋਣ ਦੀ ਪੁਸ਼ਟੀ",
       "noDeadline": "ਕੋਈ ਸਮਾਂ ਸੀਮਾ ਨਹੀਂ",
       "reviewSlaAssignment": "SLA ਨਿਰਧਾਰਨ ਦੀ ਸਮੀਖਿਆ ਕਰੋ",
       "allOpenFindingsTracked": "ਸਾਰੀਆਂ ਖੁੱਲ੍ਹੀਆਂ ਸਮੱਸਿਆਵਾਂ ਦੀ ਨਿਗਰਾਨੀ ਜਾਰੀ"

@@ -1753,7 +1753,7 @@
       "deadlinePassed": "ເກີນກຳນົດແລ້ວ",
       "deadlinePassedDetail": "ຮ້າຍແຮງ {{critical}}, ສູງ {{high}}",
       "dueThisWeek": "ຄົບກຳນົດອາທິດນີ້",
-      "dueThisWeekDetail": "ຢືນຢັນແລ້ວວ່ານຳໄປໃຊ້ໂຈມຕີໄດ້ {{exploitable}} ລາຍການ",
+      "dueThisWeekDetail": "ໃນນັ້ນ ຢືນຢັນແລ້ວວ່ານຳໄປໃຊ້ໂຈມຕີໄດ້ {{exploitable}} ລາຍການ",
       "noDeadline": "ບໍ່ມີວັນຄົບກຳນົດ",
       "reviewSlaAssignment": "ກວດທານການຕັ້ງກຳນົດ SLA",
       "allOpenFindingsTracked": "ຕິດຕາມບັນຫາທີ່ຍັງເປີດຢູ່ທັງໝົດແລ້ວ"

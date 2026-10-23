@@ -1753,7 +1753,7 @@
       "deadlinePassed": "آخری تاریخ گزر گئی",
       "deadlinePassedDetail": "{{critical}} سنگین، {{high}} زیادہ",
       "dueThisWeek": "اس ہفتے مہلت ختم ہو گی",
-      "dueThisWeekDetail": "{{exploitable}} مسائل سے حملہ آوروں کے فائدہ اٹھانے کی تصدیق",
+      "dueThisWeekDetail": "ان میں سے {{exploitable}} مسائل سے حملہ آوروں کے فائدہ اٹھانے کی تصدیق",
       "noDeadline": "کوئی آخری تاریخ نہیں",
       "reviewSlaAssignment": "SLA مقرر کرنے کا جائزہ لیں",
       "allOpenFindingsTracked": "تمام غیر حل شدہ مسائل کی نگرانی جاری"

@@ -1753,7 +1753,7 @@
       "deadlinePassed": "Prazo vencido",
       "deadlinePassedDetail": "{{critical}} críticos, {{high}} de gravidade alta",
       "dueThisWeek": "Vence esta semana",
-      "dueThisWeekDetail": "{{exploitable}} confirmados como explotables",
+      "dueThisWeekDetail": "{{exploitable}} destes confirmados como explotables",
       "noDeadline": "Sen prazo",
       "reviewSlaAssignment": "Revisar a asignación do SLA",
       "allOpenFindingsTracked": "Todos os achados abertos en seguimento"

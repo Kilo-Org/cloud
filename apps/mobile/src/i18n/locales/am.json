@@ -1753,7 +1753,7 @@
       "deadlinePassed": "የጊዜ ገደቡ አልፏል",
       "deadlinePassedDetail": "{{critical}} እጅግ ከፍተኛ፣ {{high}} ከፍተኛ",
       "dueThisWeek": "በዚህ ሳምንት ጊዜያቸው የሚያበቃ",
-      "dueThisWeekDetail": "{{exploitable}} ለጥቃት ሊውሉ እንደሚችሉ ተረጋግጠዋል",
+      "dueThisWeekDetail": "ከእነዚህ ውስጥ {{exploitable}} ለጥቃት ሊውሉ እንደሚችሉ ተረጋግጠዋል",
       "noDeadline": "ምንም ጊዜ ገደብ የለም",
       "reviewSlaAssignment": "የተወሰኑትን የSLA ጊዜ ገደቦች ይገምግሙ",
       "allOpenFindingsTracked": "ሁሉም ክፍት ግኝቶች በክትትል ላይ ናቸው"

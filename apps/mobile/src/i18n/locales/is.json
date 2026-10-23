@@ -1753,7 +1753,7 @@
       "deadlinePassed": "Frestur liðinn",
       "deadlinePassedDetail": "{{critical}} á bráðalvarlegu stigi, {{high}} á háu stigi",
       "dueThisWeek": "Frestur rennur út í vikunni",
-      "dueThisWeekDetail": "{{exploitable}} frávik sem staðfest er að hægt sé að misnota",
+      "dueThisWeekDetail": "{{exploitable}} af þessum er staðfest að hægt sé að misnota",
       "noDeadline": "Enginn frestur",
       "reviewSlaAssignment": "Yfirfara úthlutun SLA-fresta",
       "allOpenFindingsTracked": "Fylgst með öllum opnum frávikum"

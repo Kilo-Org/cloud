@@ -1753,7 +1753,7 @@
       "deadlinePassed": "Хугацаа дууссан",
       "deadlinePassedDetail": "{{critical}} ноцтой, {{high}} өндөр",
       "dueThisWeek": "Эцсийн хугацаа энэ долоо хоногт",
-      "dueThisWeekDetail": "{{exploitable}} асуудлыг халдлагад ашиглах боломжтой нь батлагдсан",
+      "dueThisWeekDetail": "Тэдгээрээс {{exploitable}} асуудлыг халдлагад ашиглах боломжтой нь батлагдсан",
       "noDeadline": "Хугацаагүй",
       "reviewSlaAssignment": "Тогтоосон SLA хугацааг шалгах",
       "allOpenFindingsTracked": "Бүх шийдээгүй асуудлыг хянаж байна"

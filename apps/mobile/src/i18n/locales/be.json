@@ -1803,7 +1803,7 @@
       "deadlinePassed": "Тэрмін мінуў",
       "deadlinePassedDetail": "Крытычны ўзровень: {{critical}}, высокі: {{high}}",
       "dueThisWeek": "Тэрмін на гэтым тыдні",
-      "dueThisWeekDetail": "Можна выкарыстаць у атацы: {{exploitable}}",
+      "dueThisWeekDetail": "З гэтых праблем {{exploitable}} можна выкарыстаць у атацы",
       "noDeadline": "Няма тэрміну",
       "reviewSlaAssignment": "Праверце прызначаныя тэрміны SLA",
       "allOpenFindingsTracked": "Усе адкрытыя праблемы адсочваюцца"

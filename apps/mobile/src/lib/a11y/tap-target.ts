@@ -35,6 +35,20 @@ export const ICON_TARGET_DP = 48;
 export const ICON_TARGET_BOX_CLASS = 'h-[48px] w-[48px] items-center justify-center';
 
 /**
+ * The minimum an action's own node renders inside a state surface — an empty
+ * or error state's way out. Android's `<Button>` rule is 48dp, and a
+ * control-size audit reads the pressed node's view rect, so the shared
+ * `Button` default frame (`min-h-[44px]`) lands 4dp under it; `hitSlop` widens
+ * the touch region without moving that rect. 48 clears iOS's 44pt on the same
+ * node, so one class serves both platforms and no `Platform` branch is needed.
+ * Explicit px, because NativeWind's rem is 14pt here.
+ */
+export const STATE_ACTION_TARGET_DP = 48;
+
+/** The floor every state surface's action renders, as {@link STATE_ACTION_TARGET_DP}. */
+export const STATE_ACTION_CLASS = 'min-h-[48px]';
+
+/**
  * The box every icon-only control renders. Its own node carries the target, as
  * a control-size audit measures, and 32pt clears the audit's
  * {@link MIN_TAP_TARGET_DP} floor while fitting the agents header row's

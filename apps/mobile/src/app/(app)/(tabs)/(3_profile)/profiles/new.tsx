@@ -1,5 +1,5 @@
 import { NewProfileScreen } from '@/components/profiles/new-profile-screen';
 
 export default function NewProfileRoute() {
-  return <NewProfileScreen />;
+  return <NewProfileScreen stack="profileTab" />;
 }

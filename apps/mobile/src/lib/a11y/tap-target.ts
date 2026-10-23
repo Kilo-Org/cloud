@@ -181,57 +181,54 @@ export const INLINE_LINK_ROW_CLASS = 'my-[5px]';
 export const INLINE_LINK_CONNECTOR_CLASS = 'min-w-[10px] text-center';
 
 /**
- * The box a legal link renders when it is a control of its own — the two store
- * links under the credit packs, and the privacy-policy link each consent
- * sentence ends with — rather than a word inside a sentence with a neighbour
- * `{@link INLINE_LINK_BOX_CLASS}` has to stay clear of.
+ * The box a legal link renders — the two store links under the credit packs,
+ * and the privacy-policy link each consent sentence ends with — rather than a
+ * word inside a sentence with a neighbour {@link INLINE_LINK_BOX_CLASS} has to
+ * stay clear of.
  *
- * The whole target is the box, `{@link ICON_TARGET_DP}` 48dp tall and wide, the
- * size the control-size audit reads from a node's own rect (Android's `<Button>`
- * minimum). `hitSlop` cannot reach it: the audit measures the rect, not the
- * touch region. A legal link's neighbour is plain prose or another legal link,
- * so the region the box claims does not belong to any other control — but that
- * same neighbour is why the box has to grow invisibly. The store links sit in a
- * `gap-x-4` row and the consent links end a prose sentence, so `-my-[17px]`
- * cancels `(48 - 14) / 2`, the box's overflow past the `text-xs` line it
- * centres on, exactly as `{@link INLINE_LINK_BOX_CLASS}` does: the line keeps
- * its 14dp and the glyphs do not move.
- *
- * The sign-in sentence keeps the smaller {@link INLINE_LINK_BOX_CLASS}: its two
- * links share a 10.5dp gutter with the Continue button above and the browser
- * button below, where a 48dp box would reach into a neighbour that is itself a
- * control.
+ * The whole target is the box, {@link ICON_TARGET_DP} 48dp tall and wide, the
+ * size the control-size audit reads from a node's own rect (Android's
+ * `<Button>` minimum). `hitSlop` cannot reach it: the audit measures the rect,
+ * not the touch region.
  */
 export const LEGAL_LINK_MIN_DP = 48;
 
 /**
+ * The box two store legal links render in a wrapping row. Both keep their full
+ * {@link LEGAL_LINK_MIN_DP} height in the flow, so the row's lines are 48dp
+ * tall: when a long locale wraps the second link onto its own line the two
+ * boxes sit one gutter apart and can never overlap, so a tap between the lines
+ * opens the link it points at. The footer pays one 48dp line for that, which is
+ * what keeps the geometry honest: a box that cancelled its own height would
+ * reach 17dp into the line below.
+ */
+export const LEGAL_LINK_BOX_CLASS = `min-h-[${LEGAL_LINK_MIN_DP}px] min-w-[${LEGAL_LINK_MIN_DP}px] items-center justify-center`;
+
+/**
  * The `text-xs` line a legal link centres on, in dp: line-height
- * `calc(1 / 0.75)` of 10.5dp. The layout-neutral form subtracts its difference
- * with {@link LEGAL_LINK_MIN_DP} from the box's margins.
+ * `calc(1 / 0.75)` of 10.5dp.
  */
 export const LEGAL_LINK_LINE_DP = 14;
 
-/** Per-side vertical margin that keeps {@link LEGAL_LINK_BOX_CLASS} out of the line. */
-export const LEGAL_LINK_BOX_CANCEL_DP = (LEGAL_LINK_MIN_DP - LEGAL_LINK_LINE_DP) / 2;
+/**
+ * The vertical margin a legal link cancels inside a running sentence: the box's
+ * overflow past the `text-xs` line it centres on, `(48 - 14) / 2`. A sentence
+ * has no second link beside it, so the overflow only ever lands on prose, and
+ * cancelling it keeps the sentence on its own line exactly as the sign-in
+ * sentence's {@link INLINE_LINK_BOX_CLASS} does.
+ */
+export const LEGAL_LINK_SENTENCE_CANCEL_DP = (LEGAL_LINK_MIN_DP - LEGAL_LINK_LINE_DP) / 2;
+
+/** The box a legal link renders as the last word of a consent sentence. */
+export const LEGAL_LINK_SENTENCE_BOX_CLASS = `${LEGAL_LINK_BOX_CLASS} -my-[${LEGAL_LINK_SENTENCE_CANCEL_DP}px]`;
 
 /**
- * Two legal links in one wrapping row need this much between their lines, or
- * their boxes overlap across the wrap: each box overflows the line by
- * {@link LEGAL_LINK_BOX_CANCEL_DP}, so the gutter is twice that. At the row's
- * `gap-3`/`gap-4` gutter (14dp) the two boxes would overlap by 20dp and a tap
- * between the lines would open the wrong document.
+ * The row the two store legal links share: side by side when they fit, one per
+ * line when a long locale wraps them. `gap-x-4` separates two boxes on one line
+ * (14dp, and no slop points sideways); the boxes' own height separates the
+ * wrapped lines.
  */
-export const LEGAL_LINK_WRAP_GUTTER_DP = 2 * LEGAL_LINK_BOX_CANCEL_DP;
-
-export const LEGAL_LINK_BOX_CLASS = `min-h-[${LEGAL_LINK_MIN_DP}px] min-w-[${LEGAL_LINK_MIN_DP}px] -my-[${LEGAL_LINK_BOX_CANCEL_DP}px] items-center justify-center`;
-
-/**
- * The row the two store legal links share. `gap-x-4` keeps the two boxes apart
- * horizontally (14dp is wider than the text gap it replaces, and no slop points
- * sideways), and the wrap gutter is twice the box's cancel so the boxes tile
- * instead of overlapping when a long locale puts them on two lines.
- */
-export const LEGAL_LINK_ROW_CLASS = `flex-row flex-wrap items-center gap-x-4 gap-y-[${LEGAL_LINK_WRAP_GUTTER_DP}px]`;
+export const LEGAL_LINK_ROW_CLASS = 'flex-row flex-wrap items-center gap-x-4';
 
 /**
  * The reach a box plus its per-side slop offers. This is the number the tests

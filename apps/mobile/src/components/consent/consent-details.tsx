@@ -343,12 +343,13 @@ export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
             footer={<VoiceTranscriptionControl />}
           />
 
-          <ConsentPolicySentence
-            className="mt-6"
-            prefix={t('consent.retentionPrefix')}
-            linkLabel={t('consent.privacyPolicy')}
-            onOpenPolicy={handleOpenPrivacy}
-          />
+          <View className="mt-6">
+            <ConsentPolicySentence
+              prefix={t('consent.retentionPrefix')}
+              linkLabel={t('consent.privacyPolicy')}
+              onOpenPolicy={handleOpenPrivacy}
+            />
+          </View>
 
           <View className="mt-8">
             <Button

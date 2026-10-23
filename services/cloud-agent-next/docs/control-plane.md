@@ -182,6 +182,8 @@ public stream has no reconnecting status today, so `reconnecting` changes no cli
 - Wrapper events are appended to the event log and broadcast on `/stream` with the current schema.
   The Session DO emits `cloud.message.*` events on message changes and `preparing` events from route
   progress.
+- Session event error fields use the shared public failure projection before event storage and delivery.
+  Public execution-stop notices retain their bounded reason and recovery guidance.
 - Pending questions and permissions are projected from events. Answers go to the wrapper through the
   Sandbox DO. If the turn already settled, for example because the sandbox stopped, the answer is
   sent as a new message.

@@ -1963,7 +1963,7 @@
       "couldNotLoad": "Tsy nety nampidirina ny Security Agent.",
       "installApp": "Apetraho ny rindranasa GitHub",
       "reauthorizeButton": "Omeo alalana indray ny rindranasa GitHub",
-      "reauthorizeDescription": "Mila ny alalana vulnerability_alerts ny Security Agent mba hijery ny fampandrenesan'ny Dependabot. Omeo alalana indray ny rindranasa GitHub mba hanomezana azy io alalana io.",
+      "reauthorizeDescription": "Mila ny alalana ny Security Agent hamaky ny fampandrenesan'ny Dependabot. Omeo alalana indray ny rindranasa GitHub mba hanomezana azy io alalana io.",
       "reauthorizeTitle": "Ilaina ny alalana fanampiny",
       "setupFailed": "Tsy nety natomboka ny fametrahana ny GitHub. Andramo indray azafady."
     },

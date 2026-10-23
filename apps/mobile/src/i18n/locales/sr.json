@@ -1986,7 +1986,7 @@
       "couldNotLoad": "Nije moguće učitati bezbednosnog agenta.",
       "installApp": "Instaliraj GitHub aplikaciju",
       "reauthorizeButton": "Ponovo ovlasti GitHub aplikaciju",
-      "reauthorizeDescription": "Bezbednosni agent zahteva dozvolu vulnerability_alerts za pristup Dependabot upozorenjima. Ponovo ovlasti GitHub aplikaciju da joj dodeliš ovu dozvolu.",
+      "reauthorizeDescription": "Bezbednosni agent zahteva dozvolu da čita Dependabot upozorenja. Ponovo ovlasti GitHub aplikaciju da joj dodeliš ovu dozvolu.",
       "reauthorizeTitle": "Potrebne su dodatne dozvole",
       "setupFailed": "Nije moguće pokrenuti podešavanje za GitHub. Pokušaj ponovo."
     },

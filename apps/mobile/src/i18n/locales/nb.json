@@ -1963,7 +1963,7 @@
       "couldNotLoad": "Kunne ikke laste inn sikkerhetsagenten.",
       "installApp": "Installer GitHub-appen",
       "reauthorizeButton": "Autoriser GitHub-appen på nytt",
-      "reauthorizeDescription": "Sikkerhetsagenten trenger tillatelsen vulnerability_alerts for å få tilgang til Dependabot-varsler. Autoriser GitHub-appen på nytt for å gi denne tillatelsen.",
+      "reauthorizeDescription": "Sikkerhetsagenten trenger tillatelse til å lese Dependabot-varsler. Autoriser GitHub-appen på nytt for å gi denne tillatelsen.",
       "reauthorizeTitle": "Flere tillatelser kreves",
       "setupFailed": "Kunne ikke starte GitHub-oppsettet. Prøv igjen."
     },

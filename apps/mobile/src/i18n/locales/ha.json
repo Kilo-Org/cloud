@@ -1963,7 +1963,7 @@
       "couldNotLoad": "An kasa loda Wakilin tsaro.",
       "installApp": "Shigar da manhajar GitHub",
       "reauthorizeButton": "Sake ba manhajar GitHub izini",
-      "reauthorizeDescription": "Wakilin tsaro yana buƙatar izinin vulnerability_alerts don samun faɗakarwar Dependabot. Sake ba manhajar GitHub izini don ba ta wannan damar.",
+      "reauthorizeDescription": "Wakilin tsaro yana buƙatar izinin karanta faɗakarwar Dependabot. Sake ba manhajar GitHub izini don ba ta wannan damar.",
       "reauthorizeTitle": "Ana buƙatar ƙarin izini",
       "setupFailed": "An kasa fara saitin GitHub. Sake gwadawa."
     },

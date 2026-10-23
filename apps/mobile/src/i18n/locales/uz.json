@@ -1963,7 +1963,7 @@
       "couldNotLoad": "Xavfsizlik agentini yuklab bo'lmadi.",
       "installApp": "GitHub ilovasini o'rnatish",
       "reauthorizeButton": "GitHub ilovasiga qayta ruxsat berish",
-      "reauthorizeDescription": "Xavfsizlik agentiga Dependabot ogohlantirishlarini olish uchun vulnerability_alerts ruxsati kerak. Bu ruxsatni berish uchun GitHub ilovasiga qayta ruxsat bering.",
+      "reauthorizeDescription": "Xavfsizlik agentiga Dependabot ogohlantirishlarini o'qish uchun ruxsat kerak. Bu ruxsatni berish uchun GitHub ilovasiga qayta ruxsat bering.",
       "reauthorizeTitle": "Qo'shimcha ruxsatlar talab qilinadi",
       "setupFailed": "GitHubni sozlashni boshlab bo'lmadi. Iltimos, qayta urinib ko'ring."
     },

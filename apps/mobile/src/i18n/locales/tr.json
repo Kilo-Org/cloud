@@ -1402,7 +1402,7 @@
       "couldNotLoad": "Güvenlik ajanı yüklenemedi.",
       "installApp": "GitHub uygulamasını yükle",
       "reauthorizeButton": "GitHub uygulamasını yeniden yetkilendir",
-      "reauthorizeDescription": "Güvenlik ajanının Dependabot uyarılarına erişebilmesi için vulnerability_alerts izni gerekir. Bu izni vermek için GitHub uygulamasını yeniden yetkilendir.",
+      "reauthorizeDescription": "Güvenlik ajanının Dependabot uyarılarını okuyabilmesi için izin gerekir. Bu izni vermek için GitHub uygulamasını yeniden yetkilendir.",
       "reauthorizeTitle": "Ek izinler gerekiyor",
       "setupFailed": "GitHub kurulumu başlatılamadı. Lütfen tekrar dene."
     },

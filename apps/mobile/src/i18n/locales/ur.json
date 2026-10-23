@@ -1963,7 +1963,7 @@
       "couldNotLoad": "سکیورٹی ایجنٹ لوڈ نہیں ہو سکا۔",
       "installApp": "GitHub ایپ انسٹال کریں",
       "reauthorizeButton": "GitHub ایپ کو دوبارہ اجازت دیں",
-      "reauthorizeDescription": "سکیورٹی ایجنٹ کو Dependabot کی اطلاعات تک رسائی کے لیے vulnerability_alerts کی اجازت درکار ہے۔ یہ اجازت دینے کے لیے GitHub ایپ کو دوبارہ مجاز بنائیں۔",
+      "reauthorizeDescription": "سکیورٹی ایجنٹ کو Dependabot کی اطلاعات پڑھنے کے لیے اجازت درکار ہے۔ یہ اجازت دینے کے لیے GitHub ایپ کو دوبارہ مجاز بنائیں۔",
       "reauthorizeTitle": "اضافی اجازتیں درکار ہیں",
       "setupFailed": "GitHub سیٹ اپ شروع نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔"
     },

@@ -1963,7 +1963,7 @@
       "couldNotLoad": "Kāore i taea te uta i te Kaiāwhina haumarutanga.",
       "installApp": "Tāutahia te taupānga GitHub",
       "reauthorizeButton": "Whakamanahia anō te taupānga GitHub",
-      "reauthorizeDescription": "Me whai te Kaiāwhina haumarutanga i te whakaaetanga vulnerability_alerts kia uru ki ngā matohi Dependabot. Whakamanahia anō te taupānga GitHub hei tuku i tēnei whakaaetanga.",
+      "reauthorizeDescription": "Me whai te Kaiāwhina haumarutanga i te whakaaetanga kia pānui i ngā matohi Dependabot. Whakamanahia anō te taupānga GitHub hei tuku i tēnei whakaaetanga.",
       "reauthorizeTitle": "E hiahiatia ana ētahi atu whakaaetanga",
       "setupFailed": "Kāore i taea te tīmata i te whakarite i GitHub. Whakamātau anō."
     },

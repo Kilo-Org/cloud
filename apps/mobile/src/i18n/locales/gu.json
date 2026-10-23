@@ -1963,7 +1963,7 @@
       "couldNotLoad": "સુરક્ષા એજન્ટ લોડ કરી શકાયો નહીં.",
       "installApp": "GitHub ઍપ ઇન્સ્ટોલ કરો",
       "reauthorizeButton": "GitHub ઍપને ફરી અધિકૃત કરો",
-      "reauthorizeDescription": "સુરક્ષા એજન્ટને Dependabot ની ચેતવણીઓ મેળવવા vulnerability_alerts પરવાનગી જરૂરી છે. આ પરવાનગી આપવા GitHub ઍપને ફરી અધિકૃત કરો.",
+      "reauthorizeDescription": "સુરક્ષા એજન્ટને Dependabot ની ચેતવણીઓ વાંચવા પરવાનગી જરૂરી છે. આ પરવાનગી આપવા GitHub ઍપને ફરી અધિકૃત કરો.",
       "reauthorizeTitle": "વધારાની પરવાનગીઓ જરૂરી છે",
       "setupFailed": "GitHub સેટઅપ શરૂ થઈ શક્યું નથી. કૃપા કરીને ફરી પ્રયાસ કરો."
     },

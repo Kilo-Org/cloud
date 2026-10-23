@@ -1963,7 +1963,7 @@
       "couldNotLoad": "Nuk u ngarkua agjenti i sigurisë.",
       "installApp": "Instalo aplikacionin GitHub",
       "reauthorizeButton": "Riautorizo aplikacionin GitHub",
-      "reauthorizeDescription": "Agjenti i sigurisë kërkon lejen vulnerability_alerts për të pasur qasje në njoftimet e Dependabot. Riautorizo aplikacionin GitHub për t'ia dhënë këtë leje.",
+      "reauthorizeDescription": "Agjenti i sigurisë ka nevojë për leje për të lexuar njoftimet e Dependabot. Riautorizo aplikacionin GitHub për t'ia dhënë këtë leje.",
       "reauthorizeTitle": "Kërkohen leje shtesë",
       "setupFailed": "Nuk u nis konfigurimi i GitHub. Provo përsëri."
     },

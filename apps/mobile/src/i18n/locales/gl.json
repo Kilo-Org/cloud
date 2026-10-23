@@ -1963,7 +1963,7 @@
       "couldNotLoad": "Non se puido cargar o axente de seguridade.",
       "installApp": "Instalar a aplicación de GitHub",
       "reauthorizeButton": "Volver autorizar a aplicación de GitHub",
-      "reauthorizeDescription": "O axente de seguridade require o permiso vulnerability_alerts para acceder aos avisos de Dependabot. Volve autorizar a aplicación de GitHub para conceder este permiso.",
+      "reauthorizeDescription": "O axente de seguridade require permiso para ler os avisos de Dependabot. Volve autorizar a aplicación de GitHub para conceder este permiso.",
       "reauthorizeTitle": "Requírense permisos adicionais",
       "setupFailed": "Non se puido iniciar a configuración de GitHub. Téntao de novo."
     },

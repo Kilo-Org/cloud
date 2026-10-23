@@ -1986,7 +1986,7 @@
       "couldNotLoad": "Neizdevās ielādēt drošības aģentu.",
       "installApp": "Instalēt GitHub lietotni",
       "reauthorizeButton": "Atkārtoti autorizēt GitHub lietotni",
-      "reauthorizeDescription": "Drošības aģentam vajadzīga atļauja vulnerability_alerts, lai piekļūtu Dependabot brīdinājumiem. Atkārtoti autorizē GitHub lietotni, lai piešķirtu šo atļauju.",
+      "reauthorizeDescription": "Drošības aģentam vajadzīga atļauja lasīt Dependabot brīdinājumus. Atkārtoti autorizē GitHub lietotni, lai piešķirtu šo atļauju.",
       "reauthorizeTitle": "Nepieciešamas papildu atļaujas",
       "setupFailed": "Neizdevās sākt GitHub iestatīšanu. Lūdzu, mēģini vēlreiz."
     },

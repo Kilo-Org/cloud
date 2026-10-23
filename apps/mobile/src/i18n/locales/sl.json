@@ -2009,7 +2009,7 @@
       "couldNotLoad": "Varnostnega agenta ni bilo mogoče naložiti.",
       "installApp": "Namesti aplikacijo GitHub",
       "reauthorizeButton": "Znova pooblasti aplikacijo GitHub",
-      "reauthorizeDescription": "Varnostni agent za dostop do opozoril Dependabot potrebuje dovoljenje vulnerability_alerts. Znova pooblasti aplikacijo GitHub, da ji dodeliš to dovoljenje.",
+      "reauthorizeDescription": "Varnostni agent potrebuje dovoljenje za branje opozoril Dependabot. Znova pooblasti aplikacijo GitHub, da ji dodeliš to dovoljenje.",
       "reauthorizeTitle": "Potrebna so dodatna dovoljenja",
       "setupFailed": "Nastavitve povezave s platformo GitHub ni bilo mogoče začeti. Poskusi znova."
     },

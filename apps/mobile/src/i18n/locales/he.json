@@ -1408,7 +1408,7 @@
       "couldNotLoad": "לא ניתן לטעון את סוכן האבטחה.",
       "installApp": "התקנת אפליקציית GitHub",
       "reauthorizeButton": "חידוש ההרשאה לאפליקציית GitHub",
-      "reauthorizeDescription": "סוכן האבטחה זקוק להרשאת vulnerability_alerts כדי לגשת להתראות Dependabot. חדש את ההרשאה לאפליקציית GitHub כדי לתת לו גישה.",
+      "reauthorizeDescription": "סוכן האבטחה זקוק להרשאה כדי לקרוא את התראות Dependabot. חדש את ההרשאה לאפליקציית GitHub כדי להעניק לו את ההרשאה.",
       "reauthorizeTitle": "נדרשות הרשאות נוספות",
       "setupFailed": "לא ניתן להתחיל את הגדרת GitHub. נסה שוב."
     },

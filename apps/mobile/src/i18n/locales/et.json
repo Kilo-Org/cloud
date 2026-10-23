@@ -1963,7 +1963,7 @@
       "couldNotLoad": "Turvaagenti ei õnnestunud laadida.",
       "installApp": "Paigalda GitHubi rakendus",
       "reauthorizeButton": "Volita GitHubi rakendus uuesti",
-      "reauthorizeDescription": "Turvaagent vajab õigust vulnerability_alerts, et pääseda ligi Dependaboti hoiatustele. Selle õiguse andmiseks volita GitHubi rakendus uuesti.",
+      "reauthorizeDescription": "Turvaagent vajab õigust Dependaboti hoiatusi lugeda. Selle õiguse andmiseks volita GitHubi rakendus uuesti.",
       "reauthorizeTitle": "Vaja on täiendavaid õigusi",
       "setupFailed": "GitHubi seadistamist ei õnnestunud alustada. Proovi uuesti."
     },

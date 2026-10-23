@@ -1414,7 +1414,7 @@
       "couldNotLoad": "Не вдалося завантажити Агента безпеки.",
       "installApp": "Установити застосунок GitHub",
       "reauthorizeButton": "Повторно авторизувати застосунок GitHub",
-      "reauthorizeDescription": "Агент безпеки потребує дозволу vulnerability_alerts для доступу до сповіщень Dependabot. Повторно авторизуйте застосунок GitHub, щоб надати цей дозвіл.",
+      "reauthorizeDescription": "Агент безпеки потребує дозволу на читання сповіщень Dependabot. Повторно авторизуйте застосунок GitHub, щоб надати цей дозвіл.",
       "reauthorizeTitle": "Потрібні додаткові дозволи",
       "setupFailed": "Не вдалося розпочати налаштування GitHub. Спробуйте ще раз."
     },

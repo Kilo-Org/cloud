@@ -1963,7 +1963,7 @@
       "couldNotLoad": "Ekki tókst að hlaða öryggisvakanum.",
       "installApp": "Setja upp GitHub-forrit",
       "reauthorizeButton": "Endurnýja heimildir GitHub-forritsins",
-      "reauthorizeDescription": "Öryggisvakinn þarf heimildina vulnerability_alerts til að fá aðgang að Dependabot-viðvörunum. Endurnýjaðu heimildir GitHub-forritsins til að veita þessa heimild.",
+      "reauthorizeDescription": "Öryggisvakinn þarf heimild til að lesa Dependabot-viðvaranir. Endurnýjaðu heimildir GitHub-forritsins til að veita þessa heimild.",
       "reauthorizeTitle": "Viðbótarheimildir nauðsynlegar",
       "setupFailed": "Ekki tókst að hefja uppsetningu GitHub. Reyndu aftur."
     },

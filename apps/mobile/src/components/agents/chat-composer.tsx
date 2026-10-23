@@ -62,6 +62,7 @@ import {
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
 import { executeChatComposerSubmission } from '@/components/agents/chat-composer-submission';
+import { clearComposerInput } from '@/components/agents/composer-input-clear';
 import {
   type ComposerSelection,
   pasteTextIntoComposer,
@@ -1007,7 +1008,7 @@ export function ChatComposer({
     publishDerivedState('', null);
     setGoalComposeActive(false);
     measureHandleRef.current?.reset();
-    inputRef.current?.clear();
+    clearComposerInput(inputRef.current);
     // Clear the persisted draft only on successful send / explicit clear,
     // never on navigation-away, process kill, or sign-out.
     if (draftKey && userId) {

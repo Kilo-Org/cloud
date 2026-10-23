@@ -143,7 +143,13 @@ function foldDecimalDigits(value: string): string {
   });
 }
 
-export function parseLocalizedNumber(value: string, locale: string): number | null {
+/**
+ * A number typed in the active locale as a plain ASCII decimal literal, or
+ * `null` when the input is not one. Callers that compare magnitudes use this
+ * form: a literal too large for a JS number stays a digit string instead of
+ * collapsing into the same `null` a non-number produces.
+ */
+export function normalizeLocalizedNumber(value: string, locale: string): string | null {
   const parts = numberFormat(locale, { useGrouping: true }).formatToParts(-12_345.6);
   const part = (type: Intl.NumberFormatPartTypes, fallback: string) =>
     parts.find(item => item.type === type)?.value ?? fallback;
@@ -156,6 +162,14 @@ export function parseLocalizedNumber(value: string, locale: string): number | nu
   }
   normalized = normalized.split(group).join('').split(decimal).join('.').split(minus).join('-');
   if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(normalized)) {
+    return null;
+  }
+  return normalized;
+}
+
+export function parseLocalizedNumber(value: string, locale: string): number | null {
+  const normalized = normalizeLocalizedNumber(value, locale);
+  if (normalized === null) {
     return null;
   }
   const parsed = Number(normalized);

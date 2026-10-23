@@ -33,7 +33,8 @@ export const MAX_WRITER_RESPONSE_BYTES = 4096;
 
 export async function recordUsage(
   payload: UsageRecordRequest,
-  config: UsageWriterConfig
+  config: UsageWriterConfig,
+  fetchWriter: typeof fetch = fetch
 ): Promise<UsageWriteOutcome> {
   const unavailable = (
     reason: Extract<UsageWriteOutcome, { kind: 'unavailable' }>['reason'],
@@ -52,7 +53,7 @@ export async function recordUsage(
   const signal = AbortSignal.timeout(USAGE_WRITER_TIMEOUT_MS);
   let response: Response | undefined;
   try {
-    response = await fetch(config.url, {
+    response = await fetchWriter(config.url, {
       method: 'POST',
       redirect: 'manual',
       headers: {

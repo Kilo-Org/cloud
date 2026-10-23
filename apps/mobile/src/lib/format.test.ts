@@ -9,6 +9,7 @@ import {
   formatList,
   formatMoney,
   formatNumber,
+  normalizeLocalizedNumber,
   parseLocalizedNumber,
 } from './format';
 
@@ -81,6 +82,17 @@ describe('localized format helpers', () => {
   it.each(SUPPORTED_LANGUAGES)('round-trips its own formatted amount in %s', tag => {
     expect(parseLocalizedNumber(formatNumber(25.5, tag), tag)).toBe(25.5);
     expect(parseLocalizedNumber(formatNumber(1234.5, tag), tag)).toBe(1234.5);
+  });
+
+  it('normalizes to an ASCII literal so callers can compare magnitudes', () => {
+    expect(normalizeLocalizedNumber('1.234,5', 'de-DE')).toBe('1234.5');
+    expect(normalizeLocalizedNumber(' 1 234,5 ', 'ru')).toBe('1234.5');
+    expect(normalizeLocalizedNumber('-12', 'en')).toBe('-12');
+    expect(normalizeLocalizedNumber('twelve', 'en')).toBeNull();
+    expect(normalizeLocalizedNumber('', 'en')).toBeNull();
+    // Longer than a JS number can hold: the literal survives, the parse does not.
+    expect(normalizeLocalizedNumber('9'.repeat(950), 'en')).toBe('9'.repeat(950));
+    expect(parseLocalizedNumber('9'.repeat(950), 'en')).toBeNull();
   });
 
   it('formats a calendar date without a time-zone shift', () => {

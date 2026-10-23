@@ -159,6 +159,33 @@ describe('useSettingsBackGuard', () => {
     });
   });
 
+  it('replays the captured action only after the guard has unregistered', () => {
+    const { renderer, result } = mountGuard(true, true, noOpSave);
+    result.skipNextGuardRef.current = true;
+
+    // The navigator drops a re-dispatched action while the route still counts
+    // as prevented, so the replay must observe the guard already switched off.
+    const preventedDuringReplay: (boolean | undefined)[] = [];
+    const action = { type: 'GO_BACK' };
+    act(() => {
+      usePreventRemoveHolder.callback?.({
+        data: { action },
+        repeat: () => {
+          preventedDuringReplay.push(usePreventRemoveHolder.preventRemove);
+          dispatchMock(action);
+        },
+      });
+    });
+
+    expect(preventedDuringReplay).toEqual([false]);
+    expect(dispatchMock).toHaveBeenCalledTimes(1);
+    expect(dispatchMock).toHaveBeenCalledWith(action);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
   it('shows Save / Discard / Keep editing for a dirty-valid screen', () => {
     const { renderer } = mountGuard(true, true, noOpSave);
 

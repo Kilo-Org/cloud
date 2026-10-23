@@ -150,8 +150,10 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     medium: Number.NaN,
     low: Number.NaN,
   });
-  const hydratedRef = useRef(false);
-  const initialConfigRef = useRef<Partial<SecurityAgentConfig>>({});
+  // The saved baseline the draft is compared against. State rather than a ref:
+  // a successful save must re-render, so `dirty` (and the back guard that
+  // reads it) reflects the saved values by the time the header action leaves.
+  const [baseline, setBaseline] = useState<Partial<SecurityAgentConfig> | null>(null);
 
   // Local state initialized from the loaded config exactly once — later
   // config refetches (e.g. after this screen's own save) shouldn't clobber
@@ -159,11 +161,10 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   // read below) until this has run, so they never mount with the NaN
   // placeholder as their initial value.
   useEffect(() => {
-    if (hydratedRef.current || !config.data) {
+    if (baseline !== null || !config.data) {
       return;
     }
-    hydratedRef.current = true;
-    initialConfigRef.current = config.data;
+    setBaseline(config.data);
     setSlaEnabled(config.data.slaEnabled);
     setSlaDays({
       critical: config.data.slaCriticalDays,
@@ -171,7 +172,7 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
       medium: config.data.slaMediumDays,
       low: config.data.slaLowDays,
     });
-  }, [config.data]);
+  }, [baseline, config.data]);
 
   // Ref indirection keeps the tracking effect independent of the mutation
   // object's identity (a new object every render) — fires once per mount,
@@ -202,23 +203,17 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     slaEnabled,
     slaCriticalDays: daysValid.critical
       ? slaDays.critical
-      : (initialConfigRef.current.slaCriticalDays ?? slaDays.critical),
-    slaHighDays: daysValid.high
-      ? slaDays.high
-      : (initialConfigRef.current.slaHighDays ?? slaDays.high),
-    slaMediumDays: daysValid.medium
-      ? slaDays.medium
-      : (initialConfigRef.current.slaMediumDays ?? slaDays.medium),
-    slaLowDays: daysValid.low ? slaDays.low : (initialConfigRef.current.slaLowDays ?? slaDays.low),
+      : (baseline?.slaCriticalDays ?? slaDays.critical),
+    slaHighDays: daysValid.high ? slaDays.high : (baseline?.slaHighDays ?? slaDays.high),
+    slaMediumDays: daysValid.medium ? slaDays.medium : (baseline?.slaMediumDays ?? slaDays.medium),
+    slaLowDays: daysValid.low ? slaDays.low : (baseline?.slaLowDays ?? slaDays.low),
   };
-  const dirty =
-    hydratedRef.current &&
-    getSettingsDirtyState(initialConfigRef.current, patch, valid) !== 'clean';
+  const dirty = baseline !== null && getSettingsDirtyState(baseline, patch, valid) !== 'clean';
   useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, { dirty });
 
   const handleSave = async () => {
     await save.mutateAsync(patch);
-    initialConfigRef.current = { ...initialConfigRef.current, ...patch };
+    setBaseline(previous => ({ ...previous, ...patch }));
   };
 
   const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
@@ -281,7 +276,7 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
           onValueChange={setSlaEnabled}
         />
 
-        {hydratedRef.current && slaEnabled && (
+        {baseline !== null && slaEnabled && (
           <View className="gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               {t('securityAgent.sla.deadlinesHeading')}

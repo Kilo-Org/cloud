@@ -82,18 +82,19 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
   // kiloclaw/settings-card.tsx.
   const warningDaysRef = useRef('');
   const [slaNotificationWarningDays, setSlaNotificationWarningDays] = useState(Number.NaN);
-  const hydratedRef = useRef(false);
-  const initialConfigRef = useRef<Partial<SecurityAgentConfig>>({});
+  // The saved baseline the draft is compared against. State rather than a ref:
+  // a successful save must re-render, so `dirty` (and the back guard that
+  // reads it) reflects the saved values by the time the header action leaves.
+  const [baseline, setBaseline] = useState<Partial<SecurityAgentConfig> | null>(null);
 
   // Local state initialized from the loaded config exactly once — later
   // config refetches (e.g. after this screen's own save) shouldn't clobber
   // in-progress edits.
   useEffect(() => {
-    if (hydratedRef.current || !config.data) {
+    if (baseline !== null || !config.data) {
       return;
     }
-    hydratedRef.current = true;
-    initialConfigRef.current = config.data;
+    setBaseline(config.data);
     setNewFindingNotificationsEnabled(config.data.newFindingNotificationsEnabled);
     setNewFindingNotificationMinSeverity(config.data.newFindingNotificationMinSeverity);
     setSlaNotificationsEnabled(config.data.slaNotificationsEnabled);
@@ -102,7 +103,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
       useGrouping: false,
     });
     setSlaNotificationWarningDays(config.data.slaNotificationWarningDays);
-  }, [config.data]);
+  }, [baseline, config.data]);
 
   // Ref indirection keeps the tracking effect independent of the mutation
   // object's identity (a new object every render) — fires once per mount,
@@ -131,16 +132,14 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
     slaNotificationMinSeverity,
     slaNotificationWarningDays: warningDaysValid
       ? slaNotificationWarningDays
-      : (initialConfigRef.current.slaNotificationWarningDays ?? slaNotificationWarningDays),
+      : (baseline?.slaNotificationWarningDays ?? slaNotificationWarningDays),
   };
-  const dirty =
-    hydratedRef.current &&
-    getSettingsDirtyState(initialConfigRef.current, patch, valid) !== 'clean';
+  const dirty = baseline !== null && getSettingsDirtyState(baseline, patch, valid) !== 'clean';
   useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, { dirty });
 
   const handleSave = async () => {
     await save.mutateAsync(patch);
-    initialConfigRef.current = { ...initialConfigRef.current, ...patch };
+    setBaseline(previous => ({ ...previous, ...patch }));
   };
 
   const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({

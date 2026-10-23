@@ -36,9 +36,9 @@ describe('resolveGitHubIntegrationIdForRepository', () => {
       githubAppType: 'standard',
     });
 
-    await expect(
-      resolveIntegrationId({ type: 'user', id: 'user-1' }, 'acme/notes')
-    ).resolves.toBe('123e4567-e89b-12d3-a456-426614174050');
+    await expect(resolveIntegrationId({ type: 'user', id: 'user-1' }, 'acme/notes')).resolves.toBe(
+      '123e4567-e89b-12d3-a456-426614174050'
+    );
     expect(resolveForOwner).toHaveBeenCalledWith(
       { type: 'user', id: 'user-1' },
       'acme/notes',

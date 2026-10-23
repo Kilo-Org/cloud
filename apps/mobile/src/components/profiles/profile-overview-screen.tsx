@@ -243,10 +243,7 @@ export function ProfileOverviewScreen({
       {/* Back keeps the route it was opened from (the Profiles list, or the
           session whose profile chip opened it); `backFallback` still lands on
           Profiles when the app has no history, as a cold deep link does. */}
-      <ScreenHeader
-        title={profile?.name ?? t('profiles.title')}
-        backFallback={getProfilesPath()}
-      />
+      <ScreenHeader title={profile?.name ?? t('profiles.title')} backFallback={getProfilesPath()} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-6 px-6 pt-4"

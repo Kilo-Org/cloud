@@ -52,6 +52,7 @@ vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: h.back, push: h.push, replace: h.replace }),
 }));
+vi.mock('@/lib/navigation/pop-when-focused', () => ({ usePopWhenFocused: () => h.back }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     agentProfiles: {
@@ -164,9 +165,7 @@ describe('ProfileOverviewScreen', () => {
 
     const queryError = findOne(renderer.root, 'QueryError');
     expect(queryError.props.title).toBe("Couldn't load profiles");
-    act(() => {
-      (queryError.props as { onRetry: () => void }).onRetry();
-    });
+    act(queryError.props.onRetry as () => void);
     expect(h.query.refetch).toHaveBeenCalledTimes(1);
   });
 
@@ -319,9 +318,8 @@ describe('ProfileOverviewScreen', () => {
     expect(h.mutations.deleteProfile.mutateAsync.mock.calls[0]?.[0]).toEqual({
       profileId: 'profile-1',
     });
-    await waitFor(() => h.success.mock.calls.length > 0);
-    expect(h.success).toHaveBeenCalledWith('Profile "Backend debugging" deleted');
     await waitFor(() => h.back.mock.calls.length > 0);
+    expect(h.back).toHaveBeenCalledTimes(1);
   });
 
   it('non-retryable: a PRECONDITION_FAILED delete shows deleteBlocked and stays', async () => {

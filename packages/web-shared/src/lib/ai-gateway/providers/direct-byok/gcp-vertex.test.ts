@@ -86,7 +86,12 @@ describe('getGcpVertexHost', () => {
 describe('buildGcpVertexUpstream', () => {
   it('routes Gemini to the OpenAI-compatible endpoint with the Gemini reasoning transform', () => {
     expect(
-      buildGcpVertexUpstream(credentials, 'token', { id: 'gemini-3.5-flash', endpoint: 'openapi' }, true)
+      buildGcpVertexUpstream(
+        credentials,
+        'token',
+        { id: 'gemini-3.5-flash', endpoint: 'openapi' },
+        true
+      )
     ).toEqual({
       apiKey: 'token',
       apiKeyHeader: null,

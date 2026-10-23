@@ -36,23 +36,26 @@ describe('resolveAwsBedrockUpstream', () => {
       apiUrl: 'https://bedrock-mantle.eu-west-1.api.aws/openai/v1',
       api: 'responses',
     },
-  ])('routes $endpoint models to $apiUrl and signs with IAM keys', ({ endpoint, id, apiUrl, api }) => {
-    expect(resolveAwsBedrockUpstream(iamCredential, { id, endpoint })).toEqual({
-      apiUrl,
-      apiUrlOverrides: {},
-      disableUrlSuffix: false,
-      supportedChatApis: [api],
-      responseTransforms: null,
-      apiKey: '',
-      apiKeyHeader: null,
-      awsBedrock: {
-        type: 'aws_bedrock',
-        region: 'eu-west-1',
-        access_key_id: 'AKIDEXAMPLE',
-        secret_access_key: 'secret',
-      },
-    });
-  });
+  ])(
+    'routes $endpoint models to $apiUrl and signs with IAM keys',
+    ({ endpoint, id, apiUrl, api }) => {
+      expect(resolveAwsBedrockUpstream(iamCredential, { id, endpoint })).toEqual({
+        apiUrl,
+        apiUrlOverrides: {},
+        disableUrlSuffix: false,
+        supportedChatApis: [api],
+        responseTransforms: null,
+        apiKey: '',
+        apiKeyHeader: null,
+        awsBedrock: {
+          type: 'aws_bedrock',
+          region: 'eu-west-1',
+          access_key_id: 'AKIDEXAMPLE',
+          secret_access_key: 'secret',
+        },
+      });
+    }
+  );
 
   it('infers the endpoint from the model id when the catalog has none', () => {
     expect(

@@ -301,7 +301,10 @@ async function getCatalogModelIds(
   return catalogModelIds;
 }
 
-function getModelsDevEntry(providerId: DirectUserByokInferenceProviderId, catalog: ModelsDevCatalog) {
+function getModelsDevEntry(
+  providerId: DirectUserByokInferenceProviderId,
+  catalog: ModelsDevCatalog
+) {
   const catalogKey = getModelsDevId(providerId);
   if (!catalogKey) {
     throw new Error(`${providerId} has no models.dev ID`);

@@ -1,5 +1,3 @@
-import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
-
 export const CONTROL_PLANE_TIMER_OVERRIDE_ENV = 'CONTROL_PLANE_TIMER_DIVISOR';
 
 const MINUTE_MS = 60_000;
@@ -78,10 +76,13 @@ export type ControlPlaneTimers = {
 // scaled) because they bound provider and container work.
 const PROVIDER_CREATE_MS = 2 * MINUTE_MS;
 const PROVIDER_CREATE_RETRY_MS = 10_000;
-// A repository-backed container allocation widens its create bound to
-// DEADLINE_MS.repositoryStartup (`control-plane/sandbox/sandbox-do.ts`), which
-// is the create path every preparation attempt with a repository takes.
-const PREPARATION_CREATE_MS = Math.max(PROVIDER_CREATE_MS, DEADLINE_MS.repositoryStartup);
+// A repository-backed container allocation creates its sandbox under the wider
+// repository startup bound (`DEADLINE_MS.repositoryStartup` in
+// `sandbox-control/deadlines.ts`), which is the create path every preparation
+// attempt with a repository takes. It is restated here because this module is
+// bundled into the wrapper without the worker's other sources;
+// `control-plane-timers.test.ts` asserts the attempt budget against that bound.
+const PREPARATION_CREATE_MS = 5 * MINUTE_MS;
 const WRAPPER_FIRST_CONNECT_MS = 5 * MINUTE_MS;
 const WRAPPER_HELLO_MS = 30_000;
 const RESTORE_MS = 2 * MINUTE_MS;

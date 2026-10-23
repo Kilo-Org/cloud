@@ -2855,7 +2855,6 @@
   },
   "voiceInput": {
     "listening": "Lyssnar…",
-    "staysOff": "Röstinmatningen förblir avstängd tills du tillåter transkribering via internet.",
     "onlineTitle": "Talet bearbetas via internet",
     "onlineMessage": "Den här enheten kan inte transkribera utan internetanslutning. Din inspelning skickas till {{provider}} för att omvandlas till text. Kilo lagrar inte ljudet.",
     "allow": "Tillåt",

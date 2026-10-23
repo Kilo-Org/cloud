@@ -2341,7 +2341,6 @@
     "allow": "Cho phép",
     "onlineMessage": "Thiết bị này không thể chuyển giọng nói thành văn bản ngoại tuyến. Bản ghi âm của bạn được gửi đến {{provider}} để chuyển thành văn bản. Kilo không lưu trữ âm thanh.",
     "onlineTitle": "Giọng nói được xử lý trực tuyến",
-    "staysOff": "Tính năng nhập bằng giọng nói vẫn tắt cho đến khi bạn cho phép chuyển giọng nói thành văn bản trực tuyến.",
     "start": "Bắt đầu nhập bằng giọng nói",
     "stop": "Dừng nhập bằng giọng nói",
     "restricted": "Tính năng nhập bằng giọng nói bị hạn chế trên thiết bị này.",

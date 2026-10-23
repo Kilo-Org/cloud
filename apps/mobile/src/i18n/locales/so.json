@@ -2855,7 +2855,6 @@
   },
   "voiceInput": {
     "listening": "Waa la dhegaysanayaa...",
-    "staysOff": "Gelinta codku way dansanaanaysaa ilaa aad oggolaato in hadalka qoraal loogu beddelo internetka.",
     "onlineTitle": "Hadalka waxaa lagu farsameeyaa internetka",
     "onlineMessage": "Qalabkani hadalka qoraal uma beddeli karo internet la'aan. Codkaaga la duubay waxaa loo diraa {{provider}} si qoraal loogu beddelo. Kilo ma kaydiyo codka.",
     "allow": "Oggolow",

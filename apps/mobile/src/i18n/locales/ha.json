@@ -2855,7 +2855,6 @@
   },
   "voiceInput": {
     "listening": "Ana sauraro...",
-    "staysOff": "Shigar da rubutu ta murya zai kasance a kashe har sai ka ba da izinin mayar da magana rubutu ta intanet.",
     "onlineTitle": "Ana sarrafa magana ta intanet",
     "onlineMessage": "Wannan na'urar ba za ta iya mayar da magana rubutu ba tare da intanet ba. Ana aika sautin da ka ɗauka zuwa {{provider}} don a mayar da shi rubutu. Kilo ba ya adana sautin.",
     "allow": "Ba da izini",

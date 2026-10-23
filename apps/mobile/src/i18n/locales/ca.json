@@ -2894,7 +2894,6 @@
   },
   "voiceInput": {
     "listening": "S'està escoltant…",
-    "staysOff": "El dictat continuarà desactivat fins que permetis la transcripció en línia.",
     "onlineTitle": "La veu es processa en línia",
     "onlineMessage": "Aquest dispositiu no pot transcriure sense connexió. El teu enregistrament s'envia a {{provider}} per convertir-lo en text. Kilo no emmagatzema l'àudio.",
     "allow": "Permet",

@@ -2855,7 +2855,6 @@
   },
   "voiceInput": {
     "listening": "Mihaino...",
-    "staysOff": "Tsy handeha ny fampidirana amin'ny feo raha tsy avelanao hovadika ho soratra an-tserasera ny feo.",
     "onlineTitle": "Karakaraina an-tserasera ny feo",
     "onlineMessage": "Tsy afaka mamadika feo ho soratra ity fitaovana ity raha tsy mifandray amin'ny aterineto. Alefa any amin'ny {{provider}} ny feo noraketinao mba havadika ho soratra. Tsy mitahiry ny feo i Kilo.",
     "allow": "Avelao",

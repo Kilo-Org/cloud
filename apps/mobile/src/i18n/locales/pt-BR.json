@@ -2364,7 +2364,6 @@
     "allow": "Permitir",
     "onlineMessage": "Este dispositivo não consegue transcrever sem conexão com a internet. Sua gravação é enviada para {{provider}} para ser convertida em texto. O Kilo não armazena o áudio.",
     "onlineTitle": "A fala é processada online",
-    "staysOff": "A digitação por voz permanece desativada até você permitir a transcrição online.",
     "start": "Iniciar digitação por voz",
     "stop": "Parar digitação por voz",
     "restricted": "A digitação por voz está restrita neste dispositivo.",

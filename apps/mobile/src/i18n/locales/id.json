@@ -2341,7 +2341,6 @@
     "allow": "Izinkan",
     "onlineMessage": "Perangkat ini tidak dapat mengubah ucapan menjadi teks secara luring. Rekamanmu dikirim ke {{provider}} untuk diubah menjadi teks. Kilo tidak menyimpan audio.",
     "onlineTitle": "Ucapan diproses secara daring",
-    "staysOff": "Masukan suara tetap nonaktif hingga kamu mengizinkan transkripsi daring.",
     "start": "Mulai masukan suara",
     "stop": "Hentikan masukan suara",
     "restricted": "Masukan suara dibatasi di perangkat ini.",

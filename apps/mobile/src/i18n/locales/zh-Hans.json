@@ -2341,7 +2341,6 @@
     "allow": "允许",
     "onlineMessage": "此设备不支持离线语音转写。录音将发送至 {{provider}} 转换为文字。Kilo 不会存储音频。",
     "onlineTitle": "语音将在线处理",
-    "staysOff": "允许在线语音转写后，才能使用语音输入。",
     "start": "开始语音输入",
     "stop": "停止语音输入",
     "restricted": "此设备上的语音输入受到限制。",

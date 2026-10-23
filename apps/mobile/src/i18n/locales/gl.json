@@ -2855,7 +2855,6 @@
   },
   "voiceInput": {
     "listening": "Escoitando...",
-    "staysOff": "O ditado seguirá desactivado ata que permitas a transcrición en liña.",
     "onlineTitle": "O audio procésase en liña",
     "onlineMessage": "Este dispositivo non pode transcribir sen conexión. A túa gravación envíase a {{provider}} para convertela en texto. Kilo non almacena o audio.",
     "allow": "Permitir",

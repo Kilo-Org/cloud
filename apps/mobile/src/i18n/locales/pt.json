@@ -2894,7 +2894,6 @@
   },
   "voiceInput": {
     "listening": "A ouvir...",
-    "staysOff": "O ditado fica desativado até permitires a transcrição pela Internet.",
     "onlineTitle": "O ditado é processado pela Internet",
     "onlineMessage": "Este dispositivo não consegue transcrever sem ligação à Internet. A tua gravação é enviada para {{provider}} para ser convertida em texto. O Kilo não guarda o áudio.",
     "allow": "Permitir",

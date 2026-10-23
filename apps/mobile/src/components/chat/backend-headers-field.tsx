@@ -24,7 +24,7 @@ export function BackendHeadersField({
           label={t('profiles.mcp.headers')}
           defaultValue={value.current}
           multiline
-          className="min-h-28 leading-5"
+          className="min-h-28 leading-[1.25rem]"
           autoCapitalize="none"
           autoCorrect={false}
           disabled={busy}

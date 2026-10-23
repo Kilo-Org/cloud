@@ -86,6 +86,31 @@ async function seedReport(organization: string | null = null, count = 1) {
   if (!report) throw new Error('Report fixture was not inserted');
   return { report, sessionIds };
 }
+/**
+ * Schedule a night that ended minutes ago with no sessions, events or usage.
+ * `collectionCovered: false` starts the collection an hour into the night, so the
+ * evidence cannot prove a zero.
+ */
+async function seedQuietNight({ collectionCovered = true } = {}) {
+  const now = Date.now();
+  const nightStart = new Date(now - 3 * 3600_000);
+  const cutoff = new Date(now - 5 * 60_000);
+  const morningEnd = new Date(now + 3 * 3600_000);
+  const clock = (value: Date) =>
+    `${String(value.getUTCHours()).padStart(2, '0')}:${String(value.getUTCMinutes()).padStart(2, '0')}`;
+  await db.insert(agent_briefing_preferences).values({
+    kilo_user_id: user.id,
+    timezone: 'UTC',
+    night_start: clock(nightStart),
+    morning_start: clock(cutoff),
+    morning_end: clock(morningEnd),
+    next_run_at: nightStart.toISOString(),
+    created_at: new Date(
+      nightStart.getTime() + (collectionCovered ? -60_000 : 3600_000)
+    ).toISOString(),
+  });
+  return new Date(now);
+}
 describe('agent briefing ownership and lifecycle', () => {
   it('distinguishes Personal, organization and all report scopes and denies another user', async () => {
     const personal = await seedReport();
@@ -384,6 +409,113 @@ describe('agent briefing ownership and lifecycle', () => {
     expect(
       (await agentBriefingRouter.createCaller({ user }).list({ currentOnly: true })).reports
     ).toHaveLength(0);
+  });
+  it('publishes a collected quiet night with zero counts and never bills a summary', async () => {
+    const now = await seedQuietNight();
+    await db.insert(agent_briefing_context_preferences).values({
+      kilo_user_id: user.id,
+      context_key: 'personal',
+      ai_enabled: true,
+      model: 'test/bounded',
+    });
+    jest.mocked(dispatchAgentBriefingPush).mockClear();
+    await sweepAgentBriefings(now);
+    const reports = await db.select().from(agent_briefing_reports);
+    expect(reports.map(report => report.published_at !== null)).toEqual([true, true]);
+    const report = reports.find(entry => entry.organization_id === null);
+    if (!report) throw new Error('Personal quiet report was not created');
+    expect(report.facts).toMatchObject({
+      scorecard: { sessions: 0, pullRequests: 0, blockers: 0, spendMicrodollars: 0 },
+      coverage: {
+        activity: 'complete',
+        spend: 'complete',
+        blockers: 'complete',
+        pullRequests: 'complete',
+      },
+    });
+    expect(report.summary).toMatchObject({
+      status: 'unavailable',
+      text: null,
+      error: null,
+      canRetry: false,
+    });
+    expect(report.generation_id).toBeNull();
+    expect(dispatchAgentBriefingPush).not.toHaveBeenCalled();
+    const listed = await agentBriefingRouter.createCaller({ user }).list({ scope: 'personal' });
+    expect(listed.reports.map(entry => entry.id)).toEqual([report.id]);
+    expect(listed.reports[0]?.scorecard).toEqual({
+      sessions: 0,
+      pullRequests: 0,
+      blockers: 0,
+      spendMicrodollars: 0,
+    });
+    const caller = agentBriefingRouter.createCaller({ user });
+    const estimate = await caller.estimateSummary({ reportId: report.id });
+    expect(estimate.canGenerate).toBe(false);
+    await expect(
+      caller.generateSummary({ reportId: report.id, estimateToken: estimate.estimateToken })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+  it('publishes a quiet night for a context with AI off without offering a summary', async () => {
+    const now = await seedQuietNight();
+    await sweepAgentBriefings(now);
+    const report = (await db.select().from(agent_briefing_reports)).find(
+      entry => entry.organization_id === null
+    );
+    if (!report) throw new Error('Personal quiet report was not created');
+    expect(report.published_at).not.toBeNull();
+    expect(report.summary).toMatchObject({ status: 'disabled', text: null, canRetry: false });
+  });
+  it('keeps a quiet night unpublished while the collection window is not covered', async () => {
+    const now = await seedQuietNight({ collectionCovered: false });
+    await sweepAgentBriefings(now);
+    const reports = await db.select().from(agent_briefing_reports);
+    expect(reports.map(entry => entry.published_at)).toEqual([null, null]);
+    const report = reports.find(entry => entry.organization_id === null);
+    if (!report) throw new Error('Personal quiet report was not created');
+    expect(report.facts).toMatchObject({
+      coverage: {
+        activity: 'partial',
+        spend: 'unavailable',
+        blockers: 'partial',
+        pullRequests: 'partial',
+      },
+    });
+    expect(
+      (await agentBriefingRouter.createCaller({ user }).list({ scope: 'personal' })).reports
+    ).toHaveLength(0);
+  });
+  it('reopens summary generation when late evidence makes a published quiet night active', async () => {
+    const now = await seedQuietNight();
+    await db.insert(agent_briefing_context_preferences).values({
+      kilo_user_id: user.id,
+      context_key: 'personal',
+      ai_enabled: true,
+      model: 'test/bounded',
+    });
+    await sweepAgentBriefings(now);
+    const sessionId = `ses_briefing_${sessionSequence++}`;
+    await db.insert(cli_sessions_v2).values({
+      session_id: sessionId,
+      kilo_user_id: user.id,
+      title: 'Late activity',
+      created_on_platform: 'cli',
+    });
+    await db.insert(agent_briefing_events).values({
+      id: crypto.randomUUID(),
+      session_id: sessionId,
+      kilo_user_id: user.id,
+      kind: 'activity',
+      occurred_at: new Date(now.getTime() - 30 * 60_000).toISOString(),
+    });
+    await sweepAgentBriefings(new Date(now.getTime() + 120_000));
+    const report = (await db.select().from(agent_briefing_reports)).find(
+      entry => entry.organization_id === null
+    );
+    if (!report) throw new Error('Personal quiet report was not created');
+    expect(report.published_at).not.toBeNull();
+    expect(report.facts).toMatchObject({ scorecard: { sessions: 1 } });
+    expect(report.summary).toMatchObject({ status: 'pending', text: null, error: null });
   });
   it('requires estimate consent and finite per-context safeguards before paid generation', async () => {
     const caller = agentBriefingRouter.createCaller({ user });

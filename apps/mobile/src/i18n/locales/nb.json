@@ -269,6 +269,7 @@
     "voiceInput": "Taleinndata",
     "autoExpandThinking": "Vis resonnering automatisk",
     "autoExpandThinkingSubtitle": "Vis hele agentens resonnement når det er ferdig.",
+    "autoExpandThinkingInactiveSubtitle": "Ingen effekt mens detaljer om resonnering er skjult.",
     "hideThinking": "Skjul detaljer om resonnering",
     "hideThinkingSubtitle": "Ikke vis agentens resonnering i øktvisningen.",
     "keepScreenOn": "Hold skjermen på i øktvisningen",

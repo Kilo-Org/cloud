@@ -269,6 +269,7 @@
     "voiceInput": "Häälsisestus",
     "autoExpandThinking": "Ava mõttekäik automaatselt",
     "autoExpandThinkingSubtitle": "Näita agendi mõttekäiku avatuna, kui mõtlemine lõpeb.",
+    "autoExpandThinkingInactiveSubtitle": "Ei oma mõju, kui mõttekäigu üksikasjad on peidetud.",
     "hideThinking": "Peida mõttekäigu üksikasjad",
     "hideThinkingSubtitle": "Ära näita agendi mõttekäiku seansi lehel.",
     "keepScreenOn": "Hoia ekraan seansi lehel sisselülitatuna",

@@ -269,6 +269,7 @@
     "voiceInput": "إدخال صوتي",
     "autoExpandThinking": "عرض تفاصيل التفكير تلقائيًا",
     "autoExpandThinkingSubtitle": "عرض تفاصيل تفكير الوكيل عند انتهائه.",
+    "autoExpandThinkingInactiveSubtitle": "لا تأثير عندما تكون تفاصيل التفكير مخفية.",
     "hideThinking": "إخفاء تفاصيل التفكير",
     "hideThinkingSubtitle": "عدم عرض تفكير الوكيل في صفحة الجلسة.",
     "keepScreenOn": "إبقاء الشاشة مضاءة في صفحة الجلسة",

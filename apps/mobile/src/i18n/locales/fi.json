@@ -269,6 +269,7 @@
     "voiceInput": "Äänisyöte",
     "autoExpandThinking": "Avaa päättely automaattisesti",
     "autoExpandThinkingSubtitle": "Näytä agentin päättely kokonaan, kun päättely valmistuu.",
+    "autoExpandThinkingInactiveSubtitle": "Ei vaikutusta, kun päättelyn tiedot on piilotettu.",
     "hideThinking": "Piilota päättelyn tiedot",
     "hideThinkingSubtitle": "Älä näytä agentin päättelyä istuntosivulla.",
     "keepScreenOn": "Pidä näyttö päällä istuntosivulla",

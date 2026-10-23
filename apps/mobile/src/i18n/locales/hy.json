@@ -269,6 +269,7 @@
     "voiceInput": "Ձայնային մուտք",
     "autoExpandThinking": "Ինքնաշխատ բացել մտածման բաժինը",
     "autoExpandThinkingSubtitle": "Մտածումն ավարտվելուց հետո բացել գործակալի մտածման բաժինը։",
+    "autoExpandThinkingInactiveSubtitle": "Ազդեցություն չունի, երբ մտածման մանրամասները թաքցված են։",
     "hideThinking": "Թաքցնել մտածման մանրամասները",
     "hideThinkingSubtitle": "Չցուցադրել գործակալի մտածումը նիստի էջում։",
     "keepScreenOn": "Նիստի էջում էկրանը միացված պահել",

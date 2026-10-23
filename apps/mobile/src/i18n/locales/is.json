@@ -269,6 +269,7 @@
     "voiceInput": "Raddinntak",
     "autoExpandThinking": "Opna hugsunarferlið sjálfkrafa",
     "autoExpandThinkingSubtitle": "Sýna allt hugsunarferli fulltrúans þegar því er lokið.",
+    "autoExpandThinkingInactiveSubtitle": "Hefur engin áhrif á meðan upplýsingar um hugsun eru faldar.",
     "hideThinking": "Fela upplýsingar um hugsun",
     "hideThinkingSubtitle": "Ekki sýna hugsun fulltrúans á lotusíðunni.",
     "keepScreenOn": "Halda skjánum kveiktum á lotusíðunni",

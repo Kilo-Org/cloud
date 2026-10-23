@@ -269,6 +269,7 @@
     "voiceInput": "Shigar da murya",
     "autoExpandThinking": "Faɗaɗa tunani kai tsaye",
     "autoExpandThinkingSubtitle": "Nuna cikakken tunanin wakilin idan ya gama.",
+    "autoExpandThinkingInactiveSubtitle": "Babu wani tasiri idan an ɓoye bayanan tunani.",
     "hideThinking": "Ɓoye bayanan tunani",
     "hideThinkingSubtitle": "Kada a nuna tunanin wakilin a shafin zaman.",
     "keepScreenOn": "Bar allo a kunne a shafin zaman",

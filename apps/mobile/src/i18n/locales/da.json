@@ -269,6 +269,7 @@
     "voiceInput": "Stemmeinput",
     "autoExpandThinking": "Fold ræsonnementer ud automatisk",
     "autoExpandThinkingSubtitle": "Vis agentens ræsonnement foldet ud, når det er færdigt.",
+    "autoExpandThinkingInactiveSubtitle": "Ingen effekt, mens detaljer om ræsonnement er skjult.",
     "hideThinking": "Skjul detaljer om ræsonnement",
     "hideThinkingSubtitle": "Vis ikke agentens ræsonnement på sessionssiden.",
     "keepScreenOn": "Hold skærmen tændt på sessionssiden",

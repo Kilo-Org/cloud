@@ -269,6 +269,7 @@
     "voiceInput": "Ìwọlé ohùn",
     "autoExpandThinking": "Ṣí ìrònú sílẹ̀ láìfọwọ́yí",
     "autoExpandThinkingSubtitle": "Fi ìrònú aṣojú hàn ní kíkún nígbà tí ó bá parí.",
+    "autoExpandThinkingInactiveSubtitle": "Kò ní ipa nígbà tí àwọn kúlẹ̀kúlẹ̀ ìrònú bá wà ní pamọ́.",
     "hideThinking": "Fi àwọn kúlẹ̀kúlẹ̀ ìrònú pamọ́",
     "hideThinkingSubtitle": "Má ṣe fi ìrònú aṣojú hàn ní ojú ìwé ìgbà iṣẹ́.",
     "keepScreenOn": "Jẹ́ kí iboju máa tàn ní ojú ìwé ìgbà iṣẹ́",

@@ -269,6 +269,7 @@
     "voiceInput": "Mewnbwn llais",
     "autoExpandThinking": "Ehangu meddwl yn awtomatig",
     "autoExpandThinkingSubtitle": "Dangos meddwl yr asiant yn llawn pan fydd wedi gorffen meddwl.",
+    "autoExpandThinkingInactiveSubtitle": "Nid oes unrhyw effaith tra bydd manylion meddwl wedi'u cuddio.",
     "hideThinking": "Cuddio manylion meddwl",
     "hideThinkingSubtitle": "Peidio â dangos meddwl yr asiant ar dudalen y sesiwn.",
     "keepScreenOn": "Cadw'r sgrin ymlaen ar dudalen y sesiwn",

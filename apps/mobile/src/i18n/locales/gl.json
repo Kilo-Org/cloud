@@ -269,6 +269,7 @@
     "voiceInput": "Entrada de voz",
     "autoExpandThinking": "Despregar o razoamento automaticamente",
     "autoExpandThinkingSubtitle": "Mostrar o razoamento do axente despregado cando remate.",
+    "autoExpandThinkingInactiveSubtitle": "Non ten efecto mentres os detalles do razoamento estean ocultos.",
     "hideThinking": "Ocultar os detalles do razoamento",
     "hideThinkingSubtitle": "Non mostrar o razoamento do axente na páxina da sesión.",
     "keepScreenOn": "Manter a pantalla acesa ao ver a sesión",

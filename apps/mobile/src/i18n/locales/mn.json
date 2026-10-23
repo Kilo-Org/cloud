@@ -269,6 +269,7 @@
     "voiceInput": "Дуут оруулга",
     "autoExpandThinking": "Бодлыг автоматаар дэлгэх",
     "autoExpandThinkingSubtitle": "Дууссаны дараа агентын бодлыг дэлгэсэн байдлаар харуулна.",
+    "autoExpandThinkingInactiveSubtitle": "Бодлын дэлгэрэнгүйг нуух үед нөлөө үзүүлэхгүй.",
     "hideThinking": "Бодлын дэлгэрэнгүйг нуух",
     "hideThinkingSubtitle": "Сессийн хуудсан дээр агентын бодлыг харуулахгүй.",
     "keepScreenOn": "Сессийн дэлгэц дээр байх үед дэлгэцийг асаалттай байлгах",

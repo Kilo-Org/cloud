@@ -269,6 +269,7 @@
     "voiceInput": "Pag-input ng boses",
     "autoExpandThinking": "Awtomatikong ipakita ang buong pag-iisip",
     "autoExpandThinkingSubtitle": "Ipakita nang buo ang pag-iisip ng ahente kapag natapos ito.",
+    "autoExpandThinkingInactiveSubtitle": "Walang epekto habang itinatago ang mga detalye ng pag-iisip.",
     "hideThinking": "Itago ang mga detalye ng pag-iisip",
     "hideThinkingSubtitle": "Huwag ipakita ang pag-iisip ng ahente sa pahina ng sesyon.",
     "keepScreenOn": "Panatilihing bukas ang screen sa pahina ng sesyon",

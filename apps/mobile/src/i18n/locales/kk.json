@@ -269,6 +269,7 @@
     "voiceInput": "Дауыспен енгізу",
     "autoExpandThinking": "Ойлау барысын автоматты түрде ашу",
     "autoExpandThinkingSubtitle": "Агент ойлануды аяқтағанда, оның ойлау барысын толық көрсету.",
+    "autoExpandThinkingInactiveSubtitle": "Ойлау мәліметтері жасырылғанда әсері болмайды.",
     "hideThinking": "Ойлау мәліметтерін жасыру",
     "hideThinkingSubtitle": "Сессия бетінде агенттің ойлауын көрсетпеу.",
     "keepScreenOn": "Сессия бетінде экранды қосулы ұстау",

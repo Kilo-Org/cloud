@@ -269,6 +269,7 @@
     "voiceInput": "વૉઇસ ઇનપુટ",
     "autoExpandThinking": "વિચારપ્રક્રિયા આપમેળે ખોલો",
     "autoExpandThinkingSubtitle": "એજન્ટની વિચારપ્રક્રિયા પૂરી થાય ત્યારે તેની વિગતો ખોલીને બતાવો.",
+    "autoExpandThinkingInactiveSubtitle": "વિચારપ્રક્રિયાની વિગતો છુપાવેલી હોય ત્યારે કોઈ અસર થશે નહીં.",
     "hideThinking": "વિચારપ્રક્રિયાની વિગતો છુપાવો",
     "hideThinkingSubtitle": "સત્ર પૃષ્ઠ પર એજન્ટની વિચારપ્રક્રિયા બતાવશો નહીં.",
     "keepScreenOn": "સત્ર પૃષ્ઠ પર હોય ત્યારે સ્ક્રીન ચાલુ રાખો",

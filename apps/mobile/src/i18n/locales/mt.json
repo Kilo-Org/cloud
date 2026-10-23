@@ -269,6 +269,7 @@
     "voiceInput": "Input tal-vuċi",
     "autoExpandThinking": "Espandi awtomatikament il-ħsieb",
     "autoExpandThinkingSubtitle": "Uri l-ħsieb tal-aġent espandut meta jispiċċa.",
+    "autoExpandThinkingInactiveSubtitle": "L-ebda effett meta d-dettalji tal-ħsieb ikunu moħbija.",
     "hideThinking": "Aħbi d-dettalji tal-ħsieb",
     "hideThinkingSubtitle": "Turix il-ħsieb tal-aġent fil-paġna tas-sessjoni.",
     "keepScreenOn": "Żomm l-iskrin mixgħul fil-paġna tas-sessjoni",

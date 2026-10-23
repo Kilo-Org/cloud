@@ -2336,6 +2336,7 @@
     "voiceInput": "Input vocale",
     "autoExpandThinking": "Espandi automaticamente il ragionamento",
     "autoExpandThinkingSubtitle": "Mostra il ragionamento completo dell'agente al termine dell'elaborazione.",
+    "autoExpandThinkingInactiveSubtitle": "Non ha effetto quando i dettagli del ragionamento sono nascosti.",
     "hideThinking": "Nascondi i dettagli del ragionamento",
     "hideThinkingSubtitle": "Non mostrare il ragionamento dell'agente nella schermata della sessione.",
     "keepScreenOn": "Mantieni lo schermo acceso nella schermata della sessione",

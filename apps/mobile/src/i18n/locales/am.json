@@ -269,6 +269,7 @@
     "voiceInput": "የድምጽ ግቤት",
     "autoExpandThinking": "አስተሳሰቡን በራስ ሰር ያስፉ",
     "autoExpandThinkingSubtitle": "ወኪሉ ማሰቡን ሲጨርስ አስተሳሰቡን ተዘርግቶ ያሳዩ።",
+    "autoExpandThinkingInactiveSubtitle": "የአስተሳሰብ ዝርዝሮች ተደብቀው ባሉ ጊዜ ምንም ውጤት የላቸውም።",
     "hideThinking": "የአስተሳሰብ ዝርዝሮችን ደብቅ",
     "hideThinkingSubtitle": "የወኪሉን አስተሳሰብ በክፍለ ጊዜ ገጽ ላይ አታሳዩ።",
     "keepScreenOn": "በክፍለ ጊዜ ገጽ ላይ ሲሆኑ ማያ ገጹን እንደበራ ያቆዩ",

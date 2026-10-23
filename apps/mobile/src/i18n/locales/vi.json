@@ -269,6 +269,7 @@
     "voiceInput": "Nhập bằng giọng nói",
     "autoExpandThinking": "Tự động mở phần suy luận",
     "autoExpandThinkingSubtitle": "Hiển thị toàn bộ nội dung suy luận của tác nhân sau khi suy luận xong.",
+    "autoExpandThinkingInactiveSubtitle": "Không có tác dụng khi chi tiết suy luận đang bị ẩn.",
     "hideThinking": "Ẩn chi tiết suy luận",
     "hideThinkingSubtitle": "Không hiển thị suy luận của tác nhân trên trang phiên.",
     "keepScreenOn": "Giữ màn hình sáng khi xem phiên",

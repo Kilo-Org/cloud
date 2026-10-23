@@ -269,6 +269,7 @@
     "voiceInput": "ورودی صوتی",
     "autoExpandThinking": "باز کردن خودکار بخش تفکر",
     "autoExpandThinkingSubtitle": "پس از پایان تفکر عامل، محتوای آن را به‌صورت بازشده نمایش دهید.",
+    "autoExpandThinkingInactiveSubtitle": "تا زمانی که جزئیات تفکر پنهان باشند، اثری ندارد.",
     "hideThinking": "پنهان کردن جزئیات تفکر",
     "hideThinkingSubtitle": "تفکر عامل در صفحهٔ نشست نمایش داده نشود.",
     "keepScreenOn": "روشن نگه داشتن صفحه در صفحهٔ نشست",

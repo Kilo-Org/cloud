@@ -269,6 +269,7 @@
     "voiceInput": "Fampidirana feo",
     "autoExpandThinking": "Velaro ho azy ny fisainana",
     "autoExpandThinkingSubtitle": "Asehoy mivelatra ny fisainan'ny mpanampy rehefa vita izany.",
+    "autoExpandThinkingInactiveSubtitle": "Tsy misy akony raha afeno ny antsipirian'ny fisainana.",
     "hideThinking": "Afeno ny antsipirian'ny fisainana",
     "hideThinkingSubtitle": "Aza aseho ny fisainan'ny mpanampy eo amin'ny pejin'ny fotoam-piasana.",
     "keepScreenOn": "Avelao hirehitra ny efijery eo amin'ny pejin'ny fotoam-piasana",

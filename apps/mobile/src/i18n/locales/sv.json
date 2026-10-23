@@ -269,6 +269,7 @@
     "voiceInput": "Röstinmatning",
     "autoExpandThinking": "Visa resonemang automatiskt",
     "autoExpandThinkingSubtitle": "Visa agentens resonemang i sin helhet när det är klart.",
+    "autoExpandThinkingInactiveSubtitle": "Ingen effekt när information om resonemang är dold.",
     "hideThinking": "Dölj information om resonemang",
     "hideThinkingSubtitle": "Visa inte agentens resonemang på sessionssidan.",
     "keepScreenOn": "Håll skärmen tänd på sessionssidan",

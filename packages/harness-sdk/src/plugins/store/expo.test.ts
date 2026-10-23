@@ -4,7 +4,7 @@ import { expect, it } from 'vitest';
 import { SessionStore, StoreError, type SessionStoreService } from '../../core/storage.js';
 import { expoDriver, type ExpoDatabase } from './expo.js';
 import { layerSqliteStore } from './sqlite.js';
-import { standIn } from './expo-fixture.js';
+import { probeTable, standIn } from './expo-fixture.js';
 import { textOf } from '../../core/turn.js';
 
 /** The double in `expo-fixture.ts` keeps the two rules expo-sqlite keeps. */
@@ -105,12 +105,9 @@ it('runs two reads of one SQL text at once without either losing its rows', asyn
   expect(open()).toBe(0);
 });
 
-// eslint-disable-next-line max-statements -- one scenario end to end: park the read, attempt the write, release, assert
 it('keeps a write out of a read that is between its run and its rows', async () => {
-  const { database, open, parkReads, wroteDuringRead } = standIn();
+  const { database, parkReads, wroteDuringRead } = standIn({ probe: true });
   const driver = expoDriver(database);
-  await driver('CREATE TABLE probe (a integer)', [], 'run');
-  await driver('INSERT INTO probe VALUES (1)', [], 'run');
 
   /* The read is held exactly where the adapter yields: its statement has run
      and its rows are not taken yet, which is the window a write would land in
@@ -123,25 +120,22 @@ it('keeps a write out of a read that is between its run and its rows', async () 
   parked.release();
   const [rows] = await Promise.all([read, write]);
 
-  expect(rows.rows).toEqual([[1]]);
-  expect(wroteDuringRead()).toBeFalsy();
-  await driver.close?.();
-  expect(open()).toBe(0);
+  expect({ rows: rows.rows, wrote: wroteDuringRead() }).toEqual({ rows: [[1]], wrote: false });
 });
 
 it('keeps at most four idle statements for one SQL text', async () => {
   const { database, open, prepared } = standIn();
   const driver = expoDriver(database);
-  await driver('CREATE TABLE probe (a integer)', [], 'run');
-  const before = prepared('SELECT a FROM probe');
+  await probeTable(driver);
+  const opened = open();
+  const reads = prepared('SELECT a FROM probe');
 
   /* Six reads of one text in flight at once find no idle statement, so each of
      them prepares one; the two that come back past the cap are finalized. */
   await Promise.all(Array.from({ length: 6 }, () => driver('SELECT a FROM probe', [], 'all')));
 
-  expect(prepared('SELECT a FROM probe') - before).toBe(6);
-  /* Four kept for the reads, plus the statement the DDL left behind. */
-  expect(open()).toBe(5);
+  expect(prepared('SELECT a FROM probe') - reads).toBe(6);
+  expect(open() - opened).toBe(4);
   await driver.close?.();
   expect(open()).toBe(0);
 });

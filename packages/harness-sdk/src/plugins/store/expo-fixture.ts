@@ -1,6 +1,6 @@
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync, type StatementSync } from 'node:sqlite';
 import { type ExpoDatabase, type ExpoStatement } from './expo.js';
-import type { SqlValue } from './driver.js';
+import type { SqlDriver, SqlValue } from './driver.js';
 
 /**
  * Expo's SQLite is a native module, so it cannot run here. What can run is the
@@ -67,54 +67,81 @@ const releaseOf = <A>(parking: Parking, result: A): Promise<A> => {
   return (parking.until ?? Promise.resolve()).then(() => result);
 };
 
+/** One statement's cursor, which a later run of the same statement takes over. */
+interface Cursor {
+  generation: number;
+}
+
+/** A write: it steps the statement once and has no rows to hand back. */
+const runOf =
+  (connection: Backing['connection'], cursor: Cursor, statement: StatementSync) =>
+  (params: SqlValue[]): Promise<void> => {
+    if (connection.reading > 0) {
+      connection.wrote = true;
+    }
+    cursor.generation += 1;
+    statement.run(...params);
+    return Promise.resolve();
+  };
+
+/** One run's place in its statement: the cursor it took and the rows it holds. */
+interface Reading {
+  readonly cursor: Cursor;
+  readonly mine: number;
+  readonly first: IteratorResult<Record<string, unknown>>;
+  readonly rows: IterableIterator<Record<string, unknown>>;
+}
+
+/** Every row a run has, refusing a result an earlier run of it took over. */
+const rowsOf = (
+  connection: Backing['connection'],
+  reading: Reading
+): { readonly getAllAsync: () => Promise<unknown[][]> } => ({
+  getAllAsync: () => {
+    connection.reading -= 1;
+    const { cursor, mine, first, rows } = reading;
+    if (mine !== cursor.generation) {
+      return Promise.reject(
+        new Error('this result is no longer readable because the statement ran again')
+      );
+    }
+    const read: unknown[][] = [];
+    if (first.done !== true) {
+      read.push(Object.values(first.value));
+    }
+    for (let row = rows.next(); row.done !== true; row = rows.next()) {
+      read.push(Object.values(row.value));
+    }
+    return Promise.resolve(read);
+  },
+});
+
+/** A read: it runs, and hands back the result a test may hold at the latch. */
+const readOf =
+  (backing: Backing, cursor: Cursor, statement: StatementSync) =>
+  (params: SqlValue[]): Promise<{ readonly getAllAsync: () => Promise<unknown[][]> }> => {
+    cursor.generation += 1;
+    const mine = cursor.generation;
+    backing.connection.reading += 1;
+    const rows = statement.iterate(...params);
+    const first = rows.next();
+    return releaseOf(backing.parking, rowsOf(backing.connection, { cursor, mine, first, rows }));
+  };
+
 /**
- * One prepared statement, with the two rules expo-sqlite holds it to.
- *
- * A statement is a single object literal here, so the two shape rules count its
- * members rather than the steps of anything it does.
+ * One prepared statement, with the two rules expo-sqlite holds it to: a run
+ * takes over the cursor its predecessor was reading, and a write is recorded
+ * when it lands between a read's run and its rows.
  */
-// eslint-disable-next-line max-lines-per-function, max-statements
 const statementOf = (backing: Backing, source: string): ExpoStatement => {
-  const { sqlite, counting, connection, parking } = backing;
+  const { sqlite, counting } = backing;
   const statement = sqlite.prepare(source);
   counting.live.count += 1;
   counting.perText.set(source, (counting.perText.get(source) ?? 0) + 1);
-  let generation = 0;
+  const cursor: Cursor = { generation: 0 };
   return {
-    executeAsync: (params: SqlValue[]) => {
-      if (connection.reading > 0) {
-        connection.wrote = true;
-      }
-      generation += 1;
-      statement.run(...params);
-      return Promise.resolve();
-    },
-    executeForRawResultAsync: (params: SqlValue[]) => {
-      generation += 1;
-      const mine = generation;
-      connection.reading += 1;
-      const rows = statement.iterate(...params);
-      const first = rows.next();
-      const result = {
-        getAllAsync: () => {
-          connection.reading -= 1;
-          if (mine !== generation) {
-            return Promise.reject(
-              new Error('this result is no longer readable because the statement ran again')
-            );
-          }
-          const read: unknown[][] = [];
-          if (first.done !== true) {
-            read.push(Object.values(first.value));
-          }
-          for (let row = rows.next(); row.done !== true; row = rows.next()) {
-            read.push(Object.values(row.value));
-          }
-          return Promise.resolve(read);
-        },
-      };
-      return releaseOf(parking, result);
-    },
+    executeAsync: runOf(backing.connection, cursor, statement),
+    executeForRawResultAsync: readOf(backing, cursor, statement),
     finalizeAsync: () => {
       counting.live.count -= 1;
       return Promise.resolve();
@@ -122,10 +149,26 @@ const statementOf = (backing: Backing, source: string): ExpoStatement => {
   };
 };
 
-const standIn = (): StandIn => {
+/** A one-column table with one row, for the driver-level tests. */
+const probeTable = async (driver: SqlDriver): Promise<void> => {
+  await driver('CREATE TABLE probe (a integer)', [], 'run');
+  await driver('INSERT INTO probe VALUES (1)', [], 'run');
+};
+
+/** What a test wants the double to start with. */
+interface StandInOptions {
+  /** A one-column table holding one row, for a test that measures something else. */
+  readonly probe?: boolean;
+}
+
+const standIn = (options: StandInOptions = {}): StandIn => {
   const parking: Parking = { armed: false };
+  const sqlite = new DatabaseSync(':memory:');
+  if (options.probe === true) {
+    sqlite.exec('CREATE TABLE probe (a integer); INSERT INTO probe VALUES (1);');
+  }
   const backing: Backing = {
-    sqlite: new DatabaseSync(':memory:'),
+    sqlite,
     counting: { live: { count: 0 }, perText: new Map() },
     connection: { reading: 0, wrote: false },
     parking,
@@ -154,5 +197,5 @@ const standIn = (): StandIn => {
   };
 };
 
-export { standIn };
-export type { StandIn };
+export { probeTable, standIn };
+export type { StandIn, StandInOptions };

@@ -27,11 +27,15 @@ describe('derivedChatText', () => {
   });
 
   it('keeps a message that fits the cap in characters but not in code units', () => {
-    // Half the cap in characters, twice the cap in UTF-16 units: it still fits,
-    // so no ellipsis belongs on it.
-    const families = '👨‍👩‍👧‍👦'.repeat(DERIVED_CHAT_TEXT_MAX_LENGTH / 2);
-    const stacked = '😀'.repeat(DERIVED_CHAT_TEXT_MAX_LENGTH / 2);
+    // Well inside the cap in characters, far past it in UTF-16 units: it still
+    // fits, so no ellipsis belongs on it. A family is eleven units, so forty of
+    // them are four hundred and forty against a cap of eighty.
+    const families = '👨‍👩‍👧‍👦'.repeat(40);
+    // Forty-one characters are eighty-two units: past the cap only in units.
+    const stacked = '😀'.repeat(41);
 
+    expect(families.length).toBeGreaterThan(DERIVED_CHAT_TEXT_MAX_LENGTH);
+    expect(stacked.length).toBeGreaterThan(DERIVED_CHAT_TEXT_MAX_LENGTH);
     expect(derivedChatText(families)).toBe(families);
     expect(derivedChatText(stacked)).toBe(stacked);
   });

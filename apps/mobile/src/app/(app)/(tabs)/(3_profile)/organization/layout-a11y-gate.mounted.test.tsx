@@ -13,8 +13,14 @@ vi.mock('@/components/app-unlock-screen', () => ({
 vi.mock('@/components/centered-state-surface', () => ({
   NativeStateSurface: ({ children }: { children: ReactElement }) => children,
 }));
-vi.mock('@/lib/form-sheet', () => ({ useFormSheetScreenOptions: () => ({}) }));
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('@/lib/form-sheet', () => ({
+  useFormSheetScreenOptions: () => ({ sheetAllowedDetents: [0.5, 1] }),
+}));
+vi.mock('react-native', () => ({
+  Platform: { OS: 'android' },
+  View: 'View',
+  useWindowDimensions: () => ({ width: 400, height: 800 }),
+}));
 
 /**
  * The scene's own navigation object: the nested Stack hands it to the layout,

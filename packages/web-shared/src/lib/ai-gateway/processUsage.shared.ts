@@ -1,4 +1,4 @@
-import { captureMessage } from '@sentry/nextjs';
+import { captureException, captureMessage } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -157,6 +157,66 @@ export function isResponseInterruptedError(error: unknown): boolean {
     error.name === 'TimeoutError' ||
     getUpstreamBodyTermination(error) !== null
   );
+}
+
+const ACCOUNT_ERROR_CODES = new Set<unknown>([401, 402, 403, '401', '402', '403']);
+const ACCOUNT_ERROR_TYPES = new Set<unknown>([
+  'authentication_error',
+  'permission_error',
+  'billing_error',
+  'invalid_api_key',
+  'insufficient_quota',
+  'billing_hard_limit_reached',
+]);
+
+type UpstreamStreamError = {
+  message?: string | null;
+  code?: number | string | null;
+  type?: string | null;
+  error_type?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+function isAccountError(error: UpstreamStreamError): boolean {
+  return (
+    ACCOUNT_ERROR_CODES.has(error.code) ||
+    ACCOUNT_ERROR_TYPES.has(error.code) ||
+    ACCOUNT_ERROR_TYPES.has(error.type) ||
+    ACCOUNT_ERROR_TYPES.has(error.error_type) ||
+    ACCOUNT_ERROR_TYPES.has(error.metadata?.error_type)
+  );
+}
+
+/**
+ * Reports an error event received inside an upstream SSE stream. Transient
+ * upstream failures (timeouts, overloads, dropped streams) are only logged, since
+ * they are frequent and not actionable. Authentication, permission, and billing
+ * failures on Kilo-owned credentials, including organization custom LLM keys,
+ * are sent to Sentry, since Kilo's provider keys or upstream account need
+ * attention. On user credentials (BYOK keys, ChatGPT subscriptions) they are
+ * logged.
+ */
+export function reportUpstreamStreamError(params: {
+  label: string;
+  source: string;
+  error: UpstreamStreamError;
+  usesUserCredentials: boolean;
+  logContext: Record<string, unknown>;
+  sentryExtra: Record<string, unknown>;
+}) {
+  const { label, source, error, usesUserCredentials, logContext, sentryExtra } = params;
+  const message = `${label}: ${error.message ?? 'unknown'}`;
+  if (!usesUserCredentials && isAccountError(error)) {
+    captureException(new Error(message), { tags: { source }, extra: sentryExtra });
+    return;
+  }
+  console.warn(message, {
+    source,
+    code: error.code,
+    error_type: error.error_type ?? error.metadata?.error_type ?? error.type,
+    uses_user_credentials: usesUserCredentials,
+    ...logContext,
+  });
 }
 
 /**

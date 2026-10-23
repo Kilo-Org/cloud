@@ -1,4 +1,3 @@
-import { useRouter } from 'expo-router';
 import { type ReactNode, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
@@ -27,6 +26,7 @@ import { Text } from '@/components/ui/text';
 import { useAgentProfile } from '@/lib/hooks/use-agent-profiles';
 import { useProfileCommandsSave } from '@/lib/hooks/use-profile-commands-save';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { usePopWhenFocused } from '@/lib/navigation/pop-when-focused';
 import { cn } from '@/lib/utils';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 
@@ -57,7 +57,7 @@ export function ProfileCommandsScreen({
   organizationId,
 }: Readonly<{ profileId: string; organizationId?: string }>) {
   const { t } = useTranslation();
-  const router = useRouter();
+  const popWhenFocused = usePopWhenFocused();
   const colors = useThemeColors();
   const profileQuery = useAgentProfile(profileId, organizationId);
 
@@ -147,7 +147,9 @@ export function ProfileCommandsScreen({
         return;
       }
       if (sameCommands(nonBlankCommands(commandsRef.current), persistedRef.current)) {
-        router.back();
+        // A hardware or gesture Back during the write already left this
+        // screen; a second pop would remove the profile overview beneath it.
+        popWhenFocused();
         return;
       }
     }

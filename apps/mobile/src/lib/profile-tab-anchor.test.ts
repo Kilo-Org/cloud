@@ -5,11 +5,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  findingDetailBackTarget,
-  findingDetailHasLocalHistory,
-  PROFILE_TAB_ROOT,
-} from './finding-detail-back';
+import { findingDetailBackTarget, findingDetailHasLocalHistory } from './finding-detail-back';
+import { getSecurityAgentPath } from './security-agent';
 import { profileTabPressListeners } from './tab-press-listeners';
 import { __resetTabSwitchInputForTests } from './tab-switch-input-gate';
 
@@ -39,18 +36,14 @@ describe('findingDetailHasLocalHistory', () => {
 
 describe('findingDetailBackTarget', () => {
   it('pops when there is local history (findings-list -> finding)', () => {
-    expect(findingDetailBackTarget(true)).toEqual({ kind: 'pop' });
+    expect(findingDetailBackTarget(true, 'personal')).toEqual({ kind: 'pop' });
   });
 
-  it('replaces to the profile root when a push/deep-link opened the report with no local history', () => {
-    expect(findingDetailBackTarget(false)).toEqual({
+  it('replaces with the scope findings list when a push/deep-link has no local history', () => {
+    expect(findingDetailBackTarget(false, 'personal')).toEqual({
       kind: 'replace',
-      href: '/(app)/(tabs)/(3_profile)',
+      href: getSecurityAgentPath('personal', 'findings'),
     });
-  });
-
-  it('anchors the no-history landing target to the profile tab root', () => {
-    expect(PROFILE_TAB_ROOT).toBe('/(app)/(tabs)/(3_profile)');
   });
 });
 

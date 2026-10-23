@@ -14,7 +14,7 @@ import {
   getBlockingCardPresentationForKind,
 } from '@/components/agents/blocking-card-state';
 import { permissionToolLabel } from '@/components/agents/permission-tool-label';
-import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
+import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -80,7 +80,7 @@ export function PermissionCard({
     () =>
       applyBlockingCardAppearance(presentationRef.current, titleRef, {
         announce: announceForA11y,
-        focus: moveA11yFocus,
+        focus: requestA11yFocus,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only announce/focus on a new request
     [requestId]

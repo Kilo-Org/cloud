@@ -2241,6 +2241,7 @@
       "branchLoadError": "څانګې بار نه شوې",
       "branchUnavailable": "د دې زېرمتون لپاره څانګې شتون نلري. له چمتو کوونکي سره خپل لاسرسی وګورئ، بیا بل زېرمتون وټاکئ.",
       "branchEmpty": "هېڅ څانګه شتون نلري",
+      "branchListIncomplete": "یوازې ځینې څانګې ښودل شوې دي. زېرمتون له دې لیست څخه ډېرې څانګې لري.",
       "branchPlaceholder": "یوه څانګه وټاکئ",
       "runOnWithTarget": "د چلولو ځای: {{target}}",
       "environment": "چاپېریال",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "{{count}} وسیله",
       "serverToolCount_other": "{{count}} وسیلې",
       "serverUnreachable": "دې سرور ته رسېدل ممکن نه شول",
-      "serverOff": "دا سرور بند دی"
+      "serverOff": "دا سرور بند دی",
+      "app": {
+        "label": "د وسیزې انټرفیس",
+        "failed": "د دې وسیزې انټرفیس لوډ نه شو.",
+        "empty": "د دې وسیزې انټرفیس کې د ښودلو لپاره هیڅ نشته."
+      }
     },
     "mcpOAuth": {
       "authMethod": "تصدیق",

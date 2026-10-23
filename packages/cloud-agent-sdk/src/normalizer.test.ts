@@ -987,27 +987,79 @@ describe('normalize', () => {
   });
 
   describe('question.asked', () => {
+    const question = {
+      question: 'Continue?',
+      header: 'Approval',
+      options: [{ label: 'Yes', description: 'Run the command' }],
+    };
+
     it('extracts requestId and questions from tool.callID', () => {
       const data = {
         id: 'q-1',
         tool: { callID: 'call-1' },
-        questions: [{ text: 'Continue?' }],
+        questions: [question],
       };
       const result = normalize(createRaw('question.asked', data));
       expect(result).toEqual({
         type: 'question.asked',
         requestId: 'q-1',
-        questions: [{ text: 'Continue?' }],
+        questions: [question],
       });
     });
 
     it('works when tool is absent', () => {
-      const data = { id: 'q-1', questions: [{ text: 'Yes?' }] };
+      const data = { id: 'q-1', questions: [question] };
       const result = normalize(createRaw('question.asked', data));
       expect(result).toEqual({
         type: 'question.asked',
         requestId: 'q-1',
-        questions: [{ text: 'Yes?' }],
+        questions: [question],
+      });
+    });
+
+    it('keeps the valid prefix and stops at the first malformed entry', () => {
+      const data = {
+        id: 'q-1',
+        questions: [question, { text: 'Continue?' }, question],
+      };
+      const result = normalize(createRaw('question.asked', data));
+      expect(result).toEqual({
+        type: 'question.asked',
+        requestId: 'q-1',
+        questions: [question],
+      });
+    });
+
+    it('keeps only the shared QuestionInfo fields', () => {
+      const data = {
+        id: 'q-1',
+        questions: [{ ...question, extra: 'ignored' }],
+      };
+      const result = normalize(createRaw('question.asked', data));
+      expect(result).toEqual({
+        type: 'question.asked',
+        requestId: 'q-1',
+        questions: [question],
+      });
+    });
+
+    it('treats a list whose first entry is malformed as carrying no questions', () => {
+      const data = { id: 'q-1', questions: [{ header: 'Approval' }, question] };
+      const result = normalize(createRaw('question.asked', data));
+      expect(result).toEqual({
+        type: 'question.asked',
+        requestId: 'q-1',
+        questions: undefined,
+      });
+    });
+
+    it('keeps an explicitly empty questions array', () => {
+      const data = { id: 'q-1', questions: [] };
+      const result = normalize(createRaw('question.asked', data));
+      expect(result).toEqual({
+        type: 'question.asked',
+        requestId: 'q-1',
+        questions: [],
       });
     });
 
@@ -2454,12 +2506,24 @@ describe('normalizeCliEvent', () => {
       const data = {
         id: 'q-1',
         tool: { callID: 'call-1' },
-        questions: [{ text: 'Continue?' }],
+        questions: [
+          {
+            question: 'Continue?',
+            header: 'Approval',
+            options: [{ label: 'Yes', description: '' }],
+          },
+        ],
       };
       expect(normalizeCliEvent('question.asked', data)).toEqual({
         type: 'question.asked',
         requestId: 'q-1',
-        questions: [{ text: 'Continue?' }],
+        questions: [
+          {
+            question: 'Continue?',
+            header: 'Approval',
+            options: [{ label: 'Yes', description: '' }],
+          },
+        ],
       });
     });
   });

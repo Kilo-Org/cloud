@@ -10,20 +10,20 @@ import { useTabBarBottomPadding } from '@/components/tab-screen';
  * The action used to be the scroll body's last child. At large display
  * densities the form is taller than the viewport, so it was clipped mid-label
  * at the scroll fold, against the tab bar (explorer manual-review finding,
- * 2026-09-19). The footer keeps its own layout space clear of the tab bar, so
- * the call to action is always fully legible.
+ * 2026-09-19). The footer reserves the screen's bottom clearance, so the call
+ * to action is always fully legible.
  *
  * The host wraps this footer and the scroll body in the keyboard-lift view,
  * which owns the bottom space while the keyboard is open. The footer's own
  * clearance therefore covers only what the lift does not: a keyboard taller
- * than the tab bar drops it to 0, while a keyboard shorter than the tab bar
- * (the hardware-keyboard IME bar is one navigation bar tall) keeps the rest, so
- * the action never lands behind the tab bar (e1-fill, 2026-09-19).
+ * than the clearance drops it to 0, while a shorter one (the hardware-keyboard
+ * IME bar is one navigation bar tall) keeps the rest, so the action never lands
+ * behind the bottom edge (e1-fill, 2026-09-19).
  */
 export function ManualReviewActionFooter({ children }: Readonly<{ children: ReactNode }>) {
-  const tabBarBottomPadding = useTabBarBottomPadding();
+  const bottomClearance = useTabBarBottomPadding();
   const keyboardLift = useKeyboardState(state => state.height);
-  const bottomPadding = Math.max(0, tabBarBottomPadding - keyboardLift);
+  const bottomPadding = Math.max(0, bottomClearance - keyboardLift);
   return (
     <View className="bg-background px-6 pt-3" style={{ paddingBottom: bottomPadding }}>
       {children}

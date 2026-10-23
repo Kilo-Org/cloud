@@ -1724,6 +1724,7 @@
       "branchLoadError": "无法加载分支",
       "branchUnavailable": "此仓库没有可用的分支。检查你在提供商处的访问权限，然后选择另一个仓库。",
       "branchEmpty": "没有可用的分支",
+      "branchListIncomplete": "仅显示部分分支。此仓库的分支数量超过此列表所能包含的范围。",
       "branchPlaceholder": "选择一个分支",
       "runOnWithTarget": "运行位置：{{target}}",
       "environment": "环境",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "{{count}} 个工具",
       "serverToolCount_other": "{{count}} 个工具",
       "serverUnreachable": "无法连接此服务器",
-      "serverOff": "此服务器已关闭"
+      "serverOff": "此服务器已关闭",
+      "app": {
+        "label": "工具界面",
+        "failed": "无法加载此工具的界面。",
+        "empty": "此工具的界面没有可显示的内容。"
+      }
     },
     "mcpOAuth": {
       "authMethod": "身份验证",

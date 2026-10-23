@@ -444,8 +444,7 @@ export const DYNAMIC_COUNTED_KEYS = new Map([
         'profiles.counts.setupCommands',
         'profiles.counts.agents',
       ],
-      reason:
-        'COUNT_KEYS map in profile-count-labels.ts; every unit word but MCP inflects',
+      reason: 'COUNT_KEYS map in profile-count-labels.ts; every unit word but MCP inflects',
     },
   ],
   [

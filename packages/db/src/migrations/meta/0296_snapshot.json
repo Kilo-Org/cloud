@@ -1,5 +1,5 @@
 {
-  "id": "1987a7d1-5725-46bc-8fe6-b186aaac7832",
+  "id": "2d61ccea-6389-4ab3-a6fd-492cc75f6550",
   "prevId": "9f79dabe-58e7-4e83-ad12-3a271b4d0d7f",
   "version": "7",
   "dialect": "postgresql",
@@ -10903,30 +10903,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "requesting_client_id": {
-          "name": "requesting_client_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "requesting_client_name": {
-          "name": "requesting_client_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "requesting_redirect_origin": {
-          "name": "requesting_redirect_origin",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "client_confirmed_at": {
-          "name": "client_confirmed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -11019,8 +10995,8 @@
           "method": "btree",
           "with": {}
         },
-        "IDX_device_auth_requests_user_code": {
-          "name": "IDX_device_auth_requests_user_code",
+        "UQ_device_auth_requests_user_code": {
+          "name": "UQ_device_auth_requests_user_code",
           "columns": [
             {
               "expression": "user_code",
@@ -11029,7 +11005,7 @@
               "nulls": "last"
             }
           ],
-          "isUnique": false,
+          "isUnique": true,
           "where": "\"device_auth_requests\".\"user_code\" IS NOT NULL",
           "concurrently": true,
           "method": "btree",

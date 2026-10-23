@@ -2077,8 +2077,15 @@
     {
       "idx": 296,
       "version": "7",
-      "when": 1792689795460,
-      "tag": "0296_device_auth_client_details",
+      "when": 1792693880283,
+      "tag": "0296_orange_jack_power",
+      "breakpoints": true
+    },
+    {
+      "idx": 297,
+      "version": "7",
+      "when": 1792780933206,
+      "tag": "0297_device_auth_client_details",
       "breakpoints": true
     }
   ]

@@ -1,5 +1,4 @@
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { replaceReasoningObjectWithReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import {
   faviconIcon,
@@ -8,13 +7,12 @@ import {
 
 export default {
   id: 'ollama-cloud',
+  models_dev_id: 'ollama-cloud',
   base_url: 'https://ollama.com/v1',
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions'],
   reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
-  transformRequest(context) {
-    replaceReasoningObjectWithReasoningEffort(context.request);
-  },
+  transformRequest() {},
   models: cachedEnhancedDirectByokModelList({
     providerId: 'ollama-cloud',
     recommendedModels: [

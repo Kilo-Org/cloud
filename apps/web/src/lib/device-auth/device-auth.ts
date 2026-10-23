@@ -20,6 +20,7 @@ export const DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE =
 const CODE_LENGTH = 8;
 const CODE_EXPIRATION_MINUTES = 10;
 const MAX_PENDING_REQUESTS_PER_IP = 5;
+const MAX_USER_CODE_ATTEMPTS = 5;
 
 export const DEVICE_AUTH_PENDING_LIMIT_MESSAGE =
   'Too many sign-in attempts from this network. Wait a few minutes and try again.';
@@ -67,7 +68,11 @@ export function hashDeviceSecret(secret: string): string {
 
 /**
  * Create a new device authorization request.
- * Writes both the legacy code and new user_code/device_code_hash.
+ *
+ * `code` is a high-entropy poll secret kept by the requesting client, while
+ * `user_code` is the short code shown to the user and typed into the approval
+ * page. `device_code_hash` covers the device secret used by the newer
+ * device-code flow.
  */
 export async function createDeviceAuthRequest(params: {
   userAgent?: string;
@@ -105,26 +110,39 @@ export async function createDeviceAuthRequest(params: {
     }
   }
 
-  const userCode = generateUserCode();
+  const pollSecret = generateDeviceSecret();
   const deviceSecret = generateDeviceSecret();
   const deviceCodeHash = hashDeviceSecret(deviceSecret);
   const expiresAt = new Date(Date.now() + CODE_EXPIRATION_MINUTES * 60 * 1000);
 
-  await db.insert(device_auth_requests).values({
-    code: userCode,
-    user_code: userCode,
-    device_code_hash: deviceCodeHash,
-    status: 'pending',
-    expires_at: expiresAt.toISOString(),
-    user_agent: userAgent,
-    ip_address: ipAddress,
-    ...requestingClientColumns(requestingClient),
-  });
+  for (let attempt = 0; attempt < MAX_USER_CODE_ATTEMPTS; attempt++) {
+    const userCode = generateUserCode();
+    const [inserted] = await db
+      .insert(device_auth_requests)
+      .values({
+        code: pollSecret,
+        user_code: userCode,
+        device_code_hash: deviceCodeHash,
+        status: 'pending',
+        expires_at: expiresAt.toISOString(),
+        user_agent: userAgent,
+        ip_address: ipAddress,
+        ...requestingClientColumns(requestingClient),
+      })
+      .onConflictDoNothing({
+        target: device_auth_requests.user_code,
+        where: sql`${device_auth_requests.user_code} IS NOT NULL`,
+      })
+      .returning({ id: device_auth_requests.id });
 
-  return { code: userCode, userCode, deviceCode: deviceSecret, expiresAt, requestingClient };
+    if (inserted) {
+      return { code: pollSecret, userCode, deviceCode: deviceSecret, expiresAt, requestingClient };
+    }
+  }
+
+  throw new Error('Unable to allocate a device authorization user code');
 }
 
-/** The stored columns of a named requesting client; absent for an unnamed caller. */
 function requestingClientColumns(client: RequestingClient | null): {
   requesting_client_id: string | null;
   requesting_client_name: string | null;
@@ -138,13 +156,13 @@ function requestingClientColumns(client: RequestingClient | null): {
 }
 
 /**
- * Get device auth request by code (legacy path).
+ * Get a device auth request by its displayed user code (approval side).
  */
-export async function getDeviceAuthRequest(code: string) {
+export async function getDeviceAuthRequest(userCode: string) {
   const [request] = await db
     .select()
     .from(device_auth_requests)
-    .where(eq(device_auth_requests.code, code))
+    .where(eq(device_auth_requests.user_code, userCode))
     .limit(1);
 
   return request;
@@ -161,21 +179,15 @@ export function isDeviceAuthRequestExpired(request: {
 }
 
 /**
- * Approve a device authorization request.
- *
- * A request that names a requesting client is approved only together with a
- * confirmation of that exact client: the approval page shows the client and
- * its redirect origin, and the approver confirms them. The confirmation is
- * recorded on the row so the requester can verify that the approval it
- * receives is for the client it asked about.
+ * Approve a device authorization request by its displayed user code.
  */
 export async function approveDeviceAuthRequest(
-  code: string,
+  userCode: string,
   userId: string,
   options: { confirmedClientId?: string } = {}
 ): Promise<void> {
   const now = new Date().toISOString();
-  const existing = await getDeviceAuthRequest(code);
+  const existing = await getDeviceAuthRequest(userCode);
   const requestingClientId = existing?.requesting_client_id ?? null;
   // An actionable row that names a client requires its confirmation before any
   // other outcome is considered; an expired row reports its expiry below.
@@ -196,7 +208,7 @@ export async function approveDeviceAuthRequest(
     })
     .where(
       and(
-        eq(device_auth_requests.code, code),
+        eq(device_auth_requests.user_code, userCode),
         eq(device_auth_requests.status, 'pending'),
         gt(device_auth_requests.expires_at, now)
       )
@@ -207,7 +219,7 @@ export async function approveDeviceAuthRequest(
     return;
   }
 
-  const request = await getDeviceAuthRequest(code);
+  const request = await getDeviceAuthRequest(userCode);
 
   if (!request) {
     throw new Error('Device authorization request not found');
@@ -222,7 +234,7 @@ export async function approveDeviceAuthRequest(
     .set({ status: 'expired' })
     .where(
       and(
-        eq(device_auth_requests.code, code),
+        eq(device_auth_requests.user_code, userCode),
         eq(device_auth_requests.status, 'pending'),
         lte(device_auth_requests.expires_at, now)
       )
@@ -235,11 +247,6 @@ export async function approveDeviceAuthRequest(
   throw new Error('Device authorization request has expired');
 }
 
-/**
- * Accept a matching client confirmation, refuse a missing or different one.
- * The client id of a row never changes after insert, so this decision holds
- * for the transition that follows.
- */
 function confirmRequestingClient(requestingClientId: string, confirmedClientId?: string): true {
   if (confirmedClientId !== requestingClientId) {
     throw new Error(DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE);
@@ -248,10 +255,10 @@ function confirmRequestingClient(requestingClientId: string, confirmedClientId?:
 }
 
 /**
- * Deny a device authorization request.
+ * Deny a device authorization request by its displayed user code.
  */
-export async function denyDeviceAuthRequest(code: string): Promise<void> {
-  const request = await getDeviceAuthRequest(code);
+export async function denyDeviceAuthRequest(userCode: string): Promise<void> {
+  const request = await getDeviceAuthRequest(userCode);
 
   if (!request) {
     throw new Error('Device authorization request not found');
@@ -264,7 +271,9 @@ export async function denyDeviceAuthRequest(code: string): Promise<void> {
   const [denied] = await db
     .update(device_auth_requests)
     .set({ status: 'denied' })
-    .where(and(eq(device_auth_requests.code, code), eq(device_auth_requests.status, 'pending')))
+    .where(
+      and(eq(device_auth_requests.user_code, userCode), eq(device_auth_requests.status, 'pending'))
+    )
     .returning({ id: device_auth_requests.id });
 
   if (!denied) {
@@ -397,7 +406,8 @@ export async function consumeDeviceAuthByDeviceCode(
 
 /**
  * Poll for device authorization status and return token if approved.
- * Legacy path — uses atomic consume to prevent double-spend.
+ * Legacy path — keyed on the high-entropy poll secret stored in `code`.
+ * Uses atomic consume to prevent double-spend.
  *
  * If credential issuance fails after the atomic consume succeeds, the row is
  * restored to `approved` so the request remains redeemable.

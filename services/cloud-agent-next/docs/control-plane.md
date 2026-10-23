@@ -963,6 +963,11 @@ or disabled. The wrapper receives only a session-bound runtime credential proxy 
 legacy Kilo broker capability and direct-token execution paths are retired. Git credential
 containment and managed SCM direct-token paths keep their existing behavior.
 
+Managed SCM request-body inspection uses a growable buffer capped by each caller's byte limit
+and a 30-second total read deadline. GitHub git replay is capped at 1 MiB; bootstrap JSON
+inspection is capped at 16,000 bytes. An unavailable replay body keeps the single-forward path.
+The reader inspects a clone and preserves the original request body for forwarding.
+
 ### Compatibility and rollout
 
 Persisted sessions and credential grants without modern runtime authorization remain readable

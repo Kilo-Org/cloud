@@ -38,8 +38,9 @@ export type DeadlineWatchedStart = {
  * `reset` withdraws the failure of the attempt in flight: the caller invokes it
  * when the input that produced that attempt changes, so the feedback and its
  * retry describe the current input only. The withdrawn attempt's own settle is
- * ignored; an operation that still succeeds reports through the caller's own
- * callback.
+ * ignored, while the deadline watch it started keeps running, so a request
+ * that outlives its budget still releases the action. An operation that still
+ * succeeds reports through the caller's own callback.
  */
 export function useDeadlineWatchedStart(
   deadlineMs: number,
@@ -49,16 +50,24 @@ export function useDeadlineWatchedStart(
   const [stalled, setStalled] = useState(false);
   const [failureMessage, setFailureMessage] = useState<string | null>(null);
   const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The attempt that armed the watch in `watchdogRef`. A withdrawn attempt's
+  // late settle may only end the watch it started, never a newer attempt's.
+  const watchdogAttemptRef = useRef<number | null>(null);
   // Identity of the newest armed attempt. A delayed attempt's settle runs
   // against this token: only the newest attempt may clear the watchdog and
   // publish its result, so a retry is never disarmed or overwritten by a
   // previous attempt's late outcome.
   const attemptRef = useRef(0);
-  const clearWatchdog = useCallback(() => {
-    if (watchdogRef.current !== null) {
-      clearTimeout(watchdogRef.current);
-      watchdogRef.current = null;
+  const clearWatchdog = useCallback((attempt?: number) => {
+    if (watchdogRef.current === null) {
+      return;
     }
+    if (attempt !== undefined && watchdogAttemptRef.current !== attempt) {
+      return;
+    }
+    clearTimeout(watchdogRef.current);
+    watchdogRef.current = null;
+    watchdogAttemptRef.current = null;
   }, []);
   useEffect(() => clearWatchdog, [clearWatchdog]);
 
@@ -74,9 +83,17 @@ export function useDeadlineWatchedStart(
     clearWatchdog();
     const settle = (message: string | null) => {
       if (attemptRef.current !== attempt) {
+        // The input this attempt describes moved on, so its result must not
+        // be published. Its own deadline watch ends with it; a newer
+        // attempt's watch is left alone.
+        if (watchdogAttemptRef.current !== null && watchdogAttemptRef.current !== attempt) {
+          return;
+        }
+        clearWatchdog();
+        setStalled(false);
         return;
       }
-      clearWatchdog();
+      clearWatchdog(attempt);
       setStalled(false);
       setFailureMessage(message);
     };
@@ -86,8 +103,10 @@ export function useDeadlineWatchedStart(
       attemptRef.current += 1;
       return;
     }
+    watchdogAttemptRef.current = attempt;
     watchdogRef.current = setTimeout(() => {
       watchdogRef.current = null;
+      watchdogAttemptRef.current = null;
       // The start has not settled within its budget. Stop showing the busy
       // button and offer the retry; the operation itself keeps running, so a
       // late success still lands.
@@ -96,13 +115,15 @@ export function useDeadlineWatchedStart(
   }, [clearWatchdog, deadlineMs, run]);
 
   const reset = useCallback(() => {
-    // Bumping the token first makes the withdrawn attempt's pending settle a
-    // no-op, so it cannot publish a result for input it no longer describes.
+    // Withdraw the attempt in flight: bumping the token makes its pending
+    // settle unable to publish a result for input it no longer describes, and
+    // the failure it reported goes with it. The deadline watch stays armed,
+    // because the request it watches is still running and the action must
+    // still be released when the budget runs out. The stall copy is not
+    // withdrawn for the same reason: it describes the wait, not the draft.
     attemptRef.current += 1;
-    clearWatchdog();
-    setStalled(false);
     setFailureMessage(null);
-  }, [clearWatchdog]);
+  }, []);
 
   return {
     begin,

@@ -2,11 +2,12 @@
 import { createElement, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
 
+import { MANUAL_REVIEW_START_DEADLINE_MS } from './deadline-watched-start';
 import { ManualReviewScreen } from './manual-review-screen';
 
 // The explorer finding (manual-review, 2026-09-19) was the primary action
@@ -463,5 +464,42 @@ describe('ManualReviewScreen failed start', () => {
     ).not.toContain('outline');
 
     unmount();
+  });
+
+  it('still releases the action at the deadline after the draft changes', async () => {
+    vi.useFakeTimers();
+    try {
+      // The request never settles, so only the deadline can release the action.
+      status.mutate.mockImplementationOnce(() => undefined);
+      const { renderer, unmount } = await renderScreen();
+
+      act(() => {
+        (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(GITHUB_PR_URL);
+      });
+      const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
+      act(() => {
+        (propOf(action, 'onPress') as () => void)();
+      });
+      // The user edits the draft while that request is still running.
+      act(() => {
+        (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(
+          `${GITHUB_PR_URL}/files`
+        );
+      });
+      act(() => {
+        vi.advanceTimersByTime(MANUAL_REVIEW_START_DEADLINE_MS);
+      });
+
+      // The wait is still real, so the stall copy and the released action stay.
+      expect(
+        findAllOfType(renderer.root, 'Text')
+          .map(node => propOf(node, 'children'))
+          .filter(child => typeof child === 'string')
+      ).toContain(i18n.t('common.takingLonger'));
+
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

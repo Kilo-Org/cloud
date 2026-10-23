@@ -1400,6 +1400,7 @@
       "installGithubApp": "برنامه GitHub را روی مخازن نصب کنید",
       "installGithubAppDescription": "به برنامه Kilo در GitHub اجازه دسترسی به مخازنی را بدهید که می‌خواهید بررسی شوند.",
       "noRepositoriesFound": "مخزنی پیدا نشد",
+      "lastSynced": "آخرین همگام‌سازی: {{time}}",
       "repositoryAccess": "دسترسی به مخزن"
     },
     "style": {

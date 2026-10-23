@@ -1400,6 +1400,7 @@
       "installGithubApp": "ರೆಪೊಸಿಟರಿಗಳಲ್ಲಿ GitHub ಅಪ್ಲಿಕೇಶನ್ ಅನ್ನು ಸ್ಥಾಪಿಸಿ",
       "installGithubAppDescription": "ಪರಿಶೀಲಿಸಬೇಕಾದ ರೆಪೊಸಿಟರಿಗಳನ್ನು ಪ್ರವೇಶಿಸಲು Kilo GitHub ಅಪ್ಲಿಕೇಶನ್‌ಗೆ ಅನುಮತಿ ನೀಡಿ.",
       "noRepositoriesFound": "ಯಾವುದೇ ರೆಪೊಸಿಟರಿ ಕಂಡುಬಂದಿಲ್ಲ",
+      "lastSynced": "ಕೊನೆಯ ಸಿಂಕ್: {{time}}",
       "repositoryAccess": "ರೆಪೊಸಿಟರಿ ಪ್ರವೇಶ"
     },
     "style": {

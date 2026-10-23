@@ -1400,6 +1400,7 @@
       "installGithubApp": "Fi ohun èlò GitHub sórí àwọn ibi ìpamọ́",
       "installGithubAppDescription": "Fún ohun èlò Kilo fún GitHub ní àṣẹ láti wọlé sí àwọn ibi ìpamọ́ tí o fẹ́ kí a ṣàtúnyẹ̀wò.",
       "noRepositoriesFound": "A kò rí ibi ìpamọ́ kankan",
+      "lastSynced": "Ìmúṣiṣẹ́pọ̀ tó kẹ́yìn: {{time}}",
       "repositoryAccess": "àṣẹ ìwọlé sí ibi ìpamọ́"
     },
     "style": {

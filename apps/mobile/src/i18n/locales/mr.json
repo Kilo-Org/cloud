@@ -1400,6 +1400,7 @@
       "installGithubApp": "रिपॉझिटरींसाठी GitHub ॲप इन्स्टॉल करा",
       "installGithubAppDescription": "ज्या रिपॉझिटरींचे पुनरावलोकन हवे आहे, त्यांमध्ये Kilo GitHub ॲपला प्रवेश द्या.",
       "noRepositoriesFound": "कोणतीही रिपॉझिटरी सापडली नाही",
+      "lastSynced": "शेवटचे सिंक: {{time}}",
       "repositoryAccess": "रिपॉझिटरीमधील प्रवेश"
     },
     "style": {

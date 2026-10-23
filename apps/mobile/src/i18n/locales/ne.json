@@ -1400,6 +1400,7 @@
       "installGithubApp": "रिपोजिटरीहरूमा GitHub एप स्थापना गर्नुहोस्",
       "installGithubAppDescription": "तपाईंले समीक्षा गराउन चाहेका रिपोजिटरीहरूमा Kilo GitHub एपलाई पहुँच दिनुहोस्।",
       "noRepositoriesFound": "कुनै रिपोजिटरी फेला परेन",
+      "lastSynced": "पछिल्लो सिंक: {{time}}",
       "repositoryAccess": "रिपोजिटरीको पहुँच"
     },
     "style": {

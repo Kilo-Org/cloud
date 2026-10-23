@@ -1400,6 +1400,7 @@
       "installGithubApp": "GitHubi rakenduse paigaldamine hoidlatele",
       "installGithubAppDescription": "Anna Kilo GitHubi rakendusele juurdepääs hoidlatele, mille koodi soovid üle vaadata.",
       "noRepositoriesFound": "Hoidlaid ei leitud",
+      "lastSynced": "Viimati sünkroonitud {{time}}",
       "repositoryAccess": "juurdepääs hoidlatele"
     },
     "style": {

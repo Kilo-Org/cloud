@@ -1400,6 +1400,7 @@
       "installGithubApp": "Enstale aplikasyon GitHub la sou depo yo",
       "installGithubAppDescription": "Bay aplikasyon GitHub Kilo a aksè nan depo ou vle fè revize yo.",
       "noRepositoriesFound": "Pa jwenn okenn depo",
+      "lastSynced": "Dènye senkronizasyon: {{time}}",
       "repositoryAccess": "aksè nan depo yo"
     },
     "style": {

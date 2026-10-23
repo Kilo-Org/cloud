@@ -1438,6 +1438,7 @@
       "installGithubApp": "Instalace aplikace GitHub pro repozitáře",
       "installGithubAppDescription": "Udělte aplikaci Kilo na GitHubu přístup k repozitářům, které chcete nechat zkontrolovat.",
       "noRepositoriesFound": "Žádné repozitáře nebyly nalezeny",
+      "lastSynced": "Naposledy synchronizováno {{time}}",
       "repositoryAccess": "přístup k repozitářům"
     },
     "style": {

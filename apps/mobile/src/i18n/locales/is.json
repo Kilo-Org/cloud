@@ -1400,6 +1400,7 @@
       "installGithubApp": "Settu upp GitHub-forritið á geymslum",
       "installGithubAppDescription": "Veittu GitHub-forriti Kilo aðgang að geymslunum sem þú vilt láta yfirfara.",
       "noRepositoriesFound": "Engar geymslur fundust",
+      "lastSynced": "Samstillt síðast {{time}}",
       "repositoryAccess": "aðgang að geymslum"
     },
     "style": {

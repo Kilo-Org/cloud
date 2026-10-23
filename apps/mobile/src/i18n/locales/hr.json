@@ -1419,6 +1419,7 @@
       "installGithubApp": "Instaliraj aplikaciju GitHub za repozitorije",
       "installGithubAppDescription": "Odobri aplikaciji Kilo za GitHub pristup repozitorijima koje želiš pregledati.",
       "noRepositoriesFound": "Nisu pronađeni repozitoriji",
+      "lastSynced": "Zadnja sinkronizacija: {{time}}",
       "repositoryAccess": "pristup repozitoriju"
     },
     "style": {

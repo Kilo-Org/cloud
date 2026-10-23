@@ -1400,6 +1400,7 @@
       "installGithubApp": "களஞ்சியங்களில் GitHub செயலியை நிறுவவும்",
       "installGithubAppDescription": "மதிப்பாய்வு செய்ய வேண்டிய களஞ்சியங்களை அணுக Kilo GitHub செயலிக்கு அனுமதி வழங்கவும்.",
       "noRepositoriesFound": "களஞ்சியங்கள் எதுவும் கிடைக்கவில்லை",
+      "lastSynced": "கடைசி ஒத்திசைவு: {{time}}",
       "repositoryAccess": "களஞ்சிய அணுகல்"
     },
     "style": {

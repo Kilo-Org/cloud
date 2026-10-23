@@ -67,8 +67,13 @@ const state = vi.hoisted(() => ({
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ scope: state.scope, platform: state.platform }),
   useRouter: () => ({ push: state.push }),
+  useNavigation: () => ({ isFocused: () => true }),
 }));
-vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable' }));
+vi.mock('react-native', () => ({
+  AppState: { addEventListener: () => ({ remove: vi.fn() }) },
+  Pressable: 'Pressable',
+  View: 'View',
+}));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({
     top: 0,
@@ -87,6 +92,7 @@ vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: 'ScrollView',
   useTabBarBottomPadding: () => 0,
@@ -104,6 +110,26 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.test' }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: state.openExternalUrl }));
 vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({
+    personalReviewAgent: {
+      listGitHubRepositories: {
+        queryOptions: (input: unknown) => ({ queryKey: ['personal-github', input] }),
+      },
+      listGitLabRepositories: {
+        queryOptions: (input: unknown) => ({ queryKey: ['personal-gitlab', input] }),
+      },
+    },
+    organizations: {
+      reviewAgent: {
+        listGitHubRepositories: {
+          queryOptions: (input: unknown) => ({ queryKey: ['org-github', input] }),
+        },
+        listGitLabRepositories: {
+          queryOptions: (input: unknown) => ({ queryKey: ['org-gitlab', input] }),
+        },
+      },
+    },
+  }),
   trpcClient: {
     githubApps: {
       mintInstallState: { mutate: state.mintInstallState },
@@ -111,6 +137,7 @@ vi.mock('@/lib/trpc', () => ({
   },
 }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
+  isPersonal: (scope: string) => scope === 'personal',
   PERSONAL_SCOPE: 'personal',
   useGitHubStatus: () => ({ data: { connected: state.connected } }),
   useGitLabStatus: () => ({ data: { connected: false } }),

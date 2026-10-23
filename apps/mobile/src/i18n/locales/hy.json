@@ -1400,6 +1400,7 @@
       "installGithubApp": "GitHub հավելվածի տեղադրում պահոցներում",
       "installGithubAppDescription": "Kilo-ի GitHub հավելվածին տրամադրիր այն պահոցների հասանելիությունը, որոնք ուզում ես ստուգել։",
       "noRepositoriesFound": "Պահոցներ չեն գտնվել",
+      "lastSynced": "Վերջին համաժամեցումը՝ {{time}}",
       "repositoryAccess": "պահոցի հասանելիություն"
     },
     "style": {

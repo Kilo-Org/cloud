@@ -1400,6 +1400,7 @@
       "installGithubApp": "Wụnye ngwa GitHub na ebe nchekwa",
       "installGithubAppDescription": "Nye ngwa Kilo maka GitHub ikike ịnweta ebe nchekwa ịchọrọ ka a nyochaa.",
       "noRepositoriesFound": "A hụghị ebe nchekwa",
+      "lastSynced": "Mmekọrịta data ikpeazụ: {{time}}",
       "repositoryAccess": "ikike ịnweta ebe nchekwa"
     },
     "style": {

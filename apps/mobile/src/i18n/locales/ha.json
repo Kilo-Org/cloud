@@ -1400,6 +1400,7 @@
       "installGithubApp": "Shigar da manhajar GitHub a ma'ajiyoyi",
       "installGithubAppDescription": "Ba manhajar Kilo ta GitHub damar shiga ma'ajiyoyin da kake son a yi bitarsu.",
       "noRepositoriesFound": "Ba a sami ma'ajiyoyi ba",
+      "lastSynced": "An daidaita a ƙarshe {{time}}",
       "repositoryAccess": "damar shiga ma'ajiya"
     },
     "style": {

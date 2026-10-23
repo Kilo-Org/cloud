@@ -1400,6 +1400,7 @@
       "installGithubApp": "ගබඩා සඳහා GitHub යෙදුම ස්ථාපනය කරන්න",
       "installGithubAppDescription": "සමාලෝචනය කිරීමට අවශ්‍ය ගබඩාවලට ප්‍රවේශ වීමට Kilo GitHub යෙදුමට අවසර දෙන්න.",
       "noRepositoriesFound": "ගබඩා හමු නොවීය",
+      "lastSynced": "අවසන් වරට සමමුහුර්ත කළේ {{time}}",
       "repositoryAccess": "ගබඩා ප්‍රවේශය"
     },
     "style": {

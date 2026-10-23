@@ -883,6 +883,7 @@
       "installGithubApp": "為存放庫安裝 GitHub App",
       "installGithubAppDescription": "請授權 Kilo GitHub App 存取要審查的存放庫。",
       "noRepositoriesFound": "找不到存放庫",
+      "lastSynced": "上次同步於 {{time}}",
       "repositoryAccess": "存放庫存取權限"
     },
     "style": {

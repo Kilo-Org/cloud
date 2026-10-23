@@ -886,6 +886,7 @@
       "installGithubApp": "התקנת אפליקציית GitHub במאגרים",
       "installGithubAppDescription": "תן לאפליקציית Kilo ב-GitHub גישה למאגרים שברצונך לסקור.",
       "noRepositoriesFound": "לא נמצאו מאגרים",
+      "lastSynced": "סנכרון אחרון: {{time}}",
       "repositoryAccess": "גישה למאגר"
     },
     "style": {

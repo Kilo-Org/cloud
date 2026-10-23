@@ -1438,6 +1438,7 @@
       "installGithubApp": "Усталюйце праграму GitHub для рэпазіторыяў",
       "installGithubAppDescription": "Дайце праграме Kilo для GitHub доступ да рэпазіторыяў, якія хочаце правяраць.",
       "noRepositoriesFound": "Рэпазіторыі не знойдзены",
+      "lastSynced": "Апошняя сінхранізацыя: {{time}}",
       "repositoryAccess": "доступ да рэпазіторыяў"
     },
     "style": {

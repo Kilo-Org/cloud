@@ -855,6 +855,7 @@
       "installGithubApp": "Installer l'application GitHub sur les dépôts",
       "installGithubAppDescription": "Accordez à l'application GitHub de Kilo l'accès aux dépôts dont vous souhaitez faire examiner le code.",
       "noRepositoriesFound": "Aucun dépôt trouvé",
+      "lastSynced": "Dernière synchronisation : {{time}}",
       "repositoryAccess": "accès au dépôt"
     },
     "style": {

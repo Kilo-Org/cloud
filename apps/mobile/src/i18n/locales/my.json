@@ -1400,6 +1400,7 @@
       "installGithubApp": "ကုဒ်သိုလှောင်ရာများတွင် GitHub အက်ပ်ကို ထည့်သွင်းပါ",
       "installGithubAppDescription": "စစ်ဆေးစေလိုသော ကုဒ်သိုလှောင်ရာများသို့ Kilo GitHub အက်ပ်ကို ဝင်ရောက်ခွင့်ပေးပါ။",
       "noRepositoriesFound": "ကုဒ်သိုလှောင်ရာ မတွေ့ပါ",
+      "lastSynced": "နောက်ဆုံး ထပ်တူပြုချိန်: {{time}}",
       "repositoryAccess": "ကုဒ်သိုလှောင်ရာ ဝင်ရောက်ခွင့်"
     },
     "style": {

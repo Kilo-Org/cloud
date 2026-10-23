@@ -1419,6 +1419,7 @@
       "installGithubApp": "Instalē GitHub lietotni repozitorijos",
       "installGithubAppDescription": "Piešķir Kilo GitHub lietotnei piekļuvi repozitorijiem, kuru kodu vēlies pārskatīt.",
       "noRepositoriesFound": "Nav atrasts neviens repozitorijs",
+      "lastSynced": "Pēdējo reizi sinhronizēts {{time}}",
       "repositoryAccess": "piekļuve repozitorijiem"
     },
     "style": {

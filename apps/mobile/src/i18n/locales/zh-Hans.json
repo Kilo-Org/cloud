@@ -883,6 +883,7 @@
       "installGithubApp": "为仓库安装 GitHub 应用",
       "installGithubAppDescription": "请授予 Kilo GitHub 应用访问待审查仓库的权限。",
       "noRepositoriesFound": "未找到仓库",
+      "lastSynced": "上次同步于 {{time}}",
       "repositoryAccess": "仓库访问权限"
     },
     "style": {

@@ -1400,6 +1400,7 @@
       "installGithubApp": "I-install ang GitHub app sa mga repository",
       "installGithubAppDescription": "Bigyan ang Kilo GitHub App ng access sa mga repository na gusto mong suriin.",
       "noRepositoriesFound": "Walang nahanap na repository",
+      "lastSynced": "Huling na-sync {{time}}",
       "repositoryAccess": "access sa repository"
     },
     "style": {

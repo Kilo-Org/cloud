@@ -1400,6 +1400,7 @@
       "installGithubApp": "په ذخیرو کې د GitHub اپ نصب کړئ",
       "installGithubAppDescription": "د Kilo د GitHub اپ ته هغو ذخیرو ته لاسرسی ورکړئ چې غواړئ بیاکتنه یې وشي.",
       "noRepositoriesFound": "هېڅ ذخیره و نه موندل شوه",
+      "lastSynced": "وروستی هممهاله کېدل: {{time}}",
       "repositoryAccess": "ذخیرې ته لاسرسی"
     },
     "style": {

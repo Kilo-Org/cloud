@@ -1400,6 +1400,7 @@
       "installGithubApp": "ئەپی GitHub لەسەر کۆگاکان دابمەزرێنە",
       "installGithubAppDescription": "مۆڵەت بدە بە ئەپی Kilo لە GitHub بگاتە ئەو کۆگایانەی دەتەوێت پێداچوونەوەیان بۆ بکرێت.",
       "noRepositoriesFound": "هیچ کۆگایەک نەدۆزرایەوە",
+      "lastSynced": "دوایین هاوکاتکردن: {{time}}",
       "repositoryAccess": "دەستگەیشتن بە کۆگا"
     },
     "style": {

@@ -1400,6 +1400,7 @@
       "installGithubApp": "Εγκατάσταση της εφαρμογής GitHub σε αποθετήρια",
       "installGithubAppDescription": "Δώσε στην εφαρμογή Kilo για το GitHub πρόσβαση στα αποθετήρια που θέλεις να ελέγχονται.",
       "noRepositoriesFound": "Δεν βρέθηκαν αποθετήρια",
+      "lastSynced": "Τελευταίος συγχρονισμός: {{time}}",
       "repositoryAccess": "πρόσβαση σε αποθετήρια"
     },
     "style": {

@@ -1438,6 +1438,7 @@
       "installGithubApp": "Įdiek GitHub programėlę saugyklose",
       "installGithubAppDescription": "Suteik Kilo GitHub programėlei prieigą prie saugyklų, kurių kodą nori peržiūrėti.",
       "noRepositoriesFound": "Saugyklų nerasta",
+      "lastSynced": "Paskutinį kartą sinchronizuota {{time}}",
       "repositoryAccess": "prieiga prie saugyklų"
     },
     "style": {

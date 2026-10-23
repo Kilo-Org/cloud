@@ -1438,6 +1438,7 @@
       "installGithubApp": "Namestitev aplikacije GitHub v skladišča",
       "installGithubAppDescription": "Aplikaciji Kilo za GitHub odobri dostop do skladišč, ki jih želiš pregledati.",
       "noRepositoriesFound": "Ni najdenih skladišč",
+      "lastSynced": "Nazadnje sinhronizirano {{time}}",
       "repositoryAccess": "dostop do skladišč"
     },
     "style": {

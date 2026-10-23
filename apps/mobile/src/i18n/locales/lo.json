@@ -1400,6 +1400,7 @@
       "installGithubApp": "ຕິດຕັ້ງແອັບ GitHub ໃນຄັງໂຄ້ດ",
       "installGithubAppDescription": "ໃຫ້ສິດແອັບ GitHub ຂອງ Kilo ເຂົ້າເຖິງຄັງໂຄ້ດທີ່ເຈົ້າຕ້ອງການໃຫ້ກວດທານ.",
       "noRepositoriesFound": "ບໍ່ພົບຄັງໂຄ້ດ",
+      "lastSynced": "ຊິງຂໍ້ມູນຄັ້ງລ່າສຸດ {{time}}",
       "repositoryAccess": "ສິດເຂົ້າເຖິງຄັງໂຄ້ດ"
     },
     "style": {

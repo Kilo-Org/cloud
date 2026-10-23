@@ -1400,6 +1400,7 @@
       "installGithubApp": "GitHub қолданбасын репозиторийлерге орнатыңыз",
       "installGithubAppDescription": "GitHub-тағы Kilo қолданбасына тексерілетін репозиторийлерге кіруге рұқсат беріңіз.",
       "noRepositoriesFound": "Репозиторийлер табылмады",
+      "lastSynced": "Соңғы синхрондау: {{time}}",
       "repositoryAccess": "репозиторийге кіру рұқсаты"
     },
     "style": {

@@ -1400,6 +1400,7 @@
       "installGithubApp": "Installera GitHub-appen på kodarkiv",
       "installGithubAppDescription": "Ge Kilos GitHub-app åtkomst till de kodarkiv du vill få granskade.",
       "noRepositoriesFound": "Inga kodarkiv hittades",
+      "lastSynced": "Senast synkroniserat {{time}}",
       "repositoryAccess": "åtkomst till kodarkiv"
     },
     "style": {

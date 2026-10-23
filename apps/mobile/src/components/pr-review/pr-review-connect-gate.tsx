@@ -59,9 +59,10 @@ type PrReviewConnectGateProps = {
  * pass-through there; the provider gates protect each detail route.
  *
  * The GitHub CTA calls `githubApps.connectUserAuthorization` and opens the
- * returned URL with the shared auth-session launcher. Cancellation on either platform
- * simply leaves the gate showing — there's nothing to roll back because the
- * auth flow is server-driven.
+ * returned URL with the shared auth-session launcher. Backing out of the sign-in
+ * sheet returns the CTA to idle so the user can retry, on both platforms; there
+ * is nothing to roll back because the auth flow is server-driven, and the status
+ * re-check runs without holding the CTA.
  */
 export function PrReviewConnectGate({
   children,
@@ -112,11 +113,22 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
       await launchConnectGateBrowser(result.authorizationUrl, {
         signal: controller.signal,
         onOpenFailure: () => void toast.error(t('authErrors.couldNotOpenBrowser')),
-        onReturn: async () => {
-          await authorization.refetch();
-          await queryClient.invalidateQueries({
-            queryKey: trpc.githubApps.getUserAuthorization.queryKey(),
-          });
+        onReturn: () => {
+          // Detached on purpose: the sheet closing is the user's edge, so the
+          // CTA returns to idle as soon as it happens. A status read that stays
+          // pending (the default `networkMode: 'online'` never settles while the
+          // online manager reports offline) must not keep Connect disabled — the
+          // read's own states carry the outcome, and a real failure renders the
+          // retryable QueryError below.
+          void authorization
+            .refetch()
+            .then(() =>
+              queryClient.invalidateQueries({
+                queryKey: trpc.githubApps.getUserAuthorization.queryKey(),
+              })
+            )
+            .catch(() => undefined);
+          return Promise.resolve();
         },
       });
     } catch {

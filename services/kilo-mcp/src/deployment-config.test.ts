@@ -1,15 +1,23 @@
 import { readFileSync } from 'node:fs';
 import { URL } from 'node:url';
-import { parseConfigFileTextToJson } from 'typescript';
+import { parse as parseJsonc, type ParseError } from 'jsonc-parser';
 import { expect, it } from 'vitest';
 
-it('uses a real or automatically provisioned production OAuth KV namespace', () => {
-  const parsed = parseConfigFileTextToJson(
-    'wrangler.jsonc',
-    readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8')
+function readWranglerConfig(): unknown {
+  const errors: ParseError[] = [];
+  const config: unknown = parseJsonc(
+    readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8'),
+    errors,
+    { allowTrailingComma: true }
   );
-  expect(parsed.error).toBeUndefined();
-  const config = parsed.config as { kv_namespaces: Array<{ binding: string; id?: string }> };
+  expect(errors).toEqual([]);
+  return config;
+}
+
+it('uses a real or automatically provisioned production OAuth KV namespace', () => {
+  const config = readWranglerConfig() as {
+    kv_namespaces: Array<{ binding: string; id?: string }>;
+  };
   const binding = config.kv_namespaces.find(item => item.binding === 'OAUTH_KV');
   expect(binding).toBeDefined();
   if (binding?.id !== undefined) {
@@ -26,12 +34,7 @@ it('marks the dev AI and Vectorize bindings remote so semantic search is reachab
   // dev worker to the real dev resources (src/search-knn.ts + wrangler's
   // binding table). Assert it here so a regression is caught in CI instead of
   // silently disabling semantic search at sign-in.
-  const parsed = parseConfigFileTextToJson(
-    'wrangler.jsonc',
-    readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8')
-  );
-  expect(parsed.error).toBeUndefined();
-  const config = parsed.config as {
+  const config = readWranglerConfig() as {
     env?: {
       dev?: {
         ai?: { binding: string; remote?: boolean };

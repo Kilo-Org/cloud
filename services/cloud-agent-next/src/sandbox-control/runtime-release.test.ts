@@ -7,10 +7,10 @@ import {
   type RuntimeReleaseDescriptor,
 } from './runtime-release.js';
 
-// Measured identity of @kilocode/cli-linux-x64-baseline@7.8.1 (plan §2/§6).
-const CLI_SHA = '2e0de8a1f786de31d27d7f8a1c0d35e468b1ee3af66826c1b5f15658acbb1f79';
-const CLI_TRANSFER_BYTES = 64_318_335;
-const CLI_EXPANDED_BYTES = 237_895_845;
+// Measured identity of @kilocode/cli-linux-x64-baseline@7.8.17 (plan §2/§6).
+const CLI_SHA = 'dd4920830a587aaab8aec12f64afcff640538fba27c5eb645160e64ba5972217';
+const CLI_TRANSFER_BYTES = 84_083_125;
+const CLI_EXPANDED_BYTES = 325_970_060;
 const CLI_FILE_COUNT = 419;
 const CONTROL_SHA = 'b'.repeat(64);
 const CONTROL_BYTES = 1_048_576;
@@ -64,10 +64,10 @@ function descriptor(): RuntimeReleaseDescriptor {
     format: 1,
     bootstrap: 1,
     platform: { os: 'linux', arch: 'x64', libc: 'glibc', cpu: 'baseline' },
-    abi: 'bun-1.3.14',
-    cliVersion: '7.8.1',
+    abi: 'bun-1.4.4',
+    cliVersion: '7.8.17',
     cliExecutable: 'package/bin/kilo',
-    wrapperSdkVersion: '7.8.1',
+    wrapperSdkVersion: '7.8.17',
     protocol: 'control-plane-v1',
     artifacts: [
       {
@@ -87,7 +87,7 @@ function descriptor(): RuntimeReleaseDescriptor {
     ],
     caps: {
       maxTransferBytes: 256 * 1024 * 1024,
-      maxExpandedBytes: 256 * 1024 * 1024,
+      maxExpandedBytes: 512 * 1024 * 1024,
       maxFileCount: 2_000,
     },
     inventory: [...cliInventory(), ...controlInventory()],

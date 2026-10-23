@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one cohesive leave suite: the removal guard, the save queue behind it, and the failure paths share the navigator mock harness */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -28,13 +29,38 @@ const h = vi.hoisted(() => ({
     setCommands: { mutateAsync: vi.fn() },
   },
   back: vi.fn(),
+  // The navigator side of `usePreventRemove`: while prevention is on, a
+  // removal attempt is blocked and replayed through `repeat` only after the
+  // screen has persisted its list.
+  guard: {
+    enabled: false,
+    callback: undefined as ((options: { repeat: () => void }) => void) | undefined,
+  },
 }));
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfile: () => h.query,
   useAgentProfileMutations: () => h.mutations,
 }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ back: h.back }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({
+    back: () => {
+      if (h.guard.enabled && h.guard.callback) {
+        h.guard.callback({
+          repeat: () => {
+            h.back();
+          },
+        });
+        return;
+      }
+      h.back();
+    },
+  }),
+  usePreventRemove: (enabled: boolean, handler: (options: { repeat: () => void }) => void) => {
+    h.guard.enabled = enabled;
+    h.guard.callback = handler;
+  },
+}));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
 vi.mock('react-native', () => ({
   View: 'View',
@@ -80,6 +106,8 @@ vi.mock('@/components/ui/icons', () => ({
 describe('ProfileCommandsScreen Back', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    h.guard.enabled = false;
+    h.guard.callback = undefined;
     Object.assign(h.query, {
       data: undefined,
       isError: false,
@@ -267,6 +295,104 @@ describe('ProfileCommandsScreen Back', () => {
     ]);
     expect(labels).toContain('Move up');
     expect(labels).toContain('Move down');
+    unmount();
+  });
+
+  it('arms the removal guard only while there is unsaved work or a write in flight', async () => {
+    h.query.data = testProfile(['a']);
+    h.query.isPending = false;
+    const pending = Promise.withResolvers<{ success: boolean }>();
+    h.mutations.setCommands.mutateAsync.mockReturnValueOnce(pending.promise);
+    const { renderer, unmount } = await mountScreen();
+
+    // A clean list removes the route on the first attempt, as before.
+    expect(h.guard.enabled).toBe(false);
+
+    changeRowText(renderer.root, 0, 'edited');
+    expect(h.guard.enabled).toBe(true);
+
+    // The save hook records the payload before the write settles, so the list
+    // already matches it; the in-flight write still holds the guard on.
+    commitRow(renderer.root, 0);
+    expect(h.guard.enabled).toBe(true);
+
+    await act(async () => {
+      pending.resolve({ success: true });
+      await pending.promise;
+    });
+    await waitFor(() => !h.guard.enabled);
+    unmount();
+  });
+
+  it('saves the focused edit when a system back is blocked, then replays the leave', async () => {
+    h.query.data = testProfile(['git fetch']);
+    h.query.isPending = false;
+    const pending = Promise.withResolvers<{ success: boolean }>();
+    h.mutations.setCommands.mutateAsync.mockReturnValueOnce(pending.promise);
+    const { renderer, unmount } = await mountScreen();
+
+    // The navigator blocks the hardware-back removal and hands it to the guard.
+    changeRowText(renderer.root, 0, 'git fetch --tags');
+    act(() => {
+      h.guard.callback?.({
+        repeat: () => {
+          h.back();
+        },
+      });
+    });
+
+    await waitFor(() => h.mutations.setCommands.mutateAsync.mock.calls.length === 1);
+    expect(h.mutations.setCommands.mutateAsync).toHaveBeenCalledWith({
+      profileId: 'profile-1',
+      commands: ['git fetch --tags'],
+    });
+    expect(h.back).not.toHaveBeenCalled();
+
+    await act(async () => {
+      pending.resolve({ success: true });
+      await pending.promise;
+    });
+
+    await waitFor(() => h.back.mock.calls.length > 0);
+    expect(h.back).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('keeps the screen and retries on the next system back when the save fails', async () => {
+    h.query.data = testProfile(['a']);
+    h.query.isPending = false;
+    const error = new Error('placeholder');
+    error.message = '';
+    h.mutations.setCommands.mutateAsync
+      .mockRejectedValueOnce(error)
+      .mockResolvedValueOnce({ success: true });
+    const { renderer, unmount } = await mountScreen();
+
+    changeRowText(renderer.root, 0, 'unsaved');
+    act(() => {
+      h.guard.callback?.({
+        repeat: () => {
+          h.back();
+        },
+      });
+    });
+    await waitFor(() => h.error.mock.calls.length > 0);
+    expect(h.back).not.toHaveBeenCalled();
+    expect(findFields(renderer.root)[0]?.props.nativeText).toBe('unsaved');
+
+    act(() => {
+      h.guard.callback?.({
+        repeat: () => {
+          h.back();
+        },
+      });
+    });
+    await waitFor(() => h.back.mock.calls.length > 0);
+    expect(h.mutations.setCommands.mutateAsync).toHaveBeenCalledTimes(2);
+    expect(h.mutations.setCommands.mutateAsync).toHaveBeenLastCalledWith({
+      profileId: 'profile-1',
+      commands: ['unsaved'],
+    });
     unmount();
   });
 });

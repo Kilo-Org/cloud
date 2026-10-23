@@ -92,7 +92,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `GASTOWN_RESOURCE_TOKENS_ENABLED` - Default-off family gate for Gastown control tokens; requires the master and exact `true`. This is not a safe-activation declaration: known ingest-audience and live-token-transport blockers remain deferred. [SERVER]
 - `WASTELAND_RESOURCE_TOKENS_ENABLED` - Default-off family gate for Wasteland control tokens; requires the master and exact `true`. [SERVER]
 - `CHAT_RESOURCE_TOKENS_ENABLED` - Default-off family gate for fresh chat resource issuance; requires the master and exact `true`. Validated modern devices retain chat/event-service/notifications issuance after rollback, capped by one hour and parent expiry. [SERVER]
-- `DELEGATED_RESOURCE_TOKENS_ENABLED` - Default-off family gate for explicit API, gateway, attribution, and HTML-deploy delegation, including the organization user-token resource route; requires the master and exact `true`. Disabled explicit delegation remains unavailable. [SERVER]
+- `DELEGATED_RESOURCE_TOKENS_ENABLED` - Default-off family gate for explicit API, gateway, and attribution delegation, including the organization user-token resource route; requires the master and exact `true`. Disabled explicit delegation remains unavailable. [SERVER]
 - `WORKFLOW_GATEWAY_RESOURCE_TOKENS_ENABLED` - Default-off family gate for server workflow gateway tokens; requires the master and exact `true`. [SERVER]
 - `INTERNAL_BOT_RESOURCE_TOKENS_ENABLED` - Default-off family gate for internal bot tokens from `POST /api/internal/bot-token`; requires the master and exact `true`. [SERVER]
 - `CODE_REVIEW_CONTAINERS_ORG_IDS` - Comma-separated user or org IDs whose Code Reviewer sessions use DO-managed Cloudflare Containers. Empty is off; `*` includes personal accounts. Enrolled sessions use 1 vCPU, 4 GiB memory, and 8 GB disk. Billing remains `cloud-agent-code-review-2026-07`. Every session uses the control plane. [SERVER]
@@ -219,7 +219,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `POSTGRES_REPLICA_EU_URL`, `POSTGRES_REPLICA_EU_URL_2` - EU read replicas; `readDb` picks one at random in EU regions and falls back to the primary when neither is set. `[SECRET]`
 - `POSTGRES_SCRIPT_URL` - Alternate Postgres URL used by one-off scripts/backfills in `src/scripts/` and tests. `[SECRET]`
 - `POSTGRES_URL_PRODUCTION` - Production Postgres connection string override; used by `packages/db/src/database-url.ts`. `[SECRET]`
-- `POSTGRES_CONNECT_TIMEOUT` - Postgres connect timeout in ms (default/typical: 10000). [SERVER]
+- `POSTGRES_CONNECT_TIMEOUT` - Postgres connect timeout in ms (required; typical: 10000). [SERVER]
 - `POSTGRES_MAX_QUERY_TIME` - Max allowed query time in ms. [SERVER]
 - `USE_PRODUCTION_DB` - Forces use of the production DB URL in non-production contexts; used by `packages/db/src/database-url.ts`. [SERVER]
 - `DATABASE_CA` - CA certificate content (PEM) for TLS connections to Postgres; used by `packages/db/src/database-url.ts` in tests and scripts. [SERVER]
@@ -230,6 +230,18 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 ### Redis & Queue
 
 - `REDIS_URL` - Redis connection URL; used by `packages/web-shared/src/lib/redis.ts` and bot state. `[SECRET]`
+- `UPSTASH_REDIS_REST_URL` - Shared Redis REST endpoint, including Discord message admission. Locally provided by `redis-http`. [SERVER]
+- `UPSTASH_REDIS_REST_TOKEN` - Redis REST credential used by the shared client. `[SECRET]`
+
+Discord message admission requires the shared Redis REST service. Accepted message
+claims are scoped to the bot and message, expire after 15 minutes, and remain
+accepted through background processing completion or failure. The gateway uses
+eight forwarding slots, a 10-second request deadline, and primary-database
+ownership checks with bounded retries. Listener availability is retained while
+ownership reads recover. Capacity drops are counted in listener logs.
+Forwarding slots cover the HTTP request lifecycle; background bot execution has a
+separate lifecycle. HTTP recovery uses at most three attempts for temporary
+admission responses within the same slot and deadline.
 
 ### Encryption & Secrets
 
@@ -254,16 +266,8 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `NEXT_PUBLIC_SESSION_INGEST_WS_URL` - WebSocket URL for session ingest from the browser. [PUBLIC]
 - `CODE_REVIEW_WORKER_URL` - URL for the code review worker. [SERVER]
 - `CODE_REVIEW_WORKER_AUTH_TOKEN` - Auth token for the code review worker. `[SECRET]`
-- `APP_BUILDER_URL` - URL for the App Builder worker. [SERVER]
-- `APP_BUILDER_AUTH_TOKEN` - Auth token for the App Builder worker. `[SECRET]`
 - `KILOCLAW_API_URL` - Base URL for KiloClaw API; used heavily by `apps/web/src/routers/kiloclaw-router.ts` and tests. [SERVER]
-- `USER_DEPLOYMENTS_API_BASE_URL` - Base URL for the user deployments builder. [SERVER]
-- `USER_DEPLOYMENTS_API_AUTH_KEY` - Auth key for the user deployments builder. `[SECRET]`
-- `USER_DEPLOYMENTS_DISPATCHER_URL` - URL for the deployments dispatcher (local dev). [SERVER]
-- `USER_DEPLOYMENTS_DISPATCHER_AUTH_KEY` - Auth key for the deployments dispatcher. `[SECRET]`
-- `USER_DEPLOYMENTS_ENV_VARS_PUBLIC_KEY` - Public key for encrypting user deployment env vars. [SERVER]
-- `USER_DEPLOYMENTS_ENV_VARS_PRIVATE_KEY` - Private key counterpart for decrypting user deployment env vars. `[SECRET]`
-- `CLOUD_AGENT_NEXT_API_URL` - URL for the Cloud Agent Next API; used by App Builder chat and other clients. [SERVER]
+- `CLOUD_AGENT_NEXT_API_URL` - URL for the Cloud Agent Next API. [SERVER]
 - `NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL` - WebSocket URL for Cloud Agent Next from the browser. [PUBLIC]
 - `CLOUD_AGENT_R2_ATTACHMENTS_BUCKET_NAME` - R2 bucket for cloud agent file attachments. [SERVER]
 - `GASTOWN_SERVICE_URL` - URL for the Gastown service. [SERVER]
@@ -314,6 +318,10 @@ The connection-role migration preserves a sole eligible connection, prefers an u
   - Financial events enter the durable `bouncer_credit_event_outbox` before acknowledgment. The dispatcher sends `/api/v2/credit-event` with a 5-second transport budget.
   - Delivery retries use the same event ID and type. Eight failed attempts produce a visible terminal failure; terminal rows remain for 30 days.
   - Apple `originalTransactionId` identifies a subscription chain, not an Apple ID. Refund requests and declined requests use distinct event types.
+  - Checkout calls `/api/v1/charge-decide` with `stage: "checkout"` before Stripe creates or reuses a Checkout session or updates a subscription: personal Kilo Pass and the KiloClaw upsell, KiloClaw subscription checkout, top-up, organization Kilo Pass, seat checkout, a seat-count increase, and personal or organization auto-top-up setup and payment-method change. Off-session background auto top-up is not gated. The call has a 1,500 ms budget.
+  - Only an enforced charge verdict refuses the checkout: tRPC procedures return `FORBIDDEN` with "We could not start this payment. Contact support.", and the top-up route returns HTTP 403 with the same copy in `{ error }`. Flags are logged server-side and never returned to a client. A timeout, error, non-2xx (including an older Bouncer's 404), or unknown shape fails open and the checkout proceeds.
+  - After a declined charge commits to `bouncer_credit_event_outbox`, the webhook delivers that row immediately, then calls `charge-decide` with `stage: "failure"` and the charge id as `requestId`. An enforced verdict expires every open Checkout session of the declined charge's Stripe customer, in payment or subscription mode; a charge without a customer falls back to the open session behind its payment intent. A failed immediate delivery leaves the sessions alone and the cron drainer retries it. These steps are bounded and never fail the webhook; a redelivered second Stripe event for the same charge finds the row already delivered and changes nothing.
+  - Bouncer enforces no charge block until `enforcement.enabled` is on and a reason is listed in `enforcement.chargeBlockReasons`, which ships empty; user and IP exemptions still apply.
   - Deploy Bouncer v2 before this cloud change. Bouncer retains v1 for the current cloud deployment; the new outbox sends only v2.
 - `CRON_SECRET` - Shared secret for authenticated cron endpoints; used in `dev/discord-gateway-cron.ts` and `.env.test`. `[SECRET]`
 - `dispatch-invite-email-outbox` - Vercel cron path (`/api/cron/dispatch-invite-email-outbox`) that drains the organization invite-email outbox; reuses `CRON_SECRET` for auth. [SERVER]
@@ -340,6 +348,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `QDRANT_API_KEY` - Qdrant API key. `[SECRET]`
 - `MILVUS_ADDRESS` - Milvus vector DB address. [SERVER]
 - `MILVUS_TOKEN` - Milvus auth token. `[SECRET]`
+- `CODE_INDEXING_ENABLED` - Set to `true` to enable cloud managed code indexing. Disabled by default; unset, empty, or any other value keeps the feature off. [SERVER]
 
 ### Email & Notifications
 
@@ -360,7 +369,6 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `SLACK_CREDENTIAL_KEYSET_JSON` - RSA keyset for encrypting Slack bot credentials at rest, as JSON or base64-encoded JSON: `{"active":{"keyId":"...","publicKeyPem":"..."},"decrypt":[{"keyId":"...","privateKeyPem":"..."}]}`. Web holds the private half because the Slack webhook decrypts in-process; the active key ID must also appear in `decrypt` with a private key. `[SECRET]`
 - `SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL` - Slack incoming webhook used by server-side Admin UI code to send events, summaries, reminders, and actions. `[SECRET]`
 - `SLACK_USER_FEEDBACK_WEBHOOK_URL` - Slack incoming webhook for user feedback. [SERVER]
-- `SLACK_DEPLOY_THREAT_WEBHOOK_URL` - Slack incoming webhook for deploy threat alerts. [SERVER]
 
 ### Feature Flags
 
@@ -481,12 +489,6 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `AGENT_IDLE_TIMEOUT_MS` - Timeout in ms before an idle Gastown agent is terminated; used in `services/gastown/container/src/process-manager.ts`. [SERVER]
 - `REFINERY_IDLE_TIMEOUT_MS` - Timeout in ms before an idle Refinery sub-process is killed; used in `services/gastown/container/src/process-manager.ts`. [SERVER]
 
-### Deploy Infra (Dispatcher)
-
-- `LOCAL_AUTH_TOKEN` - Auth token for the local deployment dispatcher env. `[SECRET]`
-- `STAGING_AUTH_TOKEN` - Auth token for the staging deployment dispatcher env. `[SECRET]`
-- `PROD_AUTH_TOKEN` - Auth token for the production deployment dispatcher env. `[SECRET]`
-
 ### Auto Routing Worker
 
 - `KILO_AI_GATEWAY_BASE_URL` - Origin of the AI gateway that `services/auto-routing` asks which custom router gateway entries the organization model policy denies (`/api/v1/internal/auto-routing/denied-models`). A `wrangler.jsonc` var for production; `pnpm dev:env` writes the local gateway port to `.dev.vars`. [SERVER]
@@ -523,7 +525,6 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 ## Tests / Dev
 
 - `IS_IN_AUTOMATED_TEST` - Set to `1` to put the app in automated-test mode (e.g. skip Turnstile challenges). [SERVER]
-- `AUTH_TOKEN` - Generic auth token used in `services/app-builder/src/_integration_tests/git-test-helpers.ts` to authenticate integration tests against local services. `[SECRET]`
 - `CANDIDATE_TAG` - Tag string used by `scripts/test-rollout-bucket.mjs` to test rollout bucket assignment. [SERVER]
 - `PERCENT` - Percentage value (0-100) used by `scripts/test-rollout-bucket.mjs` when testing rollout bucket logic. [SERVER]
 - `SNOWFLAKE_MAX_POLL_ATTEMPTS` - Max poll attempts for Snowflake job completion in `services/kiloclaw-billing/src/snowflake.ts`. [SERVER]

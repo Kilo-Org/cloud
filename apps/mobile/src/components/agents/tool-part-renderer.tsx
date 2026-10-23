@@ -1,6 +1,7 @@
 import { type StoredMessage, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { type ReactNode } from 'react';
 
+import { remoteServerView } from '@/lib/chat/remote-mcp-surface';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import {
@@ -15,6 +16,7 @@ import {
   GlobToolCard,
   GrepToolCard,
   ListToolCard,
+  McpAppToolCard,
   PatchToolCard,
   ReadToolCard,
   TaskToolCard,
@@ -113,7 +115,16 @@ export function ToolPartRenderer({
       break;
     }
     default: {
-      card = <GenericToolCard part={part} />;
+      // A tool whose server attached an MCP Apps view draws that view under its
+      // row, once the call has an answer to hand it. Every other tool, and every
+      // call still running or failed, keeps the row it has always had.
+      const view = part.state.status === 'completed' ? remoteServerView(part.tool) : undefined;
+      card =
+        view === undefined ? (
+          <GenericToolCard part={part} />
+        ) : (
+          <McpAppToolCard part={part} view={view} />
+        );
     }
   }
 

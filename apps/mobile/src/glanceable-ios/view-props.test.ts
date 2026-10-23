@@ -181,23 +181,21 @@ describe('buildGlanceableLiveActivityContentState needsApproval', () => {
     expect(buildGlanceableLiveActivityContentState(built).needsApproval).toBe(0);
   });
 
-  it('expires to a frame with no counts while keeping the approvable count', () => {
+  it('expires to a frame with no work at all, the approvable count included', () => {
     // The fetch-error path (`handleFetchError`) advances the retained card with
-    // `withStatus(..., 'stale', now)`: past `expiresAt` it zeroes every count
-    // but leaves `needsApproval` standing. The layout gates the Approve control
-    // on the counts too (`hasCounts && needsApproval`), so this frame draws no
-    // control; this test pins the exact shape that gate defends against.
+    // `withStatus(..., 'stale', now)`: past `expiresAt` every work field is
+    // blank, so the Approve control loses both of the terms it reads at once.
     const current = snapshotFor([PERMISSION_ROW]);
     expect(current.needsApproval).toBe(1);
     const expired = withStatus(current, 'stale', Date.parse(current.expiresAt));
 
     expect(expired.status).toBe('expired');
-    const contentState = buildGlanceableLiveActivityContentState(expired);
-    expect(contentState.needsInput).toBe(0);
-    expect(contentState.running).toBe(0);
-    expect(contentState.idle).toBe(0);
-    // Survives expiry — which is exactly why the layout cannot gate on it alone.
-    expect(contentState.needsApproval).toBe(1);
+    expect(buildGlanceableLiveActivityContentState(expired)).toMatchObject({
+      needsInput: 0,
+      needsApproval: 0,
+      running: 0,
+      idle: 0,
+    });
   });
 
   it('keeps the approvable count off the widget props', () => {

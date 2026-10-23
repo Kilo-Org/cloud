@@ -143,7 +143,7 @@ if [[ ! -x $real_pnpm ]] || grep -qF "$pnpm_wrapper_marker" "$real_pnpm"; then
 fi
 
 tools=()
-command -v bun >/dev/null || tools+=(bun@1.3.13)
+command -v bun >/dev/null || tools+=(bun@1.4.4)
 command -v agent-browser >/dev/null || tools+=(agent-browser@0.38.2)
 if (( ${#tools[@]} )); then
   "${root[@]}" npm install --global --no-audit --no-fund "${tools[@]}"

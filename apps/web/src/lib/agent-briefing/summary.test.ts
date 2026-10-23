@@ -7,6 +7,7 @@ import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/li
 import { getRawOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
+import { enforceRequestCostLimit } from '@kilocode/web-shared/lib/ai-gateway/request-cost-limit';
 import { briefingPriceBound, briefingPrompt } from './summary';
 import type { BriefingReportRow } from './store';
 
@@ -59,6 +60,18 @@ describe('briefing model pricing', () => {
     expect(quote.outputRate).toBe(0.0000014);
     expect(quote.estimatedCost).toBeGreaterThan(0);
     expect(quote.upperBound).toBeLessThanOrEqual(2_000_000);
+    await expect(
+      enforceRequestCostLimit(
+        String(quote.upperBound),
+        aion.id,
+        {
+          messages: [{ role: 'user', content: 'Overnight activity' }],
+          max_tokens: quote.maxTokens,
+          stream: false,
+        },
+        2_000_000
+      )
+    ).resolves.toBeNull();
     await expect(briefingPriceBound(aion.id, 'Overnight activity', 1)).rejects.toThrow(
       'spend_limit_too_low'
     );
@@ -84,6 +97,18 @@ describe('briefing model pricing', () => {
     expect(quote.inputRate).toBe(0.000002);
     expect(quote.outputRate).toBe(0.000004);
     expect(quote.estimatedCost).toBe(11_300);
+    await expect(
+      enforceRequestCostLimit(
+        String(quote.upperBound),
+        aion.id,
+        {
+          messages: [{ role: 'user', content: 'Overnight activity' }],
+          max_tokens: quote.maxTokens,
+          stream: false,
+        },
+        2_000_000
+      )
+    ).resolves.toBeNull();
   });
 
   it('rejects a model the picker does not price', async () => {

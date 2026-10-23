@@ -1,18 +1,38 @@
-import { desc } from 'drizzle-orm';
 import { z } from 'zod';
-import { modelsByProvider, StoredModelSchema, type StoredModel } from '@kilocode/db';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { StoredModelSchema, type StoredModel } from '@kilocode/db';
+import type { PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
+import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
-  getModelDisplayPricing,
-  type EndpointPricing,
-} from './providers/openrouter/display-pricing';
+  getRawOpenRouterModels,
+  pickerExtraModel,
+  pickerModelPricing,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { EndpointPricing } from './providers/openrouter/display-pricing';
 import {
   getVercelModelIdOverrides,
   mapResolvedModelIdToVercel,
 } from './providers/vercel/mapModelIdToVercel';
-import { getCustomPricing } from './custom-pricing.constants';
-import { findKiloExclusiveModel } from './kilo-exclusive-models';
+import { applyCustomPricingToPricing } from './custom-pricing';
 
+function pickerRequestPrice(
+  modelId: string,
+  models: Record<string, StoredModel>,
+  catalog: OpenRouterModel[],
+  preferredProviderOrderConfig: PreferredProviderOrderConfig
+) {
+  const extra = pickerExtraModel(modelId);
+  const model = extra ?? catalog.find(entry => entry.id === modelId);
+  if (!model) throw new Error('Model pricing is unavailable');
+  const pricing = applyCustomPricingToPricing(
+    model.id,
+    pickerExtraModel(modelId)
+      ? model.pricing
+      : pickerModelPricing(model, models, preferredProviderOrderConfig)
+  );
+  return textPricingRates(pricing);
+}
 export type TextPricingRates = {
   inputRate: number;
   outputRate: number;
@@ -43,36 +63,6 @@ export function textPricingRates(pricing: EndpointPricing | undefined): TextPric
   };
 }
 
-export function textRequestPriceCeiling(metadata: StoredModel) {
-  if (metadata.endpoints.length === 0) throw new Error('Model pricing is unavailable');
-  let inputRate = 0;
-  let outputRate = 0;
-  let requestCost = 0;
-  for (const endpoint of metadata.endpoints) {
-    const rates = textPricingRates(getModelDisplayPricing(endpoint.pricing));
-    inputRate = Math.max(inputRate, rates.inputRate);
-    outputRate = Math.max(outputRate, rates.outputRate);
-    requestCost = Math.max(requestCost, rates.requestCost);
-  }
-  const billedTiers = [
-    ...(getCustomPricing(metadata.id)?.pricing ?? []),
-    ...(findKiloExclusiveModel(metadata.id)?.pricing?.tiers ?? []),
-  ];
-  for (const { pricing } of billedTiers) {
-    const input =
-      Math.max(
-        pricing.prompt_per_million,
-        pricing.input_cache_write_per_million ?? 0,
-        pricing.input_cache_read_per_million ?? 0
-      ) / 1_000_000;
-    const output = pricing.completion_per_million / 1_000_000;
-    if (![input, output].every(value => Number.isFinite(value) && value >= 0))
-      throw new Error('Model has invalid billed pricing');
-    inputRate = Math.max(inputRate, input);
-    outputRate = Math.max(outputRate, output);
-  }
-  return { inputRate, outputRate, requestCost };
-}
 function requestTextBytes(value: unknown): number {
   if (typeof value === 'string') return Buffer.byteLength(value, 'utf8');
   if (Array.isArray(value)) {
@@ -125,21 +115,31 @@ export async function enforceRequestCostLimit(
     .safeParse(body);
   if (!parsed.success)
     return 'Bounded spending requires a text-only request with explicit max_tokens and no tools';
-  const [catalog] = await db
-    .select({ models: modelsByProvider.openrouter })
-    .from(modelsByProvider)
-    .orderBy(desc(modelsByProvider.id))
-    .limit(1);
-  const requestedMetadata = StoredModelSchema.safeParse(catalog?.models?.[model]);
-  const aliasTarget =
-    model.startsWith('~') && requestedMetadata.success
-      ? requestedMetadata.data.alias_target?.slug
-      : undefined;
-  const metadata = aliasTarget
-    ? StoredModelSchema.safeParse(catalog?.models?.[aliasTarget])
-    : requestedMetadata;
-  if (!metadata.success) return 'Current model pricing is unavailable for bounded spending';
   try {
+    const [models, rawCatalog, preferredProviderOrderConfig] = await Promise.all([
+      getOpenRouterModelsMetadataFromDatabase(),
+      getRawOpenRouterModels(),
+      getPreferredProviderOrderConfig(),
+    ]);
+    const requestedMetadata = StoredModelSchema.safeParse(models[model]);
+    const aliasTarget =
+      model.startsWith('~') && requestedMetadata.success
+        ? requestedMetadata.data.alias_target?.slug
+        : undefined;
+    const targetMetadata = aliasTarget
+      ? StoredModelSchema.safeParse(models[aliasTarget])
+      : undefined;
+    const targetCatalogEntry = aliasTarget
+      ? rawCatalog.data.find(entry => entry.id === aliasTarget)
+      : undefined;
+    if (
+      !pickerExtraModel(model) &&
+      !rawCatalog.data.some(entry => entry.id === model) &&
+      !requestedMetadata.success
+    )
+      return 'Current model pricing is unavailable for bounded spending';
+    if (aliasTarget && !targetMetadata?.success && !targetCatalogEntry)
+      return 'Current model pricing is unavailable for bounded spending';
     if (
       aliasTarget &&
       parsed.data.model !== model &&
@@ -147,7 +147,22 @@ export async function enforceRequestCostLimit(
         mapResolvedModelIdToVercel(aliasTarget, await getVercelModelIdOverrides())
     )
       return 'Model alias target changed before bounded spending admission';
-    const price = textRequestPriceCeiling(metadata.data);
+    const requestedPrice = pickerRequestPrice(
+      model,
+      models,
+      rawCatalog.data,
+      preferredProviderOrderConfig
+    );
+    const targetPrice = aliasTarget
+      ? pickerRequestPrice(aliasTarget, models, rawCatalog.data, preferredProviderOrderConfig)
+      : undefined;
+    const price = targetPrice
+      ? {
+          inputRate: Math.max(requestedPrice.inputRate, targetPrice.inputRate),
+          outputRate: Math.max(requestedPrice.outputRate, targetPrice.outputRate),
+          requestCost: Math.max(requestedPrice.requestCost, targetPrice.requestCost),
+        }
+      : requestedPrice;
     const inputTokenCeiling = requestTextBytes(body) + 2048;
     const bound = Math.ceil(
       (inputTokenCeiling * price.inputRate +

@@ -8,6 +8,7 @@ import {
   pickerModelPricing,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
+import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { resolvePreferredProviderOrder } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
 import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
@@ -108,20 +109,25 @@ function pickerProvider(
 ): { selected: string | undefined; configuredOrder: string[] } {
   const configuredOrder = resolvePreferredProviderOrder(preferredProviderOrderConfig, modelId);
   const extra = pickerExtraModel(modelId);
-  const exclusiveProviders = extra
-    ? (findKiloExclusiveModel(modelId)?.inference_providers ?? [])
-    : [];
-  const selected =
-    configuredOrder[0] ??
-    (exclusiveProviders.length === 1
-      ? exclusiveProviders[0]
-      : extra
-        ? undefined
-        : (models[modelId]?.endpoints[0]?.tag ??
-          (models[modelId]?.alias_target
-            ? models[models[modelId].alias_target.slug]?.endpoints[0]?.tag
-            : undefined)));
-  return { selected, configuredOrder };
+  if (extra) {
+    const providers = findKiloExclusiveModel(modelId)?.inference_providers ?? [];
+    return {
+      selected: configuredOrder[0] ?? (providers.length === 1 ? providers[0] : undefined),
+      configuredOrder,
+    };
+  }
+  const endpoints = models[modelId]?.endpoints ?? [];
+  const preferredProvider = configuredOrder[0];
+  if (preferredProvider) {
+    const matchingEndpoint = endpoints.some(
+      endpoint =>
+        endpoint.tag === preferredProvider ||
+        normalizeInferenceProviderId(endpoint.tag) ===
+          normalizeInferenceProviderId(preferredProvider)
+    );
+    return { selected: matchingEndpoint ? preferredProvider : undefined, configuredOrder };
+  }
+  return { selected: endpoints[0]?.tag, configuredOrder };
 }
 export type RequestCostLimitResult = {
   refusal: string | null;
@@ -214,6 +220,7 @@ export async function enforceRequestCostLimit(
         .object({
           order: z.array(z.string()).optional(),
           only: z.array(z.string()).optional(),
+          ignore: z.array(z.string()).optional(),
           allow_fallbacks: z.boolean().optional(),
         })
         .passthrough()
@@ -294,7 +301,7 @@ export async function enforceRequestCostLimit(
 
     let providerConfig: OpenRouterProviderConfig | null = null;
     if (providerId === 'openrouter') {
-      const route = pickerProvider(model, models, preferredProviderOrderConfig);
+      const route = pickerProvider(aliasTarget ?? model, models, preferredProviderOrderConfig);
       const requestedOrder = parsed.data.provider?.order ?? [];
       const matchesConfiguredOrder =
         route.configuredOrder.length > 0 &&
@@ -305,19 +312,21 @@ export async function enforceRequestCostLimit(
         requestedOrder.length === 1 &&
         requestedOrder[0] === route.selected;
       const requestedOnly = parsed.data.provider?.only ?? [];
+      const requestedIgnore = parsed.data.provider?.ignore ?? [];
       const matchesOnly =
         requestedOnly.length === 0 ||
-        (route.selected !== undefined &&
-          requestedOnly.length === 1 &&
-          requestedOnly[0] === route.selected);
+        (route.selected !== undefined && requestedOnly.includes(route.selected));
       if (
         (requestedOrder.length > 0 && !matchesConfiguredOrder && !matchesSelectedOrder) ||
-        !matchesOnly
+        !matchesOnly ||
+        (route.selected !== undefined && requestedIgnore.includes(route.selected))
       )
         return refused('Provider routing conflicts with the spend safeguard');
       providerConfig = {
         ...parsed.data.provider,
-        ...(route.selected ? { order: [route.selected], only: [route.selected] } : {}),
+        ...(route.selected
+          ? { order: [route.selected], only: [route.selected] }
+          : { order: undefined, only: undefined }),
         allow_fallbacks: false,
       };
     }

@@ -165,7 +165,13 @@ describe('request cost admission', () => {
     const decision = await enforceRequestCostLimitDecision(
       '500',
       id,
-      { ...body, provider: { order: ['preferred-route', 'other-route'] } },
+      {
+        ...body,
+        provider: {
+          order: ['preferred-route', 'other-route'],
+          only: ['preferred-route', 'other-route'],
+        },
+      },
       2_000_000,
       'openrouter'
     );
@@ -178,6 +184,41 @@ describe('request cost admission', () => {
         allow_fallbacks: false,
       },
     });
+  });
+  it('does not pin a preferred provider whose route price the picker cannot match', async () => {
+    const id = 'test/catalog-fallback';
+    const routeModel: StoredModel = {
+      id,
+      name: 'Catalog-priced model',
+      endpoints: [{ tag: 'other-route', pricing: { prompt: '0.000002', completion: '0.000004' } }],
+    };
+    const catalogEntry = catalogModel(id, {
+      prompt: '0.0000003',
+      completion: '0.0000005',
+    });
+    const preferredOrder = {
+      rules: [{ includes: ['test/catalog-fallback'], providers: ['unlisted-route'] }],
+    };
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({ [id]: routeModel });
+    jest.mocked(getRawOpenRouterModels).mockResolvedValue({ data: [catalogEntry] });
+    jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue(preferredOrder);
+    expect(pickerModelPricing(catalogEntry, { [id]: routeModel }, preferredOrder)).toEqual(
+      catalogEntry.pricing
+    );
+
+    const decision = await enforceRequestCostLimitDecision(
+      '1000',
+      id,
+      { ...body, provider: { order: ['unlisted-route'] } },
+      2_000_000,
+      'openrouter'
+    );
+    expect(decision).toMatchObject({
+      refusal: null,
+      providerConfig: { allow_fallbacks: false },
+    });
+    expect(decision.providerConfig?.order).toBeUndefined();
+    expect(decision.providerConfig?.only).toBeUndefined();
   });
   it('rejects provider overrides that differ from the priced route', async () => {
     await expect(
@@ -194,6 +235,17 @@ describe('request cost admission', () => {
         '2000000',
         model.id,
         { ...body, provider: { only: ['second-route'] } },
+        2_000_000,
+        'openrouter'
+      )
+    ).resolves.toMatchObject({ refusal: 'Provider routing conflicts with the spend safeguard' });
+  });
+  it('refuses to pin a route that gateway policy excludes', async () => {
+    await expect(
+      enforceRequestCostLimitDecision(
+        '2000000',
+        model.id,
+        { ...body, provider: { ignore: ['first-route'] } },
         2_000_000,
         'openrouter'
       )

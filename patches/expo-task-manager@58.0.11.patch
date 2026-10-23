@@ -1,0 +1,34 @@
+diff --git a/android/src/main/java/expo/modules/taskManager/TaskService.java b/android/src/main/java/expo/modules/taskManager/TaskService.java
+index fdb832e..649ea8e 100644
+--- a/android/src/main/java/expo/modules/taskManager/TaskService.java
++++ b/android/src/main/java/expo/modules/taskManager/TaskService.java
+@@ -424,7 +424,15 @@ public class TaskService implements SingletonModule, TaskServiceInterface {
+     }
+     mTasksAndEventsRepository.putEventForAppScopeKey(appScopeKey, body);
+ 
+-    getAppLoader().loadApp(mContextRef.get(),
++    HeadlessAppLoader appLoader = getAppLoader();
++    if (appLoader == null) {
++      // Job restoration can precede initialization of the application context.
++      Log.e(TAG, "Cannot execute background task '" + task.getName() + "': headless app loader is unavailable (context released). Dropping queued event.");
++      mTasksAndEventsRepository.removeEvents(appScopeKey);
++      return;
++    }
++
++    appLoader.loadApp(mContextRef.get(),
+       new HeadlessAppLoader.Params(appScopeKey, task.getAppUrl()),
+       () -> {
+       },
+@@ -444,8 +452,10 @@ public class TaskService implements SingletonModule, TaskServiceInterface {
+   //region helpers
+ 
+   private HeadlessAppLoader getAppLoader() {
+-    if (mContextRef.get() != null) {
+-      return AppLoaderProvider.getLoader("react-native-headless", mContextRef.get());
++    // JobScheduler can call this before initialization or after the reference clears.
++    Context context = mContextRef != null ? mContextRef.get() : null;
++    if (context != null) {
++      return AppLoaderProvider.getLoader("react-native-headless", context);
+     } else {
+       return null;
+     }

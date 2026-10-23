@@ -32,8 +32,6 @@ import { sortSessionMessagesForDisplay } from '@/lib/cloud-agent-next/message-or
 import { postTestStaleSyncAlert } from '@/lib/providers/openrouter/sync-providers-stale-alert';
 import { syncAndStoreProviders } from '@/lib/providers/openrouter/sync-providers';
 import { syncAndStoreDirectByokProviders } from '@/lib/providers/direct-byok/sync-direct-byok';
-import { adminAppBuilderRouter } from '@/routers/admin-app-builder-router';
-import { adminDeploymentsRouter } from '@/routers/admin-deployments-router';
 import { adminKiloclawInstancesRouter } from '@/routers/admin-kiloclaw-instances-router';
 import { adminKiloclawVersionsRouter } from '@/routers/admin-kiloclaw-versions-router';
 import { adminKiloclawRegionsRouter } from '@/routers/admin-kiloclaw-regions-router';
@@ -2472,8 +2470,6 @@ export const adminRouter = createTRPCRouter({
     }),
   }),
 
-  deployments: adminDeploymentsRouter,
-
   alerting: adminAlertingRouter,
 
   featureInterest: adminFeatureInterestRouter,
@@ -2735,7 +2731,6 @@ export const adminRouter = createTRPCRouter({
         }
       }),
   }),
-  appBuilder: adminAppBuilderRouter,
   kiloclawInstances: adminKiloclawInstancesRouter,
   kiloclawVersions: adminKiloclawVersionsRouter,
   kiloclawRegions: adminKiloclawRegionsRouter,

@@ -2062,7 +2062,7 @@ describe('createSessionWithLedger admission ladder', () => {
         runtime: { sandboxAllocation: 'isolated-standard' },
         options: {
           operationKey: OPERATION_KEY,
-          createdOnPlatform: 'app-builder',
+          createdOnPlatform: 'cli',
           kilocodeOrganizationId: orgId,
         },
       })
@@ -2077,7 +2077,7 @@ describe('createSessionWithLedger admission ladder', () => {
     );
     expect(createdMetadata(doStub)).toMatchObject(
       expect.objectContaining({
-        identity: expect.objectContaining({ orgId, createdOnPlatform: 'app-builder' }),
+        identity: expect.objectContaining({ orgId, createdOnPlatform: 'cli' }),
         workspace: expect.objectContaining({
           sandboxId: expect.any(String),
           sandboxAllocation: 'isolated-standard',
@@ -2094,7 +2094,7 @@ describe('createSessionWithLedger admission ladder', () => {
       runtime: { sandboxAllocation: 'isolated-standard' },
       options: {
         operationKey: OPERATION_KEY,
-        createdOnPlatform: 'app-builder',
+        createdOnPlatform: 'cli',
         kilocodeOrganizationId: orgId,
       },
     });
@@ -2334,7 +2334,6 @@ describe('createSessionWithLedger admission ladder', () => {
 
   it.each([
     ['missing platform', undefined, undefined],
-    ['app-builder origin', 'browser', 'app-builder'],
     ['code-review origin', undefined, 'code-review'],
   ] as const)(
     'routes %s creates to workspace_ sessions',
@@ -5074,7 +5073,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
         runtime: { sandboxAllocation: 'isolated-standard' },
         options: {
           operationKey: OPERATION_KEY,
-          createdOnPlatform: 'app-builder',
+          createdOnPlatform: 'cli',
           kilocodeOrganizationId: orgId,
         },
       })

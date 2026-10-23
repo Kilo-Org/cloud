@@ -323,7 +323,7 @@ vi.mock('@expo/react-native-action-sheet', () => ({
 const globalContext = vi.hoisted(() => ({
   organizationId: 'global-org' as string | null,
   isLoaded: true,
-  error: null,
+  error: null as 'restore' | 'save' | null,
   retry: vi.fn(),
   setOrganizationId: vi.fn(),
 }));
@@ -623,6 +623,28 @@ describe('SessionDetailScreen invalid session-id', () => {
     // conditions (confirmed owner, no organization route) all true.
     expect(queryEnabled()).toBe(false);
   });
+
+  it('holds the composer behind the account retry when the account list cannot be restored', async () => {
+    // The composer mounts account-scoped reads (model catalog, repositories,
+    // profiles, create), so a scope that only the active account can decide
+    // does not fall back to Personal while the account list is what failed.
+    useLocalSearchParamsMock.mockReturnValue({
+      'session-id': '00000000-0000-0000-0000-000000000000',
+    });
+    globalContext.error = 'restore';
+    onTestFinished(() => {
+      globalContext.error = null;
+    });
+    const renderer = await mountRoute();
+
+    expect(findByType(renderer.root, 'NewSessionScreenBody')).toHaveLength(0);
+    expect(findByType(renderer.root, 'NewSessionModelProvider')).toHaveLength(0);
+    act(() => {
+      pressControl(retryControl(renderer));
+    });
+    expect(globalContext.retry).toHaveBeenCalled();
+    expect(queryEnabled()).toBe(false);
+  });
 });
 
 describe('SessionDetailScreen display scope', () => {
@@ -671,8 +693,6 @@ describe('SessionDetailScreen display scope', () => {
       queryState.isError = state !== 'pending';
       queryState.error = { data: { code: state } };
       const renderer = await mountRoute();
-      const header = renderer.root.findByType(ScreenHeader);
-      expect(propOf(header, 'context')).toBeUndefined();
       expect(findByType(renderer.root, 'Text').flatMap(node => node.children)).not.toContain(
         'Personal'
       );

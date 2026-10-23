@@ -4,6 +4,7 @@ import { createTRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { ensureOrganizationAccessAndFetchOrg } from '@kilocode/web-shared/routers/organizations/utils';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { isEnabledForUser } from '@/lib/code-indexing/util';
+import { isCodeIndexingEnabled } from '@/lib/code-indexing/availability.server';
 
 type EnabledResponse = { enabled: boolean };
 type ErrorResponse = { error: string; message?: string };
@@ -25,6 +26,10 @@ export async function GET(
   const res = await getUserFromAuth({ adminOnly: false });
   if (!res.user) {
     return res.authFailedResponse;
+  }
+
+  if (!isCodeIndexingEnabled()) {
+    return NextResponse.json({ enabled: false });
   }
 
   const { searchParams } = new URL(request.url);

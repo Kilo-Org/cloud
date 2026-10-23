@@ -172,6 +172,13 @@ export type ProfileOrganization = {
   role: OrganizationRole;
 };
 
+/** One row of the profile query: the org, the caller's membership, and its current seat status. */
+type ProfileOrganizationRow = {
+  organization: Organization;
+  membership: typeof organization_memberships.$inferSelect;
+  latestSeatPurchaseStatus: OrganizationSeatsPurchase['subscription_status'] | null;
+};
+
 export type GetProfileOrganizationsOptions = {
   // When true, omit organizations whose free trial has hard-expired without an
   // active entitlement (the "Access Blocked" state). These orgs are locked to
@@ -200,7 +207,7 @@ export async function getProfileOrganizations(
       )`
     : sql<OrganizationSeatsPurchase['subscription_status'] | null>`NULL`;
 
-  const results = await db
+  const results: ProfileOrganizationRow[] = await db
     .select({
       organization: organizations,
       membership: organization_memberships,
@@ -747,6 +754,38 @@ export async function acceptOrganizationInvite(
           role: invitation.role,
           membershipInserted: false,
         });
+      }
+
+      // The invitation must be newer than the removal record to be accepted.
+      const [removal] = await tx
+        .select({ removedAt: organization_membership_removals.removed_at })
+        .from(organization_membership_removals)
+        .where(
+          and(
+            eq(organization_membership_removals.organization_id, invitation.organization_id),
+            eq(organization_membership_removals.kilo_user_id, userId)
+          )
+        )
+        .limit(1);
+
+      if (removal && new Date(invitation.created_at) <= new Date(removal.removedAt)) {
+        // The invitation is refused, so it must not linger as live in the
+        // invitation list or produce a later invite email: expire it and mark
+        // its outbox row terminal (same shape as the deleteInvite procedure).
+        await tx
+          .update(organization_invitations)
+          .set({ expires_at: sql`NOW()` })
+          .where(eq(organization_invitations.id, invitation.id));
+        await tx
+          .update(external_side_effect_outbox)
+          .set({
+            status: 'failed',
+            claimed_at: null,
+            next_attempt_at: null,
+            last_error: 'revoked',
+          })
+          .where(eq(external_side_effect_outbox.invitation_id, invitation.id));
+        return failureResult('Invitation is no longer valid');
       }
 
       // Add user to organization

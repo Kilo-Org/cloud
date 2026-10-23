@@ -50,7 +50,8 @@ type ResponsesApiStreamEvent = {
 export function processResponsesApiUsage(
   usage: ResponsesApiUsage | null | undefined,
   providerMetadata: VercelProviderMetaData | null | undefined,
-  coreProps: NotYetCostedUsageStats
+  coreProps: NotYetCostedUsageStats,
+  provider: ProviderId
 ): JustTheCostsUsageStats {
   // OpenAI-style input_tokens already includes cached and cache-write tokens.
   const inputTokens = usage?.input_tokens ?? 0;
@@ -63,7 +64,8 @@ export function processResponsesApiUsage(
     const { cost_mUsd, is_byok } = computeOpenRouterCostFields(
       usage,
       coreProps,
-      'responses_sse_processing'
+      'responses_sse_processing',
+      provider
     );
     return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens, cost_mUsd, is_byok };
   }
@@ -223,13 +225,14 @@ export async function parseResponsesMicrodollarUsageFromStream(
     status_code: statusCode,
   } satisfies NotYetCostedUsageStats;
 
-  const costs = processResponsesApiUsage(usage, providerMetadata, coreProps);
+  const costs = processResponsesApiUsage(usage, providerMetadata, coreProps, provider);
   return { ...coreProps, ...costs };
 }
 
 export function parseResponsesMicrodollarUsageFromString(
   fullResponse: string,
-  statusCode: number
+  statusCode: number,
+  provider: ProviderId
 ): MicrodollarUsageStats {
   const responseJson = JSON.parse(fullResponse) as ResponsesApiResponse | null;
 
@@ -254,7 +257,7 @@ export function parseResponsesMicrodollarUsageFromString(
     status_code: statusCode,
   } satisfies NotYetCostedUsageStats;
 
-  const costs = processResponsesApiUsage(usage, providerMetadata, coreProps);
+  const costs = processResponsesApiUsage(usage, providerMetadata, coreProps, provider);
   return { ...coreProps, ...costs };
 }
 

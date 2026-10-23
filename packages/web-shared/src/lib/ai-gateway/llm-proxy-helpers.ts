@@ -1311,11 +1311,12 @@ type EmbeddingUsage = {
   cost?: number;
 };
 
+// Upstream error bodies (`{ error: {...} }`) carry neither model nor usage.
 type EmbeddingResponse = {
   id?: string;
-  object: 'list';
-  model: string;
-  usage: EmbeddingUsage;
+  object?: 'list';
+  model?: string;
+  usage?: EmbeddingUsage;
 };
 
 type TranscriptionUsage = {
@@ -1340,17 +1341,27 @@ export function parseEmbeddingUsageFromResponse(
   statusCode: number
 ): MicrodollarUsageStats {
   const json = JSON.parse(responseText) as EmbeddingResponse;
+  const usage = json.usage;
+  const hasError = !json.model || statusCode >= 400;
+
+  if (!usage && !hasError) {
+    captureMessage('SUSPICIOUS: No embedding usage information', {
+      level: 'error',
+      tags: { source: 'embedding_usage_processing' },
+      extra: { model: json.model, statusCode },
+    });
+  }
 
   // Upstream providers (OpenRouter, Vercel) include cost in USD → convert to microdollars.
-  const cost_mUsd = json.usage.cost != null ? toMicrodollars(json.usage.cost) : 0;
+  const cost_mUsd = usage?.cost != null ? toMicrodollars(usage.cost) : 0;
 
   return {
     messageId: json.id ?? null,
-    model: json.model,
+    model: json.model ?? null,
     responseContent: '',
-    hasError: !json.model || statusCode >= 400,
+    hasError,
     inference_provider: null,
-    inputTokens: json.usage.prompt_tokens,
+    inputTokens: usage?.prompt_tokens ?? 0,
     outputTokens: 0,
     cacheHitTokens: 0,
     cacheWriteTokens: 0,
@@ -1370,7 +1381,8 @@ export function parseEmbeddingUsageFromResponse(
 export function parseTranscriptionUsageFromResponse(
   responseText: string,
   statusCode: number,
-  requestedModel: string
+  requestedModel: string,
+  provider: ProviderId
 ): MicrodollarUsageStats {
   const json = JSON.parse(responseText) as TranscriptionResponse;
   const base = {
@@ -1391,7 +1403,8 @@ export function parseTranscriptionUsageFromResponse(
   const cost = computeOpenRouterCostFields(
     json.usage ?? {},
     base,
-    'transcription_usage_processing'
+    'transcription_usage_processing',
+    provider
   );
 
   return {
@@ -1473,7 +1486,12 @@ export function countAndStoreTranscriptionUsage(
     : clonedResponse
         .text()
         .then(text =>
-          parseTranscriptionUsageFromResponse(text, statusCode, usageContext.requested_model)
+          parseTranscriptionUsageFromResponse(
+            text,
+            statusCode,
+            usageContext.requested_model,
+            usageContext.provider
+          )
         )
         .catch(() => null);
 

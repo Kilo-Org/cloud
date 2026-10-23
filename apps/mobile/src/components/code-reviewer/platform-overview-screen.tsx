@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Switch, View } from 'react-native';
+import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
@@ -20,6 +20,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';

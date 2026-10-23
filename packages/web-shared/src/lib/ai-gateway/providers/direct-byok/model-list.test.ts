@@ -93,7 +93,12 @@ describe('cachedEnhancedDirectByokModelList', () => {
     const result = await getModels();
 
     expect(result).toStrictEqual([
-      { ...recommended, flags: ['vision', 'recommended'], reasoning_options: undefined },
+      {
+        ...recommended,
+        flags: ['vision', 'recommended'],
+        reasoning_options: undefined,
+        catalog_model_id: undefined,
+      },
     ]);
     expect(result).not.toBe(recommendedModels);
     expect(recommended.flags).toEqual(['vision']);
@@ -102,13 +107,16 @@ describe('cachedEnhancedDirectByokModelList', () => {
     expectProviderReads('codestral');
   });
 
-  test('merges ordered metadata, deduplicated flags and reasoning option precedence', async () => {
+  test('merges ordered metadata, deduplicated flags, reasoning option and catalog ID precedence', async () => {
     const syncedOptions = [{ type: 'effort' as const, values: ['high' as const] }];
     const beta = model('beta', {
       name: 'Curated beta',
       flags: ['vision', 'vision', 'recommended'],
     });
-    const alpha = model('alpha', { reasoning_options: [{ type: 'toggle' }] });
+    const alpha = model('alpha', {
+      reasoning_options: [{ type: 'toggle' }],
+      catalog_model_id: 'vendor/curated-alpha',
+    });
     const empty = model('empty', { reasoning_options: [] });
     const zeta = model('zeta', { flags: [] });
     const gamma = model('gamma', { flags: ['reasoning', 'reasoning'] });
@@ -122,8 +130,8 @@ describe('cachedEnhancedDirectByokModelList', () => {
         flags: ['reasoning'],
         reasoning_options: [{ type: 'effort', values: ['low'] }],
       }),
-      model('alpha', { reasoning_options: syncedOptions }),
-      model('beta', { reasoning_options: syncedOptions }),
+      model('alpha', { reasoning_options: syncedOptions, catalog_model_id: 'vendor/alpha' }),
+      model('beta', { reasoning_options: syncedOptions, catalog_model_id: 'vendor/beta' }),
       model('empty', { reasoning_options: syncedOptions }),
       model('zeta', { name: 'Discarded synced duplicate' }),
       gamma,
@@ -137,11 +145,16 @@ describe('cachedEnhancedDirectByokModelList', () => {
     mockLimit.mockResolvedValueOnce([{ models: synced }]);
 
     await expect(getMerged()).resolves.toStrictEqual([
-      { ...beta, flags: ['vision', 'recommended'], reasoning_options: syncedOptions },
+      {
+        ...beta,
+        flags: ['vision', 'recommended'],
+        reasoning_options: syncedOptions,
+        catalog_model_id: 'vendor/beta',
+      },
       { ...alpha, flags: ['recommended'] },
-      { ...empty, flags: ['recommended'] },
-      { ...zeta, flags: undefined, reasoning_options: undefined },
-      { ...gamma, flags: ['reasoning'], reasoning_options: undefined },
+      { ...empty, flags: ['recommended'], catalog_model_id: undefined },
+      { ...zeta, flags: undefined, reasoning_options: undefined, catalog_model_id: undefined },
+      { ...gamma, flags: ['reasoning'], reasoning_options: undefined, catalog_model_id: undefined },
     ]);
     expect(curated).toEqual(originalCurated);
     expect(synced).toEqual(originalSynced);
@@ -169,8 +182,18 @@ describe('cachedEnhancedDirectByokModelList', () => {
       mockLimit.mockResolvedValueOnce([{ models: [model('recovered')] }]);
       const recovered = await getModels();
       expect(recovered).toStrictEqual([
-        { ...recommended, flags: ['vision', 'recommended'], reasoning_options: undefined },
-        { ...model('recovered'), flags: undefined, reasoning_options: undefined },
+        {
+          ...recommended,
+          flags: ['vision', 'recommended'],
+          reasoning_options: undefined,
+          catalog_model_id: undefined,
+        },
+        {
+          ...model('recovered'),
+          flags: undefined,
+          reasoning_options: undefined,
+          catalog_model_id: undefined,
+        },
       ]);
       await expect(getModels()).resolves.toBe(recovered);
       expectProviderReads('codestral', 'codestral');

@@ -98,6 +98,9 @@ jest.mock('./db/security-commands', () => ({
 jest.mock('./db/dashboard-stats', () => ({ getDashboardStats: jest.fn() }));
 jest.mock('./db/security-analysis', () => ({
   canStartAnalysis: mockCanStartAnalysis,
+  tryReserveAnalysisStartSlot: jest.fn(async () => ({ reserved: true })),
+  tryReserveAnalysisRestartSlot: jest.fn(async () => ({ reserved: true })),
+  releaseAnalysisStartReservation: jest.fn(async () => undefined),
   enqueueBacklogFindings: jest.fn(),
 }));
 jest.mock('./services/auto-dismiss-service', () => ({

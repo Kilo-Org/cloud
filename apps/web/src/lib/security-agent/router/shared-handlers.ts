@@ -33,7 +33,12 @@ import {
   markApplyAutoRemediationCommandAdmissionFailed,
   type SecurityAgentCommandStatusResponse,
 } from '@/lib/security-agent/db/security-commands';
-import { canStartAnalysis } from '@/lib/security-agent/db/security-analysis';
+import {
+  canStartAnalysis,
+  releaseAnalysisStartReservation,
+  tryReserveAnalysisRestartSlot,
+  tryReserveAnalysisStartSlot,
+} from '@/lib/security-agent/db/security-analysis';
 import {
   decorateFindingWithRemediation,
   decorateFindingsWithRemediation,
@@ -420,10 +425,15 @@ function replayedSecurityResponse(canonical: Record<string, unknown>) {
 /**
  * Runs the Worker submission under an already-admitted row:
  * - acceptance records the provider reference durably, then returns accepted;
- * - a definitive pre-acceptance rejection settles the row `failed`;
+ * - a definitive pre-acceptance rejection settles the row `failed` and marks
+ *   the thrown error with `PRE_ACCEPTANCE_REJECTION` so callers can recover
+ *   admission-time state;
  * - an ambiguous transport outcome (BAD_GATEWAY) marks the row
  *   `reconcile_pending` and surfaces a retryable CONFLICT.
  */
+const PRE_ACCEPTANCE_REJECTION = Symbol('security.pre-acceptance-rejection');
+
+type PreAcceptanceTaggableError = Error & { [PRE_ACCEPTANCE_REJECTION]?: true };
 async function executeSecurityCommandSubmit(args: {
   row: OperationLedgerRow;
   intent: SecurityLedgerIntent;
@@ -444,7 +454,7 @@ async function executeSecurityCommandSubmit(args: {
     accepted = await args.submit();
   } catch (error) {
     if (error instanceof TRPCError && error.code === 'BAD_GATEWAY') {
-      // The ambiguous CONFLICT promises same-key reconciliation, so it is
+      // An ambiguous outcome promises same-key reconciliation, so it is
       // surfaced only once `reconcile_pending` is durable.
       await requireLedgerWrite(
         'We could not record this action. Please try again later.',
@@ -472,6 +482,10 @@ async function executeSecurityCommandSubmit(args: {
       });
     } catch (settleError) {
       console.error('Failed to settle the security operation ledger row', settleError);
+    }
+    const taggable = error as PreAcceptanceTaggableError;
+    if (taggable instanceof Error && Object.isExtensible(taggable)) {
+      taggable[PRE_ACCEPTANCE_REJECTION] = true;
     }
     throw error;
   }
@@ -1706,15 +1720,25 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        if (!input.restartActive) {
-          const concurrencyCheck = await canStartAnalysis(securityOwner);
+        // Admission reserves the owner slot and the per-finding lease in one
+        // transaction, so concurrent starts cannot all pass a stale count. A
+        // restart keeps the finding's own running slot and only validates the
+        // owner cap under the same lock.
+        const reservation = input.restartActive
+          ? await tryReserveAnalysisRestartSlot(securityOwner, input.findingId)
+          : await tryReserveAnalysisStartSlot(securityOwner, input.findingId);
 
-          if (!concurrencyCheck.allowed) {
+        if (!reservation.reserved) {
+          if (reservation.reason === 'cap') {
             throw new TRPCError({
               code: 'TOO_MANY_REQUESTS',
-              message: `Maximum concurrent analyses reached (${concurrencyCheck.currentCount}/${concurrencyCheck.limit}). Please wait for existing analyses to complete.`,
+              message: `Maximum concurrent analyses reached (${reservation.currentCount}/${reservation.limit}). Please wait for existing analyses to complete.`,
             });
           }
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Analysis already in progress',
+          });
         }
 
         // Analysis has no client `operationKey`, so each start attempt gets a
@@ -1722,29 +1746,42 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         // Worker `commandId` is recorded as the provider reference, which the
         // web observation settle later joins on to emit
         // `security_command_settled` with the `start_analysis` intent.
-        const result: SecurityCommandResult = await runSecurityLedgerSubmit({
-          ctx,
-          owner: securityOwner,
-          intent: 'start_analysis',
-          operationKey: crypto.randomUUID(),
-          resourceKey: securityAnalysisLedgerResourceKey(securityOwner, input.findingId),
-          submit: async () => {
-            const { commandId } = await submitManualAnalysisStart({
-              findingId: input.findingId,
-              owner: securityOwner,
-              actorUserId: ctx.user.id,
-              requestedModels: {
-                model: input.model,
-                triageModel: input.triageModel,
-                analysisModel: input.analysisModel,
-              },
-              forceSandbox: input.forceSandbox,
-              retrySandboxOnly: input.retrySandboxOnly,
-              restartActive: input.restartActive,
-            });
-            return { accepted: true, commandId };
-          },
-        });
+        let result: SecurityCommandResult;
+        try {
+          result = await runSecurityLedgerSubmit({
+            ctx,
+            owner: securityOwner,
+            intent: 'start_analysis',
+            operationKey: crypto.randomUUID(),
+            resourceKey: securityAnalysisLedgerResourceKey(securityOwner, input.findingId),
+            submit: async () => {
+              const { commandId } = await submitManualAnalysisStart({
+                findingId: input.findingId,
+                owner: securityOwner,
+                actorUserId: ctx.user.id,
+                requestedModels: {
+                  model: input.model,
+                  triageModel: input.triageModel,
+                  analysisModel: input.analysisModel,
+                },
+                forceSandbox: input.forceSandbox,
+                retrySandboxOnly: input.retrySandboxOnly,
+                restartActive: input.restartActive,
+              });
+              return { accepted: true, commandId };
+            },
+          });
+        } catch (error) {
+          // Release only for a definitive pre-acceptance rejection, tagged by
+          // the ledger submit after settling the row. Ambiguous outcomes and
+          // post-acceptance ledger-write failures keep the reservation while
+          // the ledger reconciles or the Worker owns the lifecycle.
+          const taggable = error as PreAcceptanceTaggableError;
+          if (!input.restartActive && taggable[PRE_ACCEPTANCE_REJECTION] === true) {
+            await releaseAnalysisStartReservation(input.findingId);
+          }
+          throw error;
+        }
 
         if (result.kind === 'replayed') {
           const commandId =

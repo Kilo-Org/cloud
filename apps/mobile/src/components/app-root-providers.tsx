@@ -4,7 +4,6 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { usePathname, useSegments } from 'expo-router';
 import { CheckCircle2, Info, Loader, TriangleAlert, XCircle } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
-import { Platform, useWindowDimensions } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider, useKeyboardState } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,13 +13,15 @@ import { useTranslation } from 'react-i18next';
 import { AppUnlockAnnouncements } from '@/components/app-unlock-screen';
 import { OfflineBanner } from '@/components/offline-banner';
 import { AppUnlockProvider } from '@/lib/app-unlock-context';
+import { SystemFontScaleProvider } from '@/lib/font-scale/system-font-scale';
 import { AuthProvider } from '@/lib/auth/auth-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { OrganizationProvider } from '@/lib/organization-context';
 import { queryClient } from '@/lib/query-client';
 import { QueryClientNativeLifecycle } from '@/lib/query-client-lifecycle';
 import { ToolSummaryTranslationRuntimeBootstrap } from '@/lib/tool-summary-translation/tool-summary-translation-preference';
-import { getEffectiveTabBarHeight, shouldHideTabBar } from '@/lib/tab-bar-layout';
+import { shouldHideTabBar } from '@/lib/tab-bar-layout';
+import { useRenderedTabBarHeight } from '@/lib/tab-bar-clearance';
 import { getToastBottomOffset } from '@/lib/toast-offset';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
 
@@ -55,30 +56,31 @@ export function AppRootProviders({
     // bg-background: the gesture root is the first opaque surface above the
     // window — a rotation relayout gap behind any screen must show the app's
     // own background, never the platform window default (foreign white/black).
-    <GestureHandlerRootView className="flex-1 bg-background">
-      {/* `react-native-keyboard-controller` measures the keyboard once in native
+    <SystemFontScaleProvider>
+      <GestureHandlerRootView className="flex-1 bg-background">
+        {/* `react-native-keyboard-controller` measures the keyboard once in native
           code and hands the height and the insets to every consumer. The app's
           keyboard surfaces — `KeyboardAvoidingView` on the session, history,
           quick-chat and detail screens — read it from here instead of listening
           to React Native's keyboard events. */}
-      <KeyboardProvider>
-        <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
-          <QueryClientProvider client={queryClient}>
-            <QueryClientNativeLifecycle />
-            <AuthProvider>
-              <AppUnlockProvider
-                promptMessage={languageReady ? t('preferences.biometricUnlock') : null}
-              >
-                {languageReady ? <AppUnlockAnnouncements /> : null}
-                <OrganizationProvider>
-                  <ToolSummaryTranslationRuntimeBootstrap />
-                  {/* Use one renderer so iOS and Android both honor the app palette and safe area. */}
-                  <ActionSheetProvider useCustomActionSheet>
-                    <>
-                      {children}
-                      <OfflineBanner />
-                      <PortalHost />
-                      {/*
+        <KeyboardProvider>
+          <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
+            <QueryClientProvider client={queryClient}>
+              <QueryClientNativeLifecycle />
+              <AuthProvider>
+                <AppUnlockProvider
+                  promptMessage={languageReady ? t('preferences.biometricUnlock') : null}
+                >
+                  {languageReady ? <AppUnlockAnnouncements /> : null}
+                  <OrganizationProvider>
+                    <ToolSummaryTranslationRuntimeBootstrap />
+                    {/* Use one renderer so iOS and Android both honor the app palette and safe area. */}
+                    <ActionSheetProvider useCustomActionSheet>
+                      <>
+                        {children}
+                        <OfflineBanner />
+                        <PortalHost />
+                        {/*
                         Toaster mounts last so it renders above PortalHost overlays (sheets/dropdowns
                         built on @rn-primitives/portal) — last sibling wins for overlapping overlays.
                         Ground truth (D2): prior on-device testing (2026-07-07, iOS) found sonner-native
@@ -90,16 +92,17 @@ export function AppRootProviders({
                         lifetime (spot check e4-end). Bottom is the transient-message convention:
                         a toast may cover the composer briefly, never the navigation.
                       */}
-                      <AppToaster />
-                    </>
-                  </ActionSheetProvider>
-                </OrganizationProvider>
-              </AppUnlockProvider>
-            </AuthProvider>
-          </QueryClientProvider>
-        </TRPCProvider>
-      </KeyboardProvider>
-    </GestureHandlerRootView>
+                        <AppToaster />
+                      </>
+                    </ActionSheetProvider>
+                  </OrganizationProvider>
+                </AppUnlockProvider>
+              </AuthProvider>
+            </QueryClientProvider>
+          </TRPCProvider>
+        </KeyboardProvider>
+      </GestureHandlerRootView>
+    </SystemFontScaleProvider>
   );
 }
 
@@ -124,7 +127,6 @@ export function AppRootProviders({
 function AppToaster() {
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
-  const { fontScale } = useWindowDimensions();
   // The provider reports the whole strip the IME hides, anchored to the screen
   // bottom: on Android edge-to-edge its height is the full IME inset (the
   // navigation bar is translucent there, so nothing is subtracted), and on iOS
@@ -141,13 +143,14 @@ function AppToaster() {
   // `shouldHideTabBar` does not hide it — the same predicate the bar's own
   // layout uses — so the toast clears it only while it is actually on screen;
   // a screen pushed over the tabs (agent-chat, pr-review) or the auth flow
-  // keeps the toast at its resting offset. `getEffectiveTabBarHeight` is the
-  // bar's own measurement (it carries the bar's small Android-only extra
-  // padding), so the toast cannot disagree with what the bar renders. See
-  // `lib/toast-offset.ts`.
+  // keeps the toast at its resting offset. The bar publishes the height it
+  // renders (it carries the bar's small Android-only extra padding and the
+  // lines its labels reserve), so the toast cannot disagree with what is on
+  // screen. See `lib/toast-offset.ts`.
+  const renderedTabBarHeight = useRenderedTabBarHeight();
   const tabBarHeight =
     (segments as readonly string[]).includes('(tabs)') && !shouldHideTabBar(pathname, segments)
-      ? getEffectiveTabBarHeight({ bottomInset: bottom, platform: Platform.OS, fontScale })
+      ? (renderedTabBarHeight ?? 0)
       : 0;
 
   return (

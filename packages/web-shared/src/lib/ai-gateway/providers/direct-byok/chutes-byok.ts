@@ -1,17 +1,15 @@
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { replaceReasoningObjectWithReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
 export default {
   id: 'chutes-byok',
+  models_dev_id: 'chutes',
   base_url: 'https://llm.chutes.ai/v1',
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions'],
   reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
-  transformRequest(context) {
-    replaceReasoningObjectWithReasoningEffort(context.request);
-  },
+  transformRequest() {},
   models: cachedEnhancedDirectByokModelList({
     providerId: 'chutes-byok',
     recommendedModels: [

@@ -182,7 +182,7 @@
     "codeArrivalHint": "Ако оваа адреса ги исполнува условите, кодот ќе пристигне во рок од една минута.",
     "verifyCode": "Потврди го кодот",
     "resendCode": "Испрати го кодот повторно",
-    "termsPrefix": "Со продолжувањето се согласуваш со нашите",
+    "termsPrefix": "Со продолжувањето се согласуваш со нашите ",
     "terms": "Услови",
     "termsConnector": " и ",
     "termsSuffix": ".",
@@ -293,7 +293,8 @@
     "condenseToolCallsSubtitle": "Групирај ги последователните повици на алатките во еден ред што можеш да го отвориш.",
     "toolSummaryTranslation": "Преведи резимеа на алатки",
     "toolSummaryTranslationSubtitle": "Испрати го секое резиме на алатка до модел за да го преведе на јазикот на твојата апликација. Ако преводот не успее, се прикажува оригиналот.",
-    "toolSummaryTranslationModelUnavailableNotice": "Овој модел веќе не се нуди. Допрете $t(common.model) за да изберете друг."
+    "toolSummaryTranslationModelUnavailableNotice": "Овој модел веќе не се нуди. Допрете $t(common.model) за да изберете друг.",
+    "autoExpandThinkingInactiveSubtitle": "Нема ефект додека се скриени деталите за размислувањето."
   },
   "prReview": {
     "pullRequestUnavailable": "Барањето за спојување е недостапно",
@@ -493,7 +494,7 @@
       "unresolveThread": "Означи ја нишката како нерешена",
       "resolved": "Решено",
       "outdated": "Застарено",
-      "comment_one": "1 коментар",
+      "comment_one": "{{displayCount}} коментар",
       "comment": "{{displayCount}} коментари",
       "comment_other": "{{displayCount}} коментари",
       "startedRelative": " · започната {{relative}}",
@@ -622,9 +623,15 @@
       "viewOnGitHub": "Прикажи PR на GitHub",
       "noChecksReported": "Нема пријавени проверки",
       "passed": "{{displayCount}} успешни",
+      "passed_one": "{{displayCount}} успешни",
+      "passed_other": "{{displayCount}} успешни",
       "failed": "{{displayCount}} неуспешни",
+      "failed_one": "{{displayCount}} неуспешни",
+      "failed_other": "{{displayCount}} неуспешни",
       "pending": "{{displayCount}} на чекање",
       "skipped": "{{displayCount}} прескокнати",
+      "skipped_one": "{{displayCount}} прескокнати",
+      "skipped_other": "{{displayCount}} прескокнати",
       "checksCount": "{{displayCount}} проверки",
       "checksCount_one": "{{displayCount}} проверка",
       "checksCount_other": "{{displayCount}} проверки",
@@ -1427,15 +1434,11 @@
       "findingsUnavailable": "Резултатите не се достапни бидејќи овој преглед беше неуспешен.",
       "serviceUnavailable": "Не успеа поврзувањето со услугата за преглед на код. Повтори го прегледот кога услугата ќе биде достапна.",
       "reviewFailed": "Прегледот беше неуспешен. Обиди се повторно.",
-      "cancelReasonSuperseded": "Беше објавен понов commit, па овој преглед беше заменет.",
-      "cancelReasonIntegrationDisconnected": "{{platform}} е исклучен, па овој преглед беше откажан. Поврзи го повторно, а потоа повтори го прегледот.",
-      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer беше исклучен за Bitbucket, па овој преглед беше откажан. Овозможи го повторно, а потоа повтори го прегледот.",
-      "cancelReasonBitbucketPullRequestChanged": "Барањето за повлекување во Bitbucket беше променето, па овој преглед беше заменет.",
-      "cancelReasonCancelled": "Овој преглед беше откажан.",
-      "cancelReasonInterrupted": "Овој преглед беше прекинат.",
       "showMore": "Прикажи повеќе",
       "created": "Создадено",
       "started": "Започнато",
+      "reviewEnded": "Окончено",
+      "severityNitpick": "Ситница",
       "tokens": "Токени",
       "tokensInOut": "{{input}} влез / {{output}} излез",
       "council": "Совет",
@@ -1459,7 +1462,13 @@
       "sessionError": "Се појави грешка во сесијата: {{error}}.",
       "statusWithValue": "Статус: {{status}}",
       "toolName": "Алатка: {{name}}",
-      "toolNameError": "Се појави грешка во алатката: {{name}}."
+      "toolNameError": "Се појави грешка во алатката: {{name}}.",
+      "cancelReasonSuperseded": "Беше објавен понов commit, па овој преглед беше заменет.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} е исклучен, па овој преглед беше откажан. Поврзи го повторно, а потоа повтори го прегледот.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer беше исклучен за Bitbucket, па овој преглед беше откажан. Овозможи го повторно, а потоа повтори го прегледот.",
+      "cancelReasonBitbucketPullRequestChanged": "Барањето за повлекување во Bitbucket беше променето, па овој преглед беше заменет.",
+      "cancelReasonCancelled": "Овој преглед беше откажан.",
+      "cancelReasonInterrupted": "Овој преглед беше прекинат."
     },
     "reviewMemory": {
       "title": "Меморија од прегледи",
@@ -1746,7 +1755,7 @@
       "deadlinePassed": "Рокот помина",
       "deadlinePassedDetail": "{{critical}} со критична, {{high}} со висока сериозност",
       "dueThisWeek": "Со рок оваа недела",
-      "dueThisWeekDetail": "За {{exploitable}} е потврдено дека можат да се искористат за напад",
+      "dueThisWeekDetail": "Од нив за {{exploitable}} е потврдено дека можат да се искористат за напад",
       "noDeadline": "Нема рок",
       "reviewSlaAssignment": "Провери ги доделените рокови според SLA",
       "allOpenFindingsTracked": "Се следат сите отворени наоди"
@@ -1906,11 +1915,17 @@
       "actorSystem": "Систем Kilo",
       "couldNotLoad": "Не успеа вчитувањето на извештајот за ревизија.",
       "events": "Настани",
+      "eventConfidence": "Доверба: {{confidence}}",
+      "eventReason": "Причина: {{reason}}",
+      "eventsCount_one": "{{displayCount}} настан",
+      "eventsCount_other": "{{displayCount}} настани",
       "generated": "Извештајот е генериран {{generatedAt}}.",
       "noActivity": "Нема запишана активност",
       "noActivityDescription": "Kilo нема активност поврзана со безбедносни наоди што може да ја вклучи во извештајот за периодот од {{start}} до {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Складиштето не е запишано",
+      "reasonUnknown": "Непрепознаена причина",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Резиме на извештајот",
       "title": "Извештај за ревизија",
       "unavailable": "Извештајот за ревизија е недостапен",
@@ -1963,8 +1978,9 @@
       "couldNotLoad": "Не успеа вчитувањето на безбедносниот агент.",
       "installApp": "Инсталирај ја апликацијата на GitHub",
       "reauthorizeButton": "Повторно овласти ја апликацијата на GitHub",
-      "reauthorizeDescription": "На безбедносниот агент му треба дозволата vulnerability_alerts за пристап до предупредувањата од Dependabot. Повторно овласти ја апликацијата на GitHub за да ја доделиш оваа дозвола.",
+      "reauthorizeDescription": "На безбедносниот агент му треба дозвола да ги чита предупредувањата од Dependabot. Повторно овласти ја апликацијата на GitHub за да ја доделиш оваа дозвола.",
       "reauthorizeTitle": "Потребни се дополнителни дозволи",
+      "retryFailed": "Сè уште не успеа вчитувањето на безбедносниот агент. Провери ја врската и обиди се повторно.",
       "setupFailed": "Не можеше да се започне поставувањето на GitHub. Обиди се повторно."
     },
     "queuedActionUntracked": "Дејството во редицата повеќе не може да се следи. Освежи за да ја видиш најновата состојба.",
@@ -2127,8 +2143,8 @@
       "dollar_other": "долари",
       "costSpoken": "трошок {{cost}}",
       "costSpokenWithTime": "трошок {{cost}}, {{time}}",
-      "spokenJoiner": "и",
-      "pullRequest": "барање за спојување {{number}}"
+      "pullRequest": "барање за спојување {{number}}",
+      "spokenJoiner": "и"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Не можеше да се отвори GitHub",
@@ -2264,7 +2280,6 @@
       "couldNotLoadEnvironment": "Не успеа вчитувањето на твојата околина.",
       "retryLoadingEnvironment": "Повторно вчитај ја околината",
       "defaultEnvironment": "Стандардна околина",
-      "environmentSummary": "{{commands}} команди · {{mcp}} MCP · {{skills}} вештини · {{agents}} агенти",
       "leaveChanges": "Остави ги промените",
       "commitAndPush": "Комитирај и испрати",
       "startSession": "Започни сесија",
@@ -2559,7 +2574,10 @@
       "allowOnceAccessibility": "Дозволи еднаш",
       "alwaysAllow": "Секогаш дозволи",
       "alwaysAllowAccessibility": "Секогаш дозволи",
-      "retrying": "Повторен обид…"
+      "retrying": "Повторен обид…",
+      "retryDeny": "Повтори го одбивањето",
+      "retryAllowOnce": "Повтори го дозволувањето еднаш",
+      "retryAlwaysAllow": "Повтори го дозволувањето секогаш"
     },
     "questionCard": {
       "title": "Агентот чека одговор",
@@ -3111,22 +3129,16 @@
     "boundary": {
       "backToProfile": "Назад на профилот",
       "loadErrorMessage": "Провери ја врската и обиди се повторно.",
-
       "chooseAccount": "Избери сметка",
       "loadErrorTitle": "Не успеа вчитувањето на твоите организации.",
       "membershipLostNotice": "Веќе немаш пристап до оваа организација. Префрлено на {{target}}.",
       "noOrganization": "Нема организација",
-
       "noOrganizationDescription": "Оваа сметка не е дел од организација. Создај или придружи се на организација на веб-страницата за да ги користиш функциите на организацијата, како покани за членови и предупредувања за низок баланс.",
-
       "openWebOrganizations": "Отвори организации на веб-страницата",
-
       "organizationUnavailable": "Организацијата не е достапна.",
       "selectDescriptionWithOrganizations": "Припаѓаш на една или повеќе организации. Избери ја сметката што треба да ја користи овој екран.",
-
       "selectOrganization": "Избор на организација",
       "unavailableDescription": "Оваа организација веќе не е достапна. Избери друга од твојот профил за да продолжиш.",
-
       "unavailableSessionsDescription": "Оваа организација веќе не е достапна. Нејзините сесии не можат да се вчитаат.",
       "accessDeniedDescription": "Немаш пристап до оваа организација."
     },
@@ -3149,14 +3161,14 @@
       "truncated": "Достапни се и постари активности со кредити."
     },
     "inviteMember": {
-      "alreadyInvited": "Оваа адреса веќе е поканета или веќе припаѓа на член.",
       "emailError": "Внеси важечка адреса за е-пошта.",
       "emailPlaceholder": "име@компанија.com",
       "permissionDenied": "Немаш дозвола да покануваш членови.",
       "roleMember": "Улога: член",
-      "sendError": "Не успеа испраќањето на поканата.",
       "sendInvite": "Испрати покана",
-      "title": "Покани член"
+      "title": "Покани член",
+      "alreadyInvited": "Оваа адреса веќе е поканета или веќе припаѓа на член.",
+      "sendError": "Не успеа испраќањето на поканата."
     },
     "invoices": {
       "downloadA11y": "Преземи фактура {{number}}",
@@ -3225,8 +3237,8 @@
       "inviteCreated": "Поканата е создадена",
       "pendingInvitations": "Покани на чекање",
       "resendInvite": "Испрати ја повторно поканата",
-      "resendInviteError": "Не успеа повторното испраќање на поканата.",
-      "shareInviteLink": "Сподели линк за покана"
+      "shareInviteLink": "Сподели линк за покана",
+      "resendInviteError": "Не успеа повторното испраќање на поканата."
     },
     "usageStats": {
       "inputTokens": "Влезни токени",
@@ -3371,11 +3383,11 @@
   },
   "transcriptionModel": {
     "title": "Модел за транскрипција",
-    "choose": "Одбери модел",
     "noneChosen": "Не е избран",
     "emptyTitle": "Нема модели за транскрипција",
     "emptyDescription": "Kilo Gateway моментално не нуди модели за транскрипција.",
-    "loadFailed": "Моделите за транскрипција не се вчитаа."
+    "loadFailed": "Моделите за транскрипција не се вчитаа.",
+    "choose": "Одбери модел"
   },
   "voiceLanguage": {
     "title": "Јазик на гласовниот внес",
@@ -3397,7 +3409,6 @@
   },
   "modelChat": {
     "offlineFailure": "На овој модел му е потребна интернет-врска. Поврзете се и обидете се повторно или префрлете се на модел на овој уред.",
-    "creditsRequired": "Немате доволно кредити за да ја испратите оваа порака. Додајте кредити и обидете се повторно.",
     "empty": {
       "title": "Започнете разговор",
       "description": "Испратете порака за да разговарате со модел."
@@ -3591,6 +3602,7 @@
       "fromHuggingFace": "Од Hugging Face",
       "loading": "Се вчитуваат моделите",
       "noResults": "Не се најдени модели",
+      "noResultsForQuery": "Не се најдени модели за \"{{query}}\"",
       "noFits": "Ниеден модел не одговара за уредов",
       "noFitsDescription": "Поголемите модели се во картичката $t(common.all).",
       "fit": {
@@ -3621,8 +3633,6 @@
       "quantizations": "Квантизации",
       "quantizationsHelp": "Помалите датотеки користат помалку меморија и простор. Поголемите датотеки обично даваат подобри одговори.",
       "quantDetail": "Преземање од {{size}} · околу {{memory}} меморија",
-      "downloadQuant": "Преземи {{quant}}",
-      "downloadModelA11y": "Преземи {{name}}",
       "detailsA11y": "Детали: {{name}}",
       "loadingModel": "Се вчитуваат деталите за моделот",
       "couldNotLoadModel": "Овој модел не може да се вчита",
@@ -3667,13 +3677,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "Овој модел поддржува ниво на размислување"
-    }
+    },
+    "creditsRequired": "Немате доволно кредити за да ја испратите оваа порака. Додајте кредити и обидете се повторно."
   },
   "settingsTools": {
     "confirmTitle": "Да се потврди оваа промена?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "твојот најнов репозиториум",
+      "confirmMessage": "Репозиториум: {{repository}}. Упатство: {{prompt}}",
+      "confirmTitle": "Да го стартираш овој агент?",
       "promptRequired": "За да стартираш агент, потребно е упатство. Додај упатство и стартувај го повторно.",
       "repositoryRequired": "За да стартираш агент, потребен е репозиториум. Отвори Kilo и избери еден, па стартувај повторно.",
       "repositoryUnknown": "Kilo не го препознава {{repository}} како GitHub или GitLab репозиториум. Избери друг репозиториум во Kilo.",
@@ -3702,10 +3716,10 @@
     "noSpend": "Сè уште нема евидентирано трошење",
     "spend24h": "Трошење во последните 24 часа",
     "multiplierError": "Внеси множител од 1 или повеќе",
-    "multiplierMaxError": "Внеси множител од {{max}} или помалку",
-    "thresholdMaxError": "Внеси износ од {{max}} или помалку.",
     "permissionDenied": "Немаш дозвола да управуваш со предупредувањата за трошење.",
-    "pushOffByCategory": "Исклучено во Известувања"
+    "pushOffByCategory": "Исклучено во Известувања",
+    "multiplierMaxError": "Внеси множител од {{max}} или помалку",
+    "thresholdMaxError": "Внеси износ од {{max}} или помалку."
   },
   "profiles": {
     "title": "Профили",
@@ -3722,9 +3736,10 @@
       "skills_other": "{{count}} вештини",
       "commands_one": "{{count}} команда",
       "commands_other": "{{count}} команди",
-      "varsShort": "{{count}}п",
-      "skillsShort": "{{count}}в",
-      "commandsShort": "{{count}}к"
+      "setupCommands_one": "{{count}} команда за поставување",
+      "setupCommands_other": "{{count}} команди за поставување",
+      "agents_one": "{{count}} агент",
+      "agents_other": "{{count}} агенти"
     },
     "nameLabel": "Име на профилот",
     "namePlaceholder": "на пр. Дебагирање на задниот дел",
@@ -3752,6 +3767,8 @@
     "keyTooLong": "Клучот мора да има 256 знаци или помалку",
     "keyDuplicate": "Овој клуч веќе постои во профилот",
     "valueLabel": "Вредност",
+    "valueRequired": "Внесете вредност",
+    "tooLong": "Користете најмногу {{max}} знаци",
     "secrets": {
       "markSecret": "Означи како тајна",
       "masked": "Скриена вредност",
@@ -3761,7 +3778,6 @@
     },
     "variablesEmpty": "Сè уште нема променливи",
     "variablesSaveFailed": "Не може да се зачува променливата",
-    "variablesDeleteFailed": "Не може да се избрише променливата",
     "commandsTitle": "Команди за поставување",
     "addCommand": "Додадете команда",
     "commandLabel": "Команда",
@@ -3772,7 +3788,6 @@
     "moveDown": "Движете се надолу",
     "moveCommandUp": "Премести команда {{position}} нагоре",
     "moveCommandDown": "Премести команда {{position}} надолу",
-    "deleteCommand": "Избриши команда {{position}}",
     "skillsTitle": "Вештини",
     "addSkill": "Додадете вештина",
     "skillNameLabel": "Име на вештина",
@@ -3804,7 +3819,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Внесете име на серверот",
-      "nameInvalid": "Името може да користи само букви, бројки, долни цртички и цртички",
+      "nameInvalid": "Името може да користи само ASCII букви, бројки, долни цртички и цртички, до 100 знаци",
       "commandRequired": "Внесете команда",
       "commandTooLong": "Користете најмногу 50 аргументи од по 500 знаци",
       "urlRequired": "Внесете URL-адреса",
@@ -3849,7 +3864,7 @@
       "deleteFailed": "Не може да се избрише агентот",
       "nameRequired": "Внесете име на агент",
       "slugRequired": "Внесете голтка агент",
-      "slugInvalid": "Slug мора да започнува со буква и да користи само мали букви, цифри и цртички",
+      "slugInvalid": "Slug мора да започнува со мала ASCII буква и да користи само ASCII мали букви, цифри и цртички, до 50 знаци",
       "slugConflict": "Тој slug веќе го користи вграден агент или друг агент во овој профил",
       "edit": "Уредување агент"
     },
@@ -3894,7 +3909,9 @@
       "pinFailed": "Не можеше да се закачи репо",
       "unboundToast": "Репото не е поврзано",
       "unbindFailed": "Не можеше да се одврзе репото"
-    }
+    },
+    "variablesDeleteFailed": "Не може да се избрише променливата",
+    "deleteCommand": "Избриши команда {{position}}"
   },
   "credits": {
     "title": "Купи кредити",
@@ -3921,7 +3938,6 @@
       "newList": "Нов список",
       "empty": "Сè уште нема списоци",
       "couldNotLoad": "Списоците не се вчитаа",
-      "createFailed": "Списокот не се создаде",
       "noRepository": "Нема репозиториум",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} отворени",
@@ -3931,7 +3947,8 @@
       "archive": "Архивирај",
       "unarchive": "Врати од архива",
       "deleteTitle": "Да се избрише {{name}}?",
-      "deleteMessage": "Ќе се избришат и неговите задачи. Сесиите остануваат."
+      "deleteMessage": "Ќе се избришат и неговите задачи. Сесиите остануваат.",
+      "createFailed": "Списокот не се создаде"
     },
     "listSettings": {
       "title": "Поставки за списокот",
@@ -3999,21 +4016,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Утрински преглед",
+    "title": "Агентски преглед",
     "atLeast": "≥{{value}}",
     "coverageHint": "Можно е да недостасува дел од историската активност. ≥ значи најмалку толку; непознато не е нула.",
     "available": "Достапни прегледи",
     "history": "Историја на прегледи",
-    "historyHint": "Извештаите се чуваат 30 дена, вклучително и отфрлените.",
+    "historyHint": "Прегледите се чуваат 30 дена, вклучително и отфрлените.",
     "settings": "Поставки за преглед",
-    "saved": "Поставките за преглед се зачувани",
-    "empty": "Нема ноќна активност",
-    "emptyHint": "Вашите сесии за кодирање во облак и CLI ќе се појават тука по активна ноќ.",
+    "empty": "Нема активност во овој прозорец на преглед",
+    "emptyHint": "Вашите сесии за кодирање во облак и CLI ќе се појават тука кога закажан преглед има активност.",
     "loadError": "Прегледите не можеа да се вчитаат",
-    "sessions": "Активни преку ноќ",
+    "sessions": "Активни во прозорецот",
     "pullRequests": "Отворени PRs",
     "blockers": "Нови пречки",
-    "spend": "Ноќна потрошувачка",
+    "spend": "Потрошувачка во прозорецот",
     "view": "Прочитај преглед",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -4035,13 +4051,13 @@
     "sources": "Докази и артефакти",
     "timezone": "Временска зона на прегледот",
     "deviceTimezone": "Користи ја временската зона на уредот",
-    "timezoneHint": "IANA временска зона, на пример Europe/Berlin. Промените на распоредот важат за идните ноќи.",
-    "nightStart": "Почеток на ноќта",
-    "morningStart": "Крај на ноќта / почеток на утрото",
-    "morningEnd": "Крај на утрото",
-    "timeHint": "Картичката на почетниот екран го враќа статусот во живо кога ќе заврши утрото, дури и офлајн.",
-    "invalidSchedule": "Изберете валидна временска зона и непреклопувачки, непразни ноќни и утрински периоди.",
-    "notificationsHint": "Едно општо известување секое утро кога ќе биде готов првиот извештај. Независно од платените AI резимеа.",
+    "timezoneHint": "IANA временска зона, на пример Europe/Berlin. Промените на распоредот важат за идните прегледи.",
+    "nightStart": "Почеток на прозорецот на преглед",
+    "morningStart": "Прегледот е готов во",
+    "morningEnd": "Прегледот е достапен до",
+    "timeHint": "Картичката на почетниот екран го враќа статусот во живо кога ќе заврши прозорецот на преглед, дури и офлајн.",
+    "invalidSchedule": "Изберете валидна временска зона и непразен прозорец на преглед.",
+    "notificationsHint": "Едно општо известување за секој закажан преглед. Независно од платените AI резимеа.",
     "notificationPermission": "Овозможете известувања на уредот во $t(common.notifications) за да го добивате прегледот.",
     "aiOptIn": "Платени AI резимеа",
     "aiHint": "Опционално само за овој контекст. Избрани, редактирани извадоци и структурирани факти се испраќаат до вашиот модел на јазикот на апликацијата. Наплатите се од салдото на овој контекст.",
@@ -4059,7 +4075,7 @@
     "contextSettings": "AI поставки · {{context}}",
     "allContexts": "Личните и организациските прегледи остануваат одвоени.",
     "create": "Создај преглед",
-    "oneOff": "Еднократен",
+    "oneOff": "По барање",
     "createdAt": "Создадено {{time}}",
     "chooseContext": "Изберете еден контекст",
     "period": "Период на прегледот",
@@ -4081,13 +4097,16 @@
     "emptyPeriod": "Не е пронајдена активност во овој период. Нема AI резиме ниту наплата.",
     "emptyHistory": "Нема зачувани прегледи",
     "historicalStateHint": "Состојбата на сесијата ја одразува состојбата на крајот од избраниот период, а не тековната состојба во живо.",
-    "oneOffHint": "AI добива избрани докази со скриени чувствителни податоци на јазикот на вашата апликација. Овој еднократен извештај не го менува вашиот утрински распоред ниту поставките за AI.",
+    "oneOffHint": "AI добива избрани докази со скриени чувствителни податоци на јазикот на вашата апликација. Овој преглед по барање не го менува вашиот закажан преглед ниту поставките за AI.",
     "createOffline": "Поврзете се на интернет за да проверите или создадете преглед. Платените барања никогаш не се ставаат во редица додека сте офлајн.",
     "estimateInputTooLarge": "Овој период содржи премногу докази за избраниот модел.",
     "estimatePermissionUnavailable": "Немате дозвола да ги користите средствата на овој контекст.",
+    "createFailed": "Прегледот не можеше да се создаде.",
+    "reviewFailed": "Прегледот не можеше да се прегледа.",
     "estimatePricingUnavailable": "Цените за овој модел не се достапни.",
     "estimateBalanceUnavailable": "Нема доволно средства за платен резиме.",
     "estimateModelNotAllowed": "Овој модел не е дозволен тука.",
-    "estimateSpendLimitTooLow": "Подигнете го лимитот за трошоци за да го овозможите овој резиме."
+    "estimateSpendLimitTooLow": "Подигнете го лимитот за трошоци за да го овозможите овој резиме.",
+    "saved": "Поставките за преглед се зачувани"
   }
 }

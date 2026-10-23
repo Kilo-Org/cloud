@@ -1,5 +1,5 @@
 import { type Href, Stack, useLocalSearchParams } from 'expo-router';
-import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
+import { appScreenLayout } from '@/components/app-screen-layout';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { SecurityAgentCommandObserver } from '@/components/security-agent/security-agent-command-observer';
@@ -28,7 +28,7 @@ export default function SecurityAgentScopeLayout() {
   return (
     <>
       <SecurityAgentCommandObserver scope={scope} />
-      <Stack screenLayout={appUnlockScreenLayout} screenOptions={{ headerShown: false }}>
+      <Stack screenLayout={appScreenLayout} screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="dismiss/[id]" options={sheetOptions} />
         <Stack.Screen name="filter" options={sheetOptions} />

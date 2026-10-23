@@ -181,6 +181,99 @@ test('rejects an empty translated value', context => {
   assert.match(result.stderr, /mobile\/ru: "agents\.title" is empty/);
 });
 
+test('rejects a trailing space that English does not carry', context => {
+  const result = runChecker(context, {
+    translated: { agents: { ...TRANSLATED.agents, title: 'Localized agents ' } },
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /mobile\/ru: "agents\.title" leading or trailing space differs/);
+});
+
+test('accepts a locale-owned separator in the login legal sentence', context => {
+  // A catalog that does not separate words with spaces abuts the prefix, the
+  // Terms link and the conjunction, so its values carry no edge whitespace
+  // where English has one.
+  const english = {
+    login: {
+      termsPrefix: 'By continuing you agree to our ',
+      terms: 'Terms',
+      termsConnector: ' and ',
+    },
+  };
+  const result = runChecker(context, {
+    language: 'zh-Hans',
+    english,
+    translated: {
+      login: { termsPrefix: '继续即表示你同意我们的', terms: '条款', termsConnector: '和' },
+    },
+    source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('still rejects separator whitespace elsewhere in the same catalog', context => {
+  const english = { login: { termsPrefix: 'By continuing you agree to our ', terms: 'Terms' } };
+  const result = runChecker(context, {
+    language: 'zh-Hans',
+    english,
+    translated: { login: { termsPrefix: '继续即表示你同意我们的', terms: '条款 ' } },
+    source: "t('login.termsPrefix'); t('login.terms');",
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /mobile\/zh-Hans: "login\.terms" leading or trailing space differs/);
+});
+
+for (const [name, termsPrefix, termsConnector] of [
+  ['a dropped separator in a spaced catalog', 'Unsere', ' und '],
+  ['a padded prefix beside a bare conjunction', 'Unsere ', 'und'],
+]) {
+  test(`rejects ${name}`, context => {
+    const english = {
+      login: {
+        termsPrefix: 'By continuing you agree to our ',
+        terms: 'Terms',
+        termsConnector: ' and ',
+      },
+    };
+    const result = runChecker(context, {
+      language: 'de',
+      english,
+      translated: { login: { termsPrefix, terms: 'Bedingungen', termsConnector } },
+      source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
+    });
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(
+      result.stderr,
+      /mobile\/de: "login\.termsPrefix" and "login\.termsConnector" disagree about their separator/
+    );
+  });
+}
+
+test('accepts a spaced catalog that pads both separator keys', context => {
+  const english = {
+    login: {
+      termsPrefix: 'By continuing you agree to our ',
+      terms: 'Terms',
+      termsConnector: ' and ',
+    },
+  };
+  const result = runChecker(context, {
+    language: 'de',
+    english,
+    translated: {
+      login: {
+        termsPrefix: 'Wenn du fortfährst, akzeptierst du unsere ',
+        terms: 'Bedingungen',
+        termsConnector: ' und ',
+      },
+    },
+    source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
 test('rejects a translated $TOKEN expansion token', context => {
   const result = runChecker(context, {
     english: { agents: { template: 'Explain $ARGUMENTS' } },
@@ -215,6 +308,190 @@ test('rejects unknown placeholders in a locale-specific plural category', contex
   assert.match(
     result.stderr,
     /mobile\/ru: "agents\.liveCount_few" uses placeholder \{\{total\}\}, which the English family does not/
+  );
+});
+
+const SINGULAR_COUNTED = {
+  agents: {
+    title: 'Agents',
+    liveCount_one: '1 live session',
+    liveCount_other: '{{count}} live sessions',
+  },
+};
+
+test('accepts a category that interpolates the count its English family uses', context => {
+  const result = runChecker(context, {
+    english: SINGULAR_COUNTED,
+    translated: {
+      agents: {
+        title: 'Localized agents',
+        liveCount_one: '{{count}} localized session',
+        liveCount_few: '{{count}} localized sessions (few)',
+        liveCount_many: '{{count}} localized sessions (many)',
+        liveCount_other: '{{count}} localized sessions',
+      },
+    },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('still rejects a token no value of the family uses', context => {
+  const result = runChecker(context, {
+    english: SINGULAR_COUNTED,
+    translated: {
+      agents: {
+        title: 'Localized agents',
+        liveCount_one: '{{count}} localized session out of {{total}}',
+        liveCount_few: '{{count}} localized sessions (few)',
+        liveCount_many: '{{count}} localized sessions (many)',
+        liveCount_other: '{{count}} localized sessions',
+      },
+    },
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ru: "agents\.liveCount_one" placeholders differ from English \(none\)/
+  );
+});
+
+test('still rejects a category that drops a placeholder English requires', context => {
+  const result = runChecker(context, {
+    english: {
+      agents: {
+        title: 'Agents',
+        liveCount_one: '{{total}} live session',
+        liveCount_other: '{{count}} of {{total}} live sessions',
+      },
+    },
+    translated: {
+      agents: {
+        title: 'Localized agents',
+        liveCount_one: '{{count}} localized session',
+        liveCount_few: '{{count}} localized sessions (few)',
+        liveCount_many: '{{count}} localized sessions (many)',
+        liveCount_other: '{{count}} localized sessions',
+      },
+    },
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ru: "agents\.liveCount_other" placeholders differ from English \(count,total\)/
+  );
+});
+
+/**
+ * A counted form may say its number in a word instead of the placeholder, but
+ * only where the allowlist names that key, category and locale: Arabic names
+ * one day and two days with their own word forms. Every other form of the same
+ * family still has to keep its count, so a deleted number stays visible.
+ */
+const WORDED_ENGLISH = {
+  securityAgent: {
+    dashboard: {
+      title: 'Dashboard',
+      daysOverdue_one: '{{displayCount}} day overdue',
+      daysOverdue_other: '{{displayCount}} days overdue',
+    },
+  },
+};
+const WORDED_SOURCE =
+  "t('securityAgent.dashboard.title');\nt('securityAgent.dashboard.daysOverdue', { count: 2 });";
+const WORDED_TRANSLATED = {
+  securityAgent: {
+    dashboard: {
+      title: 'لوحة المعلومات',
+      daysOverdue_zero: 'لا تأخير',
+      daysOverdue_one: 'متأخرة يومًا واحدًا',
+      daysOverdue_two: 'متأخرة يومين',
+      daysOverdue_few: 'متأخرة {{displayCount}} أيام',
+      daysOverdue_many: 'متأخرة {{displayCount}} يومًا',
+      daysOverdue_other: 'متأخرة {{displayCount}} يوم',
+    },
+  },
+};
+
+test('accepts the reviewed plural forms that say their count in a word', context => {
+  const result = runChecker(context, {
+    english: WORDED_ENGLISH,
+    translated: WORDED_TRANSLATED,
+    source: WORDED_SOURCE,
+    language: 'ar',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('rejects a dropped count in an unreviewed locale-only plural form', context => {
+  const result = runChecker(context, {
+    english: WORDED_ENGLISH,
+    translated: {
+      securityAgent: {
+        dashboard: {
+          ...WORDED_TRANSLATED.securityAgent.dashboard,
+          daysOverdue_few: 'متأخرة أيام',
+        },
+      },
+    },
+    source: WORDED_SOURCE,
+    language: 'ar',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ar: "securityAgent\.dashboard\.daysOverdue_few" drops \{\{displayCount\}\} without a reviewed worded form/
+  );
+});
+
+test('rejects a dropped count in a plural form the allowlist does not name', context => {
+  const result = runChecker(context, {
+    english: WORDED_ENGLISH,
+    translated: {
+      securityAgent: {
+        dashboard: {
+          ...WORDED_TRANSLATED.securityAgent.dashboard,
+          daysOverdue_other: 'متأخرة يوم',
+        },
+      },
+    },
+    source: WORDED_SOURCE,
+    language: 'ar',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ar: "securityAgent\.dashboard\.daysOverdue_other" placeholders differ from English \(displayCount\)/
+  );
+});
+
+test('rejects a plural sibling that drops a value other than its count', context => {
+  const result = runChecker(context, {
+    english: {
+      agents: {
+        title: 'Agents',
+        window: '{{displayCount}} days from {{start}}',
+        window_one: '{{displayCount}} day from {{start}}',
+        window_other: '{{displayCount}} days from {{start}}',
+      },
+    },
+    translated: {
+      agents: {
+        title: 'Localized agents',
+        window: '{{displayCount}} дней с {{start}}',
+        window_one: 'один день ({{displayCount}})',
+        window_few: '{{displayCount}} дня с {{start}}',
+        window_many: '{{displayCount}} дней с {{start}}',
+        window_other: '{{displayCount}} дней с {{start}}',
+      },
+    },
+    source: "t('agents.title');\nt('agents.window', { count: 2 });",
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ru: "agents\.window_one" placeholders differ from English \(displayCount,start\)/
   );
 });
 

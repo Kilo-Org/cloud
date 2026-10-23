@@ -182,7 +182,7 @@
     "codeArrivalHint": "Якщо для цієї адреси доступний вхід, код надійде протягом хвилини.",
     "verifyCode": "Перевірити код",
     "resendCode": "Надіслати код повторно",
-    "termsPrefix": "Продовжуючи, ви погоджуєтеся з нашими",
+    "termsPrefix": "Продовжуючи, ви погоджуєтеся з нашими ",
     "terms": "Умовами",
     "termsConnector": " і ",
     "termsSuffix": ".",
@@ -293,7 +293,8 @@
     "condenseToolCallsSubtitle": "Об'єднуйте послідовні виклики інструментів в один рядок, який можна відкрити.",
     "toolSummaryTranslation": "Перекладати підсумки інструментів",
     "toolSummaryTranslationSubtitle": "Надсилай кожен підсумок інструмента моделі, щоб перекласти його мовою твого застосунку. Якщо переклад не вдасться, показується оригінал.",
-    "toolSummaryTranslationModelUnavailableNotice": "Ця модель більше не пропонується. Натисніть $t(common.model), щоб вибрати іншу."
+    "toolSummaryTranslationModelUnavailableNotice": "Ця модель більше не пропонується. Натисніть $t(common.model), щоб вибрати іншу.",
+    "autoExpandThinkingInactiveSubtitle": "Не дає ефекту, поки подробиці міркувань приховано."
   },
   "notifications": {
     "liveActivities": "Дії наживо",
@@ -921,6 +922,8 @@
       "invalidUrl": "Введіть коректну URL-адресу запиту на злиття.",
       "pullRequestUrl": "URL-адреса запиту на злиття",
       "start": "Почати перевірку",
+      "starting": "Починаємо перевірку…",
+      "title": "Перевірка вручну",
       "startNotFound": "Не вдалося прочитати {{requestNoun}} з {{provider}}. Перевірте URL-адресу та переконайтеся, що репозиторій доступний.",
       "startRateLimited": "{{provider}} зараз обмежує запити. Спробуйте ще раз через кілька хвилин.",
       "startNotAllowed": "Ви не маєте доступу, щоб запустити перевірку й перевірити {{requestNoun}}. Перевірте свої права та план вашої організації.",
@@ -928,9 +931,7 @@
       "startAlreadyRunning": "Цей {{requestNoun}} уже перевіряється.",
       "startRejected": "Цей {{requestNoun}} неможливо перевірити. Переконайтеся, що він відкритий, не є чернеткою, і що URL-адреса вказана правильно.",
       "startProviderUnavailable": "Не вдалося зв'язатися з {{provider}}, щоб прочитати цей {{requestNoun}}. Спробуйте ще раз.",
-      "startFailed": "Не вдалося запустити перевірку. Перевірте підключення та спробуйте ще раз.",
-      "starting": "Починаємо перевірку…",
-      "title": "Перевірка вручну"
+      "startFailed": "Не вдалося запустити перевірку. Перевірте підключення та спробуйте ще раз."
     },
     "notConnectedReadOnly": "{{platform}} не підключено. Підключити його можуть лише власники та адміністратори організації.",
     "gitlab": {
@@ -968,12 +969,6 @@
       "findingsUnavailable": "Результати недоступні, оскільки ця перевірка завершилася з помилкою.",
       "serviceUnavailable": "Не вдалося підключитися до сервісу перевірки коду. Повторіть перевірку, коли сервіс буде доступний.",
       "reviewFailed": "Перевірка завершилася з помилкою. Спробуйте ще раз.",
-      "cancelReasonSuperseded": "Було надіслано новіший коміт, тому цю перевірку замінено.",
-      "cancelReasonIntegrationDisconnected": "{{platform}} від'єднано, тому цю перевірку скасовано. Відновіть з'єднання, а потім повторіть перевірку.",
-      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer вимкнено для Bitbucket, тому цю перевірку скасовано. Увімкніть його знову, а потім повторіть перевірку.",
-      "cancelReasonBitbucketPullRequestChanged": "Запит на злиття в Bitbucket змінився, тому цю перевірку замінено.",
-      "cancelReasonCancelled": "Цю перевірку скасовано.",
-      "cancelReasonInterrupted": "Цю перевірку перервано.",
       "retryMessage": "Це повторно запустить перевірку коду.",
       "retryReview": "Повторити перевірку",
       "retryNeedsSettings": "Агент перевірки коду вимкнено, або його налаштування потребують уваги. Виправте налаштування, а потім повторіть цю перевірку.",
@@ -981,6 +976,8 @@
       "retryTitle": "Повторити перевірку?",
       "showMore": "Показати більше",
       "started": "Розпочато",
+      "reviewEnded": "Закінчено",
+      "severityNitpick": "Дрібниця",
       "threshold": "Поріг",
       "title": "Перевірка",
       "tokens": "Токени",
@@ -999,7 +996,13 @@
       "sessionError": "Помилка сеансу: {{error}}.",
       "statusWithValue": "Стан: {{status}}",
       "toolName": "Інструмент: {{name}}",
-      "toolNameError": "Сталася помилка інструмента {{name}}."
+      "toolNameError": "Сталася помилка інструмента {{name}}.",
+      "cancelReasonSuperseded": "Було надіслано новіший коміт, тому цю перевірку замінено.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} від'єднано, тому цю перевірку скасовано. Відновіть з'єднання, а потім повторіть перевірку.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer вимкнено для Bitbucket, тому цю перевірку скасовано. Увімкніть його знову, а потім повторіть перевірку.",
+      "cancelReasonBitbucketPullRequestChanged": "Запит на злиття в Bitbucket змінився, тому цю перевірку замінено.",
+      "cancelReasonCancelled": "Цю перевірку скасовано.",
+      "cancelReasonInterrupted": "Цю перевірку перервано."
     },
     "reviewList": {
       "configureProvider": "Налаштувати сервіс",
@@ -1163,12 +1166,20 @@
       "actorSystem": "Система Kilo",
       "couldNotLoad": "Не вдалося завантажити звіт аудиту.",
       "events": "Події",
+      "eventConfidence": "Впевненість: {{confidence}}",
+      "eventReason": "Причина: {{reason}}",
+      "eventsCount_one": "{{displayCount}} подія",
+      "eventsCount_few": "{{displayCount}} події",
+      "eventsCount_many": "{{displayCount}} подій",
+      "eventsCount_other": "{{displayCount}} події",
       "generated": "Звіт сформовано {{generatedAt}}.",
       "noActivity": "Немає зафіксованих дій",
       "noActivityDescription": "За період із {{start}} до {{end}} у Kilo не зафіксовано дій із проблемами безпеки, які можна включити до звіту.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "Не вдалося завершити запит на звіт. Спробуйте ще раз.",
       "repositoryNotRecorded": "Репозиторій не зафіксовано",
+      "reasonUnknown": "Нерозпізнана причина",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Підсумок звіту",
       "title": "Звіт аудиту",
       "unavailable": "Звіт аудиту недоступний",
@@ -1285,7 +1296,7 @@
       "deadlinePassed": "Термін минув",
       "deadlinePassedDetail": "Критичний рівень: {{critical}}, високий: {{high}}",
       "dueThisWeek": "Термін спливає цього тижня",
-      "dueThisWeekDetail": "Підтверджена можливість атаки: {{exploitable}}",
+      "dueThisWeekDetail": "З них {{exploitable}} з підтвердженою можливістю атаки",
       "noDeadline": "Терміну немає",
       "reviewSlaAssignment": "Перевірити встановлені терміни за SLA",
       "allOpenFindingsTracked": "Усі відкриті проблеми відстежуються"
@@ -1414,8 +1425,9 @@
       "couldNotLoad": "Не вдалося завантажити Агента безпеки.",
       "installApp": "Установити застосунок GitHub",
       "reauthorizeButton": "Повторно авторизувати застосунок GitHub",
-      "reauthorizeDescription": "Агент безпеки потребує дозволу vulnerability_alerts для доступу до сповіщень Dependabot. Повторно авторизуйте застосунок GitHub, щоб надати цей дозвіл.",
+      "reauthorizeDescription": "Агент безпеки потребує дозволу на читання сповіщень Dependabot. Повторно авторизуйте застосунок GitHub, щоб надати цей дозвіл.",
       "reauthorizeTitle": "Потрібні додаткові дозволи",
+      "retryFailed": "Все ще не вдалося завантажити Агента безпеки. Перевірте підключення та спробуйте ще раз.",
       "setupFailed": "Не вдалося розпочати налаштування GitHub. Спробуйте ще раз."
     },
     "settingsOverview": {
@@ -1631,8 +1643,8 @@
       "dollar_many": "доларів",
       "costSpoken": "вартість {{cost}}",
       "costSpokenWithTime": "вартість {{cost}}, {{time}}",
-      "spokenJoiner": "і",
-      "pullRequest": "запит на злиття {{number}}"
+      "pullRequest": "запит на злиття {{number}}",
+      "spokenJoiner": "і"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Не вдалося розпочати налаштування застосунку GitHub. Спробуйте ще раз.",
@@ -1770,7 +1782,6 @@
       "couldNotLoadEnvironment": "Не вдалося завантажити ваше середовище.",
       "retryLoadingEnvironment": "Повторити завантаження середовища",
       "defaultEnvironment": "Типове середовище",
-      "environmentSummary": "команд: {{commands}} · MCP: {{mcp}} · навичок: {{skills}} · агентів: {{agents}}",
       "leaveChanges": "Залишити зміни",
       "commitAndPush": "Закомітити та надіслати",
       "startSession": "Розпочати сеанс",
@@ -2073,7 +2084,10 @@
       "allowOnceAccessibility": "Дозволити один раз",
       "alwaysAllow": "Завжди дозволяти",
       "alwaysAllowAccessibility": "Завжди дозволяти",
-      "retrying": "Повторна спроба…"
+      "retrying": "Повторна спроба…",
+      "retryDeny": "Спробувати не дозволяти ще раз",
+      "retryAllowOnce": "Спробувати дозволити один раз ще раз",
+      "retryAlwaysAllow": "Спробувати завжди дозволяти ще раз"
     },
     "questionCard": {
       "title": "Агенту потрібна відповідь",
@@ -2640,14 +2654,26 @@
       "checksCount_other": "перевірок: {{displayCount}}",
       "couldNotLoad": "Не вдалося завантажити перевірки.",
       "failed": "з помилками: {{displayCount}}",
+      "failed_one": "з помилками: {{displayCount}}",
+      "failed_other": "з помилками: {{displayCount}}",
+      "failed_few": "з помилками: {{displayCount}}",
+      "failed_many": "з помилками: {{displayCount}}",
       "noAccess": "У вас немає доступу до перевірок цього репозиторію.",
       "noChecksReported": "Немає даних про перевірки",
       "notAvailable": "Перевірки ще недоступні. Можливо, останній коміт ще не оброблено або застосунок Kilo для GitHub не встановлено у вихідному репозиторії.",
       "openDetails": "Відкрити відомості про {{name}}",
       "passed": "успішно: {{displayCount}}",
+      "passed_one": "успішно: {{displayCount}}",
+      "passed_other": "успішно: {{displayCount}}",
+      "passed_few": "успішно: {{displayCount}}",
+      "passed_many": "успішно: {{displayCount}}",
       "pending": "в очікуванні: {{displayCount}}",
       "retryChecks": "Повторити перевірки",
       "skipped": "пропущено: {{displayCount}}",
+      "skipped_one": "пропущено: {{displayCount}}",
+      "skipped_other": "пропущено: {{displayCount}}",
+      "skipped_few": "пропущено: {{displayCount}}",
+      "skipped_many": "пропущено: {{displayCount}}",
       "title": "Перевірки",
       "viewOnGitHub": "Переглянути PR на GitHub",
       "checkDetails": "відомості про перевірку"
@@ -2730,7 +2756,7 @@
       "mutedUser": "Користувача {{login}} додано до ігнорованих",
       "noDiscussion": "Обговорень ще немає",
       "noDiscussionDescription": "У цьому запиті на злиття ще немає обговорень коду чи загальних коментарів.",
-      "comment_one": "1 коментар",
+      "comment_one": "{{displayCount}} коментар",
       "outdated": "Застаріло",
       "quotedDiffSnippet": "Цитований фрагмент змін",
       "reactionPill": "реакція {{emoji}}, {{displayCount}} {{countLabel}}",
@@ -3183,22 +3209,16 @@
     "boundary": {
       "backToProfile": "Назад до профілю",
       "loadErrorMessage": "Перевір з’єднання та спробуй ще раз.",
-
       "chooseAccount": "Виберіть обліковий запис",
       "loadErrorTitle": "Не вдалося завантажити ваші організації.",
       "membershipLostNotice": "У вас більше немає доступу до цієї організації. Перемкнуто на {{target}}.",
       "noOrganization": "Немає організації",
-
       "noOrganizationDescription": "Цей обліковий запис не входить до організації. Створіть організацію або приєднайтеся до неї у вебверсії, щоб використовувати функції організації, як-от запрошення учасників і сповіщення про низький баланс.",
-
       "openWebOrganizations": "Відкрити організації у вебверсії",
-
       "organizationUnavailable": "Організація недоступна.",
       "selectDescriptionWithOrganizations": "Ви належите до однієї або кількох організацій. Виберіть обліковий запис, який має використовувати цей екран.",
-
       "selectOrganization": "Виберіть організацію",
       "unavailableDescription": "Ця організація більше недоступна. Виберіть іншу у своєму профілі, щоб продовжити.",
-
       "unavailableSessionsDescription": "Ця організація більше недоступна. Завантажити її сесії неможливо.",
       "accessDeniedDescription": "У вас немає доступу до цієї організації."
     },
@@ -3228,14 +3248,14 @@
       "renameTitle": "Перейменувати організацію"
     },
     "inviteMember": {
-      "alreadyInvited": "Ця адреса вже запрошена або вже належить учаснику організації.",
       "emailError": "Введіть коректну адресу електронної пошти.",
       "emailPlaceholder": "ім’я@компанія.укр",
       "permissionDenied": "У вас немає дозволу запрошувати учасників.",
       "roleMember": "Роль: учасник",
-      "sendError": "Не вдалося надіслати запрошення.",
       "sendInvite": "Надіслати запрошення",
-      "title": "Запросити учасника"
+      "title": "Запросити учасника",
+      "alreadyInvited": "Ця адреса вже запрошена або вже належить учаснику організації.",
+      "sendError": "Не вдалося надіслати запрошення."
     },
     "invoices": {
       "downloadA11y": "Завантажити рахунок {{number}}",
@@ -3304,8 +3324,8 @@
       "inviteCreated": "Запрошення створено",
       "pendingInvitations": "Неприйняті запрошення",
       "resendInvite": "Надіслати запрошення повторно",
-      "resendInviteError": "Не вдалося надіслати запрошення повторно.",
-      "shareInviteLink": "Поділитися посиланням на запрошення"
+      "shareInviteLink": "Поділитися посиланням на запрошення",
+      "resendInviteError": "Не вдалося надіслати запрошення повторно."
     },
     "usageStats": {
       "inputTokens": "Вхідні токени",
@@ -3453,11 +3473,11 @@
   },
   "transcriptionModel": {
     "title": "Модель розпізнавання мовлення",
-    "choose": "Виберіть модель",
     "noneChosen": "Не вибрано",
     "emptyTitle": "Немає моделей розпізнавання мовлення",
     "emptyDescription": "Зараз Kilo Gateway не пропонує моделей розпізнавання мовлення.",
-    "loadFailed": "Не вдалося завантажити моделі розпізнавання мовлення."
+    "loadFailed": "Не вдалося завантажити моделі розпізнавання мовлення.",
+    "choose": "Виберіть модель"
   },
   "voiceLanguage": {
     "title": "Мова голосового введення",
@@ -3479,7 +3499,6 @@
   },
   "modelChat": {
     "offlineFailure": "Цій моделі потрібне підключення до інтернету. Підключіться й повторіть спробу або перейдіть на модель на цьому пристрої.",
-    "creditsRequired": "Недостатньо кредитів, щоб надіслати це повідомлення. Поповніть баланс і повторіть спробу.",
     "empty": {
       "title": "Розпочніть чат",
       "description": "Надішліть повідомлення, щоб поговорити з моделлю."
@@ -3675,6 +3694,7 @@
       "fromHuggingFace": "З Hugging Face",
       "loading": "Завантаження моделей",
       "noResults": "Моделей не знайдено",
+      "noResultsForQuery": "Моделей для \"{{query}}\" не знайдено",
       "noFits": "Немає моделей для цього пристрою",
       "noFitsDescription": "Більші моделі — на вкладці «$t(common.all)».",
       "fit": {
@@ -3705,8 +3725,6 @@
       "quantizations": "Квантування",
       "quantizationsHelp": "Менші файли займають менше пам’яті та місця. Більші файли зазвичай дають кращі відповіді.",
       "quantDetail": "Завантаження {{size}} · близько {{memory}} пам’яті",
-      "downloadQuant": "Завантажити {{quant}}",
-      "downloadModelA11y": "Завантажити {{name}}",
       "detailsA11y": "Деталі: {{name}}",
       "loadingModel": "Завантаження відомостей про модель",
       "couldNotLoadModel": "Не вдалося завантажити цю модель",
@@ -3751,13 +3769,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "Ця модель підтримує рівень міркування"
-    }
+    },
+    "creditsRequired": "Недостатньо кредитів, щоб надіслати це повідомлення. Поповніть баланс і повторіть спробу."
   },
   "settingsTools": {
     "confirmTitle": "Підтвердити цю зміну?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "ваш останній репозиторій",
+      "confirmMessage": "Репозиторій: {{repository}}. Запит: {{prompt}}",
+      "confirmTitle": "Запустити цього агента?",
       "promptRequired": "Для запуску агента потрібен запит. Додайте запит і запустіть знову.",
       "repositoryRequired": "Для запуску агента потрібен репозиторій. Відкрийте Kilo, виберіть репозиторій та запустіть знову.",
       "repositoryUnknown": "Kilo не розпізнає {{repository}} як репозиторій GitHub або GitLab. Виберіть інший репозиторій у Kilo.",
@@ -3786,10 +3808,10 @@
     "noSpend": "Витрати ще не зафіксовано",
     "spend24h": "Витрати за останні 24 години",
     "multiplierError": "Введіть множник 1 або більше",
-    "multiplierMaxError": "Введіть множник {{max}} або менше",
-    "thresholdMaxError": "Введіть суму, що не перевищує {{max}}.",
     "permissionDenied": "У вас немає дозволу керувати сповіщеннями про витрати.",
-    "pushOffByCategory": "Вимкнено у сповіщеннях"
+    "pushOffByCategory": "Вимкнено у сповіщеннях",
+    "multiplierMaxError": "Введіть множник {{max}} або менше",
+    "thresholdMaxError": "Введіть суму, що не перевищує {{max}}."
   },
   "profiles": {
     "title": "Профілі",
@@ -3799,22 +3821,27 @@
     "emptyDescription": "Створіть профіль, щоб повторно використовувати змінні середовища, команди налаштування та навички під час сеансів.",
     "loadFailed": "Не вдалося завантажити профілі",
     "counts": {
+      "vars_one": "{{count}} змінна",
       "vars_few": "{{count}} змінні",
       "vars_many": "{{count}} змінних",
-      "vars_one": "{{count}} змінна",
       "vars_other": "{{count}} змінних",
       "mcp": "{{count}} MCP",
+      "skills_one": "{{count}} навичка",
       "skills_few": "{{count}} навички",
       "skills_many": "{{count}} навичок",
-      "skills_one": "{{count}} навичка",
       "skills_other": "{{count}} навичок",
+      "commands_one": "{{count}} команда",
       "commands_few": "{{count}} команди",
       "commands_many": "{{count}} команд",
-      "commands_one": "{{count}} команда",
       "commands_other": "{{count}} команд",
-      "varsShort": "{{count}}зм",
-      "skillsShort": "{{count}}нав",
-      "commandsShort": "{{count}}ком"
+      "setupCommands_one": "{{count}} команда налаштування",
+      "setupCommands_few": "{{count}} команди налаштування",
+      "setupCommands_many": "{{count}} команд налаштування",
+      "setupCommands_other": "{{count}} команд налаштування",
+      "agents_one": "{{count}} агент",
+      "agents_few": "{{count}} агенти",
+      "agents_many": "{{count}} агентів",
+      "agents_other": "{{count}} агенти"
     },
     "nameLabel": "Ім'я профілю",
     "namePlaceholder": "напр. Бекенд налагодження",
@@ -3842,6 +3869,8 @@
     "keyTooLong": "Ключ має містити не більше 256 символів",
     "keyDuplicate": "Цей ключ уже існує в профілі",
     "valueLabel": "Значення",
+    "valueRequired": "Введіть значення",
+    "tooLong": "Використайте не більше {{max}} символів",
     "secrets": {
       "markSecret": "Позначити як секрет",
       "masked": "Прихована цінність",
@@ -3851,7 +3880,6 @@
     },
     "variablesEmpty": "Ще немає змінних",
     "variablesSaveFailed": "Не вдалося зберегти змінну",
-    "variablesDeleteFailed": "Не вдалося видалити змінну",
     "commandsTitle": "Команди налаштування",
     "addCommand": "Додати команду",
     "commandLabel": "Команда",
@@ -3862,7 +3890,6 @@
     "moveDown": "Рухатися вниз",
     "moveCommandUp": "Перемістити команду {{position}} вгору",
     "moveCommandDown": "Перемістити команду {{position}} вниз",
-    "deleteCommand": "Видалити команду {{position}}",
     "skillsTitle": "Навички",
     "addSkill": "Додайте навички",
     "skillNameLabel": "Назва навички",
@@ -3894,7 +3921,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Введіть назву сервера",
-      "nameInvalid": "В назві можна використовувати лише літери, цифри, знаки підкреслення та тире",
+      "nameInvalid": "В назві можна використовувати лише літери ASCII, цифри, знаки підкреслення та тире, до 100 символів",
       "commandRequired": "Введіть команду",
       "commandTooLong": "Використовуйте не більше 50 аргументів по 500 символів кожен",
       "urlRequired": "Введіть URL",
@@ -3939,7 +3966,7 @@
       "deleteFailed": "Не вдалося видалити агента",
       "nameRequired": "Введіть ім'я агента",
       "slugRequired": "Введіть слизь агента",
-      "slugInvalid": "Слизень має починатися з літери та використовувати лише малі літери, цифри та тире",
+      "slugInvalid": "Слизень має починатися з маленької літери ASCII та використовувати лише малі літери ASCII, цифри та тире, до 50 символів",
       "slugConflict": "Цей slug уже використовується вбудованим агентом або іншим агентом у цьому профілі",
       "edit": "Агент редагування"
     },
@@ -3984,7 +4011,9 @@
       "pinFailed": "Не вдалося закріпити репо",
       "unboundToast": "Репо без зв'язку",
       "unbindFailed": "Не вдалося скасувати прив’язку репо"
-    }
+    },
+    "variablesDeleteFailed": "Не вдалося видалити змінну",
+    "deleteCommand": "Видалити команду {{position}}"
   },
   "credits": {
     "title": "Купити кредити",
@@ -4011,7 +4040,6 @@
       "newList": "Новий список",
       "empty": "Списків ще немає",
       "couldNotLoad": "Не вдалося завантажити списки.",
-      "createFailed": "Не вдалося створити список.",
       "noRepository": "Немає репозиторію",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} відкрито",
@@ -4025,7 +4053,8 @@
       "archive": "Архівувати",
       "unarchive": "Розархівувати",
       "deleteTitle": "Видалити «{{name}}»?",
-      "deleteMessage": "Його завдання теж буде видалено. Сеанси залишаться."
+      "deleteMessage": "Його завдання теж буде видалено. Сеанси залишаться.",
+      "createFailed": "Не вдалося створити список."
     },
     "listSettings": {
       "title": "Налаштування списку",
@@ -4097,21 +4126,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Ранковий брифінг",
+    "title": "Брифінг агента",
     "atLeast": "≥{{value}}",
     "coverageHint": "Частина історичної активності може бути відсутня. ≥ означає щонайменше стільки; невідомо — не означає нуль.",
     "available": "Доступні брифінги",
     "history": "Історія брифінгів",
-    "historyHint": "Звіти зберігаються 30 днів, зокрема відхилені.",
+    "historyHint": "Брифінги зберігаються 30 днів, зокрема відхилені.",
     "settings": "Налаштування брифінгу",
-    "saved": "Налаштування брифінгу збережено.",
-    "empty": "Немає нічної активності",
-    "emptyHint": "Ваші хмарні та CLI-сесії програмування з’являться тут після активної ночі.",
+    "empty": "Немає активності в цьому вікні брифінгу",
+    "emptyHint": "Ваші хмарні та CLI-сесії програмування з’являться тут, коли запланований брифінг має активність.",
     "loadError": "Не вдалося завантажити брифінги",
-    "sessions": "Активні вночі",
+    "sessions": "Активні у вікні",
     "pullRequests": "Відкриті PRs",
     "blockers": "Нові блокери",
-    "spend": "Нічні витрати",
+    "spend": "Витрати у вікні",
     "view": "Читати брифінг",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -4133,13 +4161,13 @@
     "sources": "Докази та артефакти",
     "timezone": "Часовий пояс брифінгу",
     "deviceTimezone": "Часовий пояс пристрою",
-    "timezoneHint": "Часовий пояс IANA, наприклад Europe/Berlin. Зміни розкладу діятимуть з наступних ночей.",
-    "nightStart": "Початок ночі",
-    "morningStart": "Кінець ночі / початок ранку",
-    "morningEnd": "Кінець ранку",
-    "timeHint": "Після завершення ранку картка на головному екрані знову показує поточний стан, навіть офлайн.",
-    "invalidSchedule": "Виберіть дійсний часовий пояс і непорожні періоди ночі та ранку, що не перетинаються.",
-    "notificationsHint": "Одне загальне сповіщення щоранку, коли буде готовий перший звіт. Не залежить від платних підсумків AI.",
+    "timezoneHint": "Часовий пояс IANA, наприклад Europe/Berlin. Зміни розкладу діятимуть з наступних брифінгів.",
+    "nightStart": "Початок вікна брифінгу",
+    "morningStart": "Брифінг готовий о",
+    "morningEnd": "Брифінг доступний до",
+    "timeHint": "Коли завершується вікно брифінгу, картка на головному екрані знову показує поточний стан, навіть офлайн.",
+    "invalidSchedule": "Виберіть дійсний часовий пояс і непорожнє вікно брифінгу.",
+    "notificationsHint": "Одне загальне сповіщення на кожен запланований брифінг. Не залежить від платних підсумків AI.",
     "notificationPermission": "Увімкніть сповіщення пристрою в розділі $t(common.notifications), щоб отримувати брифінг.",
     "aiOptIn": "Платні підсумки AI",
     "aiHint": "Необов’язково, лише для цього контексту. Вибрані знеособлені уривки та структуровані факти надсилаються вашій моделі мовою застосунку. Оплата списується з балансу цього контексту.",
@@ -4157,7 +4185,7 @@
     "contextSettings": "Налаштування AI · {{context}}",
     "allContexts": "Особисті брифінги та брифінги організації зберігаються окремо.",
     "create": "Створити брифінг",
-    "oneOff": "Одноразовий",
+    "oneOff": "На вимогу",
     "createdAt": "Створено {{time}}",
     "chooseContext": "Виберіть один контекст",
     "period": "Період брифінгу",
@@ -4179,13 +4207,16 @@
     "emptyPeriod": "За цей період активності не знайдено. Підсумок AI не створюватиметься, оплата не стягуватиметься.",
     "emptyHistory": "Немає збережених брифінгів",
     "historicalStateHint": "Стан сеансу відображає кінець вибраного періоду, а не поточний стан у реальному часі.",
-    "oneOffHint": "AI отримує вибрані матеріали з вилученими конфіденційними даними мовою вашого застосунку. Цей одноразовий звіт не змінює ваш ранковий розклад або налаштування AI.",
+    "oneOffHint": "AI отримує вибрані матеріали з вилученими конфіденційними даними мовою вашого застосунку. Цей брифінг на вимогу не змінює ваш запланований брифінг або налаштування AI.",
     "createOffline": "Підключіться до інтернету, щоб переглянути або створити брифінг. Платні запити ніколи не додаються до черги в автономному режимі.",
     "estimateInputTooLarge": "За цей період забагато матеріалів для вибраної моделі.",
     "estimatePermissionUnavailable": "У вас немає дозволу використовувати баланс цього контексту.",
+    "createFailed": "Не вдалося створити цей брифінг.",
+    "reviewFailed": "Не вдалося переглянути цей брифінг.",
     "estimatePricingUnavailable": "Ціни для цієї моделі недоступні.",
     "estimateBalanceUnavailable": "Недостатньо коштів для платного звіту.",
     "estimateModelNotAllowed": "Ця модель тут недоступна.",
-    "estimateSpendLimitTooLow": "Підніміть ліміт витрат, щоб дозволити цей звіт."
+    "estimateSpendLimitTooLow": "Підніміть ліміт витрат, щоб дозволити цей звіт.",
+    "saved": "Налаштування брифінгу збережено."
   }
 }

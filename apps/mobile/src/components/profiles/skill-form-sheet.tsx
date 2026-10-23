@@ -131,7 +131,7 @@ export function SkillFormSheet({
           disabled={isSaving}
           multiline
           textAlignVertical="top"
-          className="min-h-40 max-h-52 leading-5"
+          className="min-h-40 max-h-52 leading-[1.25rem]"
           autoCapitalize="none"
           autoCorrect={false}
           containerOnLayout={fieldLayout('content')}

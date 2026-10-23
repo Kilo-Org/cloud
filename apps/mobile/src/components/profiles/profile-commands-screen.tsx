@@ -1,3 +1,4 @@
+import { usePreventRemove, useRouter } from 'expo-router';
 import { type ReactNode, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
@@ -26,9 +27,8 @@ import { Text } from '@/components/ui/text';
 import { useAgentProfile } from '@/lib/hooks/use-agent-profiles';
 import { useProfileCommandsSave } from '@/lib/hooks/use-profile-commands-save';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { usePopWhenFocused } from '@/lib/navigation/pop-when-focused';
 import { cn } from '@/lib/utils';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 
 type CommandRow = Readonly<{ sequence: number; command: string }>;
 
@@ -57,7 +57,7 @@ export function ProfileCommandsScreen({
   organizationId,
 }: Readonly<{ profileId: string; organizationId?: string }>) {
   const { t } = useTranslation();
-  const popWhenFocused = usePopWhenFocused();
+  const router = useRouter();
   const colors = useThemeColors();
   const profileQuery = useAgentProfile(profileId, organizationId);
 
@@ -80,6 +80,9 @@ export function ProfileCommandsScreen({
   const commandsRef = useRef(commands);
   commandsRef.current = commands;
   const leavingRef = useRef(false);
+  // Latched once the newest list is persisted, so the replay of the blocked
+  // navigation action is not intercepted again.
+  const [leaveAllowed, setLeaveAllowed] = useState(false);
   // Remount uncontrolled fields for reorders and accepted server changes;
   // their text belongs to the position, not the input instance.
   const [generation, setGeneration] = useState(0);
@@ -130,11 +133,13 @@ export function ProfileCommandsScreen({
   };
 
   /**
-   * The screen has no save control, so the header arrow persists the focused
-   * edit before leaving. Each pass re-reads the rendered list, so an edit made
-   * during a write is saved by the same press.
+   * The screen has no save control, so every leave — the header arrow, the
+   * Android back button and the back gesture — persists the focused edit
+   * before the screen goes. Each pass re-reads the rendered list, so an edit
+   * made during a write is saved by the same attempt; the replay of the
+   * blocked navigation action then leaves. A failed save stays on the screen.
    */
-  const leave = async () => {
+  const leave = async (repeat: () => void) => {
     if (leavingRef.current) {
       return;
     }
@@ -147,13 +152,24 @@ export function ProfileCommandsScreen({
         return;
       }
       if (sameCommands(nonBlankCommands(commandsRef.current), persistedRef.current)) {
-        // A hardware or gesture Back during the write already left this
-        // screen; a second pop would remove the profile overview beneath it.
-        popWhenFocused();
+        setLeaveAllowed(true);
+        repeat();
         return;
       }
     }
   };
+
+  /**
+   * One guard covers the header arrow, the hardware back button and the back
+   * gesture, because all of them remove this route. A focused, unblurred field
+   * is already in `commands`, so a typed draft counts as unsaved work before
+   * any blur commit; a write in flight keeps the guard on so a second back
+   * waits for it instead of leaving behind an unreported failure.
+   */
+  const unsavedCommands = !sameCommands(nonBlankCommands(commands), persistedRef.current);
+  usePreventRemove(!leaveAllowed && (unsavedCommands || isSaving), ({ repeat }) => {
+    void leave(repeat);
+  });
 
   const controlClass = (disabled: boolean) =>
     cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70', disabled && 'opacity-40');
@@ -167,6 +183,8 @@ export function ProfileCommandsScreen({
       position === null ? t('profiles.moveUp') : t('profiles.moveCommandUp', { position });
     const downLabel =
       position === null ? t('profiles.moveDown') : t('profiles.moveCommandDown', { position });
+    const deleteLabel =
+      position === null ? t('common.delete') : t('profiles.deleteCommand', { position });
     const rowHint = position === null ? undefined : commandRowA11yLabel(position - 1, commandTotal);
     return (
       <View key={`${generation}-${index}`} className="gap-3 rounded-lg bg-secondary p-3">
@@ -218,7 +236,8 @@ export function ProfileCommandsScreen({
           <Pressable
             className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
             accessibilityRole="button"
-            accessibilityLabel={t('common.delete')}
+            accessibilityLabel={deleteLabel}
+            accessibilityHint={rowHint}
             onPress={() => {
               remove(index);
             }}
@@ -251,7 +270,7 @@ export function ProfileCommandsScreen({
         description={null}
         placement="top"
         action={
-          <Button onPress={add}>
+          <Button className={STATE_ACTION_CLASS} onPress={add}>
             <Text>{t('profiles.addCommand')}</Text>
           </Button>
         }
@@ -273,7 +292,7 @@ export function ProfileCommandsScreen({
       <ScreenHeader
         title={t('profiles.commandsTitle')}
         onBack={() => {
-          void leave();
+          router.back();
         }}
       />
       <TabScreenScrollView

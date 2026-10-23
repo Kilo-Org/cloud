@@ -48,10 +48,8 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => h.connectivity,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } }));
-vi.mock('expo-router', () => ({
-  useRouter: () => ({ back: h.back, push: h.push }),
-  useNavigation: () => ({ isFocused: () => true }),
-}));
+vi.mock('expo-router', () => ({ useRouter: () => ({ back: h.back, push: h.push }) }));
+vi.mock('@/lib/navigation/pop-when-focused', () => ({ usePopWhenFocused: () => h.back }));
 vi.mock('@/lib/profile-agent-navigation', () => ({
   getProfileVariablesPath: (id: string, org?: string) =>
     `/profiles/${id}/variables${org ? `?org=${org}` : ''}`,
@@ -86,6 +84,7 @@ vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrol
 vi.mock('@/components/profiles/profile-repo-pins-section', () => ({
   ProfileRepoPinsSection: 'ProfileRepoPinsSection',
 }));
+vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
@@ -158,9 +157,7 @@ describe('ProfileOverviewScreen', () => {
 
     const queryError = findOne(renderer.root, 'QueryError');
     expect(queryError.props.title).toBe("Couldn't load profiles");
-    act(() => {
-      (queryError.props as { onRetry: () => void }).onRetry();
-    });
+    act(queryError.props.onRetry as () => void);
     expect(h.query.refetch).toHaveBeenCalledTimes(1);
 
     unmount();
@@ -228,20 +225,38 @@ describe('ProfileOverviewScreen', () => {
     unmount();
   });
 
-  it('retryable: a save failure with no usable message adds saveFailed', async () => {
+  it('retains edited metadata after a failed save and clears the error after an explicit retry', async () => {
     h.query.data = testProfile();
     h.query.isPending = false;
-    const error = new Error('placeholder');
+    const error = new Error('Unavailable');
     error.message = '';
-    h.mutations.update.mutateAsync.mockRejectedValue(error);
+    h.mutations.update.mutateAsync
+      .mockRejectedValueOnce(error)
+      .mockResolvedValueOnce({ success: true });
 
-    const { renderer, unmount } = await mountScreen();
+    const { renderer, queryClient, unmount } = await mountScreen();
 
+    changeText(renderer.root, 'Profile name', 'Renamed');
+    changeText(renderer.root, 'Profile description', 'Retained description');
     await pressSave(renderer.root);
+    await waitFor(() => findAll(renderer.root, 'AccessibleStatus').length === 1);
+    expect(h.error).toHaveBeenCalledTimes(1);
 
-    await waitFor(() => h.error.mock.calls.length > 0);
-    expect(h.error).toHaveBeenCalledWith("Couldn't save profile");
+    // An unrelated profile refetch must not replace the failed draft.
+    h.query.data = testProfile({ vars: [{ key: 'NEW' }] });
+    rerenderScreen(renderer, queryClient);
+    expect(findField(renderer.root, 'Profile name').props.defaultValue).toBe('Renamed');
+    expect(findField(renderer.root, 'Profile description').props.defaultValue).toBe(
+      'Retained description'
+    );
+    await pressSave(renderer.root);
+    await waitFor(() => h.success.mock.calls.length === 1);
 
+    expect(h.mutations.update.mutateAsync.mock.calls.map(([input]) => input)).toEqual([
+      { profileId: 'profile-1', name: 'Renamed', description: 'Retained description' },
+      { profileId: 'profile-1', name: 'Renamed', description: 'Retained description' },
+    ]);
+    expect(findAll(renderer.root, 'AccessibleStatus')).toHaveLength(0);
     unmount();
   });
 
@@ -307,9 +322,9 @@ describe('ProfileOverviewScreen', () => {
     expect(h.mutations.deleteProfile.mutateAsync.mock.calls[0]?.[0]).toEqual({
       profileId: 'profile-1',
     });
-    await waitFor(() => h.success.mock.calls.length > 0);
-    expect(h.success).toHaveBeenCalledWith('Profile "Backend debugging" deleted');
     await waitFor(() => h.back.mock.calls.length > 0);
+    expect(h.success).toHaveBeenCalledWith('Profile "Backend debugging" deleted');
+    expect(h.back).toHaveBeenCalledTimes(1);
 
     unmount();
   });

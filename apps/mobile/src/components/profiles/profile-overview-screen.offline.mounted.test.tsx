@@ -36,10 +36,8 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => h.connectivity,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('expo-router', () => ({
-  useRouter: () => ({ back: vi.fn(), push: vi.fn() }),
-  useNavigation: () => ({ isFocused: () => true }),
-}));
+vi.mock('expo-router', () => ({ useRouter: () => ({ back: vi.fn(), push: vi.fn() }) }));
+vi.mock('@/lib/navigation/pop-when-focused', () => ({ usePopWhenFocused: () => vi.fn() }));
 vi.mock('@/lib/profile-agent-navigation', () => ({
   getProfileVariablesPath: (id: string) => `/profiles/${id}/variables`,
   getProfileCommandsPath: (id: string) => `/profiles/${id}/commands`,

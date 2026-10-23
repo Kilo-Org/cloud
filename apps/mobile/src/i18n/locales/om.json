@@ -224,7 +224,7 @@
     "hideBalance": "Haftee dhoksi",
     "showBalance": "Haftee agarsiisi",
     "balanceHidden": "Hafteen dhokateera",
-    "bonusCreditsExpiring": "Kiriiditiin badhaasaa {{amount}} gaafa {{date}} yeroon isaa darba.",
+    "bonusCreditsExpiring": "Kiriiditiin {{amount}} gaafa {{date}} yeroon isaa darba.",
     "signOutTitle": "Keessaa baataa?",
     "signOutMessage": "Iddoo hojii keetti deebi'uuf ammas seenuu qabda.",
     "deleteAccountTitle": "Herrega haqxaa?",
@@ -2241,6 +2241,7 @@
       "branchLoadError": "Dameewwan fe'uu hin danda'amne",
       "branchUnavailable": "Kuusaa koodii kanaaf dameewwan hin argaman. Hayyama waltajjii waliin qabdu ilaali, erga kanaan booda kuusaa koodii bira filadhu.",
       "branchEmpty": "Damee hin jiru",
+      "branchListIncomplete": "Dameewwan muraasni qofa ni mul'atu. Kuusaan koodii dameewwan listiin kun hammachuu danda'u caalaa baay'ee qaba.",
       "branchPlaceholder": "Damee tokko filadhu",
       "runOnWithTarget": "{{target}} irratti hojjechiisi",
       "environment": "Naannoo",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "meeshaa {{count}}",
       "serverToolCount_other": "meeshaalee {{count}}",
       "serverUnreachable": "Seerverii kana bira ga'uun hin danda'amne",
-      "serverOff": "Seerveriin kun dhaameera"
+      "serverOff": "Seerveriin kun dhaameera",
+      "app": {
+        "label": "Walqunnamtii meeshaa",
+        "failed": "Walqunnamtiin meeshaa kanaa hin dandeenye baafachuu.",
+        "empty": "Walqunnamtiin meeshaa kanaa waan agarsiisuu hin qabu."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Mirkaneessa",

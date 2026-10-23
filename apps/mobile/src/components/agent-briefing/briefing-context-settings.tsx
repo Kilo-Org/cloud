@@ -4,12 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { Alert, Switch, View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { briefingMoney } from './briefing-card';
 import { ModelSelector } from '@/components/agents/model-selector';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { type BriefingPreferences } from '@/lib/agent-briefing';
+import { briefingMoney } from '@/lib/agent-briefing-format';
 import {
   briefingEstimateUnavailableKey,
   parseBriefingSafeguards,

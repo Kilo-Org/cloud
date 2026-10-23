@@ -224,7 +224,7 @@
     "hideBalance": "بیلنس چھپائیں",
     "showBalance": "بیلنس دکھائیں",
     "balanceHidden": "بیلنس چھپا ہوا ہے",
-    "bonusCreditsExpiring": "{{amount}} کے بونس کریڈٹس کی میعاد {{date}} کو ختم ہو رہی ہے۔",
+    "bonusCreditsExpiring": "{{amount}} کے کریڈٹس کی میعاد {{date}} کو ختم ہو رہی ہے۔",
     "signOutTitle": "سائن آؤٹ کریں؟",
     "signOutMessage": "اپنے ورک اسپیس تک رسائی کے لیے آپ کو دوبارہ سائن ان کرنا ہوگا۔",
     "deleteAccountTitle": "اکاؤنٹ حذف کریں؟",
@@ -2241,6 +2241,7 @@
       "branchLoadError": "برانچز لوڈ نہیں ہو سکیں",
       "branchUnavailable": "اس ریپوزٹری کے لیے برانچز دستیاب نہیں ہیں۔ پرووائیڈر کے ساتھ اپنی رسائی چیک کریں، پھر کوئی دوسری ریپوزٹری منتخب کریں۔",
       "branchEmpty": "کوئی برانچ دستیاب نہیں",
+      "branchListIncomplete": "صرف کچھ برانچز دکھائی گئی ہیں۔ اس ریپوزٹری میں اس فہرست میں شامل ہو سکنے سے زیادہ برانچز ہیں۔",
       "branchPlaceholder": "ایک برانچ منتخب کریں",
       "runOnWithTarget": "{{target}} پر چلائیں",
       "environment": "ماحول",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "{{count}} ٹول",
       "serverToolCount_other": "{{count}} ٹولز",
       "serverUnreachable": "اس سرور تک نہیں پہنچ سکا",
-      "serverOff": "یہ سرور بند ہے"
+      "serverOff": "یہ سرور بند ہے",
+      "app": {
+        "label": "ٹول کا انٹرفیس",
+        "failed": "اس ٹول کا انٹرفیس لوڈ نہیں ہو سکا۔",
+        "empty": "اس ٹول کے انٹرفیس میں دکھانے کے لیے کچھ نہیں ہے۔"
+      }
     },
     "mcpOAuth": {
       "authMethod": "تصدیق",

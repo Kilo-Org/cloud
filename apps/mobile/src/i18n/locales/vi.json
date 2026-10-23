@@ -224,7 +224,7 @@
     "hideBalance": "Ẩn số dư",
     "showBalance": "Hiện số dư",
     "balanceHidden": "Số dư đã ẩn",
-    "bonusCreditsExpiring": "Khoản tiền thưởng {{amount}} sẽ hết hạn vào {{date}}.",
+    "bonusCreditsExpiring": "Khoản tiền {{amount}} sẽ hết hạn vào {{date}}.",
     "signOutTitle": "Đăng xuất?",
     "signOutMessage": "Bạn cần đăng nhập lại để truy cập không gian làm việc của mình.",
     "deleteAccountTitle": "Xóa tài khoản?",
@@ -1724,6 +1724,7 @@
       "branchLoadError": "Không tải được các nhánh",
       "branchUnavailable": "Không có nhánh khả dụng cho kho mã nguồn này. Kiểm tra quyền truy cập của bạn với nhà cung cấp, rồi chọn kho mã nguồn khác.",
       "branchEmpty": "Không có nhánh khả dụng",
+      "branchListIncomplete": "Chỉ một số nhánh được hiển thị. Kho mã nguồn có nhiều nhánh hơn mức danh sách này có thể chứa.",
       "branchPlaceholder": "Chọn một nhánh",
       "runOnWithTarget": "Chạy trên: {{target}}",
       "environment": "Môi trường",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "{{count}} công cụ",
       "serverToolCount_other": "{{count}} công cụ",
       "serverUnreachable": "Không thể kết nối với máy chủ này",
-      "serverOff": "Máy chủ này đang tắt"
+      "serverOff": "Máy chủ này đang tắt",
+      "app": {
+        "label": "Giao diện công cụ",
+        "failed": "Không thể tải giao diện của công cụ này.",
+        "empty": "Giao diện của công cụ này không có gì để hiển thị."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Xác thực",

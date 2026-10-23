@@ -335,7 +335,7 @@ export class UserConnectionDO extends DurableObject<Env> {
   private sessionOwners = new Map<string, string>();
   // Which web sockets want events for a session
   private webSubscriptions = new Map<string, Set<WebSocket>>();
-  // Sessions per CLI connection (from heartbeat)
+  // Live session snapshots from heartbeats and authoritative status notifications.
   private connectionSessions = new Map<string, HeartbeatSession[]>();
   // Protocol version per CLI connection (from heartbeat); absent = legacy CLI
   private connectionProtocolVersion = new Map<string, string | undefined>();
@@ -388,11 +388,21 @@ export class UserConnectionDO extends DurableObject<Env> {
     let webCount = 0;
     let sessionCount = 0;
 
-    for (const ws of this.ctx.getWebSockets()) {
+    const sockets = this.ctx.getWebSockets();
+    const openCliConnectionIds = new Set<string>();
+    for (const ws of sockets) {
+      if (ws.readyState !== WebSocket.OPEN) continue;
+      const attachment = ws.deserializeAttachment() as WSAttachment | null;
+      if (attachment?.role === 'cli') openCliConnectionIds.add(attachment.connectionId);
+    }
+    for (const ws of sockets) {
       const attachment = ws.deserializeAttachment() as WSAttachment | null;
       if (!attachment) continue;
 
       if (attachment.role === 'cli') {
+        if (ws.readyState !== WebSocket.OPEN && openCliConnectionIds.has(attachment.connectionId)) {
+          continue;
+        }
         cliCount++;
         const { connectionId, sessions, protocolVersion, capabilities } = attachment;
         this.connectionSessions.set(connectionId, sessions);
@@ -2295,6 +2305,12 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
   }
 
+  /**
+   * Persist authoritative status into the owning socket's live snapshot before
+   * fanout, so a subsequent list read or hibernation sees the same transition.
+   * Heartbeats have no status version: later heartbeats remain admissible, and
+   * notifications retain their existing arrival-order semantics.
+   */
   async notifySessionEvent(event: SessionEventPayload): Promise<{ delivered: number }> {
     this.ensureState();
     const parsed = SessionEventPayloadSchema.parse(event);
@@ -2303,12 +2319,76 @@ export class UserConnectionDO extends DurableObject<Env> {
       event: parsed.type,
       data: parsed.data,
     };
+    const rootStatusEvents: WebInboundMessage[] = [];
+    if (parsed.type === 'session.status.updated') {
+      const data = parsed.data;
+      const sessionId = 'session' in data ? data.session.sessionId : data.sessionId;
+      const owner = this.sessionOwners.get(sessionId);
+      const socket = this.ctx.getWebSockets('cli').find(ws => {
+        if (ws.readyState !== WebSocket.OPEN) return false;
+        const attachment = ws.deserializeAttachment() as WSAttachment | null;
+        return attachment?.role === 'cli' && attachment.connectionId === owner;
+      });
+      const attachment = socket?.deserializeAttachment() as WSAttachment | null | undefined;
+      if (socket && attachment?.role === 'cli') {
+        const previousRootStatuses = new Map(
+          this.aggregateSessions().map(session => [session.id, session.status])
+        );
+        const previous = this.connectionSessions.get(attachment.connectionId) ?? [];
+        const status = data.status ?? ('session' in data ? data.session.status : null) ?? '';
+        const sessions = previous.map(session => {
+          if (session.id !== sessionId) return session;
+          const { scheduledAt: _previousScheduledAt, ...rest } = session;
+          const scheduledAt =
+            data.scheduledAt ?? ('session' in data ? data.session.scheduledAt : null);
+          return {
+            ...rest,
+            status,
+            ...(status === 'scheduled' && scheduledAt ? { scheduledAt } : {}),
+          };
+        });
+        socket.serializeAttachment({ ...attachment, sessions });
+        this.connectionSessions.set(attachment.connectionId, sessions);
+
+        const currentRoots = this.aggregateSessions();
+        const effectiveRootStatus = currentRoots.find(session => session.id === sessionId)?.status;
+        if (effectiveRootStatus !== undefined && effectiveRootStatus !== status) {
+          msg.data = {
+            ...data,
+            status: effectiveRootStatus,
+            statusUpdatedAt: null,
+            ...('session' in data
+              ? { session: { ...data.session, status: effectiveRootStatus, statusUpdatedAt: null } }
+              : {}),
+          };
+        }
+        for (const root of currentRoots) {
+          const previousStatus = previousRootStatuses.get(root.id);
+          if (root.id === sessionId || previousStatus === root.status) continue;
+          rootStatusEvents.push({
+            type: 'system',
+            event: 'session.status.updated',
+            data: {
+              source: 'v2',
+              sessionId: root.id,
+              previousStatus: previousStatus ?? null,
+              status: root.status,
+              ...(root.status === 'scheduled' && root.scheduledAt
+                ? { scheduledAt: root.scheduledAt }
+                : {}),
+              statusUpdatedAt: null,
+              changedAt: data.changedAt,
+            },
+          });
+        }
+      }
+    }
 
     let delivered = 0;
-    const json = JSON.stringify(msg);
+    const messages = [msg, ...rootStatusEvents].map(message => JSON.stringify(message));
     for (const ws of this.activeWebSockets()) {
       try {
-        ws.send(json);
+        for (const json of messages) ws.send(json);
         delivered++;
       } catch (err) {
         console.warn('notifySessionEvent: skipping failed web socket:', err);

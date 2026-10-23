@@ -255,7 +255,18 @@ export type {
   SecurityFindingAuditWriterDb,
 } from './security-finding-audit.js';
 
-export { hasOrganizationAccess } from './organization-membership.js';
+export {
+  activeOrganizationAccessSql,
+  activeOrganizationJoinCondition,
+  hasOrganizationAccess,
+  organizationMembershipJoinCondition,
+  parentOrganizationJoinCondition,
+  parentOrganizationMembershipJoinCondition,
+  parentOrganizationsTable,
+  parentOrganizationMembershipsTable,
+  personalOrActiveOrganizationCondition,
+  personalOrInheritedOrganizationCondition,
+} from './organization-membership.js';
 
 export {
   MAX_AUTO_COMMIT_MESSAGE_BYTES,

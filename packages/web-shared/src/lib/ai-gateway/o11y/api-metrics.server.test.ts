@@ -240,7 +240,7 @@ describe('emitApiMetricsForResponse', () => {
     expect(jest.getTimerCount()).toBe(0);
     expect(mockedFetch).toHaveBeenCalledTimes(1);
     const [, init] = mockedFetch.mock.calls[0];
-    expect(JSON.parse(String(init?.body))).toMatchObject({
+    expect(JSON.parse(init?.body as string)).toMatchObject({
       inferenceProvider: 'Fireworks',
       clientSecret: 'test-secret',
     });

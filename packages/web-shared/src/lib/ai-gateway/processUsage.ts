@@ -46,7 +46,6 @@ import {
   findKiloExclusiveModel,
   shouldRedactModelNameInMicrodollarUsage,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@kilocode/web-shared/lib/kilo-pass/threshold';
@@ -96,6 +95,7 @@ import {
   extractVercelIsByok,
   extractVercelUpstreamId,
   isResponseInterruptedError,
+  reportUpstreamStreamError,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import {
   calculateCost_mUsd,
@@ -170,6 +170,7 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     has_middle_out_transform: usageContext.has_middle_out_transform,
     project_id: usageContext.project_id,
     requested_model: usageContext.requested_model,
+    is_free: usageContext.is_free,
     status_code: usageContext.status_code,
     editor_name: usageContext.editor_name,
     api_kind: usageContext.api_kind,
@@ -261,7 +262,6 @@ export async function toInsertableDbUsageRecord(
     streamed: usageStats.streamed,
     cancelled: usageStats.cancelled,
     market_cost: usageStats.market_cost ?? null,
-    is_free: isFreeModel(usageContextInfo.requested_model),
     abuse_delay: metadataFromContext.abuse_delay,
     abuse_downgraded_from: metadataFromContext.abuse_downgraded_from,
   };
@@ -318,7 +318,7 @@ async function enqueueUsageWithinLifetime(
   const publication = start.promise.then(async (registered): Promise<UsageEnqueueOutcome> => {
     if (!registered) return { kind: 'unavailable', reason: 'registration_failed' };
     try {
-      return await enqueueUsage(payload);
+      return await enqueueUsage(payload, { retryTransientFailures: USAGE_QUEUE_ONLY_ENABLED });
     } catch {
       return { kind: 'unavailable', reason: 'unexpected_rejection' };
     }
@@ -328,7 +328,7 @@ async function enqueueUsageWithinLifetime(
     after(publication);
     start.resolve(true);
   } catch {
-    // No request lifetime means no network I/O; preserve usage with the direct writer.
+    // No request lifetime means no network I/O; let the accounting mode handle the failure.
     start.resolve(false);
   }
   return publication;
@@ -357,13 +357,14 @@ export async function logMicrodollarUsage(
       console.info('usage accounting queued', { usageId: core.id });
       return { status: 'queued', usageId: core.id, createdAt: core.created_at };
     }
-    console.warn('usage accounting direct fallback', {
+    console.error('usage accounting publication failed', {
       usageId: core.id,
       reason: outcome.kind === 'disabled' ? 'publisher_disabled' : outcome.reason,
     });
-  } else {
-    scheduleUsageEnqueue(payload);
+    return null;
   }
+
+  scheduleUsageEnqueue(payload);
 
   const inserted = await saveUsageRelatedData(
     core,
@@ -889,8 +890,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
   const result = await executor.execute<{
     usage_id: string;
     usage_created_at: string;
-    new_microdollars_used: number | null;
-    kilo_pass_threshold: number | null;
+    new_microdollars_used: string | null;
+    kilo_pass_threshold: string | null;
   }>(sql`
           WITH microdollar_usage_ins AS (
             INSERT INTO microdollar_usage (
@@ -1083,6 +1084,9 @@ export function countAndStoreUsage(
     }
   };
 
+  const usesUserCredentials =
+    usageContext.user_byok || usageContext.provider === OPENAI_CHATGPT_PROVIDER_ID;
+
   if (clonedReponse.body) {
     if (usageContext.api_kind === 'responses') {
       usageStatsPromise = usageContext.isStreaming
@@ -1091,7 +1095,8 @@ export function countAndStoreUsage(
             usageContext.kiloUserId,
             openrouterRequestSpan,
             usageContext.provider,
-            clonedReponse.status
+            clonedReponse.status,
+            usesUserCredentials
           )
         : parseResponseText(content =>
             parseResponsesMicrodollarUsageFromString(content, clonedReponse.status)
@@ -1104,7 +1109,8 @@ export function countAndStoreUsage(
             usageContext.kiloUserId,
             openrouterRequestSpan,
             usageContext.provider,
-            clonedReponse.status
+            clonedReponse.status,
+            usesUserCredentials
           )
         : parseResponseText(content =>
             parseMicrodollarUsageFromString(content, usageContext.kiloUserId, clonedReponse.status)
@@ -1117,7 +1123,8 @@ export function countAndStoreUsage(
             usageContext.kiloUserId,
             openrouterRequestSpan,
             usageContext.provider,
-            clonedReponse.status
+            clonedReponse.status,
+            usesUserCredentials
           )
         : parseResponseText(content =>
             parseMessagesMicrodollarUsageFromString(content, clonedReponse.status)
@@ -1154,11 +1161,12 @@ export function processOpenRouterUsage(
 }
 
 export async function parseMicrodollarUsageFromStream(
-  stream: ReadableStream,
+  stream: ReadableStream<Uint8Array>,
   kiloUserId: string,
   openrouterRequestSpan: Span | undefined,
   provider: ProviderId,
-  statusCode: number
+  statusCode: number,
+  usesUserCredentials: boolean
 ): Promise<MicrodollarUsageStats> {
   // End the request span immediately as this function starts
   openrouterRequestSpan?.end();
@@ -1198,7 +1206,7 @@ export async function parseMicrodollarUsageFromStream(
         return;
       }
 
-      const json: ChatCompletionChunk = JSON.parse(event.data);
+      const json = JSON.parse(event.data) as ChatCompletionChunk;
 
       if (!json) {
         captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
@@ -1213,20 +1221,19 @@ export async function parseMicrodollarUsageFromStream(
         if (typeof error.code === 'number') {
           effectiveStatusCode = error.code;
         }
-        if (error.message === 'Upstream error from Nvidia: Service temporarily overloaded') {
-          console.info(`OpenRouter error: ${error.message}`, {
-            source: 'sse_processing',
+        reportUpstreamStreamError({
+          label: 'OpenRouter error',
+          source: 'sse_processing',
+          error,
+          usesUserCredentials,
+          logContext: {
             provider,
-            code: error.code,
+            inference_provider: json.provider ?? inference_provider,
             messageId: json.id ?? messageId,
             model: json.model ?? model,
-          });
-        } else {
-          captureException(new Error(`OpenRouter error: ${error.message}`), {
-            tags: { source: 'sse_processing' },
-            extra: { json, event },
-          });
-        }
+          },
+          sentryExtra: { json, event },
+        });
       }
 
       model = json.model ?? model;
@@ -1375,7 +1382,7 @@ export async function processTokenData(
   }
 
   const timer = createTimer();
-  const generationProvider = await getGenerationLookupProvider(usageStats, usageContext);
+  const generationProvider = getGenerationLookupProvider(usageStats, usageContext);
   const generation =
     generationProvider &&
     usageStats.messageId &&
@@ -1449,7 +1456,7 @@ export async function processTokenData(
   usageStats.market_cost ??= usageStats.cost_mUsd;
   usageStats.cost_mUsd = customCost_mUsd ?? usageStats.cost_mUsd;
 
-  if (isFreeModel(usageContext.requested_model) || usageContext.user_byok) {
+  if (usageContext.is_free || usageContext.user_byok) {
     usageStats.cost_mUsd = 0;
     usageStats.cacheDiscount_mUsd = 0;
   }
@@ -1464,7 +1471,7 @@ export async function processTokenData(
  *
  * When the request's decide verdict said `spendWatch`, the writer enqueues the usage event in its
  * transaction and attempts delivery right after commit; the cron drainer retries a failure.
- * Queued and recorded outcomes leave delivery with that writer/outbox. A failed direct write
+ * Queued and recorded outcomes leave delivery with that writer/outbox. Failed accounting
  * keeps the best-effort send; bouncer dedupes on `requestId`. Every other request also keeps the
  * independent best-effort send, which never rejects.
  */
@@ -1530,10 +1537,10 @@ function bouncerUsageEvent(
   };
 }
 
-async function getGenerationLookupProvider(
+function getGenerationLookupProvider(
   usageStats: MicrodollarUsageStats | null,
   usageContext: MicrodollarUsageContext
-): Promise<typeof OPENROUTER | typeof VERCEL_AI_GATEWAY | undefined> {
+): typeof OPENROUTER | typeof VERCEL_AI_GATEWAY | undefined {
   const provider =
     usageContext.provider === 'openrouter'
       ? OPENROUTER
@@ -1546,9 +1553,7 @@ async function getGenerationLookupProvider(
   }
   const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
   const hasCostWhenPaid =
-    isFreeModel(usageContext.requested_model) ||
-    usageContext.user_byok ||
-    (usageStats?.cost_mUsd ?? 0) > 0;
+    usageContext.is_free || usageContext.user_byok || (usageStats?.cost_mUsd ?? 0) > 0;
   const hasInferenceProvider = Boolean(usageStats?.inference_provider);
   if (!hasOutputTokens) {
     console.debug('[getGenerationLookupProvider] token stats are missing');

@@ -95,11 +95,13 @@ function ChangeLineCounts({
 export function WorktreeChangesButton({
   cloudAgentSessionId,
   organizationId,
+  worktreeId,
   open,
   onToggle,
 }: {
   cloudAgentSessionId: string;
   organizationId?: string;
+  worktreeId?: string;
   open: boolean;
   onToggle: (event: MouseEvent<HTMLButtonElement>) => void;
 }) {
@@ -109,6 +111,7 @@ export function WorktreeChangesButton({
   const { saved, queryKey } = useSavedWorktreeChanges({
     cloudAgentSessionId,
     organizationId,
+    worktreeId,
     enabled: true,
   });
   const handledSignal = useRef(refreshSignal);
@@ -142,7 +145,9 @@ export function WorktreeChangesButton({
     });
   }, [refreshSignal, cloudAgentSessionId, queryClient, queryKey]);
 
-  const totals = getWorktreeChangesTotals(saved.data?.snapshot);
+  const snapshotTotals = getWorktreeChangesTotals(saved.data?.snapshot);
+  // A clean worktree keeps the plain icon instead of a row of zero counts.
+  const totals = snapshotTotals && snapshotTotals.fileCount > 0 ? snapshotTotals : null;
   const summary = totals
     ? `${totals.fileCount} changed files, ${totals.additions} additions, ${totals.deletions} deletions${totals.countsComplete ? '' : ' (partial summary)'}`
     : 'Changes';
@@ -174,6 +179,7 @@ export function WorktreeChangesButton({
 export function WorktreeChangesView({
   cloudAgentSessionId,
   organizationId,
+  worktreeId,
   open,
   commentCounts,
   review,
@@ -181,6 +187,7 @@ export function WorktreeChangesView({
 }: {
   cloudAgentSessionId: string;
   organizationId?: string;
+  worktreeId?: string;
   open: boolean;
   commentCounts?: ReadonlyMap<string, number>;
   review?: WorktreeFileReviewBindings;
@@ -195,6 +202,7 @@ export function WorktreeChangesView({
   const { saved } = useSavedWorktreeChanges({
     cloudAgentSessionId,
     organizationId,
+    worktreeId,
     enabled: open,
   });
   const files = saved.data?.snapshot?.files ?? [];
@@ -238,6 +246,7 @@ export function WorktreeChangesView({
         <WorktreeChanges
           cloudAgentSessionId={cloudAgentSessionId}
           organizationId={organizationId}
+          worktreeId={worktreeId}
           open={open}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
@@ -276,6 +285,7 @@ export function WorktreeChangesView({
             <WorktreeFilePane
               cloudAgentSessionId={cloudAgentSessionId}
               organizationId={organizationId}
+              worktreeId={worktreeId}
               path={selected}
               mode={mode}
               onModeChange={setMode}
@@ -405,6 +415,7 @@ function ChangedFileTree({
 function WorktreeChanges({
   cloudAgentSessionId,
   organizationId,
+  worktreeId,
   open,
   viewMode,
   onViewModeChange,
@@ -415,6 +426,7 @@ function WorktreeChanges({
 }: {
   cloudAgentSessionId: string;
   organizationId?: string;
+  worktreeId?: string;
   open: boolean;
   viewMode: WorktreeChangesViewMode;
   onViewModeChange: (value: WorktreeChangesViewMode) => void;
@@ -428,6 +440,7 @@ function WorktreeChanges({
   const { saved, queryKey } = useSavedWorktreeChanges({
     cloudAgentSessionId,
     organizationId,
+    worktreeId,
     enabled: open,
   });
   const refresh = useMutation({

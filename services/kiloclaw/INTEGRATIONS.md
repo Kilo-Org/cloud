@@ -18,7 +18,6 @@ Before adding code, identify which supported model fits the service:
 | Vendor CLI session | A vendor CLI accepts a static credential and owns its resulting session | Composio, GitHub CLI |
 | Native MCP OAuth | The MCP client and provider can own discovery, refresh, and token persistence | Preferred for OAuth enabled remote MCP servers |
 | On demand token broker | Temporary tokens must remain centrally controlled and be refreshed only when used | Google Workspace |
-| Kilo MCP Gateway | Runtime credential injection and lazy provider refresh should stay outside the customer instance | General remote MCP integrations |
 
 An integration specific global polling job is not an accepted default architecture. If the proposed design requires Kilo to periodically scan every connected account, refresh credentials, and push updates through Durable Objects into customer runtimes, stop and review the design with the Kilo team.
 
@@ -56,7 +55,7 @@ There is no universal preference between native MCP OAuth and an on demand broke
 | Model | Prefer when | Important tradeoffs |
 |---|---|---|
 | Native MCP OAuth | The provider and pinned MCP client support a reliable headless flow, safe token persistence, refresh token rotation, and concurrent requests | Keeps the integration self sufficient, but places provider grants and refresh behavior inside the hosted runtime and may reduce central visibility and control |
-| On demand broker | Kilo needs central grant storage, immediate revocation, consistent reconnect status, auditability, or protection of refresh tokens from the hosted runtime | Adds a Kilo runtime service path, but refresh occurs only when the integration is used and follows existing Google Workspace and MCP Gateway patterns |
+| On demand broker | Kilo needs central grant storage, immediate revocation, consistent reconnect status, auditability, or protection of refresh tokens from the hosted runtime | Adds a Kilo runtime service path, but refresh occurs only when the integration is used and follows the existing Google Workspace pattern |
 | Revocable integration credential | The provider can issue a stable, narrowly scoped credential that remains valid until disconnect or revocation | Simple and reliable, but the persistent credential is available to the hosted runtime |
 
 For sensitive integrations, including payments or tools that expose personal data, prefer the on demand broker unless native MCP OAuth provides equivalent controls and has been validated in the exact client version used by KiloClaw. For lower risk integrations with mature MCP OAuth support, native MCP OAuth may be the simpler design.
@@ -108,8 +107,6 @@ The on demand broker model should provide these properties:
 - Terminal provider errors move the connection to a reconnect state.
 
 The Google Workspace integration demonstrates runtime caching, refresh buffering, request deduplication, and fallback to an unexpired cached token in `services/kiloclaw/controller/src/google-oauth-token-provider.ts`. Its Worker route keeps the refresh token in central encrypted storage, persists rotated tokens, and marks terminal errors for reconnection in `services/kiloclaw/src/routes/controller.ts`.
-
-The Kilo MCP Gateway provides the general pattern for remote MCP servers. It checks current eligibility at runtime, injects provider credentials upstream, and refreshes OAuth grants lazily with coordination for each instance. See `services/mcp-gateway/src/lib/provider-refresh.ts` and `services/mcp-gateway/src/durable-objects/mcp-gateway-instance/refresh.ts`.
 
 ## Background Work
 
@@ -225,7 +222,7 @@ Keep integration PRs narrow and reviewable. Avoid combining all of the following
 
 Large integrations should begin with a short architecture proposal agreed with Kilo maintainers. The proposal should identify the credential model, runtime boundary, data model, failure modes, operational ownership, and rollout plan before implementation begins.
 
-Do not duplicate an existing abstraction without explaining why it cannot support the integration. In particular, evaluate the existing Google token broker, Kilo MCP Gateway, encrypted secret catalog, controller bootstrap, and `mcporter` configuration before adding infrastructure for one specific partner.
+Do not duplicate an existing abstraction without explaining why it cannot support the integration. In particular, evaluate the existing Google token broker, encrypted secret catalog, controller bootstrap, and `mcporter` configuration before adding infrastructure for one specific partner.
 
 ## Testing Expectations
 
@@ -275,7 +272,6 @@ A partner integration PR should include:
 | KiloClaw architecture and invariants | `services/kiloclaw/AGENTS.md` |
 | Local testing and testing that represents production | `services/kiloclaw/DEVELOPMENT.md` |
 | Controller behavior | `.specs/kiloclaw-controller.md` |
-| General MCP gateway authentication | `.specs/mcp-gateway-auth.md` |
 | Secret catalog | `packages/kiloclaw-secret-catalog/` |
 | Web integration routes and services | `apps/web/src/lib/integrations/` and `apps/web/src/app/api/integrations/` |
 | KiloClaw web to Worker client | `apps/web/src/lib/kiloclaw/kiloclaw-internal-client.ts` |
@@ -284,6 +280,5 @@ A partner integration PR should include:
 | Controller for each instance | `services/kiloclaw/controller/src/` |
 | Managed remote MCP configuration | `services/kiloclaw/controller/src/config-writer.ts` |
 | KiloClaw skills | `services/kiloclaw/skills/` |
-| General MCP runtime gateway | `services/mcp-gateway/` |
 
 When a proposed integration conflicts with this guide, raise the conflict during architecture review rather than silently introducing a new operating model.

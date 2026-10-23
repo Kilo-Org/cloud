@@ -76,7 +76,7 @@ export function VoiceTestField(): React.ReactElement {
       <Text className="text-sm font-medium text-foreground">{t('voiceInput.testTitle')}</Text>
       <TextInput
         ref={inputRef}
-        className="min-h-24 rounded-md border border-input bg-background px-3 py-2 text-base leading-6 text-foreground"
+        className="min-h-24 rounded-md border border-input bg-background px-3 py-2 text-base leading-[1.5rem] text-foreground"
         defaultValue=""
         multiline
         onChangeText={handleTextChange}

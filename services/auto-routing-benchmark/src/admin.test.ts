@@ -208,6 +208,7 @@ function schedulerDatabase(db: DatabaseSync): D1Database {
 
 const env = {
   INTERNAL_API_SECRET_PROD: { get: tokenGet },
+  BOT_TOKEN_MINT_SECRET: { get: async () => 'mint-secret' },
   BENCH_DB: undefined,
   BENCH_QUEUE: { sendBatch: queueSendBatch, send: queueSend },
   BENCHMARK_SCHEDULER_CONFIG: '{}',
@@ -718,6 +719,20 @@ describe('POST /admin/runs', () => {
     expect(queueSendBatch).not.toHaveBeenCalled();
   });
 
+  it('returns 400 before claiming anything when the saved user override is not an internal bot', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: { ...TEST_CONFIG_ROWS.config, benchmark_user_id: 'human-user' },
+    });
+    const res = await authedPost('/admin/runs', { kind: 'classifier' });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({
+      error: expect.stringContaining('is not an internal bot user'),
+    });
+    expect(insertRun).not.toHaveBeenCalled();
+    expect(queueSendBatch).not.toHaveBeenCalled();
+  });
+
   it('starts a classifier run and returns runId + enqueuedModels', async () => {
     // No prior summaries → every configured model is enqueued.
     vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
@@ -900,6 +915,21 @@ describe('POST /admin/runs', () => {
     };
     expect(body.startedRuns.map(r => r.purpose)).toEqual(['platform']);
     expect(body.drainErrors).toEqual(['registry unavailable']);
+  });
+});
+
+describe('POST /admin/debug-cli', () => {
+  it('returns 400 without minting when the saved user override is not an internal bot', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: { ...TEST_CONFIG_ROWS.config, benchmark_user_id: 'human-user' },
+    });
+    const res = await authedPost('/admin/debug-cli', { model: 'a/b', prompt: 'hello' });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({
+      error: expect.stringContaining('is not an internal bot user'),
+    });
+    expect(fetch).not.toHaveBeenCalled();
   });
 });
 
@@ -1414,7 +1444,7 @@ describe('POST /admin/profiles/register', () => {
       const catalogToken = 'scope-catalog-token';
       const server = createServer(async (request, response) => {
         response.setHeader('content-type', 'application/json');
-        if (request.url === '/api/internal/auto-routing-benchmark/token') {
+        if (request.url === '/api/internal/bot-token') {
           const chunks: Buffer[] = [];
           for await (const chunk of request) {
             if (!Buffer.isBuffer(chunk)) throw new Error('Expected a binary request chunk.');
@@ -1422,11 +1452,11 @@ describe('POST /admin/profiles/register', () => {
           }
           const body: unknown = JSON.parse(Buffer.concat(chunks).toString());
           if (
-            request.headers.authorization !== 'Bearer bench-token' ||
+            request.headers.authorization !== 'Bearer mint-secret' ||
             typeof body !== 'object' ||
             body === null ||
             !('userId' in body) ||
-            body.userId !== 'benchmark-user' ||
+            body.userId !== 'bot-internal-benchmark-user' ||
             !('organizationId' in body) ||
             body.organizationId !== expectedOrganization
           ) {
@@ -1464,7 +1494,7 @@ describe('POST /admin/profiles/register', () => {
           ...TEST_CONFIG_ROWS,
           config: {
             ...TEST_CONFIG_ROWS.config,
-            benchmark_user_id: 'benchmark-user',
+            benchmark_user_id: 'bot-internal-benchmark-user',
             benchmark_org_id: benchmarkOrgId,
           },
         });

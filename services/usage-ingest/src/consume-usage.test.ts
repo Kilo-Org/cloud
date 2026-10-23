@@ -201,7 +201,7 @@ describe('usage consumer mode', () => {
               ? acknowledgement('recorded', 'wrong-id')
               : failure === 'malformed'
                 ? Response.json({ secret: writerSecret })
-                : new Response('sensitive-response', { status: 503 })
+                : new Response('sensitive-response', { status: 500 })
         );
       const msg = message({
         ...usage,
@@ -248,6 +248,78 @@ describe('usage consumer mode', () => {
         'sensitive-bouncer-payload',
       ])
         expect(serialized).not.toContain(sensitive);
+    }
+  );
+
+  it.each([429, 503])(
+    'rejects writer HTTP %s after settling every mixed-batch item',
+    async status => {
+      const { fetch, logs, processingLogs } = setup();
+      const events = Array.from({ length: 4 }, (_, index) => ({
+        ...usage,
+        core: { ...usage.core, id: `4f2504e0-4f89-41d3-9a0c-0305e82c330${index}` },
+      }));
+      fetch
+        .mockResolvedValueOnce(acknowledgement('recorded', events[0].core.id))
+        .mockResolvedValueOnce(new Response('sensitive-response', { status }))
+        .mockResolvedValueOnce(new Response('sensitive-client-error', { status: 400 }))
+        .mockResolvedValueOnce(acknowledgement('duplicate', events[3].core.id));
+      const messages = events.map(event => message(event));
+      const input = batch(messages);
+      await expect(worker.queue(input, env)).rejects.toThrow('Usage writer overloaded');
+      expect(fetch).toHaveBeenCalledTimes(4);
+      for (const index of [0, 3]) {
+        expect(messages[index].ack).toHaveBeenCalledExactlyOnceWith();
+        expect(messages[index].retry).not.toHaveBeenCalled();
+      }
+      for (const index of [1, 2]) {
+        expect(messages[index].retry).toHaveBeenCalledExactlyOnceWith();
+        expect(messages[index].ack).not.toHaveBeenCalled();
+      }
+      expect(input.ackAll).not.toHaveBeenCalled();
+      expect(input.retryAll).not.toHaveBeenCalled();
+      expect(fetch.mock.calls.map(([, options]) => JSON.parse(options?.body as string))).toEqual(
+        events
+      );
+      expect(processingLogs().find(log => log.usage_id === events[1].core.id)).toMatchObject({
+        reason: 'http_error',
+        queue_action: 'retry',
+        writer_status: status,
+        invocation_failure: 'writer_overloaded',
+        usage_id: events[1].core.id,
+      });
+      for (const index of [0, 2, 3]) {
+        expect(
+          processingLogs().find(log => log.usage_id === events[index].core.id)
+        ).not.toHaveProperty('invocation_failure');
+      }
+      const serialized = JSON.stringify(logs.flatMap(log => log.mock.calls));
+      for (const sensitive of [
+        writerSecret,
+        env.USAGE_WRITER_PROTECTION_BYPASS,
+        env.USAGE_WRITER_URL,
+        'sensitive-response',
+        'sensitive-client-error',
+        usage.metadata.user_prompt_prefix,
+      ]) {
+        expect(serialized).not.toContain(sensitive);
+      }
+    }
+  );
+
+  it.each([301, 400, 401, 403, 408, 500, 502, 504])(
+    'retries HTTP %s without labelling it overload or failing the invocation',
+    async status => {
+      const { fetch, processingLogs } = setup();
+      fetch.mockResolvedValue(new Response(null, { status }));
+      const msg = message();
+      await expect(worker.queue(batch([msg]), env)).resolves.toBeUndefined();
+      expect(msg.retry).toHaveBeenCalledExactlyOnceWith();
+      expect(msg.ack).not.toHaveBeenCalled();
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(processingLogs()[0]).toMatchObject({ reason: 'http_error', queue_action: 'retry' });
+      expect(processingLogs()[0]).not.toHaveProperty('invocation_failure');
+      expect(processingLogs()[0]).not.toHaveProperty('writer_status');
     }
   );
 

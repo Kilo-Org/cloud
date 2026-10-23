@@ -142,7 +142,7 @@ export default async function SharePage({
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-4 py-12">
+    <div className="ph-no-capture flex min-h-screen flex-col items-center justify-center px-4 py-12">
       <div className="mx-auto flex flex-col items-center gap-12">
         <AnimatedLogo />
 

@@ -113,8 +113,84 @@ describe('artifacts File Provider extension contract', () => {
   it('reports sessions as folders and their files as items', () => {
     expect(extensionSource).toContain('contentType: .folder');
     expect(extensionSource).toContain('filename: session.title');
-    expect(extensionSource).toContain('filename: file.name');
+    // The file item's filename is the session-resolved safe name, never the
+    // raw manifest name (see the filename resolution test below).
+    expect(extensionSource).toContain('filename: name,');
     expect(extensionSource).toContain('contentType: UTType(mimeType: file.mime) ?? .data');
+  });
+
+  it('resolves every file item filename to one safe unique component', () => {
+    // The manifest's names are sanitized and deduplicated in the manifest
+    // writer, but a stale or older index can still carry a name with a path
+    // separator, a `..` component or a NUL, so the extension applies the same
+    // contract itself before a name becomes a filename or a staging path
+    // component.
+    expect(extensionSource).toContain('enum ArtifactFileName {');
+    expect(extensionSource).toContain(
+      'static func sanitize(id: String, name: String, mime: String) -> String'
+    );
+    expect(extensionSource).toContain(
+      'static func unique(_ name: String, taken: inout Set<String>) -> String'
+    );
+    expect(extensionSource).toContain('static let maxBytes = 200');
+    // Enumeration resolves every entry through the sanitizer, in the
+    // manifest's own order, so the first duplicate keeps its name and a later
+    // one takes a counter suffix.
+    expect(itemsBody).toContain('ArtifactFileName.sanitize(');
+    expect(itemsBody).toContain('ArtifactFileName.unique(');
+    // The stage path holds the invariant at the boundary: the component it
+    // appends to the per-fetch UUID directory is sanitized again as a
+    // last-resort fallback, so an unsafe name can never reach the path API.
+    expect(extensionSource).toContain('let stagedName = ArtifactPath.isSafeComponent(filename)');
+  });
+
+  it('exposes an item version and honours the requested version', () => {
+    // The version is the mirror file's own size and modification date, which
+    // the wholesale rewrite changes on every rewrite. It is exposed as the
+    // `NSFileProviderItemVersion` the framework compares — `contentVersion`
+    // is `Data`, a String-typed property is never read by the system, and the
+    // protocol requirement is non-optional, so folders carry the zero version.
+    expect(extensionSource).toContain('let contentModificationDate: Date?');
+    expect(extensionSource).toContain('let version: NSFileProviderItemVersion');
+    expect(extensionSource).toContain(
+      'static func contentVersion(size: Int, modified: Date?) -> NSFileProviderItemVersion {'
+    );
+    expect(extensionSource).toContain(
+      'NSFileProviderItemVersion(contentVersion: content, metadataVersion: content)'
+    );
+    // A non-nil request whose pinned content version differs from the
+    // current one fails instead of returning bytes that do not match it.
+    // The Swift enum case is macOS-only, so the extension builds the error
+    // from the domain and the code the case stands for.
+    expect(extensionSource).toContain('NSFileProviderErrorDomain');
+    expect(extensionSource).toContain('-2009');
+    expect(extensionSource).not.toContain('.versionNoLongerAvailable)');
+    expect(fetchContentsBody).toContain(
+      'requestedVersion.contentVersion != item.itemVersion.contentVersion'
+    );
+  });
+
+  it('registers the domain with the dev-only testing mode', () => {
+    // A fresh file-provider domain is disabled until the user enables it; the
+    // dev-only testing-mode entitlement plus `testingModes = [.alwaysEnabled]`
+    // skips that step so the Files app opens the location on development
+    // builds. Apple does not grant the capability on distribution profiles,
+    // so the entitlement is carried in three places — the extension's
+    // entitlements, the EAS app-extension entry, and the app target (whose
+    // process performs the registration) — each gated to non-production, and
+    // the Swift mode reads the Info.plist key the app config bakes under the
+    // same gate (`#if DEBUG` would not fire: EAS builds non-production
+    // profiles with the Release configuration). The contract test pins the
+    // pairing so neither half drifts.
+    expect(entitlements).toContain('com.apple.developer.fileprovider.testing-mode');
+    expect(pluginSource).toContain("'com.apple.developer.fileprovider.testing-mode': true");
+    expect(pluginSource).toContain("process.env.EAS_BUILD_PROFILE === 'production'");
+    expect(pluginSource).toContain(String.raw`com\.apple\.developer\.fileprovider\.testing-mode`);
+    expect(providerModuleSource).toContain('domain.testingModes = [.alwaysEnabled]');
+    expect(providerModuleSource).toContain('KiloArtifactsFileProviderTesting');
+    expect(appConfigSource).toContain("'com.apple.developer.fileprovider.testing-mode': true");
+    expect(appConfigSource).toContain('...(isProductionBuild');
+    expect(appConfigSource).toContain('KiloArtifactsFileProviderTesting');
   });
 
   it('shows the session label the mirror sanitizes into one path component', () => {
@@ -222,6 +298,9 @@ describe('artifacts File Provider target plugin contract', () => {
     runInNewContext(pluginSource, {
       __dirname: '/mobile/plugins',
       module: pluginModule,
+      // The plugin reads the build profile at module scope; the sandbox gets a
+      // neutral `process` so the profile gate evaluates to non-production.
+      process: { env: {} },
       require: (id: string) => {
         if (id === 'fs') {
           return { readdirSync: () => ['Info.plist', 'ArtifactsFileProviderExtension.swift'] };
@@ -387,6 +466,9 @@ const fileBody = swiftFunctionBody(
 );
 const itemsBody = swiftFunctionBody(
   'func items(in container: ArtifactItemIdentifier) -> [ArtifactItem] {'
+);
+const fetchContentsBody = swiftFunctionBody(
+  'func fetchContents(\n    for itemIdentifier: NSFileProviderItemIdentifier,\n    version requestedVersion: NSFileProviderItemVersion?,'
 );
 
 type MemoFile = { id: string; name: string; mime: string; size: number };
@@ -563,6 +645,6 @@ describe('artifacts File Provider manifest memoization', () => {
     expect(sessionBody).toContain('manifest()?.sessions.first');
     expect(fileBody).toContain('session(id: sessionId)?.files.first');
     expect(itemsBody).toContain('manifest()?.sessions ?? []');
-    expect(itemsBody).toContain('session(id: sessionId)?.files ?? []');
+    expect(itemsBody).toContain('guard let session = session(id: sessionId) else');
   });
 });

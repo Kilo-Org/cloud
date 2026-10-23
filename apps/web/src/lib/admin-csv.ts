@@ -1,6 +1,6 @@
-/** Wrap a CSV field value in quotes if it contains commas, quotes, or newlines. */
+/** Wrap a CSV field value in quotes if it contains commas, quotes, or line breaks. */
 export function csvField(value: string): string {
-  if (value.includes('"') || value.includes(',') || value.includes('\n')) {
+  if (value.includes('"') || value.includes(',') || /[\r\n]/.test(value)) {
     return `"${value.replace(/"/g, '""')}"`;
   }
   return value;

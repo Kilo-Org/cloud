@@ -87,7 +87,7 @@ describe('injectExtraProviderModels', () => {
       },
     };
 
-    injectExtraProviderModels(vercelModels, providerModelData);
+    injectExtraProviderModels(vercelModels, providerModelData, new Map());
 
     const injected = providerModelData[1]?.models[0];
     expect(injected?.slug).toBe(MODEL_SLUG);
@@ -134,10 +134,50 @@ describe('injectExtraProviderModels', () => {
       },
     };
 
-    injectExtraProviderModels(vercelModels, providerModelData);
+    injectExtraProviderModels(vercelModels, providerModelData, new Map());
 
     expect(providerModelData[1]?.models[0]?.slug).toBe(MODEL_SLUG);
     expect(providerModelData[1]?.models[0]?.context_length).toBe(128_000);
+  });
+
+  test('looks up the Vercel model through a model ID override', () => {
+    const model = nvidiaModel();
+    const providerModelData = [
+      {
+        provider: provider('nvidia', 'NVIDIA', {
+          training: true,
+          retainsPrompts: true,
+          canPublish: false,
+        }),
+        models: [model],
+      },
+      {
+        provider: provider('future-provider', 'Future Provider', {
+          training: false,
+          retainsPrompts: false,
+          canPublish: false,
+        }),
+        models: [] as OpenRouterModel[],
+      },
+    ];
+    const vercelModelId = 'nvidia/nemotron-3-super';
+    const vercelModels: Record<string, StoredModel> = {
+      [vercelModelId]: {
+        id: vercelModelId,
+        name: model.name,
+        endpoints: [{ provider_name: 'nvidia' }, { provider_name: 'future-provider' }],
+      },
+    };
+
+    injectExtraProviderModels(vercelModels, providerModelData, new Map());
+    expect(providerModelData[1]?.models).toEqual([]);
+
+    injectExtraProviderModels(
+      vercelModels,
+      providerModelData,
+      new Map([[MODEL_SLUG, vercelModelId]])
+    );
+    expect(providerModelData[1]?.models[0]?.slug).toBe(MODEL_SLUG);
   });
 });
 
@@ -183,7 +223,7 @@ describe('injectVercelOnlyProviders', () => {
       },
     };
 
-    injectVercelOnlyProviders(vercelModels, providerModelData);
+    injectVercelOnlyProviders(vercelModels, providerModelData, new Map());
 
     expect(providerModelData.map(({ provider }) => provider.slug)).toEqual([
       'nvidia',
@@ -225,7 +265,7 @@ describe('injectVercelOnlyProviders', () => {
       },
     };
 
-    injectVercelOnlyProviders(vercelModels, providerModelData);
+    injectVercelOnlyProviders(vercelModels, providerModelData, new Map());
 
     const futureProvider = providerModelData.find(
       ({ provider }) => provider.slug === 'future-provider'
@@ -251,7 +291,7 @@ describe('injectVercelOnlyProviders', () => {
       },
     };
 
-    injectVercelOnlyProviders(vercelModels, providerModelData);
+    injectVercelOnlyProviders(vercelModels, providerModelData, new Map());
 
     const boundless = providerModelData.find(({ provider }) => provider.slug === 'boundless');
     expect(boundless?.provider.dataPolicy).toEqual({
@@ -277,7 +317,7 @@ describe('injectVercelOnlyProviders', () => {
       },
     };
 
-    injectVercelOnlyProviders(vercelModels, providerModelData);
+    injectVercelOnlyProviders(vercelModels, providerModelData, new Map());
 
     expect(providerModelData.map(({ provider }) => provider.slug)).toEqual([
       'nvidia',
@@ -295,7 +335,7 @@ describe('injectVercelOnlyProviders', () => {
       },
     };
 
-    injectVercelOnlyProviders(vercelModels, providerModelData);
+    injectVercelOnlyProviders(vercelModels, providerModelData, new Map());
 
     expect(providerModelData).toHaveLength(2);
   });
@@ -310,7 +350,7 @@ describe('injectVercelOnlyProviders', () => {
       },
     };
 
-    injectVercelOnlyProviders(vercelModels, providerModelData);
+    injectVercelOnlyProviders(vercelModels, providerModelData, new Map());
 
     expect(providerModelData).toHaveLength(2);
   });

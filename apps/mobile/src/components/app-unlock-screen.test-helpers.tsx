@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Use the repository's DOM-free mounted renderer; one shared harness mocks every native module the five layouts reach. */
-import { createElement, type ElementType, type ReactElement, useState } from 'react';
+import { createElement, type ElementType, type ReactElement, useEffect, useState } from 'react';
 import { type AppStateStatus } from 'react-native';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { expect, vi } from 'vitest';
@@ -169,6 +169,13 @@ vi.mock('@/components/centered-state-surface', () => ({
   NativeStateSurface: ({ children }: { children: ReactElement }) => children,
   StateSurface: 'StateSurface',
 }));
+// The (app) layout's screenLayout is the covered-screen gate; the fake Scene
+// the Stack mock below mounts passes the scene straight through, so the unlock
+// wrapper stays the only hidden/visible surface under test.
+vi.mock('@/components/app-screen-layout', () => ({
+  // Same call shape as production: the layout receives the scene props object.
+  appScreenLayout: (props: { children: ReactElement }) => unlockScene(props.children),
+}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/icons', () => ({
   Bell: 'Icon',
@@ -203,9 +210,15 @@ vi.mock('expo-router', () => ({
     { Screen: 'StackScreen' }
   ),
   useRouter: () => ({ push: vi.fn() }),
+  useNavigation: () => ({ addListener: () => () => undefined }),
   usePathname: () => route.pathname,
   useLocalSearchParams: () => ({ owner: 'owner', repo: 'repo', number: '1', scope: 'personal' }),
   useSegments: () => route.segments,
+  // The General settings screen retires its attempt feedback on blur; the
+  // announcement suites keep it focused, so the cleanup never runs here.
+  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
+    useEffect(effect, [effect]);
+  },
 }));
 vi.mock('@expo/react-native-action-sheet', () => ({ ActionSheetProvider: 'ActionSheetProvider' }));
 vi.mock('@rn-primitives/portal', () => ({ PortalHost: 'PortalHost' }));

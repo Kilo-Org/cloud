@@ -86,7 +86,6 @@ jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
     mockHandleInstallationUnsuspend(payload, appType),
   handleInstallationTargetRenamed: (payload: unknown, appType: string) =>
     mockHandleInstallationTargetRenamed(payload, appType),
-  handleIssue: jest.fn(),
   handlePullRequest: (payload: unknown, platformIntegration: unknown) =>
     mockHandlePullRequest(payload, platformIntegration),
   upsertCliSessionPullRequestsFromWebhook: jest.fn(),

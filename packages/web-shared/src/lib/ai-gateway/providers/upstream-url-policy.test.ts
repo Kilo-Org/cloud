@@ -141,7 +141,7 @@ describe('isUpstreamUrlPolicyEnforced', () => {
 
   it.each([
     ['staging', true],
-    ['production', false],
+    ['production', true],
     ['preview', false],
     ['development', false],
     [undefined, false],

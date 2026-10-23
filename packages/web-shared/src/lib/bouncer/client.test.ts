@@ -23,6 +23,7 @@ let creditEventWireBody: typeof BouncerClient.creditEventWireBody;
 let usageEventWireBody: typeof BouncerClient.usageEventWireBody;
 let normalizeJa4: typeof BouncerClient.normalizeJa4;
 let signupDecide: typeof BouncerClient.signupDecide;
+let chargeDecide: typeof BouncerClient.chargeDecide;
 
 beforeAll(() => {
   ({
@@ -33,6 +34,7 @@ beforeAll(() => {
     usageEventWireBody,
     normalizeJa4,
     signupDecide,
+    chargeDecide,
   } = jest.requireActual<typeof BouncerClient>('@kilocode/web-shared/lib/bouncer/client'));
 });
 
@@ -201,6 +203,96 @@ describe('decide', () => {
     expect(body.accountCreatedAt).toBe('2026-04-29T01:16:12.945Z');
     expect(body.usedMicrodollars).toBe(5_000_000_000);
     expect(body).not.toHaveProperty('acquiredMicrodollars');
+  });
+});
+
+describe('chargeDecide', () => {
+  const request = {
+    requestId: 'checkout:r',
+    accountId: 'user:u',
+    userId: 'u',
+    ip: '203.0.113.7',
+    ja4: 'JA4_ABC',
+    stage: 'checkout' as const,
+    flow: 'kilo_pass' as const,
+  };
+
+  it('returns an enforced verdict with its internal flags', async () => {
+    const verdict = {
+      enforced: true,
+      code: 'charge_blocked',
+      flags: [
+        { name: 'card_testing', decision: 'block', enforced: true, until: 1_800_000_000_000 },
+      ],
+    };
+    mockFetch.mockResolvedValue(Response.json(verdict));
+    await expect(chargeDecide(request)).resolves.toEqual(verdict);
+  });
+
+  it('sends the normalized request to the charge-decide endpoint', async () => {
+    mockFetch.mockResolvedValue(Response.json({ enforced: false, flags: [] }));
+    await chargeDecide(request);
+    const [url] = mockFetch.mock.calls[0] ?? [];
+    expect(url).toBe('https://bouncer.example.com/api/v1/charge-decide');
+    expect(lastRequestBody()).toEqual({
+      requestId: 'checkout:r',
+      accountId: 'user:u',
+      userId: 'u',
+      ip: '203.0.113.7',
+      ja4: 'ja4_abc',
+      stage: 'checkout',
+      flow: 'kilo_pass',
+    });
+  });
+
+  it('fails open on a 404 from an older bouncer deploy', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockFetch.mockResolvedValue(new Response('not found', { status: 404 }));
+    await expect(chargeDecide(request)).resolves.toBeNull();
+  });
+
+  it('fails open at the timeout', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockFetch.mockImplementation(
+      (_url, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+        })
+    );
+    await expect(chargeDecide(request, { timeoutMs: 30 })).resolves.toBeNull();
+  });
+
+  it.each([
+    ['an unknown code and a malformed flag', { enforced: true, code: 'banned', flags: [{}] }],
+    ['a non-string code and no flags', { enforced: true, code: 7 }],
+  ])('keeps an enforced verdict with %s', async (_name, body) => {
+    mockFetch.mockResolvedValue(Response.json(body));
+    await expect(chargeDecide(request)).resolves.toEqual({ enforced: true, flags: [] });
+  });
+
+  it('keeps the known flags of an enforced verdict whose code is unknown', async () => {
+    const flag = { name: 'card_testing', decision: 'block', enforced: true, until: null };
+    mockFetch.mockResolvedValue(
+      Response.json({ enforced: true, code: 'something_new', flags: [flag] })
+    );
+    await expect(chargeDecide(request)).resolves.toEqual({ enforced: true, flags: [flag] });
+  });
+
+  it('drops the flags list when any entry has an unknown shape', async () => {
+    mockFetch.mockResolvedValue(
+      Response.json({ enforced: true, flags: [{ name: 'card_testing', decision: 'block' }] })
+    );
+    await expect(chargeDecide(request)).resolves.toEqual({ enforced: true, flags: [] });
+  });
+
+  it.each([
+    ['a non-boolean enforced', { enforced: 'yes', flags: [] }],
+    ['a non-object body', 'allow'],
+    ['a body without enforced', { code: 'charge_blocked', flags: [] }],
+  ])('fails open on %s', async (_name, body) => {
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockFetch.mockResolvedValue(Response.json(body));
+    await expect(chargeDecide(request)).resolves.toBeNull();
   });
 });
 
@@ -484,7 +576,7 @@ describe('usage event and charge cost fields', () => {
 function lastRequestBody(): Record<string, unknown> {
   const call = mockFetch.mock.calls[mockFetch.mock.calls.length - 1];
   const body = call?.[1]?.body;
-  return JSON.parse(String(body)) as Record<string, unknown>;
+  return JSON.parse(body as string) as Record<string, unknown>;
 }
 
 describe('normalizeJa4', () => {

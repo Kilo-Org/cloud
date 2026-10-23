@@ -1,7 +1,7 @@
 import * as z from 'zod';
 
 /**
- * Owner of an automation run (auto-triage, code review): an
+ * Owner of an automation run (code review): an
  * organization or a personal user. `id` is the owner key (organization UUID or
  * user id); `userId` is the Kilo user the run is attributed to (the org bot
  * user, or the personal user itself).

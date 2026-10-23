@@ -1,10 +1,4 @@
-export type BotType =
-  | 'code-review'
-  | 'security-scan'
-  | 'auto-triage'
-  | 'slack-bot'
-  | 'discord-bot'
-  | 'webhook-bot';
+export type BotType = 'code-review' | 'security-scan' | 'slack-bot' | 'discord-bot' | 'webhook-bot';
 
 /**
  * Bot user naming patterns
@@ -19,11 +13,6 @@ const BOT_USER_PATTERNS = {
     idPrefix: 'bot-security-scan',
     emailSuffix: 'security-scan-bot',
     displayName: 'Security Scan Bot',
-  },
-  'auto-triage': {
-    idPrefix: 'bot-auto-triage',
-    emailSuffix: 'auto-triage-bot',
-    displayName: 'Auto Triage Bot',
   },
   'slack-bot': {
     idPrefix: 'bot-slack',

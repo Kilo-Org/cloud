@@ -12,7 +12,6 @@ import {
   InstallationRepositoriesPayloadSchema,
   PushEventPayloadSchema,
   PullRequestPayloadSchema,
-  IssuePayloadSchema,
   PullRequestReviewCommentPayloadSchema,
   PullRequestReviewPayloadSchema,
   GitHubAppAuthorizationRevokedPayloadSchema,
@@ -30,7 +29,6 @@ import {
   handleInstallationTargetRenamed,
   handleInstallationRepositories,
   handlePullRequest,
-  handleIssue,
   upsertCliSessionPullRequestsFromWebhook,
   upsertCliSessionPullRequestReviewFromWebhook,
 } from '@/lib/integrations/platforms/github/webhook-handlers';
@@ -853,46 +851,6 @@ export async function handleGitHubWebhook(
       });
 
       return NextResponse.json({ message: 'Event received' }, { status: 200 });
-    }
-
-    // Handle issues events
-    if (eventType === GITHUB_EVENT.ISSUES) {
-      const parseResult = IssuePayloadSchema.safeParse(payload);
-      if (!parseResult.success) {
-        logExceptInTest(`Invalid issues payload${logSuffix}:`, parseResult.error);
-        captureMessage('Invalid GitHub webhook payload structure', {
-          level: 'error',
-          tags: { source: `${sentryPrefix}webhook_validation`, event: 'issues' },
-          extra: { errors: parseResult.error.issues },
-        });
-        return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
-      }
-
-      const action = parseResult.data.action;
-
-      // Log webhook event for both user and organization-owned integrations
-      const logResult = await logWebhook(integration, action);
-      if (logResult.isDuplicate) {
-        return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
-      }
-
-      const result = await handleIssue(parseResult.data, integration);
-
-      // Mark webhook event as processed
-      if (logResult.webhookEventId) {
-        try {
-          await updateWebhookEvent(logResult.webhookEventId, {
-            processed: true,
-            processed_at: new Date().toISOString(),
-            handlers_triggered: ['auto_triage'],
-            errors: null,
-          });
-        } catch (error) {
-          logExceptInTest(`Error updating webhook event${logSuffix}:`, error);
-        }
-      }
-
-      return result;
     }
 
     // Default: acknowledge receipt

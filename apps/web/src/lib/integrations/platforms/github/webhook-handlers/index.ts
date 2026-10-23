@@ -7,6 +7,5 @@ export {
 export { handleInstallationTargetRenamed } from './installation-target-handler';
 export { handleInstallationRepositories } from './installation-repositories-handler';
 export { handlePullRequest } from './pull-request-handler';
-export { handleIssue } from './issue-handler';
 export { upsertCliSessionPullRequestsFromWebhook } from './upsert-cli-session-pull-requests';
 export { upsertCliSessionPullRequestReviewFromWebhook } from './upsert-cli-session-pull-request-review';

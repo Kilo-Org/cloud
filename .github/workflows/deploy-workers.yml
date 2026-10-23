@@ -110,16 +110,8 @@ jobs:
           if (required && !existsSync('wrangler.writer-relay.jsonc')) {
             throw new Error('Selected staging source requires the usage writer relay but its config is missing');
           }
-          const { producers = [], consumers = [] } = config.queues;
-          const historical = producers.length === 2 && consumers.length === 1 &&
-            producers.find(p => p.binding === 'USAGE_INGEST_QUEUE')?.queue === 'usage-ingest-processing-staging' &&
-            producers.find(p => p.binding === 'USAGE_INGEST_DLQ')?.queue === 'usage-ingest-processing-dlq-staging' &&
-            consumers[0].queue === 'usage-ingest-processing-staging' &&
-            consumers[0].dead_letter_queue === 'usage-ingest-processing-dlq-staging';
-          if (!historical && (!existsSync('scripts/provision-queues.mjs') || !existsSync('queues.staging.json'))) {
-            throw new Error('Selected staging source requires EU queue provisioning config and entrypoint');
-          }
-          appendFileSync(process.env.GITHUB_OUTPUT, `queues_required=${!historical}\n`);
+          const queuesRequired = config.queues.producers.some(p => p.queue?.endsWith('-eu'));
+          appendFileSync(process.env.GITHUB_OUTPUT, `queues_required=${queuesRequired}\n`);
           appendFileSync(process.env.GITHUB_OUTPUT, `required=${required}\n`);
           NODE
 
@@ -128,7 +120,7 @@ jobs:
         working-directory: services/usage-ingest
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: node scripts/provision-queues.mjs prepare staging
+        run: node scripts/provision-queues.mjs staging
 
       - name: Deploy private staging usage writer relay
         if: steps.usage_relay.outputs.required == 'true'
@@ -398,16 +390,8 @@ jobs:
           if (required && !existsSync('wrangler.writer-relay.jsonc')) {
             throw new Error('Selected staging source requires the usage writer relay but its config is missing');
           }
-          const { producers = [], consumers = [] } = config.queues;
-          const historical = producers.length === 2 && consumers.length === 1 &&
-            producers.find(p => p.binding === 'USAGE_INGEST_QUEUE')?.queue === 'usage-ingest-processing-staging' &&
-            producers.find(p => p.binding === 'USAGE_INGEST_DLQ')?.queue === 'usage-ingest-processing-dlq-staging' &&
-            consumers[0].queue === 'usage-ingest-processing-staging' &&
-            consumers[0].dead_letter_queue === 'usage-ingest-processing-dlq-staging';
-          if (!historical && (!existsSync('scripts/provision-queues.mjs') || !existsSync('queues.staging.json'))) {
-            throw new Error('Selected staging source requires EU queue provisioning config and entrypoint');
-          }
-          appendFileSync(process.env.GITHUB_OUTPUT, `queues_required=${!historical}\n`);
+          const queuesRequired = config.queues.producers.some(p => p.queue?.endsWith('-eu'));
+          appendFileSync(process.env.GITHUB_OUTPUT, `queues_required=${queuesRequired}\n`);
           appendFileSync(process.env.GITHUB_OUTPUT, `required=${required}\n`);
           NODE
 
@@ -416,7 +400,7 @@ jobs:
         working-directory: services/usage-ingest
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: node scripts/provision-queues.mjs prepare staging
+        run: node scripts/provision-queues.mjs staging
 
       - name: Deploy private staging usage writer relay
         if: steps.usage_relay.outputs.required == 'true'

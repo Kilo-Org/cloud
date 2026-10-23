@@ -194,11 +194,10 @@ workflow with `worker: services/usage-ingest` and `target_environment: productio
 or `staging`.
 
 Normal staging CI has one EU queue preparation step before any Worker upload.
-It reads queue names from `wrangler.jsonc` and jurisdiction/retention from
-[`queues.staging.json`](queues.staging.json), creates missing resources with
-explicit EU jurisdiction, and verifies/reuses compatible existing resources.
-Wrong/unknown metadata stops deployment. Then the existing Frankfurt relay
-and consumer deploy in order; both consumer upload attempts disable Wrangler's
+It reads queue names from `wrangler.jsonc`, creates missing resources with
+explicit `jurisdiction: "eu"`, and verifies/reuses existing EU resources.
+Unknown jurisdiction or lookup/API errors stop deployment. Then the existing
+Frankfurt relay and consumer deploy in order; both consumer upload attempts disable Wrangler's
 global auto-provisioning. See [setup and operational detachment](eu-queues.md).
 Production keeps automatic provisioning and its original names/policy.
 `USAGE_INGEST_QUEUE` binds the source and `USAGE_INGEST_DLQ` binds its matching DLQ;

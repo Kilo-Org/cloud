@@ -9,7 +9,7 @@
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/usage-ingest/src services/usage-ingest/scripts",
     "test": "node --test scripts/*.test.mjs && vitest run",
-    "queues:prepare": "node scripts/provision-queues.mjs prepare staging",
+    "queues:prepare": "node scripts/provision-queues.mjs staging",
     "test:queues": "node --test scripts/*.test.mjs"
   },
   "devDependencies": {

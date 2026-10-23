@@ -18,6 +18,9 @@
       "extends": "base",
       "autoIncrement": true,
       "environment": "production",
+      "android": {
+        "resourceClass": "large"
+      },
       "ios": {
         "buildArtifactPaths": ["ios/Podfile.lock"]
       }

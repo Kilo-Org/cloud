@@ -85,6 +85,15 @@ export async function assertNoActiveDeletionFence(params: {
   }
 }
 
+/**
+ * Boolean form of the fence for the sign-in and account-linking paths.
+ *
+ * Answers `true` only when the active-deletion lookup completed and found no
+ * request. A hit and an unevaluable lookup (database fault, unconfigured HMAC
+ * key) both answer `false`, so a deletion-covered identity is never admitted
+ * because the coverage could not be checked. The error is still reported to
+ * Sentry with the `deletion-identity-fence` tag.
+ */
 export async function authPassesDeletionFence(params: {
   email: string;
   userId?: string;
@@ -94,11 +103,10 @@ export async function authPassesDeletionFence(params: {
     await assertNoActiveDeletionFence(params);
     return true;
   } catch (error) {
-    if (error instanceof ActiveDeletionFenceError) {
-      return false;
+    if (!(error instanceof ActiveDeletionFenceError)) {
+      captureException(error, { tags: { source: 'deletion-identity-fence' } });
     }
-    captureException(error, { tags: { source: 'deletion-identity-fence' } });
-    return true;
+    return false;
   }
 }
 

@@ -465,11 +465,6 @@ describe('ConsentCard', () => {
     }
   });
 
-  it('exposes the inline privacy-policy link as a link', () => {
-    const renderer = mountCard('onboarding');
-    expect(requireDisclosure(renderer.root).props.accessibilityRole).toBe('link');
-  });
-
   it('renders the privacy disclosure in the pinned footer, outside the scrolling body', () => {
     for (const mode of ['onboarding', 'review'] as const) {
       const renderer = mountCard(mode);

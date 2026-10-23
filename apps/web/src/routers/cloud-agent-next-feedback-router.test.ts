@@ -6,8 +6,20 @@ const mockInsert = jest.fn(() => ({
   values: () => ({ returning: async () => [{ id: 'feedback-id' }] }),
 }));
 
+const mockTx = {
+  execute: async () => undefined,
+  insert: () => mockInsert(),
+  select: () => ({
+    from: () => ({
+      where: () => ({
+        orderBy: () => ({ limit: async () => [] as { created_at: string }[] }),
+      }),
+    }),
+  }),
+};
+
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
-  db: { insert: () => mockInsert() },
+  db: { transaction: (run: (tx: typeof mockTx) => unknown) => run(mockTx) },
 }));
 
 jest.mock('@kilocode/web-shared/lib/trpc/init', () => {

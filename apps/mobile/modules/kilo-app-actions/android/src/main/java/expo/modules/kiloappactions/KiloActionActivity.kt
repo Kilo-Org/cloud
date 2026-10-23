@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import org.json.JSONException
 import org.json.JSONObject
 
 /**
@@ -108,6 +109,21 @@ internal object KiloActionContract {
     }
     return slug?.takeIf(SLUG_BY_ACTION::containsValue)
   }
+
+  /** True when the intent asks for `StartAgent`, the action confirmed in the app. */
+  fun isStartAgent(intent: Intent?): Boolean =
+    intent != null && slugOf(intent) == SLUG_BY_ACTION[ACTION_START_AGENT]
+
+  /** The result code a declined confirmation reports (`AppActionResult`). */
+  private const val CODE_START_CANCELLED = "start-cancelled"
+
+  /** True when a result JSON reports a declined confirmation. */
+  fun isCancelledResult(result: String): Boolean =
+    try {
+      JSONObject(result).optString("code") == CODE_START_CANCELLED
+    } catch (_: JSONException) {
+      false
+    }
 }
 
 /**
@@ -141,6 +157,7 @@ class KiloActionActivity : Activity() {
   private fun handle(intent: Intent?) {
     settled = false
     awaitsResult = intent?.hasExtra(KiloActionContract.EXTRA_RESULT) == true
+    val startAgent = KiloActionContract.isStartAgent(intent)
     val payload = intent?.let(KiloActionContract::payload)
     if (payload == null) {
       finishWith(null)
@@ -149,7 +166,14 @@ class KiloActionActivity : Activity() {
     if (awaitsResult) {
       waitingFor = payload
       AppActionDispatcher.await(payload) { result -> finishWith(result) }
-      main.postDelayed({ finishWith(null) }, RESULT_TIMEOUT_MS)
+      val timeout = if (startAgent) START_AGENT_RESULT_TIMEOUT_MS else RESULT_TIMEOUT_MS
+      main.postDelayed({ finishWith(null) }, timeout)
+    }
+    // Bring the app up before the dispatcher runs: a `StartAgent` request is
+    // confirmed inside the app, and an alert the JS side shows before an
+    // activity attaches is dropped.
+    if (startAgent) {
+      showInApp()
     }
     if (AppActionDispatcher.dispatch(payload)) {
       if (!awaitsResult) {
@@ -160,9 +184,19 @@ class KiloActionActivity : Activity() {
     // The JS runtime is not up yet. The dispatcher buffered the payload, so
     // bring the app up: registration drains it through the same dispatcher and
     // answers the waiting caller with `completeAppAction`.
-    packageManager.getLaunchIntentForPackage(packageName)?.let { launched -> startActivity(launched) }
+    showInApp()
     if (!awaitsResult) {
       finish()
+    }
+  }
+
+  /**
+   * Bring the app to the front. A `StartAgent` request is confirmed inside the
+   * app, so the app has to be on screen; a warm app is not yet.
+   */
+  private fun showInApp() {
+    packageManager.getLaunchIntentForPackage(packageName)?.let { launched ->
+      startActivity(launched)
     }
   }
 
@@ -177,14 +211,28 @@ class KiloActionActivity : Activity() {
     waitingFor = null
     if (awaitsResult) {
       val reply = Intent().putExtra(KiloActionContract.EXTRA_RESULT, result)
-      val code = if (result == null) Activity.RESULT_CANCELED else Activity.RESULT_OK
+      val code =
+        if (result == null || KiloActionContract.isCancelledResult(result)) {
+          Activity.RESULT_CANCELED
+        } else {
+          Activity.RESULT_OK
+        }
       setResult(code, reply)
     }
     finish()
   }
 
   private companion object {
-    /** A cold start has to boot the app before the dispatcher can answer. */
+    /**
+     * A cold start has to boot the app before the dispatcher can answer. The
+     * three open actions answer as soon as the JS runtime is up.
+     */
     const val RESULT_TIMEOUT_MS = 15_000L
+
+    /**
+     * `StartAgent` answers after the person reads and answers the confirmation,
+     * so its bound holds the whole run: boot, the confirmation, and the create.
+     */
+    const val START_AGENT_RESULT_TIMEOUT_MS = 300_000L
   }
 }

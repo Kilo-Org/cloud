@@ -269,7 +269,6 @@
     "voiceInput": "व्हॉइस इनपुट",
     "autoExpandThinking": "विचारप्रक्रिया आपोआप उघडून दाखवा",
     "autoExpandThinkingSubtitle": "एजंटची विचारप्रक्रिया पूर्ण झाल्यावर तिचा संपूर्ण मजकूर दाखवा.",
-    "autoExpandThinkingInactiveSubtitle": "विचारप्रक्रियेचे तपशील लपवले असताना याचा कोणताही परिणाम होत नाही.",
     "hideThinking": "विचारप्रक्रियेचे तपशील लपवा",
     "hideThinkingSubtitle": "सत्र पृष्ठावर एजंटची विचारप्रक्रिया दाखवू नका.",
     "keepScreenOn": "सत्र पृष्ठावर असताना स्क्रीन चालू ठेवा",
@@ -294,7 +293,8 @@
     "condenseToolCallsSubtitle": "सलग साधन कॉल्स एका ओळीत गटबद्ध करा जी तुम्ही उघडू शकता.",
     "toolSummaryTranslation": "टूल सारांशांचे भाषांतर करा",
     "toolSummaryTranslationSubtitle": "प्रत्येक टूल सारांश तुमच्या ॲपच्या भाषेत भाषांतरित करण्यासाठी मॉडेलकडे पाठवा. भाषांतर अयशस्वी झाल्यास मूळ दर्शविले जाते.",
-    "toolSummaryTranslationModelUnavailableNotice": "हे मॉडेल आता उपलब्ध नाही. दुसरे निवडण्यासाठी $t(common.model) वर टॅप करा."
+    "toolSummaryTranslationModelUnavailableNotice": "हे मॉडेल आता उपलब्ध नाही. दुसरे निवडण्यासाठी $t(common.model) वर टॅप करा.",
+    "autoExpandThinkingInactiveSubtitle": "विचारप्रक्रियेचे तपशील लपवले असताना याचा कोणताही परिणाम होत नाही."
   },
   "prReview": {
     "pullRequestUnavailable": "पुल रिक्वेस्ट अनुपलब्ध",
@@ -1434,15 +1434,11 @@
       "findingsUnavailable": "हे पुनरावलोकन अयशस्वी झाल्यामुळे परिणाम उपलब्ध नाहीत.",
       "serviceUnavailable": "कोड पुनरावलोकन सेवेशी संपर्क साधता आला नाही. सेवा उपलब्ध झाल्यावर पुनरावलोकन पुन्हा करा.",
       "reviewFailed": "पुनरावलोकन अयशस्वी झाले. कृपया पुन्हा प्रयत्न करा.",
-      "cancelReasonSuperseded": "नवीन कमिट पुश करण्यात आल्यामुळे हे पुनरावलोकन त्याच्या जागी बदलण्यात आले.",
-      "cancelReasonIntegrationDisconnected": "{{platform}} ची जोडणी तुटली आहे, त्यामुळे हे पुनरावलोकन रद्द करण्यात आले. ते पुन्हा जोडा आणि नंतर पुनरावलोकन पुन्हा चालवा.",
-      "cancelReasonBitbucketReviewerDisabled": "Bitbucket साठी Code Reviewer बंद करण्यात आले, त्यामुळे हे पुनरावलोकन रद्द करण्यात आले. ते पुन्हा सुरू करा आणि नंतर पुनरावलोकन पुन्हा चालवा.",
-      "cancelReasonBitbucketPullRequestChanged": "Bitbucket पुल विनंती बदलल्यामुळे हे पुनरावलोकन त्याच्या जागी बदलण्यात आले.",
-      "cancelReasonCancelled": "हे पुनरावलोकन रद्द करण्यात आले.",
-      "cancelReasonInterrupted": "हे पुनरावलोकन मध्येच थांबवण्यात आले.",
       "showMore": "आणखी दाखवा",
       "created": "तयार केले",
       "started": "सुरू केले",
+      "reviewEnded": "संपले",
+      "severityNitpick": "किरकोळ",
       "tokens": "टोकन",
       "tokensInOut": "{{input}} इनपुट / {{output}} आउटपुट",
       "council": "पुनरावलोकन मंडळ",
@@ -1466,7 +1462,13 @@
       "sessionError": "सत्रात त्रुटी आली: {{error}}.",
       "statusWithValue": "स्थिती: {{status}}",
       "toolName": "टूल: {{name}}",
-      "toolNameError": "टूल {{name}} मध्ये त्रुटी आली."
+      "toolNameError": "टूल {{name}} मध्ये त्रुटी आली.",
+      "cancelReasonSuperseded": "नवीन कमिट पुश करण्यात आल्यामुळे हे पुनरावलोकन त्याच्या जागी बदलण्यात आले.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} ची जोडणी तुटली आहे, त्यामुळे हे पुनरावलोकन रद्द करण्यात आले. ते पुन्हा जोडा आणि नंतर पुनरावलोकन पुन्हा चालवा.",
+      "cancelReasonBitbucketReviewerDisabled": "Bitbucket साठी Code Reviewer बंद करण्यात आले, त्यामुळे हे पुनरावलोकन रद्द करण्यात आले. ते पुन्हा सुरू करा आणि नंतर पुनरावलोकन पुन्हा चालवा.",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket पुल विनंती बदलल्यामुळे हे पुनरावलोकन त्याच्या जागी बदलण्यात आले.",
+      "cancelReasonCancelled": "हे पुनरावलोकन रद्द करण्यात आले.",
+      "cancelReasonInterrupted": "हे पुनरावलोकन मध्येच थांबवण्यात आले."
     },
     "reviewMemory": {
       "title": "समीक्षा मेमरी",
@@ -1753,7 +1755,7 @@
       "deadlinePassed": "मुदत संपली",
       "deadlinePassedDetail": "{{critical}} गंभीर, {{high}} उच्च",
       "dueThisWeek": "या आठवड्यात मुदत",
-      "dueThisWeekDetail": "{{exploitable}} निष्कर्षांचा गैरफायदा घेता येत असल्याचे निश्चित",
+      "dueThisWeekDetail": "{{exploitable}} यापैकी गैरफायदा घेता येत असल्याचे निश्चित",
       "noDeadline": "मुदत नाही",
       "reviewSlaAssignment": "ठरवलेल्या SLA मुदतींचे पुनरावलोकन करा",
       "allOpenFindingsTracked": "सर्व प्रलंबित निष्कर्षांचा मागोवा घेतला जात आहे"
@@ -1913,11 +1915,17 @@
       "actorSystem": "Kilo सिस्टीम",
       "couldNotLoad": "ऑडिट अहवाल लोड करता आला नाही.",
       "events": "घटना",
+      "eventConfidence": "विश्वास: {{confidence}}",
+      "eventReason": "कारण: {{reason}}",
+      "eventsCount_one": "{{displayCount}} घटना",
+      "eventsCount_other": "{{displayCount}} घटना",
       "generated": "{{generatedAt}} रोजी तयार केला.",
       "noActivity": "कोणतीही कृती नोंदवलेली नाही",
       "noActivityDescription": "{{start}} ते {{end}} या काळात सुरक्षा निष्कर्षांबाबत अहवालात समाविष्ट करण्याजोग्या कोणत्याही कृती Kilo मध्ये नोंदवलेल्या नाहीत.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "रिपॉझिटरी नोंदवलेली नाही",
+      "reasonUnknown": "अनोळखी कारण",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "अहवालाचा सारांश",
       "title": "ऑडिट अहवाल",
       "unavailable": "ऑडिट अहवाल अनुपलब्ध",
@@ -1972,6 +1980,7 @@
       "reauthorizeButton": "GitHub ॲपला पुन्हा परवानगी द्या",
       "reauthorizeDescription": "Dependabot सूचना वाचण्याची परवानगी सुरक्षा एजंटला आवश्यक आहे. ती देण्यासाठी GitHub ॲपला पुन्हा परवानगी द्या.",
       "reauthorizeTitle": "अतिरिक्त परवानग्या आवश्यक",
+      "retryFailed": "सुरक्षा एजंट अजूनही लोड करता आला नाही. कृपया तुमचे कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
       "setupFailed": "GitHub सेटअप सुरू करता आला नाही. कृपया पुन्हा प्रयत्न करा."
     },
     "queuedActionUntracked": "रांगेत असलेल्या कृतीचा मागोवा घेता येत नाही. सध्याची स्थिती पाहण्यासाठी रिफ्रेश करा.",
@@ -2134,8 +2143,8 @@
       "dollar_other": "डॉलर",
       "costSpoken": "खर्च {{cost}}",
       "costSpokenWithTime": "खर्च {{cost}}, {{time}}",
-      "spokenJoiner": "आणि",
-      "pullRequest": "पुल रिक्वेस्ट {{number}}"
+      "pullRequest": "पुल रिक्वेस्ट {{number}}",
+      "spokenJoiner": "आणि"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub उघडता आले नाही",
@@ -2565,7 +2574,10 @@
       "allowOnceAccessibility": "एकदा परवानगी द्या",
       "alwaysAllow": "नेहमी परवानगी द्या",
       "alwaysAllowAccessibility": "नेहमी परवानगी द्या",
-      "retrying": "पुन्हा प्रयत्न करत आहे…"
+      "retrying": "पुन्हा प्रयत्न करत आहे…",
+      "retryDeny": "नाकारण्याचा पुन्हा प्रयत्न करा",
+      "retryAllowOnce": "एकदा परवानगी देण्याचा पुन्हा प्रयत्न करा",
+      "retryAlwaysAllow": "नेहमी परवानगी देण्याचा पुन्हा प्रयत्न करा"
     },
     "questionCard": {
       "title": "एजंटला तुमचे उत्तर हवे आहे",
@@ -3117,22 +3129,16 @@
     "boundary": {
       "backToProfile": "प्रोफाइलवर परत जा",
       "loadErrorMessage": "इंटरनेट जोडणी तपासा आणि पुन्हा प्रयत्न करा.",
-
       "chooseAccount": "खाते निवडा",
       "loadErrorTitle": "तुमच्या संस्था लोड करता आल्या नाहीत.",
       "membershipLostNotice": "तुम्हाला या संस्थेमध्ये आता प्रवेश नाही. {{target}} वर स्विच केले.",
       "noOrganization": "कोणतीही संस्था नाही",
-
       "noOrganizationDescription": "हे खाते कोणत्याही संस्थेचा भाग नाही. सदस्य आमंत्रणे आणि कमी शिल्लक सूचना यांसारखी संस्था वैशिष्ट्ये वापरण्यासाठी वेबवर संस्था तयार करा किंवा एकात सामील व्हा.",
-
       "openWebOrganizations": "वेबवर संस्था उघडा",
-
       "organizationUnavailable": "संस्था उपलब्ध नाही.",
       "selectDescriptionWithOrganizations": "तुम्ही एक किंवा अधिक संस्थांचे सदस्य आहात. ही स्क्रीन जे खाते वापरावे ते निवडा.",
-
       "selectOrganization": "संस्था निवडा",
       "unavailableDescription": "ही संस्था आता उपलब्ध नाही. पुढे जाण्यासाठी तुमच्या प्रोफाइलमधून दुसरी संस्था निवडा.",
-
       "unavailableSessionsDescription": "ही संस्था आता उपलब्ध नाही. तिचे सत्र लोड केले जू शकत नाहीत.",
       "accessDeniedDescription": "तुम्हाला या संस्थेमध्ये प्रवेश नाही."
     },
@@ -3155,14 +3161,14 @@
       "truncated": "क्रेडिटचे जुने व्यवहार उपलब्ध आहेत."
     },
     "inviteMember": {
-      "alreadyInvited": "त्यांना आधीच आमंत्रित केले आहे किंवा ते आधीपासूनच सदस्य आहेत.",
       "emailError": "वैध ईमेल पत्ता द्या.",
       "emailPlaceholder": "नाव@company.com",
       "permissionDenied": "तुम्हाला सदस्यांना आमंत्रित करण्याची परवानगी नाही.",
       "roleMember": "भूमिका: सदस्य",
-      "sendError": "आमंत्रण पाठवता आले नाही.",
       "sendInvite": "आमंत्रण पाठवा",
-      "title": "सदस्याला आमंत्रित करा"
+      "title": "सदस्याला आमंत्रित करा",
+      "alreadyInvited": "त्यांना आधीच आमंत्रित केले आहे किंवा ते आधीपासूनच सदस्य आहेत.",
+      "sendError": "आमंत्रण पाठवता आले नाही."
     },
     "invoices": {
       "downloadA11y": "{{number}} क्रमांकाचे बिल डाउनलोड करा",
@@ -3231,8 +3237,8 @@
       "inviteCreated": "आमंत्रण तयार केले",
       "pendingInvitations": "प्रलंबित आमंत्रणे",
       "resendInvite": "आमंत्रण पुन्हा पाठवा",
-      "resendInviteError": "आमंत्रण पुन्हा पाठवता आले नाही.",
-      "shareInviteLink": "आमंत्रणाची लिंक शेअर करा"
+      "shareInviteLink": "आमंत्रणाची लिंक शेअर करा",
+      "resendInviteError": "आमंत्रण पुन्हा पाठवता आले नाही."
     },
     "usageStats": {
       "inputTokens": "इनपुट टोकन",
@@ -3377,11 +3383,11 @@
   },
   "transcriptionModel": {
     "title": "लिप्यंतरण मॉडेल",
-    "choose": "मॉडेल निवडा",
     "noneChosen": "काहीही निवडले नाही",
     "emptyTitle": "लिप्यंतरणासाठी मॉडेल्स नाहीत",
     "emptyDescription": "Kilo Gateway सध्या लिप्यंतरणासाठी कोणतीही मॉडेल्स देत नाही.",
-    "loadFailed": "लिप्यंतरण मॉडेल्स लोड करता आली नाहीत."
+    "loadFailed": "लिप्यंतरण मॉडेल्स लोड करता आली नाहीत.",
+    "choose": "मॉडेल निवडा"
   },
   "voiceLanguage": {
     "title": "व्हॉइस इनपुटची भाषा",
@@ -3403,7 +3409,6 @@
   },
   "modelChat": {
     "offlineFailure": "या मॉडेलसाठी इंटरनेट कनेक्शन आवश्यक आहे. कनेक्ट करा आणि पुन्हा प्रयत्न करा, किंवा या डिव्हाइसवरील मॉडेलवर स्विच करा.",
-    "creditsRequired": "हा संदेश पाठवण्यासाठी पुरेसे क्रेडिट नाहीत. क्रेडिट जोडा आणि पुन्हा प्रयत्न करा.",
     "empty": {
       "title": "चॅट सुरू करा",
       "description": "मॉडेलशी बोलण्यासाठी संदेश पाठवा."
@@ -3597,6 +3602,7 @@
       "fromHuggingFace": "Hugging Face वरून",
       "loading": "मॉडेल लोड होत आहेत",
       "noResults": "कोणतेही मॉडेल सापडले नाही",
+      "noResultsForQuery": "\"{{query}}\" साठी कोणतेही मॉडेल सापडले नाही",
       "noFits": "कोणतेही मॉडेल या डिव्हाइसवर बसत नाही",
       "noFitsDescription": "मोठी मॉडेल $t(common.all) टॅबवर आहेत.",
       "fit": {
@@ -3671,13 +3677,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "हे मॉडेल विचारांची पातळी समर्थित करते"
-    }
+    },
+    "creditsRequired": "हा संदेश पाठवण्यासाठी पुरेसे क्रेडिट नाहीत. क्रेडिट जोडा आणि पुन्हा प्रयत्न करा."
   },
   "settingsTools": {
     "confirmTitle": "हा बदल निश्चित करायचा?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "तुमची सर्वात अलीकडील रिपॉझिटरी",
+      "confirmMessage": "रिपॉझिटरी: {{repository}}. विनंती: {{prompt}}",
+      "confirmTitle": "हा एजंट सुरू करायचा का?",
       "promptRequired": "एजंट सुरू करण्यासाठी प्रॉम्प्ट आवश्यक आहे. प्रॉम्प्ट जोडा आणि ते पुन्हा चालवा.",
       "repositoryRequired": "एजंट सुरू करण्यासाठी रिपॉझिटरी आवश्यक आहे. Kilo उघडा आणि एक निवडा, नंतर ते पुन्हा चालवा.",
       "repositoryUnknown": "Kilo, {{repository}} ला GitHub किंवा GitLab रिपॉझिटरी म्हणून ओळखत नाही. Kilo मध्ये दुसरी रिपॉझिटरी निवडा.",
@@ -3706,10 +3716,10 @@
     "noSpend": "अजून कोणताही खर्च नोंदवला गेलेला नाही",
     "spend24h": "गेल्या 24 तासांतील खर्च",
     "multiplierError": "1 किंवा त्याहून मोठा गुणक टाका",
-    "multiplierMaxError": "{{max}} किंवा त्याहून कमी गुणक टाका",
-    "thresholdMaxError": "{{max}} किंवा त्याहून कमी रक्कम द्या.",
     "permissionDenied": "तुम्हाला खर्चाच्या सूचना व्यवस्थापित करण्याची परवानगी नाही.",
-    "pushOffByCategory": "सूचनांमध्ये बंद"
+    "pushOffByCategory": "सूचनांमध्ये बंद",
+    "multiplierMaxError": "{{max}} किंवा त्याहून कमी गुणक टाका",
+    "thresholdMaxError": "{{max}} किंवा त्याहून कमी रक्कम द्या."
   },
   "profiles": {
     "title": "प्रोफाइल",
@@ -3757,6 +3767,8 @@
     "keyTooLong": "की 256 अक्षरे किंवा कमी असावी",
     "keyDuplicate": "ही की आधीपासून प्रोफाइलमध्ये आहे",
     "valueLabel": "मूल्य",
+    "valueRequired": "मूल्य एंटर करा",
+    "tooLong": "जास्तीत जास्त {{max}} अक्षरे वापरा",
     "secrets": {
       "markSecret": "गुप्त म्हणून चिन्हांकित करा",
       "masked": "लपलेले मूल्य",
@@ -3766,7 +3778,6 @@
     },
     "variablesEmpty": "अद्याप कोणतेही व्हेरिएबल्स नाहीत",
     "variablesSaveFailed": "व्हेरिएबल सेव्ह करू शकलो नाही",
-    "variablesDeleteFailed": "व्हेरिएबल हटवू शकलो नाही",
     "commandsTitle": "सेटअप कमांड",
     "addCommand": "आदेश जोडा",
     "commandLabel": "आज्ञा",
@@ -3777,7 +3788,6 @@
     "moveDown": "खाली हलवा",
     "moveCommandUp": "आदेश {{position}} वर हलवा",
     "moveCommandDown": "आदेश {{position}} खाली हलवा",
-    "deleteCommand": "आदेश {{position}} हटवा",
     "skillsTitle": "कौशल्य",
     "addSkill": "कौशल्य जोडा",
     "skillNameLabel": "कौशल्याचे नाव",
@@ -3809,7 +3819,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "सर्व्हरचे नाव एंटर करा",
-      "nameInvalid": "नाव फक्त अक्षरे, संख्या, अंडरस्कोअर आणि डॅश वापरू शकते",
+      "nameInvalid": "नाव फक्त ASCII अक्षरे, संख्या, अंडरस्कोअर आणि डॅश वापरू शकते, जास्तीत जास्त 100 अक्षरे",
       "commandRequired": "कमांड एंटर करा",
       "commandTooLong": "कमाल 50 आर्ग्युमेंट वापरा, प्रत्येकी 500 अक्षरे",
       "urlRequired": "URL एंटर करा",
@@ -3854,7 +3864,7 @@
       "deleteFailed": "एजंट हटवू शकलो नाही",
       "nameRequired": "एजंटचे नाव एंटर करा",
       "slugRequired": "एजंट स्लग एंटर करा",
-      "slugInvalid": "स्लग अक्षराने सुरू होणे आवश्यक आहे आणि फक्त लोअरकेस अक्षरे, अंक आणि डॅश वापरणे आवश्यक आहे",
+      "slugInvalid": "स्लग लोअरकेस ASCII अक्षराने सुरू होणे आवश्यक आहे आणि फक्त ASCII लोअरकेस अक्षरे, अंक आणि डॅश वापरणे आवश्यक आहे, जास्तीत जास्त 50 अक्षरे",
       "slugConflict": "तो स्लॅग आधीच बिल्ट-इन एजंत किंवा या प्रोफाइलमधील दुसऱ्या एजंतकडून वापरला जातो",
       "edit": "एजंट संपादित करा"
     },
@@ -3899,7 +3909,9 @@
       "pinFailed": "रेपो पिन करू शकलो नाही",
       "unboundToast": "रेपो अनबाउंड",
       "unbindFailed": "रेपो अनबाइंड करू शकलो नाही"
-    }
+    },
+    "variablesDeleteFailed": "व्हेरिएबल हटवू शकलो नाही",
+    "deleteCommand": "आदेश {{position}} हटवा"
   },
   "credits": {
     "title": "क्रेडिट्स खरेदी करा",
@@ -3926,7 +3938,6 @@
       "newList": "नवीन यादी",
       "empty": "अजून याद्या नाहीत",
       "couldNotLoad": "याद्या लोड करता आल्या नाहीत",
-      "createFailed": "यादी तयार करता आली नाही",
       "noRepository": "रिपॉझिटरी नाही",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} खुले",
@@ -3936,7 +3947,8 @@
       "archive": "संग्रहित करा",
       "unarchive": "संग्रहातून काढा",
       "deleteTitle": "{{name}} हटवायचे?",
-      "deleteMessage": "त्यातील कामेही हटवली जातील. त्यांची सत्रे राहतील."
+      "deleteMessage": "त्यातील कामेही हटवली जातील. त्यांची सत्रे राहतील.",
+      "createFailed": "यादी तयार करता आली नाही"
     },
     "listSettings": {
       "title": "यादी सेटिंग्ज",
@@ -4004,21 +4016,20 @@
     }
   },
   "agentBriefing": {
-    "title": "सकाळचा आढावा",
+    "title": "एजंट आढावा",
     "atLeast": "≥{{value}}",
     "coverageHint": "काही जुनी क्रियाकलाप माहिती गहाळ असू शकते. ≥ म्हणजे किमान इतके; अज्ञात म्हणजे शून्य नाही.",
     "available": "उपलब्ध आढावे",
     "history": "आढावा इतिहास",
-    "historyHint": "डिसमिस केलेल्या अहवालांसह सर्व अहवाल 30 दिवस ठेवले जातात.",
+    "historyHint": "डिसमिस केलेल्यांसह आढावे 30 दिवस ठेवले जातात.",
     "settings": "आढावा सेटिंग्ज",
-    "saved": "आढावा सेटिंग्ज जतन झाल्या.",
-    "empty": "रात्रभरात कोणतीही क्रियाकलाप नाही",
-    "emptyHint": "सक्रिय रात्रीनंतर तुमची क्लाउड आणि CLI कोडिंग सत्रे येथे दिसतील.",
+    "empty": "या आढावा कालावधीत कोणतीही क्रियाकलाप नाही",
+    "emptyHint": "नियोजित आढाव्यात क्रियाकलाप असल्यास तुमची क्लाउड आणि CLI कोडिंग सत्रे येथे दिसतील.",
     "loadError": "आढावे लोड करता आले नाहीत",
-    "sessions": "रात्रभर सक्रिय",
+    "sessions": "कालावधीत सक्रिय",
     "pullRequests": "उघडलेले PRs",
     "blockers": "नवीन अडथळे",
-    "spend": "रात्रभरातील खर्च",
+    "spend": "कालावधीतील खर्च",
     "view": "आढावा वाचा",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -4040,13 +4051,13 @@
     "sources": "पुरावे आणि आर्टिफॅक्ट्स",
     "timezone": "आढावा वेळ क्षेत्र",
     "deviceTimezone": "डिव्हाइसचे वेळ क्षेत्र वापरा",
-    "timezoneHint": "IANA वेळ क्षेत्र, उदा. Europe/Berlin. वेळापत्रकातील बदल पुढील रात्रींना लागू होतात.",
-    "nightStart": "रात्र सुरू",
-    "morningStart": "रात्र संपते / सकाळ सुरू",
-    "morningEnd": "सकाळ संपते",
-    "timeHint": "सकाळ संपल्यावर Home कार्ड थेट स्थिती पुन्हा दाखवते, ऑफलाइन असतानाही.",
-    "invalidSchedule": "वैध वेळ क्षेत्र आणि एकमेकांवर न येणारे, रिकामे नसलेले रात्र व सकाळ कालावधी निवडा.",
-    "notificationsHint": "तुमचा पहिला अहवाल तयार झाल्यावर दररोज सकाळी एक सामान्य सूचना. सशुल्क AI सारांशांपासून स्वतंत्र.",
+    "timezoneHint": "IANA वेळ क्षेत्र, उदा. Europe/Berlin. वेळापत्रकातील बदल पुढील आढाव्यांना लागू होतात.",
+    "nightStart": "आढावा कालावधी सुरू",
+    "morningStart": "आढावा तयार होण्याची वेळ",
+    "morningEnd": "आढावा उपलब्ध असेपर्यंत",
+    "timeHint": "आढावा कालावधी संपल्यावर Home कार्ड थेट स्थिती पुन्हा दाखवते, ऑफलाइन असतानाही.",
+    "invalidSchedule": "वैध वेळ क्षेत्र आणि रिकामे नसलेला आढावा कालावधी निवडा.",
+    "notificationsHint": "प्रत्येक नियोजित आढाव्यासाठी एक सामान्य सूचना. सशुल्क AI सारांशांपासून स्वतंत्र.",
     "notificationPermission": "तुमचा आढावा मिळवण्यासाठी $t(common.notifications) मध्ये डिव्हाइस सूचना सुरू करा.",
     "aiOptIn": "सशुल्क AI सारांश",
     "aiHint": "फक्त या संदर्भासाठी ऐच्छिक. निवडक, संपादित उतारे आणि संरचित तथ्ये तुमच्या ॲप भाषेत तुमच्या मॉडेलला पाठवली जातात. शुल्क या संदर्भाच्या शिल्लकमधून आकारले जाते.",
@@ -4064,10 +4075,10 @@
     "contextSettings": "AI सेटिंग्ज · {{context}}",
     "allContexts": "वैयक्तिक आणि संस्थेचे आढावे वेगळे ठेवले जातात.",
     "create": "आढावा तयार करा",
-    "oneOff": "एकदाच",
+    "oneOff": "मागणीनुसार",
     "createdAt": "{{time}} वाजता तयार केले",
     "chooseContext": "एक संदर्भ निवडा",
-    "period": "आढाव्याचा कालावधी",
+    "period": "आढावा कालावधी",
     "last24Hours": "मागील २४ तास",
     "last7Days": "मागील ७ दिवस",
     "customPeriod": "सानुकूल कालावधी",
@@ -4086,13 +4097,16 @@
     "emptyPeriod": "या कालावधीत कोणतीही हालचाल आढळली नाही. AI सारांश तयार केला जाणार नाही आणि शुल्कही आकारले जाणार नाही.",
     "emptyHistory": "जतन केलेले आढावे नाहीत",
     "historicalStateHint": "सत्राची स्थिती निवडलेल्या कालावधीच्या शेवटची स्थिती दर्शवते, सध्याची थेट स्थिती नव्हे.",
-    "oneOffHint": "AI ला तुमच्या अ‍ॅपच्या भाषेत निवडक पुरावे दिले जातात, ज्यांतील संवेदनशील तपशील लपवलेले असतात. हा एकदाच तयार होणारा अहवाल तुमचे सकाळचे वेळापत्रक किंवा AI प्राधान्ये बदलत नाही.",
+    "oneOffHint": "AI ला तुमच्या अ‍ॅपच्या भाषेत निवडक पुरावे दिले जातात, ज्यांतील संवेदनशील तपशील लपवलेले असतात. हा मागणीनुसार तयार होणारा आढावा तुमचा नियोजित आढावा किंवा AI प्राधान्ये बदलत नाही.",
     "createOffline": "आढावा तपासण्यासाठी किंवा तयार करण्यासाठी इंटरनेटशी कनेक्ट करा. सशुल्क विनंत्या ऑफलाइन असताना कधीही रांगेत ठेवल्या जात नाहीत.",
     "estimateInputTooLarge": "या कालावधीतील पुरावे निवडलेल्या मॉडेलसाठी खूप जास्त आहेत.",
     "estimatePermissionUnavailable": "तुम्हाला या संदर्भातील शिल्लक रक्कम वापरण्याची परवानगी नाही.",
+    "createFailed": "हा आढावा तयार करता आला नाही.",
+    "reviewFailed": "हा आढावा तपासता आला नाही.",
     "estimatePricingUnavailable": "या मॉडेलचे मूल्यनिर्धारण उपलब्ध नाही.",
     "estimateBalanceUnavailable": "सशुल्क सारांशासाठी पुरेशी शिल्लक नाही.",
     "estimateModelNotAllowed": "या मॉडेलला येथे परवानगी नाही.",
-    "estimateSpendLimitTooLow": "हा सारांश परवानगी देण्यासाठी खर्च मर्यादा वाढवा."
+    "estimateSpendLimitTooLow": "हा सारांश परवानगी देण्यासाठी खर्च मर्यादा वाढवा.",
+    "saved": "आढावा सेटिंग्ज जतन झाल्या."
   }
 }

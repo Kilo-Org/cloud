@@ -2,7 +2,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Check } from '@/components/ui/icons';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BackHandler, Pressable, ScrollView, View } from 'react-native';
+import { BackHandler, Pressable, View } from 'react-native';
 
 import { roleLabel } from '@/components/organization/member-row';
 import { getInviteSuccessMessage } from '@/components/organization/invited-member-row-state';
@@ -13,6 +13,7 @@ import {
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { SheetHeader } from '@/components/sheet-header';
+import { SheetScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
@@ -75,10 +76,13 @@ export function InviteMemberSheet() {
 
   if (isResolving) {
     return (
-      <ScrollView className="flex-1 bg-background" contentContainerClassName="px-6 gap-6 pb-8 pt-4">
+      <SheetScrollView
+        className="flex-1 bg-background"
+        contentContainerClassName="px-6 gap-6 pb-8 pt-4"
+      >
         <Skeleton className="h-11 rounded-lg" />
         <Skeleton className="h-11 rounded-lg" />
-      </ScrollView>
+      </SheetScrollView>
     );
   }
   if (organizationId == null || org == null) {
@@ -115,7 +119,7 @@ export function InviteMemberSheet() {
         doneDisabled={!canSubmit || mutations.invite.isPending}
         topInset="bottom-form-sheet"
       />
-      <ScrollView
+      <SheetScrollView
         className="flex-1 bg-background"
         contentContainerClassName="px-6 gap-6 pb-8 pt-4"
         automaticallyAdjustKeyboardInsets
@@ -182,7 +186,7 @@ export function InviteMemberSheet() {
             </RadioGroup>
           </View>
         )}
-      </ScrollView>
+      </SheetScrollView>
       {dialog}
     </>
   );

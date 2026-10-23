@@ -43,6 +43,7 @@ vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } })
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: h.back, push: h.push, replace: h.replace }),
 }));
+vi.mock('@/lib/navigation/pop-when-focused', () => ({ usePopWhenFocused: () => h.back }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     agentProfiles: {

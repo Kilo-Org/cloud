@@ -115,6 +115,19 @@ const TWO_SENSE_COPY = new Map([
 ]);
 
 /**
+ * Counted forms that say their number as a word instead of the visible count
+ * placeholder, as `base key:plural category:locale`. Arabic names one day and
+ * two days with their own word forms, so those two messages read as words and
+ * carry no numeral. Every other form of a counted family must keep its
+ * language's exact placeholder set, so a count deleted from a form that should
+ * show it still fails. Add an entry only after reading the rendered message.
+ */
+const WORDED_COUNTS = new Set([
+  'securityAgent.dashboard.daysOverdue:one:ar',
+  'securityAgent.dashboard.daysOverdue:two:ar',
+]);
+
+/**
  * Proper nouns, format-only strings, and pre-existing English-identical copy
  * outside this section's new keys. Remove a key from the set when that copy
  * is translated or the key is deleted.
@@ -505,6 +518,26 @@ function pluralBaseKey(key) {
   return key.replace(/_(?:zero|one|two|few|many|other)$/, '');
 }
 
+/**
+ * The visible-count placeholders an English family declares, e.g.
+ * `displayCount`. A translated form must carry each one unless a reviewed
+ * worded form spells the number out instead.
+ */
+function familyVisibleCounts(english, base) {
+  const names = new Set();
+  for (const [key, value] of english) {
+    if (key !== base && pluralBaseKey(key) !== base) {
+      continue;
+    }
+    for (const name of placeholders(value).split(',').filter(Boolean)) {
+      if (name === 'displayCount' || name === 'itemCount') {
+        names.add(name);
+      }
+    }
+  }
+  return names;
+}
+
 /** Split a dotted key into its family base and plural category, if any. */
 function pluralParts(key) {
   const match = PLURAL_SUFFIX_RE.exec(key);
@@ -512,6 +545,58 @@ function pluralParts(key) {
     return null;
   }
   return { base: key.slice(0, -match[0].length), category: match[1] };
+}
+
+/**
+ * Every `{{token}}` an English plural family uses, across the base key and all
+ * of its categories. A language may need one of those tokens in a category
+ * where English spells the number out: English's `_one` only ever renders at 1,
+ * but Serbian, Croatian, Bosnian, Russian, Ukrainian, Belarusian, Macedonian,
+ * Lithuanian, Latvian, Icelandic, Filipino and Slovene also select their
+ * singular form for 21, 101 and the like, so their `_one` value has to
+ * interpolate the count. A category may therefore add a token its English
+ * family already uses; it may never drop one English requires in that category.
+ */
+function familyPlaceholders(english, base) {
+  const tokens = new Set();
+  for (const [key, value] of english) {
+    if (key !== base && pluralBaseKey(key) !== base) {
+      continue;
+    }
+    for (const token of placeholders(value).split(',').filter(Boolean)) {
+      tokens.add(token);
+    }
+  }
+  return tokens;
+}
+
+/**
+ * Whether a plural category's placeholder set is English's plus tokens from its
+ * own family. Returns false for a non-plural key, for a dropped required token,
+ * and for a token no value of the family uses.
+ */
+function addsFamilyPlaceholderOnly(english, key, actual, expected) {
+  const parts = pluralParts(key);
+  if (!parts) {
+    return false;
+  }
+  const required = new Set(expected.split(',').filter(Boolean));
+  const used = new Set(actual.split(',').filter(Boolean));
+  if (used.size <= required.size) {
+    return false;
+  }
+  for (const token of required) {
+    if (!used.has(token)) {
+      return false;
+    }
+  }
+  const family = familyPlaceholders(english, parts.base);
+  for (const token of used) {
+    if (!family.has(token)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 const tags = supportedLanguages();
@@ -707,6 +792,23 @@ for (const catalog of CATALOGS) {
           fail(`${label}: "${key}" uses placeholder {{${ph}}}, which the English family does not`);
         }
       }
+      // Every form keeps the family's visible count unless the reviewed list
+      // names it: a form without a numeral reads as an age only when the
+      // language spells the number out. A zero form is the exception — "none
+      // required" reads better than a numeral beside a noun, and several
+      // catalogs already word it that way.
+      if (
+        parts.category !== 'zero' &&
+        !WORDED_COUNTS.has(`${parts.base}:${parts.category}:${tag}`)
+      ) {
+        for (const ph of familyVisibleCounts(english, parts.base)) {
+          if (!placeholders(value).split(',').includes(ph)) {
+            fail(
+              `${label}: "${key}" drops {{${ph}}} without a reviewed worded form (WORDED_COUNTS)`
+            );
+          }
+        }
+      }
     }
     for (const [key, value] of translated) {
       if (!english.has(key)) {
@@ -720,7 +822,24 @@ for (const catalog of CATALOGS) {
         fail(`${label}: "${key}" must be translated`);
       }
       const expected = placeholders(englishValue);
-      if (placeholders(value) !== expected) {
+      const actual = placeholders(value);
+      const expectedSet = expected.split(',').filter(Boolean);
+      const actualSet = actual.split(',').filter(Boolean);
+      // Only a reviewed (key, category, locale) entry may say its number as a
+      // word; every other form keeps its language's exact placeholder set.
+      const parts = pluralParts(key);
+      const wordedForm = Boolean(
+        parts && WORDED_COUNTS.has(`${parts.base}:${parts.category}:${tag}`)
+      );
+      const droppedVisibleCount = expectedSet
+        .filter(name => !actualSet.includes(name))
+        .every(name => name === 'displayCount' || name === 'itemCount');
+      const addedPlaceholder = actualSet.some(name => !expectedSet.includes(name));
+      if (
+        actual !== expected &&
+        !addsFamilyPlaceholderOnly(english, key, actual, expected) &&
+        !(wordedForm && droppedVisibleCount && !addedPlaceholder)
+      ) {
         fail(`${label}: "${key}" placeholders differ from English (${expected || 'none'})`);
       }
       const expectedRefs = nestingRefs(englishValue).join(',');

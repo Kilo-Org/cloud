@@ -26,6 +26,14 @@ without restarting JavaScript, so the initial snapshot may predate sign-in.
 Back-exit and force-stop preserve the stored session; explicit sign-out clears it.
 The existing bootstrap loading and retryable-error surfaces cover restoration.
 
+## Runtime recovery
+
+Retry on the runtime-error screen restores the last focused route for the
+current account. Route recording pauses while the root layout remounts, so its
+temporary Home route cannot replace the recovery destination. Credential
+preloads are used only for the first auth-provider mount; recovery reads the
+current stored credentials through the normal bounded retry path.
+
 ## New-session model choice
 
 Model resolution waits for stored preferences to load. An explicit model and
@@ -40,6 +48,27 @@ Usage tiles retain labels and show cached totals or em dash placeholders.
 Unavailable usage and low-balance settings expose Retry. The low-balance row
 retries its settings read until data is available, then opens configuration.
 Cached settings remain visible during offline pauses and refresh failures.
+
+## PR merge sheet
+
+The merge sheet composes the form and provider-specific bodies. `usePrMergeDraft`
+owns identity-scoped loading, seeding, saving, background flushing, and clearing;
+`usePrMergeSubmit` owns confirmation, mutation inputs, errors, and success effects.
+Header back retains the draft. Footer Cancel and a successful submission clear it.
+
+The mounted suites keep React, form sections, and draft persistence real, with
+native controls, encrypted storage, identity, and mutations replaced at their boundaries:
+
+```bash
+pnpm --filter kilo-app exec vitest run src/components/pr-review/merge
+```
+
+## Remote session recovery
+
+A response that fails before producing any content still shows its failure and
+Retry action, including after reopening the session. Retry resends the original
+user prompt as a new turn in the same session; the original prompt remains in
+the transcript.
 
 ## Transcript action targets
 

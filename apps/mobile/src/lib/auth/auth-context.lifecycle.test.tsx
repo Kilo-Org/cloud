@@ -3067,7 +3067,6 @@ describe('session restoration after provider remount', () => {
     });
     expect(fourth.getCtx().token).toBe('third-token');
     expect(fourth.getCtx().restoreFailed).toBe(false);
-
   });
 
   it('does not restore an initial session after explicit sign-out', async () => {

@@ -74,7 +74,9 @@ test('writes planned env files owner-only and keeps a stricter existing mode', a
   fs.mkdirSync(path.join(repoRoot, 'apps', 'web'), { recursive: true });
   const existingDevVars = path.join(repoRoot, existingWorker, '.dev.vars');
   fs.writeFileSync(existingDevVars, 'PORT=1\nSECRET=old\n');
-  fs.chmodSync(existingDevVars, 0o600);
+  // An existing destination mode that grants nothing to group or other stays;
+  // 0400 makes that observable, since a created file starts at 0600.
+  fs.chmodSync(existingDevVars, 0o400);
 
   const plan: EnvSyncPlan = {
     lanIp: undefined,
@@ -106,7 +108,7 @@ test('writes planned env files owner-only and keeps a stricter existing mode', a
   try {
     await applyPlan(plan, repoRoot);
 
-    assert.equal(fs.statSync(existingDevVars).mode & 0o777, 0o600);
+    assert.equal(fs.statSync(existingDevVars).mode & 0o777, 0o400);
     assert.equal(fs.readFileSync(existingDevVars, 'utf-8'), 'PORT=1\nSECRET=new\n');
     assert.equal(fs.statSync(path.join(repoRoot, newWorker, '.dev.vars')).mode & 0o777, 0o600);
     assert.equal(

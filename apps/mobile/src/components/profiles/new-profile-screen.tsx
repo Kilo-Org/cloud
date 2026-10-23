@@ -17,7 +17,11 @@ import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
-import { validateProfileDescription, validateProfileName } from '@/lib/agent-profile-forms';
+import {
+  type ProfileNameError,
+  validateProfileDescription,
+  validateProfileName,
+} from '@/lib/agent-profile-forms';
 import { useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { getProfileOverviewPath } from '@/lib/profile-agent-navigation';
@@ -38,6 +42,10 @@ const OWNER_CHOICE_FALLBACK_KEYS = {
   personal: 'common.personal',
   organization: 'common.organization',
 } as const satisfies Record<ProfileOwnerChoice, string>;
+const NAME_ERROR_KEYS = {
+  empty: 'profiles.nameRequired',
+  'too-long': 'agentChat.newSession.nameTooLong',
+} as const satisfies Record<ProfileNameError, string>;
 
 /**
  * The mutation hook toasts `error.message`; this screen only supplies a
@@ -50,12 +58,13 @@ function hasUsableMessage(error: unknown): boolean {
 export function NewProfileScreen() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { organizationId, role, isResolving } = useOrgBoundary();
+  const { organizationId, role, org, isResolving } = useOrgBoundary();
   // No organization context on the hook: the owner choice below decides which
   // `organizationId` each create carries, so a personal create is never
   // rewritten to the selected organization.
   const { create } = useAgentProfileMutations();
   const nameRef = useRef('');
+  const nameValidationStarted = useRef(false);
   const descriptionRef = useRef('');
   const [ownerSelection, setOwnerSelection] = useState<{
     organizationId: string | null;
@@ -70,16 +79,15 @@ export function NewProfileScreen() {
   const selectOwner = (next: ProfileOwnerChoice) => {
     setOwnerSelection({ organizationId: organizationId ?? null, owner: next });
   };
-  const [nameError, setNameError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<ProfileNameError | null>(null);
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
 
   const submit = async () => {
     const name = nameRef.current.trim();
+    nameValidationStarted.current = true;
     const nameIssue = validateProfileName(name);
+    setNameError(nameIssue);
     if (nameIssue !== null) {
-      setNameError(
-        nameIssue === 'empty' ? t('profiles.nameRequired') : t('agentChat.newSession.nameTooLong')
-      );
       return;
     }
 
@@ -88,7 +96,6 @@ export function NewProfileScreen() {
       setDescriptionError(t('agentChat.newSession.descriptionTooLong'));
       return;
     }
-    setNameError(null);
     setDescriptionError(null);
     const ownerOrganizationId = createOrganizationId(organizationId, owner);
     try {
@@ -119,13 +126,13 @@ export function NewProfileScreen() {
         <FormField
           label={t('profiles.nameLabel')}
           placeholder={t('profiles.namePlaceholder')}
-          error={nameError ?? undefined}
+          error={nameError === null ? undefined : t(NAME_ERROR_KEYS[nameError])}
           required
           returnKeyType="next"
           onChangeText={value => {
             nameRef.current = value;
-            if (nameError !== null && validateProfileName(value) === null) {
-              setNameError(null);
+            if (nameValidationStarted.current) {
+              setNameError(validateProfileName(value));
             }
           }}
         />
@@ -162,6 +169,9 @@ export function NewProfileScreen() {
               onChange={selectOwner}
               accessibilityLabel={t(OWNER_LABEL_KEY, { defaultValue: t(OWNER_LABEL_FALLBACK_KEY) })}
             />
+            {owner === 'organization' && org ? (
+              <Text className="text-sm text-muted-foreground">{org.organizationName}</Text>
+            ) : null}
           </View>
         ) : null}
 

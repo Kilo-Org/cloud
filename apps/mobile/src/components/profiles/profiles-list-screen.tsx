@@ -15,6 +15,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { IconButton } from '@/components/ui/icon-button';
 import {
   Building2,
   type LucideIcon,
@@ -98,7 +99,14 @@ export function ProfilesListScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profiles.title')} />
+      <ScreenHeader
+        title={t('profiles.title')}
+        headerRight={
+          <IconButton onPress={openNewProfile} accessibilityLabel={t('profiles.newProfile')}>
+            <Plus size={22} color={colors.foreground} />
+          </IconButton>
+        }
+      />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-6 px-6 pt-4"
@@ -139,63 +147,54 @@ export function ProfilesListScreen() {
             }
           />
         )}
-        {!isListLoading && sections.length > 0 && (
-          <>
-            {sections.map(section => (
-              <View key={section.key} className="gap-3">
-                {section.titleKey ? (
-                  <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-                    {t(section.titleKey, {
-                      // Reviewed English heading until the `profiles.list.*`
-                      // copy lands with the translation slice.
-                      defaultValue: t(
-                        section.key === 'organization' ? 'common.organization' : 'common.personal'
-                      ),
-                    })}
-                  </Text>
-                ) : null}
-                {section.profiles.map((profile, index) => {
-                  const subtitle = formatProfileCountItemsShort(
-                    t,
-                    profileListCountItems(profileCounts(profile))
-                  ).join(' · ');
-                  return (
-                    <ConfigureRow
-                      key={profile.id}
-                      icon={ownerIcon(profile)}
-                      title={profile.name}
-                      subtitle={subtitle || undefined}
-                      className="rounded-lg bg-secondary px-3"
-                      last={index === section.profiles.length - 1}
-                      trailing={
-                        isEffectiveDefault(profile, effectiveDefaultId) ? (
-                          // The row already announces the profile name; the
-                          // star adds only the state it marks.
-                          <Star
-                            size={16}
-                            color={colors.primary}
-                            fill={colors.primary}
-                            accessibilityLabel={t('profiles.defaultSectionTitle')}
-                          />
-                        ) : undefined
-                      }
-                      onPress={() => {
-                        openProfile(profile);
-                      }}
-                    />
-                  );
-                })}
-              </View>
-            ))}
-
-            {/* Persistent create entry: the list keeps a create CTA at the end
-                once profiles exist, so the flow never dead-ends. */}
-            <Button onPress={openNewProfile}>
-              <Plus size={16} color={colors.primaryForeground} />
-              <Text>{t('profiles.newProfile')}</Text>
-            </Button>
-          </>
-        )}
+        {!isListLoading &&
+          sections.length > 0 &&
+          sections.map(section => (
+            <View key={section.key} className="gap-3">
+              {section.titleKey ? (
+                <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+                  {t(section.titleKey, {
+                    // Reviewed English heading until the `profiles.list.*`
+                    // copy lands with the translation slice.
+                    defaultValue: t(
+                      section.key === 'organization' ? 'common.organization' : 'common.personal'
+                    ),
+                  })}
+                </Text>
+              ) : null}
+              {section.profiles.map((profile, index) => {
+                const subtitle = formatProfileCountItemsShort(
+                  t,
+                  profileListCountItems(profileCounts(profile))
+                ).join(' · ');
+                return (
+                  <ConfigureRow
+                    key={profile.id}
+                    icon={ownerIcon(profile)}
+                    title={profile.name}
+                    subtitle={subtitle || undefined}
+                    className="rounded-lg bg-secondary px-3"
+                    last={index === section.profiles.length - 1}
+                    trailing={
+                      isEffectiveDefault(profile, effectiveDefaultId) ? (
+                        // The row already announces the profile name; the
+                        // star adds only the state it marks.
+                        <Star
+                          size={16}
+                          color={colors.primary}
+                          fill={colors.primary}
+                          accessibilityLabel={t('profiles.defaultSectionTitle')}
+                        />
+                      ) : undefined
+                    }
+                    onPress={() => {
+                      openProfile(profile);
+                    }}
+                  />
+                );
+              })}
+            </View>
+          ))}
       </TabScreenScrollView>
     </View>
   );

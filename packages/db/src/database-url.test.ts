@@ -73,6 +73,14 @@ describe('getDatabaseClientConfig', () => {
       expect(config.ssl).toEqual({ rejectUnauthorized: false });
     });
 
+    it('accepts sslmode=no-verify as an encrypted mode', () => {
+      const config = getDatabaseClientConfig(
+        'postgres://user:secret@db.example.com:5432/mydb?sslmode=no-verify'
+      );
+
+      expect(config.ssl).toEqual({ rejectUnauthorized: false });
+    });
+
     it('verifies the certificate against the system trust store for sslmode=verify-full', () => {
       const config = getDatabaseClientConfig(
         'postgres://user:secret@db.example.com:5432/mydb?sslmode=verify-full'

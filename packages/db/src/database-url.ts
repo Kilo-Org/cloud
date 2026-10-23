@@ -52,15 +52,17 @@ export function getDatabaseClientConfig(postgresUrl: string): ClientConfig {
 
 /**
  * The connection string's sslmode decides whether TLS is used when `DATABASE_CA`
- * is unset. `require`/`prefer` encrypt without a certificate check;
- * `verify-ca`/`verify-full` verify the server certificate against the Node
- * system trust store. `allow` negotiates plaintext first and upgrades to TLS,
- * which Node's `pg` cannot retry, so it is treated like `disable` rather than
- * forcing a connection style the caller did not pin down.
+ * is unset. `require`, `prefer` and `no-verify` select the encrypted mode;
+ * `verify-ca`/`verify-full` select the encrypted mode that also verifies the
+ * server certificate against the Node system trust store. `allow` negotiates
+ * plaintext first and upgrades to TLS, which Node's `pg` cannot retry, so it is
+ * treated like `disable` rather than forcing a connection style the caller did
+ * not pin down.
  */
 const VERIFY_CERTIFICATE_BY_SSLMODE: Record<string, boolean> = {
   prefer: false,
   require: false,
+  'no-verify': false,
   'verify-ca': true,
   'verify-full': true,
 };

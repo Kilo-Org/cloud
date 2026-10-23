@@ -36,6 +36,7 @@ export type GroupedRegisterSessionInput = {
     | 'sandboxRoute'
     | 'sandboxKind'
     | 'sandboxProvider'
+    | 'sandboxProviderBinding'
     | 'shallow'
     | 'credentialContainment'
     | 'devcontainerRequested'

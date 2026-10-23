@@ -380,12 +380,10 @@ describe('Vercel runtime metadata', () => {
         readFile: vi.fn<VercelControlRestClient['readFile']>(),
         updateNetworkPolicy: vi.fn<VercelControlRestClient['updateNetworkPolicy']>(),
       };
-      const billingLifetimeSink = vi.fn();
       const provider = createVercelProviderAdapter({
         sandboxName: SANDBOX_ID,
         config,
         restClient,
-        billingLifetimeSink,
         readContainedGrants: async () => [],
       });
       const result =
@@ -425,7 +423,7 @@ describe('Vercel runtime metadata', () => {
       expect(restClient.getSession).not.toHaveBeenCalled();
       if (operation === 'create') {
         expect(restClient.createSandbox).toHaveBeenCalledWith(
-          expect.objectContaining({ snapshotId: config.snapshotId })
+          expect.objectContaining({ source: { type: 'snapshot', snapshotId: config.snapshotId } })
         );
       } else {
         expect(restClient.inspectByName).toHaveBeenCalledWith(
@@ -439,11 +437,6 @@ describe('Vercel runtime metadata', () => {
       expect(await provider.observe(providerRef, intent)).toEqual({ status: 'active' });
       expect(await provider.stop(providerRef, intent)).toBe('terminal');
       expect(restClient.stopSession).toHaveBeenCalledOnce();
-      expect(billingLifetimeSink.mock.calls.map(([evidence]) => evidence.providerRef)).toEqual([
-        providerRef,
-        providerRef,
-        providerRef,
-      ]);
       expect(provider.describeRuntime?.(providerRef)?.region).toBe(
         validMetadata ? region : undefined
       );

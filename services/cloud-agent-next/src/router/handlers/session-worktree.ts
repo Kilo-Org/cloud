@@ -1,3 +1,4 @@
+import { VERCEL_BYOC_REQUIRED_MESSAGE } from '../../byoc/vercel-owner.js';
 import { TRPCError } from '@trpc/server';
 import type { WorkerDb } from '@kilocode/db/client';
 import {
@@ -26,9 +27,11 @@ import { z } from 'zod';
 import { getPgDb } from '../../db/pg.js';
 import {
   CurrentSessionMetadataSchema,
+  getSandboxProviderBinding,
   type SessionMetadata,
 } from '../../persistence/session-metadata.js';
 import { logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
+import { sameSandboxProviderBinding } from '../../sandbox-provider-binding.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import { generateSessionId } from '../../session-identity.js';
 import { buildControlPlaneSandboxSelection } from '../../session/control-plane-session-input.js';
@@ -250,6 +253,11 @@ async function loadWorktreeSource(
       normalizeGitUrl(ownership.gitUrl) !== canonicalRepositoryUrl(repository))
   ) {
     throw sourceRejected();
+  }
+
+  const binding = getSandboxProviderBinding(metadata);
+  if (binding.kind === 'vercel' && binding.source.kind === 'platform') {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: VERCEL_BYOC_REQUIRED_MESSAGE });
   }
 
   return {
@@ -474,6 +482,10 @@ function assertRegisteredMetadata(
     (workspace.egressMode ?? 'unrestricted') !== (source.workspace.egressMode ?? 'unrestricted') ||
     JSON.stringify(workspace.egressAllowlist ?? []) !==
       JSON.stringify(source.workspace.egressAllowlist ?? []) ||
+    !sameSandboxProviderBinding(
+      getSandboxProviderBinding(metadata),
+      getSandboxProviderBinding(source.metadata)
+    ) ||
     workspace.branchName !== sourceWorktreeBranchName(source) ||
     JSON.stringify(workspace.sandboxRoute) !== JSON.stringify(source.workspace.sandboxRoute) ||
     workspace.sandboxKind !== source.workspace.sandboxKind ||

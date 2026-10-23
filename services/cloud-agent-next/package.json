@@ -8,6 +8,7 @@
   "type": "module",
   "scripts": {
     "preinstall": "npx only-allow pnpm",
+    "predeploy": "pnpm run build:wrapper",
     "deploy": "wrangler deploy",
     "predev": "pnpm run build:wrapper",
     "dev": "scripts/dev-with-docker-proxy.sh --no-proxy --env dev",

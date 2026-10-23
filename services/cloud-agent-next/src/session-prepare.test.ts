@@ -743,8 +743,9 @@ describe('prepareSession endpoint', () => {
 
   it('registers full lazy-prep metadata in one DO call', async () => {
     selectControlPlaneSandboxMock.mockResolvedValueOnce({
-      kind: 'isolated',
-      sandboxId: 'crv-abcdef',
+      sandboxKind: 'code-review',
+      provider: 'cloudflare',
+      sandboxId: 'sbx-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     });
     const doStub = createMockDOStub();
     const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
@@ -826,7 +827,7 @@ describe('prepareSession endpoint', () => {
           finalization: { autoCommit: true, condenseOnComplete: true, gateThreshold: 'warning' },
           callback: { target: { url: 'https://example.com/callback' } },
           workspace: expect.objectContaining({
-            sandboxId: 'crv-abcdef',
+            sandboxId: 'sbx-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
             sandboxProvider: 'cloudflare',
             shallow: true,
             credentialContainment: {
@@ -2149,7 +2150,7 @@ describe('start endpoint', () => {
     ).rejects.toThrow('metadata invalid');
   });
 
-  it('forwards Vercel enrollment configuration and persists only the selected identity', async () => {
+  it('ignores retired platform Vercel enrollment configuration', async () => {
     const doStub = createMockDOStub();
     const context = createInternalApiContext({ doStub });
     Object.assign(context.env, {
@@ -2190,7 +2191,7 @@ describe('start endpoint', () => {
         metadata: expect.objectContaining({
           workspace: expect.objectContaining({
             sandboxId: expect.stringMatching(/^sbx-/),
-            sandboxProvider: 'vercel',
+            sandboxProvider: 'cloudflare-containers',
           }),
         }),
       })

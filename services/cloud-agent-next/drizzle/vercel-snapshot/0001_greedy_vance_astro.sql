@@ -1,0 +1,1 @@
+ALTER TABLE `vercel_snapshot_builds` ADD `owner_type` text DEFAULT 'org' NOT NULL;

@@ -1630,7 +1630,7 @@ describe('organizationCloudAgentNextRouter.getSandboxSelectionOptions', () => {
   it('authorizes membership and forwards the organization with the caller token', async () => {
     const capabilities: SandboxSelectionCapabilities = {
       enabled: true,
-      defaultDestination: { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
+      defaultDestination: { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'default' },
       options: [
         { allocation: getSandboxAllocationRequest('cloudflare-single') },
         {
@@ -1711,7 +1711,7 @@ describe('organizationCloudAgentNextRouter.getSandboxSelectionOptions', () => {
       options: [
         {
           allocation: {
-            provider: { id: 'vercel', account: 'kilo' },
+            provider: { id: 'vercel', account: 'byoc' },
             instanceType: 'medium' as 'small',
           },
         },

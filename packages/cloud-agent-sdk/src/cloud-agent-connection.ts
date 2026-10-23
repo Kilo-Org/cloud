@@ -3,7 +3,7 @@ import {
   isStreamError,
   type CloudAgentEvent,
   type StreamError,
-} from './event-types';
+} from './schemas';
 import {
   createBaseConnection,
   type Connection,
@@ -25,7 +25,6 @@ export type ConnectionConfig = {
   onError?: ((error: StreamError) => void) | undefined;
   onRefreshTicket?: (() => Promise<CloudAgentStreamTicketResult>) | undefined;
   heartbeatTimeoutMs?: number | undefined;
-  reconnectDelayMs?: number | undefined;
   lifecycleHooks?: ConnectionLifecycleHooks | undefined;
   websocketHeaders?: WebSocketHeaders | undefined;
 };

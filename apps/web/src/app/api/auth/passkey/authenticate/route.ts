@@ -1,7 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import * as z from 'zod';
-import type { AuthenticationResponseJSON } from '@simplewebauthn/server';
 
 import {
   createAuthenticationOptions,
@@ -9,6 +8,7 @@ import {
   PasskeyVerificationError,
 } from '@/lib/auth/passkey';
 import { checkFirewallRateLimit } from '@/lib/auth/firewall-rate-limit';
+import { authenticationResponseSchema } from '@/lib/auth/passkey-response';
 
 /**
  * Vercel Firewall rate-limit rules applied by this route.
@@ -48,7 +48,7 @@ const requestSchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('verify'),
     challengeId: z.string().uuid(),
-    response: z.record(z.string(), z.unknown()),
+    response: authenticationResponseSchema,
   }),
 ]);
 
@@ -89,10 +89,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'RATE_LIMIT_UNAVAILABLE' }, { status: 503 });
     }
 
-    const { ticket } = await verifyAuthentication(
-      parsed.data.challengeId,
-      parsed.data.response as unknown as AuthenticationResponseJSON
-    );
+    const { ticket } = await verifyAuthentication(parsed.data.challengeId, parsed.data.response);
     return NextResponse.json({ ticket });
   } catch (error) {
     if (error instanceof PasskeyVerificationError) {

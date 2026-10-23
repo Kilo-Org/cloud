@@ -1,0 +1,87 @@
+import { useLocalSearchParams } from 'expo-router';
+import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+
+import { ScreenHeader } from '@/components/screen-header';
+import { Text } from '@/components/ui/text';
+import { ChoiceRow } from '@/components/ui/choice-row';
+import { TabScreenScrollView } from '@/components/tab-screen';
+import { REVIEW_FOCUS_AREAS, type ReviewerPlatform } from '@/lib/code-reviewer-config';
+import {
+  useReviewConfig,
+  useReviewConfigCacheReader,
+  useSaveReviewConfig,
+} from '@/lib/hooks/use-code-reviewer';
+
+export default function FocusAreasRoute() {
+  const { scope, platform } = useLocalSearchParams<{ scope: string; platform: ReviewerPlatform }>();
+  const { data } = useReviewConfig(scope, platform);
+  const save = useSaveReviewConfig(scope, platform);
+  const readConfig = useReviewConfigCacheReader(scope, platform);
+  const selected = data?.focusAreas ?? [];
+  const disabled = data == null;
+  const { t } = useTranslation();
+  const areaLabels = {
+    security: 'codeReviewer.focusArea.security',
+    performance: 'common.performance',
+    bugs: 'codeReviewer.focusArea.bugs',
+    style: 'codeReviewer.focusArea.style',
+    testing: 'codeReviewer.focusArea.testing',
+    documentation: 'codeReviewer.focusArea.documentation',
+  } as const;
+
+  // A stored area outside REVIEW_FOCUS_AREAS has no enum row of its own; show
+  // each distinct one with the localized fallback label so the user can see
+  // and unselect it instead of it silently persisting.
+  const unknownAreas = [
+    ...new Set(selected.filter(area => !(REVIEW_FOCUS_AREAS as readonly string[]).includes(area))),
+  ];
+
+  const toggleArea = (area: string) => {
+    // Read the cache at call time, not the render-time snapshot above, so
+    // two rapid taps each build the next array from the latest committed
+    // selection instead of dropping one another.
+    const current = readConfig()?.focusAreas ?? [];
+    const next = current.includes(area)
+      ? current.filter(item => item !== area)
+      : [...current, area];
+    save.mutate({ focusAreas: next });
+  };
+
+  return (
+    <View className="flex-1 bg-background">
+      <ScreenHeader title={t('codeReviewer.focusAreas.title')} />
+      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
+        <Text variant="muted" className="mb-2 text-xs">
+          {t('codeReviewer.focusAreas.hint')}
+        </Text>
+        {REVIEW_FOCUS_AREAS.map(area => (
+          <ChoiceRow
+            key={area}
+            label={t(areaLabels[area])}
+            multi
+            selected={selected.includes(area)}
+            disabled={disabled}
+            className="border-b-[0.5px] border-hair-soft"
+            onPress={() => {
+              toggleArea(area);
+            }}
+          />
+        ))}
+        {unknownAreas.map(area => (
+          <ChoiceRow
+            key={area}
+            label={t('codeReviewer.focusArea.unknown', { area })}
+            multi
+            selected
+            disabled={disabled}
+            className="border-b-[0.5px] border-hair-soft"
+            onPress={() => {
+              toggleArea(area);
+            }}
+          />
+        ))}
+      </TabScreenScrollView>
+    </View>
+  );
+}

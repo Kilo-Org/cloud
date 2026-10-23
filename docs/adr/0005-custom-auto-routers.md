@@ -24,11 +24,11 @@ per owner, and a customizable router that is not named as one.
 
 Split auto routing into platform routers and custom routers.
 
-- `kilo-auto/efficient` and `kilo-auto/frontier` are platform-owned. Owners cannot set a pool or a
-  mode on them. Organization model policy (`deniedModelIds`) still filters their candidates.
-- A **custom router** is owned by a user or an organization. Its owner sets a name, a slug, a
-  base dataset, a mode, a default member, and a pool of at most 20 models. The pool can contain
-  gateway models and client models.
+- `kilo-auto/efficient` and `kilo-auto/frontier` use platform-selected pools. Users and organizations
+  select their routing mode. Organization model policy still filters the platform candidates.
+- A **custom router** is owned by a user or an organization. Its owner selects the benchmark
+  difficulty, routing mode, default member, and model pool. The pool can contain gateway and client
+  models. The Efficient or Frontier base selects the benchmark dataset and routing thresholds.
 - The CLI routes client models. It calls a public `/v1/decide` route on the auto-routing worker,
   then dispatches the chosen model itself. The gateway routes custom routers for every other
   client, with gateway candidates only.
@@ -201,16 +201,81 @@ with `custom_router_unavailable`. A custom router never routes outside its pool.
 
 ## Rollout and cutover
 
-1. Ship custom routers behind the PostHog flag `kilo-auto-custom-routers`. The flag gates router
-   creation, the `/models` listing, and the web editor. A router can exist only for a flagged
-   owner, so the gateway and the workers need no flag check.
-2. At graduation, one deploy does the cutover:
-   - Each saved owner pool becomes a custom router with slug `efficient`, base `efficient`, the
-     owner's configured mode, and the first pool entry as the default member.
-   - Owner settings that have a mode and no pool are dropped.
-   - Efficient stops reading owner settings. The owner settings Durable Object, routes, and UI
-     are removed. ADR 0003 becomes Superseded.
-   - Owners whose pool was converted get a notice with the new model ID.
+1. Deploy contracts, benchmark support, web, serving, and gateway integration behind the
+   `kilo-auto-custom-routers` flag. Publish the CLI after cloud verification. The flag was
+   rolled out to everyone and removed before the cutover; custom routers no longer have a gate.
+2. Deploy the overlap migration separately from graduation. Keep legacy serving, settings,
+   and storage. Run the silent conversion before sending the advance notice.
+   - Each saved pool becomes an owner-scoped `efficient` custom router.
+   - The migrated row is canonical for both model IDs. Edits do not update separate copies.
+   - Copy the owner's configured mode, using the default when none is saved.
+     Custom modes are independent of platform mode settings and organization mode inheritance.
+     Platform mode settings remain stored and editable throughout the transition.
+   - Keep the migrated slug stable and reject deletion until graduation; benchmark difficulty remains editable.
+   - Migrated owners and authorized organization editors keep using their router.
+   - New legacy pool saves also convert before acknowledging success, including owners missed
+     by an earlier scan.
+3. Resolve every conversion exception and verify both model IDs before the blast.
+   Conversion sends no email. Repeated conversion must not overwrite edits.
+4. Run the notice script in dry-run mode. Review the live cohort, then explicitly send.
+   Use a staffed cutover window and allow a full notice period before graduation.
+   Retain the private campaign directory across retries. Provider acceptance is not proof of
+   inbox delivery; inspect delivery failures and suppressed recipients separately.
+   The notice tells organization billing contacts to share the organization model ID with members
+   and update shared integrations.
+5. During the notice period, both IDs use the shared pool. Repeat discovery before cutover.
+   Refresh the reviewed campaign for new recipients without resetting delivery history.
+   Give late recipients the full notice period; postpone cutover when necessary.
+6. At graduation, deploy only the cutover:
+   - Efficient stops reading owner pools and overlap aliases. Its pool becomes platform-selected.
+   - Platform modes remain selectable, retaining organization, personal, then default precedence.
+   - The custom model ID retains its own pool and independently selected mode and benchmark difficulty.
+   - Remove legacy pool settings/UI, custom-mode inheritance compatibility, and temporary pool edit guards.
+     Keep the platform mode endpoint, mode-only UI, and persisted mode storage.
+   - Do not reconvert pools or resend the advance notice.
+7. Retire one-time pool conversion tooling after verification. Preserve the existing mode Durable
+   Object, its binding, namespace, and saved modes. Do not apply a `deleted_classes` migration.
+
+Owners with a configured mode but no saved pool are outside the pool migration and notice cohort.
+Their platform mode settings remain valid and editable after cutover. They need no custom router
+to keep selecting a platform routing mode.
+
+### Operator commands
+
+Run the migration from the repository root with the approved production credentials available.
+The default is read-only; `--apply` is required for conversion.
+
+```sh
+pnpm --filter auto-routing exec tsx scripts/convert-owner-pools.ts --dry-run
+pnpm --filter auto-routing exec tsx scripts/convert-owner-pools.ts --apply
+pnpm --filter auto-routing exec tsx scripts/convert-owner-pools.ts --dry-run
+```
+
+The scanner requires `CLOUDFLARE_API_TOKEN` and `INTERNAL_API_SECRET`.
+Retain every report. Resolve unreadable, invalid, unmatched, missing-owner, collision, and
+router-cap findings before declaring the cohort complete. Interrupted writes retain a recovery
+fence; retry the conversion rather than clearing the fence manually.
+`--limit` controls the page size, not the total number of owners.
+
+Set `CUTOVER_AT` to a future timestamp with an explicit timezone.
+Set `STATE_DIR` to a private, durable campaign directory outside the checkout.
+The script requires `POSTGRES_SCRIPT_URL`; normal database configuration remains required.
+Sending also requires the production Mailgun configuration and `VERCEL_TARGET_ENV=production`.
+
+```sh
+pnpm --filter web script src/scripts/notify-auto-routing-pool-users.ts --cutover-at "$CUTOVER_AT" --state-dir "$STATE_DIR"
+pnpm --filter web script src/scripts/notify-auto-routing-pool-users.ts --cutover-at "$CUTOVER_AT" --state-dir "$STATE_DIR" --send
+```
+
+The dry run writes a private hashed plan, but sends nothing.
+Live personal owners and direct or inherited organization billing contacts receive one grouped
+notice per address. Soft-deleted users are never owners or contacts. An owner with no live, valid
+contact is not sent. The plan saves its private hash, and the output reports the unreachable count.
+Reuse the same timestamp and directory. `--refresh-plan` reviews cohort changes without resending
+successful targets. Resolve unknown delivery outcomes against provider records with
+`--reconcile-target` and `--reconcile-outcome`; use `--help` for the exact recovery procedure.
+Do not discard a used plan or remove its lock until the prior sender has stopped.
+A changed cutover date requires a separately reviewed update campaign, not an ordinary retry.
 
 ## Invariants
 

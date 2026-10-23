@@ -4,6 +4,7 @@ import { sendBalanceAlertEmail } from '@kilocode/web-shared/lib/email';
 import { dispatchLowBalancePush } from '@kilocode/web-shared/lib/notifications-worker-client';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
+  credit_transactions,
   organizations,
   organization_memberships,
   organization_user_usage,
@@ -145,6 +146,96 @@ describe('Organization Usage Functions', () => {
 
       expect(result1.balance).toBe(0.01); // 10000 microdollars = 0.01 USD
       expect(result2.balance).toBe(0.02); // 20000 microdollars = 0.02 USD
+    });
+  });
+
+  describe('credit expiry cut-off', () => {
+    const now = new Date('2026-03-01T12:00:00.000Z');
+    // Due half an hour before the cut-off's starting point, so the outcome depends only on
+    // the jitter the caller injects.
+    const expiry = new Date(now.getTime() - 30 * 60 * 1000);
+
+    async function createOrganizationWithDueCredit() {
+      const owner = await insertTestUser();
+      const organization = await createTestOrganization('Expiry Cut-off Org', owner.id, 1_000_000);
+      await db
+        .update(organizations)
+        .set({ next_credit_expiration_at: expiry.toISOString() })
+        .where(eq(organizations.id, organization.id));
+      await db.insert(credit_transactions).values({
+        kilo_user_id: owner.id,
+        organization_id: organization.id,
+        amount_microdollars: 1_000_000,
+        is_free: true,
+        expiry_date: expiry.toISOString(),
+        expiration_baseline_microdollars_used: 0,
+        original_baseline_microdollars_used: 0,
+        description: 'Expiring org credits',
+      });
+      return { owner, organization };
+    }
+
+    async function readExpirationState(organizationId: string) {
+      const [row] = await db
+        .select({
+          total_microdollars_acquired: organizations.total_microdollars_acquired,
+          microdollars_balance: organizations.microdollars_balance,
+          next_credit_expiration_at: organizations.next_credit_expiration_at,
+        })
+        .from(organizations)
+        .where(eq(organizations.id, organizationId));
+      const expired = await db
+        .select({ amount_microdollars: credit_transactions.amount_microdollars })
+        .from(credit_transactions)
+        .where(
+          and(
+            eq(credit_transactions.organization_id, organizationId),
+            eq(credit_transactions.credit_category, 'credits_expired')
+          )
+        );
+      return {
+        ...row,
+        next_credit_expiration_at: row.next_credit_expiration_at
+          ? new Date(row.next_credit_expiration_at).toISOString()
+          : null,
+        expired,
+      };
+    }
+
+    test('processes a credit that expired before the cut-off and reports the reduced balance', async () => {
+      const { owner, organization } = await createOrganizationWithDueCredit();
+
+      const result = await getBalanceForOrganizationUser(organization.id, owner.id, {
+        now,
+        expiryJitterHours: 0,
+      });
+      await drainAfterCallbacks();
+
+      expect(result.balance).toBe(0);
+      expect(await readExpirationState(organization.id)).toEqual({
+        total_microdollars_acquired: 0,
+        microdollars_balance: 0,
+        next_credit_expiration_at: null,
+        expired: [{ amount_microdollars: -1_000_000 }],
+      });
+    });
+
+    test('keeps a credit that expires after the cut-off and reports the unchanged balance', async () => {
+      const { owner, organization } = await createOrganizationWithDueCredit();
+
+      const result = await getBalanceForOrganizationUser(organization.id, owner.id, {
+        now,
+        expiryJitterHours: 1,
+      });
+      await drainAfterCallbacks();
+
+      expect(result.balance).toBe(1);
+      expect(await readExpirationState(organization.id)).toEqual({
+        total_microdollars_acquired: 1_000_000,
+        microdollars_balance: 1_000_000,
+        next_credit_expiration_at: expiry.toISOString(),
+        expired: [],
+      });
     });
   });
 

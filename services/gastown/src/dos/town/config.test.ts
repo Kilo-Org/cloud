@@ -1,6 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { TownConfigSchema } from '../../types';
 import { getTownConfig, resolveModel } from './config';
+
+vi.mock('../GastownUser.do', () => ({ getGastownUserStub: vi.fn() }));
+vi.mock('../GastownOrg.do', () => ({ getGastownOrgStub: vi.fn() }));
 
 const HARDCODED_FALLBACK = 'anthropic/claude-sonnet-4.6';
 

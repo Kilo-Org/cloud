@@ -41,7 +41,7 @@ const holder = vi.hoisted(
     platformOS: 'ios' | 'android';
     prompt: ReturnType<typeof vi.fn>;
     announceForA11y: ReturnType<typeof vi.fn>;
-    moveA11yFocus: ReturnType<typeof vi.fn>;
+    requestA11yFocus: ReturnType<typeof vi.fn>;
     /**
      * Whether the focus helper was handed a live node *at call time*. Reading
      * the `RefObject` after the test would show the node that mounted later,
@@ -63,7 +63,7 @@ const holder = vi.hoisted(
       prompt: vi.fn(),
       announceForA11y: vi.fn(),
       focusMoveHadNode,
-      moveA11yFocus: vi.fn((ref: { current: unknown } | undefined): boolean => {
+      requestA11yFocus: vi.fn((ref: { current: unknown } | undefined): boolean => {
         const hadNode = ref?.current != null;
         focusMoveHadNode.push(hadNode);
         return hadNode;
@@ -120,13 +120,10 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-// The overlay moves VoiceOver focus on open; the real helper reaches
-// `AccessibilityInfo`/`findNodeHandle`, which the `react-native` stub above
-// does not carry. `status-announcement` (inside `QueryError`) still needs the
-// announce half of the module.
+// Mock the native adapter; QueryError still uses its announcement export.
 vi.mock('@/lib/a11y/announce', () => ({
   announceForA11y: holder.announceForA11y,
-  moveA11yFocus: holder.moveA11yFocus,
+  requestA11yFocus: holder.requestA11yFocus,
 }));
 
 /* eslint-disable promise/prefer-await-to-callbacks -- Reanimated's withTiming
@@ -311,7 +308,7 @@ export function resetPreviewHolder(): void {
   holder.platformOS = 'ios';
   holder.prompt.mockClear();
   holder.announceForA11y.mockClear();
-  holder.moveA11yFocus.mockClear();
+  holder.requestA11yFocus.mockClear();
   holder.focusMoveHadNode.length = 0;
 }
 

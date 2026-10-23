@@ -62,6 +62,45 @@ describe('scrubEvent message redaction', () => {
     expect(result.contexts.network.outcome).toBe('http_error');
     expect(result.contexts.network.statusText).toBe('Upstream rejected [redacted]');
   });
+
+  it('applies the declared context policies together', () => {
+    const event = {
+      exception: {
+        values: [{ type: 'NetworkError', value: `request failed ${OPAQUE_RUN}` }],
+      },
+      contexts: {
+        network: {
+          url: FRAGMENT_URL,
+          statusText: `busy ${OPAQUE_RUN}`,
+          procedure: 'session.list',
+        },
+        'network.body': {
+          code: 'INTERNAL_SERVER_ERROR',
+          httpStatus: 500,
+          path: 'session.list',
+          message: 'request details',
+        },
+        NetworkError: { detail: `retry ${OPAQUE_RUN}` },
+      },
+    };
+
+    const result = scrubEvent(event);
+
+    expect(result.contexts).toEqual({
+      network: {
+        url: 'https://example.com/oauth/callback',
+        statusText: 'busy [redacted]',
+        procedure: 'session.list',
+      },
+      'network.body': {
+        code: 'INTERNAL_SERVER_ERROR',
+        httpStatus: 500,
+        path: 'session.list',
+      },
+      NetworkError: { detail: 'retry [redacted]' },
+    });
+    expect(result.exception.values[0]?.value).toBe('request failed [redacted]');
+  });
 });
 
 describe('scrubEvent URL reduction', () => {

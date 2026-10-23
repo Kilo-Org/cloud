@@ -331,33 +331,6 @@ function scrubPayload(value: unknown): Record<string, unknown> {
   return result;
 }
 
-/**
- * Names of the thrown errors in an event, i.e. the context keys that
- * `extraErrorDataIntegration` writes a thrown error's own properties under
- * (see lib/sentry-init.ts). Its data is free-form and must be token-scrubbed;
- * Sentry's structured contexts (device, trace, os, app) are not.
- */
-function exceptionContextNames(event: Record<string, unknown>): string[] {
-  const exception = event.exception;
-  if (exception == null || typeof exception !== 'object') {
-    return [];
-  }
-  const values = (exception as Record<string, unknown>).values;
-  if (!Array.isArray(values)) {
-    return [];
-  }
-  const names: string[] = [];
-  for (const value of values) {
-    if (value != null && typeof value === 'object') {
-      const type = (value as Record<string, unknown>).type;
-      if (typeof type === 'string' && type.length > 0) {
-        names.push(type);
-      }
-    }
-  }
-  return names;
-}
-
 /** The string at `key`, or undefined when it is absent or not a string. */
 function stringField(value: Record<string, unknown>, key: string): string | undefined {
   const field = value[key];
@@ -427,18 +400,23 @@ function fallbackFingerprint(event: Record<string, unknown>): string[] | undefin
   return [stringField(exception, 'type') ?? 'Error', fingerprintMessage(message)];
 }
 
-/**
- * Redact the message of every entry in an exception chain in place, since each
- * entry carries text the issue view shows.
- */
-function redactExceptionValues(exception: Record<string, unknown>): void {
+/** Scrub exception messages and their attached contexts in one pass. */
+function scrubExceptions(exception: Record<string, unknown>, contexts: unknown): void {
   const values = exception.values;
   if (!Array.isArray(values)) {
     return;
   }
+  const ctx =
+    contexts != null && typeof contexts === 'object'
+      ? (contexts as Record<string, unknown>)
+      : undefined;
   for (const value of values) {
     if (value != null && typeof value === 'object') {
       const entry = value as Record<string, unknown>;
+      const type = entry.type;
+      if (ctx !== undefined && typeof type === 'string' && type.length > 0 && type in ctx) {
+        ctx[type] = redactValue(ctx[type], new WeakMap(), []);
+      }
       if (typeof entry.value === 'string') {
         entry.value = redactString(entry.value, false);
       }
@@ -494,11 +472,6 @@ export function scrubEvent<T>(event: T): T {
           ctx[name] = scrubPayload(ctx[name]);
         }
       }
-      for (const name of exceptionContextNames(e)) {
-        if (name in ctx) {
-          ctx[name] = redactValue(ctx[name], new WeakMap(), []);
-        }
-      }
       if (NETWORK_CONTEXT in ctx) {
         ctx[NETWORK_CONTEXT] = scrubNetworkContext(ctx[NETWORK_CONTEXT]);
       }
@@ -533,7 +506,7 @@ export function scrubEvent<T>(event: T): T {
     // The exception messages and event.message carry the same text the issue
     // view shows, so both go through the same redaction as the fingerprint.
     if (e.exception != null && typeof e.exception === 'object') {
-      redactExceptionValues(e.exception as Record<string, unknown>);
+      scrubExceptions(e.exception as Record<string, unknown>, e.contexts);
     }
     if (typeof e.message === 'string') {
       e.message = redactString(e.message, false);

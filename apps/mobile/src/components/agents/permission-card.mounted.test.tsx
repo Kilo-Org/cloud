@@ -25,7 +25,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('@/lib/a11y/announce', () => ({
   announceForA11y: vi.fn(),
-  moveA11yFocus: vi.fn(),
+  requestA11yFocus: vi.fn(),
 }));
 
 function findByAccessibilityLabel(

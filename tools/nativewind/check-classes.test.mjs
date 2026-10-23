@@ -14,10 +14,9 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 
-// The checker reads the app's global.css for its token list, parses JSX with
-// the root typescript install and resolves react-native-css through
-// apps/mobile's node_modules for the compiler assertions, so the fixture tree
-// mirrors the repository layout and links the real node_modules in.
+// The checker reads the app's global.css for its token list and resolves
+// react-native-css through apps/mobile's node_modules for the compiler
+// assertions, so the fixture tree mirrors the repository layout.
 const REPO = realpathSync(new URL('../..', import.meta.url).pathname);
 const MOBILE_ROOT = join(REPO, 'apps/mobile');
 
@@ -38,7 +37,6 @@ function runChecker(context, files) {
     join(root, 'tools/nativewind/check-classes.mjs')
   );
   copyFileSync(join(MOBILE_ROOT, 'src/global.css'), join(root, 'apps/mobile/src/global.css'));
-  symlinkSync(join(REPO, 'node_modules'), join(root, 'node_modules'), 'dir');
   symlinkSync(join(MOBILE_ROOT, 'node_modules'), join(root, 'apps/mobile/node_modules'), 'dir');
 
   const result = spawnSync(process.execPath, [join(root, 'tools/nativewind/check-classes.mjs')], {

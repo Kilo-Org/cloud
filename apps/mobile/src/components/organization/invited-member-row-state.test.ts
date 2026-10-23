@@ -7,14 +7,17 @@ import {
   invitedMemberActionOptions,
   useResendInvite,
 } from '@/components/organization/invited-member-row-state';
+import { i18n } from '@/i18n';
 
 // The state module now imports the resend mutation hook, which pulls in
 // `@/lib/trpc` (native modules) and `@tanstack/react-query`. Mock those so the
 // pure `emailStatusLabel` tests and the hook wiring test both run in node.
 const resendInviteMutateMock = vi.fn();
+const toast = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn(), warning: vi.fn() }));
 
 type MutationOptions = {
   mutationFn?: (vars: unknown) => Promise<unknown>;
+  onError?: (error: unknown) => void;
 };
 let capturedOptions: MutationOptions | null = null;
 
@@ -39,9 +42,7 @@ vi.mock('@/lib/trpc', () => ({
   },
 }));
 
-vi.mock('@/lib/a11y/announcing-toast', () => ({
-  announcingToast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
-}));
+vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: toast }));
 
 describe('emailStatusLabel', () => {
   it('maps pending and sending to Pending', () => {
@@ -116,5 +117,15 @@ describe('useResendInvite', () => {
       organizationId: 'org-1',
       inviteId: 'inv-1',
     });
+  });
+
+  it('announces a failed resend in catalog copy, not the server sentence', () => {
+    toast.error.mockClear();
+    useResendInvite('org-1');
+
+    capturedOptions?.onError?.(new Error('Invitation not found'));
+
+    expect(toast.error).toHaveBeenCalledWith(i18n.t('organization.members.resendInviteError'));
+    expect(toast.error).not.toHaveBeenCalledWith('Invitation not found');
   });
 });

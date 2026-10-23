@@ -11,7 +11,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
 import { ShieldCheck, SlidersHorizontal } from '@/components/ui/icons';
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, View, type ViewStyle } from 'react-native';
+import { View, type ViewStyle } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { useTranslation } from 'react-i18next';
@@ -23,6 +23,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { FindingRow } from '@/components/security-agent/finding-row';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
@@ -165,7 +166,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
         // title's readable minimum when the row is narrow.
         headerRightWidth={44}
         headerRight={
-          <Pressable
+          <IconButton
             onPress={() => {
               if (filterUnavailable) {
                 return;
@@ -178,19 +179,15 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
               router.push(getSecurityAgentPath(scope, 'filter'));
             }}
             disabled={filterUnavailable}
-            accessibilityRole="button"
             accessibilityLabel={t('securityAgent.filter.title')}
             accessibilityState={{ disabled: filterUnavailable }}
-            className={cn(
-              'size-11 items-center justify-center active:opacity-70',
-              filterUnavailable && 'opacity-50'
-            )}
+            className={cn(filterUnavailable && 'opacity-50')}
           >
             <SlidersHorizontal
               size={20}
               color={filtersActive ? colors.foreground : colors.mutedForeground}
             />
-          </Pressable>
+          </IconButton>
         }
       />
 

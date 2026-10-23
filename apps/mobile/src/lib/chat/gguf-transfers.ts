@@ -70,33 +70,39 @@ export function activeDownload(input: {
 }
 
 /**
- * Moves every finished transfer to its model name, or none: a model without its
- * projector is not the model that was verified. A move that failed is no verdict
- * on the bytes, so a file an earlier attempt left at a model name is cleared and
- * the move runs once more. False when both moves failed.
+ * Moves every finished transfer that is still a partial file to its model name.
+ * A move that failed is no verdict on the bytes, so a file an earlier attempt
+ * left at a model name is cleared and the remaining moves run once more. False
+ * when a file is neither a partial nor in place afterwards.
  */
 export function moveIntoPlace(storage: GgufStorage, transfers: readonly GgufTransfer[]): boolean {
   if (moveAll(storage, transfers)) {
     return true;
   }
+  const names = new Set(storage.list());
   for (const transfer of transfers) {
-    removeQuietly(storage, transfer.name);
+    // A destination is only in the way while its own partial file is still waiting.
+    if (names.has(transfer.part)) {
+      removeQuietly(storage, transfer.name);
+    }
   }
   return moveAll(storage, transfers);
 }
 
 function moveAll(storage: GgufStorage, transfers: readonly GgufTransfer[]): boolean {
-  const moved: string[] = [];
+  const names = new Set(storage.list());
   try {
     for (const transfer of transfers) {
-      storage.move(transfer.part, transfer.name);
-      moved.push(transfer.name);
+      // A move that already happened is never repeated or undone: its partial is gone.
+      if (!names.has(transfer.part) && !names.has(transfer.name)) {
+        return false;
+      }
+      if (names.has(transfer.part)) {
+        storage.move(transfer.part, transfer.name);
+      }
     }
     return true;
   } catch {
-    for (const name of moved) {
-      removeQuietly(storage, name);
-    }
     return false;
   }
 }

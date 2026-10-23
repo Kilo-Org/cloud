@@ -73,6 +73,8 @@ export function ggufDownloads({
   const discard = (download: Active) => {
     for (const transfer of download.transfers) {
       removeQuietly(storage, transfer.part);
+      // A file the last step already moved is not in the list yet, so it goes too.
+      removeQuietly(storage, transfer.name);
     }
     if (active === download) {
       active = undefined;
@@ -126,10 +128,6 @@ export function ggufDownloads({
   /** One transfer finished: check that it is whole, then start the next or verify the model. */
   const complete = async (download: Active) => {
     const last = download.step === download.transfers.length - 1;
-    if (last) {
-      download.phase = 'verifying';
-      publish();
-    }
     const transfer = currentTransfer(download);
     const size = storage.size(transfer.part);
     const expected = transfer.expected ?? (download.total > 0 ? download.total : undefined);
@@ -152,6 +150,9 @@ export function ggufDownloads({
       begin(download);
       return;
     }
+    // Only a whole file is worth reading, so a retried transfer still reads as a download.
+    download.phase = 'verifying';
+    publish();
     await verify(download, download.done + size);
   };
 

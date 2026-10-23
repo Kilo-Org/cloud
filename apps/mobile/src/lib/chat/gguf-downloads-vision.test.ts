@@ -167,6 +167,20 @@ describe('downloading a vision model', () => {
     expect(h.store.model('eyes')).toBeUndefined();
   });
 
+  it('keeps a model whose first move placed the model file and failed on the projector', async () => {
+    const h = harness({ failMoveOnce: ggufProjectorName('eyes') });
+    h.store.start(VISION_CATALOG);
+    await finish(taskAt(h.tasks, 0), 1000);
+    await finish(taskAt(h.tasks, 1), 200);
+
+    expect(h.store.snapshot().failure).toBeNull();
+    expect(h.store.model('eyes')).toMatchObject({ sizeBytes: 1200, vision: true });
+    expect([...h.files.keys()].toSorted()).toEqual([
+      ggufModelName('eyes'),
+      ggufProjectorName('eyes'),
+    ]);
+  });
+
   it('keeps no model file when its projector cannot be moved into place', async () => {
     const h = harness({ failMove: ggufProjectorName('eyes') });
     h.store.start(VISION_CATALOG);

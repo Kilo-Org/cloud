@@ -122,7 +122,11 @@ describe('pausing, resuming and cancelling', () => {
 
     expect(h.tasks).toHaveLength(2);
     expect(h.store.snapshot().failure).toBeNull();
-    expect(h.store.snapshot().download).toMatchObject({ fileId: 'small', written: 0 });
+    expect(h.store.snapshot().download).toMatchObject({
+      fileId: 'small',
+      phase: 'downloading',
+      written: 0,
+    });
 
     await finish(taskAt(h.tasks, 1), 1000);
 

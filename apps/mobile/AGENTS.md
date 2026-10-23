@@ -146,6 +146,7 @@ Direct full-screen entry clears the status bar; presented sheets do not add a se
 - Default exports only where Expo Router requires them, in `src/app/`.
 - Import React Native primitives from `react-native`; NativeWind adds `className`.
 - Import `Image` from `@/components/ui/image` and other UI primitives from `@/components/ui/<component>`.
+- Import `Switch` from `@/components/ui/switch`. It mirrors `disabled` into `accessibilityState`, which iOS needs to report the control as disabled to assistive technology.
 - Add reusables with `pnpm dlx @react-native-reusables/cli@latest add <component> --styling-library nativewind -y`.
 - Style with Tailwind `className`. No inline styles, no `StyleSheet.create`. Merge classes with `cn()` from `@/lib/utils`.
 - Opacity modifiers do not work on theme colors (CSS variables): `bg-destructive/10` is dropped. Where a `*-tile-bg` / `*-tile-border` pair exists — `danger` for `destructive`, plus `good`, `warn`, `info`, the agent colors and the row hues — use it; otherwise use a concrete color with a dark variant. `<utility>-black/<alpha>` compiles to an unparseable `#NaN` color and paints nothing either; use a concrete value, for example `bg-[#0000000d]` for 5%. `pnpm check:classes` enforces both.

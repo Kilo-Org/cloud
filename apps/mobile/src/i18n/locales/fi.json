@@ -293,7 +293,8 @@
     "condenseToolCallsSubtitle": "Ryhmittele peräkkäiset työkalukutsut yhdelle riville, jonka voit avata.",
     "toolSummaryTranslation": "Käännä työkalujen yhteenvedot",
     "toolSummaryTranslationSubtitle": "Lähetä jokainen työkalun yhteenveto mallille käännettäväksi sovelluksesi kielelle. Alkuperäinen näytetään, jos käännös epäonnistuu.",
-    "toolSummaryTranslationModelUnavailableNotice": "Tätä mallia ei enää tarjota. Valitse toinen napauttamalla $t(common.model)."
+    "toolSummaryTranslationModelUnavailableNotice": "Tätä mallia ei enää tarjota. Valitse toinen napauttamalla $t(common.model).",
+    "autoExpandThinkingInactiveSubtitle": "Ei vaikutusta, kun päättelyn tiedot on piilotettu."
   },
   "prReview": {
     "pullRequestUnavailable": "Muutospyyntö ei ole käytettävissä",
@@ -669,7 +670,8 @@
       "gitlabDescription": "Yhdistä GitLab-tilisi, niin voit katselmoida yhdistämispyyntöjä mobiililaitteella.",
       "bitbucketDescription": "Yhdistä Bitbucket tähän organisaatioon, niin voit katselmoida muutospyyntöjä mobiililaitteella.",
       "bitbucketOrgOnlyDescription": "Vaihda yllä oleva tili organisaatioon, niin voit katselmoida sen Bitbucket-muutospyyntöjä.",
-      "contextLine": "{{organization}}-organisaatiolle"
+      "contextLine": "{{organization}}-organisaatiolle",
+      "contextLinePersonal": "Henkilökohtaiselle tilillesi"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1452,7 +1454,13 @@
       "sessionError": "Istunnossa tapahtui virhe: {{error}}",
       "statusWithValue": "Tila: {{status}}",
       "toolName": "Työkalu: {{name}}",
-      "toolNameError": "Työkalussa {{name}} tapahtui virhe."
+      "toolNameError": "Työkalussa {{name}} tapahtui virhe.",
+      "cancelReasonSuperseded": "Uudempi commit työnnettiin, joten tämä katselmointi korvattiin.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} on katkaistu, joten tämä katselmointi peruttiin. Yhdistä se uudelleen ja suorita katselmointi uudelleen.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer poistettiin käytöstä Bitbucketissa, joten tämä katselmointi peruttiin. Ota se uudelleen käyttöön ja suorita katselmointi uudelleen.",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucketin vetopyyntö muuttui, joten tämä katselmointi korvattiin.",
+      "cancelReasonCancelled": "Tämä katselmointi peruttiin.",
+      "cancelReasonInterrupted": "Tämä katselmointi keskeytyi."
     },
     "reviewMemory": {
       "title": "Katselmointimuisti",
@@ -1479,7 +1487,15 @@
       "instructions": "Ohjeet (valinnaiset)",
       "instructionsPlaceholder": "Katselmoinnin erityiset painopisteet…",
       "starting": "Käynnistetään katselmointia…",
-      "start": "Aloita katselmointi"
+      "start": "Aloita katselmointi",
+      "startNotFound": "Kyseinen {{requestNoun}} ei ole luettavissa {{provider}}-palvelusta. Tarkista URL-osoite ja se, että repositorio on saatavilla.",
+      "startRateLimited": "{{provider}} rajoittaa pyyntöjä juuri nyt. Yritä uudelleen muutaman minuutin kuluttua.",
+      "startNotAllowed": "Katselmoinnin käynnistäminen ei ole sallittua, koska kyseinen {{requestNoun}} vaatii käyttöoikeuden, jota sinulla ei ole. Tarkista käyttöoikeutesi ja organisaatiosi tilaus.",
+      "startProviderNeedsAttention": "Manuaalinen katselmointi vaatii tavallisen {{provider}}-yhteyden. Yhdistä se ja yritä uudelleen.",
+      "startAlreadyRunning": "Kyseinen {{requestNoun}} on jo katselmoitavana.",
+      "startRejected": "Kyseinen {{requestNoun}} ei ole katselmoitavissa. Varmista, että se on avoin eikä luonnos, ja että URL-osoite on oikein.",
+      "startProviderUnavailable": "Yhteyttä {{provider}}-palveluun ei saatu, joten kyseinen {{requestNoun}} ei ole juuri nyt luettavissa. Yritä uudelleen.",
+      "startFailed": "Katselmointia ei voitu käynnistää. Tarkista internetyhteys ja yritä uudelleen."
     },
     "notConnectedReadOnly": "Palvelua {{platform}} ei ole yhdistetty. Vain organisaation omistajat ja ylläpitäjät voivat yhdistää sen.",
     "gitlab": {
@@ -1948,7 +1964,7 @@
       "couldNotLoad": "Tietoturva-agenttia ei voitu ladata",
       "installApp": "Asenna GitHub-sovellus",
       "reauthorizeButton": "Valtuuta GitHub-sovellus uudelleen",
-      "reauthorizeDescription": "Tietoturva-agentti tarvitsee vulnerability_alerts-käyttöoikeuden Dependabot-hälytysten lukemiseen. Myönnä käyttöoikeus valtuuttamalla GitHub-sovellus uudelleen.",
+      "reauthorizeDescription": "Tietoturva-agentti tarvitsee käyttöoikeuden Dependabot-hälytysten lukemiseen. Myönnä käyttöoikeus valtuuttamalla GitHub-sovellus uudelleen.",
       "reauthorizeTitle": "Lisäkäyttöoikeuksia tarvitaan",
       "setupFailed": "GitHubin käyttöönottoa ei voitu aloittaa. Yritä uudelleen."
     },
@@ -2112,7 +2128,8 @@
       "dollar_other": "dollaria",
       "costSpoken": "kustannus {{cost}}",
       "costSpokenWithTime": "kustannus {{cost}}, {{time}}",
-      "pullRequest": "muutospyyntö {{number}}"
+      "pullRequest": "muutospyyntö {{number}}",
+      "spokenJoiner": "ja"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubia ei voitu avata",
@@ -2467,7 +2484,71 @@
       "preparationComplete": "Valmistelu valmis",
       "preparationFailed": "Valmistelu epäonnistui",
       "setupCommand": "Valmistelukomento {{index}}",
-      "setupCommandOf": "Valmistelukomento {{index}} / {{displayCount}}"
+      "setupCommandOf": "Valmistelukomento {{index}} / {{displayCount}}",
+      "stepWorkspaceSetup": "Työtilan valmistelu",
+      "stepDiskCheck": "Levytila tarkistetaan",
+      "stepCloning": "Kloonataan tietovarastoa",
+      "stepBranch": "Valmistellaan haaraa",
+      "stepDevcontainerSetup": "Dev-säiliön valmistelu",
+      "stepWorkspaceRestore": "Palautetaan työtilaa",
+      "stepWorkspaceBackup": "Tallennetaan työtilaa",
+      "stepSandboxProvision": "Valmistellaan hiekkalaatikkoa",
+      "stepSandboxBoot": "Käynnistetään hiekkalaatikkoa",
+      "stepSnapshotFallback": "Yritetään uudelleen ilman tilannevedosta",
+      "stepKiloServer": "Käynnistetään Kiloa",
+      "stepKiloSession": "Valmistellaan istuntoa",
+      "stepRestoreIncomplete": "Istunnon palautus vaillinainen",
+      "stepReady": "Ympäristö valmis",
+      "stepFailed": "Ympäristön valmistelu epäonnistui",
+      "stepUnknown": "Ympäristön valmistelu",
+      "detailCreatingSandbox": "Luodaan hiekkalaatikkoa",
+      "detailUpdatingRepository": "Päivitetään tietovarastoa",
+      "detailCheckingOutBranch": "Vaihdetaan haaraa",
+      "detailRunningSetupCommands": "Suoritetaan valmistelukomentoja",
+      "detailSavingRepository": "Tallennetaan tietovarastoa nopeampia käynnistyksiä varten",
+      "detailStartingKiloRuntime": "Käynnistetään Kilo-ajoaikaa",
+      "detailPreparingKiloSession": "Valmistellaan Kilo-istuntoa",
+      "detailWaitingForPreviousSandbox": "Odotetaan edellisen hiekkalaatikon pysähtymistä",
+      "detailRetryingSandboxCreation": "Yritetään hiekkalaatikon luontia uudelleen",
+      "detailPreviousSnapshotFailed": "Tilannevedoksen käynnistys epäonnistui. Yritetään uudelleen ilman tilannevedosta.",
+      "detailSnapshotStartupFailed": "Tilannevedoksen käynnistys epäonnistui. Yritetään uudelleen ilman tilannevedosta.",
+      "detailStartingSandboxWithoutSnapshot": "Käynnistetään hiekkalaatikkoa ilman tilannevedosta",
+      "detailSettingUpWorkspace": "Valmistellaan työtilaa",
+      "detailRestoringSession": "Palautetaan istuntoa",
+      "detailWarmWorkspaceReused": "Lämmin työtila otettiin uudelleen käyttöön",
+      "detailRetryingClone": "Yritetään kloonausta uudelleen (yritys {{attempt}} / {{total}})",
+      "detailSetupCommandFailed": "Valmistelukomento {{index}} epäonnistui",
+      "detailSetupCommandTimedOut": "Valmistelukomento {{index}} aikakatkesi",
+      "detailColdRestore": "Kylmä palautus, tilannevedos otettu käyttöön, {{applied}} / {{total}} tiedostoa palautettu",
+      "detailProgressPercent": "{{percent}} % valmis",
+      "detailRestoreIncompleteReport": "Istunnon palautus vaillinainen: {{skipped}} / {{total}} tiedostoa ei palautettu ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Puuttuvat: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} ja {{omitted}} lisää",
+      "detailReasonPatchFailed": "muutosta ei voitu soveltaa",
+      "detailReasonOutsideWorkspace": "polku on työtilan ulkopuolella",
+      "detailReasonMissingContent": "tilannevedos ei sisältänyt tiedoston sisältöä",
+      "detailReasonIndexResetFailed": "indeksiä ei voitu nollata epäonnistuneen suorituksen jälkeen",
+      "detailReasonUnlinkFailed": "tiedostoa ei voitu poistaa",
+      "detailReasonWriteFailed": "tiedostoa ei voitu kirjoittaa",
+      "detailReasonUnknown": "tuntematon syy",
+      "detailUnknown": "Valmistellaan edelleen",
+      "errorPreparationTimeout": "Ympäristön valmistelu aikakatkesi",
+      "errorWorkspaceSetupFailed": "Työtilan valmistelu epäonnistui",
+      "errorCredentialUpgradeRequired": "Istunnosta puuttuu vaadittu tunnistetietojen päivitys. Aloita uusi istunto jatkaaksesi.",
+      "errorAgentUnavailable": "Agentti ei ole enää käytettävissä",
+      "errorBillingBlocked": "Hiekkalaatikon laskutus vaatii lisää krediittejä",
+      "errorBillingUnavailable": "Hiekkalaatikon laskutus- tai kapasiteettitarkistus ei ole käytettävissä. Yritä pian uudelleen.",
+      "errorContainerLimitReached": "Säiliöraja saavutettiin. Pysäytä olemassa oleva säiliö ennen uuden käynnistystä.",
+      "errorInvalidConfiguration": "Hiekkalaatikon asetukset ovat virheelliset tai ei-tuetut",
+      "errorRuntimeArtifactUnauthorized": "Ajoaikaa ei voitu vahvistaa",
+      "errorRuntimeArtifactInvalid": "Ajoaikaa ei ladattu luvalla",
+      "errorRuntimeCliProbeFailed": "Ajoajan komentorivikäyttöliittymän tarkistus epäonnistui",
+      "errorRuntimeSupervisorMissing": "Ajoajan valvoja puuttuu",
+      "errorConnectionLost": "Yhteys hiekkalaatikkoon katkesi",
+      "errorSandboxLost": "Hiekkalaatikko katosi",
+      "errorAgentRestarted": "Agentti käynnistettiin uudelleen",
+      "errorSandboxOutOfMemory": "Hiekkalaatikon muisti loppui",
+      "errorPreparationDidNotComplete": "Valmistelu ei valmistunut"
     },
     "permissionCard": {
       "title": "Lupa tarvitaan",
@@ -3031,22 +3112,16 @@
     "boundary": {
       "backToProfile": "Takaisin profiiliin",
       "loadErrorMessage": "Tarkista yhteys ja yritä uudelleen.",
-
       "chooseAccount": "Valitse tili",
       "loadErrorTitle": "Organisaatioitasi ei voitu ladata.",
       "membershipLostNotice": "Sinulla ei ole enää pääsyä tähän organisaatioon. Vaihdettu {{target}}.",
       "noOrganization": "Ei organisaatiota",
-
       "noOrganizationDescription": "Tämä tili ei kuulu mihinkään organisaatioon. Luo organisaatio tai liity sellaiseen verkossa käyttääksesi organisaatio-ominaisuuksia, kuten jäsenkutsuja ja alhaisen saldon hälytyksiä.",
-
       "openWebOrganizations": "Avaa organisaatiot verkossa",
-
       "organizationUnavailable": "Organisaatio ei ole käytettävissä.",
       "selectDescriptionWithOrganizations": "Kuulut yhteen tai useampaan organisaatioon. Valitse tili, jota tämän näytön tulee käyttää.",
-
       "selectOrganization": "Valitse organisaatio",
       "unavailableDescription": "Tämä organisaatio ei ole enää käytettävissä. Jatka valitsemalla toinen organisaatio profiilistasi.",
-
       "unavailableSessionsDescription": "Tämä organisaatio ei ole enää käytettävissä. Sen istuntoja ei voida ladata.",
       "accessDeniedDescription": "Sinulla ei ole pääsyä tähän organisaatioon."
     },
@@ -3074,7 +3149,9 @@
       "permissionDenied": "Sinulla ei ole oikeutta kutsua jäseniä.",
       "roleMember": "Rooli: jäsen",
       "sendInvite": "Lähetä kutsu",
-      "title": "Kutsu jäsen"
+      "title": "Kutsu jäsen",
+      "alreadyInvited": "Tämä sähköpostiosoite on jo kutsuttu tai kuuluu jo jäsenelle.",
+      "sendError": "Kutsun lähettäminen epäonnistui."
     },
     "invoices": {
       "downloadA11y": "Lataa lasku {{number}}",
@@ -3143,7 +3220,8 @@
       "inviteCreated": "Kutsu luotu",
       "pendingInvitations": "Odottavat kutsut",
       "resendInvite": "Lähetä kutsu uudelleen",
-      "shareInviteLink": "Jaa kutsulinkki"
+      "shareInviteLink": "Jaa kutsulinkki",
+      "resendInviteError": "Kutsun lähettäminen uudelleen epäonnistui."
     },
     "usageStats": {
       "inputTokens": "Syötetokenit",
@@ -3291,7 +3369,8 @@
     "noneChosen": "Ei valintaa",
     "emptyTitle": "Ei puheentunnistusmalleja",
     "emptyDescription": "Kilo Gateway ei juuri nyt tarjoa puheentunnistusmalleja.",
-    "loadFailed": "Puheentunnistusmallien lataaminen epäonnistui."
+    "loadFailed": "Puheentunnistusmallien lataaminen epäonnistui.",
+    "choose": "Valitse malli"
   },
   "voiceLanguage": {
     "title": "Puheentunnistuksen kieli",
@@ -3536,8 +3615,6 @@
       "quantizations": "Kvantisoinnit",
       "quantizationsHelp": "Pienemmät tiedostot vievät vähemmän muistia ja tallennustilaa. Suuremmat tiedostot antavat yleensä parempia vastauksia.",
       "quantDetail": "Lataus {{size}} · noin {{memory}} muistia",
-      "downloadQuant": "Lataa {{quant}}",
-      "downloadModelA11y": "Lataa {{name}}",
       "detailsA11y": "Tiedot: {{name}}",
       "loadingModel": "Ladataan mallin tietoja",
       "couldNotLoadModel": "Tämän mallin lataaminen epäonnistui",
@@ -3582,7 +3659,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "Tämä malli tukee päättelyn tasoa"
-    }
+    },
+    "creditsRequired": "Krediitit eivät riitä tämän viestin lähettämiseen – lisää krediittejä ja yritä uudelleen."
   },
   "settingsTools": {
     "confirmTitle": "Vahvistetaanko tämä muutos?"
@@ -3618,7 +3696,9 @@
     "spend24h": "Kulutus viimeisten 24 tunnin aikana",
     "multiplierError": "Anna kerroin, joka on 1 tai suurempi",
     "permissionDenied": "Sinulla ei ole oikeutta hallita kulutusvaroituksia.",
-    "pushOffByCategory": "Pois päältä Ilmoituksissa"
+    "pushOffByCategory": "Pois päältä Ilmoituksissa",
+    "multiplierMaxError": "Anna kerroin, joka on {{max}} tai pienempi",
+    "thresholdMaxError": "Anna summa, joka on {{max}} tai pienempi."
   },
   "profiles": {
     "title": "Profiilit",
@@ -3743,16 +3823,16 @@
       "stepsPlaceholder": "esim. 50",
       "temperature": "Lämpötila",
       "temperaturePlaceholder": "esim. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "esim. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Agenttini",
       "promptPlaceholder": "Olet...",
       "tools": "Työkalut",
       "visibility": "Näkyvyys",
-      "visibilityPrimary": "Ensisijainen – näkyy valitsimessa",
-      "visibilitySubagent": "Aliagentti – vain muiden kutsuttavissa",
-      "visibilityAll": "Kaikki – molemmat",
+      "visibilityPrimary": "Ensisijainen — näkyy valitsimessa",
+      "visibilitySubagent": "Aliagentti — vain muiden kutsuttavissa",
+      "visibilityAll": "Kaikki — molemmat",
       "modePrimary": "Vain ensisijainen",
       "modeSubagent": "Vain aliagentti",
       "modeAll": "Kaikki",
@@ -3805,7 +3885,9 @@
       "pinFailed": "Koodivarastoa ei voitu kiinnittää",
       "unboundToast": "Koodivaraston sidonta purettu",
       "unbindFailed": "Koodivaraston sidontaa ei voitu purkaa"
-    }
+    },
+    "variablesDeleteFailed": "Muuttujaa ei voitu poistaa",
+    "deleteCommand": "Poista komento {{position}}"
   },
   "credits": {
     "title": "Osta krediittejä",
@@ -3841,7 +3923,8 @@
       "archive": "Arkistoi",
       "unarchive": "Palauta arkistosta",
       "deleteTitle": "Poistetaanko {{name}}?",
-      "deleteMessage": "Myös sen tehtävät poistetaan. Niiden istunnot säilyvät."
+      "deleteMessage": "Myös sen tehtävät poistetaan. Niiden istunnot säilyvät.",
+      "createFailed": "Listaa ei voitu luoda"
     },
     "listSettings": {
       "title": "Listan asetukset",
@@ -3999,6 +4082,7 @@
     "estimateInputTooLarge": "Tällä ajanjaksolla on liikaa aineistoa valitulle mallille.",
     "estimatePermissionUnavailable": "Sinulla ei ole oikeutta käyttää tämän kontekstin saldoa.",
     "createFailed": "Tätä katsausta ei voitu luoda.",
-    "reviewFailed": "Tätä katsausta ei voitu tarkistaa."
+    "reviewFailed": "Tätä katsausta ei voitu tarkistaa.",
+    "saved": "Katsauksen asetukset tallennettu"
   }
 }

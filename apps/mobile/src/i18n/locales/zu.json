@@ -293,7 +293,8 @@
     "condenseToolCallsSubtitle": "Hlanganisa izingcingo zamathuluzi ezilandelanayo zibe umugqa owodwa ongawuvula.",
     "toolSummaryTranslation": "Humusha izifinyezo zamathuluzi",
     "toolSummaryTranslationSubtitle": "Thumela isifinyezo sethuluzi ngasinye kumodeli ukuze siyihumushele olimini lohlelo lwakho. Okwangempela kuyaboniswa uma ukuhumusha kwehluleka.",
-    "toolSummaryTranslationModelUnavailableNotice": "Le modeli ayisanikezwa. Thepha $t(common.model) ukukhetha enye."
+    "toolSummaryTranslationModelUnavailableNotice": "Le modeli ayisanikezwa. Thepha $t(common.model) ukukhetha enye.",
+    "autoExpandThinkingInactiveSubtitle": "Ayinampembelele uma imininingwane yokucabanga efihliwe."
   },
   "prReview": {
     "pullRequestUnavailable": "Isicelo sokuhlanganisa asitholakali",
@@ -669,7 +670,8 @@
       "gitlabDescription": "Xhuma i-akhawunti yakho ye-GitLab ukuze ubuyekeze izicelo zokuhlanganisa kufoni.",
       "bitbucketDescription": "Xhuma i-Bitbucket kule nhlangano ukuze ubuyekeze ama-PR kufoni.",
       "bitbucketOrgOnlyDescription": "Shintsha i-akhawunti engenhla ibe yinhlangano ukuze ubuyekeze ama-PR ayo e-Bitbucket.",
-      "contextLine": "Ku-{{organization}}"
+      "contextLine": "Ku-{{organization}}",
+      "contextLinePersonal": "Kwokomuntu siqu"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1452,7 +1454,13 @@
       "sessionError": "Kwenzeke iphutha eseshinini: {{error}}.",
       "statusWithValue": "Isimo: {{status}}",
       "toolName": "Ithuluzi: {{name}}",
-      "toolNameError": "Kwenzeke iphutha ethuluzini: {{name}}."
+      "toolNameError": "Kwenzeke iphutha ethuluzini: {{name}}.",
+      "cancelReasonSuperseded": "Kuthunyelwe i-commit entsha, ngakho-ke lolu hlolo lwathathwa indawo.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} yehlukanisiwe, ngakho-ke lolu hlolo lwakhanselwa. Phinda ulixhume, bese uphinda ulwenza ukuhlola.",
+      "cancelReasonBitbucketReviewerDisabled": "I-Code Reviewer yavalwa ku-Bitbucket, ngakho-ke lolu hlolo lwakhanselwa. Phinda uyivule, bese uphinda ulwenza ukuhlola.",
+      "cancelReasonBitbucketPullRequestChanged": "Isicelo sokudonsa se-Bitbucket sashintsha, ngakho-ke lolu hlolo lwathathwa indawo.",
+      "cancelReasonCancelled": "Lolu hlolo lwakhanselwa.",
+      "cancelReasonInterrupted": "Lolu hlolo lwaphazanyiswa."
     },
     "reviewMemory": {
       "title": "Inkumbulo yokuhlola",
@@ -1479,7 +1487,15 @@
       "instructions": "Imiyalo (ayidingekile)",
       "instructionsPlaceholder": "Okuthile umhloli okumele agxile kukho…",
       "starting": "Kuqaliswa ukuhlolwa…",
-      "start": "Qala ukuhlola"
+      "start": "Qala ukuhlola",
+      "startNotFound": "Asikwazanga ukufunda le {{requestNoun}} etholakala ku-{{provider}}. Hlola i-URL bese uqinisekisa ukuthi indawo yokugcina ikhodi ingafinyelelwa.",
+      "startRateLimited": "Kukhona imikhawulo yezicelo ku-{{provider}} njengamanje. Zama futhi ngemizuzu embalwa.",
+      "startNotAllowed": "Awunalo ilungelo lokulungiselela ukuhlolwa kwale {{requestNoun}}. Hlola imvume yakho, kanye nohlelo lwenhlangano yakho.",
+      "startProviderNeedsAttention": "Ukuhlolwa okwenziwa ngesandla kudinga unxibelelwano olujwayelekile kwi-{{provider}}. Xhuma bese uzama futhi.",
+      "startAlreadyRunning": "Ukuhlolwa {{requestNoun}} sekuyaqhubeka.",
+      "startRejected": "Akukwazeki ukuhlolwa {{requestNoun}}. Qinisekisa ukuthi kuvulekile, akukho idrafu, futhi i-URL ilungile.",
+      "startProviderUnavailable": "Asikwazanga ukufinyelela ku-{{provider}} ukufunda {{requestNoun}}. Zama futhi.",
+      "startFailed": "Asikwazanga ukuqalisa ukuhlolwa. Hlola unxibelelwano lwakho bese uzama futhi."
     },
     "notConnectedReadOnly": "{{platform}} ayixhunyiwe. Abanikazi benhlangano nabalawuli kuphela abangayixhuma.",
     "gitlab": {
@@ -1948,7 +1964,7 @@
       "couldNotLoad": "Asikwazanga ukulayisha i-ejenti yezokuphepha.",
       "installApp": "Faka uhlelo lokusebenza lwe-GitHub",
       "reauthorizeButton": "Phinda unike uhlelo lokusebenza lwe-GitHub imvume",
-      "reauthorizeDescription": "I-ejenti yezokuphepha idinga imvume ye-vulnerability_alerts ukuze ifinyelele izexwayiso ze-Dependabot. Phinda unike uhlelo lokusebenza lwe-GitHub imvume ukuze luyithole.",
+      "reauthorizeDescription": "I-ejenti yezokuphepha idinga imvume yokufunda izexwayiso ze-Dependabot. Phinda unike uhlelo lokusebenza lwe-GitHub imvume ukuze lunikeze le mvume.",
       "reauthorizeTitle": "Ezinye izimvume ziyadingeka",
       "setupFailed": "Asikwazanga ukuqala ukusetha i-GitHub. Sicela uzame futhi."
     },
@@ -2112,7 +2128,8 @@
       "dollar_other": "amadola",
       "costSpoken": "izindleko {{cost}}",
       "costSpokenWithTime": "izindleko {{cost}}, {{time}}",
-      "pullRequest": "isicelo sokuhlanganisa {{number}}"
+      "pullRequest": "isicelo sokuhlanganisa {{number}}",
+      "spokenJoiner": ", ne-"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Asikwazanga ukuvula i-GitHub",
@@ -2467,7 +2484,71 @@
       "preparationComplete": "Ukulungisa kuqediwe",
       "preparationFailed": "Ukulungisa kwehlulekile",
       "setupCommand": "Umyalo wokusetha {{index}}",
-      "setupCommandOf": "Umyalo wokusetha {{index}} kwengu-{{displayCount}}"
+      "setupCommandOf": "Umyalo wokusetha {{index}} kwengu-{{displayCount}}",
+      "stepWorkspaceSetup": "Ukusetha kwendawo yokusebenza",
+      "stepDiskCheck": "Ukuhlola idiski",
+      "stepCloning": "Kukopishwa i-repository",
+      "stepBranch": "Kusethwa i-branch",
+      "stepDevcontainerSetup": "Ukusetha i-dev container",
+      "stepWorkspaceRestore": "Kubuyiswa indawo yokusebenza",
+      "stepWorkspaceBackup": "Kugcinwa indawo yokusebenza",
+      "stepSandboxProvision": "Kuhlinzekwa isandbox",
+      "stepSandboxBoot": "Kuqaliswa isandbox",
+      "stepSnapshotFallback": "Kuzanywa kabusha ngaphandle kwesithombe-simo",
+      "stepKiloServer": "Kuqaliswa i-Kilo",
+      "stepKiloSession": "Kulungiswa iseshini",
+      "stepRestoreIncomplete": "Ukubuyiswa kweseshini akuphelele",
+      "stepReady": "Indawo yokusebenza ilungile",
+      "stepFailed": "Ukusetha kwendawo yokusebenza kwehlulekile",
+      "stepUnknown": "Ukusetha kwendawo yokusebenza",
+      "detailCreatingSandbox": "Kudalwa isandbox",
+      "detailUpdatingRepository": "Kubuyekezwa i-repository",
+      "detailCheckingOutBranch": "Kukhishwa i-branch",
+      "detailRunningSetupCommands": "Kusetshenziswa imiyalo yokusetha",
+      "detailSavingRepository": "Kugcinwa i-repository ukuze kuqaliswe ngokushesha",
+      "detailStartingKiloRuntime": "Kuqaliswa i-Kilo runtime",
+      "detailPreparingKiloSession": "Kulungiswa iseshini ye-Kilo",
+      "detailWaitingForPreviousSandbox": "Kulindwa isandbox yangaphambilini ukuthi imise",
+      "detailRetryingSandboxCreation": "Kuzanywa kabusha ukudala isandbox",
+      "detailPreviousSnapshotFailed": "Ukuqalisa kwesithombe-simo kwangaphambilini kwehlulekile. Kuzanywa kabusha ngaphandle kwesithombe-simo.",
+      "detailSnapshotStartupFailed": "Ukuqalisa kwesithombe-simo kwehlulekile. Kuzanywa kabusha ngaphandle kwesithombe-simo.",
+      "detailStartingSandboxWithoutSnapshot": "Kuqaliswa isandbox ngaphandle kwesithombe-simo",
+      "detailSettingUpWorkspace": "Kusethwa indawo yokusebenza",
+      "detailRestoringSession": "Kubuyiswa iseshini",
+      "detailWarmWorkspaceReused": "Indawo yokusebenza efudumeleyo iphinde yasetshenziswa",
+      "detailRetryingClone": "Kuzanywa kabusha ukukopisha (isizamo {{attempt}} kwengu-{{total}})",
+      "detailSetupCommandFailed": "Umyalo wokusetha {{index}} wehlulekile",
+      "detailSetupCommandTimedOut": "Umyalo wokusetha {{index}} uphele isikhathi",
+      "detailColdRestore": "Ukubuyisa okubandayo, isithombe-simo sisetshenzisiwe, {{applied}} kwengu-{{total}} amafayela abuyisiwe",
+      "detailProgressPercent": "{{percent}}% kuqediwe",
+      "detailRestoreIncompleteReport": "Ukubuyiswa kweseshini akuphelele: {{skipped}} kwengu-{{total}} amafayela abuyiswanga ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Ayitholakali: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} kanye nokunye okungu-{{omitted}}",
+      "detailReasonPatchFailed": "isiphuculo asizange sisebenze",
+      "detailReasonOutsideWorkspace": "indlela ingaphandle kwendawo yokusebenza",
+      "detailReasonMissingContent": "isithombe-simo asazange athwele okuqukethwe kwaleli fayela",
+      "detailReasonIndexResetFailed": "i-index yehlulekile ukusethwa kabusha emva kokusebenzisa okwehlulekile",
+      "detailReasonUnlinkFailed": "leli fayela alukwazanga ukususwa",
+      "detailReasonWriteFailed": "leli fayela alukwazanga ukubhalwa",
+      "detailReasonUnknown": "isizathu esingaziwa",
+      "detailUnknown": "Kusalungiswa",
+      "errorPreparationTimeout": "Ukulungisa kwaphela isikhathi",
+      "errorWorkspaceSetupFailed": "Ukusetha kwendawo yokusebenza kwehlulekile",
+      "errorCredentialUpgradeRequired": "Le seshini ayinakho ukuthuthukiswa okudingekayo kwekredenshali. Qala iseshini entsha ukuze uqhubeke.",
+      "errorAgentUnavailable": "I-agent ayisatholakali",
+      "errorBillingBlocked": "Inkokhelo yesandbox idinga ama-credit okwengeziwe",
+      "errorBillingUnavailable": "Inkokhelo yesandbox noma ukuqinisekiswa kwamandla awo akutholakali. Zama futhi maduze.",
+      "errorContainerLimitReached": "Umkhawulo we-container ufinyelelwe. Misa i-container ekhona ngaphambi kokuqala enye.",
+      "errorInvalidConfiguration": "Ukusethwa kwesandbox akulungile noma akusekelwe",
+      "errorRuntimeArtifactUnauthorized": "Ukulanda kweruntime akuzange kuvunyelwe",
+      "errorRuntimeArtifactInvalid": "Ukuqinisekisa i-artifact yeruntime kwehlulekile",
+      "errorRuntimeCliProbeFailed": "Ukuqinisekisa i-CLI yeruntime kwehlulekile",
+      "errorRuntimeSupervisorMissing": "I-supervisor yeruntime ayikho",
+      "errorConnectionLost": "Uxhumano lwesandbox lwalahlekile",
+      "errorSandboxLost": "Isandbox lalahlekile",
+      "errorAgentRestarted": "I-agent iphindwe iqaliswa",
+      "errorSandboxOutOfMemory": "Isandbox liphelelwe inkumbulo",
+      "errorPreparationDidNotComplete": "Ukulungisa akuzange kuqedwe"
     },
     "permissionCard": {
       "title": "Imvume iyadingeka",
@@ -3031,22 +3112,16 @@
     "boundary": {
       "backToProfile": "Buyela kuphrofayili",
       "loadErrorMessage": "Hlola uxhumano lwakho bese uzama futhi.",
-
       "chooseAccount": "Khetha i-akhawunti",
       "loadErrorTitle": "Asikwazanga ukulayisha izinhlangano zakho.",
       "membershipLostNotice": "Awusenayo imvume yokufinyelela kule nhlangano. Ushintshelwe ku-{{target}}.",
       "noOrganization": "Ayikho inhlangano",
-
       "noOrganizationDescription": "Le akhawunti ayiyona ingxenye yenhlangano. Dala noma ujoyine inhlangano kuwebhu ukuze usebenzise izici zenhlangano njengezimemo zamalungu nezexwayiso zebhalansi ephansi.",
-
       "openWebOrganizations": "Vula izinhlangano kuwebhu",
-
       "organizationUnavailable": "Inhlangano ayitholakali.",
       "selectDescriptionWithOrganizations": "Uyingxenye yenhlangano eyodwa noma ngaphezulu. Khetha i-akhawunti okufanele isikrini sisisebenzise.",
-
       "selectOrganization": "Khetha inhlangano",
       "unavailableDescription": "Le nhlangano ayisatholakali. Khetha enye kuphrofayili yakho ukuze uqhubeke.",
-
       "unavailableSessionsDescription": "Le nhlangano ayisatholakali. Amaseshini ayo awakwazi ukulayishwa.",
       "accessDeniedDescription": "Awunayo imvume yokufinyelela kule nhlangano."
     },
@@ -3074,7 +3149,9 @@
       "permissionDenied": "Awunayo imvume yokumema amalungu.",
       "roleMember": "Iqhaza lakho ngelokuba ilungu.",
       "sendInvite": "Thumela isimemo",
-      "title": "Mema ilungu"
+      "title": "Mema ilungu",
+      "alreadyInvited": "Isimemo sabo sesivele sikhona noma bese belilungu leqembu.",
+      "sendError": "Asikwazanga ukuthumela isimemo."
     },
     "invoices": {
       "downloadA11y": "Landa i-invoyisi {{number}}",
@@ -3143,7 +3220,8 @@
       "inviteCreated": "Isimemo sakhiwe",
       "pendingInvitations": "Izimemo ezilindile",
       "resendInvite": "Thumela kabusha isimemo",
-      "shareInviteLink": "Yabelana ngesixhumanisi sesimemo"
+      "shareInviteLink": "Yabelana ngesixhumanisi sesimemo",
+      "resendInviteError": "Asikwazanga ukuthumela kabusha isimemo."
     },
     "usageStats": {
       "inputTokens": "Amathokheni okufakiwe",
@@ -3291,7 +3369,8 @@
     "noneChosen": "Akukho okukhethiwe",
     "emptyTitle": "Azikho izimodeli zokuguqula inkulumo",
     "emptyDescription": "I-Kilo Gateway ayinikezi zimodeli zokuguqula inkulumo okwamanje.",
-    "loadFailed": "Azikwazanga ukulayisha izimodeli zokuguqula inkulumo."
+    "loadFailed": "Azikwazanga ukulayisha izimodeli zokuguqula inkulumo.",
+    "choose": "Khetha imodeli"
   },
   "voiceLanguage": {
     "title": "Ulimi lokufaka ngezwi",
@@ -3536,8 +3615,6 @@
       "quantizations": "Ama-quantization",
       "quantizationsHelp": "Amafayela amancane asebenzisa inkumbulo nendawo yokugcina encane. Amafayela amakhulu ngokuvamile anikeza izimpendulo ezingcono.",
       "quantDetail": "Ukulanda okungu-{{size}} · cishe u-{{memory}} wenkumbulo",
-      "downloadQuant": "Landa i-{{quant}}",
-      "downloadModelA11y": "Landa i-{{name}}",
       "detailsA11y": "Imininingwane: {{name}}",
       "loadingModel": "Ilayisha imininingwane yemodeli",
       "couldNotLoadModel": "Ayikwazanga ukulayisha le modeli",
@@ -3582,7 +3659,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "Le modeli isekela umzamo wokucabanga"
-    }
+    },
+    "creditsRequired": "Ayikho imikhredithi eyanele yokuthumela lo myalezo. Engeza amakhredithi bese uzama futhi."
   },
   "settingsTools": {
     "confirmTitle": "Qinisekisa lolu shintsho?"
@@ -3618,7 +3696,9 @@
     "spend24h": "Ukusetshenziswa kwemali emahoreni angu-24 edlule",
     "multiplierError": "Faka isiphindaphindi esingu-1 noma ngaphezulu",
     "permissionDenied": "Awunayo imvume yokuphatha izexwayiso zokusetshenziswa kwemali.",
-    "pushOffByCategory": "Kucishiwe kuzaziso"
+    "pushOffByCategory": "Kucishiwe kuzaziso",
+    "multiplierMaxError": "Faka isiphindaphindi esingu-{{max}} noma ngaphansi",
+    "thresholdMaxError": "Faka inani elingaphansi kuka-{{max}}."
   },
   "profiles": {
     "title": "Amaphrofayili",
@@ -3743,7 +3823,7 @@
       "stepsPlaceholder": "isb. 50",
       "temperature": "Izinga lokushisa",
       "temperaturePlaceholder": "isb. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "isb. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Umenzeli wami",
@@ -3751,8 +3831,8 @@
       "tools": "Amathuluzi",
       "visibility": "Ukubonakala",
       "visibilityPrimary": "Okuyinhloko — kukhonjiswe kusikhi",
-      "visibilitySubagent": "I-Subagent - itholakala kuphela kwabanye",
-      "visibilityAll": "Konke - kokubili",
+      "visibilitySubagent": "I-Subagent — itholakala kuphela kwabanye",
+      "visibilityAll": "Konke — kokubili",
       "modePrimary": "Okuyinhloko kuphela",
       "modeSubagent": "I-Subagent kuphela",
       "modeAll": "Zonke izimo",
@@ -3805,7 +3885,9 @@
       "pinFailed": "Ayikwazanga ukuphina i-repo",
       "unboundToast": "I-Repo ikhululiwe",
       "unbindFailed": "Ayikwazanga ukukhulula i-repo"
-    }
+    },
+    "variablesDeleteFailed": "Ayikwazanga ukususa okuguquguqukayo",
+    "deleteCommand": "Susa umyalo {{position}}"
   },
   "credits": {
     "title": "Thenga amakhredithi",
@@ -3841,7 +3923,8 @@
       "archive": "Gcina",
       "unarchive": "Khipha",
       "deleteTitle": "Susa {{name}}?",
-      "deleteMessage": "Imisebenzi yalo isuswa nayo. Amaseshini ayo ayahlala."
+      "deleteMessage": "Imisebenzi yalo isuswa nayo. Amaseshini ayo ayahlala.",
+      "createFailed": "Asikwazanga ukudala uhlu"
     },
     "listSettings": {
       "title": "Izilungiselelo zohlu",
@@ -3999,6 +4082,7 @@
     "estimatePricingUnavailable": "Intengo yale modeli ayitholakali.",
     "estimateBalanceUnavailable": "Ibalansi ayanele ngokwanele ukuthola isifinyezo esikhokhelwayo.",
     "estimateModelNotAllowed": "Le modeli ayivunyelwe lapha.",
-    "estimateSpendLimitTooLow": "Nyusa umkhombe wokusebenzisa imali ukuze uvumele lesi sifinyezo."
+    "estimateSpendLimitTooLow": "Nyusa umkhombe wokusebenzisa imali ukuze uvumele lesi sifinyezo.",
+    "saved": "Izilungiselelo zesifinyezo zilondoloziwe"
   }
 }

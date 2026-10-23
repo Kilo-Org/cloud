@@ -293,7 +293,8 @@
     "condenseToolCallsSubtitle": "સતત ટૂલ કૉલ્સને એક પંક્તિમાં જૂથબદ્ધ કરો જે તમે ખોલી શકો.",
     "toolSummaryTranslation": "ટૂલ સારાંશનું ભાષાંતર કરો",
     "toolSummaryTranslationSubtitle": "દરેક ટૂલ સારાંશને તમારી ઍપની ભાષામાં ભાષાંતર કરવા મોડેલ પર મોકલો. ભાષાંતર નિષ્ફળ થાય તો મૂળ દર્શાવવામાં આવે છે.",
-    "toolSummaryTranslationModelUnavailableNotice": "આ મોડેલ હવે ઑફર કરવામાં આવતું નથી. બીજું પસંદ કરવા $t(common.model) પર ટૅપ કરો."
+    "toolSummaryTranslationModelUnavailableNotice": "આ મોડેલ હવે ઑફર કરવામાં આવતું નથી. બીજું પસંદ કરવા $t(common.model) પર ટૅપ કરો.",
+    "autoExpandThinkingInactiveSubtitle": "વિચારપ્રક્રિયાની વિગતો છુપાવેલી હોય ત્યારે કોઈ અસર થશે નહીં."
   },
   "prReview": {
     "pullRequestUnavailable": "પુલ રિક્વેસ્ટ ઉપલબ્ધ નથી",
@@ -669,7 +670,8 @@
       "gitlabDescription": "મોબાઇલ પર મર્જ રિક્વેસ્ટની સમીક્ષા કરવા માટે તમારું GitLab ખાતું કનેક્ટ કરો.",
       "bitbucketDescription": "મોબાઇલ પર પુલ રિક્વેસ્ટની સમીક્ષા કરવા માટે આ સંસ્થાને Bitbucket સાથે કનેક્ટ કરો.",
       "bitbucketOrgOnlyDescription": "તેની Bitbucket પુલ રિક્વેસ્ટની સમીક્ષા કરવા માટે ઉપરનું ખાતું સંસ્થામાં બદલો.",
-      "contextLine": "{{organization}} માટે"
+      "contextLine": "{{organization}} માટે",
+      "contextLinePersonal": "તમારા વ્યક્તિગત ખાતા માટે"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1452,7 +1454,13 @@
       "sessionError": "સત્રમાં ભૂલ: {{error}}.",
       "statusWithValue": "સ્થિતિ: {{status}}",
       "toolName": "ટૂલ: {{name}}",
-      "toolNameError": "ટૂલ {{name}} માં ભૂલ થઈ."
+      "toolNameError": "ટૂલ {{name}} માં ભૂલ થઈ.",
+      "cancelReasonSuperseded": "નવું કોમિટ પુશ કરવામાં આવ્યું હોવાથી આ સમીક્ષા બદલી દેવામાં આવી હતી.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} ડિસ્કનેક્ટ થયેલું છે, તેથી આ સમીક્ષા રદ કરવામાં આવી હતી. તેને ફરી કનેક્ટ કરો, પછી સમીક્ષા ફરી ચલાવો.",
+      "cancelReasonBitbucketReviewerDisabled": "Bitbucket માટે Code Reviewer બંધ કરવામાં આવ્યું હતું, તેથી આ સમીક્ષા રદ કરવામાં આવી હતી. તેને ફરી ચાલુ કરો, પછી સમીક્ષા ફરી ચલાવો.",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket પુલ રિક્વેસ્ટ બદલાઈ હોવાથી આ સમીક્ષા બદલી દેવામાં આવી હતી.",
+      "cancelReasonCancelled": "આ સમીક્ષા રદ કરવામાં આવી હતી.",
+      "cancelReasonInterrupted": "આ સમીક્ષા અટકાવી દેવામાં આવી હતી."
     },
     "reviewMemory": {
       "title": "સમીક્ષાની સ્મૃતિ",
@@ -1479,7 +1487,15 @@
       "instructions": "સૂચનાઓ (વૈકલ્પિક)",
       "instructionsPlaceholder": "સમીક્ષકે ખાસ ધ્યાન આપવાના મુદ્દા…",
       "starting": "સમીક્ષા શરૂ થઈ રહી છે…",
-      "start": "સમીક્ષા શરૂ કરો"
+      "start": "સમીક્ષા શરૂ કરો",
+      "startNotFound": "તે {{requestNoun}} {{provider}} પરથી વાંચી શકાયું નહીં. URL ચકાસો અને ખાતરી કરો કે રિપોઝિટરી સુલભ છે.",
+      "startRateLimited": "{{provider}} અત્યારે વિનંતીઓ પર મર્યાદા લાગુ કરી રહ્યું છે. થોડી મિનિટમાં ફરી પ્રયાસ કરો.",
+      "startNotAllowed": "તમારી પાસે તે {{requestNoun}} માટે સમીક્ષા શરૂ કરવાની ઍક્સેસ નથી. તમારી પરવાનગીઓ અને તમારી સંસ્થાની યોજના ચકાસો.",
+      "startProviderNeedsAttention": "જાતે કરેલી સમીક્ષાઓ માટે પ્રમાણભૂત {{provider}} જોડાણ જરૂરી છે. તે જોડો અને ફરી પ્રયાસ કરો.",
+      "startAlreadyRunning": "આ {{requestNoun}} માટે સમીક્ષા પહેલેથી ચાલી રહી છે.",
+      "startRejected": "આ {{requestNoun}}ની સમીક્ષા કરી શકાતી નથી. ખાતરી કરો કે તે ખુલ્લી છે, ડ્રાફ્ટ નથી અને URL સાચો છે.",
+      "startProviderUnavailable": "આ {{requestNoun}} વાંચવા માટે {{provider}} સાથે સંપર્ક કરી શકાયો નહીં. ફરી પ્રયાસ કરો.",
+      "startFailed": "સમીક્ષા શરૂ કરી શકાઈ નહીં. તમારું જોડાણ તપાસો અને ફરી પ્રયાસ કરો."
     },
     "notConnectedReadOnly": "{{platform}} જોડાયેલું નથી. માત્ર સંસ્થાના માલિકો અને એડમિનો જ તેને જોડી શકે છે.",
     "gitlab": {
@@ -1948,7 +1964,7 @@
       "couldNotLoad": "સુરક્ષા એજન્ટ લોડ કરી શકાયો નહીં.",
       "installApp": "GitHub ઍપ ઇન્સ્ટોલ કરો",
       "reauthorizeButton": "GitHub ઍપને ફરી અધિકૃત કરો",
-      "reauthorizeDescription": "સુરક્ષા એજન્ટને Dependabot ની ચેતવણીઓ મેળવવા vulnerability_alerts પરવાનગી જરૂરી છે. આ પરવાનગી આપવા GitHub ઍપને ફરી અધિકૃત કરો.",
+      "reauthorizeDescription": "સુરક્ષા એજન્ટને Dependabot ની ચેતવણીઓ વાંચવા પરવાનગી જરૂરી છે. આ પરવાનગી આપવા GitHub ઍપને ફરી અધિકૃત કરો.",
       "reauthorizeTitle": "વધારાની પરવાનગીઓ જરૂરી છે",
       "setupFailed": "GitHub સેટઅપ શરૂ થઈ શક્યું નથી. કૃપા કરીને ફરી પ્રયાસ કરો."
     },
@@ -2112,7 +2128,8 @@
       "dollar_other": "ડૉલર",
       "costSpoken": "ખર્ચ {{cost}}",
       "costSpokenWithTime": "ખર્ચ {{cost}}, {{time}}",
-      "pullRequest": "પુલ રિક્વેસ્ટ {{number}}"
+      "pullRequest": "પુલ રિક્વેસ્ટ {{number}}",
+      "spokenJoiner": "અને"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ખોલી શકાયું નહીં",
@@ -2467,7 +2484,71 @@
       "preparationComplete": "તૈયારી પૂર્ણ",
       "preparationFailed": "તૈયારી નિષ્ફળ",
       "setupCommand": "સેટઅપ કમાન્ડ {{index}}",
-      "setupCommandOf": "કુલ {{displayCount}}માંથી સેટઅપ કમાન્ડ {{index}}"
+      "setupCommandOf": "કુલ {{displayCount}}માંથી સેટઅપ કમાન્ડ {{index}}",
+      "stepWorkspaceSetup": "કાર્યપરિસર સેટઅપ",
+      "stepDiskCheck": "ડિસ્ક તપાસ",
+      "stepCloning": "રિપોઝિટરી ક્લોન થઈ રહી છે",
+      "stepBranch": "બ્રાન્ચ સેટ થઈ રહી છે",
+      "stepDevcontainerSetup": "દેવ કન્ટેનર સેટઅપ",
+      "stepWorkspaceRestore": "કાર્યપરિસર પુનઃસ્થાપિત થઈ રહ્યું છે",
+      "stepWorkspaceBackup": "કાર્યપરિસર સાચવાઈ રહ્યું છે",
+      "stepSandboxProvision": "સેન્ડબોક્સ પ્રોવિઝન થઈ રહ્યું છે",
+      "stepSandboxBoot": "સેન્ડબોક્સ શરૂ થઈ રહ્યું છે",
+      "stepSnapshotFallback": "સ્નેપશોટ વગર ફરી પ્રયાસ કરી રહ્યાં છીએ",
+      "stepKiloServer": "Kilo શરૂ થઈ રહ્યું છે",
+      "stepKiloSession": "સેશન તૈયાર થઈ રહ્યું છે",
+      "stepRestoreIncomplete": "સેશન પુનઃસ્થાપન અધૂરું છે",
+      "stepReady": "કાર્યપરિસર તૈયાર છે",
+      "stepFailed": "કાર્યપરિસર સેટઅપ નિષ્ફળ ગયું",
+      "stepUnknown": "કાર્યપરિસર સેટઅપ",
+      "detailCreatingSandbox": "સેન્ડબોક્સ બનાવાઈ રહ્યું છે",
+      "detailUpdatingRepository": "રિપોઝિટરી અપડેટ થઈ રહી છે",
+      "detailCheckingOutBranch": "બ્રાન્ચ ચેક આઉટ થઈ રહી છે",
+      "detailRunningSetupCommands": "સેટઅપ કમાન્ડ ચાલી રહ્યાં છે",
+      "detailSavingRepository": "ઝડપી શરૂઆત માટે રિપોઝિટરી સાચવાઈ રહી છે",
+      "detailStartingKiloRuntime": "Kilo રનટાઇમ શરૂ થઈ રહ્યું છે",
+      "detailPreparingKiloSession": "Kilo સેશન તૈયાર થઈ રહ્યું છે",
+      "detailWaitingForPreviousSandbox": "અગાઉનું સેન્ડબોક્સ બંધ થવાની રાહ જોઈ રહ્યાં છીએ",
+      "detailRetryingSandboxCreation": "સેન્ડબોક્સ બનાવવાનો ફરી પ્રયાસ થઈ રહ્યો છે",
+      "detailPreviousSnapshotFailed": "અગાઉના સ્નેપશોટથી શરૂઆત નિષ્ફળ ગઈ. સ્નેપશોટ વગર ફરી પ્રયાસ કરી રહ્યાં છીએ.",
+      "detailSnapshotStartupFailed": "સ્નેપશોટ શરૂઆત નિષ્ફળ ગઈ. સ્નેપશોટ વગર ફરી પ્રયાસ કરી રહ્યાં છીએ.",
+      "detailStartingSandboxWithoutSnapshot": "સ્નેપશોટ વગર સેન્ડબોક્સ શરૂ થઈ રહ્યું છે",
+      "detailSettingUpWorkspace": "કાર્યપરિસર સેટ થઈ રહ્યું છે",
+      "detailRestoringSession": "સેશન પુનઃસ્થાપિત થઈ રહ્યું છે",
+      "detailWarmWorkspaceReused": "વોર્મ કાર્યપરિસર ફરી વાપર્યું",
+      "detailRetryingClone": "ક્લોનનો ફરી પ્રયાસ (કુલ {{total}}માંથી પ્રયાસ {{attempt}})",
+      "detailSetupCommandFailed": "સેટઅપ કમાન્ડ {{index}} નિષ્ફળ ગયું",
+      "detailSetupCommandTimedOut": "સેટઅપ કમાન્ડ {{index}} ટાઇમ આઉટ થયું",
+      "detailColdRestore": "કોલ્ડ પુનઃસ્થાપન, સ્નેપશોટ લાગુ થયો, કુલ {{total}} ફાઇલોમાંથી {{applied}} પુનઃસ્થાપિત થઈ",
+      "detailProgressPercent": "{{percent}}% પૂર્ણ",
+      "detailRestoreIncompleteReport": "સેશન પુનઃસ્થાપન અધૂરું: કુલ {{total}} ફાઇલોમાંથી {{skipped}} પુનઃસ્થાપિત થઈ નહીં ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "ખૂટે છે: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} અને {{omitted}} વધુ",
+      "detailReasonPatchFailed": "પેચ લાગુ થઈ શક્યો નથી",
+      "detailReasonOutsideWorkspace": "પાથ કાર્યપરિસરની બહાર છે",
+      "detailReasonMissingContent": "સ્નેપશોટમાં ફાઇલનું કોઈપણ કન્ટેન્ટ નહોતું",
+      "detailReasonIndexResetFailed": "નિષ્ફળ એપ્લાય પછી ઇન્ડેક્સ રીસેટ ન થઈ શક્યો",
+      "detailReasonUnlinkFailed": "ફાઇલ દૂર કરી શકાઈ નહીં",
+      "detailReasonWriteFailed": "ફાઇલ લખી શકાઈ નહીં",
+      "detailReasonUnknown": "અજ્ઞાત કારણ",
+      "detailUnknown": "હજુ તૈયારી ચાલુ છે",
+      "errorPreparationTimeout": "કાર્યપરિસરની તૈયારી ટાઇમ આઉટ થઈ",
+      "errorWorkspaceSetupFailed": "કાર્યપરિસર સેટઅપ નિષ્ફળ ગયું",
+      "errorCredentialUpgradeRequired": "આ સેશનમાં જરૂરી ક્રેડેન્શિયલ અપગ્રેડ ખૂટે છે. ચાલુ રાખવા માટે નવો સેશન શરૂ કરો.",
+      "errorAgentUnavailable": "એજન્ટ અનુપલબ્ધ થઈ ગયું",
+      "errorBillingBlocked": "સેન્ડબોક્સ બિલિંગ માટે વધારાના ક્રેડિટ જરૂરી છે",
+      "errorBillingUnavailable": "સેન્ડબોક્સ બિલિંગ અથવા ક્ષમતા ચકાસણી અનુપલબ્ધ છે. થોડીવારમાં ફરી પ્રયાસ કરો.",
+      "errorContainerLimitReached": "કન્ટેનર મર્યાદા સુધી પહોંચી ગયાં. નવું કન્ટેનર શરૂ કરતાં પહેલાં કોઈ ચાલુ કન્ટેનર બંધ કરો.",
+      "errorInvalidConfiguration": "સેન્ડબોક્સ કન્ફિગરેશન અમાન્ય અથવા બિનસમર્થિત છે",
+      "errorRuntimeArtifactUnauthorized": "રનટાઇમ ડાઉનલોડ અધિકૃત નહોતું",
+      "errorRuntimeArtifactInvalid": "રનટાઇમ આર્ટિફેક્ટ ચકાસણી નિષ્ફળ ગઈ",
+      "errorRuntimeCliProbeFailed": "રનટાઇમ CLI ચકાસણી નિષ્ફળ ગઈ",
+      "errorRuntimeSupervisorMissing": "રનટાઇમ સુપરવાઇઝર ખૂટે છે",
+      "errorConnectionLost": "સેન્ડબોક્સ કનેક્શન ગુમ થયું",
+      "errorSandboxLost": "સેન્ડબોક્સ ગુમ થયું",
+      "errorAgentRestarted": "એજન્ટ રીસ્ટાર્ટ થયું",
+      "errorSandboxOutOfMemory": "સેન્ડબોક્સની મેમરી ખૂટી ગઈ",
+      "errorPreparationDidNotComplete": "તૈયારી પૂર્ણ ન થઈ"
     },
     "permissionCard": {
       "title": "પરવાનગી જરૂરી",
@@ -3031,22 +3112,16 @@
     "boundary": {
       "backToProfile": "પ્રોફાઇલ પર પાછા જાઓ",
       "loadErrorMessage": "તમારું ઇન્ટરનેટ જોડાણ તપાસીને ફરી પ્રયાસ કરો.",
-
       "chooseAccount": "એકાઉન્ટ પસંદ કરો",
       "loadErrorTitle": "તમારી સંસ્થાઓ લોડ કરી શકાઈ નહીં.",
       "membershipLostNotice": "તમારી પાસે આ સંસ્થાનો ઍક્સેસ હવે નથી. {{target}} પર સ્વિચ કર્યું.",
       "noOrganization": "કોઈ સંસ્થા નથી",
-
       "noOrganizationDescription": "આ એકાઉન્ટ કોઈ સંસ્થાનો ભાગ નથી. સભ્ય આમંત્રણો અને ઓછી બેલેન્સ ચેતવણીઓ જેવી સંસ્થા સુવિધાઓનો ઉપયોગ કરવા માટે વેબ પર સંસ્થા બનાવો અથવા એકમાં જોડાઓ.",
-
       "openWebOrganizations": "વેબ પર સંસ્થાઓ ખોલો",
-
       "organizationUnavailable": "સંસ્થા ઉપલબ્ધ નથી.",
       "selectDescriptionWithOrganizations": "તમે એક અથવા વધુ સંસ્થાઓના સભ્ય છો. આ સ્ક્રીન જે એકાઉન્ટનો ઉપયોગ કરવો જોઈએ તે પસંદ કરો.",
-
       "selectOrganization": "સંસ્થા પસંદ કરો",
       "unavailableDescription": "આ સંસ્થા હવે ઉપલબ્ધ નથી. આગળ વધવા માટે તમારી પ્રોફાઇલમાંથી બીજી સંસ્થા પસંદ કરો.",
-
       "unavailableSessionsDescription": "આ સંસ્થા હવે ઉપલબ્ધ નથી. તેના સત્રો લોડ કરી શકાતા નથી.",
       "accessDeniedDescription": "તમારી પાસે આ સંસ્થાનો ઍક્સેસ નથી."
     },
@@ -3074,7 +3149,9 @@
       "permissionDenied": "તમને સભ્યોને આમંત્રિત કરવાની પરવાનગી નથી.",
       "roleMember": "ભૂમિકા: સભ્ય",
       "sendInvite": "આમંત્રણ મોકલો",
-      "title": "સભ્યને આમંત્રિત કરો"
+      "title": "સભ્યને આમંત્રિત કરો",
+      "alreadyInvited": "તેઓ પહેલેથી આમંત્રિત છે અથવા પહેલેથી સભ્ય છે.",
+      "sendError": "આમંત્રણ મોકલી શકાયું નહીં."
     },
     "invoices": {
       "downloadA11y": "ઇનવોઇસ {{number}} ડાઉનલોડ કરો",
@@ -3143,7 +3220,8 @@
       "inviteCreated": "આમંત્રણ બનાવ્યું",
       "pendingInvitations": "બાકી આમંત્રણો",
       "resendInvite": "આમંત્રણ ફરી મોકલો",
-      "shareInviteLink": "આમંત્રણની લિંક શેર કરો"
+      "shareInviteLink": "આમંત્રણની લિંક શેર કરો",
+      "resendInviteError": "આમંત્રણ ફરી મોકલી શકાયું નહીં."
     },
     "usageStats": {
       "inputTokens": "ઇનપુટ ટોકન",
@@ -3291,7 +3369,8 @@
     "noneChosen": "કંઈ પસંદ થયું નથી",
     "emptyTitle": "અવાજને લખાણમાં ફેરવતાં કોઈ મોડેલ નથી",
     "emptyDescription": "Kilo Gateway હાલમાં અવાજને લખાણમાં ફેરવતાં કોઈ મોડેલ આપતું નથી.",
-    "loadFailed": "અવાજને લખાણમાં ફેરવતાં મોડેલ લોડ કરી શકાયાં નહીં."
+    "loadFailed": "અવાજને લખાણમાં ફેરવતાં મોડેલ લોડ કરી શકાયાં નહીં.",
+    "choose": "મોડેલ પસંદ કરો"
   },
   "voiceLanguage": {
     "title": "વૉઇસ ઇનપુટની ભાષા",
@@ -3536,8 +3615,6 @@
       "quantizations": "ક્વૉન્ટાઇઝેશન્સ",
       "quantizationsHelp": "નાની ફાઇલો ઓછી મેમરી અને સ્ટોરેજ વાપરે છે. મોટી ફાઇલો સામાન્ય રીતે વધુ સારા જવાબો આપે છે.",
       "quantDetail": "{{size}} ડાઉનલોડ · આશરે {{memory}} મેમરી",
-      "downloadQuant": "{{quant}} ડાઉનલોડ કરો",
-      "downloadModelA11y": "{{name}} ડાઉનલોડ કરો",
       "detailsA11y": "વિગતો: {{name}}",
       "loadingModel": "મોડેલની વિગતો લોડ થઈ રહી છે",
       "couldNotLoadModel": "આ મોડેલ લોડ કરી શકાયું નહીં",
@@ -3582,7 +3659,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "આ મોડેલ વિચારના સ્તરને સપોર્ટ કરે છે"
-    }
+    },
+    "creditsRequired": "આ સંદેશ મોકલવા માટે પૂરતા ક્રેડિટ નથી. ક્રેડિટ ઉમેરો અને ફરી પ્રયાસ કરો."
   },
   "settingsTools": {
     "confirmTitle": "આ ફેરફારની પુષ્ટિ કરવી?"
@@ -3618,7 +3696,9 @@
     "spend24h": "છેલ્લા 24 કલાકનો ખર્ચ",
     "multiplierError": "1 કે તેથી વધુ ગુણક દાખલ કરો",
     "permissionDenied": "તમને ખર્ચની ચેતવણીઓનું સંચાલન કરવાની પરવાનગી નથી.",
-    "pushOffByCategory": "સૂચનાઓમાં બંધ"
+    "pushOffByCategory": "સૂચનાઓમાં બંધ",
+    "multiplierMaxError": "{{max}} કે તેથી ઓછો ગુણક દાખલ કરો",
+    "thresholdMaxError": "{{max}} કે તેથી ઓછી રકમ દાખલ કરો."
   },
   "profiles": {
     "title": "પ્રોફાઇલ્સ",
@@ -3743,7 +3823,7 @@
       "stepsPlaceholder": "દા.ત. 50",
       "temperature": "તાપમાન",
       "temperaturePlaceholder": "દા.ત. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "દા.ત. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "મારા એજન્ટ",
@@ -3751,8 +3831,8 @@
       "tools": "સાધનો",
       "visibility": "દૃશ્યતા",
       "visibilityPrimary": "પ્રાથમિક — પીકરમાં બતાવેલ છે",
-      "visibilitySubagent": "સબએજન્ટ - ફક્ત અન્ય લોકો પાસેથી કૉલ કરી શકાય છે",
-      "visibilityAll": "બધા - બંને",
+      "visibilitySubagent": "સબએજન્ટ — ફક્ત અન્ય લોકો પાસેથી કૉલ કરી શકાય છે",
+      "visibilityAll": "બધા — બંને",
       "modePrimary": "ફક્ત પ્રાથમિક",
       "modeSubagent": "ફક્ત સબએજન્ટ",
       "modeAll": "બધા",
@@ -3805,7 +3885,9 @@
       "pinFailed": "રેપો પિન કરી શકાયું નથી",
       "unboundToast": "રેપો અનબાઉન્ડ",
       "unbindFailed": "રેપોને અનબાઇન્ડ કરી શકાયું નથી"
-    }
+    },
+    "variablesDeleteFailed": "ચલ ડિલીટ કરી શકાયું નથી",
+    "deleteCommand": "આદેશ {{position}} કાઢી નાખો"
   },
   "credits": {
     "title": "ક્રેડિટ ખરીદો",
@@ -3841,7 +3923,8 @@
       "archive": "આર્કાઇવ કરો",
       "unarchive": "આર્કાઇવમાંથી કાઢો",
       "deleteTitle": "{{name}} કાઢી નાખવી?",
-      "deleteMessage": "તેનાં કાર્યો પણ કાઢી નાખવામાં આવશે. તેનાં સત્રો રહેશે."
+      "deleteMessage": "તેનાં કાર્યો પણ કાઢી નાખવામાં આવશે. તેનાં સત્રો રહેશે.",
+      "createFailed": "યાદી બનાવી શકાઈ નહીં"
     },
     "listSettings": {
       "title": "યાદીની સેટિંગ્સ",
@@ -3999,6 +4082,7 @@
     "estimatePricingUnavailable": "આ મોડેલ માટે પ્રાઇસિંગ ઉપલબ્ધ નથી.",
     "estimateBalanceUnavailable": "પેઇડ સારાંશ માટે પૂરતી બેલેન્સ નથી.",
     "estimateModelNotAllowed": "આ મોડેલ અહીં મંજૂર નથી.",
-    "estimateSpendLimitTooLow": "આ સારાંશની મંજૂરી માટે સ્પેન્ડ સેફગાર્ડ વધારો."
+    "estimateSpendLimitTooLow": "આ સારાંશની મંજૂરી માટે સ્પેન્ડ સેફગાર્ડ વધારો.",
+    "saved": "સારાંશ સેટિંગ્સ સાચવાઈ ગઈ"
   }
 }

@@ -1,5 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { Tabs, usePathname, useRouter, useSegments } from 'expo-router';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { Bot, House, MessageCircle, MessageSquare, UserRound } from '@/components/ui/icons';
 import { useEffect, useMemo } from 'react';
 import { Platform, useWindowDimensions, View, type ViewStyle } from 'react-native';
@@ -61,7 +62,8 @@ export default function TabsLayout() {
   const router = useRouter();
   const colors = useThemeColors();
   const { bottom, left, right } = useSafeAreaInsets();
-  const { width, fontScale } = useWindowDimensions();
+  const { width } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
   const hideTabs = shouldHideTabBar(pathname, segments);
   const showKiloClawTab = useKiloClawTabVisible();
   const tabFlags = { showKiloClaw: showKiloClawTab };

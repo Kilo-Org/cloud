@@ -23,12 +23,13 @@ import {
 } from '@/components/ui/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Linking, Platform, Pressable, Switch, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 
 import { deriveMasterGateLeadingPresentation } from '@/components/notifications-master-gate';
 import { BriefingNotificationToggle } from '@/components/agent-briefing/briefing-notification-toggle';
+import { Switch } from '@/components/ui/switch';
 import { liveActivitiesAllowedBySystem } from '@/glanceable-ios/system-switch';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';

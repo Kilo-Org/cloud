@@ -293,7 +293,8 @@
     "condenseToolCallsSubtitle": "فراخوانی‌های متوالی ابزار را در یک ردیف که می‌توانید بازش کنید گروه کنید.",
     "toolSummaryTranslation": "ترجمه خلاصه‌های ابزار",
     "toolSummaryTranslationSubtitle": "هر خلاصه ابزار را به یک مدل بفرست تا آن را به زبان برنامه شما ترجمه کند. در صورت شکست ترجمه، متن اصلی نمایش داده می‌شود.",
-    "toolSummaryTranslationModelUnavailableNotice": "این مدل دیگر ارائه نمی‌شود. برای انتخاب مدل دیگر روی $t(common.model) ضربه بزنید."
+    "toolSummaryTranslationModelUnavailableNotice": "این مدل دیگر ارائه نمی‌شود. برای انتخاب مدل دیگر روی $t(common.model) ضربه بزنید.",
+    "autoExpandThinkingInactiveSubtitle": "تا زمانی که جزئیات تفکر پنهان باشند، اثری ندارد."
   },
   "prReview": {
     "pullRequestUnavailable": "درخواست ادغام در دسترس نیست",
@@ -669,7 +670,8 @@
       "gitlabDescription": "حساب GitLab خود را وصل کنید تا درخواست‌های ادغام را در موبایل بازبینی کنید.",
       "bitbucketDescription": "Bitbucket را به این سازمان وصل کنید تا پول ریکوئست‌ها را در موبایل بازبینی کنید.",
       "bitbucketOrgOnlyDescription": "حساب بالا را به یک سازمان تغییر دهید تا پول ریکوئست‌های Bitbucket آن را بازبینی کنید.",
-      "contextLine": "برای {{organization}}"
+      "contextLine": "برای {{organization}}",
+      "contextLinePersonal": "برای حساب شخصی شما"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1452,7 +1454,13 @@
       "sessionError": "خطایی در نشست رخ داد: {{error}}.",
       "statusWithValue": "وضعیت: {{status}}",
       "toolName": "ابزار: {{name}}",
-      "toolNameError": "ابزار {{name}} با خطا روبه‌رو شد."
+      "toolNameError": "ابزار {{name}} با خطا روبه‌رو شد.",
+      "cancelReasonSuperseded": "یک کامیت جدیدتر ارسال شد، بنابراین این بازبینی جایگزین شد.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} قطع شده است، بنابراین این بازبینی لغو شد. آن را دوباره متصل کنید، سپس بازبینی را دوباره انجام دهید.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer برای Bitbucket خاموش شد، بنابراین این بازبینی لغو شد. آن را دوباره فعال کنید، سپس بازبینی را دوباره انجام دهید.",
+      "cancelReasonBitbucketPullRequestChanged": "درخواست ادغام Bitbucket تغییر کرد، بنابراین این بازبینی جایگزین شد.",
+      "cancelReasonCancelled": "این بازبینی لغو شد.",
+      "cancelReasonInterrupted": "این بازبینی متوقف شد."
     },
     "reviewMemory": {
       "title": "حافظه بازبینی",
@@ -1479,7 +1487,15 @@
       "instructions": "دستورالعمل‌ها (اختیاری)",
       "instructionsPlaceholder": "نکات خاصی که بررسی‌کننده باید روی آن‌ها تمرکز کند…",
       "starting": "در حال شروع بررسی…",
-      "start": "شروع بررسی"
+      "start": "شروع بررسی",
+      "startNotFound": "نتوانستیم آن {{requestNoun}} را از {{provider}} بخوانیم. URL را بررسی کنید و مطمئن شوید مخزن قابل دسترسی است.",
+      "startRateLimited": "{{provider}} در حال حاضر درخواست‌ها را محدود کرده است. چند دقیقه دیگر دوباره تلاش کنید.",
+      "startNotAllowed": "شما اجازه شروع بررسی برای آن {{requestNoun}} را ندارید. مجوزهای خود و پلن سازمان‌تان را بررسی کنید.",
+      "startProviderNeedsAttention": "بررسی‌های دستی به اتصال استاندارد {{provider}} نیاز دارند. آن را متصل کنید و دوباره تلاش کنید.",
+      "startAlreadyRunning": "یک بررسی برای آن {{requestNoun}} از قبل در حال اجراست.",
+      "startRejected": "آن {{requestNoun}} قابل بررسی نیست. مطمئن شوید باز است، پیش‌نویس نیست و URL درست است.",
+      "startProviderUnavailable": "اتصال به {{provider}} برای خواندن آن {{requestNoun}} ممکن نشد. دوباره تلاش کنید.",
+      "startFailed": "نتوانستیم بررسی را شروع کنیم. اتصال خود را بررسی کنید و دوباره تلاش کنید."
     },
     "notConnectedReadOnly": "{{platform}} متصل نیست. فقط مالکان سازمان و مدیران می‌توانند آن را متصل کنند.",
     "gitlab": {
@@ -1948,7 +1964,7 @@
       "couldNotLoad": "بارگذاری عامل امنیتی ممکن نشد.",
       "installApp": "نصب برنامه GitHub",
       "reauthorizeButton": "اعطای مجدد مجوز به برنامه GitHub",
-      "reauthorizeDescription": "عامل امنیتی برای دسترسی به هشدارهای Dependabot به مجوز vulnerability_alerts نیاز دارد. برای دادن این مجوز، دوباره دسترسی برنامه GitHub را تأیید کنید.",
+      "reauthorizeDescription": "عامل امنیتی برای خواندن هشدارهای Dependabot به مجوز نیاز دارد. برای دادن این مجوز، دوباره دسترسی برنامه GitHub را تأیید کنید.",
       "reauthorizeTitle": "مجوزهای بیشتری لازم است",
       "setupFailed": "شروع راه‌اندازی GitHub ممکن نشد. لطفاً دوباره تلاش کنید."
     },
@@ -2112,7 +2128,8 @@
       "dollar_other": "دلار",
       "costSpoken": "هزینه {{cost}}",
       "costSpokenWithTime": "هزینه {{cost}}، {{time}}",
-      "pullRequest": "درخواست ادغام {{number}}"
+      "pullRequest": "درخواست ادغام {{number}}",
+      "spokenJoiner": "، و"
     },
     "githubInstall": {
       "couldNotOpenTitle": "باز کردن GitHub ممکن نشد",
@@ -2467,7 +2484,71 @@
       "preparationComplete": "آماده‌سازی کامل شد",
       "preparationFailed": "آماده‌سازی ناموفق بود",
       "setupCommand": "دستور راه‌اندازی {{index}}",
-      "setupCommandOf": "دستور راه‌اندازی {{index}} از {{displayCount}}"
+      "setupCommandOf": "دستور راه‌اندازی {{index}} از {{displayCount}}",
+      "stepWorkspaceSetup": "راه‌اندازی فضای کار",
+      "stepDiskCheck": "بررسی دیسک",
+      "stepCloning": "در حال کلون کردن مخزن",
+      "stepBranch": "راه‌اندازی شاخه",
+      "stepDevcontainerSetup": "راه‌اندازی کانتینر توسعه",
+      "stepWorkspaceRestore": "در حال بازیابی فضای کار",
+      "stepWorkspaceBackup": "در حال ذخیره فضای کار",
+      "stepSandboxProvision": "در حال فراهم‌سازی سندباکس",
+      "stepSandboxBoot": "در حال راه‌اندازی سندباکس",
+      "stepSnapshotFallback": "تلاش مجدد بدون اسنپ‌شات",
+      "stepKiloServer": "در حال راه‌اندازی Kilo",
+      "stepKiloSession": "در حال آماده‌سازی نشست",
+      "stepRestoreIncomplete": "بازیابی نشست ناقص بود",
+      "stepReady": "محیط آماده است",
+      "stepFailed": "راه‌اندازی محیط ناموفق بود",
+      "stepUnknown": "راه‌اندازی محیط",
+      "detailCreatingSandbox": "در حال ایجاد سندباکس",
+      "detailUpdatingRepository": "در حال به‌روزرسانی مخزن",
+      "detailCheckingOutBranch": "در حال بررسی شاخه (checkout)",
+      "detailRunningSetupCommands": "در حال اجرای دستورهای راه‌اندازی",
+      "detailSavingRepository": "ذخیره مخزن برای شروع سریع‌تر",
+      "detailStartingKiloRuntime": "در حال راه‌اندازی زمان اجرای Kilo",
+      "detailPreparingKiloSession": "در حال آماده‌سازی نشست Kilo",
+      "detailWaitingForPreviousSandbox": "در انتظار توقف سندباکس قبلی",
+      "detailRetryingSandboxCreation": "تلاش مجدد برای ایجاد سندباکس",
+      "detailPreviousSnapshotFailed": "راه‌اندازی با اسنپ‌شات قبلی ناموفق بود. تلاش مجدد بدون اسنپ‌شات.",
+      "detailSnapshotStartupFailed": "راه‌اندازی با اسنپ‌شات ناموفق بود. تلاش مجدد بدون اسنپ‌شات.",
+      "detailStartingSandboxWithoutSnapshot": "در حال راه‌اندازی سندباکس بدون اسنپ‌شات",
+      "detailSettingUpWorkspace": "در حال راه‌اندازی فضای کار",
+      "detailRestoringSession": "در حال بازیابی نشست",
+      "detailWarmWorkspaceReused": "فضای کار گرم بازاستفاده شد",
+      "detailRetryingClone": "تلاش مجدد برای کلون (تلاش {{attempt}} از {{total}})",
+      "detailSetupCommandFailed": "دستور راه‌اندازی {{index}} ناموفق بود",
+      "detailSetupCommandTimedOut": "مهلت دستور راه‌اندازی {{index}} به پایان رسید",
+      "detailColdRestore": "بازیابی سرد، اسنپ‌شات اعمال شد، {{applied}} از {{total}} فایل بازیابی شد",
+      "detailProgressPercent": "{{percent}}٪ کامل شد",
+      "detailRestoreIncompleteReport": "بازیابی نشست ناقص بود: {{skipped}} از {{total}} فایل بازیابی نشدند ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "موارد حذف‌شده: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} و {{omitted}} مورد دیگر",
+      "detailReasonPatchFailed": "وصله اعمال نشد",
+      "detailReasonOutsideWorkspace": "مسیر خارج از فضای کار است",
+      "detailReasonMissingContent": "اسنپ‌شات هیچ محتوایی برای فایل نداشت",
+      "detailReasonIndexResetFailed": "ایندکس پس از اعمال ناموفق بازنشانی نشد",
+      "detailReasonUnlinkFailed": "فایل حذف نشد",
+      "detailReasonWriteFailed": "فایل نوشته نشد",
+      "detailReasonUnknown": "دلیل نامشخص",
+      "detailUnknown": "در حال آماده‌سازی",
+      "errorPreparationTimeout": "مهلت آماده‌سازی محیط به پایان رسید",
+      "errorWorkspaceSetupFailed": "راه‌اندازی فضای کار ناموفق بود",
+      "errorCredentialUpgradeRequired": "برای این نشست ارتقای احراز هویت مورد نیاز است. برای ادامه، نشست جدیدی را شروع کنید.",
+      "errorAgentUnavailable": "دستیار در دسترس نیست",
+      "errorBillingBlocked": "صورتحساب سندباکس نیازمند اعتبار بیشتر است",
+      "errorBillingUnavailable": "بررسی صورتحساب یا ظرفیت سندباکس در دسترس نیست. به‌زودی دوباره تلاش کنید.",
+      "errorContainerLimitReached": "به سقف کانتینر رسیده است. پیش از شروع کانتینر جدید، یک کانتینر موجود را متوقف کنید.",
+      "errorInvalidConfiguration": "پیکربندی سندباکس نامعتبر یا پشتیبانی‌نشده است",
+      "errorRuntimeArtifactUnauthorized": "دانلود زمان اجرا مجاز نشد",
+      "errorRuntimeArtifactInvalid": "راستی‌آزمایی فایل زمان اجرا ناموفق بود",
+      "errorRuntimeCliProbeFailed": "اعتبارسنجی CLI زمان اجرا ناموفق بود",
+      "errorRuntimeSupervisorMissing": "نظارت‌کننده زمان اجرا وجود ندارد",
+      "errorConnectionLost": "اتصال سندباکس قطع شد",
+      "errorSandboxLost": "سندباکس از دست رفت",
+      "errorAgentRestarted": "دستیار راه‌اندازی مجدد شد",
+      "errorSandboxOutOfMemory": "حافظه سندباکس تمام شد",
+      "errorPreparationDidNotComplete": "آماده‌سازی کامل نشد"
     },
     "permissionCard": {
       "title": "نیاز به مجوز",
@@ -3031,22 +3112,16 @@
     "boundary": {
       "backToProfile": "بازگشت به پروفایل",
       "loadErrorMessage": "اتصال اینترنت خود را بررسی کنید و دوباره تلاش کنید.",
-
       "chooseAccount": "انتخاب حساب",
       "loadErrorTitle": "بارگذاری سازمان‌های شما ممکن نشد.",
       "membershipLostNotice": "شما دیگر به این سازمان دسترسی ندارید. به {{target}} تغییر یافت.",
       "noOrganization": "بدون سازمان",
-
       "noOrganizationDescription": "این حساب بخشی از هیچ سازمانی نیست. برای استفاده از ویژگی‌های سازمان مانند دعوت اعضا و هشدارهای موجودی کم، در وب یک سازمان ایجاد کنید یا به یکی بپیوندید.",
-
       "openWebOrganizations": "باز کردن سازمان‌ها در وب",
-
       "organizationUnavailable": "سازمان در دسترس نیست.",
       "selectDescriptionWithOrganizations": "شما عضو یک یا چند سازمان هستید. حسابی را انتخاب کنید که این صفحه باید استفاده کند.",
-
       "selectOrganization": "انتخاب سازمان",
       "unavailableDescription": "این سازمان دیگر در دسترس نیست. برای ادامه، در پروفایل خود سازمان دیگری انتخاب کنید.",
-
       "unavailableSessionsDescription": "این سازمان دیگر در دسترس نیست. جلسات آن قابل بارگذاری نیست.",
       "accessDeniedDescription": "شما به این سازمان دسترسی ندارید."
     },
@@ -3074,7 +3149,9 @@
       "permissionDenied": "شما اجازه دعوت اعضا را ندارید.",
       "roleMember": "نقش: عضو",
       "sendInvite": "ارسال دعوت‌نامه",
-      "title": "دعوت از عضو"
+      "title": "دعوت از عضو",
+      "alreadyInvited": "این آدرس ایمیل قبلاً دعوت شده است یا از قبل عضو است.",
+      "sendError": "ارسال دعوت‌نامه ممکن نشد."
     },
     "invoices": {
       "downloadA11y": "دانلود فاکتور {{number}}",
@@ -3143,7 +3220,8 @@
       "inviteCreated": "دعوت‌نامه ایجاد شد",
       "pendingInvitations": "دعوت‌نامه‌های در انتظار پذیرش",
       "resendInvite": "ارسال دوبارهٔ دعوت‌نامه",
-      "shareInviteLink": "اشتراک‌گذاری پیوند دعوت"
+      "shareInviteLink": "اشتراک‌گذاری پیوند دعوت",
+      "resendInviteError": "ارسال دوبارهٔ دعوت‌نامه ممکن نشد."
     },
     "usageStats": {
       "inputTokens": "توکن‌های ورودی",
@@ -3291,7 +3369,8 @@
     "noneChosen": "هیچ‌کدام انتخاب نشده",
     "emptyTitle": "مدل تبدیل گفتار به متن وجود ندارد",
     "emptyDescription": "Kilo Gateway در حال حاضر مدلی برای تبدیل گفتار به متن ارائه نمی‌دهد.",
-    "loadFailed": "بارگذاری مدل‌های تبدیل گفتار به متن ناموفق بود."
+    "loadFailed": "بارگذاری مدل‌های تبدیل گفتار به متن ناموفق بود.",
+    "choose": "انتخاب مدل"
   },
   "voiceLanguage": {
     "title": "زبان ورودی صوتی",
@@ -3536,8 +3615,6 @@
       "quantizations": "کوانتیزاسیون‌ها",
       "quantizationsHelp": "فایل‌های کوچک‌تر حافظه و فضای ذخیره‌سازی کمتری مصرف می‌کنند. فایل‌های بزرگ‌تر معمولاً پاسخ‌های بهتری می‌دهند.",
       "quantDetail": "دانلود {{size}} · حدود {{memory}} حافظه",
-      "downloadQuant": "دانلود {{quant}}",
-      "downloadModelA11y": "دانلود {{name}}",
       "detailsA11y": "جزئیات: {{name}}",
       "loadingModel": "در حال بارگیری جزئیات مدل",
       "couldNotLoadModel": "بارگیری این مدل ممکن نشد",
@@ -3582,7 +3659,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "این مدل از میزان تفکر پشتیبانی می‌کند"
-    }
+    },
+    "creditsRequired": "اعتبار کافی برای ارسال این پیام وجود ندارد. اعتبار اضافه کنید و دوباره امتحان کنید."
   },
   "settingsTools": {
     "confirmTitle": "این تغییر تأیید شود؟"
@@ -3618,7 +3696,9 @@
     "spend24h": "هزینه در ۲۴ ساعت گذشته",
     "multiplierError": "ضریبی برابر ۱ یا بیشتر وارد کن",
     "permissionDenied": "شما اجازهٔ مدیریت هشدارهای هزینه را ندارید.",
-    "pushOffByCategory": "در اعلان‌ها خاموش"
+    "pushOffByCategory": "در اعلان‌ها خاموش",
+    "multiplierMaxError": "ضریبی برابر {{max}} یا کمتر وارد کن",
+    "thresholdMaxError": "مبلغی برابر {{max}} یا کمتر وارد کنید."
   },
   "profiles": {
     "title": "پروفایل ها",
@@ -3743,16 +3823,16 @@
       "stepsPlaceholder": "مثلاً 50",
       "temperature": "دما",
       "temperaturePlaceholder": "مثلاً 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "مثلاً 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "نماینده من",
       "promptPlaceholder": "شما یک ...",
       "tools": "ابزار",
       "visibility": "دید",
-      "visibilityPrimary": "اولیه - در انتخابگر نشان داده شده است",
-      "visibilitySubagent": "Subagent - فقط از دیگران قابل تماس است",
-      "visibilityAll": "همه - هر دو",
+      "visibilityPrimary": "اولیه — در انتخابگر نشان داده شده است",
+      "visibilitySubagent": "Subagent — فقط از دیگران قابل تماس است",
+      "visibilityAll": "همه — هر دو",
       "modePrimary": "فقط اولیه",
       "modeSubagent": "فقط Subagent",
       "modeAll": "همه",
@@ -3805,7 +3885,9 @@
       "pinFailed": "Repo پین نشد",
       "unboundToast": "Repo بدون محدودیت",
       "unbindFailed": "Repo لغو پیوند نشد"
-    }
+    },
+    "variablesDeleteFailed": "متغیر حذف نشد",
+    "deleteCommand": "فرمان {{position}} را حذف کنید"
   },
   "credits": {
     "title": "خرید اعتبار",
@@ -3841,7 +3923,8 @@
       "archive": "بایگانی",
       "unarchive": "خروج از بایگانی",
       "deleteTitle": "«{{name}}» حذف شود؟",
-      "deleteMessage": "کارهای آن هم حذف می‌شوند. نشست‌هایشان باقی می‌مانند."
+      "deleteMessage": "کارهای آن هم حذف می‌شوند. نشست‌هایشان باقی می‌مانند.",
+      "createFailed": "ایجاد فهرست ممکن نشد."
     },
     "listSettings": {
       "title": "تنظیمات فهرست",
@@ -3999,6 +4082,7 @@
     "estimateInputTooLarge": "حجم شواهد این بازه برای مدل انتخاب‌شده بیش از حد زیاد است.",
     "estimatePermissionUnavailable": "شما اجازه استفاده از موجودی این زمینه را ندارید.",
     "createFailed": "ایجاد این گزارش ممکن نشد.",
-    "reviewFailed": "بازبینی این گزارش ممکن نشد."
+    "reviewFailed": "بازبینی این گزارش ممکن نشد.",
+    "saved": "تنظیمات گزارش ذخیره شد"
   }
 }

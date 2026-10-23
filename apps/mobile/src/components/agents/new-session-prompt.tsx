@@ -14,6 +14,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { CornerDownLeft } from '@/components/ui/icons';
 import { toast } from 'sonner-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -132,7 +133,8 @@ export function NewSessionPrompt({
 }: Readonly<NewSessionPromptComponentProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { height: windowHeight, fontScale } = useWindowDimensions();
+  const { height: windowHeight } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
   const insets = useSafeAreaInsets();
   const { returnSendsMessage } = useReturnSendsMessagePreference();
   const [keyboardHeight, setKeyboardHeight] = useState(0);

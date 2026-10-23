@@ -1,15 +1,9 @@
 /* eslint-disable max-lines -- The live list keeps its query, pull-refresh, keyboard container, and FAB orchestration together on one screen. */
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
-import {
-  AppState,
-  I18nManager,
-  Keyboard,
-  Pressable,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { AppState, I18nManager, Keyboard, Pressable, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -41,6 +35,7 @@ import { Button } from '@/components/ui/button';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
@@ -62,7 +57,7 @@ export function AgentSessionListScreen({
   // The empty state's own height grows with Dynamic Type, so the list chrome's
   // presentation decision needs the window's text scale (see
   // `useAgentsListChrome`).
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
 
   const context = useLiveSessionContext();
   const { organizationId, isError: isContextError, refetch: refetchContext } = context;
@@ -396,6 +391,7 @@ export function AgentSessionListScreen({
             variant="outline"
             size={compactEmptyState ? 'sm' : 'default'}
             onPress={isSearching ? query.handleClearSearch : query.handleClearFilters}
+            className={STATE_ACTION_CLASS}
           >
             <Text>{isSearching ? t('common.clearSearch') : t('common.clearFilters')}</Text>
           </Button>

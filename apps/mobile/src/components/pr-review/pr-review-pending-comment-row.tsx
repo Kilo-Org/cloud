@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Trash2 } from '@/components/ui/icons';
 import { Pressable, TextInput, View } from 'react-native';
 
-import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
+import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { useFormSheetKeyboardVisible } from '@/components/pr-review/pr-form-sheet-chrome';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -95,7 +95,7 @@ export function focusAfterPendingCommentRemoval(
     return;
   }
   announceForA11y(i18n.t('prReview.pendingComment.deletedAnnouncement'));
-  moveA11yFocus(inputRef);
+  requestA11yFocus(inputRef);
 }
 
 /** Mono location label matching the composer range format (en dash). */

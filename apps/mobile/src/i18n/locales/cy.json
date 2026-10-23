@@ -293,7 +293,8 @@
     "condenseToolCallsSubtitle": "Grwpio galwadau offer yn olynol i un rhes y gallwch ei hagor.",
     "toolSummaryTranslation": "Cyfieithu crynodebau offer",
     "toolSummaryTranslationSubtitle": "Anfonwch bob crynodeb offer at fodel i'w gyfieithu i iaith eich ap. Dangosir y gwreiddiol os bydd'r cyfieithiad yn methu.",
-    "toolSummaryTranslationModelUnavailableNotice": "Nid yw'r model hwn yn cael ei gynnig mwyach. Tapiwch $t(common.model) i ddewis un arall."
+    "toolSummaryTranslationModelUnavailableNotice": "Nid yw'r model hwn yn cael ei gynnig mwyach. Tapiwch $t(common.model) i ddewis un arall.",
+    "autoExpandThinkingInactiveSubtitle": "Nid oes unrhyw effaith tra bydd manylion meddwl wedi'u cuddio."
   },
   "prReview": {
     "pullRequestUnavailable": "Cais tynnu ddim ar gael",
@@ -717,7 +718,8 @@
       "gitlabDescription": "Cysylltwch eich cyfrif GitLab i adolygu ceisiadau uno ar y dyfais symudol.",
       "bitbucketDescription": "Cysylltwch Bitbucket â'r sefydliad hwn i adolygu ceisiadau tynnu ar y dyfais symudol.",
       "bitbucketOrgOnlyDescription": "Newidiwch y cyfrif uchod i sefydliad i adolygu ei geisiadau tynnu ar Bitbucket.",
-      "contextLine": "Ar gyfer {{organization}}"
+      "contextLine": "Ar gyfer {{organization}}",
+      "contextLinePersonal": "Ar gyfer eich cyfrif personol"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1528,7 +1530,13 @@
       "sessionError": "Gwall yn y sesiwn: {{error}}.",
       "statusWithValue": "Statws: {{status}}",
       "toolName": "Offeryn: {{name}}",
-      "toolNameError": "Gwall yn yr offeryn: {{name}}."
+      "toolNameError": "Gwall yn yr offeryn: {{name}}.",
+      "cancelReasonSuperseded": "Cafodd commit newydd ei wthio, felly disodlwyd yr adolygiad hwn.",
+      "cancelReasonIntegrationDisconnected": "Mae {{platform}} wedi'i ddatgysylltu, felly cafodd yr adolygiad hwn ei ganslo. Ail-gysylltwch ef, yna ail-redegwch yr adolygiad.",
+      "cancelReasonBitbucketReviewerDisabled": "Trowyd Code Reviewer i ffwrdd ar gyfer Bitbucket, felly cafodd yr adolygiad hwn ei ganslo. Galluogwch ef eto, yna ail-redegwch yr adolygiad.",
+      "cancelReasonBitbucketPullRequestChanged": "Cafodd ceisiad tynnu Bitbucket ei newid, felly disodlwyd yr adolygiad hwn.",
+      "cancelReasonCancelled": "Cafodd yr adolygiad hwn ei ganslo.",
+      "cancelReasonInterrupted": "Cafodd yr adolygiad hwn ei darfu arno."
     },
     "reviewMemory": {
       "title": "Cof adolygu",
@@ -1555,7 +1563,15 @@
       "instructions": "Cyfarwyddiadau (dewisol)",
       "instructionsPlaceholder": "Unrhyw beth penodol y dylai'r adolygydd ganolbwyntio arno…",
       "starting": "Yn dechrau adolygiad…",
-      "start": "Dechrau adolygiad"
+      "start": "Dechrau adolygiad",
+      "startNotFound": "Ni ellid darllen y {{requestNoun}} hwnnw o {{provider}}. Gwiriwch yr URL a bod y storfa'n hygyrch.",
+      "startRateLimited": "Mae {{provider}} yn cyfyngu ar geisiadau ar hyn o bryd. Ceisiwch eto mewn ychydig funudau.",
+      "startNotAllowed": "Nid oes gennych fynediad i ddechrau adolygiad ar gyfer y {{requestNoun}} hwnnw. Gwiriwch eich caniatâd a chynllun eich sefydliad.",
+      "startProviderNeedsAttention": "Mae adolygiadau â llaw angen y cysylltiad {{provider}} safonol. Cysylltwch ef a cheisiwch eto.",
+      "startAlreadyRunning": "Mae adolygiad ar gyfer y {{requestNoun}} hwnnw eisoes yn rhedeg.",
+      "startRejected": "Ni ellir adolygu'r {{requestNoun}} hwnnw. Gwnewch yn siŵr ei fod ar agor, nad yw'n ddrafft, a bod yr URL yn gywir.",
+      "startProviderUnavailable": "Doedd dim modd cyrraedd {{provider}} i ddarllen y {{requestNoun}} hwnnw. Ceisiwch eto.",
+      "startFailed": "Doedd dim modd dechrau'r adolygiad. Gwiriwch eich cysylltiad a cheisiwch eto."
     },
     "notConnectedReadOnly": "Nid yw {{platform}} wedi'i gysylltu. Dim ond perchnogion a gweinyddwyr y sefydliad sy'n gallu ei gysylltu.",
     "gitlab": {
@@ -2040,7 +2056,7 @@
       "couldNotLoad": "Ni ellid llwytho'r Asiant diogelwch.",
       "installApp": "Gosod ap GitHub",
       "reauthorizeButton": "Ailawdurdodi ap GitHub",
-      "reauthorizeDescription": "Mae angen y caniatâd vulnerability_alerts ar yr Asiant diogelwch i gael mynediad at rybuddion Dependabot. Ailawdurdodwch ap GitHub i roi'r caniatâd hwn.",
+      "reauthorizeDescription": "Mae angen caniatâd ar yr Asiant diogelwch i ddarllen rhybuddion Dependabot. Ailawdurdodwch ap GitHub i roi'r caniatâd hwn.",
       "reauthorizeTitle": "Angen caniatadau ychwanegol",
       "setupFailed": "Ni ellid dechrau sefydlu GitHub. Ceisiwch eto."
     },
@@ -2220,7 +2236,8 @@
       "dollar_many": "doler",
       "costSpoken": "cost o {{cost}}",
       "costSpokenWithTime": "y gost yw {{cost}}, {{time}}",
-      "pullRequest": "cais tynnu {{number}}"
+      "pullRequest": "cais tynnu {{number}}",
+      "spokenJoiner": ", a(c)"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ni lwyddwyd i agor GitHub",
@@ -2595,7 +2612,71 @@
       "preparationComplete": "Wedi gorffen paratoi",
       "preparationFailed": "Methodd y paratoi",
       "setupCommand": "Gorchymyn gosod {{index}}",
-      "setupCommandOf": "Gorchymyn gosod {{index}} o {{displayCount}}"
+      "setupCommandOf": "Gorchymyn gosod {{index}} o {{displayCount}}",
+      "stepWorkspaceSetup": "Gosod gweithfan",
+      "stepDiskCheck": "Gwirio'r ddisg",
+      "stepCloning": "Yn clonio'r storfa",
+      "stepBranch": "Yn gosod cangen",
+      "stepDevcontainerSetup": "Gosod cynhwysydd datblygu",
+      "stepWorkspaceRestore": "Yn adfer y weithfan",
+      "stepWorkspaceBackup": "Yn cadw'r weithfan",
+      "stepSandboxProvision": "Yn darparu blwch tywod",
+      "stepSandboxBoot": "Yn cychwyn y blwch tywod",
+      "stepSnapshotFallback": "Yn ailgeisio heb giplun",
+      "stepKiloServer": "Yn cychwyn Kilo",
+      "stepKiloSession": "Yn paratoi'r sesiwn",
+      "stepRestoreIncomplete": "Adferiad y sesiwn yn anghyflawn",
+      "stepReady": "Yr amgylchedd yn barod",
+      "stepFailed": "Methodd gosod yr amgylchedd",
+      "stepUnknown": "Gosod yr amgylchedd",
+      "detailCreatingSandbox": "Yn creu blwch tywod",
+      "detailUpdatingRepository": "Yn diweddaru'r storfa",
+      "detailCheckingOutBranch": "Yn symud i'r gangen",
+      "detailRunningSetupCommands": "Yn rhedeg gorchmynion gosod",
+      "detailSavingRepository": "Yn cadw'r storfa ar gyfer cychwyn cyflymach",
+      "detailStartingKiloRuntime": "Yn cychwyn amser rhedeg Kilo",
+      "detailPreparingKiloSession": "Yn paratoi sesiwn Kilo",
+      "detailWaitingForPreviousSandbox": "Yn aros i'r blwch tywod blaenorol ddod i ben",
+      "detailRetryingSandboxCreation": "Yn ailgeisio creu'r blwch tywod",
+      "detailPreviousSnapshotFailed": "Methodd gychwyn gyda'r ciplun blaenorol. Yn ailgeisio heb giplun.",
+      "detailSnapshotStartupFailed": "Methodd gychwyn y ciplun. Yn ailgeisio heb giplun.",
+      "detailStartingSandboxWithoutSnapshot": "Yn cychwyn y blwch tywod heb giplun",
+      "detailSettingUpWorkspace": "Yn gosod y weithfan",
+      "detailRestoringSession": "Yn adfer y sesiwn",
+      "detailWarmWorkspaceReused": "Ailddefnyddiwyd gweithfan gynnes",
+      "detailRetryingClone": "Yn ailgeisio clonio (ymgais {{attempt}} o {{total}})",
+      "detailSetupCommandFailed": "Methodd gorchymyn gosod {{index}}",
+      "detailSetupCommandTimedOut": "Gorchymyn gosod {{index}} wedi mynd dros ei amser",
+      "detailColdRestore": "Adferiad oer, ciplun wedi'i gymhwyso, {{applied}} o {{total}} ffeil wedi'u hadfer",
+      "detailProgressPercent": "{{percent}}% wedi'i gwblhau",
+      "detailRestoreIncompleteReport": "Adferiad y sesiwn yn anghyflawn: ni adferwyd {{skipped}} o {{total}} ffeil ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Ar goll: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} a {{omitted}} arall",
+      "detailReasonPatchFailed": "ni chymhwysodd y patch",
+      "detailReasonOutsideWorkspace": "mae'r llwybr y tu allan i'r weithfan",
+      "detailReasonMissingContent": "nid oedd gan y ciplun gynnwys i'r ffeil",
+      "detailReasonIndexResetFailed": "nid oedd modd ailosod y mynegai ar ôl methiant cymhwyso",
+      "detailReasonUnlinkFailed": "nid oedd modd dileu'r ffeil",
+      "detailReasonWriteFailed": "nid oedd modd ysgrifennu'r ffeil",
+      "detailReasonUnknown": "rheswm anhysbys",
+      "detailUnknown": "Yn paratoi eto",
+      "errorPreparationTimeout": "Mae paratoi'r amgylchedd wedi mynd dros ei amser",
+      "errorWorkspaceSetupFailed": "Methodd gosod y weithfan",
+      "errorCredentialUpgradeRequired": "Nid yw'r sesiwn hon wedi derbyn diweddariad credensialau gofynnol. Cychwynwch sesiwn newydd i barhau.",
+      "errorAgentUnavailable": "Nid yw'r asiant ar gael",
+      "errorBillingBlocked": "Mae bilio'r blwch tywod yn gofyn am gredydau ychwanegol",
+      "errorBillingUnavailable": "Nid yw gwirio bilio na chynhwysedd y blwch tywod ar gael. Ceisiwch eto yn fuan.",
+      "errorContainerLimitReached": "Wedi cyrraedd terfyn cynhwysyddion. Rhaid atal cynhwysydd sy'n bodoli eisoes cyn cychwyn un arall.",
+      "errorInvalidConfiguration": "Mae ffurfweddiad y blwch tywod yn annilys neu ddim yn cael ei gefnogi",
+      "errorRuntimeArtifactUnauthorized": "Ni chaniatewyd lawrlwytho'r amser rhedeg",
+      "errorRuntimeArtifactInvalid": "Methodd wirio creuwaith yr amser rhedeg",
+      "errorRuntimeCliProbeFailed": "Methodd ddilysu CLI'r amser rhedeg",
+      "errorRuntimeSupervisorMissing": "Mae goruchwyliwr yr amser rhedeg ar goll",
+      "errorConnectionLost": "Collwyd y cysylltiad â'r blwch tywod",
+      "errorSandboxLost": "Collwyd y blwch tywod",
+      "errorAgentRestarted": "Ailddechreuodd yr asiant",
+      "errorSandboxOutOfMemory": "Daeth cof y blwch tywod i ben",
+      "errorPreparationDidNotComplete": "Ni chwblhawyd y paratoi"
     },
     "permissionCard": {
       "title": "Angen caniatâd",
@@ -3191,22 +3272,16 @@
     "boundary": {
       "backToProfile": "Yn ôl i'r proffil",
       "loadErrorMessage": "Gwiria dy gysylltiad a rho gynnig arall arni.",
-
       "chooseAccount": "Dewiswch gyfrif",
       "loadErrorTitle": "Methu llwytho'ch sefydliadau.",
       "membershipLostNotice": "Nid oes gennych fynediad i'r sefydliad hwn mwyach. Wedi newid i {{target}}.",
       "noOrganization": "Dim sefydliad",
-
       "noOrganizationDescription": "Nid yw'r cyfrif hwn yn rhan o sefydliad. Crëwch un neu ymunwch ag un ar y we i ddefnyddio nodweddion sefydliad fel gwahoddiadau i aelodau a rhybuddion balans isel.",
-
       "openWebOrganizations": "Agor sefydliadau ar y we",
-
       "organizationUnavailable": "Nid yw'r sefydliad ar gael.",
       "selectDescriptionWithOrganizations": "Rydych chi'n perthyn i un neu fwy o sefydliadau. Dewiswch y cyfrif y dylai'r sgrin hon ei ddefnyddio.",
-
       "selectOrganization": "Dewis sefydliad",
       "unavailableDescription": "Nid yw'r sefydliad hwn ar gael mwyach. Dewiswch un o'ch proffil i barhau.",
-
       "unavailableSessionsDescription": "Nid yw'r sefydliad hwn ar gael mwyach. Ni ellir llwytho ei sesiynau.",
       "accessDeniedDescription": "Nid oes gennych fynediad i'r sefydliad hwn."
     },
@@ -3234,7 +3309,9 @@
       "permissionDenied": "Nid oes gennych ganiatâd i wahodd aelodau.",
       "roleMember": "Rôl: aelod",
       "sendInvite": "Anfon gwahoddiad",
-      "title": "Gwahodd aelod"
+      "title": "Gwahodd aelod",
+      "alreadyInvited": "Mae'r cyfeiriad e-bost hwn eisoes wedi cael gwahoddiad neu'n eisoes yn perthyn i aelod.",
+      "sendError": "Ni lwyddwyd i anfon y gwahoddiad."
     },
     "invoices": {
       "downloadA11y": "Lawrlwytho anfoneb {{number}}",
@@ -3303,7 +3380,8 @@
       "inviteCreated": "Crëwyd y gwahoddiad",
       "pendingInvitations": "Gwahoddiadau sy'n aros",
       "resendInvite": "Ailanfon y gwahoddiad",
-      "shareInviteLink": "Rhannu dolen gwahoddiad"
+      "shareInviteLink": "Rhannu dolen gwahoddiad",
+      "resendInviteError": "Ni lwyddwyd i ailanfon y gwahoddiad."
     },
     "usageStats": {
       "inputTokens": "Tocynnau mewnbwn",
@@ -3455,7 +3533,8 @@
     "noneChosen": "Dim wedi'i ddewis",
     "emptyTitle": "Dim modelau trawsgrifio",
     "emptyDescription": "Does dim modelau trawsgrifio ar gael gan Kilo Gateway ar hyn o bryd.",
-    "loadFailed": "Doedd dim modd llwytho'r modelau trawsgrifio."
+    "loadFailed": "Doedd dim modd llwytho'r modelau trawsgrifio.",
+    "choose": "Dewiswch fodel"
   },
   "voiceLanguage": {
     "title": "Iaith mewnbwn llais",
@@ -3704,8 +3783,6 @@
       "quantizations": "Cwanteiddiadau",
       "quantizationsHelp": "Mae ffeiliau llai yn defnyddio llai o gof a storfa. Mae ffeiliau mwy fel arfer yn rhoi atebion gwell.",
       "quantDetail": "Lawrlwythiad {{size}} · tua {{memory}} o gof",
-      "downloadQuant": "Lawrlwytho {{quant}}",
-      "downloadModelA11y": "Lawrlwytho {{name}}",
       "detailsA11y": "Manylion: {{name}}",
       "loadingModel": "Wrthi'n llwytho manylion y model",
       "couldNotLoadModel": "Methu llwytho'r model hwn",
@@ -3750,7 +3827,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "Mae'r model hwn yn cefnogi ymdrech feddwl"
-    }
+    },
+    "creditsRequired": "Dim digon o gredydau i anfon y neges hon. Ychwanegwch gredydau a rhowch gynnig arall arni."
   },
   "settingsTools": {
     "confirmTitle": "Cadarnhau'r newid hwn?"
@@ -3786,7 +3864,9 @@
     "spend24h": "Gwariant yn y 24 awr diwethaf",
     "multiplierError": "Nodwch luosydd o 1 neu fwy",
     "permissionDenied": "Nid oes gennyt ganiatâd i reoli rhybuddion gwariant.",
-    "pushOffByCategory": "I ffwrdd yn Hysbysiadau"
+    "pushOffByCategory": "I ffwrdd yn Hysbysiadau",
+    "multiplierMaxError": "Nodwch luosydd o {{max}} neu lai",
+    "thresholdMaxError": "Nodwch swm o {{max}} neu lai."
   },
   "profiles": {
     "title": "Proffiliau",
@@ -3923,16 +4003,16 @@
       "stepsPlaceholder": "e.e. 50",
       "temperature": "Tymheredd",
       "temperaturePlaceholder": "e.e. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "e.e. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Fy Asiant",
       "promptPlaceholder": "Rydych chi'n ...",
       "tools": "Offer",
       "visibility": "Gwelededd",
-      "visibilityPrimary": "Cynradd - a ddangosir yn y codwr",
+      "visibilityPrimary": "Cynradd — a ddangosir yn y codwr",
       "visibilitySubagent": "Subagent — dim ond ei alw gan eraill",
-      "visibilityAll": "Pawb—y ddau",
+      "visibilityAll": "Pawb — y ddau",
       "modePrimary": "Cynradd yn unig",
       "modeSubagent": "Subagent yn unig",
       "modeAll": "Pob modd",
@@ -3985,7 +4065,9 @@
       "pinFailed": "Methu pinio repo",
       "unboundToast": "Repo heb ei rwymo",
       "unbindFailed": "Ni fu modd dadrwymo repo"
-    }
+    },
+    "variablesDeleteFailed": "Ni fu modd dileu'r newidyn",
+    "deleteCommand": "Dileu gorchymyn {{position}}"
   },
   "credits": {
     "title": "Prynu credydau",
@@ -4029,7 +4111,8 @@
       "archive": "Archifio",
       "unarchive": "Dadarchifio",
       "deleteTitle": "Dileu {{name}}?",
-      "deleteMessage": "Caiff ei thasgau eu dileu hefyd. Mae ei sesiynau'n aros."
+      "deleteMessage": "Caiff ei thasgau eu dileu hefyd. Mae ei sesiynau'n aros.",
+      "createFailed": "Ni lwyddwyd i greu'r rhestr"
     },
     "listSettings": {
       "title": "Gosodiadau'r rhestr",
@@ -4195,6 +4278,7 @@
     "estimateInputTooLarge": "Mae gormod o dystiolaeth yn y cyfnod hwn ar gyfer y model a ddewiswyd.",
     "estimatePermissionUnavailable": "Nid oes gennych ganiatâd i ddefnyddio balans y cyd-destun hwn.",
     "createFailed": "Methu creu'r briff hwn.",
-    "reviewFailed": "Methu adolygu'r briff hwn."
+    "reviewFailed": "Methu adolygu'r briff hwn.",
+    "saved": "Mae gosodiadau briffio wedi'u cadw"
   }
 }

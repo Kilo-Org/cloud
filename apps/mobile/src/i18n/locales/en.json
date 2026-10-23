@@ -90,7 +90,8 @@
     "estimateInputTooLarge": "This period has too much evidence for the selected model.",
     "estimatePermissionUnavailable": "You do not have permission to use this context’s balance.",
     "createFailed": "Could not create this brief.",
-    "reviewFailed": "Could not review this brief."
+    "reviewFailed": "Could not review this brief.",
+    "saved": "Briefing settings saved"
   },
   "common": {
     "cancel": "Cancel",
@@ -386,7 +387,8 @@
     "condenseToolCallsSubtitle": "Group consecutive tool calls into one row you can open.",
     "toolSummaryTranslation": "Translate tool summaries",
     "toolSummaryTranslationSubtitle": "Send each tool summary to a model to translate it into your app language. The original is shown if translation fails.",
-    "toolSummaryTranslationModelUnavailableNotice": "This model is no longer offered. Tap $t(common.model) to choose another."
+    "toolSummaryTranslationModelUnavailableNotice": "This model is no longer offered. Tap $t(common.model) to choose another.",
+    "autoExpandThinkingInactiveSubtitle": "No effect while thinking details are hidden."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request unavailable",
@@ -762,7 +764,8 @@
       "gitlabDescription": "Connect your GitLab account to review merge requests on mobile.",
       "bitbucketDescription": "Connect Bitbucket to this organization to review pull requests on mobile.",
       "bitbucketOrgOnlyDescription": "Switch the account above to an organization to review its Bitbucket pull requests.",
-      "contextLine": "For {{organization}}"
+      "contextLine": "For {{organization}}",
+      "contextLinePersonal": "For your personal account"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1545,7 +1548,13 @@
       "reviewInterrupted": "Review interrupted",
       "errorWithMessage": "Error: {{message}}",
       "anErrorOccurred": "An error occurred",
-      "statusWithValue": "Status: {{status}}"
+      "statusWithValue": "Status: {{status}}",
+      "cancelReasonSuperseded": "A newer commit was pushed, so this review was replaced.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} is disconnected, so this review was cancelled. Reconnect it, then re-run the review.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer was turned off for Bitbucket, so this review was cancelled. Enable it again, then re-run the review.",
+      "cancelReasonBitbucketPullRequestChanged": "The Bitbucket pull request changed, so this review was replaced.",
+      "cancelReasonCancelled": "This review was cancelled.",
+      "cancelReasonInterrupted": "This review was interrupted."
     },
     "reviewMemory": {
       "title": "Review memory",
@@ -1572,7 +1581,15 @@
       "instructions": "Instructions (optional)",
       "instructionsPlaceholder": "Anything specific the reviewer should focus on…",
       "starting": "Starting review…",
-      "start": "Start review"
+      "start": "Start review",
+      "startNotFound": "Could not read that {{requestNoun}} from {{provider}}. Check the URL and that the repository is accessible.",
+      "startRateLimited": "{{provider}} is limiting requests right now. Try again in a few minutes.",
+      "startNotAllowed": "You don't have access to start a review for that {{requestNoun}}. Check your permissions, and your organization's plan.",
+      "startProviderNeedsAttention": "Manual reviews need the standard {{provider}} connection. Connect it and try again.",
+      "startAlreadyRunning": "A review for that {{requestNoun}} is already running.",
+      "startRejected": "That {{requestNoun}} can't be reviewed. Make sure it is open, not a draft, and that the URL is correct.",
+      "startProviderUnavailable": "Could not reach {{provider}} to read that {{requestNoun}}. Try again.",
+      "startFailed": "Couldn't start the review. Check your connection and try again."
     },
     "notConnectedReadOnly": "{{platform}} isn't connected. Only organization owners and admins can connect it.",
     "gitlab": {
@@ -2207,7 +2224,8 @@
       "dollar_other": "dollars",
       "costSpoken": "cost {{cost}}",
       "costSpokenWithTime": "cost {{cost}}, {{time}}",
-      "pullRequest": "pull request {{number}}"
+      "pullRequest": "pull request {{number}}",
+      "spokenJoiner": ", and"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Could not open GitHub",
@@ -2579,7 +2597,71 @@
       "preparationComplete": "Preparation complete",
       "preparationFailed": "Preparation failed",
       "setupCommand": "Setup command {{index}}",
-      "setupCommandOf": "Setup command {{index}} of {{displayCount}}"
+      "setupCommandOf": "Setup command {{index}} of {{displayCount}}",
+      "stepWorkspaceSetup": "Workspace setup",
+      "stepDiskCheck": "Disk check",
+      "stepCloning": "Cloning repository",
+      "stepBranch": "Setting up branch",
+      "stepDevcontainerSetup": "Dev container setup",
+      "stepWorkspaceRestore": "Restoring workspace",
+      "stepWorkspaceBackup": "Saving workspace",
+      "stepSandboxProvision": "Provisioning sandbox",
+      "stepSandboxBoot": "Starting sandbox",
+      "stepSnapshotFallback": "Retrying without a snapshot",
+      "stepKiloServer": "Starting Kilo",
+      "stepKiloSession": "Preparing session",
+      "stepRestoreIncomplete": "Session restore incomplete",
+      "stepReady": "Environment ready",
+      "stepFailed": "Environment setup failed",
+      "stepUnknown": "Environment setup",
+      "detailCreatingSandbox": "Creating sandbox",
+      "detailUpdatingRepository": "Updating repository",
+      "detailCheckingOutBranch": "Checking out branch",
+      "detailRunningSetupCommands": "Running setup commands",
+      "detailSavingRepository": "Saving repository for faster starts",
+      "detailStartingKiloRuntime": "Starting Kilo runtime",
+      "detailPreparingKiloSession": "Preparing Kilo session",
+      "detailWaitingForPreviousSandbox": "Waiting for the previous sandbox to stop",
+      "detailRetryingSandboxCreation": "Retrying sandbox creation",
+      "detailPreviousSnapshotFailed": "Previous snapshot startup failed. Retrying without a snapshot.",
+      "detailSnapshotStartupFailed": "Snapshot startup failed. Retrying without a snapshot.",
+      "detailStartingSandboxWithoutSnapshot": "Starting sandbox without a snapshot",
+      "detailSettingUpWorkspace": "Setting up workspace",
+      "detailRestoringSession": "Restoring session",
+      "detailWarmWorkspaceReused": "Warm workspace reused",
+      "detailRetryingClone": "Retrying clone (attempt {{attempt}} of {{total}})",
+      "detailSetupCommandFailed": "Setup command {{index}} failed",
+      "detailSetupCommandTimedOut": "Setup command {{index}} timed out",
+      "detailColdRestore": "Cold restore, snapshot applied, {{applied}} of {{total}} files restored",
+      "detailProgressPercent": "{{percent}}% complete",
+      "detailRestoreIncompleteReport": "Session restore incomplete: {{skipped}} of {{total}} files were not restored ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Missing: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} and {{omitted}} more",
+      "detailReasonPatchFailed": "the patch did not apply",
+      "detailReasonOutsideWorkspace": "the path is outside the workspace",
+      "detailReasonMissingContent": "the snapshot carried no content for the file",
+      "detailReasonIndexResetFailed": "the index could not be reset after a failed apply",
+      "detailReasonUnlinkFailed": "the file could not be removed",
+      "detailReasonWriteFailed": "the file could not be written",
+      "detailReasonUnknown": "an unknown reason",
+      "detailUnknown": "Still preparing",
+      "errorPreparationTimeout": "Environment preparation timed out",
+      "errorWorkspaceSetupFailed": "Workspace setup failed",
+      "errorCredentialUpgradeRequired": "This session is missing a required credential upgrade. Start a new session to continue.",
+      "errorAgentUnavailable": "The agent became unavailable",
+      "errorBillingBlocked": "Sandbox billing requires additional credits",
+      "errorBillingUnavailable": "Sandbox billing or capacity verification is unavailable. Try again shortly.",
+      "errorContainerLimitReached": "Container limit reached. Stop an existing container before starting another.",
+      "errorInvalidConfiguration": "Sandbox configuration is invalid or unsupported",
+      "errorRuntimeArtifactUnauthorized": "Runtime download was not authorized",
+      "errorRuntimeArtifactInvalid": "Runtime artifact verification failed",
+      "errorRuntimeCliProbeFailed": "Runtime CLI validation failed",
+      "errorRuntimeSupervisorMissing": "Runtime supervisor is missing",
+      "errorConnectionLost": "The sandbox connection was lost",
+      "errorSandboxLost": "The sandbox was lost",
+      "errorAgentRestarted": "The agent restarted",
+      "errorSandboxOutOfMemory": "The sandbox ran out of memory",
+      "errorPreparationDidNotComplete": "Preparation did not complete"
     },
     "permissionCard": {
       "title": "Permission required",
@@ -2790,7 +2872,7 @@
       "exitSession": "Exit the session",
       "clearSession": "End this session and start a new one",
       "compactDescription": "compact the current session context",
-      "goalDescription": "Keep working toward a session goal. /goal <objective> or pause, resume, clear",
+      "goalDescription": "Keep working toward a session goal. /goal <objective> or pause, resume, clear. A goal may wait on a scheduled wakeup, a cron task, or a background process: the wait suspends the goal until it fires and the goal resumes itself; /goal pause and /goal clear cancel its armed timers. If the objective is to wait for a deploy, build, or CI job, schedule that wait immediately; do not explore the repository first.",
       "initDescription": "guided AGENTS.md setup",
       "resumeClaudeDescription": "import a Claude Code session transcript",
       "resumeCodexDescription": "import an OpenAI Codex session transcript",
@@ -3174,7 +3256,9 @@
       "permissionDenied": "You don't have permission to invite members.",
       "roleMember": "Role: Member",
       "sendInvite": "Send invite",
-      "title": "Invite member"
+      "title": "Invite member",
+      "alreadyInvited": "They're already invited or already a member.",
+      "sendError": "Couldn't send the invite."
     },
     "invoices": {
       "downloadA11y": "Download invoice {{number}}",
@@ -3243,7 +3327,8 @@
       "inviteCreated": "Invite created",
       "pendingInvitations": "Pending invitations",
       "resendInvite": "Resend invite",
-      "shareInviteLink": "Share invite link"
+      "shareInviteLink": "Share invite link",
+      "resendInviteError": "Couldn't resend the invite."
     },
     "usageStats": {
       "inputTokens": "Input Tokens",
@@ -3378,7 +3463,8 @@
     "noneChosen": "None chosen",
     "emptyTitle": "No transcription models",
     "emptyDescription": "The gateway offers no transcription models right now.",
-    "loadFailed": "Couldn't load transcription models."
+    "loadFailed": "Couldn't load transcription models.",
+    "choose": "Choose a model"
   },
   "voiceLanguage": {
     "title": "Voice language",
@@ -3558,8 +3644,6 @@
       "quantizations": "Quantizations",
       "quantizationsHelp": "Smaller files use less memory and storage. Larger files usually give better answers.",
       "quantDetail": "{{size}} download · about {{memory}} of memory",
-      "downloadQuant": "Download {{quant}}",
-      "downloadModelA11y": "Download {{name}}",
       "detailsA11y": "Details: {{name}}",
       "loadingModel": "Loading model details",
       "couldNotLoadModel": "Couldn't load this model",
@@ -3669,7 +3753,8 @@
       "signIn": "Sign in",
       "signInA11y": "Sign in to this server: {{name}}",
       "signInFailed": "Couldn't sign in to {{name}}. Try again."
-    }
+    },
+    "creditsRequired": "Not enough credits to send this message. Add credits and try again."
   },
   "settingsTools": {
     "confirmTitle": "Confirm this change?"
@@ -3705,7 +3790,9 @@
     "spend24h": "Spend in the last 24 hours",
     "multiplierError": "Enter a multiplier of 1 or more",
     "permissionDenied": "You don't have permission to manage spend alerts.",
-    "pushOffByCategory": "Off in Notifications"
+    "pushOffByCategory": "Off in Notifications",
+    "multiplierMaxError": "Enter a multiplier of {{max}} or less",
+    "thresholdMaxError": "Enter an amount of {{max}} or less"
   },
   "profiles": {
     "title": "Profiles",
@@ -3830,7 +3917,7 @@
       "stepsPlaceholder": "e.g. 50",
       "temperature": "Temperature",
       "temperaturePlaceholder": "e.g. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "e.g. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "My Agent",
@@ -3892,7 +3979,9 @@
       "pinFailed": "Couldn't pin repo",
       "unboundToast": "Repo unbound",
       "unbindFailed": "Couldn't unbind repo"
-    }
+    },
+    "variablesDeleteFailed": "Couldn't delete variable",
+    "deleteCommand": "Delete command {{position}}"
   },
   "credits": {
     "title": "Buy credits",
@@ -3928,7 +4017,8 @@
       "archive": "Archive",
       "unarchive": "Unarchive",
       "deleteTitle": "Delete {{name}}?",
-      "deleteMessage": "Its to-dos are deleted too. Their sessions stay."
+      "deleteMessage": "Its to-dos are deleted too. Their sessions stay.",
+      "createFailed": "Couldn’t create the list"
     },
     "listSettings": {
       "title": "List settings",

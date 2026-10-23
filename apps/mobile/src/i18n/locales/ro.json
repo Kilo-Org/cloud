@@ -293,7 +293,8 @@
     "condenseToolCallsSubtitle": "Grupează apelurile consecutive ale instrumentelor într-un singur rând pe care îl poți deschide.",
     "toolSummaryTranslation": "Tradu rezumatele instrumentelor",
     "toolSummaryTranslationSubtitle": "Trimite fiecare rezumat de instrument unui model pentru a-l traduce în limba aplicației tale. Originalul este afișat dacă traducerea eșuează.",
-    "toolSummaryTranslationModelUnavailableNotice": "Acest model nu mai este oferit. Atinge $t(common.model) pentru a alege altul."
+    "toolSummaryTranslationModelUnavailableNotice": "Acest model nu mai este oferit. Atinge $t(common.model) pentru a alege altul.",
+    "autoExpandThinkingInactiveSubtitle": "Nu are efect cât timp detaliile raționamentului sunt ascunse."
   },
   "prReview": {
     "pullRequestUnavailable": "PR indisponibil",
@@ -681,7 +682,8 @@
       "gitlabDescription": "Conectează-ți contul GitLab pentru a revizui merge requesturi de pe mobil.",
       "bitbucketDescription": "Conectează Bitbucket la această organizație pentru a revizui PR-uri de pe mobil.",
       "bitbucketOrgOnlyDescription": "Comută contul de mai sus pe o organizație pentru a revizui PR-urile Bitbucket ale acesteia.",
-      "contextLine": "Pentru {{organization}}"
+      "contextLine": "Pentru {{organization}}",
+      "contextLinePersonal": "Pentru contul personal"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1471,7 +1473,13 @@
       "sessionError": "A apărut o eroare în sesiune: {{error}}.",
       "statusWithValue": "Stare: {{status}}",
       "toolName": "Instrument: {{name}}",
-      "toolNameError": "Instrumentul {{name}} a întâmpinat o eroare."
+      "toolNameError": "Instrumentul {{name}} a întâmpinat o eroare.",
+      "cancelReasonSuperseded": "A fost pushat un commit mai nou, deci această revizuire a fost înlocuită.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} este deconectat, deci această revizuire a fost anulată. Reconectează-l, apoi reia revizuirea.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer a fost dezactivat pentru Bitbucket, deci această revizuire a fost anulată. Activează-l din nou, apoi reia revizuirea.",
+      "cancelReasonBitbucketPullRequestChanged": "Cererea de pull Bitbucket s-a modificat, deci această revizuire a fost înlocuită.",
+      "cancelReasonCancelled": "Această revizuire a fost anulată.",
+      "cancelReasonInterrupted": "Această revizuire a fost întreruptă."
     },
     "reviewMemory": {
       "title": "Memoria revizuirilor",
@@ -1498,7 +1506,15 @@
       "instructions": "Instrucțiuni (opțional)",
       "instructionsPlaceholder": "Aspecte specifice de urmărit la revizuire…",
       "starting": "Se începe revizuirea…",
-      "start": "Începe revizuirea"
+      "start": "Începe revizuirea",
+      "startNotFound": "Nu s-a putut citi acest {{requestNoun}} din {{provider}}. Verifică adresa URL și accesibilitatea depozitului.",
+      "startRateLimited": "{{provider}} limitează cererile în acest moment. Încearcă din nou în câteva minute.",
+      "startNotAllowed": "Nu ai acces să începi o revizuire pentru acest {{requestNoun}}. Verifică-ți permisiunile și planul organizației.",
+      "startProviderNeedsAttention": "Recenziile manuale necesită conexiunea standard {{provider}}. Conecteaz-o și încearcă din nou.",
+      "startAlreadyRunning": "O revizuire pentru acest {{requestNoun}} este deja în curs.",
+      "startRejected": "Acest {{requestNoun}} nu poate fi revizuit. Asigură-te că este deschis, că nu este ciornă și că adresa URL este corectă.",
+      "startProviderUnavailable": "Nu s-a putut accesa {{provider}} pentru a citi acest {{requestNoun}}. Încearcă din nou.",
+      "startFailed": "Nu s-a putut începe revizuirea. Verifică conexiunea și încearcă din nou."
     },
     "notConnectedReadOnly": "{{platform}} nu este conectat. Doar proprietarii și administratorii organizației îl pot conecta.",
     "gitlab": {
@@ -1971,7 +1987,7 @@
       "couldNotLoad": "Nu s-a putut încărca agentul de securitate.",
       "installApp": "Instalează aplicația GitHub",
       "reauthorizeButton": "Autorizează din nou aplicația GitHub",
-      "reauthorizeDescription": "Agentul de securitate are nevoie de permisiunea vulnerability_alerts pentru a accesa alertele Dependabot. Autorizează din nou aplicația GitHub pentru a acorda această permisiune.",
+      "reauthorizeDescription": "Agentul de securitate are nevoie de permisiunea de a citi alertele Dependabot. Autorizează din nou aplicația GitHub pentru a acorda această permisiune.",
       "reauthorizeTitle": "Sunt necesare permisiuni suplimentare",
       "setupFailed": "Nu s-a putut începe configurarea GitHub. Încearcă din nou."
     },
@@ -2139,7 +2155,8 @@
       "dollar_few": "dolari",
       "costSpoken": "cost de {{cost}}",
       "costSpokenWithTime": "costul este {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}"
+      "pullRequest": "pR {{number}}",
+      "spokenJoiner": "și"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nu s-a putut deschide GitHub",
@@ -2499,7 +2516,71 @@
       "preparationComplete": "Pregătire finalizată",
       "preparationFailed": "Pregătire eșuată",
       "setupCommand": "Comanda de configurare {{index}}",
-      "setupCommandOf": "Comanda de configurare {{index}} din {{displayCount}}"
+      "setupCommandOf": "Comanda de configurare {{index}} din {{displayCount}}",
+      "stepWorkspaceSetup": "Configurare spațiu de lucru",
+      "stepDiskCheck": "Verificare disc",
+      "stepCloning": "Se clonează depozitul",
+      "stepBranch": "Se configurează ramura",
+      "stepDevcontainerSetup": "Configurare dev container",
+      "stepWorkspaceRestore": "Se restaurează spațiul de lucru",
+      "stepWorkspaceBackup": "Se salvează spațiul de lucru",
+      "stepSandboxProvision": "Se pregătește sandbox-ul",
+      "stepSandboxBoot": "Se pornește sandbox-ul",
+      "stepSnapshotFallback": "Se reîncearcă fără snapshot",
+      "stepKiloServer": "Se pornește Kilo",
+      "stepKiloSession": "Se pregătește sesiunea",
+      "stepRestoreIncomplete": "Restaurarea sesiunii este incompletă",
+      "stepReady": "Mediul este pregătit",
+      "stepFailed": "Configurarea mediului a eșuat",
+      "stepUnknown": "Configurarea mediului",
+      "detailCreatingSandbox": "Se creează sandbox-ul",
+      "detailUpdatingRepository": "Se actualizează depozitul",
+      "detailCheckingOutBranch": "Se extrage ramura",
+      "detailRunningSetupCommands": "Se execută comenzile de configurare",
+      "detailSavingRepository": "Se salvează depozitul pentru porniri mai rapide",
+      "detailStartingKiloRuntime": "Se pornește runtime-ul Kilo",
+      "detailPreparingKiloSession": "Se pregătește sesiunea Kilo",
+      "detailWaitingForPreviousSandbox": "Se așteaptă oprirea sandbox-ului anterior",
+      "detailRetryingSandboxCreation": "Se reîncearcă crearea sandbox-ului",
+      "detailPreviousSnapshotFailed": "Pornirea cu snapshot-ul anterior a eșuat. Se reîncearcă fără snapshot.",
+      "detailSnapshotStartupFailed": "Pornirea cu snapshot a eșuat. Se reîncearcă fără snapshot.",
+      "detailStartingSandboxWithoutSnapshot": "Se pornește sandbox-ul fără snapshot",
+      "detailSettingUpWorkspace": "Se configurează spațiul de lucru",
+      "detailRestoringSession": "Se restaurează sesiunea",
+      "detailWarmWorkspaceReused": "S-a reutilizat spațiul de lucru cald",
+      "detailRetryingClone": "Se reîncearcă clonarea (încercarea {{attempt}} din {{total}})",
+      "detailSetupCommandFailed": "Comanda de configurare {{index}} a eșuat",
+      "detailSetupCommandTimedOut": "Comanda de configurare {{index}} a expirat",
+      "detailColdRestore": "Restaurare la rece, snapshot aplicat, {{applied}} din {{total}} fișiere restaurate",
+      "detailProgressPercent": "{{percent}}% finalizat",
+      "detailRestoreIncompleteReport": "Restaurarea sesiunii este incompletă: {{skipped}} din {{total}} fișiere nu au fost restaurate ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Lipsesc: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} și încă {{omitted}}",
+      "detailReasonPatchFailed": "patch-ul nu s-a aplicat",
+      "detailReasonOutsideWorkspace": "calea este în afara spațiului de lucru",
+      "detailReasonMissingContent": "snapshot-ul nu conținea conținut pentru fișier",
+      "detailReasonIndexResetFailed": "indexul nu a putut fi resetat după o aplicare eșuată",
+      "detailReasonUnlinkFailed": "fișierul nu a putut fi eliminat",
+      "detailReasonWriteFailed": "fișierul nu a putut fi scris",
+      "detailReasonUnknown": "un motiv necunoscut",
+      "detailUnknown": "Se pregătește în continuare",
+      "errorPreparationTimeout": "Pregătirea mediului a expirat",
+      "errorWorkspaceSetupFailed": "Configurarea spațiului de lucru a eșuat",
+      "errorCredentialUpgradeRequired": "Această sesiune nu are o actualizare de credențial necesară. Porniți o sesiune nouă pentru a continua.",
+      "errorAgentUnavailable": "Agentul a devenit indisponibil",
+      "errorBillingBlocked": "Facturarea sandbox-ului necesită credite suplimentare",
+      "errorBillingUnavailable": "Verificarea facturării sau a capacității sandbox-ului nu este disponibilă. Încercați din nou în scurt timp.",
+      "errorContainerLimitReached": "Limita de containere a fost atinsă. Opriți un container existent înainte de a porni altul.",
+      "errorInvalidConfiguration": "Configurația sandbox-ului este invalidă sau neacceptată",
+      "errorRuntimeArtifactUnauthorized": "Descărcarea runtime-ului nu a fost autorizată",
+      "errorRuntimeArtifactInvalid": "Verificarea artefactului runtime a eșuat",
+      "errorRuntimeCliProbeFailed": "Validarea CLI-ului runtime a eșuat",
+      "errorRuntimeSupervisorMissing": "Supervisorul runtime lipsește",
+      "errorConnectionLost": "Conexiunea la sandbox s-a pierdut",
+      "errorSandboxLost": "Sandbox-ul s-a pierdut",
+      "errorAgentRestarted": "Agentul a repornit",
+      "errorSandboxOutOfMemory": "Sandbox-ul a rămas fără memorie",
+      "errorPreparationDidNotComplete": "Pregătirea nu s-a finalizat"
     },
     "permissionCard": {
       "title": "Permisiune necesară",
@@ -3071,22 +3152,16 @@
     "boundary": {
       "backToProfile": "Înapoi la profil",
       "loadErrorMessage": "Verifică conexiunea și încearcă din nou.",
-
       "chooseAccount": "Selectează un cont",
       "loadErrorTitle": "Nu s-au putut încărca organizațiile tale.",
       "membershipLostNotice": "Nu mai ai acces la această organizație. S-a comutat la {{target}}.",
       "noOrganization": "Nicio organizație",
-
       "noOrganizationDescription": "Acest cont nu face parte dintr-o organizație. Creează sau alătură-te unei organizații pe site pentru a folosi funcții de organizație precum invitațiile pentru membri și alertele de sold scăzut.",
-
       "openWebOrganizations": "Deschide organizațiile pe site",
-
       "organizationUnavailable": "Organizația nu este disponibilă.",
       "selectDescriptionWithOrganizations": "Aparții unei sau mai multor organizații. Alege contul pe care ar trebui să îl folosească acest ecran.",
-
       "selectOrganization": "Selectează o organizație",
       "unavailableDescription": "Această organizație nu mai este disponibilă. Alege una din profilul tău pentru a continua.",
-
       "unavailableSessionsDescription": "Această organizație nu mai este disponibilă. Sesiunile ei nu pot fi încărcate.",
       "accessDeniedDescription": "Nu ai acces la această organizație."
     },
@@ -3114,7 +3189,9 @@
       "permissionDenied": "Nu ai permisiunea de a invita membri.",
       "roleMember": "Rolul atribuit este cel de membru.",
       "sendInvite": "Trimite invitația",
-      "title": "Invită un membru"
+      "title": "Invită un membru",
+      "alreadyInvited": "Această persoană este deja invitată sau este deja membru.",
+      "sendError": "Invitația nu a putut fi trimisă."
     },
     "invoices": {
       "downloadA11y": "Descarcă factura {{number}}",
@@ -3183,7 +3260,8 @@
       "inviteCreated": "Invitație creată",
       "pendingInvitations": "Invitații în așteptare",
       "resendInvite": "Retrimite invitația",
-      "shareInviteLink": "Partajează linkul de invitație"
+      "shareInviteLink": "Partajează linkul de invitație",
+      "resendInviteError": "Invitația nu a putut fi retrimisă."
     },
     "usageStats": {
       "inputTokens": "Tokenuri de intrare",
@@ -3332,7 +3410,8 @@
     "noneChosen": "Niciunul selectat",
     "emptyTitle": "Nu există modele de transcriere",
     "emptyDescription": "Kilo Gateway nu oferă modele de transcriere în acest moment.",
-    "loadFailed": "Nu s-au putut încărca modelele de transcriere."
+    "loadFailed": "Nu s-au putut încărca modelele de transcriere.",
+    "choose": "Alege un model"
   },
   "voiceLanguage": {
     "title": "Limba dictării",
@@ -3578,8 +3657,6 @@
       "quantizations": "Cuantizări",
       "quantizationsHelp": "Fișierele mai mici folosesc mai puțină memorie și spațiu de stocare. Fișierele mai mari oferă de obicei răspunsuri mai bune.",
       "quantDetail": "Descărcare de {{size}} · aproximativ {{memory}} de memorie",
-      "downloadQuant": "Descarcă {{quant}}",
-      "downloadModelA11y": "Descarcă {{name}}",
       "detailsA11y": "Detalii: {{name}}",
       "loadingModel": "Se încarcă detaliile modelului",
       "couldNotLoadModel": "Acest model nu a putut fi încărcat",
@@ -3624,7 +3701,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "Acest model acceptă efort de raționament"
-    }
+    },
+    "creditsRequired": "Nu ai suficiente credite pentru a trimite acest mesaj. Adaugă credite și încearcă din nou."
   },
   "settingsTools": {
     "confirmTitle": "Confirmi această modificare?"
@@ -3660,7 +3738,9 @@
     "spend24h": "Cheltuieli din ultimele 24 de ore",
     "multiplierError": "Introdu un multiplicator de 1 sau mai mare",
     "permissionDenied": "Nu ai permisiunea de a gestiona alertele de cheltuieli.",
-    "pushOffByCategory": "Oprit în Notificări"
+    "pushOffByCategory": "Oprit în Notificări",
+    "multiplierMaxError": "Introdu un multiplicator de {{max}} sau mai mic",
+    "thresholdMaxError": "Introdu o sumă de {{max}} sau mai puțin."
   },
   "profiles": {
     "title": "Profiluri",
@@ -3788,7 +3868,7 @@
       "stepsPlaceholder": "de ex. 50",
       "temperature": "Temperatură",
       "temperaturePlaceholder": "de ex. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "de ex. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Agentul meu",
@@ -3796,7 +3876,7 @@
       "tools": "Instrumente",
       "visibility": "Vizibilitate",
       "visibilityPrimary": "Primar — afișat în selector",
-      "visibilitySubagent": "Subagent - apelabil numai de la alții",
+      "visibilitySubagent": "Subagent — apelabil numai de la alții",
       "visibilityAll": "Toate — ambele",
       "modePrimary": "Doar primar",
       "modeSubagent": "Doar subagent",
@@ -3850,7 +3930,9 @@
       "pinFailed": "Nu s-a putut fixa repo",
       "unboundToast": "Repo nelegat",
       "unbindFailed": "Nu s-a putut dezlega repo"
-    }
+    },
+    "variablesDeleteFailed": "Variabila nu a putut fi ștearsă",
+    "deleteCommand": "Șterge comanda {{position}}"
   },
   "credits": {
     "title": "Cumpără credite",
@@ -3888,7 +3970,8 @@
       "archive": "Arhivează",
       "unarchive": "Scoate din arhivă",
       "deleteTitle": "Ștergi {{name}}?",
-      "deleteMessage": "Sarcinile ei se șterg și ele. Sesiunile rămân."
+      "deleteMessage": "Sarcinile ei se șterg și ele. Sesiunile rămân.",
+      "createFailed": "Nu s-a putut crea lista"
     },
     "listSettings": {
       "title": "Setările listei",
@@ -4048,6 +4131,7 @@
     "estimatePricingUnavailable": "Prețurile pentru acest model nu sunt disponibile.",
     "estimateBalanceUnavailable": "Sold insuficient pentru un rezumat plătit.",
     "estimateModelNotAllowed": "Acest model nu este permis aici.",
-    "estimateSpendLimitTooLow": "Creșteți limita de cheltuieli pentru a permite acest rezumat."
+    "estimateSpendLimitTooLow": "Creșteți limita de cheltuieli pentru a permite acest rezumat.",
+    "saved": "Setări rezumat salvate"
   }
 }

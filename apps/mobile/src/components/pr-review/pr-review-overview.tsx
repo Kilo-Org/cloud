@@ -13,6 +13,7 @@ import { QueryError } from '@/components/query-error';
 import { MarkdownText } from '@/components/agents/markdown-text';
 import { PrOverviewMeta } from '@/components/pr-review/pr-review-meta-parts';
 import { PrReviewChecksSection } from '@/components/pr-review/pr-review-checks-section';
+import { PrReviewOverviewSkeleton } from '@/components/pr-review/pr-review-overview-skeleton';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import { PrMergeSection } from '@/components/pr-review/merge/pr-merge-section';
@@ -27,6 +28,7 @@ import {
 } from '@/components/pr-review/pr-review-overview-parts';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -34,6 +36,7 @@ import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-q
 import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
 import { useCheckGitHubConnection } from '@/lib/pr-review/use-check-github-connection';
 import { trpcClient } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
 
 const REVIEW_SUBMIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/review-submit' as const;
 
@@ -50,28 +53,6 @@ type PrReviewOverviewProps = {
   readonly isActive: boolean;
   readonly refreshControl?: ScrollViewProps['refreshControl'];
 };
-
-function OverviewSkeleton() {
-  return (
-    <View className="gap-6">
-      <View className="gap-2">
-        <View className="h-5 w-20 rounded-full bg-muted" />
-        <View className="h-7 w-3/4 rounded bg-muted" />
-        <View className="h-5 w-1/2 rounded bg-muted" />
-      </View>
-      <View className="gap-2">
-        <View className="h-3 w-32 rounded bg-muted" />
-        <View className="h-3 w-48 rounded bg-muted" />
-        <View className="h-3 w-40 rounded bg-muted" />
-      </View>
-      <View className="gap-2">
-        <View className="h-3 w-full rounded bg-muted" />
-        <View className="h-3 w-5/6 rounded bg-muted" />
-        <View className="h-3 w-2/3 rounded bg-muted" />
-      </View>
-    </View>
-  );
-}
 
 export function PrReviewOverview({
   owner,
@@ -139,7 +120,7 @@ export function PrReviewOverview({
           }
           action={
             isGitHub ? (
-              <Button className="mt-3 w-full" onPress={handleInstallApp}>
+              <Button className={cn('mt-3 w-full', STATE_ACTION_CLASS)} onPress={handleInstallApp}>
                 <Text>{t('prReview.installKiloGitHubApp')}</Text>
               </Button>
             ) : (
@@ -196,7 +177,7 @@ export function PrReviewOverview({
           description={t('prReview.reconnectNotice.message')}
           action={
             <Button
-              className="mt-3 w-full"
+              className={cn('mt-3 w-full', STATE_ACTION_CLASS)}
               onPress={() => {
                 connection.mutate();
               }}
@@ -247,7 +228,7 @@ export function PrReviewOverview({
         contentContainerClassName="px-4"
         refreshControl={refreshControl}
       >
-        <OverviewSkeleton />
+        <PrReviewOverviewSkeleton />
       </DetailScreenScrollView>
     );
   }

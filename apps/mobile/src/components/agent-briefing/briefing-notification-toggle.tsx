@@ -1,10 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Switch, View } from 'react-native';
+import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { type BriefingPreferences, useBriefingPreferences } from '@/lib/agent-briefing';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';

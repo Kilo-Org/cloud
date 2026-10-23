@@ -293,7 +293,8 @@
     "condenseToolCallsSubtitle": "தொடர்ச்சியான கருவி அழைப்புகளை நீங்கள் திறக்கக்கூடிய ஒரு வரிசையில் தொகுக்கவும்.",
     "toolSummaryTranslation": "கருவி சுருக்கங்களை மொழிபெயர்க்கவும்",
     "toolSummaryTranslationSubtitle": "ஒவ்வொரு கருவி சுருக்கத்தையும் உங்கள் ஆப் மொழிக்கு மொழிபெயர்க்க ஒரு மாதிரிக்கு அனுப்பவும். மொழிபெயர்ப்பு தோல்வியடைந்தால் மூலம் காட்டப்படும்.",
-    "toolSummaryTranslationModelUnavailableNotice": "இந்த மாதிரி இனி வழங்கப்படாது. வேறொன்றைத் தேர்ந்தெடுக்க $t(common.model) தட்டவும்."
+    "toolSummaryTranslationModelUnavailableNotice": "இந்த மாதிரி இனி வழங்கப்படாது. வேறொன்றைத் தேர்ந்தெடுக்க $t(common.model) தட்டவும்.",
+    "autoExpandThinkingInactiveSubtitle": "சிந்தனை விவரங்கள் மறைக்கப்பட்டிருக்கும்போது விளைவு இருக்காது."
   },
   "prReview": {
     "pullRequestUnavailable": "இணைப்புக் கோரிக்கை கிடைக்கவில்லை",
@@ -669,7 +670,8 @@
       "gitlabDescription": "மொபைலில் இணைப்புக் கோரிக்கைகளை மதிப்பாய்வு செய்ய உங்கள் GitLab கணக்கை இணைக்கவும்.",
       "bitbucketDescription": "மொபைலில் இணைப்புக் கோரிக்கைகளை மதிப்பாய்வு செய்ய Bitbucket-ஐ இந்த நிறுவனத்துடன் இணைக்கவும்.",
       "bitbucketOrgOnlyDescription": "அதன் Bitbucket இணைப்புக் கோரிக்கைகளை மதிப்பாய்வு செய்ய மேலே உள்ள கணக்கை ஒரு நிறுவனத்திற்கு மாற்றவும்.",
-      "contextLine": "{{organization}}-க்கு"
+      "contextLine": "{{organization}}-க்கு",
+      "contextLinePersonal": "உங்கள் தனிப்பட்ட கணக்கிற்கு"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1452,7 +1454,13 @@
       "sessionError": "அமர்வில் பிழை ஏற்பட்டது: {{error}}.",
       "statusWithValue": "நிலை: {{status}}",
       "toolName": "கருவி: {{name}}",
-      "toolNameError": "கருவி {{name}}-இல் பிழை ஏற்பட்டது."
+      "toolNameError": "கருவி {{name}}-இல் பிழை ஏற்பட்டது.",
+      "cancelReasonSuperseded": "ஒரு புதிய கமிட் புஷ் செய்யப்பட்டதால், இந்த மதிப்பாய்வு மாற்றப்பட்டது.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} துண்டிக்கப்பட்டுள்ளதால், இந்த மதிப்பாய்வு ரத்து செய்யப்பட்டது. அதை மீண்டும் இணைத்து, மதிப்பாய்வை மீண்டும் இயக்கவும்.",
+      "cancelReasonBitbucketReviewerDisabled": "Bitbucket-க்கான Code Reviewer முடக்கப்பட்டதால், இந்த மதிப்பாய்வு ரத்து செய்யப்பட்டது. அதை மீண்டும் இயக்கி, மதிப்பாய்வை மீண்டும் இயக்கவும்.",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket புல் ரிக்வெஸ்ட் மாறியதால், இந்த மதிப்பாய்வு மாற்றப்பட்டது.",
+      "cancelReasonCancelled": "இந்த மதிப்பாய்வு ரத்து செய்யப்பட்டது.",
+      "cancelReasonInterrupted": "இந்த மதிப்பாய்வு தடைபட்டது."
     },
     "reviewMemory": {
       "title": "மதிப்பாய்வு நினைவகம்",
@@ -1479,7 +1487,15 @@
       "instructions": "வழிமுறைகள் (விருப்பத்தேர்வு)",
       "instructionsPlaceholder": "மதிப்பாய்வாளர் குறிப்பாகக் கவனிக்க வேண்டியவை…",
       "starting": "மதிப்பாய்வு தொடங்குகிறது…",
-      "start": "மதிப்பாய்வைத் தொடங்கவும்"
+      "start": "மதிப்பாய்வைத் தொடங்கவும்",
+      "startNotFound": "{{provider}}-இலிருந்து அந்த {{requestNoun}}-ஐப் படிக்க முடியவில்லை. URL-ஐயும் களஞ்சியம் அணுகக்கூடியதா என்பதையும் சரிபார்க்கவும்.",
+      "startRateLimited": "{{provider}} தற்போது கோரிக்கைகளை வரம்புக்குட்படுத்துகிறது. சில நிமிடங்களில் மீண்டும் முயற்சிக்கவும்.",
+      "startNotAllowed": "அந்த {{requestNoun}}-க்கு மதிப்பாய்வைத் தொடங்க உங்களுக்கு அணுகல் இல்லை. உங்கள் அனுமதிகளையும், உங்கள் நிறுவனத்தின் திட்டத்தையும் சரிபார்க்கவும்.",
+      "startProviderNeedsAttention": "கைமுறை மதிப்பாய்வுகளுக்கு நிலையான {{provider}} இணைப்பு தேவை. அதை இணைத்து மீண்டும் முயற்சிக்கவும்.",
+      "startAlreadyRunning": "அந்த {{requestNoun}} மீதான மதிப்பாய்வு ஏற்கனவே நடைபெற்று வருகிறது.",
+      "startRejected": "அந்த {{requestNoun}} மதிப்பாய்வு செய்யப்பட முடியாது. அது திறந்திருக்கிறதா, வரைவு இல்லையா, URL சரியாக உள்ளதா என்பதை உறுதிப்படுத்தவும்.",
+      "startProviderUnavailable": "அந்த {{requestNoun}} படிக்க {{provider}}-ஐ அணுக முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
+      "startFailed": "மதிப்பாய்வைத் தொடங்க முடியவில்லை. உங்கள் இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்."
     },
     "notConnectedReadOnly": "{{platform}} இணைக்கப்படவில்லை. நிறுவன உரிமையாளர்களும் நிர்வாகிகளும் மட்டுமே அதை இணைக்க முடியும்.",
     "gitlab": {
@@ -1948,7 +1964,7 @@
       "couldNotLoad": "பாதுகாப்பு முகவரை ஏற்ற முடியவில்லை.",
       "installApp": "GitHub செயலியை நிறுவவும்",
       "reauthorizeButton": "GitHub செயலிக்கு மீண்டும் அனுமதி வழங்கவும்",
-      "reauthorizeDescription": "Dependabot எச்சரிக்கைகளை அணுக பாதுகாப்பு முகவருக்கு vulnerability_alerts அனுமதி தேவை. இந்த அனுமதியை வழங்க GitHub செயலிக்கு மீண்டும் அனுமதி அளிக்கவும்.",
+      "reauthorizeDescription": "Dependabot எச்சரிக்கைகளைப் படிக்க பாதுகாப்பு முகவருக்கு அனுமதி தேவை. இந்த அனுமதியை வழங்க GitHub செயலிக்கு மீண்டும் அனுமதி அளிக்கவும்.",
       "reauthorizeTitle": "கூடுதல் அனுமதிகள் தேவை",
       "setupFailed": "GitHub அமைப்புச் செயல்முறையைத் தொடங்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்."
     },
@@ -2112,7 +2128,8 @@
       "dollar_other": "டாலர்கள்",
       "costSpoken": "செலவு {{cost}}",
       "costSpokenWithTime": "செலவு {{cost}}, {{time}}",
-      "pullRequest": "இணைப்புக் கோரிக்கை {{number}}"
+      "pullRequest": "இணைப்புக் கோரிக்கை {{number}}",
+      "spokenJoiner": "மற்றும்"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub-ஐத் திறக்க முடியவில்லை",
@@ -2467,7 +2484,71 @@
       "preparationComplete": "தயார்நிலை முடிந்தது",
       "preparationFailed": "தயார்ப்படுத்த முடியவில்லை",
       "setupCommand": "அமைவுக் கட்டளை {{index}}",
-      "setupCommandOf": "அமைவுக் கட்டளை {{index}} / {{displayCount}}"
+      "setupCommandOf": "அமைவுக் கட்டளை {{index}} / {{displayCount}}",
+      "stepWorkspaceSetup": "பணியிட அமைப்பு",
+      "stepDiskCheck": "வட்டு சரிபார்ப்பு",
+      "stepCloning": "களஞ்சியம் நகலெடுக்கப்படுகிறது",
+      "stepBranch": "கிளை அமைக்கப்படுகிறது",
+      "stepDevcontainerSetup": "டெவ் கண்டெய்னர் அமைப்பு",
+      "stepWorkspaceRestore": "பணியிடம் மீட்டமைக்கப்படுகிறது",
+      "stepWorkspaceBackup": "பணியிடம் சேமிக்கப்படுகிறது",
+      "stepSandboxProvision": "சாண்ட்பாக்ஸ் வழங்கப்படுகிறது",
+      "stepSandboxBoot": "சாண்ட்பாக்ஸ் தொடங்கப்படுகிறது",
+      "stepSnapshotFallback": "ஸ்னாப்ஷாட் இல்லாமல் மீண்டும் முயற்சிக்கப்படுகிறது",
+      "stepKiloServer": "Kilo தொடங்கப்படுகிறது",
+      "stepKiloSession": "அமர்வு தயாராகிறது",
+      "stepRestoreIncomplete": "அமர்வு மீட்டமைப்பு முழுமையடையவில்லை",
+      "stepReady": "சூழல் தயாராக உள்ளது",
+      "stepFailed": "சூழல் அமைவு தோல்வியடைந்தது",
+      "stepUnknown": "சூழல் அமைப்பு",
+      "detailCreatingSandbox": "சாண்ட்பாக்ஸ் உருவாக்கப்படுகிறது",
+      "detailUpdatingRepository": "களஞ்சியம் புதுப்பிக்கப்படுகிறது",
+      "detailCheckingOutBranch": "கிளை செக்அவுட் செய்யப்படுகிறது",
+      "detailRunningSetupCommands": "அமைவுக் கட்டளைகள் இயக்கப்படுகின்றன",
+      "detailSavingRepository": "வேகமான தொடக்கத்திற்கு களஞ்சியம் சேமிக்கப்படுகிறது",
+      "detailStartingKiloRuntime": "Kilo ரன்டைம் தொடங்கப்படுகிறது",
+      "detailPreparingKiloSession": "Kilo அமர்வு தயாராகிறது",
+      "detailWaitingForPreviousSandbox": "முந்தைய சாண்ட்பாக்ஸ் நிறுத்தப்படுவதற்காக காத்திருக்கப்படுகிறது",
+      "detailRetryingSandboxCreation": "சாண்ட்பாக்ஸ் உருவாக்கம் மீண்டும் முயற்சிக்கப்படுகிறது",
+      "detailPreviousSnapshotFailed": "முந்தைய ஸ்னாப்ஷாட் தொடக்கம் தோல்வியடைந்தது. ஸ்னாப்ஷாட் இல்லாமல் மீண்டும் முயற்சிக்கப்படுகிறது.",
+      "detailSnapshotStartupFailed": "ஸ்னாப்ஷாட் தொடக்கம் தோல்வியடைந்தது. ஸ்னாப்ஷாட் இல்லாமல் மீண்டும் முயற்சிக்கப்படுகிறது.",
+      "detailStartingSandboxWithoutSnapshot": "ஸ்னாப்ஷாட் இல்லாமல் சாண்ட்பாக்ஸ் தொடங்கப்படுகிறது",
+      "detailSettingUpWorkspace": "பணியிடம் அமைக்கப்படுகிறது",
+      "detailRestoringSession": "அமர்வு மீட்டமைக்கப்படுகிறது",
+      "detailWarmWorkspaceReused": "வெப்ப பணியிடம் மீண்டும் பயன்படுத்தப்பட்டது",
+      "detailRetryingClone": "க்ளோன் மீண்டும் முயற்சிக்கப்படுகிறது (முயற்சி {{attempt}} / {{total}})",
+      "detailSetupCommandFailed": "அமைவுக் கட்டளை {{index}} தோல்வியடைந்தது",
+      "detailSetupCommandTimedOut": "அமைவுக் கட்டளை {{index}} நேரம் முடிந்தது",
+      "detailColdRestore": "குளிர் மீட்டமைப்பு, ஸ்னாப்ஷாட் பிரயோகிக்கப்பட்டது, {{total}} கோப்புகளில் {{applied}} மீட்டமைக்கப்பட்டன",
+      "detailProgressPercent": "{{percent}}% முடிந்தது",
+      "detailRestoreIncompleteReport": "அமர்வு மீட்டமைப்பு முழுமையடையவில்லை: {{total}} கோப்புகளில் {{skipped}} மீட்டமைக்கப்படவில்லை ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "விடுபட்டவை: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} மற்றும் மேலும் {{omitted}}",
+      "detailReasonPatchFailed": "பேட்ச் பிரயோகிக்கப்படவில்லை",
+      "detailReasonOutsideWorkspace": "பாதை பணியிடத்திற்கு வெளியே உள்ளது",
+      "detailReasonMissingContent": "ஸ்னாப்ஷாட்டில் கோப்பிற்கான உள்ளடக்கம் இல்லை",
+      "detailReasonIndexResetFailed": "தோல்வியுற்ற பிரயோகத்திற்குப் பிறகு இண்டெக்ஸை மீட்டமைக்க முடியவில்லை",
+      "detailReasonUnlinkFailed": "கோப்பை அகற்ற முடியவில்லை",
+      "detailReasonWriteFailed": "கோப்பை எழுத முடியவில்லை",
+      "detailReasonUnknown": "தெரியாத காரணம்",
+      "detailUnknown": "இன்னும் தயாராகிறது",
+      "errorPreparationTimeout": "சூழல் தயாரிப்பு காலாவதியானது",
+      "errorWorkspaceSetupFailed": "பணியிட அமைப்பு தோல்வியடைந்தது",
+      "errorCredentialUpgradeRequired": "இந்த அமர்வில் தேவையான சான்று மேம்பாடு இல்லை. தொடர புதிய அமர்வைத் தொடங்கவும்.",
+      "errorAgentUnavailable": "ஏஜென்ட் கிடைக்கவில்லை",
+      "errorBillingBlocked": "சாண்ட்பாக்ஸ் பில்லிங்கிற்கு கூடுதல் கிரெடிட்கள் தேவைப்படுகின்றன",
+      "errorBillingUnavailable": "சாண்ட்பாக்ஸ் பில்லிங் அல்லது கொள்ளளவு சரிபார்ப்பு கிடைக்கவில்லை. விரைவில் மீண்டும் முயற்சிக்கவும்.",
+      "errorContainerLimitReached": "கண்டெய்னர் வரம்பு அடைந்தது. மற்றொன்றைத் தொடங்க முன் ஏற்கனவே உள்ள ஒரு கண்டெய்னரை நிறுத்தவும்.",
+      "errorInvalidConfiguration": "சாண்ட்பாக்ஸ் அமைவாக்கம் தவறானது அல்லது ஆதரிக்கப்படாதது",
+      "errorRuntimeArtifactUnauthorized": "ரன்டைம் பதிவிறக்கம் அங்கீகரிக்கப்படவில்லை",
+      "errorRuntimeArtifactInvalid": "ரன்டைம் ஆர்ட்டிஃபேக்ட் சரிபார்ப்பு தோல்வியடைந்தது",
+      "errorRuntimeCliProbeFailed": "ரன்டைம் CLI சரிபார்ப்பு தோல்வியடைந்தது",
+      "errorRuntimeSupervisorMissing": "ரன்டைம் சூப்பர்வைசர் இல்லை",
+      "errorConnectionLost": "சாண்ட்பாக்ஸ் இணைப்பு துண்டிக்கப்பட்டது",
+      "errorSandboxLost": "சாண்ட்பாக்ஸ் இழக்கப்பட்டது",
+      "errorAgentRestarted": "ஏஜென்ட் மறுதொடங்கப்பட்டது",
+      "errorSandboxOutOfMemory": "சாண்ட்பாக்ஸில் நினைவகம் தீர்ந்துவிட்டது",
+      "errorPreparationDidNotComplete": "தயாரிப்பு முடிவடையவில்லை"
     },
     "permissionCard": {
       "title": "அனுமதி தேவை",
@@ -3031,22 +3112,16 @@
     "boundary": {
       "backToProfile": "சுயவிவரத்திற்குத் திரும்பவும்",
       "loadErrorMessage": "உங்கள் இணைய இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.",
-
       "chooseAccount": "ஒரு கணக்கைத் தேர்ந்தெடுக்கவும்",
       "loadErrorTitle": "உங்கள் நிறுவனங்களை ஏற்ற முடியவில்லை.",
       "membershipLostNotice": "இந்த நிறுவனத்தை இனி அணுக உங்களுக்கு அனுமதி இல்லை. {{target}}-க்கு மாற்றப்பட்டது.",
       "noOrganization": "நிறுவனம் இல்லை",
-
       "noOrganizationDescription": "இந்தக் கணக்கு ஒரு நிறுவனத்தின் பகுதி அல்ல. உறுப்பினர் அழைப்புகள் மற்றும் குறைந்த இருப்பு எச்சரிக்கைகள் போன்ற நிறுவன அம்சங்களைப் பயன்படுத்த வலைத்தளத்தில் ஒரு நிறுவனத்தை உருவாக்கவும் அல்லது அதில் சேரவும்.",
-
       "openWebOrganizations": "வலைத்தளத்தில் நிறுவனங்களைத் திறக்கவும்",
-
       "organizationUnavailable": "நிறுவனம் கிடைக்கவில்லை.",
       "selectDescriptionWithOrganizations": "நீங்கள் ஒன்று அல்லது அதற்கு மேற்பட்ட நிறுவனங்களைச் சேர்ந்தவர். இந்தத் திரை பயன்படுத்த வேண்டிய கணக்கைத் தேர்ந்தெடுக்கவும்.",
-
       "selectOrganization": "ஒரு நிறுவனத்தைத் தேர்ந்தெடுக்கவும்",
       "unavailableDescription": "இந்த நிறுவனம் இனி கிடைக்கவில்லை. தொடர உங்கள் சுயவிவரத்திலிருந்து வேறொரு நிறுவனத்தைத் தேர்ந்தெடுக்கவும்.",
-
       "unavailableSessionsDescription": "இந்த நிறுவனம் இனி கிடைக்கவில்லை. அதன் அமர்வுகளை ஏற்ற முடியாது.",
       "accessDeniedDescription": "இந்த நிறுவனத்தை அணுக உங்களுக்கு அனுமதி இல்லை."
     },
@@ -3074,7 +3149,9 @@
       "permissionDenied": "உறுப்பினர்களை அழைக்க உங்களுக்கு அனுமதி இல்லை.",
       "roleMember": "பொறுப்பு: உறுப்பினர்.",
       "sendInvite": "அழைப்பை அனுப்பவும்",
-      "title": "உறுப்பினரை அழைக்கவும்"
+      "title": "உறுப்பினரை அழைக்கவும்",
+      "alreadyInvited": "இவர் ஏற்கனவே அழைக்கப்பட்டுள்ளார் அல்லது ஏற்கனவே உறுப்பினராக உள்ளார்.",
+      "sendError": "அழைப்பை அனுப்ப முடியவில்லை."
     },
     "invoices": {
       "downloadA11y": "{{number}} விலைப்பட்டியலைப் பதிவிறக்கவும்",
@@ -3143,7 +3220,8 @@
       "inviteCreated": "அழைப்பு உருவாக்கப்பட்டது",
       "pendingInvitations": "நிலுவையில் உள்ள அழைப்புகள்",
       "resendInvite": "அழைப்பை மீண்டும் அனுப்பவும்",
-      "shareInviteLink": "அழைப்பு இணைப்பைப் பகிரவும்"
+      "shareInviteLink": "அழைப்பு இணைப்பைப் பகிரவும்",
+      "resendInviteError": "அழைப்பை மீண்டும் அனுப்ப முடியவில்லை."
     },
     "usageStats": {
       "inputTokens": "உள்ளீட்டு டோக்கன்கள்",
@@ -3291,7 +3369,8 @@
     "noneChosen": "எதுவும் தேர்ந்தெடுக்கப்படவில்லை",
     "emptyTitle": "உரையாக்க மாதிரிகள் இல்லை",
     "emptyDescription": "Kilo Gateway தற்போது உரையாக்க மாதிரிகளை வழங்கவில்லை.",
-    "loadFailed": "உரையாக்க மாதிரிகளை ஏற்ற முடியவில்லை."
+    "loadFailed": "உரையாக்க மாதிரிகளை ஏற்ற முடியவில்லை.",
+    "choose": "ஒரு மாதிரியைத் தேர்ந்தெடுக்கவும்"
   },
   "voiceLanguage": {
     "title": "குரல் உள்ளீட்டு மொழி",
@@ -3536,8 +3615,6 @@
       "quantizations": "குவாண்டைசேஷன்கள்",
       "quantizationsHelp": "சிறிய கோப்புகள் குறைந்த நினைவகத்தையும் சேமிப்பகத்தையும் பயன்படுத்தும். பெரிய கோப்புகள் பொதுவாகச் சிறந்த பதில்களைத் தரும்.",
       "quantDetail": "{{size}} பதிவிறக்கம் · சுமார் {{memory}} நினைவகம்",
-      "downloadQuant": "{{quant}} ஐப் பதிவிறக்கவும்",
-      "downloadModelA11y": "{{name}} ஐப் பதிவிறக்கவும்",
       "detailsA11y": "விவரங்கள்: {{name}}",
       "loadingModel": "மாதிரி விவரங்கள் ஏற்றப்படுகின்றன",
       "couldNotLoadModel": "இந்த மாதிரியை ஏற்ற முடியவில்லை",
@@ -3582,7 +3659,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "இந்த மாதிரி சிந்தனை அளவை ஆதரிக்கிறது"
-    }
+    },
+    "creditsRequired": "இந்தச் செய்தியை அனுப்ப போதுமான கிரெடிட்கள் இல்லை. கிரெடிட்களைச் சேர்த்து மீண்டும் முயற்சிக்கவும்."
   },
   "settingsTools": {
     "confirmTitle": "இந்த மாற்றத்தை உறுதிப்படுத்தவா?"
@@ -3618,7 +3696,9 @@
     "spend24h": "கடந்த 24 மணிநேர செலவு",
     "multiplierError": "1 அல்லது அதற்கு மேற்பட்ட பெருக்கியை உள்ளிடு",
     "permissionDenied": "செலவு எச்சரிக்கைகளை நிர்வகிக்க உங்களுக்கு அனுமதி இல்லை.",
-    "pushOffByCategory": "அறிவிப்புகளில் அணைக்கப்பட்டது"
+    "pushOffByCategory": "அறிவிப்புகளில் அணைக்கப்பட்டது",
+    "multiplierMaxError": "{{max}} அல்லது அதற்குக் குறைவான பெருக்கியை உள்ளிடு",
+    "thresholdMaxError": "{{max}} அல்லது அதற்குக் குறைவான தொகையை உள்ளிடவும்."
   },
   "profiles": {
     "title": "சுயவிவரங்கள்",
@@ -3743,16 +3823,16 @@
       "stepsPlaceholder": "எ.கா. 50",
       "temperature": "வெப்பநிலை",
       "temperaturePlaceholder": "எ.கா. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "எ.கா. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "என் முகவர்",
       "promptPlaceholder": "நீங்கள் ஒரு ...",
       "tools": "கருவிகள்",
       "visibility": "தெரிவுநிலை",
-      "visibilityPrimary": "முதன்மை - பிக்கரில் காட்டப்பட்டுள்ளது",
-      "visibilitySubagent": "துணை - மற்றவர்களிடமிருந்து மட்டுமே அழைக்க முடியும்",
-      "visibilityAll": "அனைத்தும் - இரண்டும்",
+      "visibilityPrimary": "முதன்மை — பிக்கரில் காட்டப்பட்டுள்ளது",
+      "visibilitySubagent": "துணை — மற்றவர்களிடமிருந்து மட்டுமே அழைக்க முடியும்",
+      "visibilityAll": "அனைத்தும் — இரண்டும்",
       "modePrimary": "முதன்மை மட்டும்",
       "modeSubagent": "துணை மட்டும்",
       "modeAll": "அனைத்து பயன்முறைகள்",
@@ -3805,7 +3885,9 @@
       "pinFailed": "ரெப்போவை பின் செய்ய முடியவில்லை",
       "unboundToast": "ரெப்போ கட்டுப்படாதது",
       "unbindFailed": "ரெப்போவை அவிழ்க்க முடியவில்லை"
-    }
+    },
+    "variablesDeleteFailed": "மாறியை நீக்க முடியவில்லை",
+    "deleteCommand": "{{position}} கட்டளையை நீக்கவும்"
   },
   "credits": {
     "title": "கிரெடிட்களை வாங்கவும்",
@@ -3841,7 +3923,8 @@
       "archive": "காப்பகப்படுத்தவும்",
       "unarchive": "காப்பகத்திலிருந்து மீட்டெடுக்கவும்",
       "deleteTitle": "{{name}} நீக்கவா?",
-      "deleteMessage": "அதன் பணிகளும் நீக்கப்படும். அவற்றின் அமர்வுகள் இருக்கும்."
+      "deleteMessage": "அதன் பணிகளும் நீக்கப்படும். அவற்றின் அமர்வுகள் இருக்கும்.",
+      "createFailed": "பட்டியலை உருவாக்க முடியவில்லை"
     },
     "listSettings": {
       "title": "பட்டியல் அமைப்புகள்",
@@ -3999,6 +4082,7 @@
     "estimatePricingUnavailable": "இந்த மாடலுக்கான விலை விவரம் கிடைக்கவில்லை.",
     "estimateBalanceUnavailable": "கட்டண சுருக்கத்திற்கு போதுமான இருப்பு இல்லை.",
     "estimateModelNotAllowed": "இந்த மாடல் இங்கு அனுமதிக்கப்படவில்லை.",
-    "estimateSpendLimitTooLow": "இந்த சுருக்கத்தை அனுமதிக்க செலவு பாதுகாப்பு வரம்பை உயர்த்தவும்."
+    "estimateSpendLimitTooLow": "இந்த சுருக்கத்தை அனுமதிக்க செலவு பாதுகாப்பு வரம்பை உயர்த்தவும்.",
+    "saved": "சுருக்க அமைப்புகள் சேமிக்கப்பட்டன"
   }
 }

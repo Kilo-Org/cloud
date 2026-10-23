@@ -293,7 +293,8 @@
     "condenseToolCallsSubtitle": "Ardışık araç çağrılarını açabileceğin tek bir satırda grupla.",
     "toolSummaryTranslation": "Araç özetlerini çevir",
     "toolSummaryTranslationSubtitle": "Her araç özetini uygulama dilinize çevirmesi için bir modele gönderin. Çeviri başarısız olursa özgün metin gösterilir.",
-    "toolSummaryTranslationModelUnavailableNotice": "Bu model artık sunulmuyor. Başka bir tane seçmek için $t(common.model) öğesine dokun."
+    "toolSummaryTranslationModelUnavailableNotice": "Bu model artık sunulmuyor. Başka bir tane seçmek için $t(common.model) öğesine dokun.",
+    "autoExpandThinkingInactiveSubtitle": "Düşünce ayrıntıları gizliyken hiçbir etkisi olmaz."
   },
   "notifications": {
     "liveActivities": "Canlı etkinlikler",
@@ -916,7 +917,15 @@
       "pullRequestUrl": "Çekme isteği URL'si",
       "start": "İncelemeyi başlat",
       "starting": "İnceleme başlatılıyor…",
-      "title": "Manuel inceleme"
+      "title": "Manuel inceleme",
+      "startNotFound": "Bu {{requestNoun}}, {{provider}} üzerinden okunamadı. URL'yi ve deponun erişilebilir olup olmadığını kontrol et.",
+      "startRateLimited": "{{provider}} şu anda istekleri sınırlıyor. Birkaç dakika sonra tekrar dene.",
+      "startNotAllowed": "Bu {{requestNoun}} için inceleme başlatma erişimin yok. İzinlerini ve kuruluşunun planını kontrol et.",
+      "startProviderNeedsAttention": "Manuel incelemeler standart {{provider}} bağlantısına ihtiyaç duyar. Bağlantıyı kur ve tekrar dene.",
+      "startAlreadyRunning": "Bu {{requestNoun}} için bir inceleme zaten çalışıyor.",
+      "startRejected": "Bu {{requestNoun}} incelenemiyor. Açık olduğundan, taslak olmadığından ve URL'nin doğru olduğundan emin ol.",
+      "startProviderUnavailable": "{{provider}} servisine ulaşılamadı ve bu {{requestNoun}} okunamadı. Tekrar dene.",
+      "startFailed": "İnceleme başlatılamadı. Bağlantını kontrol et ve tekrar dene."
     },
     "notConnectedReadOnly": "{{platform}} bağlı değil. Yalnızca kuruluş sahipleri ve yöneticiler bağlayabilir.",
     "gitlab": {
@@ -979,7 +988,13 @@
       "sessionError": "Oturum hatası: {{error}}.",
       "statusWithValue": "Durum: {{status}}",
       "toolName": "Araç: {{name}}",
-      "toolNameError": "{{name}} aracında hata oluştu."
+      "toolNameError": "{{name}} aracında hata oluştu.",
+      "cancelReasonSuperseded": "Daha yeni bir işlem gönderildi, bu yüzden bu inceleme değiştirildi.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} bağlantısı kesildi, bu yüzden bu inceleme iptal edildi. Yeniden bağlan, sonra incelemeyi tekrar çalıştır.",
+      "cancelReasonBitbucketReviewerDisabled": "Bitbucket için Code Reviewer kapatıldı, bu yüzden bu inceleme iptal edildi. Yeniden etkinleştir, sonra incelemeyi tekrar çalıştır.",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket çekme isteği değişti, bu yüzden bu inceleme değiştirildi.",
+      "cancelReasonCancelled": "Bu inceleme iptal edildi.",
+      "cancelReasonInterrupted": "Bu inceleme kesintiye uğradı."
     },
     "reviewList": {
       "configureProvider": "Sağlayıcıyı yapılandır",
@@ -1388,7 +1403,7 @@
       "couldNotLoad": "Güvenlik ajanı yüklenemedi.",
       "installApp": "GitHub uygulamasını yükle",
       "reauthorizeButton": "GitHub uygulamasını yeniden yetkilendir",
-      "reauthorizeDescription": "Güvenlik ajanının Dependabot uyarılarına erişebilmesi için vulnerability_alerts izni gerekir. Bu izni vermek için GitHub uygulamasını yeniden yetkilendir.",
+      "reauthorizeDescription": "Güvenlik ajanının Dependabot uyarılarını okuyabilmesi için izin gerekir. Bu izni vermek için GitHub uygulamasını yeniden yetkilendir.",
       "reauthorizeTitle": "Ek izinler gerekiyor",
       "setupFailed": "GitHub kurulumu başlatılamadı. Lütfen tekrar dene."
     },
@@ -1595,7 +1610,8 @@
       "dollar_other": "dolar",
       "costSpoken": "maliyet: {{cost}}",
       "costSpokenWithTime": "maliyet {{cost}}, {{time}}",
-      "pullRequest": "{{number}} numaralı çekme isteği"
+      "pullRequest": "{{number}} numaralı çekme isteği",
+      "spokenJoiner": "ve"
     },
     "githubInstall": {
       "couldNotOpenMessage": "GitHub uygulamasının kurulumu başlatılamadı. Lütfen tekrar dene.",
@@ -1950,7 +1966,71 @@
       "preparationComplete": "Hazırlık tamamlandı",
       "preparationFailed": "Hazırlık başarısız oldu",
       "setupCommand": "Kurulum komutu {{index}}",
-      "setupCommandOf": "Kurulum komutu {{index}} / {{displayCount}}"
+      "setupCommandOf": "Kurulum komutu {{index}} / {{displayCount}}",
+      "stepWorkspaceSetup": "Çalışma alanı kurulumu",
+      "stepDiskCheck": "Disk denetimi",
+      "stepCloning": "Depo klonlanıyor",
+      "stepBranch": "Dal ayarlanıyor",
+      "stepDevcontainerSetup": "Geliştirme konteyneri kurulumu",
+      "stepWorkspaceRestore": "Çalışma alanı geri yükleniyor",
+      "stepWorkspaceBackup": "Çalışma alanı kaydediliyor",
+      "stepSandboxProvision": "Kum havuzu sağlanıyor",
+      "stepSandboxBoot": "Kum havuzu başlatılıyor",
+      "stepSnapshotFallback": "Anlık görüntüsüz yeniden deneniyor",
+      "stepKiloServer": "Kilo başlatılıyor",
+      "stepKiloSession": "Oturum hazırlanıyor",
+      "stepRestoreIncomplete": "Oturum geri yüklemesi tamamlanamadı",
+      "stepReady": "Ortam hazır",
+      "stepFailed": "Ortam kurulumu başarısız oldu",
+      "stepUnknown": "Ortam kurulumu",
+      "detailCreatingSandbox": "Kum havuzu oluşturuluyor",
+      "detailUpdatingRepository": "Depo güncelleniyor",
+      "detailCheckingOutBranch": "Dal kontrol ediliyor",
+      "detailRunningSetupCommands": "Kurulum komutları çalıştırılıyor",
+      "detailSavingRepository": "Depo daha hızlı başlangıçlar için kaydediliyor",
+      "detailStartingKiloRuntime": "Kilo çalışma zamanı başlatılıyor",
+      "detailPreparingKiloSession": "Kilo oturumu hazırlanıyor",
+      "detailWaitingForPreviousSandbox": "Önceki kum havuzunun durması bekleniyor",
+      "detailRetryingSandboxCreation": "Kum havuzu oluşturma yeniden deneniyor",
+      "detailPreviousSnapshotFailed": "Önceki anlık görüntüyle başlatma başarısız oldu. Anlık görüntüsüz yeniden deneniyor.",
+      "detailSnapshotStartupFailed": "Anlık görüntüyle başlatma başarısız oldu. Anlık görüntüsüz yeniden deneniyor.",
+      "detailStartingSandboxWithoutSnapshot": "Kum havuzu anlık görüntüsüz başlatılıyor",
+      "detailSettingUpWorkspace": "Çalışma alanı kuruluyor",
+      "detailRestoringSession": "Oturum geri yükleniyor",
+      "detailWarmWorkspaceReused": "Sıcak çalışma alanı yeniden kullanıldı",
+      "detailRetryingClone": "Klon yeniden deneniyor (deneme {{attempt}} / {{total}})",
+      "detailSetupCommandFailed": "Kurulum komutu {{index}} başarısız oldu",
+      "detailSetupCommandTimedOut": "Kurulum komutu {{index}} zaman aşımına uğradı",
+      "detailColdRestore": "Soğuk geri yükleme, anlık görüntü uygulandı, {{total}} dosyadan {{applied}} tanesi geri yüklendi",
+      "detailProgressPercent": "%{{percent}} tamamlandı",
+      "detailRestoreIncompleteReport": "Oturum geri yüklemesi tamamlanamadı: {{total}} dosyadan {{skipped}} tanesi geri yüklenmedi ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Eksik: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} ve {{omitted}} dosya daha",
+      "detailReasonPatchFailed": "yama uygulanamadı",
+      "detailReasonOutsideWorkspace": "yol çalışma alanının dışında",
+      "detailReasonMissingContent": "anlık görüntüde dosya içeriği yoktu",
+      "detailReasonIndexResetFailed": "başarısız uygulamanın ardından dizin sıfırlanamadı",
+      "detailReasonUnlinkFailed": "dosya kaldırılamadı",
+      "detailReasonWriteFailed": "dosya yazılamadı",
+      "detailReasonUnknown": "bilinmeyen bir neden",
+      "detailUnknown": "Hâlâ hazırlanıyor",
+      "errorPreparationTimeout": "Ortam hazırlama zaman aşımına uğradı",
+      "errorWorkspaceSetupFailed": "Çalışma alanı kurulumu başarısız oldu",
+      "errorCredentialUpgradeRequired": "Bu oturumda gerekli bir kimlik bilgisi yükseltmesi eksik. Devam etmek için yeni bir oturum başlatın.",
+      "errorAgentUnavailable": "Aracı kullanılamaz hale geldi",
+      "errorBillingBlocked": "Kum havuzu faturalandırması ek kredi gerektiriyor",
+      "errorBillingUnavailable": "Kum havuzu faturalandırma veya kapasite doğrulaması kullanılamıyor. Kısa süre sonra tekrar deneyin.",
+      "errorContainerLimitReached": "Konteyner sınırına ulaşıldı. Yeni bir tane başlatmadan önce mevcut bir konteyneri durdurun.",
+      "errorInvalidConfiguration": "Kum havuzu yapılandırması geçersiz veya desteklenmiyor",
+      "errorRuntimeArtifactUnauthorized": "Çalışma zamanı indirmesi yetkilendirilmedi",
+      "errorRuntimeArtifactInvalid": "Çalışma zamanı yapıtı doğrulaması başarısız oldu",
+      "errorRuntimeCliProbeFailed": "Çalışma zamanı CLI doğrulaması başarısız oldu",
+      "errorRuntimeSupervisorMissing": "Çalışma zamanı süpervizörü eksik",
+      "errorConnectionLost": "Kum havuzu bağlantısı kesildi",
+      "errorSandboxLost": "Kum havuzu kaybedildi",
+      "errorAgentRestarted": "Aracı yeniden başlatıldı",
+      "errorSandboxOutOfMemory": "Kum havuzu belleği tükendi",
+      "errorPreparationDidNotComplete": "Hazırlık tamamlanmadı"
     },
     "permissionCard": {
       "title": "İzin gerekli",
@@ -2555,7 +2635,8 @@
       "gitlabDescription": "Mobilde birleştirme isteklerini gözden geçirmek için GitLab hesabını bağla.",
       "bitbucketDescription": "Mobilde çekme isteklerini gözden geçirmek için Bitbucket'ı bu kuruluşla bağla.",
       "bitbucketOrgOnlyDescription": "Yukarıdaki hesabı bir kuruluşa geçir, onun Bitbucket çekme isteklerini gözden geçirmek için.",
-      "contextLine": "{{organization}} için"
+      "contextLine": "{{organization}} için",
+      "contextLinePersonal": "Kişisel hesabınız için"
     },
     "connectionExpired": "GitHub bağlantısının süresi doldu.",
     "couldNotLoadPullRequest": "Çekme isteği yüklenemedi.",
@@ -3023,22 +3104,16 @@
     "boundary": {
       "backToProfile": "Profile geri dön",
       "loadErrorMessage": "Bağlantını kontrol edip tekrar dene.",
-
       "chooseAccount": "Bir hesap seç",
       "loadErrorTitle": "Kuruluşların yüklenemedi.",
       "membershipLostNotice": "Bu kuruluşa artık erişimin yok. {{target}}'e geçildi.",
       "noOrganization": "Kuruluş yok",
-
       "noOrganizationDescription": "Bu hesap bir kuruluşun parçası değil. Üye davetleri ve düşük bakiye uyarıları gibi kuruluş özelliklerini kullanmak için web sitesinde bir kuruluş oluştur veya birine katıl.",
-
       "openWebOrganizations": "Kuruluşları web sitesinde aç",
-
       "organizationUnavailable": "Kuruluş kullanılamıyor.",
       "selectDescriptionWithOrganizations": "Bir veya daha fazla kuruluşa aitsin. Bu ekranın kullanması gereken hesabı seç.",
-
       "selectOrganization": "Bir kuruluş seç",
       "unavailableDescription": "Bu kuruluş artık kullanılamıyor. Devam etmek için profilinden başka bir kuruluş seç.",
-
       "unavailableSessionsDescription": "Bu kuruluş artık kullanılamıyor. Oturumları yüklenemiyor.",
       "accessDeniedDescription": "Bu kuruluşa erişimin yok."
     },
@@ -3073,7 +3148,9 @@
       "permissionDenied": "Üye davet etme iznin yok.",
       "roleMember": "Rol: Üye",
       "sendInvite": "Davet gönder",
-      "title": "Üye davet et"
+      "title": "Üye davet et",
+      "alreadyInvited": "Bu kişi zaten davet edilmiş veya zaten üye.",
+      "sendError": "Davet gönderilemedi."
     },
     "invoices": {
       "downloadA11y": "{{number}} numaralı faturayı indir",
@@ -3142,7 +3219,8 @@
       "inviteCreated": "Davet oluşturuldu",
       "pendingInvitations": "Bekleyen davetler",
       "resendInvite": "Daveti yeniden gönder",
-      "shareInviteLink": "Davet bağlantısını paylaş"
+      "shareInviteLink": "Davet bağlantısını paylaş",
+      "resendInviteError": "Davet yeniden gönderilemedi."
     },
     "usageStats": {
       "inputTokens": "Girdi tokenları",
@@ -3291,7 +3369,8 @@
     "noneChosen": "Hiçbiri seçilmedi",
     "emptyTitle": "Metne dönüştürme modeli yok",
     "emptyDescription": "Kilo Gateway şu anda metne dönüştürme modeli sunmuyor.",
-    "loadFailed": "Metne dönüştürme modelleri yüklenemedi."
+    "loadFailed": "Metne dönüştürme modelleri yüklenemedi.",
+    "choose": "Bir model seç"
   },
   "voiceLanguage": {
     "title": "Sesli giriş dili",
@@ -3536,8 +3615,6 @@
       "quantizations": "Nicemlemeler",
       "quantizationsHelp": "Küçük dosyalar daha az bellek ve depolama alanı kullanır. Büyük dosyalar genellikle daha iyi yanıtlar verir.",
       "quantDetail": "{{size}} indirme · yaklaşık {{memory}} bellek",
-      "downloadQuant": "{{quant}} indir",
-      "downloadModelA11y": "{{name}} indir",
       "detailsA11y": "Ayrıntılar: {{name}}",
       "loadingModel": "Model ayrıntıları yükleniyor",
       "couldNotLoadModel": "Bu model yüklenemedi",
@@ -3582,7 +3659,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "Bu model düşünme düzeyini destekler"
-    }
+    },
+    "creditsRequired": "Bu mesajı göndermek için yeterli kredi yok. Kredi ekle ve tekrar dene."
   },
   "settingsTools": {
     "confirmTitle": "Bu değişiklik onaylansın mı?"
@@ -3618,7 +3696,9 @@
     "spend24h": "Son 24 saatteki harcama",
     "multiplierError": "1 veya daha büyük bir çarpan gir",
     "permissionDenied": "Harcama uyarılarını yönetme iznin yok.",
-    "pushOffByCategory": "Bildirimler'de kapalı"
+    "pushOffByCategory": "Bildirimler'de kapalı",
+    "multiplierMaxError": "{{max}} veya daha küçük bir çarpan gir",
+    "thresholdMaxError": "{{max}} veya daha az bir tutar gir."
   },
   "profiles": {
     "title": "Profiller",
@@ -3743,7 +3823,7 @@
       "stepsPlaceholder": "örn. 50",
       "temperature": "Sıcaklık",
       "temperaturePlaceholder": "örn. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "örn. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Temsilcim",
@@ -3752,7 +3832,7 @@
       "visibility": "Görünürlük",
       "visibilityPrimary": "Birincil — seçicide gösterilir",
       "visibilitySubagent": "Alt temsilci — yalnızca başkaları tarafından aranabilir",
-      "visibilityAll": "Hepsi - ikisi de",
+      "visibilityAll": "Hepsi — ikisi de",
       "modePrimary": "Yalnızca birincil",
       "modeSubagent": "Yalnızca alt temsilci",
       "modeAll": "Tüm modlar",
@@ -3805,7 +3885,9 @@
       "pinFailed": "Repo sabitlenemedi",
       "unboundToast": "Repo ilişkisiz",
       "unbindFailed": "Deponun bağlantısı kaldırılamadı"
-    }
+    },
+    "variablesDeleteFailed": "Değişken silinemedi",
+    "deleteCommand": "{{position}}. komutu sil"
   },
   "credits": {
     "title": "Kredi satın al",
@@ -3841,7 +3923,8 @@
       "archive": "Arşivle",
       "unarchive": "Arşivden çıkar",
       "deleteTitle": "{{name}} silinsin mi?",
-      "deleteMessage": "Görevleri de silinir. Oturumları kalır."
+      "deleteMessage": "Görevleri de silinir. Oturumları kalır.",
+      "createFailed": "Liste oluşturulamadı"
     },
     "listSettings": {
       "title": "Liste ayarları",
@@ -3999,6 +4082,7 @@
     "estimatePricingUnavailable": "Bu model için fiyatlandırma mevcut değil.",
     "estimateBalanceUnavailable": "Ücretli özet için bakiye yetersiz.",
     "estimateModelNotAllowed": "Bu model burada kullanılamaz.",
-    "estimateSpendLimitTooLow": "Bu önete izin vermek için harcama limitini yükseltin."
+    "estimateSpendLimitTooLow": "Bu önete izin vermek için harcama limitini yükseltin.",
+    "saved": "Özet ayarları kaydedildi"
   }
 }

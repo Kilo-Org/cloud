@@ -293,7 +293,8 @@
     "condenseToolCallsSubtitle": "Elkartu jarraian dauden tresna-deiak ireki dezakezun errenkada batean.",
     "toolSummaryTranslation": "Itzuli tresnen laburpenak",
     "toolSummaryTranslationSubtitle": "Bidali tresna-laburpen bakoitza eredu batera zure aplikazioaren hizkuntzara itzultzeko. Jatorrizkoa erakutsiko da itzulpenak huts eginez gero.",
-    "toolSummaryTranslationModelUnavailableNotice": "Eredu hau jada ez da eskaintzen. Sakatu $t(common.model) beste bat hautatzeko."
+    "toolSummaryTranslationModelUnavailableNotice": "Eredu hau jada ez da eskaintzen. Sakatu $t(common.model) beste bat hautatzeko.",
+    "autoExpandThinkingInactiveSubtitle": "Ez du eraginik pentsamenduaren xehetasunak ezkutatuta dauden bitartean."
   },
   "prReview": {
     "pullRequestUnavailable": "Bateratze-eskaera ez dago eskuragarri",
@@ -669,7 +670,8 @@
       "gitlabDescription": "Konektatu zure GitLab kontua merge-eskaerak mugikorrean berrikusteko.",
       "bitbucketDescription": "Konektatu Bitbucket erakunde honetara bateratze-eskaerak mugikorrean berrikusteko.",
       "bitbucketOrgOnlyDescription": "Aldatu goiko kontua erakunde batera haren Bitbucket bateratze-eskaerak berrikusteko.",
-      "contextLine": "{{organization}}-rako"
+      "contextLine": "{{organization}}-rako",
+      "contextLinePersonal": "Zure kontu pertsonalerako"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1452,7 +1454,13 @@
       "sessionError": "Errore bat gertatu da saioan: {{error}}.",
       "statusWithValue": "Egoera: {{status}}",
       "toolName": "Tresna: {{name}}",
-      "toolNameError": "{{name}} tresnak errore bat izan du."
+      "toolNameError": "{{name}} tresnak errore bat izan du.",
+      "cancelReasonSuperseded": "Commit berri bat push egin da, beraz berrikuspen hau ordeztu da.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} deskonektatuta dago, beraz berrikuspen hau bertan behera utzi da. Konektatu berriro, eta exekutatu berrikuspena berriro.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer itzali egin da Bitbucket-erako, beraz berrikuspen hau bertan behera utzi da. Gaitu berriro, eta exekutatu berrikuspena berriro.",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket-eko pull requesta aldatu da, beraz berrikuspen hau ordeztu da.",
+      "cancelReasonCancelled": "Berrikuspen hau bertan behera utzi da.",
+      "cancelReasonInterrupted": "Berrikuspen hau eten da."
     },
     "reviewMemory": {
       "title": "Berrikuspen-memoria",
@@ -1479,7 +1487,15 @@
       "instructions": "Argibideak (aukerakoak)",
       "instructionsPlaceholder": "Berrikusleak aztertu beharreko zerbait zehatza…",
       "starting": "Berrikuspena hasten…",
-      "start": "Hasi berrikuspena"
+      "start": "Hasi berrikuspena",
+      "startNotFound": "Ezin izan da {{requestNoun}} hori irakurri {{provider}} hornitzailetik. Egiaztatu URLa eta biltegia eskuragarria dela.",
+      "startRateLimited": "{{provider}} eskaerak mugatzen ari da une honetan. Saiatu berriro minutu batzuen buruan.",
+      "startNotAllowed": "Ez duzu {{requestNoun}} horren berrikuspena hasteko baimenik. Egiaztatu zure baimenak eta zure erakundearen plana.",
+      "startProviderNeedsAttention": "Eskuzko berrikusek {{provider}} konexio estandarra behar dute. Konektatu eta saiatu berriro.",
+      "startAlreadyRunning": "{{requestNoun}} horren berrikuspen bat dagoeneko abian da.",
+      "startRejected": "Ezin da {{requestNoun}} hori berrikusi. Ziurtatu irekia dagoela, zirriborroa ez dela eta URLa zuzena dela.",
+      "startProviderUnavailable": "Ezin izan da {{provider}} atzitu {{requestNoun}} hori irakurtzeko. Saiatu berriro.",
+      "startFailed": "Ezin izan da berrikuspena hasi. Egiaztatu zure konexioa eta saiatu berriro."
     },
     "notConnectedReadOnly": "{{platform}} ez dago konektatuta. Erakundeko jabeek eta administratzaileek soilik konekta dezakete.",
     "gitlab": {
@@ -1948,7 +1964,7 @@
       "couldNotLoad": "Ezin izan da segurtasun-agentea kargatu.",
       "installApp": "Instalatu GitHub aplikazioa",
       "reauthorizeButton": "Baimendu berriro GitHub aplikazioa",
-      "reauthorizeDescription": "Segurtasun-agenteak vulnerability_alerts baimena behar du Dependabot-en abisuak atzitzeko. Baimendu berriro GitHub aplikazioa baimen hori emateko.",
+      "reauthorizeDescription": "Segurtasun-agenteak baimena behar du Dependabot-en abisuak irakurtzeko. Baimendu berriro GitHub aplikazioa baimen hori emateko.",
       "reauthorizeTitle": "Baimen gehigarriak behar dira",
       "setupFailed": "Ezin izan da GitHub konfiguratzeko prozesua hasi. Saiatu berriro."
     },
@@ -2112,7 +2128,8 @@
       "dollar_other": "dolar",
       "costSpoken": "kostua: {{cost}}",
       "costSpokenWithTime": "kostua: {{cost}}, {{time}}",
-      "pullRequest": "{{number}}. bateratze-eskaera"
+      "pullRequest": "{{number}}. bateratze-eskaera",
+      "spokenJoiner": "eta"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ezin izan da GitHub ireki",
@@ -2467,7 +2484,71 @@
       "preparationComplete": "Prestaketa amaituta",
       "preparationFailed": "Prestaketak huts egin du",
       "setupCommand": "{{index}}. konfigurazio-komandoa",
-      "setupCommandOf": "{{index}}. konfigurazio-komandoa ({{displayCount}} guztira)"
+      "setupCommandOf": "{{index}}. konfigurazio-komandoa ({{displayCount}} guztira)",
+      "stepWorkspaceSetup": "Lan-eremuaren konfigurazioa",
+      "stepDiskCheck": "Disko-egiaztapena",
+      "stepCloning": "Biltegia klonatzen",
+      "stepBranch": "Adarra konfiguratzen",
+      "stepDevcontainerSetup": "Dev edukiontziaren konfigurazioa",
+      "stepWorkspaceRestore": "Lan-eremua berrezartzen",
+      "stepWorkspaceBackup": "Lan-eremua gordetzen",
+      "stepSandboxProvision": "Sandbox-a hornitzen",
+      "stepSandboxBoot": "Sandbox-a abiarazten",
+      "stepSnapshotFallback": "Snapshotik gabe berriro saiatzen",
+      "stepKiloServer": "Kilo abiarazten",
+      "stepKiloSession": "Saioa prestatzen",
+      "stepRestoreIncomplete": "Saioaren berrezartzea osatu gabe",
+      "stepReady": "Ingurunea prest",
+      "stepFailed": "Ingurumenaren konfigurazioak huts egin du",
+      "stepUnknown": "Ingurumenaren konfigurazioa",
+      "detailCreatingSandbox": "Sandbox-a sortzen",
+      "detailUpdatingRepository": "Biltegia eguneratzen",
+      "detailCheckingOutBranch": "Adarrera aldatzen",
+      "detailRunningSetupCommands": "Konfigurazio-komandoak exekutatzen",
+      "detailSavingRepository": "Biltegia gordetzen azkarrago abiarazteko",
+      "detailStartingKiloRuntime": "Kilo exekuzio-ingurunea abiarazten",
+      "detailPreparingKiloSession": "Kilo saioa prestatzen",
+      "detailWaitingForPreviousSandbox": "Aurreko sandbox-a gelditzearen zain",
+      "detailRetryingSandboxCreation": "Sandbox-a sortzen berriro saiatzen",
+      "detailPreviousSnapshotFailed": "Aurreko snapshot-aren abioak huts egin du. Snapshotik gabe berriro saiatzen.",
+      "detailSnapshotStartupFailed": "Snapshot-aren abioak huts egin du. Snapshotik gabe berriro saiatzen.",
+      "detailStartingSandboxWithoutSnapshot": "Sandbox-a abiarazten snapshotik gabe",
+      "detailSettingUpWorkspace": "Lan-eremua konfiguratzen",
+      "detailRestoringSession": "Saioa berrezartzen",
+      "detailWarmWorkspaceReused": "Lan-eremu epela berrerabili da",
+      "detailRetryingClone": "Klonatzen berriro saiatzen ({{total}} saiotatik {{attempt}}. saiakera)",
+      "detailSetupCommandFailed": "{{index}}. konfigurazio-komandoak huts egin du",
+      "detailSetupCommandTimedOut": "{{index}}. konfigurazio-komandoaren denbora-muga gainditu da",
+      "detailColdRestore": "Berrezartze hotza, snapshot-a aplikatuta, {{total}} fitxategitatik {{applied}} berrezarri dira",
+      "detailProgressPercent": "{{percent}}% osatuta",
+      "detailRestoreIncompleteReport": "Saioaren berrezartzea osatu gabe: {{total}} fitxategitatik {{skipped}} ez dira berrezarri ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Falta dira: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} eta beste {{omitted}}",
+      "detailReasonPatchFailed": "adabakia ezin izan da aplikatu",
+      "detailReasonOutsideWorkspace": "bidea lan-eremutik kanpo dago",
+      "detailReasonMissingContent": "snapshot-ak ez du fitxategiaren edukirik",
+      "detailReasonIndexResetFailed": "indizea ezin izan da berrezarri aplikazioak huts egin ondoren",
+      "detailReasonUnlinkFailed": "fitxategia ezin izan da kendu",
+      "detailReasonWriteFailed": "fitxategia ezin izan da idatzi",
+      "detailReasonUnknown": "arrazoi ezezaguna",
+      "detailUnknown": "Oraindik prestatzen",
+      "errorPreparationTimeout": "Ingurumenaren prestaketaren denbora-muga gainditu da",
+      "errorWorkspaceSetupFailed": "Lan-eremuaren konfigurazioak huts egin du",
+      "errorCredentialUpgradeRequired": "Saio honi beharrezko kredentzial-berritzea falta zaio. Jarraitzeko, hasi saio berri bat.",
+      "errorAgentUnavailable": "Agentea erabilkaitza bihurtu da",
+      "errorBillingBlocked": "Sandbox-aren fakturazioak kreditu gehiago behar ditu",
+      "errorBillingUnavailable": "Sandbox-aren fakturazioa edo edukieraren egiaztapena ez dago erabilgarri. Saiatu zaitez lasterrago berriz.",
+      "errorContainerLimitReached": "Edukiontzi-mugara iritsi da. Beste bat abiarazi aurretik, gelditu existitzen den edukiontzi bat.",
+      "errorInvalidConfiguration": "Sandbox-aren konfigurazioa baliogabea da edo ez da onartzen",
+      "errorRuntimeArtifactUnauthorized": "Exekuzio-ingurunearen deskarga ez da baimendu",
+      "errorRuntimeArtifactInvalid": "Exekuzio-ingurunearen artefaktuaren egiaztapenak huts egin du",
+      "errorRuntimeCliProbeFailed": "Exekuzio-ingurunearen CLI balidazioak huts egin du",
+      "errorRuntimeSupervisorMissing": "Exekuzio-ingurunearen gainbegiratzailea falta da",
+      "errorConnectionLost": "Sandbox-arekiko konexioa galdu da",
+      "errorSandboxLost": "Sandbox-a galdu da",
+      "errorAgentRestarted": "Agentea berrabiarazi da",
+      "errorSandboxOutOfMemory": "Sandbox-ak memoria agortu du",
+      "errorPreparationDidNotComplete": "Prestaketak ez du amaitu"
     },
     "permissionCard": {
       "title": "Baimena behar da",
@@ -3031,22 +3112,16 @@
     "boundary": {
       "backToProfile": "Itzuli profilera",
       "loadErrorMessage": "Egiaztatu konexioa eta saiatu berriro.",
-
       "chooseAccount": "Hautatu kontu bat",
       "loadErrorTitle": "Ezin izan dira zure erakundeak kargatu.",
       "membershipLostNotice": "Ez duzu jada erakunde honetarako sarbiderik. Aldatu da {{target}}-ra.",
       "noOrganization": "Erakunderik ez",
-
       "noOrganizationDescription": "Kontu hau ez da erakunde baten parte. Sortu edo batu erakunde bat webgunean, kideen gonbidapenak eta saldo baxuaren abisuak bezalako erakunde-funtzioak erabiltzeko.",
-
       "openWebOrganizations": "Ireki erakundeak webgunean",
-
       "organizationUnavailable": "Erakundea ez dago erabilgarri.",
       "selectDescriptionWithOrganizations": "Erakunde bateko edo gehiagoko kide zara. Hautatu pantaila honek erabili behar duen kontua.",
-
       "selectOrganization": "Hautatu erakunde bat",
       "unavailableDescription": "Erakunde hau jada ez dago erabilgarri. Aukeratu bat zure profiletik jarraitzeko.",
-
       "unavailableSessionsDescription": "Erakunde hau jada ez dago erabilgarri. Ezin dira kargatu haren saioak.",
       "accessDeniedDescription": "Ez duzu erakunde honetarako sarbiderik."
     },
@@ -3074,7 +3149,9 @@
       "permissionDenied": "Ez duzu kideak gonbidatzeko baimenik.",
       "roleMember": "Rola: kidea",
       "sendInvite": "Bidali gonbidapena",
-      "title": "Gonbidatu kidea"
+      "title": "Gonbidatu kidea",
+      "alreadyInvited": "Dagoeneko gonbidatuta dago edo dagoeneko kidea da.",
+      "sendError": "Ezin izan da gonbidapena bidali."
     },
     "invoices": {
       "downloadA11y": "Deskargatu {{number}} faktura",
@@ -3143,7 +3220,8 @@
       "inviteCreated": "Gonbidapena sortuta",
       "pendingInvitations": "Onartzeko zain dauden gonbidapenak",
       "resendInvite": "Bidali gonbidapena berriro",
-      "shareInviteLink": "Partekatu gonbidapen-esteka"
+      "shareInviteLink": "Partekatu gonbidapen-esteka",
+      "resendInviteError": "Ezin izan da gonbidapena berriro bidali."
     },
     "usageStats": {
       "inputTokens": "Sarrerako tokenak",
@@ -3291,7 +3369,8 @@
     "noneChosen": "Ezer hautatu gabe",
     "emptyTitle": "Ez dago transkripzio-eredurik",
     "emptyDescription": "Kilo Gateway-k ez du transkripzio-eredurik eskaintzen oraintxe.",
-    "loadFailed": "Ezin izan dira transkripzio-ereduak kargatu."
+    "loadFailed": "Ezin izan dira transkripzio-ereduak kargatu.",
+    "choose": "Hautatu eredu bat"
   },
   "voiceLanguage": {
     "title": "Ahots-sarreraren hizkuntza",
@@ -3536,8 +3615,6 @@
       "quantizations": "Kuantizazioak",
       "quantizationsHelp": "Fitxategi txikiagoek memoria eta biltegiratze gutxiago erabiltzen dute. Fitxategi handiagoek erantzun hobeak ematen dituzte normalean.",
       "quantDetail": "{{size}} deskargatzeko · {{memory}} memoria inguru",
-      "downloadQuant": "Deskargatu {{quant}}",
-      "downloadModelA11y": "Deskargatu {{name}}",
       "detailsA11y": "Xehetasunak: {{name}}",
       "loadingModel": "Modeloaren xehetasunak kargatzen",
       "couldNotLoadModel": "Ezin izan da modelo hau kargatu",
@@ -3582,7 +3659,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "Modelo honek arrazoiketa-ahalegina onartzen du"
-    }
+    },
+    "creditsRequired": "Ez dago kreditu nahiko mezu hau bidaltzeko. Gehitu kredituak eta saiatu berriro."
   },
   "settingsTools": {
     "confirmTitle": "Aldaketa hau berretsi?"
@@ -3618,7 +3696,9 @@
     "spend24h": "Azken 24 orduetako gastua",
     "multiplierError": "Sartu 1 edo handiagoa den biderkatzaile bat",
     "permissionDenied": "Ez duzu gastu-alertak kudeatzeko baimenik.",
-    "pushOffByCategory": "Jakinarazpenetan itzalita"
+    "pushOffByCategory": "Jakinarazpenetan itzalita",
+    "multiplierMaxError": "Sartu {{max}} edo txikiagoa den biderkatzaile bat",
+    "thresholdMaxError": "Sartu {{max}} edo txikiagoa den zenbateko bat."
   },
   "profiles": {
     "title": "Profilak",
@@ -3743,16 +3823,16 @@
       "stepsPlaceholder": "adib. 50",
       "temperature": "Tenperatura",
       "temperaturePlaceholder": "adib. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "adib. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Nire agentea",
       "promptPlaceholder": "bat zara...",
       "tools": "Tresnak",
       "visibility": "Ikusgarritasuna",
-      "visibilityPrimary": "Lehen mailakoa: hautatzailean agertzen da",
-      "visibilitySubagent": "Azpi-agentea - besteengandik bakarrik dei daiteke",
-      "visibilityAll": "Guztiak - biak",
+      "visibilityPrimary": "Lehen mailakoa — hautatzailean agertzen da",
+      "visibilitySubagent": "Azpi-agentea — besteengandik bakarrik dei daiteke",
+      "visibilityAll": "Guztiak — biak",
       "modePrimary": "Lehen mailakoa soilik",
       "modeSubagent": "Azpi-agentea soilik",
       "modeAll": "Guztiak",
@@ -3805,7 +3885,9 @@
       "pinFailed": "Ezin izan da repo ainguratu",
       "unboundToast": "Repo lotu gabe",
       "unbindFailed": "Ezin izan da biltegia deslotu"
-    }
+    },
+    "variablesDeleteFailed": "Ezin izan da aldagaia ezabatu",
+    "deleteCommand": "Ezabatu {{position}}. komandoa"
   },
   "credits": {
     "title": "Erosi kredituak",
@@ -3841,7 +3923,8 @@
       "archive": "Artxibatu",
       "unarchive": "Desartxibatu",
       "deleteTitle": "Ezabatu {{name}}?",
-      "deleteMessage": "Bere zereginak ere ezabatzen dira. Saioak mantendu egiten dira."
+      "deleteMessage": "Bere zereginak ere ezabatzen dira. Saioak mantendu egiten dira.",
+      "createFailed": "Ezin izan da zerrenda sortu"
     },
     "listSettings": {
       "title": "Zerrendaren ezarpenak",
@@ -3999,6 +4082,7 @@
     "estimateInputTooLarge": "Epe honek ebidentzia gehiegi ditu hautatutako eredurako.",
     "estimatePermissionUnavailable": "Ez duzu testuinguru honen saldoa erabiltzeko baimenik.",
     "createFailed": "Ezin izan da laburpen hau sortu.",
-    "reviewFailed": "Ezin izan da laburpen hau berrikusi."
+    "reviewFailed": "Ezin izan da laburpen hau berrikusi.",
+    "saved": "Laburpenaren ezarpenak gorde dira."
   }
 }

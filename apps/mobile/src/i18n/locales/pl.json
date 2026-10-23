@@ -293,7 +293,8 @@
     "condenseToolCallsSubtitle": "Grupuj kolejne wywołania narzędzi w jednym wierszu, który możesz otworzyć.",
     "toolSummaryTranslation": "Tłumacz podsumowania narzędzi",
     "toolSummaryTranslationSubtitle": "Wyślij każde podsumowanie narzędzia do modelu, aby przetłumaczył je na język Twojej aplikacji. Jeśli tłumaczenie się nie powiedzie, wyświetlany jest oryginał.",
-    "toolSummaryTranslationModelUnavailableNotice": "Ten model nie jest już oferowany. Dotknij $t(common.model), aby wybrać inny."
+    "toolSummaryTranslationModelUnavailableNotice": "Ten model nie jest już oferowany. Dotknij $t(common.model), aby wybrać inny.",
+    "autoExpandThinkingInactiveSubtitle": "Nie działa, gdy szczegóły rozumowania są ukryte."
   },
   "notifications": {
     "liveActivities": "Aktywności na żywo",
@@ -922,7 +923,15 @@
       "pullRequestUrl": "Adres URL PR",
       "start": "Rozpocznij przegląd",
       "starting": "Rozpoczynanie przeglądu…",
-      "title": "Ręczny przegląd"
+      "title": "Ręczny przegląd",
+      "startNotFound": "Nie udało się odczytać tego {{requestNoun}} z {{provider}}. Sprawdź adres URL i czy repozytorium jest dostępne.",
+      "startRateLimited": "{{provider}} ogranicza obecnie liczbę żądań. Spróbuj ponownie za kilka minut.",
+      "startNotAllowed": "Nie masz uprawnień, aby rozpocząć przegląd tego {{requestNoun}}. Sprawdź swoje uprawnienia oraz plan swojej organizacji.",
+      "startProviderNeedsAttention": "Przeglądy ręczne wymagają standardowego połączenia z {{provider}}. Połącz je i spróbuj ponownie.",
+      "startAlreadyRunning": "Przegląd tego {{requestNoun}} jest już uruchomiony.",
+      "startRejected": "Nie można przeprowadzić przeglądu tego {{requestNoun}}. Upewnij się, że jest otwarty, nie jest szkicem, oraz że adres URL jest poprawny.",
+      "startProviderUnavailable": "Nie udało się połączyć z {{provider}}, aby odczytać ten {{requestNoun}}. Spróbuj ponownie.",
+      "startFailed": "Nie udało się rozpocząć przeglądu. Sprawdź połączenie i spróbuj ponownie."
     },
     "notConnectedReadOnly": "Brak połączenia z {{platform}}. Tylko właściciele organizacji i administratorzy mogą je skonfigurować.",
     "gitlab": {
@@ -985,7 +994,13 @@
       "sessionError": "Wystąpił błąd sesji: {{error}}.",
       "statusWithValue": "Stan: {{status}}",
       "toolName": "Narzędzie: {{name}}",
-      "toolNameError": "Wystąpił błąd narzędzia: {{name}}."
+      "toolNameError": "Wystąpił błąd narzędzia: {{name}}.",
+      "cancelReasonSuperseded": "Wypchnięto nowszy commit, więc ten przegląd został zastąpiony.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} jest rozłączony, więc ten przegląd został anulowany. Połącz go ponownie, a następnie ponów przegląd.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer został wyłączony dla Bitbucket, więc ten przegląd został anulowany. Włącz go ponownie, a następnie ponów przegląd.",
+      "cancelReasonBitbucketPullRequestChanged": "Pull request w Bitbucket uległ zmianie, więc ten przegląd został zastąpiony.",
+      "cancelReasonCancelled": "Ten przegląd został anulowany.",
+      "cancelReasonInterrupted": "Ten przegląd został przerwany."
     },
     "reviewList": {
       "configureProvider": "Skonfiguruj dostawcę",
@@ -1400,7 +1415,7 @@
       "couldNotLoad": "Nie udało się wczytać agenta bezpieczeństwa.",
       "installApp": "Zainstaluj aplikację GitHub",
       "reauthorizeButton": "Autoryzuj ponownie aplikację GitHub",
-      "reauthorizeDescription": "Agent bezpieczeństwa wymaga uprawnienia vulnerability_alerts, aby uzyskać dostęp do alertów Dependabot. Autoryzuj ponownie aplikację GitHub, aby przyznać to uprawnienie.",
+      "reauthorizeDescription": "Agent bezpieczeństwa wymaga uprawnienia do odczytu alertów Dependabot. Autoryzuj ponownie aplikację GitHub, aby przyznać to uprawnienie.",
       "reauthorizeTitle": "Wymagane dodatkowe uprawnienia",
       "setupFailed": "Nie udało się rozpocząć konfiguracji GitHub. Spróbuj ponownie."
     },
@@ -1617,7 +1632,8 @@
       "dollar_many": "dolarów",
       "costSpoken": "koszt {{cost}}",
       "costSpokenWithTime": "koszt {{cost}}, {{time}}",
-      "pullRequest": "PR {{number}}"
+      "pullRequest": "PR {{number}}",
+      "spokenJoiner": "i"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Nie udało się rozpocząć konfiguracji aplikacji GitHub. Spróbuj ponownie.",
@@ -1982,7 +1998,71 @@
       "preparationComplete": "Zakończono przygotowanie",
       "preparationFailed": "Przygotowanie nie powiodło się",
       "setupCommand": "Polecenie konfiguracyjne {{index}}",
-      "setupCommandOf": "Polecenie konfiguracyjne {{index}} z {{displayCount}}"
+      "setupCommandOf": "Polecenie konfiguracyjne {{index}} z {{displayCount}}",
+      "stepWorkspaceSetup": "Konfiguracja przestrzeni roboczej",
+      "stepDiskCheck": "Sprawdzanie dysku",
+      "stepCloning": "Klonowanie repozytorium",
+      "stepBranch": "Konfigurowanie gałęzi",
+      "stepDevcontainerSetup": "Konfiguracja kontenera deweloperskiego",
+      "stepWorkspaceRestore": "Przywracanie przestrzeni roboczej",
+      "stepWorkspaceBackup": "Zapisywanie przestrzeni roboczej",
+      "stepSandboxProvision": "Aprowizacja piaskownicy",
+      "stepSandboxBoot": "Uruchamianie piaskownicy",
+      "stepSnapshotFallback": "Ponawianie bez migawki",
+      "stepKiloServer": "Uruchamianie Kilo",
+      "stepKiloSession": "Przygotowywanie sesji",
+      "stepRestoreIncomplete": "Przywracanie sesji niekompletne",
+      "stepReady": "Środowisko gotowe",
+      "stepFailed": "Konfiguracja środowiska nie powiodła się",
+      "stepUnknown": "Konfiguracja środowiska",
+      "detailCreatingSandbox": "Tworzenie piaskownicy",
+      "detailUpdatingRepository": "Aktualizowanie repozytorium",
+      "detailCheckingOutBranch": "Przełączanie na gałąź",
+      "detailRunningSetupCommands": "Uruchamianie poleceń konfiguracyjnych",
+      "detailSavingRepository": "Zapisywanie repozytorium dla szybszego uruchamiania",
+      "detailStartingKiloRuntime": "Uruchamianie środowiska wykonawczego Kilo",
+      "detailPreparingKiloSession": "Przygotowywanie sesji Kilo",
+      "detailWaitingForPreviousSandbox": "Oczekiwanie na zatrzymanie poprzedniej piaskownicy",
+      "detailRetryingSandboxCreation": "Ponawianie tworzenia piaskownicy",
+      "detailPreviousSnapshotFailed": "Uruchomienie z poprzedniej migawki nie powiodło się. Ponawianie bez migawki.",
+      "detailSnapshotStartupFailed": "Uruchomienie z migawki nie powiodło się. Ponawianie bez migawki.",
+      "detailStartingSandboxWithoutSnapshot": "Uruchamianie piaskownicy bez migawki",
+      "detailSettingUpWorkspace": "Konfigurowanie przestrzeni roboczej",
+      "detailRestoringSession": "Przywracanie sesji",
+      "detailWarmWorkspaceReused": "Ponownie użyto rozgrzanej przestrzeni roboczej",
+      "detailRetryingClone": "Ponawianie klonowania (próba {{attempt}} z {{total}})",
+      "detailSetupCommandFailed": "Polecenie konfiguracyjne {{index}} nie powiodło się",
+      "detailSetupCommandTimedOut": "Upłynął limit czasu polecenia konfiguracyjnego {{index}}",
+      "detailColdRestore": "Przywracanie na zimno, zastosowano migawkę, przywrócono {{applied}} z {{total}} plików",
+      "detailProgressPercent": "Ukończono {{percent}}%",
+      "detailRestoreIncompleteReport": "Przywracanie sesji niekompletne: nie przywrócono {{skipped}} z {{total}} plików ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Brakujące: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} i jeszcze {{omitted}}",
+      "detailReasonPatchFailed": "łatka nie została zastosowana",
+      "detailReasonOutsideWorkspace": "ścieżka znajduje się poza przestrzenią roboczą",
+      "detailReasonMissingContent": "migawka nie zawierała zawartości pliku",
+      "detailReasonIndexResetFailed": "nie udało się zresetować indeksu po nieudanym zastosowaniu",
+      "detailReasonUnlinkFailed": "nie udało się usunąć pliku",
+      "detailReasonWriteFailed": "nie udało się zapisać pliku",
+      "detailReasonUnknown": "nieznany powód",
+      "detailUnknown": "Nadal przygotowujemy",
+      "errorPreparationTimeout": "Upłynął limit czasu przygotowania środowiska",
+      "errorWorkspaceSetupFailed": "Konfiguracja przestrzeni roboczej nie powiodła się",
+      "errorCredentialUpgradeRequired": "Ta sesja wymaga wymuszonego uaktualnienia poświadczeń. Rozpocznij nową sesję, aby kontynuować.",
+      "errorAgentUnavailable": "Agent stał się niedostępny",
+      "errorBillingBlocked": "Rozliczanie piaskownicy wymaga dodatkowych kredytów",
+      "errorBillingUnavailable": "Weryfikacja rozliczeń lub pojemności piaskownicy jest niedostępna. Spróbuj ponownie wkrótce.",
+      "errorContainerLimitReached": "Osiągnięto limit kontenerów. Zatrzymaj istniejący kontener przed uruchomieniem kolejnego.",
+      "errorInvalidConfiguration": "Konfiguracja piaskownicy jest nieprawidłowa lub nieobsługiwana",
+      "errorRuntimeArtifactUnauthorized": "Pobieranie środowiska wykonawczego nie zostało autoryzowane",
+      "errorRuntimeArtifactInvalid": "Weryfikacja artefaktu środowiska wykonawczego nie powiodła się",
+      "errorRuntimeCliProbeFailed": "Walidacja CLI środowiska wykonawczego nie powiodła się",
+      "errorRuntimeSupervisorMissing": "Brak nadzorcy środowiska wykonawczego",
+      "errorConnectionLost": "Utracono połączenie z piaskownicą",
+      "errorSandboxLost": "Piaskownica została utracona",
+      "errorAgentRestarted": "Agent został uruchomiony ponownie",
+      "errorSandboxOutOfMemory": "Piaskownicy zabrakło pamięci",
+      "errorPreparationDidNotComplete": "Przygotowanie nie zostało ukończone"
     },
     "permissionCard": {
       "title": "Wymagana zgoda",
@@ -2605,7 +2685,8 @@
       "gitlabDescription": "Połącz konto GitLab, aby przeglądać merge requesty na telefonie.",
       "bitbucketDescription": "Połącz Bitbucket z tą organizacją, aby przeglądać PR-y na telefonie.",
       "bitbucketOrgOnlyDescription": "Przełącz konto powyżej na organizację, aby przeglądać jej PR-y na Bitbucketu.",
-      "contextLine": "Dla {{organization}}"
+      "contextLine": "Dla {{organization}}",
+      "contextLinePersonal": "Dla konta osobistego"
     },
     "connectionExpired": "Połączenie z serwisem GitHub wygasło.",
     "couldNotLoadPullRequest": "Nie udało się wczytać PR.",
@@ -3103,22 +3184,16 @@
     "boundary": {
       "backToProfile": "Wróć do profilu",
       "loadErrorMessage": "Sprawdź połączenie i spróbuj ponownie.",
-
       "chooseAccount": "Wybierz konto",
       "loadErrorTitle": "Nie udało się wczytać twoich organizacji.",
       "membershipLostNotice": "Nie masz już dostępu do tej organizacji. Przełączono na {{target}}.",
       "noOrganization": "Brak organizacji",
-
       "noOrganizationDescription": "To konto nie należy do organizacji. Utwórz organizację lub dołącz do niej w przeglądarce, aby korzystać z funkcji organizacji, takich jak zaproszenia dla członków i alerty o niskim saldzie.",
-
       "openWebOrganizations": "Otwórz organizacje w przeglądarce",
-
       "organizationUnavailable": "Organizacja jest niedostępna.",
       "selectDescriptionWithOrganizations": "Należysz do jednej lub więcej organizacji. Wybierz konto, którego ma używać ten ekran.",
-
       "selectOrganization": "Wybierz organizację",
       "unavailableDescription": "Ta organizacja nie jest już dostępna. Wybierz inną w swoim profilu, aby kontynuować.",
-
       "unavailableSessionsDescription": "Ta organizacja nie jest już dostępna. Nie można wczytać jej sesji.",
       "accessDeniedDescription": "Nie masz dostępu do tej organizacji."
     },
@@ -3153,7 +3228,9 @@
       "permissionDenied": "Nie masz uprawnień do zapraszania członków.",
       "roleMember": "Przypisana rola: członek.",
       "sendInvite": "Wyślij zaproszenie",
-      "title": "Zaproś członka"
+      "title": "Zaproś członka",
+      "alreadyInvited": "Ten adres e-mail ma już oczekujące zaproszenie lub należy już do członka tej organizacji.",
+      "sendError": "Nie udało się wysłać zaproszenia."
     },
     "invoices": {
       "downloadA11y": "Pobierz fakturę {{number}}",
@@ -3222,7 +3299,8 @@
       "inviteCreated": "Utworzono zaproszenie",
       "pendingInvitations": "Oczekujące zaproszenia",
       "resendInvite": "Wyślij zaproszenie ponownie",
-      "shareInviteLink": "Udostępnij link do zaproszenia"
+      "shareInviteLink": "Udostępnij link do zaproszenia",
+      "resendInviteError": "Nie udało się wysłać zaproszenia ponownie."
     },
     "usageStats": {
       "inputTokens": "Tokeny wejściowe",
@@ -3373,7 +3451,8 @@
     "noneChosen": "Nie wybrano",
     "emptyTitle": "Brak modeli transkrypcji",
     "emptyDescription": "Kilo Gateway nie oferuje teraz żadnych modeli transkrypcji.",
-    "loadFailed": "Nie udało się wczytać modeli transkrypcji."
+    "loadFailed": "Nie udało się wczytać modeli transkrypcji.",
+    "choose": "Wybierz model"
   },
   "voiceLanguage": {
     "title": "Język dyktowania",
@@ -3620,8 +3699,6 @@
       "quantizations": "Kwantyzacje",
       "quantizationsHelp": "Mniejsze pliki zajmują mniej pamięci i miejsca. Większe pliki zwykle dają lepsze odpowiedzi.",
       "quantDetail": "Pobieranie: {{size}} · ok. {{memory}} pamięci",
-      "downloadQuant": "Pobierz {{quant}}",
-      "downloadModelA11y": "Pobierz {{name}}",
       "detailsA11y": "Szczegóły: {{name}}",
       "loadingModel": "Wczytywanie szczegółów modelu",
       "couldNotLoadModel": "Nie udało się wczytać tego modelu",
@@ -3666,7 +3743,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "Ten model obsługuje poziom rozumowania"
-    }
+    },
+    "creditsRequired": "Brak wystarczającej liczby kredytów, aby wysłać tę wiadomość. Doładuj konto i spróbuj ponownie."
   },
   "settingsTools": {
     "confirmTitle": "Potwierdzić tę zmianę?"
@@ -3702,7 +3780,9 @@
     "spend24h": "Wydatki z ostatnich 24 godzin",
     "multiplierError": "Podaj mnożnik równy 1 lub większy",
     "permissionDenied": "Nie masz uprawnień do zarządzania alertami o wydatkach.",
-    "pushOffByCategory": "Wyłączone w Powiadomieniach"
+    "pushOffByCategory": "Wyłączone w Powiadomieniach",
+    "multiplierMaxError": "Podaj mnożnik równy {{max}} lub mniejszy",
+    "thresholdMaxError": "Wpisz kwotę {{max}} lub mniejszą."
   },
   "profiles": {
     "title": "Profile",
@@ -3833,7 +3913,7 @@
       "stepsPlaceholder": "np. 50",
       "temperature": "Temperatura",
       "temperaturePlaceholder": "np. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "np. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Mój agent",
@@ -3842,7 +3922,7 @@
       "visibility": "Widoczność",
       "visibilityPrimary": "Podstawowy — pokazany w selektorze",
       "visibilitySubagent": "Subagent — można go wywołać tylko od innych osób",
-      "visibilityAll": "Wszyscy – oba",
+      "visibilityAll": "Wszyscy — oba",
       "modePrimary": "Tylko podstawowy",
       "modeSubagent": "Tylko subagent",
       "modeAll": "Wszystkie tryby",
@@ -3895,7 +3975,9 @@
       "pinFailed": "Nie udało się przypiąć repozytorium",
       "unboundToast": "Repo niezwiązane",
       "unbindFailed": "Nie można odłączyć repozytorium"
-    }
+    },
+    "variablesDeleteFailed": "Nie udało się usunąć zmiennej",
+    "deleteCommand": "Usuń polecenie {{position}}"
   },
   "credits": {
     "title": "Kup kredyty",
@@ -3935,7 +4017,8 @@
       "archive": "Zarchiwizuj",
       "unarchive": "Przywróć z archiwum",
       "deleteTitle": "Usunąć {{name}}?",
-      "deleteMessage": "Jej zadania też zostaną usunięte. Sesje pozostaną."
+      "deleteMessage": "Jej zadania też zostaną usunięte. Sesje pozostaną.",
+      "createFailed": "Nie udało się utworzyć listy"
     },
     "listSettings": {
       "title": "Ustawienia listy",
@@ -4097,6 +4180,7 @@
     "estimatePricingUnavailable": "Cennik tego modelu jest niedostępny.",
     "estimateBalanceUnavailable": "Brak wystarczających środków na płatne podsumowanie.",
     "estimateModelNotAllowed": "Ten model nie jest tu dozwolony.",
-    "estimateSpendLimitTooLow": "Zwiększ limit wydatków, aby umożliwić to podsumowanie."
+    "estimateSpendLimitTooLow": "Zwiększ limit wydatków, aby umożliwić to podsumowanie.",
+    "saved": "Zapisano ustawienia raportu"
   }
 }

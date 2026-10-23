@@ -293,7 +293,8 @@
     "condenseToolCallsSubtitle": "Ardıcıl alət çağırışlarını aça biləcəyiniz bir sətirdə qruplaşdırın.",
     "toolSummaryTranslation": "Alət xülasələrini tərcümə et",
     "toolSummaryTranslationSubtitle": "Hər alət xülasəsini tətbiq dilinə tərcümə etmək üçün modelə göndərin. Tərcümə uğursuz olarsa, orijinal göstərilir.",
-    "toolSummaryTranslationModelUnavailableNotice": "Bu model artıq təklif edilmir. Başqasını seçmək üçün $t(common.model) üzərinə toxunun."
+    "toolSummaryTranslationModelUnavailableNotice": "Bu model artıq təklif edilmir. Başqasını seçmək üçün $t(common.model) üzərinə toxunun.",
+    "autoExpandThinkingInactiveSubtitle": "Düşüncə təfərrüatları gizli olanda təsiri yoxdur."
   },
   "prReview": {
     "pullRequestUnavailable": "Birləşdirmə sorğusu əlçatan deyil",
@@ -669,7 +670,8 @@
       "gitlabDescription": "Mobil cihazda merge sorğularına baxış keçirmək üçün GitLab hesabını qoş.",
       "bitbucketDescription": "Mobil cihazda birləşdirmə sorğularına baxış keçirmək üçün Bitbucket-ı bu təşkilata qoş.",
       "bitbucketOrgOnlyDescription": "Yuxarıdakı hesabı təşkilata keçir ki, onun Bitbucket birləşdirmə sorğularına baxış keçirəsən.",
-      "contextLine": "{{organization}} üçün"
+      "contextLine": "{{organization}} üçün",
+      "contextLinePersonal": "Şəxsi hesabınız üçün"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1452,7 +1454,13 @@
       "sessionError": "Sessiyada xəta baş verdi: {{error}}.",
       "statusWithValue": "Vəziyyət: {{status}}",
       "toolName": "Alət: {{name}}",
-      "toolNameError": "{{name}} alətində xəta baş verdi."
+      "toolNameError": "{{name}} alətində xəta baş verdi.",
+      "cancelReasonSuperseded": "Daha yeni bir commit push edildiyi üçün bu yoxlama əvəz edildi.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} qoşulmayıb, bu səbəbdən bu yoxlama ləğv edildi. Onu yenidən qoş, sonra yoxlamanı təkrarla.",
+      "cancelReasonBitbucketReviewerDisabled": "Bitbucket üçün Code Reviewer deaktiv edildiyindən bu yoxlama ləğv edildi. Onu yenidən aktivləşdir, sonra yoxlamanı təkrarla.",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket pull request-i dəyişdiyindən bu yoxlama əvəz edildi.",
+      "cancelReasonCancelled": "Bu yoxlama ləğv edildi.",
+      "cancelReasonInterrupted": "Bu yoxlama kəsildi."
     },
     "reviewMemory": {
       "title": "Yoxlama yaddaşı",
@@ -1479,7 +1487,15 @@
       "instructions": "Təlimatlar (istəyə bağlı)",
       "instructionsPlaceholder": "Yoxlama zamanı xüsusi diqqət tələb edən məqamlar…",
       "starting": "Kod yoxlaması başlayır…",
-      "start": "Yoxlamaya başla"
+      "start": "Yoxlamaya başla",
+      "startNotFound": "Həmin {{requestNoun}} {{provider}} üzərindən oxuna bilmədi. URL-i və deponun əlçatanlığını yoxla.",
+      "startRateLimited": "{{provider}} hazırda sorğuları məhdudlaşdırır. Bir neçə dəqiqədən sonra yenidən cəhd et.",
+      "startNotAllowed": "Həmin {{requestNoun}} üçün yoxlamanı başlatmaq icazən yoxdur. İcazətlərini və təşkilatının planını yoxla.",
+      "startProviderNeedsAttention": "Əl ilə yoxlamalar standart {{provider}} bağlantısı tələb edir. Onu qoş və yenidən cəhd et.",
+      "startAlreadyRunning": "Həmin {{requestNoun}} üçün yoxlama artıq davam edir.",
+      "startRejected": "Bu {{requestNoun}} yoxlana bilməz. Onun açıq, qaralama olmadığından və URL-nin düzgün olduğundan əmin ol.",
+      "startProviderUnavailable": "Həmin {{requestNoun}} məlumatlarını {{provider}}-dan oxumaq mümkün olmadı. Yenidən cəhd et.",
+      "startFailed": "Yoxlamanı başlatmaq mümkün olmadı. Bağlantını yoxla və yenidən cəhd et."
     },
     "notConnectedReadOnly": "{{platform}} qoşulmayıb. Onu yalnız təşkilat sahibləri və inzibatçılar qoşa bilər.",
     "gitlab": {
@@ -1948,7 +1964,7 @@
       "couldNotLoad": "Təhlükəsizlik agentini yükləmək mümkün olmadı.",
       "installApp": "GitHub tətbiqini quraşdır",
       "reauthorizeButton": "GitHub tətbiqinə yenidən icazə ver",
-      "reauthorizeDescription": "Təhlükəsizlik agentinə Dependabot bildirişlərinə giriş üçün vulnerability_alerts icazəsi lazımdır. Bu icazəni vermək üçün GitHub tətbiqinə yenidən icazə ver.",
+      "reauthorizeDescription": "Təhlükəsizlik agentinə Dependabot bildirişlərini oxumaq üçün icazə lazımdır. Bu icazəni vermək üçün GitHub tətbiqinə yenidən icazə ver.",
       "reauthorizeTitle": "Əlavə icazələr tələb olunur",
       "setupFailed": "GitHub quraşdırmasını başlatmaq mümkün olmadı. Yenidən cəhd et."
     },
@@ -2112,7 +2128,8 @@
       "dollar_other": "dollar",
       "costSpoken": "xərc: {{cost}}",
       "costSpokenWithTime": "xərc {{cost}}, {{time}}",
-      "pullRequest": "birləşdirmə sorğusu {{number}}"
+      "pullRequest": "birləşdirmə sorğusu {{number}}",
+      "spokenJoiner": "və"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub açıla bilmədi",
@@ -2467,7 +2484,71 @@
       "preparationComplete": "Hazırlıq tamamlandı",
       "preparationFailed": "Hazırlıq uğursuz oldu",
       "setupCommand": "Quraşdırma əmri: {{index}}",
-      "setupCommandOf": "Quraşdırma əmri: {{index}} / {{displayCount}}"
+      "setupCommandOf": "Quraşdırma əmri: {{index}} / {{displayCount}}",
+      "stepWorkspaceSetup": "İş sahəsi quraşdırması",
+      "stepDiskCheck": "Disk yoxlanışı",
+      "stepCloning": "Repository klonlaşdırılır",
+      "stepBranch": "Branch quraşdırılır",
+      "stepDevcontainerSetup": "Dev konteyner quraşdırması",
+      "stepWorkspaceRestore": "İş sahəsi bərpa olunur",
+      "stepWorkspaceBackup": "İş sahəsi saxlanılır",
+      "stepSandboxProvision": "Sandbox təmin edilir",
+      "stepSandboxBoot": "Sandbox başladılır",
+      "stepSnapshotFallback": "Snapshot olmadan yenidən cəhd edilir",
+      "stepKiloServer": "Kilo başladılır",
+      "stepKiloSession": "Seans hazırlanır",
+      "stepRestoreIncomplete": "Seans bərpası natamamdır",
+      "stepReady": "Mühit hazırdır",
+      "stepFailed": "Mühit quraşdırması uğursuz oldu",
+      "stepUnknown": "Mühit quraşdırması",
+      "detailCreatingSandbox": "Sandbox yaradılır",
+      "detailUpdatingRepository": "Repository yenilənir",
+      "detailCheckingOutBranch": "Branch seçilir",
+      "detailRunningSetupCommands": "Quraşdırma əmrləri icra olunur",
+      "detailSavingRepository": "Daha sürətli başlanğıc üçün repository saxlanılır",
+      "detailStartingKiloRuntime": "Kilo iş vaxtı başladılır",
+      "detailPreparingKiloSession": "Kilo seansı hazırlanır",
+      "detailWaitingForPreviousSandbox": "Əvvəlki sandboxın dayanması gözlənilir",
+      "detailRetryingSandboxCreation": "Sandbox yaradılması yenidən cəhd edilir",
+      "detailPreviousSnapshotFailed": "Snapshot ilə başlanğıc uğursuz oldu. Snapshot olmadan yenidən cəhd edilir.",
+      "detailSnapshotStartupFailed": "Snapshot ilə başlanğıc uğursuz oldu. Snapshot olmadan yenidən cəhd edilir.",
+      "detailStartingSandboxWithoutSnapshot": "Snapshot olmadan sandbox başladılır",
+      "detailSettingUpWorkspace": "İş sahəsi quraşdırılır",
+      "detailRestoringSession": "Seans bərpa olunur",
+      "detailWarmWorkspaceReused": "İsti iş sahəsi yenidən istifadə olundu",
+      "detailRetryingClone": "Klon yenidən cəhd edilir ({{total}} cəhddən {{attempt}})",
+      "detailSetupCommandFailed": "Quraşdırma əmri {{index}} uğursuz oldu",
+      "detailSetupCommandTimedOut": "Quraşdırma əmri {{index}} vaxtı bitdi",
+      "detailColdRestore": "Soyutma bərpası, snapshot tətbiq edildi, {{total}} fayldan {{applied}} bərpa olundu",
+      "detailProgressPercent": "{{percent}}% tamamlandı",
+      "detailRestoreIncompleteReport": "Seans bərpası natamamdır: {{total}} fayldan {{skipped}} bərpa olunmadı ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Əskik: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} və daha {{omitted}}",
+      "detailReasonPatchFailed": "patch tətbiq edilmədi",
+      "detailReasonOutsideWorkspace": "yol iş sahəsindən kənardadır",
+      "detailReasonMissingContent": "snapshot fayl üçün məzmun daşımırdı",
+      "detailReasonIndexResetFailed": "uğursuz tətbiqdən sonra indeks sıfırlanmadı",
+      "detailReasonUnlinkFailed": "fayl silinə bilmədi",
+      "detailReasonWriteFailed": "fayl yazıla bilmədi",
+      "detailReasonUnknown": "naməlum səbəb",
+      "detailUnknown": "Hələ hazırlanır",
+      "errorPreparationTimeout": "Mühit hazırlığının vaxtı bitdi",
+      "errorWorkspaceSetupFailed": "İş sahəsi quraşdırması uğursuz oldu",
+      "errorCredentialUpgradeRequired": "Bu seansta tələb olunan kimlik sertifikatı yenilənməsi yoxdur. Davam etmək üçün yeni seans başladın.",
+      "errorAgentUnavailable": "Agent əlçatmaz oldu",
+      "errorBillingBlocked": "Sandbox billing üçün əlavə kredit tələb olunur",
+      "errorBillingUnavailable": "Sandbox billing və ya tutum yoxlanışı əlçatmazdır. Bir azdan yenidən cəhd edin.",
+      "errorContainerLimitReached": "Konteyner limitinə çatıldı. Yenisini başlatmazdan əvvəl mövcud konteyneri dayandırın.",
+      "errorInvalidConfiguration": "Sandbox konfiqurasiyası yanlış və ya dəstəklənmir",
+      "errorRuntimeArtifactUnauthorized": "Runtime yüklənməsi üçün icazə verilmədi",
+      "errorRuntimeArtifactInvalid": "Runtime artefaktının yoxlanışı uğursuz oldu",
+      "errorRuntimeCliProbeFailed": "Runtime CLI yoxlanışı uğursuz oldu",
+      "errorRuntimeSupervisorMissing": "Runtime supervisoru yoxdur",
+      "errorConnectionLost": "Sandbox bağlantısı itdi",
+      "errorSandboxLost": "Sandbox itdi",
+      "errorAgentRestarted": "Agent yenidən başladı",
+      "errorSandboxOutOfMemory": "Sandboxın yaddaşı bitdi",
+      "errorPreparationDidNotComplete": "Hazırlıq tamamlanmadı"
     },
     "permissionCard": {
       "title": "İcazə tələb olunur",
@@ -3031,22 +3112,16 @@
     "boundary": {
       "backToProfile": "Profilə qayıt",
       "loadErrorMessage": "Bağlantını yoxla və yenidən cəhd et.",
-
       "chooseAccount": "Hesab seç",
       "loadErrorTitle": "Təşkilatlarını yükləmək mümkün olmadı.",
       "membershipLostNotice": "Bu təşkilata artıq giriş icazən yoxdur. Keçid edildi: {{target}}.",
       "noOrganization": "Təşkilat yoxdur",
-
       "noOrganizationDescription": "Bu hesab heç bir təşkilatın üzvü deyil. Üzv dəvətləri və aşağı balans xəbərdarlıqları kimi təşkilat funksiyalarından istifadə etmək üçün saytda təşkilat yarat və ya ona qoşul.",
-
       "openWebOrganizations": "Təşkilatları saytda aç",
-
       "organizationUnavailable": "Təşkilat əlçatan deyil.",
       "selectDescriptionWithOrganizations": "Sən bir və ya bir neçə təşkilatın üzvüsən. Bu ekranın istifadə etməli olduğu hesabı seç.",
-
       "selectOrganization": "Təşkilat seç",
       "unavailableDescription": "Bu təşkilat artıq əlçatan deyil. Davam etmək üçün profilindən başqa təşkilat seç.",
-
       "unavailableSessionsDescription": "Bu təşkilat artıq əlçatan deyil. Onun sessiyalarını yükləmək mümkün deyil.",
       "accessDeniedDescription": "Bu təşkilata giriş icazən yoxdur."
     },
@@ -3074,7 +3149,9 @@
       "permissionDenied": "Üzv dəvət etmək icazən yoxdur.",
       "roleMember": "Rol: üzv",
       "sendInvite": "Dəvət göndər",
-      "title": "Üzv dəvət et"
+      "title": "Üzv dəvət et",
+      "alreadyInvited": "Bu e-poçt ünvanı artıq dəvət olunub və ya artıq üzvdür.",
+      "sendError": "Dəvət göndərilmədi."
     },
     "invoices": {
       "downloadA11y": "{{number}} nömrəli hesab-fakturanı endir",
@@ -3143,7 +3220,8 @@
       "inviteCreated": "Dəvət yaradıldı",
       "pendingInvitations": "Gözləyən dəvətlər",
       "resendInvite": "Dəvəti yenidən göndər",
-      "shareInviteLink": "Dəvət keçidini paylaş"
+      "shareInviteLink": "Dəvət keçidini paylaş",
+      "resendInviteError": "Dəvət yenidən göndərilmədi."
     },
     "usageStats": {
       "inputTokens": "Giriş tokenləri",
@@ -3291,7 +3369,8 @@
     "noneChosen": "Seçilməyib",
     "emptyTitle": "Səsin mətnə çevrilməsi modeli yoxdur",
     "emptyDescription": "Kilo Gateway hazırda səsin mətnə çevrilməsi modeli təklif etmir.",
-    "loadFailed": "Səsin mətnə çevrilməsi modellərini yükləmək mümkün olmadı."
+    "loadFailed": "Səsin mətnə çevrilməsi modellərini yükləmək mümkün olmadı.",
+    "choose": "Model seçin"
   },
   "voiceLanguage": {
     "title": "Səslə daxiletmə dili",
@@ -3536,8 +3615,6 @@
       "quantizations": "Kvantlaşdırmalar",
       "quantizationsHelp": "Kiçik fayllar daha az yaddaş və yer tutur. Böyük fayllar adətən daha yaxşı cavablar verir.",
       "quantDetail": "{{size}} yükləmə · təxminən {{memory}} yaddaş",
-      "downloadQuant": "{{quant}} yüklə",
-      "downloadModelA11y": "{{name}} yüklə",
       "detailsA11y": "Detallar: {{name}}",
       "loadingModel": "Model məlumatları yüklənir",
       "couldNotLoadModel": "Bu modeli yükləmək mümkün olmadı",
@@ -3582,7 +3659,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "Bu model düşünmə səviyyəsini dəstəkləyir"
-    }
+    },
+    "creditsRequired": "Bu mesajı göndərmək üçün kifayət qədər kredit yoxdur. Kredit əlavə edin və yenidən cəhd edin."
   },
   "settingsTools": {
     "confirmTitle": "Bu dəyişiklik təsdiqlənsin?"
@@ -3618,7 +3696,9 @@
     "spend24h": "Son 24 saatda xərc",
     "multiplierError": "1 və ya daha böyük əmsal daxil et",
     "permissionDenied": "Xərc bildirişlərini idarə etmək icazən yoxdur.",
-    "pushOffByCategory": "Bildirişlərdə söndürülüb"
+    "pushOffByCategory": "Bildirişlərdə söndürülüb",
+    "multiplierMaxError": "{{max}} və ya daha az əmsal daxil et",
+    "thresholdMaxError": "{{max}} və ya daha az məbləğ daxil et."
   },
   "profiles": {
     "title": "Profillər",
@@ -3743,7 +3823,7 @@
       "stepsPlaceholder": "məs. 50",
       "temperature": "Temperatur",
       "temperaturePlaceholder": "məs. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "məs. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Mənim Agentim",
@@ -3752,7 +3832,7 @@
       "visibility": "Görünüş",
       "visibilityPrimary": "Əsas — seçicidə göstərilir",
       "visibilitySubagent": "Subagent — yalnız başqalarından zəng etmək olar",
-      "visibilityAll": "Hamısı - hər ikisi",
+      "visibilityAll": "Hamısı — hər ikisi",
       "modePrimary": "Yalnız əsas",
       "modeSubagent": "Yalnız subagent",
       "modeAll": "Hamısı",
@@ -3805,7 +3885,9 @@
       "pinFailed": "Repo bağlamaq mümkün olmadı",
       "unboundToast": "Repo bağlanmamışdır",
       "unbindFailed": "Repo bağlamaq mümkün olmadı"
-    }
+    },
+    "variablesDeleteFailed": "Dəyişəni silmək mümkün olmadı",
+    "deleteCommand": "{{position}} nömrəli əmri sil"
   },
   "credits": {
     "title": "Kredit al",
@@ -3841,7 +3923,8 @@
       "archive": "Arxivləşdir",
       "unarchive": "Arxivdən çıxar",
       "deleteTitle": "{{name}} silinsin?",
-      "deleteMessage": "Onun tapşırıqları da silinir. Sessiyaları qalır."
+      "deleteMessage": "Onun tapşırıqları da silinir. Sessiyaları qalır.",
+      "createFailed": "Siyahını yaratmaq mümkün olmadı"
     },
     "listSettings": {
       "title": "Siyahı parametrləri",
@@ -3999,6 +4082,7 @@
     "estimatePricingUnavailable": "Bu model üçün qiymətləndirmə mövcud deyil.",
     "estimateBalanceUnavailable": "Ödənişli icmal üçün balans kifayət etmir.",
     "estimateModelNotAllowed": "Bu model burada icazə verilmir.",
-    "estimateSpendLimitTooLow": "Bu icmalın icazəsi üçün xərcləmə limitini artırın."
+    "estimateSpendLimitTooLow": "Bu icmalın icazəsi üçün xərcləmə limitini artırın.",
+    "saved": "Brifinq ayarları yadda saxlanıldı."
   }
 }

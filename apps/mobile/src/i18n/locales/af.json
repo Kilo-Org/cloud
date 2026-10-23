@@ -293,7 +293,8 @@
     "condenseToolCallsSubtitle": "Groepeer opeenvolgende nutsmiddel-oproepe in een ry wat jy kan oopmaak.",
     "toolSummaryTranslation": "Vertaal hulpmiddelopsommings",
     "toolSummaryTranslationSubtitle": "Stuur elke hulpmiddelopsomming na 'n model om dit in jou app-taal te vertaal. Die oorspronklike word gewys as die vertaling misluk.",
-    "toolSummaryTranslationModelUnavailableNotice": "Hierdie model word nie meer aangebied nie. Tik op $t(common.model) om 'n ander een te kies."
+    "toolSummaryTranslationModelUnavailableNotice": "Hierdie model word nie meer aangebied nie. Tik op $t(common.model) om 'n ander een te kies.",
+    "autoExpandThinkingInactiveSubtitle": "Geen uitwerking terwyl denke-besonderhede versteek is nie."
   },
   "prReview": {
     "pullRequestUnavailable": "Trekversoek onbeskikbaar",
@@ -669,7 +670,8 @@
       "gitlabDescription": "Koppel jou GitLab-rekening om merge requests op jou foon te hersien.",
       "bitbucketDescription": "Koppel Bitbucket aan hierdie organisasie om trekversoeke op jou foon te hersien.",
       "bitbucketOrgOnlyDescription": "Skakel die rekening hierbo oor na 'n organisasie om sy Bitbucket-trekversoeke te hersien.",
-      "contextLine": "Vir {{organization}}"
+      "contextLine": "Vir {{organization}}",
+      "contextLinePersonal": "Vir jou persoonlike rekening"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1452,7 +1454,13 @@
       "sessionError": "Die sessie het 'n fout opgelewer: {{error}}",
       "statusWithValue": "Huidige status: {{status}}",
       "toolName": "Hulpmiddel: {{name}}",
-      "toolNameError": "'N Fout het by die hulpmiddel {{name}} voorgekom."
+      "toolNameError": "'N Fout het by die hulpmiddel {{name}} voorgekom.",
+      "cancelReasonSuperseded": "'n Nuwere commit is gepus, so is hierdie hersiening vervang.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} is afgesny, so is hierdie hersiening gekanselleer. Verbind dit weer, en voer die hersiening weer uit.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer is vir Bitbucket afgeskakel, so is hierdie hersiening gekanselleer. Skakel dit weer aan, en voer die hersiening weer uit.",
+      "cancelReasonBitbucketPullRequestChanged": "Die Bitbucket-pull request het verander, so is hierdie hersiening vervang.",
+      "cancelReasonCancelled": "Hierdie hersiening is gekanselleer.",
+      "cancelReasonInterrupted": "Hierdie hersiening is onderbreek."
     },
     "reviewMemory": {
       "title": "Hersieningsgeheue",
@@ -1479,7 +1487,15 @@
       "instructions": "Instruksies (opsioneel)",
       "instructionsPlaceholder": "Enigiets spesifieks waarop die hersiener moet fokus…",
       "starting": "Hersiening begin…",
-      "start": "Begin hersiening"
+      "start": "Begin hersiening",
+      "startNotFound": "Daardie {{requestNoun}} kon nie van {{provider}} gelees word nie. Kontroleer die URL en dat die bewaarplek toeganklik is.",
+      "startRateLimited": "{{provider}} beperk tans versoeke. Probeer oor 'n paar minute weer.",
+      "startNotAllowed": "Jy het nie toegang om 'n hersiening vir daardie {{requestNoun}} te begin nie. Kontroleer jou toestemmings en jou organisasie se plan.",
+      "startProviderNeedsAttention": "Handmatige hersienings benodig die standaard {{provider}}-koppeling. Koppel dit en probeer weer.",
+      "startAlreadyRunning": "'n Hersiening vir daardie {{requestNoun}} loop reeds.",
+      "startRejected": "Daardie {{requestNoun}} kan nie hersien word nie. Maak seker dit is oop, nie 'n konsep nie, en dat die URL korrek is.",
+      "startProviderUnavailable": "{{provider}} kon nie bereik word om daardie {{requestNoun}} te lees nie. Probeer weer.",
+      "startFailed": "Die hersiening kon nie begin word nie. Kontroleer jou verbinding en probeer weer."
     },
     "notConnectedReadOnly": "{{platform}} is nie gekoppel nie. Slegs organisasie-eienaars en administrateurs kan dit koppel.",
     "gitlab": {
@@ -1948,7 +1964,7 @@
       "couldNotLoad": "Die Sekuriteitsagent kon nie gelaai word nie.",
       "installApp": "Installeer die GitHub-app",
       "reauthorizeButton": "Magtig die GitHub-app weer",
-      "reauthorizeDescription": "Die Sekuriteitsagent benodig die vulnerability_alerts-toestemming vir toegang tot Dependabot-waarskuwings. Magtig die GitHub-app weer om hierdie toestemming te verleen.",
+      "reauthorizeDescription": "Die Sekuriteitsagent benodig toestemming om Dependabot-waarskuwings te lees. Magtig die GitHub-app weer om hierdie toestemming te verleen.",
       "reauthorizeTitle": "Bykomende toestemmings vereis",
       "setupFailed": "Kon nie GitHub-opstelling begin nie. Probeer asseblief weer."
     },
@@ -2112,7 +2128,8 @@
       "dollar_other": "dollar",
       "costSpoken": "koste {{cost}}",
       "costSpokenWithTime": "koste {{cost}}, {{time}}",
-      "pullRequest": "trekversoek {{number}}"
+      "pullRequest": "trekversoek {{number}}",
+      "spokenJoiner": "en"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kon GitHub nie oopmaak nie",
@@ -2467,7 +2484,71 @@
       "preparationComplete": "Voorbereiding voltooi",
       "preparationFailed": "Voorbereiding misluk",
       "setupCommand": "Opstelopdrag {{index}}",
-      "setupCommandOf": "Opstelopdrag {{index}} van {{displayCount}}"
+      "setupCommandOf": "Opstelopdrag {{index}} van {{displayCount}}",
+      "stepWorkspaceSetup": "Werkruimte-opstelling",
+      "stepDiskCheck": "Skyftoets",
+      "stepCloning": "Bewaarplek word gekloon",
+      "stepBranch": "Tak word opgestel",
+      "stepDevcontainerSetup": "Dev-houeropstelling",
+      "stepWorkspaceRestore": "Werkruimte word herstel",
+      "stepWorkspaceBackup": "Werkruimte word gestoor",
+      "stepSandboxProvision": "Sandbox word ingerig",
+      "stepSandboxBoot": "Sandbox word begin",
+      "stepSnapshotFallback": "Probeer weer sonder 'n momentopname",
+      "stepKiloServer": "Kilo word begin",
+      "stepKiloSession": "Sessie word voorberei",
+      "stepRestoreIncomplete": "Sessieherstel onvolledig",
+      "stepReady": "Omgewing gereed",
+      "stepFailed": "Omgewingsopstelling het misluk",
+      "stepUnknown": "Omgewingsopstelling",
+      "detailCreatingSandbox": "Sandbox word geskep",
+      "detailUpdatingRepository": "Bewaarplek word opgedateer",
+      "detailCheckingOutBranch": "Tak word uitgecheck",
+      "detailRunningSetupCommands": "Opstelopdragte word uitgevoer",
+      "detailSavingRepository": "Bewaarplek word gestoor vir vinniger aanvang",
+      "detailStartingKiloRuntime": "Kilo-looptyd word begin",
+      "detailPreparingKiloSession": "Kilo-sessie word voorberei",
+      "detailWaitingForPreviousSandbox": "Wag vir die vorige sandbox om te stop",
+      "detailRetryingSandboxCreation": "Probeer weer om sandbox te skep",
+      "detailPreviousSnapshotFailed": "Die vorige momentopname kon nie begin nie. Probeer weer sonder 'n momentopname.",
+      "detailSnapshotStartupFailed": "Die momentopname kon nie begin nie. Probeer weer sonder 'n momentopname.",
+      "detailStartingSandboxWithoutSnapshot": "Sandbox word begin sonder 'n momentopname",
+      "detailSettingUpWorkspace": "Werkruimte word opgestel",
+      "detailRestoringSession": "Sessie word herstel",
+      "detailWarmWorkspaceReused": "Warm werkruimte hergebruik",
+      "detailRetryingClone": "Probeer kloon weer (poging {{attempt}} van {{total}})",
+      "detailSetupCommandFailed": "Opstelopdrag {{index}} het misluk",
+      "detailSetupCommandTimedOut": "Opstelopdrag {{index}} se tyd het uitgeloop",
+      "detailColdRestore": "Koue herstel, momentopname toegepas, {{applied}} van {{total}} lêers herstel",
+      "detailProgressPercent": "{{percent}}% voltooi",
+      "detailRestoreIncompleteReport": "Sessieherstel onvolledig: {{skipped}} van {{total}} lêers is nie herstel nie ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Ontbreek: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} en nog {{omitted}} meer",
+      "detailReasonPatchFailed": "die pleister is nie toegepas nie",
+      "detailReasonOutsideWorkspace": "die pad is buite die werkruimte",
+      "detailReasonMissingContent": "die momentopname het geen inhoud vir die lêer bevat nie",
+      "detailReasonIndexResetFailed": "die indeks kon nie herstel word ná 'n mislukte toepassing nie",
+      "detailReasonUnlinkFailed": "die lêer kon nie verwyder word nie",
+      "detailReasonWriteFailed": "die lêer kon nie geskryf word nie",
+      "detailReasonUnknown": "'n onbekende rede",
+      "detailUnknown": "Word nog voorberei",
+      "errorPreparationTimeout": "Omgewingsvoorbereiding se tyd het uitgeloop",
+      "errorWorkspaceSetupFailed": "Werkruimte-opstelling het misluk",
+      "errorCredentialUpgradeRequired": "Hierdie sessie kort 'n vereiste geloofsbriefopgradering. Begin 'n nuwe sessie om voort te gaan.",
+      "errorAgentUnavailable": "Die agent is nie meer beskikbaar nie",
+      "errorBillingBlocked": "Sandbox-fakturering vereis addisionele krediete",
+      "errorBillingUnavailable": "Sandbox-fakturering of kapasiteitsverifikasie is nie beskikbaar nie. Probeer binnekort weer.",
+      "errorContainerLimitReached": "Houerlimiet bereik. Stop 'n bestaande houer voordat jy 'n ander een begin.",
+      "errorInvalidConfiguration": "Sandbox-konfigurasie is ongeldig of word nie ondersteun nie",
+      "errorRuntimeArtifactUnauthorized": "Looptydaflaai was nie gemagtig nie",
+      "errorRuntimeArtifactInvalid": "Looptydartefakt-verifikasie het misluk",
+      "errorRuntimeCliProbeFailed": "Looptyd-CLI-validering het misluk",
+      "errorRuntimeSupervisorMissing": "Looptydtoesighouer ontbreek",
+      "errorConnectionLost": "Die sandbox-verbinding is verloor",
+      "errorSandboxLost": "Die sandbox is verloor",
+      "errorAgentRestarted": "Die agent het herbegin",
+      "errorSandboxOutOfMemory": "Die sandbox se geheue het opgeraak",
+      "errorPreparationDidNotComplete": "Voorbereiding het nie voltooi nie"
     },
     "permissionCard": {
       "title": "Toestemming vereis",
@@ -3031,22 +3112,16 @@
     "boundary": {
       "backToProfile": "Terug na profiel",
       "loadErrorMessage": "Kontroleer jou verbinding en probeer weer.",
-
       "chooseAccount": "Kies 'n rekening",
       "loadErrorTitle": "Jou organisasies kon nie gelaai word nie.",
       "membershipLostNotice": "Jy het nie meer toegang tot hierdie organisasie nie. Oorgeskakel na {{target}}.",
       "noOrganization": "Geen organisasie",
-
       "noOrganizationDescription": "Hierdie rekening is nie deel van 'n organisasie nie. Skep of sluit by een aan op die web om organisasiefunksies soos lede-uitnodigings en waarskuwings oor lae saldo te gebruik.",
-
       "openWebOrganizations": "Maak organisasies op die web oop",
-
       "organizationUnavailable": "Die organisasie is nie beskikbaar nie.",
       "selectDescriptionWithOrganizations": "Jy behoort aan een of meer organisasies. Kies die rekening wat hierdie skerm moet gebruik.",
-
       "selectOrganization": "Kies 'n organisasie",
       "unavailableDescription": "Hierdie organisasie is nie meer beskikbaar nie. Kies een uit jou profiel om voort te gaan.",
-
       "unavailableSessionsDescription": "Hierdie organisasie is nie meer beskikbaar nie. Sessies daarvoor kan nie gelaai word nie.",
       "accessDeniedDescription": "Jy het nie toegang tot hierdie organisasie nie."
     },
@@ -3074,7 +3149,9 @@
       "permissionDenied": "Jy het nie toestemming om lede te nooi nie.",
       "roleMember": "Jou rol is lid.",
       "sendInvite": "Stuur uitnodiging",
-      "title": "Nooi lid uit"
+      "title": "Nooi lid uit",
+      "alreadyInvited": "Hulle is reeds genooi of is reeds 'n lid.",
+      "sendError": "Kon nie die uitnodiging stuur nie."
     },
     "invoices": {
       "downloadA11y": "Laai faktuur {{number}} af",
@@ -3143,7 +3220,8 @@
       "inviteCreated": "Uitnodiging geskep",
       "pendingInvitations": "Hangende uitnodigings",
       "resendInvite": "Stuur uitnodiging weer",
-      "shareInviteLink": "Deel uitnodigingskakel"
+      "shareInviteLink": "Deel uitnodigingskakel",
+      "resendInviteError": "Kon nie die uitnodiging weer stuur nie."
     },
     "usageStats": {
       "inputTokens": "Invoertekens",
@@ -3291,7 +3369,8 @@
     "noneChosen": "Geen gekies nie",
     "emptyTitle": "Geen transkripsiemodelle nie",
     "emptyDescription": "Die Kilo Gateway bied tans geen transkripsiemodelle nie.",
-    "loadFailed": "Die transkripsiemodelle kon nie gelaai word nie."
+    "loadFailed": "Die transkripsiemodelle kon nie gelaai word nie.",
+    "choose": "Kies 'n model"
   },
   "voiceLanguage": {
     "title": "Stemtaal",
@@ -3536,8 +3615,6 @@
       "quantizations": "Kwantiserings",
       "quantizationsHelp": "Kleiner lêers gebruik minder geheue en berging. Groter lêers gee gewoonlik beter antwoorde.",
       "quantDetail": "{{size}} aflaai · sowat {{memory}} geheue",
-      "downloadQuant": "Laai {{quant}} af",
-      "downloadModelA11y": "Laai {{name}} af",
       "detailsA11y": "Besonderhede: {{name}}",
       "loadingModel": "Laai tans modelbesonderhede",
       "couldNotLoadModel": "Kon nie hierdie model laai nie",
@@ -3582,7 +3659,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "Hierdie model ondersteun denkinspanning"
-    }
+    },
+    "creditsRequired": "Nie genoeg krediete om hierdie boodskap te stuur nie. Voeg krediete by en probeer weer."
   },
   "settingsTools": {
     "confirmTitle": "Bevestig hierdie verandering?"
@@ -3618,7 +3696,9 @@
     "spend24h": "Besteding in die afgelope 24 uur",
     "multiplierError": "Voer 'n vermenigvuldiger van 1 of meer in",
     "permissionDenied": "Jy het nie toestemming om bestedingswaarskuwings te bestuur nie.",
-    "pushOffByCategory": "Af in Kennisgewings"
+    "pushOffByCategory": "Af in Kennisgewings",
+    "multiplierMaxError": "Voer 'n vermenigvuldiger van {{max}} of minder in",
+    "thresholdMaxError": "Voer 'n bedrag van {{max}} of minder in."
   },
   "profiles": {
     "title": "Profiele",
@@ -3743,7 +3823,7 @@
       "stepsPlaceholder": "bv. 50",
       "temperature": "Temperatuur",
       "temperaturePlaceholder": "bv. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "bv. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "My agent",
@@ -3751,8 +3831,8 @@
       "tools": "Gereedskap",
       "visibility": "Sigbaarheid",
       "visibilityPrimary": "Primêr — gewys in die kieser",
-      "visibilitySubagent": "Subagent - slegs oproepbaar vanaf ander",
-      "visibilityAll": "Almal - albei",
+      "visibilitySubagent": "Subagent — slegs oproepbaar vanaf ander",
+      "visibilityAll": "Almal — albei",
       "modePrimary": "Slegs primêr",
       "modeSubagent": "Slegs subagent",
       "modeAll": "Alle modusse",
@@ -3805,7 +3885,9 @@
       "pinFailed": "Kon nie repo vasspeld nie",
       "unboundToast": "Repo ongebonde",
       "unbindFailed": "Kon nie repo ontbind nie"
-    }
+    },
+    "variablesDeleteFailed": "Kon nie veranderlike verwyder nie",
+    "deleteCommand": "Skrap bevel {{position}}"
   },
   "credits": {
     "title": "Koop krediete",
@@ -3841,7 +3923,8 @@
       "archive": "Argiveer",
       "unarchive": "Ontargiveer",
       "deleteTitle": "Skrap {{name}}?",
-      "deleteMessage": "Sy take word ook geskrap. Hul sessies bly."
+      "deleteMessage": "Sy take word ook geskrap. Hul sessies bly.",
+      "createFailed": "Kon nie die lys skep nie"
     },
     "listSettings": {
       "title": "Lysinstellings",
@@ -3999,6 +4082,7 @@
     "estimatePricingUnavailable": "Prysinligting vir hierdie model is nie beskikbaar nie.",
     "estimateBalanceUnavailable": "Nie genoeg saldo vir ’n betaalde opsomming nie.",
     "estimateModelNotAllowed": "Hierdie model is hier nie toegelaat nie.",
-    "estimateSpendLimitTooLow": "Verhoog die bestedingswaaktaam om hierdie opsomming toe te laat."
+    "estimateSpendLimitTooLow": "Verhoog die bestedingswaaktaam om hierdie opsomming toe te laat.",
+    "saved": "Verslaginstellings gestoor"
   }
 }

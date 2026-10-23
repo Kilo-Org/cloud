@@ -554,18 +554,20 @@ describe('ScreenHeader mounted', () => {
     }
   );
 
-  it('labels the title with the override or the default open-menu label', () => {
+  it('labels the title with its own text and hints at the action', () => {
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
-    expect(findTitlePressable(renderer.root).props.accessibilityLabel).toBe(
-      'Open menu for Sessions'
-    );
+    const title = findTitlePressable(renderer.root);
+    expect(title.props.accessibilityLabel).toBe('Sessions');
+    expect(title.props.accessibilityHint).toBe('Open menu for Sessions');
 
     const customRenderer = renderHeader({
       title: 'Sessions',
       onTitlePress: () => undefined,
-      onTitlePressAccessibilityLabel: 'Rename session',
+      onTitlePressAccessibilityHint: 'Rename session',
     });
-    expect(findTitlePressable(customRenderer.root).props.accessibilityLabel).toBe('Rename session');
+    const custom = findTitlePressable(customRenderer.root);
+    expect(custom.props.accessibilityLabel).toBe('Sessions');
+    expect(custom.props.accessibilityHint).toBe('Rename session');
   });
 
   it('renders the close icon and label for backIcon="close"', () => {
@@ -627,6 +629,15 @@ describe('ScreenHeader mounted', () => {
       { title: longTitle, titleNumberOfLines: 1, onTitlePress: () => undefined },
       { title: longTitle, titleNumberOfLines: 3, headerRight: 'METRICS', reserveTitleSpace: true },
       { title: longTitle, titleNumberOfLines: 9, reserveTitleSpace: true },
+      { title: 'Agents', size: 'large', reserveTitleSpace: true },
+      { title: longTitle, size: 'large', titleNumberOfLines: 2, reserveTitleSpace: true },
+      {
+        title: longTitle,
+        size: 'large',
+        titleNumberOfLines: 3,
+        headerRight: 'METRICS',
+        reserveTitleSpace: true,
+      },
     ];
 
     for (const props of variants) {
@@ -634,13 +645,21 @@ describe('ScreenHeader mounted', () => {
       const back = findBackPressable(renderer.root);
       const title = renderer.root.findByProps({ accessibilityRole: 'header' });
       // The cap is clamped to the three lines the reserved box covers, so a
-      // title can never paint a line the reserve does not hold.
-      const cappedLines = Math.min(props.titleNumberOfLines ?? 2, 3);
+      // title can never paint a line the reserve does not hold. The default
+      // is one line: CJK titles ellipsize instead of orphaning characters.
+      const cappedLines = Math.min(props.titleNumberOfLines ?? 1, 3);
       expect(title.props.numberOfLines).toBe(cappedLines);
       expect(title.props.ellipsizeMode).toBe('tail');
       expect(title.children).toEqual([props.title]);
       if (props.reserveTitleSpace) {
-        expect(title.parent?.props.className).toContain(cappedLines > 2 ? 'min-h-21' : 'min-h-14');
+        const large = props.size === 'large';
+        let reserveClass = large ? 'min-h-[72px]' : 'min-h-14';
+        if (cappedLines > 2) {
+          reserveClass = large ? 'min-h-[108px]' : 'min-h-21';
+        } else if (cappedLines === 1) {
+          reserveClass = large ? 'min-h-[36px]' : 'min-h-7';
+        }
+        expect(title.parent?.props.className).toContain(reserveClass);
         expect(title.parent?.props.className).toContain('justify-start');
       }
       if (props.modal || props.centerTitle) {

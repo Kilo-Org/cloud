@@ -293,7 +293,8 @@
     "condenseToolCallsSubtitle": "Aufeinanderfolgende Tool-Aufrufe in einer Zeile zusammenfassen, die sich öffnen lässt.",
     "toolSummaryTranslation": "Werkzeugzusammenfassungen übersetzen",
     "toolSummaryTranslationSubtitle": "Sende jede Werkzeugzusammenfassung an ein Modell, um sie in deine App-Sprache zu übersetzen. Wenn die Übersetzung fehlschlägt, wird das Original angezeigt.",
-    "toolSummaryTranslationModelUnavailableNotice": "Dieses Modell wird nicht mehr angeboten. Tippe auf $t(common.model), um ein anderes zu wählen."
+    "toolSummaryTranslationModelUnavailableNotice": "Dieses Modell wird nicht mehr angeboten. Tippe auf $t(common.model), um ein anderes zu wählen.",
+    "autoExpandThinkingInactiveSubtitle": "Keine Auswirkung, solange Denkdetails ausgeblendet sind."
   },
   "notifications": {
     "liveActivities": "Live-Aktivitäten",
@@ -916,7 +917,15 @@
       "pullRequestUrl": "Pull-Request-URL",
       "start": "Review starten",
       "starting": "Review wird gestartet …",
-      "title": "Manuelles Review"
+      "title": "Manuelles Review",
+      "startNotFound": "Der {{requestNoun}} konnte nicht von {{provider}} gelesen werden. Überprüfe die URL und ob das Repository zugänglich ist.",
+      "startRateLimited": "{{provider}} begrenzt aktuell die Anfragen. Versuche es in ein paar Minuten erneut.",
+      "startNotAllowed": "Du hast keinen Zugriff, um ein Review für diesen {{requestNoun}} zu starten. Überprüfe deine Berechtigungen und den Plan deiner Organisation.",
+      "startProviderNeedsAttention": "Manuelle Reviews benötigen die Standardverbindung zu {{provider}}. Verbinde sie und versuche es erneut.",
+      "startAlreadyRunning": "Für diesen {{requestNoun}} läuft bereits ein Review.",
+      "startRejected": "Dieser {{requestNoun}} kann nicht überprüft werden. Stelle sicher, dass er offen und kein Entwurf ist und dass die URL korrekt ist.",
+      "startProviderUnavailable": "{{provider}} konnte nicht erreicht werden, um diesen {{requestNoun}} zu lesen. Versuche es erneut.",
+      "startFailed": "Das Review konnte nicht gestartet werden. Prüfe deine Verbindung und versuche es erneut."
     },
     "notConnectedReadOnly": "{{platform}} ist nicht verbunden. Nur Organisationsinhaber und Admins können die Verbindung herstellen.",
     "gitlab": {
@@ -979,7 +988,13 @@
       "sessionError": "In der Sitzung ist ein Fehler aufgetreten: {{error}}.",
       "statusWithValue": "Zustand: {{status}}",
       "toolName": "Werkzeug: {{name}}",
-      "toolNameError": "Beim Werkzeug {{name}} ist ein Fehler aufgetreten."
+      "toolNameError": "Beim Werkzeug {{name}} ist ein Fehler aufgetreten.",
+      "cancelReasonSuperseded": "Es wurde ein neuerer Commit gepusht, daher wurde dieses Review ersetzt.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} ist nicht verbunden, daher wurde dieses Review abgebrochen. Stelle die Verbindung wieder her und führe das Review erneut aus.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer wurde für Bitbucket deaktiviert, daher wurde dieses Review abgebrochen. Aktiviere es wieder und führe das Review erneut aus.",
+      "cancelReasonBitbucketPullRequestChanged": "Der Bitbucket-Pull-Request wurde geändert, daher wurde dieses Review ersetzt.",
+      "cancelReasonCancelled": "Dieses Review wurde abgebrochen.",
+      "cancelReasonInterrupted": "Dieses Review wurde unterbrochen."
     },
     "reviewList": {
       "configureProvider": "Anbieter konfigurieren",
@@ -1388,7 +1403,7 @@
       "couldNotLoad": "Security Agent konnte nicht geladen werden.",
       "installApp": "GitHub-App installieren",
       "reauthorizeButton": "GitHub-App erneut autorisieren",
-      "reauthorizeDescription": "Security Agent benötigt die Berechtigung vulnerability_alerts, um auf Dependabot-Warnungen zuzugreifen. Autorisiere die GitHub-App erneut, um diese Berechtigung zu gewähren.",
+      "reauthorizeDescription": "Security Agent benötigt die Berechtigung, Dependabot-Warnungen zu lesen. Autorisiere die GitHub-App erneut, um diese Berechtigung zu gewähren.",
       "reauthorizeTitle": "Zusätzliche Berechtigungen erforderlich",
       "setupFailed": "Die GitHub-Einrichtung konnte nicht gestartet werden. Bitte versuche es erneut."
     },
@@ -1587,15 +1602,16 @@
       "sessionDeleted": "Sitzung gelöscht",
       "needsInput": "eingabe erforderlich",
       "fromPlatform": "von {{platform}}",
-      "cent_one": "cent",
-      "cent": "cent",
-      "cent_other": "cent",
-      "dollar_one": "dollar",
-      "dollar": "dollar",
-      "dollar_other": "dollar",
-      "costSpoken": "kosten: {{cost}}",
-      "costSpokenWithTime": "kosten {{cost}}, {{time}}",
-      "pullRequest": "pull-Request {{number}}"
+      "cent_one": "Cent",
+      "cent": "Cent",
+      "cent_other": "Cent",
+      "dollar_one": "Dollar",
+      "dollar": "Dollar",
+      "dollar_other": "Dollar",
+      "costSpoken": "kostet {{cost}}",
+      "costSpokenWithTime": "kostet {{cost}}, {{time}}",
+      "pullRequest": "pull-Request {{number}}",
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenMessage": "Die Einrichtung der GitHub-App konnte nicht gestartet werden. Bitte versuche es erneut.",
@@ -1950,7 +1966,71 @@
       "preparationComplete": "Vorbereitung abgeschlossen",
       "preparationFailed": "Vorbereitung fehlgeschlagen",
       "setupCommand": "Einrichtungsbefehl {{index}}",
-      "setupCommandOf": "Einrichtungsbefehl {{index}} von {{displayCount}}"
+      "setupCommandOf": "Einrichtungsbefehl {{index}} von {{displayCount}}",
+      "stepWorkspaceSetup": "Workspace-Einrichtung",
+      "stepDiskCheck": "Speicherplatzprüfung",
+      "stepCloning": "Repository wird geklont",
+      "stepBranch": "Branch wird eingerichtet",
+      "stepDevcontainerSetup": "Dev-Container-Einrichtung",
+      "stepWorkspaceRestore": "Workspace wird wiederhergestellt",
+      "stepWorkspaceBackup": "Workspace wird gespeichert",
+      "stepSandboxProvision": "Sandbox wird bereitgestellt",
+      "stepSandboxBoot": "Sandbox wird gestartet",
+      "stepSnapshotFallback": "Neuer Versuch ohne Snapshot",
+      "stepKiloServer": "Kilo wird gestartet",
+      "stepKiloSession": "Sitzung wird vorbereitet",
+      "stepRestoreIncomplete": "Sitzungswiederherstellung unvollständig",
+      "stepReady": "Umgebung bereit",
+      "stepFailed": "Umgebungseinrichtung fehlgeschlagen",
+      "stepUnknown": "Umgebungseinrichtung",
+      "detailCreatingSandbox": "Sandbox wird erstellt",
+      "detailUpdatingRepository": "Repository wird aktualisiert",
+      "detailCheckingOutBranch": "Branch wird ausgecheckt",
+      "detailRunningSetupCommands": "Einrichtungsbefehle werden ausgeführt",
+      "detailSavingRepository": "Repository wird für schnellere Starts gespeichert",
+      "detailStartingKiloRuntime": "Kilo-Runtime wird gestartet",
+      "detailPreparingKiloSession": "Kilo-Sitzung wird vorbereitet",
+      "detailWaitingForPreviousSandbox": "Warten auf das Beenden der vorherigen Sandbox",
+      "detailRetryingSandboxCreation": "Sandbox-Erstellung wird wiederholt",
+      "detailPreviousSnapshotFailed": "Snapshot-Start fehlgeschlagen. Neuer Versuch ohne Snapshot.",
+      "detailSnapshotStartupFailed": "Snapshot-Start fehlgeschlagen. Neuer Versuch ohne Snapshot.",
+      "detailStartingSandboxWithoutSnapshot": "Sandbox wird ohne Snapshot gestartet",
+      "detailSettingUpWorkspace": "Workspace wird eingerichtet",
+      "detailRestoringSession": "Sitzung wird wiederhergestellt",
+      "detailWarmWorkspaceReused": "Warmer Workspace wiederverwendet",
+      "detailRetryingClone": "Klonen wird wiederholt (Versuch {{attempt}} von {{total}})",
+      "detailSetupCommandFailed": "Einrichtungsbefehl {{index}} fehlgeschlagen",
+      "detailSetupCommandTimedOut": "Zeitüberschreitung bei Einrichtungsbefehl {{index}}",
+      "detailColdRestore": "Kalt-Wiederherstellung, Snapshot angewendet, {{applied}} von {{total}} Dateien wiederhergestellt",
+      "detailProgressPercent": "{{percent}}% abgeschlossen",
+      "detailRestoreIncompleteReport": "Sitzungswiederherstellung unvollständig: {{skipped}} von {{total}} Dateien wurden nicht wiederhergestellt ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Fehlend: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} und {{omitted}} weitere",
+      "detailReasonPatchFailed": "der Patch konnte nicht angewendet werden",
+      "detailReasonOutsideWorkspace": "der Pfad liegt außerhalb des Workspace",
+      "detailReasonMissingContent": "der Snapshot enthielt keinen Inhalt für die Datei",
+      "detailReasonIndexResetFailed": "der Index konnte nach einem fehlgeschlagenen Anwenden nicht zurückgesetzt werden",
+      "detailReasonUnlinkFailed": "die Datei konnte nicht entfernt werden",
+      "detailReasonWriteFailed": "die Datei konnte nicht geschrieben werden",
+      "detailReasonUnknown": "ein unbekannter Grund",
+      "detailUnknown": "Wird noch vorbereitet",
+      "errorPreparationTimeout": "Zeitüberschreitung bei der Umgebungsvorbereitung",
+      "errorWorkspaceSetupFailed": "Workspace-Einrichtung fehlgeschlagen",
+      "errorCredentialUpgradeRequired": "Für diese Sitzung fehlt ein erforderliches Credential-Upgrade. Starten Sie eine neue Sitzung, um fortzufahren.",
+      "errorAgentUnavailable": "Der Agent ist nicht mehr verfügbar",
+      "errorBillingBlocked": "Für die Sandbox-Abrechnung sind zusätzliche Credits erforderlich",
+      "errorBillingUnavailable": "Sandbox-Abrechnung oder Kapazitätsprüfung ist derzeit nicht verfügbar. Versuchen Sie es später erneut.",
+      "errorContainerLimitReached": "Containerlimit erreicht. Stoppen Sie einen vorhandenen Container, bevor Sie einen anderen starten.",
+      "errorInvalidConfiguration": "Die Sandbox-Konfiguration ist ungültig oder wird nicht unterstützt",
+      "errorRuntimeArtifactUnauthorized": "Der Runtime-Download wurde nicht autorisiert",
+      "errorRuntimeArtifactInvalid": "Verifizierung des Runtime-Artefakts fehlgeschlagen",
+      "errorRuntimeCliProbeFailed": "Runtime-CLI-Validierung fehlgeschlagen",
+      "errorRuntimeSupervisorMissing": "Der Runtime-Supervisor fehlt",
+      "errorConnectionLost": "Die Sandbox-Verbindung wurde unterbrochen",
+      "errorSandboxLost": "Die Sandbox ging verloren",
+      "errorAgentRestarted": "Der Agent wurde neu gestartet",
+      "errorSandboxOutOfMemory": "Der Arbeitsspeicher der Sandbox war aufgebraucht",
+      "errorPreparationDidNotComplete": "Die Vorbereitung wurde nicht abgeschlossen"
     },
     "permissionCard": {
       "title": "Berechtigung erforderlich",
@@ -2173,7 +2253,7 @@
     "contextUsage": {
       "windowUnavailable": "Größe des Kontextfensters nicht verfügbar",
       "tapToViewDetails": "Tippe, um Kontextdetails anzusehen.",
-      "costSuffix": ", kosten {{cost}}",
+      "costSuffix": ", kostet {{cost}}",
       "tokensWindowUnavailable": "Kontext: {{used}} Tokens, Größe des Kontextfensters nicht verfügbar",
       "tokensUsage": "Kontext: {{used}} von {{window}} Tokens, {{percentage}} genutzt",
       "title": "Kontextnutzung",
@@ -2555,7 +2635,8 @@
       "gitlabDescription": "Verbinde dein GitLab-Konto, um Merge-Requests in der App zu prüfen.",
       "bitbucketDescription": "Verbinde Bitbucket mit dieser Organisation, um Pull-Requests in der App zu prüfen.",
       "bitbucketOrgOnlyDescription": "Wechsle das Konto oben zu einer Organisation, um deren Pull-Requests in Bitbucket zu prüfen.",
-      "contextLine": "Für {{organization}}"
+      "contextLine": "Für {{organization}}",
+      "contextLinePersonal": "Für den persönlichen Bereich"
     },
     "connectionExpired": "Die GitHub-Verbindung ist abgelaufen.",
     "couldNotLoadPullRequest": "Der Pull-Request konnte nicht geladen werden.",
@@ -3023,22 +3104,16 @@
     "boundary": {
       "backToProfile": "Zurück zum Profil",
       "loadErrorMessage": "Prüfe deine Verbindung und versuche es erneut.",
-
       "chooseAccount": "Konto auswählen",
       "loadErrorTitle": "Deine Organisationen konnten nicht geladen werden.",
       "membershipLostNotice": "Du hast keinen Zugriff mehr auf diese Organisation. Gewechselt zu {{target}}.",
       "noOrganization": "Keine Organisation",
-
       "noOrganizationDescription": "Dieses Konto gehört keiner Organisation an. Erstelle eine Organisation oder tritt einer auf der Website bei, um Organisationsfunktionen wie Mitgliedseinladungen und Warnungen bei niedrigem Guthaben zu nutzen.",
-
       "openWebOrganizations": "Organisationen auf der Website öffnen",
-
       "organizationUnavailable": "Die Organisation ist nicht verfügbar.",
       "selectDescriptionWithOrganizations": "Du gehörst einer oder mehreren Organisationen an. Wähle das Konto aus, das dieser Bildschirm verwenden soll.",
-
       "selectOrganization": "Organisation auswählen",
       "unavailableDescription": "Diese Organisation ist nicht mehr verfügbar. Wähle in deinem Profil eine andere Organisation aus, um fortzufahren.",
-
       "unavailableSessionsDescription": "Diese Organisation ist nicht mehr verfügbar. Deren Sitzungen können nicht geladen werden.",
       "accessDeniedDescription": "Du hast keinen Zugriff auf diese Organisation."
     },
@@ -3073,7 +3148,9 @@
       "permissionDenied": "Du hast keine Berechtigung, Mitglieder einzuladen.",
       "roleMember": "Die Rolle ist „Mitglied“.",
       "sendInvite": "Einladung senden",
-      "title": "Mitglied einladen"
+      "title": "Mitglied einladen",
+      "alreadyInvited": "Diese Person ist bereits eingeladen oder bereits Mitglied.",
+      "sendError": "Die Einladung konnte nicht gesendet werden."
     },
     "invoices": {
       "downloadA11y": "Rechnung {{number}} herunterladen",
@@ -3142,7 +3219,8 @@
       "inviteCreated": "Einladung erstellt",
       "pendingInvitations": "Ausstehende Einladungen",
       "resendInvite": "Einladung erneut senden",
-      "shareInviteLink": "Einladungslink teilen"
+      "shareInviteLink": "Einladungslink teilen",
+      "resendInviteError": "Die Einladung konnte nicht erneut gesendet werden."
     },
     "usageStats": {
       "inputTokens": "Eingabe-Tokens",
@@ -3291,7 +3369,8 @@
     "noneChosen": "Keines ausgewählt",
     "emptyTitle": "Keine Transkriptionsmodelle",
     "emptyDescription": "Kilo Gateway bietet derzeit keine Transkriptionsmodelle.",
-    "loadFailed": "Die Transkriptionsmodelle konnten nicht geladen werden."
+    "loadFailed": "Die Transkriptionsmodelle konnten nicht geladen werden.",
+    "choose": "Modell wählen"
   },
   "voiceLanguage": {
     "title": "Sprache der Spracheingabe",
@@ -3536,8 +3615,6 @@
       "quantizations": "Quantisierungen",
       "quantizationsHelp": "Kleinere Dateien benötigen weniger Arbeitsspeicher und Speicherplatz. Größere Dateien liefern meist bessere Antworten.",
       "quantDetail": "{{size}} Download · ca. {{memory}} Arbeitsspeicher",
-      "downloadQuant": "{{quant}} herunterladen",
-      "downloadModelA11y": "{{name}} herunterladen",
       "detailsA11y": "Einzelheiten: {{name}}",
       "loadingModel": "Modelldetails werden geladen",
       "couldNotLoadModel": "Dieses Modell konnte nicht geladen werden",
@@ -3582,7 +3659,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "Dieses Modell unterstützt Denkaufwand"
-    }
+    },
+    "creditsRequired": "Nicht genug Guthaben, um diese Nachricht zu senden. Lade Guthaben auf und versuche es erneut."
   },
   "settingsTools": {
     "confirmTitle": "Diese Änderung bestätigen?"
@@ -3618,7 +3696,9 @@
     "spend24h": "Ausgaben der letzten 24 Stunden",
     "multiplierError": "Gib einen Multiplikator von 1 oder mehr ein",
     "permissionDenied": "Du hast keine Berechtigung, Ausgaben-Warnungen zu verwalten.",
-    "pushOffByCategory": "In Benachrichtigungen aus"
+    "pushOffByCategory": "In Benachrichtigungen aus",
+    "multiplierMaxError": "Gib einen Multiplikator von {{max}} oder weniger ein",
+    "thresholdMaxError": "Gib einen Betrag von {{max}} oder weniger ein."
   },
   "profiles": {
     "title": "Profile",
@@ -3743,16 +3823,16 @@
       "stepsPlaceholder": "z. B. 50",
       "temperature": "Temperatur",
       "temperaturePlaceholder": "z. B. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "z. B. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Mein Agent",
       "promptPlaceholder": "Du bist ein...",
       "tools": "Werkzeuge",
       "visibility": "Sichtweite",
-      "visibilityPrimary": "Primär – wird im Picker angezeigt",
-      "visibilitySubagent": "Subagent – nur von anderen aufrufbar",
-      "visibilityAll": "Alle – beides",
+      "visibilityPrimary": "Primär — wird im Picker angezeigt",
+      "visibilitySubagent": "Subagent — nur von anderen aufrufbar",
+      "visibilityAll": "Alle — beides",
       "modePrimary": "Nur primär",
       "modeSubagent": "Nur Subagent",
       "modeAll": "Alle Modi",
@@ -3805,7 +3885,9 @@
       "pinFailed": "Repo konnte nicht angeheftet werden",
       "unboundToast": "Repo ungebunden",
       "unbindFailed": "Repo konnte nicht entbunden werden"
-    }
+    },
+    "variablesDeleteFailed": "Die Variable konnte nicht gelöscht werden",
+    "deleteCommand": "Befehl {{position}} löschen"
   },
   "credits": {
     "title": "Guthaben kaufen",
@@ -3841,7 +3923,8 @@
       "archive": "Archivieren",
       "unarchive": "Wiederherstellen",
       "deleteTitle": "{{name}} löschen?",
-      "deleteMessage": "Die zugehörigen Aufgaben werden ebenfalls gelöscht. Die Sitzungen bleiben erhalten."
+      "deleteMessage": "Die zugehörigen Aufgaben werden ebenfalls gelöscht. Die Sitzungen bleiben erhalten.",
+      "createFailed": "Liste konnte nicht erstellt werden."
     },
     "listSettings": {
       "title": "Listeneinstellungen",
@@ -3999,6 +4082,7 @@
     "estimateInputTooLarge": "Dieser Zeitraum enthält zu viele Belege für das ausgewählte Modell.",
     "estimatePermissionUnavailable": "Du hast keine Berechtigung, das Guthaben dieses Kontexts zu nutzen.",
     "createFailed": "Dieses Briefing konnte nicht erstellt werden.",
-    "reviewFailed": "Dieses Briefing konnte nicht geprüft werden."
+    "reviewFailed": "Dieses Briefing konnte nicht geprüft werden.",
+    "saved": "Briefing-Einstellungen gespeichert"
   }
 }

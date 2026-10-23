@@ -888,7 +888,15 @@
       "pullRequestUrl": "URL della pull request",
       "start": "Avvia la revisione",
       "starting": "Avvio della revisione…",
-      "title": "Revisione manuale"
+      "title": "Revisione manuale",
+      "startNotFound": "Impossibile leggere quella {{requestNoun}} da {{provider}}. Controlla l'URL e che il repository sia accessibile.",
+      "startRateLimited": "{{provider}} sta limitando le richieste in questo momento. Riprova tra qualche minuto.",
+      "startNotAllowed": "Non hai le autorizzazioni per avviare una revisione di quella {{requestNoun}}. Controlla i tuoi permessi e il piano della tua organizzazione.",
+      "startProviderNeedsAttention": "Le revisioni manuali richiedono la connessione standard a {{provider}}. Connetti la piattaforma e riprova.",
+      "startAlreadyRunning": "Una revisione di questa {{requestNoun}} è già in corso.",
+      "startRejected": "Non è possibile revisionare questa {{requestNoun}}. Assicurati che sia aperta, non una bozza, e che l'URL sia corretto.",
+      "startProviderUnavailable": "Impossibile raggiungere {{provider}} per leggere questa {{requestNoun}}. Riprova.",
+      "startFailed": "Impossibile avviare la revisione. Controlla la connessione e riprova."
     },
     "notConnectedReadOnly": "{{platform}} non è connesso. Solo i proprietari dell'organizzazione e gli amministratori possono connetterlo.",
     "gitlab": {
@@ -951,7 +959,13 @@
       "sessionError": "Errore della sessione: {{error}}.",
       "statusWithValue": "Stato: {{status}}",
       "toolName": "Strumento: {{name}}",
-      "toolNameError": "Si è verificato un errore nello strumento {{name}}."
+      "toolNameError": "Si è verificato un errore nello strumento {{name}}.",
+      "cancelReasonSuperseded": "È stato eseguito il push di un commit più recente, quindi questa revisione è stata sostituita.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} è disconnesso, quindi questa revisione è stata annullata. Riconnettilo, quindi esegui di nuovo la revisione.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer è stato disattivato per Bitbucket, quindi questa revisione è stata annullata. Riattivalo, quindi esegui di nuovo la revisione.",
+      "cancelReasonBitbucketPullRequestChanged": "La pull request di Bitbucket è cambiata, quindi questa revisione è stata sostituita.",
+      "cancelReasonCancelled": "Questa revisione è stata annullata.",
+      "cancelReasonInterrupted": "Questa revisione è stata interrotta."
     },
     "reviewList": {
       "configureProvider": "Configura la piattaforma",
@@ -1363,7 +1377,7 @@
       "couldNotLoad": "Impossibile caricare Security Agent.",
       "installApp": "Installa l'app GitHub",
       "reauthorizeButton": "Riautorizza l'app GitHub",
-      "reauthorizeDescription": "Security Agent richiede l'autorizzazione vulnerability_alerts per accedere agli avvisi di Dependabot. Riautorizza l'app GitHub per concederla.",
+      "reauthorizeDescription": "Security Agent richiede l'autorizzazione per leggere gli avvisi di Dependabot. Riautorizza l'app GitHub per concederla.",
       "reauthorizeTitle": "Servono autorizzazioni aggiuntive",
       "setupFailed": "Impossibile avviare la configurazione di GitHub. Riprova."
     },
@@ -1575,7 +1589,8 @@
       "dollar_many": "dollari",
       "costSpoken": "costo {{cost}}",
       "costSpokenWithTime": "costo {{cost}}, {{time}}",
-      "pullRequest": "pull request n. {{number}}"
+      "pullRequest": "pull request n. {{number}}",
+      "spokenJoiner": "e"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Impossibile avviare la configurazione dell'app per GitHub. Riprova.",
@@ -1935,7 +1950,71 @@
       "preparationComplete": "Preparazione completata",
       "preparationFailed": "Preparazione non riuscita",
       "setupCommand": "Comando di configurazione {{index}}",
-      "setupCommandOf": "Comando di configurazione {{index}} su {{displayCount}}"
+      "setupCommandOf": "Comando di configurazione {{index}} su {{displayCount}}",
+      "stepWorkspaceSetup": "Configurazione dello spazio di lavoro",
+      "stepDiskCheck": "Controllo del disco",
+      "stepCloning": "Clonazione del repository",
+      "stepBranch": "Configurazione del branch",
+      "stepDevcontainerSetup": "Configurazione del dev container",
+      "stepWorkspaceRestore": "Ripristino dello spazio di lavoro",
+      "stepWorkspaceBackup": "Salvataggio dello spazio di lavoro",
+      "stepSandboxProvision": "Provisioning della sandbox",
+      "stepSandboxBoot": "Avvio della sandbox",
+      "stepSnapshotFallback": "Nuovo tentativo senza snapshot",
+      "stepKiloServer": "Avvio di Kilo",
+      "stepKiloSession": "Preparazione della sessione",
+      "stepRestoreIncomplete": "Ripristino della sessione incompleto",
+      "stepReady": "Ambiente pronto",
+      "stepFailed": "Configurazione dell'ambiente non riuscita",
+      "stepUnknown": "Configurazione dell'ambiente",
+      "detailCreatingSandbox": "Creazione della sandbox",
+      "detailUpdatingRepository": "Aggiornamento del repository",
+      "detailCheckingOutBranch": "Checkout del branch",
+      "detailRunningSetupCommands": "Esecuzione dei comandi di configurazione",
+      "detailSavingRepository": "Salvataggio del repository per avvii più rapidi",
+      "detailStartingKiloRuntime": "Avvio del runtime Kilo",
+      "detailPreparingKiloSession": "Preparazione della sessione Kilo",
+      "detailWaitingForPreviousSandbox": "In attesa dell'arresto della sandbox precedente",
+      "detailRetryingSandboxCreation": "Nuovo tentativo di creazione della sandbox",
+      "detailPreviousSnapshotFailed": "Avvio dalla snapshot precedente non riuscito. Nuovo tentativo senza snapshot.",
+      "detailSnapshotStartupFailed": "Avvio dalla snapshot non riuscito. Nuovo tentativo senza snapshot.",
+      "detailStartingSandboxWithoutSnapshot": "Avvio della sandbox senza snapshot",
+      "detailSettingUpWorkspace": "Configurazione dello spazio di lavoro",
+      "detailRestoringSession": "Ripristino della sessione",
+      "detailWarmWorkspaceReused": "Spazio di lavoro caldo riutilizzato",
+      "detailRetryingClone": "Nuovo tentativo di clone (tentativo {{attempt}} su {{total}})",
+      "detailSetupCommandFailed": "Comando di configurazione {{index}} non riuscito",
+      "detailSetupCommandTimedOut": "Tempo scaduto per il comando di configurazione {{index}}",
+      "detailColdRestore": "Ripristino a freddo, snapshot applicata, {{applied}} su {{total}} file ripristinati",
+      "detailProgressPercent": "{{percent}}% completato",
+      "detailRestoreIncompleteReport": "Ripristino della sessione incompleto: {{skipped}} su {{total}} file non sono stati ripristinati ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Mancanti: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} e altri {{omitted}}",
+      "detailReasonPatchFailed": "la patch non è stata applicata",
+      "detailReasonOutsideWorkspace": "il percorso è al di fuori dello spazio di lavoro",
+      "detailReasonMissingContent": "la snapshot non conteneva contenuti per il file",
+      "detailReasonIndexResetFailed": "l'indice non è stato possibile ripristinarlo dopo un'applicazione non riuscita",
+      "detailReasonUnlinkFailed": "non è stato possibile rimuovere il file",
+      "detailReasonWriteFailed": "non è stato possibile scrivere il file",
+      "detailReasonUnknown": "un motivo sconosciuto",
+      "detailUnknown": "Preparazione in corso",
+      "errorPreparationTimeout": "Tempo esaurito per la preparazione dell'ambiente",
+      "errorWorkspaceSetupFailed": "Configurazione dello spazio di lavoro non riuscita",
+      "errorCredentialUpgradeRequired": "Questa sessione richiede un aggiornamento delle credenziali non ancora effettuato. Avvia una nuova sessione per continuare.",
+      "errorAgentUnavailable": "L'agente non è più disponibile",
+      "errorBillingBlocked": "La fatturazione della sandbox richiede crediti aggiuntivi",
+      "errorBillingUnavailable": "La verifica di fatturazione o capacità della sandbox non è disponibile. Riprova a breve.",
+      "errorContainerLimitReached": "Limite di container raggiunto. Arresta un container esistente prima di avviarne un altro.",
+      "errorInvalidConfiguration": "La configurazione della sandbox non è valida o non è supportata",
+      "errorRuntimeArtifactUnauthorized": "Download del runtime non autorizzato",
+      "errorRuntimeArtifactInvalid": "Verifica dell'artifact di runtime non riuscita",
+      "errorRuntimeCliProbeFailed": "Validazione della CLI di runtime non riuscita",
+      "errorRuntimeSupervisorMissing": "Supervisor di runtime mancante",
+      "errorConnectionLost": "Connessione alla sandbox persa",
+      "errorSandboxLost": "La sandbox è andata persa",
+      "errorAgentRestarted": "L'agente è stato riavviato",
+      "errorSandboxOutOfMemory": "Memoria esaurita nella sandbox",
+      "errorPreparationDidNotComplete": "Preparazione non completata"
     },
     "permissionCard": {
       "title": "Autorizzazione necessaria",
@@ -2281,7 +2360,8 @@
     "condenseToolCallsSubtitle": "Raggruppa le chiamate degli strumenti consecutive in una riga che puoi aprire.",
     "toolSummaryTranslation": "Traduci i riepiloghi degli strumenti",
     "toolSummaryTranslationSubtitle": "Invia ogni riepilogo di strumento a un modello per tradurlo nella lingua della tua app. Se la traduzione non riesce, viene mostrato l'originale.",
-    "toolSummaryTranslationModelUnavailableNotice": "Questo modello non è più offerto. Tocca $t(common.model) per sceglierne un altro."
+    "toolSummaryTranslationModelUnavailableNotice": "Questo modello non è più offerto. Tocca $t(common.model) per sceglierne un altro.",
+    "autoExpandThinkingInactiveSubtitle": "Non ha effetto quando i dettagli del ragionamento sono nascosti."
   },
   "addCredits": {
     "cta": "Aggiungi crediti",
@@ -2580,7 +2660,8 @@
       "gitlabDescription": "Connetti il tuo account GitLab per revisionare le merge request dall'app.",
       "bitbucketDescription": "Connetti Bitbucket a questa organizzazione per revisionare le pull request dall'app.",
       "bitbucketOrgOnlyDescription": "Passa l'account qui sopra a un'organizzazione per revisionarne le pull request Bitbucket.",
-      "contextLine": "Per {{organization}}"
+      "contextLine": "Per {{organization}}",
+      "contextLinePersonal": "Per il tuo account personale"
     },
     "connectionExpired": "La connessione a GitHub è scaduta.",
     "couldNotLoadPullRequest": "Impossibile caricare la pull request.",
@@ -3063,22 +3144,16 @@
     "boundary": {
       "backToProfile": "Torna al profilo",
       "loadErrorMessage": "Controlla la connessione e riprova.",
-
       "chooseAccount": "Seleziona un account",
       "loadErrorTitle": "Impossibile caricare le tue organizzazioni.",
       "membershipLostNotice": "Non hai più accesso a questa organizzazione. Passato a {{target}}.",
       "noOrganization": "Nessuna organizzazione",
-
       "noOrganizationDescription": "Questo account non fa parte di un'organizzazione. Crea o unisciti a un'organizzazione sul web per usare le funzioni dell'organizzazione come gli inviti dei membri e gli avvisi di saldo basso.",
-
       "openWebOrganizations": "Apri le organizzazioni sul web",
-
       "organizationUnavailable": "L'organizzazione non è disponibile.",
       "selectDescriptionWithOrganizations": "Appartieni a una o più organizzazioni. Scegli l'account che questa schermata deve usare.",
-
       "selectOrganization": "Seleziona un'organizzazione",
       "unavailableDescription": "Questa organizzazione non è più disponibile. Scegline una dal tuo profilo per continuare.",
-
       "unavailableSessionsDescription": "Questa organizzazione non è più disponibile. Non è possibile caricare le sue sessioni.",
       "accessDeniedDescription": "Non hai accesso a questa organizzazione."
     },
@@ -3113,7 +3188,9 @@
       "permissionDenied": "Non hai l'autorizzazione per invitare membri.",
       "roleMember": "L'invito assegna il ruolo di membro.",
       "sendInvite": "Invia l'invito",
-      "title": "Invita un membro"
+      "title": "Invita un membro",
+      "alreadyInvited": "Questo indirizzo ha già un invito in sospeso o appartiene già a un membro.",
+      "sendError": "Impossibile inviare l'invito."
     },
     "invoices": {
       "downloadA11y": "Scarica la fattura {{number}}",
@@ -3182,7 +3259,8 @@
       "inviteCreated": "Invito creato",
       "pendingInvitations": "Inviti in sospeso",
       "resendInvite": "Invia di nuovo l'invito",
-      "shareInviteLink": "Condividi il link di invito"
+      "shareInviteLink": "Condividi il link di invito",
+      "resendInviteError": "Impossibile inviare di nuovo l'invito."
     },
     "usageStats": {
       "inputTokens": "Token in ingresso",
@@ -3332,7 +3410,8 @@
     "noneChosen": "Nessuno selezionato",
     "emptyTitle": "Nessun modello di trascrizione",
     "emptyDescription": "Kilo Gateway non offre modelli di trascrizione in questo momento.",
-    "loadFailed": "Impossibile caricare i modelli di trascrizione."
+    "loadFailed": "Impossibile caricare i modelli di trascrizione.",
+    "choose": "Scegli un modello"
   },
   "voiceLanguage": {
     "title": "Lingua della dettatura",
@@ -3578,8 +3657,6 @@
       "quantizations": "Quantizzazioni",
       "quantizationsHelp": "I file più piccoli usano meno memoria e spazio. I file più grandi di solito danno risposte migliori.",
       "quantDetail": "Download di {{size}} · circa {{memory}} di memoria",
-      "downloadQuant": "Scarica {{quant}}",
-      "downloadModelA11y": "Scarica {{name}}",
       "detailsA11y": "Dettagli: {{name}}",
       "loadingModel": "Caricamento dettagli del modello",
       "couldNotLoadModel": "Impossibile caricare questo modello",
@@ -3624,7 +3701,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "Questo modello supporta il livello di ragionamento"
-    }
+    },
+    "creditsRequired": "Crediti insufficienti per inviare questo messaggio: aggiungi crediti e riprova."
   },
   "settingsTools": {
     "confirmTitle": "Confermare questa modifica?"
@@ -3660,7 +3738,9 @@
     "spend24h": "Spesa nelle ultime 24 ore",
     "multiplierError": "Inserisci un moltiplicatore di 1 o più",
     "permissionDenied": "Non hai l'autorizzazione per gestire gli avvisi di spesa.",
-    "pushOffByCategory": "Disattivato in Notifiche"
+    "pushOffByCategory": "Disattivato in Notifiche",
+    "multiplierMaxError": "Inserisci un moltiplicatore di {{max}} o meno",
+    "thresholdMaxError": "Inserisci un importo di {{max}} o meno."
   },
   "profiles": {
     "title": "Profili",
@@ -3788,16 +3868,16 @@
       "stepsPlaceholder": "es. 50",
       "temperature": "Temperatura",
       "temperaturePlaceholder": "es. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "es. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Il mio agente",
       "promptPlaceholder": "Tu sei un...",
       "tools": "Utensili",
       "visibility": "Visibilità",
-      "visibilityPrimary": "Principale: mostrato nel selettore",
-      "visibilitySubagent": "Subagente: richiamabile solo da altri",
-      "visibilityAll": "Tutti, entrambi",
+      "visibilityPrimary": "Principale — mostrato nel selettore",
+      "visibilitySubagent": "Subagente — richiamabile solo da altri",
+      "visibilityAll": "Tutti — entrambi",
       "modePrimary": "Solo principale",
       "modeSubagent": "Solo subagente",
       "modeAll": "Tutte le modalità",
@@ -3850,7 +3930,9 @@
       "pinFailed": "Impossibile bloccare il repository",
       "unboundToast": "Repo non vincolato",
       "unbindFailed": "Impossibile scollegare il repository"
-    }
+    },
+    "variablesDeleteFailed": "Impossibile eliminare la variabile",
+    "deleteCommand": "Elimina il comando {{position}}"
   },
   "credits": {
     "title": "Acquista crediti",
@@ -3888,7 +3970,8 @@
       "archive": "Archivia",
       "unarchive": "Rimuovi dall'archivio",
       "deleteTitle": "Eliminare {{name}}?",
-      "deleteMessage": "Anche le sue attività vengono eliminate. Le sessioni restano."
+      "deleteMessage": "Anche le sue attività vengono eliminate. Le sessioni restano.",
+      "createFailed": "Impossibile creare l'elenco"
     },
     "listSettings": {
       "title": "Impostazioni elenco",
@@ -4048,6 +4131,7 @@
     "estimatePricingUnavailable": "Prezzi non disponibili per questo modello.",
     "estimateBalanceUnavailable": "Saldo insufficiente per un riepilogo a pagamento.",
     "estimateModelNotAllowed": "Questo modello non è consentito qui.",
-    "estimateSpendLimitTooLow": "Aumenta la tutela di spesa per consentire questo riepilogo."
+    "estimateSpendLimitTooLow": "Aumenta la tutela di spesa per consentire questo riepilogo.",
+    "saved": "Impostazioni briefing salvate"
   }
 }

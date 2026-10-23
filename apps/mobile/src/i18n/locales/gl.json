@@ -293,7 +293,8 @@
     "condenseToolCallsSubtitle": "Agrupa as chamadas de ferramentas consecutivas nunha fila que poidas abrir.",
     "toolSummaryTranslation": "Traduce os resumos de ferramentas",
     "toolSummaryTranslationSubtitle": "Envía cada resumo de ferramenta a un modelo para traducilo á lingua da túa aplicación. Móstrase o orixinal se a tradución falla.",
-    "toolSummaryTranslationModelUnavailableNotice": "Este modelo xa non se ofrece. Toca $t(common.model) para escoller outro."
+    "toolSummaryTranslationModelUnavailableNotice": "Este modelo xa non se ofrece. Toca $t(common.model) para escoller outro.",
+    "autoExpandThinkingInactiveSubtitle": "Non ten efecto mentres os detalles do razoamento estean ocultos."
   },
   "prReview": {
     "pullRequestUnavailable": "Solicitude de integración non dispoñible",
@@ -669,7 +670,8 @@
       "gitlabDescription": "Conecta a túa conta de GitLab para revisar solicitudes de fusión no móbil.",
       "bitbucketDescription": "Conecta Bitbucket a esta organización para revisar solicitudes de integración no móbil.",
       "bitbucketOrgOnlyDescription": "Cambia a conta de arriba a unha organización para revisar as súas solicitudes de integración en Bitbucket.",
-      "contextLine": "Para {{organization}}"
+      "contextLine": "Para {{organization}}",
+      "contextLinePersonal": "Para a túa conta persoal"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1452,7 +1454,13 @@
       "sessionError": "Produciuse un erro na sesión: {{error}}.",
       "statusWithValue": "Estado: {{status}}",
       "toolName": "Ferramenta: {{name}}",
-      "toolNameError": "Produciuse un erro na ferramenta {{name}}."
+      "toolNameError": "Produciuse un erro na ferramenta {{name}}.",
+      "cancelReasonSuperseded": "Fíxose push dun commit máis recente, polo que esta revisión foi substituída.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} está desconectado, polo que esta revisión foi cancelada. Volve conectalo e executa de novo a revisión.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer foi desactivado para Bitbucket, polo que esta revisión foi cancelada. Actívao de novo e executa de novo a revisión.",
+      "cancelReasonBitbucketPullRequestChanged": "O pull request de Bitbucket cambiou, polo que esta revisión foi substituída.",
+      "cancelReasonCancelled": "Esta revisión foi cancelada.",
+      "cancelReasonInterrupted": "Esta revisión foi interrompida."
     },
     "reviewMemory": {
       "title": "Memoria das revisións",
@@ -1479,7 +1487,15 @@
       "instructions": "Instrucións (opcionais)",
       "instructionsPlaceholder": "Aspectos concretos nos que centrar a revisión…",
       "starting": "Iniciando a revisión…",
-      "start": "Iniciar a revisión"
+      "start": "Iniciar a revisión",
+      "startNotFound": "Non se puido ler esa {{requestNoun}} de {{provider}}. Comproba o URL e que o repositorio estea accesible.",
+      "startRateLimited": "{{provider}} está a limitar as peticións neste momento. Téntao de novo nuns minutos.",
+      "startNotAllowed": "Non tes acceso para iniciar unha revisión desa {{requestNoun}}. Comproba os teus permisos e o plan da túa organización.",
+      "startProviderNeedsAttention": "As revisións manuais precisan a conexión estándar de {{provider}}. Conéctaa e téntao de novo.",
+      "startAlreadyRunning": "Xa hai unha revisión en curso para esa {{requestNoun}}.",
+      "startRejected": "Non se pode revisar esa {{requestNoun}}. Asegúrate de que está aberta, de que non é un borrador e de que o URL é correcto.",
+      "startProviderUnavailable": "Non se puido conectar con {{provider}} para ler esa {{requestNoun}}. Téntao de novo.",
+      "startFailed": "Non se puido iniciar a revisión. Comproba a túa conexión e téntao de novo."
     },
     "notConnectedReadOnly": "{{platform}} non está conectado. Só os propietarios da organización e os administradores poden conectalo.",
     "gitlab": {
@@ -1948,7 +1964,7 @@
       "couldNotLoad": "Non se puido cargar o axente de seguridade.",
       "installApp": "Instalar a aplicación de GitHub",
       "reauthorizeButton": "Volver autorizar a aplicación de GitHub",
-      "reauthorizeDescription": "O axente de seguridade require o permiso vulnerability_alerts para acceder aos avisos de Dependabot. Volve autorizar a aplicación de GitHub para conceder este permiso.",
+      "reauthorizeDescription": "O axente de seguridade require permiso para ler os avisos de Dependabot. Volve autorizar a aplicación de GitHub para conceder este permiso.",
       "reauthorizeTitle": "Requírense permisos adicionais",
       "setupFailed": "Non se puido iniciar a configuración de GitHub. Téntao de novo."
     },
@@ -2112,7 +2128,8 @@
       "dollar_other": "dólares",
       "costSpoken": "custo de {{cost}}",
       "costSpokenWithTime": "custo {{cost}}, {{time}}",
-      "pullRequest": "solicitude de integración {{number}}"
+      "pullRequest": "solicitude de integración {{number}}",
+      "spokenJoiner": "e"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Non se puido abrir GitHub",
@@ -2467,7 +2484,71 @@
       "preparationComplete": "Preparación completada",
       "preparationFailed": "Fallou a preparación",
       "setupCommand": "Comando de configuración {{index}}",
-      "setupCommandOf": "Comando de configuración {{index}} de {{displayCount}}"
+      "setupCommandOf": "Comando de configuración {{index}} de {{displayCount}}",
+      "stepWorkspaceSetup": "Configuración do espazo de traballo",
+      "stepDiskCheck": "Comprobación do disco",
+      "stepCloning": "Clonando o repositorio",
+      "stepBranch": "Configurando a rama",
+      "stepDevcontainerSetup": "Configuración do contedor de desenvolvemento",
+      "stepWorkspaceRestore": "Restaurando o espazo de traballo",
+      "stepWorkspaceBackup": "Gardando o espazo de traballo",
+      "stepSandboxProvision": "Aprovisionando a sandbox",
+      "stepSandboxBoot": "Iniciando a sandbox",
+      "stepSnapshotFallback": "Reintentando sen instantánea",
+      "stepKiloServer": "Iniciando Kilo",
+      "stepKiloSession": "Preparando a sesión",
+      "stepRestoreIncomplete": "Restauración da sesión incompleta",
+      "stepReady": "Contorno listo",
+      "stepFailed": "Fallou a configuración do contorno",
+      "stepUnknown": "Configuración do contorno",
+      "detailCreatingSandbox": "Creando a sandbox",
+      "detailUpdatingRepository": "Actualizando o repositorio",
+      "detailCheckingOutBranch": "Cambiando á rama",
+      "detailRunningSetupCommands": "Executando comandos de configuración",
+      "detailSavingRepository": "Gardando o repositorio para arranques máis rápidos",
+      "detailStartingKiloRuntime": "Iniciando o runtime de Kilo",
+      "detailPreparingKiloSession": "Preparando a sesión de Kilo",
+      "detailWaitingForPreviousSandbox": "Agardando a que se deteña a sandbox anterior",
+      "detailRetryingSandboxCreation": "Reintentando a creación da sandbox",
+      "detailPreviousSnapshotFailed": "Fallou o arranque coa instantánea anterior. Reintentando sen instantánea.",
+      "detailSnapshotStartupFailed": "Fallou o arranque coa instantánea. Reintentando sen instantánea.",
+      "detailStartingSandboxWithoutSnapshot": "Iniciando a sandbox sen instantánea",
+      "detailSettingUpWorkspace": "Configurando o espazo de traballo",
+      "detailRestoringSession": "Restaurando a sesión",
+      "detailWarmWorkspaceReused": "Reutilizouse o espazo de traballo en quente",
+      "detailRetryingClone": "Reintentando a clonación (intento {{attempt}} de {{total}})",
+      "detailSetupCommandFailed": "Fallou o comando de configuración {{index}}",
+      "detailSetupCommandTimedOut": "O comando de configuración {{index}} esgotou o tempo de espera",
+      "detailColdRestore": "Restauración en frío, aplicouse a instantánea, restauráronse {{applied}} de {{total}} ficheiros",
+      "detailProgressPercent": "{{percent}}% completado",
+      "detailRestoreIncompleteReport": "Restauración da sesión incompleta: non se restauraron {{skipped}} de {{total}} ficheiros ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Faltan: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} e {{omitted}} máis",
+      "detailReasonPatchFailed": "o parche non se aplicou",
+      "detailReasonOutsideWorkspace": "a ruta está fóra do espazo de traballo",
+      "detailReasonMissingContent": "a instantánea non contiña contido para o ficheiro",
+      "detailReasonIndexResetFailed": "non se puido restablecer o índice tras unha aplicación fallida",
+      "detailReasonUnlinkFailed": "non se puido eliminar o ficheiro",
+      "detailReasonWriteFailed": "non se puido escribir o ficheiro",
+      "detailReasonUnknown": "un motivo descoñecido",
+      "detailUnknown": "Seguindo a preparar",
+      "errorPreparationTimeout": "A preparación do contorno esgotou o tempo de espera",
+      "errorWorkspaceSetupFailed": "Fallou a configuración do espazo de traballo",
+      "errorCredentialUpgradeRequired": "Esta sesión carece dunha actualización de credenciais necesaria. Inicia unha nova sesión para continuar.",
+      "errorAgentUnavailable": "O axente deixou de estar dispoñible",
+      "errorBillingBlocked": "O pagamento da sandbox require créditos adicionais",
+      "errorBillingUnavailable": "A verificación de pagamento ou capacidade da sandbox non está dispoñible. Téntao de novo nun momento.",
+      "errorContainerLimitReached": "Acadouse o límite de contedores. Detén un contedor existente antes de iniciar outro.",
+      "errorInvalidConfiguration": "A configuración da sandbox non é válida ou non é compatible",
+      "errorRuntimeArtifactUnauthorized": "Non se autorizou a descarga do runtime",
+      "errorRuntimeArtifactInvalid": "Fallou a verificación do artefacto do runtime",
+      "errorRuntimeCliProbeFailed": "Fallou a validación do CLI do runtime",
+      "errorRuntimeSupervisorMissing": "Falta o supervisor do runtime",
+      "errorConnectionLost": "Perdeuse a conexión coa sandbox",
+      "errorSandboxLost": "Perdeuse a sandbox",
+      "errorAgentRestarted": "O axente reiniciouse",
+      "errorSandboxOutOfMemory": "A sandbox esgotou a memoria",
+      "errorPreparationDidNotComplete": "A preparación non se completou"
     },
     "permissionCard": {
       "title": "Permiso necesario",
@@ -3031,22 +3112,16 @@
     "boundary": {
       "backToProfile": "Volver ao perfil",
       "loadErrorMessage": "Comproba a túa conexión e téntao de novo.",
-
       "chooseAccount": "Seleccionar unha conta",
       "loadErrorTitle": "Non se puideron cargar as túas organizacións.",
       "membershipLostNotice": "Xa non tes acceso a esta organización. Cambiado a {{target}}.",
       "noOrganization": "Sen organización",
-
       "noOrganizationDescription": "Esta conta non forma parte dunha organización. Crea unha ou únete a unha na web para usar funcións de organización como as invitacións de membros e as alertas de saldo baixo.",
-
       "openWebOrganizations": "Abrir as organizacións na web",
-
       "organizationUnavailable": "A organización non está dispoñible.",
       "selectDescriptionWithOrganizations": "Pertences a unha ou máis organizacións. Escolle a conta que debe usar esta pantalla.",
-
       "selectOrganization": "Seleccionar unha organización",
       "unavailableDescription": "Esta organización xa non está dispoñible. Escolle unha desde o teu perfil para continuar.",
-
       "unavailableSessionsDescription": "Esta organización xa non está dispoñible. Non se poden cargar as súas sesións.",
       "accessDeniedDescription": "Non tes acceso a esta organización."
     },
@@ -3074,7 +3149,9 @@
       "permissionDenied": "Non tes permiso para invitar membros.",
       "roleMember": "O rol é de membro.",
       "sendInvite": "Enviar invitación",
-      "title": "Convidar un membro"
+      "title": "Convidar un membro",
+      "alreadyInvited": "Xa está convidado ou xa é membro.",
+      "sendError": "Non se puido enviar a invitación."
     },
     "invoices": {
       "downloadA11y": "Descargar factura {{number}}",
@@ -3143,7 +3220,8 @@
       "inviteCreated": "Invitación creada",
       "pendingInvitations": "Invitacións pendentes",
       "resendInvite": "Reenviar invitación",
-      "shareInviteLink": "Compartir ligazón de invitación"
+      "shareInviteLink": "Compartir ligazón de invitación",
+      "resendInviteError": "Non se puido reenviar a invitación."
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",
@@ -3291,7 +3369,8 @@
     "noneChosen": "Ningún seleccionado",
     "emptyTitle": "Non hai modelos de transcrición",
     "emptyDescription": "Kilo Gateway non ofrece modelos de transcrición neste momento.",
-    "loadFailed": "Non se puideron cargar os modelos de transcrición."
+    "loadFailed": "Non se puideron cargar os modelos de transcrición.",
+    "choose": "Escoller un modelo"
   },
   "voiceLanguage": {
     "title": "Idioma do ditado",
@@ -3536,8 +3615,6 @@
       "quantizations": "Cuantizacións",
       "quantizationsHelp": "Os ficheiros máis pequenos usan menos memoria e almacenamento. Os máis grandes adoitan dar mellores respostas.",
       "quantDetail": "Descarga de {{size}} · uns {{memory}} de memoria",
-      "downloadQuant": "Descargar {{quant}}",
-      "downloadModelA11y": "Descargar {{name}}",
       "detailsA11y": "Detalles: {{name}}",
       "loadingModel": "Cargando os detalles do modelo",
       "couldNotLoadModel": "Non se puido cargar este modelo",
@@ -3582,7 +3659,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "Este modelo admite esforzo de razoamento"
-    }
+    },
+    "creditsRequired": "Non hai créditos suficientes para enviar esta mensaxe. Engade créditos e téntao de novo."
   },
   "settingsTools": {
     "confirmTitle": "Confirmar este cambio?"
@@ -3618,7 +3696,9 @@
     "spend24h": "Gasto nas últimas 24 horas",
     "multiplierError": "Introduce un multiplicador de 1 ou máis",
     "permissionDenied": "Non tes permiso para xestionar as alertas de gasto.",
-    "pushOffByCategory": "Desactivado en Notificacións"
+    "pushOffByCategory": "Desactivado en Notificacións",
+    "multiplierMaxError": "Introduce un multiplicador de {{max}} ou menos",
+    "thresholdMaxError": "Introduce unha cantidade de {{max}} ou menos."
   },
   "profiles": {
     "title": "Perfís",
@@ -3743,16 +3823,16 @@
       "stepsPlaceholder": "p. ex. 50",
       "temperature": "Temperatura",
       "temperaturePlaceholder": "p. ex. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "p. ex. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "O meu axente",
       "promptPlaceholder": "Vostede é un...",
       "tools": "Ferramentas",
       "visibility": "Visibilidade",
-      "visibilityPrimary": "Primario: móstrase no selector",
-      "visibilitySubagent": "Subaxente: só se pode chamar desde outros",
-      "visibilityAll": "Todos - ambos",
+      "visibilityPrimary": "Primario — móstrase no selector",
+      "visibilitySubagent": "Subaxente — só se pode chamar desde outros",
+      "visibilityAll": "Todos — ambos",
       "modePrimary": "Só primario",
       "modeSubagent": "Só subaxente",
       "modeAll": "Todos",
@@ -3805,7 +3885,9 @@
       "pinFailed": "Non se puido fixar o repositorio",
       "unboundToast": "Repo desvinculado",
       "unbindFailed": "Non se puido desvincular o repositorio"
-    }
+    },
+    "variablesDeleteFailed": "Non se puido eliminar a variable",
+    "deleteCommand": "Eliminar o comando {{position}}"
   },
   "credits": {
     "title": "Mercar créditos",
@@ -3841,7 +3923,8 @@
       "archive": "Arquivar",
       "unarchive": "Desarquivar",
       "deleteTitle": "Eliminar {{name}}?",
-      "deleteMessage": "As súas tarefas tamén se eliminan. As sesións mantéñense."
+      "deleteMessage": "As súas tarefas tamén se eliminan. As sesións mantéñense.",
+      "createFailed": "Non se puido crear a lista"
     },
     "listSettings": {
       "title": "Axustes da lista",
@@ -3999,6 +4082,7 @@
     "estimatePricingUnavailable": "Non está dispoñible o prezo deste modelo.",
     "estimateBalanceUnavailable": "Non hai saldo abondo para un resumo de pago.",
     "estimateModelNotAllowed": "Este modelo non está permitido aquí.",
-    "estimateSpendLimitTooLow": "Suba o límite de gasto para permitir este resumo."
+    "estimateSpendLimitTooLow": "Suba o límite de gasto para permitir este resumo.",
+    "saved": "Configuración do resumo gardada"
   }
 }

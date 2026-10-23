@@ -293,7 +293,8 @@
     "condenseToolCallsSubtitle": "連続するツール呼び出しを、開ける1つの行にまとめます。",
     "toolSummaryTranslation": "ツールの概要を翻訳",
     "toolSummaryTranslationSubtitle": "各ツールの概要をモデルに送信して、アプリの言語に翻訳します。翻訳に失敗した場合は元のテキストが表示されます。",
-    "toolSummaryTranslationModelUnavailableNotice": "このモデルは提供が終了しました。別のモデルを選ぶには$t(common.model)をタップしてください。"
+    "toolSummaryTranslationModelUnavailableNotice": "このモデルは提供が終了しました。別のモデルを選ぶには$t(common.model)をタップしてください。",
+    "autoExpandThinkingInactiveSubtitle": "思考の詳細が非表示の場合は効果がありません。"
   },
   "notifications": {
     "liveActivities": "ライブアクティビティ",
@@ -916,7 +917,15 @@
       "pullRequestUrl": "プルリクエストのURL",
       "start": "レビューを開始",
       "starting": "レビューを開始中…",
-      "title": "手動レビュー"
+      "title": "手動レビュー",
+      "startNotFound": "その{{requestNoun}}を{{provider}}から読み込めませんでした。URLと、リポジトリにアクセスできるかどうかをご確認ください。",
+      "startRateLimited": "{{provider}}は現在リクエストを制限しています。数分後にもう一度お試しください。",
+      "startNotAllowed": "その{{requestNoun}}のレビューを開始する権限がありません。権限と組織のプランをご確認ください。",
+      "startProviderNeedsAttention": "手動レビューには標準の{{provider}}接続が必要です。接続してから、もう一度お試しください。",
+      "startAlreadyRunning": "その{{requestNoun}}のレビューはすでに実行中です。",
+      "startRejected": "その{{requestNoun}}はレビューできません。オープン状態であること、ドラフトでないこと、URLが正しいことをご確認ください。",
+      "startProviderUnavailable": "その{{requestNoun}}を読み取るために{{provider}}に接続できませんでした。もう一度お試しください。",
+      "startFailed": "レビューを開始できませんでした。接続を確認して、もう一度お試しください。"
     },
     "notConnectedReadOnly": "{{platform}}が接続されていません。接続できるのは組織のオーナーと管理者のみです。",
     "gitlab": {
@@ -979,7 +988,13 @@
       "sessionError": "セッションでエラーが発生しました（{{error}}）。",
       "statusWithValue": "状態：{{status}}",
       "toolName": "ツール：{{name}}",
-      "toolNameError": "ツール{{name}}でエラーが発生しました。"
+      "toolNameError": "ツール{{name}}でエラーが発生しました。",
+      "cancelReasonSuperseded": "新しいコミットがプッシュされたため、このレビューは置き換えられました。",
+      "cancelReasonIntegrationDisconnected": "{{platform}}が切断されているため、このレビューはキャンセルされました。再接続してから、レビューを再実行してください。",
+      "cancelReasonBitbucketReviewerDisabled": "BitbucketでCode Reviewerがオフになったため、このレビューはキャンセルされました。再度有効にしてから、レビューを再実行してください。",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucketのプルリクエストが変更されたため、このレビューは置き換えられました。",
+      "cancelReasonCancelled": "このレビューはキャンセルされました。",
+      "cancelReasonInterrupted": "このレビューは中断されました。"
     },
     "reviewList": {
       "configureProvider": "プロバイダーを設定",
@@ -1388,7 +1403,7 @@
       "couldNotLoad": "セキュリティエージェントを読み込めませんでした。",
       "installApp": "GitHub Appをインストール",
       "reauthorizeButton": "GitHub Appを再承認",
-      "reauthorizeDescription": "セキュリティエージェントがDependabotアラートにアクセスするには、vulnerability_alerts権限が必要です。GitHub Appを再承認して、この権限を付与してください。",
+      "reauthorizeDescription": "セキュリティエージェントがDependabotアラートを読み取るには、権限が必要です。GitHub Appを再承認して、この権限を付与してください。",
       "reauthorizeTitle": "追加の権限が必要です",
       "setupFailed": "GitHubのセットアップを開始できませんでした。もう一度お試しください。"
     },
@@ -1595,7 +1610,8 @@
       "dollar_other": "ドル",
       "costSpoken": "コスト {{cost}}",
       "costSpokenWithTime": "料金{{cost}}、{{time}}",
-      "pullRequest": "プルリクエスト {{number}}"
+      "pullRequest": "プルリクエスト {{number}}",
+      "spokenJoiner": "、"
     },
     "githubInstall": {
       "couldNotOpenMessage": "GitHub Appのセットアップを開始できませんでした。もう一度お試しください。",
@@ -1950,7 +1966,71 @@
       "preparationComplete": "準備完了",
       "preparationFailed": "準備失敗",
       "setupCommand": "セットアップコマンド {{index}}",
-      "setupCommandOf": "セットアップコマンド {{index}} / {{displayCount}}"
+      "setupCommandOf": "セットアップコマンド {{index}} / {{displayCount}}",
+      "stepWorkspaceSetup": "ワークスペースのセットアップ",
+      "stepDiskCheck": "ディスク容量の確認",
+      "stepCloning": "リポジトリをクローン中",
+      "stepBranch": "ブランチを設定中",
+      "stepDevcontainerSetup": "Devコンテナのセットアップ",
+      "stepWorkspaceRestore": "ワークスペースを復元中",
+      "stepWorkspaceBackup": "ワークスペースを保存中",
+      "stepSandboxProvision": "サンドボックスをプロビジョニング中",
+      "stepSandboxBoot": "サンドボックスを起動中",
+      "stepSnapshotFallback": "スナップショットなしで再試行中",
+      "stepKiloServer": "Kiloを起動中",
+      "stepKiloSession": "セッションを準備中",
+      "stepRestoreIncomplete": "セッションの復元が未完了",
+      "stepReady": "環境の準備が完了",
+      "stepFailed": "環境のセットアップに失敗",
+      "stepUnknown": "環境のセットアップ",
+      "detailCreatingSandbox": "サンドボックスを作成中",
+      "detailUpdatingRepository": "リポジトリを更新中",
+      "detailCheckingOutBranch": "ブランチをチェックアウト中",
+      "detailRunningSetupCommands": "セットアップコマンドを実行中",
+      "detailSavingRepository": "高速起動用にリポジトリを保存中",
+      "detailStartingKiloRuntime": "Kiloランタイムを起動中",
+      "detailPreparingKiloSession": "Kiloセッションを準備中",
+      "detailWaitingForPreviousSandbox": "前のサンドボックスの停止を待機中",
+      "detailRetryingSandboxCreation": "サンドボックスの作成を再試行中",
+      "detailPreviousSnapshotFailed": "前回のスナップショットでの起動に失敗しました。スナップショットなしで再試行しています。",
+      "detailSnapshotStartupFailed": "スナップショットでの起動に失敗しました。スナップショットなしで再試行しています。",
+      "detailStartingSandboxWithoutSnapshot": "スナップショットなしでサンドボックスを起動中",
+      "detailSettingUpWorkspace": "ワークスペースをセットアップ中",
+      "detailRestoringSession": "セッションを復元中",
+      "detailWarmWorkspaceReused": "ウォームワークスペースを再利用",
+      "detailRetryingClone": "クローンを再試行中（{{attempt}} / {{total}}回目）",
+      "detailSetupCommandFailed": "セットアップコマンド {{index}} が失敗しました",
+      "detailSetupCommandTimedOut": "セットアップコマンド {{index}} がタイムアウトしました",
+      "detailColdRestore": "コールドリストア、スナップショットを適用、{{total}}ファイル中{{applied}}ファイルを復元",
+      "detailProgressPercent": "{{percent}}% 完了",
+      "detailRestoreIncompleteReport": "セッションの復元が未完了です：{{total}}ファイル中{{skipped}}ファイルが復元されませんでした（{{reasons}}）。",
+      "detailRestoreIncompleteMissing": "不足：{{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}}のほか{{omitted}}件",
+      "detailReasonPatchFailed": "パッチが適用されなかったため",
+      "detailReasonOutsideWorkspace": "パスがワークスペースの外にあるため",
+      "detailReasonMissingContent": "スナップショットにそのファイルの内容が含まれていなかったため",
+      "detailReasonIndexResetFailed": "適用失敗後にインデックスをリセットできなかったため",
+      "detailReasonUnlinkFailed": "ファイルを削除できなかったため",
+      "detailReasonWriteFailed": "ファイルを書き込めなかったため",
+      "detailReasonUnknown": "不明な理由",
+      "detailUnknown": "準備中",
+      "errorPreparationTimeout": "環境の準備がタイムアウトしました",
+      "errorWorkspaceSetupFailed": "ワークスペースのセットアップに失敗しました",
+      "errorCredentialUpgradeRequired": "このセッションには必要な認証情報のアップグレードがありません。続行するには新しいセッションを開始してください。",
+      "errorAgentUnavailable": "エージェントが利用できなくなりました",
+      "errorBillingBlocked": "サンドボックスの課金には追加クレジットが必要です",
+      "errorBillingUnavailable": "サンドボックスの課金またはキャパシティの確認が利用できません。しばらくしてから再試行してください。",
+      "errorContainerLimitReached": "コンテナの上限に達しました。別のコンテナを開始する前に、既存のコンテナを停止してください。",
+      "errorInvalidConfiguration": "サンドボックスの設定が無効または未対応です",
+      "errorRuntimeArtifactUnauthorized": "ランタイムのダウンロードが許可されませんでした",
+      "errorRuntimeArtifactInvalid": "ランタイムアーティファクトの検証に失敗しました",
+      "errorRuntimeCliProbeFailed": "ランタイムCLIの検証に失敗しました",
+      "errorRuntimeSupervisorMissing": "ランタイムスーパーバイザーが見つかりません",
+      "errorConnectionLost": "サンドボックスへの接続が失われました",
+      "errorSandboxLost": "サンドボックスが失われました",
+      "errorAgentRestarted": "エージェントが再起動されました",
+      "errorSandboxOutOfMemory": "サンドボックスのメモリが不足しました",
+      "errorPreparationDidNotComplete": "準備が完了しませんでした"
     },
     "permissionCard": {
       "title": "許可のリクエスト",
@@ -2555,7 +2635,8 @@
       "gitlabDescription": "モバイルでマージリクエストをレビューするには、GitLabアカウントを接続してください。",
       "bitbucketDescription": "モバイルでプルリクエストをレビューするには、この組織をBitbucketに接続してください。",
       "bitbucketOrgOnlyDescription": "Bitbucket のプルリクエストを確認するには、上のアカウントを組織に切り替えてください。",
-      "contextLine": "{{organization}}用"
+      "contextLine": "{{organization}}用",
+      "contextLinePersonal": "個人用"
     },
     "connectionExpired": "GitHubとの連携が期限切れになりました。",
     "couldNotLoadPullRequest": "プルリクエストを読み込めませんでした。",
@@ -3023,22 +3104,16 @@
     "boundary": {
       "backToProfile": "プロフィールに戻る",
       "loadErrorMessage": "接続を確認して、もう一度お試しください。",
-
       "chooseAccount": "アカウントを選択",
       "loadErrorTitle": "組織を読み込めませんでした。",
       "membershipLostNotice": "この組織にアクセスできなくなりました。{{target}}に切り替えました。",
       "noOrganization": "組織なし",
-
       "noOrganizationDescription": "このアカウントは組織に属していません。メンバーの招待や残高不足のアラートなどの組織機能を使用するには、ウェブで組織を作成するか参加してください。",
-
       "openWebOrganizations": "ウェブで組織を開く",
-
       "organizationUnavailable": "組織を利用できません。",
       "selectDescriptionWithOrganizations": "あなたは1つ以上の組織に所属しています。この画面で使用するアカウントを選択してください。",
-
       "selectOrganization": "組織を選択",
       "unavailableDescription": "この組織は利用できなくなりました。続行するには、プロフィールから組織を選択してください。",
-
       "unavailableSessionsDescription": "この組織は利用できなくなりました。セッションを読み込めません。",
       "accessDeniedDescription": "この組織にアクセスする権限がありません。"
     },
@@ -3073,7 +3148,9 @@
       "permissionDenied": "メンバーを招待する権限がありません。",
       "roleMember": "役割はメンバーです。",
       "sendInvite": "招待を送信",
-      "title": "メンバーを招待"
+      "title": "メンバーを招待",
+      "alreadyInvited": "このメールアドレスは、すでに招待済みか、すでにメンバーに追加されています。",
+      "sendError": "招待を送信できませんでした。"
     },
     "invoices": {
       "downloadA11y": "請求書{{number}}をダウンロード",
@@ -3142,7 +3219,8 @@
       "inviteCreated": "招待を作成しました",
       "pendingInvitations": "承諾待ちの招待",
       "resendInvite": "招待を再送信",
-      "shareInviteLink": "招待リンクを共有"
+      "shareInviteLink": "招待リンクを共有",
+      "resendInviteError": "招待を再送信できませんでした。"
     },
     "usageStats": {
       "inputTokens": "入力トークン",
@@ -3291,7 +3369,8 @@
     "noneChosen": "未選択",
     "emptyTitle": "文字起こしモデルがありません",
     "emptyDescription": "現在、Kilo Gatewayは文字起こしモデルを提供していません。",
-    "loadFailed": "文字起こしモデルを読み込めませんでした。"
+    "loadFailed": "文字起こしモデルを読み込めませんでした。",
+    "choose": "モデルを選択"
   },
   "voiceLanguage": {
     "title": "音声入力の言語",
@@ -3536,8 +3615,6 @@
       "quantizations": "量子化",
       "quantizationsHelp": "小さいファイルほどメモリとストレージの使用量が少なくなります。大きいファイルのほうが通常は回答の質が高くなります。",
       "quantDetail": "ダウンロード {{size}} · メモリ約 {{memory}}",
-      "downloadQuant": "{{quant}} をダウンロード",
-      "downloadModelA11y": "{{name}} をダウンロード",
       "detailsA11y": "詳細：{{name}}",
       "loadingModel": "モデルの詳細を読み込み中",
       "couldNotLoadModel": "このモデルを読み込めませんでした",
@@ -3582,7 +3659,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "このモデルは思考量の指定に対応しています"
-    }
+    },
+    "creditsRequired": "このメッセージを送信するにはクレジットが足りません。クレジットを追加して再試行してください。"
   },
   "settingsTools": {
     "confirmTitle": "この変更を確認しますか？"
@@ -3618,7 +3696,9 @@
     "spend24h": "過去24時間の支出",
     "multiplierError": "1以上の倍率を入力してください",
     "permissionDenied": "支出アラートを管理する権限がありません。",
-    "pushOffByCategory": "通知でオフ"
+    "pushOffByCategory": "通知でオフ",
+    "multiplierMaxError": "{{max}}以下の倍率を入力してください",
+    "thresholdMaxError": "{{max}}以下の金額を入力してください。"
   },
   "profiles": {
     "title": "プロフィール",
@@ -3743,7 +3823,7 @@
       "stepsPlaceholder": "例: 50",
       "temperature": "温度",
       "temperaturePlaceholder": "例: 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "例: 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "私のエージェント",
@@ -3805,7 +3885,9 @@
       "pinFailed": "リポジトリを固定できませんでした",
       "unboundToast": "バインドされていないリポジトリ",
       "unbindFailed": "リポジトリのバインドを解除できませんでした"
-    }
+    },
+    "variablesDeleteFailed": "変数を削除できませんでした",
+    "deleteCommand": "コマンド{{position}}を削除"
   },
   "credits": {
     "title": "クレジットを購入",
@@ -3841,7 +3923,8 @@
       "archive": "アーカイブ",
       "unarchive": "アーカイブを解除",
       "deleteTitle": "{{name}}を削除しますか？",
-      "deleteMessage": "そのタスクも削除されます。セッションは残ります。"
+      "deleteMessage": "そのタスクも削除されます。セッションは残ります。",
+      "createFailed": "リストを作成できませんでした"
     },
     "listSettings": {
       "title": "リストの設定",
@@ -3999,6 +4082,7 @@
     "estimatePricingUnavailable": "このモデルの価格情報はご利用いただけません。",
     "estimateBalanceUnavailable": "有料サマリーには残高が不足しています。",
     "estimateModelNotAllowed": "このモデルはここでは使用できません。",
-    "estimateSpendLimitTooLow": "このサマリーを許可するには利用上限を引き上げてください。"
+    "estimateSpendLimitTooLow": "このサマリーを許可するには利用上限を引き上げてください。",
+    "saved": "ブリーフィング設定を保存しました"
   }
 }

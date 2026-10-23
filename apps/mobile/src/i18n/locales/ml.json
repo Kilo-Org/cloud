@@ -293,7 +293,8 @@
     "condenseToolCallsSubtitle": "തുടർച്ചയായ ടൂൾ വിളികളെ നിങ്ങൾക്ക് തുറക്കാവുന്ന ഒരു വരിയിൽ ഗ്രൂപ്പുചെയ്യുക.",
     "toolSummaryTranslation": "ടൂൾ സംഗ്രഹങ്ങൾ വിവർത്തനം ചെയ്യുക",
     "toolSummaryTranslationSubtitle": "ഓരോ ടൂൾ സംഗ്രഹവും നിങ്ങളുടെ ആപ്പിന്റെ ഭാഷയിലേക്ക് വിവർത്തനം ചെയ്യാൻ ഒരു മോഡലിലേക്ക് അയയ്ക്കുക. വിവർത്തനം പരാജയപ്പെട്ടാൽ യഥാർത്ഥ പാഠം കാണിക്കും.",
-    "toolSummaryTranslationModelUnavailableNotice": "ഈ മോഡൽ ഇനി ലഭ്യമല്ല. മറ്റൊന്ന് തിരഞ്ഞെടുക്കാൻ $t(common.model) ടാപ്പ് ചെയ്യുക."
+    "toolSummaryTranslationModelUnavailableNotice": "ഈ മോഡൽ ഇനി ലഭ്യമല്ല. മറ്റൊന്ന് തിരഞ്ഞെടുക്കാൻ $t(common.model) ടാപ്പ് ചെയ്യുക.",
+    "autoExpandThinkingInactiveSubtitle": "ചിന്തയുടെ വിശദാംശങ്ങൾ മറയ്ക്കപ്പെട്ടിരിക്കുമ്പോൾ ഇതിന് ഫലമുണ്ടാകില്ല."
   },
   "prReview": {
     "pullRequestUnavailable": "പുൾ റിക്വസ്റ്റ് ലഭ്യമല്ല",
@@ -669,7 +670,8 @@
       "gitlabDescription": "മൊബൈലിൽ മെർജ് റിക്വസ്റ്റുകൾ പരിശോധിക്കാൻ നിങ്ങളുടെ GitLab അക്കൗണ്ട് കണക്റ്റ് ചെയ്യുക.",
       "bitbucketDescription": "മൊബൈലിൽ പുൾ റിക്വസ്റ്റുകൾ പരിശോധിക്കാൻ ഈ ഓർഗനൈസേഷനെ Bitbucket-മായി കണക്റ്റ് ചെയ്യുക.",
       "bitbucketOrgOnlyDescription": "അതിന്റെ Bitbucket പുൾ റിക്വസ്റ്റുകൾ പരിശോധിക്കാൻ മുകളിലുള്ള അക്കൗണ്ട് ഒരു ഓർഗനൈസേഷനിലേക്ക് മാറ്റുക.",
-      "contextLine": "{{organization}}-ന്"
+      "contextLine": "{{organization}}-ന്",
+      "contextLinePersonal": "വ്യക്തിപരത്തിന്"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1452,7 +1454,13 @@
       "sessionError": "സെഷനിൽ പിശകുണ്ടായി: {{error}}.",
       "statusWithValue": "നില: {{status}}",
       "toolName": "ടൂൾ: {{name}}",
-      "toolNameError": "{{name}} എന്ന ടൂളിൽ പിശകുണ്ടായി."
+      "toolNameError": "{{name}} എന്ന ടൂളിൽ പിശകുണ്ടായി.",
+      "cancelReasonSuperseded": "ഒരു പുതിയ കമ്മിറ്റ് പുഷ് ചെയ്തതിനാൽ ഈ അവലോകനം മാറ്റിസ്ഥാപിക്കപ്പെട്ടു.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} വിച്ഛേദിച്ചതിനാൽ ഈ അവലോകനം റദ്ദാക്കപ്പെട്ടു. അത് വീണ്ടും ബന്ധിപ്പിച്ചതിനുശേഷം അവലോകനം വീണ്ടും നടത്തുക.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer Bitbucket-ന് ഓഫ് ചെയ്തതിനാൽ ഈ അവലോകനം റദ്ദാക്കപ്പെട്ടു. അത് വീണ്ടും പ്രവർത്തനക്ഷമമാക്കിയതിനുശേഷം അവലോകനം വീണ്ടും നടത്തുക.",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket പുൾ റിക്വസ്റ്റ് മാറിയതിനാൽ ഈ അവലോകനം മാറ്റിസ്ഥാപിക്കപ്പെട്ടു.",
+      "cancelReasonCancelled": "ഈ അവലോകനം റദ്ദാക്കപ്പെട്ടു.",
+      "cancelReasonInterrupted": "ഈ അവലോകനം തടസ്സപ്പെട്ടു."
     },
     "reviewMemory": {
       "title": "പരിശോധനാ മെമ്മറി",
@@ -1479,7 +1487,15 @@
       "instructions": "നിർദ്ദേശങ്ങൾ (നിർബന്ധമില്ല)",
       "instructionsPlaceholder": "അവലോകനത്തിൽ പ്രത്യേകം ശ്രദ്ധിക്കേണ്ട കാര്യങ്ങൾ…",
       "starting": "അവലോകനം ആരംഭിക്കുന്നു…",
-      "start": "അവലോകനം ആരംഭിക്കുക"
+      "start": "അവലോകനം ആരംഭിക്കുക",
+      "startNotFound": "{{provider}}-ൽ നിന്ന് ആ {{requestNoun}} വായിക്കാൻ കഴിഞ്ഞില്ല. URL-ഉം റിപ്പോസിറ്ററി ആക്സസ് ചെയ്യാൻ കഴിയുന്നതും പരിശോധിക്കുക.",
+      "startRateLimited": "{{provider}} ഇപ്പോൾ അഭ്യർത്ഥനകളിൽ പരിധി ഏർപ്പെടുത്തിയിരിക്കുന്നു. അൽപം മിനിറ്റുകൾക്ക് ശേഷം വീണ്ടും ശ്രമിക്കുക.",
+      "startNotAllowed": "ആ {{requestNoun}}-ന്റെ അവലോകനം ആരംഭിക്കാനുള്ള ആക്സസ് നിങ്ങൾക്കില്ല. നിങ്ങളുടെ അനുമതികളും നിങ്ങളുടെ സ്ഥാപനത്തിന്റെ പ്ലാനും പരിശോധിക്കുക.",
+      "startProviderNeedsAttention": "നേരിട്ട് ആരംഭിക്കുന്ന അവലോകനങ്ങൾക്ക് സാധാരണ {{provider}} കണക്ഷൻ ആവശ്യമാണ്. അത് കണക്റ്റ് ചെയ്ത് വീണ്ടും ശ്രമിക്കുക.",
+      "startAlreadyRunning": "ആ {{requestNoun}}-ന്റെ അവലോകനം ഇതിനകം പ്രവർത്തിക്കുന്നുണ്ട്.",
+      "startRejected": "ആ {{requestNoun}} അവലോകനം ചെയ്യാൻ കഴിയില്ല. അത് തുറന്നതാണെന്നും, ഡ്രാഫ്റ്റ് അല്ലെന്നും, URL ശരിയാണെന്നും ഉറപ്പാക്കുക.",
+      "startProviderUnavailable": "ആ {{requestNoun}} വായിക്കാൻ {{provider}}-നെ ബന്ധപ്പെടാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
+      "startFailed": "അവലോകനം ആരംഭിക്കാൻ കഴിഞ്ഞില്ല. നിങ്ങളുടെ കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക."
     },
     "notConnectedReadOnly": "{{platform}} കണക്റ്റുചെയ്തിട്ടില്ല. ഓർഗനൈസേഷൻ ഉടമകൾക്കും അഡ്മിനുകൾക്കും മാത്രമേ അത് കണക്റ്റുചെയ്യാൻ കഴിയൂ.",
     "gitlab": {
@@ -1948,7 +1964,7 @@
       "couldNotLoad": "സുരക്ഷാ ഏജന്റ് ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "installApp": "GitHub ആപ്പ് ഇൻസ്റ്റാൾ ചെയ്യുക",
       "reauthorizeButton": "GitHub ആപ്പിന് വീണ്ടും അനുമതി നൽകുക",
-      "reauthorizeDescription": "Dependabot അറിയിപ്പുകൾ ലഭിക്കാൻ സുരക്ഷാ ഏജന്റിന് vulnerability_alerts അനുമതി ആവശ്യമാണ്. ഈ അനുമതി നൽകാൻ GitHub ആപ്പിന് വീണ്ടും അനുമതി നൽകുക.",
+      "reauthorizeDescription": "Dependabot അറിയിപ്പുകൾ വായിക്കാൻ സുരക്ഷാ ഏജന്റിന് അനുമതി ആവശ്യമാണ്. ഈ അനുമതി നൽകാൻ GitHub ആപ്പിന് വീണ്ടും അനുമതി നൽകുക.",
       "reauthorizeTitle": "കൂടുതൽ അനുമതികൾ ആവശ്യമാണ്",
       "setupFailed": "GitHub സജ്ജീകരണം ആരംഭിക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക."
     },
@@ -2112,7 +2128,8 @@
       "dollar_other": "ഡോളർ",
       "costSpoken": "ചെലവ് {{cost}}",
       "costSpokenWithTime": "ചെലവ് {{cost}}, {{time}}",
-      "pullRequest": "പുൾ റിക്വസ്റ്റ് {{number}}"
+      "pullRequest": "പുൾ റിക്വസ്റ്റ് {{number}}",
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub തുറക്കാനായില്ല",
@@ -2467,7 +2484,71 @@
       "preparationComplete": "തയ്യാറെടുപ്പ് പൂർത്തിയായി",
       "preparationFailed": "തയ്യാറെടുപ്പ് പരാജയപ്പെട്ടു",
       "setupCommand": "സജ്ജീകരണ കമാൻഡ് {{index}}",
-      "setupCommandOf": "ആകെ {{displayCount}} സജ്ജീകരണ കമാൻഡുകളിൽ {{index}}"
+      "setupCommandOf": "ആകെ {{displayCount}} സജ്ജീകരണ കമാൻഡുകളിൽ {{index}}",
+      "stepWorkspaceSetup": "വർക്ക്സ്പേസ് സജ്ജീകരണം",
+      "stepDiskCheck": "ഡിസ്ക് പരിശോധന",
+      "stepCloning": "റിപ്പോസിറ്ററി ക്ലോൺ ചെയ്യുന്നു",
+      "stepBranch": "ബ്രാഞ്ച് സജ്ജീകരിക്കുന്നു",
+      "stepDevcontainerSetup": "ഡെവ് കണ്ടെയ്നർ സജ്ജീകരണം",
+      "stepWorkspaceRestore": "വർക്ക്സ്പേസ് പുനഃസ്ഥാപിക്കുന്നു",
+      "stepWorkspaceBackup": "വർക്ക്സ്പേസ് സംരക്ഷിക്കുന്നു",
+      "stepSandboxProvision": "സാൻഡ്ബോക്സ് തയ്യാറാക്കുന്നു",
+      "stepSandboxBoot": "സാൻഡ്ബോക്സ് ആരംഭിക്കുന്നു",
+      "stepSnapshotFallback": "സ്നാപ്ഷോട്ട് ഇല്ലാതെ വീണ്ടും ശ്രമിക്കുന്നു",
+      "stepKiloServer": "Kilo ആരംഭിക്കുന്നു",
+      "stepKiloSession": "സെഷൻ തയ്യാറാക്കുന്നു",
+      "stepRestoreIncomplete": "സെഷൻ പുനഃസ്ഥാപനം പൂർത്തിയായില്ല",
+      "stepReady": "പ്രവർത്തനാന്തരീക്ഷം തയ്യാർ",
+      "stepFailed": "പ്രവർത്തനാന്തരീക്ഷ സജ്ജീകരണം പരാജയപ്പെട്ടു",
+      "stepUnknown": "പ്രവർത്തനാന്തരീക്ഷ സജ്ജീകരണം",
+      "detailCreatingSandbox": "സാൻഡ്ബോക്സ് സൃഷ്ടിക്കുന്നു",
+      "detailUpdatingRepository": "റിപ്പോസിറ്ററി അപ്ഡേറ്റ് ചെയ്യുന്നു",
+      "detailCheckingOutBranch": "ബ്രാഞ്ച് ചെക്ക് ഔട്ട് ചെയ്യുന്നു",
+      "detailRunningSetupCommands": "സജ്ജീകരണ കമാൻഡുകൾ പ്രവർത്തിപ്പിക്കുന്നു",
+      "detailSavingRepository": "വേഗത്തിലുള്ള ആരംഭത്തിനായി റിപ്പോസിറ്ററി സംരക്ഷിക്കുന്നു",
+      "detailStartingKiloRuntime": "Kilo റൺടൈം ആരംഭിക്കുന്നു",
+      "detailPreparingKiloSession": "Kilo സെഷൻ തയ്യാറാക്കുന്നു",
+      "detailWaitingForPreviousSandbox": "മുമ്പത്തെ സാൻഡ്ബോക്സ് നിലയ്ക്കാൻ കാത്തിരിക്കുന്നു",
+      "detailRetryingSandboxCreation": "സാൻഡ്ബോക്സ് സൃഷ്ടി വീണ്ടും ശ്രമിക്കുന്നു",
+      "detailPreviousSnapshotFailed": "മുമ്പത്തെ സ്നാപ്ഷോട്ട് ആരംഭം പരാജയപ്പെട്ടു. സ്നാപ്ഷോട്ട് ഇല്ലാതെ വീണ്ടും ശ്രമിക്കുന്നു.",
+      "detailSnapshotStartupFailed": "സ്നാപ്ഷോട്ട് ആരംഭം പരാജയപ്പെട്ടു. സ്നാപ്ഷോട്ട് ഇല്ലാതെ വീണ്ടും ശ്രമിക്കുന്നു.",
+      "detailStartingSandboxWithoutSnapshot": "സ്നാപ്ഷോട്ട് ഇല്ലാതെ സാൻഡ്ബോക്സ് ആരംഭിക്കുന്നു",
+      "detailSettingUpWorkspace": "വർക്ക്സ്പേസ് സജ്ജീകരിക്കുന്നു",
+      "detailRestoringSession": "സെഷൻ പുനഃസ്ഥാപിക്കുന്നു",
+      "detailWarmWorkspaceReused": "ചൂടുള്ള വർക്ക്സ്പേസ് പുനരുപയോഗിച്ചു",
+      "detailRetryingClone": "ക്ലോൺ വീണ്ടും ശ്രമിക്കുന്നു ({{total}}-ൽ {{attempt}} ശ്രമം)",
+      "detailSetupCommandFailed": "സജ്ജീകരണ കമാൻഡ് {{index}} പരാജയപ്പെട്ടു",
+      "detailSetupCommandTimedOut": "സജ്ജീകരണ കമാൻഡ് {{index}} കാലഹരണപ്പെട്ടു",
+      "detailColdRestore": "കോൾഡ് പുനഃസ്ഥാപനം, സ്നാപ്ഷോട്ട് പ്രയോഗിച്ചു, {{total}} ഫയലുകളിൽ {{applied}} പുനഃസ്ഥാപിച്ചു",
+      "detailProgressPercent": "{{percent}}% പൂർത്തിയായി",
+      "detailRestoreIncompleteReport": "സെഷൻ പുനഃസ്ഥാപനം പൂർത്തിയായില്ല: {{total}} ഫയലുകളിൽ {{skipped}} പുനഃസ്ഥാപിച്ചില്ല ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "കാണുന്നില്ല: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}}, കൂടാതെ {{omitted}} കൂടുതൽ",
+      "detailReasonPatchFailed": "പാച്ച് പ്രയോഗിക്കാനായില്ല",
+      "detailReasonOutsideWorkspace": "പാത്ത് വർക്ക്സ്പേസിന് പുറത്താണ്",
+      "detailReasonMissingContent": "സ്നാപ്ഷോട്ടിൽ ഫയലിന്റെ ഉള്ളടക്കം ഉണ്ടായിരുന്നില്ല",
+      "detailReasonIndexResetFailed": "പ്രയോഗം പരാജയപ്പെട്ടതിന് ശേഷം ഇൻഡെക്സ് റീസെറ്റ് ചെയ്യാനായില്ല",
+      "detailReasonUnlinkFailed": "ഫയൽ നീക്കം ചെയ്യാനായില്ല",
+      "detailReasonWriteFailed": "ഫയൽ എഴുതാനായില്ല",
+      "detailReasonUnknown": "അജ്ഞാതമായ കാരണം",
+      "detailUnknown": "ഇപ്പോഴും തയ്യാറാക്കുന്നു",
+      "errorPreparationTimeout": "പ്രവർത്തനാന്തരീക്ഷ തയ്യാറെടുപ്പ് കാലഹരണപ്പെട്ടു",
+      "errorWorkspaceSetupFailed": "വർക്ക്സ്പേസ് സജ്ജീകരണം പരാജയപ്പെട്ടു",
+      "errorCredentialUpgradeRequired": "ഈ സെഷന് ആവശ്യമായ ക്രെഡൻഷ്യൽ അപ്ഗ്രേഡ് ലഭ്യമല്ല. തുടരാൻ പുതിയ സെഷൻ ആരംഭിക്കുക.",
+      "errorAgentUnavailable": "ഏജന്റ് ലഭ്യമല്ലാതായി",
+      "errorBillingBlocked": "സാൻഡ്ബോക്സ് ബില്ലിംഗിന് അധിക ക്രെഡിറ്റുകൾ ആവശ്യമുണ്ട്",
+      "errorBillingUnavailable": "സാൻഡ്ബോക്സ് ബില്ലിംഗ് അല്ലെങ്കിൽ ശേഷി പരിശോധന ലഭ്യമല്ല. അല്പം കഴിഞ്ഞ് വീണ്ടും ശ്രമിക്കുക.",
+      "errorContainerLimitReached": "കണ്ടെയ്നർ പരിധിയിൽ എത്തി. മറ്റൊന്ന് ആരംഭിക്കുന്നതിന് മുമ്പ് നിലവിലുള്ള ഒരു കണ്ടെയ്നർ നിർത്തുക.",
+      "errorInvalidConfiguration": "സാൻഡ്ബോക്സ് കോൺഫിഗറേഷൻ അസാധുവാണ് അല്ലെങ്കിൽ പിന്തുണയ്ക്കുന്നില്ല",
+      "errorRuntimeArtifactUnauthorized": "റൺടൈം ഡൗൺലോഡിന് അംഗീകാരം ലഭിച്ചില്ല",
+      "errorRuntimeArtifactInvalid": "റൺടൈം ആർട്ടിഫാക്ട് പരിശോധന പരാജയപ്പെട്ടു",
+      "errorRuntimeCliProbeFailed": "റൺടൈം CLI പരിശോധന പരാജയപ്പെട്ടു",
+      "errorRuntimeSupervisorMissing": "റൺടൈം സൂപ്പർവൈസർ ലഭ്യമല്ല",
+      "errorConnectionLost": "സാൻഡ്ബോക്സ് കണക്ഷൻ നഷ്ടപ്പെട്ടു",
+      "errorSandboxLost": "സാൻഡ്ബോക്സ് നഷ്ടപ്പെട്ടു",
+      "errorAgentRestarted": "ഏജന്റ് പുനരാരംഭിച്ചു",
+      "errorSandboxOutOfMemory": "സാൻഡ്ബോക്സിന്റെ മെമ്മറി തീർന്നു",
+      "errorPreparationDidNotComplete": "തയ്യാറെടുപ്പ് പൂർത്തിയായില്ല"
     },
     "permissionCard": {
       "title": "അനുമതി ആവശ്യമാണ്",
@@ -3031,22 +3112,16 @@
     "boundary": {
       "backToProfile": "പ്രൊഫൈലിലേക്ക് മടങ്ങുക",
       "loadErrorMessage": "ഇന്റർനെറ്റ് കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
-
       "chooseAccount": "ഒരു അക്കൗണ്ട് തിരഞ്ഞെടുക്കുക",
       "loadErrorTitle": "നിങ്ങളുടെ ഓർഗനൈസേഷനുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "membershipLostNotice": "ഈ ഓർഗനൈസേഷനിൽ നിങ്ങൾക്ക് ഇനി പ്രവേശനമില്ല. {{target}}-ലേക്ക് മാറി.",
       "noOrganization": "ഓർഗനൈസേഷൻ ഇല്ല",
-
       "noOrganizationDescription": "ഈ അക്കൗണ്ട് ഒരു ഓർഗനൈസേഷന്റെ ഭാഗമല്ല. അംഗ ക്ഷണങ്ങളും കുറഞ്ഞ ബാലൻസ് മുന്നറിയിപ്പുകളും പോലുള്ള ഓർഗനൈസേഷൻ സവിശേഷതകൾ ഉപയോഗിക്കാൻ വെബ്സൈറ്റിൽ ഒരു ഓർഗനൈസേഷൻ സൃഷ്ടിക്കുകയോ ഒന്നിൽ ചേരുകയോ ചെയ്യുക.",
-
       "openWebOrganizations": "വെബ്സൈറ്റിൽ ഓർഗനൈസേഷനുകൾ തുറക്കുക",
-
       "organizationUnavailable": "ഓർഗനൈസേഷൻ ലഭ്യമല്ല.",
       "selectDescriptionWithOrganizations": "നിങ്ങൾ ഒന്നോ അതിലധികമോ ഓർഗനൈസേഷനുകളുടെ ഭാഗമാണ്. ഈ സ്ക്രീൻ ഉപയോഗിക്കേണ്ട അക്കൗണ്ട് തിരഞ്ഞെടുക്കുക.",
-
       "selectOrganization": "ഒരു ഓർഗനൈസേഷൻ തിരഞ്ഞെടുക്കുക",
       "unavailableDescription": "ഈ ഓർഗനൈസേഷൻ ഇനി ലഭ്യമല്ല. തുടരാൻ നിങ്ങളുടെ പ്രൊഫൈലിൽ നിന്ന് ഒന്ന് തിരഞ്ഞെടുക്കുക.",
-
       "unavailableSessionsDescription": "ഈ ഓർഗനൈസേഷൻ ഇനി ലഭ്യമല്ല. അതിന്റെ സെഷനുകൾ ലോഡ് ചെയ്യാനാവില്ല.",
       "accessDeniedDescription": "ഈ ഓർഗനൈസേഷനിൽ പ്രവേശിക്കാൻ നിങ്ങൾക്ക് അനുമതിയില്ല."
     },
@@ -3074,7 +3149,9 @@
       "permissionDenied": "അംഗങ്ങളെ ക്ഷണിക്കാൻ നിങ്ങൾക്ക് അനുമതിയില്ല.",
       "roleMember": "റോൾ: അംഗം",
       "sendInvite": "ക്ഷണം അയയ്ക്കുക",
-      "title": "അംഗത്തെ ക്ഷണിക്കുക"
+      "title": "അംഗത്തെ ക്ഷണിക്കുക",
+      "alreadyInvited": "അവർക്ക് ഇതിനകം ക്ഷണം ലഭിച്ചതാണ് അല്ലെങ്കിൽ അവർ ഇതിനകം ഒരു അംഗമാണ്.",
+      "sendError": "ക്ഷണം അയയ്ക്കാനായില്ല."
     },
     "invoices": {
       "downloadA11y": "ഇൻവോയ്സ് {{number}} ഡൗൺലോഡ് ചെയ്യുക",
@@ -3143,7 +3220,8 @@
       "inviteCreated": "ക്ഷണം സൃഷ്ടിച്ചു",
       "pendingInvitations": "സ്വീകരിക്കാത്ത ക്ഷണങ്ങൾ",
       "resendInvite": "ക്ഷണം വീണ്ടും അയയ്ക്കുക",
-      "shareInviteLink": "ക്ഷണ ലിങ്ക് പങ്കിടുക"
+      "shareInviteLink": "ക്ഷണ ലിങ്ക് പങ്കിടുക",
+      "resendInviteError": "ക്ഷണം വീണ്ടും അയയ്ക്കാനായില്ല."
     },
     "usageStats": {
       "inputTokens": "ഇൻപുട്ട് ടോക്കണുകൾ",
@@ -3291,7 +3369,8 @@
     "noneChosen": "ഒന്നും തിരഞ്ഞെടുത്തിട്ടില്ല",
     "emptyTitle": "ശബ്ദം ടെക്സ്റ്റാക്കാൻ മോഡലുകളില്ല",
     "emptyDescription": "Kilo Gateway ഇപ്പോൾ ശബ്ദം ടെക്സ്റ്റാക്കാൻ മോഡലുകൾ നൽകുന്നില്ല.",
-    "loadFailed": "ശബ്ദം ടെക്സ്റ്റാക്കുന്ന മോഡലുകൾ ലോഡ് ചെയ്യാനായില്ല."
+    "loadFailed": "ശബ്ദം ടെക്സ്റ്റാക്കുന്ന മോഡലുകൾ ലോഡ് ചെയ്യാനായില്ല.",
+    "choose": "മോഡൽ തിരഞ്ഞെടുക്കുക"
   },
   "voiceLanguage": {
     "title": "ശബ്ദ ഇൻപുട്ടിന്റെ ഭാഷ",
@@ -3536,8 +3615,6 @@
       "quantizations": "ക്വാണ്ടൈസേഷനുകൾ",
       "quantizationsHelp": "ചെറിയ ഫയലുകൾ കുറഞ്ഞ മെമ്മറിയും സ്റ്റോറേജും ഉപയോഗിക്കുന്നു. വലിയ ഫയലുകൾ സാധാരണയായി മികച്ച ഉത്തരങ്ങൾ നൽകുന്നു.",
       "quantDetail": "{{size}} ഡൗൺലോഡ് · ഏകദേശം {{memory}} മെമ്മറി",
-      "downloadQuant": "{{quant}} ഡൗൺലോഡ് ചെയ്യുക",
-      "downloadModelA11y": "{{name}} ഡൗൺലോഡ് ചെയ്യുക",
       "detailsA11y": "വിശദാംശങ്ങൾ: {{name}}",
       "loadingModel": "മോഡൽ വിശദാംശങ്ങൾ ലോഡ് ചെയ്യുന്നു",
       "couldNotLoadModel": "ഈ മോഡൽ ലോഡ് ചെയ്യാനായില്ല",
@@ -3582,7 +3659,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "ഈ മോഡൽ ചിന്തയുടെ തോത് പിന്തുണയ്ക്കുന്നു"
-    }
+    },
+    "creditsRequired": "ഈ സന്ദേശം അയയ്ക്കാൻ മതിയായ ക്രെഡിറ്റുകൾ ഇല്ല. ക്രെഡിറ്റുകൾ ചേർത്ത് വീണ്ടും ശ്രമിക്കുക."
   },
   "settingsTools": {
     "confirmTitle": "ഈ മാറ്റം സ്ഥിരീകരിക്കണോ?"
@@ -3618,7 +3696,9 @@
     "spend24h": "കഴിഞ്ഞ 24 മണിക്കൂറിലെ ചെലവ്",
     "multiplierError": "1 അല്ലെങ്കിൽ അതിൽ കൂടുതലുള്ള ഗുണിതം നൽകുക",
     "permissionDenied": "ചെലവ് മുന്നറിയിപ്പുകൾ നിയന്ത്രിക്കാൻ നിങ്ങൾക്ക് അനുമതിയില്ല.",
-    "pushOffByCategory": "അറിയിപ്പുകളിൽ ഓഫ്"
+    "pushOffByCategory": "അറിയിപ്പുകളിൽ ഓഫ്",
+    "multiplierMaxError": "{{max}} അല്ലെങ്കിൽ അതിൽ കുറവുള്ള ഗുണിതം നൽകുക",
+    "thresholdMaxError": "{{max}} അല്ലെങ്കിൽ അതിൽ കുറവുള്ള തുക നൽകുക."
   },
   "profiles": {
     "title": "പ്രൊഫൈലുകൾ",
@@ -3743,16 +3823,16 @@
       "stepsPlaceholder": "ഉദാ. 50",
       "temperature": "താപനില",
       "temperaturePlaceholder": "ഉദാ. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "ഉദാ. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "എൻ്റെ ഏജൻ്റ്",
       "promptPlaceholder": "നിങ്ങൾ ഒരു...",
       "tools": "ഉപകരണങ്ങൾ",
       "visibility": "ദൃശ്യപരത",
-      "visibilityPrimary": "പ്രാഥമികം - പിക്കറിൽ കാണിച്ചിരിക്കുന്നു",
-      "visibilitySubagent": "ഉപജൻ്റ് - മറ്റുള്ളവരിൽ നിന്ന് മാത്രമേ വിളിക്കാനാവൂ",
-      "visibilityAll": "എല്ലാം - രണ്ടും",
+      "visibilityPrimary": "പ്രാഥമികം — പിക്കറിൽ കാണിച്ചിരിക്കുന്നു",
+      "visibilitySubagent": "ഉപജൻ്റ് — മറ്റുള്ളവരിൽ നിന്ന് മാത്രമേ വിളിക്കാനാവൂ",
+      "visibilityAll": "എല്ലാം — രണ്ടും",
       "modePrimary": "പ്രാഥമികം മാത്രം",
       "modeSubagent": "ഉപജൻ്റ് മാത്രം",
       "modeAll": "എല്ലാ മോഡുകളും",
@@ -3805,7 +3885,9 @@
       "pinFailed": "റിപ്പോ പിൻ ചെയ്യാനായില്ല",
       "unboundToast": "റിപ്പോ അൺബൗണ്ട്",
       "unbindFailed": "റിപ്പോ അൺബൈൻഡ് ചെയ്യാനായില്ല"
-    }
+    },
+    "variablesDeleteFailed": "വേരിയബിൾ ഡിലീറ്റ് ചെയ്യാനായില്ല",
+    "deleteCommand": "കമാൻഡ് {{position}} ഇല്ലാതാക്കുക"
   },
   "credits": {
     "title": "ക്രെഡിറ്റുകൾ വാങ്ങുക",
@@ -3841,7 +3923,8 @@
       "archive": "ആർക്കൈവ് ചെയ്യുക",
       "unarchive": "ആർക്കൈവിൽ നിന്ന് പുറത്തെടുക്കുക",
       "deleteTitle": "{{name}} ഇല്ലാതാക്കണോ?",
-      "deleteMessage": "ഇതിലെ ജോലികളും ഇല്ലാതാകും. സെഷനുകൾ നിലനിൽക്കും."
+      "deleteMessage": "ഇതിലെ ജോലികളും ഇല്ലാതാകും. സെഷനുകൾ നിലനിൽക്കും.",
+      "createFailed": "പട്ടിക സൃഷ്ടിക്കാനായില്ല"
     },
     "listSettings": {
       "title": "പട്ടിക ക്രമീകരണങ്ങൾ",
@@ -3999,6 +4082,7 @@
     "estimatePricingUnavailable": "ഈ മോഡലിനുള്ള വിലനിർണ്ണയം ലഭ്യമല്ല.",
     "estimateBalanceUnavailable": "പണമടച്ചുള്ള സാരാംശത്തിന് തികഞ്ഞ ബാലൻസ് ഇല്ല.",
     "estimateModelNotAllowed": "ഇവിടെ ഈ മോഡൽ അനുവദനീയമല്ല.",
-    "estimateSpendLimitTooLow": "ഈ സാരാംശം അനുവദിക്കാൻ ചെലവ് പരിധി ഉയർത്തുക."
+    "estimateSpendLimitTooLow": "ഈ സാരാംശം അനുവദിക്കാൻ ചെലവ് പരിധി ഉയർത്തുക.",
+    "saved": "ബ്രീഫിംഗ് ക്രമീകരണങ്ങൾ സംരക്ഷിച്ചു"
   }
 }

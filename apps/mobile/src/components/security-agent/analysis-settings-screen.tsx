@@ -4,7 +4,7 @@ import {
 } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { Brain, Search, Wrench } from '@/components/ui/icons';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -72,23 +72,24 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const [analysisModelSlug, setAnalysisModelSlug] = useState('');
   const [remediationModelSlug, setRemediationModelSlug] = useState('');
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('auto');
-  const hydratedRef = useRef(false);
-  const initialConfigRef = useRef<Partial<FlattenedSecurityAgentConfig>>({});
+  // The saved baseline the draft is compared against. State rather than a ref:
+  // a successful save must re-render, so `dirty` (and the back guard that
+  // reads it) reflects the saved values by the time the header action leaves.
+  const [baseline, setBaseline] = useState<Partial<FlattenedSecurityAgentConfig> | null>(null);
 
   // Local state initialized from the loaded config exactly once — later
   // config refetches (e.g. after this screen's own save) shouldn't clobber
   // in-progress edits.
   useEffect(() => {
-    if (hydratedRef.current || !config.data) {
+    if (baseline !== null || !config.data) {
       return;
     }
-    hydratedRef.current = true;
-    initialConfigRef.current = config.data;
+    setBaseline(config.data);
     setTriageModelSlug(config.data.triageModelSlug);
     setAnalysisModelSlug(config.data.analysisModelSlug);
     setRemediationModelSlug(config.data.remediationModelSlug);
     setAnalysisMode(config.data.analysisMode);
-  }, [config.data]);
+  }, [baseline, config.data]);
 
   // Every field here is a model slug or a fixed enum option — there is no
   // invalid combination once hydrated, unlike the repository or SLA screens.
@@ -99,14 +100,12 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     remediationModelSlug,
     analysisMode,
   };
-  const dirty =
-    hydratedRef.current &&
-    getSettingsDirtyState(initialConfigRef.current, patch, valid) !== 'clean';
+  const dirty = baseline !== null && getSettingsDirtyState(baseline, patch, valid) !== 'clean';
   useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, { dirty });
 
   const handleSave = async () => {
     await save.mutateAsync(patch);
-    initialConfigRef.current = { ...initialConfigRef.current, ...patch };
+    setBaseline(previous => ({ ...previous, ...patch }));
   };
 
   const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({

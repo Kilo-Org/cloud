@@ -1,7 +1,8 @@
 import { createContext, useContext, useSyncExternalStore } from 'react';
-import { Platform, useWindowDimensions } from 'react-native';
+import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 
 /**
@@ -29,7 +30,7 @@ export const TabBarLabelContext = createContext<TabBarLabelState | null | undefi
  */
 export function useEffectiveTabBarHeight(): number {
   const { bottom } = useSafeAreaInsets();
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
   const state = useContext(TabBarLabelContext);
   if (state === null) {
     return bottom;

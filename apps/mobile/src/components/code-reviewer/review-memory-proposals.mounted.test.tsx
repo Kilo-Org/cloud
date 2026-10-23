@@ -38,6 +38,7 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
   Switch: 'Switch',
+  Platform: { OS: 'android' },
 }));
 vi.mock('@shopify/flash-list', () => ({
   FlashList: ({

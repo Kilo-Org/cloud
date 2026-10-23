@@ -27,15 +27,18 @@ import {
   STATE_ACTION_CLASS,
   STATE_ACTION_TARGET_DP,
   tapTargetReachDp,
+  textActionTargetClass,
   TOUCH_TARGET_DP,
   VOICE_INPUT_LG_HIT_SLOP_DP,
 } from './tap-target';
 
 // `inlineLinkHitSlop` resolves the sentence's ends through the interface
 // direction, and this project has no app build, so the native module is a
-// mutable stub the mirror case flips.
+// mutable stub the mirror case flips. `textActionTargetClass` reads the
+// platform at call time, so the stub carries it mutably too.
 const rtl = vi.hoisted(() => ({ isRTL: false }));
-vi.mock('react-native', () => ({ I18nManager: rtl }));
+const platform = vi.hoisted(() => ({ OS: 'ios' as string }));
+vi.mock('react-native', () => ({ I18nManager: rtl, Platform: platform }));
 
 const { compile } = createRequire(import.meta.url)(
   'react-native-css/compiler'
@@ -92,6 +95,27 @@ describe('shared tap-target geometry', () => {
     expect(ICON_TARGET_BOX_CLASS).toContain('w-[48px]');
     expect(ICON_TARGET_BOX_CLASS).toContain('items-center');
     expect(ICON_TARGET_BOX_CLASS).toContain('justify-center');
+  });
+
+  it('renders a text-only action frame at the platform minimum on both axes', async () => {
+    // The regression this guards: a text link whose only child is one label
+    // line reports that line's height as its own rect, and `hitSlop` never
+    // lifts the rect an audit reads. `min-h-11` would be 38.5pt on device. The
+    // width floor is needed because the caller drops its hit slop: a short
+    // label is only a couple of glyphs wide.
+    platform.OS = 'ios';
+    const ios = textActionTargetClass();
+    expect(ios).toContain('min-h-[44px]');
+    expect(await compiledDp(ios, 'minHeight')).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    expect(await compiledDp(ios, 'minWidth')).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+
+    platform.OS = 'android';
+    const android = textActionTargetClass();
+    expect(android).toContain('min-h-[48px]');
+    expect(await compiledDp(android, 'minHeight')).toBeGreaterThanOrEqual(ICON_TARGET_DP);
+    expect(await compiledDp(android, 'minWidth')).toBeGreaterThanOrEqual(ICON_TARGET_DP);
+
+    platform.OS = 'ios';
   });
 
   it('renders a state surface action on the Android 48dp minimum', async () => {

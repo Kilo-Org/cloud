@@ -3,10 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
-import {
-  sessionProfileCountItems,
-  type SessionProfilePickerProfile,
-} from '@/components/agents/session-profile-picker-model';
+import { type SessionProfilePickerProfile } from '@/components/agents/session-profile-picker-model';
 import { Button } from '@/components/ui/button';
 import { Check, Settings2 } from '@/components/ui/icons';
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
@@ -14,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { formatProfileCountItems } from '@/lib/profile-count-labels';
+import { formatProfileCountItems, profileCountItems } from '@/lib/profile-count-labels';
 
 const SKELETON_ROW_COUNT = 4;
 
@@ -155,9 +152,7 @@ export function ProfilePickerSheet({
 
         {candidates.map(candidate => {
           const selected = candidate.id === selectedOverrideProfileId;
-          const counts = formatProfileCountItems(t, sessionProfileCountItems(candidate)).join(
-            ' · '
-          );
+          const counts = formatProfileCountItems(t, profileCountItems(candidate)).join(' · ');
           return (
             <Pressable
               key={candidate.id}
@@ -172,7 +167,7 @@ export function ProfilePickerSheet({
                   {candidate.name}
                 </Text>
                 {counts ? (
-                  <Text className="text-sm text-muted-foreground" numberOfLines={1}>
+                  <Text className="text-sm text-muted-foreground" numberOfLines={2}>
                     {counts}
                   </Text>
                 ) : null}

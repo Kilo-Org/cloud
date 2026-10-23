@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "Hugging Face પરથી",
       "loading": "મોડેલ્સ લોડ થઈ રહ્યા છે",
       "noResults": "કોઈ મોડેલ મળ્યું નહીં",
+      "noResultsForQuery": "\"{{query}}\" માટે કોઈ મોડેલ મળ્યું નહીં",
       "noFits": "આ ડિવાઇસમાં કોઈ મોડેલ બંધબેસતું નથી",
       "noFitsDescription": "મોટા મોડેલ્સ $t(common.all) ટૅબમાં છે.",
       "fit": {

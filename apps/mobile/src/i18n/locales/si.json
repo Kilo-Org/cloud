@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "Hugging Face වෙතින්",
       "loading": "ආකෘති පූරණය වෙමින්",
       "noResults": "ආකෘති හමු නොවීය",
+      "noResultsForQuery": "\"{{query}}\" සඳහා ආකෘති හමු නොවීය",
       "noFits": "මෙම උපාංගයට ගැළපෙන ආකෘති නැත",
       "noFitsDescription": "විශාල ආකෘති $t(common.all) ටැබයේ ඇත.",
       "fit": {

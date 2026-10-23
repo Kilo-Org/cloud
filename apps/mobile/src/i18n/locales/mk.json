@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "Од Hugging Face",
       "loading": "Се вчитуваат моделите",
       "noResults": "Не се најдени модели",
+      "noResultsForQuery": "Не се најдени модели за \"{{query}}\"",
       "noFits": "Ниеден модел не одговара за уредов",
       "noFitsDescription": "Поголемите модели се во картичката $t(common.all).",
       "fit": {

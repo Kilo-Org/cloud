@@ -3548,6 +3548,7 @@
       "fromHuggingFace": "No Hugging Face",
       "loading": "Ielādē modeļus",
       "noResults": "Neviens modelis nav atrasts",
+      "noResultsForQuery": "Neviens modelis nav atrasts vaicājumam \"{{query}}\"",
       "noFits": "Neviens modelis neder šai ierīcei",
       "noFitsDescription": "Lielāki modeļi ir cilnē $t(common.all).",
       "fit": {

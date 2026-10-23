@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "Hugging Face’dan",
       "loading": "Modellar yuklanmoqda",
       "noResults": "Hech qanday model topilmadi",
+      "noResultsForQuery": "\"{{query}}\" bo‘yicha hech qanday model topilmadi",
       "noFits": "Bu qurilmaga mos model yo‘q",
       "noFitsDescription": "Kattaroq modellar “$t(common.all)” bo‘limida.",
       "fit": {

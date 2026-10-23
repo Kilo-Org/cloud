@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "Frá Hugging Face",
       "loading": "Hleður líkönum",
       "noResults": "Engin líkön fundust",
+      "noResultsForQuery": "Engin líkön fundust fyrir \"{{query}}\"",
       "noFits": "Engin líkön passa í þetta tæki",
       "noFitsDescription": "Stærri líkön eru á flipanum $t(common.all).",
       "fit": {

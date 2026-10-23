@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "Site na Hugging Face",
       "loading": "Na-ebunye ụdị nlereanya",
       "noResults": "Achọtaghị ụdị nlereanya ọ bụla",
+      "noResultsForQuery": "Achọtaghị ụdị nlereanya ọ bụla maka \"{{query}}\"",
       "noFits": "Ọ dịghị ụdị nlereanya dabara na ngwaọrụ a",
       "noFitsDescription": "Ụdị nlereanya ndị ka ibu dị na taabụ $t(common.all).",
       "fit": {

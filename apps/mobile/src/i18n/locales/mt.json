@@ -3632,6 +3632,7 @@
       "fromHuggingFace": "Minn Hugging Face",
       "loading": "Qed jitgħabbew il-mudelli",
       "noResults": "Ma nstab l-ebda mudell",
+      "noResultsForQuery": "Ma nstab l-ebda mudell għal \"{{query}}\"",
       "noFits": "L-ebda mudell ma jaqbel ma' dan l-apparat",
       "noFitsDescription": "Il-mudelli akbar jinsabu fit-tab $t(common.all).",
       "fit": {

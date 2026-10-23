@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "ពី Hugging Face",
       "loading": "កំពុងផ្ទុកគំរូ",
       "noResults": "រកមិនឃើញគំរូទេ",
+      "noResultsForQuery": "រកមិនឃើញគំរូសម្រាប់ \"{{query}}\"ទេ",
       "noFits": "គ្មានគំរូណាសមនឹងឧបករណ៍នេះទេ",
       "noFitsDescription": "គំរូធំៗមាននៅក្នុងផ្ទាំង $t(common.all)។",
       "fit": {

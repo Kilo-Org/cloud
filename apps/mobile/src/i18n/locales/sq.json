@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "Nga Hugging Face",
       "loading": "Po ngarkohen modelet",
       "noResults": "Nuk u gjet asnjë model",
+      "noResultsForQuery": "Nuk u gjet asnjë model për \"{{query}}\"",
       "noFits": "Asnjë model nuk përshtatet me këtë pajisje",
       "noFitsDescription": "Modelet më të mëdha janë te skeda $t(common.all).",
       "fit": {

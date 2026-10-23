@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "Dari Hugging Face",
       "loading": "Memuat model",
       "noResults": "Model tidak ditemukan",
+      "noResultsForQuery": "Tidak ada model yang ditemukan untuk \"{{query}}\"",
       "noFits": "Tidak ada model yang cocok untuk perangkat ini",
       "noFitsDescription": "Model yang lebih besar ada di tab $t(common.all).",
       "fit": {

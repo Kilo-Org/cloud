@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "Kutoka Hugging Face",
       "loading": "Inapakia modeli",
       "noResults": "Hakuna modeli zilizopatikana",
+      "noResultsForQuery": "Hakuna modeli zilizopatikana kwa \"{{query}}\"",
       "noFits": "Hakuna modeli zinazotosha kifaa hiki",
       "noFitsDescription": "Modeli kubwa zaidi ziko kwenye kichupo cha $t(common.all).",
       "fit": {

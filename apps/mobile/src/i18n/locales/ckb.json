@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "لە Hugging Faceـەوە",
       "loading": "مۆدێلەکان باردەکرێن",
       "noResults": "هیچ مۆدێلێک نەدۆزرایەوە",
+      "noResultsForQuery": "هیچ مۆدێلێک بۆ \"{{query}}\" نەدۆزرایەوە",
       "noFits": "هیچ مۆدێلێک بۆ ئەم ئامێرە گونجاو نییە",
       "noFitsDescription": "مۆدێلە گەورەترەکان لە تابی $t(common.all)دان.",
       "fit": {

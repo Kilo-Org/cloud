@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "จาก Hugging Face",
       "loading": "กำลังโหลดโมเดล",
       "noResults": "ไม่พบโมเดล",
+      "noResultsForQuery": "ไม่พบโมเดลสำหรับ \"{{query}}\"",
       "noFits": "ไม่มีโมเดลที่เหมาะกับอุปกรณ์นี้",
       "noFitsDescription": "โมเดลที่ใหญ่กว่าอยู่ในแท็บ$t(common.all)",
       "fit": {

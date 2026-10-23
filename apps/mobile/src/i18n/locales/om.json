@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "Hugging Face irraa",
       "loading": "Moodeelonni fe'amaa jiru",
       "noResults": "Moodeelli hin argamne",
+      "noResultsForQuery": "Moodeelonni \"{{query}}\" hin argamne",
       "noFits": "Moodeelli meeshaa kanaaf ta'u hin jiru",
       "noFitsDescription": "Moodeelonni gurguddaan tarree $t(common.all) irra jiru.",
       "fit": {

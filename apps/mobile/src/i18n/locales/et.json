@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "Hugging Face'ist",
       "loading": "Mudelite laadimine",
       "noResults": "Mudeleid ei leitud",
+      "noResultsForQuery": "Päringuga \"{{query}}\" ei leitud mudeleid",
       "noFits": "Ükski mudel ei sobi sellele seadmele",
       "noFitsDescription": "Suuremad mudelid on vahekaardil $t(common.all).",
       "fit": {

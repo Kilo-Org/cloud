@@ -3632,6 +3632,7 @@
       "fromHuggingFace": "Ó Hugging Face",
       "loading": "Samhlacha á lódáil",
       "noResults": "Níor aimsíodh aon samhail",
+      "noResultsForQuery": "Níor aimsíodh aon samhail do \"{{query}}\"",
       "noFits": "Ní oireann aon samhail don ghléas seo",
       "noFitsDescription": "Tá samhlacha níos mó ar an gcluaisín $t(common.all).",
       "fit": {

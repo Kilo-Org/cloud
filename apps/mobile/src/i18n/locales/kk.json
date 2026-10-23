@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "Hugging Face-тен",
       "loading": "Модельдер жүктелуде",
       "noResults": "Модельдер табылмады",
+      "noResultsForQuery": "\"{{query}}\" үшін модельдер табылмады",
       "noFits": "Осы құрылғыға сәйкес модельдер жоқ",
       "noFitsDescription": "Үлкенірек модельдер «$t(common.all)» қойындысында.",
       "fit": {

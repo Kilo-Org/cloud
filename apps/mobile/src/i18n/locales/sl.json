@@ -3590,6 +3590,7 @@
       "fromHuggingFace": "Iz Hugging Face",
       "loading": "Nalaganje modelov",
       "noResults": "Ni najdenih modelov",
+      "noResultsForQuery": "Ni najdenih modelov za \"{{query}}\"",
       "noFits": "Noben model ni primeren za to napravo",
       "noFitsDescription": "Večji modeli so na zavihku $t(common.all).",
       "fit": {

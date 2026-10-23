@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "Hugging Face-tik",
       "loading": "Modeloak kargatzen",
       "noResults": "Ez da modelorik aurkitu",
+      "noResultsForQuery": "Ez da aurkitu modelorik \"{{query}}\" bilaketarako",
       "noFits": "Ez dago gailu honetan sartzen den modelorik",
       "noFitsDescription": "Modelo handiagoak $t(common.all) fitxan daude.",
       "fit": {

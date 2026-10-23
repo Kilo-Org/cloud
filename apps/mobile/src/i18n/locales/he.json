@@ -3548,6 +3548,7 @@
       "fromHuggingFace": "מ-Hugging Face",
       "loading": "טוען מודלים",
       "noResults": "לא נמצאו מודלים",
+      "noResultsForQuery": "לא נמצאו מודלים עבור \"{{query}}\"",
       "noFits": "אין מודלים שמתאימים למכשיר הזה",
       "noFitsDescription": "מודלים גדולים יותר נמצאים בכרטיסייה $t(common.all).",
       "fit": {

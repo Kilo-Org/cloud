@@ -3590,6 +3590,7 @@
       "fromHuggingFace": "Z Hugging Face",
       "loading": "Načítavajú sa modely",
       "noResults": "Nenašli sa žiadne modely",
+      "noResultsForQuery": "Nenašli sa žiadne modely pre \"{{query}}\"",
       "noFits": "Pre toto zariadenie nie je vhodný žiadny model",
       "noFitsDescription": "Väčšie modely nájdete na karte $t(common.all).",
       "fit": {

@@ -3526,6 +3526,7 @@
       "fromHuggingFace": "From Hugging Face",
       "loading": "Loading models",
       "noResults": "No models found",
+      "noResultsForQuery": "No models found for \"{{query}}\"",
       "noFits": "No models fit this device",
       "noFitsDescription": "Larger models are on the $t(common.all) tab.",
       "fit": {

@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "ຈາກ Hugging Face",
       "loading": "ກຳລັງໂຫຼດໂມເດວ",
       "noResults": "ບໍ່ພົບໂມເດວ",
+      "noResultsForQuery": "ບໍ່ພົບໂມເດວສຳລັບ \"{{query}}\"",
       "noFits": "ບໍ່ມີໂມເດວທີ່ເໝາະກັບອຸປະກອນນີ້",
       "noFitsDescription": "ໂມເດວທີ່ໃຫຍ່ກວ່າຢູ່ໃນແຖບ $t(common.all).",
       "fit": {

@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "Hugging Face ରୁ",
       "loading": "ମଡେଲଗୁଡ଼ିକ ଲୋଡ଼ ହେଉଛି",
       "noResults": "କୌଣସି ମଡେଲ ମିଳିଲା ନାହିଁ",
+      "noResultsForQuery": "\"{{query}}\" ପାଇଁ କୌଣସି ମଡେଲ ମିଳିଲା ନାହିଁ",
       "noFits": "ଏହି ଡିଭାଇସରେ କୌଣସି ମଡେଲ ଚାଲିବ ନାହିଁ",
       "noFitsDescription": "ବଡ଼ ମଡେଲଗୁଡ଼ିକ $t(common.all) ଟ୍ୟାବରେ ଅଛି।",
       "fit": {

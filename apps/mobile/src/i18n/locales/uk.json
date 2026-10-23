@@ -3590,6 +3590,7 @@
       "fromHuggingFace": "З Hugging Face",
       "loading": "Завантаження моделей",
       "noResults": "Моделей не знайдено",
+      "noResultsForQuery": "Моделей для \"{{query}}\" не знайдено",
       "noFits": "Немає моделей для цього пристрою",
       "noFitsDescription": "Більші моделі — на вкладці «$t(common.all)».",
       "fit": {

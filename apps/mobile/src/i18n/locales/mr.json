@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "Hugging Face वरून",
       "loading": "मॉडेल लोड होत आहेत",
       "noResults": "कोणतेही मॉडेल सापडले नाही",
+      "noResultsForQuery": "\"{{query}}\" साठी कोणतेही मॉडेल सापडले नाही",
       "noFits": "कोणतेही मॉडेल या डिव्हाइसवर बसत नाही",
       "noFitsDescription": "मोठी मॉडेल $t(common.all) टॅबवर आहेत.",
       "fit": {

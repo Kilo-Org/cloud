@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "له Hugging Face څخه",
       "loading": "ماډلونه پورته کېږي",
       "noResults": "هېڅ ماډل ونه موندل شو",
+      "noResultsForQuery": "د \"{{query}}\" لپاره هېڅ ماډل ونه موندل شو",
       "noFits": "هېڅ ماډل له دې وسیلې سره برابر نه دی",
       "noFitsDescription": "لوی ماډلونه د $t(common.all) ټب کې دي.",
       "fit": {

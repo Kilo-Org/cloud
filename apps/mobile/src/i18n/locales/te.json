@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "Hugging Face నుండి",
       "loading": "మోడల్‌లు లోడ్ అవుతున్నాయి",
       "noResults": "మోడల్‌లు ఏవీ కనుగొనబడలేదు",
+      "noResultsForQuery": "\"{{query}}\" కోసం మోడల్‌లు ఏవీ కనుగొనబడలేదు",
       "noFits": "ఈ పరికరానికి సరిపోయే మోడల్‌లు ఏవీ లేవు",
       "noFitsDescription": "పెద్ద మోడల్‌లు $t(common.all) ట్యాబ్‌లో ఉన్నాయి.",
       "fit": {

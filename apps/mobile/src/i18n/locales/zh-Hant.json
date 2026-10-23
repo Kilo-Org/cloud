@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "來自 Hugging Face",
       "loading": "正在載入模型",
       "noResults": "找不到模型",
+      "noResultsForQuery": "找不到\"{{query}}\"的模型",
       "noFits": "沒有適合此裝置的模型",
       "noFitsDescription": "較大的模型位於「$t(common.all)」分頁。",
       "fit": {

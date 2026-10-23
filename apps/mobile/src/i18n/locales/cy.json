@@ -3674,6 +3674,7 @@
       "fromHuggingFace": "O Hugging Face",
       "loading": "Wrthi'n llwytho modelau",
       "noResults": "Dim modelau wedi'u canfod",
+      "noResultsForQuery": "Dim modelau wedi'u canfod ar gyfer \"{{query}}\"",
       "noFits": "Does dim modelau'n ffitio'r ddyfais hon",
       "noFitsDescription": "Mae modelau mwy ar y tab $t(common.all).",
       "fit": {

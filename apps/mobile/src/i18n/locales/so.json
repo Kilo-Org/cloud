@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "Laga keenay Hugging Face",
       "loading": "Moodeelada waa la soo rarayaa",
       "noResults": "Wax moodeel ah lama helin",
+      "noResultsForQuery": "Wax moodeel ah lama helin oo ku habboon \"{{query}}\"",
       "noFits": "Ma jiro moodeel ku habboon qalabkan",
       "noFitsDescription": "Moodeelada waaweyn waxay ku jiraan tabka $t(common.all).",
       "fit": {

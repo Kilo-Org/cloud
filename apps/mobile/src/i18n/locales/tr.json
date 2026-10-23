@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "Hugging Face'ten",
       "loading": "Modeller yükleniyor",
       "noResults": "Model bulunamadı",
+      "noResultsForQuery": "\"{{query}}\" için model bulunamadı",
       "noFits": "Bu cihaza uygun model yok",
       "noFitsDescription": "Daha büyük modeller $t(common.all) sekmesinde.",
       "fit": {

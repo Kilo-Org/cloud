@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "از Hugging Face",
       "loading": "در حال بارگیری مدل‌ها",
       "noResults": "مدلی پیدا نشد",
+      "noResultsForQuery": "هیچ مدلی برای \"{{query}}\" پیدا نشد",
       "noFits": "هیچ مدلی مناسب این دستگاه نیست",
       "noFitsDescription": "مدل‌های بزرگ‌تر در زبانهٔ «$t(common.all)» هستند.",
       "fit": {

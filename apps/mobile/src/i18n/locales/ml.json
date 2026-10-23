@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "Hugging Face-ൽ നിന്ന്",
       "loading": "മോഡലുകൾ ലോഡ് ചെയ്യുന്നു",
       "noResults": "മോഡലുകളൊന്നും കണ്ടെത്തിയില്ല",
+      "noResultsForQuery": "\"{{query}}\" എന്നതിനായി മോഡലുകളൊന്നും കണ്ടെത്തിയില്ല",
       "noFits": "ഈ ഉപകരണത്തിന് അനുയോജ്യമായ മോഡലുകളൊന്നുമില്ല",
       "noFitsDescription": "വലിയ മോഡലുകൾ $t(common.all) ടാബിലുണ്ട്.",
       "fit": {

@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "Avy amin'ny Hugging Face",
       "loading": "Mampiditra ireo modely",
       "noResults": "Tsy nisy modely hita",
+      "noResultsForQuery": "Tsy nisy modely hita ho an'ny \"{{query}}\"",
       "noFits": "Tsy misy modely mety amin'ity fitaovana ity",
       "noFitsDescription": "Ao amin'ny tabilao $t(common.all) ireo modely lehibe kokoa.",
       "fit": {

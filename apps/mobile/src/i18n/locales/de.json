@@ -3506,6 +3506,7 @@
       "fromHuggingFace": "Von Hugging Face",
       "loading": "Modelle werden geladen",
       "noResults": "Keine Modelle gefunden",
+      "noResultsForQuery": "Keine Modelle für \"{{query}}\" gefunden",
       "noFits": "Keine Modelle passen auf dieses Gerät",
       "noFitsDescription": "Größere Modelle findest du im Tab „$t(common.all)“.",
       "fit": {

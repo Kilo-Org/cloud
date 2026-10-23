@@ -4,7 +4,10 @@ import {
   type OpenCodeSettings,
   type Verbosity,
 } from '@kilocode/db/schema-types';
-import { GEMMA_4_26B_A4B_IT_FREE_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import {
+  MERCURY_3_FREE_ID,
+  MERCURY_3_ID,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/inception';
 import {
   customRouterModelId,
   isCustomRouterModelId,
@@ -101,8 +104,8 @@ export const KILO_AUTO_SMALL_MODEL: AutoModel = {
 };
 
 export const AUTO_SMALL_TARGET_MODELS = {
-  paid: 'inception/mercury-3',
-  free: GEMMA_4_26B_A4B_IT_FREE_ID,
+  paid: MERCURY_3_ID,
+  free: MERCURY_3_FREE_ID,
 } as const;
 
 export const KILO_AUTO_EFFICIENT_MODEL: AutoModel = {

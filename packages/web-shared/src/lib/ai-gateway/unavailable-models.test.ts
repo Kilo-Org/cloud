@@ -23,8 +23,9 @@ beforeAll(async () => {
 });
 
 describe('unavailable models', () => {
-  test('combines the stored list with the hardcoded gemma free model', async () => {
+  test('combines the stored list with the hardcoded free models', async () => {
     expect([...(await getUnavailableModelIds())]).toEqual([
+      'inception/mercury-3:free',
       'google/gemma-4-26b-a4b-it:free',
       'apodex/apodex-1.1-mini:free',
       'google/gemma-4-31b-it:free',
@@ -36,6 +37,8 @@ describe('unavailable models', () => {
   test('keeps exact matching for request rejection', async () => {
     expect(await isUnavailableModel('apodex/apodex-1.1-mini:free')).toBe(true);
     expect(await isUnavailableModel('apodex/apodex-1.1-mini')).toBe(false);
+    expect(await isUnavailableModel('inception/mercury-3:free')).toBe(true);
+    expect(await isUnavailableModel('inception/mercury-3')).toBe(false);
     expect(await isUnavailableModel('google/gemma-4-26b-a4b-it:free')).toBe(true);
     expect(await isUnavailableModel('google/gemma-4-26b-a4b-it')).toBe(false);
     expect(await isUnavailableModel('google/gemma-4-31b-it:free')).toBe(true);

@@ -661,7 +661,7 @@ describe('resolveAutoModel — kilo-auto/small branch', () => {
     });
   });
 
-  it('routes users without balance to the free target', async () => {
+  it('routes users without balance to free Mercury 3 with reasoning disabled', async () => {
     const result = await resolveAutoModel(
       { ...baseParams, model: KILO_AUTO_SMALL_MODEL.id, apiKind: 'chat_completions' },
       nullUserPromise,
@@ -670,7 +670,7 @@ describe('resolveAutoModel — kilo-auto/small branch', () => {
 
     expect(result).toEqual({
       kind: 'ok',
-      resolved: { model: 'google/gemma-4-26b-a4b-it:free' },
+      resolved: { model: 'inception/mercury-3:free', reasoning: { enabled: false } },
     });
   });
 });

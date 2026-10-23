@@ -34,7 +34,7 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
 }));
 
 import {
-  gemma_4_26b_a4b_it_free_model,
+  mercury_3_free_model,
   glyph_cluster_stealth_free_model,
   kiloExclusiveModels,
   reflection_beam_free_model,
@@ -1577,7 +1577,7 @@ describe('checkExclusiveModelProviderAllowed', () => {
       checkExclusiveModelProviderAllowed(reflection_beam_free_model.public_id, undefined)
     ).toBeNull();
     expect(
-      checkExclusiveModelProviderAllowed(gemma_4_26b_a4b_it_free_model.public_id, {
+      checkExclusiveModelProviderAllowed(mercury_3_free_model.public_id, {
         only: ['openai'],
       })
     ).toBeNull();

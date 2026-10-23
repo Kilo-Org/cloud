@@ -113,10 +113,10 @@ describe('mapModelIdToVercel', () => {
 
   describe('kilo-exclusive models', () => {
     it('maps an exclusive flagged with vercel-routing to its internal id', async () => {
-      // google/gemma-4-26b-a4b-it:free is registered in kiloExclusiveModels
-      // with the 'vercel-routing' flag and internal_id 'google/gemma-4-26b-a4b-it'.
-      await expect(mapModelIdToVercel('google/gemma-4-26b-a4b-it:free')).resolves.toBe(
-        'google/gemma-4-26b-a4b-it'
+      // inception/mercury-3:free is registered in kiloExclusiveModels
+      // with the 'vercel-routing' flag and internal_id 'inception/mercury-3'.
+      await expect(mapModelIdToVercel('inception/mercury-3:free')).resolves.toBe(
+        'inception/mercury-3'
       );
     });
 

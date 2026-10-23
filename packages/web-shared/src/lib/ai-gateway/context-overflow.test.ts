@@ -4,7 +4,7 @@ import type {
   GatewayRequest,
   OpenRouterChatCompletionRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { mercury_3_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 
 function chatRequest(body: OpenRouterChatCompletionRequest): GatewayRequest {
@@ -161,13 +161,13 @@ describe('detectContextOverflow', () => {
     // Gemma 4 has context_length 262_144 and max_completion_tokens 32_768.
     // This request estimates to more than 282_000 tokens, exceeding the context window.
     const hugeRequest = chatRequest({
-      model: gemma_4_26b_a4b_it_free_model.public_id,
+      model: mercury_3_free_model.public_id,
       messages: [{ role: 'user', content: 'x'.repeat(1_000_000) }],
       max_tokens: 32_768,
     });
 
     const result = await detectContextOverflow({
-      requestedModel: gemma_4_26b_a4b_it_free_model.public_id,
+      requestedModel: mercury_3_free_model.public_id,
       request: hugeRequest,
       response: new Response('Internal Server Error', { status: 500 }),
     });
@@ -180,12 +180,12 @@ describe('detectContextOverflow', () => {
 
   it('does not trigger on a 500 when the estimate fits the window', async () => {
     const smallRequest = chatRequest({
-      model: gemma_4_26b_a4b_it_free_model.public_id,
+      model: mercury_3_free_model.public_id,
       messages: [{ role: 'user', content: 'hi' }],
     });
 
     const result = await detectContextOverflow({
-      requestedModel: gemma_4_26b_a4b_it_free_model.public_id,
+      requestedModel: mercury_3_free_model.public_id,
       request: smallRequest,
       response: new Response('Internal Server Error', { status: 500 }),
     });

@@ -137,7 +137,8 @@ export default function AdminGatewayPage() {
                   Model IDs the gateway hides from the catalog and rejects for direct requests,
                   stored in the <code>unavailable_models</code> column of{' '}
                   <code>ai_gateway_config</code>. <code>kilo-auto</code> can still route to them.{' '}
-                  <code>google/gemma-4-26b-a4b-it:free</code> is always unavailable and is not
+                  <code>inception/mercury-3:free</code> and{' '}
+                  <code>google/gemma-4-26b-a4b-it:free</code> are always unavailable and are not
                   listed here.
                 </>
               }

@@ -128,8 +128,11 @@ describe('tab screen bottom clearance', () => {
   it('keeps the font-scale rule for a screen rendered under neither layout', async () => {
     layout.fontScale = 1.5;
     await expect(clearanceFor(undefined)).resolves.toBe(
-      getTabBarOverlayHeight({ bottomInset: layout.bottom, platform: 'android', fontScale: layout.fontScale }) +
-      TAB_SCREEN_BOTTOM_GAP
+      getTabBarOverlayHeight({
+        bottomInset: layout.bottom,
+        platform: 'android',
+        fontScale: layout.fontScale,
+      }) + TAB_SCREEN_BOTTOM_GAP
     );
   });
 });

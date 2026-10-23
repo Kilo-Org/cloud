@@ -151,7 +151,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       'fake-user-id',
       undefined,
       'openrouter',
-      200
+      200,
+      false
     );
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
@@ -168,7 +169,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       'fake-user-id',
       undefined,
       'openrouter',
-      200
+      200,
+      false
     );
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
@@ -185,7 +187,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       'fake-user-id',
       undefined,
       'openrouter',
-      200
+      200,
+      false
     );
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
@@ -243,7 +246,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
         'fake-user-id',
         undefined,
         'openrouter',
-        200
+        200,
+        false
       );
 
       expect(result.messageId).toBe('gen-123');
@@ -266,7 +270,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       'fake-user-id',
       undefined,
       'openrouter',
-      200
+      200,
+      false
     );
 
     expect(result.hasError).toBe(true);
@@ -328,7 +333,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       'fake-user-id',
       undefined,
       'openrouter',
-      200
+      200,
+      false
     );
 
     expect(result.hasError).toBe(true);
@@ -336,19 +342,17 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
   });
 
   describe('upstream error reporting', () => {
-    const overloadMessage = 'Upstream error from Nvidia: Service temporarily overloaded';
-
     beforeEach(() => {
       jest.mocked(captureException).mockClear();
       jest.mocked(captureMessage).mockClear();
-      jest.spyOn(console, 'info').mockImplementation(() => {});
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
     });
 
     afterEach(() => {
       jest.restoreAllMocks();
     });
 
-    const parseChunks = (chunks: object[]) =>
+    const parseChunks = (chunks: object[], userByok = false) =>
       parseMicrodollarUsageFromStream(
         new ReadableStream<Uint8Array>({
           start(controller) {
@@ -362,63 +366,95 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
         'fake-user-id',
         undefined,
         'openrouter',
-        200
+        200,
+        userByok
       );
 
-    test.each([502, '502', undefined])(
-      'logs Nvidia overload without reporting to Sentry when code is %s',
-      async code => {
-        const result = await parseChunks([
-          {
-            id: 'gen-nvidia-overload',
-            model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
-            provider: 'Nvidia',
-            choices: [],
-            error: { code, message: overloadMessage },
-          },
-        ]);
-
-        expect(console.info).toHaveBeenCalledWith(`OpenRouter error: ${overloadMessage}`, {
-          source: 'sse_processing',
-          provider: 'openrouter',
-          code,
-          messageId: 'gen-nvidia-overload',
-          model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
-        });
-        expect(captureException).not.toHaveBeenCalled();
-        expect(captureMessage).not.toHaveBeenCalled();
-        expect(result).toMatchObject({
-          hasError: true,
-          status_code: typeof code === 'number' ? code : 200,
-          messageId: 'gen-nvidia-overload',
-          model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
-          inference_provider: 'Nvidia',
-        });
-      }
-    );
-
     test.each([
-      'Upstream error from Nvidia: Internal server error',
-      'Upstream error from Nvidia: ResourceExhausted: Worker local total request limit reached (16/16)',
-      'Upstream error from Tencent: Service temporarily overloaded',
-      'Upstream idle timeout exceeded',
-    ])('still reports %s to Sentry', async message => {
-      const chunk = { error: { code: 502, message } };
-      const result = await parseChunks([chunk]);
+      { code: 502, message: 'Upstream error from Nvidia: Service temporarily overloaded' },
+      { code: '502', message: 'Upstream error from Nvidia: Internal server error' },
+      { code: undefined, message: 'Upstream stream ended before terminal chunk' },
+      {
+        code: 502,
+        message: 'JSON error injected into SSE stream',
+        metadata: { error_type: 'provider_unavailable' },
+      },
+      {
+        code: 504,
+        message: 'Upstream idle timeout exceeded',
+        metadata: { error_type: 'timeout' },
+      },
+    ])('logs transient upstream error $message without reporting to Sentry', async error => {
+      const result = await parseChunks([
+        {
+          id: 'gen-transient',
+          model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+          provider: 'Nvidia',
+          choices: [],
+          error,
+        },
+      ]);
 
-      expect(console.info).not.toHaveBeenCalled();
-      expect(captureException).toHaveBeenCalledTimes(1);
-      expect(captureException).toHaveBeenCalledWith(new Error(`OpenRouter error: ${message}`), {
-        tags: { source: 'sse_processing' },
-        extra: { json: chunk, event: expect.objectContaining({ data: JSON.stringify(chunk) }) },
+      expect(console.warn).toHaveBeenCalledWith(`OpenRouter error: ${error.message}`, {
+        source: 'sse_processing',
+        code: error.code,
+        error_type: error.metadata?.error_type,
+        user_byok: false,
+        provider: 'openrouter',
+        inference_provider: 'Nvidia',
+        messageId: 'gen-transient',
+        model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
       });
-      expect(result).toMatchObject({ hasError: true, status_code: 502 });
+      expect(captureException).not.toHaveBeenCalled();
+      expect(captureMessage).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        hasError: true,
+        status_code: typeof error.code === 'number' ? error.code : 200,
+        messageId: 'gen-transient',
+        model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+        inference_provider: 'Nvidia',
+      });
     });
 
-    test('preserves partial content and usage and reports later errors after Nvidia overload', async () => {
+    test.each([
+      { code: 401, message: 'User not found.' },
+      { code: '403', message: 'Key is not allowed to access this model' },
+      { code: 402, message: 'Insufficient credits' },
+      { code: 500, message: 'Invalid key', metadata: { error_type: 'authentication_error' } },
+    ])('reports account error $message on Kilo credentials to Sentry', async error => {
+      const chunk = { choices: [], error };
+      await parseChunks([chunk]);
+
+      expect(console.warn).not.toHaveBeenCalled();
+      expect(captureException).toHaveBeenCalledTimes(1);
+      expect(captureException).toHaveBeenCalledWith(
+        new Error(`OpenRouter error: ${error.message}`),
+        {
+          tags: { source: 'sse_processing' },
+          extra: { json: chunk, event: expect.objectContaining({ data: JSON.stringify(chunk) }) },
+        }
+      );
+    });
+
+    test('only logs account errors when the user brought their own key', async () => {
+      await parseChunks([{ choices: [], error: { code: 401, message: 'Invalid API key' } }], true);
+
+      expect(captureException).not.toHaveBeenCalled();
+      expect(console.warn).toHaveBeenCalledWith(
+        'OpenRouter error: Invalid API key',
+        expect.objectContaining({ code: 401, user_byok: true })
+      );
+    });
+
+    test('preserves partial content and usage across multiple upstream errors', async () => {
       const result = await parseChunks([
         { id: 'gen-partial', model: 'test-model', choices: [{ delta: { content: 'Hello' } }] },
-        { error: { code: 502, message: overloadMessage } },
+        {
+          error: {
+            code: 502,
+            message: 'Upstream error from Nvidia: Service temporarily overloaded',
+          },
+        },
         {
           choices: [{ delta: { content: ' world' } }],
           usage: { prompt_tokens: 10, completion_tokens: 2, cost: 0.001, is_byok: false },
@@ -426,15 +462,12 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
         { error: { code: 504, message: 'Upstream idle timeout exceeded' } },
       ]);
 
-      expect(console.info).toHaveBeenCalledWith(
-        `OpenRouter error: ${overloadMessage}`,
-        expect.objectContaining({ messageId: 'gen-partial', model: 'test-model' })
+      expect(console.warn).toHaveBeenCalledTimes(2);
+      expect(console.warn).toHaveBeenLastCalledWith(
+        'OpenRouter error: Upstream idle timeout exceeded',
+        expect.objectContaining({ messageId: 'gen-partial', model: 'test-model', code: 504 })
       );
-      expect(captureException).toHaveBeenCalledTimes(1);
-      expect(captureException).toHaveBeenCalledWith(
-        new Error('OpenRouter error: Upstream idle timeout exceeded'),
-        expect.any(Object)
-      );
+      expect(captureException).not.toHaveBeenCalled();
       expect(captureMessage).not.toHaveBeenCalled();
       expect(result).toMatchObject({
         hasError: true,
@@ -462,7 +495,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       'fake-user-id',
       undefined,
       'vercel',
-      200
+      200,
+      false
     );
 
     expect(result.upstream_id).toBe('chatcmpl-ccebc94c526d4f8797cfe00023478a9a');
@@ -486,7 +520,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       'fake-user-id',
       undefined,
       'vercel',
-      200
+      200,
+      false
     );
 
     expect(result.upstream_id).toBeNull();

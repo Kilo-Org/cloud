@@ -19,6 +19,7 @@ import {
   extractVercelGenerationTime,
   extractVercelIsByok,
   extractVercelUpstreamId,
+  reportUpstreamStreamError,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 
@@ -110,7 +111,8 @@ export async function parseResponsesMicrodollarUsageFromStream(
   kiloUserId: string,
   openrouterRequestSpan: Span | undefined,
   provider: ProviderId,
-  statusCode: number
+  statusCode: number,
+  userByok: boolean
 ): Promise<MicrodollarUsageStats> {
   openrouterRequestSpan?.end();
   const streamProcessingSpan = startInactiveSpan({
@@ -159,9 +161,13 @@ export async function parseResponsesMicrodollarUsageFromStream(
 
       if ('error' in json && json.error) {
         reportedError = true;
-        captureException(new Error(`Responses API error: ${json.error.message}`), {
-          tags: { source: 'responses_sse_processing' },
-          extra: { json, event },
+        reportUpstreamStreamError({
+          label: 'Responses API error',
+          source: 'responses_sse_processing',
+          error: json.error,
+          userByok,
+          logContext: { provider, inference_provider, messageId, model },
+          sentryExtra: { json, event },
         });
       }
 

@@ -18,6 +18,7 @@ import {
   extractVercelGenerationTime,
   extractVercelIsByok,
   extractVercelUpstreamId,
+  reportUpstreamStreamError,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import type Anthropic from '@anthropic-ai/sdk';
@@ -130,7 +131,8 @@ export async function parseMessagesMicrodollarUsageFromStream(
   kiloUserId: string,
   openrouterRequestSpan: Span | undefined,
   provider: ProviderId,
-  statusCode: number
+  statusCode: number,
+  userByok: boolean
 ): Promise<MicrodollarUsageStats> {
   openrouterRequestSpan?.end();
   const streamProcessingSpan = startInactiveSpan({
@@ -183,13 +185,14 @@ export async function parseMessagesMicrodollarUsageFromStream(
       if (json.type === 'error') {
         reportedError = true;
         finish_reason = json.error?.error_type ?? json.error?.type ?? 'error';
-        captureException(
-          new Error(`Messages API stream error: ${json.error?.message ?? 'unknown'}`),
-          {
-            tags: { source: 'messages_sse_processing' },
-            extra: { json, event },
-          }
-        );
+        reportUpstreamStreamError({
+          label: 'Messages API stream error',
+          source: 'messages_sse_processing',
+          error: json.error ?? {},
+          userByok,
+          logContext: { provider, inference_provider, messageId, model },
+          sentryExtra: { json, event },
+        });
         return;
       }
 

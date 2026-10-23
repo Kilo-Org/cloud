@@ -71,11 +71,9 @@ export function blobUrlColumns(copiedBlobs: Partial<Record<BlobUrlKeys, string>>
 }
 
 /**
- * Reserve a share row for a session and state, or refuse once the account
- * holds {@link CLI_SESSION_SHARE_MAX_PER_OWNER} shares. A share stores its own
- * copy of the session folder, taken when the request runs. The row is inserted
- * under the same lock as the count check; the caller attaches the blob urls
- * once the copy succeeds and discards the row otherwise.
+ * Reserve a share row for a session and state, or return its existing id.
+ * Existing links are refreshed from the session's current folder whenever
+ * the caller publishes them again.
  */
 export async function reserveSharedSession({
   kiloUserId,
@@ -84,6 +82,22 @@ export async function reserveSharedSession({
 }: ReserveSharedSessionParams): Promise<string> {
   return db.transaction(async tx => {
     await lockOwnerCopies(tx, kiloUserId);
+
+    const [existing] = await tx
+      .select({ share_id: sharedCliSessions.share_id })
+      .from(sharedCliSessions)
+      .where(
+        and(
+          eq(sharedCliSessions.session_id, sessionId),
+          eq(sharedCliSessions.kilo_user_id, kiloUserId),
+          eq(sharedCliSessions.shared_state, sharedState)
+        )
+      )
+      .limit(1);
+
+    if (existing) {
+      return existing.share_id;
+    }
 
     const [totals] = await tx
       .select({ shareCount: count() })
@@ -187,23 +201,8 @@ export async function discardReservedFork(sessionId: string): Promise<void> {
 }
 
 /** Delete the shared-sessions object copies of the given shares. */
-async function deleteSharedSessionCopies(shareIds: string[]): Promise<void> {
+export async function deleteSharedSessionCopies(shareIds: string[]): Promise<void> {
   for (const shareId of shareIds) {
     await deleteBlobs(shareId, sessionBlobRefs('shared-sessions'));
   }
-}
-
-/**
- * Undo a share reservation whose copy did not complete. The row belongs to the
- * request that inserted it, so removing it together with whatever the copy
- * wrote leaves nothing behind.
- */
-export async function discardReservedShare(shareId: string): Promise<void> {
-  try {
-    await deleteSharedSessionCopies([shareId]);
-  } catch {
-    // The row delete below still runs; a cleanup failure must not replace the
-    // error that caused the discard.
-  }
-  await db.delete(sharedCliSessions).where(eq(sharedCliSessions.share_id, shareId));
 }

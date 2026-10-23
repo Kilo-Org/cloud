@@ -1675,7 +1675,7 @@ describe('cli-sessions-router', () => {
       });
     });
 
-    it('publishes the current blobs when a session is shared again', async () => {
+    it('refreshes a session share with the blobs present when it is published again', async () => {
       const caller = await createCallerForUser(regularUser.id);
       const { copyBlobs } = await import('@/lib/r2/cli-sessions');
       jest.mocked(copyBlobs).mockClear();
@@ -1695,7 +1695,7 @@ describe('cli-sessions-router', () => {
         shared_state: CliSessionSharedState.Public,
       });
 
-      expect(second.share_id).not.toBe(first.share_id);
+      expect(second.share_id).toBe(first.share_id);
       expect(copyBlobs).toHaveBeenCalledTimes(2);
 
       const shares = await db
@@ -1706,13 +1706,11 @@ describe('cli-sessions-router', () => {
         .from(sharedCliSessions)
         .where(eq(sharedCliSessions.session_id, shareSessionId));
 
-      expect(shares).toHaveLength(2);
-      expect(shares.find(share => share.share_id === second.share_id)?.ui_messages_blob_url).toBe(
-        'sessions/second-id/ui_messages.json'
-      );
+      expect(shares).toHaveLength(1);
+      expect(shares[0].ui_messages_blob_url).toBe('sessions/second-id/ui_messages.json');
     });
 
-    it('stores its own blob urls for a session that already has a share row without them', async () => {
+    it('completes an existing share row that has no blob urls', async () => {
       const [storedShare] = await db
         .insert(sharedCliSessions)
         .values({
@@ -1731,7 +1729,7 @@ describe('cli-sessions-router', () => {
         shared_state: CliSessionSharedState.Public,
       });
 
-      expect(result.share_id).not.toBe(storedShare.share_id);
+      expect(result.share_id).toBe(storedShare.share_id);
       expect(copyBlobs).toHaveBeenCalledTimes(1);
 
       const [published] = await db
@@ -1742,10 +1740,9 @@ describe('cli-sessions-router', () => {
       expect(published.ui_messages_blob_url).toBe('sessions/new-id/ui_messages.json');
     });
 
-    it('removes the share row when its copy fails', async () => {
+    it('keeps the share row available for a later copy attempt', async () => {
       const caller = await createCallerForUser(regularUser.id);
-      const { copyBlobs, deleteBlobs } = await import('@/lib/r2/cli-sessions');
-      jest.mocked(deleteBlobs).mockClear();
+      const { copyBlobs } = await import('@/lib/r2/cli-sessions');
       jest.mocked(copyBlobs).mockRejectedValueOnce(new Error('copy failed'));
 
       await expect(
@@ -1755,18 +1752,57 @@ describe('cli-sessions-router', () => {
         })
       ).rejects.toThrow('copy failed');
 
-      const shares = await db
-        .select({ share_id: sharedCliSessions.share_id })
+      const [reserved] = await db
+        .select({
+          share_id: sharedCliSessions.share_id,
+          ui_messages_blob_url: sharedCliSessions.ui_messages_blob_url,
+        })
         .from(sharedCliSessions)
         .where(eq(sharedCliSessions.session_id, shareSessionId));
 
-      expect(shares).toHaveLength(0);
-      expect(deleteBlobs).toHaveBeenCalledWith(expect.any(String), [
-        { folderName: 'shared-sessions', filename: 'api_conversation_history' },
-        { folderName: 'shared-sessions', filename: 'task_metadata' },
-        { folderName: 'shared-sessions', filename: 'ui_messages' },
-        { folderName: 'shared-sessions', filename: 'git_state' },
-      ]);
+      expect(reserved.ui_messages_blob_url).toBeNull();
+
+      const result = await caller.cliSessions.share({
+        session_id: shareSessionId,
+        shared_state: CliSessionSharedState.Organization,
+      });
+
+      expect(result.share_id).toBe(reserved.share_id);
+
+      const [completed] = await db
+        .select({ ui_messages_blob_url: sharedCliSessions.ui_messages_blob_url })
+        .from(sharedCliSessions)
+        .where(eq(sharedCliSessions.share_id, result.share_id));
+
+      expect(completed.ui_messages_blob_url).toBe('sessions/new-id/ui_messages.json');
+    });
+
+    it('preserves the published share row when a refresh copy fails', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const first = await caller.cliSessions.share({
+        session_id: shareSessionId,
+        shared_state: CliSessionSharedState.Public,
+      });
+      const { copyBlobs } = await import('@/lib/r2/cli-sessions');
+      jest.mocked(copyBlobs).mockRejectedValueOnce(new Error('copy failed'));
+
+      await expect(
+        caller.cliSessions.share({
+          session_id: shareSessionId,
+          shared_state: CliSessionSharedState.Public,
+        })
+      ).rejects.toThrow('copy failed');
+
+      const [stored] = await db
+        .select({
+          share_id: sharedCliSessions.share_id,
+          ui_messages_blob_url: sharedCliSessions.ui_messages_blob_url,
+        })
+        .from(sharedCliSessions)
+        .where(eq(sharedCliSessions.session_id, shareSessionId));
+
+      expect(stored.share_id).toBe(first.share_id);
+      expect(stored.ui_messages_blob_url).toBe('sessions/new-id/ui_messages.json');
     });
 
     it('fails when the share row disappears before its copy finishes', async () => {

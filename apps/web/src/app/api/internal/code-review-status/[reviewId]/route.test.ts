@@ -2059,48 +2059,62 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
     });
 
-    it('allows one fresh retry for a pre-dispatch runtime start failure when usage is unavailable', async () => {
-      // A preparation timeout classifies as wrapper_start_failed before the
-      // agent runs, so the unusable usage read must not forfeit the retry.
-      const retryFlow = mockCreatedInfraRetryFlow({
-        sessionId: 'agent-preparation-timeout',
-        cliSessionId: 'ses_preparation_timeout',
-      });
-      mockGetCodeReviewById.mockResolvedValue(
-        makeReview({ status: 'running', session_id: retryFlow.sessionId })
-      );
-      mockGetSessionUsageFromBilling.mockResolvedValue(null);
+    it.each([
+      {
+        name: 'runtime start failure',
+        code: 'wrapper_start_failed',
+        message: 'Environment preparation timed out',
+      },
+      {
+        name: 'Kilo server failure',
+        code: 'kilo_server_failed',
+        message: 'Kilo server failed to start',
+      },
+    ])(
+      'allows one fresh retry for a pre-dispatch $name when usage is unavailable',
+      async ({ code, message }) => {
+        // Both codes classify before the agent runs, so an unusable usage read
+        // must not forfeit the retry.
+        const retryFlow = mockCreatedInfraRetryFlow({
+          sessionId: `agent-pre-dispatch-${code}`,
+          cliSessionId: `ses_pre_dispatch_${code}`,
+        });
+        mockGetCodeReviewById.mockResolvedValue(
+          makeReview({ status: 'running', session_id: retryFlow.sessionId })
+        );
+        mockGetSessionUsageFromBilling.mockResolvedValue(null);
 
-      const response = await POST(
-        makeRequest({
-          status: 'failed',
-          cloudAgentSessionId: retryFlow.sessionId,
-          kiloSessionId: retryFlow.cliSessionId,
-          errorMessage: 'Environment preparation timed out',
-          terminalReason: 'sandbox_error',
-          failure: {
-            stage: 'pre_dispatch',
-            code: 'wrapper_start_failed',
-            message: 'Environment preparation timed out',
-          },
-        }),
-        makeParams(REVIEW_ID)
-      );
+        const response = await POST(
+          makeRequest({
+            status: 'failed',
+            cloudAgentSessionId: retryFlow.sessionId,
+            kiloSessionId: retryFlow.cliSessionId,
+            errorMessage: message,
+            terminalReason: 'sandbox_error',
+            failure: {
+              stage: 'pre_dispatch',
+              code,
+              message,
+            },
+          }),
+          makeParams(REVIEW_ID)
+        );
 
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toMatchObject({ success: true, retried: true });
-      expect(mockCreateInfraRetryAttemptIfMissing).toHaveBeenCalledWith({
-        codeReviewId: REVIEW_ID,
-        retryOfAttemptId: retryFlow.failedAttemptId,
-      });
-      expect(mockRetryReviewFresh).toHaveBeenCalledWith(REVIEW_ID, {
-        sessionId: retryFlow.sessionId,
-        reason: 'Environment preparation timed out',
-        failedAttemptId: retryFlow.failedAttemptId,
-        retryAttemptId: retryFlow.retryAttemptId,
-      });
-      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
-    });
+        expect(response.status).toBe(200);
+        await expect(response.json()).resolves.toMatchObject({ success: true, retried: true });
+        expect(mockCreateInfraRetryAttemptIfMissing).toHaveBeenCalledWith({
+          codeReviewId: REVIEW_ID,
+          retryOfAttemptId: retryFlow.failedAttemptId,
+        });
+        expect(mockRetryReviewFresh).toHaveBeenCalledWith(REVIEW_ID, {
+          sessionId: retryFlow.sessionId,
+          reason: message,
+          failedAttemptId: retryFlow.failedAttemptId,
+          retryAttemptId: retryFlow.retryAttemptId,
+        });
+        expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      }
+    );
 
     it('does not infer the unavailable-usage exception from sandbox connection error text', async () => {
       const retryFlow = mockCreatedInfraRetryFlow({

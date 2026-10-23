@@ -1,4 +1,7 @@
-import { mapResolvedModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import {
+  mapResolvedModelIdToVercel,
+  type VercelModelIdOverrides,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import {
   normalizeInferenceProviderId,
   normalizeVercelInferenceProviderIdForRouting,
@@ -48,10 +51,12 @@ function toVercelEndpointModel(
 
 export function injectExtraProviderModels(
   vercelModels: Record<string, StoredModel>,
-  providerModelData: ProviderModelData
+  providerModelData: ProviderModelData,
+  vercelModelIdOverrides: VercelModelIdOverrides
 ) {
   for (const model of getUniqueModels(providerModelData)) {
-    const vercelModel = vercelModels[mapResolvedModelIdToVercel(model.slug)];
+    const vercelModel =
+      vercelModels[mapResolvedModelIdToVercel(model.slug, vercelModelIdOverrides)];
     if (!vercelModel) continue;
 
     for (const providerData of providerModelData) {
@@ -143,7 +148,8 @@ function createVercelOnlyProvider(providerId: string): OpenRouterProvider {
  */
 export function injectVercelOnlyProviders(
   vercelModels: Record<string, StoredModel>,
-  providerModelData: ProviderModelData
+  providerModelData: ProviderModelData,
+  vercelModelIdOverrides: VercelModelIdOverrides
 ) {
   const knownVercelProviderIds = new Set(
     providerModelData.map(({ provider }) => openRouterToVercelInferenceProviderId(provider.slug))
@@ -151,7 +157,8 @@ export function injectVercelOnlyProviders(
   const vercelOnlyProviders = new Map<string, ProviderModelData[number]>();
 
   for (const model of getUniqueModels(providerModelData)) {
-    const vercelModel = vercelModels[mapResolvedModelIdToVercel(model.slug)];
+    const vercelModel =
+      vercelModels[mapResolvedModelIdToVercel(model.slug, vercelModelIdOverrides)];
     if (!vercelModel) continue;
 
     for (const endpoint of vercelModel.endpoints) {

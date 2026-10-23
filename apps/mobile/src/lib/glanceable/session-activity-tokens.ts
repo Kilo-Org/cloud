@@ -4,7 +4,7 @@ import {
   awaitLogoutReconciliationSettled,
   hasPendingActivityUnregister,
 } from '@/lib/auth/logout-reconciliation';
-import { SessionLiveActivity } from '@/glanceable-ios/session-live-activity';
+import { getSessionLiveActivity } from '@/glanceable-ios/session-live-activity';
 import { trpcClient } from '@/lib/trpc';
 
 import { getGlanceableDelivery, type GlanceableActivity } from './sink-registry';
@@ -227,7 +227,7 @@ export async function collectSessionScopeTokens(): Promise<void> {
   }
   let instances: GlanceableActivity[] = [];
   try {
-    instances = SessionLiveActivity.getInstances(true);
+    instances = getSessionLiveActivity().getInstances(true);
   } catch {
     // The recorded tokens still cover every card this process observed.
   }

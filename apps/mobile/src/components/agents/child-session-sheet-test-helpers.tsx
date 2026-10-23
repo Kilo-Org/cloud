@@ -37,6 +37,8 @@ vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'Activ
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   ActivityIndicator: 'ActivityIndicator',
   AccessibilityInfo: { announceForAccessibility: vi.fn() },
   ...reactNativeMock,
@@ -242,7 +244,6 @@ export async function createRecoverySource(
       variant: null,
       repository: null,
       isInitiated: true,
-      needsLegacyPrepare: false,
       isPreparingAsync: false,
       prompt: null,
       initialMessageId: null,

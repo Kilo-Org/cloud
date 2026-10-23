@@ -31,7 +31,7 @@ import {
   sessionCardRelevance,
   settleCardWork,
 } from './session-card-press';
-import { SessionLiveActivity, type SessionLiveActivityProps } from './session-live-activity';
+import { getSessionLiveActivity, type SessionLiveActivityProps } from './session-live-activity';
 import { drawsSame, isOlderThanCard, sessionCardStaleAfterSeconds } from './session-card-facts';
 import { liveActivitiesAllowedBySystem } from './system-switch';
 
@@ -202,7 +202,7 @@ export function restoreFollowedSessionCards(ctx: SessionFollowContext | null): v
 /** Start the card collapsed and silent, or null when iOS refuses it. */
 function startCard(content: SessionLiveActivityContentState): SessionActivity | null {
   try {
-    return SessionLiveActivity.start(
+    return getSessionLiveActivity().start(
       content,
       launcherSessionUrl(content.sessionId),
       sessionCardStaleAfterSeconds(content),

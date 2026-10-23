@@ -21,6 +21,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 
 import { getTierName } from './utils';
+import { getPlanChangeBlockedReason } from './kiloPassPlanChange.logic';
 import { useKiloPassSubscriptionInfo } from './useKiloPassSubscriptionInfo';
 import { useKiloPassChurnkeyCancelFlow } from './useKiloPassChurnkeyCancelFlow';
 import {
@@ -54,14 +55,12 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
   const scheduleChange = useMutation(trpc.kiloPass.scheduleChange.mutationOptions());
   const cancelScheduledChange = useMutation(trpc.kiloPass.cancelScheduledChange.mutationOptions());
 
-  const [panel, setPanel] = useState<'main' | 'update'>('update');
   const [isCancelingPendingChangeUntilRefetch, setIsCancelingPendingChangeUntilRefetch] =
     useState(false);
 
   const scheduledChange = scheduledChangeQuery.data?.scheduledChange ?? null;
 
   const closeModal = () => {
-    setPanel('update');
     onClose();
   };
 
@@ -93,6 +92,8 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
 
   const isSameSelection =
     targetTier === subscription.tier && targetCadence === subscription.cadence;
+
+  const planChangeBlockedReason = getPlanChangeBlockedReason(subscription);
 
   const computedEffectiveAt = useMemo(() => {
     if (scheduledChange?.effectiveAt) {
@@ -210,7 +211,7 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
   }, [targetCadence, targetTier]);
 
   const handleScheduleChange = async () => {
-    if (isSameSelection) return;
+    if (isSameSelection || planChangeBlockedReason) return;
 
     try {
       const result = await scheduleChange.mutateAsync({
@@ -252,17 +253,14 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
   const resumeAction = view.actions.resume;
   const resumePausedAction = view.actions.resumePaused;
 
-  const isUpdateSubscriptionDisabled = view.status.isPendingCancellation;
-
   const pendingChange = Boolean(scheduledChange);
-  const showUpdatePanel = panel === 'update' && !pendingChange;
+  const showUpdatePanel = !pendingChange;
 
   return (
     <Dialog
       open={isOpen}
       onOpenChange={open => {
         if (!open) {
-          setPanel('update');
           onClose();
         }
       }}
@@ -273,7 +271,11 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
             <Settings className="h-5 w-5 text-blue-400" />
             {showUpdatePanel ? 'Update Kilo Pass' : 'Manage Kilo Pass'}
           </DialogTitle>
-          {showUpdatePanel ? null : (
+          {showUpdatePanel ? (
+            <DialogDescription className="sr-only">
+              Choose a new tier or billing cadence for your Kilo Pass.
+            </DialogDescription>
+          ) : (
             <DialogDescription className="text-muted-foreground">
               Update your subscription, payment method, or cancellation status.
             </DialogDescription>
@@ -290,6 +292,8 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
             targetCadence={targetCadence}
             isMutating={isMutating}
             updateSummary={updateSummary}
+            planChangeBlockedReason={planChangeBlockedReason}
+            onOpenSubscriptionDetails={closeModal}
             hasScheduledChange={Boolean(scheduledChange)}
             effectiveAtLabel={effectiveAtLabel}
             onSelectTier={setTargetTier}
@@ -297,11 +301,8 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
           />
         ) : (
           <MainPanel
-            hasScheduledChange={Boolean(scheduledChange)}
             onCancelPendingChange={handleCancelScheduledChange}
             isCancelingPendingChange={isCancelingPendingChange}
-            onUpdateSubscription={() => setPanel('update')}
-            isUpdateSubscriptionDisabled={isUpdateSubscriptionDisabled}
             onManagePaymentMethod={actions.openCustomerPortal}
             isOpeningCustomerPortal={actions.isOpeningCustomerPortal}
             resumeAction={resumeAction}
@@ -327,6 +328,7 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
               isCancelingPendingChange={isCancelingPendingChange}
               isSchedulingChange={scheduleChange.isPending}
               isSameSelection={isSameSelection}
+              isPlanChangeBlocked={planChangeBlockedReason !== null}
             />
           ) : (
             <Button variant="outline" onClick={closeModal} disabled={isMutating}>

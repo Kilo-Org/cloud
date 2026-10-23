@@ -22,6 +22,13 @@ export const group = (
   repositories: NewSessionRepository[] = []
 ): RepositoryGroup => ({ key, status, repositories });
 
+export const partialGroup = (key: RepositoryGroup['key']): RepositoryGroup => ({
+  key,
+  status: 'repos',
+  repositories: [githubRow],
+  notice: 'partial',
+});
+
 export function mountSection(
   overrides: Partial<ComponentProps<typeof NewSessionRepositorySection>>
 ) {

@@ -47,8 +47,10 @@ import {
   getOrCreateProjectAccessToken,
   type GitLabIntegrationMetadata,
 } from '@/lib/integrations/gitlab-service';
+import { isGitLabReconnectRequiredError } from '@/lib/integrations/platforms/gitlab/credential-errors';
 import type {
   ExistingReviewState,
+  InlineComment,
   PreviousReviewStatus,
   GitLabDiffContext,
 } from '../prompts/generate-prompt';
@@ -557,6 +559,12 @@ export async function prepareReviewPayload(
             projectId,
           });
         } catch (pratError) {
+          if (isGitLabReconnectRequiredError(pratError)) {
+            throw new Error(
+              `GitLab rejected the connected credential while preparing this review of ` +
+                `${review.repo_full_name}. Reconnect the GitLab integration, then retry.`
+            );
+          }
           if (pratError instanceof GitLabProjectAccessTokenPermissionError) {
             throw new Error(
               `Cannot create Project Access Token for GitLab code review. ` +
@@ -637,6 +645,7 @@ export async function prepareReviewPayload(
             line: c.line,
             body: c.body,
             isOutdated: c.isOutdated,
+            authoredByKilo: c.authoredByKilo,
           }));
 
           existingReviewState = buildReviewState(
@@ -1050,13 +1059,7 @@ function getReviewInstructionsFetchErrorMetadata(error: unknown): {
  */
 function buildReviewState(
   summaryComment: { commentId: number; body: string } | null,
-  inlineComments: Array<{
-    id: number;
-    path: string;
-    line: number | null;
-    body: string;
-    isOutdated: boolean;
-  }>,
+  inlineComments: InlineComment[],
   headCommitSha: string
 ): ExistingReviewState {
   // Determine previous status from summary body

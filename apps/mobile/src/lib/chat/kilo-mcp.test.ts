@@ -291,7 +291,7 @@ describe('the snapshot a screen draws', () => {
     await ensureKiloMcp(place);
     const gate: { release?: () => void } = {};
     answer = () =>
-      Effect.async<readonly Tool[], RemoteMcpError>(resume => {
+      Effect.callback<readonly Tool[], RemoteMcpError>(resume => {
         gate.release = () => {
           resume(Effect.succeed([tool]));
         };

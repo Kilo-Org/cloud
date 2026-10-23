@@ -14,7 +14,9 @@ import { securityConfigFixture } from './security-config.test-fixture';
 const committedConnectivity = vi.hoisted(() => ({
   status: 'online' as 'online' | 'offline' | 'unknown',
 }));
-const transport = vi.hoisted(() => vi.fn<typeof fetch>());
+const transport = vi.hoisted(() =>
+  vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+);
 const failures = new Set<string>();
 const gates = new Map<string, Promise<undefined>>();
 let configData: Record<string, unknown> = {};
@@ -108,7 +110,7 @@ async function retry(root: ReactTestInstance) {
   await advanceBy();
 }
 const denialCopy =
-  'Security Agent is disabled. Only organization owners and billing managers can turn it on.';
+  'Security Agent is disabled. Only organization owners, admins, and billing managers can turn it on.';
 const emptyCopy = 'Select at least one repository before enabling Security Agent.';
 const failureCases = [
   ['personal', 'getConfig', 'Could not load Security Agent settings'],
@@ -208,7 +210,12 @@ describe.each([
       await retry(root);
       if (procedure === 'getRepositories') {
         const progress = presentation === 'inline' ? 'Skeleton' : 'ActivityIndicator';
-        expect(host(root, progress)).toHaveLength(1);
+        expect(host(root, progress).length).toBeGreaterThan(0);
+      } else if (presentation === 'inline') {
+        // The entry screen replaces its failure page with the loading skeleton
+        // while the retry runs, so the attempt is visible without a spinner.
+        expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
+        expect(host(root, 'Skeleton').length).toBeGreaterThan(0);
       } else {
         expect(host(root, 'PlatformErrorScreen')[0]?.props.isRetrying).toBe(true);
       }

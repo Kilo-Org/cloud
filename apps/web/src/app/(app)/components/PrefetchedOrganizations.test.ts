@@ -52,7 +52,7 @@ describe('PrefetchedOrganizations user seed', () => {
       if (state === 'context-failed') {
         const fetchUser = jest.fn().mockResolvedValue(user);
         await expect(
-          queryClient.fetchQuery({ queryKey: ['user'], queryFn: fetchUser })
+          queryClient.query({ queryKey: ['user'], queryFn: fetchUser })
         ).resolves.toEqual(user);
         expect(fetchUser).toHaveBeenCalledTimes(1);
       }

@@ -8,6 +8,7 @@ import { CodeReviewStreamView } from '@/components/code-reviews/CodeReviewStream
 import { CouncilGovernancePanel } from '@/components/code-reviews/CouncilGovernancePanel';
 import { formatTokenCount } from '@/lib/code-reviews/summary/usage-footer';
 import { getCodeReviewJobsHref } from '@/lib/code-reviews/code-review-links';
+import { getCodeReviewCancellationCopy } from '@/lib/code-reviews/cancellation-copy';
 import { getCodeReviewTerminalReasonCopy } from '@/lib/code-reviews/terminal-reason-copy';
 import {
   formatSessionCost,
@@ -136,29 +137,36 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
   // orchestrator-accumulated review cost when the billing lookup has nothing (no
   // linked session, an in-flight review, or a failed lookup).
   const sessionCostMusd = data.sessionCostMusd ?? review.total_cost_musd;
-  const isSupersededCancellation =
-    status === 'cancelled' &&
-    (review.terminal_reason === 'superseded' ||
-      review.error_message?.toLowerCase().includes('superseded'));
   // Reasons with customer-facing copy render muted rather than destructive: the
   // cause is stated plainly and there is nothing broken on our side to alarm
-  // about. Checked before the raw error_message so the friendlier text wins.
+  // about. Checked before the cancellation copy so the specific reason wins, and
+  // both before the raw error_message.
   const terminalReasonCopy = getCodeReviewTerminalReasonCopy(review.terminal_reason);
+  const cancellationCopy = getCodeReviewCancellationCopy({
+    status: review.status,
+    terminalReason: review.terminal_reason,
+    errorMessage: review.error_message,
+    platform: review.platform,
+  });
   const reviewMessage = terminalReasonCopy
     ? {
         label: terminalReasonCopy.label,
         message: terminalReasonCopy.message,
         className: 'border-border bg-muted/30 text-muted-foreground',
       }
-    : review.error_message
+    : cancellationCopy
       ? {
-          label: isSupersededCancellation ? 'Cancelled' : 'Error',
-          message: isSupersededCancellation ? 'Superseded by a newer push.' : review.error_message,
-          className: isSupersededCancellation
-            ? 'border-border bg-muted/30 text-muted-foreground'
-            : 'border-destructive/30 bg-destructive/10 text-destructive',
+          label: cancellationCopy.label,
+          message: cancellationCopy.message,
+          className: 'border-border bg-muted/30 text-muted-foreground',
         }
-      : null;
+      : review.error_message
+        ? {
+            label: 'Error',
+            message: review.error_message,
+            className: 'border-destructive/30 bg-destructive/10 text-destructive',
+          }
+        : null;
   return (
     <PageContainer>
       {/* Back link */}

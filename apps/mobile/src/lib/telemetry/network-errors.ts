@@ -6,7 +6,9 @@
  * Pure and total: no SDK import, no network, no React. The caller installs a
  * transport sink (s2 wires the Sentry adapter); until then every report is a
  * no-op. Query strings are never emitted — tRPC input and tokens live there
- * (mirrors `sentry-scrub.ts`).
+ * (mirrors `sentry-scrub.ts`). A parsed error body never leaves the device
+ * either: only its tRPC metadata (code, HTTP status, procedure path) reaches
+ * the event.
  *
  * Family 4 (KILO-APP-GX, `fetch failed: Fetch request has been canceled`) is
  * raised by this module's classifier (`abort-classification.ts`), so the fix
@@ -30,7 +32,7 @@ import { isAbortError, isRequestDeadlineError } from '@/lib/telemetry/abort-clas
 import { NETWORK_BODY_CONTEXT } from '@/lib/telemetry/sentry-scrub';
 
 // Re-exported for existing consumers and tests; the classifier lives in
-// `abort-classification.ts` so this module stays under the line limit.
+// `abort-classification.ts`.
 export { isAbortError };
 
 type TelemetrySource = 'trpc' | 'fetch';
@@ -43,7 +45,6 @@ export type TrpcErrorContext = {
   code?: string;
   httpStatus?: number;
   path?: string;
-  message?: string;
 };
 
 export type NetworkErrorContext = {
@@ -69,7 +70,6 @@ export type NetworkErrorFetchOptions = {
 // `data.httpStatus` / `data.path`; v11 client errors expose flat `data.*`.
 const TrpcErrorDataSchema = z.looseObject({
   code: z.string().optional(),
-  message: z.string().optional(),
   httpStatus: z.number().optional(),
   path: z.string().optional(),
 });
@@ -172,7 +172,8 @@ export function trpcProcedureFromUrl(url: string): string | undefined {
 
 /**
  * Read tRPC error metadata from a direct (`data.*`) or server-shaped
- * (`shape.data.*`) error. Total: an unrecognized value yields `{}`.
+ * (`shape.data.*`) error. The body's own `message` is untrusted text and is
+ * never read. Total: an unrecognized value yields `{}`.
  */
 export function readTrpcErrorContext(error: unknown): TrpcErrorContext {
   try {
@@ -188,10 +189,6 @@ export function readTrpcErrorContext(error: unknown): TrpcErrorContext {
         (topLevelCode.success ? topLevelCode.data.code : undefined),
       httpStatus: directData?.httpStatus ?? shapedData?.httpStatus,
       path: directData?.path ?? shapedData?.path,
-      message:
-        directData?.message ??
-        shapedData?.message ??
-        (error instanceof Error ? error.message : undefined),
     };
   } catch {
     return {};
@@ -206,6 +203,8 @@ export function readTrpcErrorContext(error: unknown): TrpcErrorContext {
  * not expected ({@link isExpectedStatus}), else its first error, so an
  * expected 404 ahead of a 500 cannot hide the 500. Total: a success-only,
  * non-JSON, or otherwise unreadable body yields `undefined` and never throws.
+ * `undefined` from a batch means the body carries no error item, which is not a
+ * failure: the caller records nothing for it.
  */
 export async function readTrpcResponseError(
   response: Response
@@ -251,6 +250,21 @@ function networkOutcome(context: NetworkErrorContext): NetworkOutcome {
 // says the body is a batch. It is not the failing procedure's status, so it
 // must not replace the parsed inner status or code.
 const BATCH_ENVELOPE_STATUS = 207;
+
+/**
+ * True for a batch envelope whose parsed body yields no tRPC error metadata:
+ * no inner status and no tRPC code. Every item succeeded, the error item (if
+ * any) carries no readable detail, or the cloned body could not be read. The
+ * envelope only says the body is a batch, so nothing failed: no event, and not
+ * even the breadcrumb that an expected answer leaves.
+ */
+function isBatchEnvelopeWithoutError(context: NetworkErrorContext): boolean {
+  if (context.status !== BATCH_ENVELOPE_STATUS) {
+    return false;
+  }
+  const trpc = readTrpcErrorContext(context.error);
+  return trpc.httpStatus === undefined && trpc.code === undefined;
+}
 
 /**
  * The status that names the defect: the transport status, except that the tRPC
@@ -309,11 +323,30 @@ function buildSyntheticError(
 }
 
 /**
+ * The tRPC metadata a report carries from a parsed response body: the fields
+ * the app already reads, and nothing else. `undefined` when the error names
+ * none of them, so an unreadable body adds no payload context.
+ */
+function trpcPayload(trpc: TrpcErrorContext): TrpcErrorContext | undefined {
+  const payload: TrpcErrorContext = {
+    ...(trpc.code === undefined ? {} : { code: trpc.code }),
+    ...(trpc.httpStatus === undefined ? {} : { httpStatus: trpc.httpStatus }),
+    ...(trpc.path === undefined ? {} : { path: trpc.path }),
+  };
+  return Object.keys(payload).length === 0 ? undefined : payload;
+}
+
+/**
  * Build and emit one warning-level telemetry event for a network error.
- * Never throws; never includes headers, bodies, or query strings.
+ * Never throws; never includes headers, body text, or query strings. A parsed
+ * error body contributes only its tRPC metadata (code, HTTP status, procedure
+ * path); every other field stays on the device.
  */
 export function reportNetworkError(context: NetworkErrorContext): void {
   try {
+    if (isBatchEnvelopeWithoutError(context)) {
+      return;
+    }
     const pathOnly = stripQueryString(context.url);
     const normalizedPath = normalizeUrlPath(context.url);
     const procedure = trpcProcedureFromUrl(context.url);
@@ -322,6 +355,7 @@ export function reportNetworkError(context: NetworkErrorContext): void {
     const statusClass = statusClassFor(context.status);
     const outcome = networkOutcome(context);
     const passedError = context.error instanceof Error ? context.error : undefined;
+    const bodyMetadata = passedError === undefined ? trpcPayload(trpc) : undefined;
     const error = passedError ?? buildSyntheticError(context, normalizedPath, trpc);
 
     const tags = {
@@ -346,17 +380,16 @@ export function reportNetworkError(context: NetworkErrorContext): void {
       ...(trpcCode === undefined ? {} : { trpcCode }),
     };
 
-    // A non-`Error` context (a parsed tRPC body) rides in the payload context
-    // `NETWORK_BODY_CONTEXT`, which `scrubEvent` walks and token-redacts.
-    // Passing it to `captureException` would both leak and title the issue from
-    // an SDK frame, and keying it on the synthesized exception's class name
-    // would be overwritten with `{}` by `extraErrorDataIntegration` (which owns
+    // A non-`Error` context (a parsed tRPC body) contributes only its metadata
+    // ({@link trpcPayload}) under `NETWORK_BODY_CONTEXT`; `scrubEvent` keeps
+    // that context to the same allow-listed fields. Passing the body itself to
+    // `captureException` would both leak it and title the issue from an SDK
+    // frame, and keying it on the synthesized exception's class name would be
+    // overwritten with `{}` by `extraErrorDataIntegration` (which owns
     // `contexts[error.name]`).
     const contexts = {
       network,
-      ...(passedError === undefined && context.error !== undefined
-        ? { [NETWORK_BODY_CONTEXT]: { data: context.error } }
-        : {}),
+      ...(bodyMetadata === undefined ? {} : { [NETWORK_BODY_CONTEXT]: bodyMetadata }),
     };
 
     captureTelemetry({
@@ -480,11 +513,13 @@ function safeShouldReport(url: string, shouldReport: (url: string) => boolean): 
  * Wrap a fetch implementation so every error-status http(s) response is
  * reported once at warning level and every transport failure (a rejection
  * that is not an abort) leaves one breadcrumb. `isResponseError` chooses the
- * statuses that count as errors (default `>= 400`; tRPC adds 207 so a mixed
- * batch is reported). An expected answer (`isExpectedResponse`) is a
- * breadcrumb instead of a report. `readResponseError` may parse the body via a
- * clone to enrich the report. The original rejection is re-thrown and the
- * original Response is returned unchanged; the original body is never read.
+ * statuses that count as errors (default `>= 400`; tRPC adds 207 so a batch
+ * that yields an error status or code is reported). A batch envelope whose body
+ * yields no error status or code is not a failure and records nothing. An
+ * expected answer (`isExpectedResponse`) is a breadcrumb instead of a report. `readResponseError`
+ * may parse the body via a clone to enrich the report. The original rejection is
+ * re-thrown and the original Response is returned unchanged; the original body
+ * is never read.
  */
 export function createNetworkErrorFetch(
   baseFetch: typeof fetch,
@@ -518,6 +553,9 @@ export function createNetworkErrorFetch(
           durationMs: Date.now() - startedAt,
           ...(error === undefined ? {} : { error }),
         };
+        if (isBatchEnvelopeWithoutError(context)) {
+          return response;
+        }
         if (isExpectedResponse(context)) {
           recordExpectedResponse(context);
         } else {

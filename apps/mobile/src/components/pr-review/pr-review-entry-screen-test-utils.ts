@@ -22,6 +22,7 @@ const harnessMocks = vi.hoisted(() => ({
   confirm: vi.fn(),
   toastError: vi.fn(),
   clipboard: { current: '' as string },
+  clipboardHasString: { current: false },
 }));
 
 // A hoisted binding cannot be exported directly; alias it for the test files.
@@ -53,6 +54,10 @@ vi.mock('expo-clipboard', () => ({
   getStringAsync: async () => {
     await Promise.resolve();
     return harnessMocks.clipboard.current;
+  },
+  hasStringAsync: async () => {
+    await Promise.resolve();
+    return harnessMocks.clipboardHasString.current;
   },
 }));
 
@@ -105,6 +110,7 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 // the field now uses is the one `@/components/ui/input` owns and s3 covers.
 vi.mock('@/components/ui/input', () => ({ Input: 'Input' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/icons', () => ({
   Clipboard: 'ClipboardIcon',
@@ -120,6 +126,11 @@ vi.mock('@/components/pr-review/pr-review-inbox-list', () => ({
 }));
 vi.mock('@/components/pr-review/pr-link-placeholder', () => ({
   PrLinkPlaceholder: 'PrLinkPlaceholder',
+}));
+// The harness calls the screen as a plain function, so the context line is a
+// same-named host stub; its own mounted test covers its content.
+vi.mock('@/components/pr-review/pr-review-context-line', () => ({
+  PrReviewContextLine: 'PrReviewContextLine',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6F6A61', primaryForeground: '#FFFFFF' }),

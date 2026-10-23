@@ -14,9 +14,10 @@ import { CenteredState } from '@/components/centered-state';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
 import {
+  formatConfidence,
   formatExploitable,
+  formatSuggestedAction,
   getAgentChatSessionHref,
-  humanize,
 } from '@/components/security-agent/finding-analysis-panel-helpers';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
 import { EmptyState } from '@/components/empty-state';
@@ -26,12 +27,14 @@ import { useConfirmDialog } from '@/components/ui/dialog';
 import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { AnalysisCapacityNotice } from '@/components/security-agent/analysis-capacity-notice';
 import { formatNumber } from '@/lib/format';
 import { useSecurityAnalysisCapacity } from '@/lib/hooks/use-security-agent';
 import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 import {
+  getAnalysisCapacityBlockedHint,
   getSecurityAnalysisDetailDescription,
   getSecurityAnalysisDetailTitle,
 } from '@/lib/security-agent-copy';
@@ -134,14 +137,7 @@ export function FindingAnalysisPanel({
   const canStartAnalysis =
     findingOpen && (analysisState === 'not-analyzed' || analysisState === 'failed');
   const canRestartAnalysis = findingOpen && analysis.status === 'running';
-  const hasCapacity =
-    capacity.runningCount !== undefined &&
-    capacity.concurrencyLimit !== undefined &&
-    capacity.runningCount < capacity.concurrencyLimit;
-  // "Capacity full" is only ever true after a successful count — while
-  // loading or on error, `hasCapacity` is false too (so the button stays
-  // disabled), but neither of those states means it's actually full.
-  const capacityConfirmedFull = !capacity.isLoading && !capacity.isError && !hasCapacity;
+  const hasCapacity = capacity.state === 'available';
 
   const handleStartAnalysis = () => {
     startAnalysis.mutate({
@@ -187,6 +183,7 @@ export function FindingAnalysisPanel({
           {canStartAnalysis ? (
             <Button
               disabled={startAnalysis.isPending || !hasCapacity}
+              accessibilityHint={getAnalysisCapacityBlockedHint(capacity.state)}
               onPress={handleStartAnalysis}
             >
               {startAnalysis.isPending ? (
@@ -199,24 +196,11 @@ export function FindingAnalysisPanel({
               </Text>
             </Button>
           ) : null}
-          {canStartAnalysis && capacityConfirmedFull ? (
-            <Text variant="muted" className="text-xs">
-              {t('securityAgent.analysis.capacityFull')}
-            </Text>
-          ) : null}
-          {canStartAnalysis && capacity.isError ? (
-            <View className="flex-row items-center gap-2">
-              <Text variant="muted" className="text-xs">
-                {t('securityAgent.analysis.couldNotCheckCapacity')}
-              </Text>
-              <Pressable
-                onPress={() => void capacity.refetch()}
-                accessibilityRole="button"
-                accessibilityLabel={t('common.retry')}
-              >
-                <Text className="text-xs font-medium text-primary">{t('common.retry')}</Text>
-              </Pressable>
-            </View>
+          {canStartAnalysis ? (
+            <AnalysisCapacityNotice
+              state={capacity.state}
+              onRetry={() => void capacity.refetch()}
+            />
           ) : null}
           {canRestartAnalysis ? (
             <Button
@@ -252,11 +236,11 @@ export function FindingAnalysisPanel({
           <View className="rounded-lg bg-secondary px-3">
             <KvRow
               label={t('securityAgent.analysis.triageConfidence')}
-              value={humanize(triage.confidence)}
+              value={formatConfidence(triage.confidence)}
             />
             <KvRow
               label={t('securityAgent.analysis.suggestedAction')}
-              value={humanize(triage.suggestedAction)}
+              value={formatSuggestedAction(triage.suggestedAction)}
               last
             />
           </View>
@@ -282,7 +266,7 @@ export function FindingAnalysisPanel({
             />
             <KvRow
               label={t('securityAgent.analysis.suggestedAction')}
-              value={humanize(sandbox.suggestedAction)}
+              value={formatSuggestedAction(sandbox.suggestedAction)}
             />
             <KvRow
               label={t('common.model')}

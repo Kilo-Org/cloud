@@ -293,8 +293,15 @@ describe('startAgent failure codes', () => {
       ok: false,
       code: 'no-repository',
       retryable: false,
-      message: i18n.t('agentChat.newSession.noRepositoriesVisible'),
     });
+    // No provider is known on this path, so the message must not point the
+    // user at one provider's app or installation.
+    const message = i18n.t('appActions.start.repositoryRequired');
+    if (result.ok) {
+      throw new Error('expected a no-repository failure');
+    }
+    expect(result.message).toBe(message);
+    expect(message).not.toMatch(/GitHub|GitLab|Bitbucket/);
     expect(prepareSessionMutate).not.toHaveBeenCalled();
   });
 

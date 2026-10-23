@@ -5,12 +5,7 @@ import { type NextRequest } from 'next/server';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { extractPromptInfo } from '@kilocode/web-shared/lib/ai-gateway/extractPromptInfo';
 import { determineFallbackFeature } from '@kilocode/web-shared/lib/ai-gateway/determineFallbackFeature';
-import {
-  validateFeatureHeader,
-  FEATURE_HEADER,
-  isUserRateLimitedFeature,
-  type FeatureValue,
-} from '@kilocode/web-shared/lib/feature-detection';
+import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import type {
   OpenRouterChatCompletionRequest,
   GatewayResponsesRequest,
@@ -34,11 +29,11 @@ import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
-import { isKiloExclusiveRateLimitedModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isFreeModel,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   accountForMicrodollarUsage,
   captureProxyError,
@@ -61,6 +56,8 @@ import {
   autoRoutingUnavailableResponse,
   invalidAutoDecisionResponse,
   paidModelAuthRequiredResponse,
+  anonymousFreeModelLimitResponse,
+  accountFreeModelLimitResponse,
   temporarilyUnavailableResponse,
   creditsBlockedResponse,
   unavailableModelResponse,
@@ -85,7 +82,11 @@ import {
   isAnonymousContext,
   type AnonymousUserContext,
 } from '@kilocode/web-shared/lib/anonymous';
-import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
+import {
+  freeModelRateLimitKey,
+  isFreeModelRateLimited,
+  type FreeModelRateLimitSubject,
+} from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
   gatewayRateLimitKey,
@@ -93,7 +94,6 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { isUnavailableModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
-import { isCloudflareIP } from '@kilocode/web-shared/lib/cloudflare-ip';
 import {
   isKiloAutoModel,
   KILO_AUTO_BALANCED_MODEL,
@@ -194,25 +194,24 @@ function validatePath(
   return { errorResponse: invalidPathResponse() };
 }
 
-async function resolveFreeModelRateLimitKey(
-  feature: FeatureValue | null,
+/**
+ * Signed-in callers count per account, anonymous callers per IP. Uses the
+ * resolved auth rather than the token's claims, so a revoked token cannot spend
+ * its account's allowance: a rejected credential gets the invalid-token
+ * response instead. Auth has already resolved by the time free-model requests
+ * get here, because balance and settings wait on it.
+ */
+async function resolveFreeModelRateLimitSubject(
   ipAddress: string,
-  authPromise: Promise<{ user: { id: string } | null }>
-): Promise<NextResponseType<unknown> | string> {
-  if (isUserRateLimitedFeature(feature) && isCloudflareIP(ipAddress)) {
-    const { user } = await authPromise;
-    if (!user) {
-      return NextResponse.json(
-        {
-          error: 'Authentication required for this feature',
-          error_type: ProxyErrorType.authentication_required,
-        },
-        { status: 401 }
-      );
-    }
-    return `user:${user.id}`;
+  authPromise: ReturnType<typeof getUserFromAuth>
+): Promise<NextResponseType<unknown> | FreeModelRateLimitSubject> {
+  const { user, authFailedResponse, credentialsRejected } = await authPromise;
+  if (authFailedResponse && credentialsRejected) {
+    return invalidTokenResponse();
   }
-  return `ip:${ipAddress}`;
+  return user && !authFailedResponse
+    ? { kind: 'account', kiloUserId: user.id }
+    : { kind: 'ip', ipAddress };
 }
 
 export async function handleLlmProxyRequest(
@@ -263,18 +262,22 @@ export async function handleLlmProxyRequest(
   let requestBodyParsed: GatewayRequest;
   try {
     if (path === '/chat/completions') {
-      const body: OpenRouterChatCompletionRequest = JSON.parse(requestBodyText);
+      const body = JSON.parse(requestBodyText) as OpenRouterChatCompletionRequest;
       // Inject or merge stream_options.include_usage = true (only when streaming)
       if (body.stream) {
         body.stream_options = { ...(body.stream_options || {}), include_usage: true };
       }
       requestBodyParsed = { kind: 'chat_completions', body };
     } else if (path === '/messages') {
-      const body: GatewayMessagesRequest = JSON.parse(requestBodyText);
+      const body = JSON.parse(requestBodyText) as GatewayMessagesRequest;
       requestBodyParsed = { kind: 'messages', body };
     } else {
-      const body: GatewayResponsesRequest = JSON.parse(requestBodyText);
+      const body = JSON.parse(requestBodyText) as GatewayResponsesRequest;
       requestBodyParsed = { kind: 'responses', body };
+    }
+    // Usage accounting parses the response as SSE only when `stream` is exactly true.
+    if (requestBodyParsed.body.stream) {
+      requestBodyParsed.body.stream = true;
     }
   } catch (e) {
     return malformedJsonResponse(e);
@@ -584,6 +587,8 @@ export async function handleLlmProxyRequest(
   }
 
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
+  // Custom LLMs count as free; `getProvider` still refuses callers without access.
+  const isFreeRequestedModel = await isFreeModel(effectiveModelIdLowerCased);
 
   if (!ipAddress) {
     return NextResponse.json(
@@ -599,26 +604,18 @@ export async function handleLlmProxyRequest(
   // the report-only decide call and the usage event, which share this request.
   const clientIp = bareIpLiteral(ipAddress);
 
-  // For rate-limited Kilo-exclusive models: server-side products (cloud-agent,
-  // code-review, app-builder, gastown) rate-limit per user when the request comes
-  // from Cloudflare IPs (Kilo infrastructure). All other products rate-limit per
-  // IP (fast pre-auth path).
-  if (isKiloExclusiveRateLimitedModel(effectiveModelIdLowerCased)) {
-    const rateLimitKey = await resolveFreeModelRateLimitKey(feature, ipAddress, authPromise);
-    if (rateLimitKey instanceof NextResponse) return rateLimitKey;
+  // Custom LLMs are exempt, even when their id matches a free-model pattern.
+  if (isFreeRequestedModel && !(await isCustomLlm(effectiveModelIdLowerCased))) {
+    const rateLimitSubject = await resolveFreeModelRateLimitSubject(ipAddress, authPromise);
+    if (rateLimitSubject instanceof NextResponse) return rateLimitSubject;
 
-    if (await isFreeModelRateLimited(request, rateLimitKey)) {
+    if (await isFreeModelRateLimited(request, rateLimitSubject)) {
       console.warn(
-        `Model rate limit exceeded, ${rateLimitKey}, model: ${effectiveModelIdLowerCased}`
+        `Model rate limit exceeded, ${freeModelRateLimitKey(rateLimitSubject)}, model: ${effectiveModelIdLowerCased}, feature: ${feature ?? 'none'}`
       );
-      return NextResponse.json(
-        {
-          error: 'Rate limit exceeded',
-          error_type: ProxyErrorType.rate_limit_exceeded,
-          message: 'Model usage limit reached. Please try again later.',
-        },
-        { status: 429 }
-      );
+      return rateLimitSubject.kind === 'account'
+        ? accountFreeModelLimitResponse()
+        : anonymousFreeModelLimitResponse();
     }
   }
 
@@ -650,7 +647,7 @@ export async function handleLlmProxyRequest(
     }
 
     // No valid auth
-    if (!isFreeModel(effectiveModelIdLowerCased)) {
+    if (!isFreeRequestedModel) {
       return paidModelAuthRequiredResponse();
     }
 
@@ -726,6 +723,7 @@ export async function handleLlmProxyRequest(
             organizationId,
             provider: 'openrouter',
             requested_model: requestedModelLowerCased,
+            is_free: false,
             promptInfo: {
               system_prompt_prefix: '',
               system_prompt_length: 0,
@@ -842,6 +840,10 @@ export async function handleLlmProxyRequest(
     // instead of silently serving the request through another billing path.
     return chatGptReconnectResponse(providerResult.message);
   }
+  if (providerResult.kind === 'custom-llm-unavailable') {
+    // Same response as an unknown model id, so callers cannot probe for custom LLMs.
+    return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
+  }
   const effectiveProviderContext = providerResult;
 
   if (autoModel === ORG_AUTO_MODEL.id && routingTarget) {
@@ -893,7 +895,7 @@ export async function handleLlmProxyRequest(
 
     if (
       !canSpendPaidUsage(balance) &&
-      !isFreeModel(effectiveModelIdLowerCased) &&
+      !effectiveProviderContext.isFree &&
       !effectiveProviderContext.userByok &&
       !effectiveProviderContext.skipBalanceCheck
     ) {
@@ -924,6 +926,7 @@ export async function handleLlmProxyRequest(
     kiloUserId: user.id,
     provider: effectiveProviderContext.provider.id,
     requested_model: effectiveModelIdLowerCased,
+    is_free: effectiveProviderContext.isFree,
     promptInfo,
     max_tokens: getMaxTokens(requestBodyParsed),
     has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),
@@ -969,7 +972,7 @@ export async function handleLlmProxyRequest(
   setTag('ui.ai_model', requestBodyParsed.body.model);
 
   if (
-    hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased) &&
+    (await hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased)) &&
     isDataCollectionExplicitlyDisallowed(requestBodyParsed.body.provider)
   ) {
     return dataCollectionRequiredResponse();

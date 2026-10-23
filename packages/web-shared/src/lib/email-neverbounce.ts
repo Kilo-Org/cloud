@@ -52,7 +52,7 @@ export async function verifyEmail(
       return true;
     }
 
-    const data: NeverBounceResponse = await response.json();
+    const data = (await response.json()) as NeverBounceResponse;
 
     if (data.status !== 'success') {
       if (!options.suppressDiagnostics) {

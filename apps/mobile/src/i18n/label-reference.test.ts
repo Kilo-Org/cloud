@@ -112,7 +112,7 @@ describe('catalog copy', () => {
     for (const key of [
       'codeReviewer.reviewDetail.tokens',
       'codeReviewer.reviewDetail.transcriptLive',
-      'codeReviewer.status.running',
+      'common.running',
       'agentChat.childSession.task',
       'chat.messageActions.edit',
       'securityAgent.dismiss.reasonNotUsed',

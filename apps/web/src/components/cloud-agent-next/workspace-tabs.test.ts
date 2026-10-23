@@ -3,7 +3,6 @@ import { getWorktreeFileViewMode } from './worktree-file';
 import {
   CHAT_TAB_ID,
   addTerminalTab as addOwnedTerminalTab,
-  clearFileTabs,
   closeFileTab,
   closeTerminalTab,
   createWorkspaceTabsState,
@@ -156,17 +155,14 @@ describe('saved file tabs', () => {
     content: { status: 'available', source: 'current', text: '# Saved file\n' },
   };
 
-  it('clears selected-session files without replacing worktree terminal owners or selection', () => {
+  it('preserves worktree files and terminal owners when selecting another chat', () => {
     const terminal = addOwnedTerminalTab(createWorkspaceTabsState(), 'pty', 'workspace-original');
     const files = setFileTabMode(openFileTab(terminal, 'README.md'), 'README.md', 'preview');
-    const cleared = clearFileTabs(files);
-    expect(cleared.files).toEqual([]);
-    expect(cleared.activeTabId).toBe(CHAT_TAB_ID);
-    expect(cleared.terminals).toBe(terminal.terminals);
-    expect(clearFileTabs(selectWorkspaceTab(files, terminalTabId('pty'))).activeTabId).toBe(
-      terminalTabId('pty')
-    );
-    expect(openFileTab(cleared, 'README.md').files).toEqual([{ path: 'README.md' }]);
+    const chat = selectWorkspaceTab(files, CHAT_TAB_ID);
+    expect(chat.files).toBe(files.files);
+    expect(chat.activeTabId).toBe(CHAT_TAB_ID);
+    expect(chat.terminals).toBe(terminal.terminals);
+    expect(openFileTab(chat, 'README.md').files).toEqual([{ path: 'README.md', mode: 'preview' }]);
   });
 
   it('opens files without choosing a mode before saved data is available, then defaults to diff', () => {

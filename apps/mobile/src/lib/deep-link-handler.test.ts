@@ -71,15 +71,15 @@ const MAPPED_CASES = [
   },
   {
     path: 'https://app.kilo.ai/security-agent/findings',
-    href: '/(app)/(tabs)/(3_profile)/security-agent/personal/findings',
+    href: '/(app)/security-agent/personal/findings',
   },
   {
     path: 'https://app.kilo.ai/code-reviews/rev_9',
-    href: '/(app)/(tabs)/(3_profile)/code-reviewer/personal/reviews/rev_9',
+    href: '/(app)/code-reviewer/personal/reviews/rev_9',
   },
   {
     path: 'https://app.kilo.ai/organizations/org_1/code-reviews/rev_9',
-    href: '/(app)/(tabs)/(3_profile)/code-reviewer/org_1/reviews/rev_9',
+    href: '/(app)/code-reviewer/org_1/reviews/rev_9',
   },
 ] as const;
 

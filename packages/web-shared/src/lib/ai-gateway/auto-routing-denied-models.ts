@@ -122,21 +122,27 @@ export async function deniedAutoRoutingCandidates(
   return deniedModelIdsForCandidates(policy, uniqueCandidates, modelId => allowed.has(modelId));
 }
 
-function dataCollectionRequiredCandidates(
+async function dataCollectionRequiredCandidates(
   candidateIds: ReadonlyArray<string>,
   dataCollectionRequiredModelIds: ReadonlySet<string>
-): string[] {
-  return candidateIds.filter(
-    modelId =>
-      hasBestEffortGuessDataCollectionRequirement(modelId) ||
-      dataCollectionRequiredModelIds.has(modelId)
+): Promise<string[]> {
+  const requiresDataCollection = await Promise.all(
+    candidateIds.map(
+      async modelId =>
+        dataCollectionRequiredModelIds.has(modelId) ||
+        (await hasBestEffortGuessDataCollectionRequirement(modelId))
+    )
   );
+  return candidateIds.filter((_modelId, index) => requiresDataCollection[index]);
 }
 
 export async function dataCollectionRequiredAutoRoutingCandidates(
   candidateIds: ReadonlyArray<string>
 ): Promise<string[]> {
-  return dataCollectionRequiredCandidates(candidateIds, await getDataCollectionRequiredModelIds());
+  return await dataCollectionRequiredCandidates(
+    candidateIds,
+    await getDataCollectionRequiredModelIds()
+  );
 }
 
 export async function collectDataCollectionRequiredAutoRoutingModelIds(
@@ -147,7 +153,7 @@ export async function collectDataCollectionRequiredAutoRoutingModelIds(
     loadAutoRoutingCandidateModelIds(owner, router),
     getDataCollectionRequiredModelIds(),
   ]);
-  return dataCollectionRequiredCandidates(candidateIds, dataCollectionRequiredModelIds);
+  return await dataCollectionRequiredCandidates(candidateIds, dataCollectionRequiredModelIds);
 }
 
 // The gateway evaluation for named candidates, served to the auto-routing worker's CLI path.

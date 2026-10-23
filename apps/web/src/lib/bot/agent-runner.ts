@@ -115,7 +115,7 @@ async function buildSystemPrompt(
 }
 
 async function pickSummaryModel(modelSlug: string): Promise<string> {
-  return isFreeModel(modelSlug) ? modelSlug : SUMMARY_MODEL;
+  return (await isFreeModel(modelSlug)) ? modelSlug : SUMMARY_MODEL;
 }
 
 async function summarizePrompt(

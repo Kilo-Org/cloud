@@ -11,7 +11,7 @@ import {
   Wrench,
 } from '@/components/ui/icons';
 import { createContext, type ReactNode, useContext, useMemo } from 'react';
-import { Keyboard, Pressable, ScrollView, View } from 'react-native';
+import { Keyboard, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
@@ -391,25 +391,21 @@ export function ModelPickerOptionRow({
           <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {t('agentChat.modelSelector.thinkingEffort')}
           </Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerClassName="gap-2"
-            keyboardShouldPersistTaps="handled"
-          >
+          <View className="flex-row flex-wrap gap-2">
             {option.variants.map(thinkingVariant => {
               const active = thinkingVariant === selectedVariant;
               return (
                 <Pressable
                   key={thinkingVariant}
                   className={cn(
-                    'rounded-full px-3 py-1.5 active:opacity-70',
+                    'min-h-11 items-center justify-center rounded-full px-4 active:opacity-70',
                     active ? 'bg-foreground' : 'bg-secondary'
                   )}
                   onPress={() => {
                     onSelectVariant(thinkingVariant);
                   }}
-                  accessibilityRole="button"
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: active }}
                   accessibilityLabel={
                     active
                       ? t('agentChat.modelSelector.thinkingEffortSelected', {
@@ -431,7 +427,7 @@ export function ModelPickerOptionRow({
                 </Pressable>
               );
             })}
-          </ScrollView>
+          </View>
         </View>
       ) : null}
     </View>

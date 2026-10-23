@@ -10,6 +10,7 @@ import {
 import {
   auto_routing_custom_routers,
   organization_memberships,
+  organizations,
   type User,
 } from '@kilocode/db/schema';
 import {
@@ -24,12 +25,11 @@ import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
-import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { TRPCError } from '@trpc/server';
-import { eq, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import { NextRequest, type NextResponse } from 'next/server';
 import { GET as listRouters, POST as createRouter } from './route';
 import {
@@ -61,7 +61,6 @@ jest.mock('@kilocode/web-shared/lib/organizations/organization-models', () => ({
 }));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
-const mockedIsReleaseToggleEnabled = jest.mocked(isReleaseToggleEnabled);
 const mockedRequireActiveSubscription = jest.mocked(requireActiveSubscriptionOrTrial);
 const mockedGetStatus = jest.mocked(getCustomRouterStatus);
 const mockedRegister = jest.mocked(registerOwnerBenchmarkProfiles);
@@ -183,7 +182,6 @@ describe('/api/auto-routing/custom-routers', () => {
     jest.resetAllMocks();
     user = await insertTestUser();
     signIn(user);
-    mockedIsReleaseToggleEnabled.mockResolvedValue(true);
     mockedRequireActiveSubscription.mockResolvedValue({ isReadOnly: false, daysRemaining: 30 });
     mockedRegister.mockResolvedValue({ ok: true });
     mockedGetEnhanced.mockResolvedValue({ data: [model(SONNET), model(FLASH), model(DENIED)] });
@@ -205,23 +203,311 @@ describe('/api/auto-routing/custom-routers', () => {
     await cleanupDbForTest();
   });
 
-  describe('feature flag', () => {
-    test('a user without the flag gets router_not_found and cannot create routers', async () => {
-      mockedIsReleaseToggleEnabled.mockResolvedValue(false);
+  describe('migrated owner pools', () => {
+    test('a migrated owner edits the canonical router and keeps full router access', async () => {
+      await create(routerBody());
+      await create(routerBody({ slug: 'efficient' }));
+      await db
+        .update(auto_routing_custom_routers)
+        .set({ legacy_pool: true, legacy_mode_inherited: true })
+        .where(eq(auto_routing_custom_routers.slug, 'efficient'));
 
-      const listed = await errorOf(await listRouters(request('')));
-      const created = await create(routerBody());
-
-      expect(listed).toEqual({
-        status: 404,
-        body: { error: { code: 'router_not_found', message: expect.any(String) } },
-      });
-      expect(created.status).toBe(404);
-      expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
-      expect(mockedIsReleaseToggleEnabled).toHaveBeenCalledWith(
-        'kilo-auto-custom-routers',
-        user.id
+      const listed = await list();
+      expect(listed.body.canCreate).toBe(true);
+      expect(listed.body.routers).toEqual([
+        expect.objectContaining({ slug: 'coding', legacyPool: false, canEdit: true }),
+        expect.objectContaining({ slug: 'efficient', legacyPool: true, canEdit: true }),
+      ]);
+      expect((await create(routerBody({ slug: 'another' }))).status).toBe(201);
+      expect((await getRouter(request('/user/coding'), params('user', 'coding'))).status).toBe(200);
+      const response = await updateRouter(
+        request('/user/efficient', {
+          method: 'PATCH',
+          body: {
+            name: 'Edited pool',
+            mode: 'best_accuracy',
+            entries: [gateway(FLASH)],
+            defaultEntryKey: customRouterEntryKey(gateway(FLASH)),
+          },
+        }),
+        params('user', 'efficient')
       );
+      expect(response.status).toBe(200);
+      expect(((await response.json()) as CustomRouterResponse).router).toMatchObject({
+        slug: 'efficient',
+        name: 'Edited pool',
+        mode: 'best_accuracy',
+        legacyPool: true,
+        legacyModeInherited: false,
+        defaultEntryKey: customRouterEntryKey(gateway(FLASH)),
+      });
+    });
+
+    test('an entries-only custom edit preserves the preexisting inherited mode marker', async () => {
+      await create(routerBody({ slug: 'efficient' }));
+      await db
+        .update(auto_routing_custom_routers)
+        .set({
+          legacy_pool: true,
+          legacy_mode_inherited: true,
+        })
+        .where(eq(auto_routing_custom_routers.owned_by_user_id, user.id));
+
+      const response = await updateRouter(
+        request('/user/efficient', {
+          method: 'PATCH',
+          body: {
+            entries: [gateway(FLASH)],
+            defaultEntryKey: customRouterEntryKey(gateway(FLASH)),
+          },
+        }),
+        params('user', 'efficient')
+      );
+
+      expect(response.status).toBe(200);
+      expect(((await response.json()) as CustomRouterResponse).router).toMatchObject({
+        legacyPool: true,
+        legacyModeInherited: true,
+      });
+    });
+
+    test('preserves the migrated slug and row while allowing benchmark difficulty edits', async () => {
+      await create(routerBody({ slug: 'efficient' }));
+      await db
+        .update(auto_routing_custom_routers)
+        .set({ legacy_pool: true })
+        .where(eq(auto_routing_custom_routers.owned_by_user_id, user.id));
+
+      expect(
+        (
+          await updateRouter(
+            request('/user/efficient', {
+              method: 'PATCH',
+              body: { slug: 'renamed', name: 'Edited' },
+            }),
+            params('user', 'efficient')
+          )
+        ).status
+      ).toBe(400);
+      expect(
+        (
+          await updateRouter(
+            request('/user/efficient', { method: 'PATCH', body: { baseRouter: 'frontier' } }),
+            params('user', 'efficient')
+          )
+        ).status
+      ).toBe(200);
+      expect(
+        (
+          await deleteRouter(
+            request('/user/efficient', { method: 'DELETE' }),
+            params('user', 'efficient')
+          )
+        ).status
+      ).toBe(400);
+      const [row] = await db.select().from(auto_routing_custom_routers);
+      expect(row).toMatchObject({ slug: 'efficient', base_router: 'frontier', legacy_pool: true });
+    });
+
+    test.each(['member', 'billing_manager'] as const)(
+      'an organization %s retains existing role permissions on a migrated router',
+      async role => {
+        const organization = await createTestOrganization('Migrated', user.id, 0);
+        await create(
+          routerBody({ scope: 'org', slug: 'efficient' }),
+          `?organizationId=${organization.id}`
+        );
+        await db
+          .update(auto_routing_custom_routers)
+          .set({ legacy_pool: true })
+          .where(eq(auto_routing_custom_routers.owned_by_organization_id, organization.id));
+        const member = await insertTestUser();
+        await db.insert(organization_memberships).values({
+          organization_id: organization.id,
+          kilo_user_id: member.id,
+          role,
+        });
+        signIn(member, organization.id);
+
+        const listed = await list();
+        expect(listed.body.routers).toEqual([
+          expect.objectContaining({
+            modelId: 'kilo-auto/custom/org/efficient',
+            legacyPool: true,
+            canEdit: role === 'billing_manager',
+          }),
+        ]);
+        const response = await updateRouter(
+          request('/org/efficient', { method: 'PATCH', body: { name: 'Edited' } }),
+          params('org', 'efficient')
+        );
+        expect(response.status).toBe(role === 'billing_manager' ? 200 : 403);
+      }
+    );
+
+    test.each(['owner', 'admin', 'billing_manager'] as const)(
+      'a parent %s can discover and edit every router of its child organization',
+      async role => {
+        const parent = await createTestOrganization('Parent', user.id, 0);
+        const childOwner = await insertTestUser();
+        const child = await createTestOrganization('Child', childOwner.id, 0);
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: parent.id })
+          .where(eq(organizations.id, child.id));
+        await db
+          .update(organization_memberships)
+          .set({ role })
+          .where(eq(organization_memberships.kilo_user_id, user.id));
+        signIn(childOwner, child.id);
+        await create(routerBody({ scope: 'org', slug: 'efficient' }));
+        await create(routerBody({ scope: 'org', slug: 'unrelated-router' }));
+        await db
+          .update(auto_routing_custom_routers)
+          .set({ legacy_pool: true })
+          .where(eq(auto_routing_custom_routers.slug, 'efficient'));
+        signIn(user, child.id);
+
+        const listed = await list();
+        expect(listed.status).toBe(200);
+        expect(listed.body.canCreate).toBe(true);
+        expect(listed.body.routers).toEqual([
+          expect.objectContaining({
+            modelId: 'kilo-auto/custom/org/efficient',
+            legacyPool: true,
+            canEdit: true,
+          }),
+          expect.objectContaining({
+            modelId: 'kilo-auto/custom/org/unrelated-router',
+            legacyPool: false,
+            canEdit: true,
+          }),
+        ]);
+        mockedRequireActiveSubscription.mockClear();
+        expect(
+          (
+            await updateRouter(
+              request('/org/unrelated-router', {
+                method: 'PATCH',
+                body: { name: 'Inherited editor change' },
+              }),
+              params('org', 'unrelated-router')
+            )
+          ).status
+        ).toBe(200);
+        expect(mockedRequireActiveSubscription).toHaveBeenCalledWith(child.id);
+      }
+    );
+
+    test('a parent editor retains its effective role over a direct child member role', async () => {
+      const parent = await createTestOrganization('Parent', user.id, 0);
+      const childOwner = await insertTestUser();
+      const child = await createTestOrganization('Child', childOwner.id, 0);
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+      await db.insert(organization_memberships).values({
+        organization_id: child.id,
+        kilo_user_id: user.id,
+        role: 'member',
+      });
+      signIn(childOwner, child.id);
+      await create(routerBody({ scope: 'org', slug: 'efficient' }));
+      await db
+        .update(auto_routing_custom_routers)
+        .set({ legacy_pool: true })
+        .where(eq(auto_routing_custom_routers.owned_by_organization_id, child.id));
+      signIn(user, child.id);
+
+      expect((await list()).body.routers).toEqual([expect.objectContaining({ canEdit: true })]);
+      expect(
+        (
+          await updateRouter(
+            request('/org/efficient', { method: 'PATCH', body: { name: 'Effective owner edit' } }),
+            params('org', 'efficient')
+          )
+        ).status
+      ).toBe(200);
+    });
+
+    test('hierarchy access excludes sibling editors, parent ordinary members, and grandparent owners', async () => {
+      const parentOwner = await insertTestUser();
+      const parent = await createTestOrganization('Parent', parentOwner.id, 0);
+      const child = await createTestOrganization('Child', user.id, 0);
+      const sibling = await createTestOrganization('Sibling', parentOwner.id, 0);
+      const grandchild = await createTestOrganization('Grandchild', parentOwner.id, 0);
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, sibling.id));
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: sibling.id })
+        .where(eq(organizations.id, grandchild.id));
+      signIn(parentOwner);
+      for (const organization of [child, sibling, grandchild]) {
+        await create(
+          routerBody({ scope: 'org', slug: 'efficient' }),
+          `?organizationId=${organization.id}`
+        );
+      }
+      await db
+        .update(auto_routing_custom_routers)
+        .set({ legacy_pool: true })
+        .where(
+          inArray(auto_routing_custom_routers.owned_by_organization_id, [
+            child.id,
+            sibling.id,
+            grandchild.id,
+          ])
+        );
+      signIn(user);
+      expect((await list(`?organizationId=${child.id}`)).status).toBe(200);
+      for (const organization of [sibling, grandchild]) {
+        expect((await list(`?organizationId=${organization.id}`)).status).toBe(403);
+        expect(
+          (
+            await getRouter(
+              request(`/org/efficient?organizationId=${organization.id}`),
+              params('org', 'efficient')
+            )
+          ).status
+        ).toBe(403);
+        expect(
+          (
+            await updateRouter(
+              request(`/org/efficient?organizationId=${organization.id}`, {
+                method: 'PATCH',
+                body: { name: 'Denied' },
+              }),
+              params('org', 'efficient')
+            )
+          ).status
+        ).toBe(403);
+      }
+      const grandparentEditor = await insertTestUser();
+      await db.insert(organization_memberships).values({
+        organization_id: parent.id,
+        kilo_user_id: grandparentEditor.id,
+        role: 'owner',
+      });
+      signIn(grandparentEditor, sibling.id);
+      expect((await list()).status).toBe(200);
+      signIn(grandparentEditor, grandchild.id);
+      expect((await list()).status).toBe(403);
+      const ordinaryParentMember = await insertTestUser();
+      await db.insert(organization_memberships).values({
+        organization_id: sibling.id,
+        kilo_user_id: ordinaryParentMember.id,
+        role: 'member',
+      });
+      signIn(ordinaryParentMember, grandchild.id);
+      expect((await list()).status).toBe(403);
     });
   });
 

@@ -1,9 +1,9 @@
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
 import { AgentFormSheet } from '@/components/profiles/agent-form-sheet';
 import { type AgentSource } from '@/components/profiles/profile-agents-model';
+import { i18n } from '@/i18n';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -11,6 +11,7 @@ const h = vi.hoisted(() => ({
   useAvailableModels: vi.fn(),
   onSave: vi.fn(),
   onClose: vi.fn(),
+  confirm: vi.fn(),
 }));
 
 vi.mock('@/lib/hooks/use-available-models', () => ({
@@ -18,6 +19,7 @@ vi.mock('@/lib/hooks/use-available-models', () => ({
   thinkingEffortLabel: (variant: string) => variant,
 }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
@@ -30,6 +32,14 @@ vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'Se
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({
+    confirm: (request: unknown) => {
+      h.confirm(request);
+    },
+    dialog: null,
+  }),
+}));
 
 function agentSource(overrides: Partial<AgentSource> = {}): AgentSource {
   return {
@@ -90,15 +100,51 @@ function pressDone(root: ReactTestInstance): void {
   });
 }
 
+function pressCancel(root: ReactTestInstance): void {
+  const onCancel = voidHandler(findOne(root, 'SheetHeader').props.onCancel);
+  act(() => {
+    onCancel();
+  });
+}
+
+/** A host stub keeps the component's own props untyped; these suites call one handler each. */
+function voidHandler(value: unknown): () => void {
+  if (typeof value !== 'function') {
+    throw new TypeError('expected a handler prop');
+  }
+  return value as () => void;
+}
+
+/** The sheet's dismissal request answers whether it may close. */
+function booleanHandler(value: unknown): () => boolean {
+  if (typeof value !== 'function') {
+    throw new TypeError('expected a handler prop');
+  }
+  return value as () => boolean;
+}
+
+type ConfirmRequest = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  cancelLabel?: string;
+  onConfirm: () => void;
+};
+
+function confirmRequest(index: number): ConfirmRequest | undefined {
+  return h.confirm.mock.calls[index]?.[0];
+}
+
 function modelOption(id: string, variants: string[]) {
   return { id, name: id, variants, isPreferred: false };
 }
 
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
-function mountSheet(agent: AgentSource | null) {
+function mountSheet(agent: AgentSource | null, existingSlugs: readonly string[] = []) {
   return renderWithProviders(
     createElement(AgentFormSheet, {
       agent,
+      existingSlugs,
       organizationId: undefined,
       isSaving: false,
       onClose: () => {
@@ -122,7 +168,7 @@ describe('AgentFormSheet parity fields', () => {
 
     expect(findField(renderer.root, 'Max steps')).toBeTruthy();
     expect(findField(renderer.root, 'Temperature')).toBeTruthy();
-    expect(findField(renderer.root, 'top_p')).toBeTruthy();
+    expect(findField(renderer.root, 'Top P')).toBeTruthy();
 
     unmount();
   });
@@ -160,7 +206,7 @@ describe('AgentFormSheet parity fields', () => {
 
     changeText(renderer.root, 'Max steps', '50');
     changeText(renderer.root, 'Temperature', '0.2');
-    changeText(renderer.root, 'top_p', '0.95');
+    changeText(renderer.root, 'Top P', '0.95');
     pressDone(renderer.root);
 
     expect(h.onSave).toHaveBeenCalledTimes(1);
@@ -207,6 +253,85 @@ describe('AgentFormSheet parity fields', () => {
         String(node.props.accessibilityLabel).includes('thinking effort')
       )
     ).toBe(false);
+
+    unmount();
+  });
+
+  it('refuses an over-long description inline and keeps the sheet open', async () => {
+    const { renderer, unmount } = await mountSheet(agentSource());
+
+    changeText(renderer.root, 'Agent description', 'd'.repeat(2001));
+    pressDone(renderer.root);
+
+    expect(h.onSave).not.toHaveBeenCalled();
+    expect(findField(renderer.root, 'Agent description').props.error).toBe(
+      'Use at most 2000 characters'
+    );
+
+    unmount();
+  });
+
+  it('closes without asking when nothing changed', async () => {
+    const { renderer, unmount } = await mountSheet(agentSource());
+
+    pressCancel(renderer.root);
+
+    expect(h.onClose).toHaveBeenCalledTimes(1);
+    expect(h.confirm).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('refuses a non-ASCII slug with the character rule instead of calling it empty', async () => {
+    const { renderer, unmount } = await mountSheet(agentSource());
+
+    changeText(renderer.root, 'Agent slug', 'नमूना एजेंट स्लग');
+    pressDone(renderer.root);
+
+    expect(h.onSave).not.toHaveBeenCalled();
+    expect(findField(renderer.root, 'Agent slug').props.error).toBe(
+      'Slug must start with a lowercase ASCII letter and use only ASCII lowercase letters, digits, and dashes, up to 50 characters'
+    );
+
+    unmount();
+  });
+
+  it('asks Keep editing / Discard when Cancel would drop typed fields', async () => {
+    const { renderer, unmount } = await mountSheet(agentSource());
+
+    changeText(renderer.root, 'Max steps', '50');
+    pressCancel(renderer.root);
+
+    expect(h.onClose).not.toHaveBeenCalled();
+    expect(h.confirm).toHaveBeenCalledTimes(1);
+    const request = h.confirm.mock.calls[0]?.[0];
+    expect(request).toMatchObject({
+      title: i18n.t('common.discardChangesTitle'),
+      message: i18n.t('common.discardChangesMessage'),
+      confirmLabel: i18n.t('common.discard'),
+      cancelLabel: i18n.t('common.keepEditing'),
+    });
+
+    // Discard closes; Keep editing never reaches this callback.
+    confirmRequest(0)?.onConfirm();
+    expect(h.onClose).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('keeps Android Back while dirty for the confirm, and lets it close a clean form', async () => {
+    const { renderer, unmount } = await mountSheet(agentSource());
+    const requestDismiss = booleanHandler(
+      findOne(renderer.root, 'SessionPageSheet').props.onRequestDismiss
+    );
+
+    expect(requestDismiss()).toBe(true);
+    expect(h.confirm).not.toHaveBeenCalled();
+
+    changeText(renderer.root, 'Max steps', '50');
+    expect(requestDismiss()).toBe(false);
+    expect(h.confirm).toHaveBeenCalledTimes(1);
+    expect(h.onClose).not.toHaveBeenCalled();
 
     unmount();
   });

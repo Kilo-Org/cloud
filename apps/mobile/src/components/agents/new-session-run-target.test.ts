@@ -174,4 +174,29 @@ describe('NewSessionRunTarget', () => {
 
     expect(element).toBeNull();
   });
+
+  it('passes the pending computer state to the selector instead of the Cloud default', async () => {
+    const { NewSessionRunTarget } = await import('./new-session-run-target');
+    const props = { ...baseProps(), pendingComputer: true };
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionRunTarget(props) as Node;
+
+    expect(findElementByType(element, 'InstanceSelector')).toMatchObject({
+      value: null,
+      pendingComputer: true,
+      instances: props.instanceList,
+    });
+  });
+
+  it('omits the pending state for the ordinary Cloud entry', async () => {
+    const { NewSessionRunTarget } = await import('./new-session-run-target');
+    const props = baseProps();
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionRunTarget(props) as Node;
+
+    const selector = findElementByType(element, 'InstanceSelector');
+    expect(selector?.pendingComputer).toBeUndefined();
+  });
 });

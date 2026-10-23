@@ -1,6 +1,6 @@
 import { FlashList } from '@shopify/flash-list';
 import { reloadAppAsync } from 'expo';
-import { useFocusEffect, useNavigation } from 'expo-router';
+import { useFocusEffect, usePreventRemove } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { I18nManager, type TextInput, View, type ViewStyle } from 'react-native';
@@ -27,10 +27,11 @@ import {
   type LanguagePreference,
 } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 
 // The picker sheet renders its own scroll container (`scrollable={false}`), so
-// the list fills the sheet's body.
+// the list fills the sheet's body. The list stays transparent: the route's
+// themed `contentStyle` paints the surface (see the (auth) layout), and a
+// second opaque layer would cover the sheet's own themed surface.
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = {
   paddingHorizontal: 16,
@@ -62,32 +63,23 @@ export function LanguagePickerSheet({
   // `value`), so an emptied field is cleared through this ref rather than by
   // remounting the input.
   const searchInputRef = useRef<TextInput>(null);
-  const skipNextGuardRef = useRef(false);
+  const [closing, setClosing] = useState(false);
   const closeRequestedRef = useRef(false);
-  const navigation = useNavigation();
+  const disablePrevention = usePreventRemove((busy || restarting || reloadFailed) && !closing);
   const closePicker = useCallback(() => {
     if (closeRequestedRef.current) {
       return;
     }
     closeRequestedRef.current = true;
-    skipNextGuardRef.current = true;
+    setClosing(true);
+    disablePrevention();
     onClose();
-  }, [onClose]);
-
-  // While an apply is in flight — busy, restarting, or the reload has failed
-  // and Retry is up — a swipe-dismiss or back would close the sheet mid-change.
-  usePreventRemove(busy || restarting || reloadFailed, ({ data }) => {
-    if (skipNextGuardRef.current) {
-      skipNextGuardRef.current = false;
-      navigation.dispatch(data.action);
-    }
-    // Otherwise leave the sheet: swipe and back do not apply the change.
-  });
+  }, [disablePrevention, onClose]);
 
   useFocusEffect(
     useCallback(() => {
       closeRequestedRef.current = false;
-      skipNextGuardRef.current = false;
+      setClosing(false);
       setQuery('');
       // Empty the field imperatively instead of remounting it. A remount hands
       // the recreated native EditText the text it still holds, and the next
@@ -164,6 +156,15 @@ export function LanguagePickerSheet({
     }
   };
 
+  // The preference was persisted before the reload attempt, so a failed reload
+  // is not a failed change: Continue leaves the sheet with the saved language.
+  // Clearing the failed state first keeps the normal sheet from re-arming the
+  // guard, and `closePicker` releases the guard the failed state still holds.
+  const handleContinue = () => {
+    setReloadFailed(false);
+    closePicker();
+  };
+
   const retryReload = async () => {
     if (busy) {
       return;
@@ -184,6 +185,8 @@ export function LanguagePickerSheet({
           void retryReload();
         }}
         doneLabel={t('common.retry')}
+        onCancel={handleContinue}
+        cancelLabel={t('common.continue')}
         disabled={busy}
         scrollable={false}
       >
@@ -271,7 +274,7 @@ export function LanguagePickerSheet({
         />
       ) : (
         <FlashList
-          style={[listStyle, { backgroundColor: colors.background }]}
+          style={listStyle}
           contentContainerStyle={listContentContainerStyle}
           data={items}
           keyExtractor={item => item.key}

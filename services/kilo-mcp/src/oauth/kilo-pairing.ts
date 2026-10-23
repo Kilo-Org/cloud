@@ -34,10 +34,7 @@ export type KiloPairingDeps = {
 type ForwardedHeaderName = 'cf-connecting-ip' | 'x-forwarded-for' | 'user-agent';
 
 /**
- * Forward one client header only when it passes `forwardedClientHeadersSchema`
- * (bounded length, no CR/LF). Validating per header keeps a malformed value
- * (e.g. an oversized user-agent) from also stripping the Cloudflare-set IP
- * that apps/web rate-limits pending pairings by.
+ * Forward a request header only when it matches the shared schema.
  */
 function forwardedHeader(request: Request, name: ForwardedHeaderName): string | undefined {
   const value = request.headers.get(name);
@@ -49,12 +46,8 @@ function forwardedHeader(request: Request, name: ForwardedHeaderName): string | 
 export type KiloPairingFailure = 'rate_limited' | 'unreachable';
 
 /**
- * Create the Kilo device-auth pairing on apps/web
- * (`POST /api/device-auth/codes`, apps/web/src/app/api/device-auth/codes/route.ts).
- * apps/web rate-limits pending pairings per IP and requires the client IP in
- * production, so the incoming request's IP and user-agent are forwarded.
- * Returns both the short pairing code (shown to the user) and the device
- * secret (the polling credential kept by the worker).
+ * Create the device authorization pairing on apps/web. The web service
+ * returns a display code and a credential for the worker.
  */
 export async function createKiloPairing(
   deps: KiloPairingDeps,
@@ -83,17 +76,17 @@ export async function createKiloPairing(
   const body: unknown = await response.json().catch(() => null);
   const record =
     typeof body === 'object' && body !== null
-      ? (body as { code?: unknown; device_code?: unknown })
+      ? (body as { user_code?: unknown; device_code?: unknown })
       : undefined;
-  const code = record?.code;
+  const pairingCode = record?.user_code;
   const deviceCode = record?.device_code;
-  if (typeof code !== 'string' || code.length === 0) {
+  if (typeof pairingCode !== 'string' || pairingCode.length === 0) {
     return { ok: false, kind: 'unreachable' };
   }
   if (typeof deviceCode !== 'string' || deviceCode.length === 0) {
     return { ok: false, kind: 'unreachable' };
   }
-  return { ok: true, pairingCode: code, deviceCode };
+  return { ok: true, pairingCode, deviceCode };
 }
 
 export type KiloPollOutcome =
@@ -107,8 +100,8 @@ export type KiloPollOutcome =
  * Redeem one pairing on apps/web
  * (`POST /api/device-auth/token` with the device secret — statuses pending/
  * approved/denied/expired, apps/web/src/app/api/device-auth/token/route.ts).
- * Any transport-level or shape surprise is `unreachable`: the caller keeps the
- * user waiting and lets the next poll retry rather than failing the flow.
+ * Any transport-level or shape surprise is `unreachable`: the caller retries
+ * on the next poll rather than failing the flow.
  */
 export async function redeemKiloPairing(
   deps: Pick<KiloPairingDeps, 'webBaseUrl' | 'fetchImpl'>,

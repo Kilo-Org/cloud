@@ -2,7 +2,7 @@ import { connection, type NextRequest } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { api_request_log, kilocode_users } from '@kilocode/db/schema';
-import { and, gte, lte, eq, asc, gt, count, or, isNotNull, type SQL } from 'drizzle-orm';
+import { and, gte, lte, eq, asc, gt, count, or, isNotNull, like, type SQL } from 'drizzle-orm';
 import archiver from 'archiver';
 import { Readable } from 'node:stream';
 import { getApiRequestLogBlob } from '@kilocode/web-shared/lib/r2/api-request-log';
@@ -162,15 +162,29 @@ async function resolveUserId(userIdOrEmail: string): Promise<ResolvedUser> {
   return { ok: false, error: `No user found with email ${userIdOrEmail}`, status: 404 };
 }
 
-function buildFilter(
-  id: bigint | null,
-  userId: string | null,
-  parsedStart: Date | null,
-  parsedEnd: Date | null,
-  model: string | null,
-  sessionId: string | null,
-  errorsOnly: boolean
-) {
+function escapeLikePattern(value: string) {
+  return value.replace(/[%_\\]/g, '\\$&');
+}
+
+function buildFilter({
+  id,
+  userId,
+  organizationId,
+  parsedStart,
+  parsedEnd,
+  modelPrefix,
+  sessionId,
+  errorsOnly,
+}: {
+  id: bigint | null;
+  userId: string | null;
+  organizationId: string | null;
+  parsedStart: Date | null;
+  parsedEnd: Date | null;
+  modelPrefix: string | null;
+  sessionId: string | null;
+  errorsOnly: boolean;
+}) {
   const conditions: SQL[] = [];
   if (id !== null) {
     conditions.push(eq(api_request_log.id, id));
@@ -178,14 +192,17 @@ function buildFilter(
   if (userId) {
     conditions.push(eq(api_request_log.kilo_user_id, userId));
   }
+  if (organizationId) {
+    conditions.push(eq(api_request_log.organization_id, organizationId));
+  }
   if (parsedStart) {
     conditions.push(gte(api_request_log.created_at, parsedStart.toISOString()));
   }
   if (parsedEnd) {
     conditions.push(lte(api_request_log.created_at, parsedEnd.toISOString()));
   }
-  if (model) {
-    conditions.push(eq(api_request_log.model, model));
+  if (modelPrefix) {
+    conditions.push(like(api_request_log.model, `${escapeLikePattern(modelPrefix)}%`));
   }
   if (sessionId) {
     conditions.push(eq(api_request_log.session_id, sessionId));
@@ -214,6 +231,7 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const id = searchParams.get('id');
   const userId = searchParams.get('userId');
+  const organizationId = searchParams.get('organizationId');
   const startDate = searchParams.get('startDate');
   const startTime = searchParams.get('startTime');
   const endDate = searchParams.get('endDate');
@@ -245,15 +263,16 @@ export async function GET(request: NextRequest) {
   }
   const resolvedUserId = resolvedUser?.userId ?? null;
 
-  const filter = buildFilter(
-    parsedId,
-    resolvedUserId,
-    parsedStart.value,
-    parsedEnd.value,
-    model,
+  const filter = buildFilter({
+    id: parsedId,
+    userId: resolvedUserId,
+    organizationId,
+    parsedStart: parsedStart.value,
+    parsedEnd: parsedEnd.value,
+    modelPrefix: model,
     sessionId,
-    errorsOnly
-  );
+    errorsOnly,
+  });
 
   const [result] = await db.select({ total: count() }).from(api_request_log).where(filter);
   if (result.total === 0) {
@@ -408,13 +427,14 @@ export async function GET(request: NextRequest) {
 
   const sanitize = (value: string) => value.replaceAll(/[^a-zA-Z0-9._-]/g, '-');
   const safeUserId = userId ? sanitize(userId) : 'all-users';
+  const safeOrganizationId = organizationId ? `_org-${sanitize(organizationId)}` : '';
   const safeModel = model ? `_${sanitize(model)}` : '';
   const safeSessionId = sessionId ? `_${sanitize(sessionId)}` : '';
   const safeId = parsedId !== null ? `_id-${parsedId}` : '';
   const safeErrorsOnly = errorsOnly ? '_errors-only' : '';
   const safeStart = formatBoundaryForFilename(startDate, startTime, 'any-start');
   const safeEnd = formatBoundaryForFilename(endDate, endTime, 'any-end');
-  const filename = `api-request-log_${safeUserId}_${safeStart}_${safeEnd}${safeModel}${safeSessionId}${safeErrorsOnly}${safeId}.zip`;
+  const filename = `api-request-log_${safeUserId}${safeOrganizationId}_${safeStart}_${safeEnd}${safeModel}${safeSessionId}${safeErrorsOnly}${safeId}.zip`;
 
   return new Response(webStream, {
     headers: {

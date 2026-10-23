@@ -65,6 +65,7 @@ vi.mock('expo-router', () => ({
       navigation.current = 'caller';
     },
   }),
+  useNavigation: () => ({ addListener: () => () => undefined }),
   useFocusEffect: (effect: EffectCallback) => {
     useEffect(effect, [effect]);
   },

@@ -32,7 +32,11 @@ function forwardedHeaders(init: RequestInit | undefined): Record<string, string>
 describe('createKiloPairing', () => {
   it('POSTs to apps/web and returns the pairing code and device secret', async () => {
     const fetchImpl = fetchMock(() =>
-      Response.json({ code: 'PAIR-1', device_code: 'device-secret-1' })
+      Response.json({
+        code: 'request-value',
+        user_code: 'PAIR-1',
+        device_code: 'device-secret-1',
+      })
     );
     const result = await createKiloPairing({ webBaseUrl: WEB, fetchImpl }, authorizeRequest());
     expect(result).toEqual({ ok: true, pairingCode: 'PAIR-1', deviceCode: 'device-secret-1' });
@@ -43,9 +47,13 @@ describe('createKiloPairing', () => {
     expect(init?.body).toBe('{}');
   });
 
-  it('forwards the Cloudflare client IP and user-agent to apps/web', async () => {
+  it('forwards valid request metadata to apps/web', async () => {
     const fetchImpl = fetchMock(() =>
-      Response.json({ code: 'PAIR-1', device_code: 'device-secret-1' })
+      Response.json({
+        code: 'request-value',
+        user_code: 'PAIR-1',
+        device_code: 'device-secret-1',
+      })
     );
     await createKiloPairing(
       { webBaseUrl: WEB, fetchImpl },
@@ -56,14 +64,18 @@ describe('createKiloPairing', () => {
       })
     );
     const headers = forwardedHeaders(fetchImpl.mock.calls[0]![1]);
-    // CF-Connecting-IP is authoritative when present.
+    // The preferred forwarded value takes precedence.
     expect(headers['x-forwarded-for']).toBe('203.0.113.7');
     expect(headers['user-agent']).toBe('claude-ai/0.1.0');
   });
 
-  it('falls back to x-forwarded-for when CF-Connecting-IP is absent', async () => {
+  it('uses available request metadata when the preferred value is absent', async () => {
     const fetchImpl = fetchMock(() =>
-      Response.json({ code: 'PAIR-1', device_code: 'device-secret-1' })
+      Response.json({
+        code: 'request-value',
+        user_code: 'PAIR-1',
+        device_code: 'device-secret-1',
+      })
     );
     await createKiloPairing(
       { webBaseUrl: WEB, fetchImpl },
@@ -72,9 +84,13 @@ describe('createKiloPairing', () => {
     expect(forwardedHeaders(fetchImpl.mock.calls[0]![1])['x-forwarded-for']).toBe('198.51.100.2');
   });
 
-  it('drops a header that fails validation without dropping the rest', async () => {
+  it('drops invalid metadata without dropping other headers', async () => {
     const fetchImpl = fetchMock(() =>
-      Response.json({ code: 'PAIR-1', device_code: 'device-secret-1' })
+      Response.json({
+        code: 'request-value',
+        user_code: 'PAIR-1',
+        device_code: 'device-secret-1',
+      })
     );
     await createKiloPairing(
       { webBaseUrl: WEB, fetchImpl },
@@ -118,13 +134,21 @@ describe('createKiloPairing', () => {
     ).resolves.toEqual({ ok: false, kind: 'unreachable' });
     await expect(
       createKiloPairing(
-        { webBaseUrl: WEB, fetchImpl: fetchMock(() => Response.json({ code: '' })) },
+        {
+          webBaseUrl: WEB,
+          fetchImpl: fetchMock(() =>
+            Response.json({ code: 'request-value', user_code: '', device_code: 'device' })
+          ),
+        },
         authorizeRequest()
       )
     ).resolves.toEqual({ ok: false, kind: 'unreachable' });
     await expect(
       createKiloPairing(
-        { webBaseUrl: WEB, fetchImpl: fetchMock(() => Response.json({ code: 'PAIR-1' })) },
+        {
+          webBaseUrl: WEB,
+          fetchImpl: fetchMock(() => Response.json({ code: 'request-value', user_code: 'PAIR-1' })),
+        },
         authorizeRequest()
       )
     ).resolves.toEqual({ ok: false, kind: 'unreachable' });
@@ -157,7 +181,7 @@ describe('redeemKiloPairing', () => {
     ).resolves.toEqual({ status: 'expired' });
   });
 
-  it('returns token + userId on an approved pairing', async () => {
+  it('returns the approved response', async () => {
     const fetchImpl = fetchMock(() =>
       Response.json({ status: 'approved', token: 'kilo-jwt', userId: 'u-7' })
     );

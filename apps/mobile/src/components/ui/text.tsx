@@ -3,6 +3,9 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 import { I18nManager, Text as RNText, type Role } from 'react-native';
 
+import { useSystemFontScale } from '@/lib/font-scale/system-font-scale-context';
+import { resolveFontScaleCap } from '@/lib/font-scale/text-scale-cap';
+
 import {
   containsJoinedScript,
   hasRtlScript,
@@ -20,7 +23,7 @@ const textVariants = cva('text-foreground text-base font-medium', {
       h2: 'border-border border-b pb-2 text-3xl font-semibold tracking-tight',
       h3: 'text-2xl font-semibold tracking-tight',
       h4: 'text-xl font-semibold tracking-tight',
-      p: 'mt-3 leading-7',
+      p: 'mt-3 leading-[1.75rem]',
       blockquote: 'mt-4 border-l-2 pl-3 italic',
       code: 'bg-muted relative rounded px-[0.3rem] py-[0.2rem] font-mono-semibold text-sm',
       lead: 'text-muted-foreground text-xl',
@@ -78,11 +81,11 @@ function Text({
   variant = 'default',
   ...props
 }: React.ComponentProps<typeof RNText> &
-  TextVariantProps &
-  React.RefAttributes<RNText> & {
+  TextVariantProps & {
     asChild?: boolean;
   }) {
   const textClass = React.useContext(TextClassContext);
+  const fontScaleCap = resolveFontScaleCap(useSystemFontScale(), props.maxFontSizeMultiplier);
   const Component = asChild ? Slot.Text : RNText;
   const isRTL = I18nManager.isRTL;
   // The font family is the script's, not the interface's: JetBrains Mono ships
@@ -107,6 +110,7 @@ function Text({
       role={variant ? ROLE[variant as keyof typeof ROLE] : undefined}
       aria-level={variant ? ARIA_LEVEL[variant as keyof typeof ARIA_LEVEL] : undefined}
       {...props}
+      maxFontSizeMultiplier={fontScaleCap ?? props.maxFontSizeMultiplier}
       style={
         isRTL || resetsTracking
           ? [

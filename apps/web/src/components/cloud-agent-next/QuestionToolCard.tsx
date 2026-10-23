@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, type KeyboardEvent } from 'react';
 
 import { Loader2, Check, Send, X, AlertCircle, MessageCircleQuestion } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -106,6 +106,7 @@ function InteractiveQuestionContent({
   onToggleOption,
   onCustomInputChange,
   onToggleCustom,
+  onCustomInputKeyDown,
   showHeader = true,
 }: {
   question: QuestionInfo;
@@ -115,6 +116,7 @@ function InteractiveQuestionContent({
   onToggleOption: (label: string) => void;
   onCustomInputChange: (value: string) => void;
   onToggleCustom: () => void;
+  onCustomInputKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
   showHeader?: boolean;
 }) {
   const isMultiple = question.multiple === true;
@@ -201,6 +203,7 @@ function InteractiveQuestionContent({
                 value={customInput}
                 onClick={e => e.stopPropagation()}
                 onChange={e => onCustomInputChange(e.target.value)}
+                onKeyDown={onCustomInputKeyDown}
                 placeholder="Type your own answer..."
                 className="placeholder:text-muted-foreground/50 min-w-0 flex-1 bg-transparent font-medium outline-none"
               />
@@ -255,7 +258,6 @@ function QuestionTab({
 }
 
 export function QuestionToolCard(props: QuestionToolCardProps) {
-  // Normalize: tool-part vs standalone question
   const isStandalone = 'questions' in props;
   const questions: QuestionInfo[] = isStandalone
     ? props.questions
@@ -285,7 +287,6 @@ export function QuestionToolCard(props: QuestionToolCardProps) {
       ? questionRequestIds.get(props.toolPart.callID)
       : undefined;
 
-  // Get answers from metadata for completed state
   const completedAnswers: string[][] = (() => {
     if (isStandalone) return [];
     const { state } = props.toolPart;
@@ -367,7 +368,6 @@ export function QuestionToolCard(props: QuestionToolCardProps) {
         updated[questionIndex] = value;
         return updated;
       });
-      // Auto-select custom when user types
       if (value.length > 0) {
         setCustomSelected(prev => {
           if (prev[questionIndex]) return prev;
@@ -404,7 +404,7 @@ export function QuestionToolCard(props: QuestionToolCardProps) {
   const hasAnyAnswer = questions.some((_, i) => getEffectiveAnswers(i).length > 0);
 
   const handleSubmit = useCallback(async () => {
-    if (!requestId || isSubmitting) return;
+    if (!requestId || isSubmitting || !hasAnyAnswer) return;
 
     const answers: string[][] = questions.map((_, i) => getEffectiveAnswers(i));
 
@@ -439,10 +439,28 @@ export function QuestionToolCard(props: QuestionToolCardProps) {
     organizationId,
     questions,
     getEffectiveAnswers,
+    hasAnyAnswer,
     isSubmitting,
     trpcClient,
     ctxAnswerQuestion,
   ]);
+
+  const handleCustomInputKeyDown = useCallback(
+    (questionIndex: number, event: KeyboardEvent<HTMLInputElement>) => {
+      if (event.key !== 'Enter' || event.shiftKey) return;
+      if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+
+      event.preventDefault();
+
+      if (questionCount > 1 && questionIndex < questionCount - 1) {
+        setActiveTab(questionIndex + 1);
+        return;
+      }
+
+      void handleSubmit();
+    },
+    [questionCount, handleSubmit]
+  );
 
   const handleDismiss = useCallback(async () => {
     if (!requestId || isSubmitting) return;
@@ -525,6 +543,7 @@ export function QuestionToolCard(props: QuestionToolCardProps) {
               onToggleOption={label => handleToggleOption(activeTab, label)}
               onCustomInputChange={value => handleCustomInputChange(activeTab, value)}
               onToggleCustom={() => handleToggleCustom(activeTab)}
+              onCustomInputKeyDown={event => handleCustomInputKeyDown(activeTab, event)}
               showHeader={false}
             />
           )}
@@ -606,7 +625,6 @@ export function QuestionToolCard(props: QuestionToolCardProps) {
     );
   }
 
-  // Non-running states: use shared shell
   return (
     <ToolCardShell
       icon={MessageCircleQuestion}

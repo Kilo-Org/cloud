@@ -132,6 +132,7 @@ function createFakeStore(): OAuthStoreApi &
         kiloUserId: null,
         organizationId: null,
         kiloToken: null,
+        flowToken: input.flowToken,
         createdAt: input.createdAt,
         expiresAt: input.expiresAt,
       });
@@ -228,15 +229,24 @@ function seedAuthenticator(
   return SECRET;
 }
 
+/** The flow token every seeded pending record carries (the binding cookie). */
+const FLOW_TOKEN = 'flow-tok-seed';
+
+/** The Cookie header the seeded record's browser presents. */
+function flowCookie(id: string = 'pa-1', token: string = FLOW_TOKEN): string {
+  return `kilo_mcp_flow_${id}=${token}`;
+}
+
 async function seedPending(
   store: ReturnType<typeof createFakeStore>,
-  overrides: { id?: string; deviceAuthCode?: string; expiresAt?: string } = {}
+  overrides: { id?: string; deviceAuthCode?: string; expiresAt?: string; flowToken?: string } = {}
 ): Promise<string> {
   const id = overrides.id ?? 'pa-1';
   await store.createPendingAuthorization({
     id,
     authRequest: authRequest(),
     deviceAuthCode: overrides.deviceAuthCode ?? 'device-secret-1',
+    flowToken: overrides.flowToken ?? FLOW_TOKEN,
     createdAt: iso(-1000),
     expiresAt: overrides.expiresAt ?? iso(600_000),
   });
@@ -342,7 +352,11 @@ function flowFetch(
       if (url.endsWith(suffix)) return response();
     }
     if (url.endsWith('/api/device-auth/codes')) {
-      return Response.json({ code: 'PAIR-1', device_code: 'device-secret-1' });
+      return Response.json({
+        code: 'request-value',
+        user_code: 'PAIR-1',
+        device_code: 'device-secret-1',
+      });
     }
     if (url.endsWith('/api/device-auth/token')) {
       return Response.json({ status: 'approved', token: 'kilo-tok-1', userId: 'u-1' });
@@ -407,11 +421,10 @@ describe('GET /authorize (consent)', () => {
     const html = await response.text();
     expect(html).toContain('Connect to Kilo MCP');
     expect(html).toContain('Test Client');
+    expect(html).toContain(`${WEB}/device-auth?code=PAIR-1`);
     const id = [...store.pending.keys()][0]!;
-    // The status URL carries the internal pending id, never the device-auth code.
     expect(html).toContain(`/authorize/status?id=${id}`);
     expectPrivateStatusUrl(html, id);
-    // A leaked query parameter must fail the invariant, not just visible text.
     expect(() =>
       expectPrivateStatusUrl(
         html.replace(`/authorize/status?id=${id}`, `/authorize/status?id=${id}&code=PAIR-1`),
@@ -517,7 +530,7 @@ describe('GET /authorize (consent)', () => {
 });
 
 describe('GET /authorize/status', () => {
-  it('reports pending while the user has not approved upstream, and keeps the next poll alive', async () => {
+  it('reports pending while upstream approval is incomplete and keeps the next poll alive', async () => {
     const store = createFakeStore();
     await seedPending(store);
     const fetchImpl = flowFetch({
@@ -526,7 +539,7 @@ describe('GET /authorize/status', () => {
     const handler = createDefaultHandler(deps(store, fetchImpl));
     const response = await run(
       handler,
-      new Request(`${ISSUER}/authorize/status?id=pa-1`),
+      new Request(`${ISSUER}/authorize/status?id=pa-1`, { headers: { Cookie: flowCookie() } }),
       envWith(fakeHelpers({}).helpers)
     );
     expect(response.status).toBe(200);
@@ -549,7 +562,11 @@ describe('GET /authorize/status', () => {
     const handler = createDefaultHandler(deps(store, fetchImpl));
     const env = envWith(fakeHelpers({}).helpers);
     await expect(
-      run(handler, new Request(`${ISSUER}/authorize/status?id=pa-1`), env).then(r => r.json())
+      run(
+        handler,
+        new Request(`${ISSUER}/authorize/status?id=pa-1`, { headers: { Cookie: flowCookie() } }),
+        env
+      ).then(r => r.json())
     ).resolves.toEqual({ status: 'needs_org', picker_url: '/authorize/org?id=pa-1' });
     expect(store.pending.get('pa-1')).toMatchObject({
       kiloUserId: 'u-1',
@@ -558,7 +575,11 @@ describe('GET /authorize/status', () => {
     });
     // The token is held locally; apps/web is never asked again.
     await expect(
-      run(handler, new Request(`${ISSUER}/authorize/status?id=pa-1`), env).then(r => r.json())
+      run(
+        handler,
+        new Request(`${ISSUER}/authorize/status?id=pa-1`, { headers: { Cookie: flowCookie() } }),
+        env
+      ).then(r => r.json())
     ).resolves.toEqual({ status: 'needs_org', picker_url: '/authorize/org?id=pa-1' });
     expect(polls).toBe(1);
   });
@@ -573,7 +594,7 @@ describe('GET /authorize/status', () => {
     await expect(
       run(
         handler,
-        new Request(`${ISSUER}/authorize/status?id=pa-1`),
+        new Request(`${ISSUER}/authorize/status?id=pa-1`, { headers: { Cookie: flowCookie() } }),
         envWith(fakeHelpers({}).helpers)
       ).then(r => r.json())
     ).resolves.toEqual({ status: 'pending' });
@@ -589,11 +610,19 @@ describe('GET /authorize/status', () => {
     const handler = createDefaultHandler(deps(store, fetchImpl, { analytics }));
     const env = envWith(fakeHelpers({}).helpers);
     await expect(
-      run(handler, new Request(`${ISSUER}/authorize/status?id=pa-1`), env).then(r => r.json())
+      run(
+        handler,
+        new Request(`${ISSUER}/authorize/status?id=pa-1`, { headers: { Cookie: flowCookie() } }),
+        env
+      ).then(r => r.json())
     ).resolves.toEqual({ status: 'denied' });
     expect(store.pending.get('pa-1')?.status).toBe('denied');
     await expect(
-      run(handler, new Request(`${ISSUER}/authorize/status?id=pa-1`), env).then(r => r.json())
+      run(
+        handler,
+        new Request(`${ISSUER}/authorize/status?id=pa-1`, { headers: { Cookie: flowCookie() } }),
+        env
+      ).then(r => r.json())
     ).resolves.toEqual({ status: 'denied' });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(calls).toEqual([
@@ -612,11 +641,19 @@ describe('GET /authorize/status', () => {
     const handler = createDefaultHandler(deps(store, fetchImpl, { analytics }));
     const env = envWith(fakeHelpers({}).helpers);
     await expect(
-      run(handler, new Request(`${ISSUER}/authorize/status?id=pa-1`), env).then(r => r.json())
+      run(
+        handler,
+        new Request(`${ISSUER}/authorize/status?id=pa-1`, { headers: { Cookie: flowCookie() } }),
+        env
+      ).then(r => r.json())
     ).resolves.toEqual({ status: 'expired' });
     expect(store.pending.get('pa-1')?.status).toBe('expired');
     await expect(
-      run(handler, new Request(`${ISSUER}/authorize/status?id=pa-1`), env).then(r => r.json())
+      run(
+        handler,
+        new Request(`${ISSUER}/authorize/status?id=pa-1`, { headers: { Cookie: flowCookie() } }),
+        env
+      ).then(r => r.json())
     ).resolves.toEqual({ status: 'expired' });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(calls).toEqual([
@@ -637,7 +674,11 @@ describe('GET /authorize/status', () => {
     ).resolves.toEqual({ status: 'unknown' });
     await seedPending(store, { expiresAt: iso(-1) });
     await expect(
-      run(handler, new Request(`${ISSUER}/authorize/status?id=pa-1`), env).then(r => r.json())
+      run(
+        handler,
+        new Request(`${ISSUER}/authorize/status?id=pa-1`, { headers: { Cookie: flowCookie() } }),
+        env
+      ).then(r => r.json())
     ).resolves.toEqual({ status: 'unknown' });
   });
 
@@ -653,7 +694,7 @@ describe('GET /authorize/status', () => {
     await expect(
       run(
         handler,
-        new Request(`${ISSUER}/authorize/status?id=${id}`),
+        new Request(`${ISSUER}/authorize/status?id=${id}`, { headers: { Cookie: flowCookie() } }),
         envWith(fakeHelpers({}).helpers)
       ).then(r => r.json())
     ).resolves.toEqual({ status: 'unknown' });
@@ -664,21 +705,66 @@ describe('GET /authorize/status', () => {
     const handler = createDefaultHandler(deps(store, flowFetch()));
     const response = await run(
       handler,
-      new Request(`${ISSUER}/authorize/status?id=pa-1`, { method: 'POST' }),
+      new Request(`${ISSUER}/authorize/status?id=pa-1`, {
+        headers: { Cookie: flowCookie() },
+        method: 'POST',
+      }),
       envWith(fakeHelpers({}).helpers)
     );
     expect(response.status).toBe(405);
   });
+
+  it('answers unknown without the flow cookie, with a wrong name, or a wrong token', async () => {
+    for (const cookie of [
+      null,
+      flowCookie('pa-other', FLOW_TOKEN),
+      flowCookie('pa-1', 'wrong-tok'),
+    ]) {
+      const store = createFakeStore();
+      const id = await seedPaired(store);
+      const handler = createDefaultHandler(deps(store, flowFetch()));
+      const headers: Record<string, string> = {};
+      if (cookie !== null) headers.Cookie = cookie;
+      await expect(
+        run(
+          handler,
+          new Request(`${ISSUER}/authorize/status?id=${id}`, { headers }),
+          envWith(fakeHelpers({}).helpers)
+        ).then(r => r.json())
+      ).resolves.toEqual({ status: 'unknown' });
+      // The record is exactly as the pairing left it: the poll drove nothing.
+      expect(store.pending.get(id)).toMatchObject({
+        status: 'pending',
+        kiloUserId: 'u-1',
+        kiloToken: 'kilo-tok-1',
+      });
+    }
+  });
+
+  it('accepts the flow cookie and answers the org picker', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    const handler = createDefaultHandler(deps(store, flowFetch()));
+    await expect(
+      run(
+        handler,
+        new Request(`${ISSUER}/authorize/status?id=${id}`, {
+          headers: { Cookie: flowCookie() },
+        }),
+        envWith(fakeHelpers({}).helpers)
+      ).then(r => r.json())
+    ).resolves.toEqual({ status: 'needs_org', picker_url: `/authorize/org?id=${id}` });
+  });
 });
 
 describe('GET/POST /authorize/org', () => {
-  it('renders the personal context plus each of the user organizations', async () => {
+  it('renders the personal context plus available organizations', async () => {
     const store = createFakeStore();
     const id = await seedPaired(store);
     const handler = createDefaultHandler(deps(store, flowFetch()));
     const response = await run(
       handler,
-      new Request(`${ISSUER}/authorize/org?id=${id}`),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, { headers: { Cookie: flowCookie() } }),
       envWith(fakeHelpers({ client: clientInfo() }).helpers)
     );
     expect(response.status).toBe(200);
@@ -699,7 +785,7 @@ describe('GET/POST /authorize/org', () => {
     const handler = createDefaultHandler(deps(store, fetchImpl));
     const response = await run(
       handler,
-      new Request(`${ISSUER}/authorize/org?id=${id}`),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, { headers: { Cookie: flowCookie() } }),
       envWith(fakeHelpers({ client: clientInfo() }).helpers)
     );
     const html = await response.text();
@@ -716,7 +802,7 @@ describe('GET/POST /authorize/org', () => {
     const handler = createDefaultHandler(deps(store, fetchImpl));
     const response = await run(
       handler,
-      new Request(`${ISSUER}/authorize/org?id=${id}`),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, { headers: { Cookie: flowCookie() } }),
       envWith(fakeHelpers({ client: clientInfo() }).helpers)
     );
     expect(response.status).toBe(200);
@@ -731,13 +817,12 @@ describe('GET/POST /authorize/org', () => {
     const handler = createDefaultHandler(deps(store, flowFetch()));
     const response = await run(
       handler,
-      new Request(`${ISSUER}/authorize/org?id=pa-1`),
+      new Request(`${ISSUER}/authorize/org?id=pa-1`, { headers: { Cookie: flowCookie() } }),
       envWith(fakeHelpers({ client: clientInfo() }).helpers)
     );
     expect(response.status).toBe(400);
     const html = await response.text();
     expect(html).toMatch(/no longer valid/);
-    // The polling secret must never appear in a rendered page.
     expect(html).not.toContain('device-secret-1');
   });
 
@@ -755,7 +840,7 @@ describe('GET/POST /authorize/org', () => {
       handler,
       new Request(`${ISSUER}/authorize/org?id=${id}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded', Cookie: flowCookie() },
         body: new URLSearchParams({ organization_id: 'org-2' }).toString(),
       }),
       env
@@ -781,7 +866,7 @@ describe('GET/POST /authorize/org', () => {
       createDefaultHandler(deps(store, flowFetch())),
       new Request(`${ISSUER}/authorize/org?id=${id}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded', Cookie: flowCookie() },
         body: new URLSearchParams({ organization_id: 'personal' }).toString(),
       }),
       envWith(helpers)
@@ -802,7 +887,7 @@ describe('GET/POST /authorize/org', () => {
       createDefaultHandler(deps(store, flowFetch())),
       new Request(`${ISSUER}/authorize/org?id=${id}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded', Cookie: flowCookie() },
         body: new URLSearchParams({ organization_id: 'personal' }).toString(),
       }),
       envWith(failing.helpers)
@@ -824,7 +909,7 @@ describe('GET/POST /authorize/org', () => {
       createDefaultHandler(deps(store, flowFetch(), { analytics })),
       new Request(`${ISSUER}/authorize/org?id=${id}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded', Cookie: flowCookie() },
         body: new URLSearchParams({ organization_id: 'org-2' }).toString(),
       }),
       envWith(helpers)
@@ -852,7 +937,7 @@ describe('GET/POST /authorize/org', () => {
       createDefaultHandler(deps(store, fetchImpl, { analytics })),
       new Request(`${ISSUER}/authorize/org?id=${id}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded', Cookie: flowCookie() },
         body: new URLSearchParams({ organization_id: 'personal' }).toString(),
       }),
       envWith(helpers)
@@ -878,7 +963,7 @@ describe('GET/POST /authorize/org', () => {
       createDefaultHandler(deps(store, fetchImpl)),
       new Request(`${ISSUER}/authorize/org?id=${id}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded', Cookie: flowCookie() },
         body: new URLSearchParams({ organization_id: 'personal' }).toString(),
       }),
       envWith(helpers)
@@ -896,7 +981,7 @@ describe('GET/POST /authorize/org', () => {
       createDefaultHandler(deps(store, flowFetch())),
       new Request(`${ISSUER}/authorize/org?id=${id}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded', Cookie: flowCookie() },
         body: new URLSearchParams({ organization_id: 'org-victim' }).toString(),
       }),
       envWith(helpers)
@@ -919,7 +1004,7 @@ describe('GET/POST /authorize/org', () => {
         handler,
         new Request(`${ISSUER}/authorize/org?id=${id}`, {
           method: 'POST',
-          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          headers: { 'content-type': 'application/x-www-form-urlencoded', Cookie: flowCookie() },
           body: new URLSearchParams({ organization_id: 'org-2' }).toString(),
         }),
         env
@@ -946,7 +1031,7 @@ describe('GET/POST /authorize/org', () => {
         handler,
         new Request(`${ISSUER}/authorize/org?id=${id}`, {
           method: 'POST',
-          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          headers: { 'content-type': 'application/x-www-form-urlencoded', Cookie: flowCookie() },
           body: new URLSearchParams({ organization_id: 'org-2' }).toString(),
         }),
         env
@@ -964,7 +1049,7 @@ describe('GET/POST /authorize/org', () => {
     // retry without restarting from the MCP client.
     const status = await run(
       handler,
-      new Request(`${ISSUER}/authorize/status?id=${id}`),
+      new Request(`${ISSUER}/authorize/status?id=${id}`, { headers: { Cookie: flowCookie() } }),
       envWith(fakeHelpers({}).helpers)
     );
     await expect(status.json()).resolves.toEqual({
@@ -992,7 +1077,7 @@ describe('GET/POST /authorize/org', () => {
       createDefaultHandler(deps(store, flowFetch(), { analytics })),
       new Request(`${ISSUER}/authorize/org?id=${id}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded', Cookie: flowCookie() },
         body: new URLSearchParams({ organization_id: 'org-2' }).toString(),
       }),
       envWith(helpers)
@@ -1019,13 +1104,13 @@ describe('GET/POST /authorize/org', () => {
     ).resolves.toBe(400);
   });
 
-  it('shows the admin opt-in unchecked, with the hidden authenticator subsection', async () => {
+  it('offers the opt-in and the enroll action on the GET, with no enrollment material', async () => {
     const store = createFakeStore();
     const id = await seedPaired(store);
     const handler = createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true })));
     const response = await run(
       handler,
-      new Request(`${ISSUER}/authorize/org?id=${id}`),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, { headers: { Cookie: flowCookie() } }),
       envWith(fakeHelpers({ client: clientInfo() }).helpers)
     );
     expect(response.status).toBe(200);
@@ -1037,9 +1122,41 @@ describe('GET/POST /authorize/org', () => {
     );
     // Off by default, in every render: the option never arrives pre-checked.
     expect(html).not.toMatch(/<input[^>]*name="admin_enabled"[^>]*checked/);
-    // The subsection is hidden by default and carries the enrolment material
-    // (the secret the store just minted) plus the code field.
-    expect(html).toContain('<div id="otp-section" hidden>');
+    // A GET never carries the enrolment material: the secret is one explicit
+    // reveal action away, offered as its own form after the main one.
+    expect(html).not.toContain('id="otp-section"');
+    expect(html).not.toContain(`<code>${store.authenticators.get('u-1')?.secret}</code>`);
+    expect(html).not.toContain('otpauth://totp/');
+    expect(html).toContain(
+      '<button class="secondary" type="submit" name="enroll" value="1">Add an authenticator</button>'
+    );
+    // The store minted (or reused) the authenticator for the option row even
+    // before any reveal.
+    expect(store.ensureCalls).toBe(1);
+    // Nothing on the page names the dropped approval queue.
+    expect(html).not.toContain('queue');
+  });
+
+  it('reveals the enrollment material only to the enroll POST, minting nothing', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    const { helpers, completes } = fakeHelpers({ client: clientInfo() });
+    const handler = createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true })));
+    const response = await run(
+      handler,
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          Cookie: flowCookie(),
+        },
+        body: new URLSearchParams({ enroll: '1' }).toString(),
+      }),
+      envWith(helpers)
+    );
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('<div id="otp-section">');
     expect(html).toContain('Add an authenticator');
     expect(html).toContain(`<code>${store.authenticators.get('u-1')?.secret}</code>`);
     expect(html).toContain('<code>otpauth://totp/');
@@ -1047,21 +1164,34 @@ describe('GET/POST /authorize/org', () => {
       '<label for="otp_code">Code from your authenticator app</label>' +
         '<input id="otp_code" name="otp_code" inputmode="numeric" autocomplete="one-time-code">'
     );
-    // Nothing on the page names the dropped approval queue.
-    expect(html).not.toContain('queue');
+    // The reveal touched nothing: no grant, the record stays retryable.
+    expect(completes).toHaveLength(0);
+    expect(store.pending.get(id)?.status).toBe('pending');
   });
 
-  it('reuses the stored authenticator on a re-render instead of minting a new secret', async () => {
+  it('reuses the stored authenticator on a revealed re-render instead of minting a new secret', async () => {
     const store = createFakeStore();
     const id = await seedPaired(store);
     const handler = createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true })));
     const env = envWith(fakeHelpers({ client: clientInfo() }).helpers);
-    const first = await run(handler, new Request(`${ISSUER}/authorize/org?id=${id}`), env);
+    const post = () =>
+      run(
+        handler,
+        new Request(`${ISSUER}/authorize/org?id=${id}`, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/x-www-form-urlencoded',
+            Cookie: flowCookie(),
+          },
+          body: new URLSearchParams({ enroll: '1' }).toString(),
+        }),
+        env
+      );
+    await post();
     const secret = store.authenticators.get('u-1')?.secret;
-    const second = await run(handler, new Request(`${ISSUER}/authorize/org?id=${id}`), env);
+    const second = await post();
     expect(store.authenticators.get('u-1')?.secret).toBe(secret);
     expect(await second.text()).toContain(`<code>${secret}</code>`);
-    expect(first.status).toBe(200);
     expect(store.ensureCalls).toBe(2);
   });
 
@@ -1074,7 +1204,7 @@ describe('GET/POST /authorize/org', () => {
     const handler = createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true })));
     const response = await run(
       handler,
-      new Request(`${ISSUER}/authorize/org?id=${id}`),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, { headers: { Cookie: flowCookie() } }),
       envWith(fakeHelpers({ client: clientInfo() }).helpers)
     );
     // A throw is an internal failure of the admin option, never a reason to
@@ -1102,7 +1232,7 @@ describe('GET/POST /authorize/org', () => {
       createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true }))),
       new Request(`${ISSUER}/authorize/org?id=${id}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded', Cookie: flowCookie() },
         body: new URLSearchParams({ organization_id: 'org-2', admin_enabled: 'on' }).toString(),
       }),
       envWith(helpers)
@@ -1129,7 +1259,7 @@ describe('GET/POST /authorize/org', () => {
       createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true }))),
       new Request(`${ISSUER}/authorize/org?id=${id}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded', Cookie: flowCookie() },
         body: new URLSearchParams({ organization_id: 'org-2' }).toString(),
       }),
       envWith(helpers)
@@ -1146,7 +1276,7 @@ describe('GET/POST /authorize/org', () => {
     const handler = createDefaultHandler(deps(store, flowFetch({}, { isAdmin: false })));
     const response = await run(
       handler,
-      new Request(`${ISSUER}/authorize/org?id=${id}`),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, { headers: { Cookie: flowCookie() } }),
       envWith(fakeHelpers({ client: clientInfo() }).helpers)
     );
     expect(response.status).toBe(200);
@@ -1174,7 +1304,7 @@ describe('GET/POST /authorize/org', () => {
       createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true }))),
       new Request(`${ISSUER}/authorize/org?id=${id}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded', Cookie: flowCookie() },
         body: new URLSearchParams({
           organization_id: 'org-2',
           admin_enabled: 'on',
@@ -1200,7 +1330,7 @@ describe('GET/POST /authorize/org', () => {
       createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true }))),
       new Request(`${ISSUER}/authorize/org?id=${id}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded', Cookie: flowCookie() },
         body: new URLSearchParams({ organization_id: 'org-2', admin_enabled: 'on' }).toString(),
       }),
       envWith(helpers)
@@ -1227,7 +1357,7 @@ describe('GET/POST /authorize/org', () => {
       createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true }))),
       new Request(`${ISSUER}/authorize/org?id=${id}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded', Cookie: flowCookie() },
         body: new URLSearchParams({
           organization_id: 'org-2',
           admin_enabled: 'on',
@@ -1260,7 +1390,7 @@ describe('GET/POST /authorize/org', () => {
         handler,
         new Request(`${ISSUER}/authorize/org?id=${id}`, {
           method: 'POST',
-          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          headers: { 'content-type': 'application/x-www-form-urlencoded', Cookie: flowCookie() },
           body: new URLSearchParams({
             organization_id: 'org-2',
             admin_enabled: 'on',
@@ -1287,7 +1417,7 @@ describe('GET/POST /authorize/org', () => {
     const handler = createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true })));
     const response = await run(
       handler,
-      new Request(`${ISSUER}/authorize/org?id=${id}`),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, { headers: { Cookie: flowCookie() } }),
       envWith(fakeHelpers({ client: clientInfo() }).helpers)
     );
     expect(response.status).toBe(200);
@@ -1309,7 +1439,7 @@ describe('GET/POST /authorize/org', () => {
       createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true }))),
       new Request(`${ISSUER}/authorize/org?id=${id}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded', Cookie: flowCookie() },
         // No otp_code at all: the verified authenticator's checkbox is the gate.
         body: new URLSearchParams({ organization_id: 'org-2', admin_enabled: 'on' }).toString(),
       }),
@@ -1334,7 +1464,7 @@ describe('GET/POST /authorize/org', () => {
       createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true }))),
       new Request(`${ISSUER}/authorize/org?id=${id}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded', Cookie: flowCookie() },
         body: new URLSearchParams({ organization_id: 'org-2' }).toString(),
       }),
       envWith(helpers)
@@ -1356,7 +1486,7 @@ describe('GET/POST /authorize/org', () => {
       createDefaultHandler(deps(store, flowFetch({}, { isAdmin: false }))),
       new Request(`${ISSUER}/authorize/org?id=${id}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded', Cookie: flowCookie() },
         body: new URLSearchParams({
           organization_id: 'org-2',
           admin_enabled: 'on',
@@ -1381,7 +1511,7 @@ describe('GET/POST /authorize/org', () => {
       createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true }))),
       new Request(`${ISSUER}/authorize/org?id=${id}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded', Cookie: flowCookie() },
         // Even a valid code is ignored without the opt-in.
         body: new URLSearchParams({
           organization_id: 'org-2',
@@ -1412,7 +1542,7 @@ describe('GET/POST /authorize/org', () => {
     // checkbox is absent, and the notice tells the user to reload.
     const page = await run(
       handler,
-      new Request(`${ISSUER}/authorize/org?id=${id}`),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, { headers: { Cookie: flowCookie() } }),
       envWith(fakeHelpers({ client: clientInfo() }).helpers)
     );
     expect(page.status).toBe(200);
@@ -1441,7 +1571,7 @@ describe('GET/POST /authorize/org', () => {
       handler,
       new Request(`${ISSUER}/authorize/org?id=${id}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded', Cookie: flowCookie() },
         body: new URLSearchParams({ organization_id: 'org-2', admin_enabled: 'on' }).toString(),
       }),
       envWith(helpers)
@@ -1476,7 +1606,7 @@ describe('GET/POST /authorize/org', () => {
         createDefaultHandler(deps(store, fetchImpl)),
         new Request(`${ISSUER}/authorize/org?id=${id}`, {
           method: 'POST',
-          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          headers: { 'content-type': 'application/x-www-form-urlencoded', Cookie: flowCookie() },
           body: new URLSearchParams({
             organization_id: 'org-2',
             admin_enabled: 'on',
@@ -1511,7 +1641,7 @@ describe('GET/POST /authorize/org', () => {
       createDefaultHandler(deps(store, fetchImpl)),
       new Request(`${ISSUER}/authorize/org?id=${id}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded', Cookie: flowCookie() },
         body: new URLSearchParams({ organization_id: 'org-2' }).toString(),
       }),
       envWith(helpers)
@@ -1534,7 +1664,7 @@ describe('GET/POST /authorize/org', () => {
         createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true }))),
         new Request(`${ISSUER}/authorize/org?id=${id}`, {
           method: 'POST',
-          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          headers: { 'content-type': 'application/x-www-form-urlencoded', Cookie: flowCookie() },
           body: body.toString(),
         }),
         envWith(helpers)
@@ -1543,6 +1673,109 @@ describe('GET/POST /authorize/org', () => {
       expect(completes).toHaveLength(1);
       expect(completes[0]?.props).toMatchObject({ adminEnabled: false });
     }
+  });
+
+  it('serves the stale-error page without the flow cookie, even for a valid record and org choice', async () => {
+    for (const method of ['GET', 'POST'] as const) {
+      const store = createFakeStore();
+      const id = await seedPaired(store);
+      const { helpers, completes } = fakeHelpers({ client: clientInfo() });
+      const response = await run(
+        createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true }))),
+        new Request(`${ISSUER}/authorize/org?id=${id}`, {
+          method,
+          ...(method === 'POST'
+            ? {
+                headers: { 'content-type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                  organization_id: 'org-2',
+                  admin_enabled: 'on',
+                }).toString(),
+              }
+            : {}),
+        }),
+        envWith(helpers)
+      );
+      // Indistinguishable from an expired id: nothing about the record or its
+      // admin option leaks.
+      expect(response.status).toBe(400);
+      expect(await response.text()).toMatch(/no longer valid/);
+      expect(completes).toHaveLength(0);
+      expect(store.pending.get(id)?.status).toBe('pending');
+    }
+  });
+
+  it('rejects a wrong flow token like a missing one and mints nothing', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    seedAuthenticator(store, 'u-1');
+    const { helpers, completes } = fakeHelpers({ client: clientInfo() });
+    const response = await run(
+      createDefaultHandler(deps(store, flowFetch({}, { isAdmin: true }))),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          // The record's own cookie name with a token that is not its own.
+          Cookie: flowCookie(id, 'wrong-tok'),
+        },
+        body: new URLSearchParams({
+          organization_id: 'org-2',
+          admin_enabled: 'on',
+          enroll: '1',
+        }).toString(),
+      }),
+      envWith(helpers)
+    );
+    expect(response.status).toBe(400);
+    expect(await response.text()).toMatch(/no longer valid/);
+    expect(completes).toHaveLength(0);
+    expect(store.pending.get(id)?.status).toBe('pending');
+    // Not even the enrollment reveal ran for the wrong cookie.
+    expect(store.ensureCalls).toBe(0);
+  });
+});
+
+describe('GET /authorize (flow cookie)', () => {
+  it('sets the record-scoped binding cookie and stores the same token on the record', async () => {
+    const store = createFakeStore();
+    const { helpers } = fakeHelpers({ authRequest: authRequest(), client: clientInfo() });
+    const handler = createDefaultHandler(deps(store, flowFetch()));
+    const response = await run(handler, authorizeRequestFor(), envWith(helpers));
+    expect(response.status).toBe(200);
+    const setCookie = response.headers.get('Set-Cookie');
+    const id = [...store.pending.keys()][0]!;
+    // The name carries the record id, so concurrent flows in one browser keep
+    // separate cookies instead of overwriting each other.
+    expect(setCookie).toContain(`kilo_mcp_flow_${id}=`);
+    expect(setCookie).toContain('HttpOnly');
+    expect(setCookie).toContain('Secure');
+    expect(setCookie).toContain('SameSite=Lax');
+    expect(setCookie).toContain('Path=/');
+    const token = setCookie?.match(new RegExp(`kilo_mcp_flow_${id}=([^;]+)`))?.[1];
+    expect(token).toBeDefined();
+    const record = [...store.pending.values()][0];
+    expect(record?.flowToken).toBe(token);
+    expect(record?.flowToken.length).toBeGreaterThan(0);
+  });
+
+  it('gives two concurrent flows separate cookie names and tokens', async () => {
+    const store = createFakeStore();
+    const { helpers } = fakeHelpers({ authRequest: authRequest(), client: clientInfo() });
+    const handler = createDefaultHandler(deps(store, flowFetch()));
+    const first = await run(handler, authorizeRequestFor(), envWith(helpers));
+    const second = await run(handler, authorizeRequestFor(), envWith(helpers));
+    const [idA, idB] = [...store.pending.keys()];
+    const cookieA = first.headers.get('Set-Cookie')?.match(/kilo_mcp_flow_[^=]+/)?.[0];
+    const cookieB = second.headers.get('Set-Cookie')?.match(/kilo_mcp_flow_[^=]+/)?.[0];
+    expect(cookieA).toBe(`kilo_mcp_flow_${idA}`);
+    expect(cookieB).toBe(`kilo_mcp_flow_${idB}`);
+    expect(cookieA).not.toBe(cookieB);
+    // Each record's cookie carries its own token.
+    const tokenA = first.headers.get('Set-Cookie')?.match(/=([^;]+)/)?.[1];
+    const tokenB = second.headers.get('Set-Cookie')?.match(/=([^;]+)/)?.[1];
+    expect(store.pending.get(idA!)?.flowToken).toBe(tokenA);
+    expect(store.pending.get(idB!)?.flowToken).toBe(tokenB);
   });
 });
 

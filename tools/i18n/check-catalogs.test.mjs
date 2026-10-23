@@ -181,6 +181,99 @@ test('rejects an empty translated value', context => {
   assert.match(result.stderr, /mobile\/ru: "agents\.title" is empty/);
 });
 
+test('rejects a trailing space that English does not carry', context => {
+  const result = runChecker(context, {
+    translated: { agents: { ...TRANSLATED.agents, title: 'Localized agents ' } },
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /mobile\/ru: "agents\.title" leading or trailing space differs/);
+});
+
+test('accepts a locale-owned separator in the login legal sentence', context => {
+  // A catalog that does not separate words with spaces abuts the prefix, the
+  // Terms link and the conjunction, so its values carry no edge whitespace
+  // where English has one.
+  const english = {
+    login: {
+      termsPrefix: 'By continuing you agree to our ',
+      terms: 'Terms',
+      termsConnector: ' and ',
+    },
+  };
+  const result = runChecker(context, {
+    language: 'zh-Hans',
+    english,
+    translated: {
+      login: { termsPrefix: '继续即表示你同意我们的', terms: '条款', termsConnector: '和' },
+    },
+    source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('still rejects separator whitespace elsewhere in the same catalog', context => {
+  const english = { login: { termsPrefix: 'By continuing you agree to our ', terms: 'Terms' } };
+  const result = runChecker(context, {
+    language: 'zh-Hans',
+    english,
+    translated: { login: { termsPrefix: '继续即表示你同意我们的', terms: '条款 ' } },
+    source: "t('login.termsPrefix'); t('login.terms');",
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /mobile\/zh-Hans: "login\.terms" leading or trailing space differs/);
+});
+
+for (const [name, termsPrefix, termsConnector] of [
+  ['a dropped separator in a spaced catalog', 'Unsere', ' und '],
+  ['a padded prefix beside a bare conjunction', 'Unsere ', 'und'],
+]) {
+  test(`rejects ${name}`, context => {
+    const english = {
+      login: {
+        termsPrefix: 'By continuing you agree to our ',
+        terms: 'Terms',
+        termsConnector: ' and ',
+      },
+    };
+    const result = runChecker(context, {
+      language: 'de',
+      english,
+      translated: { login: { termsPrefix, terms: 'Bedingungen', termsConnector } },
+      source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
+    });
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(
+      result.stderr,
+      /mobile\/de: "login\.termsPrefix" and "login\.termsConnector" disagree about their separator/
+    );
+  });
+}
+
+test('accepts a spaced catalog that pads both separator keys', context => {
+  const english = {
+    login: {
+      termsPrefix: 'By continuing you agree to our ',
+      terms: 'Terms',
+      termsConnector: ' and ',
+    },
+  };
+  const result = runChecker(context, {
+    language: 'de',
+    english,
+    translated: {
+      login: {
+        termsPrefix: 'Wenn du fortfährst, akzeptierst du unsere ',
+        terms: 'Bedingungen',
+        termsConnector: ' und ',
+      },
+    },
+    source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
 test('rejects a translated $TOKEN expansion token', context => {
   const result = runChecker(context, {
     english: { agents: { template: 'Explain $ARGUMENTS' } },
@@ -215,5 +308,288 @@ test('rejects unknown placeholders in a locale-specific plural category', contex
   assert.match(
     result.stderr,
     /mobile\/ru: "agents\.liveCount_few" uses placeholder \{\{total\}\}, which the English family does not/
+  );
+});
+
+/**
+ * A counted form may say its number in a word instead of the placeholder, but
+ * only where the allowlist names that key, category and locale: Arabic names
+ * one day and two days with their own word forms. Every other form of the same
+ * family still has to keep its count, so a deleted number stays visible.
+ */
+const WORDED_ENGLISH = {
+  securityAgent: {
+    dashboard: {
+      title: 'Dashboard',
+      daysOverdue_one: '{{displayCount}} day overdue',
+      daysOverdue_other: '{{displayCount}} days overdue',
+    },
+  },
+};
+const WORDED_SOURCE =
+  "t('securityAgent.dashboard.title');\nt('securityAgent.dashboard.daysOverdue', { count: 2 });";
+const WORDED_TRANSLATED = {
+  securityAgent: {
+    dashboard: {
+      title: 'لوحة المعلومات',
+      daysOverdue_zero: 'لا تأخير',
+      daysOverdue_one: 'متأخرة يومًا واحدًا',
+      daysOverdue_two: 'متأخرة يومين',
+      daysOverdue_few: 'متأخرة {{displayCount}} أيام',
+      daysOverdue_many: 'متأخرة {{displayCount}} يومًا',
+      daysOverdue_other: 'متأخرة {{displayCount}} يوم',
+    },
+  },
+};
+
+test('accepts the reviewed plural forms that say their count in a word', context => {
+  const result = runChecker(context, {
+    english: WORDED_ENGLISH,
+    translated: WORDED_TRANSLATED,
+    source: WORDED_SOURCE,
+    language: 'ar',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('rejects a dropped count in an unreviewed locale-only plural form', context => {
+  const result = runChecker(context, {
+    english: WORDED_ENGLISH,
+    translated: {
+      securityAgent: {
+        dashboard: {
+          ...WORDED_TRANSLATED.securityAgent.dashboard,
+          daysOverdue_few: 'متأخرة أيام',
+        },
+      },
+    },
+    source: WORDED_SOURCE,
+    language: 'ar',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ar: "securityAgent\.dashboard\.daysOverdue_few" drops \{\{displayCount\}\} without a reviewed worded form/
+  );
+});
+
+test('rejects a dropped count in a plural form the allowlist does not name', context => {
+  const result = runChecker(context, {
+    english: WORDED_ENGLISH,
+    translated: {
+      securityAgent: {
+        dashboard: {
+          ...WORDED_TRANSLATED.securityAgent.dashboard,
+          daysOverdue_other: 'متأخرة يوم',
+        },
+      },
+    },
+    source: WORDED_SOURCE,
+    language: 'ar',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ar: "securityAgent\.dashboard\.daysOverdue_other" placeholders differ from English \(displayCount\)/
+  );
+});
+
+test('rejects a plural sibling that drops a value other than its count', context => {
+  const result = runChecker(context, {
+    english: {
+      agents: {
+        title: 'Agents',
+        window: '{{displayCount}} days from {{start}}',
+        window_one: '{{displayCount}} day from {{start}}',
+        window_other: '{{displayCount}} days from {{start}}',
+      },
+    },
+    translated: {
+      agents: {
+        title: 'Localized agents',
+        window: '{{displayCount}} дней с {{start}}',
+        window_one: 'один день ({{displayCount}})',
+        window_few: '{{displayCount}} дня с {{start}}',
+        window_many: '{{displayCount}} дней с {{start}}',
+        window_other: '{{displayCount}} дней с {{start}}',
+      },
+    },
+    source: "t('agents.title');\nt('agents.window', { count: 2 });",
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ru: "agents\.window_one" placeholders differ from English \(displayCount,start\)/
+  );
+});
+
+const COUNTED = {
+  counts: {
+    items: '{{count}} items',
+    itemsShort: '{{count}}i',
+  },
+};
+const COUNTED_SOURCE = "t('counts.items', { count: 2 });\nt('counts.itemsShort', { count: 2 });";
+
+test('accepts a locale-declared family for a flat counted English key', context => {
+  const result = runChecker(context, {
+    english: COUNTED,
+    translated: {
+      counts: {
+        items: '{{count}} lokal',
+        items_one: '{{count}} lokal',
+        items_few: '{{count}} lokala',
+        items_many: '{{count}} lokala',
+        items_other: '{{count}} lokala',
+        itemsShort: '{{count}}l',
+      },
+    },
+    source: COUNTED_SOURCE,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('accepts a flat counted key kept untranslated to a family in another locale', context => {
+  const result = runChecker(context, {
+    english: COUNTED,
+    translated: { counts: { items: '{{count}} lokala', itemsShort: '{{count}}l' } },
+    source: COUNTED_SOURCE,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('rejects an incomplete locale-declared family for a counted key', context => {
+  const result = runChecker(context, {
+    english: COUNTED,
+    translated: {
+      counts: {
+        items: '{{count}} lokal',
+        items_one: '{{count}} lokal',
+        itemsShort: '{{count}}l',
+      },
+    },
+    source: COUNTED_SOURCE,
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ru: plural family "counts\.items" lacks the other category of ru/
+  );
+});
+
+test('rejects a wrong placeholder in a locale-declared counted family', context => {
+  const result = runChecker(context, {
+    english: COUNTED,
+    translated: {
+      counts: {
+        items: '{{count}} lokal',
+        items_one: '{{total}} lokal',
+        items_other: '{{total}} lokala',
+        itemsShort: '{{count}}l',
+      },
+    },
+    source: COUNTED_SOURCE,
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ru: "counts\.items_one" uses placeholder \{\{total\}\}, which the English family does not/
+  );
+});
+
+test('still rejects an unrelated extra key beside a counted family', context => {
+  const result = runChecker(context, {
+    english: COUNTED,
+    translated: {
+      counts: {
+        items: '{{count}} lokal',
+        items_one: '{{count}} lokal',
+        items_other: '{{count}} lokala',
+        itemsShort: '{{count}}l',
+        stray: 'extra',
+      },
+    },
+    source: COUNTED_SOURCE,
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /mobile\/ru: extra key "counts\.stray" is not in en\.json/);
+});
+
+const AGENT_EDITOR = {
+  agents: { title: 'Agents' },
+  profiles: {
+    agents: {
+      visibilityPrimary: 'Primary — in the picker',
+      visibilitySubagent: 'Subagent — callable from others',
+      visibilityAll: 'All — both',
+      topP: 'Top P',
+    },
+  },
+};
+const AGENT_EDITOR_TRANSLATED = {
+  agents: { title: 'Агенты' },
+  profiles: {
+    agents: {
+      visibilityPrimary: 'Основной — в списке',
+      visibilitySubagent: 'Субагент — только извне',
+      visibilityAll: 'Все — оба',
+      topP: 'Top P',
+    },
+  },
+};
+const AGENT_EDITOR_SOURCE = [
+  "t('agents.title');",
+  "t('profiles.agents.visibilityPrimary');",
+  "t('profiles.agents.visibilitySubagent');",
+  "t('profiles.agents.visibilityAll');",
+  "t('profiles.agents.topP');",
+].join('\n');
+
+test('accepts one spaced em dash in every agent-editor visibility option', context => {
+  const result = runChecker(context, {
+    english: AGENT_EDITOR,
+    translated: AGENT_EDITOR_TRANSLATED,
+    source: AGENT_EDITOR_SOURCE,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('rejects a visibility option whose label and description use a hyphen', context => {
+  const result = runChecker(context, {
+    english: AGENT_EDITOR,
+    translated: {
+      ...AGENT_EDITOR_TRANSLATED,
+      profiles: {
+        agents: { ...AGENT_EDITOR_TRANSLATED.profiles.agents, visibilityAll: 'Все - оба' },
+      },
+    },
+    source: AGENT_EDITOR_SOURCE,
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ru: "profiles\.agents\.visibilityAll" must join its label and description with " — "/
+  );
+});
+
+test('rejects a catalog that translates the sampling parameter label', context => {
+  const result = runChecker(context, {
+    english: AGENT_EDITOR,
+    translated: {
+      ...AGENT_EDITOR_TRANSLATED,
+      profiles: {
+        agents: { ...AGENT_EDITOR_TRANSLATED.profiles.agents, topP: 'Верхний P' },
+      },
+    },
+    source: AGENT_EDITOR_SOURCE,
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ru: "profiles\.agents\.topP" must read "Top P" in every catalog/
   );
 });

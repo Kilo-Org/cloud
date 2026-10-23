@@ -31,11 +31,12 @@ function noopOnChange(value: string): void {
 }
 
 describe('SegmentedControl', () => {
-  // Regression: "Commit and push" is wider than "Leave changes", so a wrapping
-  // label made the two segments render at unequal height and weight (new-task
-  // "Changes" control, 720x1600). Every label must stay on one line; the
-  // platform shrinks the font to fit instead of wrapping.
-  it('keeps every segment label on a single line', () => {
+  // Regression: the period control on the spend-alerts screen rendered the Hindi
+  // option "7 दिन" as "7". The label was pinned to one line with
+  // `adjustsFontSizeToFit`, and a label that the font shrink could not fit was
+  // cut with no ellipsis. Every option must keep its full label: no line cap, no
+  // font shrink, and a segment that lets the label wrap instead of clipping it.
+  it('never truncates or shrinks an option label', () => {
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const element = SegmentedControl({
       accessibilityLabel: 'Changes',
@@ -53,8 +54,14 @@ describe('SegmentedControl', () => {
       'Commit and push',
     ]);
     for (const label of labels) {
-      expect(label.props?.numberOfLines).toBe(1);
-      expect(label.props?.adjustsFontSizeToFit).toBe(true);
+      expect(label.props?.numberOfLines).toBeUndefined();
+      expect(label.props?.adjustsFontSizeToFit).toBeFalsy();
+    }
+
+    // A centred Text child is sized to its content, so a long label would
+    // overflow its segment instead of wrapping onto a second line.
+    for (const segment of collectByType(element, 'Pressable')) {
+      expect(String(segment.props?.className)).not.toContain('items-center');
     }
   });
 });

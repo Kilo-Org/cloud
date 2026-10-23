@@ -1,6 +1,7 @@
 import type { WorkerDb } from '@kilocode/db';
 import {
   agent_environment_profile_mcp_servers,
+  agent_environment_profiles,
   type AgentEnvironmentProfileMcpServer,
 } from '@kilocode/db/schema';
 import { and, eq, count } from 'drizzle-orm';
@@ -204,8 +205,13 @@ function toMaskedConfig(
   };
 }
 
-async function assertMcpServerLimit(db: WorkerDb, profileId: string): Promise<void> {
-  const [row] = await db
+type McpServerWriteTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
+
+async function assertMcpServerLimit(
+  tx: McpServerWriteTransaction,
+  profileId: string
+): Promise<void> {
+  const [row] = await tx
     .select({ n: count() })
     .from(agent_environment_profile_mcp_servers)
     .where(eq(agent_environment_profile_mcp_servers.profile_id, profileId));
@@ -277,23 +283,34 @@ export async function createMcpServer(
   owner: ProfileOwner
 ): Promise<{ id: string }> {
   await verifyProfileOwnership(db, profileId, owner);
-  await assertMcpServerLimit(db, profileId);
 
   const config = buildStoredConfig(publicKeyBase64, input);
 
-  const [server] = await db
-    .insert(agent_environment_profile_mcp_servers)
-    .values({
-      profile_id: profileId,
-      name: input.name,
-      type: input.type,
-      enabled: input.enabled ?? true,
-      timeout: input.timeout ?? null,
-      config,
-    })
-    .returning({ id: agent_environment_profile_mcp_servers.id });
+  return await db.transaction(async tx => {
+    // Lock the owning profile row so the cap count and the insert are one
+    // serialized unit, keeping concurrent creates within the per-profile cap.
+    await tx
+      .select({ id: agent_environment_profiles.id })
+      .from(agent_environment_profiles)
+      .where(eq(agent_environment_profiles.id, profileId))
+      .for('update');
 
-  return { id: server.id };
+    await assertMcpServerLimit(tx, profileId);
+
+    const [server] = await tx
+      .insert(agent_environment_profile_mcp_servers)
+      .values({
+        profile_id: profileId,
+        name: input.name,
+        type: input.type,
+        enabled: input.enabled ?? true,
+        timeout: input.timeout ?? null,
+        config,
+      })
+      .returning({ id: agent_environment_profile_mcp_servers.id });
+
+    return { id: server.id };
+  });
 }
 
 export async function updateMcpServer(

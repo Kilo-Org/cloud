@@ -808,7 +808,8 @@ test('conversation remount loads current storage instead of cached query history
     await context.route('https://app.kilo.ai/api/device-auth/codes?app=1', route =>
       route.fulfill({
         json: {
-          code: 'ABCD-2345',
+          code: 'request-value',
+          user_code: 'ABCD-2345',
           device_code: 'base64url-device-secret',
           verificationUrl: 'https://example.com/device-auth?code=ABCD-2345',
         },
@@ -817,7 +818,7 @@ test('conversation remount loads current storage instead of cached query history
     );
     await context.route(/\/api\/device-auth\/token$/, route =>
       route.fulfill({
-        json: { token: 'token-2', userEmail: 'user@kilo.ai' },
+        json: { token: 'token-2', userEmail: 'user@example.com' },
         status: 200,
       })
     );

@@ -915,7 +915,7 @@ describe('organizations trpc router', () => {
           organizationId: testOrganization.id,
           name: longName,
         })
-      ).rejects.toThrow('Organization name must be less than 100 characters');
+      ).rejects.toThrow('Organization name must be 100 characters or fewer');
     });
 
     it('should trim whitespace from organization name', async () => {

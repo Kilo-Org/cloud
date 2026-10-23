@@ -2,11 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AUTO_ROUTING_DENIED_MODELS_PATH,
   CUSTOM_ROUTER_DECIDE_PATH,
+  CUSTOM_ROUTER_EVAL_CASE_PATH,
   CUSTOM_ROUTER_EVAL_PLAN_PATH,
   CUSTOM_ROUTER_EVAL_RESULT_PATH,
   CUSTOM_ROUTER_TABLE_PATH,
   CustomRouterDecideResponseSchema,
   verifyAutoDecision,
+  type AutoRoutingMode,
   type CustomRouterDefinition,
   type CustomRouterEntry,
   type MirrorPayload,
@@ -28,6 +30,7 @@ import { app } from './index';
 
 const findCustomRouter = vi.hoisted(() => vi.fn());
 const findCustomRouterById = vi.hoisted(() => vi.fn());
+const findLegacyPoolRouter = vi.hoisted(() => vi.fn());
 const classifyNormalizedInput = vi.hoisted(() => vi.fn());
 const findOrganizationMemberRole = vi.hoisted(() => vi.fn());
 const findOrganizationMemberBalanceRow = vi.hoisted(() => vi.fn());
@@ -40,6 +43,7 @@ vi.mock('./custom-router-store', async importOriginal => ({
   ...(await importOriginal<typeof CustomRouterStoreModule>()),
   findCustomRouter,
   findCustomRouterById,
+  findLegacyPoolRouter,
 }));
 
 vi.mock('./model-classifier', async importOriginal => ({
@@ -177,6 +181,8 @@ const classification = {
 const benchmarkFetch = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>();
 const recordUsage = vi.fn(async (_usage: UsageRecordRequest) => {});
 const cacheIdFromName = vi.fn((name: string) => name);
+const platformModes = new Map<string, AutoRoutingMode>();
+const getPlatformMode = vi.fn(async (key: string) => platformModes.get(key) ?? null);
 let customTable: RoutingTable | null = rankedTable;
 
 const env = {
@@ -198,6 +204,17 @@ const env = {
       recordClassifierUsage: recordUsage,
       putEntry: async () => {},
       putStickyDecision: async () => {},
+    }),
+  },
+  AUTO_ROUTING_MODE_CONFIG: {
+    idFromName: (name: string) => name,
+    get: (key: string) => ({
+      getMode: () => getPlatformMode(key),
+      setMode: async (mode: AutoRoutingMode | null) => {
+        if (mode === null) platformModes.delete(key);
+        else platformModes.set(key, mode);
+      },
+      getSettings: async () => ({ mode: platformModes.get(key) ?? null, pool: null }),
     }),
   },
 };
@@ -242,6 +259,38 @@ async function post(path: string, body: unknown, headers: Record<string, string>
   );
 }
 
+// A request body that reports whether the handler consumed it. A ReadableStream fills its
+// queue on construction, so a pull counter cannot distinguish consumption; `bodyUsed` can.
+function streamingBody() {
+  const text = JSON.stringify({ routerId: '11111111-1111-4111-8111-111111111111' });
+  return new Response(text).body as ReadableStream<Uint8Array>;
+}
+
+async function postStream(
+  path: string,
+  body: ReadableStream<Uint8Array>,
+  headers: Record<string, string> = {}
+) {
+  const request = new Request(`https://auto-routing.example.com${path}`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${await userToken()}`,
+      'content-type': 'application/json',
+      ...headers,
+    },
+    body,
+    duplex: 'half',
+  } as RequestInit);
+  const res = await app.request(request, undefined, env, executionCtx);
+  return { res, bodyUsed: request.bodyUsed };
+}
+
+// Pads a request object with an unknown field, which the contracts strip, to an exact body size.
+function paddedBody(value: Record<string, unknown>, bytes: number) {
+  const base = JSON.stringify({ ...value, padding: '' }).length;
+  return { ...value, padding: 'x'.repeat(bytes - base) };
+}
+
 function decideBody(overrides: Record<string, unknown> = {}) {
   return {
     model: 'kilo-auto/custom/mine',
@@ -271,6 +320,17 @@ function memberBalanceRow(overrides: Partial<OrganizationMemberBalanceRow> = {})
 async function decisionOf(res: Response) {
   expect(res.status).toBe(200);
   return CustomRouterDecideResponseSchema.parse(await res.json());
+}
+
+// A user whose credited balance is fully spent.
+function spentBalanceUser() {
+  return {
+    api_token_pepper: 'pepper-1',
+    blocked_reason: null,
+    google_user_email: 'dev@example.com',
+    total_microdollars_acquired: 1_000_000,
+    microdollars_used: 1_000_000,
+  };
 }
 
 async function errorCode(res: Response) {
@@ -305,6 +365,8 @@ beforeEach(() => {
   clearClassificationHotCache();
   clearOrganizationPolicyCache();
   backgroundTasks.length = 0;
+  platformModes.clear();
+  getPlatformMode.mockClear();
   customTable = rankedTable;
   gatewayDeniedModelIds = [];
   gatewayFailuresLeft = 0;
@@ -343,6 +405,7 @@ beforeEach(() => {
   dbRows.organization = [{ total_microdollars_acquired: 3_000_000, microdollars_used: 0 }];
   findCustomRouter.mockReset().mockResolvedValue(customRouter());
   findCustomRouterById.mockReset().mockResolvedValue(customRouter());
+  findLegacyPoolRouter.mockReset().mockResolvedValue(null);
   findOrganizationMemberRole.mockReset().mockResolvedValue('member');
   findOrganizationMemberBalanceRow.mockReset().mockResolvedValue(memberBalanceRow());
   classifyNormalizedInput.mockReset().mockResolvedValue({
@@ -369,6 +432,73 @@ afterEach(async () => {
 });
 
 describe('public custom router decide', () => {
+  it.each(['efficient', 'frontier'] as const)(
+    'uses the saved %s custom mode independently of platform modes and inheritance markers',
+    async baseRouter => {
+      let router = customRouter({
+        baseRouter,
+        mode: 'best_accuracy',
+        legacyPool: true,
+        legacyModeInherited: true,
+      });
+      findCustomRouter.mockImplementation(async () => router);
+      platformModes.set(`user:${USER_ID}`, 'cost_per_accuracy');
+      platformModes.set(`org:${ORG_ID}`, 'cost_per_accuracy');
+      customTable = table({
+        [ROUTE]: [
+          {
+            model: 'client:ollama/qwen3:32b',
+            accuracy: 0.8,
+            avgCostUsd: 0,
+            meetsThreshold: true,
+            variant: null,
+          },
+          { model: SONNET, accuracy: 0.95, avgCostUsd: 0.01, meetsThreshold: true, variant: null },
+        ],
+      });
+      const headers = { 'X-KiloCode-OrganizationId': ORG_ID };
+      const first = await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), headers));
+      expect(first.decision).toMatchObject({ model: SONNET, fallback: false });
+
+      router = { ...router, mode: 'cost_per_accuracy' };
+      const edited = await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), headers));
+      expect(edited.decision).toMatchObject({ model: 'client:ollama/qwen3:32b', fallback: false });
+      expect(platformModes.get(`user:${USER_ID}`)).toBe('cost_per_accuracy');
+      expect(platformModes.get(`org:${ORG_ID}`)).toBe('cost_per_accuracy');
+      for (const [ownerType, ownerId] of [
+        ['user', USER_ID],
+        ['org', ORG_ID],
+      ] as const) {
+        const updated = await app.request(
+          'https://auto-routing.example.com/admin/routing-mode',
+          {
+            method: 'PUT',
+            headers: {
+              authorization: 'Bearer internal-secret',
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({ ownerType, ownerId, mode: 'best_accuracy' }),
+          },
+          env,
+          executionCtx
+        );
+        expect(updated.status).toBe(200);
+      }
+      const afterPlatformEdit = await decisionOf(
+        await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), headers)
+      );
+      expect(afterPlatformEdit.decision).toMatchObject({
+        model: 'client:ollama/qwen3:32b',
+        fallback: false,
+      });
+      expect(router.mode).toBe('cost_per_accuracy');
+      expect(getPlatformMode).not.toHaveBeenCalled();
+      expect(findLegacyPoolRouter).not.toHaveBeenCalled();
+      expect(platformModes.get(`user:${USER_ID}`)).toBe('best_accuracy');
+      expect(platformModes.get(`org:${ORG_ID}`)).toBe('best_accuracy');
+    }
+  );
+
   it('picks a servable client entry, flags its stale measurement, and signs the decision', async () => {
     const { decision, decisionId } = await decisionOf(
       await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())
@@ -433,6 +563,60 @@ describe('public custom router decide', () => {
       taskType: null,
       subtaskType: null,
       tableVersion: 'custom-table-1',
+    });
+  });
+
+  const imageMessages = [
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: 'Fix the layout in this screenshot.' },
+        { type: 'image_url', image_url: { url: 'data:image/png;base64,AAAA' } },
+      ],
+    },
+  ];
+
+  it('falls back past a default entry that lacks a required modality', async () => {
+    findCustomRouter.mockResolvedValue(
+      customRouter({ entries: [ollama, sonnet], defaultEntryKey: 'client:ollama/qwen3:32b' })
+    );
+    classifyNormalizedInput.mockRejectedValue(new Error('classifier down'));
+    const { decision } = await decisionOf(
+      await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody({ messages: imageMessages }))
+    );
+    expect(decision).toMatchObject({ model: SONNET, fallback: true });
+  });
+
+  it('fails with custom_router_unavailable when the classifier fails and no entry fits', async () => {
+    findCustomRouter.mockResolvedValue(
+      customRouter({ entries: [ollama, lmstudio], defaultEntryKey: 'client:ollama/qwen3:32b' })
+    );
+    classifyNormalizedInput.mockRejectedValue(new Error('classifier down'));
+    const res = await post(
+      CUSTOM_ROUTER_DECIDE_PATH,
+      decideBody({
+        messages: imageMessages,
+        clientEntries: [
+          { provider: 'ollama', model: 'qwen3:32b' },
+          { provider: 'lmstudio', model: 'gemma' },
+        ],
+      })
+    );
+    expect(res.status).toBe(422);
+    expect(await errorCode(res)).toBe('custom_router_unavailable');
+  });
+
+  it('accepts a body at the size limit and rejects one byte more', async () => {
+    const limit = 32_000_000;
+    const padded = (bytes: number) => {
+      const unpadded = JSON.stringify({ ...decideBody(), padding: '' }).length;
+      return { ...decideBody(), padding: 'x'.repeat(bytes - unpadded) };
+    };
+    await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, padded(limit)));
+    const tooLarge = await post(CUSTOM_ROUTER_DECIDE_PATH, padded(limit + 1));
+    expect(tooLarge.status).toBe(400);
+    expect(await tooLarge.json()).toEqual({
+      error: { code: 'invalid_request', message: 'Request body is too large' },
     });
   });
 
@@ -636,6 +820,24 @@ describe('public custom router decide', () => {
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 
+  it('requires a paid-usage balance from a personal caller', async () => {
+    dbRows.user = [
+      {
+        api_token_pepper: 'pepper-1',
+        blocked_reason: null,
+        google_user_email: 'dev@example.com',
+        total_microdollars_acquired: 1_000_000,
+        microdollars_used: 1_000_000,
+      },
+    ];
+    const { res, bodyUsed } = await postStream(CUSTOM_ROUTER_DECIDE_PATH, streamingBody());
+    expect(res.status).toBe(402);
+    expect(await errorCode(res)).toBe('insufficient_balance');
+    expect(bodyUsed).toBe(false);
+    expect(findCustomRouter).not.toHaveBeenCalled();
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+  });
+
   it('charges an organization context to the member allowance', async () => {
     findOrganizationMemberBalanceRow.mockResolvedValue(
       memberBalanceRow({ microdollar_limit: 1_000_000, microdollar_usage: 1_000_000 })
@@ -659,7 +861,10 @@ describe('public custom router decide', () => {
 });
 
 describe('internal custom router decide', () => {
-  function internalDecide(payload: Partial<MirrorPayload>) {
+  function internalDecide(
+    payload: Partial<MirrorPayload>,
+    requestedModel = 'kilo-auto/custom/mine'
+  ) {
     return app.request(
       'https://auto-routing.example.com/decide',
       {
@@ -668,7 +873,7 @@ describe('internal custom router decide', () => {
         body: JSON.stringify({
           input: {
             apiKind: 'chat_completions',
-            requestedModel: 'kilo-auto/custom/mine',
+            requestedModel,
             systemPromptPrefix: '',
             userPromptPrefix: 'Add a feature flag.',
             latestUserPromptPrefix: null,
@@ -705,6 +910,140 @@ describe('internal custom router decide', () => {
     });
   });
 
+  it('routes old and new Efficient IDs through the same canonical table and cache scope', async () => {
+    const canonical = customRouter({
+      slug: 'efficient',
+      legacyPool: true,
+      entries: [sonnet],
+    });
+    findLegacyPoolRouter.mockResolvedValue(canonical);
+    findCustomRouter.mockResolvedValue(canonical);
+    const oldResponse = await internalDecide({ router: 'efficient' }, 'kilo-auto/efficient');
+    const newResponse = await internalDecide(
+      { customRouter: { scope: 'user', slug: 'efficient' } },
+      'kilo-auto/custom/efficient'
+    );
+    expect(oldResponse.status).toBe(200);
+    expect(newResponse.status).toBe(200);
+    const oldBody = await oldResponse.json();
+    const newBody = await newResponse.json();
+    expect(oldBody).toHaveProperty('decision', expect.objectContaining({ model: SONNET }));
+    expect(newBody).toHaveProperty('decision', expect.objectContaining({ model: SONNET }));
+    expect(benchmarkFetch).toHaveBeenCalledTimes(1);
+    expect(
+      cacheIdFromName.mock.calls.every(([key]) => key.startsWith(`custom:${ROUTER_ID}:`))
+    ).toBe(true);
+    await drainBackgroundTasks();
+    expect(recordUsage.mock.calls.map(([usage]) => usage.core.requested_model)).toContain(
+      'kilo-auto/efficient'
+    );
+  });
+
+  it('shares the canonical pool but not mode between a platform alias and explicit custom ID', async () => {
+    const canonical = customRouter({
+      slug: 'efficient',
+      legacyPool: true,
+      legacyModeInherited: true,
+      mode: 'best_accuracy',
+    });
+    findLegacyPoolRouter.mockResolvedValue(canonical);
+    findCustomRouter.mockResolvedValue(canonical);
+    platformModes.set(`user:${USER_ID}`, 'cost_per_accuracy');
+    customTable = table({
+      [ROUTE]: [
+        {
+          model: 'client:ollama/qwen3:32b',
+          accuracy: 0.8,
+          avgCostUsd: 0,
+          meetsThreshold: true,
+          variant: null,
+        },
+        { model: SONNET, accuracy: 0.95, avgCostUsd: 0.01, meetsThreshold: true, variant: null },
+      ],
+    });
+    const clientEntries = [{ provider: 'ollama', model: 'qwen3:32b' }];
+    const alias = await internalDecide(
+      { router: 'efficient', clientEntries },
+      'kilo-auto/efficient'
+    );
+    const explicit = await internalDecide({
+      customRouter: { scope: 'user', slug: 'efficient' },
+      clientEntries,
+    });
+    expect(alias.status).toBe(200);
+    expect(explicit.status).toBe(200);
+    await expect(alias.json()).resolves.toMatchObject({
+      decision: { model: 'client:ollama/qwen3:32b', fallback: false },
+    });
+    await expect(explicit.json()).resolves.toMatchObject({
+      decision: { model: SONNET, fallback: false },
+    });
+    expect(canonical.mode).toBe('best_accuracy');
+    expect(platformModes.get(`user:${USER_ID}`)).toBe('cost_per_accuracy');
+  });
+
+  it('uses platform mode for a gateway-resolved platform alias and the row mode for the explicit custom ID', async () => {
+    const canonical = customRouter({
+      slug: 'efficient',
+      legacyPool: true,
+      legacyModeInherited: true,
+      mode: 'best_accuracy',
+    });
+    findLegacyPoolRouter.mockResolvedValue(canonical);
+    findCustomRouter.mockResolvedValue(canonical);
+    platformModes.set(`user:${USER_ID}`, 'cost_per_accuracy');
+    customTable = table({
+      [ROUTE]: [
+        {
+          model: 'client:ollama/qwen3:32b',
+          accuracy: 0.8,
+          avgCostUsd: 0,
+          meetsThreshold: true,
+          variant: null,
+        },
+        { model: SONNET, accuracy: 0.95, avgCostUsd: 0.01, meetsThreshold: true, variant: null },
+      ],
+    });
+    const clientEntries = [{ provider: 'ollama', model: 'qwen3:32b' }];
+    const reference = { scope: 'user', slug: 'efficient' } as const;
+    const gatewayAlias = await internalDecide(
+      { customRouter: reference, clientEntries },
+      'kilo-auto/efficient'
+    );
+    const explicit = await internalDecide(
+      { customRouter: reference, clientEntries },
+      'kilo-auto/custom/efficient'
+    );
+    expect(gatewayAlias.status).toBe(200);
+    expect(explicit.status).toBe(200);
+    await expect(gatewayAlias.json()).resolves.toMatchObject({
+      decision: { model: 'client:ollama/qwen3:32b', fallback: false },
+    });
+    await expect(explicit.json()).resolves.toMatchObject({
+      decision: { model: SONNET, fallback: false },
+    });
+  });
+
+  it('never falls back outside a migrated legacy pool when policy denies its only gateway entry', async () => {
+    findLegacyPoolRouter.mockResolvedValue(
+      customRouter({ slug: 'efficient', legacyPool: true, entries: [sonnet] })
+    );
+    const response = await internalDecide(
+      { router: 'efficient', routingPolicy: { deniedModelIds: [SONNET] } },
+      'kilo-auto/efficient'
+    );
+    expect(response.status).toBe(422);
+    expect(await errorCode(response)).toBe('custom_router_unavailable');
+  });
+
+  it('does not consult a platform table after a canonical lookup fails', async () => {
+    findLegacyPoolRouter.mockRejectedValue(new Error('canonical storage unavailable'));
+    const response = await internalDecide({ router: 'efficient' }, 'kilo-auto/efficient');
+    expect(response.status).toBe(500);
+    expect(benchmarkFetch).not.toHaveBeenCalled();
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+  });
+
   it('returns router_not_found for an organization router without an organization', async () => {
     const res = await internalDecide({ customRouter: { scope: 'org', slug: 'team' } });
     expect(res.status).toBe(404);
@@ -726,6 +1065,23 @@ describe('client eval proxy', () => {
   function forwarded(path: string) {
     const call = benchmarkFetch.mock.calls.find(([url]) => new URL(url).pathname === path);
     return call ? (JSON.parse(call[1]?.body as string) as Record<string, unknown>) : null;
+  }
+
+  function resultUpload(overrides: Record<string, unknown> = {}) {
+    return {
+      routerId: ROUTER_ID,
+      engineIdentity: 'router:v3:abc',
+      entry: { kind: 'client', provider: 'ollama', model: 'qwen3:32b' },
+      variant: null,
+      caseId: 'case-1',
+      rep: 0,
+      output: 'done',
+      costUsd: 0,
+      durationMs: 1200,
+      exitCode: 0,
+      timedOut: false,
+      ...overrides,
+    };
   }
 
   it('forwards a plan with the router context and passes the benchmark answer through', async () => {
@@ -753,6 +1109,7 @@ describe('client eval proxy', () => {
       customRouter({ ownerType: 'org', ownerId: ORG_ID, slug: 'team' })
     );
     findOrganizationMemberRole.mockResolvedValue('billing_manager');
+    findOrganizationMemberBalanceRow.mockResolvedValue(null);
     benchmarkFetch.mockResolvedValueOnce(Response.json({ score: 1 }));
     const upload = {
       routerId: ROUTER_ID,
@@ -809,5 +1166,96 @@ describe('client eval proxy', () => {
     );
     expect(res.status).toBe(402);
     expect(benchmarkFetch).not.toHaveBeenCalled();
+  });
+
+  it('requires a funded payer for an eval plan', async () => {
+    dbRows.user = [spentBalanceUser()];
+    dbRows.organization = [{ total_microdollars_acquired: 1_000, microdollars_used: 1_000 }];
+    const { res, bodyUsed } = await postStream(CUSTOM_ROUTER_EVAL_PLAN_PATH, streamingBody(), {
+      'X-KiloCode-OrganizationId': ORG_ID,
+    });
+    expect(res.status).toBe(402);
+    expect(await errorCode(res)).toBe('insufficient_balance');
+    expect(bodyUsed).toBe(false);
+    expect(findCustomRouterById).not.toHaveBeenCalled();
+    expect(benchmarkFetch).not.toHaveBeenCalled();
+  });
+
+  it('runs an eval plan for an organization billing manager funded by the organization', async () => {
+    findCustomRouterById.mockResolvedValue(
+      customRouter({ ownerType: 'org', ownerId: ORG_ID, slug: 'team' })
+    );
+    findOrganizationMemberRole.mockResolvedValue('billing_manager');
+    findOrganizationMemberBalanceRow.mockResolvedValue(null);
+    dbRows.user = [spentBalanceUser()];
+    benchmarkFetch.mockResolvedValueOnce(Response.json({}));
+    const res = await post(
+      CUSTOM_ROUTER_EVAL_PLAN_PATH,
+      { routerId: ROUTER_ID },
+      { 'X-KiloCode-OrganizationId': ORG_ID }
+    );
+    expect(res.status).toBe(200);
+    expect(forwarded(CUSTOM_ROUTER_EVAL_PLAN_PATH)).toMatchObject({
+      routerId: ROUTER_ID,
+      ownerType: 'org',
+      ownerId: ORG_ID,
+    });
+  });
+
+  it('accepts an eval plan at the body cap and refuses a larger one', async () => {
+    const limit = 16_000;
+    benchmarkFetch.mockResolvedValueOnce(Response.json({}));
+    const atLimit = await postStream(
+      CUSTOM_ROUTER_EVAL_PLAN_PATH,
+      new Response(JSON.stringify(paddedBody({ routerId: ROUTER_ID }, limit)))
+        .body as ReadableStream<Uint8Array>
+    );
+    expect(atLimit.res.status).toBe(200);
+    expect(atLimit.bodyUsed).toBe(true);
+    const tooLarge = await post(
+      CUSTOM_ROUTER_EVAL_PLAN_PATH,
+      paddedBody({ routerId: ROUTER_ID }, limit + 1)
+    );
+    expect(tooLarge.status).toBe(400);
+    expect(await tooLarge.json()).toEqual({
+      error: { code: 'invalid_request', message: 'Request body is too large' },
+    });
+    expect(benchmarkFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts an eval case at the body cap and refuses a larger one', async () => {
+    const limit = 16_000;
+    const body = { routerId: ROUTER_ID, caseId: 'case-1' };
+    benchmarkFetch.mockResolvedValueOnce(Response.json({}));
+    const atLimit = await post(CUSTOM_ROUTER_EVAL_CASE_PATH, paddedBody(body, limit));
+    expect(atLimit.status).toBe(200);
+    expect(forwarded(CUSTOM_ROUTER_EVAL_CASE_PATH)).toMatchObject({
+      routerId: ROUTER_ID,
+      caseId: 'case-1',
+    });
+    const tooLarge = await post(CUSTOM_ROUTER_EVAL_CASE_PATH, paddedBody(body, limit + 1));
+    expect(tooLarge.status).toBe(400);
+    expect(await tooLarge.json()).toEqual({
+      error: { code: 'invalid_request', message: 'Request body is too large' },
+    });
+    expect(benchmarkFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts a maximal client output and refuses a body above the result cap', async () => {
+    benchmarkFetch.mockResolvedValueOnce(Response.json({ score: 1 }));
+    const res = await post(
+      CUSTOM_ROUTER_EVAL_RESULT_PATH,
+      resultUpload({ output: 'x'.repeat(1_000_000) })
+    );
+    expect(res.status).toBe(200);
+    const tooLarge = await post(
+      CUSTOM_ROUTER_EVAL_RESULT_PATH,
+      paddedBody(resultUpload(), 8_000_000 + 1)
+    );
+    expect(tooLarge.status).toBe(400);
+    expect(await tooLarge.json()).toEqual({
+      error: { code: 'invalid_request', message: 'Request body is too large' },
+    });
+    expect(benchmarkFetch).toHaveBeenCalledTimes(1);
   });
 });

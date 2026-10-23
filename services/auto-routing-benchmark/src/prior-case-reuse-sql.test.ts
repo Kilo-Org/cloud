@@ -18,6 +18,10 @@ const SCHEMA_SQL = `
     error TEXT, engine_identity TEXT NOT NULL, repetitions INTEGER NOT NULL
   );
   CREATE TABLE scheduler_runs (run_id TEXT PRIMARY KEY);
+  CREATE TABLE benchmark_profiles (
+    router TEXT NOT NULL, model TEXT NOT NULL, variant TEXT NOT NULL,
+    engine_identity TEXT NOT NULL, repetitions INTEGER NOT NULL, invalidated_at TEXT
+  );
   CREATE TABLE case_results (
     run_id TEXT NOT NULL, model TEXT NOT NULL, variant TEXT NOT NULL,
     case_id TEXT NOT NULL, route_key TEXT, score REAL NOT NULL,
@@ -402,6 +406,9 @@ describe('reuseDeciderCaseResults (real SQLite)', () => {
     const timedOut = pendingPayload('timed out');
     timedOut.result.timedOut = true;
     insertPending(sqlite, 'new-z', 'timeout', JSON.stringify(timedOut));
+    const unavailable = pendingPayload('unavailable');
+    unavailable.result.unavailableModelId = 'concrete/model';
+    insertPending(sqlite, 'new-z', 'unavailable', JSON.stringify(unavailable));
     insertPending(sqlite, 'new-z', 'invalid-json', '{invalid');
     insertPending(sqlite, 'new-z', 'unrelated-json', '{"other":true}');
     const sourcePending = ['old', 'new-a', 'new-z'].map(id => pending(sqlite, id));

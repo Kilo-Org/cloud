@@ -1299,6 +1299,21 @@ describe('createUserWebConnection', () => {
     client.destroy();
   });
 
+  it('rejects a reply that carries an empty error instead of resolving its result', async () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+    client.connect();
+    open();
+
+    const promise = client.sendCommand('ses-1', 'send_message', {});
+    await Promise.resolve();
+    inbound({ type: 'response', id: 'uuid-2', result: { ok: true }, error: '' });
+
+    await expect(promise).rejects.toEqual(
+      expect.objectContaining({ name: 'CommandDeliveredError', message: 'Command failed' })
+    );
+    client.destroy();
+  });
+
   it('routes command responses by request id', async () => {
     const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
     client.connect();

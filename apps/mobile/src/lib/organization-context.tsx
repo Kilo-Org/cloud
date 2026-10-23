@@ -1,3 +1,7 @@
+/* eslint-disable max-lines -- the selection lifecycle (restore, default
+   resolution, lost-membership recovery, and the storage contract) shares one
+   state machine; splitting it would scatter the generation fencing that keeps
+   the publisher correct */
 import * as SecureStore from '@/lib/auth/secure-store';
 import {
   createContext,
@@ -16,6 +20,9 @@ import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { unregisterActivityTokensAndTombstone } from '@/lib/auth/logout-cleanup';
 import { writePrivacySnapshotAndEnd } from '@/lib/glanceable/cleanup';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
+import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { i18n } from '@/i18n';
 import { ORGANIZATION_PERSONAL_STORAGE_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
 /**
@@ -76,6 +83,16 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
   // stored). An auto-resolved Personal — from an empty list or a failed restore
   // — is not explicit, so selecting Personal must still write the marker.
   const personalExplicit = useRef(false);
+  // Set while the provider switches away from a membership the fetched list no
+  // longer contains. The recovery effect owns the switch; the toast copy names
+  // the target context, so the target is carried beside the flag.
+  const recoveringRef = useRef<string | null | undefined>(undefined);
+  // The list snapshot the current selection was published against (undefined
+  // until a settled list is seen for it). Detection compares only across
+  // snapshots: a selection published against the list it came from is valid by
+  // construction; only a NEW snapshot (a refetch) missing the selection means
+  // the membership vanished server-side.
+  const selectionListSeen = useRef<readonly OrgListEntry[] | undefined>(undefined);
 
   const restore = useCallback(async () => {
     generation.current += 1;
@@ -83,6 +100,8 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     const epoch = currentAuthEpoch();
     awaitingDefault.current = false;
     defaultFence.current = null;
+    recoveringRef.current = undefined;
+    selectionListSeen.current = undefined;
     setState(current => ({ ...current, token, isLoaded: false, isSaving: false, error: null }));
     try {
       // A stored organization is an explicit choice; the marker beside it is an
@@ -129,9 +148,6 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     setState(current => ({ ...current, isSaving: true }));
     let error: 'save' | null = null;
     try {
-      // An organization writes the organization key and clears the Personal
-      // marker; Personal deletes the organization key every other reader relies
-      // on and writes the marker in its place.
       await (id
         ? setAccountMetadata(ORGANIZATION_STORAGE_KEY, id)
         : deleteAccountMetadata(ORGANIZATION_STORAGE_KEY));
@@ -207,6 +223,44 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     persist,
   ]);
 
+  // Detection: a settled, successful snapshot that does not name the stored
+  // organization arms the recovery effect (declared below `setOrganizationId`,
+  // which it calls). A restored selection has no baseline of its own, so its
+  // very first snapshot is evaluated: a cold start whose fetched list already
+  // omits the stored organization switches instead of rendering the dead
+  // selection with a generic credits name and a failed balance. A snapshot
+  // that names the selection records the baseline; from there, any later
+  // snapshot missing it means the membership vanished while the app ran.
+  // Personal (null) and the default resolution (above) need no detection. The
+  // baseline is recorded only after the guards pass, so a snapshot observed
+  // during an error is re-evaluated once the error clears.
+  useEffect(() => {
+    if (!state.isLoaded || !organizationsFetched || organizationsError) {
+      selectionListSeen.current = undefined;
+      return;
+    }
+    if (organizationsFetching || state.error !== null || state.organizationId === null) {
+      return;
+    }
+    const snapshot = organizations ?? [];
+    if (snapshot === selectionListSeen.current) {
+      return;
+    }
+    if (snapshot.some(entry => entry.organizationId === state.organizationId)) {
+      selectionListSeen.current = snapshot;
+      return;
+    }
+    recoveringRef.current = snapshot[0]?.organizationId ?? null;
+  }, [
+    state.isLoaded,
+    state.error,
+    state.organizationId,
+    organizations,
+    organizationsFetched,
+    organizationsFetching,
+    organizationsError,
+  ]);
+
   // This provider stays mounted above the auth gate. Reset on sign-out and
   // invalidate obsolete reads/saves on token changes and unmount.
   useEffect(() => {
@@ -218,6 +272,8 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
       awaitingDefault.current = false;
       defaultFence.current = null;
       personalExplicit.current = false;
+      recoveringRef.current = undefined;
+      selectionListSeen.current = undefined;
       setState({ token, organizationId: null, isLoaded: true, isSaving: false, error: null });
     }
     return () => {
@@ -227,6 +283,11 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
 
   const setOrganizationId = useCallback(
     (id: string | null) => {
+      // A manual selection disarms the recovery switch: the user moved first,
+      // and the snapshot it was made against becomes the selection's baseline
+      // (the picker only offers organizations from that snapshot).
+      recoveringRef.current = undefined;
+      selectionListSeen.current = organizations;
       // An explicit selection always settles a pending default, even when it
       // matches the placeholder published while waiting; otherwise the default
       // would publish later and override the user's choice.
@@ -265,8 +326,52 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
       }));
       void persist(id);
     },
-    [token, persist, state.organizationId]
+    [token, persist, state.organizationId, organizations]
   );
+
+  // A stored selection can go stale server-side: the host removes the
+  // membership (or deletes the organization) while the app still holds the id.
+  // Once a settled, successful list misses the selection, switch to the same
+  // target the default resolution would pick — the first remaining membership,
+  // else Personal — through the existing selection path, and say so.
+  useEffect(() => {
+    if (recoveringRef.current === undefined) {
+      // No stale selection detected; `setOrganizationId` owns the toast.
+      return;
+    }
+    // A failed or still-fetching list cannot decide the target; the stale
+    // selection stays armed for the next settled, successful list.
+    if (
+      state.error !== null ||
+      !organizationsFetched ||
+      organizationsFetching ||
+      organizationsError
+    ) {
+      return;
+    }
+    const target = recoveringRef.current;
+    recoveringRef.current = undefined;
+    if (target !== state.organizationId) {
+      setOrganizationId(target);
+      announcingToast.warning(
+        i18n.t('organization.boundary.membershipLostNotice', {
+          target:
+            target === null
+              ? i18n.t('common.personal')
+              : (organizations?.find(entry => entry.organizationId === target)?.organizationName ??
+                i18n.t('common.organization')),
+        })
+      );
+    }
+  }, [
+    state.organizationId,
+    state.error,
+    organizations,
+    organizationsFetched,
+    organizationsFetching,
+    organizationsError,
+    setOrganizationId,
+  ]);
 
   // `restore` re-reads the keys, but a default that failed on the shared list
   // would be republished from the same failed query. Refresh the list first so

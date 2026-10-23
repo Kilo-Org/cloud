@@ -89,9 +89,18 @@ export async function getBalanceForOrganizationUser(
     limitType?: OrganizationUserLimitType;
     /** Database instance to use (defaults to primary db, pass readDb for replica) */
     fromDb?: typeof db;
+    /** Instant the expiry cut-off is measured from. Defaults to the current time. */
+    now?: Date;
+    /** How many hours the cut-off trails `now` by. Defaults to a random 0-1 draw. */
+    expiryJitterHours?: number;
   } = {}
 ): Promise<BalanceAndOrgSettings> {
-  const { limitType = 'daily', fromDb = db } = options;
+  const {
+    limitType = 'daily',
+    fromDb = db,
+    now = new Date(),
+    expiryJitterHours = Math.random(),
+  } = options;
   const startTime = performance.now();
   logExceptInTest(
     `[getBalanceForOrganizationUser] Starting balance check for user ${userId} in org ${organizationId}`
@@ -124,7 +133,7 @@ export async function getBalanceForOrganizationUser(
   let total_microdollars_acquired = row.total_microdollars_acquired;
 
   // Lazy credit expiry check (mirrors user pattern in getBalanceForUser)
-  const expireBefore = subHours(new Date(), Math.random());
+  const expireBefore = subHours(now, expiryJitterHours);
   const needsExpirationComputation =
     next_credit_expiration_at && expireBefore >= new Date(next_credit_expiration_at);
 
@@ -248,7 +257,13 @@ export async function mutateOrganizationUsage(
       updated_at = NOW()
   `);
 
-  const [orgData] = await tx
+  type OrganizationBalanceRow = {
+    total_microdollars_acquired: number;
+    previous_microdollars_used: number;
+    new_microdollars_used: number;
+    settings: OrganizationSettings | null;
+  };
+  const balanceRows: OrganizationBalanceRow[] = await tx
     .update(organizations)
     .set({
       microdollars_used: sql`${organizations.microdollars_used} + ${cost}`,
@@ -264,6 +279,7 @@ export async function mutateOrganizationUsage(
       settings: organizations.settings,
     });
 
+  const [orgData] = balanceRows;
   if (!orgData) return NO_ORGANIZATION_BALANCE_ALERT;
 
   const currentBalance = orgData.total_microdollars_acquired - orgData.previous_microdollars_used;

@@ -69,12 +69,12 @@ const storedAuthSchema = z.object({
 });
 const deviceAuthRequestSchema = z
   .object({
-    code: nonEmptyStringSchema,
+    user_code: nonEmptyStringSchema,
     device_code: nonEmptyStringSchema,
     verificationUrl: nonEmptyStringSchema,
   })
-  .transform(({ code, device_code, verificationUrl }) => ({
-    code,
+  .transform(({ user_code, device_code, verificationUrl }) => ({
+    code: user_code,
     deviceCode: device_code,
     verificationUrl,
   }));

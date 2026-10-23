@@ -702,6 +702,23 @@ for (const catalog of CATALOGS) {
       }
     }
 
+    // The separator keys are this catalog's only statement about how it joins
+    // one word to the next, and they are allowed to differ from English on
+    // purpose — so they have to agree with each other. A padded prefix with a
+    // bare connector joins "our" to "Terms" but runs the conjunction into the
+    // next noun; the reverse drops the space before the link.
+    const prefixValue = translated.get('login.termsPrefix');
+    const connectorValue = translated.get('login.termsConnector');
+    if (prefixValue !== undefined && connectorValue !== undefined) {
+      const paddedPrefix = /\s$/.test(prefixValue);
+      const paddedConnector = /^\s/.test(connectorValue) && /\s$/.test(connectorValue);
+      if (paddedPrefix !== paddedConnector) {
+        fail(
+          `${label}: "login.termsPrefix" and "login.termsConnector" disagree about their separator; pad both or neither`
+        );
+      }
+    }
+
     // One alphabet per catalog.
     const counts = scriptCounts(translated.values());
     const allowed = new Set(MULTI_SCRIPT_LANGUAGES[tag] ?? []);

@@ -224,6 +224,56 @@ test('still rejects separator whitespace elsewhere in the same catalog', context
   assert.match(result.stderr, /mobile\/zh-Hans: "login\.terms" leading or trailing space differs/);
 });
 
+for (const [name, termsPrefix, termsConnector] of [
+  ['a dropped separator in a spaced catalog', 'Unsere', ' und '],
+  ['a padded prefix beside a bare conjunction', 'Unsere ', 'und'],
+]) {
+  test(`rejects ${name}`, context => {
+    const english = {
+      login: {
+        termsPrefix: 'By continuing you agree to our ',
+        terms: 'Terms',
+        termsConnector: ' and ',
+      },
+    };
+    const result = runChecker(context, {
+      language: 'de',
+      english,
+      translated: { login: { termsPrefix, terms: 'Bedingungen', termsConnector } },
+      source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
+    });
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(
+      result.stderr,
+      /mobile\/de: "login\.termsPrefix" and "login\.termsConnector" disagree about their separator/
+    );
+  });
+}
+
+test('accepts a spaced catalog that pads both separator keys', context => {
+  const english = {
+    login: {
+      termsPrefix: 'By continuing you agree to our ',
+      terms: 'Terms',
+      termsConnector: ' and ',
+    },
+  };
+  const result = runChecker(context, {
+    language: 'de',
+    english,
+    translated: {
+      login: {
+        termsPrefix: 'Wenn du fortfährst, akzeptierst du unsere ',
+        terms: 'Bedingungen',
+        termsConnector: ' und ',
+      },
+    },
+    source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
 test('rejects a translated $TOKEN expansion token', context => {
   const result = runChecker(context, {
     english: { agents: { template: 'Explain $ARGUMENTS' } },

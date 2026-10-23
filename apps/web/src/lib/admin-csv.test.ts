@@ -29,6 +29,7 @@ describe('csvField', () => {
     expect(csvField('line one\nline two')).toBe('"line one\nline two"');
     expect(csvField('line one\rline two')).toBe('"line one\rline two"');
     expect(csvField('line one\r\nline two')).toBe('"line one\r\nline two"');
+    expect(csvField('\nvalue')).toBe('"\nvalue"');
   });
 
   it('formats representative cells as literal text', () => {

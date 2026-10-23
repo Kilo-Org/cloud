@@ -83,7 +83,9 @@ export function AgentFormSheet({
   const [disabledTools, setDisabledTools] = useState<readonly string[]>(initial.disabledTools);
   const [error, setError] = useState<AgentFormError | null>(null);
   const { models } = useAvailableModels(organizationId);
-  const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<'slug' | 'name'>();
+  const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<
+    'slug' | 'name' | 'description'
+  >();
 
   const variantsFor = (model: string): readonly string[] =>
     models.find(option => option.id === model.trim())?.variants ?? [];
@@ -124,7 +126,13 @@ export function AgentFormSheet({
     const problem = validateAgentForm(state, existingSlugs);
     if (problem !== null) {
       setError(problem);
-      scrollToField(problem.startsWith('slug-') ? 'slug' : 'name');
+      scrollToField(
+        problem === 'description-too-long'
+          ? 'description'
+          : problem.startsWith('slug-')
+            ? 'slug'
+            : 'name'
+      );
       return;
     }
     setError(null);
@@ -189,6 +197,7 @@ export function AgentFormSheet({
           error={error === 'description-too-long' ? agentErrorText(t, error) : undefined}
           disabled={isSaving}
           placeholder={t('profiles.descriptionPlaceholder')}
+          containerOnLayout={fieldLayout('description')}
           onChangeText={value => {
             descriptionRef.current = value;
             setError(null);

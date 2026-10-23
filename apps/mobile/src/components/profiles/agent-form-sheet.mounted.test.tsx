@@ -294,12 +294,15 @@ describe('AgentFormSheet parity fields', () => {
     const { renderer, unmount } = await mountSheet(agentSource());
 
     changeText(renderer.root, 'Agent description', 'd'.repeat(2001));
+    layoutField(renderer.root, 'Agent name', 120);
+    layoutField(renderer.root, 'Agent description', 280);
     pressDone(renderer.root);
 
     expect(h.onSave).not.toHaveBeenCalled();
     expect(findField(renderer.root, 'Agent description').props.error).toBe(
       'Use at most 2000 characters'
     );
+    expect(h.scrollTo).toHaveBeenCalledWith({ y: 268, animated: true });
 
     unmount();
   });

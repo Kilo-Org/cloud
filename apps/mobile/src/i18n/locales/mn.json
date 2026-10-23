@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Тушаалын мөр эсвэл ямар нэг утга өөрчлөгдөхөд бүх утга шаардлагатай",
       "nameRequired": "Серверийн нэрийг оруулна уу",
       "nameInvalid": "Нэр нь зөвхөн үсэг, тоо, доогуур зураас, зураас ашиглаж болно",
       "commandRequired": "Команд оруулна уу",

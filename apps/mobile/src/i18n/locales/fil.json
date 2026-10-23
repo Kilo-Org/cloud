@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Kinakailangan ang bawat value kapag nagbago ang command line o alinmang value",
       "nameRequired": "Maglagay ng pangalan ng server",
       "nameInvalid": "Ang pangalan ay maaari lamang gumamit ng mga titik, numero, underscore, at gitling",
       "commandRequired": "Maglagay ng command",

@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Բոլոր արժեքները պարտադիր են, երբ փոխվում է հրամանի տողը կամ որևէ արժեք",
       "nameRequired": "Մուտքագրեք սերվերի անունը",
       "nameInvalid": "Անունը կարող է օգտագործել միայն տառեր, թվեր, ընդգծումներ և գծիկներ",
       "commandRequired": "Մուտքագրեք հրաման",

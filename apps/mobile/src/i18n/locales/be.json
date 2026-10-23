@@ -3705,6 +3705,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Кожнае значэнне патрабуецца, калі змяняецца камандны радок або любое значэнне",
       "nameRequired": "Увядзіце імя сервера",
       "nameInvalid": "У назве можна выкарыстоўваць толькі літары, лічбы, сімвалы падкрэслівання і працяжнікі",
       "commandRequired": "Увядзіце каманду",

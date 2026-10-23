@@ -3787,6 +3787,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Mae pob gwerth yn ofynnol pan fydd y llinell orchymyn neu unrhyw werth yn newid",
       "nameRequired": "Rhowch enw gweinydd",
       "nameInvalid": "Dim ond llythrennau, rhifau, tanlinellau a llinellau toriad y gall enw eu defnyddio",
       "commandRequired": "Rhowch orchymyn",

@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Kur ndryshon rreshti i komandës ose çdo vlerë, kërkohen të gjitha vlerat",
       "nameRequired": "Futni një emër serveri",
       "nameInvalid": "Emri mund të përdorë vetëm shkronja, numra, nënvizime dhe viza",
       "commandRequired": "Futni një komandë",

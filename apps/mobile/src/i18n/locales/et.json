@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Kõik väärtused on kohustuslikud, kui käsurida või mis tahes väärtus muutub",
       "nameRequired": "Sisestage serveri nimi",
       "nameInvalid": "Nimes võib kasutada ainult tähti, numbreid, allkriipse ja sidekriipse",
       "commandRequired": "Sisestage käsk",

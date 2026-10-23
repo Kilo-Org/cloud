@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "کمانڈ لائن یا کسی بھی ویلیو کی تبدیلی پر ہر ویلیو ضروری ہے",
       "nameRequired": "سرور کا نام درج کریں۔",
       "nameInvalid": "نام صرف حروف، اعداد، انڈر سکور اور ڈیشز کا استعمال کر سکتا ہے۔",
       "commandRequired": "ایک کمانڈ درج کریں۔",

@@ -3746,6 +3746,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Kull valur huwa meħtieġ meta l-linja tal-kmand jew kwalunkwe valur jinbidel",
       "nameRequired": "Daħħal isem server",
       "nameInvalid": "Isem jista 'juża biss ittri, numri, underscore, u sing",
       "commandRequired": "Daħħal kmand",

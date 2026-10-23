@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Elke waarde is vereis wanneer die opdragreël of enige waarde verander",
       "nameRequired": "Voer 'n bedienernaam in",
       "nameInvalid": "Naam kan slegs letters, syfers, onderstrepe en strepe gebruik",
       "commandRequired": "Voer 'n opdrag in",

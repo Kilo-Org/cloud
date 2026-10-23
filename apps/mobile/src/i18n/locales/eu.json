@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Balio guztiak beharrezkoak dira komando-lerroa edo edozein balio aldatzen denean",
       "nameRequired": "Sartu zerbitzariaren izena",
       "nameInvalid": "Izenak hizkiak, zenbakiak, azpimarra eta marra soilik erabil ditzake",
       "commandRequired": "Sartu komando bat",

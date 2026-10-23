@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Marka amarka ama qiimo kasta isbeddelo, qiimaha oo dhan waa loo baahan yahay",
       "nameRequired": "Geli magaca adeegaha",
       "nameInvalid": "Magaca waxa uu isticmaali karaa xarfo, lambaro, hoosta, iyo xariijimaha",
       "commandRequired": "Gali amar",

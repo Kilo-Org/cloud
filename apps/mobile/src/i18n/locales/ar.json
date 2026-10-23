@@ -3787,6 +3787,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "كل قيمة مطلوبة عند تغيير سطر الأوامر أو أي قيمة",
       "nameRequired": "أدخل اسم الخادم",
       "nameInvalid": "يمكن أن يستخدم الاسم الحروف والأرقام والشرطات السفلية والشرطات فقط",
       "commandRequired": "أدخل أمرًا",

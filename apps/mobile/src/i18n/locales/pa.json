@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "ਜਦੋਂ ਕਮਾਂਡ ਲਾਈਨ ਜਾਂ ਕੋਈ ਵੀ ਮੁੱਲ ਬਦਲਦਾ ਹੈ ਤਾਂ ਹਰੇਕ ਮੁੱਲ ਲਾਜ਼ਮੀ ਹੁੰਦਾ ਹੈ",
       "nameRequired": "ਇੱਕ ਸਰਵਰ ਨਾਮ ਦਰਜ ਕਰੋ",
       "nameInvalid": "ਨਾਮ ਸਿਰਫ਼ ਅੱਖਰਾਂ, ਸੰਖਿਆਵਾਂ, ਅੰਡਰਸਕੋਰਾਂ ਅਤੇ ਡੈਸ਼ਾਂ ਦੀ ਵਰਤੋਂ ਕਰ ਸਕਦਾ ਹੈ",
       "commandRequired": "ਇੱਕ ਕਮਾਂਡ ਦਿਓ",

@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "විධාන පේළිය හෝ ඕනෑම අගයක් වෙනස් වන විට සෑම අගයක්ම අවශ්‍ය වේ",
       "nameRequired": "සේවාදායකයේ නමක් ඇතුළත් කරන්න",
       "nameInvalid": "නමට භාවිත කළ හැක්කේ අකුරු, අංක, යටි ඉරි සහ ඉරි පමණි",
       "commandRequired": "විධානයක් ඇතුල් කරන්න",

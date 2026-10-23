@@ -3705,6 +3705,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Ko se ukazna vrstica ali katera koli vrednost spremeni, so vse vrednosti obvezne",
       "nameRequired": "Vnesite ime strežnika",
       "nameInvalid": "Ime lahko vsebuje samo črke, številke, podčrtaje in pomišljaje",
       "commandRequired": "Vnesite ukaz",

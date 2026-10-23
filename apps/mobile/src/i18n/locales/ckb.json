@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "کاتێک دەستەی فەرمان یان هەر بەهایەک دەگۆڕدرێت، هەموو بەهاکان پێویستن",
       "nameRequired": "ناوی سێرڤەرێک دابنێ",
       "nameInvalid": "ناو دەتوانێت تەنها پیت و ژمارە و هێڵی ژێرەوە و هێڵکاری بەکاربهێنێت",
       "commandRequired": "فەرمانێک داخڵ بکە",

@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Сите вредности се задолжителни кога ќе се смени командната линија или било која вредност",
       "nameRequired": "Внесете име на серверот",
       "nameInvalid": "Името може да користи само букви, бројки, долни цртички и цртички",
       "commandRequired": "Внесете команда",

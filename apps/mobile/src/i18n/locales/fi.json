@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Jokainen arvo on pakollinen, kun komentorivi tai mikä tahansa arvo muuttuu",
       "nameRequired": "Anna palvelimen nimi",
       "nameInvalid": "Nimessä voi käyttää vain kirjaimia, numeroita, alaviivoja ja väliviivoja",
       "commandRequired": "Anna komento",

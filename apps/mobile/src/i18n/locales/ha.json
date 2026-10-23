@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Kowane ƙima ana buƙatarsa sa'ad da layin umarni ko kowane ƙima ya canja",
       "nameRequired": "Shigar da sunan uwar garke",
       "nameInvalid": "Sunan zai iya amfani da haruffa kawai, lambobi, ƙararraki, da dashes",
       "commandRequired": "Shigar da umarni",

@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "కమాండ్ లైన్ లేదా ఏ విలువ మారినప్పుడు ప్రతి విలువ అవసరం",
       "nameRequired": "సర్వర్ పేరును నమోదు చేయండి",
       "nameInvalid": "పేరు అక్షరాలు, సంఖ్యలు, అండర్‌స్కోర్‌లు మరియు డాష్‌లను మాత్రమే ఉపయోగించగలదు",
       "commandRequired": "ఆదేశాన్ని నమోదు చేయండి",

@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Όλες οι τιμές είναι υποχρεωτικές όταν αλλάζει η γραμμή εντολών ή οποιαδήποτε τιμή",
       "nameRequired": "Εισαγάγετε ένα όνομα διακομιστή",
       "nameInvalid": "Το όνομα μπορεί να χρησιμοποιεί μόνο γράμματα, αριθμούς, κάτω παύλες και παύλες",
       "commandRequired": "Εισαγάγετε μια εντολή",

@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "តម្លៃទាំងអស់ត្រូវការនៅពេលខ្សែពាក្យបញ្ជា ឬតម្លៃណាមួយផ្លាស់ប្តូរ",
       "nameRequired": "បញ្ចូលឈ្មោះម៉ាស៊ីនមេ",
       "nameInvalid": "ឈ្មោះអាចប្រើតែអក្សរ លេខ សញ្ញាគូសក្រោម និងសញ្ញាចុចៗ",
       "commandRequired": "បញ្ចូលពាក្យបញ្ជា",

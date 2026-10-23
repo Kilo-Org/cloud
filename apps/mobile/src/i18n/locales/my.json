@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "command line သို့မဟုတ် မည်သည့် တန်ဖိုး ပြောင်းလဲသောအခါ တန်ဖိုးအားလုံး လိုအပ်သည်",
       "nameRequired": "ဆာဗာအမည်ကို ထည့်သွင်းပါ။",
       "nameInvalid": "အမည်သည် စာလုံးများ၊ နံပါတ်များ၊ အောက်ခံများနှင့် ဒက်ရှ်များကိုသာ အသုံးပြုနိုင်သည်။",
       "commandRequired": "အမိန့်တစ်ခုထည့်ပါ။",

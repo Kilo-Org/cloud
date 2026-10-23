@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "ሁሉም እሴቶች ያስፈልጋሉ የትእዛዝ መስመሩ ወይም ማንኛውም እሴት ሲቀየር",
       "nameRequired": "የአገልጋይ ስም አስገባ",
       "nameInvalid": "ስም ፊደሎችን፣ ቁጥሮችን፣ ሰረዞችን እና ሰረዞችን ብቻ መጠቀም ይችላል።",
       "commandRequired": "ትእዛዝ አስገባ",

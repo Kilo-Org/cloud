@@ -3746,6 +3746,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Tá gach luach de dhíth nuair a athraíonn an líne ordaithe nó aon luach",
       "nameRequired": "Cuir isteach ainm freastalaí",
       "nameInvalid": "Ní féidir le hainm ach litreacha, uimhreacha, béimeanna agus daiseanna a úsáid",
       "commandRequired": "Cuir isteach ordú",

@@ -3664,6 +3664,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "כל ערך נדרש כאשר שורת הפקודה או כל ערך אחר משתנה",
       "nameRequired": "הזן שם שרת",
       "nameInvalid": "השם יכול להשתמש רק באותיות, מספרים, קווים תחתונים ומקפים",
       "commandRequired": "הזן פקודה",

@@ -3705,6 +3705,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Kai pasikeičia komandinė eilutė arba bet kuri reikšmė, visos reikšmės yra būtinos",
       "nameRequired": "Įveskite serverio pavadinimą",
       "nameInvalid": "Varde gali būti naudojamos tik raidės, skaičiai, apatiniai brūkšniai ir brūkšniai",
       "commandRequired": "Įveskite komandą",

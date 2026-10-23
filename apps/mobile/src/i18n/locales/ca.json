@@ -3664,6 +3664,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Tots els valors són obligatoris quan canvia la línia d'ordres o qualsevol valor",
       "nameRequired": "Introduïu un nom de servidor",
       "nameInvalid": "El nom només pot utilitzar lletres, números, guions baixos i guions",
       "commandRequired": "Introduïu una ordre",

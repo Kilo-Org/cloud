@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Buyruq qatori yoki har qanday qiymat o'zgarsa, barcha qiymatlar talab qilinadi",
       "nameRequired": "Server nomini kiriting",
       "nameInvalid": "Ism faqat harflar, raqamlar, pastki chiziq va chiziqlardan foydalanishi mumkin",
       "commandRequired": "Buyruqni kiriting",

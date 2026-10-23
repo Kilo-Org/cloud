@@ -3705,6 +3705,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Все значения обязательны при изменении командной строки или любого значения",
       "nameRequired": "Введите имя сервера",
       "nameInvalid": "В имени можно использовать только буквы, цифры, символы подчеркивания и тире.",
       "commandRequired": "Введите команду",

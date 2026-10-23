@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "هر ارزښت اړین دی کله چې د کمانډ کرښه یا هر ارزښت بدل شي",
       "nameRequired": "د سرور نوم دننه کړئ",
       "nameInvalid": "نوم کولی شي یوازې توري، شمیرې، انډر سکورونه او ډشونه وکاروي",
       "commandRequired": "یو کمانډ دننه کړئ",

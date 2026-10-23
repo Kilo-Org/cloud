@@ -3705,6 +3705,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Všechny hodnoty jsou vyžadovány při změně příkazového řádku nebo kterékoli hodnoty",
       "nameRequired": "Zadejte název serveru",
       "nameInvalid": "Název může používat pouze písmena, čísla, podtržítka a pomlčky",
       "commandRequired": "Zadejte příkaz",

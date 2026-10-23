@@ -171,22 +171,29 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
           />
         )}
 
-        <FormField
-          label={type === 'local' ? t('profiles.mcp.environment') : t('profiles.mcp.headers')}
-          defaultValue={initial.configJson}
-          error={errorKeyFor(t, error, ['json-invalid', 'record-too-large'])}
-          disabled={isSaving}
-          multiline
-          textAlignVertical="top"
-          className="min-h-28 leading-5"
-          autoCapitalize="none"
-          autoCorrect={false}
-          placeholder={t('profiles.mcp.jsonPlaceholder')}
-          onChangeText={value => {
-            configRef.current = value;
-            setError(null);
-          }}
-        />
+        <View className="gap-1.5">
+          <FormField
+            label={type === 'local' ? t('profiles.mcp.environment') : t('profiles.mcp.headers')}
+            defaultValue={initial.configJson}
+            error={errorKeyFor(t, error, ['json-invalid', 'record-too-large'])}
+            disabled={isSaving}
+            multiline
+            textAlignVertical="top"
+            className="min-h-28 leading-5"
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder={t('profiles.mcp.jsonPlaceholder')}
+            onChangeText={value => {
+              configRef.current = value;
+              setError(null);
+            }}
+          />
+          {type === 'local' && server !== null ? (
+            <Text className="text-xs text-muted-foreground">
+              {t('profiles.mcp.environmentHint')}
+            </Text>
+          ) : null}
+        </View>
 
         <FormField
           label={t('profiles.mcp.timeout')}

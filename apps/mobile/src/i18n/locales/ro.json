@@ -3664,6 +3664,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Toate valorile sunt obligatorii atunci când linia de comandă sau orice valoare se schimbă",
       "nameRequired": "Introduceți un nume de server",
       "nameInvalid": "Numele poate folosi numai litere, cifre, litere de subliniere și liniuțe",
       "commandRequired": "Introduceți o comandă",

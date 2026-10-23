@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "கட்டளை வரி அல்லது எந்த மதிப்பு மாறும்போது ஒவ்வொரு மதிப்பும் தேவை",
       "nameRequired": "சர்வர் பெயரை உள்ளிடவும்",
       "nameInvalid": "பெயர் எழுத்துகள், எண்கள், அடிக்கோடுகள் மற்றும் கோடுகளை மட்டுமே பயன்படுத்த முடியும்",
       "commandRequired": "கட்டளையை உள்ளிடவும்",

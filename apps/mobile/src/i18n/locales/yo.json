@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Gbogbo iye ni pataki nigbati laini aṣẹ tabi eyikeyi iye yipada",
       "nameRequired": "Tẹ orukọ olupin sii",
       "nameInvalid": "Orukọ le lo awọn lẹta nikan, awọn nọmba, awọn abẹlẹ, ati dashes",
       "commandRequired": "Tẹ aṣẹ sii",

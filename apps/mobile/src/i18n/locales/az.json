@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Əmr sətri və ya hər hansı bir dəyişəndə bütün dəyərlər tələb olunur",
       "nameRequired": "Server adını daxil edin",
       "nameInvalid": "Ad yalnız hərflərdən, rəqəmlərdən, alt xəttlərdən və tirelərdən istifadə edə bilər",
       "commandRequired": "Komanda daxil edin",

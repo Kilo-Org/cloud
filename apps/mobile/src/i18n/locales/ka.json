@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "ბრძანების სტრიქონის ან რომელიმე მნიშვნელობის შეცვლისას ყველა მნიშვნელობა აუცილებელია",
       "nameRequired": "შეიყვანეთ სერვერის სახელი",
       "nameInvalid": "სახელს შეუძლია გამოიყენოს მხოლოდ ასოები, რიცხვები, ხაზები და ტირეები",
       "commandRequired": "შეიყვანეთ ბრძანება",

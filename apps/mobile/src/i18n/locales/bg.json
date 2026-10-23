@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Всяка стойност е задължителна при промяна на командния ред или на която и да е стойност",
       "nameRequired": "Въведете име на сървър",
       "nameInvalid": "Името може да съдържа само букви, цифри, долна черта и тирета",
       "commandRequired": "Въведете команда",

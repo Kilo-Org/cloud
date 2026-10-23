@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "명령줄 또는 값이 하나라도 변경되면 모든 값이 필요합니다",
       "nameRequired": "서버 이름을 입력하세요.",
       "nameInvalid": "이름에는 문자, 숫자, 밑줄, 대시만 사용할 수 있습니다.",
       "commandRequired": "명령을 입력하세요",

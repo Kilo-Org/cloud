@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "कमांड लाइन किंवा कोणतीही मूल्य बदलल्यावर प्रत्येक मूल्य आवश्यक आहे",
       "nameRequired": "सर्व्हरचे नाव एंटर करा",
       "nameInvalid": "नाव फक्त अक्षरे, संख्या, अंडरस्कोअर आणि डॅश वापरू शकते",
       "commandRequired": "कमांड एंटर करा",

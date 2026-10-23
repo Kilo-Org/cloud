@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "هر مقدار هنگام تغییر خط فرمان یا هر مقدار الزامی است",
       "nameRequired": "نام سرور را وارد کنید",
       "nameInvalid": "نام فقط می تواند از حروف، اعداد، زیرخط و خط تیره استفاده کند",
       "commandRequired": "دستوری را وارد کنید",

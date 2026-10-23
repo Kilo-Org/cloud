@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "當命令列或任何值變更時，所有值皆為必填",
       "nameRequired": "輸入伺服器名稱",
       "nameInvalid": "名稱只能使用字母、數字、底線和破折號",
       "commandRequired": "輸入命令",

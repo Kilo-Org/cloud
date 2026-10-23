@@ -3623,6 +3623,7 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "ທຸກໆຄ່າແມ່ນຕ້ອງການເມື່ອບັນດັບຄຳສັ່ງ ຫຼື ຄ່າໃດໜຶ່ງປ່ຽນແປງ",
       "nameRequired": "ໃສ່ຊື່ເຊີບເວີ",
       "nameInvalid": "ຊື່ສາມາດໃຊ້ພຽງແຕ່ຕົວອັກສອນ, ຕົວເລກ, ຂີດກ້ອງ, ແລະເຄື່ອງໝາຍຂີດ",
       "commandRequired": "ໃສ່ຄໍາສັ່ງ",

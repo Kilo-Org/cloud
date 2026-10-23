@@ -105,6 +105,7 @@ describe('baseSendMessageNextSchema', () => {
   it('rejects a follow-up prompt one character over the shared cap', () => {
     const result = baseSendMessageNextSchema.safeParse({
       cloudAgentSessionId: 'cloud-session-1',
+      messageId: MESSAGE_ID,
       payload: promptPayload(overCap),
     });
     expect(result.success).toBe(false);
@@ -113,6 +114,7 @@ describe('baseSendMessageNextSchema', () => {
   it('accepts follow-up command arguments at the shared cap', () => {
     const result = baseSendMessageNextSchema.safeParse({
       cloudAgentSessionId: 'cloud-session-1',
+      messageId: MESSAGE_ID,
       payload: commandPayload(atCap),
     });
     expect(result.success).toBe(true);
@@ -121,6 +123,7 @@ describe('baseSendMessageNextSchema', () => {
   it('rejects follow-up command arguments one character over the shared cap', () => {
     const result = baseSendMessageNextSchema.safeParse({
       cloudAgentSessionId: 'cloud-session-1',
+      messageId: MESSAGE_ID,
       payload: commandPayload(overCap),
     });
     expect(result.success).toBe(false);

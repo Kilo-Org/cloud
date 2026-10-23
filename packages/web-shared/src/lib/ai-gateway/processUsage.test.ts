@@ -30,7 +30,8 @@ import {
 import { join } from 'node:path';
 import { createReadStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import assert from 'node:assert/strict';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   bouncer_usage_event_outbox,
   microdollar_usage,
@@ -49,6 +50,11 @@ import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detecti
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { PgDialect } from 'drizzle-orm/pg-core';
+import {
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { extractReasoningSetting } from './llm-proxy-helpers';
 
 jest.mock('@sentry/nextjs', () => ({
@@ -145,7 +151,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       'fake-user-id',
       undefined,
       'openrouter',
-      200
+      200,
+      false
     );
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
@@ -162,7 +169,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       'fake-user-id',
       undefined,
       'openrouter',
-      200
+      200,
+      false
     );
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
@@ -179,7 +187,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       'fake-user-id',
       undefined,
       'openrouter',
-      200
+      200,
+      false
     );
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
@@ -237,7 +246,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
         'fake-user-id',
         undefined,
         'openrouter',
-        200
+        200,
+        false
       );
 
       expect(result.messageId).toBe('gen-123');
@@ -260,7 +270,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       'fake-user-id',
       undefined,
       'openrouter',
-      200
+      200,
+      false
     );
 
     expect(result.hasError).toBe(true);
@@ -273,9 +284,19 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     ['responses', 'TimeoutError'],
     ['messages', 'ResponseAborted'],
     ['messages', 'TimeoutError'],
+    ['chat_completions', 'undici terminated'],
+    ['responses', 'undici terminated'],
+    ['messages', 'undici terminated'],
+    ['chat_completions', 'cross-realm undici terminated'],
   ] as const)('handles %s response.text() %s errors', async (apiKind, errorName) => {
-    const streamError = new Error('Response interrupted');
-    streamError.name = errorName;
+    const streamError =
+      errorName === 'undici terminated'
+        ? new TypeError('terminated', {
+            cause: Object.assign(new Error('other side closed'), { code: 'UND_ERR_SOCKET' }),
+          })
+        : errorName === 'cross-realm undici terminated'
+          ? { name: 'TypeError', message: 'terminated', cause: { code: 'UND_ERR_SOCKET' } }
+          : Object.assign(new Error('Response interrupted'), { name: errorName });
     const response = new Response(
       new ReadableStream({
         start(controller) {
@@ -290,6 +311,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
         {
           api_kind: apiKind,
           isStreaming: false,
+          is_free: false,
         } as MicrodollarUsageContext,
         undefined
       )
@@ -311,7 +333,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       'fake-user-id',
       undefined,
       'openrouter',
-      200
+      200,
+      false
     );
 
     expect(result.hasError).toBe(true);
@@ -319,19 +342,17 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
   });
 
   describe('upstream error reporting', () => {
-    const overloadMessage = 'Upstream error from Nvidia: Service temporarily overloaded';
-
     beforeEach(() => {
       jest.mocked(captureException).mockClear();
       jest.mocked(captureMessage).mockClear();
-      jest.spyOn(console, 'info').mockImplementation(() => {});
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
     });
 
     afterEach(() => {
       jest.restoreAllMocks();
     });
 
-    const parseChunks = (chunks: object[]) =>
+    const parseChunks = (chunks: object[], usesUserCredentials = false) =>
       parseMicrodollarUsageFromStream(
         new ReadableStream<Uint8Array>({
           start(controller) {
@@ -345,63 +366,95 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
         'fake-user-id',
         undefined,
         'openrouter',
-        200
+        200,
+        usesUserCredentials
       );
 
-    test.each([502, '502', undefined])(
-      'logs Nvidia overload without reporting to Sentry when code is %s',
-      async code => {
-        const result = await parseChunks([
-          {
-            id: 'gen-nvidia-overload',
-            model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
-            provider: 'Nvidia',
-            choices: [],
-            error: { code, message: overloadMessage },
-          },
-        ]);
-
-        expect(console.info).toHaveBeenCalledWith(`OpenRouter error: ${overloadMessage}`, {
-          source: 'sse_processing',
-          provider: 'openrouter',
-          code,
-          messageId: 'gen-nvidia-overload',
-          model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
-        });
-        expect(captureException).not.toHaveBeenCalled();
-        expect(captureMessage).not.toHaveBeenCalled();
-        expect(result).toMatchObject({
-          hasError: true,
-          status_code: typeof code === 'number' ? code : 200,
-          messageId: 'gen-nvidia-overload',
-          model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
-          inference_provider: 'Nvidia',
-        });
-      }
-    );
-
     test.each([
-      'Upstream error from Nvidia: Internal server error',
-      'Upstream error from Nvidia: ResourceExhausted: Worker local total request limit reached (16/16)',
-      'Upstream error from Tencent: Service temporarily overloaded',
-      'Upstream idle timeout exceeded',
-    ])('still reports %s to Sentry', async message => {
-      const chunk = { error: { code: 502, message } };
-      const result = await parseChunks([chunk]);
+      { code: 502, message: 'Upstream error from Nvidia: Service temporarily overloaded' },
+      { code: '502', message: 'Upstream error from Nvidia: Internal server error' },
+      { code: undefined, message: 'Upstream stream ended before terminal chunk' },
+      {
+        code: 502,
+        message: 'JSON error injected into SSE stream',
+        metadata: { error_type: 'provider_unavailable' },
+      },
+      {
+        code: 504,
+        message: 'Upstream idle timeout exceeded',
+        metadata: { error_type: 'timeout' },
+      },
+    ])('logs transient upstream error $message without reporting to Sentry', async error => {
+      const result = await parseChunks([
+        {
+          id: 'gen-transient',
+          model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+          provider: 'Nvidia',
+          choices: [],
+          error,
+        },
+      ]);
 
-      expect(console.info).not.toHaveBeenCalled();
-      expect(captureException).toHaveBeenCalledTimes(1);
-      expect(captureException).toHaveBeenCalledWith(new Error(`OpenRouter error: ${message}`), {
-        tags: { source: 'sse_processing' },
-        extra: { json: chunk, event: expect.objectContaining({ data: JSON.stringify(chunk) }) },
+      expect(console.warn).toHaveBeenCalledWith(`OpenRouter error: ${error.message}`, {
+        source: 'sse_processing',
+        code: error.code,
+        error_type: error.metadata?.error_type,
+        uses_user_credentials: false,
+        provider: 'openrouter',
+        inference_provider: 'Nvidia',
+        messageId: 'gen-transient',
+        model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
       });
-      expect(result).toMatchObject({ hasError: true, status_code: 502 });
+      expect(captureException).not.toHaveBeenCalled();
+      expect(captureMessage).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        hasError: true,
+        status_code: typeof error.code === 'number' ? error.code : 200,
+        messageId: 'gen-transient',
+        model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+        inference_provider: 'Nvidia',
+      });
     });
 
-    test('preserves partial content and usage and reports later errors after Nvidia overload', async () => {
+    test.each([
+      { code: 401, message: 'User not found.' },
+      { code: '403', message: 'Key is not allowed to access this model' },
+      { code: 402, message: 'Insufficient credits' },
+      { code: 500, message: 'Invalid key', metadata: { error_type: 'authentication_error' } },
+    ])('reports account error $message on Kilo credentials to Sentry', async error => {
+      const chunk = { choices: [], error };
+      await parseChunks([chunk]);
+
+      expect(console.warn).not.toHaveBeenCalled();
+      expect(captureException).toHaveBeenCalledTimes(1);
+      expect(captureException).toHaveBeenCalledWith(
+        new Error(`OpenRouter error: ${error.message}`),
+        {
+          tags: { source: 'sse_processing' },
+          extra: { json: chunk, event: expect.objectContaining({ data: JSON.stringify(chunk) }) },
+        }
+      );
+    });
+
+    test('only logs account errors on user credentials', async () => {
+      await parseChunks([{ choices: [], error: { code: 401, message: 'Invalid API key' } }], true);
+
+      expect(captureException).not.toHaveBeenCalled();
+      expect(console.warn).toHaveBeenCalledWith(
+        'OpenRouter error: Invalid API key',
+        expect.objectContaining({ code: 401, uses_user_credentials: true })
+      );
+    });
+
+    test('preserves partial content and usage across multiple upstream errors', async () => {
       const result = await parseChunks([
         { id: 'gen-partial', model: 'test-model', choices: [{ delta: { content: 'Hello' } }] },
-        { error: { code: 502, message: overloadMessage } },
+        {
+          error: {
+            code: 502,
+            message: 'Upstream error from Nvidia: Service temporarily overloaded',
+          },
+        },
         {
           choices: [{ delta: { content: ' world' } }],
           usage: { prompt_tokens: 10, completion_tokens: 2, cost: 0.001, is_byok: false },
@@ -409,15 +462,12 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
         { error: { code: 504, message: 'Upstream idle timeout exceeded' } },
       ]);
 
-      expect(console.info).toHaveBeenCalledWith(
-        `OpenRouter error: ${overloadMessage}`,
-        expect.objectContaining({ messageId: 'gen-partial', model: 'test-model' })
+      expect(console.warn).toHaveBeenCalledTimes(2);
+      expect(console.warn).toHaveBeenLastCalledWith(
+        'OpenRouter error: Upstream idle timeout exceeded',
+        expect.objectContaining({ messageId: 'gen-partial', model: 'test-model', code: 504 })
       );
-      expect(captureException).toHaveBeenCalledTimes(1);
-      expect(captureException).toHaveBeenCalledWith(
-        new Error('OpenRouter error: Upstream idle timeout exceeded'),
-        expect.any(Object)
-      );
+      expect(captureException).not.toHaveBeenCalled();
       expect(captureMessage).not.toHaveBeenCalled();
       expect(result).toMatchObject({
         hasError: true,
@@ -445,7 +495,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       'fake-user-id',
       undefined,
       'vercel',
-      200
+      200,
+      false
     );
 
     expect(result.upstream_id).toBe('chatcmpl-ccebc94c526d4f8797cfe00023478a9a');
@@ -469,7 +520,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       'fake-user-id',
       undefined,
       'vercel',
-      200
+      200,
+      false
     );
 
     expect(result.upstream_id).toBeNull();
@@ -675,6 +727,7 @@ describe('logMicrodollarUsage', () => {
       isStreaming: true,
       project_id: null,
       requested_model: 'anthropic/claude-3.7-sonnet',
+      is_free: false,
       promptInfo: {
         system_prompt_prefix: 'You are a helpful assistant',
         system_prompt_length: 'You are a helpful assistant'.length,
@@ -1410,6 +1463,204 @@ describe('logMicrodollarUsage', () => {
     expect(mockedReportUsageEvent).not.toHaveBeenCalled();
   });
 
+  test('records custom LLM usage as free regardless of upstream cost', async () => {
+    const user = await insertTestUser({
+      id: 'test-custom-llm-free-user',
+      microdollars_used: 1000,
+      google_user_email: 'custom-llm-free@example.com',
+    });
+
+    await insertCustomLlmForTest('acme/free-custom-model');
+    try {
+      await processTokenData(
+        { ...BASE_USAGE_STATS, messageId: 'test-custom-llm-free', cost_mUsd: 700 },
+        {
+          ...createBaseUsageContext(user),
+          provider: 'custom',
+          requested_model: 'acme/free-custom-model',
+          is_free: true,
+        }
+      );
+    } finally {
+      await deleteCustomLlmForTest('acme/free-custom-model');
+    }
+
+    expect((await findUserById('test-custom-llm-free-user'))?.microdollars_used).toBe(1000);
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.message_id, 'test-custom-llm-free'),
+    });
+    expect(metadataRecord?.is_free).toBe(true);
+  });
+
+  test.each(['deleted', 'unavailable'] as const)(
+    'keeps a selected custom LLM free when its catalog entry is %s',
+    async catalogState => {
+      const user = await insertTestUser({
+        id: `test-${catalogState}-custom-llm-user`,
+        microdollars_used: 1000,
+        google_user_email: `${catalogState}-custom-llm@example.com`,
+      });
+      const organization = await createTestOrganization('Deleted custom LLM', user.id, 10_000);
+      const modelId = `acme/${catalogState}-custom-model`;
+      await insertCustomLlmForTest(modelId);
+      const catalogReadSpy = jest.spyOn(readDb, 'select');
+      try {
+        expect(await isCustomLlm(modelId)).toBe(true);
+        const usageContext: MicrodollarUsageContext = {
+          ...createBaseUsageContext(user),
+          organizationId: organization.id,
+          provider: 'custom',
+          requested_model: modelId,
+          is_free: true,
+        };
+
+        await deleteCustomLlmForTest(modelId);
+        if (catalogState === 'unavailable') {
+          catalogReadSpy.mockImplementation(() => {
+            throw new Error('Custom LLM catalog unavailable');
+          });
+        }
+        expect(await isCustomLlm(modelId)).toBe(false);
+
+        const result = await processTokenData(
+          { ...BASE_USAGE_STATS, cost_mUsd: 700, cacheDiscount_mUsd: 50 },
+          usageContext
+        );
+        assert(result);
+        const usageRecord = await db.query.microdollar_usage.findFirst({
+          where: eq(microdollar_usage.id, result.usageId),
+        });
+        expect(usageRecord).toMatchObject({ provider: 'custom', cost: 0, cache_discount: 0 });
+        const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+          where: eq(microdollar_usage_metadata.id, result.usageId),
+        });
+        expect(metadataRecord).toMatchObject({ is_free: true, market_cost: 700 });
+        expect((await findUserById(user.id))?.microdollars_used).toBe(1000);
+        const updatedOrganization = await db.query.organizations.findFirst({
+          where: eq(organizations.id, organization.id),
+        });
+        expect(updatedOrganization).toMatchObject({
+          microdollars_used: 0,
+          microdollars_balance: 10_000,
+        });
+      } finally {
+        catalogReadSpy.mockRestore();
+        await deleteCustomLlmForTest(modelId);
+      }
+    }
+  );
+
+  test.each([false, true])('preserves paid model accounting with user BYOK=%s', async userByok => {
+    const user = await insertTestUser({
+      id: `test-paid-model-byok-${userByok}`,
+      microdollars_used: 1000,
+      google_user_email: `paid-model-byok-${userByok}@example.com`,
+    });
+    const result = await processTokenData(
+      { ...BASE_USAGE_STATS, messageId: null, cost_mUsd: 700, cacheDiscount_mUsd: 50 },
+      { ...createBaseUsageContext(user), user_byok: userByok }
+    );
+
+    assert(result);
+    const usageRecord = await db.query.microdollar_usage.findFirst({
+      where: eq(microdollar_usage.id, result.usageId),
+    });
+    expect(usageRecord).toMatchObject({
+      cost: userByok ? 0 : 700,
+      cache_discount: userByok ? 0 : 50,
+    });
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.id, result.usageId),
+    });
+    expect(metadataRecord).toMatchObject({
+      is_free: false,
+      is_user_byok: userByok,
+      market_cost: 700,
+    });
+    expect((await findUserById(user.id))?.microdollars_used).toBe(userByok ? 1000 : 1700);
+  });
+
+  test.each([
+    { provider: 'openrouter', user_byok: false, reportsToSentry: true },
+    { provider: 'custom', user_byok: false, reportsToSentry: true },
+    { provider: 'openrouter', user_byok: true, reportsToSentry: false },
+    { provider: 'openai-chatgpt', user_byok: false, reportsToSentry: false },
+  ] as const)(
+    'reports in-stream auth errors to Sentry=$reportsToSentry for provider $provider with user BYOK=$user_byok',
+    async ({ provider, user_byok, reportsToSentry }) => {
+      jest.mocked(captureException).mockClear();
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const user = await insertTestUser({
+        id: `test-stream-auth-error-${provider}-${user_byok}`,
+        microdollars_used: 0,
+        google_user_email: `stream-auth-error-${provider}-${user_byok}@example.com`,
+      });
+      const errorEvent = {
+        type: 'error',
+        error: { code: 'invalid_api_key', message: 'Incorrect API key provided' },
+      };
+
+      try {
+        await countAndStoreUsage(
+          new Response(`data: ${JSON.stringify(errorEvent)}\n\n`),
+          { ...createBaseUsageContext(user), api_kind: 'responses', provider, user_byok },
+          undefined
+        );
+
+        const authError = new Error('Responses API error: Incorrect API key provided');
+        const authErrorContext = expect.objectContaining({
+          tags: { source: 'responses_sse_processing' },
+        });
+        if (reportsToSentry) {
+          expect(captureException).toHaveBeenCalledWith(authError, authErrorContext);
+        } else {
+          expect(captureException).not.toHaveBeenCalledWith(authError, authErrorContext);
+          expect(warn).toHaveBeenCalledWith(
+            'Responses API error: Incorrect API key provided',
+            expect.objectContaining({ uses_user_credentials: true })
+          );
+        }
+      } finally {
+        warn.mockRestore();
+      }
+    }
+  );
+
+  test('preserves a paid snapshot when the requested id later becomes a custom model', async () => {
+    const user = await insertTestUser({
+      id: 'test-paid-snapshot-user',
+      microdollars_used: 1000,
+      google_user_email: 'paid-snapshot@example.com',
+    });
+    const modelId = 'acme/registered-after-routing';
+    const usageContext: MicrodollarUsageContext = {
+      ...createBaseUsageContext(user),
+      requested_model: modelId,
+      is_free: false,
+    };
+
+    await insertCustomLlmForTest(modelId);
+    try {
+      expect(await isCustomLlm(modelId)).toBe(true);
+      const result = await processTokenData(
+        { ...BASE_USAGE_STATS, messageId: null, cost_mUsd: 700, cacheDiscount_mUsd: 50 },
+        usageContext
+      );
+      assert(result);
+      const usageRecord = await db.query.microdollar_usage.findFirst({
+        where: eq(microdollar_usage.id, result.usageId),
+      });
+      expect(usageRecord).toMatchObject({ cost: 700, cache_discount: 50 });
+      const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+        where: eq(microdollar_usage_metadata.id, result.usageId),
+      });
+      expect(metadataRecord).toMatchObject({ is_free: false, market_cost: 700 });
+      expect((await findUserById(user.id))?.microdollars_used).toBe(1700);
+    } finally {
+      await deleteCustomLlmForTest(modelId);
+    }
+  });
+
   test('does not report a bouncer usage event without the bouncer context', async () => {
     mockedReportUsageEvent.mockClear();
     const user = await insertTestUser({
@@ -1505,6 +1756,25 @@ describe('logMicrodollarUsage', () => {
       expect(mockedReportUsageEvent).toHaveBeenCalledWith(
         expect.objectContaining({ requestId, costMicrodollars: BASE_USAGE_STATS.cost_mUsd })
       );
+      expect(mockedReportUsageEvent.mock.calls[0]?.[0]).not.toHaveProperty('siwc');
+    });
+
+    test('marks a request served on the delegated ChatGPT connection as siwc', async () => {
+      const user = await insertTestUser({
+        id: 'test-bouncer-siwc-user',
+        microdollars_used: 0,
+        google_user_email: 'bouncer-siwc@example.com',
+      });
+      const requestId = 'req-bouncer-siwc';
+
+      await processTokenData(
+        { ...BASE_USAGE_STATS, messageId: null },
+        { ...spendWatchContext(user, requestId, false), provider: 'openai-chatgpt' }
+      );
+
+      expect(mockedReportUsageEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ requestId, accountId: `user:${user.id}`, siwc: true })
+      );
     });
   });
 });
@@ -1582,6 +1852,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       isStreaming: false,
       project_id: null,
       requested_model: 'provider/requested-model',
+      is_free: false,
       promptInfo: {
         system_prompt_prefix: 'sys-prefix',
         system_prompt_length: 10,

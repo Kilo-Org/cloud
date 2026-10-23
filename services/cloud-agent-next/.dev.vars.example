@@ -25,8 +25,14 @@ INTERNAL_API_SECRET=your-internal-api-secret-here
 KILOCODE_BACKEND_BASE_URL=http://localhost:3000
 # Always the local Next.js gateway. Selecting `fake-deterministic` routes
 # through Next.js to the fake-llm service; do not point this at fake-llm.
-# @url nextjs/api
-KILO_OPENROUTER_BASE=http://localhost:3000/api
+# @url nextjs/api/openrouter
+KILO_OPENROUTER_BASE=http://localhost:3000/api/openrouter
+
+# Scoped subagent-launch MCP endpoint for parent sessions that opt in with
+# allowSubagentSessions. Local dev points the grant at the local kilo-mcp
+# service; deployed config never sets this and issuance pins production.
+# @url kilo-mcp/mcp
+CLOUD_AGENT_MCP_URL_OVERRIDE=http://host.docker.internal:8815/mcp
 
 # Worker base URL used by the wrapper to connect to /ingest.
 # Sandbox containers reach the host via `host.docker.internal`.
@@ -47,9 +53,9 @@ REAPER_INTERVAL_MS=300000
 # Comma-separated list of org IDs that use per-session Cloudflare sandboxes, or `*` for all orgs
 PER_SESSION_SANDBOX_ORG_IDS=
 
-# Code Reviewer sessions run on the control plane for these owners.
+# Code Reviewer sessions use the Cloudflare Containers runtime for these owners.
 # Comma-separated user or org IDs, or `*` for all including personal accounts.
-CODE_REVIEW_CONTROL_PLANE_IDS=*
+CODE_REVIEW_CONTAINERS_ORG_IDS=
 # Comma-separated user or org IDs allowed to pick a sandbox destination, or `*` for all
 SANDBOX_SELECTION_IDS=*
 

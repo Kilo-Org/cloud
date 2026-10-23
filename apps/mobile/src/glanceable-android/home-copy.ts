@@ -1,4 +1,5 @@
 import { type HomeWidgetPresentation } from '@kilocode/app-shared/home-widget';
+import { parseTimestamp } from '@kilocode/app-shared/utils';
 
 import { type GlanceableCountKind } from '@/lib/glanceable/presentation';
 import { type GlanceableActionFeedback } from '@/lib/glanceable/surface-extras';
@@ -76,7 +77,8 @@ function scheduledAgentTime(
   if (scheduledAt === null) {
     return null;
   }
-  return Date.parse(scheduledAt) <= Date.now()
+  const wake = parseTimestamp(scheduledAt).getTime();
+  return Number.isFinite(wake) && wake <= Date.now()
     ? translate('glanceable.awaitingUpdate')
     : formatClock(scheduledAt);
 }

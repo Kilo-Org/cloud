@@ -155,11 +155,6 @@ export function createControlTerminalRuntime(options: {
   wrapperInstanceId: string;
   getKiloRuntime: (identity: SessionRequestIdentity) => WorktreeKiloRuntime | undefined;
   getRetainedKiloRuntime?: (identity: SessionRequestIdentity) => WorktreeKiloRuntime | undefined;
-  /**
-   * Called for each browser→PTY input frame. The control-plane wrapper uses it
-   * to keep heartbeat `active` true only while a terminal has real input
-   * (spec §6), not merely because a PTY exists.
-   */
   onInput?: (identity: SessionRequestIdentity) => void;
 }): ControlTerminalRuntime {
   const { wrapperInstanceId } = options;

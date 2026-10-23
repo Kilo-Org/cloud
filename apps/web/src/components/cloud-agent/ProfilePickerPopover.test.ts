@@ -12,11 +12,12 @@ import type * as ProfilePickerPopoverModule from './ProfilePickerPopover';
 
 let mockCombined: unknown;
 let mockPersonal: unknown;
+let mockRepoBindings: { repoFullName: string; platform: 'github'; profileId: string }[] = [];
 
 jest.mock('@/hooks/useCloudAgentProfiles', () => ({
   useCombinedProfiles: () => mockCombined,
   useProfiles: () => mockPersonal,
-  useRepoBindings: () => ({ data: [] }),
+  useRepoBindings: () => ({ data: mockRepoBindings }),
 }));
 
 jest.mock('@/components/ui/popover', () => {
@@ -44,20 +45,67 @@ const PROFILE = {
   name: 'Production',
   ownerType: 'organization',
   varCount: 2,
-  mcpServerCount: 1,
-  skillCount: 0,
-  kiloCommandCount: 0,
+  mcpServerCount: 2,
+  skillCount: 6,
+  kiloCommandCount: 3,
 };
 
-function renderPicker(): string {
+function renderPicker(
+  selectedOverrideProfileId: string | null = null,
+  repoFullName?: string
+): string {
   return renderToStaticMarkup(
     createElement(ProfilePickerPopover, {
       organizationId: 'org-1',
-      selectedOverrideProfileId: null,
+      selectedOverrideProfileId,
+      repoFullName,
       onOverrideProfileSelect: jest.fn(),
     })
   );
 }
+
+describe('ProfilePickerPopover trigger', () => {
+  beforeEach(() => {
+    mockCombined = {
+      data: {
+        allProfiles: [PROFILE, { ...PROFILE, id: 'profile-2', name: 'Development' }],
+        effectiveDefaultId: PROFILE.id,
+      },
+      isLoading: false,
+      error: undefined,
+      refetch: jest.fn(),
+    };
+    mockPersonal = { data: [], isLoading: false, error: undefined, refetch: jest.fn() };
+    mockRepoBindings = [{ repoFullName: 'acme/repo', platform: 'github', profileId: PROFILE.id }];
+  });
+
+  it.each([
+    { selectedOverrideProfileId: null, repoFullName: undefined, name: 'Production' },
+    { selectedOverrideProfileId: 'profile-2', repoFullName: undefined, name: 'Development' },
+    { selectedOverrideProfileId: 'profile-2', repoFullName: 'acme/repo', name: 'Development' },
+  ])('shows only $name for override $selectedOverrideProfileId and repo $repoFullName', props => {
+    const markup = renderPicker(props.selectedOverrideProfileId, props.repoFullName);
+    const triggerText = markup.split('</button>')[0].replace(/<[^>]*>/g, '');
+
+    expect(triggerText).toBe(props.name);
+    expect(markup).toContain('2 vars · 2 MCP · 6 skills · 3 cmds');
+  });
+
+  it('keeps the no-profile label when no profile is selected', () => {
+    mockCombined = {
+      data: { allProfiles: [], effectiveDefaultId: null },
+      isLoading: false,
+      error: undefined,
+      refetch: jest.fn(),
+    };
+
+    const triggerText = renderPicker()
+      .split('</button>')[0]
+      .replace(/<[^>]*>/g, '');
+
+    expect(triggerText).toBe('No profile');
+  });
+});
 
 describe('ProfilePickerPopover profiles error state', () => {
   it('keeps the picker when a refetch fails but cached profiles remain', () => {

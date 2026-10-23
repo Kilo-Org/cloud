@@ -23,6 +23,7 @@ const fetchInstances = vi.hoisted(() =>
 const queryOptionsCalls = vi.hoisted(() => [] as Record<string, unknown>[]);
 const bridge = vi.hoisted(() => ({
   currentValue: null as InstancePickerInstance | null,
+  pendingComputer: false,
   onSelect: vi.fn(),
 }));
 const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
@@ -50,7 +51,7 @@ const flashListMock = vi.hoisted(
         )
       );
       const empty = props.data.length === 0 ? props.ListEmptyComponent : null;
-      return createElement('FlashList', null, props.ListHeaderComponent, ...rows, empty);
+      return createElement('FlashList', props, props.ListHeaderComponent, ...rows, empty);
     }
 );
 
@@ -190,12 +191,24 @@ async function mount(): Promise<TestRenderer.ReactTestRenderer> {
   return ref.current;
 }
 
+/** The FlashList the success state renders, so a test can inspect its list props. */
+function flashListOf(root: TestRenderer.ReactTestInstance): {
+  props: { contentContainerStyle?: { paddingBottom?: number } };
+} {
+  const list = findByType(root, 'FlashList')[0];
+  if (!list) {
+    throw new Error('FlashList not found');
+  }
+  return list as { props: { contentContainerStyle?: { paddingBottom?: number } } };
+}
+
 describe('InstancePickerScreen list', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     fetchInstances.mockReset().mockResolvedValue({ instances: [CLI_INSTANCE, REMOTE_INSTANCE] });
     queryOptionsCalls.length = 0;
     bridge.currentValue = CLI_INSTANCE;
+    bridge.pendingComputer = false;
     bridge.onSelect.mockClear();
     router.back.mockClear();
     insets.bottom = 0;
@@ -242,6 +255,48 @@ describe('InstancePickerScreen list', () => {
     // through FlashList when the instance data is an empty array.
     expect(findByType(renderer.root, 'EmptyState')).toHaveLength(1);
     expect(radios(renderer.root)).toHaveLength(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('clears the gesture bar with the detail-screen floor, not the raw inset', async () => {
+    // A zero reported bottom inset: the floor still keeps the sheet's bottom
+    // action above the Android gesture navigation bar.
+    insets.bottom = 0;
+    const renderer = await mount();
+
+    const style = flashListOf(renderer.root).props.contentContainerStyle;
+    expect(style?.paddingBottom).toBe(32);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps a reported bottom inset larger than the floor', async () => {
+    insets.bottom = 34;
+    const renderer = await mount();
+
+    const style = flashListOf(renderer.root).props.contentContainerStyle;
+    expect(style?.paddingBottom).toBe(50);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('marks no row checked while the pending computer target owns the form', async () => {
+    bridge.currentValue = null;
+    bridge.pendingComputer = true;
+    const renderer = await mount();
+
+    // Every radio renders unchecked: the Cloud Agent default is not the
+    // current target, and no instance row is bound either.
+    for (const radio of radios(renderer.root)) {
+      expect(radio.props.accessibilityState).toMatchObject({ checked: false });
+    }
 
     act(() => {
       renderer.unmount();

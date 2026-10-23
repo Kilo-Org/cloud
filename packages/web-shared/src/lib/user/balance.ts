@@ -4,6 +4,7 @@ import { after } from 'next/server';
 import { maybePerformAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
 import type { UserForBalance } from '@kilocode/web-shared/lib/user/balance-types';
 import { subHours } from 'date-fns';
+import { accountBalanceMicrodollars } from '@kilocode/worker-utils/account-access';
 
 export type BalanceForUser = Awaited<ReturnType<typeof getBalanceForUser>>;
 export async function getBalanceForUser(
@@ -11,13 +12,22 @@ export async function getBalanceForUser(
   options: {
     forceRefresh?: boolean;
     quiet?: boolean;
+    /** Instant the expiry cut-off is measured from. Defaults to the current time. */
+    now?: Date;
+    /** How many hours the cut-off trails `now` by. Defaults to a random 0-1 draw. */
+    expiryJitterHours?: number;
   } = {}
 ) {
-  const { forceRefresh = false, quiet = false } = options;
+  const {
+    forceRefresh = false,
+    quiet = false,
+    now = new Date(),
+    expiryJitterHours = Math.random(),
+  } = options;
   // If we DO unfortunately coincidentally check a user in multiple threads,
   // reduce chance of optimistic concurrency issues by giving users a random
   // extra 0 - 1 extra  hours before expiration:
-  const expireBefore = subHours(new Date(), Math.random());
+  const expireBefore = subHours(now, expiryJitterHours);
 
   const needsExpirationComputation =
     forceRefresh ||
@@ -32,6 +42,6 @@ export async function getBalanceForUser(
   }
 
   after(() => maybePerformAutoTopUp(user));
-  const balance = (user.total_microdollars_acquired - user.microdollars_used) / 1_000_000;
+  const balance = accountBalanceMicrodollars(user) / 1_000_000;
   return { balance };
 }

@@ -23,7 +23,7 @@ import {
   type CondenseResult,
 } from '../condense-on-complete.js';
 import { childFromSessionCreated, eventKiloSessionId } from '../control/feed.js';
-import type { KiloFeedEvent } from '../control/worktree-feed.js';
+import type { KiloFeedEvent } from './kilo-event-feed.js';
 import { isKiloServerUnreachableError, type WrapperKiloClient } from '../kilo-api.js';
 import { materializeMessageAttachments } from '../session-bootstrap.js';
 import { isUnresponsiveRestart, type KiloRestartInfo } from './kilo-runtime.js';
@@ -763,7 +763,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
           reply.permissionId,
           reply.response,
           reply.message,
-          undefined,
+          true,
           route.directory
         );
       } else if (reply.action === 'reject') {

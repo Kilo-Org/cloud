@@ -41,11 +41,11 @@ describe('deletion completion gates', () => {
       requestId,
       catalogForVersion(2)
         .map(entry => entry.stepKey)
-        .filter(key => key !== UserDeletionStepKey.CsaSupportDb),
+        .filter(key => key !== UserDeletionStepKey.PylonContact),
       { status: UserDeletionStepStatus.NotApplicable }
     );
     const claimToken = crypto.randomUUID();
-    await setStepsStatus(requestId, [UserDeletionStepKey.CsaSupportDb], {
+    await setStepsStatus(requestId, [UserDeletionStepKey.PylonContact], {
       status: UserDeletionStepStatus.Running,
       claim_token: claimToken,
       claimed_until: new Date(Date.now() + 60_000).toISOString(),
@@ -53,7 +53,7 @@ describe('deletion completion gates', () => {
 
     const persisted = await persistHandlerOutcome({
       requestId,
-      stepKey: UserDeletionStepKey.CsaSupportDb,
+      stepKey: UserDeletionStepKey.PylonContact,
       claimToken,
       outcome: { kind: 'not_applicable' },
     });
@@ -61,6 +61,49 @@ describe('deletion completion gates', () => {
     expect(persisted.kind).toBe('applied');
     const request = await loadRequest(requestId);
     expect(request?.status).toBe(UserDeletionRequestStatus.Completed);
+  });
+
+  it.each([
+    UserDeletionStepStatus.Pending,
+    UserDeletionStepStatus.RetryWait,
+    UserDeletionStepStatus.NeedsAttention,
+    UserDeletionStepStatus.Running,
+  ])('completes without waiting for a historical CSA row in %s status', async status => {
+    const requestId = await enqueueEmailOnly();
+    await setRequestStatus(requestId, UserDeletionRequestStatus.Finalizing);
+    await setStepsStatus(
+      requestId,
+      catalogForVersion(2).map(entry => entry.stepKey),
+      { status: UserDeletionStepStatus.Succeeded }
+    );
+    const claimToken = status === UserDeletionStepStatus.Running ? crypto.randomUUID() : null;
+    const claimedUntil = claimToken ? new Date(Date.now() + 60_000).toISOString() : null;
+    await db.insert(user_deletion_steps).values({
+      request_id: requestId,
+      step_key: UserDeletionStepKey.CsaSupportDb,
+      status,
+      claim_token: claimToken,
+      claimed_until: claimedUntil,
+    });
+
+    await advanceDeletionGates(requestId);
+
+    const request = await loadRequest(requestId);
+    expect(request?.status).toBe(UserDeletionRequestStatus.Completed);
+    expect(request?.target_email).toBeNull();
+    const [legacyStep] = await db
+      .select()
+      .from(user_deletion_steps)
+      .where(
+        and(
+          eq(user_deletion_steps.request_id, requestId),
+          eq(user_deletion_steps.step_key, UserDeletionStepKey.CsaSupportDb)
+        )
+      );
+    expect(legacyStep).toMatchObject({ status, claim_token: claimToken });
+    if (claimedUntil) {
+      expect(new Date(legacyStep.claimed_until ?? '').toISOString()).toBe(claimedUntil);
+    }
   });
 
   it('does not scrub or complete a new v2 request while completion email is pending', async () => {
@@ -129,12 +172,12 @@ describe('deletion completion gates', () => {
       .where(
         and(
           eq(user_deletion_steps.request_id, requestId),
-          eq(user_deletion_steps.step_key, UserDeletionStepKey.CsaSupportDb)
+          eq(user_deletion_steps.step_key, UserDeletionStepKey.PylonContact)
         )
       );
 
     await expect(advanceDeletionGates(requestId)).rejects.toThrow(
-      `missing required step ${UserDeletionStepKey.CsaSupportDb}`
+      `missing required step ${UserDeletionStepKey.PylonContact}`
     );
 
     const request = await loadRequest(requestId);

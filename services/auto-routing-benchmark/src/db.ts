@@ -16,7 +16,22 @@ import { benchmarkPairKey, RoutingTableSchema } from '@kilocode/auto-routing-con
 import type { BenchmarkPair } from '@kilocode/auto-routing-contracts';
 import { BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
-import { and, asc, count, desc, eq, gt, inArray, lt, ne, notInArray, or, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  ne,
+  notInArray,
+  or,
+  sql,
+} from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import * as z from 'zod';
 import {
@@ -28,6 +43,7 @@ import {
   configDeciderModels,
   modelSummaries,
   pendingDeciderOutputs,
+  profileRemeasures,
   routingTableCandidates,
   routingTables,
   runLaneFailures,
@@ -40,6 +56,8 @@ import {
   variantToStorage,
 } from './reasoning-effort';
 import type { OfflineSweep } from './scoreboard/schema';
+import { noLiveBenchmarkChunks } from './profile-entry-claims';
+import { PROMPT_TRANSPORT_REVISION } from './prompt-transport';
 
 export type CaseResultRow = typeof caseResults.$inferSelect;
 export type RunRow = typeof benchmarkRuns.$inferSelect;
@@ -358,6 +376,7 @@ export async function upsertCaseResult(db: D1Database, row: CaseResultRow): Prom
         last_event_types: row.last_event_types,
         rep: row.rep,
         timed_out: row.timed_out,
+        prompt_revision: row.prompt_revision,
       },
     });
   await orm.batch([
@@ -366,6 +385,11 @@ export async function upsertCaseResult(db: D1Database, row: CaseResultRow): Prom
   ]);
 }
 
+/**
+ * Copy each pair's newest compatible graded case (and recoverable pending output) from
+ * earlier runs into this run. A result for one of `skipOldCaseIds` measured under an
+ * older prompt transport is never copied, so those cases run again.
+ */
 export async function reuseDeciderCaseResults(
   db: D1Database,
   params: {
@@ -374,8 +398,11 @@ export async function reuseDeciderCaseResults(
     engineIdentity: string;
     repetitions: number;
     entries: readonly BenchmarkPair[];
+    skipOldCaseIds: readonly string[];
+    promptRevision: number;
   }
 ): Promise<number> {
+  const skipCaseIds = JSON.stringify(params.skipOldCaseIds);
   let copied = 0;
   for (let offset = 0; offset < params.entries.length; offset += 10) {
     const statements: D1PreparedStatement[] = [];
@@ -387,6 +414,8 @@ export async function reuseDeciderCaseResults(
         params.repetitions,
         entry.model,
         variantToStorage(entry.variant),
+        params.promptRevision,
+        skipCaseIds,
         params.runId,
       ];
       statements.push(
@@ -404,15 +433,24 @@ export async function reuseDeciderCaseResults(
               AND run.router = ? AND run.engine_identity = ? AND run.repetitions = ?
               AND source.model = ? AND source.variant = ?
               AND source.error IS NULL AND source.timed_out = 0 AND source.exit_code = 0
+              AND NOT EXISTS (
+                SELECT 1 FROM benchmark_profiles AS profile
+                WHERE profile.router = run.router AND profile.engine_identity = run.engine_identity
+                  AND profile.repetitions = run.repetitions AND profile.model = source.model
+                  AND profile.variant = source.variant AND profile.invalidated_at IS NOT NULL
+                  AND run.started_at < profile.invalidated_at
+              )
+              AND NOT (source.prompt_revision < ?
+                AND source.case_id IN (SELECT value FROM json_each(?)))
           )
           INSERT INTO case_results (
             run_id, model, variant, case_id, route_key, score, latency_ms, cost_usd,
             error, fallback_reason, route_hit, retried, exit_code, output_prefix,
-            event_count, last_event_types, rep, timed_out
+            event_count, last_event_types, rep, timed_out, prompt_revision
           )
           SELECT ?, model, variant, case_id, route_key, score, latency_ms, cost_usd,
             error, fallback_reason, route_hit, retried, exit_code, output_prefix,
-            event_count, last_event_types, rep, timed_out
+            event_count, last_event_types, rep, timed_out, prompt_revision
           FROM ranked WHERE reuse_rank = 1
           ON CONFLICT (run_id, model, variant, case_id, rep) DO NOTHING
         `)
@@ -430,11 +468,21 @@ export async function reuseDeciderCaseResults(
             WHERE run.kind = 'decider' AND run.status IN ('completed', 'failed')
               AND run.router = ? AND run.engine_identity = ? AND run.repetitions = ?
               AND source.model = ? AND source.variant = ?
+              AND NOT EXISTS (
+                SELECT 1 FROM benchmark_profiles AS profile
+                WHERE profile.router = run.router AND profile.engine_identity = run.engine_identity
+                  AND profile.repetitions = run.repetitions AND profile.model = source.model
+                  AND profile.variant = source.variant AND profile.invalidated_at IS NOT NULL
+                  AND run.started_at < profile.invalidated_at
+              )
               AND CASE WHEN json_valid(source.payload) THEN
                 json_type(source.payload, '$.result.exitCode') = 'integer'
                 AND json_extract(source.payload, '$.result.exitCode') = 0
                 AND json_type(source.payload, '$.result.timedOut') = 'false'
+                AND json_extract(source.payload, '$.result.unavailableModelId') IS NULL
               ELSE 0 END
+              AND NOT (source.prompt_revision < ?
+                AND source.case_id IN (SELECT value FROM json_each(?)))
               AND NOT EXISTS (
                 SELECT 1 FROM case_results AS graded
                 WHERE graded.run_id = source.run_id AND graded.model = source.model
@@ -442,8 +490,9 @@ export async function reuseDeciderCaseResults(
                   AND graded.rep = source.rep
               )
           )
-          INSERT INTO pending_decider_outputs (run_id, model, variant, case_id, rep, payload)
-          SELECT ?, model, variant, case_id, rep, payload FROM ranked
+          INSERT INTO pending_decider_outputs (run_id, model, variant, case_id, rep, payload,
+            prompt_revision)
+          SELECT ?, model, variant, case_id, rep, payload, prompt_revision FROM ranked
           WHERE reuse_rank = 1 AND NOT EXISTS (
             SELECT 1 FROM case_results AS destination
             WHERE destination.run_id = ? AND destination.model = ranked.model
@@ -603,8 +652,13 @@ const PendingDeciderOutputSchema = z.object({
     eventCount: z.number(),
     lastEventTypes: z.array(z.string()),
     timedOut: z.boolean(),
+    unavailableModelId: z.string().min(1).optional(),
   }),
   retried: z.boolean(),
+  // From the row's prompt_revision column; absent when the output is about to be saved by
+  // this worker, which uses PROMPT_TRANSPORT_REVISION.
+  promptRevision: z.number().int().optional(),
+  attemptStartedAt: z.number().int().nonnegative().optional(),
 });
 
 export type PendingDeciderOutput = z.infer<typeof PendingDeciderOutputSchema>;
@@ -624,24 +678,154 @@ export async function getPendingDeciderOutput(
   key: PendingDeciderOutputKey
 ): Promise<PendingDeciderOutput | null> {
   const row = await drizzle(db)
-    .select({ payload: pendingDeciderOutputs.payload })
+    .select({
+      payload: pendingDeciderOutputs.payload,
+      promptRevision: pendingDeciderOutputs.prompt_revision,
+    })
     .from(pendingDeciderOutputs)
     .where(pendingDeciderOutputPredicate(key))
     .get();
   if (!row) return null;
   const payload: unknown = JSON.parse(row.payload);
-  return PendingDeciderOutputSchema.parse(payload);
+  return { ...PendingDeciderOutputSchema.parse(payload), promptRevision: row.promptRevision };
 }
 
 export async function savePendingDeciderOutput(
   db: D1Database,
   key: PendingDeciderOutputKey,
-  output: PendingDeciderOutput
+  output: PendingDeciderOutput,
+  execution?: { token: string; attemptStartedAt?: number }
+): Promise<boolean> {
+  const { promptRevision, ...payload } = output;
+  const inserted = await db
+    .prepare(`
+      INSERT INTO pending_decider_outputs
+        (run_id, model, variant, case_id, rep, payload, prompt_revision)
+      SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7
+      WHERE NOT EXISTS (
+        SELECT 1 FROM case_results
+        WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND case_id = ?4 AND rep = ?5
+      ) AND (?8 IS NULL OR EXISTS (
+        SELECT 1 FROM scheduler_executions
+        WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND case_id = ?4 AND rep = ?5
+          AND token = ?8 AND (?9 IS NULL OR started_at = ?9)
+      ))
+      ON CONFLICT DO NOTHING
+    `)
+    .bind(
+      key.run_id,
+      key.model,
+      key.variant,
+      key.case_id,
+      key.rep,
+      JSON.stringify(payload),
+      promptRevision ?? PROMPT_TRANSPORT_REVISION,
+      execution?.token ?? null,
+      execution?.attemptStartedAt ?? null
+    )
+    .run();
+  return inserted.meta.changes > 0;
+}
+
+export async function claimDeciderGrading(
+  db: D1Database,
+  key: PendingDeciderOutputKey,
+  token: string,
+  now: number
+): Promise<boolean> {
+  const result = await db
+    .prepare(`
+      UPDATE pending_decider_outputs SET grading_token = ?6, grading_lease_until = ?7
+      WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND case_id = ?4 AND rep = ?5
+        AND grading_lease_until <= ?8
+        AND NOT EXISTS (
+          SELECT 1 FROM case_results
+          WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND case_id = ?4 AND rep = ?5
+        )
+    `)
+    .bind(key.run_id, key.model, key.variant, key.case_id, key.rep, token, now + 5 * 60_000, now)
+    .run();
+  return result.meta.changes > 0;
+}
+
+export async function releaseDeciderGrading(
+  db: D1Database,
+  key: PendingDeciderOutputKey,
+  token: string
 ): Promise<void> {
-  await drizzle(db)
-    .insert(pendingDeciderOutputs)
-    .values({ ...key, payload: JSON.stringify(output) })
-    .onConflictDoNothing();
+  await db
+    .prepare(`
+      UPDATE pending_decider_outputs SET grading_token = NULL, grading_lease_until = 0
+      WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND case_id = ?4 AND rep = ?5
+        AND grading_token = ?6
+    `)
+    .bind(key.run_id, key.model, key.variant, key.case_id, key.rep, token)
+    .run();
+}
+
+export async function deletePendingDeciderOutput(
+  db: D1Database,
+  key: PendingDeciderOutputKey
+): Promise<void> {
+  await drizzle(db).delete(pendingDeciderOutputs).where(pendingDeciderOutputPredicate(key));
+}
+
+export async function needsPendingOutputRecovery(
+  db: D1Database,
+  key: PendingDeciderOutputKey
+): Promise<boolean> {
+  const row = await db
+    .prepare(`
+      SELECT 1 AS needed FROM benchmark_runs AS run
+      WHERE run.id = ?1 AND (
+        run.status != 'running' OR EXISTS (
+          SELECT 1 FROM run_lane_failures
+          WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND rep = ?5
+        )
+      ) AND EXISTS (
+        SELECT 1 FROM pending_decider_outputs
+        WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND case_id = ?4 AND rep = ?5
+      ) AND NOT EXISTS (
+        SELECT 1 FROM case_results
+        WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND case_id = ?4 AND rep = ?5
+      )
+    `)
+    .bind(key.run_id, key.model, key.variant, key.case_id, key.rep)
+    .first<{ needed: number }>();
+  return row !== null;
+}
+
+export async function listPendingOutputRecoveries(
+  db: D1Database,
+  router: AutoRouter,
+  engineIdentity: string,
+  limit: number
+): Promise<PendingDeciderOutputKey[]> {
+  const rows = await db
+    .prepare(`
+    SELECT p.run_id, p.model, p.variant, p.rep, p.case_id
+    FROM pending_decider_outputs AS p
+    JOIN benchmark_runs AS run ON run.id = p.run_id
+    WHERE run.router = ?1 AND run.engine_identity = ?2
+      AND p.grading_lease_until <= ?3
+      AND (run.status != 'running' OR EXISTS (
+        SELECT 1 FROM run_lane_failures f WHERE f.run_id = p.run_id
+          AND f.model = p.model AND f.variant = p.variant AND f.rep = p.rep
+      ))
+      AND NOT EXISTS (
+        SELECT 1 FROM case_results r WHERE r.run_id = p.run_id AND r.model = p.model
+          AND r.variant = p.variant AND r.case_id = p.case_id AND r.rep = p.rep
+      )
+      AND (
+        json_extract(p.payload, '$.result.unavailableModelId') IS NULL
+        OR lower(json_extract(p.payload, '$.result.stderrTail')) LIKE '%failed to load%model catalog%'
+      )
+    ORDER BY p.run_id, p.model, p.variant, p.case_id, p.rep
+    LIMIT ?4
+  `)
+    .bind(router, engineIdentity, Date.now(), limit)
+    .all<PendingDeciderOutputKey>();
+  return rows.results;
 }
 
 export async function replaceModelSummaries(
@@ -891,7 +1075,9 @@ function boundProfileFailureReason(reason: string): string {
 /**
  * Mark Benchmark-profile rows claimed by this run as running. Only touches rows
  * still pending (or already running for this run_id) under the exact PK — never
- * clobbers ready/failed or a different run's claim.
+ * clobbers ready/failed or a different run's claim. A ready row queued in
+ * `profile_remeasures` is claimed there instead: the profile stays ready on its
+ * previous run until `settleRemeasuresForRun` moves it.
  */
 export async function markProfilesRunningForRun(
   db: D1Database,
@@ -929,9 +1115,124 @@ export async function markProfilesRunningForRun(
           )
         )
       );
-    if ((result.meta.changes ?? 0) > 0) claimed.push(entry);
+    if ((result.meta.changes ?? 0) > 0) {
+      claimed.push(entry);
+      continue;
+    }
+    const remeasure = await orm
+      .update(profileRemeasures)
+      .set({ run_id: runId, claimed_at: nowIso })
+      .where(
+        and(
+          eq(profileRemeasures.model, entry.model),
+          eq(profileRemeasures.variant, variantToStorage(entry.variant)),
+          eq(profileRemeasures.router, current.router ?? 'efficient'),
+          eq(profileRemeasures.engine_identity, current.engineIdentity),
+          eq(profileRemeasures.repetitions, current.repetitions),
+          isNull(profileRemeasures.run_id),
+          readyProfileForRemeasure()
+        )
+      );
+    if ((remeasure.meta.changes ?? 0) > 0) claimed.push(entry);
   }
   return claimed;
+}
+
+function readyProfileForRemeasure() {
+  return sql`EXISTS (
+    SELECT 1 FROM ${benchmarkProfiles}
+    WHERE ${benchmarkProfiles.router} = ${profileRemeasures.router}
+      AND ${benchmarkProfiles.model} = ${profileRemeasures.model}
+      AND ${benchmarkProfiles.variant} = ${profileRemeasures.variant}
+      AND ${benchmarkProfiles.engine_identity} = ${profileRemeasures.engine_identity}
+      AND ${benchmarkProfiles.repetitions} = ${profileRemeasures.repetitions}
+      AND ${benchmarkProfiles.status} = 'ready'
+      AND ${benchmarkProfiles.run_id} IS NOT NULL
+  )`;
+}
+
+/**
+ * Copy every result of each claimed re-measure's previous run into this run, except the
+ * `skipOldCaseIds` results measured under an older prompt transport. Failed and timed-out
+ * results are copied too: only the skipped cases run again.
+ */
+export async function copyRemeasureBaselines(
+  db: D1Database,
+  params: { runId: string; skipOldCaseIds: readonly string[]; promptRevision: number }
+): Promise<number> {
+  const result = await db
+    .prepare(`
+      INSERT INTO case_results (
+        run_id, model, variant, case_id, route_key, score, latency_ms, cost_usd,
+        error, fallback_reason, route_hit, retried, exit_code, output_prefix,
+        event_count, last_event_types, rep, timed_out, prompt_revision
+      )
+      SELECT r.run_id, source.model, source.variant, source.case_id, source.route_key,
+        source.score, source.latency_ms, source.cost_usd, source.error, source.fallback_reason,
+        source.route_hit, source.retried, source.exit_code, source.output_prefix,
+        source.event_count, source.last_event_types, source.rep, source.timed_out,
+        source.prompt_revision
+      FROM profile_remeasures AS r
+      JOIN benchmark_profiles AS p ON p.router = r.router AND p.model = r.model
+        AND p.variant = r.variant AND p.engine_identity = r.engine_identity
+        AND p.repetitions = r.repetitions AND p.status = 'ready'
+      JOIN case_results AS source ON source.run_id = p.run_id
+        AND source.model = p.model AND source.variant = p.variant
+      WHERE r.run_id = ?
+        AND NOT (source.prompt_revision < ?
+          AND source.case_id IN (SELECT value FROM json_each(?)))
+      ON CONFLICT (run_id, model, variant, case_id, rep) DO NOTHING
+    `)
+    .bind(params.runId, params.promptRevision, JSON.stringify(params.skipOldCaseIds))
+    .run();
+  return result.meta.changes ?? 0;
+}
+
+/**
+ * Settle this run's re-measures: an entry with a dead lane is dropped and keeps its
+ * previous measurement; every other claimed profile moves its provenance to this run,
+ * which now holds its full result set. Status stays `ready` throughout.
+ */
+export async function settleRemeasuresForRun(
+  db: D1Database,
+  runId: string,
+  /** Storage-form variant keys ('' = default variant). */
+  failedEntries: readonly { model: string; variant: string }[],
+  nowIso: string = new Date().toISOString()
+): Promise<void> {
+  const orm = drizzle(db);
+  const statements: BatchItem<'sqlite'>[] = failedEntries.map(entry =>
+    orm
+      .delete(profileRemeasures)
+      .where(
+        and(
+          eq(profileRemeasures.run_id, runId),
+          eq(profileRemeasures.model, entry.model),
+          eq(profileRemeasures.variant, entry.variant)
+        )
+      )
+  );
+  statements.push(
+    orm
+      .update(benchmarkProfiles)
+      .set({ run_id: runId, updated_at: nowIso, completed_at: nowIso })
+      .where(
+        and(
+          eq(benchmarkProfiles.status, 'ready'),
+          sql`EXISTS (
+            SELECT 1 FROM ${profileRemeasures}
+            WHERE ${profileRemeasures.run_id} = ${runId}
+              AND ${profileRemeasures.router} = ${benchmarkProfiles.router}
+              AND ${profileRemeasures.model} = ${benchmarkProfiles.model}
+              AND ${profileRemeasures.variant} = ${benchmarkProfiles.variant}
+              AND ${profileRemeasures.engine_identity} = ${benchmarkProfiles.engine_identity}
+              AND ${profileRemeasures.repetitions} = ${benchmarkProfiles.repetitions}
+          )`
+        )
+      ),
+    orm.delete(profileRemeasures).where(eq(profileRemeasures.run_id, runId))
+  );
+  await orm.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 }
 
 /**
@@ -988,8 +1289,9 @@ export function markProfilesFailedForRunStatement(
 }
 
 /**
- * Transition profiles claimed by this run to failed with a bounded reason.
- * Only rows still pointing at this run_id and still running are updated.
+ * Transition profiles claimed by this run to failed with a bounded reason. Only rows
+ * still pointing at this run_id and still running are updated. This run's re-measure
+ * claims are dropped; those profiles keep serving their previous measurement.
  */
 export async function markProfilesFailedForRun(
   db: D1Database,
@@ -997,7 +1299,11 @@ export async function markProfilesFailedForRun(
   failureReason: string,
   nowIso: string = new Date().toISOString()
 ): Promise<void> {
-  await markProfilesFailedForRunStatement(drizzle(db), runId, failureReason, nowIso);
+  const orm = drizzle(db);
+  await orm.batch([
+    markProfilesFailedForRunStatement(orm, runId, failureReason, nowIso),
+    orm.delete(profileRemeasures).where(eq(profileRemeasures.run_id, runId)),
+  ]);
 }
 
 /**
@@ -1161,58 +1467,46 @@ export async function listPendingCurrentProfiles(
     );
 }
 
-/**
- * Move owner requests off pending alias rows whose concrete catalog target is
- * resolvable, so the owner queue never measures an alias beside its target.
- * Each alias still pending and owner-requested hands its flag to its concrete
- * pair (created pending when absent); a null target only drops the flag
- * because that variant no longer exists on the target. Running, failed and
- * ready alias rows are left untouched.
- */
-export async function collapsePendingOwnerAliasRows(
+/** Queued, unclaimed re-measures of ready current-engine rows wanted by one queue. */
+export async function listQueuedRemeasures(
   db: D1Database,
   current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
-  aliases: readonly {
-    alias: { model: string; variant: string };
-    target: { model: string; variant: string | null } | null;
-  }[],
-  nowIso: string = new Date().toISOString()
-): Promise<void> {
-  const router = current.router ?? 'efficient';
-  const aliasKey = [router, current.engineIdentity, current.repetitions] as const;
-  const stmts = aliases.flatMap(({ alias, target }) => {
-    const unflag = db
-      .prepare(
-        `UPDATE benchmark_profiles SET user_requested = 0, updated_at = ?
-         WHERE router = ? AND engine_identity = ? AND repetitions = ? AND model = ? AND variant = ?
-           AND status = 'pending' AND user_requested = 1`
+  queue: BenchmarkRunPurpose
+): Promise<Array<{ model: string; variant: string; requested_at: string }>> {
+  return drizzle(db)
+    .select({
+      model: profileRemeasures.model,
+      variant: profileRemeasures.variant,
+      requested_at: profileRemeasures.requested_at,
+    })
+    .from(profileRemeasures)
+    .innerJoin(
+      benchmarkProfiles,
+      and(
+        eq(benchmarkProfiles.router, profileRemeasures.router),
+        eq(benchmarkProfiles.model, profileRemeasures.model),
+        eq(benchmarkProfiles.variant, profileRemeasures.variant),
+        eq(benchmarkProfiles.engine_identity, profileRemeasures.engine_identity),
+        eq(benchmarkProfiles.repetitions, profileRemeasures.repetitions)
       )
-      .bind(nowIso, ...aliasKey, alias.model, alias.variant);
-    if (!target) return [unflag];
-    const claimTarget = db
-      .prepare(
-        `INSERT INTO benchmark_profiles
-           (router, model, variant, engine_identity, repetitions, status, run_id, failure_reason,
-            requested_at, updated_at, completed_at, platform_requested, user_requested)
-         SELECT router, ?, ?, engine_identity, repetitions, 'pending', NULL, NULL,
-                requested_at, ?, NULL, 0, 1
-         FROM benchmark_profiles
-         WHERE router = ? AND engine_identity = ? AND repetitions = ? AND model = ? AND variant = ?
-           AND status = 'pending' AND user_requested = 1
-         ON CONFLICT (router, model, variant, engine_identity, repetitions)
-         DO UPDATE SET user_requested = 1`
+    )
+    .where(
+      and(
+        isNull(profileRemeasures.run_id),
+        eq(profileRemeasures.router, current.router ?? 'efficient'),
+        eq(profileRemeasures.engine_identity, current.engineIdentity),
+        eq(profileRemeasures.repetitions, current.repetitions),
+        eq(benchmarkProfiles.status, 'ready'),
+        queue === 'platform'
+          ? eq(benchmarkProfiles.platform_requested, true)
+          : eq(benchmarkProfiles.user_requested, true)
       )
-      .bind(
-        target.model,
-        variantToStorage(target.variant),
-        nowIso,
-        ...aliasKey,
-        alias.model,
-        alias.variant
-      );
-    return [claimTarget, unflag];
-  });
-  if (stmts.length > 0) await db.batch(stmts);
+    )
+    .orderBy(
+      asc(profileRemeasures.requested_at),
+      asc(profileRemeasures.model),
+      asc(profileRemeasures.variant)
+    );
 }
 
 /** Registry row counts per status for one queue's current-engine rows. */
@@ -1298,6 +1592,13 @@ export async function requeueFailedCurrentProfiles(
         eq(benchmarkProfiles.router, current.router ?? 'efficient'),
         eq(benchmarkProfiles.engine_identity, current.engineIdentity),
         eq(benchmarkProfiles.repetitions, current.repetitions),
+        noLiveBenchmarkChunks({
+          router: benchmarkProfiles.router,
+          model: benchmarkProfiles.model,
+          variant: benchmarkProfiles.variant,
+          engineIdentity: benchmarkProfiles.engine_identity,
+          repetitions: benchmarkProfiles.repetitions,
+        }),
         queueFilter
       )
     );
@@ -1378,7 +1679,7 @@ export function claimPlatformRequestedStatement(
         // reaper only touches rows untouched for hours. This reconcile runs
         // every 15 minutes, so bumping it would hold every platform row
         // permanently below the reaper's age guard and an orphaned claim
-        // would keep the queue unsettled forever.
+        // would leave that pair unmeasured, never reaching the routing table.
         set: { platform_requested: true },
       })
   );
@@ -1488,8 +1789,8 @@ export async function getSummariesForRuns(
  * threw), or the claim landed and the run row was never written at all. Neither
  * is reachable otherwise — the drain wants `pending`, requeue wants `failed`,
  * and the stale sweep only looks at runs that are still `running`. Left alone
- * they stay claimed forever, and because a claimed platform row keeps the queue
- * unsettled, the platform routing table would never publish again.
+ * they stay claimed forever, so the pair is neither served nor re-measured and
+ * the routing table would never gain it.
  *
  * The age guard is what makes this safe to run from every sweep: a run marks
  * itself completed just before settling its rows, so without it this would fail
@@ -1531,21 +1832,44 @@ export async function failOrphanedRunningProfiles(
   olderThanIso: string,
   nowIso: string = new Date().toISOString()
 ): Promise<number> {
-  const result = await failOrphanedRunningProfilesStatement(
-    drizzle(db),
-    failureReason,
-    olderThanIso,
-    nowIso
-  );
-  return result.meta.changes ?? 0;
+  const orm = drizzle(db);
+  const [failed] = await orm.batch([
+    failOrphanedRunningProfilesStatement(orm, failureReason, olderThanIso, nowIso),
+    orm
+      .delete(profileRemeasures)
+      .where(
+        and(
+          isNotNull(profileRemeasures.run_id),
+          lt(profileRemeasures.claimed_at, olderThanIso),
+          notInArray(
+            profileRemeasures.run_id,
+            orm
+              .select({ id: benchmarkRuns.id })
+              .from(benchmarkRuns)
+              .where(eq(benchmarkRuns.status, 'running'))
+          )
+        )
+      ),
+  ]);
+  return failed.meta.changes ?? 0;
 }
 
-/** Release rows this run claimed back to `pending` (claim made, run never written). */
+/**
+ * Release rows this run claimed back to `pending` (claim made, run never written), and
+ * its re-measure claims back to the queue.
+ */
 export async function releaseProfileClaims(db: D1Database, runId: string): Promise<void> {
-  await drizzle(db)
-    .update(benchmarkProfiles)
-    .set({ status: 'pending', run_id: null, updated_at: new Date().toISOString() })
-    .where(and(eq(benchmarkProfiles.run_id, runId), eq(benchmarkProfiles.status, 'running')));
+  const orm = drizzle(db);
+  await orm.batch([
+    orm
+      .update(benchmarkProfiles)
+      .set({ status: 'pending', run_id: null, updated_at: new Date().toISOString() })
+      .where(and(eq(benchmarkProfiles.run_id, runId), eq(benchmarkProfiles.status, 'running'))),
+    orm
+      .update(profileRemeasures)
+      .set({ run_id: null, claimed_at: null })
+      .where(eq(profileRemeasures.run_id, runId)),
+  ]);
 }
 
 export async function listStaleRunningDeciderRuns(

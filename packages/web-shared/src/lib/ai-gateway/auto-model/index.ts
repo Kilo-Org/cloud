@@ -1,8 +1,3 @@
-import { z } from 'zod';
-import {
-  CLAUDE_OPUS_CURRENT_MODEL_ID,
-  CLAUDE_SONNET_CURRENT_MODEL_ID,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
 import type { OpenRouterReasoningConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   ORGANIZATION_AUTO_MODEL_ID,
@@ -13,6 +8,12 @@ import {
   GEMMA_4_26B_A4B_IT_FREE_ID,
   GEMMA_4_26B_A4B_IT_ID,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import {
+  customRouterModelId,
+  isCustomRouterModelId,
+  type AutoRouter,
+  type CustomRouterScope,
+} from '@kilocode/auto-routing-contracts';
 
 export type AutoModelPricing = {
   prompt: string;
@@ -37,51 +38,6 @@ export type ResolvedAutoModel = {
   model: string;
   reasoning?: OpenRouterReasoningConfig;
   verbosity?: Verbosity;
-};
-
-export const modeSchema = z.enum([
-  'claw',
-  'plan',
-  'general',
-  'architect',
-  'orchestrator',
-  'ask',
-  'debug',
-  'build',
-  'explore',
-  'code',
-]);
-
-type Mode = z.infer<typeof modeSchema>;
-
-const FRONTIER_REASONING = { enabled: true, effort: 'medium' } as const;
-const FRONTIER_VERBOSITY = 'medium' as const;
-
-const OPUS_FRONTIER: ResolvedAutoModel = {
-  model: CLAUDE_OPUS_CURRENT_MODEL_ID,
-  reasoning: FRONTIER_REASONING,
-  verbosity: FRONTIER_VERBOSITY,
-};
-
-const SONNET_FRONTIER: ResolvedAutoModel = {
-  model: CLAUDE_SONNET_CURRENT_MODEL_ID,
-  reasoning: FRONTIER_REASONING,
-  verbosity: FRONTIER_VERBOSITY,
-};
-
-export const FRONTIER_CODE_MODEL: ResolvedAutoModel = SONNET_FRONTIER;
-
-export const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
-  claw: OPUS_FRONTIER,
-  plan: OPUS_FRONTIER,
-  general: OPUS_FRONTIER,
-  architect: OPUS_FRONTIER,
-  orchestrator: OPUS_FRONTIER,
-  ask: OPUS_FRONTIER,
-  debug: OPUS_FRONTIER,
-  build: SONNET_FRONTIER,
-  explore: SONNET_FRONTIER,
-  code: SONNET_FRONTIER,
 };
 
 const UNKNOWN_PRICING: AutoModelPricing = {
@@ -182,6 +138,26 @@ export const AUTO_MODELS = [
   KILO_AUTO_SMALL_MODEL,
 ];
 
+export function customRouterAutoModel(router: {
+  scope: CustomRouterScope;
+  slug: string;
+  name: string;
+  baseRouter: AutoRouter;
+}): AutoModel {
+  const base =
+    router.baseRouter === 'frontier' ? KILO_AUTO_FRONTIER_MODEL : KILO_AUTO_EFFICIENT_MODEL;
+  return {
+    ...base,
+    id: customRouterModelId(router.scope, router.slug),
+    name: router.name,
+    description: `Custom auto router built on ${base.name}. Routes only to the models in its pool.`,
+  };
+}
+
 export function isKiloAutoModel(model: string) {
-  return AUTO_MODELS.some(m => m.id === model) || model === ORG_AUTO_MODEL.id;
+  return (
+    AUTO_MODELS.some(m => m.id === model) ||
+    model === ORG_AUTO_MODEL.id ||
+    isCustomRouterModelId(model)
+  );
 }

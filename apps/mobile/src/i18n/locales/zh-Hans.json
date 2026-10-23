@@ -3759,7 +3759,7 @@
       "saveFailed": "无法保存代理",
       "deleteFailed": "无法删除代理",
       "nameRequired": "输入代理名称",
-      "slugRequired": "输入代理 slug",
+      "slugRequired": "输入代理标识符",
       "slugInvalid": "代理标识符必须以字母开头，并且只能使用小写字母、数字和连字符",
       "slugConflict": "该代理标识符已被内置代理或此配置文件中的另一个代理使用",
       "edit": "编辑代理"

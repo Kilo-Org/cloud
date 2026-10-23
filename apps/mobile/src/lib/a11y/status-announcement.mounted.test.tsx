@@ -115,6 +115,20 @@ describe('useStatusAnnouncement on iOS', () => {
     expect(announcements()).toEqual(['Failed to load', 'Failed to load']);
     renderer.unmount();
   });
+
+  it('keeps the hook alive when a native announcement throws', () => {
+    accessibilityMock.announceForAccessibility.mockImplementationOnce(() => {
+      throw new Error('native announcement failed');
+    });
+
+    const renderer = mount('Failed to load');
+    // The swallowed native failure must not freeze the dedupe: the next status
+    // still reaches the platform.
+    rerender(renderer, 'Reconnected');
+
+    expect(announcements()).toEqual(['Failed to load', 'Reconnected']);
+    renderer.unmount();
+  });
 });
 
 describe('useStatusAnnouncement on Android', () => {

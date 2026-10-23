@@ -1,4 +1,4 @@
-import { type Ref, useCallback, useContext, useEffect, useImperativeHandle, useRef } from 'react';
+import { type Ref, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
 import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
@@ -10,10 +10,9 @@ import {
   View,
 } from 'react-native';
 import { useKeyboardState } from 'react-native-keyboard-controller';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { scrollFocusedInputAboveKeyboard } from '@/lib/keyboard-reveal';
-import { TabBarBandContext, useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
+import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 import { useScreenInsets } from '@/lib/screen-insets';
 
 type ScrollEvent = NativeSyntheticEvent<NativeScrollEvent>;
@@ -21,18 +20,14 @@ type ScrollEvent = NativeSyntheticEvent<NativeScrollEvent>;
 const TAB_SCREEN_BOTTOM_GAP = 16;
 
 /**
- * The tab bar's rendered height for this screen's clearance:
- * `useEffectiveTabBarHeight` supplies the tabs layout's label decision, the
- * safe-area bottom inset and the platform, so the clearance cannot drift from
- * the rendered bar height. A screen that declares no bar below it (a tab screen
- * reused on the root stack) keeps only the safe-area edge. Shared by the scroll
- * viewport and by `useTabBarBottomPadding`.
+ * The bottom chrome this screen clears: the tab bar's rendered height under the
+ * tabs navigator, or the safe-area inset alone on a root-stack screen, where no
+ * bar is drawn. `useEffectiveTabBarHeight` supplies the tabs layout's label
+ * decision, the inset and the platform, so the clearance cannot drift from what
+ * is on screen. Shared by the scroll viewport and by `useTabBarBottomPadding`.
  */
 function useTabBarHeight() {
-  const tabBarBand = useContext(TabBarBandContext);
-  const measuredBarHeight = useEffectiveTabBarHeight();
-  const { bottom } = useSafeAreaInsets();
-  return tabBarBand ? measuredBarHeight : bottom;
+  return useEffectiveTabBarHeight();
 }
 
 // FlatList/FlashList screens use this directly for contentContainerStyle.paddingBottom.

@@ -40,7 +40,7 @@ export function getProfileAgentScope(
 }
 
 export function getCodeReviewerProfilePath(scope: string): Href {
-  return `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}` as Href;
+  return `/(app)/code-reviewer/${scope}` as Href;
 }
 
 export function getPrReviewEntryPath(): Href {

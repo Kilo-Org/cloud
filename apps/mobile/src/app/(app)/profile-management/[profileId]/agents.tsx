@@ -2,7 +2,6 @@ import { useLocalSearchParams } from 'expo-router';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { ProfileAgentsScreen } from '@/components/profiles/profile-agents-screen';
-import { RootStackProfileScreen } from '@/components/profiles/root-stack-profile-screen';
 import { getProfilesPath } from '@/lib/profile-agent-navigation';
 import { parseParam } from '@/lib/route-params';
 
@@ -16,11 +15,9 @@ export default function AppStackProfileAgentsRoute() {
     return <InvalidRouteState backTo={getProfilesPath('app')} />;
   }
   return (
-    <RootStackProfileScreen>
-      <ProfileAgentsScreen
-        profileId={profileId}
-        organizationId={parseParam(rawOrganizationId) ?? undefined}
-      />
-    </RootStackProfileScreen>
+    <ProfileAgentsScreen
+      profileId={profileId}
+      organizationId={parseParam(rawOrganizationId) ?? undefined}
+    />
   );
 }

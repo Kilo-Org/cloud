@@ -1705,6 +1705,7 @@
       "branchLoadError": "Impossibile caricare i branch",
       "branchUnavailable": "Nessun branch disponibile per questo repository. Verifica i tuoi accessi con il provider, poi scegli un altro repository.",
       "branchEmpty": "Nessun branch disponibile",
+      "branchListIncomplete": "Vengono mostrati solo alcuni branch. Il repository contiene più branch di quanti questo elenco possa includerne.",
       "branchPlaceholder": "Seleziona un branch",
       "runOnWithTarget": "Esegui su: {{target}}",
       "environment": "Ambiente",
@@ -3428,7 +3429,12 @@
       "serverToolCount_one": "{{count}} strumento",
       "serverToolCount_other": "{{count}} strumenti",
       "serverUnreachable": "Impossibile raggiungere questo server",
-      "serverOff": "Questo server è disattivato"
+      "serverOff": "Questo server è disattivato",
+      "app": {
+        "label": "Interfaccia dello strumento",
+        "failed": "Impossibile caricare l'interfaccia di questo strumento.",
+        "empty": "L'interfaccia di questo strumento non ha nulla da mostrare."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autenticazione",

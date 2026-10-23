@@ -4,10 +4,10 @@ import { useTranslation } from 'react-i18next';
 import { Alert, View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { briefingMoney } from './briefing-card';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { type BriefingReport, useBriefingPreferences } from '@/lib/agent-briefing';
+import { briefingMoney } from '@/lib/agent-briefing-format';
 import {
   briefingEstimateUnavailableKey,
   briefingSummaryStatusKey,

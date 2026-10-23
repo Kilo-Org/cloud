@@ -61,6 +61,28 @@ describe('signPreviewTicket', () => {
 
     expect(decode(ticket).organizationId).toBe('org_1');
   });
+
+  it('returns an expiry that equals the token expiry when the clock advances during signing', () => {
+    let calls = 0;
+    const now = jest.spyOn(Date, 'now').mockImplementation(() => {
+      calls += 1;
+      return 1_800_000_000_000 + calls * 1_000;
+    });
+
+    try {
+      const { ticket, expiresAt } = signPreviewTicket({
+        userId: 'user_1',
+        cloudAgentSessionId: 'workspace_1',
+        port: 5173,
+      });
+
+      const decoded = decode(ticket);
+      expect(decoded.exp! - decoded.iat!).toBe(60);
+      expect(expiresAt).toBe(decoded.exp);
+    } finally {
+      now.mockRestore();
+    }
+  });
 });
 
 describe('signStreamTicket', () => {

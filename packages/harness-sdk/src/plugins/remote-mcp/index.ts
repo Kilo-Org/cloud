@@ -5,11 +5,22 @@ import type {
   OAuthTokens,
 } from '@modelcontextprotocol/sdk/shared/auth.js';
 import {
+  remoteMcpApp,
+  type RemoteMcpApp,
+  type RemoteMcpAppContext,
+  type RemoteMcpAppOptions,
+  type RemoteMcpAppResult,
+  type RemoteMcpAppSize,
+  type RemoteMcpAppTransport,
+} from './app.js';
+import {
   remoteMcpClient,
+  type RemoteMcpCallResult,
   type RemoteMcpClient,
   type RemoteMcpClientDeps,
   type RemoteMcpTool,
 } from './client.js';
+import { type RemoteMcpCallAnswered } from './deps.js';
 import { type RemoteMcpResource } from './resource.js';
 import {
   remoteMcpSignIn,
@@ -26,7 +37,7 @@ import {
   type RemoteMcpFailure,
   type RemoteMcpServer,
 } from './server.js';
-import { remoteMcpTools } from './tools.js';
+import { type RemoteMcpOfferedTool, remoteMcpTools } from './tools.js';
 import { permissiveJsonSchemaValidator } from './validator.js';
 
 /**
@@ -51,10 +62,19 @@ export type {
   OAuthClientMetadata as RemoteMcpOAuthClientMetadata,
   OAuthClientProvider as RemoteMcpOAuthProvider,
   OAuthTokens as RemoteMcpOAuthTokens,
+  RemoteMcpApp,
+  RemoteMcpAppContext,
+  RemoteMcpAppOptions,
+  RemoteMcpAppResult,
+  RemoteMcpAppSize,
+  RemoteMcpAppTransport,
   RemoteMcpAuth,
+  RemoteMcpCallAnswered,
+  RemoteMcpCallResult,
   RemoteMcpClient,
   RemoteMcpClientDeps,
   RemoteMcpFailure,
+  RemoteMcpOfferedTool,
   RemoteMcpResource,
   RemoteMcpServer,
   RemoteMcpSignInDeps,
@@ -67,6 +87,7 @@ export {
   mcpToolName,
   permissiveJsonSchemaValidator,
   RemoteMcpError,
+  remoteMcpApp,
   remoteMcpClient,
   remoteMcpSignIn,
   remoteMcpTools,

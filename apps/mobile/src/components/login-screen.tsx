@@ -25,7 +25,6 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
-  clearLoginDrafts,
   clearPersistedLoginDrafts,
   persistLoginDrafts,
   restoreLoginDrafts,
@@ -66,7 +65,6 @@ export function LoginScreen() {
       setPersistFailed(false);
       try {
         await signIn(tokenValue, refreshTokenValue, expiresInValue);
-        clearLoginDrafts();
       } catch {
         // The message renders from the catalog at draw time, so a language
         // switch re-renders it in the new language.

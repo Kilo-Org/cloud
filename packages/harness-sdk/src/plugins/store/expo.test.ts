@@ -186,21 +186,29 @@ it('prepares each SQL text once and runs it again for the next load', async () =
 });
 
 it('runs two reads of one SQL text at once without either losing its rows', async () => {
-  const { database, open } = standIn();
+  const { database, open, prepared } = standIn();
 
-  const loaded = await use(database, store =>
+  const result = await use(database, store =>
     Effect.gen(function* () {
       yield* store.create(session);
       yield* store.create({ ...session, id: 'ses_2' });
       yield* store.append(oneTurn('ses_1', 'first', 0));
       yield* store.append(oneTurn('ses_2', 'second', 0));
-      return yield* Effect.all([store.load('ses_1'), store.load('ses_2')], {
+      /* One load first, so the pool holds a statement for each scan and the
+         two concurrent reads have to decide between sharing it and preparing
+         another. Sharing one cursor is what the double refuses. */
+      yield* store.load('ses_1');
+      const warmed = prepared('from "turns"');
+      const [one, two] = yield* Effect.all([store.load('ses_1'), store.load('ses_2')], {
         concurrency: 'unbounded',
       });
+      return { one, two, warmed, after: prepared('from "turns"') };
     })
   );
 
-  expect(loaded.map(turns => turns.map(textOf))).toEqual([['first'], ['second']]);
+  expect(result.one.map(textOf)).toEqual(['first']);
+  expect(result.two.map(textOf)).toEqual(['second']);
+  expect(result.after).toBeGreaterThan(result.warmed);
   expect(open()).toBe(0);
 });
 
@@ -247,18 +255,37 @@ it('drops a statement that threw, and prepares another for the next call', async
   expect(open()).toBe(0);
 });
 
-it('finalizes every statement it prepared once the store is released', async () => {
-  const { database, open, prepared } = standIn();
+it('finalizes what a call prepares after the store was released', async () => {
+  const { database, open } = standIn();
+  const driver = expoDriver(database);
+  await driver('CREATE TABLE probe (a integer)', [], 'run');
+  await driver.close?.();
 
-  const read = await use(database, store =>
-    Effect.gen(function* () {
-      yield* store.create(session);
-      yield* store.append(oneTurn('ses_1', 'hello', 1));
-      return yield* store.load('ses_1');
-    })
-  );
+  /* The store is gone, so nothing this call prepares may be kept: it runs, and
+     the handle goes with it. */
+  await driver('INSERT INTO probe VALUES (1)', [], 'run');
+  const read = await driver('SELECT a FROM probe', [], 'all');
 
-  expect(read.map(textOf)).toEqual(['hello']);
-  expect(prepared('from "turns"')).toBeGreaterThan(0);
+  expect(read.rows).toEqual([[1]]);
+  expect(open()).toBe(0);
+});
+
+it('finalizes what it prepared for a build that failed', async () => {
+  const { database, open } = standIn();
+  let prepared = 0;
+  const refusing: ExpoDatabase = {
+    prepareAsync: (source: string) => {
+      prepared += 1;
+      /* The migration set is a series of statements; the one after this fails
+         the way a database that cannot migrate does. */
+      return prepared > 3
+        ? Promise.reject(new Error('the database refused the statement'))
+        : database.prepareAsync(source);
+    },
+  };
+
+  await expect(use(refusing, store => Effect.asVoid(store.read('ses_1')))).rejects.toBeDefined();
+
+  expect(prepared).toBeGreaterThan(3);
   expect(open()).toBe(0);
 });

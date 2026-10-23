@@ -53,7 +53,12 @@ interface Pool {
   closed: boolean;
 }
 
-const poolFor = (pools: Map<string, Pool>, sql: string): Pool => {
+const poolFor = (pools: Map<string, Pool>, sql: string, released: boolean): Pool => {
+  if (released) {
+    /* A store that is already released keeps nothing: the call still runs, and
+       what it prepared is finalized on the way out. */
+    return { idle: [], closed: true };
+  }
   const held = pools.get(sql);
   if (held !== undefined) {
     return held;
@@ -65,6 +70,20 @@ const poolFor = (pools: Map<string, Pool>, sql: string): Pool => {
 
 const take = async (pool: Pool, database: ExpoDatabase, sql: string): Promise<ExpoStatement> =>
   pool.idle.pop() ?? database.prepareAsync(sql);
+
+/**
+ * Finalizing is the last thing done with a handle, and nothing a caller can do
+ * changes its outcome: a statement the runtime refuses to finalize goes when the
+ * database closes. So a failure here never replaces the answer, or the error,
+ * of the call it followed.
+ */
+const finalize = async (statement: ExpoStatement): Promise<void> => {
+  try {
+    await statement.finalizeAsync();
+  } catch {
+    /* The handle outlives the store in the runtime, not in this object. */
+  }
+};
 
 /**
  * A statement whose cursor state is known goes back for the next caller; one
@@ -81,7 +100,7 @@ const put = async (pool: Pool, statement: ExpoStatement, known: boolean): Promis
     pool.idle.push(statement);
     return;
   }
-  await statement.finalizeAsync();
+  await finalize(statement);
 };
 
 /** Finalizes what the pools hold and closes them, so nothing outlives the store. */
@@ -91,8 +110,9 @@ const release = async (pools: Map<string, Pool>): Promise<void> => {
   for (const pool of held) {
     pool.closed = true;
   }
-  const statements = held.flatMap(pool => pool.idle.splice(0));
-  await Promise.all(statements.map(statement => statement.finalizeAsync()));
+  await Promise.all(
+    held.flatMap(pool => pool.idle.splice(0)).map(statement => finalize(statement))
+  );
 };
 
 /**
@@ -231,10 +251,11 @@ const runOn = async (
 const expoDriver = (database: ExpoDatabase): SqlDriver => {
   const pools = new Map<string, Pool>();
   const gate = gateOfDatabase(database);
+  let released = false;
 
   const driver = (sql: string, params: readonly SqlValue[], method: string) =>
     (method === 'run' ? gate.alone : gate.share)(async () => {
-      const pool = poolFor(pools, sql);
+      const pool = poolFor(pools, sql, released);
       const statement = await take(pool, database, sql);
       let known = false;
       try {
@@ -246,7 +267,12 @@ const expoDriver = (database: ExpoDatabase): SqlDriver => {
       }
     });
 
-  return Object.assign(driver as SqlDriver, { close: () => release(pools) });
+  return Object.assign(driver as SqlDriver, {
+    close: () => {
+      released = true;
+      return release(pools);
+    },
+  });
 };
 
 /** Opens the store on a database the caller already opened, and still closes. */

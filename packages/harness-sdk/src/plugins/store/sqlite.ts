@@ -159,14 +159,18 @@ const layerSqliteStore = (driver: SqlDriver): Layer.Layer<SessionStore, StoreErr
     const { close } = driver;
     return Layer.effect(
       SessionStore,
-      Effect.acquireRelease(
-        attempt('create', async () => {
+      Effect.gen(function* () {
+        /* The release is registered before the work that can fail, so a
+           migration that throws still hands back what the driver prepared. */
+        yield* Effect.acquireRelease(Effect.void, () =>
+          close === undefined ? Effect.void : Effect.ignore(Effect.tryPromise(() => close()))
+        );
+        return yield* attempt('create', async () => {
           await driver('PRAGMA foreign_keys = ON', [], 'run');
           await migrate(connection);
           return storeOn(connection);
-        }),
-        () => (close === undefined ? Effect.void : Effect.ignore(Effect.tryPromise(() => close())))
-      )
+        });
+      })
     );
   });
 

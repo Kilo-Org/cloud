@@ -25,6 +25,18 @@ const fakeUser = { id: 'user-1', google_user_email: 'user@example.com' };
 
 const challengeId = '11111111-1111-4111-8111-111111111111';
 
+/** One attestation as the browser's credential API returns it, JSON-encoded. */
+const attestation = {
+  id: 'credential-1',
+  rawId: 'credential-1',
+  type: 'public-key',
+  response: {
+    clientDataJSON: 'client-data',
+    attestationObject: 'attestation-object',
+  },
+  clientExtensionResults: {},
+};
+
 function createRequest(body: unknown): NextRequest {
   return new NextRequest('http://localhost:3000/api/auth/passkey/register', {
     method: 'POST',
@@ -68,16 +80,15 @@ describe('POST /api/auth/passkey/register', () => {
 
   it('binds the credential to the session user, ignoring the request body', async () => {
     mockVerifyRegistration.mockResolvedValue({ credential_id: 'credential-1' } as never);
-    const attestation = {
-      id: 'credential-1',
-      rawId: 'credential-1',
-      type: 'public-key',
-      response: { clientDataJSON: 'xxx' },
-      kiloUserId: 'attacker-user',
-    };
 
     const response = await POST(
-      createRequest({ action: 'verify', challengeId, response: attestation })
+      createRequest({
+        action: 'verify',
+        challengeId,
+        // A field the boundary does not know is stripped, so the ceremony is
+        // called with the validated attestation and the session user only.
+        response: { ...attestation, kiloUserId: 'attacker-user' },
+      })
     );
 
     expect(response.status).toBe(200);
@@ -94,13 +105,43 @@ describe('POST /api/auth/passkey/register', () => {
     expect(mockCreateRegistrationOptions).not.toHaveBeenCalled();
   });
 
+  it('returns 400 without verifying a body that is not a WebAuthn attestation', async () => {
+    const bodies = [
+      // Only the inner response object: no credential id or type.
+      { action: 'verify', challengeId, response: attestation.response },
+      // A registration response without the attestation object has nothing to
+      // verify.
+      {
+        action: 'verify',
+        challengeId,
+        response: { ...attestation, response: { clientDataJSON: 'client-data' } },
+      },
+      // Anything other than a public-key credential is not an attestation.
+      { action: 'verify', challengeId, response: { ...attestation, type: 'password' } },
+      // The credential API members must be strings, not objects or numbers.
+      {
+        action: 'verify',
+        challengeId,
+        response: {
+          ...attestation,
+          response: { ...attestation.response, clientDataJSON: 42 },
+        },
+      },
+    ];
+
+    for (const body of bodies) {
+      expect((await POST(createRequest(body))).status).toBe(400);
+    }
+    expect(mockVerifyRegistration).not.toHaveBeenCalled();
+  });
+
   it('returns 401 with the stable code when verification is refused', async () => {
     mockVerifyRegistration.mockRejectedValue(
       new PasskeyVerificationError('CHALLENGE_ALREADY_USED')
     );
 
     const response = await POST(
-      createRequest({ action: 'verify', challengeId, response: { id: 'credential-1' } })
+      createRequest({ action: 'verify', challengeId, response: attestation })
     );
 
     expect(response.status).toBe(401);

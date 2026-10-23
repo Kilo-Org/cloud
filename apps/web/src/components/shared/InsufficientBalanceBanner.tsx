@@ -41,7 +41,7 @@ const colorSchemes: Record<ColorScheme, ColorSchemeConfig> = {
 
 type ProductNameContent = {
   type: 'productName';
-  /** Product name to display in the message (e.g., "App Builder", "Cloud Agent") */
+  /** Product name to display in the message (e.g., "Cloud Agent") */
   productName: string;
   minBalance?: number;
 };

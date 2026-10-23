@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useRouter } from 'next/navigation';
@@ -26,6 +26,7 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
   const trpc = useTRPC();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [githubRepo, setGithubRepo] = useState('');
 
   // Build URLs based on context
   const routes = getWebhookRoutes(organizationId);
@@ -34,8 +35,16 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
     ? `/organizations/${organizationId}/integrations`
     : '/integrations';
 
-  const { data: capabilities, isPending: isLoadingCapabilities } = useQuery(
-    trpc.webhookTriggers.capabilities.queryOptions({ organizationId })
+  const {
+    data: capabilities,
+    isPending: isLoadingCapabilities,
+    isError: hasCapabilitiesError,
+    refetch: refetchCapabilities,
+  } = useQuery(
+    trpc.webhookTriggers.capabilities.queryOptions({
+      organizationId,
+      githubRepo: githubRepo || undefined,
+    })
   );
 
   // Fetch GitHub repositories
@@ -212,7 +221,11 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
         models={modelOptions}
         isLoadingModels={isLoadingModels}
         canSetSandboxAllocation={capabilities?.canSetSandboxAllocation ?? false}
+        sandboxSelection={capabilities?.sandboxSelection}
+        onRepositoryChange={setGithubRepo}
         isLoadingCapabilities={isLoadingCapabilities}
+        hasCapabilitiesError={hasCapabilitiesError}
+        onRetryCapabilities={() => void refetchCapabilities()}
         onSubmit={handleSubmit}
         onCancel={handleCancel}
         isLoading={isCreatePending}

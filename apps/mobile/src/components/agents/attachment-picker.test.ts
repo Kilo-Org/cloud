@@ -32,7 +32,7 @@ const expoFileSystemMock = vi.hoisted(() => {
       get exists() {
         return files.has(uri);
       },
-      write(content: string) {
+      writeSync(content: string) {
         files.set(uri, content);
       },
       textSync() {

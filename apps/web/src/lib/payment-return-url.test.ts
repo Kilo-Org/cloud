@@ -6,7 +6,6 @@ describe('isValidReturnUrl', () => {
     expect(isValidReturnUrl('/profile')).toBe(true);
     expect(isValidReturnUrl('/organizations/123')).toBe(true);
     expect(isValidReturnUrl('/cloud/sessions')).toBe(true);
-    expect(isValidReturnUrl('/app-builder')).toBe(true);
   });
 
   it('should accept relative paths with query parameters', () => {

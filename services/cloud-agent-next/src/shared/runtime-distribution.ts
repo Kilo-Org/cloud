@@ -15,12 +15,6 @@ export type WrapperBundle = {
 
 export const WRAPPER_BUNDLES: readonly WrapperBundle[] = [
   {
-    entry: 'src/main.ts',
-    distName: 'wrapper.js',
-    installName: 'kilocode-wrapper.js',
-    executable: false,
-  },
-  {
     entry: 'src/restore-session.ts',
     distName: 'restore-session.js',
     installName: 'kilo-restore-session.js',

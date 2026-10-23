@@ -299,6 +299,33 @@ test('release retries preserve shipped sections on a bump branch without a PR', 
         .map(line => line.split('='))
     );
   };
+  const runBump = previousPending => {
+    const outputs = previousPending ? { pending: previousPending } : {};
+    for (const item of workflow.jobs['bump-version'].steps.filter(item => item.run)) {
+      if (item.id === 'pending' && previousPending) {
+        continue;
+      }
+      if (item.if) {
+        const condition = /^steps\.([^.]+)\.outputs\.([a-z_]+) == '([^']*)'$/.exec(item.if);
+        assert.ok(condition, `Unsupported fixture condition: ${item.if}`);
+        if (outputs[condition[1]]?.[condition[2]] !== condition[3]) {
+          continue;
+        }
+      }
+      const body = item.run.replaceAll(
+        /\$\{\{\s*steps\.([^.]+)\.outputs\.([a-z_]+)\s*\}\}/g,
+        (_, id, key) => outputs[id][key]
+      );
+      const result = run(
+        body,
+        item['working-directory'] ? join(repo, item['working-directory']) : repo
+      );
+      if (item.id) {
+        outputs[item.id] = result;
+      }
+    }
+    return outputs;
+  };
   try {
     mkdirSync(join(repo, 'apps/mobile'), { recursive: true });
     execFileSync('git', ['init', '--bare', remote], { stdio: 'pipe' });
@@ -315,15 +342,9 @@ test('release retries preserve shipped sections on a bump branch without a PR', 
     git('commit', '-m', 'Initial app');
     const base = git('rev-parse', 'HEAD');
 
-    const pending = step(workflow, 'bump-version', 'pending').run;
-    const first = run(pending);
-    assert.equal(first.open, '0');
-    const bump = run(step(workflow, 'bump-version', 'bump').run, join(repo, 'apps/mobile'));
-    const push = workflow.jobs['bump-version'].steps.find(
-      item => item.name === 'Push bump branch'
-    ).run;
-    run(push.replaceAll('${{ steps.bump.outputs.new }}', bump.new));
-    const branch = bump.branch;
+    const first = runBump();
+    assert.equal(first.pending.open, '0');
+    const branch = first.bump.branch;
     assert.equal(
       git('show', `${branch}:apps/mobile/app.config.ts`),
       "export default {\n  version: '1.2.4',\n};"
@@ -336,17 +357,32 @@ test('release retries preserve shipped sections on a bump branch without a PR', 
     git('push', 'origin', branch);
     const documented = git('rev-parse', 'HEAD');
     git('checkout', '--detach', base);
-    const retry = run(pending);
-    assert.equal(retry.open, '1');
-    assert.equal(retry.branch, branch);
+    git('branch', '-D', branch);
+    const retry = runBump();
+    assert.equal(retry.pending.open, '1');
+    assert.equal(retry.pending.branch, branch);
     assert.equal(
       git('ls-remote', '--heads', 'origin', `refs/heads/${branch}`).split(/\s/)[0],
       documented
     );
     assert.equal(git('show', `${documented}:apps/mobile/CHANGELOG.md`), shipped.trim());
 
+    assert.throws(
+      () => runBump(first.pending),
+      error => error.status === 1 && /non-fast-forward|fetch first/.test(error.stderr.toString())
+    );
+    assert.equal(
+      git('ls-remote', '--heads', 'origin', `refs/heads/${branch}`).split(/\s/)[0],
+      documented
+    );
+
     git('remote', 'set-url', 'origin', join(work, 'missing.git'));
-    assert.throws(() => run(pending));
+    assert.throws(
+      () => runBump(),
+      error =>
+        error.status === 128 &&
+        /missing\.git.*does not appear to be a git repository/.test(error.stderr.toString())
+    );
   } finally {
     rmSync(work, { recursive: true, force: true });
   }

@@ -20,12 +20,12 @@ describe('withUiDeadline', () => {
 
   it('marks its own rejection so a caller keeps its message', async () => {
     vi.useFakeTimers();
-    const result = withUiDeadline(new Promise(() => undefined), 15_000);
-    const rejection = result.catch((error: unknown) => error);
+    const pending = withUiDeadline(new Promise(() => undefined), 15_000);
+    const rejection = expect(pending).rejects.toSatisfy(isUiDeadlineError);
 
     await vi.advanceTimersByTimeAsync(15_000);
+    await rejection;
 
-    expect(isUiDeadlineError(await rejection)).toBe(true);
     expect(isUiDeadlineError(new Error('saved'))).toBe(false);
     vi.useRealTimers();
   });

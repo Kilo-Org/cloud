@@ -97,13 +97,11 @@ export function RenameModal<TSaveResult>({
     } catch (error) {
       // The deadline is the app's own message, already localized; only a
       // rejection from the save itself goes through the caller's mapper.
-      setErrorText(
-        !isUiDeadlineError(error) && errorCopy
-          ? errorCopy(error)
-          : error instanceof Error
-            ? error.message
-            : t('common.somethingWentWrong')
-      );
+      if (errorCopy && !isUiDeadlineError(error)) {
+        setErrorText(errorCopy(error));
+      } else {
+        setErrorText(error instanceof Error ? error.message : t('common.somethingWentWrong'));
+      }
     } finally {
       setPending(false);
     }

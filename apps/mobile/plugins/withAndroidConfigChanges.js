@@ -16,8 +16,13 @@ const { withAndroidManifest } = require('expo/config-plugins');
  * re-reads the display metrics on a configuration change and requests a layout
  * of every attached surface (`enableFontScaleChangesUpdatingLayout`, on by
  * default), which emits `didUpdateDimensions` to JS. Text re-measures in `sp`
- * at the new scale, `useWindowDimensions().fontScale` consumers re-render, and
- * the current route keeps its state.
+ * at the new scale and the current route keeps its state.
+ *
+ * `useWindowDimensions().fontScale` does not follow that event: React Native
+ * caches the value at launch and refreshes it only on resume, which this change
+ * no longer causes. Anything that sizes itself from the scale reads it through
+ * `useLiveFontScale()`, whose `KiloFontScale` module reports the live value
+ * directly.
  *
  * Entries are appended to whatever the template writes, so a template refresh
  * that adds another handled change neither drops nor duplicates these.

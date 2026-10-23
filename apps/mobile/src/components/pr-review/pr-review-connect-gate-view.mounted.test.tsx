@@ -356,6 +356,17 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
     }
   );
 
+  it.each(['gitlab', 'bitbucket'] as const)(
+    '%s keeps the first-time Connect copy when the status carries no reconnect marker',
+    provider => {
+      queryResult.data = { connected: false };
+      const noun = provider === 'gitlab' ? 'GitLab' : 'Bitbucket';
+      const renderer = mount(provider, provider === 'bitbucket' ? 'org-1' : null);
+      const emptyState = renderer.root.findByType('EmptyState');
+      expect(emptyState.props.title).toBe(`Connect ${noun}`);
+    }
+  );
+
   it('a personal GitLab reconnect CTA opens the personal integration page', async () => {
     platform.OS = 'android';
     queryResult.data = { connected: false, reconnectRequired: true };

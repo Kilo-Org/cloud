@@ -45,7 +45,7 @@ function findGatewaySwitch(renderer: ReactTestRenderer) {
   const found = renderer.root.findAll(
     node =>
       typeof node.type === 'string' &&
-      (node.type as string) === 'Pressable' &&
+      (node.type as string) === 'Switch' &&
       node.props.accessibilityLabel === 'Gateway transcription'
   );
   const foundSwitch = found[0];

@@ -60,6 +60,7 @@ import {
   ipCountryFromHeaders,
   ja4FromHeaders,
 } from '@kilocode/web-shared/lib/bouncer/credit-events';
+import { assertChargeAllowed } from '@kilocode/web-shared/lib/bouncer/charge-gate';
 import { retrievePaymentMethodInfo } from '@/lib/stripePaymentMethodInfo';
 import type { AutoTopUpAmountCents } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import {
@@ -1018,6 +1019,12 @@ export const userRouter = createTRPCRouter({
           return { enabled: true } as const;
         } else {
           const amountCents = input.amountCents ?? 5000;
+          await assertChargeAllowed({
+            userId: ctx.user.id,
+            flow: 'auto_topup',
+            ip: ctx.ip,
+            ja4: ja4FromHeaders(ctx.headersList),
+          });
           await reportChargeAttempted({
             flow: 'auto_topup',
             userId: ctx.user.id,
@@ -1050,6 +1057,12 @@ export const userRouter = createTRPCRouter({
     .input(z.object({ amountCents: z.number().optional() }).optional())
     .mutation(async ({ ctx, input }) => {
       const amountCents = input?.amountCents ?? 5000;
+      await assertChargeAllowed({
+        userId: ctx.user.id,
+        flow: 'auto_topup',
+        ip: ctx.ip,
+        ja4: ja4FromHeaders(ctx.headersList),
+      });
       await reportChargeAttempted({
         flow: 'auto_topup',
         userId: ctx.user.id,
@@ -1395,7 +1408,9 @@ export const userRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await db
+      // A token belongs to the account that registered it. A device that
+      // switches accounts releases the token with unregisterPushToken first.
+      const registered = await db
         .insert(user_push_tokens)
         .values({
           user_id: ctx.user.id,
@@ -1407,13 +1422,22 @@ export const userRouter = createTRPCRouter({
         .onConflictDoUpdate({
           target: [user_push_tokens.token],
           set: {
-            user_id: ctx.user.id,
             platform: input.platform,
             app_version: input.appVersion ?? null,
             locale: input.locale ?? null,
             updated_at: sql`now()`,
           },
+          setWhere: eq(user_push_tokens.user_id, ctx.user.id),
+        })
+        .returning({ id: user_push_tokens.id });
+
+      if (registered.length === 0) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'Push token is registered to another account.',
         });
+      }
+
       return { success: true };
     }),
 

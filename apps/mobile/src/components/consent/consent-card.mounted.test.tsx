@@ -147,6 +147,24 @@ function requireDisclosure(root: I): I {
   return n;
 }
 
+function findDetailsRow(root: I): I {
+  const label = i18n.t('consent.seeFullDetails');
+  const rows = root.findAll(
+    n =>
+      typeof n.type === 'string' &&
+      (n.type as string) === 'Pressable' &&
+      (n.props.accessibilityLabel as string) === label
+  );
+  if (rows.length !== 1) {
+    throw new Error(`expected 1 details row, got ${rows.length}`);
+  }
+  const row = rows[0];
+  if (!row) {
+    throw new Error('details row not found');
+  }
+  return row;
+}
+
 function requireParent(node: I): I {
   const parent = node.parent;
   if (!parent) {
@@ -185,10 +203,22 @@ describe('ConsentCard', () => {
     const renderer = mountCard('onboarding');
     const t = texts(renderer.root);
     expect(t).toContain('Required to use Kilo');
-    expect(t).toContain('Optional');
+    expect(t).toContain('Before we get started');
+    expect(t).toContain('Optional — on unless you turn it off');
+    expect(t).not.toContain('Data sharing preferences');
+    expect(t).not.toContain('Optional — you can change this any time in Settings');
     expect(t).toContain('Help improve Kilo');
     expect(t).toContain('Accept and continue');
     expect(t).toContain('Decline');
+  });
+
+  it('renders review wording in review mode', () => {
+    const renderer = mountCard('review');
+    const t = texts(renderer.root);
+    expect(t).toContain('Data sharing preferences');
+    expect(t).toContain('Optional — you can change this any time in Settings');
+    expect(t).not.toContain('Before we get started');
+    expect(t).not.toContain('Optional — on unless you turn it off');
   });
 
   it('defaults the optional switch to on', () => {
@@ -415,6 +445,24 @@ describe('ConsentCard', () => {
     expect(row).toBeDefined();
     expect(row?.props.title).toBe('Account & usage data');
     expect(row?.props.title).not.toContain('&amp;');
+  });
+
+  it('exposes the see-full-details row as a button that opens the details screen', () => {
+    for (const mode of ['onboarding', 'review'] as const) {
+      mockedPush.mockClear();
+      const row = findDetailsRow(mountCard(mode).root);
+      expect(row.props.accessibilityRole).toBe('button');
+      expect(row.props.accessibilityLabel).toBe(i18n.t('consent.seeFullDetails'));
+      (row.props.onPress as () => void)();
+      expect(mockedPush).toHaveBeenCalledWith(
+        mode === 'review' ? '/(app)/consent-details?mode=review' : '/(app)/consent-details'
+      );
+    }
+  });
+
+  it('exposes the inline privacy-policy link as a link', () => {
+    const renderer = mountCard('onboarding');
+    expect(requireDisclosure(renderer.root).props.accessibilityRole).toBe('link');
   });
 
   it('renders the privacy disclosure in the pinned footer, outside the scrolling body', () => {

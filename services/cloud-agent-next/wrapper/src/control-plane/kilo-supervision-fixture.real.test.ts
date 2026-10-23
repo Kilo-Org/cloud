@@ -12,7 +12,7 @@ type FakeServer = {
   close(): Promise<void>;
 };
 
-suite('shared supervision fake with pinned Kilo 7.8.1', () => {
+suite('shared supervision fake with pinned Kilo', () => {
   for (const mode of ['progress', 'silent', 'stuck'] as const) {
     it(`${mode} runs after the first native execution closes`, async () => {
       if (!binary) throw new Error('KILO_781_BINARY is required');

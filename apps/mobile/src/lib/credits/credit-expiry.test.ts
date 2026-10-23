@@ -20,6 +20,22 @@ describe('getNextCreditExpiry', () => {
     });
   });
 
+  it('ignores expiry dates that have already elapsed', () => {
+    expect(
+      getNextCreditExpiry(
+        [
+          { balance_mUsd: 1_000_000, expiry_date: '2026-10-17T12:00:00Z' },
+          { balance_mUsd: 2_000_000, expiry_date: '2026-12-17T12:00:00Z' },
+        ],
+        Date.parse('2026-10-17T12:00:00Z')
+      )
+    ).toEqual({
+      balanceMicrodollars: 2_000_000,
+      expiryDate: '2026-12-17T12:00:00Z',
+      timestamp: Date.parse('2026-12-17T12:00:00Z'),
+    });
+  });
+
   it('does not invent expiry for Apple or grandfathered balances', () => {
     expect(getNextCreditExpiry([{ balance_mUsd: 100_000_000, expiry_date: null }])).toBeUndefined();
     expect(getNextCreditExpiry([])).toBeUndefined();

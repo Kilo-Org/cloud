@@ -502,6 +502,7 @@ export async function prepareOrganizationKiloPassSeatCapacityFee(input: {
         store,
         assessmentKey,
         stripeIds,
+        livemode: input.subscription.livemode,
         failureCode: SERVICE_FEE_FAILURE_APPLICATION,
         record,
         deps,
@@ -523,6 +524,7 @@ export async function prepareOrganizationKiloPassSeatCapacityFee(input: {
         store,
         assessmentKey,
         stripeIds,
+        livemode: input.subscription.livemode,
         failureCode: SERVICE_FEE_FAILURE_APPLICATION,
         record,
         deps,
@@ -564,6 +566,7 @@ export async function prepareOrganizationKiloPassSeatCapacityFee(input: {
       flow: 'organization_kilo_pass',
       kiloUserId: metadata.kiloUserId,
       organizationId: metadata.organizationId,
+      livemode: input.subscription.livemode,
       eligibleSubtotalMinor: 0,
       expectedFeeMinor: 0,
       failureCode: failureCodeFromUnknown(error, SERVICE_FEE_FAILURE_APPLICATION),
@@ -644,6 +647,7 @@ export async function attachPreparedOrganizationKiloPassServiceFee(input: {
         store,
         assessmentKey: prepared.assessmentKey,
         stripeIds,
+        livemode: input.invoice.livemode,
         failureCode: SERVICE_FEE_FAILURE_INVOICE_NOT_DRAFT,
         record: prepared.assessment,
         deps,
@@ -673,6 +677,7 @@ export async function attachPreparedOrganizationKiloPassServiceFee(input: {
       store,
       assessmentKey: prepared.assessmentKey,
       stripeIds,
+      livemode: input.invoice.livemode,
       failureCode: failureCodeFromUnknown(error, SERVICE_FEE_FAILURE_APPLICATION),
       record: prepared.assessment,
       deps,
@@ -774,6 +779,7 @@ async function persistSeatCapacityMissed(params: {
   stripeIds: ServiceFeeStripeIds;
   failureCode: string;
   record: ServiceFeeAssessmentRecord | null;
+  livemode?: boolean;
   deps: OrganizationKiloPassSeatCapacityFeeDependencies;
   now: Date;
 }): Promise<{ assessment: ServiceFeeAssessmentRecord | null }> {
@@ -791,6 +797,7 @@ async function persistSeatCapacityMissed(params: {
       kiloUserId: missed.kiloUserId,
       organizationId: missed.organizationId,
       stripeInvoiceId: missed.stripeInvoiceId,
+      livemode: params.livemode,
       eligibleSubtotalMinor: missed.eligibleSubtotalMinor,
       expectedFeeMinor: missed.expectedFeeMinor,
       failureCode: missed.failureCode ?? params.failureCode,
@@ -805,6 +812,7 @@ async function persistSeatCapacityMissed(params: {
       kiloUserId: params.record?.kiloUserId,
       organizationId: params.record?.organizationId,
       stripeInvoiceId: params.stripeIds.stripeInvoiceId,
+      livemode: params.livemode,
       eligibleSubtotalMinor: params.record?.eligibleSubtotalMinor ?? 0,
       expectedFeeMinor: params.record?.expectedFeeMinor ?? 0,
       failureCode: failureCodeFromUnknown(error, params.failureCode),
@@ -821,6 +829,7 @@ async function alertSeatCapacitySafely(params: {
   kiloUserId?: string | null;
   organizationId?: string | null;
   stripeInvoiceId?: string | null;
+  livemode?: boolean;
   eligibleSubtotalMinor: number;
   expectedFeeMinor: number;
   failureCode: string;
@@ -835,6 +844,7 @@ async function alertSeatCapacitySafely(params: {
       kiloUserId: params.kiloUserId,
       organizationId: params.organizationId,
       stripeInvoiceId: params.stripeInvoiceId,
+      livemode: params.livemode,
       eligibleSubtotalMinor: params.eligibleSubtotalMinor,
       expectedFeeMinor: params.expectedFeeMinor,
       currency: SERVICE_FEE_SUPPORTED_CURRENCY,
@@ -987,6 +997,7 @@ export async function prepareOrganizationKiloPassCheckoutFee(input: {
         store,
         assessmentKey: input.assessmentKey,
         stripeIds,
+        livemode: input.subscription.livemode,
         failureCode: SERVICE_FEE_FAILURE_APPLICATION,
         record,
         deps,
@@ -1008,6 +1019,7 @@ export async function prepareOrganizationKiloPassCheckoutFee(input: {
         store,
         assessmentKey: input.assessmentKey,
         stripeIds,
+        livemode: input.subscription.livemode,
         failureCode: SERVICE_FEE_FAILURE_APPLICATION,
         record,
         deps,

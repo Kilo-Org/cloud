@@ -29,6 +29,7 @@ import { AUTOCOMPLETE_MODEL } from '@kilocode/web-shared/lib/constants';
 import { sendBalanceAlertEmail } from '@kilocode/web-shared/lib/email';
 import { dispatchLowBalancePush } from '@kilocode/web-shared/lib/notifications-worker-client';
 import { after } from 'next/server';
+import { subHours } from 'date-fns';
 
 import {
   maybePerformAutoTopUp,
@@ -103,9 +104,19 @@ export async function getBalanceForOrganizationUser(
     /** Database instance to use (defaults to primary db, pass readDb for replica) */
     fromDb?: typeof db;
     funding?: 'usage';
+    /** Instant the expiry cut-off is measured from. Defaults to the current time. */
+    now?: Date;
+    /** How many hours the cut-off trails `now` by. Defaults to no jitter. */
+    expiryJitterHours?: number;
   } = {}
 ): Promise<BalanceAndOrgSettings> {
-  const { limitType = 'daily', fromDb = db, funding } = options;
+  const {
+    limitType = 'daily',
+    fromDb = db,
+    funding,
+    now = new Date(),
+    expiryJitterHours = 0,
+  } = options;
   const startTime = performance.now();
   logExceptInTest(
     `[getBalanceForOrganizationUser] Starting balance check for user ${userId} in org ${organizationId}`
@@ -138,7 +149,8 @@ export async function getBalanceForOrganizationUser(
   let total_microdollars_acquired = row.total_microdollars_acquired;
   let microdollars_used = initial_microdollars_used;
 
-  const expireBefore = new Date();
+  // Lazy credit expiry check (mirrors user pattern in getBalanceForUser)
+  const expireBefore = subHours(now, expiryJitterHours);
   const needsExpirationComputation =
     next_credit_expiration_at && expireBefore >= new Date(next_credit_expiration_at);
 
@@ -270,7 +282,13 @@ export async function mutateOrganizationUsage(
       updated_at = NOW()
   `);
 
-  const [orgData] = await tx
+  type OrganizationBalanceRow = {
+    total_microdollars_acquired: number;
+    previous_microdollars_used: number;
+    new_microdollars_used: number;
+    settings: OrganizationSettings | null;
+  };
+  const balanceRows: OrganizationBalanceRow[] = await tx
     .update(organizations)
     .set({
       microdollars_used: sql`${organizations.microdollars_used} + ${cost}`,
@@ -287,6 +305,7 @@ export async function mutateOrganizationUsage(
       auto_top_up_enabled: organizations.auto_top_up_enabled,
     });
 
+  const [orgData] = balanceRows;
   if (!orgData) return NO_ORGANIZATION_BALANCE_ALERT;
 
   const currentBalance = orgData.total_microdollars_acquired - orgData.previous_microdollars_used;

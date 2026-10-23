@@ -45,6 +45,7 @@ import {
   ipCountryFromHeaders,
   ja4FromHeaders,
 } from '@kilocode/web-shared/lib/bouncer/credit-events';
+import { assertChargeAllowed } from '@kilocode/web-shared/lib/bouncer/charge-gate';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   classifyKiloClawCommitTerm,
@@ -4997,6 +4998,13 @@ export const kiloclawRouter = createTRPCRouter({
         });
       }
 
+      await assertChargeAllowed({
+        userId: ctx.user.id,
+        flow: 'kiloclaw',
+        ip: ctx.ip,
+        ja4: ja4FromHeaders(ctx.headersList),
+      });
+
       // Guard against duplicate Stripe subscriptions: the DB check above exempts
       // trialing rows, so also verify against live Stripe state.
       const [activeSubs, trialingSubs, openSessions] = await Promise.all([
@@ -5332,6 +5340,13 @@ export const kiloclawRouter = createTRPCRouter({
         kiloclawPriceVersion: intendedPriceVersion,
         paid_credit_policy: paidCreditTerms,
       };
+
+      await assertChargeAllowed({
+        userId: ctx.user.id,
+        flow: 'kilo_pass',
+        ip: ctx.ip,
+        ja4: ja4FromHeaders(ctx.headersList),
+      });
 
       return createOrReuseKiloPassCheckoutSession({
         userId: ctx.user.id,

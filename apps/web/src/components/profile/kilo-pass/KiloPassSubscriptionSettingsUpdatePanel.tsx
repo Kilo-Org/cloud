@@ -1,6 +1,8 @@
 import { ArrowRight, Check, Loader2 } from 'lucide-react';
+import Link from 'next/link';
 
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { cn } from '@/lib/utils';
@@ -29,6 +31,8 @@ type UpdatePanelProps = {
   targetCadence: KiloPassCadence;
   isMutating: boolean;
   updateSummary: UpdateSummary;
+  planChangeBlockedReason: string | null;
+  onOpenSubscriptionDetails: () => void;
   hasScheduledChange: boolean;
   effectiveAtLabel: string | null;
   onSelectTier: (tier: KiloPassTier) => void;
@@ -45,11 +49,15 @@ export function UpdatePanel(props: UpdatePanelProps) {
     targetCadence,
     isMutating,
     updateSummary,
+    planChangeBlockedReason,
+    onOpenSubscriptionDetails,
     hasScheduledChange,
     effectiveAtLabel,
     onSelectTier,
     onSelectCadence,
   } = props;
+
+  const areOptionsDisabled = isMutating || planChangeBlockedReason !== null;
 
   return (
     <div className="grid gap-4">
@@ -79,7 +87,7 @@ export function UpdatePanel(props: UpdatePanelProps) {
               key={tier}
               tier={tier}
               isSelected={tier === targetTier}
-              isDisabled={isMutating}
+              isDisabled={areOptionsDisabled}
               onSelect={() => onSelectTier(tier)}
             />
           ))}
@@ -94,7 +102,7 @@ export function UpdatePanel(props: UpdatePanelProps) {
               key={cadence}
               cadence={cadence}
               isSelected={cadence === targetCadence}
-              isDisabled={isMutating}
+              isDisabled={areOptionsDisabled}
               onSelect={() => onSelectCadence(cadence)}
             />
           ))}
@@ -109,6 +117,21 @@ export function UpdatePanel(props: UpdatePanelProps) {
         <p className="text-muted-foreground text-sm">{updateSummary.body}</p>
       </div>
       <CreditExpiryNotice purchase="pass" />
+
+      {planChangeBlockedReason ? (
+        <Alert variant="warning">
+          <AlertDescription>
+            <p>{planChangeBlockedReason}</p>
+            <Link
+              href="/subscriptions/kilo-pass"
+              onClick={onOpenSubscriptionDetails}
+              className="font-medium underline underline-offset-2"
+            >
+              Go to your Kilo Pass subscription
+            </Link>
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       {hasScheduledChange && effectiveAtLabel ? (
         <div className="text-muted-foreground text-xs">Scheduled for {effectiveAtLabel}</div>
@@ -126,6 +149,7 @@ type UpdateFooterProps = {
   isCancelingPendingChange: boolean;
   isSchedulingChange: boolean;
   isSameSelection: boolean;
+  isPlanChangeBlocked: boolean;
 };
 
 export function UpdateFooter(props: UpdateFooterProps) {
@@ -139,6 +163,7 @@ export function UpdateFooter(props: UpdateFooterProps) {
     isCancelingPendingChange,
     isSchedulingChange,
     isSameSelection,
+    isPlanChangeBlocked,
   } = props;
 
   return (
@@ -161,7 +186,7 @@ export function UpdateFooter(props: UpdateFooterProps) {
             onClick={() => {
               if (policyReady) onScheduleChange();
             }}
-            disabled={isSameSelection || isMutating || !policyReady}
+            disabled={isSameSelection || isMutating || !policyReady || isPlanChangeBlocked}
           >
             {isSchedulingChange ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

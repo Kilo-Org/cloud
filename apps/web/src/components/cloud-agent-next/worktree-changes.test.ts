@@ -9,7 +9,9 @@ import {
   createWorktreeChangesRefresher,
   deserializeWorktreeChangesViewMode,
   formatWorktreeChangesBaseBranch,
+  getWorktreeChangesQueryKey,
   getWorktreeChangesTotals,
+  getWorktreeFileQueryKey,
   groupWorktreeChangesByDirectory,
   preserveNewerWorktreeChanges,
   resolveWorktreeChangesSelection,
@@ -202,7 +204,8 @@ describe('worktree changes capability', () => {
 
 describe('saved worktree changes cache', () => {
   let queryClient: QueryClient;
-  const queryKey = ['worktree-changes', 'personal', 'workspace-a'];
+  const scope = { cloudAgentSessionId: 'workspace-chat-a', worktreeId: 'worktree-a' };
+  const queryKey = getWorktreeChangesQueryKey(scope);
 
   beforeEach(() => {
     queryClient = new QueryClient({
@@ -240,7 +243,7 @@ describe('saved worktree changes cache', () => {
   it('does not let an in-flight saved read overwrite a newer refresh', async () => {
     queryClient.setQueryData(queryKey, { snapshot });
     const read = Promise.withResolvers<GetWorktreeChangesOutput>();
-    const pendingRead = queryClient.fetchQuery({ queryKey, queryFn: () => read.promise });
+    const pendingRead = queryClient.query({ queryKey, queryFn: () => read.promise });
     const newer = { ...snapshot, revision: 4 };
     queryClient.setQueryData(queryKey, { snapshot: newer });
     read.resolve({ snapshot });
@@ -249,8 +252,25 @@ describe('saved worktree changes cache', () => {
     expect(queryClient.getQueryData(queryKey)).toEqual({ snapshot: newer });
   });
 
-  it('keeps delayed responses scoped to their session without a global revision floor', () => {
-    const nextSessionKey = ['worktree-changes', 'personal', 'workspace-b'];
+  it('shares newer revisions across sibling chats without accepting delayed older reads', async () => {
+    const siblingKey = getWorktreeChangesQueryKey({
+      ...scope,
+      cloudAgentSessionId: 'workspace-chat-b',
+    });
+    queryClient.setQueryData(queryKey, { snapshot });
+    expect(queryClient.getQueryData(siblingKey)).toEqual({ snapshot });
+    const read = Promise.withResolvers<GetWorktreeChangesOutput>();
+    const pendingRead = queryClient.query({ queryKey, queryFn: () => read.promise });
+    const newer = { ...snapshot, revision: 4 };
+    queryClient.setQueryData(siblingKey, { snapshot: newer });
+    read.resolve({ snapshot });
+    await pendingRead;
+    expect(queryClient.getQueryData(queryKey)).toEqual({ snapshot: newer });
+    expect(queryClient.getQueryData(siblingKey)).toEqual({ snapshot: newer });
+  });
+
+  it('keeps different worktrees isolated without a global revision floor', () => {
+    const nextSessionKey = getWorktreeChangesQueryKey({ ...scope, worktreeId: 'worktree-b' });
     queryClient.setQueryData(queryKey, { snapshot });
     expect(queryClient.getQueryData(nextSessionKey)).toBeUndefined();
     queryClient.setQueryData(nextSessionKey, { snapshot: { ...snapshot, revision: 1 } });
@@ -261,11 +281,62 @@ describe('saved worktree changes cache', () => {
     });
   });
 
-  it('does not share data between personal and organization scopes', () => {
-    queryClient.setQueryData(queryKey, { snapshot });
+  it.each(['organization-a', 'organization-b', 'personal'])(
+    'does not share personal data with organization %s',
+    organizationId => {
+      queryClient.setQueryData(queryKey, { snapshot });
+      expect(
+        queryClient.getQueryData(getWorktreeChangesQueryKey({ ...scope, organizationId }))
+      ).toBeUndefined();
+    }
+  );
+
+  it('does not share data between organizations', () => {
+    queryClient.setQueryData(
+      getWorktreeChangesQueryKey({ ...scope, organizationId: 'organization-a' }),
+      { snapshot }
+    );
     expect(
-      queryClient.getQueryData(['worktree-changes', 'organization-a', 'workspace-a'])
+      queryClient.getQueryData(
+        getWorktreeChangesQueryKey({ ...scope, organizationId: 'organization-b' })
+      )
     ).toBeUndefined();
+  });
+
+  it('falls back to isolated sessions without colliding with a worktree of the same name', () => {
+    const sessionKey = getWorktreeChangesQueryKey({ cloudAgentSessionId: 'worktree-a' });
+    queryClient.setQueryData(queryKey, { snapshot });
+    expect(queryClient.getQueryData(sessionKey)).toBeUndefined();
+    queryClient.setQueryData(sessionKey, { snapshot });
+    expect(
+      queryClient.getQueryData(
+        getWorktreeChangesQueryKey({ cloudAgentSessionId: 'workspace-chat-b' })
+      )
+    ).toBeUndefined();
+  });
+
+  it('shares file records across siblings only for the same organization, worktree, path, and revision', () => {
+    const fileScope = { ...scope, path: 'src/file.ts', expectedRevision: 3 };
+    const fileKey = getWorktreeFileQueryKey(fileScope);
+    const record = { revision: 3, text: 'saved file' };
+    queryClient.setQueryDefaults(fileKey, { structuralSharing: true });
+    queryClient.setQueryData(fileKey, record);
+    expect(
+      queryClient.getQueryData(
+        getWorktreeFileQueryKey({ ...fileScope, cloudAgentSessionId: 'workspace-chat-b' })
+      )
+    ).toEqual(record);
+    for (const overrides of [
+      { worktreeId: 'worktree-b' },
+      { organizationId: 'organization-a' },
+      { path: 'src/other.ts' },
+      { expectedRevision: 4 },
+      { worktreeId: undefined },
+    ]) {
+      expect(
+        queryClient.getQueryData(getWorktreeFileQueryKey({ ...fileScope, ...overrides }))
+      ).toBeUndefined();
+    }
   });
 });
 

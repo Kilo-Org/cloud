@@ -7,13 +7,16 @@ type CreditBlock = Pick<
   'balance_mUsd' | 'expiry_date'
 >;
 
-export function getNextCreditExpiry(creditBlocks: readonly CreditBlock[]) {
+export function getNextCreditExpiry(
+  creditBlocks: readonly CreditBlock[],
+  now = Date.now()
+) {
   const dated = creditBlocks.flatMap(block => {
     if (block.expiry_date === null || block.balance_mUsd <= 0) {
       return [];
     }
     const timestamp = parseTimestamp(block.expiry_date).getTime();
-    return Number.isFinite(timestamp)
+    return Number.isFinite(timestamp) && timestamp > now
       ? [{ balanceMicrodollars: block.balance_mUsd, expiryDate: block.expiry_date, timestamp }]
       : [];
   });

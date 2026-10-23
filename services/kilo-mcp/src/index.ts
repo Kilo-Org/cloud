@@ -1,4 +1,5 @@
 import catalogJson from '../catalog.json';
+import { cloudAgentAuthorityProcedure } from '../../../packages/worker-utils/src/cloud-agent-authority';
 import {
   classifyToolError,
   createMcpAnalytics,
@@ -7,7 +8,12 @@ import {
   type CallRejectedReason,
   type McpAnalytics,
 } from './analytics';
-import { forwardedAuthFromProps, ORGANIZATION_ID_HEADER, verifyKiloSessionToken } from './auth';
+import {
+  forwardedAuthFromProps,
+  hasCloudAgentAuthorityClaim,
+  ORGANIZATION_ID_HEADER,
+  verifyKiloSessionToken,
+} from './auth';
 import { MCP_SCOPE, scopeTokens } from './auth/http';
 import {
   callCatalogEndpoint,
@@ -235,6 +241,7 @@ const PROTECTED_TOOLS = [
  */
 export function canUseProtectedActions(auth: ForwardedAuth): boolean {
   return (
+    auth.cloudAgentAuthority === undefined &&
     auth.adminEnabled === true &&
     auth.adminEligible === true &&
     typeof auth.sessionId === 'string' &&
@@ -444,6 +451,12 @@ async function runTool(
   analytics: McpAnalytics,
   callerIdentity: AnalyticsIdentity
 ): Promise<ToolResult> {
+  if (
+    auth.cloudAgentAuthority &&
+    auth.cloudAgentAuthority.expiresAt <= Math.floor(Date.now() / 1000)
+  ) {
+    throw new JsonRpcFailure(UNAUTHORIZED, 'Cloud Agent authority has expired');
+  }
   if (name === 'search') {
     const parsed = searchArgsSchema.safeParse(args);
     if (!parsed.success) {
@@ -463,6 +476,12 @@ async function runTool(
       // Fail-closed: only a grant that ticked the admin opt-in sees admin or
       // debug rows.
       includeGuarded: auth.adminEnabled === true,
+      ...(auth.cloudAgentAuthority
+        ? {
+            allowedPaths: [cloudAgentAuthorityProcedure(auth.cloudAgentAuthority)],
+            cloudAgentAuthority: auth.cloudAgentAuthority,
+          }
+        : {}),
     });
     // The query's shape only — never the raw text (it can carry personal data).
     analytics.searchPerformed({
@@ -705,13 +724,18 @@ async function handleRpcMessage(
           protocolVersion,
           ...(clientName !== undefined ? { clientName } : {}),
         });
+        const childSessionInstructions = auth.cloudAgentAuthority
+          ? ` This session may launch child Cloud Agent sessions. Launch one only when the user explicitly asks you to spin up a new Cloud Agent session. Each child session gets its own sandbox and worktree, so use child sessions to fan out independent tasks. Do not use a child session to explore or work in this worktree; use your own tools here. To launch one, run search first, then call ${cloudAgentAuthorityProcedure(auth.cloudAgentAuthority)} with the child's task. To receive the child's completion, failure or interruption as a new message in this parent session, include callbackTarget: { url: "session:parent" }. Omit callbackTarget when no notification is needed. Do not poll or wait in a tool for a callback; finish your turn and resume when it arrives.`
+          : '';
         return jsonRpcResult(id ?? 0, {
           protocolVersion,
           capabilities: { tools: {} },
           serverInfo: SERVER_INFO,
-          instructions: canUseProtectedActions(auth)
-            ? `This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying. This connection may also run admin and debug endpoints: use call_protected to submit one, then submit_otp with the code the user reads from their authenticator app to approve it. The endpoint and payload are fixed once call_protected returns. ${feedback}`
-            : `This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying. ${feedback}`,
+          instructions:
+            (canUseProtectedActions(auth)
+              ? `This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying. This connection may also run admin and debug endpoints: use call_protected to submit one, then submit_otp with the code the user reads from their authenticator app to approve it. The endpoint and payload are fixed once call_protected returns. ${feedback}`
+              : `This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying. ${feedback}`) +
+            childSessionInstructions,
         });
       }
       case 'ping':
@@ -884,12 +908,31 @@ type McpApiContext = ExecutionContext & { props?: GrantProps };
 export const apiHandler = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const analytics = createMcpAnalytics({ env, ctx });
-    const props = (ctx as McpApiContext).props;
+    let props = (ctx as McpApiContext).props;
     if (!props || typeof props.kiloToken !== 'string' || props.kiloToken.length === 0) {
       // Anonymous by construction: no Kilo user is bound, so the event must not
       // be attributed to a person ($process_person_profile: false).
       analytics.callRejected({ identity: null, reason: 'auth_failure' });
       return unauthorizedResponse(request);
+    }
+    if (props.cloudAgentAuthority !== undefined || hasCloudAgentAuthorityClaim(props.kiloToken)) {
+      const identity = await verifyKiloSessionToken({
+        webBaseUrl: env.WEB_BASE_URL,
+        token: props.kiloToken,
+      });
+      if (
+        !identity?.cloudAgentAuthority ||
+        identity.kiloUserId !== props.kiloUserId ||
+        identity.cloudAgentAuthority.organizationId !== (props.organizationId ?? null)
+      ) {
+        return unauthorizedResponse(request);
+      }
+      props = {
+        ...props,
+        cloudAgentAuthority: identity.cloudAgentAuthority,
+        adminEnabled: false,
+        adminEligible: false,
+      };
     }
     // The pending protected requests live in the worker's existing DO (o2).
     // Resolve it only when the binding is present so a handler built without one
@@ -955,12 +998,21 @@ export async function resolveExternalToken(
   });
   if (!identity) return null;
 
-  const organizationId = input.request.headers.get(ORGANIZATION_ID_HEADER) ?? undefined;
+  const requestedOrganizationId = input.request.headers.get(ORGANIZATION_ID_HEADER) ?? undefined;
+  const scope = identity.cloudAgentAuthority;
+  if (
+    scope &&
+    requestedOrganizationId !== undefined &&
+    requestedOrganizationId !== scope.organizationId
+  )
+    return null;
+  const organizationId = scope ? (scope.organizationId ?? undefined) : requestedOrganizationId;
   return {
     props: {
       kiloToken: input.token,
       kiloUserId: identity.kiloUserId,
       ...(organizationId ? { organizationId } : {}),
+      ...(scope ? { cloudAgentAuthority: scope, adminEnabled: false, adminEligible: false } : {}),
     },
   };
 }
@@ -1032,6 +1084,8 @@ export class KiloMcpOAuthStore extends OAuthStore {
     store: this,
     revokeGrant: (grantId, userId) =>
       getOAuthApi(providerOptions, this.env).revokeGrant(grantId, userId),
+    // Built lazily: only a reuse rejection emits, and the factory is pure.
+    analytics: () => createMcpAnalytics({ env: this.env, ctx: this.ctx }),
   });
 
   fetch(request: Request): Promise<Response> {

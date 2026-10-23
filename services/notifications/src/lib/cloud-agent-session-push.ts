@@ -157,7 +157,10 @@ async function dispatchSessionPush(
         // read site defaults the kind to `unknown`.
         ...(content.category === 'attention' && {
           ...(content.attentionKind !== undefined && { attentionKind: content.attentionKind }),
-          ...(content.prUrl != null && { prUrl: content.prUrl }),
+          // The payload's `prUrl` is a usable URL or absent: an empty value
+          // would fail the payload schema on the device and cost the whole
+          // notification its route and actions, not just the Open PR action.
+          ...(content.prUrl ? { prUrl: content.prUrl } : {}),
         }),
       },
       sound: 'default',

@@ -1,8 +1,9 @@
 /**
- * Queue a user message on an existing cloud-agent session.
+ * Queue a user message on an existing control-plane session.
  *
- * Shared by current follow-up admission and the retained legacy follow-up
- * endpoint. Prepared initial replay is isolated in `legacy-prepared-admission`.
+ * Shared by current follow-up admission and the retained split public
+ * endpoints. Prepared initial replay is isolated in
+ * `prepared-session-admission`.
  *
  * Returns the explicitly compatibility-projected public acknowledgment shape.
  */
@@ -11,18 +12,13 @@ import { TRPCError } from '@trpc/server';
 import type {
   QueueExecutionTurnCommand,
   SessionMessageAdmissionResult,
-  SubmittedSessionMessageRequest,
   RetryableResultCode,
 } from '../execution/types.js';
 import type { SessionId } from '../types/ids.js';
 import type { Env } from '../types.js';
-import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import type { QueueAckResponse } from '../router/schemas.js';
 import { withDORetry } from '../utils/do-retry.js';
-import {
-  resolveLegacySessionStub,
-  getSandboxSessionStub,
-} from '../sandbox-session/session-stub.js';
+import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
 import type {
   ControlPlaneSendResult,
   SandboxSessionV2,
@@ -33,16 +29,13 @@ import {
   ControlPlaneMessageInputError,
 } from './control-plane-session-input.js';
 import type { ControlPlanePromptPayload } from '../shared/control-plane-protocol.js';
-import { isControlSession } from '../session-plane.js';
-import { logger } from '../logger.js';
 import { preflightExistingPromptModel, preflightSessionRuntime } from './model-preflight.js';
-import { createMessageId } from './message-id.js';
 import {
   createRuntimeAuthorization,
   sealRuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization';
 import { resolveSecret } from '../auth.js';
-import { fetchSessionMetadata } from '../session-service.js';
+import { fetchSessionMetadata } from './metadata.js';
 import jwt from 'jsonwebtoken';
 import { logRuntimeAuthorizationDiagnostic } from './runtime-authorization-diagnostics.js';
 
@@ -109,9 +102,9 @@ export function throwAdmissionError(
 /**
  * The public queue-full admission failure. One owner for the code and message:
  * the tRPC paths pass it to `throwAdmissionError` (429 `PENDING_QUEUE_FULL`),
- * and the Kilo facade returns it directly. The legacy public queue-capacity
- * limit and error are kept by the execution brief's queue-capacity decision,
- * recorded in the ledger.
+ * and the Kilo facade returns it directly. The public queue-capacity limit and
+ * error are kept by the execution brief's queue-capacity decision, recorded in
+ * the ledger.
  */
 export function pendingQueueFullAdmissionFailure(): Extract<
   SessionMessageAdmissionResult,
@@ -149,18 +142,13 @@ export async function preflightRuntimeAuthorizationRecovery(
     return;
   }
   const sessionId = cloudAgentSessionId as SessionId;
-  const isControl = isControlSession(sessionId);
-  const state = isControl
-    ? await withDORetry(
-        () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),
-        target => target.getRuntimeAuthorizationStatus(),
-        'getRuntimeAuthorizationStatus'
-      )
-    : await withDORetry(
-        () => resolveLegacySessionStub(ctx.env, ctx.userId, sessionId),
-        target => target.getRuntimeAuthorizationRecoveryState(),
-        'getRuntimeAuthorizationRecoveryState'
-      );
+  const state = await withDORetry(
+    () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),
+    target => target.getRuntimeAuthorizationStatus(),
+    'getRuntimeAuthorizationStatus'
+  );
+  // `legacy` is a credential-compatibility status for a stored authorization,
+  // not the retired `agent_*` session plane.
   if (state.state === 'legacy' || state.state === 'active') return;
   if (state.state === 'revoked') {
     logRuntimeAuthorizationDiagnostic(
@@ -186,30 +174,17 @@ export async function preflightRuntimeAuthorizationRecovery(
     ...(metadata.identity.orgId ? { organizationId: metadata.identity.orgId } : {}),
   });
   const runtimeAuthorizationSeal = await sealRuntimeAuthorization(created.authorization, secret);
-  const result = isControl
-    ? await withDORetry(
-        () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),
-        target =>
-          target.recoverExpiredRuntimeAuthorization({
-            ownerId: ctx.userId,
-            expectedOldId,
-            runtimeAuthorizationSeal,
-            runtimeToken: created.token,
-          }),
-        'recoverExpiredRuntimeAuthorization'
-      )
-    : await withDORetry(
-        () => resolveLegacySessionStub(ctx.env, ctx.userId, sessionId),
-        target =>
-          target.recoverExpiredRuntimeAuthorization({
-            ownerId: ctx.userId,
-            expectedOldId,
-            recoveryId: (state as { recoveryId?: string }).recoveryId ?? crypto.randomUUID(),
-            runtimeAuthorizationSeal,
-            runtimeToken: created.token,
-          }),
-        'recoverExpiredRuntimeAuthorization'
-      );
+  const result = await withDORetry(
+    () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),
+    target =>
+      target.recoverExpiredRuntimeAuthorization({
+        ownerId: ctx.userId,
+        expectedOldId,
+        runtimeAuthorizationSeal,
+        runtimeToken: created.token,
+      }),
+    'recoverExpiredRuntimeAuthorization'
+  );
   if (result.status === 'denied') {
     logRuntimeAuthorizationDiagnostic(cloudAgentSessionId, 'preflight', 'recovery_denied');
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Runtime authorization denied' });
@@ -223,10 +198,8 @@ export async function preflightRuntimeAuthorizationRecovery(
 }
 
 /**
- * Admit a user message via `CloudAgentSession.admitSubmittedMessage`.
- *
- * Throws a TRPCError on failure and projects durable admission into the public
- * compatibility response, including `delivery: 'sent'` for accepted replays.
+ * Projects durable admission into the public compatibility response, including
+ * `delivery: 'sent'` for accepted replays.
  */
 export function projectAdmissionToPublicAck(
   sessionId: SessionId,
@@ -239,18 +212,6 @@ export function projectAdmissionToPublicAck(
     messageId: result.messageId,
     delivery: result.compatibilityDelivery,
   };
-}
-
-async function hasMessageAdmission(input: QueueMessageInput, ctx: QueueMessageContext) {
-  const messageId = input.turn.id;
-  if (messageId === undefined || messageId === null) return false;
-
-  const sessionId = input.cloudAgentSessionId as SessionId;
-  return withDORetry<DurableObjectStub<CloudAgentSession>, boolean>(
-    () => resolveLegacySessionStub(ctx.env, ctx.userId, sessionId),
-    stub => stub.hasMessageAdmission(messageId),
-    'hasMessageAdmission'
-  );
 }
 
 export async function preflightAndAdmitPromptMessage<T>(
@@ -266,20 +227,6 @@ export async function preflightAndAdmitPromptMessage<T>(
     procedure,
   });
   await preflightRuntimeAuthorizationRecovery(input.cloudAgentSessionId, ctx);
-  if (isControlSession(input.cloudAgentSessionId)) {
-    // Model policy (org allow-list, forbidden/unavailable) still gates a
-    // control-plane send; only the legacy message-admission probe is skipped.
-    await preflightExistingPromptModel({
-      env: ctx.env,
-      userId: ctx.userId,
-      cloudAgentSessionId: input.cloudAgentSessionId,
-      requestedModel: input.agent?.model,
-      procedure,
-    });
-    return admit(input, ctx);
-  }
-  if (await hasMessageAdmission(input, ctx)) return admit(input, ctx);
-
   await preflightExistingPromptModel({
     env: ctx.env,
     userId: ctx.userId,
@@ -287,7 +234,6 @@ export async function preflightAndAdmitPromptMessage<T>(
     requestedModel: input.agent?.model,
     procedure,
   });
-
   return admit(input, ctx);
 }
 
@@ -296,7 +242,7 @@ export function preflightAndQueuePromptMessage(
   ctx: QueueMessageContext,
   procedure: string
 ): Promise<QueueAckResponse> {
-  return preflightAndAdmitPromptMessage(input, ctx, procedure, queueMessageAfterRecoveryPreflight);
+  return preflightAndAdmitPromptMessage(input, ctx, procedure, queueControlPlaneMessage);
 }
 
 export async function queueMessage(
@@ -304,7 +250,7 @@ export async function queueMessage(
   ctx: QueueMessageContext
 ): Promise<QueueAckResponse> {
   await preflightRuntimeAuthorizationRecovery(input.cloudAgentSessionId, ctx);
-  return queueMessageAfterRecoveryPreflight(input, ctx);
+  return queueControlPlaneMessage(input, ctx);
 }
 
 /**
@@ -360,47 +306,4 @@ async function queueControlPlaneMessage(
     messageId: payload.messageId,
     delivery: 'queued',
   };
-}
-
-async function queueMessageAfterRecoveryPreflight(
-  input: QueueMessageInput,
-  ctx: QueueMessageContext
-): Promise<QueueAckResponse> {
-  const sessionId = input.cloudAgentSessionId as SessionId;
-  if (isControlSession(sessionId)) {
-    return queueControlPlaneMessage(input, ctx);
-  }
-  const request: SubmittedSessionMessageRequest = {
-    userId: ctx.userId,
-    botId: ctx.botId,
-    turn: {
-      ...input.turn,
-      id: input.turn.id ?? createMessageId(),
-    },
-    agent: input.agent,
-    finalization: input.finalization,
-  };
-
-  const result = await withDORetry<
-    DurableObjectStub<CloudAgentSession>,
-    SessionMessageAdmissionResult
-  >(
-    () => resolveLegacySessionStub(ctx.env, ctx.userId, sessionId),
-    stub => stub.admitSubmittedMessage(request),
-    'admitSubmittedMessage'
-  );
-
-  if (!result.success) {
-    logger
-      .withFields({
-        sessionId,
-        userId: ctx.userId,
-        resultCode: result.code,
-        retryable: isAdmissionFailureRetryable(result.code),
-      })
-      .warn('Cloud-agent Durable Object rejected message admission request');
-    throwAdmissionError(result);
-  }
-
-  return projectAdmissionToPublicAck(sessionId, result);
 }

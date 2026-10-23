@@ -70,14 +70,14 @@ const until = (said: Ref.Ref<number>, target: number) =>
   Ref.get(said).pipe(
     Effect.delay(Duration.millis(20)),
     Effect.repeat({ until: (held: number) => held >= target }),
-    Effect.timeoutFail({
+    Effect.timeoutOrElse({
       /* A minute, because this waits on a model and not on the package. Half of
          it was not enough for `minimax/minimax-m3` on 2026-09-06, which streams
          nothing at all — not even thinking — for a long time before its first
          word, and a run that gave up then reported a cancellation that never
          happened. */
       duration: Duration.seconds(60),
-      onTimeout: () => new Error(`the answer never reached ${String(target)} pieces`),
+      orElse: () => Effect.fail(new Error(`the answer never reached ${String(target)} pieces`)),
     })
   );
 
@@ -95,7 +95,7 @@ const program = (model: string) =>
     const cut = yield* Ref.make(0);
     const cutSession = yield* openSession({ system, model });
     const cutStarted = Date.now();
-    const reading = yield* Effect.fork(counted(cutSession, cut));
+    const reading = yield* Effect.forkChild(counted(cutSession, cut));
     yield* until(cut, readBeforeLeaving);
     yield* Fiber.interrupt(reading);
     const cutMillis = since(cutStarted);
@@ -112,7 +112,7 @@ const program = (model: string) =>
            reasoning model spends the lot on thinking and says nothing, which
            reads as a stranded session and is not one. */
         cutSession.ask('Answer with the word: ok', { maxTokens: room }),
-        '',
+        () => '',
         (held, event) => (event.kind === 'delta' ? held + event.text : held)
       ),
     };
@@ -132,22 +132,22 @@ for (const model of models) {
      money and minutes, and learning one failure per sweep turns an afternoon
      into a week. */
   const got = await Effect.runPromise(
-    Effect.either(Effect.scoped(Effect.provide(program(model), layers)))
+    Effect.result(Effect.scoped(Effect.provide(program(model), layers)))
   );
-  if (got._tag === 'Left') {
-    console.log('model         ', model, 'FAILED', JSON.stringify(String(got.left)));
+  if (got._tag === 'Failure') {
+    console.log('model         ', model, 'FAILED', JSON.stringify(String(got.failure)));
     /* A minute with fewer than ten pieces is a model too slow to walk away
        from, not a cancellation that failed: `minimax/minimax-m3` streams
        nothing for over a minute on 2026-09-06. There is no mid-stream here to
        leave. A package that stopped streaming would put every model here, which
        is what the floor below catches. */
-    if (!String(got.left).includes('never reached')) {
-      fail(`the run failed: ${String(got.left)}`);
+    if (!String(got.failure).includes('never reached')) {
+      fail(`the run failed: ${String(got.failure)}`);
     }
     continue;
   }
   cancelled.push(model);
-  const result = got.right;
+  const result = got.success;
 
   const roles = result.history.map(turn => turn.role);
 

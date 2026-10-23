@@ -38,6 +38,7 @@ import {
   ipCountryFromHeaders,
   ja4FromHeaders,
 } from '@kilocode/web-shared/lib/bouncer/credit-events';
+import { assertChargeAllowed } from '@kilocode/web-shared/lib/bouncer/charge-gate';
 import { KILO_PASS_REFERRER_REWARD_CAP } from '@/lib/impact/kilo-pass-referrals';
 import { TRPCError } from '@trpc/server';
 import {
@@ -2474,6 +2475,16 @@ export const kiloPassRouter = createTRPCRouter({
         });
       }
 
+      // A subscription set to cancel at period end ends instead of switching plans, so the
+      // user has to resume it before changing plans.
+      if (subscription.cancelAtPeriodEnd) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message:
+            'Your Kilo Pass is set to cancel. Resume your subscription before changing plans.',
+        });
+      }
+
       const fromTier = subscription.tier;
       const fromCadence = subscription.cadence;
       const toTier = input.targetTier;
@@ -2807,6 +2818,13 @@ export const kiloPassRouter = createTRPCRouter({
         affiliateTrackingId: attribution?.tracking_id ?? '',
         paid_credit_policy: paidCreditTerms,
       };
+
+      await assertChargeAllowed({
+        userId: ctx.user.id,
+        flow: 'kilo_pass',
+        ip: ctx.ip,
+        ja4: ja4FromHeaders(ctx.headersList),
+      });
 
       return createOrReuseKiloPassCheckoutSession({
         userId: ctx.user.id,

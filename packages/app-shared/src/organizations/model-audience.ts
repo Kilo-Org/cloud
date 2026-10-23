@@ -3,7 +3,7 @@
  *
  * - `member`: the viewing member runs them, as in a new cloud agent session.
  * - `shared_services`: a platform service runs them for the organization, as
- *   for code review, auto-fix, auto-triage, webhook triggers and the Discord
+ *   for code review, webhook triggers and the Discord
  *   bot. Such a run cannot use a member's own ChatGPT connection, so the list
  *   marks a model BYOK-available only for an organization BYOK key or the
  *   organization's shared-services ChatGPT connection.

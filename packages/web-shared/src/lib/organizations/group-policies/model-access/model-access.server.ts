@@ -13,7 +13,10 @@ import {
   VIRTUAL_PROVIDER,
   withoutVirtualProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
-import { isModelRestrictionExempt } from '@kilocode/web-shared/lib/model-allow.server';
+import {
+  isModelRestrictionExempt,
+  type CustomLlmGrantee,
+} from '@kilocode/web-shared/lib/model-allow.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   getOrganizationGroupPolicyContext,
@@ -35,6 +38,7 @@ export type EffectiveOrganizationModelPolicy = {
       };
   dataCollection?: OrganizationSettings['data_collection'];
   policyRevision: number;
+  customLlmGrantee: CustomLlmGrantee;
 };
 
 export type EffectiveModelDecision = {
@@ -58,6 +62,10 @@ export type ProviderLookup = (modelId: string) => Promise<ReadonlySet<string>>;
 export function evaluateEffectiveModelAccessPolicy(
   context: OrganizationGroupPolicyContext
 ): EffectiveOrganizationModelPolicy {
+  const customLlmGrantee = {
+    organizationId: context.organization.id,
+    groupIds: context.groupIds,
+  };
   const organizationRestrictionsEnabled = context.organization.plan === 'enterprise';
   const organizationModelDenyList = organizationRestrictionsEnabled
     ? (context.organization.settings.model_deny_list ?? []).map(normalizeModelId)
@@ -73,6 +81,7 @@ export function evaluateEffectiveModelAccessPolicy(
       memberGrant: { mode: 'unrestricted' },
       dataCollection: context.organization.settings.data_collection,
       policyRevision: context.policyRevision,
+      customLlmGrantee,
     };
   }
 
@@ -95,6 +104,7 @@ export function evaluateEffectiveModelAccessPolicy(
       memberGrant: { mode: 'organization_baseline' },
       dataCollection: context.organization.settings.data_collection,
       policyRevision: context.policyRevision,
+      customLlmGrantee,
     };
   }
 
@@ -124,6 +134,7 @@ export function evaluateEffectiveModelAccessPolicy(
     },
     dataCollection: context.organization.settings.data_collection,
     policyRevision: context.policyRevision,
+    customLlmGrantee,
   };
 }
 
@@ -149,7 +160,7 @@ export async function getEffectiveModelDecision(
   providerLookup: ProviderLookup = getProviderSlugsForModel
 ): Promise<EffectiveModelDecision> {
   const normalizedModelId = normalizeModelId(modelId);
-  if (await isModelRestrictionExempt(modelId)) {
+  if (await isModelRestrictionExempt(modelId, policy.customLlmGrantee)) {
     return { allowed: true };
   }
   if (

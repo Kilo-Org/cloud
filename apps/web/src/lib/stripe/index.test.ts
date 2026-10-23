@@ -18,6 +18,7 @@ const CURRENT_KILO_PASS_TIER_19_MONTHLY_PRICE_ID =
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import type * as creditsModule from '@kilocode/web-shared/lib/credits';
 import type * as organizationBillingModule from '@/lib/organizations/organization-billing';
+import type * as bouncerClientModule from '@kilocode/web-shared/lib/bouncer/client';
 
 // Allow spying on processTopUp / processTopupForOrganization inside stripe.ts.
 // The mock delegates to the real implementation by default so existing tests are unaffected.
@@ -53,6 +54,25 @@ jest.mock(
   }),
   { virtual: true }
 );
+// The webhook's inline bouncer steps are stubbed at the HTTP boundary: delivery fails by default
+// (the row stays queued) and the charge gate answers "unavailable" (fail open). Tests that state an
+// outcome override these.
+jest.mock('@kilocode/web-shared/lib/bouncer/client', () => {
+  const actual = jest.requireActual<typeof bouncerClientModule>(
+    '@kilocode/web-shared/lib/bouncer/client'
+  );
+  return {
+    __esModule: true,
+    ...actual,
+    deliverCreditEventWireBody: jest.fn(async () => ({
+      delivered: false,
+      permanent: false,
+      status: null,
+      error: 'TypeError',
+    })),
+    chargeDecide: jest.fn(async () => null),
+  };
+});
 
 import {
   type StripeTopupMetadata,
@@ -65,6 +85,7 @@ import {
   getStripeSeatsCheckoutUrl,
 } from '@/lib/stripe';
 import { client } from '@kilocode/web-shared/lib/stripe-client';
+import { chargeDecide, deliverCreditEventWireBody } from '@kilocode/web-shared/lib/bouncer/client';
 import * as kiloPassOrgStripe from '@/lib/kilo-pass-org/stripe-adapter';
 import {
   type ServiceFeeAssessmentRecord,
@@ -5069,6 +5090,9 @@ describe('processStripePaymentEventHook bouncer credit events', () => {
   });
 
   test('charge.failed reports the failing payer', async () => {
+    const retrieveSpy = jest
+      .spyOn(client.charges, 'retrieve')
+      .mockRejectedValue(new Error('unexpected retrieve'));
     const charge = sampleStripeCharge({
       id: 'ch_bouncer_failed',
       customer: testUser.stripe_customer_id,
@@ -5088,16 +5112,259 @@ describe('processStripePaymentEventHook bouncer credit events', () => {
     const rows = await db.select().from(bouncer_credit_event_outbox);
     expect(rows).toHaveLength(1);
     expect(rows[0].event_type).toBe('charge.failed');
-    expect(rows[0].event_id).toBe('evt_bouncer_failed');
+    expect(rows[0].event_id).toBe('charge:ch_bouncer_failed');
     expect(rows[0].user_id).toBe(testUser.id);
+    // The payload is the charge itself, so no second read can add a fingerprint.
+    expect(retrieveSpy).not.toHaveBeenCalled();
     expect(rows[0].payload).toEqual(
       expect.objectContaining({
         type: 'charge.failed',
-        eventId: 'evt_bouncer_failed',
+        eventId: 'charge:ch_bouncer_failed',
         userId: testUser.id,
         cardFingerprint: 'fp_failed',
       })
     );
+  });
+
+  test.each([
+    {
+      field: 'failure_code',
+      key: 'failure_code',
+      overrides: { failure_code: 'authentication_required' },
+    },
+    {
+      field: 'outcome.reason authentication_required',
+      key: 'outcome_reason_authentication_required',
+      overrides: {
+        outcome: { reason: 'authentication_required' } as unknown as Stripe.Charge.Outcome,
+      },
+    },
+    {
+      field: 'outcome.reason authentication_failed',
+      key: 'outcome_reason_authentication_failed',
+      overrides: {
+        outcome: { reason: 'authentication_failed' } as unknown as Stripe.Charge.Outcome,
+      },
+    },
+  ])(
+    'a charge failed by authentication ($field) is not reported as a declined card',
+    async scenario => {
+      const charge = sampleStripeCharge({
+        id: `ch_bouncer_auth_${scenario.key}`,
+        customer: testUser.stripe_customer_id,
+        ...scenario.overrides,
+      });
+      const event = {
+        ...baseStripeEvent(),
+        id: `evt_bouncer_auth_charge_${scenario.key}`,
+        type: 'charge.failed',
+        data: { object: charge },
+      } as unknown as Stripe.Event;
+
+      await processStripePaymentEventHook(event);
+
+      const rows = await db.select().from(bouncer_credit_event_outbox);
+      expect(rows).toHaveLength(0);
+    }
+  );
+
+  test('payment_intent.payment_failed reports the decline with the card read from its charge', async () => {
+    const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
+      sampleStripeChargeResponse(
+        sampleStripeCharge({
+          id: 'ch_bouncer_pi_failed',
+          customer: testUser.stripe_customer_id,
+          payment_method_details: {
+            card: { fingerprint: 'fp_pi_failed' },
+          } as unknown as Stripe.Charge.PaymentMethodDetails,
+        })
+      )
+    );
+    const event = {
+      ...baseStripeEvent(),
+      id: 'evt_bouncer_pi_failed',
+      type: 'payment_intent.payment_failed',
+      data: {
+        object: {
+          id: 'pi_bouncer_failed',
+          object: 'payment_intent',
+          customer: testUser.stripe_customer_id,
+          latest_charge: 'ch_bouncer_pi_failed',
+          metadata: {},
+        },
+      },
+    } as unknown as Stripe.Event;
+
+    await processStripePaymentEventHook(event);
+
+    const rows = await db.select().from(bouncer_credit_event_outbox);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].event_type).toBe('charge.failed');
+    expect(rows[0].event_id).toBe('charge:ch_bouncer_pi_failed');
+    expect(retrieveSpy).toHaveBeenCalledWith('ch_bouncer_pi_failed');
+    expect(rows[0].payload).toEqual(
+      expect.objectContaining({
+        type: 'charge.failed',
+        eventId: 'charge:ch_bouncer_pi_failed',
+        userId: testUser.id,
+        cardFingerprint: 'fp_pi_failed',
+      })
+    );
+  });
+
+  test('one declined charge counts once when both of its events arrive', async () => {
+    jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
+      sampleStripeChargeResponse(
+        sampleStripeCharge({
+          id: 'ch_bouncer_decline_once',
+          customer: testUser.stripe_customer_id,
+        })
+      )
+    );
+    const charge = sampleStripeCharge({
+      id: 'ch_bouncer_decline_once',
+      customer: testUser.stripe_customer_id,
+    });
+
+    await processStripePaymentEventHook({
+      ...baseStripeEvent(),
+      id: 'evt_bouncer_decline_pi',
+      type: 'payment_intent.payment_failed',
+      data: {
+        object: {
+          id: 'pi_bouncer_decline_once',
+          object: 'payment_intent',
+          customer: testUser.stripe_customer_id,
+          latest_charge: 'ch_bouncer_decline_once',
+          metadata: {},
+        },
+      },
+    } as unknown as Stripe.Event);
+    await processStripePaymentEventHook({
+      ...baseStripeEvent(),
+      id: 'evt_bouncer_decline_charge',
+      type: 'charge.failed',
+      data: { object: charge },
+    } as unknown as Stripe.Event);
+
+    const rows = await db.select().from(bouncer_credit_event_outbox);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].event_id).toBe('charge:ch_bouncer_decline_once');
+  });
+
+  test('a declined payment intent with no charge keeps its own event id', async () => {
+    const event = {
+      ...baseStripeEvent(),
+      id: 'evt_bouncer_pi_no_charge',
+      type: 'payment_intent.payment_failed',
+      data: {
+        object: {
+          id: 'pi_bouncer_no_charge',
+          object: 'payment_intent',
+          customer: testUser.stripe_customer_id,
+          latest_charge: null,
+          metadata: {},
+        },
+      },
+    } as unknown as Stripe.Event;
+
+    await processStripePaymentEventHook(event);
+
+    const rows = await db.select().from(bouncer_credit_event_outbox);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].event_id).toBe('payment_intent:pi_bouncer_no_charge');
+    expect(rows[0].payload).toEqual(
+      expect.objectContaining({
+        type: 'charge.failed',
+        eventId: 'payment_intent:pi_bouncer_no_charge',
+      })
+    );
+    // The wire body omits an absent fingerprint; bouncer reads that as null and raises `missing_card`.
+    expect(rows[0].payload.cardFingerprint ?? null).toBeNull();
+  });
+
+  test('a declined payment intent with no charge reads the card from its payment method', async () => {
+    const retrieveSpy = jest.spyOn(client.paymentMethods, 'retrieve').mockResolvedValue({
+      id: 'pm_bouncer_no_charge',
+      card: { fingerprint: 'fp_from_payment_method' },
+    } as unknown as Stripe.Response<Stripe.PaymentMethod>);
+    const event = {
+      ...baseStripeEvent(),
+      id: 'evt_bouncer_pi_payment_method',
+      type: 'payment_intent.payment_failed',
+      data: {
+        object: {
+          id: 'pi_bouncer_payment_method',
+          object: 'payment_intent',
+          customer: testUser.stripe_customer_id,
+          latest_charge: null,
+          payment_method: 'pm_bouncer_no_charge',
+          metadata: {},
+        },
+      },
+    } as unknown as Stripe.Event;
+
+    await processStripePaymentEventHook(event);
+
+    const rows = await db.select().from(bouncer_credit_event_outbox);
+    expect(rows).toHaveLength(1);
+    expect(retrieveSpy).toHaveBeenCalledWith('pm_bouncer_no_charge');
+    expect(rows[0].payload).toEqual(
+      expect.objectContaining({
+        type: 'charge.failed',
+        eventId: 'payment_intent:pi_bouncer_payment_method',
+        cardFingerprint: 'fp_from_payment_method',
+      })
+    );
+  });
+
+  test.each(['authentication_required', 'payment_intent_authentication_failure'])(
+    'an authentication failure (%s) is not reported as a declined card',
+    async code => {
+      const event = {
+        ...baseStripeEvent(),
+        id: `evt_bouncer_auth_${code}`,
+        type: 'payment_intent.payment_failed',
+        data: {
+          object: {
+            id: `pi_bouncer_auth_${code}`,
+            object: 'payment_intent',
+            customer: testUser.stripe_customer_id,
+            latest_charge: `ch_bouncer_auth_${code}`,
+            payment_method: 'pm_bouncer_auth',
+            last_payment_error: { code },
+            metadata: {},
+          },
+        },
+      } as unknown as Stripe.Event;
+
+      await processStripePaymentEventHook(event);
+
+      const rows = await db.select().from(bouncer_credit_event_outbox);
+      expect(rows).toHaveLength(0);
+    }
+  );
+
+  test('payment_intent.payment_failed is skipped when no owner resolves', async () => {
+    const event = {
+      ...baseStripeEvent(),
+      id: 'evt_bouncer_pi_orphan',
+      type: 'payment_intent.payment_failed',
+      data: {
+        object: {
+          id: 'pi_bouncer_orphan',
+          object: 'payment_intent',
+          customer: 'cus_bouncer_orphan',
+          latest_charge: 'ch_bouncer_orphan_pi',
+          metadata: {},
+        },
+      },
+    } as unknown as Stripe.Event;
+
+    await processStripePaymentEventHook(event);
+
+    const rows = await db.select().from(bouncer_credit_event_outbox);
+    expect(rows).toHaveLength(0);
   });
 
   test('charge.failed is skipped when no owner resolves', async () => {
@@ -5119,10 +5386,10 @@ describe('processStripePaymentEventHook bouncer credit events', () => {
   });
 
   test('a bouncer failure does not fail the webhook', async () => {
-    // Stripe retries a failed webhook, and later work in the delivery would be skipped. The
-    // webhook performs no bouncer HTTP call: it commits the event to the durable outbox, so a
+    // Stripe retries a failed webhook, and later work in the delivery would be skipped. The event
+    // is committed to the durable outbox first, and the inline delivery is best-effort, so a
     // bouncer outage can only delay delivery (the cron drainer retries) and never fails the
-    // webhook. The row is still `pending` here precisely because no inline delivery happened.
+    // webhook. The row is back to `pending` here after the failed inline attempt.
     const charge = sampleStripeCharge({
       id: 'ch_bouncer_down',
       customer: testUser.stripe_customer_id,
@@ -5370,5 +5637,164 @@ describe('getStripeSeatsCheckoutUrl bouncer charge.attempted', () => {
       })
     );
     createSpy.mockRestore();
+  });
+});
+
+describe('processStripePaymentEventHook bouncer decline gate', () => {
+  let testUser: User;
+  const mockDeliver = jest.mocked(deliverCreditEventWireBody);
+  const mockChargeDecide = jest.mocked(chargeDecide);
+  let listSpy: jest.SpiedFunction<typeof client.checkout.sessions.list>;
+  let expireSpy: jest.SpiedFunction<typeof client.checkout.sessions.expire>;
+
+  const failedPaymentIntentEvent = (chargeId: string, paymentIntentId: string) =>
+    ({
+      ...baseStripeEvent(),
+      id: `evt_gate_${paymentIntentId}`,
+      type: 'payment_intent.payment_failed',
+      data: {
+        object: {
+          id: paymentIntentId,
+          customer: testUser.stripe_customer_id,
+          latest_charge: chargeId,
+          metadata: { kiloUserId: testUser.id },
+        },
+      },
+    }) as unknown as Stripe.Event;
+
+  beforeEach(async () => {
+    jest.restoreAllMocks();
+    await cleanupDbForTest();
+    testUser = await insertTestUser();
+    mockDeliver.mockReset();
+    mockDeliver.mockResolvedValue({ delivered: true, status: 204 });
+    mockChargeDecide.mockReset();
+    jest
+      .spyOn(client.charges, 'retrieve')
+      .mockImplementation(async chargeId =>
+        sampleStripeChargeResponse(sampleStripeCharge({ id: String(chargeId) }))
+      );
+    listSpy = jest.spyOn(client.checkout.sessions, 'list').mockResolvedValue({
+      object: 'list',
+      data: [{ id: 'cs_gate_open', status: 'open' }],
+      has_more: false,
+      url: '/v1/checkout/sessions',
+    } as unknown as Stripe.Response<Stripe.ApiList<Stripe.Checkout.Session>>);
+    expireSpy = jest.spyOn(client.checkout.sessions, 'expire').mockResolvedValue({
+      id: 'cs_gate_open',
+      object: 'checkout.session',
+      status: 'expired',
+    } as unknown as Stripe.Response<Stripe.Checkout.Session>);
+  });
+
+  test('an enforced failure verdict expires the open checkout session of the customer', async () => {
+    mockChargeDecide.mockResolvedValue({
+      enforced: true,
+      code: 'charge_blocked',
+      flags: [{ name: 'card_testing', decision: 'block', enforced: true, until: null }],
+    });
+
+    await processStripePaymentEventHook(failedPaymentIntentEvent('ch_gate_stop', 'pi_gate_stop'));
+
+    expect(mockChargeDecide).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stage: 'failure',
+        accountId: `user:${testUser.id}`,
+        requestId: 'ch_gate_stop',
+      })
+    );
+    expect(listSpy).toHaveBeenCalledWith(
+      { customer: testUser.stripe_customer_id, status: 'open', limit: 10 },
+      expect.objectContaining({ timeout: 5_000 })
+    );
+    expect(expireSpy).toHaveBeenCalledWith(
+      'cs_gate_open',
+      expect.objectContaining({ timeout: 5_000 })
+    );
+  });
+
+  test('an enforced decline expires an open subscription-mode session', async () => {
+    mockChargeDecide.mockResolvedValue({ enforced: true, code: 'charge_blocked', flags: [] });
+    listSpy.mockResolvedValue({
+      object: 'list',
+      // A `mode: 'subscription'` session carries no payment intent; only the customer finds it.
+      data: [
+        { id: 'cs_gate_kilo_pass', mode: 'subscription', status: 'open', payment_intent: null },
+        { id: 'cs_gate_closed_pass', mode: 'subscription', status: 'complete' },
+      ],
+      has_more: false,
+      url: '/v1/checkout/sessions',
+    } as unknown as Stripe.Response<Stripe.ApiList<Stripe.Checkout.Session>>);
+
+    await processStripePaymentEventHook(failedPaymentIntentEvent('ch_gate_sub', 'pi_gate_sub'));
+
+    expect(listSpy).toHaveBeenCalledWith(
+      { customer: testUser.stripe_customer_id, status: 'open', limit: 10 },
+      expect.objectContaining({ timeout: 5_000 })
+    );
+    expect(expireSpy).toHaveBeenCalledTimes(1);
+    expect(expireSpy).toHaveBeenCalledWith(
+      'cs_gate_kilo_pass',
+      expect.objectContaining({ timeout: 5_000 })
+    );
+  });
+
+  test('one session that fails to expire does not keep the other open sessions alive', async () => {
+    mockChargeDecide.mockResolvedValue({ enforced: true, code: 'charge_blocked', flags: [] });
+    listSpy.mockResolvedValue({
+      object: 'list',
+      data: [
+        { id: 'cs_gate_closed_meanwhile', status: 'open' },
+        { id: 'cs_gate_second', status: 'open' },
+      ],
+      has_more: false,
+      url: '/v1/checkout/sessions',
+    } as unknown as Stripe.Response<Stripe.ApiList<Stripe.Checkout.Session>>);
+    expireSpy.mockImplementation(async id => {
+      if (id === 'cs_gate_closed_meanwhile') throw new Error('session is not open');
+      return {
+        id,
+        object: 'checkout.session',
+        status: 'expired',
+      } as unknown as Stripe.Response<Stripe.Checkout.Session>;
+    });
+
+    await processStripePaymentEventHook(failedPaymentIntentEvent('ch_gate_two', 'pi_gate_two'));
+
+    expect(expireSpy).toHaveBeenCalledWith(
+      'cs_gate_second',
+      expect.objectContaining({ timeout: 5_000 })
+    );
+  });
+
+  test('a failed immediate delivery leaves the open checkout session alone', async () => {
+    mockDeliver.mockResolvedValue({
+      delivered: false,
+      permanent: false,
+      status: 503,
+      error: 'http_503',
+    });
+    mockChargeDecide.mockResolvedValue({
+      enforced: true,
+      code: 'charge_blocked',
+      flags: [],
+    });
+
+    await processStripePaymentEventHook(failedPaymentIntentEvent('ch_gate_retry', 'pi_gate_retry'));
+
+    expect(mockChargeDecide).not.toHaveBeenCalled();
+    expect(expireSpy).not.toHaveBeenCalled();
+    const rows = await db.select().from(bouncer_credit_event_outbox);
+    expect(rows[0]?.status).toBe('pending');
+  });
+
+  test('a verdict that is not enforced leaves the open checkout session alone', async () => {
+    mockChargeDecide.mockResolvedValue({ enforced: false, flags: [] });
+
+    await processStripePaymentEventHook(failedPaymentIntentEvent('ch_gate_allow', 'pi_gate_allow'));
+
+    expect(mockChargeDecide).toHaveBeenCalledTimes(1);
+    expect(listSpy).not.toHaveBeenCalled();
+    expect(expireSpy).not.toHaveBeenCalled();
   });
 });

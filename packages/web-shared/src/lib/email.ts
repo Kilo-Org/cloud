@@ -74,7 +74,8 @@ export const subjects = {
   kiloPassOrgBlocked: 'Action required: Update Kilo Pass assignments',
   userDataExportReady: 'Your Kilo data export is ready',
   dataExportDownloadCode: 'Your Kilo data export download code',
-  autoRoutingPoolNotice: 'Kilo: Your custom Auto pool is ready',
+  // The sender appends the cutover date; this is the admin preview and test subject.
+  autoRoutingPoolNotice: 'Change Required: Your Auto model pool has a new model ID',
 } as const;
 
 export type TemplateName = keyof typeof subjects;

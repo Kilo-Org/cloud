@@ -13,6 +13,7 @@ import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { FolderOpen } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type DirectoryEntry, useListDirectories } from '@/lib/hooks/use-list-directories';
 import { folderPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
@@ -136,6 +137,7 @@ export default function FolderPickerScreen() {
         description={t('agentChat.folderPicker.retryableDescription')}
         action={
           <Button
+            className={STATE_ACTION_CLASS}
             variant="outline"
             onPress={() => {
               list(currentState.path);

@@ -151,14 +151,17 @@ describe('authorizeWorkspace', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('maps a degraded connection to non-retryable not_found', async () => {
+  it('maps a degraded connection to a non-retryable reconnect', async () => {
     mockGetBitbucketWorkspaceAccessTokenStatus.mockResolvedValue({
       status: 'reconnect_required',
       workspace: null,
       integrationId: null,
     });
 
-    await expect(authorizeWorkspace(ORG_OWNER)).rejects.toMatchObject({ kind: 'not_found' });
+    await expect(authorizeWorkspace(ORG_OWNER)).rejects.toMatchObject({
+      kind: 'reconnect',
+      retryable: false,
+    });
   });
 });
 
@@ -320,13 +323,13 @@ describe('authorizeRepository — identity resolution', () => {
     expect(mockReadCachedRepositories).not.toHaveBeenCalled();
   });
 
-  it('maps an insufficient-permission repository cache to non-retryable forbidden', async () => {
+  it('maps an insufficient-permission repository cache to a non-retryable reconnect', async () => {
     mockReadCachedRepositories.mockResolvedValue({ status: 'insufficient_permissions' });
 
     const error = await captureRejection(authorizeRepository(ORG_OWNER, 'acme', 'repo'));
 
     expect(error).toBeInstanceOf(BitbucketReviewError);
-    expect(error.kind).toBe('forbidden');
+    expect(error.kind).toBe('reconnect');
     expect(error.retryable).toBe(false);
     expect(error.message).toMatch(/reconnect/i);
     expect(error.message).toMatch(/scope/i);
@@ -367,6 +370,7 @@ describe('credential failure classification', () => {
 
   it('classifies provider statuses onto non-retryable and retryable kinds', () => {
     expect(classifyBitbucketStatus(404).kind).toBe('not_found');
+    expect(classifyBitbucketStatus(401)).toMatchObject({ kind: 'reconnect', retryable: false });
     expect(classifyBitbucketStatus(403).kind).toBe('forbidden');
     expect(classifyBitbucketStatus(409).kind).toBe('stale_head');
     expect(classifyBitbucketStatus(409).retryable).toBe(false);

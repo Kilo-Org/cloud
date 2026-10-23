@@ -2,11 +2,17 @@
 /**
  * Mobile patterns that go wrong in a way nothing else reports.
  *
- * Two kinds. Some are dropped outright, so the element renders with no
- * background, no shadow, no alignment, and the build stays quiet — each of
- * those bans is pinned to a compiler assertion further down, so it lifts the
- * moment react-native-css handles the value. The rest apply, but land in the
- * wrong place, and only in one writing direction.
+ * Classes the compiler drops outright leave the element with no background,
+ * no shadow, no alignment, and the build stays quiet. Each of those bans is
+ * pinned to a compiler assertion further down, so it lifts the moment
+ * react-native-css handles the value.
+ *
+ * Classes and markup that apply but land in the wrong place do so in one
+ * writing direction only, so they stay invisible until the app is read in an
+ * RTL locale.
+ *
+ * Formatting built by hand instead of through `@/lib/intl-cache` skips the tag
+ * normalisation every other surface shares, and pins or ignores the locale.
  *
  * Usage: node tools/nativewind/check-classes.mjs
  */
@@ -40,27 +46,37 @@ const COLOR_UTILITIES = [
   'to',
 ].join('|');
 
+/**
+ * Theme colour tokens come from the same `@theme inline` block in the app's
+ * global.css that makes `bg-<token>` a class at all. Parsing it keeps the
+ * rule in step with the generated theme map and global.css variables: a new
+ * token such as `--color-primary-disabled` is covered the moment it lands,
+ * instead of waiting for this list to be edited by hand.
+ *
+ * Tile tokens are kept on purpose: they pre-bake an alpha, and an `/opacity`
+ * modifier on top of one is still a color-mix over a variable that NativeWind
+ * drops.
+ */
+const THEME_TOKENS = (() => {
+  const css = readFileSync(join(ROOT, 'apps/mobile/src/global.css'), 'utf8');
+  const block = css.match(/@theme inline \{([\s\S]*?)\n\}/)?.[1];
+  if (!block) {
+    throw new Error('check-classes: no @theme inline block in apps/mobile/src/global.css');
+  }
+  const tokens = [...block.matchAll(/--color-([a-z0-9-]+):\s*var\(--/g)].map(m => m[1]);
+  // Longest first so the alternation is unambiguous (`muted-soft` before `muted`).
+  tokens.sort((a, b) => b.length - a.length || a.localeCompare(b));
+  return tokens;
+})();
+
 const RULES = [
-  {
-    // `bg-black/40` compiles to `#NaNNaNNaN66`: Tailwind emits
-    // `color-mix(in oklab, #000 40%, transparent)`, and folding that mix
-    // through OKLab yields NaN channels for achromatic black. React Native
-    // cannot parse the result, so the element paints nothing at all. Other
-    // colours survive the same fold — `bg-white/20` gives `#fff3` — so this
-    // is black specifically, not the `/alpha` modifier in general.
-    pattern: new RegExp(`\\b(?:${COLOR_UTILITIES})-black/\\d+\\b`, 'g'),
-    advice: 'compiles to an unparseable #NaN colour; use a concrete value, e.g. bg-[#00000066]',
-  },
   {
     // A `/opacity` modifier on a theme colour compiles to
     // `color-mix(in oklab, var(--color-…) n%, transparent)`. NativeWind v5
     // cannot decompose the variable, so the runtime drops the declaration and
     // the element paints nothing, with no build error. The `*-tile-bg` /
     // `*-tile-border` pairs pre-bake the alpha instead.
-    pattern: new RegExp(
-      `\\b(?:${COLOR_UTILITIES})-(?:background|foreground|card|popover|primary|secondary|muted-soft|muted|accent-soft|accent|destructive|border|input|ring|ink2|good|warn|info|danger|agent-[a-z]+)(?:-foreground)?/\\d+\\b`,
-      'g'
-    ),
+    pattern: new RegExp(`\\b(?:${COLOR_UTILITIES})-(?:${THEME_TOKENS.join('|')})/\\d+\\b`, 'g'),
     advice:
       'the /opacity modifier is dropped on CSS-variable theme colours; use the paired *-tile-bg / *-tile-border token or a concrete colour',
   },
@@ -77,6 +93,16 @@ const RULES = [
     pattern: /\bltr:/g,
     advice: 'the ltr: variant also matches in RTL; express the rule with rtl: instead',
   },
+  {
+    // A numeric `leading-N` compiles to `calc(var(--spacing) * N)`, and the
+    // runtime's line-height resolver treats that resolved length as a unitless
+    // multiplier of the font size. `leading-9` on a 30px title paints a 945pt
+    // line box, which pushes everything below it off the screen. An explicit
+    // length is resolved as a length.
+    pattern: /(?<![\w-])leading-\d+(?:\.5)?(?![\w[.-])/g,
+    advice:
+      'a numeric leading-N is multiplied by the font size at runtime; use an explicit length, e.g. leading-[1.25rem]',
+  },
 ];
 
 /**
@@ -90,7 +116,7 @@ const SCROLL_CONTAINERS =
   '(?:Animated\\.)?(?:ScrollView|TabScreenScrollView|FlatList|FlashList|KeyboardAwareScrollView)';
 const SCROLL_TAG = new RegExp(`<(${SCROLL_CONTAINERS})\\b([^>]*?)/?>`, 'gs');
 const OWN_CLASS_NAME = /(?<!contentContainer)className="([^"]*)"/;
-const HORIZONTAL_PADDING = /^-?(?:px|pl|pr|ps|pe)-/;
+const HORIZONTAL_PADDING = /^-?(?:p|px|pl|pr|ps|pe)-/;
 
 function checkScrollPadding(relative, text) {
   for (const match of text.matchAll(SCROLL_TAG)) {
@@ -113,10 +139,6 @@ function checkScrollPadding(relative, text) {
  * paragraph direction, so its copy stays left-aligned in Arabic, Farsi and
  * Hebrew while everything beside it mirrors. Importing it under an alias is
  * fine: `type Text as RNText` is how callers type a ref.
- *
- * The exemption is a hidden node measured for height. It must not inherit the
- * shared component's base font classes, or the measurement stops matching the
- * input it mirrors.
  */
 const RAW_TEXT_IMPORT = /import\s*\{([^}]*)\}\s*from\s*'react-native'/gs;
 const RAW_TEXT_EXEMPT = new Set([
@@ -229,21 +251,17 @@ function checkCompilerStillDropsThese() {
   let compile;
   try {
     ({ compile } = require('react-native-css/compiler'));
-  } catch {
-    console.warn('check-classes: react-native-css not resolvable, skipped the compiler assertions');
+  } catch (error) {
+    const detail = error instanceof Error ? error.message.split('\n')[0] : String(error);
+    fail(
+      `check-classes: react-native-css/compiler did not resolve (${detail}) — run pnpm install; the compiler pins cannot be verified without it`
+    );
     return;
   }
-  const firstValue = css => {
-    const sheet = compile(css).stylesheet();
+  const firstValue = (css, options) => {
+    const sheet = compile(css, options).stylesheet();
     return JSON.stringify(sheet?.s?.[0]?.[1]?.[0]?.d?.[0] ?? null);
   };
-
-  const black = firstValue('.x { background-color: color-mix(in oklab, #000 40%, transparent); }');
-  if (!black.includes('NaN')) {
-    fail(
-      `check-classes: color-mix over black now compiles to ${black} instead of NaN — drop the *-black/<alpha> rule`
-    );
-  }
 
   const alignment = compile('.x { text-align: start; }').warnings();
   if (!JSON.stringify(alignment).includes('text-align')) {
@@ -262,6 +280,20 @@ function checkCompilerStillDropsThese() {
   if (!themeOpacity.includes('colorMix')) {
     fail(
       `check-classes: color-mix over an @theme inline variable now compiles to ${themeOpacity} instead of a deferred colorMix — drop the theme-token opacity rule`
+    );
+  }
+
+  // With `inlineVariables: false` (apps/mobile/metro.config.js) the spacing
+  // scale reaches the runtime as a deferred calc inside the line-height
+  // function, which multiplies the result by the font size. When the compiler
+  // folds it to a length instead, this stops matching and the rule can go.
+  const spacingLeading = firstValue(
+    ':root { --spacing: 0.25rem; }\n.x { line-height: calc(var(--spacing) * 5); }',
+    { inlineVariables: false }
+  );
+  if (!spacingLeading.includes('"lineHeight",[{},"calc"')) {
+    fail(
+      `check-classes: a spacing-scale line height now compiles to ${spacingLeading} instead of a deferred calc — drop the numeric leading rule`
     );
   }
 }

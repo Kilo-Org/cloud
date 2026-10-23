@@ -14,6 +14,18 @@ type SessionPageSheetProps = {
   onClose: () => void;
   /** Fires after the native dismiss animation completes. */
   onDismiss?: () => void;
+  /**
+   * Asked before Android Back closes the sheet, so a form with unsaved edits can
+   * confirm first. Return false to keep the sheet open.
+   */
+  onRequestDismiss?: () => boolean;
+  /**
+   * Whether a downward drag closes the sheet. Read-only surfaces pass true so
+   * the native dismiss gesture works. A sheet that edits its own values leaves
+   * it off: the swipe is how a form loses its draft, and a drag that starts over
+   * its scroll view used to close it when the user scrolled back up.
+   */
+  dismissible?: boolean;
   children: ReactNode;
 };
 
@@ -21,6 +33,11 @@ type SessionPageSheetProps = {
  * Shared full-window sheet for the session page. Callers render their own
  * SheetHeader, scroll content, and safe bottom spacer inside it. Android Back
  * and Done both route through `onClose`.
+ *
+ * The swipe and the iOS backdrop tap are off by default, because a full-window
+ * sheet holds a form's whole scroll view and the native sheet claims every
+ * downward drag that starts over it. A surface that shows data and holds no
+ * edits passes `dismissible`, and then the drag is the same way out as Done.
  *
  * It is a native sheet at the full detent, so it stacks above the session
  * screen and above another native sheet. The sheet owns the whole window, so a
@@ -34,6 +51,8 @@ export function SessionPageSheet({
   visible,
   onClose,
   onDismiss,
+  onRequestDismiss,
+  dismissible = false,
   children,
 }: Readonly<SessionPageSheetProps>) {
   const insets = useSafeAreaInsets();
@@ -46,6 +65,8 @@ export function SessionPageSheet({
       visible={visible}
       onClose={onClose}
       onDismiss={onDismiss}
+      onRequestDismiss={onRequestDismiss}
+      dismissGestures={dismissible}
       snapPoints={SHEET_SNAP_POINTS}
       showHandle={false}
       background={colors.background}

@@ -466,7 +466,10 @@ export async function createManualReviewMutationFn(scope: string, vars: CreateMa
   return result;
 }
 
-export function useCreateManualReview(scope: string) {
+export function useCreateManualReview(
+  scope: string,
+  { silent = false }: { silent?: boolean } = {}
+) {
   const invalidateReviews = useInvalidateReviews(scope);
 
   return useMutation({
@@ -475,7 +478,11 @@ export function useCreateManualReview(scope: string) {
       invalidateReviews();
     },
     onError: error => {
-      announcingToast.error(error.message);
+      // A screen that renders the failure inline owns the feedback channel
+      // (the cloud-create pattern), so the hook stays silent for it.
+      if (!silent) {
+        announcingToast.error(error.message);
+      }
     },
   });
 }

@@ -12,6 +12,7 @@ type PrInboxViewKind =
   | 'happy'
   | 'empty'
   | 'retryable'
+  | 'service-unavailable'
   | 'permission'
   | 'not-found'
   | 'reconnect';

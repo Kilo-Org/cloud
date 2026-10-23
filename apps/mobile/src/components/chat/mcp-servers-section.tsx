@@ -1,11 +1,12 @@
 import { type ReactNode } from 'react';
-import { Switch, View } from 'react-native';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
 import { Button } from '@/components/ui/button';
 import { Server } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 
 import { type RemoteMcpServerRow } from './mcp-settings-state';

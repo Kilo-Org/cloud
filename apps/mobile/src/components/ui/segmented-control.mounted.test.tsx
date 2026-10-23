@@ -51,21 +51,26 @@ afterEach(() => {
 });
 
 describe('SegmentedControl mounted layout', () => {
-  // Equal-width segments are narrow on a phone, so the longest reference label
-  // ("Commit and push") wrapped to two lines while "Leave changes" stayed on
-  // one, leaving the two choices uneven (SPOT-DEFECT: the Changes control on
-  // the session-create-failed screen).
-  it('clamps every option label to one line so the choices stay even', () => {
+  // Regression: the spend-alerts period control rendered the Hindi option
+  // "7 दिन" as "7" — the label was clamped to one line with a font shrink that
+  // clipped instead of ellipsizing. Equal-width segments are narrow, so the
+  // label must be free to wrap to as many lines as it needs, never cut.
+  it('leaves every option label uncapped so the full text always shows', () => {
     const root = renderControl();
-    expect(labelText(root, 'Leave changes').props.numberOfLines).toBe(1);
-    expect(labelText(root, 'Commit and push').props.numberOfLines).toBe(1);
+    expect(labelText(root, 'Leave changes').props.numberOfLines).toBeUndefined();
+    expect(labelText(root, 'Commit and push').props.numberOfLines).toBeUndefined();
+    expect(labelText(root, 'Commit and push').props.adjustsFontSizeToFit).toBeFalsy();
   });
 
-  it('insets each segment by px-2 so the reference label fits without wrapping', () => {
+  // `items-center` on the segment sizes the Text to its content, which clips a
+  // long label instead of wrapping it; `py-2` keeps a two-line label inset.
+  it('stretches the label across the segment and insets wrapped lines', () => {
     const options = renderControl().findAllByType('Pressable' as ElementType);
     expect(options).toHaveLength(2);
     for (const option of options) {
-      expect(String(option.props.className)).toContain('px-2');
+      const className = String(option.props.className);
+      expect(className).not.toContain('items-center');
+      expect(className).toContain('py-2');
     }
   });
 });

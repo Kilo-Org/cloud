@@ -66,7 +66,7 @@ export function ScopeListScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('common.securityAgent')} />
+      <ScreenHeader className="px-6" title={t('common.securityAgent')} />
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <ConfigureRow
           icon={User}

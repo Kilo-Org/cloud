@@ -30,7 +30,7 @@ function ScopeEntrySkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('common.securityAgent')} />
+      <ScreenHeader className="px-6" title={t('common.securityAgent')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-10 w-full rounded-lg" />
         <View className="flex-row flex-wrap gap-3">
@@ -197,7 +197,11 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       // made the landing permanently unusable on a transient backend failure.
       return (
         <View className="flex-1 bg-background">
-          <ScreenHeader title={t('common.securityAgent')} headerRight={auditAction} />
+          <ScreenHeader
+            className="px-6"
+            title={t('common.securityAgent')}
+            headerRight={auditAction}
+          />
           {!connectUrl && isMinting ? (
             <View className="gap-3 px-6 pt-4">
               <Skeleton className="h-10 w-full rounded-lg" />
@@ -225,7 +229,11 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       // re-mints on press.
       return (
         <View className="flex-1 bg-background">
-          <ScreenHeader title={t('common.securityAgent')} headerRight={auditAction} />
+          <ScreenHeader
+            className="px-6"
+            title={t('common.securityAgent')}
+            headerRight={auditAction}
+          />
           {!reauthUrl && !connectUrl && isMinting ? (
             <View className="gap-3 px-6 pt-4">
               <Skeleton className="h-10 w-full rounded-lg" />

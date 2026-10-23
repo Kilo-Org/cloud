@@ -57,7 +57,7 @@ function RepositorySettingsSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('common.repositories')} />
+      <ScreenHeader className="px-6" title={t('common.repositories')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-11 w-full rounded-lg" />
         <Skeleton className="h-11 w-full rounded-lg" />
@@ -289,6 +289,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        className="px-6"
         title={t('common.repositories')}
         onBack={onBack}
         headerRight={

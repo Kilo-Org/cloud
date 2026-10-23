@@ -306,7 +306,12 @@ export function ScreenHeader({
       </Text>
     );
     const titleLayout = reserveTitleSpace ? (
-      <View className={cn(reservedTitleHeightClass(size, titleLines), 'justify-center')}>
+      // Pinned to the top of the reserved box: a short title keeps the header's
+      // own padding above it instead of floating in the middle of the box it
+      // reserves for the longest title, which read as a blank band between the
+      // status bar and the screen. The box height is unchanged, so a title that
+      // grows still cannot move the body.
+      <View className={cn(reservedTitleHeightClass(size, titleLines), 'justify-start')}>
         {titleText}
       </View>
     ) : (

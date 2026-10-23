@@ -49,7 +49,7 @@ function NotificationSettingsSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('common.notifications')} />
+      <ScreenHeader className="px-6" title={t('common.notifications')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-16 w-full rounded-lg" />
         <Skeleton className="h-16 w-full rounded-lg" />
@@ -175,6 +175,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        className="px-6"
         title={t('common.notifications')}
         onBack={onBack}
         headerRight={

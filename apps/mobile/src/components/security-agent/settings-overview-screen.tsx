@@ -36,7 +36,7 @@ function SettingsOverviewSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('securityAgent.dashboard.settings')} />
+      <ScreenHeader className="px-6" title={t('securityAgent.dashboard.settings')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-16 w-full rounded-lg" />
         <Skeleton className="h-12 w-full rounded-lg" />
@@ -230,7 +230,11 @@ export function SettingsOverviewScreen({
   // above the card (explorer security-agent-settings, 2026-09-20).
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('securityAgent.dashboard.settings')} headerRight={auditAction} />
+      <ScreenHeader
+        className="px-6"
+        title={t('securityAgent.dashboard.settings')}
+        headerRight={auditAction}
+      />
       <TabScreenScrollView className="flex-1">
         <View className="gap-6 px-6 py-4">
           <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">

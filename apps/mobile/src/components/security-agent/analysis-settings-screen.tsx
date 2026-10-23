@@ -44,7 +44,7 @@ function AnalysisSettingsSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('securityAgent.analysisSettings.title')} />
+      <ScreenHeader className="px-6" title={t('securityAgent.analysisSettings.title')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-11 w-full rounded-lg" />
         <Skeleton className="h-12 w-full rounded-lg" />
@@ -144,6 +144,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        className="px-6"
         title={t('securityAgent.analysisSettings.title')}
         onBack={onBack}
         headerRight={

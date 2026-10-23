@@ -159,6 +159,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        className="px-6"
         title={t('common.findings')}
         headerRight={
           <Pressable

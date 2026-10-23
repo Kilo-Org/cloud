@@ -280,7 +280,7 @@ export function AuditReportScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('securityAgent.auditReport.title')} showBackButton />
+      <ScreenHeader className="px-6" title={t('securityAgent.auditReport.title')} showBackButton />
 
       {query.isLoading && <AuditReportSkeleton />}
 

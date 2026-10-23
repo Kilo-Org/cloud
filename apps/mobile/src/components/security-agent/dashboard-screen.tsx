@@ -255,6 +255,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        className="px-6"
         title={t('common.securityAgent')}
         headerRight={
           <View className="flex-row items-center">

@@ -48,7 +48,7 @@ function AutomationSettingsSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('securityAgent.automation.title')} />
+      <ScreenHeader className="px-6" title={t('securityAgent.automation.title')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-16 w-full rounded-lg" />
         <Skeleton className="h-16 w-full rounded-lg" />
@@ -202,6 +202,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        className="px-6"
         title={t('securityAgent.automation.title')}
         onBack={onBack}
         headerRight={

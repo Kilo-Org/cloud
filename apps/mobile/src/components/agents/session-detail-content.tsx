@@ -2286,7 +2286,7 @@ export function SessionDetailContent({
               entering={FadeIn.duration(200)}
               exiting={FadeOut.duration(150)}
               layout={reducedMotion ? undefined : LinearTransition.duration(150)}
-              className="px-4 pb-1"
+              className="px-4 pb-3"
             >
               <ActiveProfileIndicator
                 state={sessionProfileIndicatorState}

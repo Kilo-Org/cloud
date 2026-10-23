@@ -1,6 +1,39 @@
 import * as WebBrowser from 'expo-web-browser';
 import { AppState, type AppStateStatus, Platform } from 'react-native';
 
+type LaunchEdge<Result> =
+  | { readonly edge: 'launched'; readonly result: Result }
+  | { readonly edge: 'failed'; readonly error: unknown };
+
+/**
+ * The browser's own report as a settled value, so it can lose the race below
+ * without leaving a rejection unobserved.
+ */
+async function launchSettled(
+  authorizationUrl: string
+): Promise<LaunchEdge<WebBrowser.WebBrowserResult | WebBrowser.WebBrowserAuthSessionResult>> {
+  try {
+    return {
+      edge: 'launched',
+      result:
+        Platform.OS === 'android'
+          ? await WebBrowser.openBrowserAsync(authorizationUrl)
+          : await WebBrowser.openAuthSessionAsync(authorizationUrl),
+    };
+  } catch (error) {
+    return { edge: 'failed', error };
+  }
+}
+
+/** A bare completion signal as a distinguishable race edge. */
+async function delayEdge<Edge extends string>(
+  signal: Promise<unknown>,
+  edge: Edge
+): Promise<{ readonly edge: Edge }> {
+  await signal;
+  return { edge };
+}
+
 /**
  * Subscribes to the next foreground return. The caller owns cleanup, including
  * when the launch fails or its wait is cancelled before the app returns.
@@ -56,21 +89,13 @@ export async function openAuthorizationAndWaitForReturn(
   signal?.addEventListener('abort', onAbort);
   const foreground = waitForForeground();
   try {
-    // Settled rather than awaited directly: a launch failure that loses the race
+    // Every edge races as a settled value: a launch failure that loses the race
     // still has to reach the caller when it is the edge that ended the wait, and
     // a late one must not escape as an unhandled rejection.
-    const launched = (
-      Platform.OS === 'android'
-        ? WebBrowser.openBrowserAsync(authorizationUrl)
-        : WebBrowser.openAuthSessionAsync(authorizationUrl)
-    ).then(
-      result => ({ edge: 'launched' as const, result }),
-      (error: unknown) => ({ edge: 'failed' as const, error })
-    );
     const first = await Promise.race([
-      launched,
-      cancelled.then(() => ({ edge: 'aborted' as const })),
-      foreground.returned.then(() => ({ edge: 'foreground' as const })),
+      launchSettled(authorizationUrl),
+      delayEdge(cancelled, 'aborted'),
+      delayEdge(foreground.returned, 'foreground'),
     ]);
     if (first.edge === 'aborted' || first.edge === 'foreground') {
       return;

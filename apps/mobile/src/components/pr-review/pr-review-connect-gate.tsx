@@ -111,7 +111,7 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
       await launchConnectGateBrowser(result.authorizationUrl, {
         signal: controller.signal,
         onOpenFailure: () => void toast.error(t('authErrors.couldNotOpenBrowser')),
-        onReturn: async () => {
+        onReturn: () => {
           // Detached on purpose: the sheet closing is the user's edge, so the
           // CTA returns to idle as soon as it happens. A status read that stays
           // pending (the default `networkMode: 'online'` never settles while the
@@ -126,6 +126,7 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
               })
             )
             .catch(() => undefined);
+          return Promise.resolve();
         },
       });
     } catch {

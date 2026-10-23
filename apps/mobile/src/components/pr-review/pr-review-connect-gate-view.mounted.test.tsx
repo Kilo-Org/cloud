@@ -324,7 +324,7 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
       // Default `networkMode: 'online'`: while the online manager reports
       // offline the awaited read stays pending for good. The CTA must not wait
       // on it — the user already backed out of the sign-in sheet.
-      const neverSettles = Promise.withResolvers<void>();
+      const neverSettles = Promise.withResolvers<undefined>();
       queryResult.refetch.mockReturnValue(neverSettles.promise);
       const pending = beginPendingLaunch();
       const renderer = mount(provider);

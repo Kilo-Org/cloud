@@ -69,7 +69,10 @@ export function renderProfileRowBody({
     title = t('agentChat.newSession.couldNotLoadEnvironment');
   } else if (profile) {
     title = profile.name;
-    summary = formatProfileCountItems(t, profileCountItems(profile)).join(' · ');
+    // A profile with nothing configured resolves no counts. Treat that as no
+    // summary, so the slot keeps its placeholder instead of collapsing.
+    const counts = formatProfileCountItems(t, profileCountItems(profile)).join(' · ');
+    summary = counts.length > 0 ? counts : undefined;
   }
 
   return (
@@ -93,9 +96,9 @@ export function renderProfileRowBody({
           importantForAccessibility={summary ? 'auto' : 'no-hide-descendants'}
         >
           {/* The summary may wrap to a second line in long locales, so every
-              state reserves both lines. A one-line placeholder would let the
-              row grow as soon as the profile resolves. */}
-          <Text className="text-sm leading-5 text-muted-foreground" numberOfLines={2}>
+              state holds both lines: `min-h-10` keeps a one-line summary at the
+              placeholder's height, and the placeholder itself spans two lines. */}
+          <Text className="min-h-10 text-sm leading-5 text-muted-foreground" numberOfLines={2}>
             {summary ?? '\u00A0\n\u00A0'}
           </Text>
           {isProfileLoading ? (

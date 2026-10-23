@@ -163,8 +163,30 @@ describe('new-session environment feedback', () => {
       expect(summary?.props.numberOfLines).toBe(2);
       // A one-line placeholder would let the row grow when the profile lands.
       expect(summary?.props.children).toBe('\u00A0\n\u00A0');
+      // A summary that fits one line still occupies the placeholder's height.
+      expect(summary?.props.className).toContain('min-h-10');
     }
   );
+
+  it('keeps the placeholder when the profile has nothing configured', () => {
+    const root = renderRow({
+      profile: {
+        ...PROFILE,
+        varCount: 0,
+        mcpServerCount: 0,
+        skillCount: 0,
+        kiloCommandCount: 0,
+        commandCount: 0,
+        agentCount: 0,
+      },
+    });
+
+    const summary = body(root).findAllByType('Text')[1];
+    expect(summary?.props.children).toBe('\u00A0\n\u00A0');
+    expect(
+      root.findByProps({ importantForAccessibility: 'no-hide-descendants' }).props
+    ).toMatchObject({ accessibilityElementsHidden: true });
+  });
 
   it.each([{ isProfileLoading: true }, { profile: PROFILE }, { isProfileError: true }, {}])(
     'keeps the summary slot across a state swap: %j',

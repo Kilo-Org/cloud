@@ -430,6 +430,9 @@ export function NewSessionProfileRow({
 }: Readonly<NewSessionProfileRowProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const profileSummary = profile
+    ? formatProfileCountItems(t, profileCountItems(profile)).join(' · ')
+    : '';
 
   return (
     <View className="mt-5">
@@ -454,9 +457,9 @@ export function NewSessionProfileRow({
             <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
               {profile?.name ?? t('agentChat.newSession.defaultEnvironment')}
             </Text>
-            {profile ? (
+            {profileSummary ? (
               <Text className="text-sm text-muted-foreground" numberOfLines={2}>
-                {formatProfileCountItems(t, profileCountItems(profile)).join(' · ')}
+                {profileSummary}
               </Text>
             ) : null}
           </View>

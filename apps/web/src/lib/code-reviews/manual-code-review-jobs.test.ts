@@ -255,8 +255,10 @@ describe('createManualCodeReviewJob connected GitLab source', () => {
       sha: 'sha-7',
       web_url: MR_URL,
       author: { username: 'gl-user' },
-      project_id: 501,
-      target_project_id: 501,
+      // The provider's ids differ from the cached repository id (501) so the
+      // assertion pins which id the review row stores.
+      project_id: 999,
+      target_project_id: 999,
       ...overrides,
     };
   }

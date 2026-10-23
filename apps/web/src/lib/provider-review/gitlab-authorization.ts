@@ -355,9 +355,11 @@ export async function authorizeProject(
     repo => repo.full_name.toLowerCase() === requested.toLowerCase()
   );
   if (!match) {
+    // The repository list is the project's authorization scope, so this refusal
+    // names the one remedy that restores it.
     throw new GitLabReviewError(
       'not_found',
-      'This project is not part of your connected GitLab repositories.'
+      'This project is not in your connected GitLab repositories. Refresh the repository list on the GitLab integration and try again.'
     );
   }
 

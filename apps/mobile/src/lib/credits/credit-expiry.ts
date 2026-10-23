@@ -7,10 +7,7 @@ type CreditBlock = Pick<
   'balance_mUsd' | 'expiry_date'
 >;
 
-export function getNextCreditExpiry(
-  creditBlocks: readonly CreditBlock[],
-  now = Date.now()
-) {
+export function getNextCreditExpiry(creditBlocks: readonly CreditBlock[], now = Date.now()) {
   const dated = creditBlocks.flatMap(block => {
     if (block.expiry_date === null || block.balance_mUsd <= 0) {
       return [];

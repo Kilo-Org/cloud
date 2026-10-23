@@ -96,6 +96,10 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insets,
 }));
 vi.mock('react-i18next', () => ({
+  // The app's real i18n module installs this plugin at import time; the hook
+  // reads the active language through it, so the mock has to accept the
+  // install the way the plugin does.
+  initReactI18next: { type: '3rdParty', init: () => undefined },
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));

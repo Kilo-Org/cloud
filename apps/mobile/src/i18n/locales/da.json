@@ -3961,7 +3961,6 @@
       "titleLabel": "Opgavetitel",
       "renameTitle": "Omdøb opgave",
       "notes": "Noter",
-      "editNotes": "Rediger noter",
       "addNotes": "Tilføj noter",
       "notesPrompt": "Tilføj kontekst, krav eller acceptkriterier.",
       "markdownSupported": "Markdown understøttet",

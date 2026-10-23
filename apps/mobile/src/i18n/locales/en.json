@@ -4047,7 +4047,6 @@
       "titleLabel": "To-do title",
       "renameTitle": "Rename task",
       "notes": "Notes",
-      "editNotes": "Edit notes",
       "addNotes": "Add notes",
       "notesPrompt": "Add context, requirements, or acceptance criteria.",
       "markdownSupported": "Markdown supported",

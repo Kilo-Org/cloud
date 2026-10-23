@@ -3961,7 +3961,6 @@
       "titleLabel": "Tittel på gjøremålet",
       "renameTitle": "Gi nytt navn til oppgave",
       "notes": "Notater",
-      "editNotes": "Rediger notater",
       "addNotes": "Legg til notater",
       "notesPrompt": "Legg til kontekst, krav eller akseptansekriterier.",
       "markdownSupported": "Markdown støttes",

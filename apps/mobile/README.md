@@ -41,11 +41,6 @@ Compact, default, and large button sizes remain unchanged for other controls.
 Verify Android targets using the clickable accessibility node bounds, not
 hitSlop alone; keep the translated label fully visible.
 
-## To-do accessibility
-
-Populated task notes expose a localized “Edit notes” button name independently of
-the rendered Markdown. Activating the notes body opens the existing notes editor.
-
 ## Getting started
 
 Generally speaking, you only need a new dev build if making dependency/native changes.

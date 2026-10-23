@@ -3757,6 +3757,8 @@
     "keyTooLong": "Der Schlüssel darf höchstens 256 Zeichen lang sein",
     "keyDuplicate": "Dieser Schlüssel ist bereits im Profil vorhanden",
     "valueLabel": "Wert",
+    "valueRequired": "Geben Sie einen Wert ein",
+    "tooLong": "Verwenden Sie höchstens {{max}} Zeichen",
     "secrets": {
       "markSecret": "Als geheim markieren",
       "masked": "Versteckter Wert",
@@ -3809,7 +3811,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Gib einen Servernamen ein",
-      "nameInvalid": "Der Name darf nur Buchstaben, Zahlen, Unterstriche und Bindestriche enthalten",
+      "nameInvalid": "Der Name darf nur ASCII-Buchstaben, Zahlen, Unterstriche und Bindestriche enthalten, höchstens 100 Zeichen",
       "commandRequired": "Gib einen Befehl ein",
       "commandTooLong": "Verwende höchstens 50 Argumente mit je 500 Zeichen",
       "urlRequired": "Gib eine URL ein",
@@ -3854,7 +3856,7 @@
       "deleteFailed": "Der Agent konnte nicht gelöscht werden",
       "nameRequired": "Gib einen Agentennamen ein",
       "slugRequired": "Gib einen Agenten-Slug ein",
-      "slugInvalid": "Slug muss mit einem Buchstaben beginnen und darf nur Kleinbuchstaben, Ziffern und Bindestriche verwenden",
+      "slugInvalid": "Slug muss mit einem ASCII-Kleinbuchstaben beginnen und darf nur ASCII-Kleinbuchstaben, Ziffern und Bindestriche enthalten, höchstens 50 Zeichen",
       "slugConflict": "Dieser Slug wird bereits von einem integrierten Agenten oder einem anderen Agenten in diesem Profil verwendet",
       "edit": "Agent bearbeiten"
     },

@@ -3807,6 +3807,8 @@
     "keyTooLong": "A chave deve ter 256 caracteres ou menos",
     "keyDuplicate": "Esta chave já existe no perfil",
     "valueLabel": "Valor",
+    "valueRequired": "Insira um valor",
+    "tooLong": "Use no máximo {{max}} caracteres",
     "secrets": {
       "markSecret": "Marcar como secreto",
       "masked": "Valor oculto",
@@ -3859,7 +3861,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Insira um nome de servidor",
-      "nameInvalid": "O nome pode usar apenas letras, números, sublinhados e travessões",
+      "nameInvalid": "O nome pode usar apenas letras ASCII, números, sublinhados e travessões, com até 100 caracteres",
       "commandRequired": "Digite um comando",
       "commandTooLong": "Use no máximo 50 argumentos de 500 caracteres cada",
       "urlRequired": "Insira um URL",
@@ -3904,7 +3906,7 @@
       "deleteFailed": "Não foi possível excluir o agente",
       "nameRequired": "Insira um nome de agente",
       "slugRequired": "Insira um slug de agente",
-      "slugInvalid": "Slug deve começar com uma letra e usar apenas letras minúsculas, dígitos e travessões",
+      "slugInvalid": "Slug deve começar com uma letra ASCII minúscula e usar apenas letras ASCII minúsculas, dígitos e travessões, com até 50 caracteres",
       "slugConflict": "Esse slug já é usado por um agente integrado ou por outro agente neste perfil",
       "edit": "Editar agente"
     },

@@ -3807,6 +3807,8 @@
     "keyTooLong": "Atslēgai jābūt 256 rakstzīmēm vai mazāk",
     "keyDuplicate": "Šī atslēga jau ir profilā",
     "valueLabel": "Vērtība",
+    "valueRequired": "Ievadiet vērtību",
+    "tooLong": "Izmantojiet ne vairāk kā {{max}} rakstzīmes",
     "secrets": {
       "markSecret": "Atzīmēt kā noslēpumu",
       "masked": "Slēptā vērtība",
@@ -3859,7 +3861,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Ievadiet servera nosaukumu",
-      "nameInvalid": "Nosaukumā var izmantot tikai burtus, ciparus, pasvītras un domuzīmes",
+      "nameInvalid": "Nosaukumā var izmantot tikai ASCII burtus, ciparus, pasvītras un domuzīmes, līdz 100 rakstzīmēm",
       "commandRequired": "Ievadiet komandu",
       "commandTooLong": "Izmantojiet ne vairāk kā 50 argumentus, katrs 500 rakstzīmes",
       "urlRequired": "Ievadiet URL",
@@ -3904,7 +3906,7 @@
       "deleteFailed": "Nevarēja izdzēst aģentu",
       "nameRequired": "Ievadiet aģenta nosaukumu",
       "slugRequired": "Ievadiet aģenta lodes",
-      "slugInvalid": "Slug jāsākas ar burtu un jāizmanto tikai mazie burti, cipari un domuzīmes",
+      "slugInvalid": "Slug jāsākas ar mazo ASCII burtu un jāizmanto tikai mazie ASCII burti, cipari un domuzīmes, līdz 50 rakstzīmēm",
       "slugConflict": "Šo slug jau izmanto iebūvēts aģents vai cits aģents šajā profilā",
       "edit": "Rediģēt aģentu"
     },

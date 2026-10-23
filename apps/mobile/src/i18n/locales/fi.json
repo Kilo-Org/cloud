@@ -3757,6 +3757,8 @@
     "keyTooLong": "Avaimessa saa olla enintään 256 merkkiä",
     "keyDuplicate": "Tämä avain on jo profiilissa",
     "valueLabel": "Arvo",
+    "valueRequired": "Anna arvo",
+    "tooLong": "Käytä enintään {{max}} merkkiä",
     "secrets": {
       "markSecret": "Merkitse salaiseksi",
       "masked": "Piilotettu arvo",
@@ -3809,7 +3811,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Anna palvelimen nimi",
-      "nameInvalid": "Nimessä voi käyttää vain kirjaimia, numeroita, alaviivoja ja väliviivoja",
+      "nameInvalid": "Nimessä voi käyttää vain ASCII-kirjaimia, numeroita, alaviivoja ja väliviivoja, enintään 100 merkkiä",
       "commandRequired": "Anna komento",
       "commandTooLong": "Käytä enintään 50 argumenttia, kukin 500 merkkiä",
       "urlRequired": "Anna URL-osoite",
@@ -3854,7 +3856,7 @@
       "deleteFailed": "Agenttia ei voitu poistaa",
       "nameRequired": "Anna agentin nimi",
       "slugRequired": "Syötä agentin slug",
-      "slugInvalid": "Slugin tulee alkaa kirjaimella ja käyttää vain pieniä kirjaimia, numeroita ja väliviivoja",
+      "slugInvalid": "Slugin tulee alkaa pienellä ASCII-kirjaimella ja käyttää vain pieniä ASCII-kirjaimia, numeroita ja väliviivoja, enintään 50 merkkiä",
       "slugConflict": "Tuo slug on jo käytössä sisäänrakennetulla agentilla tai toisella agentilla tässä profiilissa",
       "edit": "Muokkaa agenttia"
     },

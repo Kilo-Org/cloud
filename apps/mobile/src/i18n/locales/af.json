@@ -3757,6 +3757,8 @@
     "keyTooLong": "Sleutel moet 256 karakters of minder wees",
     "keyDuplicate": "Hierdie sleutel bestaan reeds in die profiel",
     "valueLabel": "Waarde",
+    "valueRequired": "Voer 'n waarde in",
+    "tooLong": "Gebruik hoogstens {{max}} karakters",
     "secrets": {
       "markSecret": "Merk as geheim",
       "masked": "Versteekte waarde",
@@ -3809,7 +3811,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Voer 'n bedienernaam in",
-      "nameInvalid": "Naam kan slegs letters, syfers, onderstrepe en strepe gebruik",
+      "nameInvalid": "Naam kan slegs ASCII-letters, syfers, onderstrepe en strepe tot 100 karakters gebruik",
       "commandRequired": "Voer 'n opdrag in",
       "commandTooLong": "Gebruik hoogstens 50 argumente van 500 karakters elk",
       "urlRequired": "Voer 'n URL in",
@@ -3854,7 +3856,7 @@
       "deleteFailed": "Kon nie agent verwyder nie",
       "nameRequired": "Voer 'n agentnaam in",
       "slugRequired": "Voer 'n agentslak in",
-      "slugInvalid": "Slak moet met 'n letter begin en slegs kleinletters, syfers en strepe gebruik",
+      "slugInvalid": "Slak moet met 'n ASCII-kleinletter begin en slegs ASCII-kleinletters, syfers en strepe tot 50 karakters gebruik",
       "slugConflict": "Daardie slak word deur 'n ingeboude agent of 'n ander agent in hierdie profiel gebruik",
       "edit": "Wysig agent"
     },

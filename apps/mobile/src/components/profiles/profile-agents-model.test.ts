@@ -164,6 +164,34 @@ describe('validateAgentForm', () => {
     expect(validateAgentForm(formState({ slug: '1agent' }))).toBe('slug-invalid');
   });
 
+  it('refuses a non-ASCII slug instead of treating it as empty', () => {
+    expect(validateAgentForm(formState({ slug: 'xmvdbak5d6-नमूना-नया' }))).toBe('slug-invalid');
+    expect(validateAgentForm(formState({ slug: 'नमूना एजेंट स्लग' }))).toBe('slug-invalid');
+    expect(validateAgentForm(formState({ slug: 'ümlaut' }))).toBe('slug-invalid');
+  });
+
+  it('refuses a slug longer than the server cap of 50', () => {
+    expect(validateAgentForm(formState({ slug: `a${'b'.repeat(49)}` }))).toBeNull();
+    expect(validateAgentForm(formState({ slug: `a${'b'.repeat(50)}` }))).toBe('slug-invalid');
+  });
+
+  it('refuses a name longer than the server cap of 100', () => {
+    expect(validateAgentForm(formState({ name: 'n'.repeat(100) }))).toBeNull();
+    expect(validateAgentForm(formState({ name: 'n'.repeat(101) }))).toBe('name-too-long');
+  });
+
+  it('refuses a description longer than the server cap of 2000', () => {
+    expect(validateAgentForm(formState({ description: 'd'.repeat(2000) }))).toBeNull();
+    expect(validateAgentForm(formState({ description: 'd'.repeat(2001) }))).toBe(
+      'description-too-long'
+    );
+  });
+
+  it('measures the bounds after trimming, so surrounding space cannot fail a value', () => {
+    expect(validateAgentForm(formState({ name: `  ${'n'.repeat(100)}  ` }))).toBeNull();
+    expect(validateAgentForm(formState({ description: `  ${'d'.repeat(2000)}\n` }))).toBeNull();
+  });
+
   it('refuses a slug reserved by a built-in agent', () => {
     expect(validateAgentForm(formState({ slug: 'code' }))).toBe('slug-conflict');
   });

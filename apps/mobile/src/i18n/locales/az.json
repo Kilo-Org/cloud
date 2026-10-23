@@ -3757,6 +3757,8 @@
     "keyTooLong": "Açar 256 simvol və ya daha az olmalıdır",
     "keyDuplicate": "Bu açar artıq profildə mövcuddur",
     "valueLabel": "Dəyər",
+    "valueRequired": "Dəyəri daxil edin",
+    "tooLong": "Ən çox {{max}} simvoldan istifadə edin",
     "secrets": {
       "markSecret": "Gizli olaraq qeyd edin",
       "masked": "Gizli dəyər",
@@ -3809,7 +3811,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Server adını daxil edin",
-      "nameInvalid": "Ad yalnız hərflərdən, rəqəmlərdən, alt xəttlərdən və tirelərdən istifadə edə bilər",
+      "nameInvalid": "Ad yalnız ASCII hərflərindən, rəqəmlərdən, alt xəttlərindən və tirelərdən istifadə edə bilər, maksimum 100 simvol",
       "commandRequired": "Komanda daxil edin",
       "commandTooLong": "Ən çoxu 500 simvoldan ibarət 50 arqumentdən istifadə edin",
       "urlRequired": "URL daxil edin",
@@ -3854,7 +3856,7 @@
       "deleteFailed": "Agenti silmək mümkün olmadı",
       "nameRequired": "Agent adını daxil edin",
       "slugRequired": "Agent slug daxil edin",
-      "slugInvalid": "Slug hərflə başlamalı və yalnız kiçik hərflərdən, rəqəmlərdən və tirelərdən istifadə etməlidir",
+      "slugInvalid": "Slug kiçik ASCII hərfi ilə başlamalı və yalnız kiçik ASCII hərflərindən, rəqəmlərdən və tirelərdən istifadə etməlidir, maksimum 50 simvol",
       "slugConflict": "Bu şlak daxili agent və ya bu profildəki başqa bir agent tərəfindən istifadə olunur",
       "edit": "Agenti redaktə edin"
     },

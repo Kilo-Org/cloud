@@ -3290,6 +3290,7 @@
   },
   "transcriptionModel": {
     "title": "Modeli i transkriptimit",
+    "choose": "Zgjidh një model",
     "noneChosen": "Asgjë nuk u zgjodh",
     "emptyTitle": "Nuk ka modele transkriptimi",
     "emptyDescription": "Kilo Gateway nuk ofron tani asnjë model transkriptimi.",

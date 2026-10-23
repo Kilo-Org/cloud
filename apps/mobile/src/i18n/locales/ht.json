@@ -3290,6 +3290,7 @@
   },
   "transcriptionModel": {
     "title": "Modèl transkripsyon",
+    "choose": "Chwazi yon modèl",
     "noneChosen": "Okenn pa chwazi",
     "emptyTitle": "Pa gen modèl transkripsyon",
     "emptyDescription": "Kilo Gateway pa ofri okenn modèl transkripsyon kounye a.",

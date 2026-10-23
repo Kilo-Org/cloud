@@ -3454,6 +3454,7 @@
   },
   "transcriptionModel": {
     "title": "Model trawsgrifio",
+    "choose": "Dewiswch fodel",
     "noneChosen": "Dim wedi'i ddewis",
     "emptyTitle": "Dim modelau trawsgrifio",
     "emptyDescription": "Does dim modelau trawsgrifio ar gael gan Kilo Gateway ar hyn o bryd.",

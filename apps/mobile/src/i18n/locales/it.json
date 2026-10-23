@@ -3331,6 +3331,7 @@
   },
   "transcriptionModel": {
     "title": "Modello di trascrizione",
+    "choose": "Scegli un modello",
     "noneChosen": "Nessuno selezionato",
     "emptyTitle": "Nessun modello di trascrizione",
     "emptyDescription": "Kilo Gateway non offre modelli di trascrizione in questo momento.",

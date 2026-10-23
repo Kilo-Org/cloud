@@ -3290,6 +3290,7 @@
   },
   "transcriptionModel": {
     "title": "వచనంగా మార్చే మోడల్",
+    "choose": "మోడల్‌ను ఎంచుకోండి",
     "noneChosen": "ఏదీ ఎంచుకోలేదు",
     "emptyTitle": "వచనంగా మార్చే మోడల్లు లేవు",
     "emptyDescription": "Kilo Gateway ప్రస్తుతం వచనంగా మార్చే మోడల్లను అందించడం లేదు.",

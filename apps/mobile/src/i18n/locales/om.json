@@ -3290,6 +3290,7 @@
   },
   "transcriptionModel": {
     "title": "Moodeela sagalee gara barreeffamaatti jijjiiru",
+    "choose": "Moodeela filadhu",
     "noneChosen": "Homni hin filatamne",
     "emptyTitle": "Moodeeli sagalee jijjiiru hin jiru",
     "emptyDescription": "Kilo Gateway amma moodeela sagalee gara barreeffamaatti jijjiiru hin dhiyeessu.",

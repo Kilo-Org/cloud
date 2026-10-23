@@ -3290,6 +3290,7 @@
   },
   "transcriptionModel": {
     "title": "Տեքստի վերածման մոդել",
+    "choose": "Ընտրեք մոդել",
     "noneChosen": "Ոչինչ չի ընտրվել",
     "emptyTitle": "Տեքստի վերածման մոդելներ չկան",
     "emptyDescription": "Kilo Gateway-ը հիմա տեքստի վերածման մոդելներ չի առաջարկում։",

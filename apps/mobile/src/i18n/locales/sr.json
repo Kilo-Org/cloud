@@ -3331,6 +3331,7 @@
   },
   "transcriptionModel": {
     "title": "Model za transkripciju",
+    "choose": "Izaberi model",
     "noneChosen": "Nije izabran",
     "emptyTitle": "Nema modela za transkripciju",
     "emptyDescription": "Kilo Gateway trenutno ne nudi modele za transkripciju.",

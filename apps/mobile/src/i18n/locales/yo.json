@@ -3290,6 +3290,7 @@
   },
   "transcriptionModel": {
     "title": "Àwòṣe ìyípadà ohùn sí ọ̀rọ̀",
+    "choose": "Yan àwòṣe",
     "noneChosen": "Kò sí tí a yan",
     "emptyTitle": "Kò sí àwòṣe ìyípadà ohùn sí ọ̀rọ̀",
     "emptyDescription": "Kilo Gateway kò pèsè àwòṣe ìyípadà ohùn sí ọ̀rọ̀ ní báyìí.",

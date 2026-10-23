@@ -3290,6 +3290,7 @@
   },
   "transcriptionModel": {
     "title": "Transkripsiemodel",
+    "choose": "Kies 'n model",
     "noneChosen": "Geen gekies nie",
     "emptyTitle": "Geen transkripsiemodelle nie",
     "emptyDescription": "Die Kilo Gateway bied tans geen transkripsiemodelle nie.",

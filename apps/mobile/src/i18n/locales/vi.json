@@ -3290,6 +3290,7 @@
   },
   "transcriptionModel": {
     "title": "Mô hình chuyển giọng nói thành văn bản",
+    "choose": "Chọn một mô hình",
     "noneChosen": "Chưa chọn",
     "emptyTitle": "Không có mô hình chuyển giọng nói thành văn bản",
     "emptyDescription": "Hiện Kilo Gateway không cung cấp mô hình chuyển giọng nói thành văn bản.",

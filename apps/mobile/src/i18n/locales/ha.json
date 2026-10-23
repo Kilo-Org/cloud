@@ -3290,6 +3290,7 @@
   },
   "transcriptionModel": {
     "title": "Samfurin mayar da magana zuwa rubutu",
+    "choose": "Zaɓi samfuri",
     "noneChosen": "Ba a zaɓi ba",
     "emptyTitle": "Babu samfuran mayar da magana zuwa rubutu",
     "emptyDescription": "Kilo Gateway bai ba da samfuran mayar da magana zuwa rubutu a halin yanzu.",

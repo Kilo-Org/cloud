@@ -3290,6 +3290,7 @@
   },
   "transcriptionModel": {
     "title": "โมเดลถอดเสียง",
+    "choose": "เลือกโมเดล",
     "noneChosen": "ยังไม่ได้เลือก",
     "emptyTitle": "ไม่มีโมเดลถอดเสียง",
     "emptyDescription": "ขณะนี้ Kilo Gateway ไม่มีโมเดลถอดเสียงให้บริการ",

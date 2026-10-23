@@ -3290,6 +3290,7 @@
   },
   "transcriptionModel": {
     "title": "Kõnetuvastuse mudel",
+    "choose": "Vali mudel",
     "noneChosen": "Pole valitud",
     "emptyTitle": "Kõnetuvastuse mudelid puuduvad",
     "emptyDescription": "Kilo Gateway ei paku praegu ühtegi kõnetuvastuse mudelit.",

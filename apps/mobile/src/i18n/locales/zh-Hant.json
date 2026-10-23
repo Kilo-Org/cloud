@@ -3290,6 +3290,7 @@
   },
   "transcriptionModel": {
     "title": "轉錄模型",
+    "choose": "選擇模型",
     "noneChosen": "未選擇",
     "emptyTitle": "沒有轉錄模型",
     "emptyDescription": "Kilo Gateway 目前沒有提供轉錄模型。",

@@ -3290,6 +3290,7 @@
   },
   "transcriptionModel": {
     "title": "Ihe nlereanya maka ịtụgharị okwu ka ọ bụrụ ederede",
+    "choose": "Họrọ ihe nlereanya",
     "noneChosen": "A họpụtaghị nke ọ bụla",
     "emptyTitle": "Enweghị ihe nlereanya maka ịtụgharị okwu ka ọ bụrụ ederede",
     "emptyDescription": "Kilo Gateway enyeghị ihe nlereanya ọ bụla maka ịtụgharị okwu ugbu a.",

@@ -3290,6 +3290,7 @@
   },
   "transcriptionModel": {
     "title": "ტრანსკრიფციის მოდელი",
+    "choose": "აირჩიეთ მოდელი",
     "noneChosen": "არჩეული არ არის",
     "emptyTitle": "ტრანსკრიფციის მოდელები არ არის",
     "emptyDescription": "Kilo Gateway ამჟამად არ სთავაზობს ტრანსკრიფციის მოდელებს.",

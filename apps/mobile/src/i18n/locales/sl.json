@@ -3372,6 +3372,7 @@
   },
   "transcriptionModel": {
     "title": "Model za prepisovanje",
+    "choose": "Izberite model",
     "noneChosen": "Ni izbran",
     "emptyTitle": "Ni modelov za prepisovanje",
     "emptyDescription": "Kilo Gateway trenutno ne ponuja modelov za prepisovanje.",

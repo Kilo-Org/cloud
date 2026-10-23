@@ -3372,6 +3372,7 @@
   },
   "transcriptionModel": {
     "title": "Модель распознавания речи",
+    "choose": "Выберите модель",
     "noneChosen": "Не выбрано",
     "emptyTitle": "Нет моделей распознавания речи",
     "emptyDescription": "Сейчас Kilo Gateway не предлагает моделей распознавания речи.",

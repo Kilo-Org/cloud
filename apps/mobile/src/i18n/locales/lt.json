@@ -3372,6 +3372,7 @@
   },
   "transcriptionModel": {
     "title": "Transkribavimo modelis",
+    "choose": "Pasirinkite modelį",
     "noneChosen": "Neišrinkta",
     "emptyTitle": "Nėra transkribavimo modelių",
     "emptyDescription": "Šiuo metu Kilo Gateway neteikia jokių transkribavimo modelių.",

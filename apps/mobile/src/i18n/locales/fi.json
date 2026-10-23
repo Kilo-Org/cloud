@@ -3290,6 +3290,7 @@
   },
   "transcriptionModel": {
     "title": "Puheentunnistusmalli",
+    "choose": "Valitse malli",
     "noneChosen": "Ei valintaa",
     "emptyTitle": "Ei puheentunnistusmalleja",
     "emptyDescription": "Kilo Gateway ei juuri nyt tarjoa puheentunnistusmalleja.",

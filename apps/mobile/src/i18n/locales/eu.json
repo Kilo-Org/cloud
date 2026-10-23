@@ -3290,6 +3290,7 @@
   },
   "transcriptionModel": {
     "title": "Transkripzio-eredua",
+    "choose": "Hautatu eredu bat",
     "noneChosen": "Ezer hautatu gabe",
     "emptyTitle": "Ez dago transkripzio-eredurik",
     "emptyDescription": "Kilo Gateway-k ez du transkripzio-eredurik eskaintzen oraintxe.",

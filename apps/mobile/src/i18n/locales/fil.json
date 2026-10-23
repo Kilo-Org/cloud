@@ -3290,6 +3290,7 @@
   },
   "transcriptionModel": {
     "title": "Modelo para sa pagsasalin ng boses sa teksto",
+    "choose": "Pumili ng modelo",
     "noneChosen": "Walang napili",
     "emptyTitle": "Walang modelo para sa pagsasalin ng boses sa teksto",
     "emptyDescription": "Walang iniaalok na modelo para sa pagsasalin ng boses sa teksto ang Kilo Gateway ngayon.",

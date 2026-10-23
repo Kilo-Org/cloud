@@ -3290,6 +3290,7 @@
   },
   "transcriptionModel": {
     "title": "Modeli ya unukuzi",
+    "choose": "Chagua modeli",
     "noneChosen": "Hakuna iliyochaguliwa",
     "emptyTitle": "Hakuna modeli za unukuzi",
     "emptyDescription": "Kilo Gateway haina modeli za unukuzi kwa sasa.",

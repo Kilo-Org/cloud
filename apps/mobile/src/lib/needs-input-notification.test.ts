@@ -64,7 +64,7 @@ describe('shouldPublishForSession', () => {
     );
   });
 
-  it.each(['background', 'inactive', 'unknown'] as const)(
+  it.each(['background', 'inactive', 'unknown', null, undefined] as const)(
     'withholds while the app is %s and the server push is the carrier',
     appState => {
       expect(shouldPublishForSession({ appState, pathname: AWAY, sessionId: 'ses_1' })).toBe(false);

@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Switch, View } from 'react-native';
+import { View } from 'react-native';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
 import { CenteredState } from '@/components/centered-state';
@@ -15,6 +15,7 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { PlatformOverviewSkeleton } from '@/components/code-reviewer/platform-overview-skeleton';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -110,7 +111,7 @@ export function BitbucketOverview({
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
-        <CenteredState className="px-6">
+        <CenteredState contentContainerClassName="px-6">
           {canEdit ? (
             <BitbucketConnectForm scope={scope} />
           ) : (
@@ -124,7 +125,7 @@ export function BitbucketOverview({
   }
 
   const pushField = (field: string) => {
-    router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/bitbucket/${field}` as Href);
+    router.push(`/(app)/code-reviewer/${scope}/bitbucket/${field}` as Href);
   };
 
   const data = config.data;

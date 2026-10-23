@@ -156,7 +156,7 @@ export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailS
       ) : null}
 
       {centered ? (
-        <CenteredState className="px-4">
+        <CenteredState contentContainerClassName="px-4">
           <View className="items-center py-6">{content}</View>
         </CenteredState>
       ) : (

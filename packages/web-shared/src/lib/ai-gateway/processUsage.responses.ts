@@ -19,6 +19,7 @@ import {
   extractVercelGenerationTime,
   extractVercelIsByok,
   extractVercelUpstreamId,
+  reportUpstreamStreamError,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 
@@ -106,11 +107,12 @@ function extractResponseContent(output: OpenAI.Responses.ResponseOutputItem[]): 
 }
 
 export async function parseResponsesMicrodollarUsageFromStream(
-  stream: ReadableStream,
+  stream: ReadableStream<Uint8Array>,
   kiloUserId: string,
   openrouterRequestSpan: Span | undefined,
   provider: ProviderId,
-  statusCode: number
+  statusCode: number,
+  usesUserCredentials: boolean
 ): Promise<MicrodollarUsageStats> {
   openrouterRequestSpan?.end();
   const streamProcessingSpan = startInactiveSpan({
@@ -159,9 +161,13 @@ export async function parseResponsesMicrodollarUsageFromStream(
 
       if ('error' in json && json.error) {
         reportedError = true;
-        captureException(new Error(`Responses API error: ${json.error.message}`), {
-          tags: { source: 'responses_sse_processing' },
-          extra: { json, event },
+        reportUpstreamStreamError({
+          label: 'Responses API error',
+          source: 'responses_sse_processing',
+          error: json.error,
+          usesUserCredentials,
+          logContext: { provider, inference_provider, messageId, model },
+          sentryExtra: { json, event },
         });
       }
 
@@ -271,7 +277,7 @@ export function extractInputItemTextContent(
   if (Array.isArray(content)) {
     return content
       .filter(
-        (c): c is OpenAI.Responses.ResponseInputText =>
+        (c: unknown): c is OpenAI.Responses.ResponseInputText =>
           typeof c === 'object' &&
           c !== null &&
           'type' in c &&

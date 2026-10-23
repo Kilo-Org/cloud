@@ -247,6 +247,11 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     }
   }
 
+  // Data-use contract for this route: FIM goes straight to the provider, and the supported
+  // providers are classified by the gateway's provider data policy as not training on prompts
+  // (https://openrouter.ai/docs/guides/privacy/provider-logging). A new supported model must
+  // carry the same classification.
+
   const systemKey = getSystemApiKey(fimProvider);
   const userByokEntry = byokProviderKeys
     .map(providerId => userByok?.find(entry => entry.providerId === providerId))

@@ -413,19 +413,57 @@ describe('ReviewDetailScreen outcome-first order', () => {
     expect(renderScreen()).toContain(i18n.t('codeReviewer.reviewDetail.reviewFailed'));
   });
 
-  it.each(['cancelled', 'interrupted'])('preserves the reason for a %s review', status => {
+  it.each(['cancelled', 'interrupted'])(
+    'explains a %s review instead of echoing the stored diagnostic',
+    status => {
+      detail.data = {
+        success: true,
+        review: makeReview({
+          status,
+          terminal_reason: 'superseded',
+          error_message: 'Superseded by new push',
+        }),
+        tokenUsage: { input: 0, output: 0 },
+      };
+      const texts = renderScreen();
+      expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.cancelReasonSuperseded'));
+      expect(texts.join(' ')).not.toContain('Superseded by new push');
+      expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.reviewFailed'));
+    }
+  );
+
+  it('names the platform to reconnect after an integration disconnect', () => {
     detail.data = {
       success: true,
       review: makeReview({
-        status,
-        terminal_reason: 'superseded',
-        error_message: 'Superseded by new push',
+        status: 'cancelled',
+        terminal_reason: 'user_cancelled',
+        error_message: 'Platform integration disconnected',
       }),
       tokenUsage: { input: 0, output: 0 },
     };
     const texts = renderScreen();
-    expect(texts).toContain('Superseded by new push');
-    expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.reviewFailed'));
+    expect(texts).toContain(
+      i18n.t('codeReviewer.reviewDetail.cancelReasonIntegrationDisconnected', {
+        platform: 'GitHub',
+      })
+    );
+    expect(texts.join(' ')).not.toContain('Platform integration disconnected');
+  });
+
+  it('falls back to the outcome for a cancellation it cannot attribute', () => {
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status: 'cancelled',
+        terminal_reason: 'user_cancelled',
+        error_message: 'Cancelled by user',
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    const texts = renderScreen();
+    expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.cancelReasonCancelled'));
+    expect(texts.join(' ')).not.toContain('Cancelled by user');
   });
 
   it('uses existing localized copy for a typed action-required failure', () => {
@@ -448,7 +486,7 @@ describe('ReviewDetailScreen details metadata', () => {
   it('labels the completion-timestamp row in the Details list', () => {
     // The Details key-value list pairs every label with its value in one
     // MetaRow. The completion row must pass the localized
-    // `codeReviewer.status.completed` copy as MetaRow's label beside its
+    // `common.completed` copy as MetaRow's label beside its
     // timeAgo value; a value-only row would leave the label column blank
     // (finding: review-detail.png).
     detail.data = {
@@ -462,7 +500,7 @@ describe('ReviewDetailScreen details metadata', () => {
     };
 
     const renderer = mountScreen();
-    const completedLabel = i18n.t('codeReviewer.status.completed');
+    const completedLabel = i18n.t('common.completed');
 
     // `timeAgo` is mocked to "now" in this suite, so the completion row is the
     // one MetaRow that carries the completion label and the timeAgo value.
@@ -500,7 +538,7 @@ describe('ReviewDetailScreen details metadata', () => {
     };
 
     const renderer = mountScreen();
-    const completedLabel = i18n.t('codeReviewer.status.completed');
+    const completedLabel = i18n.t('common.completed');
 
     expect(
       renderer.root.findAll(node => node.type === MetaRow && node.props.label === completedLabel)
@@ -1354,9 +1392,7 @@ describe('ReviewDetailScreen retry when Code Reviewer cannot run', () => {
     act(() => {
       fixSettings?.onPress?.();
     });
-    expect(routerMock.push).toHaveBeenCalledWith(
-      '/(app)/(tabs)/(3_profile)/code-reviewer/personal/github'
-    );
+    expect(routerMock.push).toHaveBeenCalledWith('/(app)/code-reviewer/personal/github');
   });
 
   it('links to the settings when the configuration needs attention', () => {

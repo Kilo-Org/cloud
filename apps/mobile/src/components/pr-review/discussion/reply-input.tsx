@@ -22,6 +22,7 @@ import { clearDraft, prReplyDraftKey, saveDraft } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
+import { reconnectExpiredMessage } from '@/lib/pr-review/mutation-error-display';
 import { type useReplyToCommentMutation } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
 import {
   isPrOperationAmbiguous,
@@ -221,7 +222,7 @@ export function ReplyInput({
       // The ledger persistence-failure marker is retry-blocking: the row never
       // became `reconcile_pending`, so the same key must not be retried.
       if (isPrOperationPersistenceFailed(reply.error)) {
-        setInlineError(i18n.t('prReview.operation.persistenceFailed'));
+        setInlineError(i18n.t('common.actionNotRecorded'));
         setInlineErrorKind('bad-request');
         return;
       }
@@ -265,7 +266,7 @@ export function ReplyInput({
         );
         setInlineErrorKind('forbidden');
       } else if (classification.kind === 'reconnect') {
-        setInlineError(t('prReview.connectionExpired'));
+        setInlineError(reconnectExpiredMessage(providerPlatform));
         setInlineErrorKind('reconnect');
       } else {
         // A generic/transient failure shows the specified retryable copy,

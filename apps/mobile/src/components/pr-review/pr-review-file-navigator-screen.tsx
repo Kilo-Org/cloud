@@ -142,7 +142,7 @@ function NavigatorError({
   }
   if (state?.kind === 'reconnect') {
     return (
-      <CenteredState className="px-6">
+      <CenteredState contentContainerClassName="px-6">
         <PrReviewReconnectNotice />
       </CenteredState>
     );
@@ -150,7 +150,16 @@ function NavigatorError({
   return (
     <QueryError
       variant="server"
-      title={t('prReview.fileNavigator.couldNotLoadFiles')}
+      title={
+        state?.kind === 'service-unavailable'
+          ? t('prReview.reviewServiceUnavailable')
+          : t('prReview.fileNavigator.couldNotLoadFiles')
+      }
+      message={
+        state?.kind === 'service-unavailable'
+          ? t('prReview.reviewServiceUnavailableDescription')
+          : undefined
+      }
       onRetry={onRetry}
       isRetrying={isRetrying}
     />

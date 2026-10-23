@@ -8,6 +8,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { direct_byok_model_lists } from '@kilocode/db/schema';
 import { ReasoningOptionSchema, type ReasoningOption } from '@kilocode/db/schema-types';
 import { toLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
+import { recordSyncCompleted } from '@/lib/providers/openrouter/sync-providers-stale-alert';
 
 const DEFAULT_CONTENT_LENGTH = 200_000;
 const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
@@ -302,4 +303,19 @@ export async function syncDirectByokModels(): Promise<
     FETCHERS.map(async fetcher => [fetcher.providerId, await syncProvider(fetcher, ctx)] as const)
   );
   return Object.fromEntries(entries);
+}
+
+export async function syncAndStoreDirectByokProviders() {
+  const startTime = performance.now();
+  const direct_byok_model_counts = await syncDirectByokModels();
+  console.log('[sync-direct-byok-providers] model counts:', direct_byok_model_counts);
+  const completed_at = await recordSyncCompleted('direct_byok');
+  const counts = Object.values(direct_byok_model_counts);
+  return {
+    completed_at,
+    total_providers: counts.length,
+    total_models: counts.reduce((sum, count) => sum + count, 0),
+    direct_byok_model_counts,
+    time: performance.now() - startTime,
+  };
 }

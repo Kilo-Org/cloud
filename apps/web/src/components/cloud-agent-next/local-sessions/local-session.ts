@@ -13,6 +13,7 @@ export type LocalSessionSync =
       message: string;
       /** The outcome is unknown, so a retry must repeat the same attempt. */
       retrySameAttempt: boolean;
+      canReleaseUploads?: boolean;
       billingFailure: CustomerBillingFailure | null;
     };
 

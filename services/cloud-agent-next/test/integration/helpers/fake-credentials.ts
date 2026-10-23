@@ -1,3 +1,7 @@
+/** Decoded-only fixture; authorization verification is covered by the runtime-proxy suite. */
+export const FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN =
+  'eyJhbGciOiJub25lIn0.eyJydW50aW1lQXV0aG9yaXphdGlvbiI6eyJpZCI6InJhXzEifX0.c2ln';
+
 /**
  * Shared fakes for the B3 credential tests. The git-token-service is a service
  * binding the Miniflare Worker test runtime does not provide, so capability
@@ -66,6 +70,7 @@ export function installFakeCredentialEnv(
     // The fake harness asserts contained grants unless a test opts out; the
     // local `.dev.vars` value must not decide what a test means.
     CREDENTIAL_CONTAINMENT_ENABLED: 'true',
+    WORKER_URL: 'https://worker.example.com',
     ...extra,
   });
 }

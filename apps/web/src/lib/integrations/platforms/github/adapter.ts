@@ -568,7 +568,6 @@ const MAX_KILO_REVIEW_COMMENT_PAGES = 5;
 
 /**
  * Looks for the <!-- kilo-review --> marker in issue comments.
- * Falls back to detecting older Kilo comments by patterns if no marker found.
  */
 export async function findKiloReviewComment(
   installationId: string,

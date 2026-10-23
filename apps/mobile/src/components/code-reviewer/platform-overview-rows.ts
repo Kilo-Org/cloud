@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/icons';
 
 import { i18n } from '@/i18n';
+import { modelLabelFromCatalogue } from '@/lib/auto-model-name';
 import { formatList, formatNumber } from '@/lib/format';
 import { type PLATFORM_CAPABILITIES, type ReviewConfigData } from '@/lib/code-reviewer-config';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
@@ -108,7 +109,7 @@ export function buildOverviewRows({
       field: 'model',
       icon: FileSliders,
       title: i18n.t('common.model'),
-      subtitle: models.find(model => model.id === data.modelSlug)?.name ?? data.modelSlug,
+      subtitle: modelLabelFromCatalogue(models, data.modelSlug),
       onPress: modelsLoading || models.length === 0 ? undefined : onOpenModelPicker,
     },
     ...(capabilities.gateRow

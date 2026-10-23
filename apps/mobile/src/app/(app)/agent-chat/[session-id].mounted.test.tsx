@@ -508,7 +508,6 @@ beforeEach(() => {
             variant: null,
             repository: null,
             isInitiated: true,
-            needsLegacyPrepare: false,
             isPreparingAsync: false,
             prompt: null,
             initialMessageId: null,
@@ -532,6 +531,17 @@ beforeEach(() => {
     },
     replace: (href: string) => {
       navigationRoutes.splice(-1, 1, href);
+    },
+    // The POP_TO end state the component relies on: find the destination at or
+    // below the current index, truncate everything above it; with no match,
+    // drop the current route and land on the destination.
+    dismissTo: (href: string) => {
+      const index = navigationRoutes.lastIndexOf(href.split('?')[0] ?? href);
+      if (index === -1) {
+        navigationRoutes.splice(0, navigationRoutes.length, href);
+      } else {
+        navigationRoutes.splice(index + 1);
+      }
     },
   });
   useQueryMock.mockReset();
@@ -661,8 +671,6 @@ describe('SessionDetailScreen display scope', () => {
       queryState.isError = state !== 'pending';
       queryState.error = { data: { code: state } };
       const renderer = await mountRoute();
-      const header = renderer.root.findByType(ScreenHeader);
-      expect(propOf(header, 'context')).toBeUndefined();
       expect(findByType(renderer.root, 'Text').flatMap(node => node.children)).not.toContain(
         'Personal'
       );
@@ -1500,7 +1508,7 @@ describe.each([true, false])('SessionDetailScreen header return with history=%s'
     });
 
     expect(navigationRoutes).toEqual(
-      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)']
+      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)/']
     );
     expect(rootRequests).toEqual([]);
   });
@@ -1619,6 +1627,10 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
 
   it('leaves failed confirmation through Back to sessions', async () => {
     confirmationRequests.getMe.mockRejectedValueOnce(new Error('offline'));
+    // The composer-under-session shape the fix exists for: the not-found
+    // screen sits above the New session composer, and "Back to sessions" must
+    // remove both rather than reveal what was below.
+    navigationRoutes.unshift('agent-chat/new');
     const renderer = await mountRoute();
     const back = findByType(renderer.root, 'Button').find(button =>
       findByType(button, 'Text').some(text => text.children.includes('Back to sessions'))
@@ -1627,7 +1639,8 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
       pressControl(back);
     });
 
-    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)']);
+    // Truncated to the tabs entry: the composer is no longer on the stack.
+    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)/']);
     expect(rootRequests).toEqual([]);
   });
 

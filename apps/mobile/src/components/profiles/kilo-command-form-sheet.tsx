@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, Switch, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
@@ -18,6 +18,7 @@ import {
 } from '@/components/profiles/profile-kilo-commands-model';
 import { SheetHeader } from '@/components/sheet-header';
 import { FormField } from '@/components/ui/form-field';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 
@@ -171,7 +172,7 @@ export function KiloCommandFormSheet({
           disabled={isSaving}
           autoCapitalize="none"
           autoCorrect={false}
-          placeholder={t('agentChat.modeOptions.code')}
+          placeholder={t('profiles.slashCommands.agentPlaceholder')}
           onChangeText={value => {
             agentRef.current = value;
           }}

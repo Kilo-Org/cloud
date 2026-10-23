@@ -1,13 +1,14 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Switch, View } from 'react-native';
+import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
 import { CenteredState } from '@/components/centered-state';
 import { openModelPicker } from '@/components/agents/model-selector';
 import { BitbucketOverview } from '@/components/code-reviewer/bitbucket-overview';
+import { connectNoticeKey } from '@/components/code-reviewer/connect-notice-key';
 import {
   buildOverviewRows,
   resolveRowOnPress,
@@ -19,6 +20,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
@@ -148,12 +150,12 @@ export function PlatformOverviewScreen({
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
-        <CenteredState className="px-6">
+        <CenteredState contentContainerClassName="px-6">
           {canEdit ? (
             <ProviderConnectCard scope={scope} platform={platform} onConnected={handleConnected} />
           ) : (
             <Text className="text-center text-xs text-muted-foreground">
-              {t('codeReviewer.notConnectedReadOnly', { platform: capabilities.label })}
+              {t(connectNoticeKey(platform), { platform: capabilities.label })}
             </Text>
           )}
         </CenteredState>
@@ -162,7 +164,7 @@ export function PlatformOverviewScreen({
   }
 
   const pushField = (field: string) => {
-    router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/${platform}/${field}` as Href);
+    router.push(`/(app)/code-reviewer/${scope}/${platform}/${field}` as Href);
   };
 
   const data = config.data;
@@ -194,9 +196,7 @@ export function PlatformOverviewScreen({
           onOpenReviewMemory:
             platform === 'github'
               ? () => {
-                  router.push(
-                    `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/review-memory` as Href
-                  );
+                  router.push(`/(app)/code-reviewer/${scope}/review-memory` as Href);
                 }
               : undefined,
         });

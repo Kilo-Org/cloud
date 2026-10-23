@@ -32,6 +32,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { parseParam } from '@/lib/route-params';
+import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
 import { isPlausibleKiloSessionId } from '@/lib/session-id-shape';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { parseResumeAnchor } from '@/lib/session-resume';
@@ -280,7 +281,7 @@ export default function SessionDetailScreen() {
           title={t('agentChat.session.title')}
           reserveTitleSpace
           titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
-          backFallback={'/(app)/(tabs)/(2_agents)' as Href}
+          backFallback={AGENTS_SESSIONS_HREF}
           headerRight={
             <View className="min-w-0 shrink flex-row items-center gap-2">
               <SessionContextMetrics
@@ -362,7 +363,7 @@ export default function SessionDetailScreen() {
           title={t('agentChat.session.title')}
           reserveTitleSpace
           titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
-          backFallback={'/(app)/(tabs)/(2_agents)' as Href}
+          backFallback={AGENTS_SESSIONS_HREF}
         />
         <CenteredState>
           <View className="items-center gap-3 px-6">
@@ -388,7 +389,10 @@ export default function SessionDetailScreen() {
               <Button
                 variant="ghost"
                 onPress={() => {
-                  router.replace('/(app)/(tabs)/(2_agents)' as Href);
+                  // POP_TO reuses the `(tabs)` route under this screen and
+                  // truncates every `agent-chat` route above it, so a composer
+                  // still on the stack under a missing session is gone with it.
+                  router.dismissTo(AGENTS_SESSIONS_HREF);
                 }}
               >
                 <Text>{t('agentChat.session.backToSessions')}</Text>

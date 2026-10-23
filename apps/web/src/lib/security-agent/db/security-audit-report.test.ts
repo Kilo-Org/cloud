@@ -528,6 +528,7 @@ describe('buildSecurityAgentAuditReportFromRows', () => {
       id: '00000000-0000-0000-0000-000000000000',
       displayName: 'Kilo Admin',
       masked: true,
+      maskedKind: 'kilo_admin',
     });
     expect(report.findings[0].events[1].afterState).toEqual({ status: 'ignored' });
     expect(report.findings[0].events[1].metadata).toEqual({ reason_code: 'not_used' });
@@ -675,6 +676,7 @@ describe('buildSecurityAgentAuditReportFromRows', () => {
         id: '00000000-0000-0000-0000-000000000000',
         displayName: 'Kilo Admin',
         masked: true,
+        maskedKind: 'kilo_admin',
       },
       {
         type: 'user',
@@ -687,6 +689,7 @@ describe('buildSecurityAgentAuditReportFromRows', () => {
         id: '00000000-0000-0000-0000-000000000000',
         displayName: 'Masked user',
         masked: true,
+        maskedKind: 'user',
       },
     ]);
 

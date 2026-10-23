@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigation } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Platform, Pressable, StatusBar, View } from 'react-native';
+import { Platform, Pressable, StatusBar, View, type ViewInstance } from 'react-native';
 
 import { Share } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
@@ -125,13 +125,13 @@ export function SheetHeader({
           ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
         }
       : undefined;
-  const containerRef = useRef<View | null>(null);
+  const containerRef = useRef<ViewInstance | null>(null);
   const remeasureWindowTop = useCallback(() => {
     containerRef.current?.measureInWindow((_x, y) => {
       setReachesWindowTop(isAtWindowTop(y));
     });
   }, []);
-  const setContainerRef = useCallback((view: View | null) => {
+  const setContainerRef = useCallback((view: ViewInstance | null) => {
     containerRef.current = view;
     view?.measureInWindow((_x, y) => {
       setReachesWindowTop(isAtWindowTop(y));

@@ -17,7 +17,8 @@ import { __resetFilePartUrlResolverForTests } from './file-part-url-resolver';
 
 type FileInstance = {
   uri: string;
-  write: ReturnType<typeof vi.fn>;
+  write: (content: string, options?: { encoding?: string }) => Promise<void>;
+  writeSync: (content: string, options?: { encoding?: string }) => void;
   text: ReturnType<typeof vi.fn>;
   filename?: string;
 };
@@ -39,7 +40,8 @@ const expoFileSystemMock = vi.hoisted(() => {
         typeof directoryOrUri === 'string'
           ? directoryOrUri
           : `file:///cache/session-file-parts/${filename}`,
-      write: vi.fn(),
+      write: vi.fn().mockResolvedValue(undefined),
+      writeSync: vi.fn(),
       text: fileText,
       filename,
     };

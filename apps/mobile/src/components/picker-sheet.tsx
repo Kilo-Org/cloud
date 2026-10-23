@@ -1,13 +1,14 @@
 import { Info } from '@/components/ui/icons';
 import { useRouter } from 'expo-router';
-import { type ReactNode, useContext, useEffect, useRef } from 'react';
+import { type ReactNode, useCallback, useContext, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BackHandler, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
-import { NavigationContext } from '@/lib/navigation/navigation-context';
 import { SheetHeader, type SheetHeaderTopInset } from '@/components/sheet-header';
+import { NavigationContext } from '@/lib/navigation/navigation-context';
+import { useRouteFocused } from '@/lib/navigation/route-focus';
 
 export function PickerSheet({
   title,
@@ -64,15 +65,17 @@ export function PickerSheet({
 }) {
   const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
-  // Focus comes from the navigation context rather than `useNavigation()`:
-  // surfaces rendered outside a navigator (an excluded feature's chat sheet)
-  // and harnesses with a partial expo-router mock then mount unchanged —
-  // `useContext` returns undefined instead of throwing, and the listener
-  // degrades to nothing. The context value is structurally partial here: the
-  // excluded-feature sheet renders without a navigator above it.
-  const navigation = useContext(
-    NavigationContext as React.Context<{ isFocused: () => boolean } | undefined>
-  );
+  const routeFocused = useRouteFocused();
+  // Back reads focus at press time, not from the render-time value: the native
+  // dismissal can blur the route after the last render and before the key
+  // event. Same context object as `useRouteFocused`, read directly so a
+  // caller outside a navigator (an excluded feature's chat sheet) and a
+  // harness with a partial expo-router mock keep mounting unchanged — there
+  // the read is `undefined` and the listener degrades to nothing.
+  const navigation = useContext(NavigationContext) as
+    | { isFocused?: () => boolean }
+    | undefined;
+  const isRouteFocused = useCallback(() => navigation?.isFocused?.() ?? false, [navigation]);
   const router = useRouter();
 
   // Latest-callback refs: the listener is armed once per mount and must run
@@ -94,9 +97,7 @@ export function PickerSheet({
       }
     };
     const backHandler = readBackHandler();
-    const navigationValue = navigation;
-    const focus = navigationValue?.isFocused;
-    if (!backHandler?.addEventListener || !focus) {
+    if (!backHandler?.addEventListener || !navigation?.isFocused) {
       return undefined;
     }
     const subscription = backHandler.addEventListener('hardwareBackPress', () => {
@@ -104,7 +105,7 @@ export function PickerSheet({
       // native dismissal already popped it) must not pop the stack again: the
       // focus-aware guard collapses the double-dismissal race (native hide →
       // JS pop, user Back → JS pop) into one pop.
-      if (!focus()) {
+      if (!isRouteFocused()) {
         return false;
       }
       if (onHardwareBackRef.current?.()) {
@@ -118,8 +119,14 @@ export function PickerSheet({
     return () => {
       subscription.remove();
     };
-  }, [navigation, router]);
+  }, [isRouteFocused, navigation, router]);
 
+  // A picker whose caller bridge is gone is a dead shell. It must only say so
+  // while its own route is the one on screen: painted over another screen it
+  // is a modal the user cannot leave through the screen they think they are on.
+  if (expired && !routeFocused) {
+    return null;
+  }
   const body = expired ? (
     <EmptyState
       icon={Info}

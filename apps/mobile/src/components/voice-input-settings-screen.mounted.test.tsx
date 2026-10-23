@@ -46,6 +46,7 @@ const organization = vi.hoisted(() => ({ organizationId: 'org-1' as string | nul
 const voiceLanguage = vi.hoisted(() => ({ chosen: null as string | null, loaded: true }));
 
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   Switch: 'Switch',
   Pressable: 'Pressable',
   View: 'View',

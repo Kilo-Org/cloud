@@ -596,6 +596,10 @@ function GitHubIntegrationDetailsContent({
   };
 
   const handleCancelPending = async () => {
+    // Cancel exactly the pending row this view rendered; the id is required so
+    // the request cannot fall back to another pending request.
+    const pendingIntegrationId = installationData?.installation?.id;
+    if (!pendingIntegrationId) return;
     if (
       await confirm({
         title: 'Cancel this installation request?',
@@ -605,17 +609,22 @@ function GitHubIntegrationDetailsContent({
         destructive: true,
       })
     ) {
-      cancelPendingInstallation.mutate(managementInput, {
-        onSuccess: async () => {
-          toast.success('Installation request cancelled');
-          await refetch();
-        },
-        onError: error => {
-          toast.error('Failed to cancel installation request', {
-            description: error.message,
-          });
-        },
-      });
+      cancelPendingInstallation.mutate(
+        organizationId
+          ? { organizationId, integrationId: pendingIntegrationId }
+          : { integrationId: pendingIntegrationId },
+        {
+          onSuccess: async () => {
+            toast.success('Installation request cancelled');
+            await refetch();
+          },
+          onError: error => {
+            toast.error('Failed to cancel installation request', {
+              description: error.message,
+            });
+          },
+        }
+      );
     }
   };
 

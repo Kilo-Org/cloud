@@ -21,6 +21,7 @@ import { AuditReportButton } from '@/components/security-agent/audit-report-butt
 import { ScreenHeader } from '@/components/screen-header';
 import { DashboardSections } from '@/components/security-agent/dashboard-sections';
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
+import { IconButton } from '@/components/ui/icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
@@ -35,13 +36,11 @@ import {
   useSecurityAgentRepositories,
   useTriggerSecuritySync,
 } from '@/lib/hooks/use-security-agent';
+import { isSecuritySyncRetryable, securitySyncReconcileCopy } from '@/lib/security-agent-ledger';
 import {
-  isSecurityConfigurationError,
-  isSecuritySyncRetryable,
-  securityConfigurationCopy,
-  securitySyncReconcileCopy,
-} from '@/lib/hooks/use-security-agent-mutations';
-import { useSecurityDismissFailures } from '@/lib/hooks/use-security-dismiss-draft';
+  securityDismissFailureCopy,
+  useSecurityDismissFailures,
+} from '@/lib/hooks/use-security-dismiss-draft';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
@@ -258,28 +257,29 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={t('common.securityAgent')}
+        // Size-11 (44dp) icon buttons: findings and settings, plus the audit
+        // overflow when the viewer can manage the agent. Declaring exactly the
+        // buttons this viewer renders drops the actions onto their own row
+        // before the one-line CJK title loses its readable minimum.
+        headerRightWidth={canManage ? 3 * 44 : 2 * 44}
         headerRight={
           <View className="flex-row items-center">
-            <Pressable
+            <IconButton
               onPress={() => {
                 router.push(getSecurityAgentPath(scope, 'findings'));
               }}
-              accessibilityRole="button"
               accessibilityLabel={t('common.findings')}
-              className="size-11 items-center justify-center active:opacity-70"
             >
               <ShieldAlert size={20} color={colors.foreground} />
-            </Pressable>
-            <Pressable
+            </IconButton>
+            <IconButton
               onPress={() => {
                 router.push(getSecurityAgentPath(scope, 'settings'));
               }}
-              accessibilityRole="button"
               accessibilityLabel={t('securityAgent.dashboard.settings')}
-              className="size-11 items-center justify-center active:opacity-70"
             >
               <Settings size={20} color={colors.foreground} />
-            </Pressable>
+            </IconButton>
             {canManage ? <AuditReportButton scope={scope} /> : null}
           </View>
         }
@@ -306,7 +306,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
               {lastSyncLabel}
             </Text>
           </Pressable>
-          <Pressable
+          <IconButton
             onPress={() => {
               triggerSync.mutate(
                 { repoFullName },
@@ -321,13 +321,9 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
               );
             }}
             disabled={syncDisabled}
-            accessibilityRole="button"
             accessibilityLabel={t('securityAgent.dashboard.syncNow')}
             accessibilityState={{ disabled: syncDisabled, busy: triggerSync.isPending }}
-            className={cn(
-              'size-11 items-center justify-center active:opacity-70',
-              syncBlocked && 'opacity-50'
-            )}
+            className={cn(syncBlocked && 'opacity-50')}
           >
             <SpinningIcon
               icon={RefreshCw}
@@ -335,7 +331,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
               color={colors.mutedForeground}
               spinning={triggerSync.isPending}
             />
-          </Pressable>
+          </IconButton>
         </View>
 
         {repositories.isError ? (
@@ -353,17 +349,13 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         ) : null}
 
         {triggerSync.isError ? (
-          <Text className="text-xs text-destructive">
-            {isSecurityConfigurationError(triggerSync.error)
-              ? securityConfigurationCopy()
-              : triggerSync.error.message}
-          </Text>
+          <Text className="text-xs text-destructive">{triggerSync.error.message}</Text>
         ) : null}
 
         {dismissFailures.failures.map(failure => (
           <SecurityCommandRetryCard
             key={failure.findingId}
-            lastError={failure.lastError}
+            lastError={securityDismissFailureCopy(failure)}
             retryable={failure.retryable === true}
             onRetry={() => {
               router.push(getSecurityAgentPath(scope, `dismiss/${failure.findingId}`));
@@ -399,7 +391,10 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           />
         ))}
 
-        {dashboardStats.isLoading ? (
+        {/* `isPending` rather than `isLoading`: a NetInfo-paused read is pending
+            without fetching, and it must show this skeleton instead of an empty
+            metrics row. */}
+        {dashboardStats.isPending ? (
           <View className="flex-row flex-wrap gap-3">
             <Skeleton className="h-24 w-[47%] rounded-lg" />
             <Skeleton className="h-24 w-[47%] rounded-lg" />

@@ -9,7 +9,9 @@ import { useAgentProfile } from '@/lib/hooks/use-agent-profiles';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
-const transport = vi.hoisted(() => vi.fn<typeof fetch>());
+const transport = vi.hoisted(() =>
+  vi.fn<(input: RequestInfo | URL | string, init?: RequestInit) => Promise<Response>>()
+);
 const connectivity = vi.hoisted(() => ({ value: 'online' as string }));
 
 // vi.mock factories are hoisted above static imports, so they import lazily.

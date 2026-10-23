@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -17,6 +17,7 @@ import {
 } from '@/components/profiles/profile-kilo-commands-model';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Terminal } from '@/components/ui/icons';
@@ -27,6 +28,7 @@ import {
   useAgentProfile,
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_COMMANDS: AgentProfileDetail['kiloCommands'] = [];
@@ -104,7 +106,7 @@ export function ProfileKiloCommandsScreen({
       await deleteKiloCommand.mutateAsync({ profileId, commandId });
     } catch (error) {
       if (!hasUsableMessage(error)) {
-        toast.error(t('profiles.slashCommands.saveFailed'));
+        toast.error(t('profiles.slashCommands.deleteFailed'));
       }
     }
   };
@@ -159,7 +161,7 @@ export function ProfileKiloCommandsScreen({
         description={null}
         placement="top"
         action={
-          <Button onPress={startAdd}>
+          <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
             <Text>{t('profiles.slashCommands.add')}</Text>
           </Button>
         }
@@ -222,7 +224,7 @@ export function ProfileKiloCommandsScreen({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('profiles.slashCommands.title')} />
-      <ScrollView
+      <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-3 px-6 pt-4 pb-8"
         keyboardShouldPersistTaps="handled"
@@ -230,7 +232,7 @@ export function ProfileKiloCommandsScreen({
         showsVerticalScrollIndicator={false}
       >
         {content}
-      </ScrollView>
+      </TabScreenScrollView>
 
       {form !== null ? (
         <KiloCommandFormSheet

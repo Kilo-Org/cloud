@@ -15,7 +15,15 @@ type SecurityAgentSetupProps<T> = {
   title: string;
   description: string;
   buttonLabel: string;
-  url: string;
+  /**
+   * The URL to open. Undefined while the install-state token is still being
+   * minted or after a failed mint: pressing the button then mints again and
+   * only opens once a URL exists, so a transient mint failure never replaces
+   * this screen with an error-only page.
+   */
+  url?: string;
+  /** Resolves the current URL (mints when the screen has none) before opening. */
+  resolveUrl: () => Promise<string | undefined>;
   /** Refreshes permission/config/repository queries after the browser closes. */
   onConnected: () => Promise<T>;
 };
@@ -25,6 +33,7 @@ export function SecurityAgentSetup<T>({
   description,
   buttonLabel,
   url,
+  resolveUrl,
   onConnected,
 }: Readonly<SecurityAgentSetupProps<T>>) {
   const colors = useThemeColors();
@@ -34,7 +43,15 @@ export function SecurityAgentSetup<T>({
   const connect = async () => {
     setConnecting(true);
     try {
-      await openAuthorizationAndWaitForReturn(url);
+      // The screen may mount without a minted URL (failed or still-pending
+      // mint); resolve one now. Opening without a pre-minted token would fail
+      // closed on the web side, so a failed resolution aborts the connect.
+      const openUrl = (await resolveUrl()) ?? url;
+      if (!openUrl) {
+        toast.error(t('securityAgent.scopeEntry.setupFailed'));
+        return;
+      }
+      await openAuthorizationAndWaitForReturn(openUrl);
       await onConnected();
     } catch {
       toast.error(t('securityAgent.setup.couldNotOpenGithub'));

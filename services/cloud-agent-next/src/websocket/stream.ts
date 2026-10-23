@@ -187,10 +187,10 @@ export function createStreamHandler(
         if (!options?.getPreparationSnapshots) return;
         const snapshots = await options.getPreparationSnapshots();
         for (const snapshot of snapshots) {
-          if (!matchesFilters({ ...snapshot, id: 0 as EventId }, filters)) continue;
+          if (!matchesFilters({ ...snapshot, id: 0 }, filters)) continue;
           server.send(
             JSON.stringify({
-              ...formatStreamEvent({ ...snapshot, id: 0 as EventId }, sessionId),
+              ...formatStreamEvent({ ...snapshot, id: 0 }, sessionId),
               eventId: 0,
             })
           );

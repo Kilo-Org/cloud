@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { generateText } from 'ai';
-import { COMPATIBLE_USER_AGENT } from './types';
+import { COMPATIBLE_USER_AGENT, type DirectByokModel } from './types';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   readDb: {},
@@ -36,6 +36,7 @@ jest.mock('./direct-byok-definitions', () => ({
         {
           id: 'supported-model',
           name: 'Supported Model',
+          description: 'Curated provider copy.',
           flags: ['reasoning'],
           context_length: 4096,
           max_completion_tokens: 1024,
@@ -258,5 +259,89 @@ describe('getDirectByokModel', () => {
     expect(organizationModels.map(model => model.id)).toEqual(['orcarouter/other-model']);
     expect(getBYOKforUser).not.toHaveBeenCalled();
     expect(getBYOKforOrganization).not.toHaveBeenCalled();
+  });
+
+  test('carries a provider description into the catalog entry and leaves others empty', async () => {
+    const { getDirectByokModelsForUser } = await loadDirectByokModule();
+    const { getUserByokProviderIds } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    jest.mocked(getUserByokProviderIds).mockResolvedValueOnce(['chutes-byok']);
+
+    const models = await getDirectByokModelsForUser('user-id');
+
+    expect(models.map(model => ({ id: model.id, description: model.description }))).toEqual([
+      { id: 'chutes-byok/supported-model', description: 'Curated provider copy.' },
+      { id: 'chutes-byok/non-reasoning-model', description: '' },
+    ]);
+  });
+});
+
+function deferred<T>() {
+  const { promise, resolve } = Promise.withResolvers<T>();
+  return { promise, resolve };
+}
+
+/** Lets every pending promise continuation run, however many links the chain has. */
+const flushPromiseChain = () => new Promise<void>(resolveFlush => setImmediate(resolveFlush));
+
+describe('direct BYOK preferred indexes', () => {
+  const providerModels = [
+    [recommendedModel('first'), recommendedModel('second')],
+    [recommendedModel('third')],
+  ];
+
+  function recommendedModel(id: string): DirectByokModel {
+    return {
+      id,
+      name: id,
+      flags: ['recommended'],
+      context_length: 1000,
+      max_completion_tokens: 100,
+    };
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('numbers recommended models in declared provider order whatever the settle order', async () => {
+    const { directByokProviders, getDirectByokModelsForUser } = await loadDirectByokModule();
+    const { getUserByokProviderIds } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    const { getPreferredModels } =
+      await import('@kilocode/web-shared/lib/ai-gateway/preferred-models');
+
+    async function listModels(settleOrder: 'declared' | 'reversed') {
+      const pending = directByokProviders.map(() => deferred<ReadonlyArray<DirectByokModel>>());
+      directByokProviders.forEach((provider, index) => {
+        const modelsMock = provider.models as unknown as jest.Mock<
+          () => Promise<ReadonlyArray<DirectByokModel>>
+        >;
+        modelsMock.mockImplementationOnce(() => pending[index].promise);
+      });
+      jest.mocked(getUserByokProviderIds).mockResolvedValueOnce(['orcarouter', 'chutes-byok']);
+      jest.mocked(getPreferredModels).mockResolvedValueOnce(['gateway/one', 'gateway/two']);
+
+      const listing = getDirectByokModelsForUser('user-id');
+      await flushPromiseChain();
+      const resolutionOrder = settleOrder === 'declared' ? [0, 1] : [1, 0];
+      for (const index of resolutionOrder) {
+        pending[index].resolve(providerModels[index]);
+        await flushPromiseChain();
+      }
+
+      return (await listing).map(model => ({
+        id: model.id,
+        preferredIndex: model.preferredIndex,
+      }));
+    }
+
+    const declaredSettleOrder = await listModels('declared');
+    const reversedSettleOrder = await listModels('reversed');
+
+    expect(reversedSettleOrder).toEqual(declaredSettleOrder);
+    expect(declaredSettleOrder).toEqual([
+      { id: 'chutes-byok/first', preferredIndex: 2 },
+      { id: 'chutes-byok/second', preferredIndex: 3 },
+      { id: 'orcarouter/third', preferredIndex: 4 },
+    ]);
   });
 });

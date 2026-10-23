@@ -3,6 +3,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useState } from 'react';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { ChevronDown, Eye, EyeOff } from '@/components/ui/icons';
 import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
@@ -37,7 +38,8 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
   const router = useRouter();
-  const { width, fontScale } = useWindowDimensions();
+  const { width } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
   const [availableWidth, setAvailableWidth] = useState<number | null>(null);
   // Reserve room for the amount, visibility toggle and purchase action in
   // scaled text units, using the card's width rather than the display's.
@@ -82,17 +84,30 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     ...balanceOptions,
     enabled: enabled && hasUserId,
     placeholderData: keepPreviousData,
+    // The card must stop waiting while the online manager reports offline: a
+    // paused read is pending without fetching, so the skeleton below had no
+    // exit. This one either answers or fails once the control-plane deadline
+    // lands, and `balanceFailed` then offers the retry.
+    networkMode: 'always',
+    // `networkMode: 'always'` also disables the derived reconnect refetch
+    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
+    // 'always'` when it is undefined), so ask for it explicitly.
+    refetchOnReconnect: true,
   });
 
   const { data: personalCreditData, isLoading: personalCreditsLoading } = useQuery({
     ...personalCreditOptions,
     enabled: enabled && hasUserId && !selectedOrgId,
+    networkMode: 'always',
+    refetchOnReconnect: true,
   });
 
   const { data: orgCreditData, isLoading: orgCreditsLoading } = useQuery({
     ...orgCreditOptions,
     enabled: enabled && hasUserId && Boolean(selectedOrgId),
     placeholderData: keepPreviousData,
+    networkMode: 'always',
+    refetchOnReconnect: true,
   });
 
   // A failed getMe (no userId) can never render a trusted balance, so it shares
@@ -103,16 +118,22 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const creditsLoading = selectedOrgId ? orgCreditsLoading : personalCreditsLoading;
 
   const balanceDollars = balance?.balance ?? 0;
-  // A paused query (offline/unknown connectivity, empty cache) is pending but
-  // not fetching, so `balanceLoading` (isLoading) is false while `balance`
-  // is still undefined. Treat "no data yet" as loading so the card shows a
-  // skeleton instead of `$0` on a cold launch before NetInfo settles.
+  // A read that has not answered yet is pending without fetching while the
+  // owner is still unresolved (the balance query is gated on the identity), so
+  // `balanceLoading` (isLoading) is false while `balance` is still undefined.
+  // Treat "no data yet" as loading so the card shows a skeleton instead of `$0`
+  // on a cold launch. The read itself settles regardless of the online manager,
+  // and an unreachable one lands on `balanceFailed` instead of this branch.
   const balancePending = balance === undefined && !balanceFailed;
   const showBalanceSkeleton =
     (balanceLoading || balancePending || !hideBalanceLoaded) && !balanceFailed;
   const now = Date.now();
+  // Read the block list defensively: the persisted query cache can restore an
+  // entry written before this field existed, and that payload must leave the
+  // expiring row empty rather than throw out of the Profile render.
   const expiringBlocks =
-    creditData?.creditBlocks.filter(
+    // eslint-disable-next-line typescript/no-unnecessary-condition -- the static type cannot see a restored cache entry from an older payload
+    creditData?.creditBlocks?.filter(
       b => b.expiry_date !== null && parseTimestamp(b.expiry_date).getTime() > now
     ) ?? [];
   const expiringTotal = fromMicrodollars(

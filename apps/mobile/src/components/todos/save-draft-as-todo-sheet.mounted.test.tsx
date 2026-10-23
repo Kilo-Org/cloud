@@ -169,7 +169,9 @@ describe('SaveDraftAsTodoSheet', () => {
     act(() => {
       create?.onPress?.();
     });
-    expect(push).toHaveBeenCalledWith('/(app)/todos/list-settings?organizationId=org-1');
+    expect(push).toHaveBeenCalledWith(
+      '/(app)/todos/list-settings?organizationId=org-1&afterCreate=back'
+    );
     // The create route is a formSheet and the native sheet stacks above a
     // formSheet route, so the sheet drops while the form is open.
     expect(sheetVisible(mounted)).toBe(false);

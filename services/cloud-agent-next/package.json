@@ -74,7 +74,7 @@
     "@vitest/ui": "catalog:",
     "drizzle-kit": "catalog:",
     "jscpd": "5.0.16",
-    "tsx": "^4.21.0",
+    "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "wrangler": "catalog:",

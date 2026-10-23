@@ -7,6 +7,7 @@ import {
   WifiOff,
 } from '@/components/ui/icons';
 import { type TFunction } from 'i18next';
+import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type ScrollViewProps } from 'react-native';
 
@@ -14,6 +15,7 @@ import { EmptyState } from '@/components/empty-state';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 
 export type QueryErrorVariant = 'neutral' | 'offline' | 'permission' | 'not-found' | 'server';
 
@@ -57,6 +59,11 @@ type QueryErrorProps = {
    */
   retryLabel?: string;
   isRetrying?: boolean;
+  /**
+   * Replaces the built-in retry button entirely. A caller that composes its
+   * own recovery row (multiple actions) uses this and leaves `onRetry` unset.
+   */
+  action?: ReactNode;
   className?: string;
   placement?: 'center' | 'top' | 'static';
   refreshControl?: ScrollViewProps['refreshControl'];
@@ -72,6 +79,7 @@ export function QueryError({
   onRetry,
   retryLabel,
   isRetrying = false,
+  action,
   className,
   placement = 'center',
   refreshControl,
@@ -97,8 +105,10 @@ export function QueryError({
       iconStrokeWidth={2}
       titleAccessibilityRole="header"
       action={
-        onRetry && (
+        action ??
+        (onRetry && (
           <Button
+            className={STATE_ACTION_CLASS}
             variant="outline"
             onPress={onRetry}
             loading={isRetrying}
@@ -106,7 +116,7 @@ export function QueryError({
           >
             <Text>{retryText}</Text>
           </Button>
-        )
+        ))
       }
     />
   );

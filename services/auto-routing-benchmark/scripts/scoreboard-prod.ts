@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
-import { parseConfigFileTextToJson } from 'typescript';
+import { parse as parseJsonc, type ParseError } from 'jsonc-parser';
 import {
   DECISION_LOG_SAMPLE_RATE_CONFIG_KEY,
   DEFAULT_DECISION_LOG_SAMPLE_RATE,
@@ -86,13 +86,16 @@ function count(rows: Record<string, unknown>[]): number {
 async function decisionLogSampleRate(): Promise<number> {
   try {
     const configUrl = new URL('../../auto-routing/wrangler.jsonc', import.meta.url);
-    const parsed = parseConfigFileTextToJson('wrangler.jsonc', await readFile(configUrl, 'utf8'));
-    if (parsed.error) throw new CollectionError('invalid auto-routing Wrangler config');
+    const errors: ParseError[] = [];
+    const parsed: unknown = parseJsonc(await readFile(configUrl, 'utf8'), errors, {
+      allowTrailingComma: true,
+    });
+    if (errors.length > 0) throw new CollectionError('invalid auto-routing Wrangler config');
     const config = z
       .object({
         kv_namespaces: z.array(z.object({ binding: z.string(), id: z.string() })),
       })
-      .parse(parsed.config);
+      .parse(parsed);
     const namespace = config.kv_namespaces.find(item => item.binding === 'AUTO_ROUTING_CONFIG');
     if (!namespace) throw new CollectionError('missing AUTO_ROUTING_CONFIG namespace');
     const raw = await new Promise<string>((resolve, reject) => {

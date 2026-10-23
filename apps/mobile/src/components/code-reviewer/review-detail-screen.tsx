@@ -15,6 +15,8 @@ import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { statusMeta } from '@/components/code-reviewer/review-list-screen';
 import {
   flattenCouncilFindings,
+  reviewCancellationLabel,
+  reviewFailureLabel,
   selectRetryAction,
 } from '@/components/code-reviewer/review-detail-helpers';
 import { ReviewSpectatorSheet } from '@/components/code-reviewer/review-spectator-sheet';
@@ -150,6 +152,21 @@ export function ReviewDetailScreen({
   const gateThreshold = (
     review.manual_config as { agentConfig?: { gate_threshold?: string } } | null
   )?.agentConfig?.gate_threshold;
+  // A cancelled or interrupted row explains its outcome in the reader's own
+  // words; only a failure or an unmapped diagnostic keeps the raw message.
+  const cancellationLabel = reviewCancellationLabel(t, {
+    status: review.status,
+    errorMessage: review.error_message,
+    terminalReason: review.terminal_reason,
+    platformLabel: reviewerPlatformLabel(review.platform),
+  });
+  // The single message the conclusion block renders: the cancellation sentence,
+  // the failure copy, or a diagnostic we have no copy for.
+  const reviewMessage =
+    cancellationLabel ??
+    (review.status === 'failed'
+      ? reviewFailureLabel(t, review.error_message, review.terminal_reason)
+      : review.error_message);
 
   return (
     <View className="flex-1 bg-background">
@@ -180,18 +197,22 @@ export function ReviewDetailScreen({
           </Text>
         </Animated.View>
 
-        {/* Conclusion: the outcome leads — status first, then the failure reason. */}
+        {/* Conclusion: the outcome leads — status first, then the reason. */}
         <View className="gap-2">
           <Text className={cn('text-sm font-semibold', meta.className)}>{meta.label}</Text>
-          {review.error_message ? (
-            <View className="rounded-lg bg-danger-tile-bg p-3">
-              {/* Upstream failures can persist a serialized stack dump here;
-                  unclamped it filled the screen and pushed the retry action
-                  below the fold (e1-review-status.png). Bound the block so
-                  the conclusion keeps a fixed footprint and the actions stay
-                  reachable. */}
-              <Text className="text-xs text-destructive" numberOfLines={4}>
-                {review.error_message}
+          {reviewMessage ? (
+            <View
+              className={cn(
+                'rounded-lg p-3',
+                cancellationLabel ? 'bg-secondary' : 'bg-danger-tile-bg'
+              )}
+            >
+              <Text
+                variant={cancellationLabel ? 'muted' : undefined}
+                className={cn('text-xs', !cancellationLabel && 'text-destructive')}
+                numberOfLines={4}
+              >
+                {reviewMessage}
               </Text>
             </View>
           ) : null}
@@ -202,7 +223,11 @@ export function ReviewDetailScreen({
           <Text className="text-sm font-medium">{t('common.findings')}</Text>
           {visibleFindings.length === 0 ? (
             <Text variant="muted" className="text-xs">
-              {t('codeReviewer.reviewDetail.noFindings')}
+              {t(
+                review.status === 'failed'
+                  ? 'codeReviewer.reviewDetail.findingsUnavailable'
+                  : 'codeReviewer.reviewDetail.noFindings'
+              )}
             </Text>
           ) : (
             <View className="gap-2">
@@ -253,7 +278,7 @@ export function ReviewDetailScreen({
             ) : null}
             {review.completed_at ? (
               <MetaRow
-                label={t('codeReviewer.status.completed')}
+                label={t('common.completed')}
                 value={timeAgo(parseTimestamp(review.completed_at))}
               />
             ) : null}
@@ -280,10 +305,12 @@ export function ReviewDetailScreen({
           <Button
             variant="secondary"
             onPress={() => {
-              const destination = resolveCodeReviewerOpenPrDestination(review.pr_url);
-              if (destination.kind === 'in-app') {
-                router.push(destination.href);
-                return;
+              if (isPersonal(scope)) {
+                const destination = resolveCodeReviewerOpenPrDestination(review.pr_url);
+                if (destination.kind === 'in-app') {
+                  router.push(destination.href);
+                  return;
+                }
               }
               void openExternalUrl(review.pr_url, {
                 label: t('common.pullRequest'),
@@ -345,9 +372,7 @@ export function ReviewDetailScreen({
               <Button
                 variant="secondary"
                 onPress={() => {
-                  router.push(
-                    `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/${review.platform}` as Href
-                  );
+                  router.push(`/(app)/code-reviewer/${scope}/${review.platform}` as Href);
                 }}
               >
                 <Text>{t('codeReviewer.reviewDetail.fixSettings')}</Text>

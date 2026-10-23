@@ -35,6 +35,21 @@ type SheetProps = {
    * so the sheet's edge never shows the card behind it.
    */
   background?: string;
+  /**
+   * Whether a downward drag on the sheet dismisses it (and, on iOS, a backdrop
+   * tap). Defaults to true. A sheet whose content scrolls passes false: the
+   * native sheet claims every downward drag that starts over a React Native
+   * scroll view on iOS, so dragging the content back up would dismiss the sheet
+   * and drop its values.
+   */
+  dismissGestures?: boolean;
+  /**
+   * Asked before a dismissal the sheet received by itself — Android Back or a
+   * backdrop tap. Return false to keep the sheet open, which is how a form asks
+   * its own "Keep editing / Discard" question first. iOS backdrop taps cannot
+   * be separated from the drag, so `dismissGestures` governs those.
+   */
+  onRequestDismiss?: () => boolean;
   children: ReactNode;
 };
 
@@ -44,8 +59,10 @@ type SheetProps = {
  * native sheet — unlike a JS sheet or a `@rn-primitives/portal` overlay, which
  * render inside the app's React tree and disappear behind it.
  *
- * Android Back, a swipe down and a backdrop tap all dismiss. The native sheet
- * cannot separate those three, and every caller here dismisses on all of them.
+ * A content-sized sheet dismisses on a swipe down, a backdrop tap and Android
+ * Back. A sheet whose content scrolls turns the swipe (and the iOS backdrop
+ * tap) off with `dismissGestures={false}`, keeps Android Back, and answers it
+ * through `onRequestDismiss`.
  */
 export function Sheet({
   visible,
@@ -54,6 +71,8 @@ export function Sheet({
   snapPoints,
   showHandle = true,
   background,
+  dismissGestures = true,
+  onRequestDismiss,
   children,
 }: Readonly<SheetProps>) {
   const colors = useThemeColors();
@@ -101,6 +120,8 @@ export function Sheet({
       backgroundStyle={{ backgroundColor: background ?? colors.card }}
       handleComponent={showHandle ? undefined : null}
       enablePanDownToClose
+      dismissGestures={dismissGestures}
+      onRequestDismiss={onRequestDismiss}
       onClose={() => {
         // A dismissal the caller already reopened past must not close the sheet
         // again through the caller's own handler. A self-dismissal (backdrop,

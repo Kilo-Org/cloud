@@ -64,11 +64,6 @@ export async function assembleCustomRoutingTable(
     fetchImpl?: typeof fetch;
   } = {}
 ): Promise<CustomRoutingTableResponse> {
-  if (config.router === 'frontier') {
-    throw new ProfileValidationError(
-      'Custom model pools are only supported by the efficient router'
-    );
-  }
   assertUniqueEntries(entries);
   const current = currentProfileContextFromConfig(config);
   const readyRows = await listReadyCurrentProfilesForEntries(db, current, entries);

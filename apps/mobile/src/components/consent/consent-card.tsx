@@ -4,7 +4,7 @@ import { LineChart, MessageSquare, Shield, Smartphone, User } from '@/components
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, Pressable, ScrollView, Switch, View } from 'react-native';
+import { Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConsentRow } from '@/components/consent/consent-row';
@@ -12,6 +12,7 @@ import { type ConsentMode, getConsentActions } from '@/components/consent/consen
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -230,7 +231,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           </View>
 
           <Text className="mt-6 text-2xl font-bold text-foreground">
-            {t('consent.beforeWeGetStarted')}
+            {mode === 'review' ? t('consent.summaryTitle') : t('consent.beforeWeGetStarted')}
           </Text>
           <Text className="mt-3 text-base text-muted-foreground">
             {t('consent.introDescription')}
@@ -259,7 +260,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           </View>
 
           <Text className="mt-6 text-sm font-semibold text-foreground">
-            {t('consent.optional')}
+            {mode === 'review' ? t('consent.optionalReview') : t('consent.optionalOnboarding')}
           </Text>
 
           <View className="mt-3 flex-row items-start gap-3 rounded-lg border border-border p-4">
@@ -297,6 +298,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
               );
             }}
             hitSlop={8}
+            accessibilityRole="button"
             accessibilityLabel={t('consent.seeFullDetails')}
             className="mt-6 flex-row items-center gap-1 active:opacity-70"
           >
@@ -326,6 +328,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           <Text
             className="text-xs text-primary underline"
             maxFontSizeMultiplier={CONSENT_DISCLOSURE_MAX_FONT_SCALE}
+            accessibilityRole="link"
             onPress={handleOpenPrivacy}
           >
             {t('consent.privacyPolicy')}

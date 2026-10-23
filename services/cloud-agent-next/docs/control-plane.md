@@ -2,8 +2,8 @@
 
 This is the single design and acceptance spec for the `workspace_*` control plane: the Session DO
 (`SandboxSession`), the Sandbox DO (`SandboxControl`), the in-container supervisor and the control
-wrapper. Product rules stay in `.specs/cloud-agent-session.md`. The legacy `agent_*` plane
-(`CloudAgentSession`, legacy wrapper `wrapper/src/main.ts`) is out of scope.
+wrapper. Product rules stay in `.specs/cloud-agent-session.md`. The retired `agent_*` plane is
+out of scope; old session IDs are rejected.
 
 ## 1. Principles
 
@@ -32,9 +32,10 @@ wrapper. Product rules stay in `.specs/cloud-agent-session.md`. The legacy `agen
 
 | Component | Owns | Does not own |
 |---|---|---|
-| Worker | Authentication, organization and worktree access, billing eligibility on send, tRPC, `/stream` and terminal WebSocket upgrade, preview on/off (`PREVIEW_HOST_SUFFIX`) and UI gate (`PREVIEW_ENABLED_IDS`), `/preview/open` hop, preview hostname dispatch, entry-ticket validation, session-token cookie, entry 303, per-request access checks, and preview request/response header sanitisation (`src/shared/preview-headers.ts`) | Message, route or sandbox state |
+| Worker | Authentication, organization and worktree access, billing eligibility on send, tRPC, `/stream` and terminal WebSocket upgrade, preview on/off (`PREVIEW_HOST_SUFFIX`) and UI gate (`PREVIEW_ENABLED_IDS`), `/preview/open` hop, preview hostname dispatch, entry-ticket validation, session-token cookie, entry 303, per-request access checks, and preview request/response header sanitisation (`src/shared/preview-headers.ts`), runtime artifact downloads by grant, startup-failure report admission | Message, route or sandbox state |
 | Session DO, one per session | Message queue and message states, route view, event log and client stream, question/permission projection, per-message reports and batch callback, current runtime authorization and delegated Kilo token renewal, preview eligibility and sandbox lookup | Sandbox lifecycle, preparation steps, Kilo health, turn outcome |
-| Sandbox DO, one per `sandboxId` | Allocation lifecycle through the provider adapter, wrapper socket, per-session routes, forwarding in both directions, activity, idle stop and provider lease, billing admission and attribution, wrapper and session credentials, preview target coordinates | Message states, Kilo health, turn outcome, workspace steps, physical billing intervals (container lifecycle owns them) |
+| Sandbox DO, one per `sandboxId` | Allocation lifecycle through the provider adapter, startup mode and startup command, wrapper socket, per-session routes, forwarding in both directions, activity, idle stop and provider lease, billing admission and attribution, wrapper and session credentials, preview target coordinates | Message states, Kilo health, turn outcome, workspace steps, physical billing intervals (container lifecycle owns them) |
+| Bootstrap, inside the container, `downloaded` mode only | Verify and install the selected runtime, exec the supervisor, report one startup failure | Allocation decisions, retries |
 | Supervisor, inside the container | Restart a crashed wrapper, bounded | Anything else |
 | Wrapper, one per sandbox | Connection to the Sandbox DO, route preparation (clone, checkout, setup commands, Kilo runtime, Kilo session), Kilo supervision and restart, prompt submission, event streaming, turn outcome, finalization (auto-commit, condense), activity heartbeat, terminals, worktree changes | Sandbox lifecycle, message states |
 | Kilo | Agent execution, provider retries, native history published to session-ingest | Infrastructure |
@@ -189,12 +190,76 @@ public stream has no reconnecting status today, so `reconnecting` changes no cli
 
 ## 6. Sandbox DO
 
+### Startup modes
+
+The Sandbox DO selects the first process of a sandbox. The provider runs it and does not interpret it.
+The mode says where the runtime (Kilo and the supervisor) comes from: the image or a download.
+
+- **Contract.** `launch(ref, { command, env }, options)` takes the command as an argv; a script is
+  `['/bin/sh', '-c', script]`. Native uses it as the start entrypoint, and as the exec on a
+  `sleep infinity` main process. Vercel runs it without a login shell. The Sandbox SDK runs it
+  with `startProcess`. A provider never chooses a Kilo version, reads a release descriptor or owns
+  a deadline other than `deadlineAt`.
+- **`preinstalled`.** `preinstalled-startup.ts` supplies `['/bin/sh', CONTROL_SUPERVISOR_PATH]`.
+  The image holds Kilo and the supervisor. There is no download and no grant.
+- **`downloaded`.** `downloaded-startup.ts` reads the release descriptor, confirms both payload
+  objects, mints an artifact grant and renders the bootstrap (`runtime-bootstrap.ts`). The bootstrap
+  installs the CLI and control payloads under `/opt/kilo-cloud`, points the stable paths at them,
+  removes the grant and execs the same supervisor argv. The native PID 1 check, the `pgrep` probe
+  and the SDK process scan stay unchanged.
+- **Selection.** `startup-selection.ts` reads the mode and the native image from Worker
+  configuration once per create attempt. Absent configuration means `preinstalled`. Mode and image
+  are independent, but the runtime-free image requires `downloaded`. `downloaded` is native only:
+  SDK and Vercel pins on a downloaded target use `preinstalled`. Any other pair, a native
+  `downloaded` pin without a descriptor, or a missing descriptor or payload object fails
+  `invalid_configuration` before provider work. An R2 read error is a transient create error.
+- **State.** The repository-launch record stores the allocation's mode, and both record writers
+  keep it. There is no other new
+  allocation state. Install time is inside the wrapper first-connect timer. Success is the wrapper
+  `hello`; failure is one bootstrap report. Neither adds a provider poll.
+- **Grant.** It names only the two selected payload hashes and the artifact audience. It expires at
+  `createDeadlineAt` plus the first-connect timer, because the install can continue in `starting`. It
+  is never persisted or logged, and never reaches the supervisor or Kilo env or arguments.
+- **URLs.** Artifact and report URLs come from `WORKER_URL`. The native egress allowlist already
+  holds that host, so restricted egress needs no new rule. There is no separate artifact origin.
+
+**Startup failure report.** The bootstrap sends `{ allocationId, code }` with the wrapper launch
+credential. Admission is the same as `hello`: the Worker checks the signed launch binding before DO
+lookup, then the Sandbox DO checks the credential hash and the current allocation. The DO applies
+`startup-failed` only in `creating` or `starting`. The first accepted report leaves those states,
+so a later report changes nothing.
+
+| Code (exit) | Kind |
+|---|---|
+| `artifact_unavailable` (70), `base_incompatible` (72), `install_interrupted` (74), `deadline_exceeded` (75) | Retryable |
+| `artifact_unauthorized` (71), `artifact_invalid` (73), `cli_probe_failed` (76), `supervisor_missing` (77) | Permanent |
+
+- A permanent code fails the preparing routes at once with `runtime_<code>`. A retryable code keeps
+  them `preparing` for a new allocation within the route deadline, like a transient create error.
+- After a repository start the wrapper never connected, so the existing first-start rule starts
+  the next allocation from the image. `runCreate` never overlaps, so `recordLaunch` writes the
+  source before the next start reads it, also for a report in `creating`. `base_incompatible` on a
+  fresh image is a configuration error that the deploy blocks; if it happens, routes fail at the
+  deadline with `preparation_timeout`.
+- The report itself is not a snapshot failure and does not count against the snapshot failure
+  budget. A bootstrap that exits before the first PID 1 check of a repository start is still one
+  under the baseline rule when the provider failure wins: the in-attempt image fallback runs once,
+  and its credential rotation rejects the first launch's report. When the report wins, the
+  allocation leaves `creating` and the fallback does not run.
+- If the report cannot reach the Worker, the first-connect timer applies.
+- A retryable report can stop an allocation while its launch is still pending. Preparing work
+  keeps an alarm at the existing create-retry interval. After instance loss, that alarm resumes
+  allocation with the same route attempt and deadline. It makes no provider call while the
+  original launch remains in flight. A lost launch result keeps the baseline unresolved-source
+  behavior; the report does not create source evidence.
+
 ### Allocation state
 
 | State | Leaves to | On | Timer |
 |---|---|---|---|
-| `stopped` | `creating` | `prepare` for a session | — |
-| `creating` | `starting` | Provider created the sandbox and launched the supervisor | Provider call 2 min |
+| `stopped` | `creating` | `prepare` for a session or pending retry work after reconstruction | Existing route retry interval when work remains |
+| `creating` | `starting` | Provider created the sandbox and launched the startup command | Provider call 2 min |
+| `creating` or `starting` | `stopping` | Accepted `startup-failed` report: a permanent code fails preparing routes at once; a retryable code keeps them `preparing` | Existing ladder |
 | `creating` | `creating` or `stopped` | Transient create error: retry after a 10 s pause while a route deadline remains, else stop | — |
 | `creating` | `stopping` or `stopped` | Classified permanent create/launch error: fail preparing routes immediately; an owned physical ref uses the existing stop ladder | Existing ladder when a ref exists |
 | `starting` | `connected` | Wrapper `hello` accepted | 5 min without `hello` → `stopping` |
@@ -309,10 +374,16 @@ The wrapper heartbeat (every 5 s) carries `active`. Each Kilo process owns a nat
 session supervisor that observes every session before Cloud route filtering, including
 unrouted sessions, subagents and autonomous continuations. Its running or stopping
 executions keep compute active independently of accepted Cloud messages and UI selection.
-Preparation, bounded prompt delivery, finalization and recent terminal input also contribute.
+Preparation, bounded prompt delivery and finalization also contribute.
 The 2-minute delivery budget excludes legitimate serialized command/summarization waits
 described below. A follow-up waiting behind a serialized command adds no compute activity of
 its own; the command's live native execution decides it. An accepted UI turn alone is not activity.
+
+Terminal presence and browser-to-PTY input do not contribute activity or renew the provider
+lease. Recent terminal input is tracked for diagnostics only. An interactive terminal without
+an agent turn lets the sandbox stop after the applicable idle window, even if terminal input
+continues. This is the intended trade-off, not a regression: terminal-only workloads must not
+keep a sandbox alive indefinitely.
 
 A session blocked only on questions or permissions does not need compute. Pending requests
 are tracked separately; answering one does not clear another, and an independent runnable
@@ -327,8 +398,10 @@ without a cache.
 The 1-minute rule is checked only on an inactive heartbeat, never on a disconnect or
 reconnect. The existing allocation idle backstop (10 min), heartbeat deadline (45 s),
 reconnect window (90 s), and provider lease (11 min) are unchanged. Active heartbeats
-renew that provider lease (`ensureLeaseAtLeast`); inactive heartbeats still prove wrapper
-liveness. A reconnect does not manufacture activity or extend the existing idle clock.
+refresh `lastActivityAt` and renew that provider lease (`ensureLeaseAtLeast`). Accepted `hello`
+and heartbeat frames still update `lastFrameAt` for liveness; inactive heartbeats do not refresh
+activity or renew the lease. A reconnect also updates liveness only: it does not reset `lastActivityAt`,
+extend the existing idle window or renew the provider lease.
 Native supervision does not schedule future wakeups after compute has stopped.
 
 ### Billing, credentials and deletion
@@ -406,7 +479,9 @@ path `/workspace/app`. A snapshot holds one repository at one path, so any other
   repository gets its own key. It stores the digest on the route (`repo_key`) and keeps it across
   attempts. No key is computed, and no snapshot used, when the owner is not enrolled
   (`CONTAINER_REPO_SNAPSHOT_IDS`), the route has no repository, the provider cannot capture, or the
-  secret is missing. Scope is per user; per org is a change to that one field.
+  secret is missing. Scope is per user; per org is a change to that one field. The Sandbox DO
+  adds the allocation's startup mode to the key for `launch` and capture, so a snapshot captured
+  in one mode is never restored in the other.
 - **Start.** `launch` receives the key of the routes waiting for the allocation: exactly one key,
   else none. `SandboxContainers` appends the image, and starts from the
   repository snapshot in the `REPO_SNAPSHOTS` KV index when it has one for that digest, else from
@@ -414,8 +489,8 @@ path `/workspace/app`. A snapshot holds one repository at one path, so any other
    and asks the Sandbox DO to clean up the failed container and launch the image for the same
    allocation. Cleanup and fallback only run while that allocation is still creating; a wrapper
    that already connected is never destroyed by fallback. Before cleanup, the Sandbox DO rotates
-   the launch credential so a late wrapper from the failed snapshot cannot connect. The snapshot attempt uses half the
-   remaining launch budget, reserving time for cleanup and the image within the original deadline.
+   the launch credential so a late wrapper from the failed snapshot cannot connect. The snapshot attempt, cleanup and image fallback share the original
+   launch deadline. No separate half-budget reservation exists.
    Each later sandbox start retries the snapshot once, up to ten failed starts per snapshot ID
    in that sandbox's durable record. After that it uses the image; a replacement snapshot gets
    its own failure budget. Failure never deletes or changes the shared snapshot index.
@@ -441,7 +516,10 @@ path `/workspace/app`. A snapshot holds one repository at one path, so any other
 - **No session snapshots.** A stop destroys the container without a snapshot. A restarted session
   uses the repository snapshot, then restores its Kilo history from session-ingest.
 - **Image tie.** A deploy that changes the image changes the index key, so the next start per key is
-  cold. The platform keeps an unused snapshot for 30 days; there is no list or delete API.
+  cold. The platform keeps an unused snapshot for 30 days; there is no list or delete API. The
+  runtime-free image changes only when its own inputs change, so a runtime-only deploy keeps
+  `downloaded` snapshots. A restored `downloaded` sandbox runs the bootstrap first; the captured
+  runtime never starts.
 
 ## 7. Wrapper
 
@@ -745,18 +823,20 @@ protections.
 
 ### Supervisor
 
-The provider launch command starts a small supervisor loop that runs the wrapper. After a non-zero
+The startup command starts a small supervisor loop that runs the wrapper. After a non-zero
 exit it restarts the wrapper with 1 s to 30 s backoff, at most 5 times in 10 minutes. Exit code 0
 ends the loop; that is the wrapper's terminal `shutdown` path, while a SIGTERM sent to the wrapper
 alone is non-zero and restarts. If the loop gives up, the Sandbox DO `starting` or `disconnected`
 timer stops the sandbox.
 
-The provider launch command is not the only starter. On the native Cloudflare Containers runtime the
-container main process is the supervisor: `start()` is issued with `['/bin/sh', supervisor-path]` as
-its entrypoint, and PID 1 identity (`/proc/1/cmdline`) is the issuance confirmation, bounded by the
-wrapper readiness deadline. PID 1 identity is not wrapper readiness: the wrapper socket and the
-Sandbox DO `starting` timer stay the readiness owner, and no provider poll or wrapper-child probe is
-added for that path. Sandbox SDK and Vercel still exec the supervisor against a living PID 1.
+On the native Cloudflare Containers runtime the container main process is the startup command:
+`start()` is issued with it as the entrypoint. In `preinstalled` mode that is
+`['/bin/sh', supervisor-path]`. In `downloaded` mode it is the bootstrap, which execs the same argv
+after install. PID 1 identity (`/proc/1/cmdline`) is the issuance confirmation when it is either
+argv, bounded by the wrapper readiness deadline. PID 1 identity is not wrapper readiness: the
+wrapper socket and the Sandbox DO `starting` timer stay the readiness owner, and no provider poll or
+wrapper-child probe is added for that path. Sandbox SDK and Vercel run the preinstalled startup
+command against a living PID 1; downloaded startup is native-only.
 
 A native attempt that already issued the main process does not start another supervisor when that
 process is gone; the persisted `exec_pending` fence is not reset, and the next allocation may start a
@@ -779,7 +859,7 @@ them through one development-only override.
 | Session DO | Queued transport recovery | 15 s after exhaustion; development-only scaling | Consume once; passive status then bounded prepare/deliver, no self-rearm |
 | Sandbox DO | Provider create call | 2 min | Retry after the pause below while a route deadline remains |
 | Sandbox DO | Provider create retry pause | 10 s after a transient failed create | Create again within the unchanged route attempt; classified permanent errors fail promptly |
-| Sandbox DO | Wrapper first connect | 5 min from launch | Stop the sandbox |
+| Sandbox DO | Wrapper first connect | 5 min from launch; includes the `downloaded` install | Stop the sandbox |
 | Sandbox DO | Unbound wrapper hello | 30 s from socket admission, not scaled | Close candidate only; attachment deadline survives hibernation and participates in the existing alarm even while stopped |
 | Sandbox DO | Heartbeat | 45 s | Treat the socket as lost |
 | Sandbox DO | Reconnect | 90 s from the last frame received | Stop the sandbox |
@@ -788,6 +868,8 @@ them through one development-only override.
 | Sandbox DO | Idle | 10 min without activity | Stop the sandbox |
 | Sandbox DO | Provider lease | Existing lease length, renewed while active | Provider may stop an inactive sandbox |
 | Sandbox DO | Credential grant | 4 h; re-issued on `deliver` below 1 h | — |
+| Sandbox DO | Artifact grant | `createDeadlineAt` plus first connect | Downloads are rejected |
+| Bootstrap | Install | Until the first-connect deadline, rendered by the Worker | Report `deadline_exceeded` and exit |
 | Sandbox DO | Provider stop | Existing ladder | Log unconfirmed stop; routing state `stopped` |
 | Sandbox DO | Repository capture call | 5 min 5 s (container DO: 5 min) | Answer `ok: false`; preparation continues |
 | Wrapper | Preparation steps | Section 7 | Route `failed` with the step reason |
@@ -811,6 +893,10 @@ them through one development-only override.
 | Actual compute credit denial | Provider adapter / existing Vercel billing admission | New message after adding credits | Queued fail promptly (`billing_blocked`) |
 | Proven invalid/unsupported provider configuration | Provider adapter | New message after correcting configuration | Queued fail promptly (`invalid_configuration`) |
 | Wrapper never connects | Sandbox DO, 5 min | Stop; new allocation within the route deadline | Queued fail at the deadline |
+| Startup configuration, release descriptor or payload missing | `startup-selection.ts`, `downloaded-startup.ts` | New message after the configuration is corrected | Queued fail promptly (`invalid_configuration`) |
+| Runtime install fails permanently | Bootstrap report | None until the next message | Queued fail promptly (`runtime_<code>`) |
+| Runtime install fails transiently, or the base is incompatible | Bootstrap report | Stop; new allocation within the route deadline, from the image after a restore | Queued fail at the deadline |
+| Startup report lost | Sandbox DO, 5 min | Same as "Wrapper never connects" | Queued fail at the deadline |
 | Clone network error | Wrapper | 3 attempts | Queued fail (`workspace_setup_failed`) |
 | Repository snapshot cannot be used (start, adopt) | Container DO, wrapper | Start from the image, or clone | None; a cold start |
 | Repository capture fails or times out | Sandbox DO, wrapper | Continue without a snapshot | None |
@@ -848,13 +934,48 @@ Sandbox DO → Session DO (RPC notifications): `onRoute(update)` where the updat
 Other callers of the Sandbox DO keep their current RPC: contained outbound credential lookup
 (`resolveCredential`), runtime credential proxy, worktree deletion, sandbox status.
 
+Bootstrap → Worker (HTTPS on the `WORKER_URL` host, `downloaded` mode only): `GET` one payload with
+the artifact grant, and `POST` one startup-failure report with the wrapper launch credential. The
+Worker forwards an admitted report to the Sandbox DO as `startup-failed`.
+
+### Startup mode rollout
+
+- A deploy does not replace a running native container, so an existing allocation keeps its mode.
+- CI publishes runtime payloads create-only by content hash, and the descriptor last. The deploy
+  reads an immutable handoff for the exact commit, and verifies the base image digest and both
+  payloads before it deploys a `downloaded` target.
+- Roll out on an isolated target first: `downloaded` on the all-in-one image, then `downloaded` on
+  the runtime-free image, then production. Roll back the first step by mode and the second by image.
+- The runtime-free image change relies on B1 (#7914), which is already merged: a running container
+  captures under the image that it started with, including after DO reconstruction.
+- `runtime-targets.json` owns mode and image. Deployment renders Worker vars and the native image
+  from it. Real-provider qualification remains an explicit approval gate; see `runtime-rollout.md`.
+
 ### Runtime credential proxy
 
 Modern runtime authorization uses the existing Worker facade for model, backend and native
 ingest/export requests on every supported provider. Each outbound request resolves the current
 Session-owned token through its renewing authorization path. No modern backing token reaches the
-wrapper, and no capability or direct-token fallback can redeem the registration snapshot. Legacy
-non-policy-bearing tokens retain their existing credential paths and access limits.
+wrapper, and no capability or direct-token fallback can redeem the registration snapshot.
+
+Kilo execution requires modern runtime authorization, whether credential containment is enabled
+or disabled. The wrapper receives only a session-bound runtime credential proxy handle. The
+legacy Kilo broker capability and direct-token execution paths are retired. Git credential
+containment and managed SCM direct-token paths keep their existing behavior.
+
+### Compatibility and rollout
+
+Persisted sessions and credential grants without modern runtime authorization remain readable
+for viewing, Stop, deletion, and cleanup. Their next start, restore, resume, or warm message
+delivery fails with `credential_upgrade_required` and asks the user to start a new session.
+Messages and callbacks receive the same failure guidance. There is no production data migration
+or automatic termination of an existing sandbox.
+
+New session producers must issue modern control tokens. Web and workflow issuance requires
+both `SHARED_RESOURCE_TOKENS_ENABLED=true` and `CLOUD_AGENT_RESOURCE_TOKENS_ENABLED=true`.
+Worker-local producers use their existing modern issuance settings. Local development must
+also enable modern issuance and configure a reachable Worker runtime proxy endpoint; enabling
+containment alone does not enable legacy Kilo execution.
 
 Handles are per worktree scope, including in a shared checkout: one handle serves every member of
 the scope. A handle is bound to the user, organization, authorization, worktree scope, current
@@ -951,6 +1072,12 @@ Sandbox DO ↔ wrapper (WebSocket frames): `hello`, `welcome`, `shutdown`, `hear
 `session.outcome`, `events_dropped`, terminal control requests, worktree-change requests,
 worktree-deletion requests (`worktree.prepareDeletion`, `worktree.delete`; both answer with
 `worktree.result`). Terminal bytes use the existing wrapper-to-Session-DO terminal socket.
+
+### Startup mode rollout
+
+- An image change requires capture to key a snapshot with the image that the allocation started
+  with. Capture uses that recorded image, including after a Worker deploy. A legacy running
+  allocation with no recorded image skips capture until the next allocation.
 
 ### Preview
 
@@ -1137,6 +1264,7 @@ failure monitors keep working.
 | `sandbox_stopped` (idle while waiting on the user), `execution_limit` | `interruption` / `system_interrupt` |
 | Kilo final error, or `no_progress` during a Kilo model retry | `agent_activity` / `assistant_error`; responsibility from the existing assistant-failure helpers, so Kilo and provider errors stay attributed to them |
 | Stop | `interruption` / `user_interrupt` |
+| `runtime_artifact_unauthorized`, `runtime_artifact_invalid`, `runtime_cli_probe_failed`, `runtime_supervisor_missing` | `pre_dispatch` / `wrapper_start_failed` |
 | `missing_metadata`, `invalid_model`, payment required | Unchanged |
 
 ## 11. Acceptance scenarios
@@ -1250,6 +1378,15 @@ counts.
     host still returns health JSON; a reserved port (3000) is 403 well under 5 s and never reaches
     the fixture; a closed port is 502 well under 5 s; a chunked or over-2 MiB body returns intact. A
     local run does not prove hosted DNS/TLS/providers, the native Containers path, or no-wake.
+24. **Downloaded runtime start and restore.** A fresh `downloaded` start runs the selected CLI and
+    wrapper. A snapshot captured with runtime A, restored with runtime B, runs only B: A never
+    reaches `hello`. User files and configuration stay. Absent configuration keeps `preinstalled`
+    unchanged.
+25. **Downloaded runtime startup failure.** An unauthorized download or a failed CLI probe fails
+    queued work promptly with `runtime_<code>`, before the first-connect timer. If the bootstrap
+    exits before the first PID 1 check of a repository start and the provider failure wins, one
+    in-attempt image start runs first. `base_incompatible` after a restore starts the next
+    allocation from the image, also when the report arrives before `launch` returns.
 
 Fault scenarios use existing harness faults (container kill, pause, socket recycle through the
 wrapper's SIGUSR1 handler) plus harness additions for Kilo and wrapper process kill. Timer overrides keep long scenarios short. A local run does not prove
@@ -1269,6 +1406,12 @@ provider stop reliability, billing or hosted timing; those are checked on a depl
 - A prompt frame lost when the socket breaks stays `accepted` until the next outcome or the backstop.
 - Notifications are best effort; the Session DO backstop bounds a lost one.
 - An unconfirmed provider stop is logged; the container may run until the provider stops it.
+- Until the bootstrap execs the supervisor, the artifact grant is in the PID 1 argv and in provider
+  start metadata. Its narrow scope and short expiry bound the exposure.
+- A restored snapshot is trusted like its owner's own container. The bootstrap does not defend
+  against a replaced host tool in the root filesystem.
+- Remote native qualification of `downloaded` is pending: restore from A to B, install time on the
+  minimum instance, and provider retention of start metadata.
 - A killed container is not found by polling the provider. It is a wrapper connection that does not
   return. The user waits at most the reconnect window, then the message fails `connection_lost`.
 - The reconnect window is short so a queued message does not wait long on a wrapper that is gone. A
@@ -1280,4 +1423,4 @@ provider stop reliability, billing or hosted timing; those are checked on a depl
   the desired environment after the next restart. This predates the directory-key flip for legacy
   shared directories.
 - Out of scope: Kilo and model-provider retry policy, workspace file recovery after sandbox loss,
-  the legacy plane.
+  the retired legacy plane.

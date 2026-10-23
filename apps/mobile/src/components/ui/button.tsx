@@ -1,8 +1,9 @@
 import { cva, type VariantProps } from 'class-variance-authority';
+import * as React from 'react';
 import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
-import { TextClassContext } from '@/components/ui/text';
+import { Text, TextClassContext } from '@/components/ui/text';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -22,11 +23,12 @@ const buttonVariants = cva(
       size: {
         // min-h (not fixed h) so the button grows to fit text scaled by large
         // Dynamic Type instead of clipping the label; the min still guarantees
-        // the 44pt (default/lg) / 36pt-plus-hitSlop (sm) touch target.
+        // the 48pt action / 44pt default/lg / 36pt-plus-hitSlop sm target.
         // Use px because native rem defaults to 14pt, not 16pt.
         default: 'min-h-[44px] px-4 py-2',
         sm: 'min-h-[36px] gap-1.5 rounded-md px-3 py-1.5',
         lg: 'min-h-[44px] rounded-md px-6 py-2',
+        action: 'min-h-[48px] px-4 py-2',
         icon: 'h-[44px] w-[44px]',
       },
     },
@@ -54,6 +56,39 @@ const SM_HIT_SLOP = { top: 4, bottom: 4, left: 4, right: 4 };
 // ink in flight). The slot never gives up its box, in either motion branch.
 export const BUTTON_BUSY_SLOT_CLASS = 'h-[20px] w-[20px] shrink-0 items-center justify-center';
 
+/**
+ * The visible text of the button's children, for a label a loading button can
+ * hand to the accessibility layer when the caller gave none. Text children
+ * carry their caption in `props.children`; glyphs contribute nothing, so a
+ * caller with an icon-only button must label it itself.
+ */
+function flattenChildrenText(children: React.ReactNode): string | undefined {
+  const parts: string[] = [];
+  const visit = (node: React.ReactNode): void => {
+    if (node === null || node === undefined || node === true || node === false) {
+      return;
+    }
+    if (Array.isArray(node)) {
+      const items: React.ReactNode[] = node;
+      for (const child of items) {
+        visit(child);
+      }
+      return;
+    }
+    if (React.isValidElement<{ children?: React.ReactNode }>(node)) {
+      visit(node.props.children);
+      return;
+    }
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ReactNode has no non-typeof way to detect its plain-string variant
+    if (typeof node === 'string' || typeof node === 'number') {
+      parts.push(String(node));
+    }
+  };
+  visit(children);
+  const text = parts.join(' ').replaceAll(/\s+/g, ' ').trim();
+  return text === '' ? undefined : text;
+}
+
 // Spinner color per variant, matching that variant's text color (see
 // buttonTextVariants below). accent-soft's foreground isn't in useThemeColors
 // but is identical in both themes (global.css --accent-soft-foreground).
@@ -71,7 +106,7 @@ function spinnerColor(variant: ButtonProps['variant'], colors: ThemeColors): str
   return colors.primaryForeground;
 }
 
-const buttonTextVariants = cva('text-foreground text-sm font-semibold', {
+const buttonTextVariants = cva('text-foreground text-center text-sm font-semibold', {
   variants: {
     variant: {
       default: 'text-primary-foreground',
@@ -86,6 +121,7 @@ const buttonTextVariants = cva('text-foreground text-sm font-semibold', {
       default: '',
       sm: '',
       lg: '',
+      action: '',
       icon: '',
     },
   },
@@ -110,6 +146,7 @@ function Button({
   loading,
   disabled,
   accessibilityState,
+  accessibilityLabel,
   hitSlop,
   children,
   ...props
@@ -126,6 +163,15 @@ function Button({
   // keeps the brand fill and its spinner so it still reads as working.
   const isMutedDisabled = isDisabled && !loading && isPrimary;
   const isDimmed = isDisabled && !isPrimary;
+  // On Android, a node's accessible name is only rewritten while the incoming
+  // state still carries `busy`. A loading button therefore keeps announcing its
+  // busy state after the request settles unless its label prop holds a real
+  // name for the `busy: true → false` transition to write. Pass the caller's
+  // label when given; when a call site opted into `loading` without one,
+  // derive it from the visible child text, so the announced name always
+  // matches what is on screen.
+  const resolvedLabel =
+    accessibilityLabel ?? (loading !== undefined ? flattenChildrenText(children) : undefined);
   // Reserve the busy slot whenever the caller opted into `loading` (even when
   // it is false), so the row has the same geometry before and during a request.
   // A button that never loads keeps its original layout. The fixed `icon` size
@@ -135,6 +181,31 @@ function Button({
   const busyIndicator = loading ? (
     <ActivityIndicator size="small" color={spinnerColor(variant, colors)} />
   ) : null;
+  // A bare string or number child has no host to draw on: Pressable is a View,
+  // and a View draws no text, so the button collapses to its padding and the
+  // label disappears while the accessibility tree still names it. Wrap scalars
+  // in the themed label Text so every caller's label renders. Array children
+  // get the same treatment per entry; whitespace-only strings are skipped so
+  // JSX spacing idioms between an icon and a labeled element keep their today
+  // behaviour (they draw nothing in a View, and the row's gap does the spacing).
+  // Elements pass through untouched.
+  // oxlint-disable anti-slop/no-runtime-typeof -- ReactNode has no non-typeof way to detect its plain-string/number variants
+  const childrenIsScalar = typeof children === 'string' || typeof children === 'number';
+  let normalizedChildren: React.ReactNode = children;
+  if (childrenIsScalar) {
+    normalizedChildren = <Text>{children}</Text>;
+  } else if (Array.isArray(children)) {
+    normalizedChildren = children.map((child, index) => {
+      if (typeof child === 'string' && /^\s*$/.test(child)) {
+        return child;
+      }
+      const childIsScalar = typeof child === 'string' || typeof child === 'number';
+      return (
+        <React.Fragment key={index}>{childIsScalar ? <Text>{child}</Text> : child}</React.Fragment>
+      );
+    });
+  }
+  // oxlint-enable anti-slop/no-runtime-typeof
   return (
     <TextClassContext.Provider value={buttonTextVariants({ variant, size })}>
       <Pressable
@@ -146,6 +217,7 @@ function Button({
         )}
         role="button"
         disabled={isDisabled}
+        accessibilityLabel={resolvedLabel}
         accessibilityState={{ ...accessibilityState, disabled: isDisabled, busy: loading }}
         hitSlop={hitSlop ?? (size === 'sm' ? SM_HIT_SLOP : undefined)}
         {...props}
@@ -155,7 +227,7 @@ function Button({
         ) : (
           busyIndicator
         )}
-        {children}
+        {normalizedChildren}
         {rendersBusySlot ? (
           // Mirrors the leading slot (and the row's own gap), so the label keeps
           // the button's centre instead of drifting toward the trailing edge.

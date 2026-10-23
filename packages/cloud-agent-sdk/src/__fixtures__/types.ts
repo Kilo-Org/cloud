@@ -1,4 +1,4 @@
-import type { CloudAgentEvent } from '../event-types';
+import type { CloudAgentEvent } from '../schemas';
 import type { MessageDeliveryState } from '../types';
 
 type ExpectedPart = {

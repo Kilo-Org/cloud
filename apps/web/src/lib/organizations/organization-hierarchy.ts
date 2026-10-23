@@ -1,6 +1,7 @@
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { organizations } from '@kilocode/db/schema';
+import { enforceOrganizationCreationLimit } from '@kilocode/web-shared/lib/organizations/organization-creation-limit';
 import { TRPCError } from '@trpc/server';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 
@@ -98,9 +99,16 @@ export async function validateParentOrganizationChange(
   }
 }
 
-export async function createChildOrganization(name: string, parentOrganizationId: string) {
+export async function createChildOrganization(
+  name: string,
+  parentOrganizationId: string,
+  userId?: string
+) {
   const organization = await db.transaction(async tx => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(20260624, 1)`);
+    if (userId) {
+      await enforceOrganizationCreationLimit(tx, userId);
+    }
 
     const [createdOrganization] = await tx
       .insert(organizations)

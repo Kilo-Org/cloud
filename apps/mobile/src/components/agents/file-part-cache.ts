@@ -72,7 +72,7 @@ function resolveCacheUrl(
       directory,
       getSafeCacheFilename({ id: partId, filename: payload.filename ?? 'file' })
     );
-    file.write(stripped, { encoding: 'base64' });
+    file.writeSync(stripped, { encoding: 'base64' });
     return file.uri;
   } catch {
     return payload.url;

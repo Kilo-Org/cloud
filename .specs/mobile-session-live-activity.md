@@ -195,6 +195,10 @@ its turn, or when the user loses access to the session.
    MUST NOT show "Status expired" or "no longer current". A running card's
    stale date MUST follow the session's last activity, so a quiet session
    reaches the quiet state without a clock update.
+6. A content state MUST carry a failure only while its source row reports
+   one. A row that reports no failure MUST end a failed card as `idle`
+   ("Finished"); only a row that cannot report a failure at all, because it
+   carries no failure fact, keeps the stop reason the card already shows.
 
 ### Aggregate card coexistence
 
@@ -379,6 +383,13 @@ observable behavior is the same.
    the notification's data for routing and approval only.
 
 ## Changelog
+
+### 2026-10-21 -- Failure facts come from the row that reports them
+
+- Added Updates rule 6: a content state carries a failure only while its
+  source row reports one. A row that reports no failure ends a failed card as
+  `idle`; a row that carries no failure fact at all (a local tray row) keeps
+  the stop reason already on the card.
 
 ### 2026-10-12 -- Initial spec
 

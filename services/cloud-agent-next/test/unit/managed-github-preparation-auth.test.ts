@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer as createHttpServer } from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
 import { connect, type Server } from 'node:net';
@@ -20,7 +20,9 @@ const url = `https://x-access-token:${alias}@github.com/synthetic/repo.git`;
 const requests: Array<{ url: string | undefined; authorization: string | undefined }> = [];
 const connections: string[] = [];
 let redirect: string | undefined;
+let serveRepository = false;
 let root: string;
+let bareRepository: string;
 let env: Record<string, string>;
 let https: ReturnType<typeof createHttpsServer>;
 let proxy: ReturnType<typeof createHttpServer>;
@@ -62,6 +64,32 @@ beforeAll(async () => {
         res.writeHead(429).end('Anonymous rate limit');
       } else if (redirect) {
         res.writeHead(302, { Location: redirect }).end();
+      } else if (serveRepository) {
+        const discovery = req.method === 'GET';
+        const backend = execFile(
+          'git',
+          [
+            'upload-pack',
+            '--stateless-rpc',
+            ...(discovery ? ['--advertise-refs'] : []),
+            bareRepository,
+          ],
+          { env, encoding: 'buffer', timeout: 5_000 },
+          (error, stdout, stderr) => {
+            if (error) {
+              res.writeHead(500).end(stderr);
+              return;
+            }
+            res.writeHead(200, {
+              'Content-Type': discovery
+                ? 'application/x-git-upload-pack-advertisement'
+                : 'application/x-git-upload-pack-result',
+            });
+            if (discovery) res.write('001e# service=git-upload-pack\n0000');
+            res.end(stdout);
+          }
+        );
+        if (backend.stdin) req.pipe(backend.stdin);
       } else {
         // An empty smart-HTTP repository is enough to complete discovery and clone.
         res.writeHead(200, { 'Content-Type': 'application/x-git-upload-pack-advertisement' });
@@ -103,6 +131,32 @@ beforeAll(async () => {
     GIT_CONFIG_KEY_1: 'credential.helper',
     GIT_CONFIG_VALUE_1: '',
   };
+  const source = path.join(root, 'source');
+  bareRepository = path.join(root, 'repo.git');
+  await exec('git', ['init', '-b', 'main', source], { env });
+  await writeFile(path.join(source, 'review.txt'), 'Lazy review checkout contents\n');
+  await exec('git', ['-C', source, 'add', 'review.txt'], { env });
+  await exec(
+    'git',
+    [
+      '-C',
+      source,
+      '-c',
+      'user.name=Test',
+      '-c',
+      'user.email=test@example.com',
+      'commit',
+      '-m',
+      'Review',
+    ],
+    { env }
+  );
+  await exec('git', ['clone', '--bare', source, bareRepository], { env });
+  await exec('git', ['-C', bareRepository, 'config', 'uploadpack.allowFilter', 'true'], { env });
+  await exec('git', ['-C', bareRepository, 'config', 'uploadpack.allowAnySHA1InWant', 'true'], {
+    env,
+  });
+  await exec('git', ['-C', bareRepository, 'update-ref', 'refs/pull/12/head', 'HEAD'], { env });
 });
 
 afterAll(async () => {
@@ -118,24 +172,30 @@ beforeEach(() => {
   requests.length = 0;
   connections.length = 0;
   redirect = undefined;
+  serveRepository = false;
 });
 
 async function preparationCommand(
-  command: 'clone' | 'fetch',
-  directory: string
+  command: 'clone' | 'fetch' | 'checkout',
+  directory: string,
+  branch = 'refs/pull/12/head'
 ): Promise<string[]> {
   let captured: string[] | undefined;
   const manager = createPreparationManager({
     timers: CONTROL_PLANE_TIMERS,
+    allocationId: 'allocation_synthetic',
     emit: () => undefined,
     inheritedEnv: {},
     homeRoot: path.join(root, 'homes'),
     mkdir: async () => undefined,
-    hasGit: async () => command === 'fetch',
-    hasBootstrapMarker: async () => false,
+    hasGit: async () => command !== 'clone',
+    readStamp: async () => null,
     runGit: async args => {
-      if (args.includes(command)) captured = args;
-      return { exitCode: 128, stdout: '', stderr: 'fatal: Authentication failed' };
+      if (args.includes(command)) {
+        captured = args;
+        return { exitCode: 128, stdout: '', stderr: 'fatal: Authentication failed' };
+      }
+      return { exitCode: 0, stdout: '', stderr: '' };
     },
     runtimes: {
       ensure: async () => {
@@ -143,6 +203,7 @@ async function preparationCommand(
       },
       installCredentials: async () => undefined,
       isUnavailable: () => false,
+      getLiveClient: () => undefined,
       remove: () => undefined,
       release: () => undefined,
     },
@@ -152,7 +213,8 @@ async function preparationCommand(
     kiloSessionId: 'ses_synthetic',
     attemptId: 'attempt',
     directory,
-    branch: 'refs/pull/12/head',
+    branch,
+    ...(command === 'checkout' ? { createdOnPlatform: 'code-review' as const } : {}),
     git: { url: 'https://github.com/synthetic/repo.git', token: alias, platform: 'github' },
     kilo: {
       scopeId: 'synthetic',
@@ -166,6 +228,45 @@ async function preparationCommand(
   });
   if (!captured) throw new Error(`Preparation did not invoke ${command}`);
   return captured;
+}
+
+async function bloblessReviewRepository(): Promise<string> {
+  serveRepository = true;
+  const directory = await mkdtemp(path.join(root, 'lazy-'));
+  const result = await git(
+    [
+      '-c',
+      'http.https://github.com/.proactiveAuth=basic',
+      '-c',
+      'http.https://github.com/.followRedirects=false',
+      'clone',
+      '--filter=blob:none',
+      '--no-checkout',
+      url,
+      directory,
+    ],
+    { env, inheritEnv: false, hardTimeoutMs: 5_000 }
+  );
+  expect(result.exitCode, result.stderr).toBe(0);
+  const missing = await exec(
+    'git',
+    ['-C', directory, 'rev-list', '--objects', '--missing=print', 'HEAD'],
+    { env }
+  );
+  expect(missing.stdout).toMatch(/^\?[0-9a-f]{40}$/m);
+  await expect(readFile(path.join(directory, 'review.txt'))).rejects.toMatchObject({
+    code: 'ENOENT',
+  });
+  const fetched = await git(await preparationCommand('fetch', directory), {
+    cwd: directory,
+    env,
+    inheritEnv: false,
+    hardTimeoutMs: 5_000,
+  });
+  expect(fetched.exitCode, fetched.stderr).toBe(0);
+  requests.length = 0;
+  connections.length = 0;
+  return directory;
 }
 
 it('authenticates the first clone request instead of failing on anonymous discovery', async () => {
@@ -220,6 +321,69 @@ it.each(['clone', 'fetch'] as const)(
         { url: '/synthetic/repo.git/info/refs?service=git-upload-pack', authorization },
       ]);
       expect(connections).toEqual(['github.com:443']);
+    }
+  }
+);
+
+it.each(['refs/pull/12/head', 'main'])(
+  '%s checkout authenticates the first implicit lazy blob fetch',
+  async branch => {
+    const directory = await bloblessReviewRepository();
+    const args = await preparationCommand('checkout', directory, branch);
+    const options = { cwd: directory, env, inheritEnv: false, hardTimeoutMs: 5_000 };
+    const anonymous = await git(args.slice(args.indexOf('checkout')), options);
+    expect(anonymous.exitCode).not.toBe(0);
+    expect(anonymous.stderr).toContain('429');
+    expect(requests).toEqual([
+      { url: '/synthetic/repo.git/info/refs?service=git-upload-pack', authorization: undefined },
+    ]);
+
+    requests.length = 0;
+    const authenticated = await git(args, options);
+    expect(authenticated.exitCode, authenticated.stderr).toBe(0);
+    expect(requests.map(request => request.url)).toEqual([
+      '/synthetic/repo.git/info/refs?service=git-upload-pack',
+      '/synthetic/repo.git/git-upload-pack',
+    ]);
+    expect(requests.every(request => request.authorization === authorization)).toBe(true);
+    expect(await readFile(path.join(directory, 'review.txt'), 'utf8')).toBe(
+      'Lazy review checkout contents\n'
+    );
+    expect(await readFile(path.join(directory, '.git/config'), 'utf8')).not.toMatch(
+      /proactiveAuth|followRedirects/i
+    );
+  }
+);
+
+it.each(['refs/pull/12/head', 'main'])(
+  '%s checkout refuses redirects during implicit lazy blob fetch without forwarding the alias',
+  async branch => {
+    const directory = await bloblessReviewRepository();
+    const args = await preparationCommand('checkout', directory, branch);
+    for (const target of [
+      'https://github.com/renamed/repo.git',
+      'https://other.example/repo.git',
+      'https://github.com:8443/repo.git',
+      'http://github.com/repo.git',
+    ]) {
+      requests.length = 0;
+      connections.length = 0;
+      redirect = `${target}/info/refs?service=git-upload-pack`;
+      const result = await git(args, {
+        cwd: directory,
+        env,
+        inheritEnv: false,
+        hardTimeoutMs: 5_000,
+      });
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stderr).toContain('302');
+      expect(requests).toEqual([
+        { url: '/synthetic/repo.git/info/refs?service=git-upload-pack', authorization },
+      ]);
+      expect(connections).toEqual(['github.com:443']);
+      await expect(readFile(path.join(directory, 'review.txt'))).rejects.toMatchObject({
+        code: 'ENOENT',
+      });
     }
   }
 );

@@ -30,7 +30,7 @@ import { isAbortError, isRequestDeadlineError } from '@/lib/telemetry/abort-clas
 import { NETWORK_BODY_CONTEXT, redactUrlText } from '@/lib/telemetry/sentry-scrub';
 
 // Re-exported for existing consumers and tests; the classifier lives in
-// `abort-classification.ts` so this module stays under the line limit.
+// `abort-classification.ts`.
 export { isAbortError };
 
 type TelemetrySource = 'trpc' | 'fetch';
@@ -217,6 +217,8 @@ export function readTrpcErrorContext(error: unknown): TrpcErrorContext {
  * not expected ({@link isExpectedStatus}), else its first error, so an
  * expected 404 ahead of a 500 cannot hide the 500. Total: a success-only,
  * non-JSON, or otherwise unreadable body yields `undefined` and never throws.
+ * `undefined` from a batch means the body carries no error item, which is not a
+ * failure: the caller records nothing for it.
  */
 export async function readTrpcResponseError(
   response: Response
@@ -262,6 +264,21 @@ function networkOutcome(context: NetworkErrorContext): NetworkOutcome {
 // says the body is a batch. It is not the failing procedure's status, so it
 // must not replace the parsed inner status or code.
 const BATCH_ENVELOPE_STATUS = 207;
+
+/**
+ * True for a batch envelope whose parsed body yields no tRPC error metadata:
+ * no inner status and no tRPC code. Every item succeeded, the error item (if
+ * any) carries no readable detail, or the cloned body could not be read. The
+ * envelope only says the body is a batch, so nothing failed: no event, and not
+ * even the breadcrumb that an expected answer leaves.
+ */
+function isBatchEnvelopeWithoutError(context: NetworkErrorContext): boolean {
+  if (context.status !== BATCH_ENVELOPE_STATUS) {
+    return false;
+  }
+  const trpc = readTrpcErrorContext(context.error);
+  return trpc.httpStatus === undefined && trpc.code === undefined;
+}
 
 /**
  * The status that names the defect: the transport status, except that the tRPC
@@ -325,9 +342,11 @@ function buildSyntheticError(
  */
 export function reportNetworkError(context: NetworkErrorContext): void {
   try {
-    // The fingerprint key, the synthesized message, and the context URL all
-    // name the endpoint, and all three carry the same origin-and-path form.
-    // The app-set tRPC procedure stays readable instead.
+    if (isBatchEnvelopeWithoutError(context)) {
+      return;
+    }
+    // One origin-and-path form for the fingerprint key, the synthesized
+    // message, and the context URL. The app-set tRPC procedure stays readable.
     const pathOnly = redactUrlText(context.url);
     const normalizedPath = redactUrlText(normalizeUrlPath(context.url));
     const procedure = trpcProcedureFromUrl(context.url);
@@ -494,11 +513,13 @@ function safeShouldReport(url: string, shouldReport: (url: string) => boolean): 
  * Wrap a fetch implementation so every error-status http(s) response is
  * reported once at warning level and every transport failure (a rejection
  * that is not an abort) leaves one breadcrumb. `isResponseError` chooses the
- * statuses that count as errors (default `>= 400`; tRPC adds 207 so a mixed
- * batch is reported). An expected answer (`isExpectedResponse`) is a
- * breadcrumb instead of a report. `readResponseError` may parse the body via a
- * clone to enrich the report. The original rejection is re-thrown and the
- * original Response is returned unchanged; the original body is never read.
+ * statuses that count as errors (default `>= 400`; tRPC adds 207 so a batch
+ * that yields an error status or code is reported). A batch envelope whose body
+ * yields no error status or code is not a failure and records nothing. An
+ * expected answer (`isExpectedResponse`) is a breadcrumb instead of a report. `readResponseError`
+ * may parse the body via a clone to enrich the report. The original rejection is
+ * re-thrown and the original Response is returned unchanged; the original body
+ * is never read.
  */
 export function createNetworkErrorFetch(
   baseFetch: typeof fetch,
@@ -532,6 +553,9 @@ export function createNetworkErrorFetch(
           durationMs: Date.now() - startedAt,
           ...(error === undefined ? {} : { error }),
         };
+        if (isBatchEnvelopeWithoutError(context)) {
+          return response;
+        }
         if (isExpectedResponse(context)) {
           recordExpectedResponse(context);
         } else {

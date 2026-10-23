@@ -8,7 +8,7 @@ export default function OrganizationLayout() {
 
   return (
     <Stack screenLayout={appUnlockScreenLayout} screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="invite-member" options={sheetOptions} />
+      <Stack.Screen name="invite-member" options={{ ...sheetOptions, gestureEnabled: false }} />
       <Stack.Screen name="member-limit" options={sheetOptions} />
       <Stack.Screen name="low-balance-alert" options={sheetOptions} />
     </Stack>

@@ -11,7 +11,9 @@ import { mimeForExtension, normalizeAttachmentExtension } from '@/lib/agent-atta
 import { IMAGE_PICKER_OPTIONS, launchImagePicker } from '@/lib/agent-attachments/image-picker';
 import {
   type AttachmentSurface,
+  clearPickerRestoreRecord,
   writePickerLaunchContext,
+  writePickerRestoreRecord,
 } from '@/lib/agent-attachments/picker-launch-context';
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { waitForActionSheetDismissal } from '@/lib/action-sheet-dismissal';
@@ -169,6 +171,12 @@ type AttachmentPickerContext = {
   userId: string | undefined;
   surface: AttachmentSurface;
   sessionId: string | null;
+  /**
+   * The organization the launching composer belongs to. Only the new-session
+   * composer passes one, so a launch it loses to an Activity recreation can be
+   * reopened in the same organization scope.
+   */
+  organizationId?: string | null;
 };
 
 type AttachmentSourceSheet = {
@@ -205,18 +213,23 @@ function showAttachmentSourceSheet(
       await waitForActionSheetDismissal();
       // Record the launching composer + account before the camera/library
       // launch so the recovery hook can match a pending result after an
-      // Activity recreation. NOT before the Files branch, which uses
+      // Activity recreation, and so the app can reopen the composer when the
+      // picker never comes back to it. NOT before the Files branch, which uses
       // `startActivityForResult` and is unaffected by that bug. Only record
       // the launch when a real user id is present; an empty id would store a
       // context the recovery hook can never match.
-      if ((source === 'camera' || source === 'library') && context.userId) {
+      const launchUserId = source === 'camera' || source === 'library' ? context.userId : undefined;
+      if (launchUserId !== undefined) {
+        const launchContext = {
+          userId: launchUserId,
+          surface: context.surface,
+          sessionId: context.sessionId,
+          organizationId: context.organizationId ?? null,
+          launchedAt: Date.now(),
+        };
         try {
-          await writePickerLaunchContext({
-            userId: context.userId,
-            surface: context.surface,
-            sessionId: context.sessionId,
-            launchedAt: Date.now(),
-          });
+          await writePickerLaunchContext(launchContext);
+          await writePickerRestoreRecord(launchContext);
         } catch (error) {
           // A store write failure must not block the picker launch; the
           // recovery hook simply finds no context and nothing is attached.
@@ -246,6 +259,16 @@ function showAttachmentSourceSheet(
           extra: { source, surface: context.surface, hasSession: context.sessionId !== null },
         });
         settle([]);
+      } finally {
+        if (launchUserId !== undefined) {
+          // The picker came back to this composer, so no start needs to
+          // reopen it. A clear that fails leaves a record the TTL retires.
+          try {
+            await clearPickerRestoreRecord();
+          } catch {
+            // Best effort: the record only reopens a composer at a start.
+          }
+        }
       }
     };
     const options = buildAttachmentSourceOptions(sources);

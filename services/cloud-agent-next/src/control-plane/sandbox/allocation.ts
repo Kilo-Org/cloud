@@ -1,3 +1,7 @@
+import {
+  STARTUP_FAILURES,
+  type StartupFailureCode,
+} from '../../sandbox-control/startup-failure.js';
 import type { ControlPlaneTimers } from '../../shared/control-plane-timers.js';
 import type { ControlPlaneFailureReason } from '../../shared/control-plane-protocol.js';
 import type { AgentSandboxProvider } from '../../types.js';
@@ -83,6 +87,7 @@ export type AllocationEvent =
    * `hello` never observes a null ref.
    */
   | { type: 'provider-ref'; at: number; allocationId: string; providerRef: string }
+  | { type: 'startup-failed'; at: number; allocationId: string; code: StartupFailureCode }
   | { type: 'created'; at: number; allocationId: string; providerRef: string }
   | {
       type: 'create-failed';
@@ -264,6 +269,20 @@ export function reduceAllocation(
       }
       if (state.allocationId !== event.allocationId) return { state, effects: NO_EFFECTS };
       return { state: { ...state, providerRef: event.providerRef }, effects: NO_EFFECTS };
+    }
+
+    case 'startup-failed': {
+      if (
+        (state.kind !== 'creating' && state.kind !== 'starting') ||
+        state.allocationId !== event.allocationId
+      )
+        return { state, effects: NO_EFFECTS };
+      return enterStopping(
+        state,
+        event.at,
+        timers,
+        STARTUP_FAILURES[event.code].reason ?? 'connection_lost'
+      );
     }
 
     case 'created': {

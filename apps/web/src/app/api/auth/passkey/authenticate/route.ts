@@ -3,13 +3,13 @@ import { NextResponse } from 'next/server';
 import * as z from 'zod';
 import { checkRateLimit } from '@vercel/firewall';
 import { captureMessage } from '@sentry/nextjs';
-import type { AuthenticationResponseJSON } from '@simplewebauthn/server';
 
 import {
   createAuthenticationOptions,
   verifyAuthentication,
   PasskeyVerificationError,
 } from '@/lib/auth/passkey';
+import { authenticationResponseSchema } from '@/lib/auth/passkey-response';
 
 /**
  * Vercel Firewall rate limit that caps unauthenticated challenge minting.
@@ -46,7 +46,7 @@ const requestSchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('verify'),
     challengeId: z.string().uuid(),
-    response: z.record(z.string(), z.unknown()),
+    response: authenticationResponseSchema,
   }),
 ]);
 
@@ -77,10 +77,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ challengeId, options });
     }
 
-    const { ticket } = await verifyAuthentication(
-      parsed.data.challengeId,
-      parsed.data.response as unknown as AuthenticationResponseJSON
-    );
+    const { ticket } = await verifyAuthentication(parsed.data.challengeId, parsed.data.response);
     return NextResponse.json({ ticket });
   } catch (error) {
     if (error instanceof PasskeyVerificationError) {

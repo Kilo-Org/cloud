@@ -14,16 +14,80 @@ import {
   verifyAppleAssertion,
 } from './native-admission-apple';
 import { verifyPlayIntegrity } from './native-admission-google';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+
+// ── Expected-condition telemetry ───────────────────────────────────────────
+
+/**
+ * Interval-aggregated counter for expected, traffic-scaled admission
+ * conditions (legacy clients, malformed shapes). Emits one structured log
+ * line per 60 s window carrying the count observed in that window instead of
+ * one event per request, so rollout traffic cannot flood telemetry. The
+ * window start is carried on each line so a burst after a traffic pause is
+ * attributed to the window it was counted in.
+ */
+const AGGREGATE_INTERVAL_MS = 60_000;
+const admissionCounters = new Map<string, number>();
+let admissionCountersWindowStart = 0;
+
+function flushAdmissionCounters(now: number): void {
+  if (admissionCounters.size === 0) return;
+  for (const [metric, count] of admissionCounters) {
+    warnExceptInTest(
+      JSON.stringify({
+        event: 'native_admission_aggregate',
+        metric,
+        count,
+        intervalMs: AGGREGATE_INTERVAL_MS,
+        // Window the counts were accumulated in, not the flush time.
+        windowStart: new Date(admissionCountersWindowStart).toISOString(),
+        at: new Date(now).toISOString(),
+      })
+    );
+  }
+  admissionCounters.clear();
+}
+
+/**
+ * Roll the window forward when it has elapsed. Called on every admission
+ * check, so the window closes on any later traffic rather than only when
+ * another counted condition arrives — the last window of a sparse traffic
+ * pattern is not silently dropped.
+ */
+function rollAdmissionWindowIfNeeded(now: number): void {
+  if (now - admissionCountersWindowStart >= AGGREGATE_INTERVAL_MS) {
+    flushAdmissionCounters(now);
+    admissionCountersWindowStart = now;
+  }
+}
+
+/**
+ * Count an expected, traffic-scaled admission outcome. Refusals are the normal
+ * shape of hostile traffic, so they aggregate per window instead of emitting
+ * one event each. Unexpected provider faults keep their per-event message.
+ */
+export function countAdmissionCondition(metric: string): void {
+  const now = Date.now();
+  rollAdmissionWindowIfNeeded(now);
+  admissionCounters.set(metric, (admissionCounters.get(metric) ?? 0) + 1);
+}
+
+/** Exported for tests: flush any pending counters and reset the interval. */
+export function resetAdmissionCountersForTests(): void {
+  admissionCounters.clear();
+  admissionCountersWindowStart = 0;
+}
+
+/** Exported for tests: the counts accumulated in the open window. */
+export function pendingAdmissionCountsForTests(): Record<string, number> {
+  return Object.fromEntries(admissionCounters);
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────
-
-export type NativeAdmissionMode = 'off' | 'report' | 'enforce';
 
 export type AdmissionPlatform = 'ios' | 'android';
 
 export type AdmissionKind = 'attestation' | 'assertion';
-
-export type NativeAdmissionResult = { ok: true } | { ok: false; errorCode: 'ADMISSION_REQUIRED' };
 
 // ── Wire contract ──────────────────────────────────────────────────────────
 
@@ -127,62 +191,37 @@ export function validateAdmissionPayload(raw: unknown): AdmissionPayload | undef
   };
 }
 
-// ── Admission gate (sync) ──────────────────────────────────────────────────
+// ── Admission gate ─────────────────────────────────────────────────────────
 
 /**
- * Evaluate admission for a native auth request body.
- *
- * Mode behaviour:
- * - 'off':      admit everything.
- * - 'report':   evaluate and log, always admit.
- * - 'enforce':  validate admission. Absent field = legacy admit + count.
- *               Present invalid = refuse. Provider fault = 5xx via throw.
- *
- * Returns whether async verification is needed ('report' and 'enforce' modes
- * with a valid admission payload).
+ * The proof a native request must carry. Token issuance is attested-device
+ * only: a missing or malformed `admission` field is refused, never admitted.
+ * There is no legacy, report, or disabled mode — the only exception is the
+ * non-production sentinel below, which no production request can reach.
  */
-export function checkNativeAdmission(body: Record<string, unknown>): {
-  admission: NativeAdmissionResult;
-  /** True when async crypto verification is needed (enforce or report). */
-  verifyAsync: boolean;
-} {
-  const mode = getEnvVariable('NATIVE_ADMISSION_MODE') as NativeAdmissionMode;
-
-  // off mode (or unset) always admits with no async verification
-  if (!mode || mode === 'off') {
-    return { admission: { ok: true }, verifyAsync: false };
-  }
-
-  const hasAdmission = 'admission' in body && body['admission'] !== undefined;
-
-  if (!hasAdmission) {
-    if (mode === 'enforce') {
-      captureMessage('native_admission_legacy_count: 1');
-    }
-    return { admission: { ok: true }, verifyAsync: false };
-  }
-
-  // Validate the admission payload shape synchronously.
-  const admission = validateAdmissionPayload(body['admission']);
-  if (!admission) {
-    if (mode === 'report') {
-      captureMessage('native_admission_invalid_shape');
-      return { admission: { ok: true }, verifyAsync: false };
-    }
-    return { admission: { ok: false, errorCode: 'ADMISSION_REQUIRED' }, verifyAsync: false };
-  }
-
-  // Valid payload — async verification needed for enforce and report modes.
-  return { admission: { ok: true }, verifyAsync: mode === 'enforce' || mode === 'report' };
+export function requireAdmissionPayload(
+  body: Record<string, unknown>
+): AdmissionPayload | undefined {
+  // Roll the telemetry window on any native auth request, so the final window
+  // of a sparse traffic pattern still flushes.
+  rollAdmissionWindowIfNeeded(Date.now());
+  return validateAdmissionPayload(body['admission']);
 }
 
 /**
- * Whether to refuse admission when the async verify fails.
- * Only true under enforce mode; report mode evaluates but always admits.
+ * Proof a non-production device sends when it cannot attest at all (simulator,
+ * emulator without Play Services). Accepted only when the process is not
+ * production and `NATIVE_ADMISSION_DEV_SENTINEL` is `true`; the branch skips
+ * the platform verifier and persists no key.
  */
-export function shouldRefuseAsyncFailure(): boolean {
-  const mode = getEnvVariable('NATIVE_ADMISSION_MODE') as NativeAdmissionMode;
-  return mode === 'enforce';
+export const DEV_SENTINEL_PAYLOAD = 'native-admission-dev-sentinel';
+
+function isDevSentinel(admission: AdmissionPayload): boolean {
+  return (
+    process.env.NODE_ENV !== 'production' &&
+    getEnvVariable('NATIVE_ADMISSION_DEV_SENTINEL') === 'true' &&
+    admission.payload === DEV_SENTINEL_PAYLOAD
+  );
 }
 
 // ── Async attestation / assertion verification ─────────────────────────────
@@ -233,6 +272,12 @@ export async function verifyAdmissionAsync(
 
   if (!consumed) {
     return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
+  }
+
+  if (isDevSentinel(admission)) {
+    // Android shape on purpose: no key id means nothing is persisted and the
+    // device session is created without an attested-key binding.
+    return { ok: true, platform: 'android', keyId: '' };
   }
 
   // Route to platform-specific verifier

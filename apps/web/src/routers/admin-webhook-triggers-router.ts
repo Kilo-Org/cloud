@@ -7,6 +7,11 @@ import { cloud_agent_webhook_triggers } from '@kilocode/db/schema';
 import { resolveCloudAgentSessionIds } from '@/lib/webhook-session-resolution';
 import { getWebhookRequestLogs } from '@/lib/webhook-request-logs';
 import { sessionViewerProcedure } from '@/lib/trpc/admin-procedures';
+import {
+  organizationActionTarget,
+  recordAdminAction,
+  userActionTarget,
+} from '@/lib/admin/admin-action-audit';
 import { triggerIdSchema } from '@/lib/webhook-trigger-validation';
 import {
   getWorkerTrigger,
@@ -136,7 +141,7 @@ export const adminWebhookTriggersRouter = createTRPCRouter({
 
   getRequestLogs: sessionViewerProcedure
     .input(AdminTriggerGetInput.and(z.object({ requestId: z.string().uuid() })))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const { scope, id } = resolveScope(input);
       const [trigger] = await db
         .select({ id: cloud_agent_webhook_triggers.id })
@@ -155,6 +160,12 @@ export const adminWebhookTriggersRouter = createTRPCRouter({
       if (!trigger) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Trigger not found' });
       }
+      await recordAdminAction(ctx, {
+        action: 'webhook_trigger.request_logs.view',
+        target: scope === 'org' ? organizationActionTarget(id) : userActionTarget(id),
+        message: 'Viewed webhook trigger request logs',
+        metadata: { triggerId: input.triggerId, requestId: input.requestId },
+      });
       return getWebhookRequestLogs(
         scope === 'user' ? id : undefined,
         scope === 'org' ? id : undefined,

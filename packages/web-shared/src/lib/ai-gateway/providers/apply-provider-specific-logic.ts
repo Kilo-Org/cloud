@@ -23,16 +23,16 @@ import {
   applyMoonshotModelSettings,
   isKimiModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/moonshotai';
-import { isGlmModel } from '@kilocode/web-shared/lib/ai-gateway/providers/zai';
-import { isMinimaxModel } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
+import { resolvePreferredProviderOrder } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
+import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
+import type { PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
 import {
   ReasoningDetailsTransform,
   type BYOKResult,
   type Provider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { isStepModel } from '@kilocode/web-shared/lib/ai-gateway/providers/stepfun';
-import { isDeepseekModel } from '@kilocode/web-shared/lib/ai-gateway/providers/deepseek';
 import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { applyTrackingIds } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import {
   repairChatCompletionsTools,
@@ -47,11 +47,7 @@ import {
   mapReasoningDetailsToReasoningContent,
   scrubOpenCodeSpecificProperties,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
-import {
-  isQwenExplicitCacheModel,
-  isQwenModel,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
-import { isOpenAiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
+import { isQwenExplicitCacheModel } from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
 import { ReasoningFormat } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/format';
 import { ReasoningDetailType } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-details';
 import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
@@ -60,6 +56,11 @@ import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/
 import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
 import { removeRecursiveToolSchemaRefs } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-recursive-tool-schema-refs';
 import { removeTopLevelToolSchemaCombinators } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-top-level-tool-schema-combinators';
+import { removePaidServerFeatures } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-paid-server-features';
+import {
+  addReflectionReasoningPlaceholders,
+  isReflectionModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/reflection';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -139,46 +140,6 @@ function applyGeminiReasoningTransform(request: OpenRouterChatCompletionRequest)
   mapGeminiReasoningDetails(request);
 }
 
-export function getPreferredProviderOrder(requestedModel: string): string[] {
-  if (isOpenAiModel(requestedModel)) {
-    return [OpenRouterInferenceProviderIdSchema.enum.openai];
-  }
-  if (isClaudeModel(requestedModel)) {
-    return [
-      OpenRouterInferenceProviderIdSchema.enum['google-vertex'],
-      OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],
-    ];
-  }
-  if (isMinimaxModel(requestedModel)) {
-    return ['minimax/fp8']; // do not prefer minimax/highspeed
-  }
-  if (isMistralModel(requestedModel)) {
-    return [OpenRouterInferenceProviderIdSchema.enum.mistral];
-  }
-  if (isKimiModel(requestedModel)) {
-    return [
-      OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],
-      OpenRouterInferenceProviderIdSchema.enum.alibaba,
-    ];
-  }
-  if (isStepModel(requestedModel)) {
-    return [OpenRouterInferenceProviderIdSchema.enum.stepfun];
-  }
-  if (isDeepseekModel(requestedModel)) {
-    return [OpenRouterInferenceProviderIdSchema.enum.novita];
-  }
-  if (isGlmModel(requestedModel)) {
-    return [
-      OpenRouterInferenceProviderIdSchema.enum.friendli,
-      OpenRouterInferenceProviderIdSchema.enum.novita,
-    ];
-  }
-  if (isQwenModel(requestedModel)) {
-    return [OpenRouterInferenceProviderIdSchema.enum.alibaba];
-  }
-  return [];
-}
-
 /**
  * Claude goes to Anthropic directly only for non-trial enterprise
  * organizations; everyone else is served by the other Claude providers.
@@ -204,6 +165,7 @@ export function withIgnoredProviders(
 }
 
 export function applyPreferredProvider(
+  preferredProviderOrderConfig: PreferredProviderOrderConfig,
   requestedModel: string,
   requestToMutate:
     | OpenRouterChatCompletionRequest
@@ -211,7 +173,10 @@ export function applyPreferredProvider(
     | GatewayMessagesRequest,
   isAnthropicProviderAllowed: boolean
 ) {
-  const preferredProviderOrder = getPreferredProviderOrder(requestedModel);
+  const preferredProviderOrder = resolvePreferredProviderOrder(
+    preferredProviderOrderConfig,
+    requestedModel
+  );
   const ignoredProviders = getIgnoredProviders(requestedModel, isAnthropicProviderAllowed);
   if (preferredProviderOrder.length === 0 && ignoredProviders.length === 0) {
     return;
@@ -230,10 +195,32 @@ export function applyPreferredProvider(
 
 /**
  * Fallback models are not supported: a request for a free model could fall
- * back to a paid model and be served without being charged.
+ * back to a paid model and be served without being charged. OpenRouter accepts
+ * them as `models` on every API and as `fallbacks` on the Messages API.
  */
-export function removeModelsFallback(requestToMutate: GatewayRequest) {
+export function removeModelsFallback(
+  requestedModel: string,
+  requestToMutate: GatewayRequest,
+  userId: string
+) {
+  const { models, fallbacks } = requestToMutate.body;
   delete requestToMutate.body.models;
+  delete requestToMutate.body.fallbacks;
+
+  if (!hasFallbackModels(models) && !hasFallbackModels(fallbacks)) {
+    return;
+  }
+  console.warn('[applyProviderSpecificLogic] Removed caller-provided fallback models', {
+    userId,
+    model: requestedModel,
+    requestKind: requestToMutate.kind,
+    models,
+    fallbacks,
+  });
+}
+
+function hasFallbackModels(value: unknown) {
+  return value !== undefined && value !== null && !(Array.isArray(value) && value.length === 0);
 }
 
 export function removeUnsupportedRequestServiceTier(
@@ -300,7 +287,10 @@ export async function applyProviderSpecificLogic(
   taskId: string | null,
   isNonTrialEnterprise: boolean
 ) {
-  removeModelsFallback(requestToMutate);
+  removeModelsFallback(requestedModel, requestToMutate, userId);
+  if (isFreeModelExcludingCustomLlms(requestedModel)) {
+    removePaidServerFeatures(provider, requestedModel, requestToMutate, userId);
+  }
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
   sanitizeBinaryToolResults(requestToMutate);
@@ -354,6 +344,7 @@ export async function applyProviderSpecificLogic(
   if (provider.id === 'openrouter' || provider.id === 'vercel') {
     // A user's own BYOK credential is never ignored.
     applyPreferredProvider(
+      await getPreferredProviderOrderConfig(),
       requestedModel,
       requestToMutate.body,
       isNonTrialEnterprise || userByok !== null
@@ -370,6 +361,10 @@ export async function applyProviderSpecificLogic(
 
   if (isQwenExplicitCacheModel(requestedModel)) {
     addCacheBreakpoints(requestToMutate);
+  }
+
+  if (isReflectionModel(requestedModel)) {
+    addReflectionReasoningPlaceholders(requestedModel, requestToMutate);
   }
 
   if (provider.id === 'vercel') {

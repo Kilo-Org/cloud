@@ -1,22 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  defaultControlLabel,
   defaultDescriptionKey,
   deleteErrorMessage,
   metadataFormKey,
   overviewSectionRows,
 } from '@/components/profiles/profile-overview-model';
-
-describe('defaultControlLabel', () => {
-  it('offers to set the profile as default when it is not', () => {
-    expect(defaultControlLabel(false)).toBe('profiles.setAsDefault');
-  });
-
-  it('offers to remove the default when it is', () => {
-    expect(defaultControlLabel(true)).toBe('profiles.removeDefault');
-  });
-});
 
 describe('defaultDescriptionKey', () => {
   it('explains the personal rule for a personal profile', () => {

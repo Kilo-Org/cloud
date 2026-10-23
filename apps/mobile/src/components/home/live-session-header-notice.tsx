@@ -23,10 +23,12 @@ export type LiveSessionHeaderNoticeState = Readonly<{
 }>;
 
 /**
- * Home's one-line notice in the `Live now` header: a failed load beside
+ * Home's notice in the `Live now` header: a failed load beside
  * readable rows, then no internet, then a lost connection. Null while there is
  * nothing to report, so the header lays out its action as if no notice
- * existed. `LiveSessionFeedback` (with `inlineNotices={false}`) keeps the
+ * existed. The message wraps when it outgrows the free width beside Retry and
+ * the header action (pt-BR portrait: "Conexão perdida").
+ * `LiveSessionFeedback` (with `inlineNotices={false}`) keeps the
  * screen-reader announcements, so the notice text is not a live region.
  */
 export function useLiveSessionHeaderNotice(
@@ -87,7 +89,9 @@ export function useLiveSessionHeaderNotice(
 /**
  * Status dot, message, and a sentence-case `Retry`: the retry must not share
  * the header action's uppercase mono treatment, or `Retry` and `See all` read
- * as one label.
+ * as one label. A long message (pt-BR "Conexão perdida") wraps under the
+ * dot's line instead of ellipsizing; the row centers its children, so the
+ * single-line children stay vertically centered against the wrapped text.
  */
 export function LiveSessionHeaderNotice({
   notice,
@@ -102,9 +106,8 @@ export function LiveSessionHeaderNotice({
         )}
       />
       <Text
-        numberOfLines={1}
         className={cn(
-          'shrink text-xs',
+          'min-w-0 shrink text-xs',
           notice.loadFailed ? 'text-destructive' : 'text-muted-foreground'
         )}
       >

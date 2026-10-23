@@ -2,6 +2,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { TRPCClientError } from '@trpc/client';
 import { WebhookRequestLogs } from './WebhookRequestLogs';
+import { MessageErrorBoundary } from '@/components/cloud-agent-next/MessageErrorBoundary';
 
 const mockPersonalOptions = jest.fn(() => ({ queryKey: ['personal'] }));
 const mockAdminOptions = jest.fn(() => ({ queryKey: ['admin'] }));
@@ -15,6 +16,18 @@ jest.mock('@/lib/trpc/utils', () => ({
 }));
 jest.mock('@tanstack/react-query', () => ({
   useQuery: (options: unknown) => mockUseQuery(options),
+}));
+jest.mock('@/components/cloud-agent-next/MessageBubble', () => ({
+  MessageBubble: ({ message }: { message: { parts: Array<{ text: string }> } }) =>
+    React.createElement('div', { 'data-user-message': true }, message.parts[0]?.text),
+}));
+jest.mock('@/components/cloud-agent-next/PartRenderer', () => ({
+  PartRenderer: ({ part }: { part: { text?: string; tool?: string } }) =>
+    React.createElement('div', {}, part.text ?? part.tool),
+}));
+jest.mock('@/components/cloud-agent-next/LegacyMessageBubble', () => ({
+  LegacyMessageBubble: ({ message }: { message: { text: string } }) =>
+    React.createElement('div', { 'data-legacy-message': true }, message.text),
 }));
 
 function render(props: Partial<React.ComponentProps<typeof WebhookRequestLogs>> = {}) {
@@ -59,25 +72,97 @@ it('uses the separately authorized admin endpoint', () => {
   expect(mockPersonalOptions).not.toHaveBeenCalled();
 });
 
-it('renders tool details and escapes agent output', () => {
+it('renders shared-session chat with collapsed tool work and escaped output', () => {
   mockUseQuery.mockReturnValue({
     data: {
       processStatus: 'success',
       logsReady: true,
-      logs: [
-        {
-          timestamp: '',
-          eventType: 'tool',
-          message: 'Tool: bash',
-          content: '<script>bad</script>',
-        },
-      ],
+      transcript: {
+        version: 'v2',
+        messages: [
+          {
+            info: { id: 'user', role: 'user' },
+            parts: [{ type: 'text', text: 'Inspect the webhook' }],
+          },
+          {
+            info: { id: 'assistant', role: 'assistant' },
+            parts: [
+              {
+                type: 'tool',
+                tool: 'bash',
+                state: { status: 'completed', time: { start: 1, end: 1001 } },
+              },
+              { type: 'text', text: '<script>bad</script>' },
+            ],
+          },
+        ],
+      },
     },
   });
   const html = render();
-  expect(html).toContain('Tool: bash');
+  expect(html).toContain('data-user-message');
+  expect(html).toContain('Inspect the webhook');
+  expect(html).toContain('1 tool call');
+  expect(html).toContain('aria-expanded="false"');
   expect(html).toContain('&lt;script&gt;bad&lt;/script&gt;');
   expect(html).not.toContain('Auto-refreshing');
+});
+
+it('renders older runs with the existing legacy chat renderer', () => {
+  mockUseQuery.mockReturnValue({
+    data: {
+      processStatus: 'success',
+      transcript: {
+        version: 'v1',
+        messages: [{ ts: 1, type: 'assistant', text: 'Legacy response' }],
+      },
+    },
+  });
+  const html = render();
+  expect(html).toContain('data-legacy-message');
+  expect(html).toContain('Legacy response');
+});
+
+it('keeps agent failures visible when the assistant has no parts', () => {
+  mockUseQuery.mockReturnValue({
+    data: {
+      processStatus: 'failed',
+      transcript: {
+        version: 'v2',
+        messages: [{ info: { id: 'failed', role: 'assistant' }, parts: [] }],
+      },
+      logs: [{ timestamp: '', eventType: 'error', message: 'Error: Provider quota exceeded' }],
+    },
+  });
+  const html = render();
+  expect(html).toContain('role="alert"');
+  expect(html).toContain('Error: Provider quota exceeded');
+});
+
+it('shows logged errors when no transcript messages render', () => {
+  mockUseQuery.mockReturnValue({
+    data: {
+      processStatus: 'failed',
+      transcript: { version: 'v2', messages: [] },
+      logs: [{ timestamp: '', eventType: 'error', message: 'Error: Provider quota exceeded' }],
+    },
+  });
+  const html = render();
+  expect(html).toContain('role="alert"');
+  expect(html).toContain('Error: Provider quota exceeded');
+  expect(html).not.toContain('No execution logs available for this run');
+});
+
+it('recovers from a rendering failure on updated data without resetting healthy conversations', () => {
+  const boundary = new MessageErrorBoundary({ children: null, resetKey: 2 });
+  const setState = jest.spyOn(boundary, 'setState').mockImplementation(() => {});
+  boundary.componentDidUpdate({ children: null, resetKey: 1 });
+  expect(setState).not.toHaveBeenCalled();
+  boundary.state = { hasError: true, error: new Error('Incomplete snapshot') };
+  boundary.componentDidUpdate({ children: null, resetKey: 2 });
+  expect(setState).not.toHaveBeenCalled();
+  boundary.componentDidUpdate({ children: null, resetKey: 1 });
+  expect(setState).toHaveBeenCalledWith({ hasError: false, error: undefined });
 });
 
 it('shows loading, empty terminal, and error states', () => {
@@ -117,7 +202,10 @@ it('stops polling and retrying when access is denied', () => {
     error,
     data: {
       processStatus: 'inprogress',
-      logs: [{ timestamp: '', eventType: 'text', message: 'Previously cached output' }],
+      transcript: {
+        version: 'v1',
+        messages: [{ ts: 1, type: 'assistant', text: 'Previously cached output' }],
+      },
     },
   });
   const html = render();

@@ -2,15 +2,15 @@ import { describe, expect, it } from 'vitest';
 
 import { scrubBreadcrumb, scrubEvent } from './sentry-scrub';
 
-// Assembled from parts: the fixture is a URL component, not a credential URI.
+// Assembled from parts so the fixture reads as a plain URL value.
 const USERINFO = ['user', 'abcdefghijklmnopqrst'].join(':');
 const OPAQUE_RUN = 'abcdefghijklmnopqrst';
 const FRAGMENT_URL = `https://example.com/oauth/callback#${OPAQUE_RUN}`;
 
 /**
- * The scrubber's message and URL coverage: the payload text Sentry shows — the
- * exception message, `event.message`, the app's `network` context — is
- * redacted, and a captured URL carries only its origin and path.
+ * Message and URL coverage for {@link scrubEvent}: an exception message,
+ * `event.message`, the `network` context, and a captured URL all take the same
+ * scrubbed form.
  */
 describe('scrubEvent message redaction', () => {
   it('redacts a long opaque run in an exception value and keeps the text readable', () => {

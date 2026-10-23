@@ -14,6 +14,7 @@ import {
   ContainerDetailResponseSchema,
   MONITORED_CONTAINER_APPS,
   type ContainerApplication,
+  type ContainerListApp,
 } from './container-capacity';
 
 type QueryEnv = {
@@ -33,7 +34,7 @@ async function fetchListPage(
   page: number,
   fetchFn: FetchFn
 ): Promise<{
-  apps: Array<{ id: string; name: string; instances: number; health?: unknown }>;
+  apps: ContainerListApp[];
   totalPages: number;
 }> {
   const url = `${CF_API_BASE}/accounts/${accountId}/containers/dash/applications?page=${page}&per_page=${PER_PAGE}`;
@@ -106,8 +107,7 @@ export async function queryContainerApplications(
   }
 
   // Collect all monitored app entries across all pages
-  const monitoredEntries: Array<{ id: string; name: string; instances: number; health?: unknown }> =
-    [];
+  const monitoredEntries: ContainerListApp[] = [];
 
   let page = 1;
   let totalPages = 1;

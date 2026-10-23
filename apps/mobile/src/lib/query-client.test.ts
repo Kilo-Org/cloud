@@ -53,7 +53,7 @@ describe('query retry policy', () => {
       let attempts = 0;
 
       await expect(
-        queryClient.fetchQuery({
+        queryClient.query({
           queryKey: ['session', 'retry-policy', code],
           retryDelay: 0,
           queryFn: () => {
@@ -90,7 +90,7 @@ describe('permission-denied query removal', () => {
     });
 
     await expect(
-      queryClient.fetchQuery({
+      queryClient.query({
         queryKey: org1Key,
         staleTime: 0,
         queryFn: () => {
@@ -99,7 +99,6 @@ describe('permission-denied query removal', () => {
       })
     ).rejects.toBe(error);
 
-    // The forbidden org's query is dropped; the sibling org's query survives.
     expect(queryClient.getQueryData(org1Key)).toBeUndefined();
     expect(queryClient.getQueryData(org2Key)).toEqual({ members: ['b'] });
     // Permission loss never signs the user out.
@@ -123,7 +122,7 @@ describe('permission-denied query removal', () => {
     });
 
     await expect(
-      queryClient.fetchQuery({
+      queryClient.query({
         queryKey: key,
         staleTime: 0,
         queryFn: () => {
@@ -188,7 +187,7 @@ describe('permission-denied query removal', () => {
     });
 
     await expect(
-      queryClient.fetchQuery({
+      queryClient.query({
         queryKey: key,
         staleTime: 0,
         queryFn: () => {
@@ -204,6 +203,91 @@ describe('permission-denied query removal', () => {
   });
 });
 
+const LIST_KEY: readonly unknown[] = [['organizations', 'list'], { type: 'query' }];
+const makeOrgKey = (id: string): readonly unknown[] => [
+  ['organizations', 'withMembers'],
+  { type: 'query', input: { organizationId: id } },
+];
+const forbidden = () =>
+  Object.assign(new Error('forbidden'), {
+    data: { code: 'FORBIDDEN', httpStatus: 403 },
+  });
+
+describe('organizations.list refresh on permission loss', () => {
+  it('refetches the shared list once an org-scoped FORBIDDEN lands', async () => {
+    const queryClient = createKiloAppQueryClient();
+    const listFn = vi.fn<() => Promise<{ organizationId: string }[]>>();
+    queryClient.setQueryData(LIST_KEY, [{ organizationId: 'org-1' }]);
+
+    const observer = new QueryObserver(queryClient, {
+      queryKey: makeOrgKey('org-1'),
+      queryFn: () => {
+        throw forbidden();
+      },
+      retry: false,
+      staleTime: Infinity,
+    });
+    const unsubscribe = observer.subscribe(() => undefined);
+    await observer.refetch().catch(() => undefined);
+    unsubscribe();
+
+    // The denial scheduled the shared list's refresh: the fresh payload is now
+    // marked stale, so the next observer mount refetches it.
+    expect(queryClient.getQueryState(LIST_KEY)?.isInvalidated).toBe(true);
+
+    const pending = Promise.withResolvers<{ organizationId: string }[]>();
+    let gated = false;
+    listFn.mockImplementation(async () => {
+      // The initial mount fires one refetch (the invalidation marked the query
+      // stale); gate it so the resolution order is observable. Any further
+      // call answers immediately.
+      if (gated) {
+        await Promise.resolve();
+        return [];
+      }
+      gated = true;
+      const settled = await pending.promise;
+      return settled;
+    });
+    const listObserver = new QueryObserver(queryClient, {
+      queryKey: LIST_KEY,
+      queryFn: listFn,
+      retry: false,
+      staleTime: Infinity,
+    });
+    const unsubList = listObserver.subscribe(() => undefined);
+    await flushQueryUpdates();
+    // The mount's refetch arrived at the gated queryFn.
+    expect(listFn).toHaveBeenCalledTimes(1);
+    pending.resolve([{ organizationId: 'org-2' }]);
+    await flushQueryUpdates();
+    expect(listObserver.getCurrentResult().data).toEqual([{ organizationId: 'org-2' }]);
+    unsubList();
+  });
+
+  it('does not refresh the list for a non-org FORBIDDEN', async () => {
+    const queryClient = createKiloAppQueryClient();
+    queryClient.setQueryData(LIST_KEY, [{ organizationId: 'org-1' }]);
+
+    const error = forbidden();
+    await expect(
+      queryClient.query({
+        queryKey: [['user', 'getMe'], { type: 'query' }],
+        staleTime: 0,
+        queryFn: () => {
+          throw error;
+        },
+      })
+    ).rejects.toBe(error);
+
+    // No observer was attached to the list, no invalidation was scheduled: the
+    // cached payload stays fresh and unmarked, so a later mount refetches
+    // nothing.
+    expect(queryClient.getQueryState(LIST_KEY)?.dataUpdatedAt).toBeGreaterThan(0);
+    expect(queryClient.getQueryState(LIST_KEY)?.isInvalidated).toBe(false);
+  });
+});
+
 const emptyResult = { sessions: [] };
 
 describe('accepted active-session outcomes', () => {
@@ -214,7 +298,7 @@ describe('accepted active-session outcomes', () => {
     const query = client.getQueryCache().find({ queryKey: QUERY_KEY, exact: true });
     query?.setState({ status: 'success', dataUpdatedAt: Date.now() - 1 });
     expect(getActiveSessionsQueryMetadata(query)).toBe(absent);
-    await client.fetchQuery({ queryKey: QUERY_KEY, queryFn: () => emptyResult, staleTime: 0 });
+    await client.query({ queryKey: QUERY_KEY, queryFn: () => emptyResult, staleTime: 0 });
     const accepted = getActiveSessionsQueryMetadata(query);
     expect(accepted.acceptedRevision).toBe(1);
     client.setQueryData(QUERY_KEY, emptyResult);
@@ -250,7 +334,7 @@ describe('accepted active-session outcomes', () => {
       expect(failed.acceptedRevision).toBe(0);
       client.setQueryData(QUERY_KEY, { sessions: [{ id: 'live', title: 'socket' }] });
       const recovery = deferred<typeof emptyResult>();
-      const retry = client.fetchQuery({
+      const retry = client.query({
         queryKey: QUERY_KEY,
         queryFn: async () => {
           const result = await recovery.promise;
@@ -262,7 +346,7 @@ describe('accepted active-session outcomes', () => {
       await retry;
       expect(getActiveSessionsQueryMetadata(query)).toBe(failed);
       recovery.resolve(emptyResult);
-      await client.fetchQuery({ queryKey: QUERY_KEY, queryFn: () => emptyResult });
+      await client.query({ queryKey: QUERY_KEY, queryFn: () => emptyResult });
       expect(getActiveSessionsQueryMetadata(query)).toEqual({
         acceptedRevision: 1,
         terminalError: null,
@@ -275,7 +359,7 @@ describe('accepted active-session outcomes', () => {
     const client = makeClient();
     const result = deferred<typeof emptyResult>();
     let attempts = 0;
-    const pending = client.fetchQuery({
+    const pending = client.query({
       queryKey: QUERY_KEY,
       retry: 1,
       retryDelay: 0,
@@ -302,7 +386,7 @@ describe('accepted active-session outcomes', () => {
     'preserves provenance across remounts but resets it after %s',
     async removal => {
       const client = makeClient();
-      await client.fetchQuery({ queryKey: QUERY_KEY, queryFn: () => emptyResult });
+      await client.query({ queryKey: QUERY_KEY, queryFn: () => emptyResult });
       const query = client.getQueryCache().find({ queryKey: QUERY_KEY, exact: true });
       const accepted = getActiveSessionsQueryMetadata(query);
       const observer = new QueryObserver(client, { queryKey: QUERY_KEY, staleTime: Infinity });
@@ -325,7 +409,7 @@ describe('accepted active-session outcomes', () => {
       const recreated = client.getQueryCache().find({ queryKey: QUERY_KEY, exact: true });
       expect(recreated).not.toBe(query);
       expect(getActiveSessionsQueryMetadata(recreated).acceptedRevision).toBe(0);
-      await client.fetchQuery({ queryKey: QUERY_KEY, queryFn: () => emptyResult });
+      await client.query({ queryKey: QUERY_KEY, queryFn: () => emptyResult });
       expect(getActiveSessionsQueryMetadata(recreated).acceptedRevision).toBe(1);
       expect(published).toEqual([0]);
     }
@@ -352,17 +436,17 @@ describe('accepted active-session outcomes', () => {
     subscribeActiveSessionsQueryMetadata(otherQuery, () => {
       otherPublished.push(getActiveSessionsQueryMetadata(otherQuery).acceptedRevision);
     });
-    await client.fetchQuery({ queryKey: otherKey, queryFn: () => emptyResult });
+    await client.query({ queryKey: otherKey, queryFn: () => emptyResult });
     expect(
       getActiveSessionsQueryMetadata(client.getQueryCache().find({ queryKey: otherKey }))
         .acceptedRevision
     ).toBe(0);
     expect(published).toEqual([]);
-    await client.fetchQuery({ queryKey: QUERY_KEY, queryFn: () => emptyResult });
+    await client.query({ queryKey: QUERY_KEY, queryFn: () => emptyResult });
     expect(published).toEqual([1]);
     client.setQueryData(QUERY_KEY, emptyResult);
     expect(published).toEqual([1]);
-    await client.fetchQuery({ queryKey: QUERY_KEY, queryFn: () => emptyResult });
+    await client.query({ queryKey: QUERY_KEY, queryFn: () => emptyResult });
     expect(published).toEqual([1, 2]);
     expect(otherPublished).toEqual([]);
     expect(getActiveSessionsQueryMetadata(otherQuery).acceptedRevision).toBe(0);
@@ -383,7 +467,7 @@ describe('app error reporting', () => {
 
     const generic = new Error('generic query failure');
     await expect(
-      queryClient.fetchQuery({
+      queryClient.query({
         queryKey: ['session', 'generic'],
         queryFn: () => {
           throw generic;
@@ -404,7 +488,7 @@ describe('app error reporting', () => {
       data: { code: 'INTERNAL_SERVER_ERROR' },
     });
     await expect(
-      queryClient.fetchQuery({
+      queryClient.query({
         queryKey: ['session', 'trpc'],
         queryFn: () => {
           throw trpcError;

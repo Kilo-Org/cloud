@@ -41,7 +41,8 @@ jest.mock('@/lib/bot/platforms', () => ({
     })),
   },
 }));
-jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
+jest.mock('@kilocode/worker-utils/account-access', () => ({
+  ...jest.requireActual('@kilocode/worker-utils/account-access'),
   isOrganizationMember: jest.fn(async () => true),
 }));
 jest.mock('@/lib/bot/run', () => ({

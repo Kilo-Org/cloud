@@ -13,6 +13,8 @@ import * as organizationModels from './organizations/[id]/models/route';
 import * as organizationModelValidation from './organizations/[id]/models/validate/route';
 import * as providers from './providers/route';
 import * as transcriptionModels from './transcription-models/route';
+import * as autoRoutingDeniedModels from './internal/auto-routing/denied-models/route';
+import { handleAutoRoutingDeniedModelsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/auto-routing-denied-models';
 import { handleEditCompletionsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/edit-completions';
 import { handleEmbeddingModelsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/embedding-models';
 import { handleEmbeddingsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/embeddings';
@@ -41,6 +43,11 @@ describe('ai-gateway route facades', () => {
       'organizations/[id]/models/validate',
       organizationModelValidation.POST,
       handleOrganizationModelValidationRequest,
+    ],
+    [
+      'internal/auto-routing/denied-models',
+      autoRoutingDeniedModels.POST,
+      handleAutoRoutingDeniedModelsRequest,
     ],
   ])('%s exports the implementation handler by identity', (_route, routeHandler, handler) => {
     expect(routeHandler).toBe(handler);

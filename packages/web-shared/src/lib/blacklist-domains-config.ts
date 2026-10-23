@@ -1,16 +1,13 @@
 import 'server-only';
 import * as z from 'zod';
+import {
+  blacklistedDomainsFromConfig,
+  type BlacklistDomainsConfigSchema,
+} from '@kilocode/worker-utils/account-access';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { BLACKLIST_DOMAINS_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
-
-export const BlacklistDomainsConfigSchema = z.object({
-  domains: z.array(z.string()),
-  updated_at: z.string().nullable(),
-  updated_by: z.string().nullable(),
-  updated_by_email: z.string().nullable(),
-});
 
 export type BlacklistDomainsConfig = z.infer<typeof BlacklistDomainsConfigSchema>;
 
@@ -37,20 +34,14 @@ function getEnvFallbackDomains(): string[] {
 
 /**
  * Reads blacklisted domains from Redis, falling back to the BLACKLIST_DOMAINS env var.
- * Cached in-process for 60 seconds (stale-while-revalidate) to avoid hitting Redis on
- * every auth check.
+ * Cached in-process for 60 seconds to avoid hitting Redis on every auth check.
  */
 export const getBlacklistedDomains = createCachedFetch(
-  async (): Promise<string[]> => {
-    const raw = await redisClient.get<string>(BLACKLIST_DOMAINS_REDIS_KEY);
-    if (raw) {
-      const parsed = BlacklistDomainsConfigSchema.parse(JSON.parse(raw));
-      if (parsed.domains.length > 0) {
-        return parsed.domains;
-      }
-    }
-    return getEnvFallbackDomains();
-  },
+  async (): Promise<string[]> =>
+    blacklistedDomainsFromConfig(
+      await redisClient.get<string>(BLACKLIST_DOMAINS_REDIS_KEY),
+      getEnvFallbackDomains()
+    ),
   60_000,
   getEnvFallbackDomains()
 );

@@ -2,7 +2,10 @@ import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/p
 import { randomUUID } from 'node:crypto';
 import { generateProviderSpecificSessionHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
-import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import {
+  faviconIcon,
+  type DirectByokProvider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import {
   removeChatCompletionsMessageNames,
   replaceReasoningObjectWithReasoningEffort,
@@ -43,4 +46,14 @@ export default {
       },
     ],
   }),
+  provider_listing: {
+    dataPolicy: {
+      training: true,
+      retainsPrompts: true,
+      canPublish: false,
+      termsOfServiceURL: 'https://opencode.ai/legal/terms-of-service',
+      privacyPolicyURL: 'https://opencode.ai/legal/privacy-policy',
+    },
+    icon: faviconIcon('https://opencode.ai/'),
+  },
 } satisfies DirectByokProvider;

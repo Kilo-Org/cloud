@@ -1437,6 +1437,8 @@
       "showMore": "තවත් පෙන්වන්න",
       "created": "සෑදූ දිනය",
       "started": "ආරම්භ කළ වේලාව",
+      "reviewEnded": "අවසන් වූ වේලාව",
+      "severityNitpick": "සුළු යෝජනාව",
       "tokens": "ටෝකන",
       "tokensInOut": "ආදාන {{input}} / ප්‍රතිදාන {{output}}",
       "council": "කවුන්සිලය",

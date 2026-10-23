@@ -1481,6 +1481,8 @@
       "showMore": "Паказаць больш",
       "created": "Створана",
       "started": "Пачата",
+      "reviewEnded": "Скончана",
+      "severityNitpick": "Дробязь",
       "tokens": "Токены",
       "tokensInOut": "Уваход: {{input}} / Выхад: {{output}}",
       "council": "Рада",

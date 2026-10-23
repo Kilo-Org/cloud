@@ -1437,6 +1437,8 @@
       "showMore": "Прикажи повеќе",
       "created": "Создадено",
       "started": "Започнато",
+      "reviewEnded": "Окончено",
+      "severityNitpick": "Ситница",
       "tokens": "Токени",
       "tokensInOut": "{{input}} влез / {{output}} излез",
       "council": "Совет",

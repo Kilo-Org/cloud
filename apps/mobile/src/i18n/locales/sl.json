@@ -1481,6 +1481,8 @@
       "showMore": "Prikaži več",
       "created": "Ustvarjeno",
       "started": "Začeto",
+      "reviewEnded": "Zaključeno",
+      "severityNitpick": "Malenkost",
       "tokens": "Žetonov",
       "tokensInOut": "Vhod: {{input}} / izhod: {{output}}",
       "council": "Svet pregledovalnikov",

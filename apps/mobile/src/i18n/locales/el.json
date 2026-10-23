@@ -1437,6 +1437,8 @@
       "showMore": "Εμφάνιση περισσότερων",
       "created": "Δημιουργήθηκε",
       "started": "Ξεκίνησε",
+      "reviewEnded": "Έληξε",
+      "severityNitpick": "Λεπτομέρεια",
       "tokens": "Μονάδες κειμένου",
       "tokensInOut": "{{input}} εισερχόμενα / {{output}} εξερχόμενα",
       "council": "Συμβούλιο",

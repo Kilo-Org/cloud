@@ -970,6 +970,8 @@
       "retryTitle": "レビューを再試行しますか？",
       "showMore": "さらに表示",
       "started": "開始日時",
+      "reviewEnded": "終了日時",
+      "severityNitpick": "指摘",
       "threshold": "しきい値",
       "title": "レビュー",
       "tokens": "トークン",

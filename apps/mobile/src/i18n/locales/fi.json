@@ -1437,6 +1437,8 @@
       "showMore": "Näytä lisää",
       "created": "Luotu",
       "started": "Aloitettu",
+      "reviewEnded": "Päättynyt",
+      "severityNitpick": "Pikkuvika",
       "tokens": "Tokenit",
       "tokensInOut": "{{input}} syötteenä / {{output}} tulosteena",
       "council": "Arviointiryhmä",

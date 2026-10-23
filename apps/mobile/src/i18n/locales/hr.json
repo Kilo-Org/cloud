@@ -1459,6 +1459,8 @@
       "showMore": "Prikaži više",
       "created": "Stvoreno",
       "started": "Pokrenuto",
+      "reviewEnded": "Završeno",
+      "severityNitpick": "Sitnica",
       "tokens": "Tokeni",
       "tokensInOut": "Ulazni: {{input}} / izlazni: {{output}}",
       "council": "Vijeće",

@@ -1437,6 +1437,8 @@
       "showMore": "Shfaq më shumë",
       "created": "Krijuar",
       "started": "Filluar",
+      "reviewEnded": "Mbaruar",
+      "severityNitpick": "Vërejtje",
       "tokens": "Tokenë",
       "tokensInOut": "{{input}} hyrës / {{output}} dalës",
       "council": "Këshilli",

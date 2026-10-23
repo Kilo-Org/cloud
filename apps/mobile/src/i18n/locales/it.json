@@ -941,6 +941,8 @@
       "retryTitle": "Ripetere la revisione?",
       "showMore": "Mostra di più",
       "started": "Avviata",
+      "reviewEnded": "Terminata",
+      "severityNitpick": "Dettaglio stilistico",
       "threshold": "Soglia",
       "title": "Revisione",
       "tokens": "Token",

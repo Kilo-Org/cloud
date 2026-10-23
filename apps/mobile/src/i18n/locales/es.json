@@ -973,6 +973,8 @@
       "retryTitle": "¿Reintentar la revisión?",
       "showMore": "Mostrar más",
       "started": "Iniciada",
+      "reviewEnded": "Finalizada",
+      "severityNitpick": "Nimiedad",
       "threshold": "Umbral",
       "title": "Revisión",
       "tokens": "Unidades de texto",

@@ -1437,6 +1437,8 @@
       "showMore": "Nuna ƙari",
       "created": "An ƙirƙira",
       "started": "An fara",
+      "reviewEnded": "An ƙare",
+      "severityNitpick": "Ƙaramin abu",
       "tokens": "Guntayen rubutu",
       "tokensInOut": "{{input}} sun shiga / {{output}} sun fita",
       "council": "Majalisa",

@@ -1437,6 +1437,8 @@
       "showMore": "နောက်ထပ် ပြရန်",
       "created": "ဖန်တီးချိန်",
       "started": "စတင်ချိန်",
+      "reviewEnded": "အဆုံးသတ်ချိန်",
+      "severityNitpick": "အသေးစိတ်",
       "tokens": "တိုကင်",
       "tokensInOut": "အဝင် {{input}} / အထွက် {{output}}",
       "council": "စစ်ဆေးရေးအဖွဲ့",

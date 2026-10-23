@@ -1437,6 +1437,8 @@
       "showMore": "Ցույց տալ ավելին",
       "created": "Ստեղծվել է",
       "started": "Սկսվել է",
+      "reviewEnded": "Ավարտվել է",
+      "severityNitpick": "Մանրուք",
       "tokens": "Թոքեններ",
       "tokensInOut": "{{input}} մուտքային / {{output}} ելքային",
       "council": "Խորհուրդ",

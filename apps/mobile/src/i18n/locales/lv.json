@@ -1459,6 +1459,8 @@
       "showMore": "Rādīt vairāk",
       "created": "Izveidota",
       "started": "Sākta",
+      "reviewEnded": "Beigusies",
+      "severityNitpick": "Piezīme",
       "tokens": "Tokeni",
       "tokensInOut": "Ievade: {{input}} / izvade: {{output}}",
       "council": "Padome",

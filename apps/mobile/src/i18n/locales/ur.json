@@ -1437,6 +1437,8 @@
       "showMore": "مزید دکھائیں",
       "created": "تخلیق شدہ",
       "started": "شروع ہوا",
+      "reviewEnded": "اختتام پذیر",
+      "severityNitpick": "معمولی تنقیح",
       "tokens": "ٹوکن",
       "tokensInOut": "{{input}} ان پٹ / {{output}} آؤٹ پٹ",
       "council": "جائزہ کمیٹی",

@@ -1437,6 +1437,8 @@
       "showMore": "ଅଧିକ ଦେଖାନ୍ତୁ",
       "created": "ତିଆରି ହୋଇଛି",
       "started": "ଆରମ୍ଭ ହୋଇଛି",
+      "reviewEnded": "ଶେଷ ହୋଇଛି",
+      "severityNitpick": "ସୂକ୍ଷ୍ମ",
       "tokens": "ଟୋକେନ୍",
       "tokensInOut": "{{input}} ଇନ୍‌ପୁଟ୍ / {{output}} ଆଉଟ୍‌ପୁଟ୍",
       "council": "ସମୀକ୍ଷକ ମଣ୍ଡଳୀ",

@@ -1437,6 +1437,8 @@
       "showMore": "Muuji wax badan",
       "created": "Waa la abuuray",
       "started": "Waa la bilaabay",
+      "reviewEnded": "La soo afjaray",
+      "severityNitpick": "Arrin yar",
       "tokens": "Tokenno",
       "tokensInOut": "{{input}} soo galay / {{output}} baxay",
       "council": "Golaha",

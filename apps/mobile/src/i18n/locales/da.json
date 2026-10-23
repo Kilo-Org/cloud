@@ -1437,6 +1437,8 @@
       "showMore": "Vis mere",
       "created": "Oprettet",
       "started": "Startet",
+      "reviewEnded": "Ophørt",
+      "severityNitpick": "Detalje",
       "tokens": "Teksttokens",
       "tokensInOut": "{{input}} ind / {{output}} ud",
       "council": "Bedømmelsespanel",

@@ -970,6 +970,8 @@
       "retryTitle": "重试审查？",
       "showMore": "显示更多",
       "started": "开始时间",
+      "reviewEnded": "结束时间",
+      "severityNitpick": "吹毛求疵",
       "threshold": "阈值",
       "title": "审查",
       "tokens": "词元",

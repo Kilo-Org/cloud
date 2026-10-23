@@ -1525,6 +1525,8 @@
       "showMore": "Dangos mwy",
       "created": "Crëwyd",
       "started": "Dechreuwyd",
+      "reviewEnded": "Daeth i ben",
+      "severityNitpick": "Manylyn",
       "tokens": "Tocynnau",
       "tokensInOut": "{{input}} i mewn / {{output}} allan",
       "council": "Cyngor",

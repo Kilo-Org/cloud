@@ -1437,6 +1437,8 @@
       "showMore": "Amosar máis",
       "created": "Creada",
       "started": "Iniciada",
+      "reviewEnded": "Finalizada",
+      "severityNitpick": "Miudeza",
       "tokens": "Unidades de texto",
       "tokensInOut": "{{input}} de entrada / {{output}} de saída",
       "council": "Consello",

@@ -970,6 +970,8 @@
       "retryTitle": "Review erneut ausführen?",
       "showMore": "Mehr anzeigen",
       "started": "Gestartet",
+      "reviewEnded": "Beendet",
+      "severityNitpick": "Kleinigkeit",
       "threshold": "Schwellenwert",
       "title": "Prüfung",
       "tokens": "Text-Tokens",

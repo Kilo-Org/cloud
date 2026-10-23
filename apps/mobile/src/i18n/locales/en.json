@@ -1531,6 +1531,8 @@
       "showMore": "Show more",
       "created": "Created",
       "started": "Started",
+      "reviewEnded": "Review ended",
+      "severityNitpick": "Nitpick",
       "tokens": "Tokens",
       "tokensInOut": "{{input}} in / {{output}} out",
       "transcriptWaiting": "Waiting for the review transcript.",

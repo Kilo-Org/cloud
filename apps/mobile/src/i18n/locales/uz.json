@@ -1437,6 +1437,8 @@
       "showMore": "Ko'proq ko'rsatish",
       "created": "Yaratilgan",
       "started": "Boshlangan",
+      "reviewEnded": "Tugagan",
+      "severityNitpick": "Arzimagan",
       "tokens": "Token",
       "tokensInOut": "{{input}} kirish / {{output}} chiqish",
       "council": "Kengash",

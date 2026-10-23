@@ -1437,6 +1437,8 @@
       "showMore": "Sýna meira",
       "created": "Búin til",
       "started": "Hófst",
+      "reviewEnded": "Lauk",
+      "severityNitpick": "Atriði",
       "tokens": "Tókar",
       "tokensInOut": "{{input}} inn / {{output}} út",
       "council": "Yfirferðarráð",

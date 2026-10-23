@@ -1437,6 +1437,8 @@
       "showMore": "Visa mer",
       "created": "Skapad",
       "started": "Startad",
+      "reviewEnded": "Avslutad",
+      "severityNitpick": "Anmärkning",
       "tokens": "Token",
       "tokensInOut": "{{input}} in / {{output}} ut",
       "council": "Granskningsråd",

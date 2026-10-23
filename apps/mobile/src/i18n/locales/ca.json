@@ -1459,6 +1459,8 @@
       "showMore": "Mostra'n més",
       "created": "Data de creació",
       "started": "Data d'inici",
+      "reviewEnded": "Data de finalització",
+      "severityNitpick": "Mínim",
       "tokens": "Unitats de text",
       "tokensInOut": "{{input}} d'entrada / {{output}} de sortida",
       "council": "Consell",

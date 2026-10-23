@@ -1437,6 +1437,8 @@
       "showMore": "மேலும் காட்டவும்",
       "created": "உருவாக்கப்பட்டது",
       "started": "தொடங்கப்பட்டது",
+      "reviewEnded": "முடிவு",
+      "severityNitpick": "சிறுகுறை",
       "tokens": "டோக்கன்கள்",
       "tokensInOut": "{{input}} உள்ளீடு / {{output}} வெளியீடு",
       "council": "குழு",

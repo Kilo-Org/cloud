@@ -1437,6 +1437,8 @@
       "showMore": "Továbbiak megjelenítése",
       "created": "Létrehozva",
       "started": "Elindítva",
+      "reviewEnded": "Lezárva",
+      "severityNitpick": "Apróság",
       "tokens": "Token",
       "tokensInOut": "{{input}} bemenet / {{output}} kimenet",
       "council": "Tanács",

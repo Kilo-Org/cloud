@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
 import { formatMicrodollars } from '@/lib/admin-utils';
+import { buildDeductionGroups } from '@/lib/credits/deductionGroups';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -85,67 +86,6 @@ function formatExpiryTimestamp(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Unknown';
   return EXPIRY_TIMESTAMP_FORMATTER.format(date);
-}
-
-function deductionKindLabel(kind: 'deduction' | 'adjustment' | 'balance_neutral'): string {
-  switch (kind) {
-    case 'balance_neutral':
-      return 'Balance neutral';
-    case 'adjustment':
-      return 'Adjustment';
-    case 'deduction':
-      return 'Deduction';
-  }
-}
-
-/** One table group per credit event: a purchase with the expiry that closed it. */
-type DeductionGroup = {
-  key: string;
-  main: { date: string; description: string; type: string; amount_mUsd: number };
-  child?: { description: string; type: string; amount_mUsd: number };
-};
-
-function buildDeductionGroups(
-  deductions: {
-    id: string;
-    date: string;
-    description: string;
-    amount_mUsd: number;
-    kind: 'deduction' | 'adjustment' | 'balance_neutral';
-    purchase: { id: string; date: string; description: string; amount_mUsd: number } | null;
-  }[]
-): DeductionGroup[] {
-  return deductions
-    .map(deduction => {
-      if (!deduction.purchase) {
-        return {
-          key: deduction.id,
-          main: {
-            date: deduction.date,
-            description: deduction.description,
-            type: deductionKindLabel(deduction.kind),
-            amount_mUsd: deduction.amount_mUsd,
-          },
-        };
-      }
-      // The purchase is the main row, so its date leads the pair and the
-      // expiry reads as the second ledger line of the same event.
-      return {
-        key: deduction.id,
-        main: {
-          date: deduction.purchase.date,
-          description: deduction.purchase.description,
-          type: 'Purchase',
-          amount_mUsd: deduction.purchase.amount_mUsd,
-        },
-        child: {
-          description: deduction.description,
-          type: deductionKindLabel(deduction.kind),
-          amount_mUsd: deduction.amount_mUsd,
-        },
-      };
-    })
-    .sort((a, b) => new Date(b.main.date).getTime() - new Date(a.main.date).getTime());
 }
 
 function formatSignedAmount(amount_mUsd: number): string {

@@ -1,0 +1,89 @@
+import { buildDeductionGroups, type CreditDeductionRow } from './deductionGroups';
+
+function makeDeduction(overrides: Partial<CreditDeductionRow> = {}): CreditDeductionRow {
+  return {
+    id: 'deduction-1',
+    date: '2026-10-01T00:00:00.000Z',
+    description: 'Expired: Promotional credits',
+    amount_mUsd: -50_000_000,
+    kind: 'adjustment',
+    purchase: {
+      id: 'grant-1',
+      date: '2025-10-01T00:00:00.000Z',
+      description: 'Promotional credits',
+      amount_mUsd: 50_000_000,
+    },
+    ...overrides,
+  };
+}
+
+describe('buildDeductionGroups', () => {
+  it('leads a paired group with the purchase and keeps the expiry as its child line', () => {
+    const groups = buildDeductionGroups([makeDeduction()]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toEqual({
+      key: 'deduction-1',
+      main: {
+        date: '2025-10-01T00:00:00.000Z',
+        description: 'Promotional credits',
+        type: 'Purchase',
+        amount_mUsd: 50_000_000,
+      },
+      child: {
+        description: 'Expired: Promotional credits',
+        type: 'Adjustment',
+        amount_mUsd: -50_000_000,
+      },
+    });
+  });
+
+  it('leaves an unlinked deduction as a single row in its own date order', () => {
+    const groups = buildDeductionGroups([
+      makeDeduction({
+        id: 'legacy',
+        date: '2026-10-05T00:00:00.000Z',
+        description: 'Deducting credits, due to expiration time.',
+        amount_mUsd: -3_000_000,
+        kind: 'deduction',
+        purchase: null,
+      }),
+    ]);
+
+    expect(groups).toEqual([
+      {
+        key: 'legacy',
+        main: {
+          date: '2026-10-05T00:00:00.000Z',
+          description: 'Deducting credits, due to expiration time.',
+          type: 'Deduction',
+          amount_mUsd: -3_000_000,
+        },
+      },
+    ]);
+  });
+
+  it('orders groups by the date the row shows, newest first', () => {
+    const groups = buildDeductionGroups([
+      makeDeduction({
+        id: 'older-pair',
+        purchase: {
+          id: 'grant-older',
+          date: '2025-01-01T00:00:00.000Z',
+          description: 'Older credits',
+          amount_mUsd: 10_000_000,
+        },
+      }),
+      makeDeduction({
+        id: 'newer-deduction',
+        date: '2026-11-01T00:00:00.000Z',
+        description: 'Usage charge',
+        amount_mUsd: -1_000_000,
+        kind: 'deduction',
+        purchase: null,
+      }),
+    ]);
+
+    expect(groups.map(group => group.key)).toEqual(['newer-deduction', 'older-pair']);
+  });
+});

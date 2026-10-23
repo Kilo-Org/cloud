@@ -255,9 +255,7 @@ function accountRow(node: ReactTestInstance) {
 
 /** The sheet's account rows, in option order. */
 function accountLabels(renderer: ReactTestRenderer) {
-  return renderer.root
-    .findAll(accountRow)
-    .map(node => node.props.accessibilityLabel as string);
+  return renderer.root.findAll(accountRow).map(node => node.props.accessibilityLabel as string);
 }
 
 /** Presses one row of the open sheet: an account row or Cancel (button). */

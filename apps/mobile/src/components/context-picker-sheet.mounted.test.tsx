@@ -78,18 +78,15 @@ function accountRow(node: ReactTestInstance) {
 }
 
 function rows(renderer: ReactTestRenderer) {
-  return renderer.root
-    .findAll(accountRow)
-    .map(node => ({
-      label: node.props.accessibilityLabel as string,
-      selected: selectedState(node) === true,
-      divider:
-        typeof node.props.className === 'string' &&
-        node.props.className.includes('border-hair-soft'),
-      check: node.findAll(child => child.type === Check).length > 0,
-      // Every account row reserves one blank gutter View so the labels line up.
-      gutter: node.findAll(child => child.type === View).length === 1,
-    }));
+  return renderer.root.findAll(accountRow).map(node => ({
+    label: node.props.accessibilityLabel as string,
+    selected: selectedState(node) === true,
+    divider:
+      typeof node.props.className === 'string' && node.props.className.includes('border-hair-soft'),
+    check: node.findAll(child => child.type === Check).length > 0,
+    // Every account row reserves one blank gutter View so the labels line up.
+    gutter: node.findAll(child => child.type === View).length === 1,
+  }));
 }
 
 /** The native sheet wrapper; its `onClose` is the dismiss path the sheet owns. */

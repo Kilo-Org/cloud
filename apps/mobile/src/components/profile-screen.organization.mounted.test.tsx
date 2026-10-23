@@ -78,7 +78,7 @@ describe('ProfileScreen Organization section', () => {
         node.props.accessibilityRole === 'button' &&
         selectedState(node) !== undefined
     );
-    expect(rows.map(row => row.props.accessibilityLabel)).toEqual([
+    expect(rows.map(account => account.props.accessibilityLabel)).toEqual([
       i18n.t('common.personal'),
       'Kilo',
       'Acme',

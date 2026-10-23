@@ -6,9 +6,9 @@ import AuthLayout from '@/app/(auth)/_layout';
 import ChatLayout from '@/app/(app)/(tabs)/(4_chat)/_layout';
 import HomeLayout from '@/app/(app)/(tabs)/(0_home)/_layout';
 import AgentsLayout from '@/app/(app)/(tabs)/(2_agents)/_layout';
-import CodeReviewerEditLayout from '@/app/(app)/(tabs)/(3_profile)/code-reviewer/[scope]/[platform]/(edit)/_layout';
-import CodeReviewerPlatformLayout from '@/app/(app)/(tabs)/(3_profile)/code-reviewer/[scope]/[platform]/_layout';
-import SecurityAgentScopeLayout from '@/app/(app)/(tabs)/(3_profile)/security-agent/[scope]/_layout';
+import CodeReviewerEditLayout from '@/app/(app)/code-reviewer/[scope]/[platform]/(edit)/_layout';
+import CodeReviewerPlatformLayout from '@/app/(app)/code-reviewer/[scope]/[platform]/_layout';
+import SecurityAgentScopeLayout from '@/app/(app)/security-agent/[scope]/_layout';
 import ProfileLayout from '@/app/(app)/(tabs)/(3_profile)/_layout';
 
 // These stacks sit inside a root `(app)` scene that already hosts the unlock

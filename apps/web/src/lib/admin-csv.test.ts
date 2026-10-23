@@ -8,6 +8,7 @@ describe('csvField', () => {
     expect(csvField('a,b')).toBe('"a,b"');
     expect(csvField('say "hi"')).toBe('"say ""hi"""');
     expect(csvField('line one\nline two')).toBe('"line one\nline two"');
+    expect(csvField('line one\rline two')).toBe('"line one\rline two"');
   });
 
   it('formats representative cells as literal text', () => {
@@ -17,7 +18,7 @@ describe('csvField', () => {
       ['-1', `'-1`],
       ['@SUM(1)', `'@SUM(1)`],
       ['\t=1+1', `'\t=1+1`],
-      ['\r=1', `'\r=1`],
+      ['\r=1', `"'\r=1"`],
       ['  =1', `'  =1`],
       [' =1,2', `"' =1,2"`],
     ];

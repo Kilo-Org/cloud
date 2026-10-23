@@ -462,6 +462,36 @@ describe('getFileLines', () => {
     // budget, so the body is abandoned well before its six chunks are pulled.
     expect(pulled).toBeLessThan(6);
   });
+
+  it('rejects a declared oversized body without reading it', async () => {
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          controller.enqueue(new Uint8Array(FILE_READ_MAX_BYTES + 1));
+        },
+        cancel() {
+          cancelled = true;
+        },
+      },
+      { highWaterMark: 0 }
+    );
+    fetchMock.mockImplementation(
+      async () =>
+        new Response(stream, {
+          status: 200,
+          headers: { 'content-length': String(FILE_READ_MAX_BYTES + 1) },
+        })
+    );
+
+    const error = await captureRejection(
+      getFileLines(OWNER, PROJECT_PATH, 'sha-head', 'file.txt', 1, 2)
+    );
+
+    expect(error.kind).toBe('too_large');
+    expect(error.message).toBe(FILE_READ_TOO_LARGE_MESSAGE);
+    expect(cancelled).toBe(true);
+  });
 });
 
 describe('listDiscussions', () => {

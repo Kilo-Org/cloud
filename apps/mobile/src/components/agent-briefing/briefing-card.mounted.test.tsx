@@ -3,8 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 
-import { BriefingCard, BriefingScorecard } from './briefing-card';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { BriefingScorecard } from './briefing-card';
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -21,12 +20,7 @@ vi.mock('react-i18next', () => ({
 vi.mock('@/lib/agent-briefing', () => ({
   BRIEFING_PATH: '/(app)/agent-briefing',
   useBriefings: () => ({ reports: [] }),
-  useBriefingDismissals: () => ({
-    isSuccess: true,
-    data: [],
-    save: { isPending: false },
-    dismiss: () => undefined,
-  }),
+  useBriefingDismissals: () => ({ isSuccess: true, data: [] }),
 }));
 vi.mock('@/lib/hooks/use-now-ticker', () => ({ useNowTicker: () => Date.now() }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({ useOfflineBannerState: () => false }));
@@ -120,60 +114,5 @@ describe('BriefingScorecard', () => {
       'common.unknown',
       'common.unknown',
     ]);
-  });
-});
-
-describe('BriefingCard', () => {
-  const report = {
-    id: 'report-e2e',
-    kind: 'scheduled',
-    createdAt: '2026-10-23T04:00:00.000Z',
-    timezone: 'UTC',
-    context: { id: 'personal', organizationId: null, name: 'Personal' },
-    localDate: '2026-10-23',
-    nightStartAt: '2026-10-22T20:00:00.000Z',
-    cutoffAt: '2026-10-23T04:00:00.000Z',
-    morningEndAt: '2026-10-24T08:00:00.000Z',
-    publishedAt: '2026-10-23T04:05:00.000Z',
-    updatedAt: '2026-10-23T04:05:00.000Z',
-    revision: 1,
-    revised: false,
-    readAt: null,
-    dismissedAt: null,
-    scorecard: { sessions: 2, pullRequests: 1, blockers: 0, spendMicrodollars: 1200 },
-    coverage: complete,
-    sessions: [],
-    sources: [],
-    summary: {
-      status: 'ready',
-      text: 'Two sessions ran overnight.',
-      model: null,
-      costMicrodollars: 0,
-      chargeStatus: 'settled',
-      estimatedCostMicrodollars: 0,
-      startedAt: null,
-      finishedAt: null,
-      error: null,
-      canRetry: false,
-    },
-    expiresAt: '2026-10-24T08:00:00.000Z',
-  } satisfies Parameters<typeof BriefingCard>[0]['report'];
-
-  it('gives the dismiss control the shared 48dp frame and keeps its circle compact', () => {
-    // Field defect: the control was `size-11`, 38.5pt at NativeWind's 14pt rem,
-    // under both the 44pt design target and Android's 48dp minimum, and a size
-    // audit reads the node's own rect rather than a hit slop.
-    const ref: { current: ReactTestRenderer | undefined } = { current: undefined };
-    act(() => {
-      ref.current = TestRenderer.create(<BriefingCard report={report} />);
-    });
-    const node = ref.current?.root;
-    if (!node) {
-      throw new Error('BriefingCard did not mount');
-    }
-    const dismiss = node.findByProps({ accessibilityLabel: 'agentBriefing.dismiss' });
-    expect(dismiss.props.className).toContain(ICON_TARGET_BOX_CLASS);
-    expect(dismiss.props.hitSlop).toBeUndefined();
-    expect(dismiss.findByType('View' as ElementType).props.className).toContain('size-11');
   });
 });

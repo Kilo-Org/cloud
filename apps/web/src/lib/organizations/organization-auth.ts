@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 import {
   organizationTarget,
   recordKiloAdminElevationForRequest,
+  type AdminAccessSurface,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -44,10 +45,19 @@ function allowedRole(
 export async function getAuthorizedOrgContext(
   id: Organization['id'],
   roles?: OrganizationRole[],
-  // this is used only in testing because mocking getUserFromAuth doesn't work with jest
-  // due to the way next module loading works
-  getUserFromAuthOverride?: typeof getUserFromAuth
+  options: {
+    // used only in testing because mocking getUserFromAuth doesn't work with jest
+    // due to the way next module loading works
+    getUserFromAuthOverride?: typeof getUserFromAuth;
+    /**
+     * How this helper was reached, for the audit event its admin branch emits.
+     * Defaults to `'rest'`; server-component pages and layouts pass
+     * `'server-component'`.
+     */
+    surface?: AdminAccessSurface;
+  } = {}
 ): Promise<DataOrNextError<{ user: UserWithRole; organization: Organization }>> {
+  const { getUserFromAuthOverride, surface } = options;
   const getUserFromAuthFn =
     process.env.NODE_ENV === 'test' && getUserFromAuthOverride
       ? getUserFromAuthOverride
@@ -74,6 +84,7 @@ export async function getAuthorizedOrgContext(
       tokenSource,
       reason: 'organization_access_rest',
       target: organizationTarget(organizationId),
+      surface,
     });
     const organization = await getOrganizationById(organizationId);
     if (!organization) {

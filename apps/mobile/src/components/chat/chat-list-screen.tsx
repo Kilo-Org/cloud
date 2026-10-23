@@ -1,11 +1,12 @@
 import { FlashList } from '@shopify/flash-list';
 import { type Href, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, useWindowDimensions, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
@@ -16,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { MessageCircle, Plus } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useAuth } from '@/lib/auth/auth-context';
 import { autoModelLabel } from '@/lib/auto-model-name';
 import { defaultChatModel } from '@/lib/chat/backend-model-options';
@@ -61,7 +63,7 @@ function ScopedChatListScreen() {
   const { organizationId } = useOrganization();
   const place = useChatPlace();
   const { bottom } = useSafeAreaInsets();
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
   const tabBarHeight = useMemo(
     () => getEffectiveTabBarHeight({ bottomInset: bottom, platform: Platform.OS, fontScale }),
     [bottom, fontScale]
@@ -247,6 +249,7 @@ function ScopedChatListScreen() {
           description={t('modelChat.empty.description')}
           action={
             <Button
+              className={STATE_ACTION_CLASS}
               onPress={start}
               loading={starting}
               disabled={selectedModel === undefined}

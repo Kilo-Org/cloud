@@ -16,11 +16,8 @@ export type NativeAppActionHandler = (payload: unknown) => Promise<AppActionResu
 /** What registering the JS dispatcher yields. */
 export type NativeAppActionRegistration = {
   /**
-   * Runs one payload through the JS dispatcher. The native module holds this
-   * same handler for its live dispatches; the buffered replay runs through it
-   * too, so a payload that arrived while the app was cold runs exactly like a
-   * live one. Its result is the app's own: nothing travels back through the
-   * entry point that started it.
+   * Runs live and buffered payloads through the same JS dispatcher. The
+   * returned promise preserves the settled result for native consumers.
    */
   handle: NativeAppActionHandler;
   /**
@@ -47,10 +44,7 @@ const nativeModule = requireOptionalNativeModule<KiloAppActionsModule>('KiloAppA
 export const isNativeAppActionsAvailable = nativeModule !== null;
 
 /**
- * Hand the JS dispatcher to the native module and return the handler it drives
- * plus the payloads that arrived before registration, verbatim in arrival
- * order. The handler is the dispatcher's own: it returns the settled
- * `AppActionResult` for the run, and the app is what shows that outcome.
+ * Register the shared handler and return buffered payloads in arrival order.
  *
  * A missing module registers nothing and is not an error; the in-app path
  * keeps working.

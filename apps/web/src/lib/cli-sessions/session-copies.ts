@@ -70,43 +70,20 @@ export function blobUrlColumns(copiedBlobs: Partial<Record<BlobUrlKeys, string>>
   };
 }
 
-const SHARED_SESSION_URL_COLUMNS = {
-  share_id: sharedCliSessions.share_id,
-  api_conversation_history_blob_url: sharedCliSessions.api_conversation_history_blob_url,
-  task_metadata_blob_url: sharedCliSessions.task_metadata_blob_url,
-  ui_messages_blob_url: sharedCliSessions.ui_messages_blob_url,
-  git_state_blob_url: sharedCliSessions.git_state_blob_url,
-} as const;
-
 /**
- * Reserve the share row for a session and state, or hand back the one that
- * already exists. `needsCopy` is false only for a row that carries a copied
- * blob: the existing link keeps the snapshot it was published with.
+ * Reserve a share row for a session and state, or refuse once the account
+ * holds {@link CLI_SESSION_SHARE_MAX_PER_OWNER} shares. A share stores its own
+ * copy of the session folder, taken when the request runs. The row is inserted
+ * under the same lock as the count check; the caller attaches the blob urls
+ * once the copy succeeds and discards the row otherwise.
  */
 export async function reserveSharedSession({
   kiloUserId,
   sessionId,
   sharedState,
-}: ReserveSharedSessionParams): Promise<{ shareId: string; needsCopy: boolean }> {
+}: ReserveSharedSessionParams): Promise<string> {
   return db.transaction(async tx => {
     await lockOwnerCopies(tx, kiloUserId);
-
-    const [existing] = await tx
-      .select(SHARED_SESSION_URL_COLUMNS)
-      .from(sharedCliSessions)
-      .where(
-        and(
-          eq(sharedCliSessions.session_id, sessionId),
-          eq(sharedCliSessions.kilo_user_id, kiloUserId),
-          eq(sharedCliSessions.shared_state, sharedState)
-        )
-      )
-      .limit(1);
-
-    if (existing) {
-      const hasCopiedBlob = BLOB_TYPES.some(filename => existing[`${filename}_blob_url`] != null);
-      return { shareId: existing.share_id, needsCopy: !hasCopiedBlob };
-    }
 
     const [totals] = await tx
       .select({ shareCount: count() })
@@ -122,17 +99,15 @@ export async function reserveSharedSession({
       });
     }
 
-    const [row] = await tx
-      .insert(sharedCliSessions)
-      .values({
-        share_id: crypto.randomUUID(),
-        session_id: sessionId,
-        kilo_user_id: kiloUserId,
-        shared_state: sharedState,
-      })
-      .returning({ share_id: sharedCliSessions.share_id });
+    const shareId = crypto.randomUUID();
+    await tx.insert(sharedCliSessions).values({
+      share_id: shareId,
+      session_id: sessionId,
+      kilo_user_id: kiloUserId,
+      shared_state: sharedState,
+    });
 
-    return { shareId: row.share_id, needsCopy: true };
+    return shareId;
   });
 }
 
@@ -212,8 +187,23 @@ export async function discardReservedFork(sessionId: string): Promise<void> {
 }
 
 /** Delete the shared-sessions object copies of the given shares. */
-export async function deleteSharedSessionCopies(shareIds: string[]): Promise<void> {
+async function deleteSharedSessionCopies(shareIds: string[]): Promise<void> {
   for (const shareId of shareIds) {
     await deleteBlobs(shareId, sessionBlobRefs('shared-sessions'));
   }
+}
+
+/**
+ * Undo a share reservation whose copy did not complete. The row belongs to the
+ * request that inserted it, so removing it together with whatever the copy
+ * wrote leaves nothing behind.
+ */
+export async function discardReservedShare(shareId: string): Promise<void> {
+  try {
+    await deleteSharedSessionCopies([shareId]);
+  } catch {
+    // The row delete below still runs; a cleanup failure must not replace the
+    // error that caused the discard.
+  }
+  await db.delete(sharedCliSessions).where(eq(sharedCliSessions.share_id, shareId));
 }

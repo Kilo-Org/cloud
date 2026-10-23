@@ -29,8 +29,8 @@ import {
 import {
   blobUrlColumns,
   copySessionBlobs,
-  deleteSharedSessionCopies,
   discardReservedFork,
+  discardReservedShare,
   reserveForkedSession,
   reserveSharedSession,
   sessionBlobRefs,
@@ -276,46 +276,43 @@ async function getForkableSession(
 }
 
 /**
- * Publish one session folder under a share id. A session already shared with
- * the same state reuses that row and link; a new share, or a row whose copy
- * never completed, is copied in full before its row claims any blob. A copy
- * that fails leaves the row without a blob, which the next request for the
- * same key completes.
+ * Publish one session folder under a fresh share id, copying the blobs the
+ * session holds when the request runs. The row claims its blobs only after the
+ * copy succeeds; a share that cannot be copied is removed again, so every
+ * stored share resolves to stored blobs.
  */
 async function createSharedSessionCopy(params: {
   kiloUserId: string;
   sessionId: string;
   sharedState: string;
 }): Promise<{ share_id: string; session_id: string }> {
-  const reservation = await reserveSharedSession(params);
+  const shareId = await reserveSharedSession(params);
 
-  if (reservation.needsCopy) {
+  try {
     const blobUrls = await copySessionBlobs(
       params.sessionId,
       'sessions',
-      reservation.shareId,
+      shareId,
       'shared-sessions'
     );
     const [completed] = await db
       .update(sharedCliSessions)
       .set(blobUrlColumns(blobUrls))
-      .where(eq(sharedCliSessions.share_id, reservation.shareId))
+      .where(eq(sharedCliSessions.share_id, shareId))
       .returning({ share_id: sharedCliSessions.share_id });
 
     if (!completed) {
-      try {
-        await deleteSharedSessionCopies([reservation.shareId]);
-      } catch {
-        // The row is gone; a cleanup failure must not replace the conflict.
-      }
       throw new TRPCError({
         code: 'CONFLICT',
         message: 'The share was removed before its copy finished. Share the session again.',
       });
     }
-  }
 
-  return { share_id: reservation.shareId, session_id: params.sessionId };
+    return { share_id: shareId, session_id: params.sessionId };
+  } catch (error) {
+    await discardReservedShare(shareId);
+    throw error;
+  }
 }
 
 /**

@@ -12,8 +12,17 @@ import {
   type ControlPlaneRouteView,
   type ControlPlaneWorkspaceFailureSubtype,
 } from '../../shared/control-plane-protocol.js';
-import type { SessionCredentialGrant } from '../../sandbox-control/session-credentials.js';
+import {
+  SessionCredentialUpgradeRequiredError,
+  type SessionCredentialGrant,
+} from '../../sandbox-control/session-credentials.js';
 import { logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
+import {
+  createGrantDiagnostic,
+  pickGrantDiagnosticFields,
+  type GrantDiagnostic,
+  type GrantDiagnosticSnapshot,
+} from '../../sandbox-control/grant-diagnostic.js';
 import { routes as routesTable } from './sqlite-schema.js';
 import type { SyncAcceptedHandleStorage } from './accepted-handles.js';
 import { lastSentHandleKey } from './scope-handle-delivery.js';
@@ -85,7 +94,8 @@ export type RouteContext = {
    */
   issueGrant: (
     spec: ControlPlaneRouteSpec,
-    source: ControlPlaneCredentialSource
+    source: ControlPlaneCredentialSource,
+    diagnostic?: GrantDiagnostic
   ) => Promise<RouteGrantIssue>;
   /**
    * Applies the provider credential policy for the current grants. Resolves
@@ -265,7 +275,8 @@ export async function failRoute(
   spec: ControlPlaneRouteSpec,
   attemptId: string,
   reason: ControlPlaneFailureReason,
-  stage = 'route'
+  stage = 'route',
+  diagnostic?: GrantDiagnosticSnapshot
 ): Promise<RouteRecord> {
   const existing = await readRoute(ctx.db, spec.sessionId);
   const route: RouteRecord = {
@@ -285,6 +296,7 @@ export async function failRoute(
     attemptId,
     reason,
     stage,
+    ...(diagnostic === undefined ? {} : pickGrantDiagnosticFields(diagnostic)),
   });
   await ctx.notify(spec.sessionId, { state: 'failed', attemptId, reason });
   return route;
@@ -358,16 +370,21 @@ export async function startAttempt(
       'credential_source_missing'
     );
   }
+  const diagnostic = createGrantDiagnostic();
   let issued: RouteGrantIssue;
   try {
-    issued = await ctx.issueGrant(attemptSpec, source);
+    issued = await ctx.issueGrant(attemptSpec, source, diagnostic);
   } catch (error) {
+    const upgradeRequired = error instanceof SessionCredentialUpgradeRequiredError;
     return failRoute(
       ctx,
       attemptSpec,
       attemptId,
-      'workspace_setup_failed',
-      admissionFailureStage(error, 'credential_grant_failed')
+      upgradeRequired ? 'credential_upgrade_required' : 'workspace_setup_failed',
+      upgradeRequired
+        ? 'credential_upgrade_required'
+        : admissionFailureStage(error, 'credential_grant_failed'),
+      diagnostic.snapshot()
     );
   }
   const route = newPreparingRoute(

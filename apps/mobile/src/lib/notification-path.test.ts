@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { SECURITY_LIFECYCLE_EVENTS } from '@kilocode/notifications';
+
 import { notificationPathForData, prPathForData } from './notification-path';
 
 describe('prPathForData', () => {
@@ -122,6 +124,7 @@ describe('notificationPathForData', () => {
         status: 'happy',
         running: 1,
         needsInput: 0,
+        needsApproval: 0,
         idle: 0,
         scheduled: 0,
         updatedAt: '2026-01-01T00:00:00.000Z',
@@ -169,7 +172,7 @@ describe('notificationPathForData', () => {
         findingId: 'finding-1',
         scope: 'personal',
       })
-    ).toBe('/(app)/(tabs)/(3_profile)/security-agent/personal/findings/finding-1?via=push');
+    ).toBe('/(app)/security-agent/personal/findings/finding-1?via=push');
   });
 
   it('routes security_finding notifications for an organization scope', () => {
@@ -179,22 +182,11 @@ describe('notificationPathForData', () => {
         findingId: 'finding-2',
         scope: 'org-xyz',
       })
-    ).toBe('/(app)/(tabs)/(3_profile)/security-agent/org-xyz/findings/finding-2?via=push');
+    ).toBe('/(app)/security-agent/org-xyz/findings/finding-2?via=push');
   });
 
   it('routes every security_lifecycle event value to the finding detail path', () => {
-    const events = [
-      'analysis_completed',
-      'analysis_failed',
-      'remediation_queued',
-      'remediation_pr_opened',
-      'remediation_failed',
-      'remediation_blocked',
-      'remediation_no_changes_needed',
-      'remediation_cancelled',
-    ] as const;
-
-    for (const event of events) {
+    for (const event of SECURITY_LIFECYCLE_EVENTS) {
       expect(
         notificationPathForData({
           type: 'security_lifecycle',
@@ -202,7 +194,7 @@ describe('notificationPathForData', () => {
           findingId: 'finding-3',
           scope: 'personal',
         })
-      ).toBe('/(app)/(tabs)/(3_profile)/security-agent/personal/findings/finding-3?via=push');
+      ).toBe('/(app)/security-agent/personal/findings/finding-3?via=push');
     }
   });
 
@@ -214,6 +206,6 @@ describe('notificationPathForData', () => {
         findingId: 'finding-4',
         scope: 'org-xyz',
       })
-    ).toBe('/(app)/(tabs)/(3_profile)/security-agent/org-xyz/findings/finding-4?via=push');
+    ).toBe('/(app)/security-agent/org-xyz/findings/finding-4?via=push');
   });
 });

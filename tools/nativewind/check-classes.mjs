@@ -65,16 +65,6 @@ const THEME_TOKENS = (() => {
 
 const RULES = [
   {
-    // `bg-black/40` compiles to `#NaNNaNNaN66`: Tailwind emits
-    // `color-mix(in oklab, #000 40%, transparent)`, and folding that mix
-    // through OKLab yields NaN channels for achromatic black. React Native
-    // cannot parse the result, so the element paints nothing at all. Other
-    // colours survive the same fold — `bg-white/20` gives `#fff3` — so this
-    // is black specifically, not the `/alpha` modifier in general.
-    pattern: new RegExp(`\\b(?:${COLOR_UTILITIES})-black/\\d+\\b`, 'g'),
-    advice: 'compiles to an unparseable #NaN colour; use a concrete value, e.g. bg-[#00000066]',
-  },
-  {
     // A `/opacity` modifier on a theme colour compiles to
     // `color-mix(in oklab, var(--color-…) n%, transparent)`. NativeWind v5
     // cannot decompose the variable, so the runtime drops the declaration and
@@ -245,21 +235,17 @@ function checkCompilerStillDropsThese() {
   let compile;
   try {
     ({ compile } = require('react-native-css/compiler'));
-  } catch {
-    console.warn('check-classes: react-native-css not resolvable, skipped the compiler assertions');
+  } catch (error) {
+    const detail = error instanceof Error ? error.message.split('\n')[0] : String(error);
+    fail(
+      `check-classes: react-native-css/compiler did not resolve (${detail}) — run pnpm install; the compiler pins cannot be verified without it`
+    );
     return;
   }
   const firstValue = css => {
     const sheet = compile(css).stylesheet();
     return JSON.stringify(sheet?.s?.[0]?.[1]?.[0]?.d?.[0] ?? null);
   };
-
-  const black = firstValue('.x { background-color: color-mix(in oklab, #000 40%, transparent); }');
-  if (!black.includes('NaN')) {
-    fail(
-      `check-classes: color-mix over black now compiles to ${black} instead of NaN — drop the *-black/<alpha> rule`
-    );
-  }
 
   const alignment = compile('.x { text-align: start; }').warnings();
   if (!JSON.stringify(alignment).includes('text-align')) {

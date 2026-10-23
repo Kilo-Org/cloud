@@ -25,6 +25,7 @@
     "error": "ข้อผิดพลาด: {{error}}",
     "back": "ย้อนกลับ",
     "somethingWentWrong": "เกิดข้อผิดพลาด",
+    "actionNotRecorded": "เราไม่สามารถบันทึกการดำเนินการนี้ได้ โปรดลองอีกครั้งในภายหลัง",
     "couldNotOpen": "ไม่สามารถเปิด {{label}} ได้",
     "link": "ลิงก์",
     "takingLonger": "ใช้เวลานานกว่าที่คาดไว้ คุณสามารถปิดหน้านี้แล้วตรวจสอบอีกครั้งได้",
@@ -35,6 +36,8 @@
     "connectGithub": "เชื่อมต่อ GitHub",
     "cost": "ค่าใช้จ่าย",
     "discard": "ทิ้ง",
+    "discardChangesMessage": "การเปลี่ยนแปลงของคุณจะหายไป",
+    "discardChangesTitle": "ทิ้งการเปลี่ยนแปลง",
     "findings": "ข้อค้นพบ",
     "mergeRequest": "merge request",
     "notConnected": "ยังไม่เชื่อมต่อ",
@@ -108,8 +111,10 @@
     "notFound": "ไม่พบข้อมูล",
     "online": "ออนไลน์",
     "open": "เปิด {{name}}",
-    "openPullRequest": "เปิดพูลรีเควสต์",
+    "openPullRequest": "เปิด PR",
+    "completed": "เสร็จสิ้น",
     "pending": "รอดำเนินการ",
+    "running": "กำลังทำงาน",
     "performance": "ประสิทธิภาพ",
     "preferences": "การตั้งค่า",
     "privacyPolicy": "นโยบายความเป็นส่วนตัว",
@@ -137,7 +142,7 @@
     "working": "กำลังทำงาน",
     "yourOwnRepositories": "คลังโค้ดของคุณเอง",
     "dismissed": "ละเว้นแล้ว",
-    "agent": "ตัวแทน",
+    "agent": "เอเจนต์",
     "durationMinuteShort": "น.",
     "durationHourShort": "ชม.",
     "changes": "การเปลี่ยนแปลง"
@@ -219,7 +224,7 @@
     "hideBalance": "ซ่อนยอดคงเหลือ",
     "showBalance": "แสดงยอดคงเหลือ",
     "balanceHidden": "ยอดคงเหลือถูกซ่อน",
-    "bonusCreditsExpiring": "เครดิตโบนัส {{amount}} จะหมดอายุ {{date}}",
+    "bonusCreditsExpiring": "เครดิต {{amount}} จะหมดอายุ {{date}}",
     "signOutTitle": "ออกจากระบบหรือไม่?",
     "signOutMessage": "คุณต้องลงชื่อเข้าใช้อีกครั้งเพื่อใช้พื้นที่ทำงาน",
     "deleteAccountTitle": "ลบบัญชีหรือไม่?",
@@ -586,6 +591,8 @@
     "installKiloGitHubApp": "ติดตั้ง Kilo GitHub App",
     "checkConnection": "ตรวจสอบการเชื่อมต่อ",
     "couldNotLoadPullRequest": "ไม่สามารถโหลด PR ได้",
+    "reviewServiceUnavailable": "บริการไม่พร้อมใช้งาน",
+    "reviewServiceUnavailableDescription": "บริการไม่พร้อมใช้งานชั่วคราว โปรดลองอีกครั้งในภายหลัง",
     "description": "คำอธิบาย",
     "noDescriptionProvided": "ไม่มีคำอธิบาย",
     "review": "การตรวจสอบ",
@@ -757,6 +764,7 @@
       "truncationBanner_other": "กำลังแสดง {{limit}} ไฟล์แรกจากทั้งหมด {{total}} ไฟล์ที่เปลี่ยนแปลง — ขีดจำกัด API ของ GitHub"
     },
     "linkPasteClipboardEmpty": "คลิปบอร์ดว่างเปล่า",
+    "linkPasteDenied": "การเข้าถึงการวางถูกปฏิเสธ อนุญาตการวางแล้วลองอีกครั้ง",
     "linkPasteNotAPullRequest": "ไม่ใช่ลิงก์ PR หรือ merge request",
     "announce": {
       "commentPosted": "โพสต์ความคิดเห็นแล้ว",
@@ -780,7 +788,6 @@
       "mergeResultDefaultError": "GitHub รวมไม่สำเร็จ",
       "mergeResultNotCompleted": "{{term}} ยังไม่ถูกรวม ตรวจสอบสถานะแล้วลองอีกครั้ง",
       "ambiguous": "ยืนยันผลไม่ได้ — ตรวจสอบ PR ก่อนลองอีกครั้ง",
-      "persistenceFailed": "เราไม่สามารถบันทึกการดำเนินการนี้ได้ โปรดลองอีกครั้งในภายหลัง",
       "forbidden": "ไม่มีสิทธิ์ดำเนินการ"
     },
     "capabilities": {
@@ -985,7 +992,7 @@
       "takePhoto": "ถ่ายภาพ",
       "photoLibrary": "คลังรูปภาพ",
       "files": "ไฟล์",
-      "cameraAccessMessage": "อนุญาตให้ใช้กล้องในการตั้งค่าเพื่อถ่ายรูป"
+      "cameraAccessMessage": "อนุญาตให้ใช้กล้องในการตั้งค่าเพื่อถ่ายภาพ"
     },
     "typingIndicator": {
       "someone": "มีคน",
@@ -1380,7 +1387,7 @@
       "warning": "ไม่ผ่านเมื่อพบข้อค้นพบระดับคำเตือนหรือวิกฤต"
     },
     "instructions": {
-      "title": "คำสั่งที่กำหนดเอง",
+      "title": "คำแนะนำที่กำหนดเอง",
       "deprecation": "คำแนะนำที่กำหนดเองจะเลิกใช้งานในอนาคต ย้ายคำแนะนำเหล่านี้ไปไว้ในไฟล์ REVIEW.md ในคลังโค้ดแทน",
       "placeholder": "เช่น ตรวจให้เป็นไปตามแนวทางการจัดการข้อผิดพลาดของเรา…"
     },
@@ -1422,7 +1429,7 @@
       "showMore": "แสดงเพิ่มเติม",
       "created": "สร้างเมื่อ",
       "started": "เริ่มเมื่อ",
-      "tokens": "โทเค็น",
+      "tokens": "โทเคน",
       "tokensInOut": "ขาเข้า {{input}} / ขาออก {{output}}",
       "council": "คณะผู้ตรวจสอบ",
       "decision": "การตัดสินใจ",
@@ -1434,7 +1441,7 @@
       "transcriptWaiting": "กำลังรอบันทึกการตรวจสอบ",
       "transcriptEmpty": "ไม่มีบันทึกสำหรับการตรวจสอบนี้",
       "transcriptRetry": "ไม่สามารถโหลดบันทึกการตรวจสอบได้",
-      "transcriptLive": "กำลังทำงาน",
+      "transcriptLive": "สด",
       "agentIdle": "เอเจนต์ว่าง",
       "agentWorking": "เอเจนต์กำลังทำงาน...",
       "anErrorOccurred": "เกิดข้อผิดพลาด",
@@ -1452,8 +1459,9 @@
       "loading": "กำลังโหลดความจำในการตรวจสอบ",
       "couldNotLoad": "โหลดความจำในการตรวจสอบไม่สำเร็จ",
       "off": "ความจำในการตรวจสอบปิดอยู่",
+      "on": "ความจำในการตรวจสอบเปิดอยู่",
       "offDescription": "เปิดเพื่อให้ Kilo เรียนรู้จากคำตอบของผู้ดูแลและเสนอคำแนะนำสำหรับไฟล์ REVIEW.md",
-      "readOnlyDescription": "เฉพาะเจ้าขององค์กรและผู้จัดการการเรียกเก็บเงินเท่านั้นที่สามารถเปิดความจำในการตรวจสอบได้",
+      "readOnlyDescription": "เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถเปลี่ยนความจำในการตรวจสอบได้",
       "enable": "เปิดความจำในการตรวจสอบ",
       "loadingProposals": "กำลังโหลดข้อเสนอ",
       "couldNotLoadProposals": "โหลดข้อเสนอไม่สำเร็จ",
@@ -1470,10 +1478,13 @@
       "pullRequestUrl": "URL ของ PR",
       "instructions": "คำแนะนำ (ไม่บังคับ)",
       "instructionsPlaceholder": "เรื่องที่ต้องการให้ผู้ตรวจสอบเน้นเป็นพิเศษ…",
-      "starting": "กำลังเริ่มการตรวจสอบ...",
+      "starting": "กำลังเริ่มการตรวจสอบ…",
       "start": "เริ่มการตรวจสอบ"
     },
-    "notConnectedReadOnly": "{{platform}} ยังไม่เชื่อมต่อ เฉพาะเจ้าขององค์กรและผู้จัดการการเรียกเก็บเงินเท่านั้นที่สามารถเชื่อมต่อได้",
+    "notConnectedReadOnly": "{{platform}} ยังไม่เชื่อมต่อ เฉพาะเจ้าขององค์กรและผู้ดูแลระบบเท่านั้นที่สามารถเชื่อมต่อได้",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} ยังไม่เชื่อมต่อ ขอให้เจ้าของ ผู้ดูแลระบบ หรือผู้ดูแลการเรียกเก็บเงินขององค์กรเชื่อมต่อ."
+    },
     "webhookSetup": "ยังตั้งค่าเว็บฮุกไม่เสร็จ",
     "webhookSetupDescription": "คลังโค้ดบางแห่งอาจไม่ได้รับการตรวจสอบอัตโนมัติ",
     "autoReviews": "การตรวจสอบอัตโนมัติ",
@@ -1481,7 +1492,7 @@
     "followReviewMd": "ปฏิบัติตาม REVIEW.md",
     "followReviewMdSubtitle": "ทำตามคำแนะนำในไฟล์ REVIEW.md ของแต่ละคลังโค้ด",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ยังไม่เชื่อมต่อ เฉพาะเจ้าขององค์กรและผู้จัดการการเรียกเก็บเงินเท่านั้นที่สามารถเชื่อมต่อได้",
+      "notConnectedReadOnly": "Bitbucket ยังไม่เชื่อมต่อ เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถเชื่อมต่อได้",
       "setupIncomplete": "ยังตั้งค่าไม่เสร็จ ตั้งค่าต่อให้เสร็จบน kilo.ai",
       "setup": "การตั้งค่า Bitbucket"
     },
@@ -1520,7 +1531,7 @@
       "reviewStyle": "รูปแบบการตรวจสอบ",
       "focusAreas": "ประเด็นที่เน้น",
       "allAreas": "ทุกด้าน",
-      "customInstructions": "คำสั่งที่กำหนดเอง",
+      "customInstructions": "คำแนะนำที่กำหนดเอง",
       "set": "ตั้งค่าแล้ว",
       "nSelected": "เลือกแล้ว {{displayCount}} รายการ",
       "proposedReviewMdGuidance": "คำแนะนำที่เสนอสำหรับ REVIEW.md"
@@ -1528,14 +1539,12 @@
     "decision": {
       "pass": "ผ่าน",
       "block": "บล็อก",
-      "noDecision": "ยังไม่มีข้อสรุป",
+      "noDecision": "ไม่มีข้อสรุป",
       "noResult": "ไม่มีผลลัพธ์"
     },
     "updateFailed": "อัปเดตตัวตรวจสอบโค้ดไม่สำเร็จ",
     "configSaveFailed": "บันทึกการตั้งค่าการตรวจสอบไม่สำเร็จ",
     "status": {
-      "running": "กำลังทำงาน",
-      "completed": "เสร็จสิ้น",
       "interrupted": "ถูกขัดจังหวะ"
     },
     "reviewStyle": {
@@ -1661,7 +1670,14 @@
       "whereFound": "ตำแหน่งที่พบ ({{displayCount}})",
       "fullReport": "รายงานฉบับเต็มที่สร้างขึ้น",
       "yes": "ใช่",
-      "no": "ไม่"
+      "no": "ไม่",
+      "action": {
+        "analyzeCodebase": "วิเคราะห์โค้ดเบส",
+        "dismiss": "ปัดทิ้ง",
+        "manualReview": "การตรวจสอบที่เริ่มด้วยตนเอง",
+        "monitor": "ติดตาม",
+        "openPr": "เปิด PR"
+      }
     },
     "dashboard": {
       "findingsCount": "ข้อค้นพบ {{displayCount}} รายการ",
@@ -1736,7 +1752,7 @@
       "couldNotLoad": "ไม่สามารถโหลดข้อค้นพบนี้ได้",
       "couldNotCheckPermissions": "ไม่สามารถตรวจสอบสิทธิ์การละเว้นได้",
       "cannotDismissTitle": "ไม่สามารถละเว้นข้อค้นพบนี้ได้",
-      "cannotDismissDescription": "เฉพาะเจ้าขององค์กรและผู้จัดการการเรียกเก็บเงินเท่านั้นที่สามารถละเว้นข้อค้นพบได้",
+      "cannotDismissDescription": "เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถละเว้นข้อค้นพบได้",
       "alreadyResolvedDescription": "ข้อค้นพบนี้ได้รับการแก้ไขแล้ว จึงไม่สามารถละเว้นได้อีก"
     },
     "findingDetails": {
@@ -1778,7 +1794,7 @@
       "automationAllOff": "ปิดทั้งหมด",
       "automationCount": "เปิดอยู่ {{displayCount}} จาก 3 รายการ",
       "notificationsCount": "เปิดอยู่ {{displayCount}} จาก 2 รายการ",
-      "disabledNoManage": "Security Agent ปิดอยู่ เฉพาะเจ้าขององค์กรและผู้จัดการการเรียกเก็บเงินเท่านั้นที่สามารถเปิดได้",
+      "disabledNoManage": "Security Agent ปิดอยู่ เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถเปิดได้",
       "disabledNoRepo": "เลือกคลังโค้ดอย่างน้อยหนึ่งแห่งก่อนเปิด Security Agent",
       "disabledPrompt": "เปิด Security Agent เพื่อซิงค์การแจ้งเตือน Dependabot เลือกคลังโค้ด และตั้งค่าระบบอัตโนมัติ"
     },
@@ -1827,7 +1843,7 @@
       "invalidDayCount": "ระบุจำนวนวันเป็นจำนวนเต็มตั้งแต่ 1 ถึง 365",
       "remediationDeadlineA11y": "ระยะเวลาแก้ไขระดับ{{label}} หน่วยเป็นวัน",
       "enterWholeNumber": "ป้อนจำนวนเต็มตั้งแต่ 1 ถึง 365",
-      "permissionNote": "เฉพาะเจ้าขององค์กรและผู้จัดการการเรียกเก็บเงินเท่านั้นที่สามารถเปลี่ยนการตั้งค่าเหล่านี้ได้",
+      "permissionNote": "เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถเปลี่ยนการตั้งค่าเหล่านี้ได้",
       "enableTracking": "เปิดการติดตาม SLA",
       "enableTrackingSubtitle": "กำหนดเวลาแก้ไขตามระดับความรุนแรงของข้อค้นพบ",
       "deadlinesHeading": "ระยะเวลาแก้ไข (วัน)"
@@ -1863,12 +1879,16 @@
     "settingsSave": {
       "saveChanges": "บันทึกการเปลี่ยนแปลง",
       "unsavedTitle": "การเปลี่ยนแปลงที่ยังไม่บันทึก",
-      "unsavedMessage": "บันทึกการเปลี่ยนแปลงก่อนออกจากหน้าจอนี้หรือไม่?"
+      "unsavedMessage": "บันทึกการเปลี่ยนแปลงก่อนออกจากหน้าจอนี้หรือไม่?",
+      "unsavedInvalidMessage": "ยังไม่สามารถบันทึกการเปลี่ยนแปลงเหล่านี้ได้ แก้ไขให้ถูกต้องเพื่อบันทึก หรือทิ้งเพื่อออก"
     },
     "auditReportButton": {
       "viewA11y": "ดูรายงานการตรวจสอบ"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "ผู้ดูแลระบบ Kilo",
+      "actorMaskedUser": "ผู้ใช้ที่ซ่อนตัวตน",
+      "actorSystem": "ระบบ Kilo",
       "couldNotLoad": "ไม่สามารถโหลดรายงานการตรวจสอบได้",
       "events": "เหตุการณ์",
       "generated": "สร้างเมื่อ {{generatedAt}}",
@@ -1879,8 +1899,25 @@
       "summary": "สรุปรายงาน",
       "title": "รายงานการตรวจสอบ",
       "unavailable": "รายงานการตรวจสอบไม่พร้อมใช้งาน",
-      "unavailableDescription": "เฉพาะเจ้าขององค์กรและผู้จัดการการเรียกเก็บเงินเท่านั้นที่สามารถดูรายงานการตรวจสอบได้ ติดต่อเจ้าขององค์กรหรือผู้จัดการการเรียกเก็บเงินเพื่อขอสิทธิ์เข้าถึง",
-      "queryFailed": "ดึงข้อมูลรายงานไม่สำเร็จ ลองอีกครั้ง"
+      "unavailableDescription": "เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้จัดการการเรียกเก็บเงินเท่านั้นที่สามารถดูรายงานการตรวจสอบได้ ติดต่อเจ้าขององค์กร ผู้ดูแลระบบ หรือผู้จัดการการเรียกเก็บเงินเพื่อขอสิทธิ์เข้าถึง",
+      "queryFailed": "ดึงข้อมูลรายงานไม่สำเร็จ ลองอีกครั้ง",
+      "eventActions": {
+        "findingAnalysisCompleted": "การวิเคราะห์เสร็จสมบูรณ์",
+        "findingAnalysisFailed": "การวิเคราะห์ล้มเหลว",
+        "findingAutoDismissed": "ปัดทิ้งอัตโนมัติแล้ว",
+        "findingCreated": "นำเข้าแล้ว",
+        "findingDeleted": "ลบแล้ว",
+        "findingDismissed": "ละเว้นแล้ว",
+        "findingSeverityChanged": "เปลี่ยนความรุนแรงแล้ว",
+        "findingStatusChange": "เปลี่ยนสถานะแล้ว",
+        "findingSuperseded": "ถูกแทนที่แล้ว",
+        "remediationBlocked": "การแก้ไขถูกบล็อก",
+        "remediationCancelled": "ยกเลิกแล้ว",
+        "remediationFailed": "การแก้ไขล้มเหลว",
+        "remediationNoChangesNeeded": "ไม่จำเป็นต้องเปลี่ยนแปลง",
+        "remediationPrOpened": "เปิด PR แล้ว",
+        "remediationQueued": "ขอการแก้ไขแล้ว"
+      }
     },
     "notifications": {
       "couldNotLoad": "ไม่สามารถโหลดการตั้งค่าการแจ้งเตือนได้",
@@ -1912,7 +1949,6 @@
       "installApp": "ติดตั้ง GitHub App",
       "reauthorizeButton": "ให้สิทธิ์ GitHub App อีกครั้ง",
       "reauthorizeDescription": "Security Agent ต้องใช้สิทธิ์ vulnerability_alerts เพื่อเข้าถึงการแจ้งเตือน Dependabot ให้สิทธิ์ GitHub App อีกครั้งเพื่อเพิ่มสิทธิ์นี้",
-      "reauthorizeFailed": "ไม่สามารถเริ่มขั้นตอนการให้สิทธิ์อีกครั้งได้ กรุณาลองอีกครั้ง",
       "reauthorizeTitle": "ต้องมีสิทธิ์เพิ่มเติม",
       "setupFailed": "ไม่สามารถเริ่มการตั้งค่า GitHub ได้ กรุณาลองอีกครั้ง"
     },
@@ -1931,7 +1967,12 @@
       "syncMayNotHaveCompleted": "การซิงค์อาจยังไม่เสร็จสมบูรณ์ ลองอีกครั้งเพื่อปรับข้อมูลให้ตรงกัน หรือละทิ้งรายการนี้",
       "syncInProgress": "กำลังซิงค์ข้อมูลด้านความปลอดภัยอยู่ กรุณาลองอีกครั้ง",
       "dismissalInProgress": "กำลังดำเนินการละเว้นรายการนี้อยู่ กรุณาลองอีกครั้ง",
-      "couldNotReadPendingSyncs": "ไม่สามารถอ่านการซิงค์ที่รอดำเนินการได้ ลองอีกครั้ง"
+      "couldNotReadPendingSyncs": "ไม่สามารถอ่านการซิงค์ที่รอดำเนินการได้ ลองอีกครั้ง",
+      "ambiguous": "ยืนยันผลไม่ได้ — ตรวจสอบบทวิเคราะห์ความปลอดภัยก่อนลองอีกครั้ง",
+      "settleFailed": "การดำเนินการเสร็จสมบูรณ์แล้ว แต่เราบันทึกผลลัพธ์ไม่สำเร็จ กรุณาลองอีกครั้ง",
+      "replayFailed": "การดำเนินการนี้ยังไม่เสร็จสมบูรณ์ กรุณาลองอีกครั้ง",
+      "actionFailed": "ดำเนินการนี้ให้เสร็จสมบูรณ์ไม่ได้ กรุณาลองอีกครั้ง",
+      "actionBlocked": "ดำเนินการนี้ให้เสร็จสมบูรณ์ไม่ได้ ต้องแก้ไขปัญหาก่อนจึงจะลองใหม่ได้"
     },
     "analysisState": {
       "queued": "รอคิววิเคราะห์",
@@ -2047,7 +2088,7 @@
       "completedWillAppear": "เซสชันที่เสร็จแล้วจะแสดงที่นี่",
       "noPastSessions": "ยังไม่มีเซสชันที่ผ่านมา",
       "pastSessions": "เซสชันที่ผ่านมา",
-      "live": "กำลังทำงาน",
+      "live": "สด",
       "updating": "กำลังอัปเดต"
     },
     "sessionRow": {
@@ -2071,15 +2112,15 @@
       "dollar_other": "ดอลลาร์",
       "costSpoken": "ค่าใช้จ่าย {{cost}}",
       "costSpokenWithTime": "ค่าใช้จ่าย {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}"
+      "pullRequest": "PR {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "ไม่สามารถเปิด GitHub ได้",
       "couldNotOpenMessage": "เริ่มตั้งค่า GitHub App ไม่สำเร็จ โปรดลองอีกครั้ง",
       "installedTitle": "ติดตั้ง GitHub App แล้ว",
       "installedMessage": "เชื่อมต่อรีโพซิทอรีของคุณแล้ว",
-      "pendingTitle": "รอการอนุมัติจากผู้ดูแลระบบ",
-      "pendingMessage": "ผู้ดูแลระบบขององค์กรต้องอนุมัติคำขอติดตั้ง",
+      "pendingTitle": "รอการอนุมัติจากผู้ดูแลองค์กร",
+      "pendingMessage": "ผู้ดูแลองค์กรต้องอนุมัติคำขอติดตั้ง",
       "accountMismatchTitle": "บัญชีไม่ตรงกัน",
       "accountMismatchMessage": "การเชื่อมต่อนี้เริ่มจาก Kilo App ที่เข้าสู่ระบบด้วยบัญชีอื่น เข้าสู่ระบบบนเว็บด้วยบัญชีนั้น หรือเริ่มใหม่จากแอป",
       "cannotCompleteTitle": "ไม่สามารถติดตั้งให้เสร็จสมบูรณ์ได้",
@@ -2139,7 +2180,7 @@
       "exitSession": "ออกจากเซสชัน",
       "restartExitFailed": "เริ่มเซสชันใหม่แล้ว แต่เซสชันก่อนหน้ายังเปิดอยู่",
       "exitNotSupported": "เซสชันปัจจุบันไม่รองรับการออกจากเซสชันระยะไกล",
-      "exitUnavailable": "ขณะนี้ไม่สามารถออกจากเซสชันระยะไกลนี้ได้",
+      "exitUnavailable": "ไม่สามารถออกจากเซสชันระยะไกลนี้ได้",
       "exitNeedsNewerCli": "คำสั่งที่ขึ้นต้นด้วย / ในเซสชันระยะไกลต้องใช้ Kilo CLI เวอร์ชันใหม่กว่า อัปเดต Kilo CLI แล้วเชื่อมต่ออีกครั้ง"
     },
     "sessionConnection": {
@@ -2190,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "ไม่พบคลังโค้ด ตรวจสอบสิทธิ์เข้าถึงคลังโค้ดบน GitLab แล้วรีเฟรช",
       "noRepositoriesVisibleBitbucket": "ไม่พบคลังโค้ด ตรวจสอบสิทธิ์เข้าถึงคลังโค้ดบน Bitbucket แล้วรีเฟรช",
       "bitbucketOrganizationsOnly": "Bitbucket พร้อมใช้งานสำหรับองค์กรเท่านั้น",
+      "githubNeedsAttention": "ต้องเชื่อมต่อ GitHub อีกครั้ง",
+      "githubNeedsAttentionDescription": "เชื่อมต่อแอป GitHub ของ Kilo อีกครั้ง แล้วรีเฟรชเพื่อโหลดคลังโค้ด",
+      "partialRepositories": "คลังโค้ด GitHub บางรายการไม่ได้โหลด",
       "branchPickerTitle": "เลือกบรานช์",
       "branchDefault": "ค่าเริ่มต้น",
       "branchAccessibility": "บรานช์: {{label}}",
@@ -2197,6 +2241,7 @@
       "branchLoadError": "โหลดบรานช์ไม่ได้",
       "branchUnavailable": "ไม่มีบรานช์พร้อมใช้งานสำหรับคลังโค้ดนี้ ตรวจสอบสิทธิ์การเข้าถึงของคุณกับผู้ให้บริการ แล้วเลือกคลังโค้ดอื่น",
       "branchEmpty": "ไม่มีบรานช์พร้อมใช้งาน",
+      "branchListIncomplete": "แสดงบรานช์เพียงบางส่วนเท่านั้น คลังโค้ดมีบรานช์มากกว่าที่รายการนี้จะรวมได้",
       "branchPlaceholder": "เลือกบรานช์หนึ่ง",
       "runOnWithTarget": "รันบน: {{target}}",
       "environment": "สภาพแวดล้อม",
@@ -2208,6 +2253,8 @@
       "commitAndPush": "คอมมิตและพุช",
       "startSession": "เริ่มเซสชัน",
       "selectRepositoryToStart": "เลือกคลังโค้ดเพื่อเริ่มต้น",
+      "enterPromptToStart": "เพิ่มพรอมป์ตเพื่อเริ่มต้น",
+      "enterPromptOrFileToStart": "เพิ่มพรอมป์ตหรือไฟล์เพื่อเริ่มต้น",
       "connectProviderToStart": "เชื่อมต่อผู้ให้บริการเพื่อเริ่มต้น",
       "promptPlaceholder": "อยากทำงานอะไร?",
       "couldNotLoadModels": "ไม่สามารถโหลดโมเดลได้",
@@ -2234,7 +2281,7 @@
       "pickProfile": "เลือกโปรไฟล์",
       "noProfile": "ไม่มีโปรไฟล์",
       "manageProfiles": "จัดการโปรไฟล์",
-      "noProfiles": "ยังไม่มีโปรไฟล์ สร้างรายการเพื่อเพิ่มตัวแปรสภาพแวดล้อม เซิร์ฟเวอร์ MCP และทักษะ",
+      "noProfiles": "ยังไม่มีโปรไฟล์ สร้างโปรไฟล์เพื่อเพิ่มตัวแปรสภาพแวดล้อม เซิร์ฟเวอร์ MCP และทักษะ",
       "advancedConfig": "การกำหนดค่าขั้นสูง",
       "advancedConfigDescription": "เลือกโปรไฟล์เพื่อโหลดการกำหนดค่าที่บันทึกไว้ และกำหนดค่าตัวแปรสภาพแวดล้อมเพิ่มเติมและคำสั่งการตั้งค่าด้วยตนเอง",
       "saveAsProfile": "บันทึกเป็นโปรไฟล์",
@@ -2251,7 +2298,7 @@
       "profilesActive": "โปรไฟล์ใช้งานอยู่",
       "customConfigActive": "การกำหนดค่าแบบกำหนดเองทำงานอยู่",
       "configNeedsAttention": "การกำหนดค่าจำเป็นต้องได้รับการดูแล",
-      "repoProfile": "โปรไฟล์ซื้อคืน",
+      "repoProfile": "โปรไฟล์คลังโค้ด",
       "selectedProfile": "โปรไฟล์ที่เลือก",
       "manualOverrides": "การแทนที่ด้วยตนเอง",
       "openSettingsToReview": "เปิดการตั้งค่าเพื่อตรวจสอบ",
@@ -2286,7 +2333,8 @@
       "linesBadge_other": "{{displayCount}} บรรทัด",
       "matchesBadge_one": "พบ {{displayCount}} รายการ",
       "matchesBadge_other": "พบ {{displayCount}} รายการ",
-      "noOutput": "ไม่มีเอาต์พุต"
+      "noOutput": "ไม่มีเอาต์พุต",
+      "translationFailed": "การแปลล้มเหลว"
     },
     "readToolMarkdown": {
       "linesTruncated": "บรรทัด {{start}}–{{end}} (ตัดบางส่วนออก)",
@@ -2660,7 +2708,7 @@
       "olderActivity": "กิจกรรมก่อนหน้า",
       "olderActivityDescription": "ค่าใช้จ่ายที่ไม่อยู่ในประวัติที่โหลดมา",
       "ofWindowTokens": "จาก {{window}} โทเคน",
-      "tokens": "โทเค็น",
+      "tokens": "โทเคน",
       "tokensWithPercentage": "โทเคน ({{percentage}})",
       "stepsCount_one": "{{steps}} ขั้นตอน",
       "stepsCount": "{{steps}} ขั้นตอน",
@@ -2672,7 +2720,7 @@
     "sessionChanges": {
       "viewChanges": "ดูการเปลี่ยนแปลง",
       "asOf": "ณ เวลา {{time}}",
-      "tooLarge": "ส่วนต่างนี้มีขนาดใหญ่เกินกว่าจะแสดงบนมือถือได้",
+      "tooLarge": "การเปลี่ยนแปลงนี้มีขนาดใหญ่เกินกว่าจะแสดงบนมือถือได้",
       "empty": "ยังไม่มีการเปลี่ยนแปลงไฟล์ในเซสชันนี้"
     },
     "autoApprove": {
@@ -2681,9 +2729,9 @@
       "unavailable": "เซสชันนี้ไม่สามารถรับคำขออนุญาตได้"
     },
     "prBadge": {
-      "open": "เปิดพูลรีเควสต์",
-      "closed": "pR ที่ปิดแล้ว",
-      "merged": "pR ที่รวมโค้ดแล้ว",
+      "open": "เปิด PR",
+      "closed": "PR ที่ปิดแล้ว",
+      "merged": "PR ที่รวมโค้ดแล้ว",
       "draft": "PR ฉบับร่าง",
       "updating": "กำลังอัปเดต, {{label}} #{{number}}",
       "label": "{{label}} หมายเลข {{number}}"
@@ -2745,11 +2793,11 @@
     "thisDevice": "อุปกรณ์นี้",
     "viewProfile": "ดูโปรไฟล์",
     "signOutThisDevice": "ออกจากระบบบนอุปกรณ์นี้",
-    "signOutThisSession": "ออกจากระบบสำหรับเซสชันนี้",
+    "signOutSessionLabel": "ออกจากระบบบน{{device}}, เข้าสู่ระบบเมื่อ {{signedIn}}",
     "sessionSignedOut": "ออกจากระบบสำหรับเซสชันนี้แล้ว",
     "signOutThisDeviceTitle": "ออกจากระบบบนอุปกรณ์นี้หรือไม่?",
     "signOutThisSessionTitle": "ออกจากระบบสำหรับเซสชันนี้หรือไม่?",
-    "signOutThisSessionMessage": "ระบบจะให้ {{device}} ออกจากระบบ แต่อุปกรณ์นี้ยังเข้าถึง API ได้อีกไม่เกินหนึ่งชั่วโมง",
+    "signOutThisSessionMessage": "ระบบจะให้ {{device}} ออกจากระบบ แต่อุปกรณ์นั้นยังเข้าถึง API ได้อีกไม่เกินหนึ่งชั่วโมง",
     "webBrowser": "เว็บเบราว์เซอร์"
   },
   "forceUpdate": {
@@ -2983,11 +3031,23 @@
     "boundary": {
       "backToProfile": "กลับไปยังโปรไฟล์",
       "loadErrorMessage": "ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
+
+      "chooseAccount": "เลือกบัญชี",
       "loadErrorTitle": "โหลดองค์กรของคุณไม่สำเร็จ",
+      "membershipLostNotice": "คุณไม่มีสิทธิ์เข้าถึงองค์กรนี้อีกต่อไป เปลี่ยนเป็น {{target}} แล้ว",
+      "noOrganization": "ไม่มีองค์กร",
+
+      "noOrganizationDescription": "บัญชีนี้ไม่ได้เป็นส่วนหนึ่งขององค์กร สร้างหรือเข้าร่วมองค์กรบนเว็บเพื่อใช้ฟีเจอร์ขององค์กร เช่น คำเชิญสมาชิกและการแจ้งเตือนยอดคงเหลือต่ำ",
+
+      "openWebOrganizations": "เปิดองค์กรบนเว็บ",
+
       "organizationUnavailable": "องค์กรไม่พร้อมใช้งาน",
-      "selectDescription": "เลือกองค์กรจากโปรไฟล์ของคุณเพื่อดำเนินการต่อ",
+      "selectDescriptionWithOrganizations": "คุณเป็นสมาชิกขององค์กรหนึ่งแห่งขึ้นไป เลือกบัญชีที่หน้าจอนี้ควรใช้",
+
       "selectOrganization": "เลือกองค์กร",
       "unavailableDescription": "องค์กรนี้ไม่พร้อมใช้งานแล้ว เลือกองค์กรอื่นจากโปรไฟล์เพื่อดำเนินการต่อ",
+
+      "unavailableSessionsDescription": "องค์กรนี้ไม่พร้อมใช้งานแล้ว โหลดเซสชันขององค์กรนี้ไม่ได้",
       "accessDeniedDescription": "คุณไม่มีสิทธิ์เข้าถึงองค์กรนี้"
     },
     "creditActivity": {
@@ -3039,7 +3099,11 @@
       "separateEmailsHint": "หากมีหลายอีเมล ให้คั่นด้วยเครื่องหมายจุลภาค",
       "thresholdLabel": "แจ้งเตือนเมื่อต่ำกว่า (USD)",
       "title": "การแจ้งเตือนยอดคงเหลือต่ำ",
-      "emailsError": "ป้อนอีเมลที่ถูกต้องอย่างน้อยหนึ่งรายการ หากมีหลายอีเมล ให้คั่นด้วยเครื่องหมายจุลภาค",
+      "emailsInvalid": "มีอีเมลอย่างน้อยหนึ่งรายการที่ไม่ถูกต้อง",
+      "emailsRequired": "ป้อนอีเมลอย่างน้อยหนึ่งรายการ",
+      "saveEmailsError": "มีอีเมลบางรายการที่ไม่ได้รับการยอมรับ โปรดตรวจสอบแล้วลองอีกครั้ง",
+      "saveError": "ไม่สามารถบันทึกการแจ้งเตือนยอดคงเหลือต่ำได้",
+      "thresholdPlaceholder": "ป้อนจำนวนเงิน",
       "thresholdError": "ป้อนจำนวนเงินที่มากกว่า 0"
     },
     "memberLimit": {
@@ -3050,12 +3114,13 @@
       "removeLimit": "ยกเลิกวงเงิน",
       "title": "วงเงินใช้งานรายวัน",
       "blankError": "ป้อนจำนวนเงิน หรือแตะยกเลิกวงเงินด้านล่าง",
+      "blankWithoutLimitError": "ป้อนวงเงินรายวันระหว่าง 0 ถึง {{max}}",
       "rangeError": "ป้อนจำนวนเงินระหว่าง 0 ถึง {{max}}"
     },
     "members": {
       "changeRole": "เปลี่ยนบทบาท",
       "emptyDescriptionCanInvite": "เชิญเพื่อนร่วมทีมเพื่อเริ่มทำงานร่วมกันในองค์กรนี้",
-      "emptyDescriptionCannotInvite": "ขอให้เจ้าขององค์กรหรือผู้ดูแลการเรียกเก็บเงินเชิญเพื่อนร่วมทีม",
+      "emptyDescriptionCannotInvite": "โปรดขอให้เจ้าของ ผู้ดูแลระบบ หรือผู้ดูแลการเรียกเก็บเงินเชิญเพื่อนร่วมทีม",
       "emptyTitle": "ยังไม่มีสมาชิก",
       "invitedDate": "เชิญเมื่อ {{date}}",
       "limitPerDay": "{{amount}}/วัน",
@@ -3123,12 +3188,12 @@
     "invalidCode": "รหัสนั้นไม่ถูกต้อง โปรดลองอีกครั้ง",
     "codeInProgress": "กำลังประมวลผลรหัสของคุณ รอสักครู่แล้วลองอีกครั้ง",
     "tooManyAttempts": "ลองหลายครั้งเกินไป โปรดขอรหัสใหม่",
-    "invalidToken": "เข้าสู่ระบบไม่สำเร็จ ลองอีกครั้ง",
+    "invalidToken": "เข้าสู่ระบบไม่สำเร็จ โปรดลองอีกครั้ง",
     "invalidEmail": "ไม่สามารถส่งอีเมลไปยังที่อยู่นี้ได้ โปรดใช้อีเมลอื่น",
     "invalidRequest": "ตรวจสอบที่อยู่อีเมลของคุณแล้วลองอีกครั้ง",
     "emailDeliveryFailed": "ระบบส่งอีเมลใช้งานไม่ได้ชั่วคราว โปรดลองอีกครั้งภายหลัง",
     "admissionRequired": "ไม่สามารถยืนยันอุปกรณ์ของคุณได้ ใช้ '$t(login.moreSignInOptions)' เพื่อเข้าสู่ระบบบนอุปกรณ์อื่นหรือผ่านเว็บ",
-    "default": "เกิดข้อผิดพลาด ลองอีกครั้ง",
+    "default": "เกิดข้อผิดพลาด โปรดลองอีกครั้ง",
     "retryableAdmission": "ไม่สามารถยืนยันอุปกรณ์นี้ได้ ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
     "startSignInFailed": "เริ่มเข้าสู่ระบบไม่สำเร็จ โปรดลองอีกครั้ง",
     "couldNotOpenBrowser": "ไม่สามารถเปิดเบราว์เซอร์ได้ โปรดลองอีกครั้ง",
@@ -3319,9 +3384,15 @@
       "settingsToolsOn": "เปิด — เครื่องมือการตั้งค่าถูกส่งไปยังโมเดล",
       "settingsToolsOff": "ปิด — ไม่มีเครื่องมือการตั้งค่าถูกส่งไปยังโมเดล",
       "serverChecking": "กำลังตรวจสอบเซิร์ฟเวอร์นี้…",
-      "serverToolCount": "{{count}} เครื่องมือ",
+      "serverToolCount_one": "{{count}} เครื่องมือ",
+      "serverToolCount_other": "{{count}} เครื่องมือ",
       "serverUnreachable": "ไม่สามารถเข้าถึงเซิร์ฟเวอร์นี้ได้",
-      "serverOff": "เซิร์ฟเวอร์นี้ปิดอยู่"
+      "serverOff": "เซิร์ฟเวอร์นี้ปิดอยู่",
+      "app": {
+        "label": "อินเทอร์เฟซของเครื่องมือ",
+        "failed": "ไม่สามารถโหลดอินเทอร์เฟซของเครื่องมือนี้ได้.",
+        "empty": "อินเทอร์เฟซของเครื่องมือนี้ไม่มีอะไรจะแสดง."
+      }
     },
     "mcpOAuth": {
       "authMethod": "การยืนยันตัวตน",
@@ -3466,6 +3537,8 @@
       "quantizationsHelp": "ไฟล์ที่เล็กกว่าใช้หน่วยความจำและพื้นที่จัดเก็บน้อยกว่า ไฟล์ที่ใหญ่กว่ามักให้คำตอบที่ดีกว่า",
       "quantDetail": "ดาวน์โหลด {{size}} · ใช้หน่วยความจำประมาณ {{memory}}",
       "downloadQuant": "ดาวน์โหลด {{quant}}",
+      "downloadModelA11y": "ดาวน์โหลด {{name}}",
+      "detailsA11y": "รายละเอียด: {{name}}",
       "loadingModel": "กำลังโหลดรายละเอียดโมเดล",
       "couldNotLoadModel": "โหลดโมเดลนี้ไม่ได้",
       "noFiles": "ไม่มีไฟล์ที่แอปนี้เรียกใช้ได้",
@@ -3517,8 +3590,9 @@
   "appActions": {
     "start": {
       "promptRequired": "การเริ่มเอเจนต์ต้องมีพรอมต์ เพิ่มพรอมต์แล้วลองอีกครั้ง",
+      "repositoryRequired": "การเริ่มเอเจนต์ต้องมีคลังโค้ด เปิด Kilo แล้วเลือกคลังโค้ด จากนั้นลองอีกครั้ง",
       "repositoryUnknown": "Kilo ไม่รู้จัก {{repository}} ว่าเป็นคลังโค้ด GitHub หรือ GitLab เลือกคลังโค้ดอื่นใน Kilo",
-      "repositoryUnsupported": "{{repository}} เป็นคลังโค้ด Bitbucket — เริ่มเอเจนต์ยังใช้ไม่ได้ เลือกคลังโค้ดอื่นใน Kilo"
+      "repositoryUnsupported": "{{repository}} เป็นคลังโค้ด Bitbucket — เริ่มเอเจนต์ยังใช้คลังโค้ดนี้ไม่ได้ เลือกคลังโค้ดอื่นใน Kilo"
     }
   },
   "launcher": {
@@ -3554,10 +3628,13 @@
     "emptyDescription": "สร้างโปรไฟล์เพื่อนำตัวแปรสภาพแวดล้อม คำสั่งการตั้งค่า และทักษะมาใช้ซ้ำในเซสชันต่างๆ",
     "loadFailed": "ไม่สามารถโหลดโปรไฟล์ได้",
     "counts": {
-      "vars": "{{count}} ตัวแปร",
+      "vars_one": "{{count}} ตัวแปร",
+      "vars_other": "{{count}} ตัวแปร",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} ทักษะ",
-      "commands": "{{count}} คำสั่ง",
+      "skills_one": "{{count}} ทักษะ",
+      "skills_other": "{{count}} ทักษะ",
+      "commands_one": "{{count}} คำสั่ง",
+      "commands_other": "{{count}} คำสั่ง",
       "varsShort": "{{count}}ต",
       "skillsShort": "{{count}}ท",
       "commandsShort": "{{count}}ค"
@@ -3584,23 +3661,22 @@
     "deletedToast": "ลบโปรไฟล์ \"{{name}}\" แล้ว",
     "variablesTitle": "ตัวแปรสภาพแวดล้อม",
     "addVariable": "เพิ่มตัวแปร",
-    "keyLabel": "สำคัญ",
+    "keyLabel": "คีย์",
     "keyTooLong": "คีย์ต้องมี 256 อักขระหรือน้อยกว่า",
     "keyDuplicate": "คีย์นี้มีอยู่ในโปรไฟล์แล้ว",
     "valueLabel": "ค่า",
-    "secretLabel": "ความลับ",
     "secrets": {
       "markSecret": "ทำเครื่องหมายว่าเป็นความลับ",
-      "masked": "คุณค่าที่ซ่อนอยู่",
-      "reveal": "เผยคุณค่า",
-      "newValuePlaceholder": "ป้อนค่าเป็นความลับใหม่",
-      "valuePlaceholder": "ค่าเป็นความลับ (เข้ารหัสแล้ว)"
+      "masked": "ค่าที่ซ่อนอยู่",
+      "reveal": "แสดงค่า",
+      "newValuePlaceholder": "ป้อนค่าความลับใหม่",
+      "valuePlaceholder": "ค่าความลับ (จะเข้ารหัส)"
     },
     "variablesEmpty": "ยังไม่มีตัวแปร",
     "variablesSaveFailed": "ไม่สามารถบันทึกตัวแปรได้",
     "commandsTitle": "คำสั่งการตั้งค่า",
     "addCommand": "เพิ่มคำสั่ง",
-    "commandLabel": "สั่งการ",
+    "commandLabel": "คำสั่ง",
     "commandPlaceholder": "เช่น pnpm install",
     "commandsEmpty": "ยังไม่มีคำสั่งการตั้งค่า",
     "commandsSaveFailed": "ไม่สามารถบันทึกคำสั่งการตั้งค่าได้",
@@ -3617,7 +3693,9 @@
     "skillNameInvalid": "ชื่อทักษะต้องขึ้นต้นด้วยตัวอักษรหรือตัวเลข และใช้เฉพาะตัวอักษรพิมพ์เล็ก ตัวเลข และขีดกลางเท่านั้น",
     "skillContentRequired": "จำเป็นต้องมีเนื้อหาทักษะ",
     "skillSaveFailed": "ไม่สามารถบันทึกทักษะได้",
-    "skillsHint": "วาง SKILL.md และกรอกชื่อลงไป เพิ่มทักษะจากโทรศัพท์ของคุณโดยไม่ต้องลากและวาง",
+    "skillSourceCustom": "กำหนดเอง",
+    "skillSourceMarketplace": "ตลาด",
+    "skillsHint": "วาง SKILL.md แล้วชื่อจะถูกกรอกให้อัตโนมัติ เพิ่มทักษะจากโทรศัพท์ของคุณโดยไม่ต้องลากและวาง",
     "skillEditTitle": "แก้ไขทักษะ",
     "mcp": {
       "title": "เซิร์ฟเวอร์ MCP",
@@ -3625,14 +3703,14 @@
       "empty": "ยังไม่มีเซิร์ฟเวอร์ MCP",
       "name": "ชื่อเซิร์ฟเวอร์",
       "type": "ประเภทเซิร์ฟเวอร์",
-      "localType": "ท้องถิ่น",
+      "localType": "ในเครื่อง",
       "remoteType": "ระยะไกล",
       "command": "บรรทัดคำสั่ง",
       "url": "URL",
-      "environment": "สิ่งแวดล้อม (JSON)",
+      "environment": "ตัวแปรสภาพแวดล้อม (JSON)",
       "headers": "ส่วนหัว (JSON)",
       "timeout": "หมดเวลา",
-      "secretCount": "การนับความลับ",
+      "secretCount": "จำนวนความลับ: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3645,17 +3723,19 @@
       "urlTooLong": "URL ต้องมี 2048 อักขระหรือน้อยกว่า",
       "jsonInvalid": "ป้อน JSON ที่ถูกต้อง — ออบเจ็กต์ของค่าสตริง",
       "jsonTooLarge": "ใช้รายการไม่เกิน 50 รายการ คีย์ไม่เกิน 128 และค่าไม่เกิน 4096 อักขระ",
-      "timeoutInvalid": "การหมดเวลาต้องเป็นจำนวนมิลลิวินาทีทั้งหมด",
+      "timeoutInvalid": "การหมดเวลาต้องเป็นจำนวนเต็มมิลลิวินาที",
       "edit": "แก้ไขเซิร์ฟเวอร์ MCP",
-      "saveFailed": "ไม่สามารถบันทึกเซิร์ฟเวอร์ MCP"
+      "saveFailed": "ไม่สามารถบันทึกเซิร์ฟเวอร์ MCP",
+      "deleteFailed": "ไม่สามารถลบเซิร์ฟเวอร์ MCP ได้",
+      "updateFailed": "ไม่สามารถอัปเดตเซิร์ฟเวอร์ MCP ได้"
     },
     "agents": {
-      "title": "ตัวแทนโปรไฟล์",
-      "add": "เพิ่มตัวแทน",
-      "empty": "ยังไม่มีตัวแทน",
-      "name": "ชื่อตัวแทน",
-      "slug": "ตัวแทนทาก",
-      "description": "คำอธิบายตัวแทน",
+      "title": "เอเจนต์โปรไฟล์",
+      "add": "เพิ่มเอเจนต์",
+      "empty": "ยังไม่มีเอเจนต์",
+      "name": "ชื่อเอเจนต์",
+      "slug": "ตัวระบุเอเจนต์",
+      "description": "คำอธิบายเอเจนต์",
       "model": "การแทนที่โมเดล",
       "modelPlaceholder": "ใช้ค่าเริ่มต้นของเซสชัน",
       "prompt": "พร้อมท์ระบบ",
@@ -3666,19 +3746,23 @@
       "topP": "top_p",
       "topPPlaceholder": "เช่น 0.95",
       "slugPlaceholder": "my-agent",
-      "namePlaceholder": "ตัวแทนของฉัน",
+      "namePlaceholder": "เอเจนต์ของฉัน",
       "promptPlaceholder": "คุณเป็น...",
       "tools": "เครื่องมือ",
       "visibility": "การมองเห็น",
       "visibilityPrimary": "หลัก — แสดงในเครื่องมือเลือก",
       "visibilitySubagent": "Subagent — สามารถเรียกได้จากผู้อื่นเท่านั้น",
       "visibilityAll": "ทั้งหมด - ทั้งสองอย่าง",
-      "saveFailed": "ไม่สามารถบันทึกตัวแทนได้",
-      "nameRequired": "ป้อนชื่อตัวแทน",
-      "slugRequired": "ใส่ตัวแทนทาก",
+      "modePrimary": "หลักเท่านั้น",
+      "modeSubagent": "Subagent เท่านั้น",
+      "modeAll": "โหมดทั้งหมด",
+      "saveFailed": "ไม่สามารถบันทึกเอเจนต์ได้",
+      "deleteFailed": "ไม่สามารถลบเอเจนต์ได้",
+      "nameRequired": "ป้อนชื่อเอเจนต์",
+      "slugRequired": "ใส่ตัวระบุเอเจนต์",
       "slugInvalid": "Slug ต้องขึ้นต้นด้วยตัวอักษรและใช้เฉพาะตัวอักษรพิมพ์เล็ก ตัวเลข และขีดกลางเท่านั้น",
-      "slugConflict": "สลักนั้นมีเอเจนต์ในตัวหรือเอเจนต์อื่นในโปรไฟล์นี้ใช้งานอยู่แล้ว",
-      "edit": "แก้ไขตัวแทน"
+      "slugConflict": "ตัวระบุนั้นมีเอเจนต์ในตัวหรือเอเจนต์อื่นในโปรไฟล์นี้ใช้งานอยู่แล้ว",
+      "edit": "แก้ไขเอเจนต์"
     },
     "slashCommands": {
       "title": "คำสั่งสแลช",
@@ -3688,37 +3772,39 @@
       "description": "คำอธิบายคำสั่ง",
       "template": "แม่แบบ",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "อธิบาย $ARGUMENTS",
       "subtask": "ทำงานเป็นงานย่อย",
       "edit": "แก้ไขคำสั่งสแลช",
       "saveFailed": "ไม่สามารถบันทึกคำสั่งได้",
+      "deleteFailed": "ไม่สามารถลบคำสั่งได้",
       "nameRequired": "ป้อนชื่อคำสั่ง",
       "nameInvalid": "ชื่อต้องขึ้นต้นด้วยตัวอักษรพิมพ์เล็กและใช้เฉพาะตัวอักษรพิมพ์เล็ก ตัวเลข และขีดกลางเท่านั้น",
-      "templateRequired": "ป้อนเทมเพลตคำสั่ง",
+      "templateRequired": "ป้อนแม่แบบคำสั่ง",
       "nameConflict": "ชื่อนั้นถูกสงวนไว้โดยคำสั่งในตัว"
     },
     "repoBindings": {
-      "title": "โปรไฟล์เริ่มต้นสำหรับ Repos",
+      "title": "โปรไฟล์เริ่มต้นสำหรับคลังโค้ด",
       "add": "เพิ่มค่าเริ่มต้น",
       "empty": "ไม่มีการกำหนดค่าเริ่มต้น",
-      "emptyDescription": "เพิ่มค่าเริ่มต้นเพื่อใช้โปรไฟล์โดยอัตโนมัติเมื่อเริ่มต้นเซสชันสำหรับ repo",
-      "repo": "เลือกที่เก็บ...",
+      "emptyDescription": "เพิ่มค่าเริ่มต้นเพื่อใช้โปรไฟล์โดยอัตโนมัติเมื่อเริ่มต้นเซสชันสำหรับคลังโค้ด",
+      "repo": "เลือกคลังโค้ด...",
       "profile": "เลือกโปรไฟล์",
       "remove": "เลิกผูก",
       "private": "ส่วนตัว",
-      "search": "ค้นหาที่เก็บ...",
+      "search": "ค้นหาคลังโค้ด...",
       "addedToast": "โปรไฟล์เริ่มต้นที่ตั้งไว้สำหรับ \"{{repo}}\"",
       "addFailed": "ไม่สามารถตั้งค่าโปรไฟล์เริ่มต้นได้",
-      "removedToast": "โปรไฟล์เริ่มต้นถูกลบสำหรับ \"{{repo}}\"",
-      "removeFailed": "ไม่สามารถลบโปรไฟล์เริ่มต้นได้",
-      "pinnedTitle": "ปักหมุดไว้ที่คลังแล้ว",
-      "pinRepo": "ปักหมุด repo",
-      "pinnedEmpty": "ไม่ถูกตรึงไว้ที่ที่เก็บใด ๆ",
-      "pinnedDescription": "โหลดอัตโนมัติทุกครั้งที่เซสชันกำหนดเป้าหมายหนึ่งในที่เก็บเหล่านี้",
+      "removedToast": "เลิกผูกโปรไฟล์เริ่มต้นสำหรับ \"{{repo}}\" แล้ว",
+      "removeFailed": "ไม่สามารถเลิกผูกโปรไฟล์เริ่มต้นได้",
+      "pinnedTitle": "ปักหมุดไว้ในคลังโค้ดแล้ว",
+      "pinRepo": "ปักหมุดคลังโค้ด",
+      "pinnedEmpty": "ยังไม่ได้ปักหมุดไว้ที่คลังโค้ดใด ๆ",
+      "pinnedDescription": "โหลดอัตโนมัติทุกครั้งที่เซสชันกำหนดเป้าหมายหนึ่งในคลังโค้ดเหล่านี้",
       "pinnedToast": "ปักหมุดไว้ที่ \"{{repo}}\"",
-      "pinFailed": "ปักหมุด repo ไม่ได้",
-      "unboundToast": "Repo ไม่ถูกผูกไว้",
-      "unbindFailed": "ไม่สามารถเลิกผูก repo ได้"
+      "pinFailed": "ไม่สามารถปักหมุดคลังโค้ดได้",
+      "unboundToast": "เลิกผูกคลังโค้ดแล้ว",
+      "unbindFailed": "ไม่สามารถเลิกผูกคลังโค้ดได้"
     }
   },
   "credits": {
@@ -3730,6 +3816,8 @@
     "empty": "แพ็กเกจเครดิตไม่พร้อมใช้งานในขณะนี้",
     "noMatchingProducts": "App Store ไม่ได้ส่งแพ็กเกจเครดิตที่ตรงกันกลับมา",
     "noMatchingProductsPlay": "Google Play ไม่ได้ส่งแพ็กเกจเครดิตที่ตรงกันกลับมา",
+    "storeTimedOut": "App Store ไม่ได้ตอบสนองภายในเวลาที่กำหนด ลองอีกครั้ง",
+    "storeTimedOutPlay": "Google Play ไม่ได้ตอบสนองภายในเวลาที่กำหนด ลองอีกครั้ง",
     "purchaseOwnedByAnotherAccount": "เครดิตใน Apple Account นี้เป็นของบัญชี Kilo อื่น ลงชื่อเข้าใช้บัญชี Kilo นั้นเพื่อใช้งาน",
     "purchaseOwnedByAnotherAccountPlay": "เครดิตในบัญชี Google Play นี้เป็นของบัญชี Kilo อื่น ลงชื่อเข้าใช้บัญชี Kilo นั้นเพื่อใช้งาน"
   },
@@ -3838,7 +3926,7 @@
     "view": "อ่านสรุป",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "แสดงสถานะสด",
+    "dismiss": "ละเว้นสรุป",
     "offline": "ออฟไลน์ · สรุปที่บันทึกไว้",
     "cached": "รายงานที่บันทึกไว้ · รีเฟรชไม่ได้",
     "revised": "แก้ไขแล้ว · {{revision}}",
@@ -3879,6 +3967,33 @@
     "enable": "เปิดใช้สรุปแบบชำระเงิน",
     "contextSettings": "การตั้งค่า AI · {{context}}",
     "allContexts": "สรุปส่วนตัวและขององค์กรจะแยกจากกัน",
+    "create": "สร้างสรุป",
+    "oneOff": "ครั้งเดียว",
+    "createdAt": "สร้างเมื่อ {{time}}",
+    "chooseContext": "เลือกหนึ่งบริบท",
+    "period": "ช่วงเวลาของสรุป",
+    "last24Hours": "24 ชั่วโมงที่ผ่านมา",
+    "last7Days": "7 วันที่ผ่านมา",
+    "customPeriod": "กำหนดช่วงเวลาเอง",
+    "periodStart": "เริ่มช่วงเวลา",
+    "periodEnd": "สิ้นสุดช่วงเวลา",
+    "periodHint": "เลือกได้สูงสุด 31 วัน ข้อมูลย้อนหลังอาจไม่ครบถ้วน",
+    "periodSessions": "มีการใช้งานในช่วงเวลา",
+    "periodSpend": "ค่าใช้จ่ายในช่วงเวลา",
+    "invalidPeriod": "เลือกเวลาเริ่มต้นก่อนเวลาสิ้นสุด",
+    "futurePeriod": "ช่วงเวลาต้องไม่สิ้นสุดในอนาคต",
+    "periodTooLong": "เลือกช่วงเวลาไม่เกิน 31 วัน",
+    "invalidLocalTime": "ไม่มีเวลาท้องถิ่นนี้ในเขตเวลาของสรุป โปรดเลือกเวลาอื่น",
+    "reviewBriefing": "ตรวจสอบสรุป",
+    "reviewAgain": "เตรียมการตรวจสอบใหม่",
+    "payer": "เรียกเก็บเงินจาก {{context}}",
+    "emptyPeriod": "ไม่พบกิจกรรมในช่วงเวลานี้ จะไม่มีการสร้างสรุปโดย AI หรือเรียกเก็บเงิน",
+    "emptyHistory": "ไม่มีสรุปที่บันทึกไว้",
+    "historicalStateHint": "สถานะเซสชันแสดงสถานะ ณ สิ้นสุดช่วงเวลาที่เลือก ไม่ใช่สถานะปัจจุบันแบบเรียลไทม์",
+    "oneOffHint": "AI จะได้รับหลักฐานที่เลือกและปกปิดข้อมูลที่ละเอียดอ่อนแล้วในภาษาของแอปคุณ รายงานแบบครั้งเดียวนี้จะไม่เปลี่ยนกำหนดการยามเช้าหรือการตั้งค่า AI ของคุณ",
+    "createOffline": "เชื่อมต่ออินเทอร์เน็ตเพื่อตรวจสอบหรือสร้างสรุป คำขอที่มีค่าบริการจะไม่ถูกจัดคิวขณะออฟไลน์",
+    "estimateInputTooLarge": "ช่วงเวลานี้มีหลักฐานมากเกินกว่าที่โมเดลที่เลือกจะรองรับได้",
+    "estimatePermissionUnavailable": "คุณไม่มีสิทธิ์ใช้ยอดเงินของบริบทนี้",
     "estimatePricingUnavailable": "ไม่มีข้อมูลราคาสำหรับโมเดลนี้",
     "estimateBalanceUnavailable": "ยอดเงินไม่เพียงพอสำหรับสรุปแบบเสียเงิน",
     "estimateModelNotAllowed": "โมเดลนี้ไม่ได้รับอนุญาตให้ใช้ที่นี่",

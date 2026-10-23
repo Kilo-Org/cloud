@@ -50,9 +50,8 @@ import {
   ReviewSideSchema,
   buildAddReactionVariables,
   buildCreateReviewCommentParams,
-  buildDeleteIssueCommentParams,
+  buildDeleteCommentParams,
   buildDeleteRefParams,
-  buildDeleteReviewCommentParams,
   buildDisableAutoMergeVariables,
   buildEnableAutoMergeVariables,
   buildMergePullRequestParams,
@@ -62,8 +61,7 @@ import {
   buildSubmitReviewParams,
   buildUnresolveThreadVariables,
   buildUpdateBranchParams,
-  buildUpdateIssueCommentParams,
-  buildUpdateReviewCommentParams,
+  buildUpdateCommentParams,
 } from '@/lib/github-pr-review/mutations';
 
 const ownerRepoRegex = /^[A-Za-z0-9_.-]+$/;
@@ -246,15 +244,29 @@ const UpdateBranchInput = ownerRepoSchema
   })
   .strict();
 
-const AutoMergeInput = ownerRepoSchema
-  .extend({
-    number: prNumberSchema,
+// Both auto-merge mutations address the pull request by its GraphQL node id:
+// the caller's own token is authorized against that node, and neither mutation
+// is ledgered, so `owner`/`repo`/`number` carry no authorization or keying
+// weight. They were REQUIRED by an earlier wire version and older shipped
+// mobile clients still send them, so the schema keeps `.strict()` (unknown
+// fields are still rejected) and tolerates all three as accepted and IGNORED.
+// `method`/`commitTitle`/`commitMessage` are enable-only: `disableAutoMerge`
+// reads nothing but `prNodeId`.
+const AutoMergeNodeInput = z
+  .object({
     prNodeId: z.string().min(1).max(256),
-    method: AutoMergeMethodSchema.optional(),
-    commitTitle: z.string().min(1).max(255).optional(),
-    commitMessage: z.string().min(1).max(65_535).optional(),
+    // Legacy fields — accepted for backward compat, ignored by the server.
+    owner: z.string().regex(ownerRepoRegex).optional(),
+    repo: z.string().regex(ownerRepoRegex).optional(),
+    number: prNumberSchema.optional(),
   })
   .strict();
+
+const EnableAutoMergeInput = AutoMergeNodeInput.extend({
+  method: AutoMergeMethodSchema.optional(),
+  commitTitle: z.string().min(1).max(255).optional(),
+  commitMessage: z.string().min(1).max(65_535).optional(),
+}).strict();
 
 // Overview enrichment: the aggregate review decision plus the three sidebar
 // boxes REST cannot answer — per-reviewer state, pending review requests, and
@@ -822,6 +834,12 @@ const PR_LEDGER_SETTLE_FAILED_MESSAGE =
 // distinct non-retryable error so the client cannot blind-retry the same key.
 const PR_LEDGER_PERSISTENCE_FAILED_MESSAGE =
   'We could not record this action. Please try again later.';
+// A settled row whose stored canonical result does not match its intent's
+// result shape cannot be replayed. Reporting a partial object as a success
+// would tell the client an action completed with fields the provider never
+// confirmed, so the row is surfaced as an unreadable result instead.
+const PR_LEDGER_RESULT_UNREADABLE_MESSAGE =
+  'We could not read the recorded result of this action. Please try again.';
 
 function ambiguousPrError(): TRPCError {
   return new TRPCError({ code: 'CONFLICT', message: PR_AMBIGUOUS_MESSAGE });
@@ -1013,6 +1031,38 @@ function prSettledOutboxEvent(params: {
   };
 }
 
+/**
+ * Canonical results as stored in `operation_ledgers.canonical_result`, one
+ * schema per ledger intent. These are the exact shapes the mobile client reads,
+ * so a replayed row is validated into the intent's concrete result instead of
+ * being asserted into it. Unknown keys are stripped: only these fields were
+ * ever part of the replay contract.
+ */
+const CommentWriteResultSchema = z.object({ commentId: z.number(), nodeId: z.string() });
+type CommentWriteResult = z.infer<typeof CommentWriteResultSchema>;
+
+const ReviewWriteResultSchema = z.object({
+  reviewId: z.number(),
+  nodeId: z.string(),
+  state: z.string(),
+});
+type ReviewWriteResult = z.infer<typeof ReviewWriteResultSchema>;
+
+/**
+ * The merge effect's result. `branchDeleteError` is response-only free text and
+ * never enters the ledger canonical result, so a settled row only ever holds
+ * the two `branchDeleted` arms.
+ */
+type MergeWriteResult =
+  | { merged: boolean; sha: string; branchDeleted: false }
+  | { merged: true; sha: string; branchDeleted: true }
+  | { merged: true; sha: string; branchDeleted: false; branchDeleteError: string };
+
+const MergeSettledResultSchema = z.discriminatedUnion('branchDeleted', [
+  z.object({ merged: z.literal(true), sha: z.string(), branchDeleted: z.literal(false) }),
+  z.object({ merged: z.literal(true), sha: z.string(), branchDeleted: z.literal(true) }),
+]);
+
 type PrLedgerMutationArgs<T> = {
   userId: string;
   intent: PrLedgerIntent;
@@ -1025,6 +1075,8 @@ type PrLedgerMutationArgs<T> = {
   execute: (row: OperationLedgerRow) => Promise<T>;
   /** Reconcilies a same-key retry before any effect. */
   reconcile: (row: OperationLedgerRow) => Promise<T | ReplayedResult<T>>;
+  /** Validates a settled row's stored canonical result into this intent's result. */
+  parseCanonical: (raw: unknown) => T;
 };
 
 /** The canonical result replayed under the same key carries `replayed: true`. */
@@ -1092,7 +1144,7 @@ async function runPrLedgerMutation<T>(
     case 'admitted':
       return args.execute(admission.row);
     case 'duplicate_settled':
-      return replaySettledPrRow<T>(admission.row);
+      return replaySettledPrRow(admission.row, args.parseCanonical);
     case 'duplicate_in_flight':
     case 'duplicate_reconcile_in_progress':
       throw new TRPCError({ code: 'CONFLICT', message: OPERATION_IN_PROGRESS_MESSAGE });
@@ -1103,9 +1155,22 @@ async function runPrLedgerMutation<T>(
 }
 
 /** Replays a terminal row: only `completed`/`no_op` may replay a canonical result. */
-function replaySettledPrRow<T>(row: OperationLedgerRow): ReplayedResult<T> {
+function replaySettledPrRow<T>(
+  row: OperationLedgerRow,
+  parseCanonical: (raw: unknown) => T
+): ReplayedResult<T> {
   if (row.status === 'completed' || row.status === 'no_op') {
-    return { ...(row.canonical_result ?? {}), replayed: true } as ReplayedResult<T>;
+    let parsed: T;
+    try {
+      parsed = parseCanonical(row.canonical_result);
+    } catch (error) {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: PR_LEDGER_RESULT_UNREADABLE_MESSAGE,
+        cause: error,
+      });
+    }
+    return Object.assign({}, parsed, { replayed: true } as const);
   }
   // A settled `failed` row cannot be recovered under the same key: surface a
   // non-retryable typed rejection so the client starts a fresh intent.
@@ -1284,6 +1349,8 @@ async function runPrCommentMutation<T extends Record<string, unknown>>(args: {
     octokit: ReturnType<typeof createGitHubPrReviewOctokit>,
     providerId: number
   ) => Promise<T>;
+  /** Validates this intent's stored canonical result on replay. */
+  parseCanonical: (raw: unknown) => T;
 }): Promise<T | ReplayedResult<T>> {
   if (args.operationKey === undefined) {
     return withGitHubUserTokenRetry({ kiloUserId: args.userId, call: args.write });
@@ -1312,6 +1379,7 @@ async function runPrCommentMutation<T extends Record<string, unknown>>(args: {
         providerRefKey: args.providerRefKey,
         readRef: args.readRef,
       }),
+    parseCanonical: args.parseCanonical,
   });
 }
 
@@ -1325,7 +1393,7 @@ async function runPrCommentMutation<T extends Record<string, unknown>>(args: {
  *   re-execute the merge under the same row (takeover);
  * - the authoritative read failed → stay reconcile-pending, surface ambiguous.
  */
-async function reconcileMergePrRow<T>(args: {
+async function reconcileMergePrRow(args: {
   userId: string;
   /** Analytics identity channel, from `ctx.user` — never re-queried here. */
   distinctId: string;
@@ -1335,8 +1403,8 @@ async function reconcileMergePrRow<T>(args: {
   repo: string;
   number: number;
   expectedHeadSha: string;
-  execute: (row: OperationLedgerRow) => Promise<T>;
-}): Promise<T | ReplayedResult<T>> {
+  execute: (row: OperationLedgerRow) => Promise<MergeWriteResult>;
+}): Promise<MergeWriteResult | ReplayedResult<MergeWriteResult>> {
   type MergeReconcileState =
     | { kind: 'merged'; sha: string | null }
     | { kind: 'closed_unmerged' }
@@ -1392,13 +1460,13 @@ async function reconcileMergePrRow<T>(args: {
         merged: true,
         sha: reconcile.sha ?? 'unknown',
         branchDeleted: false,
-      };
+      } satisfies MergeWriteResult;
       await settleCompletedPrRow({
         ...ledgerArgs,
         canonicalResult: canonical,
         reconcileResult: 'confirmed_completed',
       });
-      return { ...canonical, replayed: true } as unknown as ReplayedResult<T>;
+      return Object.assign({}, canonical, { replayed: true } as const);
     }
     case 'closed_unmerged':
     case 'stale_head':
@@ -1424,11 +1492,6 @@ async function reconcileMergePrRow<T>(args: {
  * branch-delete error text stays in the response only — it is free text and
  * must never enter the ledger `canonical_result`.
  */
-type MergeWriteResult =
-  | { merged: boolean; sha: string; branchDeleted: false }
-  | { merged: true; sha: string; branchDeleted: true }
-  | { merged: true; sha: string; branchDeleted: false; branchDeleteError: string };
-
 async function runMergeWrite(
   octokit: ReturnType<typeof createGitHubPrReviewOctokit>,
   input: z.infer<typeof MergePullRequestInput>
@@ -1853,7 +1916,8 @@ export const githubPrReviewRouter = createTRPCRouter({
         input,
         operationKey: input.operationKey,
         providerRefKey: 'commentId',
-        write: async octokit => {
+        parseCanonical: raw => CommentWriteResultSchema.parse(raw),
+        write: async (octokit): Promise<CommentWriteResult> => {
           const response = await octokit.pulls.createReviewComment(
             buildCreateReviewCommentParams({
               owner: input.owner,
@@ -1892,7 +1956,8 @@ export const githubPrReviewRouter = createTRPCRouter({
       input,
       operationKey: input.operationKey,
       providerRefKey: 'commentId',
-      write: async octokit => {
+      parseCanonical: raw => CommentWriteResultSchema.parse(raw),
+      write: async (octokit): Promise<CommentWriteResult> => {
         const response = await octokit.pulls.createReplyForReviewComment(
           buildReplyToCommentParams({
             owner: input.owner,
@@ -1927,7 +1992,8 @@ export const githubPrReviewRouter = createTRPCRouter({
       input,
       operationKey: input.operationKey,
       providerRefKey: 'commentId',
-      write: async octokit => {
+      parseCanonical: raw => CommentWriteResultSchema.parse(raw),
+      write: async (octokit): Promise<CommentWriteResult> => {
         const response = await octokit.issues.createComment({
           owner: input.owner,
           repo: input.repo,
@@ -1968,24 +2034,16 @@ export const githubPrReviewRouter = createTRPCRouter({
           commentId: input.commentId,
           kind: input.kind,
         });
+        const params = buildUpdateCommentParams({
+          owner: input.owner,
+          repo: input.repo,
+          commentId: input.commentId,
+          body: input.body,
+        });
         const response =
           input.kind === 'review'
-            ? await octokit.pulls.updateReviewComment(
-                buildUpdateReviewCommentParams({
-                  owner: input.owner,
-                  repo: input.repo,
-                  commentId: input.commentId,
-                  body: input.body,
-                })
-              )
-            : await octokit.issues.updateComment(
-                buildUpdateIssueCommentParams({
-                  owner: input.owner,
-                  repo: input.repo,
-                  commentId: input.commentId,
-                  body: input.body,
-                })
-              );
+            ? await octokit.pulls.updateReviewComment(params)
+            : await octokit.issues.updateComment(params);
         return {
           commentId: response.data.id,
           nodeId: response.data.node_id,
@@ -2019,22 +2077,15 @@ export const githubPrReviewRouter = createTRPCRouter({
           kind: input.kind,
         });
         try {
+          const params = buildDeleteCommentParams({
+            owner: input.owner,
+            repo: input.repo,
+            commentId: input.commentId,
+          });
           if (input.kind === 'review') {
-            await octokit.pulls.deleteReviewComment(
-              buildDeleteReviewCommentParams({
-                owner: input.owner,
-                repo: input.repo,
-                commentId: input.commentId,
-              })
-            );
+            await octokit.pulls.deleteReviewComment(params);
           } else {
-            await octokit.issues.deleteComment(
-              buildDeleteIssueCommentParams({
-                owner: input.owner,
-                repo: input.repo,
-                commentId: input.commentId,
-              })
-            );
+            await octokit.issues.deleteComment(params);
           }
         } catch (error) {
           if (classifyGitHubHttpError(error).code !== 'NOT_FOUND') {
@@ -2067,7 +2118,8 @@ export const githubPrReviewRouter = createTRPCRouter({
       input,
       operationKey: input.operationKey,
       providerRefKey: 'reviewId',
-      write: async octokit => {
+      parseCanonical: raw => ReviewWriteResultSchema.parse(raw),
+      write: async (octokit): Promise<ReviewWriteResult> => {
         const response = await octokit.pulls.createReview(
           buildSubmitReviewParams({
             owner: input.owner,
@@ -2241,6 +2293,7 @@ export const githubPrReviewRouter = createTRPCRouter({
           expectedHeadSha: input.expectedHeadSha,
           execute,
         }),
+      parseCanonical: raw => MergeSettledResultSchema.parse(raw),
     });
   }),
 
@@ -2265,7 +2318,7 @@ export const githubPrReviewRouter = createTRPCRouter({
     });
   }),
 
-  enableAutoMerge: baseProcedure.input(AutoMergeInput).mutation(async ({ ctx, input }) => {
+  enableAutoMerge: baseProcedure.input(EnableAutoMergeInput).mutation(async ({ ctx, input }) => {
     const result = await withGitHubUserTokenRetry({
       kiloUserId: ctx.user.id,
       call: async octokit => {
@@ -2288,7 +2341,7 @@ export const githubPrReviewRouter = createTRPCRouter({
     return result;
   }),
 
-  disableAutoMerge: baseProcedure.input(AutoMergeInput).mutation(async ({ ctx, input }) => {
+  disableAutoMerge: baseProcedure.input(AutoMergeNodeInput).mutation(async ({ ctx, input }) => {
     const result = await withGitHubUserTokenRetry({
       kiloUserId: ctx.user.id,
       call: async octokit => {

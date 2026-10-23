@@ -25,6 +25,7 @@
     "error": "kļūda: {{error}}",
     "back": "Atpakaļ",
     "somethingWentWrong": "Radās kļūda.",
+    "actionNotRecorded": "Neizdevās reģistrēt šo darbību. Mēģini vēlreiz vēlāk.",
     "couldNotOpen": "Neizdevās atvērt {{label}}.",
     "link": "saite",
     "takingLonger": "Tas aizņem vairāk laika, nekā gaidīts. Vari aizvērt šo ekrānu un pārbaudīt vēlreiz.",
@@ -35,6 +36,8 @@
     "connectGithub": "Pievienot GitHub",
     "cost": "Izmaksas",
     "discard": "Atmest",
+    "discardChangesMessage": "Jūsu izmaiņas tiks zaudētas.",
+    "discardChangesTitle": "Atmest izmaiņas?",
     "findings": "Konstatējumi",
     "mergeRequest": "merge request",
     "notConnected": "Nav pievienots",
@@ -109,7 +112,9 @@
     "online": "Tiešsaistē",
     "open": "Atvērt {{name}}",
     "openPullRequest": "Atvērt izmaiņu pieprasījumu",
+    "completed": "Pabeigts",
     "pending": "Gaida",
+    "running": "Darbojas",
     "performance": "Veiktspēja",
     "preferences": "Lietotāja iestatījumi",
     "privacyPolicy": "Privātuma politika",
@@ -219,7 +224,7 @@
     "hideBalance": "Slēpt atlikumu",
     "showBalance": "Rādīt atlikumu",
     "balanceHidden": "Atlikums ir paslēpts",
-    "bonusCreditsExpiring": "Bonusa kredītu {{amount}} apmērā derīguma termiņš beidzas {{date}}.",
+    "bonusCreditsExpiring": "Kredītu {{amount}} apmērā derīguma termiņš beidzas {{date}}.",
     "signOutTitle": "Izrakstīties?",
     "signOutMessage": "Lai piekļūtu savai darbvietai, tev būs jāpierakstās vēlreiz.",
     "deleteAccountTitle": "Dzēst kontu?",
@@ -597,6 +602,8 @@
     "installKiloGitHubApp": "Instalēt Kilo GitHub lietotni",
     "checkConnection": "Pārbaudīt savienojumu",
     "couldNotLoadPullRequest": "Neizdevās ielādēt izmaiņu pieprasījumu.",
+    "reviewServiceUnavailable": "Pakalpojums nav pieejams",
+    "reviewServiceUnavailableDescription": "Pakalpojums īslaicīgi nav pieejams. Drīz mēģiniet vēlreiz.",
     "description": "Apraksts",
     "noDescriptionProvided": "Nav sniegts apraksts.",
     "review": "Pārskatīšana",
@@ -773,6 +780,7 @@
       "truncationBanner_zero": "GitHub API ierobežojuma dēļ tiek rādīti tikai pirmie {{limit}} no {{total}} mainītajiem failiem."
     },
     "linkPasteClipboardEmpty": "Starpliktuve ir tukša.",
+    "linkPasteDenied": "Ielīmēšanas piekļuve tika liegta. Atļaujiet ielīmēšanu un mēģiniet vēlreiz.",
     "linkPasteNotAPullRequest": "Šī nav izmaiņu pieprasījuma vai merge request saite",
     "announce": {
       "commentPosted": "Komentārs publicēts",
@@ -796,7 +804,6 @@
       "mergeResultDefaultError": "GitHub nepabeidza apvienošanu.",
       "mergeResultNotCompleted": "{{term}} netika apvienots. Pārbaudi tā statusu un mēģini vēlreiz.",
       "ambiguous": "Neizdevās apstiprināt rezultātu — pirms atkārtota mēģinājuma pārbaudi PR.",
-      "persistenceFailed": "Neizdevās reģistrēt šo darbību. Mēģini vēlreiz vēlāk.",
       "forbidden": "Šī darbība nav atļauta."
     },
     "capabilities": {
@@ -1471,8 +1478,9 @@
       "loading": "Tiek ielādēta koda pārskatīšanas atmiņa",
       "couldNotLoad": "Neizdevās ielādēt koda pārskatīšanas atmiņu.",
       "off": "Koda pārskatīšanas atmiņa ir izslēgta.",
+      "on": "Koda pārskatīšanas atmiņa ir ieslēgta.",
       "offDescription": "Ieslēdz to, lai Kilo mācītos no uzturētāju atbildēm un ieteiktu norādījumus REVIEW.md failam.",
-      "readOnlyDescription": "Tikai organizācijas īpašnieki un norēķinu pārvaldnieki var iespējot koda pārskatīšanas atmiņu.",
+      "readOnlyDescription": "Tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki var mainīt koda pārskatīšanas atmiņu.",
       "enable": "Iespējot koda pārskatīšanas atmiņu",
       "loadingProposals": "Tiek ielādēti priekšlikumi",
       "couldNotLoadProposals": "Neizdevās ielādēt priekšlikumus.",
@@ -1492,7 +1500,10 @@
       "starting": "Tiek sākta koda pārskatīšana…",
       "start": "Sākt koda pārskatīšanu"
     },
-    "notConnectedReadOnly": "{{platform}} nav pievienots. To var pievienot tikai organizācijas īpašnieki un norēķinu pārvaldnieki.",
+    "notConnectedReadOnly": "{{platform}} nav pievienots. To var pievienot tikai organizācijas īpašnieki un administratori.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} nav pievienots. Lūdziet īpašniekam, administratoram vai norēķinu pārvaldniekam to pievienot."
+    },
     "webhookSetup": "Tīmekļa aizķeres iestatīšana nav pabeigta.",
     "webhookSetupDescription": "Dažos repozitorijos, iespējams, nenotiks automātiska koda pārskatīšana.",
     "autoReviews": "Automātiska koda pārskatīšana",
@@ -1500,7 +1511,7 @@
     "followReviewMd": "Ievērot REVIEW.md norādījumus",
     "followReviewMdSubtitle": "Ievērot katra repozitorija REVIEW.md failā sniegtos norādījumus",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nav pievienots. To var pievienot tikai organizācijas īpašnieki un norēķinu pārvaldnieki.",
+      "notConnectedReadOnly": "Bitbucket nav pievienots. To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki.",
       "setupIncomplete": "Iestatīšana nav pabeigta. Pabeidz konfigurēšanu vietnē kilo.ai.",
       "setup": "Bitbucket iestatīšana"
     },
@@ -1553,8 +1564,6 @@
     "updateFailed": "Neizdevās atjaunināt koda pārskatītāju.",
     "configSaveFailed": "Neizdevās saglabāt koda pārskatīšanas iestatījumus.",
     "status": {
-      "running": "Darbojas",
-      "completed": "Pabeigts",
       "interrupted": "Pārtraukta"
     },
     "reviewStyle": {
@@ -1681,7 +1690,14 @@
       "whereFound": "Konstatējuma atrašanās vietas ({{displayCount}})",
       "fullReport": "Pilns sagatavotais ziņojums",
       "yes": "Jā",
-      "no": "Nē"
+      "no": "Nē",
+      "action": {
+        "analyzeCodebase": "Analizēt koda bāzi",
+        "dismiss": "Noraidīt",
+        "manualReview": "Manuāla pārskatīšana",
+        "monitor": "Uzraudzīt",
+        "openPr": "Atvērt PR"
+      }
     },
     "dashboard": {
       "findingsCount": "Konstatējumi: {{displayCount}}",
@@ -1758,7 +1774,7 @@
       "couldNotLoad": "Neizdevās ielādēt šo konstatējumu.",
       "couldNotCheckPermissions": "Neizdevās pārbaudīt noraidīšanas atļaujas.",
       "cannotDismissTitle": "Šo konstatējumu nevar noraidīt",
-      "cannotDismissDescription": "Tikai organizācijas īpašnieki un norēķinu pārvaldnieki var noraidīt konstatējumus.",
+      "cannotDismissDescription": "Tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki var noraidīt konstatējumus.",
       "alreadyResolvedDescription": "Šis konstatējums jau ir atrisināts, un to vairs nevar noraidīt."
     },
     "findingDetails": {
@@ -1800,7 +1816,7 @@
       "automationAllOff": "Viss izslēgts",
       "automationCount": "Iespējoti {{displayCount}} no 3",
       "notificationsCount": "Iespējoti {{displayCount}} no 2",
-      "disabledNoManage": "Drošības aģents ir atspējots. To var ieslēgt tikai organizācijas īpašnieki un norēķinu pārvaldnieki.",
+      "disabledNoManage": "Drošības aģents ir atspējots. To var ieslēgt tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki.",
       "disabledNoRepo": "Pirms drošības aģenta iespējošanas izvēlies vismaz vienu repozitoriju.",
       "disabledPrompt": "Ieslēdz drošības aģentu, lai sinhronizētu Dependabot brīdinājumus, izvēlētos repozitorijus un iestatītu automatizāciju.",
       "repositoriesCount_zero": "Izvēlēts {{displayCount}} repozitoriju"
@@ -1850,7 +1866,7 @@
       "invalidDayCount": "norādi no 1 līdz 365 dienām, izmantojot tikai veselus skaitļus.",
       "remediationDeadlineA11y": "Labošanas termiņš dienās; smaguma pakāpe: {{label}}",
       "enterWholeNumber": "Ievadi veselu skaitli no 1 līdz 365",
-      "permissionNote": "Tikai organizācijas īpašnieki un norēķinu pārvaldnieki var mainīt šos iestatījumus.",
+      "permissionNote": "Tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki var mainīt šos iestatījumus.",
       "enableTracking": "Iespējot SLA uzraudzību",
       "enableTrackingSubtitle": "Nosaka labošanas termiņus atbilstoši konstatējumu smaguma pakāpei.",
       "deadlinesHeading": "Labošanas termiņi (dienās)"
@@ -1886,12 +1902,16 @@
     "settingsSave": {
       "saveChanges": "Saglabāt izmaiņas",
       "unsavedTitle": "Nesaglabātas izmaiņas",
-      "unsavedMessage": "Saglabāt izmaiņas pirms šī ekrāna aizvēršanas?"
+      "unsavedMessage": "Saglabāt izmaiņas pirms šī ekrāna aizvēršanas?",
+      "unsavedInvalidMessage": "Šīs izmaiņas vēl nevar saglabāt. Izlabojiet tās, lai saglabātu, vai atmetiet, lai aizietu."
     },
     "auditReportButton": {
       "viewA11y": "Skatīt audita ziņojumu"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo administrators",
+      "actorMaskedUser": "Maskēts lietotājs",
+      "actorSystem": "Kilo sistēma",
       "couldNotLoad": "Neizdevās ielādēt audita ziņojumu.",
       "events": "Notikumi",
       "generated": "Ziņojums sagatavots {{generatedAt}}.",
@@ -1902,8 +1922,25 @@
       "summary": "Ziņojuma kopsavilkums",
       "title": "Audita ziņojums",
       "unavailable": "Audita ziņojums nav pieejams",
-      "unavailableDescription": "Tikai organizācijas īpašnieki un norēķinu pārvaldnieki var skatīt audita ziņojumus. Lūdz īpašnieku vai norēķinu pārvaldnieku piešķirt tev piekļuvi.",
-      "queryFailed": "Neizdevās pabeigt ziņojuma vaicājumu. Mēģini vēlreiz."
+      "unavailableDescription": "Tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki var skatīt audita ziņojumus. Lūdz īpašnieku, administratoru vai norēķinu pārvaldnieku piešķirt tev piekļuvi.",
+      "queryFailed": "Neizdevās pabeigt ziņojuma vaicājumu. Mēģini vēlreiz.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Analīze pabeigta",
+        "findingAnalysisFailed": "Analīze neizdevās",
+        "findingAutoDismissed": "Automātiski noraidīts",
+        "findingCreated": "Importēts",
+        "findingDeleted": "Izdzēsts",
+        "findingDismissed": "Noraidīts",
+        "findingSeverityChanged": "Mainīta smaguma pakāpe",
+        "findingStatusChange": "Mainīts statuss",
+        "findingSuperseded": "Aizstāts",
+        "remediationBlocked": "Labošana bloķēta",
+        "remediationCancelled": "Atcelta",
+        "remediationFailed": "Labošana neizdevās",
+        "remediationNoChangesNeeded": "Izmaiņas nav nepieciešamas",
+        "remediationPrOpened": "Atvērts PR",
+        "remediationQueued": "Labošana pieprasīta"
+      }
     },
     "notifications": {
       "couldNotLoad": "Neizdevās ielādēt paziņojumu iestatījumus.",
@@ -1935,7 +1972,6 @@
       "installApp": "Instalēt GitHub lietotni",
       "reauthorizeButton": "Atkārtoti autorizēt GitHub lietotni",
       "reauthorizeDescription": "Drošības aģentam vajadzīga atļauja vulnerability_alerts, lai piekļūtu Dependabot brīdinājumiem. Atkārtoti autorizē GitHub lietotni, lai piešķirtu šo atļauju.",
-      "reauthorizeFailed": "Neizdevās sākt atkārtotu autorizāciju. Lūdzu, mēģini vēlreiz.",
       "reauthorizeTitle": "Nepieciešamas papildu atļaujas",
       "setupFailed": "Neizdevās sākt GitHub iestatīšanu. Lūdzu, mēģini vēlreiz."
     },
@@ -1954,7 +1990,12 @@
       "syncMayNotHaveCompleted": "Sinhronizācija, iespējams, nav pabeigta. Mēģini vēlreiz, lai atjauninātu tās stāvokli, vai atmet to.",
       "syncInProgress": "Drošības datu sinhronizācija jau notiek. Lūdzu, mēģini vēlreiz.",
       "dismissalInProgress": "Šī noraidīšana jau notiek. Lūdzu, mēģini vēlreiz.",
-      "couldNotReadPendingSyncs": "Neizdevās nolasīt gaidošās sinhronizācijas. Mēģini vēlreiz."
+      "couldNotReadPendingSyncs": "Neizdevās nolasīt gaidošās sinhronizācijas. Mēģini vēlreiz.",
+      "ambiguous": "Neizdevās apstiprināt rezultātu — pirms atkārtota mēģinājuma pārbaudi drošības pārskatījumu.",
+      "settleFailed": "Darbība tika pabeigta, bet mēs nevarējām reģistrēt rezultātu. Lūdzu, mēģini vēlreiz.",
+      "replayFailed": "Šī darbība netika pabeigta. Lūdzu, mēģini vēlreiz.",
+      "actionFailed": "Neizdevās pabeigt šo darbību. Lūdzu, mēģini vēlreiz.",
+      "actionBlocked": "Neizdevās pabeigt šo darbību. Vispirms jāatrisina problēma, lai varētu mēģināt vēlreiz."
     },
     "analysisState": {
       "queued": "Analīze rindā",
@@ -2218,6 +2259,9 @@
       "noRepositoriesVisibleGitlab": "Nav redzamu repozitoriju. Pārbaudi piekļuvi GitLab repozitorijiem, pēc tam atsvaidzini sarakstu.",
       "noRepositoriesVisibleBitbucket": "Nav redzamu repozitoriju. Pārbaudi piekļuvi Bitbucket repozitorijiem, pēc tam atsvaidzini sarakstu.",
       "bitbucketOrganizationsOnly": "Bitbucket ir pieejams tikai organizācijām.",
+      "githubNeedsAttention": "GitHub ir jāpievieno no jauna",
+      "githubNeedsAttentionDescription": "Pievieno Kilo GitHub lietotni no jauna, pēc tam atsvaidzini, lai ielādētu tās repozitorijus.",
+      "partialRepositories": "Dažus GitHub repozitorijus neizdevās ielādēt.",
       "branchPickerTitle": "Atlasīt atzaru",
       "branchDefault": "Noklusējuma",
       "branchAccessibility": "Atzars: {{label}}",
@@ -2225,6 +2269,7 @@
       "branchLoadError": "Neizdevās ielādēt atzarus",
       "branchUnavailable": "Šim repozitorijam atzari nav pieejami. Pārbaudi savas tiesības pie pakalpojumu sniedzēja un izvēlies citu repozitoriju.",
       "branchEmpty": "Nav pieejamu atzaru",
+      "branchListIncomplete": "Tiek rādīti tikai daži atzari. Repozitorijā ir vairāk atzaru, nekā šis saraksts var ietvert.",
       "branchPlaceholder": "Izvēlēties atzaru",
       "runOnWithTarget": "Izpildes vide: {{target}}",
       "environment": "Vide",
@@ -2236,6 +2281,8 @@
       "commitAndPush": "Fiksēt un nosūtīt",
       "startSession": "Sākt sesiju",
       "selectRepositoryToStart": "Lai sāktu, izvēlies repozitoriju.",
+      "enterPromptToStart": "Lai sāktu, pievieno promptu.",
+      "enterPromptOrFileToStart": "Lai sāktu, pievieno promptu vai failu.",
       "connectProviderToStart": "Lai sāktu, pievieno pakalpojuma sniedzēju.",
       "promptPlaceholder": "Pie kā vēlētos strādāt?",
       "couldNotLoadModels": "Neizdevās ielādēt modeļus.",
@@ -2318,7 +2365,8 @@
       "matchesBadge_one": "{{displayCount}} atbilstība",
       "matchesBadge_other": "{{displayCount}} atbilstības",
       "matchesBadge_zero": "{{displayCount}} atbilstību",
-      "noOutput": "Nav izvades."
+      "noOutput": "Nav izvades.",
+      "translationFailed": "Tulkojums neizdevās"
     },
     "readToolMarkdown": {
       "linesTruncated": "rindas {{start}}–{{end}} (saturs saīsināts)",
@@ -2785,7 +2833,7 @@
     "viewProfile": "Skatīt profilu",
     "webBrowser": "Tīmekļa pārlūks",
     "signOutThisDevice": "Izrakstīties šajā ierīcē",
-    "signOutThisSession": "Beigt šo sesiju",
+    "signOutSessionLabel": "Izrakstīties no „{{device}}”, pierakstīšanās: {{signedIn}}",
     "sessionSignedOut": "Sesija ir beigta.",
     "signOutThisDeviceTitle": "Izrakstīties šajā ierīcē?",
     "signOutThisSessionTitle": "Beigt šo sesiju?",
@@ -3023,11 +3071,23 @@
     "boundary": {
       "backToProfile": "Atpakaļ uz profilu",
       "loadErrorMessage": "Pārbaudi savienojumu un mēģini vēlreiz.",
+
+      "chooseAccount": "Izvēlies kontu",
       "loadErrorTitle": "Neizdevās ielādēt tavas organizācijas.",
+      "membershipLostNotice": "Tev vairs nav piekļuves šai organizācijai. Pārslēgts uz {{target}}.",
+      "noOrganization": "Nav organizācijas",
+
+      "noOrganizationDescription": "Šis konts nav daļa no organizācijas. Lai izmantotu organizācijas funkcijas, piemēram, dalībnieku uzaicinājumus un brīdinājumus par zemu atlikumu, izveido vai pievienojies organizācijai tīmeklī.",
+
+      "openWebOrganizations": "Atvērt organizācijas tīmeklī",
+
       "organizationUnavailable": "Organizācija nav pieejama.",
-      "selectDescription": "Lai turpinātu, izvēlies organizāciju savā profilā.",
+      "selectDescriptionWithOrganizations": "Tu piederi vienai vai vairākām organizācijām. Izvēlies kontu, kuru šim ekrānam vajadzētu izmantot.",
+
       "selectOrganization": "Organizācijas izvēle",
       "unavailableDescription": "Šī organizācija vairs nav pieejama. Lai turpinātu, izvēlies citu organizāciju savā profilā.",
+
+      "unavailableSessionsDescription": "Šī organizācija vairs nav pieejama. Tās sesijas nevar ielādēt.",
       "accessDeniedDescription": "Tev nav piekļuves šai organizācijai."
     },
     "creditActivity": {
@@ -3079,7 +3139,11 @@
       "separateEmailsHint": "Atdali vairākas e-pasta adreses ar komatiem.",
       "thresholdLabel": "Atlikuma slieksnis (USD)",
       "title": "Brīdinājums par mazu atlikumu",
-      "emailsError": "Ievadi vismaz vienu derīgu e-pasta adresi. Vairākas adreses atdali ar komatiem.",
+      "emailsInvalid": "Viena vai vairākas e-pasta adreses nav derīgas.",
+      "emailsRequired": "Ievadi vismaz vienu e-pasta adresi.",
+      "saveEmailsError": "Dažas e-pasta adreses netika pieņemtas. Pārbaudi tās un mēģini vēlreiz.",
+      "saveError": "Neizdevās saglabāt brīdinājumu par mazu atlikumu.",
+      "thresholdPlaceholder": "Ievadi summu",
       "thresholdError": "Ievadi summu, kas ir lielāka par 0."
     },
     "memberLimit": {
@@ -3090,12 +3154,13 @@
       "removeLimit": "Noņemt limitu",
       "title": "Dienas tēriņu limits",
       "blankError": "Ievadi summu vai nospied zemāk esošo pogu „Noņemt limitu”.",
+      "blankWithoutLimitError": "Ievadi dienas limitu no 0 līdz {{max}}.",
       "rangeError": "Ievadi summu no 0 līdz {{max}}."
     },
     "members": {
       "changeRole": "Mainīt lomu",
       "emptyDescriptionCanInvite": "Uzaicini komandas biedrus, lai sāktu sadarbību šajā organizācijā.",
-      "emptyDescriptionCannotInvite": "Palūdz īpašniekam vai norēķinu pārvaldniekam uzaicināt komandas biedrus.",
+      "emptyDescriptionCannotInvite": "Palūdz īpašniekam, administratoram vai norēķinu pārvaldniekam uzaicināt komandas biedrus.",
       "emptyTitle": "Vēl nav dalībnieku",
       "invitedDate": "Uzaicināts {{date}}",
       "limitPerDay": "{{amount}}/dienā",
@@ -3360,9 +3425,16 @@
       "settingsToolsOn": "Ieslēgts — iestatījumu rīki tiek sūtīti modelim",
       "settingsToolsOff": "Izslēgts — modelim netiek sūtīts neviens iestatījumu rīks",
       "serverChecking": "Pārbauda šo serveri…",
-      "serverToolCount": "{{count}} rīki",
       "serverUnreachable": "Neizdevās sasniegt šo serveri",
-      "serverOff": "Šis serveris ir izslēgts"
+      "serverOff": "Šis serveris ir izslēgts",
+      "app": {
+        "label": "Rīka saskarne",
+        "failed": "Neizdevās ielādēt šī rīka saskarni.",
+        "empty": "Šī rīka saskarnē nav ko parādīt."
+      },
+      "serverToolCount_zero": "{{count}} rīku",
+      "serverToolCount_one": "{{count}} rīks",
+      "serverToolCount_other": "{{count}} rīki"
     },
     "mcpOAuth": {
       "authMethod": "Autentifikācija",
@@ -3507,6 +3579,8 @@
       "quantizationsHelp": "Mazāki faili izmanto mazāk atmiņas un krātuves. Lielāki faili parasti sniedz labākas atbildes.",
       "quantDetail": "Lejupielāde: {{size}} · aptuveni {{memory}} atmiņas",
       "downloadQuant": "Lejupielādēt {{quant}}",
+      "downloadModelA11y": "Lejupielādēt {{name}}",
+      "detailsA11y": "Informācija: {{name}}",
       "loadingModel": "Ielādē modeļa informāciju",
       "couldNotLoadModel": "Neizdevās ielādēt šo modeli",
       "noFiles": "Nav failu, ko šī lietotne var palaist",
@@ -3558,6 +3632,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Lai sāktu aģentu, nepieciešama uzvedne. Pievieno uzvedni un palaid to vēlreiz.",
+      "repositoryRequired": "Lai sāktu aģentu, nepieciešama repozitorija. Atver Kilo un izvēlies vienu, pēc tam palaid to vēlreiz.",
       "repositoryUnknown": "Kilo neatpazīst {{repository}} kā GitHub vai GitLab repozitoriju. Izvēlies citu repozitoriju Kilo.",
       "repositoryUnsupported": "{{repository}} ir Bitbucket repozitorijs — Sākt aģentu to vēl nevar izmantot. Izvēlies citu repozitoriju Kilo."
     }
@@ -3595,13 +3670,19 @@
     "emptyDescription": "Izveidojiet profilu, lai sesijās atkārtoti izmantotu vides mainīgos, iestatīšanas komandas un prasmes.",
     "loadFailed": "Nevarēja ielādēt profilus",
     "counts": {
-      "vars": "{{count}} mainīgo",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} prasmju",
-      "commands": "{{count}} komandu",
       "varsShort": "{{count}}m",
       "skillsShort": "{{count}}p",
-      "commandsShort": "{{count}}k"
+      "commandsShort": "{{count}}k",
+      "commands_zero": "{{count}} komandu",
+      "commands_one": "{{count}} komanda",
+      "commands_other": "{{count}} komandas",
+      "skills_zero": "{{count}} prasmju",
+      "skills_one": "{{count}} prasme",
+      "skills_other": "{{count}} prasmes",
+      "vars_zero": "{{count}} mainīgo",
+      "vars_one": "{{count}} mainīgais",
+      "vars_other": "{{count}} mainīgie"
     },
     "nameLabel": "Profila nosaukums",
     "namePlaceholder": "piem. Aizmugursistēmas atkļūdošana",
@@ -3629,7 +3710,6 @@
     "keyTooLong": "Atslēgai jābūt 256 rakstzīmēm vai mazāk",
     "keyDuplicate": "Šī atslēga jau ir profilā",
     "valueLabel": "Vērtība",
-    "secretLabel": "Noslēpums",
     "secrets": {
       "markSecret": "Atzīmēt kā noslēpumu",
       "masked": "Slēptā vērtība",
@@ -3658,6 +3738,8 @@
     "skillNameInvalid": "Prasmes nosaukumam jāsākas ar burtu vai ciparu, un tajā jāizmanto tikai mazie burti, cipari un domuzīmes.",
     "skillContentRequired": "Nepieciešams prasmju saturs",
     "skillSaveFailed": "Nevarēja saglabāt prasmi",
+    "skillSourceCustom": "Pielāgots",
+    "skillSourceMarketplace": "Tirgus",
     "skillsHint": "Ielīmējiet failu SKILL.md, un tā nosaukums tiks aizpildīts; pievienojiet prasmi no sava tālruņa bez vilkšanas un nomešanas.",
     "skillEditTitle": "Rediģēt prasmi",
     "mcp": {
@@ -3673,7 +3755,7 @@
       "environment": "Vide (JSON)",
       "headers": "Galvenes (JSON)",
       "timeout": "Taimauts",
-      "secretCount": "Slepenais skaitījums",
+      "secretCount": "Slepenais skaitījums: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3688,7 +3770,9 @@
       "jsonTooLarge": "Izmantojiet ne vairāk kā 50 ierakstus, atslēgas līdz 128 un vērtības līdz 4096 rakstzīmēm",
       "timeoutInvalid": "Taimautai ir jābūt veselam milisekunžu skaitam",
       "edit": "Rediģēt MCP serveri",
-      "saveFailed": "Nevarēja saglabāt MCP serveri"
+      "saveFailed": "Nevarēja saglabāt MCP serveri",
+      "deleteFailed": "Nevarēja izdzēst MCP serveri",
+      "updateFailed": "Nevarēja atjaunināt MCP serveri"
     },
     "agents": {
       "title": "Profila aģenti",
@@ -3714,7 +3798,11 @@
       "visibilityPrimary": "Primārais — parādīts atlasītājā",
       "visibilitySubagent": "Subaģents — izsaucams tikai no citiem",
       "visibilityAll": "Visi - abi",
+      "modePrimary": "Tikai primārais",
+      "modeSubagent": "Tikai subaģents",
+      "modeAll": "Visi režīmi",
       "saveFailed": "Nevarēja saglabāt aģentu",
+      "deleteFailed": "Nevarēja izdzēst aģentu",
       "nameRequired": "Ievadiet aģenta nosaukumu",
       "slugRequired": "Ievadiet aģenta lodes",
       "slugInvalid": "Slug jāsākas ar burtu un jāizmanto tikai mazie burti, cipari un domuzīmes",
@@ -3729,10 +3817,12 @@
       "description": "Komandas apraksts",
       "template": "Veidne",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Izskaidrojiet $ARGUMENTS",
       "subtask": "Palaist kā apakšuzdevumu",
       "edit": "Rediģēt slīpsvītras komandu",
       "saveFailed": "Nevarēja saglabāt komandu",
+      "deleteFailed": "Nevarēja izdzēst komandu",
       "nameRequired": "Ievadiet komandas nosaukumu",
       "nameInvalid": "Nosaukumam ir jāsākas ar mazo burtu un jāizmanto tikai mazie burti, cipari un domuzīmes",
       "templateRequired": "Ievadiet komandas veidni",
@@ -3771,6 +3861,8 @@
     "empty": "Kredītu paketes šobrīd nav pieejamas.",
     "noMatchingProducts": "App Store neatgrieza nevienu atbilstošu kredītu paketi.",
     "noMatchingProductsPlay": "Google Play neatgrieza nevienu atbilstošu kredītu paketi.",
+    "storeTimedOut": "App Store neatbildēja laicīgi. Mēģināt vēlreiz.",
+    "storeTimedOutPlay": "Google Play neatbildēja laicīgi. Mēģināt vēlreiz.",
     "purchaseOwnedByAnotherAccount": "Kredīti šajā Apple Account kontā pieder citam Kilo kontam. Lai tos izmantotu, pieraksties attiecīgajā Kilo kontā.",
     "purchaseOwnedByAnotherAccountPlay": "Kredīti šajā Google Play kontā pieder citam Kilo kontam. Lai tos izmantotu, piesakieties tajā Kilo kontā."
   },
@@ -3883,7 +3975,7 @@
     "view": "Lasīt kopsavilkumu",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Rādīt tiešsaistes statusu",
+    "dismiss": "Noraidīt kopsavilkumu",
     "offline": "Bezsaistē · saglabāts kopsavilkums",
     "cached": "Saglabāta atskaite · atsvaidzināšana nav pieejama",
     "revised": "Pārskatīts · {{revision}}",
@@ -3924,6 +4016,33 @@
     "enable": "Iespējot maksas kopsavilkumus",
     "contextSettings": "AI iestatījumi · {{context}}",
     "allContexts": "Personīgie un organizācijas kopsavilkumi tiek glabāti atsevišķi.",
+    "create": "Izveidot kopsavilkumu",
+    "oneOff": "Vienreizējs",
+    "createdAt": "Izveidots {{time}}",
+    "chooseContext": "Izvēlieties vienu kontekstu",
+    "period": "Kopsavilkuma periods",
+    "last24Hours": "Pēdējās 24 stundas",
+    "last7Days": "Pēdējās 7 dienas",
+    "customPeriod": "Pielāgots periods",
+    "periodStart": "Perioda sākums",
+    "periodEnd": "Perioda beigas",
+    "periodHint": "Izvēlieties līdz 31 dienai ilgu periodu. Vēsturiskie dati var būt nepilnīgi.",
+    "periodSessions": "Aktīvas šajā periodā",
+    "periodSpend": "Perioda izdevumi",
+    "invalidPeriod": "Izvēlieties sākumu pirms beigām.",
+    "futurePeriod": "Periods nevar beigties nākotnē.",
+    "periodTooLong": "Izvēlieties periodu, kas nepārsniedz 31 dienu.",
+    "invalidLocalTime": "Šāds vietējais laiks kopsavilkuma laika joslā nepastāv. Izvēlieties citu laiku.",
+    "reviewBriefing": "Pārskatīt kopsavilkumu",
+    "reviewAgain": "Sagatavot jaunu pārskatu",
+    "payer": "Maksa tiek ieturēta no {{context}}",
+    "emptyPeriod": "Šajā periodā nav atrasta neviena darbība. AI kopsavilkums netiks veidots, un maksa netiks piemērota.",
+    "emptyHistory": "Nav saglabātu kopsavilkumu",
+    "historicalStateHint": "Sesijas stāvoklis atspoguļo izvēlētā perioda beigu stāvokli, nevis pašreizējo stāvokli reāllaikā.",
+    "oneOffHint": "AI saņem atlasītus datus ar aizklātu sensitīvo informāciju jūsu lietotnes valodā. Šis vienreizējais pārskats nemaina jūsu rīta grafiku vai AI preferences.",
+    "createOffline": "Izveidojiet savienojumu ar internetu, lai pārskatītu vai izveidotu kopsavilkumu. Maksas pieprasījumi bezsaistē nekad netiek ievietoti rindā.",
+    "estimateInputTooLarge": "Šajā periodā ir pārāk daudz datu izvēlētajam modelim.",
+    "estimatePermissionUnavailable": "Jums nav atļaujas izmantot šī konteksta atlikumu.",
     "estimatePricingUnavailable": "Šī modeļa cenu informācija nav pieejama.",
     "estimateBalanceUnavailable": "Nepietiek līdzekļu apmaksātam kopsavilkumam.",
     "estimateModelNotAllowed": "Šis modelis šeit nav atļauts.",

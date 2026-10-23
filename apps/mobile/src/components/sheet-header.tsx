@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigation } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Platform, Pressable, StatusBar, View } from 'react-native';
+import { Platform, Pressable, StatusBar, View, type ViewInstance } from 'react-native';
 
 import { Share } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
@@ -53,6 +53,7 @@ export function SheetHeader({
   onShare,
   sharing = false,
   disabled = false,
+  doneDisabled = false,
   topInset = 'always',
 }: {
   title: string;
@@ -71,7 +72,14 @@ export function SheetHeader({
   cancelLabel?: string;
   onShare?: () => void;
   sharing?: boolean;
+  /** Disables both controls. Use `doneDisabled` when only the commit waits. */
   disabled?: boolean;
+  /**
+   * Disables the Done control alone, so Cancel still closes a sheet that is
+   * saving. A full-window sheet has no drag dismissal left, so Cancel is the
+   * only way out while a write is in flight.
+   */
+  doneDisabled?: boolean;
   topInset?: SheetHeaderTopInset;
 }) {
   const { t } = useTranslation();
@@ -117,13 +125,13 @@ export function SheetHeader({
           ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
         }
       : undefined;
-  const containerRef = useRef<View | null>(null);
+  const containerRef = useRef<ViewInstance | null>(null);
   const remeasureWindowTop = useCallback(() => {
     containerRef.current?.measureInWindow((_x, y) => {
       setReachesWindowTop(isAtWindowTop(y));
     });
   }, []);
-  const setContainerRef = useCallback((view: View | null) => {
+  const setContainerRef = useCallback((view: ViewInstance | null) => {
     containerRef.current = view;
     view?.measureInWindow((_x, y) => {
       setReachesWindowTop(isAtWindowTop(y));
@@ -208,7 +216,7 @@ export function SheetHeader({
           </View>
           <Pressable
             onPress={onDone}
-            disabled={disabled}
+            disabled={disabled || doneDisabled}
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={resolvedDoneLabel}

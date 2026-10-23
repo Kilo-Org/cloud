@@ -255,7 +255,7 @@ export function ReviewDetailScreen({
             ) : null}
             {review.completed_at ? (
               <MetaRow
-                label={t('codeReviewer.status.completed')}
+                label={t('common.completed')}
                 value={timeAgo(parseTimestamp(review.completed_at))}
               />
             ) : null}
@@ -349,9 +349,7 @@ export function ReviewDetailScreen({
               <Button
                 variant="secondary"
                 onPress={() => {
-                  router.push(
-                    `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/${review.platform}` as Href
-                  );
+                  router.push(`/(app)/code-reviewer/${scope}/${review.platform}` as Href);
                 }}
               >
                 <Text>{t('codeReviewer.reviewDetail.fixSettings')}</Text>

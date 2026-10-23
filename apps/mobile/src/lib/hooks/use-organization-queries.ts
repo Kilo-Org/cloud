@@ -201,6 +201,12 @@ export type OrgInvoice = RouterOutputs['organizations']['invoicesPage']['entries
  * Build the invoices infinite-query options. Kept as a pure builder so the
  * retention bound, the fixed `period: 'year'` input, and the cursor
  * passthrough are testable without mounting the hook.
+ *
+ * The first page must settle while the online manager reports offline: a
+ * paused read leaves the screen's `isLoading` branch (its skeleton rows) with
+ * no exit, because a paused query is pending but never fetching, so it neither
+ * errors nor loads. This read either answers or fails once the control-plane
+ * deadline lands, and the screen's error state then offers Retry.
  */
 export function buildOrgInvoicesPageQueryOptions(
   trpc: ReturnType<typeof useTRPC>,
@@ -215,6 +221,11 @@ export function buildOrgInvoicesPageQueryOptions(
           lastPage.hasMore && !hasReachedRetentionBound(pages.length)
             ? (lastPage.nextCursor ?? undefined)
             : undefined,
+        networkMode: 'always',
+        // `networkMode: 'always'` also disables the derived reconnect refetch
+        // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
+        // 'always'` when it is undefined), so ask for it explicitly.
+        refetchOnReconnect: true,
       }
     )
   );

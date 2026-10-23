@@ -190,6 +190,11 @@ export function initServerSentry(): void {
     debug: false,
     normalizeDepth: 5,
 
+    // SDK 11 attaches a synthetic stack trace to captureMessage events by default, which
+    // groups them by minified call site instead of by message and splits every existing
+    // message issue into new ones.
+    attachStacktrace: false,
+
     // The Vercel OTel setup in node-instrumentation.ts owns the tracer provider, so Sentry
     // must not install one of its own.
     enableOpenTelemetrySetup: false,

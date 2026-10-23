@@ -19,6 +19,9 @@ if (process.env.NODE_ENV !== 'development') {
     debug: false,
     normalizeDepth: 5,
 
+    // Keep SDK 10 grouping of captureMessage events; see initServerSentry.
+    attachStacktrace: false,
+
     dataCollection: RESTRICTED_DATA_COLLECTION,
 
     integrations: [

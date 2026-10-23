@@ -153,7 +153,7 @@ jobs:
 
   detect-changes:
     # Guard: privileged workflow — only the canonical repo may run it.
-    if: inputs.worker == '' && (inputs.base_sha != '' || inputs.target_environment != 'production') && github.repository == 'Kilo-Org/cloud'
+    if: inputs.worker == '' && inputs.base_sha != '' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:

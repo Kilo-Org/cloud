@@ -34,7 +34,14 @@ import {
 } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import { findUserByStripeCustomerId } from '@/lib/user';
 import { findOrganizationByStripeCustomerId } from '@kilocode/web-shared/lib/organizations/organizations';
-import type { CreditEvent, StoreCreditEvent } from '@kilocode/web-shared/lib/bouncer/client';
+import {
+  bouncerAccountId,
+  bouncerWireEventId,
+  type CreditEvent,
+  type StoreCreditEvent,
+} from '@kilocode/web-shared/lib/bouncer/client';
+import { chargeStanding } from '@kilocode/web-shared/lib/bouncer/charge-gate';
+import { deliverBouncerCreditEventNow } from '@/lib/bouncer/dispatch-credit-event-outbox';
 import {
   enqueueCreditEvent,
   reportChargeAttempted,
@@ -277,7 +284,7 @@ async function reportWebhookCreditEvent(
   owner: Parameters<typeof resolveBouncerCreditOwner>[0],
   event: WebhookCreditEvent,
   fingerprintChargeId?: string | null
-): Promise<void> {
+): Promise<{ payer: BouncerCreditOwner; wireEventId: string } | null> {
   const payer = await resolveBouncerCreditOwner(owner).catch(error => {
     captureException(error, { tags: { source: 'bouncer_webhook_credit_event' } });
     throw error;
@@ -287,7 +294,7 @@ async function reportWebhookCreditEvent(
       eventType: event.type,
       eventId: event.eventId,
     });
-    return;
+    return null;
   }
   const cardFingerprint =
     event.cardFingerprint ??
@@ -301,6 +308,7 @@ async function reportWebhookCreditEvent(
       orgId: payer.orgId,
     })
   );
+  return { payer, wireEventId: bouncerWireEventId(event.eventId) };
 }
 
 /** The card fingerprint of a charge, or null when the charge cannot be read. */
@@ -357,6 +365,54 @@ function isAuthenticationFailureCharge(charge: Stripe.Charge): boolean {
   );
 }
 
+/** Bounds each Stripe call the failure gate makes from a webhook. */
+const CHARGE_GATE_STRIPE_TIMEOUT_MS = 5_000;
+
+/**
+ * Expires the checkout session behind a failed payment intent, when it is still open, so a card
+ * tester cannot keep cycling cards inside one session. Best-effort: the caller logs and continues.
+ */
+async function expireOpenCheckoutSessionForPaymentIntent(paymentIntentId: string): Promise<void> {
+  const listed = await client.checkout.sessions.list(
+    { payment_intent: paymentIntentId, limit: 1 },
+    { timeout: CHARGE_GATE_STRIPE_TIMEOUT_MS }
+  );
+  const session = listed.data[0];
+  if (session?.status !== 'open') return;
+  await client.checkout.sessions.expire(session.id, { timeout: CHARGE_GATE_STRIPE_TIMEOUT_MS });
+}
+
+/**
+ * After a decline is durably enqueued, sends it to bouncer now and asks for the failure-stage
+ * verdict. A refusal expires the payer's open checkout session. Every step is best-effort and
+ * bounded: an error is logged and the webhook still succeeds, so Stripe never retries because of
+ * this gate.
+ */
+async function enforceDeclinedChargeStanding(params: {
+  payer: BouncerCreditOwner;
+  wireEventId: string;
+  requestId: string;
+  paymentIntentId: string | null;
+}): Promise<void> {
+  try {
+    // The credit-event POST applies the payer standing before it answers, so the verdict below
+    // sees this failure.
+    if (!(await deliverBouncerCreditEventNow(params.wireEventId))) return;
+    const verdict = await chargeStanding({
+      stage: 'failure',
+      requestId: params.requestId,
+      accountId: bouncerAccountId(params.payer.userId, params.payer.orgId),
+      userId: params.payer.userId,
+    });
+    if (!verdict?.enforced || !params.paymentIntentId) return;
+    await expireOpenCheckoutSessionForPaymentIntent(params.paymentIntentId);
+  } catch (error) {
+    warnExceptInTest('Bouncer decline gate failed; the decline stays in the outbox', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 /**
  * Reports one declined charge attempt to bouncer as `charge.failed`.
  *
@@ -370,6 +426,11 @@ function isAuthenticationFailureCharge(charge: Stripe.Charge): boolean {
  * fingerprint the event lacks; a `charge.failed` payload is the charge, so a second read of it
  * returns the same answer and it passes none. Without a fingerprint bouncer cannot count the card
  * ledger and files a `missing_card` review instead.
+ *
+ * After the durable enqueue, the attempt is delivered to bouncer immediately and the failure-stage
+ * verdict is applied, so an enforced standing expires the open checkout session behind the payment
+ * intent. A redelivered second event for the same attempt finds the row already delivered and
+ * leaves the session alone.
  */
 async function reportDeclinedCharge(params: {
   owner: Parameters<typeof resolveBouncerCreditOwner>[0];
@@ -399,11 +460,19 @@ async function reportDeclinedCharge(params: {
     (params.fingerprintSource?.paymentMethodId
       ? await bouncerCardFingerprintForPaymentMethodId(params.fingerprintSource.paymentMethodId)
       : null);
-  await reportWebhookCreditEvent(params.owner, {
+  const reported = await reportWebhookCreditEvent(params.owner, {
     type: 'charge.failed',
     eventId,
     occurredAt: params.occurredAt,
     cardFingerprint,
+  });
+  if (!reported) return;
+  const paymentIntentId = params.paymentIntentId ?? null;
+  await enforceDeclinedChargeStanding({
+    payer: reported.payer,
+    wireEventId: reported.wireEventId,
+    requestId: chargeId ?? paymentIntentId ?? eventId,
+    paymentIntentId,
   });
 }
 

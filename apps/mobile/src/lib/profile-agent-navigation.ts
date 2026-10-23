@@ -15,6 +15,13 @@ type ProfileOrganization = { organizationId: string };
  */
 export type ProfileManagementStack = 'app' | 'profileTab';
 
+/**
+ * Route roots per Stack. Both trees render the same screen components; only
+ * the tree differs, because Expo Router resolves an href inside the navigator
+ * that owns it. A screen opened from the root stack must travel through
+ * `app`, and one opened from the Profile tab through `profileTab`, or Back
+ * unwinds the wrong navigator.
+ */
 const PROFILE_ROOTS = {
   app: '/(app)/profile-management',
   profileTab: '/(app)/(tabs)/(3_profile)/profiles',

@@ -260,11 +260,15 @@ describe('EmailOtpForm controls', () => {
     expect(destination(mounted.root).props.children).toBe(initialDescription);
   });
 
-  it('verifies a code typed in Arabic-Indic digits', () => {
+  it.each([
+    ['Arabic-Indic', '٢٤٦٨١٠'],
+    ['Thai', '๒๔๖๘๑๐'],
+    ['full-width', '２４６８１０'],
+  ])('verifies a code typed in %s digits', (_script, typed) => {
     const { mounted, props } = mount();
     const input = mounted.root.findByType('TextInput');
     act(() => {
-      (input.props.onChangeText as (value: string) => void)('٢٤٦٨١٠');
+      (input.props.onChangeText as (value: string) => void)(typed);
     });
 
     const verify = mounted.root.findByProps({ accessibilityLabel: 'Verify code' });

@@ -34,32 +34,32 @@ const pattern = z
 // Keep RPC contracts shallow. The recursive parser validates every nested keyword.
 export type WebhookBodySchema = Record<string, unknown>;
 type SchemaNode = {
-  type?: z.infer<typeof instanceType> | z.infer<typeof instanceType>[];
-  title?: string;
-  description?: string;
-  properties?: Record<string, SchemaNode>;
-  required?: string[];
-  additionalProperties?: boolean | SchemaNode;
-  items?: SchemaNode;
-  enum?: JsonValue[];
-  const?: JsonValue;
-  minimum?: number;
-  maximum?: number;
-  exclusiveMinimum?: number;
-  exclusiveMaximum?: number;
-  multipleOf?: number;
-  minLength?: number;
-  maxLength?: number;
-  pattern?: string;
-  minItems?: number;
-  maxItems?: number;
-  uniqueItems?: boolean;
-  minProperties?: number;
-  maxProperties?: number;
-  allOf?: SchemaNode[];
-  anyOf?: SchemaNode[];
-  oneOf?: SchemaNode[];
-  not?: SchemaNode;
+  type?: z.infer<typeof instanceType> | z.infer<typeof instanceType>[] | undefined;
+  title?: string | undefined;
+  description?: string | undefined;
+  properties?: Record<string, SchemaNode> | undefined;
+  required?: string[] | undefined;
+  additionalProperties?: boolean | SchemaNode | undefined;
+  items?: SchemaNode | undefined;
+  enum?: JsonValue[] | undefined;
+  const?: JsonValue | undefined;
+  minimum?: number | undefined;
+  maximum?: number | undefined;
+  exclusiveMinimum?: number | undefined;
+  exclusiveMaximum?: number | undefined;
+  multipleOf?: number | undefined;
+  minLength?: number | undefined;
+  maxLength?: number | undefined;
+  pattern?: string | undefined;
+  minItems?: number | undefined;
+  maxItems?: number | undefined;
+  uniqueItems?: boolean | undefined;
+  minProperties?: number | undefined;
+  maxProperties?: number | undefined;
+  allOf?: SchemaNode[] | undefined;
+  anyOf?: SchemaNode[] | undefined;
+  oneOf?: SchemaNode[] | undefined;
+  not?: SchemaNode | undefined;
 };
 
 const recursiveSchema: z.ZodType<SchemaNode> = z.lazy(() =>

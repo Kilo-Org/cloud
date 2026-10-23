@@ -11,8 +11,10 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   DEFAULT_VERCEL_ROUTING_ENABLED,
+  GatewayConfigInputSchema,
   NOTE_MAX_LENGTH,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
+import { formatZodError } from '@/lib/zod/format-zod-error';
 
 export function RoutingContent() {
   const trpc = useTRPC();
@@ -24,6 +26,7 @@ export function RoutingContent() {
   const [optOutModelsValue, setOptOutModelsValue] = useState('');
   const [noteValue, setNoteValue] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (data) {
@@ -43,7 +46,7 @@ export function RoutingContent() {
         toast.success('Gateway routing configuration updated');
       },
       onError: error => {
-        toast.error(error.message || 'Failed to update');
+        toast.error(formatZodError(error));
       },
     })
   );
@@ -53,23 +56,20 @@ export function RoutingContent() {
     return trimmed === '' ? null : trimmed;
   }
 
-  function optOutModels() {
-    return [
-      ...new Set(
-        optOutModelsValue
-          .split('\n')
-          .map(model => model.trim())
-          .filter(Boolean)
-      ),
-    ];
-  }
-
   function handleSave() {
-    mutation.mutate({
+    const parsed = GatewayConfigInputSchema.safeParse({
       vercel_routing_enabled: vercelEnabled,
-      vercel_routing_opt_out_models: optOutModels(),
+      vercel_routing_opt_out_models: optOutModelsValue
+        .split('\n')
+        .filter(model => model.trim() !== ''),
       note: noteInput(),
     });
+    if (!parsed.success) {
+      setValidationError(formatZodError(parsed.error));
+      return;
+    }
+    setValidationError(null);
+    mutation.mutate(parsed.data);
   }
 
   if (isLoading) {
@@ -113,6 +113,7 @@ export function RoutingContent() {
               value={optOutModelsValue}
               onChange={e => {
                 setOptOutModelsValue(e.target.value);
+                setValidationError(null);
                 setHasChanges(true);
               }}
               rows={6}
@@ -138,6 +139,15 @@ export function RoutingContent() {
               className="min-h-20"
             />
           </div>
+
+          {validationError && (
+            <pre
+              className="bg-destructive/10 text-destructive rounded-md p-3 text-sm whitespace-pre-wrap"
+              role="alert"
+            >
+              {validationError}
+            </pre>
+          )}
 
           <div>
             <Button onClick={handleSave} disabled={mutation.isPending || !hasChanges} size="sm">

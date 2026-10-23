@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, Switch, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
@@ -18,6 +18,7 @@ import {
 } from '@/components/profiles/profile-kilo-commands-model';
 import { SheetHeader } from '@/components/sheet-header';
 import { FormField } from '@/components/ui/form-field';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 
@@ -156,7 +157,7 @@ export function KiloCommandFormSheet({
           multiline
           textAlignVertical="top"
           maxLength={MAX_KILO_COMMAND_TEMPLATE_LENGTH}
-          className="min-h-32 leading-5"
+          className="min-h-32 leading-[1.25rem]"
           autoCapitalize="none"
           autoCorrect={false}
           placeholder={t('profiles.slashCommands.templatePlaceholder')}

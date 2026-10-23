@@ -146,6 +146,7 @@ Direct full-screen entry clears the status bar; presented sheets do not add a se
 - Default exports only where Expo Router requires them, in `src/app/`.
 - Import React Native primitives from `react-native`; NativeWind adds `className`.
 - Import `Image` from `@/components/ui/image` and other UI primitives from `@/components/ui/<component>`.
+- Import `Switch` from `@/components/ui/switch`. It mirrors `disabled` into `accessibilityState`, which iOS needs to report the control as disabled to assistive technology.
 - Add reusables with `pnpm dlx @react-native-reusables/cli@latest add <component> --styling-library nativewind -y`.
 - Style with Tailwind `className`. No inline styles, no `StyleSheet.create`. Merge classes with `cn()` from `@/lib/utils`.
 - Opacity modifiers do not work on theme colors (CSS variables): `bg-destructive/10` is dropped. Where a `*-tile-bg` / `*-tile-border` pair exists — `danger` for `destructive`, plus `good`, `warn`, `info`, the agent colors and the row hues — use it; otherwise use a concrete color with a dark variant. `<utility>-black/<alpha>` compiles to an unparseable `#NaN` color and paints nothing either; use a concrete value, for example `bg-[#0000000d]` for 5%. `pnpm check:classes` enforces both.
@@ -222,7 +223,7 @@ The Chat tab runs `@kilocode/harness-sdk` on the device. `src/lib/chat/` holds t
 
 Quick Chat renders streamed text, reasoning and tools through the shared agent message and tool-detail surfaces. Tool results update the matching call rather than adding user-message bubbles; the same pairing is rebuilt from stored turns when a chat reopens.
 
-The header usage pill shows its percentage or token count without a visible Context prefix. Its accessibility label names the context.
+The header usage pill shows its percentage, or a dash while the context window is unknown, without a visible Context prefix. Its accessibility label names the context and the token count.
 Collapsed reasoning uses the tool row's full-width shape, padding and text style, with a dashed border.
 
 A chat is opened with the SDK's `time` tool and no other. A model has no clock, so it answers a dated question from its training date, confidently and wrong. The other three tools the SDK ships stay off: the composer is already how a person is asked something, a subagent costs a second session, and a to-do list is working memory for a run a chat does not have.

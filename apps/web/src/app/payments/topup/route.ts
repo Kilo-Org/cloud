@@ -13,6 +13,10 @@ import {
   ipCountryFromHeaders,
   ja4FromHeaders,
 } from '@kilocode/web-shared/lib/bouncer/credit-events';
+import {
+  CHARGE_GATE_BLOCKED_MESSAGE,
+  decideCheckoutCharge,
+} from '@kilocode/web-shared/lib/bouncer/charge-gate';
 
 /**
  * NOTE: Crypto payment support (Coinbase Commerce) was removed in January 2026.
@@ -87,6 +91,18 @@ export async function POST(request: NextRequest): Promise<NextResponse<unknown>>
 
   const cancelPathRaw = searchParams.get('cancel-path');
   const cancelPath = cancelPathRaw && isValidReturnUrl(cancelPathRaw) ? cancelPathRaw : null;
+
+  // Refuse before Stripe creates a session when bouncer blocks this payer's charges.
+  const chargeVerdict = await decideCheckoutCharge({
+    userId: currentUser.id,
+    organizationId,
+    flow: 'topup',
+    ip: clientIpFromHeaders(request.headers),
+    ja4: ja4FromHeaders(request.headers),
+  });
+  if (chargeVerdict?.enforced) {
+    return NextResponse.json({ error: CHARGE_GATE_BLOCKED_MESSAGE }, { status: 403 });
+  }
 
   const url = await getStripeTopUpCheckoutUrl(
     currentUser.id,

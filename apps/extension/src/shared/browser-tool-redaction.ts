@@ -111,7 +111,7 @@ const redactJsonContainer = (value: Exclude<JsonValue, null>): RedactedJson => {
       }
 
       const nested = redactJsonContainer(element);
-      changed = changed || nested.changed;
+      changed ||= nested.changed;
 
       return nested.value;
     });
@@ -130,7 +130,7 @@ const redactJsonContainer = (value: Exclude<JsonValue, null>): RedactedJson => {
       changed = true;
     } else if (isJsonContainer(entry)) {
       const nested = redactJsonContainer(entry);
-      changed = changed || nested.changed;
+      changed ||= nested.changed;
       result[key] = nested.value;
     } else {
       result[key] = entry;

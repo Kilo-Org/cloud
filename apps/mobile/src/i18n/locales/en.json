@@ -1531,6 +1531,8 @@
       "showMore": "Show more",
       "created": "Created",
       "started": "Started",
+      "reviewEnded": "Review ended",
+      "severityNitpick": "Nitpick",
       "tokens": "Tokens",
       "tokensInOut": "{{input}} in / {{output}} out",
       "transcriptWaiting": "Waiting for the review transcript.",
@@ -2024,11 +2026,17 @@
         "remediationCancelled": "Cancelled",
         "findingDeleted": "Deleted"
       },
+      "eventConfidence": "Confidence: {{confidence}}",
+      "eventReason": "Reason: {{reason}}",
+      "eventsCount_one": "{{displayCount}} event",
+      "eventsCount_other": "{{displayCount}} events",
       "generated": "Generated {{generatedAt}}",
       "noActivity": "No recorded activity",
       "noActivityDescription": "Kilo has no reportable Security Finding activity from {{start}} to {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
+      "reasonUnknown": "Unrecognized reason",
       "repositoryNotRecorded": "Repository not recorded",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Report summary",
       "title": "Audit report",
       "unavailable": "Audit report unavailable",
@@ -2679,7 +2687,10 @@
       "allowOnceAccessibility": "Allow once",
       "alwaysAllow": "Always Allow",
       "alwaysAllowAccessibility": "Always allow",
-      "retrying": "Retrying…"
+      "retrying": "Retrying…",
+      "retryDeny": "Retry deny",
+      "retryAllowOnce": "Retry allow once",
+      "retryAlwaysAllow": "Retry always allow"
     },
     "questionCard": {
       "title": "Agent needs input",

@@ -29,7 +29,13 @@ const mocks = vi.hoisted(() => ({
   pruneSessionCards: vi.fn(),
   restoreSessionCard: vi.fn(),
   getStoredSessionCards: vi.fn<
-    () => { sessionId: string; organizationId: string | null; approvalKey: string | null }[]
+    () => {
+      sessionId: string;
+      userId?: string | null;
+      organizationId: string | null;
+      approvalKey: string | null;
+      finishedUntil?: number;
+    }[]
   >(() => []),
   registerAndroidSessionToken: vi.fn(),
   releaseAndroidSessionToken: vi.fn(async (_sessionId: string) => {
@@ -209,11 +215,11 @@ describe('unfollowSession and endAllSessionCards', () => {
 });
 
 describe('restoreFollowedSessionCards', () => {
-  it('cancels a stored card of another scope and re-registers the kept ones', () => {
+  it('cancels a stored card of another organization and re-registers the kept ones', () => {
     followSession(RUNNING, CTX, NOW);
     mocks.getStoredSessionCards.mockReturnValue([
-      { sessionId: 'session-1', organizationId: 'org-1', approvalKey: null },
-      { sessionId: 'session-7', organizationId: null, approvalKey: null },
+      { sessionId: 'session-1', userId: 'user-1', organizationId: 'org-1', approvalKey: null },
+      { sessionId: 'session-7', userId: 'user-1', organizationId: null, approvalKey: null },
     ]);
     mocks.dismissSessionCard.mockClear();
     mocks.registerAndroidSessionToken.mockClear();
@@ -229,6 +235,32 @@ describe('restoreFollowedSessionCards', () => {
     });
   });
 
+  it('cancels a stored card of another account in the same organization', () => {
+    mocks.getStoredSessionCards.mockReturnValue([
+      { sessionId: 'session-1', userId: 'user-2', organizationId: 'org-1', approvalKey: null },
+    ]);
+    mocks.dismissSessionCard.mockClear();
+
+    restoreFollowedSessionCards(CTX);
+
+    expect(mocks.dismissSessionCard).toHaveBeenCalledWith('session-1');
+    expect(mocks.pruneSessionCards).toHaveBeenCalledWith([]);
+    expect(isSessionFollowed('session-1')).toBe(false);
+    expect(mocks.registerAndroidSessionToken).not.toHaveBeenCalled();
+  });
+
+  it('cancels a stored card that carries no account', () => {
+    mocks.getStoredSessionCards.mockReturnValue([
+      { sessionId: 'session-1', organizationId: 'org-1', approvalKey: null },
+    ]);
+    mocks.dismissSessionCard.mockClear();
+
+    restoreFollowedSessionCards(CTX);
+
+    expect(mocks.dismissSessionCard).toHaveBeenCalledWith('session-1');
+    expect(mocks.registerAndroidSessionToken).not.toHaveBeenCalled();
+  });
+
   it('notifies subscribers on every real change, and the revision moves with them', () => {
     const listener = vi.fn<() => void>();
     const before = getSessionFollowsRevision();
@@ -242,7 +274,7 @@ describe('restoreFollowedSessionCards', () => {
   it('restores from the stored account and scope when the caller has none', async () => {
     _setStoredContextReaderForTests(() => CTX);
     mocks.getStoredSessionCards.mockReturnValue([
-      { sessionId: 'session-1', organizationId: 'org-1', approvalKey: null },
+      { sessionId: 'session-1', userId: 'user-1', organizationId: 'org-1', approvalKey: null },
     ]);
 
     await restoreFollowedSessionCardsFromStorage();

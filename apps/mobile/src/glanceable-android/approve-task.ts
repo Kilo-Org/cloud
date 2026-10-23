@@ -3,7 +3,11 @@ import { z } from 'zod';
 
 import { i18n } from '@/i18n';
 import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
-import { approveFollowedSession, unfollowDismissedSession } from '@/lib/glanceable/session-follow';
+import {
+  approveFollowedSession,
+  restoreFollowedSessionsFromStorage,
+  unfollowDismissedSession,
+} from '@/lib/glanceable/session-follow';
 import { runGlanceableApprove } from '@/lib/glanceable/approve-ask';
 import { restorePersistedGlanceable } from '@/lib/glanceable/persist';
 import { republishAnsweredAsk } from '@/lib/glanceable/republish-ask';
@@ -155,6 +159,15 @@ export async function handleApproveTask(input?: unknown): Promise<void> {
   const sessionTarget = readSessionApproveTarget(input);
   if (sessionTarget !== null) {
     await applyLanguageBestEffort();
+    // The card is answered under the account and organization it was followed
+    // in, and a cold process holds none of them yet: rebuild the persisted set
+    // first, as the aggregate branch restores its persisted scope. A card
+    // outside the current scope is cancelled there, and a set that cannot be
+    // read answers nothing — the tap then leaves Approve in place.
+    const known = await restoreFollowedSessionsFromStorage();
+    if (!known) {
+      return;
+    }
     await approveFollowedSession(sessionTarget.sessionId, sessionTarget.approvalKey);
     return;
   }

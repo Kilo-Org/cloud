@@ -13,6 +13,7 @@ import { buildSessionNotificationCard } from './session-notification-card';
 vi.mock('expo-localization', () => ({ getCalendars: () => [{ uses24hourClock: true }] }));
 
 const NOW = Date.parse('2026-10-12T10:20:00.000Z');
+const SCOPE = { userId: 'user-1', organizationId: null };
 
 function content(
   overrides: Partial<SessionLiveActivityContentState>
@@ -42,7 +43,7 @@ describe('buildSessionNotificationCard', () => {
   it('names the stop reason and the stop time on a failed card', () => {
     const card = buildSessionNotificationCard(
       content({ statusKind: 'failed', failure: { kind: 'provider' } }),
-      null,
+      SCOPE,
       NOW
     );
 
@@ -53,14 +54,14 @@ describe('buildSessionNotificationCard', () => {
   });
 
   it('falls back to the plain stop reason when the failure has no class', () => {
-    const card = buildSessionNotificationCard(content({ statusKind: 'failed' }), null, NOW);
+    const card = buildSessionNotificationCard(content({ statusKind: 'failed' }), SCOPE, NOW);
 
     expect(card.text.startsWith(i18n.t('glanceable.failure.other'))).toBe(true);
   });
 
   it('shows the quiet warning once the quiet window has passed, timed from the last activity', () => {
     const lastActivityAt = new Date(NOW - SESSION_CARD_QUIET_AFTER_MS - 60_000).toISOString();
-    const card = buildSessionNotificationCard(content({ lastActivityAt }), null, NOW);
+    const card = buildSessionNotificationCard(content({ lastActivityAt }), SCOPE, NOW);
 
     expect(card.text).toBe(`${i18n.t('common.working')} · ${i18n.t('glanceable.noActivityFor')}`);
     expect(card).toMatchObject({
@@ -73,7 +74,7 @@ describe('buildSessionNotificationCard', () => {
 
   it('arms the quiet form for the native side while the window is still open', () => {
     const lastActivityAt = new Date(NOW - 60_000).toISOString();
-    const card = buildSessionNotificationCard(content({ lastActivityAt }), null, NOW);
+    const card = buildSessionNotificationCard(content({ lastActivityAt }), SCOPE, NOW);
 
     expect(card).toMatchObject({
       text: i18n.t('common.working'),
@@ -86,7 +87,7 @@ describe('buildSessionNotificationCard', () => {
   });
 
   it('arms no quiet form for a Working card with no known activity', () => {
-    const card = buildSessionNotificationCard(content({}), null, NOW);
+    const card = buildSessionNotificationCard(content({}), SCOPE, NOW);
 
     expect(card).toMatchObject({ text: i18n.t('common.working'), quietAtMs: 0, quietText: null });
   });
@@ -100,7 +101,7 @@ describe('buildSessionNotificationCard', () => {
         approvalKey: 'a'.repeat(64),
         permissionCommand: 'pnpm test',
       }),
-      null,
+      SCOPE,
       NOW
     );
 
@@ -120,12 +121,12 @@ describe('buildSessionNotificationCard', () => {
 
     const plan = buildSessionNotificationCard(
       content({ plan: { done: 3, total: 7, current: null } }),
-      null,
+      SCOPE,
       NOW
     );
     const cost = buildSessionNotificationCard(
       content({ statusKind: 'idle', costMicrodollars: 840_000 }),
-      null,
+      SCOPE,
       NOW
     );
 
@@ -141,7 +142,7 @@ describe('buildSessionNotificationCard', () => {
         plan: { done: 3, total: 7, current: null },
         costMicrodollars: 840_000,
       }),
-      null,
+      SCOPE,
       NOW
     );
 
@@ -159,7 +160,7 @@ describe('buildSessionNotificationCard', () => {
   ])('draws a small cost of %i microdollars truthfully, or not at all', (micros, expected) => {
     const card = buildSessionNotificationCard(
       content({ statusKind: 'idle', costMicrodollars: micros }),
-      null,
+      SCOPE,
       NOW
     );
 
@@ -167,10 +168,24 @@ describe('buildSessionNotificationCard', () => {
     expect(card.expandedText).not.toBe('$0.00');
   });
 
+  it('carries the account and scope it was followed under without drawing them', () => {
+    const card = buildSessionNotificationCard(
+      content({ statusKind: 'needsInput' }),
+      { userId: 'user-1', organizationId: 'org-1' },
+      NOW
+    );
+
+    // The record a restore reads back, and nothing the card shows.
+    expect(card).toMatchObject({ userId: 'user-1', organizationId: 'org-1' });
+    expect(
+      [card.title, card.text, card.subText, card.expandedText, card.compactText].join(' ')
+    ).not.toMatch(/user-1|org-1/u);
+  });
+
   it('keeps the cost off the header when the session has no plan', () => {
     const card = buildSessionNotificationCard(
       content({ statusKind: 'idle', costMicrodollars: 840_000 }),
-      null,
+      SCOPE,
       NOW
     );
 

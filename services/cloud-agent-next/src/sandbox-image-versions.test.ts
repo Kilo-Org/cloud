@@ -67,7 +67,7 @@ describe('runtime distribution packaging', () => {
   const dockerfiles = ['Dockerfile', 'Dockerfile.dev', 'Dockerfile.containers', 'Dockerfile.dind'];
 
   it('pins the shared toolchain versions', () => {
-    expect(RUNTIME_DISTRIBUTION.bun).toBe('1.3.14');
+    expect(RUNTIME_DISTRIBUTION.bun).toBe('1.4.4');
     expect(RUNTIME_DISTRIBUTION.pnpm).toBe('12.14.0');
     expect(RUNTIME_DISTRIBUTION.glab).toBe('1.124.0');
     expect(RUNTIME_DISTRIBUTION.gh).toBe('2.102.0');

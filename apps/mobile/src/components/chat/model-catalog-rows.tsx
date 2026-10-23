@@ -71,7 +71,7 @@ export function RecommendedRow({
         fileId={model.fileId}
         name={model.name}
         snapshot={snapshot}
-        downloadLabel={t('modelChat.catalog.downloadModelA11y', { name: displayName })}
+        downloadDetail={displayName}
         onDownload={
           fit === 'noStorage'
             ? undefined

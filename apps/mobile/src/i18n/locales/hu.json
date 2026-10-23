@@ -182,7 +182,7 @@
     "codeArrivalHint": "Ha ezzel a címmel be lehet jelentkezni, a kód egy percen belül megérkezik.",
     "verifyCode": "Kód ellenőrzése",
     "resendCode": "Kód újraküldése",
-    "termsPrefix": "A folytatással elfogadod a",
+    "termsPrefix": "A folytatással elfogadod a ",
     "terms": "Felhasználási feltételeket",
     "termsConnector": " és a ",
     "termsSuffix": ".",

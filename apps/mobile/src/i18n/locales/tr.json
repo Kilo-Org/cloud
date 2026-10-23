@@ -182,7 +182,7 @@
     "codeArrivalHint": "Bu adres uygunsa kod bir dakika içinde gelir.",
     "verifyCode": "Kodu doğrula",
     "resendCode": "Kodu yeniden gönder",
-    "termsPrefix": "Devam ederek şunları kabul etmiş olursun:",
+    "termsPrefix": "Devam ederek şunları kabul etmiş olursun: ",
     "terms": "Koşullar",
     "termsConnector": " ve ",
     "termsSuffix": ".",

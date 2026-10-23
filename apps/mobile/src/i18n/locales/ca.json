@@ -182,7 +182,7 @@
     "codeArrivalHint": "Si aquesta adreça compleix els requisits, rebràs el codi en menys d'un minut.",
     "verifyCode": "Verifica el codi",
     "resendCode": "Torna a enviar el codi",
-    "termsPrefix": "En continuar, acceptes les nostres",
+    "termsPrefix": "En continuar, acceptes les nostres ",
     "terms": "Condicions d'ús",
     "termsConnector": " i ",
     "termsSuffix": ".",

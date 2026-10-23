@@ -182,7 +182,7 @@
     "codeArrivalHint": "Jos osoitteella voi kirjautua, koodi saapuu minuutin kuluessa.",
     "verifyCode": "Vahvista koodi",
     "resendCode": "Lähetä koodi uudelleen",
-    "termsPrefix": "Jatkamalla hyväksyt",
+    "termsPrefix": "Jatkamalla hyväksyt ",
     "terms": "Käyttöehdot",
     "termsConnector": " ja ",
     "termsSuffix": ".",

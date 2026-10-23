@@ -182,7 +182,7 @@
     "codeArrivalHint": "Kui see aadress vastab tingimustele, saabub kood minuti jooksul.",
     "verifyCode": "Kinnita kood",
     "resendCode": "Saada kood uuesti",
-    "termsPrefix": "Jätkates nõustud meie",
+    "termsPrefix": "Jätkates nõustud meie ",
     "terms": "Kasutustingimustega",
     "termsConnector": " ja ",
     "termsSuffix": ".",

@@ -184,7 +184,7 @@
     "resendCode": "ส่งรหัสอีกครั้ง",
     "termsPrefix": "การดำเนินการต่อแสดงว่าคุณยอมรับ",
     "terms": "ข้อกำหนด",
-    "termsConnector": " และ ",
+    "termsConnector": "และ",
     "termsSuffix": ".",
     "moreSignInOptions": "ตัวเลือกการลงชื่อเข้าใช้เพิ่มเติม",
     "passkeyCancelled": "การลงชื่อเข้าใช้ด้วยพาสคีย์ถูกยกเลิก โปรดลองอีกครั้ง",

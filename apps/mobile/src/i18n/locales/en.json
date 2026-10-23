@@ -274,7 +274,7 @@
     "codeArrivalHint": "If this address is eligible, the code arrives within a minute.",
     "verifyCode": "Verify code",
     "resendCode": "Resend code",
-    "termsPrefix": "By continuing you agree to our",
+    "termsPrefix": "By continuing you agree to our ",
     "terms": "Terms",
     "termsConnector": " and ",
     "termsSuffix": ".",

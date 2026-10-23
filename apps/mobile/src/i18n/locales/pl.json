@@ -182,7 +182,7 @@
     "codeArrivalHint": "Jeśli ten adres spełnia warunki logowania, kod dotrze w ciągu minuty.",
     "verifyCode": "Zweryfikuj kod",
     "resendCode": "Wyślij kod ponownie",
-    "termsPrefix": "Kontynuując, akceptujesz nasze",
+    "termsPrefix": "Kontynuując, akceptujesz nasze ",
     "terms": "Warunki",
     "termsConnector": " i ",
     "termsSuffix": ".",

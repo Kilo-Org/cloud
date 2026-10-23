@@ -182,7 +182,7 @@
     "codeArrivalHint": "Nếu địa chỉ này đủ điều kiện, bạn sẽ nhận được mã trong vòng một phút.",
     "verifyCode": "Xác minh mã",
     "resendCode": "Gửi lại mã",
-    "termsPrefix": "Khi tiếp tục, bạn đồng ý với",
+    "termsPrefix": "Khi tiếp tục, bạn đồng ý với ",
     "terms": "Điều khoản",
     "termsConnector": " và ",
     "termsSuffix": ".",

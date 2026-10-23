@@ -182,7 +182,7 @@
     "codeArrivalHint": "Si esta dirección cumple los requisitos, recibirás el código en menos de un minuto.",
     "verifyCode": "Verificar código",
     "resendCode": "Reenviar código",
-    "termsPrefix": "Al continuar, aceptas nuestros",
+    "termsPrefix": "Al continuar, aceptas nuestros ",
     "terms": "Términos",
     "termsConnector": " y ",
     "termsSuffix": ".",

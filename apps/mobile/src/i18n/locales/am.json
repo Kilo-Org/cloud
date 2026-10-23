@@ -182,7 +182,7 @@
     "codeArrivalHint": "ይህ አድራሻ መስፈርቶቹን የሚያሟላ ከሆነ፣ ኮዱ በአንድ ደቂቃ ውስጥ ይደርሳል።",
     "verifyCode": "ኮዱን ያረጋግጡ",
     "resendCode": "ኮዱን እንደገና ይላኩ",
-    "termsPrefix": "ሲቀጥሉ የሚከተሉትን ይቀበላሉ፦",
+    "termsPrefix": "ሲቀጥሉ የሚከተሉትን ይቀበላሉ፦ ",
     "terms": "ውሎች",
     "termsConnector": " እና ",
     "termsSuffix": "።",

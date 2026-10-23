@@ -8,6 +8,7 @@ import {
 
 export default {
   id: 'neuralwatt',
+  models_dev_id: 'neuralwatt',
   base_url: 'https://api.neuralwatt.com/v1',
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions'],

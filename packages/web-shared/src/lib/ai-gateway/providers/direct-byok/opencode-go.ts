@@ -13,6 +13,7 @@ import {
 
 export default {
   id: 'opencode-go',
+  models_dev_id: 'opencode-go',
   base_url: 'https://opencode.ai/zen/go/v1',
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions', 'messages', 'responses'],

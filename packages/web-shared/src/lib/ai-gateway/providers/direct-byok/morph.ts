@@ -5,6 +5,7 @@ import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/pro
 
 export default {
   id: 'morph-byok',
+  models_dev_id: 'morph',
   base_url: 'https://api.morphllm.com/v1',
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions'],

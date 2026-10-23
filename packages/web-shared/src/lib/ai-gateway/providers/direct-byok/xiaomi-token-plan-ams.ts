@@ -5,6 +5,7 @@ import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-g
 
 export default {
   id: 'xiaomi-token-plan-ams',
+  models_dev_id: 'xiaomi-token-plan-ams',
   base_url: 'https://token-plan-ams.xiaomimimo.com/v1',
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions'],

@@ -8,6 +8,7 @@ import {
 
 export default {
   id: 'synthetic',
+  models_dev_id: 'synthetic',
   base_url: 'https://api.synthetic.new/v1',
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions'],

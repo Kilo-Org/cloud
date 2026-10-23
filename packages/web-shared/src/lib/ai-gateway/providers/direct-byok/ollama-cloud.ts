@@ -8,6 +8,7 @@ import {
 
 export default {
   id: 'ollama-cloud',
+  models_dev_id: 'ollama-cloud',
   base_url: 'https://ollama.com/v1',
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions'],

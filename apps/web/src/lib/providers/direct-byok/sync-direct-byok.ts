@@ -2,7 +2,9 @@ import * as z from 'zod';
 import {
   type DirectByokModel,
   type DirectByokModelFlag,
+  type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import type { DirectUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { direct_byok_model_lists } from '@kilocode/db/schema';
@@ -65,9 +67,18 @@ const ModelsDevProviderSchema = z.object({
   models: z.record(z.string(), ModelsDevModelSchema),
 });
 
+const ModelsDevCanonicalIdsSchema = z.object({
+  models: z.record(
+    z.string(),
+    z.object({ id: z.string(), canonical_model_id: z.string().optional().catch(undefined) })
+  ),
+});
+
 const ModelsDevCatalogSchema = z.record(z.string(), z.unknown());
 
 type ModelsDevCatalog = z.infer<typeof ModelsDevCatalogSchema>;
+
+const MODELS_DEV_OPENROUTER_ID = 'openrouter';
 
 type RawModel = {
   id: string;
@@ -81,6 +92,7 @@ type RawModel = {
 
 type SyncContext = {
   getModelsDevCatalog(): Promise<ModelsDevCatalog>;
+  getCatalogModelIdsByCanonicalId(): Promise<ReadonlyMap<string, string>>;
 };
 
 type ProviderFetcher = {
@@ -166,14 +178,67 @@ export function parseModelsDevProviderModels(
     });
 }
 
+function getModelsDevId(providerId: DirectUserByokInferenceProviderId): string | undefined {
+  const providers: ReadonlyArray<DirectByokProvider> = DIRECT_BYOK_PROVIDERS;
+  return providers.find(provider => provider.id === providerId)?.models_dev_id;
+}
+
+function isPreferredCatalogModelId(candidate: string, current: string, canonicalId: string) {
+  if (current === canonicalId) return false;
+  return candidate === canonicalId || candidate.length < current.length;
+}
+
+// models.dev keys its `openrouter` provider by OpenRouter model ID, so its canonical IDs translate
+// the models.dev vendor namespace (`zhipuai/glm-5.2`) into the catalog's (`z-ai/glm-5.2`).
+export function indexCatalogModelIdsByCanonicalId(
+  catalog: ModelsDevCatalog
+): ReadonlyMap<string, string> {
+  const index = new Map<string, string>();
+  const entry = catalog[MODELS_DEV_OPENROUTER_ID];
+  if (!entry) {
+    console.warn('[sync-direct-byok-providers] models.dev catalog missing openrouter entry');
+    return index;
+  }
+  for (const model of Object.values(ModelsDevCanonicalIdsSchema.parse(entry).models)) {
+    const canonicalId = model.canonical_model_id;
+    // Variants such as `:free` are routing options of a catalog model, not separate models.
+    if (!canonicalId || model.id.includes(':')) continue;
+    const current = index.get(canonicalId);
+    if (!current || isPreferredCatalogModelId(model.id, current, canonicalId)) {
+      index.set(canonicalId, model.id);
+    }
+  }
+  return index;
+}
+
+async function getCatalogModelIds(
+  providerId: DirectUserByokInferenceProviderId,
+  ctx: SyncContext
+): Promise<ReadonlyMap<string, string>> {
+  const catalogModelIds = new Map<string, string>();
+  const modelsDevId = getModelsDevId(providerId);
+  if (!modelsDevId) return catalogModelIds;
+  const entry = (await ctx.getModelsDevCatalog())[modelsDevId];
+  if (!entry) return catalogModelIds;
+  const byCanonicalId = await ctx.getCatalogModelIdsByCanonicalId();
+  for (const model of Object.values(ModelsDevCanonicalIdsSchema.parse(entry).models)) {
+    const catalogModelId = model.canonical_model_id && byCanonicalId.get(model.canonical_model_id);
+    if (catalogModelId) catalogModelIds.set(model.id, catalogModelId);
+  }
+  return catalogModelIds;
+}
+
 function modelsDevFetcher(
   providerId: DirectUserByokInferenceProviderId,
-  catalogKey: string,
   availableModelsUrl?: string
 ): ProviderFetcher {
   return {
     providerId,
     async fetch(ctx) {
+      const catalogKey = getModelsDevId(providerId);
+      if (!catalogKey) {
+        throw new Error(`${providerId} has no models.dev ID`);
+      }
       const catalog = await ctx.getModelsDevCatalog();
       const entry = catalog[catalogKey];
       if (!entry) {
@@ -214,7 +279,7 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     label: 'Neuralwatt',
     url: 'https://api.neuralwatt.com/v1/models',
   }),
-  modelsDevFetcher('nvidia-byok', 'nvidia', 'https://integrate.api.nvidia.com/v1/models'),
+  modelsDevFetcher('nvidia-byok', 'https://integrate.api.nvidia.com/v1/models'),
   openAICompatibleFetcher({
     providerId: 'chutes-byok',
     label: 'Chutes',
@@ -245,17 +310,20 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     label: 'Morph BYOK',
     url: 'https://www.morphllm.com/api/models/json',
   }),
-  modelsDevFetcher('alibaba-token-plan', 'alibaba-token-plan'),
-  modelsDevFetcher('edenai', 'edenai', 'https://api.edenai.run/v3/models'),
-  modelsDevFetcher('zai-coding', 'zai-coding-plan'),
-  modelsDevFetcher('ollama-cloud', 'ollama-cloud', 'https://ollama.com/v1/models'),
-  modelsDevFetcher('opencode-go', 'opencode-go', 'https://opencode.ai/zen/go/v1/models'),
-  modelsDevFetcher('xiaomi-token-plan-ams', 'xiaomi-token-plan-ams'),
-  modelsDevFetcher('xiaomi-token-plan-sgp', 'xiaomi-token-plan-sgp'),
+  modelsDevFetcher('alibaba-token-plan'),
+  modelsDevFetcher('edenai', 'https://api.edenai.run/v3/models'),
+  modelsDevFetcher('zai-coding'),
+  modelsDevFetcher('ollama-cloud', 'https://ollama.com/v1/models'),
+  modelsDevFetcher('opencode-go', 'https://opencode.ai/zen/go/v1/models'),
+  modelsDevFetcher('xiaomi-token-plan-ams'),
+  modelsDevFetcher('xiaomi-token-plan-sgp'),
 ];
 
 async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise<number> {
-  const fetched = await fetcher.fetch(ctx);
+  const [fetched, catalogModelIds] = await Promise.all([
+    fetcher.fetch(ctx),
+    getCatalogModelIds(fetcher.providerId, ctx),
+  ]);
   const models: DirectByokModel[] = [];
 
   for (const raw of fetched) {
@@ -274,6 +342,7 @@ async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise
       context_length,
       max_completion_tokens,
       reasoning_options: raw.reasoning_options,
+      catalog_model_id: catalogModelIds.get(raw.id),
     });
   }
 
@@ -293,10 +362,13 @@ export async function syncDirectByokModels(): Promise<
   Partial<Record<DirectUserByokInferenceProviderId, number>>
 > {
   let catalogPromise: Promise<ModelsDevCatalog> | null = null;
+  let catalogModelIdsPromise: Promise<ReadonlyMap<string, string>> | null = null;
+  const getModelsDevCatalog = () => (catalogPromise ??= fetchModelsDevCatalog());
   const ctx: SyncContext = {
-    getModelsDevCatalog() {
-      catalogPromise ??= fetchModelsDevCatalog();
-      return catalogPromise;
+    getModelsDevCatalog,
+    getCatalogModelIdsByCanonicalId() {
+      catalogModelIdsPromise ??= getModelsDevCatalog().then(indexCatalogModelIdsByCanonicalId);
+      return catalogModelIdsPromise;
     },
   };
   const entries = await Promise.all(

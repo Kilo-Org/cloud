@@ -367,20 +367,12 @@ describe('CreditsCard balance state', () => {
   });
 
   it.each([
-    {
-      orgs: [],
-      options: ['Personal', 'Cancel'],
-      choice: 0,
-      expected: null,
-      stored: 'personal',
-      label: 'Personal',
-    },
+    { orgs: [], options: ['Personal', 'Cancel'], choice: 0, expected: null, label: 'Personal' },
     {
       orgs: [{ organizationId: 'org-a', organizationName, role: 'owner' }],
       options: ['Personal', organizationName, 'Cancel'],
       choice: 1,
       expected: 'org-a',
-      stored: 'org-a',
       label: organizationName,
     },
   ])('uses supplied memberships for the picker: $expected', async state => {
@@ -399,11 +391,11 @@ describe('CreditsCard balance state', () => {
     expect([...accountLabels(renderer), 'Cancel']).toEqual(state.options);
     await choose(renderer, 'Cancel');
     expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe(
-      (state.orgs as OrgListEntry[])[0]?.organizationId ?? 'personal'
+      (state.orgs as OrgListEntry[])[0]?.organizationId ?? undefined
     );
     await openSheet(renderer);
     await choose(renderer, state.label);
-    expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe(state.stored);
+    expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe(state.expected ?? undefined);
     const label = renderer.root.findByProps({ children: state.label });
     expect(label.props).toMatchObject({ numberOfLines: 1, ellipsizeMode: 'tail' });
     unmount();
@@ -434,7 +426,9 @@ describe('CreditsCard balance state', () => {
       expect(retryButton.props.accessibilityHint).toBe('Could not save setting');
       // Keep the rendered handler to catch a retry that captures the earlier failed choice.
       const retry = retryButton.props.onPress as () => void;
-      storage.write.mockRejectedValueOnce(new Error('latest save failed'));
+      (id === null ? storage.remove : storage.write).mockRejectedValueOnce(
+        new Error('latest save failed')
+      );
       await openSheet(renderer);
       await choose(renderer, id === null ? 'Personal' : 'Latest organization');
       const label = id === null ? 'Personal' : 'Latest organization';
@@ -459,7 +453,7 @@ describe('CreditsCard balance state', () => {
       await act(() => {
         save.resolve(undefined);
       });
-      expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe(id ?? 'personal');
+      expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe(id ?? undefined);
       expect(texts()).toContain(label);
       expect(texts()).not.toContain('Could not save setting');
       expect(texts()).not.toContain('Retry');

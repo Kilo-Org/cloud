@@ -9,7 +9,6 @@ import { buildActiveSessionsTrayInput, isAttentionStatus } from '@/lib/active-se
 import { readStoredValue } from '@/lib/auth/secure-store-value';
 import { dismissNeedsInputNotification } from '@/lib/needs-input-notification';
 import { ackSessionAttention } from '@/lib/session-attention';
-import { decodeSelection } from '@/lib/organization-selection';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 import { trpcClient } from '@/lib/trpc';
@@ -173,7 +172,7 @@ async function readStoredScope(): Promise<WidgetScope> {
     readStoredValueReported(ORGANIZATION_STORAGE_KEY),
     readStoredValueReported(ACTIVE_USER_ID_KEY),
   ]);
-  return { organizationId: decodeSelection(organizationId), userId: userId ?? null };
+  return { organizationId: organizationId ?? null, userId: userId ?? null };
 }
 
 /**

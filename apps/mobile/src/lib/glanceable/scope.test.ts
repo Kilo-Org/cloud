@@ -25,13 +25,6 @@ describe('glanceable scope reads', () => {
     expect(mocks.getItemAsync).toHaveBeenCalledWith(ORGANIZATION_STORAGE_KEY);
   });
 
-  it('resolves a stored Personal selection to the personal scope', async () => {
-    mocks.getItemAsync.mockResolvedValue('personal');
-
-    // A stored Personal choice resolves to the personal scope for every reader.
-    await expect(getSelectedOrganizationId()).resolves.toBeNull();
-  });
-
   it('reads the active user from its storage key', async () => {
     mocks.getItemAsync.mockResolvedValue('u1');
 

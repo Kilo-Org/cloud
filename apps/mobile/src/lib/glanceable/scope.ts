@@ -1,5 +1,4 @@
 import { readStoredValueSafe } from '@/lib/auth/secure-store-value';
-import { decodeSelection } from '@/lib/organization-selection';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
 /**
@@ -24,7 +23,8 @@ import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys
  * A missing hint only matches a personal scope; it cannot revive an org scope.
  */
 export async function getSelectedOrganizationId(): Promise<string | null> {
-  return decodeSelection(await readStoredValueSafe(ORGANIZATION_STORAGE_KEY));
+  const organizationId = await readStoredValueSafe(ORGANIZATION_STORAGE_KEY);
+  return organizationId;
 }
 
 /**

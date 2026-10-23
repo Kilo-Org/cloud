@@ -11,7 +11,6 @@ import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getTerminalBlankEpoch } from '@/lib/glanceable/cleanup';
 import { getLastGlanceableSnapshot, getLocalScopeKey } from '@/lib/glanceable/persist';
 import { forEachSink } from '@/lib/glanceable/sink-registry';
-import { decodeSelection } from '@/lib/organization-selection';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
 /**
@@ -61,7 +60,6 @@ async function replayVerifiedSnapshot(admit: () => boolean): Promise<void> {
     // A failed organization read must not be treated as the personal scope.
     return;
   }
-  organizationId = decodeSelection(organizationId);
   if (
     currentAuthEpoch() !== authEpoch ||
     getTerminalBlankEpoch() !== blankEpoch ||

@@ -212,7 +212,10 @@ function upsertEnvValue(filePath: string, key: string, value: string): void {
 
   const regex = new RegExp(`^${escapeRegex(key)}=.*$`, 'm');
   if (regex.test(content)) {
-    writeSecretsFile(filePath, content.replace(regex, () => line));
+    writeSecretsFile(
+      filePath,
+      content.replace(regex, () => line)
+    );
     return;
   }
 

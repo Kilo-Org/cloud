@@ -128,10 +128,11 @@ const DECIMAL_DIGIT = /\p{Nd}/u;
  * The ASCII form of one decimal digit, or `null` when the character is not one.
  * The locale's numbering system is not enough to find it: ICU formats `th`,
  * `lo` and `ja` numbers with Latin digits, while a keyboard in those scripts
- * types ๐, ໐ and ２. Unicode gives every decimal digit a contiguous ten-code-point
- * run that starts at zero, so the value is the distance from the run's start and
- * every script — Arabic-Indic, Extended Arabic-Indic, Devanagari, full-width,
- * the locale's own — comes from the same rule.
+ * types ๐, ໐ and ２. Unicode assigns decimal digits in contiguous runs that
+ * begin at zero and hold whole sets of ten, so a digit's value is its offset
+ * from the start of its run modulo ten. The modulo matters: Mathematical
+ * Alphanumeric Symbols (U+1D7CE–U+1D7FF) is one fifty-code-point run holding
+ * five sets, so double-struck zero sits at offset ten.
  */
 function asciiDigit(char: string): string | null {
   if (!DECIMAL_DIGIT.test(char)) {
@@ -142,7 +143,7 @@ function asciiDigit(char: string): string | null {
   while (start > 0 && DECIMAL_DIGIT.test(String.fromCodePoint(start - 1))) {
     start -= 1;
   }
-  return String(code - start);
+  return String((code - start) % 10);
 }
 
 /**

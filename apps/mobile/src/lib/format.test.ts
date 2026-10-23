@@ -79,6 +79,14 @@ describe('toAsciiDigits', () => {
     expect(toAsciiDigits('２４６８１０')).toBe('246810');
   });
 
+  it('reads one digit from a run that holds several digit sets', () => {
+    // U+1D7CE–U+1D7FF is one run of five sets; the value is the distance back
+    // to the digit's own zero, not to the start of the run.
+    expect(toAsciiDigits('𝟚𝟜𝟞𝟠𝟙𝟘')).toBe('246810');
+    expect(toAsciiDigits('𝟘')).toBe('0');
+    expect(toAsciiDigits('𝟡')).toBe('9');
+  });
+
   it('converts each digit of a mixed-script value and leaves other characters alone', () => {
     expect(toAsciiDigits('٢٤6٨๑0')).toBe('246810');
     expect(toAsciiDigits('24a6')).toBe('24a6');

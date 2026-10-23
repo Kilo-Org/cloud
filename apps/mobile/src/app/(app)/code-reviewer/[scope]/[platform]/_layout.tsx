@@ -12,7 +12,7 @@ export default function CodeReviewerPlatformLayout() {
   const params = useValidatedReviewerRouteParams();
 
   if (!params) {
-    return <InvalidRouteState backTo={'/(app)/(tabs)/(3_profile)/code-reviewer' as Href} />;
+    return <InvalidRouteState backTo={'/(app)/code-reviewer' as Href} />;
   }
 
   return <Stack screenLayout={appSceneLayout} screenOptions={{ headerShown: false }} />;

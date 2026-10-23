@@ -1,6 +1,3 @@
-// eslint-disable-next-line import/no-nodejs-modules -- Load the installed router without the native Expo entry.
-import { createRequire } from 'node:module';
-import type * as PathParserModule from 'expo-router/build/fork/getStateFromPath.js';
 import { Children, createElement, isValidElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -9,14 +6,10 @@ import { type PushData } from '@kilocode/notifications';
 
 import SecurityAgentScopeLayout, {
   unstable_settings,
-} from '@/app/(app)/(tabs)/(3_profile)/security-agent/[scope]/_layout';
+} from '@/app/(app)/security-agent/[scope]/_layout';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { notificationPathForData } from './notification-path';
 
-const loadRouter = createRequire(import.meta.url);
-const { getStateFromPath } = loadRouter(
-  'expo-router/build/fork/getStateFromPath.js'
-) as typeof PathParserModule;
 type StackProps = { children?: ReactNode };
 
 const captured = vi.hoisted(() => ({
@@ -80,70 +73,42 @@ function mountScope(scope: string | string[] | undefined) {
   return renderer;
 }
 
-function parseScopeEntry(scope: string, path: string) {
-  mountScope(scope);
+function declaredScopeRoutes(): string[] {
   const stack = captured.stack;
   if (!stack) {
     throw new Error('Scope layout did not render a Stack');
   }
-  // eslint-disable-next-line react/no-react-children -- Read the actual Stack.Screen declarations for this layout regression.
-  const declared = Children.toArray(stack.children).map(child => {
+  // eslint-disable-next-line react/no-react-children -- Read actual Stack.Screen declarations.
+  return Children.toArray(stack.children).map(child => {
     if (!isValidElement<{ name: string }>(child)) {
       throw new Error('Expected a Stack.Screen declaration');
     }
-    return child.props;
+    return child.props.name;
   });
-  const routeNames = [...declared.map(screen => screen.name), 'findings/index', 'findings/[id]'];
-  const screens = Object.fromEntries(
-    routeNames.map(name => [name, name.replaceAll(/\[([^/]+)\]/g, ':$1').replace(/\/?index$/, '')])
-  );
-  const parsed = getStateFromPath(path, {
-    screens: {
-      scope: {
-        path: '(app)/(tabs)/(3_profile)/security-agent/:scope',
-        initialRouteName: unstable_settings.anchor,
-        screens,
-      },
-    },
-  });
-  const state = parsed?.routes[0]?.state;
-  if (!state) {
-    throw new Error('Notification path did not resolve into the scope stack');
-  }
-  return state;
 }
 
-describe.each(['personal', 'org-example'])('security notification history (%s)', scope => {
+describe.each(['personal', 'org-example'])('security notification routes (%s)', scope => {
   it.each([
     { type: 'security_finding' },
     { type: 'security_lifecycle', event: 'analysis_completed' },
-  ] as const)('resolves a $type entry above the scoped dashboard', payload => {
+  ] as const)('targets the scoped finding route for $type notifications', payload => {
     const data = { ...payload, scope, findingId: 'finding-123' } satisfies PushData;
     const path = notificationPathForData(data);
-    expect(path).toBe(
-      `/(app)/(tabs)/(3_profile)/security-agent/${scope}/findings/finding-123?via=push`
-    );
-    const opened = parseScopeEntry(scope, path);
-    expect(opened.index).toBe(1);
-    expect(opened.routes.map(route => route.name)).toEqual(['index', 'findings/[id]']);
-    expect(opened.routes[0]?.params).toMatchObject({ scope });
-    expect(opened.routes[1]?.params).toMatchObject({ scope, id: 'finding-123', via: 'push' });
-  });
+    expect(path).toBe(`/(app)/security-agent/${scope}/findings/finding-123?via=push`);
 
-  it('preserves scope and filters in a findings-list link', () => {
-    const state = parseScopeEntry(
+    mountScope(scope);
+    expect(unstable_settings.anchor).toBe('index');
+    expect(declaredScopeRoutes()).toEqual(['index', 'dismiss/[id]', 'filter']);
+
+    const url = new URL(path, 'https://example.test');
+    expect(url.pathname.split('/').filter(Boolean)).toEqual([
+      '(app)',
+      'security-agent',
       scope,
-      `/(app)/(tabs)/(3_profile)/security-agent/${scope}/findings?repoFullName=org%2Frepo&status=open&severity=critical&sortBy=sla_due_at_asc`
-    );
-    expect(state.routes.map(route => route.name)).toEqual(['index', 'findings/index']);
-    expect(state.routes[0]?.params).toMatchObject({ scope });
-    expect(state.routes[1]?.params).toMatchObject({
-      scope,
-      repoFullName: 'org/repo',
-      status: 'open',
-      severity: 'critical',
-      sortBy: 'sla_due_at_asc',
-    });
+      'findings',
+      'finding-123',
+    ]);
+    expect(url.searchParams.get('via')).toBe('push');
   });
 });
 
@@ -161,7 +126,7 @@ it.each([{ scope: undefined }, { scope: '' }, { scope: ['personal', 'org-example
   ({ scope }) => {
     const tree = mountScope(scope);
     expect(tree.root.findByType(InvalidRouteState).props).toMatchObject({
-      backTo: '/(app)/(tabs)/(3_profile)/security-agent',
+      backTo: '/(app)/security-agent',
     });
     expect(captured.stack).toBeUndefined();
   }

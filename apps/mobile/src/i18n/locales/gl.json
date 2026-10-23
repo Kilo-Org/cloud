@@ -2241,6 +2241,7 @@
       "branchLoadError": "Non se puideron cargar as ramas",
       "branchUnavailable": "Non hai ramas dispoñibles para este repositorio. Comproba o teu acceso co provedor e escolle outro repositorio.",
       "branchEmpty": "Non hai ramas dispoñibles",
+      "branchListIncomplete": "Só se mostran algunhas ramas. O repositorio ten máis ramas das que esta lista pode incluír.",
       "branchPlaceholder": "Selecciona unha rama",
       "runOnWithTarget": "Executar en: {{target}}",
       "environment": "Contorno",
@@ -3386,7 +3387,12 @@
       "serverToolCount_one": "{{count}} ferramenta",
       "serverToolCount_other": "{{count}} ferramentas",
       "serverUnreachable": "Non se puido contactar con este servidor",
-      "serverOff": "Este servidor está desactivado"
+      "serverOff": "Este servidor está desactivado",
+      "app": {
+        "label": "Interface da ferramenta",
+        "failed": "Non se puido cargar a interface desta ferramenta.",
+        "empty": "A interface desta ferramenta non ten nada que mostrar."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autenticación",

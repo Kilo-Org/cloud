@@ -72,6 +72,17 @@ describe('confirmAppActionStart', () => {
     expect(message).toContain('your most recent repository');
   });
 
+  it('names the continued session', async () => {
+    void confirmAppActionStart({
+      prompt: 'Review the build',
+      repository: 'owner/repo',
+      sessionId: 'ses_original',
+    });
+    const { message } = await openedAlert();
+    expect(message).toContain('owner/repo');
+    expect(message).toContain('ses_original');
+  });
+
   it('resolves false when the person cancels', async () => {
     const answer = confirmAppActionStart({ prompt: 'fix the build' });
     const { buttons } = await openedAlert();

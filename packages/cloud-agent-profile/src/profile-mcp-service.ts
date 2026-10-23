@@ -121,6 +121,11 @@ function encryptRecord(
   }
   return Object.keys(out).length > 0 ? out : undefined;
 }
+type DestinationRule = {
+  unchanged: boolean;
+  field: 'command line' | 'URL';
+  kind: 'Environment' | 'Header';
+};
 
 function updateValueRecord(
   publicKeyBase64: string,

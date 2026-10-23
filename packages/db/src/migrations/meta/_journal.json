@@ -2077,8 +2077,15 @@
     {
       "idx": 296,
       "version": "7",
-      "when": 1792694535711,
-      "tag": "0296_cli_session_copy_metadata",
+      "when": 1792693880283,
+      "tag": "0296_orange_jack_power",
+      "breakpoints": true
+    },
+    {
+      "idx": 297,
+      "version": "7",
+      "when": 1792777043249,
+      "tag": "0297_mysterious_devos",
       "breakpoints": true
     }
   ]

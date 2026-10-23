@@ -1,5 +1,5 @@
 {
-  "id": "af005a7f-9614-4ffd-b35f-63b34be4ad2e",
+  "id": "2d61ccea-6389-4ab3-a6fd-492cc75f6550",
   "prevId": "9f79dabe-58e7-4e83-ad12-3a271b4d0d7f",
   "version": "7",
   "dialect": "postgresql",
@@ -4107,13 +4107,6 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
-        },
-        "is_fork": {
-          "name": "is_fork",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         },
         "parent_session_id": {
           "name": "parent_session_id",
@@ -11002,8 +10995,8 @@
           "method": "btree",
           "with": {}
         },
-        "IDX_device_auth_requests_user_code": {
-          "name": "IDX_device_auth_requests_user_code",
+        "UQ_device_auth_requests_user_code": {
+          "name": "UQ_device_auth_requests_user_code",
           "columns": [
             {
               "expression": "user_code",
@@ -11012,7 +11005,7 @@
               "nulls": "last"
             }
           ],
-          "isUnique": false,
+          "isUnique": true,
           "where": "\"device_auth_requests\".\"user_code\" IS NOT NULL",
           "concurrently": true,
           "method": "btree",
@@ -31313,21 +31306,6 @@
           ],
           "isUnique": false,
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_shared_cli_sessions_kilo_user_id": {
-          "name": "IDX_shared_cli_sessions_kilo_user_id",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },

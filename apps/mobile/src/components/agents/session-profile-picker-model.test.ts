@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   resolveSessionProfileLayerIds,
   resolveSessionProfilePicker,
-  sessionProfileCountItems,
   type SessionProfilePickerProfile,
 } from './session-profile-picker-model';
 
@@ -15,6 +14,8 @@ function profile(
     mcpServerCount: 0,
     skillCount: 0,
     kiloCommandCount: 0,
+    commandCount: 0,
+    agentCount: 0,
     ...overrides,
   };
 }
@@ -68,35 +69,6 @@ describe('resolveSessionProfileLayerIds', () => {
         explicitOverrideProfileId: null,
       })
     ).toEqual({ baseProfileId: null, topProfileId: null, topSource: null });
-  });
-});
-
-describe('sessionProfileCountItems', () => {
-  it('resolves the non-zero counts in web order', () => {
-    expect(
-      sessionProfileCountItems(
-        profile({
-          id: 'p',
-          name: 'P',
-          varCount: 3,
-          mcpServerCount: 1,
-          skillCount: 2,
-          kiloCommandCount: 4,
-        })
-      )
-    ).toEqual([
-      { kind: 'vars', count: 3 },
-      { kind: 'mcp', count: 1 },
-      { kind: 'skills', count: 2 },
-      { kind: 'commands', count: 4 },
-    ]);
-  });
-
-  it('omits zero counts, so an all-zero profile resolves no items', () => {
-    expect(sessionProfileCountItems(profile({ id: 'p', name: 'P', skillCount: 2 }))).toEqual([
-      { kind: 'skills', count: 2 },
-    ]);
-    expect(sessionProfileCountItems(profile({ id: 'p', name: 'P' }))).toEqual([]);
   });
 });
 

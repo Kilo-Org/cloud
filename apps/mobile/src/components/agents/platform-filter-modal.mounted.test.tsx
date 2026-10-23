@@ -17,6 +17,8 @@ let windowDimensions = { width: 400, height: 700, fontScale: 1, scale: 1 };
 let insets = { top: 0, bottom: 0, left: 0, right: 0 };
 
 vi.mock('react-native', () => ({
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   Modal: 'Modal',
   Platform: { OS: 'android' },
   Pressable: 'Pressable',

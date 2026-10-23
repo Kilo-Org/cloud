@@ -228,7 +228,7 @@ export const NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT = 160;
 
 /**
  * New-session prompt TextInput geometry, mirroring the input's own classes:
- * `leading-6` lines, `py-2` vertical padding, and the three-line floor an empty
+ * `leading-[1.5rem]` lines, `py-2` vertical padding, and the three-line floor an empty
  * prompt starts at. Exported so the clipped-last-line regression test measures
  * the frame the prompt actually renders instead of re-declaring the numbers.
  */

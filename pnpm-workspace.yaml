@@ -141,12 +141,14 @@ overrides:
   adm-zip: 0.6.1
   baseline-browser-mapping: 2.11.20
   browserslist: 4.28.7
-  # Every override selects a reviewed version. An exact pin records the version the
-  # lockfile carries; where a floor is kept, the range is bounded to the reviewed
-  # major, so moving to a newer line takes a reviewed change to this file and the
-  # lockfile.
+  # An entry added or changed here names a reviewed version: an exact pin for the
+  # version the lockfile carries, or a range that also states its upper bound, so
+  # the entry moves only through a reviewed change to this file and the lockfile.
+  # esbuild below keeps a floor without an upper bound; see its own note.
   glob: 13.0.6
   google-auth-library: 10.6.2
+  # Two 0.28.x copies are in the tree as peer variants of the vite/vitest/storybook
+  # graph, so a bound here re-points those dependents. Not narrowed in this change.
   esbuild: '>=0.28.1'
   lodash: 4.18.1
   diff: 8.0.3

@@ -46,7 +46,7 @@ function convertModel(
     hugging_face_id: '',
     name,
     created: 631148400, // our clients do not care about this field, we can fix it later if that changes
-    description: '',
+    description: model.description ?? '',
     context_length: model.context_length,
     architecture: {
       modality: model.flags?.includes('vision') ? 'text+image-\u003Etext' : 'text-\u003Etext',

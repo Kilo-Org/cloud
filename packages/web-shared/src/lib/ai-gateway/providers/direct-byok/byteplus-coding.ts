@@ -14,8 +14,6 @@ import {
 
 export const BYTEPLUS_CODING_PROVIDER_ID = 'byteplus-coding';
 
-type BytePlusCodingModel = DirectByokModel & { description: string };
-
 export const BYTEPLUS_CODING_MODELS = [
   {
     id: 'bytedance-seed-code',
@@ -112,7 +110,7 @@ export const BYTEPLUS_CODING_MODELS = [
     max_completion_tokens: 131072,
     reasoning_options: effortOptions('minimal', 'low', 'medium', 'high'),
   },
-] as const satisfies ReadonlyArray<BytePlusCodingModel>;
+] as const satisfies ReadonlyArray<DirectByokModel>;
 
 export const BYTEPLUS_CODING_MODEL_IDS = BYTEPLUS_CODING_MODELS.map(
   model => `${BYTEPLUS_CODING_PROVIDER_ID}/${model.id}`

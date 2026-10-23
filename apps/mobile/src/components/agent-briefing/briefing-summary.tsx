@@ -139,7 +139,7 @@ export function BriefingSummary({ report }: { readonly report: BriefingReport })
         </Text>
       ) : null}
       {report.summary.text ? (
-        <Text className="text-sm leading-6" selectable>
+        <Text className="text-sm leading-[1.5rem]" selectable>
           {report.summary.text}
         </Text>
       ) : null}

@@ -80,7 +80,7 @@ export function renderProfileRowBody({
       <View className="min-w-0 flex-1 gap-1">
         <Text
           className={cn(
-            'text-sm leading-5 text-foreground',
+            'text-sm leading-[1.25rem] text-foreground',
             isProfileLoading && 'text-muted-foreground',
             showError && 'text-destructive',
             summary && 'font-semibold'
@@ -96,7 +96,7 @@ export function renderProfileRowBody({
           importantForAccessibility={summary ? 'auto' : 'no-hide-descendants'}
         >
           {/* A text line reserves the summary's height even at larger system font sizes. */}
-          <Text className="text-sm leading-5 text-muted-foreground" numberOfLines={1}>
+          <Text className="text-sm leading-[1.25rem] text-muted-foreground" numberOfLines={1}>
             {summary ?? '\u00A0'}
           </Text>
           {isProfileLoading ? (

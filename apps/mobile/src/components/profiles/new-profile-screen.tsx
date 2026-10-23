@@ -135,7 +135,7 @@ export function NewProfileScreen() {
           error={descriptionError ?? undefined}
           multiline
           textAlignVertical="top"
-          className="min-h-20 leading-5"
+          className="min-h-20 leading-[1.25rem]"
           onChangeText={value => {
             descriptionRef.current = value;
             if (descriptionError !== null && validateProfileDescription(value) === null) {

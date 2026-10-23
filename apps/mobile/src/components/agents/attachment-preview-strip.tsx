@@ -117,7 +117,9 @@ function renderPreviewBody(preview: { mode: 'markdown' | 'text'; text: string })
     return <MarkdownText value={preview.text} />;
   }
   return (
-    <SelectableText className="text-sm leading-5 text-foreground">{preview.text}</SelectableText>
+    <SelectableText className="text-sm leading-[1.25rem] text-foreground">
+      {preview.text}
+    </SelectableText>
   );
 }
 

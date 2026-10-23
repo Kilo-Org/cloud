@@ -156,7 +156,7 @@ export function KiloCommandFormSheet({
           multiline
           textAlignVertical="top"
           maxLength={MAX_KILO_COMMAND_TEMPLATE_LENGTH}
-          className="min-h-32 leading-5"
+          className="min-h-32 leading-[1.25rem]"
           autoCapitalize="none"
           autoCorrect={false}
           placeholder={t('profiles.slashCommands.templatePlaceholder')}

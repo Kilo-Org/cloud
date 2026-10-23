@@ -28,7 +28,7 @@ const TAB_ICON_MAX_SIZE = 26;
 
 // Label metrics mirrored from `TabBarLabel`
 // (`apps/mobile/src/components/tab-bar-label.tsx`): `font-mono-medium text-[11px]
-// leading-4 uppercase tracking-[0.2px]`. Keep these in step with that style.
+// leading-[1rem] uppercase tracking-[0.2px]`. Keep these in step with that style.
 const TAB_LABEL_FONT_SIZE = 11;
 const TAB_LABEL_LETTER_SPACING = 0.2;
 /** JetBrains Mono (the `font-mono-medium` label) advances 0.6em per glyph. */

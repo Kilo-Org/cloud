@@ -351,7 +351,7 @@ describe('mirrored tab label metrics', () => {
     // `tabLabelWidth` must use the same 11px/0.2px the component's class sets,
     // and the component renders that line count (its own break rule first).
     expect(LABEL_SOURCE).toContain(
-      'font-mono-medium text-[11px] leading-4 uppercase tracking-[0.2px]'
+      'font-mono-medium text-[11px] leading-[1rem] uppercase tracking-[0.2px]'
     );
     expect(LABEL_SOURCE).toContain('numberOfLines={resolvedLines}');
     expect(tabLabelWidth('A')).toBeCloseTo(0.6 * 11 + 0.2);

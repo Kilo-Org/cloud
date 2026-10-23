@@ -51,7 +51,7 @@ function InstructionsEditor({
         {t('codeReviewer.instructions.deprecation')}
       </Text>
       <TextInput
-        className="min-h-32 rounded-lg bg-secondary p-3 text-sm leading-5 text-foreground"
+        className="min-h-32 rounded-lg bg-secondary p-3 text-sm leading-[1.25rem] text-foreground"
         multiline
         textAlignVertical="top"
         inputAccessoryViewID={INSTRUCTIONS_DONE_ACCESSORY_ID}

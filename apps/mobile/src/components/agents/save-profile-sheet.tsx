@@ -138,7 +138,7 @@ export function SaveProfileSheet({
           disabled={isSubmitting}
           multiline
           textAlignVertical="top"
-          className="min-h-20 leading-5"
+          className="min-h-20 leading-[1.25rem]"
           autoCapitalize="sentences"
           autoCorrect={false}
           onChangeText={value => {

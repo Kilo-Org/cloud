@@ -45,10 +45,10 @@ function renderPartContent(part: Part | null): ReactNode {
     // (dropped frames), and UIKit resets any selection on each text change
     // anyway. The finished part swaps back to the selectable path.
     if (isPartStreaming(part)) {
-      return <Text className="text-sm leading-5 text-muted-foreground">{part.text}</Text>;
+      return <Text className="text-sm leading-[1.25rem] text-muted-foreground">{part.text}</Text>;
     }
     return (
-      <SelectableText className="text-sm leading-5 text-muted-foreground">
+      <SelectableText className="text-sm leading-[1.25rem] text-muted-foreground">
         {part.text}
       </SelectableText>
     );

@@ -169,7 +169,7 @@ describe('new-session environment feedback', () => {
       expect(lines).toHaveLength(2);
       for (const line of lines) {
         expect(line.props.numberOfLines).toBe(1);
-        expect(line.props.className).toContain('text-sm leading-5');
+        expect(line.props.className).toContain('text-sm leading-[1.25rem]');
         expect(line.props.children).not.toBe('');
       }
     }

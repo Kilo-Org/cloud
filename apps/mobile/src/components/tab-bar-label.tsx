@@ -23,8 +23,8 @@ export function TabBarLabel({
       accessible={false}
       className={
         focused
-          ? 'w-full text-center font-mono-medium text-[11px] leading-4 uppercase tracking-[0.2px] text-foreground'
-          : 'w-full text-center font-mono-medium text-[11px] leading-4 uppercase tracking-[0.2px] text-muted-foreground'
+          ? 'w-full text-center font-mono-medium text-[11px] leading-[1rem] uppercase tracking-[0.2px] text-foreground'
+          : 'w-full text-center font-mono-medium text-[11px] leading-[1rem] uppercase tracking-[0.2px] text-muted-foreground'
       }
       numberOfLines={resolvedLines}
       adjustsFontSizeToFit={singleLine}

@@ -273,7 +273,7 @@ function ScopedChatListScreen() {
           titleContent={
             <View className="flex-row items-center gap-2">
               <Text
-                className="text-[30px] font-semibold leading-9 text-foreground"
+                className="text-[30px] font-semibold leading-[2.25rem] text-foreground"
                 numberOfLines={1}
               >
                 {t('common.chat')}

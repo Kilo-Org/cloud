@@ -21,6 +21,17 @@ describe('Security Agent analysis capacity state', () => {
     ).toBe('full');
   });
 
+  it('reports full when the owner already exceeds the limit', () => {
+    // A lowered limit (or a cap change mid-flight) can leave more analyses
+    // running than the limit allows; the action must stay blocked either way.
+    expect(
+      getSecurityAnalysisCapacityState({ ...idle, runningCount: 4, concurrencyLimit: 3 })
+    ).toBe('full');
+    expect(
+      getSecurityAnalysisCapacityState({ ...idle, runningCount: 0, concurrencyLimit: 0 })
+    ).toBe('full');
+  });
+
   it('reports a failed read before any count state', () => {
     expect(
       getSecurityAnalysisCapacityState({

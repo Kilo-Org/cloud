@@ -29,6 +29,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatProfileCountItemsShort } from '@/lib/profile-count-labels';
 import { type AgentProfileListItem, useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
 import { useOrganization } from '@/lib/organization-context';
@@ -141,7 +142,7 @@ export function ProfilesListScreen() {
             description={t('profiles.emptyDescription')}
             placement="top"
             action={
-              <Button onPress={openNewProfile}>
+              <Button className={STATE_ACTION_CLASS} onPress={openNewProfile}>
                 <Text>{t('profiles.newProfile')}</Text>
               </Button>
             }

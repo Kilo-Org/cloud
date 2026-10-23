@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { MessageCircle, Plus } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useAuth } from '@/lib/auth/auth-context';
 import { autoModelLabel } from '@/lib/auto-model-name';
 import { defaultChatModel } from '@/lib/chat/backend-model-options';
@@ -247,6 +248,7 @@ function ScopedChatListScreen() {
           description={t('modelChat.empty.description')}
           action={
             <Button
+              className={STATE_ACTION_CLASS}
               onPress={start}
               loading={starting}
               disabled={selectedModel === undefined}

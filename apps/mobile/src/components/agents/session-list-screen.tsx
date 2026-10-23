@@ -34,6 +34,7 @@ import { Button } from '@/components/ui/button';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
@@ -386,6 +387,7 @@ export function AgentSessionListScreen({
             variant="outline"
             size={compactEmptyState ? 'sm' : 'default'}
             onPress={isSearching ? query.handleClearSearch : query.handleClearFilters}
+            className={STATE_ACTION_CLASS}
           >
             <Text>{isSearching ? t('common.clearSearch') : t('common.clearFilters')}</Text>
           </Button>

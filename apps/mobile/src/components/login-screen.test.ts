@@ -16,6 +16,7 @@ import {
   persistLoginDrafts,
   restoreLoginDrafts,
 } from '@/lib/login-draft';
+import LoginRoute from '@/app/(auth)/login';
 import { LoginScreen } from './login-screen';
 import { errorMessage, resolveKeyboardBottomPadding } from './login-screen-state';
 
@@ -140,6 +141,19 @@ async function mountLoginScreen(): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
     ref.current = TestRenderer.create(createElement(LoginScreen));
+    await Promise.resolve();
+  });
+  const renderer = ref.current;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
+}
+
+async function mountLoginRoute(): Promise<TestRenderer.ReactTestRenderer> {
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  await act(async () => {
+    ref.current = TestRenderer.create(createElement(LoginRoute));
     await Promise.resolve();
   });
   const renderer = ref.current;
@@ -393,6 +407,53 @@ describe('login-screen language globe', () => {
     expect(setLanguagePickerBridge).toHaveBeenCalledWith({ beforeReload: persistLoginDrafts });
     expect(push).toHaveBeenCalledTimes(1);
     expect(push).toHaveBeenCalledWith('/(auth)/language-picker');
+
+    renderer.unmount();
+  });
+});
+
+describe('login route language refresh', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    deviceAuth.status = 'idle';
+    deviceAuth.token = undefined;
+    deviceAuth.code = undefined;
+    deviceAuth.refreshToken = undefined;
+    deviceAuth.expiresIn = undefined;
+    deviceAuth.error = undefined;
+    deviceAuth.verificationUrl = undefined;
+    deviceAuth.resumed = false;
+  });
+
+  it('remounts the sign-in screen and re-labels it in the applied language', async () => {
+    vi.mocked(restoreLoginDrafts).mockClear();
+    const renderer = await mountLoginRoute();
+    const mountsBeforeSwitch = vi.mocked(restoreLoginDrafts).mock.calls.length;
+    expect(mountsBeforeSwitch).toBeGreaterThan(0);
+
+    await act(async () => {
+      await i18n.changeLanguage('ja');
+    });
+    try {
+      // A fresh mount re-runs the draft restore, so the count is how a remount
+      // is observable: the route's `useTranslation` re-render alone would keep
+      // the same screen instance.
+      expect(vi.mocked(restoreLoginDrafts).mock.calls.length).toBeGreaterThan(mountsBeforeSwitch);
+      // The fresh mount restores its drafts asynchronously, so flush that
+      // before reading the revealed form.
+      await act(async () => {
+        await Promise.resolve();
+      });
+      const pressableLabels = renderer.root
+        .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Pressable')
+        .map(node => node.props.accessibilityLabel);
+      expect(pressableLabels).toContain(i18n.t('common.language'));
+      expect(pressableLabels).not.toContain('Language');
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+    }
 
     renderer.unmount();
   });

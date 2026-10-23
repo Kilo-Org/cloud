@@ -134,6 +134,7 @@ export function MessageDetailsSheet({
 
   return (
     <SessionPageSheet
+      dismissible
       visible={visible}
       onClose={
         selectVisible

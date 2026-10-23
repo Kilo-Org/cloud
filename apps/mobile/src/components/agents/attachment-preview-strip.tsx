@@ -477,6 +477,7 @@ function AttachmentChip({
 
       {textPreview !== null ? (
         <SessionPageSheet
+          dismissible
           visible
           onClose={() => {
             setTextPreview(null);

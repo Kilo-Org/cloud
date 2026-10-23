@@ -641,7 +641,7 @@ function FilePreviewModal({
   }
 
   return (
-    <SessionPageSheet visible onClose={onClose}>
+    <SessionPageSheet visible onClose={onClose} dismissible>
       <SheetHeader
         // i18n-dup-ok: prReview.overview.file_* is a numeral count unit ('1 file'),
         // which languages inflect by number; this key is the standalone noun label.

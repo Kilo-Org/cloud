@@ -178,7 +178,10 @@ export function SessionFilterModal({
   };
 
   return (
-    <Sheet visible onClose={onClose} snapPoints={SHEET_SNAP_POINTS}>
+    // The sheet edits a draft (platform and project selections) that Apply
+    // commits, so the downward drag stays off: on iOS it would otherwise close
+    // the sheet and drop the draft when the user dragged the option list.
+    <Sheet visible onClose={onClose} dismissGestures={false} snapPoints={SHEET_SNAP_POINTS}>
       {/* The sheet fills the detent, so the row list takes the slack and
           scrolls: a long recent-repository list can never push Apply off the
           bottom of the sheet. */}

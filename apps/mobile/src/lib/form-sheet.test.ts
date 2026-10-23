@@ -27,6 +27,10 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: mocks.useSafeAreaInsets,
 }));
 
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ background: '#101010' }),
+}));
+
 describe('useFormSheetDetents', () => {
   beforeEach(() => {
     mocks.platform.OS = 'android';
@@ -82,6 +86,7 @@ describe('useFormSheetScreenOptions', () => {
       sheetGrabberVisible: true,
       headerShown: false,
       sheetShouldOverflowTopInset: true,
+      contentStyle: { backgroundColor: '#101010' },
     });
   });
 
@@ -95,6 +100,7 @@ describe('useFormSheetScreenOptions', () => {
       sheetGrabberVisible: true,
       headerShown: false,
       sheetShouldOverflowTopInset: true,
+      contentStyle: { backgroundColor: '#101010' },
     });
   });
 });

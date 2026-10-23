@@ -295,7 +295,7 @@ export function ChildSessionSheet({
   }
 
   return (
-    <SessionPageSheet visible={visible} onClose={onClose} onDismiss={onDismiss}>
+    <SessionPageSheet visible={visible} onClose={onClose} onDismiss={onDismiss} dismissible>
       <SheetHeader title={title} onDone={onClose} topInset="ios-page-sheet" />
       {modelLabel ? (
         <View className="border-b border-border px-4 py-2">

@@ -133,7 +133,7 @@ export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailS
   );
 
   return (
-    <SessionPageSheet visible={visible} onClose={onClose}>
+    <SessionPageSheet visible={visible} onClose={onClose} dismissible>
       <SheetHeader
         title={shownTitle}
         onDone={onClose}

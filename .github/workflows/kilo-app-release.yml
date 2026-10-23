@@ -475,37 +475,30 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: write # push the bump branch
-      pull-requests: read # look for an open bump PR to reuse its branch
     outputs:
       branch: ${{ steps.pending.outputs.branch || steps.bump.outputs.branch }}
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
 
-      # An open bump PR already carries the next version. A second one would
-      # bump to the same number and conflict with it.
-      # Only a PR from this repository counts: `gh pr list` also returns PRs
-      # opened from forks, and a fork PR whose head branch happens to be named
-      # `kilo-app-version-bump-x.y.z` would make this job skip the bump and
-      # publish a branch the changelog job cannot fetch from origin. The
-      # version would never be bumped while that PR stayed open.
-      - name: Look for an open bump PR
+      # Reuse the branch even when a retry has not opened its PR yet.
+      - name: Look for the next version branch
         id: pending
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          BRANCHES=$(gh pr list --state open --limit 100 --json headRefName,isCrossRepository \
-            --jq '[.[] | select((.headRefName | startswith("kilo-app-version-bump-")) and (.isCrossRepository | not))] | .[].headRefName')
-          OPEN=$(printf '%s\n' "$BRANCHES" | grep -c . || true)
-          if [ "$OPEN" != "0" ]; then
-            echo "A kilo-app version bump PR is already open — nothing to open."
-          fi
-          # A PR head ref is a name a stranger can choose. It is consumed by the
-          # changelog job's shell, so accept only the exact name this pipeline
-          # creates and fail loudly on anything else.
-          BRANCH=$(printf '%s\n' "$BRANCHES" | head -n 1)
-          if [ -n "$BRANCH" ] && ! printf '%s' "$BRANCH" | grep -qE '^kilo-app-version-bump-[0-9.]+$'; then
-            echo "::error::Refusing a version-bump branch this pipeline did not create: $BRANCH"
+          OLD=$(sed -n "s/^  version: '\([0-9][0-9.]*\)',$/\1/p" apps/mobile/app.config.ts)
+          if [ -z "$OLD" ]; then
+            echo "::error::Could not read the version line from apps/mobile/app.config.ts"
             exit 1
+          fi
+          NEW=$(echo "$OLD" | awk -F. '{print $1"."$2"."$3+1}')
+          BRANCH="kilo-app-version-bump-$NEW"
+          if git ls-remote --exit-code --heads origin "refs/heads/$BRANCH"; then
+            OPEN=1
+          else
+            STATUS=$?
+            if [ "$STATUS" != "2" ]; then
+              exit "$STATUS"
+            fi
+            OPEN=0
           fi
           echo "open=$OPEN" >> "$GITHUB_OUTPUT"
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
@@ -536,8 +529,7 @@ jobs:
           git checkout -b "kilo-app-version-bump-$NEW"
           git add apps/mobile/app.config.ts
           git commit -m "chore(kilo-app): bump version to $NEW"
-          # Force: a re-run rewrites the same single line onto the same branch.
-          git push -fu origin "kilo-app-version-bump-$NEW"
+          git push -u origin "kilo-app-version-bump-$NEW"
 
   # The changelog section rides the version-bump branch, not main. Main is
   # protected by the `main-reviews` ruleset (pull_request, 1 approval,
@@ -641,6 +633,5 @@ jobs:
               --head "$BRANCH" \
               --title "chore(kilo-app): bump version to $NEW" \
               --body-file "$RUNNER_TEMP/kilo-app-bump-pr.md" \
-              --assignee iscekic \
-              --reviewer iscekic
+              --assignee iscekic
           fi

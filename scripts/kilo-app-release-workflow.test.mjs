@@ -1,15 +1,11 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import { load } from 'js-yaml';
-
-// The kilo-app release workflow wires two release scripts (sibling slice s1) into
-// the pipeline: `kilo-app-release-notes.mjs` writes one changelog section per
-// build, and `kilo-app-release-upload-cap.mjs` holds a run that Apple's rolling
-// upload limit would refuse. Every check below sits beside a mutation applied to
-// a parsed copy, so a dropped gate, a moved step or a wrong destination fails
-// this suite instead of a real release.
 
 const workflowPath = '.github/workflows/kilo-app-release.yml';
 
@@ -174,15 +170,6 @@ function validate(workflow) {
       'bump-version must not open the PR; the changelog job opens it after the section lands'
     );
   }
-  const pending = step(workflow, 'bump-version', 'pending');
-  assert.match(pending.run, /headRefName/, 'the pending step must capture the open PR head branch');
-  // The branch name is a PR head ref, so a stranger can choose it. It is checked
-  // here, before the pipeline hands it to the changelog job.
-  assert.match(
-    pending.run,
-    /grep -qE '\^kilo-app-version-bump-\[0-9\.\]\+\$'/,
-    'the pending step must reject a branch this pipeline did not create'
-  );
   assert.match(
     step(workflow, 'bump-version', 'bump').run,
     /branch=kilo-app-version-bump-\$NEW/,
@@ -281,6 +268,88 @@ function validate(workflow) {
 
 test('the release workflow gates the build on the upload cap and lands the changelog section', () => {
   validate(readWorkflow());
+});
+
+test('release retries preserve shipped sections on a bump branch without a PR', () => {
+  const work = mkdtempSync(join(tmpdir(), 'kilo-app-bump-'));
+  const repo = join(work, 'repo');
+  const remote = join(work, 'remote.git');
+  const output = join(work, 'output');
+  const workflow = readWorkflow();
+  const env = { ...process.env, GITHUB_OUTPUT: output };
+  const git = (...args) =>
+    execFileSync('git', args, {
+      cwd: repo,
+      env,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+  const run = (body, cwd = repo) => {
+    writeFileSync(output, '');
+    execFileSync('bash', ['-e', '-o', 'pipefail', '-c', body], {
+      cwd,
+      env,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    return Object.fromEntries(
+      readFileSync(output, 'utf8')
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map(line => line.split('='))
+    );
+  };
+  try {
+    mkdirSync(join(repo, 'apps/mobile'), { recursive: true });
+    execFileSync('git', ['init', '--bare', remote], { stdio: 'pipe' });
+    git('init', '-b', 'main');
+    git('config', 'user.name', 'Release Test');
+    git('config', 'user.email', 'release@example.invalid');
+    git('remote', 'add', 'origin', remote);
+    writeFileSync(
+      join(repo, 'apps/mobile/app.config.ts'),
+      "export default {\n  version: '1.2.3',\n};\n"
+    );
+    writeFileSync(join(repo, 'apps/mobile/CHANGELOG.md'), '# Changelog\n');
+    git('add', '.');
+    git('commit', '-m', 'Initial app');
+    const base = git('rev-parse', 'HEAD');
+
+    const pending = step(workflow, 'bump-version', 'pending').run;
+    const first = run(pending);
+    assert.equal(first.open, '0');
+    const bump = run(step(workflow, 'bump-version', 'bump').run, join(repo, 'apps/mobile'));
+    const push = workflow.jobs['bump-version'].steps.find(
+      item => item.name === 'Push bump branch'
+    ).run;
+    run(push.replaceAll('${{ steps.bump.outputs.new }}', bump.new));
+    const branch = bump.branch;
+    assert.equal(
+      git('show', `${branch}:apps/mobile/app.config.ts`),
+      "export default {\n  version: '1.2.4',\n};"
+    );
+
+    const shipped = '# Changelog\n\n## shipped build\n\n- A shipped change.\n';
+    writeFileSync(join(repo, 'apps/mobile/CHANGELOG.md'), shipped);
+    git('add', '.');
+    git('commit', '-m', 'Document shipped build');
+    git('push', 'origin', branch);
+    const documented = git('rev-parse', 'HEAD');
+    git('checkout', '--detach', base);
+    const retry = run(pending);
+    assert.equal(retry.open, '1');
+    assert.equal(retry.branch, branch);
+    assert.equal(
+      git('ls-remote', '--heads', 'origin', `refs/heads/${branch}`).split(/\s/)[0],
+      documented
+    );
+    assert.equal(git('show', `${documented}:apps/mobile/CHANGELOG.md`), shipped.trim());
+
+    git('remote', 'set-url', 'origin', join(work, 'missing.git'));
+    assert.throws(() => run(pending));
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
 });
 
 const mutations = {
@@ -401,20 +470,9 @@ const mutations = {
   'bump-version drops its branch output': workflow => {
     delete workflow.jobs['bump-version'].outputs.branch;
   },
-  'the pending step does not capture the branch name': workflow => {
-    const pending = step(workflow, 'bump-version', 'pending');
-    pending.run = pending.run.replaceAll('headRefName', 'headRef');
-  },
   'the created branch is not recorded': workflow => {
     const bump = step(workflow, 'bump-version', 'bump');
     bump.run = bump.run.replace('branch=kilo-app-version-bump-$NEW', '');
-  },
-  'the pending step accepts any branch': workflow => {
-    const pending = step(workflow, 'bump-version', 'pending');
-    pending.run = pending.run.replace(
-      "grep -qE '^kilo-app-version-bump-[0-9.]+$'",
-      "grep -qE '^kilo-app-version-bump-'"
-    );
   },
   'changelog drops build-and-submit': workflow => {
     workflow.jobs.changelog.needs = workflow.jobs.changelog.needs.filter(

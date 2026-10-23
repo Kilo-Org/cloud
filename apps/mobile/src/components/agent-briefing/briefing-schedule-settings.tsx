@@ -97,7 +97,7 @@ export function ScheduleSettings({
           key={timezoneInputKey}
           label={t('agentBriefing.timezone')}
           defaultValue={draft.current.timezone}
-          error={timezoneInvalid ? t('agentBriefing.invalidTimezone') : undefined}
+          error={timezoneInvalid ? t('agentBriefing.invalidSchedule') : undefined}
           autoCapitalize="none"
           autoCorrect={false}
           onChangeText={value => {
@@ -176,7 +176,7 @@ export function ScheduleSettings({
         );
       })}
       <AccessibleStatus
-        message={timesInvalid ? t('agentBriefing.invalidScheduleTimes') : null}
+        message={timesInvalid ? t('agentBriefing.invalidSchedule') : null}
         className="text-sm"
       />
       <Text className="text-xs text-muted-foreground">{t('agentBriefing.timezoneHint')}</Text>

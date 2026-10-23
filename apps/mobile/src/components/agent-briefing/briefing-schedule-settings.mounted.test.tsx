@@ -147,7 +147,7 @@ describe('briefing schedule validation', () => {
     press(all(renderer, 'Button').at(-1) as Node);
     expect(mutate).not.toHaveBeenCalled();
     const { error } = first(renderer, 'FormField').props as { error?: string };
-    expect(error).toBe('agentBriefing.invalidTimezone');
+    expect(error).toBe('agentBriefing.invalidSchedule');
     edit(first(renderer, 'FormField'), 'Europe/Berlin');
     const cleared = first(renderer, 'FormField').props as { error?: string };
     expect(cleared.error).toBeUndefined();
@@ -164,7 +164,7 @@ describe('briefing schedule validation', () => {
     choose(first(renderer, 'NativeDateTimePicker'), new Date(2000, 0, 1, 6, 0));
     press(all(renderer, 'Button').at(-1) as Node);
     expect(mutate).not.toHaveBeenCalled();
-    expect(renderedTexts(renderer)).toContain('agentBriefing.invalidScheduleTimes');
+    expect(renderedTexts(renderer)).toContain('agentBriefing.invalidSchedule');
     act(() => {
       renderer.unmount();
     });

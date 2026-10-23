@@ -44,6 +44,7 @@ vi.mock('../session-events', () => ({
 }));
 
 import { getWorkerDb } from '@kilocode/db/client';
+import { agent_briefing_events } from '@kilocode/db/schema';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { notifyUserSessionEvent } from '../session-events';
 import {
@@ -67,6 +68,8 @@ function createTransactionDb(options: {
   persistedStatus?: string | null;
   rowMissing?: boolean;
 }) {
+  const insertedEvidence = vi.fn(() => ({ onConflictDoNothing: vi.fn(async () => undefined) }));
+  const insert = vi.fn(() => ({ values: insertedEvidence }));
   const updateWhere = vi.fn(async () => undefined);
   const updateSet = vi.fn(() => ({ where: updateWhere }));
   // Named without the substring "update" so oxlint drizzle rules do not flag test spies.
@@ -132,10 +135,10 @@ function createTransactionDb(options: {
   }));
 
   const transaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
-    fn({ select, update: applyUpdate })
+    fn({ select, update: applyUpdate, insert })
   );
 
-  return { transaction, select, applyUpdate, updateSet, updateWhere };
+  return { transaction, select, applyUpdate, updateSet, updateWhere, insertedEvidence };
 }
 
 type ApplyMetadataDbOptions = {
@@ -146,6 +149,8 @@ type ApplyMetadataDbOptions = {
   parentCloudAgentScopeId?: string;
   parentWorktreeId?: string;
   initialStatus?: string | null;
+  initialStatusUpdatedAt?: string | null;
+  initialStatusTransitionId?: string | null;
   rowMissing?: boolean;
   cloudAgentSessionScopeId?: string | null;
   cloudAgentSessionId?: string | null;
@@ -170,6 +175,8 @@ type ApplyMetadataDbOptions = {
  * - parent / read-back: select → from → where → limit (awaited without for)
  */
 function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
+  const insertedEvidence = vi.fn(() => ({ onConflictDoNothing: vi.fn(async () => undefined) }));
+  const insert = vi.fn(() => ({ values: insertedEvidence }));
   const updateSets: unknown[] = [];
   const updateWhere = vi.fn(async () => undefined);
   const updateSet = vi.fn((values: unknown) => {
@@ -177,7 +184,11 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
     return { where: updateWhere };
   });
   // Named without the substring "update" so oxlint drizzle rules do not flag test spies.
-  const applyUpdate = vi.fn(() => ({ set: updateSet }));
+  const evidenceScopeWhere = vi.fn(async () => undefined);
+  const evidenceScopeSet = vi.fn(() => ({ where: evidenceScopeWhere }));
+  const applyUpdate = vi.fn((table: unknown) => ({
+    set: table === agent_briefing_events ? evidenceScopeSet : updateSet,
+  }));
 
   const queryLog: Array<
     'session-initial' | 'session-lock' | 'membership' | 'parent' | 'read-back'
@@ -191,6 +202,8 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
     return {
       title: options.initialTitle ?? null,
       status: options.initialStatus ?? 'idle',
+      statusUpdatedAt: options.initialStatusUpdatedAt ?? null,
+      statusTransitionId: options.initialStatusTransitionId ?? null,
       parentSessionId: options.parentSessionId ?? null,
       cloudAgentSessionScopeId: options.cloudAgentSessionScopeId ?? null,
       cloudAgentSessionId: options.cloudAgentSessionId ?? null,
@@ -285,7 +298,7 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
   }));
   let committedSession = persistedSessionRow();
   const transaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
-    const result = await fn({ select, update: applyUpdate, execute });
+    const result = await fn({ select, update: applyUpdate, execute, insert });
     await options.beforeCommit?.();
     committedSession = persistedSessionRow();
     return result;
@@ -299,6 +312,9 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
     updateSet,
     updateWhere,
     updateSets,
+    insertedEvidence,
+    evidenceScopeSet,
+    evidenceScopeWhere,
     execute,
     queryLog,
     membershipQueryCount: () => queryLog.filter(k => k === 'membership').length,
@@ -373,6 +389,15 @@ describe('resetAttentionStatusOnCliDisconnect', () => {
       status: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
       status_updated_at: expect.any(String),
     });
+    expect(db.insertedEvidence).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kilo_user_id: 'usr_1',
+        session_id: 'ses_1',
+        kind: 'status',
+        status: 'retry',
+        occurred_at: expect.any(String),
+      })
+    );
     expect(notifyUserSessionEvent).toHaveBeenCalledWith(
       env,
       'usr_1',
@@ -611,6 +636,281 @@ describe('applyMetadataChanges', () => {
       remove: cacheRemove,
     } as never);
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  });
+  it('projects blocker clearing at source time without inventing history from the projection', async () => {
+    const db = createApplyMetadataDb({ initialStatus: 'question' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['status', 'busy'],
+        ['statusOccurredAt', '2026-07-24T23:00:00.000Z'],
+      ])
+    );
+    expect(db.updateSets[0]).toMatchObject({
+      status: 'busy',
+      status_updated_at: '2026-07-24T23:00:00.000Z',
+    });
+    expect(db.insertedEvidence).not.toHaveBeenCalled();
+  });
+  it('preserves a pre-cutoff originating status even when projection happens after cutoff', async () => {
+    const db = createApplyMetadataDb({ initialStatus: 'busy' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const occurredAt = '2026-07-24T07:59:00.000Z';
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['status', 'question'],
+        ['statusOccurredAt', occurredAt],
+      ])
+    );
+    expect(db.insertedEvidence).not.toHaveBeenCalled();
+    expect(db.updateSets[0]).toMatchObject({ status_updated_at: occurredAt });
+  });
+
+  it('does not invent historical blocker onset for an untimestamped legacy status', async () => {
+    const db = createApplyMetadataDb({ initialStatus: 'busy' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['status', 'question']]));
+    expect(db.insertedEvidence).not.toHaveBeenCalled();
+    expect(db.updateSets[0]).toMatchObject({ status: 'question' });
+  });
+  it('does not regress newer SQL status for a delayed historical transition', async () => {
+    const db = createApplyMetadataDb({
+      initialStatus: 'idle',
+      initialStatusUpdatedAt: '2026-07-24T08:05:00.000Z',
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['status', 'question'],
+        ['statusOccurredAt', '2026-07-24T07:59:00.000Z'],
+      ])
+    );
+    expect(db.updateSets).toEqual([]);
+    expect(db.insertedEvidence).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+  it('does not rewrite a same-state snapshot when its historical source event is delivered separately', async () => {
+    const db = createApplyMetadataDb({
+      initialStatus: 'question',
+      initialStatusUpdatedAt: '2026-07-24T08:01:00.000Z',
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const occurredAt = '2026-07-24T07:59:00.000Z';
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['status', 'question'],
+        ['statusOccurredAt', occurredAt],
+      ])
+    );
+    expect(db.insertedEvidence).not.toHaveBeenCalled();
+    expect(db.updateSets).toEqual([]);
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+  it('does not reverse SQL projection for a delayed equal-millisecond older transition id', async () => {
+    const occurredAt = '2026-07-24T07:59:00.000Z';
+    const db = createApplyMetadataDb({
+      initialStatus: 'busy',
+      initialStatusUpdatedAt: occurredAt,
+      initialStatusTransitionId: '01ARZ3NDEKTSV4RRFFQ69G5FAW',
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['status', 'question'],
+        ['statusOccurredAt', occurredAt],
+        ['statusTransitionId', '01ARZ3NDEKTSV4RRFFQ69G5FAV'],
+      ])
+    );
+    expect(db.updateSets).toEqual([]);
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  it('persists newer same-millisecond transition identity and clears it on legacy writes', async () => {
+    const occurredAt = '2026-07-24T07:59:00.000Z';
+    const db = createApplyMetadataDb({
+      initialStatus: 'question',
+      initialStatusUpdatedAt: occurredAt,
+      initialStatusTransitionId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['status', 'busy'],
+        ['statusOccurredAt', occurredAt],
+        ['statusTransitionId', '01ARZ3NDEKTSV4RRFFQ69G5FAW'],
+      ])
+    );
+    expect(db.updateSets[0]).toMatchObject({
+      status: 'busy',
+      status_updated_at: occurredAt,
+      status_transition_id: '01ARZ3NDEKTSV4RRFFQ69G5FAW',
+    });
+    expect(computeSessionMetadataUpdates(new Map([['status', 'idle']]))).toMatchObject({
+      status_transition_id: null,
+    });
+  });
+  describe('producer ordering across a CLI-disconnect reset', () => {
+    const questionAt = '2026-07-24T08:00:00.000Z';
+    const delayedAt = '2026-07-24T08:05:00.000Z';
+    const resetAt = '2026-07-24T08:10:00.000Z';
+    const questionId = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
+
+    async function resetProducerQuestion() {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date(resetAt));
+      try {
+        const resetDb = createTransactionDb({
+          initialStatus: 'question',
+          initialStatusUpdatedAt: questionAt,
+        });
+        vi.mocked(getWorkerDb).mockReturnValue(resetDb as never);
+        await resetAttentionStatusOnCliDisconnect(env, 'usr_1', 'ses_1');
+        expect(resetDb.updateSet).toHaveBeenCalledWith({
+          status: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+          status_updated_at: resetAt,
+        });
+        expect(resetDb.insertedEvidence).toHaveBeenCalledWith(
+          expect.objectContaining({
+            status: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+            occurred_at: resetAt,
+          })
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+      vi.mocked(notifyUserSessionEvent).mockReset();
+      const db = createApplyMetadataDb({
+        initialStatus: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+        initialStatusUpdatedAt: resetAt,
+        initialStatusTransitionId: questionId,
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      return db;
+    }
+
+    it('applies a delayed newer producer transition whose source time precedes the reset', async () => {
+      const db = await resetProducerQuestion();
+      await applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([
+          ['status', 'idle'],
+          ['statusOccurredAt', delayedAt],
+          ['statusTransitionId', '01ARZ3NDEKTSV4RRFFQ69G5FAW'],
+        ])
+      );
+      expect(db.updateSets[0]).toMatchObject({
+        status: 'idle',
+        status_updated_at: delayedAt,
+        status_transition_id: '01ARZ3NDEKTSV4RRFFQ69G5FAW',
+      });
+      expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+        env,
+        'usr_1',
+        expect.objectContaining({
+          type: 'session.status.updated',
+          data: expect.objectContaining({
+            previousStatus: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+            status: 'idle',
+          }),
+        }),
+        undefined
+      );
+    });
+
+    it.each([
+      ['an older producer transition', '01ARZ3NDEKTSV4RRFFQ69G5FAT'],
+      ['a replay of the reset producer transition', questionId],
+    ])('still rejects %s after the reset', async (_label, transitionId) => {
+      const db = await resetProducerQuestion();
+      await applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([
+          ['status', 'question'],
+          ['statusOccurredAt', '2026-07-24T08:20:00.000Z'],
+          ['statusTransitionId', transitionId],
+        ])
+      );
+      expect(db.updateSets).toEqual([]);
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    });
+
+    it('keeps source-time ordering for a cursorless legacy projection', async () => {
+      const stale = createApplyMetadataDb({
+        initialStatus: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+        initialStatusUpdatedAt: resetAt,
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(stale as never);
+      await applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([
+          ['status', 'idle'],
+          ['statusOccurredAt', delayedAt],
+          ['statusTransitionId', '01ARZ3NDEKTSV4RRFFQ69G5FAW'],
+        ])
+      );
+      expect(stale.updateSets).toEqual([]);
+
+      const fresh = createApplyMetadataDb({
+        initialStatus: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+        initialStatusUpdatedAt: resetAt,
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(fresh as never);
+      await applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([
+          ['status', 'idle'],
+          ['statusOccurredAt', '2026-07-24T08:15:00.000Z'],
+          ['statusTransitionId', '01ARZ3NDEKTSV4RRFFQ69G5FAW'],
+        ])
+      );
+      expect(fresh.updateSets[0]).toMatchObject({
+        status: 'idle',
+        status_updated_at: '2026-07-24T08:15:00.000Z',
+        status_transition_id: '01ARZ3NDEKTSV4RRFFQ69G5FAW',
+      });
+    });
+  });
+
+  it('migrates session evidence atomically to authorized organization scope', async () => {
+    const db = createApplyMetadataDb({ membershipRows: 1 });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['orgId', 'org_owned']]));
+    expect(db.evidenceScopeSet).toHaveBeenCalledWith({ organization_id: 'org_owned' });
+    expect(db.evidenceScopeWhere).toHaveBeenCalledTimes(1);
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not move evidence for a refused organization claim', async () => {
+    const db = createApplyMetadataDb({ membershipRows: 0 });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['orgId', 'org_foreign']]));
+    expect(db.evidenceScopeSet).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -1142,6 +1442,7 @@ describe('applyMetadataChanges', () => {
         git_branch: 'feature/provenance',
         status: 'busy',
         status_updated_at: expect.any(String),
+        status_transition_id: null,
       },
     ]);
     expect(notifyUserSessionEvent).toHaveBeenCalledWith(

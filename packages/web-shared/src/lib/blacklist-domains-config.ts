@@ -1,16 +1,15 @@
 import 'server-only';
 import * as z from 'zod';
+import { captureException } from '@sentry/nextjs';
+import {
+  blacklistedDomainsFromConfig,
+  type BlacklistDomainsConfigSchema,
+} from '@kilocode/worker-utils/account-access';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { BLACKLIST_DOMAINS_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
-
-export const BlacklistDomainsConfigSchema = z.object({
-  domains: z.array(z.string()),
-  updated_at: z.string().nullable(),
-  updated_by: z.string().nullable(),
-  updated_by_email: z.string().nullable(),
-});
+import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export type BlacklistDomainsConfig = z.infer<typeof BlacklistDomainsConfigSchema>;
 
@@ -36,21 +35,29 @@ function getEnvFallbackDomains(): string[] {
 }
 
 /**
+ * Reads the operator-maintained list from Redis. Throws when the read or the stored payload
+ * is unusable, after reporting it: createCachedFetch then keeps serving the last list it read
+ * successfully, and retries once the failure backoff window passes.
+ */
+async function readBlacklistedDomains(): Promise<string[]> {
+  try {
+    return blacklistedDomainsFromConfig(
+      await redisClient.get<string>(BLACKLIST_DOMAINS_REDIS_KEY),
+      getEnvFallbackDomains()
+    );
+  } catch (error) {
+    errorExceptInTest('[blacklist-domains] Failed to read the blacklisted domains:', error);
+    captureException(error, { tags: { source: 'blacklist_domains_config' } });
+    throw error;
+  }
+}
+
+/**
  * Reads blacklisted domains from Redis, falling back to the BLACKLIST_DOMAINS env var.
- * Cached in-process for 60 seconds (stale-while-revalidate) to avoid hitting Redis on
- * every auth check.
+ * Cached in-process for 60 seconds to avoid hitting Redis on every auth check.
  */
 export const getBlacklistedDomains = createCachedFetch(
-  async (): Promise<string[]> => {
-    const raw = await redisClient.get<string>(BLACKLIST_DOMAINS_REDIS_KEY);
-    if (raw) {
-      const parsed = BlacklistDomainsConfigSchema.parse(JSON.parse(raw));
-      if (parsed.domains.length > 0) {
-        return parsed.domains;
-      }
-    }
-    return getEnvFallbackDomains();
-  },
+  readBlacklistedDomains,
   60_000,
   getEnvFallbackDomains()
 );

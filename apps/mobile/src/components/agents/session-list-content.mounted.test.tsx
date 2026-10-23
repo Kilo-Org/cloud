@@ -131,7 +131,7 @@ vi.mock('@/components/ui/icons', () => ({
   ServerCrash: 'ServerCrash',
   WifiOff: 'WifiOff',
 }));
-vi.mock('@/lib/a11y/announce', () => ({ moveA11yFocus: vi.fn() }));
+vi.mock('@/lib/a11y/announce', () => ({ requestA11yFocus: vi.fn() }));
 vi.mock('@/lib/hooks/use-session-mutations', () => ({ useSessionMutations: () => controls }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#999999' }),

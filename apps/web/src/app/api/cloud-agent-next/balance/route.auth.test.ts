@@ -25,7 +25,8 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: { query: { kilocode_users: { findFirst: (...args: unknown[]) => mockFindUser(...args) } } },
   readDb: {},
 }));
-jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
+jest.mock('@kilocode/worker-utils/account-access', () => ({
+  ...jest.requireActual('@kilocode/worker-utils/account-access'),
   isOrganizationMember: (...args: unknown[]) => mockMembership(...args),
 }));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
@@ -55,7 +56,14 @@ jest.mock('@/lib/organizations/organization-seats', () => ({}));
 jest.mock('@/lib/organizations/sales-demo', () => ({}));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-sso-policy', () => ({}));
 jest.mock('@/lib/account-linking-session', () => ({}));
-jest.mock('@kilocode/web-shared/lib/admin/admin-access-log', () => ({}));
+jest.mock('@kilocode/web-shared/lib/admin/admin-access-log', () => ({
+  // `getUserFromAuth`'s resolver calls this predicate to pick the bearer path,
+  // so the stub has to answer the same way the real header check does.
+  authViaTokenFromHeaders: (headers: Headers) => Boolean(headers.get('Authorization')),
+  clientIpFromHeaders: () => null,
+  routeFromHeaders: () => null,
+  emitAdminAccessEvent: jest.fn(),
+}));
 jest.mock('@/lib/user/sso', () => ({}));
 jest.mock('@kilocode/web-shared/lib/web-session-revocation', () => ({}));
 
@@ -114,7 +122,7 @@ it.each(['human-api', 'device-access'])(
       })
     );
     expect((await GET()).status).toBe(200);
-    expect(mockMembership).toHaveBeenCalledWith(organizationId, user.id, expect.anything());
+    expect(mockMembership).toHaveBeenCalledWith(expect.anything(), organizationId, user.id);
     expect(mockBalance).toHaveBeenCalledWith(organizationId, user);
     mockBalance.mockClear();
     expect((await getGenericBalance()).status).toBe(401);

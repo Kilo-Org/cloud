@@ -516,7 +516,7 @@ describe('startOpenAiChatGptConnect', () => {
 });
 
 describe('OpenAiChatGptCard usage limit', () => {
-  const USAGE_LIMIT = { reachedAt: '2026-09-16T13:00:00.000Z', resetsAt: null };
+  const USAGE_LIMIT = { reachedAt: '2026-09-16T13:00:00.000Z', resetsAt: null, code: null };
   const USAGE_LIMIT_TITLE = 'ChatGPT usage limit reached';
   const USAGE_LINK_SUMMARY = 'View and manage your ChatGPT usage';
 

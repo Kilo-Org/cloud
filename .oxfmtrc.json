@@ -9,5 +9,11 @@
   "arrowParens": "avoid",
   "endOfLine": "lf",
   "sortPackageJson": false,
-  "ignorePatterns": ["services/kilo-mcp/catalog.json"]
+  "ignorePatterns": [
+    "services/kilo-mcp/catalog.json",
+    "services/*/container/plugin/*",
+    "services/*/plugins/*/src/*",
+    "apps/web/src/app/(app)/*/*/merges/*",
+    "apps/web/src/app/(app)/organizations/*/*/*/merges/page.tsx"
+  ]
 }

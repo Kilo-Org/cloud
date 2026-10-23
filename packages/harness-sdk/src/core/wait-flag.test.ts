@@ -36,7 +36,7 @@ const asking = (wait?: boolean) => ({
 
 /** What the tool says about waiting, in the two ways a tool can say it. */
 interface Says {
-  readonly inlineFor?: Duration.DurationInput;
+  readonly inlineFor?: Duration.Input;
   readonly wait?: boolean;
 }
 

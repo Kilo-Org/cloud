@@ -5,7 +5,6 @@ import {
   GEMINI_4_ARGON_MODEL_ID,
   GEMINI_FLASH_CURRENT_MODEL_ID,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
-import { MISTRAL_LARGE_4_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral.constants';
 import {
   applyCustomPricingToPricing,
   applyCustomPricingToModel,
@@ -95,33 +94,7 @@ describe('custom model pricing', () => {
     ).toBe(Math.round(500 * 2 + 100 * 10 + 200 * 0.1 + 300 * 0.1875));
   });
 
-  test('replaces upstream Mistral Large 4 pricing with the discounted OpenRouter rates', () => {
-    const model = applyCustomPricingToModel({
-      ...makeModel(MISTRAL_LARGE_4_MODEL_ID),
-      name: 'Mistral: Mistral Large 4',
-    });
-
-    expect(model.name).toBe('Mistral: Mistral Large 4 (50% off)');
-    expect(model.pricing).toEqual({
-      prompt: '0.000000680000',
-      completion: '0.000002090000',
-      input_cache_read: '0.000000070000',
-      input_cache_write: undefined,
-    });
-    expect(
-      calculateCustomCost_mUsd(
-        MISTRAL_LARGE_4_MODEL_ID,
-        makeUsage({
-          inputTokens: 1_000,
-          outputTokens: 100,
-          cacheHitTokens: 200,
-          cost_mUsd: 999,
-        })
-      )
-    ).toBe(Math.round(800 * 0.68 + 100 * 2.09 + 200 * 0.07));
-  });
-
-  test.each(['qwen/qwen3.7-max', 'qwen/qwen3.7-plus'])(
+  test.each(['qwen/qwen3.7-max', 'qwen/qwen3.7-plus', 'mistralai/mistral-large-4-0'])(
     'does not apply custom pricing to %s',
     modelId => {
       const model = makeModel(modelId);

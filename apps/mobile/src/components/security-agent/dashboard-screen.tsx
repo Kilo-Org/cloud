@@ -393,7 +393,10 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           />
         ))}
 
-        {dashboardStats.isLoading ? (
+        {/* `isPending` rather than `isLoading`: a NetInfo-paused read is pending
+            without fetching, and it must show this skeleton instead of an empty
+            metrics row. */}
+        {dashboardStats.isPending ? (
           <View className="flex-row flex-wrap gap-3">
             <Skeleton className="h-24 w-[47%] rounded-lg" />
             <Skeleton className="h-24 w-[47%] rounded-lg" />

@@ -1,5 +1,4 @@
 import { isPersonalSecurityScope } from '@kilocode/app-shared/security-agent';
-import Animated, { FadeIn } from 'react-native-reanimated';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -260,16 +259,16 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       );
     }
     case 'dashboard': {
-      // Fade the Dashboard in when the agent is enabled: the
-      // `disabled-settings` branch's <SettingsOverviewScreen> unmounts in
-      // place once `config.isEnabled` flips true, which is otherwise an
-      // abrupt snap. Only the incoming subtree is wrapped — the loading,
-      // error, and setup branches above must stay snap-instant so they
-      // feel like real state changes, not animations.
+      // No entrance animation: a Reanimated `FadeIn` carries
+      // `initialValues: { opacity: 0 }`, so a first mount whose entrance is
+      // dropped or never started leaves this whole subtree — the header
+      // included — invisible at opacity 0, and only the tab bar outside the
+      // screen paints. The dashboard (and its header) must paint in the frame
+      // the enabled view resolves.
       return (
-        <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+        <View className="flex-1">
           <DashboardScreen scope={scope} />
-        </Animated.View>
+        </View>
       );
     }
     default: {

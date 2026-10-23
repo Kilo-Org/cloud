@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Platform, View } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
@@ -170,9 +171,10 @@ export function ScheduleSettings({
           </View>
         );
       })}
-      {timesInvalid ? (
-        <Text className="text-sm text-destructive">{t('agentBriefing.invalidScheduleTimes')}</Text>
-      ) : null}
+      <AccessibleStatus
+        message={timesInvalid ? t('agentBriefing.invalidScheduleTimes') : null}
+        className="text-sm"
+      />
       <Text className="text-xs text-muted-foreground">{t('agentBriefing.timezoneHint')}</Text>
       <Text className="text-xs text-muted-foreground">{t('agentBriefing.timeHint')}</Text>
       <Button disabled={offline} loading={update.isPending} onPress={save}>

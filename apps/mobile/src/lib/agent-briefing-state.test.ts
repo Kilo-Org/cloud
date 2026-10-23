@@ -223,6 +223,21 @@ describe('parseBriefingSafeguardInput', () => {
     expect(parseBriefingSafeguardInput('zwei', '2,5', 'de')).toBeNull();
     expect(parseBriefingSafeguardInput('2,5', '-1', 'de')).toBeNull();
   });
+
+  it('refuses a separator the active language does not read as a decimal point', () => {
+    // A German "2.5" is not a group separator position, and reading it as one
+    // would save 25 instead of 2.5.
+    expect(parseBriefingSafeguardInput('2.5', '2.5', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('0.5', '1', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('2,5', '2,5', 'en')).toBeNull();
+  });
+
+  it('accepts the language its own display writes', () => {
+    expect(parseBriefingSafeguardInput('10', '1234,5', 'de')).toEqual({
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 1_234_500_000,
+    });
+  });
 });
 
 describe('briefingSyncDelayMs', () => {

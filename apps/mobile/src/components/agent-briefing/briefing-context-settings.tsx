@@ -21,8 +21,15 @@ import { useTRPC } from '@/lib/trpc';
 
 type ContextPreference = BriefingPreferences['contexts'][number];
 
-/** Six decimals cover a whole second (1/60 min) and a single microdollar. */
-const SAFEGUARD_INPUT_FORMAT: Intl.NumberFormatOptions = { maximumFractionDigits: 6 };
+/**
+ * Six decimals cover a whole second (1/60 min) and a single microdollar. No
+ * grouping, so the value the field shows parses back without an ambiguous
+ * group separator.
+ */
+const SAFEGUARD_INPUT_FORMAT: Intl.NumberFormatOptions = {
+  maximumFractionDigits: 6,
+  useGrouping: false,
+};
 
 export function BriefingContextSettings({
   preference,

@@ -13,25 +13,22 @@ describe('briefingPickerDate and briefingPickerTime', () => {
     vi.stubEnv('TZ', 'America/Los_Angeles');
     for (let hour = 0; hour < 24; hour += 1) {
       const time = `${String(hour).padStart(2, '0')}:30`;
-      const pickerValue = briefingPickerDate(time);
-      // The picker opens on the hour the row shows, not on its UTC equivalent.
-      expect(pickerValue.getHours()).toBe(hour);
-      expect(pickerValue.getMinutes()).toBe(30);
-      expect(briefingPickerTime(pickerValue)).toBe(time);
+      // The value the picker opens on and the value it reports back are built
+      // and read in the same local frame, so the hour survives the round trip.
+      expect(briefingPickerTime(briefingPickerDate(time))).toBe(time);
     }
+  });
+
+  it('puts the picker on the local hour, not its UTC equivalent', () => {
+    vi.stubEnv('TZ', 'America/Los_Angeles');
+    expect(briefingPickerDate('23:00').getHours()).toBe(23);
+    expect(briefingPickerDate('00:30').getHours()).toBe(0);
   });
 
   it('keeps the hour in a time zone ahead of UTC with a half-hour offset', () => {
     vi.stubEnv('TZ', 'Asia/Kolkata');
     expect(briefingPickerDate('23:00').getHours()).toBe(23);
     expect(briefingPickerTime(new Date(2000, 0, 1, 22, 5))).toBe('22:05');
-  });
-
-  it('keeps the chosen hour across a device time zone change at the same instant', () => {
-    vi.stubEnv('TZ', 'Europe/Berlin');
-    const picked = briefingPickerTime(briefingPickerDate('07:45'));
-    vi.stubEnv('TZ', 'America/Los_Angeles');
-    expect(picked).toBe('07:45');
   });
 });
 

@@ -297,6 +297,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
               );
             }}
             hitSlop={8}
+            accessibilityRole="button"
             accessibilityLabel={t('consent.seeFullDetails')}
             className="mt-6 flex-row items-center gap-1 active:opacity-70"
           >
@@ -326,6 +327,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           <Text
             className="text-xs text-primary underline"
             maxFontSizeMultiplier={CONSENT_DISCLOSURE_MAX_FONT_SCALE}
+            accessibilityRole="link"
             onPress={handleOpenPrivacy}
           >
             {t('consent.privacyPolicy')}

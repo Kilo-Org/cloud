@@ -115,6 +115,19 @@ const TWO_SENSE_COPY = new Map([
 ]);
 
 /**
+ * Counted forms that say their number as a word instead of the visible count
+ * placeholder, as `base key:plural category:locale`. Arabic names one day and
+ * two days with their own word forms, so those two messages read as words and
+ * carry no numeral. Every other form of a counted family must keep its
+ * language's exact placeholder set, so a count deleted from a form that should
+ * show it still fails. Add an entry only after reading the rendered message.
+ */
+const WORDED_COUNTS = new Set([
+  'securityAgent.dashboard.daysOverdue:one:ar',
+  'securityAgent.dashboard.daysOverdue:two:ar',
+]);
+
+/**
  * Proper nouns, format-only strings, and pre-existing English-identical copy
  * outside this section's new keys. Remove a key from the set when that copy
  * is translated or the key is deleted.
@@ -664,18 +677,17 @@ for (const catalog of CATALOGS) {
       const actual = placeholders(value);
       const expectedSet = expected.split(',').filter(Boolean);
       const actualSet = actual.split(',').filter(Boolean);
-      // A counted family's member may carry the number in a word rather than
-      // the placeholder: Arabic and Hebrew say the dual form without a
-      // numeral. Only the visible count may be dropped, and only in a family
-      // whose base English string is counted; an added or renamed placeholder
-      // still fails.
+      // Only a reviewed (key, category, locale) entry may say its number as a
+      // word; every other form keeps its language's exact placeholder set.
       const parts = pluralParts(key);
-      const countedMember = Boolean(parts && englishFamilies.has(parts.base));
+      const wordedForm = Boolean(
+        parts && WORDED_COUNTS.has(`${parts.base}:${parts.category}:${tag}`)
+      );
       const droppedVisibleCount = expectedSet
         .filter(name => !actualSet.includes(name))
         .every(name => name === 'displayCount' || name === 'itemCount');
       const addedPlaceholder = actualSet.some(name => !expectedSet.includes(name));
-      if (actual !== expected && !(countedMember && droppedVisibleCount && !addedPlaceholder)) {
+      if (actual !== expected && !(wordedForm && droppedVisibleCount && !addedPlaceholder)) {
         fail(`${label}: "${key}" placeholders differ from English (${expected || 'none'})`);
       }
       const expectedRefs = nestingRefs(englishValue).join(',');

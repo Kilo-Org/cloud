@@ -103,25 +103,13 @@ jobs:
         working-directory: services/usage-ingest
         run: |
           node --input-type=commonjs <<'NODE'
-          const { appendFileSync, existsSync, readFileSync } = require('node:fs');
+          const { appendFileSync, existsSync } = require('node:fs');
           const { unstable_readConfig } = require('wrangler');
           const config = unstable_readConfig({ config: 'wrangler.jsonc', env: 'staging' });
           const required = config.services.some(service => service.binding === 'USAGE_WRITER_RELAY');
           if (required && !existsSync('wrangler.writer-relay.jsonc')) {
             throw new Error('Selected staging source requires the usage writer relay but its config is missing');
           }
-          const { producers, consumers } = config.queues;
-          const legacy = producers.length === 2 &&
-            producers.find(p => p.binding === 'USAGE_INGEST_QUEUE')?.queue === 'usage-ingest-processing-staging' &&
-            producers.find(p => p.binding === 'USAGE_INGEST_DLQ')?.queue === 'usage-ingest-processing-dlq-staging' &&
-            consumers.length === 1 && consumers[0].queue === 'usage-ingest-processing-staging' &&
-            consumers[0].dead_letter_queue === 'usage-ingest-processing-dlq-staging';
-          const scripts = JSON.parse(readFileSync('package.json', 'utf8')).scripts ?? {};
-          const euRequired = !legacy || Object.values(scripts).some(value => typeof value === 'string' && value.includes('eu-queues'));
-          if (euRequired && !existsSync('scripts/eu-queues.mjs')) {
-            throw new Error('Selected staging source requires EU queue verification but its helper is missing');
-          }
-          appendFileSync(process.env.GITHUB_OUTPUT, `eu_required=${euRequired}\n`);
           appendFileSync(process.env.GITHUB_OUTPUT, `required=${required}\n`);
           NODE
 
@@ -146,7 +134,6 @@ jobs:
           # Workers that define a `predeploy` script (e.g. D1 migrations) run it
           # right before deploy; all other workers are unaffected.
           preCommands: |
-            if [ "${{ steps.usage_relay.outputs.eu_required }}" = "true" ]; then node scripts/eu-queues.mjs verify staging || exit 1; fi
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
           command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ inputs.worker == 'services/usage-ingest' && inputs.target_environment == 'staging' && '--experimental-provision=false' || '' }}
 
@@ -157,7 +144,6 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: ${{ inputs.worker }}
           preCommands: |
-            if [ "${{ steps.usage_relay.outputs.eu_required }}" = "true" ]; then node scripts/eu-queues.mjs verify staging || exit 1; fi
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
           command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ inputs.worker == 'services/usage-ingest' && inputs.target_environment == 'staging' && '--experimental-provision=false' || '' }}
 
@@ -388,25 +374,13 @@ jobs:
         working-directory: services/usage-ingest
         run: |
           node --input-type=commonjs <<'NODE'
-          const { appendFileSync, existsSync, readFileSync } = require('node:fs');
+          const { appendFileSync, existsSync } = require('node:fs');
           const { unstable_readConfig } = require('wrangler');
           const config = unstable_readConfig({ config: 'wrangler.jsonc', env: 'staging' });
           const required = config.services.some(service => service.binding === 'USAGE_WRITER_RELAY');
           if (required && !existsSync('wrangler.writer-relay.jsonc')) {
             throw new Error('Selected staging source requires the usage writer relay but its config is missing');
           }
-          const { producers, consumers } = config.queues;
-          const legacy = producers.length === 2 &&
-            producers.find(p => p.binding === 'USAGE_INGEST_QUEUE')?.queue === 'usage-ingest-processing-staging' &&
-            producers.find(p => p.binding === 'USAGE_INGEST_DLQ')?.queue === 'usage-ingest-processing-dlq-staging' &&
-            consumers.length === 1 && consumers[0].queue === 'usage-ingest-processing-staging' &&
-            consumers[0].dead_letter_queue === 'usage-ingest-processing-dlq-staging';
-          const scripts = JSON.parse(readFileSync('package.json', 'utf8')).scripts ?? {};
-          const euRequired = !legacy || Object.values(scripts).some(value => typeof value === 'string' && value.includes('eu-queues'));
-          if (euRequired && !existsSync('scripts/eu-queues.mjs')) {
-            throw new Error('Selected staging source requires EU queue verification but its helper is missing');
-          }
-          appendFileSync(process.env.GITHUB_OUTPUT, `eu_required=${euRequired}\n`);
           appendFileSync(process.env.GITHUB_OUTPUT, `required=${required}\n`);
           NODE
 
@@ -435,7 +409,6 @@ jobs:
           # Workers that define a `predeploy` script (e.g. D1 migrations) run it
           # right before deploy; all other workers are unaffected.
           preCommands: |
-            if [ "${{ steps.usage_relay.outputs.eu_required }}" = "true" ]; then node scripts/eu-queues.mjs verify staging || exit 1; fi
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
           command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ matrix.worker == 'services/usage-ingest' && inputs.target_environment == 'staging' && '--experimental-provision=false' || '' }}
 
@@ -446,6 +419,5 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: ${{ matrix.worker }}
           preCommands: |
-            if [ "${{ steps.usage_relay.outputs.eu_required }}" = "true" ]; then node scripts/eu-queues.mjs verify staging || exit 1; fi
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
           command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ matrix.worker == 'services/usage-ingest' && inputs.target_environment == 'staging' && '--experimental-provision=false' || '' }}

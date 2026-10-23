@@ -75,6 +75,40 @@ test('both Worker deployment paths deploy the private relay before the staging u
   }
 });
 
+test('initial and retry uploads disable auto-provisioning only for staging usage-ingest', () => {
+  for (const job of ['deploy-manual', 'deploy-changed']) {
+    const uploads = workers.jobs[job].steps.filter(step =>
+      step.name?.startsWith('Deploy to Cloudflare Workers')
+    );
+    assert.equal(uploads.length, 2);
+    for (const step of uploads) {
+      for (const worker of ['services/usage-ingest', 'services/other-worker']) {
+        for (const environment of ['staging', 'production']) {
+          for (const runtimeCommand of ['', 'deploy --env staging --some-runtime-option']) {
+            const command = step.with.command.replace(/\$\{\{(.*?)\}\}/g, (_, expression) =>
+              runInNewContext(expression, {
+                inputs: { worker, target_environment: environment },
+                matrix: { worker },
+                steps: { runtime: { outputs: { command: runtimeCommand } } },
+                format: (_, value) => `deploy --env ${value}`,
+              })
+            );
+            assert.equal(
+              command.includes('--experimental-provision=false'),
+              worker === 'services/usage-ingest' && environment === 'staging',
+              `${job}: ${command}`
+            );
+            assert.equal(
+              command.replace(' --experimental-provision=false', '').trim(),
+              runtimeCommand || (environment === 'production' ? 'deploy' : 'deploy --env staging')
+            );
+          }
+        }
+      }
+    }
+  }
+});
+
 test('selected source controls the relay requirement and failures stop consumer deployment', () => {
   const directory = mkdtempSync(join(tmpdir(), 'usage-relay-selected-source-'));
   try {
@@ -83,12 +117,6 @@ test('selected source controls the relay requirement and failures stop consumer 
     symlinkSync(
       fileURLToPath(new URL('../services/usage-ingest/node_modules', import.meta.url)),
       join(directory, 'node_modules')
-    );
-    writeFileSync(
-      join(directory, 'package.json'),
-      readFileSync(
-        new URL('../services/usage-ingest/test/fixtures/pre-eu/package.json', import.meta.url)
-      )
     );
     const output = join(directory, 'output');
     const calls = join(directory, 'calls');
@@ -113,18 +141,6 @@ test('selected source controls the relay requirement and failures stop consumer 
             env: {
               staging: {
                 name: 'usage-ingest-staging',
-                queues: {
-                  producers: [
-                    { binding: 'USAGE_INGEST_QUEUE', queue: 'usage-ingest-processing-staging' },
-                    { binding: 'USAGE_INGEST_DLQ', queue: 'usage-ingest-processing-dlq-staging' },
-                  ],
-                  consumers: [
-                    {
-                      queue: 'usage-ingest-processing-staging',
-                      dead_letter_queue: 'usage-ingest-processing-dlq-staging',
-                    },
-                  ],
-                },
                 ...(required
                   ? {
                       services: [

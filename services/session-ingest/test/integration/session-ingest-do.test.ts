@@ -1023,6 +1023,48 @@ describe('SessionIngestDO integration', () => {
         exported.messages.map(entry => [entry.info.id, entry.parts.map(part => part.id)])
       ).toEqual([['part', ['prt_legacy']]]);
     });
+
+    it('exports only parts persisted before the shared boundary in either layout', async () => {
+      const sessionId = 'ses_part_layout_shared_0000001';
+      const publicId = '33333333-3333-4333-8333-333333333333';
+      const stub = getStub(kiloUserId, sessionId);
+      await stub.ingest(
+        [
+          { type: 'message', data: message(sessionId) },
+          { type: 'part', data: part(sessionId, 'kept') },
+        ],
+        kiloUserId,
+        sessionId,
+        1,
+        1000
+      );
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+          'msg_a/prt_legacy',
+          'part',
+          JSON.stringify({ ...part(sessionId, 'kept earlier'), id: 'prt_legacy' }),
+          1000
+        );
+      });
+      await stub.captureShareInfo(publicId);
+      await stub.ingest(
+        [{ type: 'part', data: { ...part(sessionId, 'later'), id: 'prt_2' } }],
+        kiloUserId,
+        sessionId,
+        1,
+        3000
+      );
+
+      const shared = JSON.parse(
+        await stub
+          .getSharedSessionStream({ publicId, ingestedBeforeMs: 2000 })
+          .then(s => new Response(s).text())
+      ) as { messages: Array<{ parts: Array<{ id: string }> }> };
+      expect(shared.messages.map(entry => entry.parts.map(partRow => partRow.id))).toEqual([
+        ['prt_1', 'prt_legacy'],
+      ]);
+    });
   });
 
   describe('SDK session snapshot reads', () => {

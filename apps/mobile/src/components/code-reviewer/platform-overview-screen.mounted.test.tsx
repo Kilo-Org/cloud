@@ -427,6 +427,25 @@ describe('PlatformOverviewScreen actionRequired recovery', () => {
     );
   });
 
+  it('falls back to the integration page when minting an install state is refused', async () => {
+    // Organizations whose members can edit the config but not mint an install
+    // state, and organizations that already hold an installation, still reach
+    // the page that opens the install/manage flow.
+    mintInstallState.mockImplementationOnce(() =>
+      Promise.reject(new Error('This organization already has a GitHub installation'))
+    );
+    config.data = makeConfig({
+      actionRequired: makeActionRequired('github_installation_required'),
+    });
+
+    await pressRecovery('Update GitHub App', 'org-1');
+
+    expect(launchBrowser).toHaveBeenCalledWith(
+      'https://app.kilo.ai/github-app?organizationId=org-1'
+    );
+    expect(config.refetch).toHaveBeenCalledTimes(1);
+  });
+
   it('opens the GitLab integration page for a project-access block', async () => {
     config.data = makeConfig({
       actionRequired: makeActionRequired('gitlab_project_access_required'),

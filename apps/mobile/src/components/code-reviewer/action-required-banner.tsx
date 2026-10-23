@@ -60,11 +60,19 @@ export function ActionRequiredBanner({
   const recoveryUrl = async () => {
     const kind = RECOVERY_KIND[reason];
     if (kind === 'github-app') {
-      const { token } = await trpcClient.githubApps.mintInstallState.mutate({
-        organizationId,
-        returnTo: '/cloud/sessions',
-      });
-      return getGitHubIntegrationUrl(WEB_BASE_URL, organizationId, token);
+      try {
+        const { token } = await trpcClient.githubApps.mintInstallState.mutate({
+          organizationId,
+          returnTo: '/cloud/sessions',
+        });
+        return getGitHubIntegrationUrl(WEB_BASE_URL, organizationId, token);
+      } catch {
+        // Minting needs owner/admin rights, which are narrower than the edit
+        // permission that shows this control, and an organization that already
+        // has an installation refuses a second one. The integration page still
+        // opens the install/manage flow, so the label never becomes a dead end.
+        return getGitHubIntegrationUrl(WEB_BASE_URL, organizationId);
+      }
     }
     if (kind === 'byok') {
       return getByokUrl(WEB_BASE_URL, organizationId);
@@ -111,7 +119,7 @@ export function ActionRequiredBanner({
           size="sm"
           className="mt-1 self-start px-0"
           accessibilityLabel={recoveryLabel}
-          loading={opening}
+          disabled={opening}
           onPress={recover}
         >
           <Text>{recoveryLabel}</Text>

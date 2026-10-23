@@ -58,6 +58,7 @@ import {
   ipCountryFromHeaders,
   ja4FromHeaders,
 } from '@kilocode/web-shared/lib/bouncer/credit-events';
+import { assertChargeAllowed } from '@kilocode/web-shared/lib/bouncer/charge-gate';
 import { retrievePaymentMethodInfo } from '@/lib/stripePaymentMethodInfo';
 import type { AutoTopUpAmountCents } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import {
@@ -970,6 +971,12 @@ export const userRouter = createTRPCRouter({
           return { enabled: true } as const;
         } else {
           const amountCents = input.amountCents ?? 5000;
+          await assertChargeAllowed({
+            userId: ctx.user.id,
+            flow: 'auto_topup',
+            ip: ctx.ip,
+            ja4: ja4FromHeaders(ctx.headersList),
+          });
           await reportChargeAttempted({
             flow: 'auto_topup',
             userId: ctx.user.id,
@@ -1002,6 +1009,12 @@ export const userRouter = createTRPCRouter({
     .input(z.object({ amountCents: z.number().optional() }).optional())
     .mutation(async ({ ctx, input }) => {
       const amountCents = input?.amountCents ?? 5000;
+      await assertChargeAllowed({
+        userId: ctx.user.id,
+        flow: 'auto_topup',
+        ip: ctx.ip,
+        ja4: ja4FromHeaders(ctx.headersList),
+      });
       await reportChargeAttempted({
         flow: 'auto_topup',
         userId: ctx.user.id,

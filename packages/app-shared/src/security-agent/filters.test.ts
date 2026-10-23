@@ -7,6 +7,7 @@ import {
   parseSecurityFindingFilters,
   selectSecurityFindingOutcome,
   selectSecurityFindingStatus,
+  toSecurityFindingParams,
   toSecurityFindingQuery,
 } from './filters';
 
@@ -191,5 +192,48 @@ describe('hasActiveSecurityFindingFilters', () => {
     expect(
       hasActiveSecurityFindingFilters({ ...DEFAULT_SECURITY_FINDING_FILTERS, overdue: true })
     ).toBe(true);
+  });
+});
+
+describe('toSecurityFindingParams', () => {
+  it('leaves every param unset for the default filters', () => {
+    expect(toSecurityFindingParams(DEFAULT_SECURITY_FINDING_FILTERS)).toEqual({
+      status: undefined,
+      severity: undefined,
+      outcomeFilter: undefined,
+      repoFullName: undefined,
+      sortBy: undefined,
+      overdue: undefined,
+    });
+    expect(parseSecurityFindingFilters(toSecurityFindingParams(DEFAULT_SECURITY_FINDING_FILTERS))).toEqual(
+      DEFAULT_SECURITY_FINDING_FILTERS
+    );
+  });
+
+  it('round-trips every filter the sheet can set through the route', () => {
+    const filters = {
+      status: 'closed' as const,
+      severity: 'high' as const,
+      outcome: 'needs_review' as const,
+      repoFullName: 'kilocode/cloud',
+      sortBy: 'sla_due_at_asc' as const,
+      overdue: true,
+    };
+    expect(parseSecurityFindingFilters(toSecurityFindingParams(filters))).toEqual(filters);
+  });
+
+  it('keeps a terminal outcome readable without inventing a status', () => {
+    const filters = { ...DEFAULT_SECURITY_FINDING_FILTERS, status: 'all' as const, outcome: 'fixed' as const };
+    const params = toSecurityFindingParams(filters);
+    expect(params.status).toBeUndefined();
+    expect(parseSecurityFindingFilters(params)).toEqual(filters);
+  });
+
+  it('is idempotent for an unnormalized status/outcome pair', () => {
+    const unnormalized = { ...DEFAULT_SECURITY_FINDING_FILTERS, status: 'open' as const, outcome: 'dismissed' as const };
+    const once = toSecurityFindingParams(unnormalized);
+    const twice = toSecurityFindingParams(parseSecurityFindingFilters(once));
+    expect(twice).toEqual(once);
+    expect(parseSecurityFindingFilters(twice).status).toBe('all');
   });
 });

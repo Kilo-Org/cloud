@@ -3687,6 +3687,7 @@
       "fromHuggingFace": "Z Hugging Face",
       "loading": "Wczytywanie modeli",
       "noResults": "Nie znaleziono modeli",
+      "noResultsForQuery": "Nie znaleziono modeli dla \"{{query}}\"",
       "noFits": "Żaden model nie pasuje do tego urządzenia",
       "noFitsDescription": "Większe modele znajdziesz na karcie $t(common.all).",
       "fit": {

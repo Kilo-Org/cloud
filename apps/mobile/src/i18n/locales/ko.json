@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "Hugging Face 제공",
       "loading": "모델을 불러오는 중",
       "noResults": "모델을 찾을 수 없습니다",
+      "noResultsForQuery": "\"{{query}}\"에 대한 모델을 찾을 수 없습니다",
       "noFits": "이 기기에 적합한 모델이 없습니다",
       "noFitsDescription": "더 큰 모델은 $t(common.all) 탭에 있습니다.",
       "fit": {

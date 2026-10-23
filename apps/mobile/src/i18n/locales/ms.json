@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "Daripada Hugging Face",
       "loading": "Memuatkan model",
       "noResults": "Tiada model ditemui",
+      "noResultsForQuery": "Tiada model ditemui untuk \"{{query}}\"",
       "noFits": "Tiada model yang sesuai untuk peranti ini",
       "noFitsDescription": "Model yang lebih besar terdapat dalam tab $t(common.all).",
       "fit": {

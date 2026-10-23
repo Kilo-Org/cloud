@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "Hugging Face سے",
       "loading": "ماڈلز لوڈ ہو رہے ہیں",
       "noResults": "کوئی ماڈل نہیں ملا",
+      "noResultsForQuery": "\"{{query}}\" کے لیے کوئی ماڈل نہیں ملا",
       "noFits": "کوئی ماڈل اس آلے کے موافق نہیں",
       "noFitsDescription": "بڑے ماڈلز $t(common.all) ٹیب میں ہیں۔",
       "fit": {

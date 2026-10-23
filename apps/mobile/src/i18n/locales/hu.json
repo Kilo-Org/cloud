@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "A Hugging Face-ről",
       "loading": "Modellek betöltése",
       "noResults": "Nem található modell",
+      "noResultsForQuery": "Nem található modell a következőre: \"{{query}}\"",
       "noFits": "Egyik modell sem fér el ezen az eszközön",
       "noFitsDescription": "A nagyobb modellek az $t(common.all) lapon találhatók.",
       "fit": {

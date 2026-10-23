@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "Hugging Face-იდან",
       "loading": "მოდელები იტვირთება",
       "noResults": "მოდელები ვერ მოიძებნა",
+      "noResultsForQuery": "\"{{query}}\" არანაირი მოდელი ვერ მოიძებნა",
       "noFits": "ამ მოწყობილობას არცერთი მოდელი არ ერგება",
       "noFitsDescription": "უფრო დიდი მოდელები ჩანართშია „$t(common.all)“.",
       "fit": {

@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "Van Hugging Face",
       "loading": "Laai tans modelle",
       "noResults": "Geen modelle gevind nie",
+      "noResultsForQuery": "Geen modelle gevind vir \"{{query}}\" nie",
       "noFits": "Geen modelle pas op hierdie toestel nie",
       "noFitsDescription": "Groter modelle is op die $t(common.all)-oortjie.",
       "fit": {

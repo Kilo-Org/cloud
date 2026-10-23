@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "ከHugging Face",
       "loading": "ሞዴሎች በመጫን ላይ",
       "noResults": "ምንም ሞዴል አልተገኘም",
+      "noResultsForQuery": "ለ\"{{query}}\" ምንም ሞዴል አልተገኘም",
       "noFits": "ለዚህ መሣሪያ የሚስማማ ሞዴል የለም",
       "noFitsDescription": "ትላልቅ ሞዴሎች በ$t(common.all) ትር ላይ ይገኛሉ።",
       "fit": {

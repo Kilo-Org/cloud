@@ -3642,6 +3642,7 @@
       "fromHuggingFace": "De Hugging Face",
       "loading": "S'estan carregant els models",
       "noResults": "No s'ha trobat cap model",
+      "noResultsForQuery": "No s'han trobat models per a \"{{query}}\"",
       "noFits": "Cap model no cap en aquest dispositiu",
       "noFitsDescription": "Els models més grans són a la pestanya $t(common.all).",
       "fit": {

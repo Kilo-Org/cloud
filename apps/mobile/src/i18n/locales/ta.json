@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "Hugging Face இலிருந்து",
       "loading": "மாதிரிகள் ஏற்றப்படுகின்றன",
       "noResults": "மாதிரிகள் எதுவும் இல்லை",
+      "noResultsForQuery": "\"{{query}}\"-க்கு மாதிரிகள் எதுவும் இல்லை",
       "noFits": "இந்தச் சாதனத்திற்குப் பொருந்தும் மாதிரிகள் இல்லை",
       "noFitsDescription": "பெரிய மாதிரிகள் $t(common.all) தாவலில் உள்ளன.",
       "fit": {

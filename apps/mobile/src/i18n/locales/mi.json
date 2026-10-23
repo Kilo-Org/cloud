@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "Nō Hugging Face",
       "loading": "E uta ana i ngā tauira",
       "noResults": "Kāore he tauira i kitea",
+      "noResultsForQuery": "Kāore he tauira i kitea mō \"{{query}}\"",
       "noFits": "Kāore he tauira e uru ana ki tēnei pūrere",
       "noFitsDescription": "Kei te ripa $t(common.all) ngā tauira nui ake.",
       "fit": {

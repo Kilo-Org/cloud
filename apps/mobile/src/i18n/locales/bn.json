@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "Hugging Face থেকে",
       "loading": "মডেল লোড হচ্ছে",
       "noResults": "কোনো মডেল পাওয়া যায়নি",
+      "noResultsForQuery": "\"{{query}}\" এর জন্য কোনো মডেল পাওয়া যায়নি",
       "noFits": "এই ডিভাইসে চলবে এমন কোনো মডেল নেই",
       "noFitsDescription": "বড় মডেলগুলো $t(common.all) ট্যাবে আছে।",
       "fit": {

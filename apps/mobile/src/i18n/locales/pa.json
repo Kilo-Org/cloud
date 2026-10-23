@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "Hugging Face ਤੋਂ",
       "loading": "ਮਾਡਲ ਲੋਡ ਹੋ ਰਹੇ ਹਨ",
       "noResults": "ਕੋਈ ਮਾਡਲ ਨਹੀਂ ਮਿਲਿਆ",
+      "noResultsForQuery": "\"{{query}}\" ਲਈ ਕੋਈ ਮਾਡਲ ਨਹੀਂ ਮਿਲਿਆ",
       "noFits": "ਕੋਈ ਮਾਡਲ ਇਸ ਡਿਵਾਈਸ ਲਈ ਢੁਕਵਾਂ ਨਹੀਂ",
       "noFitsDescription": "ਵੱਡੇ ਮਾਡਲ $t(common.all) ਟੈਬ ਵਿੱਚ ਹਨ।",
       "fit": {

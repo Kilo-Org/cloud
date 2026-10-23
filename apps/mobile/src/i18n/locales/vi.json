@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "Từ Hugging Face",
       "loading": "Đang tải danh sách mô hình",
       "noResults": "Không tìm thấy mô hình nào",
+      "noResultsForQuery": "Không tìm thấy mô hình nào cho \"{{query}}\"",
       "noFits": "Không có mô hình nào phù hợp với thiết bị này",
       "noFitsDescription": "Các mô hình lớn hơn nằm ở thẻ $t(common.all).",
       "fit": {

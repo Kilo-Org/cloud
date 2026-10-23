@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "От Hugging Face",
       "loading": "Зареждане на модели",
       "noResults": "Няма намерени модели",
+      "noResultsForQuery": "Не са намерени модели за \"{{query}}\"",
       "noFits": "Няма модели, подходящи за това устройство",
       "noFitsDescription": "По-големите модели са в раздела „$t(common.all)“.",
       "fit": {

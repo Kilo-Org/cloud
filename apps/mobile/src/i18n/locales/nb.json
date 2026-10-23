@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "Fra Hugging Face",
       "loading": "Laster inn modeller",
       "noResults": "Fant ingen modeller",
+      "noResultsForQuery": "Fant ingen modeller for \"{{query}}\"",
       "noFits": "Ingen modeller passer denne enheten",
       "noFitsDescription": "Større modeller finner du i fanen $t(common.all).",
       "fit": {

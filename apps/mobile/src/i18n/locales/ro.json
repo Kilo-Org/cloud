@@ -3642,6 +3642,7 @@
       "fromHuggingFace": "De pe Hugging Face",
       "loading": "Se încarcă modelele",
       "noResults": "Nu s-au găsit modele",
+      "noResultsForQuery": "Nu s-au găsit modele pentru \"{{query}}\"",
       "noFits": "Niciun model nu se potrivește acestui dispozitiv",
       "noFitsDescription": "Modelele mai mari se află în fila $t(common.all).",
       "fit": {

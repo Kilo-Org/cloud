@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "Daga Hugging Face",
       "loading": "Ana loda samfura",
       "noResults": "Ba a sami samfura ba",
+      "noResultsForQuery": "Ba a sami samfura ba don \"{{query}}\"",
       "noFits": "Babu samfurin da ya dace da wannan na'ura",
       "noFitsDescription": "Manyan samfura suna shafin $t(common.all).",
       "fit": {

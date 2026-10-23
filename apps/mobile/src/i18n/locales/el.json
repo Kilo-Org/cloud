@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "Από το Hugging Face",
       "loading": "Φόρτωση μοντέλων",
       "noResults": "Δεν βρέθηκαν μοντέλα",
+      "noResultsForQuery": "Δεν βρέθηκαν μοντέλα για \"{{query}}\"",
       "noFits": "Κανένα μοντέλο δεν είναι κατάλληλο για αυτή τη συσκευή",
       "noFitsDescription": "Τα μεγαλύτερα μοντέλα βρίσκονται στην καρτέλα $t(common.all).",
       "fit": {

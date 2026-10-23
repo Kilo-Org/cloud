@@ -3642,6 +3642,7 @@
       "fromHuggingFace": "De Hugging Face",
       "loading": "Cargando modelos",
       "noResults": "No se encontraron modelos",
+      "noResultsForQuery": "No se encontraron modelos para \"{{query}}\"",
       "noFits": "Ningún modelo cabe en este dispositivo",
       "noFitsDescription": "Los modelos más grandes están en la pestaña $t(common.all).",
       "fit": {

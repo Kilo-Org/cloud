@@ -3596,6 +3596,7 @@
       "fromHuggingFace": "Från Hugging Face",
       "loading": "Läser in modeller",
       "noResults": "Inga modeller hittades",
+      "noResultsForQuery": "Inga modeller hittades för \"{{query}}\"",
       "noFits": "Inga modeller passar den här enheten",
       "noFitsDescription": "Större modeller finns på fliken $t(common.all).",
       "fit": {

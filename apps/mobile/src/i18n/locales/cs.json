@@ -3687,6 +3687,7 @@
       "fromHuggingFace": "Z Hugging Face",
       "loading": "Načítání modelů",
       "noResults": "Nebyly nalezeny žádné modely",
+      "noResultsForQuery": "Nebyly nalezeny žádné modely pro \"{{query}}\"",
       "noFits": "Pro toto zařízení není vhodný žádný model",
       "noFitsDescription": "Větší modely najdete na kartě $t(common.all).",
       "fit": {

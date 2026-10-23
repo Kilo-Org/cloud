@@ -3642,6 +3642,7 @@
       "fromHuggingFace": "S Hugging Facea",
       "loading": "Učitavanje modela",
       "noResults": "Nema pronađenih modela",
+      "noResultsForQuery": "Nema pronađenih modela za \"{{query}}\"",
       "noFits": "Nijedan model ne odgovara ovom uređaju",
       "noFitsDescription": "Veći modeli nalaze se na kartici $t(common.all).",
       "fit": {

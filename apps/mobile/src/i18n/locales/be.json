@@ -3687,6 +3687,7 @@
       "fromHuggingFace": "З Hugging Face",
       "loading": "Загрузка мадэляў",
       "noResults": "Мадэлі не знойдзены",
+      "noResultsForQuery": "Мадэляў па запыце \"{{query}}\" не знойдзена",
       "noFits": "Няма мадэляў, якія падыходзяць гэтай прыладзе",
       "noFitsDescription": "Большыя мадэлі знаходзяцца на ўкладцы «$t(common.all)».",
       "fit": {

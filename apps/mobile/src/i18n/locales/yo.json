@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "Láti Hugging Face",
       "loading": "Ń gbé àwọn awoṣe wọlé",
       "noResults": "A kò rí awoṣe kankan",
+      "noResultsForQuery": "Kò sí àwọn awoṣe tí a rí fún \"{{query}}\"",
       "noFits": "Kò sí awoṣe tí ó bá ẹ̀rọ yìí mu",
       "noFitsDescription": "Àwọn awoṣe tí ó tóbi jù wà lórí táàbù $t(common.all).",
       "fit": {

@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "Lähde: Hugging Face",
       "loading": "Ladataan malleja",
       "noResults": "Malleja ei löytynyt",
+      "noResultsForQuery": "Haulla \"{{query}}\" ei löytynyt malleja",
       "noFits": "Mikään malli ei sovi tälle laitteelle",
       "noFitsDescription": "Suuremmat mallit ovat välilehdellä $t(common.all).",
       "fit": {

@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "Hugging Face-ից",
       "loading": "Մոդելները բեռնվում են",
       "noResults": "Մոդելներ չեն գտնվել",
+      "noResultsForQuery": "\"{{query}}\" հարցման համար մոդելներ չեն գտնվել",
       "noFits": "Այս սարքին համապատասխանող մոդելներ չկան",
       "noFitsDescription": "Ավելի մեծ մոդելները «$t(common.all)» ներդիրում են։",
       "fit": {

@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "Hugging Face ನಿಂದ",
       "loading": "ಮಾದರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ",
       "noResults": "ಯಾವುದೇ ಮಾದರಿಗಳು ಕಂಡುಬಂದಿಲ್ಲ",
+      "noResultsForQuery": "\"{{query}}\" ಗಾಗಿ ಯಾವುದೇ ಮಾದರಿಗಳು ಕಂಡುಬಂದಿಲ್ಲ",
       "noFits": "ಈ ಸಾಧನಕ್ಕೆ ಯಾವುದೇ ಮಾದರಿ ಹೊಂದುವುದಿಲ್ಲ",
       "noFitsDescription": "ದೊಡ್ಡ ಮಾದರಿಗಳು $t(common.all) ಟ್ಯಾಬ್‌ನಲ್ಲಿವೆ.",
       "fit": {

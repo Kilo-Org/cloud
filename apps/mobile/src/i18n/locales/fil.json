@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "Mula sa Hugging Face",
       "loading": "Nilo-load ang mga modelo",
       "noResults": "Walang nakitang modelo",
+      "noResultsForQuery": "Walang nakitang modelo para sa \"{{query}}\"",
       "noFits": "Walang modelong kasya sa device na ito",
       "noFitsDescription": "Nasa tab na $t(common.all) ang mas malalaking modelo.",
       "fit": {

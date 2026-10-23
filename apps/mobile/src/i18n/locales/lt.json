@@ -3687,6 +3687,7 @@
       "fromHuggingFace": "Iš Hugging Face",
       "loading": "Įkeliami modeliai",
       "noResults": "Modelių nerasta",
+      "noResultsForQuery": "Nerasta modelių, atitinkančių \"{{query}}\"",
       "noFits": "Šiam įrenginiui netinka nė vienas modelis",
       "noFitsDescription": "Didesni modeliai yra skirtuke „$t(common.all)“.",
       "fit": {

@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "Hugging Face မှ",
       "loading": "မော်ဒယ်များ ဖွင့်နေသည်",
       "noResults": "မော်ဒယ် မတွေ့ပါ",
+      "noResultsForQuery": "\"{{query}}\" အတွက် မော်ဒယ် မတွေ့ပါ",
       "noFits": "ဤစက်နှင့် ကိုက်ညီသော မော်ဒယ် မရှိပါ",
       "noFitsDescription": "ပိုကြီးသော မော်ဒယ်များကို $t(common.all) တဘ်တွင် ကြည့်နိုင်သည်။",
       "fit": {

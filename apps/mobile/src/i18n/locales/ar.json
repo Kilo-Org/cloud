@@ -3777,6 +3777,7 @@
       "fromHuggingFace": "من Hugging Face",
       "loading": "جارٍ تحميل النماذج",
       "noResults": "لم يتم العثور على نماذج",
+      "noResultsForQuery": "لم يتم العثور على نماذج لـ \"{{query}}\"",
       "noFits": "لا توجد نماذج مناسبة لهذا الجهاز",
       "noFitsDescription": "النماذج الأكبر موجودة في علامة التبويب $t(common.all).",
       "fit": {

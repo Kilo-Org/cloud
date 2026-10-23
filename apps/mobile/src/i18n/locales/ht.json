@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "Soti nan Hugging Face",
       "loading": "Modèl yo ap chaje",
       "noResults": "Pa gen modèl yo jwenn",
+      "noResultsForQuery": "Pa jwenn modèl pou \"{{query}}\"",
       "noFits": "Pa gen modèl ki mache sou aparèy sa a",
       "noFitsDescription": "Modèl ki pi gwo yo nan onglè $t(common.all) a.",
       "fit": {

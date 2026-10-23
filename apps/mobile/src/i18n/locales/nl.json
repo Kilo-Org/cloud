@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "Van Hugging Face",
       "loading": "Modellen laden",
       "noResults": "Geen modellen gevonden",
+      "noResultsForQuery": "Geen modellen gevonden voor \"{{query}}\"",
       "noFits": "Geen modellen passen op dit apparaat",
       "noFitsDescription": "Grotere modellen staan op het tabblad $t(common.all).",
       "fit": {

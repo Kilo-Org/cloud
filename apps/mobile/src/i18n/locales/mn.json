@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "Hugging Face-ээс",
       "loading": "Загваруудыг ачаалж байна",
       "noResults": "Загвар олдсонгүй",
+      "noResultsForQuery": "\"{{query}}\"-д тохирох загвар олдсонгүй",
       "noFits": "Энэ төхөөрөмжид тохирох загвар алга",
       "noFitsDescription": "Том загварууд \"$t(common.all)\" табд байна.",
       "fit": {

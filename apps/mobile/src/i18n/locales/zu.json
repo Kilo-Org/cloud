@@ -3597,6 +3597,7 @@
       "fromHuggingFace": "Kusuka ku-Hugging Face",
       "loading": "Ilayisha amamodeli",
       "noResults": "Awekho amamodeli atholakele",
+      "noResultsForQuery": "Awekho amamodeli atholakele ngo-\"{{query}}\"",
       "noFits": "Awekho amamodeli afanele le divayisi",
       "noFitsDescription": "Amamodeli amakhulu asethebhini ethi $t(common.all).",
       "fit": {

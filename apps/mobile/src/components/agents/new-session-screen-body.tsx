@@ -486,7 +486,9 @@ export function NewSessionScreenBody() {
   }, [organizationId, overrideProfileId, router]);
 
   const handleOpenRepoDefaults = useCallback(() => {
-    router.push(getRepoBindingsPath(organizationId));
+    // The composer's own Stack, so Back returns here with the draft instead of
+    // landing on the Profile tab root.
+    router.push(getRepoBindingsPath(organizationId, 'app'));
   }, [organizationId, router]);
 
   // Keep the inline selector and picker list in sync.

@@ -57,6 +57,9 @@ vi.mock('@/components/organization/invited-member-row-state', () => ({
   getInviteSuccessMessage: () => '',
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+// The real clearance reads the tab bar and the keyboard, neither of which this
+// suite models: the surface still renders its body as the ScrollView host.
+vi.mock('@/components/tab-screen', () => ({ SheetScrollView: 'ScrollView' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -262,7 +265,7 @@ describe('MemberLimitSheet error copy', () => {
     const { renderer, unmount } = await mountLimitForm(1200);
 
     const messages = accessibleStatusMessages(renderer);
-    expect(messages).toContain(i18n.t('common.somethingWentWrong'));
+    expect(messages).toContain(i18n.t('common.couldNotSaveSetting'));
     expect(messages).not.toContain('Failed to update user role');
     unmount();
   });

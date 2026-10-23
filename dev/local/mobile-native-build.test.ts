@@ -184,6 +184,23 @@ function writeRootNativeInputs(root: string): void {
   fs.writeFileSync(path.join(root, 'pnpm-workspace.yaml'), 'packages:\n  - apps/*\n');
   fs.writeFileSync(path.join(root, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n');
   fs.writeFileSync(path.join(root, 'patches', 'react-native.patch'), 'original patch');
+  writeMobilePackage(root, ['expo-notifications']);
+}
+
+function writeMobilePackage(root: string, buildFromSource: string[]): void {
+  fs.mkdirSync(path.join(root, 'apps', 'mobile'), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, 'apps', 'mobile', 'package.json'),
+    JSON.stringify(
+      {
+        name: 'kilo-app',
+        dependencies: ['one', 'two'],
+        expo: { autolinking: { android: { buildFromSource } } },
+      },
+      null,
+      2
+    )
+  );
 }
 
 test('root native inputs hash is stable when nothing changes', () => {
@@ -209,6 +226,28 @@ test('root native inputs hash changes with patch, workspace, and lockfile edits'
     assert.equal(seen.includes(next), false);
     seen.push(next);
   }
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('building a module from source re-keys the native build', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-root-inputs-'));
+  writeRootNativeInputs(root);
+  const linked = hashRootNativeInputs(root);
+  // Linking a patch-bearing module from its prebuilt AAR instead of compiling
+  // its patched sources is a different native build under the same name.
+  writeMobilePackage(root, ['expo-notifications', 'expo-localization']);
+  const fromSource = hashRootNativeInputs(root);
+  assert.notEqual(fromSource, linked);
+  // Dependency churn outside the autolinking config must not re-key it.
+  fs.writeFileSync(
+    path.join(root, 'apps', 'mobile', 'package.json'),
+    JSON.stringify({
+      name: 'kilo-app',
+      dependencies: ['one'],
+      expo: { autolinking: { android: { buildFromSource: ['expo-notifications', 'expo-localization'] } } },
+    })
+  );
+  assert.equal(hashRootNativeInputs(root), fromSource);
   fs.rmSync(root, { recursive: true, force: true });
 });
 

@@ -173,6 +173,7 @@
         "buildFromSource": [
           "expo-ui",
           "expo-background-task",
+          "expo-localization",
           "expo-notifications",
           "expo-task-manager",
           "unimodules-app-loader"

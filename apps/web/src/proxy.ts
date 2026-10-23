@@ -46,12 +46,13 @@ export const proxy = withAuthenticatedAdminApiRoutes(withKiloEditorCookie(basePr
 
 export const config = {
   /*
-   * Match all request paths except for the ones starting with:
-   * - api routes that don't need middleware
+   * Match all request paths except for:
+   * - the exact usage writer route (with or without a trailing slash), which authenticates itself
    * - _next/static (static files)
    * - _next/image (image optimization files)
    * - favicon.ico (favicon file)
-   * - public folder
    */
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: [
+    '/((?!api/internal/usage/record/?$|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
 };

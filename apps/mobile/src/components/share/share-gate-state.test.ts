@@ -23,6 +23,7 @@ const allRejected: SharePayloadValidation = {
   kind: 'all-rejected',
   reason: 'denied',
   message: "Executable files can't be attached",
+  failedCopies: [],
 };
 
 function base(overrides: Partial<ShareGateStateInput> = {}): ShareGateStateInput {

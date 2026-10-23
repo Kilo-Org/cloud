@@ -52,7 +52,7 @@ export async function checkDomainSignInEligibility(
   const existingUser = await findUserByNormalizedEmail(email);
 
   // Block new signups from blocked TLDs (existing users can still sign in)
-  if (!existingUser && isBlockedTLD(email)) {
+  if (!existingUser && (await isBlockedTLD(email))) {
     return { ok: false, status: 403, errorCode: 'BLOCKED' };
   }
 
@@ -109,7 +109,7 @@ export async function isNewAccountEligibleForMagicLink(email: string): Promise<b
     return false;
   }
 
-  return !isBlockedTLD(email);
+  return !(await isBlockedTLD(email));
 }
 
 /**

@@ -51,7 +51,10 @@ import {
   type KiloCredentialExchangeEligibilityPolicy,
 } from '@kilocode/worker-utils/kilo-token-policy';
 
-import { getBlacklistedDomains } from '@kilocode/web-shared/lib/blacklist-domains-config';
+import {
+  getBlacklistedDomains,
+  getBlockedSignupTlds,
+} from '@kilocode/web-shared/lib/blacklist-domains-config';
 
 // NextAuth calls a user-provided `debug` logger regardless of the `debug` option,
 // and its debug payloads contain sensitive data (tokens, secrets, provider config).
@@ -490,10 +493,21 @@ export async function isEmailBlacklistedByDomainAsync(email: string): Promise<bo
   return isEmailBlacklistedByDomain(email, domains);
 }
 
-export const isBlockedTLD = (email: string) => {
-  const lowercaseEmail = email.toLowerCase();
-  return lowercaseEmail.endsWith('.shop') || lowercaseEmail.endsWith('.top');
-};
+/**
+ * Pure TLD gate used by the async {@link isBlockedTLD}. Entries are bare
+ * labels (`asia`), so an entry matches every address on that TLD.
+ */
+export function isEmailOnBlockedTld(email: string, blockedTlds: readonly string[]): boolean {
+  return isEmailBlacklistedByDomain(email, blockedTlds);
+}
+
+/**
+ * New-signup TLD gate. The TLD list is admin-configurable in Redis, so a cheap
+ * TLD can be blocked without a deploy. Only new accounts are refused; an
+ * existing account on a blocked TLD keeps signing in.
+ */
+export const isBlockedTLD = async (email: string): Promise<boolean> =>
+  isEmailOnBlockedTld(email, await getBlockedSignupTlds());
 
 export function report_blocked_user(kiloUserId: string) {
   return authError(403, 'Access denied (R1)', kiloUserId);

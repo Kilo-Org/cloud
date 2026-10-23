@@ -71,11 +71,7 @@ const SECTION_PATHS = {
   agents: getProfileAgentsPath,
 } satisfies Record<
   OverviewSectionKey,
-  (
-    profileId: string,
-    organizationId: string | undefined,
-    stack: ProfileManagementStack
-  ) => Href
+  (profileId: string, organizationId: string | undefined, stack: ProfileManagementStack) => Href
 >;
 
 /**

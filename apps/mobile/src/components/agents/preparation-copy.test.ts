@@ -72,6 +72,11 @@ describe('preparationStepLabel', () => {
     expect(preparationStepLabel(step('a_new_phase'), t)).toBe('Environment setup');
   });
 
+  it('treats an inherited object member as an unknown key', () => {
+    expect(preparationStepLabel(step('constructor'), t)).toBe('Environment setup');
+    expect(preparationStepLabel(step('toString'), t)).toBe('Environment setup');
+  });
+
   it('reads the label from the active catalog, not the server label', async () => {
     await i18n.changeLanguage('ja');
     expect(preparationStepLabel(step('sandbox_provision'), t)).not.toBe('Provisioning sandbox');

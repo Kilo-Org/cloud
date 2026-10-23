@@ -116,9 +116,15 @@ const SETUP_COMMAND_TIMED_OUT_PATTERN = /^Setup command (\d+) timed out$/u;
 const COLD_RESTORE_PATTERN = /^Cold restore, snapshot applied, (\d+)\/(\d+) files restored$/u;
 const GIT_PROGRESS_PATTERN = /(\d{1,3})%$/u;
 
-/** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
+/**
+ * Looks up a possibly-unknown key in a literal dictionary without widening its
+ * type. Only an own property resolves: the server text is untrusted input, and
+ * `constructor` or `toString` must read as unknown, not as an inherited member.
+ */
 function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
-  return (dictionary as Readonly<Record<string, V | undefined>>)[key];
+  return Object.hasOwn(dictionary, key)
+    ? (dictionary as Readonly<Record<string, V | undefined>>)[key]
+    : undefined;
 }
 
 function localizedNumber(value: string): string {

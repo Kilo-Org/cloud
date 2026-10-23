@@ -35,6 +35,7 @@ function sheetElement(
     onClose?: () => void;
     onDismiss?: () => void;
     onRequestDismiss?: () => boolean;
+    dismissible?: boolean;
     children?: ReactElement | null;
   } = {}
 ): ReactElement {
@@ -43,6 +44,7 @@ function sheetElement(
     onClose: props.onClose ?? vi.fn<() => void>(),
     onDismiss: props.onDismiss,
     onRequestDismiss: props.onRequestDismiss,
+    dismissible: props.dismissible,
     // eslint-disable-next-line react/no-children-prop -- tsgo requires `children` in the props object, not the third argument.
     children: props.children ?? null,
   });
@@ -53,6 +55,7 @@ async function mountSheet(
     onClose?: () => void;
     onDismiss?: () => void;
     onRequestDismiss?: () => boolean;
+    dismissible?: boolean;
     children?: ReactElement | null;
   } = {}
 ): Promise<TestRenderer.ReactTestRenderer> {
@@ -206,6 +209,16 @@ describe('SessionPageSheet mounted', () => {
     const requestDismiss = booleanHandler(sheetNode.props.onRequestDismiss);
     expect(requestDismiss()).toBe(false);
     expect(onRequestDismiss).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('lets a read-only surface dismiss on a drag', async () => {
+    const renderer = await mountSheet({ dismissible: true });
+
+    const sheetNode = sheet(renderer.root);
+    expect(sheetNode.props.dismissGestures).toBe(true);
+    expect(sheetNode.props.enablePanDownToClose).toBe(true);
 
     renderer.unmount();
   });

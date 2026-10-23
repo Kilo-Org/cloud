@@ -57,7 +57,7 @@ function ListDefaultsLine({ list, onPress }: Readonly<{ list: TodoList; onPress:
       className="mx-4 mb-1 min-h-11 flex-row items-center gap-2 py-2 active:opacity-70"
     >
       <Settings2 size={16} color={colors.mutedForeground} />
-      <Text className="min-w-0 flex-1 text-sm leading-5 text-ink2">
+      <Text className="min-w-0 flex-1 text-sm leading-[1.25rem] text-ink2">
         {summary ?? t('todos.list.setDefaults')}
       </Text>
       <DirectionalChevronRight size={16} color={colors.mutedForeground} />

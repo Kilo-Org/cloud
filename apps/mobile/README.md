@@ -18,6 +18,14 @@ current render time. Elapsed grants and non-expiring credits do not contribute t
 its amount or earliest expiry, for both personal and organization accounts.
 The balance continues to come from the balance query.
 
+## Runtime recovery
+
+Retry on the runtime-error screen restores the last focused route for the
+current account. Route recording pauses while the root layout remounts, so its
+temporary Home route cannot replace the recovery destination. Credential
+preloads are used only for the first auth-provider mount; recovery reads the
+current stored credentials through the normal bounded retry path.
+
 ## New-session model choice
 
 Model resolution waits for stored preferences to load. An explicit model and
@@ -32,6 +40,14 @@ Usage tiles retain labels and show cached totals or em dash placeholders.
 Unavailable usage and low-balance settings expose Retry. The low-balance row
 retries its settings read until data is available, then opens configuration.
 Cached settings remain visible during offline pauses and refresh failures.
+
+## Selectable row accessibility
+
+Use `selectableRowA11y` from `@/lib/a11y/selectable-row` for custom checkbox and
+radio rows. It exposes button/selected traits on iOS and checkbox or radio roles
+with checked state on Android. `ChoiceRow` and `radioItemA11y` use this mapping.
+Verify both the native role and state transitions in device accessibility trees;
+a rendered checkmark alone does not verify accessibility.
 
 ## Review memory proposals
 
@@ -48,6 +64,7 @@ The fixture requires a localhost database and `SKIP_STRIPE_API=true`, returns mo
 deep links, and creates no provider integration. It covers editable, opened, failed,
 and member-only proposals; successful provider pull-request creation requires a
 separate integration fixture.
+
 ## PR merge sheet
 
 The merge sheet composes the form and provider-specific bodies. `usePrMergeDraft`

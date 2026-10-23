@@ -58,13 +58,18 @@ export default function SecurityAgentFilterFindingsRoute() {
   );
 
   // An unloaded or failed repository fetch must not cost the reader the sheet:
-  // the fixed sections stay usable and the list area explains itself.
-  const repositoriesLoading = repositories.isPending && !repositories.isError;
+  // the fixed sections stay usable and the list area explains itself. A fetch
+  // paused by lost connectivity is reported the same way instead of leaving a
+  // skeleton that can never finish.
+  const repositoriesOffline = repositories.isPending && repositories.isPaused;
+  const repositoriesLoading =
+    repositories.isPending && !repositories.isPaused && !repositories.isError;
   const renderOptionList = () => {
-    if (repositories.isError) {
+    if (repositories.isError || repositoriesOffline) {
       return (
         <View className="px-6">
           <QueryError
+            variant={repositoriesOffline ? 'offline' : 'neutral'}
             message={t('common.couldNotLoadRepositories')}
             onRetry={() => {
               void repositories.refetch();

@@ -30,12 +30,14 @@ const state = vi.hoisted(() => {
   const repositories: {
     data: RepositoryOption[] | undefined;
     isPending: boolean;
+    isPaused: boolean;
     isError: boolean;
     isFetching: boolean;
     refetch: () => void;
   } = {
     data: undefined,
     isPending: false,
+    isPaused: false,
     isError: false,
     isFetching: false,
     refetch: vi.fn<() => void>(),
@@ -83,6 +85,7 @@ beforeEach(() => {
   state.params = {};
   state.repositories.data = REPOSITORIES;
   state.repositories.isPending = false;
+  state.repositories.isPaused = false;
   state.repositories.isError = false;
   state.repositories.isFetching = false;
   state.config.data = { repositorySelectionMode: 'all', selectedRepositoryIds: [] };
@@ -166,6 +169,16 @@ describe('Security Agent findings filter sheet', () => {
     expect(root.findAllByType(FindingFilterModal)).toHaveLength(0);
     // The header controls stay usable while the options are prepared.
     expect((root.findByType(PickerSheet).props as SheetProps).onDone).toBeTypeOf('function');
+  });
+
+  it('reports a paused fetch as an offline retry instead of an endless skeleton', async () => {
+    state.repositories.data = undefined;
+    state.repositories.isPending = true;
+    state.repositories.isPaused = true;
+    const root = await mount();
+    const errorProps = root.findByType(QueryError).props as ErrorProps & { variant?: string };
+    expect(errorProps.variant).toBe('offline');
+    expect(root.findAllByType(Skeleton)).toHaveLength(0);
   });
 
   it('keeps the sheet open with an inline retry when the repository fetch fails', async () => {

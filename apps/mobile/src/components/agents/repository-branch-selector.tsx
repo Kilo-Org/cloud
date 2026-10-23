@@ -157,7 +157,9 @@ export function RepositoryBranchSelector({
                 before the sheet is opened, rather than presenting a partial list
                 as the repository's whole set. */}
             {section.truncated ? (
-              <View className="mt-2">{renderNote(t('agentChat.newSession.branchListIncomplete'))}</View>
+              <View className="mt-2">
+                {renderNote(t('agentChat.newSession.branchListIncomplete'))}
+              </View>
             ) : null}
           </>
         );

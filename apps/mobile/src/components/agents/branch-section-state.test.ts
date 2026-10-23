@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  type BranchSectionInput,
-  resolveBranchSectionState,
-} from './new-session-repository-state';
+import { type BranchSectionInput, resolveBranchSectionState } from './new-session-repository-state';
 
 // The branch row renders from this one value, so every state must be reachable
 // by exactly one flag combination and the priority must be total: "loading" and
@@ -44,7 +41,9 @@ describe('resolveBranchSectionState', () => {
   });
 
   it('is loading for a row whose query cannot run yet', () => {
-    expect(resolveBranchSectionState({ ...settled, isEnabled: false })).toEqual({ kind: 'loading' });
+    expect(resolveBranchSectionState({ ...settled, isEnabled: false })).toEqual({
+      kind: 'loading',
+    });
   });
 
   it('reports a refusal a retry cannot fix', () => {

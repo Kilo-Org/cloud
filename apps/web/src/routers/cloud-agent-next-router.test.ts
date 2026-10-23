@@ -160,10 +160,9 @@ const mockFetchGitHubRepositoriesForUser = jest.fn<
     syncedAt: null;
   }>
 >();
-const mockResolveGitHubIntegrationIdForRepository =
-  jest.fn<(owner: unknown, repositoryFullName: string) => Promise<string | null>>(() =>
-    Promise.resolve(null)
-  );
+const mockResolveGitHubIntegrationIdForRepository = jest.fn<
+  (owner: unknown, repositoryFullName: string) => Promise<string | null>
+>(() => Promise.resolve(null));
 const mockFetchGitLabRepositoriesForUser = jest.fn<
   (
     userId: string,

@@ -180,10 +180,9 @@ const mockFetchGitHubRepositoriesForOrganization = jest.fn<
     syncedAt: null;
   }>
 >();
-const mockResolveGitHubIntegrationIdForRepository =
-  jest.fn<(owner: unknown, repositoryFullName: string) => Promise<string | null>>(() =>
-    Promise.resolve(null)
-  );
+const mockResolveGitHubIntegrationIdForRepository = jest.fn<
+  (owner: unknown, repositoryFullName: string) => Promise<string | null>
+>(() => Promise.resolve(null));
 const mockFetchGitLabRepositoriesForOrganization = jest.fn<
   (
     organizationId: string,

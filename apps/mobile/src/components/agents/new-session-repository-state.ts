@@ -398,4 +398,3 @@ export function resolveBranchSectionState(input: BranchSectionInput): BranchSect
     truncated: input.truncated,
   };
 }
-

@@ -7,6 +7,7 @@ import { formFieldA11y } from '@/components/ui/form-field-a11y';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { type useNativeAuth } from '@/lib/auth/use-native-auth';
+import { toAsciiDigits } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { canSubmitEmailCode } from './email-otp-state';
 
@@ -46,7 +47,7 @@ export function EmailOtpForm({
   onBack: () => void;
 }>) {
   const colors = useThemeColors();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const codeRef = useRef('');
   const [hasCompleteCode, setHasCompleteCode] = useState(false);
   const authBusy = busy !== undefined;
@@ -81,8 +82,13 @@ export function EmailOtpForm({
         textContentType="oneTimeCode"
         maxLength={6}
         onChangeText={value => {
-          codeRef.current = value;
-          setHasCompleteCode(/^\d{6}$/.test(value));
+          // The field keeps what was typed, but validation and the code sent to
+          // the server work on ASCII: the sign-in code is issued in ASCII, and a
+          // keyboard in an Arabic, Persian or Devanagari script types the same
+          // code in its own digits.
+          const digits = toAsciiDigits(value, i18n.language);
+          codeRef.current = digits;
+          setHasCompleteCode(/^\d{6}$/.test(digits));
         }}
         accessibilityLabel={formFieldA11y({ label: t('login.signInCodeField'), required: true })}
       />
@@ -92,7 +98,7 @@ export function EmailOtpForm({
         disabled={!hasCompleteCode || authBusy}
         loading={busy === 'otp-verify'}
         onPress={() => {
-          if (canSubmitEmailCode(codeRef.current, busy)) {
+          if (canSubmitEmailCode(codeRef.current, i18n.language, busy)) {
             onVerify(codeRef.current);
           }
         }}

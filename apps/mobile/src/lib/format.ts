@@ -122,6 +122,52 @@ export function firstGrapheme(value: string, locale: string): string {
   );
 }
 
+/**
+ * Decimal-digit blocks a phone keyboard can produce for typed numbers. The
+ * locale's numbering system is not enough on its own: ICU resolves a bare `ar`
+ * to Latin digits and `ar-EG` to Arabic-Indic, so the blocks a user can type
+ * are mapped explicitly.
+ */
+const NATIVE_DIGIT_BASES = [
+  0x0660 /* Arabic-Indic */, 0x06f0 /* Extended */, 0x0966 /* Devanagari */,
+] as const;
+const localeDigitMaps = new Map<string, Map<string, string>>();
+
+function localeDigitMap(locale: string): Map<string, string> {
+  const cached = localeDigitMaps.get(locale);
+  if (cached) {
+    return cached;
+  }
+  const format = numberFormat(locale, { useGrouping: false });
+  const map = new Map(
+    Array.from({ length: 10 }, (_, digit) => [format.format(digit), String(digit)])
+  );
+  localeDigitMaps.set(locale, map);
+  return map;
+}
+
+/**
+ * Converts digits typed in another script to ASCII so a value can be validated
+ * and sent as the ASCII form the server stores. Characters that are not digits
+ * pass through unchanged.
+ */
+export function toAsciiDigits(value: string, locale: string): string {
+  const digits = localeDigitMap(locale);
+  let normalized = '';
+  for (const char of value) {
+    const code = char.codePointAt(0) ?? 0;
+    let base = -1;
+    for (const candidate of NATIVE_DIGIT_BASES) {
+      if (code >= candidate && code <= candidate + 9) {
+        base = candidate;
+        break;
+      }
+    }
+    normalized += base === -1 ? (digits.get(char) ?? char) : String(code - base);
+  }
+  return normalized;
+}
+
 export function parseLocalizedNumber(value: string, locale: string): number | null {
   const parts = numberFormat(locale, { useGrouping: true }).formatToParts(-12_345.6);
   const part = (type: Intl.NumberFormatPartTypes, fallback: string) =>
@@ -129,16 +175,7 @@ export function parseLocalizedNumber(value: string, locale: string): number | nu
   const group = part('group', ',');
   const decimal = part('decimal', '.');
   const minus = part('minusSign', '-');
-  const digits = new Map(
-    Array.from({ length: 10 }, (_, digit) => [
-      numberFormat(locale, { useGrouping: false }).format(digit),
-      String(digit),
-    ])
-  );
-  let normalized = value.trim().replaceAll(/[\u061C\u200E\u200F]/g, '');
-  for (const [local, ascii] of digits) {
-    normalized = normalized.split(local).join(ascii);
-  }
+  let normalized = toAsciiDigits(value.trim().replaceAll(/[\u061C\u200E\u200F]/g, ''), locale);
   if (/^[\s\u00A0\u202F]+$/u.test(group)) {
     normalized = normalized.replaceAll(/[ \u00A0\u202F]/gu, group);
   }

@@ -432,30 +432,37 @@ function isRepositoryRootPath(path: string, repository: { owner: string; repo: s
 }
 
 /**
- * Matches one Git smart-HTTP or LFS control request for `repositoryPath`
- * (for example `/acme/widgets.git`).
+ * Matches a Git smart-HTTP or LFS endpoint by the path after the repository
+ * root, for example `/info/refs` or `/git-receive-pack`.
  */
-function matchesGitHubGitRequest(
-  method: string,
-  url: URL,
-  path: string,
-  repositoryPath: string
-): boolean {
-  if (method === 'GET' && path === `${repositoryPath}/info/refs`) {
+function matchesGitRequestSuffix(method: string, url: URL, suffix: string): boolean {
+  if (method === 'GET' && suffix === '/info/refs') {
     const entries = [...url.searchParams.entries()];
     const service = url.searchParams.get('service');
     return (
       entries.length === 1 && (service === 'git-upload-pack' || service === 'git-receive-pack')
     );
   }
+  if (method === 'GET' && suffix === '/info/lfs/locks') return true;
+  if (method !== 'POST' || url.search !== '') return false;
   return (
-    method === 'POST' &&
-    url.search === '' &&
-    (path === `${repositoryPath}/git-upload-pack` ||
-      path === `${repositoryPath}/git-receive-pack` ||
-      path === `${repositoryPath}/info/lfs/objects/batch` ||
-      path === `${repositoryPath}/info/lfs/locks/verify`)
+    suffix === '/git-upload-pack' ||
+    suffix === '/git-receive-pack' ||
+    suffix === '/info/lfs/objects/batch' ||
+    suffix === '/info/lfs/locks' ||
+    suffix === '/info/lfs/locks/verify' ||
+    /^\/info\/lfs\/locks\/[^/]+\/unlock$/.test(suffix)
   );
+}
+
+function matchesGitHubGitRequest(
+  method: string,
+  url: URL,
+  path: string,
+  repositoryPath: string
+): boolean {
+  if (!path.startsWith(repositoryPath)) return false;
+  return matchesGitRequestSuffix(method, url, path.slice(repositoryPath.length));
 }
 
 /**
@@ -476,23 +483,13 @@ function matchesRepositoryGitRequest(
 }
 
 /**
- * True for a Git smart-HTTP or LFS control request shaped URL for any repository.
- * Requests for another repository are forwarded anonymously.
+ * Matches the Git endpoints that need no authorization header, such as a public
+ * repository's clone and LFS requests.
  */
 function matchesAnonymousGitHubGitRequest(method: string, url: URL, path: string): boolean {
-  const match =
-    /^\/[^/]+\/[^/]+?(?:\.git)?(\/info\/refs|\/git-upload-pack|\/git-receive-pack|\/info\/lfs\/objects\/batch|\/info\/lfs\/locks\/verify)$/.exec(
-      path
-    );
-  if (!match) return false;
-  if (method === 'GET' && match[1] === '/info/refs') {
-    const entries = [...url.searchParams.entries()];
-    const service = url.searchParams.get('service');
-    return (
-      entries.length === 1 && (service === 'git-upload-pack' || service === 'git-receive-pack')
-    );
-  }
-  return method === 'POST' && url.search === '';
+  const segments = path.split('/');
+  if (segments.length < 3) return false;
+  return matchesGitRequestSuffix(method, url, `/${segments.slice(3).join('/')}`);
 }
 
 /**

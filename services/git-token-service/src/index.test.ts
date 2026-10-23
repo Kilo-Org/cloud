@@ -1782,6 +1782,8 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
   it.each([
     'https://github.com/acme/repo.git/info/lfs/objects/batch',
     'https://github.com/acme/repo.git/info/lfs/locks/verify',
+    'https://github.com/acme/repo.git/info/lfs/locks',
+    'https://github.com/acme/repo.git/info/lfs/locks/42/unlock',
   ])('redeems an installation-pinned capability for exact LFS control URL %s', async requestUrl => {
     const service = createService();
     const issued = await service.issueGitHubSessionCapability({
@@ -1975,6 +1977,8 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     ['GET', 'https://npm.pkg.github.com/download/@acme/design/1.0.0/package.tgz'],
     ['GET', 'https://github.com/acme/repo/info/refs?service=git-upload-pack'],
     ['POST', 'https://github.com/acme/repo.git/info/lfs/objects/batch'],
+    ['GET', 'https://github.com/acme/repo.git/info/lfs/locks?path=asset.bin&limit=100'],
+    ['POST', 'https://github.com/acme/repo.git/info/lfs/locks'],
   ] as const)(
     'redeems a selected-user capability for its own repository request %s %s',
     async (requestMethod, requestUrl) => {

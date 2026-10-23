@@ -19,14 +19,11 @@ function parseLines(spy: jest.SpiedFunction<typeof console.log>): Record<string,
 }
 
 let savedSampleRate: string | undefined;
-let savedMobileSampleRate: string | undefined;
 let logSpy: jest.SpiedFunction<typeof console.log>;
 
 beforeEach(() => {
   savedSampleRate = process.env.TRPC_TIMING_SAMPLE_RATE;
-  savedMobileSampleRate = process.env.TRPC_TIMING_MOBILE_SAMPLE_RATE;
   delete process.env.TRPC_TIMING_SAMPLE_RATE;
-  delete process.env.TRPC_TIMING_MOBILE_SAMPLE_RATE;
   logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 });
 
@@ -35,11 +32,6 @@ afterEach(() => {
     delete process.env.TRPC_TIMING_SAMPLE_RATE;
   } else {
     process.env.TRPC_TIMING_SAMPLE_RATE = savedSampleRate;
-  }
-  if (savedMobileSampleRate === undefined) {
-    delete process.env.TRPC_TIMING_MOBILE_SAMPLE_RATE;
-  } else {
-    process.env.TRPC_TIMING_MOBILE_SAMPLE_RATE = savedMobileSampleRate;
   }
   jest.restoreAllMocks();
 });
@@ -135,7 +127,7 @@ describe('isMobileDimensions', () => {
 });
 
 describe('shouldLogTiming', () => {
-  test('logs mobile at the mobile rate while the base rate is 0', () => {
+  test('always logs mobile, even at rate 0', () => {
     process.env.TRPC_TIMING_SAMPLE_RATE = '0';
     expect(shouldLogTiming({ client: 'mobile' })).toBe(true);
   });
@@ -165,25 +157,10 @@ describe('shouldLogTiming', () => {
     expect(shouldLogTiming({ client: 'MOBILE' })).toBe(false);
     expect(shouldLogTiming({ client: 'other' })).toBe(false);
   });
-
-  test('samples the mobile client at the configured mobile rate', () => {
-    process.env.TRPC_TIMING_SAMPLE_RATE = '1';
-    process.env.TRPC_TIMING_MOBILE_SAMPLE_RATE = '0';
-    expect(shouldLogTiming({ client: 'mobile' })).toBe(false);
-
-    process.env.TRPC_TIMING_MOBILE_SAMPLE_RATE = 'not-a-number';
-    expect(shouldLogTiming({ client: 'mobile' })).toBe(true);
-  });
-
-  test('the mobile rate never applies to another client', () => {
-    process.env.TRPC_TIMING_MOBILE_SAMPLE_RATE = '1';
-    process.env.TRPC_TIMING_SAMPLE_RATE = '0';
-    expect(shouldLogTiming({ client: 'extension' })).toBe(false);
-  });
 });
 
 describe('buildTimingLine', () => {
-  test('includes userId from the authenticated context, for any client', () => {
+  test('includes userId only on a mobile line', () => {
     const mobile = buildTimingLine({
       surface: 'trpc',
       path: 'user.getMe',
@@ -216,30 +193,8 @@ describe('buildTimingLine', () => {
       userId: 'u1',
       dimensions: readClientDimensions(new Headers({ 'x-kilo-client': 'extension' })),
     });
-    expect(sampled).toMatchObject({ client: 'extension', type: 'trpc_timing', userId: 'u1' });
-  });
-
-  test('omits userId for an unauthenticated request', () => {
-    const anonymous = buildTimingLine({
-      surface: 'trpc',
-      path: 'kiloPass.getState',
-      procedureType: 'query',
-      durationMs: 8,
-      ok: true,
-      userId: null,
-      dimensions: readClientDimensions(new Headers(MOBILE_HEADERS)),
-    });
-    expect(anonymous).not.toHaveProperty('userId');
-
-    const missing = buildTimingLine({
-      surface: 'trpc',
-      path: 'kiloPass.getState',
-      procedureType: 'query',
-      durationMs: 8,
-      ok: true,
-      dimensions: readClientDimensions(new Headers(MOBILE_HEADERS)),
-    });
-    expect(missing).not.toHaveProperty('userId');
+    expect(sampled).not.toHaveProperty('userId');
+    expect(sampled).toMatchObject({ client: 'extension', type: 'trpc_timing' });
   });
 });
 
@@ -394,8 +349,8 @@ describe('withRestTiming', () => {
 });
 
 // The extension's model calls land on `/api/gateway/v1/chat/completions` at
-// high volume, so a non-mobile REST line is sampled at the shared rate while
-// mobile follows its own configured rate (default 100%).
+// high volume, so a non-mobile REST line is sampled like a tRPC line while
+// mobile stays at 100%.
 describe('withRestTiming sampling policy', () => {
   const gatewayRequest = (headers?: Record<string, string>) =>
     new Request('https://app.kilo.ai/api/gateway/v1/chat/completions', {
@@ -451,18 +406,6 @@ describe('withRestTiming sampling policy', () => {
 
     await wrapped(gatewayRequest({ 'x-kilo-client': 'mobile-app' }), undefined);
     await wrapped(gatewayRequest({ 'x-kilo-client': 'MOBILE' }), undefined);
-
-    expect(logSpy).not.toHaveBeenCalled();
-  });
-
-  test('the mobile line follows the configured mobile rate', async () => {
-    process.env.TRPC_TIMING_MOBILE_SAMPLE_RATE = '0';
-    const wrapped = withRestTiming(
-      '/api/gateway/[...path]',
-      jest.fn(async () => new Response('ok', { status: 200 }))
-    );
-
-    await wrapped(gatewayRequest(MOBILE_HEADERS), undefined);
 
     expect(logSpy).not.toHaveBeenCalled();
   });

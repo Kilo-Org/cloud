@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { Tabs, usePathname, useRouter, useSegments } from 'expo-router';
 import { Bot, House, MessageCircle, MessageSquare, UserRound } from '@/components/ui/icons';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Platform, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -97,6 +97,13 @@ export default function TabsLayout() {
     showKiloClawTab ? kiloclawLines : 1
   ) as 1 | 2;
   const showTabLabel = shouldShowTabLabel(fontScale);
+  // One object for the whole layout render: the context value is read by every
+  // tab screen's clearance hook, so a fresh identity per poll tick would
+  // re-render each of them for an unchanged answer.
+  const labelState = useMemo(
+    () => ({ showLabel: showTabLabel, labelLines }),
+    [showTabLabel, labelLines]
+  );
   const tabBarHeight = getEffectiveTabBarHeight({
     bottomInset: bottom,
     platform: Platform.OS,
@@ -310,7 +317,7 @@ export default function TabsLayout() {
     </StateSurfaceInsets>
   );
   return (
-    <TabBarLabelContext value={{ showLabel: showTabLabel, labelLines }}>
+    <TabBarLabelContext value={labelState}>
       <TabSwitchInputGate>{tabsLayout}</TabSwitchInputGate>
       <SessionPreviewOverlay />
     </TabBarLabelContext>

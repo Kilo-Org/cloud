@@ -57,7 +57,7 @@ const mockManager = {
   destroy: jest.fn(),
   send: jest.fn(async () => true),
 };
-const mockQueryClient = { invalidateQueries: jest.fn(), fetchQuery: jest.fn() };
+const mockQueryClient = { invalidateQueries: jest.fn(), query: jest.fn() };
 const mockUploadEndpoint = { mutationOptions: () => ({}) };
 const mockGetWithRuntimeState = { queryOptions: (input: unknown) => input };
 const mockTrpc = {
@@ -411,7 +411,7 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     mockAtParam = null;
     mockWorktreeId = 'worktree_shared';
     mockClosedPtys.length = 0;
-    mockQueryClient.fetchQuery.mockReset();
+    mockQueryClient.query.mockReset();
     mockAtomValues = {
       sessionId: 'workspace_recent',
       fetchedSessionData: {
@@ -490,11 +490,9 @@ describe('CloudChatPage terminal ownership across navigation', () => {
       worktreeId: 'worktree_shared',
       routeReady: false,
     };
-    mockQueryClient.fetchQuery.mockImplementation(
-      async ({ session_id }: { session_id: string }) => ({
-        runtimeState: { routeReady: session_id === 'ses_historical' },
-      })
-    );
+    mockQueryClient.query.mockImplementation(async ({ session_id }: { session_id: string }) => ({
+      runtimeState: { routeReady: session_id === 'ses_historical' },
+    }));
     render();
 
     await act(async () => {
@@ -515,7 +513,7 @@ describe('CloudChatPage terminal ownership across navigation', () => {
       worktreeId: 'worktree_shared',
       routeReady: false,
     };
-    mockQueryClient.fetchQuery.mockImplementation(async () => ({
+    mockQueryClient.query.mockImplementation(async () => ({
       runtimeState: { routeReady: false },
     }));
     render();

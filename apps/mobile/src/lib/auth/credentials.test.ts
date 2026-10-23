@@ -140,6 +140,18 @@ vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 // expo root needs `__DEV__` and cannot load in the node test environment.
 vi.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.0' }));
 
+// The same graph builds an admission proof for the legacy exchange, which
+// reaches `@expo/app-integrity`; that module's expo root needs `__DEV__` too.
+vi.mock('@/lib/auth/admission', () => ({
+  getAdmission: vi.fn().mockResolvedValue({
+    platform: 'android',
+    kind: 'assertion',
+    challenge: 'challenge',
+    payload: 'proof',
+  }),
+  clearAttestKeyOnRefusal: vi.fn(),
+}));
+
 // These imported session-clear modules pull in native bindings that crash the
 // node test environment: use-trusted-hosts -> secure-store-preference ->
 // sonner-native -> react-native (Flow `import typeof`), and the cache/file

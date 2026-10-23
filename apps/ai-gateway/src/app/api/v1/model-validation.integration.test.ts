@@ -1,11 +1,11 @@
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 const mockFetchSessionMetadata = jest.fn();
 const mockGetRuntimeToken = jest.fn();
-jest.mock('../../../../../../services/cloud-agent-next/src/session-service', () => ({
+jest.mock('../../../../../../services/cloud-agent-next/src/session/metadata', () => ({
   fetchSessionMetadata: (...args: unknown[]) => mockFetchSessionMetadata(...args),
 }));
 jest.mock('../../../../../../services/cloud-agent-next/src/sandbox-session/session-stub', () => ({
-  resolveSessionStub: () => ({ getRuntimeToken: () => mockGetRuntimeToken() }),
+  getSandboxSessionStub: () => ({ getRuntimeToken: () => mockGetRuntimeToken() }),
 }));
 let currentHeaders = new Headers();
 const mockHeaders = jest.fn(() => currentHeaders);
@@ -141,7 +141,7 @@ async function runtimeToken(
         runtimeAuthorization: {
           id: crypto.randomUUID(),
           resourceKind: 'cloud-agent-next',
-          resourceId: 'agent-session',
+          resourceId: 'workspace_11111111-1111-4111-8111-111111111111',
         },
       },
     })
@@ -235,7 +235,7 @@ describe('cloud-agent model validation through real web authentication', () => {
         runtimeAuthorization: {
           id,
           resourceKind: 'cloud-agent-next' as const,
-          resourceId: 'agent-session',
+          resourceId: 'workspace_11111111-1111-4111-8111-111111111111',
         },
       };
       const sign = (issuedAt: Date) =>
@@ -253,7 +253,7 @@ describe('cloud-agent model validation through real web authentication', () => {
         });
       let metadata: TestSessionMetadata = {
         metadataSchemaVersion: 2,
-        identity: { sessionId: 'agent-session', userId: user.id },
+        identity: { sessionId: 'workspace_11111111-1111-4111-8111-111111111111', userId: user.id },
         auth: { kilocodeToken: (await sign(new Date(now - 7200000))).token },
         agent: { model: privateModel },
         workspace: {},
@@ -263,7 +263,7 @@ describe('cloud-agent model validation through real web authentication', () => {
         version: 1,
         id,
         resourceKind: 'cloud-agent-next',
-        resourceId: 'agent-session',
+        resourceId: 'workspace_11111111-1111-4111-8111-111111111111',
         userId: user.id,
         authorizationUserId: user.id,
         issuedAt: new Date(now - 10800000).toISOString(),
@@ -293,7 +293,7 @@ describe('cloud-agent model validation through real web authentication', () => {
       const validation = preflightExistingPromptModel({
         env,
         userId: user.id,
-        cloudAgentSessionId: 'agent-session',
+        cloudAgentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
         procedure: 'send',
       });
       if (state === 'active') {

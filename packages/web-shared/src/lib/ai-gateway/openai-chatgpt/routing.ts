@@ -51,6 +51,16 @@ const OPENAI_CHATGPT_PURPOSE = "Run the user's coding task in Kilo Code.";
 const METADATA_ENTRY_LIMIT = 16;
 const METADATA_VALUE_LIMIT = 512;
 
+/** OpenAI rejects a smaller `max_output_tokens` with `integer_below_min_value`. */
+const MIN_MAX_OUTPUT_TOKENS = 16;
+
+/**
+ * api.openai.com rejects these with `unknown_parameter`. `enabled`, `exclude`
+ * and `max_tokens` are OpenRouter's reasoning extensions; `generate_summary` is
+ * OpenAI's deprecated name for `summary`, which the gateway always sets.
+ */
+const UNSUPPORTED_REASONING_FIELDS = ['enabled', 'exclude', 'max_tokens', 'generate_summary'];
+
 /**
  * Adds the required traceability keys to the request metadata, keeping any
  * caller-supplied entries. `session_id` is the gateway's identifier for one
@@ -281,6 +291,24 @@ export function buildOpenAiChatGptProvider(
       // api.openai.com rejects unknown request arguments, exactly like the
       // other raw upstream providers strip it.
       delete body.provider;
+      // Subscription sharing accepts only `auto` and `default`, which match the
+      // behavior without a tier, and rejects every other tier.
+      delete body.service_tier;
+      // The reasoning models served on this route reject sampling parameters
+      // with `unsupported_parameter`.
+      delete body.temperature;
+      delete body.top_p;
+      if (
+        typeof body.max_output_tokens === 'number' &&
+        body.max_output_tokens < MIN_MAX_OUTPUT_TOKENS
+      ) {
+        body.max_output_tokens = MIN_MAX_OUTPUT_TOKENS;
+      }
+      if (body.reasoning) {
+        for (const field of UNSUPPORTED_REASONING_FIELDS) {
+          Reflect.deleteProperty(body.reasoning, field);
+        }
+      }
       // OpenAI requires this traceability metadata on every delegated Responses
       // request, including later turns. Without it the request is rejected once
       // the integration is enabled for it.

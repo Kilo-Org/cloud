@@ -1874,6 +1874,8 @@ const PR_LEDGER_SETTLE_FAILED_MESSAGE =
   'The action completed, but we could not record the result. Please try again.';
 const PR_LEDGER_PERSISTENCE_FAILED_MESSAGE =
   'We could not record this action. Please try again later.';
+const PR_LEDGER_RESULT_UNREADABLE_MESSAGE =
+  'We could not read the recorded result of this action. Please try again.';
 
 function ledgerRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -2248,6 +2250,29 @@ describe('githubPrReviewRouter PR operation ledger (P1-A-08c)', () => {
     const result = await caller.createReviewComment(ledgerCommentInput);
 
     expect(result).toEqual({ commentId: 7, nodeId: 'N_7', replayed: true });
+    expect(t1Octokit.pulls.createReviewComment).not.toHaveBeenCalled();
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+  });
+
+  it('surfaces an unreadable canonical result instead of replaying a partial success', async () => {
+    // A settled row whose stored result lacks the intent's fields cannot be
+    // replayed: returning the loose spread would tell the client the comment
+    // was posted with an id it never received.
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: ledgerRow({
+        status: 'completed',
+        canonical_result: { nodeId: 'N_7' },
+      }),
+    });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+
+    await expect(caller.createReviewComment(ledgerCommentInput)).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: PR_LEDGER_RESULT_UNREADABLE_MESSAGE,
+    });
     expect(t1Octokit.pulls.createReviewComment).not.toHaveBeenCalled();
     expect(mockSettleOperation).not.toHaveBeenCalled();
   });

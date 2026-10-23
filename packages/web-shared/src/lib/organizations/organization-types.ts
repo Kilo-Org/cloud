@@ -21,7 +21,7 @@ export {
 } from './organization-base-types';
 
 import type { OrganizationRole, OrganizationPlan } from './organization-base-types';
-import { OrganizationPlanSchema, OrganizationSettingsSchema } from './organization-base-types';
+import { OrganizationSettingsSchema } from './organization-base-types';
 import { EnkryptPublishedBenchmarkSchema, OpenCodeSettingsSchema } from '@kilocode/db/schema-types';
 
 export const OrganizationRoleSchema = z.enum(ORGANIZATION_ROLES);
@@ -298,7 +298,9 @@ const OpenRouterProviderSchema = z.object({
   baseUrl: z.string().optional(),
   dataPolicy: z
     .object({
+      /** Stores prompts for feedback or training; governed by `data_collection`. */
       training: z.boolean().optional(),
+      /** Stores prompts for any reason, including compliance; governed by `zdr`. */
       retainsPrompts: z.boolean().optional(),
       canPublish: z.boolean().optional(),
       termsOfServiceURL: z.string().optional(),

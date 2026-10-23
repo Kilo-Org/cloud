@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CODE_REVIEW_ACTION_REQUIRED_REASONS } from '@kilocode/app-shared/code-reviews';
 
 import '@/i18n';
+
 import { PlatformOverviewScreen } from './platform-overview-screen';
 
 const config = vi.hoisted(() => ({
@@ -36,6 +37,7 @@ const permission = vi.hoisted(() => ({
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   View: 'View',
   Switch: 'Switch',
   ActivityIndicator: 'ActivityIndicator',
@@ -179,11 +181,11 @@ function collectText(node: unknown): string[] {
   return [];
 }
 
-async function renderScreen(): Promise<string[]> {
+async function renderScreen(platform: 'github' | 'gitlab' = 'github'): Promise<string[]> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
     ref.current = TestRenderer.create(
-      createElement(PlatformOverviewScreen, { scope: 'personal', platform: 'github' })
+      createElement(PlatformOverviewScreen, { scope: 'personal', platform })
     );
     await Promise.resolve();
   });
@@ -218,6 +220,21 @@ describe('PlatformOverviewScreen disconnected setup', () => {
     await renderScreen();
     expect(centeredState).toHaveBeenCalledOnce();
     expect(scrollView).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['github', "GitHub isn't connected. Only organization owners and admins can connect it."],
+    [
+      'gitlab',
+      "GitLab isn't connected. Ask an organization owner, admin, or billing manager to connect it.",
+    ],
+  ] as const)('states who can connect %s to a read-only viewer', async (platform, copy) => {
+    provider.status = 'disconnected';
+    permission.canEdit = false;
+
+    const texts = await renderScreen(platform);
+
+    expect(texts).toContain(copy);
   });
 });
 

@@ -20,6 +20,7 @@ import { waitFor } from '@/test/render-with-providers';
 const h = vi.hoisted(() => ({
   back: vi.fn(),
   push: vi.fn(),
+  replace: vi.fn(),
   success: vi.fn(),
   error: vi.fn(),
   confirm: vi.fn(),
@@ -48,8 +49,19 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => h.connectivity,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ back: h.back, push: h.push }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ back: h.back, push: h.push, replace: h.replace }),
+}));
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({
+    agentProfiles: {
+      list: { pathFilter: () => ({ queryKey: ['agentProfiles', 'list'] }) },
+      listCombined: { pathFilter: () => ({ queryKey: ['agentProfiles', 'listCombined'] }) },
+    },
+  }),
+}));
 vi.mock('@/lib/profile-agent-navigation', () => ({
+  getProfilesPath: () => '/(app)/(tabs)/(3_profile)/profiles',
   getProfileVariablesPath: (id: string, org?: string) =>
     `/profiles/${id}/variables${org ? `?org=${org}` : ''}`,
   getProfileCommandsPath: (id: string, org?: string) =>
@@ -83,6 +95,7 @@ vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrol
 vi.mock('@/components/profiles/profile-repo-pins-section', () => ({
   ProfileRepoPinsSection: 'ProfileRepoPinsSection',
 }));
+vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
@@ -115,19 +128,17 @@ describe('ProfileOverviewScreen', () => {
   });
 
   it('loading: renders skeleton rows and no content rows', async () => {
-    const { renderer, unmount } = await mountScreen();
+    const { renderer } = await mountScreen();
 
     expect(findAll(renderer.root, 'Skeleton').length).toBeGreaterThan(0);
     expect(findAll(renderer.root, 'ConfigureRow')).toHaveLength(0);
-
-    unmount();
   });
 
   it('renders the overview in TabScreenScrollView, including the delete action', async () => {
     h.query.data = testProfile();
     h.query.isPending = false;
 
-    const { renderer, unmount } = await mountScreen();
+    const { renderer } = await mountScreen();
 
     // The shared scroll view reserves the tab bar (and, while the keyboard is
     // up, the IME) below its viewport, so the destructive action at the end of
@@ -144,14 +155,12 @@ describe('ProfileOverviewScreen', () => {
     const buttons = findAll(renderer.root, 'Button');
     expect(buttons).toHaveLength(2);
     expect(findAll(scroll, 'Button')).toHaveLength(buttons.length);
-
-    unmount();
   });
 
   it('error: renders QueryError and Retry refetches', async () => {
     Object.assign(h.query, { isError: true, isPending: false });
 
-    const { renderer, unmount } = await mountScreen();
+    const { renderer } = await mountScreen();
 
     const queryError = findOne(renderer.root, 'QueryError');
     expect(queryError.props.title).toBe("Couldn't load profiles");
@@ -159,8 +168,6 @@ describe('ProfileOverviewScreen', () => {
       (queryError.props as { onRetry: () => void }).onRetry();
     });
     expect(h.query.refetch).toHaveBeenCalledTimes(1);
-
-    unmount();
   });
 
   it('happy: seeds the fields, lists the sections, and saves the metadata', async () => {
@@ -172,7 +179,7 @@ describe('ProfileOverviewScreen', () => {
     h.query.isPending = false;
     h.mutations.update.mutateAsync.mockResolvedValue({ success: true });
 
-    const { renderer, unmount } = await mountScreen();
+    const { renderer } = await mountScreen();
 
     expect(findField(renderer.root, 'Profile name').props.defaultValue).toBe('Backend debugging');
     expect(findField(renderer.root, 'Profile description').props.defaultValue).toBe(
@@ -203,15 +210,13 @@ describe('ProfileOverviewScreen', () => {
     });
     await waitFor(() => h.success.mock.calls.length > 0);
     expect(h.success).toHaveBeenCalledWith('Updated');
-
-    unmount();
   });
 
   it('empty: an empty profile still renders all six rows with zero counts', async () => {
     h.query.data = testProfile();
     h.query.isPending = false;
 
-    const { renderer, unmount } = await mountScreen();
+    const { renderer } = await mountScreen();
 
     expect(findAll(renderer.root, 'ConfigureRow').map(row => row.props.subtitle)).toEqual([
       '0',
@@ -221,32 +226,46 @@ describe('ProfileOverviewScreen', () => {
       '0',
       '0',
     ]);
-
-    unmount();
   });
 
-  it('retryable: a save failure with no usable message adds saveFailed', async () => {
+  it('retains edited metadata after a failed save and clears the error after an explicit retry', async () => {
     h.query.data = testProfile();
     h.query.isPending = false;
-    const error = new Error('placeholder');
-    error.message = '';
-    h.mutations.update.mutateAsync.mockRejectedValue(error);
+    const error = Object.assign(new Error('Unavailable'), { message: '' });
+    h.mutations.update.mutateAsync
+      .mockRejectedValueOnce(error)
+      .mockResolvedValueOnce({ success: true });
 
-    const { renderer, unmount } = await mountScreen();
+    const { renderer, queryClient } = await mountScreen();
 
+    changeText(renderer.root, 'Profile name', 'Renamed');
+    changeText(renderer.root, 'Profile description', 'Retained description');
     await pressSave(renderer.root);
+    await waitFor(() => findAll(renderer.root, 'AccessibleStatus').length === 1);
+    expect(h.error).toHaveBeenCalledTimes(1);
 
-    await waitFor(() => h.error.mock.calls.length > 0);
-    expect(h.error).toHaveBeenCalledWith("Couldn't save profile");
+    // An unrelated profile refetch must not replace the failed draft.
+    h.query.data = testProfile({ vars: [{ key: 'NEW' }] });
+    rerenderScreen(renderer, queryClient);
+    expect(findField(renderer.root, 'Profile name').props.defaultValue).toBe('Renamed');
+    expect(findField(renderer.root, 'Profile description').props.defaultValue).toBe(
+      'Retained description'
+    );
+    await pressSave(renderer.root);
+    await waitFor(() => h.success.mock.calls.length === 1);
 
-    unmount();
+    expect(h.mutations.update.mutateAsync.mock.calls.map(([input]) => input)).toEqual([
+      { profileId: 'profile-1', name: 'Renamed', description: 'Retained description' },
+      { profileId: 'profile-1', name: 'Renamed', description: 'Retained description' },
+    ]);
+    expect(findAll(renderer.root, 'AccessibleStatus')).toHaveLength(0);
   });
 
   it('happy: the default toggle calls setAsDefault and clearDefault', async () => {
     h.query.data = testProfile({ isDefault: false });
     h.query.isPending = false;
 
-    const { renderer, unmount } = await mountScreen();
+    const { renderer } = await mountScreen();
 
     const defaultRow = findOne(renderer.root, 'PreferenceRow');
 
@@ -259,15 +278,13 @@ describe('ProfileOverviewScreen', () => {
       (defaultRow.props as { onValueChange: (next: boolean) => void }).onValueChange(false);
     });
     expect(h.mutations.clearDefault.mutate).toHaveBeenCalledWith({ profileId: 'profile-1' });
-
-    unmount();
   });
 
   it('keeps unsaved metadata edits when a refetch changes only updatedAt', async () => {
     h.query.data = testProfile();
     h.query.isPending = false;
 
-    const { renderer, queryClient, unmount } = await mountScreen();
+    const { renderer, queryClient } = await mountScreen();
 
     changeText(renderer.root, 'Profile name', 'Renamed');
 
@@ -287,8 +304,6 @@ describe('ProfileOverviewScreen', () => {
       name: 'Renamed',
       description: 'Old description',
     });
-
-    unmount();
   });
 
   it('happy: confirming delete toasts and navigates back', async () => {
@@ -296,7 +311,7 @@ describe('ProfileOverviewScreen', () => {
     h.query.isPending = false;
     h.mutations.deleteProfile.mutateAsync.mockResolvedValue({ success: true });
 
-    const { renderer, unmount } = await mountScreen();
+    const { renderer } = await mountScreen();
 
     await pressDelete(renderer.root, h.confirm);
 
@@ -307,8 +322,6 @@ describe('ProfileOverviewScreen', () => {
     await waitFor(() => h.success.mock.calls.length > 0);
     expect(h.success).toHaveBeenCalledWith('Profile "Backend debugging" deleted');
     await waitFor(() => h.back.mock.calls.length > 0);
-
-    unmount();
   });
 
   it('non-retryable: a PRECONDITION_FAILED delete shows deleteBlocked and stays', async () => {
@@ -318,7 +331,7 @@ describe('ProfileOverviewScreen', () => {
       data: { code: 'PRECONDITION_FAILED' },
     });
 
-    const { renderer, unmount } = await mountScreen();
+    const { renderer } = await mountScreen();
 
     await pressDelete(renderer.root, h.confirm);
 
@@ -328,25 +341,20 @@ describe('ProfileOverviewScreen', () => {
     );
     expect(h.back).not.toHaveBeenCalled();
     expect(findField(renderer.root, 'Profile name')).toBeTruthy();
-
-    unmount();
   });
 
   it('retryable: a generic delete failure with no usable message adds deleteFailed', async () => {
     h.query.data = testProfile();
     h.query.isPending = false;
-    const error = new Error('placeholder');
-    error.message = '';
+    const error = Object.assign(new Error('Unavailable'), { message: '' });
     h.mutations.deleteProfile.mutateAsync.mockRejectedValue(error);
 
-    const { renderer, unmount } = await mountScreen();
+    const { renderer } = await mountScreen();
 
     await pressDelete(renderer.root, h.confirm);
 
     await waitFor(() => h.error.mock.calls.length > 0);
     expect(h.error).toHaveBeenCalledWith("Couldn't delete profile");
     expect(h.back).not.toHaveBeenCalled();
-
-    unmount();
   });
 });

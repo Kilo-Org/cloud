@@ -11,19 +11,18 @@ import { toast } from 'sonner-native';
 import { EmptyState } from '@/components/empty-state';
 import { GitHubIcon } from '@/components/icons/github-icon';
 import { PrReviewContextLine } from '@/components/pr-review/pr-review-context-line';
-import {
-  PR_REVIEW_ENTRY_HREF,
-  ProviderConnectGate,
-} from '@/components/pr-review/pr-review-provider-connect-gate';
+import { PrReviewGateHeader } from '@/components/pr-review/pr-review-gate-header';
+import { ProviderConnectGate } from '@/components/pr-review/pr-review-provider-connect-gate';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform';
 import { selectPrReviewGateView } from '@/lib/pr-review/pr-review-connect-gate-view';
 import { type ProviderPrPlatform } from '@/lib/pr-review/provider-pr-ref';
 import { useTRPC } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
 
 type PrReviewConnectGateProps = {
   readonly children: ReactNode;
@@ -60,9 +59,10 @@ type PrReviewConnectGateProps = {
  * pass-through there; the provider gates protect each detail route.
  *
  * The GitHub CTA calls `githubApps.connectUserAuthorization` and opens the
- * returned URL with the shared auth-session launcher. Cancellation on either platform
- * simply leaves the gate showing — there's nothing to roll back because the
- * auth flow is server-driven.
+ * returned URL with the shared auth-session launcher. Backing out of the sign-in
+ * sheet returns the CTA to idle so the user can retry, on both platforms; there
+ * is nothing to roll back because the auth flow is server-driven, and the status
+ * re-check runs without holding the CTA.
  */
 export function PrReviewConnectGate({
   children,
@@ -113,11 +113,22 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
       await launchConnectGateBrowser(result.authorizationUrl, {
         signal: controller.signal,
         onOpenFailure: () => void toast.error(t('authErrors.couldNotOpenBrowser')),
-        onReturn: async () => {
-          await authorization.refetch();
-          await queryClient.invalidateQueries({
-            queryKey: trpc.githubApps.getUserAuthorization.queryKey(),
-          });
+        onReturn: () => {
+          // Detached on purpose: the sheet closing is the user's edge, so the
+          // CTA returns to idle as soon as it happens. A status read that stays
+          // pending (the default `networkMode: 'online'` never settles while the
+          // online manager reports offline) must not keep Connect disabled — the
+          // read's own states carry the outcome, and a real failure renders the
+          // retryable QueryError below.
+          void authorization
+            .refetch()
+            .then(() =>
+              queryClient.invalidateQueries({
+                queryKey: trpc.githubApps.getUserAuthorization.queryKey(),
+              })
+            )
+            .catch(() => undefined);
+          return Promise.resolve();
         },
       });
     } catch {
@@ -146,7 +157,7 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
   if (view === 'error') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('common.prReview')} backFallback={PR_REVIEW_ENTRY_HREF} />
+        <PrReviewGateHeader />
         <QueryError
           variant="server"
           title={t('prReview.connect.checkFailedTitle')}
@@ -163,7 +174,7 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
   if (view === 'loading') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('common.prReview')} backFallback={PR_REVIEW_ENTRY_HREF} />
+        <PrReviewGateHeader />
         <CenteredState>
           <ActivityIndicator size="small" color={colors.mutedForeground} />
         </CenteredState>
@@ -175,7 +186,7 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
     const revoked = view === 'reconnect';
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('common.prReview')} backFallback={PR_REVIEW_ENTRY_HREF} />
+        <PrReviewGateHeader />
         <EmptyState
           icon={revoked ? ShieldAlert : PlugZap}
           title={revoked ? t('prReview.connect.reconnectTitle') : t('common.connectGithub')}
@@ -191,7 +202,7 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
           }
           action={
             <Button
-              className="mt-3 w-full flex-row gap-2"
+              className={cn('mt-3 w-full flex-row gap-2', STATE_ACTION_CLASS)}
               disabled={connecting}
               onPress={() => {
                 void handleConnect();

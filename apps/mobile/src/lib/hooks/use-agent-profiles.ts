@@ -49,6 +49,10 @@ export function keepPreviousDataForQueryKey<TQueryData>(
  * is `isPending && isFetching`, which is false while a paused (offline) first
  * fetch is unsettled. `isPending` stays true until the query settles, so the
  * screen cannot mistake an unloaded list for an empty one.
+ *
+ * `error` is the active query's error, so a screen can name the cause (an
+ * access denial is not a server fault) instead of reporting every failure the
+ * same way.
  */
 export function useAgentProfileList(organizationId?: string) {
   const trpc = useTRPC();
@@ -102,6 +106,7 @@ export function useAgentProfileList(organizationId?: string) {
       : (personal.data?.find(profile => profile.isDefault)?.id ?? null),
     isLoading: query.isPending,
     isError: query.isError,
+    error: query.error,
     isRefetching: query.isRefetching,
     refetch: query.refetch,
   };

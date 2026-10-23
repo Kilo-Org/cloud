@@ -9,7 +9,7 @@ Expo Router app for iOS and Android only. Use dev builds, never Expo Go. No web-
 
 ## Stack
 
-- Expo SDK 57, React Native 0.86, React 19, strict TypeScript (`tsgo`)
+- Expo SDK 58, React Native 0.88, React 19.3, strict TypeScript (`tsgo`)
 - NativeWind v5 / Tailwind CSS v4; React Native Reusables in `src/components/ui/`
 - Expo Router routes in `src/app/`
 - oxlint and oxfmt
@@ -62,10 +62,10 @@ git diff --check
 Before you build a UI element, find the library that already does it.
 
 1. Check the element map below. If the concern has an entry, use that element.
-2. Check `@expo/ui` (`node_modules/@expo/ui/build/`), which ships native modules for `57.x`: universal
+2. Check `@expo/ui` (`node_modules/@expo/ui/build/`), which ships native modules for `58.x`: universal
    `BottomSheet`, `Picker`, `Switch`, `TextInput`, `List`, `Host`, plus
    `community/{segmented-control, picker, datetime-picker, masked-view, menu, pager-view, slider}`.
-3. Check the Expo SDK 57 docs for the concern.
+3. Check the Expo SDK 58 docs for the concern.
 4. Check npm for a maintained package. A release in the last six months is the bar.
 
 A hand-built element is correct only when steps 1–4 fail. Record the decision in the PR body: the library
@@ -146,6 +146,7 @@ Direct full-screen entry clears the status bar; presented sheets do not add a se
 - Default exports only where Expo Router requires them, in `src/app/`.
 - Import React Native primitives from `react-native`; NativeWind adds `className`.
 - Import `Image` from `@/components/ui/image` and other UI primitives from `@/components/ui/<component>`.
+- Import `Switch` from `@/components/ui/switch`. It mirrors `disabled` into `accessibilityState`, which iOS needs to report the control as disabled to assistive technology.
 - Add reusables with `pnpm dlx @react-native-reusables/cli@latest add <component> --styling-library nativewind -y`.
 - Style with Tailwind `className`. No inline styles, no `StyleSheet.create`. Merge classes with `cn()` from `@/lib/utils`.
 - Opacity modifiers do not work on theme colors (CSS variables): `bg-destructive/10` is dropped. Where a `*-tile-bg` / `*-tile-border` pair exists — `danger` for `destructive`, plus `good`, `warn`, `info`, the agent colors and the row hues — use it; otherwise use a concrete color with a dark variant. `<utility>-black/<alpha>` compiles to an unparseable `#NaN` color and paints nothing either; use a concrete value, for example `bg-[#0000000d]` for 5%. `pnpm check:classes` enforces both.

@@ -175,3 +175,35 @@ test('renders a data image shape', async ({ page, host }) => {
   ).toEqual([DATA_IMAGE]);
   expect(host.requests).toEqual([]);
 });
+
+// The document policy, not one renderer code path, is the page's network
+// boundary: a request the page starts itself must be refused and reported.
+test('keeps page subresources off the network', async ({ page, host }) => {
+  await renderDiagram(page, 'flowchart TD\n  A[Start] --> B[Finish]');
+  await expectRenderedDiagram(page);
+  const outcome = await page.evaluate(async recorderUrl => {
+    const violations: string[] = [];
+    document.addEventListener('securitypolicyviolation', event => {
+      violations.push(`${event.effectiveDirective} ${event.blockedURI}`);
+    });
+    let fetchRefused = false;
+    try {
+      await fetch(`${recorderUrl}/probe`);
+    } catch {
+      fetchRefused = true;
+    }
+    const image = new Image();
+    const settled = Promise.withResolvers<void>();
+    image.addEventListener('load', () => settled.resolve(), { once: true });
+    image.addEventListener('error', () => settled.resolve(), { once: true });
+    image.src = `${recorderUrl}/probe.svg`;
+    await settled.promise;
+    return { fetchRefused, violations };
+  }, host.recorderUrl);
+  expect(outcome.fetchRefused).toBe(true);
+  expect(outcome.violations).toEqual([
+    `connect-src ${host.recorderUrl}/probe`,
+    `img-src ${host.recorderUrl}/probe.svg`,
+  ]);
+  expect(host.requests).toEqual([]);
+});

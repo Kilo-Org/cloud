@@ -2479,7 +2479,10 @@
       "allowOnceAccessibility": "ଏଥର ଅନୁମତି ଦିଅନ୍ତୁ",
       "alwaysAllow": "ସର୍ବଦା ଅନୁମତି ଦିଅନ୍ତୁ",
       "alwaysAllowAccessibility": "ସର୍ବଦା ଅନୁମତି ଦିଅନ୍ତୁ",
-      "retrying": "ପୁଣି ଚେଷ୍ଟା ହେଉଛି…"
+      "retrying": "ପୁଣି ଚେଷ୍ଟା ହେଉଛି…",
+      "retryDeny": "ଅସ୍ୱୀକାର କରିବାକୁ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ",
+      "retryAllowOnce": "ଏଥର ଅନୁମତି ଦେବାକୁ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ",
+      "retryAlwaysAllow": "ସର୍ବଦା ଅନୁମତି ଦେବାକୁ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ"
     },
     "questionCard": {
       "title": "ଏଜେଣ୍ଟକୁ ଆପଣଙ୍କ ଉତ୍ତର ଦରକାର",

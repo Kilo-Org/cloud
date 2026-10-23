@@ -2479,7 +2479,10 @@
       "allowOnceAccessibility": "یو ځل اجازه ورکړئ",
       "alwaysAllow": "تل اجازه ورکړئ",
       "alwaysAllowAccessibility": "تل اجازه ورکړئ",
-      "retrying": "بیا هڅه روانه ده…"
+      "retrying": "بیا هڅه روانه ده…",
+      "retryDeny": "د رد بیا هڅه وکړئ",
+      "retryAllowOnce": "د یو ځل اجازې بیا هڅه وکړئ",
+      "retryAlwaysAllow": "د تل اجازې بیا هڅه وکړئ"
     },
     "questionCard": {
       "title": "ایجنټ ځواب ته اړتیا لري",

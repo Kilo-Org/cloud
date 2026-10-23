@@ -2479,7 +2479,10 @@
       "allowOnceAccessibility": "Bir dəfə icazə ver",
       "alwaysAllow": "Həmişə icazə ver",
       "alwaysAllowAccessibility": "Həmişə icazə ver",
-      "retrying": "Yenidən cəhd edilir…"
+      "retrying": "Yenidən cəhd edilir…",
+      "retryDeny": "Yenidən rədd etməyə çalış",
+      "retryAllowOnce": "Yenidən bir dəfə icazə verməyə çalış",
+      "retryAlwaysAllow": "Yenidən həmişə icazə verməyə çalış"
     },
     "questionCard": {
       "title": "Agent cavab gözləyir",

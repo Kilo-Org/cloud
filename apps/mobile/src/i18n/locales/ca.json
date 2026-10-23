@@ -2511,7 +2511,10 @@
       "allowOnceAccessibility": "Permet-ho una vegada",
       "alwaysAllow": "Permet-ho sempre",
       "alwaysAllowAccessibility": "Permet-ho sempre",
-      "retrying": "Tornant-ho a provar…"
+      "retrying": "Tornant-ho a provar…",
+      "retryDeny": "Torna a provar de denegar",
+      "retryAllowOnce": "Torna a provar de permetre-ho una vegada",
+      "retryAlwaysAllow": "Torna a provar de permetre-ho sempre"
     },
     "questionCard": {
       "title": "L'agent necessita una resposta",

@@ -2479,7 +2479,10 @@
       "allowOnceAccessibility": "اجازه برای یک بار",
       "alwaysAllow": "اجازه همیشگی",
       "alwaysAllowAccessibility": "اجازه همیشگی",
-      "retrying": "در حال تلاش دوباره…"
+      "retrying": "در حال تلاش دوباره…",
+      "retryDeny": "تلاش دوباره برای رد کردن",
+      "retryAllowOnce": "تلاش دوباره برای اجازه برای یک بار",
+      "retryAlwaysAllow": "تلاش دوباره برای اجازه همیشگی"
     },
     "questionCard": {
       "title": "نیاز عامل به پاسخ شما",

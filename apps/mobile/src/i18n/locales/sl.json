@@ -2543,7 +2543,10 @@
       "allowOnceAccessibility": "Dovoli enkrat",
       "alwaysAllow": "Vedno dovoli",
       "alwaysAllowAccessibility": "Vedno dovoli",
-      "retrying": "Ponovni poskus…"
+      "retrying": "Ponovni poskus…",
+      "retryDeny": "Znova zavrni",
+      "retryAllowOnce": "Znova dovoli enkrat",
+      "retryAlwaysAllow": "Znova vedno dovoli"
     },
     "questionCard": {
       "title": "Agent potrebuje tvoj odgovor",

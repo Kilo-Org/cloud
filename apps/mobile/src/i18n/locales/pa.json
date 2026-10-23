@@ -2479,7 +2479,10 @@
       "allowOnceAccessibility": "ਇੱਕ ਵਾਰ ਇਜਾਜ਼ਤ ਦਿਓ",
       "alwaysAllow": "ਹਮੇਸ਼ਾ ਇਜਾਜ਼ਤ ਦਿਓ",
       "alwaysAllowAccessibility": "ਹਮੇਸ਼ਾ ਇਜਾਜ਼ਤ ਦਿਓ",
-      "retrying": "ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ…"
+      "retrying": "ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ…",
+      "retryDeny": "ਇਨਕਾਰ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
+      "retryAllowOnce": "ਇੱਕ ਵਾਰ ਇਜਾਜ਼ਤ ਦੇਣ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
+      "retryAlwaysAllow": "ਹਮੇਸ਼ਾ ਇਜਾਜ਼ਤ ਦੇਣ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ"
     },
     "questionCard": {
       "title": "ਏਜੰਟ ਨੂੰ ਤੁਹਾਡੇ ਜਵਾਬ ਦੀ ਲੋੜ ਹੈ",

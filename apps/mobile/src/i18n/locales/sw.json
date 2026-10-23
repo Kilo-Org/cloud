@@ -2479,7 +2479,10 @@
       "allowOnceAccessibility": "Ruhusu mara moja",
       "alwaysAllow": "Ruhusu daima",
       "alwaysAllowAccessibility": "Ruhusu daima",
-      "retrying": "Inajaribu tena…"
+      "retrying": "Inajaribu tena…",
+      "retryDeny": "Jaribu tena kukataa",
+      "retryAllowOnce": "Jaribu tena kuruhusu mara moja",
+      "retryAlwaysAllow": "Jaribu tena kuruhusu daima"
     },
     "questionCard": {
       "title": "Wakala anahitaji jibu",

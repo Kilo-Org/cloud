@@ -1962,7 +1962,10 @@
       "allowOnceAccessibility": "Izinkan sekali",
       "alwaysAllow": "Selalu izinkan",
       "alwaysAllowAccessibility": "Selalu izinkan",
-      "retrying": "Mencoba lagi…"
+      "retrying": "Mencoba lagi…",
+      "retryDeny": "Coba tolak lagi",
+      "retryAllowOnce": "Coba izinkan sekali lagi",
+      "retryAlwaysAllow": "Coba selalu izinkan lagi"
     },
     "questionCard": {
       "title": "Agen membutuhkan masukan",

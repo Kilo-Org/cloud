@@ -2479,7 +2479,10 @@
       "allowOnceAccessibility": "Tillat én gang",
       "alwaysAllow": "Tillat alltid",
       "alwaysAllowAccessibility": "Tillat alltid",
-      "retrying": "Prøver på nytt…"
+      "retrying": "Prøver på nytt…",
+      "retryDeny": "Prøv å nekte på nytt",
+      "retryAllowOnce": "Prøv å tillate én gang på nytt",
+      "retryAlwaysAllow": "Prøv å tillate alltid på nytt"
     },
     "questionCard": {
       "title": "Agenten trenger svar",

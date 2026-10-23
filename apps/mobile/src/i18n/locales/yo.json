@@ -2479,7 +2479,10 @@
       "allowOnceAccessibility": "Gba láyè lẹ́ẹ̀kan",
       "alwaysAllow": "Gba láyè ní gbogbo ìgbà",
       "alwaysAllowAccessibility": "Gba láyè ní gbogbo ìgbà",
-      "retrying": "Ń gbìyànjú lẹ́ẹ̀kan sí i…"
+      "retrying": "Ń gbìyànjú lẹ́ẹ̀kan sí i…",
+      "retryDeny": "Gbìyànjú láti kọ̀ lẹ́ẹ̀kan sí i",
+      "retryAllowOnce": "Gbìyànjú láti gba láyè lẹ́ẹ̀kan sí i",
+      "retryAlwaysAllow": "Gbìyànjú láti gba láyè ní gbogbo ìgbà lẹ́ẹ̀kan sí i"
     },
     "questionCard": {
       "title": "Aṣojú nílò ìdáhùn",

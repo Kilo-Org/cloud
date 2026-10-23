@@ -2479,7 +2479,10 @@
       "allowOnceAccessibility": "Бір рет рұқсат ету",
       "alwaysAllow": "Әрқашан рұқсат ету",
       "alwaysAllowAccessibility": "Әрқашан рұқсат ету",
-      "retrying": "Қайталануда…"
+      "retrying": "Қайталануда…",
+      "retryDeny": "Рұқсат бермеуді қайталау",
+      "retryAllowOnce": "Бір рет рұқсат етуді қайталау",
+      "retryAlwaysAllow": "Әрқашан рұқсат етуді қайталау"
     },
     "questionCard": {
       "title": "Агентке жауап қажет",

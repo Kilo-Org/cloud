@@ -2479,7 +2479,10 @@
       "allowOnceAccessibility": "એકવાર મંજૂરી આપો",
       "alwaysAllow": "હંમેશા મંજૂરી આપો",
       "alwaysAllowAccessibility": "હંમેશા મંજૂરી આપો",
-      "retrying": "ફરી પ્રયાસ થઈ રહ્યો છે…"
+      "retrying": "ફરી પ્રયાસ થઈ રહ્યો છે…",
+      "retryDeny": "નકારવાનો ફરી પ્રયાસ કરો",
+      "retryAllowOnce": "એકવાર મંજૂરી આપવાનો ફરી પ્રયાસ કરો",
+      "retryAlwaysAllow": "હંમેશા મંજૂરી આપવાનો ફરી પ્રયાસ કરો"
     },
     "questionCard": {
       "title": "એજન્ટને તમારો જવાબ જોઈએ છે",

@@ -2479,7 +2479,10 @@
       "allowOnceAccessibility": "Нэг удаа зөвшөөрөх",
       "alwaysAllow": "Үргэлж зөвшөөрөх",
       "alwaysAllowAccessibility": "Үргэлж зөвшөөрөх",
-      "retrying": "Дахин оролдож байна…"
+      "retrying": "Дахин оролдож байна…",
+      "retryDeny": "Татгалзахыг дахин оролдох",
+      "retryAllowOnce": "Нэг удаа зөвшөөрөхийг дахин оролдох",
+      "retryAlwaysAllow": "Үргэлж зөвшөөрөхийг дахин оролдох"
     },
     "questionCard": {
       "title": "Агент хариулт хүлээж байна",

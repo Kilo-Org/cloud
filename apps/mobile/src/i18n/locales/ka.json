@@ -2479,7 +2479,10 @@
       "allowOnceAccessibility": "ერთჯერადი დაშვება",
       "alwaysAllow": "ყოველთვის დაშვება",
       "alwaysAllowAccessibility": "ყოველთვის დაშვება",
-      "retrying": "ხელახლა ცდა…"
+      "retrying": "ხელახლა ცდა…",
+      "retryDeny": "უარყოფის ხელახლა ცდა",
+      "retryAllowOnce": "ერთჯერადი დაშვების ხელახლა ცდა",
+      "retryAlwaysAllow": "ყოველთვის დაშვების ხელახლა ცდა"
     },
     "questionCard": {
       "title": "აგენტი პასუხს ელოდება",

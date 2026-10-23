@@ -2479,7 +2479,10 @@
       "allowOnceAccessibility": "Whakaaetia mō tēnei wā anake",
       "alwaysAllow": "Whakaaetia i ngā wā katoa",
       "alwaysAllowAccessibility": "Whakaaetia i ngā wā katoa",
-      "retrying": "Kei te whakamātau anō…"
+      "retrying": "Kei te whakamātau anō…",
+      "retryDeny": "Whakamātau anō ki te whakakāhoretia",
+      "retryAllowOnce": "Whakamātau anō ki te whakaaetia mō tēnei wā anake",
+      "retryAlwaysAllow": "Whakamātau anō ki te whakaaetia i ngā wā katoa"
     },
     "questionCard": {
       "title": "E hiahia ana te māngai ki tō whakautu",

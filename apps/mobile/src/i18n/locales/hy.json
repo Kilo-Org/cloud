@@ -2479,7 +2479,10 @@
       "allowOnceAccessibility": "Թույլատրել մեկ անգամ",
       "alwaysAllow": "Միշտ թույլատրել",
       "alwaysAllowAccessibility": "Միշտ թույլատրել",
-      "retrying": "Կրկնափորձ…"
+      "retrying": "Կրկնափորձ…",
+      "retryDeny": "Կրկին փորձել մերժել",
+      "retryAllowOnce": "Կրկին փորձել մեկ անգամ թույլատրել",
+      "retryAlwaysAllow": "Կրկին փորձել միշտ թույլատրել"
     },
     "questionCard": {
       "title": "Գործակալը պատասխանի է սպասում",

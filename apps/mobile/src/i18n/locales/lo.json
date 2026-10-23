@@ -2479,7 +2479,10 @@
       "allowOnceAccessibility": "ອະນຸຍາດສະເພາະຄັ້ງນີ້",
       "alwaysAllow": "ອະນຸຍາດທຸກຄັ້ງ",
       "alwaysAllowAccessibility": "ອະນຸຍາດທຸກຄັ້ງ",
-      "retrying": "ກຳລັງລອງໃໝ່…"
+      "retrying": "ກຳລັງລອງໃໝ່…",
+      "retryDeny": "ລອງບໍ່ອະນຸຍາດໃໝ່",
+      "retryAllowOnce": "ລອງອະນຸຍາດສະເພາະຄັ້ງນີ້ໃໝ່",
+      "retryAlwaysAllow": "ລອງອະນຸຍາດທຸກຄັ້ງໃໝ່"
     },
     "questionCard": {
       "title": "ເອເຈນຕ້ອງການຄຳຕອບ",

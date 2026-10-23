@@ -1962,7 +1962,10 @@
       "allowOnceAccessibility": "Bir kez izin ver",
       "alwaysAllow": "Her zaman izin ver",
       "alwaysAllowAccessibility": "Her zaman izin ver",
-      "retrying": "Tekrar deneniyor…"
+      "retrying": "Tekrar deneniyor…",
+      "retryDeny": "Reddetmeyi tekrar dene",
+      "retryAllowOnce": "Bir kez izin vermeyi tekrar dene",
+      "retryAlwaysAllow": "Her zaman izin vermeyi tekrar dene"
     },
     "questionCard": {
       "title": "Ajan yanıt bekliyor",

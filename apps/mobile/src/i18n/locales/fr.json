@@ -1879,7 +1879,10 @@
       "allowOnceAccessibility": "Autoriser une fois",
       "alwaysAllow": "Toujours autoriser",
       "alwaysAllowAccessibility": "Toujours autoriser",
-      "retrying": "Nouvel essai…"
+      "retrying": "Nouvel essai…",
+      "retryDeny": "Réessayer de refuser",
+      "retryAllowOnce": "Réessayer d'autoriser une fois",
+      "retryAlwaysAllow": "Réessayer de toujours autoriser"
     },
     "questionCard": {
       "title": "Réponse attendue par l'agent",

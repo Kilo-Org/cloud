@@ -1962,7 +1962,10 @@
       "allowOnceAccessibility": "Eenmalig toestaan",
       "alwaysAllow": "Altijd toestaan",
       "alwaysAllowAccessibility": "Altijd toestaan",
-      "retrying": "Opnieuw proberen…"
+      "retrying": "Opnieuw proberen…",
+      "retryDeny": "Opnieuw weigeren",
+      "retryAllowOnce": "Opnieuw eenmalig toestaan",
+      "retryAlwaysAllow": "Opnieuw altijd toestaan"
     },
     "questionCard": {
       "title": "Invoer voor de agent nodig",

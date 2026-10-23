@@ -2479,7 +2479,10 @@
       "allowOnceAccessibility": "Lejo një herë",
       "alwaysAllow": "Lejo gjithmonë",
       "alwaysAllowAccessibility": "Lejo gjithmonë",
-      "retrying": "Duke u provuar përsëri…"
+      "retrying": "Duke u provuar përsëri…",
+      "retryDeny": "Provo ta refuzosh përsëri",
+      "retryAllowOnce": "Provo ta lejosh një herë përsëri",
+      "retryAlwaysAllow": "Provo ta lejosh gjithmonë përsëri"
     },
     "questionCard": {
       "title": "Agjenti kërkon përgjigjen tënde",

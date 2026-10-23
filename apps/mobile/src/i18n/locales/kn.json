@@ -2479,7 +2479,10 @@
       "allowOnceAccessibility": "ಒಮ್ಮೆ ಅನುಮತಿಸಿ",
       "alwaysAllow": "ಯಾವಾಗಲೂ ಅನುಮತಿಸಿ",
       "alwaysAllowAccessibility": "ಯಾವಾಗಲೂ ಅನುಮತಿಸಿ",
-      "retrying": "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸುತ್ತಿದೆ…"
+      "retrying": "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸುತ್ತಿದೆ…",
+      "retryDeny": "ನಿರಾಕರಿಸಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
+      "retryAllowOnce": "ಒಮ್ಮೆ ಅನುಮತಿಸಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
+      "retryAlwaysAllow": "ಯಾವಾಗಲೂ ಅನುಮತಿಸಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ"
     },
     "questionCard": {
       "title": "ಏಜೆಂಟ್‌ಗೆ ನಿಮ್ಮ ಉತ್ತರ ಬೇಕಿದೆ",

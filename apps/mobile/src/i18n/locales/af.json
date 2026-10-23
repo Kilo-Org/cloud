@@ -2479,7 +2479,10 @@
       "allowOnceAccessibility": "Laat een keer toe",
       "alwaysAllow": "Laat altyd toe",
       "alwaysAllowAccessibility": "Laat altyd toe",
-      "retrying": "Probeer weer…"
+      "retrying": "Probeer weer…",
+      "retryDeny": "Probeer weer weier",
+      "retryAllowOnce": "Probeer weer laat een keer toe",
+      "retryAlwaysAllow": "Probeer weer laat altyd toe"
     },
     "questionCard": {
       "title": "Agent benodig insette",

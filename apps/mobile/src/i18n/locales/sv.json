@@ -2479,7 +2479,10 @@
       "allowOnceAccessibility": "Tillåt en gång",
       "alwaysAllow": "Tillåt alltid",
       "alwaysAllowAccessibility": "Tillåt alltid",
-      "retrying": "Försöker igen…"
+      "retrying": "Försöker igen…",
+      "retryDeny": "Försök neka igen",
+      "retryAllowOnce": "Försök tillåta en gång igen",
+      "retryAlwaysAllow": "Försök tillåta alltid igen"
     },
     "questionCard": {
       "title": "Agenten behöver inmatning",

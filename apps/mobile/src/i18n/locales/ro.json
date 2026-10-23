@@ -2511,7 +2511,10 @@
       "allowOnceAccessibility": "Permite o singură dată",
       "alwaysAllow": "Permite întotdeauna",
       "alwaysAllowAccessibility": "Permite întotdeauna",
-      "retrying": "Se reîncearcă…"
+      "retrying": "Se reîncearcă…",
+      "retryDeny": "Încearcă din nou să refuzi",
+      "retryAllowOnce": "Încearcă din nou să permiți o singură dată",
+      "retryAlwaysAllow": "Încearcă din nou să permiți întotdeauna"
     },
     "questionCard": {
       "title": "Răspuns necesar pentru agent",

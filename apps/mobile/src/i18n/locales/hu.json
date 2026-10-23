@@ -2479,7 +2479,10 @@
       "allowOnceAccessibility": "Egyszeri engedélyezés",
       "alwaysAllow": "Mindig engedélyezés",
       "alwaysAllowAccessibility": "Mindig engedélyezés",
-      "retrying": "Újrapróbálás…"
+      "retrying": "Újrapróbálás…",
+      "retryDeny": "Megtagadás újrapróbálása",
+      "retryAllowOnce": "Egyszeri engedélyezés újrapróbálása",
+      "retryAlwaysAllow": "Mindig engedélyezés újrapróbálása"
     },
     "questionCard": {
       "title": "Az ügynök válaszra vagy jóváhagyásra vár",

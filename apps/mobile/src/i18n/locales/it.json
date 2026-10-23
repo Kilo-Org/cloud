@@ -1947,7 +1947,10 @@
       "allowOnceAccessibility": "Consenti una volta",
       "alwaysAllow": "Consenti sempre",
       "alwaysAllowAccessibility": "Consenti sempre",
-      "retrying": "Nuovo tentativo…"
+      "retrying": "Nuovo tentativo…",
+      "retryDeny": "Riprova a negare",
+      "retryAllowOnce": "Riprova a consentire una volta",
+      "retryAlwaysAllow": "Riprova a consentire sempre"
     },
     "questionCard": {
       "title": "Richiesta dell'agente",

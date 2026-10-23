@@ -2026,7 +2026,10 @@
       "allowOnceAccessibility": "السماح لمرة واحدة",
       "alwaysAllow": "السماح دائمًا",
       "alwaysAllowAccessibility": "السماح دائمًا",
-      "retrying": "جارٍ إعادة المحاولة…"
+      "retrying": "جارٍ إعادة المحاولة…",
+      "retryDeny": "إعادة محاولة الرفض",
+      "retryAllowOnce": "إعادة محاولة السماح لمرة واحدة",
+      "retryAlwaysAllow": "إعادة محاولة السماح دائمًا"
     },
     "questionCard": {
       "title": "الوكيل بحاجة إلى إجابتك",

@@ -1994,7 +1994,10 @@
       "allowOnceAccessibility": "Zezwól tylko tym razem",
       "alwaysAllow": "Zawsze zezwalaj",
       "alwaysAllowAccessibility": "Zawsze zezwalaj",
-      "retrying": "Ponawianie…"
+      "retrying": "Ponawianie…",
+      "retryDeny": "Ponów odmowę",
+      "retryAllowOnce": "Ponów zezwolenie tylko tym razem",
+      "retryAlwaysAllow": "Ponów zezwalanie zawsze"
     },
     "questionCard": {
       "title": "Agent czeka na odpowiedź",

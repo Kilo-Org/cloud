@@ -2543,7 +2543,10 @@
       "allowOnceAccessibility": "Дазволіць адзін раз",
       "alwaysAllow": "Дазваляць заўсёды",
       "alwaysAllowAccessibility": "Дазваляць заўсёды",
-      "retrying": "Паўторная спроба…"
+      "retrying": "Паўторная спроба…",
+      "retryDeny": "Паспрабаваць адмовіць яшчэ раз",
+      "retryAllowOnce": "Паспрабаваць дазволіць адзін раз яшчэ раз",
+      "retryAlwaysAllow": "Паспрабаваць дазваляць заўсёды яшчэ раз"
     },
     "questionCard": {
       "title": "Агенту патрэбны адказ",

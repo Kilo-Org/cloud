@@ -1994,7 +1994,10 @@
       "allowOnceAccessibility": "Разрешить один раз",
       "alwaysAllow": "Всегда разрешать",
       "alwaysAllowAccessibility": "Всегда разрешать",
-      "retrying": "Повторная попытка…"
+      "retrying": "Повторная попытка…",
+      "retryDeny": "Запретить ещё раз",
+      "retryAllowOnce": "Разрешить один раз ещё раз",
+      "retryAlwaysAllow": "Всегда разрешать ещё раз"
     },
     "questionCard": {
       "title": "Агенту нужен ответ",

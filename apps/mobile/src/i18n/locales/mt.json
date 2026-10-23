@@ -2575,7 +2575,10 @@
       "allowOnceAccessibility": "Ippermetti darba biss",
       "alwaysAllow": "Ippermetti dejjem",
       "alwaysAllowAccessibility": "Ippermetti dejjem",
-      "retrying": "Qed jerġa' jipprova…"
+      "retrying": "Qed jerġa' jipprova…",
+      "retryDeny": "Erġa' pprova tiċħad",
+      "retryAllowOnce": "Erġa' pprova tippermetti darba biss",
+      "retryAlwaysAllow": "Erġa' pprova tippermetti dejjem"
     },
     "questionCard": {
       "title": "L-aġent jeħtieġ it-tweġiba tiegħek",

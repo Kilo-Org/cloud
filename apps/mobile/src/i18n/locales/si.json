@@ -2479,7 +2479,10 @@
       "allowOnceAccessibility": "එක් වරක් පමණක් ඉඩ දෙන්න",
       "alwaysAllow": "සැමවිටම ඉඩ දෙන්න",
       "alwaysAllowAccessibility": "සැමවිටම ඉඩ දෙන්න",
-      "retrying": "නැවත උත්සාහ කරමින්…"
+      "retrying": "නැවත උත්සාහ කරමින්…",
+      "retryDeny": "ප්‍රතික්ෂේප කිරීමට නැවත උත්සාහ කරන්න",
+      "retryAllowOnce": "එක් වරක් පමණක් ඉඩ දීමට නැවත උත්සාහ කරන්න",
+      "retryAlwaysAllow": "සැමවිටම ඉඩ දීමට නැවත උත්සාහ කරන්න"
     },
     "questionCard": {
       "title": "නියෝජිතයාට ඔබේ පිළිතුර අවශ්‍යයි",

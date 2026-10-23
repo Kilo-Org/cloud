@@ -2479,7 +2479,10 @@
       "allowOnceAccessibility": "Leyfa einu sinni",
       "alwaysAllow": "Leyfa alltaf",
       "alwaysAllowAccessibility": "Leyfa alltaf",
-      "retrying": "Reynir aftur…"
+      "retrying": "Reynir aftur…",
+      "retryDeny": "Reyna að hafna aftur",
+      "retryAllowOnce": "Reyna að leyfa einu sinni aftur",
+      "retryAlwaysAllow": "Reyna að leyfa alltaf aftur"
     },
     "questionCard": {
       "title": "Fulltrúinn þarf svar",

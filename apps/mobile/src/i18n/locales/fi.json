@@ -2479,7 +2479,10 @@
       "allowOnceAccessibility": "Salli kerran",
       "alwaysAllow": "Salli aina",
       "alwaysAllowAccessibility": "Salli aina",
-      "retrying": "Yritetään uudelleen…"
+      "retrying": "Yritetään uudelleen…",
+      "retryDeny": "Yritä kieltää uudelleen",
+      "retryAllowOnce": "Yritä salli kerran uudelleen",
+      "retryAlwaysAllow": "Yritä salli aina uudelleen"
     },
     "questionCard": {
       "title": "Agentti tarvitsee vastauksesi",

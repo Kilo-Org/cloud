@@ -1170,37 +1170,43 @@ describe('IdleAuth layout repairs', () => {
     });
   });
 
-  it('abuts the Chinese legal sentence, the connector and the spoken label to the words', async () => {
-    await act(async () => {
-      await i18n.changeLanguage('zh-Hans');
-    });
-    try {
-      const renderer = await mountIdleAuth(vi.fn<StartFn>());
-
-      // Chinese separates no words with spaces, so the catalog carries neither
-      // a separator before the Terms link nor spaces around the conjunction:
-      // the row and the wrapper's label render the same unspaced sentence.
-      const expected = '继续即表示你同意我们的条款和隐私政策。';
-      expect(legalSentence(renderer.root)).toBe(expected);
-      const wrapper = renderer.root.find(
-        n =>
-          typeof n.type === 'string' &&
-          (n.type as string) === 'View' &&
-          n.props.accessible === true &&
-          typeof n.props.accessibilityLabel === 'string' &&
-          n.props.accessibilityLabel.includes('条款')
-      );
-      expect(wrapper.props.accessibilityLabel).toBe(expected);
-
-      act(() => {
-        renderer.unmount();
-      });
-    } finally {
+  it.each([
+    ['zh-Hans', '条款', '继续即表示你同意我们的条款和隐私政策。'],
+    ['zh-Hant', '條款', '繼續即表示你同意我們的條款和隱私權政策。'],
+  ])(
+    'abuts the %s legal sentence, the connector and the spoken label to the words',
+    async (language, terms, expected) => {
       await act(async () => {
-        await i18n.changeLanguage('en');
+        await i18n.changeLanguage(language);
       });
+      try {
+        const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+        // Chinese separates no words with spaces, so the catalog carries
+        // neither a separator before the Terms link nor spaces around the
+        // conjunction: the row and the wrapper's label render the same
+        // unspaced sentence.
+        expect(legalSentence(renderer.root)).toBe(expected);
+        const wrapper = renderer.root.find(
+          n =>
+            typeof n.type === 'string' &&
+            (n.type as string) === 'View' &&
+            n.props.accessible === true &&
+            typeof n.props.accessibilityLabel === 'string' &&
+            n.props.accessibilityLabel.includes(terms)
+        );
+        expect(wrapper.props.accessibilityLabel).toBe(expected);
+
+        act(() => {
+          renderer.unmount();
+        });
+      } finally {
+        await act(async () => {
+          await i18n.changeLanguage('en');
+        });
+      }
     }
-  });
+  );
 
   it('cancels the inline link box height so the sentence keeps a text-xs line', async () => {
     // The audit floor stays on the node's own rect...

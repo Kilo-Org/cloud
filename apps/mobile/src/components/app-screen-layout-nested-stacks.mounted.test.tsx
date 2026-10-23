@@ -31,8 +31,13 @@ vi.mock('@/components/security-agent/security-agent-command-observer', () => ({
 vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({
   useRouteForegroundRefresh: () => undefined,
 }));
+// The code-reviewer layouts validate the pair once and publish it to the
+// screens below; the shared shape stands in for both halves so each layout
+// reaches its Stack.
 vi.mock('@/lib/hooks/use-reviewer-route-params', () => ({
-  useValidatedReviewerRouteParams: () => ({ scope: 'personal', platform: 'github' }),
+  useValidatedReviewerRouteParams: () => ({ kind: 'personal', platform: 'github' }),
+  ReviewerRouteParamsProvider: ({ children }: { children: ReactElement }) => children,
+  useReviewerRouteParams: () => ({ scope: 'personal', platform: 'github' }),
 }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({ useReviewerEditGuard: () => undefined }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({

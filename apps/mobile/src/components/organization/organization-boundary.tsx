@@ -11,6 +11,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useContextPicker } from '@/components/context-control';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { openExternalUrl } from '@/lib/external-link';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -95,6 +96,7 @@ export function OrganizationBoundary({
     const backToProfileAction = (
       <Button
         variant="outline"
+        className={STATE_ACTION_CLASS}
         onPress={() => {
           router.replace(PROFILE_HREF);
         }}
@@ -116,7 +118,7 @@ export function OrganizationBoundary({
           description={t('organization.boundary.noOrganizationDescription')}
           action={
             <View className="gap-3">
-              <Button onPress={openWebOrganizations}>
+              <Button className={STATE_ACTION_CLASS} onPress={openWebOrganizations}>
                 <View className="flex-row items-center gap-2">
                   <Globe size={18} color={colors.primaryForeground} />
                   <Text>{t('organization.boundary.openWebOrganizations')}</Text>
@@ -187,6 +189,7 @@ function OrganizationPickerBoundaryState({
         action={
           <View className="gap-3">
             <Button
+              className={STATE_ACTION_CLASS}
               onPress={() => {
                 openPicker();
               }}

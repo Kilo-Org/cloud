@@ -10379,6 +10379,10 @@ export const operation_ledgers = pgTable(
       table.operation_key
     ),
     index('IDX_operation_ledgers_status_expires_at').on(table.status, table.expires_at),
+    index('IDX_operation_ledgers_admin_renewal_batch')
+      .on(table.intent, table.resource_key, table.status)
+      .concurrently()
+      .where(sql`${table.domain} = 'admin_kiloclaw_stripe_renewals'`),
     // Partial: provider_ref is NULL for every non-security domain, so the
     // index only carries the rows the provider-ref join actually reads.
     index('IDX_operation_ledgers_provider_ref')

@@ -121,7 +121,16 @@ export function PrReviewCommentComposerScreen() {
             router.back();
           },
         },
-      ]
+      ],
+      // Android back dismisses the alert and leaves the composer exactly as
+      // the OK button does: onDismiss routes the dismissal through
+      // router.back, matching the OK press.
+      {
+        cancelable: true,
+        onDismiss: () => {
+          router.back();
+        },
+      }
     );
   }, [parsed, isEdit, pendingItem, router, t]);
 

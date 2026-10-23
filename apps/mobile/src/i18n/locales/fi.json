@@ -269,7 +269,6 @@
     "voiceInput": "Äänisyöte",
     "autoExpandThinking": "Avaa päättely automaattisesti",
     "autoExpandThinkingSubtitle": "Näytä agentin päättely kokonaan, kun päättely valmistuu.",
-    "autoExpandThinkingInactiveSubtitle": "Ei vaikutusta, kun päättelyn tiedot on piilotettu.",
     "hideThinking": "Piilota päättelyn tiedot",
     "hideThinkingSubtitle": "Älä näytä agentin päättelyä istuntosivulla.",
     "keepScreenOn": "Pidä näyttö päällä istuntosivulla",
@@ -294,7 +293,8 @@
     "condenseToolCallsSubtitle": "Ryhmittele peräkkäiset työkalukutsut yhdelle riville, jonka voit avata.",
     "toolSummaryTranslation": "Käännä työkalujen yhteenvedot",
     "toolSummaryTranslationSubtitle": "Lähetä jokainen työkalun yhteenveto mallille käännettäväksi sovelluksesi kielelle. Alkuperäinen näytetään, jos käännös epäonnistuu.",
-    "toolSummaryTranslationModelUnavailableNotice": "Tätä mallia ei enää tarjota. Valitse toinen napauttamalla $t(common.model)."
+    "toolSummaryTranslationModelUnavailableNotice": "Tätä mallia ei enää tarjota. Valitse toinen napauttamalla $t(common.model).",
+    "autoExpandThinkingInactiveSubtitle": "Ei vaikutusta, kun päättelyn tiedot on piilotettu."
   },
   "prReview": {
     "pullRequestUnavailable": "Muutospyyntö ei ole käytettävissä",
@@ -1434,15 +1434,11 @@
       "findingsUnavailable": "Tulokset eivät ole saatavilla, koska tämä katselmointi epäonnistui.",
       "serviceUnavailable": "Koodin katselmointipalveluun ei saatu yhteyttä. Yritä katselmointia uudelleen, kun palvelu on käytettävissä.",
       "reviewFailed": "Katselmointi epäonnistui. Yritä uudelleen.",
-      "cancelReasonSuperseded": "Uudempi commit työnnettiin, joten tämä katselmointi korvattiin.",
-      "cancelReasonIntegrationDisconnected": "{{platform}} on katkaistu, joten tämä katselmointi peruttiin. Yhdistä se uudelleen ja suorita katselmointi uudelleen.",
-      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer poistettiin käytöstä Bitbucketissa, joten tämä katselmointi peruttiin. Ota se uudelleen käyttöön ja suorita katselmointi uudelleen.",
-      "cancelReasonBitbucketPullRequestChanged": "Bitbucketin vetopyyntö muuttui, joten tämä katselmointi korvattiin.",
-      "cancelReasonCancelled": "Tämä katselmointi peruttiin.",
-      "cancelReasonInterrupted": "Tämä katselmointi keskeytyi.",
       "showMore": "Näytä lisää",
       "created": "Luotu",
       "started": "Aloitettu",
+      "reviewEnded": "Päättynyt",
+      "severityNitpick": "Pikkuvika",
       "tokens": "Tokenit",
       "tokensInOut": "{{input}} syötteenä / {{output}} tulosteena",
       "council": "Arviointiryhmä",
@@ -1466,7 +1462,13 @@
       "sessionError": "Istunnossa tapahtui virhe: {{error}}",
       "statusWithValue": "Tila: {{status}}",
       "toolName": "Työkalu: {{name}}",
-      "toolNameError": "Työkalussa {{name}} tapahtui virhe."
+      "toolNameError": "Työkalussa {{name}} tapahtui virhe.",
+      "cancelReasonSuperseded": "Uudempi commit työnnettiin, joten tämä katselmointi korvattiin.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} on katkaistu, joten tämä katselmointi peruttiin. Yhdistä se uudelleen ja suorita katselmointi uudelleen.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer poistettiin käytöstä Bitbucketissa, joten tämä katselmointi peruttiin. Ota se uudelleen käyttöön ja suorita katselmointi uudelleen.",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucketin vetopyyntö muuttui, joten tämä katselmointi korvattiin.",
+      "cancelReasonCancelled": "Tämä katselmointi peruttiin.",
+      "cancelReasonInterrupted": "Tämä katselmointi keskeytyi."
     },
     "reviewMemory": {
       "title": "Katselmointimuisti",
@@ -1753,7 +1755,7 @@
       "deadlinePassed": "Määräaika umpeutunut",
       "deadlinePassedDetail": "{{critical}} kriittistä, {{high}} vakavaa",
       "dueThisWeek": "Määräaika tällä viikolla",
-      "dueThisWeekDetail": "{{exploitable}} hyödynnettäväksi vahvistettua havaintoa",
+      "dueThisWeekDetail": "{{exploitable}} näistä hyödynnettäväksi vahvistettua",
       "noDeadline": "Ei määräaikaa",
       "reviewSlaAssignment": "Tarkista SLA-määräajan asetus",
       "allOpenFindingsTracked": "Kaikki avoimet havainnot seurannassa"
@@ -1913,11 +1915,17 @@
       "actorSystem": "Kilo-järjestelmä",
       "couldNotLoad": "Tarkastusraporttia ei voitu ladata",
       "events": "Tapahtumat",
+      "eventConfidence": "Varmuus: {{confidence}}",
+      "eventReason": "Syy: {{reason}}",
+      "eventsCount_one": "{{displayCount}} tapahtuma",
+      "eventsCount_other": "{{displayCount}} tapahtumaa",
       "generated": "Raportti luotiin {{generatedAt}}",
       "noActivity": "Ei kirjattuja tapahtumia",
       "noActivityDescription": "Kilossa ei ole raportoitavia tietoturvahavaintojen tapahtumia ajalta {{start}}–{{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Koodivarastoa ei ole kirjattu",
+      "reasonUnknown": "Tunnistamaton syy",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Raportin yhteenveto",
       "title": "Tarkastusraportti",
       "unavailable": "Tarkastusraporttia ei ole saatavilla",
@@ -1972,6 +1980,7 @@
       "reauthorizeButton": "Valtuuta GitHub-sovellus uudelleen",
       "reauthorizeDescription": "Tietoturva-agentti tarvitsee käyttöoikeuden Dependabot-hälytysten lukemiseen. Myönnä käyttöoikeus valtuuttamalla GitHub-sovellus uudelleen.",
       "reauthorizeTitle": "Lisäkäyttöoikeuksia tarvitaan",
+      "retryFailed": "Tietoturva-agenttia ei yhä voitu ladata. Tarkista internetyhteytesi ja yritä uudelleen.",
       "setupFailed": "GitHubin käyttöönottoa ei voitu aloittaa. Yritä uudelleen."
     },
     "queuedActionUntracked": "Jonoon lisätyn toiminnon seuranta katkesi. Näet ajantasaisen tilan päivittämällä näkymän.",
@@ -2134,8 +2143,8 @@
       "dollar_other": "dollaria",
       "costSpoken": "kustannus {{cost}}",
       "costSpokenWithTime": "kustannus {{cost}}, {{time}}",
-      "spokenJoiner": "ja",
-      "pullRequest": "muutospyyntö {{number}}"
+      "pullRequest": "muutospyyntö {{number}}",
+      "spokenJoiner": "ja"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubia ei voitu avata",
@@ -2565,7 +2574,10 @@
       "allowOnceAccessibility": "Salli kerran",
       "alwaysAllow": "Salli aina",
       "alwaysAllowAccessibility": "Salli aina",
-      "retrying": "Yritetään uudelleen…"
+      "retrying": "Yritetään uudelleen…",
+      "retryDeny": "Yritä kieltää uudelleen",
+      "retryAllowOnce": "Yritä salli kerran uudelleen",
+      "retryAlwaysAllow": "Yritä salli aina uudelleen"
     },
     "questionCard": {
       "title": "Agentti tarvitsee vastauksesi",
@@ -3117,22 +3129,16 @@
     "boundary": {
       "backToProfile": "Takaisin profiiliin",
       "loadErrorMessage": "Tarkista yhteys ja yritä uudelleen.",
-
       "chooseAccount": "Valitse tili",
       "loadErrorTitle": "Organisaatioitasi ei voitu ladata.",
       "membershipLostNotice": "Sinulla ei ole enää pääsyä tähän organisaatioon. Vaihdettu {{target}}.",
       "noOrganization": "Ei organisaatiota",
-
       "noOrganizationDescription": "Tämä tili ei kuulu mihinkään organisaatioon. Luo organisaatio tai liity sellaiseen verkossa käyttääksesi organisaatio-ominaisuuksia, kuten jäsenkutsuja ja alhaisen saldon hälytyksiä.",
-
       "openWebOrganizations": "Avaa organisaatiot verkossa",
-
       "organizationUnavailable": "Organisaatio ei ole käytettävissä.",
       "selectDescriptionWithOrganizations": "Kuulut yhteen tai useampaan organisaatioon. Valitse tili, jota tämän näytön tulee käyttää.",
-
       "selectOrganization": "Valitse organisaatio",
       "unavailableDescription": "Tämä organisaatio ei ole enää käytettävissä. Jatka valitsemalla toinen organisaatio profiilistasi.",
-
       "unavailableSessionsDescription": "Tämä organisaatio ei ole enää käytettävissä. Sen istuntoja ei voida ladata.",
       "accessDeniedDescription": "Sinulla ei ole pääsyä tähän organisaatioon."
     },
@@ -3155,14 +3161,14 @@
       "truncated": "Aiempia krediittitapahtumia on saatavilla."
     },
     "inviteMember": {
-      "alreadyInvited": "Tämä sähköpostiosoite on jo kutsuttu tai kuuluu jo jäsenelle.",
       "emailError": "Anna kelvollinen sähköpostiosoite.",
       "emailPlaceholder": "nimi@yritys.fi",
       "permissionDenied": "Sinulla ei ole oikeutta kutsua jäseniä.",
       "roleMember": "Rooli: jäsen",
-      "sendError": "Kutsun lähettäminen epäonnistui.",
       "sendInvite": "Lähetä kutsu",
-      "title": "Kutsu jäsen"
+      "title": "Kutsu jäsen",
+      "alreadyInvited": "Tämä sähköpostiosoite on jo kutsuttu tai kuuluu jo jäsenelle.",
+      "sendError": "Kutsun lähettäminen epäonnistui."
     },
     "invoices": {
       "downloadA11y": "Lataa lasku {{number}}",
@@ -3231,8 +3237,8 @@
       "inviteCreated": "Kutsu luotu",
       "pendingInvitations": "Odottavat kutsut",
       "resendInvite": "Lähetä kutsu uudelleen",
-      "resendInviteError": "Kutsun lähettäminen uudelleen epäonnistui.",
-      "shareInviteLink": "Jaa kutsulinkki"
+      "shareInviteLink": "Jaa kutsulinkki",
+      "resendInviteError": "Kutsun lähettäminen uudelleen epäonnistui."
     },
     "usageStats": {
       "inputTokens": "Syötetokenit",
@@ -3377,11 +3383,11 @@
   },
   "transcriptionModel": {
     "title": "Puheentunnistusmalli",
-    "choose": "Valitse malli",
     "noneChosen": "Ei valintaa",
     "emptyTitle": "Ei puheentunnistusmalleja",
     "emptyDescription": "Kilo Gateway ei juuri nyt tarjoa puheentunnistusmalleja.",
-    "loadFailed": "Puheentunnistusmallien lataaminen epäonnistui."
+    "loadFailed": "Puheentunnistusmallien lataaminen epäonnistui.",
+    "choose": "Valitse malli"
   },
   "voiceLanguage": {
     "title": "Puheentunnistuksen kieli",
@@ -3403,7 +3409,6 @@
   },
   "modelChat": {
     "offlineFailure": "Tämä malli tarvitsee internetyhteyden. Muodosta yhteys ja yritä uudelleen tai vaihda tällä laitteella toimivaan malliin.",
-    "creditsRequired": "Krediitit eivät riitä tämän viestin lähettämiseen – lisää krediittejä ja yritä uudelleen.",
     "empty": {
       "title": "Aloita keskustelu",
       "description": "Lähetä viesti keskustellaksesi mallin kanssa."
@@ -3597,6 +3602,7 @@
       "fromHuggingFace": "Lähde: Hugging Face",
       "loading": "Ladataan malleja",
       "noResults": "Malleja ei löytynyt",
+      "noResultsForQuery": "Haulla \"{{query}}\" ei löytynyt malleja",
       "noFits": "Mikään malli ei sovi tälle laitteelle",
       "noFitsDescription": "Suuremmat mallit ovat välilehdellä $t(common.all).",
       "fit": {
@@ -3671,13 +3677,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "Tämä malli tukee päättelyn tasoa"
-    }
+    },
+    "creditsRequired": "Krediitit eivät riitä tämän viestin lähettämiseen – lisää krediittejä ja yritä uudelleen."
   },
   "settingsTools": {
     "confirmTitle": "Vahvistetaanko tämä muutos?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "viimeisin koodivarastosi",
+      "confirmMessage": "Koodivarasto: {{repository}}. Pyyntö: {{prompt}}.",
+      "confirmTitle": "Käynnistetäänkö tämä agentti?",
       "promptRequired": "Agentin käynnistys vaatii kehotteen. Lisää kehote ja suorita se uudelleen.",
       "repositoryRequired": "Agentin käynnistys vaatii koodivaraston. Avaa Kilo ja valitse koodivarasto, sitten suorita se uudelleen.",
       "repositoryUnknown": "Kilo ei tunnista {{repository}}-kohdetta GitHub- tai GitLab-koodivarastoksi. Valitse toinen koodivarasto Kilossa.",
@@ -3706,10 +3716,10 @@
     "noSpend": "Kulutusta ei ole vielä kirjattu",
     "spend24h": "Kulutus viimeisten 24 tunnin aikana",
     "multiplierError": "Anna kerroin, joka on 1 tai suurempi",
-    "multiplierMaxError": "Anna kerroin, joka on {{max}} tai pienempi",
-    "thresholdMaxError": "Anna summa, joka on {{max}} tai pienempi.",
     "permissionDenied": "Sinulla ei ole oikeutta hallita kulutusvaroituksia.",
-    "pushOffByCategory": "Pois päältä Ilmoituksissa"
+    "pushOffByCategory": "Pois päältä Ilmoituksissa",
+    "multiplierMaxError": "Anna kerroin, joka on {{max}} tai pienempi",
+    "thresholdMaxError": "Anna summa, joka on {{max}} tai pienempi."
   },
   "profiles": {
     "title": "Profiilit",
@@ -3757,6 +3767,8 @@
     "keyTooLong": "Avaimessa saa olla enintään 256 merkkiä",
     "keyDuplicate": "Tämä avain on jo profiilissa",
     "valueLabel": "Arvo",
+    "valueRequired": "Anna arvo",
+    "tooLong": "Käytä enintään {{max}} merkkiä",
     "secrets": {
       "markSecret": "Merkitse salaiseksi",
       "masked": "Piilotettu arvo",
@@ -3766,7 +3778,6 @@
     },
     "variablesEmpty": "Ei vielä muuttujia",
     "variablesSaveFailed": "Muuttujan tallentaminen epäonnistui",
-    "variablesDeleteFailed": "Muuttujaa ei voitu poistaa",
     "commandsTitle": "Asennuskomennot",
     "addCommand": "Lisää komento",
     "commandLabel": "Komento",
@@ -3777,7 +3788,6 @@
     "moveDown": "Siirrä alas",
     "moveCommandUp": "Siirrä komento {{position}} ylös",
     "moveCommandDown": "Siirrä komento {{position}} alas",
-    "deleteCommand": "Poista komento {{position}}",
     "skillsTitle": "Taidot",
     "addSkill": "Lisää taito",
     "skillNameLabel": "Taidon nimi",
@@ -3809,7 +3819,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Anna palvelimen nimi",
-      "nameInvalid": "Nimessä voi käyttää vain kirjaimia, numeroita, alaviivoja ja väliviivoja",
+      "nameInvalid": "Nimessä voi käyttää vain ASCII-kirjaimia, numeroita, alaviivoja ja väliviivoja, enintään 100 merkkiä",
       "commandRequired": "Anna komento",
       "commandTooLong": "Käytä enintään 50 argumenttia, kukin 500 merkkiä",
       "urlRequired": "Anna URL-osoite",
@@ -3854,7 +3864,7 @@
       "deleteFailed": "Agenttia ei voitu poistaa",
       "nameRequired": "Anna agentin nimi",
       "slugRequired": "Syötä agentin slug",
-      "slugInvalid": "Slugin tulee alkaa kirjaimella ja käyttää vain pieniä kirjaimia, numeroita ja väliviivoja",
+      "slugInvalid": "Slugin tulee alkaa pienellä ASCII-kirjaimella ja käyttää vain pieniä ASCII-kirjaimia, numeroita ja väliviivoja, enintään 50 merkkiä",
       "slugConflict": "Tuo slug on jo käytössä sisäänrakennetulla agentilla tai toisella agentilla tässä profiilissa",
       "edit": "Muokkaa agenttia"
     },
@@ -3899,7 +3909,9 @@
       "pinFailed": "Koodivarastoa ei voitu kiinnittää",
       "unboundToast": "Koodivaraston sidonta purettu",
       "unbindFailed": "Koodivaraston sidontaa ei voitu purkaa"
-    }
+    },
+    "variablesDeleteFailed": "Muuttujaa ei voitu poistaa",
+    "deleteCommand": "Poista komento {{position}}"
   },
   "credits": {
     "title": "Osta krediittejä",
@@ -3926,7 +3938,6 @@
       "newList": "Uusi lista",
       "empty": "Ei vielä listoja",
       "couldNotLoad": "Listoja ei voitu ladata",
-      "createFailed": "Listaa ei voitu luoda",
       "noRepository": "Ei koodivarastoa",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} avoin",
@@ -3936,7 +3947,8 @@
       "archive": "Arkistoi",
       "unarchive": "Palauta arkistosta",
       "deleteTitle": "Poistetaanko {{name}}?",
-      "deleteMessage": "Myös sen tehtävät poistetaan. Niiden istunnot säilyvät."
+      "deleteMessage": "Myös sen tehtävät poistetaan. Niiden istunnot säilyvät.",
+      "createFailed": "Listaa ei voitu luoda"
     },
     "listSettings": {
       "title": "Listan asetukset",
@@ -4004,21 +4016,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Aamukatsaus",
+    "title": "Agenttikatsaus",
     "atLeast": "≥{{value}}",
     "coverageHint": "Osa aiemmasta toiminnasta voi puuttua. ≥ tarkoittaa vähintään tätä; tuntematon ei ole nolla.",
     "available": "Saatavilla olevat katsaukset",
     "history": "Katsaushistoria",
-    "historyHint": "Raportit säilytetään 30 päivää, myös hylätyt raportit.",
+    "historyHint": "Katsaukset säilytetään 30 päivää, myös hylätyt katsaukset.",
     "settings": "Katsauksen asetukset",
-    "saved": "Katsauksen asetukset tallennettu",
-    "empty": "Ei yöllistä toimintaa",
-    "emptyHint": "Pilvi- ja CLI-koodausistuntosi näkyvät täällä aktiivisen yön jälkeen.",
+    "empty": "Ei toimintaa tässä katsausikkunassa",
+    "emptyHint": "Pilvi- ja CLI-koodausistuntosi näkyvät täällä, kun ajastetussa katsauksessa on toimintaa.",
     "loadError": "Katsauksia ei voitu ladata",
-    "sessions": "Aktiivisena yöllä",
+    "sessions": "Aktiivisena katsausikkunassa",
     "pullRequests": "Avatut PRs",
     "blockers": "Uudet esteet",
-    "spend": "Yön kulut",
+    "spend": "Katsausikkunan kulut",
     "view": "Lue katsaus",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -4040,13 +4051,13 @@
     "sources": "Todisteet ja artefaktit",
     "timezone": "Katsauksen aikavyöhyke",
     "deviceTimezone": "Käytä laitteen aikavyöhykettä",
-    "timezoneHint": "IANA-aikavyöhyke, esimerkiksi Europe/Berlin. Aikataulumuutokset koskevat tulevia öitä.",
-    "nightStart": "Yö alkaa",
-    "morningStart": "Yö päättyy / aamu alkaa",
-    "morningEnd": "Aamu päättyy",
-    "timeHint": "Kotikortti palauttaa reaaliaikaisen tilan aamun päättyessä, myös offline-tilassa.",
-    "invalidSchedule": "Valitse kelvollinen aikavyöhyke sekä ei-päällekkäiset, ei-tyhjät yö- ja aamujaksot.",
-    "notificationsHint": "Yksi yleinen ilmoitus aamuisin, kun ensimmäinen raporttisi on valmis. Riippumaton maksullisista AI-yhteenvedoista.",
+    "timezoneHint": "IANA-aikavyöhyke, esimerkiksi Europe/Berlin. Aikataulumuutokset koskevat tulevia katsauksia.",
+    "nightStart": "Katsausikkuna alkaa",
+    "morningStart": "Katsaus valmiina",
+    "morningEnd": "Katsaus saatavilla asti",
+    "timeHint": "Kotikortti palauttaa reaaliaikaisen tilan, kun katsausikkuna päättyy, myös offline-tilassa.",
+    "invalidSchedule": "Valitse kelvollinen aikavyöhyke ja ei-tyhjä katsausikkuna.",
+    "notificationsHint": "Yksi yleinen ilmoitus ajastettua katsausta kohden. Riippumaton maksullisista AI-yhteenvedoista.",
     "notificationPermission": "Ota laitteen ilmoitukset käyttöön kohdassa $t(common.notifications) saadaksesi katsauksesi.",
     "aiOptIn": "Maksulliset AI-yhteenvedot",
     "aiHint": "Valinnainen vain tässä kontekstissa. Valitut, sensuroidut otteet ja jäsennellyt tiedot lähetetään mallillesi sovelluksesi kielellä. Veloitukset käyttävät tämän kontekstin saldoa.",
@@ -4068,7 +4079,7 @@
     "contextSettings": "AI-asetukset · {{context}}",
     "allContexts": "Henkilökohtaiset ja organisaation katsaukset pidetään erillään.",
     "create": "Luo katsaus",
-    "oneOff": "Kertaluonteinen",
+    "oneOff": "Tarvittaessa",
     "createdAt": "Luotu {{time}}",
     "chooseContext": "Valitse yksi konteksti",
     "period": "Katsauksen ajanjakso",
@@ -4090,9 +4101,12 @@
     "emptyPeriod": "Tällä ajanjaksolla ei löytynyt toimintaa. AI-yhteenvetoa ei luoda eikä maksua veloiteta.",
     "emptyHistory": "Ei tallennettuja katsauksia",
     "historicalStateHint": "Istunnon tila vastaa valitun ajanjakson lopun tilannetta, ei nykyistä reaaliaikaista tilaa.",
-    "oneOffHint": "AI saa valitun aineiston, josta arkaluonteiset tiedot on poistettu, sovelluksesi kielellä. Tämä kertaluonteinen raportti ei muuta aamukatsauksesi aikataulua tai AI-asetuksiasi.",
+    "oneOffHint": "AI saa valitun aineiston, josta arkaluonteiset tiedot on poistettu, sovelluksesi kielellä. Tämä tarvittaessa luotava katsaus ei muuta ajastettua katsaustasi tai AI-asetuksiasi.",
     "createOffline": "Muodosta verkkoyhteys, jotta voit tarkistaa tai luoda katsauksen. Maksullisia pyyntöjä ei koskaan lisätä jonoon ilman verkkoyhteyttä.",
     "estimateInputTooLarge": "Tällä ajanjaksolla on liikaa aineistoa valitulle mallille.",
-    "estimatePermissionUnavailable": "Sinulla ei ole oikeutta käyttää tämän kontekstin saldoa."
+    "estimatePermissionUnavailable": "Sinulla ei ole oikeutta käyttää tämän kontekstin saldoa.",
+    "createFailed": "Tätä katsausta ei voitu luoda.",
+    "reviewFailed": "Tätä katsausta ei voitu tarkistaa.",
+    "saved": "Katsauksen asetukset tallennettu"
   }
 }

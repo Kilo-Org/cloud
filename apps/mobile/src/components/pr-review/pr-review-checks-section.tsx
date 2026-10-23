@@ -358,6 +358,13 @@ export function PrReviewChecksSection({
   const data = checks.data;
   const runList = data?.checkRuns ?? [];
   const groups = groupRunsByStatus(runList);
+  // The server reads each listing up to a fixed page ceiling and flags the
+  // response when entries were left behind, so the header prints a lower bound
+  // instead of a total the rows would contradict. The "+" rides inside the
+  // formatted number of the existing count copy, so no locale needs new text.
+  const displayCount = `${formatNumber(runList.length, i18n.language)}${
+    data?.truncated ? '+' : ''
+  }`;
 
   if (runList.length === 0) {
     return (
@@ -402,7 +409,7 @@ export function PrReviewChecksSection({
           <Text variant="muted" className="text-xs">
             {t('prReview.checks.checksCount', {
               count: runList.length,
-              displayCount: formatNumber(runList.length, i18n.language),
+              displayCount,
             })}
           </Text>
         </View>

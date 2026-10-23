@@ -78,7 +78,7 @@ export function ProfileMetadataForm({
         error={descriptionError ?? undefined}
         multiline
         textAlignVertical="top"
-        className="min-h-20 leading-5"
+        className="min-h-20 leading-[1.25rem]"
         disabled={disabled || isSaving}
         onChangeText={value => {
           descriptionRef.current = value;

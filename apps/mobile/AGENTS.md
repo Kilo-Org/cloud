@@ -196,6 +196,10 @@ what a translator has to work from.
   message, or every catalog quotes a button the reader never sees.
 - Keep the `{{placeholder}}` set identical to English. Word order around a
   placeholder is the translator's to change, so never assume English order.
+  One exception: a plural category may interpolate the count its own family
+  already declares, where that language's plural rules select the category for
+  counts other than one. Never drop a placeholder English requires, and never
+  add one the family does not use.
 - Case follows the English copy, and only in a language that has case. Georgian
   Mkhedruli has none, and Greek keeps the tonos on a capital initial and drops
   it only in full capitals.
@@ -223,7 +227,7 @@ The Chat tab runs `@kilocode/harness-sdk` on the device. `src/lib/chat/` holds t
 
 Quick Chat renders streamed text, reasoning and tools through the shared agent message and tool-detail surfaces. Tool results update the matching call rather than adding user-message bubbles; the same pairing is rebuilt from stored turns when a chat reopens.
 
-The header usage pill shows its percentage or token count without a visible Context prefix. Its accessibility label names the context.
+The header usage pill shows its percentage, or a dash while the context window is unknown, without a visible Context prefix. Its accessibility label names the context and the token count.
 Collapsed reasoning uses the tool row's full-width shape, padding and text style, with a dashed border.
 
 A chat is opened with the SDK's `time` tool and no other. A model has no clock, so it answers a dated question from its training date, confidently and wrong. The other three tools the SDK ships stay off: the composer is already how a person is asked something, a subagent costs a second session, and a to-do list is working memory for a run a chat does not have.

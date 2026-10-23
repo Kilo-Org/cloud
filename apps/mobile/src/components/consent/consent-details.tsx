@@ -6,6 +6,7 @@ import { Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
+import { ConsentPolicySentence } from '@/components/consent/consent-policy-sentence';
 import { Section } from '@/components/consent/section';
 import { type ConsentMode } from '@/components/consent/consent-mode';
 import { ScreenHeader } from '@/components/screen-header';
@@ -343,17 +344,13 @@ export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
             footer={<VoiceTranscriptionControl />}
           />
 
-          <Text className="mt-6 text-xs text-muted-foreground">
-            {t('consent.retentionPrefix')}{' '}
-            <Text
-              className="text-xs text-primary underline"
-              accessibilityRole="link"
-              onPress={handleOpenPrivacy}
-            >
-              {t('consent.privacyPolicy')}
-            </Text>
-            .
-          </Text>
+          <View className="mt-6">
+            <ConsentPolicySentence
+              prefix={t('consent.retentionPrefix')}
+              linkLabel={t('consent.privacyPolicy')}
+              onOpenPolicy={handleOpenPrivacy}
+            />
+          </View>
 
           <View className="mt-8">
             <Button

@@ -7,6 +7,7 @@ import {
 
 export default {
   id: 'orcarouter',
+  models_dev_id: 'orcarouter',
   base_url: 'https://api.orcarouter.ai/v1',
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions', 'messages', 'responses'],

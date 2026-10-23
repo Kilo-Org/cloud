@@ -81,7 +81,8 @@ describe('voice input feedback side effects', () => {
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Choose a model', onPress: expect.any(Function) },
-      ]
+      ],
+      { cancelable: true }
     );
     buttons?.find(button => button.text === 'Choose a model')?.onPress?.();
     expect(routerMock.push).toHaveBeenCalledWith('/(app)/transcription-model-picker');

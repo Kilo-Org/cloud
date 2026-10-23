@@ -1,12 +1,24 @@
-import { useLocalSearchParams } from 'expo-router';
+import { type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
+import { InvalidRouteState } from '@/components/invalid-route-state';
 import { OptionList } from '@/components/code-reviewer/option-list';
 import { REVIEW_STYLES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { useReviewConfig, useSaveReviewConfig } from '@/lib/hooks/use-code-reviewer';
+import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 
 export default function ReviewStyleRoute() {
-  const { scope, platform } = useLocalSearchParams<{ scope: string; platform: ReviewerPlatform }>();
+  const params = useReviewerRouteParams();
+  if (!params) {
+    return <InvalidRouteState backTo={'/(app)/code-reviewer' as Href} />;
+  }
+  return <ReviewStyleScreen scope={params.scope} platform={params.platform} />;
+}
+
+function ReviewStyleScreen({
+  scope,
+  platform,
+}: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   const { data } = useReviewConfig(scope, platform);
   const save = useSaveReviewConfig(scope, platform);
   const { t } = useTranslation();

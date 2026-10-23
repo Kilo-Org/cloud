@@ -2,11 +2,17 @@
 /**
  * Mobile patterns that go wrong in a way nothing else reports.
  *
- * Two kinds. Some are dropped outright, so the element renders with no
- * background, no shadow, no alignment, and the build stays quiet — each of
- * those bans is pinned to a compiler assertion further down, so it lifts the
- * moment react-native-css handles the value. The rest apply, but land in the
- * wrong place, and only in one writing direction.
+ * Classes the compiler drops outright leave the element with no background,
+ * no shadow, no alignment, and the build stays quiet. Each of those bans is
+ * pinned to a compiler assertion further down, so it lifts the moment
+ * react-native-css handles the value.
+ *
+ * Classes and markup that apply but land in the wrong place do so in one
+ * writing direction only, so they stay invisible until the app is read in an
+ * RTL locale.
+ *
+ * Formatting built by hand instead of through `@/lib/intl-cache` skips the tag
+ * normalisation every other surface shares, and pins or ignores the locale.
  *
  * Usage: node tools/nativewind/check-classes.mjs
  */

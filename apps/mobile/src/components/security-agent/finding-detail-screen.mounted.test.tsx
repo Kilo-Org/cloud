@@ -127,8 +127,8 @@ let renderer: R | undefined = undefined;
 const scopeRoot = '/(app)/security-agent/personal';
 const detailPath = `${scopeRoot}/findings/finding-1`;
 
-function renderScreen(): R {
-  const screen = createElement(FindingDetailScreen, { scope: 'personal', findingId: 'finding-1' });
+function renderScreen(findingId = 'finding-1'): R {
+  const screen = createElement(FindingDetailScreen, { scope: 'personal', findingId });
   act(() => {
     if (renderer) {
       renderer.update(screen);
@@ -304,6 +304,48 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
 
     expect(tree.root.findAllByType(QueryError)).toHaveLength(1);
     expectSafeBack(tree);
+  });
+
+  it('holds the failed load with retry progress while the retry runs', () => {
+    finding.isError = true;
+    finding.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+    finding.data = undefined;
+    const tree = renderScreen();
+    expect(tree.root.findByType(QueryError).props.isRetrying).toBe(false);
+
+    // React Query resets a failed query to pending when its retry starts, so
+    // the surface has to survive isError turning false for the retry window.
+    finding.isError = false;
+    finding.error = null;
+    finding.isFetching = true;
+    renderScreen();
+
+    expect(tree.root.findAllByType(QueryError)).toHaveLength(1);
+    expect(tree.root.findByType(QueryError).props.isRetrying).toBe(true);
+    expect(tree.root.findAllByType(Skeleton)).toHaveLength(0);
+
+    finding.isFetching = false;
+    finding.data = { status: 'open', repo_full_name: 'org/recovered' };
+    renderScreen();
+
+    expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
+    expect(tree.root.findAllByProps({ children: 'org/recovered' })).toHaveLength(1);
+  });
+
+  it('does not carry a failed load onto another finding', () => {
+    finding.isError = true;
+    finding.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+    finding.data = undefined;
+    const tree = renderScreen();
+    expect(tree.root.findAllByType(QueryError)).toHaveLength(1);
+
+    finding.isError = false;
+    finding.error = null;
+    finding.isFetching = true;
+    renderScreen('finding-2');
+
+    expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
+    expect(tree.root.findAllByType(Skeleton)).toHaveLength(4);
   });
 
   it('recovers the finding through Retry after a transient load failure', () => {

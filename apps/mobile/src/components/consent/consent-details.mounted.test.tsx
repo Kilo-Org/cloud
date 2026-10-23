@@ -316,6 +316,22 @@ describe('ConsentDetails copy', () => {
       'Account ID, request metadata, token usage, and the prompts and voice recordings the app sends through it.'
     );
   });
+
+  it('exposes the inline privacy-policy link as a link', () => {
+    const renderer = mount();
+    const links = renderer.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Text' &&
+        n.props.children === 'Kilo privacy policy'
+    );
+    expect(links).toHaveLength(1);
+    const link = links[0];
+    if (!link) {
+      throw new Error('privacy link not found');
+    }
+    expect(link.props.accessibilityRole).toBe('link');
+  });
 });
 
 describe('Voice transcription section', () => {

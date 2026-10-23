@@ -404,3 +404,79 @@ test('still rejects an unrelated extra key beside a counted family', context => 
   assert.equal(result.status, 1, result.stderr);
   assert.match(result.stderr, /mobile\/ru: extra key "counts\.stray" is not in en\.json/);
 });
+
+const AGENT_EDITOR = {
+  agents: { title: 'Agents' },
+  profiles: {
+    agents: {
+      visibilityPrimary: 'Primary — in the picker',
+      visibilitySubagent: 'Subagent — callable from others',
+      visibilityAll: 'All — both',
+      topP: 'Top P',
+    },
+  },
+};
+const AGENT_EDITOR_TRANSLATED = {
+  agents: { title: 'Агенты' },
+  profiles: {
+    agents: {
+      visibilityPrimary: 'Основной — в списке',
+      visibilitySubagent: 'Субагент — только извне',
+      visibilityAll: 'Все — оба',
+      topP: 'Top P',
+    },
+  },
+};
+const AGENT_EDITOR_SOURCE = [
+  "t('agents.title');",
+  "t('profiles.agents.visibilityPrimary');",
+  "t('profiles.agents.visibilitySubagent');",
+  "t('profiles.agents.visibilityAll');",
+  "t('profiles.agents.topP');",
+].join('\n');
+
+test('accepts one spaced em dash in every agent-editor visibility option', context => {
+  const result = runChecker(context, {
+    english: AGENT_EDITOR,
+    translated: AGENT_EDITOR_TRANSLATED,
+    source: AGENT_EDITOR_SOURCE,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('rejects a visibility option whose label and description use a hyphen', context => {
+  const result = runChecker(context, {
+    english: AGENT_EDITOR,
+    translated: {
+      ...AGENT_EDITOR_TRANSLATED,
+      profiles: {
+        agents: { ...AGENT_EDITOR_TRANSLATED.profiles.agents, visibilityAll: 'Все - оба' },
+      },
+    },
+    source: AGENT_EDITOR_SOURCE,
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ru: "profiles\.agents\.visibilityAll" must join its label and description with " — "/
+  );
+});
+
+test('rejects a catalog that translates the sampling parameter label', context => {
+  const result = runChecker(context, {
+    english: AGENT_EDITOR,
+    translated: {
+      ...AGENT_EDITOR_TRANSLATED,
+      profiles: {
+        agents: { ...AGENT_EDITOR_TRANSLATED.profiles.agents, topP: 'Верхний P' },
+      },
+    },
+    source: AGENT_EDITOR_SOURCE,
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ru: "profiles\.agents\.topP" must read "Top P" in every catalog/
+  );
+});

@@ -44,8 +44,14 @@ vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     user: {
       getContextBalance: {
-        queryOptions: () => ({
-          queryKey: ['user', 'getContextBalance'] as const,
+        // tRPC builds `[path, { input, type }]`, so the account selection lives
+        // in the key: a context switch is a different query, which is what
+        // `keepPreviousData` then bridges while the new context's read runs.
+        queryOptions: (input?: { organizationId?: string }) => ({
+          queryKey: [
+            ['user', 'getContextBalance'],
+            { ...(input !== undefined && { input }), type: 'query' },
+          ] as const,
           queryFn: getContextBalanceQueryFn,
         }),
       },
@@ -204,7 +210,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-const BALANCE_KEY = ['user', 'getContextBalance'] as const;
+const BALANCE_KEY = [['user', 'getContextBalance'], { input: {}, type: 'query' }] as const;
 const organizationName = 'A very long organization name that must leave the credits label visible';
 const savedMetadata = new Map<string, string>();
 let saveCompletion: Promise<undefined> | undefined = undefined;
@@ -331,6 +337,32 @@ describe('CreditsCard balance state', () => {
 
     expect(renderer.root.findAllByType('ActivityIndicator' as ElementType)).toHaveLength(0);
     expect(texts()).toContain('$10.00');
+
+    unmount();
+  });
+
+  it('shows the skeleton instead of the previous account balance while a switch settles', async () => {
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 10 });
+    const orgs = [
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+      { organizationId: 'org-b', organizationName: 'Beta', role: 'owner' },
+    ] as OrgListEntry[];
+    listState.payload = orgs;
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+
+    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+    await waitFor(() => texts().includes('$10.00'));
+
+    // The newly selected account's read never answers: the previous account's
+    // amount must not stay on the row under the new account's name.
+    const stalled = Promise.withResolvers<undefined>();
+    getContextBalanceQueryFn.mockReturnValue(stalled.promise);
+    await openSheet(renderer);
+    await choose(renderer, 'Beta');
+
+    await waitFor(() => texts().includes('SKELETON'));
+    expect(texts()).not.toContain('$10.00');
 
     unmount();
   });

@@ -75,6 +75,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const {
     data: balance,
     isLoading: balanceLoading,
+    isPlaceholderData: balancePlaceholder,
     isError: balanceQueryError,
     refetch: refetchBalance,
   } = useQuery({
@@ -122,8 +123,14 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // on a cold launch. The read itself settles regardless of the online manager,
   // and an unreachable one lands on `balanceFailed` instead of this branch.
   const balancePending = balance === undefined && !balanceFailed;
+  // `keepPreviousData` keeps the last account's amount on screen while the next
+  // account's read runs, which would paint the previous account's balance under
+  // the newly selected account's name with no cue at all. The skeleton owns that
+  // window too, so a context switch never shows an amount that belongs to
+  // another account; the read either answers or lands on `balanceFailed`.
   const showBalanceSkeleton =
-    (balanceLoading || balancePending || !hideBalanceLoaded) && !balanceFailed;
+    (balanceLoading || balancePending || balancePlaceholder || !hideBalanceLoaded) &&
+    !balanceFailed;
   const now = Date.now();
   const expiringBlocks =
     creditData?.creditBlocks.filter(
@@ -303,12 +310,13 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
               ))}
           </Animated.View>
           <View className="max-w-full flex-row flex-wrap items-center gap-2">
-            {/* No in-progress indicator here: this row paints a balance that has
-                already answered, and a background refresh may legitimately take
-                a while or never finish. The first load owns the skeleton above;
-                a refresh that fails owns the retry surface. An indicator tied to
-                every in-flight refresh spun for as long as a stalled one lasted
-                (and announced itself as "In progress"). */}
+            {/* No in-progress indicator here: this row paints a balance that
+                belongs to the selected account, and a background refresh may
+                legitimately take a while or never finish. The first load and a
+                context switch own the skeleton above; a refresh that fails owns
+                the retry surface. An indicator tied to every in-flight refresh
+                spun for as long as a stalled one lasted (and announced itself
+                as "In progress"). */}
             {selectedOrgId == null && (
               <AddCreditsButton
                 className={cn('h-auto min-h-11 max-w-full py-2', stackBalance && 'flex-1')}
@@ -336,7 +344,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           stacking a second skeleton card. The card's queries still run from
           mount, so the swap adds no fetch latency. */}
       {enabled && !selectedOrgId ? (
-        <KiloPassSubscriptionCard hideLoadingSkeleton={balanceLoading || balancePending} />
+        <KiloPassSubscriptionCard hideLoadingSkeleton={showBalanceSkeleton} />
       ) : null}
     </View>
   );

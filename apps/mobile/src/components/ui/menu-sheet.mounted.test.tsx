@@ -52,10 +52,7 @@ async function renderMenu(overrides: Partial<Parameters<typeof MenuSheet>[0]> = 
   const props = {
     visible: true,
     title: 'Member E2E',
-    options: [
-      { label: 'Change role' },
-      { label: 'Remove member', destructive: true },
-    ] as const,
+    options: [{ label: 'Change role' }, { label: 'Remove member', destructive: true }] as const,
     cancelLabel: 'Cancel',
     onSelect: vi.fn<(index: number) => void>(),
     onClose: vi.fn<() => void>(),
@@ -88,7 +85,9 @@ describe('MenuSheet', () => {
   it('marks only the destructive row as destructive', async () => {
     const { renderer } = await renderMenu();
     const labels = renderer.root.findAllByType('Text').map(node => node.props);
-    const destructive = labels.filter(props => String(props.className ?? '').includes('text-destructive'));
+    const destructive = labels.filter(props =>
+      String(props.className ?? '').includes('text-destructive')
+    );
     expect(destructive).toHaveLength(1);
     expect(destructive[0]?.children).toBe('Remove member');
   });

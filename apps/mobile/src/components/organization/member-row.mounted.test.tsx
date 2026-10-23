@@ -60,13 +60,7 @@ const mounted: Mounted[] = [];
 async function renderRow(overrides: Partial<Parameters<typeof MemberRow>[0]> = {}) {
   mocks.menuProps.length = 0;
   const view = await renderWithProviders(
-    <MemberRow
-      member={member}
-      canManage
-      enableUsageLimits
-      organizationId="org-1"
-      {...overrides}
-    />
+    <MemberRow member={member} canManage enableUsageLimits organizationId="org-1" {...overrides} />
   );
   mounted.push(view);
   return view.renderer;

@@ -185,7 +185,7 @@ import {
   MESSAGE_SENT_EVENT,
   SESSION_VIEWED_EVENT,
 } from '@/lib/analytics/posthog';
-import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
+import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { useMotionPolicy } from '@/lib/a11y/motion';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -1910,11 +1910,13 @@ export function SessionDetailContent({
     if (!wasBlocking || isBlocking) {
       return undefined;
     }
-    if (moveA11yFocus(transcriptRef)) {
+    // `false` means the transcript had no node handle yet; retry once it has
+    // mounted. A dispatched request the platform ignores is not retryable.
+    if (requestA11yFocus(transcriptRef)) {
       return undefined;
     }
     const handle = setTimeout(() => {
-      moveA11yFocus(transcriptRef);
+      requestA11yFocus(transcriptRef);
     }, 50);
     return () => {
       clearTimeout(handle);

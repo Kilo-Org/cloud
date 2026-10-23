@@ -451,7 +451,7 @@ vi.mock('@/lib/analytics/posthog', () => ({
   SESSION_VIEWED_EVENT: 'viewed',
 }));
 vi.mock('@/lib/a11y/announce', () => ({
-  moveA11yFocus: () => false,
+  requestA11yFocus: () => false,
   announceForA11y: vi.fn(),
 }));
 // `test-user` by default; the last-opened test flips it to `undefined` to model

@@ -9,7 +9,7 @@ export default function CodeReviewerReviewListRoute() {
   const scope = parseParam(rawScope);
 
   if (!scope) {
-    return <InvalidRouteState backTo={'/(app)/(tabs)/(3_profile)' as Href} />;
+    return <InvalidRouteState backTo={'/(app)/code-reviewer' as Href} />;
   }
 
   return <ReviewListScreen scope={scope} />;

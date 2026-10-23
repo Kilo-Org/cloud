@@ -798,6 +798,54 @@ describe('PrReviewScreen header eyebrow cap', () => {
   });
 });
 
+describe('PrReviewScreen failed first load', () => {
+  afterEach(() => {
+    vi.mocked(React.useContext).mockReturnValue(null);
+  });
+
+  it.each(['files', 'discussion'] as const)(
+    'keeps the overview body when the first load fails on the %s tab',
+    tab => {
+      // The Files and Discussion bodies read their data from the same PR query,
+      // so a failed first load leaves them nothing to paint: the screen must show
+      // the overview's own error arm (reason + Retry) instead of an empty tab.
+      prQueryResult = { data: undefined, isLoading: false, isError: true, isFetching: false };
+      vi.mocked(React.useState).mockReturnValueOnce([tab, vi.fn<() => void>()]);
+      // eslint-disable-next-line new-cap
+      const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+      expect(
+        findElement({ node: element, type: 'PrReviewOverview', prop: 'number', value: 7 })
+      ).not.toBeNull();
+      expect(
+        findElement({ node: element, type: 'PrReviewFilesTab', prop: 'number', value: 7 })
+      ).toBeNull();
+      expect(
+        findElement({ node: element, type: 'PrReviewDiscussionTab', prop: 'number', value: 7 })
+      ).toBeNull();
+      // The selector is disabled in this state, so the tab it paints as selected
+      // must be the one whose body is on screen.
+      expect(
+        findElement({
+          node: element,
+          type: 'PrReviewTabSelector',
+          prop: 'activeTab',
+          value: 'overview',
+        })
+      ).not.toBeNull();
+    }
+  );
+
+  it('keeps the selected tab while the read is still loading', () => {
+    prQueryResult = { data: undefined, isLoading: true, isError: false, isFetching: false };
+    vi.mocked(React.useState).mockReturnValueOnce(['files', vi.fn<() => void>()]);
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    expect(
+      findElement({ node: element, type: 'PrReviewFilesTab', prop: 'number', value: 7 })
+    ).not.toBeNull();
+  });
+});
+
 describe('PrReviewScreen Back target', () => {
   beforeEach(() => {
     routerDismissTo.mockClear();

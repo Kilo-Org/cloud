@@ -59,11 +59,17 @@ function Probe() {
   return createElement('Probe', { padding: useTabBarBottomPadding() });
 }
 
-/** The clearance `useTabBarBottomPadding` reserves under an optional label decision. */
-async function clearanceFor(showLabel: boolean | null): Promise<number> {
+/**
+ * The clearance `useTabBarBottomPadding` reserves under a tab-bar context:
+ * `true`/`false` are the tabs layout's label decisions, `null` is the root
+ * stack (no bar), `undefined` is a screen rendered under neither layout.
+ */
+async function clearanceFor(showLabel: boolean | null | undefined): Promise<number> {
   const probe = createElement(Probe);
   const ui =
-    showLabel === null ? probe : createElement(TabBarLabelContext, { value: showLabel }, probe);
+    showLabel === undefined
+      ? probe
+      : createElement(TabBarLabelContext, { value: showLabel }, probe);
   const mounted = await renderWithProviders(ui);
   try {
     return mounted.renderer.root.findByType('Probe').props.padding as number;
@@ -125,10 +131,17 @@ describe('tab screen bottom clearance', () => {
     );
   });
 
-  it('falls back to the font-scale rule outside the tabs navigator', async () => {
+  it('clears only the safe-area inset on a root-stack screen', async () => {
+    // The root stack draws no bar under its own screens, so their content
+    // clears the inset alone; a bar's height here would leave a blank strip.
     layout.fontScale = 2.5;
-    await expect(clearanceFor(null)).resolves.toBe(
-      getTabBarIconForwardHeight(layout.bottom, 'android') + TAB_SCREEN_BOTTOM_GAP
+    await expect(clearanceFor(null)).resolves.toBe(layout.bottom + TAB_SCREEN_BOTTOM_GAP);
+  });
+
+  it('keeps the font-scale rule for a screen rendered under neither layout', async () => {
+    layout.fontScale = 1.5;
+    await expect(clearanceFor(undefined)).resolves.toBe(
+      getTabBarOverlayHeight(layout.bottom, 'android', layout.fontScale) + TAB_SCREEN_BOTTOM_GAP
     );
   });
 });
@@ -143,7 +156,11 @@ describe('TabScreenScrollView', () => {
     layout.bottom = 34;
     layout.fontScale = 1;
     const { renderer, unmount } = await renderWithProviders(
-      createElement(TabScreenScrollView, null, createElement('Content'))
+      createElement(
+        TabBarLabelContext,
+        { value: true },
+        createElement(TabScreenScrollView, null, createElement('Content'))
+      )
     );
     const findByType = (type: string) =>
       renderer.root.findAll(node => typeof node.type === 'string' && node.type === type);
@@ -158,6 +175,25 @@ describe('TabScreenScrollView', () => {
     expect(childTypes).toEqual(['Content', 'View']);
     const [spacer] = findByType('View');
     expect(spacer?.props.style).toEqual({ height: 16 });
+    unmount();
+  });
+
+  it('ends the viewport at the safe-area inset on a root-stack screen', async () => {
+    // No tabs navigator above this screen means no bar to end above, so the
+    // viewport clears the bottom inset alone instead of leaving a bar-height
+    // blank strip under the last row.
+    layout.platform = 'ios';
+    layout.bottom = 34;
+    layout.fontScale = 1;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(
+        TabBarLabelContext,
+        { value: null },
+        createElement(TabScreenScrollView, null, createElement('Content'))
+      )
+    );
+    const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
+    expect(scroll?.props.style).toEqual([undefined, { marginBottom: 34 }]);
     unmount();
   });
 });

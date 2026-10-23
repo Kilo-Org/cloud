@@ -1354,9 +1354,7 @@ describe('ReviewDetailScreen retry when Code Reviewer cannot run', () => {
     act(() => {
       fixSettings?.onPress?.();
     });
-    expect(routerMock.push).toHaveBeenCalledWith(
-      '/(app)/(tabs)/(3_profile)/code-reviewer/personal/github'
-    );
+    expect(routerMock.push).toHaveBeenCalledWith('/(app)/code-reviewer/personal/github');
   });
 
   it('links to the settings when the configuration needs attention', () => {

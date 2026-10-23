@@ -24,21 +24,20 @@ const TAB_SCREEN_BOTTOM_GAP = 16;
  * band (the tab bar's height, or the IME occlusion while the keyboard is up) is
  * a margin on a `flex-1` frame, so a window shorter than the band leaves the
  * frame zero points tall: nothing below the header renders and nothing can be
- * scrolled, which made a short landscape window unusable (frame height 0 with
- * 577 points of content on Home). The floor gives up part of the reserved band
- * in that window instead: the lowest 88 points of the viewport (about two list
- * rows, or a section header and one row) can then sit under the translucent
- * bar, which is the lesser cost. Any window that can afford the whole band
- * keeps it unchanged.
+ * scrolled. The floor gives up part of the reserved band in such a window
+ * instead: the lowest 88 points of the viewport (about two list rows, or a
+ * section header and one row) can then sit under the translucent bar, which is
+ * the lesser cost. Any window that can afford the whole band keeps it
+ * unchanged.
  */
 const TAB_SCREEN_MIN_VIEWPORT = 88;
 
 /**
- * The tab bar's rendered height for this screen's clearance:
- * `useEffectiveTabBarHeight` supplies the tabs layout's label decision, the
- * safe-area bottom inset and the platform, so the clearance cannot drift from
- * the rendered bar height. Shared by the scroll viewport and by
- * `useTabBarBottomPadding`.
+ * The bottom chrome this screen clears: the tab bar's rendered height under the
+ * tabs navigator, or the safe-area inset alone on a root-stack screen, where no
+ * bar is drawn. `useEffectiveTabBarHeight` supplies the tabs layout's label
+ * decision, the inset and the platform, so the clearance cannot drift from what
+ * is on screen. Shared by the scroll viewport and by `useTabBarBottomPadding`.
  */
 function useTabBarHeight() {
   return useEffectiveTabBarHeight();

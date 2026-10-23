@@ -5,7 +5,7 @@ import { vi } from 'vitest';
 // The value the app ships at a default scale is all a rendered tree needs; a
 // suite that needs another one can register its own mock, which wins.
 vi.mock('@/lib/font-scale/native-font-scale', () => ({
-  readLiveFontScale: () => 1,
+  readLiveFontScale: () => null,
   subscribeToFontScale: () => null,
 }));
 

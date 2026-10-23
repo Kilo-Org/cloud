@@ -16,7 +16,7 @@ import { SystemFontScaleContext } from '@/lib/font-scale/system-font-scale-conte
  * text node reads it through.
  */
 export function SystemFontScaleProvider({ children }: { readonly children: ReactNode }) {
-  const [fontScale, setFontScale] = useState(readLiveFontScale);
+  const [fontScale, setFontScale] = useState<number | null>(readLiveFontScale);
 
   useEffect(() => {
     const subscription = subscribeToFontScale(setFontScale);

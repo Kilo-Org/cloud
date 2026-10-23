@@ -17,9 +17,10 @@ type FontScaleModule = InstanceType<
 
 const nativeModule = requireOptionalNativeModule<FontScaleModule>('KiloFontScale');
 
-export function readLiveFontScale(): number {
-  const scale = nativeModule?.getFontScale() ?? 1;
-  return Number.isFinite(scale) && scale > 0 ? scale : 1;
+/** The live scale, or `null` when this build has no `KiloFontScale` module. */
+export function readLiveFontScale(): number | null {
+  const scale = nativeModule?.getFontScale();
+  return scale != null && Number.isFinite(scale) && scale > 0 ? scale : null;
 }
 
 export function subscribeToFontScale(

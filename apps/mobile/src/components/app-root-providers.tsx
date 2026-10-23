@@ -2,9 +2,10 @@ import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import { PortalHost } from '@rn-primitives/portal';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { usePathname, useSegments } from 'expo-router';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { CheckCircle2, Info, Loader, TriangleAlert, XCircle } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
-import { Platform, useWindowDimensions } from 'react-native';
+import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider, useKeyboardState } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -127,7 +128,7 @@ export function AppRootProviders({
 function AppToaster() {
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
   // The provider reports the whole strip the IME hides, anchored to the screen
   // bottom: on Android edge-to-edge its height is the full IME inset (the
   // navigation bar is translucent there, so nothing is subtracted), and on iOS

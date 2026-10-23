@@ -11,13 +11,7 @@ export default {
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions', 'messages', 'responses'],
   reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
-  transformRequest(context) {
-    const { request } = context;
-    if (request.kind !== 'chat_completions') {
-      return;
-    }
-    request.body.reasoning_effort ??= request.body.reasoning?.effort ?? undefined;
-  },
+  transformRequest() {},
   models: cachedEnhancedDirectByokModelList({
     providerId: 'orcarouter',
     recommendedModels: [

@@ -60,6 +60,11 @@ const MOBILE_EXACT_EXCLUDE_ENTRIES = [
   '@shopify/flash-list@2.3.3',
   'react-native-reanimated@4.7.1',
 ] as const;
+
+// Bun 1.4.4 rejects the compromised eMudhra chains, and the wrapper dev types
+// must equal the runtime the image-version contract test pins, so the types
+// pair moves with it. Types only: no runtime code and no install scripts.
+const BUN_TYPES_EXACT_EXCLUDE_ENTRIES = ['@types/bun@1.4.4', 'bun-types@1.4.4'] as const;
 // Exact pnpm syntax for one pinned package version: bare or @scoped name, then
 // @ and a version starting with a digit. Rejects name-only entries, ranges,
 // wildcards, and future-version placeholders alike.
@@ -103,13 +108,14 @@ describe('minimum release age policy contract', () => {
     expect(Number(match?.[1])).toBe(EXPECTED_MINIMUM_RELEASE_AGE_MINUTES);
   });
 
-  it('excludes exactly the base list plus the container-runtime and mobile exact versions', () => {
+  it('excludes exactly the base list plus the container-runtime, mobile and Bun-types exact versions', () => {
     const expected = [
       BASE_EXCLUDE_ENTRIES[0],
       ...CLOUDFLARE_SANDBOX_EXACT_EXCLUDE_ENTRIES,
       ...CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES,
       ...BASE_EXCLUDE_ENTRIES.slice(1),
       ...MOBILE_EXACT_EXCLUDE_ENTRIES,
+      ...BUN_TYPES_EXACT_EXCLUDE_ENTRIES,
     ];
     expect(excludeEntries).toEqual(expected);
   });
@@ -119,6 +125,7 @@ describe('minimum release age policy contract', () => {
       ...CLOUDFLARE_SANDBOX_EXACT_EXCLUDE_ENTRIES,
       ...CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES,
       ...MOBILE_EXACT_EXCLUDE_ENTRIES,
+      ...BUN_TYPES_EXACT_EXCLUDE_ENTRIES,
     ]);
     for (const entry of newExclusions) {
       expect(entry).toMatch(EXACT_VERSION_PATTERN);

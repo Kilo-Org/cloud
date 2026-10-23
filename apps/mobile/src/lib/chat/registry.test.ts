@@ -74,7 +74,11 @@ const modelError = vi.hoisted(() => {
   }
   return {
     ModelError: ModelError as unknown as new (...args: never[]) => Error,
-    failed: (fields: { readonly reason: string; readonly status?: number; readonly cause?: unknown }) =>
+    failed: (fields: {
+      readonly reason: string;
+      readonly status?: number;
+      readonly cause?: unknown;
+    }) =>
       Object.assign(Object.create(ModelError.prototype as object) as Error, {
         name: 'ModelError',
         message: fields.reason,

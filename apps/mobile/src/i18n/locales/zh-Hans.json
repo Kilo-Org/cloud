@@ -205,7 +205,7 @@
     "codeReviewerSubtitle": "自动 PR 审查",
     "securityAgentSubtitle": "查找并修复漏洞",
     "reviews": "审查",
-    "prReviewSubtitle": "在移动端审查拉取请求",
+    "prReviewSubtitle": "在手机上审查拉取请求",
     "couldNotLoadOrganization": "无法加载组织。",
     "couldNotLoadOrganizationDescription": "加载完成前，无法使用组织和智能体设置。",
     "linkedAccounts": "已关联账户",

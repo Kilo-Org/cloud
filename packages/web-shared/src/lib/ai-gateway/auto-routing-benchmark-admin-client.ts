@@ -10,6 +10,8 @@ import {
   BenchmarkRunsResponseSchema,
   CUSTOM_ROUTER_STATUS_PATH,
   CustomRouterStatusResponseSchema,
+  PLATFORM_MEASUREMENTS_PATH,
+  PlatformMeasurementsResponseSchema,
   RequeueBenchmarkRegistryResponseSchema,
   StartBenchmarkRunResponseSchema,
   type BenchmarkConfig,
@@ -202,5 +204,13 @@ export function getCustomRouterStatus(request: CustomRouterBenchmarkContext) {
       body: JSON.stringify(request),
     },
     CustomRouterStatusResponseSchema
+  );
+}
+
+export function getPlatformMeasurements(baseRouter: AutoRouter) {
+  return fetchBenchmarkAdmin(
+    `${PLATFORM_MEASUREMENTS_PATH}?router=${baseRouter}`,
+    { method: 'GET', signal: AbortSignal.timeout(10_000) },
+    PlatformMeasurementsResponseSchema
   );
 }

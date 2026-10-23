@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { namedSessionTitle } from '@/components/agents/session-detail-rename-state';
 import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { QueryError } from '@/components/query-error';
+import { SheetTitleRow } from '@/components/sheet-title-row';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
@@ -104,11 +105,17 @@ export function TodoLinkSessionSheet({
   }
 
   return (
-    <Sheet visible={visible} onClose={onClose} snapPoints={['70%']}>
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      // The body scrolls, so the native sheet's drag would dismiss it on a
+      // scroll and the iOS backdrop tap is gone with it; the title row's close
+      // control and Android Back are this sheet's exits.
+      dismissGestures={false}
+      snapPoints={['70%']}
+    >
       <View className="flex-1 pt-4">
-        <Text accessibilityRole="header" className="px-5 pb-3 text-base font-semibold">
-          {t('todos.linkSession.title')}
-        </Text>
+        <SheetTitleRow title={t('todos.linkSession.title')} onClose={onClose} />
         <ScrollView contentContainerStyle={{ paddingBottom: bottom + 16 }}>{body}</ScrollView>
       </View>
     </Sheet>

@@ -169,11 +169,15 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
         if (generation.current !== operation || !isCurrentAuthEpoch(epoch)) {
           return;
         }
-        // The two writes are one pair, so they are never split: once the first
-        // lands, the second lands too, and a newer save rewrites both.
+        // Keep the pair ordered with saves, but stop between keys if a new
+        // selection or auth epoch supersedes this one. Its queued save, or
+        // sign-out cleanup, owns the remaining storage update.
         await (id
           ? setAccountMetadata(ORGANIZATION_STORAGE_KEY, id)
           : deleteAccountMetadata(ORGANIZATION_STORAGE_KEY));
+        if (generation.current !== operation || !isCurrentAuthEpoch(epoch)) {
+          return;
+        }
         await (id
           ? deleteAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY)
           : setAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY, PERSONAL_MARKER));

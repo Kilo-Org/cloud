@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import CodeReviewerManualReviewRoute from './manual-review';
+import CodeReviewerScopeRoute from './index';
 
 const useLocalSearchParamsMock = vi.hoisted(() => vi.fn());
 
@@ -14,8 +14,8 @@ vi.mock('@/components/invalid-route-state', () => ({
   InvalidRouteState: 'InvalidRouteState',
 }));
 
-vi.mock('@/components/code-reviewer/manual-review-screen', () => ({
-  ManualReviewScreen: 'ManualReviewScreen',
+vi.mock('@/components/code-reviewer/platform-list-screen', () => ({
+  PlatformListScreen: 'PlatformListScreen',
 }));
 
 function findByType(
@@ -37,7 +37,7 @@ function propOf(instance: TestRenderer.ReactTestInstance | undefined, key: strin
 function mountRoute(): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
-    ref.current = TestRenderer.create(createElement(CodeReviewerManualReviewRoute));
+    ref.current = TestRenderer.create(createElement(CodeReviewerScopeRoute));
   });
   if (!ref.current) {
     throw new Error('route did not render');
@@ -49,29 +49,29 @@ beforeEach(() => {
   useLocalSearchParamsMock.mockReset();
 });
 
-describe('CodeReviewerManualReviewRoute invalid scope', () => {
-  it('renders InvalidRouteState with the profile backTo when scope is undefined', () => {
+describe('CodeReviewerScopeRoute invalid scope', () => {
+  it('renders InvalidRouteState with the Code Reviewer backTo when scope is undefined', () => {
     useLocalSearchParamsMock.mockReturnValue({ scope: undefined });
     const renderer = mountRoute();
 
     const invalid = findByType(renderer.root, 'InvalidRouteState');
     expect(invalid).toHaveLength(1);
-    expect(propOf(invalid[0], 'backTo')).toBe('/(app)/(tabs)/(3_profile)');
-    expect(findByType(renderer.root, 'ManualReviewScreen')).toHaveLength(0);
+    expect(propOf(invalid[0], 'backTo')).toBe('/(app)/code-reviewer');
+    expect(findByType(renderer.root, 'PlatformListScreen')).toHaveLength(0);
 
     act(() => {
       renderer.unmount();
     });
   });
 
-  it('renders InvalidRouteState with the profile backTo when scope is an array', () => {
+  it('renders InvalidRouteState with the Code Reviewer backTo when scope is an array', () => {
     useLocalSearchParamsMock.mockReturnValue({ scope: ['personal', 'org'] });
     const renderer = mountRoute();
 
     const invalid = findByType(renderer.root, 'InvalidRouteState');
     expect(invalid).toHaveLength(1);
-    expect(propOf(invalid[0], 'backTo')).toBe('/(app)/(tabs)/(3_profile)');
-    expect(findByType(renderer.root, 'ManualReviewScreen')).toHaveLength(0);
+    expect(propOf(invalid[0], 'backTo')).toBe('/(app)/code-reviewer');
+    expect(findByType(renderer.root, 'PlatformListScreen')).toHaveLength(0);
 
     act(() => {
       renderer.unmount();
@@ -79,12 +79,12 @@ describe('CodeReviewerManualReviewRoute invalid scope', () => {
   });
 });
 
-describe('CodeReviewerManualReviewRoute valid scope', () => {
-  it('renders the manual review screen with the parsed scope', () => {
+describe('CodeReviewerScopeRoute valid scope', () => {
+  it('renders the platform list with the parsed scope', () => {
     useLocalSearchParamsMock.mockReturnValue({ scope: 'personal' });
     const renderer = mountRoute();
 
-    const screen = findByType(renderer.root, 'ManualReviewScreen');
+    const screen = findByType(renderer.root, 'PlatformListScreen');
     expect(screen).toHaveLength(1);
     expect(propOf(screen[0], 'scope')).toBe('personal');
     expect(findByType(renderer.root, 'InvalidRouteState')).toHaveLength(0);

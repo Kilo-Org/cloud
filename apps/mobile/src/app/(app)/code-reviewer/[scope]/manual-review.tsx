@@ -1,16 +1,16 @@
 import { type Href, useLocalSearchParams } from 'expo-router';
 
-import { PlatformListScreen } from '@/components/code-reviewer/platform-list-screen';
+import { ManualReviewScreen } from '@/components/code-reviewer/manual-review-screen';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { parseParam } from '@/lib/route-params';
 
-export default function CodeReviewerScopeRoute() {
+export default function CodeReviewerManualReviewRoute() {
   const { scope: rawScope } = useLocalSearchParams<{ scope: string }>();
   const scope = parseParam(rawScope);
 
   if (!scope) {
-    return <InvalidRouteState backTo={'/(app)/(tabs)/(3_profile)' as Href} />;
+    return <InvalidRouteState backTo={'/(app)/code-reviewer' as Href} />;
   }
 
-  return <PlatformListScreen scope={scope} />;
+  return <ManualReviewScreen scope={scope} />;
 }

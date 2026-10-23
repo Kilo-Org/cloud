@@ -194,12 +194,17 @@ function accountControl(ui: RenderWithProvidersResult) {
 
 /** The open picker's account rows, in option order. */
 function optionRows(ui: RenderWithProvidersResult) {
-  return ui.renderer.root.findAll(
-    node =>
+  return ui.renderer.root.findAll(node => {
+    const selectionState: unknown = node.props.accessibilityState;
+    return (
       (node.type as string) === 'Pressable' &&
       node.props.accessibilityRole === 'button' &&
-      node.props.accessibilityState?.selected !== undefined
-  );
+      typeof selectionState === 'object' &&
+      selectionState !== null &&
+      'selected' in selectionState &&
+      typeof selectionState.selected === 'boolean'
+    );
+  });
 }
 
 async function press(node: ReactTestInstance): Promise<void> {

@@ -47,6 +47,17 @@ export async function handleInstallationCreated(
 ) {
   const { installation, requester } = payload;
   const requesterId = requester?.id?.toString();
+  // The delivery's GitHub identities, as attributed by GitHub: the requester
+  // recorded on the installation, and the actor that triggered the delivery.
+  // A pending request may only be completed by a delivery attributed to the
+  // GitHub identity that recorded it.
+  const installerAccountIds = [
+    ...new Set(
+      [requester?.id, payload.sender?.id]
+        .filter((value): value is number => typeof value === 'number')
+        .map(value => value.toString())
+    ),
+  ];
 
   // Build installation data using helper function
   const installationData = buildInstallationData(installation);
@@ -90,20 +101,24 @@ export async function handleInstallationCreated(
       appType,
     });
   }
-  const targetMatches = await db
-    .select()
-    .from(platform_integrations)
-    .where(
-      and(
-        eq(platform_integrations.platform, PLATFORM.GITHUB),
-        appTypeCondition,
-        eq(platform_integrations.platform_account_id, installationData.account_id),
-        eq(platform_integrations.integration_status, INTEGRATION_STATUS.PENDING),
-        isNull(platform_integrations.platform_installation_id)
-      )
-    );
+  const targetMatches =
+    installerAccountIds.length === 0
+      ? []
+      : await db
+          .select()
+          .from(platform_integrations)
+          .where(
+            and(
+              eq(platform_integrations.platform, PLATFORM.GITHUB),
+              appTypeCondition,
+              eq(platform_integrations.platform_account_id, installationData.account_id),
+              eq(platform_integrations.integration_status, INTEGRATION_STATUS.PENDING),
+              isNull(platform_integrations.platform_installation_id),
+              inArray(platform_integrations.platform_requester_account_id, installerAccountIds)
+            )
+          );
   let pending = targetMatches.length === 1 ? targetMatches[0] : undefined;
-  if (!pending && requesterId) {
+  if (!pending && installerAccountIds.length > 0) {
     const legacyMatches = await db
       .select()
       .from(platform_integrations)
@@ -111,7 +126,7 @@ export async function handleInstallationCreated(
         and(
           eq(platform_integrations.platform, PLATFORM.GITHUB),
           appTypeCondition,
-          eq(platform_integrations.platform_requester_account_id, requesterId),
+          inArray(platform_integrations.platform_requester_account_id, installerAccountIds),
           eq(platform_integrations.integration_status, INTEGRATION_STATUS.PENDING),
           isNull(platform_integrations.platform_installation_id),
           isNull(platform_integrations.platform_account_id)
@@ -151,15 +166,19 @@ export async function handleInstallationCreated(
             ])
           )
         );
-      if (competingAssociation) return false;
-      await autoCompleteInstallation(
+      if (competingAssociation) {
+        return { ok: false as const, reason: 'competing_association' as const };
+      }
+      const completion = await autoCompleteInstallation(
         {
           integrationId: pending.id,
           installationData,
           existingMetadata: (pending.metadata as Record<string, unknown> | null) ?? {},
+          authorizedRequesterAccountIds: installerAccountIds,
         },
         tx
       );
+      if (!completion.ok) return completion;
       await bindGitHubIntegrationToCanonicalInstallation(
         {
           integrationId: pending.id,
@@ -168,12 +187,19 @@ export async function handleInstallationCreated(
         },
         tx
       );
-      return true;
+      return { ok: true as const };
     });
-    if (!completed) {
-      // Another tenant already owns this installation: the pending request
-      // must not be auto-activated. Leave it pending so it goes through
-      // verified sharing admission on the connect-existing path.
+    if (!completed.ok) {
+      // The pending request must not be auto-activated: either another tenant
+      // already owns this installation, or this delivery is not attributed to
+      // the GitHub identity that recorded the request. Leave the row pending
+      // so it goes through verified connection confirmation.
+      logExceptInTest('GitHub pending installation completion declined:', {
+        installation_id: installationData.installation_id,
+        account_id: installationData.account_id,
+        integration_id: pending.id,
+        reason: completed.reason,
+      });
       return NextResponse.json(
         { message: 'Installation association requires verified connection confirmation' },
         { status: 200 }

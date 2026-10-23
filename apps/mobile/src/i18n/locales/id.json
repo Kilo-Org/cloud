@@ -224,7 +224,7 @@
     "hideBalance": "Sembunyikan saldo",
     "showBalance": "Tampilkan saldo",
     "balanceHidden": "Saldo tersembunyi",
-    "bonusCreditsExpiring": "Kredit bonus senilai {{amount}} akan kedaluwarsa pada {{date}}.",
+    "bonusCreditsExpiring": "Kredit senilai {{amount}} akan kedaluwarsa pada {{date}}.",
     "signOutTitle": "Keluar?",
     "signOutMessage": "Kamu perlu masuk lagi untuk mengakses ruang kerjamu.",
     "deleteAccountTitle": "Hapus akun?",
@@ -1714,6 +1714,9 @@
       "noRepositoriesVisibleGitlab": "Tidak ada repositori yang ditampilkan. Periksa akses repositori untuk GitLab, lalu muat ulang.",
       "noRepositoriesVisibleBitbucket": "Tidak ada repositori yang ditampilkan. Periksa akses repositori untuk Bitbucket, lalu muat ulang.",
       "bitbucketOrganizationsOnly": "Bitbucket hanya tersedia untuk organisasi.",
+      "githubNeedsAttention": "GitHub perlu dihubungkan kembali",
+      "githubNeedsAttentionDescription": "Hubungkan kembali App GitHub Kilo, lalu muat ulang agar repositorinya dimuat.",
+      "partialRepositories": "Beberapa repositori GitHub tidak dimuat.",
       "branchPickerTitle": "Pilih cabang",
       "branchDefault": "Bawaan",
       "branchAccessibility": "Cabang: {{label}}",
@@ -1721,6 +1724,7 @@
       "branchLoadError": "Tidak dapat memuat cabang",
       "branchUnavailable": "Cabang tidak tersedia untuk repositori ini. Periksa aksesmu ke penyedia, lalu pilih repositori lain.",
       "branchEmpty": "Tidak ada cabang yang tersedia",
+      "branchListIncomplete": "Hanya sebagian cabang yang ditampilkan. Repositori ini memiliki lebih banyak cabang daripada yang dapat dimuat oleh daftar ini.",
       "branchPlaceholder": "Pilih cabang",
       "runOnWithTarget": "Jalankan di: {{target}}",
       "environment": "Lingkungan",
@@ -3383,7 +3387,12 @@
       "serverToolCount_one": "{{count}} alat",
       "serverToolCount_other": "{{count}} alat",
       "serverUnreachable": "Tidak dapat menjangkau server ini",
-      "serverOff": "Server ini nonaktif"
+      "serverOff": "Server ini nonaktif",
+      "app": {
+        "label": "Antarmuka alat",
+        "failed": "Antarmuka alat ini tidak dapat dimuat.",
+        "empty": "Antarmuka alat ini tidak memiliki apa pun untuk ditampilkan."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autentikasi",
@@ -3684,6 +3693,8 @@
     "skillNameInvalid": "Nama keterampilan harus dimulai dengan huruf atau angka dan hanya menggunakan huruf kecil, angka, dan tanda hubung",
     "skillContentRequired": "Konten keterampilan diperlukan",
     "skillSaveFailed": "Tidak dapat menyimpan keterampilan",
+    "skillSourceCustom": "Kustom",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Tempelkan SKILL.md dan isikan namanya; tambahkan keterampilan dari ponsel Anda tanpa drag and drop.",
     "skillEditTitle": "Mengedit keterampilan",
     "mcp": {

@@ -93,6 +93,8 @@ export type BranchPickerBridge = {
   defaultBranch: string | null;
   /** The branch the trigger row shows as selected (override or default). */
   selectedBranch: string | null;
+  /** The provider holds more branches than `branches` includes. */
+  truncated: boolean;
   onSelect: (branch: string) => void;
 };
 

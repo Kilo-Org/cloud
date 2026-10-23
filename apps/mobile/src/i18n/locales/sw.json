@@ -224,7 +224,7 @@
     "hideBalance": "Ficha salio",
     "showBalance": "Onyesha salio",
     "balanceHidden": "Salio limefichwa",
-    "bonusCreditsExpiring": "Muda wa salio la bonasi la {{amount}} unaisha {{date}}.",
+    "bonusCreditsExpiring": "Muda wa salio la {{amount}} unaisha {{date}}.",
     "signOutTitle": "Ungependa kutoka kwenye akaunti?",
     "signOutMessage": "Utahitaji kuingia tena ili kufikia eneo lako la kazi.",
     "deleteAccountTitle": "Ungependa kufuta akaunti?",
@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Hakuna hazina zinazoonekana. Angalia ruhusa za kufikia hazina kwenye GitLab, kisha pakia upya orodha.",
       "noRepositoriesVisibleBitbucket": "Hakuna hazina zinazoonekana. Angalia ruhusa za kufikia hazina kwenye Bitbucket, kisha pakia upya orodha.",
       "bitbucketOrganizationsOnly": "Bitbucket inapatikana kwa mashirika pekee.",
+      "githubNeedsAttention": "GitHub inahitaji kuunganishwa upya",
+      "githubNeedsAttentionDescription": "Unganisha upya programu ya Kilo kwenye GitHub, kisha pakia upya ili kupakia hazina zake.",
+      "partialRepositories": "Baadhi ya hazina za GitHub hazikupakia.",
       "branchPickerTitle": "Chagua tawi",
       "branchDefault": "Chaguomsingi",
       "branchAccessibility": "Tawi: {{label}}",
@@ -2238,6 +2241,7 @@
       "branchLoadError": "Imeshindikana kupakia matawi",
       "branchUnavailable": "Matawi hayapatikani kwa hazina hii. Angalia ruhusa yako kwa mtoa huduma, kisha chagua hazina nyingine.",
       "branchEmpty": "Hakuna matawi yanayopatikana",
+      "branchListIncomplete": "Ni matawi machache tu yanayoonyeshwa. Hazina ina matawi zaidi kuliko orodha hii inavyoweza kujumuisha.",
       "branchPlaceholder": "Chagua tawi",
       "runOnWithTarget": "Endesha kwenye: {{target}}",
       "environment": "Mazingira",
@@ -3383,7 +3387,12 @@
       "serverToolCount_one": "zana {{count}}",
       "serverToolCount_other": "zana {{count}}",
       "serverUnreachable": "Haikuweza kufikia seva hii",
-      "serverOff": "Seva hii imezimwa"
+      "serverOff": "Seva hii imezimwa",
+      "app": {
+        "label": "Kiolesura cha zana",
+        "failed": "Kiolesura cha zana hii hakukuweza kupakiwa.",
+        "empty": "Kiolesura cha zana hii hakina kitu cha kuonyesha."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Uthibitishaji",
@@ -3684,6 +3693,8 @@
     "skillNameInvalid": "Jina la ustadi lazima lianze na herufi au tarakimu na litumie herufi ndogo, tarakimu na deshi pekee.",
     "skillContentRequired": "Maudhui ya ujuzi yanahitajika",
     "skillSaveFailed": "Haikuweza kuhifadhi ujuzi",
+    "skillSourceCustom": "Maalum",
+    "skillSourceMarketplace": "Soko",
     "skillsHint": "Bandika SKILL.md na jina lake lijazwe; ongeza ujuzi kutoka kwa simu yako bila kuburuta na kuangusha.",
     "skillEditTitle": "Hariri ujuzi",
     "mcp": {

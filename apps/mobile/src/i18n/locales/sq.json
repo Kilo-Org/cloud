@@ -224,7 +224,7 @@
     "hideBalance": "Fshih gjendjen",
     "showBalance": "Shfaq gjendjen",
     "balanceHidden": "Gjendja është e fshehur",
-    "bonusCreditsExpiring": "Kredite bonus në vlerën {{amount}} skadojnë më {{date}}.",
+    "bonusCreditsExpiring": "Kredite në vlerën {{amount}} skadojnë më {{date}}.",
     "signOutTitle": "Do të dalësh nga llogaria?",
     "signOutMessage": "Do të duhet të hysh përsëri për të pasur qasje në hapësirën tënde të punës.",
     "deleteAccountTitle": "Të fshihet llogaria?",
@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Nuk shfaqet asnjë depo. Kontrollo qasjen në depo për GitLab, pastaj rifresko.",
       "noRepositoriesVisibleBitbucket": "Nuk shfaqet asnjë depo. Kontrollo qasjen në depo për Bitbucket, pastaj rifresko.",
       "bitbucketOrganizationsOnly": "Bitbucket është i disponueshëm vetëm për organizata.",
+      "githubNeedsAttention": "GitHub duhet të rilidhet",
+      "githubNeedsAttentionDescription": "Rilidh GitHub App-in e Kilo, pastaj rifresko për të ngarkuar depot e tij.",
+      "partialRepositories": "Disa depo nga GitHub nuk u ngarkuan.",
       "branchPickerTitle": "Përzgjidh degën",
       "branchDefault": "Parazgjedhje",
       "branchAccessibility": "Dega: {{label}}",
@@ -2238,6 +2241,7 @@
       "branchLoadError": "Degët nuk u ngarkuan dot",
       "branchUnavailable": "Nuk ka degë të disponueshme për këtë depo. Kontrollo aksesin tënd te ofruesi, pastaj përzgjidh një depo tjetër.",
       "branchEmpty": "Nuk ka degë të disponueshme",
+      "branchListIncomplete": "Shfaqen vetëm disa degë. Depoja ka më shumë degë sesa mund të përfshijë kjo listë.",
       "branchPlaceholder": "Përzgjidh një degë",
       "runOnWithTarget": "Ekzekuto në: {{target}}",
       "environment": "Mjedisi",
@@ -3383,7 +3387,12 @@
       "serverToolCount_one": "{{count}} mjet",
       "serverToolCount_other": "{{count}} mjete",
       "serverUnreachable": "Nuk u arrit ky server",
-      "serverOff": "Ky server është i fikur"
+      "serverOff": "Ky server është i fikur",
+      "app": {
+        "label": "Ndërfaqja e mjetit",
+        "failed": "Ndërfaqja e këtij mjeti nuk mund të ngarkohej.",
+        "empty": "Ndërfaqja e këtij mjeti nuk ka gjë për të shfaqur."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Vërtetimi",
@@ -3684,6 +3693,8 @@
     "skillNameInvalid": "Emri i aftësisë duhet të fillojë me një shkronjë ose shifër dhe të përdorë vetëm shkronja të vogla, shifra dhe viza",
     "skillContentRequired": "Kërkohet përmbajtja e aftësive",
     "skillSaveFailed": "Aftësia nuk mund të kursehej",
+    "skillSourceCustom": "E personalizuar",
+    "skillSourceMarketplace": "Tregu",
     "skillsHint": "Ngjit një SKILL.md dhe emri i saj plotëson; shtoni një aftësi nga telefoni juaj pa zvarritje dhe lëshim.",
     "skillEditTitle": "Shkathtësia e redaktimit",
     "mcp": {

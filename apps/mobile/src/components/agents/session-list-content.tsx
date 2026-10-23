@@ -32,7 +32,7 @@ import { QueryError } from '@/components/query-error';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { moveA11yFocus } from '@/lib/a11y/announce';
+import { requestA11yFocus } from '@/lib/a11y/announce';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { SESSION_LIST_SORT } from '@/lib/agent-session-sort';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
@@ -45,7 +45,7 @@ export const FAB_MARGIN = 16;
 
 type AgentSessionListContentProps = {
   /** Post-deletion focus anchor: the screen's always-mounted search input. */
-  searchInputRef: Parameters<typeof moveA11yFocus>[0];
+  searchInputRef: Parameters<typeof requestA11yFocus>[0];
   sections: SessionSection[];
   activeSessionIds: ReadonlySet<string>;
   hasAnySessions: boolean;
@@ -319,10 +319,10 @@ export function AgentSessionListContent({
           }}
           onDelete={() => {
             // The hook's success toast announces the deletion; onDeleted only
-            // restores focus, and moveA11yFocus no-ops once the header is
+            // restores focus, and requestA11yFocus no-ops once the header is
             // unmounted (last session deleted).
             deleteSession(item.session.session_id, () => {
-              moveA11yFocus(searchInputRef);
+              requestA11yFocus(searchInputRef);
             });
           }}
           onRename={newTitle => {

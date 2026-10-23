@@ -224,7 +224,7 @@
     "hideBalance": "Ocultar saldo",
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
-    "bonusCreditsExpiring": "{{amount}} em créditos de bônus expiram em {{date}}.",
+    "bonusCreditsExpiring": "{{amount}} em créditos expiram em {{date}}.",
     "signOutTitle": "Sair?",
     "signOutMessage": "Você precisará entrar novamente para acessar seu espaço de trabalho.",
     "deleteAccountTitle": "Excluir conta?",
@@ -1695,6 +1695,9 @@
       "noRepositoriesVisibleGitlab": "Nenhum repositório está visível. Verifique as permissões de acesso aos repositórios no GitLab e atualize a lista.",
       "noRepositoriesVisibleBitbucket": "Nenhum repositório está visível. Verifique as permissões de acesso aos repositórios no Bitbucket e atualize a lista.",
       "bitbucketOrganizationsOnly": "O Bitbucket está disponível apenas para organizações.",
+      "githubNeedsAttention": "O GitHub precisa ser reconectado",
+      "githubNeedsAttentionDescription": "Reconecte o App do GitHub do Kilo e depois atualize para carregar os repositórios dele.",
+      "partialRepositories": "Alguns repositórios do GitHub não foram carregados.",
       "branchPickerTitle": "Selecionar branch",
       "branchDefault": "Padrão",
       "branchAccessibility": "Branch: {{label}}",
@@ -1702,6 +1705,7 @@
       "branchLoadError": "Não foi possível carregar os branches",
       "branchUnavailable": "Não há branches disponíveis para este repositório. Verifique seu acesso com o provedor e escolha outro repositório.",
       "branchEmpty": "Nenhum branch disponível",
+      "branchListIncomplete": "Apenas alguns branches são mostrados. O repositório tem mais branches do que esta lista pode incluir.",
       "branchPlaceholder": "Selecionar um branch",
       "runOnWithTarget": "Executar em: {{target}}",
       "environment": "Ambiente",
@@ -3425,7 +3429,12 @@
       "serverToolCount_one": "{{count}} ferramenta",
       "serverToolCount_other": "{{count}} ferramentas",
       "serverUnreachable": "Não foi possível alcançar este servidor",
-      "serverOff": "Este servidor está desativado"
+      "serverOff": "Este servidor está desativado",
+      "app": {
+        "label": "Interface da ferramenta",
+        "failed": "Não foi possível carregar a interface desta ferramenta.",
+        "empty": "A interface desta ferramenta não tem nada para exibir."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autenticação",
@@ -3729,6 +3738,8 @@
     "skillNameInvalid": "O nome da habilidade deve começar com uma letra ou dígito e usar apenas letras minúsculas, dígitos e travessões",
     "skillContentRequired": "O conteúdo da habilidade é obrigatório",
     "skillSaveFailed": "Não foi possível salvar a habilidade",
+    "skillSourceCustom": "Personalizado",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Cole um SKILL.md e seu nome será preenchido; adicione uma habilidade do seu telefone sem arrastar e soltar.",
     "skillEditTitle": "Editar habilidade",
     "mcp": {

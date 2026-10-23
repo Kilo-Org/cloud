@@ -7,6 +7,7 @@ import { FolderGit2 } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
@@ -48,6 +49,10 @@ type RepositoryRow = NonNullable<ReturnType<typeof useSecurityAgentRepositories>
 // rides on the content (the ScrollView used a frame `marginBottom`) so the
 // last row can still scroll clear of the bar.
 const listStyle = { flex: 1 } satisfies ViewStyle;
+
+// The gutter each row keeps inside the safe-area side insets: in landscape they
+// are what clear the sensor housing, and portrait insets are zero.
+const LIST_CONTENT_GUTTER = 24;
 
 function RepositorySettingsSkeleton() {
   const { t } = useTranslation();
@@ -123,9 +128,17 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   }, []);
 
   const paddingBottom = useTabBarBottomPadding();
+  const insets = useSafeAreaInsets();
+  // One content-container style for the whole list, so every row — recycled or
+  // not — starts at the same offset and a rotation re-derives it once.
   const listContentContainerStyle = useMemo(
-    () => ({ paddingHorizontal: 24, paddingTop: 16, paddingBottom }),
-    [paddingBottom]
+    () => ({
+      paddingTop: 16,
+      paddingLeft: insets.left + LIST_CONTENT_GUTTER,
+      paddingRight: insets.right + LIST_CONTENT_GUTTER,
+      paddingBottom,
+    }),
+    [insets.left, insets.right, paddingBottom]
   );
 
   // Hoisted so the FlashList keeps one renderer identity across toggles and

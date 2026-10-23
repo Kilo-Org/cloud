@@ -25,7 +25,7 @@ export type SecurityCommand = NonNullable<RouterOutputs['securityAgent']['getCom
 export type SecurityCommandBatch = RouterOutputs['securityAgent']['getCommandStatuses'];
 
 export function getSecurityAgentPath(scope: string, suffix = ''): Href {
-  const path = `/(app)/(tabs)/(3_profile)/security-agent/${scope}`;
+  const path = `/(app)/security-agent/${scope}`;
   return (suffix ? `${path}/${suffix}` : path) as Href;
 }
 

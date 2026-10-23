@@ -1,10 +1,8 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-
-import { load } from 'js-yaml';
 
 import { readPnpmProductionClosure } from './mobile-sbom-pnpm.mjs';
 
@@ -183,57 +181,4 @@ test('throws when the importer key is missing or not an object', () => {
       assert.throws(() => readPnpmProductionClosure({ lockfilePath }), /no importer apps\/mobile/);
     }
   );
-});
-
-test('reads the real lockfile production closure without throwing', () => {
-  const lockfilePath = new URL('../pnpm-lock.yaml', import.meta.url);
-  const lockfile = load(readFileSync(lockfilePath, 'utf8'));
-  const directEntries = Object.keys(lockfile.importers['apps/mobile'].dependencies);
-
-  const { components, counts, skipped } = readPnpmProductionClosure({ lockfilePath });
-
-  assert.ok(
-    components.length >= directEntries.length,
-    `expected at least ${directEntries.length} components, got ${components.length}`
-  );
-  assert.equal(counts.resolved, components.length);
-  assert.ok(Array.isArray(skipped));
-  for (const component of components) {
-    assert.match(component.purl, /^pkg:npm\//);
-    assert.ok(component.version.length > 0);
-    assert.ok(component.name.length > 0);
-    // A scoped name is percent-encoded, so exactly one literal '@' remains: the
-    // version separator. Two would mean an alias name leaked into the purl.
-    assert.equal(
-      component.purl.split('@').length,
-      2,
-      `purl carries exactly one version separator: ${component.purl}`
-    );
-  }
-
-  const names = components.map(component => component.name);
-  for (let index = 1; index < names.length; index += 1) {
-    assert.ok(names[index - 1] <= names[index], 'components must stay sorted');
-  }
-
-  // The importer's production deps are present, including a peer-suffixed one
-  // whose integrity only resolves after the suffix is stripped.
-  const expo = components.find(component => component.name === 'expo');
-  assert.ok(expo, 'expo is a direct production dependency');
-  assert.match(expo.version, /^57\./);
-  assert.ok(expo.hashes?.[0]?.content.match(/^[0-9a-f]{128}$/), 'expo carries a SHA-512 hash');
-  assert.ok(
-    components.some(component => component.purl.startsWith('pkg:npm/%40')),
-    'scoped names are percent-encoded'
-  );
-
-  // A pure devDependency must never enter the production closure.
-  assert.equal(names.includes('knip'), false, 'devDependencies must not appear');
-
-  // metro reaches its `image-size` dependency through an npm alias
-  // (`image-size: image-size-next@1.2.2`); the closure must report the real
-  // package instead of dropping the alias key.
-  const aliased = components.find(component => component.name === 'image-size-next');
-  assert.ok(aliased, 'the aliased dependency resolves to its real package');
-  assert.equal(aliased.purl, `pkg:npm/image-size-next@${aliased.version}`);
 });

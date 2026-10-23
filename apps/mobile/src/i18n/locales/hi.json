@@ -224,7 +224,7 @@
     "hideBalance": "बैलेंस छिपाएँ",
     "showBalance": "बैलेंस दिखाएँ",
     "balanceHidden": "बैलेंस छिपा हुआ है",
-    "bonusCreditsExpiring": "{{amount}} के बोनस क्रेडिट की समय-सीमा {{date}} को समाप्त होगी।",
+    "bonusCreditsExpiring": "{{amount}} के क्रेडिट की समय-सीमा {{date}} को समाप्त होगी।",
     "signOutTitle": "साइन आउट करें?",
     "signOutMessage": "अपने कार्यक्षेत्र तक पहुँचने के लिए आपको फिर से साइन इन करना होगा।",
     "deleteAccountTitle": "खाता हटाएँ?",
@@ -1714,6 +1714,9 @@
       "noRepositoriesVisibleGitlab": "कोई रिपॉज़िटरी दिखाई नहीं दे रही है। GitLab के लिए रिपॉज़िटरी का ऐक्सेस जाँचें, फिर रीफ़्रेश करें।",
       "noRepositoriesVisibleBitbucket": "कोई रिपॉज़िटरी दिखाई नहीं दे रही है। Bitbucket के लिए रिपॉज़िटरी का ऐक्सेस जाँचें, फिर रीफ़्रेश करें।",
       "bitbucketOrganizationsOnly": "Bitbucket केवल संगठनों के लिए उपलब्ध है।",
+      "githubNeedsAttention": "GitHub को फिर से कनेक्ट करना होगा",
+      "githubNeedsAttentionDescription": "Kilo GitHub ऐप को फिर से कनेक्ट करें, फिर उसकी रिपॉज़िटरी लोड करने के लिए रीफ़्रेश करें।",
+      "partialRepositories": "कुछ GitHub रिपॉज़िटरी लोड नहीं हो सकीं।",
       "branchPickerTitle": "ब्रांच चुनें",
       "branchDefault": "डिफ़ॉल्ट",
       "branchAccessibility": "ब्रांच: {{label}}",
@@ -1721,6 +1724,7 @@
       "branchLoadError": "ब्रांच लोड नहीं हो सकीं",
       "branchUnavailable": "इस रिपॉज़िटरी के लिए ब्रांच उपलब्ध नहीं हैं। प्रदाता के साथ अपनी पहुँच जाँचें, फिर कोई दूसरी रिपॉज़िटरी चुनें।",
       "branchEmpty": "कोई ब्रांच उपलब्ध नहीं",
+      "branchListIncomplete": "केवल कुछ ब्रांच दिखाई जा रही हैं। इस रिपॉज़िटरी में इस सूची में शामिल हो सकने से अधिक ब्रांच हैं।",
       "branchPlaceholder": "एक ब्रांच चुनें",
       "runOnWithTarget": "इस पर चलाएँ: {{target}}",
       "environment": "एनवायरनमेंट",
@@ -3383,7 +3387,12 @@
       "serverToolCount_one": "{{count}} टूल",
       "serverToolCount_other": "{{count}} टूल",
       "serverUnreachable": "इस सर्वर तक नहीं पहुँच सका",
-      "serverOff": "यह सर्वर बंद है"
+      "serverOff": "यह सर्वर बंद है",
+      "app": {
+        "label": "टूल इंटरफ़ेस",
+        "failed": "इस टूल का इंटरफ़ेस लोड नहीं हो सका.",
+        "empty": "इस टूल के इंटरफ़ेस में दिखाने के लिए कुछ नहीं है."
+      }
     },
     "mcpOAuth": {
       "authMethod": "प्रमाणीकरण",
@@ -3684,6 +3693,8 @@
     "skillNameInvalid": "कौशल का नाम किसी अक्षर या अंक से शुरू होना चाहिए और केवल छोटे अक्षरों, अंकों और डैश का उपयोग करना चाहिए",
     "skillContentRequired": "कौशल सामग्री की आवश्यकता है",
     "skillSaveFailed": "कौशल सहेजा नहीं जा सका",
+    "skillSourceCustom": "कस्टम",
+    "skillSourceMarketplace": "मार्केटप्लेस",
     "skillsHint": "एक SKILL.md चिपकाएँ और उसका नाम भरें; अपने फ़ोन से बिना खींचें और छोड़े एक कौशल जोड़ें।",
     "skillEditTitle": "कौशल संपादित करें",
     "mcp": {

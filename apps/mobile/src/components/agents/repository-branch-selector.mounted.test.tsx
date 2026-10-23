@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the suite renders every selector state, each with its own assertion set */
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -63,6 +64,7 @@ function branchesState(overrides: Partial<RepositoryBranchesState> = {}): Reposi
   return {
     defaultBranch: 'main',
     branches: ['main', 'release/2.0'],
+    truncated: false,
     isEnabled: true,
     isLoading: false,
     isRetryableError: false,
@@ -145,7 +147,25 @@ describe('RepositoryBranchSelector', () => {
     expect(bridge?.branches).toEqual(['main', 'release/2.0']);
     expect(bridge?.defaultBranch).toBe('main');
     expect(bridge?.selectedBranch).toBe('main');
+    expect(bridge?.truncated).toBe(false);
     expect(router.push).toHaveBeenCalledWith('/(app)/agent-chat/branch-picker');
+  });
+
+  it('says the branch list is incomplete and publishes the flag to the picker', () => {
+    const partialNote = i18n.t('agentChat.newSession.branchListIncomplete');
+    const renderer = mountSelector(githubRow, branchesState({ truncated: true }));
+
+    expect(texts(renderer)).toContain(partialNote);
+
+    openPicker(renderer, 'main');
+
+    expect(branchPickerSlot.get(UNFENCED_ROUTE_KEY)?.truncated).toBe(true);
+  });
+
+  it('shows no partial-listing note for a complete list', () => {
+    const renderer = mountSelector(githubRow);
+
+    expect(texts(renderer)).not.toContain(i18n.t('agentChat.newSession.branchListIncomplete'));
   });
 
   it('dismisses the keyboard when the picker opens', () => {

@@ -2,6 +2,8 @@ import {
   activeSessionSchema,
   cloudAgentEventSchema,
   cloudWorktreeChangesReadyDataSchema,
+  isStreamError,
+  isValidCloudAgentEvent,
   parseCustomerBillingFailure,
   remoteCommandCatalogV1Schema,
   sessionEventPayloadSchema,
@@ -9,6 +11,11 @@ import {
   sessionStatusDataSchema,
   sessionStatusUpdatedPayloadSchema,
 } from './schemas';
+
+function omitKey(record: Record<string, unknown>, key: string): Record<string, unknown> {
+  const { [key]: _omitted, ...rest } = record;
+  return rest;
+}
 
 describe('cloudWorktreeChangesReadyDataSchema', () => {
   it.each([1, 42, Number.MAX_SAFE_INTEGER])('accepts positive safe revision %p', revision => {
@@ -55,6 +62,63 @@ describe('cloudWorktreeChangesReadyDataSchema', () => {
         streamEventType: 'future.event',
       }).success
     ).toBe(true);
+  });
+});
+
+describe('isValidCloudAgentEvent', () => {
+  const envelope = {
+    eventId: 7,
+    sessionId: 'agent-1',
+    streamEventType: 'message.part.updated',
+    timestamp: '2026-10-22T00:00:00.000Z',
+    data: { type: 'message.part.updated' },
+  };
+
+  it.each([
+    ['without executionId', envelope],
+    ['with a string executionId', { ...envelope, executionId: 'exec-1' }],
+    ['with a null executionId', { ...envelope, executionId: null }],
+    ['with an unknown stream event type', { ...envelope, streamEventType: 'future.event' }],
+    ['with an extra field', { ...envelope, extra: true }],
+  ])('accepts a frame %s', (_case, frame) => {
+    expect(isValidCloudAgentEvent(frame)).toBe(true);
+  });
+
+  it.each([
+    ['a frame without data', omitKey(envelope, 'data')],
+    ['a frame without eventId', omitKey(envelope, 'eventId')],
+    ['a frame without sessionId', omitKey(envelope, 'sessionId')],
+    ['a frame without streamEventType', omitKey(envelope, 'streamEventType')],
+    ['a frame without timestamp', omitKey(envelope, 'timestamp')],
+    ['a numeric executionId', { ...envelope, executionId: 42 }],
+    ['a numeric timestamp', { ...envelope, timestamp: 1 }],
+    ['an array', [envelope]],
+    ['null', null],
+    ['a stream error', { type: 'error', code: 'WS_AUTH_ERROR', message: 'bad' }],
+  ])('rejects %s', (_case, frame) => {
+    expect(isValidCloudAgentEvent(frame)).toBe(false);
+  });
+});
+
+describe('isStreamError', () => {
+  it.each([
+    'WS_PROTOCOL_ERROR',
+    'WS_AUTH_ERROR',
+    'WS_SESSION_NOT_FOUND',
+    'WS_EXECUTION_NOT_FOUND',
+    'WS_DUPLICATE_CONNECTION',
+    'WS_INTERNAL_ERROR',
+  ])('accepts the %s code', code => {
+    expect(isStreamError({ type: 'error', code, message: 'bad' })).toBe(true);
+  });
+
+  it.each([
+    ['an unknown code', { type: 'error', code: 'INVALID', message: 'bad' }],
+    ['a missing message', { type: 'error', code: 'WS_AUTH_ERROR' }],
+    ['a cloud agent event', { eventId: 1, data: {} }],
+    ['null', null],
+  ])('rejects %s', (_case, frame) => {
+    expect(isStreamError(frame)).toBe(false);
   });
 });
 

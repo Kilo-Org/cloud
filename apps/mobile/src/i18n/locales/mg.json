@@ -224,7 +224,7 @@
     "hideBalance": "Afeno ny ambim-bola",
     "showBalance": "Aseho ny ambim-bola",
     "balanceHidden": "Voafeno ny ambim-bola",
-    "bonusCreditsExpiring": "Kireditra fanampiny {{amount}} ho lany daty amin'ny {{date}}.",
+    "bonusCreditsExpiring": "Kireditra {{amount}} ho lany daty amin'ny {{date}}.",
     "signOutTitle": "Hivoaka ve?",
     "signOutMessage": "Mila miditra indray ianao vao afaka mampiasa ny sehatra fiasanao.",
     "deleteAccountTitle": "Hofafana ve ny kaonty?",
@@ -2231,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Tsy misy tahirin-kaody hita. Hamarino ny alalana hiditra amin'ny tahirin-kaody ao amin'ny GitLab, dia havaozy ny lisitra.",
       "noRepositoriesVisibleBitbucket": "Tsy misy tahirin-kaody hita. Hamarino ny alalana hiditra amin'ny tahirin-kaody ao amin'ny Bitbucket, dia havaozy ny lisitra.",
       "bitbucketOrganizationsOnly": "Ho an'ny fikambanana ihany ny Bitbucket.",
+      "githubNeedsAttention": "Mila ampifandraisina indray ny GitHub",
+      "githubNeedsAttentionDescription": "Ampifandraiso indray ny Kilo GitHub App, dia havaozy ny lisitra mba ho voaray ny tahirin-kaody ao aminy.",
+      "partialRepositories": "Tsy voaray ny tahirin-kaody sasany ao amin'ny GitHub.",
       "branchPickerTitle": "Safidio ny sampana",
       "branchDefault": "Default",
       "branchAccessibility": "Sampana: {{label}}",
@@ -2238,6 +2241,7 @@
       "branchLoadError": "Tsy tafiditra ny sampana",
       "branchUnavailable": "Tsy azo ny sampana amin'ity tahirin-kaody ity. Hamarino ny alalana ananao amin'ny mpanome tolotra, dia safidio tahirin-kaody hafa.",
       "branchEmpty": "Tsy misy sampana azo",
+      "branchListIncomplete": "Ny sampana sasany ihany no aseho. Manana sampana mihoatra noho izay azon'ity lisitra ity ampidirina ny tahirin-kaody.",
       "branchPlaceholder": "Safidio sampana iray",
       "runOnWithTarget": "Ampandeho amin'ny: {{target}}",
       "environment": "Tontolo fiasana",
@@ -3383,7 +3387,12 @@
       "serverToolCount_one": "fitaovana {{count}}",
       "serverToolCount_other": "fitaovana {{count}}",
       "serverUnreachable": "Tsy tratra ity server ity",
-      "serverOff": "Mihidy ity server ity"
+      "serverOff": "Mihidy ity server ity",
+      "app": {
+        "label": "Interfasan'ny fitaovana",
+        "failed": "Tsy tafiditra ny interfasan'ity fitaovana ity.",
+        "empty": "Tsy misy zavatra haseho ao amin'ny interfasan'ity fitaovana ity."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Fanamarinana",
@@ -3684,6 +3693,8 @@
     "skillNameInvalid": "Ny anaran'ny fahaiza-manao dia tsy maintsy manomboka amin'ny litera na tarehimarika ary tsy mampiasa afa-tsy litera kely, isa ary tsipiho",
     "skillContentRequired": "Ilaina ny votoatin'ny fahaiza-manao",
     "skillSaveFailed": "Tsy nahavonjy fahaizana",
+    "skillSourceCustom": "Namboarinao",
+    "skillSourceMarketplace": "Tsena",
     "skillsHint": "Apetaho ny SKILL.md ary fenoy ny anarany; ampio fahaiza-manao avy amin'ny findainao tsy misy drag and drop.",
     "skillEditTitle": "Ahitsio fahaizana",
     "mcp": {

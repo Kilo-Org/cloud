@@ -224,7 +224,7 @@
     "hideBalance": "Aħbi l-bilanċ",
     "showBalance": "Uri l-bilanċ",
     "balanceHidden": "Il-bilanċ huwa moħbi",
-    "bonusCreditsExpiring": "{{amount}} fi krediti bonus jiskadu: {{date}}.",
+    "bonusCreditsExpiring": "{{amount}} fi krediti jiskadu: {{date}}.",
     "signOutTitle": "Toħroġ mill-kont?",
     "signOutMessage": "Ikollok terġa' tidħol biex taċċessa l-ispazju tax-xogħol tiegħek.",
     "deleteAccountTitle": "Tħassar il-kont?",
@@ -2315,6 +2315,9 @@
       "noRepositoriesVisibleGitlab": "Ma jidher l-ebda repożitorju. Iċċekkja l-aċċess għar-repożitorji għal GitLab, imbagħad aġġorna.",
       "noRepositoriesVisibleBitbucket": "Ma jidher l-ebda repożitorju. Iċċekkja l-aċċess għar-repożitorji għal Bitbucket, imbagħad aġġorna.",
       "bitbucketOrganizationsOnly": "Bitbucket huwa disponibbli għall-organizzazzjonijiet biss.",
+      "githubNeedsAttention": "GitHub għandu jerġa' jingħaqad",
+      "githubNeedsAttentionDescription": "Erġa' qabbad l-applikazzjoni Kilo għal GitHub, imbagħad aġġorna biex jitgħabbew ir-repożitorji tagħha.",
+      "partialRepositories": "Xi repożitorji ta' GitHub ma tgħabbewx.",
       "branchPickerTitle": "Agħżel fergħa",
       "branchDefault": "Predefinit",
       "branchAccessibility": "Fergħa: {{label}}",
@@ -2322,6 +2325,7 @@
       "branchLoadError": "Ma setgħetx titgħabba l-fergħat",
       "branchUnavailable": "M'hemmx fergħat disponibbli għal dan ir-repożitorju. Iċċekkja l-aċċess tiegħek mal-fornitur, imbagħad agħżel repożitorju ieħor.",
       "branchEmpty": "Ebda fergħa disponibbli",
+      "branchListIncomplete": "Qed jintwerew biss xi fergħat. Ir-repożitorju għandu aktar fergħat milli din il-lista tista' tinkludi.",
       "branchPlaceholder": "Agħżel fergħa",
       "runOnWithTarget": "Ħaddem fuq: {{target}}",
       "environment": "Ambjent",
@@ -3509,7 +3513,12 @@
       "serverToolCount_other": "{{count}} għodod",
       "serverToolCount_two": "{{count}} għodod",
       "serverUnreachable": "Ma setax jintlaħaq dan is-server",
-      "serverOff": "Dan is-server huwa mitfi"
+      "serverOff": "Dan is-server huwa mitfi",
+      "app": {
+        "label": "Interfaċċa tal-għodda",
+        "failed": "L-interfaċċa ta' din l-għodda ma rnexxietx tgħabba.",
+        "empty": "L-interfaċċa ta' din l-għodda m'għandha xejn li turi."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Awtentikazzjoni",
@@ -3819,6 +3828,8 @@
     "skillNameInvalid": "L-isem tal-ħiliet għandu jibda b'ittra jew ċifra u juża biss ittri żgħar, ċifri u sings",
     "skillContentRequired": "Il-kontenut tal-ħiliet huwa meħtieġ",
     "skillSaveFailed": "Ma setgħetx tiffranka l-ħiliet",
+    "skillSourceCustom": "Personalizzat",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Pasta SKILL.md u isimha jimla; żid ħila mit-telefon tiegħek mingħajr drag and drop.",
     "skillEditTitle": "Edit ħiliet",
     "mcp": {

@@ -121,9 +121,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
           onSuccess: ({ reviewId }) => {
             settle(null);
             void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            router.replace(
-              `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/reviews/${reviewId}` as Href
-            );
+            router.replace(`/(app)/code-reviewer/${scope}/reviews/${reviewId}` as Href);
           },
           onError: error => {
             // A client-deadline rejection is the stall, not a server reason:
@@ -207,7 +205,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             <Button
               className={cn('mt-3 w-full', STATE_ACTION_CLASS)}
               onPress={() => {
-                router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/github` as Href);
+                router.push(`/(app)/code-reviewer/${scope}/github` as Href);
               }}
             >
               <Text>{t('common.connectGithub')}</Text>

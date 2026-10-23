@@ -1,8 +1,8 @@
 import { useRouter } from 'expo-router';
 import { MoreHorizontal } from '@/components/ui/icons';
-import { Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import { IconButton } from '@/components/ui/icon-button';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 
@@ -19,15 +19,13 @@ export function AuditReportButton({ scope }: Readonly<{ scope: string }>) {
   const { t } = useTranslation();
 
   return (
-    <Pressable
+    <IconButton
       onPress={() => {
         router.push(getSecurityAgentPath(scope, 'audit-report'));
       }}
-      accessibilityRole="button"
       accessibilityLabel={t('securityAgent.auditReportButton.viewA11y')}
-      className="size-11 items-center justify-center active:opacity-70"
     >
       <MoreHorizontal size={20} color={colors.foreground} />
-    </Pressable>
+    </IconButton>
   );
 }

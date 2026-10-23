@@ -949,6 +949,37 @@ describe('GitLab encrypted credential persistence', () => {
     expect(mockCreateProjectAccessToken).toHaveBeenCalledTimes(1);
   });
 
+  it('does not repeat a probe whose answer is a stored configuration problem', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    let [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await getOrCreateProjectAccessToken(integration, 42, { userId: user.id });
+    [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    mockValidateProjectAccessToken.mockClear();
+    mockValidateProjectAccessToken.mockResolvedValue({
+      status: 'unverified',
+      reason: 'instance-url',
+    });
+
+    await expect(
+      getOrCreateProjectAccessToken(integration, 42, { userId: user.id })
+    ).rejects.toThrow(GitLabProjectAccessTokenUnverifiedError);
+
+    expect(mockValidateProjectAccessToken).toHaveBeenCalledTimes(1);
+    expect(mockCreateProjectAccessToken).toHaveBeenCalledTimes(1);
+  });
+
   it('removes the exact encrypted project credential after explicit revocation', async () => {
     const user = await insertTestUser();
     const connected = await connectWithPAT(

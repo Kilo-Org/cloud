@@ -602,6 +602,12 @@ async function validateStoredProjectAccessToken(
     return first;
   }
 
+  // A rejected instance URL is a stored configuration problem: repeating the
+  // probe cannot change the answer.
+  if (first.reason === 'instance-url') {
+    return first;
+  }
+
   logExceptInTest('[validateStoredProjectAccessToken] Retrying unconfirmed token probe', {
     reason: first.reason,
     status: first.httpStatus,

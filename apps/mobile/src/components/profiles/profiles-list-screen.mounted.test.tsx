@@ -146,6 +146,7 @@ describe('ProfilesListScreen', () => {
     refetchFn.mockReset();
     routerPush.mockReset();
     organizationState.organizationId = 'org-1';
+    connectivityState.value = 'online';
     Object.assign(listState, {
       orgProfiles: [],
       personalProfiles: [],

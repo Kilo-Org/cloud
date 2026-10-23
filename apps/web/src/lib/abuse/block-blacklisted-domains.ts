@@ -1,6 +1,6 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
-import { and, eq, inArray, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 
 /** A distinct email domain whose users match the blacklist, with its count. */
 export type BlacklistedEmailDomain = {
@@ -30,11 +30,10 @@ export function emailDomainMatchesBlacklist(
  * match the blacklist.
  *
  * Matching every blacklist entry against every user is not viable: an imported
- * list of ~137k entries pushed `email_domain LIKE ANY (patterns)` past a
- * two-minute statement timeout. The users table holds far fewer distinct email
- * domains (~65k) than rows, so one grouped scan plus an in-process label match
- * returns in well under a second and hands the callers a small domain list for
- * the indexed `email_domain` lookups that follow.
+ * blocklist makes `email_domain LIKE ANY (patterns)` exceed the statement
+ * timeout. The users table holds far fewer distinct email domains than rows, so
+ * one grouped scan plus an in-process label match returns quickly and hands the
+ * callers a small domain list for the indexed `email_domain` lookups that follow.
  */
 export async function findBlacklistedEmailDomains(
   domains: string[]
@@ -96,7 +95,9 @@ export async function backfillBlockBlacklistedDomainsBatch(params: {
   if (matchingDomains.length === 0) {
     return { processed: 0, remaining: false };
   }
-  const condition = inArray(kilocode_users.email_domain, matchingDomains);
+  // Bind the whole list as one array parameter: a blocklist that matches most
+  // stored domains would otherwise approach PostgreSQL's bind-parameter limit.
+  const condition = sql`${kilocode_users.email_domain} = ANY(${sql.param(matchingDomains)}::text[])`;
   let totalProcessed = 0;
   // Track whether we ever hit a short select, which is the only reliable
   // signal that the result set is exhausted. Basing `remaining` on

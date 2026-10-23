@@ -21,20 +21,38 @@ describe('csvLiteral', () => {
 });
 
 describe('csvField', () => {
-  it('quotes values with commas, quotes, or line breaks and doubles embedded quotes', () => {
+  it('keeps quoting for commas, quotes and line breaks', () => {
+    expect(csvField('')).toBe('');
+    expect(csvField('plain text')).toBe('plain text');
     expect(csvField('a,b')).toBe('"a,b"');
     expect(csvField('say "hi"')).toBe('"say ""hi"""');
-    expect(csvField('first\nsecond')).toBe('"first\nsecond"');
-    expect(csvField('first\rsecond')).toBe('"first\rsecond"');
-    expect(csvField('first\r\nsecond')).toBe('"first\r\nsecond"');
+    expect(csvField('line one\nline two')).toBe('"line one\nline two"');
+    expect(csvField('line one\rline two')).toBe('"line one\rline two"');
+    expect(csvField('line one\r\nline two')).toBe('"line one\r\nline two"');
   });
 
-  it('leaves a plain value unquoted', () => {
-    expect(csvField('plain')).toBe('plain');
+  it('formats representative cells as literal text', () => {
+    const cases: Array<[string, string]> = [
+      ['=HYPERLINK("x")', `"'=HYPERLINK(""x"")"`],
+      ['+1', `'+1`],
+      ['-1', `'-1`],
+      ['@SUM(1)', `'@SUM(1)`],
+      ['\t=1+1', `'\t=1+1`],
+      ['\r=1', `"'\r=1"`],
+      ['  =1', `'  =1`],
+      [' =1,2', `"' =1,2"`],
+      ['=SUM(A1)', "'=SUM(A1)"],
+      ['=SUM(A1,B1)', `"'=SUM(A1,B1)"`],
+    ];
+
+    for (const [value, expected] of cases) {
+      expect([value, csvField(value)]).toEqual([value, expected]);
+    }
   });
 
-  it('prefixes before quoting so the prefix stays inside the quotes', () => {
-    expect(csvField('=SUM(A1)')).toBe("'=SUM(A1)");
-    expect(csvField('=SUM(A1,B1)')).toBe(`"'=SUM(A1,B1)"`);
+  it('leaves already prefixed and ordinary values untouched', () => {
+    expect(csvField("'=1")).toBe("'=1");
+    expect(csvField('user@example.com')).toBe('user@example.com');
+    expect(csvField('2026-10-02 11:22:33')).toBe('2026-10-02 11:22:33');
   });
 });

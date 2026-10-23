@@ -3617,6 +3617,8 @@
     "noSpend": "Belum ada perbelanjaan direkodkan",
     "spend24h": "Perbelanjaan dalam 24 jam terakhir",
     "multiplierError": "Masukkan pengganda 1 atau lebih",
+    "multiplierMaxError": "Masukkan pengganda {{max}} atau kurang",
+    "thresholdMaxError": "Masukkan amaun {{max}} atau kurang.",
     "permissionDenied": "Anda tidak mempunyai kebenaran untuk mengurus amaran perbelanjaan.",
     "pushOffByCategory": "Dimatikan dalam Pemberitahuan"
   },

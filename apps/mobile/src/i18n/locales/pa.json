@@ -3617,6 +3617,8 @@
     "noSpend": "ਹਾਲੇ ਕੋਈ ਖਰਚਾ ਦਰਜ ਨਹੀਂ ਹੋਇਆ",
     "spend24h": "ਪਿਛਲੇ 24 ਘੰਟਿਆਂ ਦਾ ਖਰਚਾ",
     "multiplierError": "1 ਜਾਂ ਵੱਧ ਦਾ ਗੁਣਕ ਦਾਖਲ ਕਰੋ",
+    "multiplierMaxError": "{{max}} ਜਾਂ ਘੱਟ ਦਾ ਗੁਣਕ ਦਾਖਲ ਕਰੋ",
+    "thresholdMaxError": "{{max}} ਜਾਂ ਘੱਟ ਦੀ ਰਕਮ ਦਰਜ ਕਰੋ।",
     "permissionDenied": "ਤੁਹਾਨੂੰ ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਪ੍ਰਬੰਧਨ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
     "pushOffByCategory": "ਸੂਚਨਾਵਾਂ ਵਿੱਚ ਬੰਦ"
   },

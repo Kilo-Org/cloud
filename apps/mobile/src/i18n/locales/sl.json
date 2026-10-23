@@ -3701,6 +3701,8 @@
     "noSpend": "Poraba še ni zabeležena",
     "spend24h": "Poraba v zadnjih 24 urah",
     "multiplierError": "Vnesi množitelj 1 ali večji",
+    "multiplierMaxError": "Vnesi množitelj {{max}} ali manjši",
+    "thresholdMaxError": "Vnesi znesek {{max}} ali manjši.",
     "permissionDenied": "Nimaš dovoljenja za upravljanje opozoril o porabi.",
     "pushOffByCategory": "Izklopljeno v Obvestilih"
   },

@@ -3743,6 +3743,8 @@
     "noSpend": "Għadu ma ġie rreġistrat l-ebda infiq",
     "spend24h": "Infiq fl-aħħar 24 siegħa",
     "multiplierError": "Daħħal multiplikatur ta' 1 jew aktar",
+    "multiplierMaxError": "Daħħal multiplikatur ta' {{max}} jew inqas",
+    "thresholdMaxError": "Daħħal ammont ta' {{max}} jew inqas.",
     "permissionDenied": "M'għandekx permess biex timmaniġġja t-twissijiet tal-infiq.",
     "pushOffByCategory": "Mitfi fin-Notifiki"
   },

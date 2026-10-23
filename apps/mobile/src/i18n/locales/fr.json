@@ -3659,6 +3659,8 @@
     "noSpend": "Aucune dépense enregistrée pour l'instant",
     "spend24h": "Dépenses des dernières 24 heures",
     "multiplierError": "Saisissez un multiplicateur de 1 ou plus",
+    "multiplierMaxError": "Saisissez un multiplicateur de {{max}} ou moins",
+    "thresholdMaxError": "Saisissez un montant de {{max}} ou moins.",
     "permissionDenied": "Vous n'avez pas l'autorisation de gérer les alertes de dépenses.",
     "pushOffByCategory": "Désactivé dans les notifications"
   },

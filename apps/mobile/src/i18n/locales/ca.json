@@ -3659,6 +3659,8 @@
     "noSpend": "Encara no s'ha registrat cap despesa",
     "spend24h": "Despesa de les últimes 24 hores",
     "multiplierError": "Introdueix un multiplicador d'1 o més",
+    "multiplierMaxError": "Introdueix un multiplicador de {{max}} o menys",
+    "thresholdMaxError": "Introdueix un import de {{max}} o menys.",
     "permissionDenied": "No tens permís per gestionar les alertes de despesa.",
     "pushOffByCategory": "Desactivat a Notificacions"
   },

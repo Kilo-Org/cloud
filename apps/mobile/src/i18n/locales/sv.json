@@ -3616,6 +3616,8 @@
     "noSpend": "Ingen utgift registrerad ännu",
     "spend24h": "Utgifter de senaste 24 timmarna",
     "multiplierError": "Ange en multiplikator på 1 eller mer",
+    "multiplierMaxError": "Ange en multiplikator på {{max}} eller mindre",
+    "thresholdMaxError": "Ange ett belopp på {{max}} eller mindre.",
     "permissionDenied": "Du har inte behörighet att hantera utgiftsvarningar.",
     "pushOffByCategory": "Av i Aviseringar"
   },

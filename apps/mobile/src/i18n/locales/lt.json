@@ -3701,6 +3701,8 @@
     "noSpend": "Išlaidų dar neužregistruota",
     "spend24h": "Išlaidos per paskutines 24 valandas",
     "multiplierError": "Įvesk daugiklį, lygų 1 arba didesnį",
+    "multiplierMaxError": "Įvesk daugiklį, lygų {{max}} arba mažesnį",
+    "thresholdMaxError": "Įveskite sumą, lygią {{max}} arba mažesnę.",
     "permissionDenied": "Neturite leidimo valdyti išlaidų įspėjimų.",
     "pushOffByCategory": "Išjungta pranešimuose"
   },

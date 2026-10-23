@@ -3617,6 +3617,8 @@
     "noSpend": "Chưa ghi nhận chi tiêu nào",
     "spend24h": "Chi tiêu trong 24 giờ qua",
     "multiplierError": "Nhập hệ số từ 1 trở lên",
+    "multiplierMaxError": "Nhập hệ số từ {{max}} trở xuống",
+    "thresholdMaxError": "Hãy nhập số tiền từ {{max}} trở xuống.",
     "permissionDenied": "Bạn không có quyền quản lý cảnh báo chi tiêu.",
     "pushOffByCategory": "Đã tắt trong Thông báo"
   },

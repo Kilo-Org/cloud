@@ -3617,6 +3617,8 @@
     "noSpend": "Aínda non se rexistrou ningún gasto",
     "spend24h": "Gasto nas últimas 24 horas",
     "multiplierError": "Introduce un multiplicador de 1 ou máis",
+    "multiplierMaxError": "Introduce un multiplicador de {{max}} ou menos",
+    "thresholdMaxError": "Introduce unha cantidade de {{max}} ou menos.",
     "permissionDenied": "Non tes permiso para xestionar as alertas de gasto.",
     "pushOffByCategory": "Desactivado en Notificacións"
   },

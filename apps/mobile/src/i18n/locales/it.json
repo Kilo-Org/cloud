@@ -3659,6 +3659,8 @@
     "noSpend": "Nessuna spesa registrata finora",
     "spend24h": "Spesa nelle ultime 24 ore",
     "multiplierError": "Inserisci un moltiplicatore di 1 o più",
+    "multiplierMaxError": "Inserisci un moltiplicatore di {{max}} o meno",
+    "thresholdMaxError": "Inserisci un importo di {{max}} o meno.",
     "permissionDenied": "Non hai l'autorizzazione per gestire gli avvisi di spesa.",
     "pushOffByCategory": "Disattivato in Notifiche"
   },

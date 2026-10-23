@@ -3617,6 +3617,8 @@
     "noSpend": "Edebebeghị mmefu ọ bụla",
     "spend24h": "Mmefu n'ime awa 24 gara aga",
     "multiplierError": "Tinye ọnụọgụ mmụba nke 1 ma ọ bụ karịa",
+    "multiplierMaxError": "Tinye ọnụọgụ mmụba nke {{max}} ma ọ bụ obere",
+    "thresholdMaxError": "Tinye ego nke {{max}} ma ọ bụ obere.",
     "permissionDenied": "Ị nweghị ikike ijikwa ọkwa gbasara mmefu.",
     "pushOffByCategory": "Gbanyụrụ n'ime Ọkwa"
   },

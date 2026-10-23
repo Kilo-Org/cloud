@@ -3617,6 +3617,8 @@
     "noSpend": "Henüz harcama kaydedilmedi",
     "spend24h": "Son 24 saatteki harcama",
     "multiplierError": "1 veya daha büyük bir çarpan gir",
+    "multiplierMaxError": "{{max}} veya daha küçük bir çarpan gir",
+    "thresholdMaxError": "{{max}} veya daha az bir tutar gir.",
     "permissionDenied": "Harcama uyarılarını yönetme iznin yok.",
     "pushOffByCategory": "Bildirimler'de kapalı"
   },

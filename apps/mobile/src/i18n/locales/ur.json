@@ -3617,6 +3617,8 @@
     "noSpend": "ابھی تک کوئی خرچ درج نہیں ہوا",
     "spend24h": "گزشتہ 24 گھنٹوں کا خرچ",
     "multiplierError": "1 یا اس سے زیادہ کا ضرب درج کریں",
+    "multiplierMaxError": "{{max}} یا اس سے کم کا ضرب درج کریں",
+    "thresholdMaxError": "{{max}} یا اس سے کم رقم درج کریں۔",
     "permissionDenied": "آپ کو اخراجات کی تنبیہات کا انتظام کرنے کی اجازت نہیں ہے۔",
     "pushOffByCategory": "اطلاعات میں بند"
   },

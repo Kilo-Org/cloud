@@ -3702,6 +3702,8 @@
     "noSpend": "No spend recorded yet",
     "spend24h": "Spend in the last 24 hours",
     "multiplierError": "Enter a multiplier of 1 or more",
+    "multiplierMaxError": "Enter a multiplier of {{max}} or less",
+    "thresholdMaxError": "Enter an amount of {{max}} or less",
     "permissionDenied": "You don't have permission to manage spend alerts.",
     "pushOffByCategory": "Off in Notifications"
   },

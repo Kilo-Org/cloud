@@ -3701,6 +3701,8 @@
     "noSpend": "Zatiaľ nie sú zaznamenané žiadne výdavky",
     "spend24h": "Výdavky za posledných 24 hodín",
     "multiplierError": "Zadaj násobiteľ 1 alebo väčší",
+    "multiplierMaxError": "Zadaj násobiteľ {{max}} alebo menší",
+    "thresholdMaxError": "Zadaj sumu {{max}} alebo menšiu.",
     "permissionDenied": "Nemáš povolenie spravovať upozornenia na výdavky.",
     "pushOffByCategory": "Vypnuté v Upozorneniach"
   },

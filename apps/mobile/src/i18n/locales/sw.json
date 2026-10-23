@@ -3617,6 +3617,8 @@
     "noSpend": "Hakuna matumizi yaliyorekodiwa bado",
     "spend24h": "Matumizi katika saa 24 zilizopita",
     "multiplierError": "Weka kizidishi cha 1 au zaidi",
+    "multiplierMaxError": "Weka kizidishi cha {{max}} au chini",
+    "thresholdMaxError": "Weka kiasi cha {{max}} au chini.",
     "permissionDenied": "Huna ruhusa ya kusimamia tahadhari za matumizi.",
     "pushOffByCategory": "Imezimwa katika Arifa"
   },

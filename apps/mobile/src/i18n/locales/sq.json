@@ -3617,6 +3617,8 @@
     "noSpend": "Nuk është regjistruar ende asnjë shpenzim",
     "spend24h": "Shpenzimet në 24 orët e fundit",
     "multiplierError": "Vendos një shumëzues 1 ose më shumë",
+    "multiplierMaxError": "Vendos një shumëzues {{max}} ose më të vogël",
+    "thresholdMaxError": "Shkruaj një shumë prej {{max}} ose më pak.",
     "permissionDenied": "Nuk ke leje për të menaxhuar njoftimet për shpenzimet.",
     "pushOffByCategory": "Fikur në Njoftimet"
   },

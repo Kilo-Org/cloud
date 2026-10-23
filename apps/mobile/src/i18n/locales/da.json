@@ -3617,6 +3617,8 @@
     "noSpend": "Der er endnu ikke registreret noget forbrug",
     "spend24h": "Forbrug de seneste 24 timer",
     "multiplierError": "Angiv en multiplikator på 1 eller mere",
+    "multiplierMaxError": "Angiv en multiplikator på {{max}} eller mindre",
+    "thresholdMaxError": "Angiv et beløb på {{max}} eller mindre.",
     "permissionDenied": "Du har ikke tilladelse til at administrere forbrugsadvarsler.",
     "pushOffByCategory": "Fra i Notifikationer"
   },

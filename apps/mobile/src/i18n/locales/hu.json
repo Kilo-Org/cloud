@@ -3617,6 +3617,8 @@
     "noSpend": "Még nincs rögzített költés",
     "spend24h": "Költés az elmúlt 24 órában",
     "multiplierError": "Adj meg 1 vagy nagyobb szorzót",
+    "multiplierMaxError": "Adj meg {{max}} vagy kisebb szorzót",
+    "thresholdMaxError": "Adj meg {{max}} vagy kisebb összeget.",
     "permissionDenied": "Nincs jogosultságod a költésfigyelmeztetések kezelésére.",
     "pushOffByCategory": "Értesítésekben kikapcsolva"
   },

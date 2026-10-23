@@ -3617,6 +3617,8 @@
     "noSpend": "እስካሁን ምንም ወጪ አልተመዘገበም",
     "spend24h": "ባለፉት 24 ሰዓታት የወጣ ወጪ",
     "multiplierError": "ከ1 ወይም ከዚያ በላይ የሆነ ብዜት ያስገቡ",
+    "multiplierMaxError": "ከ{{max}} ወይም ከዚያ በታች የሆነ ብዜት ያስገቡ",
+    "thresholdMaxError": "ከ{{max}} ወይም ከዚያ በታች የሆነ መጠን ያስገቡ።",
     "permissionDenied": "የወጪ ማስጠንቀቂያዎችን ለማስተዳደር ፈቃድ የለዎትም።",
     "pushOffByCategory": "በማሳወቂያዎች ውስጥ ተሰናክሏል"
   },

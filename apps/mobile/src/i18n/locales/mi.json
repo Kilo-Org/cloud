@@ -3617,6 +3617,8 @@
     "noSpend": "Kāore anō kia tuhia he whakapaunga",
     "spend24h": "Whakapaunga i ngā 24 hāora kua hipa",
     "multiplierError": "Whakaurua he whakarea 1, nui ake rānei",
+    "multiplierMaxError": "Whakaurua he whakarea {{max}}, iti ake rānei",
+    "thresholdMaxError": "Whakaurua he moni {{max}}, iti ake rānei.",
     "permissionDenied": "Kāore ō whakaaetanga ki te whakahaere i ngā matohi whakapaunga.",
     "pushOffByCategory": "Weto i roto i Ngā whakamōhiotanga"
   },

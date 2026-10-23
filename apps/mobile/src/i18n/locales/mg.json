@@ -3617,6 +3617,8 @@
     "noSpend": "Mbola tsy misy fandaniana voarakitra",
     "spend24h": "Fandaniana tao anatin'ny 24 ora farany",
     "multiplierError": "Ampidiro mpamaro 1 na mihoatra",
+    "multiplierMaxError": "Ampidiro mpamaro tsy mihoatra ny {{max}}",
+    "thresholdMaxError": "Mampidira vola tsy mihoatra ny {{max}}.",
     "permissionDenied": "Tsy manana alalana hitantana ny fampitandremana momba ny fandaniana ianao.",
     "pushOffByCategory": "Mihidy ao amin'ny Fampandrenesana"
   },

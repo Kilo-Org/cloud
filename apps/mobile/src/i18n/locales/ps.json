@@ -3617,6 +3617,8 @@
     "noSpend": "تر دې دمه هیڅ لګښت ثبت شوی نه دی",
     "spend24h": "د تېرو 24 ساعتونو لګښت",
     "multiplierError": "د 1 یا ډېر ضریب ولیکه",
+    "multiplierMaxError": "د {{max}} یا کم ضریب ولیکه",
+    "thresholdMaxError": "د {{max}} یا کمه اندازه ولیکئ.",
     "permissionDenied": "تاسو د لګښت خبرتیاوو د اداره کولو اجازه نه لرئ.",
     "pushOffByCategory": "په خبرتیاوو کې بند"
   },

@@ -3659,6 +3659,8 @@
     "noSpend": "Izdevumi vēl nav reģistrēti",
     "spend24h": "Izdevumi pēdējo 24 stundu laikā",
     "multiplierError": "Ievadi reizinātāju, kas ir 1 vai lielāks",
+    "multiplierMaxError": "Ievadi reizinātāju, kas ir {{max}} vai mazāks",
+    "thresholdMaxError": "Ievadi summu, kas ir {{max}} vai mazāka.",
     "permissionDenied": "Tev nav atļaujas pārvaldīt izdevumu brīdinājumus.",
     "pushOffByCategory": "Izslēgts paziņojumos"
   },

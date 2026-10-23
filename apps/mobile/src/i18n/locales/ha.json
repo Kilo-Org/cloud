@@ -3617,6 +3617,8 @@
     "noSpend": "Ba a rubuta wani kashe kuɗi ba tukuna",
     "spend24h": "Kashe kuɗi a cikin sa'o'i 24 da suka gabata",
     "multiplierError": "Shigar da mai ninka 1 ko fiye",
+    "multiplierMaxError": "Shigar da mai ninka {{max}} ko ƙasa da haka",
+    "thresholdMaxError": "Shigar da adadin kuɗin da bai wuce {{max}} ba.",
     "permissionDenied": "Ba ka da izinin sarrafa faɗakarwar kashe kuɗi.",
     "pushOffByCategory": "A kashe a cikin Sanarwa"
   },

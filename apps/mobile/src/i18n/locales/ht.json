@@ -3617,6 +3617,8 @@
     "noSpend": "Poko gen depans ki anrejistre",
     "spend24h": "Depans nan 24 èdtan ki sot pase yo",
     "multiplierError": "Antre yon miltiplikatè 1 oswa plis",
+    "multiplierMaxError": "Antre yon miltiplikatè {{max}} oswa mwens",
+    "thresholdMaxError": "Antre yon montan {{max}} oswa mwens.",
     "permissionDenied": "Ou pa gen pèmisyon pou jere alèt depans yo.",
     "pushOffByCategory": "Fèmen nan Notifikasyon"
   },

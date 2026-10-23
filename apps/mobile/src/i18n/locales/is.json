@@ -3617,6 +3617,8 @@
     "noSpend": "Engin útgjöld skráð ennþá",
     "spend24h": "Útgjöld síðustu 24 klukkustundir",
     "multiplierError": "Sláðu inn margfaldara sem er 1 eða meira",
+    "multiplierMaxError": "Sláðu inn margfaldara sem er {{max}} eða minna",
+    "thresholdMaxError": "Sláðu inn upphæð sem er {{max}} eða lægri.",
     "permissionDenied": "Þú hefur ekki heimild til að stjórna útgjaldaviðvörunum.",
     "pushOffByCategory": "Af í Tilkynningum"
   },

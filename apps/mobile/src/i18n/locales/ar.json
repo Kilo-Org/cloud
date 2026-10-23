@@ -3785,6 +3785,8 @@
     "noSpend": "لم يُسجَّل أي إنفاق بعد",
     "spend24h": "الإنفاق خلال آخر 24 ساعة",
     "multiplierError": "أدخل مضاعفًا يساوي 1 أو أكثر",
+    "multiplierMaxError": "أدخل مضاعفًا يساوي {{max}} أو أقل",
+    "thresholdMaxError": "أدخل مبلغًا يساوي {{max}} أو أقل.",
     "permissionDenied": "ليست لديك صلاحية لإدارة تنبيهات الإنفاق.",
     "pushOffByCategory": "معطّل في الإشعارات"
   },

@@ -3617,6 +3617,8 @@
     "noSpend": "Wala pang naitalang gastos",
     "spend24h": "Gastos sa nakalipas na 24 na oras",
     "multiplierError": "Maglagay ng multiplier na 1 o higit pa",
+    "multiplierMaxError": "Maglagay ng multiplier na {{max}} o mas mababa",
+    "thresholdMaxError": "Maglagay ng halagang {{max}} o mas mababa.",
     "permissionDenied": "Wala kang pahintulot na pamahalaan ang mga babala sa gastos.",
     "pushOffByCategory": "Naka-off sa Mga abiso"
   },

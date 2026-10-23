@@ -3659,6 +3659,8 @@
     "noSpend": "Još nema zabilježene potrošnje",
     "spend24h": "Potrošnja u posljednja 24 sata",
     "multiplierError": "Unesi množitelj 1 ili veći",
+    "multiplierMaxError": "Unesi množitelj {{max}} ili manji",
+    "thresholdMaxError": "Unesi iznos {{max}} ili manji.",
     "permissionDenied": "Nemaš dopuštenje za upravljanje upozorenjima o potrošnji.",
     "pushOffByCategory": "Isključeno u Obavijestima"
   },

@@ -3617,6 +3617,8 @@
     "noSpend": "এখনও কোনো খরচ নথিভুক্ত হয়নি",
     "spend24h": "গত 24 ঘণ্টার খরচ",
     "multiplierError": "1 বা তার বেশি গুণক লিখুন",
+    "multiplierMaxError": "{{max}} বা তার কম গুণক লিখুন",
+    "thresholdMaxError": "{{max}} বা তার কম একটি পরিমাণ লিখুন।",
     "permissionDenied": "খরচের সতর্কতা পরিচালনার অনুমতি আপনার নেই।",
     "pushOffByCategory": "বিজ্ঞপ্তিতে বন্ধ"
   },

@@ -3617,6 +3617,8 @@
     "noSpend": "Nog geen besteding aangeteken nie",
     "spend24h": "Besteding in die afgelope 24 uur",
     "multiplierError": "Voer 'n vermenigvuldiger van 1 of meer in",
+    "multiplierMaxError": "Voer 'n vermenigvuldiger van {{max}} of minder in",
+    "thresholdMaxError": "Voer 'n bedrag van {{max}} of minder in.",
     "permissionDenied": "Jy het nie toestemming om bestedingswaarskuwings te bestuur nie.",
     "pushOffByCategory": "Af in Kennisgewings"
   },

@@ -63,6 +63,7 @@ describe('listProviderRepositoryBranches (gitlab)', () => {
     expect(listing).toEqual({
       defaultBranch: 'main',
       branches: ['main', 'feature/deploy'],
+      truncated: false,
     });
     expect(mockFetchGitLabBranches).toHaveBeenCalledWith(
       'glpat-mock-token',
@@ -182,12 +183,12 @@ describe('listProviderRepositoryBranches (github refusals)', () => {
       repositoryFullName: 'octocat/hello',
     });
 
-    expect(listing).toEqual({ defaultBranch: 'main', branches: ['main', 'dev'] });
+    expect(listing).toEqual({ defaultBranch: 'main', branches: ['main', 'dev'], truncated: false });
   });
 });
 
 describe('listProviderRepositoryBranches (gitlab refusals)', () => {
-  it('maps a 403 from GitLab to FORBIDDEN instead of a 500', async () => {
+  it('maps a personal 403 from GitLab to FORBIDDEN instead of a 500', async () => {
     mockFetchGitLabBranches.mockRejectedValue(
       new GitLabBranchesFetchError(403, 'GitLab branches fetch failed: 403')
     );
@@ -199,6 +200,35 @@ describe('listProviderRepositoryBranches (gitlab refusals)', () => {
         repositoryFullName: 'group/repo',
       })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('maps a refused credential to the reconnect state', async () => {
+    mockFetchGitLabBranches.mockRejectedValue(
+      new GitLabBranchesFetchError(401, 'GitLab branches fetch failed: 401')
+    );
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'gitlab',
+        userId: 'user_1',
+        repositoryFullName: 'group/repo',
+      })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+  });
+
+  it('maps an organization connection 403 to the reconnect state', async () => {
+    mockFetchGitLabBranches.mockRejectedValue(
+      new GitLabBranchesFetchError(403, 'GitLab branches fetch failed: 403')
+    );
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'gitlab',
+        userId: 'user_1',
+        organizationId: 'org_1',
+        repositoryFullName: 'group/repo',
+      })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
   });
 
   it('maps a 404 from GitLab to NOT_FOUND instead of a 500', async () => {

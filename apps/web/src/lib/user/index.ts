@@ -74,7 +74,6 @@ import {
   kiloclaw_inbound_email_aliases,
   kiloclaw_access_codes,
   user_feedback,
-  app_builder_feedback,
   cloud_agent_feedback,
   security_advisor_scans,
   kilo_pass_scheduled_changes,
@@ -116,7 +115,6 @@ import {
   stripe_early_fraud_warning_cases,
   coding_plan_availability_intents,
   coding_plan_subscriptions,
-  deployments_ephemeral,
   operation_ledgers,
   analytics_event_outbox,
   bouncer_credit_event_outbox,
@@ -143,6 +141,7 @@ import {
   type SignupStepUpMethod,
 } from '@kilocode/web-shared/lib/auth/constants';
 import { shouldAutoProvisionPlatformAdmin } from '@/lib/admin/platform-admin';
+import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
 import { strict as assert } from 'node:assert';
 import type { OptionalError, Result } from '@kilocode/web-shared/lib/maybe-result';
 import { failureResult, successResult, trpcFailure } from '@kilocode/web-shared/lib/maybe-result';
@@ -457,7 +456,8 @@ export async function createOrUpdateUser(
   requestHeaders?: Headers,
   affiliateTrackingId?: string | null,
   trackingContext?: CreateOrUpdateUserTrackingContext,
-  deferSignInAnalytics?: boolean
+  deferSignInAnalytics?: boolean,
+  verifyNewAccountAdmission?: () => Promise<boolean>
 ): Promise<CreateOrUpdateUserResult> {
   const existingUser = await findAndSyncExistingUser(args);
   if (existingUser) {
@@ -605,12 +605,33 @@ export async function createOrUpdateUser(
     }
   }
 
+  const normalizedEmail = normalizeEmail(args.google_user_email);
+  const operationId = signupOperationId(normalizedEmail);
+
+  // Never fall through to the insert: its dedup misses legacy rows with a NULL
+  // normalized_email that findUserByNormalizedEmail matches case-insensitively.
+  if (args.provider === 'email' && isEmailSignupDisabled()) {
+    const matchingUser = await findUserByNormalizedEmail(args.google_user_email);
+    console.info('[auth] Signup creation outcome', {
+      operationId,
+      outcome: 'rejected',
+      reason: matchingUser ? 'email_already_used' : 'email_signup_disabled',
+    });
+    return failureResult(matchingUser ? 'EMAIL-ALREADY-USED' : 'EMAIL-SIGNUP-DISABLED');
+  }
+
   if (turnstile_guid && (await findUserById(turnstile_guid)))
     throw new Error('Abuser warning: turnstile guid reuse detected ' + turnstile_guid);
 
   const signupIp = getSignupIp(requestHeaders);
-  const normalizedEmail = normalizeEmail(args.google_user_email);
-  const operationId = signupOperationId(normalizedEmail);
+  if (verifyNewAccountAdmission && !(await verifyNewAccountAdmission())) {
+    console.info('[auth] Signup creation outcome', {
+      operationId,
+      outcome: 'rejected',
+      reason: 'native_admission',
+    });
+    return failureResult('ADMISSION_REQUIRED');
+  }
   const bouncerIp = bareIpLiteral(signupIp ?? undefined);
   if (!IS_DEVELOPMENT) {
     // Subdomains of one registrable domain share Bouncer's domain counter.
@@ -944,7 +965,6 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - credit_transactions, microdollar_usage (billing records)
  * - kilo_pass_subscriptions/issuances/issuance_items (financial)
  * - kilo_pass_welcome_promo_payment_fingerprint_claims (minimal retained payment anti-abuse evidence)
- * - deployments, app_builder_projects (user assets)
  * - stytch_fingerprints and provider safety identifiers (abuse detection)
  * - referral_code_usages (financial, references anonymized user)
  * - kiloclaw_subscriptions, kiloclaw_earlybird_purchases, kiloclaw_email_log (retained records)
@@ -976,12 +996,10 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - credit_campaigns (created_by_kilo_user_id anonymized)
  * - payment_methods (soft-deleted, address/name/IP fields nulled)
  * - App Store account token and retained Kilo Pass store purchase/event token fields
- * - user_feedback / app_builder_feedback (FK nulled)
+ * - user_feedback (FK nulled)
  * - user_data_exports and their multipart/outbox state (external object keys
  *   are copied to durable deletion tombstones for Worker cleanup)
  * - Stripe early-fraud-warning/dispute retained user links (FK nulled)
- * - deployments_ephemeral ownership link and cleanup claims (FK nulled;
- *   immediate cleanup scheduled)
  * - Recommendation dismissal actor references (nulled)
  * - platform_oauth_credentials (encrypted OAuth tokens and provider identity;
  *   authorizations created by the user are removed, including organization grants)
@@ -1827,10 +1845,7 @@ export async function anonymizeCloudUserData(
     .update(user_feedback)
     .set({ kilo_user_id: null })
     .where(eq(user_feedback.kilo_user_id, userId));
-  await tx
-    .update(app_builder_feedback)
-    .set({ kilo_user_id: null })
-    .where(eq(app_builder_feedback.kilo_user_id, userId));
+
   await tx
     .update(cloud_agent_feedback)
     .set({ kilo_user_id: null })
@@ -1865,17 +1880,6 @@ export async function anonymizeCloudUserData(
     .update(stripe_dispute_cases)
     .set({ accepted_by_kilo_user_id: null })
     .where(eq(stripe_dispute_cases.accepted_by_kilo_user_id, userId));
-  await tx
-    .update(deployments_ephemeral)
-    .set({
-      owned_by_user_id: null,
-      status: 'cleanup_retry',
-      next_cleanup_at: sql`now()`,
-      cleanup_claim_token: null,
-      cleanup_claimed_until: null,
-      updated_at: sql`now()`,
-    })
-    .where(eq(deployments_ephemeral.owned_by_user_id, userId));
   await tx
     .update(security_advisor_scans)
     .set({ kilo_user_id: 'deleted', public_ip: null })

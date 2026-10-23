@@ -16,7 +16,7 @@ type KilocodePayload = {
 function parseKilocodePayload(payload: string): KilocodePayload | null {
   try {
     const parsed: unknown = JSON.parse(payload);
-    return typeof parsed === 'object' && parsed !== null ? (parsed as KilocodePayload) : null;
+    return typeof parsed === 'object' && parsed !== null ? parsed : null;
   } catch {
     return null;
   }
@@ -44,7 +44,7 @@ export function createMemoryEventQueries(): EventQueries {
         stream_event_type: params.streamEventType,
         payload: params.payload,
         timestamp: params.timestamp,
-      } as StoredEvent);
+      });
       return id;
     },
     findByEntityId: (entityId: string) => rows.get(entityId) ?? null,

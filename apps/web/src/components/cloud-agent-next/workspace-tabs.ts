@@ -59,15 +59,6 @@ export function resetWorkspaceTabs(_state: WorkspaceTabsState): WorkspaceTabsSta
   return createWorkspaceTabsState();
 }
 
-export function clearFileTabs(state: WorkspaceTabsState): WorkspaceTabsState {
-  if (state.files.length === 0) return state;
-  return {
-    ...state,
-    files: [],
-    activeTabId: state.activeTabId.startsWith('file:') ? CHAT_TAB_ID : state.activeTabId,
-  };
-}
-
 export function addTerminalTab(
   state: WorkspaceTabsState,
   terminalId: string,

@@ -83,9 +83,9 @@ describe('upstreamRequest upstream URL policy', () => {
     setTargetEnv(originalTargetEnv);
   });
 
-  describe('when VERCEL_TARGET_ENV is staging', () => {
+  describe.each(['production', 'staging'])('when VERCEL_TARGET_ENV is %s', targetEnv => {
     beforeEach(() => {
-      setTargetEnv('staging');
+      setTargetEnv(targetEnv);
     });
 
     it('sends to a public HTTPS upstream without following redirects', async () => {
@@ -180,7 +180,7 @@ describe('upstreamRequest upstream URL policy', () => {
     });
   });
 
-  it.each(['production', 'preview', undefined])(
+  it.each(['preview', 'development', undefined])(
     'leaves the request unchecked when VERCEL_TARGET_ENV is %s',
     async targetEnv => {
       setTargetEnv(targetEnv);

@@ -52,4 +52,6 @@ export type ExecutionCallbackPayload = {
 export type CallbackJob = {
   target: CallbackTarget;
   payload: ExecutionCallbackPayload;
+  /** Server-owned routing context. Persisted once so queue retries reuse the same parent turn. */
+  parentSession?: { userId: string; messageId: string };
 };

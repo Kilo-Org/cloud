@@ -1,5 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
-import { Building2 } from '@/components/ui/icons';
+import { Building2, Globe, type LucideIcon } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -10,6 +10,9 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { useContextPicker } from '@/components/context-control';
+import { openExternalUrl } from '@/lib/external-link';
+import { WEB_BASE_URL } from '@/lib/config';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 
@@ -20,6 +23,8 @@ type OrganizationBoundaryProps = Readonly<{
   title?: string;
   /** Explicit org id (e.g. deep-link `?org=`) replacing the persisted selection for this render. */
   organizationIdOverride?: string;
+  /** Overrides the default boundary icon (PR-review passes its own glyph). */
+  icon?: LucideIcon;
 }>;
 
 /**
@@ -30,20 +35,30 @@ type OrganizationBoundaryProps = Readonly<{
  * 2. `isError` — `organizations.list` itself failed to fetch; this is
  *    retryable and must NOT be conflated with a stale org selection.
  * 3. otherwise — the list loaded fine but the persisted `organizationId`
- *    doesn't resolve to a membership: either nothing was ever selected, or
- *    the selected org is stale (deleted / user removed). Each gets its own
- *    copy.
+ *    doesn't resolve to a membership. Three settled states, mutually
+ *    exclusive:
+ *    - no memberships at all → the account has no organization; the action
+ *      opens the web organizations page (create/join live there), and Back
+ *      to profile stays as the plain exit.
+ *    - memberships exist but nothing is selected → the action opens the
+ *      context picker sheet, the same account switcher the composer uses.
+ *    - a deep-link override absent from a non-empty member list is
+ *      access-denied; a stale persisted selection keeps the older
+ *      "unavailable" copy. An absent override with zero memberships is the
+ *      no-organization state above, not access-denied: the account has no
+ *      organization to be denied access to.
  * Calls `useOrgBoundary()` itself — cheap, context/query-cache backed — so
  * callers only need to pass a `title` for full screens (sheets omit it).
  */
 export function OrganizationBoundary({
   title,
   organizationIdOverride,
+  icon = Building2,
 }: OrganizationBoundaryProps = {}) {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const { organizationId, org, isResolving, isError, isFetching, refetch } =
+  const { organizationId, org, orgs, isResolving, isError, isFetching, refetch } =
     useOrgBoundary(organizationIdOverride);
 
   let content: ReactNode = null;
@@ -63,10 +78,20 @@ export function OrganizationBoundary({
       />
     );
   } else {
-    // Three distinct settled states, mutually exclusive:
-    // 1. nothing selected and no override — prompt to select an org.
-    // 2. an override that is not in the member list — access denied.
-    // 3. a stale persisted selection (no override) — org unavailable.
+    // Four distinct settled states, mutually exclusive, decided first by
+    // whether the account has any memberships at all:
+    // 1. no memberships — the account has no organization (nothing selected,
+    //    a stale selection, or an absent deep-link override all look the
+    //    same here); the web organizations page owns create/join, so the
+    //    boundary sends the reader there instead of a profile control that
+    //    does not exist.
+    // 2. memberships exist but the resolved selection renders nothing —
+    //    nothing selected or a stale persisted selection; open the context
+    //    picker so the reader can actually make the choice.
+    // 3. a deep-link override absent from a non-empty member list — access
+    //    denied; the account has organizations, just not that one.
+    // 4. defensive fallback for a resolved selection the callers would not
+    //    route here — org unavailable.
     const backToProfileAction = (
       <Button
         variant="outline"
@@ -77,19 +102,37 @@ export function OrganizationBoundary({
         <Text>{t('organization.boundary.backToProfile')}</Text>
       </Button>
     );
-    if (organizationId == null) {
+    const hasOrganizations = (orgs?.length ?? 0) > 0;
+    if (!hasOrganizations) {
+      const openWebOrganizations = () => {
+        void openExternalUrl(`${WEB_BASE_URL}/organizations`, {
+          label: t('organization.boundary.openWebOrganizations'),
+        });
+      };
       content = (
         <EmptyState
-          icon={Building2}
-          title={t('organization.boundary.selectOrganization')}
-          description={t('organization.boundary.selectDescription')}
-          action={backToProfileAction}
+          icon={icon}
+          title={t('organization.boundary.noOrganization')}
+          description={t('organization.boundary.noOrganizationDescription')}
+          action={
+            <View className="gap-3">
+              <Button onPress={openWebOrganizations}>
+                <View className="flex-row items-center gap-2">
+                  <Globe size={18} color={colors.primaryForeground} />
+                  <Text>{t('organization.boundary.openWebOrganizations')}</Text>
+                </View>
+              </Button>
+              {backToProfileAction}
+            </View>
+          }
         />
       );
+    } else if (organizationId == null || (organizationIdOverride == null && org == null)) {
+      content = <OrganizationPickerBoundaryState icon={icon} backAction={backToProfileAction} />;
     } else if (organizationIdOverride != null && org == null) {
       content = (
         <EmptyState
-          icon={Building2}
+          icon={icon}
           title={t('common.accessDenied')}
           description={t('organization.boundary.accessDeniedDescription')}
           action={backToProfileAction}
@@ -98,7 +141,7 @@ export function OrganizationBoundary({
     } else {
       content = (
         <EmptyState
-          icon={Building2}
+          icon={icon}
           title={t('organization.boundary.organizationUnavailable')}
           description={t('organization.boundary.unavailableDescription')}
           action={backToProfileAction}
@@ -116,5 +159,44 @@ export function OrganizationBoundary({
       <ScreenHeader title={title} />
       {content}
     </View>
+  );
+}
+
+/**
+ * The settled "memberships exist, nothing selected" state. The boundary's
+ * action opens the same context picker sheet the composer's account control
+ * uses, so the reader can actually make the selection the heading asks for;
+ * `useContextPicker` owns the sheet element the caller's tree must keep
+ * mounted alongside the empty state.
+ */
+function OrganizationPickerBoundaryState({
+  icon,
+  backAction,
+}: Readonly<{ icon: LucideIcon; backAction?: ReactNode }>) {
+  const { t } = useTranslation();
+  const { orgs } = useOrgBoundary();
+  const { openPicker, picker } = useContextPicker(orgs);
+
+  return (
+    <>
+      {picker}
+      <EmptyState
+        icon={icon}
+        title={t('organization.boundary.selectOrganization')}
+        description={t('organization.boundary.selectDescriptionWithOrganizations')}
+        action={
+          <View className="gap-3">
+            <Button
+              onPress={() => {
+                openPicker();
+              }}
+            >
+              <Text>{t('organization.boundary.chooseAccount')}</Text>
+            </Button>
+            {backAction}
+          </View>
+        }
+      />
+    </>
   );
 }

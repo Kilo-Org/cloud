@@ -10,10 +10,10 @@ import { SessionPreviewOverlay } from '@/components/agents/session-preview-overl
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { TabBarButton } from '@/components/tab-bar-button';
 import { TabBarLabel } from '@/components/tab-bar-label';
+import { TabSwitchInputGate } from '@/components/tab-screen-input-gate';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Text } from '@/components/ui/text';
 import { usePendingAppAction } from '@/lib/app-actions/use-pending-app-action';
-import { PROFILE_TAB_ROOT } from '@/lib/finding-detail-back';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useKiloClawTabVisible } from '@/lib/hooks/use-kiloclaw-tab-visible';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -25,6 +25,7 @@ import {
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
 import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
+import { profileTabPressListeners, tabPressListeners } from '@/lib/tab-press-listeners';
 import {
   getEffectiveTabBarHeight,
   getTabBarHorizontalInset,
@@ -43,9 +44,6 @@ const TAB_BAR_ICON_STYLE = {
   alignItems: 'center',
   justifyContent: 'center',
 } satisfies ViewStyle;
-
-/** The plain tab press: the same feedback for every tab without its own move. */
-const TAB_PRESS_HAPTICS = { tabPress: () => void Haptics.selectionAsync() };
 
 export const unstable_settings = {
   initialRouteName: '(0_home)',
@@ -165,7 +163,10 @@ export default function TabsLayout() {
   const needsInputRows = activeSessions.map(session => ({
     id: session.id,
     status: session.status,
-    isAcked: isAttentionAcked(session.id, session.status),
+    isAcked: isAttentionAcked(session.id, {
+      raiseId: session.statusUpdatedAt ?? session.status,
+      status: session.status,
+    }),
   }));
   const needsInputCount = needsInputRows.filter(session =>
     shouldShowNeedsInput({
@@ -249,7 +250,7 @@ export default function TabsLayout() {
               <House size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
           }}
-          listeners={TAB_PRESS_HAPTICS}
+          listeners={tabPressListeners}
         />
         <Tabs.Screen
           name="(1_kiloclaw)"
@@ -298,7 +299,7 @@ export default function TabsLayout() {
               <Bot size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
           }}
-          listeners={TAB_PRESS_HAPTICS}
+          listeners={tabPressListeners}
         />
         <Tabs.Screen
           name="(4_chat)"
@@ -316,7 +317,7 @@ export default function TabsLayout() {
               <MessageCircle size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
           }}
-          listeners={TAB_PRESS_HAPTICS}
+          listeners={tabPressListeners}
         />
         <Tabs.Screen
           name="(3_profile)"
@@ -334,20 +335,14 @@ export default function TabsLayout() {
               <UserRound size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
           }}
-          listeners={{
-            tabPress: event => {
-              void Haptics.selectionAsync();
-              event.preventDefault();
-              router.navigate(PROFILE_TAB_ROOT);
-            },
-          }}
+          listeners={profileTabPressListeners(segments)}
         />
       </Tabs>
     </StateSurfaceInsets>
   );
   return (
     <TabBarLabelContext value={showTabLabel}>
-      {tabsLayout}
+      <TabSwitchInputGate>{tabsLayout}</TabSwitchInputGate>
       <SessionPreviewOverlay />
     </TabBarLabelContext>
   );

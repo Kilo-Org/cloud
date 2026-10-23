@@ -205,9 +205,9 @@ describe('toSecurityFindingParams', () => {
       sortBy: undefined,
       overdue: undefined,
     });
-    expect(parseSecurityFindingFilters(toSecurityFindingParams(DEFAULT_SECURITY_FINDING_FILTERS))).toEqual(
-      DEFAULT_SECURITY_FINDING_FILTERS
-    );
+    expect(
+      parseSecurityFindingFilters(toSecurityFindingParams(DEFAULT_SECURITY_FINDING_FILTERS))
+    ).toEqual(DEFAULT_SECURITY_FINDING_FILTERS);
   });
 
   it('round-trips every filter the sheet can set through the route', () => {
@@ -223,14 +223,22 @@ describe('toSecurityFindingParams', () => {
   });
 
   it('keeps a terminal outcome readable without inventing a status', () => {
-    const filters = { ...DEFAULT_SECURITY_FINDING_FILTERS, status: 'all' as const, outcome: 'fixed' as const };
+    const filters = {
+      ...DEFAULT_SECURITY_FINDING_FILTERS,
+      status: 'all' as const,
+      outcome: 'fixed' as const,
+    };
     const params = toSecurityFindingParams(filters);
     expect(params.status).toBeUndefined();
     expect(parseSecurityFindingFilters(params)).toEqual(filters);
   });
 
   it('is idempotent for an unnormalized status/outcome pair', () => {
-    const unnormalized = { ...DEFAULT_SECURITY_FINDING_FILTERS, status: 'open' as const, outcome: 'dismissed' as const };
+    const unnormalized = {
+      ...DEFAULT_SECURITY_FINDING_FILTERS,
+      status: 'open' as const,
+      outcome: 'dismissed' as const,
+    };
     const once = toSecurityFindingParams(unnormalized);
     const twice = toSecurityFindingParams(parseSecurityFindingFilters(once));
     expect(twice).toEqual(once);

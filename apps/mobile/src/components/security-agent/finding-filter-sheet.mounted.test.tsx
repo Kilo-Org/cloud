@@ -13,10 +13,7 @@ import { PickerSheet } from '@/components/picker-sheet';
 import { QueryError } from '@/components/query-error';
 import { FindingFilterModal } from '@/components/security-agent/finding-filter-modal';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  renderWithProviders,
-  type RenderWithProvidersResult,
-} from '@/test/render-with-providers';
+import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 
 type RepositoryOption = { id: number; fullName: string };
 
@@ -122,9 +119,7 @@ describe('Security Agent findings filter sheet', () => {
     const modalProps = root.findByType(FindingFilterModal).props as ModalProps & {
       repositories: RepositoryOption[];
     };
-    expect(modalProps.repositories).toEqual([
-      { id: 2, fullName: 'acme/two' },
-    ]);
+    expect(modalProps.repositories).toEqual([{ id: 2, fullName: 'acme/two' }]);
   });
 
   it('applies the draft back to the findings route', async () => {

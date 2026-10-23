@@ -185,8 +185,7 @@ export function toSecurityFindingParams(
     severity: filters.severity !== 'all' ? filters.severity : undefined,
     outcomeFilter: filters.outcome !== 'all' ? filters.outcome : undefined,
     repoFullName: filters.repoFullName ?? undefined,
-    sortBy:
-      filters.sortBy !== DEFAULT_SECURITY_FINDING_FILTERS.sortBy ? filters.sortBy : undefined,
+    sortBy: filters.sortBy !== DEFAULT_SECURITY_FINDING_FILTERS.sortBy ? filters.sortBy : undefined,
     overdue: filters.overdue ? 'true' : undefined,
   };
 }

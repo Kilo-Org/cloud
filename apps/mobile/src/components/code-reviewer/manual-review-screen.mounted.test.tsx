@@ -469,17 +469,28 @@ describe('ManualReviewScreen failed start', () => {
   it('still releases the action at the deadline after the draft changes', async () => {
     vi.useFakeTimers();
     try {
-      // The request never settles, so only the deadline can release the action.
+      // The request never settles and the button reports it, so only the
+      // deadline can release the action.
+      status.pending = true;
       status.mutate.mockImplementationOnce(() => undefined);
       const { renderer, unmount } = await renderScreen();
+
+      const primaryAction = () =>
+        only(
+          findAllOfType(renderer.root, 'Button').filter(
+            node => propOf(node, 'variant') !== 'outline'
+          ),
+          'primary action'
+        );
 
       act(() => {
         (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(GITHUB_PR_URL);
       });
-      const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
       act(() => {
-        (propOf(action, 'onPress') as () => void)();
+        (propOf(primaryAction(), 'onPress') as () => void)();
       });
+      expect(propOf(primaryAction(), 'loading')).toBe(true);
+
       // The user edits the draft while that request is still running.
       act(() => {
         (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(
@@ -490,7 +501,9 @@ describe('ManualReviewScreen failed start', () => {
         vi.advanceTimersByTime(MANUAL_REVIEW_START_DEADLINE_MS);
       });
 
-      // The wait is still real, so the stall copy and the released action stay.
+      // The wait is still real, so the action comes back and the stall copy
+      // explains it, even though the request was raised for older input.
+      expect(propOf(primaryAction(), 'loading')).toBe(false);
       expect(
         findAllOfType(renderer.root, 'Text')
           .map(node => propOf(node, 'children'))

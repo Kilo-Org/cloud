@@ -1631,8 +1631,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Ni razpoložljivih filtrov",
-      "noFiltersDescription": "Vrni se na seznam ugotovitev in znova odpri filtre.",
       "title": "Filtri ugotovitev",
       "reset": "Ponastavi",
       "severity": "Resnost",

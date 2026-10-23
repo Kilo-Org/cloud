@@ -1631,8 +1631,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Filtrų nėra",
-      "noFiltersDescription": "Grįžk į radinių sąrašą ir vėl atidaryk filtrus.",
       "title": "Radinių filtravimas",
       "reset": "Atkurti",
       "severity": "Pavojingumas",

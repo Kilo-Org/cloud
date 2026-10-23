@@ -1048,8 +1048,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Nessun filtro disponibile",
-      "noFiltersDescription": "Torna indietro e riapri i filtri dall'elenco delle segnalazioni.",
       "title": "Filtri delle segnalazioni",
       "fixed": "Risolto",
       "outcome": "Esito",

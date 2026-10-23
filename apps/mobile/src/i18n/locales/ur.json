@@ -1593,8 +1593,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "کوئی فلٹر دستیاب نہیں",
-      "noFiltersDescription": "واپس جائیں اور مسائل کی فہرست سے فلٹرز دوبارہ کھولیں۔",
       "title": "مسائل کے فلٹرز",
       "reset": "اصل حالت بحال کریں",
       "severity": "شدت",

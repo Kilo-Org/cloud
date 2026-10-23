@@ -1593,8 +1593,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Calaltuun hin jiru",
-      "noFiltersDescription": "Duubatti deebi'ii tarree argamootaa irraa calaltuu irra deebi'ii bani.",
       "title": "Argamoota calaluu",
       "reset": "Gara duraaniitti deebisi",
       "severity": "Cimina",

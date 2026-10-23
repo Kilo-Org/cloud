@@ -1593,8 +1593,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Enweghị ihe nzacha",
-      "noFiltersDescription": "Laghachi ma mepee ihe nzacha ọzọ site na ndepụta ihe achọpụtara.",
       "title": "Nzacha ihe achọpụtara",
       "reset": "Weghachite ntọala mbụ",
       "severity": "Ogo njọ",

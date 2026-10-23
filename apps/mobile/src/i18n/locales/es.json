@@ -1079,8 +1079,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "No hay filtros disponibles",
-      "noFiltersDescription": "Vuelve atrás y abre de nuevo los filtros desde la lista de hallazgos.",
       "title": "Filtrar hallazgos",
       "fixed": "Corregido",
       "outcome": "Resultado",

@@ -1593,8 +1593,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Pa gen filtè ki disponib",
-      "noFiltersDescription": "Retounen epi ouvri filtè yo ankò nan lis konsta yo.",
       "title": "Filtè pou konsta yo",
       "reset": "Reyinisyalize",
       "severity": "Gravite",

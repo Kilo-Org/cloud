@@ -1,11 +1,12 @@
-import { DEFAULT_SECURITY_FINDING_FILTERS } from '@kilocode/app-shared/security-agent';
+import {
+  DEFAULT_SECURITY_FINDING_FILTERS,
+  toSecurityFindingParams,
+} from '@kilocode/app-shared/security-agent';
 import { FlashList } from '@shopify/flash-list';
 import { act, type ComponentProps, createElement, type ReactElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import SecurityAgentFilterFindingsRoute from '@/app/(app)/security-agent/[scope]/filter';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PickerSheet } from '@/components/picker-sheet';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -31,7 +32,9 @@ const repositories = vi.hoisted(() => ({
 const mocks = vi.hoisted(() => ({
   query: vi.fn(),
   push: vi.fn(),
-  bridge: vi.fn(),
+  setParams: vi.fn(),
+  back: vi.fn(),
+  dismissTo: vi.fn(),
   toastError: vi.fn(),
 }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
@@ -42,8 +45,14 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: mocks.push, back: vi.fn() }),
+  useRouter: () => ({
+    push: mocks.push,
+    back: mocks.back,
+    setParams: mocks.setParams,
+    dismissTo: mocks.dismissTo,
+  }),
   useFocusEffect: vi.fn(),
+  useLocalSearchParams: () => ({ scope: 'personal' }),
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
@@ -78,14 +87,6 @@ vi.mock('@/lib/hooks/use-security-findings', () => ({
 vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({ useRouteForegroundRefresh: vi.fn() }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 vi.mock('@/lib/utils', () => ({ cn: (...values: unknown[]) => values.filter(Boolean).join(' ') }));
-vi.mock('@/lib/security-finding-filter-bridge', () => ({
-  setSecurityFindingFilterBridge: mocks.bridge,
-}));
-vi.mock('@/lib/route-registry', () => ({
-  SECURITY_FILTER_ROUTE_KEY: 'security-filter',
-  securityFilterSlot: { get: () => undefined },
-  useRouteRegistry: vi.fn(),
-}));
 
 let mounted: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefined;
 async function mount(routeParams: ComponentProps<typeof FindingListScreen>['routeParams'] = {}) {
@@ -140,14 +141,20 @@ describe('Security Agent list surfaces', () => {
     expect(empty.props.title).toBe('securityAgent.findingList.noMatchesTitle');
     const action = empty.props.action as ReactElement<{ onPress: () => void }>;
     act(action.props.onPress);
-    expect(root.findByType(EmptyState).props.title).toBe('securityAgent.findingList.emptyTitle');
+    // Clearing writes the default filters into this route's params, so the URL
+    // and the rendered list cannot disagree.
+    expect(mocks.setParams).toHaveBeenCalledWith(
+      toSecurityFindingParams(DEFAULT_SECURITY_FINDING_FILTERS)
+    );
     const filter = root.findByType(ScreenHeader).props.headerRight as ReactElement<{
       onPress: () => void;
     }>;
     act(filter.props.onPress);
-    expect(mocks.bridge).toHaveBeenLastCalledWith(
-      expect.objectContaining({ filters: DEFAULT_SECURITY_FINDING_FILTERS })
-    );
+    // The sheet is pushed with the filters the list currently shows.
+    expect(mocks.push).toHaveBeenLastCalledWith({
+      pathname: '/(app)/security-agent/[scope]/filter',
+      params: { scope: 'personal', severity: 'high' },
+    });
   });
 
   it('centers a load failure without cached rows and retains Retry and refresh', async () => {
@@ -161,37 +168,34 @@ describe('Security Agent list surfaces', () => {
     expect(findings.refetch).toHaveBeenCalledTimes(2);
   });
 
-  it('disables the filter and shows a repositories retry while the repositories fetch failed', async () => {
+  it('keeps the filter available and offers a repositories retry while that fetch failed', async () => {
     repositories.isError = true;
     const root = await mount();
     const filter = root.findByType(ScreenHeader).props.headerRight as ReactElement<{
       onPress: () => void;
-      disabled: boolean;
+      disabled?: boolean;
     }>;
-    expect(filter.props.disabled).toBe(true);
+    // The sheet owns its own loading/error state, so the control never becomes
+    // a silent no-op: the reader can always open it and retry from inside.
+    expect(filter.props.disabled).toBeUndefined();
 
     const errors = root.findAllByType(QueryError);
     expect(errors).toHaveLength(1);
     expect(errors[0]?.props.message).toBe('common.couldNotLoadRepositories');
     expect(errors[0]?.props.placement).toBe('top');
 
-    // The press stays a no-op while the repositories error stands.
     act(filter.props.onPress as () => void);
-    expect(mocks.bridge).not.toHaveBeenCalled();
-    expect(mocks.push).not.toHaveBeenCalled();
+    expect(mocks.push).toHaveBeenCalledWith({
+      pathname: '/(app)/security-agent/[scope]/filter',
+      params: { scope: 'personal' },
+    });
 
     act(errors[0]?.props.onRetry as () => void);
     expect(repositories.refetch).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps the filter enabled and no repositories error once the fetch succeeds', async () => {
+  it('shows no repositories error once the fetch succeeds', async () => {
     const root = await mount();
-    const filter = root.findByType(ScreenHeader).props.headerRight as ReactElement<{
-      onPress: () => void;
-      disabled: boolean;
-    }>;
-
-    expect(filter.props.disabled).toBe(false);
     expect(root.findAllByType(QueryError)).toHaveLength(0);
   });
 
@@ -261,11 +265,5 @@ describe('Security Agent list surfaces', () => {
     const footer = list.props.ListFooterComponent as ReactElement<{ className: string }>;
     expect(header.props.className).toBe('pb-3');
     expect(footer.props.className).toBe('pt-3');
-  });
-
-  it('keeps expired filter guidance outside a scroller', async () => {
-    mounted = await renderWithProviders(<SecurityAgentFilterFindingsRoute />);
-    expect(mounted.renderer.root.findByType(EmptyState).props.placement).not.toBe('top');
-    expect(mounted.renderer.root.findAllByType(PickerSheet)).toHaveLength(0);
   });
 });

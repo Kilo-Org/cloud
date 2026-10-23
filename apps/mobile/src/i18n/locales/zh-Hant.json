@@ -1076,8 +1076,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "沒有可用的篩選條件",
-      "noFiltersDescription": "請返回資安問題清單，再重新開啟篩選設定。",
       "title": "篩選資安問題",
       "fixed": "已修復",
       "outcome": "結果",

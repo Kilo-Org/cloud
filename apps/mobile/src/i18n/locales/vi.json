@@ -1076,8 +1076,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Không có bộ lọc",
-      "noFiltersDescription": "Quay lại danh sách vấn đề rồi mở lại bộ lọc.",
       "title": "Lọc vấn đề",
       "fixed": "Đã sửa",
       "outcome": "Kết quả",

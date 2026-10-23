@@ -1684,8 +1684,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "No filters available",
-      "noFiltersDescription": "Go back and reopen filters from the findings list.",
       "title": "Filter findings",
       "reset": "Reset",
       "severity": "Severity",

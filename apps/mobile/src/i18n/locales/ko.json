@@ -1076,8 +1076,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "사용 가능한 필터 없음",
-      "noFiltersDescription": "뒤로 돌아가 발견된 문제 목록에서 필터를 다시 여세요.",
       "title": "발견된 문제 필터",
       "fixed": "수정됨",
       "outcome": "결과",

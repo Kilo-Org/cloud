@@ -1076,8 +1076,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "暂无可用的筛选条件",
-      "noFiltersDescription": "请返回安全问题列表，重新打开筛选面板。",
       "title": "筛选安全问题",
       "fixed": "已修复",
       "outcome": "结果",

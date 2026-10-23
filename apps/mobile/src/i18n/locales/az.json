@@ -1593,8 +1593,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Filtr yoxdur",
-      "noFiltersDescription": "Geri qayıt və tapıntılar siyahısından filtrləri yenidən aç.",
       "title": "Tapıntıların filtrlənməsi",
       "reset": "Sıfırla",
       "severity": "Ciddilik dərəcəsi",

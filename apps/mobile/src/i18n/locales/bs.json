@@ -1612,8 +1612,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Nema dostupnih filtera",
-      "noFiltersDescription": "Vrati se i ponovo otvori filtere s liste nalaza.",
       "title": "Filtriranje nalaza",
       "reset": "Poništi",
       "severity": "Ozbiljnost",

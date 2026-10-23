@@ -1593,8 +1593,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Suodattimia ei ole saatavilla",
-      "noFiltersDescription": "Palaa takaisin ja avaa suodattimet uudelleen havaintolistasta.",
       "title": "Havaintojen suodatus",
       "reset": "Nollaa",
       "severity": "Vakavuus",

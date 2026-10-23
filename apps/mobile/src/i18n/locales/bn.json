@@ -1593,8 +1593,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "কোনো ফিল্টার নেই",
-      "noFiltersDescription": "ফিরে গিয়ে ত্রুটির তালিকা থেকে আবার ফিল্টার খুলুন।",
       "title": "ত্রুটির ফিল্টার",
       "reset": "রিসেট করুন",
       "severity": "তীব্রতা",

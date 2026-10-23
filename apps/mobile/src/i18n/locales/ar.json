@@ -1088,8 +1088,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "لا توجد عوامل تصفية متاحة",
-      "noFiltersDescription": "ارجع وأعد فتح عوامل التصفية من قائمة النتائج.",
       "title": "تصفية النتائج",
       "fixed": "تم الإصلاح",
       "outcome": "النتيجة",

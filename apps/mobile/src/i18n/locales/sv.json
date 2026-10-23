@@ -1593,8 +1593,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Inga filter tillgängliga",
-      "noFiltersDescription": "Gå tillbaka och öppna filtren igen från listan med fynd.",
       "title": "Filtrera fynd",
       "reset": "Återställ",
       "severity": "Allvarlighetsgrad",

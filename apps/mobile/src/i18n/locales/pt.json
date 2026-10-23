@@ -1612,8 +1612,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Sem filtros disponíveis",
-      "noFiltersDescription": "Volta à lista de ocorrências e abre novamente os filtros.",
       "title": "Filtrar ocorrências",
       "reset": "Limpar",
       "severity": "Gravidade",

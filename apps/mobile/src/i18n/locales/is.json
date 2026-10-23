@@ -1593,8 +1593,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Engar síur tiltækar",
-      "noFiltersDescription": "Farðu til baka og opnaðu síurnar aftur úr frávikalistanum.",
       "title": "Sía frávik",
       "reset": "Endurstilla",
       "severity": "Alvarleiki",

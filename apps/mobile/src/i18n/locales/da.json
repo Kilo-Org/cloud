@@ -1593,8 +1593,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Ingen filtre tilgængelige",
-      "noFiltersDescription": "Gå tilbage, og åbn filtrene igen fra listen over fund.",
       "title": "Filtrering af fund",
       "reset": "Nulstil",
       "severity": "Alvorlighed",

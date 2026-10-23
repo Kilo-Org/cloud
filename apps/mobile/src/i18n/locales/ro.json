@@ -1612,8 +1612,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Niciun filtru disponibil",
-      "noFiltersDescription": "Revino și deschide din nou filtrele din lista de constatări.",
       "title": "Filtrarea constatărilor",
       "reset": "Resetează",
       "severity": "Gravitate",

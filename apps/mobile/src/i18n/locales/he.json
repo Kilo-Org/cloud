@@ -1079,8 +1079,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "אין מסננים זמינים",
-      "noFiltersDescription": "חזור ופתח את המסננים מתוך רשימת הממצאים.",
       "title": "סינון ממצאים",
       "fixed": "תוקן",
       "outcome": "תוצאה",

@@ -1593,8 +1593,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Non hai filtros dispoñibles",
-      "noFiltersDescription": "Volve atrás e abre de novo os filtros desde a lista de achados.",
       "title": "Filtros de achados",
       "reset": "Restablecer",
       "severity": "Gravidade",

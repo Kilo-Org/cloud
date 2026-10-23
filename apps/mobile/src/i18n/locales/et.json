@@ -1593,8 +1593,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Filtreid pole saadaval",
-      "noFiltersDescription": "Mine tagasi ja ava filtrid leidude loendist uuesti.",
       "title": "Leidude filtreerimine",
       "reset": "Lähtesta",
       "severity": "Raskusaste",

@@ -1612,8 +1612,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Nav pieejamu filtru",
-      "noFiltersDescription": "Atgriezies konstatējumu sarakstā un vēlreiz atver filtrus.",
       "title": "Filtrēt konstatējumus",
       "reset": "Atiestatīt",
       "severity": "Smaguma pakāpe",

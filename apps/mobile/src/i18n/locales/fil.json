@@ -1593,8 +1593,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Walang magagamit na filter",
-      "noFiltersDescription": "Bumalik at buksan muli ang mga filter mula sa listahan ng mga natukoy na isyu.",
       "title": "Mga filter ng natukoy na isyu",
       "reset": "Ibalik sa dati",
       "severity": "Kalubhaan",

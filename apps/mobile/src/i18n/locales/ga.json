@@ -1650,8 +1650,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Níl aon scagairí ar fáil",
-      "noFiltersDescription": "Téigh ar ais agus oscail na scagairí arís ó liosta na dtorthaí.",
       "title": "Scagadh torthaí",
       "reset": "Athshocraigh",
       "severity": "Déine",

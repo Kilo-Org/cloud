@@ -394,8 +394,8 @@ export async function createPRComment(
 
 /**
  * Checks whether a comment containing the given marker already exists on a PR.
- * Reads at most MAX_KILO_REVIEW_COMMENT_PAGES pages of comments, newest first,
- * and only counts comments attributed to the Kilo GitHub App.
+ * Reads only the most recent MAX_KILO_REVIEW_COMMENT_PAGES pages of comments
+ * and counts comments attributed to the Kilo GitHub App only.
  */
 export async function hasPRCommentWithMarker(
   installationId: string,
@@ -609,10 +609,11 @@ type PRIssueComment = {
 };
 
 /**
- * Reads at most MAX_KILO_REVIEW_COMMENT_PAGES pages of pull-request issue
- * comments, newest first, so no single lookup follows the whole comment list of
- * a pull request. `reachedScanLimit` reports that the cap was hit while more
- * comments may exist.
+ * Reads the most recent MAX_KILO_REVIEW_COMMENT_PAGES pages of pull-request
+ * issue comments. GitHub returns issue comments oldest first and has no
+ * ordering parameter, so the last page number comes from the `Link` header and
+ * the scan starts there. `reachedScanLimit` reports that older comments were
+ * not read.
  */
 async function scanPRIssueComments(
   octokit: Octokit,
@@ -620,26 +621,40 @@ async function scanPRIssueComments(
   repo: string,
   prNumber: number
 ): Promise<{ comments: PRIssueComment[]; reachedScanLimit: boolean }> {
-  const comments: PRIssueComment[] = [];
-  let reachedScanLimit = false;
+  const base = {
+    owner,
+    repo,
+    issue_number: prNumber,
+    per_page: KILO_REVIEW_COMMENTS_PER_PAGE,
+  };
 
-  for (let page = 1; page <= MAX_KILO_REVIEW_COMMENT_PAGES; page++) {
-    const { data } = await octokit.issues.listComments({
-      owner,
-      repo,
-      issue_number: prNumber,
-      per_page: KILO_REVIEW_COMMENTS_PER_PAGE,
-      page,
-      sort: 'created',
-      direction: 'desc',
-    });
+  const firstResponse = await octokit.issues.listComments({ ...base, page: 1 });
+  const lastPage = lastIssueCommentPage(firstResponse.headers.link);
+  const firstPageToRead = Math.max(1, lastPage - (MAX_KILO_REVIEW_COMMENT_PAGES - 1));
+
+  const comments: PRIssueComment[] = firstPageToRead === 1 ? [...firstResponse.data] : [];
+
+  for (let page = Math.max(2, firstPageToRead); page <= lastPage; page++) {
+    const { data } = await octokit.issues.listComments({ ...base, page });
     comments.push(...data);
-
-    if (data.length < KILO_REVIEW_COMMENTS_PER_PAGE) break;
-    reachedScanLimit = page === MAX_KILO_REVIEW_COMMENT_PAGES;
   }
 
-  return { comments, reachedScanLimit };
+  return { comments, reachedScanLimit: firstPageToRead > 1 };
+}
+
+/**
+ * Reads the `rel="last"` page number from a `Link` response header.
+ */
+function lastIssueCommentPage(linkHeader: string | undefined): number {
+  if (!linkHeader) return 1;
+
+  for (const segment of linkHeader.split(',')) {
+    if (!segment.includes('rel="last"')) continue;
+    const page = segment.match(/[?&]page=(\d+)/);
+    if (page) return Number(page[1]);
+  }
+
+  return 1;
 }
 
 /**

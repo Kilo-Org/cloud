@@ -27,16 +27,19 @@ jest.mock('@octokit/auth-app', () => ({
 import { hasPRCommentWithMarker } from './adapter';
 
 const MARKER = '<!-- kilo-billing-notice -->';
-const MAX_PAGES = 5;
 
-function ordinaryPage() {
+function lastPageHeader(page: number) {
   return {
-    data: Array.from({ length: 100 }, (_, index) => ({
-      id: index + 1,
-      body: 'ordinary discussion',
-      updated_at: '2026-05-01T00:00:00Z',
-    })),
+    link: `<https://api.github.com/repos/acme/widgets/issues/7/comments?per_page=100&page=${page}>; rel="last"`,
   };
+}
+
+function fullPage() {
+  return Array.from({ length: 100 }, (_, index) => ({
+    id: index + 1,
+    body: 'ordinary discussion',
+    updated_at: '2026-05-01T00:00:00Z',
+  }));
 }
 
 beforeEach(() => {
@@ -46,6 +49,7 @@ beforeEach(() => {
 describe('hasPRCommentWithMarker', () => {
   it('returns true for a marker comment from the trusted app', async () => {
     mockListComments.mockResolvedValueOnce({
+      headers: {},
       data: [
         {
           id: 1,
@@ -62,6 +66,7 @@ describe('hasPRCommentWithMarker', () => {
 
   it('ignores a marker copied into a comment from another author', async () => {
     mockListComments.mockResolvedValueOnce({
+      headers: {},
       data: [
         {
           id: 1,
@@ -75,24 +80,29 @@ describe('hasPRCommentWithMarker', () => {
     await expect(hasPRCommentWithMarker('42', 'acme', 'widgets', 7, MARKER)).resolves.toBe(false);
   });
 
-  it('stops after the maximum page count when the provider always returns full pages', async () => {
-    mockListComments.mockResolvedValue(ordinaryPage());
+  it('reads only the most recent pages when the comment list is longer than the cap', async () => {
+    mockListComments.mockResolvedValue({ headers: lastPageHeader(12), data: fullPage() });
 
     await expect(hasPRCommentWithMarker('42', 'acme', 'widgets', 7, MARKER)).resolves.toBe(false);
-    expect(mockListComments).toHaveBeenCalledTimes(MAX_PAGES);
+
+    const requestedPages = mockListComments.mock.calls.map(call => call[0].page);
+    expect(requestedPages).toEqual([1, 8, 9, 10, 11, 12]);
   });
 
   it('finds the marker on a later page within the cap', async () => {
-    mockListComments.mockResolvedValueOnce(ordinaryPage()).mockResolvedValueOnce({
-      data: [
-        {
-          id: 500,
-          body: MARKER,
-          updated_at: '2026-05-02T00:00:00Z',
-          performed_via_github_app: { id: 'test-app-id' },
-        },
-      ],
-    });
+    mockListComments
+      .mockResolvedValueOnce({ headers: lastPageHeader(2), data: fullPage() })
+      .mockResolvedValueOnce({
+        headers: {},
+        data: [
+          {
+            id: 500,
+            body: MARKER,
+            updated_at: '2026-05-02T00:00:00Z',
+            performed_via_github_app: { id: 'test-app-id' },
+          },
+        ],
+      });
 
     await expect(hasPRCommentWithMarker('42', 'acme', 'widgets', 7, MARKER)).resolves.toBe(true);
     expect(mockListComments).toHaveBeenCalledTimes(2);

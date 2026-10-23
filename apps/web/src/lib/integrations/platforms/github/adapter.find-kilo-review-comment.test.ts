@@ -34,6 +34,9 @@ describe('findKiloReviewComment', () => {
   it('finds a marked Kilo review comment across paginated issue comments', async () => {
     mockListComments
       .mockResolvedValueOnce({
+        headers: {
+          link: '<https://api.github.com/repos/acme/widgets/issues/7/comments?per_page=100&page=2>; rel="next", <https://api.github.com/repos/acme/widgets/issues/7/comments?per_page=100&page=2>; rel="last"',
+        },
         data: Array.from({ length: 100 }, (_, index) => ({
           id: index + 1,
           body: 'ordinary discussion',
@@ -41,6 +44,7 @@ describe('findKiloReviewComment', () => {
         })),
       })
       .mockResolvedValueOnce({
+        headers: {},
         data: [
           {
             id: 101,
@@ -68,8 +72,6 @@ describe('findKiloReviewComment', () => {
       issue_number: 7,
       per_page: 100,
       page: 1,
-      sort: 'created',
-      direction: 'desc',
     });
     expect(mockListComments).toHaveBeenNthCalledWith(2, {
       owner: 'acme',
@@ -77,13 +79,12 @@ describe('findKiloReviewComment', () => {
       issue_number: 7,
       per_page: 100,
       page: 2,
-      sort: 'created',
-      direction: 'desc',
     });
   });
 
   it('ignores a marker comment not authored by the trusted app', async () => {
     mockListComments.mockResolvedValueOnce({
+      headers: {},
       data: [
         {
           id: 1,
@@ -108,6 +109,7 @@ describe('findKiloReviewComment', () => {
 
   it('ignores every marker comment when none is authored by the trusted app', async () => {
     mockListComments.mockResolvedValueOnce({
+      headers: {},
       data: [
         {
           id: 1,
@@ -121,8 +123,11 @@ describe('findKiloReviewComment', () => {
     await expect(findKiloReviewComment('42', 'acme', 'widgets', 7)).resolves.toBeNull();
   });
 
-  it('stops instead of creating a duplicate after the safe scan limit', async () => {
+  it('reads only the most recent pages before stopping at the safe scan limit', async () => {
     mockListComments.mockResolvedValue({
+      headers: {
+        link: '<https://api.github.com/repos/acme/widgets/issues/7/comments?per_page=100&page=12>; rel="last"',
+      },
       data: Array.from({ length: 100 }, (_, index) => ({
         id: index + 1,
         body: 'ordinary discussion',
@@ -134,6 +139,7 @@ describe('findKiloReviewComment', () => {
       'safe issue-comment scan limit'
     );
 
-    expect(mockListComments).toHaveBeenCalledTimes(5);
+    const requestedPages = mockListComments.mock.calls.map(call => call[0].page);
+    expect(requestedPages).toEqual([1, 8, 9, 10, 11, 12]);
   });
 });

@@ -3,7 +3,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 import { I18nManager, Text as RNText, type Role } from 'react-native';
 
-import { useSystemFontScale } from '@/lib/font-scale/system-font-scale';
+import { useSystemFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { resolveFontScaleCap } from '@/lib/font-scale/text-scale-cap';
 
 import {

@@ -1,6 +1,8 @@
-import { type NativeModule, requireOptionalNativeModule } from 'expo';
-import { createContext, type ReactNode, useContext, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
+
+import { readLiveFontScale, subscribeToFontScale } from '@/lib/font-scale/native-font-scale';
+import { SystemFontScaleContext } from '@/lib/font-scale/system-font-scale-context';
 
 /**
  * The system font scale as the app currently needs it.
@@ -12,35 +14,14 @@ import { AppState } from 'react-native';
  * `KiloFontScale` module reads the value from the live resources and emits it
  * on every configuration change; this provider is the one subscription every
  * text node reads it through.
- *
- * `null` means no live value: a build without the module, and the app tree
- * rendered before the provider mounts.
  */
-
-type FontScaleModule = InstanceType<
-  typeof NativeModule<{ onFontScaleChange: (event: { fontScale: number }) => void }>
-> & {
-  getFontScale: () => number;
-};
-
-const nativeModule = requireOptionalNativeModule<FontScaleModule>('KiloFontScale');
-
-function readLiveFontScale(): number {
-  const scale = nativeModule?.getFontScale() ?? 1;
-  return Number.isFinite(scale) && scale > 0 ? scale : 1;
-}
-
-const SystemFontScaleContext = createContext<number | null>(null);
-
 export function SystemFontScaleProvider({ children }: { readonly children: ReactNode }) {
   const [fontScale, setFontScale] = useState(readLiveFontScale);
 
   useEffect(() => {
-    const subscription = nativeModule?.addListener('onFontScaleChange', event => {
-      setFontScale(event.fontScale);
-    });
-    // A resume re-reads the same value: the change may have landed while the
-    // app was in the background, where the module's callback is not delivered.
+    const subscription = subscribeToFontScale(setFontScale);
+    // A resume re-reads the same value: a change may have landed while the app
+    // was in the background, where the module's callback is not delivered.
     const appStateSubscription = AppState.addEventListener('change', state => {
       if (state === 'active') {
         setFontScale(readLiveFontScale());
@@ -55,9 +36,4 @@ export function SystemFontScaleProvider({ children }: { readonly children: React
   return (
     <SystemFontScaleContext.Provider value={fontScale}>{children}</SystemFontScaleContext.Provider>
   );
-}
-
-/** The live system font scale, or `null` outside the provider. */
-export function useSystemFontScale(): number | null {
-  return useContext(SystemFontScaleContext);
 }

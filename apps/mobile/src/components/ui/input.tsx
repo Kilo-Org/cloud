@@ -1,6 +1,6 @@
 import { type StyleProp, TextInput, type TextInputProps, type TextStyle } from 'react-native';
 
-import { useSystemFontScale } from '@/lib/font-scale/system-font-scale';
+import { useSystemFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { resolveFontScaleCap } from '@/lib/font-scale/text-scale-cap';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { withRtlInputAlignment } from '@/lib/rtl-text';

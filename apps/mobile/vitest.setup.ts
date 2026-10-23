@@ -1,5 +1,14 @@
 import { vi } from 'vitest';
 
+// The live system font scale comes from a local Expo module, and the test
+// projects have no Expo runtime (importing `expo` fails on its ESM resolution).
+// The value the app ships at a default scale is all a rendered tree needs; a
+// suite that needs another one can register its own mock, which wins.
+vi.mock('@/lib/font-scale/native-font-scale', () => ({
+  readLiveFontScale: () => 1,
+  subscribeToFontScale: () => null,
+}));
+
 /** The subset of keyboard state the app reads through `useKeyboardState`. */
 type KeyboardStateSnapshot = {
   height: number;

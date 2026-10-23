@@ -24,7 +24,10 @@ import {
 } from '@/lib/agent-profile-forms';
 import { useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
-import { getProfileOverviewPath } from '@/lib/profile-agent-navigation';
+import {
+  getProfileOverviewPath,
+  type ProfileManagementStack,
+} from '@/lib/profile-agent-navigation';
 
 /**
  * Copy keys for the owner control, named here so the catalog entries land with
@@ -55,7 +58,12 @@ function hasUsableMessage(error: unknown): boolean {
   return error instanceof Error && error.message.trim().length > 0;
 }
 
-export function NewProfileScreen() {
+export function NewProfileScreen({
+  stack,
+}: Readonly<{
+  /** The Stack this screen is mounted in; the created profile opens in it. */
+  stack: ProfileManagementStack;
+}>) {
   const router = useRouter();
   const { t } = useTranslation();
   const { organizationId, role, org, isResolving } = useOrgBoundary();
@@ -105,7 +113,7 @@ export function NewProfileScreen() {
         ...(ownerOrganizationId === undefined ? {} : { organizationId: ownerOrganizationId }),
       });
       toast.success(t('profiles.createdToast', { name }));
-      router.replace(getProfileOverviewPath(created.id, ownerOrganizationId));
+      router.replace(getProfileOverviewPath(created.id, ownerOrganizationId, stack));
     } catch (error) {
       if (!hasUsableMessage(error)) {
         toast.error(t('profiles.createFailed'));

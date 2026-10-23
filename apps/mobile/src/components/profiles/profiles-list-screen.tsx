@@ -1,4 +1,4 @@
-import { type Href, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -33,9 +33,11 @@ import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatProfileCountItemsShort } from '@/lib/profile-count-labels';
 import { type AgentProfileListItem, useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
 import { useOrganization } from '@/lib/organization-context';
-import { getProfileOverviewPath } from '@/lib/profile-agent-navigation';
-
-const NEW_PROFILE_PATH = '/(app)/(tabs)/(3_profile)/profiles/new' as Href;
+import {
+  getNewProfilePath,
+  getProfileOverviewPath,
+  type ProfileManagementStack,
+} from '@/lib/profile-agent-navigation';
 
 /**
  * The row's leading icon names its owner, the same split the web list row
@@ -67,7 +69,12 @@ function ProfileListSkeleton() {
   );
 }
 
-export function ProfilesListScreen() {
+export function ProfilesListScreen({
+  stack,
+}: Readonly<{
+  /** The Stack this screen is mounted in; the rows it opens stay in it. */
+  stack: ProfileManagementStack;
+}>) {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -91,11 +98,13 @@ export function ProfilesListScreen() {
   const isListLoading = !isLoaded || isLoading;
 
   const openNewProfile = () => {
-    router.push(NEW_PROFILE_PATH);
+    router.push(getNewProfilePath(stack));
   };
 
   const openProfile = (profile: AgentProfileListItem) => {
-    router.push(getProfileOverviewPath(profile.id, profileOrganizationId(organizationId, profile)));
+    router.push(
+      getProfileOverviewPath(profile.id, profileOrganizationId(organizationId, profile), stack)
+    );
   };
 
   return (

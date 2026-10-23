@@ -14,9 +14,11 @@ import { SUPPORTED_LANGUAGES, type SupportedLanguage } from './languages';
  * The catalogs already carry one deliberate pair of surface-specific twins,
  * `notifications.liveActivitySubtitle` (iOS) and `notifications.liveUpdateSubtitle`
  * (Android). Whatever the two sentences do not share is this catalog's name for
- * the iOS surface, and no follow label may repeat it. Deriving the terms from
- * the catalogs keeps the check language-agnostic: there is no glossary to
- * maintain, and a catalog that renames the surface keeps the guard working.
+ * the iOS surface, and no follow label may repeat it. Words both sentences use
+ * are dropped, so only the surface name carries over when the surrounding
+ * phrasing is translated differently. Deriving the terms from the catalogs
+ * keeps the check language-agnostic: there is no glossary to maintain, and a
+ * catalog that renames the surface keeps the guard working.
  */
 const FOLLOW_LABEL_KEYS = [
   'agentChat.session.follow',
@@ -64,7 +66,8 @@ function trimEdges(value: string): string {
 
 /**
  * The part of the Lock Screen sentence the notifications sentence does not
- * share, as the whole fragment and as each word of it long enough to be a noun.
+ * share, as the whole fragment and as each of its words the notifications
+ * sentence does not already use.
  */
 function surfaceTerms(tag: SupportedLanguage): string[] {
   const lockScreen = catalogValue(tag, 'notifications.liveActivitySubtitle')?.toLocaleLowerCase();
@@ -78,10 +81,11 @@ function surfaceTerms(tag: SupportedLanguage): string[] {
   if (!fragment) {
     return [];
   }
+  const notificationsWords = new Set(notifications.split(/\s+/).map(word => trimEdges(word)));
   const words = fragment
     .split(/\s+/)
     .map(word => trimEdges(word))
-    .filter(word => word.length >= SHORTEST_SURFACE_WORD);
+    .filter(word => word.length >= SHORTEST_SURFACE_WORD && !notificationsWords.has(word));
   return [...new Set([fragment, ...words])];
 }
 

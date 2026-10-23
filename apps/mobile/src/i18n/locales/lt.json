@@ -1996,6 +1996,7 @@
       "reauthorizeButton": "Iš naujo suteikti teises GitHub programėlei",
       "reauthorizeDescription": "Saugos agentui reikia vulnerability_alerts teisės, kad galėtų pasiekti Dependabot įspėjimus. Iš naujo suteik teises GitHub programėlei, kad pridėtum šią teisę.",
       "reauthorizeTitle": "Reikia papildomų teisių",
+      "retryFailed": "Vis tiek nepavyko įkelti saugos agento. Patikrink interneto ryšį ir bandyk dar kartą.",
       "setupFailed": "Nepavyko pradėti GitHub sąrankos. Bandyk dar kartą."
     },
     "queuedActionUntracked": "Į eilę įtraukto veiksmo būsenos nebegalima stebėti. Atnaujink duomenis, kad pamatytum naujausią būseną.",

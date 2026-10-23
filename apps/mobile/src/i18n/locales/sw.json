@@ -1950,6 +1950,7 @@
       "reauthorizeButton": "Idhinisha upya programu ya GitHub",
       "reauthorizeDescription": "Wakala wa usalama anahitaji ruhusa ya vulnerability_alerts ili kufikia arifa za Dependabot. Idhinisha upya programu ya GitHub ili kutoa ruhusa hii.",
       "reauthorizeTitle": "Ruhusa za ziada zinahitajika",
+      "retryFailed": "Bado imeshindikana kupakia wakala wa usalama. Tafadhali angalia muunganisho wako kisha ujaribu tena.",
       "setupFailed": "Imeshindikana kuanza usanidi wa GitHub. Tafadhali jaribu tena."
     },
     "queuedActionUntracked": "Hatua iliyoongezwa kwenye foleni haiwezi kufuatiliwa tena. Onyesha upya ili kuona hali ya sasa.",

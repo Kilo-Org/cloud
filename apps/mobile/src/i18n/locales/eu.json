@@ -1950,6 +1950,7 @@
       "reauthorizeButton": "Baimendu berriro GitHub aplikazioa",
       "reauthorizeDescription": "Segurtasun-agenteak vulnerability_alerts baimena behar du Dependabot-en abisuak atzitzeko. Baimendu berriro GitHub aplikazioa baimen hori emateko.",
       "reauthorizeTitle": "Baimen gehigarriak behar dira",
+      "retryFailed": "Oraindik ezin izan da segurtasun-agentea kargatu. Egiaztatu konexioa eta saiatu berriro.",
       "setupFailed": "Ezin izan da GitHub konfiguratzeko prozesua hasi. Saiatu berriro."
     },
     "queuedActionUntracked": "Jada ezin da ilaran jarritako ekintza baten jarraipena egin. Eguneratu azken egoera ikusteko.",

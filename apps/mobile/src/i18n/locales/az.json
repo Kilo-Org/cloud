@@ -1950,6 +1950,7 @@
       "reauthorizeButton": "GitHub tətbiqinə yenidən icazə ver",
       "reauthorizeDescription": "Təhlükəsizlik agentinə Dependabot bildirişlərinə giriş üçün vulnerability_alerts icazəsi lazımdır. Bu icazəni vermək üçün GitHub tətbiqinə yenidən icazə ver.",
       "reauthorizeTitle": "Əlavə icazələr tələb olunur",
+      "retryFailed": "Təhlükəsizlik agentini yenidən yükləmək mümkün olmadı. İnternet bağlantını yoxla və yenidən cəhd et.",
       "setupFailed": "GitHub quraşdırmasını başlatmaq mümkün olmadı. Yenidən cəhd et."
     },
     "queuedActionUntracked": "Növbəyə əlavə edilmiş əməliyyatı artıq izləmək mümkün deyil. Son vəziyyəti görmək üçün yenilə.",

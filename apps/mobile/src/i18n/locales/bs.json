@@ -1973,6 +1973,7 @@
       "reauthorizeButton": "Ponovo autoriziraj GitHub aplikaciju",
       "reauthorizeDescription": "Sigurnosni agent zahtijeva dozvolu vulnerability_alerts za pristup upozorenjima iz Dependabota. Ponovo autoriziraj GitHub aplikaciju da dodijeliš ovu dozvolu.",
       "reauthorizeTitle": "Potrebne dodatne dozvole",
+      "retryFailed": "I dalje nije moguće učitati sigurnosnog agenta. Provjeri vezu i pokušaj ponovo.",
       "setupFailed": "Nije moguće započeti podešavanje GitHuba. Pokušaj ponovo."
     },
     "queuedActionUntracked": "Više nije moguće pratiti radnju dodanu u red. Osvježi prikaz da vidiš najnovije stanje.",

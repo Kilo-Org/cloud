@@ -1950,6 +1950,7 @@
       "reauthorizeButton": "Godkänn GitHub-appen på nytt",
       "reauthorizeDescription": "Security Agent behöver behörigheten vulnerability_alerts för att komma åt Dependabot-varningar. Godkänn GitHub-appen på nytt för att ge den behörigheten.",
       "reauthorizeTitle": "Ytterligare behörigheter krävs",
+      "retryFailed": "Kunde fortfarande inte läsa in Security Agent. Kontrollera din anslutning och försök igen.",
       "setupFailed": "Kunde inte starta GitHub-konfigurationen. Försök igen."
     },
     "queuedActionUntracked": "En köad åtgärd kunde inte längre spåras. Uppdatera för att se det senaste läget.",

@@ -1950,6 +1950,7 @@
       "reauthorizeButton": "Tún fún ohun èlò GitHub ní àṣẹ",
       "reauthorizeDescription": "Aṣojú ààbò nílò àṣẹ vulnerability_alerts láti wọlé sí àwọn ìkìlọ̀ Dependabot. Tún fún ohun èlò GitHub ní àṣẹ láti fi àṣẹ yìí kún un.",
       "reauthorizeTitle": "Àwọn àṣẹ sí i nílò",
+      "retryFailed": "A kò ṣì lè gbé Aṣojú ààbò wọlé. Jọ̀wọ́ ṣàyẹ̀wò ìsopọ̀ rẹ kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
       "setupFailed": "A kò lè bẹ̀rẹ̀ ìṣètò GitHub. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i."
     },
     "queuedActionUntracked": "A kò lè tọpinpin ìgbésẹ̀ tó wà ní ìlà ìdúró mọ́. Sọ dátà di tuntun láti rí ipò tuntun.",

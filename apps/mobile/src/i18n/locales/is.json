@@ -1950,6 +1950,7 @@
       "reauthorizeButton": "Endurnýja heimildir GitHub-forritsins",
       "reauthorizeDescription": "Öryggisvakinn þarf heimildina vulnerability_alerts til að fá aðgang að Dependabot-viðvörunum. Endurnýjaðu heimildir GitHub-forritsins til að veita þessa heimild.",
       "reauthorizeTitle": "Viðbótarheimildir nauðsynlegar",
+      "retryFailed": "Ekki tókst enn að hlaða öryggisvakanum. Athugaðu nettenginguna þína og reyndu aftur.",
       "setupFailed": "Ekki tókst að hefja uppsetningu GitHub. Reyndu aftur."
     },
     "queuedActionUntracked": "Ekki var lengur hægt að fylgjast með aðgerð í biðröð. Endurnýjaðu til að sjá nýjustu stöðu.",

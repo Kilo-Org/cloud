@@ -1365,6 +1365,7 @@
       "reauthorizeButton": "Riautorizza l'app GitHub",
       "reauthorizeDescription": "Security Agent richiede l'autorizzazione vulnerability_alerts per accedere agli avvisi di Dependabot. Riautorizza l'app GitHub per concederla.",
       "reauthorizeTitle": "Servono autorizzazioni aggiuntive",
+      "retryFailed": "Non è stato possibile caricare Security Agent. Controlla la connessione e riprova.",
       "setupFailed": "Impossibile avviare la configurazione di GitHub. Riprova."
     },
     "settingsOverview": {

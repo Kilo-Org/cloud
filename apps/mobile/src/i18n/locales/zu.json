@@ -1950,6 +1950,7 @@
       "reauthorizeButton": "Phinda unike uhlelo lokusebenza lwe-GitHub imvume",
       "reauthorizeDescription": "I-ejenti yezokuphepha idinga imvume ye-vulnerability_alerts ukuze ifinyelele izexwayiso ze-Dependabot. Phinda unike uhlelo lokusebenza lwe-GitHub imvume ukuze luyithole.",
       "reauthorizeTitle": "Ezinye izimvume ziyadingeka",
+      "retryFailed": "I-ejenti yezokuphepha isayingenaki ukulayisha. Sicela uhlole ukuxhumana kwakho bese uzama futhi.",
       "setupFailed": "Asikwazanga ukuqala ukusetha i-GitHub. Sicela uzame futhi."
     },
     "queuedActionUntracked": "Asisakwazi ukulandelela isenzo esifakwe emgqeni. Vuselela ukuze ubone isimo sakamuva.",

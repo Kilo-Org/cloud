@@ -1950,6 +1950,7 @@
       "reauthorizeButton": "ให้สิทธิ์ GitHub App อีกครั้ง",
       "reauthorizeDescription": "Security Agent ต้องใช้สิทธิ์ vulnerability_alerts เพื่อเข้าถึงการแจ้งเตือน Dependabot ให้สิทธิ์ GitHub App อีกครั้งเพื่อเพิ่มสิทธิ์นี้",
       "reauthorizeTitle": "ต้องมีสิทธิ์เพิ่มเติม",
+      "retryFailed": "ยังคงไม่สามารถโหลด Security Agent ได้ กรุณาตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง",
       "setupFailed": "ไม่สามารถเริ่มการตั้งค่า GitHub ได้ กรุณาลองอีกครั้ง"
     },
     "queuedActionUntracked": "ไม่สามารถติดตามการดำเนินการที่จัดคิวได้อีกต่อไป รีเฟรชเพื่อดูสถานะล่าสุด",

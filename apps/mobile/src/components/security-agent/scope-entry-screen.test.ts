@@ -30,7 +30,13 @@ let previousOnline = true;
 let mintFailed = false;
 let deniedProcedures = new Set<string>();
 let sessionAuthRequired = false;
+let failingProcedures = new Set<string>();
+let heldProcedures = new Set<string>();
+let releaseHeld: (() => void) | undefined = undefined;
 const DENIAL_MESSAGE = 'You do not have access to this organization';
+const SERVER_ERROR_MESSAGE = 'Internal server error';
+const RETRY_FAILED_COPY =
+  'Still could not load Security Agent. Check your connection and try again.';
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
@@ -133,12 +139,32 @@ beforeEach(() => {
   mintFailed = false;
   deniedProcedures = new Set();
   sessionAuthRequired = false;
+  failingProcedures = new Set();
+  heldProcedures = new Set();
+  releaseHeld = undefined;
   repositoriesData = [{ id: 1 }];
   roles = [{ organizationId: 'org_123', role: 'owner' }];
   transport.mockReset().mockImplementation(async input => {
     await Promise.resolve();
     if (mintFailed && procedureFor(input) === 'mintInstallState') {
       throw new Error('Setup failed');
+    }
+    if (heldProcedures.has(procedureFor(input))) {
+      await new Promise<void>(resolve => {
+        releaseHeld = resolve;
+      });
+    }
+    if (failingProcedures.has(procedureFor(input))) {
+      return Response.json(
+        {
+          error: {
+            message: SERVER_ERROR_MESSAGE,
+            code: -32_603,
+            data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500, path: procedureFor(input) },
+          },
+        },
+        { status: 500 }
+      );
     }
     if (deniedProcedures.has(procedureFor(input))) {
       return Response.json(
@@ -452,5 +478,89 @@ describe.each([
     });
     await advanceBy();
     expect(queryClient.getQueryState(configKey)?.fetchStatus).toBe('paused');
+  });
+});
+
+describe('ScopeEntryScreen retry recovery', () => {
+  it('shows progress while a retry runs and a fresh message when it fails again', async () => {
+    failingProcedures = new Set(['getConfig']);
+    const root = await mount('personal');
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(1);
+    expect(host(root, 'PlatformErrorScreen')[0]?.props.message).toBeUndefined();
+
+    // Hold one refetch open so the in-flight attempt is observable.
+    heldProcedures = new Set(['getConfig']);
+    await retry(root);
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
+    expect(host(root, 'Skeleton').length).toBeGreaterThan(0);
+
+    releaseHeld?.();
+    await advanceBy();
+    await advanceBy();
+    await advanceBy();
+
+    expect(host(root, 'Skeleton')).toHaveLength(0);
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(1);
+    expect(host(root, 'PlatformErrorScreen')[0]?.props.message).toBe(RETRY_FAILED_COPY);
+  });
+
+  it('leaves the error screen for the resolved destination when the retry succeeds', async () => {
+    configData.isEnabled = true;
+    failingProcedures = new Set(['getConfig']);
+    const root = await mount('personal');
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(1);
+
+    failingProcedures = new Set();
+    await retry(root);
+    await advanceBy();
+    await advanceBy();
+
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
+    expect(host(root, 'DashboardScreen')).toHaveLength(1);
+  });
+
+  it('refetches the GitHub status read that the entry error came from', async () => {
+    configData.isEnabled = false;
+    failingProcedures = new Set(['getPermissionStatus']);
+    const root = await mount('personal');
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(1);
+
+    failingProcedures = new Set();
+    await retry(root);
+    await advanceBy();
+    await advanceBy();
+
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
+    expect(
+      transport.mock.calls.filter(([input]) => procedureFor(input) === 'getPermissionStatus')
+    ).toHaveLength(2);
+  });
+
+  it.each(['personal', 'org_123'])(
+    'opens the enabled destination while the GitHub status read fails for %s',
+    async scope => {
+      configData.isEnabled = true;
+      failingProcedures = new Set(['getPermissionStatus']);
+      const root = await mount(scope);
+      expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
+      expect(host(root, 'ScopeAccessDeniedScreen')).toHaveLength(0);
+      expect(host(root, 'DashboardScreen')).toHaveLength(1);
+    }
+  );
+
+  it('keeps the load-error screen when the GitHub status read fails and the scope is disabled', async () => {
+    configData.isEnabled = false;
+    failingProcedures = new Set(['getPermissionStatus']);
+    const root = await mount('personal');
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(1);
+    expect(host(root, 'DashboardScreen')).toHaveLength(0);
+  });
+
+  it('keeps a denied scope denied while the GitHub status read fails', async () => {
+    deniedProcedures = new Set(['getPermissionStatus']);
+    const root = await mount('org_123');
+    expect(host(root, 'ScopeAccessDeniedScreen')).toHaveLength(1);
+    expect(host(root, 'DashboardScreen')).toHaveLength(0);
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
   });
 });

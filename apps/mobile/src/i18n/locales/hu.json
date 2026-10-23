@@ -1950,6 +1950,7 @@
       "reauthorizeButton": "GitHub-alkalmazás újbóli engedélyezése",
       "reauthorizeDescription": "A biztonsági ügynöknek a vulnerability_alerts engedélyre van szüksége a Dependabot-riasztások eléréséhez. Az engedély megadásához engedélyezd újra a GitHub-alkalmazást.",
       "reauthorizeTitle": "További engedélyek szükségesek",
+      "retryFailed": "Továbbra sem sikerült betölteni a biztonsági ügynököt. Ellenőrizd a kapcsolatot, és próbáld újra.",
       "setupFailed": "Nem sikerült elindítani a GitHub beállítását. Próbáld újra."
     },
     "queuedActionUntracked": "Egy sorba állított műveletet már nem lehet nyomon követni. Frissíts a legújabb állapot megtekintéséhez.",

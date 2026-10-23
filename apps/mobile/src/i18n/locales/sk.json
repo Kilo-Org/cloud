@@ -1996,6 +1996,7 @@
       "reauthorizeButton": "Znova autorizovať aplikáciu GitHub",
       "reauthorizeDescription": "Bezpečnostný agent vyžaduje oprávnenie vulnerability_alerts na prístup k upozorneniam zo služby Dependabot. Znova autorizujte aplikáciu GitHub, aby ste jej udelili toto oprávnenie.",
       "reauthorizeTitle": "Vyžadujú sa ďalšie oprávnenia",
+      "retryFailed": "Bezpečnostného agenta sa stále nepodarilo načítať. Skontrolujte pripojenie a skúste to znova.",
       "setupFailed": "Nastavenie pripojenia k platforme GitHub sa nepodarilo spustiť. Skúste to znova."
     },
     "queuedActionUntracked": "Akciu zaradenú do frontu už nemožno sledovať. Obnovte zobrazenie, aby ste videli aktuálny stav.",

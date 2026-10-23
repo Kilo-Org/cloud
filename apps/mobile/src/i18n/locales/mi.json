@@ -1950,6 +1950,7 @@
       "reauthorizeButton": "Whakamanahia anō te taupānga GitHub",
       "reauthorizeDescription": "Me whai te Kaiāwhina haumarutanga i te whakaaetanga vulnerability_alerts kia uru ki ngā matohi Dependabot. Whakamanahia anō te taupānga GitHub hei tuku i tēnei whakaaetanga.",
       "reauthorizeTitle": "E hiahiatia ana ētahi atu whakaaetanga",
+      "retryFailed": "Kāore anō i taea te uta i te Kaiāwhina haumarutanga. Tirohia tō hononga ka whakamātau anō.",
       "setupFailed": "Kāore i taea te tīmata i te whakarite i GitHub. Whakamātau anō."
     },
     "queuedActionUntracked": "Kua kore e taea te aroturuki i tētahi mahi kei te tūtira. Tāmatatia kia kite i te tūnga hou rawa.",

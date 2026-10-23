@@ -1950,6 +1950,7 @@
       "reauthorizeButton": "Sake ba manhajar GitHub izini",
       "reauthorizeDescription": "Wakilin tsaro yana buƙatar izinin vulnerability_alerts don samun faɗakarwar Dependabot. Sake ba manhajar GitHub izini don ba ta wannan damar.",
       "reauthorizeTitle": "Ana buƙatar ƙarin izini",
+      "retryFailed": "Har yanzu an kasa loda Wakilin tsaro. Ka duba hanyar haɗin ka ka sake gwadawa.",
       "setupFailed": "An kasa fara saitin GitHub. Sake gwadawa."
     },
     "queuedActionUntracked": "An kasa ci gaba da bin diddigin aikin da aka saka a jerin jira. Sabunta don ganin halin da ake ciki yanzu.",

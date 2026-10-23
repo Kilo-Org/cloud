@@ -2041,6 +2041,7 @@
       "reauthorizeButton": "Re-authorize GitHub App",
       "reauthorizeDescription": "Security Agent needs permission to read Dependabot alerts. Re-authorize the GitHub App to grant this permission.",
       "reauthorizeTitle": "Additional permissions required",
+      "retryFailed": "Still could not load Security Agent. Check your connection and try again.",
       "setupFailed": "Could not start GitHub setup. Please try again."
     },
     "queuedActionUntracked": "A queued action could no longer be tracked. Refresh to see the latest state.",

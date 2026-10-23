@@ -2019,6 +2019,7 @@
       "reauthorizeButton": "Erġa' awtorizza l-app ta' GitHub",
       "reauthorizeDescription": "L-aġent tas-sigurtà jeħtieġ il-permess vulnerability_alerts biex jaċċessa l-allerti ta' Dependabot. Erġa' awtorizza l-app ta' GitHub biex tagħti dan il-permess.",
       "reauthorizeTitle": "Permessi addizzjonali meħtieġa",
+      "retryFailed": "Ma setax jitgħabba l-aġent tas-sigurtà. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
       "setupFailed": "Ma setgħetx tinbeda l-konfigurazzjoni ta' GitHub. Jekk jogħġbok erġa' pprova."
     },
     "queuedActionUntracked": "Azzjoni fil-kju ma setgħetx tibqa' tiġi traċċata. Aġġorna biex tara l-aħħar stat.",

@@ -1390,6 +1390,7 @@
       "reauthorizeButton": "Cấp quyền lại cho ứng dụng GitHub",
       "reauthorizeDescription": "Trợ lý bảo mật cần quyền vulnerability_alerts để truy cập cảnh báo Dependabot. Hãy cấp quyền lại cho ứng dụng GitHub để bổ sung quyền này.",
       "reauthorizeTitle": "Cần thêm quyền",
+      "retryFailed": "Vẫn không thể tải Trợ lý bảo mật. Kiểm tra kết nối rồi thử lại.",
       "setupFailed": "Không thể bắt đầu thiết lập GitHub. Vui lòng thử lại."
     },
     "settingsOverview": {

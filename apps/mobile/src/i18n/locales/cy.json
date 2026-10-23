@@ -2042,6 +2042,7 @@
       "reauthorizeButton": "Ailawdurdodi ap GitHub",
       "reauthorizeDescription": "Mae angen y caniatâd vulnerability_alerts ar yr Asiant diogelwch i gael mynediad at rybuddion Dependabot. Ailawdurdodwch ap GitHub i roi'r caniatâd hwn.",
       "reauthorizeTitle": "Angen caniatadau ychwanegol",
+      "retryFailed": "Ni ellid llwytho'r Asiant diogelwch o hyd. Gwiriwch eich cysylltiad a cheisiwch eto.",
       "setupFailed": "Ni ellid dechrau sefydlu GitHub. Ceisiwch eto."
     },
     "queuedActionUntracked": "Ni ellid olrhain gweithred yn y ciw mwyach. Adnewyddwch i weld y statws diweddaraf.",

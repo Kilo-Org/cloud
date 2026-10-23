@@ -1390,6 +1390,7 @@
       "reauthorizeButton": "重新授权 GitHub 应用",
       "reauthorizeDescription": "安全智能体需要 vulnerability_alerts 权限才能访问 Dependabot 警报。请重新授权 GitHub 应用以授予此权限。",
       "reauthorizeTitle": "需要额外权限",
+      "retryFailed": "仍然无法加载安全智能体。请检查网络连接，然后重试。",
       "setupFailed": "无法启动 GitHub 配置流程。请重试。"
     },
     "settingsOverview": {

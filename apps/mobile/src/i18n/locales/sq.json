@@ -1950,6 +1950,7 @@
       "reauthorizeButton": "Riautorizo aplikacionin GitHub",
       "reauthorizeDescription": "Agjenti i sigurisë kërkon lejen vulnerability_alerts për të pasur qasje në njoftimet e Dependabot. Riautorizo aplikacionin GitHub për t'ia dhënë këtë leje.",
       "reauthorizeTitle": "Kërkohen leje shtesë",
+      "retryFailed": "Nuk u ngarkua akoma agjenti i sigurisë. Kontrollo lidhjen dhe provo përsëri.",
       "setupFailed": "Nuk u nis konfigurimi i GitHub. Provo përsëri."
     },
     "queuedActionUntracked": "Nuk mund të ndiqej më gjendja e një veprimi në radhë. Rifresko për të parë gjendjen më të fundit.",

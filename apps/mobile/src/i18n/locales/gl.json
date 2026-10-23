@@ -1950,6 +1950,7 @@
       "reauthorizeButton": "Volver autorizar a aplicación de GitHub",
       "reauthorizeDescription": "O axente de seguridade require o permiso vulnerability_alerts para acceder aos avisos de Dependabot. Volve autorizar a aplicación de GitHub para conceder este permiso.",
       "reauthorizeTitle": "Requírense permisos adicionais",
+      "retryFailed": "Non se puido cargar o axente de seguridade. Comproba a túa conexión e téntao de novo.",
       "setupFailed": "Non se puido iniciar a configuración de GitHub. Téntao de novo."
     },
     "queuedActionUntracked": "Non se puido continuar o seguimento dunha acción na cola. Actualiza para ver o estado máis recente.",

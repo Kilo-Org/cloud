@@ -1950,6 +1950,7 @@
       "reauthorizeButton": "ለGitHub መተግበሪያ እንደገና ፈቃድ ይስጡ",
       "reauthorizeDescription": "የደህንነት ወኪሉ የDependabot ማስጠንቀቂያዎችን ለማግኘት የvulnerability_alerts ፈቃድ ያስፈልገዋል። ይህን ፈቃድ ለመስጠት የGitHub መተግበሪያን እንደገና ይፍቀዱ።",
       "reauthorizeTitle": "ተጨማሪ ፈቃዶች ያስፈልጋሉ",
+      "retryFailed": "የደህንነት ወኪሉን አሁንም መጫን አልተቻለም። ግንኙነትዎን ያረጋግጡ እና እንደገና ይሞክሩ።",
       "setupFailed": "GitHubን የማዋቀር ሂደት መጀመር አልተቻለም። እባክዎ እንደገና ይሞክሩ።"
     },
     "queuedActionUntracked": "ወደ ወረፋ የገባን እርምጃ ከእንግዲህ መከታተል አልተቻለም። የቅርብ ጊዜ ሁኔታውን ለማየት ያድሱ።",

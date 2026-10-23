@@ -1390,6 +1390,7 @@
       "reauthorizeButton": "GitHub 앱 재승인",
       "reauthorizeDescription": "보안 에이전트가 Dependabot 알림에 접근하려면 vulnerability_alerts 권한이 필요합니다. 이 권한을 부여하려면 GitHub 앱을 다시 승인하세요.",
       "reauthorizeTitle": "추가 권한 필요",
+      "retryFailed": "보안 에이전트를 계속 불러올 수 없습니다. 연결을 확인한 후 다시 시도하세요.",
       "setupFailed": "GitHub 설정을 시작할 수 없습니다. 다시 시도하세요."
     },
     "settingsOverview": {

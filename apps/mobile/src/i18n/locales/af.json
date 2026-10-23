@@ -1950,6 +1950,7 @@
       "reauthorizeButton": "Magtig die GitHub-app weer",
       "reauthorizeDescription": "Die Sekuriteitsagent benodig die vulnerability_alerts-toestemming vir toegang tot Dependabot-waarskuwings. Magtig die GitHub-app weer om hierdie toestemming te verleen.",
       "reauthorizeTitle": "Bykomende toestemmings vereis",
+      "retryFailed": "Die Sekuriteitsagent kon steeds nie gelaai word nie. Kontroleer jou verbinding en probeer asseblief weer.",
       "setupFailed": "Kon nie GitHub-opstelling begin nie. Probeer asseblief weer."
     },
     "queuedActionUntracked": "'N Aksie in die tou kon nie meer gemonitor word nie. Verfris om die jongste status te sien.",

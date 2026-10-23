@@ -1950,6 +1950,7 @@
       "reauthorizeButton": "Mar kale oggolaansho sii abka GitHub",
       "reauthorizeDescription": "Wakiilka amnigu wuxuu u baahan yahay oggolaanshaha vulnerability_alerts si uu u helo digniinaha Dependabot. Mar kale oggolaansho sii abka GitHub si aad u siiso oggolaanshahan.",
       "reauthorizeTitle": "Oggolaansho dheeraad ah ayaa loo baahan yahay",
+      "retryFailed": "Wakiilka amniga wali lama soo dejin karin. Isku xidhkaaga hubi oo mar kale isku day.",
       "setupFailed": "Lama bilaabi karin dejinta GitHub. Fadlan mar kale isku day."
     },
     "queuedActionUntracked": "Tallaabo safka ku jirta mar dambe lama raaci karin. Cusboonaysii si aad u aragto xaaladda ugu dambaysa.",

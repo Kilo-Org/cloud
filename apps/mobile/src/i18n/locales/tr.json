@@ -1390,6 +1390,7 @@
       "reauthorizeButton": "GitHub uygulamasını yeniden yetkilendir",
       "reauthorizeDescription": "Güvenlik ajanının Dependabot uyarılarına erişebilmesi için vulnerability_alerts izni gerekir. Bu izni vermek için GitHub uygulamasını yeniden yetkilendir.",
       "reauthorizeTitle": "Ek izinler gerekiyor",
+      "retryFailed": "Güvenlik ajanı hâlâ yüklenemedi. Bağlantını kontrol et ve tekrar dene.",
       "setupFailed": "GitHub kurulumu başlatılamadı. Lütfen tekrar dene."
     },
     "settingsOverview": {

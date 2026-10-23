@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires -- @swc/jest does not hoist `jest.mock` above imports, so the mocked module and the module under test are required after the mock registers. */
 import { describe, expect, it, jest } from '@jest/globals';
 import type { resolveGitHubRepositoryForOwner } from '@/lib/slack-bot/github-repository-context';
 import type { resolveGitHubIntegrationIdForRepository } from '@/lib/cloud-agent/github-integration-resolution';
@@ -13,11 +14,9 @@ jest.mock('@/lib/slack-bot/github-repository-context', () => ({
   resolveGitHubRepositoryForOwner: jest.fn(),
 }));
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- the mock must be registered before this module loads
 const context = require('@/lib/slack-bot/github-repository-context') as {
   resolveGitHubRepositoryForOwner: ResolveForOwner;
 };
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- the mock must be registered before this module loads
 const subject = require('@/lib/cloud-agent/github-integration-resolution') as {
   resolveGitHubIntegrationIdForRepository: ResolveIntegrationId;
 };

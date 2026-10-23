@@ -34,6 +34,7 @@
       "workers_dev": true,
       "vars": {
         "USAGE_INGEST_MODE": "processing",
+        "USAGE_INGEST_DIAGNOSTICS": "all",
         "USAGE_WRITER_URL": "https://staging-app.kilo.ai/api/internal/usage/record",
       },
       "services": [{ "binding": "USAGE_WRITER_RELAY", "service": "usage-writer-relay-staging" }],

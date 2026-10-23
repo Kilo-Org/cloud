@@ -8,6 +8,8 @@ it('keeps production direct and routes the existing staging consumer through the
   const production = unstable_readConfig({ config });
   const staging = unstable_readConfig({ config, env: 'staging' });
   expect(production.services).toEqual([]);
+  expect(production.vars.USAGE_INGEST_DIAGNOSTICS).toBeUndefined();
+  expect(staging.vars.USAGE_INGEST_DIAGNOSTICS).toBe('all');
   expect(staging.services).toMatchObject([
     { binding: 'USAGE_WRITER_RELAY', service: 'usage-writer-relay-staging' },
   ]);
@@ -31,6 +33,7 @@ it('keeps production direct and routes the existing staging consumer through the
   expect(relay.preview_urls).toBe(false);
   expect(relay.routes).toEqual([]);
   expect(relay.vars.USAGE_WRITER_URL).toBe(staging.vars.USAGE_WRITER_URL);
+  expect(relay.vars.USAGE_INGEST_DIAGNOSTICS).toBe('all');
 });
 
 it('runs the real queue -> service-binding fetch -> relay -> HTTP writer path', async () => {
@@ -103,6 +106,21 @@ it('runs the real queue -> service-binding fetch -> relay -> HTTP writer path', 
     expect((await publish()).status).toBe(202);
     await vi.waitFor(() => expect(calls).toHaveLength(1), { timeout: 10_000 });
     expect(processingLogs()).toEqual([]);
+    const entries = harness
+      .getLogs()
+      .filter(log => log.message.includes('usage_ingest_handler_entry'))
+      .map(log => JSON.parse(log.message));
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      usage_id: usage.core.id,
+      queue: 'usage-ingest-processing-staging',
+      handler_entry_at_ms: expect.any(Number),
+      message_timestamp_ms: expect.any(Number),
+      event_created_at_ms: Date.parse(usage.core.created_at),
+      batch_id: expect.any(String),
+      batch_size: 1,
+      delivery_attempts: 1,
+    });
     release.resolve();
     await vi.waitFor(() => expect(processingLogs()).toHaveLength(1), { timeout: 10_000 });
     for (const count of [2, 3]) {
@@ -125,8 +143,40 @@ it('runs the real queue -> service-binding fetch -> relay -> HTTP writer path', 
         'x-internal-api-key': 'synthetic-writer',
         'x-vercel-protection-bypass': 'synthetic-bypass',
         'x-usage-write-source': 'queue',
+        'x-usage-id': usage.core.id,
       });
     }
+    const diagnostics = harness
+      .getLogs()
+      .filter(log => log.message.startsWith('{'))
+      .map(log => JSON.parse(log.message));
+    const enqueues = diagnostics.filter(log => log.event === 'usage_ingest_enqueue');
+    const forwards = diagnostics.filter(log => log.event === 'usage_ingest_relay_forward');
+    expect(enqueues).toHaveLength(3);
+    expect(forwards).toHaveLength(3);
+    for (const log of enqueues) {
+      expect(log).toMatchObject({
+        usage_id: usage.core.id,
+        outcome: 'accepted',
+        publisher_entry_at_ms: expect.any(Number),
+        before_send_at_ms: expect.any(Number),
+        after_send_at_ms: expect.any(Number),
+        send_duration_ms: expect.any(Number),
+      });
+      expect(log.send_duration_ms).toBeGreaterThanOrEqual(0);
+    }
+    expect(forwards.map(log => log.writer_status)).toEqual([200, 200, 503]);
+    for (const log of forwards) {
+      expect(log).toMatchObject({
+        usage_id: usage.core.id,
+        forward_duration_ms: expect.any(Number),
+        relay_entry_at_ms: expect.any(Number),
+        before_forward_at_ms: expect.any(Number),
+        after_forward_at_ms: expect.any(Number),
+      });
+      expect(log.forward_duration_ms).toBeGreaterThanOrEqual(0);
+    }
+    for (const log of processingLogs()) expect(log.queue).toBe('usage-ingest-processing-staging');
     const logs = JSON.stringify(harness.getLogs());
     for (const value of [
       'synthetic-publisher',

@@ -274,6 +274,27 @@ describe('TabScreenScrollView viewport floor', () => {
     expect(reservedMargin(renderer)).toBe(212);
     unmount();
   });
+  it('keeps the floor in front of the safe-area band on a root-stack screen', async () => {
+    // A root-stack screen draws no bar, so its band is the bottom inset alone.
+    // The floor still never reserves more than the room the screen has.
+    layout.platform = 'ios';
+    layout.bottom = 34;
+    layout.fontScale = 1;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(
+        TabBarLabelContext,
+        { value: null },
+        createElement(TabScreenScrollView, null, createElement('Content'))
+      )
+    );
+    layoutFrame(renderer, 402, 166);
+    expect(reservedMargin(renderer)).toBe(34);
+    // A room shorter than the floor releases the inset instead of overflowing.
+    layoutFrame(renderer, 402, 0);
+    expect(reservedMargin(renderer)).toBe(0);
+    unmount();
+  });
+
   it('re-reserves the keyboard band from the measured room, not the tab-bar clamp', async () => {
     // The room is what is kept: a limit derived from the tab-bar band outlives
     // the band and truncates the IME reservation, leaving the focused field

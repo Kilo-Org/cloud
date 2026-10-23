@@ -8,7 +8,7 @@
 import { createElement, type ElementType, type ReactNode } from 'react';
 import type * as ReactModule from 'react';
 import { Platform, Pressable } from 'react-native';
-import { act, type ReactTestRenderer } from '@/test/renderer';
+import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { onlineManager, type QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -235,21 +235,37 @@ async function openSheet(renderer: ReactTestRenderer) {
   });
 }
 
-/** The sheet's account rows, in option order. */
-function accountLabels(renderer: ReactTestRenderer) {
-  return renderer.root
-    .findAll(node => node.type === Pressable && node.props.accessibilityRole === 'radio')
-    .map(node => node.props.accessibilityLabel as string);
+/** The selected state an account action button carries, if it carries one. */
+function selectedState(node: ReactTestInstance): boolean | undefined {
+  const state: unknown = node.props.accessibilityState;
+  if (typeof state !== 'object' || state === null || !('selected' in state)) {
+    return undefined;
+  }
+  return typeof state.selected === 'boolean' ? state.selected : undefined;
 }
 
-/** Presses one row of the open sheet: an account (radio) or Cancel (button). */
+/** An account action button: the picker marks every row's selection. */
+function accountRow(node: ReactTestInstance) {
+  return (
+    node.type === Pressable &&
+    node.props.accessibilityRole === 'button' &&
+    selectedState(node) !== undefined
+  );
+}
+
+/** The sheet's account rows, in option order. */
+function accountLabels(renderer: ReactTestRenderer) {
+  return renderer.root.findAll(accountRow).map(node => node.props.accessibilityLabel as string);
+}
+
+/** Presses one row of the open sheet: an account row or Cancel (button). */
 async function choose(renderer: ReactTestRenderer, label: string) {
   const target = renderer.root.find(
     node =>
       node.type === Pressable &&
       node.props.accessibilityLabel === label &&
       node.props.onPress !== undefined &&
-      (node.props.accessibilityRole === 'radio' ? true : node.props.accessibilityHint === undefined)
+      (accountRow(node) ? true : node.props.accessibilityHint === undefined)
   );
   await act(() => {
     (target.props.onPress as () => void)();

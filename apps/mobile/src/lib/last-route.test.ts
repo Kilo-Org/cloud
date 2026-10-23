@@ -226,10 +226,11 @@ describe('subscribeLastRoute (the restart read)', () => {
       '/(app)/(tabs)/(3_profile)/security-agent/org-1/findings/f_1',
       '/(app)/security-agent/org-1/findings/f_1',
     ],
+    ['/(app)/(tabs)/(3_profile)/notifications', '/(app)/notifications'],
   ])('rehydrates a %s record at the path the screen has now', async (stored, current) => {
-    // Mirrored before the Code Reviewer and Security Agent surfaces moved out of
-    // the Profile tab: replaying the old href after the update opens an
-    // unmatched route, so the record is read at the screen's current path.
+    // Mirrored before these surfaces moved out of the Profile tab: replaying the
+    // old href after the update opens an unmatched route, so the record is read
+    // at the screen's current path.
     store.set(KEY, recordFor(stored, 'u1'));
     await _hydrateLastRouteForTests();
 

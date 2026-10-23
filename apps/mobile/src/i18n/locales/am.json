@@ -182,7 +182,7 @@
     "codeArrivalHint": "ይህ አድራሻ መስፈርቶቹን የሚያሟላ ከሆነ፣ ኮዱ በአንድ ደቂቃ ውስጥ ይደርሳል።",
     "verifyCode": "ኮዱን ያረጋግጡ",
     "resendCode": "ኮዱን እንደገና ይላኩ",
-    "termsPrefix": "ሲቀጥሉ የሚከተሉትን ይቀበላሉ፦",
+    "termsPrefix": "ሲቀጥሉ የሚከተሉትን ይቀበላሉ፦ ",
     "terms": "ውሎች",
     "termsConnector": " እና ",
     "termsSuffix": "።",
@@ -293,7 +293,8 @@
     "condenseToolCallsSubtitle": "ተከታታይ የመሳሪያ ጥሪዎችን መክፈት በሚችሉት አንድ ረድፍ ውስጥ ይሰብስቡ።",
     "toolSummaryTranslation": "የመሳሪያ ማጠቃለያዎችን ተርጉም",
     "toolSummaryTranslationSubtitle": "እያንዳንዱን የመሳሪያ ማጠቃለያ ወደ መተግበሪያዎ ቋንቋ ለመተርጎም ወደ ሞዴል ላክ። ትርጉሙ ካልተሳካ ዋናው ይታያል።",
-    "toolSummaryTranslationModelUnavailableNotice": "ይህ ሞዴል ከእንግዲህ አይቀርብም። ሌላ ለመምረጥ $t(common.model) ይንኩ።"
+    "toolSummaryTranslationModelUnavailableNotice": "ይህ ሞዴል ከእንግዲህ አይቀርብም። ሌላ ለመምረጥ $t(common.model) ይንኩ።",
+    "autoExpandThinkingInactiveSubtitle": "የአስተሳሰብ ዝርዝሮች ተደብቀው ባሉ ጊዜ ምንም ውጤት የላቸውም።"
   },
   "prReview": {
     "pullRequestUnavailable": "የማዋሃድ ጥያቄው አይገኝም",
@@ -622,9 +623,15 @@
       "viewOnGitHub": "PRን በGitHub እይ",
       "noChecksReported": "ምንም ፍተሻዎች አልተዘገቡም",
       "passed": "{{displayCount}} አልፈዋል",
+      "passed_one": "{{displayCount}} አልፈዋል",
+      "passed_other": "{{displayCount}} አልፈዋል",
       "failed": "{{displayCount}} አላለፉም",
+      "failed_one": "{{displayCount}} አላለፉም",
+      "failed_other": "{{displayCount}} አላለፉም",
       "pending": "{{displayCount}} በመጠባበቅ ላይ",
       "skipped": "{{displayCount}} ተዘልለዋል",
+      "skipped_one": "{{displayCount}} ተዘልለዋል",
+      "skipped_other": "{{displayCount}} ተዘልለዋል",
       "checksCount": "{{displayCount}} ፍተሻዎች",
       "checksCount_one": "{{displayCount}} ፍተሻ",
       "checksCount_other": "{{displayCount}} ፍተሻዎች",
@@ -669,7 +676,8 @@
       "gitlabDescription": "በሞባይል ላይ የማዋሃድ ጥያቄዎችን ለመገምገም የGitLab መለያዎን ያገናኙ።",
       "bitbucketDescription": "Bitbucketን ከዚህ ድርጅት ጋር ያገናኙ የማዋሃድ ጥያቄዎችን በሞባይል ለመገምገም።",
       "bitbucketOrgOnlyDescription": "ከላይ ያለውን መለያ ወደ ድርጅት ይቀይሩ፣ የዚህ ድርጅት የBitbucket የማዋሃድ ጥያቄዎችን ለመገምገም።",
-      "contextLine": "ለ{{organization}}"
+      "contextLine": "ለ{{organization}}",
+      "contextLinePersonal": "ለግል መለያዎ"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1452,7 +1460,13 @@
       "sessionError": "በክፍለ ጊዜው ላይ ስህተት ተከስቷል፦ {{error}}።",
       "statusWithValue": "ሁኔታ፦ {{status}}",
       "toolName": "መሣሪያ፦ {{name}}",
-      "toolNameError": "በመሣሪያው {{name}} ላይ ስህተት ተከስቷል።"
+      "toolNameError": "በመሣሪያው {{name}} ላይ ስህተት ተከስቷል።",
+      "cancelReasonSuperseded": "አዲስ commit ስለተገፈፈ፣ ይህ ግምገማ ተተካ።",
+      "cancelReasonIntegrationDisconnected": "{{platform}} የተቋረጠ ስለሆነ፣ ይህ ግምገማ ተሰርዟል። እባክዎ እንደገና ያገናኙት፣ ከዚያም ግምገማውን እንደገና ያሂዱ።",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer ለBitbucket ስለተጠፋ፣ ይህ ግምገማ ተሰርዟል። እባክዎ እንደገና ያንቁት፣ ከዚያም ግምገማውን እንደገና ያሂዱ።",
+      "cancelReasonBitbucketPullRequestChanged": "የBitbucket pull request ስለተለወጠ፣ ይህ ግምገማ ተተካ።",
+      "cancelReasonCancelled": "ይህ ግምገማ ተሰርዟል።",
+      "cancelReasonInterrupted": "ይህ ግምገማ ተቋርጧል።"
     },
     "reviewMemory": {
       "title": "የግምገማ ትውስታ",
@@ -1479,7 +1493,15 @@
       "instructions": "መመሪያዎች (አማራጭ)",
       "instructionsPlaceholder": "ገምጋሚው በተለይ ትኩረት እንዲሰጠው የሚፈልጉት ነገር…",
       "starting": "ግምገማን በመጀመር ላይ…",
-      "start": "ግምገማ ይጀምሩ"
+      "start": "ግምገማ ይጀምሩ",
+      "startNotFound": "ከ{{provider}} ያንን {{requestNoun}} ማንበብ አልተቻለም። URL እና መጋዘኑ ተደራሽ መሆኑን ያረጋግጡ።",
+      "startRateLimited": "{{provider}} አሁን ጥያቄዎችን እየገደበ ነው። ከጥቂት ደቂቃዎች በኋላ እንደገና ይሞክሩ።",
+      "startNotAllowed": "ለዚያ {{requestNoun}} ግምገማ ለመጀመር ፍቃድ የለዎትም። ፍቃዶችዎን እና የድርጅትዎን ዕቅድ ያረጋግጡ።",
+      "startProviderNeedsAttention": "በተጠቃሚ የሚጀመሩ ግምገማዎች መደበኛ የ{{provider}} ግንኙነት ያስፈልጋቸዋል። ያገናኙት እና እንደገና ይሞክሩ።",
+      "startAlreadyRunning": "ለዚያ {{requestNoun}} ግምገማ ቀድሞውኑ በሂደት ላይ ነው።",
+      "startRejected": "ያንን {{requestNoun}} መገምገም አይቻልም። ክፍት መሆኑን፣ ረቂቅ እንዳልሆነ እና URLው ትክክለኛ መሆኑን ያረጋግጡ።",
+      "startProviderUnavailable": "ያንን {{requestNoun}} ለማንበብ {{provider}} ላይ መድረስ አልተቻለም። እንደገና ይሞክሩ።",
+      "startFailed": "ግምገማውን ማስጀመር አልተቻለም። ግንኙነትዎን ይፈትሹ እና እንደገና ይሞክሩ።"
     },
     "notConnectedReadOnly": "{{platform}} አልተገናኘም። ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች እና አስተዳዳሪዎች ብቻ ናቸው።",
     "gitlab": {
@@ -1731,7 +1753,7 @@
       "deadlinePassed": "የጊዜ ገደቡ አልፏል",
       "deadlinePassedDetail": "{{critical}} እጅግ ከፍተኛ፣ {{high}} ከፍተኛ",
       "dueThisWeek": "በዚህ ሳምንት ጊዜያቸው የሚያበቃ",
-      "dueThisWeekDetail": "{{exploitable}} ለጥቃት ሊውሉ እንደሚችሉ ተረጋግጠዋል",
+      "dueThisWeekDetail": "ከእነዚህ ውስጥ {{exploitable}} ለጥቃት ሊውሉ እንደሚችሉ ተረጋግጠዋል",
       "noDeadline": "ምንም ጊዜ ገደብ የለም",
       "reviewSlaAssignment": "የተወሰኑትን የSLA ጊዜ ገደቦች ይገምግሙ",
       "allOpenFindingsTracked": "ሁሉም ክፍት ግኝቶች በክትትል ላይ ናቸው"
@@ -1948,8 +1970,9 @@
       "couldNotLoad": "የደህንነት ወኪሉን መጫን አልተቻለም።",
       "installApp": "የGitHub መተግበሪያን ይጫኑ",
       "reauthorizeButton": "ለGitHub መተግበሪያ እንደገና ፈቃድ ይስጡ",
-      "reauthorizeDescription": "የደህንነት ወኪሉ የDependabot ማስጠንቀቂያዎችን ለማግኘት የvulnerability_alerts ፈቃድ ያስፈልገዋል። ይህን ፈቃድ ለመስጠት የGitHub መተግበሪያን እንደገና ይፍቀዱ።",
+      "reauthorizeDescription": "የደህንነት ወኪሉ የDependabot ማስጠንቀቂያዎችን ለማንበብ ፈቃድ ያስፈልገዋል። ይህን ፈቃድ ለመስጠት የGitHub መተግበሪያን እንደገና ይፍቀዱ።",
       "reauthorizeTitle": "ተጨማሪ ፈቃዶች ያስፈልጋሉ",
+      "retryFailed": "የደህንነት ወኪሉን አሁንም መጫን አልተቻለም። ግንኙነትዎን ያረጋግጡ እና እንደገና ይሞክሩ።",
       "setupFailed": "GitHubን የማዋቀር ሂደት መጀመር አልተቻለም። እባክዎ እንደገና ይሞክሩ።"
     },
     "queuedActionUntracked": "ወደ ወረፋ የገባን እርምጃ ከእንግዲህ መከታተል አልተቻለም። የቅርብ ጊዜ ሁኔታውን ለማየት ያድሱ።",
@@ -2112,7 +2135,8 @@
       "dollar_other": "ዶላር",
       "costSpoken": "ወጪ {{cost}}",
       "costSpokenWithTime": "ወጪ {{cost}}፣ {{time}}",
-      "pullRequest": "የማዋሃድ ጥያቄ {{number}}"
+      "pullRequest": "የማዋሃድ ጥያቄ {{number}}",
+      "spokenJoiner": "እና"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubን መክፈት አልተቻለም",
@@ -2248,7 +2272,6 @@
       "couldNotLoadEnvironment": "የሥራ አካባቢዎን መጫን አልተቻለም።",
       "retryLoadingEnvironment": "የሥራ አካባቢውን ለመጫን እንደገና ይሞክሩ",
       "defaultEnvironment": "ነባሪ የሥራ አካባቢ",
-      "environmentSummary": "{{commands}} ትዕዛዞች · {{mcp}} MCP · {{skills}} ክህሎቶች · {{agents}} ወኪሎች",
       "leaveChanges": "ለውጦችን ይተዉ",
       "commitAndPush": "መዝግበው ይላኩ",
       "startSession": "ክፍለ ጊዜውን ያስጀምሩ",
@@ -2467,7 +2490,71 @@
       "preparationComplete": "ዝግጅቱ ተጠናቋል",
       "preparationFailed": "ዝግጅቱ አልተሳካም",
       "setupCommand": "የማዋቀር ትዕዛዝ {{index}}",
-      "setupCommandOf": "ከ{{displayCount}} የማዋቀር ትዕዛዞች {{index}}ኛው"
+      "setupCommandOf": "ከ{{displayCount}} የማዋቀር ትዕዛዞች {{index}}ኛው",
+      "stepWorkspaceSetup": "የሥራ አካባቢ ማዋቀር",
+      "stepDiskCheck": "የዲስክ ፍተሻ",
+      "stepCloning": "ማከማቻውን በመቅዳት ላይ",
+      "stepBranch": "ቅርንጫፍ በማዋቀር ላይ",
+      "stepDevcontainerSetup": "የDev container ማዋቀር",
+      "stepWorkspaceRestore": "የሥራ አካባቢውን በመመለስ ላይ",
+      "stepWorkspaceBackup": "የሥራ አካባቢውን በማስቀመጥ ላይ",
+      "stepSandboxProvision": "Sandbox በማዘጋጀት ላይ",
+      "stepSandboxBoot": "Sandbox በማስጀመር ላይ",
+      "stepSnapshotFallback": "ያለ snapshot እንደገና በመሞከር ላይ",
+      "stepKiloServer": "Kilo በማስጀመር ላይ",
+      "stepKiloSession": "ክፍለ-ጊዜውን በማዘጋጀት ላይ",
+      "stepRestoreIncomplete": "የክፍለ-ጊዜ መመለስ ያልተጠናቀቀ ነው",
+      "stepReady": "አካባቢው ዝግጁ ነው",
+      "stepFailed": "የአካባቢ ማዋቀር አልተሳካም",
+      "stepUnknown": "የአካባቢ ማዋቀር",
+      "detailCreatingSandbox": "Sandbox በመፍጠር ላይ",
+      "detailUpdatingRepository": "ማከማቻውን በማዘመን ላይ",
+      "detailCheckingOutBranch": "ቅርንጫፉን በማውጣት ላይ",
+      "detailRunningSetupCommands": "የማዋቀር ትዕዛዞችን በማካሄድ ላይ",
+      "detailSavingRepository": "ለፈጣን ማስጀመር ማከማቻውን በማስቀመጥ ላይ",
+      "detailStartingKiloRuntime": "የKilo runtime በማስጀመር ላይ",
+      "detailPreparingKiloSession": "የKilo ክፍለ-ጊዜ በማዘጋጀት ላይ",
+      "detailWaitingForPreviousSandbox": "የቀዳሚው Sandbox እንዲያቆም በመጠበቅ ላይ",
+      "detailRetryingSandboxCreation": "የSandbox መፍጠሩን እንደገና በመሞከር ላይ",
+      "detailPreviousSnapshotFailed": "የቀደመው snapshot ማስጀመር አልተሳካም። ያለ snapshot እንደገና በመሞከር ላይ።",
+      "detailSnapshotStartupFailed": "የsnapshot ማስጀመር አልተሳካም። ያለ snapshot እንደገና በመሞከር ላይ።",
+      "detailStartingSandboxWithoutSnapshot": "ያለ snapshot Sandbox በማስጀመር ላይ",
+      "detailSettingUpWorkspace": "የሥራ አካባቢውን በማዋቀር ላይ",
+      "detailRestoringSession": "ክፍለ-ጊዜውን በመመለስ ላይ",
+      "detailWarmWorkspaceReused": "ያልቀዘቀዘው የሥራ አካባቢ እንደገና ተጠቅሟል",
+      "detailRetryingClone": "ቅዳቱን እንደገና በመሞከር ላይ (ሙከራ {{attempt}} ከ{{total}})",
+      "detailSetupCommandFailed": "የማዋቀር ትዕዛዝ {{index}} አልተሳካም",
+      "detailSetupCommandTimedOut": "የማዋቀር ትዕዛዝ {{index}} ጊዜው አልፎበታል",
+      "detailColdRestore": "Cold restore፣ snapshot ተተግብሯል፣ ከ{{total}} ፋይሎች {{applied}} ተመልሰዋል",
+      "detailProgressPercent": "{{percent}}% ተጠናቋል",
+      "detailRestoreIncompleteReport": "የክፍለ-ጊዜ መመለስ ያልተጠናቀቀ ነው፦ ከ{{total}} ፋይሎች {{skipped}} አልተመለሱም ({{reasons}})።",
+      "detailRestoreIncompleteMissing": "ጎድለዋል፦ {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} እና ተጨማሪ {{omitted}}",
+      "detailReasonPatchFailed": "patch አልተተገበረም",
+      "detailReasonOutsideWorkspace": "መንገዱ ከሥራ አካባቢው ውጭ ነው",
+      "detailReasonMissingContent": "snapshot ለፋይሉ ይዘት አልነበረውም",
+      "detailReasonIndexResetFailed": "ኢንዴክሱ ከአልተሳካ መተግበር በኋላ መመለስ አልተቻለም",
+      "detailReasonUnlinkFailed": "ፋይሉን ማስወገድ አልተቻለም",
+      "detailReasonWriteFailed": "ፋይሉን መጻፍ አልተቻለም",
+      "detailReasonUnknown": "ያልታወቀ ምክንያት",
+      "detailUnknown": "አሁንም በማዘጋጀት ላይ",
+      "errorPreparationTimeout": "የአካባቢ ዝግጅት ጊዜው አልፎበታል",
+      "errorWorkspaceSetupFailed": "የሥራ አካባቢ ማዋቀር አልተሳካም",
+      "errorCredentialUpgradeRequired": "ይህ ክፍለ-ጊዜ የሚያስፈልገውን የማረጋገጫ ማሻሻያ አይዟል። ለመቀጠል አዲስ ክፍለ-ጊዜ ይጀምሩ።",
+      "errorAgentUnavailable": "ኤጀንቱ አልተገኘም",
+      "errorBillingBlocked": "የSandbox ክፍያ ተጨማሪ ክሬዲት ይፈልጋል",
+      "errorBillingUnavailable": "የSandbox ክፍያ ወይም የአቅም ማረጋገጥ አይገኝም። በቅርቡ እንደገና ይሞክሩ።",
+      "errorContainerLimitReached": "የኮንቴይነር ገደብ ደርሷል። አዲስ ኮንቴይነር ከመጀመርዎ በፊት ያለውን ኮንቴይነር ያቁሙ።",
+      "errorInvalidConfiguration": "የSandbox ማዋቀር ልክ ያልሆነ ወይም የማይደገፍ ነው",
+      "errorRuntimeArtifactUnauthorized": "የruntime ማውረድ አልተፈቀደም",
+      "errorRuntimeArtifactInvalid": "የruntime artifact ማረጋገጥ አልተሳካም",
+      "errorRuntimeCliProbeFailed": "የruntime CLI ማረጋገጥ አልተሳካም",
+      "errorRuntimeSupervisorMissing": "የruntime supervisor አይገኝም",
+      "errorConnectionLost": "የSandbox ግንኙነቱ ተቋርጧል",
+      "errorSandboxLost": "Sandbox ጠፍቷል",
+      "errorAgentRestarted": "ኤጀንቱ እንደገና ተነስቷል",
+      "errorSandboxOutOfMemory": "የSandbox ትውስታው አልበቃውም",
+      "errorPreparationDidNotComplete": "ዝግጅቱ አልተጠናቀቀም"
     },
     "permissionCard": {
       "title": "ፈቃድ ያስፈልጋል",
@@ -3031,22 +3118,16 @@
     "boundary": {
       "backToProfile": "ወደ መገለጫ ይመለሱ",
       "loadErrorMessage": "ግንኙነትህን አረጋግጠህ እንደገና ሞክር።",
-
       "chooseAccount": "መለያ ይምረጡ",
       "loadErrorTitle": "ድርጅቶችዎን መጫን አልተቻለም።",
       "membershipLostNotice": "ይህን ድርጅት ከእንግዲህ የመድረስ ፈቃድ የለዎትም። ወደ {{target}} ተቀይሯል።",
       "noOrganization": "ድርጅት የለም",
-
       "noOrganizationDescription": "ይህ መለያ የድርጅት አካል አይደለም። እንደ አባል ግብዣዎች እና ዝቅተኛ ቀሪ ሂሳብ ማንቂያዎች ያሉ የድርጅት ባህሪያትን ለመጠቀም በድር ላይ አንዱን ይፍጠሩ ወይም ይቀላቀሉ።",
-
       "openWebOrganizations": "ድርጅቶችን በድር ላይ ይክፈቱ",
-
       "organizationUnavailable": "ድርጅቱ አይገኝም።",
       "selectDescriptionWithOrganizations": "እርስዎ አንድ ወይም ከዚያ በላይ ድርጅቶች አባል ነዎት። ይህ ማያ ገጽ መጠቀም ያለበትን መለያ ይምረጡ።",
-
       "selectOrganization": "ድርጅት ይምረጡ",
       "unavailableDescription": "ይህ ድርጅት ከእንግዲህ አይገኝም። ለመቀጠል ከመገለጫዎ ሌላ ድርጅት ይምረጡ።",
-
       "unavailableSessionsDescription": "ይህ ድርጅት ከእንግዲህ አይገኝም። የዚህ ድርጅት ክፍለ ጊዜዎችን መጫን አይቻልም።",
       "accessDeniedDescription": "ይህን ድርጅት የመድረስ ፈቃድ የለዎትም።"
     },
@@ -3074,7 +3155,9 @@
       "permissionDenied": "አባላትን ለመጋበዝ ፈቃድ የለዎትም።",
       "roleMember": "ሚና፦ አባል",
       "sendInvite": "ግብዣ ይላኩ",
-      "title": "አባል ጋብዝ"
+      "title": "አባል ጋብዝ",
+      "alreadyInvited": "አስቀድሞ ግብዣ ተልኳል ወይም አስቀድሞ አባል ነው።",
+      "sendError": "ግብዣውን መላክ አልተቻለም።"
     },
     "invoices": {
       "downloadA11y": "ደረሰኝ {{number}}ን ያውርዱ",
@@ -3143,7 +3226,8 @@
       "inviteCreated": "ግብዣው ተፈጥሯል",
       "pendingInvitations": "ምላሽ የሚጠብቁ ግብዣዎች",
       "resendInvite": "ግብዣውን እንደገና ይላኩ",
-      "shareInviteLink": "የግብዣውን አገናኝ ያጋሩ"
+      "shareInviteLink": "የግብዣውን አገናኝ ያጋሩ",
+      "resendInviteError": "ግብዣውን እንደገና መላክ አልተቻለም።"
     },
     "usageStats": {
       "inputTokens": "የግብዓት ቶከኖች",
@@ -3291,7 +3375,8 @@
     "noneChosen": "ምንም አልተመረጠም",
     "emptyTitle": "ምንም የድምጽ ወደ ጽሑፍ ሞዴሎች የሉም",
     "emptyDescription": "Kilo Gateway በአሁኑ ሰዓት ምንም የድምጽ ወደ ጽሑፍ ሞዴሎችን አያቀርብም።",
-    "loadFailed": "የድምጽ ወደ ጽሑፍ ሞዴሎችን መጫን አልተቻለም።"
+    "loadFailed": "የድምጽ ወደ ጽሑፍ ሞዴሎችን መጫን አልተቻለም።",
+    "choose": "ሞዴል ይምረጡ"
   },
   "voiceLanguage": {
     "title": "የድምፅ ግብዓት ቋንቋ",
@@ -3506,6 +3591,7 @@
       "fromHuggingFace": "ከHugging Face",
       "loading": "ሞዴሎች በመጫን ላይ",
       "noResults": "ምንም ሞዴል አልተገኘም",
+      "noResultsForQuery": "ለ\"{{query}}\" ምንም ሞዴል አልተገኘም",
       "noFits": "ለዚህ መሣሪያ የሚስማማ ሞዴል የለም",
       "noFitsDescription": "ትላልቅ ሞዴሎች በ$t(common.all) ትር ላይ ይገኛሉ።",
       "fit": {
@@ -3536,8 +3622,6 @@
       "quantizations": "ኳንታይዜሽኖች",
       "quantizationsHelp": "ትናንሽ ፋይሎች አነስተኛ ማህደረ ትውስታ እና ማከማቻ ይጠቀማሉ። ትላልቅ ፋይሎች ብዙውን ጊዜ የተሻሉ መልሶችን ይሰጣሉ።",
       "quantDetail": "{{size}} ውርድ · ወደ {{memory}} ማህደረ ትውስታ",
-      "downloadQuant": "{{quant}} አውርድ",
-      "downloadModelA11y": "{{name}} አውርድ",
       "detailsA11y": "ዝርዝሮች: {{name}}",
       "loadingModel": "የሞዴል ዝርዝሮች በመጫን ላይ",
       "couldNotLoadModel": "ይህን ሞዴል መጫን አልተቻለም",
@@ -3582,13 +3666,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "ይህ ሞዴል የማሰብ ጥረትን ይደግፋል"
-    }
+    },
+    "creditsRequired": "ይህን መልዕክት ለመላክ በቂ ክሬዲት የለም። ክሬዲት ያክሉ እና እንደገና ይሞክሩ።"
   },
   "settingsTools": {
     "confirmTitle": "ይህን ለውጥ ያረጋግጡ?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "የቅርብ ጊዜ ማከማቻዎ",
+      "confirmMessage": "ማከማቻ፦ {{repository}}። ጥያቄ፦ {{prompt}}",
+      "confirmTitle": "ይህን ወኪል ይጀምሩ?",
       "promptRequired": "ወኪል ለመጀመር ጥያቄ ያስፈልጋል። ጥያቄ ያክሉ እና እንደገና ያሂዱ።",
       "repositoryRequired": "ወኪል ለመጀመር ማከማቻ ያስፈልጋል። Kilo ይክፈቱ እና አንዱን ይምረጡ፣ ከዚያ እንደገና ያሂዱ።",
       "repositoryUnknown": "Kilo {{repository}}ን እንደ GitHub ወይም GitLab ማከማቻ አያውቅም። በKilo ውስጥ ሌላ ማከማቻ ይምረጡ።",
@@ -3618,7 +3706,9 @@
     "spend24h": "ባለፉት 24 ሰዓታት የወጣ ወጪ",
     "multiplierError": "ከ1 ወይም ከዚያ በላይ የሆነ ብዜት ያስገቡ",
     "permissionDenied": "የወጪ ማስጠንቀቂያዎችን ለማስተዳደር ፈቃድ የለዎትም።",
-    "pushOffByCategory": "በማሳወቂያዎች ውስጥ ተሰናክሏል"
+    "pushOffByCategory": "በማሳወቂያዎች ውስጥ ተሰናክሏል",
+    "multiplierMaxError": "ከ{{max}} ወይም ከዚያ በታች የሆነ ብዜት ያስገቡ",
+    "thresholdMaxError": "ከ{{max}} ወይም ከዚያ በታች የሆነ መጠን ያስገቡ።"
   },
   "profiles": {
     "title": "መገለጫዎች",
@@ -3635,9 +3725,10 @@
       "skills_other": "{{count}} ችሎታዎች",
       "commands_one": "{{count}} ትዕዛዝ",
       "commands_other": "{{count}} ትዕዛዞች",
-      "varsShort": "{{count}}ተ",
-      "skillsShort": "{{count}}ች",
-      "commandsShort": "{{count}}ት"
+      "setupCommands_one": "{{count}} ማዋቀር ትዕዛዝ",
+      "setupCommands_other": "{{count}} ማዋቀር ትዕዛዞች",
+      "agents_one": "{{count}} ወኪል",
+      "agents_other": "{{count}} ወኪሎች"
     },
     "nameLabel": "የመገለጫ ስም",
     "namePlaceholder": "ለምሳሌ. የጀርባ ማረም",
@@ -3665,6 +3756,8 @@
     "keyTooLong": "ቁልፉ 256 ቁምፊዎች ወይም ከዚያ ያነሰ መሆን አለበት",
     "keyDuplicate": "ይህ ቁልፍ አስቀድሞ በመገለጫው ውስጥ አለ",
     "valueLabel": "ዋጋ",
+    "valueRequired": "ዋጋ አስገባ",
+    "tooLong": "እስከ {{max}} ቁምፊዎች ብቻ ይጠቀሙ",
     "secrets": {
       "markSecret": "እንደ ምስጢር ምልክት ያድርጉ",
       "masked": "የተደበቀ እሴት",
@@ -3715,7 +3808,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "የአገልጋይ ስም አስገባ",
-      "nameInvalid": "ስም ፊደሎችን፣ ቁጥሮችን፣ ሰረዞችን እና ሰረዞችን ብቻ መጠቀም ይችላል።",
+      "nameInvalid": "ስም የASCII ፊደላትን፣ አሃዞችን፣ የስር መስመሮችን እና ሰረዞችን ብቻ መጠቀም ይችላል፣ እስከ 100 ቁምፊዎች።",
       "commandRequired": "ትእዛዝ አስገባ",
       "commandTooLong": "ቢበዛ 50 አርጉመንቶችን ይጠቀሙ፣ እያንዳንዱ 500 ቁምፊ",
       "urlRequired": "URL አስገባ",
@@ -3743,16 +3836,16 @@
       "stepsPlaceholder": "ለምሳሌ 50",
       "temperature": "የሙቀት መጠን",
       "temperaturePlaceholder": "ለምሳሌ 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "ለምሳሌ 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "የእኔ ወኪል",
       "promptPlaceholder": "አንተ የ...",
       "tools": "መሳሪያዎች",
       "visibility": "ታይነት",
-      "visibilityPrimary": "ዋና - በቃሚው ውስጥ ይታያል",
-      "visibilitySubagent": "ሱባጀንት - ከሌሎች ብቻ የሚጠራ",
-      "visibilityAll": "ሁሉም - ሁለቱም",
+      "visibilityPrimary": "ዋና — በቃሚው ውስጥ ይታያል",
+      "visibilitySubagent": "ሱባጀንት — ከሌሎች ብቻ የሚጠራ",
+      "visibilityAll": "ሁሉም — ሁለቱም",
       "modePrimary": "ዋና ብቻ",
       "modeSubagent": "ሱባጀንት ብቻ",
       "modeAll": "ሁሉም ሁነታዎች",
@@ -3760,7 +3853,7 @@
       "deleteFailed": "ወኪል ማጥፋት አልተቻለም",
       "nameRequired": "የወኪል ስም አስገባ",
       "slugRequired": "የወኪል ማሰሪያ አስገባ",
-      "slugInvalid": "ስሉግ በፊደል መጀመር እና ትንንሽ ሆሄያትን፣ አሃዞችን እና ሰረዞችን ብቻ መጠቀም አለበት።",
+      "slugInvalid": "ስሉግ በትንንሽ ASCII ፊደል መጀመር እና በትንንሽ ASCII ሆሄያት፣ አሃዞች እና ሰረዞች ብቻ መጠቀም አለበት፣ እስከ 50 ቁምፊዎች።",
       "slugConflict": "ያ ስሉግ በአንድ አብሮ በተሰራ ወኪል ወይም በሌላ ወኪል በዚህ መገለጫ ውስጥ ጥቅም ላይ ውሏል።",
       "edit": "ወኪል አርትዕ"
     },
@@ -3805,7 +3898,9 @@
       "pinFailed": "ሪፖን ማያያዝ አልተቻለም",
       "unboundToast": "ሪፖ ያልታሰረ",
       "unbindFailed": "ሪፖን ማላቀቅ አልተቻለም"
-    }
+    },
+    "variablesDeleteFailed": "ተለዋዋጭ ማጥፋት አልተቻለም",
+    "deleteCommand": "ትዕዛዝ {{position}} ሰርዝ"
   },
   "credits": {
     "title": "ክሬዲት ይግዙ",
@@ -3841,7 +3936,8 @@
       "archive": "ማህደር አድርግ",
       "unarchive": "ከማህደር አውጣ",
       "deleteTitle": "{{name}} ይሰረዝ?",
-      "deleteMessage": "ተግባሮቹም ይሰረዛሉ። ክፍለ ጊዜዎቹ ግን ይቀራሉ።"
+      "deleteMessage": "ተግባሮቹም ይሰረዛሉ። ክፍለ ጊዜዎቹ ግን ይቀራሉ።",
+      "createFailed": "ዝርዝሩን መፍጠር አልተቻለም"
     },
     "listSettings": {
       "title": "የዝርዝር ቅንብሮች",
@@ -3909,20 +4005,20 @@
     }
   },
   "agentBriefing": {
-    "title": "የጠዋት ማጠቃለያ",
+    "title": "የወኪል ማጠቃለያ",
     "atLeast": "≥{{value}}",
     "coverageHint": "አንዳንድ ያለፉ እንቅስቃሴዎች ላይገኙ ይችላሉ። ≥ ቢያንስ ይህን ያህል ማለት ነው፤ ያልታወቀ ዜሮ ማለት አይደለም።",
     "available": "የሚገኙ ማጠቃለያዎች",
     "history": "የማጠቃለያ ታሪክ",
-    "historyHint": "ሪፖርቶች የተሰናበቱትን ጨምሮ ለ30 ቀናት ይቀመጣሉ።",
+    "historyHint": "ማጠቃለያዎች የተሰናበቱትን ጨምሮ ለ30 ቀናት ይቀመጣሉ።",
     "settings": "የማጠቃለያ ቅንብሮች",
-    "empty": "የሌሊት እንቅስቃሴ የለም",
-    "emptyHint": "የክላውድ እና CLI ኮዲንግ ክፍለ ጊዜዎችዎ ንቁ ከሆነ ሌሊት በኋላ እዚህ ይታያሉ።",
+    "empty": "በዚህ የማጠቃለያ ጊዜ ውስጥ እንቅስቃሴ የለም",
+    "emptyHint": "የክላውድ እና CLI ኮዲንግ ክፍለ ጊዜዎችዎ የመርሃ ግብር ማጠቃለያ እንቅስቃሴ ሲኖረው እዚህ ይታያሉ።",
     "loadError": "ማጠቃለያዎችን መጫን አልተቻለም",
-    "sessions": "በሌሊት ንቁ",
+    "sessions": "በማጠቃለያ ጊዜ ውስጥ ንቁ",
     "pullRequests": "የተከፈቱ PRs",
     "blockers": "አዲስ እንቅፋቶች",
-    "spend": "የሌሊት ወጪ",
+    "spend": "በማጠቃለያ ጊዜ ውስጥ ወጪ",
     "view": "ማጠቃለያውን አንብብ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -3944,13 +4040,13 @@
     "sources": "ማስረጃዎች እና ውጤቶች",
     "timezone": "የማጠቃለያ የሰዓት ሰቅ",
     "deviceTimezone": "የመሣሪያውን የሰዓት ሰቅ ተጠቀም",
-    "timezoneHint": "IANA የሰዓት ሰቅ፣ ለምሳሌ Europe/Berlin። የመርሃ ግብር ለውጦች ለወደፊት ሌሊቶች ይተገበራሉ።",
-    "nightStart": "ሌሊት ይጀምራል",
-    "morningStart": "ሌሊት ያበቃል / ጠዋት ይጀምራል",
-    "morningEnd": "ጠዋት ያበቃል",
-    "timeHint": "ጠዋት ሲያበቃ የመነሻ ካርዱ ከመስመር ውጭም ቢሆን የቀጥታ ሁኔታን ይመልሳል።",
-    "invalidSchedule": "ትክክለኛ የሰዓት ሰቅ እና የማይደራረቡ፣ ባዶ ያልሆኑ የሌሊት እና የጠዋት ጊዜያትን ይምረጡ።",
-    "notificationsHint": "የመጀመሪያው ሪፖርትዎ ሲዘጋጅ በየጠዋቱ አንድ አጠቃላይ ማሳወቂያ። ከሚከፈልባቸው AI ማጠቃለያዎች ነጻ ነው።",
+    "timezoneHint": "IANA የሰዓት ሰቅ፣ ለምሳሌ Europe/Berlin። የመርሃ ግብር ለውጦች ለወደፊት ማጠቃለያዎች ይተገበራሉ።",
+    "nightStart": "የማጠቃለያ ጊዜ ይጀምራል",
+    "morningStart": "ማጠቃለያ ዝግጁ የሚሆንበት ሰዓት",
+    "morningEnd": "ማጠቃለያ እስከሚገኝበት ሰዓት",
+    "timeHint": "የማጠቃለያ ጊዜ ሲያበቃ የመነሻ ካርዱ ከመስመር ውጭም ቢሆን የቀጥታ ሁኔታን ይመልሳል።",
+    "invalidSchedule": "ትክክለኛ የሰዓት ሰቅ እና ባዶ ያልሆነ የማጠቃለያ ጊዜ ይምረጡ።",
+    "notificationsHint": "ለእያንዳንዱ የመርሃ ግብር ማጠቃለያ አንድ አጠቃላይ ማሳወቂያ። ከሚከፈልባቸው AI ማጠቃለያዎች ነጻ ነው።",
     "notificationPermission": "ማጠቃለያዎን ለመቀበል የመሣሪያ ማሳወቂያዎችን በ$t(common.notifications) ውስጥ ያንቁ።",
     "aiOptIn": "የሚከፈልባቸው AI ማጠቃለያዎች",
     "aiHint": "ለዚህ አውድ ብቻ አማራጭ። የተመረጡ፣ የተደበቁ ቅንጭቦች እና የተዋቀሩ እውነታዎች በመተግበሪያዎ ቋንቋ ወደ ሞዴልዎ ይላካሉ። ክፍያዎች የዚህን አውድ ቀሪ ሂሳብ ይጠቀማሉ።",
@@ -3968,7 +4064,7 @@
     "contextSettings": "የAI ቅንብሮች · {{context}}",
     "allContexts": "የግል እና የድርጅት ማጠቃለያዎች ተለይተው ይቀመጣሉ።",
     "create": "ማጠቃለያ ፍጠር",
-    "oneOff": "የአንድ ጊዜ",
+    "oneOff": "በፍላጎት ላይ",
     "createdAt": "በ{{time}} ተፈጥሯል",
     "chooseContext": "አንድ አውድ ምረጥ",
     "period": "የማጠቃለያ ጊዜ ክልል",
@@ -3990,13 +4086,16 @@
     "emptyPeriod": "በዚህ የጊዜ ክልል ምንም እንቅስቃሴ አልተገኘም። የAI ማጠቃለያም ሆነ ክፍያ አይኖርም።",
     "emptyHistory": "የተቀመጡ ማጠቃለያዎች የሉም",
     "historicalStateHint": "የክፍለ ጊዜው ሁኔታ የሚያሳየው በተመረጠው የጊዜ ክልል መጨረሻ የነበረውን ሁኔታ እንጂ የአሁኑን ቀጥታ ሁኔታ አይደለም።",
-    "oneOffHint": "AI የተመረጠና ሚስጥራዊ ይዘቱ የተሸፈነ መረጃ በመተግበሪያህ ቋንቋ ይቀበላል። ይህ የአንድ ጊዜ ሪፖርት የጠዋት መርሃ ግብርህን ወይም የAI ምርጫዎችህን አይቀይርም።",
+    "oneOffHint": "AI የተመረጠና ሚስጥራዊ ይዘቱ የተሸፈነ መረጃ በመተግበሪያህ ቋንቋ ይቀበላል። ይህ በፍላጎት ላይ ያለ ማጠቃለያ የመርሃ ግብር ማጠቃለያህን ወይም የAI ምርጫዎችህን አይቀይርም።",
     "createOffline": "ማጠቃለያ ለመገምገም ወይም ለመፍጠር ከበይነመረብ ጋር ተገናኝ። ክፍያ የሚያስከትሉ ጥያቄዎች ከመስመር ውጭ ሲሆኑ በጭራሽ ወረፋ አይያዙም።",
     "estimateInputTooLarge": "ይህ የጊዜ ክልል ለተመረጠው ሞዴል ከመጠን በላይ መረጃ ይዟል።",
     "estimatePermissionUnavailable": "የዚህን አውድ ቀሪ ሂሳብ ለመጠቀም ፈቃድ የለህም።",
+    "createFailed": "ይህን ማጠቃለያ መፍጠር አልተቻለም።",
+    "reviewFailed": "ይህን ማጠቃለያ መገምገም አልተቻለም።",
     "estimatePricingUnavailable": "ለዚህ ሞዴል የዋጋ መረጃ አይገኝም።",
     "estimateBalanceUnavailable": "ለክፍያ ማጠቃለያ በቂ ሂሳብ የለም።",
     "estimateModelNotAllowed": "ይህ ሞዴል እዚህ አይፈቀድም።",
-    "estimateSpendLimitTooLow": "ይህን ማጠቃለያ ለመፍቀድ የወጪ ጥበቃውን ጨምር።"
+    "estimateSpendLimitTooLow": "ይህን ማጠቃለያ ለመፍቀድ የወጪ ጥበቃውን ጨምር።",
+    "saved": "የማጠቃለያ ቅንብሮች ተቀምጠዋል።"
   }
 }

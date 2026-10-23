@@ -182,7 +182,7 @@
     "codeArrivalHint": "यो ठेगाना योग्य भएमा, कोड एक मिनेटभित्र आउँछ।",
     "verifyCode": "कोड प्रमाणित गर्नुहोस्",
     "resendCode": "कोड पुनः पठाउनुहोस्",
-    "termsPrefix": "अघि बढ्दा तपाईं हाम्रा",
+    "termsPrefix": "अघि बढ्दा तपाईं हाम्रा ",
     "terms": "सर्तहरू",
     "termsConnector": " र ",
     "termsSuffix": "मा सहमत हुनुहुन्छ।",
@@ -293,7 +293,8 @@
     "condenseToolCallsSubtitle": "लगातार उपकरण कलहरूलाई तपाईंले खोल्न सक्ने एउटा पङ्क्तिमा समूहबद्ध गर्नुहोस्।",
     "toolSummaryTranslation": "उपकरण सारांश अनुवाद गर्नुहोस्",
     "toolSummaryTranslationSubtitle": "प्रत्येक उपकरण सारांशलाई तपाईंको एपको भाषामा अनुवाद गर्न मोडेलमा पठाउनुहोस्। अनुवाद असफल भएमा मूल देखाइन्छ।",
-    "toolSummaryTranslationModelUnavailableNotice": "यो मोडेल अब उपलब्ध छैन। अर्को छान्न $t(common.model) मा ट्याप गर्नुहोस्।"
+    "toolSummaryTranslationModelUnavailableNotice": "यो मोडेल अब उपलब्ध छैन। अर्को छान्न $t(common.model) मा ट्याप गर्नुहोस्।",
+    "autoExpandThinkingInactiveSubtitle": "सोचको विवरण लुकाइएको बेला कुनै प्रभाव हुँदैन।"
   },
   "prReview": {
     "pullRequestUnavailable": "पुल रिक्वेस्ट उपलब्ध छैन",
@@ -622,9 +623,15 @@
       "viewOnGitHub": "GitHub मा PR हेर्नुहोस्",
       "noChecksReported": "कुनै जाँचको नतिजा आएको छैन",
       "passed": "{{displayCount}} सफल",
+      "passed_one": "{{displayCount}} सफल",
+      "passed_other": "{{displayCount}} सफल",
       "failed": "{{displayCount}} असफल",
+      "failed_one": "{{displayCount}} असफल",
+      "failed_other": "{{displayCount}} असफल",
       "pending": "{{displayCount}} प्रतीक्षामा",
       "skipped": "{{displayCount}} छोडियो",
+      "skipped_one": "{{displayCount}} छोडियो",
+      "skipped_other": "{{displayCount}} छोडियो",
       "checksCount": "{{displayCount}} जाँच",
       "checksCount_one": "{{displayCount}} जाँच",
       "checksCount_other": "{{displayCount}} जाँच",
@@ -669,7 +676,8 @@
       "gitlabDescription": "मोबाइलमा मर्ज रिक्वेस्टहरू समीक्षा गर्न आफ्नो GitLab खाता जडान गर्नुहोस्।",
       "bitbucketDescription": "मोबाइलमा पुल रिक्वेस्टहरू समीक्षा गर्न यो संस्थालाई Bitbucket सँग जडान गर्नुहोस्।",
       "bitbucketOrgOnlyDescription": "यसको Bitbucket पुल रिक्वेस्टहरू समीक्षा गर्न माथिको खाता एउटा संस्थामा स्विच गर्नुहोस्।",
-      "contextLine": "{{organization}} का लागि"
+      "contextLine": "{{organization}} का लागि",
+      "contextLinePersonal": "तपाईंको व्यक्तिगत खाताका लागि"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1452,7 +1460,13 @@
       "sessionError": "सत्रमा त्रुटि भयो: {{error}}।",
       "statusWithValue": "स्थिति: {{status}}",
       "toolName": "उपकरण: {{name}}",
-      "toolNameError": "उपकरण {{name}} मा त्रुटि भयो।"
+      "toolNameError": "उपकरण {{name}} मा त्रुटि भयो।",
+      "cancelReasonSuperseded": "नयाँ कमिट पुश भएकाले यो समीक्षा प्रतिस्थापन गरियो।",
+      "cancelReasonIntegrationDisconnected": "{{platform}} जडान विच्छेद भएकाले यो समीक्षा रद्द गरियो। यसलाई पुनः जडान गर्नुहोस्, त्यसपछि समीक्षा फेरि चलाउनुहोस्।",
+      "cancelReasonBitbucketReviewerDisabled": "Bitbucket का लागि Code Reviewer बन्धाइएकाले यो समीक्षा रद्द गरियो। यसलाई फेरि सक्षम बनाउनुहोस्, त्यसपछि समीक्षा फेरि चलाउनुहोस्।",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket पुल रिक्वेस्ट परिवर्तन भएकाले यो समीक्षा प्रतिस्थापन गरियो।",
+      "cancelReasonCancelled": "यो समीक्षा रद्द गरियो।",
+      "cancelReasonInterrupted": "यो समीक्षा अवरुद्ध भयो।"
     },
     "reviewMemory": {
       "title": "समीक्षा मेमोरी",
@@ -1479,7 +1493,15 @@
       "instructions": "निर्देशनहरू (ऐच्छिक)",
       "instructionsPlaceholder": "समीक्षकले ध्यान दिनुपर्ने कुनै विशेष कुरा…",
       "starting": "समीक्षा सुरु गर्दै…",
-      "start": "समीक्षा सुरु गर्नुहोस्"
+      "start": "समीक्षा सुरु गर्नुहोस्",
+      "startNotFound": "{{provider}} मा त्यो {{requestNoun}} पढ्न सकिएन। URL र रिपोजिटरी पहुँचयोग्य छ कि छैन जाँच्नुहोस्।",
+      "startRateLimited": "{{provider}} ले अहिले अनुरोध सीमित गरिरहेको छ। केही मिनेटपछि फेरि प्रयास गर्नुहोस्।",
+      "startNotAllowed": "त्यो {{requestNoun}} का लागि समीक्षा सुरु गर्न तपाईंसँग पहुँच छैन। आफ्ना अनुमतिहरू र आफ्नो संस्थाको योजना जाँच्नुहोस्।",
+      "startProviderNeedsAttention": "म्यानुअल समीक्षालाई मानक {{provider}} जडान चाहिन्छ। जडान गर्नुहोस् र फेरि प्रयास गर्नुहोस्।",
+      "startAlreadyRunning": "त्यो {{requestNoun}}को समीक्षा पहिले नै चालु छ।",
+      "startRejected": "त्यो {{requestNoun}} समीक्षा गर्न सकिँदैन। खुला छ, ड्राफ्ट होइन, र URL सही छ भन्ने निश्चित गर्नुहोस्।",
+      "startProviderUnavailable": "त्यो {{requestNoun}} पढ्न {{provider}} सम्पर्क गर्न सकिएन। फेरि प्रयास गर्नुहोस्।",
+      "startFailed": "समीक्षा सुरु गर्न सकिएन। आफ्नो इन्टरनेट जडान जाँच्नुहोस् र फेरि प्रयास गर्नुहोस्।"
     },
     "notConnectedReadOnly": "{{platform}} जडान भएको छैन। संस्थाका मालिक र प्रशासकहरूले मात्र यसलाई जडान गर्न सक्छन्।",
     "gitlab": {
@@ -1731,7 +1753,7 @@
       "deadlinePassed": "म्याद नाघेको",
       "deadlinePassedDetail": "{{critical}} अति गम्भीर, {{high}} उच्च",
       "dueThisWeek": "यस हप्ता म्याद सकिने",
-      "dueThisWeekDetail": "{{exploitable}} वटा दुरुपयोग हुन सक्ने पुष्टि भएका",
+      "dueThisWeekDetail": "यसमध्ये {{exploitable}} वटा दुरुपयोग हुन सक्ने पुष्टि भएका",
       "noDeadline": "म्याद छैन",
       "reviewSlaAssignment": "तोकिएको SLA समीक्षा गर्नुहोस्",
       "allOpenFindingsTracked": "सबै खुला सुरक्षा समस्याको निगरानी भइरहेको"
@@ -1948,8 +1970,9 @@
       "couldNotLoad": "सुरक्षा एजेन्ट लोड गर्न सकिएन।",
       "installApp": "GitHub एप स्थापना गर्नुहोस्",
       "reauthorizeButton": "GitHub एपलाई फेरि अनुमति दिनुहोस्",
-      "reauthorizeDescription": "Dependabot का चेतावनीहरूमा पहुँच पाउन सुरक्षा एजेन्टलाई vulnerability_alerts अनुमति चाहिन्छ। यो अनुमति दिन GitHub एपलाई फेरि अनुमति प्रदान गर्नुहोस्।",
+      "reauthorizeDescription": "Dependabot का चेतावनीहरू पढ्न सुरक्षा एजेन्टलाई अनुमति चाहिन्छ। यो अनुमति दिन GitHub एपलाई फेरि अनुमति प्रदान गर्नुहोस्।",
       "reauthorizeTitle": "थप अनुमतिहरू आवश्यक छन्",
+      "retryFailed": "अझै पनि सुरक्षा एजेन्ट लोड गर्न सकिएन। आफ्नो जडान जाँच गर्नुहोस् र फेरि प्रयास गर्नुहोस्।",
       "setupFailed": "GitHub सेटअप सुरु गर्न सकिएन। फेरि प्रयास गर्नुहोस्।"
     },
     "queuedActionUntracked": "पालोमा राखिएको कार्यको स्थिति अब हेर्न सकिएन। पछिल्लो स्थिति हेर्न रिफ्रेस गर्नुहोस्।",
@@ -2112,7 +2135,8 @@
       "dollar_other": "डलर",
       "costSpoken": "लागत {{cost}}",
       "costSpokenWithTime": "लागत {{cost}}, {{time}}",
-      "pullRequest": "पुल रिक्वेस्ट {{number}}"
+      "pullRequest": "पुल रिक्वेस्ट {{number}}",
+      "spokenJoiner": "र"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub खोल्न सकिएन",
@@ -2248,7 +2272,6 @@
       "couldNotLoadEnvironment": "तपाईंको वातावरण लोड गर्न सकिएन।",
       "retryLoadingEnvironment": "वातावरण लोड गर्न पुनः प्रयास गर्नुहोस्",
       "defaultEnvironment": "पूर्वनिर्धारित वातावरण",
-      "environmentSummary": "{{commands}} कमाण्ड · {{mcp}} MCP · {{skills}} सीप · {{agents}} एजेन्ट",
       "leaveChanges": "परिवर्तन यथावत्",
       "commitAndPush": "कमिट र पुश",
       "startSession": "सत्र सुरु गर्नुहोस्",
@@ -2467,7 +2490,71 @@
       "preparationComplete": "तयारी पूरा भयो",
       "preparationFailed": "तयारी असफल",
       "setupCommand": "सेटअप कमाण्ड {{index}}",
-      "setupCommandOf": "{{displayCount}} मध्ये सेटअप कमाण्ड {{index}}"
+      "setupCommandOf": "{{displayCount}} मध्ये सेटअप कमाण्ड {{index}}",
+      "stepWorkspaceSetup": "वर्कस्पेस सेटअप",
+      "stepDiskCheck": "डिस्क जाँच",
+      "stepCloning": "रिपोजिटोरी क्लोन गर्दै",
+      "stepBranch": "ब्रान्च सेटअप गर्दै",
+      "stepDevcontainerSetup": "देव कन्टेनर सेटअप",
+      "stepWorkspaceRestore": "वर्कस्पेस रिस्टोर गर्दै",
+      "stepWorkspaceBackup": "वर्कस्पेस सुरक्षित गर्दै",
+      "stepSandboxProvision": "स्यान्डबक्स प्रोभिजन गर्दै",
+      "stepSandboxBoot": "स्यान्डबक्स सुरु गर्दै",
+      "stepSnapshotFallback": "स्न्यापसट बिना पुनः प्रयास गर्दै",
+      "stepKiloServer": "Kilo सुरु गर्दै",
+      "stepKiloSession": "सेसन तयार गर्दै",
+      "stepRestoreIncomplete": "सेसन रिस्टोर अपूर्ण",
+      "stepReady": "वातावरण तयार छ",
+      "stepFailed": "वातावरण सेटअप असफल भयो",
+      "stepUnknown": "वातावरण सेटअप",
+      "detailCreatingSandbox": "स्यान्डबक्स सिर्जना गर्दै",
+      "detailUpdatingRepository": "रिपोजिटोरी अपडेट गर्दै",
+      "detailCheckingOutBranch": "ब्रान्च चेकआउट गर्दै",
+      "detailRunningSetupCommands": "सेटअप कमाण्ड चलाउँदै",
+      "detailSavingRepository": "छिटो सुरुका लागि रिपोजिटोरी सुरक्षित गर्दै",
+      "detailStartingKiloRuntime": "Kilo रनटाइम सुरु गर्दै",
+      "detailPreparingKiloSession": "Kilo सेसन तयार गर्दै",
+      "detailWaitingForPreviousSandbox": "अघिल्लो स्यान्डबक्स बन्द हुन पर्खँदै",
+      "detailRetryingSandboxCreation": "स्यान्डबक्स सिर्जना पुनः प्रयास गर्दै",
+      "detailPreviousSnapshotFailed": "अघिल्लो स्न्यापसट सुरुवात असफल भयो। स्न्यापसट बिना पुनः प्रयास गर्दै।",
+      "detailSnapshotStartupFailed": "स्न्यापसट सुरुवात असफल भयो। स्न्यापसट बिना पुनः प्रयास गर्दै।",
+      "detailStartingSandboxWithoutSnapshot": "स्न्यापसट बिना स्यान्डबक्स सुरु गर्दै",
+      "detailSettingUpWorkspace": "वर्कस्पेस सेटअप गर्दै",
+      "detailRestoringSession": "सेसन रिस्टोर गर्दै",
+      "detailWarmWorkspaceReused": "वार्म वर्कस्पेस पुनः प्रयोग गरियो",
+      "detailRetryingClone": "क्लोन पुनः प्रयास गर्दै ({{total}} मध्ये {{attempt}} प्रयास)",
+      "detailSetupCommandFailed": "सेटअप कमाण्ड {{index}} असफल भयो",
+      "detailSetupCommandTimedOut": "सेटअप कमाण्ड {{index}} समय सकियो",
+      "detailColdRestore": "कोल्ड रिस्टोर, स्न्यापसट लागू गरियो, {{total}} मध्ये {{applied}} फाइल रिस्टोर भयो",
+      "detailProgressPercent": "{{percent}}% पूरा भयो",
+      "detailRestoreIncompleteReport": "सेसन रिस्टोर अपूर्ण: {{total}} मध्ये {{skipped}} फाइल रिस्टोर भएनन् ({{reasons}})।",
+      "detailRestoreIncompleteMissing": "छुटेका: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} र {{omitted}} थप",
+      "detailReasonPatchFailed": "प्याच लागू भएन",
+      "detailReasonOutsideWorkspace": "पथ वर्कस्पेसभित्र छैन",
+      "detailReasonMissingContent": "स्न्यापसटमा फाइलको लागि कुनै सामग्री थिएन",
+      "detailReasonIndexResetFailed": "असफल एप्लाइ पछि इन्डेक्स रिसेट गर्न सकिएन",
+      "detailReasonUnlinkFailed": "फाइल हटाउन सकिएन",
+      "detailReasonWriteFailed": "फाइल लेख्न सकिएन",
+      "detailReasonUnknown": "अज्ञात कारण",
+      "detailUnknown": "अझै तयार गर्दै",
+      "errorPreparationTimeout": "वातावरण तयारीको समय सकियो",
+      "errorWorkspaceSetupFailed": "वर्कस्पेस सेटअप असफल भयो",
+      "errorCredentialUpgradeRequired": "यो सेसनमा आवश्यक क्रेडेन्सियल अपग्रेड छुटेको छ। जारी राख्न नयाँ सेसन सुरु गर्नुहोस्।",
+      "errorAgentUnavailable": "एजेन्ट उपलब्ध भएन",
+      "errorBillingBlocked": "स्यान्डबक्स बिलिङलाई थप क्रेडिट चाहिन्छ",
+      "errorBillingUnavailable": "स्यान्डबक्स बिलिङ वा क्षमता प्रमाणीकरण उपलब्ध छैन। छिट्टै पुनः प्रयास गर्नुहोस्।",
+      "errorContainerLimitReached": "कन्टेनर सीमा पुग्यो। अर्को सुरु गर्नु अघि अवस्थित कन्टेनर रोक्नुहोस्।",
+      "errorInvalidConfiguration": "स्यान्डबक्स कन्फिगरेसन अमान्य वा असमर्थित छ",
+      "errorRuntimeArtifactUnauthorized": "रनटाइम डाउनलोड अनुमोदित थिएन",
+      "errorRuntimeArtifactInvalid": "रनटाइम आर्टिफ्याक्ट प्रमाणीकरण असफल भयो",
+      "errorRuntimeCliProbeFailed": "रनटाइम CLI प्रमाणीकरण असफल भयो",
+      "errorRuntimeSupervisorMissing": "रनटाइम सुपरभाइजर छुटेको छ",
+      "errorConnectionLost": "स्यान्डबक्स जडान गुम्यो",
+      "errorSandboxLost": "स्यान्डबक्स गुम्यो",
+      "errorAgentRestarted": "एजेन्ट पुनः सुरु भयो",
+      "errorSandboxOutOfMemory": "स्यान्डबक्सको मेमोरी सकियो",
+      "errorPreparationDidNotComplete": "तयारी पूरा भएन"
     },
     "permissionCard": {
       "title": "अनुमति आवश्यक",
@@ -3031,22 +3118,16 @@
     "boundary": {
       "backToProfile": "प्रोफाइलमा फर्कनुहोस्",
       "loadErrorMessage": "इन्टरनेट जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
-
       "chooseAccount": "खाता चयन गर्नुहोस्",
       "loadErrorTitle": "तपाईंका संस्थाहरू लोड गर्न सकिएन।",
       "membershipLostNotice": "तपाईंसँग यो संस्थामा अब पहुँच छैन। {{target}} मा स्विच गरियो।",
       "noOrganization": "कुनै संस्था छैन",
-
       "noOrganizationDescription": "यो खाता कुनै संस्थाको भाग होइन। सदस्य निमन्त्रणा र कम ब्यालेन्स सतर्कता जस्ता संस्था सुविधाहरू प्रयोग गर्न वेबमा संस्था सिर्जना गर्नुहोस् वा सामेल हुनुहोस्।",
-
       "openWebOrganizations": "वेबमा संस्थाहरू खोल्नुहोस्",
-
       "organizationUnavailable": "संस्था उपलब्ध छैन।",
       "selectDescriptionWithOrganizations": "तपाईं एक वा धेरै संस्थासँग सम्बन्धित हुनुहुन्छ। यो स्क्रिनले प्रयोग गर्नुपर्ने खाता छान्नुहोस्।",
-
       "selectOrganization": "संस्था चयन गर्नुहोस्",
       "unavailableDescription": "यो संस्था अब उपलब्ध छैन। जारी राख्न आफ्नो प्रोफाइलबाट अर्को संस्था छान्नुहोस्।",
-
       "unavailableSessionsDescription": "यो संस्था अब उपलब्ध छैन। यसका सत्रहरू लोड गर्न सकिँदैन।",
       "accessDeniedDescription": "तपाईंसँग यो संस्थामा पहुँच छैन।"
     },
@@ -3074,7 +3155,9 @@
       "permissionDenied": "सदस्यहरूलाई निम्तो दिने अनुमति तपाईंसँग छैन।",
       "roleMember": "भूमिका सदस्य हो।",
       "sendInvite": "निम्तो पठाउनुहोस्",
-      "title": "सदस्यलाई निम्तो दिनुहोस्"
+      "title": "सदस्यलाई निम्तो दिनुहोस्",
+      "alreadyInvited": "उनलाई पहिले नै निम्तो पठाइएको छ वा उनी पहिले नै सदस्य हुन्।",
+      "sendError": "निम्तो पठाउन सकिएन।"
     },
     "invoices": {
       "downloadA11y": "बिल {{number}} डाउनलोड गर्नुहोस्",
@@ -3143,7 +3226,8 @@
       "inviteCreated": "निम्तो सिर्जना गरियो",
       "pendingInvitations": "पर्खाइमा रहेका निम्तोहरू",
       "resendInvite": "निम्तो पुनः पठाउनुहोस्",
-      "shareInviteLink": "निम्तोको लिङ्क साझा गर्नुहोस्"
+      "shareInviteLink": "निम्तोको लिङ्क साझा गर्नुहोस्",
+      "resendInviteError": "निम्तो पुनः पठाउन सकिएन।"
     },
     "usageStats": {
       "inputTokens": "इनपुट टोकनहरू",
@@ -3291,7 +3375,8 @@
     "noneChosen": "कुनै पनि चयन गरिएको छैन",
     "emptyTitle": "बोलीलाई पाठमा रूपान्तरण गर्ने कुनै मोडेल छैन",
     "emptyDescription": "Kilo Gateway ले अहिले बोलीलाई पाठमा रूपान्तरण गर्ने कुनै मोडेल प्रदान गरिरहेको छैन।",
-    "loadFailed": "बोलीलाई पाठमा रूपान्तरण गर्ने मोडेलहरू लोड गर्न सकिएन।"
+    "loadFailed": "बोलीलाई पाठमा रूपान्तरण गर्ने मोडेलहरू लोड गर्न सकिएन।",
+    "choose": "मोडेल छान्नुहोस्"
   },
   "voiceLanguage": {
     "title": "भ्वाइस इनपुटको भाषा",
@@ -3506,6 +3591,7 @@
       "fromHuggingFace": "Hugging Face बाट",
       "loading": "मोडेलहरू लोड हुँदैछन्",
       "noResults": "कुनै मोडेल भेटिएन",
+      "noResultsForQuery": "\"{{query}}\" का लागि कुनै मोडेल भेटिएन",
       "noFits": "यो डिभाइसमा मिल्ने कुनै मोडेल छैन",
       "noFitsDescription": "ठूला मोडेलहरू $t(common.all) ट्याबमा छन्।",
       "fit": {
@@ -3536,8 +3622,6 @@
       "quantizations": "क्वान्टाइजेसनहरू",
       "quantizationsHelp": "साना फाइलहरूले कम मेमोरी र भण्डारण प्रयोग गर्छन्। ठूला फाइलहरूले प्रायः राम्रा जवाफ दिन्छन्।",
       "quantDetail": "{{size}} डाउनलोड · लगभग {{memory}} मेमोरी",
-      "downloadQuant": "{{quant}} डाउनलोड गर्नुहोस्",
-      "downloadModelA11y": "{{name}} डाउनलोड गर्नुहोस्",
       "detailsA11y": "विवरण: {{name}}",
       "loadingModel": "मोडेलको विवरण लोड हुँदैछ",
       "couldNotLoadModel": "यो मोडेल लोड गर्न सकिएन",
@@ -3582,13 +3666,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "यो मोडेलले सोच्ने प्रयासको स्तर समर्थन गर्छ"
-    }
+    },
+    "creditsRequired": "यो सन्देश पठाउन पर्याप्त क्रेडिट छैन। क्रेडिट थप्नुहोस् र फेरि प्रयास गर्नुहोस्।"
   },
   "settingsTools": {
     "confirmTitle": "यो परिवर्तन पुष्टि गर्ने?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "तपाईंको पछिल्लो रिपोजिटरी",
+      "confirmMessage": "रिपोजिटरी: {{repository}}। अनुरोध: {{prompt}}",
+      "confirmTitle": "यो एजेन्ट सुरु गर्ने?",
       "promptRequired": "एजेन्ट सुरु गर्न प्रम्प्ट आवश्यक पर्छ। प्रम्प्ट थप्नुहोस् र यसलाई फेरि चलाउनुहोस्।",
       "repositoryRequired": "एजेन्ट सुरु गर्न रिपोजिटरी आवश्यक पर्छ। Kilo खोल्नुहोस् र एउटा छान्नुहोस्, त्यसपछि यसलाई फेरि चलाउनुहोस्।",
       "repositoryUnknown": "Kilo ले {{repository}} लाई GitHub वा GitLab रिपोजिटरीका रूपमा चिन्दैन। Kilo मा अर्को रिपोजिटरी छान्नुहोस्।",
@@ -3618,7 +3706,9 @@
     "spend24h": "पछिल्लो 24 घण्टाको खर्च",
     "multiplierError": "1 वा त्यसभन्दा बढीको गुणक लेख्नुहोस्",
     "permissionDenied": "तपाईंसँग खर्चका चेतावनीहरू व्यवस्थापन गर्ने अनुमति छैन।",
-    "pushOffByCategory": "सूचनाहरूमा बन्द"
+    "pushOffByCategory": "सूचनाहरूमा बन्द",
+    "multiplierMaxError": "{{max}} वा त्यसभन्दा कमको गुणक लेख्नुहोस्",
+    "thresholdMaxError": "{{max}} वा त्यसभन्दा कम रकम प्रविष्ट गर्नुहोस्।"
   },
   "profiles": {
     "title": "प्रोफाइलहरू",
@@ -3635,9 +3725,10 @@
       "skills_other": "{{count}} सीप",
       "commands_one": "{{count}} आदेश",
       "commands_other": "{{count}} आदेश",
-      "varsShort": "{{count}}च",
-      "skillsShort": "{{count}}स",
-      "commandsShort": "{{count}}आ"
+      "setupCommands_one": "{{count}} सेटअप आदेश",
+      "setupCommands_other": "{{count}} सेटअप आदेश",
+      "agents_one": "{{count}} एजेन्ट",
+      "agents_other": "{{count}} एजेन्ट"
     },
     "nameLabel": "प्रोफाइल नाम",
     "namePlaceholder": "जस्तै ब्याकएन्ड डिबगिङ",
@@ -3665,6 +3756,8 @@
     "keyTooLong": "कुञ्जी 256 अक्षर वा कम हुनुपर्छ",
     "keyDuplicate": "यो कुञ्जी पहिले नै प्रोफाइलमा छ",
     "valueLabel": "मूल्य",
+    "valueRequired": "मूल्य प्रविष्ट गर्नुहोस्",
+    "tooLong": "अधिकतम {{max}} अक्षरहरू प्रयोग गर्नुहोस्",
     "secrets": {
       "markSecret": "गोप्य रूपमा चिन्ह लगाउनुहोस्",
       "masked": "लुकेको मूल्य",
@@ -3715,7 +3808,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "सर्भर नाम प्रविष्ट गर्नुहोस्",
-      "nameInvalid": "नामले अक्षर, संख्या, अन्डरस्कोर र ड्यास मात्र प्रयोग गर्न सक्छ",
+      "nameInvalid": "नामले केवल ASCII अक्षरहरू, संख्याहरू, अन्डरस्कोर र ड्यासहरू प्रयोग गर्न सक्छ, अधिकतम 100 अक्षरसम्म",
       "commandRequired": "आदेश प्रविष्ट गर्नुहोस्",
       "commandTooLong": "बढीमा 50 आर्गुमेन्ट प्रयोग गर्नुहोस्, प्रत्येक 500 वर्ण",
       "urlRequired": "URL प्रविष्ट गर्नुहोस्",
@@ -3743,7 +3836,7 @@
       "stepsPlaceholder": "जस्तै 50",
       "temperature": "तापक्रम",
       "temperaturePlaceholder": "जस्तै 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "जस्तै 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "मेरो एजेन्ट",
@@ -3751,8 +3844,8 @@
       "tools": "उपकरणहरू",
       "visibility": "दृश्यता",
       "visibilityPrimary": "प्राथमिक — पिकरमा देखाइएको छ",
-      "visibilitySubagent": "Subagent - अरूबाट मात्र कल गर्न मिल्ने",
-      "visibilityAll": "सबै - दुबै",
+      "visibilitySubagent": "Subagent — अरूबाट मात्र कल गर्न मिल्ने",
+      "visibilityAll": "सबै — दुबै",
       "modePrimary": "केवल प्राथमिक",
       "modeSubagent": "केवल उप-एजेन्ट",
       "modeAll": "सबै मोड",
@@ -3760,7 +3853,7 @@
       "deleteFailed": "एजेन्ट मेटाउन सकिएन",
       "nameRequired": "एजेन्टको नाम प्रविष्ट गर्नुहोस्",
       "slugRequired": "एजेन्ट स्लग प्रविष्ट गर्नुहोस्",
-      "slugInvalid": "स्लग एउटा अक्षरबाट सुरु हुनुपर्छ र सानो अक्षर, अंक र ड्यासहरू मात्र प्रयोग गर्नुपर्छ",
+      "slugInvalid": "स्लग सानो ASCII अक्षरबाट सुरु हुनुपर्छ र केवल सानो ASCII अक्षरहरू, अंकहरू र ड्यासहरू प्रयोग गर्नुपर्छ, अधिकतम 50 अक्षरसम्म",
       "slugConflict": "त्यो स्लग पहिले नै कुनै इनबिल्ट एजेन्ट वा यो प्रोफाइलको अर्को एजेन्टले प्रयोग गर्दैछ",
       "edit": "एजेन्ट सम्पादन गर्नुहोस्"
     },
@@ -3805,7 +3898,9 @@
       "pinFailed": "रिपो पिन गर्न सकिएन",
       "unboundToast": "रिपो अनबाउन्ड",
       "unbindFailed": "रिपो अनबाइन्ड गर्न सकेन"
-    }
+    },
+    "variablesDeleteFailed": "चर मेटाउन सकिएन",
+    "deleteCommand": "आदेश {{position}} मेट्नुहोस्"
   },
   "credits": {
     "title": "क्रेडिट किन्नुहोस्",
@@ -3841,7 +3936,8 @@
       "archive": "आर्काइभ गर्नुहोस्",
       "unarchive": "आर्काइभबाट निकाल्नुहोस्",
       "deleteTitle": "{{name}} मेट्ने?",
-      "deleteMessage": "यसका कामहरू पनि मेटिन्छन्। तिनका सत्रहरू रहन्छन्।"
+      "deleteMessage": "यसका कामहरू पनि मेटिन्छन्। तिनका सत्रहरू रहन्छन्।",
+      "createFailed": "सूची सिर्जना गर्न सकिएन"
     },
     "listSettings": {
       "title": "सूची सेटिङ",
@@ -3909,20 +4005,20 @@
     }
   },
   "agentBriefing": {
-    "title": "बिहानको ब्रिफिङ",
+    "title": "एजेन्ट ब्रिफिङ",
     "atLeast": "≥{{value}}",
     "coverageHint": "केही पुरानो गतिविधि छुटेको हुन सक्छ। ≥ को अर्थ कम्तीमा यति हो; अज्ञात भनेको शून्य होइन।",
     "available": "उपलब्ध ब्रिफिङहरू",
     "history": "ब्रिफिङ इतिहास",
-    "historyHint": "खारेज गरिएका सहित रिपोर्टहरू ३० दिनसम्म राखिन्छन्।",
+    "historyHint": "खारेज गरिएका सहित ब्रिफिङहरू ३० दिनसम्म राखिन्छन्।",
     "settings": "ब्रिफिङ सेटिङहरू",
-    "empty": "रातभर कुनै गतिविधि भएन",
-    "emptyHint": "सक्रिय रातपछि तपाईंका क्लाउड र CLI कोडिङ सत्रहरू यहाँ देखिनेछन्।",
+    "empty": "यो ब्रिफिङ अवधिमा कुनै गतिविधि भएन",
+    "emptyHint": "निर्धारित ब्रिफिङमा गतिविधि हुँदा तपाईंका क्लाउड र CLI कोडिङ सत्रहरू यहाँ देखिनेछन्।",
     "loadError": "ब्रिफिङहरू लोड गर्न सकिएन",
-    "sessions": "रातभर सक्रिय",
+    "sessions": "ब्रिफिङ अवधिमा सक्रिय",
     "pullRequests": "खोलिएका PRs",
     "blockers": "नयाँ अवरोधहरू",
-    "spend": "रातभरको खर्च",
+    "spend": "ब्रिफिङ अवधिको खर्च",
     "view": "ब्रिफिङ पढ्नुहोस्",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -3944,14 +4040,14 @@
     "sources": "प्रमाण र आर्टिफ्याक्टहरू",
     "timezone": "ब्रिफिङ समय क्षेत्र",
     "deviceTimezone": "डिभाइसको समय क्षेत्र प्रयोग गर्नुहोस्",
-    "timezoneHint": "IANA समय क्षेत्र, उदाहरणका लागि Europe/Berlin। तालिका परिवर्तन आगामी रातहरूमा लागू हुन्छ।",
-    "nightStart": "रात सुरु",
-    "morningStart": "रात अन्त्य / बिहान सुरु",
-    "morningEnd": "बिहान अन्त्य",
-    "timeHint": "बिहान सकिएपछि अफलाइनमा पनि Home कार्डले लाइभ स्थिति फर्काउँछ।",
-    "invalidSchedule": "मान्य समय क्षेत्र र नखप्टिने, खाली नभएका रात र बिहानका अवधिहरू छान्नुहोस्।",
-    "notificationsHint": "पहिलो रिपोर्ट तयार हुँदा हरेक बिहान एउटा सामान्य सूचना। सशुल्क AI सारांशहरूसँग स्वतन्त्र।",
-    "notificationPermission": "ब्रिफिङ पाउन $t(common.notifications) मा डिभाइस सूचनाहरू सक्षम गर्नुहोस्।",
+    "timezoneHint": "IANA समय क्षेत्र, उदाहरणका लागि Europe/Berlin। तालिका परिवर्तन आगामी ब्रिफिङहरूमा लागू हुन्छ।",
+    "nightStart": "ब्रिफिङ अवधि सुरु",
+    "morningStart": "ब्रिफिङ तयार हुने समय",
+    "morningEnd": "ब्रिफिङ उपलब्ध हुने अन्तिम समय",
+    "timeHint": "ब्रिफिङ अवधि सकिएपछि अफलाइनमा पनि Home कार्डले लाइभ स्थिति फर्काउँछ।",
+    "invalidSchedule": "मान्य समय क्षेत्र र खाली नभएको ब्रिफिङ अवधि छान्नुहोस्।",
+    "notificationsHint": "प्रत्येक निर्धारित ब्रिफिङका लागि एउटा सामान्य सूचना। सशुल्क AI सारांशहरूसँग स्वतन्त्र।",
+    "notificationPermission": "तपाईंको ब्रिफिङ पाउन $t(common.notifications) मा डिभाइस सूचनाहरू सक्षम गर्नुहोस्।",
     "aiOptIn": "सशुल्क AI सारांशहरू",
     "aiHint": "यो सन्दर्भका लागि मात्र ऐच्छिक। छानिएका, गोप्य अंश हटाइएका अंशहरू र संरचित तथ्यहरू तपाईंको एप भाषामा तपाईंको मोडेललाई पठाइन्छन्। शुल्क यो सन्दर्भको ब्यालेन्सबाट काटिन्छ।",
     "defaultModel": "Kilo को डिफल्ट मोडेल प्रयोग गर्नुहोस्",
@@ -3968,7 +4064,7 @@
     "contextSettings": "AI सेटिङहरू · {{context}}",
     "allContexts": "व्यक्तिगत र संस्थाका ब्रिफिङहरू छुट्टाछुट्टै रहन्छन्।",
     "create": "ब्रिफिङ बनाउनुहोस्",
-    "oneOff": "एकपटक मात्र",
+    "oneOff": "मागअनुसार",
     "createdAt": "{{time}} मा बनाइएको",
     "chooseContext": "एउटा सन्दर्भ छान्नुहोस्",
     "period": "ब्रिफिङ अवधि",
@@ -3990,13 +4086,16 @@
     "emptyPeriod": "यस अवधिमा कुनै गतिविधि भेटिएन। AI सारांश बनाइने छैन र शुल्क लाग्ने छैन।",
     "emptyHistory": "सुरक्षित गरिएका ब्रिफिङहरू छैनन्",
     "historicalStateHint": "सत्रको अवस्थाले छानिएको अवधिको अन्त्यको अवस्था देखाउँछ, हालको प्रत्यक्ष अवस्था होइन।",
-    "oneOffHint": "AI ले तपाईंको एपको भाषामा छानिएका र संवेदनशील विवरण हटाइएका प्रमाणहरू प्राप्त गर्छ। यो एकपटकको प्रतिवेदनले तपाईंको बिहानको तालिका वा AI प्राथमिकताहरू परिवर्तन गर्दैन।",
+    "oneOffHint": "AI ले तपाईंको एपको भाषामा छानिएका र संवेदनशील विवरण हटाइएका प्रमाणहरू प्राप्त गर्छ। यो मागअनुसारको ब्रिफिङले तपाईंको निर्धारित ब्रिफिङ वा AI प्राथमिकताहरू परिवर्तन गर्दैन।",
     "createOffline": "ब्रिफिङ समीक्षा गर्न वा बनाउन इन्टरनेटमा जोडिनुहोस्। सशुल्क अनुरोधहरू अफलाइन हुँदा कहिल्यै लाममा राखिँदैनन्।",
     "estimateInputTooLarge": "यस अवधिमा छानिएको मोडेलले सम्हाल्न सक्नेभन्दा बढी प्रमाणहरू छन्।",
     "estimatePermissionUnavailable": "तपाईंलाई यस सन्दर्भको मौज्दात प्रयोग गर्ने अनुमति छैन।",
+    "createFailed": "यो ब्रिफिङ बनाउन सकिएन।",
+    "reviewFailed": "यो ब्रिफिङ समीक्षा गर्न सकिएन।",
     "estimatePricingUnavailable": "यो मोडेलको मूल्य उपलब्ध छैन।",
     "estimateBalanceUnavailable": "भुक्तानी सारांशका लागि पर्याप्त ब्यालेन्स छैन।",
     "estimateModelNotAllowed": "यो मोडेल यहाँ अनुमति छैन।",
-    "estimateSpendLimitTooLow": "यो सारांशको लागि खर्च सुरक्षा सीमा बढाउनुहोस्।"
+    "estimateSpendLimitTooLow": "यो सारांशको लागि खर्च सुरक्षा सीमा बढाउनुहोस्।",
+    "saved": "ब्रिफिङ सेटिङहरू सेभ भयो"
   }
 }

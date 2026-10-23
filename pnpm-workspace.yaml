@@ -117,6 +117,12 @@ minimumReleaseAgeExclude:
   # Approved early exception; worklets 0.13.0 is its required pair and is old
   # enough on its own.
   - react-native-reanimated@4.7.1
+  # @types/bun is DefinitelyTyped only: types, no runtime code, no install scripts.
+  # The wrapper and gastown dev types must equal the Bun the sandbox runs, which
+  # sandbox-image-versions.test.ts asserts. Bun 1.4.4 is the first release that
+  # rejects the compromised eMudhra chains, so the pair moves before the window.
+  - '@types/bun@1.4.4'
+  - bun-types@1.4.4
 overrides:
   # One pg client in the tree: drizzle-orm's optional peers include pg, so two
   # pg versions split drizzle-orm into two packages and their SQL types stop
@@ -257,6 +263,9 @@ patchedDependencies:
   # ("31 minutes", no seconds) and `ago` ("3 minutes ago"). Also separates a
   # bottom sheet's drag gesture from its back/scrim dismissal and lets a caller
   # veto a requested dismissal, so a scrolling form can keep its values.
+  # Android closes through native hide before unmounting. Keep src/ and build/
+  # bottom-sheet implementations aligned: the default export resolves to build/.
+  # The dialog key listener covers Back before Compose's lifecycle handler starts.
   '@expo/ui@58.0.17': patches/@expo+ui@58.0.17.patch
   expo-dev-launcher@58.0.14: patches/expo-dev-launcher@58.0.14.patch
   # A zero badge count must not cancel every app notification: upstream called
@@ -309,6 +318,9 @@ patchedDependencies:
   # A finished first entry made a cold start re-enqueue with REPLACE, which
   # cancelled the glanceable refresh run in progress.
   expo-background-task@58.0.10: patches/expo-background-task@58.0.10.patch
+  # Android: defer sheet insets registration to ON_RESUME when React has no
+  # current activity during fragment ON_START; react-native-screens#4531.
+  react-native-screens@4.30.0: patches/react-native-screens@4.30.0.patch
   # React Native installs on-device JSI bindings through its TurboModule runtime hook.
   llama.rn@0.12.9: patches/llama.rn@0.12.9.patch
   '@expo/react-native-action-sheet@4.1.1': patches/@expo+react-native-action-sheet@4.1.1.patch

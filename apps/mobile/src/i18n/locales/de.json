@@ -3078,10 +3078,12 @@
       "renameTitle": "Organisation umbenennen"
     },
     "inviteMember": {
+      "alreadyInvited": "Diese Person ist bereits eingeladen oder bereits Mitglied.",
       "emailError": "Gib eine gültige E-Mail-Adresse ein.",
       "emailPlaceholder": "name@firma.de",
       "permissionDenied": "Du hast keine Berechtigung, Mitglieder einzuladen.",
       "roleMember": "Die Rolle ist „Mitglied“.",
+      "sendError": "Die Einladung konnte nicht gesendet werden.",
       "sendInvite": "Einladung senden",
       "title": "Mitglied einladen"
     },
@@ -3152,6 +3154,7 @@
       "inviteCreated": "Einladung erstellt",
       "pendingInvitations": "Ausstehende Einladungen",
       "resendInvite": "Einladung erneut senden",
+      "resendInviteError": "Die Einladung konnte nicht erneut gesendet werden.",
       "shareInviteLink": "Einladungslink teilen"
     },
     "usageStats": {

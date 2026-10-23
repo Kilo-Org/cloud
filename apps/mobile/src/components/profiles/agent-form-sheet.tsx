@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the agent form keeps its validation, dirty check, and every field group in one sheet, so Save and the fields it saves stay together */
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, Switch, View } from 'react-native';
@@ -20,6 +21,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 import { cn } from '@/lib/utils';
 
 /** Catalog key for each refused field, so the message lands under the input at fault. */
@@ -90,6 +92,7 @@ export function AgentFormSheet({
   const [disabledTools, setDisabledTools] = useState<readonly string[]>(initial.disabledTools);
   const [error, setError] = useState<AgentFormError | null>(null);
   const { models } = useAvailableModels(organizationId);
+  const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<'slug' | 'name'>();
 
   const variantsFor = (model: string): readonly string[] =>
     models.find(option => option.id === model.trim())?.variants ?? [];
@@ -130,6 +133,7 @@ export function AgentFormSheet({
     const problem = validateAgentForm(state, existingSlugs);
     if (problem !== null) {
       setError(problem);
+      scrollToField(problem.startsWith('slug-') ? 'slug' : 'name');
       return;
     }
     setError(null);
@@ -147,6 +151,7 @@ export function AgentFormSheet({
         topInset="ios-page-sheet"
       />
       <ScrollView
+        ref={scrollRef}
         className="flex-1"
         contentContainerClassName="gap-4 px-6 pt-4 pb-8"
         keyboardShouldPersistTaps="handled"
@@ -169,6 +174,7 @@ export function AgentFormSheet({
           autoCapitalize="none"
           autoCorrect={false}
           placeholder={t('profiles.agents.slugPlaceholder')}
+          containerOnLayout={fieldLayout('slug')}
           onChangeText={value => {
             slugRef.current = value.toLowerCase().replaceAll(/[^a-z0-9-]/g, '');
             setError(null);
@@ -181,6 +187,7 @@ export function AgentFormSheet({
           disabled={isSaving}
           required
           placeholder={t('profiles.agents.namePlaceholder')}
+          containerOnLayout={fieldLayout('name')}
           onChangeText={value => {
             nameRef.current = value;
             setError(null);
@@ -201,7 +208,7 @@ export function AgentFormSheet({
           disabled={isSaving}
           multiline
           textAlignVertical="top"
-          className="min-h-28 leading-5"
+          className="min-h-28 max-h-52 leading-5"
           autoCapitalize="none"
           autoCorrect={false}
           placeholder={t('profiles.agents.promptPlaceholder')}

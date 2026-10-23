@@ -20,6 +20,7 @@ import { SheetHeader } from '@/components/sheet-header';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
+import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 
 /** Catalog key for each refused field, so the message lands under the input at fault. */
 const ERROR_KEYS = {
@@ -28,6 +29,14 @@ const ERROR_KEYS = {
   'name-conflict': 'profiles.slashCommands.nameConflict',
   'template-required': 'profiles.slashCommands.templateRequired',
 } satisfies Record<KiloCommandFormError, string>;
+
+/** The form field each refused input belongs to, so Save can scroll it into view. */
+const FIELD_FOR_ERROR = {
+  'name-required': 'name',
+  'name-invalid': 'name',
+  'name-conflict': 'name',
+  'template-required': 'template',
+} satisfies Record<KiloCommandFormError, 'name' | 'template'>;
 
 /** The create payload the form hands back for a new command. */
 export type KiloCommandSubmission = ReturnType<typeof buildKiloCommandCreatePayload>;
@@ -67,6 +76,7 @@ export function KiloCommandFormSheet({
   const modelRef = useRef(initial.model);
   const [subtask, setSubtask] = useState(initial.subtask);
   const [error, setError] = useState<KiloCommandFormError | null>(null);
+  const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<'name' | 'template'>();
 
   const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({
     isDirty: () =>
@@ -91,6 +101,7 @@ export function KiloCommandFormSheet({
     const problem = validateKiloCommandForm(state);
     if (problem !== null) {
       setError(problem);
+      scrollToField(FIELD_FOR_ERROR[problem]);
       return;
     }
     setError(null);
@@ -112,6 +123,7 @@ export function KiloCommandFormSheet({
         topInset="ios-page-sheet"
       />
       <ScrollView
+        ref={scrollRef}
         className="flex-1"
         contentContainerClassName="gap-4 px-6 pt-4 pb-8"
         keyboardShouldPersistTaps="handled"
@@ -132,6 +144,7 @@ export function KiloCommandFormSheet({
           autoCorrect={false}
           maxLength={MAX_KILO_COMMAND_NAME_LENGTH}
           placeholder={t('profiles.slashCommands.namePlaceholder')}
+          containerOnLayout={fieldLayout('name')}
           onChangeText={value => {
             nameRef.current = value.toLowerCase().replaceAll(/[^a-z0-9-]/g, '');
             setError(null);
@@ -156,10 +169,11 @@ export function KiloCommandFormSheet({
           multiline
           textAlignVertical="top"
           maxLength={MAX_KILO_COMMAND_TEMPLATE_LENGTH}
-          className="min-h-32 leading-5"
+          className="min-h-32 max-h-52 leading-5"
           autoCapitalize="none"
           autoCorrect={false}
           placeholder={t('profiles.slashCommands.templatePlaceholder')}
+          containerOnLayout={fieldLayout('template')}
           onChangeText={value => {
             templateRef.current = value;
             setError(null);

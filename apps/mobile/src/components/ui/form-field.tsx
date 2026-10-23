@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { type TextInput, type TextInputProps, View } from 'react-native';
+import { type LayoutChangeEvent, type TextInput, type TextInputProps, View } from 'react-native';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
@@ -20,6 +20,12 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
      * stays unchanged (React Native has no required accessibility state).
      */
     required?: boolean;
+    /**
+     * Layout of the field's whole block: its label, input and message. A form
+     * that scrolls a refused Save to the field at fault records this offset;
+     * the input's own `onLayout` stays with the native text view.
+     */
+    containerOnLayout?: (event: LayoutChangeEvent) => void;
     /**
      * Owns blur-validation: runs on blur, and re-runs live once an error is
      * showing so it clears the moment the value becomes valid again. When
@@ -42,6 +48,7 @@ function FormField({
   reserveErrorMessages,
   disabled,
   required,
+  containerOnLayout,
   className,
   ref,
   validate,
@@ -67,7 +74,7 @@ function FormField({
   }, []);
 
   return (
-    <View className="gap-1.5">
+    <View className="gap-1.5" onLayout={containerOnLayout}>
       <Text className="text-sm font-medium text-foreground">{label}</Text>
       <Input
         ref={instance => {

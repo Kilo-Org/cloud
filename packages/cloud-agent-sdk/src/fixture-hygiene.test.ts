@@ -1,9 +1,10 @@
 import { allFixtures } from './__fixtures__';
 
-// Fixtures mirror real wire shapes, so every identifier they carry is invented.
-// Sample identifiers keep the production prefix and use a numeric body. The
-// check reads the parsed fixture data rather than the source text, so it also
-// covers values that the fixture helpers compose at import time.
+// Fixtures mirror wire protocol shapes with invented values, so every
+// identifier they carry is a sample. Sample identifiers keep the wire prefix
+// and use a numeric body. The check reads the parsed fixture data rather than
+// the source text, so it also covers values the fixture helpers compose at
+// import time.
 const IDENTIFIER_PREFIX = /^(?:agent|exc|exec|msg|prt|sandbox|sbx|ses|workspace)_/;
 const SAMPLE_IDENTIFIER = /^(?:agent|exc|exec|msg|prt|sandbox|sbx|ses|workspace)_[0-9-]+$/;
 
@@ -32,4 +33,10 @@ describe.each(allFixtures)('fixture data: $name', ({ events, expected }) => {
 
     expect(others).toEqual([]);
   });
+});
+
+it('registers each fixture under a unique name', () => {
+  const names = allFixtures.map(fixture => fixture.name);
+
+  expect(new Set(names).size).toBe(names.length);
 });

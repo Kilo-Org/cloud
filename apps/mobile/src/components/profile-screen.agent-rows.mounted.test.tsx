@@ -121,9 +121,7 @@ describe('ProfileScreen agent rows', () => {
       // The refetch never answers, so this promise stays pending by design.
       void queryClient.invalidateQueries({ queryKey: keys.organizations });
     });
-    await waitFor(
-      () => queryClient.getQueryState(keys.organizations)?.fetchStatus === 'fetching'
-    );
+    await waitFor(() => queryClient.getQueryState(keys.organizations)?.fetchStatus === 'fetching');
     // Flush the observer notification the refetch schedules, so the rows are
     // judged on a render that knows the refresh is in flight.
     await act(async () => {

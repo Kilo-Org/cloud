@@ -225,6 +225,7 @@ function setup() {
   const lifecycle = new MeteredBillingLifecycle({
     storage,
     usageClient,
+    enforceContainerCapacity: true,
     schedule: (_delaySeconds, callback, payload) => container.schedule(0, callback, payload),
     deleteSchedules: callback => container.deleteSchedules(callback),
     getState: () => container.getState(),
@@ -329,23 +330,22 @@ describe('MeteredBillingLifecycle placed sandbox admission', () => {
     }
   );
 
-  it('retains Code Reviewer attribution before and after billing admission', async () => {
-    const { lifecycle, container } = setup();
+  it('sends the Code Reviewer origin with the capacity marker so the meter can exempt it', async () => {
+    const { lifecycle, container, meter } = setup();
     container.running = false;
     const identity = { sandboxClassName: 'Sandbox' } as const;
     const input = { ...placedInput('code-review'), metadata: { origin: 'code-review' } };
     await lifecycle.configureBilling(identity, input);
-    const expected = {
-      subject: input.subject,
-      actor: input.actor,
-      instanceId: PLACED_ID,
-      billingOrigin: 'code-review',
-    };
-    expect(await lifecycle.getStartAttribution()).toEqual(expected);
     await expect(lifecycle.ensureBillingAdmission(identity, input)).resolves.toEqual({
       success: true,
     });
-    expect(await lifecycle.getStartAttribution()).toEqual(expected);
+    expect(meter.recordStartInputs).toEqual([
+      expect.objectContaining({
+        instanceId: PLACED_ID,
+        metadata: expect.objectContaining({ origin: 'code-review' }),
+        enforceCapacity: true,
+      }),
+    ]);
   });
 
   it("rejects a placed sandbox admitted outside its kind's classes", async () => {

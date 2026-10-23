@@ -71,7 +71,10 @@ import {
   requestedSamples,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
-import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import {
+  getBalanceAndOrgSettings,
+  type BalanceAndOrgSettings,
+} from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { isDataCollectionExplicitlyDisallowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   rewriteModelResponse,
@@ -319,6 +322,13 @@ export async function handleLlmProxyRequest(
       determineFallbackFeature(requestBodyParsed, request.headers.get('user-agent'))
   );
 
+  // An unauthenticated caller has no balance, allowance, or payer. Type it as
+  // the full read result so the union does not hide those optional fields.
+  const anonymousBalance: BalanceAndOrgSettings = {
+    balance: 0,
+    settings: undefined,
+    plan: undefined,
+  };
   const balanceAndSettingsPromise = authPromise.then(async res =>
     res.user
       ? getBalanceAndOrgSettings(
@@ -327,7 +337,7 @@ export async function handleLlmProxyRequest(
           readDb,
           (await isFreeModel(requestedModelLowerCased)) ? undefined : 'usage'
         )
-      : { balance: 0, settings: undefined, plan: undefined }
+      : anonymousBalance
   );
   const organizationContextPromise = Promise.all([authPromise, balanceAndSettingsPromise]).then(
     ([auth, balanceAndSettings]) => ({

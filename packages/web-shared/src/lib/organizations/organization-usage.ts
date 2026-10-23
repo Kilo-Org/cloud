@@ -53,7 +53,7 @@ export type BalancePayer = {
   totalMicrodollarsAcquired: number;
 };
 
-type BalanceAndOrgSettings = {
+export type BalanceAndOrgSettings = {
   balance: number;
   settings?: OrganizationSettings;
   plan?: OrganizationPlan;
@@ -287,6 +287,7 @@ export async function mutateOrganizationUsage(
     previous_microdollars_used: number;
     new_microdollars_used: number;
     settings: OrganizationSettings | null;
+    auto_top_up_enabled: boolean;
   };
   const balanceRows: OrganizationBalanceRow[] = await tx
     .update(organizations)

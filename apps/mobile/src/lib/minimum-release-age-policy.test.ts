@@ -91,7 +91,7 @@ const lockfile = readFileSync(lockfilePath, 'utf8');
 // end one (a colon, quote, paren or whitespace), so a stale pin such as
 // `name@1.2.3` cannot match a resolution of `name@1.2.34`.
 function lockfileResolves(entry: string): boolean {
-  const escaped = entry.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escaped = entry.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
   return new RegExp(`(?:^|[\\s('])${escaped}(?![\\w.+-])`, 'm').test(lockfile);
 }
 

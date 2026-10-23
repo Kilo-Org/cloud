@@ -559,7 +559,7 @@ export async function say(
       askedModel: model,
       askedEffort: effort,
       failed: reason(error),
-      failureKey: backendFailureKey(error),
+      failureKey: backendFailureKey(error, model),
     });
   }
 }
@@ -677,7 +677,10 @@ function reading(sessionId: string, question: Question, runtime: ChatRuntime): E
         Effect.promise(async () => {
           await settle(sessionId, runtime, {
             reason: why(cause),
-            key: backendFailureKey(Option.getOrUndefined(Cause.findErrorOption(cause))),
+            key: backendFailureKey(
+              Option.getOrUndefined(Cause.findErrorOption(cause)),
+              snapshotOf(sessionId).model
+            ),
           });
         }),
       onSuccess: () =>
@@ -780,7 +783,10 @@ async function drain(sessionId: string, chat: Chat, failed: boolean): Promise<vo
       if (held !== undefined) {
         held.pendingTools = true;
       }
-      change(current, { failed: reason(error), failureKey: backendFailureKey(error) });
+      change(current, {
+        failed: reason(error),
+        failureKey: backendFailureKey(error, snapshotOf(current).model),
+      });
       return;
     }
   }
@@ -865,7 +871,17 @@ async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<st
         }
       : { ...chat, handle, scope, answering: undefined, counted: new Map() }
   );
-  change(handle.id, { ...held, sessionId: handle.id, model, effort, turns });
+  /* The record describes the session the chat is now, and the move changed its
+     effort: carrying the one it moved off would make the details sheet report
+     the effort of a session the conversation is no longer on. */
+  change(handle.id, {
+    ...held,
+    sessionId: handle.id,
+    model,
+    effort,
+    turns,
+    record: { ...held.record, effort },
+  });
   /* The chat it moved off is left pointing at the one it became, rather than
      forgotten. Whoever asked for the move is not always the screen — a question
      queued on another model moves the chat from inside the registry — so the

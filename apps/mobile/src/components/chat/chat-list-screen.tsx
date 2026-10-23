@@ -1,12 +1,10 @@
 import { FlashList } from '@shopify/flash-list';
 import { type Href, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
-import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
@@ -30,7 +28,7 @@ import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
-import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
+import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 
 import { BetaPill } from './beta-pill';
 import { ChatRow } from './chat-row';
@@ -62,12 +60,7 @@ function ScopedChatListScreen() {
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
   const place = useChatPlace();
-  const { bottom } = useSafeAreaInsets();
-  const fontScale = useLiveFontScale();
-  const tabBarHeight = useMemo(
-    () => getEffectiveTabBarHeight({ bottomInset: bottom, platform: Platform.OS, fontScale }),
-    [bottom, fontScale]
-  );
+  const tabBarHeight = useEffectiveTabBarHeight();
 
   const {
     models,
@@ -282,7 +275,7 @@ function ScopedChatListScreen() {
           titleContent={
             <View className="flex-row items-center gap-2">
               <Text
-                className="text-[30px] font-semibold leading-9 text-foreground"
+                className="text-[30px] font-semibold leading-[2.25rem] text-foreground"
                 numberOfLines={1}
               >
                 {t('common.chat')}

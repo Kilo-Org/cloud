@@ -55,7 +55,7 @@ describe('Vercel snapshot operator pure logic', () => {
       runtimeBuildId: 'cloud-agent-2026-06-10.1',
       wrapperVersion: '2.3.0',
       runtime: 'node24',
-      bunVersion: '1.3.14',
+      bunVersion: '1.4.4',
       controlPlaneWrapperSha256: '042faca14bb0e2ccbb0d1f7c3617f91df4254711df5d8fb54e66e64e39264908',
       controlPlaneSupervisorSha256:
         '0834c2d60725ac5902257b3b78dd161ad26d1c0290dbf1e47cc14add5b8c8142',

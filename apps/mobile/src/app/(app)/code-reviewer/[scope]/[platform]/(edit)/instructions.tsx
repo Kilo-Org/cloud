@@ -55,7 +55,7 @@ function InstructionsEditor({
       {/* A multiline field takes the platform's generic text-view name on iOS,
           so the accessible name is the localized heading this screen renders. */}
       <TextInput
-        className="min-h-32 rounded-lg bg-secondary p-3 text-sm leading-5 text-foreground"
+        className="min-h-32 rounded-lg bg-secondary p-3 text-sm leading-[1.25rem] text-foreground"
         accessibilityLabel={t('codeReviewer.instructions.title')}
         multiline
         textAlignVertical="top"

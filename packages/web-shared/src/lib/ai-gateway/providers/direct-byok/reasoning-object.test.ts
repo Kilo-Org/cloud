@@ -1,6 +1,7 @@
 import type { GatewayRequest, OpenRouterChatCompletionRequest } from '../openrouter/types';
 import { replaceReasoningObjectWithReasoningEffort } from '../openrouter/request-helpers';
-import type { TransformRequestContext } from '../types';
+import { applyReasoningDetailsTransform } from '../apply-provider-specific-logic';
+import type { Provider, TransformRequestContext } from '../types';
 import type { DirectByokProvider } from './types';
 import alibabaTokenPlan from './alibaba-token-plan';
 import byteplusCoding from './byteplus-coding';
@@ -13,6 +14,7 @@ import neuralwatt from './neurowatt';
 import nvidia from './nvidia-byok';
 import openCodeGo from './opencode-go';
 import ollamaCloud from './ollama-cloud';
+import orcaRouter from './orcarouter';
 import synthetic from './synthetic';
 import xiaomiTokenPlanAms from './xiaomi-token-plan-ams';
 import xiaomiTokenPlanSgp from './xiaomi-token-plan-sgp';
@@ -32,6 +34,10 @@ function transform(provider: DirectByokProvider, request: GatewayRequest) {
     session_id: 'session-1',
     provider: { id: 'direct-byok', apiKey: 'test-api-key' },
   } as unknown as TransformRequestContext);
+  applyReasoningDetailsTransform(
+    { responseTransforms: provider.reasoning_details_transform } as Provider,
+    request
+  );
 }
 
 describe('replaceReasoningObjectWithReasoningEffort', () => {
@@ -100,6 +106,7 @@ describe('direct BYOK providers that receive OpenRouter reasoning settings', () 
     nvidia,
     openCodeGo,
     ollamaCloud,
+    orcaRouter,
     synthetic,
     xiaomiTokenPlanAms,
     xiaomiTokenPlanSgp,

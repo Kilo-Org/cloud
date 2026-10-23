@@ -236,6 +236,10 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={title}
+        // The list name is user prose, not a UI label, so it keeps a second
+        // line for a natural break; the shared one-line default only suits
+        // fixed labels.
+        titleNumberOfLines={2}
         reserveTitleSpace
         backFallback={LISTS_HREF}
         {...(list

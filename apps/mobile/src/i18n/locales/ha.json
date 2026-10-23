@@ -665,6 +665,8 @@
       "providerCheckFailedMessage": "Ba a samun yanayin haɗi har sai wannan ya lodu.",
       "reconnectTitle": "Sake haɗa GitHub",
       "reconnectDescription": "An soke haɗinka na GitHub. Sake haɗawa don ci gaba da bitar buƙatun haɗawa a waya.",
+      "reconnectProviderTitle": "Sake haɗa {{provider}}",
+      "reconnectProviderDescription": "Ana buƙatar sake sake haɗa haɗinka na {{provider}} kafin ka iya bitar buƙatun haɗawa a waya.",
       "description": "Haɗa asusunka na GitHub don yin bitar buƙatun haɗawa a waya.",
       "gitlabDescription": "Haɗa asusun GitLab ɗinka don bita buƙatun haɗawa a wayar hannu.",
       "bitbucketDescription": "Haɗa Bitbucket da wannan ƙungiya don bita buƙatun haɗa canje-canje a wayar hannu.",

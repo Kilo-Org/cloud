@@ -665,6 +665,8 @@
       "providerCheckFailedMessage": "สถานะการเชื่อมต่อไม่พร้อมใช้งานจนกว่าจะโหลดเสร็จ",
       "reconnectTitle": "เชื่อมต่อ GitHub ใหม่",
       "reconnectDescription": "การเชื่อมต่อ GitHub ของคุณถูกเพิกถอน เชื่อมต่อใหม่เพื่อรีวิว PR บนมือถือต่อ",
+      "reconnectProviderTitle": "เชื่อมต่อ {{provider}} ใหม่",
+      "reconnectProviderDescription": "การเชื่อมต่อ {{provider}} ของคุณต้องได้รับการอนุญาตใหม่ก่อนที่คุณจะรีวิว merge request บนมือถือได้",
       "description": "เชื่อมต่อบัญชี GitHub ของคุณเพื่อรีวิว PR บนมือถือ",
       "gitlabDescription": "เชื่อมต่อบัญชี GitLab ของคุณเพื่อรีวิว merge request บนมือถือ",
       "bitbucketDescription": "เชื่อมต่อ Bitbucket กับองค์กรนี้เพื่อรีวิวพูลรีเควสต์บนมือถือ",

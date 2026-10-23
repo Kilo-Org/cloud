@@ -2601,6 +2601,8 @@
       "providerCheckFailedMessage": "Status połączenia będzie dostępny po wczytaniu danych.",
       "reconnectTitle": "Połącz ponownie konto GitHub",
       "reconnectDescription": "Cofnięto dostęp do konta GitHub. Połącz je ponownie, aby nadal przeglądać PR na telefonie.",
+      "reconnectProviderTitle": "Połącz ponownie konto {{provider}}",
+      "reconnectProviderDescription": "Połączenie z kontem {{provider}} wymaga ponownej autoryzacji, zanim zaczniesz przeglądać merge requesty na telefonie.",
       "description": "Połącz konto GitHub, aby przeglądać PR na telefonie.",
       "gitlabDescription": "Połącz konto GitLab, aby przeglądać merge requesty na telefonie.",
       "bitbucketDescription": "Połącz Bitbucket z tą organizacją, aby przeglądać PR-y na telefonie.",

@@ -713,6 +713,8 @@
       "providerCheckFailedMessage": "Nid yw statws y cysylltiad ar gael nes iddo lwytho.",
       "reconnectTitle": "Ailgysylltu â GitHub",
       "reconnectDescription": "Dirymwyd eich cysylltiad GitHub. Ailgysylltwch i barhau i adolygu ceisiadau tynnu ar eich ffôn.",
+      "reconnectProviderTitle": "Ailgysylltu â {{provider}}",
+      "reconnectProviderDescription": "Rhaid ailawdurdodi eich cysylltiad {{provider}} cyn y gallwch adolygu ceisiadau uno ar y dyfais symudol.",
       "description": "Cysylltwch eich cyfrif GitHub i adolygu ceisiadau tynnu ar eich ffôn.",
       "gitlabDescription": "Cysylltwch eich cyfrif GitLab i adolygu ceisiadau uno ar y dyfais symudol.",
       "bitbucketDescription": "Cysylltwch Bitbucket â'r sefydliad hwn i adolygu ceisiadau tynnu ar y dyfais symudol.",

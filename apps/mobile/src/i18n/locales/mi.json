@@ -665,6 +665,8 @@
       "providerCheckFailedMessage": "Kāore e wātea te tūnga hononga kia uta ra ano.",
       "reconnectTitle": "Hono anō ki GitHub",
       "reconnectDescription": "Kua whakakorea tō hononga GitHub. Hono anō kia arotake tonu ai koe i ngā tono kume i tō waea pūkoro.",
+      "reconnectProviderTitle": "Hono anō ki {{provider}}",
+      "reconnectProviderDescription": "Me whakamana anō tō hononga {{provider}} kia arotake tonu ai koe i ngā tono whakakotahi i te waea pūkoro.",
       "description": "Honoa tō pūkete GitHub hei arotake i ngā tono kume i tō waea pūkoro.",
       "gitlabDescription": "Honoa tō pūkete GitLab kia arotakehia ngā tono whakakotahi i te waea pūkoro.",
       "bitbucketDescription": "Honoa a Bitbucket ki tēnei whakahaere kia arotakehia ngā tono kume i te waea pūkoro.",

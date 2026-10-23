@@ -756,6 +756,8 @@
       "providerCheckFailedMessage": "Connection status is unavailable until this loads.",
       "reconnectTitle": "Reconnect GitHub",
       "reconnectDescription": "Your GitHub connection was revoked. Reconnect to keep reviewing pull requests on mobile.",
+      "reconnectProviderTitle": "Reconnect {{provider}}",
+      "reconnectProviderDescription": "Your {{provider}} connection needs to be reauthorized before you can review merge requests on mobile.",
       "description": "Connect your GitHub account to review pull requests on mobile.",
       "gitlabDescription": "Connect your GitLab account to review merge requests on mobile.",
       "bitbucketDescription": "Connect Bitbucket to this organization to review pull requests on mobile.",

@@ -50,6 +50,9 @@ type PrReviewConnectGateProps = {
  *  - happy: connected → render children
  *  - retryable: the status check fails → QueryError + Retry
  *  - empty: not connected → EmptyState CTA into the provider's connect flow
+ *  - reconnect: the connection exists but can no longer be used (GitHub
+ *    revoked, or a personal GitLab row whose credential the token service
+ *    refuses) → re-authorize copy and the same integration-page CTA
  *  - non-retryable: Bitbucket personal → org-only explanation, no CTA
  *
  * The entry screen is provider-neutral — a pasted GitLab or Bitbucket link
@@ -136,7 +139,7 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
     // settles.
     isLoading: authorization.isPending,
     connected: authorization.data?.connected === true,
-    revoked: authorization.data?.revoked === true,
+    reconnectRequired: authorization.data?.revoked === true,
     organizationId: null,
   });
 

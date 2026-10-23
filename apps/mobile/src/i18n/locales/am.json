@@ -665,6 +665,8 @@
       "providerCheckFailedMessage": "ይህ እስኪጫን ድረስ የግንኙነት ሁኔታ አይገኝም።",
       "reconnectTitle": "GitHubን እንደገና ማገናኘት",
       "reconnectDescription": "የGitHub ግንኙነትህ ፈቃድ ተሰርዟል። በሞባይል ላይ የማዋሃድ ጥያቄዎችን መገምገም ለመቀጠል እንደገና አገናኝ።",
+      "reconnectProviderTitle": "{{provider}}ን እንደገና አገናኝ",
+      "reconnectProviderDescription": "የ{{provider}} ግንኙነትህ በሞባይል ላይ የማዋሃድ ጥያቄዎችን መገምገም ከመቀጠልህ በፊት እንደገና መፈቀቅ ያስፈልገዋል።",
       "description": "በሞባይል ላይ የማዋሃድ ጥያቄዎችን ለመገምገም የGitHub መለያህን አገናኝ።",
       "gitlabDescription": "በሞባይል ላይ የማዋሃድ ጥያቄዎችን ለመገምገም የGitLab መለያዎን ያገናኙ።",
       "bitbucketDescription": "Bitbucketን ከዚህ ድርጅት ጋር ያገናኙ የማዋሃድ ጥያቄዎችን በሞባይል ለመገምገም።",

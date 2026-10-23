@@ -665,6 +665,8 @@
       "providerCheckFailedMessage": "Anslutningsstatusen kan inte visas förrän inläsningen är klar.",
       "reconnectTitle": "Anslut GitHub igen",
       "reconnectDescription": "Åtkomsten via din GitHub-anslutning har återkallats. Anslut igen för att fortsätta granska PR:er i mobilen.",
+      "reconnectProviderTitle": "Anslut {{provider}} igen",
+      "reconnectProviderDescription": "Din {{provider}}-anslutning måste auktoriseras igen innan du kan granska merge requests i mobilen.",
       "description": "Anslut ditt GitHub-konto för att granska PR:er i mobilen.",
       "gitlabDescription": "Anslut ditt GitLab-konto för att granska merge requests i mobilen.",
       "bitbucketDescription": "Anslut Bitbucket till den här organisationen för att granska PR:er i mobilen.",

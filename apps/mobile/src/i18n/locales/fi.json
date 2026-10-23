@@ -665,6 +665,8 @@
       "providerCheckFailedMessage": "Yhteyden tila näkyy vasta latauksen valmistuttua.",
       "reconnectTitle": "Yhdistä GitHub uudelleen",
       "reconnectDescription": "GitHub-yhteytesi käyttöoikeus on peruttu. Yhdistä uudelleen, jotta voit jatkaa muutospyyntöjen katselmointia mobiililaitteella.",
+      "reconnectProviderTitle": "Yhdistä {{provider}} uudelleen",
+      "reconnectProviderDescription": "{{provider}}-yhteytesi käyttöoikeus on vahvistettava uudelleen, ennen kuin voit katselmoida muutospyyntöjä mobiililaitteella.",
       "description": "Yhdistä GitHub-tilisi, niin voit katselmoida muutospyyntöjä mobiililaitteella.",
       "gitlabDescription": "Yhdistä GitLab-tilisi, niin voit katselmoida yhdistämispyyntöjä mobiililaitteella.",
       "bitbucketDescription": "Yhdistä Bitbucket tähän organisaatioon, niin voit katselmoida muutospyyntöjä mobiililaitteella.",

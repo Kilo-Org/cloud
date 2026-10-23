@@ -10,7 +10,7 @@ const githubBase = {
   isError: false,
   isLoading: false,
   connected: true,
-  revoked: false,
+  reconnectRequired: false,
   organizationId: null,
 };
 
@@ -33,14 +33,14 @@ describe('selectPrReviewGateView — GitHub', () => {
     expect(selectPrReviewGateView({ ...githubBase, connected: false })).toBe('connect');
   });
 
-  it('a revoked connection asks to reconnect', () => {
-    expect(selectPrReviewGateView({ ...githubBase, connected: false, revoked: true })).toBe(
-      'reconnect'
-    );
+  it('a connection that must be re-authorized asks to reconnect', () => {
+    expect(
+      selectPrReviewGateView({ ...githubBase, connected: false, reconnectRequired: true })
+    ).toBe('reconnect');
   });
 
-  it('revoked never outranks a connected answer', () => {
-    expect(selectPrReviewGateView({ ...githubBase, revoked: true })).toBe('children');
+  it('a reconnect marker never outranks a connected answer', () => {
+    expect(selectPrReviewGateView({ ...githubBase, reconnectRequired: true })).toBe('children');
   });
 });
 
@@ -51,7 +51,7 @@ describe('selectPrReviewGateView — GitLab (personal and org)', () => {
       isError: false,
       isLoading: false,
       connected: true,
-      revoked: false,
+      reconnectRequired: false,
       organizationId,
     };
 
@@ -61,6 +61,12 @@ describe('selectPrReviewGateView — GitLab (personal and org)', () => {
 
     it(`scope ${organizationId ?? 'personal'}: not connected asks to connect`, () => {
       expect(selectPrReviewGateView({ ...base, connected: false })).toBe('connect');
+    });
+
+    it(`scope ${organizationId ?? 'personal'}: an existing connection that cannot be used asks to reconnect`, () => {
+      expect(selectPrReviewGateView({ ...base, connected: false, reconnectRequired: true })).toBe(
+        'reconnect'
+      );
     });
 
     it(`scope ${organizationId ?? 'personal'}: a failed check is retryable, not Connect`, () => {
@@ -81,7 +87,7 @@ describe('selectPrReviewGateView — Bitbucket', () => {
     isError: false,
     isLoading: false,
     connected: true,
-    revoked: false,
+    reconnectRequired: false,
     organizationId: 'org_1',
   };
 
@@ -155,7 +161,7 @@ describe('selectPrReviewGateView — Bitbucket', () => {
         isError: false,
         isLoading: true,
         connected: false,
-        revoked: false,
+        reconnectRequired: false,
         organizationId: null,
       })
     ).toBe('org-only');

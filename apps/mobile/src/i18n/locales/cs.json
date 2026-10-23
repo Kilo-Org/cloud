@@ -689,6 +689,8 @@
       "providerCheckFailedMessage": "Stav připojení bude dostupný až po načtení.",
       "reconnectTitle": "Znovu připojit GitHub",
       "reconnectDescription": "Oprávnění pro připojení ke GitHubu bylo zrušeno. Znovu se připoj a pokračuj v revizích PR na mobilu.",
+      "reconnectProviderTitle": "Znovu připojit {{provider}}",
+      "reconnectProviderDescription": "Tvé připojení k {{provider}}u je potřeba znovu ověřit, než budeš moct kontrolovat merge requesty na mobilu.",
       "description": "Připoj svůj účet GitHub a kontroluj PR na mobilu.",
       "gitlabDescription": "Připoj svůj účet GitLab a kontroluj merge requesty na mobilu.",
       "bitbucketDescription": "Připoj Bitbucket k této organizaci a kontroluj PR na mobilu.",

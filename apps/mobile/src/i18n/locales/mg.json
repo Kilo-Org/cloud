@@ -665,6 +665,8 @@
       "providerCheckFailedMessage": "Tsy azo ny satan'ny fifandraisana raha tsy tafiditra izao.",
       "reconnectTitle": "Fampifandraisana indray amin'ny GitHub",
       "reconnectDescription": "Nofoanana ny fifandraisanao amin'ny GitHub. Ampifandraiso indray mba hanohizana ny fandinihana fangatahana fampiraisana amin'ny finday.",
+      "reconnectProviderTitle": "Fampifandraisana indray amin'ny {{provider}}",
+      "reconnectProviderDescription": "Mila alaina alalana indray ny fifandraisanao amin'ny {{provider}} alohan'ny hahafahanao mandinika ny fangatahana fampiraisana amin'ny finday.",
       "description": "Ampifandraiso ny kaontinao GitHub mba handinihana fangatahana fampiraisana amin'ny finday.",
       "gitlabDescription": "Ampifandraiso ny kaonty GitLab-nao mba hijerena ny fangatahana fampiraisana amin'ny finday.",
       "bitbucketDescription": "Ampifandraiso amin'ity fikambanana ity ny Bitbucket mba hijerena ny fangatahana fampiraisana amin'ny finday.",

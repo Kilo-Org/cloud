@@ -2651,6 +2651,8 @@
       "providerCheckFailedMessage": "حالة الاتصال غير متاحة حتى يتم تحميلها.",
       "reconnectTitle": "إعادة ربط GitHub",
       "reconnectDescription": "أُلغي ربط حسابك على GitHub. أعد ربطه لمواصلة مراجعة طلبات السحب على الجوال.",
+      "reconnectProviderTitle": "إعادة ربط {{provider}}",
+      "reconnectProviderDescription": "يجب إعادة التحقق من ربط حسابك على {{provider}} قبل أن تتمكن من مراجعة طلبات الدمج على الجوال.",
       "description": "اربط حسابك على GitHub لمراجعة طلبات السحب على الجوال.",
       "gitlabDescription": "اربط حسابك في GitLab لمراجعة طلبات الدمج على الجوال.",
       "bitbucketDescription": "اربط Bitbucket بهذه المؤسسة لمراجعة طلبات السحب على الجوال.",

@@ -665,6 +665,8 @@
       "providerCheckFailedMessage": "Status sambungan tidak tersedia sehingga ia dimuatkan.",
       "reconnectTitle": "Sambung semula ke GitHub",
       "reconnectDescription": "Sambungan GitHub anda telah dibatalkan. Sambung semula untuk terus menyemak permintaan tarik pada peranti mudah alih.",
+      "reconnectProviderTitle": "Sambung semula ke {{provider}}",
+      "reconnectProviderDescription": "Sambungan {{provider}} anda perlu disahkan semula sebelum anda dapat menyemak permintaan gabungan pada mudah alih.",
       "description": "Sambungkan akaun GitHub anda untuk menyemak permintaan tarik pada peranti mudah alih.",
       "gitlabDescription": "Sambungkan akaun GitLab anda untuk menyemak permintaan gabungan pada mudah alih.",
       "bitbucketDescription": "Sambungkan Bitbucket ke organisasi ini untuk menyemak permintaan tarik pada mudah alih.",

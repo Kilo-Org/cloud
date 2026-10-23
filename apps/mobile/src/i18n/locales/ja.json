@@ -2551,6 +2551,8 @@
       "providerCheckFailedMessage": "読み込みが完了するまで接続状態は利用できません。",
       "reconnectTitle": "GitHubに再接続",
       "reconnectDescription": "GitHubとの接続が解除されました。モバイルでプルリクエストのレビューを続けるには、再接続してください。",
+      "reconnectProviderTitle": "{{provider}}に再接続",
+      "reconnectProviderDescription": "モバイルでマージリクエストをレビューするには、{{provider}}との接続を再承認してください。",
       "description": "モバイルでプルリクエストをレビューするには、GitHubアカウントを接続してください。",
       "gitlabDescription": "モバイルでマージリクエストをレビューするには、GitLabアカウントを接続してください。",
       "bitbucketDescription": "モバイルでプルリクエストをレビューするには、この組織をBitbucketに接続してください。",

@@ -2551,6 +2551,8 @@
       "providerCheckFailedMessage": "De verbindingsstatus is pas beschikbaar zodra het laden is voltooid.",
       "reconnectTitle": "GitHub opnieuw verbinden",
       "reconnectDescription": "De toegang tot je GitHub-account is ingetrokken. Maak opnieuw verbinding om PR's op je telefoon te blijven beoordelen.",
+      "reconnectProviderTitle": "{{provider}} opnieuw verbinden",
+      "reconnectProviderDescription": "Je {{provider}}-verbinding moet opnieuw worden geautoriseerd voordat je merge requests op je telefoon kunt beoordelen.",
       "description": "Koppel je GitHub-account om PR's op je telefoon te beoordelen.",
       "gitlabDescription": "Koppel je GitLab-account om merge requests op je telefoon te beoordelen.",
       "bitbucketDescription": "Koppel Bitbucket aan deze organisatie om PR's op je telefoon te beoordelen.",

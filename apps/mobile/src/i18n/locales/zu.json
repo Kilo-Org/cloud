@@ -665,6 +665,8 @@
       "providerCheckFailedMessage": "Isimo sokuxhumana asitholakali kuze kulayishwe lokhu.",
       "reconnectTitle": "Xhuma kabusha i-GitHub",
       "reconnectDescription": "Ukuxhumana kwakho kwe-GitHub kuhoxisiwe. Xhuma kabusha ukuze uqhubeke ubuyekeza izicelo zokuhlanganisa efonini.",
+      "reconnectProviderTitle": "Xhuma kabusha i-{{provider}}",
+      "reconnectProviderDescription": "Ukuxhumana kwakho kwe-{{provider}} kudinga ukuvunyelwa kabusha ngaphambi kokuthi ubuyekeze izicelo zokuhlanganisa efonini.",
       "description": "Xhuma i-akhawunti yakho ye-GitHub ukuze ubuyekeze izicelo zokuhlanganisa efonini.",
       "gitlabDescription": "Xhuma i-akhawunti yakho ye-GitLab ukuze ubuyekeze izicelo zokuhlanganisa kufoni.",
       "bitbucketDescription": "Xhuma i-Bitbucket kule nhlangano ukuze ubuyekeze ama-PR kufoni.",

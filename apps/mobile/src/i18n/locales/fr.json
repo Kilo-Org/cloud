@@ -2576,6 +2576,8 @@
       "providerCheckFailedMessage": "L'état de la connexion reste indisponible jusqu'à la fin du chargement.",
       "reconnectTitle": "Reconnecter GitHub",
       "reconnectDescription": "L'accès à votre compte GitHub a été révoqué. Reconnectez-vous pour continuer à examiner des demandes de fusion sur mobile.",
+      "reconnectProviderTitle": "Reconnecter {{provider}}",
+      "reconnectProviderDescription": "Votre connexion {{provider}} doit être réautorisée avant de pouvoir examiner des merge requests sur mobile.",
       "description": "Connectez votre compte GitHub pour examiner des demandes de fusion sur mobile.",
       "gitlabDescription": "Connectez votre compte GitLab pour examiner des merge requests sur mobile.",
       "bitbucketDescription": "Connectez Bitbucket à cette organisation pour examiner des PR sur mobile.",

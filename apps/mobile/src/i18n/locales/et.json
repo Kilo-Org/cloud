@@ -665,6 +665,8 @@
       "providerCheckFailedMessage": "Ühenduse olekut saab näha alles pärast laadimise lõppu.",
       "reconnectTitle": "Ühenda GitHub uuesti",
       "reconnectDescription": "Sinu GitHubi ühendus on tühistatud. Taasta ühendus, et jätkata tõmbetaotluste ülevaatamist mobiilis.",
+      "reconnectProviderTitle": "Ühenda {{provider}} uuesti",
+      "reconnectProviderDescription": "Sinu {{provider}}i ühendus tuleb uuesti autoriseerida, enne kui saad tõmbetaotlusi mobiilis üle vaadata.",
       "description": "Ühenda oma GitHubi konto, et tõmbetaotlusi mobiilis üle vaadata.",
       "gitlabDescription": "Ühenda oma GitLab konto, et liitmistaotlusi mobiilis üle vaadata.",
       "bitbucketDescription": "Ühenda Bitbucket selle organisatsiooniga, et tõmbetaotlusi mobiilis üle vaadata.",

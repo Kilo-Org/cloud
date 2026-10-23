@@ -665,6 +665,8 @@
       "providerCheckFailedMessage": "Hindi available ang katayuan ng koneksyon hanggang sa ma-load ito.",
       "reconnectTitle": "Kumonekta muli sa GitHub",
       "reconnectDescription": "Binawi ang koneksyon mo sa GitHub. Kumonekta muli para patuloy na makapagsuri ng mga pull request sa mobile.",
+      "reconnectProviderTitle": "Kumonekta muli sa {{provider}}",
+      "reconnectProviderDescription": "Kailangang muling pahintulutan ang koneksyon mo sa {{provider}} bago ka makasuri ng mga merge request sa mobile.",
       "description": "Ikonekta ang GitHub account mo para makapagsuri ng mga pull request sa mobile.",
       "gitlabDescription": "Ikonekta ang iyong GitLab account para suriin ang mga merge request sa mobile.",
       "bitbucketDescription": "Ikonekta ang Bitbucket sa organizasyong ito para suriin ang mga pull request sa mobile.",

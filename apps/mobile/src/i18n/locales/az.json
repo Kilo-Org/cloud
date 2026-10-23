@@ -665,6 +665,8 @@
       "providerCheckFailedMessage": "Yüklənənə qədər bağlantı statusu əlçatan deyil.",
       "reconnectTitle": "GitHub-a yenidən qoşul",
       "reconnectDescription": "GitHub bağlantın ləğv edilib. Mobil cihazda birləşdirmə sorğularını nəzərdən keçirməyə davam etmək üçün yenidən qoşul.",
+      "reconnectProviderTitle": "{{provider}}-a yenidən qoşul",
+      "reconnectProviderDescription": "Mobil cihazda birləşdirmə sorğularını nəzərdən keçirmək üçün {{provider}} bağlantın yenidən təsdiqlənməlidir.",
       "description": "Mobil cihazda birləşdirmə sorğularını nəzərdən keçirmək üçün GitHub hesabını qoş.",
       "gitlabDescription": "Mobil cihazda merge sorğularına baxış keçirmək üçün GitLab hesabını qoş.",
       "bitbucketDescription": "Mobil cihazda birləşdirmə sorğularına baxış keçirmək üçün Bitbucket-ı bu təşkilata qoş.",

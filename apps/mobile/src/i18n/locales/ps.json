@@ -665,6 +665,8 @@
       "providerCheckFailedMessage": "تر څو چې دا نه وي بار شوی، د اړیکې حالت شتون نلري.",
       "reconnectTitle": "GitHub بیا ونښلئ",
       "reconnectDescription": "ستاسو د GitHub اړیکه لغوه شوې ده. په موبایل کې د پل ریکویسټونو د بیاکتنې د دوام لپاره بیا ونښلئ.",
+      "reconnectProviderTitle": "{{provider}} بیا ونښلئ",
+      "reconnectProviderDescription": "ستاسو د {{provider}} اړیکه باید بیا اعتبار شي مخکې له دې چې په موبایل کې د یوځای کولو د غوښتنو بیاکتنه وکړئ.",
       "description": "په موبایل کې د پل ریکویسټونو د بیاکتنې لپاره خپل GitHub حساب ونښلوئ.",
       "gitlabDescription": "په موبایل کې د یوځای کولو د غوښتنو د بیاکتنې لپاره خپل GitLab حساب ونښلوئ.",
       "bitbucketDescription": "په موبایل کې د پول ریکویسټونو د بیاکتنې لپاره Bitbucket له دې بنسټ سره ونښلوئ.",

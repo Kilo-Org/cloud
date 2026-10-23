@@ -665,6 +665,8 @@
       "providerCheckFailedMessage": "Kun fe'amuun isaa dura haalli walqunnamtii hin argamu.",
       "reconnectTitle": "GitHub irra deebi'ii walqabsiisi",
       "reconnectDescription": "Hayyamni walqunnamtii GitHub kee haqameera. Gaaffiiwwan walitti makuu bilbilaan gamaaggamuu itti fufuuf irra deebi'ii walqabsiisi.",
+      "reconnectProviderTitle": "{{provider}} irra deebi'ii walqabsiisi",
+      "reconnectProviderDescription": "Gaaffiiwwan walitti makuu bilbilaan gamaagamuuf dursa, hayyamni walqunnamtii {{provider}} kee irra deebi'ii hayamamuu qaba.",
       "description": "Gaaffiiwwan walitti makuu bilbilaan gamaaggamuuf herrega GitHub kee walqabsiisi.",
       "gitlabDescription": "Gaaffiiwwan walitti makuu simbirroo harkaan gamaaggamuuf herrega GitLab kee walqabsiisi.",
       "bitbucketDescription": "Gaaffiiwwan walitti makuu simbirroo harkaan gamaaggamuuf Bitbucket dhaabbata kana waliin walqabsiisi.",

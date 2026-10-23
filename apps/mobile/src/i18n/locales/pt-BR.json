@@ -2576,6 +2576,8 @@
       "providerCheckFailedMessage": "O status da conexão só fica disponível quando o carregamento terminar.",
       "reconnectTitle": "Reconexão com o GitHub",
       "reconnectDescription": "Sua conexão com o GitHub foi revogada. Conecte-se novamente para continuar revisando pull requests no celular.",
+      "reconnectProviderTitle": "Reconectar {{provider}}",
+      "reconnectProviderDescription": "Sua conexão com o {{provider}} precisa ser reautorizada para que você possa revisar merge requests no celular.",
       "description": "Conecte sua conta do GitHub para revisar pull requests no celular.",
       "gitlabDescription": "Conecte sua conta do GitLab para revisar merge requests no celular.",
       "bitbucketDescription": "Conecte o Bitbucket a esta organização para revisar pull requests no celular.",

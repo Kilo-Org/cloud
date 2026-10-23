@@ -689,6 +689,8 @@
       "providerCheckFailedMessage": "Ryšio būsena bus prieinama įkėlus duomenis.",
       "reconnectTitle": "Prisijungti prie GitHub iš naujo",
       "reconnectDescription": "Tavo GitHub prieiga atšaukta. Prisijunk iš naujo, kad galėtum toliau peržiūrėti pakeitimų užklausas mobiliajame įrenginyje.",
+      "reconnectProviderTitle": "Prisijungti prie {{provider}} iš naujo",
+      "reconnectProviderDescription": "Tavo {{provider}} ryšį reikia patvirtinti iš naujo, kad galėtum peržiūrėti merge requests mobiliajame įrenginyje.",
       "description": "Prijunk savo GitHub paskyrą, kad galėtum peržiūrėti pakeitimų užklausas mobiliajame įrenginyje.",
       "gitlabDescription": "Prijunk savo GitLab paskyrą, kad galėtum peržiūrėti merge requests mobiliajame įrenginyje.",
       "bitbucketDescription": "Prijunk Bitbucket prie šios organizacijos, kad galėtum peržiūrėti pakeitimų užklausas mobiliajame įrenginyje.",

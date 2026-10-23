@@ -2551,6 +2551,8 @@
       "providerCheckFailedMessage": "Bağlantı durumu, yüklenene kadar kullanılamıyor.",
       "reconnectTitle": "GitHub'a yeniden bağlan",
       "reconnectDescription": "GitHub bağlantının izni kaldırıldı. Mobilde çekme isteklerini incelemeye devam etmek için yeniden bağlan.",
+      "reconnectProviderTitle": "{{provider}}'a yeniden bağlan",
+      "reconnectProviderDescription": "Mobilde birleştirme isteklerini gözden geçirmek için {{provider}} bağlantını yeniden yetkilendirmen gerekiyor.",
       "description": "Mobilde çekme isteklerini incelemek için GitHub hesabını bağla.",
       "gitlabDescription": "Mobilde birleştirme isteklerini gözden geçirmek için GitLab hesabını bağla.",
       "bitbucketDescription": "Mobilde çekme isteklerini gözden geçirmek için Bitbucket'ı bu kuruluşla bağla.",

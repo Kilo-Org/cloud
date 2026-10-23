@@ -94,6 +94,16 @@ export const AGENT_VISIBILITY_LABEL_KEYS = {
   all: 'profiles.agents.modeAll',
 } satisfies Record<AgentVisibility, string>;
 
+/**
+ * The visibility choices in the order the add/edit sheet offers them, with the
+ * catalog key that explains each mode.
+ */
+export const AGENT_VISIBILITY_OPTIONS: readonly { value: AgentVisibility; labelKey: string }[] = [
+  { value: 'primary', labelKey: 'profiles.agents.visibilityPrimary' },
+  { value: 'subagent', labelKey: 'profiles.agents.visibilitySubagent' },
+  { value: 'all', labelKey: 'profiles.agents.visibilityAll' },
+];
+
 /** Project the profile's agents into the rows the list renders. */
 export function agentRows(agents: readonly AgentSource[]): AgentRow[] {
   return agents.map(agent => ({

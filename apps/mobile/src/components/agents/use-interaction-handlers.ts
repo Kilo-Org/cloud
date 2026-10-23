@@ -13,6 +13,7 @@ import {
   QUESTION_ANSWERED_EVENT,
 } from '@/lib/analytics/posthog';
 import { ackSessionAttention } from '@/lib/session-attention';
+import { type ObservedSessionRaise } from '@/lib/hooks/use-session-raise-reader';
 
 import { type useSessionManager } from './session-provider';
 
@@ -26,6 +27,13 @@ type InteractionHandlersArgs = {
   activeQuestion: { requestId: string; questions?: unknown[] } | null;
   activePermission: { requestId: string } | null;
   surface: AnalyticsSurface;
+  /**
+   * The raise the app last observed for a session, read before submitting.
+   * The ack names that raise so it suppresses only the one the user answered;
+   * null when the session has no live row, and the ack then carries the status
+   * alone.
+   */
+  readObservedRaise: (sessionId: string) => ObservedSessionRaise | null;
 };
 
 export function useInteractionHandlers({
@@ -34,7 +42,15 @@ export function useInteractionHandlers({
   activeQuestion,
   activePermission,
   surface,
+  readObservedRaise,
 }: InteractionHandlersArgs) {
+  const readAnsweredRaiseTime = useCallback(
+    (status: 'question' | 'permission') => {
+      const observed = readObservedRaise(kiloSessionId);
+      return observed?.status === status ? observed.statusUpdatedAt : undefined;
+    },
+    [readObservedRaise, kiloSessionId]
+  );
   const [answeringRequestId, setAnsweringRequestId] = useState<string | null>(null);
   const [respondingRequestId, setRespondingRequestId] = useState<string | null>(null);
   const [questionSubmissionError, setQuestionSubmissionError] = useState<{
@@ -52,11 +68,12 @@ export function useInteractionHandlers({
         return false;
       }
       const requestId = activeQuestion.requestId;
+      const statusUpdatedAt = readAnsweredRaiseTime('question');
       setQuestionSubmissionError(null);
       setAnsweringRequestId(requestId);
       try {
         await manager.answerQuestion(requestId, answers);
-        ackSessionAttention(kiloSessionId);
+        ackSessionAttention(kiloSessionId, 'question', statusUpdatedAt);
         captureEvent(QUESTION_ANSWERED_EVENT, { surface, skipped: false });
         return true;
       } catch (error) {
@@ -71,7 +88,7 @@ export function useInteractionHandlers({
         setAnsweringRequestId(current => (current === requestId ? null : current));
       }
     },
-    [manager, kiloSessionId, activeQuestion, surface]
+    [manager, kiloSessionId, readAnsweredRaiseTime, activeQuestion, surface]
   );
 
   const handleRejectQuestion = useCallback(async (): Promise<boolean> => {
@@ -79,11 +96,12 @@ export function useInteractionHandlers({
       return false;
     }
     const requestId = activeQuestion.requestId;
+    const statusUpdatedAt = readAnsweredRaiseTime('question');
     setQuestionSubmissionError(null);
     setAnsweringRequestId(requestId);
     try {
       await manager.rejectQuestion(requestId);
-      ackSessionAttention(kiloSessionId);
+      ackSessionAttention(kiloSessionId, 'question', statusUpdatedAt);
       captureEvent(QUESTION_ANSWERED_EVENT, { surface, skipped: true });
       return true;
     } catch (error) {
@@ -95,7 +113,7 @@ export function useInteractionHandlers({
     } finally {
       setAnsweringRequestId(current => (current === requestId ? null : current));
     }
-  }, [manager, kiloSessionId, activeQuestion, surface]);
+  }, [manager, kiloSessionId, readAnsweredRaiseTime, activeQuestion, surface]);
 
   const handleRespondToPermission = useCallback(
     async (response: 'once' | 'always' | 'reject'): Promise<'ok' | 'retryable' | 'terminal'> => {
@@ -105,11 +123,12 @@ export function useInteractionHandlers({
         return 'ok';
       }
       const requestId = activePermission.requestId;
+      const statusUpdatedAt = readAnsweredRaiseTime('permission');
       setPermissionSubmissionError(null);
       setRespondingRequestId(requestId);
       try {
         await manager.respondToPermission(requestId, response);
-        ackSessionAttention(kiloSessionId);
+        ackSessionAttention(kiloSessionId, 'permission', statusUpdatedAt);
         captureEvent(PERMISSION_RESPONDED_EVENT, { surface, response });
         return 'ok';
       } catch (error) {
@@ -125,7 +144,7 @@ export function useInteractionHandlers({
         setRespondingRequestId(current => (current === requestId ? null : current));
       }
     },
-    [manager, kiloSessionId, activePermission, surface]
+    [manager, kiloSessionId, readAnsweredRaiseTime, activePermission, surface]
   );
 
   return {

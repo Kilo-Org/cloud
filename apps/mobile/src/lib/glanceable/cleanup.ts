@@ -2,6 +2,7 @@ import {
   GLANCEABLE_SNAPSHOT_EXPIRY_MS,
   GLANCEABLE_SNAPSHOT_SCHEMA_VERSION,
   type GlanceableAgentsSnapshot,
+  NO_GLANCEABLE_WORK,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { clearHomeWidgetData } from './home-widget-data';
@@ -84,13 +85,7 @@ function buildTerminalSnapshot(status: 'signed_out' | 'privacy'): GlanceableAgen
     scopeKey: `terminal:${status}`,
     organizationBound: false,
     status,
-    running: 0,
-    needsInput: 0,
-    needsApproval: 0,
-    idle: 0,
-    scheduled: 0,
-    needsInputSince: null,
-    scheduledAt: null,
+    ...NO_GLANCEABLE_WORK,
     // A terminal scope asserts nothing about work, so the newest-result fact is
     // blank with the counts.
     newestResultKind: null,

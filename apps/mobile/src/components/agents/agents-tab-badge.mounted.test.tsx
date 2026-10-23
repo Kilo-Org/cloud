@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one cohesive mounted suite: the tab badge, the live header, and the ack store share the mock harness */
 import { createElement } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act, type ReactTestInstance } from '@/test/renderer';
@@ -26,6 +27,27 @@ import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 type Mount = Awaited<ReturnType<typeof renderWithProviders>>;
 const mounts: Mount[] = [];
+
+/** The tray rows a dated raise renders: one waiting permission, one working. */
+function datedRaise(statusUpdatedAt: string): ActiveSession[] {
+  return [
+    {
+      id: 'personal-0',
+      connectionId: 'cli',
+      title: 'Session 0',
+      status: 'permission',
+      organizationId: null,
+      statusUpdatedAt,
+    },
+    {
+      id: 'personal-1',
+      connectionId: 'cli',
+      title: 'Session 1',
+      status: 'busy',
+      organizationId: null,
+    },
+  ];
+}
 
 async function mount(queryClient = makeTestQueryClient()) {
   const result = await renderWithProviders(createElement(CountSurfaces), { queryClient });
@@ -136,12 +158,12 @@ describe('Agents needs-input badge and shared live count', () => {
       const cached = result.queryClient.getQueryData(key());
       const fetchCount = fetchSessions.mock.calls.length;
       act(() => {
-        ackSessionAttention('personal-0');
+        ackSessionAttention('personal-0', status);
       });
       expectCounts(result.renderer, 1, 3);
       expect(__peekSessionAttentionForTests('personal-0')).toEqual({ raiseId: status });
       act(() => {
-        ackSessionAttention('personal-1');
+        ackSessionAttention('personal-1', status);
       });
       expectCounts(result.renderer, undefined, 3);
       expect(result.queryClient.getQueryData(key())).toBe(cached);
@@ -155,11 +177,11 @@ describe('Agents needs-input badge and shared live count', () => {
       const result = await mount();
       await updateSessions(result, sessions(['question']));
       act(() => {
-        ackSessionAttention('personal-0');
+        ackSessionAttention('personal-0', 'question');
       });
       expectCounts(result.renderer, undefined, 1);
       await updateSessions(result, sessions([status]));
-      expect(isAttentionAcked('personal-0', 'question')).toBe(false);
+      expect(isAttentionAcked('personal-0', { raiseId: 'question' })).toBe(false);
       expectCounts(result.renderer, status === 'permission' ? 1 : undefined, 1);
       await updateSessions(result, sessions(['question']));
       expectCounts(result.renderer, 1, 1);
@@ -167,12 +189,15 @@ describe('Agents needs-input badge and shared live count', () => {
   );
 
   it.each([
-    { status: 'question', raiseId: 'question' },
-    { status: 'question', raiseId: null },
-    { status: 'busy', raiseId: 'question' },
+    { status: 'question', raiseId: 'question', suppresses: true },
+    // A blob from a build that stored unbound acks names no raise, so it is
+    // dropped on hydration and suppresses nothing.
+    { status: 'question', raiseId: null, suppresses: false },
+    // The raise it names is gone: the busy row deletes the entry.
+    { status: 'busy', raiseId: 'question', suppresses: false },
   ] as const)(
     'reconciles hydrated $raiseId acknowledgments against $status',
-    async ({ status, raiseId }) => {
+    async ({ status, raiseId, suppresses }) => {
       const pending = Promise.withResolvers<string | null>();
       attentionKv.getItem.mockReturnValueOnce(pending.promise);
       const hydration = __hydrateSessionAttentionForTests();
@@ -193,14 +218,33 @@ describe('Agents needs-input badge and shared live count', () => {
         );
         await hydration;
       });
-      expectCounts(result.renderer, 1, 2);
+      // The row the dropped ack named is answered only when the ack survived.
+      const answeredCount = suppresses || status !== 'question' ? 1 : 2;
+      expectCounts(result.renderer, answeredCount, 2);
       expect(__peekSessionAttentionForTests('personal-0')).toEqual(
-        status === 'question' ? { raiseId: 'question' } : undefined
+        suppresses ? { raiseId: 'question' } : undefined
       );
       await updateSessions(result, sessions(['question', 'permission']));
-      expectCounts(result.renderer, status === 'question' ? 1 : 2, 2);
+      expectCounts(result.renderer, suppresses ? 1 : 2, 2);
     }
   );
+
+  it('counts a same-status re-raise after an ack once the row names its raise', async () => {
+    const result = await mount();
+
+    await updateSessions(result, datedRaise('2026-09-18T21:00:00.000Z'));
+    expectCounts(result.renderer, 1, 2);
+
+    // The answer path acks the raise its row names.
+    act(() => {
+      ackSessionAttention('personal-0', 'permission', '2026-09-18T21:00:00.000Z');
+    });
+    expectCounts(result.renderer, undefined, 2);
+
+    // A permission raised later reads as its own raise, not the answered one.
+    await updateSessions(result, datedRaise('2026-09-18T21:30:00.000Z'));
+    expectCounts(result.renderer, 1, 2);
+  });
 
   it('hides counts while the initial live query loads', async () => {
     const { renderer, queryClient } = await mount();
@@ -275,7 +319,7 @@ describe('Agents needs-input badge and shared live count', () => {
     const result = await mount(queryClient);
     expectCounts(result.renderer, 2, 3);
     act(() => {
-      ackSessionAttention('org-a-0');
+      ackSessionAttention('org-a-0', 'question');
     });
     expectCounts(result.renderer, 1, 3);
     const pending = Promise.withResolvers<{ sessions: ActiveSession[] }>();
@@ -293,7 +337,7 @@ describe('Agents needs-input badge and shared live count', () => {
       queryClient.setQueryData(key('org-a'), { sessions: sessions(['busy'], 'org-a') });
     });
     expectCounts(result.renderer);
-    expect(isAttentionAcked('org-a-0', 'question')).toBe(true);
+    expect(isAttentionAcked('org-a-0', { raiseId: 'question' })).toBe(true);
     fetchSessions.mockResolvedValue({
       sessions: [
         ...sessions(['question', 'busy'], 'org-b'),
@@ -306,7 +350,7 @@ describe('Agents needs-input badge and shared live count', () => {
     });
     await waitFor(() => agentsOptions(result.renderer).tabBarBadge === 1);
     expectCounts(result.renderer, 1, 2);
-    expect(isAttentionAcked('org-a-0', 'question')).toBe(true);
+    expect(isAttentionAcked('org-a-0', { raiseId: 'question' })).toBe(true);
     expect(
       queryClient
         .getQueryCache()

@@ -152,7 +152,7 @@ type PrepareSessionSharedFields = {
   images?: Images;
   /** Callback configuration for execution completion events */
   callbackTarget?: CallbackTarget;
-  /** Platform that created this session (e.g. 'security-agent', 'slack', 'app-builder') */
+  /** Platform that created this session (e.g. 'security-agent', 'slack') */
   createdOnPlatform?: string;
   clientProvenance?: 'browser' | 'mobile';
   /** PR gate threshold — when not 'off', the agent reports gateResult in its callback */
@@ -669,7 +669,7 @@ type CloudAgentNextTRPCClient = {
  */
 export type CloudAgentNextClientOptions = {
   /**
-   * Skip balance validation in cloud-agent (used by App Builder which handles its own billing).
+   * Skip balance validation in cloud-agent for free/BYOK model sessions.
    */
   skipBalanceCheck?: boolean;
 };
@@ -1219,9 +1219,11 @@ export function createCloudAgentNextClient(
 }
 
 /**
- * Create a cloud agent next client instance configured for App Builder.
+ * Create a client that skips the worker balance check, used for free/BYOK models.
  */
-export function createAppBuilderCloudAgentNextClient(authToken: string): CloudAgentNextClient {
+export function createSkippedBalanceCheckCloudAgentNextClient(
+  authToken: string
+): CloudAgentNextClient {
   return new CloudAgentNextClient(authToken, {
     skipBalanceCheck: true,
   });
@@ -1233,7 +1235,7 @@ export function createAppBuilderCloudAgentNextClient(authToken: string): CloudAg
  *
  * Free models (and BYOK-capable models, where the user provides their own key
  * and the model is therefore not billed against their balance) cost the user
- * nothing, so we mirror AppBuilder and set `x-skip-balance-check: true` to
+ * nothing, so we set `x-skip-balance-check: true` to
  * allow $0-balance users to still create sessions when their selected model
  * is free. Paid models stay on the default client so the worker balance
  * middleware can still enforce the $1 minimum on paid-model sessions.
@@ -1247,7 +1249,7 @@ export function createCloudAgentNextClientForModel(
   model: { isFree: boolean; hasUserByokAvailable: boolean }
 ): CloudAgentNextClient {
   if (model.isFree || model.hasUserByokAvailable) {
-    return createAppBuilderCloudAgentNextClient(authToken);
+    return createSkippedBalanceCheckCloudAgentNextClient(authToken);
   }
   return createCloudAgentNextClient(authToken);
 }

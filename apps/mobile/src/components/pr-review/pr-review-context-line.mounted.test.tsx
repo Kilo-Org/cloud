@@ -87,6 +87,15 @@ function line(ui: RenderWithProvidersResult) {
   return nodes[0] as ReactTestInstance | undefined;
 }
 
+/** The selected state an account action button carries, if it carries one. */
+function selectedState(node: ReactTestInstance): boolean | undefined {
+  const state: unknown = node.props.accessibilityState;
+  if (typeof state !== 'object' || state === null || !('selected' in state)) {
+    return undefined;
+  }
+  return typeof state.selected === 'boolean' ? state.selected : undefined;
+}
+
 async function press(node: ReactTestInstance) {
   const onPress = node.props.onPress as () => void;
   await act(() => {
@@ -122,8 +131,8 @@ describe('PrReviewContextLine', () => {
       key === ORGANIZATION_PERSONAL_STORAGE_KEY ? 'personal' : null
     );
     const ui = await mount();
-    await waitFor(() => texts(ui).includes('For Personal'));
-    expect(texts(ui)).toContain('For Personal');
+    await waitFor(() => texts(ui).includes('For your personal account'));
+    expect(texts(ui)).toContain('For your personal account');
   });
 
   it('switches organization through the picker sheet', async () => {
@@ -137,9 +146,13 @@ describe('PrReviewContextLine', () => {
     }
     await press(control);
 
-    // The sheet is open: the picker rows render with radio roles.
+    // The sheet is open: every account row is an action button that reports
+    // whether it is the current account.
     const rows = ui.renderer.root.findAll(
-      node => node.type === Pressable && node.props.accessibilityRole === 'radio'
+      node =>
+        node.type === Pressable &&
+        node.props.accessibilityRole === 'button' &&
+        selectedState(node) !== undefined
     );
     expect(rows.map(row => row.props.accessibilityLabel)).toEqual(['Personal', 'Acme', 'Umbrella']);
 
@@ -155,7 +168,7 @@ describe('PrReviewContextLine', () => {
   it('renders plain text with no chevron when there is nothing to switch to', async () => {
     list.mockResolvedValue([]);
     const ui = await mount();
-    await waitFor(() => texts(ui).includes('For Personal'));
+    await waitFor(() => texts(ui).includes('For your personal account'));
     expect(line(ui)).toBeUndefined();
     expect(ui.renderer.root.findAllByType(ChevronDown)).toHaveLength(0);
   });
@@ -199,7 +212,7 @@ describe('PrReviewContextLine', () => {
   it('offers a retry on the personal scope when the memberships query fails', async () => {
     list.mockRejectedValue(new Error('list failed'));
     const ui = await mount();
-    await waitFor(() => texts(ui).includes('For Personal'));
+    await waitFor(() => texts(ui).includes('For your personal account'));
     const retry = ui.renderer.root.find(node => node.props.accessibilityLabel === 'Retry');
     list.mockResolvedValue([ORG_A, ORG_B]);
     await press(retry);

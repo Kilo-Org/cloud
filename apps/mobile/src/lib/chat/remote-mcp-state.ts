@@ -1,4 +1,5 @@
 import { type Tool } from '@kilocode/harness-sdk';
+import { type RemoteMcpOfferedTool } from '@kilocode/harness-sdk/plugins/remote-mcp';
 
 import { type StoredRemoteMcpServer } from './remote-mcp-store';
 
@@ -14,9 +15,27 @@ type RemoteMcpStatus = 'idle' | 'connecting' | 'ready' | 'failed' | 'signIn';
 /** One server's discovery result, keyed by the server's id. */
 export type RemoteMcpDiscovery = {
   readonly tools: readonly Tool[];
+  /** The MCP Apps view a tool carries, by the name the model calls the tool by. */
+  readonly views: ReadonlyMap<string, RemoteMcpToolView>;
+  /** The tools as the server names them, which is what a view calls them by. */
+  readonly serverTools: readonly string[];
   /** True when the discovery did not reach the server, so none of its tools are offered. */
   readonly failed?: boolean;
   readonly signIn?: boolean;
+};
+
+/**
+ * The view one discovered tool carries.
+ *
+ * The model calls the tool by `mcp_<server>_<tool>`; the view calls it by the
+ * server's own name, and reads it from the uri the server attached. Both are
+ * kept beside the discovery because the transcript draws the call by the name
+ * the model used.
+ */
+export type RemoteMcpToolView = {
+  readonly serverId: string;
+  readonly serverToolName: string;
+  readonly resourceUri: string;
 };
 
 /** What one server looks like to whoever draws it. */
@@ -103,4 +122,48 @@ export function remoteServerToolsFor(
     const found = server.enabled ? discovered.get(server.id) : undefined;
     return found === undefined || found.failed === true ? [] : found.tools;
   });
+}
+
+/**
+ * What a server's offered tools look like once kept: the tools themselves, the
+ * view each one carries, and the server's own names, which is what a view calls
+ * its tools by.
+ */
+export function discoveryOf(
+  serverId: string,
+  tools: readonly RemoteMcpOfferedTool[]
+): RemoteMcpDiscovery {
+  const views = new Map<string, RemoteMcpToolView>();
+  for (const tool of tools) {
+    const uri = tool.uiResourceUri;
+    if (uri !== undefined) {
+      views.set(tool.definition.name, {
+        serverId,
+        serverToolName: tool.serverToolName,
+        resourceUri: uri,
+      });
+    }
+  }
+  return { tools, views, serverTools: tools.map(tool => tool.serverToolName) };
+}
+
+/**
+ * The views the enabled servers' discovered tools carry, by the name the model
+ * calls each tool by. A disabled or failed server contributes none, which is
+ * the same rule its tools follow.
+ */
+export function remoteServerViewsFor(
+  servers: readonly StoredRemoteMcpServer[],
+  discovered: ReadonlyMap<string, RemoteMcpDiscovery>
+): ReadonlyMap<string, RemoteMcpToolView> {
+  const views = new Map<string, RemoteMcpToolView>();
+  for (const server of servers) {
+    const found = server.enabled ? discovered.get(server.id) : undefined;
+    if (found !== undefined && found.failed !== true) {
+      for (const [name, view] of found.views) {
+        views.set(name, view);
+      }
+    }
+  }
+  return views;
 }

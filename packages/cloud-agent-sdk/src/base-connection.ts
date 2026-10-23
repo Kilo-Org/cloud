@@ -385,9 +385,12 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     };
   }
 
-  function replaceStaleSocketAndReconnect(currentGeneration: number): void {
-    if (destroyed || intentionalDisconnect || currentGeneration !== generation) return;
-    if (!notifyReplacingConnection(currentGeneration)) return;
+  // Single owner of the replacement order: notify route loss, close the old
+  // socket, report the disconnection, then re-auth and open a fresh connection.
+  // Callers reset only the state that is specific to their recovery path.
+  function replaceSocketAndReconnect(expectedGeneration: number): void {
+    if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
+    if (!notifyReplacingConnection(expectedGeneration)) return;
     const staleWs = ws;
     if (staleWs !== null) {
       ws = null;
@@ -397,7 +400,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       connected = false;
       config.onDisconnected();
     }
-    void refreshAndConnect(currentGeneration);
+    void refreshAndConnect(expectedGeneration);
   }
 
   function handleVisibilityResume(): void {
@@ -426,7 +429,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     // timeout for a heartbeat that will never arrive on a zombie socket just
     // freezes the UI — reconnect immediately instead.
     if (wasHiddenSince !== 0 && Date.now() - wasHiddenSince >= stalenessTimeoutMs) {
-      replaceStaleSocketAndReconnect(generation);
+      replaceSocketAndReconnect(generation);
       return;
     }
 
@@ -435,7 +438,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     const currentGeneration = generation;
     stalenessTimeoutId = setTimeout(() => {
       stalenessTimeoutId = null;
-      replaceStaleSocketAndReconnect(currentGeneration);
+      replaceSocketAndReconnect(currentGeneration);
     }, stalenessTimeoutMs);
   }
 
@@ -459,18 +462,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     clearExhausted();
     clearReconnectTimer();
     clearStalenessTimeout();
-    if (!notifyReplacingConnection()) return;
-
-    const staleWs = ws;
-    if (staleWs !== null) {
-      ws = null;
-      staleWs.close();
-    }
-    if (connected) {
-      connected = false;
-      config.onDisconnected();
-    }
-    void refreshAndConnect(generation);
+    replaceSocketAndReconnect(generation);
   }
 
   function handleOnline(): void {
@@ -556,18 +548,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     clearExhausted();
     clearReconnectTimer();
     clearStalenessTimeout();
-    if (!notifyReplacingConnection()) return;
-
-    const staleWs = ws;
-    if (staleWs !== null) {
-      ws = null;
-      staleWs.close();
-    }
-    if (connected) {
-      connected = false;
-      config.onDisconnected();
-    }
-    void refreshAndConnect(generation);
+    replaceSocketAndReconnect(generation);
   }
 
   function retryReconnect() {

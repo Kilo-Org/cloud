@@ -2169,6 +2169,22 @@ export class SandboxControlV2 extends DurableObject<Env> {
       }
     }
     const { state, effects, stopReason } = reduceAllocation(previous, event, timers);
+    if (
+      previous.kind === 'stopped' &&
+      state.kind === 'creating' &&
+      state.allocationId !== null &&
+      this.providerPin?.provider === 'vercel'
+    ) {
+      // Vercel retains stopped names. Pin a unique physical name before create,
+      // so retries and reconstruction address this allocation's exact resource.
+      const pin = {
+        ...this.providerPin,
+        allocationName: `sbx-${state.allocationId.replaceAll('-', '')}`,
+      };
+      await this.writeProviderPin(pin);
+      this.providerPin = pin;
+      this.provider = this.createProviderAdapter(pin);
+    }
     await this.writeAllocation(state, previous);
     if (
       previous.kind !== state.kind ||

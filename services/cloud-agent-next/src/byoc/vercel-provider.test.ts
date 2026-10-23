@@ -141,13 +141,16 @@ describe('BYOC Vercel provider on the current control plane', () => {
     });
   });
 
-  it('marks only the resolved customer snapshot missing after a provider 404', async () => {
-    vi.stubGlobal('fetch', async () => new Response('', { status: 404 }));
-    await expect(adapter().create(intent)).rejects.toMatchObject({
-      reason: 'byoc_vercel_snapshot_missing',
-    });
-    expect(projectByocVercelSnapshotMissing).toHaveBeenCalledWith(expect.anything(), snapshot);
-  });
+  it.each([404, 410])(
+    'marks only the resolved customer snapshot missing after provider %s',
+    async status => {
+      vi.stubGlobal('fetch', async () => new Response('', { status }));
+      await expect(adapter().create(intent)).rejects.toMatchObject({
+        reason: 'byoc_vercel_snapshot_missing',
+      });
+      expect(projectByocVercelSnapshotMissing).toHaveBeenCalledWith(expect.anything(), snapshot);
+    }
+  );
 
   it.each([
     [403, 'byoc_vercel_forbidden'],

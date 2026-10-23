@@ -72,7 +72,7 @@ export function createByocVercelProviderAdapter(deps: {
           if (error.status === 403 || error.status === 401)
             throw new ByocVercelProviderError('byoc_vercel_forbidden');
           if (error.status === 429) throw new ByocVercelProviderError('byoc_vercel_capacity');
-          if (error.status === 404 && snapshot) {
+          if ((error.status === 404 || error.status === 410) && snapshot) {
             await projectByocVercelSnapshotMissing(deps.env, snapshot);
             throw new ByocVercelProviderError('byoc_vercel_snapshot_missing');
           }

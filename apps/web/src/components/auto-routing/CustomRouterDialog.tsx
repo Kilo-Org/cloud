@@ -149,22 +149,24 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
         entries: draft.entries,
         defaultEntryKey: draft.defaultEntryKey,
       };
+      const entriesChanged =
+        draft.entries.length !== router?.entries.length ||
+        draft.entries.some(
+          (entry, index) =>
+            customRouterEntryKey(entry) !== router?.entries[index]?.key ||
+            entry.measuredAs !== router?.entries[index]?.entry.measuredAs
+        );
+      // The API moves entries and the default together, so an entries update always carries it.
       const patch = router
         ? {
             name: fields.name,
             ...(draft.baseRouter !== router.baseRouter ? { baseRouter: draft.baseRouter } : {}),
             ...(draft.mode !== router.mode ? { mode: draft.mode } : {}),
-            ...(draft.entries.length !== router.entries.length ||
-            draft.entries.some(
-              (entry, index) =>
-                customRouterEntryKey(entry) !== router.entries[index]?.key ||
-                entry.measuredAs !== router.entries[index]?.entry.measuredAs
-            )
-              ? { entries: draft.entries }
-              : {}),
-            ...(draft.defaultEntryKey !== router.defaultEntryKey
-              ? { defaultEntryKey: draft.defaultEntryKey }
-              : {}),
+            ...(entriesChanged
+              ? { entries: draft.entries, defaultEntryKey: draft.defaultEntryKey }
+              : draft.defaultEntryKey !== router.defaultEntryKey
+                ? { defaultEntryKey: draft.defaultEntryKey }
+                : {}),
           }
         : fields;
       const response = router

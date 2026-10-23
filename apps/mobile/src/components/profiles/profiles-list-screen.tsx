@@ -28,7 +28,6 @@ import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-s
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatProfileCountItems, profileCountItems } from '@/lib/profile-count-labels';
 import { type AgentProfileListItem, useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
-import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useOrganization } from '@/lib/organization-context';
 import {
   getNewProfilePath,
@@ -77,7 +76,6 @@ export function ProfilesListScreen({
   const colors = useThemeColors();
   const { organizationId, isLoaded } = useOrganization();
   const isOrgContext = organizationId != null;
-  const canManage = useCanManageOrganizationProfiles(organizationId ?? undefined);
   const {
     orgProfiles,
     personalProfiles,
@@ -117,11 +115,9 @@ export function ProfilesListScreen({
       <ScreenHeader
         title={t('profiles.title')}
         headerRight={
-          canManage ? (
-            <IconButton onPress={openNewProfile} accessibilityLabel={t('profiles.newProfile')}>
-              <Plus size={22} color={colors.foreground} />
-            </IconButton>
-          ) : undefined
+          <IconButton onPress={openNewProfile} accessibilityLabel={t('profiles.newProfile')}>
+            <Plus size={22} color={colors.foreground} />
+          </IconButton>
         }
       />
       <TabScreenScrollView
@@ -159,11 +155,9 @@ export function ProfilesListScreen({
             description={t('profiles.emptyDescription')}
             placement="top"
             action={
-              canManage ? (
-                <Button className={STATE_ACTION_CLASS} onPress={openNewProfile}>
-                  <Text>{t('profiles.newProfile')}</Text>
-                </Button>
-              ) : null
+              <Button className={STATE_ACTION_CLASS} onPress={openNewProfile}>
+                <Text>{t('profiles.newProfile')}</Text>
+              </Button>
             }
           />
         )}

@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { ProfilesListScreen } from '@/components/profiles/profiles-list-screen';
 import { renderWithProviders } from '@/test/render-with-providers';
-const canManageState = vi.hoisted(() => ({ value: true }));
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
@@ -67,9 +66,6 @@ vi.mock('@/lib/organization-context', () => ({
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: routerPush }),
-}));
-vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useCanManageOrganizationProfiles: () => canManageState.value,
 }));
 
 vi.mock('@/lib/profile-agent-navigation', () => ({
@@ -161,7 +157,6 @@ describe('ProfilesListScreen', () => {
     refetchFn.mockReset();
     routerPush.mockReset();
     organizationState.organizationId = 'org-1';
-    canManageState.value = true;
     connectivityState.value = 'online';
     Object.assign(listState, {
       orgProfiles: [],

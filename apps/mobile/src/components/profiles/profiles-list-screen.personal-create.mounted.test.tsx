@@ -22,9 +22,6 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
     refetch: vi.fn(),
   }),
 }));
-vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useCanManageOrganizationProfiles: () => false,
-}));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   getCommittedConnectivityStatus: () => 'online',
   useCommittedConnectivityStatus: () => 'online',
@@ -34,7 +31,8 @@ vi.mock('@/lib/organization-context', () => ({
 }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: h.push }) }));
 vi.mock('@/lib/profile-agent-navigation', () => ({
-  getNewProfilePath: () => '/profiles/new',
+  getNewProfilePath: (stack: 'app' | 'profileTab') =>
+    stack === 'app' ? '/app-stack/profiles/new' : '/(app)/(tabs)/(3_profile)/profiles/new',
   getProfileOverviewPath: (profileId: string) => `/profiles/${profileId}`,
 }));
 vi.mock('react-native', () => ({ View: 'View' }));
@@ -61,22 +59,24 @@ vi.mock('@/components/ui/icons', () => ({
   User: 'User',
 }));
 
-describe('ProfilesListScreen read-only organization scope', () => {
+describe('ProfilesListScreen profile creation navigation', () => {
   beforeEach(() => {
     h.orgProfiles = [];
     h.personalProfiles = [];
     h.push.mockReset();
   });
 
-  it('renders without profile creation actions', async () => {
+  it('renders the profile creation entry point in organization context', async () => {
     const { renderer, unmount } = await renderWithProviders(
       createElement(ProfilesListScreen, { stack: 'profileTab' })
     );
-
     const elements = renderer.root.findAll(node => typeof node.type === 'string');
-    expect(elements.filter(node => String(node.type) === 'IconButton')).toHaveLength(0);
-    expect(elements.find(node => String(node.type) === 'EmptyState')?.props.action).toBeNull();
+    const createAction = elements.find(node => String(node.type) === 'IconButton');
+    expect(createAction).toBeDefined();
+    expect(createAction?.props.accessibilityLabel).toBe('New profile');
 
+    const emptyState = elements.find(node => String(node.type) === 'EmptyState');
+    expect(emptyState?.props.action).toBeTruthy();
     unmount();
   });
 });

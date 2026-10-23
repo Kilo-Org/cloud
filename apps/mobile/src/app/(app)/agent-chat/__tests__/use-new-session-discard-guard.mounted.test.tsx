@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   alertMock,
+  backMock,
   classNameOf,
   dismissDialogSheet,
   dispatchMock,
@@ -10,6 +11,7 @@ import {
   isType,
   mountGuard,
   mountGuardWithAttachments,
+  mountGuardWithPicker,
   noOpDiscard,
   platform,
   PLATFORMS,
@@ -86,16 +88,20 @@ describe('useNewSessionDiscardGuard', () => {
     });
   });
 
-  it('leaves with no confirm when the prompt is empty', () => {
+  it('leaves without a confirm when the prompt is empty', () => {
     const { renderer } = mountGuard(false, noOpDiscard);
 
-    expect(usePreventRemoveMock).toHaveBeenCalledTimes(1);
-    expect(usePreventRemoveMock.mock.calls[0]?.[0]).toBe(false);
+    // The removal is held for every prompt state: a Back that lands while a
+    // picker is presenting arrives before this screen re-rendered, so the guard
+    // reads the live stack when the removal happens instead of at render.
+    expect(usePreventRemoveMock.mock.calls[0]?.[0]).toBe(true);
 
-    // The hook never invokes the callback when the boolean is false, so the
-    // guard delegates the decision to the hook and nothing else fires.
+    const action = triggerPreventRemoveInAct();
+
+    // No picker above and nothing to lose: the leave is replayed unchanged.
+    expect(dispatchMock).toHaveBeenCalledTimes(1);
+    expect(dispatchMock).toHaveBeenCalledWith(action);
     expect(alertMock).not.toHaveBeenCalled();
-    expect(dispatchMock).not.toHaveBeenCalled();
     expect(renderedLabels(renderer)).not.toContain('Discard draft?');
 
     act(() => {
@@ -230,6 +236,56 @@ describe('useNewSessionDiscardGuard', () => {
       });
     }
   );
+
+  it('keeps a Back that lands while a picker is presenting with that picker', () => {
+    // Clean prompt: the picker rule is the only reason the removal is held.
+    const { renderer } = mountGuardWithPicker();
+
+    expect(usePreventRemoveMock.mock.calls[0]?.[0]).toBe(true);
+
+    const action = { type: 'GO_BACK' };
+    act(() => {
+      usePreventRemoveHolder.callback?.({
+        data: { action },
+        repeat: () => {
+          dispatchMock(action);
+        },
+      });
+    });
+
+    // The picker route is the top of the stack, so closing it is the removal
+    // the Back asked for; the composer is never replayed away.
+    expect(backMock).toHaveBeenCalledTimes(1);
+    expect(dispatchMock).not.toHaveBeenCalled();
+    expect(alertMock).not.toHaveBeenCalled();
+    expect(renderedLabels(renderer)).not.toContain('Discard draft?');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('replays a forward removal that happens while a picker is above', () => {
+    const { renderer } = mountGuardWithPicker();
+
+    const action = { type: 'RESET' };
+    act(() => {
+      usePreventRemoveHolder.callback?.({
+        data: { action },
+        repeat: () => {
+          dispatchMock(action);
+        },
+      });
+    });
+
+    expect(backMock).not.toHaveBeenCalled();
+    expect(dispatchMock).toHaveBeenCalledTimes(1);
+    expect(dispatchMock).toHaveBeenCalledWith(action);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
 
   it.each(PLATFORMS)('keeps the draft and stays when the confirm is dismissed (%s)', os => {
     platform.os = os;

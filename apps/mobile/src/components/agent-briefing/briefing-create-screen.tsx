@@ -142,6 +142,9 @@ export function BriefingCreateScreen() {
                 key={item.context.id}
                 size="sm"
                 variant={organizationId === item.context.organizationId ? 'secondary' : 'outline'}
+                accessibilityState={{
+                  selected: organizationId === item.context.organizationId,
+                }}
                 disabled={busy}
                 onPress={() => {
                   creation.reset();
@@ -170,6 +173,7 @@ export function BriefingCreateScreen() {
                 key={item.value}
                 size="sm"
                 variant={preset === item.value ? 'secondary' : 'outline'}
+                accessibilityState={{ selected: preset === item.value }}
                 disabled={busy}
                 onPress={() => {
                   creation.reset();

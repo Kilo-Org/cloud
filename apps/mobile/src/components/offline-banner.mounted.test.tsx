@@ -30,7 +30,7 @@ vi.mock('@/lib/trpc', async () => {
   const { createTRPCContext } = await import('@trpc/tanstack-react-query');
   return createTRPCContext<MobileRouter>();
 });
-vi.mock('react-native', () => ({ View: 'View', Switch: 'Switch' }));
+vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, View: 'View', Switch: 'Switch' }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: () => ({}) },

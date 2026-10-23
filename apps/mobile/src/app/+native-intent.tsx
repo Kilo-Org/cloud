@@ -38,7 +38,7 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
   }
   if (__DEV__) {
     const reviewCopyFixture =
-      /(?:^|\/)dev\/pr-review-copy-fixture\/(checks|navigator|files|merge|overview|merge-request-missing|merge-request-error|submit)\/?(?:\?(.*))?$/.exec(
+      /(?:^|\/)dev\/pr-review-copy-fixture\/(checks|navigator|files|merge|overview|merge-request-missing|merge-request-error|submit)\/?(?:\?([^#]*))?(?:#.*)?$/.exec(
         path
       );
     if (reviewCopyFixture) {

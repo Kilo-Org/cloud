@@ -6140,10 +6140,7 @@
                             },
                             "account": {
                               "type": "string",
-                              "enum": [
-                                "kilo",
-                                "byoc"
-                              ]
+                              "const": "byoc"
                             }
                           },
                           "required": [
@@ -6855,10 +6852,7 @@
                             },
                             "account": {
                               "type": "string",
-                              "enum": [
-                                "kilo",
-                                "byoc"
-                              ]
+                              "const": "byoc"
                             }
                           },
                           "required": [
@@ -17147,10 +17141,7 @@
                                 },
                                 "account": {
                                   "type": "string",
-                                  "enum": [
-                                    "kilo",
-                                    "byoc"
-                                  ]
+                                  "const": "byoc"
                                 }
                               },
                               "required": [
@@ -17868,10 +17859,7 @@
                                 },
                                 "account": {
                                   "type": "string",
-                                  "enum": [
-                                    "kilo",
-                                    "byoc"
-                                  ]
+                                  "const": "byoc"
                                 }
                               },
                               "required": [
@@ -32047,7 +32035,7 @@
                 "anyOf": [
                   {
                     "type": "number",
-                    "minimum": 1e-06,
+                    "minimum": 0.000001,
                     "maximum": 1000000
                   },
                   {
@@ -34872,7 +34860,7 @@
   "userExports.list": {
     "path": "userExports.list",
     "kind": "query",
-    "summary": "List data exports visible to the current user \u2014 their own export requests plus exports belonging to organizations they can export from \u2014 with cursor-based pagination ordered newest first.",
+    "summary": "List data exports visible to the current user — their own export requests plus exports belonging to organizations they can export from — with cursor-based pagination ordered newest first.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -34889,7 +34877,7 @@
       "list",
       "cursor"
     ],
-    "searchBlob": "userExports.list List data exports visible to the current user \u2014 their own export requests plus exports belonging to organizations they can export from \u2014 with cursor-based pagination ordered newest first. userexports list cursor cursor"
+    "searchBlob": "userExports.list List data exports visible to the current user — their own export requests plus exports belonging to organizations they can export from — with cursor-based pagination ordered newest first. userexports list cursor cursor"
   },
   "userExports.request": {
     "path": "userExports.request",
@@ -35009,6 +34997,166 @@
       "context_json"
     ],
     "searchBlob": "userFeedback.create Submit user feedback or a bug report to the Kilo team along with context about the app area and source it came from. userfeedback create feedback_text feedback_for feedback_batch source context_json feedback_text feedback_for feedback_batch source context_json"
+  },
+  "vercelCompute.add": {
+    "path": "vercelCompute.add",
+    "kind": "mutation",
+    "summary": "Connect an organization's Vercel account for compute by validating a token, team, and project and starting the snapshot build setup.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "teamId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "token",
+        "teamId",
+        "projectId"
+      ]
+    },
+    "tags": [
+      "vercelcompute",
+      "add",
+      "token",
+      "teamid",
+      "projectid"
+    ],
+    "searchBlob": "vercelCompute.add Connect an organization's Vercel account for compute by validating a token, team, and project and starting the snapshot build setup. vercelcompute add token teamid projectid token teamId projectId"
+  },
+  "vercelCompute.discoverProjects": {
+    "path": "vercelCompute.discoverProjects",
+    "kind": "mutation",
+    "summary": "List the Vercel projects available within a chosen Vercel team using a provided API token, for selecting the project to use for Vercel compute.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "teamId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "token",
+        "teamId"
+      ]
+    },
+    "tags": [
+      "vercelcompute",
+      "discoverprojects",
+      "token",
+      "teamid"
+    ],
+    "searchBlob": "vercelCompute.discoverProjects List the Vercel projects available within a chosen Vercel team using a provided API token, for selecting the project to use for Vercel compute. vercelcompute discoverprojects token teamid token teamId"
+  },
+  "vercelCompute.discoverTeams": {
+    "path": "vercelCompute.discoverTeams",
+    "kind": "mutation",
+    "summary": "List the Vercel teams accessible with a provided Vercel API token so an admin can choose which team to connect for Vercel compute.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "token"
+      ]
+    },
+    "tags": [
+      "vercelcompute",
+      "discoverteams",
+      "token"
+    ],
+    "searchBlob": "vercelCompute.discoverTeams List the Vercel teams accessible with a provided Vercel API token so an admin can choose which team to connect for Vercel compute. vercelcompute discoverteams token token"
+  },
+  "vercelCompute.getEnrollment": {
+    "path": "vercelCompute.getEnrollment",
+    "kind": "query",
+    "summary": "Check whether an organization is enrolled in customer-paid Vercel compute (bring your own Vercel account) and can use the integration.",
+    "inputSchema": {},
+    "tags": [
+      "vercelcompute",
+      "getenrollment"
+    ],
+    "searchBlob": "vercelCompute.getEnrollment Check whether an organization is enrolled in customer-paid Vercel compute (bring your own Vercel account) and can use the integration. vercelcompute getenrollment"
+  },
+  "vercelCompute.getStatus": {
+    "path": "vercelCompute.getStatus",
+    "kind": "query",
+    "summary": "Get the current Vercel compute setup status for an organization, including setup progress, errors, connected team and project, runtime version, and whether a runtime upgrade is available.",
+    "inputSchema": {},
+    "tags": [
+      "vercelcompute",
+      "getstatus"
+    ],
+    "searchBlob": "vercelCompute.getStatus Get the current Vercel compute setup status for an organization, including setup progress, errors, connected team and project, runtime version, and whether a runtime upgrade is available. vercelcompute getstatus"
+  },
+  "vercelCompute.remove": {
+    "path": "vercelCompute.remove",
+    "kind": "mutation",
+    "summary": "Disconnect and remove the organization's Vercel compute configuration, optionally acknowledging cleanup failures so credentials can still be deleted.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "acknowledgeCleanupFailure": {
+          "type": "boolean"
+        }
+      }
+    },
+    "tags": [
+      "vercelcompute",
+      "remove",
+      "acknowledgecleanupfailure"
+    ],
+    "searchBlob": "vercelCompute.remove Disconnect and remove the organization's Vercel compute configuration, optionally acknowledging cleanup failures so credentials can still be deleted. vercelcompute remove acknowledgecleanupfailure acknowledgeCleanupFailure"
+  },
+  "vercelCompute.retrySetup": {
+    "path": "vercelCompute.retrySetup",
+    "kind": "mutation",
+    "summary": "Retry a failed or stuck Vercel compute setup for an organization after cleaning up the previous build.",
+    "inputSchema": {},
+    "tags": [
+      "vercelcompute",
+      "retrysetup"
+    ],
+    "searchBlob": "vercelCompute.retrySetup Retry a failed or stuck Vercel compute setup for an organization after cleaning up the previous build. vercelcompute retrysetup"
+  },
+  "vercelCompute.upgradeRuntime": {
+    "path": "vercelCompute.upgradeRuntime",
+    "kind": "mutation",
+    "summary": "Upgrade the Vercel compute runtime snapshot to the latest available version for an organization that is already set up.",
+    "inputSchema": {},
+    "tags": [
+      "vercelcompute",
+      "upgraderuntime"
+    ],
+    "searchBlob": "vercelCompute.upgradeRuntime Upgrade the Vercel compute runtime snapshot to the latest available version for an organization that is already set up. vercelcompute upgraderuntime"
   },
   "webhookTriggers.capabilities": {
     "path": "webhookTriggers.capabilities",

@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { Bell, Clock, Cpu, FolderGit2, Zap } from '@/components/ui/icons';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Switch, View } from 'react-native';
+import { View } from 'react-native';
 
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
@@ -11,6 +11,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';

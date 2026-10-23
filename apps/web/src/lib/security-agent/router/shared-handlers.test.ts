@@ -41,10 +41,8 @@ const mockListSecurityFindings = jest.fn<() => Promise<unknown>>();
 const mockCanStartAnalysis = jest.fn<(owner: unknown) => Promise<unknown>>();
 const mockEnqueueBacklogFindings = jest.fn<() => Promise<number>>();
 const mockGetSecurityAgentConfigWithStatus = jest.fn<() => Promise<unknown>>();
-const mockDecorateFindingWithRemediation =
-  jest.fn<(params: unknown) => Promise<unknown>>();
-const mockDecorateFindingsWithRemediation =
-  jest.fn<(params: unknown) => Promise<unknown>>();
+const mockDecorateFindingWithRemediation = jest.fn<(params: unknown) => Promise<unknown>>();
+const mockDecorateFindingsWithRemediation = jest.fn<(params: unknown) => Promise<unknown>>();
 const mockGetRemediationAttemptHistory = jest.fn<() => Promise<unknown>>();
 const mockDeleteFindingsByRepository =
   jest.fn<(params: unknown) => Promise<{ deletedCount: number }>>();

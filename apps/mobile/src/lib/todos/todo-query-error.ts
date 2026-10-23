@@ -1,26 +1,20 @@
 // Pure error-state selector for the to-do list and detail screens.
 //
 // A denial is not a transient failure: the caller may no longer reach the list
-// or item, so it shows the access-denied state and offers no Retry. The retry
-// decision is `!isTerminalTrpcCode(code)`, the same rule the organization
-// members list uses, so no permanent code carries a refetch that cannot help.
+// or item, so it shows the access-denied state and offers no Retry. The variant
+// comes from the shared tRPC code mapping and the retry decision is
+// `!isTerminalTrpcCode(code)`, the same rule the organization and profile lists
+// use, so no permanent code carries a refetch that cannot help.
 
-import { isTerminalTrpcCode, readTrpcErrorField } from '@/lib/trpc-error';
+import { type QueryErrorVariant } from '@/components/query-error';
+import { isTerminalTrpcCode, readTrpcErrorField, trpcErrorVariant } from '@/lib/trpc-error';
 
 export type TodoQueryErrorView = {
-  variant: 'permission' | 'not-found' | 'server';
+  variant: QueryErrorVariant;
   showRetry: boolean;
 };
 
 export function selectTodoQueryErrorView(error: unknown): TodoQueryErrorView {
   const code = readTrpcErrorField(error, 'code');
-
-  let variant: TodoQueryErrorView['variant'] = 'server';
-  if (code === 'FORBIDDEN' || code === 'UNAUTHORIZED') {
-    variant = 'permission';
-  } else if (code === 'NOT_FOUND') {
-    variant = 'not-found';
-  }
-
-  return { variant, showRetry: !isTerminalTrpcCode(code) };
+  return { variant: trpcErrorVariant(code), showRetry: !isTerminalTrpcCode(code) };
 }

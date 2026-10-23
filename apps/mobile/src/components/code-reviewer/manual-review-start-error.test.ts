@@ -43,16 +43,21 @@ describe('manualReviewStartFailureKey', () => {
     expect(manualReviewStartFailureKey(undefined)).toBe('codeReviewer.manualReview.startFailed');
   });
 
-  it('reads the code from either shape a client error carries', () => {
+  it('reads the code from every shape a tRPC error carries', () => {
     expect(manualReviewStartFailureKey({ data: { code: 'NOT_FOUND' } })).toBe(
       'codeReviewer.manualReview.startNotFound'
+    );
+    expect(manualReviewStartFailureKey({ shape: { data: { code: 'CONFLICT' } } })).toBe(
+      'codeReviewer.manualReview.startAlreadyRunning'
     );
     expect(manualReviewStartFailureKey({ code: 'NOT_FOUND' })).toBe(
       'codeReviewer.manualReview.startNotFound'
     );
-    // A non-string code is not a code: it falls back rather than rendering a
+    // A non-string code is no code: the transport copy renders instead of a
     // malformed catalog key.
-    expect(manualReviewStartFailureKey({ data: { code: 42 } })).toBe('codeReviewer.unknownError');
+    expect(manualReviewStartFailureKey({ data: { code: 42 } })).toBe(
+      'codeReviewer.manualReview.startFailed'
+    );
   });
 });
 
@@ -63,7 +68,7 @@ describe('manualReviewStartFailureMessage', () => {
       'github'
     );
     expect(message).toBe(
-      'GitHub could not find that pull request. Check the URL, or make sure the repository is public.'
+      'Could not read that pull request from GitHub. Check the URL and that the repository is accessible.'
     );
     expect(message).not.toBe(SERVER_NOT_FOUND);
     expect(message).not.toContain('{{');
@@ -71,15 +76,10 @@ describe('manualReviewStartFailureMessage', () => {
 
   it('uses the merge-request noun for GitLab', () => {
     const message = manualReviewStartFailureMessage(
-      trpcError(
-        'PRECONDITION_FAILED',
-        'Connect GitLab before starting a manual Code Reviewer job.'
-      ),
+      trpcError('CONFLICT', 'A provider-publishing Code Reviewer job is already active for this change.'),
       'gitlab'
     );
-    expect(message).toBe(
-      'Manual reviews need the standard GitLab connection. Connect it and try again.'
-    );
+    expect(message).toBe('A review for that merge request is already running.');
   });
 
   it('follows the app language', async () => {
@@ -91,7 +91,7 @@ describe('manualReviewStartFailureMessage', () => {
       );
       expect(message).toContain('GitHub');
       expect(message).toContain(i18n.t('common.pullRequest'));
-      expect(message).not.toContain('could not find');
+      expect(message).not.toContain('Could not read');
     } finally {
       await i18n.changeLanguage('en');
     }

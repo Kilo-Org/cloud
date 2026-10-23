@@ -181,7 +181,7 @@ describe('ManualReviewScreen start failure copy', () => {
 
     const texts = renderedTexts(renderer);
     expect(texts).toContain(
-      'GitHub could not find that pull request. Check the URL, or make sure the repository is public.'
+      'Could not read that pull request from GitHub. Check the URL and that the repository is accessible.'
     );
     expect(texts).not.toContain(SERVER_NOT_FOUND);
     // The recovery control stays beside the failure.
@@ -220,16 +220,23 @@ describe('ManualReviewScreen start failure copy', () => {
     const { renderer, unmount } = await renderScreen();
     const handlers = startReview(renderer);
 
+    // The tRPC client wraps the deadline rejection: the deadline class sits on
+    // the cause chain, and the wrapper carries the error code. Reaching the
+    // stall through the walk is what the screen relies on in production.
     const deadline = new Error('deadline');
     deadline.name = 'RequestDeadlineError';
-    act(() => handlers.onError?.(Object.assign(deadline, { data: { code: 'NOT_FOUND' } })));
+    act(() =>
+      handlers.onError?.(
+        Object.assign(new Error('TRPCClientError'), { cause: deadline, data: { code: 'NOT_FOUND' } })
+      )
+    );
 
     const texts = renderedTexts(renderer);
     expect(texts).toContain(
       'This is taking longer than expected. You can close this and check again.'
     );
     expect(texts).not.toContain(
-      'GitHub could not find that pull request. Check the URL, or make sure the repository is public.'
+      'Could not read that pull request from GitHub. Check the URL and that the repository is accessible.'
     );
     unmount();
   });

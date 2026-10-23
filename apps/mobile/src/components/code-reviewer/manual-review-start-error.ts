@@ -1,22 +1,24 @@
 import { i18n } from '@/i18n';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 
 type ManualReviewStartPlatform = 'github' | 'gitlab';
 
 /**
  * Catalog keys for a manual-review start failure, one per tRPC code the
  * `createManualReviewJob` procedures throw — `apps/web/src/lib/code-reviews/
- * manual-code-review-jobs.ts` and the org router's membership check. The
- * message text the server sends is English, so the screen renders the
+ * manual-code-review-jobs.ts` and the org router's membership and trial gates.
+ * The message text the server sends is English, so the screen renders the
  * localized copy for the code instead. `startFailed` covers a transport
  * failure (no code at all), and an unrecognized code keeps the generic
  * `unknownError`.
  */
-export const MANUAL_REVIEW_START_FAILURE_KEYS = {
-  // Provider cannot read the pull/merge request: 404 from the provider, no
-  // installation that can read it, or every connected one failed.
+const MANUAL_REVIEW_START_FAILURE_KEYS = {
+  // The change could not be read: a provider 404, no connected installation
+  // that can read it, or a missing organization.
   NOT_FOUND: 'codeReviewer.manualReview.startNotFound',
   TOO_MANY_REQUESTS: 'codeReviewer.manualReview.startRateLimited',
+  // A member-role denial, or an organization whose trial has expired.
   FORBIDDEN: 'codeReviewer.manualReview.startNotAllowed',
   UNAUTHORIZED: 'codeReviewer.manualReview.startNotAllowed',
   // No connected provider, or only the read-only ("lite") app connected.
@@ -34,15 +36,6 @@ export type ManualReviewStartFailureKey =
   | 'codeReviewer.manualReview.startFailed'
   | 'codeReviewer.unknownError';
 
-/** The tRPC error code a rejected call carries, if any. */
-function manualReviewStartErrorCode(error: unknown): string | undefined {
-  // tRPC client errors carry the code on `data.code`; some wrappers keep it on
-  // the error itself. The value is read, never trusted: an unrecognized or
-  // absent code falls back to the generic copy below.
-  const clientError = error as { data?: { code?: string }; code?: string } | null | undefined;
-  return clientError?.data?.code ?? clientError?.code;
-}
-
 /** Whether the code has its own sentence, narrowing to its map key. */
 function isMappedStartCode(code: string): code is keyof typeof MANUAL_REVIEW_START_FAILURE_KEYS {
   return Object.hasOwn(MANUAL_REVIEW_START_FAILURE_KEYS, code);
@@ -50,7 +43,7 @@ function isMappedStartCode(code: string): code is keyof typeof MANUAL_REVIEW_STA
 
 /** The catalog key for a failed start: by error code, never by message text. */
 export function manualReviewStartFailureKey(error: unknown): ManualReviewStartFailureKey {
-  const code = manualReviewStartErrorCode(error);
+  const code = readTrpcErrorField(error, 'code');
   if (code === undefined) {
     return 'codeReviewer.manualReview.startFailed';
   }

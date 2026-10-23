@@ -1,13 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Switch, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { ModelSelector } from '@/components/agents/model-selector';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { type BriefingPreferences } from '@/lib/agent-briefing';
 import { briefingMoney } from '@/lib/agent-briefing-format';
 import {
@@ -98,6 +100,9 @@ export function BriefingContextSettings({
               : data
         );
         return { previous };
+      },
+      onSuccess: () => {
+        announcingToast.success(t('agentBriefing.saved'));
       },
       onError: (_error, _input, context) => {
         for (const [key, value] of context?.previous ?? []) {

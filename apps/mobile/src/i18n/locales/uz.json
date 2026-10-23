@@ -182,7 +182,7 @@
     "codeArrivalHint": "Agar bu manzil talablarga mos kelsa, kod bir daqiqa ichida keladi.",
     "verifyCode": "Kodni tekshirish",
     "resendCode": "Kodni qayta yuborish",
-    "termsPrefix": "Davom etish orqali quyidagi hujjatlarga rozilik bildirasiz:",
+    "termsPrefix": "Davom etish orqali quyidagi hujjatlarga rozilik bildirasiz: ",
     "terms": "Shartlar",
     "termsConnector": " va ",
     "termsSuffix": ".",
@@ -293,7 +293,8 @@
     "condenseToolCallsSubtitle": "Ketma-ket vosita chaqiruvlarini ochishingiz mumkin bo'lgan bitta qatorga guruhlang.",
     "toolSummaryTranslation": "Vosita xulosalarini tarjima qilish",
     "toolSummaryTranslationSubtitle": "Har bir vosita xulosasini ilova tilingizga tarjima qilish uchun modelga yuboring. Tarjima muvaffaqiyatsiz bo'lsa, asl nusxa ko'rsatiladi.",
-    "toolSummaryTranslationModelUnavailableNotice": "Bu model endi taklif etilmaydi. Boshqasini tanlash uchun $t(common.model) ga teging."
+    "toolSummaryTranslationModelUnavailableNotice": "Bu model endi taklif etilmaydi. Boshqasini tanlash uchun $t(common.model) ga teging.",
+    "autoExpandThinkingInactiveSubtitle": "Fikrlash tafsilotlari yashirilganda hech qanday ta'sir ko'rsatmaydi."
   },
   "prReview": {
     "pullRequestUnavailable": "PR mavjud emas",
@@ -622,9 +623,15 @@
       "viewOnGitHub": "PRni GitHubda ko'rish",
       "noChecksReported": "Tekshiruv natijalari yo'q",
       "passed": "{{displayCount}} tasi o'tdi",
+      "passed_one": "{{displayCount}} tasi o'tdi",
+      "passed_other": "{{displayCount}} tasi o'tdi",
       "failed": "{{displayCount}} tasi o'tmadi",
+      "failed_one": "{{displayCount}} tasi o'tmadi",
+      "failed_other": "{{displayCount}} tasi o'tmadi",
       "pending": "{{displayCount}} tasi kutilmoqda",
       "skipped": "{{displayCount}} tasi o'tkazib yuborildi",
+      "skipped_one": "{{displayCount}} tasi o'tkazib yuborildi",
+      "skipped_other": "{{displayCount}} tasi o'tkazib yuborildi",
       "checksCount": "{{displayCount}} tekshiruv",
       "checksCount_one": "{{displayCount}} tekshiruv",
       "checksCount_other": "{{displayCount}} tekshiruv",
@@ -669,7 +676,8 @@
       "gitlabDescription": "Telefonda merge so‘rovlarini ko‘rib chiqish uchun GitLab hisobingizni ulang.",
       "bitbucketDescription": "Telefonda PRlarni ko‘rib chiqish uchun Bitbucketni ushbu tashkilotga ulang.",
       "bitbucketOrgOnlyDescription": "Yuqoridagi hisobni tashkilotga oʻtkazing, uning Bitbucket PRlarini koʻrib chiqish uchun.",
-      "contextLine": "{{organization}} uchun"
+      "contextLine": "{{organization}} uchun",
+      "contextLinePersonal": "Shaxsiy hisob uchun"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1429,6 +1437,8 @@
       "showMore": "Ko'proq ko'rsatish",
       "created": "Yaratilgan",
       "started": "Boshlangan",
+      "reviewEnded": "Tugagan",
+      "severityNitpick": "Arzimagan",
       "tokens": "Token",
       "tokensInOut": "{{input}} kirish / {{output}} chiqish",
       "council": "Kengash",
@@ -1452,7 +1462,13 @@
       "sessionError": "Seansda xato yuz berdi: {{error}}.",
       "statusWithValue": "Holat: {{status}}",
       "toolName": "Vosita: {{name}}",
-      "toolNameError": "{{name}} vositasida xato yuz berdi."
+      "toolNameError": "{{name}} vositasida xato yuz berdi.",
+      "cancelReasonSuperseded": "Yangiroq commit yuborildi, shuning uchun bu ko'rib chiqish almashtirildi.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} uzilgan, shuning uchun bu ko'rib chiqish bekor qilindi. Uni qayta ulang, so'ng ko'rib chiqishni qayta ishga tushiring.",
+      "cancelReasonBitbucketReviewerDisabled": "Bitbucket uchun Code Reviewer o'chirilgan edi, shuning uchun bu ko'rib chiqish bekor qilindi. Uni yana yoqing, so'ng ko'rib chiqishni qayta ishga tushiring.",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket pull request so'rovi o'zgardi, shuning uchun bu ko'rib chiqish almashtirildi.",
+      "cancelReasonCancelled": "Bu ko'rib chiqish bekor qilindi.",
+      "cancelReasonInterrupted": "Bu ko'rib chiqish uzilib qoldi."
     },
     "reviewMemory": {
       "title": "Ko‘rib chiqish xotirasi",
@@ -1479,7 +1495,15 @@
       "instructions": "Ko'rsatmalar (ixtiyoriy)",
       "instructionsPlaceholder": "Ko'rib chiqishda alohida e'tibor beriladigan jihatlar…",
       "starting": "Ko'rib chiqish boshlanmoqda…",
-      "start": "Ko'rib chiqishni boshlash"
+      "start": "Ko'rib chiqishni boshlash",
+      "startNotFound": "Ushbu {{requestNoun}}ni {{provider}}dan o'qib bo'lmadi. URL manzilini va repozitoriyaga kirish mumkinligini tekshiring.",
+      "startRateLimited": "{{provider}} hozirda so'rovlarni cheklamoqda. Bir necha daqiqadan so'ng qayta urinib ko'ring.",
+      "startNotAllowed": "Ushbu {{requestNoun}} uchun ko'rib chiqishni boshlash huquqingiz yo'q. Ruxsatlaringizni va tashkilotingizning tarif rejasini tekshiring.",
+      "startProviderNeedsAttention": "Qo'lda ko'rib chiqish standart {{provider}} ulanishini talab qiladi. Uni ulang va qayta urinib ko'ring.",
+      "startAlreadyRunning": "Ushbu {{requestNoun}} uchun ko'rib chiqish allaqachon davom etmoqda.",
+      "startRejected": "Ushbu {{requestNoun}}ni ko'rib chiqish mumkin emas. Uning ochiq ekanini, qoralama emasligini va URL manzil to'g'ri ekanini tekshiring.",
+      "startProviderUnavailable": "Ushbu {{requestNoun}}ni o'qish uchun {{provider}}ga ulanib bo'lmadi. Qayta urinib ko'ring.",
+      "startFailed": "Ko'rib chiqishni boshlab bo'lmadi. Internetingizni tekshirib, qayta urinib ko'ring."
     },
     "notConnectedReadOnly": "{{platform}} ulanmagan. Faqat tashkilot egalar va administratorlar uni ulashi mumkin.",
     "gitlab": {
@@ -1731,7 +1755,7 @@
       "deadlinePassed": "Muddat o'tdi",
       "deadlinePassedDetail": "{{critical}} ta o‘ta yuqori, {{high}} ta yuqori",
       "dueThisWeek": "Muddati shu hafta tugaydi",
-      "dueThisWeekDetail": "{{exploitable}} ta muammodan hujumda foydalanish mumkinligi tasdiqlangan",
+      "dueThisWeekDetail": "{{exploitable}} tasida hujumda foydalanish mumkinligi tasdiqlangan",
       "noDeadline": "Muddat yo'q",
       "reviewSlaAssignment": "SLA muddati belgilanishini ko'rib chiqish",
       "allOpenFindingsTracked": "Barcha ochiq muammolar kuzatilmoqda"
@@ -1891,11 +1915,17 @@
       "actorSystem": "Kilo tizimi",
       "couldNotLoad": "Audit hisobotini yuklab bo'lmadi.",
       "events": "Hodisalar",
+      "eventConfidence": "Ishonch: {{confidence}}",
+      "eventReason": "Sabab: {{reason}}",
+      "eventsCount_one": "{{displayCount}} ta hodisa",
+      "eventsCount_other": "{{displayCount}} ta hodisa",
       "generated": "Yaratilgan vaqt: {{generatedAt}}.",
       "noActivity": "Qayd etilgan faoliyat yo'q",
       "noActivityDescription": "{{start}} dan {{end}} gacha Kilo tizimida xavfsizlik muammolari bo'yicha hisobotga kiritiladigan amallar qayd etilmagan.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repozitoriya qayd etilmagan",
+      "reasonUnknown": "Tanilmagan sabab",
+      "severityCount": "{{displayCount}} ta {{label}}",
       "summary": "Hisobot xulosasi",
       "title": "Audit hisoboti",
       "unavailable": "Audit hisoboti mavjud emas",
@@ -1948,8 +1978,9 @@
       "couldNotLoad": "Xavfsizlik agentini yuklab bo'lmadi.",
       "installApp": "GitHub ilovasini o'rnatish",
       "reauthorizeButton": "GitHub ilovasiga qayta ruxsat berish",
-      "reauthorizeDescription": "Xavfsizlik agentiga Dependabot ogohlantirishlarini olish uchun vulnerability_alerts ruxsati kerak. Bu ruxsatni berish uchun GitHub ilovasiga qayta ruxsat bering.",
+      "reauthorizeDescription": "Xavfsizlik agentiga Dependabot ogohlantirishlarini o'qish uchun ruxsat kerak. Bu ruxsatni berish uchun GitHub ilovasiga qayta ruxsat bering.",
       "reauthorizeTitle": "Qo'shimcha ruxsatlar talab qilinadi",
+      "retryFailed": "Xavfsizlik agentini hali ham yuklab bo'lmadi. Iltimos, aloqani tekshirib, qayta urinib ko'ring.",
       "setupFailed": "GitHubni sozlashni boshlab bo'lmadi. Iltimos, qayta urinib ko'ring."
     },
     "queuedActionUntracked": "Navbatga qo'yilgan amalni kuzatish imkoni yo'qoldi. Eng so'nggi holatni ko'rish uchun yangilang.",
@@ -2112,7 +2143,8 @@
       "dollar_other": "dollar",
       "costSpoken": "xarajati {{cost}}",
       "costSpokenWithTime": "xarajat {{cost}}, {{time}}",
-      "pullRequest": "{{number}}-sonli PR"
+      "pullRequest": "{{number}}-sonli PR",
+      "spokenJoiner": "va"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubni ochib bo'lmadi",
@@ -2248,7 +2280,6 @@
       "couldNotLoadEnvironment": "Muhitingizni yuklab bo'lmadi.",
       "retryLoadingEnvironment": "Muhitni qayta yuklash",
       "defaultEnvironment": "Standart muhit",
-      "environmentSummary": "{{commands}} buyruq · {{mcp}} MCP · {{skills}} ko'nikma · {{agents}} agent",
       "leaveChanges": "O'zgarishlarni qoldirish",
       "commitAndPush": "Kommit va yuborish",
       "startSession": "Sessiyani boshlash",
@@ -2467,7 +2498,71 @@
       "preparationComplete": "Tayyorlash tugallandi",
       "preparationFailed": "Tayyorlashda xatolik yuz berdi",
       "setupCommand": "{{index}}-sozlash buyrug'i",
-      "setupCommandOf": "{{index}}-sozlash buyrug'i, jami {{displayCount}} ta"
+      "setupCommandOf": "{{index}}-sozlash buyrug'i, jami {{displayCount}} ta",
+      "stepWorkspaceSetup": "Workspace sozlanmoqda",
+      "stepDiskCheck": "Disk tekshirilmoqda",
+      "stepCloning": "Repository klonlanmoqda",
+      "stepBranch": "Branch sozlanmoqda",
+      "stepDevcontainerSetup": "Dev konteyner sozlanmoqda",
+      "stepWorkspaceRestore": "Workspace tiklanmoqda",
+      "stepWorkspaceBackup": "Workspace saqlanmoqda",
+      "stepSandboxProvision": "Sandbox tayyorlanmoqda",
+      "stepSandboxBoot": "Sandbox ishga tushmoqda",
+      "stepSnapshotFallback": "Snapshot'siz qayta urinilmoqda",
+      "stepKiloServer": "Kilo ishga tushmoqda",
+      "stepKiloSession": "Sessiya tayyorlanmoqda",
+      "stepRestoreIncomplete": "Sessiya tiklanishi tugallanmadi",
+      "stepReady": "Muhit tayyor",
+      "stepFailed": "Muhit tayyorlashda xatolik yuz berdi",
+      "stepUnknown": "Muhit sozlanmoqda",
+      "detailCreatingSandbox": "Sandbox yaratilmoqda",
+      "detailUpdatingRepository": "Repository yangilanmoqda",
+      "detailCheckingOutBranch": "Branch checkout qilinmoqda",
+      "detailRunningSetupCommands": "Sozlash buyruqlari bajarilmoqda",
+      "detailSavingRepository": "Repository tezroq ishga tushish uchun saqlanmoqda",
+      "detailStartingKiloRuntime": "Kilo runtime ishga tushmoqda",
+      "detailPreparingKiloSession": "Kilo sessiyasi tayyorlanmoqda",
+      "detailWaitingForPreviousSandbox": "Oldingi sandboxning to'xtashi kutilmoqda",
+      "detailRetryingSandboxCreation": "Sandbox yaratish qayta urinilmoqda",
+      "detailPreviousSnapshotFailed": "Oldingi snapshot bilan ishga tushishda xatolik. Snapshot'siz qayta urinilmoqda.",
+      "detailSnapshotStartupFailed": "Snapshot bilan ishga tushishda xatolik. Snapshot'siz qayta urinilmoqda.",
+      "detailStartingSandboxWithoutSnapshot": "Sandbox snapshot'siz ishga tushmoqda",
+      "detailSettingUpWorkspace": "Workspace sozlanmoqda",
+      "detailRestoringSession": "Sessiya tiklanmoqda",
+      "detailWarmWorkspaceReused": "Tayyor workspace qayta ishlatildi",
+      "detailRetryingClone": "Klonlash qayta urinilmoqda ({{total}} tadan {{attempt}}-urinish)",
+      "detailSetupCommandFailed": "{{index}}-sozlash buyrug'i bajarilmadi",
+      "detailSetupCommandTimedOut": "{{index}}-sozlash buyrug'i vaqti tugadi",
+      "detailColdRestore": "Sovutib tiklash, snapshot qo'llanildi, {{total}} fayldan {{applied}} tasi tiklandi",
+      "detailProgressPercent": "{{percent}}% bajarildi",
+      "detailRestoreIncompleteReport": "Sessiya tiklanishi tugallanmadi: {{total}} fayldan {{skipped}} tasi tiklanmadi ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Yetishmayotgan: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} va yana {{omitted}} ta",
+      "detailReasonPatchFailed": "patch qo'llanmadi",
+      "detailReasonOutsideWorkspace": "yo'l workspace tashqarisida",
+      "detailReasonMissingContent": "snapshotda fayl uchun kontent mavjud emas edi",
+      "detailReasonIndexResetFailed": "muvaffaqiyatsiz qo'llashdan keyin indeksni qayta tiklab bo'lmadi",
+      "detailReasonUnlinkFailed": "faylni o'chirib bo'lmadi",
+      "detailReasonWriteFailed": "faylga yozib bo'lmadi",
+      "detailReasonUnknown": "noma'lum sabab",
+      "detailUnknown": "Hali tayyorlanmoqda",
+      "errorPreparationTimeout": "Muhitni tayyorlash vaqti tugadi",
+      "errorWorkspaceSetupFailed": "Workspace sozlashda xatolik yuz berdi",
+      "errorCredentialUpgradeRequired": "Bu sessiyada zarur kredensial yangilanishi yetishmayapti. Davom etish uchun yangi sessiya boshlang.",
+      "errorAgentUnavailable": "Agent mavjud bo'lmay qoldi",
+      "errorBillingBlocked": "Sandbox hisob-kitobi uchun qo'shimcha kreditlar talab qilinadi",
+      "errorBillingUnavailable": "Sandbox hisob-kitobi yoki sig'imni tekshirish mavjud emas. Tez orada yana urinib ko'ring.",
+      "errorContainerLimitReached": "Konteyner limitiga erishildi. Yangisini boshlashdan oldin mavjud konteynerni to'xtating.",
+      "errorInvalidConfiguration": "Sandbox konfiguratsiyasi yaroqsiz yoki qo'llab-quvvatlanmaydi",
+      "errorRuntimeArtifactUnauthorized": "Runtime yuklab olish uchun ruxsat berilmadi",
+      "errorRuntimeArtifactInvalid": "Runtime artefaktini tekshirishdan o'tmadi",
+      "errorRuntimeCliProbeFailed": "Runtime CLI tasdiqlanmadi",
+      "errorRuntimeSupervisorMissing": "Runtime supervisor mavjud emas",
+      "errorConnectionLost": "Sandbox bilan aloqa uzildi",
+      "errorSandboxLost": "Sandbox yo'qoldi",
+      "errorAgentRestarted": "Agent qayta ishga tushdi",
+      "errorSandboxOutOfMemory": "Sandboxda xotira tugadi",
+      "errorPreparationDidNotComplete": "Tayyorlash yakunlanmadi"
     },
     "permissionCard": {
       "title": "Ruxsat kerak",
@@ -2479,7 +2574,10 @@
       "allowOnceAccessibility": "Bir marta ruxsat berish",
       "alwaysAllow": "Doim ruxsat berish",
       "alwaysAllowAccessibility": "Doim ruxsat berish",
-      "retrying": "Qayta urinilmoqda…"
+      "retrying": "Qayta urinilmoqda…",
+      "retryDeny": "Qayta rad etish",
+      "retryAllowOnce": "Qayta bir marta ruxsat berish",
+      "retryAlwaysAllow": "Qayta doim ruxsat berish"
     },
     "questionCard": {
       "title": "Agentga javob kerak",
@@ -3031,22 +3129,16 @@
     "boundary": {
       "backToProfile": "Profilga qaytish",
       "loadErrorMessage": "Internetga ulanishni tekshiring va qayta urinib ko‘ring.",
-
       "chooseAccount": "Hisobni tanlang",
       "loadErrorTitle": "Tashkilotlaringizni yuklab bo'lmadi.",
       "membershipLostNotice": "Sizda ushbu tashkilotga kirish huquqi endi yo'q. {{target}} ga o'tkazildi.",
       "noOrganization": "Tashkilot yo'q",
-
       "noOrganizationDescription": "Bu hisob hech qanday tashkilotga tegishli emas. A'zolarni taklif qilish va kam balans haqidagi ogohlantirishlar kabi tashkilot funksiyalaridan foydalanish uchun saytda tashkilot yarating yoki unga qo'shiling.",
-
       "openWebOrganizations": "Tashkilotlarni saytda ochish",
-
       "organizationUnavailable": "Tashkilot mavjud emas.",
       "selectDescriptionWithOrganizations": "Siz bir yoki bir nechta tashkilotga a'zosiz. Bu ekran foydalanishi kerak bo'lgan hisobni tanlang.",
-
       "selectOrganization": "Tashkilotni tanlang",
       "unavailableDescription": "Bu tashkilot endi mavjud emas. Davom etish uchun profilingizdan boshqa tashkilotni tanlang.",
-
       "unavailableSessionsDescription": "Bu tashkilot endi mavjud emas. Uning sessiyalarini yuklab bo'lmaydi.",
       "accessDeniedDescription": "Sizda ushbu tashkilotga kirish huquqi yo'q."
     },
@@ -3074,7 +3166,9 @@
       "permissionDenied": "A'zolarni taklif qilishga ruxsatingiz yo'q.",
       "roleMember": "Rol: a'zo.",
       "sendInvite": "Taklifnomani yuborish",
-      "title": "A’zo taklif qilish"
+      "title": "A’zo taklif qilish",
+      "alreadyInvited": "Bu elektron pochta manzili allaqachon taklif qilingan yoki allaqachon a'zo.",
+      "sendError": "Taklifnomani yuborib bo'lmadi."
     },
     "invoices": {
       "downloadA11y": "{{number}} raqamli hisob-fakturani yuklab olish",
@@ -3143,7 +3237,8 @@
       "inviteCreated": "Taklifnoma yaratildi",
       "pendingInvitations": "Qabul qilinmagan taklifnomalar",
       "resendInvite": "Taklifnomani qayta yuborish",
-      "shareInviteLink": "Taklifnoma havolasini ulashish"
+      "shareInviteLink": "Taklifnoma havolasini ulashish",
+      "resendInviteError": "Taklifnomani qayta yuborib bo'lmadi."
     },
     "usageStats": {
       "inputTokens": "Kirish tokenlari",
@@ -3291,7 +3386,8 @@
     "noneChosen": "Hech narsa tanlanmagan",
     "emptyTitle": "Matnga aylantirish modellari yo'q",
     "emptyDescription": "Kilo Gateway hozircha matnga aylantirish modellarini taklif qilmayapti.",
-    "loadFailed": "Matnga aylantirish modellarini yuklab bo'lmadi."
+    "loadFailed": "Matnga aylantirish modellarini yuklab bo'lmadi.",
+    "choose": "Modelni tanlang"
   },
   "voiceLanguage": {
     "title": "Ovozli kiritish tili",
@@ -3506,6 +3602,7 @@
       "fromHuggingFace": "Hugging Face’dan",
       "loading": "Modellar yuklanmoqda",
       "noResults": "Hech qanday model topilmadi",
+      "noResultsForQuery": "\"{{query}}\" bo‘yicha hech qanday model topilmadi",
       "noFits": "Bu qurilmaga mos model yo‘q",
       "noFitsDescription": "Kattaroq modellar “$t(common.all)” bo‘limida.",
       "fit": {
@@ -3536,8 +3633,6 @@
       "quantizations": "Kvantlashlar",
       "quantizationsHelp": "Kichikroq fayllar kamroq operativ va doimiy xotira egallaydi. Kattaroq fayllar odatda yaxshiroq javob beradi.",
       "quantDetail": "Yuklab olish: {{size}} · taxminan {{memory}} operativ xotira",
-      "downloadQuant": "{{quant}} yuklab olish",
-      "downloadModelA11y": "{{name}} yuklab olish",
       "detailsA11y": "Tafsilotlar: {{name}}",
       "loadingModel": "Model tafsilotlari yuklanmoqda",
       "couldNotLoadModel": "Bu modelni yuklab bo‘lmadi",
@@ -3582,13 +3677,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "Bu model fikrlash darajasini qo‘llab-quvvatlaydi"
-    }
+    },
+    "creditsRequired": "Bu xabarni yuborish uchun kreditlar yetarli emas. Kreditlar qo'shing va qaytadan urinib ko'ring."
   },
   "settingsTools": {
     "confirmTitle": "Bu oʻzgarish tasdiqlansinmi?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "eng so'nggi repozitoriyangiz",
+      "confirmMessage": "Repozitoriya: {{repository}}. So'rov: {{prompt}}",
+      "confirmTitle": "Bu agent ishga tushirilsinmi?",
       "promptRequired": "Agentni ishga tushirish uchun so'rov kerak. So'rov qo'shing va qayta ishga tushiring.",
       "repositoryRequired": "Agentni ishga tushirish uchun repozitoriya kerak. Kilo'ni oching, bir repozitoriy tanlang va qayta ishga tushiring.",
       "repositoryUnknown": "Kilo {{repository}} ni GitHub yoki GitLab repozitoriyasi deb tanimaydi. Kilo'da boshqa repozitoriy tanlang.",
@@ -3618,7 +3717,9 @@
     "spend24h": "Oxirgi 24 soatdagi xarajat",
     "multiplierError": "1 yoki undan katta koeffitsiyent kiriting",
     "permissionDenied": "Xarajat bildirishnomalarini boshqarishga ruxsatingiz yo'q.",
-    "pushOffByCategory": "Bildirishnomalarda o'chirilgan"
+    "pushOffByCategory": "Bildirishnomalarda o'chirilgan",
+    "multiplierMaxError": "{{max}} yoki undan kichik koeffitsiyent kiriting",
+    "thresholdMaxError": "{{max}} yoki undan kichik miqdorni kiriting."
   },
   "profiles": {
     "title": "Profillar",
@@ -3635,9 +3736,10 @@
       "skills_other": "{{count}} ko'nikma",
       "commands_one": "{{count}} buyruq",
       "commands_other": "{{count}} buyruq",
-      "varsShort": "{{count}}o'",
-      "skillsShort": "{{count}}k",
-      "commandsShort": "{{count}}b"
+      "setupCommands_one": "{{count}} o'rnatish buyrug'i",
+      "setupCommands_other": "{{count}} o'rnatish buyrug'i",
+      "agents_one": "{{count}} agent",
+      "agents_other": "{{count}} agent"
     },
     "nameLabel": "Profil nomi",
     "namePlaceholder": "masalan. Backend disk raskadrovka",
@@ -3665,6 +3767,8 @@
     "keyTooLong": "Kalit 256 ta belgi yoki undan kam bo'lishi kerak",
     "keyDuplicate": "Bu kalit profilda allaqachon mavjud",
     "valueLabel": "Qiymat",
+    "valueRequired": "Qiymatni kiriting",
+    "tooLong": "Ko'pi bilan {{max}} ta belgidan foydalaning",
     "secrets": {
       "markSecret": "Sir sifatida belgilang",
       "masked": "Yashirin qiymat",
@@ -3715,7 +3819,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Server nomini kiriting",
-      "nameInvalid": "Ism faqat harflar, raqamlar, pastki chiziq va chiziqlardan foydalanishi mumkin",
+      "nameInvalid": "Ism faqat ASCII harflar, raqamlar, pastki chiziq va chiziqlardan foydalanishi mumkin, jami 100 ta belgidan oshmasligi kerak",
       "commandRequired": "Buyruqni kiriting",
       "commandTooLong": "Ko'pi bilan 500 belgidan iborat 50 ta argumentdan foydalaning",
       "urlRequired": "URL manzilini kiriting",
@@ -3743,16 +3847,16 @@
       "stepsPlaceholder": "mas. 50",
       "temperature": "Harorat",
       "temperaturePlaceholder": "mas. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "mas. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Mening agentim",
       "promptPlaceholder": "Siz ...",
       "tools": "Asboblar",
       "visibility": "Ko'rinish",
-      "visibilityPrimary": "Asosiy - tanlovchida ko'rsatilgan",
-      "visibilitySubagent": "Subagent - faqat boshqalar tomonidan chaqirilishi mumkin",
-      "visibilityAll": "Hammasi - ikkalasi ham",
+      "visibilityPrimary": "Asosiy — tanlovchida ko'rsatilgan",
+      "visibilitySubagent": "Subagent — faqat boshqalar tomonidan chaqirilishi mumkin",
+      "visibilityAll": "Hammasi — ikkalasi ham",
       "modePrimary": "Faqat asosiy",
       "modeSubagent": "Faqat subagent",
       "modeAll": "Hamma rejimlar",
@@ -3760,7 +3864,7 @@
       "deleteFailed": "Agentni oʻchirib boʻlmadi",
       "nameRequired": "Agent nomini kiriting",
       "slugRequired": "Agent slug'ini kiriting",
-      "slugInvalid": "Slug harf bilan boshlanishi va faqat kichik harflar, raqamlar va tirelardan foydalanishi kerak",
+      "slugInvalid": "Slug kichik ASCII harfi bilan boshlanishi va faqat kichik ASCII harflar, raqamlar va tirelardan foydalanishi, jami 50 ta belgidan oshmasligi kerak",
       "slugConflict": "Bu slug allaqachon ichki agent yoki bu profildagi boshqa agent tomonidan ishlatilgan",
       "edit": "Agentni tahrirlash"
     },
@@ -3805,7 +3909,9 @@
       "pinFailed": "Reponi mahkamlab bo‘lmadi",
       "unboundToast": "Repo cheklanmagan",
       "unbindFailed": "Reponi ajratib boʻlmadi"
-    }
+    },
+    "variablesDeleteFailed": "Oʻzgaruvchi oʻchirilmadi",
+    "deleteCommand": "{{position}}-raqamli buyruqni o‘chiring"
   },
   "credits": {
     "title": "Kredit sotib olish",
@@ -3841,7 +3947,8 @@
       "archive": "Arxivlash",
       "unarchive": "Arxivdan chiqarish",
       "deleteTitle": "{{name}} o‘chirilsinmi?",
-      "deleteMessage": "Uning vazifalari ham o‘chiriladi. Sessiyalar qoladi."
+      "deleteMessage": "Uning vazifalari ham o‘chiriladi. Sessiyalar qoladi.",
+      "createFailed": "Ro‘yxat yaratib bo‘lmadi"
     },
     "listSettings": {
       "title": "Ro‘yxat sozlamalari",
@@ -3909,20 +4016,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Ertalabki brifing",
+    "title": "Agent brifing",
     "atLeast": "≥{{value}}",
     "coverageHint": "Ba’zi tarixiy faoliyat yetishmasligi mumkin. ≥ kamida shuncha degani; noma’lum nol degani emas.",
     "available": "Mavjud brifinglar",
     "history": "Brifinglar tarixi",
-    "historyHint": "Hisobotlar, yopilganlari ham, 30 kun saqlanadi.",
+    "historyHint": "Brifinglar, e’tiborsiz qoldirilganlari ham, 30 kun saqlanadi.",
     "settings": "Brifing sozlamalari",
-    "empty": "Tungi faoliyat yo‘q",
-    "emptyHint": "Faol tundan so‘ng bulut va CLI kodlash seanslaringiz shu yerda ko‘rinadi.",
+    "empty": "Bu brifing oynasida faoliyat yo‘q",
+    "emptyHint": "Bulut va CLI kodlash seanslaringiz rejalashtirilgan brifingda faoliyat bo‘lganda shu yerda ko‘rinadi.",
     "loadError": "Brifinglarni yuklab bo‘lmadi",
-    "sessions": "Tunda faol",
+    "sessions": "Oynada faol",
     "pullRequests": "Ochilgan PRs",
     "blockers": "Yangi to‘siqlar",
-    "spend": "Tungi xarajat",
+    "spend": "Oynadagi xarajat",
     "view": "Brifingni o‘qish",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -3944,14 +4051,14 @@
     "sources": "Dalillar va artefaktlar",
     "timezone": "Brifing vaqt mintaqasi",
     "deviceTimezone": "Qurilma vaqt mintaqasidan foydalanish",
-    "timezoneHint": "IANA vaqt mintaqasi, masalan Europe/Berlin. Jadval o‘zgarishlari keyingi tunlarga qo‘llanadi.",
-    "nightStart": "Tun boshlanishi",
-    "morningStart": "Tun tugashi / ertalab boshlanishi",
-    "morningEnd": "Ertalab tugashi",
-    "timeHint": "Ertalab tugaganda Bosh sahifa kartasi oflaynda ham jonli holatni tiklaydi.",
+    "timezoneHint": "IANA vaqt mintaqasi, masalan Europe/Berlin. Jadval o‘zgarishlari keyingi brifinglarga qo‘llanadi.",
+    "nightStart": "Brifing oynasi boshlanishi",
+    "morningStart": "Brifing tayyor bo‘ladigan vaqt",
+    "morningEnd": "Brifing mavjud bo‘ladigan vaqt",
+    "timeHint": "Brifing oynasi tugaganda Bosh sahifa kartasi oflaynda ham jonli holatni tiklaydi.",
     "invalidTimezone": "To‘g‘ri IANA vaqt mintaqasini kiriting, masalan Europe/Berlin.",
     "invalidScheduleTimes": "Bir-biriga to‘g‘ri kelmaydigan, bo‘sh bo‘lmagan tun va ertalab oraliqlarini tanlang.",
-    "notificationsHint": "Birinchi hisobot tayyor bo‘lganda har ertalab bitta umumiy bildirishnoma. Pullik AI xulosalariga bog‘liq emas.",
+    "notificationsHint": "Har bir rejalashtirilgan brifing uchun bitta umumiy bildirishnoma. Pullik AI xulosalariga bog‘liq emas.",
     "notificationPermission": "Brifingni olish uchun $t(common.notifications) bo‘limida qurilma bildirishnomalarini yoqing.",
     "aiOptIn": "Pullik AI xulosalari",
     "aiHint": "Faqat shu kontekst uchun ixtiyoriy. Tanlangan, tahrirlangan parchalar va tuzilgan faktlar ilova tilingizda modelingizga yuboriladi. To‘lovlar shu kontekst balansidan olinadi.",
@@ -3969,7 +4076,7 @@
     "contextSettings": "AI sozlamalari · {{context}}",
     "allContexts": "Shaxsiy va tashkilot brifinglari alohida saqlanadi.",
     "create": "Brifing yaratish",
-    "oneOff": "Bir martalik",
+    "oneOff": "Talab bo‘yicha",
     "createdAt": "{{time}} da yaratilgan",
     "chooseContext": "Bitta kontekstni tanlang",
     "period": "Brifing davri",
@@ -3991,13 +4098,16 @@
     "emptyPeriod": "Bu davrda faollik topilmadi. AI xulosasi yaratilmaydi va to‘lov olinmaydi.",
     "emptyHistory": "Saqlangan brifinglar yo‘q",
     "historicalStateHint": "Seans holati joriy holatni emas, tanlangan davr oxiridagi holatni aks ettiradi.",
-    "oneOffHint": "AI tanlangan va maxfiy ma’lumotlari olib tashlangan dalillarni ilovangiz tilida oladi. Bu bir martalik hisobot ertalabki jadvalingizni yoki AI sozlamalaringizni o‘zgartirmaydi.",
+    "oneOffHint": "AI tanlangan va maxfiy ma’lumotlari olib tashlangan dalillarni ilovangiz tilida oladi. Bu talab bo‘yicha brifing rejalashtirilgan brifingizni yoki AI sozlamalaringizni o‘zgartirmaydi.",
     "createOffline": "Brifingni ko‘rib chiqish yoki yaratish uchun internetga ulaning. Pulli so‘rovlar internetga ulanmagan paytda hech qachon navbatga qo‘yilmaydi.",
     "estimateInputTooLarge": "Bu davrdagi dalillar hajmi tanlangan model uchun juda katta.",
     "estimatePermissionUnavailable": "Sizda bu kontekst balansidan foydalanish ruxsati yo‘q.",
+    "createFailed": "Bu brifingni yaratib bo‘lmadi.",
+    "reviewFailed": "Bu brifingni ko‘rib chiqib bo‘lmadi.",
     "estimatePricingUnavailable": "Bu model uchun narxlar mavjud emas.",
     "estimateBalanceUnavailable": "Pullik xuloma uchun balans yetarli emas.",
     "estimateModelNotAllowed": "Bu model bu yerda ruxsat etilmagan.",
-    "estimateSpendLimitTooLow": "Bu xulosani ruxsat berish uchun sarflash chegarasini oshiring."
+    "estimateSpendLimitTooLow": "Bu xulosani ruxsat berish uchun sarflash chegarasini oshiring.",
+    "saved": "Brifing sozlamalari saqlandi"
   }
 }

@@ -1,6 +1,6 @@
 FROM node:24-bookworm-slim AS node-runtime
 
-FROM oven/bun:1-slim
+FROM oven/bun:1.4.4-slim
 
 COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
 COPY --from=node-runtime /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm

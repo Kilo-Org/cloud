@@ -182,7 +182,7 @@
     "codeArrivalHint": "Бұл мекенжай жарамды болса, код бір минут ішінде келеді.",
     "verifyCode": "Кодты тексеру",
     "resendCode": "Кодты қайта жіберу",
-    "termsPrefix": "Жалғастыру арқылы мына құжаттармен келісесіз:",
+    "termsPrefix": "Жалғастыру арқылы мына құжаттармен келісесіз: ",
     "terms": "Шарттар",
     "termsConnector": " және ",
     "termsSuffix": ".",
@@ -293,7 +293,8 @@
     "condenseToolCallsSubtitle": "Тізбектелген құрал шақыруларын аша алатын бір жолға топтаңыз.",
     "toolSummaryTranslation": "Құралдар қорытындыларын аудару",
     "toolSummaryTranslationSubtitle": "Әрбір құрал қорытындысын қолданба тіліне аудару үшін модельге жіберіңіз. Аудару сәтсіз болса, түпнұсқа көрсетіледі.",
-    "toolSummaryTranslationModelUnavailableNotice": "Бұл модель енді ұсынылмайды. Басқасын таңдау үшін $t(common.model) түртіңіз."
+    "toolSummaryTranslationModelUnavailableNotice": "Бұл модель енді ұсынылмайды. Басқасын таңдау үшін $t(common.model) түртіңіз.",
+    "autoExpandThinkingInactiveSubtitle": "Ойлау мәліметтері жасырылғанда әсері болмайды."
   },
   "prReview": {
     "pullRequestUnavailable": "Біріктіру сұрауы қолжетімсіз",
@@ -622,9 +623,15 @@
       "viewOnGitHub": "PR-ді GitHub-та қарау",
       "noChecksReported": "Тексеру нәтижелері жоқ",
       "passed": "{{displayCount}} өтті",
+      "passed_one": "{{displayCount}} өтті",
+      "passed_other": "{{displayCount}} өтті",
       "failed": "{{displayCount}} сәтсіз",
+      "failed_one": "{{displayCount}} сәтсіз",
+      "failed_other": "{{displayCount}} сәтсіз",
       "pending": "{{displayCount}} күтілуде",
       "skipped": "{{displayCount}} өткізіп жіберілді",
+      "skipped_one": "{{displayCount}} өткізіп жіберілді",
+      "skipped_other": "{{displayCount}} өткізіп жіберілді",
       "checksCount": "{{displayCount}} тексеру",
       "checksCount_one": "{{displayCount}} тексеру",
       "checksCount_other": "{{displayCount}} тексеру",
@@ -669,7 +676,8 @@
       "gitlabDescription": "Мобильдіде біріктіру сұрауларын қарау үшін GitLab тіркелгіңізді қосыңыз.",
       "bitbucketDescription": "Мобильдіде тарту сұрауларын қарау үшін Bitbucket-ты осы ұйымға қосыңыз.",
       "bitbucketOrgOnlyDescription": "Жоғарыдағы тіркелгіні ұйымға ауыстырыңыз, оның Bitbucket тарту сұрауларын қарау үшін.",
-      "contextLine": "{{organization}} үшін"
+      "contextLine": "{{organization}} үшін",
+      "contextLinePersonal": "Жеке аккаунтыңыз үшін"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1429,6 +1437,8 @@
       "showMore": "Көбірек көрсету",
       "created": "Жасалған уақыты",
       "started": "Басталған уақыты",
+      "reviewEnded": "Аяқталу уақыты",
+      "severityNitpick": "Ұсақ ескерту",
       "tokens": "Токен",
       "tokensInOut": "{{input}} кіріс / {{output}} шығыс",
       "council": "Кеңес",
@@ -1452,7 +1462,13 @@
       "sessionError": "Сессия қатесі: {{error}}.",
       "statusWithValue": "Күй: {{status}}",
       "toolName": "Құрал: {{name}}",
-      "toolNameError": "Құрал: {{name}} — қате орын алды."
+      "toolNameError": "Құрал: {{name}} — қате орын алды.",
+      "cancelReasonSuperseded": "Жаңарақ commit push етілді, сондықтан бұл тексеру алмастырылды.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} қосылмай тұр, сондықтан бұл тексеру тоқтатылды. Оны қайта қосып, тексеруді қайта өткізіңіз.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer Bitbucket үшін өшірілгендіктен, бұл тексеру тоқтатылды. Оны қайта қосып, тексеруді қайта өткізіңіз.",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket pull request өзгергендіктен, бұл тексеру алмастырылды.",
+      "cancelReasonCancelled": "Бұл тексеру тоқтатылды.",
+      "cancelReasonInterrupted": "Бұл тексеру үзілді."
     },
     "reviewMemory": {
       "title": "Тексеру жады",
@@ -1479,7 +1495,15 @@
       "instructions": "Нұсқаулар (міндетті емес)",
       "instructionsPlaceholder": "Тексеру кезінде ерекше назар аударатын тұстар…",
       "starting": "Тексеру басталуда…",
-      "start": "Тексеруді бастау"
+      "start": "Тексеруді бастау",
+      "startNotFound": "Бұл {{requestNoun}} {{provider}} ішінен оқу мүмкін болмады. URL мекенжайын және репозиторийдің қолжетімді екенін тексеріңіз.",
+      "startRateLimited": "{{provider}} қазір сұраныстарды шектеп тұр. Бірнеше минуттан кейін қайталап көріңіз.",
+      "startNotAllowed": "Бұл {{requestNoun}} үшін тексеруді бастауға рұқсатыңыз жоқ. Рұқсаттарыңызды және ұйымыңыздың жоспарын тексеріңіз.",
+      "startProviderNeedsAttention": "Қолмен тексеру стандартты {{provider}} қосылымын қажет етеді. Оны қосыңыз да, қайталап көріңіз.",
+      "startAlreadyRunning": "Сол {{requestNoun}} бойынша тексеру қазірдің өзінде жүріп тұр.",
+      "startRejected": "Сол {{requestNoun}} бойынша тексеруді жүргізу мүмкін емес. Оның ашық, әлі жоба күйінде емес екенін және URL мекенжайының дұрыс екенін тексеріңіз.",
+      "startProviderUnavailable": "Сол {{requestNoun}} оқу үшін {{provider}} серверіне қол жеткізу мүмкін болмады. Қайталап көріңіз.",
+      "startFailed": "Тексеруді бастау мүмкін болмады. Қосылымыңызды тексеріңіз де, қайталап көріңіз."
     },
     "notConnectedReadOnly": "{{platform}} қосылмаған. Оны тек ұйым иелері мен әкімшілері қоса алады.",
     "gitlab": {
@@ -1731,7 +1755,7 @@
       "deadlinePassed": "Мерзім өтті",
       "deadlinePassedDetail": "{{critical}} өте жоғары, {{high}} жоғары",
       "dueThisWeek": "Мерзімі осы аптада",
-      "dueThisWeekDetail": "{{exploitable}} мәселені шабуылға пайдалануға болатыны расталды",
+      "dueThisWeekDetail": "Осы мәселелердің {{exploitable}}-і шабуылға пайдалануға болатыны расталды",
       "noDeadline": "Мерзім жоқ",
       "reviewSlaAssignment": "SLA мерзімдерінің белгіленуін тексеру",
       "allOpenFindingsTracked": "Барлық ашық мәселелер қадағаланады"
@@ -1891,11 +1915,17 @@
       "actorSystem": "Kilo жүйесі",
       "couldNotLoad": "Аудит есебін жүктеу мүмкін болмады.",
       "events": "Оқиғалар",
+      "eventConfidence": "Сенімділік: {{confidence}}",
+      "eventReason": "Себеп: {{reason}}",
+      "eventsCount_one": "{{displayCount}} оқиға",
+      "eventsCount_other": "{{displayCount}} оқиға",
       "generated": "Жасалған уақыты: {{generatedAt}}.",
       "noActivity": "Тіркелген әрекет жоқ",
       "noActivityDescription": "Kilo жүйесінде {{start}} – {{end}} аралығында қауіпсіздік мәселелері бойынша есепке енгізілетін әрекеттер жоқ.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Репозиторий тіркелмеген",
+      "reasonUnknown": "Танылмаған себеп",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Есептің қысқаша мазмұны",
       "title": "Аудит есебі",
       "unavailable": "Аудит есебі қолжетімсіз",
@@ -1948,8 +1978,9 @@
       "couldNotLoad": "Қауіпсіздік агентін жүктеу мүмкін болмады.",
       "installApp": "GitHub қолданбасын орнату",
       "reauthorizeButton": "GitHub қолданбасына қайта рұқсат беру",
-      "reauthorizeDescription": "Қауіпсіздік агентіне Dependabot ескертулерін алу үшін vulnerability_alerts рұқсаты қажет. Бұл рұқсатты беру үшін GitHub қолданбасына қайта рұқсат беріңіз.",
+      "reauthorizeDescription": "Қауіпсіздік агентіне Dependabot ескертулерін оқу үшін рұқсат қажет. Бұл рұқсатты беру үшін GitHub қолданбасына қайта рұқсат беріңіз.",
       "reauthorizeTitle": "Қосымша рұқсаттар қажет",
+      "retryFailed": "Қауіпсіздік агентін әлі де жүктеу мүмкін болмады. Байланысты тексеріп, қайталап көріңіз.",
       "setupFailed": "GitHub-ты баптауды бастау мүмкін болмады. Қайталап көріңіз."
     },
     "queuedActionUntracked": "Кезекке қойылған әрекетті бақылау мүмкін болмады. Соңғы күйді көру үшін жаңартыңыз.",
@@ -2112,7 +2143,8 @@
       "dollar_other": "доллар",
       "costSpoken": "құны {{cost}}",
       "costSpokenWithTime": "құны {{cost}}, {{time}}",
-      "pullRequest": "№{{number}} біріктіру сұрауы"
+      "pullRequest": "№{{number}} біріктіру сұрауы",
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ашылмады",
@@ -2248,7 +2280,6 @@
       "couldNotLoadEnvironment": "Ортаңызды жүктеу мүмкін болмады.",
       "retryLoadingEnvironment": "Ортаны жүктеуді қайталау",
       "defaultEnvironment": "Әдепкі орта",
-      "environmentSummary": "{{commands}} пәрмен · {{mcp}} MCP · {{skills}} дағды · {{agents}} агент",
       "leaveChanges": "Өзгерістерді қалдыру",
       "commitAndPush": "Коммит жасап, жіберу",
       "startSession": "Сессияны бастау",
@@ -2467,7 +2498,71 @@
       "preparationComplete": "Дайындық аяқталды",
       "preparationFailed": "Дайындық сәтсіз аяқталды",
       "setupCommand": "Баптау пәрмені: {{index}}",
-      "setupCommandOf": "Баптау пәрмені: {{index}} / {{displayCount}}"
+      "setupCommandOf": "Баптау пәрмені: {{index}} / {{displayCount}}",
+      "stepWorkspaceSetup": "Жұмыс кеңістігін баптау",
+      "stepDiskCheck": "Дискіні тексеру",
+      "stepCloning": "Репозиторий клондалуда",
+      "stepBranch": "Бранш бапталуда",
+      "stepDevcontainerSetup": "Dev контейнері бапталуда",
+      "stepWorkspaceRestore": "Жұмыс кеңістігі қалпына келтірілуде",
+      "stepWorkspaceBackup": "Жұмыс кеңістігі сақталуда",
+      "stepSandboxProvision": "Құмсәт ұсынылуда",
+      "stepSandboxBoot": "Құмсәт іске қосылуда",
+      "stepSnapshotFallback": "Снапшотсыз қайта талаптану",
+      "stepKiloServer": "Kilo іске қосылуда",
+      "stepKiloSession": "Сессия дайындалуда",
+      "stepRestoreIncomplete": "Сессияны қалпына келтіру аяқталмады",
+      "stepReady": "Орта дайын",
+      "stepFailed": "Ортаны баптау сәтсіз аяқталды",
+      "stepUnknown": "Ортаны баптау",
+      "detailCreatingSandbox": "Құмсәт құрылуда",
+      "detailUpdatingRepository": "Репозиторий жаңартылуда",
+      "detailCheckingOutBranch": "Бранш ауыстырылуда",
+      "detailRunningSetupCommands": "Баптау пәрмендері орындалуда",
+      "detailSavingRepository": "Репозиторий жылдам іске қосу үшін сақталуда",
+      "detailStartingKiloRuntime": "Kilo ортасы іске қосылуда",
+      "detailPreparingKiloSession": "Kilo сессиясы дайындалуда",
+      "detailWaitingForPreviousSandbox": "Алдыңғы құмсәттің тоқтауы күтілуде",
+      "detailRetryingSandboxCreation": "Құмсәт құруды қайта талаптану",
+      "detailPreviousSnapshotFailed": "Снапшотпен іске қосу сәтсіз аяқталды. Снапшотсыз қайта талаптанылуда.",
+      "detailSnapshotStartupFailed": "Снапшотпен іске қосу сәтсіз аяқталды. Снапшотсыз қайта талаптанылуда.",
+      "detailStartingSandboxWithoutSnapshot": "Құмсәт снапшотсыз іске қосылуда",
+      "detailSettingUpWorkspace": "Жұмыс кеңістігі бапталуда",
+      "detailRestoringSession": "Сессия қалпына келтірілуде",
+      "detailWarmWorkspaceReused": "Ыстық жұмыс кеңістігі қайта пайдаланылды",
+      "detailRetryingClone": "Клондауды қайта талаптану ({{total}} әрекеттің {{attempt}}-і)",
+      "detailSetupCommandFailed": "{{index}} баптау пәрмені сәтсіз аяқталды",
+      "detailSetupCommandTimedOut": "{{index}} баптау пәрменінің уақыты бітті",
+      "detailColdRestore": "Салқын қалпына келтіру, снапшот қолданылды, {{total}} файлдың {{applied}}-і қалпына келтірілді",
+      "detailProgressPercent": "{{percent}}% аяқталды",
+      "detailRestoreIncompleteReport": "Сессияны қалпына келтіру аяқталмады: {{total}} файлдың {{skipped}}-і қалпына келтірілмеді ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Жетіспейді: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} және тағы {{omitted}}",
+      "detailReasonPatchFailed": "патч қолданылмады",
+      "detailReasonOutsideWorkspace": "жол жұмыс кеңістігінен тыс жерде орналасқан",
+      "detailReasonMissingContent": "снапшотта файлдың мазмұны болмады",
+      "detailReasonIndexResetFailed": "сәтсіз қолданудан кейін индексті қайтара орнату мүмкін болмады",
+      "detailReasonUnlinkFailed": "файлды жою мүмкін болмады",
+      "detailReasonWriteFailed": "файлды жазу мүмкін болмады",
+      "detailReasonUnknown": "белгісіз себеп",
+      "detailUnknown": "Әлі дайындалуда",
+      "errorPreparationTimeout": "Ортаны дайындау уақыты бітті",
+      "errorWorkspaceSetupFailed": "Жұмыс кеңістігін баптау сәтсіз аяқталды",
+      "errorCredentialUpgradeRequired": "Бұл сессияда қажетті тіркелгі деректерін жаңарту жоқ. Жалғастыру үшін жаңа сессия бастаңыз.",
+      "errorAgentUnavailable": "Агент қолжетімсіз болып қалды",
+      "errorBillingBlocked": "Құмсәттің төленуі қосымша кредиттерді қажет етеді",
+      "errorBillingUnavailable": "Құмсәттің төленуін немесе сыйымдылығын тексеру қолжетімсіз. Жақын арада қайта байқап көріңіз.",
+      "errorContainerLimitReached": "Контейнерлер шегіне жетілді. Жаңасын іске қосудан бұрын бар контейнерді тоқтатыңыз.",
+      "errorInvalidConfiguration": "Құмсәт конфигурациясы жарамсыз немесе қолдау көрсетілмейді",
+      "errorRuntimeArtifactUnauthorized": "Ортаны жүктеп алуға рұқсат болмады",
+      "errorRuntimeArtifactInvalid": "Орта артефактісін тексеру сәтсіз аяқталды",
+      "errorRuntimeCliProbeFailed": "Орта CLI-ін тексеру сәтсіз аяқталды",
+      "errorRuntimeSupervisorMissing": "Орта супервайзері жоқ",
+      "errorConnectionLost": "Құмсәт байланысы үзілді",
+      "errorSandboxLost": "Құмсәт жоғалды",
+      "errorAgentRestarted": "Агент қайта іске қосылды",
+      "errorSandboxOutOfMemory": "Құмсәт жадысы таусылды",
+      "errorPreparationDidNotComplete": "Дайындық аяқталмады"
     },
     "permissionCard": {
       "title": "Рұқсат қажет",
@@ -2479,7 +2574,10 @@
       "allowOnceAccessibility": "Бір рет рұқсат ету",
       "alwaysAllow": "Әрқашан рұқсат ету",
       "alwaysAllowAccessibility": "Әрқашан рұқсат ету",
-      "retrying": "Қайталануда…"
+      "retrying": "Қайталануда…",
+      "retryDeny": "Рұқсат бермеуді қайталау",
+      "retryAllowOnce": "Бір рет рұқсат етуді қайталау",
+      "retryAlwaysAllow": "Әрқашан рұқсат етуді қайталау"
     },
     "questionCard": {
       "title": "Агентке жауап қажет",
@@ -3031,22 +3129,16 @@
     "boundary": {
       "backToProfile": "Профильге оралу",
       "loadErrorMessage": "Интернетке қосылғаныңызды тексеріп, қайталап көріңіз.",
-
       "chooseAccount": "Аккаунт таңдау",
       "loadErrorTitle": "Ұйымдарыңызды жүктеу мүмкін болмады.",
       "membershipLostNotice": "Бұл ұйымға енді кіру рұқсатыңыз жоқ. {{target}}-ға ауыстырылды.",
       "noOrganization": "Ұйым жоқ",
-
       "noOrganizationDescription": "Бұл аккаунт ұйымның бөлігі емес. Мүшелерді шақыру және төмен баланс туралы ескертулер сияқты ұйым мүмкіндіктерін пайдалану үшін браузерде ұйым құрыңыз немесе оған қосылыңыз.",
-
       "openWebOrganizations": "Ұйымдарды браузерде ашу",
-
       "organizationUnavailable": "Ұйым қолжетімсіз.",
       "selectDescriptionWithOrganizations": "Сіз бір немесе бірнеше ұйымға жатасыз. Осы экран пайдалануы тиіс аккаунтты таңдаңыз.",
-
       "selectOrganization": "Ұйымды таңдау",
       "unavailableDescription": "Бұл ұйым енді қолжетімсіз. Жалғастыру үшін профильден басқа ұйымды таңдаңыз.",
-
       "unavailableSessionsDescription": "Бұл ұйым енді қолжетімсіз. Оның сессияларын жүктеу мүмкін емес.",
       "accessDeniedDescription": "Бұл ұйымға кіруге рұқсатыңыз жоқ."
     },
@@ -3074,7 +3166,9 @@
       "permissionDenied": "Мүшелерді шақыруға рұқсатыңыз жоқ.",
       "roleMember": "Рөлі: мүше.",
       "sendInvite": "Шақыру жіберу",
-      "title": "Мүшені шақыру"
+      "title": "Мүшені шақыру",
+      "alreadyInvited": "Бұл мекенжайға шақыру бұрын жіберілген немесе ол әлдеқашан ұйым мүшесі болып табылады.",
+      "sendError": "Шақыруды жіберу мүмкін болмады."
     },
     "invoices": {
       "downloadA11y": "{{number}} шотын жүктеп алу",
@@ -3143,7 +3237,8 @@
       "inviteCreated": "Шақыру жасалды",
       "pendingInvitations": "Жауап күтілген шақырулар",
       "resendInvite": "Шақыруды қайта жіберу",
-      "shareInviteLink": "Шақыру сілтемесімен бөлісу"
+      "shareInviteLink": "Шақыру сілтемесімен бөлісу",
+      "resendInviteError": "Шақыруды қайта жіберу мүмкін болмады."
     },
     "usageStats": {
       "inputTokens": "Кіріс токендері",
@@ -3291,7 +3386,8 @@
     "noneChosen": "Ештеңе таңдалмаған",
     "emptyTitle": "Дауысты мәтінге айналдыру модельдері жоқ",
     "emptyDescription": "Kilo Gateway қазір дауысты мәтінге айналдыру модельдерін ұсынбайды.",
-    "loadFailed": "Дауысты мәтінге айналдыру модельдерін жүктеу мүмкін болмады."
+    "loadFailed": "Дауысты мәтінге айналдыру модельдерін жүктеу мүмкін болмады.",
+    "choose": "Модельді таңдау"
   },
   "voiceLanguage": {
     "title": "Дауыстық енгізу тілі",
@@ -3506,6 +3602,7 @@
       "fromHuggingFace": "Hugging Face-тен",
       "loading": "Модельдер жүктелуде",
       "noResults": "Модельдер табылмады",
+      "noResultsForQuery": "\"{{query}}\" үшін модельдер табылмады",
       "noFits": "Осы құрылғыға сәйкес модельдер жоқ",
       "noFitsDescription": "Үлкенірек модельдер «$t(common.all)» қойындысында.",
       "fit": {
@@ -3536,8 +3633,6 @@
       "quantizations": "Квантталған нұсқалар",
       "quantizationsHelp": "Кішірек файлдар аз жедел жад пен орын алады. Үлкенірек файлдар әдетте жақсырақ жауап береді.",
       "quantDetail": "Жүктеу көлемі {{size}} · шамамен {{memory}} жедел жад",
-      "downloadQuant": "{{quant}} жүктеп алу",
-      "downloadModelA11y": "{{name}} жүктеп алу",
       "detailsA11y": "Мәліметтер: {{name}}",
       "loadingModel": "Модель мәліметтері жүктелуде",
       "couldNotLoadModel": "Бұл модельді жүктеу мүмкін болмады",
@@ -3582,13 +3677,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "Бұл модель ойлау деңгейін қолдайды"
-    }
+    },
+    "creditsRequired": "Бұл хабарламаны жіберу үшін кредит жеткіліксіз. Кредит қосыңыз да, қайталап көріңіз."
   },
   "settingsTools": {
     "confirmTitle": "Осы өзгеріс расталсын ба?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "ең соңғы репозиторийіңіз",
+      "confirmMessage": "Репозиторий: {{repository}}. Сұрау: {{prompt}}",
+      "confirmTitle": "Осы агентті іске қосасыз ба?",
       "promptRequired": "Агентті іске қосу үшін сұрау қажет. Сұрау қосып, қайта іске қосыңыз.",
       "repositoryRequired": "Агентті іске қосу үшін репозиторий қажет. Kilo бағдарламасын ашыңыз, репозиторий таңдап, қайта іске қосыңыз.",
       "repositoryUnknown": "Kilo {{repository}} ны GitHub немесе GitLab репозиторийі ретінде танымайды. Kilo ішінен басқа репозиторий таңдаңыз.",
@@ -3618,7 +3717,9 @@
     "spend24h": "Соңғы 24 сағаттағы шығыс",
     "multiplierError": "1 немесе одан үлкен көбейткіш енгіз",
     "permissionDenied": "Шығыс ескертулерін басқаруға рұқсатыңыз жоқ.",
-    "pushOffByCategory": "Хабарландыруларда өшірулі"
+    "pushOffByCategory": "Хабарландыруларда өшірулі",
+    "multiplierMaxError": "{{max}} немесе одан кіші көбейткіш енгіз",
+    "thresholdMaxError": "{{max}} немесе одан кіші соманы енгізіңіз."
   },
   "profiles": {
     "title": "Профильдер",
@@ -3635,9 +3736,10 @@
       "skills_other": "{{count}} дағды",
       "commands_one": "{{count}} пәрмен",
       "commands_other": "{{count}} пәрмен",
-      "varsShort": "{{count}}а",
-      "skillsShort": "{{count}}д",
-      "commandsShort": "{{count}}п"
+      "setupCommands_one": "{{count}} орнату пәрмені",
+      "setupCommands_other": "{{count}} орнату пәрмені",
+      "agents_one": "{{count}} агент",
+      "agents_other": "{{count}} агент"
     },
     "nameLabel": "Профиль аты",
     "namePlaceholder": "мысалы Backend жөндеу",
@@ -3665,6 +3767,8 @@
     "keyTooLong": "Кілт 256 таңбадан аспауы керек",
     "keyDuplicate": "Бұл кілт профильде бұрыннан бар",
     "valueLabel": "Мән",
+    "valueRequired": "Мәнді енгізіңіз",
+    "tooLong": "Көп дегенде {{max}} таңба пайдаланыңыз",
     "secrets": {
       "markSecret": "Құпия деп белгілеңіз",
       "masked": "Жасырын мән",
@@ -3715,7 +3819,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Сервер атауын енгізіңіз",
-      "nameInvalid": "Атау тек әріптерді, сандарды, астын сызуларды және сызықтарды пайдалана алады",
+      "nameInvalid": "Атау тек ASCII әріптерін, сандарды, астын сызуларды және сызықтарды пайдалана алады, 100 таңбадан аспауы керек",
       "commandRequired": "Пәрменді енгізіңіз",
       "commandTooLong": "Ең көбі 50 аргумент пайдаланыңыз, әрқайсысы 500 таңба",
       "urlRequired": "URL мекенжайын енгізіңіз",
@@ -3743,7 +3847,7 @@
       "stepsPlaceholder": "мыс. 50",
       "temperature": "Температура",
       "temperaturePlaceholder": "мыс. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "мыс. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Менің агентім",
@@ -3752,7 +3856,7 @@
       "visibility": "Көріну",
       "visibilityPrimary": "Негізгі — таңдаушыда көрсетіледі",
       "visibilitySubagent": "Субагент — тек басқалардан шақыруға болады",
-      "visibilityAll": "Барлығы - екеуі де",
+      "visibilityAll": "Барлығы — екеуі де",
       "modePrimary": "Тек негізгі",
       "modeSubagent": "Тек субагент",
       "modeAll": "Барлық режимдер",
@@ -3760,7 +3864,7 @@
       "deleteFailed": "Агентті өшіру мүмкін болмады",
       "nameRequired": "Агент атын енгізіңіз",
       "slugRequired": "Агент слогын енгізіңіз",
-      "slugInvalid": "Слаг әріптен басталып, тек кіші әріптерді, сандарды және сызықшаларды қолдануы керек",
+      "slugInvalid": "Слаг кіші ASCII әріпінен басталып, тек кіші ASCII әріптерін, сандарды және сызықшаларды қолдануы керек, 50 таңбадан аспауы керек",
       "slugConflict": "Бұл slug-ды кірістірілген агент немесе осы профильдегі басқа агент қолдануда",
       "edit": "Агентті өңдеу"
     },
@@ -3805,7 +3909,9 @@
       "pinFailed": "Репо бекіту мүмкін болмады",
       "unboundToast": "Репо шектелмеген",
       "unbindFailed": "Репоны ажырату мүмкін болмады"
-    }
+    },
+    "variablesDeleteFailed": "Айнымалы мәнді өшіру мүмкін болмады",
+    "deleteCommand": "{{position}} пәрменін жою"
   },
   "credits": {
     "title": "Кредит сатып алу",
@@ -3841,7 +3947,8 @@
       "archive": "Мұрағаттау",
       "unarchive": "Мұрағаттан шығару",
       "deleteTitle": "{{name}} жою керек пе?",
-      "deleteMessage": "Оның тапсырмалары да жойылады. Сессиялары қалады."
+      "deleteMessage": "Оның тапсырмалары да жойылады. Сессиялары қалады.",
+      "createFailed": "Тізімді жасау мүмкін болмады"
     },
     "listSettings": {
       "title": "Тізім параметрлері",
@@ -3909,20 +4016,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Таңғы шолу",
+    "title": "Агент шолуы",
     "atLeast": "≥{{value}}",
     "coverageHint": "Кейбір тарихи белсенділік жоқ болуы мүмкін. ≥ кемінде осынша дегенді білдіреді; белгісіз нөл емес.",
     "available": "Қолжетімді шолулар",
     "history": "Шолулар тарихы",
-    "historyHint": "Есептер 30 күн сақталады, жабылған есептерді қоса.",
+    "historyHint": "Шолулар 30 күн сақталады, жабылғандарын қоса.",
     "settings": "Шолу параметрлері",
-    "empty": "Түнгі белсенділік жоқ",
-    "emptyHint": "Белсенді түннен кейін бұлттық және CLI кодтау сеанстарыңыз осында көрсетіледі.",
+    "empty": "Бұл шолу терезесінде белсенділік жоқ",
+    "emptyHint": "Бұлттық және CLI кодтау сеанстарыңыз жоспарланған шолуда белсенділік болғанда осында көрсетіледі.",
     "loadError": "Шолуларды жүктеу мүмкін болмады",
-    "sessions": "Түнде белсенді",
+    "sessions": "Терезеде белсенді",
     "pullRequests": "Ашылған PRs",
     "blockers": "Жаңа кедергілер",
-    "spend": "Түнгі шығын",
+    "spend": "Терезедегі шығын",
     "view": "Шолуды оқу",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -3944,14 +4051,14 @@
     "sources": "Дәлелдер мен артефактілер",
     "timezone": "Шолу уақыт белдеуі",
     "deviceTimezone": "Құрылғы уақыт белдеуін пайдалану",
-    "timezoneHint": "IANA уақыт белдеуі, мысалы Europe/Berlin. Кесте өзгерістері келесі түндерге қолданылады.",
-    "nightStart": "Түн басталады",
-    "morningStart": "Түн аяқталады / таң басталады",
-    "morningEnd": "Таң аяқталады",
-    "timeHint": "Таң аяқталғанда Басты бет картасы ағымдағы күйді қалпына келтіреді, желіден тыс болса да.",
+    "timezoneHint": "IANA уақыт белдеуі, мысалы Europe/Berlin. Кесте өзгерістері келесі шолуларға қолданылады.",
+    "nightStart": "Шолу терезесі басталады",
+    "morningStart": "Шолу дайын болады",
+    "morningEnd": "Шолу осы уақытқа дейін қолжетімді",
+    "timeHint": "Шолу терезесі аяқталғанда Басты бет картасы ағымдағы күйді қалпына келтіреді, желіден тыс болса да.",
     "invalidTimezone": "Жарамды IANA уақыт белдеуін енгізіңіз, мысалы Europe/Berlin.",
     "invalidScheduleTimes": "Қиылыспайтын, бос емес түн мен таң кезеңдерін таңдаңыз.",
-    "notificationsHint": "Алғашқы есеп дайын болғанда әр таң сайын бір жалпы хабарландыру. Ақылы AI қорытындыларына тәуелсіз.",
+    "notificationsHint": "Жоспарланған шолу сайын бір жалпы хабарландыру. Ақылы AI қорытындыларына тәуелсіз.",
     "notificationPermission": "Шолуды алу үшін $t(common.notifications) бөлімінде құрылғы хабарландыруларын қосыңыз.",
     "aiOptIn": "Ақылы AI қорытындылары",
     "aiHint": "Тек осы контекст үшін, міндетті емес. Таңдалған, өңделген үзінділер мен құрылымдық деректер модельге қолданба тілінде жіберіледі. Ақы осы контекст балансынан алынады.",
@@ -3969,7 +4076,7 @@
     "contextSettings": "AI параметрлері · {{context}}",
     "allContexts": "Жеке және ұйым шолулары бөлек сақталады.",
     "create": "Шолу жасау",
-    "oneOff": "Бір реттік",
+    "oneOff": "Сұраныс бойынша",
     "createdAt": "Жасалған уақыты: {{time}}",
     "chooseContext": "Бір контексті таңдаңыз",
     "period": "Шолу кезеңі",
@@ -3991,13 +4098,16 @@
     "emptyPeriod": "Бұл кезеңде белсенділік табылмады. AI қорытындысы жасалмайды және ақы алынбайды.",
     "emptyHistory": "Сақталған шолулар жоқ",
     "historicalStateHint": "Сеанс күйі ағымдағы күйді емес, таңдалған кезеңнің соңындағы күйді көрсетеді.",
-    "oneOffHint": "AI таңдалған, құпия мәліметтері жасырылған деректерді қолданбаңыздың тілінде алады. Бұл бір реттік есеп таңғы кестеңізді немесе AI теңшелімдеріңізді өзгертпейді.",
+    "oneOffHint": "AI таңдалған, құпия мәліметтері жасырылған деректерді қолданбаңыздың тілінде алады. Бұл сұраныс бойынша шолу жоспарланған шолуыңызды немесе AI теңшелімдеріңізді өзгертпейді.",
     "createOffline": "Шолуды тексеру немесе жасау үшін интернетке қосылыңыз. Ақылы сұраулар интернетке қосылмаған кезде ешқашан кезекке қойылмайды.",
     "estimateInputTooLarge": "Бұл кезеңдегі деректер көлемі таңдалған модель үшін тым үлкен.",
     "estimatePermissionUnavailable": "Бұл контекстің балансын пайдалануға рұқсатыңыз жоқ.",
+    "createFailed": "Бұл шолуды жасау мүмкін болмады.",
+    "reviewFailed": "Бұл шолуды тексеру мүмкін болмады.",
     "estimatePricingUnavailable": "Бұл модельдің бағасы қолжетімді емес.",
     "estimateBalanceUnavailable": "Ақылы жиынтақ үшін баланс жеткіліксіз.",
     "estimateModelNotAllowed": "Бұл модель мұнда рұқсат етілмейді.",
-    "estimateSpendLimitTooLow": "Жиынтақты рұқсат ету үшін шығын шегін жоғарылатыңыз."
+    "estimateSpendLimitTooLow": "Жиынтақты рұқсат ету үшін шығын шегін жоғарылатыңыз.",
+    "saved": "Шолу параметрлері сақталды"
   }
 }

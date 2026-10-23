@@ -7,6 +7,7 @@ import {
   sendAdminSlackNotification,
   type AdminSlackNotification,
 } from '@kilocode/web-shared/lib/slack/admin-notifications';
+import { escapeSlackLabel, escapeSlackText } from '@/lib/slack/slack-escape';
 
 export type CodingPlanInventoryCount = {
   providerId: string;
@@ -50,14 +51,6 @@ const KNOWN_STATUSES = new Set([
 
 function statusCount(summary: InventoryPlanSummary, status: string): number {
   return summary.statusCounts[status] ?? 0;
-}
-
-function escapeSlackText(value: string): string {
-  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
-}
-
-function escapeSlackLabel(value: string): string {
-  return escapeSlackText(value).replaceAll('`', "'").replaceAll('\n', ' ');
 }
 
 function formatCount(count: number): string {

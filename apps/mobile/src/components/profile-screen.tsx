@@ -120,9 +120,19 @@ export function ProfileScreen() {
   } = useQuery({
     ...trpc.organizations.list.queryOptions(),
     enabled: isAuthenticated && afterIdle,
+    // The Agents section resolves its scope from this list, so the read must
+    // settle the same way the linked-accounts one does: a read paused by the
+    // online manager is pending without fetching, and the inline error surface
+    // below never paints, leaving the organization section and the agent rows
+    // waiting on a request that never starts. Answer, or fail into Retry.
+    networkMode: 'always',
+    // `networkMode: 'always'` also disables the derived reconnect refetch
+    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
+    // 'always'` when it is undefined), so ask for it explicitly.
+    refetchOnReconnect: true,
   });
   const agentScope = organizationContextLoaded
-    ? getProfileAgentScope(organizationId, orgs, organizationsFetching || !afterIdle)
+    ? getProfileAgentScope(organizationId, orgs)
     : undefined;
   const { openPicker, picker } = useContextPicker(orgs);
   const selectedOrg = orgs?.find(org => org.organizationId === organizationId);

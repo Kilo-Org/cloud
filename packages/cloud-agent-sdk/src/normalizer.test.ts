@@ -1073,6 +1073,24 @@ describe('normalize', () => {
       });
     });
 
+    it('keeps every question in a list exactly at the maximum', () => {
+      const questions = Array.from({ length: SESSION_QUESTION_MAX_QUESTIONS }, (_, index) => ({
+        question: `Continue step ${index}?`,
+        header: `Step ${index}`,
+        options: [{ label: 'Yes', description: 'Continue' }],
+      }));
+      const result = normalize(createRaw('question.asked', { id: 'q-1', questions }));
+      expect(result).toEqual({
+        type: 'question.asked',
+        requestId: 'q-1',
+        questions: questions.map(entry => ({
+          question: entry.question,
+          header: entry.header,
+          options: [{ label: 'Yes', description: 'Continue' }],
+        })),
+      });
+    });
+
     it('drops an over-limit question list but keeps the prompt', () => {
       const questions = Array.from({ length: SESSION_QUESTION_MAX_QUESTIONS + 1 }, () => ({
         question: 'Continue?',

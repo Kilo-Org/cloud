@@ -44,6 +44,8 @@ export type GgufActiveDownload = {
   /** Set while a paused download resumes; a refused resume starts once more from zero. */
   resuming: boolean;
   restarted: boolean;
+  /** How many times the transfer in progress has been started from zero. */
+  attempts: number;
 };
 
 /** A download about to run its first transfer. */
@@ -63,14 +65,27 @@ export function activeDownload(input: {
     stop: undefined,
     resuming: false,
     restarted: false,
+    attempts: 1,
   };
 }
 
 /**
  * Moves every finished transfer to its model name, or none: a model without its
- * projector is not the model that was verified. False when a move failed.
+ * projector is not the model that was verified. A move that failed is no verdict
+ * on the bytes, so a file an earlier attempt left at a model name is cleared and
+ * the move runs once more. False when both moves failed.
  */
 export function moveIntoPlace(storage: GgufStorage, transfers: readonly GgufTransfer[]): boolean {
+  if (moveAll(storage, transfers)) {
+    return true;
+  }
+  for (const transfer of transfers) {
+    removeQuietly(storage, transfer.name);
+  }
+  return moveAll(storage, transfers);
+}
+
+function moveAll(storage: GgufStorage, transfers: readonly GgufTransfer[]): boolean {
   const moved: string[] = [];
   try {
     for (const transfer of transfers) {
@@ -85,6 +100,32 @@ export function moveIntoPlace(storage: GgufStorage, transfers: readonly GgufTran
     return false;
   }
 }
+
+/**
+ * What a finished transfer delivered, measured against the size it promised.
+ * Undefined means the server never stated a length, so only an empty file is short.
+ */
+export function transferResult(
+  size: number,
+  expected: number | undefined
+): 'whole' | 'short' | 'long' {
+  if (expected === undefined) {
+    return size === 0 ? 'short' : 'whole';
+  }
+  if (size === expected) {
+    return 'whole';
+  }
+  return size < expected ? 'short' : 'long';
+}
+
+/** Whether a finished transfer may run once more before the download is called failed. */
+export function mayRetryTransfer(download: GgufActiveDownload): boolean {
+  return download.attempts < ATTEMPTS;
+}
+
+/** A transfer that stopped short is started from zero once more, and a file that was refused is read once more. */
+export const ATTEMPTS = 2;
+export const PASSES = 2;
 
 export function currentTransfer(download: GgufActiveDownload): GgufTransfer {
   const transfer = download.transfers[download.step];

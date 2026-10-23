@@ -72,9 +72,7 @@ export function PickerSheet({
   // caller outside a navigator (an excluded feature's chat sheet) and a
   // harness with a partial expo-router mock keep mounting unchanged — there
   // the read is `undefined` and the listener degrades to nothing.
-  const navigation = useContext(NavigationContext) as
-    | { isFocused?: () => boolean }
-    | undefined;
+  const navigation = useContext(NavigationContext) as { isFocused?: () => boolean } | undefined;
   const isRouteFocused = useCallback(() => navigation?.isFocused?.() ?? false, [navigation]);
   const router = useRouter();
 

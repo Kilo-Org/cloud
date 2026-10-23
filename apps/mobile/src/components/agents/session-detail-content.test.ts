@@ -175,6 +175,14 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('expo-router', () => ({
   useFocusEffect: vi.fn(),
   useIsFocused: () => true,
+  usePreventRemove: vi.fn(),
+  useNavigation: () => ({
+    getState: () => ({
+      index: 1,
+      routes: [{ name: '(tabs)' }, { name: 'agent-chat/[session-id]' }],
+    }),
+    addListener: () => () => undefined,
+  }),
   useRouter: () => ({
     canGoBack: () => navigationRoutes.length > 1,
     back: () => {
@@ -451,7 +459,7 @@ vi.mock('@/lib/analytics/posthog', () => ({
   SESSION_VIEWED_EVENT: 'viewed',
 }));
 vi.mock('@/lib/a11y/announce', () => ({
-  moveA11yFocus: () => false,
+  requestA11yFocus: () => false,
   announceForA11y: vi.fn(),
 }));
 // `test-user` by default; the last-opened test flips it to `undefined` to model
@@ -1126,12 +1134,14 @@ describe('SessionDetailContent display scope', () => {
       header.findAll(node => node.props.accessibilityHint === i18n.t('profile.selectAccount'))
     ).toHaveLength(0);
     expect(header.findByProps({ accessibilityLabel: i18n.t('common.goBack') })).toBeDefined();
-    const { onPress } = header.findByProps({
-      accessibilityLabel: i18n.t('agentChat.session.renameAccessibility', {
+    const rename = header.findByProps({
+      accessibilityLabel: `Root ${ROOT_ID}`,
+      accessibilityHint: i18n.t('agentChat.session.renameAccessibility', {
         title: `Root ${ROOT_ID}`,
       }),
-    }).props as { onPress: () => void };
-    act(onPress);
+    });
+    expect(rename.props.accessibilityLabel).toBe(`Root ${ROOT_ID}`);
+    act(rename.props.onPress as () => void);
     expect(openRenameModal).toHaveBeenCalledOnce();
     pressHeaderBack(renderer);
     expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)/']);
@@ -1177,7 +1187,7 @@ describe('session detail active-profile indicator', () => {
     act(() => {
       (chip.props.onPress as () => void)();
     });
-    expect(navigationRoutes.at(-1)).toBe('/(app)/(tabs)/(3_profile)/profiles/p1');
+    expect(navigationRoutes.at(-1)).toBe('/(app)/profile-management/p1');
   });
 
   it.each(['user', 'organization'] as const)(
@@ -1202,7 +1212,7 @@ describe('session detail active-profile indicator', () => {
         (chip.props.onPress as () => void)();
       });
       expect(navigationRoutes.at(-1)).toBe(
-        `/(app)/(tabs)/(3_profile)/profiles/p1${ownerType === 'organization' ? '?organizationId=org-a' : ''}`
+        `/(app)/profile-management/p1${ownerType === 'organization' ? '?organizationId=org-a' : ''}`
       );
     }
   );
@@ -1230,7 +1240,7 @@ describe('session detail active-profile indicator', () => {
     act(() => {
       (chip.props.onPress as () => void)();
     });
-    expect(navigationRoutes.at(-1)).toBe('/(app)/(tabs)/(3_profile)/profiles/p-recorded');
+    expect(navigationRoutes.at(-1)).toBe('/(app)/profile-management/p-recorded');
   });
 
   it('falls back to the effective default only when the session recorded no profile', async () => {
@@ -2719,6 +2729,23 @@ describe('session detail zero-render transcript guard (mobile-app e2-open)', () 
     const message = assistantMessage(id);
     return { info: { ...message.info, sessionID: ROOT_ID }, parts: [] };
   }
+
+  it('shows the empty state instead of an empty user bubble for a stored session', async () => {
+    // A stored session opened read-only has no live writer. A user message whose
+    // parts never reached session ingest rendered as an empty bubble under a time
+    // marker (stored-session finding); the row must not exist at all.
+    const phantom: StoredMessage = {
+      info: { ...userMessage('msg-phantom').info, sessionID: ROOT_ID },
+      parts: [],
+    };
+    const view = await mountDetails([phantom]);
+
+    expect(messageLists(view.renderer)).toHaveLength(0);
+    expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
+      title: i18n.t('agentChat.session.emptyTitle'),
+    });
+    expect(view.requestedIds()).toEqual([ROOT_ID]);
+  });
 
   it('shows the empty state instead of a zero-item list when no stored message renders', async () => {
     const view = await mountDetails([blankAssistantMessage('msg-blank')]);

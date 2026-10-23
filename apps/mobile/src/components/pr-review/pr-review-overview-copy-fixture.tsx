@@ -72,7 +72,7 @@ export const reviewOverviewFixture = {
   },
 } satisfies RouterOutputs['githubPrReview']['getPullRequest'];
 
-export const reviewChecksFixture = {
+const reviewChecksFixture = {
   checkRuns: [
     {
       name: 'Formatting',

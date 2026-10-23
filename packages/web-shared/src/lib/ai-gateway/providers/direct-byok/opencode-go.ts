@@ -6,13 +6,11 @@ import {
   faviconIcon,
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
-import {
-  removeChatCompletionsMessageNames,
-  replaceReasoningObjectWithReasoningEffort,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import { removeChatCompletionsMessageNames } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 
 export default {
   id: 'opencode-go',
+  models_dev_id: 'opencode-go',
   base_url: 'https://opencode.ai/zen/go/v1',
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions', 'messages', 'responses'],
@@ -26,7 +24,6 @@ export default {
     if (context.request.kind === 'messages') {
       context.extraHeaders['x-api-key'] = context.provider.apiKey;
     }
-    replaceReasoningObjectWithReasoningEffort(context.request);
     if (context.request.kind === 'chat_completions') {
       delete context.request.body.prompt_cache_key;
       delete context.request.body.safety_identifier;

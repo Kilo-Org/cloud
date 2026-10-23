@@ -55,7 +55,12 @@ export function parseJsonStringsDeep(value: unknown): unknown {
   if (isPlainObject(value)) {
     const out: Record<string, unknown> = {};
     for (const key of Object.keys(value).sort()) {
-      out[key] = parseJsonStringsDeep(value[key]);
+      Object.defineProperty(out, key, {
+        value: parseJsonStringsDeep(value[key]),
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
     }
     return out;
   }
@@ -83,7 +88,12 @@ export function getTypeSignature(value: unknown): MessageTypeSignature {
   if (isPlainObject(value)) {
     const out: { [key: string]: MessageTypeSignature } = {};
     for (const key of Object.keys(value).sort()) {
-      out[key] = getTypeSignature(value[key]);
+      Object.defineProperty(out, key, {
+        value: getTypeSignature(value[key]),
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
     }
     return out;
   }

@@ -269,7 +269,6 @@
     "voiceInput": "Steminvoer",
     "autoExpandThinking": "Vou denke outomaties uit",
     "autoExpandThinkingSubtitle": "Wys die agent se denke volledig wanneer dit klaar gedink het.",
-    "autoExpandThinkingInactiveSubtitle": "Geen uitwerking terwyl denke-besonderhede versteek is nie.",
     "hideThinking": "Versteek denke-besonderhede",
     "hideThinkingSubtitle": "Moenie die agent se denke op die sessiebladsy wys nie.",
     "keepScreenOn": "Hou die skerm aan op die sessiebladsy",
@@ -294,7 +293,8 @@
     "condenseToolCallsSubtitle": "Groepeer opeenvolgende nutsmiddel-oproepe in een ry wat jy kan oopmaak.",
     "toolSummaryTranslation": "Vertaal hulpmiddelopsommings",
     "toolSummaryTranslationSubtitle": "Stuur elke hulpmiddelopsomming na 'n model om dit in jou app-taal te vertaal. Die oorspronklike word gewys as die vertaling misluk.",
-    "toolSummaryTranslationModelUnavailableNotice": "Hierdie model word nie meer aangebied nie. Tik op $t(common.model) om 'n ander een te kies."
+    "toolSummaryTranslationModelUnavailableNotice": "Hierdie model word nie meer aangebied nie. Tik op $t(common.model) om 'n ander een te kies.",
+    "autoExpandThinkingInactiveSubtitle": "Geen uitwerking terwyl denke-besonderhede versteek is nie."
   },
   "prReview": {
     "pullRequestUnavailable": "Trekversoek onbeskikbaar",
@@ -623,9 +623,15 @@
       "viewOnGitHub": "Bekyk PR op GitHub",
       "noChecksReported": "Geen kontroles gerapporteer nie",
       "passed": "{{displayCount}} geslaag",
+      "passed_one": "{{displayCount}} geslaag",
+      "passed_other": "{{displayCount}} geslaag",
       "failed": "{{displayCount}} misluk",
+      "failed_one": "{{displayCount}} misluk",
+      "failed_other": "{{displayCount}} misluk",
       "pending": "{{displayCount}} uitstaande",
       "skipped": "{{displayCount}} oorgeslaan",
+      "skipped_one": "{{displayCount}} oorgeslaan",
+      "skipped_other": "{{displayCount}} oorgeslaan",
       "checksCount": "{{displayCount}} kontroles",
       "checksCount_one": "{{displayCount}} kontrole",
       "checksCount_other": "{{displayCount}} kontroles",
@@ -1428,15 +1434,11 @@
       "findingsUnavailable": "Resultate is nie beskikbaar nie omdat hierdie hersiening misluk het.",
       "serviceUnavailable": "Die kodehersieningsdiens kon nie bereik word nie. Probeer die hersiening weer wanneer die diens beskikbaar is.",
       "reviewFailed": "Die hersiening het misluk. Probeer asseblief weer.",
-      "cancelReasonSuperseded": "'n Nuwere commit is gepus, so is hierdie hersiening vervang.",
-      "cancelReasonIntegrationDisconnected": "{{platform}} is afgesny, so is hierdie hersiening gekanselleer. Verbind dit weer, en voer die hersiening weer uit.",
-      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer is vir Bitbucket afgeskakel, so is hierdie hersiening gekanselleer. Skakel dit weer aan, en voer die hersiening weer uit.",
-      "cancelReasonBitbucketPullRequestChanged": "Die Bitbucket-pull request het verander, so is hierdie hersiening vervang.",
-      "cancelReasonCancelled": "Hierdie hersiening is gekanselleer.",
-      "cancelReasonInterrupted": "Hierdie hersiening is onderbreek.",
       "showMore": "Wys meer",
       "created": "Geskep",
       "started": "Begin",
+      "reviewEnded": "Beëindig",
+      "severityNitpick": "Kleinigheid",
       "tokens": "Tekseenhede",
       "tokensInOut": "{{input}} in / {{output}} uit",
       "council": "Raad",
@@ -1460,7 +1462,13 @@
       "sessionError": "Die sessie het 'n fout opgelewer: {{error}}",
       "statusWithValue": "Huidige status: {{status}}",
       "toolName": "Hulpmiddel: {{name}}",
-      "toolNameError": "'N Fout het by die hulpmiddel {{name}} voorgekom."
+      "toolNameError": "'N Fout het by die hulpmiddel {{name}} voorgekom.",
+      "cancelReasonSuperseded": "'n Nuwere commit is gepus, so is hierdie hersiening vervang.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} is afgesny, so is hierdie hersiening gekanselleer. Verbind dit weer, en voer die hersiening weer uit.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer is vir Bitbucket afgeskakel, so is hierdie hersiening gekanselleer. Skakel dit weer aan, en voer die hersiening weer uit.",
+      "cancelReasonBitbucketPullRequestChanged": "Die Bitbucket-pull request het verander, so is hierdie hersiening vervang.",
+      "cancelReasonCancelled": "Hierdie hersiening is gekanselleer.",
+      "cancelReasonInterrupted": "Hierdie hersiening is onderbreek."
     },
     "reviewMemory": {
       "title": "Hersieningsgeheue",
@@ -1747,7 +1755,7 @@
       "deadlinePassed": "Sperdatum verby",
       "deadlinePassedDetail": "{{critical}} krities, {{high}} hoog",
       "dueThisWeek": "Sperdatum hierdie week",
-      "dueThisWeekDetail": "{{exploitable}} as uitbuitbaar bevestig",
+      "dueThisWeekDetail": "{{exploitable}} hiervan is bevestig as uitbuitbaar",
       "noDeadline": "Geen sperdatum nie",
       "reviewSlaAssignment": "Hersien SLA-toewysing",
       "allOpenFindingsTracked": "Alle oop bevindings word gemonitor"
@@ -1907,11 +1915,17 @@
       "actorSystem": "Kilo-stelsel",
       "couldNotLoad": "Die ouditverslag kon nie gelaai word nie.",
       "events": "Gebeure",
+      "eventConfidence": "Vertroue: {{confidence}}",
+      "eventReason": "Rede: {{reason}}",
+      "eventsCount_one": "{{displayCount}} gebeurtenis",
+      "eventsCount_other": "{{displayCount}} gebeurtenisse",
       "generated": "Die verslag is op {{generatedAt}} gegenereer.",
       "noActivity": "Geen aangetekende aktiwiteit nie",
       "noActivityDescription": "Kilo het geen rapporteerbare aktiwiteit oor sekuriteitsbevindings van {{start}} tot {{end}} nie.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Bewaarplek nie aangeteken nie",
+      "reasonUnknown": "Onherkende rede",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Verslagoorsig",
       "title": "Ouditverslag",
       "unavailable": "Ouditverslag onbeskikbaar",
@@ -1966,6 +1980,7 @@
       "reauthorizeButton": "Magtig die GitHub-app weer",
       "reauthorizeDescription": "Die Sekuriteitsagent benodig toestemming om Dependabot-waarskuwings te lees. Magtig die GitHub-app weer om hierdie toestemming te verleen.",
       "reauthorizeTitle": "Bykomende toestemmings vereis",
+      "retryFailed": "Die Sekuriteitsagent kon steeds nie gelaai word nie. Kontroleer jou verbinding en probeer asseblief weer.",
       "setupFailed": "Kon nie GitHub-opstelling begin nie. Probeer asseblief weer."
     },
     "queuedActionUntracked": "'N Aksie in die tou kon nie meer gemonitor word nie. Verfris om die jongste status te sien.",
@@ -2128,8 +2143,8 @@
       "dollar_other": "dollar",
       "costSpoken": "koste {{cost}}",
       "costSpokenWithTime": "koste {{cost}}, {{time}}",
-      "spokenJoiner": "en",
-      "pullRequest": "trekversoek {{number}}"
+      "pullRequest": "trekversoek {{number}}",
+      "spokenJoiner": "en"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kon GitHub nie oopmaak nie",
@@ -2559,7 +2574,10 @@
       "allowOnceAccessibility": "Laat een keer toe",
       "alwaysAllow": "Laat altyd toe",
       "alwaysAllowAccessibility": "Laat altyd toe",
-      "retrying": "Probeer weer…"
+      "retrying": "Probeer weer…",
+      "retryDeny": "Probeer weer weier",
+      "retryAllowOnce": "Probeer weer laat een keer toe",
+      "retryAlwaysAllow": "Probeer weer laat altyd toe"
     },
     "questionCard": {
       "title": "Agent benodig insette",
@@ -3111,22 +3129,16 @@
     "boundary": {
       "backToProfile": "Terug na profiel",
       "loadErrorMessage": "Kontroleer jou verbinding en probeer weer.",
-
       "chooseAccount": "Kies 'n rekening",
       "loadErrorTitle": "Jou organisasies kon nie gelaai word nie.",
       "membershipLostNotice": "Jy het nie meer toegang tot hierdie organisasie nie. Oorgeskakel na {{target}}.",
       "noOrganization": "Geen organisasie",
-
       "noOrganizationDescription": "Hierdie rekening is nie deel van 'n organisasie nie. Skep of sluit by een aan op die web om organisasiefunksies soos lede-uitnodigings en waarskuwings oor lae saldo te gebruik.",
-
       "openWebOrganizations": "Maak organisasies op die web oop",
-
       "organizationUnavailable": "Die organisasie is nie beskikbaar nie.",
       "selectDescriptionWithOrganizations": "Jy behoort aan een of meer organisasies. Kies die rekening wat hierdie skerm moet gebruik.",
-
       "selectOrganization": "Kies 'n organisasie",
       "unavailableDescription": "Hierdie organisasie is nie meer beskikbaar nie. Kies een uit jou profiel om voort te gaan.",
-
       "unavailableSessionsDescription": "Hierdie organisasie is nie meer beskikbaar nie. Sessies daarvoor kan nie gelaai word nie.",
       "accessDeniedDescription": "Jy het nie toegang tot hierdie organisasie nie."
     },
@@ -3149,14 +3161,14 @@
       "truncated": "Ouer kredietaktiwiteit is beskikbaar."
     },
     "inviteMember": {
-      "alreadyInvited": "Hulle is reeds genooi of is reeds 'n lid.",
       "emailError": "Voer 'n geldige e-posadres in.",
       "emailPlaceholder": "naam@maatskappy.com",
       "permissionDenied": "Jy het nie toestemming om lede te nooi nie.",
       "roleMember": "Jou rol is lid.",
-      "sendError": "Kon nie die uitnodiging stuur nie.",
       "sendInvite": "Stuur uitnodiging",
-      "title": "Nooi lid uit"
+      "title": "Nooi lid uit",
+      "alreadyInvited": "Hulle is reeds genooi of is reeds 'n lid.",
+      "sendError": "Kon nie die uitnodiging stuur nie."
     },
     "invoices": {
       "downloadA11y": "Laai faktuur {{number}} af",
@@ -3225,8 +3237,8 @@
       "inviteCreated": "Uitnodiging geskep",
       "pendingInvitations": "Hangende uitnodigings",
       "resendInvite": "Stuur uitnodiging weer",
-      "resendInviteError": "Kon nie die uitnodiging weer stuur nie.",
-      "shareInviteLink": "Deel uitnodigingskakel"
+      "shareInviteLink": "Deel uitnodigingskakel",
+      "resendInviteError": "Kon nie die uitnodiging weer stuur nie."
     },
     "usageStats": {
       "inputTokens": "Invoertekens",
@@ -3371,11 +3383,11 @@
   },
   "transcriptionModel": {
     "title": "Transkripsiemodel",
-    "choose": "Kies 'n model",
     "noneChosen": "Geen gekies nie",
     "emptyTitle": "Geen transkripsiemodelle nie",
     "emptyDescription": "Die Kilo Gateway bied tans geen transkripsiemodelle nie.",
-    "loadFailed": "Die transkripsiemodelle kon nie gelaai word nie."
+    "loadFailed": "Die transkripsiemodelle kon nie gelaai word nie.",
+    "choose": "Kies 'n model"
   },
   "voiceLanguage": {
     "title": "Stemtaal",
@@ -3397,7 +3409,6 @@
   },
   "modelChat": {
     "offlineFailure": "Hierdie model het 'n internetverbinding nodig. Koppel en probeer weer, of skakel oor na 'n model op hierdie toestel.",
-    "creditsRequired": "Nie genoeg krediete om hierdie boodskap te stuur nie. Voeg krediete by en probeer weer.",
     "empty": {
       "title": "Begin 'n klets",
       "description": "Stuur 'n boodskap om met 'n model te gesels."
@@ -3591,6 +3602,7 @@
       "fromHuggingFace": "Van Hugging Face",
       "loading": "Laai tans modelle",
       "noResults": "Geen modelle gevind nie",
+      "noResultsForQuery": "Geen modelle gevind vir \"{{query}}\" nie",
       "noFits": "Geen modelle pas op hierdie toestel nie",
       "noFitsDescription": "Groter modelle is op die $t(common.all)-oortjie.",
       "fit": {
@@ -3665,13 +3677,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "Hierdie model ondersteun denkinspanning"
-    }
+    },
+    "creditsRequired": "Nie genoeg krediete om hierdie boodskap te stuur nie. Voeg krediete by en probeer weer."
   },
   "settingsTools": {
     "confirmTitle": "Bevestig hierdie verandering?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "jou mees onlangse bewaarplek",
+      "confirmMessage": "Bewaarplek: {{repository}}. Opdrag: {{prompt}}",
+      "confirmTitle": "Begin hierdie agent?",
       "promptRequired": "Begin agent benodig 'n opdrag. Voeg 'n opdrag by en voer dit weer uit.",
       "repositoryRequired": "Begin agent benodig 'n bewaarplek. Maak Kilo oop en kies een, voer dit dan weer uit.",
       "repositoryUnknown": "Kilo herken nie {{repository}} as 'n GitHub- of GitLab-bewaarplek nie. Kies 'n ander bewaarplek in Kilo.",
@@ -3700,10 +3716,10 @@
     "noSpend": "Nog geen besteding aangeteken nie",
     "spend24h": "Besteding in die afgelope 24 uur",
     "multiplierError": "Voer 'n vermenigvuldiger van 1 of meer in",
-    "multiplierMaxError": "Voer 'n vermenigvuldiger van {{max}} of minder in",
-    "thresholdMaxError": "Voer 'n bedrag van {{max}} of minder in.",
     "permissionDenied": "Jy het nie toestemming om bestedingswaarskuwings te bestuur nie.",
-    "pushOffByCategory": "Af in Kennisgewings"
+    "pushOffByCategory": "Af in Kennisgewings",
+    "multiplierMaxError": "Voer 'n vermenigvuldiger van {{max}} of minder in",
+    "thresholdMaxError": "Voer 'n bedrag van {{max}} of minder in."
   },
   "profiles": {
     "title": "Profiele",
@@ -3751,6 +3767,8 @@
     "keyTooLong": "Sleutel moet 256 karakters of minder wees",
     "keyDuplicate": "Hierdie sleutel bestaan reeds in die profiel",
     "valueLabel": "Waarde",
+    "valueRequired": "Voer 'n waarde in",
+    "tooLong": "Gebruik hoogstens {{max}} karakters",
     "secrets": {
       "markSecret": "Merk as geheim",
       "masked": "Versteekte waarde",
@@ -3760,7 +3778,6 @@
     },
     "variablesEmpty": "Nog geen veranderlikes nie",
     "variablesSaveFailed": "Kon nie veranderlike stoor nie",
-    "variablesDeleteFailed": "Kon nie veranderlike verwyder nie",
     "commandsTitle": "Stel opdragte op",
     "addCommand": "Voeg opdrag by",
     "commandLabel": "Bevel",
@@ -3771,7 +3788,6 @@
     "moveDown": "Beweeg af",
     "moveCommandUp": "Skuif bevel {{position}} op",
     "moveCommandDown": "Skuif bevel {{position}} af",
-    "deleteCommand": "Skrap bevel {{position}}",
     "skillsTitle": "Vaardighede",
     "addSkill": "Voeg vaardigheid by",
     "skillNameLabel": "Vaardigheidsnaam",
@@ -3803,7 +3819,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Voer 'n bedienernaam in",
-      "nameInvalid": "Naam kan slegs letters, syfers, onderstrepe en strepe gebruik",
+      "nameInvalid": "Naam kan slegs ASCII-letters, syfers, onderstrepe en strepe tot 100 karakters gebruik",
       "commandRequired": "Voer 'n opdrag in",
       "commandTooLong": "Gebruik hoogstens 50 argumente van 500 karakters elk",
       "urlRequired": "Voer 'n URL in",
@@ -3848,7 +3864,7 @@
       "deleteFailed": "Kon nie agent verwyder nie",
       "nameRequired": "Voer 'n agentnaam in",
       "slugRequired": "Voer 'n agentslak in",
-      "slugInvalid": "Slak moet met 'n letter begin en slegs kleinletters, syfers en strepe gebruik",
+      "slugInvalid": "Slak moet met 'n ASCII-kleinletter begin en slegs ASCII-kleinletters, syfers en strepe tot 50 karakters gebruik",
       "slugConflict": "Daardie slak word deur 'n ingeboude agent of 'n ander agent in hierdie profiel gebruik",
       "edit": "Wysig agent"
     },
@@ -3893,7 +3909,9 @@
       "pinFailed": "Kon nie repo vasspeld nie",
       "unboundToast": "Repo ongebonde",
       "unbindFailed": "Kon nie repo ontbind nie"
-    }
+    },
+    "variablesDeleteFailed": "Kon nie veranderlike verwyder nie",
+    "deleteCommand": "Skrap bevel {{position}}"
   },
   "credits": {
     "title": "Koop krediete",
@@ -3920,7 +3938,6 @@
       "newList": "Nuwe lys",
       "empty": "Nog geen lyste nie",
       "couldNotLoad": "Kon nie lyste laai nie",
-      "createFailed": "Kon nie die lys skep nie",
       "noRepository": "Geen bewaarplek",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} oop",
@@ -3930,7 +3947,8 @@
       "archive": "Argiveer",
       "unarchive": "Ontargiveer",
       "deleteTitle": "Skrap {{name}}?",
-      "deleteMessage": "Sy take word ook geskrap. Hul sessies bly."
+      "deleteMessage": "Sy take word ook geskrap. Hul sessies bly.",
+      "createFailed": "Kon nie die lys skep nie"
     },
     "listSettings": {
       "title": "Lysinstellings",
@@ -3998,21 +4016,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Oggendverslag",
+    "title": "Agentverslag",
     "atLeast": "≥{{value}}",
     "coverageHint": "Sommige historiese aktiwiteit kan ontbreek. ≥ beteken ten minste soveel; onbekend is nie nul nie.",
     "available": "Beskikbare verslae",
     "history": "Verslaggeskiedenis",
-    "historyHint": "Verslae word 30 dae lank bewaar, insluitend verwerpte verslae.",
+    "historyHint": "Verslae word 30 dae lank bewaar, insluitend dié wat verwerp is.",
     "settings": "Verslaginstellings",
-    "saved": "Verslaginstellings gestoor",
-    "empty": "Geen oornag-aktiwiteit nie",
-    "emptyHint": "Jou wolk- en CLI-koderingsessies sal hier verskyn ná 'n aktiewe nag.",
+    "empty": "Geen aktiwiteit in hierdie verslagvenster nie",
+    "emptyHint": "Jou wolk- en CLI-koderingsessies verskyn hier wanneer 'n geskeduleerde verslag aktiwiteit het.",
     "loadError": "Kon nie verslae laai nie",
-    "sessions": "Oornag aktief",
+    "sessions": "Aktief in venster",
     "pullRequests": "PRs geopen",
     "blockers": "Nuwe struikelblokke",
-    "spend": "Oornag-besteding",
+    "spend": "Besteding in venster",
     "view": "Lees verslag",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -4034,13 +4051,13 @@
     "sources": "Bewyse en artefakte",
     "timezone": "Verslag-tydsone",
     "deviceTimezone": "Gebruik toestel-tydsone",
-    "timezoneHint": "IANA-tydsone, byvoorbeeld Europe/Berlin. Skedulewysigings geld vir toekomstige nagte.",
-    "nightStart": "Nag begin",
-    "morningStart": "Nag eindig / oggend begin",
-    "morningEnd": "Oggend eindig",
-    "timeHint": "Die Tuis-kaart herstel regstreekse status wanneer die oggend eindig, selfs vanlyn.",
-    "invalidSchedule": "Kies 'n geldige tydsone en nag- en oggendperiodes wat nie oorvleuel of leeg is nie.",
-    "notificationsHint": "Een algemene kennisgewing per oggend wanneer jou eerste verslag gereed is. Onafhanklik van betaalde AI-opsommings.",
+    "timezoneHint": "IANA-tydsone, byvoorbeeld Europe/Berlin. Skedulewysigings geld vir toekomstige verslae.",
+    "nightStart": "Verslagvenster begin",
+    "morningStart": "Verslag gereed om",
+    "morningEnd": "Verslag beskikbaar tot",
+    "timeHint": "Die Tuis-kaart herstel regstreekse status wanneer die verslagvenster eindig, selfs vanlyn.",
+    "invalidSchedule": "Kies 'n geldige tydsone en 'n nie-leë verslagvenster.",
+    "notificationsHint": "Een algemene kennisgewing per geskeduleerde verslag. Onafhanklik van betaalde AI-opsommings.",
     "notificationPermission": "Aktiveer toestelkennisgewings in $t(common.notifications) om jou verslag te ontvang.",
     "aiOptIn": "Betaalde AI-opsommings",
     "aiHint": "Opsioneel slegs vir hierdie konteks. Geselekteerde, geredigeerde uittreksels en gestruktureerde feite word in jou apptaal na jou model gestuur. Heffings gebruik hierdie konteks se saldo.",
@@ -4058,7 +4075,7 @@
     "contextSettings": "AI-instellings · {{context}}",
     "allContexts": "Persoonlike en organisasieverslae bly apart.",
     "create": "Skep verslag",
-    "oneOff": "Eenmalig",
+    "oneOff": "Op aanvraag",
     "createdAt": "Geskep {{time}}",
     "chooseContext": "Kies een konteks",
     "period": "Verslagtydperk",
@@ -4080,13 +4097,16 @@
     "emptyPeriod": "Geen aktiwiteit in hierdie tydperk gevind nie. Geen AI-opsomming of heffing nie.",
     "emptyHistory": "Geen gestoorde verslae nie",
     "historicalStateHint": "Die sessiestatus weerspieël die einde van die gekose tydperk, nie die huidige regstreekse status nie.",
-    "oneOffHint": "AI ontvang geselekteerde bewyse waarvan sensitiewe inligting verberg is, in jou toepassingstaal. Hierdie eenmalige verslag verander nie jou oggendskedule of AI-voorkeure nie.",
+    "oneOffHint": "AI ontvang geselekteerde bewyse waarvan sensitiewe inligting verberg is, in jou toepassingstaal. Hierdie verslag op aanvraag verander nie jou geskeduleerde verslag of AI-voorkeure nie.",
     "createOffline": "Gaan aanlyn om 'n verslag te hersien of te skep. Betaalde versoeke word nooit vanlyn in 'n waglys geplaas nie.",
     "estimateInputTooLarge": "Hierdie tydperk bevat te veel bewyse vir die gekose model.",
     "estimatePermissionUnavailable": "Jy het nie toestemming om hierdie konteks se saldo te gebruik nie.",
+    "createFailed": "Kon nie hierdie verslag skep nie.",
+    "reviewFailed": "Kon nie hierdie verslag hersien nie.",
     "estimatePricingUnavailable": "Prysinligting vir hierdie model is nie beskikbaar nie.",
     "estimateBalanceUnavailable": "Nie genoeg saldo vir ’n betaalde opsomming nie.",
     "estimateModelNotAllowed": "Hierdie model is hier nie toegelaat nie.",
-    "estimateSpendLimitTooLow": "Verhoog die bestedingswaaktaam om hierdie opsomming toe te laat."
+    "estimateSpendLimitTooLow": "Verhoog die bestedingswaaktaam om hierdie opsomming toe te laat.",
+    "saved": "Verslaginstellings gestoor"
   }
 }

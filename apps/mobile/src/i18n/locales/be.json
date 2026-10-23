@@ -269,7 +269,6 @@
     "voiceInput": "Галасавы ўвод",
     "autoExpandThinking": "Аўтаматычна разгортваць развагі",
     "autoExpandThinkingSubtitle": "Паказваць развагі агента разгорнутымі пасля іх завяршэння.",
-    "autoExpandThinkingInactiveSubtitle": "Не дзейнічае, калі падрабязнасці разваг схаваны.",
     "hideThinking": "Хаваць падрабязнасці разваг",
     "hideThinkingSubtitle": "Не паказваць развагі агента на старонцы сеанса.",
     "keepScreenOn": "Не выключаць экран на старонцы сеанса",
@@ -294,7 +293,8 @@
     "condenseToolCallsSubtitle": "Збірайце паслядоўныя выклікі інструментаў у адзін радок, які можна адкрыць.",
     "toolSummaryTranslation": "Перакласці зводкі інструментаў",
     "toolSummaryTranslationSubtitle": "Адпраўляйце кожную зводку інструмента мадэлі, каб перакласці яе на мову вашай праграмы. Калі пераклад не ўдасца, паказваецца арыгінал.",
-    "toolSummaryTranslationModelUnavailableNotice": "Гэта мадэль больш не прапануецца. Націсніце $t(common.model), каб выбраць іншую."
+    "toolSummaryTranslationModelUnavailableNotice": "Гэта мадэль больш не прапануецца. Націсніце $t(common.model), каб выбраць іншую.",
+    "autoExpandThinkingInactiveSubtitle": "Не дзейнічае, калі падрабязнасці разваг схаваны."
   },
   "prReview": {
     "pullRequestUnavailable": "Запыт на зліццё недаступны",
@@ -510,7 +510,7 @@
       "unresolveThread": "Пазначыць абмеркаванне як нявырашанае",
       "resolved": "Вырашана",
       "outdated": "Састарэла",
-      "comment_one": "1 каментар",
+      "comment_one": "{{displayCount}} каментар",
       "comment": "{{displayCount}} каментара",
       "comment_other": "{{displayCount}} каментара",
       "startedRelative": " · пачата {{relative}}",
@@ -645,9 +645,21 @@
       "viewOnGitHub": "Прагледзець PR на GitHub",
       "noChecksReported": "Звестак пра праверкі няма",
       "passed": "паспяхова: {{displayCount}}",
+      "passed_one": "паспяхова: {{displayCount}}",
+      "passed_other": "паспяхова: {{displayCount}}",
+      "passed_few": "паспяхова: {{displayCount}}",
+      "passed_many": "паспяхова: {{displayCount}}",
       "failed": "з памылкамі: {{displayCount}}",
+      "failed_one": "з памылкамі: {{displayCount}}",
+      "failed_other": "з памылкамі: {{displayCount}}",
+      "failed_few": "з памылкамі: {{displayCount}}",
+      "failed_many": "з памылкамі: {{displayCount}}",
       "pending": "у чаканні: {{displayCount}}",
       "skipped": "прапушчана: {{displayCount}}",
+      "skipped_one": "прапушчана: {{displayCount}}",
+      "skipped_other": "прапушчана: {{displayCount}}",
+      "skipped_few": "прапушчана: {{displayCount}}",
+      "skipped_many": "прапушчана: {{displayCount}}",
       "checksCount": "праверак: {{displayCount}}",
       "checksCount_one": "праверка: {{displayCount}}",
       "checksCount_few": "праверкі: {{displayCount}}",
@@ -1466,15 +1478,11 @@
       "findingsUnavailable": "Вынікі недаступныя, бо гэтая праверка завяршылася няўдала.",
       "serviceUnavailable": "Не атрымалася злучыцца з сэрвісам праверкі кода. Паўтарыце праверку, калі сэрвіс будзе даступны.",
       "reviewFailed": "Праверка завяршылася няўдала. Калі ласка, паспрабуйце яшчэ раз.",
-      "cancelReasonSuperseded": "Быў запушчаны новы коміт, таму гэтая праверка была заменена.",
-      "cancelReasonIntegrationDisconnected": "{{platform}} адключаны, таму гэтая праверка была адменена. Падключыце яго зноў і паўтарыце праверку.",
-      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer быў адключаны для Bitbucket, таму гэтая праверка была адменена. Уключыце яго зноў і паўтарыце праверку.",
-      "cancelReasonBitbucketPullRequestChanged": "Запыт на аб'яднанне ў Bitbucket змяніўся, таму гэтая праверка была заменена.",
-      "cancelReasonCancelled": "Гэтая праверка была адменена.",
-      "cancelReasonInterrupted": "Гэтая праверка была перарвана.",
       "showMore": "Паказаць больш",
       "created": "Створана",
       "started": "Пачата",
+      "reviewEnded": "Скончана",
+      "severityNitpick": "Дробязь",
       "tokens": "Токены",
       "tokensInOut": "Уваход: {{input}} / Выхад: {{output}}",
       "council": "Рада",
@@ -1498,7 +1506,13 @@
       "sessionError": "Памылка сеанса: {{error}}.",
       "statusWithValue": "Стан: {{status}}",
       "toolName": "Інструмент: {{name}}",
-      "toolNameError": "Памылка інструмента {{name}}."
+      "toolNameError": "Памылка інструмента {{name}}.",
+      "cancelReasonSuperseded": "Быў запушчаны новы коміт, таму гэтая праверка была заменена.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} адключаны, таму гэтая праверка была адменена. Падключыце яго зноў і паўтарыце праверку.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer быў адключаны для Bitbucket, таму гэтая праверка была адменена. Уключыце яго зноў і паўтарыце праверку.",
+      "cancelReasonBitbucketPullRequestChanged": "Запыт на аб'яднанне ў Bitbucket змяніўся, таму гэтая праверка была заменена.",
+      "cancelReasonCancelled": "Гэтая праверка была адменена.",
+      "cancelReasonInterrupted": "Гэтая праверка была перарвана."
     },
     "reviewMemory": {
       "title": "Памяць праверак",
@@ -1791,7 +1805,7 @@
       "deadlinePassed": "Тэрмін мінуў",
       "deadlinePassedDetail": "Крытычны ўзровень: {{critical}}, высокі: {{high}}",
       "dueThisWeek": "Тэрмін на гэтым тыдні",
-      "dueThisWeekDetail": "Можна выкарыстаць у атацы: {{exploitable}}",
+      "dueThisWeekDetail": "З гэтых праблем {{exploitable}} можна выкарыстаць у атацы",
       "noDeadline": "Няма тэрміну",
       "reviewSlaAssignment": "Праверце прызначаныя тэрміны SLA",
       "allOpenFindingsTracked": "Усе адкрытыя праблемы адсочваюцца"
@@ -1953,11 +1967,19 @@
       "actorSystem": "Сістэма Kilo",
       "couldNotLoad": "Не атрымалася загрузіць справаздачу аўдыту.",
       "events": "Падзеі",
+      "eventConfidence": "Упэўненасць: {{confidence}}",
+      "eventReason": "Прычына: {{reason}}",
+      "eventsCount_one": "{{displayCount}} падзея",
+      "eventsCount_few": "{{displayCount}} падзеі",
+      "eventsCount_many": "{{displayCount}} падзей",
+      "eventsCount_other": "{{displayCount}} падзеі",
       "generated": "Справаздача створана: {{generatedAt}}.",
       "noActivity": "Няма зарэгістраваных дзеянняў",
       "noActivityDescription": "У Kilo няма дзеянняў з праблемамі бяспекі для ўключэння ў справаздачу за перыяд з {{start}} да {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Рэпазіторый не запісаны",
+      "reasonUnknown": "Нераспазнаная прычына",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Зводка справаздачы",
       "title": "Справаздача аўдыту",
       "unavailable": "Справаздача аўдыту недаступная",
@@ -2012,6 +2034,7 @@
       "reauthorizeButton": "Паўторна аўтарызаваць праграму GitHub",
       "reauthorizeDescription": "Агенту бяспекі патрэбны дазвол на чытанне апавяшчэнняў Dependabot. Паўторна аўтарызуйце праграму GitHub, каб даць гэты дазвол.",
       "reauthorizeTitle": "Патрабуюцца дадатковыя дазволы",
+      "retryFailed": "Не атрымалася загрузіць агента бяспекі. Праверце злучэнне і паспрабуйце яшчэ раз.",
       "setupFailed": "Не атрымалася пачаць наладжванне GitHub. Паспрабуйце яшчэ раз."
     },
     "queuedActionUntracked": "Больш не атрымліваецца адсочваць дзеянне ў чарзе. Абнавіце даныя, каб убачыць актуальны стан.",
@@ -2182,8 +2205,8 @@
       "dollar_many": "долараў",
       "costSpoken": "кошт {{cost}}",
       "costSpokenWithTime": "кошт {{cost}}, {{time}}",
-      "spokenJoiner": "і",
-      "pullRequest": "запыт на зліццё {{number}}"
+      "pullRequest": "запыт на зліццё {{number}}",
+      "spokenJoiner": "і"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Не атрымалася адкрыць GitHub",
@@ -2623,7 +2646,10 @@
       "allowOnceAccessibility": "Дазволіць адзін раз",
       "alwaysAllow": "Дазваляць заўсёды",
       "alwaysAllowAccessibility": "Дазваляць заўсёды",
-      "retrying": "Паўторная спроба…"
+      "retrying": "Паўторная спроба…",
+      "retryDeny": "Паспрабаваць адмовіць яшчэ раз",
+      "retryAllowOnce": "Паспрабаваць дазволіць адзін раз яшчэ раз",
+      "retryAlwaysAllow": "Паспрабаваць дазваляць заўсёды яшчэ раз"
     },
     "questionCard": {
       "title": "Агенту патрэбны адказ",
@@ -3191,22 +3217,16 @@
     "boundary": {
       "backToProfile": "Назад да профілю",
       "loadErrorMessage": "Правер злучэнне і паспрабуй яшчэ раз.",
-
       "chooseAccount": "Выберыце ўліковы запіс",
       "loadErrorTitle": "Не ўдалося загрузіць вашы арганізацыі.",
       "membershipLostNotice": "У вас больш няма доступу да гэтай арганізацыі. Пераключана на {{target}}.",
       "noOrganization": "Няма арганізацыі",
-
       "noOrganizationDescription": "Гэты ўліковы запіс не ўваходзіць у арганізацыю. Стварыце арганізацыю або далучыцеся да яе на сайце, каб выкарыстоўваць функцыі арганізацыі, такія як запрашэнні ўдзельнікаў і апавяшчэнні аб нізкім балансе.",
-
       "openWebOrganizations": "Адкрыць арганізацыі на сайце",
-
       "organizationUnavailable": "Арганізацыя недаступная.",
       "selectDescriptionWithOrganizations": "Вы належыце да адной або некалькіх арганізацый. Выберыце ўліковы запіс, які павінен выкарыстоўваць гэты экран.",
-
       "selectOrganization": "Выберыце арганізацыю",
       "unavailableDescription": "Гэтая арганізацыя больш недаступная. Каб працягнуць, выберыце іншую ў сваім профілі.",
-
       "unavailableSessionsDescription": "Гэтая арганізацыя больш недаступная. Загрузіць сесіі для яе немагчыма.",
       "accessDeniedDescription": "У вас няма доступу да гэтай арганізацыі."
     },
@@ -3229,14 +3249,14 @@
       "truncated": "Даступныя ранейшыя аперацыі з крэдытамі."
     },
     "inviteMember": {
-      "alreadyInvited": "Гэты адрас ужо мае запрашэнне або належыць удзельніку арганізацыі.",
       "emailError": "Увядзіце карэктны адрас электроннай пошты.",
       "emailPlaceholder": "імя@company.com",
       "permissionDenied": "У вас няма дазволу запрашаць удзельнікаў.",
       "roleMember": "Роля: удзельнік.",
-      "sendError": "Не атрымалася адправіць запрашэнне.",
       "sendInvite": "Адправіць запрашэнне",
-      "title": "Запрасіць удзельніка"
+      "title": "Запрасіць удзельніка",
+      "alreadyInvited": "Гэты адрас ужо мае запрашэнне або належыць удзельніку арганізацыі.",
+      "sendError": "Не атрымалася адправіць запрашэнне."
     },
     "invoices": {
       "downloadA11y": "Спампаваць рахунак {{number}}",
@@ -3305,8 +3325,8 @@
       "inviteCreated": "Запрашэнне створанае",
       "pendingInvitations": "Запрашэнні без адказу",
       "resendInvite": "Адправіць запрашэнне зноў",
-      "resendInviteError": "Не атрымалася адправіць запрашэнне зноў.",
-      "shareInviteLink": "Падзяліцца спасылкай на запрашэнне"
+      "shareInviteLink": "Падзяліцца спасылкай на запрашэнне",
+      "resendInviteError": "Не атрымалася адправіць запрашэнне зноў."
     },
     "usageStats": {
       "inputTokens": "Уваходныя токены",
@@ -3453,11 +3473,11 @@
   },
   "transcriptionModel": {
     "title": "Мадэль распазнавання маўлення",
-    "choose": "Абярыце мадэль",
     "noneChosen": "Не выбрана",
     "emptyTitle": "Няма мадэляў распазнавання маўлення",
     "emptyDescription": "Зараз Kilo Gateway не прапануе мадэляў распазнавання маўлення.",
-    "loadFailed": "Не атрымалася загрузіць мадэлі распазнавання маўлення."
+    "loadFailed": "Не атрымалася загрузіць мадэлі распазнавання маўлення.",
+    "choose": "Абярыце мадэль"
   },
   "voiceLanguage": {
     "title": "Мова галасавога ўводу",
@@ -3479,7 +3499,6 @@
   },
   "modelChat": {
     "offlineFailure": "Гэтай мадэлі патрэбна падключэнне да інтэрнэту. Падключыцеся і паспрабуйце зноў або пераключыцеся на мадэль на гэтай прыладзе.",
-    "creditsRequired": "Недастаткова крэдытаў для адпраўкі гэтага паведамлення. Папоўніце баланс і паспрабуйце зноў.",
     "empty": {
       "title": "Пачаць чат",
       "description": "Адпраўце паведамленне, каб паразмаўляць з мадэллю."
@@ -3675,6 +3694,7 @@
       "fromHuggingFace": "З Hugging Face",
       "loading": "Загрузка мадэляў",
       "noResults": "Мадэлі не знойдзены",
+      "noResultsForQuery": "Мадэляў па запыце \"{{query}}\" не знойдзена",
       "noFits": "Няма мадэляў, якія падыходзяць гэтай прыладзе",
       "noFitsDescription": "Большыя мадэлі знаходзяцца на ўкладцы «$t(common.all)».",
       "fit": {
@@ -3749,13 +3769,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "Гэтая мадэль падтрымлівае ўзровень разважанняў"
-    }
+    },
+    "creditsRequired": "Недастаткова крэдытаў для адпраўкі гэтага паведамлення. Папоўніце баланс і паспрабуйце зноў."
   },
   "settingsTools": {
     "confirmTitle": "Пацвердзіць гэта змяненне?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "ваш апошні рэпазіторый",
+      "confirmMessage": "Рэпазіторый: {{repository}}. Запыт: {{prompt}}",
+      "confirmTitle": "Запусціць гэтага агента?",
       "promptRequired": "Каб запусціць агента, патрэбен запыт. Дадайце запыт і запусціце зноў.",
       "repositoryRequired": "Каб запусціць агента, патрэбны рэпазіторый. Адкрыйце Kilo і выберыце рэпазіторый, затым запусціце зноў.",
       "repositoryUnknown": "Kilo не распазнае {{repository}} як рэпазіторый GitHub або GitLab. Выберыце іншы рэпазіторый у Kilo.",
@@ -3784,10 +3808,10 @@
     "noSpend": "Выдаткі яшчэ не зафіксаваны",
     "spend24h": "Выдаткі за апошнія 24 гадзіны",
     "multiplierError": "Увядзіце множнік 1 або больш",
-    "multiplierMaxError": "Увядзіце множнік {{max}} або менш",
-    "thresholdMaxError": "Увядзіце суму {{max}} або менш.",
     "permissionDenied": "У вас няма дазволу кіраваць апавяшчэннямі аб выдатаках.",
-    "pushOffByCategory": "Выключана ў апавяшчэннях"
+    "pushOffByCategory": "Выключана ў апавяшчэннях",
+    "multiplierMaxError": "Увядзіце множнік {{max}} або менш",
+    "thresholdMaxError": "Увядзіце суму {{max}} або менш."
   },
   "profiles": {
     "title": "Профілі",
@@ -3845,6 +3869,8 @@
     "keyTooLong": "Ключ павінен змяшчаць не больш за 256 сімвалаў",
     "keyDuplicate": "Гэты ключ ужо існуе ў профілі",
     "valueLabel": "Каштоўнасць",
+    "valueRequired": "Увядзіце каштоўнасць",
+    "tooLong": "Выкарыстоўвайце не больш за {{max}} сімвалаў",
     "secrets": {
       "markSecret": "Пазначыць як сакрэтнае",
       "masked": "Схаваная каштоўнасць",
@@ -3854,7 +3880,6 @@
     },
     "variablesEmpty": "Зменных пакуль няма",
     "variablesSaveFailed": "Не ўдалося захаваць зменную",
-    "variablesDeleteFailed": "Не ўдалося выдаліць зменную",
     "commandsTitle": "Каманды наладкі",
     "addCommand": "Дадаць каманду",
     "commandLabel": "Камандаванне",
@@ -3865,7 +3890,6 @@
     "moveDown": "Рухайцеся ўніз",
     "moveCommandUp": "Перамясціць каманду {{position}} уверх",
     "moveCommandDown": "Перамясціць каманду {{position}} уніз",
-    "deleteCommand": "Выдаліць каманду {{position}}",
     "skillsTitle": "Навыкі",
     "addSkill": "Дадаць майстэрства",
     "skillNameLabel": "Назва навыку",
@@ -3897,7 +3921,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Увядзіце імя сервера",
-      "nameInvalid": "У назве можна выкарыстоўваць толькі літары, лічбы, сімвалы падкрэслівання і працяжнікі",
+      "nameInvalid": "У назве можна выкарыстоўваць толькі літары ASCII, лічбы, сімвалы падкрэслівання і працяжнікі, да 100 сімвалаў",
       "commandRequired": "Увядзіце каманду",
       "commandTooLong": "Выкарыстайце не больш за 50 аргументаў па 500 сімвалаў кожны",
       "urlRequired": "Увядзіце URL",
@@ -3942,7 +3966,7 @@
       "deleteFailed": "Не ўдалося выдаліць агента",
       "nameRequired": "Увядзіце імя агента",
       "slugRequired": "Увядзіце смоўж агента",
-      "slugInvalid": "Смоўж павінен пачынацца з літары і выкарыстоўваць толькі малыя літары, лічбы і працяжнікі",
+      "slugInvalid": "Смоўж павінен пачынацца з малой літары ASCII і ўтрымліваць толькі малыя літары ASCII, лічбы і працяжнікі, да 50 сімвалаў",
       "slugConflict": "Гэты смоўж ужо заняты ўбудаваным агентам або іншым агентам у гэтым профілі",
       "edit": "Агент рэдагавання"
     },
@@ -3987,7 +4011,9 @@
       "pinFailed": "Не ўдалося замацаваць рэпазітар",
       "unboundToast": "РЭПО без прывязкі",
       "unbindFailed": "Не ўдалося адвязаць рэпазітар"
-    }
+    },
+    "variablesDeleteFailed": "Не ўдалося выдаліць зменную",
+    "deleteCommand": "Выдаліць каманду {{position}}"
   },
   "credits": {
     "title": "Купіць крэдыты",
@@ -4014,7 +4040,6 @@
       "newList": "Новы спіс",
       "empty": "Спісаў пакуль няма",
       "couldNotLoad": "Не атрымалася загрузіць спісы",
-      "createFailed": "Не атрымалася стварыць спіс",
       "noRepository": "Няма рэпазіторыя",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} адкрытых",
@@ -4028,7 +4053,8 @@
       "archive": "Архіваваць",
       "unarchive": "Вярнуць з архіва",
       "deleteTitle": "Выдаліць {{name}}?",
-      "deleteMessage": "Яго задачы таксама будуць выдалены. Сеансы застануцца."
+      "deleteMessage": "Яго задачы таксама будуць выдалены. Сеансы застануцца.",
+      "createFailed": "Не атрымалася стварыць спіс"
     },
     "listSettings": {
       "title": "Налады спіса",
@@ -4100,21 +4126,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Ранішняя зводка",
+    "title": "Зводка агента",
     "atLeast": "≥{{value}}",
     "coverageHint": "Частка мінулай актыўнасці можа адсутнічаць. ≥ азначае «не менш за»; невядома — не тое ж, што нуль.",
     "available": "Даступныя зводкі",
     "history": "Гісторыя зводак",
-    "historyHint": "Справаздачы захоўваюцца 30 дзён, уключаючы схаваныя.",
+    "historyHint": "Зводкі захоўваюцца 30 дзён, уключаючы адхіленыя.",
     "settings": "Налады зводкі",
-    "saved": "Налады зводкі захаваны",
-    "empty": "Няма начной актыўнасці",
-    "emptyHint": "Вашы воблачныя і CLI-сеансы кадавання з'явяцца тут пасля актыўнай ночы.",
+    "empty": "Няма актыўнасці ў гэтым акне зводкі",
+    "emptyHint": "Вашы воблачныя і CLI-сеансы кадавання з'явяцца тут, калі ў запланаванай зводцы ёсць актыўнасць.",
     "loadError": "Не ўдалося загрузіць зводкі",
-    "sessions": "Актыўныя ўначы",
+    "sessions": "Актыўныя ў акне зводкі",
     "pullRequests": "Адкрыта PRs",
     "blockers": "Новыя перашкоды",
-    "spend": "Выдаткі за ноч",
+    "spend": "Выдаткі ў акне зводкі",
     "view": "Чытаць зводку",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -4136,14 +4161,14 @@
     "sources": "Доказы і артэфакты",
     "timezone": "Часавы пояс зводкі",
     "deviceTimezone": "Часавы пояс прылады",
-    "timezoneHint": "Часавы пояс IANA, напрыклад Europe/Berlin. Змены раскладу прымяняюцца да наступных начэй.",
-    "nightStart": "Пачатак ночы",
-    "morningStart": "Канец ночы / пачатак раніцы",
-    "morningEnd": "Канец раніцы",
-    "timeHint": "Пасля канца раніцы картка на галоўнай вяртае бягучы стан, нават па-за сеткай.",
-    "invalidSchedule": "Выберыце правільны часавы пояс і непустыя перыяды ночы і раніцы, якія не перакрываюцца.",
-    "notificationsHint": "Адно агульнае апавяшчэнне раніцай, калі першая справаздача гатовая. Не залежыць ад платных AI-рэзюмэ.",
-    "notificationPermission": "Уключыце апавяшчэнні прылады ў $t(common.notifications), каб атрымліваць зводку.",
+    "timezoneHint": "Часавы пояс IANA, напрыклад Europe/Berlin. Змены раскладу прымяняюцца да наступных зводак.",
+    "nightStart": "Пачатак акна зводкі",
+    "morningStart": "Зводка гатовая ў",
+    "morningEnd": "Зводка даступная да",
+    "timeHint": "Картка на галоўнай вяртае бягучы стан, калі акно зводкі заканчваецца, нават па-за сеткай.",
+    "invalidSchedule": "Выберыце правільны часавы пояс і непустое акно зводкі.",
+    "notificationsHint": "Адно агульнае апавяшчэнне на кожную запланаваную зводку. Не залежыць ад платных AI-рэзюмэ.",
+    "notificationPermission": "Уключыце апавяшчэнні прылады ў $t(common.notifications), каб атрымліваць вашу зводку.",
     "aiOptIn": "Платныя AI-рэзюмэ",
     "aiHint": "Неабавязкова, толькі для гэтага кантэксту. Выбраныя ачышчаныя ўрыўкі і структураваныя факты адпраўляюцца вашай мадэлі на мове праграмы. Плата спісваецца з балансу гэтага кантэксту.",
     "defaultModel": "Стандартная мадэль Kilo",
@@ -4158,9 +4183,9 @@
     "paidDisclosure": "Ацэнка {{estimate}}, да {{maximum}}, ліміт {{minutes}} хв. Плата спісваецца, нават калі стварэнне не ўдасца.",
     "enable": "Уключыць платныя рэзюмэ",
     "contextSettings": "Налады AI · {{context}}",
-    "allContexts": "Асабістыя і арганізацыйныя зводкі захоўваюцца асобна.",
+    "allContexts": "Асабістыя і арганізацыйныя зводкі застаюцца асобнымі.",
     "create": "Стварыць зводку",
-    "oneOff": "Разавая",
+    "oneOff": "Па запыце",
     "createdAt": "Створана {{time}}",
     "chooseContext": "Выберыце адзін кантэкст",
     "period": "Перыяд зводкі",
@@ -4182,13 +4207,16 @@
     "emptyPeriod": "За гэты перыяд актыўнасці не знойдзена. AI-рэзюмэ не ствараецца, плата не спісваецца.",
     "emptyHistory": "Няма захаваных зводак",
     "historicalStateHint": "Стан сеанса адлюстроўвае канец выбранага перыяду, а не бягучы стан у рэальным часе.",
-    "oneOffHint": "AI атрымлівае выбраныя даныя з выдаленай канфідэнцыйнай інфармацыяй на мове вашай праграмы. Гэтая разавая справаздача не змяняе ваш ранішні расклад або налады AI.",
-    "createOffline": "Падключыцеся да інтэрнэту, каб праглядзець або стварыць зводку. Платныя запыты ніколі не ставяцца ў чаргу без падключэння да інтэрнэту.",
+    "oneOffHint": "AI атрымлівае выбраныя даныя з выдаленай канфідэнцыйнай інфармацыяй на мове вашай праграмы. Гэтая зводка па запыце не змяняе вашу запланаваную зводку або налады AI.",
+    "createOffline": "Падключыцеся да інтэрнэту, каб праглядзець або стварыць зводку. Платныя запыты ніколі не ставяцца ў чаргу па-за сеткай.",
     "estimateInputTooLarge": "У гэтым перыядзе занадта шмат даных для выбранай мадэлі.",
     "estimatePermissionUnavailable": "У вас няма дазволу на выкарыстанне балансу гэтага кантэксту.",
+    "createFailed": "Не ўдалося стварыць гэтую зводку.",
+    "reviewFailed": "Не ўдалося прагледзець гэтую зводку.",
     "estimatePricingUnavailable": "Цэны для гэтай мадэлі недаступныя.",
     "estimateBalanceUnavailable": "Недастаткова сродкаў для платнага рэзюмэ.",
     "estimateModelNotAllowed": "Гэтая мадэль тут не дазволена.",
-    "estimateSpendLimitTooLow": "Павялічце ліміт выдаткаў, каб дазволіць гэта рэзюмэ."
+    "estimateSpendLimitTooLow": "Павялічце ліміт выдаткаў, каб дазволіць гэта рэзюмэ.",
+    "saved": "Налады зводкі захаваны"
   }
 }

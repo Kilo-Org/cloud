@@ -196,7 +196,7 @@ jobs:
         run: pnpm --filter kilo-app run check:classes
       - name: Test the NativeWind class checker
         run: node --test tools/nativewind/check-classes.test.mjs
-      - name: Test the catalog checker
+      - name: Test the i18n catalog checker
         run: node --test tools/i18n/check-catalogs.test.mjs
 
   format-check:

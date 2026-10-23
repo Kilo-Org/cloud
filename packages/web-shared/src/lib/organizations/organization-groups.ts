@@ -13,6 +13,7 @@ import { MAX_ORGANIZATION_GROUPS } from '@kilocode/db/schema-types';
 import {
   OrganizationGroupPoliciesSchema,
   OrganizationGroupPolicySchema,
+  ORGANIZATION_GROUPS_ENTERPRISE_ONLY_MESSAGE,
   type OrganizationGroupPolicies,
   type OrganizationGroupPolicy,
   type OrganizationGroupPolicyType,
@@ -76,7 +77,7 @@ async function assertEnterpriseOrganization(
   if (organization.plan !== 'enterprise') {
     throw new TRPCError({
       code: 'FORBIDDEN',
-      message: 'Groups are available to Enterprise organizations.',
+      message: ORGANIZATION_GROUPS_ENTERPRISE_ONLY_MESSAGE,
     });
   }
   return organization;

@@ -226,16 +226,17 @@ function redactTokens(
 }
 
 /**
- * The context key the network reporter stores a parsed tRPC error body under
- * (see `network-errors.ts`). The value is free-form payload, so
- * {@link scrubEvent} token-scrubs it like extra error data. It must not be the
- * synthesized exception's class name: `extraErrorDataIntegration` writes a
- * thrown error's own properties under `contexts[error.name]`, so a payload
- * under `NetworkError` is replaced with `{}` before `beforeSend` ever runs.
+ * The context key the network reporter stores parsed tRPC error metadata under
+ * (see `network-errors.ts`). The value is app-attached, so {@link scrubEvent}
+ * keeps only its allow-listed fields ({@link scrubPayloadField}) and
+ * token-scrubs every string it keeps. It must not be the synthesized
+ * exception's class name: `extraErrorDataIntegration` writes a thrown error's
+ * own properties under `contexts[error.name]`, so a payload under `NetworkError`
+ * is replaced with `{}` before `beforeSend` ever runs.
  */
 export const NETWORK_BODY_CONTEXT = 'network.body';
 
-/** Context names whose value is app-attached payload and must be token-scrubbed. */
+/** Context names whose value is app-attached payload and must be allow-listed. */
 const PAYLOAD_CONTEXT_NAMES: readonly string[] = [NETWORK_BODY_CONTEXT];
 
 /** The app-attached `network` context (see `network-errors.ts`). */
@@ -286,6 +287,51 @@ function scrubNetworkContext(value: unknown): unknown {
 }
 
 /**
+ * The scrubbed form of one payload-context field, or `undefined` when the field
+ * is not allow-listed. The payload is parsed tRPC metadata (see
+ * `network-errors.ts`): `code` and `path` are strings, `httpStatus` a number,
+ * and everything else a response body offers is untrusted text the event does
+ * not need, so it is dropped rather than scrubbed.
+ *
+ * `code` and `path` are identifier-shaped like the `trpc.code` and
+ * `trpc.procedure` tags ({@link IDENTIFIER_PATHS}), so their word chains stay
+ * readable; a token-shaped or `Bearer ` value is redacted either way.
+ */
+function scrubPayloadField(field: string, value: unknown): unknown {
+  switch (field) {
+    case 'code':
+    case 'path': {
+      return typeof value === 'string' ? redactString(value, true) : undefined;
+    }
+    case 'httpStatus': {
+      return typeof value === 'number' ? value : undefined;
+    }
+    default: {
+      return undefined;
+    }
+  }
+}
+
+/**
+ * Keep only the allow-listed payload fields ({@link scrubPayloadField}) and
+ * token-redact every string that survives. A non-object value yields `{}`, so a
+ * malformed payload becomes empty instead of forwarding.
+ */
+function scrubPayload(value: unknown): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return result;
+  }
+  for (const [field, item] of Object.entries(value)) {
+    const scrubbed = scrubPayloadField(field, item);
+    if (scrubbed !== undefined) {
+      result[field] = scrubbed;
+    }
+  }
+  return result;
+}
+
+/**
  * Names of the thrown errors in an event, i.e. the context keys that
  * `extraErrorDataIntegration` writes a thrown error's own properties under
  * (see lib/sentry-init.ts). Its data is free-form and must be token-scrubbed;
@@ -310,17 +356,6 @@ function exceptionContextNames(event: Record<string, unknown>): string[] {
     }
   }
   return names;
-}
-
-/**
- * Every context name whose value must be token-scrubbed: the app's payload
- * contexts ({@link PAYLOAD_CONTEXT_NAMES}) plus the thrown-error names
- * {@link exceptionContextNames} finds. The app-attached {@link NETWORK_CONTEXT}
- * is scrubbed separately by {@link scrubNetworkContext}; Sentry's structured
- * contexts stay out.
- */
-function redactedContextNames(event: Record<string, unknown>): string[] {
-  return [...PAYLOAD_CONTEXT_NAMES, ...exceptionContextNames(event)];
 }
 
 /** The string at `key`, or undefined when it is absent or not a string. */
@@ -417,17 +452,14 @@ function redactExceptionValues(exception: Record<string, unknown>): void {
  * - Reduces request URL, contexts.response URL, and contexts.network URL to
  *   their origin and path.
  * - Deletes `user.email`, `user.username`, and `user.ip_address`.
+ * - Rebuilds the app's payload context ({@link NETWORK_BODY_CONTEXT}) from its
+ *   allow-listed fields alone and token-redacts every string it keeps, so
+ *   response-body text outside that list never leaves the device.
  * - Redacts token-shaped runs (20+ base64url chars, or any `Bearer ` value) at
- *   any depth in `event.extra`, `event.tags`, the app's payload context
- *   ({@link NETWORK_BODY_CONTEXT}), and the exception-name context
- *   `extraErrorDataIntegration` attaches. The `network` context is scrubbed by
- *   {@link scrubNetworkContext}. A word-chain run stays only at an app-set
- *   identifier path (see {@link IDENTIFIER_PATHS} and
- *   {@link NETWORK_IDENTIFIER_FIELDS}); anywhere else a word-chain run is
- *   redacted on shape alone. Sentry's structured contexts are left intact:
- *   their identifiers trip the token heuristic without carrying a value.
- * - Redacts the exception messages and `event.message`, keeping the
- *   surrounding words readable.
+ *   any depth in `event.extra`, `event.tags`, and exception-name contexts.
+ *   The `network` context uses {@link scrubNetworkContext}, with app-set
+ *   identifiers preserved through {@link NETWORK_IDENTIFIER_FIELDS}.
+ * - Redacts exception messages and `event.message`.
  * - Gives an event with no fingerprint the fallback {@link fallbackFingerprint},
  *   so a volatile build path, host, or port inside the message or the stack
  *   cannot split one defect into many issues.
@@ -457,7 +489,12 @@ export function scrubEvent<T>(event: T): T {
           resp.url = stripQuery(resp.url);
         }
       }
-      for (const name of redactedContextNames(e)) {
+      for (const name of PAYLOAD_CONTEXT_NAMES) {
+        if (name in ctx) {
+          ctx[name] = scrubPayload(ctx[name]);
+        }
+      }
+      for (const name of exceptionContextNames(e)) {
         if (name in ctx) {
           ctx[name] = redactValue(ctx[name], new WeakMap(), []);
         }

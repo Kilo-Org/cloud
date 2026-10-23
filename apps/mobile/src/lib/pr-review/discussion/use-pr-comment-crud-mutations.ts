@@ -199,15 +199,21 @@ export function useDeletePrCommentMutation() {
         announcingToast.error(failure.message);
         return;
       }
-      Alert.alert(i18n.t('common.somethingWentWrong'), failure.message, [
-        { text: i18n.t('common.cancel'), style: 'cancel' },
-        {
-          text: i18n.t('common.retry'),
-          onPress: () => {
-            deleteComment.mutate(input);
+      Alert.alert(
+        i18n.t('common.somethingWentWrong'),
+        failure.message,
+        [
+          { text: i18n.t('common.cancel'), style: 'cancel' },
+          {
+            text: i18n.t('common.retry'),
+            onPress: () => {
+              deleteComment.mutate(input);
+            },
           },
-        },
-      ]);
+        ],
+        // Android back dismisses, which equals Cancel: nothing is retried.
+        { cancelable: true }
+      );
     },
     onSettled: () => {
       void queryClient.invalidateQueries(threadsPath);

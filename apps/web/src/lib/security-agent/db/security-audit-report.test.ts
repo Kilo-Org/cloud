@@ -545,6 +545,40 @@ describe('buildSecurityAgentAuditReportFromRows', () => {
     expect(report.hasLegacySupplementalActivity).toBe(true);
   });
 
+  it('publishes the dismissal reason and the triage confidence that triggered an auto-dismiss', () => {
+    const report = buildSecurityAgentAuditReportFromRows({
+      owner: {
+        type: 'organization',
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        displayName: 'Acme',
+      },
+      period,
+      generatedAt: '2026-06-12T15:00:00.000Z',
+      dataThrough: '2026-06-12T15:00:00.000Z',
+      isRequestingUserKiloAdmin: false,
+      rows: [
+        row({
+          action: SecurityAuditLogAction.FindingAutoDismissed,
+          before_state: { status: 'open' },
+          after_state: { status: 'ignored', reason_code: 'not_used' },
+          metadata: {
+            trigger: 'auto_dismiss_policy',
+            dismiss_source: 'triage',
+            confidence: 'high',
+            correlation_id: 'corr-1',
+            reason_code: 'not_used',
+          },
+        }),
+      ],
+    });
+
+    expect(report.findings[0].events[0]).toMatchObject({
+      action: SecurityAuditLogAction.FindingAutoDismissed,
+      afterState: { status: 'ignored', reason_code: 'not_used' },
+      metadata: { reason_code: 'not_used', confidence: 'high' },
+    });
+  });
+
   it('uses current finding metadata to describe legacy activity', () => {
     const legacyFindingId = '22222222-2222-4222-8222-222222222222';
     const report = buildSecurityAgentAuditReportFromRows({

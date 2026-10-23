@@ -5,11 +5,21 @@
 // before; this module only owns the decision.
 
 export type DiscussionTabView = {
-  kind: 'permission' | 'not-found' | 'reconnect' | 'retryable' | 'loading' | 'empty' | 'happy';
+  kind:
+    | 'permission'
+    | 'not-found'
+    | 'reconnect'
+    | 'retryable'
+    | 'service-unavailable'
+    | 'loading'
+    | 'empty'
+    | 'happy';
 };
 
 export function selectDiscussionTabView(args: {
-  firstPageErrorState: { kind: 'permission' | 'not-found' | 'reconnect' | 'retryable' } | null;
+  firstPageErrorState: {
+    kind: 'permission' | 'not-found' | 'reconnect' | 'retryable' | 'service-unavailable';
+  } | null;
   isPending: boolean;
   /**
    * The pending first page is paused — offline, or a fetch that will never

@@ -466,7 +466,7 @@ describe('generateReviewPrompt (incremental review)', () => {
 
   it('only instructs sandbox-allowlisted git and gh commands in bash blocks (GitHub)', async () => {
     // Mirrors CODE_REVIEW_ALLOWED_COMMANDS / CODE_REVIEW_DENIED_COMMAND_PATTERNS in
-    // services/cloud-agent-next/src/session-service.ts. Any other command is rejected in
+    // the cloud-agent-next command guard. Any other command is rejected in
     // non-interactive review mode, and a rejected Step 1 command used to end reviews unpublished.
     const allowedGhLine =
       /^gh (?:pr view 42 --repo owner\/repo --json |pr diff 42 --repo owner\/repo --(?:name-only|patch --color never)$|api repos\/owner\/repo\/(?:pulls\/42\/(?:comments|reviews)|issues\/42\/comments) --paginate --jq '|api repos\/owner\/repo\/(?:pulls\/42\/reviews|issues\/42\/comments) --input - << 'EOF'$|api repos\/owner\/repo\/issues\/comments\/\d+ -X PATCH --input - << 'EOF'$)/;
@@ -653,8 +653,8 @@ describe('generateReviewPrompt (incremental review)', () => {
   });
 
   it('only instructs sandbox-allowlisted glab commands in bash blocks (GitLab)', async () => {
-    // The cloud-agent-next command guard (CODE_REVIEW_ALLOWED_COMMANDS in
-    // session-service.ts) only permits `glab mr view/diff` and the
+    // The cloud-agent-next command guard (CODE_REVIEW_ALLOWED_COMMANDS)
+    // only permits `glab mr view/diff` and the
     // `glab api --method POST/PUT` publishing forms. Any other glab
     // invocation is auto-rejected in non-interactive review mode, so the
     // prompt must never instruct one (e.g. a bare `glab api "projects/..."`

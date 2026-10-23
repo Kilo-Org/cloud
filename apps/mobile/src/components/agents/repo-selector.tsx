@@ -111,7 +111,8 @@ export function RepoSelector({
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const effectivelyDisabled = disabled || isLoading || repositories.length === 0;
+  // An empty picker explains missing repositories; it must remain reachable.
+  const effectivelyDisabled = disabled || isLoading;
 
   // The selection value is `platform:fullName`; show the platform name next to
   // the fullName so two same-name repos on different providers stay distinct in

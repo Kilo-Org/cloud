@@ -16,9 +16,9 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { OpenRouterProvidersResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { fetchModelsForProvider } from '@/lib/providers/openrouter/fetch-provider-models';
-import { ai_gateway_sync_providers_state, modelsByProvider } from '@kilocode/db/schema';
+import { modelsByProvider } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { desc, eq, lt, sql } from 'drizzle-orm';
+import { desc, lt, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
@@ -26,7 +26,7 @@ import { logAutoModelChangesForAllOrgs } from '@/lib/organizations/auto-model-ch
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { StoredModel } from '@kilocode/db/schema-types';
 import { EndpointsSchema, ModelsSchema } from '@kilocode/db/schema-types';
-import { syncDirectByokModels } from '@/lib/providers/direct-byok/sync-direct-byok';
+import { recordSyncCompleted } from '@/lib/providers/openrouter/sync-providers-stale-alert';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import {
   applyFreeEndpointDataPolicy,
@@ -38,6 +38,7 @@ import {
 } from '@/lib/providers/openrouter/inject-extra-provider-models';
 import { withWorstProviderDataPolicy } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+import { getVercelModelIdOverrides } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { injectSupportedFimModels } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
 import { injectVirtualModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import type { OpenRouterModel as CatalogModel } from '@kilocode/web-shared/lib/organizations/organization-types';
@@ -188,8 +189,9 @@ async function syncProviders(params: {
     unavailableModelIds
   );
 
-  injectExtraProviderModels(vercelModels, providerModelData);
-  injectVercelOnlyProviders(vercelModels, providerModelData);
+  const vercelModelIdOverrides = await getVercelModelIdOverrides();
+  injectExtraProviderModels(vercelModels, providerModelData, vercelModelIdOverrides);
+  injectVercelOnlyProviders(vercelModels, providerModelData, vercelModelIdOverrides);
 
   const mappedExtraModels = kiloExclusiveModels
     .flatMap(kfm =>
@@ -435,25 +437,7 @@ export async function syncAndStoreProviders() {
     vercel_data,
   });
 
-  const direct_byok_model_counts = await syncDirectByokModels();
-  console.log('[syncAndStoreProviders] direct-byok model counts:', direct_byok_model_counts);
-
-  const completed_at = await db.transaction(async tx => {
-    await tx.insert(ai_gateway_sync_providers_state).values({ id: 1 }).onConflictDoNothing();
-    const [row] = await tx
-      .select({ id: ai_gateway_sync_providers_state.id })
-      .from(ai_gateway_sync_providers_state)
-      .where(eq(ai_gateway_sync_providers_state.id, 1))
-      .for('update');
-    if (!row) throw new Error('Sync-providers state row is missing');
-
-    const completedAt = new Date().toISOString();
-    await tx
-      .update(ai_gateway_sync_providers_state)
-      .set({ last_completed_at: completedAt })
-      .where(eq(ai_gateway_sync_providers_state.id, 1));
-    return completedAt;
-  });
+  const completed_at = await recordSyncCompleted('providers');
 
   return {
     id: result.id,
@@ -461,7 +445,6 @@ export async function syncAndStoreProviders() {
     completed_at,
     total_models: result.data.total_models,
     total_providers: result.data.total_providers,
-    direct_byok_model_counts,
     time: performance.now() - startTime,
   };
 }

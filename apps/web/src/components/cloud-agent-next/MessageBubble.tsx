@@ -1,5 +1,7 @@
 'use client';
 
+import { cn } from '@/lib/utils';
+
 import React, { useCallback } from 'react';
 import { Scissors, Image, FileText, AlertCircle, Clock, LoaderCircle } from 'lucide-react';
 import { TimeAgo } from '@/components/shared/TimeAgo';
@@ -21,7 +23,7 @@ import { getVisibleAssistantParts } from './message-presentation';
 import type { OpenChildSession } from './ChildSessionSection';
 import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { stripImageContext } from '@/lib/app-builder/message-utils';
+import { stripImageContext } from '@/lib/cloud-agent/message-utils';
 import { toSafeHttpUrl } from '@/lib/safe-http-url';
 import { getDeliveryBadge, type DeliveryBadge } from './delivery-badge';
 import { parseWorktreeReviewMessage } from './worktree-review';
@@ -348,8 +350,13 @@ export function MessageBubble({
             {interrupted ? 'Interrupted' : 'Failed'}
           </span>
         )}
-        {!isStreaming && hasText && (
-          <div className="mt-1 flex items-center gap-2 opacity-0 transition-opacity group-focus-within/msg:opacity-100 group-hover/msg:opacity-100">
+        {hasText && (
+          <div
+            className={cn(
+              'mt-1 flex items-center gap-2 opacity-0 transition-opacity motion-reduce:transition-none group-focus-within/msg:opacity-100 group-hover/msg:opacity-100',
+              isStreaming && 'invisible'
+            )}
+          >
             <CopyMessageButton getText={getTextForCopy} />
             <TimeAgo timestamp={timestamp} className="text-muted-foreground/70 text-xs" />
           </div>

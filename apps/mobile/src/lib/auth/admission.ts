@@ -4,8 +4,15 @@ import * as SecureStore from '@/lib/auth/secure-store';
 import { Platform } from 'react-native';
 import * as z from 'zod';
 
-import { API_BASE_URL, PLAY_INTEGRITY_PROJECT_NUMBER } from '@/lib/config';
+import {
+  API_BASE_URL,
+  NATIVE_ADMISSION_DEV_SENTINEL,
+  PLAY_INTEGRITY_PROJECT_NUMBER,
+} from '@/lib/config';
 import { ATTEST_KEY_ID_KEY } from '@/lib/storage-keys';
+
+/** Must match `DEV_SENTINEL_PAYLOAD` in the web admission module. */
+export const DEV_SENTINEL_PAYLOAD = 'native-admission-dev-sentinel';
 
 export type AdmissionPayload = {
   platform: 'ios' | 'android';
@@ -163,28 +170,46 @@ export async function clearAttestKeyOnRefusal(errorCode: string | undefined): Pr
  * Request a server admission challenge and produce a platform-specific
  * attestation or assertion.
  *
- * Returns `undefined` when this device cannot produce one, so the server's
- * counted legacy path decides admission. A provider failure — no Play
- * Services, a rooted device, a transient Google error — also returns
- * `undefined` rather than aborting sign-in: admission is a server-side policy
- * and the server holds the mode switch. Failing closed here would lock users
- * out even while `NATIVE_ADMISSION_MODE` is `off`.
+ * Returns `undefined` only when this device cannot attest at all, which the
+ * server answers with the terminal device message. A failed attempt is not the
+ * same thing: it throws, so the caller shows the retryable message instead of
+ * telling the user to switch devices for a transient provider error.
  *
- * Throws only when the challenge endpoint is unreachable. Callers catch that
- * and surface a retryable error message.
+ * A non-production build configured with the sentinel sends the fixed proof for
+ * a device that cannot attest. The server accepts it only when it also runs
+ * outside production.
  */
 export async function getAdmission(): Promise<AdmissionPayload | undefined> {
-  if (!hasAttestationCapability()) {
+  const capable = hasAttestationCapability();
+
+  if (!capable && !NATIVE_ADMISSION_DEV_SENTINEL) {
+    // No proof is possible and no sentinel is configured: the server refuses
+    // with the terminal device message.
     return undefined;
+  }
+
+  if (capable) {
+    const { challenge } = await requestChallenge();
+    try {
+      return Platform.OS === 'ios'
+        ? await getAppleAdmission(challenge)
+        : await getAndroidAdmission(challenge);
+    } catch (error) {
+      // Only a non-production build may degrade to the sentinel; everywhere
+      // else the failure is retryable and must reach the caller.
+      if (!NATIVE_ADMISSION_DEV_SENTINEL) {
+        throw error;
+      }
+    }
   }
 
   const { challenge } = await requestChallenge();
-
-  try {
-    return Platform.OS === 'ios'
-      ? await getAppleAdmission(challenge)
-      : await getAndroidAdmission(challenge);
-  } catch {
-    return undefined;
-  }
+  return {
+    // Android carries no key id, so the sentinel never needs one and the
+    // server persists no attested key for it.
+    platform: 'android',
+    kind: 'assertion',
+    challenge,
+    payload: DEV_SENTINEL_PAYLOAD,
+  };
 }

@@ -210,6 +210,8 @@ export const pendingDeciderOutputs = sqliteTable(
     rep: integer('rep').notNull(),
     payload: text('payload').notNull(),
     prompt_revision: integer('prompt_revision').notNull().default(1),
+    grading_token: text('grading_token'),
+    grading_lease_until: integer('grading_lease_until').notNull().default(0),
   },
   table => [
     primaryKey({ columns: [table.run_id, table.model, table.variant, table.case_id, table.rep] }),

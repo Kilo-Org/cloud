@@ -353,11 +353,9 @@ export async function normalizeShareIntent(
     }
   }
 
-  // Throw only when nothing usable remains: no text and zero successful copies
-  // while at least one file was attempted.
-  if (text === '' && files.length === 0 && incomingFiles.length > 0) {
-    throw new Error('Failed to copy shared files');
-  }
-
+  // A share whose copies all failed is a recoverable outcome, not an error:
+  // the payload carries the failed names, and the gate's all-rejected state
+  // reports them and offers no session to start. Text and any successful copy
+  // still count.
   return { text, files, failedFiles };
 }

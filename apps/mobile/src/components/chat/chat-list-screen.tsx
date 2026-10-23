@@ -1,8 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { type Href, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, useWindowDimensions, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
@@ -17,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { MessageCircle, Plus } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useAuth } from '@/lib/auth/auth-context';
 import { autoModelLabel } from '@/lib/auto-model-name';
 import { defaultChatModel } from '@/lib/chat/backend-model-options';
@@ -29,7 +29,7 @@ import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
-import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
+import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 
 import { BetaPill } from './beta-pill';
 import { ChatRow } from './chat-row';
@@ -61,12 +61,7 @@ function ScopedChatListScreen() {
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
   const place = useChatPlace();
-  const { bottom } = useSafeAreaInsets();
-  const { fontScale } = useWindowDimensions();
-  const tabBarHeight = useMemo(
-    () => getEffectiveTabBarHeight({ bottomInset: bottom, platform: Platform.OS, fontScale }),
-    [bottom, fontScale]
-  );
+  const tabBarHeight = useEffectiveTabBarHeight();
 
   const {
     models,
@@ -248,6 +243,7 @@ function ScopedChatListScreen() {
           description={t('modelChat.empty.description')}
           action={
             <Button
+              className={STATE_ACTION_CLASS}
               onPress={start}
               loading={starting}
               disabled={selectedModel === undefined}
@@ -280,11 +276,8 @@ function ScopedChatListScreen() {
           titleContent={
             <View className="flex-row items-center gap-2">
               <Text
-                // An explicit line height, not `leading-9`: the scale token
-                // measures a wrong height on Android (the title laid out
-                // 851dp tall, so the header filled the screen and the list
-                // below it was off-screen), while the same 2.25rem written in
-                // pixels lays the title out at 36dp on both platforms.
+                // An explicit pixel line height keeps the title's header
+                // measurement stable on Android.
                 className="text-[30px] font-semibold leading-[36px] text-foreground"
                 numberOfLines={1}
               >

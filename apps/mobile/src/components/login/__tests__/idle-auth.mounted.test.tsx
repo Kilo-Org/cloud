@@ -1170,6 +1170,53 @@ describe('IdleAuth layout repairs', () => {
     });
   });
 
+  it.each([
+    ['zh-Hans', '条款', '继续即表示你同意我们的条款和隐私政策。'],
+    ['zh-Hant', '條款', '繼續即表示你同意我們的條款和隱私權政策。'],
+    ['ja', '利用規約', '続行すると、利用規約およびプライバシーポリシーに同意したことになります。'],
+    ['th', 'ข้อกำหนด', 'การดำเนินการต่อแสดงว่าคุณยอมรับข้อกำหนดและนโยบายความเป็นส่วนตัว.'],
+    ['lo', 'ຂໍ້ກຳນົດ', 'ການສືບຕໍ່ໝາຍຄວາມວ່າທ່ານຍອມຮັບຂໍ້ກຳນົດແລະນະໂຍບາຍຄວາມເປັນສ່ວນຕົວ.'],
+    ['km', 'លក្ខខណ្ឌ', 'តាមរយៈការបន្ត អ្នកយល់ព្រមតាមលក្ខខណ្ឌនិងគោលការណ៍ឯកជនភាព។'],
+    [
+      'my',
+      'စည်းကမ်းချက်များ',
+      'ဆက်လုပ်ခြင်းဖြင့် သင်သည် ကျွန်ုပ်တို့၏စည်းကမ်းချက်များနှင့်ကိုယ်ရေးအချက်အလက် မူဝါဒကို သဘောတူလက်ခံပါသည်။',
+    ],
+  ])(
+    'abuts the %s legal sentence, the connector and the spoken label to the words',
+    async (language, terms, expected) => {
+      await act(async () => {
+        await i18n.changeLanguage(language);
+      });
+      try {
+        const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+        // Chinese separates no words with spaces, so the catalog carries
+        // neither a separator before the Terms link nor spaces around the
+        // conjunction: the row and the wrapper's label render the same
+        // unspaced sentence.
+        expect(legalSentence(renderer.root)).toBe(expected);
+        const wrapper = renderer.root.find(
+          n =>
+            typeof n.type === 'string' &&
+            (n.type as string) === 'View' &&
+            n.props.accessible === true &&
+            typeof n.props.accessibilityLabel === 'string' &&
+            n.props.accessibilityLabel.includes(terms)
+        );
+        expect(wrapper.props.accessibilityLabel).toBe(expected);
+
+        act(() => {
+          renderer.unmount();
+        });
+      } finally {
+        await act(async () => {
+          await i18n.changeLanguage('en');
+        });
+      }
+    }
+  );
+
   it('cancels the inline link box height so the sentence keeps a text-xs line', async () => {
     // The audit floor stays on the node's own rect...
     expect(await compiledNumber(INLINE_LINK_BOX_CLASS, 'minHeight')).toBe(28);

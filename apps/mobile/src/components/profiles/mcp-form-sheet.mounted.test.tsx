@@ -12,7 +12,12 @@ const h = vi.hoisted(() => ({
   confirm: vi.fn(),
 }));
 
-vi.mock('react-native', () => ({ View: 'View', ScrollView: 'ScrollView', Switch: 'Switch' }));
+vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+  View: 'View',
+  ScrollView: 'ScrollView',
+  Switch: 'Switch',
+}));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));

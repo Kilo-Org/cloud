@@ -20,8 +20,21 @@ type BlockingCardUiState = 'happy' | 'retryable' | 'non-retryable';
 
 export type BlockingCardRetryAction = 'answer' | 'reject' | 'respond';
 
+/** Tool-permission decision carried by the submission that failed. */
+export type PermissionResponse = 'once' | 'always' | 'reject';
+
 export type BlockingCardSubmissionError =
-  | { kind: 'retryable'; message: string; action: BlockingCardRetryAction }
+  | {
+      kind: 'retryable';
+      message: string;
+      action: BlockingCardRetryAction;
+      /**
+       * Permission decision the failed submission carried, or `null` for a
+       * question error. The retry CTA re-sends exactly this value, so a
+       * recovery never turns one decision into another.
+       */
+      permissionResponse: PermissionResponse | null;
+    }
   | { kind: 'non-retryable'; message: string };
 
 type BlockingCardPresentation = {
@@ -42,6 +55,12 @@ type BlockingCardPresentation = {
    */
   retryAction: BlockingCardRetryAction | null;
   /**
+   * Permission decision the retry CTA re-sends. Non-null only for a
+   * permission card whose retryable error recorded the failed decision; when
+   * it is `null` the card shows its normal decision controls instead.
+   */
+  retryPermissionResponse: PermissionResponse | null;
+  /**
    * True for the question card's "Skip" affordance. Hidden when the active
    * retry is for a failed skip so the user sees a single "Retry skip" action.
    * Permission cards never have an independent reject path, so this is always
@@ -54,6 +73,7 @@ type BlockingCardPresentation = {
 
 export type BlockingCardA11yDeps = {
   announce: (message: string) => void;
+  /** Reports dispatch, not confirmed focus; false allows a mount-race retry. */
   focus: (ref: RefObject<HostInstance | null>) => boolean;
 };
 
@@ -97,20 +117,28 @@ export function getBlockingCardPresentationForKind(input: {
       hasPrimaryCta: false,
       hasRetryCta: false,
       retryAction: null,
+      retryPermissionResponse: null,
       hasRejectCta: false,
       errorMessage: submissionError.message,
     };
   }
 
   if (submissionError?.kind === 'retryable') {
+    // A permission retry re-sends the decision that failed. Without a
+    // recorded decision there is nothing safe to re-send, so the card keeps
+    // its explicit Deny / Allow controls instead of guessing one.
+    const retryPermissionResponse =
+      kind === 'permission' ? submissionError.permissionResponse : null;
+    const canRetry = kind !== 'permission' || retryPermissionResponse != null;
     return {
       kind,
       state: 'retryable',
       announcement: buildAnnouncement(kind, 'retryable'),
       protocolExplanation: buildProtocolExplanation(kind, 'retryable'),
-      hasPrimaryCta: false,
-      hasRetryCta: true,
-      retryAction: submissionError.action,
+      hasPrimaryCta: !canRetry,
+      hasRetryCta: canRetry,
+      retryAction: canRetry ? submissionError.action : null,
+      retryPermissionResponse,
       hasRejectCta: kind === 'question' && submissionError.action !== 'reject',
       errorMessage: submissionError.message,
     };
@@ -124,17 +152,16 @@ export function getBlockingCardPresentationForKind(input: {
     hasPrimaryCta: true,
     hasRetryCta: false,
     retryAction: null,
+    retryPermissionResponse: null,
     hasRejectCta: kind === 'question',
     errorMessage: null,
   };
 }
 
 /**
- * Side-effect helper invoked from the card's mount effect. Centralises the
- * "announce + move focus" pair here so the React components execute the same
- * path the unit tests cover. If the focus target has no node handle yet
- * (first-paint race), a follow-up attempt is scheduled on the next tick and the
- * cleanup function clears that timeout on unmount/request change.
+ * Announce the card and request focus. If no request was dispatched, retry once
+ * after the first-paint race; cleanup cancels it on unmount or request change.
+ * A dispatched request is not confirmation that assistive focus moved.
  */
 export function applyBlockingCardAppearance(
   presentation: BlockingCardPresentation,
@@ -170,6 +197,33 @@ export function classifyBlockingSubmissionError(
   kind: BlockingCardKind,
   action: BlockingCardRetryAction = 'answer'
 ): BlockingCardSubmissionError {
+  return classifySubmissionError({ error, kind, action, permissionResponse: null });
+}
+
+/**
+ * Classify a failed tool-permission response. The `response` argument records
+ * the decision the submission carried, so the retry re-sends that exact value
+ * whichever caller sent it (card press, notification action, goal clear).
+ */
+export function classifyPermissionSubmissionError(
+  error: unknown,
+  response: PermissionResponse
+): BlockingCardSubmissionError {
+  return classifySubmissionError({
+    error,
+    kind: 'permission',
+    action: 'respond',
+    permissionResponse: response,
+  });
+}
+
+function classifySubmissionError(input: {
+  error: unknown;
+  kind: BlockingCardKind;
+  action: BlockingCardRetryAction;
+  permissionResponse: PermissionResponse | null;
+}): BlockingCardSubmissionError {
+  const { error, kind, action, permissionResponse } = input;
   const code = readTrpcErrorField(error, 'code');
   if (code === 'NOT_FOUND') {
     return {
@@ -184,6 +238,7 @@ export function classifyBlockingSubmissionError(
     kind: 'retryable',
     message: buildRetryableMessage(kind, action),
     action,
+    permissionResponse,
   };
 }
 

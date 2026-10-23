@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { LEGAL_LINK_BOX_CLASS, LEGAL_LINK_ROW_CLASS } from '@/lib/a11y/tap-target';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { CreditPurchaseScreen } from './credit-purchase-screen';
@@ -35,6 +36,10 @@ const balance = vi.hoisted(() => ({ balance: 1234 }));
 
 const toastMock = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }));
 
+// The legal links are the only caller of this module on the screen, so the mock
+// is the destination each link opened.
+const externalLink = vi.hoisted(() => ({ openExternalUrl: vi.fn() }));
+
 // The iOS announcement channel behind AccessibleStatus. The screen renders the
 // purchase error inline and suppresses the error toast, so this hook (plus
 // Android's live region) is the only thing a screen reader can hear.
@@ -64,7 +69,7 @@ vi.mock('@/lib/a11y/status-announcement', () => ({
 }));
 
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.com' }));
-vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+vi.mock('@/lib/external-link', () => externalLink);
 vi.mock('@/lib/iap/legal-links', () => ({
   getStoreLegalLinks: () => [
     { url: 'https://example.com/privacy-app', label: 'Privacy Policy' },
@@ -685,6 +690,55 @@ describe('CreditPurchaseScreen', () => {
 
     expect(toastMock.success).toHaveBeenCalledWith('Credits added to your balance.');
     expect(packRows(renderer)).toHaveLength(4);
+    unmount();
+  });
+
+  it('gives each store legal link a full legal-link target and its own destination', async () => {
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const legalLinks = renderer.root.findAll(
+      node =>
+        String(node.type) === 'Pressable' &&
+        (node.props as { accessibilityRole?: string }).accessibilityRole === 'link'
+    );
+    expect(legalLinks).toHaveLength(2);
+    const [termsLink, privacyLink] = legalLinks;
+    if (!termsLink || !privacyLink) {
+      throw new Error('store legal links not found');
+    }
+    for (const link of [termsLink, privacyLink]) {
+      const className = String((link.props as { className?: string }).className);
+      // A real 48dp box: the control-size audit reads the node's own rect, so a
+      // 14dp text line with slop around it is still reported as too small.
+      expect(className).toContain(LEGAL_LINK_BOX_CLASS);
+      expect(className).toContain('active:opacity-70');
+    }
+
+    const row = termsLink.parent;
+    expect(String((row?.props as { className?: string } | undefined)?.className)).toContain(
+      LEGAL_LINK_ROW_CLASS
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      (termsLink.props as { onPress: () => void }).onPress();
+      (privacyLink.props as { onPress: () => void }).onPress();
+    });
+
+    expect(externalLink.openExternalUrl).toHaveBeenCalledTimes(2);
+    expect(externalLink.openExternalUrl).toHaveBeenNthCalledWith(
+      1,
+      'https://example.com/terms-app',
+      {
+        label: 'Terms of Use (EULA)',
+      }
+    );
+    expect(externalLink.openExternalUrl).toHaveBeenNthCalledWith(
+      2,
+      'https://example.com/privacy-app',
+      { label: 'Privacy Policy' }
+    );
     unmount();
   });
 });

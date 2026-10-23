@@ -32,11 +32,18 @@ export const GitHubAppAuthorizationRevokedPayloadSchema = z.object({
   }),
 });
 
+// installation.created always carries `sender.id`; the handler compares the
+// delivery's GitHub identities with the pending request's recorded requester,
+// so the id must survive validation instead of being stripped.
+const InstallationCreatedSenderSchema = GitHubSenderSchema.extend({
+  id: z.number(),
+});
+
 export const InstallationCreatedPayloadSchema = z.object({
   action: z.literal('created'),
   installation: GitHubInstallationSchema,
   requester: GitHubRequesterSchema.nullable().optional(),
-  sender: GitHubSenderSchema.optional(),
+  sender: InstallationCreatedSenderSchema.optional(),
 });
 
 export const InstallationDeletedPayloadSchema = z.object({

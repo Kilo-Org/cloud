@@ -37,10 +37,6 @@ import {
 } from './runner';
 import { isPortlessServiceHealthy, readCapturedTunnelUrl } from './tunnel-health';
 
-// ---------------------------------------------------------------------------
-// Types & constants
-// ---------------------------------------------------------------------------
-
 type ServiceStatus = 'up' | 'down' | 'starting';
 type GroupStatus = 'on' | 'off' | 'partial';
 
@@ -67,17 +63,12 @@ const START_DELAY_MS = 300;
 const SIDEBAR_WIDTH = 40;
 const CAPTURE_TIMEOUT_MS = 30_000;
 
-// Resolved once at module level
 const sessionName = getSessionName();
 const repoRoot = findRepoRoot();
 const kiloclawDevVarsPath = path.join(repoRoot, 'services/kiloclaw/.dev.vars');
 const alwaysOnGroupIds = new Set(getAlwaysOnGroupIds());
 const groupsById = new Map(getGroups().map(g => [g.id, g]));
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
-
-// ---------------------------------------------------------------------------
-// Sidebar item list builder
-// ---------------------------------------------------------------------------
 
 function buildSidebarItems(enabledGroups: Set<string>): SidebarItem[] {
   const items: SidebarItem[] = [];
@@ -94,10 +85,6 @@ function buildSidebarItems(enabledGroups: Set<string>): SidebarItem[] {
   }
   return items;
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function computeGroupStatus(groupId: string, statuses: Map<string, ServiceStatus>): GroupStatus {
   const members = getGroupServiceNames(groupId);
@@ -199,10 +186,6 @@ function getServicesNeededByEnabledGroups(enabledGroups: Set<string>): Set<strin
   if (groupIds.length === 0) return new Set();
   return new Set(resolveGroups(groupIds));
 }
-
-// ---------------------------------------------------------------------------
-// Components
-// ---------------------------------------------------------------------------
 
 const GroupHeader = React.memo(function GroupHeader({
   group,
@@ -308,7 +291,6 @@ function Dashboard({
   const { stdout } = useStdout();
   const rows = stdout?.rows ?? 24;
 
-  // --- State ---
   const [enabledGroups, setEnabledGroups] = useState<Set<string>>(
     () => new Set(initialEnabledGroupIds)
   );
@@ -335,7 +317,6 @@ function Dashboard({
   const startTimeRef = useRef(Date.now());
   const togglingRef = useRef(false);
 
-  // --- Mouse refs (read current values in the stable stdin listener) ---
   const mouseStateRef = useRef({
     sidebarItems: [] as SidebarItem[],
     enabledGroups: new Set<string>(),
@@ -346,7 +327,6 @@ function Dashboard({
     showService: (_serviceName: string) => {},
   });
 
-  // --- Restore sidebar width after terminal resize / tab switch ---
   // The dashboard runs in pane 0, so it receives SIGWINCH whenever tmux
   // proportionally resizes it (e.g. on client resize or terminal tab switch).
   // If the width drifts from SIDEBAR_WIDTH, force it back via resize-pane.
@@ -368,7 +348,6 @@ function Dashboard({
     };
   }, []);
 
-  // --- Derived ---
   const sidebarItems = useMemo(() => buildSidebarItems(enabledGroups), [enabledGroups]);
 
   const showServiceView = useCallback((serviceName: string) => {
@@ -387,7 +366,6 @@ function Dashboard({
     }
   }, []);
 
-  // --- Status polling ---
   useEffect(() => {
     const refresh = async () => {
       if (refreshInFlight.current) return;
@@ -486,7 +464,6 @@ function Dashboard({
     return () => clearInterval(timer);
   }, [runningServices]);
 
-  // --- Toggle group ON ---
   const toggleGroupOn = useCallback(
     (groupId: string) => {
       if (togglingRef.current) return;
@@ -494,7 +471,6 @@ function Dashboard({
 
       void (async () => {
         try {
-          // Resolve transitive group-level deps (e.g. security-agent → cloud-agent)
           const allGroupIds = resolveGroupTransitiveDeps([groupId]);
           const allNeeded = resolveGroups(allGroupIds);
           const toStart = allNeeded.filter(name => !runningServices.has(name));
@@ -553,11 +529,9 @@ function Dashboard({
           });
 
           if (startedNow.length > 0) {
-            // Reset starting grace for newly started services
             startTimeRef.current = Date.now();
           }
 
-          // Show the group in multi-pane view
           const running = getGroupServiceNames(groupId).filter(n => nextRunningServices.has(n));
           showGroupView(groupId, running);
 
@@ -642,7 +616,6 @@ function Dashboard({
     [runningServices, showGroupView]
   );
 
-  // --- Toggle group OFF ---
   const toggleGroupOff = useCallback(
     (groupId: string) => {
       if (togglingRef.current) return;
@@ -650,15 +623,12 @@ function Dashboard({
 
       const directMembers = getGroupServiceNames(groupId);
 
-      // Calculate which services are needed by OTHER enabled groups
       const otherEnabledGroups = new Set(enabledGroups);
       otherEnabledGroups.delete(groupId);
       const neededByOthers = getServicesNeededByEnabledGroups(otherEnabledGroups);
 
-      // Only stop direct members that aren't needed by other groups
       const toStop = directMembers.filter(name => !neededByOthers.has(name));
 
-      // If the current view is affected by the stopped services, switch to another
       const viewed = viewedRef.current;
       const viewedAffected =
         viewed !== null &&
@@ -672,7 +642,6 @@ function Dashboard({
         }
       }
 
-      // Stop services
       for (const name of toStop) {
         try {
           stopServiceInTmux(sessionName, name);
@@ -719,7 +688,6 @@ function Dashboard({
     showService: showServiceView,
   };
 
-  // --- Keyboard ---
   useInput((input, key) => {
     if (key.upArrow) {
       setSelectedIdx(prev => {
@@ -743,17 +711,14 @@ function Dashboard({
 
       if (item.kind === 'group') {
         if (enabledGroups.has(item.groupId)) {
-          // Group is running — show all its services in multi-pane view
           const running = getGroupServiceNames(item.groupId).filter(n => runningServices.has(n));
           showGroupView(item.groupId, running);
         } else {
-          // Group is off — start it (which will also show it)
           if (!alwaysOnGroupIds.has(item.groupId)) {
             toggleGroupOn(item.groupId);
           }
         }
       } else {
-        // Service: show single pane
         if (runningServices.has(item.name)) {
           showServiceView(item.name);
         }
@@ -765,7 +730,6 @@ function Dashboard({
       if (!item) return;
 
       if (item.kind === 'group') {
-        // Space stops the group (if it can be stopped)
         if (alwaysOnGroupIds.has(item.groupId)) return;
         if (enabledGroups.has(item.groupId)) {
           toggleGroupOff(item.groupId);
@@ -773,7 +737,6 @@ function Dashboard({
           toggleGroupOn(item.groupId);
         }
       } else {
-        // Service: show single pane (same as Enter for services)
         if (runningServices.has(item.name)) {
           showServiceView(item.name);
         }
@@ -832,7 +795,6 @@ function Dashboard({
     }
   });
 
-  // --- Mouse tracking ---
   useEffect(() => {
     // Enable SGR extended mouse tracking so tmux forwards clicks to us
     process.stdout.write('\x1b[?1000h\x1b[?1006h');
@@ -890,10 +852,8 @@ function Dashboard({
 
         if (item.kind === 'group') {
           if (groups.has(item.groupId)) {
-            // Click on running group header = show group view
             onShowGroup(item.groupId);
           } else {
-            // Click on stopped group header = start it
             if (!alwaysOnGroupIds.has(item.groupId)) {
               onGroupOn(item.groupId);
             }
@@ -916,7 +876,6 @@ function Dashboard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // --- Scrolling ---
   const headerCount = 2;
   const footerCount = stackIssues.length > 0 ? 2 : 1;
   const visibleCount = Math.max(1, rows - headerCount - footerCount);
@@ -987,10 +946,6 @@ function Dashboard({
     </Box>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Entry point
-// ---------------------------------------------------------------------------
 
 const serviceNames: string[] = JSON.parse(process.argv[2] ?? '[]');
 const initialViewed = process.argv[3] ?? '';

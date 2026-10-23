@@ -169,6 +169,13 @@ vi.mock('@/components/centered-state-surface', () => ({
   NativeStateSurface: ({ children }: { children: ReactElement }) => children,
   StateSurface: 'StateSurface',
 }));
+// The (app) layout's screenLayout is the covered-screen gate; the fake Scene
+// the Stack mock below mounts passes the scene straight through, so the unlock
+// wrapper stays the only hidden/visible surface under test.
+vi.mock('@/components/app-screen-layout', () => ({
+  // Same call shape as production: the layout receives the scene props object.
+  appScreenLayout: (props: { children: ReactElement }) => unlockScene(props.children),
+}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/icons', () => ({
   Bell: 'Icon',

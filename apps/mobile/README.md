@@ -48,6 +48,26 @@ The fixture requires a localhost database and `SKIP_STRIPE_API=true`, returns mo
 deep links, and creates no provider integration. It covers editable, opened, failed,
 and member-only proposals; successful provider pull-request creation requires a
 separate integration fixture.
+## PR merge sheet
+
+The merge sheet composes the form and provider-specific bodies. `usePrMergeDraft`
+owns identity-scoped loading, seeding, saving, background flushing, and clearing;
+`usePrMergeSubmit` owns confirmation, mutation inputs, errors, and success effects.
+Header back retains the draft. Footer Cancel and a successful submission clear it.
+
+The mounted suites keep React, form sections, and draft persistence real, with
+native controls, encrypted storage, identity, and mutations replaced at their boundaries:
+
+```bash
+pnpm --filter kilo-app exec vitest run src/components/pr-review/merge
+```
+
+## Remote session recovery
+
+A response that fails before producing any content still shows its failure and
+Retry action, including after reopening the session. Retry resends the original
+user prompt as a new turn in the same session; the original prompt remains in
+the transcript.
 
 ## Transcript action targets
 

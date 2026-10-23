@@ -1429,6 +1429,8 @@
       "showMore": "მეტის ჩვენება",
       "created": "შექმნის თარიღი",
       "started": "დაწყების თარიღი",
+      "reviewEnded": "დასრულების თარიღი",
+      "severityNitpick": "წვრილმანი",
       "tokens": "ტოკენი",
       "tokensInOut": "{{input}} შემავალი / {{output}} გამომავალი",
       "council": "საბჭო",

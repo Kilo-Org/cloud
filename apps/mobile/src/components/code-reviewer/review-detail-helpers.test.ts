@@ -8,6 +8,7 @@ import {
   gateThresholdLabel,
   reviewFailureLabel,
   selectRetryAction,
+  severityLabelKey,
 } from './review-detail-helpers';
 
 type Finding = { path: string; severity: string };
@@ -111,6 +112,21 @@ describe('gateThresholdLabel', () => {
 
   it.each(['future-threshold', 'constructor', ''])('labels unknown %s', threshold => {
     expect(gateThresholdLabel(threshold)).toBe(i18n.t('common.unknown'));
+  });
+});
+
+describe('severityLabelKey', () => {
+  it.each([
+    ['critical', 'common.critical'],
+    ['warning', 'codeReviewer.gateThreshold.warning'],
+    ['suggestion', 'agentChat.suggestion.title'],
+    ['nitpick', 'codeReviewer.reviewDetail.severityNitpick'],
+  ] as const)('names the copy of %s', (severity, key) => {
+    expect(i18n.t(severityLabelKey(severity))).toBe(i18n.t(key));
+  });
+
+  it.each(['future-tier', 'constructor', ''])('falls back for an unknown %s', severity => {
+    expect(i18n.t(severityLabelKey(severity))).toBe(i18n.t('common.unknown'));
   });
 });
 

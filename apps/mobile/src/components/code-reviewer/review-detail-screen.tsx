@@ -255,7 +255,11 @@ export function ReviewDetailScreen({
             ) : null}
             {review.completed_at ? (
               <MetaRow
-                label={t('common.completed')}
+                label={t(
+                  review.status === 'completed'
+                    ? 'common.completed'
+                    : 'codeReviewer.reviewDetail.reviewEnded'
+                )}
                 value={timeAgo(parseTimestamp(review.completed_at))}
               />
             ) : null}

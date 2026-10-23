@@ -1429,6 +1429,8 @@
       "showMore": "Erakutsi gehiago",
       "created": "Sortuta",
       "started": "Hasita",
+      "reviewEnded": "Bukatuta",
+      "severityNitpick": "Huskeria",
       "tokens": "Token",
       "tokensInOut": "{{input}} sarreran / {{output}} irteeran",
       "council": "Kontseilua",

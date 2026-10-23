@@ -1429,6 +1429,8 @@
       "showMore": "បង្ហាញបន្ថែម",
       "created": "បានបង្កើត",
       "started": "បានចាប់ផ្តើម",
+      "reviewEnded": "បានបញ្ចប់ដំណើរការ",
+      "severityNitpick": "ចំណុចតូចតាច",
       "tokens": "តូខេន",
       "tokensInOut": "{{input}} ចូល / {{output}} ចេញ",
       "council": "ក្រុមប្រឹក្សា",

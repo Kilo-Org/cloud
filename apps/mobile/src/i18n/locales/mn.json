@@ -1429,6 +1429,8 @@
       "showMore": "Илүүг харуулах",
       "created": "Үүсгэсэн",
       "started": "Эхэлсэн",
+      "reviewEnded": "Дуусгасан",
+      "severityNitpick": "Жижиг алдаа",
       "tokens": "Токен",
       "tokensInOut": "{{input}} оролт / {{output}} гаралт",
       "council": "Зөвлөл",

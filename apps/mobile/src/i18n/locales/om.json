@@ -1429,6 +1429,8 @@
       "showMore": "Dabalataa agarsiisi",
       "created": "Uumame",
       "started": "Jalqabame",
+      "reviewEnded": "Yeroo xumuraa",
+      "severityNitpick": "Qeeqa xiqqaa",
       "tokens": "Tookanoota",
       "tokensInOut": "{{input}} galtee / {{output}} bu'aa",
       "council": "Gumii",

@@ -1448,6 +1448,8 @@
       "showMore": "Afișează mai mult",
       "created": "Creată",
       "started": "Începută",
+      "reviewEnded": "Terminată",
+      "severityNitpick": "Nuanță",
       "tokens": "Tokenuri",
       "tokensInOut": "{{input}} intrare / {{output}} ieșire",
       "council": "Consiliu",

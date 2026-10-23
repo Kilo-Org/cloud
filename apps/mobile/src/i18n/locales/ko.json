@@ -961,6 +961,8 @@
       "retryTitle": "리뷰를 다시 시도할까요?",
       "showMore": "더 보기",
       "started": "시작 일시",
+      "reviewEnded": "종료 일시",
+      "severityNitpick": "사소함",
       "threshold": "판정 기준",
       "title": "리뷰",
       "tokens": "토큰",

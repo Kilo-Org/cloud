@@ -967,6 +967,8 @@
       "retryTitle": "Повторить проверку?",
       "showMore": "Показать ещё",
       "started": "Начато",
+      "reviewEnded": "Окончено",
+      "severityNitpick": "Придирка",
       "threshold": "Порог",
       "title": "Проверка",
       "tokens": "Токены",

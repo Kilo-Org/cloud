@@ -1429,6 +1429,8 @@
       "showMore": "Tunjukkan lebih banyak",
       "created": "Dicipta",
       "started": "Dimulakan",
+      "reviewEnded": "Tamat",
+      "severityNitpick": "Kecil",
       "tokens": "Token",
       "tokensInOut": "{{input}} masuk / {{output}} keluar",
       "council": "Panel penyemak",

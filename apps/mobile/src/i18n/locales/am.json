@@ -1429,6 +1429,8 @@
       "showMore": "ተጨማሪ ያሳዩ",
       "created": "የተፈጠረበት ጊዜ",
       "started": "የተጀመረበት ጊዜ",
+      "reviewEnded": "ያበቃበት ጊዜ",
+      "severityNitpick": "ትንሽ ማስተካከያ",
       "tokens": "ቶከኖች",
       "tokensInOut": "{{input}} ግቤት / {{output}} ውጤት",
       "council": "የገምጋሚዎች ቡድን",

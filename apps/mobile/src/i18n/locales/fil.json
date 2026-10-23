@@ -1429,6 +1429,8 @@
       "showMore": "Magpakita ng higit pa",
       "created": "Nalikha",
       "started": "Nagsimula",
+      "reviewEnded": "Natapos na",
+      "severityNitpick": "Maliit na puna",
       "tokens": "Mga token",
       "tokensInOut": "{{input}} papasok / {{output}} palabas",
       "council": "Lupon",

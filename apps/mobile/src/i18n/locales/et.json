@@ -1429,6 +1429,8 @@
       "showMore": "Kuva rohkem",
       "created": "Loodud",
       "started": "Alustatud",
+      "reviewEnded": "Lõppenud",
+      "severityNitpick": "Pisiasi",
       "tokens": "Tokenid",
       "tokensInOut": "{{input}} sisendis / {{output}} väljundis",
       "council": "Nõukogu",

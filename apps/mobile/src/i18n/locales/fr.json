@@ -933,6 +933,8 @@
       "retryTitle": "Relancer la revue ?",
       "showMore": "Afficher la suite",
       "started": "Date de début",
+      "reviewEnded": "Fin de la revue",
+      "severityNitpick": "Détail",
       "threshold": "Seuil",
       "title": "Revue",
       "tokens": "Jetons",

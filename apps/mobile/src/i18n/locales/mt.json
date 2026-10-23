@@ -1486,6 +1486,8 @@
       "showMore": "Uri aktar",
       "created": "Maħluqa",
       "started": "Bdiet",
+      "reviewEnded": "Spċċat",
+      "severityNitpick": "Detall żgħir",
       "tokens": "Unitajiet tat-test",
       "tokensInOut": "{{input}} dħul / {{output}} ħruġ",
       "council": "Kunsill",

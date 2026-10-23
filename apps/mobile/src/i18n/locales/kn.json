@@ -1429,6 +1429,8 @@
       "showMore": "ಇನ್ನಷ್ಟು ತೋರಿಸಿ",
       "created": "ರಚಿಸಲಾಗಿದೆ",
       "started": "ಪ್ರಾರಂಭಿಸಲಾಗಿದೆ",
+      "reviewEnded": "ಕೊನೆಗೊಂಡಿದೆ",
+      "severityNitpick": "ಸೂಕ್ಷ್ಮ",
       "tokens": "ಟೋಕನ್‌ಗಳು",
       "tokensInOut": "{{input}} ಇನ್‌ಪುಟ್ / {{output}} ಔಟ್‌ಪುಟ್",
       "council": "ಪರಿಶೀಲನಾ ಮಂಡಳಿ",

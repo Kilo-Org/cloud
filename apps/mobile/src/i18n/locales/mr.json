@@ -1429,6 +1429,8 @@
       "showMore": "आणखी दाखवा",
       "created": "तयार केले",
       "started": "सुरू केले",
+      "reviewEnded": "संपले",
+      "severityNitpick": "किरकोळ",
       "tokens": "टोकन",
       "tokensInOut": "{{input}} इनपुट / {{output}} आउटपुट",
       "council": "पुनरावलोकन मंडळ",

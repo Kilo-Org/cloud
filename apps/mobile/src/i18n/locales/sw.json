@@ -1429,6 +1429,8 @@
       "showMore": "Onyesha zaidi",
       "created": "Uliundwa",
       "started": "Ulianza",
+      "reviewEnded": "Umeisha",
+      "severityNitpick": "Kidokezo",
       "tokens": "Tokeni",
       "tokensInOut": "{{input}} ingizo / {{output}} tokeo",
       "council": "Baraza",

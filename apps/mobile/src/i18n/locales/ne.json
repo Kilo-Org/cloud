@@ -1429,6 +1429,8 @@
       "showMore": "थप देखाउनुहोस्",
       "created": "सिर्जना गरिएको",
       "started": "सुरु भएको",
+      "reviewEnded": "समाप्त भएको",
+      "severityNitpick": "सानो टिप्पणी",
       "tokens": "टोकन",
       "tokensInOut": "{{input}} इनपुट / {{output}} आउटपुट",
       "council": "समीक्षक मण्डल",

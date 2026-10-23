@@ -973,6 +973,8 @@
       "retryTitle": "إعادة المراجعة؟",
       "showMore": "عرض المزيد",
       "started": "وقت البدء",
+      "reviewEnded": "وقت الانتهاء",
+      "severityNitpick": "ملاحظة طفيفة",
       "threshold": "حد الفشل",
       "title": "مراجعة",
       "tokens": "رموز",

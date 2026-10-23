@@ -1429,6 +1429,8 @@
       "showMore": "കൂടുതൽ കാണിക്കുക",
       "created": "സൃഷ്ടിച്ചത്",
       "started": "ആരംഭിച്ചത്",
+      "reviewEnded": "അവസാനിച്ചത്",
+      "severityNitpick": "അപ്രധാനം",
       "tokens": "ടോക്കണുകൾ",
       "tokensInOut": "{{input}} ഇൻപുട്ട് / {{output}} ഔട്ട്പുട്ട്",
       "council": "അവലോകന സമിതി",

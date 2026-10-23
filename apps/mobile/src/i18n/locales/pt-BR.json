@@ -933,6 +933,8 @@
       "retryTitle": "Tentar revisar novamente?",
       "showMore": "Mostrar mais",
       "started": "Iniciada",
+      "reviewEnded": "Encerrada",
+      "severityNitpick": "Observação",
       "threshold": "Limite",
       "title": "Revisão",
       "tokens": "Unidades de texto",

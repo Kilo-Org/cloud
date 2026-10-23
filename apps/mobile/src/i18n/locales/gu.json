@@ -1429,6 +1429,8 @@
       "showMore": "વધુ બતાવો",
       "created": "બનાવેલ",
       "started": "શરૂ કરેલ",
+      "reviewEnded": "સમાપ્ત થયેલ",
+      "severityNitpick": "નાની ટીકા",
       "tokens": "ટોકન",
       "tokensInOut": "{{input}} ઇનપુટ / {{output}} આઉટપુટ",
       "council": "સમીક્ષા સમિતિ",

@@ -1429,6 +1429,8 @@
       "showMore": "ສະແດງເພີ່ມເຕີມ",
       "created": "ສ້າງເມື່ອ",
       "started": "ເລີ່ມເມື່ອ",
+      "reviewEnded": "ສິ້ນສຸດເມື່ອ",
+      "severityNitpick": "ຂໍ້ຕິນ້ອຍ",
       "tokens": "ໂທເຄັນ",
       "tokensInOut": "{{input}} ເຂົ້າ / {{output}} ອອກ",
       "council": "ຄະນະຜູ້ກວດສອບ",

@@ -1429,6 +1429,8 @@
       "showMore": "Whakaaturia ētahi atu",
       "created": "I waihangatia",
       "started": "I tīmata",
+      "reviewEnded": "I mutu",
+      "severityNitpick": "Kōrero iti",
       "tokens": "Waeine kuputuhi",
       "tokensInOut": "{{input}} ki roto / {{output}} ki waho",
       "council": "Kaunihera",

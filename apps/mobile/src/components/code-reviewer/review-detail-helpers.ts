@@ -29,6 +29,27 @@ export function reviewFailureLabel(
   return t('codeReviewer.reviewDetail.reviewFailed');
 }
 
+// The copy of a finding severity badge. Only these four labels need a key of
+// their own; the other three English words already exist elsewhere in the
+// catalog, and `pnpm check:i18n` allows one key per piece of copy.
+const SEVERITY_LABEL_KEY = {
+  critical: 'common.critical',
+  warning: 'codeReviewer.gateThreshold.warning',
+  suggestion: 'agentChat.suggestion.title',
+  nitpick: 'codeReviewer.reviewDetail.severityNitpick',
+} satisfies Record<string, string>;
+
+/**
+ * The catalog key for one council severity. A severity the council did not
+ * define yet reads as the generic "unknown" copy instead of its raw token, so a
+ * future tier never leaks an English identifier into a translated screen.
+ */
+export function severityLabelKey(severity: string): string {
+  return Object.hasOwn(SEVERITY_LABEL_KEY, severity)
+    ? SEVERITY_LABEL_KEY[severity as keyof typeof SEVERITY_LABEL_KEY]
+    : 'common.unknown';
+}
+
 export function gateThresholdLabel(threshold: string): string {
   switch (threshold) {
     case 'off': {

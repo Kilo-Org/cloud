@@ -1429,6 +1429,8 @@
       "showMore": "Покажи още",
       "created": "Създаден",
       "started": "Започнат",
+      "reviewEnded": "Прекратен",
+      "severityNitpick": "Забележка",
       "tokens": "Токени",
       "tokensInOut": "{{input}} входящи / {{output}} изходящи",
       "council": "Съвет",

@@ -1429,6 +1429,8 @@
       "showMore": "Көбірек көрсету",
       "created": "Жасалған уақыты",
       "started": "Басталған уақыты",
+      "reviewEnded": "Аяқталу уақыты",
+      "severityNitpick": "Ұсақ ескерту",
       "tokens": "Токен",
       "tokensInOut": "{{input}} кіріс / {{output}} шығыс",
       "council": "Кеңес",

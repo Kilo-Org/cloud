@@ -1429,6 +1429,8 @@
       "showMore": "نور وښایئ",
       "created": "جوړ شوی",
       "started": "پیل شوی",
+      "reviewEnded": "پای شوی",
+      "severityNitpick": "کوچنی تذکر",
       "tokens": "ټوکنونه",
       "tokensInOut": "{{input}} ننوتونکي / {{output}} وتونکي",
       "council": "شورا",

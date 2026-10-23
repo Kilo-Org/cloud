@@ -1429,6 +1429,8 @@
       "showMore": "Gosi ọzọ",
       "created": "Emebere",
       "started": "Malitere",
+      "reviewEnded": "Njedebe",
+      "severityNitpick": "Nta kịrịkịrị",
       "tokens": "Iberibe ederede",
       "tokensInOut": "{{input}} batara / {{output}} pụtara",
       "council": "Otu ndị nyocha",

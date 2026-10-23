@@ -1467,6 +1467,8 @@
       "showMore": "Rodyti daugiau",
       "created": "Sukurta",
       "started": "Pradėta",
+      "reviewEnded": "Pasibaigė",
+      "severityNitpick": "Smulkmena",
       "tokens": "Žetonai",
       "tokensInOut": "Įvestis: {{input}} / išvestis: {{output}}",
       "council": "Taryba",

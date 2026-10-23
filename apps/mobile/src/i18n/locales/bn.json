@@ -1429,6 +1429,8 @@
       "showMore": "আরও দেখুন",
       "created": "তৈরি হয়েছে",
       "started": "শুরু হয়েছে",
+      "reviewEnded": "সমাপ্ত হয়েছে",
+      "severityNitpick": "সামান্য",
       "tokens": "টোকেন",
       "tokensInOut": "{{input}} ইনপুট / {{output}} আউটপুট",
       "council": "পর্যালোচক দল",

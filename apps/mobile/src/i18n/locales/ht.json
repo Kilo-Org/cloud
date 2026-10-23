@@ -1429,6 +1429,8 @@
       "showMore": "Montre plis",
       "created": "Kreye",
       "started": "Kòmanse",
+      "reviewEnded": "Revizyon fini",
+      "severityNitpick": "Ti detay",
       "tokens": "Jeton",
       "tokensInOut": "{{input}} antre / {{output}} sòti",
       "council": "Konsèy",

@@ -1429,6 +1429,8 @@
       "showMore": "మరిన్ని చూపండి",
       "created": "సృష్టించబడింది",
       "started": "ప్రారంభించబడింది",
+      "reviewEnded": "ముగిసింది",
+      "severityNitpick": "చిన్న సూచన",
       "tokens": "టోకెన్లు",
       "tokensInOut": "{{input}} ఇన్‌పుట్ / {{output}} అవుట్‌పుట్",
       "council": "సమీక్ష మండలి",

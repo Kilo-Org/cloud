@@ -1448,6 +1448,8 @@
       "showMore": "Mostrar mais",
       "created": "Criada",
       "started": "Iniciada",
+      "reviewEnded": "Terminada",
+      "severityNitpick": "Detalhe",
       "tokens": "Tokens de texto",
       "tokensInOut": "{{input}} de entrada / {{output}} de saída",
       "council": "Conselho",

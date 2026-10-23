@@ -961,6 +961,8 @@
       "retryTitle": "İnceleme tekrar denensin mi?",
       "showMore": "Daha fazla göster",
       "started": "Başlangıç zamanı",
+      "reviewEnded": "İnceleme bitiş zamanı",
+      "severityNitpick": "Küçük detay",
       "threshold": "Eşik",
       "title": "İnceleme",
       "tokens": "Belirteç",

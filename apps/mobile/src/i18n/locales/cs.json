@@ -1467,6 +1467,8 @@
       "showMore": "Zobrazit více",
       "created": "Vytvořeno",
       "started": "Zahájeno",
+      "reviewEnded": "Ukončeno",
+      "severityNitpick": "Drobnost",
       "tokens": "Tokeny",
       "tokensInOut": "Vstup: {{input}} / výstup: {{output}}",
       "council": "Rada modelů",

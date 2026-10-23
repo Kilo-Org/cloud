@@ -1429,6 +1429,8 @@
       "showMore": "Khombisa okunye",
       "created": "Kudaliwe",
       "started": "Kuqalisiwe",
+      "reviewEnded": "Kuphelile",
+      "severityNitpick": "Okuncane",
       "tokens": "Amathokheni",
       "tokensInOut": "{{input}} angenayo / {{output}} aphumayo",
       "council": "Umkhandlu",

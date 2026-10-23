@@ -1486,6 +1486,8 @@
       "showMore": "Taispeáin níos mó",
       "created": "Cruthaithe",
       "started": "Tosaithe",
+      "reviewEnded": "Athbhreithniú thart",
+      "severityNitpick": "Mionrud",
       "tokens": "Comharthaí",
       "tokensInOut": "{{input}} isteach / {{output}} amach",
       "council": "Comhairle",

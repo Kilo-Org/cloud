@@ -1429,6 +1429,8 @@
       "showMore": "نمایش بیشتر",
       "created": "زمان ایجاد",
       "started": "زمان شروع",
+      "reviewEnded": "زمان پایان",
+      "severityNitpick": "جزئی",
       "tokens": "توکن",
       "tokensInOut": "{{input}} ورودی / {{output}} خروجی",
       "council": "شورا",

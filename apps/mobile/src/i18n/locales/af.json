@@ -1429,6 +1429,8 @@
       "showMore": "Wys meer",
       "created": "Geskep",
       "started": "Begin",
+      "reviewEnded": "Beëindig",
+      "severityNitpick": "Kleinigheid",
       "tokens": "Tekseenhede",
       "tokensInOut": "{{input}} in / {{output}} uit",
       "council": "Raad",

@@ -1429,6 +1429,8 @@
       "showMore": "Daha çox göstər",
       "created": "Yaradılıb",
       "started": "Başlanıb",
+      "reviewEnded": "Bitib",
+      "severityNitpick": "Xırda qeyd",
       "tokens": "Token",
       "tokensInOut": "{{input}} giriş / {{output}} çıxış",
       "council": "Şura",

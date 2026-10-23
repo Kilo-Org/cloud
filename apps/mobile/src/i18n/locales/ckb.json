@@ -1429,6 +1429,8 @@
       "showMore": "زیاتر پیشان بدە",
       "created": "دروست کراوە",
       "started": "دەستی پێ کراوە",
+      "reviewEnded": "کۆتایی پێ هاتووە",
+      "severityNitpick": "تێبینی بچووک",
       "tokens": "تۆکن",
       "tokensInOut": "{{input}} هاتوو / {{output}} دەرچوو",
       "council": "ئەنجوومەن",

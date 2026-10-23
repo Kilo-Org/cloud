@@ -961,6 +961,8 @@
       "retryTitle": "要重新嘗試審查嗎？",
       "showMore": "顯示更多",
       "started": "開始時間",
+      "reviewEnded": "結束時間",
+      "severityNitpick": "挑剔",
       "threshold": "門檻",
       "title": "審查",
       "tokens": "詞元",

@@ -967,6 +967,8 @@
       "retryTitle": "Ponowić przegląd?",
       "showMore": "Pokaż więcej",
       "started": "Rozpoczęto",
+      "reviewEnded": "Zakończono",
+      "severityNitpick": "Drobiazg",
       "threshold": "Próg",
       "title": "Przegląd",
       "tokens": "Liczba tokenów",

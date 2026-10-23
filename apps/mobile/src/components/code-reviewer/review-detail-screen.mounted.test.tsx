@@ -489,6 +489,37 @@ describe('ReviewDetailScreen details metadata', () => {
     expect(completionRowIndex).toBeGreaterThan(detailsHeaderIndex);
   });
 
+  it.each(['failed', 'cancelled', 'interrupted'] as const)(
+    'labels the end time of a %s review without claiming it completed',
+    status => {
+      // The top of the screen already says the review stopped short, so the
+      // Details row must not repeat the success word as its label.
+      detail.data = {
+        success: true,
+        review: makeReview({
+          status,
+          started_at: '2024-01-01T00:00:00.000Z',
+          completed_at: '2024-01-01T00:05:00.000Z',
+        }),
+        tokenUsage: { input: 0, output: 0 },
+      };
+
+      const renderer = mountScreen();
+      const endedLabel = i18n.t('codeReviewer.reviewDetail.reviewEnded');
+
+      const endRows = renderer.root.findAll(
+        node => node.type === MetaRow && node.props.label === endedLabel
+      );
+      expect(endRows).toHaveLength(1);
+      expect(collectText(endRows[0]?.children ?? [])).toEqual([endedLabel, 'now']);
+      expect(
+        renderer.root.findAll(
+          node => node.type === MetaRow && node.props.label === i18n.t('common.completed')
+        )
+      ).toHaveLength(0);
+    }
+  );
+
   it('omits the completion row when the review was never completed', () => {
     // The row is a function of `completed_at`: with no completion time the
     // Details list must not draw the completion label by itself (the empty
@@ -715,6 +746,48 @@ describe('ReviewDetailScreen findings pagination', () => {
     expect(after).toContain('f0.ts');
     expect(after).toContain('f19.ts');
     expect(after).toContain('f20.ts');
+  });
+});
+
+describe('ReviewDetailScreen finding severities', () => {
+  it('labels every severity with localized copy, never the raw token', () => {
+    const severities = ['critical', 'warning', 'suggestion', 'nitpick', 'future-tier'];
+    detail.data = {
+      success: true,
+      review: makeReview({
+        council_result: {
+          decision: 'block',
+          aggregationStrategy: 'unanimous',
+          specialists: [
+            {
+              id: 'sec',
+              name: 'Security',
+              vote: 'block',
+              findings: severities.map((severity, i) => ({
+                path: `f${i}.ts`,
+                line: i + 1,
+                severity,
+                rationale: `r${i}`,
+              })),
+            },
+          ],
+        },
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen();
+
+    expect(texts).toContain(i18n.t('common.critical'));
+    expect(texts).toContain(i18n.t('codeReviewer.gateThreshold.warning'));
+    expect(texts).toContain(i18n.t('agentChat.suggestion.title'));
+    expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.severityNitpick'));
+    // A severity the council does not define yet reads as generic copy rather
+    // than leaking its identifier into a translated screen.
+    expect(texts).toContain(i18n.t('common.unknown'));
+    for (const severity of severities) {
+      expect(texts).not.toContain(severity);
+    }
   });
 });
 

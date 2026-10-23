@@ -1429,6 +1429,8 @@
       "showMore": "Vis mer",
       "created": "Opprettet",
       "started": "Startet",
+      "reviewEnded": "Avsluttet",
+      "severityNitpick": "Pirk",
       "tokens": "Tokener",
       "tokensInOut": "{{input}} inn / {{output}} ut",
       "council": "Vurderingspanel",

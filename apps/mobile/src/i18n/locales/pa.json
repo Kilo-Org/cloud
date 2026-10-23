@@ -1429,6 +1429,8 @@
       "showMore": "ਹੋਰ ਦਿਖਾਓ",
       "created": "ਬਣਾਇਆ ਗਿਆ",
       "started": "ਸ਼ੁਰੂ ਕੀਤਾ ਗਿਆ",
+      "reviewEnded": "ਸਮੀਖਿਆ ਸਮਾਪਤ",
+      "severityNitpick": "ਮਾਮੂਲੀ ਨੁਕਤਾ",
       "tokens": "ਟੋਕਨ",
       "tokensInOut": "{{input}} ਇਨਪੁਟ / {{output}} ਆਉਟਪੁਟ",
       "council": "ਕੌਂਸਲ",

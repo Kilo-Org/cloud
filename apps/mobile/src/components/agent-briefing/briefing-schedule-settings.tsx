@@ -9,12 +9,24 @@ import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { type BriefingPreferences } from '@/lib/agent-briefing';
+import {
+  briefingPickerDate,
+  briefingPickerTime,
+  briefingScheduleProblems,
+} from '@/lib/agent-briefing-schedule';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { formatDate } from '@/lib/format';
 import { dateTimeFormat } from '@/lib/intl-cache';
 import { useTRPC } from '@/lib/trpc';
 
-export function ScheduleSettings({ preferences }: { readonly preferences: BriefingPreferences }) {
+export function ScheduleSettings({
+  preferences,
+}: {
+  readonly preferences: Pick<
+    BriefingPreferences,
+    'timezone' | 'nightStart' | 'morningStart' | 'morningEnd'
+  >;
+}) {
   const trpc = useTRPC();
   const client = useQueryClient();
   const { t, i18n } = useTranslation();
@@ -31,6 +43,8 @@ export function ScheduleSettings({ preferences }: { readonly preferences: Briefi
     morningEnd: preferences.morningEnd,
   });
   const [activeTime, setActiveTime] = useState<keyof typeof times | null>(null);
+  const [timezoneInvalid, setTimezoneInvalid] = useState(false);
+  const [timesInvalid, setTimesInvalid] = useState(false);
   const [timezoneInputKey, setTimezoneInputKey] = useState(0);
   const update = useMutation(
     trpc.agentBriefing.updatePreferences.mutationOptions({
@@ -63,31 +77,10 @@ export function ScheduleSettings({ preferences }: { readonly preferences: Briefi
   ] as const;
   const save = () => {
     const next = draft.current;
-    const validTimes = [next.nightStart, next.morningStart, next.morningEnd].every(value =>
-      /^([01]\d|2[0-3]):[0-5]\d$/.test(value)
-    );
-    let validZone = true;
-    try {
-      dateTimeFormat('en', { timeZone: next.timezone }).format();
-    } catch {
-      validZone = false;
-    }
-    const [night, morning, end] = [next.nightStart, next.morningStart, next.morningEnd].map(
-      value => Number(value.slice(0, 2)) * 60 + Number(value.slice(3))
-    );
-    const overlaps =
-      night === undefined ||
-      morning === undefined ||
-      end === undefined ||
-      ((morning - night + 1440) % 1440) + ((end - morning + 1440) % 1440) >= 1440;
-    if (
-      !validTimes ||
-      !validZone ||
-      overlaps ||
-      next.nightStart === next.morningStart ||
-      next.morningStart === next.morningEnd
-    ) {
-      toast.error(t('agentBriefing.invalidSchedule'));
+    const problems = briefingScheduleProblems(next);
+    setTimezoneInvalid(problems.timezone);
+    setTimesInvalid(problems.times);
+    if (problems.timezone || problems.times) {
       return;
     }
     update.mutate({ ...next, language: i18n.resolvedLanguage ?? i18n.language });
@@ -99,10 +92,12 @@ export function ScheduleSettings({ preferences }: { readonly preferences: Briefi
           key={timezoneInputKey}
           label={t('agentBriefing.timezone')}
           defaultValue={draft.current.timezone}
+          error={timezoneInvalid ? t('agentBriefing.invalidTimezone') : undefined}
           autoCapitalize="none"
           autoCorrect={false}
           onChangeText={value => {
             draft.current.timezone = value.trim();
+            setTimezoneInvalid(false);
           }}
         />
         <Button
@@ -110,6 +105,7 @@ export function ScheduleSettings({ preferences }: { readonly preferences: Briefi
           disabled={offline || update.isPending}
           onPress={() => {
             draft.current.timezone = dateTimeFormat(undefined, {}).resolvedOptions().timeZone;
+            setTimezoneInvalid(false);
             setTimezoneInputKey(key => key + 1);
           }}
         >
@@ -118,7 +114,7 @@ export function ScheduleSettings({ preferences }: { readonly preferences: Briefi
       </View>
       {fields.map(field => {
         const time = times[field.key];
-        const pickerValue = new Date(2000, 0, 1, Number(time.slice(0, 2)), Number(time.slice(3)));
+        const pickerValue = briefingPickerDate(time);
         return (
           <View key={field.key} className="gap-2">
             <Text className="text-sm">{field.label}</Text>
@@ -150,9 +146,10 @@ export function ScheduleSettings({ preferences }: { readonly preferences: Briefi
                     setActiveTime(null);
                   }}
                   onValueChange={(_event, date) => {
-                    const next = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+                    const next = briefingPickerTime(date);
                     draft.current[field.key] = next;
                     setTimes(current => ({ ...current, [field.key]: next }));
+                    setTimesInvalid(false);
                     if (Platform.OS === 'android') {
                       setActiveTime(null);
                     }
@@ -173,6 +170,9 @@ export function ScheduleSettings({ preferences }: { readonly preferences: Briefi
           </View>
         );
       })}
+      {timesInvalid ? (
+        <Text className="text-sm text-destructive">{t('agentBriefing.invalidScheduleTimes')}</Text>
+      ) : null}
       <Text className="text-xs text-muted-foreground">{t('agentBriefing.timezoneHint')}</Text>
       <Text className="text-xs text-muted-foreground">{t('agentBriefing.timeHint')}</Text>
       <Button disabled={offline} loading={update.isPending} onPress={save}>

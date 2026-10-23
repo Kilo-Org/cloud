@@ -1,6 +1,7 @@
 import { type BriefingReport, isBriefingVisible } from '@kilocode/app-shared/agent-briefing';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 
+import { parseLocalizedNumber } from '@/lib/format';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 type BriefingMembership = Pick<
@@ -126,6 +127,24 @@ export function parseBriefingSafeguards(
     maxSpendMicrodollars > 0 &&
     Number.isSafeInteger(maxSpendMicrodollars);
   return valid ? { maxDurationSeconds, maxSpendMicrodollars } : null;
+}
+
+/**
+ * The two safeguard fields as a person typed them in the active language: a
+ * decimal comma in `de` is the decimal separator, not a bad value. Text the
+ * language's own number grammar cannot read leaves the fields invalid.
+ */
+export function parseBriefingSafeguardInput(
+  minutes: string,
+  dollars: string,
+  locale: string
+): BriefingSafeguards | null {
+  const duration = parseLocalizedNumber(minutes, locale);
+  const spend = parseLocalizedNumber(dollars, locale);
+  if (duration === null || spend === null) {
+    return null;
+  }
+  return parseBriefingSafeguards(duration, spend);
 }
 
 const SYNC_RETRY_DELAYS_MS = [0, 2000, 8000] as const;

@@ -7,6 +7,7 @@ import {
   briefingReportMissing,
   briefingSyncDelayMs,
   canReadBriefingContext,
+  parseBriefingSafeguardInput,
   parseBriefingSafeguards,
   readableBriefingOrganizationIds,
   visibleHomeBriefing,
@@ -201,6 +202,26 @@ describe('parseBriefingSafeguards', () => {
     expect(parseBriefingSafeguards(5, Number.NaN)).toBeNull();
     expect(parseBriefingSafeguards(Number.POSITIVE_INFINITY, 2)).toBeNull();
     expect(parseBriefingSafeguards(5, Number.MAX_SAFE_INTEGER)).toBeNull();
+  });
+});
+
+describe('parseBriefingSafeguardInput', () => {
+  it('reads the decimal separator of the active language', () => {
+    expect(parseBriefingSafeguardInput('2,5', '2,5', 'de')).toEqual({
+      maxDurationSeconds: 150,
+      maxSpendMicrodollars: 2_500_000,
+    });
+    expect(parseBriefingSafeguardInput('10', '2.5', 'en')).toEqual({
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 2_500_000,
+    });
+  });
+
+  it('rejects text the fields cannot turn into a server-valid limit', () => {
+    expect(parseBriefingSafeguardInput('', '2,5', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('2,5', '', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('zwei', '2,5', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('2,5', '-1', 'de')).toBeNull();
   });
 });
 

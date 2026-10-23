@@ -2,6 +2,7 @@ import Stripe from 'stripe';
 import { headers } from 'next/headers';
 import { captureException } from '@sentry/nextjs';
 import { client } from '@kilocode/web-shared/lib/stripe-client';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { processStripePaymentEventHook } from '@/lib/stripe';
 import { POST } from './route';
 
@@ -9,7 +10,9 @@ jest.mock('next/headers', () => ({ headers: jest.fn() }));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 jest.mock('@/lib/stripe', () => ({ processStripePaymentEventHook: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/dotenvx', () => ({
-  getEnvVariable: () => 'whsec_local_fixture',
+  getEnvVariable: jest.fn((key: string) =>
+    key === 'STRIPE_WEBHOOK_SECRET' ? 'whsec_local_fixture' : 'local_fixture'
+  ),
 }));
 
 const secret = 'whsec_local_fixture';
@@ -48,6 +51,11 @@ describe('Stripe webhook responses', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.mocked(processStripePaymentEventHook).mockResolvedValue(undefined);
+    jest
+      .mocked(getEnvVariable)
+      .mockImplementation((key: string) =>
+        key === 'STRIPE_WEBHOOK_SECRET' ? secret : 'local_fixture'
+      );
   });
 
   afterEach(() => {
@@ -58,12 +66,34 @@ describe('Stripe webhook responses', () => {
     null,
     'fixture',
     client.webhooks.generateTestHeaderString({ payload: body, secret: 'whsec_other_fixture' }),
+    client.webhooks.generateTestHeaderString({
+      payload: body,
+      secret,
+      timestamp: Math.floor(Date.now() / 1000) - 3600,
+    }),
   ])('applies the request response contract %#', async signature => {
     const response = await deliver(body, signature);
     expect(response.status).toBe(400);
     expect(await response.text()).toBe('Webhook Error');
     expect(processStripePaymentEventHook).not.toHaveBeenCalled();
     expect(captureException).not.toHaveBeenCalled();
+  });
+
+  test('refuses delivery when the signing secret is not configured', async () => {
+    jest
+      .mocked(getEnvVariable)
+      .mockImplementation((key: string) =>
+        key === 'STRIPE_WEBHOOK_SECRET' ? '' : 'local_fixture'
+      );
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const response = await deliver();
+
+    expect(response.status).toBe(500);
+    expect(await response.text()).toBe('Missing STRIPE_WEBHOOK_SECRET');
+    expect(processStripePaymentEventHook).not.toHaveBeenCalled();
+    expect(captureException).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledWith('STRIPE_WEBHOOK_SECRET is not set');
   });
 
   test('acknowledges event delivery', async () => {

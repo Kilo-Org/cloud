@@ -23,6 +23,12 @@ import {
   INLINE_LINK_OUTER_HIT_SLOP_DP,
   INLINE_LINK_VERTICAL_HIT_SLOP_DP,
   inlineLinkHitSlop,
+  LEGAL_LINK_BOX_CANCEL_DP,
+  LEGAL_LINK_BOX_CLASS,
+  LEGAL_LINK_LINE_DP,
+  LEGAL_LINK_MIN_DP,
+  LEGAL_LINK_ROW_CLASS,
+  LEGAL_LINK_WRAP_GUTTER_DP,
   MIN_TAP_TARGET_DP,
   tapTargetReachDp,
   TOUCH_TARGET_DP,
@@ -173,6 +179,32 @@ describe('shared tap-target geometry', () => {
     });
 
     rtl.isRTL = false;
+  });
+});
+
+describe('standalone legal link geometry', () => {
+  it('renders the 48dp box from whole dp and keeps the text line out of it', async () => {
+    // The regression this guards: the store and consent legal links rendered as
+    // bare `text-xs` Text nodes, so their whole target was the 14dp line.
+    expect(LEGAL_LINK_MIN_DP).toBe(48);
+    expect(LEGAL_LINK_LINE_DP).toBe(14);
+    expect(LEGAL_LINK_BOX_CANCEL_DP).toBe((LEGAL_LINK_MIN_DP - LEGAL_LINK_LINE_DP) / 2);
+    expect(await compiledDp(LEGAL_LINK_BOX_CLASS, 'minHeight')).toBe(LEGAL_LINK_MIN_DP);
+    expect(await compiledDp(LEGAL_LINK_BOX_CLASS, 'minWidth')).toBe(LEGAL_LINK_MIN_DP);
+    // Layout-neutral: the box's overflow past the line is cancelled, so the
+    // footer keeps its own height and the glyphs keep their position.
+    expect(await compiledDp(LEGAL_LINK_BOX_CLASS, 'marginBlock')).toBe(-LEGAL_LINK_BOX_CANCEL_DP);
+  });
+
+  it('tiles the two wrapped boxes instead of overlapping them', () => {
+    // Each box overflows its line by the cancel on both sides, so the wrap
+    // gutter has to be twice that or the later link claims the earlier one's
+    // tap between the lines: a tap meant for Terms would open Privacy Policy.
+    expect(LEGAL_LINK_WRAP_GUTTER_DP).toBe(2 * LEGAL_LINK_BOX_CANCEL_DP);
+    expect(LEGAL_LINK_ROW_CLASS).toContain(`gap-y-[${LEGAL_LINK_WRAP_GUTTER_DP}px]`);
+    // Horizontally the two boxes sit side by side with no sideways slop, so the
+    // row's own gap is the whole separation.
+    expect(LEGAL_LINK_ROW_CLASS).toContain('gap-x-4');
   });
 });
 

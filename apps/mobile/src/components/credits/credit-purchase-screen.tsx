@@ -12,6 +12,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { LEGAL_LINK_BOX_CLASS, LEGAL_LINK_ROW_CLASS } from '@/lib/a11y/tap-target';
 import { WEB_BASE_URL } from '@/lib/config';
 import { getStoreUnavailableCopyKeys } from '@/lib/credits/store-products-loader';
 import { type StoreCreditProduct } from '@/lib/credits/store-products';
@@ -238,31 +239,33 @@ export function CreditPurchaseScreen() {
               );
             })}
 
-          {/* Do not set a leading class here. Android applies the parent line
-              height to each nested link Text and the block grows to many times
-              its size. */}
           <Text className="px-1 pt-1 text-xs text-muted-foreground">
             {t('credits.description')}
           </Text>
-          <View className="flex-row flex-wrap items-center gap-4 px-1">
-            <Text
+          {/* The two store legal links are controls of their own, not words in
+              the sentence above, so each carries the shared legal-link box: a
+              real 48dp target the control-size audit can read, laid out
+              layout-neutrally so the footer keeps its `text-xs` line. `px-1`
+              stays the screen's inset, not the shared row's. */}
+          <View className={cn('px-1', LEGAL_LINK_ROW_CLASS)}>
+            <Pressable
               accessibilityRole="link"
-              className="text-xs text-primary underline active:opacity-70"
+              className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
               onPress={() => {
                 void openExternalUrl(termsOfUseLink.url, { label: termsOfUseLink.label });
               }}
             >
-              {termsOfUseLink.label}
-            </Text>
-            <Text
+              <Text className="text-xs text-primary underline">{termsOfUseLink.label}</Text>
+            </Pressable>
+            <Pressable
               accessibilityRole="link"
-              className="text-xs text-primary underline active:opacity-70"
+              className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
               onPress={() => {
                 void openExternalUrl(privacyPolicyLink.url, { label: privacyPolicyLink.label });
               }}
             >
-              {privacyPolicyLink.label}
-            </Text>
+              <Text className="text-xs text-primary underline">{privacyPolicyLink.label}</Text>
+            </Pressable>
           </View>
         </DetailScreenScrollView>
       </View>

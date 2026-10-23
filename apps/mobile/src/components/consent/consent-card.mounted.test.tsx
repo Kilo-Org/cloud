@@ -1,7 +1,9 @@
 /* oxlint-disable eslint/max-lines -- loading and error state coverage grows the file past 300 lines */
 import { createElement } from 'react';
+import * as WebBrowser from 'expo-web-browser';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { LEGAL_LINK_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { CONSENT_DISCLOSURE_MAX_FONT_SCALE, ConsentCard } from './consent-card';
 import { i18n } from '@/i18n';
 
@@ -53,7 +55,10 @@ vi.mock('@/components/consent/consent-row', () => ({ ConsentRow: 'ConsentRow' })
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://kilo.ai' }));
+vi.mock('@/lib/config', () => ({
+  PRIVACY_URL: 'https://kilo.ai/privacy-app',
+  WEB_BASE_URL: 'https://kilo.ai',
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
     background: '#fff',
@@ -477,5 +482,40 @@ describe('ConsentCard', () => {
         CONSENT_DISCLOSURE_MAX_FONT_SCALE
       );
     }
+  });
+
+  it('gives the pinned disclosure privacy link a full target and opens the policy', async () => {
+    vi.mocked(WebBrowser.openBrowserAsync).mockClear();
+    const links = (['onboarding', 'review'] as const).map(mode => {
+      const root = mountCard(mode).root;
+      const found = root.findAll(
+        n =>
+          typeof n.type === 'string' &&
+          (n.type as string) === 'Pressable' &&
+          (n.props as { accessibilityRole?: string }).accessibilityRole === 'link'
+      );
+      expect(found).toHaveLength(1);
+      const link = found[0];
+      if (!link) {
+        throw new Error('privacy link not found');
+      }
+      // A real 48dp box: the control-size audit reads the node's own rect, so
+      // the 14dp text line alone was reported as too small to tap.
+      expect(String((link.props as { className?: string }).className)).toContain(
+        LEGAL_LINK_BOX_CLASS
+      );
+      return link;
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+      for (const link of links) {
+        (link.props as { onPress: () => void }).onPress();
+      }
+    });
+
+    const openBrowser = vi.mocked(WebBrowser.openBrowserAsync);
+    expect(openBrowser).toHaveBeenCalledTimes(2);
+    expect(openBrowser).toHaveBeenCalledWith('https://kilo.ai/privacy-app');
   });
 });

@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConsentRow } from '@/components/consent/consent-row';
 import { type ConsentMode, getConsentActions } from '@/components/consent/consent-mode';
+import { ConsentPolicySentence } from '@/components/consent/consent-policy-sentence';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -318,20 +319,12 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             because at the foot of the scrolling body the footer edge cut the
             sentence in half. Its font scale is capped so the pinned height
             stays bounded (see CONSENT_DISCLOSURE_MAX_FONT_SCALE). */}
-        <Text
-          className="text-xs text-muted-foreground"
+        <ConsentPolicySentence
+          prefix={t('consent.privacyPolicyPrefix')}
+          linkLabel={t('consent.privacyPolicy')}
           maxFontSizeMultiplier={CONSENT_DISCLOSURE_MAX_FONT_SCALE}
-        >
-          {t('consent.privacyPolicyPrefix')}{' '}
-          <Text
-            className="text-xs text-primary underline"
-            maxFontSizeMultiplier={CONSENT_DISCLOSURE_MAX_FONT_SCALE}
-            onPress={handleOpenPrivacy}
-          >
-            {t('consent.privacyPolicy')}
-          </Text>
-          .
-        </Text>
+          onOpenPolicy={handleOpenPrivacy}
+        />
         <View className="min-h-5 justify-center">
           <AccessibleStatus message={error} className="text-sm" />
         </View>

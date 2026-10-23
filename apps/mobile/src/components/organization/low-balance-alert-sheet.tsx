@@ -2,21 +2,24 @@ import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, Switch, View } from 'react-native';
+import { View } from 'react-native';
 
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import {
   emailsError,
   parseEmails,
   parseThreshold,
+  saveErrorCopy,
   thresholdError,
 } from '@/components/organization/low-balance-alert-validators';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
+import { SheetScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
@@ -64,6 +67,17 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
     );
   };
 
+  // A rejected save belongs to the field that caused it; correcting either
+  // field drops the rejection so Save no longer sits under a stale sentence.
+  const saveError = mutations.updateMinimumBalanceAlert.isError
+    ? saveErrorCopy(mutations.updateMinimumBalanceAlert.error)
+    : null;
+  const clearSaveError = () => {
+    if (mutations.updateMinimumBalanceAlert.isError) {
+      mutations.updateMinimumBalanceAlert.reset();
+    }
+  };
+
   const onSave = () => {
     const threshold = parseThreshold(thresholdRef.current);
     const emails = parseEmails(emailsRef.current);
@@ -97,6 +111,7 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
             void Haptics.selectionAsync();
             setEnabled(value);
             revalidate(value, thresholdRef.current, emailsRef.current);
+            clearSaveError();
           }}
         />
       </View>
@@ -106,13 +121,14 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
           <FormField
             label={t('organization.lowBalanceAlert.thresholdLabel')}
             required
-            placeholder="10.00"
+            placeholder={t('organization.lowBalanceAlert.thresholdPlaceholder')}
             keyboardType="decimal-pad"
             defaultValue={thresholdRef.current || undefined}
             validate={thresholdError}
             onChangeText={value => {
               thresholdRef.current = value;
               revalidate(enabled, value, emailsRef.current);
+              clearSaveError();
             }}
           />
 
@@ -129,24 +145,27 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
               onChangeText={value => {
                 emailsRef.current = value;
                 revalidate(enabled, thresholdRef.current, value);
+                clearSaveError();
               }}
             />
             <Text variant="muted" className="text-xs">
               {t('organization.lowBalanceAlert.separateEmailsHint')}
             </Text>
+            <AccessibleStatus
+              message={saveError?.field === 'emails' ? saveError.message : null}
+              className="text-sm"
+            />
           </View>
         </>
       )}
 
       {/* updateMinimumBalanceAlert has no mutation toast (inline error pattern
           P2), so AccessibleStatus is the single announcement owner here: one
-          announcement per platform, visuals preserved (tone error). */}
+          announcement per platform, visuals preserved (tone error). A rejected
+          save names itself in localized copy — the server's schema message is
+          a JSON array, never a sentence a person should read. */}
       <AccessibleStatus
-        message={
-          mutations.updateMinimumBalanceAlert.isError
-            ? mutations.updateMinimumBalanceAlert.error.message
-            : null
-        }
+        message={saveError?.field === 'form' ? saveError.message : null}
         className="text-sm"
       />
 
@@ -173,7 +192,10 @@ export function LowBalanceAlertSheet() {
   // forever) falling through to OrganizationBoundary below.
   if (isResolving || (organizationId != null && orgWithMembers.isPending)) {
     return (
-      <ScrollView className="flex-1 bg-background" contentContainerClassName="px-6 gap-6 pb-8 pt-4">
+      <SheetScrollView
+        className="flex-1 bg-background"
+        contentContainerClassName="px-6 gap-6 pb-8 pt-4"
+      >
         <Skeleton className="h-[52px] rounded-lg" />
         <View className="gap-1.5">
           <Skeleton className="h-3.5 w-28 rounded" />
@@ -184,7 +206,7 @@ export function LowBalanceAlertSheet() {
           <Skeleton className="h-11 rounded-md" />
         </View>
         <Skeleton className="h-11 rounded-md" />
-      </ScrollView>
+      </SheetScrollView>
     );
   }
   if (organizationId == null || org == null) {
@@ -212,7 +234,7 @@ export function LowBalanceAlertSheet() {
   }
 
   return (
-    <ScrollView
+    <SheetScrollView
       className="flex-1 bg-background"
       contentContainerClassName="px-6 gap-6 pb-8 pt-4"
       automaticallyAdjustKeyboardInsets
@@ -228,6 +250,6 @@ export function LowBalanceAlertSheet() {
           settings={orgWithMembers.data.settings}
         />
       )}
-    </ScrollView>
+    </SheetScrollView>
   );
 }

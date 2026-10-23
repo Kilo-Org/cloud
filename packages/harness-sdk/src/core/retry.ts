@@ -15,7 +15,9 @@ interface RetryPolicyService {
   readonly schedule: Schedule.Schedule<unknown, ModelError>;
 }
 
-class RetryPolicy extends Context.Tag('harness/RetryPolicy')<RetryPolicy, RetryPolicyService>() {}
+class RetryPolicy extends Context.Service<RetryPolicy, RetryPolicyService>()(
+  'harness/RetryPolicy'
+) {}
 
 export type { RetryPolicyService };
 export { RetryPolicy };

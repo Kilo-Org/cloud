@@ -28,7 +28,8 @@ jest.mock('@/components/ui/tooltip', () => {
   return {
     Tooltip: passthrough,
     TooltipTrigger: passthrough,
-    TooltipContent: passthrough,
+    TooltipContent: ({ children, className }: { children?: ReactNode; className?: string }) =>
+      react.createElement('div', { role: 'tooltip', className }, children),
     TooltipProvider: passthrough,
   };
 });
@@ -215,6 +216,86 @@ describe('ChatSidebar row rendering', () => {
     });
   }
 
+  it('does not flash an empty state while the session list loads', () => {
+    renderSidebar({ isLoading: true });
+    expect(dom.container.querySelector('[role="status"]')?.getAttribute('aria-label')).toBe(
+      'Loading sessions'
+    );
+    expect(dom.container.textContent).not.toContain('No sessions yet');
+    renderSidebar({ isLoading: false });
+    expect(dom.container.textContent).toContain('No sessions yet');
+  });
+
+  it('keeps one skeleton until sessions, names and folders are ready together', () => {
+    const session = makeSession(0, { worktreeId: 'worktree_ready' });
+    renderSidebar({ sessions: [session], isLoading: true });
+    expect(dom.container.querySelector('[aria-label="Loading sessions"]')).not.toBeNull();
+    expect(dom.container.querySelector('[data-worktree-id="worktree_ready"]')).toBeNull();
+
+    renderSidebar({ sessions: [session] });
+    expect(dom.container.querySelector('[aria-label="Loading sessions"]')).toBeNull();
+    expect(dom.container.querySelector('[data-worktree-id="worktree_ready"]')).not.toBeNull();
+  });
+
+  it('provides the full workspace title in a wrapping tooltip on its open button', () => {
+    const session = makeSession(0, { worktreeId: 'worktree_tooltip' });
+    const title = 'Cloud Agent sidebar session titles should remain readable when truncated';
+    const onOpenSession = jest.fn();
+    renderSidebar({
+      sessions: [session],
+      onOpenSession,
+      worktreeDetails: {
+        worktree_tooltip: { name: title, defaultTitle: null, prSession: null, sessions: [] },
+      },
+    });
+
+    const row = dom.container.querySelector('[data-worktree-id="worktree_tooltip"]');
+    const tooltip = row?.querySelector('[role="tooltip"]');
+    expect(tooltip?.textContent).toBe(title);
+    expect(tooltip?.className).toContain('max-w-xs');
+    expect(tooltip?.className).toContain('break-words');
+
+    const button = row?.querySelector<HTMLButtonElement>(
+      `button[aria-label="Open worktree ${title}"]`
+    );
+    expect(button?.querySelector('.line-clamp-1')?.textContent).toBe(title);
+    act(() => button?.click());
+    expect(onOpenSession).toHaveBeenCalledWith(session.sessionId);
+
+    renderSidebar({ sessions: [session] });
+    expect(row?.querySelector('[role="tooltip"]')?.textContent).toBe(session.repository);
+  });
+
+  it('waits for the worktree name instead of flashing a repository label', () => {
+    const session = makeSession(0, { worktreeId: 'worktree_loading' });
+    renderSidebar({ sessions: [session], loadingWorktreeIds: ['worktree_loading'] });
+    const row = dom.container.querySelector('[data-worktree-id="worktree_loading"]');
+    expect(row?.querySelector('[role="tooltip"]')).toBeNull();
+    expect(row?.textContent).not.toContain(session.repository);
+    expect(
+      row?.querySelector('button[aria-label="Open worktree Loading worktree…"]')
+    ).not.toBeNull();
+    renderSidebar({
+      sessions: [session],
+      worktreeDetails: {
+        worktree_loading: {
+          name: 'Stable workspace title',
+          defaultTitle: null,
+          prSession: null,
+          sessions: [],
+        },
+      },
+    });
+    expect(
+      dom.container.querySelector('[data-worktree-id="worktree_loading"]')?.textContent
+    ).toContain('Stable workspace title');
+    // A metadata failure must leave the row usable with its repository fallback.
+    renderSidebar({ sessions: [session] });
+    expect(
+      dom.container.querySelector('[data-worktree-id="worktree_loading"]')?.textContent
+    ).toContain(session.repository);
+  });
+
   function rowElement(sessionId: string): HTMLElement {
     let node: Element | null = dom.container.querySelector(`[data-session-pr="${sessionId}"]`);
     while (node) {
@@ -281,6 +362,7 @@ describe('ChatSidebar row rendering', () => {
         { id: ids[0], name: 'Product', color: 'blue' as const, worktreeIds: [] as string[] },
       ],
       isLoading: false,
+      isFirstLoadPending: false,
       isError: false,
       isSaving: false,
       collapsedFolderIds: [],

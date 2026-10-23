@@ -5,6 +5,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
+import { i18n } from '@/i18n';
 
 import { PrReviewFileList } from './pr-diff-file-list';
 
@@ -14,6 +15,12 @@ const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }))
 // the provider-scoped keying (s6, identity rule 17) is proven at the call
 // site rather than only in the store's unit tests.
 const viewedFilesCalls = vi.hoisted(() => [] as unknown[][]);
+// Records the args the list passes to the selection hook, the scroll hook,
+// and the selection-clear bridge, so the bridge identity wiring (rule 17)
+// is proven at the call site too.
+const diffSelectionArgs = vi.hoisted(() => [] as unknown[][]);
+const listScrollArgs = vi.hoisted(() => [] as unknown[][]);
+const clearSelectionCalls = vi.hoisted(() => [] as unknown[]);
 
 const listQueryState = vi.hoisted(() => ({
   query: {
@@ -45,6 +52,9 @@ vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
   PrReviewReconnectNotice: 'PrReviewReconnectNotice',
 }));
+vi.mock('@/components/pr-review/pr-review-unavailable-actions', () => ({
+  PrReviewUnavailableActions: 'PrReviewUnavailableActions',
+}));
 vi.mock('@/components/pr-review/diff/diff-font-metrics', () => ({
   DiffFontMetricsContext: { Provider: 'DiffFontMetricsContext.Provider' },
   useBoundedDiffFontMetrics: () => ({
@@ -69,12 +79,15 @@ vi.mock('@/components/pr-review/diff/pr-diff-file-list-render', () => ({
   useDiffRenderItem: () => vi.fn(),
 }));
 vi.mock('@/components/pr-review/diff/use-diff-selection', () => ({
-  useDiffSelection: () => ({
-    selection: null,
-    selectionView: null,
-    handleLineTap: vi.fn(),
-    clearSelection: vi.fn(),
-  }),
+  useDiffSelection: (...args: unknown[]) => {
+    diffSelectionArgs.push(args);
+    return {
+      selection: null,
+      selectionView: null,
+      handleLineTap: vi.fn(),
+      clearSelection: vi.fn(),
+    };
+  },
 }));
 vi.mock('@/components/pr-review/diff/pr-diff-rows', () => ({
   EmptyFilesView: 'EmptyFilesView',
@@ -116,10 +129,14 @@ vi.mock('@/lib/pr-review/diff/pr-review-file-list-state', () => ({
   }),
 }));
 vi.mock('@/lib/pr-review/diff/use-pr-diff-list-scroll', () => ({
-  usePrDiffListScroll: vi.fn(),
+  usePrDiffListScroll: (...args: unknown[]) => {
+    listScrollArgs.push(args);
+  },
 }));
 vi.mock('@/lib/pr-review/diff-selection-bridge', () => ({
-  clearDiffSelection: vi.fn(),
+  clearDiffSelection: (...args: unknown[]) => {
+    clearSelectionCalls.push(args);
+  },
 }));
 vi.mock('@/lib/hooks/use-is-tablet', () => ({
   useIsTablet: () => false,
@@ -212,19 +229,38 @@ describe('PrReviewFileList full-body states', () => {
     expect(bottomPaddedViews(renderer)).toHaveLength(0);
   });
 
-  it('lets QueryError own the retryable body and retry action', () => {
-    listQueryState.firstPageErrorState = { kind: 'retryable' };
+  it.each(['retryable', 'service-unavailable'] as const)(
+    'retries the %s body through the query',
+    kind => {
+      listQueryState.firstPageErrorState = { kind };
+      listQueryState.query.refetch.mockClear();
+      const renderer = mountList();
+      const error = renderer.root.find(node => String(node.type) === 'QueryError');
+      expect(error.props.placement).toBeUndefined();
+      expect(bottomPaddedViews(renderer)).toHaveLength(0);
+      act(() => {
+        (error.props.onRetry as () => void)();
+      });
+      expect(listQueryState.query.refetch).toHaveBeenCalledOnce();
+    }
+  );
+
+  it('names the outage cause instead of leaving the body to the server default', () => {
+    listQueryState.firstPageErrorState = { kind: 'service-unavailable' };
     const renderer = mountList();
     const error = renderer.root.find(node => String(node.type) === 'QueryError');
-    expect(error.props.placement).toBeUndefined();
-    expect(bottomPaddedViews(renderer)).toHaveLength(0);
+    expect(error.props.title).toBe(i18n.t('prReview.reviewServiceUnavailable'));
+    expect(error.props.message).toBe(i18n.t('prReview.reviewServiceUnavailableDescription'));
+
+    listQueryState.firstPageErrorState = { kind: 'retryable' };
     act(() => {
-      (error.props.onRetry as () => void)();
+      renderer.update(createElement(PrReviewFileList, BASE_PROPS));
     });
-    expect(listQueryState.query.refetch).toHaveBeenCalled();
+    const generic = renderer.root.find(node => String(node.type) === 'QueryError');
+    expect(generic.props.title).toBeUndefined();
   });
 
-  it.each([false, true])('refreshes the waiting body with fetching state %s', isFetching => {
+  it.each([false, true])('refreshes the waiting body with fetching state %s', async isFetching => {
     listQueryState.query.isFetching = isFetching;
     listQueryState.query.refetch.mockClear();
     const renderer = mountList();
@@ -237,8 +273,8 @@ describe('PrReviewFileList full-body states', () => {
         ['FlashList', 'ScrollView', 'CenteredState'].includes(String(node.type))
       )
     ).toHaveLength(0);
-    act(() => {
-      refreshControl.props.onRefresh?.();
+    await act(async () => {
+      await refreshControl.props.onRefresh?.();
     });
     expect(listQueryState.query.refetch).toHaveBeenCalledOnce();
   });
@@ -266,6 +302,9 @@ describe('PrReviewFileList write affordances per provider', () => {
   beforeEach(() => {
     listQueryState.files = [{ path: 'src/file.ts' }];
     viewedFilesCalls.length = 0;
+    diffSelectionArgs.length = 0;
+    listScrollArgs.length = 0;
+    clearSelectionCalls.length = 0;
   });
 
   it('keeps the write bar on a GitHub pull request', () => {
@@ -302,6 +341,47 @@ describe('PrReviewFileList write affordances per provider', () => {
     const renderer = mountListInScope(prRef);
     const bar = renderer.root.find(node => String(node.type) === 'PrDiffFloatingActions');
     expect(bar.props.prRef).toEqual(prRef);
+  });
+
+  // The selection and navigator bridges must key by the live provider ref
+  // (identity rule 17), exactly like the viewed set: the call site passes
+  // the ref the bridges resolve their provider-scoped key under.
+  it('threads the live ref into the selection, scroll, and clear bridges', () => {
+    const prRef = { platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 12 } as const;
+    mountListInScope(prRef);
+
+    const selectionArgs = diffSelectionArgs[0]?.[0] as Record<string, unknown>;
+    expect(selectionArgs).toMatchObject({
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 7,
+      ref: prRef,
+    });
+    const scrollArgs = listScrollArgs[0]?.[0] as Record<string, unknown>;
+    expect(scrollArgs).toMatchObject({
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 7,
+      ref: prRef,
+    });
+  });
+
+  it('clears the selection bridge under the live ref on unmount', () => {
+    const prRef = { platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 12 } as const;
+    const holder: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+    act(() => {
+      holder.current = TestRenderer.create(
+        <ProviderPrScopeProvider value={{ ref: prRef, organizationId: null }}>
+          <PrReviewFileList {...BASE_PROPS} />
+        </ProviderPrScopeProvider>
+      );
+    });
+    act(() => {
+      holder.current?.unmount();
+    });
+    expect(clearSelectionCalls[0]).toEqual([
+      { owner: 'octocat', repo: 'hello-world', number: 7, ref: prRef },
+    ]);
   });
 
   it('keeps the small footer gap under a provider diff list too', () => {

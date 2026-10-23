@@ -12,6 +12,7 @@ import {
   restoreSalesDemoOrganization,
 } from '@/lib/organizations/sales-demo';
 import { isAllowedSalesDemoEmail } from '@/lib/organizations/sales-demo-email';
+import { organizationActionTarget, recordAdminAction } from '@/lib/admin/admin-action-audit';
 
 export const salesDemoRouter = createTRPCRouter({
   create: adminProcedure
@@ -42,6 +43,13 @@ export const salesDemoRouter = createTRPCRouter({
           })
         );
 
+        await recordAdminAction(ctx, {
+          action: 'sales_demo.create',
+          target: organizationActionTarget(organization.id),
+          message: 'Created sales demo organization',
+          metadata: { ownerKiloUserId: targetUser.id },
+        });
+
         return {
           organizationId: organization.id,
           organizationName: organization.name,
@@ -62,7 +70,7 @@ export const salesDemoRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string().min(1) }))
     .mutation(async ({ input, ctx }) => {
       try {
-        return await db.transaction(async tx => {
+        const result = await db.transaction(async tx => {
           const organizationId = await restoreSalesDemoOrganization({
             organizationId: input.organizationId,
             actorUser: ctx.user,
@@ -80,6 +88,14 @@ export const salesDemoRouter = createTRPCRouter({
             organizationName: org?.name ?? '',
           };
         });
+
+        await recordAdminAction(ctx, {
+          action: 'sales_demo.reset',
+          target: organizationActionTarget(result.organizationId),
+          message: 'Reset sales demo organization',
+        });
+
+        return result;
       } catch (error) {
         if (error instanceof Error && error.message === NOT_LIVE_SALES_DEMO) {
           throw new TRPCError({

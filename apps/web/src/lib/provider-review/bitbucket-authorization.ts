@@ -14,6 +14,12 @@ import 'server-only';
 
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
+import {
+  isNetworkFailure,
+  ProviderApiStatusError,
+  ProviderReviewError,
+  type ProviderReviewErrorKind,
+} from '@kilocode/app-shared/provider-review';
 import { BITBUCKET_WORKSPACE_ACCESS_TOKEN_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { GIT_TOKEN_SERVICE_API_URL } from '@kilocode/web-shared/lib/config.server';
 import { generateInternalServiceToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
@@ -39,44 +45,35 @@ export type BitbucketReviewOwner =
 export const BITBUCKET_ORGANIZATION_ONLY_MESSAGE =
   'Bitbucket pull requests are available in an organization context only. Switch to an organization with a connected Bitbucket workspace.';
 
-export type BitbucketReviewErrorKind =
-  | 'not_found'
-  | 'forbidden'
-  | 'stale_head'
-  | 'bad_request'
-  | 'retryable';
+export type BitbucketReviewErrorKind = ProviderReviewErrorKind;
 
 /**
  * A classified provider failure. `retryable` is true only for 5xx/network
  * outcomes. The message is fixed copy and never embeds a token or a
  * workspace identity, so every output of this layer is safe to show or log.
  */
-export class BitbucketReviewError extends Error {
-  readonly kind: BitbucketReviewErrorKind;
-  readonly retryable: boolean;
-
-  constructor(kind: BitbucketReviewErrorKind, message: string) {
-    super(message);
+export class BitbucketReviewError extends ProviderReviewError {
+  constructor(kind: ProviderReviewErrorKind, message: string) {
+    super(kind, message);
     this.name = 'BitbucketReviewError';
-    this.kind = kind;
-    this.retryable = kind === 'retryable';
   }
 }
 
 /** An HTTP failure raised by this layer's own Bitbucket JSON requests. */
-export class BitbucketApiStatusError extends Error {
-  constructor(
-    readonly status: number,
-    message: string
-  ) {
-    super(message);
+export class BitbucketApiStatusError extends ProviderApiStatusError {
+  constructor(status: number, message: string) {
+    super(status, message);
     this.name = 'BitbucketApiStatusError';
   }
 }
 
 /**
- * Bitbucket status → kind: 404 not_found, 401/403 forbidden, 409 stale head,
- * 400/405/422 bad request, 5xx/429 retryable.
+ * Bitbucket status → kind: 404 not_found, 401 reconnect, 403 forbidden, 409
+ * stale head, 400/405/422 bad request, 5xx/429 retryable.
+ *
+ * A 401 is the released workspace token being refused, so the remedy is a
+ * reconnect; 403 is a real refusal of the workspace's access to this pull
+ * request.
  */
 export function classifyBitbucketStatus(status: number): BitbucketReviewError {
   if (status === 404) {
@@ -85,7 +82,13 @@ export function classifyBitbucketStatus(status: number): BitbucketReviewError {
       'The Bitbucket pull request or repository was not found, or you do not have access to it.'
     );
   }
-  if (status === 401 || status === 403) {
+  if (status === 401) {
+    return new BitbucketReviewError(
+      'reconnect',
+      'Your Bitbucket connection is no longer valid. Reconnect Bitbucket and try again.'
+    );
+  }
+  if (status === 403) {
     return new BitbucketReviewError(
       'forbidden',
       'Your Bitbucket workspace access does not allow this action on this pull request.'
@@ -109,21 +112,17 @@ export function classifyBitbucketStatus(status: number): BitbucketReviewError {
   return new BitbucketReviewError('retryable', 'Bitbucket returned an unexpected error.');
 }
 
-function isNetworkFailure(error: Error): boolean {
-  return (
-    error.name === 'TypeError' ||
-    error.name === 'TimeoutError' ||
-    error.name === 'AbortError' ||
-    error.message.toLowerCase().includes('fetch failed')
-  );
-}
-
 function classifyTrpcError(code: TRPCError['code']): BitbucketReviewError {
   switch (code) {
     case 'NOT_FOUND':
       return new BitbucketReviewError('not_found', 'Bitbucket integration not found.');
     case 'UNAUTHORIZED':
-      return new BitbucketReviewError('forbidden', 'Your Bitbucket connection is no longer valid.');
+      // The workspace credential was refused: the connection must be
+      // re-established. The member's organization access is intact.
+      return new BitbucketReviewError(
+        'reconnect',
+        'Your Bitbucket connection is no longer valid. Reconnect Bitbucket and try again.'
+      );
     case 'SERVICE_UNAVAILABLE':
       return new BitbucketReviewError(
         'retryable',
@@ -350,11 +349,11 @@ function releaseFailureToReviewError(status: BitbucketWorkspaceAccessTokenReleas
     case 'not_connected':
       return new BitbucketReviewError(
         'not_found',
-        'The Bitbucket connection is no longer active. Reconnect Bitbucket to continue.'
+        'No Bitbucket connection found for this organization. Connect Bitbucket first.'
       );
     case 'reconnect_required':
       return new BitbucketReviewError(
-        'not_found',
+        'reconnect',
         'The Bitbucket connection is no longer active. Reconnect Bitbucket to continue.'
       );
     case 'invalid_request':
@@ -402,7 +401,7 @@ async function resolveWorkspaceIntegration(
   }
   if (status.status !== 'connected' || !status.workspace || !status.integrationId) {
     throw new BitbucketReviewError(
-      'not_found',
+      'reconnect',
       'The Bitbucket connection is no longer active. Reconnect Bitbucket to continue.'
     );
   }
@@ -478,9 +477,15 @@ export async function authorizeRepository(
     organizationId: owner.organizationId,
     expectedIntegrationId: resolved.integrationId,
   });
-  if (cache.status === 'not_connected' || cache.status === 'reconnect_required') {
+  if (cache.status === 'not_connected') {
     throw new BitbucketReviewError(
       'not_found',
+      'No Bitbucket connection found for this organization. Connect Bitbucket first.'
+    );
+  }
+  if (cache.status === 'reconnect_required') {
+    throw new BitbucketReviewError(
+      'reconnect',
       'The Bitbucket connection is no longer active. Reconnect Bitbucket to continue.'
     );
   }
@@ -488,11 +493,11 @@ export async function authorizeRepository(
     throw new BitbucketReviewError('bad_request', 'Bitbucket rejected the repository request.');
   }
   // A permanent token-scope failure: the connected integration cannot list the
-  // workspace's repositories, so no retry helps. Name the remedy instead of
-  // folding it into a generic "try again" (the retryable fallback below).
+  // workspace's repositories, so no retry helps. The remedy is reconnecting
+  // with repository read access, not the member's permission.
   if (cache.status === 'insufficient_permissions') {
     throw new BitbucketReviewError(
-      'forbidden',
+      'reconnect',
       'The Bitbucket connection is missing the repository scope. Reconnect Bitbucket with repository read access to continue.'
     );
   }

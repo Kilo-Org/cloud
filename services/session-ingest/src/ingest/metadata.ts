@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
-import { cli_sessions_v2 } from '@kilocode/db/schema';
+import { agent_briefing_events, cli_sessions_v2 } from '@kilocode/db/schema';
 import { hasOrganizationAccess, normalizeGitUrl, withDORetry } from '@kilocode/worker-utils';
 
 import type { Env } from '../env';
@@ -36,6 +36,7 @@ type SessionMetadataUpdates = Partial<
     | 'git_branch'
     | 'status'
     | 'status_updated_at'
+    | 'status_transition_id'
     | 'platform'
     | 'pr_url'
     | 'pr_number'
@@ -101,7 +102,19 @@ export function computeSessionMetadataUpdates(
   if (mergedChanges.has('gitBranch')) updates.git_branch = mergedChanges.get('gitBranch') ?? null;
   if (mergedChanges.has('status')) {
     updates.status = mergedChanges.get('status') ?? null;
-    updates.status_updated_at = now();
+    const occurredAt = mergedChanges.get('statusOccurredAt');
+    updates.status_updated_at =
+      occurredAt && Number.isFinite(Date.parse(occurredAt))
+        ? new Date(occurredAt).toISOString()
+        : now();
+    const transitionId = mergedChanges.get('statusTransitionId');
+    updates.status_transition_id =
+      occurredAt &&
+      Number.isFinite(Date.parse(occurredAt)) &&
+      transitionId &&
+      /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/.test(transitionId)
+        ? transitionId
+        : null;
   }
   // PR-link triple. `platform` here is the PR host (not created_on_platform); the
   // change-map string for prNumber is converted back to an integer, or null on clear.
@@ -133,6 +146,27 @@ export function computeSessionMetadataUpdates(
   return updates;
 }
 
+type StatusTransitionOrder = { occurredAt: string | null; transitionId: string | null };
+
+/**
+ * Whether a timestamped producer transition is ordered strictly before the current one.
+ * A producer cursor orders by itself alone: server writes (CLI-disconnect reset) move
+ * status_updated_at but never the cursor, so they can never outrank a producer transition.
+ * Only a cursorless (legacy/untimestamped) projection falls back to source time.
+ */
+export function precedesStatusTransition(
+  incoming: StatusTransitionOrder,
+  current: StatusTransitionOrder
+): boolean {
+  if (incoming.occurredAt === null) return false;
+  if (current.transitionId !== null) {
+    return incoming.transitionId === null || incoming.transitionId < current.transitionId;
+  }
+  return (
+    current.occurredAt !== null && Date.parse(incoming.occurredAt) < Date.parse(current.occurredAt)
+  );
+}
+
 export async function applyMetadataChanges(
   env: Env,
   kiloUserId: string,
@@ -145,6 +179,12 @@ export async function applyMetadataChanges(
   const db = getWorkerDb(env.HYPERDRIVE.connectionString);
   const status = mergedChanges.has('status') ? (mergedChanges.get('status') ?? null) : undefined;
   const updates = computeSessionMetadataUpdates(mergedChanges);
+  const rawStatusOccurredAt = mergedChanges.get('statusOccurredAt');
+  const statusOccurredAt =
+    rawStatusOccurredAt && Number.isFinite(Date.parse(rawStatusOccurredAt))
+      ? new Date(rawStatusOccurredAt).toISOString()
+      : null;
+  const statusTransitionId = updates.status_transition_id ?? null;
   const parentSessionId = mergedChanges.has('parentId')
     ? (mergedChanges.get('parentId') ?? null)
     : undefined;
@@ -166,6 +206,8 @@ export async function applyMetadataChanges(
         .select({
           title: cli_sessions_v2.title,
           status: cli_sessions_v2.status,
+          statusUpdatedAt: cli_sessions_v2.status_updated_at,
+          statusTransitionId: cli_sessions_v2.status_transition_id,
           parentSessionId: cli_sessions_v2.parent_session_id,
           cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
           cloudAgentSessionScopeId: cli_sessions_v2.cloud_agent_session_scope_id,
@@ -221,8 +263,21 @@ export async function applyMetadataChanges(
       delete updates.created_on_platform;
     }
 
+    const staleStatus =
+      precedesStatusTransition(
+        { occurredAt: statusOccurredAt, transitionId: statusTransitionId },
+        { occurredAt: currentRow.statusUpdatedAt, transitionId: currentRow.statusTransitionId }
+      ) ||
+      (statusOccurredAt !== null &&
+        currentRow.statusTransitionId !== null &&
+        statusTransitionId === currentRow.statusTransitionId);
+    if (staleStatus) {
+      delete updates.status;
+      delete updates.status_updated_at;
+      delete updates.status_transition_id;
+    }
     const statusChange =
-      status === undefined
+      status === undefined || staleStatus
         ? { changed: false, previousStatus: null }
         : (() => {
             // `SessionStatusSchema` is a permissive `z.string()`: a stored status
@@ -340,6 +395,17 @@ export async function applyMetadataChanges(
           and(
             eq(cli_sessions_v2.session_id, sessionId),
             eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
+        );
+    }
+    if (organizationIdWriteApplied) {
+      await tx
+        .update(agent_briefing_events)
+        .set({ organization_id: updates.organization_id ?? null })
+        .where(
+          and(
+            eq(agent_briefing_events.kilo_user_id, kiloUserId),
+            eq(agent_briefing_events.session_id, sessionId)
           )
         );
     }
@@ -594,7 +660,9 @@ export async function flushPartialMetadataChanges(
  * path only — never enters the ingest completion pipeline, so no "Task
  * completed" push can fire. A cleared `permission` also asks for an
  * approval-exempt glanceable refresh: the Approve control must disappear here,
- * ten minutes after the CLI that held it left.
+ * ten minutes after the CLI that held it left. The producer cursor
+ * (`status_transition_id`) is left untouched, so a delayed producer transition
+ * newer than that cursor still applies over this server reset.
  */
 export async function resetAttentionStatusOnCliDisconnect(
   env: Env,
@@ -683,6 +751,18 @@ export async function resetAttentionStatusOnCliDisconnect(
 
     if (!persistedRow) return null;
     if (persistedRow.status !== CLI_DISCONNECT_ATTENTION_RESET_STATUS) return null;
+    await tx
+      .insert(agent_briefing_events)
+      .values({
+        id: JSON.stringify([kiloUserId, sessionId, 'status', statusUpdatedAt]),
+        kilo_user_id: kiloUserId,
+        session_id: sessionId,
+        organization_id: persistedRow.organization_id,
+        kind: 'status',
+        occurred_at: statusUpdatedAt,
+        status: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+      })
+      .onConflictDoNothing();
 
     return {
       previousStatus,

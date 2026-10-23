@@ -252,7 +252,7 @@ const modelStream = (
   selected: Effect.Effect<Wire, ModelError>,
   send: (wire: Wire, handle: AbortHandle | undefined) => Effect.Effect<HttpResponse, ModelError>
 ): Stream.Stream<ModelEvent, ModelError> =>
-  Stream.unwrapScoped(
+  Stream.unwrap(
     Effect.gen(function* () {
       const handle = yield* Effect.acquireRelease(abortHandle(), held =>
         Effect.sync(() => held?.abort())
@@ -270,8 +270,10 @@ const modelStream = (
 
       return Stream.fromEffect(send(wire, handle)).pipe(
         Stream.flatMap(response => chunksOf(response, handle)),
-        Stream.mapConcat(chunk => frames(chunk)),
-        Stream.mapConcatEffect(data => eventsOf(wire, tally, data)),
+        Stream.map(chunk => frames(chunk)),
+        Stream.flattenIterable,
+        Stream.mapEffect(data => eventsOf(wire, tally, data)),
+        Stream.flattenIterable,
         Stream.concat(lastOf(tally))
       );
     })

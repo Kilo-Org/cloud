@@ -58,6 +58,8 @@ export function useHfModelSearch(input: {
   readonly search: string;
   readonly fitsOnly: boolean;
   readonly memoryBytes: number | null;
+  /** Holds the request until it is needed; the last answer for the same input stays cached. */
+  readonly enabled?: boolean;
 }) {
   const maxParameters =
     input.fitsOnly && input.memoryBytes !== null ? maxParametersFor(input.memoryBytes) : undefined;
@@ -71,6 +73,7 @@ export function useHfModelSearch(input: {
     initialPageParam: firstPage,
     getNextPageParam: page => page.next,
     retry,
+    enabled: input.enabled ?? true,
   });
 }
 

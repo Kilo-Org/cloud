@@ -12,6 +12,7 @@ import {
   type WrapperSessionReadyRequest,
 } from '../../src/shared/wrapper-bootstrap.js';
 import type { PreparationStepKind } from '../../src/shared/protocol.js';
+import { parseControlPlaneCredential } from '../../src/shared/control-plane-credential.js';
 import { writeCloudAgentRulesFile } from './cloud-agent-rules-file.js';
 import {
   createSafeProcessDiagnostic,
@@ -362,39 +363,25 @@ async function cleanupWorkspace(
   ]);
 }
 
-function isCodeReviewSession(request: WrapperSessionReadyRequest): boolean {
-  return request.materialized.env.KILO_PLATFORM === 'code-review';
-}
-
-function isBitbucketReviewSession(
-  request: WrapperSessionReadyRequest
-): request is WrapperSessionReadyRequest & {
-  repo: Extract<NonNullable<WrapperSessionReadyRequest['repo']>, { kind: 'git' }>;
-} {
-  const repo = request.repo;
-  return isCodeReviewSession(request) && repo?.kind === 'git' && repo.platform === 'bitbucket';
-}
-
 // Wire-format prefix of a Bitbucket outbound session capability (see the
 // git-token-service BitbucketSessionCapabilityCodec). Presence of a capability
 // qualifies the session for blobless clone; the credential helper authenticates
 // later lazy fetches.
 const BITBUCKET_CAPABILITY_PREFIX = 'kbb1.';
 
-function hasBitbucketReviewCapability(request: WrapperSessionReadyRequest): boolean {
+export function isBloblessReviewCloneEligible(
+  origin: string | undefined,
+  platform: string | undefined,
+  token: string | undefined
+): boolean {
+  if (origin !== 'code-review') return false;
+  if (platform === 'github' || platform === 'gitlab') return true;
   return (
-    isBitbucketReviewSession(request) &&
-    typeof request.repo.token === 'string' &&
-    request.repo.token.startsWith(BITBUCKET_CAPABILITY_PREFIX)
+    platform === 'bitbucket' &&
+    token !== undefined &&
+    (token.startsWith(BITBUCKET_CAPABILITY_PREFIX) ||
+      parseControlPlaneCredential(token)?.purpose === 'bitbucket')
   );
-}
-
-function isBloblessReviewCloneEligible(request: WrapperSessionReadyRequest): boolean {
-  if (!isCodeReviewSession(request)) return false;
-  const repo = request.repo;
-  if (repo?.kind === 'github') return true;
-  if (repo?.kind === 'git' && repo.platform === 'gitlab') return true;
-  return hasBitbucketReviewCapability(request);
 }
 
 async function cloneRepository(
@@ -418,7 +405,11 @@ async function cloneRepository(
   // is retained, so incremental diffs and merge-base still work. See
   // isBloblessReviewCloneEligible for which sessions qualify (GitHub, GitLab, and
   // capability-backed Bitbucket). The credential helper authenticates lazy fetch.
-  const useBlobless = isBloblessReviewCloneEligible(request);
+  const useBlobless = isBloblessReviewCloneEligible(
+    request.materialized.env.KILO_PLATFORM,
+    platform,
+    repo.token
+  );
 
   const runClone = async (blobless: boolean): Promise<ExecResult> => {
     await removePath(request.workspace.workspacePath, signal);

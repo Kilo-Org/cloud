@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -18,11 +18,13 @@ import {
 } from '@/components/profiles/profile-variables-rows';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { KeyRound } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useAgentProfile, useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_VARS: readonly ProfileVarSource[] = [];
@@ -112,7 +114,7 @@ export function ProfileVariablesScreen({
       await deleteVar.mutateAsync({ profileId, key });
     } catch (error) {
       if (!hasUsableMessage(error)) {
-        toast.error(t('profiles.variablesSaveFailed'));
+        toast.error(t('profiles.variablesDeleteFailed'));
       }
       return;
     }
@@ -140,6 +142,7 @@ export function ProfileVariablesScreen({
       initial={initial}
       existingKeys={vars.map(variable => variable.key)}
       isSaving={setVar.isPending}
+      requireValue
       onCancel={closeForm}
       onSave={saveEdit}
     />
@@ -166,7 +169,7 @@ export function ProfileVariablesScreen({
         description={null}
         placement="top"
         action={
-          <Button onPress={startAdd}>
+          <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
             <Text>{t('profiles.addVariable')}</Text>
           </Button>
         }
@@ -207,7 +210,7 @@ export function ProfileVariablesScreen({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('profiles.variablesTitle')} />
-      <ScrollView
+      <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-3 px-6 pt-4 pb-8"
         keyboardShouldPersistTaps="handled"
@@ -215,7 +218,7 @@ export function ProfileVariablesScreen({
         showsVerticalScrollIndicator={false}
       >
         {content}
-      </ScrollView>
+      </TabScreenScrollView>
 
       {dialog}
     </View>

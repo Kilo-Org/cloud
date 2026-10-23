@@ -13,13 +13,13 @@ const EXPECTED_MINIMUM_RELEASE_AGE_MINUTES = 6842;
 
 const BASE_EXCLUDE_ENTRIES = [
   'tsx@4.21.0',
-  'expo-dev-client@57.0.19',
-  'expo-dev-launcher@57.0.20',
-  'expo-dev-menu@57.0.18',
-  'expo-dev-menu-interface@57.0.0',
-  'expo-manifests@57.0.2',
-  'expo-updates-interface@57.0.2',
-  '@expo/schema-utils@57.0.2',
+  'expo-dev-client@58.0.14',
+  'expo-dev-launcher@58.0.14',
+  'expo-dev-menu@58.0.11',
+  'expo-dev-menu-interface@58.0.1',
+  'expo-manifests@58.0.1',
+  'expo-updates-interface@58.0.1',
+  '@expo/schema-utils@58.0.2',
   '@typescript/native-preview@7.0.0-dev.20260514.1',
   '@typescript/native-preview@7.0.0-dev.20251019.1',
   '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260514.1',
@@ -41,7 +41,7 @@ const BASE_EXCLUDE_ENTRIES = [
   '@anthropic-ai/sdk@0.109.1',
   '@kilocode/sdk@7.2.14',
   '@kilocode/sdk@7.2.52',
-  '@kilocode/sdk@7.8.15',
+  '@kilocode/sdk@7.8.1',
   'openclaw@2026.7.1',
 ] as const;
 

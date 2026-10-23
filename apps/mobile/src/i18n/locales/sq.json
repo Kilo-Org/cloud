@@ -269,6 +269,7 @@
     "voiceInput": "Hyrje me zë",
     "autoExpandThinking": "Zgjero automatikisht arsyetimin",
     "autoExpandThinkingSubtitle": "Shfaq arsyetimin e plotë të agjentit pasi të përfundojë.",
+    "autoExpandThinkingInactiveSubtitle": "Nuk ka asnjë efekt kur detajet e arsyetimit janë të fshehura.",
     "hideThinking": "Fshih detajet e arsyetimit",
     "hideThinkingSubtitle": "Mos shfaq arsyetimin e agjentit në faqen e seancës.",
     "keepScreenOn": "Mbaje ekranin ndezur në faqen e seancës",

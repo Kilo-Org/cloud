@@ -269,6 +269,7 @@
     "voiceInput": "Ntinye olu",
     "autoExpandThinking": "Gbasaa echiche na-akpaghị aka",
     "autoExpandThinkingSubtitle": "Gosi echiche onye nnọchi anya n'ụzọ zuru ezu mgbe ọ mechara iche echiche.",
+    "autoExpandThinkingInactiveSubtitle": "Enweghị mmetụta mgbe a zoo nkọwa echiche.",
     "hideThinking": "Zoo nkọwa echiche",
     "hideThinkingSubtitle": "Eg osi echiche onye nnọchi anya na ibe nnọkọ.",
     "keepScreenOn": "Hapụ ihuenyo ka ọ na-enwu n'ibe nnọkọ",

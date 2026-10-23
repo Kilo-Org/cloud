@@ -269,6 +269,7 @@
     "voiceInput": "Галасавы ўвод",
     "autoExpandThinking": "Аўтаматычна разгортваць развагі",
     "autoExpandThinkingSubtitle": "Паказваць развагі агента разгорнутымі пасля іх завяршэння.",
+    "autoExpandThinkingInactiveSubtitle": "Не дзейнічае, калі падрабязнасці разваг схаваны.",
     "hideThinking": "Хаваць падрабязнасці разваг",
     "hideThinkingSubtitle": "Не паказваць развагі агента на старонцы сеанса.",
     "keepScreenOn": "Не выключаць экран на старонцы сеанса",

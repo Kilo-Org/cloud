@@ -269,6 +269,7 @@
     "voiceInput": "音声入力",
     "autoExpandThinking": "思考を自動展開",
     "autoExpandThinkingSubtitle": "エージェントの思考が終了したときに展開して表示します。",
+    "autoExpandThinkingInactiveSubtitle": "思考の詳細が非表示の場合は効果がありません。",
     "hideThinking": "思考の詳細を非表示",
     "hideThinkingSubtitle": "セッション画面でエージェントの思考を表示しません。",
     "keepScreenOn": "セッション画面で画面を常時オン",

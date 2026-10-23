@@ -269,6 +269,7 @@
     "voiceInput": "Tāuru reo",
     "autoExpandThinking": "Whakawhānuitia aunoa te whakaaro",
     "autoExpandThinkingSubtitle": "Whakaaturia katoatia ngā whakaaro o te māngai ina oti tana whakaaro.",
+    "autoExpandThinkingInactiveSubtitle": "Kāore he pānga ina hunaia ngā taipitopito o te whakaaro.",
     "hideThinking": "Hunaia ngā taipitopito o te whakaaro",
     "hideThinkingSubtitle": "Kaua e whakaatu ngā whakaaro o te māngai i te whārangi wātū.",
     "keepScreenOn": "Whakakā tonutia te mata i te whārangi wātū",

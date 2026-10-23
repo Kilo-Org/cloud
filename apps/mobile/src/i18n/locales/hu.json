@@ -269,6 +269,7 @@
     "voiceInput": "Hangbevitel",
     "autoExpandThinking": "Gondolkodás automatikus kibontása",
     "autoExpandThinkingSubtitle": "Az ügynök gondolatmenete automatikusan megjelenik kibontva, amint elkészül.",
+    "autoExpandThinkingInactiveSubtitle": "Nincs hatása, amíg a gondolkodás részletei el vannak rejtve.",
     "hideThinking": "Gondolkodás részleteinek elrejtése",
     "hideThinkingSubtitle": "Ne jelenjen meg az ügynök gondolkodása a munkamenet oldalán.",
     "keepScreenOn": "Képernyő bekapcsolva tartása a munkamenet oldalán",

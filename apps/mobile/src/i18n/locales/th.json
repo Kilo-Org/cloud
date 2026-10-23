@@ -269,6 +269,7 @@
     "voiceInput": "การป้อนเสียง",
     "autoExpandThinking": "ขยายกระบวนการคิดอัตโนมัติ",
     "autoExpandThinkingSubtitle": "ขยายรายละเอียดกระบวนการคิดของเอเจนต์เมื่อคิดเสร็จ",
+    "autoExpandThinkingInactiveSubtitle": "ไม่มีผลขณะที่ซ่อนรายละเอียดการคิดอยู่",
     "hideThinking": "ซ่อนรายละเอียดการคิด",
     "hideThinkingSubtitle": "ไม่แสดงการคิดของเอเจนต์ในหน้าเซสชัน",
     "keepScreenOn": "เปิดหน้าจอค้างไว้ขณะอยู่ในหน้าเซสชัน",

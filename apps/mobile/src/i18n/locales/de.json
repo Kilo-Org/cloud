@@ -269,6 +269,7 @@
     "voiceInput": "Spracheingabe",
     "autoExpandThinking": "Denkprozess automatisch aufklappen",
     "autoExpandThinkingSubtitle": "Den Denkprozess des Agenten nach Abschluss aufgeklappt anzeigen.",
+    "autoExpandThinkingInactiveSubtitle": "Keine Auswirkung, solange Denkdetails ausgeblendet sind.",
     "hideThinking": "Denkdetails ausblenden",
     "hideThinkingSubtitle": "Den Denkprozess des Agenten nicht auf der Sitzungsseite anzeigen.",
     "keepScreenOn": "Bildschirm in der Sitzungsansicht eingeschaltet lassen",

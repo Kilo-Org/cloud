@@ -269,6 +269,7 @@
     "voiceInput": "Steminvoer",
     "autoExpandThinking": "Vou denke outomaties uit",
     "autoExpandThinkingSubtitle": "Wys die agent se denke volledig wanneer dit klaar gedink het.",
+    "autoExpandThinkingInactiveSubtitle": "Geen uitwerking terwyl denke-besonderhede versteek is nie.",
     "hideThinking": "Versteek denke-besonderhede",
     "hideThinkingSubtitle": "Moenie die agent se denke op die sessiebladsy wys nie.",
     "keepScreenOn": "Hou die skerm aan op die sessiebladsy",

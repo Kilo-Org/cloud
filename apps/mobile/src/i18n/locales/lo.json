@@ -269,6 +269,7 @@
     "voiceInput": "ການປ້ອນສຽງ",
     "autoExpandThinking": "ຂະຫຍາຍສ່ວນການຄິດອັດຕະໂນມັດ",
     "autoExpandThinkingSubtitle": "ຂະຫຍາຍສ່ວນການຄິດຂອງຕົວແທນໃຫ້ເຫັນທັງໝົດເມື່ອຄິດສຳເລັດ.",
+    "autoExpandThinkingInactiveSubtitle": "ບໍ່ມີຜົນເມື່ອເຊື່ອງລາຍລະອຽດການຄິດ.",
     "hideThinking": "ເຊື່ອງລາຍລະອຽດການຄິດ",
     "hideThinkingSubtitle": "ບໍ່ສະແດງການຄິດຂອງຕົວແທນໃນໜ້າເຊສຊັນ.",
     "keepScreenOn": "ເປີດໜ້າຈໍໄວ້ໃນຂະນະຢູ່ໜ້າເຊສຊັນ",

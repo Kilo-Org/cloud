@@ -269,6 +269,7 @@
     "voiceInput": "Ukufaka ngezwi",
     "autoExpandThinking": "Nweba ukucabanga ngokuzenzakalelayo",
     "autoExpandThinkingSubtitle": "Bonisa ukucabanga komenzeli kunwetshiwe uma eseqedile ukucabanga.",
+    "autoExpandThinkingInactiveSubtitle": "Ayinampembelele uma imininingwane yokucabanga efihliwe.",
     "hideThinking": "Fihla imininingwane yokucabanga",
     "hideThinkingSubtitle": "Ungakubonisi ukucabanga komenzeli ekhasini leseshini.",
     "keepScreenOn": "Gcina isikrini sivuliwe ngenkathi usekhasini leseshini",

@@ -269,6 +269,7 @@
     "voiceInput": "Glasovni unos",
     "autoExpandThinking": "Automatski proširi razmišljanje",
     "autoExpandThinkingSubtitle": "Prikaži cijelo razmišljanje agenta nakon što završi.",
+    "autoExpandThinkingInactiveSubtitle": "Nema učinka dok su pojedinosti razmišljanja skrivene.",
     "hideThinking": "Sakrij pojedinosti razmišljanja",
     "hideThinkingSubtitle": "Ne prikazuj razmišljanje agenta na zaslonu sesije.",
     "keepScreenOn": "Zadrži zaslon uključenim na zaslonu sesije",

@@ -269,6 +269,7 @@
     "voiceInput": "Ionchur gutha",
     "autoExpandThinking": "Leathnaigh an machnamh go huathoibríoch",
     "autoExpandThinkingSubtitle": "Taispeáin machnamh an ghníomhaire ina iomláine nuair a chríochnaíonn sé.",
+    "autoExpandThinkingInactiveSubtitle": "Níl aon éifeacht agus sonraí an mhachnaimh i bhfolach.",
     "hideThinking": "Folaigh sonraí an mhachnaimh",
     "hideThinkingSubtitle": "Ná taispeáin machnamh an ghníomhaire ar leathanach an tseisiúin.",
     "keepScreenOn": "Coinnigh an scáileán ar siúl ar leathanach an tseisiúin",

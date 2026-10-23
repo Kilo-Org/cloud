@@ -269,6 +269,7 @@
     "voiceInput": "语音输入",
     "autoExpandThinking": "自动展开思考过程",
     "autoExpandThinkingSubtitle": "智能体思考结束后，自动展开思考过程。",
+    "autoExpandThinkingInactiveSubtitle": "思考详情处于隐藏状态时不产生任何效果。",
     "hideThinking": "隐藏思考详情",
     "hideThinkingSubtitle": "不在会话页面显示智能体的思考过程。",
     "keepScreenOn": "在会话页面保持屏幕常亮",

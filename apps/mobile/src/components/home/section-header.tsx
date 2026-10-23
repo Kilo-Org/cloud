@@ -80,7 +80,7 @@ export function SectionHeader({
           // the same box, so hiding it still cannot resize the header.
           className={cn(
             textActionTargetClass(),
-            'max-w-full shrink-0 flex-row items-center active:opacity-70',
+            'max-w-full shrink-0 flex-row items-center justify-center active:opacity-70',
             actionHidden && 'opacity-0'
           )}
         >

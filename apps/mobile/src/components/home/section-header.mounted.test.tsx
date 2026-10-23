@@ -286,37 +286,34 @@ describe('SectionHeader mounted layout', () => {
   });
 
   it.each([
-    ['ios', 'min-h-[44px]'],
-    ['android', 'min-h-[48px]'],
-  ])('gives the action its own %s touch-target frame, visible or hidden', (os, frame) => {
-    // Field defect: the action's only child is one 11px label line, so its own
-    // rect was that line (~15pt on device) and a size audit reads exactly that
-    // rect — hitSlop never widens it. The hidden action keeps the same box, so
-    // hiding the action still cannot resize the header.
-    platform.OS = os;
-    const visible = mount(
-      createElement(SectionHeader, {
-        label: 'Live now',
-        actionLabel: 'See all',
-        onActionPress: () => undefined,
-      })
-    );
-    const action = visible.findByProps({ accessibilityRole: 'button' });
-    expect(action.props.className).toContain(frame);
-    expect(action.props.hitSlop).toBeUndefined();
-
-    act(() => renderer?.unmount());
-    renderer = undefined;
-    const hidden = mount(
-      createElement(SectionHeader, {
-        label: 'Live now',
-        actionLabel: 'See all',
-        onActionPress: () => undefined,
-        actionHidden: true,
-      })
-    ).find(node => Object.is(node.type, 'Pressable'));
-    expect(hidden.props.className).toContain(frame);
-  });
+    ['ios', 'min-h-[44px]', 'min-w-[44px]'],
+    ['android', 'min-h-[48px]', 'min-w-[48px]'],
+  ])(
+    'gives the action its own %s touch-target frame on both axes, visible or hidden',
+    (os, height, width) => {
+      // Field defect: the action's only child is one 11px label line, so its own
+      // rect was that line (~15pt on device) and a size audit reads exactly that
+      // rect — hitSlop never widens it. The width floor matters too because the
+      // hit slop is gone: a short label is a couple of glyphs wide. The hidden
+      // action keeps the same box, so hiding the action still cannot resize the
+      // header.
+      platform.OS = os;
+      const props = { label: 'Live now', actionLabel: 'See all', onActionPress: () => undefined };
+      const action = mount(createElement(SectionHeader, props)).findByProps({
+        accessibilityRole: 'button',
+      });
+      const frame = `${height} ${width}`;
+      expect(action.props.className).toContain(frame);
+      expect(action.props.className).toContain('justify-center');
+      expect(action.props.hitSlop).toBeUndefined();
+      act(() => renderer?.unmount());
+      renderer = undefined;
+      const hidden = mount(createElement(SectionHeader, { ...props, actionHidden: true })).find(
+        node => Object.is(node.type, 'Pressable')
+      );
+      expect(hidden.props.className).toContain(frame);
+    }
+  );
 
   it.each<Partial<ComponentProps<typeof SectionHeader>>>([
     {},

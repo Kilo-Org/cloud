@@ -3536,8 +3536,6 @@
       "quantizations": "Mga quantization",
       "quantizationsHelp": "Mas kaunting memory at storage ang ginagamit ng mas maliliit na file. Kadalasang mas mahusay ang sagot ng mas malalaking file.",
       "quantDetail": "{{size}} na download · mga {{memory}} ng memory",
-      "downloadQuant": "I-download ang {{quant}}",
-      "downloadModelA11y": "I-download ang {{name}}",
       "detailsA11y": "Mga detalye: {{name}}",
       "loadingModel": "Nilo-load ang mga detalye ng modelo",
       "couldNotLoadModel": "Hindi ma-load ang modelong ito",

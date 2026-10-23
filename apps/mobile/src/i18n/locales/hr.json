@@ -3578,8 +3578,6 @@
       "quantizations": "Kvantizacije",
       "quantizationsHelp": "Manje datoteke troše manje memorije i prostora. Veće datoteke obično daju bolje odgovore.",
       "quantDetail": "Preuzimanje {{size}} · oko {{memory}} memorije",
-      "downloadQuant": "Preuzmi {{quant}}",
-      "downloadModelA11y": "Preuzmi {{name}}",
       "detailsA11y": "Detalji: {{name}}",
       "loadingModel": "Učitavanje pojedinosti o modelu",
       "couldNotLoadModel": "Učitavanje ovog modela nije uspjelo",

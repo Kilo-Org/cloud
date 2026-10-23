@@ -48,8 +48,12 @@ type ControlsProps = {
   readonly name: string;
   readonly snapshot: GgufDownloadsSnapshot;
   readonly onDownload: (() => void) | undefined;
-  /** Tells one download button from the others on the same screen. */
-  readonly downloadLabel?: string;
+  /**
+   * The quant or model name that tells this download button from the others on
+   * the same screen. The accessible name appends it to the visible label, so a
+   * spoken label still matches what the button shows.
+   */
+  readonly downloadDetail?: string;
 };
 
 /** One model's state on the device: downloaded, downloading, or ready to download. */
@@ -58,7 +62,7 @@ export function GgufDownloadControls({
   name,
   snapshot,
   onDownload,
-  downloadLabel,
+  downloadDetail,
 }: ControlsProps) {
   const { t, i18n } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
@@ -66,6 +70,13 @@ export function GgufDownloadControls({
   const download = snapshot.download?.fileId === fileId ? snapshot.download : undefined;
   const failure = snapshot.failure?.fileId === fileId ? snapshot.failure : undefined;
   const size = (bytes: number) => formatFileSize(bytes, i18n.language);
+  const downloadText = t('modelChat.gguf.download');
+  // A voice-control user asks for the row by what it shows, so the accessible
+  // name starts with that visible label and appends the one detail that tells
+  // the rows apart. Callers pass data (a quant label, a model name), never a
+  // whole sentence, so no wording can drop the visible label.
+  const downloadA11yLabel =
+    downloadDetail === undefined ? undefined : `${downloadText} (${downloadDetail})`;
   return (
     <>
       {record !== undefined && (
@@ -136,9 +147,9 @@ export function GgufDownloadControls({
           variant="outline"
           disabled={snapshot.download !== null}
           onPress={onDownload}
-          accessibilityLabel={downloadLabel}
+          accessibilityLabel={downloadA11yLabel}
         >
-          <Text>{t('modelChat.gguf.download')}</Text>
+          <Text>{downloadText}</Text>
         </Button>
       )}
       {failure !== undefined && (

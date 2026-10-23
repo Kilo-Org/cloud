@@ -3536,8 +3536,6 @@
       "quantizations": "ક્વૉન્ટાઇઝેશન્સ",
       "quantizationsHelp": "નાની ફાઇલો ઓછી મેમરી અને સ્ટોરેજ વાપરે છે. મોટી ફાઇલો સામાન્ય રીતે વધુ સારા જવાબો આપે છે.",
       "quantDetail": "{{size}} ડાઉનલોડ · આશરે {{memory}} મેમરી",
-      "downloadQuant": "{{quant}} ડાઉનલોડ કરો",
-      "downloadModelA11y": "{{name}} ડાઉનલોડ કરો",
       "detailsA11y": "વિગતો: {{name}}",
       "loadingModel": "મોડેલની વિગતો લોડ થઈ રહી છે",
       "couldNotLoadModel": "આ મોડેલ લોડ કરી શકાયું નહીં",

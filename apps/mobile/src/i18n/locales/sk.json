@@ -3620,8 +3620,6 @@
       "quantizations": "Kvantizácie",
       "quantizationsHelp": "Menšie súbory zaberajú menej pamäte a úložiska. Väčšie súbory zvyčajne dávajú lepšie odpovede.",
       "quantDetail": "Na stiahnutie {{size}} · približne {{memory}} pamäte",
-      "downloadQuant": "Stiahnuť {{quant}}",
-      "downloadModelA11y": "Stiahnuť {{name}}",
       "detailsA11y": "Podrobnosti: {{name}}",
       "loadingModel": "Načítavajú sa podrobnosti modelu",
       "couldNotLoadModel": "Tento model sa nepodarilo načítať",

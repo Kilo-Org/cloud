@@ -3536,8 +3536,6 @@
       "quantizations": "Квантчлалууд",
       "quantizationsHelp": "Жижиг файл бага санах ой, сан ашиглана. Том файл ихэвчлэн илүү сайн хариулт өгдөг.",
       "quantDetail": "{{size}} татна · ойролцоогоор {{memory}} санах ой",
-      "downloadQuant": "{{quant}} татах",
-      "downloadModelA11y": "{{name}} татах",
       "detailsA11y": "Дэлгэрэнгүй: {{name}}",
       "loadingModel": "Загварын дэлгэрэнгүйг ачаалж байна",
       "couldNotLoadModel": "Энэ загварыг ачаалж чадсангүй",

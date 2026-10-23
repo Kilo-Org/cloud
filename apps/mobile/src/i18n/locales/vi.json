@@ -3536,8 +3536,6 @@
       "quantizations": "Lượng tử hóa",
       "quantizationsHelp": "Tệp nhỏ hơn dùng ít bộ nhớ và dung lượng hơn. Tệp lớn hơn thường cho câu trả lời tốt hơn.",
       "quantDetail": "Tải xuống {{size}} · khoảng {{memory}} bộ nhớ",
-      "downloadQuant": "Tải {{quant}} xuống",
-      "downloadModelA11y": "Tải {{name}} xuống",
       "detailsA11y": "Chi tiết: {{name}}",
       "loadingModel": "Đang tải chi tiết mô hình",
       "couldNotLoadModel": "Không thể tải mô hình này",

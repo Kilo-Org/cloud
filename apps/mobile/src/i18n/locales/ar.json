@@ -3704,8 +3704,6 @@
       "quantizations": "إصدارات التكميم",
       "quantizationsHelp": "تستهلك الملفات الأصغر ذاكرة ومساحة تخزين أقل. وتقدّم الملفات الأكبر عادةً إجابات أفضل.",
       "quantDetail": "تنزيل بحجم {{size}} · نحو {{memory}} من الذاكرة",
-      "downloadQuant": "تنزيل {{quant}}",
-      "downloadModelA11y": "تنزيل {{name}}",
       "detailsA11y": "التفاصيل: {{name}}",
       "loadingModel": "جارٍ تحميل تفاصيل النموذج",
       "couldNotLoadModel": "تعذّر تحميل هذا النموذج",

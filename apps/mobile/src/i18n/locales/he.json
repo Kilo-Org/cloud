@@ -3578,8 +3578,6 @@
       "quantizations": "קוונטיזציות",
       "quantizationsHelp": "קבצים קטנים יותר צורכים פחות זיכרון ואחסון. קבצים גדולים יותר בדרך כלל נותנים תשובות טובות יותר.",
       "quantDetail": "הורדה של {{size}} · כ-{{memory}} זיכרון",
-      "downloadQuant": "הורד {{quant}}",
-      "downloadModelA11y": "הורד {{name}}",
       "detailsA11y": "פרטים: {{name}}",
       "loadingModel": "טוען פרטי מודל",
       "couldNotLoadModel": "לא ניתן לטעון את המודל הזה",

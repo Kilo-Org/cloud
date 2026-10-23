@@ -3536,8 +3536,6 @@
       "quantizations": "Ama-quantization",
       "quantizationsHelp": "Amafayela amancane asebenzisa inkumbulo nendawo yokugcina encane. Amafayela amakhulu ngokuvamile anikeza izimpendulo ezingcono.",
       "quantDetail": "Ukulanda okungu-{{size}} · cishe u-{{memory}} wenkumbulo",
-      "downloadQuant": "Landa i-{{quant}}",
-      "downloadModelA11y": "Landa i-{{name}}",
       "detailsA11y": "Imininingwane: {{name}}",
       "loadingModel": "Ilayisha imininingwane yemodeli",
       "couldNotLoadModel": "Ayikwazanga ukulayisha le modeli",

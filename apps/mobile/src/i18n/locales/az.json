@@ -3536,8 +3536,6 @@
       "quantizations": "Kvantlaşdırmalar",
       "quantizationsHelp": "Kiçik fayllar daha az yaddaş və yer tutur. Böyük fayllar adətən daha yaxşı cavablar verir.",
       "quantDetail": "{{size}} yükləmə · təxminən {{memory}} yaddaş",
-      "downloadQuant": "{{quant}} yüklə",
-      "downloadModelA11y": "{{name}} yüklə",
       "detailsA11y": "Detallar: {{name}}",
       "loadingModel": "Model məlumatları yüklənir",
       "couldNotLoadModel": "Bu modeli yükləmək mümkün olmadı",

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
 import { defineConfig, type Plugin } from 'vitest/config';
+import { binaryAsArrayBuffer } from './test/plugins/binary-as-arraybuffer.js';
 
 // Mirrors the wrangler.jsonc Text rule for `**/*.sql`: Durable Object migrations
 // import migration SQL as modules. `vitest related` analyzes every test file's
@@ -13,27 +13,6 @@ const sqlAsText: Plugin = {
     const file = id.split('?')[0];
     if (!file.endsWith('.sql')) return null;
     return `export default ${JSON.stringify(readFileSync(file, 'utf8'))};`;
-  },
-};
-
-// Mirrors the wrangler.jsonc Data rule for `**/*.js?binary`: the Vercel BYOC
-// runtime bundles the built wrapper as binary data. Without this loader Vite
-// executes the bundle as JavaScript.
-const binaryAsArrayBuffer: Plugin = {
-  name: 'wrangler-binary-as-arraybuffer',
-  enforce: 'pre',
-  resolveId(source, importer) {
-    if (!source.endsWith('?binary') || !importer) return null;
-    return resolve(dirname(importer), source.slice(0, -'?binary'.length)) + '?binary';
-  },
-  load(id) {
-    if (!id.endsWith('?binary')) return null;
-    const file = id.slice(0, -'?binary'.length);
-    return [
-      "import { readFileSync } from 'node:fs';",
-      `const bytes = readFileSync(${JSON.stringify(file)});`,
-      'export default bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);',
-    ].join('\n');
   },
 };
 

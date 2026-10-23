@@ -1,11 +1,13 @@
 import { createRequire } from 'node:module';
 import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
 import { defineConfig } from 'vitest/config';
+import { binaryAsArrayBuffer } from './test/plugins/binary-as-arraybuffer.js';
 
 // Integration tests - run in Cloudflare Workers runtime via Miniflare
 // Use cloudflare:test utilities: env, runInDurableObject, createMessageBatch, etc.
 export default defineConfig({
   plugins: [
+    binaryAsArrayBuffer,
     {
       name: 'fix-pg-cjs-dependencies',
       enforce: 'pre',

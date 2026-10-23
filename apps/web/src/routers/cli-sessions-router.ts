@@ -276,8 +276,9 @@ async function getForkableSession(
 }
 
 /**
- * Publish the current session folder under its stable share id. Blob urls are
- * updated only after all source objects have passed the copy size check.
+ * Publish the current session folder under its stable share id. Lock the row
+ * while copying so concurrent refreshes cannot interleave writes to the same
+ * object keys.
  */
 async function createSharedSessionCopy(params: {
   kiloUserId: string;
@@ -285,12 +286,29 @@ async function createSharedSessionCopy(params: {
   sharedState: string;
 }): Promise<{ share_id: string; session_id: string }> {
   const shareId = await reserveSharedSession(params);
-  const blobUrls = await copySessionBlobs(params.sessionId, 'sessions', shareId, 'shared-sessions');
-  const [completed] = await db
-    .update(sharedCliSessions)
-    .set(blobUrlColumns(blobUrls))
-    .where(eq(sharedCliSessions.share_id, shareId))
-    .returning({ share_id: sharedCliSessions.share_id });
+  const completed = await db.transaction(async tx => {
+    const [lockedShare] = await tx
+      .select({ share_id: sharedCliSessions.share_id })
+      .from(sharedCliSessions)
+      .where(eq(sharedCliSessions.share_id, shareId))
+      .for('update');
+
+    if (!lockedShare) return false;
+
+    const blobUrls = await copySessionBlobs(
+      params.sessionId,
+      'sessions',
+      shareId,
+      'shared-sessions'
+    );
+    const [updated] = await tx
+      .update(sharedCliSessions)
+      .set(blobUrlColumns(blobUrls))
+      .where(eq(sharedCliSessions.share_id, shareId))
+      .returning({ share_id: sharedCliSessions.share_id });
+
+    return Boolean(updated);
+  });
 
   if (!completed) {
     try {
@@ -561,8 +579,18 @@ export const cliSessionsRouter = createTRPCRouter({
       .from(sharedCliSessions)
       .where(eq(sharedCliSessions.session_id, session_id));
     for (const share of shares) {
-      await deleteShareBlobsWithRetry(share.share_id);
-      await db.delete(sharedCliSessions).where(eq(sharedCliSessions.share_id, share.share_id));
+      await db.transaction(async tx => {
+        const [lockedShare] = await tx
+          .select({ share_id: sharedCliSessions.share_id })
+          .from(sharedCliSessions)
+          .where(eq(sharedCliSessions.share_id, share.share_id))
+          .for('update');
+
+        if (!lockedShare) return;
+
+        await deleteShareBlobsWithRetry(share.share_id);
+        await tx.delete(sharedCliSessions).where(eq(sharedCliSessions.share_id, share.share_id));
+      });
     }
 
     await deleteBlobs(session_id, sessionBlobRefs('sessions'));

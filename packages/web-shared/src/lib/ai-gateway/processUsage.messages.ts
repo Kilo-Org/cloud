@@ -132,7 +132,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
   openrouterRequestSpan: Span | undefined,
   provider: ProviderId,
   statusCode: number,
-  userByok: boolean
+  usesUserCredentials: boolean
 ): Promise<MicrodollarUsageStats> {
   openrouterRequestSpan?.end();
   const streamProcessingSpan = startInactiveSpan({
@@ -189,7 +189,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
           label: 'Messages API stream error',
           source: 'messages_sse_processing',
           error: json.error ?? {},
-          userByok,
+          usesUserCredentials,
           logContext: { provider, inference_provider, messageId, model },
           sentryExtra: { json, event },
         });

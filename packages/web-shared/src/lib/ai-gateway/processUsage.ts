@@ -1084,6 +1084,9 @@ export function countAndStoreUsage(
     }
   };
 
+  const usesUserCredentials =
+    usageContext.user_byok || usageContext.provider === OPENAI_CHATGPT_PROVIDER_ID;
+
   if (clonedReponse.body) {
     if (usageContext.api_kind === 'responses') {
       usageStatsPromise = usageContext.isStreaming
@@ -1093,7 +1096,7 @@ export function countAndStoreUsage(
             openrouterRequestSpan,
             usageContext.provider,
             clonedReponse.status,
-            usageContext.user_byok
+            usesUserCredentials
           )
         : parseResponseText(content =>
             parseResponsesMicrodollarUsageFromString(content, clonedReponse.status)
@@ -1107,7 +1110,7 @@ export function countAndStoreUsage(
             openrouterRequestSpan,
             usageContext.provider,
             clonedReponse.status,
-            usageContext.user_byok
+            usesUserCredentials
           )
         : parseResponseText(content =>
             parseMicrodollarUsageFromString(content, usageContext.kiloUserId, clonedReponse.status)
@@ -1121,7 +1124,7 @@ export function countAndStoreUsage(
             openrouterRequestSpan,
             usageContext.provider,
             clonedReponse.status,
-            usageContext.user_byok
+            usesUserCredentials
           )
         : parseResponseText(content =>
             parseMessagesMicrodollarUsageFromString(content, clonedReponse.status)
@@ -1163,7 +1166,7 @@ export async function parseMicrodollarUsageFromStream(
   openrouterRequestSpan: Span | undefined,
   provider: ProviderId,
   statusCode: number,
-  userByok: boolean
+  usesUserCredentials: boolean
 ): Promise<MicrodollarUsageStats> {
   // End the request span immediately as this function starts
   openrouterRequestSpan?.end();
@@ -1222,7 +1225,7 @@ export async function parseMicrodollarUsageFromStream(
           label: 'OpenRouter error',
           source: 'sse_processing',
           error,
-          userByok,
+          usesUserCredentials,
           logContext: {
             provider,
             inference_provider: json.provider ?? inference_provider,

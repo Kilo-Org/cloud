@@ -413,14 +413,14 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
       jest.restoreAllMocks();
     });
 
-    const parseError = (error: object, userByok: boolean) =>
+    const parseError = (error: object, usesUserCredentials: boolean) =>
       parseMessagesMicrodollarUsageFromStream(
         streamFromText(`event: error\ndata: ${JSON.stringify({ type: 'error', error })}\n\n`),
         'fake-user-id',
         undefined,
         'openrouter',
         200,
-        userByok
+        usesUserCredentials
       );
 
     test('logs transient stream errors without reporting to Sentry', async () => {
@@ -458,7 +458,7 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
       );
     });
 
-    test('only logs authentication errors on user BYOK keys', async () => {
+    test('only logs authentication errors on user credentials', async () => {
       const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
       await parseError({ type: 'authentication_error', message: 'invalid x-api-key' }, true);

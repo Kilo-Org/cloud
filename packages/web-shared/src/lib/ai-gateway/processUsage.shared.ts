@@ -165,6 +165,8 @@ const ACCOUNT_ERROR_TYPES = new Set<unknown>([
   'permission_error',
   'billing_error',
   'invalid_api_key',
+  'insufficient_quota',
+  'billing_hard_limit_reached',
 ]);
 
 type UpstreamStreamError = {
@@ -189,20 +191,22 @@ function isAccountError(error: UpstreamStreamError): boolean {
  * Reports an error event received inside an upstream SSE stream. Transient
  * upstream failures (timeouts, overloads, dropped streams) are only logged, since
  * they are frequent and not actionable. Authentication, permission, and billing
- * failures on Kilo-owned credentials are sent to Sentry, since Kilo's provider
- * keys or upstream account need attention. On user BYOK keys they are logged.
+ * failures on Kilo-owned credentials, including organization custom LLM keys,
+ * are sent to Sentry, since Kilo's provider keys or upstream account need
+ * attention. On user credentials (BYOK keys, ChatGPT subscriptions) they are
+ * logged.
  */
 export function reportUpstreamStreamError(params: {
   label: string;
   source: string;
   error: UpstreamStreamError;
-  userByok: boolean;
+  usesUserCredentials: boolean;
   logContext: Record<string, unknown>;
   sentryExtra: Record<string, unknown>;
 }) {
-  const { label, source, error, userByok, logContext, sentryExtra } = params;
+  const { label, source, error, usesUserCredentials, logContext, sentryExtra } = params;
   const message = `${label}: ${error.message ?? 'unknown'}`;
-  if (!userByok && isAccountError(error)) {
+  if (!usesUserCredentials && isAccountError(error)) {
     captureException(new Error(message), { tags: { source }, extra: sentryExtra });
     return;
   }
@@ -210,7 +214,7 @@ export function reportUpstreamStreamError(params: {
     source,
     code: error.code,
     error_type: error.error_type ?? error.metadata?.error_type ?? error.type,
-    user_byok: userByok,
+    uses_user_credentials: usesUserCredentials,
     ...logContext,
   });
 }

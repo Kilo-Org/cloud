@@ -352,7 +352,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       jest.restoreAllMocks();
     });
 
-    const parseChunks = (chunks: object[], userByok = false) =>
+    const parseChunks = (chunks: object[], usesUserCredentials = false) =>
       parseMicrodollarUsageFromStream(
         new ReadableStream<Uint8Array>({
           start(controller) {
@@ -367,7 +367,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
         undefined,
         'openrouter',
         200,
-        userByok
+        usesUserCredentials
       );
 
     test.each([
@@ -399,7 +399,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
         source: 'sse_processing',
         code: error.code,
         error_type: error.metadata?.error_type,
-        user_byok: false,
+        uses_user_credentials: false,
         provider: 'openrouter',
         inference_provider: 'Nvidia',
         messageId: 'gen-transient',
@@ -436,13 +436,13 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       );
     });
 
-    test('only logs account errors when the user brought their own key', async () => {
+    test('only logs account errors on user credentials', async () => {
       await parseChunks([{ choices: [], error: { code: 401, message: 'Invalid API key' } }], true);
 
       expect(captureException).not.toHaveBeenCalled();
       expect(console.warn).toHaveBeenCalledWith(
         'OpenRouter error: Invalid API key',
-        expect.objectContaining({ code: 401, user_byok: true })
+        expect.objectContaining({ code: 401, uses_user_credentials: true })
       );
     });
 
@@ -1579,6 +1579,52 @@ describe('logMicrodollarUsage', () => {
     });
     expect((await findUserById(user.id))?.microdollars_used).toBe(userByok ? 1000 : 1700);
   });
+
+  test.each([
+    { provider: 'openrouter', user_byok: false, reportsToSentry: true },
+    { provider: 'custom', user_byok: false, reportsToSentry: true },
+    { provider: 'openrouter', user_byok: true, reportsToSentry: false },
+    { provider: 'openai-chatgpt', user_byok: false, reportsToSentry: false },
+  ] as const)(
+    'reports in-stream auth errors to Sentry=$reportsToSentry for provider $provider with user BYOK=$user_byok',
+    async ({ provider, user_byok, reportsToSentry }) => {
+      jest.mocked(captureException).mockClear();
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const user = await insertTestUser({
+        id: `test-stream-auth-error-${provider}-${user_byok}`,
+        microdollars_used: 0,
+        google_user_email: `stream-auth-error-${provider}-${user_byok}@example.com`,
+      });
+      const errorEvent = {
+        type: 'error',
+        error: { code: 'invalid_api_key', message: 'Incorrect API key provided' },
+      };
+
+      try {
+        await countAndStoreUsage(
+          new Response(`data: ${JSON.stringify(errorEvent)}\n\n`),
+          { ...createBaseUsageContext(user), api_kind: 'responses', provider, user_byok },
+          undefined
+        );
+
+        const authError = new Error('Responses API error: Incorrect API key provided');
+        const authErrorContext = expect.objectContaining({
+          tags: { source: 'responses_sse_processing' },
+        });
+        if (reportsToSentry) {
+          expect(captureException).toHaveBeenCalledWith(authError, authErrorContext);
+        } else {
+          expect(captureException).not.toHaveBeenCalledWith(authError, authErrorContext);
+          expect(warn).toHaveBeenCalledWith(
+            'Responses API error: Incorrect API key provided',
+            expect.objectContaining({ uses_user_credentials: true })
+          );
+        }
+      } finally {
+        warn.mockRestore();
+      }
+    }
+  );
 
   test('preserves a paid snapshot when the requested id later becomes a custom model', async () => {
     const user = await insertTestUser({

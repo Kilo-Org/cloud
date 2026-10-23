@@ -572,7 +572,7 @@ async function handleManagedGitHubOutbound(
     return new Response('GitHub authorization unavailable', { status: 502 });
   }
 
-  const headersToApply = { authorization: result.authorization };
+  const headersToApply = { authorization: result.authorization ?? undefined };
   let response: Response;
   try {
     if (!isGitHubGitUploadRetryableRequest(request)) {

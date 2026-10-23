@@ -267,7 +267,8 @@ type IssueGitHubSessionCapabilityResult =
 type RedeemGitHubSessionCapabilityResult =
   | {
       success: true;
-      authorization: string;
+      /** Null means the request is forwarded anonymously. */
+      authorization: string | null;
       installationId?: string;
       source?: 'user' | 'installation';
       appType?: 'standard' | 'lite';

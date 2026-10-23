@@ -4,6 +4,7 @@ import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 
 import {
   firstGrapheme,
+  foldDecimalDigits,
   formatCalendarDate,
   formatFileSize,
   formatList,
@@ -11,7 +12,6 @@ import {
   formatNumber,
   normalizeLocalizedNumber,
   parseLocalizedNumber,
-  foldDecimalDigits,
 } from './format';
 
 describe('formatMoney', () => {

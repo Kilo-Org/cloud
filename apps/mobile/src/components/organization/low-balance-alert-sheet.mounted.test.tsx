@@ -44,7 +44,12 @@ vi.mock('expo-haptics', () => ({
   notificationAsync: vi.fn(),
   NotificationFeedbackType: { Success: 'success' },
 }));
-vi.mock('react-native', () => ({ ScrollView: 'ScrollView', Switch: 'Switch', View: 'View' }));
+vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+  ScrollView: 'ScrollView',
+  Switch: 'Switch',
+  View: 'View',
+}));
 vi.mock('@/components/organization/organization-boundary', () => ({
   OrganizationBoundary: 'OrganizationBoundary',
 }));

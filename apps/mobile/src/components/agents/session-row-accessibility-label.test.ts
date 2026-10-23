@@ -1,12 +1,12 @@
 /* eslint-disable max-lines -- cohesive unit-test suite for session-row a11y label helpers */
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   formatSpokenTimeAgo,
   sessionRowAccessibilityLabel,
 } from './session-row-accessibility-label';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import type * as ReactI18next from 'react-i18next';
 
 vi.mock('react-i18next', async importOriginal => {
@@ -14,8 +14,8 @@ vi.mock('react-i18next', async importOriginal => {
   return {
     ...actual,
     useTranslation: () => {
-      const i18n = actual.getI18n();
-      return { t: i18n.t.bind(i18n), i18n };
+      const instance = actual.getI18n();
+      return { t: instance.t.bind(instance), i18n: instance };
     },
   };
 });
@@ -556,5 +556,35 @@ describe('sessionRowAccessibilityLabel', () => {
         })
       ).toBe('Fix login bug and CLI');
     });
+  });
+});
+
+/**
+ * The fragments after the second are clauses, not list items: a locale whose
+ * cost sentence starts with a verb needs a separator other than its list
+ * conjunction, while two plain labels keep the conjunction.
+ */
+describe('spokenJoiner', () => {
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it('speaks a German cost row as comma-separated fragments', async () => {
+    await i18n.changeLanguage('de');
+    expect(
+      sessionRowAccessibilityLabel({
+        title: 'Lokale Sitzung',
+        needsInput: false,
+        badge: 'CLI',
+        meta: 'kostet 40 Cent, vor 19 Minuten',
+      })
+    ).toBe('Lokale Sitzung, CLI, kostet 40 Cent, vor 19 Minuten');
+  });
+
+  it('keeps the German conjunction between two plain labels', async () => {
+    await i18n.changeLanguage('de');
+    expect(
+      sessionRowAccessibilityLabel({ title: 'Lokale Sitzung', needsInput: false, badge: 'CLI' })
+    ).toBe('Lokale Sitzung und CLI');
   });
 });

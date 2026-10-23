@@ -22,6 +22,7 @@ vi.mock('@/components/ui/icons', () => ({
   WifiOff: () => null,
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('@/lib/a11y/tap-target', () => ({ STATE_ACTION_CLASS: 'min-h-[48px]' }));
 
 /** The retry button's props, including the label it renders. */
 type RetryButtonProps = { onPress: () => void; children: { props: { children: string } } };

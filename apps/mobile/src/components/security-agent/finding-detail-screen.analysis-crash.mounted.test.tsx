@@ -112,7 +112,7 @@ vi.mock('@/lib/utils', () => ({
 
 type R = TestRenderer.ReactTestRenderer;
 let renderer: R | undefined = undefined;
-const detailPath = '/(app)/(tabs)/(3_profile)/security-agent/personal/findings/finding-1';
+const detailPath = '/(app)/security-agent/personal/findings/finding-1';
 
 function renderScreen(): R {
   const screen = createElement(FindingDetailScreen, { scope: 'personal', findingId: 'finding-1' });

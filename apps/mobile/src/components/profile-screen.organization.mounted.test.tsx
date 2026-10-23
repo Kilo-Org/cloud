@@ -18,8 +18,17 @@ import {
   setOrganizationIdFn,
 } from '@/components/profile-screen.test-helpers';
 import { i18n } from '@/i18n';
-import { act } from '@/test/renderer';
+import { act, type ReactTestInstance } from '@/test/renderer';
 import { createTestQueryClient, waitFor } from '@/test/render-with-providers';
+
+/** The selected state an account action button carries, if it carries one. */
+function selectedState(node: ReactTestInstance): boolean | undefined {
+  const state: unknown = node.props.accessibilityState;
+  if (typeof state !== 'object' || state === null || !('selected' in state)) {
+    return undefined;
+  }
+  return typeof state.selected === 'boolean' ? state.selected : undefined;
+}
 
 describe('ProfileScreen Organization section', () => {
   beforeEach(() => {
@@ -62,19 +71,22 @@ describe('ProfileScreen Organization section', () => {
     });
 
     // The row opens the app's account picker: Personal first, then both
-    // memberships, with the current account checked.
-    const radios = root.findAll(
-      node => typeof node.type === 'string' && node.props.accessibilityRole === 'radio'
+    // memberships, with the current account marked as selected.
+    const rows = root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        node.props.accessibilityRole === 'button' &&
+        selectedState(node) !== undefined
     );
-    expect(radios.map(radio => radio.props.accessibilityLabel)).toEqual([
+    expect(rows.map(account => account.props.accessibilityLabel)).toEqual([
       i18n.t('common.personal'),
       'Kilo',
       'Acme',
     ]);
-    expect(radios[0]?.props.accessibilityState).toMatchObject({ checked: true });
+    expect(rows[0]?.props.accessibilityState).toMatchObject({ selected: true });
 
     act(() => {
-      (radios[2]?.props as { onPress?: () => void } | undefined)?.onPress?.();
+      (rows[2]?.props as { onPress?: () => void } | undefined)?.onPress?.();
     });
 
     expect(setOrganizationIdFn).toHaveBeenCalledWith('org-2');

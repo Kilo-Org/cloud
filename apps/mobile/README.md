@@ -26,12 +26,28 @@ without restarting JavaScript, so the initial snapshot may predate sign-in.
 Back-exit and force-stop preserve the stored session; explicit sign-out clears it.
 The existing bootstrap loading and retryable-error surfaces cover restoration.
 
+## New-session model choice
+
+Model resolution waits for stored preferences to load. An explicit model and
+effort pick updates the current account scope's preference cache before its
+server save finishes, so reopening the form does not restore an older cached
+choice. Older in-flight preference reads are cancelled before that update.
+The existing server, local, and default-model fallback order is unchanged.
+
 ## Organization hub connectivity
 
 Usage tiles retain labels and show cached totals or em dash placeholders.
 Unavailable usage and low-balance settings expose Retry. The low-balance row
 retries its settings read until data is available, then opens configuration.
 Cached settings remain visible during offline pauses and refresh failures.
+
+## Transcript action targets
+
+Standalone transcript continuation and recovery buttons use the shared
+`Button size="action"`: a 48dp minimum height that can grow with the label.
+Compact, default, and large button sizes remain unchanged for other controls.
+Verify Android targets using the clickable accessibility node bounds, not
+hitSlop alone; keep the translated label fully visible.
 
 ## Getting started
 
@@ -121,6 +137,15 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 - Use `--display=1` for the outer display and `--display=3` for the inner display.
 - An inactive display produces a black screenshot.
 - Type a draft, change the appearance in both directions, and verify the draft stays readable.
+
+## Briefing localization
+
+Scheduled report dates use the app language and preserve the report's calendar
+day across device timezones. Period windows retain the report's own timezone.
+Briefing totals, agent spend, estimates, and charges use USD currency precision
+and locale separators. Positive amounts below half a cent display as less than
+one cent; partial-coverage lower bounds retain the separate at-least marker.
+The summary prompt requests the same precision, separators, and sub-cent rule.
 
 ## One-off agent briefings
 

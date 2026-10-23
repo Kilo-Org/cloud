@@ -284,7 +284,9 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
               })();
             },
           },
-        ]
+        ],
+        // Android back dismisses without recording a consent answer.
+        { cancelable: true }
       );
     };
     // The service-level check alone is not enough: on-device recognition also

@@ -470,7 +470,8 @@ describe('useVoiceInput integration', () => {
         expect(alertMock.alert).toHaveBeenCalledWith(
           'Speech is processed online',
           expect.stringContaining('This device cannot transcribe offline'),
-          expect.any(Array)
+          expect.any(Array),
+          { cancelable: true }
         );
         expect(toastMock.error).not.toHaveBeenCalled();
       });

@@ -6,8 +6,10 @@ import {
   cli_sessions_v2,
   cloud_agent_session_runs,
   cloud_agent_sessions,
+  organization_memberships,
+  organizations,
 } from '@kilocode/db/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { User } from '@kilocode/db/schema';
 import { CLOUD_AGENT_CONNECTION_ID, resolveActiveSessionStatus } from './active-sessions-router';
 import { resolveCloudCandidateStatus } from '@/lib/active-sessions-list';
@@ -460,6 +462,73 @@ describe('active-sessions-router.list cloud merge', () => {
 
     const unfiltered = await caller.activeSessions.list({ includeCloudAgentSessions: true });
     expect(unfiltered.sessions.map(s => s.id).sort()).toEqual([personalId, orgId].sort());
+  });
+
+  it('unfiltered list keeps only cloud rows of organizations the caller can still access', async () => {
+    const kept = await createTestOrganization(`Cloud Access Kept ${PREFIX}`, regularUser.id, 0);
+    const removed = await createTestOrganization(
+      `Cloud Access Removed ${PREFIX}`,
+      regularUser.id,
+      0
+    );
+    const deleted = await createTestOrganization(
+      `Cloud Access Deleted ${PREFIX}`,
+      regularUser.id,
+      0
+    );
+
+    await db
+      .delete(organization_memberships)
+      .where(
+        and(
+          eq(organization_memberships.organization_id, removed.id),
+          eq(organization_memberships.kilo_user_id, regularUser.id)
+        )
+      );
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, deleted.id));
+
+    const keptId = nextId('access-kept');
+    const removedId = nextId('access-removed');
+    const deletedId = nextId('access-deleted');
+    for (const [sessionId, organizationId] of [
+      [keptId, kept.id],
+      [removedId, removed.id],
+      [deletedId, deleted.id],
+    ] as const) {
+      await seedCloudSession({
+        sessionId,
+        cloudAgentSessionId: nextId('cas'),
+        kiloUserId: regularUser.id,
+        organizationId,
+        status: 'busy',
+        createdAt: minutesAgoIso(3),
+        run: { terminalAt: null },
+      });
+    }
+
+    try {
+      fetchSpy = mockWorkerSessions([]);
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.list({ includeCloudAgentSessions: true });
+
+      expect(result.sessions.map(session => session.id)).toEqual([keptId]);
+    } finally {
+      await db
+        .update(organizations)
+        .set({ deleted_at: null })
+        .where(eq(organizations.id, deleted.id));
+      await db
+        .delete(organization_memberships)
+        .where(
+          inArray(organization_memberships.organization_id, [kept.id, removed.id, deleted.id])
+        );
+      await db
+        .delete(organizations)
+        .where(inArray(organizations.id, [kept.id, removed.id, deleted.id]));
+    }
   });
 
   it('NULL-org cloud row always emits organizationId: null', async () => {

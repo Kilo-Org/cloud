@@ -799,10 +799,22 @@ describe('review identity', () => {
     ).toEqual(['cancelled', 'cancelled', 'cancelled']);
     expect(reviews.find(review => review.id === completedReviewId)?.status).toBe('completed');
     const attempts = await db
-      .select({ status: cloud_agent_code_review_attempts.status })
+      .select({
+        id: cloud_agent_code_review_attempts.id,
+        status: cloud_agent_code_review_attempts.status,
+        terminalReason: cloud_agent_code_review_attempts.terminal_reason,
+        errorMessage: cloud_agent_code_review_attempts.error_message,
+      })
       .from(cloud_agent_code_review_attempts)
       .where(inArray(cloud_agent_code_review_attempts.id, [queuedAttempt.id, runningAttempt.id]));
-    expect(attempts.map(attempt => attempt.status)).toEqual(['cancelled', 'cancelled']);
+    expect(attempts).toHaveLength(2);
+    for (const attempt of attempts) {
+      expect(attempt).toMatchObject({
+        status: 'cancelled',
+        terminalReason: 'user_cancelled',
+        errorMessage: 'Platform integration disconnected',
+      });
+    }
   });
 
   it('clears a dangling dispatch reservation when cancelling for an integration', async () => {
@@ -1228,6 +1240,11 @@ describe('cancelSupersededReviewsForPR', () => {
     await updateCodeReviewStatus(unrelatedId, 'running', {
       sessionId: 'session-id-cancel-unrelated',
     });
+    const duplicateReservationId = crypto.randomUUID();
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({ dispatch_reservation_id: duplicateReservationId })
+      .where(eq(cloud_agent_code_reviews.id, runningDuplicateId));
 
     const cancelled = await cancelActiveCodeReviewsById(
       [queuedDuplicateId, runningDuplicateId],
@@ -1255,6 +1272,7 @@ describe('cancelSupersededReviewsForPR', () => {
         status: cloud_agent_code_reviews.status,
         terminalReason: cloud_agent_code_reviews.terminal_reason,
         errorMessage: cloud_agent_code_reviews.error_message,
+        dispatchReservationId: cloud_agent_code_reviews.dispatch_reservation_id,
       })
       .from(cloud_agent_code_reviews)
       .where(
@@ -1281,6 +1299,7 @@ describe('cancelSupersededReviewsForPR', () => {
         status: 'cancelled',
         terminalReason: 'superseded',
         errorMessage: 'Superseded by duplicate merge-commit continuation',
+        dispatchReservationId: duplicateReservationId,
       })
     );
   });
@@ -1398,6 +1417,51 @@ describe('cancelSupersededReviewsForPR', () => {
       .from(operation_ledgers)
       .where(eq(operation_ledgers.operation_key, `review:${reviewId}`));
     expect(ledgerRow?.status).toBe('superseded');
+  });
+
+  it('keeps a dispatch reservation while superseding for a new push', async () => {
+    const reviewId = await createReview({
+      headSha: 'sha-superseded-reservation',
+      prNumber: 47,
+      platformIntegrationId: githubIntegrationId,
+    });
+    const attempt = await createCodeReviewAttempt({ codeReviewId: reviewId, status: 'queued' });
+    await updateCodeReviewStatus(reviewId, 'queued');
+    const reservationId = crypto.randomUUID();
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({ dispatch_reservation_id: reservationId })
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+
+    const cancelled = await cancelSupersededReviewsForPR(
+      {
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        platform: 'github',
+        repoFullName: repo,
+        prNumber: 47,
+        platformIntegrationId: githubIntegrationId,
+      },
+      'sha-superseded-reservation-new'
+    );
+
+    expect(cancelled.map(row => row.id)).toEqual([reviewId]);
+    expect(cancelled[0]?.latestActiveAttemptId).toBe(attempt.id);
+
+    const [row] = await db
+      .select({
+        status: cloud_agent_code_reviews.status,
+        terminalReason: cloud_agent_code_reviews.terminal_reason,
+        errorMessage: cloud_agent_code_reviews.error_message,
+        dispatchReservationId: cloud_agent_code_reviews.dispatch_reservation_id,
+      })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+    expect(row).toEqual({
+      status: 'cancelled',
+      terminalReason: 'superseded',
+      errorMessage: 'Superseded by new push',
+      dispatchReservationId: reservationId,
+    });
   });
 });
 

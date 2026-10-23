@@ -29,6 +29,7 @@ import {
   lte,
   isNull,
   getTableColumns,
+  type SQL,
 } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -1870,24 +1871,27 @@ function mapCancelledReviewRow(row: CancelledReviewDatabaseRow): CancelledReview
   };
 }
 
-async function cancelReviewsForPR(
+/**
+ * Cancels the non-terminal reviews matched by `targetPredicate`, plus their
+ * non-terminal attempts, in one statement. The cancellation policy differs per
+ * caller and is explicit here: a new push or a duplicate continuation is
+ * `superseded` and keeps any dispatch reservation, while an integration
+ * disconnect is `user_cancelled` and clears the dangling reservation.
+ */
+async function cancelCodeReviewsWithDatabase(
   database: CodeReviewDatabase,
-  scope: ReviewScope,
-  excludeSha?: string
+  {
+    targetPredicate,
+    terminalReason,
+    errorMessage,
+    clearDispatchReservation,
+  }: {
+    targetPredicate: SQL;
+    terminalReason: 'superseded' | 'user_cancelled';
+    errorMessage: string;
+    clearDispatchReservation: boolean;
+  }
 ): Promise<CancelledReviewRow[]> {
-  const ownerCondition =
-    scope.owner.type === 'org'
-      ? sql`${cloud_agent_code_reviews.owned_by_organization_id} = ${scope.owner.id}`
-      : sql`${cloud_agent_code_reviews.owned_by_user_id} = ${scope.owner.id}`;
-  const excludedHeadCondition =
-    excludeSha === undefined
-      ? sql``
-      : sql`AND ${cloud_agent_code_reviews.head_sha} != ${excludeSha}`;
-  const platformIntegrationCondition =
-    scope.platformIntegrationId === undefined
-      ? sql``
-      : sql`AND ${cloud_agent_code_reviews.platform_integration_id} = ${scope.platformIntegrationId}
-            AND ${cloud_agent_code_reviews.manual_config} IS NULL`;
   const result = await database.execute<CancelledReviewDatabaseRow>(sql`
     WITH targets AS (
       SELECT
@@ -1909,19 +1913,14 @@ async function cancelReviewsForPR(
         platform_integration_id,
         trigger_source
       FROM ${cloud_agent_code_reviews}
-      WHERE ${ownerCondition}
-        AND ${cloud_agent_code_reviews.platform} = ${scope.platform}
-        AND ${cloud_agent_code_reviews.repo_full_name} = ${scope.repoFullName}
-        AND ${cloud_agent_code_reviews.pr_number} = ${scope.prNumber}
-        ${excludedHeadCondition}
-        ${platformIntegrationCondition}
+      WHERE ${targetPredicate}
         AND ${cloud_agent_code_reviews.status} IN (${nonTerminalCodeReviewStatusListSql()})
     ), cancelled_attempts AS (
       UPDATE ${cloud_agent_code_review_attempts} AS attempts
       SET
         status = 'cancelled',
-        terminal_reason = 'superseded',
-        error_message = 'Superseded by new push',
+        terminal_reason = ${terminalReason},
+        error_message = ${errorMessage},
         completed_at = now(),
         updated_at = now()
       FROM targets
@@ -1931,8 +1930,9 @@ async function cancelReviewsForPR(
     UPDATE ${cloud_agent_code_reviews} AS reviews
     SET
       status = 'cancelled',
-      terminal_reason = 'superseded',
-      error_message = 'Superseded by new push',
+      terminal_reason = ${terminalReason},
+      error_message = ${errorMessage},
+      ${clearDispatchReservation ? sql`dispatch_reservation_id = NULL,` : sql``}
       completed_at = now(),
       updated_at = now()
     FROM targets
@@ -1953,6 +1953,37 @@ async function cancelReviewsForPR(
   return result.rows.map(mapCancelledReviewRow);
 }
 
+async function cancelReviewsForPR(
+  database: CodeReviewDatabase,
+  scope: ReviewScope,
+  excludeSha?: string
+): Promise<CancelledReviewRow[]> {
+  const ownerCondition =
+    scope.owner.type === 'org'
+      ? sql`${cloud_agent_code_reviews.owned_by_organization_id} = ${scope.owner.id}`
+      : sql`${cloud_agent_code_reviews.owned_by_user_id} = ${scope.owner.id}`;
+  const excludedHeadCondition =
+    excludeSha === undefined
+      ? sql``
+      : sql`AND ${cloud_agent_code_reviews.head_sha} != ${excludeSha}`;
+  const platformIntegrationCondition =
+    scope.platformIntegrationId === undefined
+      ? sql``
+      : sql`AND ${cloud_agent_code_reviews.platform_integration_id} = ${scope.platformIntegrationId}
+            AND ${cloud_agent_code_reviews.manual_config} IS NULL`;
+  return cancelCodeReviewsWithDatabase(database, {
+    targetPredicate: sql`${ownerCondition}
+      AND ${cloud_agent_code_reviews.platform} = ${scope.platform}
+      AND ${cloud_agent_code_reviews.repo_full_name} = ${scope.repoFullName}
+      AND ${cloud_agent_code_reviews.pr_number} = ${scope.prNumber}
+      ${excludedHeadCondition}
+      ${platformIntegrationCondition}`,
+    terminalReason: 'superseded',
+    errorMessage: 'Superseded by new push',
+    clearDispatchReservation: false,
+  });
+}
+
 async function cancelActiveCodeReviewsByIdWithDatabase(
   database: CodeReviewDatabase,
   reviewIds: string[],
@@ -1960,64 +1991,12 @@ async function cancelActiveCodeReviewsByIdWithDatabase(
 ): Promise<CancelledReviewRow[]> {
   if (reviewIds.length === 0) return [];
 
-  const result = await database.execute<CancelledReviewDatabaseRow>(sql`
-    WITH targets AS (
-      SELECT
-        id,
-        status AS prev_status,
-        session_id,
-        (
-          SELECT attempts.id
-          FROM ${cloud_agent_code_review_attempts} AS attempts
-          WHERE attempts.code_review_id = ${cloud_agent_code_reviews}.id
-            AND attempts.status IN (${nonTerminalCodeReviewStatusListSql()})
-          ORDER BY attempts.attempt_number DESC
-          LIMIT 1
-        ) AS latest_active_attempt_id,
-        check_run_id,
-        head_sha,
-        platform,
-        platform_project_id,
-        platform_integration_id,
-        trigger_source
-      FROM ${cloud_agent_code_reviews}
-      WHERE ${inArray(cloud_agent_code_reviews.id, reviewIds)}
-        AND ${cloud_agent_code_reviews.status} IN (${nonTerminalCodeReviewStatusListSql()})
-    ), cancelled_attempts AS (
-      UPDATE ${cloud_agent_code_review_attempts} AS attempts
-      SET
-        status = 'cancelled',
-        terminal_reason = 'superseded',
-        error_message = ${errorMessage},
-        completed_at = now(),
-        updated_at = now()
-      FROM targets
-      WHERE attempts.code_review_id = targets.id
-        AND attempts.status IN (${nonTerminalCodeReviewStatusListSql()})
-    )
-    UPDATE ${cloud_agent_code_reviews} AS reviews
-    SET
-      status = 'cancelled',
-      terminal_reason = 'superseded',
-      error_message = ${errorMessage},
-      completed_at = now(),
-      updated_at = now()
-    FROM targets
-    WHERE reviews.id = targets.id
-    RETURNING
-      reviews.id,
-      targets.prev_status,
-      targets.session_id,
-      targets.latest_active_attempt_id,
-      targets.check_run_id,
-      targets.head_sha,
-      targets.platform,
-      targets.platform_project_id,
-      targets.platform_integration_id,
-      targets.trigger_source
-  `);
-
-  return result.rows.map(mapCancelledReviewRow);
+  return cancelCodeReviewsWithDatabase(database, {
+    targetPredicate: inArray(cloud_agent_code_reviews.id, reviewIds),
+    terminalReason: 'superseded',
+    errorMessage,
+    clearDispatchReservation: false,
+  });
 }
 
 /**
@@ -2046,67 +2025,14 @@ async function cancelActiveCodeReviewsForIntegrationWithDatabase(
     input.owner.type === 'org'
       ? sql`${cloud_agent_code_reviews.owned_by_organization_id} = ${input.owner.id}`
       : sql`${cloud_agent_code_reviews.owned_by_user_id} = ${input.owner.id}`;
-  const result = await database.execute<CancelledReviewDatabaseRow>(sql`
-    WITH targets AS (
-      SELECT
-        id,
-        status AS prev_status,
-        session_id,
-        (
-          SELECT attempts.id
-          FROM ${cloud_agent_code_review_attempts} AS attempts
-          WHERE attempts.code_review_id = ${cloud_agent_code_reviews}.id
-            AND attempts.status IN (${nonTerminalCodeReviewStatusListSql()})
-          ORDER BY attempts.attempt_number DESC
-          LIMIT 1
-        ) AS latest_active_attempt_id,
-        check_run_id,
-        head_sha,
-        platform,
-        platform_project_id,
-        platform_integration_id,
-        trigger_source
-      FROM ${cloud_agent_code_reviews}
-      WHERE ${ownerCondition}
-        AND ${cloud_agent_code_reviews.platform} = ${input.platform}
-        AND ${cloud_agent_code_reviews.platform_integration_id} = ${input.integrationId}
-        AND ${cloud_agent_code_reviews.status} IN (${nonTerminalCodeReviewStatusListSql()})
-    ), cancelled_attempts AS (
-      UPDATE ${cloud_agent_code_review_attempts} AS attempts
-      SET
-        status = 'cancelled',
-        terminal_reason = 'user_cancelled',
-        error_message = ${errorMessage},
-        completed_at = now(),
-        updated_at = now()
-      FROM targets
-      WHERE attempts.code_review_id = targets.id
-        AND attempts.status IN (${nonTerminalCodeReviewStatusListSql()})
-    )
-    UPDATE ${cloud_agent_code_reviews} AS reviews
-    SET
-      status = 'cancelled',
-      terminal_reason = 'user_cancelled',
-      error_message = ${errorMessage},
-      dispatch_reservation_id = NULL,
-      completed_at = now(),
-      updated_at = now()
-    FROM targets
-    WHERE reviews.id = targets.id
-    RETURNING
-      reviews.id,
-      targets.prev_status,
-      targets.session_id,
-      targets.latest_active_attempt_id,
-      targets.check_run_id,
-      targets.head_sha,
-      targets.platform,
-      targets.platform_project_id,
-      targets.platform_integration_id,
-      targets.trigger_source
-  `);
-
-  return result.rows.map(mapCancelledReviewRow);
+  return cancelCodeReviewsWithDatabase(database, {
+    targetPredicate: sql`${ownerCondition}
+      AND ${cloud_agent_code_reviews.platform} = ${input.platform}
+      AND ${cloud_agent_code_reviews.platform_integration_id} = ${input.integrationId}`,
+    terminalReason: 'user_cancelled',
+    errorMessage,
+    clearDispatchReservation: true,
+  });
 }
 
 /**

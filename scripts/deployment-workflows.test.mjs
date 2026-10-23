@@ -67,7 +67,10 @@ test('both Worker deployment paths deploy the private relay before the staging u
     assert.doesNotMatch(steps[consumerIndex].if, /always\(|failure\(/);
     assert.equal(
       steps[consumerIndex].with.command,
-      "${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }}"
+      "${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} " +
+        '${{ ' +
+        selector +
+        " == 'services/usage-ingest' && inputs.target_environment == 'staging' && '--experimental-provision=false' || '' }}"
     );
   }
 });
@@ -80,6 +83,12 @@ test('selected source controls the relay requirement and failures stop consumer 
     symlinkSync(
       fileURLToPath(new URL('../services/usage-ingest/node_modules', import.meta.url)),
       join(directory, 'node_modules')
+    );
+    writeFileSync(
+      join(directory, 'package.json'),
+      readFileSync(
+        new URL('../services/usage-ingest/test/fixtures/pre-eu/package.json', import.meta.url)
+      )
     );
     const output = join(directory, 'output');
     const calls = join(directory, 'calls');
@@ -104,6 +113,18 @@ test('selected source controls the relay requirement and failures stop consumer 
             env: {
               staging: {
                 name: 'usage-ingest-staging',
+                queues: {
+                  producers: [
+                    { binding: 'USAGE_INGEST_QUEUE', queue: 'usage-ingest-processing-staging' },
+                    { binding: 'USAGE_INGEST_DLQ', queue: 'usage-ingest-processing-dlq-staging' },
+                  ],
+                  consumers: [
+                    {
+                      queue: 'usage-ingest-processing-staging',
+                      dead_letter_queue: 'usage-ingest-processing-dlq-staging',
+                    },
+                  ],
+                },
                 ...(required
                   ? {
                       services: [

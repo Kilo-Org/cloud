@@ -7,8 +7,12 @@
     "dev": "wrangler dev --env staging",
     "types": "wrangler types --include-runtime=false --env-interface CloudflareEnv worker-configuration.d.ts",
     "typecheck": "tsgo --noEmit",
-    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/usage-ingest/src",
-    "test": "vitest run"
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/usage-ingest/src services/usage-ingest/scripts",
+    "test": "node --test scripts/*.test.mjs && vitest run",
+    "deploy:staging": "node scripts/eu-queues.mjs deploy staging",
+    "queues:verify": "node scripts/eu-queues.mjs verify",
+    "queues:create": "node scripts/eu-queues.mjs create",
+    "test:queues": "node --test scripts/*.test.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",

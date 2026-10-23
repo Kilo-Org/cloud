@@ -31,7 +31,12 @@ Unrelated paths return 404; other methods on `/usage` return 405.
 | Environment | Worker | Producer and consumer queue | DLQ (no consumer) |
 |---|---|---|---|
 | Production (top-level config) | `usage-ingest` | `usage-ingest-processing` | `usage-ingest-processing-dlq` |
-| Staging (`env.staging`) | `usage-ingest-staging` | `usage-ingest-processing-staging` | `usage-ingest-processing-dlq-staging` |
+| Staging (`env.staging`) | `usage-ingest-staging` | `usage-ingest-processing-staging-eu` | `usage-ingest-processing-dlq-staging-eu` |
+
+Staging retains the original unsuffixed consumer for drain and routing rollback.
+Only new intake moves to the EU source; there is no dual publishing. Explicit
+resource creation/readback and a fresh empty-state gate precede cutover; see the
+[staging EU runbook](eu-queues.md). Production queues and behavior are unchanged.
 
 ## Processing mode
 
@@ -178,7 +183,7 @@ Both environments use the following consumer settings:
 |---|---|---|
 | `max_batch_size` | `1` | One message per invocation. |
 | `max_batch_timeout` | `0` seconds | No intentional wait to fill a batch. |
-| `max_concurrency` | Production: `1`; staging: `200` | Cap active consumer invocations per source queue; staging uses a larger cap for load testing. |
+| `max_concurrency` | Production: `1`; staging: legacy `1` + EU `199` (total `200` at batch size 1) | Cap active consumer invocations per source queue; staging uses a larger cap for load testing. |
 | `max_retries` | `3` | Initial delivery plus up to three retries. |
 | `retry_delay` | `60` seconds | Space failed deliveries by one minute rather than retrying immediately. |
 | `dead_letter_queue` | Environment-specific name above | Retain exhausted failures separately from the source queue. |
@@ -190,28 +195,32 @@ production and staging deployments. To deploy it individually, dispatch that
 workflow with `worker: services/usage-ingest` and `target_environment: production`
 or `staging`.
 
-Wrangler automatically provisions missing configured producer queues and reuses
-existing queues. `USAGE_INGEST_QUEUE` binds the source queue; `USAGE_INGEST_DLQ` is
-an unused producer binding so Wrangler also provisions the DLQ. The consumer's
-`dead_letter_queue` routes exhausted failures to it. No consumer is attached to
-either DLQ.
+Staging EU queues must exist with verified EU jurisdiction before consumer
+upload. CI extends the selected-source relay check: historical original-queue
+revisions remain supported, but a selected revision requiring EU verification
+cannot skip a missing/broken helper. The private relay still deploys first.
+Both initial and retry consumer uploads verify EU resource metadata and disable
+automatic provisioning so absent EU queues cannot silently become global ones.
 
-To deploy directly from the repository root with Wrangler authenticated to the
-account in `wrangler.jsonc`:
+After the fresh gate in [the EU runbook](eu-queues.md), an authorized operator
+with an already injected `CLOUDFLARE_API_TOKEN` can use:
 
 ```bash
-# Staging
-pnpm --filter cloudflare-usage-ingest exec wrangler deploy --env staging
-
-# Production
-pnpm --filter cloudflare-usage-ingest exec wrangler deploy
+pnpm --filter cloudflare-usage-ingest queues:create staging
+pnpm --filter cloudflare-usage-ingest queues:verify staging
+# Guarded direct path: verify, deploy private relay, then deploy consumer.
+pnpm --filter cloudflare-usage-ingest deploy:staging
 ```
+
+These commands are staging-only; no production EU resources are prepared.
+Production retains its existing deployment path and queue names. Prefer normal
+staging CI and do not bypass EU verification with raw Wrangler commands.
 
 Staging enables its public `workers.dev` URL. After deployment, append `/usage`
 to the hostname shown for `usage-ingest-staging` and use that as the gateway's
 `USAGE_INGEST_URL`. Requests require the dedicated publisher secret above.
 Production keeps `workers_dev: false`; no custom routes or preview URLs are
-configured. The consumer is attached to each environment's producer queue.
+configured. Staging retains both legacy and EU consumers; production retains its original consumer.
 Publishing and receipt handling require no database access. See
 [Wrangler automatic provisioning](https://developers.cloudflare.com/workers/wrangler/configuration/#automatic-provisioning).
 
@@ -219,7 +228,9 @@ Publishing and receipt handling require no database access. See
 
 The retention target is **four days (345600 seconds)** for each source queue and
 DLQ. Retention is managed separately from `wrangler.jsonc`; the pinned Wrangler
-schema does not expose it. Update a queue using its name from the table above:
+schema does not expose it. The staging EU helper sets it on new resources and
+verifies it on reuse; mismatches fail without updating existing resources. An
+operator can separately review an explicit retention correction and reverify:
 
 ```bash
 pnpm --filter cloudflare-usage-ingest exec wrangler queues update <queue-name> --message-retention-period-secs 345600
@@ -236,9 +247,10 @@ pnpm install --frozen-lockfile
 pnpm --filter cloudflare-usage-ingest types
 pnpm --filter cloudflare-usage-ingest typecheck
 pnpm --filter cloudflare-usage-ingest lint
+pnpm --filter cloudflare-usage-ingest test:queues
 pnpm --filter cloudflare-usage-ingest test
 pnpm --filter cloudflare-usage-ingest exec wrangler deploy --dry-run
-pnpm --filter cloudflare-usage-ingest exec wrangler deploy --dry-run --env staging
+pnpm --filter cloudflare-usage-ingest exec wrangler deploy --dry-run --env staging --experimental-provision=false
 ```
 
 The dry runs build and show bindings without creating queues or deploying a Worker.
@@ -254,8 +266,8 @@ in both environments.
 The existing `staging` configuration sends queued writes through a private
 service binding's **fetch** method to `usage-writer-relay-staging`. The relay's
 fetch handler forwards to the same staging Vercel writer with a placement hint
-of `aws:eu-central-1`. Production keeps direct writes. The writer, middleware,
-database and queue policy stay unchanged.
+of `aws:eu-central-1`. Production keeps direct writes. The relay itself changes no writer, middleware,
+database or queue policy; the current staging EU policy is described above.
 
 This is an outbound-request placement experiment. [Placement's shared limitations](https://developers.cloudflare.com/workers/configuration/placement/#review-limitations-1)
 apply to fetch handlers and do not pin the queue consumer. The hint selects a
@@ -294,6 +306,8 @@ excludes return/ACK; the full consumer HTTP duration includes the return leg.
 Local runtime tests prove the service-binding path and ACK/retry behavior, not
 geographical placement or speedup.
 
-Rollback by reverting the relay change and deploying the reviewed direct-path
-revision through staging CI. The consumer retains the same queue and usage IDs;
-no data migration or writer rollback is needed. The unused relay can remain private.
+For a relay-only rollback after EU cutover, prepare a reviewed direct-path change
+that preserves the EU producer destination, both retained consumers and their
+combined writer-call budget. Do not deploy an old pre-EU revision that detaches
+the EU consumer. Usage IDs and the writer stay unchanged; the unused relay can
+remain private. Routing rollback is covered in the [EU runbook](eu-queues.md).

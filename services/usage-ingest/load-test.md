@@ -7,6 +7,41 @@ Use the same offered event rate, duration, account/organization distribution, an
 model/cost mix in both runs. Include steady traffic and a burst: queued processing
 may reduce peak pressure while taking longer to finish the same work.
 
+## EU queue targets
+
+After the [staging EU cutover gate](eu-queues.md), update queue-specific selectors
+without changing historical results, load scripts, payloads or the persistence
+metric definition. The owner controls staging intake and the previous run was
+reconciled empty; require one fresh confirmation of empty source/DLQ state with
+no pending retries, in-flight work or unresolved accepted IDs before switching.
+
+| Observation | Legacy target (retain separately) | New-intake EU target |
+|---|---|---|
+| Worker service | `usage-ingest-staging` | `usage-ingest-staging` |
+| Processing log `queue` field | `usage-ingest-processing-staging` | `usage-ingest-processing-staging-eu` |
+| GraphQL source `queueID`, backlog, read lag, retry/ACK series | Actual ID of legacy source | Actual ID of EU source from verified resource GET |
+| DLQ count/backlog/age | Actual ID of `usage-ingest-processing-dlq-staging` | Actual ID of `usage-ingest-processing-dlq-staging-eu` |
+
+Keep four distinct queue-ID labels (legacy source/DLQ and EU source/DLQ) in
+dashboard/GraphQL queries. A source ID must not be reused for its DLQ, and a
+human-readable queue name is not a GraphQL resource ID. Use the existing supported
+GraphQL metrics query with the new verified `queueID` filter and required Analytics
+permission; this PR makes no metrics API calls and does not establish that access.
+Retain the same Worker/relay service selectors and time window. After the preceding
+diagnostics PR, filter processing events by the exact `queue` value above; older
+records without that field are unknown, not implicitly legacy. Preserve any
+diagnostics config during the merge refresh.
+
+Usage IDs, request/publication joins, `usage_record_completion`, `entrypoint`,
+`writer_caller`, persistence outcomes, `duration_ms` and `event_age_ms` retain their
+meaning. Compare and reconcile distinct IDs as before; producer acceptance or
+persistence does not establish Queue ACK. During transition report legacy and EU
+queue wait/delivery attempts/backlog/DLQ separately and account for both consumers.
+Standalone writer-call ceiling is legacy1 + EU199 at batch1; the later
+batch2/parallel2 composition must be legacy1 + EU99, total200, not cap100 twice.
+Queue cold-start and a new instance are confounders; an EU latency benefit remains
+a hypothesis until hosted matched-rate measurements establish it.
+
 ## Select each path
 
 With the gateway queue-selection change installed, configure the intended staging

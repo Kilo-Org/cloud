@@ -39,18 +39,28 @@
       "services": [{ "binding": "USAGE_WRITER_RELAY", "service": "usage-writer-relay-staging" }],
       "queues": {
         "producers": [
-          { "binding": "USAGE_INGEST_QUEUE", "queue": "usage-ingest-processing-staging" },
-          { "binding": "USAGE_INGEST_DLQ", "queue": "usage-ingest-processing-dlq-staging" },
+          { "binding": "USAGE_INGEST_QUEUE", "queue": "usage-ingest-processing-staging-eu" },
+          { "binding": "USAGE_INGEST_DLQ", "queue": "usage-ingest-processing-dlq-staging-eu" },
         ],
         "consumers": [
+          // Preserve the legacy consumer for drain/rollback; total writer-call ceiling stays 200.
           {
             "queue": "usage-ingest-processing-staging",
             "max_batch_size": 1,
             "max_batch_timeout": 0,
             "max_retries": 3,
             "retry_delay": 60,
-            "max_concurrency": 200,
+            "max_concurrency": 1,
             "dead_letter_queue": "usage-ingest-processing-dlq-staging",
+          },
+          {
+            "queue": "usage-ingest-processing-staging-eu",
+            "max_batch_size": 1,
+            "max_batch_timeout": 0,
+            "max_retries": 3,
+            "retry_delay": 60,
+            "max_concurrency": 199,
+            "dead_letter_queue": "usage-ingest-processing-dlq-staging-eu",
           },
         ],
       },

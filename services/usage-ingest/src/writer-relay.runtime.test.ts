@@ -3,7 +3,7 @@ import { createTestHarness, unstable_readConfig } from 'wrangler';
 import { expect, it, vi } from 'vitest';
 import { usage } from './usage.test-fixture';
 
-it('keeps production direct and routes the existing staging consumer through the private relay', () => {
+it('keeps production direct and routes both retained staging consumers through the private relay', () => {
   const config = new URL('../wrangler.jsonc', import.meta.url).pathname;
   const production = unstable_readConfig({ config });
   const staging = unstable_readConfig({ config, env: 'staging' });
@@ -19,8 +19,17 @@ it('keeps production direct and routes the existing staging consumer through the
       max_batch_timeout: 0,
       max_retries: 3,
       retry_delay: 60,
-      max_concurrency: 200,
+      max_concurrency: 1,
       dead_letter_queue: 'usage-ingest-processing-dlq-staging',
+    },
+    {
+      queue: 'usage-ingest-processing-staging-eu',
+      max_batch_size: 1,
+      max_batch_timeout: 0,
+      max_retries: 3,
+      retry_delay: 60,
+      max_concurrency: 199,
+      dead_letter_queue: 'usage-ingest-processing-dlq-staging-eu',
     },
   ]);
   const relay = unstable_readConfig({

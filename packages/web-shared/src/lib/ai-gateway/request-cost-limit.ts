@@ -8,8 +8,6 @@ import {
   pickerModelPricing,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
-import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { resolvePreferredProviderOrder } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
 import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   formatPricePerToken,
@@ -102,33 +100,6 @@ function pickerRequestPrice(
   return rates;
 }
 
-function pickerProvider(
-  modelId: string,
-  models: Record<string, StoredModel>,
-  preferredProviderOrderConfig: PreferredProviderOrderConfig
-): { selected: string | undefined; configuredOrder: string[] } {
-  const configuredOrder = resolvePreferredProviderOrder(preferredProviderOrderConfig, modelId);
-  const extra = pickerExtraModel(modelId);
-  if (extra) {
-    const providers = findKiloExclusiveModel(modelId)?.inference_providers ?? [];
-    return {
-      selected: configuredOrder[0] ?? (providers.length === 1 ? providers[0] : undefined),
-      configuredOrder,
-    };
-  }
-  const endpoints = models[modelId]?.endpoints ?? [];
-  const preferredProvider = configuredOrder[0];
-  if (preferredProvider) {
-    const matchingEndpoint = endpoints.some(
-      endpoint =>
-        endpoint.tag === preferredProvider ||
-        normalizeInferenceProviderId(endpoint.tag) ===
-          normalizeInferenceProviderId(preferredProvider)
-    );
-    return { selected: matchingEndpoint ? preferredProvider : undefined, configuredOrder };
-  }
-  return { selected: endpoints[0]?.tag, configuredOrder };
-}
 export type RequestCostLimitResult = {
   refusal: string | null;
   providerConfig: OpenRouterProviderConfig | null;
@@ -222,6 +193,14 @@ export async function enforceRequestCostLimit(
           only: z.array(z.string()).optional(),
           ignore: z.array(z.string()).optional(),
           allow_fallbacks: z.boolean().optional(),
+          max_price: z
+            .object({
+              prompt: z.number().finite().nonnegative().optional(),
+              completion: z.number().finite().nonnegative().optional(),
+              request: z.number().finite().nonnegative().optional(),
+            })
+            .passthrough()
+            .optional(),
         })
         .passthrough()
         .optional(),
@@ -299,37 +278,25 @@ export async function enforceRequestCostLimit(
     if (bound > availableBalanceMicrodollars)
       return refused('Request exceeds the available context balance or allowance');
 
-    let providerConfig: OpenRouterProviderConfig | null = null;
-    if (providerId === 'openrouter') {
-      const route = pickerProvider(aliasTarget ?? model, models, preferredProviderOrderConfig);
-      const requestedOrder = parsed.data.provider?.order ?? [];
-      const matchesConfiguredOrder =
-        route.configuredOrder.length > 0 &&
-        requestedOrder.length === route.configuredOrder.length &&
-        requestedOrder.every((provider, index) => provider === route.configuredOrder[index]);
-      const matchesSelectedOrder =
-        route.selected !== undefined &&
-        requestedOrder.length === 1 &&
-        requestedOrder[0] === route.selected;
-      const requestedOnly = parsed.data.provider?.only ?? [];
-      const requestedIgnore = parsed.data.provider?.ignore ?? [];
-      const matchesOnly =
-        requestedOnly.length === 0 ||
-        (route.selected !== undefined && requestedOnly.includes(route.selected));
-      if (
-        (requestedOrder.length > 0 && !matchesConfiguredOrder && !matchesSelectedOrder) ||
-        !matchesOnly ||
-        (route.selected !== undefined && requestedIgnore.includes(route.selected))
-      )
-        return refused('Provider routing conflicts with the spend safeguard');
-      providerConfig = {
-        ...parsed.data.provider,
-        ...(route.selected
-          ? { order: [route.selected], only: [route.selected] }
-          : { order: undefined, only: undefined }),
-        allow_fallbacks: false,
-      };
-    }
+    const requestedMaxPrice = parsed.data.provider?.max_price;
+    const providerConfig: OpenRouterProviderConfig | null =
+      providerId === 'openrouter'
+        ? {
+            ...parsed.data.provider,
+            max_price: {
+              ...requestedMaxPrice,
+              prompt: Math.min(
+                requestedMaxPrice?.prompt ?? Infinity,
+                Number((price.inputRate * 1_000_000).toFixed(12))
+              ),
+              completion: Math.min(
+                requestedMaxPrice?.completion ?? Infinity,
+                Number((price.outputRate * 1_000_000).toFixed(12))
+              ),
+              request: Math.min(requestedMaxPrice?.request ?? Infinity, price.requestCost),
+            },
+          }
+        : null;
     return { refusal: null, providerConfig };
   } catch (error) {
     return refused(error instanceof Error ? error.message : 'Request pricing unavailable');

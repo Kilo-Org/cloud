@@ -21,6 +21,7 @@ export type OpenRouterProviderConfig = {
   zdr?: boolean;
   require_parameters?: boolean;
   allow_fallbacks?: boolean;
+  max_price?: { prompt?: number; completion?: number; request?: number; image?: number };
 };
 
 export function isOpenRouterProviderConfig(value: unknown): value is OpenRouterProviderConfig {

@@ -30,7 +30,7 @@ describe('isItemWithinMessageCut', () => {
     );
   });
 
-  it('keeps parts stored under the part namespace by their message ID', () => {
+  it('matches a part by its message id', () => {
     expect(
       isItemWithinMessageCut({ itemType: 'part', itemId: 'part/msg_0002/prt_0009' }, cut)
     ).toBe(true);

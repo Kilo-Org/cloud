@@ -759,7 +759,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(ImageUploadUrlInput)
     .mutation(async ({ ctx, input }) => {
       return generateImageUploadUrl({
-        service: 'cloud-agent',
         userId: ctx.user.id,
         messageUuid: input.messageUuid,
         imageId: input.imageId,
@@ -1001,19 +1000,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       ).getSandboxStatus(input.cloudAgentSessionId);
     }),
 
-  getComputeBillingStatus: organizationMemberProcedure
-    .input(GetSessionInput)
-    .query(async ({ ctx, input }) => {
-      await assertOrganizationOwnsSession({
-        organizationId: input.organizationId,
-        userId: ctx.user.id,
-        cloudAgentSessionId: input.cloudAgentSessionId,
-      });
-      return await createCloudAgentNextClient(
-        await createCloudAgentControlToken(ctx.user, ctx.headersList, input.organizationId)
-      ).getComputeBillingStatus(input.cloudAgentSessionId);
-    }),
-
   checkEligibility: organizationMemberProcedure
     .input(z.object({ organizationId: z.uuid() }))
     .query(async ({ ctx, input }) => {
@@ -1043,6 +1029,10 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         integrationInstalled: z.boolean(),
         syncedAt: z.string().nullish(),
         errorMessage: z.string().optional(),
+        unavailableReason: z
+          .enum(['suspended', 'disconnected', 'reauth_required', 'not_configured'])
+          .optional(),
+        partial: z.boolean().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -1061,6 +1051,8 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         integrationInstalled: result.integrationInstalled,
         syncedAt: result.syncedAt,
         errorMessage: result.errorMessage,
+        unavailableReason: result.unavailableReason,
+        partial: result.partial,
       };
     }),
 

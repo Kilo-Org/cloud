@@ -1,8 +1,7 @@
 import type { SessionDataItem } from '../types/session-sync';
 
 /**
- * Item-id root of a `part`. Every item type owns a distinct identity namespace, so a part keeps
- * its own root alongside `message/` and `agent_notification/`.
+ * Item-id root of a `part`: parts key their rows under `part/<messageId>/<partId>`.
  */
 const PART_ITEM_ID_ROOT = 'part';
 
@@ -19,8 +18,8 @@ export function getPartItemIdentity(messageId: string, partId: string): string {
 }
 
 /**
- * Identity of a part stored before parts had their own namespace. Rows written under it stay
- * readable: readers return them and ingest replaces one once it rewrites the same part.
+ * Item id a part row can carry from the older stored layout (`<messageId>/<partId>`). Readers
+ * return such rows, and ingest replaces one when it rewrites the same part.
  */
 export function getPreviousPartItemIdentity(messageId: string, partId: string): string {
   return `${messageId}/${partId}`;
@@ -40,7 +39,7 @@ function prefixRange(prefix: string): PartItemIdentityRange {
   return { start: `${prefix}/`, end: `${prefix}0` };
 }
 
-/** Both identities a message's parts can live under, current layout first. */
+/** Both layout ranges of a message's parts, current layout first. */
 export function getPartItemIdentityRanges(messageId: string): PartItemIdentityRange[] {
   return [getPartItemIdentityRange(messageId), getPreviousPartItemIdentityRange(messageId)];
 }
@@ -121,7 +120,7 @@ export function comparePartIngestOrder(
 
 /**
  * Splits a stored part id under either layout. `part/<messageId>/<partId>` is the current layout;
- * `<messageId>/<partId>` is the previous one, where the message id may itself be `part`.
+ * `<messageId>/<partId>` is the older one.
  */
 export function parsePartItemIdentity(itemId: string): PartItemIdentity | null {
   const segments = itemId.split('/');

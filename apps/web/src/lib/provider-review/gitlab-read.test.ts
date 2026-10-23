@@ -15,7 +15,7 @@ import {
   listDiscussions,
   listInbox,
 } from './gitlab-read';
-import { GitLabReviewError } from './gitlab-authorization';
+import { GitLabApiStatusError, GitLabReviewError } from './gitlab-authorization';
 
 // The bound transport runs through Node https.request; mirror adapter.test.ts.
 jest.mock('https', () => ({
@@ -63,6 +63,11 @@ jest.mock('@/lib/integrations/platforms/gitlab/instance-url', () => {
 const mockHttpsRequest = https.request as unknown as jest.Mock;
 
 const OWNER: { type: 'user'; userId: string } = { type: 'user', userId: 'user_1' };
+const ORG_OWNER: { type: 'organization'; organizationId: string; userId: string } = {
+  type: 'organization',
+  organizationId: 'org_1',
+  userId: 'user_1',
+};
 const INSTANCE_URL = 'https://gitlab.example.com';
 const PROJECT_PATH = 'group/sub/repo';
 
@@ -84,6 +89,12 @@ const integrationRow = {
   owned_by_organization_id: null,
   metadata: { gitlab_instance_url: INSTANCE_URL },
   repositories: [{ id: 7, name: 'repo', full_name: PROJECT_PATH, private: true }],
+} as unknown as PlatformIntegration;
+
+const ORG_INTEGRATION_ROW = {
+  ...integrationRow,
+  owned_by_user_id: null,
+  owned_by_organization_id: 'org_1',
 } as unknown as PlatformIntegration;
 
 const mrFixture = {
@@ -714,6 +725,32 @@ describe('listInbox', () => {
 
     expect(page.items).toEqual([]);
   });
+
+  it('reports a provider permission refusal as a reconnect, never as the caller permission', async () => {
+    mockFetchGitLabUser.mockRejectedValue(new GitLabApiStatusError(403, 'GitLab user fetch: 403'));
+
+    const error = await captureRejection(listInbox(OWNER));
+
+    // The inbox lists the account's own review requests: a 403 there is the
+    // connection's, not the organization member's permission.
+    expect(error).toBeInstanceOf(GitLabReviewError);
+    expect(error.kind).toBe('reconnect');
+    expect(error.retryable).toBe(false);
+    expect(error.message).toMatch(/reconnect/i);
+  });
+
+  it('wraps an organization connection refusal with inbox copy', async () => {
+    mockFetchGitLabUser.mockRejectedValue(new GitLabApiStatusError(403, 'GitLab user fetch: 403'));
+
+    const error = await captureRejection(listInbox(ORG_OWNER));
+
+    // The owner-aware classifier resolves the organization connection's 403 to
+    // a reconnect on its own; the inbox keeps copy that names the list the
+    // reader asked for instead of a merge request the request never mentioned.
+    expect(error.kind).toBe('reconnect');
+    expect(error.retryable).toBe(false);
+    expect(error.message).toMatch(/review requests/i);
+  });
 });
 
 describe('getMergeState', () => {
@@ -904,13 +941,37 @@ describe('provider failures reach the four mobile states', () => {
     expect(error.message).not.toContain('glpat-mock-token');
   });
 
-  it('classifies an adapter 403 throw as forbidden', async () => {
+  it('classifies an adapter 403 throw as forbidden for a personal connection', async () => {
     mockFetchGitLabMergeRequest.mockRejectedValue(new Error('GitLab MR fetch failed: 403'));
 
     await expect(getMergeState(OWNER, PROJECT_PATH, 12)).rejects.toMatchObject({
       kind: 'forbidden',
       retryable: false,
     });
+  });
+
+  // The merge request belongs to the organization's connection: its refusal
+  // says the connection cannot read the project, not that the reader lacks
+  // permission, so the recoverable reconnect state is the honest one.
+  it('classifies an organization connection 403 on the merge request as reconnect', async () => {
+    mockGetIntegrationForOwner.mockResolvedValue(ORG_INTEGRATION_ROW);
+    mockFetchGitLabMergeRequest.mockRejectedValue(new Error('GitLab MR fetch failed: 403'));
+
+    const error = await captureRejection(getMergeState(ORG_OWNER, PROJECT_PATH, 12));
+
+    expect(error.kind).toBe('reconnect');
+    expect(error.retryable).toBe(false);
+    expect(error.message).toMatch(/reconnect/i);
+  });
+
+  it('classifies a refused credential on an organization read as reconnect', async () => {
+    mockGetIntegrationForOwner.mockResolvedValue(ORG_INTEGRATION_ROW);
+    fetchMock.mockImplementation(() => Promise.resolve(jsonResponse({ message: '401' }, 401)));
+
+    const error = await captureRejection(listChangedFiles(ORG_OWNER, PROJECT_PATH, 12));
+
+    expect(error.kind).toBe('reconnect');
+    expect(error.retryable).toBe(false);
   });
 
   it('classifies a network failure as retryable', async () => {

@@ -10,9 +10,8 @@ const storageKeySegmentSchema = z
   });
 
 /**
- * Ids that are also the root of an item identity namespace (`message/<id>`, `part/<messageId>/<id>`,
- * `agent_notification/<id>`). Every stored item type owns its own namespace, so an identity segment
- * that names one of them is rejected at the ingest boundary.
+ * Item-type roots that start an item id (`message/<id>`, `part/<messageId>/<id>`,
+ * `agent_notification/<id>`). An identity segment equal to one of these roots is refused.
  */
 const RESERVED_IDENTITY_SEGMENTS: Record<string, true> = {
   message: true,
@@ -22,7 +21,7 @@ const RESERVED_IDENTITY_SEGMENTS: Record<string, true> = {
 
 const identitySegmentSchema = storageKeySegmentSchema.refine(
   segment => !Object.hasOwn(RESERVED_IDENTITY_SEGMENTS, segment),
-  { message: 'storage key segments must not be a reserved identity namespace' }
+  { message: 'storage key segments must not repeat an item-type root' }
 );
 
 export const SessionItemSchema = z.discriminatedUnion('type', [

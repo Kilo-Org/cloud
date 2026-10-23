@@ -265,11 +265,12 @@ test('registers user data export with worktree-aware ports and dependencies', ()
   assert.equal(service.port, 8818 + portOffset);
   assert.deepEqual(service.dependsOn, ['postgres', 'nextjs']);
   assert.deepEqual(resolveTargets(['data-export']), [
-    'redis',
     'postgres',
+    'redis',
     'stripe',
-    'redis-http',
+    'cloudflare-git-token-service',
     'cloudflare-session-ingest',
+    'redis-http',
     'ai-gateway',
     'nextjs',
     'user-data-export',
@@ -293,6 +294,41 @@ test('starts the session-ingest worker whenever the web app starts', () => {
   assert.equal(worker.type, 'worker');
   assert.equal(worker.dir, 'services/session-ingest');
   assert.equal(worker.port, 8800 + portOffset);
+});
+
+test('starts the git-token worker whenever the web app starts', () => {
+  // Every code-review read and write resolves the caller's provider credential
+  // through git-token-service, so starting the web stack must pull the worker in
+  // transitively — otherwise the fetch hits a dead GIT_TOKEN_SERVICE_API_URL and
+  // a connected provider renders as a service outage with no rows.
+  const appTargets = resolveTargets(['app']);
+
+  assert.ok(
+    appTargets.includes('cloudflare-git-token-service'),
+    `expected cloudflare-git-token-service in app start targets, got: ${appTargets.join(', ')}`
+  );
+  assert.ok(
+    appTargets.indexOf('cloudflare-git-token-service') < appTargets.indexOf('nextjs'),
+    `expected cloudflare-git-token-service before nextjs, got: ${appTargets.join(', ')}`
+  );
+
+  const worker = getService('cloudflare-git-token-service');
+  assert.equal(worker.type, 'worker');
+  assert.equal(worker.dir, 'services/git-token-service');
+  assert.equal(worker.port, 8802 + portOffset);
+});
+
+test('runs kilo-mcp with the cloud-agent group on its wrangler port', () => {
+  const targets = resolveTargets(['cloud-agent']);
+  assert.ok(
+    targets.includes('kilo-mcp'),
+    `expected kilo-mcp in cloud-agent start targets, got: ${targets.join(', ')}`
+  );
+
+  const worker = getService('kilo-mcp');
+  assert.equal(worker.type, 'worker');
+  assert.equal(worker.dir, 'services/kilo-mcp');
+  assert.equal(worker.port, 8815 + portOffset);
 });
 
 test('points both user data export Hyperdrive bindings at the offset database', () => {

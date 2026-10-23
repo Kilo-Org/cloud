@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { MIN_TAP_TARGET_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import {
   COMMENT_ACTIONS_FRAME_DP,
   COMMENT_ACTIONS_HIT_SLOP,
@@ -79,21 +79,19 @@ describe('comment trailing controls tap areas', () => {
     expect(clearance).toBe(5.5);
   });
 
-  it('keeps the overflow frame at or above the 28dp the size audit measures', () => {
+  it('keeps the overflow frame at or above the 48dp Android minimum', () => {
     // h-7 measured 24.5dp on device (NativeWind's rem is 14pt) and was
     // reported as too small to tap.
-    expect(COMMENT_ACTIONS_FRAME_DP).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+    expect(COMMENT_ACTIONS_FRAME_DP).toBeGreaterThanOrEqual(ICON_TARGET_DP);
     expect(COMMENT_ACTIONS_VISUAL_DP).toBeLessThan(COMMENT_ACTIONS_FRAME_DP);
   });
 
-  it('keeps both controls at the 44pt minimum touch target', () => {
+  it('keeps both controls at the design touch target', () => {
     // The pill renders 23pt tall (FIX_WITH_KILO_VISUAL_DP: a 1rem `text-xs`
     // line box, `py-1` per side and the border, at NativeWind's 14pt rem), so
-    // the overflow reaches 44pt from its frame plus the slop on every side and
-    // the pill needs its own vertical slop to get there.
-    expect(
-      COMMENT_ACTIONS_FRAME_DP + COMMENT_ACTIONS_HIT_SLOP.top + COMMENT_ACTIONS_HIT_SLOP.bottom
-    ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    // the pill needs its own vertical slop to reach the target; the overflow's
+    // 48dp frame alone clears it.
+    expect(COMMENT_ACTIONS_FRAME_DP).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
     expect(
       FIX_WITH_KILO_HIT_SLOP.top + FIX_WITH_KILO_HIT_SLOP.bottom + FIX_WITH_KILO_VISUAL_DP
     ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);

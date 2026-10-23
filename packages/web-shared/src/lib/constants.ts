@@ -14,7 +14,7 @@ export const allow_fake_login =
 
 export const MINIMUM_TOP_UP_AMOUNT = 10;
 export const MAXIMUM_TOP_UP_AMOUNT = 10_000;
-export const ORGANIZATION_ID_HEADER = 'x-kilocode-organizationid'; // We pass X-KiloCode-OrganizationId header to identify the organization in API requests
+export const ORGANIZATION_ID_HEADER = 'x-kilocode-organizationid';
 
 export const LANDING_URL =
   process.env.NODE_ENV === 'production' ? 'https://kilo.ai' : 'http://localhost:3001';

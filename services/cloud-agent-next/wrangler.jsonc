@@ -74,7 +74,7 @@
     "CONTAINER_BILLING_HEARTBEAT_SECONDS": "300",
     "RUNTIME_ISOLATION_ENABLED": "true",
     "SANDBOX_SELECTION_IDS": "9d278969-5453-4ae3-a51f-a8d2274a7b56,30f1620a-4aad-4456-bf4d-550f335e6f55",
-    "CONTAINER_REPO_SNAPSHOT_IDS": "2bbc9955-5dc2-428c-a353-be59d89a8130",
+    "CONTAINER_REPO_SNAPSHOT_IDS": "",
     "CLOUDFLARE_CONTAINERS_ORG_IDS": "*",
     "PREVIEW_HOST_SUFFIX": "cloud-agent.kiloapps.ai",
     "PREVIEW_ENABLED_IDS": "*",
@@ -86,8 +86,7 @@
     "VERCEL_SANDBOX_RUNTIME": "node24",
     "VERCEL_SANDBOX_INITIAL_TIMEOUT_MS": "",
     "VERCEL_SANDBOX_EXTEND_DURATION_MS": "",
-    "CODE_REVIEW_CONTROL_PLANE_IDS": "*",
-    "CODE_REVIEW_CONTAINERS_ORG_IDS": "9d278969-5453-4ae3-a51f-a8d2274a7b56",
+    "CODE_REVIEW_CONTAINERS_ORG_IDS": "*",
   },
   "placement": { "mode": "smart" },
   /**
@@ -327,10 +326,6 @@
         "name": "SandboxCodeReviewContainment",
       },
       {
-        "class_name": "CloudAgentSession",
-        "name": "CLOUD_AGENT_SESSION",
-      },
-      {
         "class_name": "StreamTicketNonceDO",
         "name": "STREAM_TICKET_NONCE_DO",
       },
@@ -499,7 +494,6 @@
         "CLOUD_AGENT_CONTAINER_BILLING_ENABLED": "false",
         "CLOUD_AGENT_CONTAINER_BILLING_USER_IDS": "",
         "CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS": "",
-        "CODE_REVIEW_CONTROL_PLANE_IDS": "*",
         "CODE_REVIEW_CONTAINERS_ORG_IDS": "",
         "RUNTIME_ISOLATION_ENABLED": "true",
         "SANDBOX_SELECTION_IDS": "*",
@@ -676,10 +670,6 @@
           {
             "class_name": "SandboxCodeReviewContainment",
             "name": "SandboxCodeReviewContainment",
-          },
-          {
-            "class_name": "CloudAgentSession",
-            "name": "CLOUD_AGENT_SESSION",
           },
           {
             "class_name": "StreamTicketNonceDO",

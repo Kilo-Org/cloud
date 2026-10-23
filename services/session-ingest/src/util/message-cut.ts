@@ -9,9 +9,9 @@ import { parsePartItemIdentity } from './compaction';
  * whole session, so files are rebuilt from the kept messages' summary diffs.
  *
  * The test reads only the ingest item identity (`message/{messageId}` for
- * messages, `part/{messageId}/{partId}` for parts, plus `{messageId}/{partId}`
- * for parts stored before parts had their own namespace), never the item body,
- * so it works the same for inline and R2-backed rows.
+ * messages, `part/{messageId}/{partId}` for parts, and `{messageId}/{partId}`
+ * for part rows in the older layout), never the item body, so it works the same
+ * for inline and R2-backed rows.
  */
 export function isItemWithinMessageCut(
   item: { itemType: string; itemId: string },

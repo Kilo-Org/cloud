@@ -99,9 +99,13 @@ const post = (caller: HttpCaller, sending: Sending): Effect.Effect<HttpResponse,
             try: () => response.text(),
             catch: cause => cause,
           }).pipe(
-            Effect.merge,
-            Effect.flatMap(cause =>
-              Effect.fail(new ModelError({ reason: 'status', status: response.status, cause }))
+            Effect.mapError(
+              cause => new ModelError({ reason: 'status', status: response.status, cause })
+            ),
+            Effect.flatMap(body =>
+              Effect.fail(
+                new ModelError({ reason: 'status', status: response.status, cause: body })
+              )
             )
           )
     ),

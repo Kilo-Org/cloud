@@ -329,9 +329,9 @@ describe('SessionItemSchema storage key identity', () => {
   });
 });
 
-describe('SessionItemSchema reserved identity segments', () => {
+describe('SessionItemSchema identity segments', () => {
   it.each(['message', 'part', 'agent_notification'])(
-    'rejects a part whose message id is the reserved segment %s',
+    'refuses a part whose message id equals the %s root',
     reserved => {
       expect(
         SessionItemSchema.safeParse({
@@ -343,7 +343,7 @@ describe('SessionItemSchema reserved identity segments', () => {
   );
 
   it.each(['message', 'part', 'agent_notification'])(
-    'rejects a message whose id is the reserved segment %s',
+    'refuses a message whose id equals the %s root',
     reserved => {
       expect(SessionItemSchema.safeParse({ type: 'message', data: { id: reserved } }).success).toBe(
         false
@@ -366,7 +366,7 @@ describe('SessionItemSchema reserved identity segments', () => {
     ).toBe(true);
   });
 
-  it('accepts a part id that matches a reserved segment', () => {
+  it('accepts a part id equal to an item-type root', () => {
     expect(
       SessionItemSchema.safeParse({
         type: 'part',

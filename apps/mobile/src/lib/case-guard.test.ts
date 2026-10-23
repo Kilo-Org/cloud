@@ -46,6 +46,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'lib/chat/backend-store.ts': 'HTTP header-name comparison',
   'lib/chat/backend-url.ts': 'hostname comparison',
   'lib/chat/gguf-catalog.ts': 'file-extension comparison',
+  'lib/chat/hf-catalog.ts': 'SPDX id lookup key',
   'lib/auth/use-native-auth.ts': 'email normalization',
   'lib/telemetry/install-error-reporting.ts': 'hostname comparison',
   'lib/pr-review/diff/highlight.ts': 'file-extension normalization',
@@ -67,6 +68,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'components/agents/markdown-html-tree.ts': 'HTML tag-name comparison',
   'components/agents/markdown-image.tsx': 'hostname comparison',
   'components/agents/markdown-link-confirm.ts': 'hostname comparison',
+  'components/agents/new-session-repository-state.ts': 'repository host comparison',
   'components/agents/new-session-prefill.ts': 'repo full-name comparison',
   'components/agents/repo-selector.tsx': 'repo key normalization',
   'components/agents/session-terminal-error.ts': 'service-message classification',
@@ -76,7 +78,6 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'components/profiles/profile-agents-model.ts': 'agent-slug comparison',
   'components/profiles/kilo-command-form-sheet.tsx': 'slash-command name normalization',
   'components/profiles/repo-bindings-model.ts': 'repository full-name search and comparison',
-  'components/todos/todo-link-session-sheet.tsx': 'repository full-name comparison',
   'app/(app)/kiloclaw/[instance-id]/settings/model-list.tsx': 'model search folding',
 };
 

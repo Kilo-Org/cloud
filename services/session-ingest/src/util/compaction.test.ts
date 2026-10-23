@@ -16,28 +16,28 @@ function item(type: string, data: Record<string, unknown> = {}): SessionDataItem
 }
 
 describe('getPartItemIdentityRange', () => {
-  it('returns the exact binary prefix range inside the part namespace', () => {
+  it('returns the exact binary prefix range of the part layout', () => {
     expect(getPartItemIdentityRange('msg_parent')).toEqual({
       start: 'part/msg_parent/',
       end: 'part/msg_parent0',
     });
   });
 
-  it('returns the exact binary prefix range of the previous layout', () => {
+  it('returns the exact binary prefix range of the older layout', () => {
     expect(getPreviousPartItemIdentityRange('msg_parent')).toEqual({
       start: 'msg_parent/',
       end: 'msg_parent0',
     });
   });
 
-  it('lists the current layout first and keeps both ranges disjoint for a normal message id', () => {
+  it('lists the current layout range first', () => {
     expect(getPartItemIdentityRanges('msg_parent')).toEqual([
       { start: 'part/msg_parent/', end: 'part/msg_parent0' },
       { start: 'msg_parent/', end: 'msg_parent0' },
     ]);
   });
 
-  it('nests the current range inside the previous one when the message id is a reserved namespace', () => {
+  it('returns both ranges for every message id', () => {
     const [current, previous] = getPartItemIdentityRanges('part');
     expect(current).toEqual({ start: 'part/part/', end: 'part/part0' });
     expect(previous).toEqual({ start: 'part/', end: 'part0' });
@@ -55,7 +55,7 @@ describe('parsePartItemIdentity', () => {
     });
   });
 
-  it('splits an id stored under the previous layout', () => {
+  it('splits an id stored under the older layout', () => {
     expect(parsePartItemIdentity('msg_42/prt_1')).toEqual({
       messageId: 'msg_42',
       partId: 'prt_1',
@@ -63,7 +63,7 @@ describe('parsePartItemIdentity', () => {
     });
   });
 
-  it('splits a previous-layout id whose message id is "part"', () => {
+  it('splits an older-layout id whose message id is a single segment', () => {
     expect(parsePartItemIdentity('part/prt_1')).toEqual({
       messageId: 'part',
       partId: 'prt_1',
@@ -102,7 +102,7 @@ describe('getItemIdentity', () => {
     });
   });
 
-  it('gives a part its own identity namespace', () => {
+  it('keys a part under the part root', () => {
     const partIdentity = getItemIdentity(item('part', { id: 'p-1', messageID: 'message' }));
     const messageIdentity = getItemIdentity(item('message', { id: 'p-1' }));
     expect(partIdentity.item_id).not.toBe(messageIdentity.item_id);

@@ -85,7 +85,7 @@ const makePending = (entropy: EntropySourceService): Effect.Effect<Pending> =>
 const enqueue = (pending: Pending, entry: Omit<Waiting, 'id'>): Effect.Effect<string> =>
   Effect.flatMap(makeId(pending.entropy, idPrefix), id =>
     Ref.update(pending.waiting, held => [...held, { ...entry, id }]).pipe(
-      Effect.zipRight(Queue.offer(pending.arrived, id)),
+      Effect.andThen(Queue.offer(pending.arrived, id)),
       Effect.as(id)
     )
   );

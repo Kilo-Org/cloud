@@ -1,5 +1,5 @@
 import { createElement } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { type TodoItemDetail } from '@/lib/todos/todo-types';
@@ -85,6 +85,7 @@ function renderNotes(notes: string): TestRenderer.ReactTestRenderer {
   if (!ref.current) {
     throw new Error('notes section did not mount');
   }
+  onTestFinished(ref.current.unmount);
   return ref.current;
 }
 

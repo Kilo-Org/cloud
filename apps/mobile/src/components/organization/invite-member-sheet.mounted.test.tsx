@@ -96,6 +96,9 @@ beforeEach(() => {
   boundary.isResolving = false;
   invite.isPending = false;
   invite.isError = false;
+  invite.error = {
+    data: { code: 'CONFLICT', message: 'This email already has a pending invitation' },
+  };
   invite.mutate.mockClear();
   invite.reset.mockClear();
   focus.effects = [];
@@ -274,6 +277,32 @@ describe('InviteMemberSheet reopen', () => {
     });
 
     expect(inviteMessage(rendered)).toBe(i18n.t('organization.inviteMember.alreadyInvited'));
+    rendered.unmount();
+  });
+
+  it('places a rejected address on the email field and drops it on the next open', async () => {
+    const rendered = await openSheet();
+    act(() => {
+      fieldProps(rendered).onChangeText('dev@example.com');
+    });
+    act(() => {
+      headerProps(rendered).onDone();
+    });
+
+    invite.isError = true;
+    invite.error = { data: { code: 'BAD_REQUEST', message: 'Invalid email address' } };
+    act(() => {
+      fieldProps(rendered).onChangeText('');
+    });
+    act(() => {
+      fieldProps(rendered).onChangeText('dev@example.com');
+    });
+
+    expect(errorMessage(rendered)).toBe(i18n.t('organization.inviteMember.emailError'));
+
+    refocus();
+
+    expect(errorMessage(rendered)).toBeNull();
     rendered.unmount();
   });
 

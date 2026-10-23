@@ -2231,7 +2231,7 @@
       "invalidLink": "此链接无法打开。",
       "hostConfirmTitle": "打开外部链接？",
       "hostConfirmMessage": "此链接将在你的浏览器中打开 {{host}}。",
-      "open": "开启",
+      "open": "打开",
       "trustThisHost": "信任此主机"
     },
     "folderPicker": {
@@ -2676,7 +2676,7 @@
       "openAccessibility": "打开拉取请求或合并请求",
       "clearLink": "清除链接",
       "pasteLink": "粘贴拉取请求或合并请求链接",
-      "open": "开启"
+      "open": "打开"
     },
     "eventChips": {
       "comment": "评论",

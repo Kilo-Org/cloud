@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_SEARCH_LIMIT } from './search';
+import { MAX_SEARCH_LIMIT, MAX_SEARCH_QUERY_LENGTH } from './search';
 import {
   MAX_CLIENT_HEADER_LENGTH,
   callArgsSchema,
@@ -119,6 +119,17 @@ describe('searchArgsSchema', () => {
     expect(searchArgsSchema.safeParse({ query: '' }).success).toBe(false);
     expect(searchArgsSchema.safeParse({ query: '   ' }).success).toBe(false);
     expect(searchArgsSchema.safeParse({}).success).toBe(false);
+  });
+
+  it('accepts a query at the maximum length and rejects one character more', () => {
+    expect(searchArgsSchema.safeParse({ query: 'q'.repeat(MAX_SEARCH_QUERY_LENGTH) }).success).toBe(
+      true
+    );
+    const over = searchArgsSchema.safeParse({ query: 'q'.repeat(MAX_SEARCH_QUERY_LENGTH + 1) });
+    expect(over.success).toBe(false);
+    expect(JSON.stringify(over.error?.issues)).toContain(
+      `at most ${MAX_SEARCH_QUERY_LENGTH} characters`
+    );
   });
 
   it('rejects a limit outside the range or not an integer', () => {

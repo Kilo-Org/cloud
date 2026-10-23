@@ -32,7 +32,7 @@ const enrichmentRows = [
   title: `Title ${row.session_id}`,
   git_url: null,
   last_activity_at: null,
-  status_updated_at: null,
+  status_updated_at: null as string | null,
   total_cost_microdollars: null,
   session_pr_platform: null,
   session_pr_url: null,
@@ -47,6 +47,13 @@ const enrichmentRows = [
   pr_review_decision: null,
   review_decision_pending: null,
   ...row,
+}));
+
+const liveSessions = ['former-org', 'personal', 'active-org', 'unattributed'].map(id => ({
+  id,
+  status: 'busy',
+  title: `Live ${id}`,
+  connectionId: 'cli',
 }));
 
 const where = jest.fn(async () => enrichmentRows);
@@ -76,12 +83,7 @@ jest.mock('@/lib/bounded-service-fetch', () => ({
   fetchWithinBudget: jest.fn(async () => ({
     ok: true,
     json: async () => ({
-      sessions: ['former-org', 'personal', 'active-org', 'unattributed'].map(id => ({
-        id,
-        status: 'busy',
-        title: `Live ${id}`,
-        connectionId: 'cli',
-      })),
+      sessions: liveSessions,
     }),
   })),
 }));
@@ -102,6 +104,9 @@ beforeEach(() => {
   chain.from.mockClear();
   chain.leftJoin.mockClear();
   where.mockClear();
+  for (const session of liveSessions) {
+    session.status = 'busy';
+  }
 });
 
 describe('listActiveSessions heartbeat enrichment', () => {
@@ -123,4 +128,62 @@ describe('listActiveSessions heartbeat enrichment', () => {
     expect(byId.get('unattributed')?.organizationId).toBeNull();
     expect(byId.has('former-org')).toBe(false);
   });
+
+  it.each([
+    ['question', 'idle'],
+    ['question', 'busy'],
+    ['permission', 'idle'],
+    ['permission', 'busy'],
+  ])(
+    'omits an earlier timestamp for live %s ahead of stored %s',
+    async (liveStatus, storedStatus) => {
+      liveSessions.forEach(session => {
+        session.status = liveStatus;
+      });
+      where.mockResolvedValueOnce(
+        enrichmentRows.map(row => ({
+          ...row,
+          status: storedStatus,
+          status_updated_at: '2026-09-22 09:15:00+00',
+        }))
+      );
+
+      const result = await listActiveSessions({
+        userId: 'user-1',
+        organizationId: undefined,
+        includeCloudAgentSessions: false,
+      });
+
+      expect(result.sessions.find(session => session.id === 'personal')).toMatchObject({
+        status: liveStatus,
+      });
+      expect(result.sessions.find(session => session.id === 'personal')).not.toHaveProperty(
+        'statusUpdatedAt'
+      );
+    }
+  );
+
+  it.each(['question', 'permission', 'busy'])(
+    'keeps the dated stored %s status when it remains the resolved status',
+    async storedStatus => {
+      where.mockResolvedValueOnce(
+        enrichmentRows.map(row => ({
+          ...row,
+          status: storedStatus,
+          status_updated_at: '2026-09-22 09:15:00+00',
+        }))
+      );
+
+      const result = await listActiveSessions({
+        userId: 'user-1',
+        organizationId: undefined,
+        includeCloudAgentSessions: false,
+      });
+
+      expect(result.sessions.find(session => session.id === 'personal')).toMatchObject({
+        status: storedStatus,
+        statusUpdatedAt: '2026-09-22T09:15:00.000Z',
+      });
+    }
+  );
 });

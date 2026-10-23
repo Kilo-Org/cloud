@@ -21,10 +21,13 @@ export function announceForA11y(message: string): void {
 }
 
 /**
- * Move assistive-technology focus to a mounted native host. A missing host or
- * throwing native call returns false so the caller can choose another target.
+ * Request assistive-technology focus on a mounted native host.
+ * `true` means the host existed and the request was dispatched without throwing,
+ * not that focus moved: `sendAccessibilityEvent` reports no outcome.
+ * `false` means the host was missing or the native call threw (swallowed), so a
+ * caller can retry when the host mounts or choose another target.
  */
-export function moveA11yFocus(ref: RefObject<HostInstance | null>): boolean {
+export function requestA11yFocus(ref: RefObject<HostInstance | null>): boolean {
   const node = ref.current;
   if (node == null) {
     return false;

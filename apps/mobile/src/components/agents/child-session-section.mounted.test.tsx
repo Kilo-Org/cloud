@@ -223,7 +223,6 @@ function rootAssistantMessage(): StoredMessage {
   };
 }
 
-/** The task input the `real-session-excerpt` event stream carried. */
 function taskInput(): Record<string, unknown> {
   return {
     description: 'Read memory bank files',

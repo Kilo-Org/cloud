@@ -2077,8 +2077,15 @@
     {
       "idx": 296,
       "version": "7",
-      "when": 1792709101975,
-      "tag": "0296_gifted_black_cat",
+      "when": 1792693880283,
+      "tag": "0296_orange_jack_power",
+      "breakpoints": true
+    },
+    {
+      "idx": 297,
+      "version": "7",
+      "when": 1792780492588,
+      "tag": "0297_contributor_credit_window",
       "breakpoints": true
     }
   ]

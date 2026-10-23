@@ -256,7 +256,7 @@ async function approveVisiblePermission(
               organizationId,
             })
           : trpcClient.cloudAgentNext.answerPermission.mutate(answer));
-        ackSessionAttention(row.id);
+        ackSessionAttention(row.id, row.status, row.statusUpdatedAt);
         return { kind: 'approved', answeredSessionId: row.id };
       }
     }

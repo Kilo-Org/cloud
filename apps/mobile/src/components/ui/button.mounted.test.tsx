@@ -55,6 +55,9 @@ function render(element: ReactElement) {
   return renderer.root.findByType(Pressable);
 }
 
+const busyWrappers = (node: TestRenderer.ReactTestInstance) =>
+  node.findAll(n => `${n.props.className ?? ''}`.startsWith(BUTTON_BUSY_LABEL_CLASS));
+
 function renderButton({
   children = createElement(Text, null, 'Retry'),
   ...props
@@ -215,7 +218,8 @@ describe('Button native target contract', () => {
     // The label stays in the row, so a content-sized button keeps exactly the
     // width its label needs and nothing shifts when the request starts.
     expect(button.findByType(NativeText)).toBe(label);
-    const wrappers = button.findAllByProps({ className: `${BUTTON_BUSY_LABEL_CLASS} opacity-0` });
+    const wrappers = busyWrappers(button);
+    expect(wrappers[0]?.props.className).toContain('opacity-0');
     expect(wrappers).toHaveLength(1);
     expect(wrappers[0]?.props.accessibilityElementsHidden).toBe(true);
     expect(wrappers[0]?.props.importantForAccessibility).toBe('no-hide-descendants');
@@ -232,12 +236,13 @@ describe('Button native target contract', () => {
     const ready = renderButton({ loading: false });
     expect(ready.findByType(NativeText)).toBe(label);
     expect(ready.findAllByType(ActivityIndicator)).toHaveLength(0);
-    expect(ready.findAllByProps({ className: BUTTON_BUSY_LABEL_CLASS })).toHaveLength(1);
+    expect(busyWrappers(ready)).toHaveLength(1);
+    expect(busyWrappers(ready)[0]?.props.className).not.toContain('opacity-0');
   });
 
   it('leaves a button that never loads without a busy wrapper', () => {
     const button = renderButton({});
-    expect(button.findAllByProps({ className: BUTTON_BUSY_LABEL_CLASS })).toHaveLength(0);
+    expect(busyWrappers(button)).toHaveLength(0);
     expect(button.findAllByProps({ className: BUTTON_BUSY_OVERLAY_CLASS })).toHaveLength(0);
     expect(button.findByType(NativeText).children).toEqual(['Retry']);
   });

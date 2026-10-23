@@ -48,7 +48,7 @@ const SM_HIT_SLOP = { top: 4, bottom: 4, left: 4, right: 4 };
 // request starts or ends; the spinner is painted over the button's centre, out
 // of flow, so it adds no width of its own. The hidden label also leaves the
 // accessibility tree, because the button carries its own busy name.
-export const BUTTON_BUSY_LABEL_CLASS = 'min-w-0 shrink flex-row items-center justify-center gap-2';
+export const BUTTON_BUSY_LABEL_CLASS = 'min-w-0 shrink flex-row items-center justify-center';
 export const BUTTON_BUSY_OVERLAY_CLASS = 'absolute inset-0 items-center justify-center';
 
 /**
@@ -172,6 +172,10 @@ function Button({
   // its original children untouched. The fixed `icon` size has no label to
   // replace, so it draws the indicator inline instead.
   const usesBusyLayout = loading !== undefined && size !== 'icon';
+  // The children sit one level deeper in that layout, so their spacing moves
+  // inside the wrapper: it takes the gap the row's size sets, or a compact
+  // button would change from 6px to 8px between its icon and label.
+  const busyLabelGap = size === 'sm' ? 'gap-1.5' : 'gap-2';
   const busyIndicator = loading ? (
     <ActivityIndicator size="small" color={spinnerColor(variant, colors)} />
   ) : null;
@@ -218,7 +222,7 @@ function Button({
       >
         {usesBusyLayout ? (
           <View
-            className={cn(BUTTON_BUSY_LABEL_CLASS, loading && 'opacity-0')}
+            className={cn(BUTTON_BUSY_LABEL_CLASS, busyLabelGap, loading && 'opacity-0')}
             accessibilityElementsHidden={loading}
             importantForAccessibility={loading ? 'no-hide-descendants' : 'auto'}
           >

@@ -83,6 +83,10 @@ const mockSettleOperation = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockGetSecurityAgentCommandStatus = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockGetSecurityAgentCommandStatuses = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockGetReauthorizeUrl = jest.fn<(installationId: string) => string>();
+const mockFetchGitHubRepositories =
+  jest.fn<(installationId: string, appType: string, integrationId: string) => Promise<unknown[]>>();
+const mockUpdateRepositoriesForIntegration =
+  jest.fn<(integrationId: string, repositories: unknown[]) => Promise<void>>();
 
 jest.mock('../services/manual-sync-client', () => ({
   submitManualSecuritySync: mockSubmitManualSecuritySync,
@@ -166,10 +170,10 @@ jest.mock('../services/auto-dismiss-service', () => ({
   countEligibleForAutoDismiss: jest.fn(),
 }));
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
-  updateRepositoriesForIntegration: jest.fn(),
+  updateRepositoriesForIntegration: mockUpdateRepositoriesForIntegration,
 }));
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
-  fetchGitHubRepositories: jest.fn(),
+  fetchGitHubRepositories: mockFetchGitHubRepositories,
 }));
 
 let createSecurityAgentHandlers: typeof createSecurityAgentHandlersType;
@@ -2087,5 +2091,142 @@ describe('findings list DTO narrowing', () => {
     expect(result.raw_data).toBeDefined();
     expect(result.analysis).toEqual(decoratedFinding.analysis);
     expect(result.remediationSummary?.latestAttempt).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cached repository snapshot
+//
+// `platform_integrations.repositories` is typed `number | string` ids, and the
+// strict reader other modules use throws on an id it cannot match. Every
+// findings-decorating procedure reads the snapshot through one tolerant reader,
+// so a damaged snapshot costs those repositories their scope instead of
+// answering 500 for the whole findings surface.
+// ---------------------------------------------------------------------------
+
+const ORGANIZATION_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+function createHandlersWithRepositorySnapshot(repositories: unknown[]) {
+  return createSecurityAgentHandlers({
+    resolveOwner: () => ({ type: 'org', id: ORGANIZATION_ID, userId: 'user-123' }),
+    resolveSecurityOwner: () => ({ organizationId: ORGANIZATION_ID }),
+    resolveResourceId: () => ORGANIZATION_ID,
+    verifyFindingOwnership: () => true,
+    getIntegration: async () =>
+      ({
+        id: 'integration-123',
+        integration_status: 'active',
+        platform_installation_id: 'installation-123',
+        github_app_type: 'standard',
+        repositories,
+      }) as never,
+    trackingExtras: () => ({}),
+  });
+}
+
+const snapshotFinding = {
+  id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  owned_by_organization_id: ORGANIZATION_ID,
+  owned_by_user_id: null,
+  repo_full_name: 'kilo/repo',
+  status: 'open',
+  raw_data: { number: 42 },
+} as never;
+
+const unreadableSnapshot = [{ id: '1', full_name: 'kilo/repo', name: 'repo', private: true }];
+const mixedSnapshot = [
+  { id: 1, full_name: 'kilo/repo', name: 'repo', private: true },
+  { id: '2', full_name: 'kilo/other', name: 'other', private: true },
+];
+
+describe('cached repository snapshot', () => {
+  beforeEach(() => {
+    mockListSecurityFindings.mockResolvedValue({ findings: [snapshotFinding], totalCount: 1 });
+    mockDecorateFindingsWithRemediation.mockResolvedValue([snapshotFinding]);
+    mockCanStartAnalysis.mockResolvedValue({ allowed: true, currentCount: 0, limit: 3 });
+    mockGetSecurityFindingById.mockResolvedValue(snapshotFinding);
+    mockDecorateFindingWithRemediation.mockResolvedValue(snapshotFinding);
+  });
+
+  it('still lists findings when every cached repository id is unreadable', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(
+      createHandlersWithRepositorySnapshot(unreadableSnapshot).listFindings.handler({
+        ctx: context,
+        input: { sortBy: 'severity_desc', limit: 10, offset: 0 },
+      })
+    ).resolves.toMatchObject({ totalCount: 1 });
+
+    expect(mockDecorateFindingsWithRemediation).toHaveBeenCalledWith(
+      expect.objectContaining({ repoFullNamesInScope: [] })
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining('ignored unreadable cached repositories'),
+      expect.objectContaining({ ownerId: ORGANIZATION_ID, ignoredCount: 1 })
+    );
+    consoleError.mockRestore();
+  });
+
+  it('still returns a finding detail when every cached repository id is unreadable', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(
+      createHandlersWithRepositorySnapshot(unreadableSnapshot).getFinding.handler({
+        ctx: context,
+        input: { id: snapshotFinding.id },
+      })
+    ).resolves.toEqual(snapshotFinding);
+    expect(mockDecorateFindingWithRemediation).toHaveBeenCalledWith(
+      expect.objectContaining({ repoFullNamesInScope: [] })
+    );
+    consoleError.mockRestore();
+  });
+
+  it('keeps the repositories that carry a numeric id in a mixed snapshot', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue({
+      config: { repository_selection_mode: 'all' },
+      storedConfig: { repository_selection_mode: 'all' },
+      isEnabled: true,
+      configRevision: 1,
+    });
+
+    await createHandlersWithRepositorySnapshot(mixedSnapshot).listFindings.handler({
+      ctx: context,
+      input: { sortBy: 'severity_desc', limit: 10, offset: 0 },
+    });
+
+    expect(mockDecorateFindingsWithRemediation).toHaveBeenCalledWith(
+      expect.objectContaining({ repoFullNamesInScope: ['kilo/repo'] })
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining('ignored unreadable cached repositories'),
+      expect.objectContaining({ ignoredCount: 1 })
+    );
+    consoleError.mockRestore();
+  });
+
+  it('replaces an unreadable snapshot by refetching it for the repository list', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const fetched = [{ id: 7, full_name: 'kilo/refetched', name: 'refetched', private: false }];
+    mockFetchGitHubRepositories.mockResolvedValue(fetched);
+    mockUpdateRepositoriesForIntegration.mockResolvedValue();
+
+    const repositories = await createHandlersWithRepositorySnapshot(
+      unreadableSnapshot
+    ).getRepositories({ ctx: context, input: {} });
+
+    expect(repositories).toEqual([
+      {
+        id: 7,
+        fullName: 'kilo/refetched',
+        name: 'refetched',
+        private: false,
+        dependabotAlerts: 'unknown',
+      },
+    ]);
+    expect(mockUpdateRepositoriesForIntegration).toHaveBeenCalledWith('integration-123', fetched);
+    consoleError.mockRestore();
   });
 });

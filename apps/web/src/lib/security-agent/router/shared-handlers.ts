@@ -10,7 +10,7 @@ import {
   updateRepositoriesForIntegration,
 } from '@/lib/integrations/db/platform-integrations';
 import { fetchGitHubRepositories } from '@/lib/integrations/platforms/github/adapter';
-import { requireNumericPlatformRepositories } from '@/lib/integrations/core/types';
+import { type PlatformRepository } from '@/lib/integrations/core/types';
 import {
   getSecurityAgentConfigWithStatus,
   upsertSecurityAgentConfig,
@@ -159,11 +159,48 @@ type SecurityAgentDeps<TExtra = {}> = {
   trackingExtras: (ctx: TRPCContext, input: TExtra) => { organizationId?: string };
 };
 
+/**
+ * The owner's cached repository snapshot, reduced to the entries this router
+ * can match by id.
+ *
+ * `platform_integrations.repositories` is shared with other providers and is
+ * typed `number | string` ids, while everything here matches a repository by
+ * numeric id. The strict reader other modules use throws on a snapshot it
+ * cannot read, and every procedure in this router that decorates findings
+ * reads the snapshot this way, so one unreadable entry answered 500 for the
+ * whole findings surface at that owner: the list, the detail and the analysis
+ * panel. Keep the entries that do carry a numeric id, and report the rest, so
+ * a damaged snapshot costs those repositories their scope instead of the page.
+ *
+ * Every consumer fails closed on a shorter list: remediation eligibility
+ * rejects `repo_not_in_scope`, and `getRepositories` refetches and rewrites a
+ * snapshot it found empty.
+ */
+function readRepositorySnapshot(owner: Owner, integration: Integration): PlatformRepository[] {
+  const snapshot = integration?.repositories ?? null;
+  if (!snapshot) {
+    return [];
+  }
+  const repositories = snapshot.filter(
+    (repository): repository is PlatformRepository => typeof repository.id === 'number'
+  );
+  const ignoredCount = snapshot.length - repositories.length;
+  if (ignoredCount > 0) {
+    console.error('Security Agent ignored unreadable cached repositories', {
+      ownerType: owner.type,
+      ownerId: owner.id,
+      ignoredCount,
+    });
+  }
+  return repositories;
+}
+
 function getRepoFullNamesInScope(
+  owner: Owner,
   integration: Integration,
   config: { repository_selection_mode?: 'all' | 'selected'; selected_repository_ids?: number[] }
 ): string[] {
-  const repositories = requireNumericPlatformRepositories(integration?.repositories ?? null) ?? [];
+  const repositories = readRepositorySnapshot(owner, integration);
   if (config.repository_selection_mode === 'all') {
     return repositories.map(repo => repo.full_name).filter((name): name is string => !!name);
   }
@@ -1130,7 +1167,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         // Refuse enabling with an empty effective repo set: no repository would
         // be synced or analyzed, so an enabled state would be misleading.
         if (input.isEnabled) {
-          const effectiveRepos = getRepoFullNamesInScope(integration, {
+          const effectiveRepos = getRepoFullNamesInScope(owner, integration, {
             repository_selection_mode: selectionMode,
             selected_repository_ids: selectedIds,
           });
@@ -1158,7 +1195,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         if (input.isEnabled && integration) {
           const installationId = integration.platform_installation_id;
           if (installationId) {
-            const allRepos = requireNumericPlatformRepositories(integration.repositories) ?? [];
+            const allRepos = readRepositorySnapshot(owner, integration);
 
             let repositoriesToSync: string[];
 
@@ -1253,13 +1290,14 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
     getRepositories: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
+      const owner = deps.resolveOwner(ctx, extra);
       const integration = await deps.getIntegration(ctx, extra);
 
       if (!integration || integration.integration_status !== 'active') {
         return [];
       }
 
-      let repos = requireNumericPlatformRepositories(integration.repositories) ?? [];
+      let repos = readRepositorySnapshot(owner, integration);
       if (repos.length === 0 && integration.platform_installation_id) {
         const appType = integration.github_app_type || 'standard';
         const fetchedRepos = await fetchGitHubRepositories(
@@ -1361,7 +1399,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           findings,
           config,
           isAgentEnabled: configWithStatus?.isEnabled ?? false,
-          repoFullNamesInScope: getRepoFullNamesInScope(integration, config),
+          repoFullNamesInScope: getRepoFullNamesInScope(owner, integration, config),
         });
 
         return {
@@ -1409,7 +1447,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           finding,
           config,
           isAgentEnabled: configWithStatus?.isEnabled ?? false,
-          repoFullNamesInScope: getRepoFullNamesInScope(integration, config),
+          repoFullNamesInScope: getRepoFullNamesInScope(owner, integration, config),
         });
       },
     },
@@ -1476,7 +1514,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        const allRepos = requireNumericPlatformRepositories(integration.repositories) ?? [];
+        const allRepos = readRepositorySnapshot(owner, integration);
 
         let syncScope:
           | { syncType: 'single_repo'; repoCount: number; repoFullName: string }
@@ -1919,7 +1957,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           finding,
           config,
           isAgentEnabled: configWithStatus?.isEnabled ?? false,
-          repoFullNamesInScope: getRepoFullNamesInScope(integration, config),
+          repoFullNamesInScope: getRepoFullNamesInScope(owner, integration, config),
         });
 
         return {
@@ -1993,12 +2031,13 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
     getOrphanedRepositories: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
       const securityOwner = deps.resolveSecurityOwner(ctx, extra);
+      const owner = deps.resolveOwner(ctx, extra);
 
       const integration = await deps.getIntegration(ctx, extra);
 
       const accessibleRepoFullNames: string[] = [];
       if (integration && integration.integration_status === 'active') {
-        const repos = requireNumericPlatformRepositories(integration.repositories) ?? [];
+        const repos = readRepositorySnapshot(owner, integration);
         for (const repo of repos) {
           if (repo.full_name) {
             accessibleRepoFullNames.push(repo.full_name);

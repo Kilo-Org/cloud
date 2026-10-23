@@ -3,7 +3,7 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { PlatformRepository } from '@/lib/integrations/core/types';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
-import crypto from 'crypto';
+import { timingSafeEqual } from '@kilocode/encryption';
 import * as http from 'http';
 import * as https from 'https';
 import {
@@ -565,12 +565,7 @@ export function verifyGitLabWebhookToken(token: string, expectedToken?: string):
     return false;
   }
 
-  // Use timing-safe comparison to prevent timing attacks
-  try {
-    return crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expectedToken));
-  } catch {
-    return false;
-  }
+  return timingSafeEqual(token, expectedToken);
 }
 
 /**

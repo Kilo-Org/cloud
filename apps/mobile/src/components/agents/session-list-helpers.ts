@@ -220,7 +220,7 @@ export function selectSessionCostInputs(
  * in-progress, old, or zero-cost sessions).
  */
 export function composeStoredSessionVisibleMeta(cost: string | null, timeMeta: string): string {
-  return cost ? `${cost} · ${timeMeta}` : timeMeta;
+  return composeActiveSessionVisibleMeta(cost, timeMeta) ?? '';
 }
 
 /**
@@ -230,9 +230,7 @@ export function composeStoredSessionVisibleMeta(cost: string | null, timeMeta: s
  * the visible "$0.12 · 5M AGO" order.
  */
 export function composeStoredSessionSpokenMeta(cost: string | null, timeSpoken: string): string {
-  return cost
-    ? i18n.t('agents.sessionRow.costSpokenWithTime', { cost, time: timeSpoken })
-    : timeSpoken;
+  return composeActiveSessionSpokenMeta(cost, timeSpoken) ?? '';
 }
 
 /**

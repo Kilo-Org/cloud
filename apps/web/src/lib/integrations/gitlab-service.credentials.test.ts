@@ -919,6 +919,47 @@ describe('GitLab encrypted credential persistence', () => {
     );
   });
 
+  it('keeps the stored project credential when GitLab rejects the acting credential', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    let [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await getOrCreateProjectAccessToken(integration, 42, { userId: user.id });
+    [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    mockRevokeProjectAccessToken.mockRejectedValueOnce(
+      new GitLabAuthenticationError(
+        42,
+        401,
+        'GitLab rejected the credential while revoking a Project Access Token'
+      )
+    );
+
+    await removeStoredProjectAccessToken(integration, 42, { userId: user.id });
+
+    const [credential] = await db
+      .select()
+      .from(platform_access_token_credentials)
+      .where(eq(platform_access_token_credentials.provider_resource_id, '42'));
+    const [updatedIntegration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+
+    expect(mockRevokeProjectAccessToken).toHaveBeenCalledTimes(1);
+    expect(credential).toEqual(expect.objectContaining({ provider_resource_id: '42' }));
+    expect(updatedIntegration.metadata).not.toHaveProperty('project_tokens');
+  });
+
   it('keeps the stored project credential when the revocation request fails in transport', async () => {
     const user = await insertTestUser();
     const connected = await connectWithPAT(

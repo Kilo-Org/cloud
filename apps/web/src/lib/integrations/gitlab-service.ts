@@ -881,6 +881,7 @@ async function updateStoredProjectAccessToken(
 function readProjectRevocationStatus(error: unknown): number | undefined {
   if (error instanceof GitLabProjectAccessTokenRevocationError) return error.status;
   if (error instanceof GitLabProjectAccessTokenPermissionError) return error.statusCode;
+  if (error instanceof GitLabAuthenticationError) return error.statusCode;
   return undefined;
 }
 

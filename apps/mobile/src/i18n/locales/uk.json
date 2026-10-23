@@ -3922,7 +3922,7 @@
       "stepsPlaceholder": "напр. 50",
       "temperature": "Температура",
       "temperaturePlaceholder": "напр. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "напр. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Мій агент",

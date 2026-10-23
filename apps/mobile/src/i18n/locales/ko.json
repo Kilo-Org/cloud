@@ -3832,7 +3832,7 @@
       "stepsPlaceholder": "예: 50",
       "temperature": "온도",
       "temperaturePlaceholder": "예: 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "예: 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "내 에이전트",

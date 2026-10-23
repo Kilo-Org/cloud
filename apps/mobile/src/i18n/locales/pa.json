@@ -3832,7 +3832,7 @@
       "stepsPlaceholder": "ਉਦਾ. 50",
       "temperature": "ਤਾਪਮਾਨ",
       "temperaturePlaceholder": "ਉਦਾ. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "ਉਦਾ. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "ਮੇਰਾ ਏਜੰਟ",

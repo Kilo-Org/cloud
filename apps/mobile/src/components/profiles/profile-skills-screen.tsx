@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, Switch, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Pencil, Sparkles, Trash2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import {
   type AgentProfileDetail,
@@ -20,6 +21,8 @@ import {
   useAgentProfileMutations,
 } from '@/lib/hooks/use-agent-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_SKILLS: AgentProfileDetail['skills'] = [];
@@ -51,6 +54,7 @@ function hasUsableMessage(error: unknown): boolean {
 function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const subtitleKey = skillRowSubtitle(skill);
   return (
     <View className="min-h-16 flex-row items-center gap-1 rounded-lg bg-secondary px-3 py-2">
       <View className="min-w-0 flex-1 gap-0.5">
@@ -58,12 +62,12 @@ function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>
           {skill.name}
         </Text>
         <Text variant="muted" className="text-xs">
-          {skillRowSubtitle(skill)}
+          {subtitleKey === null ? skill.sourceType : t(subtitleKey)}
         </Text>
       </View>
       <Switch value={skill.enabled} accessibilityLabel={skill.name} onValueChange={onToggle} />
       <Pressable
-        className="h-11 w-11 items-center justify-center active:opacity-70"
+        className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
         accessibilityRole="button"
         accessibilityLabel={t('profiles.skillEditTitle')}
         onPress={onEdit}
@@ -71,7 +75,7 @@ function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>
         <Pencil size={18} color={colors.mutedForeground} />
       </Pressable>
       <Pressable
-        className="h-11 w-11 items-center justify-center active:opacity-70"
+        className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
         accessibilityRole="button"
         accessibilityLabel={t('common.delete')}
         onPress={onDelete}
@@ -176,7 +180,7 @@ export function ProfileSkillsScreen({
         description={null}
         placement="top"
         action={
-          <Button onPress={startAdd}>
+          <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
             <Text>{t('profiles.addSkill')}</Text>
           </Button>
         }

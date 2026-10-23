@@ -6,10 +6,9 @@ import {
   type GgufModelFile,
   type GgufModelRecord,
   type GgufStorage,
+  keepStoredModels,
   modelFileOf,
   modelIndexFullyParsed,
-  orphanedModelFiles,
-  readModelIndex,
   recordFileNames,
   removeQuietly,
   settled,
@@ -21,10 +20,11 @@ import {
   currentTransfer,
   downloadProgress,
   expectedBytes,
-  moveIntoPlace,
-  readVerified,
+  mayRetryTransfer,
+  transferResult,
   transfersOf,
 } from './gguf-transfers';
+import { verifyModel } from './gguf-verify';
 
 /**
  * Downloaded GGUF models and the one download in progress. A download the
@@ -32,6 +32,11 @@ import {
  * projector as part of the same download, after the model file. Every failure
  * and every cancel removes the partial files, and partial files left by a
  * previous run go on load, so storage only ever holds whole, verified models.
+ *
+ * Bytes a transfer never delivered, and a file this device refused, are tried
+ * once more before the download is given up: missing bytes are a transfer
+ * problem, and one refused read is no verdict on the file. Only a second
+ * failure reports, so a download that worked is never thrown away.
  */
 export function ggufDownloads({
   storage,
@@ -68,6 +73,8 @@ export function ggufDownloads({
   const discard = (download: Active) => {
     for (const transfer of download.transfers) {
       removeQuietly(storage, transfer.part);
+      // A file the last step already moved is not in the list yet, so it goes too.
+      removeQuietly(storage, transfer.name);
     }
     if (active === download) {
       active = undefined;
@@ -94,62 +101,58 @@ export function ggufDownloads({
 
   /** Every file is whole, sized and hashed; llama.cpp has to read them before they are a model. */
   const verify = async (download: Active, sizeBytes: number) => {
-    const [model, projector] = download.transfers;
-    if (model === undefined) {
-      return;
-    }
-    const read = await readVerified(storage, inspect, download.transfers);
+    const read = await verifyModel(storage, inspect, { ...download, sizeBytes });
     if (active !== download) {
       return;
     }
-    // A projector the model cannot read images with is not the file the catalog promised.
-    if (
-      read === 'checksum' ||
-      !read.ok ||
-      (projector !== undefined && !read.value.vision) ||
-      !moveIntoPlace(storage, download.transfers)
-    ) {
-      fail(download, read === 'checksum' ? 'checksum' : 'invalidFile');
+    if (!read.ok) {
+      fail(download, read.problem);
       return;
     }
     active = undefined;
-    save([
-      ...models,
-      {
-        fileId: download.fileId,
-        name: download.name,
-        url: model.url,
-        sizeBytes,
-        contextWindow: read.value.contextWindow,
-        tools: read.value.tools,
-        vision: projector !== undefined,
-        thinking: read.value.thinking,
-      },
-    ]);
+    save([...models, read.model]);
     publish();
   };
 
-  /** One transfer finished: check its size, then start the next or verify the model. */
+  /** A transfer that stopped short runs once more from zero; the second one is a network failure. */
+  const again = (download: Active) => {
+    if (!mayRetryTransfer(download)) {
+      fail(download, 'network');
+      return;
+    }
+    download.attempts += 1;
+    removeQuietly(storage, currentTransfer(download).part);
+    begin(download);
+  };
+
+  /** One transfer finished: check that it is whole, then start the next or verify the model. */
   const complete = async (download: Active) => {
     const last = download.step === download.transfers.length - 1;
-    if (last) {
-      download.phase = 'verifying';
-      publish();
-    }
     const transfer = currentTransfer(download);
     const size = storage.size(transfer.part);
     const expected = transfer.expected ?? (download.total > 0 ? download.total : undefined);
-    if (size === 0 || (expected !== undefined && size !== expected)) {
-      fail(download, transfer.expected === undefined ? 'network' : 'invalidFile');
+    const result = transferResult(size, expected);
+    // A longer file cannot be a transfer that stopped short; a shorter one is a
+    // transfer problem, and the transfer runs again before the download is failed.
+    if (result !== 'whole') {
+      if (result === 'long') {
+        fail(download, 'invalidFile');
+      } else {
+        again(download);
+      }
       return;
     }
     if (!last) {
       download.done += size;
       download.step += 1;
       download.restarted = false;
+      download.attempts = 1;
       begin(download);
       return;
     }
+    // Only a whole file is worth reading, so a retried transfer still reads as a download.
+    download.phase = 'verifying';
+    publish();
     await verify(download, download.done + size);
   };
 
@@ -214,21 +217,16 @@ export function ggufDownloads({
 
   return {
     load: () => {
-      const names = storage.list();
       const index = storage.readIndex();
-      // A model whose projector is gone is not the model that was verified.
-      const kept = readModelIndex(index).filter(model =>
-        recordFileNames(model).every(name => names.includes(name))
-      );
-      const partialNames = active?.transfers.map(transfer => transfer.part) ?? [];
-      for (const name of orphanedModelFiles({ names, index, kept, partialNames })) {
-        storage.remove(name);
-      }
-      models = kept;
+      models = keepStoredModels({
+        storage,
+        index,
+        partialNames: active?.transfers.map(transfer => transfer.part) ?? [],
+      });
       // Only a list that parsed in full is written back: anything else would lose
       // an entry, and the next launch would then delete the file it names.
       if (modelIndexFullyParsed(index)) {
-        save(kept);
+        save(models);
       }
       publish();
     },

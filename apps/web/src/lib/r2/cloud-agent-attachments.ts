@@ -16,25 +16,21 @@ import { cloudAgentRelaxedAttachmentFilenameSchema } from '@/routers/cloud-agent
 import { r2Client, r2CloudAgentAttachmentsBucketName } from '@kilocode/web-shared/lib/r2/client';
 import { admitPendingUpload } from '@/lib/r2/cloud-agent-pending-uploads';
 
-type Service = 'app-builder' | 'cloud-agent';
-
 function getExtensionFromContentType(contentType: CloudAgentImageAllowedType): string {
   return CLOUD_AGENT_IMAGE_MIME_TO_EXTENSION[contentType];
 }
 
 function getImageKey(
-  service: Service,
   userId: string,
   messageUuid: string,
   imageId: string,
   contentType: CloudAgentImageAllowedType
 ): string {
   const ext = getExtensionFromContentType(contentType);
-  return `${userId}/${service}/${messageUuid}/${imageId}.${ext}`;
+  return `${userId}/cloud-agent/${messageUuid}/${imageId}.${ext}`;
 }
 
 export type GenerateImageUploadUrlParams = {
-  service: Service;
   userId: string;
   messageUuid: string;
   imageId: string;
@@ -49,14 +45,13 @@ export type GenerateImageUploadUrlResult = {
 };
 
 export async function generateImageUploadUrl({
-  service,
   userId,
   messageUuid,
   imageId,
   contentType,
   contentLength,
 }: GenerateImageUploadUrlParams): Promise<GenerateImageUploadUrlResult> {
-  const key = getImageKey(service, userId, messageUuid, imageId, contentType);
+  const key = getImageKey(userId, messageUuid, imageId, contentType);
 
   const command = new PutObjectCommand({
     Bucket: r2CloudAgentAttachmentsBucketName,

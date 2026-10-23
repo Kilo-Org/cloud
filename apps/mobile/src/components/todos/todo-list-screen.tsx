@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { Pressable, type ScrollViewInstance, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Animated, { useAnimatedRef } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -79,7 +79,7 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
   const { create, update, move, removeWithUndo } = useTodoItemMutations(listId);
   const { review, startNow, startingTodoId } = useStartTodo();
   const [showCompleted, setShowCompleted] = useState(false);
-  const scrollRef = useAnimatedRef<Animated.ScrollView>();
+  const scrollRef = useAnimatedRef<ScrollViewInstance>();
 
   const openItems = useMemo(
     () => (items.data ?? []).filter(item => item.doneAt === null),
@@ -241,12 +241,16 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={title}
+        // The list name is user prose, not a UI label, so it keeps a second
+        // line for a natural break; the shared one-line default only suits
+        // fixed labels.
+        titleNumberOfLines={2}
         reserveTitleSpace
         backFallback={LISTS_HREF}
         {...(list
           ? {
               onTitlePress: openSettings,
-              onTitlePressAccessibilityLabel: t('todos.listSettings.title'),
+              onTitlePressAccessibilityHint: t('todos.listSettings.title'),
             }
           : {})}
       />

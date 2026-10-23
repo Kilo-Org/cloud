@@ -173,12 +173,10 @@ function answer(
       output += calls.map(call => call.name + call.arguments).join('');
       Queue.offerAllUnsafe(
         queue,
-        calls.map(
-          (call): ModelEvent => ({
-            kind: 'toolCall',
-            call: { id: call.id, name: call.name, arguments: call.arguments },
-          })
-        )
+        calls.map((call): ModelEvent => ({
+          kind: 'toolCall',
+          call: { id: call.id, name: call.name, arguments: call.arguments },
+        }))
       );
       const usage: ModelUsage = {
         inputTokens: await inputTokensOf(bridge, availability, native),

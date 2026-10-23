@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
-import { sessionDoName } from '../../src/session-plane.js';
+import { sessionDoName } from '../../src/session-identity.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
@@ -16,6 +16,7 @@ import type {
   StopResult,
 } from '../../src/sandbox-control/provider.js';
 import {
+  FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   createFakeCredentialBroker,
   FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
   installFakeCredentialEnv,
@@ -31,6 +32,9 @@ const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDB
 const USER_ID = 'user_term';
 const ORG_ID = 'org_term';
 const WRAPPER_ID = 'wr_terminal';
+// Half the integration wait budget, so a dropped readiness frame is retried
+// while a genuinely stuck route still fails within the normal timeout.
+const ROUTE_READY_RETRY_MS = 5_000;
 
 type FakeProvider = { adapter: ProviderAdapter; launchEnvs: Record<string, string>[] };
 
@@ -57,7 +61,7 @@ function metadata(input: { sessionId: string; kiloSessionId: string; sandboxId: 
       orgId: ORG_ID,
       createdOnPlatform: 'cloud-agent-web',
     },
-    auth: { kiloSessionId: input.kiloSessionId, kilocodeToken: 'native-token' },
+    auth: { kiloSessionId: input.kiloSessionId, kilocodeToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN },
     agent: { mode: 'code', model: 'test/model' },
     repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
     workspace: {
@@ -304,11 +308,23 @@ async function markRouteReady(
   wrapper: FakeWrapper,
   sessionId: string
 ): Promise<void> {
-  wrapper.send({ type: 'session.ready', sessionId });
-  await waitFor(async () => {
+  const isRouteReady = async (): Promise<boolean> => {
     const snapshot = await sessionStub.getSession();
-    expect(snapshot.type === 'found' && snapshot.route.state === 'ready').toBe(true);
-  });
+    return snapshot.type === 'found' && snapshot.route.state === 'ready';
+  };
+  // The first announce can reach the sandbox DO before it records this socket
+  // as the current connection, and a frame from a superseded connection is
+  // dropped without a reply. Announce once more after a shorter wait, so one
+  // dropped frame does not fail a correct run while a stuck route still fails.
+  wrapper.send({ type: 'session.ready', sessionId });
+  try {
+    await waitFor(async () => expect(await isRouteReady()).toBe(true), {
+      timeout: ROUTE_READY_RETRY_MS,
+    });
+  } catch {
+    wrapper.send({ type: 'session.ready', sessionId });
+    await waitFor(async () => expect(await isRouteReady()).toBe(true));
+  }
 }
 
 async function startTerminalSession(): Promise<{

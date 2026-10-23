@@ -57,7 +57,13 @@ function formBodyProps(showTitle: boolean) {
   const messageRef = { current: '' };
   return {
     noMethodsAllowed: false,
-    methodOptions: [{ value: 'merge' as AllowedMergeMethod, label: 'Merge', icon: 'merge' }],
+    methodOptions: [
+      {
+        value: 'merge' as AllowedMergeMethod,
+        label: 'Merge',
+        accessibilityLabel: 'Create a merge commit',
+      },
+    ],
     method: 'merge' as AllowedMergeMethod,
     isMutating: false,
     onMethodChange: vi.fn(),
@@ -85,6 +91,26 @@ function inputByA11yLabel(
 ): TestRenderer.ReactTestInstance | null {
   const found = renderer.root.findAll(node => node.props.accessibilityLabel === label);
   return found[0] ?? null;
+}
+
+/** One method chip: the string its radio announces, the string it draws, its selected state. */
+function methodChips(renderer: TestRenderer.ReactTestRenderer): {
+  announced: string;
+  visible: string;
+  selected: boolean;
+}[] {
+  // The suite's radio mock passes `radioItemA11y`'s argument through, so the
+  // spoken label and the checked state sit on the chip itself.
+  return renderer.root
+    .findAll(node => String(node.type) === 'Pressable')
+    .map(chip => {
+      const text = chip.findAll(node => String(node.type) === 'Text')[0];
+      return {
+        announced: String(chip.props.label),
+        visible: String(text?.props.children),
+        selected: chip.props.checked === true,
+      };
+    });
 }
 
 describe('MergeSheetFormBody commit-title field (s6f)', () => {
@@ -116,5 +142,34 @@ describe('MergeSheetFormBody commit-title field (s6f)', () => {
       throw new Error('Commit title input not found');
     }
     expect(title.props.defaultValue).toBe('Merge pull request #1 from Feature');
+  });
+});
+
+describe('MergeSheetFormBody method chips', () => {
+  it('draws the short label and announces the full one', () => {
+    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+    TestRenderer.act(() => {
+      renderer = TestRenderer.create(
+        <MergeSheetFormBody
+          {...formBodyProps(true)}
+          methodOptions={[
+            { value: 'merge', label: 'Merge', accessibilityLabel: 'Create a merge commit' },
+            { value: 'squash', label: 'Squash', accessibilityLabel: 'Squash and merge' },
+          ]}
+          method="squash"
+        />
+      );
+    });
+    // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- the guard proves it, the cast cannot
+    if (!renderer) {
+      throw new Error('Failed to mount MergeSheetFormBody');
+    }
+    const chips = methodChips(renderer);
+    expect(chips.map(chip => [chip.announced, chip.visible])).toEqual([
+      ['Create a merge commit', 'Merge'],
+      ['Squash and merge', 'Squash'],
+    ]);
+    // The active chip is the one the caller selected, not the first allowed method.
+    expect(chips.map(chip => chip.selected)).toEqual([false, true]);
   });
 });

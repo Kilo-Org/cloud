@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, Switch, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Lock, Pencil, Server, Trash2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import {
   type AgentProfileDetail,
@@ -24,6 +25,8 @@ import {
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_MCP_SERVERS: AgentProfileDetail['mcpServers'] = [];
@@ -70,11 +73,19 @@ function McpServerRowView({
           </Text>
           {secretCount > 0 ? (
             <View
-              className="flex-row items-center gap-0.5"
-              accessibilityLabel={t('profiles.mcp.secretCount')}
+              accessible
+              accessibilityRole="text"
+              accessibilityLabel={t('profiles.mcp.secretCount', { count: secretCount })}
+              className="flex-row items-center"
             >
-              <Lock size={12} color={colors.mutedForeground} />
-              <Text className="text-xs text-muted-foreground">{secretCount}</Text>
+              <View
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                className="flex-row items-center gap-0.5"
+              >
+                <Lock size={12} color={colors.mutedForeground} />
+                <Text className="text-xs text-muted-foreground">{secretCount}</Text>
+              </View>
             </View>
           ) : null}
         </View>
@@ -86,7 +97,7 @@ function McpServerRowView({
       </View>
       <Switch value={server.enabled} accessibilityLabel={server.name} onValueChange={onToggle} />
       <Pressable
-        className="h-11 w-11 items-center justify-center active:opacity-70"
+        className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
         accessibilityRole="button"
         accessibilityLabel={t('profiles.mcp.edit')}
         onPress={onEdit}
@@ -94,7 +105,7 @@ function McpServerRowView({
         <Pencil size={18} color={colors.mutedForeground} />
       </Pressable>
       <Pressable
-        className="h-11 w-11 items-center justify-center active:opacity-70"
+        className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
         accessibilityRole="button"
         accessibilityLabel={t('common.delete')}
         onPress={onDelete}
@@ -195,7 +206,7 @@ export function ProfileMcpScreen({
         description={null}
         placement="top"
         action={
-          <Button onPress={startAdd}>
+          <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
             <Text>{t('profiles.mcp.add')}</Text>
           </Button>
         }

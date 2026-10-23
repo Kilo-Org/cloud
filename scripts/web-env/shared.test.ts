@@ -104,6 +104,11 @@ if (args[2] === 'list') {
 }
 `;
 
+const FAKE_PNPM_WORKSPACE_WITHOUT_VERCEL = `#!/usr/bin/env node
+process.stderr.write('[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command "vercel" not found\\n');
+process.exitCode = 1;
+`;
+
 async function captureOpInvocations(
   existing: 'none' | VaultEnvironment,
   environment: VaultEnvironment
@@ -183,6 +188,49 @@ void test('redeployLatest redeploys the latest ready deployment for the target e
     else process.env.PATH = originalPath;
     if (originalLog === undefined) delete process.env.FAKE_VERCEL_LOG;
     else process.env.FAKE_VERCEL_LOG = originalLog;
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+void test('resolveVercelContexts names the workspace install when the CLI is missing locally', () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'web-env-vercel-test-'));
+  writeFileSync(path.join(directory, 'pnpm'), FAKE_PNPM_WORKSPACE_WITHOUT_VERCEL, { mode: 0o700 });
+  const originalPath = process.env.PATH;
+  process.env.PATH = `${directory}:${originalPath ?? ''}`;
+
+  try {
+    assert.throws(
+      () => resolveVercelContexts(directory),
+      error =>
+        error instanceof Error &&
+        error.message.includes('pnpm install --frozen-lockfile') &&
+        error.message.includes('pnpm exec vercel whoami --scope kilocode --format=json') &&
+        !error.message.includes('ERR_PNPM')
+    );
+  } finally {
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+void test('redeployLatest names the workspace install when the CLI is missing locally', async () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'web-env-vercel-test-'));
+  writeFileSync(path.join(directory, 'pnpm'), FAKE_PNPM_WORKSPACE_WITHOUT_VERCEL, { mode: 0o700 });
+  const originalPath = process.env.PATH;
+  process.env.PATH = `${directory}:${originalPath ?? ''}`;
+
+  try {
+    await assert.rejects(
+      redeployLatest({ project: 'kilocode-app', orgId: 'org-id', cwd: directory }, 'staging'),
+      error =>
+        error instanceof Error &&
+        error.message.includes('pnpm install --frozen-lockfile') &&
+        !error.message.includes('ERR_PNPM')
+    );
+  } finally {
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
     rmSync(directory, { recursive: true, force: true });
   }
 });

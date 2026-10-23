@@ -86,6 +86,17 @@ function missingCommandMessage(command: string, args: string[]): string | undefi
 // it in a provider-access error (which would repeat the same instructions).
 class MissingCommandError extends Error {}
 
+// `pnpm exec` exits non-zero, rather than failing with ENOENT, when the command
+// exists but the workspace install does not provide the binary.
+const PNPM_MISSING_WORKSPACE_VERCEL = /Command "vercel" not found/;
+
+function missingWorkspaceVercelMessage(): string {
+  return [
+    'The workspace does not provide the Vercel CLI.',
+    `Run \`pnpm install --frozen-lockfile\` in the checkout, then verify access with \`${VERCEL_COMMAND} whoami --scope kilocode --format=json\`.`,
+  ].join('\n');
+}
+
 export function run(
   command: string,
   args: string[],
@@ -107,6 +118,15 @@ export function run(
   if (errorCode(result.error) === 'ENOENT') {
     const message = missingCommandMessage(command, args);
     if (message) throw new MissingCommandError(message);
+  }
+  if (
+    result.status !== 0 &&
+    command === 'pnpm' &&
+    args[0] === 'exec' &&
+    args[1] === 'vercel' &&
+    PNPM_MISSING_WORKSPACE_VERCEL.test(`${result.stderr}${result.stdout}`)
+  ) {
+    throw new MissingCommandError(missingWorkspaceVercelMessage());
   }
   if (result.status !== 0) {
     const operation = `${command} ${args.slice(0, 3).join(' ')}`;
@@ -178,6 +198,7 @@ function vercelAsync(context: VercelContext, args: string[]): Promise<string> {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
     let outputBytes = 0;
     let settled = false;
 
@@ -198,6 +219,7 @@ function vercelAsync(context: VercelContext, args: string[]): Promise<string> {
         return;
       }
       if (keep) stdout.push(chunk);
+      else stderr.push(chunk);
     };
 
     child.stdout.on('data', chunk => capture(Buffer.from(chunk), true));
@@ -217,6 +239,10 @@ function vercelAsync(context: VercelContext, args: string[]): Promise<string> {
       if (status === 0) {
         settled = true;
         resolve(Buffer.concat(stdout).toString('utf8'));
+        return;
+      }
+      if (PNPM_MISSING_WORKSPACE_VERCEL.test(Buffer.concat(stderr).toString('utf8'))) {
+        fail(new MissingCommandError(missingWorkspaceVercelMessage()));
         return;
       }
       fail(

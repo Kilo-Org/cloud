@@ -362,7 +362,13 @@ describe('initialize / ping / tools/list', () => {
     expect(tools[1]!.description.toLowerCase()).toContain('search');
     expect(tools[0]!.inputSchema).toMatchObject({
       type: 'object',
-      properties: { query: { type: 'string' }, limit: { type: 'integer' } },
+      properties: {
+        // The advertised bound and the parser's bound come from the same
+        // constant, so an agent that respects the schema never meets the
+        // refusal.
+        query: { type: 'string', maxLength: MAX_SEARCH_QUERY_LENGTH },
+        limit: { type: 'integer' },
+      },
       required: ['query'],
     });
     expect(tools[1]!.inputSchema).toMatchObject({

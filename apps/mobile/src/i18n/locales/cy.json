@@ -3867,6 +3867,7 @@
     "moveDown": "Symud i lawr",
     "moveCommandUp": "Symud gorchymyn {{position}} i fyny",
     "moveCommandDown": "Symud gorchymyn {{position}} i lawr",
+    "deleteCommand": "Dileu gorchymyn {{position}}",
     "skillsTitle": "Sgiliau",
     "addSkill": "Ychwanegu sgil",
     "skillNameLabel": "Enw sgil",

@@ -3687,6 +3687,7 @@
     "moveDown": "Siirrä alas",
     "moveCommandUp": "Siirrä komento {{position}} ylös",
     "moveCommandDown": "Siirrä komento {{position}} alas",
+    "deleteCommand": "Poista komento {{position}}",
     "skillsTitle": "Taidot",
     "addSkill": "Lisää taito",
     "skillNameLabel": "Taidon nimi",

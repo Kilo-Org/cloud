@@ -3777,6 +3777,7 @@
     "moveDown": "Posuňte se dolů",
     "moveCommandUp": "Přesunout příkaz {{position}} nahoru",
     "moveCommandDown": "Přesunout příkaz {{position}} dolů",
+    "deleteCommand": "Smazat příkaz {{position}}",
     "skillsTitle": "Dovednosti",
     "addSkill": "Přidejte dovednost",
     "skillNameLabel": "Název dovednosti",

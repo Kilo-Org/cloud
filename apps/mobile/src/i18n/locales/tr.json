@@ -3687,6 +3687,7 @@
     "moveDown": "Aşağı taşı",
     "moveCommandUp": "{{position}}. komutu yukarı taşı",
     "moveCommandDown": "{{position}}. komutu aşağı taşı",
+    "deleteCommand": "{{position}}. komutu sil",
     "skillsTitle": "Yetenekler",
     "addSkill": "Beceri ekle",
     "skillNameLabel": "Beceri adı",

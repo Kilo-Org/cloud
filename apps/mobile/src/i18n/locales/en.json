@@ -3772,6 +3772,7 @@
     "moveDown": "Move down",
     "moveCommandUp": "Move command {{position}} up",
     "moveCommandDown": "Move command {{position}} down",
+    "deleteCommand": "Delete command {{position}}",
     "skillsTitle": "Skills",
     "addSkill": "Add skill",
     "skillNameLabel": "Skill name",

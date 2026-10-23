@@ -3687,6 +3687,7 @@
     "moveDown": "Beweeg af",
     "moveCommandUp": "Skuif bevel {{position}} op",
     "moveCommandDown": "Skuif bevel {{position}} af",
+    "deleteCommand": "Skrap bevel {{position}}",
     "skillsTitle": "Vaardighede",
     "addSkill": "Voeg vaardigheid by",
     "skillNameLabel": "Vaardigheidsnaam",

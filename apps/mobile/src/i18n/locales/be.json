@@ -3777,6 +3777,7 @@
     "moveDown": "Рухайцеся ўніз",
     "moveCommandUp": "Перамясціць каманду {{position}} уверх",
     "moveCommandDown": "Перамясціць каманду {{position}} уніз",
+    "deleteCommand": "Выдаліць каманду {{position}}",
     "skillsTitle": "Навыкі",
     "addSkill": "Дадаць майстэрства",
     "skillNameLabel": "Назва навыку",

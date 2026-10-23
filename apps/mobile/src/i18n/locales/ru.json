@@ -3777,6 +3777,7 @@
     "moveDown": "Двигаться вниз",
     "moveCommandUp": "Переместить команду {{position}} вверх",
     "moveCommandDown": "Переместить команду {{position}} вниз",
+    "deleteCommand": "Удалить команду {{position}}",
     "skillsTitle": "Навыки",
     "addSkill": "Добавить навык",
     "skillNameLabel": "Название навыка",

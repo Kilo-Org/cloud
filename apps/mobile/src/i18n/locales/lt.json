@@ -3777,6 +3777,7 @@
     "moveDown": "Judėti žemyn",
     "moveCommandUp": "Perkelti komandą {{position}} aukštyn",
     "moveCommandDown": "Perkelti komandą {{position}} žemyn",
+    "deleteCommand": "Ištrinti komandą {{position}}",
     "skillsTitle": "Įgūdžiai",
     "addSkill": "Pridėkite įgūdžių",
     "skillNameLabel": "Įgūdžio pavadinimas",

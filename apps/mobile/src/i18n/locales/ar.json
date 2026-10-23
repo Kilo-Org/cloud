@@ -3867,6 +3867,7 @@
     "moveDown": "تحرك للأسفل",
     "moveCommandUp": "انقل الأمر {{position}} لأعلى",
     "moveCommandDown": "انقل الأمر {{position}} لأسفل",
+    "deleteCommand": "احذف الأمر {{position}}",
     "skillsTitle": "مهارات",
     "addSkill": "أضف مهارة",
     "skillNameLabel": "اسم المهارة",

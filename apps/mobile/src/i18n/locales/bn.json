@@ -3687,6 +3687,7 @@
     "moveDown": "নিচে সরান",
     "moveCommandUp": "কমান্ড {{position}} উপরে সরান",
     "moveCommandDown": "কমান্ড {{position}} নিচে সরান",
+    "deleteCommand": "কমান্ড {{position}} মুছুন",
     "skillsTitle": "দক্ষতা",
     "addSkill": "দক্ষতা যোগ করুন",
     "skillNameLabel": "দক্ষতার নাম",

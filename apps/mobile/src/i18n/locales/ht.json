@@ -2265,7 +2265,6 @@
       "couldNotLoadEnvironment": "Nou pa t ka chaje anviwònman ou an.",
       "retryLoadingEnvironment": "Eseye chaje anviwònman an ankò",
       "defaultEnvironment": "Anviwònman pa defo",
-      "environmentSummary": "{{commands}} kòmandman · {{mcp}} MCP · {{skills}} konpetans · {{agents}} ajan",
       "leaveChanges": "Kite chanjman yo",
       "commitAndPush": "Anrejistre epi voye",
       "startSession": "Kòmanse sesyon an",
@@ -3721,9 +3720,10 @@
       "skills_other": "{{count}} konpetans",
       "commands_one": "{{count}} kòmandman",
       "commands_other": "{{count}} kòmandman",
-      "varsShort": "{{count}}v",
-      "skillsShort": "{{count}}k",
-      "commandsShort": "{{count}}kò"
+      "setupCommands_one": "{{count}} enstalasyon kòmandman",
+      "setupCommands_other": "{{count}} enstalasyon kòmandman",
+      "agents_one": "{{count}} ajan",
+      "agents_other": "{{count}} ajan"
     },
     "nameLabel": "Non pwofil la",
     "namePlaceholder": "pa egzanp Backend debogaj",

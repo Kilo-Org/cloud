@@ -2265,7 +2265,6 @@
       "couldNotLoadEnvironment": "Nem sikerült betölteni a környezetedet.",
       "retryLoadingEnvironment": "Környezet betöltésének újrapróbálása",
       "defaultEnvironment": "Alapértelmezett környezet",
-      "environmentSummary": "{{commands}} parancs · {{mcp}} MCP · {{skills}} készség · {{agents}} ügynök",
       "leaveChanges": "Változtatások megtartása",
       "commitAndPush": "Véglegesítés és feltöltés",
       "startSession": "Munkamenet indítása",
@@ -3721,9 +3720,10 @@
       "skills_other": "{{count}} készség",
       "commands_one": "{{count}} parancs",
       "commands_other": "{{count}} parancs",
-      "varsShort": "{{count}}v",
-      "skillsShort": "{{count}}k",
-      "commandsShort": "{{count}}p"
+      "setupCommands_one": "{{count}} beállítási parancs",
+      "setupCommands_other": "{{count}} beállítási parancs",
+      "agents_one": "{{count}} ügynök",
+      "agents_other": "{{count}} ügynök"
     },
     "nameLabel": "Profil neve",
     "namePlaceholder": "például háttérbeli hibakeresés",

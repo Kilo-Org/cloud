@@ -2265,7 +2265,6 @@
       "couldNotLoadEnvironment": "Naannoo kee fe'uu hin danda'amne.",
       "retryLoadingEnvironment": "Naannoo fe'uuf deebi'ii yaali",
       "defaultEnvironment": "Naannoo durtii",
-      "environmentSummary": "ajajoota {{commands}} · MCP {{mcp}} · dandeettiiwwan {{skills}} · ergamtoota {{agents}}",
       "leaveChanges": "Jijjiiramoota dhiisi",
       "commitAndPush": "Galmeessiitii ol ergi",
       "startSession": "Turtii jalqabi",
@@ -3721,9 +3720,10 @@
       "skills_other": "{{count}} dandeettiiwwan",
       "commands_one": "{{count}} ajaja",
       "commands_other": "{{count}} ajajoota",
-      "varsShort": "{{count}}j",
-      "skillsShort": "{{count}}d",
-      "commandsShort": "{{count}}a"
+      "setupCommands_one": "{{count}} saaguu ajaja",
+      "setupCommands_other": "{{count}} saaguu ajajoota",
+      "agents_one": "{{count}} ergama",
+      "agents_other": "{{count}} ergamtoota"
     },
     "nameLabel": "Maqaa piroofaayilii",
     "namePlaceholder": "fkn. Backend sirreessuu",

@@ -1747,7 +1747,6 @@
       "couldNotLoadEnvironment": "無法載入你的環境。",
       "retryLoadingEnvironment": "重新載入環境",
       "defaultEnvironment": "預設環境",
-      "environmentSummary": "{{commands}} 個指令 · {{mcp}} 個 MCP · {{skills}} 個技能 · {{agents}} 個智慧代理",
       "leaveChanges": "保留變更",
       "commitAndPush": "提交並推送",
       "startSession": "開始工作階段",
@@ -3721,9 +3720,10 @@
       "skills_other": "{{count}} 個技能",
       "commands_one": "{{count}} 個命令",
       "commands_other": "{{count}} 個命令",
-      "varsShort": "{{count}}變",
-      "skillsShort": "{{count}}技",
-      "commandsShort": "{{count}}命"
+      "setupCommands_one": "{{count}} 個設定命令",
+      "setupCommands_other": "{{count}} 個設定命令",
+      "agents_one": "{{count}} 個代理",
+      "agents_other": "{{count}} 個代理"
     },
     "nameLabel": "設定檔名稱",
     "namePlaceholder": "例如後端偵錯",

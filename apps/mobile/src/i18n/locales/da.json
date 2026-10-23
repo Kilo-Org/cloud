@@ -2265,7 +2265,6 @@
       "couldNotLoadEnvironment": "Kunne ikke indlæse dit miljø.",
       "retryLoadingEnvironment": "Prøv at indlæse miljøet igen",
       "defaultEnvironment": "Standardmiljø",
-      "environmentSummary": "{{commands}} kommandoer · {{mcp}} MCP · {{skills}} færdigheder · {{agents}} agenter",
       "leaveChanges": "Behold ændringer",
       "commitAndPush": "Commit og push",
       "startSession": "Start en session",
@@ -3721,9 +3720,10 @@
       "skills_other": "{{count}} færdigheder",
       "commands_one": "{{count}} kommando",
       "commands_other": "{{count}} kommandoer",
-      "varsShort": "{{count}}var",
-      "skillsShort": "{{count}}fæ",
-      "commandsShort": "{{count}}kom"
+      "setupCommands_one": "{{count}} opsætningskommando",
+      "setupCommands_other": "{{count}} opsætningskommandoer",
+      "agents_one": "{{count}} agent",
+      "agents_other": "{{count}} agenter"
     },
     "nameLabel": "Profilnavn",
     "namePlaceholder": "f.eks. Backend debugging",

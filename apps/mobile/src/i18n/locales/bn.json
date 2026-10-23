@@ -2265,7 +2265,6 @@
       "couldNotLoadEnvironment": "আপনার পরিবেশ লোড করা যায়নি।",
       "retryLoadingEnvironment": "পরিবেশ লোড করার জন্য আবার চেষ্টা করুন",
       "defaultEnvironment": "ডিফল্ট পরিবেশ",
-      "environmentSummary": "{{commands}}টি কমান্ড · {{mcp}} MCP · {{skills}}টি স্কিল · {{agents}}টি এজেন্ট",
       "leaveChanges": "পরিবর্তন রেখে দিন",
       "commitAndPush": "কমিট ও পুশ করুন",
       "startSession": "সেশন শুরু করুন",
@@ -3721,9 +3720,10 @@
       "skills_other": "{{count}} দক্ষতা",
       "commands_one": "{{count}} কমান্ড",
       "commands_other": "{{count}} কমান্ড",
-      "varsShort": "{{count}}ভ",
-      "skillsShort": "{{count}}দ",
-      "commandsShort": "{{count}}ক"
+      "setupCommands_one": "{{count}} সেটআপ কমান্ড",
+      "setupCommands_other": "{{count}} সেটআপ কমান্ড",
+      "agents_one": "{{count}} এজেন্ট",
+      "agents_other": "{{count}} এজেন্ট"
     },
     "nameLabel": "প্রোফাইল নাম",
     "namePlaceholder": "যেমন ব্যাকএন্ড ডিবাগিং",

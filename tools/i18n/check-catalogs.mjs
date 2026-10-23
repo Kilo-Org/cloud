@@ -159,8 +159,7 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'profiles.agents.topP',
   'profiles.slashCommands.namePlaceholder',
   'profiles.slashCommands.agentPlaceholder',
-  // The MCP count label. `MCP` is the protocol's own acronym, and its unit
-  // word is already as short as a compact count badge allows, so every catalog
+  // The MCP count label. `MCP` is the protocol's own acronym, so every catalog
   // keeps the same "{{count}} MCP" the MCP-server rows use.
   'profiles.counts.mcp',
   // The inference protocols keep their published API names across locales.

@@ -2265,7 +2265,6 @@
       "couldNotLoadEnvironment": "Kunne ikke laste inn miljøet ditt.",
       "retryLoadingEnvironment": "Prøv å laste inn miljøet på nytt",
       "defaultEnvironment": "Standardmiljø",
-      "environmentSummary": "{{commands}} kommandoer · {{mcp}} MCP · {{skills}} ferdigheter · {{agents}} agenter",
       "leaveChanges": "Behold endringer",
       "commitAndPush": "Lagre og send",
       "startSession": "Start økt",
@@ -3721,9 +3720,10 @@
       "skills_other": "{{count}} ferdigheter",
       "commands_one": "{{count}} kommando",
       "commands_other": "{{count}} kommandoer",
-      "varsShort": "{{count}}var",
-      "skillsShort": "{{count}}fer",
-      "commandsShort": "{{count}}kom"
+      "setupCommands_one": "{{count}} oppsettkommando",
+      "setupCommands_other": "{{count}} oppsettkommandoer",
+      "agents_one": "{{count}} agent",
+      "agents_other": "{{count}} agenter"
     },
     "nameLabel": "Profilnavn",
     "namePlaceholder": "f.eks. Backend-feilsøking",

@@ -2265,7 +2265,6 @@
       "couldNotLoadEnvironment": "A kò lè gbé àyíká iṣẹ́ rẹ wọlé.",
       "retryLoadingEnvironment": "Gbìyànjú láti tún àyíká iṣẹ́ gbé wọlé",
       "defaultEnvironment": "Àyíká iṣẹ́ àiyípadà",
-      "environmentSummary": "àṣẹ {{commands}} · {{mcp}} MCP · ọgbọ́n {{skills}} · aṣojú {{agents}}",
       "leaveChanges": "Fi àyípadà sílẹ̀",
       "commitAndPush": "Ṣe àkọsílẹ̀, firánṣẹ́",
       "startSession": "Bẹ̀rẹ̀ ìgbà iṣẹ́",
@@ -3721,9 +3720,10 @@
       "skills_other": "{{count}} ogbon",
       "commands_one": "{{count}} aṣẹ",
       "commands_other": "{{count}} aṣẹ",
-      "varsShort": "{{count}}oni",
-      "skillsShort": "{{count}}ogb",
-      "commandsShort": "{{count}}a"
+      "setupCommands_one": "{{count}} aṣẹ iṣeto",
+      "setupCommands_other": "{{count}} aṣẹ iṣeto",
+      "agents_one": "{{count}} aṣoju",
+      "agents_other": "{{count}} aṣoju"
     },
     "nameLabel": "Orukọ profaili",
     "namePlaceholder": "f.eks. N ṣatunṣe aṣiṣe afẹyinti",

@@ -2265,7 +2265,6 @@
       "couldNotLoadEnvironment": "మీ పని వాతావరణాన్ని లోడ్ చేయలేకపోయాము.",
       "retryLoadingEnvironment": "పని వాతావరణాన్ని లోడ్ చేయడానికి మళ్లీ ప్రయత్నించండి",
       "defaultEnvironment": "డిఫాల్ట్ పని వాతావరణం",
-      "environmentSummary": "{{commands}} కమాండ్‌లు · {{mcp}} MCP · {{skills}} నైపుణ్యాలు · {{agents}} ఏజెంట్లు",
       "leaveChanges": "మార్పులను అలాగే ఉంచండి",
       "commitAndPush": "కమిట్ చేసి పుష్ చేయండి",
       "startSession": "సెషన్ ప్రారంభించండి",
@@ -3721,9 +3720,10 @@
       "skills_other": "{{count}} నైపుణ్యాలు",
       "commands_one": "{{count}} ఆదేశం",
       "commands_other": "{{count}} ఆదేశాలు",
-      "varsShort": "{{count}}వే",
-      "skillsShort": "{{count}}నై",
-      "commandsShort": "{{count}}ఆ"
+      "setupCommands_one": "{{count}} సెటప్ ఆదేశం",
+      "setupCommands_other": "{{count}} సెటప్ ఆదేశాలు",
+      "agents_one": "{{count}} ఏజెంట్",
+      "agents_other": "{{count}} ఏజెంట్లు"
     },
     "nameLabel": "ప్రొఫైల్ పేరు",
     "namePlaceholder": "ఉదా బ్యాకెండ్ డీబగ్గింగ్",

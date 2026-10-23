@@ -2265,7 +2265,6 @@
       "couldNotLoadEnvironment": "آپ کا ماحول لوڈ نہیں ہو سکا۔",
       "retryLoadingEnvironment": "ماحول دوبارہ لوڈ کرنے کی کوشش کریں",
       "defaultEnvironment": "پہلے سے طے شدہ ماحول",
-      "environmentSummary": "{{commands}} کمانڈز · {{mcp}} MCP · {{skills}} مہارتیں · {{agents}} ایجنٹ",
       "leaveChanges": "تبدیلیاں رہنے دیں",
       "commitAndPush": "کمٹ اور پش کریں",
       "startSession": "سیشن شروع کریں",
@@ -3721,9 +3720,10 @@
       "skills_other": "{{count}} ہنر",
       "commands_one": "{{count}} کمانڈ",
       "commands_other": "{{count}} کمانڈز",
-      "varsShort": "{{count}}م",
-      "skillsShort": "{{count}}ہ",
-      "commandsShort": "{{count}}ک"
+      "setupCommands_one": "{{count}} سیٹ اپ کمانڈ",
+      "setupCommands_other": "{{count}} سیٹ اپ کمانڈز",
+      "agents_one": "{{count}} ایجنٹ",
+      "agents_other": "{{count}} ایجنٹس"
     },
     "nameLabel": "پروفائل کا نام",
     "namePlaceholder": "جیسے بیک اینڈ ڈیبگنگ",

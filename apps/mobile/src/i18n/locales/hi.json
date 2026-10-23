@@ -1747,7 +1747,6 @@
       "couldNotLoadEnvironment": "आपका एनवायरनमेंट लोड नहीं हो सका।",
       "retryLoadingEnvironment": "एनवायरनमेंट फिर से लोड करें",
       "defaultEnvironment": "डिफ़ॉल्ट एनवायरनमेंट",
-      "environmentSummary": "{{commands}} कमांड · {{mcp}} MCP · {{skills}} स्किल · {{agents}} एजेंट",
       "leaveChanges": "बदलाव रहने दें",
       "commitAndPush": "कमिट और पुश करें",
       "startSession": "सत्र शुरू करें",
@@ -3721,9 +3720,10 @@
       "skills_other": "{{count}} कौशल",
       "commands_one": "{{count}} आदेश",
       "commands_other": "{{count}} आदेश",
-      "varsShort": "{{count}}च",
-      "skillsShort": "{{count}}क",
-      "commandsShort": "{{count}}आ"
+      "setupCommands_one": "{{count}} सेटअप आदेश",
+      "setupCommands_other": "{{count}} सेटअप आदेश",
+      "agents_one": "{{count}} एजेंट",
+      "agents_other": "{{count}} एजेंट"
     },
     "nameLabel": "प्रोफ़ाइल नाम",
     "namePlaceholder": "जैसे बैकएंड डिबगिंग",

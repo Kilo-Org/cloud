@@ -2265,7 +2265,6 @@
       "couldNotLoadEnvironment": "உங்கள் சூழலை ஏற்ற முடியவில்லை.",
       "retryLoadingEnvironment": "சூழலை மீண்டும் ஏற்ற முயற்சிக்கவும்",
       "defaultEnvironment": "இயல்புநிலை சூழல்",
-      "environmentSummary": "{{commands}} கட்டளைகள் · {{mcp}} MCP · {{skills}} திறன்கள் · {{agents}} ஏஜென்ட்கள்",
       "leaveChanges": "அப்படியே விடவும்",
       "commitAndPush": "கமிட் செய்து புஷ் செய்யவும்",
       "startSession": "அமர்வைத் தொடங்கவும்",
@@ -3721,9 +3720,10 @@
       "skills_other": "{{count}} திறன்கள்",
       "commands_one": "{{count}} கட்டளை",
       "commands_other": "{{count}} கட்டளைகள்",
-      "varsShort": "{{count}}மா",
-      "skillsShort": "{{count}}தி",
-      "commandsShort": "{{count}}க"
+      "setupCommands_one": "{{count}} அமைப்புக் கட்டளை",
+      "setupCommands_other": "{{count}} அமைப்புக் கட்டளைகள்",
+      "agents_one": "{{count}} முகவர்",
+      "agents_other": "{{count}} முகவர்கள்"
     },
     "nameLabel": "சுயவிவரப் பெயர்",
     "namePlaceholder": "எ.கா. பின்தளத்தில் பிழைத்திருத்தம்",

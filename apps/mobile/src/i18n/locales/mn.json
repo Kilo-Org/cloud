@@ -2265,7 +2265,6 @@
       "couldNotLoadEnvironment": "Таны орчныг ачаалж чадсангүй.",
       "retryLoadingEnvironment": "Орчныг дахин ачаалах",
       "defaultEnvironment": "Үндсэн орчин",
-      "environmentSummary": "{{commands}} команд · {{mcp}} MCP · {{skills}} чадвар · {{agents}} агент",
       "leaveChanges": "Өөрчлөлтүүдийг үлдээх",
       "commitAndPush": "Коммит хийж илгээх",
       "startSession": "Сессийг эхлүүлэх",
@@ -3721,9 +3720,10 @@
       "skills_other": "{{count}} ур чадвар",
       "commands_one": "{{count}} команд",
       "commands_other": "{{count}} команд",
-      "varsShort": "{{count}}х",
-      "skillsShort": "{{count}}у",
-      "commandsShort": "{{count}}к"
+      "setupCommands_one": "{{count}} тохируулах команд",
+      "setupCommands_other": "{{count}} тохируулах команд",
+      "agents_one": "{{count}} агент",
+      "agents_other": "{{count}} агент"
     },
     "nameLabel": "Профайлын нэр",
     "namePlaceholder": "жишээ нь Ар талд дибаг хийх",

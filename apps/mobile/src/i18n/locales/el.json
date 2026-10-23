@@ -2265,7 +2265,6 @@
       "couldNotLoadEnvironment": "Δεν ήταν δυνατή η φόρτωση του περιβάλλοντός σου.",
       "retryLoadingEnvironment": "Επανάληψη φόρτωσης περιβάλλοντος",
       "defaultEnvironment": "Προεπιλεγμένο περιβάλλον",
-      "environmentSummary": "{{commands}} εντολές · {{mcp}} MCP · {{skills}} δεξιότητες · {{agents}} πράκτορες",
       "leaveChanges": "Διατήρηση αλλαγών",
       "commitAndPush": "Καταχώριση και αποστολή",
       "startSession": "Έναρξη συνεδρίας",
@@ -3721,9 +3720,10 @@
       "skills_other": "{{count}} δεξιότητες",
       "commands_one": "{{count}} εντολή",
       "commands_other": "{{count}} εντολές",
-      "varsShort": "{{count}}μ",
-      "skillsShort": "{{count}}δ",
-      "commandsShort": "{{count}}ε"
+      "setupCommands_one": "{{count}} εντολή εγκατάστασης",
+      "setupCommands_other": "{{count}} εντολές εγκατάστασης",
+      "agents_one": "{{count}} πράκτορας",
+      "agents_other": "{{count}} πράκτορες"
     },
     "nameLabel": "Όνομα προφίλ",
     "namePlaceholder": "π.χ. Αποσφαλμάτωση backend",

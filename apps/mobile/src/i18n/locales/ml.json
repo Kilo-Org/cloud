@@ -2265,7 +2265,6 @@
       "couldNotLoadEnvironment": "നിങ്ങളുടെ പ്രവർത്തനാന്തരീക്ഷം ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "retryLoadingEnvironment": "പ്രവർത്തനാന്തരീക്ഷം ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക",
       "defaultEnvironment": "ഡിഫോൾട്ട് പ്രവർത്തനാന്തരീക്ഷം",
-      "environmentSummary": "{{commands}} കമാൻഡുകൾ · {{mcp}} MCP · {{skills}} സ്കില്ലുകൾ · {{agents}} ഏജന്റുകൾ",
       "leaveChanges": "മാറ്റങ്ങൾ നിലനിർത്തുക",
       "commitAndPush": "കമ്മിറ്റ് ചെയ്ത് പുഷ് ചെയ്യുക",
       "startSession": "സെഷൻ ആരംഭിക്കുക",
@@ -3721,9 +3720,10 @@
       "skills_other": "{{count}} കഴിവുകൾ",
       "commands_one": "{{count}} കമാൻഡ്",
       "commands_other": "{{count}} കമാൻഡുകൾ",
-      "varsShort": "{{count}}വ",
-      "skillsShort": "{{count}}ക",
-      "commandsShort": "{{count}}കമ"
+      "setupCommands_one": "{{count}} സജ്ജമാക്കൽ കമാൻഡ്",
+      "setupCommands_other": "{{count}} സജ്ജമാക്കൽ കമാൻഡുകൾ",
+      "agents_one": "{{count}} ഏജൻ്റ്",
+      "agents_other": "{{count}} ഏജൻ്റുകൾ"
     },
     "nameLabel": "പ്രൊഫൈൽ പേര്",
     "namePlaceholder": "ഉദാ. ബാക്കെൻഡ് ഡീബഗ്ഗിംഗ്",

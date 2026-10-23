@@ -2265,7 +2265,6 @@
       "couldNotLoadEnvironment": "तपाईंको वातावरण लोड गर्न सकिएन।",
       "retryLoadingEnvironment": "वातावरण लोड गर्न पुनः प्रयास गर्नुहोस्",
       "defaultEnvironment": "पूर्वनिर्धारित वातावरण",
-      "environmentSummary": "{{commands}} कमाण्ड · {{mcp}} MCP · {{skills}} सीप · {{agents}} एजेन्ट",
       "leaveChanges": "परिवर्तन यथावत्",
       "commitAndPush": "कमिट र पुश",
       "startSession": "सत्र सुरु गर्नुहोस्",
@@ -3721,9 +3720,10 @@
       "skills_other": "{{count}} सीप",
       "commands_one": "{{count}} आदेश",
       "commands_other": "{{count}} आदेश",
-      "varsShort": "{{count}}च",
-      "skillsShort": "{{count}}स",
-      "commandsShort": "{{count}}आ"
+      "setupCommands_one": "{{count}} सेटअप आदेश",
+      "setupCommands_other": "{{count}} सेटअप आदेश",
+      "agents_one": "{{count}} एजेन्ट",
+      "agents_other": "{{count}} एजेन्ट"
     },
     "nameLabel": "प्रोफाइल नाम",
     "namePlaceholder": "जस्तै ब्याकएन्ड डिबगिङ",

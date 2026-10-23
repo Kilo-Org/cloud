@@ -2265,7 +2265,6 @@
       "couldNotLoadEnvironment": "ଆପଣଙ୍କ ପରିବେଶ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "retryLoadingEnvironment": "ପରିବେଶ ପୁଣି ଲୋଡ୍ କରନ୍ତୁ",
       "defaultEnvironment": "ଡିଫଲ୍ଟ ପରିବେଶ",
-      "environmentSummary": "{{commands}} କମାଣ୍ଡ · {{mcp}} MCP · {{skills}} ସ୍କିଲ୍ · {{agents}} ଏଜେଣ୍ଟ",
       "leaveChanges": "ପରିବର୍ତ୍ତନ ରଖନ୍ତୁ",
       "commitAndPush": "କମିଟ୍ ଓ ପୁଶ୍ କରନ୍ତୁ",
       "startSession": "ସେସନ୍ ଆରମ୍ଭ କରନ୍ତୁ",
@@ -3721,9 +3720,10 @@
       "skills_other": "{{count}} ଦକ୍ଷତା",
       "commands_one": "{{count}} କମାଣ୍ଡ୍",
       "commands_other": "{{count}} କମାଣ୍ଡ୍",
-      "varsShort": "{{count}}ଭ",
-      "skillsShort": "{{count}}ଦ",
-      "commandsShort": "{{count}}କ"
+      "setupCommands_one": "{{count}} ସେଟଅପ୍ କମାଣ୍ଡ୍",
+      "setupCommands_other": "{{count}} ସେଟଅପ୍ କମାଣ୍ଡ୍",
+      "agents_one": "{{count}} ଏଜେଣ୍ଟ",
+      "agents_other": "{{count}} ଏଜେଣ୍ଟ"
     },
     "nameLabel": "ପ୍ରୋଫାଇଲ୍ ନାମ",
     "namePlaceholder": "ଯଥା ବ୍ୟାକେଣ୍ଡ୍ ତ୍ରୁଟି ନିବାରଣ।",

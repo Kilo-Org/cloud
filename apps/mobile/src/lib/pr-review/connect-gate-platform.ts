@@ -150,6 +150,27 @@ type ConnectGateLaunchHandlers = {
   onOpenFailure: () => void;
 };
 
+/** Resolves when the caller aborts, so a detached wait can end with it. */
+function whenAborted(signal: AbortSignal | undefined): Promise<undefined> {
+  const { promise, resolve } = Promise.withResolvers<undefined>();
+  if (signal === undefined) {
+    // No caller to end it: this edge never fires.
+    return promise;
+  }
+  if (signal.aborted) {
+    resolve(undefined);
+    return promise;
+  }
+  signal.addEventListener(
+    'abort',
+    () => {
+      resolve(undefined);
+    },
+    { once: true }
+  );
+  return promise;
+}
+
 /**
  * Launch failures are reported separately from refetch failures. Closing the
  * browser still refetches: the server-driven connection may have completed.
@@ -158,13 +179,15 @@ type ConnectGateLaunchHandlers = {
  * When the app's own return edge ends the wait before the browser reports, the
  * sheet can still complete afterwards — a sign-in that succeeds after the user
  * was briefly back in the app. The status is refreshed again on that late
- * report, so a completed connection is never missed.
+ * report, so a completed connection is never missed. That follow-up ends with
+ * the caller's abort: nothing it would refresh is on screen once the caller is
+ * gone.
  */
 export async function launchConnectGateBrowser(
   authorizationUrl: string,
   handlers: ConnectGateLaunchHandlers
 ): Promise<void> {
-  let wait: AuthorizationWait | undefined = undefined;
+  let wait: AuthorizationWait = { reported: Promise.resolve(undefined), settledByLaunch: true };
   try {
     wait = await openAuthorizationAndWaitForReturn(authorizationUrl, handlers.signal);
   } catch {
@@ -176,14 +199,20 @@ export async function launchConnectGateBrowser(
   if (!handlers.signal?.aborted) {
     await handlers.onReturn();
   }
-  if (!wait.settledByLaunch) {
-    void (async () => {
-      const late = await wait.reported;
-      // A failed launch is already behind us: only a real dismissal or sign-in
-      // after the fact is worth another read.
-      if (late !== undefined && !handlers.signal?.aborted) {
-        await handlers.onReturn();
-      }
-    })();
+  if (wait.settledByLaunch) {
+    return;
   }
+  void (async () => {
+    const late = await Promise.race([wait.reported, whenAborted(handlers.signal)]);
+    // A failed launch is already behind us, and an aborted caller wants nothing
+    // more: only a real dismissal or sign-in after the fact is worth a read.
+    if (late === undefined || handlers.signal?.aborted) {
+      return;
+    }
+    try {
+      await handlers.onReturn();
+    } catch {
+      // The read's own error state carries the outcome to the screen.
+    }
+  })();
 }

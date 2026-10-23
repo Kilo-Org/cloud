@@ -52,6 +52,12 @@ beforeEach(() => {
   );
 });
 
+function flushMicrotasks(): Promise<unknown> {
+  // A few settled microtasks: enough for the detached follow-up to reach its
+  // abort or report guard, without a wall-clock wait.
+  return Promise.all([Promise.resolve(), Promise.resolve(), Promise.resolve(), Promise.resolve()]);
+}
+
 function returnHandlers() {
   return { onReturn: vi.fn().mockResolvedValue(undefined), onOpenFailure: vi.fn() };
 }
@@ -352,6 +358,43 @@ describe.each(['ios', 'android'])('shared launch contract on %s', os => {
     await vi.waitFor(() => {
       expect(handlers.onReturn).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it('stops waiting for the sheet once the caller aborts', async () => {
+    mocks.appState.currentState = 'active';
+    const pending = pendingLaunch();
+    const controller = new AbortController();
+    const handlers = { ...returnHandlers(), signal: controller.signal };
+    const launch = launchConnectGateBrowser('https://example.com/connect', handlers);
+    emitAppState('background');
+    emitAppState('active');
+    await launch;
+    expect(handlers.onReturn).toHaveBeenCalledOnce();
+
+    // The caller is gone, so a sheet that finishes later must not refresh.
+    controller.abort();
+    pending.resolve({ type: 'cancel' });
+    await flushMicrotasks();
+    expect(handlers.onReturn).toHaveBeenCalledOnce();
+  });
+
+  it('does not surface a rejecting late refresh', async () => {
+    mocks.appState.currentState = 'active';
+    const pending = pendingLaunch();
+    const handlers = returnHandlers();
+    const launch = launchConnectGateBrowser('https://example.com/connect', handlers);
+    emitAppState('background');
+    emitAppState('active');
+    await launch;
+    handlers.onReturn.mockRejectedValueOnce(new Error('status refetch failed'));
+
+    // A rejecting read is the query's own state to report; an unhandled
+    // rejection here would fail this test.
+    pending.resolve({ type: 'cancel' });
+    await vi.waitFor(() => {
+      expect(handlers.onReturn).toHaveBeenCalledTimes(2);
+    });
+    await flushMicrotasks();
   });
 });
 

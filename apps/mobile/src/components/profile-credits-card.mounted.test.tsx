@@ -300,6 +300,41 @@ beforeEach(() => {
 });
 
 describe('CreditsCard balance state', () => {
+  it('shows no in-progress indicator while a cached balance refreshes', async () => {
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 10 });
+
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(BALANCE_KEY, { balance: 10 });
+
+    const { renderer, texts, unmount } = await mountCard(queryClient);
+    await waitFor(() => texts().includes('$10.00'));
+
+    // A refresh that never answers: the indicator used to ride every in-flight
+    // refresh, so this one spun until the read finally settled -- or forever.
+    const stalledRefresh = Promise.withResolvers<undefined>();
+    getContextBalanceQueryFn.mockReturnValue(stalledRefresh.promise);
+    act(() => {
+      // The refetch never answers, so this promise stays pending by design.
+      void queryClient.invalidateQueries({ queryKey: BALANCE_KEY });
+    });
+    await waitFor(() => queryClient.getQueryState(BALANCE_KEY)?.fetchStatus === 'fetching');
+    // Flush the observer notification the refetch schedules, so the card is
+    // judged on a render that knows the refresh is in flight.
+    await act(async () => {
+      const tick = Promise.withResolvers<undefined>();
+      setTimeout(() => {
+        tick.resolve(undefined);
+      }, 0);
+      await tick.promise;
+    });
+
+    expect(renderer.root.findAllByType('ActivityIndicator' as ElementType)).toHaveLength(0);
+    expect(texts()).toContain('$10.00');
+
+    unmount();
+  });
+
   it.each([
     { name: 'expired grants', future: false },
     { name: 'mixed grants', future: true },

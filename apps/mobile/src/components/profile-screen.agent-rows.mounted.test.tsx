@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The mock harness is imported before any product module so its `vi.mock`
 // calls register before the modules under test are loaded.
 import {
   authState,
   findConfigureRows,
+  flushIdle,
   getProfileAgentScopeMock,
   idleState,
   keys,
@@ -16,9 +17,10 @@ import {
 } from '@/components/profile-screen.test-helpers';
 import { i18n } from '@/i18n';
 import { getCodeReviewerProfilePath, getProfilesPath } from '@/lib/profile-agent-navigation';
+import type * as ProfileAgentNavigationModule from '@/lib/profile-agent-navigation';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { act } from '@/test/renderer';
-import { createTestQueryClient } from '@/test/render-with-providers';
+import { createTestQueryClient, waitFor } from '@/test/render-with-providers';
 
 /**
  * The three rows under AGENTS in the Profile tab are the only way into the code
@@ -89,6 +91,59 @@ describe('ProfileScreen agent rows', () => {
 
     pressRow(root, i18n.t('common.securityAgent'));
     expect(routerPush).toHaveBeenLastCalledWith(getSecurityAgentPath('personal'));
+
+    unmount();
+  });
+
+  it('keeps both rows usable from cached organizations while a refresh is in flight', async () => {
+    // The real resolver, not a canned scope: gating the scope on the refresh
+    // disabled both rows for as long as the organizations read kept fetching,
+    // with no error and no way in.
+    const navigation = await vi.importActual<typeof ProfileAgentNavigationModule>(
+      '@/lib/profile-agent-navigation'
+    );
+    getProfileAgentScopeMock.mockImplementation(navigation.getProfileAgentScope);
+    providersQueryFn.mockResolvedValue({ providers: [] });
+    // A refresh that never answers.
+    const stalledRefresh = Promise.withResolvers<undefined>();
+    organizationsQueryFn.mockReturnValue(stalledRefresh.promise);
+
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(keys.organizations, [
+      { organizationId: 'org-1', organizationName: 'Kilo', role: 'admin' },
+    ]);
+
+    const { renderer, unmount } = await mountProfile(queryClient);
+    const root = renderer.root;
+
+    flushIdle();
+    act(() => {
+      // The refetch never answers, so this promise stays pending by design.
+      void queryClient.invalidateQueries({ queryKey: keys.organizations });
+    });
+    await waitFor(
+      () => queryClient.getQueryState(keys.organizations)?.fetchStatus === 'fetching'
+    );
+    // Flush the observer notification the refetch schedules, so the rows are
+    // judged on a render that knows the refresh is in flight.
+    await act(async () => {
+      const tick = Promise.withResolvers<undefined>();
+      setTimeout(() => {
+        tick.resolve(undefined);
+      }, 0);
+      await tick.promise;
+    });
+
+    const [codeReviewerRow] = findConfigureRows(root, i18n.t('common.codeReviewer'));
+    const [securityAgentRow] = findConfigureRows(root, i18n.t('common.securityAgent'));
+    expect(codeReviewerRow?.props.disabled).toBe(false);
+    expect(securityAgentRow?.props.disabled).toBe(false);
+
+    pressRow(root, i18n.t('common.codeReviewer'));
+    expect(routerPush).toHaveBeenLastCalledWith(getCodeReviewerProfilePath('org-1'));
+
+    pressRow(root, i18n.t('common.securityAgent'));
+    expect(routerPush).toHaveBeenLastCalledWith(getSecurityAgentPath('org-1'));
 
     unmount();
   });

@@ -55,12 +55,12 @@ describe('ProfileScreen deferred queries', () => {
     const { renderer, unmount } = await mountProfile();
 
     // Before the flush: neither query fired, the content-shaped skeleton
-    // (icon tile + two text bars) shows, and the agent rows are held
-    // disabled (refreshing argument is true).
+    // (icon tile + two text bars) shows, and the scope resolver has no list to
+    // read yet, so the agent rows stay disabled.
     expect(providersQueryFn).not.toHaveBeenCalled();
     expect(organizationsQueryFn).not.toHaveBeenCalled();
     expect(nodeCount(renderer.root, 'Skeleton')).toBe(3);
-    expect(getProfileAgentScopeMock.mock.calls.at(-1)?.[2]).toBe(true);
+    expect(getProfileAgentScopeMock.mock.calls.at(-1)?.[1]).toBeUndefined();
 
     flushIdle();
 
@@ -70,8 +70,8 @@ describe('ProfileScreen deferred queries', () => {
     expect(providersQueryFn).toHaveBeenCalledTimes(1);
     expect(organizationsQueryFn).toHaveBeenCalledTimes(1);
 
-    // Once the deferred fetch settles, the refreshing argument is false.
-    await waitFor(() => getProfileAgentScopeMock.mock.calls.at(-1)?.[2] === false);
+    // Once the deferred read answers, the resolver receives the list itself.
+    await waitFor(() => Array.isArray(getProfileAgentScopeMock.mock.calls.at(-1)?.[1]));
 
     unmount();
   });
@@ -232,6 +232,36 @@ describe('ProfileScreen deferred queries', () => {
 
     expect(findConfigureRows(renderer.root, 'GitHub')[0]?.props.subtitle).toBe('dev@kilo.ai');
     expect(nodeCount(renderer.root, 'Skeleton')).toBe(0);
+
+    unmount();
+  });
+
+  it('settles the organizations read while the app reports offline', async () => {
+    // Same trap as the linked-accounts read: the organizations list resolves
+    // the Agents scope, so a read paused by the online manager leaves the
+    // organization section and both agent rows waiting on a request that never
+    // starts. It must ask Query to settle regardless.
+    providersQueryFn.mockResolvedValue({ providers: [] });
+    organizationsQueryFn.mockResolvedValue([
+      { organizationId: 'org-1', organizationName: 'Kilo', role: 'admin' },
+    ]);
+    onlineManager.setOnline(false);
+
+    const { renderer, unmount } = await mountProfile();
+
+    flushIdle();
+    await waitFor(
+      () =>
+        findConfigureRows(renderer.root, i18n.t('profile.manageOrganization'))[0]?.props
+          .subtitle === 'Kilo'
+    );
+
+    const [organizationRow] = findConfigureRows(
+      renderer.root,
+      i18n.t('profile.manageOrganization')
+    );
+    expect(organizationRow?.props.subtitle).toBe('Kilo');
+    expect(nodeCount(renderer.root, 'QueryError')).toBe(0);
 
     unmount();
   });

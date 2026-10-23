@@ -35,8 +35,10 @@ describe('getProfileAgentScope', () => {
     expect(getProfileAgentScope('org-1', undefined)).toBeUndefined();
   });
 
-  it('waits while organizations are being refreshed before resolving a selected organization', () => {
-    expect(getProfileAgentScope('org-1', organizations, true)).toBeUndefined();
+  it('resolves a selected organization from the list already in hand', () => {
+    // The list resolves the scope on its own: a background refresh of it (or a
+    // refresh that never finishes) must not disable the agent rows.
+    expect(getProfileAgentScope('org-1', organizations)).toBe('org-1');
   });
 });
 

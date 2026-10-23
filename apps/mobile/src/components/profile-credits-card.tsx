@@ -75,7 +75,6 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const {
     data: balance,
     isLoading: balanceLoading,
-    isFetching: balanceFetching,
     isError: balanceQueryError,
     refetch: refetchBalance,
   } = useQuery({
@@ -304,7 +303,12 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
               ))}
           </Animated.View>
           <View className="max-w-full flex-row flex-wrap items-center gap-2">
-            {balanceFetching && <ActivityIndicator size="small" color={colors.mutedForeground} />}
+            {/* No in-progress indicator here: this row paints a balance that has
+                already answered, and a background refresh may legitimately take
+                a while or never finish. The first load owns the skeleton above;
+                a refresh that fails owns the retry surface. An indicator tied to
+                every in-flight refresh spun for as long as a stalled one lasted
+                (and announced itself as "In progress"). */}
             {selectedOrgId == null && (
               <AddCreditsButton
                 className={cn('h-auto min-h-11 max-w-full py-2', stackBalance && 'flex-1')}

@@ -5,13 +5,16 @@ type ProfileOrganization = { organizationId: string };
 
 export function getProfileAgentScope(
   selectedOrganizationId: string | null,
-  organizations: readonly ProfileOrganization[] | undefined,
-  organizationsRefreshing = false
+  organizations: readonly ProfileOrganization[] | undefined
 ): string | undefined {
   if (!selectedOrganizationId) {
     return PERSONAL_SECURITY_SCOPE;
   }
-  if (!organizations || organizationsRefreshing) {
+  // A list already in hand resolves the scope, including while a background
+  // refresh runs: gating on the refresh left both agent rows disabled for as
+  // long as a stalled refresh lasted, with no error and no way to open them.
+  // Only the absence of any list -- before the first load -- keeps them waiting.
+  if (!organizations) {
     return undefined;
   }
   // A settled list that no longer contains the selection means the membership

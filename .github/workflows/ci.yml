@@ -293,6 +293,10 @@ jobs:
       - name: Test typecheck CI wiring
         run: node --test scripts/typecheck-ci.test.mjs
 
+      # The relay regression executes Wrangler's real config parser.
+      - name: Install usage-ingest deployment test dependencies
+        run: pnpm --filter cloudflare-usage-ingest install --frozen-lockfile --ignore-scripts
+
       - name: Test scheduled deployment wiring
         run: node --test scripts/deployment-workflows.test.mjs
 

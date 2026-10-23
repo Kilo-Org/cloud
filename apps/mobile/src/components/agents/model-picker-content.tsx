@@ -13,7 +13,11 @@ import { PickerSheet } from '@/components/picker-sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
-import { SEARCH_FIELD_CLEAR_BOX_CLASS, searchFieldClearHitSlop } from '@/lib/a11y/tap-target';
+import {
+  SEARCH_FIELD_CLEAR_BOX_CLASS,
+  searchFieldClearHitSlop,
+  STATE_ACTION_CLASS,
+} from '@/lib/a11y/tap-target';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -307,7 +311,7 @@ export function ModelPickerContent() {
             // same recovery the Agents search empty state does, so the only
             // exit from "No matches" is not backspacing the query away.
             deferredSearch.trim() ? (
-              <Button variant="outline" onPress={handleClearSearch}>
+              <Button variant="outline" onPress={handleClearSearch} className={STATE_ACTION_CLASS}>
                 <Text>{t('common.clearSearch')}</Text>
               </Button>
             ) : undefined

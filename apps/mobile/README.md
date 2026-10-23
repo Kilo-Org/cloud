@@ -18,12 +18,28 @@ current render time. Elapsed grants and non-expiring credits do not contribute t
 its amount or earliest expiry, for both personal and organization accounts.
 The balance continues to come from the balance query.
 
+## New-session model choice
+
+Model resolution waits for stored preferences to load. An explicit model and
+effort pick updates the current account scope's preference cache before its
+server save finishes, so reopening the form does not restore an older cached
+choice. Older in-flight preference reads are cancelled before that update.
+The existing server, local, and default-model fallback order is unchanged.
+
 ## Organization hub connectivity
 
 Usage tiles retain labels and show cached totals or em dash placeholders.
 Unavailable usage and low-balance settings expose Retry. The low-balance row
 retries its settings read until data is available, then opens configuration.
 Cached settings remain visible during offline pauses and refresh failures.
+
+## Transcript action targets
+
+Standalone transcript continuation and recovery buttons use the shared
+`Button size="action"`: a 48dp minimum height that can grow with the label.
+Compact, default, and large button sizes remain unchanged for other controls.
+Verify Android targets using the clickable accessibility node bounds, not
+hitSlop alone; keep the translated label fully visible.
 
 ## Getting started
 

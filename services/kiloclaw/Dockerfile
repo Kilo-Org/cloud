@@ -237,7 +237,7 @@ RUN echo "apt cache bust: ${APT_CACHE_BUST}" \
     && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 \
     && rm /tmp/node.tar.xz \
     && npm install --global pnpm@11.1.2 \
-    && curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.13" \
+    && curl -fsSL https://bun.sh/install | bash -s "bun-v1.4.4" \
     && rm -rf /var/lib/apt/lists/*
 ENV PATH="/root/.bun/bin:$PATH"
 

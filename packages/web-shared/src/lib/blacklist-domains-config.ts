@@ -21,7 +21,9 @@ export const DEFAULT_BLOCKED_SIGNUP_TLDS = ['shop', 'top'];
 
 export const DEFAULT_BLACKLIST_DOMAINS_CONFIG: BlacklistDomainsConfig = {
   domains: [],
-  blocked_signup_tlds: DEFAULT_BLOCKED_SIGNUP_TLDS,
+  // `blocked_signup_tlds` stays unset so a missing key resolves through
+  // getBlockedSignupTlds(): the env fallback stays in effect and the editor
+  // cannot show a list that auth does not enforce.
   updated_at: null,
   updated_by: null,
   updated_by_email: null,

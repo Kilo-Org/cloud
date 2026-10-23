@@ -531,4 +531,26 @@ describe('admin.blacklistDomains.set', () => {
 
     expect(result.blocked_signup_tlds).toEqual(['asia']);
   });
+
+  it('keeps the effective TLD fallback when no config is stored yet', async () => {
+    mockedRedisGet.mockResolvedValue(null);
+
+    const caller = await createCallerForUser(admin.id);
+    const result = await caller.admin.blacklistDomains.set({ domains: ['mailinator.com'] });
+
+    // The stored config is written with the effective list auth enforces, not
+    // an empty field that would silently re-allow every TLD.
+    expect(result.blocked_signup_tlds).toEqual(['shop', 'top']);
+  });
+});
+
+describe('admin.blacklistDomains.get', () => {
+  it('shows the effective TLD list when no config is stored yet', async () => {
+    mockedRedisGet.mockResolvedValue(null);
+
+    const caller = await createCallerForUser(admin.id);
+    const config = await caller.admin.blacklistDomains.get();
+
+    expect(config.blocked_signup_tlds).toEqual(['shop', 'top']);
+  });
 });

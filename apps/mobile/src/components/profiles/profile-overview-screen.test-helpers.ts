@@ -1,5 +1,6 @@
 import { createElement } from 'react';
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import * as z from 'zod';
 
 import { ProfileOverviewScreen } from '@/components/profiles/profile-overview-screen';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
@@ -59,6 +60,31 @@ export function findOne(root: ReactTestInstance, type: string): ReactTestInstanc
     throw new Error(`${type} was not rendered`);
   }
   return node;
+}
+
+/** A button element's props, as the screen composed them. */
+const ActionButtonSchema = z.object({
+  props: z.object({
+    onPress: z.custom<() => void>(value => typeof value === 'function'),
+    children: z.object({ props: z.object({ children: z.string() }) }),
+  }),
+});
+
+/** The props the screen hands the mocked `QueryError`. */
+const QueryErrorPropsSchema = z.object({
+  variant: z.string().optional(),
+  title: z.string().optional(),
+  onRetry: z.custom<() => void>(value => typeof value === 'function').optional(),
+  action: ActionButtonSchema.optional(),
+});
+
+/**
+ * Read the mocked `QueryError`'s props. Parsed rather than cast because the
+ * test renderer types every node's props as `any`, and an assertion about a
+ * recovery action must fail loudly when the screen stops composing one.
+ */
+export function queryErrorProps(root: ReactTestInstance) {
+  return QueryErrorPropsSchema.parse(findOne(root, 'QueryError').props);
 }
 
 export function findField(root: ReactTestInstance, label: string): ReactTestInstance {

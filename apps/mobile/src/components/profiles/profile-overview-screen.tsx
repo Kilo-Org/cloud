@@ -48,10 +48,10 @@ import {
   getProfileAgentsPath,
   getProfileCommandsPath,
   getProfileMcpPath,
+  getProfilesPath,
   getProfileSkillsPath,
   getProfileSlashCommandsPath,
   getProfileVariablesPath,
-  getProfilesPath,
 } from '@/lib/profile-agent-navigation';
 
 /** Icon per Overview section, matching the section's purpose. */

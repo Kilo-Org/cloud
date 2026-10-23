@@ -1,4 +1,3 @@
-import { QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -28,7 +27,6 @@ const h = vi.hoisted(() => ({
   connectivity: 'online' as string,
   query: {
     data: undefined as TestProfileDetail | undefined,
-    error: undefined as unknown,
     isError: false,
     isPending: true,
     isRefetching: false,
@@ -120,7 +118,6 @@ describe('ProfileOverviewScreen', () => {
     h.connectivity = 'online';
     Object.assign(h.query, {
       data: undefined,
-      error: undefined,
       isError: false,
       isPending: true,
       isRefetching: false,
@@ -174,56 +171,6 @@ describe('ProfileOverviewScreen', () => {
       (queryError.props as { onRetry: () => void }).onRetry();
     });
     expect(h.query.refetch).toHaveBeenCalledTimes(1);
-
-    unmount();
-  });
-
-  it('stale row: NOT_FOUND shows the not-found state, offers no Retry, and refreshes the lists', async () => {
-    Object.assign(h.query, {
-      isError: true,
-      isPending: false,
-      error: { data: { code: 'NOT_FOUND', httpStatus: 404 } },
-    });
-    const invalidate = vi.spyOn(QueryClient.prototype, 'invalidateQueries');
-
-    const { renderer, unmount } = await mountScreen();
-
-    const queryError = findOne(renderer.root, 'QueryError');
-    expect(queryError.props.variant).toBe('not-found');
-    // The variant's own copy names the removal; the screen's generic load
-    // failure title would claim the app broke.
-    expect(queryError.props.title).toBeUndefined();
-    // Retry would re-issue the same 404: the state offers a way back instead.
-    expect(queryError.props.onRetry).toBeUndefined();
-
-    const action = queryError.props.action;
-    expect(action).toBeDefined();
-    expect(action.props.children.props.children).toBe('Go back');
-    act(() => {
-      action.props.onPress();
-    });
-    expect(h.replace).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/profiles');
-
-    await waitFor(() => invalidate.mock.calls.length >= 2);
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['agentProfiles', 'list'] });
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['agentProfiles', 'listCombined'] });
-
-    unmount();
-  });
-
-  it('permission: FORBIDDEN shows the permission state without Retry', async () => {
-    Object.assign(h.query, {
-      isError: true,
-      isPending: false,
-      error: { data: { code: 'FORBIDDEN', httpStatus: 403 } },
-    });
-
-    const { renderer, unmount } = await mountScreen();
-
-    const queryError = findOne(renderer.root, 'QueryError');
-    expect(queryError.props.variant).toBe('permission');
-    expect(queryError.props.onRetry).toBeUndefined();
-    expect(queryError.props.action).toBeDefined();
 
     unmount();
   });

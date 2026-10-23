@@ -25,7 +25,7 @@ export type SecurityCommand = NonNullable<RouterOutputs['securityAgent']['getCom
 export type SecurityCommandBatch = RouterOutputs['securityAgent']['getCommandStatuses'];
 
 export function getSecurityAgentPath(scope: string, suffix = ''): Href {
-  const path = `/(app)/(tabs)/(3_profile)/security-agent/${scope}`;
+  const path = `/(app)/security-agent/${scope}`;
   return (suffix ? `${path}/${suffix}` : path) as Href;
 }
 
@@ -122,4 +122,20 @@ export function reconcileCommandStatuses(args: {
   });
 
   return { terminalCommands, unavailableIds };
+}
+
+/**
+ * Whether the finding's row offers the Analyze action: an open finding that was
+ * never analyzed or whose analysis failed, and whose remediation has not opened
+ * a PR (that row shows View PR instead). Eligibility only — whether the action
+ * can run right now is the separate capacity state.
+ */
+export function isSecurityFindingAnalyzable(finding: SecurityFinding): boolean {
+  const remediationPrUrl =
+    finding.remediationSummary?.status === 'pr_opened' ? finding.remediationSummary.prUrl : null;
+  return (
+    !remediationPrUrl &&
+    finding.status === 'open' &&
+    (!finding.analysis_status || finding.analysis_status === 'failed')
+  );
 }

@@ -25,7 +25,8 @@ import {
   getDataCollectionRequiredModelIds,
   getProviderSlugsForModels,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
-import { getPreferredProviderOrder } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
+import { resolvePreferredProviderOrder } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
+import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
 import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   getTerminalBenchSummaries,
@@ -132,12 +133,14 @@ async function enhancedModelList(models: OpenRouterModel[]) {
     dataCollectionRequiredModelIds,
     preferredModels,
     unavailableModelIds,
+    preferredProviderOrderConfig,
     customLlmsById,
   ] = await Promise.all([
     getOpenRouterModelsMetadataFromDatabase(),
     getDataCollectionRequiredModelIds(),
     getPreferredModels(),
     getUnavailableModelIds(),
+    getPreferredProviderOrderConfig(),
     getCustomLlmsById(),
   ]);
   // A custom LLM takes precedence over any built-in model with the same id.
@@ -168,7 +171,10 @@ async function enhancedModelList(models: OpenRouterModel[]) {
         !model.id.endsWith(':batch')
     )
     .map((model): OpenRouterModel => {
-      const preferredProvider = getPreferredProviderOrder(model.id).at(0);
+      const preferredProvider = resolvePreferredProviderOrder(
+        preferredProviderOrderConfig,
+        model.id
+      ).at(0);
       const endpoints = endpointsMetadata[model.id]?.endpoints ?? [];
       const rawPricing = !preferredProvider
         ? endpoints[0]?.pricing

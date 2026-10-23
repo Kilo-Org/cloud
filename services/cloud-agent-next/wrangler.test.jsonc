@@ -14,10 +14,6 @@
   "durable_objects": {
     "bindings": [
       {
-        "class_name": "CloudAgentSession",
-        "name": "CLOUD_AGENT_SESSION",
-      },
-      {
         "class_name": "StreamTicketNonceDO",
         "name": "STREAM_TICKET_NONCE_DO",
       },
@@ -40,10 +36,6 @@
     ],
   },
   "migrations": [
-    {
-      "new_sqlite_classes": ["CloudAgentSession"],
-      "tag": "v2",
-    },
     {
       "new_sqlite_classes": ["UserKiloFacade"],
       "tag": "v5",

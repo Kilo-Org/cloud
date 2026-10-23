@@ -2,13 +2,18 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Check } from '@/components/ui/icons';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BackHandler, Pressable, ScrollView, View } from 'react-native';
+import { BackHandler, Pressable, View } from 'react-native';
 
 import { roleLabel } from '@/components/organization/member-row';
 import { getInviteSuccessMessage } from '@/components/organization/invited-member-row-state';
+import {
+  inviteEmailError,
+  inviteErrorCopy,
+} from '@/components/organization/invite-member-validators';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { SheetHeader } from '@/components/sheet-header';
+import { SheetScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
@@ -20,7 +25,7 @@ import { captureEvent, ORGANIZATION_MEMBER_INVITED_EVENT } from '@/lib/analytics
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { isMoneyRole, type OrgRole, useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { cn, EMAIL_PATTERN } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 const INVITABLE_ROLES: OrgRole[] = ['member', 'billing_manager', 'owner'];
 
@@ -34,6 +39,17 @@ export function InviteMemberSheet() {
   const [canSubmit, setCanSubmit] = useState(false);
   const isBillingManager = myRole === 'billing_manager';
   const [role, setRole] = useState<OrgRole>('member');
+  // A rejected invite is rendered in localized copy, never as the server wrote
+  // it: a schema rejection is a JSON issue array (internal code, raw pattern,
+  // English message), not a sentence. Correcting the address drops the
+  // rejection, so the field never sits under a stale one.
+  const inviteError = mutations.invite.isError ? inviteErrorCopy(mutations.invite.error) : null;
+  const resetInvite = mutations.invite.reset;
+  const clearInviteError = () => {
+    if (mutations.invite.isError) {
+      resetInvite();
+    }
+  };
 
   const { requestClose, dialog } = useSheetDismissGuard({
     isDirty: () => emailRef.current.trim().length > 0 || role !== 'member',
@@ -60,10 +76,13 @@ export function InviteMemberSheet() {
 
   if (isResolving) {
     return (
-      <ScrollView className="flex-1 bg-background" contentContainerClassName="px-6 gap-6 pb-8 pt-4">
+      <SheetScrollView
+        className="flex-1 bg-background"
+        contentContainerClassName="px-6 gap-6 pb-8 pt-4"
+      >
         <Skeleton className="h-11 rounded-lg" />
         <Skeleton className="h-11 rounded-lg" />
-      </ScrollView>
+      </SheetScrollView>
     );
   }
   if (organizationId == null || org == null) {
@@ -100,7 +119,7 @@ export function InviteMemberSheet() {
         doneDisabled={!canSubmit || mutations.invite.isPending}
         topInset="bottom-form-sheet"
       />
-      <ScrollView
+      <SheetScrollView
         className="flex-1 bg-background"
         contentContainerClassName="px-6 gap-6 pb-8 pt-4"
         automaticallyAdjustKeyboardInsets
@@ -116,13 +135,22 @@ export function InviteMemberSheet() {
           autoComplete="email"
           textContentType="emailAddress"
           autoFocus
-          validate={value =>
-            EMAIL_PATTERN.test(value.trim()) ? null : t('organization.inviteMember.emailError')
-          }
+          validate={inviteEmailError}
+          error={inviteError?.field === 'email' ? inviteError.message : undefined}
           onChangeText={value => {
             emailRef.current = value;
-            setCanSubmit(EMAIL_PATTERN.test(value.trim()));
+            setCanSubmit(inviteEmailError(value) == null);
+            clearInviteError();
           }}
+        />
+
+        {/* The rejected invite sits under the field it names, above the
+            software keyboard. The mutation has no toast (inline error pattern
+            P2), so AccessibleStatus is the single announcement owner here: one
+            announcement per platform, visuals preserved (tone error). */}
+        <AccessibleStatus
+          message={inviteError?.field === 'form' ? inviteError.message : null}
+          className="text-sm"
         />
 
         {isBillingManager ? (
@@ -158,15 +186,7 @@ export function InviteMemberSheet() {
             </RadioGroup>
           </View>
         )}
-
-        {/* The mutation hook has no toast for invite (inline error pattern P2),
-            so AccessibleStatus is the single announcement owner here: one
-            announcement per platform, visuals preserved (tone error). */}
-        <AccessibleStatus
-          message={mutations.invite.isError ? mutations.invite.error.message : null}
-          className="text-sm"
-        />
-      </ScrollView>
+      </SheetScrollView>
       {dialog}
     </>
   );

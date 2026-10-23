@@ -1,10 +1,13 @@
 import 'server-only';
 
-import type { OrganizationGroupModelAccessPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
+import {
+  ORGANIZATION_GROUPS_ENTERPRISE_ONLY_MESSAGE,
+  type OrganizationGroupModelAccessPolicy,
+} from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import { modelsByProvider, organizations } from '@kilocode/db/schema';
 import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import { TRPCError } from '@trpc/server';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
@@ -347,7 +350,7 @@ export async function getModelAccessPolicyEditorData(organizationId: string) {
     db
       .select({ plan: organizations.plan })
       .from(organizations)
-      .where(eq(organizations.id, organizationId))
+      .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
       .limit(1),
     db
       .select({ data: modelsByProvider.data })
@@ -355,8 +358,14 @@ export async function getModelAccessPolicyEditorData(organizationId: string) {
       .orderBy(desc(modelsByProvider.id))
       .limit(1),
   ]);
-  if (!organization || organization.plan !== 'enterprise') {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Enterprise organization not found' });
+  if (!organization) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+  }
+  if (organization.plan !== 'enterprise') {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: ORGANIZATION_GROUPS_ENTERPRISE_ONLY_MESSAGE,
+    });
   }
   if (!catalog) {
     throw new TRPCError({

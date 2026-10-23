@@ -23,7 +23,7 @@ import { getVisibleAssistantParts } from './message-presentation';
 import type { OpenChildSession } from './ChildSessionSection';
 import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { stripImageContext } from '@/lib/app-builder/message-utils';
+import { stripImageContext } from '@/lib/cloud-agent/message-utils';
 import { toSafeHttpUrl } from '@/lib/safe-http-url';
 import { getDeliveryBadge, type DeliveryBadge } from './delivery-badge';
 import { parseWorktreeReviewMessage } from './worktree-review';

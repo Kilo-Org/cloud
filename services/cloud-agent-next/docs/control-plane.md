@@ -2,8 +2,8 @@
 
 This is the single design and acceptance spec for the `workspace_*` control plane: the Session DO
 (`SandboxSession`), the Sandbox DO (`SandboxControl`), the in-container supervisor and the control
-wrapper. Product rules stay in `.specs/cloud-agent-session.md`. The legacy `agent_*` plane
-(`CloudAgentSession`, legacy wrapper `wrapper/src/main.ts`) is out of scope.
+wrapper. Product rules stay in `.specs/cloud-agent-session.md`. The retired `agent_*` plane is
+out of scope; old session IDs are rejected.
 
 ## 1. Principles
 
@@ -182,6 +182,8 @@ public stream has no reconnecting status today, so `reconnecting` changes no cli
 - Wrapper events are appended to the event log and broadcast on `/stream` with the current schema.
   The Session DO emits `cloud.message.*` events on message changes and `preparing` events from route
   progress.
+- Session event error fields use the shared public failure projection before event storage and delivery.
+  Public execution-stop notices retain their bounded reason and recovery guidance.
 - Pending questions and permissions are projected from events. Answers go to the wrapper through the
   Sandbox DO. If the turn already settled, for example because the sandbox stopped, the answer is
   sent as a new message.
@@ -963,6 +965,11 @@ or disabled. The wrapper receives only a session-bound runtime credential proxy 
 legacy Kilo broker capability and direct-token execution paths are retired. Git credential
 containment and managed SCM direct-token paths keep their existing behavior.
 
+Managed SCM request-body inspection uses a growable buffer capped by each caller's byte limit
+and a 30-second total read deadline. GitHub git replay is capped at 1 MiB; bootstrap JSON
+inspection is capped at 16,000 bytes. An unavailable replay body keeps the single-forward path.
+The reader inspects a clone and preserves the original request body for forwarding.
+
 ### Compatibility and rollout
 
 Persisted sessions and credential grants without modern runtime authorization remain readable
@@ -1423,4 +1430,4 @@ provider stop reliability, billing or hosted timing; those are checked on a depl
   the desired environment after the next restart. This predates the directory-key flip for legacy
   shared directories.
 - Out of scope: Kilo and model-provider retry policy, workspace file recovery after sandbox loss,
-  the legacy plane.
+  the retired legacy plane.

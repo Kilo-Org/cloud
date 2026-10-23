@@ -4,12 +4,17 @@ import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
-import { parseSkillMarkdown, skillErrorKey } from '@/components/profiles/skill-markdown';
+import { skillErrorKey } from '@/components/profiles/skill-markdown';
 import { SheetHeader } from '@/components/sheet-header';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
-import { type SkillInputError, validateSkillInput } from '@/lib/agent-profile-forms';
+import {
+  type SkillInputError,
+  skillNameFromMarkdown,
+  validateSkillInput,
+} from '@/lib/agent-profile-forms';
+import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 
 /** The validated fields a saved skill is built from. */
 export type SkillFormSubmission = {
@@ -34,7 +39,9 @@ type SkillFormSheetProps = Readonly<{
  * The add/edit skill sheet. Mounted only while open, so every open seeds fresh
  * fields from the skill it edits. Fields are uncontrolled (refs), per the app's
  * iOS text-input rule; the name field remounts via `prefill` when frontmatter
- * in the content fills it in, and never overwrites a name the user typed.
+ * in the content fills it in, and never overwrites a name the user typed. A
+ * filled name is reduced to the server's name rule first, so the field never
+ * holds a value Save would refuse.
  *
  * Save validates through `validateSkillInput`; a refused input shows the
  * matching `profiles.skill*` message under the field at fault and persists
@@ -53,6 +60,7 @@ export function SkillFormSheet({
   const nameEditedRef = useRef(false);
   const [prefill, setPrefill] = useState(skill?.name ?? '');
   const [error, setError] = useState<SkillInputError | null>(null);
+  const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<'name' | 'content'>();
 
   const nameError = error === 'empty' || error === 'bad-name' ? t(skillErrorKey(error)) : undefined;
   const contentError = error === 'no-content' ? t(skillErrorKey(error)) : undefined;
@@ -67,6 +75,7 @@ export function SkillFormSheet({
     const result = validateSkillInput({ name: nameRef.current, content: contentRef.current });
     if (result.error !== null) {
       setError(result.error);
+      scrollToField(result.error === 'no-content' ? 'content' : 'name');
       return;
     }
     setError(null);
@@ -88,6 +97,7 @@ export function SkillFormSheet({
         topInset="ios-page-sheet"
       />
       <ScrollView
+        ref={scrollRef}
         className="flex-1"
         contentContainerClassName="gap-4 px-6 pt-4 pb-8"
         keyboardShouldPersistTaps="handled"
@@ -105,6 +115,7 @@ export function SkillFormSheet({
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="next"
+          containerOnLayout={fieldLayout('name')}
           onChangeText={value => {
             nameEditedRef.current = true;
             nameRef.current = value;
@@ -120,20 +131,28 @@ export function SkillFormSheet({
           disabled={isSaving}
           multiline
           textAlignVertical="top"
-          className="min-h-40 leading-5"
+          className="min-h-40 max-h-52 leading-[1.25rem]"
           autoCapitalize="none"
           autoCorrect={false}
+          containerOnLayout={fieldLayout('content')}
           onChangeText={value => {
             contentRef.current = value;
             if (error === 'no-content' && value.trim().length > 0) {
               setError(null);
             }
-            if (!nameEditedRef.current) {
-              const parsed = parseSkillMarkdown(value);
-              if (parsed.name !== undefined && parsed.name.length > 0 && parsed.name !== prefill) {
-                nameRef.current = parsed.name;
-                setPrefill(parsed.name);
-              }
+            if (nameEditedRef.current) {
+              return;
+            }
+            const derived = skillNameFromMarkdown(value);
+            if (derived === undefined || derived === prefill) {
+              return;
+            }
+            nameRef.current = derived;
+            setPrefill(derived);
+            // The field now holds a name the validator accepts, so an error the
+            // last save left on the empty field no longer describes it.
+            if (error === 'empty' || error === 'bad-name') {
+              setError(null);
             }
           }}
         />

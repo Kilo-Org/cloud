@@ -11,6 +11,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { Text } from '@/components/ui/text';
+import { modelLabelFromCatalogue } from '@/lib/auto-model-name';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useOrganization } from '@/lib/organization-context';
 import { useToolSummaryTranslationPreference } from '@/lib/tool-summary-translation/tool-summary-translation-preference';
@@ -68,8 +69,10 @@ export function ToolSummaryTranslationSettingsScreen() {
     modelSubtitle = t('common.loading');
   } else if (!catalogueError && models.length > 0) {
     // The default Auto Small shows before any pick; a stored model the live
-    // catalogue dropped falls back to its persisted name.
-    modelSubtitle = models.find(candidate => candidate.id === model.id)?.name ?? model.name;
+    // catalogue dropped falls back to its persisted name. Either way the label
+    // goes through the same resolver as the picker, so an Auto model reads the
+    // same on the row as the catalogue is labelled above it.
+    modelSubtitle = modelLabelFromCatalogue(models, model.id, model.name);
   }
 
   // A stored model the live catalogue dropped is kept (translations still route
@@ -124,6 +127,9 @@ export function ToolSummaryTranslationSettingsScreen() {
               onSelect: id => {
                 setModel({
                   id,
+                  // The stored name stays the catalogue's raw one: the row
+                  // localizes it at render, so a later language change is
+                  // reflected without rewriting the stored preference.
                   name: models.find(candidate => candidate.id === id)?.name ?? id,
                 });
               },

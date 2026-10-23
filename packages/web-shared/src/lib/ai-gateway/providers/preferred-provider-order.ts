@@ -3,21 +3,7 @@ import type {
   PreferredProviderOrderRule,
 } from '@kilocode/db/schema-types';
 
-/** The built-in provider order, used while no configuration is stored. */
-export const PREFERRED_PROVIDER_ORDER_FALLBACK_CONFIG: PreferredProviderOrderConfig = {
-  rules: [
-    { includes: ['openai', 'gpt'], excludes: ['gpt-oss'], providers: ['openai'] },
-    { includes: ['claude'], providers: ['google-vertex', 'amazon-bedrock'] },
-    // do not prefer minimax/highspeed
-    { includes: ['minimax'], providers: ['minimax/fp8'] },
-    { includes: ['mistral'], providers: ['mistral'] },
-    { includes: ['kimi'], providers: ['amazon-bedrock', 'alibaba'] },
-    { includes: ['step-'], providers: ['stepfun'] },
-    { includes: ['deepseek'], providers: ['novita'] },
-    { includes: ['glm'], providers: ['friendli', 'novita'] },
-    { includes: ['qwen'], providers: ['alibaba'] },
-  ],
-};
+export const EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG: PreferredProviderOrderConfig = { rules: [] };
 
 function matchesRule(rule: PreferredProviderOrderRule, requestedModel: string): boolean {
   return (

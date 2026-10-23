@@ -43,6 +43,7 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
@@ -136,7 +137,7 @@ describe('ProfileSkillsScreen', () => {
 
     const texts = findAll(renderer.root, 'Text').map(node => node.props.children);
     expect(texts).toContain('code-review');
-    expect(texts).toContain('custom');
+    expect(texts).toContain('Custom');
 
     const toggle = findOne(renderer.root, 'Switch');
     expect(toggle.props.accessibilityLabel).toBe('code-review');

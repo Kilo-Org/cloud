@@ -93,7 +93,7 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
       const loadedProducts = await loadStoreCreditProducts({
         fetchStoreProducts: options.fetchStoreProducts,
         loadBackendProducts: async () => {
-          const backendResponse = await queryClient.fetchQuery(
+          const backendResponse = await queryClient.query(
             trpc.credits.getMobileStoreProducts.queryOptions()
           );
           return backendResponse;

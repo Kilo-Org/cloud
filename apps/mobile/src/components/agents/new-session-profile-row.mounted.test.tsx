@@ -26,9 +26,11 @@ type RowProps = Parameters<typeof renderProfileRow>[0];
 const PROFILE = {
   id: 'profile-1',
   name: 'Production',
-  commandCount: 3,
+  varCount: 2,
+  commandCount: 2,
   mcpServerCount: 1,
   skillCount: 2,
+  kiloCommandCount: 1,
   agentCount: 4,
 };
 
@@ -93,7 +95,7 @@ describe('new-session environment feedback', () => {
   it('renders loading feedback immediately without a false default, stale profile, or Retry', () => {
     const root = renderRow({ isProfileLoading: true, profile: PROFILE });
 
-    expect(text(root)).toEqual(['Environment', 'Loading…', '\u00A0']);
+    expect(text(root)).toEqual(['Environment', 'Loading…', '\u00A0\n\u00A0']);
     expect(root.findByProps({ children: 'Loading…' }).props).toMatchObject({
       accessibilityLiveRegion: 'polite',
       accessibilityState: { busy: true },
@@ -108,7 +110,7 @@ describe('new-session environment feedback', () => {
     expect(text(root)).toEqual([
       'Environment',
       'Production',
-      '3 commands · 1 MCP · 2 skills · 4 agents',
+      '2 vars · 1 MCP · 2 skills · 1 cmd · 2 setup cmds · 4 agents',
     ]);
     expect(root.findAllByType('Skeleton')).toHaveLength(0);
     expect(root.findAllByType('Button')).toHaveLength(0);
@@ -117,7 +119,7 @@ describe('new-session environment feedback', () => {
   it('shows the default only after the query settles empty and hides the blank slot from accessibility', () => {
     const root = renderRow();
 
-    expect(text(root)).toEqual(['Environment', 'Default environment', '\u00A0']);
+    expect(text(root)).toEqual(['Environment', 'Default environment', '\u00A0\n\u00A0']);
     expect(
       root.findByProps({ importantForAccessibility: 'no-hide-descendants' }).props
     ).toMatchObject({
@@ -153,8 +155,41 @@ describe('new-session environment feedback', () => {
     });
   });
 
+  it.each([{ isProfileLoading: true }, { isProfileError: true }, {}])(
+    'reserves the two-line summary slot before a profile resolves: %j',
+    next => {
+      const root = renderRow(next);
+      const summary = body(root).findAllByType('Text')[1];
+      expect(summary?.props.numberOfLines).toBe(2);
+      // A one-line placeholder would let the row grow when the profile lands.
+      expect(summary?.props.children).toBe('\u00A0\n\u00A0');
+      // A summary that fits one line still occupies the placeholder's height.
+      expect(summary?.props.className).toContain('min-h-10');
+    }
+  );
+
+  it('keeps the placeholder when the profile has nothing configured', () => {
+    const root = renderRow({
+      profile: {
+        ...PROFILE,
+        varCount: 0,
+        mcpServerCount: 0,
+        skillCount: 0,
+        kiloCommandCount: 0,
+        commandCount: 0,
+        agentCount: 0,
+      },
+    });
+
+    const summary = body(root).findAllByType('Text')[1];
+    expect(summary?.props.children).toBe('\u00A0\n\u00A0');
+    expect(
+      root.findByProps({ importantForAccessibility: 'no-hide-descendants' }).props
+    ).toMatchObject({ accessibilityElementsHidden: true });
+  });
+
   it.each([{ isProfileLoading: true }, { profile: PROFILE }, { isProfileError: true }, {}])(
-    'keeps two font-scaled text lines reserved across a state swap: %j',
+    'keeps the summary slot across a state swap: %j',
     next => {
       const pending = renderRow({ isProfileLoading: true });
       const slot = body(pending);
@@ -167,8 +202,10 @@ describe('new-session environment feedback', () => {
       ).toBeTruthy();
       const lines = slot.findAllByType('Text');
       expect(lines).toHaveLength(2);
+      const [title, summary] = lines;
+      expect(title?.props.numberOfLines).toBe(1);
+      expect(summary?.props.numberOfLines).toBe(2);
       for (const line of lines) {
-        expect(line.props.numberOfLines).toBe(1);
         expect(line.props.className).toContain('text-sm leading-[1.25rem]');
         expect(line.props.children).not.toBe('');
       }

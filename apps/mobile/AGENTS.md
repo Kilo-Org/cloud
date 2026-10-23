@@ -76,24 +76,24 @@ reason.
 
 One element per concern. `no-restricted-imports` in `.oxlintrc.json` enforces the "Use instead" column.
 
-| Concern | Element | Use instead of |
-|---|---|---|
-| Bottom sheet, imperative / non-route | `Sheet` from `@/components/ui/sheet` | `Modal` from `react-native`, `@gorhom/bottom-sheet`, `react-native-modal`, `react-native-modalize` |
-| Bottom sheet, route | expo-router `formSheet` via `useFormSheetScreenOptions()` | a JS bottom-sheet library |
-| Confirm that needs the red affordance | `useConfirmDialog()` from `@/components/ui/dialog` (a native sheet) | `Alert.alert` for a destructive confirm; a direct `@rn-primitives/dialog` import |
-| Dialog form (a field, a form) | `DialogCard` from `@/components/ui/dialog` | a direct `@rn-primitives/dialog` import |
-| System confirm, non-destructive | `Alert.alert` | — |
-| Keyboard avoidance | `react-native-keyboard-controller` | `KeyboardAvoidingView` from `react-native` |
-| Lists | `@shopify/flash-list` | `FlatList`, `VirtualizedList`, `SectionList`, `@legendapp/list` |
-| Image viewer | `@/components/ui/image-viewer` | `react-native-image-viewing`, `react-native-awesome-gallery` |
-| Video | `expo-video` | `react-native-video`, `expo-av` |
-| Blur | `expo-blur` | `expo-glass-effect`, `@callstack/liquid-glass` (no Liquid Glass) |
-| Toast | `sonner-native` | `react-native-toast-message`, `burnt` |
-| Images | `@/components/ui/image` | `Image` from `react-native`, `expo-image` |
-| Icons | `@/components/ui/icons` | `lucide-react-native` |
-| Markdown | `MarkdownText` from `@/components/agents/markdown-text`, rendered by `react-native-enriched-markdown` | `react-native-marked`, `react-native-markdown-display` |
-| HTML in markdown | `MarkdownText`: `markdown-html-convert` turns HTML markdown can express into markdown; the rest renders through `MarkdownHtml` (`@native-html/render`) | `react-native-render-html` |
-| Diagram | ` ```mermaid ` fences → `MarkdownMermaid` (`react-native-webview`) | — |
+| Concern                               | Element                                                                                                                                                | Use instead of                                                                                     |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| Bottom sheet, imperative / non-route  | `Sheet` from `@/components/ui/sheet`                                                                                                                   | `Modal` from `react-native`, `@gorhom/bottom-sheet`, `react-native-modal`, `react-native-modalize` |
+| Bottom sheet, route                   | expo-router `formSheet` via `useFormSheetScreenOptions()`                                                                                              | a JS bottom-sheet library                                                                          |
+| Confirm that needs the red affordance | `useConfirmDialog()` from `@/components/ui/dialog` (a native sheet)                                                                                    | `Alert.alert` for a destructive confirm; a direct `@rn-primitives/dialog` import                   |
+| Dialog form (a field, a form)         | `DialogCard` from `@/components/ui/dialog`                                                                                                             | a direct `@rn-primitives/dialog` import                                                            |
+| System confirm, non-destructive       | `Alert.alert`                                                                                                                                          | —                                                                                                  |
+| Keyboard avoidance                    | `react-native-keyboard-controller`                                                                                                                     | `KeyboardAvoidingView` from `react-native`                                                         |
+| Lists                                 | `@shopify/flash-list`                                                                                                                                  | `FlatList`, `VirtualizedList`, `SectionList`, `@legendapp/list`                                    |
+| Image viewer                          | `@/components/ui/image-viewer`                                                                                                                         | `react-native-image-viewing`, `react-native-awesome-gallery`                                       |
+| Video                                 | `expo-video`                                                                                                                                           | `react-native-video`, `expo-av`                                                                    |
+| Blur                                  | `expo-blur`                                                                                                                                            | `expo-glass-effect`, `@callstack/liquid-glass` (no Liquid Glass)                                   |
+| Toast                                 | `sonner-native`                                                                                                                                        | `react-native-toast-message`, `burnt`                                                              |
+| Images                                | `@/components/ui/image`                                                                                                                                | `Image` from `react-native`, `expo-image`                                                          |
+| Icons                                 | `@/components/ui/icons`                                                                                                                                | `lucide-react-native`                                                                              |
+| Markdown                              | `MarkdownText` from `@/components/agents/markdown-text`, rendered by `react-native-enriched-markdown`                                                  | `react-native-marked`, `react-native-markdown-display`                                             |
+| HTML in markdown                      | `MarkdownText`: `markdown-html-convert` turns HTML markdown can express into markdown; the rest renders through `MarkdownHtml` (`@native-html/render`) | `react-native-render-html`                                                                         |
+| Diagram                               | ` ```mermaid ` fences → `MarkdownMermaid` (`react-native-webview`)                                                                                     | —                                                                                                  |
 
 No file imports `Modal` from `react-native`, `@expo/ui/community/bottom-sheet` or `@rn-primitives/dialog`
 outside `@/components/ui/sheet` and `@/components/ui/dialog`. A sheet or a confirm must be able to stack
@@ -222,7 +222,7 @@ The Chat tab runs `@kilocode/harness-sdk` on the device. `src/lib/chat/` holds t
 
 Quick Chat renders streamed text, reasoning and tools through the shared agent message and tool-detail surfaces. Tool results update the matching call rather than adding user-message bubbles; the same pairing is rebuilt from stored turns when a chat reopens.
 
-The header usage pill shows its percentage or token count without a visible Context prefix. Its accessibility label names the context.
+The header usage pill shows its percentage, or a dash while the context window is unknown, without a visible Context prefix. Its accessibility label names the context and the token count.
 Collapsed reasoning uses the tool row's full-width shape, padding and text style, with a dashed border.
 
 A chat is opened with the SDK's `time` tool and no other. A model has no clock, so it answers a dated question from its training date, confidently and wrong. The other three tools the SDK ships stay off: the composer is already how a person is asked something, a subagent costs a second session, and a to-do list is working memory for a run a chat does not have.

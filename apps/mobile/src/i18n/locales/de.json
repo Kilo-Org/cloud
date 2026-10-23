@@ -970,6 +970,8 @@
       "retryTitle": "Review erneut ausführen?",
       "showMore": "Mehr anzeigen",
       "started": "Gestartet",
+      "reviewEnded": "Beendet",
+      "severityNitpick": "Kleinigkeit",
       "threshold": "Schwellenwert",
       "title": "Prüfung",
       "tokens": "Text-Tokens",
@@ -1158,12 +1160,18 @@
       "actorSystem": "Kilo-System",
       "couldNotLoad": "Der Auditbericht konnte nicht geladen werden.",
       "events": "Ereignisse",
+      "eventConfidence": "Konfidenz: {{confidence}}",
+      "eventReason": "Grund: {{reason}}",
+      "eventsCount_one": "{{displayCount}} Ereignis",
+      "eventsCount_other": "{{displayCount}} Ereignisse",
       "generated": "Der Bericht wurde am {{generatedAt}} erstellt.",
       "noActivity": "Keine Aktivitäten erfasst",
       "noActivityDescription": "Kilo hat vom {{start}} bis zum {{end}} keine Aktivitäten zu Sicherheitsbefunden erfasst, die in den Bericht aufgenommen werden können.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "Die Berichtsanfrage wurde nicht abgeschlossen. Versuche es erneut.",
       "repositoryNotRecorded": "Repository nicht erfasst",
+      "reasonUnknown": "Unbekannter Grund",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Zusammenfassung des Berichts",
       "title": "Auditbericht",
       "unavailable": "Auditbericht nicht verfügbar",
@@ -1405,6 +1413,7 @@
       "reauthorizeButton": "GitHub-App erneut autorisieren",
       "reauthorizeDescription": "Security Agent benötigt die Berechtigung, Dependabot-Warnungen zu lesen. Autorisiere die GitHub-App erneut, um diese Berechtigung zu gewähren.",
       "reauthorizeTitle": "Zusätzliche Berechtigungen erforderlich",
+      "retryFailed": "Security Agent konnte immer noch nicht geladen werden. Prüfe deine Verbindung und versuche es erneut.",
       "setupFailed": "Die GitHub-Einrichtung konnte nicht gestartet werden. Bitte versuche es erneut."
     },
     "settingsOverview": {
@@ -2041,7 +2050,10 @@
       "allowOnceAccessibility": "Einmal erlauben",
       "alwaysAllow": "Immer erlauben",
       "alwaysAllowAccessibility": "Immer erlauben",
-      "retrying": "Erneuter Versuch…"
+      "retrying": "Erneuter Versuch…",
+      "retryDeny": "Erneut verweigern",
+      "retryAllowOnce": "Erneut einmal erlauben",
+      "retryAlwaysAllow": "Erneut immer erlauben"
     },
     "questionCard": {
       "title": "Der Agent braucht deine Antwort",

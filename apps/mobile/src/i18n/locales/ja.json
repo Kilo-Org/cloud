@@ -970,6 +970,8 @@
       "retryTitle": "レビューを再試行しますか？",
       "showMore": "さらに表示",
       "started": "開始日時",
+      "reviewEnded": "終了日時",
+      "severityNitpick": "指摘",
       "threshold": "しきい値",
       "title": "レビュー",
       "tokens": "トークン",
@@ -1158,12 +1160,18 @@
       "actorSystem": "Kiloシステム",
       "couldNotLoad": "監査レポートを読み込めませんでした。",
       "events": "イベント",
+      "eventConfidence": "信頼度：{{confidence}}",
+      "eventReason": "理由：{{reason}}",
+      "eventsCount_one": "{{displayCount}}件のイベント",
+      "eventsCount_other": "{{displayCount}}件のイベント",
       "generated": "{{generatedAt}}に生成しました。",
       "noActivity": "記録されたアクティビティはありません",
       "noActivityDescription": "{{start}}から{{end}}までの期間に、Kiloには報告対象となるセキュリティの検出結果に関するアクティビティがありません。",
       "periodUtc": "{{start}}～{{end}}（UTC）",
       "queryFailed": "レポートの取得が完了しませんでした。もう一度お試しください。",
       "repositoryNotRecorded": "リポジトリの記録なし",
+      "reasonUnknown": "認識されない理由",
+      "severityCount": "{{displayCount}}件{{label}}",
       "summary": "レポートの概要",
       "title": "監査レポート",
       "unavailable": "監査レポートを利用できません",
@@ -1405,6 +1413,7 @@
       "reauthorizeButton": "GitHub Appを再承認",
       "reauthorizeDescription": "セキュリティエージェントがDependabotアラートを読み取るには、権限が必要です。GitHub Appを再承認して、この権限を付与してください。",
       "reauthorizeTitle": "追加の権限が必要です",
+      "retryFailed": "セキュリティエージェントを読み込めませんでした。接続を確認してもう一度お試しください。",
       "setupFailed": "GitHubのセットアップを開始できませんでした。もう一度お試しください。"
     },
     "settingsOverview": {
@@ -2041,7 +2050,10 @@
       "allowOnceAccessibility": "1回だけ許可",
       "alwaysAllow": "常に許可",
       "alwaysAllowAccessibility": "常に許可",
-      "retrying": "再試行中…"
+      "retrying": "再試行中…",
+      "retryDeny": "拒否を再試行",
+      "retryAllowOnce": "1回だけ許可を再試行",
+      "retryAlwaysAllow": "常に許可を再試行"
     },
     "questionCard": {
       "title": "エージェントからの質問",

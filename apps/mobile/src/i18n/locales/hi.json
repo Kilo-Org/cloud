@@ -970,6 +970,8 @@
       "retryTitle": "समीक्षा फिर से करें?",
       "showMore": "और दिखाएँ",
       "started": "शुरू हुआ",
+      "reviewEnded": "समाप्त हुआ",
+      "severityNitpick": "मामूली टिप्पणी",
       "threshold": "सीमा",
       "title": "समीक्षा",
       "tokens": "टोकन",
@@ -1158,12 +1160,18 @@
       "actorSystem": "Kilo सिस्टम",
       "couldNotLoad": "ऑडिट रिपोर्ट लोड नहीं हो सकी।",
       "events": "घटनाएँ",
+      "eventConfidence": "विश्वास: {{confidence}}",
+      "eventReason": "कारण: {{reason}}",
+      "eventsCount_one": "{{displayCount}} घटना",
+      "eventsCount_other": "{{displayCount}} घटनाएँ",
       "generated": "रिपोर्ट तैयार हुई: {{generatedAt}}।",
       "noActivity": "कोई गतिविधि दर्ज नहीं",
       "noActivityDescription": "{{start}} से {{end}} तक Kilo में सुरक्षा समस्याओं से जुड़ी कोई गतिविधि नहीं है जिसे रिपोर्ट में शामिल किया जा सके।",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "रिपोर्ट क्वेरी पूरी नहीं हुई। फिर से कोशिश करें।",
       "repositoryNotRecorded": "रिपॉज़िटरी दर्ज नहीं",
+      "reasonUnknown": "अपरिचित कारण",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "रिपोर्ट का सारांश",
       "title": "ऑडिट रिपोर्ट",
       "unavailable": "ऑडिट रिपोर्ट अनुपलब्ध",
@@ -1405,6 +1413,7 @@
       "reauthorizeButton": "GitHub ऐप को फिर से अधिकृत करें",
       "reauthorizeDescription": "Dependabot अलर्ट पढ़ने के लिए सुरक्षा एजेंट को अनुमति चाहिए। यह अनुमति देने के लिए GitHub ऐप को फिर से अधिकृत करें।",
       "reauthorizeTitle": "अतिरिक्त अनुमतियाँ आवश्यक",
+      "retryFailed": "सुरक्षा एजेंट अब भी लोड नहीं हो सका। कृपया अपना कनेक्शन जाँचें और फिर से कोशिश करें।",
       "setupFailed": "GitHub सेटअप शुरू नहीं हो सका। कृपया फिर से कोशिश करें।"
     },
     "settingsOverview": {
@@ -2014,7 +2023,10 @@
       "allowOnceAccessibility": "एक बार अनुमति दें",
       "alwaysAllow": "हमेशा अनुमति दें",
       "alwaysAllowAccessibility": "हमेशा अनुमति दें",
-      "retrying": "फिर से कोशिश हो रही है…"
+      "retrying": "फिर से कोशिश हो रही है…",
+      "retryDeny": "अस्वीकार करने की फिर से कोशिश करें",
+      "retryAllowOnce": "एक बार अनुमति देने की फिर से कोशिश करें",
+      "retryAlwaysAllow": "हमेशा अनुमति देने की फिर से कोशिश करें"
     },
     "questionCard": {
       "title": "एजेंट को आपका उत्तर चाहिए",

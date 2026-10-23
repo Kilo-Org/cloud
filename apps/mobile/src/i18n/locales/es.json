@@ -973,6 +973,8 @@
       "retryTitle": "¿Reintentar la revisión?",
       "showMore": "Mostrar más",
       "started": "Iniciada",
+      "reviewEnded": "Finalizada",
+      "severityNitpick": "Nimiedad",
       "threshold": "Umbral",
       "title": "Revisión",
       "tokens": "Unidades de texto",
@@ -1161,12 +1163,19 @@
       "actorSystem": "Sistema Kilo",
       "couldNotLoad": "No se pudo cargar el informe de auditoría.",
       "events": "Eventos",
+      "eventConfidence": "Confianza: {{confidence}}",
+      "eventReason": "Motivo: {{reason}}",
+      "eventsCount_one": "{{displayCount}} evento",
+      "eventsCount_many": "{{displayCount}} eventos",
+      "eventsCount_other": "{{displayCount}} eventos",
       "generated": "El informe se generó el {{generatedAt}}.",
       "noActivity": "Sin actividad registrada",
       "noActivityDescription": "Kilo no ha registrado actividad de hallazgos de seguridad que incluir en el informe entre {{start}} y {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "No se completó la consulta del informe. Inténtalo de nuevo.",
       "repositoryNotRecorded": "Repositorio no registrado",
+      "reasonUnknown": "Motivo no reconocido",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Resumen del informe",
       "title": "Informe de auditoría",
       "unavailable": "Informe de auditoría no disponible",
@@ -1411,6 +1420,7 @@
       "reauthorizeButton": "Volver a autorizar la aplicación de GitHub",
       "reauthorizeDescription": "El agente de seguridad necesita permiso para leer las alertas de Dependabot. Vuelve a autorizar la aplicación de GitHub para conceder este permiso.",
       "reauthorizeTitle": "Se requieren permisos adicionales",
+      "retryFailed": "Sigue sin poder cargarse el agente de seguridad. Comprueba tu conexión e inténtalo de nuevo.",
       "setupFailed": "No se pudo iniciar la configuración de GitHub. Inténtalo de nuevo."
     },
     "settingsOverview": {
@@ -2057,7 +2067,10 @@
       "allowOnceAccessibility": "Permitir una vez",
       "alwaysAllow": "Permitir siempre",
       "alwaysAllowAccessibility": "Permitir siempre",
-      "retrying": "Reintentando…"
+      "retrying": "Reintentando…",
+      "retryDeny": "Volver a intentar denegar",
+      "retryAllowOnce": "Volver a intentar permitir una vez",
+      "retryAlwaysAllow": "Volver a intentar permitir siempre"
     },
     "questionCard": {
       "title": "El agente necesita una respuesta",

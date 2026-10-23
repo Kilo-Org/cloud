@@ -138,7 +138,7 @@ When addressing a Kilobot review remark:
 
 When GitHub reports conflicts after a base sync:
 
-1. Read the current PR base and head SHAs; confirm whether the base is an ancestor of the head.
-2. Check the local merge with `git merge-tree --write-tree <base> <head>`. If it is clean but `refs/pull/<number>/merge` still names earlier SHAs, treat the status as potentially stale and wait one PR-loop cycle (10–15 minutes) while doing other task work.
+1. Fetch the current base branch before comparing SHAs. The PR API's recorded base SHA can lag the branch tip; use the fetched tip when checking ancestry and merging.
+2. Check the local merge with `git merge-tree --write-tree <fetched-base> <head>`. If it is clean but `refs/pull/<number>/merge` still names earlier SHAs, treat the status as potentially stale and wait one PR-loop cycle (10–15 minutes) while doing other task work.
 3. If the status remains dirty, fetch the latest base and merge it into the branch with a normal merge commit. Never rebase or force-push; avoid empty commits and unrelated changes.
 4. Recheck the PR head, base, merge tree, and GitHub mergeability after the push. Do not close and reopen a PR to refresh its state.

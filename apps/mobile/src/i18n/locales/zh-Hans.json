@@ -2321,7 +2321,7 @@
     "offlineTitle": "加载失败",
     "permissionDescription": "你无权查看此内容。",
     "notFoundDescription": "此内容可能已被移除或已无法访问。",
-    "serverTitle": "无法加载内容。",
+    "serverTitle": "无法加载内容",
     "serverDescription": "服务出现问题。请重试。"
   },
   "screenHeader": {
@@ -2544,10 +2544,10 @@
       "tapDiffLineToSuggest": "点按差异中的一行，即可添加代码建议。"
     },
     "connect": {
-      "checkFailedTitle": "无法检查 GitHub 连接。",
+      "checkFailedTitle": "无法检查 GitHub 连接",
       "checkFailedMessage": "加载完成前，无法确认登录状态。",
-      "checkFailedTitleGitLab": "无法检查 GitLab 连接。",
-      "checkFailedTitleBitbucket": "无法检查 Bitbucket 连接。",
+      "checkFailedTitleGitLab": "无法检查 GitLab 连接",
+      "checkFailedTitleBitbucket": "无法检查 Bitbucket 连接",
       "providerCheckFailedMessage": "加载完成前无法获取连接状态。",
       "reconnectTitle": "重新连接 GitHub",
       "reconnectDescription": "你的 GitHub 连接授权已被撤销。请重新连接，继续在手机上审查拉取请求。",
@@ -2558,10 +2558,10 @@
       "contextLine": "适用于 {{organization}}"
     },
     "connectionExpired": "GitHub 连接已过期。",
-    "couldNotLoadPullRequest": "无法加载拉取请求。",
+    "couldNotLoadPullRequest": "无法加载拉取请求",
     "reviewServiceUnavailable": "审查服务不可用",
     "reviewServiceUnavailableDescription": "审查服务暂时不可用。请稍后重试。",
-    "couldNotOpenGitHubAppSettings": "无法打开 GitHub 应用设置。",
+    "couldNotOpenGitHubAppSettings": "无法打开 GitHub 应用设置",
     "description": "描述",
     "discussion": {
       "acceptTerms": "同意",
@@ -2573,7 +2573,7 @@
       "commentActions": "评论操作",
       "comment": "{{displayCount}} 条评论",
       "comment_other": "{{displayCount}} 条评论",
-      "couldNotLoad": "无法加载讨论。",
+      "couldNotLoad": "无法加载讨论",
       "couldNotLoadMore": "无法加载更多评论。",
       "loadMoreComments": "加载更多评论",
       "loading": "正在加载讨论",
@@ -2595,7 +2595,7 @@
           "terminal": "无法举报此用户。"
         }
       },
-      "moreLinesAbove": "上方还有 {{displayCount}} 行。",
+      "moreLinesAbove": "上方还有 {{displayCount}} 行",
       "mute": "静音",
       "mutedUser": "已静音 {{login}}",
       "noDiscussion": "暂无讨论",
@@ -2654,8 +2654,8 @@
       },
       "deletedUser": "已删除的用户",
       "replyForbiddenTerm": "你无权回复此{{term}}。",
-      "moreLinesAbove_one": "上方还有 {{displayCount}} 行。",
-      "moreLinesAbove_other": "上方还有 {{displayCount}} 行。",
+      "moreLinesAbove_one": "上方还有 {{displayCount}} 行",
+      "moreLinesAbove_other": "上方还有 {{displayCount}} 行",
       "deleteComment": "删除评论",
       "deleteCommentTitle": "删除评论？",
       "deleteCommentMessage": "此评论将从拉取请求中删除。",
@@ -2730,7 +2730,7 @@
     },
     "headLine": "{{counts}} · 最新提交 {{sha}}",
     "hunkRows": {
-      "contextUnavailable": "无法获取此引用对应的上下文。",
+      "contextUnavailable": "无法获取此引用对应的上下文",
       "expandAll": "全部展开",
       "expandAllLines": "展开全部 {{displayCount}} 行",
       "expandContext": "展开上下文",
@@ -2772,7 +2772,7 @@
       "loadedOfTotalFiles_other": "已加载 {{loaded}}/{{total}} 个文件"
     },
     "inbox": {
-      "couldNotLoad": "无法加载收件箱。",
+      "couldNotLoad": "无法加载收件箱",
       "loading": "正在加载收件箱",
       "noReviewRequests": "暂无审查请求",
       "noReviewRequestsDescription": "等待你审查的拉取请求会显示在这里。你也可以在上方粘贴任意 PR 链接。",
@@ -2823,7 +2823,7 @@
       },
       "partialSuccessBanner": {
         "accessibility": "已合并。无法删除分支：{{reason}}",
-        "body": "无法删除分支：{{reason}}。"
+        "body": "无法删除分支：{{reason}}"
       },
       "loadFailedTitle": "无法加载合并选项",
       "blocked": {
@@ -2962,15 +2962,15 @@
     "diff": {
       "selectedTapToChange": "已选择 {{label}}，点按更改选择",
       "tapToComment": "{{label}}，点按发表评论",
-      "truncationBanner": "受 GitHub API 限制，仅显示 {{total}} 个变更文件中的前 {{limit}} 个。",
+      "truncationBanner": "受 GitHub API 限制，仅显示 {{total}} 个变更文件中的前 {{limit}} 个",
       "statusContext": "上下文",
       "lineLabel": "第 {{line}} 行，{{status}}：{{text}}",
       "lineLabelNoNumber": "{{status}}：{{text}}",
       "emptyLine": "（空）",
-      "truncationBanner_one": "受 GitHub API 限制，仅显示 {{total}} 个变更文件中的前 {{limit}} 个。",
-      "truncationBanner_other": "受 GitHub API 限制，仅显示 {{total}} 个变更文件中的前 {{limit}} 个。"
+      "truncationBanner_one": "受 GitHub API 限制，仅显示 {{total}} 个变更文件中的前 {{limit}} 个",
+      "truncationBanner_other": "受 GitHub API 限制，仅显示 {{total}} 个变更文件中的前 {{limit}} 个"
     },
-    "linkPasteClipboardEmpty": "剪贴板为空。",
+    "linkPasteClipboardEmpty": "剪贴板为空",
     "linkPasteDenied": "粘贴访问被拒绝。请允许粘贴后重试。",
     "linkPasteNotAPullRequest": "不是拉取请求或合并请求链接",
     "announce": {
@@ -2995,7 +2995,7 @@
       "mergeResultDefaultError": "GitHub 未完成合并。",
       "mergeResultNotCompleted": "{{term}}未合并。检查其状态后重试。",
       "ambiguous": "无法确认操作结果，请先检查 PR 再重试。",
-      "forbidden": "无权执行此操作。"
+      "forbidden": "无权执行此操作"
     },
     "capabilities": {
       "banner": {

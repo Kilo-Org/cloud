@@ -1114,6 +1114,11 @@ export function SessionDetailContent({
     [displayedMessages, detailsMessageId, pendingMessages, isStreaming]
   );
 
+  // While a stored session is read-only, no live writer supplies its parts.
+  // Omit user rows that render nothing; if the manager later resolves a live
+  // transport, the next build restores the normal streaming behavior.
+  const dropUnrenderableUserRows = activeSessionType === 'read-only';
+
   const baseTranscript = useMemo(() => {
     // A superseded submission's preparation goes with its row: dropping only
     // the row would leave `mergeSessionTranscript` re-emitting the attempt at
@@ -1124,8 +1129,17 @@ export function SessionDetailContent({
         : preparationAttempts.filter(
             attempt => !supersededMessageIds.has(attempt.triggerMessageId)
           );
-    return mergeSessionTranscript(displayedMessages, attempts, pendingMessages);
-  }, [displayedMessages, preparationAttempts, pendingMessages, supersededMessageIds]);
+    return mergeSessionTranscript(displayedMessages, attempts, {
+      deliveryStates: pendingMessages,
+      dropUnrenderableUserRows,
+    });
+  }, [
+    displayedMessages,
+    preparationAttempts,
+    pendingMessages,
+    supersededMessageIds,
+    dropUnrenderableUserRows,
+  ]);
   // Condensing is opt-in: with the preference off the derived transcript is the
   // same array identity, so nothing below re-renders differently.
   //
@@ -1751,6 +1765,11 @@ export function SessionDetailContent({
   // footer's error line must not state the same failure a second time (explorer
   // finding: the same failure stated three times), so a status error the row
   // already carries is dropped — a classified one the row does not carry stays.
+  // `getLanguageSnapshot()` re-resolves the captured copy (`selectMessageFailure`
+  // resolves titles through module-level `i18n.t`) when the app language changes
+  // while the session is mounted; the failure is otherwise stable on its message
+  // inputs.
+  const languageSnapshot = getLanguageSnapshot();
   const footerMessageFailure = useMemo(
     () =>
       lastVisibleMessageFailure({
@@ -1758,13 +1777,17 @@ export function SessionDetailContent({
         messages,
         pendingMessages,
         canceledQueuedMessages,
+        dropUnrenderableUserRows,
       }),
-    // `getLanguageSnapshot()` re-resolves the captured copy (`selectMessageFailure`
-    // resolves titles through module-level `i18n.t`) when the app language
-    // changes while the session is mounted; the failure is otherwise stable on
-    // its message inputs.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- language drives the resolved copy inside selectMessageFailure
-    [displayedMessages, messages, pendingMessages, canceledQueuedMessages, getLanguageSnapshot()]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the captured copy is language-driven, not message-derived
+    [
+      displayedMessages,
+      messages,
+      pendingMessages,
+      canceledQueuedMessages,
+      dropUnrenderableUserRows,
+      languageSnapshot,
+    ]
   );
   const footerStatusIndicator =
     statusIndicator !== null &&

@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
+import { ContextControl } from '@/components/context-control';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -279,7 +280,12 @@ function ScopedChatListScreen() {
           titleContent={
             <View className="flex-row items-center gap-2">
               <Text
-                className="text-[30px] font-semibold leading-9 text-foreground"
+                // An explicit line height, not `leading-9`: the scale token
+                // measures a wrong height on Android (the title laid out
+                // 851dp tall, so the header filled the screen and the list
+                // below it was off-screen), while the same 2.25rem written in
+                // pixels lays the title out at 36dp on both platforms.
+                className="text-[30px] font-semibold leading-[36px] text-foreground"
                 numberOfLines={1}
               >
                 {t('common.chat')}
@@ -292,6 +298,21 @@ function ScopedChatListScreen() {
           className="px-[22px] pb-1"
           headerRight={<BackendSettingsControl />}
         />
+        {/* The account every read on this screen is scoped to: the chat list
+            (`useChatPlace`), the model catalogue, and the empty state below.
+            Switching it remounts the scoped screen, so without the name here a
+            person in two workspaces watches their conversations disappear with
+            nothing saying which workspace they are now in. It is the same
+            switchable control Home and the new-session screen put in their
+            header — the active account's name and the account picker sheet, no
+            copy of its own — and it holds one row in every scope (Personal and
+            a single membership included), so the list never moves when the
+            account list resolves or changes. It sits at the header's own
+            gutter and on its own row: the 30px title already fills the title
+            row, so a trailing cluster would paint over it on a phone. */}
+        <View className="px-[22px] pb-1">
+          <ContextControl />
+        </View>
         <View className="flex-1">{renderBody()}</View>
         {showFab && (
           <Pressable

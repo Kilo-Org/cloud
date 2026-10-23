@@ -3288,6 +3288,7 @@
   },
   "transcriptionModel": {
     "title": "Modelo de transcrición",
+    "choose": "Escoller outro modelo",
     "noneChosen": "Ningún seleccionado",
     "emptyTitle": "Non hai modelos de transcrición",
     "emptyDescription": "Kilo Gateway non ofrece modelos de transcrición neste momento.",

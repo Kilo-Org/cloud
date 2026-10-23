@@ -3288,6 +3288,7 @@
   },
   "transcriptionModel": {
     "title": "د غږ د متن ته بدلولو ماډل",
+    "choose": "بل ماډل وټاکئ",
     "noneChosen": "هیڅ نه دی ټاکل شوی",
     "emptyTitle": "د غږ د متن ته بدلولو هیڅ ماډل نشته",
     "emptyDescription": "Kilo Gateway اوس مهال د غږ د متن ته بدلولو هیڅ ماډل نه وړاندې کوي.",

@@ -3329,6 +3329,7 @@
   },
   "transcriptionModel": {
     "title": "Transkripcijas modelis",
+    "choose": "Izvēlies citu modeli",
     "noneChosen": "Nav izvēlēts",
     "emptyTitle": "Nav transkripcijas modeļu",
     "emptyDescription": "Pašlaik Kilo Gateway nepiedāvā nevienu transkripcijas modeli.",

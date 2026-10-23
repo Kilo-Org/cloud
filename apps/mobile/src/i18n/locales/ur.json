@@ -3288,6 +3288,7 @@
   },
   "transcriptionModel": {
     "title": "متن میں بدلنے کا ماڈل",
+    "choose": "دوسرا ماڈل منتخب کریں",
     "noneChosen": "کوئی نہیں چنا گیا",
     "emptyTitle": "متن میں بدلنے کا کوئی ماڈل موجود نہیں",
     "emptyDescription": "Kilo Gateway فی الحال متن میں بدلنے کا کوئی ماڈل نہیں دیتا۔",

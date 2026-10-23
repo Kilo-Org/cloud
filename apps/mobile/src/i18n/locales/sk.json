@@ -3370,6 +3370,7 @@
   },
   "transcriptionModel": {
     "title": "Model prepisu",
+    "choose": "Vyberte iný model",
     "noneChosen": "Nie je vybraný žiadny",
     "emptyTitle": "Žiadne modely prepisu",
     "emptyDescription": "Kilo Gateway teraz neponúka žiadne modely prepisu.",

@@ -3288,6 +3288,7 @@
   },
   "transcriptionModel": {
     "title": "Модел за транскрипция",
+    "choose": "Избери друг модел",
     "noneChosen": "Не е избран",
     "emptyTitle": "Няма модели за транскрипция",
     "emptyDescription": "Kilo Gateway в момента не предлага модели за транскрипция.",

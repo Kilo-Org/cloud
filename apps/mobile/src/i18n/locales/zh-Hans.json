@@ -3288,6 +3288,7 @@
   },
   "transcriptionModel": {
     "title": "转写模型",
+    "choose": "选择其他模型",
     "noneChosen": "未选择",
     "emptyTitle": "没有转写模型",
     "emptyDescription": "Kilo Gateway 当前没有提供转写模型。",

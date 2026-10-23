@@ -3411,6 +3411,7 @@
   },
   "transcriptionModel": {
     "title": "Mudell ta' traskrizzjoni",
+    "choose": "Agħżel mudell ieħor",
     "noneChosen": "Xejn magħżul",
     "emptyTitle": "L-ebda mudell ta' traskrizzjoni",
     "emptyDescription": "Kilo Gateway bħalissa ma joffri l-ebda mudell ta' traskrizzjoni.",

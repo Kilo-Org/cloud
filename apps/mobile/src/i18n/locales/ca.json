@@ -3329,6 +3329,7 @@
   },
   "transcriptionModel": {
     "title": "Model de transcripció",
+    "choose": "Tria un altre model",
     "noneChosen": "Cap seleccionat",
     "emptyTitle": "Cap model de transcripció",
     "emptyDescription": "Kilo Gateway no ofereix cap model de transcripció ara mateix.",

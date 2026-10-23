@@ -3288,6 +3288,7 @@
   },
   "transcriptionModel": {
     "title": "Metne dönüştürme modeli",
+    "choose": "Başka bir model seç",
     "noneChosen": "Hiçbiri seçilmedi",
     "emptyTitle": "Metne dönüştürme modeli yok",
     "emptyDescription": "Kilo Gateway şu anda metne dönüştürme modeli sunmuyor.",

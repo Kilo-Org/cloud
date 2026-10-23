@@ -3329,6 +3329,7 @@
   },
   "transcriptionModel": {
     "title": "מודל תמלול",
+    "choose": "בחר מודל אחר",
     "noneChosen": "לא נבחר",
     "emptyTitle": "אין מודלי תמלול",
     "emptyDescription": "Kilo Gateway לא מציע כרגע מודלי תמלול.",

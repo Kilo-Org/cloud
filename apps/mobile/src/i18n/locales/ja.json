@@ -3288,6 +3288,7 @@
   },
   "transcriptionModel": {
     "title": "文字起こしモデル",
+    "choose": "別のモデルを選択",
     "noneChosen": "未選択",
     "emptyTitle": "文字起こしモデルがありません",
     "emptyDescription": "現在、Kilo Gatewayは文字起こしモデルを提供していません。",

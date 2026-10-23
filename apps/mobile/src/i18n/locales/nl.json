@@ -3288,6 +3288,7 @@
   },
   "transcriptionModel": {
     "title": "Transcriptiemodel",
+    "choose": "Kies een ander model",
     "noneChosen": "Geen gekozen",
     "emptyTitle": "Geen transcriptiemodellen",
     "emptyDescription": "Kilo Gateway biedt op dit moment geen transcriptiemodellen.",

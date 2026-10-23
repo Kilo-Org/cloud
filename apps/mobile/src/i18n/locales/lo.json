@@ -3288,6 +3288,7 @@
   },
   "transcriptionModel": {
     "title": "ໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ",
+    "choose": "ເລືອກໂມເດວອື່ນ",
     "noneChosen": "ຍັງບໍ່ໄດ້ເລືອກ",
     "emptyTitle": "ບໍ່ມີໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ",
     "emptyDescription": "ຕອນນີ້ Kilo Gateway ບໍ່ມີໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ.",

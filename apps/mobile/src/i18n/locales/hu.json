@@ -3288,6 +3288,7 @@
   },
   "transcriptionModel": {
     "title": "Átírási modell",
+    "choose": "Válassz másik modellt",
     "noneChosen": "Nincs kiválasztva",
     "emptyTitle": "Nincsenek átírási modellek",
     "emptyDescription": "A Kilo Gateway jelenleg nem kínál átírási modelleket.",

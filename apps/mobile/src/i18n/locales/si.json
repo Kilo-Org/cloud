@@ -3288,6 +3288,7 @@
   },
   "transcriptionModel": {
     "title": "හඬ පෙළට හරවන ආකෘතිය",
+    "choose": "වෙනත් ආකෘතියක් තෝරන්න",
     "noneChosen": "කිසිවක් තෝරා නැත",
     "emptyTitle": "හඬ පෙළට හැරවීමේ ආකෘති නොමැත",
     "emptyDescription": "දැනට Kilo Gateway හඬ පෙළට හැරවීමේ ආකෘති ලබා දෙන්නේ නැත.",

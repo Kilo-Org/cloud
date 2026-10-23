@@ -3452,6 +3452,7 @@
   },
   "transcriptionModel": {
     "title": "نموذج التفريغ الصوتي",
+    "choose": "اختيار نموذج آخر",
     "noneChosen": "لا يوجد اختيار",
     "emptyTitle": "لا توجد نماذج تفريغ صوتي",
     "emptyDescription": "لا يقدّم Kilo Gateway أي نماذج تفريغ صوتي في الوقت الحالي.",

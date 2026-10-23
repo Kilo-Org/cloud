@@ -3288,6 +3288,7 @@
   },
   "transcriptionModel": {
     "title": "Modely fanovana feo ho soratra",
+    "choose": "Safidio modely hafa",
     "noneChosen": "Tsy misy safidy",
     "emptyTitle": "Tsy misy modely fanovana feo ho soratra",
     "emptyDescription": "Tsy manome modely fanovana feo ho soratra amin'izao fotoana izao ny Kilo Gateway.",

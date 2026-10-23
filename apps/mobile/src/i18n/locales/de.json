@@ -3288,6 +3288,7 @@
   },
   "transcriptionModel": {
     "title": "Transkriptionsmodell",
+    "choose": "Anderes Modell wählen",
     "noneChosen": "Keines ausgewählt",
     "emptyTitle": "Keine Transkriptionsmodelle",
     "emptyDescription": "Kilo Gateway bietet derzeit keine Transkriptionsmodelle.",

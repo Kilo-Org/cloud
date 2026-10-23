@@ -31,11 +31,12 @@ describe('resolveVoiceInputFeedbackPresentation', () => {
       kind: 'alert',
       title: 'Microphone access is off',
       message: 'Microphone access is off. Enable it in Settings to use voice input.',
+      actionLabel: 'Open Settings',
       destination: 'system-settings',
     });
   });
 
-  it('returns an alert with the picker destination when the action is open-transcription-settings', () => {
+  it('returns an alert whose action names the picker instead of repeating the title', () => {
     const presentation: VoiceInputFeedbackPresentation = resolveVoiceInputFeedbackPresentation(
       feedback({
         action: 'open-transcription-settings',
@@ -48,6 +49,7 @@ describe('resolveVoiceInputFeedbackPresentation', () => {
       kind: 'alert',
       title: 'Transcription model',
       message: "This transcription model isn't available. Pick another one in Preferences.",
+      actionLabel: 'Choose another model',
       destination: 'transcription-model-picker',
     });
   });

@@ -661,7 +661,21 @@ for (const catalog of CATALOGS) {
         fail(`${label}: "${key}" must be translated`);
       }
       const expected = placeholders(englishValue);
-      if (placeholders(value) !== expected) {
+      const actual = placeholders(value);
+      const expectedSet = expected.split(',').filter(Boolean);
+      const actualSet = actual.split(',').filter(Boolean);
+      // A counted family's member may carry the number in a word rather than
+      // the placeholder: Arabic and Hebrew say the dual form without a
+      // numeral. Only the visible count may be dropped, and only in a family
+      // whose base English string is counted; an added or renamed placeholder
+      // still fails.
+      const parts = pluralParts(key);
+      const countedMember = Boolean(parts && englishFamilies.has(parts.base));
+      const droppedVisibleCount = expectedSet
+        .filter(name => !actualSet.includes(name))
+        .every(name => name === 'displayCount' || name === 'itemCount');
+      const addedPlaceholder = actualSet.some(name => !expectedSet.includes(name));
+      if (actual !== expected && !(countedMember && droppedVisibleCount && !addedPlaceholder)) {
         fail(`${label}: "${key}" placeholders differ from English (${expected || 'none'})`);
       }
       const expectedRefs = nestingRefs(englishValue).join(',');

@@ -1259,7 +1259,7 @@
       "syncQueued": "أُضيفت المزامنة إلى قائمة الانتظار.",
       "syncStatusUnavailable": "حالة المزامنة غير متاحة.",
       "withinDeadline": "ضمن المهلة",
-      "daysOverdue_one": "متأخرة {{displayCount}} يوم",
+      "daysOverdue_one": "متأخرة يومًا واحدًا",
       "daysOverdue_other": "متأخرة {{displayCount}} يوم",
       "daysOverdue_zero": "لا تأخير",
       "daysOverdue_two": "متأخرة يومين",

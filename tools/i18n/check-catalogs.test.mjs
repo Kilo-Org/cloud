@@ -218,6 +218,66 @@ test('rejects unknown placeholders in a locale-specific plural category', contex
   );
 });
 
+/**
+ * A counted form may say the number in a word instead of the placeholder:
+ * Arabic's dual form reads "two days late" with no numeral. Only the visible
+ * count may be dropped, and only inside a counted family; a form that drops
+ * any other value still fails, because the reader would lose it.
+ */
+test('accepts a plural sibling that says its count in a word', context => {
+  const result = runChecker(context, {
+    english: {
+      agents: {
+        title: 'Agents',
+        daysOverdue_one: '{{displayCount}} day overdue',
+        daysOverdue_other: '{{displayCount}} days overdue',
+      },
+    },
+    translated: {
+      agents: {
+        title: 'Localized agents',
+        daysOverdue_one: 'one day late',
+        daysOverdue_two: 'two days late',
+        daysOverdue_few: '{{displayCount}} days late (few)',
+        daysOverdue_many: '{{displayCount}} days late (many)',
+        daysOverdue_other: '{{displayCount}} days late',
+      },
+    },
+    source: "t('agents.title');\nt('agents.daysOverdue', { count: 2 });",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('rejects a plural sibling that drops a value other than its count', context => {
+  const result = runChecker(context, {
+    english: {
+      agents: {
+        title: 'Agents',
+        window: '{{displayCount}} days from {{start}}',
+        window_one: '{{displayCount}} day from {{start}}',
+        window_other: '{{displayCount}} days from {{start}}',
+      },
+    },
+    translated: {
+      agents: {
+        title: 'Localized agents',
+        window: '{{displayCount}} дней с {{start}}',
+        window_one: 'один день ({{displayCount}})',
+        window_few: '{{displayCount}} дня с {{start}}',
+        window_many: '{{displayCount}} дней с {{start}}',
+        window_other: '{{displayCount}} дней с {{start}}',
+      },
+    },
+    source: "t('agents.title');\nt('agents.window', { count: 2 });",
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ru: "agents\.window_one" placeholders differ from English \(displayCount,start\)/
+  );
+});
+
 const COUNTED = {
   counts: {
     items: '{{count}} items',

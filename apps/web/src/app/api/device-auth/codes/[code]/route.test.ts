@@ -100,6 +100,7 @@ describe('GET /api/device-auth/codes/[code] (status only)', () => {
       params: Promise.resolve({ code: SAMPLE_CODE }),
     });
     expect(response.status).toBe(410);
+    expect(await response.json()).toEqual({ status: 'expired' });
   });
 
   test('reports 410 expired for a code with no row', async () => {

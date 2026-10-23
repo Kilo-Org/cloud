@@ -4,11 +4,12 @@ import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usa
 
 export type Env = Omit<
   CloudflareEnv,
-  'USAGE_INGEST_QUEUE' | 'USAGE_INGEST_MODE' | 'USAGE_WRITER_URL'
+  'USAGE_INGEST_QUEUE' | 'USAGE_INGEST_MODE' | 'USAGE_WRITER_URL' | 'USAGE_INGEST_PARALLELISM'
 > & {
   USAGE_INGEST_QUEUE: Queue<UsageRecordRequest>;
   USAGE_INGEST_PUBLISH_SECRET?: string;
   USAGE_INGEST_MODE?: string;
+  USAGE_INGEST_PARALLELISM?: string;
   USAGE_WRITER_URL?: string;
   USAGE_WRITER_SECRET?: string;
   USAGE_WRITER_PROTECTION_BYPASS?: string;

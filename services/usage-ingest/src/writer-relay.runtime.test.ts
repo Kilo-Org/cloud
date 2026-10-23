@@ -15,11 +15,11 @@ it('keeps production direct and routes the existing staging consumer through the
   expect(staging.queues.consumers).toMatchObject([
     {
       queue: 'usage-ingest-processing-staging',
-      max_batch_size: 1,
+      max_batch_size: 2,
       max_batch_timeout: 0,
       max_retries: 3,
       retry_delay: 60,
-      max_concurrency: 200,
+      max_concurrency: 100,
       dead_letter_queue: 'usage-ingest-processing-dlq-staging',
     },
   ]);

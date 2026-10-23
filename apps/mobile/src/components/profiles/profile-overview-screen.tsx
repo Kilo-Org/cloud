@@ -1,9 +1,11 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { selectProfileOverviewErrorView } from '@/components/profiles/profile-overview-error';
 import {
   defaultDescriptionKey,
   deleteErrorMessage,
@@ -11,16 +13,15 @@ import {
   type OverviewSectionKey,
   overviewSectionRows,
 } from '@/components/profiles/profile-overview-model';
+import { ProfileMetadataForm } from '@/components/profiles/profile-metadata-form';
 import { ProfileOverviewSkeleton } from '@/components/profiles/profile-overview-skeleton';
 import { ProfileRepoPinsSection } from '@/components/profiles/profile-repo-pins-section';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { FormField } from '@/components/ui/form-field';
 import {
   Bot,
   CornerDownLeft,
@@ -34,20 +35,17 @@ import {
 } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { Text } from '@/components/ui/text';
-import { validateProfileDescription, validateProfileName } from '@/lib/agent-profile-forms';
-import {
-  type AgentProfileDetail,
-  useAgentProfile,
-  useAgentProfileMutations,
-} from '@/lib/hooks/use-agent-profiles';
+import { useAgentProfile, useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { useTRPC } from '@/lib/trpc';
 import {
   getProfileAgentsPath,
   getProfileCommandsPath,
   getProfileMcpPath,
   getProfileSkillsPath,
   getProfileSlashCommandsPath,
+  getProfilesPath,
   getProfileVariablesPath,
   type ProfileManagementStack,
 } from '@/lib/profile-agent-navigation';
@@ -83,86 +81,6 @@ function hasUsableMessage(error: unknown): boolean {
   return error instanceof Error && error.message.trim().length > 0;
 }
 
-type MetadataFormProps = Readonly<{
-  profile: AgentProfileDetail;
-  isSaving: boolean;
-  onSave: (values: { name: string; description: string }) => Promise<boolean>;
-}>;
-
-/**
- * Uncontrolled metadata form, remounted via `metadataFormKey` only when server
- * metadata changes. Defaults follow the draft refs so pending/error renders
- * cannot restore the old server values in the native fields.
- */
-function ProfileMetadataForm({ profile, isSaving, onSave }: MetadataFormProps) {
-  const { t } = useTranslation();
-  const nameRef = useRef(profile.name);
-  const descriptionRef = useRef(profile.description ?? '');
-  const [nameError, setNameError] = useState<string | null>(null);
-  const [descriptionError, setDescriptionError] = useState<string | null>(null);
-  const [saveFailed, setSaveFailed] = useState(false);
-
-  const submit = async () => {
-    const name = nameRef.current.trim();
-    const nameIssue = validateProfileName(name);
-    if (nameIssue !== null) {
-      setNameError(
-        nameIssue === 'empty' ? t('profiles.nameRequired') : t('agentChat.newSession.nameTooLong')
-      );
-      return;
-    }
-    const description = descriptionRef.current.trim();
-    if (validateProfileDescription(description) !== null) {
-      setDescriptionError(t('agentChat.newSession.descriptionTooLong'));
-      return;
-    }
-    setNameError(null);
-    setDescriptionError(null);
-    setSaveFailed(false);
-    setSaveFailed(!(await onSave({ name, description })));
-  };
-
-  return (
-    <View className="gap-4">
-      <FormField
-        label={t('profiles.nameLabel')}
-        placeholder={t('profiles.namePlaceholder')}
-        defaultValue={nameRef.current}
-        error={nameError ?? undefined}
-        disabled={isSaving}
-        required
-        returnKeyType="next"
-        onChangeText={value => {
-          nameRef.current = value;
-          if (nameError !== null && validateProfileName(value) === null) {
-            setNameError(null);
-          }
-        }}
-      />
-      <FormField
-        label={t('profiles.descriptionLabel')}
-        placeholder={t('profiles.descriptionPlaceholder')}
-        defaultValue={descriptionRef.current}
-        error={descriptionError ?? undefined}
-        multiline
-        textAlignVertical="top"
-        className="min-h-20 leading-5"
-        disabled={isSaving}
-        onChangeText={value => {
-          descriptionRef.current = value;
-          if (descriptionError !== null && validateProfileDescription(value) === null) {
-            setDescriptionError(null);
-          }
-        }}
-      />
-      {saveFailed ? <AccessibleStatus message={t('profiles.saveFailed')} /> : null}
-      <Button loading={isSaving} disabled={isSaving} onPress={submit}>
-        <Text>{t(saveFailed ? 'common.retry' : 'common.save')}</Text>
-      </Button>
-    </View>
-  );
-}
-
 export function ProfileOverviewScreen({
   profileId,
   organizationId,
@@ -177,6 +95,8 @@ export function ProfileOverviewScreen({
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const colors = useThemeColors();
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
   // Reactive: a connectivity commit re-renders the error variant selection.
   const committedConnectivity = useCommittedConnectivityStatus();
   const profileQuery = useAgentProfile(profileId, organizationId);
@@ -185,6 +105,27 @@ export function ProfileOverviewScreen({
 
   const profile = profileQuery.data;
   const isOrgOwned = organizationId !== undefined;
+
+  // A profile the server no longer serves leaves the Profiles list advertising
+  // a row that can never open: refresh the lists (not the failed detail read,
+  // which would only re-issue the same NOT_FOUND) so the dead row leaves them.
+  const errorView = profileQuery.isError
+    ? selectProfileOverviewErrorView(profileQuery.error, committedConnectivity)
+    : null;
+  const staleRow = errorView?.staleRow === true;
+  useEffect(() => {
+    if (!staleRow) {
+      return;
+    }
+    void queryClient.invalidateQueries(trpc.agentProfiles.list.pathFilter());
+    void queryClient.invalidateQueries(trpc.agentProfiles.listCombined.pathFilter());
+  }, [staleRow, queryClient, trpc]);
+
+  // A terminal refusal replaces the editor: a cached profile the server says
+  // cannot be read must not stay editable (Save and Delete would only fail the
+  // same way). A retryable failure keeps the cached profile usable under the
+  // banner.
+  const showContent = profile !== undefined && (errorView === null || errorView.showRetry);
 
   const saveMetadata = async ({ name, description }: { name: string; description: string }) => {
     try {
@@ -228,11 +169,15 @@ export function ProfileOverviewScreen({
 
   return (
     <View className="flex-1 bg-background">
+      {/* Back keeps the route it was opened from (the Profiles list, or the
+          session whose profile chip opened it); `backFallback` still lands on
+          Profiles when the app has no history, as a cold deep link does. The
+          profile name is user prose, not a UI label, so it keeps a second line
+          for a natural break. */}
       <ScreenHeader
         title={profile?.name ?? t('profiles.title')}
-        // The profile name is user prose, not a UI label, so it keeps a second
-        // line for a natural break.
         titleNumberOfLines={2}
+        backFallback={getProfilesPath()}
       />
       <TabScreenScrollView
         className="flex-1"
@@ -243,20 +188,27 @@ export function ProfileOverviewScreen({
         {/* A stale read keeps the cached profile usable: the error banner sits
             above the content and only takes over when there is nothing to
             show. A confirmed-offline device is a connectivity failure, not a
-            server one; `unknown` connectivity keeps the server variant. */}
-        {profileQuery.isError ? (
+            server one; `unknown` connectivity keeps the server variant. A
+            profile the server refuses (NOT_FOUND, FORBIDDEN) gets its own
+            state, drops the Retry that would re-issue the same refusal, and
+            replaces the editor. */}
+        {errorView ? (
           <QueryError
-            variant={committedConnectivity === 'offline' ? 'offline' : 'server'}
+            variant={errorView.variant}
             placement="top"
-            title={t('profiles.loadFailed')}
-            onRetry={() => void profileQuery.refetch()}
+            title={
+              errorView.variant === 'not-found' || errorView.variant === 'permission'
+                ? undefined
+                : t('profiles.loadFailed')
+            }
+            onRetry={errorView.showRetry ? () => void profileQuery.refetch() : undefined}
             isRetrying={profileQuery.isRefetching}
           />
         ) : null}
 
         {!profileQuery.isError && profile === undefined ? <ProfileOverviewSkeleton /> : null}
 
-        {profile !== undefined ? (
+        {showContent ? (
           <>
             <ProfileMetadataForm
               key={metadataFormKey(profile)}

@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- THE new-session body: one screen for every entry point, with a mutually-exclusive branch per target/state. */
 import { useState } from 'react';
-import { type LayoutChangeEvent, Pressable, ScrollView, View } from 'react-native';
+import { type LayoutChangeEvent, ScrollView, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -9,19 +9,16 @@ import { LaunchFolderField } from '@/components/agents/folder-selector';
 import { AdvancedConfigPanel } from '@/components/agents/advanced-config-panel';
 import { NewSessionCloudCreateError } from '@/components/agents/new-session-cloud-create-error';
 import { type NewSessionConfigureFormProps } from '@/components/agents/new-session-configure-form-props';
-import { renderProfileRowBody } from '@/components/agents/new-session-profile-row';
-import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
+import { NewSessionProfileRow } from '@/components/agents/new-session-environment-row';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
 import { NewSessionRunTarget } from '@/components/agents/new-session-run-target';
 import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
 import { NewSessionRemoteSpawnFailure } from '@/components/agents/new-session-remote-spawn-failure';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
-import { ChevronDown } from '@/components/ui/icons';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 import { keyboardInsetOffset } from '@/lib/keyboard-inset-offset';
 import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-insets';
@@ -397,78 +394,5 @@ export function NewSessionConfigureForm({
       {body}
       {footer}
     </KeyboardAvoidingView>
-  );
-}
-
-type NewSessionProfileRowProps = {
-  profile: EffectiveAgentProfile | null;
-  isProfileLoading: boolean;
-  isProfileError: boolean;
-  /** The picked override no longer resolves to a profile. */
-  overrideNeedsAttention: boolean;
-  onRetryProfile: () => void;
-  /** Opens the profile picker sheet. */
-  onOpenProfilePicker: () => void;
-};
-
-/**
- * The new-session Environment row: a tappable summary of the effective profile.
- * Loading and failure keep the shared body's reserved lines, so the rows below
- * never move when the query settles and no default flashes before it does.
- * The settled row is the entry point that opens the profile picker.
- *
- * It lives with this screen rather than in `new-session-profile-row` because
- * the chevron reaches the app's icon barrel, which the mounted
- * suite that renders the read-only row cannot load.
- */
-export function NewSessionProfileRow({
-  profile,
-  isProfileLoading,
-  isProfileError,
-  overrideNeedsAttention,
-  onRetryProfile,
-  onOpenProfilePicker,
-}: Readonly<NewSessionProfileRowProps>) {
-  const { t } = useTranslation();
-  const colors = useThemeColors();
-
-  return (
-    <View className="mt-5">
-      <Text className="mb-2 text-sm font-medium text-muted-foreground">
-        {t('agentChat.newSession.environment')}
-      </Text>
-      {isProfileLoading || isProfileError ? (
-        renderProfileRowBody({ t, profile, isProfileLoading, isProfileError, onRetryProfile })
-      ) : (
-        <Pressable
-          className="min-h-11 flex-row items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2.5 active:opacity-70"
-          onPress={onOpenProfilePicker}
-          accessibilityRole="button"
-          accessibilityLabel={t('agentChat.newSession.pickProfile')}
-        >
-          <View className="min-w-0 flex-1 gap-1">
-            {overrideNeedsAttention ? (
-              <Text className="text-sm text-warn">
-                {t('agentChat.newSession.configNeedsAttention')}
-              </Text>
-            ) : null}
-            <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
-              {profile?.name ?? t('agentChat.newSession.defaultEnvironment')}
-            </Text>
-            {profile ? (
-              <Text className="text-sm text-muted-foreground" numberOfLines={1}>
-                {t('agentChat.newSession.environmentSummary', {
-                  commands: profile.commandCount,
-                  mcp: profile.mcpServerCount,
-                  skills: profile.skillCount,
-                  agents: profile.agentCount,
-                })}
-              </Text>
-            ) : null}
-          </View>
-          <ChevronDown size={18} color={colors.mutedForeground} />
-        </Pressable>
-      )}
-    </View>
   );
 }

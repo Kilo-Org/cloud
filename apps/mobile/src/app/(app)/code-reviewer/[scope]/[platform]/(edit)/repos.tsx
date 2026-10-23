@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { type Href } from 'expo-router';
 import { FolderGit2 } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
 import { View } from 'react-native';
@@ -7,6 +7,7 @@ import { toast } from 'sonner-native';
 
 import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
+import { InvalidRouteState } from '@/components/invalid-route-state';
 import { QueryError } from '@/components/query-error';
 import { RepoToggleRow } from '@/components/repo-toggle-row';
 import { ScreenHeader } from '@/components/screen-header';
@@ -16,6 +17,7 @@ import { RadioGroup } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { WEB_BASE_URL } from '@/lib/config';
@@ -31,10 +33,18 @@ import {
   useSaveReviewConfig,
 } from '@/lib/hooks/use-code-reviewer';
 import { useRepoSelectionToggle } from '@/lib/hooks/use-code-reviewer-repo-selection';
+import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
 
 export default function ReposRoute() {
-  const { scope, platform } = useLocalSearchParams<{ scope: string; platform: ReviewerPlatform }>();
+  const params = useReviewerRouteParams();
+  if (!params) {
+    return <InvalidRouteState backTo={'/(app)/code-reviewer' as Href} />;
+  }
+  return <ReposScreen scope={params.scope} platform={params.platform} />;
+}
+
+function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   const { data } = useReviewConfig(scope, platform);
   const save = useSaveReviewConfig(scope, platform);
   const toggleRepo = useRepoSelectionToggle(scope, platform);
@@ -158,6 +168,7 @@ export default function ReposRoute() {
         action={
           manageRepoAccessLabel ? (
             <Button
+              className={STATE_ACTION_CLASS}
               variant="outline"
               onPress={() => {
                 void (async () => {

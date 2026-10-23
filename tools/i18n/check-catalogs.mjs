@@ -115,6 +115,19 @@ const TWO_SENSE_COPY = new Map([
 ]);
 
 /**
+ * Counted forms that say their number as a word instead of the visible count
+ * placeholder, as `base key:plural category:locale`. Arabic names one day and
+ * two days with their own word forms, so those two messages read as words and
+ * carry no numeral. Every other form of a counted family must keep its
+ * language's exact placeholder set, so a count deleted from a form that should
+ * show it still fails. Add an entry only after reading the rendered message.
+ */
+const WORDED_COUNTS = new Set([
+  'securityAgent.dashboard.daysOverdue:one:ar',
+  'securityAgent.dashboard.daysOverdue:two:ar',
+]);
+
+/**
  * Proper nouns, format-only strings, and pre-existing English-identical copy
  * outside this section's new keys. Remove a key from the set when that copy
  * is translated or the key is deleted.
@@ -153,13 +166,13 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'profiles.mcp.commandPlaceholder',
   'profiles.mcp.jsonPlaceholder',
   'profiles.agents.slugPlaceholder',
-  // The sampling parameter's technical name: `top_p` is the knob's own
-  // identifier, so every catalog keeps it verbatim.
+  // The sampling parameter's published name. `Top P` is what the provider docs
+  // and every model dashboard call this knob, so no locale translates it — a
+  // translated word would hide which parameter the field sets.
   'profiles.agents.topP',
   'profiles.slashCommands.namePlaceholder',
   'profiles.slashCommands.agentPlaceholder',
-  // The MCP count label. `MCP` is the protocol's own acronym, and its unit
-  // word is already as short as a compact count badge allows, so every catalog
+  // The MCP count label. `MCP` is the protocol's own acronym, so every catalog
   // keeps the same "{{count}} MCP" the MCP-server rows use.
   'profiles.counts.mcp',
   // The inference protocols keep their published API names across locales.
@@ -240,6 +253,52 @@ function flatten(value, prefix = '', out = new Map()) {
   return out;
 }
 
+/**
+ * The agent editor's three visibility options each read `label — description`.
+ * A catalog that separates one option with an en dash, a hyphen, a colon, or no
+ * space at all draws one radio group in three shapes, and the reader has to
+ * compare the labels to see that they are the same kind of thing.
+ */
+const VISIBILITY_KEYS = [
+  'profiles.agents.visibilityPrimary',
+  'profiles.agents.visibilitySubagent',
+  'profiles.agents.visibilityAll',
+];
+
+/**
+ * Agent-editor labels that read the same in every catalog, aside from the
+ * separator shape above: `profiles.agents.topP` is the sampling parameter's
+ * published name, so a translated word would hide which parameter the field
+ * sets. The allowlist exempts the key from the "equals English everywhere"
+ * failure; this is the positive requirement that replaces it.
+ */
+const VERBATIM_KEYS = ['profiles.agents.topP'];
+
+function checkVerbatimLabels(values, english, label) {
+  for (const key of VERBATIM_KEYS) {
+    const value = values.get(key);
+    const reference = english.get(key);
+    if (value !== undefined && reference !== undefined && value !== reference) {
+      fail(`${label}: "${key}" must read "${reference}" in every catalog`);
+    }
+  }
+}
+
+function checkVisibilitySeparators(values, label) {
+  for (const key of VISIBILITY_KEYS) {
+    const value = values.get(key);
+    if (value !== undefined && value.split(' — ').length !== 2) {
+      fail(`${label}: "${key}" must join its label and description with " — "`);
+    }
+  }
+}
+
+/** The agent editor's catalog rules, applied to English and to every locale. */
+function checkAgentEditorCopy(values, english, label) {
+  checkVisibilitySeparators(values, label);
+  checkVerbatimLabels(values, english, label);
+}
+
 /** The `{{token}}` set of one string, as a sorted, counted signature. */
 function placeholders(value) {
   return [...value.matchAll(/\{\{\s*([^}\s]+)\s*\}\}/g)]
@@ -266,6 +325,16 @@ function expansionTokens(value) {
 function edges(value) {
   return JSON.stringify([/^\s*/.exec(value)[0], /\s*$/.exec(value)[0]]);
 }
+
+/**
+ * Keys whose surrounding whitespace is the sentence's own separator rather than
+ * part of a word. The login screen joins `login.termsPrefix` straight to its
+ * Terms link and puts `login.termsConnector` between the two links, so the
+ * separator belongs to the locale: a catalog that separates words with a space
+ * keeps that space in the value, and Chinese abuts the segments. Every other
+ * key keeps English's edges exactly.
+ */
+const LOCALE_SEPARATED_KEYS = new Set(['login.termsPrefix', 'login.termsConnector']);
 
 const QUOTE_PAIRS = [
   ['\u201c', '\u201d'],
@@ -449,6 +518,26 @@ function pluralBaseKey(key) {
   return key.replace(/_(?:zero|one|two|few|many|other)$/, '');
 }
 
+/**
+ * The visible-count placeholders an English family declares, e.g.
+ * `displayCount`. A translated form must carry each one unless a reviewed
+ * worded form spells the number out instead.
+ */
+function familyVisibleCounts(english, base) {
+  const names = new Set();
+  for (const [key, value] of english) {
+    if (key !== base && pluralBaseKey(key) !== base) {
+      continue;
+    }
+    for (const name of placeholders(value).split(',').filter(Boolean)) {
+      if (name === 'displayCount' || name === 'itemCount') {
+        names.add(name);
+      }
+    }
+  }
+  return names;
+}
+
 /** Split a dotted key into its family base and plural category, if any. */
 function pluralParts(key) {
   const match = PLURAL_SUFFIX_RE.exec(key);
@@ -558,6 +647,8 @@ for (const catalog of CATALOGS) {
     }
   }
 
+  checkAgentEditorCopy(english, english, `${catalog.name}/en`);
+
   const localeValues = new Map();
 
   for (const tag of present) {
@@ -567,6 +658,7 @@ for (const catalog of CATALOGS) {
     const label = `${catalog.name}/${tag}`;
     const translated = flatten(parseCatalog(join(catalog.dir, `${tag}.json`), label));
     localeValues.set(tag, translated);
+    checkAgentEditorCopy(translated, english, label);
     const ownValues = new Set(translated.values());
 
     // A locale-driven plural family: the English base interpolates {{count}}
@@ -648,6 +740,23 @@ for (const catalog of CATALOGS) {
           fail(`${label}: "${key}" uses placeholder {{${ph}}}, which the English family does not`);
         }
       }
+      // Every form keeps the family's visible count unless the reviewed list
+      // names it: a form without a numeral reads as an age only when the
+      // language spells the number out. A zero form is the exception — "none
+      // required" reads better than a numeral beside a noun, and several
+      // catalogs already word it that way.
+      if (
+        parts.category !== 'zero' &&
+        !WORDED_COUNTS.has(`${parts.base}:${parts.category}:${tag}`)
+      ) {
+        for (const ph of familyVisibleCounts(english, parts.base)) {
+          if (!placeholders(value).split(',').includes(ph)) {
+            fail(
+              `${label}: "${key}" drops {{${ph}}} without a reviewed worded form (WORDED_COUNTS)`
+            );
+          }
+        }
+      }
     }
     for (const [key, value] of translated) {
       if (!english.has(key)) {
@@ -661,7 +770,20 @@ for (const catalog of CATALOGS) {
         fail(`${label}: "${key}" must be translated`);
       }
       const expected = placeholders(englishValue);
-      if (placeholders(value) !== expected) {
+      const actual = placeholders(value);
+      const expectedSet = expected.split(',').filter(Boolean);
+      const actualSet = actual.split(',').filter(Boolean);
+      // Only a reviewed (key, category, locale) entry may say its number as a
+      // word; every other form keeps its language's exact placeholder set.
+      const parts = pluralParts(key);
+      const wordedForm = Boolean(
+        parts && WORDED_COUNTS.has(`${parts.base}:${parts.category}:${tag}`)
+      );
+      const droppedVisibleCount = expectedSet
+        .filter(name => !actualSet.includes(name))
+        .every(name => name === 'displayCount' || name === 'itemCount');
+      const addedPlaceholder = actualSet.some(name => !expectedSet.includes(name));
+      if (actual !== expected && !(wordedForm && droppedVisibleCount && !addedPlaceholder)) {
         fail(`${label}: "${key}" placeholders differ from English (${expected || 'none'})`);
       }
       const expectedRefs = nestingRefs(englishValue).join(',');
@@ -674,7 +796,7 @@ for (const catalog of CATALOGS) {
           `${label}: "${key}" $TOKEN expansion tokens differ from English (${expectedTokens || 'none'})`
         );
       }
-      if (edges(value) !== edges(englishValue)) {
+      if (!LOCALE_SEPARATED_KEYS.has(key) && edges(value) !== edges(englishValue)) {
         fail(`${label}: "${key}" leading or trailing space differs from English`);
       }
       if (/ {2}/.test(value) && !/ {2}/.test(englishValue)) {
@@ -689,6 +811,23 @@ for (const catalog of CATALOGS) {
         if (englishValues.has(run) && !holdsLabel(ownValues, run)) {
           fail(`${label}: "${key}" quotes the English label "${run}"; name its key with $t()`);
         }
+      }
+    }
+
+    // The separator keys are this catalog's only statement about how it joins
+    // one word to the next, and they are allowed to differ from English on
+    // purpose — so they have to agree with each other. A padded prefix with a
+    // bare connector joins "our" to "Terms" but runs the conjunction into the
+    // next noun; the reverse drops the space before the link.
+    const prefixValue = translated.get('login.termsPrefix');
+    const connectorValue = translated.get('login.termsConnector');
+    if (prefixValue !== undefined && connectorValue !== undefined) {
+      const paddedPrefix = /\s$/.test(prefixValue);
+      const paddedConnector = /^\s/.test(connectorValue) && /\s$/.test(connectorValue);
+      if (paddedPrefix !== paddedConnector) {
+        fail(
+          `${label}: "login.termsPrefix" and "login.termsConnector" disagree about their separator; pad both or neither`
+        );
       }
     }
 

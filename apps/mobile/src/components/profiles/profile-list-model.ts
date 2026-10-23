@@ -1,22 +1,14 @@
-import { type ProfileCountItem } from '@/lib/profile-count-labels';
-import { type AgentProfileListItem } from '@/lib/hooks/agent-profile-types';
-
 /**
  * Pure view-model helpers for the mobile profile manager.
  *
  * No React and no React Native imports: every function here is unit-tested
  * directly in `profile-list-model.test.ts`. The screens own rendering; this
- * module owns the section ordering, the effective-default rule, and the
- * compact counts summary the row subtitle shows.
+ * module owns the section ordering and the effective-default rule. The count
+ * summary the row subtitle shows comes from `profileCountItems`, the one path
+ * every profile surface shares.
  */
 
 type ProfileSectionKey = 'organization' | 'personal';
-
-/** The three summary counts the list row shows, mirroring the server's `ProfileSummarySchema`. */
-export type ProfileCounts = Pick<
-  AgentProfileListItem,
-  'varCount' | 'mcpServerCount' | 'skillCount'
->;
 
 export type ProfileDefaultSource = {
   id: string;
@@ -86,28 +78,4 @@ export function isEffectiveDefault(
   effectiveDefaultId: string | null
 ): boolean {
   return effectiveDefaultId === null ? profile.isDefault : profile.id === effectiveDefaultId;
-}
-
-/** Read the counts triple off a profile summary. */
-export function profileCounts(profile: ProfileCounts): ProfileCounts {
-  return {
-    varCount: profile.varCount,
-    mcpServerCount: profile.mcpServerCount,
-    skillCount: profile.skillCount,
-  };
-}
-
-/**
- * The non-zero counts a row subtitle shows, in web order (vars, MCP,
- * skills). The caller localizes them with the compact unit suffixes and joins
- * them; empty when the profile has nothing configured, so the row renders
- * without a subtitle.
- */
-export function profileListCountItems(counts: ProfileCounts): ProfileCountItem[] {
-  const items: (ProfileCountItem | null)[] = [
-    counts.varCount > 0 ? { kind: 'vars', count: counts.varCount } : null,
-    counts.mcpServerCount > 0 ? { kind: 'mcp', count: counts.mcpServerCount } : null,
-    counts.skillCount > 0 ? { kind: 'skills', count: counts.skillCount } : null,
-  ];
-  return items.filter((item): item is ProfileCountItem => item !== null);
 }

@@ -3,6 +3,7 @@ export * from './session-live-summary';
 export * from './cloud-agent-session-scope';
 export * from './cloud-agent-worktree-scope';
 export * from './public-worktree-projection';
+export * from './session-share';
 export * from './message-id';
 export * from './kilo-session-id';
 

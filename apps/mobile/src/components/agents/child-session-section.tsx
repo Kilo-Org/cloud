@@ -31,18 +31,11 @@ import { MessageErrorBoundary } from './message-error-boundary';
 import { partRendersContent } from './message-visibility';
 import { isToolPart } from './part-types';
 import { useOptionalSessionManager } from './session-manager-context';
+import { toolStatusLabel } from './tool-status-label';
 
 const MAX_NESTING_DEPTH = 5;
 
 type ChildSessionStatus = ToolPart['state']['status'];
-
-/** The card's visible and announced state, in the reader's language. */
-const STATUS_LABEL_KEY = {
-  pending: 'common.pending',
-  running: 'common.running',
-  completed: 'common.completed',
-  error: 'common.failed',
-} satisfies Record<ChildSessionStatus, string>;
 
 export type RenderPartFn = (props: {
   part: Part;
@@ -75,7 +68,7 @@ export function ChildSessionSection({
   const modelLabel = getChildSessionModelLabel(childMessages, modelOptions ?? []);
 
   const { status } = part.state;
-  const statusLabel = t(STATUS_LABEL_KEY[status]);
+  const statusLabel = toolStatusLabel(t, status);
   const isRunning = status === 'running' || status === 'pending';
   const sessionId = getTaskToolSessionId(part);
 

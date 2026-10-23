@@ -224,7 +224,7 @@
     "hideBalance": "बैलेंस छिपाएँ",
     "showBalance": "बैलेंस दिखाएँ",
     "balanceHidden": "बैलेंस छिपा हुआ है",
-    "bonusCreditsExpiring": "{{amount}} के बोनस क्रेडिट की समय-सीमा {{date}} को समाप्त होगी।",
+    "bonusCreditsExpiring": "{{amount}} के क्रेडिट की समय-सीमा {{date}} को समाप्त होगी।",
     "signOutTitle": "साइन आउट करें?",
     "signOutMessage": "अपने कार्यक्षेत्र तक पहुँचने के लिए आपको फिर से साइन इन करना होगा।",
     "deleteAccountTitle": "खाता हटाएँ?",
@@ -894,7 +894,7 @@
     },
     "autoReviews": "स्वचालित समीक्षाएँ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket कनेक्ट नहीं है। केवल संगठन के मालिक और बिलिंग मैनेजर ही इसे कनेक्ट कर सकते हैं।",
+      "notConnectedReadOnly": "Bitbucket कनेक्ट नहीं है। केवल संगठन के मालिक, एडमिन और बिलिंग प्रबंधक ही इसे कनेक्ट कर सकते हैं।",
       "setupIncomplete": "सेटअप अधूरा है। kilo.ai पर कॉन्फ़िगरेशन पूरा करें।",
       "setup": "Bitbucket सेटअप"
     },
@@ -918,7 +918,10 @@
       "starting": "समीक्षा शुरू हो रही है…",
       "title": "मैन्युअल समीक्षा"
     },
-    "notConnectedReadOnly": "{{platform}} कनेक्ट नहीं है। केवल संगठन के मालिक और बिलिंग मैनेजर ही इसे कनेक्ट कर सकते हैं।",
+    "notConnectedReadOnly": "{{platform}} कनेक्ट नहीं है। केवल संगठन के मालिक और एडमिन ही इसे कनेक्ट कर सकते हैं।",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} कनेक्ट नहीं है। इसे कनेक्ट करने के लिए संगठन के मालिक, एडमिन या बिलिंग प्रबंधक से अनुरोध करें।"
+    },
     "platformList": {
       "activity": "गतिविधि",
       "checking": "जाँच हो रही है…",
@@ -997,7 +1000,7 @@
       "off": "समीक्षा मेमोरी बंद है।",
       "on": "समीक्षा मेमोरी चालू है।",
       "offDescription": "इसे चालू करें ताकि Kilo मेंटेनर के जवाबों से सीखकर REVIEW.md के लिए दिशानिर्देश सुझा सके।",
-      "readOnlyDescription": "केवल संगठन के मालिक और बिलिंग मैनेजर ही समीक्षा मेमोरी बदल सकते हैं।",
+      "readOnlyDescription": "केवल संगठन के मालिक, एडमिन और बिलिंग प्रबंधक ही समीक्षा मेमोरी बदल सकते हैं।",
       "title": "समीक्षा से सीखी बातें"
     },
     "scopeList": {
@@ -1149,7 +1152,7 @@
       "summary": "रिपोर्ट का सारांश",
       "title": "ऑडिट रिपोर्ट",
       "unavailable": "ऑडिट रिपोर्ट अनुपलब्ध",
-      "unavailableDescription": "केवल संगठन के मालिक और बिलिंग मैनेजर ही ऑडिट रिपोर्ट देख सकते हैं। किसी मालिक या बिलिंग मैनेजर से आपको अनुमति देने के लिए कहें।",
+      "unavailableDescription": "केवल संगठन के मालिक, एडमिन और बिलिंग प्रबंधक ही ऑडिट रिपोर्ट देख सकते हैं। आपको अनुमति देने के लिए किसी मालिक, एडमिन या बिलिंग प्रबंधक से कहें।",
       "eventActions": {
         "findingAnalysisCompleted": "विश्लेषण पूर्ण हुआ",
         "findingAnalysisFailed": "विश्लेषण विफल रहा",
@@ -1263,7 +1266,7 @@
     },
     "dismiss": {
       "alreadyResolvedDescription": "यह समस्या पहले ही हल हो चुकी है और अब इसे खारिज नहीं किया जा सकता।",
-      "cannotDismissDescription": "केवल संगठन के मालिक और बिलिंग मैनेजर ही समस्याएँ खारिज कर सकते हैं।",
+      "cannotDismissDescription": "केवल संगठन के मालिक, एडमिन और बिलिंग प्रबंधक ही समस्याएँ खारिज कर सकते हैं।",
       "cannotDismissTitle": "यह समस्या खारिज नहीं की जा सकती",
       "commentAccessibility": "खारिज करने के बारे में टिप्पणी",
       "commentLabel": "टिप्पणी (वैकल्पिक)",
@@ -1395,7 +1398,7 @@
       "automationCount": "3 में से {{displayCount}} चालू",
       "couldNotLoadPermissions": "अनुमतियाँ लोड नहीं हो सकीं।",
       "couldNotLoadSettings": "सुरक्षा एजेंट की सेटिंग लोड नहीं हो सकीं।",
-      "disabledNoManage": "सुरक्षा एजेंट बंद है। केवल संगठन के मालिक और बिलिंग मैनेजर ही इसे चालू कर सकते हैं।",
+      "disabledNoManage": "सुरक्षा एजेंट बंद है। केवल संगठन के मालिक, एडमिन और बिलिंग प्रबंधक ही इसे चालू कर सकते हैं।",
       "disabledNoRepo": "सुरक्षा एजेंट चालू करने से पहले कम से कम एक रिपॉज़िटरी चुनें।",
       "disabledPrompt": "Dependabot अलर्ट सिंक करने, रिपॉज़िटरी चुनने और स्वचालन की सेटिंग तय करने के लिए सुरक्षा एजेंट चालू करें।",
       "notificationsCount": "2 में से {{displayCount}} चालू",
@@ -1428,7 +1431,7 @@
       "lowDescription": "सुरक्षा पर बहुत कम असर।",
       "medium": "मध्यम",
       "mediumDescription": "सीमित असर या कुछ खास शर्तों में ही जोखिम।",
-      "permissionNote": "केवल संगठन के मालिक और बिलिंग मैनेजर ही ये सेटिंग बदल सकते हैं।",
+      "permissionNote": "केवल संगठन के मालिक, एडमिन और बिलिंग प्रबंधक ही ये सेटिंग बदल सकते हैं।",
       "remediationDeadlineA11y": "{{label}} स्तर की समस्याओं के सुधार की समय सीमा, दिनों में",
       "title": "SLA नीति"
     },
@@ -1711,6 +1714,9 @@
       "noRepositoriesVisibleGitlab": "कोई रिपॉज़िटरी दिखाई नहीं दे रही है। GitLab के लिए रिपॉज़िटरी का ऐक्सेस जाँचें, फिर रीफ़्रेश करें।",
       "noRepositoriesVisibleBitbucket": "कोई रिपॉज़िटरी दिखाई नहीं दे रही है। Bitbucket के लिए रिपॉज़िटरी का ऐक्सेस जाँचें, फिर रीफ़्रेश करें।",
       "bitbucketOrganizationsOnly": "Bitbucket केवल संगठनों के लिए उपलब्ध है।",
+      "githubNeedsAttention": "GitHub को फिर से कनेक्ट करना होगा",
+      "githubNeedsAttentionDescription": "Kilo GitHub ऐप को फिर से कनेक्ट करें, फिर उसकी रिपॉज़िटरी लोड करने के लिए रीफ़्रेश करें।",
+      "partialRepositories": "कुछ GitHub रिपॉज़िटरी लोड नहीं हो सकीं।",
       "branchPickerTitle": "ब्रांच चुनें",
       "branchDefault": "डिफ़ॉल्ट",
       "branchAccessibility": "ब्रांच: {{label}}",
@@ -1718,6 +1724,7 @@
       "branchLoadError": "ब्रांच लोड नहीं हो सकीं",
       "branchUnavailable": "इस रिपॉज़िटरी के लिए ब्रांच उपलब्ध नहीं हैं। प्रदाता के साथ अपनी पहुँच जाँचें, फिर कोई दूसरी रिपॉज़िटरी चुनें।",
       "branchEmpty": "कोई ब्रांच उपलब्ध नहीं",
+      "branchListIncomplete": "केवल कुछ ब्रांच दिखाई जा रही हैं। इस रिपॉज़िटरी में इस सूची में शामिल हो सकने से अधिक ब्रांच हैं।",
       "branchPlaceholder": "एक ब्रांच चुनें",
       "runOnWithTarget": "इस पर चलाएँ: {{target}}",
       "environment": "एनवायरनमेंट",
@@ -1729,6 +1736,8 @@
       "commitAndPush": "कमिट और पुश करें",
       "startSession": "सत्र शुरू करें",
       "selectRepositoryToStart": "शुरू करने के लिए रिपॉज़िटरी चुनें।",
+      "enterPromptToStart": "शुरू करने के लिए एक प्रॉम्प्ट जोड़ें।",
+      "enterPromptOrFileToStart": "शुरू करने के लिए प्रॉम्प्ट या फ़ाइल जोड़ें।",
       "connectProviderToStart": "शुरू करने के लिए प्रदाता कनेक्ट करें।",
       "promptPlaceholder": "आप किस पर काम करना चाहेंगे?",
       "couldNotLoadModels": "मॉडल लोड नहीं हो सके।",
@@ -2550,6 +2559,8 @@
     },
     "connectionExpired": "GitHub कनेक्शन की अवधि समाप्त हो गई।",
     "couldNotLoadPullRequest": "पुल रिक्वेस्ट लोड नहीं हो सकी।",
+    "reviewServiceUnavailable": "सेवा अनुपलब्ध है",
+    "reviewServiceUnavailableDescription": "सेवा अस्थायी रूप से अनुपलब्ध है। शीघ्र ही फिर से प्रयास करें।",
     "couldNotOpenGitHubAppSettings": "GitHub ऐप की सेटिंग नहीं खुल सकीं।",
     "description": "विवरण",
     "discussion": {
@@ -2960,6 +2971,7 @@
       "truncationBanner_other": "बदली गई {{total}} फ़ाइलों में से पहली {{limit}} फ़ाइलें दिखाई जा रही हैं — GitHub API की सीमा के कारण।"
     },
     "linkPasteClipboardEmpty": "क्लिपबोर्ड खाली है।",
+    "linkPasteDenied": "पेस्ट करने की अनुमति अस्वीकार कर दी गई। पेस्ट करने की अनुमति दें और फिर से कोशिश करें।",
     "linkPasteNotAPullRequest": "यह पुल रिक्वेस्ट या मर्ज रिक्वेस्ट का लिंक नहीं है",
     "announce": {
       "commentPosted": "टिप्पणी पोस्ट हुई",
@@ -3014,6 +3026,7 @@
 
       "chooseAccount": "एक खाता चुनें",
       "loadErrorTitle": "आपके संगठन लोड नहीं हो सके।",
+      "membershipLostNotice": "आपको इस संगठन का ऐक्सेस अब नहीं है। {{target}} पर स्विच किया गया।",
       "noOrganization": "कोई संगठन नहीं",
 
       "noOrganizationDescription": "यह खाता किसी संगठन का हिस्सा नहीं है। सदस्य आमंत्रण और कम बैलेंस अलर्ट जैसी संगठन सुविधाओं का उपयोग करने के लिए वेब पर एक संगठन बनाएँ या उसमें शामिल हों।",
@@ -3106,7 +3119,7 @@
     "members": {
       "changeRole": "भूमिका बदलें",
       "emptyDescriptionCanInvite": "इस संगठन में साथ काम करने के लिए टीम के साथियों को आमंत्रित करें।",
-      "emptyDescriptionCannotInvite": "टीम के साथियों को आमंत्रित करने के लिए मालिक या बिलिंग प्रबंधक से कहें।",
+      "emptyDescriptionCannotInvite": "टीम के साथियों को आमंत्रित करने के लिए मालिक, एडमिन या बिलिंग प्रबंधक से कहें।",
       "emptyTitle": "अभी कोई सदस्य नहीं",
       "invitedDate": "{{date}} को आमंत्रित",
       "limitPerDay": "{{amount}}/दिन",
@@ -3371,9 +3384,15 @@
       "settingsToolsOn": "चालू — सेटिंग्स टूल मॉडल को भेजे जाते हैं",
       "settingsToolsOff": "बंद — मॉडल को कोई सेटिंग्स टूल नहीं भेजा जाता",
       "serverChecking": "इस सर्वर की जाँच हो रही है…",
-      "serverToolCount": "{{count}} टूल",
+      "serverToolCount_one": "{{count}} टूल",
+      "serverToolCount_other": "{{count}} टूल",
       "serverUnreachable": "इस सर्वर तक नहीं पहुँच सका",
-      "serverOff": "यह सर्वर बंद है"
+      "serverOff": "यह सर्वर बंद है",
+      "app": {
+        "label": "टूल इंटरफ़ेस",
+        "failed": "इस टूल का इंटरफ़ेस लोड नहीं हो सका.",
+        "empty": "इस टूल के इंटरफ़ेस में दिखाने के लिए कुछ नहीं है."
+      }
     },
     "mcpOAuth": {
       "authMethod": "प्रमाणीकरण",
@@ -3518,6 +3537,8 @@
       "quantizationsHelp": "छोटी फ़ाइलें कम मेमोरी और स्टोरेज लेती हैं। बड़ी फ़ाइलें आमतौर पर बेहतर जवाब देती हैं।",
       "quantDetail": "{{size}} डाउनलोड · लगभग {{memory}} मेमोरी",
       "downloadQuant": "{{quant}} डाउनलोड करें",
+      "downloadModelA11y": "{{name}} डाउनलोड करें",
+      "detailsA11y": "विवरण: {{name}}",
       "loadingModel": "मॉडल का विवरण लोड हो रहा है",
       "couldNotLoadModel": "यह मॉडल लोड नहीं हो सका",
       "noFiles": "ऐसी कोई फ़ाइल नहीं जिसे यह ऐप चला सके",
@@ -3569,6 +3590,7 @@
   "appActions": {
     "start": {
       "promptRequired": "एजेंट शुरू करने के लिए प्रॉम्प्ट चाहिए। एक प्रॉम्प्ट जोड़ें और इसे फिर से चलाएँ।",
+      "repositoryRequired": "एजेंट शुरू करने के लिए रिपॉज़िटरी चाहिए। Kilo खोलें और एक चुनें, फिर इसे दोबारा चलाएँ।",
       "repositoryUnknown": "Kilo, {{repository}} को GitHub या GitLab रिपॉज़िटरी के रूप में नहीं पहचानता। Kilo में कोई दूसरी रिपॉज़िटरी चुनें।",
       "repositoryUnsupported": "{{repository}} एक Bitbucket रिपॉज़िटरी है — एजेंट शुरू करें अभी इसका उपयोग नहीं कर सकता। Kilo में कोई दूसरी रिपॉज़िटरी चुनें।"
     }
@@ -3606,10 +3628,13 @@
     "emptyDescription": "सभी सत्रों में पर्यावरण चर, सेटअप कमांड और कौशल का पुन: उपयोग करने के लिए एक प्रोफ़ाइल बनाएं।",
     "loadFailed": "प्रोफ़ाइल लोड नहीं हो सकीं",
     "counts": {
-      "vars": "{{count}} चर",
+      "vars_one": "{{count}} चर",
+      "vars_other": "{{count}} चर",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} कौशल",
-      "commands": "{{count}} आदेश",
+      "skills_one": "{{count}} कौशल",
+      "skills_other": "{{count}} कौशल",
+      "commands_one": "{{count}} आदेश",
+      "commands_other": "{{count}} आदेश",
       "varsShort": "{{count}}च",
       "skillsShort": "{{count}}क",
       "commandsShort": "{{count}}आ"
@@ -3668,6 +3693,8 @@
     "skillNameInvalid": "कौशल का नाम किसी अक्षर या अंक से शुरू होना चाहिए और केवल छोटे अक्षरों, अंकों और डैश का उपयोग करना चाहिए",
     "skillContentRequired": "कौशल सामग्री की आवश्यकता है",
     "skillSaveFailed": "कौशल सहेजा नहीं जा सका",
+    "skillSourceCustom": "कस्टम",
+    "skillSourceMarketplace": "मार्केटप्लेस",
     "skillsHint": "एक SKILL.md चिपकाएँ और उसका नाम भरें; अपने फ़ोन से बिना खींचें और छोड़े एक कौशल जोड़ें।",
     "skillEditTitle": "कौशल संपादित करें",
     "mcp": {
@@ -3683,7 +3710,7 @@
       "environment": "पर्यावरण (JSON)",
       "headers": "हेडर (JSON)",
       "timeout": "समयबाह्य",
-      "secretCount": "गुप्त गिनती",
+      "secretCount": "गुप्त गिनती: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3726,6 +3753,9 @@
       "visibilityPrimary": "प्राथमिक - पिकर में दिखाया गया है",
       "visibilitySubagent": "सबएजेंट - केवल दूसरों से कॉल करने योग्य",
       "visibilityAll": "सभी - दोनों",
+      "modePrimary": "केवल प्राथमिक",
+      "modeSubagent": "केवल सबएजेंट",
+      "modeAll": "सभी",
       "saveFailed": "एजेंट को बचाया नहीं जा सका",
       "deleteFailed": "एजेंट को हटाया नहीं जा सका",
       "nameRequired": "एक एजेंट का नाम दर्ज करें",
@@ -3786,6 +3816,8 @@
     "empty": "क्रेडिट पैक अभी उपलब्ध नहीं हैं।",
     "noMatchingProducts": "App Store ने कोई मेल खाता क्रेडिट पैक नहीं लौटाया।",
     "noMatchingProductsPlay": "Google Play ने कोई मेल खाता क्रेडिट पैक नहीं लौटाया।",
+    "storeTimedOut": "App Store ने समय पर जवाब नहीं दिया। फिर से कोशिश करें।",
+    "storeTimedOutPlay": "Google Play ने समय पर जवाब नहीं दिया। फिर से प्रयास करें।",
     "purchaseOwnedByAnotherAccount": "इस Apple Account का क्रेडिट किसी दूसरे Kilo खाते से जुड़ा है। इसका उपयोग करने के लिए उस Kilo खाते में साइन इन करें।",
     "purchaseOwnedByAnotherAccountPlay": "इस Google Play खाते का क्रेडिट किसी दूसरे Kilo खाते से संबंधित है। इसका उपयोग करने के लिए उस Kilo खाते में साइन इन करें।"
   },
@@ -3935,6 +3967,33 @@
     "enable": "सशुल्क सारांश चालू करें",
     "contextSettings": "AI सेटिंग्स · {{context}}",
     "allContexts": "व्यक्तिगत और संगठन ब्रीफ़िंग अलग-अलग रहती हैं।",
+    "create": "ब्रीफ़िंग बनाएँ",
+    "oneOff": "केवल एक बार",
+    "createdAt": "बनाने का समय: {{time}}",
+    "chooseContext": "एक संदर्भ चुनें",
+    "period": "ब्रीफ़िंग की अवधि",
+    "last24Hours": "पिछले 24 घंटे",
+    "last7Days": "पिछले 7 दिन",
+    "customPeriod": "कस्टम अवधि",
+    "periodStart": "अवधि की शुरुआत",
+    "periodEnd": "अवधि का अंत",
+    "periodHint": "अधिकतम 31 दिन चुनें। पुराने डेटा का कवरेज अधूरा हो सकता है।",
+    "periodSessions": "अवधि में सक्रिय",
+    "periodSpend": "अवधि का खर्च",
+    "invalidPeriod": "समाप्ति से पहले का आरंभ समय चुनें।",
+    "futurePeriod": "अवधि का अंत भविष्य में नहीं हो सकता।",
+    "periodTooLong": "31 दिन या उससे कम की अवधि चुनें।",
+    "invalidLocalTime": "यह स्थानीय समय ब्रीफ़िंग के समय क्षेत्र में मौजूद नहीं है। कोई दूसरा समय चुनें।",
+    "reviewBriefing": "ब्रीफ़िंग की समीक्षा करें",
+    "reviewAgain": "नई समीक्षा तैयार करें",
+    "payer": "शुल्क {{context}} से लिया जाएगा",
+    "emptyPeriod": "इस अवधि में कोई गतिविधि नहीं मिली। न AI सारांश बनेगा, न शुल्क लगेगा।",
+    "emptyHistory": "कोई सहेजी गई ब्रीफ़िंग नहीं",
+    "historicalStateHint": "सत्र की स्थिति चुनी गई अवधि के अंत की स्थिति दर्शाती है, न कि वर्तमान लाइव स्थिति।",
+    "oneOffHint": "AI को आपके ऐप की भाषा में चुना गया साक्ष्य मिलता है, जिसमें से संवेदनशील जानकारी हटा दी गई है। केवल एक बार बनने वाली यह रिपोर्ट आपकी सुबह की समय-सारणी या AI प्राथमिकताएँ नहीं बदलती।",
+    "createOffline": "ब्रीफ़िंग की समीक्षा करने या उसे बनाने के लिए इंटरनेट से जुड़ें। सशुल्क अनुरोध ऑफ़लाइन होने पर कभी कतार में नहीं रखे जाते।",
+    "estimateInputTooLarge": "इस अवधि में चुने गए मॉडल के लिए बहुत अधिक साक्ष्य है।",
+    "estimatePermissionUnavailable": "आपको इस संदर्भ की शेष राशि का उपयोग करने की अनुमति नहीं है।",
     "estimatePricingUnavailable": "इस मॉडल की कीमत उपलब्ध नहीं है।",
     "estimateBalanceUnavailable": "सशुल्क सारांश के लिए पर्याप्त बैलेंस नहीं है।",
     "estimateModelNotAllowed": "यह मॉडल यहाँ अनुमत नहीं है।",

@@ -14,6 +14,14 @@ type PreferenceRowProps = Readonly<{
   disabled: boolean;
   busy?: boolean;
   onValueChange: (next: boolean) => void;
+  /**
+   * The value a press should flip. Defaults to the rendered `value`, which is
+   * the last render, so two presses inside one frame both flip the same state
+   * and the second one repeats the first. A store that lags its own writes
+   * passes its newest requested value here, and every press then flips the
+   * state the person last asked for.
+   */
+  resolveValue?: () => boolean;
 }>;
 
 /** Switch row shaped like the Notifications category row. */
@@ -25,16 +33,21 @@ export function PreferenceRow({
   disabled,
   busy = false,
   onValueChange,
+  resolveValue,
 }: PreferenceRowProps) {
   const colors = useThemeColors();
+  // Both ways of moving the switch flip the same value: a tap on the row and a
+  // tap on the thumb can arrive in either order, and a burst must not build one
+  // flip from the rendered value and the next from the native thumb state.
+  const flip = () => {
+    onValueChange(!(resolveValue?.() ?? value));
+  };
   return (
     <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
       <Pressable
         className="min-h-11 min-w-0 flex-1 flex-row items-center gap-3 active:opacity-70"
         disabled={disabled}
-        onPress={() => {
-          onValueChange(!value);
-        }}
+        onPress={flip}
         accessible={false}
         importantForAccessibility="no-hide-descendants"
       >
@@ -69,7 +82,7 @@ export function PreferenceRow({
         accessibilityLabel={title}
         accessibilityHint={subtitle}
         accessibilityState={{ disabled, busy, checked: value }}
-        onValueChange={onValueChange}
+        onValueChange={flip}
       />
     </View>
   );

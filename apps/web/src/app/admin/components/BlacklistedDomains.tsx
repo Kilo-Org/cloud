@@ -40,14 +40,35 @@ function EditTab() {
 
   const mutation = useMutation(
     trpc.admin.blacklistDomains.set.mutationOptions({
-      onSuccess: () => {
+      onSuccess: result => {
         void queryClient.invalidateQueries({
           queryKey: trpc.admin.blacklistDomains.get.queryKey(),
         });
         void queryClient.invalidateQueries({
           queryKey: trpc.admin.blacklistDomains.stats.queryKey(),
         });
-        toast.success('Blacklisted domains updated');
+        void queryClient.invalidateQueries({
+          queryKey: ['block-blacklisted-domains-counts'],
+        });
+
+        const { blocked, remaining, failed } = result.backfill;
+        const accountLabel = `${blocked.toLocaleString()} existing ${
+          blocked === 1 ? 'account' : 'accounts'
+        }`;
+
+        if (failed) {
+          toast.warning(
+            'Saved, but blocking existing accounts failed. Run the backfill to finish.'
+          );
+        } else if (remaining) {
+          toast.warning(
+            `Saved. Blocked ${accountLabel}; more remain. Run the backfill to finish the rest.`
+          );
+        } else if (blocked > 0) {
+          toast.success(`Saved. Blocked ${accountLabel}.`);
+        } else {
+          toast.success('Blacklisted domains updated');
+        }
       },
       onError: error => {
         toast.error(error.message || 'Failed to update');
@@ -82,7 +103,8 @@ function EditTab() {
             <CardDescription>
               Email domains that are blocked from registration and access. Enter one domain per line
               (or paste a pipe-separated list). Subdomains are automatically blocked (e.g. blocking
-              example.com also blocks subdomain.example.com).
+              example.com also blocks subdomain.example.com). Adding a domain also blocks existing
+              non-admin accounts on it that are not already blocked.
             </CardDescription>
           </div>
           <Badge variant="secondary" className="px-3 py-1">
@@ -161,34 +183,42 @@ function StatsTab() {
             No blacklisted domains configured
           </div>
         ) : (
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Domain</TableHead>
-                  <TableHead className="text-right">Blocked Users</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {stats.domains.map(domain => (
-                  <TableRow key={domain.domain}>
-                    <TableCell className="font-medium">
-                      <code className="bg-muted rounded px-2 py-1 text-sm">{domain.domain}</code>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {domain.blockedCount > 0 ? (
-                        <Badge variant={domain.blockedCount > 100 ? 'destructive' : 'secondary'}>
-                          {domain.blockedCount.toLocaleString()}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground">0</span>
-                      )}
-                    </TableCell>
+          <>
+            {stats.domains.length < stats.totalDomains && (
+              <p className="text-muted-foreground mb-2 text-xs">
+                Showing the {stats.domains.length} domains with the most matching users, of{' '}
+                {stats.totalDomains.toLocaleString()} blacklisted domains.
+              </p>
+            )}
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Domain</TableHead>
+                    <TableHead className="text-right">Blocked Users</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {stats.domains.map(domain => (
+                    <TableRow key={domain.domain}>
+                      <TableCell className="font-medium">
+                        <code className="bg-muted rounded px-2 py-1 text-sm">{domain.domain}</code>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {domain.blockedCount > 0 ? (
+                          <Badge variant={domain.blockedCount > 100 ? 'destructive' : 'secondary'}>
+                            {domain.blockedCount.toLocaleString()}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">0</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         )}
       </CardContent>
     </Card>

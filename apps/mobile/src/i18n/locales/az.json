@@ -224,7 +224,7 @@
     "hideBalance": "Balansı gizlət",
     "showBalance": "Balansı göstər",
     "balanceHidden": "Balans gizlidir",
-    "bonusCreditsExpiring": "{{amount}} məbləğində bonus kreditin müddəti {{date}} tarixində bitir.",
+    "bonusCreditsExpiring": "{{amount}} məbləğində kreditin müddəti {{date}} tarixində bitir.",
     "signOutTitle": "Hesabdan çıxılsın?",
     "signOutMessage": "İş sahənə daxil olmaq üçün hesabına yenidən giriş etməlisən.",
     "deleteAccountTitle": "Hesab silinsin?",
@@ -591,6 +591,8 @@
     "installKiloGitHubApp": "Kilo GitHub tətbiqini quraşdır",
     "checkConnection": "Bağlantını yoxla",
     "couldNotLoadPullRequest": "Birləşdirmə sorğusunu yükləmək mümkün olmadı.",
+    "reviewServiceUnavailable": "Xidmət əlçatmazdır",
+    "reviewServiceUnavailableDescription": "Xidmət müvəqqəti əlçatmazdır. Qısa müddətdən sonra yenidən cəhd edin.",
     "description": "Təsvir",
     "noDescriptionProvided": "Təsvir əlavə edilməyib.",
     "review": "Yoxlama",
@@ -762,6 +764,7 @@
       "truncationBanner_other": "Dəyişdirilmiş {{total}} fayldan ilk {{limit}} fayl göstərilir — bu, GitHub API məhdudiyyətidir."
     },
     "linkPasteClipboardEmpty": "Mübadilə buferi boşdur.",
+    "linkPasteDenied": "Yapışdırma girişi rədd edildi. Yapışdırmaya icazə verin və yenidən cəhd edin.",
     "linkPasteNotAPullRequest": "Bu, birləşdirmə sorğusu və ya merge sorğusu keçidi deyil",
     "announce": {
       "commentPosted": "Şərh göndərildi",
@@ -1458,7 +1461,7 @@
       "off": "Kod yoxlaması yaddaşı deaktivdir.",
       "on": "Kod yoxlaması yaddaşı aktivdir.",
       "offDescription": "Kilo-nun layihəyə cavabdeh şəxslərin cavablarından öyrənməsi və REVIEW.md üçün təlimatlar təklif etməsi üçün yaddaşı aktivləşdir.",
-      "readOnlyDescription": "Kod yoxlaması yaddaşını yalnız təşkilat sahibləri və ödəniş menecerləri dəyişə bilər.",
+      "readOnlyDescription": "Kod yoxlaması yaddaşını yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri dəyişə bilər.",
       "enable": "Kod yoxlaması yaddaşını aktivləşdir",
       "loadingProposals": "Təkliflər yüklənir",
       "couldNotLoadProposals": "Təklifləri yükləmək mümkün olmadı.",
@@ -1478,7 +1481,10 @@
       "starting": "Kod yoxlaması başlayır…",
       "start": "Yoxlamaya başla"
     },
-    "notConnectedReadOnly": "{{platform}} qoşulmayıb. Onu yalnız təşkilat sahibləri və ödəniş menecerləri qoşa bilər.",
+    "notConnectedReadOnly": "{{platform}} qoşulmayıb. Onu yalnız təşkilat sahibləri və inzibatçılar qoşa bilər.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} qoşulmayıb. Onu qoşmaq üçün təşkilat sahibindən, inzibatçıdan və ya ödəniş menecerindən xahiş edin."
+    },
     "webhookSetup": "Vebhuk quraşdırması tamamlanmayıb.",
     "webhookSetupDescription": "Bəzi repozitoriyalarda avtomatik kod yoxlaması aparılmaya bilər.",
     "autoReviews": "Avtomatik kod yoxlamaları",
@@ -1486,7 +1492,7 @@
     "followReviewMd": "REVIEW.md təlimatlarına əməl et",
     "followReviewMdSubtitle": "Hər repozitoriyanın REVIEW.md faylındakı təlimatlara əməl et",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket qoşulmayıb. Onu yalnız təşkilat sahibləri və ödəniş menecerləri qoşa bilər.",
+      "notConnectedReadOnly": "Bitbucket qoşulmayıb. Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər.",
       "setupIncomplete": "Quraşdırma tamamlanmayıb. Tənzimləməni kilo.ai saytında tamamla.",
       "setup": "Bitbucket quraşdırması"
     },
@@ -1746,7 +1752,7 @@
       "couldNotLoad": "Bu problem barədə məlumatı yükləmək mümkün olmadı.",
       "couldNotCheckPermissions": "Rədd etmə icazələrini yoxlamaq mümkün olmadı.",
       "cannotDismissTitle": "Bu tapıntını rədd etmək olmur",
-      "cannotDismissDescription": "Tapıntıları yalnız təşkilat sahibləri və ödəniş menecerləri rədd edə bilər.",
+      "cannotDismissDescription": "Tapıntıları yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri rədd edə bilər.",
       "alreadyResolvedDescription": "Bu tapıntı artıq həll edilib və onu rədd etmək mümkün deyil."
     },
     "findingDetails": {
@@ -1788,7 +1794,7 @@
       "automationAllOff": "Hamısı deaktivdir",
       "automationCount": "3 seçimdən {{displayCount}} seçim aktivdir",
       "notificationsCount": "2 seçimdən {{displayCount}} seçim aktivdir",
-      "disabledNoManage": "Təhlükəsizlik agenti deaktivdir. Onu yalnız təşkilat sahibləri və ödəniş menecerləri aktivləşdirə bilər.",
+      "disabledNoManage": "Təhlükəsizlik agenti deaktivdir. Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri aktivləşdirə bilər.",
       "disabledNoRepo": "Təhlükəsizlik agentini aktivləşdirməzdən əvvəl ən azı bir repozitoriya seç.",
       "disabledPrompt": "Dependabot bildirişlərini sinxronlaşdırmaq, repozitoriyaları seçmək və avtomatlaşdırmanı tənzimləmək üçün təhlükəsizlik agentini aktivləşdir."
     },
@@ -1837,7 +1843,7 @@
       "invalidDayCount": "gün sayını 1–365 aralığında tam ədədlə göstər.",
       "remediationDeadlineA11y": "{{label}} üçün düzəliş müddəti, günlə",
       "enterWholeNumber": "1-Dən 365-ə qədər tam ədəd daxil et",
-      "permissionNote": "Bu parametrləri yalnız təşkilat sahibləri və ödəniş menecerləri dəyişə bilər.",
+      "permissionNote": "Bu parametrləri yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri dəyişə bilər.",
       "enableTracking": "SLA izləməsini aktivləşdir",
       "enableTrackingSubtitle": "Tapıntıların ciddilik dərəcəsinə görə düzəliş müddətlərini təyin et.",
       "deadlinesHeading": "Düzəliş müddətləri (gün)"
@@ -1893,7 +1899,7 @@
       "summary": "Hesabatın xülasəsi",
       "title": "Audit hesabatı",
       "unavailable": "Audit hesabatı mövcud deyil",
-      "unavailableDescription": "Audit hesabatlarına yalnız təşkilat sahibləri və ödəniş menecerləri baxa bilər. Giriş icazəsi üçün təşkilat sahibinə və ya ödəniş menecerinə müraciət et.",
+      "unavailableDescription": "Audit hesabatlarına yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri baxa bilər. Giriş icazəsi üçün sahibdən, inzibatçıdan və ya ödəniş menecerindən xahiş edin.",
       "queryFailed": "Hesabat sorğusu tamamlanmadı. Yenidən cəhd et.",
       "eventActions": {
         "findingAnalysisCompleted": "Analiz tamamlandı",
@@ -2225,6 +2231,9 @@
       "noRepositoriesVisibleGitlab": "Heç bir repozitoriya görünmür. GitLab repozitoriyalarına giriş icazəsini yoxla, sonra siyahını yenilə.",
       "noRepositoriesVisibleBitbucket": "Heç bir repozitoriya görünmür. Bitbucket repozitoriyalarına giriş icazəsini yoxla, sonra siyahını yenilə.",
       "bitbucketOrganizationsOnly": "Bitbucket yalnız təşkilatlar üçün əlçatandır.",
+      "githubNeedsAttention": "GitHub-un yenidən qoşulması lazımdır",
+      "githubNeedsAttentionDescription": "Kilo GitHub tətbiqini yenidən qoş, sonra repozitoriyalarını yükləmək üçün siyahını yenilə.",
+      "partialRepositories": "Bəzi GitHub repozitoriyaları yüklənmədi.",
       "branchPickerTitle": "Budaq seç",
       "branchDefault": "Defolt",
       "branchAccessibility": "Budaq: {{label}}",
@@ -2232,6 +2241,7 @@
       "branchLoadError": "Budaqları yükləmək mümkün olmadı",
       "branchUnavailable": "Bu repozitoriya üçün budaq əlçatan deyil. Provayderdəki icazələrini yoxla, sonra başqa repozitoriya seç.",
       "branchEmpty": "Əlçatan budaq yoxdur",
+      "branchListIncomplete": "Yalnız bəzi budaqlar göstərilir. Bu repozitoriyada bu siyahının daxil edə bildiyindən daha çox budaq var.",
       "branchPlaceholder": "Budaq seç",
       "runOnWithTarget": "İcra mühiti: {{target}}",
       "environment": "Mühit",
@@ -2243,6 +2253,8 @@
       "commitAndPush": "Təsdiqlə və göndər",
       "startSession": "Sessiyanı başlat",
       "selectRepositoryToStart": "Başlamaq üçün repozitoriya seç.",
+      "enterPromptToStart": "Başlamaq üçün prompt əlavə et.",
+      "enterPromptOrFileToStart": "Başlamaq üçün prompt və ya fayl əlavə et.",
       "connectProviderToStart": "Başlamaq üçün provayder qoş.",
       "promptPlaceholder": "Nə üzərində işləmək istəyirsən?",
       "couldNotLoadModels": "Modelləri yükləmək mümkün olmadı.",
@@ -3022,6 +3034,7 @@
 
       "chooseAccount": "Hesab seç",
       "loadErrorTitle": "Təşkilatlarını yükləmək mümkün olmadı.",
+      "membershipLostNotice": "Bu təşkilata artıq giriş icazən yoxdur. Keçid edildi: {{target}}.",
       "noOrganization": "Təşkilat yoxdur",
 
       "noOrganizationDescription": "Bu hesab heç bir təşkilatın üzvü deyil. Üzv dəvətləri və aşağı balans xəbərdarlıqları kimi təşkilat funksiyalarından istifadə etmək üçün saytda təşkilat yarat və ya ona qoşul.",
@@ -3107,7 +3120,7 @@
     "members": {
       "changeRole": "Rolu dəyiş",
       "emptyDescriptionCanInvite": "Bu təşkilatda birlikdə işləməyə başlamaq üçün komanda yoldaşlarını dəvət et.",
-      "emptyDescriptionCannotInvite": "Təşkilat sahibindən və ya ödəniş menecerindən komanda yoldaşlarını dəvət etməsini istə.",
+      "emptyDescriptionCannotInvite": "Komanda yoldaşlarını dəvət etmək üçün sahibdən, inzibatçıdan və ya ödəniş menecerindən xahiş edin.",
       "emptyTitle": "Hələ üzv yoxdur",
       "invitedDate": "{{date}} tarixində dəvət edilib",
       "limitPerDay": "gündə {{amount}}",
@@ -3371,9 +3384,15 @@
       "settingsToolsOn": "Aktiv — parametr alətləri modelə göndərilir",
       "settingsToolsOff": "Deaktiv — modelə heç bir parametr aləti göndərilmir",
       "serverChecking": "Bu server yoxlanılır…",
-      "serverToolCount": "{{count}} alət",
+      "serverToolCount_one": "{{count}} alət",
+      "serverToolCount_other": "{{count}} alət",
       "serverUnreachable": "Bu serverə çatmaq mümkün olmadı",
-      "serverOff": "Bu server söndürülüb"
+      "serverOff": "Bu server söndürülüb",
+      "app": {
+        "label": "Alətin interfeysi",
+        "failed": "Bu alətin interfeysi yüklənə bilmədi.",
+        "empty": "Bu alətin interfeysində göstəriləcək heç nə yoxdur."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autentifikasiya",
@@ -3518,6 +3537,8 @@
       "quantizationsHelp": "Kiçik fayllar daha az yaddaş və yer tutur. Böyük fayllar adətən daha yaxşı cavablar verir.",
       "quantDetail": "{{size}} yükləmə · təxminən {{memory}} yaddaş",
       "downloadQuant": "{{quant}} yüklə",
+      "downloadModelA11y": "{{name}} yüklə",
+      "detailsA11y": "Detallar: {{name}}",
       "loadingModel": "Model məlumatları yüklənir",
       "couldNotLoadModel": "Bu modeli yükləmək mümkün olmadı",
       "noFiles": "Bu tətbiqin işlədə biləcəyi fayl yoxdur",
@@ -3569,6 +3590,7 @@
   "appActions": {
     "start": {
       "promptRequired": "Agenti başlatmaq üçün sorğu lazımdır. Sorğu əlavə et və yenidən işə sal.",
+      "repositoryRequired": "Agenti başlatmaq üçün repozitoriya lazımdır. Kilo-nu aç və bir repozitoriya seç, sonra yenidən işə sal.",
       "repositoryUnknown": "Kilo {{repository}} adını GitHub və ya GitLab repozitoriyası kimi tanımır. Kilo-da başqa repozitoriya seç.",
       "repositoryUnsupported": "{{repository}} Bitbucket repozitoriyasıdır — Agenti başlat hələ ondan istifadə edə bilmir. Kilo-da başqa repozitoriya seç."
     }
@@ -3606,10 +3628,13 @@
     "emptyDescription": "Mühit dəyişənlərindən, quraşdırma əmrlərindən və sessiyalar arasında bacarıqlardan təkrar istifadə etmək üçün profil yaradın.",
     "loadFailed": "Profilləri yükləmək mümkün olmadı",
     "counts": {
-      "vars": "{{count}} dəyişən",
+      "vars_one": "{{count}} dəyişən",
+      "vars_other": "{{count}} dəyişən",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} bacarıq",
-      "commands": "{{count}} əmr",
+      "skills_one": "{{count}} bacarıq",
+      "skills_other": "{{count}} bacarıq",
+      "commands_one": "{{count}} əmr",
+      "commands_other": "{{count}} əmr",
       "varsShort": "{{count}}d",
       "skillsShort": "{{count}}b",
       "commandsShort": "{{count}}ə"
@@ -3668,6 +3693,8 @@
     "skillNameInvalid": "Bacarıq adı hərf və ya rəqəmlə başlamalı və yalnız kiçik hərflər, rəqəmlər və tirelərdən istifadə etməlidir",
     "skillContentRequired": "Bacarıq məzmunu tələb olunur",
     "skillSaveFailed": "Bacarıq saxlamaq mümkün olmadı",
+    "skillSourceCustom": "Fərdi",
+    "skillSourceMarketplace": "Marketpleys",
     "skillsHint": "SKILL.md yapışdırın və onun adı doldurulur; sürükləyib buraxmadan telefonunuzdan bacarıq əlavə edin.",
     "skillEditTitle": "Bacarıqları redaktə edin",
     "mcp": {
@@ -3683,7 +3710,7 @@
       "environment": "Ətraf mühit (JSON)",
       "headers": "Başlıqlar (JSON)",
       "timeout": "Taymout",
-      "secretCount": "Gizli hesab",
+      "secretCount": "Gizli hesab: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
@@ -3726,6 +3753,9 @@
       "visibilityPrimary": "Əsas — seçicidə göstərilir",
       "visibilitySubagent": "Subagent — yalnız başqalarından zəng etmək olar",
       "visibilityAll": "Hamısı - hər ikisi",
+      "modePrimary": "Yalnız əsas",
+      "modeSubagent": "Yalnız subagent",
+      "modeAll": "Hamısı",
       "saveFailed": "Agenti saxlamaq mümkün olmadı",
       "deleteFailed": "Agenti silmək mümkün olmadı",
       "nameRequired": "Agent adını daxil edin",
@@ -3786,6 +3816,8 @@
     "empty": "Kredit paketləri hazırda əlçatan deyil.",
     "noMatchingProducts": "App Store tərəfindən uyğun kredit paketi qaytarılmadı.",
     "noMatchingProductsPlay": "Google Play tərəfindən uyğun kredit paketi qaytarılmadı.",
+    "storeTimedOut": "App Store vaxtında cavab vermədi. Yenidən cəhd et.",
+    "storeTimedOutPlay": "Google Play vaxtında cavab vermədi. Yenidən cəhd et.",
     "purchaseOwnedByAnotherAccount": "Bu Apple Account hesabındakı kreditlər başqa Kilo hesabına aiddir. Onlardan istifadə etmək üçün həmin Kilo hesabına daxil ol.",
     "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hesabındakı kreditlər başqa Kilo hesabına aiddir. Onlardan istifadə etmək üçün həmin Kilo hesabına daxil olun."
   },
@@ -3935,6 +3967,33 @@
     "enable": "Ödənişli xülasələri aktiv et",
     "contextSettings": "AI ayarları · {{context}}",
     "allContexts": "Şəxsi və təşkilat brifinqləri ayrı saxlanılır.",
+    "create": "Brifinq yarat",
+    "oneOff": "Birdəfəlik",
+    "createdAt": "Yaradılıb: {{time}}",
+    "chooseContext": "Bir kontekst seçin",
+    "period": "Brifinq dövrü",
+    "last24Hours": "Son 24 saat",
+    "last7Days": "Son 7 gün",
+    "customPeriod": "Fərdi dövr",
+    "periodStart": "Dövrün başlanğıcı",
+    "periodEnd": "Dövrün sonu",
+    "periodHint": "Ən çox 31 gün seçin. Keçmişə aid məlumatlar natamam ola bilər.",
+    "periodSessions": "Dövr ərzində aktiv olanlar",
+    "periodSpend": "Dövr üzrə xərclər",
+    "invalidPeriod": "Bitmə vaxtından əvvəl olan başlanğıc vaxtı seçin.",
+    "futurePeriod": "Dövr gələcəkdə bitə bilməz.",
+    "periodTooLong": "31 gün və ya daha qısa dövr seçin.",
+    "invalidLocalTime": "Bu yerli vaxt brifinqin saat qurşağında mövcud deyil. Başqa vaxt seçin.",
+    "reviewBriefing": "Brifinqi nəzərdən keçir",
+    "reviewAgain": "Yeni icmal hazırla",
+    "payer": "Ödəniş {{context}} balansından tutulur",
+    "emptyPeriod": "Bu dövrdə fəaliyyət tapılmadı. AI xülasəsi yaradılmır və ödəniş tutulmur.",
+    "emptyHistory": "Saxlanılmış brifinq yoxdur",
+    "historicalStateHint": "Sessiyanın vəziyyəti cari canlı vəziyyəti deyil, seçilmiş dövrün sonundakı vəziyyəti əks etdirir.",
+    "oneOffHint": "AI tətbiqinizin dilində seçilmiş və həssas məlumatları silinmiş materialları alır. Bu birdəfəlik hesabat səhər cədvəlinizi və ya AI seçimlərinizi dəyişmir.",
+    "createOffline": "Brifinqi nəzərdən keçirmək və ya yaratmaq üçün internetə qoşulun. Ödənişli sorğular internet bağlantısı olmadıqda heç vaxt növbəyə əlavə edilmir.",
+    "estimateInputTooLarge": "Bu dövrdə seçilmiş model üçün həddindən artıq çox material var.",
+    "estimatePermissionUnavailable": "Bu kontekstin balansından istifadə etmək icazəniz yoxdur.",
     "estimatePricingUnavailable": "Bu model üçün qiymətləndirmə mövcud deyil.",
     "estimateBalanceUnavailable": "Ödənişli icmal üçün balans kifayət etmir.",
     "estimateModelNotAllowed": "Bu model burada icazə verilmir.",

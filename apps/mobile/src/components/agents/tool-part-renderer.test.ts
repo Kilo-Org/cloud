@@ -19,6 +19,7 @@ import {
   GlobToolCard,
   GrepToolCard,
   ListToolCard,
+  McpAppToolCard,
   PatchToolCard,
   ReadToolCard,
   TaskToolCard,
@@ -45,6 +46,12 @@ vi.mock('./message-error-boundary', () => ({ MessageErrorBoundary: 'MessageError
 vi.mock('./suggest-tool-card', () => ({
   SuggestToolCard: 'SuggestToolCard',
 }));
+vi.mock('@/lib/chat/remote-mcp-surface', () => ({
+  remoteServerView: (tool: string) =>
+    tool === 'mcp_alpha_chart'
+      ? { serverId: 'alpha', serverToolName: 'chart', resourceUri: 'ui://alpha/chart.html' }
+      : undefined,
+}));
 vi.mock('./tool-cards', () => ({
   BashToolCard: 'BashToolCard',
   EditToolCard: 'EditToolCard',
@@ -52,6 +59,7 @@ vi.mock('./tool-cards', () => ({
   GlobToolCard: 'GlobToolCard',
   GrepToolCard: 'GrepToolCard',
   ListToolCard: 'ListToolCard',
+  McpAppToolCard: 'McpAppToolCard',
   PatchToolCard: 'PatchToolCard',
   ReadToolCard: 'ReadToolCard',
   TaskToolCard: 'TaskToolCard',
@@ -321,6 +329,7 @@ describe.each(['top-level', 'nested'] as const)('%s child-card initial history',
           expect(button.props.accessibilityRole).toBe('button');
           expect(button.props.accessibilityLabel).toContain('General, child task');
           expect(button.props.accessibilityLabel).toContain(statusLabel);
+          expect(button.props.accessibilityLabel).not.toContain(status);
           if (modelLabel) {
             expect(button.props.accessibilityLabel).toContain(modelLabel);
           }
@@ -377,6 +386,32 @@ describe('ToolPartRenderer routing', () => {
   it('routes unknown tools to the generic card', () => {
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
     const root = ToolPartRenderer({ part: makeToolPart('some-new-tool', completedState) });
+    expect(findByType(root, GenericToolCard)).toHaveLength(1);
+  });
+
+  it('routes a completed remote tool that carries a view to the view card', () => {
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = ToolPartRenderer({ part: makeToolPart('mcp_alpha_chart', completedState) });
+    expect(findByType(root, McpAppToolCard)).toHaveLength(1);
+    expect(findByType(root, GenericToolCard)).toHaveLength(0);
+  });
+
+  it('keeps the plain row for a remote tool whose server attached no view', () => {
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = ToolPartRenderer({ part: makeToolPart('mcp_alpha_read', completedState) });
+    expect(findByType(root, McpAppToolCard)).toHaveLength(0);
+    expect(findByType(root, GenericToolCard)).toHaveLength(1);
+  });
+
+  it('keeps the plain row for a view’s call that has not finished', () => {
+    const running: ToolPart['state'] = {
+      status: 'running',
+      input: {},
+      time: { start: 1 },
+    };
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = ToolPartRenderer({ part: makeToolPart('mcp_alpha_chart', running) });
+    expect(findByType(root, McpAppToolCard)).toHaveLength(0);
     expect(findByType(root, GenericToolCard)).toHaveLength(1);
   });
 

@@ -60,7 +60,7 @@ export type FrontApprovalDeps = {
   /** Tear down a manager `createLiveSessionManager` made. Never a registered one. */
   destroyLiveSessionManager(handle: LiveSessionManagerHandle): void;
   /** The ack the permission card performs after a successful response. */
-  ackSessionAttention(kiloSessionId: string): void;
+  ackSessionAttention(kiloSessionId: string, status: string, statusUpdatedAt?: string | null): void;
   /** Publish fresh rows to the glanceable sinks through the push sink loop. */
   refreshGlanceableSurfaces(input: {
     rows: readonly FrontApprovableRow[];
@@ -139,7 +139,7 @@ async function runApproval(deps: FrontApprovalDeps): Promise<FrontApprovalOutcom
 
   let outcome: FrontApprovalOutcome = { kind: 'failed', retryable: true };
   try {
-    outcome = await answerFrontAsk(deps, handle, front.id);
+    outcome = await answerFrontAsk(deps, handle, front);
   } finally {
     // Only a manager this call created: a registered one belongs to the screen.
     if (created) {
@@ -169,7 +169,7 @@ function destroyHeadless(deps: FrontApprovalDeps, handle: LiveSessionManagerHand
 async function answerFrontAsk(
   deps: FrontApprovalDeps,
   handle: LiveSessionManagerHandle,
-  kiloSessionId: string
+  front: FrontApprovableRow
 ): Promise<FrontApprovalOutcome> {
   const wait = await waitForAsk(deps, handle);
   if (wait.kind === 'timeout') {
@@ -185,8 +185,9 @@ async function answerFrontAsk(
   } catch (error) {
     return { kind: 'failed', retryable: deps.classifyFailure(error) === 'retryable' };
   }
-  // The same ack the permission card performs once the wrapper accepted it.
-  deps.ackSessionAttention(kiloSessionId);
+  // The same ack the permission card performs once the wrapper accepted it,
+  // bound to the raise this row was waiting on.
+  deps.ackSessionAttention(front.id, front.status, front.statusUpdatedAt);
   return { kind: 'approved' };
 }
 

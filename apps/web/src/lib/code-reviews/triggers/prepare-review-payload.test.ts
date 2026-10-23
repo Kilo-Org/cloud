@@ -39,6 +39,7 @@ jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
   fetchGitLabRootTextFileAtRef: (...args: unknown[]) => mockFetchGitLabRootTextFileAtRef(...args),
   fetchGitLabRepositorySize: (...args: unknown[]) => mockFetchGitLabRepositorySize(...args),
   GitLabProjectAccessTokenPermissionError: class GitLabProjectAccessTokenPermissionError extends Error {},
+  GitLabAuthenticationError: class GitLabAuthenticationError extends Error {},
 }));
 
 jest.mock('@/lib/integrations/gitlab-service', () => ({
@@ -77,6 +78,11 @@ import {
 } from '@kilocode/db/schema';
 import { eq, or } from 'drizzle-orm';
 import { GitLabProjectAccessTokenUnverifiedError } from '@/lib/integrations/gitlab-service';
+import { TRPCError } from '@trpc/server';
+import {
+  GitLabAuthenticationError,
+  GitLabProjectAccessTokenPermissionError,
+} from '@/lib/integrations/platforms/gitlab/adapter';
 import { prepareReviewPayload } from './prepare-review-payload';
 
 const REPO = `test-org/prepare-review-payload-${Date.now()}`;
@@ -752,6 +758,97 @@ describe('prepareReviewPayload', () => {
     ).rejects.toThrow(
       `GitLab did not answer the credential check for ${REPO}, so this review did not start. Retry the review.`
     );
+  });
+
+  it('reports a rejected GitLab credential as a reconnect problem', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        defineReview(testUser.id, gitlabIntegration.id, {
+          platform: 'gitlab',
+          platform_project_id: 456,
+          pr_url: `https://gitlab.example.com/${REPO}/-/merge_requests/123`,
+        })
+      )
+      .returning();
+    // The service wraps the adapter refusal, so the cause carries the kind.
+    mockGetOrCreateProjectAccessToken.mockRejectedValueOnce(
+      new TRPCError({
+        code: 'UNAUTHORIZED',
+        message:
+          'GitLab rejected the connected credential. Reconnect the GitLab integration and try again.',
+        cause: new GitLabAuthenticationError(456, 401, 'GitLab rejected the credential.'),
+      })
+    );
+
+    const failure = await prepareReviewPayload({
+      reviewId: review.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { config: baseAgentConfig },
+      platform: 'gitlab',
+    }).catch((error: unknown) => error);
+
+    expect((failure as Error).message).toBe(
+      `GitLab rejected the connected credential while preparing this review of ${REPO}. Reconnect the GitLab integration, then retry.`
+    );
+    expect((failure as Error).message).not.toContain('Maintainer');
+  });
+
+  it('reports a broker reconnect refusal as a reconnect problem', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        defineReview(testUser.id, gitlabIntegration.id, {
+          platform: 'gitlab',
+          platform_project_id: 456,
+          pr_url: `https://gitlab.example.com/${REPO}/-/merge_requests/123`,
+        })
+      )
+      .returning();
+    mockGetOrCreateProjectAccessToken.mockRejectedValueOnce(
+      new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'GitLab integration must be reconnected',
+      })
+    );
+
+    await expect(
+      prepareReviewPayload({
+        reviewId: review.id,
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        agentConfig: { config: baseAgentConfig },
+        platform: 'gitlab',
+      })
+    ).rejects.toThrow('Reconnect the GitLab integration, then retry.');
+  });
+
+  it('keeps Maintainer-role guidance when GitLab refuses the role', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        defineReview(testUser.id, gitlabIntegration.id, {
+          platform: 'gitlab',
+          platform_project_id: 456,
+          pr_url: `https://gitlab.example.com/${REPO}/-/merge_requests/123`,
+        })
+      )
+      .returning();
+    mockGetOrCreateProjectAccessToken.mockRejectedValueOnce(
+      new GitLabProjectAccessTokenPermissionError(
+        456,
+        403,
+        'Insufficient permissions to create Project Access Token for project 456. Requires Maintainer role or higher.'
+      )
+    );
+
+    await expect(
+      prepareReviewPayload({
+        reviewId: review.id,
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        agentConfig: { config: baseAgentConfig },
+        platform: 'gitlab',
+      })
+    ).rejects.toThrow('You need Maintainer role or higher');
   });
 
   it('prepares a fresh tokenless Bitbucket review from exact organization integration identity', async () => {

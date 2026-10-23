@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- The blocking question card keeps its selection, custom-answer, and CTA presentation together. */
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, type Text as RNText, ScrollView, type TextInput, View } from 'react-native';
+import { Pressable, ScrollView, type TextInput, type TextInstance, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
@@ -16,7 +16,7 @@ import {
   formatBlockingCardTitle,
   getBlockingCardPresentationForKind,
 } from '@/components/agents/blocking-card-state';
-import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
+import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -89,7 +89,7 @@ export function QuestionCard({
   // reachable by VoiceOver while still landing focus on the card when it
   // appears. A missing node handle on the first paint is recovered by a
   // follow-up focus inside the shared appearance helper.
-  const titleRef = useRef<RNText | null>(null);
+  const titleRef = useRef<TextInstance | null>(null);
   const presentationRef = useRef(presentation);
   presentationRef.current = presentation;
   useEffect(
@@ -98,7 +98,7 @@ export function QuestionCard({
       // request is replaced or the card unmounts.
       applyBlockingCardAppearance(presentationRef.current, titleRef, {
         announce: announceForA11y,
-        focus: moveA11yFocus,
+        focus: requestA11yFocus,
       }),
     [requestId]
   );

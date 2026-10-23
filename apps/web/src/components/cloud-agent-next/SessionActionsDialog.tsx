@@ -9,12 +9,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, Copy, Check, Share2, GitFork, Cloud } from 'lucide-react';
-import { useRawTRPCClient } from '@/lib/trpc/utils';
-import { toast } from 'sonner';
+import { Loader2, Share2, GitFork, Cloud } from 'lucide-react';
 import { CopyableCommand } from '@/components/CopyableCommand';
 import { OpenInEditorButton } from '@/app/share/[shareId]/open-in-editor-button';
 import { useCloudSessionFork } from './use-cloud-session-fork';
+import { SessionSharePanel } from './SessionSharePanel';
 
 type SessionActionsDialogProps = {
   open: boolean;
@@ -39,56 +38,11 @@ export function SessionActionsDialog({
   canForkToCloud = false,
 }: SessionActionsDialogProps) {
   const [isSharing, setIsSharing] = useState(false);
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
-  const [isCopied, setIsCopied] = useState(false);
-  const trpc = useRawTRPCClient();
   const { forkSessionToNewCloudSession, forkingSessionId } = useCloudSessionFork(organizationId);
   const isForkingToCloud = forkingSessionId === kiloSessionId;
 
-  const handleShare = async () => {
-    if (!kiloSessionId) {
-      toast.error('Session ID is missing');
-      return;
-    }
-
-    setIsSharing(true);
-
-    try {
-      const result = await trpc.cliSessionsV2.share.mutate({
-        session_id: kiloSessionId,
-      });
-
-      const url = new URL(`/s/${result.share_token}`, window.location.origin).toString();
-      setShareUrl(url);
-      toast.success('Session shared successfully');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to share session';
-      toast.error(message);
-    } finally {
-      setIsSharing(false);
-    }
-  };
-
-  const handleCopyShareUrl = async () => {
-    if (!shareUrl) return;
-
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setIsCopied(true);
-      toast.success('Link copied to clipboard');
-      setTimeout(() => setIsCopied(false), 2000);
-    } catch {
-      toast.error('Failed to copy link');
-    }
-  };
-
   const handleClose = () => {
-    onOpenChange(false);
-    // Reset state after dialog closes
-    setTimeout(() => {
-      setShareUrl(null);
-      setIsCopied(false);
-    }, 200);
+    if (!isSharing) onOpenChange(false);
   };
 
   const handleForkToCloud = async () => {
@@ -106,7 +60,7 @@ export function SessionActionsDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" showCloseButton={!isSharing}>
         <DialogHeader>
           <DialogTitle>Session Actions</DialogTitle>
           <DialogDescription>Share or fork this session</DialogDescription>
@@ -138,56 +92,11 @@ export function SessionActionsDialog({
               <Share2 className="h-4 w-4" />
               <h3 className="text-sm font-medium">Share Session</h3>
             </div>
-            <p className="text-muted-foreground text-xs">
-              Share a public snapshot of this session with others
-            </p>
-
-            {shareUrl ? (
-              <div className="space-y-2">
-                <div className="ph-no-capture overflow-hidden rounded-md border border-gray-700 bg-gray-800/50 p-3">
-                  <a
-                    href={shareUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block text-sm break-all text-blue-400 hover:text-blue-300 hover:underline"
-                  >
-                    {shareUrl}
-                  </a>
-                </div>
-                <Button size="sm" variant="outline" onClick={handleCopyShareUrl} className="w-full">
-                  {isCopied ? (
-                    <>
-                      <Check className="h-4 w-4" />
-                      Copied
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-4 w-4" />
-                      Copy Link
-                    </>
-                  )}
-                </Button>
-              </div>
-            ) : (
-              <Button
-                onClick={handleShare}
-                disabled={isSharing || !kiloSessionId}
-                variant="outline"
-                className="w-full"
-              >
-                {isSharing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Sharing...
-                  </>
-                ) : (
-                  <>
-                    <Share2 className="h-4 w-4" />
-                    Share Session
-                  </>
-                )}
-              </Button>
-            )}
+            <SessionSharePanel
+              kiloSessionId={kiloSessionId}
+              isSharing={isSharing}
+              onSharingChange={setIsSharing}
+            />
           </div>
 
           {/* Divider */}

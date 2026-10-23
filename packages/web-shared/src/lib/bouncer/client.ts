@@ -46,6 +46,13 @@ const RELEASE_TIMEOUT_MS = 5_000;
 
 /** Signup runs on the auth critical path, before Stripe or the user insert. */
 const SIGNUP_TIMEOUT_MS = 3_000;
+
+/**
+ * A charge verdict sits on the checkout path, before Stripe creates or reuses a session, and on the
+ * decline webhook, so it stays short: an unavailable verdict admits the charge.
+ */
+const CHARGE_DECIDE_TIMEOUT_MS = 1_500;
+
 export type CreditFlow = 'auto_topup' | 'kilo_pass' | 'kiloclaw' | 'seats' | 'topup';
 
 type CreditSubject = {
@@ -215,6 +222,15 @@ export type DecideRequest =
       acquiredMicrodollars?: number | null;
     };
 
+const bouncerFlagSchema = z.object({
+  name: z.string(),
+  decision: z.enum(['review', 'throttle', 'block']),
+  enforced: z.boolean(),
+  until: z.number().nullable(),
+  // Log-only metadata; a new source must not invalidate the whole verdict.
+  source: z.string().optional(),
+});
+
 /**
  * Bouncer's decide verdict. `enforced: true` is the only answer that rejects a request; `code` says
  * how. `flags` are internal: log them server-side and never return them to a client. `spendWatch`
@@ -225,20 +241,39 @@ const decideResponseSchema = z.object({
   code: z.enum(['rate_limited', 'spend_limited', 'restricted']).optional(),
   retryAfterMs: z.number().nonnegative().optional(),
   spendWatch: z.boolean(),
-  flags: z.array(
-    z.object({
-      name: z.string(),
-      decision: z.enum(['review', 'throttle', 'block']),
-      enforced: z.boolean(),
-      until: z.number().nullable(),
-      // Log-only metadata; a new source must not invalidate the whole verdict.
-      source: z.string().optional(),
-    })
-  ),
+  flags: z.array(bouncerFlagSchema),
 });
 
 export type DecideResponse = z.infer<typeof decideResponseSchema>;
 export type DecideFlag = DecideResponse['flags'][number];
+
+/**
+ * A charge verdict. `enforced: true` refuses a checkout or expires the payer's open sessions;
+ * `flags` are internal and are logged, never returned to a client.
+ */
+const chargeDecideResponseSchema = z.object({
+  enforced: z.boolean(),
+  code: z.literal('charge_blocked').optional(),
+  flags: z.array(bouncerFlagSchema),
+});
+
+export type ChargeDecideResponse = z.infer<typeof chargeDecideResponseSchema>;
+export type ChargeDecideFlag = ChargeDecideResponse['flags'][number];
+
+/** One charge-gate question: before a checkout, or after a declined charge. */
+export type ChargeDecideRequest = {
+  /** An id for the audit log; the charge id on the failure stage. */
+  requestId: string;
+  /** `user:<id>` or `org:<id>`, the payer key the credit events use. */
+  accountId: string;
+  /** The acting user, also for an org payer. */
+  userId?: string;
+  /** The client IP, omitted when unknown (the failure stage has no client request). */
+  ip?: string | null;
+  ja4?: string | null;
+  stage: 'checkout' | 'failure';
+  flow?: CreditFlow;
+};
 
 /** Bouncer's shape for a signup method (a Cloud `AuthProviderId`) and a step-up method. */
 const SIGNUP_METHOD = /^[a-z0-9-]{1,32}$/;
@@ -459,7 +494,9 @@ async function post(
     }
   }
   // A decide timeout is expected on a slow call; it is not worth an error line each time.
-  if (!(result.error === 'TimeoutError' && path === DECIDE_PATH)) {
+  const timedOutVerdict =
+    result.error === 'TimeoutError' && (path === DECIDE_PATH || path === CHARGE_DECIDE_PATH);
+  if (!timedOutVerdict) {
     console.error('[bouncer] request failed', { path, status: result.status, error: result.error });
   }
   return null;
@@ -472,6 +509,7 @@ async function post(
 const CREDIT_EVENT_PATH = '/api/v2/credit-event';
 const USAGE_EVENT_PATH = '/api/v1/usage-event';
 const DECIDE_PATH = '/api/v1/decide';
+const CHARGE_DECIDE_PATH = '/api/v1/charge-decide';
 const SIGNUP_DECIDE_PATH = '/api/v1/signup-decide';
 const RELEASE_PATH = '/api/v1/release';
 
@@ -692,6 +730,41 @@ export async function decide(
   const parsed = decideResponseSchema.safeParse(response);
   if (!parsed.success) {
     console.error('[bouncer] decide returned an unknown verdict shape', {
+      issues: parsed.error.issues.map(issue => ({ path: issue.path.join('.'), code: issue.code })),
+    });
+    return null;
+  }
+  return parsed.data;
+}
+
+/**
+ * Asks bouncer whether the payer's standing permits a charge. Resolves to `null` on a timeout,
+ * transport error, non-2xx (including an older bouncer's 404), or a body that is not a
+ * `ChargeDecideResponse`, so the caller fails open: a checkout proceeds and a failure webhook
+ * leaves the payer's sessions alone. Never rejects.
+ */
+export async function chargeDecide(
+  request: ChargeDecideRequest,
+  {
+    timeoutMs = CHARGE_DECIDE_TIMEOUT_MS,
+    signal,
+  }: { timeoutMs?: number; signal?: AbortSignal } = {}
+): Promise<ChargeDecideResponse | null> {
+  const body = compact({
+    requestId: id(request.requestId),
+    accountId: request.accountId,
+    userId: id(request.userId),
+    ip: request.ip || undefined,
+    ja4: normalizeJa4(request.ja4),
+    stage: request.stage,
+    flow: request.flow,
+  });
+  const response = await post(CHARGE_DECIDE_PATH, body, timeoutMs, signal);
+  if (response === null) return null;
+  const parsed = chargeDecideResponseSchema.safeParse(response);
+  if (!parsed.success) {
+    console.error('[bouncer] charge-decide returned an unknown verdict shape', {
+      requestId: body.requestId,
       issues: parsed.error.issues.map(issue => ({ path: issue.path.join('.'), code: issue.code })),
     });
     return null;

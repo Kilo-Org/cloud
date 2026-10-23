@@ -66,7 +66,6 @@
     "message": "Mensahe",
     "off": "Naka-off",
     "organization": "Organisasyon",
-    "organizationTrialEnded": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update ng may-ari ng organisasyon ang billing sa kilo.ai, pagkatapos ay subukan muli.",
     "platform": "Plataporma",
     "prReview": "Pagsusuri ng PR",
     "queued": "Nakapila",
@@ -146,7 +145,8 @@
     "agent": "Ahente",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Mga pagbabago"
+    "changes": "Mga pagbabago",
+    "organizationTrialEnded": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update ng may-ari ng organisasyon ang billing sa kilo.ai, pagkatapos ay subukan muli."
   },
   "language": {
     "restarting": "Ini-restart para ilapat ang wika",
@@ -270,7 +270,6 @@
     "voiceInput": "Pag-input ng boses",
     "autoExpandThinking": "Awtomatikong ipakita ang buong pag-iisip",
     "autoExpandThinkingSubtitle": "Ipakita nang buo ang pag-iisip ng ahente kapag natapos ito.",
-    "autoExpandThinkingInactiveSubtitle": "Walang epekto habang itinatago ang mga detalye ng pag-iisip.",
     "hideThinking": "Itago ang mga detalye ng pag-iisip",
     "hideThinkingSubtitle": "Huwag ipakita ang pag-iisip ng ahente sa pahina ng sesyon.",
     "keepScreenOn": "Panatilihing bukas ang screen sa pahina ng sesyon",
@@ -295,7 +294,8 @@
     "condenseToolCallsSubtitle": "Pagsama-samahin ang magkakasunod na tawag ng kagamitan sa isang hilera na mabubuksan mo.",
     "toolSummaryTranslation": "Isalin ang mga buod ng kasangkapan",
     "toolSummaryTranslationSubtitle": "Ipadala ang bawat buod ng kasangkapan sa isang modelo upang isalin ito sa wika ng iyong app. Ipinapakita ang orihinal kung mabigo ang pagsasalin.",
-    "toolSummaryTranslationModelUnavailableNotice": "Hindi na inaalok ang modelong ito. I-tap ang $t(common.model) para pumili ng iba."
+    "toolSummaryTranslationModelUnavailableNotice": "Hindi na inaalok ang modelong ito. I-tap ang $t(common.model) para pumili ng iba.",
+    "autoExpandThinkingInactiveSubtitle": "Walang epekto habang itinatago ang mga detalye ng pag-iisip."
   },
   "prReview": {
     "pullRequestUnavailable": "Hindi mabuksan ang pull request",
@@ -1435,12 +1435,6 @@
       "findingsUnavailable": "Hindi available ang mga resulta dahil nabigo ang pagsusuring ito.",
       "serviceUnavailable": "Hindi makakonekta sa serbisyo ng pagsusuri ng code. Subukang muli ang pagsusuri kapag available na ang serbisyo.",
       "reviewFailed": "Nabigo ang pagsusuri. Pakisubukang muli.",
-      "cancelReasonSuperseded": "Na-push ang isang mas bagong commit, kaya napalitan ang pagsusuring ito.",
-      "cancelReasonIntegrationDisconnected": "Naka-disconnect ang {{platform}}, kaya kinansela ang pagsusuring ito. I-connect ito muli, pagkatapos ay patakbuhin muli ang pagsusuri.",
-      "cancelReasonBitbucketReviewerDisabled": "Naka-off ang Code Reviewer para sa Bitbucket, kaya kinansela ang pagsusuring ito. I-enable ito muli, pagkatapos ay patakbuhin muli ang pagsusuri.",
-      "cancelReasonBitbucketPullRequestChanged": "Nagbago ang pull request sa Bitbucket, kaya napalitan ang pagsusuring ito.",
-      "cancelReasonCancelled": "Kinansela ang pagsusuring ito.",
-      "cancelReasonInterrupted": "Naputol ang pagsusuring ito.",
       "showMore": "Magpakita ng higit pa",
       "created": "Nalikha",
       "started": "Nagsimula",
@@ -1467,7 +1461,13 @@
       "sessionError": "Nagkaproblema sa sesyon: {{error}}.",
       "statusWithValue": "Katayuan: {{status}}",
       "toolName": "Kasangkapan: {{name}}",
-      "toolNameError": "Nagkaproblema ang kasangkapan: {{name}}."
+      "toolNameError": "Nagkaproblema ang kasangkapan: {{name}}.",
+      "cancelReasonSuperseded": "Na-push ang isang mas bagong commit, kaya napalitan ang pagsusuring ito.",
+      "cancelReasonIntegrationDisconnected": "Naka-disconnect ang {{platform}}, kaya kinansela ang pagsusuring ito. I-connect ito muli, pagkatapos ay patakbuhin muli ang pagsusuri.",
+      "cancelReasonBitbucketReviewerDisabled": "Naka-off ang Code Reviewer para sa Bitbucket, kaya kinansela ang pagsusuring ito. I-enable ito muli, pagkatapos ay patakbuhin muli ang pagsusuri.",
+      "cancelReasonBitbucketPullRequestChanged": "Nagbago ang pull request sa Bitbucket, kaya napalitan ang pagsusuring ito.",
+      "cancelReasonCancelled": "Kinansela ang pagsusuring ito.",
+      "cancelReasonInterrupted": "Naputol ang pagsusuring ito."
     },
     "reviewMemory": {
       "title": "Memorya ng pagsusuri",
@@ -1754,7 +1754,7 @@
       "deadlinePassed": "Lampas na sa takdang petsa",
       "deadlinePassedDetail": "{{critical}} na kritikal, {{high}} na mataas",
       "dueThisWeek": "Takdang petsa ngayong linggo",
-      "dueThisWeekDetail": "{{exploitable}} kumpirmadong maaaring samantalahin",
+      "dueThisWeekDetail": "{{exploitable}} sa mga ito ang kumpirmadong maaaring samantalahin",
       "noDeadline": "Walang takdang petsa",
       "reviewSlaAssignment": "Suriin ang pagtatalaga ng SLA",
       "allOpenFindingsTracked": "Sinusubaybayan ang lahat ng bukas na isyu"
@@ -2135,8 +2135,8 @@
       "dollar_other": "dolyar",
       "costSpoken": "gastos na {{cost}}",
       "costSpokenWithTime": "halagang {{cost}}, {{time}}",
-      "spokenJoiner": ", at",
-      "pullRequest": "pull request na {{number}}"
+      "pullRequest": "pull request na {{number}}",
+      "spokenJoiner": ", at"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Hindi mabuksan ang GitHub",
@@ -3150,16 +3150,16 @@
       "truncated": "May mas naunang aktibidad sa kredito na maaaring tingnan."
     },
     "inviteMember": {
-      "alreadyMember": "Miembro na ng organisasyong ito ang taong ito.",
-      "alreadyInvited": "Imbitado na sila o miyembro na.",
       "emailError": "Maglagay ng wastong email address.",
       "emailPlaceholder": "pangalan@kumpanya.com",
-      "pendingInvitation": "May nakabinbing imbitasyon na ang email na ito.",
       "permissionDenied": "Wala kang pahintulot na mag-imbita ng mga miyembro.",
       "roleMember": "Tungkulin: Miyembro.",
-      "sendError": "Hindi naipadala ang imbitasyon.",
       "sendInvite": "Ipadala ang imbitasyon",
-      "title": "Mag-imbita ng miyembro"
+      "title": "Mag-imbita ng miyembro",
+      "alreadyInvited": "Imbitado na sila o miyembro na.",
+      "sendError": "Hindi naipadala ang imbitasyon.",
+      "pendingInvitation": "May nakabinbing imbitasyon na ang email na ito.",
+      "alreadyMember": "Miembro na ng organisasyong ito ang taong ito."
     },
     "invoices": {
       "downloadA11y": "I-download ang talaan ng singil {{number}}",
@@ -3227,14 +3227,14 @@
       "emailStatusFailed": "Hindi naipadala ang email",
       "inviteCreated": "Nalikha ang imbitasyon",
       "pendingInvitations": "Mga nakabinbing imbitasyon",
-      "ownRoleChange": "Hindi mo maaaring baguhin ang iyong sariling tungkulin.",
-      "ownerAuthority": "Ang may-ari lamang ng organisasyon ang maaaring mamahala ng mga may-ari.",
-      "inviteExpired": "Nag-expire na ang imbitasyong ito.",
-      "inviteAccepted": "Tinanggap na ang imbitasyong ito.",
-      "inviteNotResendable": "Hindi na maaaring ipadala muli ang imbitasyong ito.",
       "resendInvite": "Ipadala muli ang imbitasyon",
+      "shareInviteLink": "Ibahagi ang link ng imbitasyon",
       "resendInviteError": "Hindi naipadala muli ang imbitasyon.",
-      "shareInviteLink": "Ibahagi ang link ng imbitasyon"
+      "inviteNotResendable": "Hindi na maaaring ipadala muli ang imbitasyong ito.",
+      "ownerAuthority": "Ang may-ari lamang ng organisasyon ang maaaring mamahala ng mga may-ari.",
+      "ownRoleChange": "Hindi mo maaaring baguhin ang iyong sariling tungkulin.",
+      "inviteExpired": "Nag-expire na ang imbitasyong ito.",
+      "inviteAccepted": "Tinanggap na ang imbitasyong ito."
     },
     "usageStats": {
       "inputTokens": "Mga papasok na token",
@@ -3379,11 +3379,11 @@
   },
   "transcriptionModel": {
     "title": "Modelo para sa pagsasalin ng boses sa teksto",
-    "choose": "Pumili ng modelo",
     "noneChosen": "Walang napili",
     "emptyTitle": "Walang modelo para sa pagsasalin ng boses sa teksto",
     "emptyDescription": "Walang iniaalok na modelo para sa pagsasalin ng boses sa teksto ang Kilo Gateway ngayon.",
-    "loadFailed": "Hindi ma-load ang mga modelo para sa pagsasalin ng boses sa teksto."
+    "loadFailed": "Hindi ma-load ang mga modelo para sa pagsasalin ng boses sa teksto.",
+    "choose": "Pumili ng modelo"
   },
   "voiceLanguage": {
     "title": "Wika ng pagdikta",
@@ -3405,7 +3405,6 @@
   },
   "modelChat": {
     "offlineFailure": "Kailangan ng modelong ito ng koneksyon sa internet. Kumonekta at subukang muli, o lumipat sa isang modelo sa device na ito.",
-    "creditsRequired": "Kulang ang kredito para ipadala ang mensaheng ito. Magdagdag ng kredito at subukang muli.",
     "empty": {
       "title": "Magsimula ng chat",
       "description": "Magpadala ng mensahe para makipag-usap sa isang modelo."
@@ -3599,6 +3598,7 @@
       "fromHuggingFace": "Mula sa Hugging Face",
       "loading": "Nilo-load ang mga modelo",
       "noResults": "Walang nakitang modelo",
+      "noResultsForQuery": "Walang nakitang modelo para sa \"{{query}}\"",
       "noFits": "Walang modelong kasya sa device na ito",
       "noFitsDescription": "Nasa tab na $t(common.all) ang mas malalaking modelo.",
       "fit": {
@@ -3673,13 +3673,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "Sinusuportahan ng modelong ito ang antas ng pag-iisip"
-    }
+    },
+    "creditsRequired": "Kulang ang kredito para ipadala ang mensaheng ito. Magdagdag ng kredito at subukang muli."
   },
   "settingsTools": {
     "confirmTitle": "Kumpirmahin ang pagbabagong ito?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "ang iyong pinakabagong repositoryo",
+      "confirmMessage": "Repositoryo: {{repository}}. Kahilingan: {{prompt}}.",
+      "confirmTitle": "Simulan ang agent na ito?",
       "promptRequired": "Nangangailangan ng prompt ang Simulan ang agent. Magdagdag ng prompt at patakbuhin itong muli.",
       "repositoryRequired": "Nangangailangan ng repositoryo ang Simulan ang agent. Buksan ang Kilo at pumili ng isa, pagkatapos ay patakbuhin itong muli.",
       "repositoryUnknown": "Hindi kinikilala ng Kilo ang {{repository}} bilang GitHub o GitLab na repositoryo. Pumili ng ibang repositoryo sa Kilo.",
@@ -3708,10 +3712,10 @@
     "noSpend": "Wala pang naitalang gastos",
     "spend24h": "Gastos sa nakalipas na 24 na oras",
     "multiplierError": "Maglagay ng multiplier na 1 o higit pa",
-    "multiplierMaxError": "Maglagay ng multiplier na {{max}} o mas mababa",
-    "thresholdMaxError": "Maglagay ng halagang {{max}} o mas mababa.",
     "permissionDenied": "Wala kang pahintulot na pamahalaan ang mga babala sa gastos.",
-    "pushOffByCategory": "Naka-off sa Mga abiso"
+    "pushOffByCategory": "Naka-off sa Mga abiso",
+    "multiplierMaxError": "Maglagay ng multiplier na {{max}} o mas mababa",
+    "thresholdMaxError": "Maglagay ng halagang {{max}} o mas mababa."
   },
   "profiles": {
     "title": "Mga profile",
@@ -3770,7 +3774,6 @@
     },
     "variablesEmpty": "Wala pang variable",
     "variablesSaveFailed": "Hindi ma-save ang variable",
-    "variablesDeleteFailed": "Hindi ma-delete ang variable",
     "commandsTitle": "Mga utos sa pag-setup",
     "addCommand": "Magdagdag ng utos",
     "commandLabel": "Utos",
@@ -3781,7 +3784,6 @@
     "moveDown": "Ilipat pababa",
     "moveCommandUp": "Ilipat ang utos {{position}} pataas",
     "moveCommandDown": "Ilipat ang utos {{position}} pababa",
-    "deleteCommand": "Burahin ang utos {{position}}",
     "skillsTitle": "Mga kasanayan",
     "addSkill": "Magdagdag ng kasanayan",
     "skillNameLabel": "Pangalan ng kasanayan",
@@ -3903,7 +3905,9 @@
       "pinFailed": "Hindi ma-pin ang repo",
       "unboundToast": "Nakalag ang repo",
       "unbindFailed": "Hindi ma-unbind ang repo"
-    }
+    },
+    "variablesDeleteFailed": "Hindi ma-delete ang variable",
+    "deleteCommand": "Burahin ang utos {{position}}"
   },
   "credits": {
     "title": "Bumili ng kredito",
@@ -3930,7 +3934,6 @@
       "newList": "Bagong listahan",
       "empty": "Wala pang listahan",
       "couldNotLoad": "Hindi ma-load ang mga listahan",
-      "createFailed": "Hindi malikha ang listahan",
       "noRepository": "Walang repositoryo",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} bukas",
@@ -3940,7 +3943,8 @@
       "archive": "I-archive",
       "unarchive": "Alisin sa archive",
       "deleteTitle": "Burahin ang {{name}}?",
-      "deleteMessage": "Burahin din ang mga gagawin nito. Nananatili ang mga sesyon nito."
+      "deleteMessage": "Burahin din ang mga gagawin nito. Nananatili ang mga sesyon nito.",
+      "createFailed": "Hindi malikha ang listahan"
     },
     "listSettings": {
       "title": "Mga setting ng listahan",
@@ -4008,21 +4012,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Briefing sa umaga",
+    "title": "Briefing ng agent",
     "atLeast": "≥{{value}}",
     "coverageHint": "Maaaring may kulang na nakaraang aktibidad. Ang ≥ ay nangangahulugang hindi bababa rito; ang hindi alam ay hindi zero.",
     "available": "Mga available na briefing",
     "history": "Kasaysayan ng briefing",
-    "historyHint": "Itinatago ang mga ulat nang 30 araw, kasama ang mga na-dismiss.",
+    "historyHint": "Itinatago ang mga briefing nang 30 araw, kasama ang mga na-dismiss.",
     "settings": "Mga setting ng briefing",
-    "saved": "Na-save na ang mga setting ng briefing",
-    "empty": "Walang aktibidad magdamag",
-    "emptyHint": "Lalabas dito ang iyong mga cloud at CLI coding session pagkatapos ng aktibong gabi.",
+    "empty": "Walang aktibidad sa window ng briefing na ito",
+    "emptyHint": "Lalabas dito ang iyong mga cloud at CLI coding session kapag may aktibidad ang isang naka-iskedyul na briefing.",
     "loadError": "Hindi ma-load ang mga briefing",
-    "sessions": "Aktibo magdamag",
+    "sessions": "Aktibo sa window",
     "pullRequests": "Mga binuksang PRs",
     "blockers": "Mga bagong blocker",
-    "spend": "Gastos magdamag",
+    "spend": "Gastos sa window",
     "view": "Basahin ang briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -4044,13 +4047,13 @@
     "sources": "Ebidensya at artifact",
     "timezone": "Time zone ng briefing",
     "deviceTimezone": "Gamitin ang time zone ng device",
-    "timezoneHint": "IANA time zone, halimbawa Europe/Berlin. Sa mga susunod na gabi magagamit ang pagbabago sa iskedyul.",
-    "nightStart": "Simula ng gabi",
-    "morningStart": "Katapusan ng gabi / simula ng umaga",
-    "morningEnd": "Katapusan ng umaga",
-    "timeHint": "Ibinabalik ng Home card ang live na status kapag natapos ang umaga, kahit offline.",
-    "invalidSchedule": "Pumili ng wastong time zone at hindi nagsasapaw at hindi walang lamang panahon ng gabi at umaga.",
-    "notificationsHint": "Isang pangkalahatang abiso bawat umaga kapag handa na ang iyong unang ulat. Hiwalay sa mga bayad na buod ng AI.",
+    "timezoneHint": "IANA time zone, halimbawa Europe/Berlin. Sa mga susunod na briefing magagamit ang pagbabago sa iskedyul.",
+    "nightStart": "Simula ng window ng briefing",
+    "morningStart": "Handa ang briefing sa",
+    "morningEnd": "Available ang briefing hanggang",
+    "timeHint": "Ibinabalik ng Home card ang live na status kapag natapos ang window ng briefing, kahit offline.",
+    "invalidSchedule": "Pumili ng wastong time zone at ng isang hindi walang laman na window ng briefing.",
+    "notificationsHint": "Isang pangkalahatang abiso bawat naka-iskedyul na briefing. Hiwalay sa mga bayad na buod ng AI.",
     "notificationPermission": "I-enable ang mga abiso ng device sa $t(common.notifications) para matanggap ang iyong briefing.",
     "aiOptIn": "Mga bayad na buod ng AI",
     "aiHint": "Opsyonal para sa kontekstong ito lamang. Ipinapadala sa iyong model ang mga piniling na-redact na sipi at nakaayos na datos sa wika ng iyong app. Ginagamit ng singil ang balanse ng kontekstong ito.",
@@ -4072,7 +4075,7 @@
     "contextSettings": "Mga setting ng AI · {{context}}",
     "allContexts": "Magkahiwalay ang mga personal at pang-organisasyong briefing.",
     "create": "Gumawa ng briefing",
-    "oneOff": "Isang beses lang",
+    "oneOff": "Sa kahilingan",
     "createdAt": "Ginawa {{time}}",
     "chooseContext": "Pumili ng isang konteksto",
     "period": "Panahon ng briefing",
@@ -4094,9 +4097,12 @@
     "emptyPeriod": "Walang nakitang aktibidad sa panahong ito. Walang buod ng AI o singil.",
     "emptyHistory": "Walang naka-save na briefing",
     "historicalStateHint": "Ipinapakita ng kalagayan ng sesyon ang kalagayan nito sa katapusan ng napiling panahon, hindi ang kasalukuyang kalagayan.",
-    "oneOffHint": "Tumatanggap ang AI ng mga napiling ebidensiyang may nakatagong sensitibong detalye sa wika ng iyong app. Hindi binabago ng minsanang ulat na ito ang iyong iskedyul sa umaga o mga kagustuhan sa AI.",
+    "oneOffHint": "Tumatanggap ang AI ng mga napiling ebidensiyang may nakatagong sensitibong detalye sa wika ng iyong app. Hindi binabago ng briefing sa kahilingan na ito ang iyong naka-iskedyul na briefing o mga kagustuhan sa AI.",
     "createOffline": "Kumonekta sa internet para suriin o gumawa ng briefing. Hindi kailanman ipinipila ang mga may bayad na kahilingan kapag walang koneksyon sa internet.",
     "estimateInputTooLarge": "Masyadong maraming ebidensiya sa panahong ito para sa napiling modelo.",
-    "estimatePermissionUnavailable": "Wala kang pahintulot na gamitin ang balanse ng kontekstong ito."
+    "estimatePermissionUnavailable": "Wala kang pahintulot na gamitin ang balanse ng kontekstong ito.",
+    "createFailed": "Hindi magawa ang briefing na ito.",
+    "reviewFailed": "Hindi masuri ang briefing na ito.",
+    "saved": "Na-save na ang mga setting ng briefing"
   }
 }

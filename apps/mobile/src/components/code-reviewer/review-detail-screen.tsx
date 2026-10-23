@@ -51,7 +51,9 @@ function confirmRetry(onConfirm: () => void) {
     [
       { text: i18n.t('common.cancel'), style: 'cancel' },
       { text: i18n.t('common.retry'), onPress: onConfirm },
-    ]
+    ],
+    // Android back dismisses, which equals Cancel: no retrigger starts.
+    { cancelable: true }
   );
 }
 

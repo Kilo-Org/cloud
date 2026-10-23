@@ -66,7 +66,6 @@
     "message": "ข้อความ",
     "off": "ปิด",
     "organization": "องค์กร",
-    "organizationTrialEnded": "การทดลองใช้งานขององค์กรสิ้นสุดลงแล้วและองค์กรไม่มีแผนที่ใช้งานอยู่ เจ้าขององค์กรสามารถอัปเดตการเรียกเก็บเงินได้ที่ kilo.ai แล้วลองอีกครั้ง",
     "platform": "แพลตฟอร์ม",
     "prReview": "การตรวจสอบ PR",
     "queued": "อยู่ในคิว",
@@ -146,7 +145,8 @@
     "agent": "เอเจนต์",
     "durationMinuteShort": "น.",
     "durationHourShort": "ชม.",
-    "changes": "การเปลี่ยนแปลง"
+    "changes": "การเปลี่ยนแปลง",
+    "organizationTrialEnded": "การทดลองใช้งานขององค์กรสิ้นสุดลงแล้วและองค์กรไม่มีแผนที่ใช้งานอยู่ เจ้าขององค์กรสามารถอัปเดตการเรียกเก็บเงินได้ที่ kilo.ai แล้วลองอีกครั้ง"
   },
   "language": {
     "restarting": "กำลังเริ่มแอปใหม่เพื่อเปลี่ยนภาษา",
@@ -270,7 +270,6 @@
     "voiceInput": "การป้อนเสียง",
     "autoExpandThinking": "ขยายกระบวนการคิดอัตโนมัติ",
     "autoExpandThinkingSubtitle": "ขยายรายละเอียดกระบวนการคิดของเอเจนต์เมื่อคิดเสร็จ",
-    "autoExpandThinkingInactiveSubtitle": "ไม่มีผลขณะที่ซ่อนรายละเอียดการคิดอยู่",
     "hideThinking": "ซ่อนรายละเอียดการคิด",
     "hideThinkingSubtitle": "ไม่แสดงการคิดของเอเจนต์ในหน้าเซสชัน",
     "keepScreenOn": "เปิดหน้าจอค้างไว้ขณะอยู่ในหน้าเซสชัน",
@@ -295,7 +294,8 @@
     "condenseToolCallsSubtitle": "จัดกลุ่มการเรียกเครื่องมือที่ต่อเนื่องกันเป็นแถวเดียวที่คุณเปิดได้",
     "toolSummaryTranslation": "แปลสรุปเครื่องมือ",
     "toolSummaryTranslationSubtitle": "ส่งสรุปเครื่องมือแต่ละรายการไปยังโมเดลเพื่อแปลเป็นภาษาของแอปคุณ หากการแปลล้มเหลว จะแสดงต้นฉบับ",
-    "toolSummaryTranslationModelUnavailableNotice": "โมเดลนี้ไม่ให้บริการแล้ว แตะ $t(common.model) เพื่อเลือกโมเดลอื่น"
+    "toolSummaryTranslationModelUnavailableNotice": "โมเดลนี้ไม่ให้บริการแล้ว แตะ $t(common.model) เพื่อเลือกโมเดลอื่น",
+    "autoExpandThinkingInactiveSubtitle": "ไม่มีผลขณะที่ซ่อนรายละเอียดการคิดอยู่"
   },
   "prReview": {
     "pullRequestUnavailable": "เปิด PR ไม่ได้",
@@ -1435,12 +1435,6 @@
       "findingsUnavailable": "ไม่สามารถแสดงผลลัพธ์ได้เนื่องจากการตรวจสอบนี้ล้มเหลว",
       "serviceUnavailable": "ไม่สามารถเชื่อมต่อกับบริการตรวจสอบโค้ดได้ ลองตรวจสอบอีกครั้งเมื่อบริการพร้อมใช้งาน",
       "reviewFailed": "การตรวจสอบล้มเหลว โปรดลองอีกครั้ง",
-      "cancelReasonSuperseded": "มี commit ที่ใหม่กว่าถูก push ขึ้นมา การตรวจสอบนี้จึงถูกแทนที่",
-      "cancelReasonIntegrationDisconnected": "{{platform}} ถูกยกเลิกการเชื่อมต่อ การตรวจสอบนี้จึงถูกยกเลิก โปรดเชื่อมต่อใหม่ แล้วตรวจสอบอีกครั้ง",
-      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer ถูกปิดใช้งานสำหรับ Bitbucket การตรวจสอบนี้จึงถูกยกเลิก โปรดเปิดใช้งานอีกครั้ง แล้วตรวจสอบอีกครั้ง",
-      "cancelReasonBitbucketPullRequestChanged": "pull request ของ Bitbucket มีการเปลี่ยนแปลง การตรวจสอบนี้จึงถูกแทนที่",
-      "cancelReasonCancelled": "การตรวจสอบนี้ถูกยกเลิก",
-      "cancelReasonInterrupted": "การตรวจสอบนี้ถูกขัดจังหวะ",
       "showMore": "แสดงเพิ่มเติม",
       "created": "สร้างเมื่อ",
       "started": "เริ่มเมื่อ",
@@ -1467,7 +1461,13 @@
       "sessionError": "ข้อผิดพลาดของเซสชัน: {{error}}",
       "statusWithValue": "สถานะ: {{status}}",
       "toolName": "เครื่องมือ: {{name}}",
-      "toolNameError": "เครื่องมือ: {{name}} — ข้อผิดพลาด"
+      "toolNameError": "เครื่องมือ: {{name}} — ข้อผิดพลาด",
+      "cancelReasonSuperseded": "มี commit ที่ใหม่กว่าถูก push ขึ้นมา การตรวจสอบนี้จึงถูกแทนที่",
+      "cancelReasonIntegrationDisconnected": "{{platform}} ถูกยกเลิกการเชื่อมต่อ การตรวจสอบนี้จึงถูกยกเลิก โปรดเชื่อมต่อใหม่ แล้วตรวจสอบอีกครั้ง",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer ถูกปิดใช้งานสำหรับ Bitbucket การตรวจสอบนี้จึงถูกยกเลิก โปรดเปิดใช้งานอีกครั้ง แล้วตรวจสอบอีกครั้ง",
+      "cancelReasonBitbucketPullRequestChanged": "pull request ของ Bitbucket มีการเปลี่ยนแปลง การตรวจสอบนี้จึงถูกแทนที่",
+      "cancelReasonCancelled": "การตรวจสอบนี้ถูกยกเลิก",
+      "cancelReasonInterrupted": "การตรวจสอบนี้ถูกขัดจังหวะ"
     },
     "reviewMemory": {
       "title": "ความจำในการตรวจสอบ",
@@ -1754,7 +1754,7 @@
       "deadlinePassed": "เลยกำหนดเวลา",
       "deadlinePassedDetail": "ระดับวิกฤต {{critical}} รายการ ระดับสูง {{high}} รายการ",
       "dueThisWeek": "ถึงกำหนดสัปดาห์นี้",
-      "dueThisWeekDetail": "ยืนยันว่าผู้โจมตีนำไปใช้ได้ {{exploitable}} รายการ",
+      "dueThisWeekDetail": "จากจำนวนนี้ยืนยันว่าผู้โจมตีนำไปใช้ได้ {{exploitable}} รายการ",
       "noDeadline": "ไม่มีกำหนดเวลา",
       "reviewSlaAssignment": "ตรวจสอบการกำหนด SLA",
       "allOpenFindingsTracked": "ติดตามข้อค้นพบที่ยังเปิดอยู่ครบแล้ว"
@@ -2135,8 +2135,8 @@
       "dollar_other": "ดอลลาร์",
       "costSpoken": "ค่าใช้จ่าย {{cost}}",
       "costSpokenWithTime": "ค่าใช้จ่าย {{cost}}, {{time}}",
-      "spokenJoiner": "และ",
-      "pullRequest": "PR {{number}}"
+      "pullRequest": "PR {{number}}",
+      "spokenJoiner": "และ"
     },
     "githubInstall": {
       "couldNotOpenTitle": "ไม่สามารถเปิด GitHub ได้",
@@ -3150,16 +3150,16 @@
       "truncated": "ยังมีรายการเครดิตก่อนหน้านี้ให้ดู"
     },
     "inviteMember": {
-      "alreadyMember": "บุคคลนี้เป็นสมาชิกขององค์กรนี้อยู่แล้ว",
-      "alreadyInvited": "ได้รับคำเชิญอยู่แล้วหรือเป็นสมาชิกอยู่แล้ว",
       "emailError": "ป้อนที่อยู่อีเมลที่ถูกต้อง",
       "emailPlaceholder": "ชื่อ@บริษัท.com",
-      "pendingInvitation": "อีเมลนี้มีคำเชิญที่รอดำเนินการอยู่แล้ว",
       "permissionDenied": "คุณไม่มีสิทธิ์เชิญสมาชิก",
       "roleMember": "บทบาท: สมาชิก",
-      "sendError": "ส่งคำเชิญไม่สำเร็จ",
       "sendInvite": "ส่งคำเชิญ",
-      "title": "เชิญสมาชิก"
+      "title": "เชิญสมาชิก",
+      "alreadyInvited": "ได้รับคำเชิญอยู่แล้วหรือเป็นสมาชิกอยู่แล้ว",
+      "sendError": "ส่งคำเชิญไม่สำเร็จ",
+      "pendingInvitation": "อีเมลนี้มีคำเชิญที่รอดำเนินการอยู่แล้ว",
+      "alreadyMember": "บุคคลนี้เป็นสมาชิกขององค์กรนี้อยู่แล้ว"
     },
     "invoices": {
       "downloadA11y": "ดาวน์โหลดใบแจ้งหนี้ {{number}}",
@@ -3227,14 +3227,14 @@
       "emailStatusFailed": "ส่งอีเมลไม่สำเร็จ",
       "inviteCreated": "สร้างคำเชิญแล้ว",
       "pendingInvitations": "คำเชิญที่รอตอบรับ",
-      "ownRoleChange": "คุณไม่สามารถเปลี่ยนบทบาทของตัวเองได้",
-      "ownerAuthority": "เฉพาะเจ้าขององค์กรเท่านั้นที่สามารถจัดการเจ้าของได้",
-      "inviteExpired": "คำเชิญนี้หมดอายุแล้ว",
-      "inviteAccepted": "คำเชิญนี้ได้รับการตอบรับแล้ว",
-      "inviteNotResendable": "ไม่สามารถส่งคำเชิญนี้อีกครั้งได้แล้ว",
       "resendInvite": "ส่งคำเชิญอีกครั้ง",
+      "shareInviteLink": "แชร์ลิงก์คำเชิญ",
       "resendInviteError": "ส่งคำเชิญอีกครั้งไม่สำเร็จ",
-      "shareInviteLink": "แชร์ลิงก์คำเชิญ"
+      "inviteNotResendable": "ไม่สามารถส่งคำเชิญนี้อีกครั้งได้แล้ว",
+      "ownerAuthority": "เฉพาะเจ้าขององค์กรเท่านั้นที่สามารถจัดการเจ้าของได้",
+      "ownRoleChange": "คุณไม่สามารถเปลี่ยนบทบาทของตัวเองได้",
+      "inviteExpired": "คำเชิญนี้หมดอายุแล้ว",
+      "inviteAccepted": "คำเชิญนี้ได้รับการตอบรับแล้ว"
     },
     "usageStats": {
       "inputTokens": "โทเคนขาเข้า",
@@ -3379,11 +3379,11 @@
   },
   "transcriptionModel": {
     "title": "โมเดลถอดเสียง",
-    "choose": "เลือกโมเดล",
     "noneChosen": "ยังไม่ได้เลือก",
     "emptyTitle": "ไม่มีโมเดลถอดเสียง",
     "emptyDescription": "ขณะนี้ Kilo Gateway ไม่มีโมเดลถอดเสียงให้บริการ",
-    "loadFailed": "ไม่สามารถโหลดโมเดลถอดเสียงได้"
+    "loadFailed": "ไม่สามารถโหลดโมเดลถอดเสียงได้",
+    "choose": "เลือกโมเดล"
   },
   "voiceLanguage": {
     "title": "ภาษาของการพิมพ์ด้วยเสียง",
@@ -3405,7 +3405,6 @@
   },
   "modelChat": {
     "offlineFailure": "โมเดลนี้ต้องใช้การเชื่อมต่ออินเทอร์เน็ต เชื่อมต่อแล้วลองอีกครั้ง หรือเปลี่ยนไปใช้โมเดลบนอุปกรณ์นี้",
-    "creditsRequired": "เครดิตไม่เพียงพอในการส่งข้อความนี้ เติมเครดิตแล้วลองอีกครั้ง",
     "empty": {
       "title": "เริ่มแชท",
       "description": "ส่งข้อความเพื่อพูดคุยกับโมเดล"
@@ -3599,6 +3598,7 @@
       "fromHuggingFace": "จาก Hugging Face",
       "loading": "กำลังโหลดโมเดล",
       "noResults": "ไม่พบโมเดล",
+      "noResultsForQuery": "ไม่พบโมเดลสำหรับ \"{{query}}\"",
       "noFits": "ไม่มีโมเดลที่เหมาะกับอุปกรณ์นี้",
       "noFitsDescription": "โมเดลที่ใหญ่กว่าอยู่ในแท็บ$t(common.all)",
       "fit": {
@@ -3673,13 +3673,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "โมเดลนี้รองรับระดับการใช้เหตุผล"
-    }
+    },
+    "creditsRequired": "เครดิตไม่เพียงพอในการส่งข้อความนี้ เติมเครดิตแล้วลองอีกครั้ง"
   },
   "settingsTools": {
     "confirmTitle": "ยืนยันการเปลี่ยนแปลงนี้หรือไม่"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "คลังโค้ดล่าสุดของคุณ",
+      "confirmMessage": "คลังโค้ด: {{repository}} คำขอ: {{prompt}}",
+      "confirmTitle": "เริ่มเอเจนต์นี้หรือไม่?",
       "promptRequired": "การเริ่มเอเจนต์ต้องมีพรอมต์ เพิ่มพรอมต์แล้วลองอีกครั้ง",
       "repositoryRequired": "การเริ่มเอเจนต์ต้องมีคลังโค้ด เปิด Kilo แล้วเลือกคลังโค้ด จากนั้นลองอีกครั้ง",
       "repositoryUnknown": "Kilo ไม่รู้จัก {{repository}} ว่าเป็นคลังโค้ด GitHub หรือ GitLab เลือกคลังโค้ดอื่นใน Kilo",
@@ -3708,10 +3712,10 @@
     "noSpend": "ยังไม่มีการบันทึกการใช้จ่าย",
     "spend24h": "การใช้จ่ายใน 24 ชั่วโมงที่ผ่านมา",
     "multiplierError": "ป้อนตัวคูณ 1 หรือมากกว่า",
-    "multiplierMaxError": "ป้อนตัวคูณ {{max}} หรือน้อยกว่า",
-    "thresholdMaxError": "ป้อนจำนวนเงิน {{max}} หรือน้อยกว่า",
     "permissionDenied": "คุณไม่มีสิทธิ์จัดการการแจ้งเตือนการใช้จ่าย",
-    "pushOffByCategory": "ปิดในการแจ้งเตือน"
+    "pushOffByCategory": "ปิดในการแจ้งเตือน",
+    "multiplierMaxError": "ป้อนตัวคูณ {{max}} หรือน้อยกว่า",
+    "thresholdMaxError": "ป้อนจำนวนเงิน {{max}} หรือน้อยกว่า"
   },
   "profiles": {
     "title": "โปรไฟล์",
@@ -3770,7 +3774,6 @@
     },
     "variablesEmpty": "ยังไม่มีตัวแปร",
     "variablesSaveFailed": "ไม่สามารถบันทึกตัวแปรได้",
-    "variablesDeleteFailed": "ไม่สามารถลบตัวแปรได้",
     "commandsTitle": "คำสั่งการตั้งค่า",
     "addCommand": "เพิ่มคำสั่ง",
     "commandLabel": "คำสั่ง",
@@ -3781,7 +3784,6 @@
     "moveDown": "เลื่อนลง",
     "moveCommandUp": "ย้ายคำสั่ง {{position}} ขึ้น",
     "moveCommandDown": "ย้ายคำสั่ง {{position}} ลง",
-    "deleteCommand": "ลบคำสั่ง {{position}}",
     "skillsTitle": "ทักษะ",
     "addSkill": "เพิ่มทักษะ",
     "skillNameLabel": "ชื่อทักษะ",
@@ -3903,7 +3905,9 @@
       "pinFailed": "ไม่สามารถปักหมุดคลังโค้ดได้",
       "unboundToast": "เลิกผูกคลังโค้ดแล้ว",
       "unbindFailed": "ไม่สามารถเลิกผูกคลังโค้ดได้"
-    }
+    },
+    "variablesDeleteFailed": "ไม่สามารถลบตัวแปรได้",
+    "deleteCommand": "ลบคำสั่ง {{position}}"
   },
   "credits": {
     "title": "ซื้อเครดิต",
@@ -3930,7 +3934,6 @@
       "newList": "รายการใหม่",
       "empty": "ยังไม่มีรายการ",
       "couldNotLoad": "ไม่สามารถโหลดรายการได้",
-      "createFailed": "ไม่สามารถสร้างรายการได้",
       "noRepository": "ไม่มีคลังโค้ด",
       "rowA11y": "{{name}} {{openCount}}",
       "openCount_one": "เปิดอยู่ {{count}}",
@@ -3940,7 +3943,8 @@
       "archive": "เก็บถาวร",
       "unarchive": "นำออกจากที่เก็บถาวร",
       "deleteTitle": "ลบ {{name}} หรือไม่?",
-      "deleteMessage": "งานในรายการนี้จะถูกลบด้วย เซสชันยังคงอยู่"
+      "deleteMessage": "งานในรายการนี้จะถูกลบด้วย เซสชันยังคงอยู่",
+      "createFailed": "ไม่สามารถสร้างรายการได้"
     },
     "listSettings": {
       "title": "การตั้งค่ารายการ",
@@ -4008,21 +4012,20 @@
     }
   },
   "agentBriefing": {
-    "title": "สรุปยามเช้า",
+    "title": "สรุปเอเจนต์",
     "atLeast": "≥{{value}}",
     "coverageHint": "กิจกรรมย้อนหลังบางส่วนอาจขาดหายไป ≥ หมายถึงอย่างน้อยเท่านี้ ไม่ทราบไม่ได้หมายถึงศูนย์",
     "available": "สรุปที่พร้อมใช้งาน",
     "history": "ประวัติสรุป",
-    "historyHint": "รายงานจะถูกเก็บไว้ 30 วัน รวมถึงรายงานที่ปิดไปแล้ว",
+    "historyHint": "สรุปจะถูกเก็บไว้ 30 วัน รวมถึงสรุปที่ปิดไปแล้ว",
     "settings": "การตั้งค่าสรุป",
-    "saved": "บันทึกการตั้งค่าสรุปแล้ว",
-    "empty": "ไม่มีกิจกรรมในช่วงกลางคืน",
-    "emptyHint": "เซสชันเขียนโค้ดบนคลาวด์และ CLI ของคุณจะแสดงที่นี่หลังจากคืนที่มีกิจกรรม",
+    "empty": "ไม่มีกิจกรรมในช่วงเวลาของสรุปนี้",
+    "emptyHint": "เซสชันเขียนโค้ดบนคลาวด์และ CLI ของคุณจะแสดงที่นี่เมื่อสรุปตามกำหนดการมีกิจกรรม",
     "loadError": "ไม่สามารถโหลดสรุปได้",
-    "sessions": "ทำงานช่วงกลางคืน",
+    "sessions": "ทำงานในช่วงเวลา",
     "pullRequests": "PRs ที่เปิด",
     "blockers": "อุปสรรคใหม่",
-    "spend": "ค่าใช้จ่ายช่วงกลางคืน",
+    "spend": "ค่าใช้จ่ายในช่วงเวลา",
     "view": "อ่านสรุป",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -4044,13 +4047,13 @@
     "sources": "หลักฐานและอาร์ทิแฟกต์",
     "timezone": "เขตเวลาของสรุป",
     "deviceTimezone": "ใช้เขตเวลาของอุปกรณ์",
-    "timezoneHint": "เขตเวลา IANA เช่น Europe/Berlin การเปลี่ยนกำหนดเวลาจะมีผลกับคืนถัดไป",
-    "nightStart": "เริ่มกลางคืน",
-    "morningStart": "สิ้นสุดกลางคืน / เริ่มเช้า",
-    "morningEnd": "สิ้นสุดช่วงเช้า",
-    "timeHint": "การ์ดหน้าหลักจะกลับไปแสดงสถานะสดเมื่อสิ้นสุดช่วงเช้า แม้จะออฟไลน์",
-    "invalidSchedule": "เลือกเขตเวลาที่ถูกต้อง และช่วงกลางคืนกับช่วงเช้าที่ไม่ว่างและไม่ทับซ้อนกัน",
-    "notificationsHint": "แจ้งเตือนทั่วไปหนึ่งครั้งต่อเช้าเมื่อรายงานแรกพร้อม ไม่เกี่ยวกับสรุป AI แบบชำระเงิน",
+    "timezoneHint": "เขตเวลา IANA เช่น Europe/Berlin การเปลี่ยนกำหนดเวลาจะมีผลกับสรุปในอนาคต",
+    "nightStart": "เริ่มช่วงเวลาของสรุป",
+    "morningStart": "สรุปพร้อมเมื่อ",
+    "morningEnd": "สรุปพร้อมใช้งานจนถึง",
+    "timeHint": "การ์ดหน้าหลักจะกลับไปแสดงสถานะสดเมื่อสิ้นสุดช่วงเวลาของสรุป แม้จะออฟไลน์",
+    "invalidSchedule": "เลือกเขตเวลาที่ถูกต้อง และช่วงเวลาของสรุปที่ไม่ว่าง",
+    "notificationsHint": "แจ้งเตือนทั่วไปหนึ่งครั้งต่อสรุปตามกำหนดการ ไม่เกี่ยวกับสรุป AI แบบชำระเงิน",
     "notificationPermission": "เปิดการแจ้งเตือนของอุปกรณ์ใน $t(common.notifications) เพื่อรับสรุป",
     "aiOptIn": "สรุป AI แบบชำระเงิน",
     "aiHint": "เลือกใช้ได้เฉพาะบริบทนี้ ข้อความบางส่วนที่คัดเลือกและปกปิดข้อมูลแล้วพร้อมข้อเท็จจริงแบบมีโครงสร้างจะถูกส่งไปยังโมเดลของคุณในภาษาของแอป ค่าบริการหักจากยอดเงินของบริบทนี้",
@@ -4068,7 +4071,7 @@
     "contextSettings": "การตั้งค่า AI · {{context}}",
     "allContexts": "สรุปส่วนตัวและขององค์กรจะแยกจากกัน",
     "create": "สร้างสรุป",
-    "oneOff": "ครั้งเดียว",
+    "oneOff": "ตามต้องการ",
     "createdAt": "สร้างเมื่อ {{time}}",
     "chooseContext": "เลือกหนึ่งบริบท",
     "period": "ช่วงเวลาของสรุป",
@@ -4090,13 +4093,16 @@
     "emptyPeriod": "ไม่พบกิจกรรมในช่วงเวลานี้ จะไม่มีการสร้างสรุปโดย AI หรือเรียกเก็บเงิน",
     "emptyHistory": "ไม่มีสรุปที่บันทึกไว้",
     "historicalStateHint": "สถานะเซสชันแสดงสถานะ ณ สิ้นสุดช่วงเวลาที่เลือก ไม่ใช่สถานะปัจจุบันแบบเรียลไทม์",
-    "oneOffHint": "AI จะได้รับหลักฐานที่เลือกและปกปิดข้อมูลที่ละเอียดอ่อนแล้วในภาษาของแอปคุณ รายงานแบบครั้งเดียวนี้จะไม่เปลี่ยนกำหนดการยามเช้าหรือการตั้งค่า AI ของคุณ",
+    "oneOffHint": "AI จะได้รับหลักฐานที่เลือกและปกปิดข้อมูลที่ละเอียดอ่อนแล้วในภาษาของแอปคุณ สรุปตามต้องการนี้จะไม่เปลี่ยนสรุปตามกำหนดการหรือการตั้งค่า AI ของคุณ",
     "createOffline": "เชื่อมต่ออินเทอร์เน็ตเพื่อตรวจสอบหรือสร้างสรุป คำขอที่มีค่าบริการจะไม่ถูกจัดคิวขณะออฟไลน์",
     "estimateInputTooLarge": "ช่วงเวลานี้มีหลักฐานมากเกินกว่าที่โมเดลที่เลือกจะรองรับได้",
     "estimatePermissionUnavailable": "คุณไม่มีสิทธิ์ใช้ยอดเงินของบริบทนี้",
+    "createFailed": "ไม่สามารถสร้างสรุปนี้ได้",
+    "reviewFailed": "ไม่สามารถตรวจสอบสรุปนี้ได้.",
     "estimatePricingUnavailable": "ไม่มีข้อมูลราคาสำหรับโมเดลนี้",
     "estimateBalanceUnavailable": "ยอดเงินไม่เพียงพอสำหรับสรุปแบบเสียเงิน",
     "estimateModelNotAllowed": "โมเดลนี้ไม่ได้รับอนุญาตให้ใช้ที่นี่",
-    "estimateSpendLimitTooLow": "เพิ่มขีดจำกัดการใช้จ่ายเพื่ออนุญาตสรุปนี้"
+    "estimateSpendLimitTooLow": "เพิ่มขีดจำกัดการใช้จ่ายเพื่ออนุญาตสรุปนี้",
+    "saved": "บันทึกการตั้งค่าสรุปแล้ว"
   }
 }

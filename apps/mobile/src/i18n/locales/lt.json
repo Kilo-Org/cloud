@@ -66,7 +66,6 @@
     "message": "Žinutė",
     "off": "Išjungta",
     "organization": "Organizacija",
-    "organizationTrialEnded": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Organizacijos savininkas gali atnaujinti atsiskaitymo duomenis adresu kilo.ai, tada bandykite dar kartą.",
     "platform": "Platforma",
     "prReview": "PR peržiūra",
     "queued": "Eilėje",
@@ -146,7 +145,8 @@
     "agent": "Agentas",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Pakeitimai"
+    "changes": "Pakeitimai",
+    "organizationTrialEnded": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Organizacijos savininkas gali atnaujinti atsiskaitymo duomenis adresu kilo.ai, tada bandykite dar kartą."
   },
   "language": {
     "restarting": "Paleidžiama iš naujo, kad būtų pakeista kalba",
@@ -270,7 +270,6 @@
     "voiceInput": "Balso įvestis",
     "autoExpandThinking": "Automatiškai išskleisti mąstymą",
     "autoExpandThinkingSubtitle": "Baigus mąstyti, automatiškai išskleisti agento mąstymo tekstą.",
-    "autoExpandThinkingInactiveSubtitle": "Nėra poveikio, kai slepiama mąstymo informacija.",
     "hideThinking": "Slėpti mąstymo informaciją",
     "hideThinkingSubtitle": "Nerodyti agento mąstymo sesijos puslapyje.",
     "keepScreenOn": "Neišjungti ekrano sesijos puslapyje",
@@ -295,7 +294,8 @@
     "condenseToolCallsSubtitle": "Sugrupuokite vienas po kito einančius įrankių iškvietimus į vieną eilutę, kurią galite atidaryti.",
     "toolSummaryTranslation": "Išversti įrankių suvestines",
     "toolSummaryTranslationSubtitle": "Siųsk kiekvieną įrankio suvestinę modeliui, kad ji būtų išversta į tavo programėlės kalbą. Jei vertimas nepavyksta, rodomas originalas.",
-    "toolSummaryTranslationModelUnavailableNotice": "Šis modelis nebeteikiamas. Palieskite $t(common.model), kad pasirinktumėte kitą."
+    "toolSummaryTranslationModelUnavailableNotice": "Šis modelis nebeteikiamas. Palieskite $t(common.model), kad pasirinktumėte kitą.",
+    "autoExpandThinkingInactiveSubtitle": "Nėra poveikio, kai slepiama mąstymo informacija."
   },
   "prReview": {
     "pullRequestUnavailable": "Pakeitimų užklausa nepasiekiama",
@@ -1479,12 +1479,6 @@
       "findingsUnavailable": "Rezultatai nepasiekiami, nes ši peržiūra nepavyko.",
       "serviceUnavailable": "Nepavyko prisijungti prie kodo peržiūros paslaugos. Pakartokite peržiūrą, kai paslauga bus pasiekiama.",
       "reviewFailed": "Peržiūra nepavyko. Bandykite dar kartą.",
-      "cancelReasonSuperseded": "Buvo įkeltas naujesnis commit'as, todėl ši peržiūra buvo pakeista.",
-      "cancelReasonIntegrationDisconnected": "{{platform}} yra atjungtas, todėl ši peržiūra buvo atšaukta. Prijunkite jį iš naujo ir paleiskite peržiūrą dar kartą.",
-      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer buvo išjungtas Bitbucket, todėl ši peržiūra buvo atšaukta. Įjunkite jį dar kartą ir paleiskite peržiūrą iš naujo.",
-      "cancelReasonBitbucketPullRequestChanged": "Bitbucket pull request pasikeitė, todėl ši peržiūra buvo pakeista.",
-      "cancelReasonCancelled": "Ši peržiūra buvo atšaukta.",
-      "cancelReasonInterrupted": "Ši peržiūra buvo nutraukta.",
       "showMore": "Rodyti daugiau",
       "created": "Sukurta",
       "started": "Pradėta",
@@ -1511,7 +1505,13 @@
       "sessionError": "Sesijos klaida: {{error}}",
       "statusWithValue": "Būsena: {{status}}",
       "toolName": "Įrankis: {{name}}",
-      "toolNameError": "Įrankio {{name}} klaida."
+      "toolNameError": "Įrankio {{name}} klaida.",
+      "cancelReasonSuperseded": "Buvo įkeltas naujesnis commit'as, todėl ši peržiūra buvo pakeista.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} yra atjungtas, todėl ši peržiūra buvo atšaukta. Prijunkite jį iš naujo ir paleiskite peržiūrą dar kartą.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer buvo išjungtas Bitbucket, todėl ši peržiūra buvo atšaukta. Įjunkite jį dar kartą ir paleiskite peržiūrą iš naujo.",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket pull request pasikeitė, todėl ši peržiūra buvo pakeista.",
+      "cancelReasonCancelled": "Ši peržiūra buvo atšaukta.",
+      "cancelReasonInterrupted": "Ši peržiūra buvo nutraukta."
     },
     "reviewMemory": {
       "title": "Peržiūrų atmintis",
@@ -1804,7 +1804,7 @@
       "deadlinePassed": "Terminas pasibaigęs",
       "deadlinePassedDetail": "Kritinio lygio: {{critical}}, aukšto lygio: {{high}}",
       "dueThisWeek": "Terminas šią savaitę",
-      "dueThisWeekDetail": "Patvirtinta galimybė išnaudoti: {{exploitable}}",
+      "dueThisWeekDetail": "{{exploitable}} iš šių patvirtinti kaip išnaudojami",
       "noDeadline": "Nėra termino",
       "reviewSlaAssignment": "Peržiūrėti SLA terminų priskyrimą",
       "allOpenFindingsTracked": "Visi atviri radiniai stebimi"
@@ -2195,8 +2195,8 @@
       "dollar_many": "dolerio",
       "costSpoken": "kaina {{cost}}",
       "costSpokenWithTime": "kaina {{cost}}, {{time}}",
-      "spokenJoiner": "ir",
-      "pullRequest": "pakeitimų užklausa {{number}}"
+      "pullRequest": "pakeitimų užklausa {{number}}",
+      "spokenJoiner": "ir"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nepavyko atidaryti GitHub",
@@ -3236,16 +3236,16 @@
       "truncated": "Galite peržiūrėti ankstesnes kreditų operacijas."
     },
     "inviteMember": {
-      "alreadyMember": "Šis asmuo jau yra šios organizacijos narys.",
-      "alreadyInvited": "Vartotojas jau pakviestas arba jau yra narys.",
       "emailError": "Įveskite tinkamą el. pašto adresą.",
       "emailPlaceholder": "vardas@company.com",
-      "pendingInvitation": "Šiam el. pašto adresui jau išsiųstas laukiantis kvietimas.",
       "permissionDenied": "Neturite leidimo kviesti narių.",
       "roleMember": "Vaidmuo: narys.",
-      "sendError": "Nepavyko išsiųsti kvietimo.",
       "sendInvite": "Siųsti kvietimą",
-      "title": "Pakviesti narį"
+      "title": "Pakviesti narį",
+      "alreadyInvited": "Vartotojas jau pakviestas arba jau yra narys.",
+      "sendError": "Nepavyko išsiųsti kvietimo.",
+      "pendingInvitation": "Šiam el. pašto adresui jau išsiųstas laukiantis kvietimas.",
+      "alreadyMember": "Šis asmuo jau yra šios organizacijos narys."
     },
     "invoices": {
       "downloadA11y": "Atsisiųsti sąskaitą {{number}}",
@@ -3313,14 +3313,14 @@
       "emailStatusFailed": "Laiško išsiųsti nepavyko",
       "inviteCreated": "Kvietimas sukurtas",
       "pendingInvitations": "Nepriimti kvietimai",
-      "ownRoleChange": "Negalite pakeisti savo paties vaidmens.",
-      "ownerAuthority": "Tik organizacijos savininkas gali valdyti savininkus.",
-      "inviteExpired": "Šio kvietimo galiojimas baigėsi.",
-      "inviteAccepted": "Šis kvietimas jau buvo priimtas.",
-      "inviteNotResendable": "Šio kvietimo nebegalima išsiųsti dar kartą.",
       "resendInvite": "Išsiųsti kvietimą dar kartą",
+      "shareInviteLink": "Bendrinti kvietimo nuorodą",
       "resendInviteError": "Nepavyko išsiųsti kvietimo dar kartą.",
-      "shareInviteLink": "Bendrinti kvietimo nuorodą"
+      "inviteNotResendable": "Šio kvietimo nebegalima išsiųsti dar kartą.",
+      "ownerAuthority": "Tik organizacijos savininkas gali valdyti savininkus.",
+      "ownRoleChange": "Negalite pakeisti savo paties vaidmens.",
+      "inviteExpired": "Šio kvietimo galiojimas baigėsi.",
+      "inviteAccepted": "Šis kvietimas jau buvo priimtas."
     },
     "usageStats": {
       "inputTokens": "Įvesties žetonai",
@@ -3467,11 +3467,11 @@
   },
   "transcriptionModel": {
     "title": "Transkribavimo modelis",
-    "choose": "Pasirinkite modelį",
     "noneChosen": "Neišrinkta",
     "emptyTitle": "Nėra transkribavimo modelių",
     "emptyDescription": "Šiuo metu Kilo Gateway neteikia jokių transkribavimo modelių.",
-    "loadFailed": "Nepavyko įkelti transkribavimo modelių."
+    "loadFailed": "Nepavyko įkelti transkribavimo modelių.",
+    "choose": "Pasirinkite modelį"
   },
   "voiceLanguage": {
     "title": "Balso įvesties kalba",
@@ -3493,7 +3493,6 @@
   },
   "modelChat": {
     "offlineFailure": "Šiam modeliui reikalingas interneto ryšys. Prisijunkite ir bandykite dar kartą arba perjunkite į šio įrenginio modelį.",
-    "creditsRequired": "Nepakanka kreditų šiai žinutei išsiųsti. Papildykite kreditų ir bandykite dar kartą.",
     "empty": {
       "title": "Pradėti pokalbį",
       "description": "Siųskite žinutę, kad pakalbėtumėte su modeliu."
@@ -3689,6 +3688,7 @@
       "fromHuggingFace": "Iš Hugging Face",
       "loading": "Įkeliami modeliai",
       "noResults": "Modelių nerasta",
+      "noResultsForQuery": "Nerasta modelių, atitinkančių \"{{query}}\"",
       "noFits": "Šiam įrenginiui netinka nė vienas modelis",
       "noFitsDescription": "Didesni modeliai yra skirtuke „$t(common.all)“.",
       "fit": {
@@ -3763,13 +3763,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "Šis modelis palaiko mąstymo intensyvumą"
-    }
+    },
+    "creditsRequired": "Nepakanka kreditų šiai žinutei išsiųsti. Papildykite kreditų ir bandykite dar kartą."
   },
   "settingsTools": {
     "confirmTitle": "Patvirtinti šį pakeitimą?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "tavo naujausia saugykla",
+      "confirmMessage": "Saugykla: {{repository}}. Užklausa: {{prompt}}",
+      "confirmTitle": "Paleisti šį agentą?",
       "promptRequired": "Norint paleisti agentą, reikia užklausos. Pridėk užklausą ir paleisk iš naujo.",
       "repositoryRequired": "Norint paleisti agentą, reikia saugyklos. Atsidaryk Kilo ir pasirink saugyklą, tada paleisk iš naujo.",
       "repositoryUnknown": "Kilo neatpažįsta {{repository}} kaip GitHub ar GitLab saugyklos. Pasirink kitą saugyklą Kilo programoje.",
@@ -3798,10 +3802,10 @@
     "noSpend": "Išlaidų dar neužregistruota",
     "spend24h": "Išlaidos per paskutines 24 valandas",
     "multiplierError": "Įvesk daugiklį, lygų 1 arba didesnį",
-    "multiplierMaxError": "Įvesk daugiklį, lygų {{max}} arba mažesnį",
-    "thresholdMaxError": "Įveskite sumą, lygią {{max}} arba mažesnę.",
     "permissionDenied": "Neturite leidimo valdyti išlaidų įspėjimų.",
-    "pushOffByCategory": "Išjungta pranešimuose"
+    "pushOffByCategory": "Išjungta pranešimuose",
+    "multiplierMaxError": "Įvesk daugiklį, lygų {{max}} arba mažesnį",
+    "thresholdMaxError": "Įveskite sumą, lygią {{max}} arba mažesnę."
   },
   "profiles": {
     "title": "Profiliai",
@@ -3870,7 +3874,6 @@
     },
     "variablesEmpty": "Dar nėra kintamųjų",
     "variablesSaveFailed": "Nepavyko išsaugoti kintamojo",
-    "variablesDeleteFailed": "Nepavyko ištrinti kintamojo",
     "commandsTitle": "Sąrankos komandos",
     "addCommand": "Pridėti komandą",
     "commandLabel": "komandą",
@@ -3881,7 +3884,6 @@
     "moveDown": "Judėti žemyn",
     "moveCommandUp": "Perkelti komandą {{position}} aukštyn",
     "moveCommandDown": "Perkelti komandą {{position}} žemyn",
-    "deleteCommand": "Ištrinti komandą {{position}}",
     "skillsTitle": "Įgūdžiai",
     "addSkill": "Pridėkite įgūdžių",
     "skillNameLabel": "Įgūdžio pavadinimas",
@@ -4003,7 +4005,9 @@
       "pinFailed": "Nepavyko prisegti atpirkimo sandorio",
       "unboundToast": "Atpirkimas neapribotas",
       "unbindFailed": "Nepavyko atsieti atpirkimo sandorio"
-    }
+    },
+    "variablesDeleteFailed": "Nepavyko ištrinti kintamojo",
+    "deleteCommand": "Ištrinti komandą {{position}}"
   },
   "credits": {
     "title": "Pirkti kreditus",
@@ -4030,7 +4034,6 @@
       "newList": "Naujas sąrašas",
       "empty": "Sąrašų dar nėra",
       "couldNotLoad": "Sąrašų įkelti nepavyko",
-      "createFailed": "Sąrašo sukurti nepavyko",
       "noRepository": "Nėra saugyklos",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "Atviros: {{count}}",
@@ -4044,7 +4047,8 @@
       "archive": "Archyvuoti",
       "unarchive": "Išarchyvuoti",
       "deleteTitle": "Ištrinti {{name}}?",
-      "deleteMessage": "Jos užduotys taip pat ištrinamos. Jų sesijos lieka."
+      "deleteMessage": "Jos užduotys taip pat ištrinamos. Jų sesijos lieka.",
+      "createFailed": "Sąrašo sukurti nepavyko"
     },
     "listSettings": {
       "title": "Sąrašo nustatymai",
@@ -4116,21 +4120,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Rytinė suvestinė",
+    "title": "Agento suvestinė",
     "atLeast": "≥{{value}}",
     "coverageHint": "Dalies ankstesnės veiklos gali trūkti. ≥ reiškia bent tiek; nežinoma nereiškia nulio.",
     "available": "Galimos suvestinės",
     "history": "Suvestinių istorija",
-    "historyHint": "Ataskaitos saugomos 30 dienų, įskaitant atmestas.",
+    "historyHint": "Suvestinės saugomos 30 dienų, įskaitant atmestas.",
     "settings": "Suvestinės nustatymai",
-    "saved": "Suvestinės nustatymai išsaugoti",
-    "empty": "Naktį veiklos nebuvo",
-    "emptyHint": "Po aktyvios nakties čia bus rodomos jūsų debesies ir CLI programavimo sesijos.",
+    "empty": "Šiame suvestinės laikotarpyje veiklos nebuvo",
+    "emptyHint": "Jūsų debesies ir CLI programavimo sesijos bus rodomos čia, kai suplanuotoje suvestinėje bus veiklos.",
     "loadError": "Nepavyko įkelti suvestinių",
-    "sessions": "Aktyvios naktį",
+    "sessions": "Aktyvios laikotarpyje",
     "pullRequests": "Atidaryti PRs",
     "blockers": "Nauji trukdžiai",
-    "spend": "Nakties išlaidos",
+    "spend": "Išlaidos laikotarpyje",
     "view": "Skaityti suvestinę",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -4152,13 +4155,13 @@
     "sources": "Įrodymai ir artefaktai",
     "timezone": "Suvestinės laiko juosta",
     "deviceTimezone": "Naudoti įrenginio laiko juostą",
-    "timezoneHint": "IANA laiko juosta, pvz., Europe/Berlin. Grafiko pakeitimai taikomi būsimoms naktims.",
-    "nightStart": "Naktis prasideda",
-    "morningStart": "Naktis baigiasi / rytas prasideda",
-    "morningEnd": "Rytas baigiasi",
-    "timeHint": "Pasibaigus rytui pradžios kortelė vėl rodo dabartinę būseną, net neprisijungus.",
-    "invalidSchedule": "Pasirinkite tinkamą laiko juostą ir nesutampančius, netuščius nakties bei ryto laikotarpius.",
-    "notificationsHint": "Vienas bendras pranešimas kas rytą, kai paruošiama pirmoji ataskaita. Nepriklauso nuo mokamų AI santraukų.",
+    "timezoneHint": "IANA laiko juosta, pvz., Europe/Berlin. Grafiko pakeitimai taikomi būsimoms suvestinėms.",
+    "nightStart": "Suvestinės laikotarpis prasideda",
+    "morningStart": "Suvestinė paruošta",
+    "morningEnd": "Suvestinė galima iki",
+    "timeHint": "Pasibaigus suvestinės laikotarpiui pradžios kortelė vėl rodo dabartinę būseną, net neprisijungus.",
+    "invalidSchedule": "Pasirinkite tinkamą laiko juostą ir netuščią suvestinės laikotarpį.",
+    "notificationsHint": "Vienas bendras pranešimas kiekvienai suplanuotai suvestinei. Nepriklauso nuo mokamų AI santraukų.",
     "notificationPermission": "Įjunkite įrenginio pranešimus skiltyje $t(common.notifications), kad gautumėte suvestinę.",
     "aiOptIn": "Mokamos AI santraukos",
     "aiHint": "Pasirinktinai tik šiam kontekstui. Atrinktos, nuasmenintos ištraukos ir struktūriniai faktai siunčiami jūsų modeliui programėlės kalba. Mokesčiai nurašomi iš šio konteksto balanso.",
@@ -4176,7 +4179,7 @@
     "contextSettings": "AI nustatymai · {{context}}",
     "allContexts": "Asmeninės ir organizacijos suvestinės laikomos atskirai.",
     "create": "Sukurti suvestinę",
-    "oneOff": "Vienkartinė",
+    "oneOff": "Pagal poreikį",
     "createdAt": "Sukurta {{time}}",
     "chooseContext": "Pasirinkite vieną kontekstą",
     "period": "Suvestinės laikotarpis",
@@ -4198,13 +4201,16 @@
     "emptyPeriod": "Šiuo laikotarpiu veiklos nerasta. AI santrauka nebus kuriama ir mokestis nebus taikomas.",
     "emptyHistory": "Nėra išsaugotų suvestinių",
     "historicalStateHint": "Seanso būsena atspindi pasirinkto laikotarpio pabaigą, o ne dabartinę būseną.",
-    "oneOffHint": "AI gauna atrinktus duomenis su užmaskuota neskelbtina informacija jūsų programėlės kalba. Ši vienkartinė ataskaita nekeičia jūsų rytinio tvarkaraščio ar AI nuostatų.",
+    "oneOffHint": "AI gauna atrinktus duomenis su užmaskuota neskelbtina informacija jūsų programėlės kalba. Ši suvestinė pagal poreikį nekeičia jūsų suplanuotos suvestinės ar AI nuostatų.",
     "createOffline": "Prisijunkite prie interneto, kad galėtumėte peržiūrėti arba sukurti suvestinę. Mokamos užklausos niekada neįtraukiamos į eilę neprisijungus.",
     "estimateInputTooLarge": "Šio laikotarpio duomenų per daug pasirinktam modeliui.",
     "estimatePermissionUnavailable": "Neturite leidimo naudoti šio konteksto likučio.",
+    "createFailed": "Nepavyko sukurti šios suvestinės.",
+    "reviewFailed": "Nepavyko peržiūrėti šios suvestinės.",
     "estimatePricingUnavailable": "Šio modelio kainos neprieinamos.",
     "estimateBalanceUnavailable": "Nepakanka balanso mokamai santrukai.",
     "estimateModelNotAllowed": "Šis modelis čia neleidžiamas.",
-    "estimateSpendLimitTooLow": "Padidinkite išlaidų apsaugą, kad leistumėte šią santrauką."
+    "estimateSpendLimitTooLow": "Padidinkite išlaidų apsaugą, kad leistumėte šią santrauką.",
+    "saved": "Suvestinės nustatymai išsaugoti"
   }
 }

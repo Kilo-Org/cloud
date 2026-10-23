@@ -114,14 +114,14 @@ export function RenameModal<TSaveResult>({
         ref={inputRef}
         accessible
         accessibilityLabel={placeholder}
-        // Single-line: leading-[normal] (not leading-5) so no lineHeight reaches
+        // Single-line: leading-[normal] (not leading-[1.25rem]) so no lineHeight reaches
         // the style: a lineHeight above the font's natural one makes iOS draw the
         // placeholder lower than the typed text and clip its bottom.
-        // Multi-line: an explicit leading-5 plus bounded min/max heights, so the
+        // Multi-line: an explicit leading-[1.25rem] plus bounded min/max heights, so the
         // value soft-wraps into the field and scrolls vertically past the cap.
         className={cn(
           'rounded-md border border-input bg-background pl-3 pr-3 text-sm text-foreground',
-          multiline ? 'py-2.5 max-h-40 min-h-24 leading-5' : 'leading-[normal]',
+          multiline ? 'py-2.5 max-h-40 min-h-24 leading-[1.25rem]' : 'leading-[normal]',
           pending && 'opacity-50'
         )}
         placeholder={placeholder}

@@ -38,6 +38,7 @@ import { Text } from '@/components/ui/text';
 import { useAgentProfile, useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { usePopWhenFocused } from '@/lib/navigation/pop-when-focused';
 import { useTRPC } from '@/lib/trpc';
 import {
   getProfileAgentsPath,
@@ -92,6 +93,7 @@ export function ProfileOverviewScreen({
   stack: ProfileManagementStack;
 }>) {
   const router = useRouter();
+  const popWhenFocused = usePopWhenFocused();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const colors = useThemeColors();
@@ -144,7 +146,9 @@ export function ProfileOverviewScreen({
     try {
       await deleteProfile.mutateAsync({ profileId });
       toast.success(t('profiles.deletedToast', { name: profileName }));
-      router.back();
+      // Back during the delete already left this profile; a second pop would
+      // remove the profiles list beneath it.
+      popWhenFocused();
     } catch (error) {
       if (deleteErrorMessage(error) === 'blocked') {
         toast.error(t('profiles.deleteBlocked'));

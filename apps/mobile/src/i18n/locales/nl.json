@@ -66,7 +66,6 @@
     "message": "Bericht",
     "off": "Uit",
     "organization": "Organisatie",
-    "organizationTrialEnded": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Een eigenaar van de organisatie kan de facturering bijwerken op kilo.ai en het daarna opnieuw proberen.",
     "platform": "Codeplatform",
     "prReview": "PR-beoordeling",
     "queued": "In de wachtrij",
@@ -146,7 +145,8 @@
     "agent": "Tussenpersoon",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Wijzigingen"
+    "changes": "Wijzigingen",
+    "organizationTrialEnded": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Een eigenaar van de organisatie kan de facturering bijwerken op kilo.ai en het daarna opnieuw proberen."
   },
   "language": {
     "restarting": "Opnieuw starten om de taal in te stellen",
@@ -270,7 +270,6 @@
     "voiceInput": "Spraakinvoer",
     "autoExpandThinking": "Gedachtegang automatisch uitvouwen",
     "autoExpandThinkingSubtitle": "Toon de volledige gedachtegang van de agent zodra die klaar is met nadenken.",
-    "autoExpandThinkingInactiveSubtitle": "Heeft geen effect zolang de details van de gedachtegang verborgen zijn.",
     "hideThinking": "Details van gedachtegang verbergen",
     "hideThinkingSubtitle": "Toon de gedachtegang van de agent niet op de sessiepagina.",
     "keepScreenOn": "Scherm aanhouden op de sessiepagina",
@@ -295,7 +294,8 @@
     "condenseToolCallsSubtitle": "Groepeer opeenvolgende tool-aanroepen in één rij die je kunt openen.",
     "toolSummaryTranslation": "Hulpmiddelsamenvattingen vertalen",
     "toolSummaryTranslationSubtitle": "Stuur elke hulpmiddelsamenvatting naar een model om die naar je app-taal te vertalen. Het origineel wordt getoond als de vertaling mislukt.",
-    "toolSummaryTranslationModelUnavailableNotice": "Dit model wordt niet meer aangeboden. Tik op $t(common.model) om een ander te kiezen."
+    "toolSummaryTranslationModelUnavailableNotice": "Dit model wordt niet meer aangeboden. Tik op $t(common.model) om een ander te kiezen.",
+    "autoExpandThinkingInactiveSubtitle": "Heeft geen effect zolang de details van de gedachtegang verborgen zijn."
   },
   "notifications": {
     "channel": {
@@ -917,6 +917,8 @@
       "invalidUrl": "Voer een geldige URL van een PR in.",
       "pullRequestUrl": "URL van de PR",
       "start": "Review starten",
+      "starting": "Review wordt gestart…",
+      "title": "Handmatige review",
       "startNotFound": "Kon die {{requestNoun}} niet lezen van {{provider}}. Controleer de URL en of de repository toegankelijk is.",
       "startRateLimited": "{{provider}} beperkt op dit moment het aantal verzoeken. Probeer het over een paar minuten opnieuw.",
       "startNotAllowed": "Je hebt geen toegang om een review te starten voor die {{requestNoun}}. Controleer je rechten en het plan van je organisatie.",
@@ -924,9 +926,7 @@
       "startAlreadyRunning": "Er loopt al een review voor die {{requestNoun}}.",
       "startRejected": "Die {{requestNoun}} kan niet worden gereviewd. Zorg dat deze openstaat, geen concept is en dat de URL klopt.",
       "startProviderUnavailable": "{{provider}} kon niet worden bereikt om die {{requestNoun}} te lezen. Probeer het opnieuw.",
-      "startFailed": "De review kon niet worden gestart. Controleer je verbinding en probeer het opnieuw.",
-      "starting": "Review wordt gestart…",
-      "title": "Handmatige review"
+      "startFailed": "De review kon niet worden gestart. Controleer je verbinding en probeer het opnieuw."
     },
     "notConnectedReadOnly": "{{platform}} is niet gekoppeld. Alleen organisatie-eigenaren en beheerders kunnen de koppeling instellen.",
     "gitlab": {
@@ -964,12 +964,6 @@
       "findingsUnavailable": "De resultaten zijn niet beschikbaar omdat deze review is mislukt.",
       "serviceUnavailable": "De codereviewservice kon niet worden bereikt. Probeer de review opnieuw wanneer de service beschikbaar is.",
       "reviewFailed": "De review is mislukt. Probeer het opnieuw.",
-      "cancelReasonSuperseded": "Er is een nieuwere commit gepusht, dus deze review is vervangen.",
-      "cancelReasonIntegrationDisconnected": "{{platform}} is niet verbonden, dus deze review is geannuleerd. Maak opnieuw verbinding en voer de review opnieuw uit.",
-      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer is uitgeschakeld voor Bitbucket, dus deze review is geannuleerd. Schakel het opnieuw in en voer de review opnieuw uit.",
-      "cancelReasonBitbucketPullRequestChanged": "De Bitbucket pull request is gewijzigd, dus deze review is vervangen.",
-      "cancelReasonCancelled": "Deze review is geannuleerd.",
-      "cancelReasonInterrupted": "Deze review is onderbroken.",
       "retryMessage": "Dit voert de codereview opnieuw uit.",
       "retryReview": "Review opnieuw proberen",
       "retryNeedsSettings": "De Codebeoordelaar staat uit of de instellingen vragen aandacht. Herstel de instellingen en probeer deze review daarna opnieuw.",
@@ -995,7 +989,13 @@
       "sessionError": "Er is een fout opgetreden in de sessie: {{error}}.",
       "statusWithValue": "Huidige status: {{status}}",
       "toolName": "Hulpmiddel: {{name}}",
-      "toolNameError": "Er is een fout opgetreden in het hulpmiddel {{name}}."
+      "toolNameError": "Er is een fout opgetreden in het hulpmiddel {{name}}.",
+      "cancelReasonSuperseded": "Er is een nieuwere commit gepusht, dus deze review is vervangen.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} is niet verbonden, dus deze review is geannuleerd. Maak opnieuw verbinding en voer de review opnieuw uit.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer is uitgeschakeld voor Bitbucket, dus deze review is geannuleerd. Schakel het opnieuw in en voer de review opnieuw uit.",
+      "cancelReasonBitbucketPullRequestChanged": "De Bitbucket pull request is gewijzigd, dus deze review is vervangen.",
+      "cancelReasonCancelled": "Deze review is geannuleerd.",
+      "cancelReasonInterrupted": "Deze review is onderbroken."
     },
     "reviewList": {
       "configureProvider": "Platform instellen",
@@ -1275,7 +1275,7 @@
       "deadlinePassed": "Deadline verstreken",
       "deadlinePassedDetail": "{{critical}} kritiek, {{high}} hoog",
       "dueThisWeek": "Deadline deze week",
-      "dueThisWeekDetail": "Misbruik bevestigd bij {{exploitable}} bevindingen",
+      "dueThisWeekDetail": "Waarvan misbruik bevestigd bij {{exploitable}} bevindingen",
       "noDeadline": "Geen deadline",
       "reviewSlaAssignment": "SLA-toewijzing controleren",
       "allOpenFindingsTracked": "Alle open bevindingen bijgehouden"
@@ -1611,8 +1611,8 @@
       "dollar_other": "dollar",
       "costSpoken": "kosten {{cost}}",
       "costSpokenWithTime": "kosten {{cost}}, {{time}}",
-      "spokenJoiner": "en",
-      "pullRequest": "pR {{number}}"
+      "pullRequest": "pR {{number}}",
+      "spokenJoiner": "en"
     },
     "githubInstall": {
       "couldNotOpenMessage": "We konden de installatie van de GitHub-app niet starten. Probeer het opnieuw.",
@@ -3149,16 +3149,16 @@
       "renameTitle": "Organisatie hernoemen"
     },
     "inviteMember": {
-      "alreadyMember": "Deze persoon is al lid van deze organisatie.",
-      "alreadyInvited": "Dit e-mailadres is al uitgenodigd of is al lid.",
       "emailError": "Voer een geldig e-mailadres in.",
       "emailPlaceholder": "naam@bedrijf.nl",
-      "pendingInvitation": "Dit e-mailadres heeft al een openstaande uitnodiging.",
       "permissionDenied": "Je hebt geen toestemming om leden uit te nodigen.",
       "roleMember": "Rol: lid",
-      "sendError": "De uitnodiging kon niet worden verzonden.",
       "sendInvite": "Uitnodiging verzenden",
-      "title": "Lid uitnodigen"
+      "title": "Lid uitnodigen",
+      "alreadyInvited": "Dit e-mailadres is al uitgenodigd of is al lid.",
+      "sendError": "De uitnodiging kon niet worden verzonden.",
+      "pendingInvitation": "Dit e-mailadres heeft al een openstaande uitnodiging.",
+      "alreadyMember": "Deze persoon is al lid van deze organisatie."
     },
     "invoices": {
       "downloadA11y": "Factuur {{number}} downloaden",
@@ -3226,14 +3226,14 @@
       "emailStatusFailed": "E-mail verzenden mislukt",
       "inviteCreated": "Uitnodiging aangemaakt",
       "pendingInvitations": "Openstaande uitnodigingen",
-      "ownRoleChange": "Je kunt je eigen rol niet wijzigen.",
-      "ownerAuthority": "Alleen een organisatie-eigenaar kan eigenaren beheren.",
-      "inviteExpired": "Deze uitnodiging is verlopen.",
-      "inviteAccepted": "Deze uitnodiging is al geaccepteerd.",
-      "inviteNotResendable": "Deze uitnodiging kan niet meer opnieuw worden verzonden.",
       "resendInvite": "Uitnodiging opnieuw verzenden",
+      "shareInviteLink": "Uitnodigingslink delen",
       "resendInviteError": "De uitnodiging kon niet opnieuw worden verzonden.",
-      "shareInviteLink": "Uitnodigingslink delen"
+      "inviteNotResendable": "Deze uitnodiging kan niet meer opnieuw worden verzonden.",
+      "ownerAuthority": "Alleen een organisatie-eigenaar kan eigenaren beheren.",
+      "ownRoleChange": "Je kunt je eigen rol niet wijzigen.",
+      "inviteExpired": "Deze uitnodiging is verlopen.",
+      "inviteAccepted": "Deze uitnodiging is al geaccepteerd."
     },
     "usageStats": {
       "inputTokens": "Invoertokens",
@@ -3379,11 +3379,11 @@
   },
   "transcriptionModel": {
     "title": "Transcriptiemodel",
-    "choose": "Kies een model",
     "noneChosen": "Geen gekozen",
     "emptyTitle": "Geen transcriptiemodellen",
     "emptyDescription": "Kilo Gateway biedt op dit moment geen transcriptiemodellen.",
-    "loadFailed": "De transcriptiemodellen konden niet worden geladen."
+    "loadFailed": "De transcriptiemodellen konden niet worden geladen.",
+    "choose": "Kies een model"
   },
   "voiceLanguage": {
     "title": "Taal van spraakinvoer",
@@ -3405,7 +3405,6 @@
   },
   "modelChat": {
     "offlineFailure": "Dit model heeft een internetverbinding nodig. Maak verbinding en probeer het opnieuw, of schakel over naar een model op dit apparaat.",
-    "creditsRequired": "Niet genoeg tegoed om dit bericht te verzenden. Vul je tegoed aan en probeer het opnieuw.",
     "empty": {
       "title": "Start een chat",
       "description": "Stuur een bericht om met een model te praten."
@@ -3599,6 +3598,7 @@
       "fromHuggingFace": "Van Hugging Face",
       "loading": "Modellen laden",
       "noResults": "Geen modellen gevonden",
+      "noResultsForQuery": "Geen modellen gevonden voor \"{{query}}\"",
       "noFits": "Geen modellen passen op dit apparaat",
       "noFitsDescription": "Grotere modellen staan op het tabblad $t(common.all).",
       "fit": {
@@ -3673,13 +3673,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "Dit model ondersteunt denkinspanning"
-    }
+    },
+    "creditsRequired": "Niet genoeg tegoed om dit bericht te verzenden. Vul je tegoed aan en probeer het opnieuw."
   },
   "settingsTools": {
     "confirmTitle": "Deze wijziging bevestigen?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "je meest recente repository",
+      "confirmMessage": "Repository: {{repository}}. Verzoek: {{prompt}}",
+      "confirmTitle": "Deze agent starten?",
       "promptRequired": "Agent starten vereist een prompt. Voeg een prompt toe en voer de actie opnieuw uit.",
       "repositoryRequired": "Agent starten vereist een repository. Open Kilo en kies er een, voer de actie daarna opnieuw uit.",
       "repositoryUnknown": "Kilo herkent {{repository}} niet als GitHub- of GitLab-repository. Kies een andere repository in Kilo.",
@@ -3708,10 +3712,10 @@
     "noSpend": "Nog geen besteding geregistreerd",
     "spend24h": "Besteding in de afgelopen 24 uur",
     "multiplierError": "Voer een vermenigvuldiger van 1 of meer in",
-    "multiplierMaxError": "Voer een vermenigvuldiger van {{max}} of minder in",
-    "thresholdMaxError": "Voer een bedrag van {{max}} of minder in.",
     "permissionDenied": "Je hebt geen toestemming om bestedingswaarschuwingen te beheren.",
-    "pushOffByCategory": "Uit in Meldingen"
+    "pushOffByCategory": "Uit in Meldingen",
+    "multiplierMaxError": "Voer een vermenigvuldiger van {{max}} of minder in",
+    "thresholdMaxError": "Voer een bedrag van {{max}} of minder in."
   },
   "profiles": {
     "title": "Profielen",
@@ -3770,7 +3774,6 @@
     },
     "variablesEmpty": "Nog geen variabelen",
     "variablesSaveFailed": "Kan variabele niet opslaan",
-    "variablesDeleteFailed": "Kan variabele niet verwijderen",
     "commandsTitle": "Instelopdrachten",
     "addCommand": "Commando toevoegen",
     "commandLabel": "Commando",
@@ -3781,7 +3784,6 @@
     "moveDown": "Ga naar beneden",
     "moveCommandUp": "Commando {{position}} omhoog verplaatsen",
     "moveCommandDown": "Commando {{position}} omlaag verplaatsen",
-    "deleteCommand": "Commando {{position}} verwijderen",
     "skillsTitle": "Vaardigheden",
     "addSkill": "Vaardigheid toevoegen",
     "skillNameLabel": "Vaardigheidsnaam",
@@ -3903,7 +3905,9 @@
       "pinFailed": "Kan de opslagplaats niet vastzetten",
       "unboundToast": "Repo niet geconsolideerd",
       "unbindFailed": "Kan repository niet ongedaan maken"
-    }
+    },
+    "variablesDeleteFailed": "Kan variabele niet verwijderen",
+    "deleteCommand": "Commando {{position}} verwijderen"
   },
   "credits": {
     "title": "Credits kopen",
@@ -3930,7 +3934,6 @@
       "newList": "Nieuwe lijst",
       "empty": "Nog geen lijsten",
       "couldNotLoad": "De lijsten konden niet worden geladen",
-      "createFailed": "De lijst kon niet worden aangemaakt",
       "noRepository": "Geen coderepository",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} open",
@@ -3940,7 +3943,8 @@
       "archive": "Archiveren",
       "unarchive": "Archivering ongedaan maken",
       "deleteTitle": "{{name}} verwijderen?",
-      "deleteMessage": "De taken erin worden ook verwijderd. De sessies blijven bestaan."
+      "deleteMessage": "De taken erin worden ook verwijderd. De sessies blijven bestaan.",
+      "createFailed": "De lijst kon niet worden aangemaakt"
     },
     "listSettings": {
       "title": "Lijstinstellingen",
@@ -4008,21 +4012,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Ochtendbriefing",
+    "title": "Agentbriefing",
     "atLeast": "≥{{value}}",
     "coverageHint": "Er kan historische activiteit ontbreken. ≥ betekent minstens zoveel; onbekend is niet nul.",
     "available": "Beschikbare briefings",
     "history": "Briefinggeschiedenis",
-    "historyHint": "Rapporten worden 30 dagen bewaard, ook gesloten rapporten.",
+    "historyHint": "Briefings worden 30 dagen bewaard, inclusief genegeerde briefings.",
     "settings": "Briefinginstellingen",
-    "saved": "Briefinginstellingen opgeslagen",
-    "empty": "Geen nachtelijke activiteit",
-    "emptyHint": "Je cloud- en CLI-codeersessies verschijnen hier na een actieve nacht.",
+    "empty": "Geen activiteit in dit briefingvenster",
+    "emptyHint": "Je cloud- en CLI-codeersessies verschijnen hier wanneer een geplande briefing activiteit heeft.",
     "loadError": "Briefings konden niet worden geladen",
-    "sessions": "Actief vannacht",
+    "sessions": "Actief in dit venster",
     "pullRequests": "PRs geopend",
     "blockers": "Nieuwe blokkades",
-    "spend": "Uitgaven vannacht",
+    "spend": "Uitgaven in dit venster",
     "view": "Briefing lezen",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -4044,13 +4047,13 @@
     "sources": "Bewijs en artefacten",
     "timezone": "Tijdzone briefing",
     "deviceTimezone": "Tijdzone van apparaat gebruiken",
-    "timezoneHint": "IANA-tijdzone, bijvoorbeeld Europe/Berlin. Schemawijzigingen gelden voor toekomstige nachten.",
-    "nightStart": "Nacht begint",
-    "morningStart": "Nacht eindigt / ochtend begint",
-    "morningEnd": "Ochtend eindigt",
-    "timeHint": "De Home-kaart toont weer de live status als de ochtend eindigt, ook offline.",
-    "invalidSchedule": "Kies een geldige tijdzone en niet-overlappende, niet-lege nacht- en ochtendperiodes.",
-    "notificationsHint": "Eén algemene melding per ochtend zodra je eerste rapport klaar is. Los van betaalde AI-samenvattingen.",
+    "timezoneHint": "IANA-tijdzone, bijvoorbeeld Europe/Berlin. Schemawijzigingen gelden voor toekomstige briefings.",
+    "nightStart": "Briefingvenster begint",
+    "morningStart": "Briefing gereed om",
+    "morningEnd": "Briefing beschikbaar tot",
+    "timeHint": "De Home-kaart toont weer de live status als het briefingvenster eindigt, ook offline.",
+    "invalidSchedule": "Kies een geldige tijdzone en een niet-leeg briefingvenster.",
+    "notificationsHint": "Eén algemene melding per geplande briefing. Los van betaalde AI-samenvattingen.",
     "notificationPermission": "Schakel apparaatmeldingen in bij $t(common.notifications) om je briefing te ontvangen.",
     "aiOptIn": "Betaalde AI-samenvattingen",
     "aiHint": "Optioneel, alleen voor deze context. Geselecteerde, geredigeerde fragmenten en gestructureerde feiten worden in je apptaal naar je model gestuurd. Kosten gaan van het saldo van deze context af.",
@@ -4068,7 +4071,7 @@
     "contextSettings": "AI-instellingen · {{context}}",
     "allContexts": "Persoonlijke en organisatiebriefings blijven gescheiden.",
     "create": "Briefing maken",
-    "oneOff": "Eenmalig",
+    "oneOff": "Op aanvraag",
     "createdAt": "Aangemaakt op {{time}}",
     "chooseContext": "Kies één context",
     "period": "Briefingperiode",
@@ -4090,13 +4093,16 @@
     "emptyPeriod": "Geen activiteit gevonden in deze periode. Er wordt geen AI-samenvatting gemaakt en er worden geen kosten in rekening gebracht.",
     "emptyHistory": "Geen opgeslagen briefings",
     "historicalStateHint": "De sessiestatus geeft de situatie aan het einde van de geselecteerde periode weer, niet de huidige livestatus.",
-    "oneOffHint": "AI ontvangt geselecteerd bewijsmateriaal waaruit gevoelige gegevens zijn verwijderd, in de taal van je app. Dit eenmalige rapport verandert je ochtendschema of AI-voorkeuren niet.",
+    "oneOffHint": "AI ontvangt geselecteerd bewijsmateriaal waaruit gevoelige gegevens zijn verwijderd, in de taal van je app. Deze briefing op aanvraag verandert je geplande briefing of AI-voorkeuren niet.",
     "createOffline": "Maak verbinding met internet om een briefing te bekijken of te maken. Betaalde verzoeken worden offline nooit in de wachtrij geplaatst.",
     "estimateInputTooLarge": "Deze periode bevat te veel bewijsmateriaal voor het geselecteerde model.",
     "estimatePermissionUnavailable": "Je hebt geen toestemming om het saldo van deze context te gebruiken.",
+    "createFailed": "Deze briefing kon niet worden gemaakt.",
+    "reviewFailed": "Deze briefing kon niet worden bekeken.",
     "estimatePricingUnavailable": "De prijs van dit model is niet beschikbaar.",
     "estimateBalanceUnavailable": "Onvoldoende saldo voor een betaalde samenvatting.",
     "estimateModelNotAllowed": "Dit model is hier niet toegestaan.",
-    "estimateSpendLimitTooLow": "Verhoog de uitgavenbeveiliging om deze samenvatting toe te staan."
+    "estimateSpendLimitTooLow": "Verhoog de uitgavenbeveiliging om deze samenvatting toe te staan.",
+    "saved": "Briefinginstellingen opgeslagen"
   }
 }

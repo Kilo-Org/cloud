@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { appSceneLayout } from '@/components/app-screen-layout';
 
 import { TabSwitchInputSettle } from '@/components/tab-screen-input-gate';
 import { settleTabSwitchInput } from '@/lib/tab-switch-input-gate';
@@ -14,6 +15,7 @@ export default function HomeLayout() {
   return (
     <TabSwitchInputSettle>
       <Stack
+        screenLayout={appSceneLayout}
         screenOptions={{ headerShown: false }}
         // A push or a pop moves a screen that is still the touch target until
         // the transition ends, so that is where the input window can close for

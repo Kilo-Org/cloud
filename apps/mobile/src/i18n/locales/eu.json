@@ -66,7 +66,6 @@
     "message": "Mezua",
     "off": "Desaktibatuta",
     "organization": "Erakundea",
-    "organizationTrialEnded": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Erakundearen jabe batek fakturazioa egunera dezake kilo.ai-n, eta gero berriro saiatu.",
     "platform": "Plataforma",
     "prReview": "PR-en berrikuspena",
     "queued": "Ilaran",
@@ -146,7 +145,8 @@
     "agent": "Agentea",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Aldaketak"
+    "changes": "Aldaketak",
+    "organizationTrialEnded": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Erakundearen jabe batek fakturazioa egunera dezake kilo.ai-n, eta gero berriro saiatu."
   },
   "language": {
     "restarting": "Hizkuntza aplikatzeko berrabiarazten",
@@ -270,7 +270,6 @@
     "voiceInput": "Ahots-sarrera",
     "autoExpandThinking": "Zabaldu pentsamendua automatikoki",
     "autoExpandThinkingSubtitle": "Erakutsi agentearen pentsamendua zabalduta amaitzen denean.",
-    "autoExpandThinkingInactiveSubtitle": "Ez du eraginik pentsamenduaren xehetasunak ezkutatuta dauden bitartean.",
     "hideThinking": "Ezkutatu pentsamenduaren xehetasunak",
     "hideThinkingSubtitle": "Ez erakutsi agentearen pentsamendua saio-orrian.",
     "keepScreenOn": "Mantendu pantaila piztuta saio-orrian",
@@ -295,7 +294,8 @@
     "condenseToolCallsSubtitle": "Elkartu jarraian dauden tresna-deiak ireki dezakezun errenkada batean.",
     "toolSummaryTranslation": "Itzuli tresnen laburpenak",
     "toolSummaryTranslationSubtitle": "Bidali tresna-laburpen bakoitza eredu batera zure aplikazioaren hizkuntzara itzultzeko. Jatorrizkoa erakutsiko da itzulpenak huts eginez gero.",
-    "toolSummaryTranslationModelUnavailableNotice": "Eredu hau jada ez da eskaintzen. Sakatu $t(common.model) beste bat hautatzeko."
+    "toolSummaryTranslationModelUnavailableNotice": "Eredu hau jada ez da eskaintzen. Sakatu $t(common.model) beste bat hautatzeko.",
+    "autoExpandThinkingInactiveSubtitle": "Ez du eraginik pentsamenduaren xehetasunak ezkutatuta dauden bitartean."
   },
   "prReview": {
     "pullRequestUnavailable": "Bateratze-eskaera ez dago eskuragarri",
@@ -1435,12 +1435,6 @@
       "findingsUnavailable": "Emaitzak ez daude erabilgarri, berrikuspen honek huts egin duelako.",
       "serviceUnavailable": "Ezin izan da kodea berrikusteko zerbitzuarekin konektatu. Egin berrikuspena berriro zerbitzua erabilgarri dagoenean.",
       "reviewFailed": "Berrikuspenak huts egin du. Saiatu berriro, mesedez.",
-      "cancelReasonSuperseded": "Commit berri bat push egin da, beraz berrikuspen hau ordeztu da.",
-      "cancelReasonIntegrationDisconnected": "{{platform}} deskonektatuta dago, beraz berrikuspen hau bertan behera utzi da. Konektatu berriro, eta exekutatu berrikuspena berriro.",
-      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer itzali egin da Bitbucket-erako, beraz berrikuspen hau bertan behera utzi da. Gaitu berriro, eta exekutatu berrikuspena berriro.",
-      "cancelReasonBitbucketPullRequestChanged": "Bitbucket-eko pull requesta aldatu da, beraz berrikuspen hau ordeztu da.",
-      "cancelReasonCancelled": "Berrikuspen hau bertan behera utzi da.",
-      "cancelReasonInterrupted": "Berrikuspen hau eten da.",
       "showMore": "Erakutsi gehiago",
       "created": "Sortuta",
       "started": "Hasita",
@@ -1467,7 +1461,13 @@
       "sessionError": "Errore bat gertatu da saioan: {{error}}.",
       "statusWithValue": "Egoera: {{status}}",
       "toolName": "Tresna: {{name}}",
-      "toolNameError": "{{name}} tresnak errore bat izan du."
+      "toolNameError": "{{name}} tresnak errore bat izan du.",
+      "cancelReasonSuperseded": "Commit berri bat push egin da, beraz berrikuspen hau ordeztu da.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} deskonektatuta dago, beraz berrikuspen hau bertan behera utzi da. Konektatu berriro, eta exekutatu berrikuspena berriro.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer itzali egin da Bitbucket-erako, beraz berrikuspen hau bertan behera utzi da. Gaitu berriro, eta exekutatu berrikuspena berriro.",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket-eko pull requesta aldatu da, beraz berrikuspen hau ordeztu da.",
+      "cancelReasonCancelled": "Berrikuspen hau bertan behera utzi da.",
+      "cancelReasonInterrupted": "Berrikuspen hau eten da."
     },
     "reviewMemory": {
       "title": "Berrikuspen-memoria",
@@ -1754,7 +1754,7 @@
       "deadlinePassed": "Epea gainditu da",
       "deadlinePassedDetail": "{{critical}} kritiko, {{high}} larritasun altuko",
       "dueThisWeek": "Aste honetan amaitzen da",
-      "dueThisWeekDetail": "{{exploitable}} ustiagarri direla baieztatuta",
+      "dueThisWeekDetail": "Horietatik {{exploitable}} ustiagarri direla baieztatuta",
       "noDeadline": "Eperik gabe",
       "reviewSlaAssignment": "Berrikusi SLAren esleipena",
       "allOpenFindingsTracked": "Aurkikuntza ireki guztien jarraipena egiten da"
@@ -2135,8 +2135,8 @@
       "dollar_other": "dolar",
       "costSpoken": "kostua: {{cost}}",
       "costSpokenWithTime": "kostua: {{cost}}, {{time}}",
-      "spokenJoiner": "eta",
-      "pullRequest": "{{number}}. bateratze-eskaera"
+      "pullRequest": "{{number}}. bateratze-eskaera",
+      "spokenJoiner": "eta"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ezin izan da GitHub ireki",
@@ -3150,16 +3150,16 @@
       "truncated": "Aurreko kreditu-jarduera eskuragarri dago."
     },
     "inviteMember": {
-      "alreadyMember": "Pertsona hau dagoeneko erakunde honetako kidea da.",
-      "alreadyInvited": "Dagoeneko gonbidatuta dago edo dagoeneko kidea da.",
       "emailError": "Sartu baliozko helbide elektroniko bat.",
       "emailPlaceholder": "izena@enpresa.eus",
-      "pendingInvitation": "Helbide elektroniko honek dagoeneko gonbidapen bat du zain.",
       "permissionDenied": "Ez duzu kideak gonbidatzeko baimenik.",
       "roleMember": "Rola: kidea",
-      "sendError": "Ezin izan da gonbidapena bidali.",
       "sendInvite": "Bidali gonbidapena",
-      "title": "Gonbidatu kidea"
+      "title": "Gonbidatu kidea",
+      "alreadyInvited": "Dagoeneko gonbidatuta dago edo dagoeneko kidea da.",
+      "sendError": "Ezin izan da gonbidapena bidali.",
+      "pendingInvitation": "Helbide elektroniko honek dagoeneko gonbidapen bat du zain.",
+      "alreadyMember": "Pertsona hau dagoeneko erakunde honetako kidea da."
     },
     "invoices": {
       "downloadA11y": "Deskargatu {{number}} faktura",
@@ -3227,14 +3227,14 @@
       "emailStatusFailed": "Mezu elektronikoaren bidalketak huts egin du",
       "inviteCreated": "Gonbidapena sortuta",
       "pendingInvitations": "Onartzeko zain dauden gonbidapenak",
-      "ownRoleChange": "Ezin duzu zure rola aldatu.",
-      "ownerAuthority": "Erakunde baten jabeak soilik kudea ditzake beste jabeak.",
-      "inviteExpired": "Gonbidapen hau iraungi da.",
-      "inviteAccepted": "Gonbidapen hau dagoeneko onartu da.",
-      "inviteNotResendable": "Gonbidapen hau ezin da berriro bidali.",
       "resendInvite": "Bidali gonbidapena berriro",
+      "shareInviteLink": "Partekatu gonbidapen-esteka",
       "resendInviteError": "Ezin izan da gonbidapena berriro bidali.",
-      "shareInviteLink": "Partekatu gonbidapen-esteka"
+      "inviteNotResendable": "Gonbidapen hau ezin da berriro bidali.",
+      "ownerAuthority": "Erakunde baten jabeak soilik kudea ditzake beste jabeak.",
+      "ownRoleChange": "Ezin duzu zure rola aldatu.",
+      "inviteExpired": "Gonbidapen hau iraungi da.",
+      "inviteAccepted": "Gonbidapen hau dagoeneko onartu da."
     },
     "usageStats": {
       "inputTokens": "Sarrerako tokenak",
@@ -3379,11 +3379,11 @@
   },
   "transcriptionModel": {
     "title": "Transkripzio-eredua",
-    "choose": "Hautatu eredu bat",
     "noneChosen": "Ezer hautatu gabe",
     "emptyTitle": "Ez dago transkripzio-eredurik",
     "emptyDescription": "Kilo Gateway-k ez du transkripzio-eredurik eskaintzen oraintxe.",
-    "loadFailed": "Ezin izan dira transkripzio-ereduak kargatu."
+    "loadFailed": "Ezin izan dira transkripzio-ereduak kargatu.",
+    "choose": "Hautatu eredu bat"
   },
   "voiceLanguage": {
     "title": "Ahots-sarreraren hizkuntza",
@@ -3405,7 +3405,6 @@
   },
   "modelChat": {
     "offlineFailure": "Modelo honek interneteko konexioa behar du. Konektatu eta saiatu berriro, edo aldatu gailu honetako modelo batera.",
-    "creditsRequired": "Ez dago kreditu nahiko mezu hau bidaltzeko. Gehitu kredituak eta saiatu berriro.",
     "empty": {
       "title": "Hasi txat bat",
       "description": "Bidali mezu bat modelo batekin hitz egiteko."
@@ -3599,6 +3598,7 @@
       "fromHuggingFace": "Hugging Face-tik",
       "loading": "Modeloak kargatzen",
       "noResults": "Ez da modelorik aurkitu",
+      "noResultsForQuery": "Ez da aurkitu modelorik \"{{query}}\" bilaketarako",
       "noFits": "Ez dago gailu honetan sartzen den modelorik",
       "noFitsDescription": "Modelo handiagoak $t(common.all) fitxan daude.",
       "fit": {
@@ -3673,13 +3673,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "Modelo honek arrazoiketa-ahalegina onartzen du"
-    }
+    },
+    "creditsRequired": "Ez dago kreditu nahiko mezu hau bidaltzeko. Gehitu kredituak eta saiatu berriro."
   },
   "settingsTools": {
     "confirmTitle": "Aldaketa hau berretsi?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "zure azken biltegia",
+      "confirmMessage": "Biltegia: {{repository}}. Eskaera: {{prompt}}",
+      "confirmTitle": "Agente hau hasi?",
       "promptRequired": "Agentea hasteko eskaera behar da. Gehitu eskaera bat eta exekutatu berriro.",
       "repositoryRequired": "Agentea hasteko biltegi bat behar da. Ireki Kilo, aukeratu bat eta exekutatu berriro.",
       "repositoryUnknown": "Kilok ez du {{repository}} GitHub edo GitLab biltegi gisa ezagutzen. Aukeratu beste biltegi bat Kilon.",
@@ -3708,10 +3712,10 @@
     "noSpend": "Oraindik ez da gasturik erregistratu",
     "spend24h": "Azken 24 orduetako gastua",
     "multiplierError": "Sartu 1 edo handiagoa den biderkatzaile bat",
-    "multiplierMaxError": "Sartu {{max}} edo txikiagoa den biderkatzaile bat",
-    "thresholdMaxError": "Sartu {{max}} edo txikiagoa den zenbateko bat.",
     "permissionDenied": "Ez duzu gastu-alertak kudeatzeko baimenik.",
-    "pushOffByCategory": "Jakinarazpenetan itzalita"
+    "pushOffByCategory": "Jakinarazpenetan itzalita",
+    "multiplierMaxError": "Sartu {{max}} edo txikiagoa den biderkatzaile bat",
+    "thresholdMaxError": "Sartu {{max}} edo txikiagoa den zenbateko bat."
   },
   "profiles": {
     "title": "Profilak",
@@ -3770,7 +3774,6 @@
     },
     "variablesEmpty": "Oraindik ez dago aldagairik",
     "variablesSaveFailed": "Ezin izan da aldagaia gorde",
-    "variablesDeleteFailed": "Ezin izan da aldagaia ezabatu",
     "commandsTitle": "Konfiguratu komandoak",
     "addCommand": "Gehitu komandoa",
     "commandLabel": "Agindua",
@@ -3781,7 +3784,6 @@
     "moveDown": "Mugitu behera",
     "moveCommandUp": "Mugitu {{position}}. komandoa gora",
     "moveCommandDown": "Mugitu {{position}}. komandoa behera",
-    "deleteCommand": "Ezabatu {{position}}. komandoa",
     "skillsTitle": "Trebetasunak",
     "addSkill": "Gehitu trebetasuna",
     "skillNameLabel": "Trebetasunaren izena",
@@ -3903,7 +3905,9 @@
       "pinFailed": "Ezin izan da repo ainguratu",
       "unboundToast": "Repo lotu gabe",
       "unbindFailed": "Ezin izan da biltegia deslotu"
-    }
+    },
+    "variablesDeleteFailed": "Ezin izan da aldagaia ezabatu",
+    "deleteCommand": "Ezabatu {{position}}. komandoa"
   },
   "credits": {
     "title": "Erosi kredituak",
@@ -3930,7 +3934,6 @@
       "newList": "Zerrenda berria",
       "empty": "Oraindik ez dago zerrendarik",
       "couldNotLoad": "Ezin izan dira zerrendak kargatu",
-      "createFailed": "Ezin izan da zerrenda sortu",
       "noRepository": "Ez dago biltegirik",
       "rowA11y": "{{name}} — {{openCount}}",
       "openCount_one": "{{count}} irekita",
@@ -3940,7 +3943,8 @@
       "archive": "Artxibatu",
       "unarchive": "Desartxibatu",
       "deleteTitle": "Ezabatu {{name}}?",
-      "deleteMessage": "Bere zereginak ere ezabatzen dira. Saioak mantendu egiten dira."
+      "deleteMessage": "Bere zereginak ere ezabatzen dira. Saioak mantendu egiten dira.",
+      "createFailed": "Ezin izan da zerrenda sortu"
     },
     "listSettings": {
       "title": "Zerrendaren ezarpenak",
@@ -4008,21 +4012,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Goizeko laburpena",
+    "title": "Agente-laburpena",
     "atLeast": "≥{{value}}",
     "coverageHint": "Baliteke jarduera historiko batzuk falta izatea. ≥ gutxienez hainbeste da; ezezaguna ez da zero.",
     "available": "Laburpen erabilgarriak",
     "history": "Laburpenen historia",
-    "historyHint": "Txostenak 30 egunez gordetzen dira, baztertutakoak barne.",
+    "historyHint": "Laburpenak 30 egunez gordetzen dira, baztertutakoak barne.",
     "settings": "Laburpenaren ezarpenak",
-    "saved": "Laburpenaren ezarpenak gorde dira.",
-    "empty": "Ez dago gaueko jarduerarik",
-    "emptyHint": "Hodeiko eta CLIko kodetze-saioak hemen agertuko dira gau aktibo baten ondoren.",
+    "empty": "Ez dago jarduerarik laburpen-tarte honetan",
+    "emptyHint": "Zure hodeiko eta CLIko kodetze-saioak hemen agertuko dira programatutako laburpen batek jarduera duenean.",
     "loadError": "Ezin izan dira laburpenak kargatu",
-    "sessions": "Gauean aktibo",
+    "sessions": "Tartean aktibo",
     "pullRequests": "Irekitako PRs",
     "blockers": "Blokeo berriak",
-    "spend": "Gaueko gastua",
+    "spend": "Tartean gastatutakoa",
     "view": "Irakurri laburpena",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -4044,14 +4047,14 @@
     "sources": "Ebidentziak eta artefaktuak",
     "timezone": "Laburpenaren ordu-zona",
     "deviceTimezone": "Erabili gailuaren ordu-zona",
-    "timezoneHint": "IANA ordu-zona, adibidez Europe/Berlin. Programazio-aldaketak hurrengo gauetan aplikatuko dira.",
-    "nightStart": "Gaua hasten da",
-    "morningStart": "Gaua amaitu / goiza hasi",
-    "morningEnd": "Goiza amaitzen da",
-    "timeHint": "Hasierako txartelak zuzeneko egoera berrezartzen du goiza amaitzean, lineaz kanpo ere bai.",
-    "invalidSchedule": "Aukeratu ordu-zona baliodun bat eta gau eta goizeko tarte ez-hutsak eta gainjarri gabeak.",
-    "notificationsHint": "Jakinarazpen orokor bat goizero, lehen txostena prest dagoenean. Ordainpeko AI laburpenetatik independentea.",
-    "notificationPermission": "Gaitu gailuaren jakinarazpenak hemen: $t(common.notifications), laburpena jasotzeko.",
+    "timezoneHint": "IANA ordu-zona, adibidez Europe/Berlin. Programazio-aldaketak hurrengo laburpenetan aplikatuko dira.",
+    "nightStart": "Laburpen-tartea hasteko ordua",
+    "morningStart": "Laburpena prest egoteko ordua",
+    "morningEnd": "Laburpena eskuragarri egoteko azken ordua",
+    "timeHint": "Hasierako txartelak zuzeneko egoera berrezartzen du laburpen-tartea amaitzean, lineaz kanpo ere bai.",
+    "invalidSchedule": "Aukeratu ordu-zona baliodun bat eta laburpen-tarte ez-huts bat.",
+    "notificationsHint": "Programatutako laburpen bakoitzeko jakinarazpen orokor bat. Ordainpeko AI laburpenetatik independentea.",
+    "notificationPermission": "Gaitu gailuaren jakinarazpenak $t(common.notifications) atalean, zure laburpena jasotzeko.",
     "aiOptIn": "Ordainpeko AI laburpenak",
     "aiHint": "Aukerakoa, testuinguru honetarako soilik. Hautatutako zati editatuak eta datu egituratuak zure eredura bidaltzen dira aplikazioaren hizkuntzan. Karguak testuinguru honen saldotik ordaintzen dira.",
     "defaultModel": "Erabili Kiloren eredu lehenetsia",
@@ -4072,7 +4075,7 @@
     "contextSettings": "AI ezarpenak · {{context}}",
     "allContexts": "Laburpen pertsonalak eta erakundekoak bereizita daude.",
     "create": "Sortu laburpena",
-    "oneOff": "Behin bakarrekoa",
+    "oneOff": "Eskatu ahala",
     "createdAt": "Sortze-unea: {{time}}",
     "chooseContext": "Aukeratu testuinguru bat",
     "period": "Laburpenaren epea",
@@ -4094,9 +4097,12 @@
     "emptyPeriod": "Ez da jarduerarik aurkitu epe honetan. Ez da AI laburpenik sortuko, ezta kargurik aplikatuko ere.",
     "emptyHistory": "Ez dago gordetako laburpenik",
     "historicalStateHint": "Saioaren egoerak hautatutako epearen amaierako egoera islatzen du, ez uneko zuzeneko egoera.",
-    "oneOffHint": "AIk hautatutako ebidentziak jasotzen ditu zure aplikazioaren hizkuntzan, datu sentikorrak ezabatuta. Behin bakarreko txosten honek ez ditu zure goizeko ordutegia edo AI hobespenak aldatzen.",
+    "oneOffHint": "AIk hautatutako ebidentziak jasotzen ditu zure aplikazioaren hizkuntzan, datu sentikorrak ezabatuta. Eskatu ahala sortutako laburpen honek ez ditu zure laburpen programatua edo AI hobespenak aldatzen.",
     "createOffline": "Konektatu Internetera laburpen bat berrikusteko edo sortzeko. Ordaindu beharreko eskaerak ez dira inoiz ilaran jartzen konexiorik gabe.",
     "estimateInputTooLarge": "Epe honek ebidentzia gehiegi ditu hautatutako eredurako.",
-    "estimatePermissionUnavailable": "Ez duzu testuinguru honen saldoa erabiltzeko baimenik."
+    "estimatePermissionUnavailable": "Ez duzu testuinguru honen saldoa erabiltzeko baimenik.",
+    "createFailed": "Ezin izan da laburpen hau sortu.",
+    "reviewFailed": "Ezin izan da laburpen hau berrikusi.",
+    "saved": "Laburpenaren ezarpenak gorde dira."
   }
 }

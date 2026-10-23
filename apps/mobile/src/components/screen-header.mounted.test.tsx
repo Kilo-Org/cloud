@@ -660,7 +660,7 @@ describe('ScreenHeader mounted', () => {
           reserveClass = large ? 'min-h-[36px]' : 'min-h-7';
         }
         expect(title.parent?.props.className).toContain(reserveClass);
-        expect(title.parent?.props.className).toContain('justify-center');
+        expect(title.parent?.props.className).toContain('justify-start');
       }
       if (props.modal || props.centerTitle) {
         expect(title.props.className).toContain('text-center');
@@ -687,7 +687,7 @@ describe('ScreenHeader mounted', () => {
     // The reserved box holds the same three lines (3 x the `text-lg` 1.75rem
     // line height), so the rendered title cannot move the body below it.
     expect(title.parent?.props.className).toContain('min-h-21');
-    expect(title.parent?.props.className).toContain('justify-center');
+    expect(title.parent?.props.className).toContain('justify-start');
   });
 
   it('keeps the close control on the title row when the sheet skips the safe-area inset', () => {

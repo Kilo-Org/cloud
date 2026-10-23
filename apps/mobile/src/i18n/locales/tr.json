@@ -66,7 +66,6 @@
     "message": "Mesaj",
     "off": "Kapalı",
     "organization": "Kuruluş",
-    "organizationTrialEnded": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. Kuruluş sahibi kilo.ai adresinden faturalandırmayı güncelleyip ardından tekrar deneyebilir.",
     "platform": "Kod barındırma hizmeti",
     "prReview": "PR incelemesi",
     "queued": "Kuyrukta",
@@ -146,7 +145,8 @@
     "agent": "Ajan",
     "durationMinuteShort": "dk",
     "durationHourShort": "sa",
-    "changes": "Değişiklikler"
+    "changes": "Değişiklikler",
+    "organizationTrialEnded": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. Kuruluş sahibi kilo.ai adresinden faturalandırmayı güncelleyip ardından tekrar deneyebilir."
   },
   "language": {
     "restarting": "Dil değişikliğini uygulamak için yeniden başlatılıyor",
@@ -270,7 +270,6 @@
     "voiceInput": "Sesli giriş",
     "autoExpandThinking": "Düşünce bölümünü otomatik genişlet",
     "autoExpandThinkingSubtitle": "Ajan düşünmeyi bitirdiğinde düşünce bölümünü genişletilmiş olarak göster.",
-    "autoExpandThinkingInactiveSubtitle": "Düşünce ayrıntıları gizliyken hiçbir etkisi olmaz.",
     "hideThinking": "Düşünce ayrıntılarını gizle",
     "hideThinkingSubtitle": "Ajanın düşüncesini oturum sayfasında gösterme.",
     "keepScreenOn": "Oturum sayfasındayken ekranı açık tut",
@@ -295,7 +294,8 @@
     "condenseToolCallsSubtitle": "Ardışık araç çağrılarını açabileceğin tek bir satırda grupla.",
     "toolSummaryTranslation": "Araç özetlerini çevir",
     "toolSummaryTranslationSubtitle": "Her araç özetini uygulama dilinize çevirmesi için bir modele gönderin. Çeviri başarısız olursa özgün metin gösterilir.",
-    "toolSummaryTranslationModelUnavailableNotice": "Bu model artık sunulmuyor. Başka bir tane seçmek için $t(common.model) öğesine dokun."
+    "toolSummaryTranslationModelUnavailableNotice": "Bu model artık sunulmuyor. Başka bir tane seçmek için $t(common.model) öğesine dokun.",
+    "autoExpandThinkingInactiveSubtitle": "Düşünce ayrıntıları gizliyken hiçbir etkisi olmaz."
   },
   "notifications": {
     "liveActivities": "Canlı etkinlikler",
@@ -917,6 +917,8 @@
       "invalidUrl": "Geçerli bir çekme isteği URL'si gir.",
       "pullRequestUrl": "Çekme isteği URL'si",
       "start": "İncelemeyi başlat",
+      "starting": "İnceleme başlatılıyor…",
+      "title": "Manuel inceleme",
       "startNotFound": "Bu {{requestNoun}}, {{provider}} üzerinden okunamadı. URL'yi ve deponun erişilebilir olup olmadığını kontrol et.",
       "startRateLimited": "{{provider}} şu anda istekleri sınırlıyor. Birkaç dakika sonra tekrar dene.",
       "startNotAllowed": "Bu {{requestNoun}} için inceleme başlatma erişimin yok. İzinlerini ve kuruluşunun planını kontrol et.",
@@ -924,9 +926,7 @@
       "startAlreadyRunning": "Bu {{requestNoun}} için bir inceleme zaten çalışıyor.",
       "startRejected": "Bu {{requestNoun}} incelenemiyor. Açık olduğundan, taslak olmadığından ve URL'nin doğru olduğundan emin ol.",
       "startProviderUnavailable": "{{provider}} servisine ulaşılamadı ve bu {{requestNoun}} okunamadı. Tekrar dene.",
-      "startFailed": "İnceleme başlatılamadı. Bağlantını kontrol et ve tekrar dene.",
-      "starting": "İnceleme başlatılıyor…",
-      "title": "Manuel inceleme"
+      "startFailed": "İnceleme başlatılamadı. Bağlantını kontrol et ve tekrar dene."
     },
     "notConnectedReadOnly": "{{platform}} bağlı değil. Yalnızca kuruluş sahipleri ve yöneticiler bağlayabilir.",
     "gitlab": {
@@ -964,12 +964,6 @@
       "findingsUnavailable": "Bu inceleme başarısız olduğu için sonuçlar kullanılamıyor.",
       "serviceUnavailable": "Kod inceleme hizmetine ulaşılamadı. Hizmet kullanılabilir olduğunda incelemeyi tekrar dene.",
       "reviewFailed": "İnceleme başarısız oldu. Lütfen tekrar dene.",
-      "cancelReasonSuperseded": "Daha yeni bir işlem gönderildi, bu yüzden bu inceleme değiştirildi.",
-      "cancelReasonIntegrationDisconnected": "{{platform}} bağlantısı kesildi, bu yüzden bu inceleme iptal edildi. Yeniden bağlan, sonra incelemeyi tekrar çalıştır.",
-      "cancelReasonBitbucketReviewerDisabled": "Bitbucket için Code Reviewer kapatıldı, bu yüzden bu inceleme iptal edildi. Yeniden etkinleştir, sonra incelemeyi tekrar çalıştır.",
-      "cancelReasonBitbucketPullRequestChanged": "Bitbucket çekme isteği değişti, bu yüzden bu inceleme değiştirildi.",
-      "cancelReasonCancelled": "Bu inceleme iptal edildi.",
-      "cancelReasonInterrupted": "Bu inceleme kesintiye uğradı.",
       "retryMessage": "Kod incelemesi yeniden çalıştırılacak.",
       "retryReview": "İncelemeyi tekrar dene",
       "retryNeedsSettings": "Kod inceleyici kapalı veya ayarlarının ilgilenilmesi gerekiyor. Ayarları düzeltin, ardından bu incelemeyi tekrar deneyin.",
@@ -995,7 +989,13 @@
       "sessionError": "Oturum hatası: {{error}}.",
       "statusWithValue": "Durum: {{status}}",
       "toolName": "Araç: {{name}}",
-      "toolNameError": "{{name}} aracında hata oluştu."
+      "toolNameError": "{{name}} aracında hata oluştu.",
+      "cancelReasonSuperseded": "Daha yeni bir işlem gönderildi, bu yüzden bu inceleme değiştirildi.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} bağlantısı kesildi, bu yüzden bu inceleme iptal edildi. Yeniden bağlan, sonra incelemeyi tekrar çalıştır.",
+      "cancelReasonBitbucketReviewerDisabled": "Bitbucket için Code Reviewer kapatıldı, bu yüzden bu inceleme iptal edildi. Yeniden etkinleştir, sonra incelemeyi tekrar çalıştır.",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket çekme isteği değişti, bu yüzden bu inceleme değiştirildi.",
+      "cancelReasonCancelled": "Bu inceleme iptal edildi.",
+      "cancelReasonInterrupted": "Bu inceleme kesintiye uğradı."
     },
     "reviewList": {
       "configureProvider": "Sağlayıcıyı yapılandır",
@@ -1275,7 +1275,7 @@
       "deadlinePassed": "Son tarih geçti",
       "deadlinePassedDetail": "{{critical}} kritik, {{high}} yüksek",
       "dueThisWeek": "Süresi bu hafta doluyor",
-      "dueThisWeekDetail": "{{exploitable}} bulgunun istismar edilebilirliği doğrulandı",
+      "dueThisWeekDetail": "Bunlardan {{exploitable}} bulgunun istismar edilebilirliği doğrulandı",
       "noDeadline": "Son tarih yok",
       "reviewSlaAssignment": "SLA atamasını incele",
       "allOpenFindingsTracked": "Tüm açık bulgular takip ediliyor"
@@ -1611,8 +1611,8 @@
       "dollar_other": "dolar",
       "costSpoken": "maliyet: {{cost}}",
       "costSpokenWithTime": "maliyet {{cost}}, {{time}}",
-      "spokenJoiner": "ve",
-      "pullRequest": "{{number}} numaralı çekme isteği"
+      "pullRequest": "{{number}} numaralı çekme isteği",
+      "spokenJoiner": "ve"
     },
     "githubInstall": {
       "couldNotOpenMessage": "GitHub uygulamasının kurulumu başlatılamadı. Lütfen tekrar dene.",
@@ -3149,16 +3149,16 @@
       "renameTitle": "Kuruluşu yeniden adlandır"
     },
     "inviteMember": {
-      "alreadyMember": "Bu kişi zaten bu kuruluşun bir üyesi.",
-      "alreadyInvited": "Bu kişi zaten davet edilmiş veya zaten üye.",
       "emailError": "Geçerli bir e-posta adresi gir.",
       "emailPlaceholder": "ad@sirket.com",
-      "pendingInvitation": "Bu e-posta adresinin zaten bekleyen bir daveti var.",
       "permissionDenied": "Üye davet etme iznin yok.",
       "roleMember": "Rol: Üye",
-      "sendError": "Davet gönderilemedi.",
       "sendInvite": "Davet gönder",
-      "title": "Üye davet et"
+      "title": "Üye davet et",
+      "alreadyInvited": "Bu kişi zaten davet edilmiş veya zaten üye.",
+      "sendError": "Davet gönderilemedi.",
+      "pendingInvitation": "Bu e-posta adresinin zaten bekleyen bir daveti var.",
+      "alreadyMember": "Bu kişi zaten bu kuruluşun bir üyesi."
     },
     "invoices": {
       "downloadA11y": "{{number}} numaralı faturayı indir",
@@ -3226,14 +3226,14 @@
       "emailStatusFailed": "E-posta gönderilemedi",
       "inviteCreated": "Davet oluşturuldu",
       "pendingInvitations": "Bekleyen davetler",
-      "ownRoleChange": "Kendi rolünüzü değiştiremezsiniz.",
-      "ownerAuthority": "Yalnızca bir organizasyon sahibi sahipleri yönetebilir.",
-      "inviteExpired": "Bu davetin süresi dolmuş.",
-      "inviteAccepted": "Bu davet zaten kabul edilmiş.",
-      "inviteNotResendable": "Bu davet artık yeniden gönderilemez.",
       "resendInvite": "Daveti yeniden gönder",
+      "shareInviteLink": "Davet bağlantısını paylaş",
       "resendInviteError": "Davet yeniden gönderilemedi.",
-      "shareInviteLink": "Davet bağlantısını paylaş"
+      "inviteNotResendable": "Bu davet artık yeniden gönderilemez.",
+      "ownerAuthority": "Yalnızca bir organizasyon sahibi sahipleri yönetebilir.",
+      "ownRoleChange": "Kendi rolünüzü değiştiremezsiniz.",
+      "inviteExpired": "Bu davetin süresi dolmuş.",
+      "inviteAccepted": "Bu davet zaten kabul edilmiş."
     },
     "usageStats": {
       "inputTokens": "Girdi tokenları",
@@ -3379,11 +3379,11 @@
   },
   "transcriptionModel": {
     "title": "Metne dönüştürme modeli",
-    "choose": "Bir model seç",
     "noneChosen": "Hiçbiri seçilmedi",
     "emptyTitle": "Metne dönüştürme modeli yok",
     "emptyDescription": "Kilo Gateway şu anda metne dönüştürme modeli sunmuyor.",
-    "loadFailed": "Metne dönüştürme modelleri yüklenemedi."
+    "loadFailed": "Metne dönüştürme modelleri yüklenemedi.",
+    "choose": "Bir model seç"
   },
   "voiceLanguage": {
     "title": "Sesli giriş dili",
@@ -3405,7 +3405,6 @@
   },
   "modelChat": {
     "offlineFailure": "Bu model internet bağlantısı gerektiriyor. Bağlan ve tekrar dene ya da bu cihazdaki bir modele geç.",
-    "creditsRequired": "Bu mesajı göndermek için yeterli kredi yok. Kredi ekle ve tekrar dene.",
     "empty": {
       "title": "Bir sohbet başlat",
       "description": "Bir modelle konuşmak için mesaj gönder."
@@ -3599,6 +3598,7 @@
       "fromHuggingFace": "Hugging Face'ten",
       "loading": "Modeller yükleniyor",
       "noResults": "Model bulunamadı",
+      "noResultsForQuery": "\"{{query}}\" için model bulunamadı",
       "noFits": "Bu cihaza uygun model yok",
       "noFitsDescription": "Daha büyük modeller $t(common.all) sekmesinde.",
       "fit": {
@@ -3673,13 +3673,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "Bu model düşünme düzeyini destekler"
-    }
+    },
+    "creditsRequired": "Bu mesajı göndermek için yeterli kredi yok. Kredi ekle ve tekrar dene."
   },
   "settingsTools": {
     "confirmTitle": "Bu değişiklik onaylansın mı?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "en son deponuz",
+      "confirmMessage": "Depo: {{repository}}. İstek: {{prompt}}",
+      "confirmTitle": "Bu ajanı başlatayım mı?",
       "promptRequired": "Ajanı başlat için bir istem gerekir. Bir istem ekleyip yeniden çalıştır.",
       "repositoryRequired": "Ajanı başlat için bir depo gerekir. Kilo'yu aç, bir depo seç, ardından yeniden çalıştır.",
       "repositoryUnknown": "Kilo, {{repository}} adresini GitHub veya GitLab deposu olarak tanımıyor. Kilo'da başka bir depo seç.",
@@ -3708,10 +3712,10 @@
     "noSpend": "Henüz harcama kaydedilmedi",
     "spend24h": "Son 24 saatteki harcama",
     "multiplierError": "1 veya daha büyük bir çarpan gir",
-    "multiplierMaxError": "{{max}} veya daha küçük bir çarpan gir",
-    "thresholdMaxError": "{{max}} veya daha az bir tutar gir.",
     "permissionDenied": "Harcama uyarılarını yönetme iznin yok.",
-    "pushOffByCategory": "Bildirimler'de kapalı"
+    "pushOffByCategory": "Bildirimler'de kapalı",
+    "multiplierMaxError": "{{max}} veya daha küçük bir çarpan gir",
+    "thresholdMaxError": "{{max}} veya daha az bir tutar gir."
   },
   "profiles": {
     "title": "Profiller",
@@ -3770,7 +3774,6 @@
     },
     "variablesEmpty": "Henüz değişken yok",
     "variablesSaveFailed": "Değişken kaydedilemedi",
-    "variablesDeleteFailed": "Değişken silinemedi",
     "commandsTitle": "Kurulum komutları",
     "addCommand": "Komut ekle",
     "commandLabel": "Emretmek",
@@ -3781,7 +3784,6 @@
     "moveDown": "Aşağı taşı",
     "moveCommandUp": "{{position}}. komutu yukarı taşı",
     "moveCommandDown": "{{position}}. komutu aşağı taşı",
-    "deleteCommand": "{{position}}. komutu sil",
     "skillsTitle": "Yetenekler",
     "addSkill": "Beceri ekle",
     "skillNameLabel": "Beceri adı",
@@ -3903,7 +3905,9 @@
       "pinFailed": "Repo sabitlenemedi",
       "unboundToast": "Repo ilişkisiz",
       "unbindFailed": "Deponun bağlantısı kaldırılamadı"
-    }
+    },
+    "variablesDeleteFailed": "Değişken silinemedi",
+    "deleteCommand": "{{position}}. komutu sil"
   },
   "credits": {
     "title": "Kredi satın al",
@@ -3930,7 +3934,6 @@
       "newList": "Yeni liste",
       "empty": "Henüz liste yok",
       "couldNotLoad": "Listeler yüklenemedi",
-      "createFailed": "Liste oluşturulamadı",
       "noRepository": "Depo yok",
       "rowA11y": "{{name}} — {{openCount}}",
       "openCount_one": "{{count}} açık",
@@ -3940,7 +3943,8 @@
       "archive": "Arşivle",
       "unarchive": "Arşivden çıkar",
       "deleteTitle": "{{name}} silinsin mi?",
-      "deleteMessage": "Görevleri de silinir. Oturumları kalır."
+      "deleteMessage": "Görevleri de silinir. Oturumları kalır.",
+      "createFailed": "Liste oluşturulamadı"
     },
     "listSettings": {
       "title": "Liste ayarları",
@@ -4008,21 +4012,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Sabah özeti",
+    "title": "Ajan özeti",
     "atLeast": "≥{{value}}",
     "coverageHint": "Bazı geçmiş etkinlikler eksik olabilir. ≥ en az bu kadar anlamına gelir; bilinmeyen sıfır değildir.",
     "available": "Mevcut özetler",
     "history": "Özet geçmişi",
-    "historyHint": "Kapatılanlar dahil raporlar 30 gün saklanır.",
+    "historyHint": "Kapatılanlar dahil özetler 30 gün saklanır.",
     "settings": "Özet ayarları",
-    "saved": "Özet ayarları kaydedildi",
-    "empty": "Gece etkinliği yok",
-    "emptyHint": "Bulut ve CLI kodlama oturumlarınız etkin bir gecenin ardından burada görünür.",
+    "empty": "Bu özet aralığında etkinlik yok",
+    "emptyHint": "Bulut ve CLI kodlama oturumlarınız, planlanmış bir özette etkinlik olduğunda burada görünür.",
     "loadError": "Özetler yüklenemedi",
-    "sessions": "Gece etkin",
+    "sessions": "Aralıkta etkin",
     "pullRequests": "Açılan PRs",
     "blockers": "Yeni engeller",
-    "spend": "Gece harcaması",
+    "spend": "Aralık harcaması",
     "view": "Özeti oku",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -4044,13 +4047,13 @@
     "sources": "Kanıtlar ve yapıtlar",
     "timezone": "Özet saat dilimi",
     "deviceTimezone": "Cihaz saat dilimini kullan",
-    "timezoneHint": "IANA saat dilimi, örneğin Europe/Berlin. Program değişiklikleri sonraki geceler için geçerlidir.",
-    "nightStart": "Gece başlangıcı",
-    "morningStart": "Gece bitişi / sabah başlangıcı",
-    "morningEnd": "Sabah bitişi",
-    "timeHint": "Ana sayfa kartı, sabah bittiğinde çevrimdışı olsa bile canlı duruma döner.",
-    "invalidSchedule": "Geçerli bir saat dilimi ve çakışmayan, boş olmayan gece ve sabah aralıkları seçin.",
-    "notificationsHint": "İlk raporunuz hazır olduğunda her sabah tek bir genel bildirim. Ücretli AI özetlerinden bağımsızdır.",
+    "timezoneHint": "IANA saat dilimi, örneğin Europe/Berlin. Program değişiklikleri sonraki özetler için geçerlidir.",
+    "nightStart": "Özet aralığı başlangıcı",
+    "morningStart": "Özet hazır olma saati",
+    "morningEnd": "Özet kullanılabilir bitiş saati",
+    "timeHint": "Ana sayfa kartı, özet aralığı bittiğinde çevrimdışı olsa bile canlı duruma döner.",
+    "invalidSchedule": "Geçerli bir saat dilimi ve boş olmayan bir özet aralığı seçin.",
+    "notificationsHint": "Planlanmış her özet için tek bir genel bildirim. Ücretli AI özetlerinden bağımsızdır.",
     "notificationPermission": "Özetinizi almak için $t(common.notifications) bölümünde cihaz bildirimlerini etkinleştirin.",
     "aiOptIn": "Ücretli AI özetleri",
     "aiHint": "Yalnızca bu bağlam için isteğe bağlıdır. Seçilmiş, gizlenmiş alıntılar ve yapılandırılmış bilgiler uygulama dilinizde modelinize gönderilir. Ücretler bu bağlamın bakiyesinden düşülür.",
@@ -4068,7 +4071,7 @@
     "contextSettings": "AI ayarları · {{context}}",
     "allContexts": "Kişisel ve kuruluş özetleri ayrı tutulur.",
     "create": "Özet oluştur",
-    "oneOff": "Tek seferlik",
+    "oneOff": "İsteğe bağlı",
     "createdAt": "Oluşturulma: {{time}}",
     "chooseContext": "Bir bağlam seçin",
     "period": "Özet dönemi",
@@ -4090,13 +4093,16 @@
     "emptyPeriod": "Bu dönemde etkinlik bulunamadı. AI özeti oluşturulmaz ve ücret alınmaz.",
     "emptyHistory": "Kayıtlı özet yok",
     "historicalStateHint": "Oturum durumu, şu anki canlı durumu değil, seçilen dönemin sonundaki durumu yansıtır.",
-    "oneOffHint": "AI, seçilmiş ve hassas bilgileri gizlenmiş kanıtları uygulamanızın dilinde alır. Bu tek seferlik rapor, sabah programınızı veya AI tercihlerinizi değiştirmez.",
+    "oneOffHint": "AI, seçilmiş ve hassas bilgileri gizlenmiş kanıtları uygulamanızın dilinde alır. Bu isteğe bağlı özet, planlanmış özetinizi veya AI tercihlerinizi değiştirmez.",
     "createOffline": "Bir özeti gözden geçirmek veya oluşturmak için internete bağlanın. Ücretli istekler çevrimdışıyken asla kuyruğa alınmaz.",
     "estimateInputTooLarge": "Bu dönemde seçilen modelin işleyebileceğinden fazla kanıt var.",
     "estimatePermissionUnavailable": "Bu bağlamın bakiyesini kullanma izniniz yok.",
+    "createFailed": "Bu özet oluşturulamadı.",
+    "reviewFailed": "Bu özet gözden geçirilemedi.",
     "estimatePricingUnavailable": "Bu model için fiyatlandırma mevcut değil.",
     "estimateBalanceUnavailable": "Ücretli özet için bakiye yetersiz.",
     "estimateModelNotAllowed": "Bu model burada kullanılamaz.",
-    "estimateSpendLimitTooLow": "Bu önete izin vermek için harcama limitini yükseltin."
+    "estimateSpendLimitTooLow": "Bu önete izin vermek için harcama limitini yükseltin.",
+    "saved": "Özet ayarları kaydedildi"
   }
 }

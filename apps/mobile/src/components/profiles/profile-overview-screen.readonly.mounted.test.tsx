@@ -52,7 +52,10 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => h.connectivity,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ back: h.back, push: h.push }) }));
+vi.mock('expo-router', () => ({
+  useNavigation: () => ({ isFocused: () => true }),
+  useRouter: () => ({ back: h.back, push: h.push }),
+}));
 vi.mock('@/lib/profile-agent-navigation', () => ({
   getProfilesPath: () => '/profiles',
   getProfileVariablesPath: (id: string, org?: string) =>

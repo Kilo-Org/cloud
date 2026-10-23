@@ -1046,6 +1046,13 @@ describe('SessionIngestDO integration', () => {
           JSON.stringify({ ...part(sessionId, 'kept earlier'), id: 'prt_legacy' }),
           1000
         );
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+          'msg_a/prt_legacy_late',
+          'part',
+          JSON.stringify({ ...part(sessionId, 'later'), id: 'prt_legacy_late' }),
+          3000
+        );
       });
       await stub.captureShareInfo(publicId);
       await stub.ingest(

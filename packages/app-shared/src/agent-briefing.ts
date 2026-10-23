@@ -125,13 +125,22 @@ export const DEFAULT_BRIEFING_SCHEDULE = {
 } as const;
 export const DEFAULT_BRIEFING_MAX_DURATION_SECONDS = 600;
 export const DEFAULT_BRIEFING_MAX_SPEND_MICRODOLLARS = 2_000_000;
+/**
+ * Evidence counts a session once it has any event, pull request, blocker or charge inside the
+ * window, so a report whose scorecard has no sessions had no overnight activity at all. Its
+ * zeros are the whole report, which is why the publish gate, the summary gates and visibility
+ * all read quiet from this one definition.
+ */
+export function briefingHasActivity(scorecard: BriefingScorecard): boolean {
+  return scorecard.sessions > 0;
+}
 export function isBriefingVisible(report: BriefingReport, now = Date.now()): boolean {
   return (
     report.publishedAt !== null &&
     report.dismissedAt === null &&
     Date.parse(report.publishedAt) <= now &&
     Date.parse(report.expiresAt) > now &&
-    report.scorecard.sessions > 0
+    briefingHasActivity(report.scorecard)
   );
 }
 export function redactBriefingExcerpt(value: string, maxLength = 600): string {

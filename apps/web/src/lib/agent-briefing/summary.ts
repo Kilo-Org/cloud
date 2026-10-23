@@ -23,6 +23,7 @@ import {
   organizationMemberBalance,
 } from '@kilocode/worker-utils/account-access';
 import {
+  briefingHasActivity,
   briefingScorecardSchema,
   briefingSummarySchema,
   briefingSummaryErrorSchema,
@@ -38,9 +39,9 @@ import {
 } from './store';
 
 /** A report with no overnight activity has nothing to summarize, so it is never billable. */
-function briefingHasActivity(row: BriefingReportRow): boolean {
+function briefingRowHasActivity(row: BriefingReportRow): boolean {
   const scorecard = briefingScorecardSchema.safeParse(row.facts.scorecard);
-  return !scorecard.success || scorecard.data.sessions > 0;
+  return !scorecard.success || briefingHasActivity(scorecard.data);
 }
 
 const estimateClaimsSchema = z.object({
@@ -313,7 +314,7 @@ export async function estimateBriefingSummary(
     maximumCostMicrodollars: maxSpendMicrodollars,
     maxDurationSeconds,
     estimateToken: jwt.sign(claims, NEXTAUTH_SECRET, { algorithm: 'HS256', expiresIn: 15 * 60 }),
-    canGenerate: unavailableReason === null && (report === null || briefingHasActivity(report)),
+    canGenerate: unavailableReason === null && (report === null || briefingRowHasActivity(report)),
     unavailableReason,
   };
 }
@@ -380,7 +381,7 @@ async function queueSummary(
       });
     if (row.kind === 'scheduled' && !setting.aiEnabled)
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Enable AI for this context first' });
-    if (row.kind === 'scheduled' && !briefingHasActivity(row))
+    if (row.kind === 'scheduled' && !briefingRowHasActivity(row))
       throw new TRPCError({
         code: 'BAD_REQUEST',
         message: 'A report without overnight activity has nothing to summarize',

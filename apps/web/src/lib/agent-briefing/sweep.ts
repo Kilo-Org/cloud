@@ -6,6 +6,7 @@ import { agent_briefing_preferences, agent_briefing_reports } from '@kilocode/db
 import { dispatchAgentBriefingPush } from '@kilocode/web-shared/lib/notifications-worker-client';
 import {
   briefingCoverageSchema,
+  briefingHasActivity,
   briefingScorecardSchema,
   briefingSummarySchema,
 } from '@kilocode/app-shared/agent-briefing';
@@ -64,7 +65,7 @@ function quietBriefingProven(facts: Record<string, unknown>): boolean {
   const coverage = briefingCoverageSchema.safeParse(facts.coverage);
   return (
     scorecard.success &&
-    scorecard.data.sessions <= 0 &&
+    !briefingHasActivity(scorecard.data) &&
     coverage.success &&
     Object.values(coverage.data).every(value => value === 'complete')
   );
@@ -177,7 +178,7 @@ export async function sweepAgentBriefings(now = new Date()) {
       continue;
     }
     const scorecard = briefingScorecardSchema.safeParse(facts.scorecard);
-    if (!scorecard.success || scorecard.data.sessions <= 0) {
+    if (!scorecard.success || !briefingHasActivity(scorecard.data)) {
       await deferBriefingRefresh(row, now);
       continue;
     }

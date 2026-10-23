@@ -19,7 +19,6 @@ import {
   SNAPSHOT_CONTROL_PLANE_SUPERVISOR_PATH,
   SNAPSHOT_MANIFEST_PATH,
   SNAPSHOT_RUNTIME,
-  SNAPSHOT_WRAPPER_PATH,
   createRuntimeManifest,
   exactVersionCheck,
   hashRuntimeArtifacts,
@@ -38,7 +37,6 @@ export {
   SNAPSHOT_CONTROL_PLANE_WRAPPER_PATH,
   SNAPSHOT_MANIFEST_PATH,
   SNAPSHOT_RUNTIME,
-  SNAPSHOT_WRAPPER_PATH,
   createRuntimeManifest,
   hashRuntimeArtifacts,
   runtimeDistributionSourceFiles,
@@ -205,7 +203,7 @@ export function defaultRuntimeBuildId(now = new Date()): string {
 }
 
 export function resolveSnapshotInputs(args: Args): {
-  wrapperPath: string;
+  buildRoot: string;
   controlPlaneWrapperPath: string;
   controlPlaneSupervisorPath: string;
   artifactPaths: Record<string, string>;
@@ -230,7 +228,6 @@ export function resolveSnapshotInputs(args: Args): {
     wrapperRoot,
     CONTROL_PLANE_SUPERVISOR.wrapperPath
   );
-  const wrapperPath = resolve(explicitWrapper ?? artifactPaths['kilocode-wrapper.js']);
   const controlPlaneWrapperPath = resolve(
     optionalArg(args, 'control-plane-wrapper') ?? artifactPaths['kilocode-control-plane-wrapper.js']
   );
@@ -239,12 +236,11 @@ export function resolveSnapshotInputs(args: Args): {
       artifactPaths['kilocode-control-plane-supervisor.sh']
   );
   return {
-    wrapperPath,
+    buildRoot: wrapperRoot,
     controlPlaneWrapperPath,
     controlPlaneSupervisorPath,
     artifactPaths: {
       ...artifactPaths,
-      'kilocode-wrapper.js': wrapperPath,
       'kilocode-control-plane-wrapper.js': controlPlaneWrapperPath,
       'kilocode-control-plane-supervisor.sh': controlPlaneSupervisorPath,
     },
@@ -922,33 +918,6 @@ async function installBuilder(config: ProviderConfig, sessionId: string): Promis
   }
 }
 
-async function smokeWrapper(config: ProviderConfig, sessionId: string, manifest: RuntimeManifest) {
-  const smokeSessionId = `agent_${randomUUID()}`;
-  const script = `set -euo pipefail
-rm -f /tmp/kilo-snapshot-smoke.log /tmp/kilo-snapshot-smoke.err /tmp/kilo-snapshot-health.json
-mkdir -p /tmp/kilo-snapshot-home
-dump_wrapper() {
-  echo "wrapper smoke failed" >&2
-  [ -s /tmp/kilo-snapshot-smoke.err ] && { echo "wrapper stderr:" >&2; cat /tmp/kilo-snapshot-smoke.err >&2; }
-  [ -s /tmp/kilo-snapshot-smoke.log ] && { echo "wrapper log:" >&2; cat /tmp/kilo-snapshot-smoke.log >&2; }
-}
-cleanup() { kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; rm -rf /tmp/kilo-snapshot-home /tmp/kilo-snapshot-smoke.log /tmp/kilo-snapshot-smoke.err /tmp/kilo-snapshot-health.json; }
-HOME=/tmp/kilo-snapshot-home WRAPPER_PORT=5099 WRAPPER_LOG_PATH=/tmp/kilo-snapshot-smoke.log bun ${SNAPSHOT_WRAPPER_PATH} --agent-session ${shellQuote(smokeSessionId)} --user-id snapshot-operator >/tmp/kilo-snapshot-smoke.err 2>&1 &
-pid=$!
-trap cleanup EXIT
-for attempt in $(seq 1 60); do
-  if curl -fsS http://127.0.0.1:5099/health > /tmp/kilo-snapshot-health.json; then break; fi
-  if ! kill -0 "$pid" 2>/dev/null; then dump_wrapper; exit 1; fi
-  sleep 1
-done
-if [ ! -s /tmp/kilo-snapshot-health.json ]; then dump_wrapper; exit 1; fi
-jq -e --arg version ${shellQuote(manifest.wrapperVersion)} '.version == $version' /tmp/kilo-snapshot-health.json >/dev/null`;
-  await execute(config, sessionId, 'bash', ['-lc', script], {
-    timeoutMs: 90_000,
-    label: 'smoke wrapper',
-  });
-}
-
 async function smokeControlPlane(config: ProviderConfig, sessionId: string): Promise<void> {
   const scratchDir = '/tmp/kilo-cp-smoke';
   const harnessName = 'control-plane-smoke.ts';
@@ -1024,7 +993,6 @@ async function readExpectedRuntime(
     manifest: createRuntimeManifest({
       runtimeBuildId: input.runtimeBuildId,
       wrapperVersion: input.wrapperVersion,
-      wrapperBytes: runtimeBytes(bytes, 'kilocode-wrapper.js'),
       controlPlaneWrapperBytes: runtimeBytes(bytes, 'kilocode-control-plane-wrapper.js'),
       controlPlaneSupervisorBytes: runtimeBytes(bytes, 'kilocode-control-plane-supervisor.sh'),
       artifacts: runtimeManifestArtifacts(artifacts),
@@ -1123,7 +1091,6 @@ async function validateChild(
     const errors = validateRuntimeManifest(manifest, expected);
     if (errors.length) throw new Error(`runtime manifest validation failed: ${errors.join(', ')}`);
     await execute(config, target.sessionId, 'bash', ['-lc', runtimeVerificationScript(artifacts)]);
-    await smokeWrapper(config, target.sessionId, expected);
     await smokeControlPlane(config, target.sessionId);
     await scanRemote(config, target.sessionId);
   } finally {
@@ -1136,10 +1103,10 @@ async function validateChild(
 
 async function buildSnapshot(args: Args): Promise<void> {
   const config = providerConfig(args);
-  const { wrapperPath } = resolveSnapshotInputs(args);
+  const input = resolveSnapshotInputs(args);
   if (args['skip-wrapper-build'] !== true) {
     log('building wrapper bundle');
-    await runLocal('bun', ['run', 'build'], dirname(dirname(wrapperPath)));
+    await runLocal('bun', ['run', 'build'], input.buildRoot);
   }
   const { manifest, artifacts } = await readExpectedRuntime(args);
   const timeoutMs = optionalNumber(args, 'timeout-ms', DEFAULT_TIMEOUT_MS);
@@ -1149,8 +1116,6 @@ async function buildSnapshot(args: Args): Promise<void> {
     log('uploading runtime artifacts and manifest');
     await uploadRuntimeArtifacts(config, builder.sessionId, artifacts);
     await uploadRuntimeManifest(config, builder.sessionId, manifest);
-    log('smoking wrapper');
-    await smokeWrapper(config, builder.sessionId, manifest);
     log('smoking control-plane supervisor');
     await smokeControlPlane(config, builder.sessionId);
     log('scanning builder for leftover credentials/state');
@@ -1266,7 +1231,7 @@ These may come from the environment, services/cloud-agent-next/.dev.vars, or:
 Build/validate/acceptance arguments:
   --snapshot-id <id>       Required except for build
   --build-id <id>          Defaults to local-YYYYMMDD-HHMMSS
-  --wrapper <path>         Defaults to wrapper/dist/wrapper.js
+  --wrapper <path>         A built bundle file; all bundles are read from its directory
   --wrapper-version <semver> Defaults to the current WRAPPER_VERSION
   --timeout-ms <ms>        Optional bounded sandbox timeout (default ${DEFAULT_TIMEOUT_MS})
   --skip-wrapper-build     Build only: use the existing wrapper bundle

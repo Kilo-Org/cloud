@@ -66,14 +66,12 @@ const asker: Asker = questions =>
   Effect.gen(function* () {
     takenUp.push([...questions]);
     yield* Effect.sleep('6 seconds');
-    return questions.map(
-      (question): Answer => ({
-        id: question.id,
-        ...(question.choices === undefined || question.choices[0] === undefined
-          ? { text: 'ultramarine' }
-          : { chosen: [question.choices[0].value] }),
-      })
-    );
+    return questions.map((question): Answer => ({
+      id: question.id,
+      ...(question.choices === undefined || question.choices[0] === undefined
+        ? { text: 'ultramarine' }
+        : { chosen: [question.choices[0].value] }),
+    }));
   });
 
 /** Holds a round open for a known time, so the line is certainly contended. */

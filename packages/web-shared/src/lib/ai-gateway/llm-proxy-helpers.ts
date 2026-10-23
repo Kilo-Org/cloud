@@ -61,6 +61,8 @@ import type { AutoDecisionRejection } from '@kilocode/web-shared/lib/ai-gateway/
 const fimSuffixFakeSysPrompMarkers = { begin: '[FIM_SUFFIX:', end: ']' } as const;
 
 const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
+// Kilo clients show a sign-up prompt for this code and do not retry the request.
+const PROMOTION_MODEL_LIMIT_REACHED = 'PROMOTION_MODEL_LIMIT_REACHED';
 
 export function invalidPathResponse() {
   return NextResponse.json(
@@ -563,6 +565,34 @@ export function paidModelAuthRequiredResponse() {
       error_type: ProxyErrorType.paid_model_auth_required,
     },
     { status: 401 }
+  );
+}
+
+// The free-model limits use hour-long windows, so an immediate client retry
+// only spends more of the caller's allowance. Kilo CLI v2 and the OpenAI SDKs
+// honor this header.
+const DO_NOT_RETRY_HEADERS = { 'x-should-retry': 'false' };
+
+export function anonymousFreeModelLimitResponse() {
+  const message =
+    'Sign up for free to continue and explore 500 other models. ' +
+    'Takes 2 minutes, no credit card required. Or come back later.';
+  return NextResponse.json(
+    {
+      error: { code: PROMOTION_MODEL_LIMIT_REACHED, message },
+      error_type: ProxyErrorType.rate_limit_exceeded,
+      message,
+    },
+    { status: 429, headers: DO_NOT_RETRY_HEADERS }
+  );
+}
+
+export function accountFreeModelLimitResponse() {
+  const message =
+    'Free model usage limit reached. Please try again later, or switch to a paid model or your own API key.';
+  return NextResponse.json(
+    { error: 'Rate limit exceeded', error_type: ProxyErrorType.rate_limit_exceeded, message },
+    { status: 429, headers: DO_NOT_RETRY_HEADERS }
   );
 }
 

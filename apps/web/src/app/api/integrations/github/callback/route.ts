@@ -18,11 +18,11 @@ import { isGitHubConnectionManagementEnabled } from '@/lib/integrations/github/m
 import { connectVerifiedGitHubInstallation } from '@/lib/integrations/db/github-installations';
 import {
   bindGitHubIntegrationToCanonicalInstallation,
-  effectiveAppTypeCondition,
   lockGitHubInstallationIdentity,
   observeGitHubInstallationLifecycle,
   updateGitHubInstallationRepositories,
 } from '@/lib/integrations/db/github-installations';
+import { effectiveAppTypeCondition } from '@/lib/integrations/db/predicates';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import {
   createPendingIntegration,

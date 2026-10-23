@@ -1,9 +1,16 @@
+/* eslint-disable eslint-plugin-import/no-nodejs-modules -- the scan contract is exercised against a fixture tree on disk, which only exists in the vitest runner */
 import { type TFunction } from 'i18next';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
   collectCountedKeys,
+  collectDynamicCountedCalls,
+  DYNAMIC_COUNTED_KEYS,
   findCountlessFamilies,
+  findUnlistedDynamicCalls,
   NO_AGREEMENT,
 } from '../../../../tools/i18n/check-plurals.mjs';
 import { i18n } from '@/i18n';
@@ -59,5 +66,52 @@ describe('plural families', () => {
       const details = resolveKey(key, options);
       expect(details.exactUsedKey, key).toBe(`${key}_one`);
     }
+  });
+
+  it('collects double-quoted and static template-literal counted keys', () => {
+    const root = mkdtempSync(join(tmpdir(), 'check-plurals-'));
+    mkdirSync(join(root, 'src'), { recursive: true });
+    writeFileSync(
+      join(root, 'src', 'fixture.ts'),
+      [
+        `t("fixture.doubleQuoted", { count: 1 });`,
+        't(`fixture.backticked`, { count: 2 });',
+        `t('fixture.singleQuoted', { count: 3 });`,
+        `t(dynamicKey, { count: 4 });`,
+        `t('fixture.notCounted');`,
+      ].join('\n')
+    );
+    try {
+      // collectCountedKeys sorts its output, so the fixture order is already stable.
+      expect(collectCountedKeys(root)).toEqual([
+        'fixture.backticked',
+        'fixture.doubleQuoted',
+        'fixture.singleQuoted',
+      ]);
+      expect(collectDynamicCountedCalls(root)).toEqual(['dynamicKey']);
+      // The fixture expression is not in the allowlist, so the audit reports it.
+      expect(findUnlistedDynamicCalls(root)).toEqual(['dynamicKey']);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('reviews every dynamic counted call and checks its possible keys', () => {
+    expect(findUnlistedDynamicCalls()).toEqual([]);
+    // `findCountlessFamilies` above walks the allowlist's keys too, so a stale
+    // entry fails the family check. Here only the entries' shape is pinned.
+    for (const [expression, listed] of DYNAMIC_COUNTED_KEYS) {
+      expect(listed.keys.length, expression).toBeGreaterThan(0);
+      expect(listed.reason.length, expression).toBeGreaterThan(0);
+    }
+  });
+
+  it('selects the singular form of a dynamic family at count 1', () => {
+    // serverToolCount is reachable only through the reviewed `row.statusKey`
+    // call; the count picks its form like any literal key's.
+    expect(t('modelChat.mcp.serverToolCount', { count: 1 })).toBe('1 tool');
+    expect(t('modelChat.mcp.serverToolCount', { count: 5 })).toBe('5 tools');
+    expect(t('profiles.counts.vars', { count: 1 })).toBe('1 var');
+    expect(t('profiles.counts.commands', { count: 5 })).toBe('5 cmds');
   });
 });

@@ -591,11 +591,6 @@ export function createExtensionAgentSessionManager({
         kiloSessionId,
         mode: rs?.mode ?? null,
         model: rs?.model ?? null,
-        needsLegacyPrepare: Boolean(
-          sessionResult.cloud_agent_session_id !== null &&
-          sessionResult.cloud_agent_session_id !== '' &&
-          !rs
-        ),
         organizationId: sessionResult.organization_id,
         profileId: sessionResult.profile_id,
         prompt: rs?.prompt ?? null,

@@ -6,6 +6,10 @@ import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-q
 import { useState } from 'react';
 
 import { type SecurityAgentConfig } from '@/lib/security-agent';
+import {
+  getSecurityAnalysisCapacityState,
+  SECURITY_ANALYSIS_CAPACITY_POLL_MS,
+} from '@/lib/security-analysis-capacity';
 import { useTRPC } from '@/lib/trpc';
 
 // Mutation hooks (save config, set enabled, trigger sync, track interaction)
@@ -99,7 +103,7 @@ export function useRetrySecurityAgentSettings(scope: string) {
         // Cancel first, then bypass NetInfo for this deliberate attempt only.
         await queryClient.cancelQueries({ queryKey, exact: true });
         try {
-          await queryClient.fetchQuery({
+          await queryClient.query({
             ...options,
             queryKey,
             networkMode: 'always',
@@ -232,15 +236,35 @@ export function useSecurityAgentCapability(scope: string) {
 
 // Reuses listFindings (status: 'open', limit 1) instead of a dedicated
 // procedure — the concurrency numbers ride along on every findings fetch.
-// `isLoading`/`isError` are exposed alongside the counts so callers can tell
-// "still loading" and "failed to load" apart from "loaded: capacity full" —
-// all three previously collapsed into the same undefined counts.
+// `state` is the derived, single-source answer every action surface reads
+// ("still loading" / "failed to load" / "full" / "available"); the raw counts
+// and flags stay for callers that need them.
 export function useSecurityAnalysisCapacity(scope: string) {
   const trpc = useTRPC();
   const capacityInput = { status: 'open' as const, limit: 1, offset: 0 };
+  // While the owner is at the limit nothing on this screen changes when a
+  // running analysis finishes, and the list does not poll its own result set —
+  // so re-read the counters until a slot frees up, then stop.
+  const refetchInterval = (query: {
+    state: {
+      data?: { runningCount?: number; concurrencyLimit?: number };
+      error?: unknown;
+    };
+  }) =>
+    getSecurityAnalysisCapacityState({
+      runningCount: query.state.data?.runningCount,
+      concurrencyLimit: query.state.data?.concurrencyLimit,
+      isLoading: false,
+      // A failed read keeps the last counts, so the full state must not win
+      // here: the notice's explicit retry owns recovery, not a silent poll.
+      isError: Boolean(query.state.error),
+    }) === 'full'
+      ? SECURITY_ANALYSIS_CAPACITY_POLL_MS
+      : false;
   const personal = useQuery({
     ...trpc.securityAgent.listFindings.queryOptions(capacityInput),
     enabled: isPersonalSecurityScope(scope),
+    refetchInterval,
   });
   const organization = useQuery({
     ...trpc.organizations.securityAgent.listFindings.queryOptions({
@@ -248,11 +272,20 @@ export function useSecurityAnalysisCapacity(scope: string) {
       ...capacityInput,
     }),
     enabled: !isPersonalSecurityScope(scope),
+    refetchInterval,
   });
   const active = isPersonalSecurityScope(scope) ? personal : organization;
+  const runningCount = active.data?.runningCount;
+  const concurrencyLimit = active.data?.concurrencyLimit;
   return {
-    runningCount: active.data?.runningCount,
-    concurrencyLimit: active.data?.concurrencyLimit,
+    runningCount,
+    concurrencyLimit,
+    state: getSecurityAnalysisCapacityState({
+      runningCount,
+      concurrencyLimit,
+      isLoading: active.isLoading,
+      isError: active.isError,
+    }),
     isLoading: active.isLoading,
     isError: active.isError,
     refetch: active.refetch,

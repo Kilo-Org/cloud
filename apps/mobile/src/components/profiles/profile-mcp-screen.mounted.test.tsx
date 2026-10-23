@@ -43,6 +43,7 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
@@ -242,6 +243,24 @@ describe('ProfileMcpScreen', () => {
     unmount();
   });
 
+  it('non-retryable: the name message names ASCII for a non-Latin name', async () => {
+    h.query.data = testProfile();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeText(renderer.root, 'Server name', 'خادم الفريق');
+    changeText(renderer.root, 'Command line', 'npx some-mcp');
+    pressSheetDone(renderer.root);
+
+    expect(h.mutations.createMcp.mutateAsync).not.toHaveBeenCalled();
+    expect(findField(renderer.root, 'Server name').props.error).toBe(
+      'Name can use only ASCII letters, numbers, underscores, and dashes, up to 100 characters'
+    );
+
+    unmount();
+  });
+
   it('non-retryable: an invalid URL is refused for a remote server', async () => {
     h.query.data = testProfile();
     h.query.isPending = false;
@@ -278,6 +297,25 @@ describe('ProfileMcpScreen', () => {
     await waitFor(() => h.error.mock.calls.length > 0);
     expect(h.error).toHaveBeenCalledWith("Couldn't save MCP server");
     expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
+
+    unmount();
+  });
+
+  it('a11y: the secret badge is one counted node and the lock glyph is hidden', async () => {
+    h.query.data = testProfile([testServer()]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    const badge = findAll(renderer.root, 'View').find(node =>
+      String(node.props.accessibilityLabel ?? '').startsWith('Secret count:')
+    );
+    expect(badge?.props.accessibilityLabel).toBe('Secret count: 1');
+    expect(badge?.props.accessible).toBe(true);
+    expect(findOne(renderer.root, 'Lock').parent?.props).toMatchObject({
+      accessibilityElementsHidden: true,
+      importantForAccessibility: 'no-hide-descendants',
+    });
 
     unmount();
   });

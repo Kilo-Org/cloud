@@ -199,7 +199,9 @@ const definitionsOf = (
  * A session that names no tool never asks for the registry, so a caller with no
  * tools needs no layer for them.
  */
-const resolveTools = (names: readonly string[]): Effect.Effect<readonly Tool[], ToolMissingError> =>
+const resolveTools = (
+  names: readonly string[]
+): Effect.Effect<readonly Tool[], ToolMissingError> =>
   names.length === 0
     ? Effect.succeed([])
     : Effect.flatMap(Effect.serviceOption(ToolRegistry), registry =>

@@ -50,15 +50,17 @@ describe('settings tools group switch', () => {
     expect(setItemAsync).toHaveBeenLastCalledWith('settings-tools-enabled', 'false');
   });
 
-  it('notifies subscribers when the switch flips', () => {
+  it('notifies subscribers once the change is stored', async () => {
     const listener = vi.fn<() => void>();
     const unsubscribe = subscribeSettingsToolsEnabled(listener);
 
     setSettingsToolsEnabled(false);
+    await flushMicrotasks();
     expect(listener).toHaveBeenCalledTimes(1);
 
     unsubscribe();
     setSettingsToolsEnabled(true);
+    await flushMicrotasks();
     expect(listener).toHaveBeenCalledTimes(1);
   });
 

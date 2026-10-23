@@ -124,7 +124,7 @@ export function mayRetryTransfer(download: GgufActiveDownload): boolean {
 }
 
 /** A transfer that stopped short is started from zero once more, and a file that was refused is read once more. */
-export const ATTEMPTS = 2;
+const ATTEMPTS = 2;
 export const PASSES = 2;
 
 export function currentTransfer(download: GgufActiveDownload): GgufTransfer {

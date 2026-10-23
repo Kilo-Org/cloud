@@ -53,6 +53,7 @@ const ModelsDevModelSchema = z.object({
     .optional(),
   tool_call: z.boolean().optional(),
   provider: z.object({ npm: z.string().optional() }).optional().catch(undefined),
+  canonical_model_id: z.string().optional().catch(undefined),
 });
 
 // A models.dev per-model `provider.npm` names the SDK for the model's own endpoint. Several SDK
@@ -65,13 +66,6 @@ const GEMINI_API_MODELS_DEV_SDKS: ReadonlySet<string> = new Set([
 
 const ModelsDevProviderSchema = z.object({
   models: z.record(z.string(), ModelsDevModelSchema),
-});
-
-const ModelsDevCanonicalIdsSchema = z.object({
-  models: z.record(
-    z.string(),
-    z.object({ id: z.string(), canonical_model_id: z.string().optional().catch(undefined) })
-  ),
 });
 
 const ModelsDevCatalogSchema = z.record(z.string(), z.unknown());
@@ -199,7 +193,7 @@ export function indexCatalogModelIdsByCanonicalId(
     console.warn('[sync-direct-byok-providers] models.dev catalog missing openrouter entry');
     return index;
   }
-  for (const model of Object.values(ModelsDevCanonicalIdsSchema.parse(entry).models)) {
+  for (const model of Object.values(ModelsDevProviderSchema.parse(entry).models)) {
     const canonicalId = model.canonical_model_id;
     // Variants such as `:free` are routing options of a catalog model, not separate models.
     if (!canonicalId || model.id.includes(':')) continue;
@@ -221,7 +215,7 @@ async function getCatalogModelIds(
   const entry = (await ctx.getModelsDevCatalog())[modelsDevId];
   if (!entry) return catalogModelIds;
   const byCanonicalId = await ctx.getCatalogModelIdsByCanonicalId();
-  for (const model of Object.values(ModelsDevCanonicalIdsSchema.parse(entry).models)) {
+  for (const model of Object.values(ModelsDevProviderSchema.parse(entry).models)) {
     const catalogModelId = model.canonical_model_id && byCanonicalId.get(model.canonical_model_id);
     if (catalogModelId) catalogModelIds.set(model.id, catalogModelId);
   }

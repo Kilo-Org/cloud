@@ -6,7 +6,6 @@
  */
 import type { ChatEvent, ServiceEvent } from './normalizer';
 import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
-import type { Images } from '@kilocode/app-shared/images-schema';
 import type { CloudAgentSessionId, KiloSessionId } from './types';
 import type { ModelRef, RemoteModelOverride } from './remote-model-catalog';
 
@@ -122,7 +121,6 @@ type TransportSendInput = {
   payload: TransportSendPayload;
   messageId?: string | undefined;
   attachments?: CloudAgentAttachments | undefined;
-  images?: Images | undefined;
   remoteModelOverride?: RemoteModelOverride | undefined;
   /**
    * Ready file parts to append to the remote CLI's `send_message` `parts`
@@ -195,7 +193,6 @@ type CloudAgentApi = {
     payload: CloudAgentSendPayload;
     messageId?: string;
     attachments?: CloudAgentAttachments;
-    images?: Images;
   }) => Promise<unknown>;
   interrupt: (payload: { sessionId: CloudAgentSessionId }) => Promise<unknown>;
   /**

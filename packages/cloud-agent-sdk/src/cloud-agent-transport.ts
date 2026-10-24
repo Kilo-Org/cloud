@@ -488,7 +488,6 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
             payload: normalizeCloudAgentPayload(input.payload),
             ...(input.messageId ? { messageId: input.messageId } : {}),
             ...(input.attachments ? { attachments: input.attachments } : {}),
-            ...(input.images ? { images: input.images } : {}),
           })
         ),
       interrupt: () => runMutation(() => config.api.interrupt({ sessionId: config.sessionId })),

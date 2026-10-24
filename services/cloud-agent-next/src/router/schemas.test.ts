@@ -22,10 +22,6 @@ import { parseCanonicalBitbucketCloneUrl } from '../types.js';
 const validMessageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
 const validSessionId = 'workspace_12345678-1234-1234-1234-123456789012';
 const validKiloSessionId = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
-const validImages = {
-  path: '123e4567-e89b-12d3-a456-426614174000',
-  files: ['123e4567-e89b-12d3-a456-426614174001.png'],
-};
 const validAttachments = {
   path: '123e4567-e89b-12d3-a456-426614174000',
   files: ['123e4567-e89b-12d3-a456-426614174001.csv'],
@@ -207,7 +203,6 @@ describe('grouped unified session input contracts', () => {
     const input = {
       message: {
         prompt: 'Create the first turn',
-        images: validImages,
         id: validMessageId,
       },
       agent: {
@@ -279,27 +274,6 @@ describe('grouped unified session input contracts', () => {
         message: { prompt: 'Read this document', attachments: validAttachments },
       }).message.attachments
     ).toEqual(validAttachments);
-  });
-
-  it('continues accepting legacy images and rejects ambiguous grouped attachment payloads', () => {
-    expect(
-      SendMessageInput.safeParse({
-        cloudAgentSessionId: validSessionId,
-        message: { prompt: 'Read the image', images: validImages },
-      }).success
-    ).toBe(true);
-    expect(
-      StartSessionInput.safeParse({
-        ...baseStartInput,
-        message: { prompt: 'ambiguous', images: validImages, attachments: validAttachments },
-      }).success
-    ).toBe(false);
-    expect(
-      SendMessageInput.safeParse({
-        cloudAgentSessionId: validSessionId,
-        message: { prompt: 'ambiguous', images: validImages, attachments: validAttachments },
-      }).success
-    ).toBe(false);
   });
 
   it('preserves the grouped send payload shape', () => {
@@ -645,7 +619,7 @@ describe('legacy live attachment input compatibility', () => {
     ).toBe(false);
   });
 
-  it('accepts document attachments on prepareSession while retaining images', () => {
+  it('accepts document attachments on prepareSession', () => {
     const basePrepareInput = {
       prompt: 'Summarize this document',
       mode: 'code',
@@ -656,16 +630,6 @@ describe('legacy live attachment input compatibility', () => {
     expect(
       PrepareSessionInput.safeParse({ ...basePrepareInput, attachments: validAttachments }).success
     ).toBe(true);
-    expect(
-      PrepareSessionInput.safeParse({ ...basePrepareInput, images: validImages }).success
-    ).toBe(true);
-    expect(
-      PrepareSessionInput.safeParse({
-        ...basePrepareInput,
-        attachments: validAttachments,
-        images: validImages,
-      }).success
-    ).toBe(false);
   });
 });
 
@@ -811,26 +775,8 @@ describe('sendMessageV2 input compatibility', () => {
     });
   });
 
-  it('continues accepting legacy images and rejects ambiguous prompt attachments', () => {
-    expect(
-      SendMessageV2Input.safeParse({
-        cloudAgentSessionId: validSessionId,
-        payload: { type: 'prompt', ...basePromptInput },
-        images: validImages,
-      }).success
-    ).toBe(true);
-    expect(
-      SendMessageV2Input.safeParse({
-        cloudAgentSessionId: validSessionId,
-        payload: { type: 'prompt', ...basePromptInput },
-        attachments: validAttachments,
-        images: validImages,
-      }).success
-    ).toBe(false);
-  });
-
   it('rejects attachment descriptors on nested command payloads', () => {
-    for (const descriptor of [{ images: validImages }, { attachments: validAttachments }]) {
+    for (const descriptor of [{ attachments: validAttachments }]) {
       expect(
         SendMessageV2Input.safeParse({
           cloudAgentSessionId: validSessionId,

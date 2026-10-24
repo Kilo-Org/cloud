@@ -69,13 +69,9 @@ import {
   baseCreatePreviewNextSchema,
   baseCreatePreviewNextOutputSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
-  cloudAgentGetImageUploadUrlSchema,
   cloudAgentReleasePendingUploadsSchema,
 } from '../cloud-agent-next-schemas';
-import {
-  generateCloudAgentAttachmentUploadUrl,
-  generateImageUploadUrl,
-} from '@/lib/r2/cloud-agent-attachments';
+import { generateCloudAgentAttachmentUploadUrl } from '@/lib/r2/cloud-agent-attachments';
 import { linkPendingUploads, releasePendingUploads } from '@/lib/r2/cloud-agent-pending-uploads';
 import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -192,10 +188,6 @@ const InterruptSessionInput = baseInterruptSessionNextSchema.extend({
 });
 
 const CancelQueuedMessageInput = baseCancelQueuedMessageNextSchema.extend({
-  organizationId: z.uuid(),
-});
-
-const ImageUploadUrlInput = cloudAgentGetImageUploadUrlSchema.extend({
   organizationId: z.uuid(),
 });
 
@@ -340,7 +332,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         publicRepoUrl,
         organizationId,
         attachments,
-        images,
         ...restInput
       } = input;
 
@@ -400,7 +391,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         const result = await client.prepareSession({
           ...restInput,
           ...gitParams,
-          attachments: attachments ?? images,
+          attachments,
           createdOnPlatform: 'cloud-agent-web',
           githubAccessPurpose: 'agent',
           kilocodeOrganizationId: organizationId,
@@ -409,9 +400,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
 
         // New-session flows call prepareSession without a follow-up
         // sendMessage, so the server must link the admitted attachment rows
-        // here too; otherwise the reaper deletes new-session objects. Only
-        // ATTACHMENT rows are admitted (images are never admitted; only
-        // generateCloudAgentAttachmentUploadUrl admits).
+        // here too; otherwise the reaper deletes new-session objects.
         if (attachments && attachments.files.length > 0) {
           await linkPendingUploads(
             ctx.user.id,
@@ -534,15 +523,13 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           payload: input.payload,
           autoCommit: input.autoCommit,
           messageId: input.messageId ?? generateMessageId(),
-          attachments: input.attachments ?? input.images,
+          attachments: input.attachments,
         });
 
         // Compatibility: the server links authoritatively so any client whose
         // send goes through sendMessage keeps its objects (mobile, old tabs).
         // The client does not link pre-send, so a failed or abandoned send
-        // leaves rows 'pending' for the reaper. Only ATTACHMENT rows are
-        // admitted (images are never admitted; only
-        // generateCloudAgentAttachmentUploadUrl admits).
+        // leaves rows 'pending' for the reaper.
         const attachments = input.attachments;
         if (attachments && attachments.files.length > 0) {
           await linkPendingUploads(
@@ -763,21 +750,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       } catch (error) {
         rethrowAsTerminalError(error);
       }
-    }),
-
-  /**
-   * Generate a presigned URL for uploading an image attachment.
-   */
-  getImageUploadUrl: organizationMemberMutationProcedure
-    .input(ImageUploadUrlInput)
-    .mutation(async ({ ctx, input }) => {
-      return generateImageUploadUrl({
-        userId: ctx.user.id,
-        messageUuid: input.messageUuid,
-        imageId: input.imageId,
-        contentType: input.contentType,
-        contentLength: input.contentLength,
-      });
     }),
 
   /**

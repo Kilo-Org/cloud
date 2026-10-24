@@ -239,7 +239,6 @@ jest.mock('@/lib/cloud-agent/order-repositories', () => ({
 }));
 
 jest.mock('@/lib/r2/cloud-agent-attachments', () => ({
-  generateImageUploadUrl: jest.fn(),
   generateCloudAgentAttachmentUploadUrl: mockGenerateCloudAgentAttachmentUploadUrl,
   generateCloudAgentAttachmentDownloadUrl: mockGenerateCloudAgentAttachmentDownloadUrl,
 }));
@@ -282,7 +281,6 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
       | { type: 'prompt'; prompt: string; mode: string; model: string }
       | { type: 'command'; command: string; arguments: string };
     attachments?: { path: string; files: string[] };
-    images?: { path: string; files: string[] };
   }) => Promise<unknown>;
   getAttachmentUploadUrl: (input: {
     messageUuid: string;
@@ -606,23 +604,6 @@ describe('cloudAgentNextRouter attachment forwarding', () => {
     });
 
     expect(mockSendMessage).toHaveBeenCalledWith(expect.objectContaining({ attachments }));
-  });
-
-  it('normalizes legacy image requests to canonical Worker attachments', async () => {
-    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
-    const images = {
-      path: '12345678-1234-4234-9234-123456789abc',
-      files: ['87654321-4321-4321-8321-cba987654321.png'],
-    };
-
-    await caller.sendMessage({
-      cloudAgentSessionId: 'agent_123',
-      payload: { type: 'prompt', prompt: 'Read image', mode: 'code', model: 'test' },
-      images,
-    });
-
-    expect(mockSendMessage).toHaveBeenCalledWith(expect.objectContaining({ attachments: images }));
-    expect(mockSendMessage).not.toHaveBeenCalledWith(expect.objectContaining({ images }));
   });
 
   it('routes free follow-up prompt models through the balance-skip client', async () => {
@@ -1230,31 +1211,6 @@ describe('cloudAgentNextRouter.prepareSession', () => {
     ).rejects.toThrow('Devcontainer support has been retired');
     expect(mockIsFeatureFlagEnabledOrDevelopment).not.toHaveBeenCalled();
     expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
-  });
-
-  it('normalizes legacy initial images to canonical Worker attachments', async () => {
-    const caller = createCaller({
-      user: { id: 'user-1', is_admin: false } as User,
-    });
-    const images = {
-      path: '12345678-1234-4234-9234-123456789abc',
-      files: ['87654321-4321-4321-8321-cba987654321.png'],
-    };
-
-    await caller.prepareSession({
-      prompt: 'Read image',
-      mode: 'code',
-      model: 'kilo/test-model',
-      githubRepo: 'acme/repo',
-      autoInitiate: true,
-      devcontainer: false,
-      images,
-    });
-
-    expect(mockPrepareSession).toHaveBeenCalledWith(
-      expect.objectContaining({ attachments: images, createdOnPlatform: 'cloud-agent-web' })
-    );
-    expect(mockPrepareSession).not.toHaveBeenCalledWith(expect.objectContaining({ images }));
   });
 
   it('rejects personal Bitbucket sessions before constructing a Cloud Agent client', async () => {

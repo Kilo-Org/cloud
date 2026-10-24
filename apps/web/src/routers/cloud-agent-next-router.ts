@@ -62,14 +62,12 @@ import {
   basePreviewOptionsNextOutputSchema,
   basePreviewOptionsNextSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
-  cloudAgentGetImageUploadUrlSchema,
   cloudAgentGetAttachmentDownloadUrlSchema,
   cloudAgentReleasePendingUploadsSchema,
 } from './cloud-agent-next-schemas';
 import {
   generateCloudAgentAttachmentUploadUrl,
   generateCloudAgentAttachmentDownloadUrl,
-  generateImageUploadUrl,
 } from '@/lib/r2/cloud-agent-attachments';
 import { linkPendingUploads, releasePendingUploads } from '@/lib/r2/cloud-agent-pending-uploads';
 import * as z from 'zod';
@@ -215,7 +213,6 @@ export const cloudAgentNextRouter = createTRPCRouter({
         githubIntegrationId,
         publicRepoUrl,
         attachments,
-        images,
         ...restInput
       } = input;
 
@@ -267,7 +264,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
         const result = await client.prepareSession({
           ...restInput,
           ...gitParams,
-          attachments: attachments ?? images,
+          attachments,
           createdOnPlatform: 'cloud-agent-web',
           githubAccessPurpose: 'agent',
           clientProvenance: isMobileClient(ctx.headersList) ? 'mobile' : 'browser',
@@ -276,8 +273,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
         // New-session flows (mobile, continue-cloud-create) call prepareSession
         // without a follow-up sendMessage, so the server must link the admitted
         // attachment rows here too; otherwise the reaper deletes new-session
-        // objects. Only ATTACHMENT rows are admitted (images are never admitted;
-        // only generateCloudAgentAttachmentUploadUrl admits).
+        // objects.
         if (attachments && attachments.files.length > 0) {
           await linkPendingUploads(
             ctx.user.id,
@@ -375,21 +371,19 @@ export const cloudAgentNextRouter = createTRPCRouter({
       // Tokens are refreshed inside cloud-agent-next (GitHub App installation
       // for GitHub, GIT_TOKEN_SERVICE for managed GitLab).
       try {
-        const { attachments, images } = input;
+        const { attachments } = input;
         const result = await client.sendMessage({
           cloudAgentSessionId: input.cloudAgentSessionId,
           payload: input.payload,
           autoCommit: input.autoCommit,
-          attachments: attachments ?? images,
+          attachments,
           messageId: input.messageId ?? generateMessageId(),
         });
 
         // Compatibility: the server links authoritatively so any client whose
         // send goes through sendMessage keeps its objects (mobile, old tabs).
         // The client does not link pre-send, so a failed or abandoned send
-        // leaves rows 'pending' for the reaper. Only ATTACHMENT rows are
-        // admitted (images are never admitted; only
-        // generateCloudAgentAttachmentUploadUrl admits).
+        // leaves rows 'pending' for the reaper.
         if (attachments && attachments.files.length > 0) {
           await linkPendingUploads(
             ctx.user.id,
@@ -554,21 +548,6 @@ export const cloudAgentNextRouter = createTRPCRouter({
       } catch (error) {
         rethrowAsTerminalError(error);
       }
-    }),
-
-  /**
-   * Generate a presigned URL for uploading an image attachment.
-   */
-  getImageUploadUrl: baseProcedure
-    .input(cloudAgentGetImageUploadUrlSchema)
-    .mutation(async ({ ctx, input }) => {
-      return generateImageUploadUrl({
-        userId: ctx.user.id,
-        messageUuid: input.messageUuid,
-        imageId: input.imageId,
-        contentType: input.contentType,
-        contentLength: input.contentLength,
-      });
     }),
 
   /**

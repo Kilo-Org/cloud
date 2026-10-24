@@ -54,7 +54,7 @@ function Probe() {
 export function state() {
   return view?.renderer.root.findAllByType('UnlockState' as ElementType)[0]?.props as Unlock;
 }
-async function flush(update?: () => void) {
+export async function flush(update?: () => void) {
   await act(async () => {
     update?.();
     await vi.dynamicImportSettled();

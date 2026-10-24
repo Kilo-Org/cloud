@@ -117,6 +117,10 @@ export function createCloudflareContainersProviderAdapter(deps: {
 
   return {
     ensureBillingAdmission,
+    async isBillingBlocked(ref) {
+      if (ref === null || decodeOwnedProviderRef(ref) === null) return false;
+      return deps.getContainer(deps.logicalSandboxId).isBillingBlocked();
+    },
     describeRuntime(ref) {
       const parsed = decodeOwnedProviderRef(ref);
       if (parsed === null) return undefined;
@@ -132,7 +136,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
       await ensureBillingAdmission(providerRef, intent.billing);
       return { providerRef };
     },
-    async launch(ref, env, options) {
+    async launch(ref, { command, env }, options) {
       const owned = decodeOwnedProviderRef(ref);
       if (owned === null) {
         throw new ProviderCreationError('invalid_configuration');
@@ -143,6 +147,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
         String(containersBillingIdentity(instance).capacity.memoryMiB);
       const { startSource, snapshotFailed } = await container.launchWrapper({
         allocationRef: ref,
+        command,
         instance,
         containment: owned.containment,
         ...(deps.egressAllowlist === undefined ? {} : { egressAllowlist: deps.egressAllowlist }),

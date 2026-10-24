@@ -10,7 +10,7 @@ it('tells the store about every turn and asks it to flush on close', async () =>
 
 it('runs with no store at all', async () => {
   const { value } = await run([{ deltas: ['hello'] }], session =>
-    Effect.zipRight(Stream.runDrain(session.ask('hi')), Effect.map(session.history, texts))
+    Effect.andThen(Stream.runDrain(session.ask('hi')), Effect.map(session.history, texts))
   );
   expect(value).toEqual(['user:hi', 'assistant:hello']);
 });
@@ -20,7 +20,7 @@ it('keeps memory and the store agreeing when the store refuses the write', async
   const { value } = await run(
     [{ deltas: ['x'] }],
     session =>
-      Effect.zipRight(
+      Effect.andThen(
         Effect.ignore(Stream.runDrain(session.ask('hi'))),
         Effect.map(session.history, texts)
       ),
@@ -37,13 +37,13 @@ it('reports the store failure to the caller rather than swallowing it', async ()
   const store = brokenStore('append');
   const failure = await run(
     [{ deltas: ['x'] }],
-    session => Effect.either(Stream.runDrain(session.ask('hi'))),
+    session => Effect.result(Stream.runDrain(session.ask('hi'))),
     store.layer
   );
 
   expect(failure.value).toMatchObject({
-    _tag: 'Left',
-    left: { _tag: 'harness/StoreError', operation: 'append' },
+    _tag: 'Failure',
+    failure: { _tag: 'harness/StoreError', operation: 'append' },
   });
 });
 
@@ -51,7 +51,7 @@ it('closes the session even when the final flush fails', async () => {
   const store = brokenStore('flush');
   const { value } = await run(
     [{ deltas: ['x'] }],
-    session => Effect.zipRight(Stream.runDrain(session.ask('hi')), Effect.succeed('closed')),
+    session => Effect.andThen(Stream.runDrain(session.ask('hi')), Effect.succeed('closed')),
     store.layer
   );
 

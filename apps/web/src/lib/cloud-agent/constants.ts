@@ -26,7 +26,7 @@ export const CLOUD_AGENT_IMAGE_PRESIGNED_URL_EXPIRY_SECONDS = 900; // 15 min
 
 /**
  * File upload constraints for Cloud Agent prompts. Kept separate from the
- * image-only contract used by App Builder and older Cloud Agent upload flows.
+ * image-only contract used by older Cloud Agent upload flows.
  */
 export const CLOUD_AGENT_ATTACHMENT_ALLOWED_TYPES = [
   ...CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
@@ -52,6 +52,16 @@ export const CLOUD_AGENT_ATTACHMENT_MIME_TO_EXTENSION: Record<
 export const CLOUD_AGENT_ATTACHMENT_MAX_COUNT = 5;
 export const CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
 export const CLOUD_AGENT_ATTACHMENT_PRESIGNED_URL_EXPIRY_SECONDS = 900; // 15 min
+
+/** Objects purged per reaper run, so one cron invocation always finishes. */
+export const CLOUD_AGENT_PENDING_UPLOAD_PURGE_BATCH = 500;
+
+/**
+ * Ceiling on live pending-upload rows per account, summed across every
+ * message. Rows expire on a 24-hour lease, so the window renews as the
+ * reaper clears expired rows.
+ */
+export const CLOUD_AGENT_PENDING_UPLOADS_MAX_PER_ACCOUNT = 25;
 
 /**
  * Filename-derived extensions that are never stored or downloaded, regardless

@@ -1,3 +1,4 @@
+import { setupCommandsSchema } from '@kilocode/cloud-agent-profile/setup-script';
 import {
   RuntimeSkillsSchema,
   RuntimeAgentsSchema,
@@ -8,7 +9,6 @@ import * as z from 'zod';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import { Limits } from '../schema.js';
 import { isValidSandboxId } from '../sandbox-id.js';
-import type { SandboxId } from '../types.js';
 
 /**
  * Attachment filename extension deny-list shared by every worker-layer
@@ -289,7 +289,7 @@ const SharedSessionProfileFields = {
     })
     .optional(),
   encryptedSecrets: EncryptedSecretsSchema.optional(),
-  setupCommands: z.array(z.string().max(500)).max(Limits.MAX_SETUP_COMMANDS).optional(),
+  setupCommands: setupCommandsSchema.optional(),
   mcpServers: z
     .record(z.string().max(100), MCPServerConfigSchema)
     .refine(obj => Object.keys(obj).length <= Limits.MAX_MCP_SERVERS, {
@@ -375,7 +375,7 @@ export const MetadataSchema = z.object({
   sandboxId: z
     .string()
     .refine(isValidSandboxId, 'Invalid sandboxId format')
-    .transform(s => s as SandboxId)
+    .transform(s => s)
     .optional(),
   devcontainer: z
     .object({

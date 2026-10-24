@@ -38,7 +38,9 @@ Unrelated paths return 404; other methods on `/usage` return 405.
 Production commits `USAGE_INGEST_MODE=receipt`; staging commits `processing` with
 `https://staging-app.kilo.ai/api/internal/usage/record` as its Frankfurt writer URL.
 An absent mode also uses receipt behavior. Processing validates and writes events
-sequentially, preserving the supplied usage ID and validated fields.
+sequentially within each consumer invocation, preserving the supplied usage ID
+and validated fields. Concurrent invocations are capped by each environment's
+`max_concurrency` setting in the queue policy below.
 
 Processing uses `@kilocode/worker-utils/usage-writer-client` for the existing
 Frankfurt `/api/internal/usage/record` endpoint. Only a matching `recorded` or
@@ -46,6 +48,18 @@ Frankfurt `/api/internal/usage/record` endpoint. Only a matching `recorded` or
 configuration, unknown modes, and unavailable writes retry under the queue policy,
 then reach the DLQ. Processing logs contain the usage ID when valid, queue message
 ID, delivery attempt count, and categorical outcome/reason.
+
+Writer HTTP 429 and 503 also reject the queue invocation after all messages in the
+batch have been handled. Each successful message keeps its explicit ACK; failed
+messages keep their explicit retry using the configured delay and retry/DLQ budget.
+There is no extra writer attempt within an invocation. Other failures retain
+per-message retries without being classified as overload. Overload retry logs add
+`writer_status` and `invocation_failure: "writer_overloaded"`.
+An uncaught queue rejection supplies Cloudflare's invocation failure signal;
+`retry()` alone does not. Autoscaling considers that signal alongside backlog and
+the concurrency cap; no particular scale-down amount or timing is guaranteed.
+See [consumer concurrency](https://developers.cloudflare.com/queues/configuration/consumer-concurrency/)
+and [explicit ACK/retry behavior](https://developers.cloudflare.com/queues/configuration/batching-retries/).
 
 Both `usage_ingest_receipt` and `usage_ingest_processing` include an explicit
 `level` and `queue_action` (`ack` or `retry`). Receipts (including discarded invalid
@@ -112,9 +126,19 @@ context, not an authorization or accounting input. Older clients remain compatib
 `execution_region` identifies the persistence function's region when available:
 SFO HTTP handoffs record `fra1`; a local fallback in SFO records `sfo1`.
 Missing or unrecognized `VERCEL_REGION` values are reported as `unknown`.
-These labels describe the actual persistence entry/caller, so identify queue-only
-fallbacks using the deployment's flag settings and existing
-`usage accounting direct fallback` warning.
+With queue-only enabled, the gateway never calls a billing writer, including on
+publication failure. It retries transient publication failures up to three total
+attempts, with a fresh two-second timeout each and jittered 200–400 ms then
+400–600 ms backoffs. Every attempt reuses the same serialized event and usage ID;
+ambiguous acceptance can create duplicate messages, which the writer deduplicates.
+Configuration failures and HTTP outcomes other than 408/429/5xx are not retried.
+Redirects are terminal 3xx failures; their targets are never followed.
+Shadow publication retains one attempt. `usage enqueue retrying` logs the usage
+ID, categorical reason and failed attempt number before each retry. `usage accounting publication failed` logs the finalized
+`usageId` and categorical `reason`; accounting returns null and emits no gateway
+persistence completion. This is not durable recovery: unaccepted events may be
+lost, and ambiguous failures may still be recorded later by the consumer. With
+queue-only off, the existing SFO handoff-to-local fallback remains unchanged.
 
 `duration_ms` covers the shared persistence call and its awaited follow-up work,
 not pure SQL time. `event_age_ms` retains the original event timestamp across
@@ -148,13 +172,13 @@ reconcile against persisted usage rows when exact completeness matters.
 
 ## Queue policy
 
-Both environments use the same consumer settings:
+Both environments use the following consumer settings:
 
 | Consumer setting | Value | Purpose |
 |---|---|---|
 | `max_batch_size` | `1` | One message per invocation. |
 | `max_batch_timeout` | `0` seconds | No intentional wait to fill a batch. |
-| `max_concurrency` | `1` | One active consumer invocation per environment's source queue. |
+| `max_concurrency` | Production: `1`; staging: `200` | Cap active consumer invocations per source queue; staging uses a larger cap for load testing. |
 | `max_retries` | `3` | Initial delivery plus up to three retries. |
 | `retry_delay` | `60` seconds | Space failed deliveries by one minute rather than retrying immediately. |
 | `dead_letter_queue` | Environment-specific name above | Retain exhausted failures separately from the source queue. |
@@ -224,3 +248,52 @@ service's ignored `.dev.vars`, then run `pnpm --filter cloudflare-usage-ingest d
 The queue is simulated locally and delivered to the shipped `queue()` handler in
 the same Worker. Runtime tests cover HTTP publishing, receipt consumption, and opt-in processing
 in both environments.
+
+## Staging Frankfurt writer relay
+
+The existing `staging` configuration sends queued writes through a private
+service binding's **fetch** method to `usage-writer-relay-staging`. The relay's
+fetch handler forwards to the same staging Vercel writer with a placement hint
+of `aws:eu-central-1`. Production keeps direct writes. The writer, middleware,
+database and queue policy stay unchanged.
+
+This is an outbound-request placement experiment. [Placement's shared limitations](https://developers.cloudflare.com/workers/configuration/placement/#review-limitations-1)
+apply to fetch handlers and do not pin the queue consumer. The hint selects a
+Cloudflare data center near Frankfurt, not an AWS-hosted Worker. A US consumer
+still crosses to Europe and waits for the return; the relay adds a hop and may
+be neutral or slower. The hypothesis is that a Frankfurt-origin request avoids
+an extra Vercel middleware/routing trip. Actual relay placement, Vercel ingress
+and latency need measurement. EU queue jurisdiction does not place the consumer.
+
+The relay has no public routes, workers.dev or preview URL. It streams to a fixed
+configured staging target, forwards only the existing internal key and optional
+Vercel protection bypass, and leaves authentication to the existing writer. It
+needs no additional secrets. Redirects are not followed, the client retains its
+160-second budget and response/identity validation, and only recorded/duplicate
+responses ACK. The relay adds no retries or persistence.
+
+### Deployment and verification
+
+Normal staging CI uses `--env staging`. Both the single-worker and changed-worker
+paths in `deploy-workers.yml` deploy `wrangler.writer-relay.jsonc` **first**, then
+deploy the existing consumer when the selected source's staging binding requires
+the relay. Historical direct-path revisions skip it. A required relay's missing
+config or failed deployment stops the consumer deploy.
+The relay's nonstandard config filename keeps it out of independent discovery;
+its deployment is owned by usage-ingest. Other Workers and production skip this
+relay step. There is no separate `staging-relay` environment or manual activation.
+
+Record both Worker revisions and the unchanged writer deployment SHA. Send one
+authenticated smoke event, verify its stable usage ID/ACK/persistence, then inspect
+the relay's actual placement and the Vercel ingress/function trace. Compute region
+is `executionRegion`/`proxy.lambdaRegion`; `proxy.region` is the ingress hop.
+For a subsequent approved comparison, keep queue cap/workload and cold/warm
+conditions fixed and capture aligned event age, full consumer HTTP p95/p99, queue
+backlog/retries/DLQ and DB pool/lock limits. Accounting creation → persistence
+excludes return/ACK; the full consumer HTTP duration includes the return leg.
+Local runtime tests prove the service-binding path and ACK/retry behavior, not
+geographical placement or speedup.
+
+Rollback by reverting the relay change and deploying the reviewed direct-path
+revision through staging CI. The consumer retains the same queue and usage IDs;
+no data migration or writer rollback is needed. The unused relay can remain private.

@@ -59,8 +59,21 @@ class MockResizeObserver {
   unobserve = jest.fn();
 }
 
+// The SDK derives the cached page's owner; the mocks own the cached rows directly.
+function mockCachedTranscriptSessionId(): unknown {
+  if (!mockAtomValues.isRefreshingCachedTranscript) return null;
+  const rows = [
+    ...((mockAtomValues.staticMessages as { info: { sessionID: string } }[] | undefined) ?? []),
+    ...((mockAtomValues.dynamicMessages as { info: { sessionID: string } }[] | undefined) ?? []),
+  ];
+  return rows[0]?.info.sessionID ?? null;
+}
+
 jest.mock('jotai', () => ({
-  useAtomValue: (key: string) => mockAtomValues[key] ?? null,
+  useAtomValue: (key: string) =>
+    key === 'cachedTranscriptSessionId'
+      ? mockCachedTranscriptSessionId()
+      : (mockAtomValues[key] ?? null),
   useSetAtom: () => mockSetAtom,
 }));
 jest.mock('next/navigation', () => ({
@@ -75,6 +88,7 @@ jest.mock('@tanstack/react-query', () => ({
   useQueryClient: () => mockQueryClient,
 }));
 jest.mock('@/lib/trpc/utils', () => ({ useTRPC: () => mockTrpc }));
+jest.mock('./use-cached-transcript-page', () => ({ useCachedTranscriptPage: () => null }));
 jest.mock('./use-preview', () => ({
   ...jest.requireActual('./use-preview'),
   usePreviewUrlTemplate: () => null,
@@ -377,7 +391,11 @@ describe('CloudChatPage route-aware transcript phase', () => {
     expect(status?.textContent).toContain('Loading session…');
     expect(alert()).toBeNull();
     expect(dom.container.querySelector('[data-conversation]')).toBeNull();
-    expect(mockChatInput?.placeholder).toBe('Loading session…');
+    expect(mockChatInput).toMatchObject({
+      textareaDisabled: false,
+      disabled: true,
+      sendUnavailableReason: 'Loading session…',
+    });
   });
 
   it.each([null, { type: 'preparing' }, { type: 'error', message: 'Preparation failed' }])(
@@ -433,7 +451,7 @@ describe('CloudChatPage route-aware transcript phase', () => {
     expect(mockChatHeader?.branch).toBe('kilo/prepared-branch');
   });
 
-  it('does not render a placeholder when branch metadata is missing', () => {
+  it('reserves the branch row without placeholder text when branch metadata is missing', () => {
     mockAtomValues.fetchedSessionData = {
       kiloSessionId: 'ses_b',
       organizationId: null,
@@ -446,7 +464,9 @@ describe('CloudChatPage route-aware transcript phase', () => {
 
     const composer = dom.container.querySelector('[data-composer]');
     expect(composer).not.toBeNull();
-    expect(composer?.nextElementSibling).toBeNull();
+    // The row holds its height so the composer does not move when metadata lands.
+    expect(composer?.nextElementSibling?.className).toContain('min-h-11');
+    expect(composer?.nextElementSibling?.textContent).toBe('');
   });
 
   it('shows cached rows before metadata without allowing submission or resuming an anchor', () => {

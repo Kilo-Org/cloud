@@ -6,7 +6,6 @@ import { debugRouter } from '@/routers/debug-router';
 import { userRouter } from '@/routers/user-router';
 import { adminRouter } from '@/routers/admin-router';
 import { codeIndexingRouter } from '@/routers/code-indexing/code-indexing-router';
-import { deploymentsRouter } from '@/routers/deployments-router';
 import { cliSessionsRouter } from '@/routers/cli-sessions-router';
 import { cliSessionsV2Router } from '@/routers/cli-sessions-v2-router';
 import { workspaceFoldersRouter } from '@/routers/workspace-folders-router';
@@ -24,7 +23,6 @@ import { reviewMemoryRouter } from '@/routers/code-reviews/review-memory-router'
 import { personalReviewAgentRouter } from '@/routers/code-reviews-router';
 import { byokRouter } from '@/routers/byok-router';
 import { openAiChatGptRouter } from '@/routers/openai-chatgpt-router';
-import { appBuilderRouter } from '@/routers/app-builder-router';
 import { securityAgentRouter } from '@/routers/security-agent-router';
 import { securityAuditLogRouter } from '@/routers/security-audit-log-router';
 import { appReportedMessagesRouter } from '@/routers/app-reported-messages-router';
@@ -32,10 +30,10 @@ import { kiloPassRouter } from '@/routers/kilo-pass-router';
 import { creditsRouter } from '@/routers/credits-router';
 import { agentProfilesRouter } from '@/routers/agent-profiles-router';
 import { cloudAgentSettingsRouter } from '@/routers/cloud-agent-settings-router';
+import { cloudEnvironmentsRouter } from '@/routers/cloud-environments-router';
 import { webhookTriggersRouter } from '@/routers/webhook-triggers-router';
 import { userFeedbackRouter } from '@/routers/user-feedback-router';
 import { feedbackRouter } from '@/routers/feedback-router';
-import { appBuilderFeedbackRouter } from '@/routers/app-builder-feedback-router';
 import { cloudAgentNextFeedbackRouter } from '@/routers/cloud-agent-next-feedback-router';
 import { kiloChatRouter } from '@/routers/kilo-chat-router';
 import { kiloclawRouter } from '@/routers/kiloclaw-router';
@@ -58,7 +56,6 @@ export const rootRouter = createTRPCRouter({
   user: userRouter,
   admin: adminRouter,
   codeIndexing: codeIndexingRouter,
-  deployments: deploymentsRouter,
   cliSessions: cliSessionsRouter,
   cliSessionsV2: cliSessionsV2Router,
   workspaceFolders: workspaceFoldersRouter,
@@ -76,7 +73,6 @@ export const rootRouter = createTRPCRouter({
   personalReviewAgent: personalReviewAgentRouter,
   byok: byokRouter,
   openAiChatGpt: openAiChatGptRouter,
-  appBuilder: appBuilderRouter,
   securityAgent: securityAgentRouter,
   securityAuditLog: securityAuditLogRouter,
   appReportedMessages: appReportedMessagesRouter,
@@ -84,10 +80,10 @@ export const rootRouter = createTRPCRouter({
   credits: creditsRouter,
   agentProfiles: agentProfilesRouter,
   cloudAgentSettings: cloudAgentSettingsRouter,
+  cloudEnvironments: cloudEnvironmentsRouter,
   webhookTriggers: webhookTriggersRouter,
   userFeedback: userFeedbackRouter,
   feedback: feedbackRouter,
-  appBuilderFeedback: appBuilderFeedbackRouter,
   cloudAgentNextFeedback: cloudAgentNextFeedbackRouter,
   kiloChat: kiloChatRouter,
   kiloclaw: kiloclawRouter,

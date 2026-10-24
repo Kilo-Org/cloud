@@ -22,8 +22,13 @@ export type SelectPrReviewGateViewInput = {
   readonly isError: boolean;
   readonly isLoading: boolean;
   readonly connected: boolean;
-  /** GitHub only: the user revoked the connection. */
-  readonly revoked: boolean;
+  /**
+   * The account already has this provider connection, but it can no longer be
+   * used: the credential was revoked, expired, or the stored integration is no
+   * longer active. A first-time connect is the wrong answer — only
+   * re-authorizing the existing connection can fix it.
+   */
+  readonly reconnectRequired: boolean;
   /** The selected organization, or null for the personal scope. */
   readonly organizationId: string | null;
 };
@@ -48,7 +53,7 @@ export function selectPrReviewGateView(args: SelectPrReviewGateViewInput): PrRev
     return 'loading';
   }
   if (!args.connected) {
-    return args.revoked ? 'reconnect' : 'connect';
+    return args.reconnectRequired ? 'reconnect' : 'connect';
   }
   return 'children';
 }

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, Switch, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import {
   validateVariableInput,
@@ -12,9 +12,12 @@ import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Eye, EyeOff, Lock, Trash2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { cleanVariableKey } from '@/lib/agent-profile-forms';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 /** Content-shaped rows in the same slot and height as a loaded variable row. */
 export function VariablesSkeleton() {
@@ -30,12 +33,16 @@ export function VariablesSkeleton() {
 /**
  * Inline edit copy for a refused input. Every case is refused before a save is
  * attempted, so none uses the screen's save-failed fallback: an empty key is
- * required, an over-long key states the server's 256-character bound, and a key
- * that cleans onto an existing one says so instead of silently overwriting it.
+ * required, an over-long key states the server's 256-character bound, a key
+ * that cleans onto an existing one says so instead of silently overwriting it,
+ * and a blank value is refused rather than saved as an empty variable.
  */
 function variableInputErrorMessage(t: (key: string) => string, error: VariableInputError): string {
   if (error === 'empty') {
     return t('common.required');
+  }
+  if (error === 'value-required') {
+    return t('profiles.valueRequired');
   }
   return error === 'duplicate' ? t('profiles.keyDuplicate') : t('profiles.keyTooLong');
 }
@@ -66,8 +73,8 @@ type VariableRowViewProps = Readonly<{
   revealed?: boolean;
   isDeleting?: boolean;
   onToggleReveal?: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }>;
 
 /**
@@ -92,6 +99,7 @@ export function VariableRowView({
         className="min-h-14 flex-1 flex-row items-center gap-2 py-2 active:opacity-70"
         accessibilityRole="button"
         accessibilityLabel={row.key}
+        disabled={onEdit === undefined}
         onPress={onEdit}
       >
         <Text className="flex-1 font-mono text-sm text-foreground" numberOfLines={1}>
@@ -116,9 +124,9 @@ export function VariableRowView({
       </Pressable>
       {row.isSecret && onToggleReveal !== undefined ? (
         <Pressable
-          className="h-11 w-11 items-center justify-center active:opacity-70"
+          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
           accessibilityRole="button"
-          accessibilityLabel={t('profiles.secretLabel')}
+          accessibilityLabel={t('profiles.secrets.reveal')}
           accessibilityState={{ selected: revealed }}
           onPress={onToggleReveal}
         >
@@ -129,16 +137,18 @@ export function VariableRowView({
           )}
         </Pressable>
       ) : null}
-      <Pressable
-        className="h-11 w-11 items-center justify-center active:opacity-70"
-        accessibilityRole="button"
-        accessibilityLabel={t('common.delete')}
-        disabled={isDeleting}
-        accessibilityState={{ disabled: isDeleting }}
-        onPress={onDelete}
-      >
-        <Trash2 size={18} color={colors.destructive} />
-      </Pressable>
+      {onDelete !== undefined ? (
+        <Pressable
+          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.delete')}
+          disabled={isDeleting}
+          accessibilityState={{ disabled: isDeleting }}
+          onPress={onDelete}
+        >
+          <Trash2 size={18} color={colors.destructive} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -154,6 +164,12 @@ type VariableEditFormProps = Readonly<{
   existingKeys?: readonly string[];
   isSaving: boolean;
   /**
+   * Refuse a blank value with an inline message. The profile Variables screen
+   * asks for it; the new-session draft editor leaves it off, because
+   * prepare-session accepts an empty value and the web editor saves it too.
+   */
+  requireValue?: boolean;
+  /**
    * The bound the value must satisfy, when the caller's target is stricter
    * than the profile's own 10000-character server cap. The manual session
    * editor passes the prepare-session limit, so an over-long value is not
@@ -165,16 +181,18 @@ type VariableEditFormProps = Readonly<{
 }>;
 
 /**
- * The inline add/edit form. Uncontrolled fields read through refs; `hasValue`
- * is derived UI only, so the Save button disables until a secret edit has a new
- * value to store (the server returns a masked `***`, which must not be saved
- * back). A failed save leaves the form mounted with the typed values.
+ * The inline add/edit form. Uncontrolled fields read through refs. When
+ * `requireValue` is set, Save refuses a blank value and says so under the Value
+ * field instead of leaving a disabled button that reports nothing; a stored
+ * secret's masked `***` is never seeded, so a secret edit needs a new value. A
+ * failed save leaves the form mounted with the typed values.
  */
 export function VariableEditForm({
   isNew,
   initial,
   existingKeys = [],
   isSaving,
+  requireValue = false,
   maxValueLength,
   onCancel,
   onSave,
@@ -185,20 +203,19 @@ export function VariableEditForm({
   const valueRef = useRef(initial.value);
   const [isSecret, setIsSecret] = useState(initial.isSecret);
   const [revealed, setRevealed] = useState(false);
-  const [hasValue, setHasValue] = useState(initial.value.trim().length > 0);
   const [error, setError] = useState<VariableInputError | null>(null);
 
-  const canSave = !isSecret || hasValue;
   const valuePlaceholder = valueFieldPlaceholder(t, isSecret, isNew);
+  // An edit's key is stored, so only an add can collide with the profile's keys.
+  const validate = (key: string, value: string): VariableInputError | null =>
+    validateVariableInput({ key, value }, isNew ? existingKeys : [], { requireValue });
 
   const submit = async () => {
     const key = keyRef.current;
-    if (isNew) {
-      const invalid = validateVariableInput({ key, value: valueRef.current }, existingKeys);
-      if (invalid !== null) {
-        setError(invalid);
-        return;
-      }
+    const invalid = validate(key, valueRef.current);
+    if (invalid !== null) {
+      setError(invalid);
+      return;
     }
     setError(null);
     await onSave({
@@ -217,11 +234,15 @@ export function VariableEditForm({
         required
         autoCapitalize="characters"
         autoCorrect={false}
-        error={error === null ? undefined : variableInputErrorMessage(t, error)}
+        error={
+          error === null || error === 'value-required'
+            ? undefined
+            : variableInputErrorMessage(t, error)
+        }
         onChangeText={value => {
           keyRef.current = value;
-          if (error !== null) {
-            setError(validateVariableInput({ key: value, value: valueRef.current }, existingKeys));
+          if (error !== null && error !== 'value-required') {
+            setError(validate(value, valueRef.current));
           }
         }}
       />
@@ -233,9 +254,12 @@ export function VariableEditForm({
         secureTextEntry={isSecret && !revealed}
         autoCapitalize="none"
         autoCorrect={false}
+        error={error === 'value-required' ? variableInputErrorMessage(t, error) : undefined}
         onChangeText={value => {
           valueRef.current = value;
-          setHasValue(value.trim().length > 0);
+          if (error === 'value-required') {
+            setError(validate(keyRef.current, value));
+          }
         }}
       />
       {isSecret ? (
@@ -274,7 +298,7 @@ export function VariableEditForm({
         <Button
           className="flex-1"
           loading={isSaving}
-          disabled={!canSave || isSaving}
+          disabled={isSaving}
           onPress={() => {
             void submit();
           }}

@@ -30,6 +30,7 @@ import {
   useDisableAutoMergeMutation,
   useUpdateBranchMutation,
 } from '@/lib/pr-review/merge/use-pr-merge-mutations';
+import { type ProviderPrTriple } from '@/lib/pr-review/provider-pr-ref';
 import {
   AutoMergeEnabledBanner,
   BlockedPanel,
@@ -63,13 +64,12 @@ function ignoreRejection(promise: Promise<unknown>): void {
   })();
 }
 
-function mergeSheetHref(args: {
-  owner: string;
-  repo: string;
-  number: number;
-  mode: 'merge' | 'enable-auto-merge';
-  method: PrMergeMethod;
-}): Href {
+function mergeSheetHref(
+  args: ProviderPrTriple & {
+    mode: 'merge' | 'enable-auto-merge';
+    method: PrMergeMethod;
+  }
+): Href {
   const href: Href = {
     pathname: '/(app)/pr-review/[owner]/[repo]/[number]/merge',
     params: {
@@ -113,6 +113,13 @@ export function PrMergeSection({
   // every status transition away from 'unknown'.
   const tickRef = useRef(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // The timer outlives any one render, so it reads the callback through a ref
+  // updated every render: the orchestrator's refetch is re-created each render,
+  // and a tick must call the current one. That keeps the interval's lifetime
+  // keyed only to `status`, so a re-render never restarts (and so never
+  // extends) the bounded poll.
+  const onRefetchRef = useRef(onRefetch);
+  onRefetchRef.current = onRefetch;
   const [hasTimedOut, setHasTimedOut] = useState(false);
 
   useEffect(() => {
@@ -140,9 +147,9 @@ export function PrMergeSection({
         setHasTimedOut(true);
         return;
       }
-      ignoreRejection(onRefetch());
+      ignoreRejection(onRefetchRef.current());
     }, MERGEABILITY_POLL_INTERVAL_MS);
-  }, [status, onRefetch]);
+  }, [status]);
 
   useEffect(
     () => () => {
@@ -190,9 +197,6 @@ export function PrMergeSection({
           onDisable={() => {
             ignoreRejection(
               disableAutoMerge.mutateAsync({
-                owner,
-                repo,
-                number: overview.number,
                 prNodeId: overview.prNodeId,
               })
             );

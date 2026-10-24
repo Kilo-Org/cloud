@@ -11,7 +11,7 @@ import { buildAgentSessionListInput } from '@/lib/agent-session-input';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
 import { isSignOutActive, setSignOutActive } from '@/lib/auth/sign-out-state';
-import { READ_CACHE_SCOPE_PREFIX, readCacheScope, SCHEMA_VERSION } from '@/lib/persist/cache-scope';
+import { READ_CACHE_SCOPE_PREFIX, readCacheScope } from '@/lib/persist/cache-scope';
 import * as encryptedKv from '@/lib/persist/encrypted-kv';
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 import { utf8ByteLength } from '@/lib/utf8-utils';

@@ -37,12 +37,19 @@ const h = vi.hoisted(() => ({
   },
 }));
 
+const permissionState = vi.hoisted(() => ({ canManage: true }));
+
+vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
+  useCanManageOrganizationProfiles: () => permissionState.canManage,
+}));
+
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfile: () => h.query,
   useAgentProfileMutations: () => h.mutations,
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
@@ -66,6 +73,7 @@ vi.mock('@/components/agents/session-page-sheet', () => ({
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -135,7 +143,7 @@ describe('ProfileSkillsScreen', () => {
 
     const texts = findAll(renderer.root, 'Text').map(node => node.props.children);
     expect(texts).toContain('code-review');
-    expect(texts).toContain('custom');
+    expect(texts).toContain('Custom');
 
     const toggle = findOne(renderer.root, 'Switch');
     expect(toggle.props.accessibilityLabel).toBe('code-review');

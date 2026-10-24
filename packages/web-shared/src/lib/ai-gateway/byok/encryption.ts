@@ -10,7 +10,6 @@ import type { EncryptedData } from '@kilocode/db/schema-types';
  * @returns EncryptedData object containing IV, encrypted data, and auth tag
  */
 export function encryptApiKey(plaintext: string, keyBase64: string): EncryptedData {
-  // Decode the base64 key
   const key = Buffer.from(keyBase64, 'base64');
 
   if (key.length !== 32) {
@@ -20,14 +19,11 @@ export function encryptApiKey(plaintext: string, keyBase64: string): EncryptedDa
   // Generate random IV (12 bytes is recommended for GCM)
   const iv = randomBytes(12);
 
-  // Create cipher
   const cipher = createCipheriv('aes-256-gcm', key, iv);
 
-  // Encrypt the data
   let encrypted = cipher.update(plaintext, 'utf8');
   encrypted = Buffer.concat([encrypted, cipher.final()]);
 
-  // Get the authentication tag
   const authTag = cipher.getAuthTag();
 
   return {
@@ -45,23 +41,19 @@ export function encryptApiKey(plaintext: string, keyBase64: string): EncryptedDa
  * @returns The decrypted plaintext string
  */
 export function decryptApiKey(encrypted: EncryptedData, keyBase64: string): string {
-  // Decode the base64 key
   const key = Buffer.from(keyBase64, 'base64');
 
   if (key.length !== 32) {
     throw new Error('Encryption key must be 32 bytes (256 bits)');
   }
 
-  // Decode the encrypted data components
   const iv = Buffer.from(encrypted.iv, 'base64');
   const encryptedData = Buffer.from(encrypted.data, 'base64');
   const authTag = Buffer.from(encrypted.authTag, 'base64');
 
-  // Create decipher
   const decipher = createDecipheriv('aes-256-gcm', key, iv);
   decipher.setAuthTag(authTag);
 
-  // Decrypt the data
   let decrypted = decipher.update(encryptedData, undefined, 'utf8');
   decrypted += decipher.final('utf8');
 

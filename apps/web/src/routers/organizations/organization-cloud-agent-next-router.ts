@@ -7,6 +7,7 @@ import {
   rethrowCloudAgentError,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
+import { isPublicRepoUrlEnabled } from '@/lib/cloud-agent-next/public-repo-url';
 import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
 import { createWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
 import { assertSessionWorktree } from '@/lib/cloud-agent-next/worktree-review-access';
@@ -18,6 +19,7 @@ import {
   organizationMemberMutationProcedure,
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { fetchAllGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
+import { resolveGitHubIntegrationIdForRepository } from '@/lib/cloud-agent/github-integration-resolution';
 import {
   BitbucketOrganizationRepositoryListResultSchema,
   fetchBitbucketRepositoriesForOrganization,
@@ -68,7 +70,6 @@ import {
   baseCreatePreviewNextOutputSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentGetImageUploadUrlSchema,
-  cloudAgentLinkPendingUploadsSchema,
   cloudAgentReleasePendingUploadsSchema,
 } from '../cloud-agent-next-schemas';
 import {
@@ -199,10 +200,6 @@ const ImageUploadUrlInput = cloudAgentGetImageUploadUrlSchema.extend({
 });
 
 const AttachmentUploadUrlInput = cloudAgentGetAttachmentUploadUrlSchema.extend({
-  organizationId: z.uuid(),
-});
-
-const LinkPendingUploadsInput = cloudAgentLinkPendingUploadsSchema.extend({
   organizationId: z.uuid(),
 });
 
@@ -340,6 +337,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         githubRepo,
         githubIntegrationId,
         bitbucketRepo,
+        publicRepoUrl,
         organizationId,
         attachments,
         images,
@@ -369,8 +367,33 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           bitbucketWorkspaceUuid: bitbucketRepo.workspaceUuid,
           bitbucketRepositoryUuid: bitbucketRepo.repositoryUuid,
         };
+      } else if (publicRepoUrl) {
+        if (!isPublicRepoUrlEnabled()) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Public repository URLs are only available in local development',
+          });
+        }
+        gitParams = { gitUrl: publicRepoUrl };
       } else {
-        gitParams = { githubRepo, githubIntegrationId, platform: PLATFORM.GITHUB };
+        // The runtime's repository preflight runs only when the request names
+        // the integration that owns the repository, so resolve it for the
+        // caller's organization here. An explicitly supplied id wins, and an
+        // unresolvable repository stays unqualified (the previous behaviour)
+        // rather than refusing a request the runtime can still serve.
+        const resolvedIntegrationId =
+          githubIntegrationId ??
+          (githubRepo === undefined
+            ? null
+            : await resolveGitHubIntegrationIdForRepository(
+                { type: 'org', id: organizationId },
+                githubRepo
+              ));
+        gitParams = {
+          githubRepo,
+          githubIntegrationId: resolvedIntegrationId ?? undefined,
+          platform: PLATFORM.GITHUB,
+        };
       }
 
       try {
@@ -412,6 +435,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         headersList: ctx.headersList,
         sourceKiloSessionId: input.sourceKiloSessionId,
         operationKey: input.operationKey,
+        kiloSessionId: input.kiloSessionId,
         organizationId: input.organizationId,
       })
     ),
@@ -748,7 +772,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(ImageUploadUrlInput)
     .mutation(async ({ ctx, input }) => {
       return generateImageUploadUrl({
-        service: 'cloud-agent',
         userId: ctx.user.id,
         messageUuid: input.messageUuid,
         imageId: input.imageId,
@@ -771,19 +794,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         contentLength: input.contentLength,
         ...(input.extension ? { extension: input.extension } : {}),
       });
-    }),
-
-  /**
-   * Finalize send-time attachment ledger rows in the organization context.
-   * The pending rows are keyed by the uploading member's user id, so the link
-   * is still scoped to ctx.user.id; organizationId only gates membership.
-   */
-  linkPendingUploads: organizationMemberMutationProcedure
-    .input(LinkPendingUploadsInput)
-    .output(z.object({ success: z.boolean() }))
-    .mutation(async ({ ctx, input }) => {
-      await linkPendingUploads(ctx.user.id, input.messageUuid, input.objectKeys);
-      return { success: true };
     }),
 
   /**
@@ -990,19 +1000,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       ).getSandboxStatus(input.cloudAgentSessionId);
     }),
 
-  getComputeBillingStatus: organizationMemberProcedure
-    .input(GetSessionInput)
-    .query(async ({ ctx, input }) => {
-      await assertOrganizationOwnsSession({
-        organizationId: input.organizationId,
-        userId: ctx.user.id,
-        cloudAgentSessionId: input.cloudAgentSessionId,
-      });
-      return await createCloudAgentNextClient(
-        await createCloudAgentControlToken(ctx.user, ctx.headersList, input.organizationId)
-      ).getComputeBillingStatus(input.cloudAgentSessionId);
-    }),
-
   checkEligibility: organizationMemberProcedure
     .input(z.object({ organizationId: z.uuid() }))
     .query(async ({ ctx, input }) => {
@@ -1032,6 +1029,10 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         integrationInstalled: z.boolean(),
         syncedAt: z.string().nullish(),
         errorMessage: z.string().optional(),
+        unavailableReason: z
+          .enum(['suspended', 'disconnected', 'reauth_required', 'not_configured'])
+          .optional(),
+        partial: z.boolean().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -1050,6 +1051,8 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         integrationInstalled: result.integrationInstalled,
         syncedAt: result.syncedAt,
         errorMessage: result.errorMessage,
+        unavailableReason: result.unavailableReason,
+        partial: result.partial,
       };
     }),
 

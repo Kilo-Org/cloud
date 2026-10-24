@@ -3,6 +3,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useState } from 'react';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { ChevronDown, Eye, EyeOff } from '@/components/ui/icons';
 import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
@@ -37,7 +38,8 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
   const router = useRouter();
-  const { width, fontScale } = useWindowDimensions();
+  const { width } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
   const [availableWidth, setAvailableWidth] = useState<number | null>(null);
   // Reserve room for the amount, visibility toggle and purchase action in
   // scaled text units, using the card's width rather than the display's.
@@ -75,24 +77,37 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const {
     data: balance,
     isLoading: balanceLoading,
-    isFetching: balanceFetching,
+    isPlaceholderData: balancePlaceholder,
     isError: balanceQueryError,
     refetch: refetchBalance,
   } = useQuery({
     ...balanceOptions,
     enabled: enabled && hasUserId,
     placeholderData: keepPreviousData,
+    // The card must stop waiting while the online manager reports offline: a
+    // paused read is pending without fetching, so the skeleton below had no
+    // exit. This one either answers or fails once the control-plane deadline
+    // lands, and `balanceFailed` then offers the retry.
+    networkMode: 'always',
+    // `networkMode: 'always'` also disables the derived reconnect refetch
+    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
+    // 'always'` when it is undefined), so ask for it explicitly.
+    refetchOnReconnect: true,
   });
 
   const { data: personalCreditData, isLoading: personalCreditsLoading } = useQuery({
     ...personalCreditOptions,
     enabled: enabled && hasUserId && !selectedOrgId,
+    networkMode: 'always',
+    refetchOnReconnect: true,
   });
 
   const { data: orgCreditData, isLoading: orgCreditsLoading } = useQuery({
     ...orgCreditOptions,
     enabled: enabled && hasUserId && Boolean(selectedOrgId),
     placeholderData: keepPreviousData,
+    networkMode: 'always',
+    refetchOnReconnect: true,
   });
 
   // A failed getMe (no userId) can never render a trusted balance, so it shares
@@ -103,14 +118,30 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const creditsLoading = selectedOrgId ? orgCreditsLoading : personalCreditsLoading;
 
   const balanceDollars = balance?.balance ?? 0;
-  // A paused query (offline/unknown connectivity, empty cache) is pending but
-  // not fetching, so `balanceLoading` (isLoading) is false while `balance`
-  // is still undefined. Treat "no data yet" as loading so the card shows a
-  // skeleton instead of `$0` on a cold launch before NetInfo settles.
+  // A read that has not answered yet is pending without fetching while the
+  // owner is still unresolved (the balance query is gated on the identity), so
+  // `balanceLoading` (isLoading) is false while `balance` is still undefined.
+  // Treat "no data yet" as loading so the card shows a skeleton instead of `$0`
+  // on a cold launch. The read itself settles regardless of the online manager,
+  // and an unreachable one lands on `balanceFailed` instead of this branch.
   const balancePending = balance === undefined && !balanceFailed;
+  // `keepPreviousData` keeps the last account's amount on screen while the next
+  // account's read runs, which would paint the previous account's balance under
+  // the newly selected account's name with no cue at all. The skeleton owns that
+  // window too, so a context switch never shows an amount that belongs to
+  // another account; the read either answers or lands on `balanceFailed`.
   const showBalanceSkeleton =
-    (balanceLoading || balancePending || !hideBalanceLoaded) && !balanceFailed;
-  const expiringBlocks = creditData?.creditBlocks.filter(b => b.expiry_date !== null) ?? [];
+    (balanceLoading || balancePending || balancePlaceholder || !hideBalanceLoaded) &&
+    !balanceFailed;
+  const now = Date.now();
+  // Read the block list defensively: the persisted query cache can restore an
+  // entry written before this field existed, and that payload must leave the
+  // expiring row empty rather than throw out of the Profile render.
+  const expiringBlocks =
+    // eslint-disable-next-line typescript/no-unnecessary-condition -- the static type cannot see a restored cache entry from an older payload
+    creditData?.creditBlocks?.filter(
+      b => b.expiry_date !== null && parseTimestamp(b.expiry_date).getTime() > now
+    ) ?? [];
   const expiringTotal = fromMicrodollars(
     expiringBlocks.reduce((sum, b) => sum + b.balance_mUsd, 0)
   );
@@ -285,7 +316,13 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
               ))}
           </Animated.View>
           <View className="max-w-full flex-row flex-wrap items-center gap-2">
-            {balanceFetching && <ActivityIndicator size="small" color={colors.mutedForeground} />}
+            {/* No in-progress indicator here: this row paints a balance that
+                belongs to the selected account, and a background refresh may
+                legitimately take a while or never finish. The first load and a
+                context switch own the skeleton above; a refresh that fails owns
+                the retry surface. An indicator tied to every in-flight refresh
+                spun for as long as a stalled one lasted (and announced itself
+                as "In progress"). */}
             {selectedOrgId == null && (
               <AddCreditsButton
                 className={cn('h-auto min-h-11 max-w-full py-2', stackBalance && 'flex-1')}
@@ -313,7 +350,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           stacking a second skeleton card. The card's queries still run from
           mount, so the swap adds no fetch latency. */}
       {enabled && !selectedOrgId ? (
-        <KiloPassSubscriptionCard hideLoadingSkeleton={balanceLoading || balancePending} />
+        <KiloPassSubscriptionCard hideLoadingSkeleton={showBalanceSkeleton} />
       ) : null}
     </View>
   );

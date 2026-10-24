@@ -100,6 +100,7 @@ function setBridge(overrides: Partial<BranchPickerBridge> = {}) {
     branches: ['main', 'release/2.0'],
     defaultBranch: 'main',
     selectedBranch: 'main',
+    truncated: false,
     onSelect: vi.fn(() => undefined),
     ...overrides,
   };
@@ -155,6 +156,37 @@ describe('BranchPickerScreen', () => {
     press(branchRow(renderer, 'main'));
 
     expect(onSelect).toHaveBeenCalledWith('main');
+  });
+
+  it('renders a long branch name in full so names that share a prefix stay distinguishable', () => {
+    const branch =
+      '89-validate-all-maintainers-are-represented-in-maintainers-and-reviewers-الذكية-لإدارة';
+    setBridge({ branches: [branch, 'main'], defaultBranch: 'main', selectedBranch: 'main' });
+    const renderer = mount();
+
+    const row = branchRow(renderer, branch);
+    if (!row) {
+      throw new Error('The long branch row did not mount');
+    }
+    // No line cap: the row grows with the name instead of cutting the tail that
+    // tells it apart from its siblings.
+    const name = row.findAll(node => String(node.type) === 'Text')[0];
+    expect(name?.props.children).toBe(branch);
+    expect(name?.props.numberOfLines).toBeUndefined();
+  });
+
+  it('says the list is incomplete when the provider holds more branches', () => {
+    setBridge({ truncated: true });
+    const renderer = mount();
+
+    expect(texts(renderer)).toContain(i18n.t('agentChat.newSession.branchListIncomplete'));
+  });
+
+  it('says nothing about truncation when the list is the whole repository', () => {
+    setBridge();
+    const renderer = mount();
+
+    expect(texts(renderer)).not.toContain(i18n.t('agentChat.newSession.branchListIncomplete'));
   });
 
   it('dismisses from the header Cancel without reporting a pick', () => {

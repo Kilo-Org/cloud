@@ -109,6 +109,15 @@ describe('container usage context', () => {
     expect(sandbox.destroy).not.toHaveBeenCalled();
   });
 
+  it('bills the code-review containers instance at the code-review capacity', () => {
+    expect(containersBillingIdentity('code-review')).toEqual({
+      className: 'SandboxContainersCodeReview',
+      service: 'cloud-agent-next-sandbox-containers-code-review',
+      sku: 'cloud-agent-code-review-2026-07',
+      capacity: { vcpu: 1, memoryMiB: 4_096, diskMB: 8_000 },
+    });
+  });
+
   it('rejects unsupported containers instance sizes', () => {
     expect(() => containersBillingIdentity('lite')).toThrow(
       'Containers billing is unsupported for instance size: lite'
@@ -403,6 +412,7 @@ describe('container usage context', () => {
   it.each([
     ['isolated', 'SandboxSmallContainment', true],
     ['code-review', 'SandboxCodeReviewContainment', true],
+    ['code-review', 'SandboxContainersCodeReview', true],
     ['shared', 'SandboxContainment', false],
   ] as const)(
     'attributes a placed %s sandbox from its kind, not its neutral key',

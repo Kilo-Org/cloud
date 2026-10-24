@@ -14,14 +14,14 @@ describe('classifyPollResponse', () => {
   it('treats 403 as a terminal denial', () => {
     expect(classifyPollResponse(403)).toEqual({
       status: 'denied',
-      message: 'Access denied by user',
+      message: { kind: 'key', key: 'authErrors.accessDeniedByUser' },
     });
   });
 
   it('treats 410 as a terminal expiry', () => {
     expect(classifyPollResponse(410)).toEqual({
       status: 'expired',
-      message: 'Code expired',
+      message: { kind: 'key', key: 'authErrors.codeExpired' },
     });
   });
 

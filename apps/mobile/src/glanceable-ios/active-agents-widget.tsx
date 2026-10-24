@@ -462,7 +462,11 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
     shifted(
       offset,
       <Rectangle
-        modifiers={[frame({ maxWidth: 10_000, height: 1 }), foregroundStyle(palette.divider)]}
+        modifiers={[
+          frame({ maxWidth: 10_000 }),
+          frame({ height: 1 }),
+          foregroundStyle(palette.divider),
+        ]}
       />
     );
   const formatDate = (date: Date, options: Intl.DateTimeFormatOptions): string | null => {
@@ -538,7 +542,8 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
         foregroundStyle(monochrome ? palette.fg : color),
         fixedSize({ horizontal: true, vertical: false }),
         padding({ horizontal: 14 }),
-        frame({ minWidth: 86, height: 24 }),
+        frame({ minWidth: 86 }),
+        frame({ height: 24 }),
         background(monochrome ? monochromeFill : fill, shapes.capsule()),
       ]}
     >
@@ -590,7 +595,8 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
       <HStack
         spacing={0}
         modifiers={[
-          frame(wide || large ? { minWidth: 86, height: 24 } : { width: 24, height: 24 }),
+          wide || large ? frame({ minWidth: 86 }) : frame({ width: 24 }),
+          frame({ height: 24 }),
           padding({ trailing: 4 }),
         ]}
       >
@@ -1180,7 +1186,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
 export const WIDGET_NAME = 'ActiveAgentsWidget';
 export const activeAgentsWidgetLayout = layout;
 const registerLayout = () =>
-  createWidget<WidgetProps>(WIDGET_NAME, withGlanceableCopy(withWidgetLogo(layout)));
+  createWidget<WidgetProps>(WIDGET_NAME, withGlanceableCopy(withWidgetLogo(layout)), {});
 export const ActiveAgentsWidget = registerLayout();
 
 /**
@@ -1194,8 +1200,10 @@ const WIDGET_GALLERY_PREVIEW_NAME = `${WIDGET_NAME}Preview`;
 /** Re-bake both layouts in the active language and re-write the gallery sample. */
 export function refreshActiveAgentsWidgetCopy(): void {
   registerLayout();
+  const previewProps = buildGalleryPreviewProps(key => i18n.t(key));
   createWidget<WidgetProps>(
     WIDGET_GALLERY_PREVIEW_NAME,
-    withGlanceableCopy(withWidgetLogo(layout))
-  ).updateSnapshot(buildGalleryPreviewProps(key => i18n.t(key)));
+    withGlanceableCopy(withWidgetLogo(layout)),
+    previewProps
+  ).updateSnapshot(previewProps);
 }

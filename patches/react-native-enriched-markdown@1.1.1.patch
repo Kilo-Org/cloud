@@ -1,0 +1,278 @@
+diff --git a/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt b/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
+index 7bb48f44c5415f7c6b914934db90705825bfea13..efb2fcd825fe021a613d3f91d8a64d37e0c750ce 100644
+--- a/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
++++ b/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
+@@ -50,6 +50,13 @@ import kotlin.math.ceil
+ object MeasurementStore {
+   private const val TAG = "MeasurementStore"
+ 
++  /**
++   * Slack added to a hugged width. The display TextView resolves per-run font
++   * fallback (emoji, combining marks) that a single TextPaint understates, so
++   * a line measured as fitting at the hug width can still wrap there.
++   */
++  private const val WIDEN_SLACK_PX = 8
++
+   private data class PaintParams(
+     val typeface: Typeface,
+     val fontSize: Float,
+@@ -120,7 +127,9 @@ object MeasurementStore {
+     val existingHash = cached?.markdownHash ?: 0
+     val paintParams = PaintParams(paint.typeface ?: Typeface.DEFAULT, paint.textSize)
+ 
+-    var newSize = measure(width, spannable, paint, id)
++    // The display view's width is the width last measured for it, so treat it
++    // as assigned exactly when recomputing the height here.
++    var newSize = measure(width, true, spannable, paint, id)
+     if (trailingMarginBottomPx > 0f) {
+       newSize =
+         YogaMeasureOutput.make(
+@@ -177,7 +186,8 @@ object MeasurementStore {
+       }
+     }
+ 
+-    val size = getMeasureByIdInternal(context, id, width, props, splitTableSegments)
++    val exactWidth = widthMode === YogaMeasureMode.EXACTLY
++    val size = getMeasureByIdInternal(context, id, width, exactWidth, props, splitTableSegments)
+ 
+     // Honor the Yoga width contract. When the parent assigns an exact width
+     // (flex child, alignItems: stretch, explicit width / width: "100%"), fill it
+@@ -273,6 +283,7 @@ object MeasurementStore {
+     context: Context,
+     id: Int?,
+     width: Float,
++    exactWidth: Boolean,
+     props: ReadableMap?,
+     splitTableSegments: Boolean,
+   ): Long {
+@@ -282,21 +293,21 @@ object MeasurementStore {
+ 
+     // Split measurement always goes through the full measure path (no spannable caching)
+     if (splitTableSegments) {
+-      return measureAndCacheSplit(context, id, width, props, allowFontScaling, fontScale, maxFontSizeMultiplier)
++      return measureAndCacheSplit(context, id, width, exactWidth, props, allowFontScaling, fontScale, maxFontSizeMultiplier)
+     }
+ 
+-    val safeId = id ?: return measureAndCache(context, null, width, props, allowFontScaling, fontScale, maxFontSizeMultiplier)
+-    val cached = data[safeId] ?: return measureAndCache(context, safeId, width, props, allowFontScaling, fontScale, maxFontSizeMultiplier)
++    val safeId = id ?: return measureAndCache(context, null, width, exactWidth, props, allowFontScaling, fontScale, maxFontSizeMultiplier)
++    val cached = data[safeId] ?: return measureAndCache(context, safeId, width, exactWidth, props, allowFontScaling, fontScale, maxFontSizeMultiplier)
+ 
+     val currentHash = computePropsHash(props, allowFontScaling, fontScale, maxFontSizeMultiplier)
+ 
+     if (cached.markdownHash != currentHash) {
+-      return measureAndCache(context, safeId, width, props, allowFontScaling, fontScale, maxFontSizeMultiplier)
++      return measureAndCache(context, safeId, width, exactWidth, props, allowFontScaling, fontScale, maxFontSizeMultiplier)
+     }
+ 
+     // Width changed - re-measure with cached spannable
+     if (cached.cachedWidth != width) {
+-      val newSize = measure(width, cached.spannable, cached.paintParams, safeId)
++      val newSize = measure(width, exactWidth, cached.spannable, cached.paintParams, safeId)
+       data[safeId] = cached.copy(cachedWidth = width, cachedSize = newSize)
+       return newSize
+     }
+@@ -368,6 +379,7 @@ object MeasurementStore {
+     context: Context,
+     id: Int?,
+     width: Float,
++    exactWidth: Boolean,
+     props: ReadableMap?,
+     allowFontScaling: Boolean,
+     fontScale: Float,
+@@ -408,7 +420,7 @@ object MeasurementStore {
+       )
+     spannable?.replaceMathSpansWithPlaceholders(context)
+     val textToMeasure = spannable ?: markdown
+-    val (size, _) = measureWithLayout(width, textToMeasure, measurePaint, id)
++    val (size, _) = measureWithLayout(width, exactWidth, textToMeasure, measurePaint, id)
+ 
+     // 3. Calculate Margin
+     val allowTrailingMargin = props.getBooleanOrDefault("allowTrailingMargin", false)
+@@ -435,6 +447,7 @@ object MeasurementStore {
+     context: Context,
+     id: Int?,
+     width: Float,
++    exactWidth: Boolean,
+     props: ReadableMap?,
+     allowFontScaling: Boolean,
+     fontScale: Float,
+@@ -543,10 +556,39 @@ object MeasurementStore {
+             segment.styledText.replaceMathSpansWithPlaceholders(context)
+ 
+             val layout = createStaticLayout(segment.styledText, fontSize, widthPx, id)
+-            totalHeightPx += layout.height
++            var segmentHeightPx = layout.height.toFloat()
+ 
+             val segmentMaxLineWidth = (0 until layout.lineCount).maxOfOrNull { layout.getLineWidth(it) } ?: 0f
+-            maxContentWidthPx = maxOf(maxContentWidthPx, ceil(segmentMaxLineWidth))
++
++            // The display view wraps at the width this node reports: the full
++            // available width when the parent assigns one exactly, and the
++            // reported content width otherwise. Its per-run font fallback
++            // (emoji, combining marks) can add a couple of px of advance over
++            // this single TextPaint, so a line that fits here can still wrap
++            // there. Report the hugged width widened by that margin so the
++            // display has the room. When there is no room to widen (the line
++            // already fills the available width), keep the reported width and
++            // re-measure the height a hair narrower instead, adopting the
++            // taller height only if that layout actually comes out taller.
++            val contentWidthPx =
++              if (exactWidth) {
++                widthPx
++              } else {
++                minOf(widthPx, ceil(segmentMaxLineWidth).toInt() + WIDEN_SLACK_PX)
++              }
++            val fillsReportedWidth = segmentMaxLineWidth > contentWidthPx - WIDEN_SLACK_PX
++            val reserveWidth = maxOf(1, contentWidthPx - WIDEN_SLACK_PX)
++            if (fillsReportedWidth) {
++              val reserveLayout =
++                createStaticLayout(segment.styledText, fontSize, reserveWidth, id)
++              if (reserveLayout.height > layout.height) {
++                segmentHeightPx = reserveLayout.height.toFloat()
++              }
++            }
++
++            totalHeightPx += segmentHeightPx
++
++            maxContentWidthPx = maxOf(maxContentWidthPx, contentWidthPx.toFloat())
+ 
+             if (includeBottomMargin) {
+               totalHeightPx += segment.lastElementMarginBottom
+@@ -610,7 +652,7 @@ object MeasurementStore {
+       result
+     } catch (e: Exception) {
+       Log.w(TAG, "Split measurement failed, falling back", e)
+-      measureAndCache(context, id, width, props, allowFontScaling, fontScale, maxFontSizeMultiplier)
++      measureAndCache(context, id, width, exactWidth, props, allowFontScaling, fontScale, maxFontSizeMultiplier)
+     }
+   }
+ 
+@@ -698,6 +740,7 @@ object MeasurementStore {
+ 
+   private fun measure(
+     maxWidth: Float,
++    exactWidth: Boolean,
+     text: CharSequence?,
+     paintParams: PaintParams,
+     viewId: Int?,
+@@ -705,11 +748,12 @@ object MeasurementStore {
+     measurePaint.reset()
+     measurePaint.typeface = paintParams.typeface
+     measurePaint.textSize = paintParams.fontSize
+-    return measure(maxWidth, text, measurePaint, viewId)
++    return measure(maxWidth, exactWidth, text, measurePaint, viewId)
+   }
+ 
+   private fun measure(
+     maxWidth: Float,
++    exactWidth: Boolean,
+     text: CharSequence?,
+     paint: TextPaint,
+     viewId: Int?,
+@@ -737,17 +781,64 @@ object MeasurementStore {
+ 
+     val layout = builder.build()
+     val visibleLineCount = visibleLineCount(layout, viewId)
+-    val measuredHeight = truncatedHeight(layout, visibleLineCount, content)
++    var measuredHeight = truncatedHeight(layout, visibleLineCount, content)
+ 
+     // Calculate actual content width (widest visible line)
+     val measuredWidth = (0 until visibleLineCount).maxOfOrNull { layout.getLineWidth(it) } ?: 0f
+ 
++    // The display view wraps at the width this node reports: the full available
++    // width when the parent assigns one exactly, the reported content width
++    // otherwise. Its per-run font fallback (emoji, combining marks) can add a
++    // couple of px of advance over this single TextPaint, so a line that fits
++    // here can still wrap there. Report the hugged width widened by that
++    // margin so the display has the room. When there is no room to widen (the
++    // line already fills the available width), keep the reported width and
++    // re-measure the height a hair narrower instead, adopting the taller
++    // height only if that layout actually comes out taller.
++    val contentWidthPx =
++      if (exactWidth) safeWidth else minOf(safeWidth, ceil(measuredWidth).toInt() + WIDEN_SLACK_PX)
++    val fillsReportedWidth = measuredWidth > contentWidthPx - WIDEN_SLACK_PX
++    val reserveWidth = maxOf(1, contentWidthPx - WIDEN_SLACK_PX)
++    if (fillsReportedWidth) {
++      val reserveLayout = buildLayout(text = content, paint = paint, widthPx = reserveWidth, viewId = viewId)
++      val reserveHeight = truncatedHeight(reserveLayout, visibleLineCount(reserveLayout, viewId), content)
++      if (reserveHeight > measuredHeight) {
++        measuredHeight = reserveHeight
++      }
++    }
++
+     return YogaMeasureOutput.make(
+-      PixelUtil.toDIPFromPixel(ceil(measuredWidth)),
++      PixelUtil.toDIPFromPixel(if (exactWidth) ceil(measuredWidth) else contentWidthPx.toFloat()),
+       PixelUtil.toDIPFromPixel(measuredHeight),
+     )
+   }
+ 
++  private fun buildLayout(
++    text: CharSequence,
++    paint: TextPaint,
++    widthPx: Int,
++    viewId: Int?,
++  ): StaticLayout {
++    prepareImageSpansForMeasurement(text, widthPx)
++    val builder =
++      StaticLayout.Builder
++        .obtain(text, 0, text.length, paint, widthPx)
++        .setIncludePad(false)
++        .setLineSpacing(0f, 1f)
++
++    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
++      @Suppress("WrongConstant")
++      builder.setBreakStrategy(resolveBreakStrategy(viewId))
++    }
++
++    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
++      builder.setUseLineSpacingFromFallbacks(true)
++    }
++
++    applyLineLimit(builder, viewId)
++    return builder.build()
++  }
++
+   // Applies the per-view numberOfLines / ellipsizeMode clamp to a builder, matching
+   // RN's TextLayoutManager.buildLayout: only when a line limit is set.
+   private fun applyLineLimit(
+@@ -816,6 +907,7 @@ object MeasurementStore {
+    */
+   private fun measureWithLayout(
+     maxWidth: Float,
++    exactWidth: Boolean,
+     text: CharSequence?,
+     paint: TextPaint,
+     viewId: Int?,
+@@ -847,10 +939,28 @@ object MeasurementStore {
+       (0 until visibleLineCount)
+         .maxOfOrNull { layout.getLineWidth(it) } ?: 0f
+ 
++    // Same contract as measure(): report the hugged width widened by the
++    // fallback margin so the display has the room. When there is no room to
++    // widen (the line already fills the available width), keep the reported
++    // width and re-measure the height a hair narrower instead, adopting the
++    // taller height only if that layout actually comes out taller.
++    val contentWidthPx =
++      if (exactWidth) widthPx else minOf(widthPx, ceil(maxLineWidth).toInt() + WIDEN_SLACK_PX)
++    val fillsReportedWidth = maxLineWidth > contentWidthPx - WIDEN_SLACK_PX
++    val reserveWidth = maxOf(1, contentWidthPx - WIDEN_SLACK_PX)
++    var height = truncatedHeight(layout, visibleLineCount, content)
++    if (fillsReportedWidth) {
++      val reserveLayout = buildLayout(content, paint, reserveWidth, viewId)
++      val reserveHeight = truncatedHeight(reserveLayout, visibleLineCount(reserveLayout, viewId), content)
++      if (reserveHeight > height) {
++        height = reserveHeight
++      }
++    }
++
+     val size =
+       YogaMeasureOutput.make(
+-        PixelUtil.toDIPFromPixel(ceil(maxLineWidth)),
+-        PixelUtil.toDIPFromPixel(truncatedHeight(layout, visibleLineCount, content)),
++        PixelUtil.toDIPFromPixel(if (exactWidth) ceil(maxLineWidth) else contentWidthPx.toFloat()),
++        PixelUtil.toDIPFromPixel(height),
+       )
+ 
+     return size to layout

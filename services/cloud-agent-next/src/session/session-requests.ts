@@ -54,6 +54,8 @@ export type SessionRuntimeIntent = {
 };
 
 export type SessionCreateRequest = {
+  allowSubagentSessions?: boolean;
+  parentCloudAgentSessionId?: string;
   /** Omitted for a clone-only create: the copied transcript is the session state. */
   initialTurn?: ExecutionTurnSubmission;
   agent: AgentSelection;
@@ -70,6 +72,12 @@ export type SessionCreateRequest = {
     /** Inclusive cut: copy source messages up to and including this ID. */
     cloneUpToMessageId?: string;
   };
+  /**
+   * The saved allocation key of the repository's environment, set only by
+   * preflight and never by a client. It is the first saved candidate;
+   * eligibility is checked when the saved allocation is resolved.
+   */
+  environmentSandboxAllocation?: string;
   profile?: {
     id?: string;
     overrides?: ProfileOverrides;
@@ -91,5 +99,7 @@ export type SessionCreateRequest = {
     shallow?: boolean;
     /** Stable per-user-intent UUID; the handler admits it only with `autoInitiate` true. */
     operationKey?: string;
+    /** Client-proposed Kilo session ID; the Worker generates one when absent. */
+    kiloSessionId?: string;
   };
 };

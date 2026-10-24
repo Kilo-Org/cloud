@@ -3,7 +3,7 @@ import {
   isStreamError,
   type CloudAgentEvent,
   type StreamError,
-} from './event-types';
+} from './schemas';
 import {
   createBaseConnection,
   type Connection,
@@ -25,7 +25,6 @@ export type ConnectionConfig = {
   onError?: ((error: StreamError) => void) | undefined;
   onRefreshTicket?: (() => Promise<CloudAgentStreamTicketResult>) | undefined;
   heartbeatTimeoutMs?: number | undefined;
-  reconnectDelayMs?: number | undefined;
   lifecycleHooks?: ConnectionLifecycleHooks | undefined;
   websocketHeaders?: WebSocketHeaders | undefined;
 };
@@ -83,6 +82,7 @@ function isAuthFailureClose(event: CloseEvent): boolean {
 
 export function createConnection(config: ConnectionConfig): Connection {
   let currentTicket = normalizeTicket(config.ticket);
+  let ticketPresented = false;
   const refreshTicket = config.onRefreshTicket;
 
   return createBaseConnection({
@@ -94,6 +94,7 @@ export function createConnection(config: ConnectionConfig): Connection {
         typeof config.websocketUrl === 'function' ? config.websocketUrl() : config.websocketUrl
       );
       url.searchParams.set('ticket', currentTicket.ticket);
+      ticketPresented = true;
       return url.toString();
     },
     parseMessage: (data: unknown) => {
@@ -121,6 +122,7 @@ export function createConnection(config: ConnectionConfig): Connection {
           currentTicket = normalizeTicket(await refreshTicket());
         }
       : undefined,
-    shouldRefreshAuthBeforeConnect: () => isTicketExpiringSoon(currentTicket.expiresAt),
+    shouldRefreshAuthBeforeConnect: () =>
+      ticketPresented || isTicketExpiringSoon(currentTicket.expiresAt),
   });
 }

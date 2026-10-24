@@ -14,7 +14,7 @@ import type {
   BenchmarkModelSummary,
   CandidatePricing,
   CustomRouterEntryRef,
-  CustomRouterScope,
+  OwnerType,
   ProductionTokenProfile,
   EffortByComplexity,
   BenchmarkProfileStatus,
@@ -210,6 +210,8 @@ export const pendingDeciderOutputs = sqliteTable(
     rep: integer('rep').notNull(),
     payload: text('payload').notNull(),
     prompt_revision: integer('prompt_revision').notNull().default(1),
+    grading_token: text('grading_token'),
+    grading_lease_until: integer('grading_lease_until').notNull().default(0),
   },
   table => [
     primaryKey({ columns: [table.run_id, table.model, table.variant, table.case_id, table.rep] }),
@@ -489,7 +491,7 @@ export const clientProfiles = sqliteTable(
   'client_profiles',
   {
     id: text('id').primaryKey(),
-    owner_type: text('owner_type').$type<CustomRouterScope>().notNull(),
+    owner_type: text('owner_type').$type<OwnerType>().notNull(),
     owner_id: text('owner_id').notNull(),
     router: text('router').$type<AutoRouter>().notNull(),
     entry_kind: text('entry_kind').$type<CustomRouterEntryRef['kind']>().notNull(),

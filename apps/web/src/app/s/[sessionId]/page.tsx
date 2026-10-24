@@ -44,7 +44,7 @@ export default async function SharedSessionPage({
   const repo = formatRepoFromGitUrl(session.gitUrl);
 
   return (
-    <div className="bg-background min-h-screen">
+    <div className="ph-no-capture bg-background min-h-screen">
       <header className="border-border bg-background/80 sticky top-0 z-10 border-b backdrop-blur-sm">
         <div className="mx-auto flex w-full max-w-3xl items-center justify-between px-4 py-2">
           <AnimatedLogo />

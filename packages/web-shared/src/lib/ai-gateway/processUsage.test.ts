@@ -56,6 +56,7 @@ import {
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { extractReasoningSetting } from './llm-proxy-helpers';
+import { fetchGeneration } from './providers/upstream-request';
 
 jest.mock('@sentry/nextjs', () => ({
   ...jest.requireActual<object>('@sentry/nextjs'),
@@ -69,6 +70,13 @@ jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
   ...(jest.requireActual('@kilocode/web-shared/lib/bouncer/client') as Record<string, unknown>),
   reportUsageEvent: jest.fn(async () => undefined),
   deliverUsageEventWireBody: jest.fn(async () => ({ delivered: true, status: 204 })),
+}));
+
+// The OpenRouter generation lookup is a network call; a test that needs it
+// resolves this mock. Unresolved, it behaves like a failed lookup.
+jest.mock('./providers/upstream-request', () => ({
+  ...(jest.requireActual('./providers/upstream-request') as Record<string, unknown>),
+  fetchGeneration: jest.fn(async () => undefined),
 }));
 
 const mockedReportUsageEvent = jest.mocked(reportUsageEvent);
@@ -1468,6 +1476,73 @@ describe('logMicrodollarUsage', () => {
       .from(microdollar_usage_daily)
       .where(eq(microdollar_usage_daily.kilo_user_id, user.id));
     expect(dailyRows).toHaveLength(0);
+  });
+
+  describe('OpenRouter usage without a BYOK status', () => {
+    const transcriptionStats: MicrodollarUsageStats = {
+      ...BASE_USAGE_STATS,
+      messageId: 'gen-stt-123',
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheWriteTokens: 0,
+      cacheHitTokens: 0,
+      cost_mUsd: 10,
+      is_byok: null,
+      inference_provider: null,
+      generation_time: 2,
+    };
+
+    beforeEach(() => {
+      jest.mocked(captureMessage).mockClear();
+      jest.mocked(fetchGeneration).mockReset();
+    });
+
+    test('reports the unresolved cost when the generation lookup fails', async () => {
+      const user = await insertTestUser({
+        id: 'test-generation-lookup-failure-user',
+        microdollars_used: 0,
+        google_user_email: 'generation-lookup-failure@example.com',
+      });
+      jest.mocked(fetchGeneration).mockResolvedValue(undefined);
+
+      await processTokenData(
+        { ...transcriptionStats },
+        { ...createBaseUsageContext(user), api_kind: 'audio_transcriptions' }
+      );
+
+      expect(fetchGeneration).toHaveBeenCalledWith('gen-stt-123', expect.anything());
+      expect(captureMessage).toHaveBeenCalledWith(
+        "SUSPICIOUS: openrouters cost accounting doesn't make sense",
+        expect.objectContaining({ tags: { source: 'generation_lookup_fallback' } })
+      );
+    });
+
+    test('bills the upstream cost the generation lookup reports', async () => {
+      const user = await insertTestUser({
+        id: 'test-generation-lookup-success-user',
+        microdollars_used: 0,
+        google_user_email: 'generation-lookup-success@example.com',
+      });
+      jest.mocked(fetchGeneration).mockResolvedValue({
+        data: {
+          id: 'gen-stt-123',
+          model: 'openai/whisper-1',
+          is_byok: true,
+          total_cost: 0.00001,
+          upstream_inference_cost: 0.0002,
+          provider_name: 'OpenAI',
+        },
+      } as OpenRouterGeneration);
+
+      const result = await processTokenData(
+        { ...transcriptionStats },
+        { ...createBaseUsageContext(user), api_kind: 'audio_transcriptions' }
+      );
+
+      expect(result).not.toBeNull();
+      expect((await findUserById(user.id))?.microdollars_used).toBe(200);
+      expect(captureMessage).not.toHaveBeenCalled();
+    });
   });
 
   test('skips anonymous usage without an IP instead of inventing one', async () => {

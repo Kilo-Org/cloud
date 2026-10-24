@@ -242,6 +242,18 @@ describe('getProvider exclusive model routing', () => {
       expect(result.kind === 'provider' && result.provider).toBe(VERCEL_AI_GATEWAY);
     }
   );
+
+  test('keeps a spend-bounded request on the provider that can enforce its ceiling', async () => {
+    jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
+
+    const result = await getProvider({
+      ...providerInput('openai/gpt-5-nano'),
+      boundedSpending: true,
+    });
+
+    expect(result.kind === 'provider' && result.provider).toBe(OPENROUTER);
+    expect(shouldRouteToVercel).not.toHaveBeenCalled();
+  });
 });
 
 describe('getProvider ChatGPT connection routing order', () => {

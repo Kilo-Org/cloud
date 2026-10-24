@@ -1,10 +1,10 @@
 import * as z from 'zod';
 import {
-  CustomRouterScopeSchema,
   customRouterEntryKey,
   customRouterModelId,
   type GatewayCustomRouterEntry,
 } from './custom-router';
+import { OwnerTypeSchema } from './owner';
 import { AutoRoutingModeSchema, type AutoRouter, type AutoRoutingMode } from './router';
 import { MAX_POOL_ENTRIES } from './routing-table';
 
@@ -15,7 +15,7 @@ export const CONVERTED_ROUTER_BASE: AutoRouter = 'efficient';
 export const MAX_OWNER_POOL_CONVERSIONS_PER_REQUEST = 5;
 
 export const OwnerPoolConversionOwnerSchema = z.object({
-  type: CustomRouterScopeSchema,
+  type: OwnerTypeSchema,
   id: z.string().trim().min(1),
 });
 export type OwnerPoolConversionOwner = z.infer<typeof OwnerPoolConversionOwnerSchema>;
@@ -107,9 +107,10 @@ export type ConvertedOwnerPoolRouter = {
 export function convertedOwnerPoolRouter(
   conversion: OwnerPoolConversion
 ): ConvertedOwnerPoolRouter {
-  const entries = conversion.models.map(
-    (model): GatewayCustomRouterEntry => ({ kind: 'gateway', model })
-  );
+  const entries = conversion.models.map((model): GatewayCustomRouterEntry => ({
+    kind: 'gateway',
+    model,
+  }));
   const [first] = entries;
   if (!first) throw new Error('An owner pool conversion needs at least one model');
   return {

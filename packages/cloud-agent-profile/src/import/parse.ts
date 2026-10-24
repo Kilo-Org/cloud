@@ -2,8 +2,9 @@ import { parseSkillFrontmatter } from '../contracts/skills';
 import { decodeConfigArchive, ImportArchiveError, type ArchiveEntry } from './archive';
 import { CONFIG_FILE_NAMES, readConfigSections, type ConfigSections } from './config-file';
 import { parseFrontmatter } from './frontmatter';
-import { matchesGlob } from './glob';
+import { compileGlob, type CompiledGlob } from './glob';
 import { instructionNameForPath } from './instructions';
+import { MAX_IMPORT_INSTRUCTION_GLOB_WORK } from './limits';
 import {
   addAgent,
   addCommand,
@@ -281,10 +282,50 @@ function parseConfigEntries(sections: ConfigSections, configPath: string, state:
   }
 }
 
-function parseInstructionGlobs(globs: string[], entries: ArchiveEntry[], state: ParseState): void {
-  for (const glob of globs) {
+/** A compiled instruction glob matcher, shared by every candidate path. */
+type InstructionGlobMatcher = (path: string) => boolean;
+
+/**
+ * Skip the instruction globs when the archive would exceed
+ * {@link MAX_IMPORT_INSTRUCTION_GLOB_WORK} for the candidate paths.
+ */
+function withinInstructionGlobBudget(
+  globs: CompiledGlob[],
+  entries: ArchiveEntry[],
+  configPath: string | null,
+  state: ParseState
+): InstructionGlobMatcher[] {
+  const passes = globs.reduce((total, glob) => total + glob.tokenCount, 0);
+  if (passes === 0) return [];
+  const candidateBytes = entries.reduce(
+    (total, entry) => total + (entry.path.toLowerCase().endsWith('.md') ? entry.path.length : 0),
+    0
+  );
+  if (passes * candidateBytes <= MAX_IMPORT_INSTRUCTION_GLOB_WORK) {
+    return globs.map(glob => glob.matches);
+  }
+
+  state.issues.push(
+    makeIssue(
+      'error',
+      'instruction-globs-exceeded',
+      'config',
+      configPath,
+      'instructions',
+      'Instruction globs are skipped: this archive is over the import limit for instruction globs'
+    )
+  );
+  return [];
+}
+
+function parseInstructionGlobs(
+  matchers: InstructionGlobMatcher[],
+  entries: ArchiveEntry[],
+  state: ParseState
+): void {
+  for (const matchesGlob of matchers) {
     for (const entry of entries) {
-      if (!entry.path.toLowerCase().endsWith('.md') || !matchesGlob(glob, entry.path)) continue;
+      if (!entry.path.toLowerCase().endsWith('.md') || !matchesGlob(entry.path)) continue;
       const name = instructionNameForPath(entry.path);
       if (!claimPath(state, entry.path, 'instructions', name)) continue;
       addInstruction(state, name, entry.content, entry.path);
@@ -292,7 +333,7 @@ function parseInstructionGlobs(globs: string[], entries: ArchiveEntry[], state: 
   }
 }
 
-function isImportablePath(path: string, globs: string[]): boolean {
+function isImportablePath(path: string, matchers: InstructionGlobMatcher[]): boolean {
   const segments = path.split('/');
   if (segments.length === 1 && CONFIG_FILE_NAMES.has(path.toLowerCase())) return true;
   const directory = segments[0].toLowerCase();
@@ -304,7 +345,7 @@ function isImportablePath(path: string, globs: string[]): boolean {
   )
     return true;
   if (segments.length >= 2 && directory === INSTRUCTIONS_DIRECTORY_NAME) return true;
-  return globs.some(glob => matchesGlob(glob, path));
+  return matchers.some(matchesGlob => matchesGlob(path));
 }
 
 /**
@@ -314,7 +355,7 @@ function isImportablePath(path: string, globs: string[]): boolean {
  */
 function routeEntryIssues(
   issues: ImportIssue[],
-  globs: string[],
+  matchers: InstructionGlobMatcher[],
   state: ParseState
 ): Map<string, ImportIssue> {
   const incompleteSkills = new Map<string, ImportIssue>();
@@ -323,7 +364,7 @@ function routeEntryIssues(
       state.issues.push(issue);
       continue;
     }
-    if (!isImportablePath(issue.path, globs)) continue;
+    if (!isImportablePath(issue.path, matchers)) continue;
     const segments = issue.path.split('/');
     if (segments.length >= 3 && segments[0].toLowerCase() === SKILLS_DIRECTORY_NAME) {
       if (!incompleteSkills.has(segments[1])) incompleteSkills.set(segments[1], issue);
@@ -367,10 +408,18 @@ export function parseLocalConfigArchive(zipBytes: Uint8Array): ImportPreview {
   }
 
   const sections = configFiles.length === 1 ? readConfigSections(configFiles[0], state) : null;
-  const instructionGlobs = (sections?.instructionGlobs ?? [])
+  // Compiled once, then reused for every candidate path.
+  const compiledGlobs = (sections?.instructionGlobs ?? [])
     .filter(glob => !REMOTE_INSTRUCTION_PATTERN.test(glob))
-    .map(toArchiveGlob);
-  const incompleteSkills = routeEntryIssues(decoded.issues, instructionGlobs, state);
+    .map(toArchiveGlob)
+    .map(compileGlob);
+  const instructionMatchers = withinInstructionGlobBudget(
+    compiledGlobs,
+    decoded.entries,
+    configFiles[0]?.path ?? null,
+    state
+  );
+  const incompleteSkills = routeEntryIssues(decoded.issues, instructionMatchers, state);
 
   parseDefinitionDirectories(decoded.entries, AGENT_DIRECTORY_NAMES, 'agents', state);
   parseDefinitionDirectories(decoded.entries, COMMAND_DIRECTORY_NAMES, 'commands', state);
@@ -379,7 +428,7 @@ export function parseLocalConfigArchive(zipBytes: Uint8Array): ImportPreview {
 
   if (sections) {
     parseConfigEntries(sections, configFiles[0].path, state);
-    parseInstructionGlobs(instructionGlobs, decoded.entries, state);
+    parseInstructionGlobs(instructionMatchers, decoded.entries, state);
   }
 
   const config: ParsedLocalConfig = {

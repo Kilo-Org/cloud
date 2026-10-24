@@ -1,17 +1,15 @@
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { replaceReasoningObjectWithReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 
 export default {
   id: 'xiaomi-token-plan-ams',
+  models_dev_id: 'xiaomi-token-plan-ams',
   base_url: 'https://token-plan-ams.xiaomimimo.com/v1',
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions'],
   reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
-  transformRequest(context) {
-    replaceReasoningObjectWithReasoningEffort(context.request);
-  },
+  transformRequest() {},
   models: cachedEnhancedDirectByokModelList({
     providerId: 'xiaomi-token-plan-ams',
     recommendedModels: [

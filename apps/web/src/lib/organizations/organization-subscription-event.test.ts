@@ -5,11 +5,13 @@ import {
   organization_seats_purchases,
   organization_memberships,
   organization_membership_removals,
+  organization_invitations,
+  external_side_effect_outbox,
   organizations,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { removeUserFromOrganization } from '@/lib/organizations/organization-member-removal';
 import {
@@ -1925,6 +1927,187 @@ describe('H2: Membership removal tombstone', () => {
         )
       );
     expect(membershipsAfterRejoin.length).toBeGreaterThanOrEqual(1);
+  });
+
+  test('should reject an invitation older than the removal record', async () => {
+    // Fixtures: the stored record, then an invitation with an earlier
+    // creation timestamp.
+    await addUserToOrganization(testOrganization.id, removedUser.id, 'member');
+    await removeUserFromOrganization(testOrganization.id, removedUser.id, testUser.id);
+    await db
+      .update(organization_membership_removals)
+      .set({ removed_at: sql`NOW()` })
+      .where(
+        and(
+          eq(organization_membership_removals.organization_id, testOrganization.id),
+          eq(organization_membership_removals.kilo_user_id, removedUser.id)
+        )
+      );
+    const [removalRow] = await db
+      .select({ removedAt: organization_membership_removals.removed_at })
+      .from(organization_membership_removals)
+      .where(
+        and(
+          eq(organization_membership_removals.organization_id, testOrganization.id),
+          eq(organization_membership_removals.kilo_user_id, removedUser.id)
+        )
+      );
+
+    const invitation = await inviteUserToOrganization(
+      testOrganization.id,
+      testUser.id,
+      removedUser.google_user_email,
+      'member'
+    );
+    await db
+      .update(organization_invitations)
+      .set({ created_at: new Date(new Date(removalRow.removedAt).getTime() - 1000).toISOString() })
+      .where(eq(organization_invitations.id, invitation.id));
+
+    await db.insert(external_side_effect_outbox).values({
+      operation: 'send_org_invite_email',
+      invitation_id: invitation.id,
+      payload: {
+        invitationId: invitation.id,
+        to: removedUser.google_user_email,
+        organizationName: testOrganization.name,
+        inviterName: 'Test User',
+        acceptInviteUrl: `https://app.kilo.ai/invite/${invitation.token}`,
+      },
+    });
+
+    const result = await acceptOrganizationInvite(removedUser.id, invitation.token);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe('Invitation is no longer valid');
+    }
+
+    const memberships = await db
+      .select()
+      .from(organization_memberships)
+      .where(
+        and(
+          eq(organization_memberships.organization_id, testOrganization.id),
+          eq(organization_memberships.kilo_user_id, removedUser.id)
+        )
+      );
+    expect(memberships).toHaveLength(0);
+
+    const removals = await db
+      .select()
+      .from(organization_membership_removals)
+      .where(
+        and(
+          eq(organization_membership_removals.organization_id, testOrganization.id),
+          eq(organization_membership_removals.kilo_user_id, removedUser.id)
+        )
+      );
+    expect(removals).toHaveLength(1);
+
+    // The refused invitation is expired so it cannot linger as live.
+    const [refusedInvitation] = await db
+      .select({ expiresAt: organization_invitations.expires_at })
+      .from(organization_invitations)
+      .where(eq(organization_invitations.id, invitation.id));
+    expect(new Date(refusedInvitation.expiresAt).getTime()).toBeLessThanOrEqual(Date.now());
+
+    // Its invite email row is terminal, so the sender never mails it later.
+    const [outboxRow] = await db
+      .select()
+      .from(external_side_effect_outbox)
+      .where(eq(external_side_effect_outbox.invitation_id, invitation.id));
+    expect(outboxRow.status).toBe('failed');
+    expect(outboxRow.last_error).toBe('revoked');
+    expect(outboxRow.claimed_at).toBeNull();
+    expect(outboxRow.next_attempt_at).toBeNull();
+  });
+
+  test('should reject an invitation created at the same instant as the removal record', async () => {
+    await addUserToOrganization(testOrganization.id, removedUser.id, 'member');
+    await removeUserFromOrganization(testOrganization.id, removedUser.id, testUser.id);
+
+    const invitation = await inviteUserToOrganization(
+      testOrganization.id,
+      testUser.id,
+      removedUser.google_user_email,
+      'member'
+    );
+    await db
+      .update(organization_membership_removals)
+      .set({ removed_at: sql`date_trunc('milliseconds', NOW())` })
+      .where(
+        and(
+          eq(organization_membership_removals.organization_id, testOrganization.id),
+          eq(organization_membership_removals.kilo_user_id, removedUser.id)
+        )
+      );
+    const [removalRow] = await db
+      .select({ removedAt: organization_membership_removals.removed_at })
+      .from(organization_membership_removals)
+      .where(
+        and(
+          eq(organization_membership_removals.organization_id, testOrganization.id),
+          eq(organization_membership_removals.kilo_user_id, removedUser.id)
+        )
+      );
+    await db
+      .update(organization_invitations)
+      .set({ created_at: new Date(removalRow.removedAt).toISOString() })
+      .where(eq(organization_invitations.id, invitation.id));
+
+    const result = await acceptOrganizationInvite(removedUser.id, invitation.token);
+    expect(result.success).toBe(false);
+
+    const memberships = await db
+      .select()
+      .from(organization_memberships)
+      .where(
+        and(
+          eq(organization_memberships.organization_id, testOrganization.id),
+          eq(organization_memberships.kilo_user_id, removedUser.id)
+        )
+      );
+    expect(memberships).toHaveLength(0);
+
+    const removals = await db
+      .select()
+      .from(organization_membership_removals)
+      .where(
+        and(
+          eq(organization_membership_removals.organization_id, testOrganization.id),
+          eq(organization_membership_removals.kilo_user_id, removedUser.id)
+        )
+      );
+    expect(removals).toHaveLength(1);
+  });
+
+  test('should accept a newer invitation and clear the stored membership record', async () => {
+    await addUserToOrganization(testOrganization.id, removedUser.id, 'member');
+    await removeUserFromOrganization(testOrganization.id, removedUser.id, testUser.id);
+
+    const reinvitation = await inviteUserToOrganization(
+      testOrganization.id,
+      testUser.id,
+      removedUser.google_user_email,
+      'member'
+    );
+
+    const result = await acceptOrganizationInvite(removedUser.id, reinvitation.token);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.organizationId).toBe(testOrganization.id);
+    }
+
+    const removals = await db
+      .select()
+      .from(organization_membership_removals)
+      .where(
+        and(
+          eq(organization_membership_removals.organization_id, testOrganization.id),
+          eq(organization_membership_removals.kilo_user_id, removedUser.id)
+        )
+      );
+    expect(removals).toHaveLength(0);
   });
 });
 

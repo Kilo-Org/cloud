@@ -97,6 +97,20 @@ export function sessionResumeHref(
 }
 
 /**
+ * Chat URL in the session's own account scope, or null when the chat page of
+ * `routeOrganizationId` (null for personal) is already that scope. A chat page
+ * opens only its own scope's sessions, so a link from another scope moves here.
+ */
+export function sessionScopeHref(
+  session: SessionResumeSession,
+  routeOrganizationId: string | null,
+  anchorMessageId: string | null | undefined
+): string | null {
+  if ((session.organization_id ?? null) === routeOrganizationId) return null;
+  return sessionResumeHref(session, anchorMessageId);
+}
+
+/**
  * Sign-in redirect for a universal session link, keeping the recorded anchor in
  * the `callbackPath` so the position survives the sign-in round trip instead of
  * dropping to the session top. The whole callback path is encoded exactly once.

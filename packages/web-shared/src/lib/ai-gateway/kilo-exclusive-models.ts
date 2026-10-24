@@ -108,7 +108,7 @@ export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
     'Gemma 4 26B A4B IT is an instruction-tuned Mixture-of-Experts (MoE) model from Google DeepMind. Despite 25.2B total parameters, only 3.8B activate per token during inference — delivering near-31B quality at a fraction of the compute cost.',
   context_length: 262144,
   max_completion_tokens: 32768,
-  flags: ['vision', 'vercel-routing', 'rate-limited'],
+  flags: ['vision', 'vercel-routing'],
   provider: OPENROUTER,
   internal_id: GEMMA_4_26B_A4B_IT_ID,
   pricing: null,
@@ -222,18 +222,6 @@ export const reflection_beam_free_model: KiloExclusiveModel = {
   inference_providers: ['reflection'],
 };
 
-export function isKiloExclusiveFreeModel(model: string): boolean {
-  return kiloExclusiveModels.some(m => m.public_id === model && !m.pricing);
-}
-
-export function isKiloExclusiveModel(model: string): boolean {
-  return kiloExclusiveModels.some(m => m.public_id === model);
-}
-
-export function isKiloExclusiveRateLimitedModel(model: string): boolean {
-  return kiloExclusiveModels.some(m => m.public_id === model && m.flags.includes('rate-limited'));
-}
-
 export const kiloExclusiveModels = [
   gemma_4_26b_a4b_it_free_model,
   qwen36_plus_stealth_model,
@@ -245,8 +233,22 @@ export const kiloExclusiveModels = [
   reflection_beam_free_model,
 ] as KiloExclusiveModel[];
 
+export function findKiloExclusiveModel(model: string): KiloExclusiveModel | null {
+  return kiloExclusiveModels.find(m => m.public_id === model) ?? null;
+}
+
+export function isKiloExclusiveFreeModel(model: string): boolean {
+  const exclusive = findKiloExclusiveModel(model);
+  return exclusive !== null && !exclusive.pricing;
+}
+
+export function isKiloExclusiveModel(model: string): boolean {
+  return findKiloExclusiveModel(model) !== null;
+}
+
 export function isKiloStealthModel(model: string): boolean {
-  return kiloExclusiveModels.some(m => m.public_id === model && isStealthModel(m));
+  const exclusive = findKiloExclusiveModel(model);
+  return exclusive !== null && isStealthModel(exclusive);
 }
 
 export function shouldRedactModelNameInMicrodollarUsage(
@@ -258,10 +260,6 @@ export function shouldRedactModelNameInMicrodollarUsage(
 
 export function shouldRedactErrorResponse(provider: ProviderId, model: string): boolean {
   return isKiloStealthModel(model);
-}
-
-export function findKiloExclusiveModel(model: string): KiloExclusiveModel | null {
-  return kiloExclusiveModels.find(m => m.public_id === model) ?? null;
 }
 
 /**

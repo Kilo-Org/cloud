@@ -10,7 +10,6 @@ export type KiloExclusiveModelFlag =
   | 'vision'
   | 'flex'
   | 'vercel-routing'
-  | 'rate-limited'
   | 'requires-data-collection';
 
 export type Usage = {

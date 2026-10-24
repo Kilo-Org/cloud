@@ -25,6 +25,7 @@
     "error": "àṣìṣe: {{error}}",
     "back": "Padà",
     "somethingWentWrong": "Àṣìṣe kan ṣẹlẹ̀.",
+    "actionNotRecorded": "A kò lè ṣe àkọsílẹ̀ ìgbésẹ̀ yìí. Jọ̀wọ́ tún gbìyànjú nígbà mìíràn.",
     "couldNotOpen": "A kò lè ṣí {{label}}.",
     "link": "ọ̀nà àsopọ̀",
     "takingLonger": "Èyí ń pẹ́ ju bí a ti retí lọ. O lè ti èyí pa kí o tún ṣàyẹ̀wò.",
@@ -35,6 +36,8 @@
     "connectGithub": "Sopọ̀ mọ́ GitHub",
     "cost": "Iye owó",
     "discard": "Jù sílẹ̀",
+    "discardChangesMessage": "Àwọn àtúnṣe rẹ máa sọ̀nu.",
+    "discardChangesTitle": "Jù àwọn àtúnṣe sílẹ̀?",
     "findings": "Àwọn àwárí",
     "mergeRequest": "ìbéèrè ìṣọ̀kan",
     "notConnected": "Kò sopọ̀",
@@ -50,6 +53,7 @@
     "connected": "Ti sopọ̀",
     "couldNotLoadModels": "A kò lè gbé àwọn àwòṣe wọlé.",
     "couldNotLoadRepositories": "A kò lè gbé àwọn ibi ìpamọ́ kóòdù wọlé.",
+    "noRepositoriesFound": "A kò rí ibi ìpamọ́ kankan",
     "critical": "Líle jù lọ",
     "delete": "Parẹ́",
     "deleted": "A ti parẹ́",
@@ -84,6 +88,7 @@
     "connect": "Sopọ̀",
     "connectBitbucket": "Sopọ̀ mọ́ Bitbucket",
     "connectGitlab": "Sopọ̀ mọ́ GitLab",
+    "connectProvider": "So olùpèsè kan pọ̀",
     "contentTruncated": "A ti gé àkóónú kúrú",
     "copyLink": "Da ìjápọ̀ kọ",
     "couldNotLoadOrganizations": "A kò lè gbé àwọn àjọ wọlé.",
@@ -109,7 +114,9 @@
     "online": "Lórí ayélujára",
     "open": "Ṣí {{name}}",
     "openPullRequest": "Ṣí ìbéèrè àkópọ̀",
+    "completed": "A ti parí",
     "pending": "Ń dúró",
+    "running": "Ń ṣiṣẹ́",
     "performance": "Agbára ìṣiṣẹ́",
     "preferences": "Àwọn ààyò",
     "privacyPolicy": "Ìlànà àṣírí",
@@ -177,7 +184,7 @@
     "codeArrivalHint": "Bí àdírẹ́sì yìí bá yẹ, kóòdù yóò dé láàárín ìṣẹ́jú kan.",
     "verifyCode": "Jẹ́rìí kóòdù",
     "resendCode": "Tún fi kóòdù ránṣẹ́",
-    "termsPrefix": "Nípa títẹ̀síwájú, o fara mọ́ àwọn ìlànà wa wọ̀nyí:",
+    "termsPrefix": "Nípa títẹ̀síwájú, o fara mọ́ àwọn ìlànà wa wọ̀nyí: ",
     "terms": "Àwọn ìlànà",
     "termsConnector": " àti ",
     "termsSuffix": ".",
@@ -219,7 +226,7 @@
     "hideBalance": "Fi owó tó kù pamọ́",
     "showBalance": "Fi owó tó kù hàn",
     "balanceHidden": "Owó tó kù ti pamọ́",
-    "bonusCreditsExpiring": "Kirẹ́dítì ẹ̀bùn {{amount}} yóò dópin {{date}}.",
+    "bonusCreditsExpiring": "Kirẹ́dítì {{amount}} yóò dópin {{date}}.",
     "signOutTitle": "Jáde?",
     "signOutMessage": "O máa nílò láti tún wọlé kí o lè lo àyè iṣẹ́ rẹ.",
     "deleteAccountTitle": "Pa àkọọ́lẹ̀ rẹ́?",
@@ -288,7 +295,8 @@
     "condenseToolCallsSubtitle": "Ẹ ṣe àkópọ̀ àwọn ìpè ohun èlò tí ó tẹ̀ léra nínú ìlà kan tí ẹ lè ṣí.",
     "toolSummaryTranslation": "Tumọ̀ àwọn àkópọ̀ irinṣẹ́",
     "toolSummaryTranslationSubtitle": "Fi àkópọ̀ irinṣẹ́ kọ̀ọ̀kan ránṣẹ́ sí àwòṣe kan láti tumọ̀ rẹ̀ sí èdè áàpù rẹ. A ó fi èyí tí ó wà níbẹ̀rẹ̀ hàn tí ìtumọ̀ bá kùnà.",
-    "toolSummaryTranslationModelUnavailableNotice": "A kìí ṣe àwòṣe yìí mọ́. Tẹ $t(common.model) láti yan òmíràn."
+    "toolSummaryTranslationModelUnavailableNotice": "A kìí ṣe àwòṣe yìí mọ́. Tẹ $t(common.model) láti yan òmíràn.",
+    "autoExpandThinkingInactiveSubtitle": "Kò ní ipa nígbà tí àwọn kúlẹ̀kúlẹ̀ ìrònú bá wà ní pamọ́."
   },
   "prReview": {
     "pullRequestUnavailable": "Ìbéèrè ìṣọ̀kan kò sí",
@@ -586,6 +594,8 @@
     "installKiloGitHubApp": "Fi ìṣàfilọ́lẹ̀ Kilo fún GitHub sórí rẹ̀",
     "checkConnection": "Ṣàyẹ̀wò ìsopọ̀",
     "couldNotLoadPullRequest": "A kò lè ṣàkójọ ìbéèrè ìṣọ̀kan.",
+    "reviewServiceUnavailable": "Àdàjọ kò sí",
+    "reviewServiceUnavailableDescription": "Àdàjọ kò sí fún ìgbà díè. Gbiyanju lẹ́ẹ̀kansi láìpẹ́.",
     "description": "Àpèjúwe",
     "noDescriptionProvided": "A kò pèsè àpèjúwe kankan.",
     "review": "Àtúnyẹ̀wò",
@@ -615,9 +625,15 @@
       "viewOnGitHub": "Wo PR lórí GitHub",
       "noChecksReported": "Kò sí àyẹ̀wò tí a ròyìn",
       "passed": "{{displayCount}} yọrí sí rere",
+      "passed_one": "{{displayCount}} yọrí sí rere",
+      "passed_other": "{{displayCount}} yọrí sí rere",
       "failed": "{{displayCount}} kùnà",
+      "failed_one": "{{displayCount}} kùnà",
+      "failed_other": "{{displayCount}} kùnà",
       "pending": "{{displayCount}} ń dúró",
       "skipped": "a fo {{displayCount}} kọjá",
+      "skipped_one": "a fo {{displayCount}} kọjá",
+      "skipped_other": "a fo {{displayCount}} kọjá",
       "checksCount": "àyẹ̀wò {{displayCount}}",
       "checksCount_one": "àyẹ̀wò {{displayCount}}",
       "checksCount_other": "àyẹ̀wò {{displayCount}}",
@@ -661,7 +677,9 @@
       "description": "So àkọọ́lẹ̀ GitHub rẹ pọ̀ láti ṣe àtúnyẹ̀wò àwọn ìbéèrè ìṣọ̀kan lórí fóònù.",
       "gitlabDescription": "So àkọọ́lẹ̀ GitLab rẹ pọ̀ láti ṣàtúnyẹ̀wò àwọn ìbéèrè ìṣọ̀kan lórí fónù.",
       "bitbucketDescription": "So Bitbucket pọ̀ mọ́ àjọ yìí láti ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ lórí fónù.",
-      "bitbucketOrgOnlyDescription": "Yan àjọ kan nínú àlàyé ara ẹni rẹ láti ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ Bitbucket rẹ̀."
+      "bitbucketOrgOnlyDescription": "Yí àkọọ́lẹ̀ tí ó wà lókè padà sí àjọ láti ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ Bitbucket rẹ̀.",
+      "contextLine": "Fún {{organization}}",
+      "contextLinePersonal": "Fún ti ara ẹni"
     },
     "screen": {
       "title": "#{{number}}",
@@ -756,6 +774,7 @@
       "truncationBanner_other": "À ń fi fáìlì {{limit}} àkọ́kọ́ hàn nínú fáìlì {{total}} tí a yí padà — ààlà API GitHub."
     },
     "linkPasteClipboardEmpty": "Àtẹ àdàkọ ṣófo.",
+    "linkPasteDenied": "A kọ láàyè láti lẹ̀ẹmọ́. Fún láàyè láti lẹ̀ẹmọ́ kí o tún gbiyanju.",
     "linkPasteNotAPullRequest": "Kì í ṣe ọ̀nà àsopọ̀ ìbéèrè àkópọ̀ tàbí ìbéèrè ìṣọ̀kan",
     "announce": {
       "commentPosted": "A ti fi àsọyé ránṣẹ́",
@@ -769,7 +788,9 @@
       "reviewNotSubmitted": "A kò lè fi àtúnyẹ̀wò yìí ránṣẹ́ bí ó ṣe wà. PR náà lè ti yí padà, tàbí o kò lè ṣe àtúnyẹ̀wò ìbéèrè ìṣọ̀kan tìrẹ.",
       "reviewNotSubmittedTerm": "Kò ṣeé fi àtúnyẹ̀wò yìí ránṣẹ́ gẹ́gẹ́ bí ó ṣe wà. Ó lè jẹ́ pé {{term}} ti yí padà, tàbí kò lè ṣàtúnyẹ̀wò {{term}} tirẹ.",
       "couldNotPostComment": "A kò lè fi àsọyé ránṣẹ́.",
-      "couldNotSubmitReview": "A kò lè fi àtúnyẹ̀wò ránṣẹ́. Ṣàyẹ̀wò àsopọ̀ rẹ kí o tún gbìyànjú."
+      "couldNotSubmitReview": "A kò lè fi àtúnyẹ̀wò ránṣẹ́. Ṣàyẹ̀wò àsopọ̀ rẹ kí o tún gbìyànjú.",
+      "rateLimited": "Ìbéèrè pọ̀ jù. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
+      "conflict": "Èyí ti yí padà nígbà tí o ń ṣiṣẹ́ lórí rẹ̀. Jọ̀wọ́ gbé e wọlé, kí o sì tún gbìyànjú lẹ́ẹ̀kan sí i."
     },
     "operation": {
       "couldNotReply": "A kò lè fi èsì ránṣẹ́.",
@@ -777,7 +798,6 @@
       "mergeResultDefaultError": "GitHub kò parí ìdàpọ̀ náà.",
       "mergeResultNotCompleted": "A kò darapọ̀ {{term}}. Ṣàyẹ̀wò ipò rẹ̀, tún sì gbìyànjú.",
       "ambiguous": "A kò lè jẹ́rìí sí i — ṣàyẹ̀wò PR náà kí o tó tún gbìyànjú.",
-      "persistenceFailed": "A kò lè ṣe àkọsílẹ̀ ìgbésẹ̀ yìí. Jọ̀wọ́ tún gbìyànjú nígbà mìíràn.",
       "forbidden": "A kò gbà á láàyè."
     },
     "capabilities": {
@@ -1389,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "Ó ṣeé ṣe kí o nílò láti fúnni ní àṣẹ láti wọlé sí àwọn ẹgbẹ́ tàbí iṣẹ́ sí i lórí GitLab.",
       "installGithubApp": "Fi ohun èlò GitHub sórí àwọn ibi ìpamọ́",
       "installGithubAppDescription": "Fún ohun èlò Kilo fún GitHub ní àṣẹ láti wọlé sí àwọn ibi ìpamọ́ tí o fẹ́ kí a ṣàtúnyẹ̀wò.",
-      "noRepositoriesFound": "A kò rí ibi ìpamọ́ kankan",
       "repositoryAccess": "àṣẹ ìwọlé sí ibi ìpamọ́"
     },
     "style": {
@@ -1413,9 +1432,14 @@
       "couldNotGetLatest": "A kò lè gba dátà tuntun.",
       "byline": "{{repo}} #{{number}} láti ọwọ́ {{author}}",
       "noFindings": "Kò sí àbùkù.",
+      "findingsUnavailable": "Àwọn àbájáde kò sí nítorí pé àtúnyẹ̀wò yìí kùnà.",
+      "serviceUnavailable": "A kò lè sopọ̀ mọ́ iṣẹ́ àtúnyẹ̀wò kóòdù. Tún gbìyànjú àtúnyẹ̀wò nígbà tí iṣẹ́ náà bá wà.",
+      "reviewFailed": "Àtúnyẹ̀wò náà kùnà. Jọ̀wọ́ tún gbìyànjú.",
       "showMore": "Fi sí i hàn",
       "created": "Tí a ṣẹ̀dá",
       "started": "Tí a bẹ̀rẹ̀",
+      "reviewEnded": "Tí a fòpin",
+      "severityNitpick": "Àwárí kékeré",
       "tokens": "Tókẹ̀n",
       "tokensInOut": "{{input}} wọlé / {{output}} jáde",
       "council": "Ìgbìmọ̀",
@@ -1439,15 +1463,22 @@
       "sessionError": "Àṣìṣe ìgbà iṣẹ́: {{error}}.",
       "statusWithValue": "Ipò: {{status}}",
       "toolName": "Irinṣẹ́: {{name}}",
-      "toolNameError": "Àṣìṣe irinṣẹ́: {{name}}."
+      "toolNameError": "Àṣìṣe irinṣẹ́: {{name}}.",
+      "cancelReasonSuperseded": "A tì kọ́mítì tuntun síta, nitorí náà wọ́n fi rọ́pò àtúnyẹ̀wò yìí.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} ti ya sọ́tọ̀, nitorí náà wọ́n fagilé àtúnyẹ̀wò yìí. Tún sopọ̀ mọ́ ọ̀n, lẹ́yìn náà tún ṣe àtúnyẹ̀wò náà.",
+      "cancelReasonBitbucketReviewerDisabled": "Wọ́n ti pa Code Reviewer dá fún Bitbucket, nitorí náà wọ́n fagilé àtúnyẹ̀wò yìí. Tún fi ọ́n ṣiṣẹ́, lẹ́yìn náà tún ṣe àtúnyẹ̀wò náà.",
+      "cancelReasonBitbucketPullRequestChanged": "Ìbéèrè àgbékalẹ̀ Bitbucket yí padà, nitorí náà wọ́n fi rọ́pò àtúnyẹ̀wò yìí.",
+      "cancelReasonCancelled": "Wọ́n fagilé àtúnyẹ̀wò yìí.",
+      "cancelReasonInterrupted": "Wọ́n dá àtúnyẹ̀wò yìí lọ́nà."
     },
     "reviewMemory": {
       "title": "Ìrántí àtúnyẹ̀wò",
       "loading": "A ń gbé ìrántí àtúnyẹ̀wò wọlé",
       "couldNotLoad": "A kò lè gbé ìrántí àtúnyẹ̀wò wọlé.",
       "off": "A ti pa ìrántí àtúnyẹ̀wò.",
+      "on": "A ti ṣí ìrántí àtúnyẹ̀wò.",
       "offDescription": "Mú un ṣiṣẹ́ kí Kilo lè kẹ́kọ̀ọ́ láti inú àwọn ìdáhùn olùtọ́jú, kí ó sì dábàá ìtọ́sọ́nà fún REVIEW.md.",
-      "readOnlyDescription": "Àwọn oní àjọ àti àwọn olùṣàkóso ìsanwó nìkan ló lè mú ìrántí àtúnyẹ̀wò ṣiṣẹ́.",
+      "readOnlyDescription": "Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè yí ìrántí àtúnyẹ̀wò padà.",
       "enable": "Mú ìrántí àtúnyẹ̀wò ṣiṣẹ́",
       "loadingProposals": "A ń gbé àwọn àbá wọlé",
       "couldNotLoadProposals": "A kò lè gbé àwọn àbá wọlé.",
@@ -1459,15 +1490,25 @@
       "invalidUrl": "Tẹ URL ìbéèrè àkópọ̀ tó tọ́ sí i.",
       "couldNotCheckProviderStatus": "A kò lè ṣàyẹ̀wò ipò olùpèsè.",
       "couldNotLoadProviders": "A kò lè gbé àwọn olùpèsè tí o ti so pọ̀ wọlé. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
-      "connectProvider": "So olùpèsè kan pọ̀",
       "connectProviderDescription": "So GitHub pọ̀ láti bẹ̀rẹ̀ àtúnyẹ̀wò ìbéèrè àkópọ̀ fúnra rẹ.",
       "pullRequestUrl": "URL ìbéèrè àkópọ̀",
       "instructions": "Àwọn ìtọ́sọ́nà (kò pọn dandan)",
       "instructionsPlaceholder": "Ohun pàtó tí olùṣàtúnyẹ̀wò gbọdọ̀ dojú kọ…",
       "starting": "Àtúnyẹ̀wò ń bẹ̀rẹ̀…",
-      "start": "Bẹ̀rẹ̀ àtúnyẹ̀wò"
+      "start": "Bẹ̀rẹ̀ àtúnyẹ̀wò",
+      "startNotFound": "A kò lè ka {{requestNoun}} yẹn láti inú {{provider}}. Ṣàyẹ̀wò URL náà àti pé a lè wọ ilé ìpamọ́ náà.",
+      "startRateLimited": "{{provider}} ń dín kù àwọn ìbéèrè fún ìgbà yìí. Tún gbìyànjú lẹ́yìn ìṣẹ́jú díẹ̀.",
+      "startNotAllowed": "O kò ní àṣẹ láti bẹ̀rẹ̀ àtúnyẹ̀wò fún {{requestNoun}} yẹn. Ṣàyẹ̀wò àṣẹ rẹ, àti ètò àjọ rẹ.",
+      "startProviderNeedsAttention": "Àtúnyẹ̀wò tí o bẹ̀rẹ̀ fúnra rẹ máa ń nilo ìjápọ̀ {{provider}} tó péye. So ó pọ̀, kí o sì tún gbìyànjú.",
+      "startAlreadyRunning": "Àtúnyẹ̀wò fún {{requestNoun}} yẹn ti ń ṣiṣẹ́ tẹ́lẹ̀.",
+      "startRejected": "A kò lè ṣe àtúnyẹ̀wò {{requestNoun}} yẹn. Dá lójú pé ó sí, kì í ṣe àkọsílẹ̀ àgbékalẹ̀, àti pé URL náà tọ́.",
+      "startProviderUnavailable": "A kò lè dé {{provider}} láti ka {{requestNoun}} yẹn. Tún gbìyànjú.",
+      "startFailed": "A kò lè bẹ̀rẹ̀ àtúnyẹ̀wò náà. Ṣàyẹ̀wò ìjápọ̀ rẹ, kí o sì tún gbìyànjú."
     },
-    "notConnectedReadOnly": "A kò tíì so {{platform}} pọ̀. Àwọn oní àjọ àti àwọn olùṣàkóso ìsanwó nìkan ló lè so ó pọ̀.",
+    "notConnectedReadOnly": "A kò tíì so {{platform}} pọ̀. Àwọn ẹni tó ni àjọ àti àwọn alákòóso nìkan ló lè so ó pọ̀.",
+    "gitlab": {
+      "notConnectedReadOnly": "A kò tíì so {{platform}} pọ̀. Ẹ bẹ̀ Ẹni tó ni àjọ, Alákòóso, tàbí Olùṣàkóso ìsanwó kí wọ́n so ó pọ̀."
+    },
     "webhookSetup": "Ìṣètò ìfitónilétí wẹ́bù kò tíì parí.",
     "webhookSetupDescription": "Ó ṣeé ṣe kí àwọn ibi ìpamọ́ kan má gba àtúnyẹ̀wò aládàáṣiṣẹ́.",
     "autoReviews": "Àwọn àtúnyẹ̀wò aládàáṣiṣẹ́",
@@ -1475,7 +1516,7 @@
     "followReviewMd": "Tẹ̀lé REVIEW.md",
     "followReviewMdSubtitle": "Tẹ̀lé àwọn fáìlì ìtọ́sọ́nà REVIEW.md nínú ibi ìpamọ́ kọ̀ọ̀kan",
     "bitbucket": {
-      "notConnectedReadOnly": "A kò tíì so Bitbucket pọ̀. Àwọn oní àjọ àti àwọn olùṣàkóso ìsanwó nìkan ló lè so ó pọ̀.",
+      "notConnectedReadOnly": "A kò tíì so Bitbucket pọ̀. Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè so ó pọ̀.",
       "setupIncomplete": "Ìṣètò kò tíì parí — parí rẹ̀ lórí kilo.ai.",
       "setup": "Ìṣètò Bitbucket"
     },
@@ -1528,8 +1569,6 @@
     "updateFailed": "A kò lè sọ olùṣàtúnyẹ̀wò di tuntun.",
     "configSaveFailed": "A kò lè fi ètò àtúnyẹ̀wò pamọ́.",
     "status": {
-      "running": "Ń ṣiṣẹ́",
-      "completed": "A ti parí",
       "interrupted": "Ó dá dúró"
     },
     "reviewStyle": {
@@ -1542,7 +1581,8 @@
       "bugs": "Àwọn àṣìṣe",
       "style": "Àṣà kíkọ kóòdù",
       "testing": "Ìdánwò",
-      "documentation": "Ìwé àkọsílẹ̀"
+      "documentation": "Ìwé àkọsílẹ̀",
+      "unknown": "Miiran ({{area}})"
     },
     "gateThreshold": {
       "warning": "Ìkìlọ̀"
@@ -1654,7 +1694,14 @@
       "whereFound": "Ibi tí a ti rí èyí ({{displayCount}})",
       "fullReport": "Ẹ̀kúnrẹ́rẹ́ ìròyìn tí a ṣe",
       "yes": "Bẹ́ẹ̀ ni",
-      "no": "Rárá"
+      "no": "Rárá",
+      "action": {
+        "analyzeCodebase": "Ṣàtúpalẹ̀ gbogbo kóòdù",
+        "dismiss": "Kọ̀ rẹ̀",
+        "manualReview": "Ìṣàyẹ̀wò pẹ̀lú ọwọ́",
+        "monitor": "Ṣojú sí",
+        "openPr": "Ṣí pull request"
+      }
     },
     "dashboard": {
       "findingsCount": "àbùkù {{displayCount}}",
@@ -1708,7 +1755,7 @@
       "deadlinePassed": "Ọjọ́ ìparí ti kọjá",
       "deadlinePassedDetail": "{{critical}} tó le jù lọ, {{high}} tó ga",
       "dueThisWeek": "Ọjọ́ ìparí dé lọ́sẹ̀ yìí",
-      "dueThisWeekDetail": "a ti jẹ́rìí pé a lè lo {{exploitable}} fún ìkọlù",
+      "dueThisWeekDetail": "{{exploitable}} nínú wọn ni a ti jẹ́rìí pé a lè lo fún ìkọlù",
       "noDeadline": "Kò sí ọjọ́ ìparí",
       "reviewSlaAssignment": "Ṣàtúnyẹ̀wò bí a ṣe yan SLA",
       "allOpenFindingsTracked": "A ń tọpinpin gbogbo àbùkù tó ṣì ṣí"
@@ -1729,7 +1776,7 @@
       "couldNotLoad": "A kò lè gbé àwárí yìí wọlé.",
       "couldNotCheckPermissions": "A kò lè ṣàyẹ̀wò àṣẹ láti kọ àbùkù sílẹ̀.",
       "cannotDismissTitle": "A kò lè kọ àbùkù yìí sílẹ̀",
-      "cannotDismissDescription": "Àwọn oní àjọ àti àwọn olùṣàkóso ìsanwó nìkan ló lè kọ àwọn àbùkù sílẹ̀.",
+      "cannotDismissDescription": "Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè kọ àwọn àbùkù sílẹ̀.",
       "alreadyResolvedDescription": "A ti yanjú àbùkù yìí tẹ́lẹ̀, a kò sì lè kọ̀ ọ́ sílẹ̀ mọ́."
     },
     "findingDetails": {
@@ -1771,7 +1818,7 @@
       "automationAllOff": "Gbogbo rẹ̀ ti pa",
       "automationCount": "{{displayCount}} nínú 3 ń ṣiṣẹ́",
       "notificationsCount": "{{displayCount}} nínú 2 ń ṣiṣẹ́",
-      "disabledNoManage": "A ti pa Aṣojú ààbò. Àwọn oní àjọ àti àwọn olùṣàkóso ìsanwó nìkan ló lè mú un ṣiṣẹ́.",
+      "disabledNoManage": "A ti pa Aṣojú ààbò. Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè mú un ṣiṣẹ́.",
       "disabledNoRepo": "Yan ó kéré tán ibi ìpamọ́ kan kí o tó mú Aṣojú ààbò ṣiṣẹ́.",
       "disabledPrompt": "Mú Aṣojú ààbò ṣiṣẹ́ láti mú àwọn ìkìlọ̀ Dependabot ṣiṣẹ́pọ̀, yan àwọn ibi ìpamọ́, kí o sì ṣètò ìṣiṣẹ́ aládàáṣiṣẹ́."
     },
@@ -1820,7 +1867,7 @@
       "invalidDayCount": "lo odindi nọ́ńbà ọjọ́ láàárín 1 àti 365.",
       "remediationDeadlineA11y": "Ọjọ́ ìparí àtúnṣe {{label}}, ní iye ọjọ́",
       "enterWholeNumber": "Tẹ nọ́ńbà odidi láàárín 1 àti 365 sí i",
-      "permissionNote": "Àwọn oní àjọ àti àwọn olùṣàkóso ìsanwó nìkan ló lè yí àwọn ètò wọ̀nyí padà.",
+      "permissionNote": "Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè yí àwọn ètò wọ̀nyí padà.",
       "enableTracking": "Mú ìtọpinpin SLA ṣiṣẹ́",
       "enableTrackingSubtitle": "Ṣètò àwọn ọjọ́ ìparí àtúnṣe gẹ́gẹ́ bí ìwọ̀n ewu àbùkù.",
       "deadlinesHeading": "Ọjọ́ ìparí àtúnṣe (iye ọjọ́)"
@@ -1856,24 +1903,51 @@
     "settingsSave": {
       "saveChanges": "Fi àwọn àyípadà pamọ́",
       "unsavedTitle": "Àwọn àyípadà tí a kò tíì fi pamọ́",
-      "unsavedMessage": "Ṣé o fẹ́ fi àwọn àyípadà rẹ pamọ́ kí o tó kúrò lójú ìbòjú yìí?"
+      "unsavedMessage": "Ṣé o fẹ́ fi àwọn àyípadà rẹ pamọ́ kí o tó kúrò lójú ìbòjú yìí?",
+      "unsavedInvalidMessage": "Àwọn àyípadà yìí kò tíì lè fi pamọ́. Tún wọn ṣe láti fi pamọ́, tàbí jù wọ́n sílẹ̀ láti kúrò."
     },
     "auditReportButton": {
       "viewA11y": "Wo ìròyìn àyẹ̀wò"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Alákòóso Kilo",
+      "actorMaskedUser": "Olùmúlò tí a fi pamọ́",
+      "actorSystem": "Ètò Kilo",
       "couldNotLoad": "A kò lè gbé ìròyìn àyẹ̀wò wọlé.",
       "events": "Àwọn ìṣẹ̀lẹ̀",
+      "eventConfidence": "Ìgbẹ́kẹ̀lé: {{confidence}}",
+      "eventReason": "Ìdí: {{reason}}",
+      "eventsCount_one": "{{displayCount}} ìṣẹ̀lẹ̀",
+      "eventsCount_other": "{{displayCount}} ìṣẹ̀lẹ̀",
       "generated": "A ṣe é ní {{generatedAt}}.",
       "noActivity": "Kò sí ìgbòkègbodò tí a ṣe àkọsílẹ̀ rẹ̀",
       "noActivityDescription": "Kò sí ìgbòkègbodò àbùkù ààbò tí Kilo lè ròyìn láti {{start}} sí {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "A kò ṣe àkọsílẹ̀ ibi ìpamọ́",
+      "reasonUnknown": "Ìdí tí a kò mọ̀",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Àkótán ìròyìn",
       "title": "Ìròyìn àyẹ̀wò",
       "unavailable": "Ìròyìn àyẹ̀wò kò sí",
-      "unavailableDescription": "Àwọn oní àjọ àti àwọn olùṣàkóso ìsanwó nìkan ló lè wo àwọn ìròyìn àyẹ̀wò. Béèrè lọ́wọ́ oní àjọ tàbí olùṣàkóso ìsanwó láti fún ọ ní àṣẹ.",
-      "queryFailed": "Ìbéèrè ìròyìn kò parí. Gbìyànjú lẹ́ẹ̀kan sí i."
+      "unavailableDescription": "Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè wo àwọn ìròyìn àyẹ̀wò. Béèrè lọ́wọ́ ẹni tó ni àjọ, alákòóso, tàbí olùṣàkóso ìsanwó láti fún ọ ní àṣẹ.",
+      "queryFailed": "Ìbéèrè ìròyìn kò parí. Gbìyànjú lẹ́ẹ̀kan sí i.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Ìtupalẹ̀ ti parí",
+        "findingAnalysisFailed": "Ìtupalẹ̀ kò ṣe àṣeyọrí",
+        "findingAutoDismissed": "A ti kọ̀ rẹ̀ lára",
+        "findingCreated": "A ti gbé e wọ̀",
+        "findingDeleted": "A ti paarẹ̀",
+        "findingDismissed": "A ti kọ̀ rẹ̀",
+        "findingSeverityChanged": "Ìpele ewu ti yí padà",
+        "findingStatusChange": "Ìpò ti yí padà",
+        "findingSuperseded": "A ti rọ́pò rẹ̀",
+        "remediationBlocked": "A ti dè àtúnṣe",
+        "remediationCancelled": "A ti fagilé",
+        "remediationFailed": "Àtúnṣe kò ṣe àṣeyọrí",
+        "remediationNoChangesNeeded": "Kò nílo àyípadà",
+        "remediationPrOpened": "A ti ṣí pull request",
+        "remediationQueued": "A ti bèèrè àtúnṣe"
+      }
     },
     "notifications": {
       "couldNotLoad": "A kò lè gbé àwọn ètò ìfitónilétí wọlé.",
@@ -1904,9 +1978,9 @@
       "couldNotLoad": "A kò lè gbé Aṣojú ààbò wọlé.",
       "installApp": "Fi ohun èlò GitHub sí ẹ̀rọ",
       "reauthorizeButton": "Tún fún ohun èlò GitHub ní àṣẹ",
-      "reauthorizeDescription": "Aṣojú ààbò nílò àṣẹ vulnerability_alerts láti wọlé sí àwọn ìkìlọ̀ Dependabot. Tún fún ohun èlò GitHub ní àṣẹ láti fi àṣẹ yìí kún un.",
-      "reauthorizeFailed": "A kò lè bẹ̀rẹ̀ fífúnni ní àṣẹ lẹ́ẹ̀kan sí i. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
+      "reauthorizeDescription": "Aṣojú ààbò nílò àṣẹ láti kà àwọn ìkìlọ̀ Dependabot. Tún fún ohun èlò GitHub ní àṣẹ láti fi àṣẹ yìí kún un.",
       "reauthorizeTitle": "Àwọn àṣẹ sí i nílò",
+      "retryFailed": "A kò ṣì lè gbé Aṣojú ààbò wọlé. Jọ̀wọ́ ṣàyẹ̀wò ìsopọ̀ rẹ kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
       "setupFailed": "A kò lè bẹ̀rẹ̀ ìṣètò GitHub. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i."
     },
     "queuedActionUntracked": "A kò lè tọpinpin ìgbésẹ̀ tó wà ní ìlà ìdúró mọ́. Sọ dátà di tuntun láti rí ipò tuntun.",
@@ -1924,7 +1998,12 @@
       "syncMayNotHaveCompleted": "Ó ṣeé ṣe kí ìmúṣiṣẹ́pọ̀ kan má tíì parí. Tún gbìyànjú láti mú dátà bá ara rẹ̀ mu, tàbí kọ̀ ọ́ sílẹ̀.",
       "syncInProgress": "Ìmúṣiṣẹ́pọ̀ ààbò kan ti ń lọ lọ́wọ́. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
       "dismissalInProgress": "Ìkọ̀sílẹ̀ yìí ti ń lọ lọ́wọ́. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
-      "couldNotReadPendingSyncs": "A kò lè ka àwọn ìmúṣiṣẹ́pọ̀ tó ń dúró. Gbìyànjú lẹ́ẹ̀kan sí i."
+      "couldNotReadPendingSyncs": "A kò lè ka àwọn ìmúṣiṣẹ́pọ̀ tó ń dúró. Gbìyànjú lẹ́ẹ̀kan sí i.",
+      "ambiguous": "A kò lè jẹ́rìí sí i — ṣàyẹ̀wò ìwádìí ààbò náà kí o tó tún gbìyànjú.",
+      "settleFailed": "A ti parun iṣẹ́ náà, ṣùgbọ́n a kò lè ṣàkósílẹ̀ èrè rẹ̀. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
+      "replayFailed": "Iṣẹ́ yìí kò parun. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
+      "actionFailed": "A kò lè parun iṣẹ́ yìí. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
+      "actionBlocked": "A kò lè parun iṣẹ́ yìí. Ìṣòro yìí gbọ́dọ̀ túnsẹ̀ kí a tó lè gbìyànjú lẹ́ẹ̀kan sí i."
     },
     "analysisState": {
       "queued": "Ìtúpalẹ̀ wà ní ìlà ìdúró",
@@ -2064,7 +2143,8 @@
       "dollar_other": "dọ́là",
       "costSpoken": "iye owó {{cost}}",
       "costSpokenWithTime": "owó {{cost}}, {{time}}",
-      "pullRequest": "ìbéèrè ìṣọ̀kan {{number}}"
+      "pullRequest": "ìbéèrè ìṣọ̀kan {{number}}",
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "A kò lè ṣí GitHub",
@@ -2183,6 +2263,9 @@
       "noRepositoriesVisibleGitlab": "Kò sí ibi ìpamọ́ kóòdù tó hàn. Ṣàyẹ̀wò àṣẹ ìwọlé sí ibi ìpamọ́ kóòdù fún GitLab, lẹ́yìn náà tún àkójọ náà gbé wọlé.",
       "noRepositoriesVisibleBitbucket": "Kò sí ibi ìpamọ́ kóòdù tó hàn. Ṣàyẹ̀wò àṣẹ ìwọlé sí ibi ìpamọ́ kóòdù fún Bitbucket, lẹ́yìn náà tún àkójọ náà gbé wọlé.",
       "bitbucketOrganizationsOnly": "Bitbucket wà fún àwọn àjọ ṣoṣo.",
+      "githubNeedsAttention": "Ó yẹ kó o tún GitHub sopọ̀",
+      "githubNeedsAttentionDescription": "Tún Kilo GitHub App náà sopọ̀, lẹ́yìn náà tún gbé àwọn ibi ìpamọ́ kóòdù rẹ̀ wọlé.",
+      "partialRepositories": "Àwọn ibi ìpamọ́ kóòdù GitHub míràn kò gbé wọlé.",
       "branchPickerTitle": "Yan ẹ̀ka",
       "branchDefault": "Ìpìlẹ̀",
       "branchAccessibility": "Ẹ̀ka: {{label}}",
@@ -2190,17 +2273,19 @@
       "branchLoadError": "A kò lè gbé àwọn ẹ̀ka wọlé",
       "branchUnavailable": "Àwọn ẹ̀ka kò sí fún ibi ìpamọ́ kóòdù yìí. Ṣàyẹ̀wò àṣẹ rẹ pẹ̀lú olùpèsè, lẹ́yìn náà yan ibi ìpamọ́ kóòdù mìíràn.",
       "branchEmpty": "Kò sí ẹ̀ka kankan",
+      "branchListIncomplete": "A fihàn àwọn ẹ̀ka kan ṣoṣo. Ibi ìpamọ́ kóòdù ní àwọn ẹ̀ka púpọ̀ ju bí àkójọ yìí ṣe lè gbà lọ.",
       "branchPlaceholder": "Yan ẹ̀ka kan",
       "runOnWithTarget": "Ṣiṣẹ́ lórí: {{target}}",
       "environment": "Àyíká iṣẹ́",
       "couldNotLoadEnvironment": "A kò lè gbé àyíká iṣẹ́ rẹ wọlé.",
       "retryLoadingEnvironment": "Gbìyànjú láti tún àyíká iṣẹ́ gbé wọlé",
       "defaultEnvironment": "Àyíká iṣẹ́ àiyípadà",
-      "environmentSummary": "àṣẹ {{commands}} · {{mcp}} MCP · ọgbọ́n {{skills}} · aṣojú {{agents}}",
       "leaveChanges": "Fi àyípadà sílẹ̀",
       "commitAndPush": "Ṣe àkọsílẹ̀, firánṣẹ́",
       "startSession": "Bẹ̀rẹ̀ ìgbà iṣẹ́",
       "selectRepositoryToStart": "Yan ibi ìpamọ́ kóòdù láti bẹ̀rẹ̀.",
+      "enterPromptToStart": "Fi ìtọ́sọ́nà kan sí láti bẹ̀rẹ̀.",
+      "enterPromptOrFileToStart": "Fi ìtọ́sọ́nà kan tàbí fàìlì sí láti bẹ̀rẹ̀.",
       "connectProviderToStart": "So olùpèsè kan pọ̀ láti bẹ̀rẹ̀.",
       "promptPlaceholder": "Kí ni o fẹ́ ṣiṣẹ́ lórí?",
       "couldNotLoadModels": "A kò lè gbé àwọn àwòṣe wọlé.",
@@ -2209,6 +2294,7 @@
       "prefillModelUnavailable": "{{model}} kò sí mọ́. Àwòṣe àiyípadà rẹ ni a ń lò.",
       "couldNotReadPendingSessions": "A kò lè ka àwọn ìgbà iṣẹ́ tó ń dúró. Gbìyànjú lẹ́ẹ̀kan sí i.",
       "failedToCreate": "A kò lè ṣẹ̀dá ìgbà iṣẹ́.",
+      "checkOrganizationAccess": "Jọ̀wọ́ ṣàyẹ̀wò àṣẹ ìwọlé rẹ sí àjọ yìí, kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
       "couldNotRefreshRepositories": "A kò lè tún àwọn ibi ìpamọ́ kóòdù gbé wọlé. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
       "discardDraftTitle": "Pa àkọ́kọ́ ìkọ̀wé rẹ́?",
       "discardDraftMessage": "Ọ̀rọ̀ ìtọ́ni rẹ yóò sọnù.",
@@ -2278,7 +2364,8 @@
       "linesBadge_other": "ìlà {{displayCount}}",
       "matchesBadge_one": "ìbámu {{displayCount}}",
       "matchesBadge_other": "ìbámu {{displayCount}}",
-      "noOutput": "Kò sí ìjáde."
+      "noOutput": "Kò sí ìjáde.",
+      "translationFailed": "Ìtumọ kùnà"
     },
     "readToolMarkdown": {
       "linesTruncated": "ìlà {{start}}–{{end}} (a gé kúrú)",
@@ -2411,7 +2498,71 @@
       "preparationComplete": "Ìmúrasílẹ̀ ti parí",
       "preparationFailed": "Ìmúrasílẹ̀ kùnà",
       "setupCommand": "Àṣẹ ìmúrasílẹ̀ {{index}}",
-      "setupCommandOf": "Àṣẹ ìmúrasílẹ̀ {{index}} nínú {{displayCount}}"
+      "setupCommandOf": "Àṣẹ ìmúrasílẹ̀ {{index}} nínú {{displayCount}}",
+      "stepWorkspaceSetup": "Ìṣètò ibi-iṣẹ́",
+      "stepDiskCheck": "Ìyèwọ́ dísíìkì",
+      "stepCloning": "Ń daakọ ilé-ipamọ́",
+      "stepBranch": "Ń ṣètò ẹ̀ka",
+      "stepDevcontainerSetup": "Ìṣètò apótì ìdàgbàsókè",
+      "stepWorkspaceRestore": "Ń dá ibi-iṣẹ́ padà",
+      "stepWorkspaceBackup": "Ń fi ibi-iṣẹ́ pamọ́",
+      "stepSandboxProvision": "Ń pèsè sandbox",
+      "stepSandboxBoot": "Ń bẹ̀rẹ̀ sandbox",
+      "stepSnapshotFallback": "Ń tún gbìyànjú láìsí àkópamọ́",
+      "stepKiloServer": "Ń bẹ̀rẹ̀ Kilo",
+      "stepKiloSession": "Ń ṣe ìmúrasílẹ̀ ìpàdé",
+      "stepRestoreIncomplete": "Ìdápadà ìpàdé kò pé",
+      "stepReady": "Àyíká iṣẹ́ ti ṣetán",
+      "stepFailed": "Ìṣètọ̀tọ̀ àyíká iṣẹ́ kùnà",
+      "stepUnknown": "Ìṣètọ̀tọ̀ àyíká iṣẹ́",
+      "detailCreatingSandbox": "Ń ṣẹ̀dá sandbox",
+      "detailUpdatingRepository": "Ń mú ilé-ipamọ́ lọ́wọ́ tuntun",
+      "detailCheckingOutBranch": "Ń yàn ẹ̀ka sílẹ̀",
+      "detailRunningSetupCommands": "Ń ṣiṣẹ́ àwọn àṣẹ ìmúrasílẹ̀",
+      "detailSavingRepository": "Ń fi ilé-ipamọ́ pamọ́ láti lè bẹ̀rẹ̀ kiákíá",
+      "detailStartingKiloRuntime": "Ń bẹ̀rẹ̀ àkókò ìṣiṣẹ́ Kilo",
+      "detailPreparingKiloSession": "Ń ṣe ìmúrasílẹ̀ ìpàdé Kilo",
+      "detailWaitingForPreviousSandbox": "Ń dúró kí sandbox tẹ́lẹ̀ ó da dúró",
+      "detailRetryingSandboxCreation": "Ń tún gbìyànjú ìṣẹ̀dá sandbox",
+      "detailPreviousSnapshotFailed": "Ìbẹ̀rẹ̀ àkópamọ́ tẹ́lẹ̀ kùnà. A ń tún gbìyànjú láìsí àkópamọ́.",
+      "detailSnapshotStartupFailed": "Ìbẹ̀rẹ̀ àkópamọ́ kùnà. A ń tún gbìyànjú láìsí àkópamọ́.",
+      "detailStartingSandboxWithoutSnapshot": "Ń bẹ̀rẹ̀ sandbox láìsí àkópamọ́",
+      "detailSettingUpWorkspace": "Ń ṣe ìṣètò ibi-iṣẹ́",
+      "detailRestoringSession": "Ń dá ìpàdé padà",
+      "detailWarmWorkspaceReused": "A tún lo ibi-iṣẹ́ tí ó gbóná",
+      "detailRetryingClone": "Ń tún gbìyànjú dídáakọ (ìgbà ìgbìyànjú {{attempt}} nínú {{total}})",
+      "detailSetupCommandFailed": "Àṣẹ ìmúrasílẹ̀ {{index}} kùnà",
+      "detailSetupCommandTimedOut": "Àṣẹ ìmúrasílẹ̀ {{index}} ti kọjá àkókò",
+      "detailColdRestore": "Ìdápadà tutu, a lo àkópamọ́, a dá {{applied}} nínú {{total}} fáìlì padà",
+      "detailProgressPercent": "{{percent}}% ti parí",
+      "detailRestoreIncompleteReport": "Ìdápadà ìpàdé kò pé: {{skipped}} nínú {{total}} fáìlì kò dá padà ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Ti sọnu: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} àti {{omitted}} míràn",
+      "detailReasonPatchFailed": "a kò lè fi àfikún náà s'óri",
+      "detailReasonOutsideWorkspace": "ìtọ́na náà wà ní ìta ibi-iṣẹ́",
+      "detailReasonMissingContent": "àkópamọ́ náà kò ní àkóónù fún fáìlì náà",
+      "detailReasonIndexResetFailed": "a kò lè tún àtẹ náà tò padà lẹ́yìn àfikún tí kò lọ",
+      "detailReasonUnlinkFailed": "a kò lè yọ fáìlì náà kúrò",
+      "detailReasonWriteFailed": "a kò lè kọ fáìlì náà",
+      "detailReasonUnknown": "ìdí àìmọ̀",
+      "detailUnknown": "A sì ń ṣe ìmúrasílẹ̀",
+      "errorPreparationTimeout": "Ìmúrasílẹ̀ àyíká iṣẹ́ ti kọjá àkókò",
+      "errorWorkspaceSetupFailed": "Ìṣètò ibi-iṣẹ́ kùnà",
+      "errorCredentialUpgradeRequired": "Ìpàdé yìí kò ní ìgbéga ẹ̀rí-ìdánimọ̀ tí ó ṣe pàtàkì. Bẹ̀rẹ̀ ìpàdé tuntun láti tẹ̀síwájú.",
+      "errorAgentUnavailable": "Agẹ́nti náà kò sí mọ́",
+      "errorBillingBlocked": "Ìsanwó sandbox ń béèrè kiredì àfikún",
+      "errorBillingUnavailable": "Ìsanwó sandbox tàbí ìfọwọ́sí agbára kò sí. Tún gbìyànjú lẹ́yìn bí ọ̀kán díẹ̀.",
+      "errorContainerLimitReached": "A ti dé ìlà-òpin iye apótì. Pa apótì kan tí ó wà tẹ́lẹ̀ dúró kí o tó bẹ̀rẹ̀ míràn.",
+      "errorInvalidConfiguration": "Ìṣètọ̀tọ̀ sandbox kò tọ́ tàbí a kò gbà á láàyè",
+      "errorRuntimeArtifactUnauthorized": "A kò fún ní àṣẹ láti gbà àkókò ìṣiṣẹ́ jáde",
+      "errorRuntimeArtifactInvalid": "Ìfọwọ́sí ohun èlò àkókò ìṣiṣẹ́ kùnà",
+      "errorRuntimeCliProbeFailed": "Ìfọwọ́sí CLI àkókò ìṣiṣẹ́ kùnà",
+      "errorRuntimeSupervisorMissing": "Olùṣàkóso àkókò ìṣiṣẹ́ kò sí",
+      "errorConnectionLost": "Ìbáṣepọ̀ sandbox sọnu",
+      "errorSandboxLost": "Sandbox náà sọnu",
+      "errorAgentRestarted": "Agẹ́nti ti tún bẹ̀rẹ̀",
+      "errorSandboxOutOfMemory": "Íranti sandbox ti tán",
+      "errorPreparationDidNotComplete": "Ìmúrasílẹ̀ kò parí"
     },
     "permissionCard": {
       "title": "A nílò ìyọ̀ǹda",
@@ -2423,7 +2574,10 @@
       "allowOnceAccessibility": "Gba láyè lẹ́ẹ̀kan",
       "alwaysAllow": "Gba láyè ní gbogbo ìgbà",
       "alwaysAllowAccessibility": "Gba láyè ní gbogbo ìgbà",
-      "retrying": "Ń gbìyànjú lẹ́ẹ̀kan sí i…"
+      "retrying": "Ń gbìyànjú lẹ́ẹ̀kan sí i…",
+      "retryDeny": "Gbìyànjú láti kọ̀ lẹ́ẹ̀kan sí i",
+      "retryAllowOnce": "Gbìyànjú láti gba láyè lẹ́ẹ̀kan sí i",
+      "retryAlwaysAllow": "Gbìyànjú láti gba láyè ní gbogbo ìgbà lẹ́ẹ̀kan sí i"
     },
     "questionCard": {
       "title": "Aṣojú nílò ìdáhùn",
@@ -2729,6 +2883,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Àwọn ìgbà ìwọlé rẹ tó ń ṣiṣẹ́ kò ní wà lárọ̀ọ́wọ́tó títí a ó fi gbé èyí wọlé.",
     "currentDeviceUnidentified": "A kò lè dá ẹ̀rọ lọ́wọ́lọ́wọ́ mọ̀.",
+    "kiloApp": "Ohun èlò Kilo",
     "noSessions": "Kò sí ìgbà ìwọlé tó ń ṣiṣẹ́",
     "noSessionsDescription": "Wọlé pẹ̀lú ohun èlò Kilo lórí ẹ̀rọ mìíràn, ẹ̀rọ náà yóò sì hàn níbí.",
     "onlyKiloAppSignIns": "Àwọn ìwọlé ohun èlò Kilo nìkan ló hàn níbí. Àwọn ìwọlé olóòtú kóòdù àti CLI kò sí nínú àkójọ yìí.",
@@ -2737,7 +2892,7 @@
     "webBrowser": "Aṣàwákiri ayélujára",
     "viewProfile": "Wo prófáìlì",
     "signOutThisDevice": "Jáde lórí ẹ̀rọ yìí",
-    "signOutThisSession": "Jáde kúrò nínú ìgbà ìwọlé yìí",
+    "signOutSessionLabel": "Jáde lórí {{device}}, wọlé {{signedIn}}",
     "sessionSignedOut": "A ti jáde kúrò nínú ìgbà ìwọlé náà.",
     "signOutThisDeviceTitle": "Jáde lórí ẹ̀rọ yìí?",
     "signOutThisSessionTitle": "Jáde kúrò nínú ìgbà ìwọlé yìí?",
@@ -2881,6 +3036,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Kí a tó bẹ̀rẹ̀",
+    "summaryTitle": "Àwọn ìfẹ́ràn pínpín dátà",
     "introDescription": "Kilo máa ń fi àwọn ìfiránṣẹ́ rẹ ránṣẹ́ sí àwọn olùpèsè AI láti ṣe ìdáhùn. Níbí ni o ti lè rí ohun tí a ń pín àti àwọn tí a ń pín in pẹ̀lú.",
     "required": "Dandan láti lo Kilo",
     "promptsTitle": "Àwọn ọ̀rọ̀ ìtọ́ni àti ìjíròrò rẹ",
@@ -2889,7 +3045,6 @@
     "accountDescription": "Ìdánimọ̀ àkọọ́lẹ̀ Kilo rẹ àti àwọn àlàyé àfikún ìbéèrè, tí a lò láti jẹ́rìí ẹni tí o jẹ́ àti láti wọ́n ìwọ̀n lílo rẹ.",
     "diagnosticsTitle": "Àyẹ̀wò ìṣòro ohun èlò",
     "diagnosticsDescription": "Àwọn ìròyìn ìdákú àti àṣìṣe, tí a ti yọ àkóónú ohun èlò kúrò nínú wọn, tí a lò láti mú kí ohun èlò ṣiṣẹ́ dáadáa.",
-    "optional": "Kì í ṣe dandan",
     "helpImprove": "Ṣèrànwọ́ láti mú Kilo dára sí i",
     "helpImproveDescription": "Pín ìṣirò lílo tí kò fi ìdánimọ̀ rẹ hàn àti orísun fífi ohun èlò sórí ẹ̀rọ. O lè yí èyí padà nígbàkigbà nínú Àwọn ètò.",
     "seeFullDetails": "Wo àlàyé kíkún",
@@ -2974,11 +3129,17 @@
     "boundary": {
       "backToProfile": "Padà sí prófáìlì",
       "loadErrorMessage": "Ṣàyẹ̀wò ìsopọ̀ rẹ kí o tún gbìyànjú.",
+      "chooseAccount": "Yan àkọọ́lẹ̀ kan",
       "loadErrorTitle": "A kò lè gbé àwọn àjọ rẹ wọlé.",
+      "membershipLostNotice": "O kò ní àṣẹ láti wọ àjọ yìí mọ́. A ti yí padà sí {{target}}.",
+      "noOrganization": "Kò sí àjọ",
+      "noOrganizationDescription": "Àkọọ́lẹ̀ yìí kì í ṣe apá kan àjọ. Ṣẹ̀dá tàbí dara pọ̀ mọ́ àjọ kan lórí wẹ́ẹ̀bù láti lo àwọn ẹ̀yà àjọ bíi ìpè àwọn ọmọ ẹgbẹ́ àti ìkìlọ̀ nípa ìyọkù tó kéré.",
+      "openWebOrganizations": "Ṣí àwọn àjọ lórí wẹ́ẹ̀bù",
       "organizationUnavailable": "Àjọ náà kò sí lárọ̀ọ́wọ́tó.",
-      "selectDescription": "Yan àjọ kan láti prófáìlì rẹ láti tẹ̀síwájú.",
+      "selectDescriptionWithOrganizations": "O jẹ́ ti àjọ kan tàbí jù bẹ́ẹ̀ lọ. Yan àkọọ́lẹ̀ tí ojú-ìwé yìí yẹ kí ó lò.",
       "selectOrganization": "Yan àjọ kan",
       "unavailableDescription": "Àjọ yìí kò sí mọ́. Yan ọ̀kan láti prófáìlì rẹ láti tẹ̀síwájú.",
+      "unavailableSessionsDescription": "Àjọ yìí kò sí mọ́. Àwọn sẹ́sín rẹ̀ kò lè jẹ́ gbígba wọlé.",
       "accessDeniedDescription": "O kò ní àṣẹ láti wọ àjọ yìí."
     },
     "creditActivity": {
@@ -3005,7 +3166,9 @@
       "permissionDenied": "O kò ní ìyọ̀ǹda láti pe àwọn ọmọ ẹgbẹ́.",
       "roleMember": "Ipò: Ọmọ ẹgbẹ́",
       "sendInvite": "Fi ìkésíni ránṣẹ́",
-      "title": "Pe ọmọ ẹgbẹ́"
+      "title": "Pe ọmọ ẹgbẹ́",
+      "alreadyInvited": "A ti pe wọ́n tẹ́lẹ̀ tàbí wọ́n ti jẹ́ ọmọ ẹgbẹ́ tẹ́lẹ̀.",
+      "sendError": "A kò lè fi ìkésíni ránṣẹ́."
     },
     "invoices": {
       "downloadA11y": "Ṣe ìgbàsílẹ̀ ìwé ìbéèrè owó {{number}}",
@@ -3030,7 +3193,11 @@
       "separateEmailsHint": "Lo àmì kọ́mà láti ya àwọn àdírẹ́sì ímeèlì sọ́tọ̀.",
       "thresholdLabel": "Kìlọ̀ tí owó bá dín ju (USD)",
       "title": "Ìkìlọ̀ owó tó kù díẹ̀",
-      "emailsError": "Tẹ ó kéré tán àdírẹ́sì ímeèlì tó péye kan. Lo àmì kọ́mà láti ya àwọn àdírẹ́sì sọ́tọ̀.",
+      "emailsInvalid": "Ọ̀kan tàbí ju bẹ́ẹ̀ lọ nínú àwọn àdírẹ́sì ímeèlì kò péye.",
+      "emailsRequired": "Tẹ ó kéré tán àdírẹ́sì ímeèlì tó péye kan.",
+      "saveEmailsError": "A kò gbà àwọn àdírẹ́sì ímeèlì míràn. Ṣàyẹ̀wọ̀ wọn kí o tún gbìyànjú.",
+      "saveError": "A kò lè fi ìkìlọ̀ owó tó kù díẹ̀ pamọ́.",
+      "thresholdPlaceholder": "Tẹ iye owó kan",
       "thresholdError": "Tẹ iye owó tó ju 0 lọ."
     },
     "memberLimit": {
@@ -3041,12 +3208,13 @@
       "removeLimit": "Yọ ààlà kúrò",
       "title": "Ààlà lílo ojoojúmọ́",
       "blankError": "Tẹ iye owó kan, tàbí tẹ Yọ ààlà kúrò ní ìsàlẹ̀.",
+      "blankWithoutLimitError": "Tẹ ààlà ojoojúmọ́ tó wà láàárín 0 àti {{max}}.",
       "rangeError": "Tẹ iye owó tó wà láàárín 0 àti {{max}}."
     },
     "members": {
       "changeRole": "Yí ipò padà",
       "emptyDescriptionCanInvite": "Pe àwọn ẹlẹgbẹ́ láti bẹ̀rẹ̀ sí í ṣiṣẹ́ pọ̀ nínú àjọ yìí.",
-      "emptyDescriptionCannotInvite": "Béèrè lọ́wọ́ ẹni tó ni àjọ tàbí olùṣàkóso ìsanwó láti pe àwọn ẹlẹgbẹ́.",
+      "emptyDescriptionCannotInvite": "Béèrè lọ́wọ́ ẹni tó ni àjọ, alákòóso, tàbí olùṣàkóso ìsanwó láti pe àwọn ẹlẹgbẹ́.",
       "emptyTitle": "Kò tíì sí ọmọ ẹgbẹ́",
       "invitedDate": "A pè é {{date}}",
       "limitPerDay": "{{amount}}/ọjọ",
@@ -3069,7 +3237,8 @@
       "inviteCreated": "A ti ṣẹ̀dá ìkésíni",
       "pendingInvitations": "Àwọn ìkésíni tó ń dúró",
       "resendInvite": "Tún ìkésíni fi ránṣẹ́",
-      "shareInviteLink": "Pín ọ̀nà àsopọ̀ ìkésíni"
+      "shareInviteLink": "Pín ọ̀nà àsopọ̀ ìkésíni",
+      "resendInviteError": "A kò lè tún ìkésíni fi ránṣẹ́."
     },
     "usageStats": {
       "inputTokens": "Àwọn ìpín ọ̀rọ̀ ìgbéwọlé",
@@ -3217,7 +3386,8 @@
     "noneChosen": "Kò sí tí a yan",
     "emptyTitle": "Kò sí àwòṣe ìyípadà ohùn sí ọ̀rọ̀",
     "emptyDescription": "Kilo Gateway kò pèsè àwòṣe ìyípadà ohùn sí ọ̀rọ̀ ní báyìí.",
-    "loadFailed": "A kò lè gbé àwòṣe ìyípadà ohùn sí ọ̀rọ̀ wọlé."
+    "loadFailed": "A kò lè gbé àwòṣe ìyípadà ohùn sí ọ̀rọ̀ wọlé.",
+    "choose": "Yan àwòṣe"
   },
   "voiceLanguage": {
     "title": "Èdè títẹ ọ̀rọ̀ pẹ̀lú ohùn",
@@ -3310,9 +3480,15 @@
       "settingsToolsOn": "Tàn — a fi àwọn irinṣẹ́ ètò ránṣẹ́ sí àwòṣe",
       "settingsToolsOff": "Pa — a kò fi irinṣẹ́ ètò kankan ránṣẹ́ sí àwòṣe",
       "serverChecking": "Ń ṣàyẹ̀wò sáfà yìí…",
-      "serverToolCount": "irinṣẹ́ {{count}}",
+      "serverToolCount_one": "irinṣẹ́ {{count}}",
+      "serverToolCount_other": "irinṣẹ́ {{count}}",
       "serverUnreachable": "A kò lè dé sáfà yìí",
-      "serverOff": "Sáfà yìí ti pa"
+      "serverOff": "Sáfà yìí ti pa",
+      "app": {
+        "label": "Ẹ̀rọ ìjápọ̀",
+        "failed": "A kò le gbé ẹ̀rọ ìjápọ̀ yìí sókè.",
+        "empty": "Ẹ̀rọ ìjápọ̀ yìí kò ní nnkan láti fihàn."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Ìjẹ́rìísí",
@@ -3426,6 +3602,7 @@
       "fromHuggingFace": "Láti Hugging Face",
       "loading": "Ń gbé àwọn awoṣe wọlé",
       "noResults": "A kò rí awoṣe kankan",
+      "noResultsForQuery": "Kò sí àwọn awoṣe tí a rí fún \"{{query}}\"",
       "noFits": "Kò sí awoṣe tí ó bá ẹ̀rọ yìí mu",
       "noFitsDescription": "Àwọn awoṣe tí ó tóbi jù wà lórí táàbù $t(common.all).",
       "fit": {
@@ -3456,7 +3633,7 @@
       "quantizations": "Àwọn ìdínkù ìwọ̀n",
       "quantizationsHelp": "Àwọn fáìlì kékeré ń lo ìrántí àti àyè ìpamọ́ díẹ̀. Àwọn fáìlì ńlá sábà máa ń fún ni ní ìdáhùn tí ó dára jù.",
       "quantDetail": "Ìgbàsílẹ̀ {{size}} · nǹkan bí {{memory}} ìrántí",
-      "downloadQuant": "Gbà {{quant}} sílẹ̀",
+      "detailsA11y": "Àwọn àlàyé: {{name}}",
       "loadingModel": "Ń gbé àlàyé awoṣe wọlé",
       "couldNotLoadModel": "Kò ṣeé ṣe láti gbé awoṣe yìí wọlé",
       "noFiles": "Kò sí fáìlì tí áàpù yìí lè ṣiṣẹ́",
@@ -3468,6 +3645,9 @@
     "localModels": {
       "title": "Àwọn awoṣe lórí ẹ̀rọ",
       "help": "Àwọn awoṣe lórí ẹ̀rọ ń ṣiṣẹ́ lórí fóònù yìí. Àwọn ìbéèrè àti èsì rẹ máa wà lórí ẹ̀rọ náà.",
+      "switchTitle": "Yí sí awoṣe lórí ẹ̀rọ?",
+      "switchMessage": "Yíyí sí {{name}} yóò jẹ́ kí a ṣe ìṣàkóso àwọn ìtọ́nisọ́nà àti àlàyé àyíká ìjíròrò yìí lórí fóònù yìí, kì í ṣe lórí sáfà tó wà ní ọ̀nà jíjìn.",
+      "switchConfirm": "Yí awoṣe padà",
       "systemPurpose": "Awoṣe tí a kọ́ sínú ètò ẹ̀rọ yìí. Ó ń ṣiṣẹ́ lórí ẹ̀rọ náà.",
       "apple": "Apple Intelligence (lórí ẹ̀rọ)",
       "checking": "A ń ṣàyẹ̀wò bóyá ó wà…",
@@ -3497,14 +3677,19 @@
     },
     "reasoningEffort": {
       "modelFlag": "Awoṣe yìí ṣe àtìlẹ́yìn fún ìwọ̀n ìrònú"
-    }
+    },
+    "creditsRequired": "Kirẹ́dítì kò tó láti fi ìfiránṣẹ́ yìí ránṣẹ́, fi kirẹ́dítì kún un kí o sì gbìyànjú lẹ́ẹ̀kan sí i."
   },
   "settingsTools": {
     "confirmTitle": "Ìjẹ́rìí ìyípadà yìí?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "ibi ìpamọ́ kóòdù tí o ṣẹ̀ṣẹ̀ lò",
+      "confirmMessage": "Ibi ìpamọ́ kóòdù: {{repository}}. Ìtọ́rọ̀: {{prompt}}",
+      "confirmTitle": "Ṣé kí a bẹ̀rẹ̀ aṣojú yìí?",
       "promptRequired": "Bẹ̀rẹ̀ aṣojú nílò ìtọ́ni. Fi ìtọ́ni kún un kí o sì tún gbìyànjú.",
+      "repositoryRequired": "Bẹ̀rẹ̀ aṣojú nílò ibi ìpamọ́ kóòdù. Ṣí Kilo, yan ibi ìpamọ́ kóòdù kan, kí o sì tún gbìyànjú.",
       "repositoryUnknown": "Kilo kò dá {{repository}} mọ̀ gẹ́gẹ́ bí ibi ìpamọ́ kóòdù GitHub tàbí GitLab. Yan ibi ìpamọ́ kóòdù mìíràn nínú Kilo.",
       "repositoryUnsupported": "{{repository}} jẹ́ ibi ìpamọ́ kóòdù Bitbucket — Bẹ̀rẹ̀ aṣojú kò tíì lè lò ó. Yan ibi ìpamọ́ kóòdù mìíràn nínú Kilo."
     }
@@ -3532,7 +3717,9 @@
     "spend24h": "Ìnáwó ní wákàtí 24 sẹ́yìn",
     "multiplierError": "Tẹ ìlọ́po 1 tàbí jù bẹ́ẹ̀ lọ",
     "permissionDenied": "O kò ní ìyọ̀ǹda láti ṣàkóso àwọn ìkìlọ̀ ìnáwó.",
-    "pushOffByCategory": "Ti pa nínú Àwọn ìfitónilétí"
+    "pushOffByCategory": "Ti pa nínú Àwọn ìfitónilétí",
+    "multiplierMaxError": "Tẹ ìlọ́po {{max}} tàbí kéré jù bẹ́ẹ̀ lọ",
+    "thresholdMaxError": "Tẹ iye owó {{max}} tàbí kéré jù bẹ́ẹ̀ lọ."
   },
   "profiles": {
     "title": "Awọn profaili",
@@ -3542,13 +3729,17 @@
     "emptyDescription": "Ṣẹda profaili kan lati tun lo awọn oniyipada ayika, awọn pipaṣẹ iṣeto, ati awọn ọgbọn kọja awọn akoko.",
     "loadFailed": "Ko le kojọpọ awọn profaili",
     "counts": {
-      "vars": "{{count}} oniyipada",
+      "vars_one": "{{count}} oniyipada",
+      "vars_other": "{{count}} oniyipada",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} ogbon",
-      "commands": "{{count}} aṣẹ",
-      "varsShort": "{{count}}oni",
-      "skillsShort": "{{count}}ogb",
-      "commandsShort": "{{count}}a"
+      "skills_one": "{{count}} ogbon",
+      "skills_other": "{{count}} ogbon",
+      "commands_one": "{{count}} aṣẹ",
+      "commands_other": "{{count}} aṣẹ",
+      "setupCommands_one": "{{count}} aṣẹ iṣeto",
+      "setupCommands_other": "{{count}} aṣẹ iṣeto",
+      "agents_one": "{{count}} aṣoju",
+      "agents_other": "{{count}} aṣoju"
     },
     "nameLabel": "Orukọ profaili",
     "namePlaceholder": "f.eks. N ṣatunṣe aṣiṣe afẹyinti",
@@ -3564,7 +3755,6 @@
     "personalDefaultDescription": "Ti kojọpọ laifọwọyi nigbati ko si ibi ipamọ ti o ni profaili pinni.",
     "organizationDefaultDescription": "Ti kojọpọ aifọwọyi fun awọn ọmọ ẹgbẹ ti ko ni aiyipada ti ara ẹni.",
     "setAsDefault": "Ṣeto bi aiyipada",
-    "removeDefault": "Yọ kuro bi aiyipada",
     "saveFailed": "Ko le fi profaili pamọ",
     "deleteTitle": "Pa profaili rẹ",
     "deleteMessage": "Eyi yoo yọ profaili ati awọn eto rẹ kuro patapata. Eyi ko le ṣe atunṣe.",
@@ -3577,7 +3767,8 @@
     "keyTooLong": "Bọtini gbọdọ̀ jẹ́ 256 àmì tàbí kéré sí i",
     "keyDuplicate": "Bọtini yii ti wà tẹ́lẹ̀ nínú profaili",
     "valueLabel": "Iye",
-    "secretLabel": "Asiri",
+    "valueRequired": "Tẹ iye kan sii",
+    "tooLong": "Lo {{max}} àmì tàbí kéré sí i",
     "secrets": {
       "markSecret": "Samisi bi asiri",
       "masked": "Iye farasin",
@@ -3590,11 +3781,13 @@
     "commandsTitle": "Awọn aṣẹ iṣeto",
     "addCommand": "Fi aṣẹ kun",
     "commandLabel": "Òfin",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "fun apẹẹrẹ pnpm install",
     "commandsEmpty": "Ko si awọn pipaṣẹ iṣeto sibẹsibẹ",
     "commandsSaveFailed": "Ko le fi awọn pipaṣẹ iṣeto pamọ",
     "moveUp": "Gbe soke",
     "moveDown": "Yi lọ si isalẹ",
+    "moveCommandUp": "Gbe òfin {{position}} sókè",
+    "moveCommandDown": "Gbe òfin {{position}} sílẹ̀",
     "skillsTitle": "Awọn ogbon",
     "addSkill": "Fi ogbon kun",
     "skillNameLabel": "Orukọ ogbon",
@@ -3604,6 +3797,8 @@
     "skillNameInvalid": "Orukọ ogbon gbọdọ bẹrẹ pẹlu lẹta tabi nọmba ati lo awọn lẹta kekere nikan, awọn nọmba, ati dashes",
     "skillContentRequired": "Akoonu ogbon ni a nilo",
     "skillSaveFailed": "Ko le fi ogbon pamọ",
+    "skillSourceCustom": "Ti ara rẹ",
+    "skillSourceMarketplace": "Ọjà",
     "skillsHint": "Lẹẹmọ SKILL.md ati orukọ rẹ kun; ṣafikun ọgbọn lati inu foonu rẹ laisi fa ati ju silẹ.",
     "skillEditTitle": "Olorijori Ṣatunkọ",
     "mcp": {
@@ -3619,12 +3814,12 @@
       "environment": "Ayika (JSON)",
       "headers": "Awọn akọle (JSON)",
       "timeout": "Duro na",
-      "secretCount": "Iye asiri",
+      "secretCount": "Iye asiri: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Tẹ orukọ olupin sii",
-      "nameInvalid": "Orukọ le lo awọn lẹta nikan, awọn nọmba, awọn abẹlẹ, ati dashes",
+      "nameInvalid": "Orukọ le lo awọn lẹta ASCII, awọn nọmba, awọn abẹlẹ, ati dashes nikan, titi di 100 àmì",
       "commandRequired": "Tẹ aṣẹ sii",
       "commandTooLong": "Lo kò ju 50 àríyànjiyàn lọ, ọ̀kọ̀ọ̀kan 500 àmì",
       "urlRequired": "Tẹ URL kan sii",
@@ -3634,7 +3829,9 @@
       "jsonTooLarge": "Lo kò ju 50 àkọsílẹ̀ lọ, bọtini tó 128 àti iye tó 4096 àmì",
       "timeoutInvalid": "Akoko ipari gbọdọ jẹ gbogbo nọmba ti milliseconds",
       "edit": "Ṣatunkọ olupin MCP",
-      "saveFailed": "Ko le fi olupin MCP pamọ"
+      "saveFailed": "Ko le fi olupin MCP pamọ",
+      "deleteFailed": "Ko le paarẹ olupin MCP",
+      "updateFailed": "Ko le ṣe imudojuiwọn olupin MCP"
     },
     "agents": {
       "title": "Awọn aṣoju profaili",
@@ -3650,21 +3847,25 @@
       "stepsPlaceholder": "fun apẹẹrẹ 50",
       "temperature": "Iwọn otutu",
       "temperaturePlaceholder": "fun apẹẹrẹ 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "fun apẹẹrẹ 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Aṣoju mi",
       "promptPlaceholder": "Iwọ jẹ ...",
       "tools": "Awọn irinṣẹ",
       "visibility": "Hihan",
-      "visibilityPrimary": "Alakoko - ti o han ni oluka",
+      "visibilityPrimary": "Alakoko — ti o han ni oluka",
       "visibilitySubagent": "Subagent — nikan callable lati elomiran",
-      "visibilityAll": "Gbogbo - mejeeji",
+      "visibilityAll": "Gbogbo — mejeeji",
+      "modePrimary": "Alakoko nikan",
+      "modeSubagent": "Subagent nikan",
+      "modeAll": "Gbogbo ipò",
       "saveFailed": "Ko le fipamọ aṣoju",
+      "deleteFailed": "Ko le paarẹ aṣoju",
       "nameRequired": "Tẹ orukọ aṣoju sii",
       "slugRequired": "Tẹ slug oluranlowo",
-      "slugInvalid": "Slug gbọdọ bẹrẹ pẹlu lẹta kan ko si lo awọn lẹta kekere nikan, awọn nọmba, ati dashes",
-      "slugConflict": "Slug yẹn wa ni ipamọ nipasẹ aṣoju ti a ṣe sinu",
+      "slugInvalid": "Slug gbọdọ bẹrẹ pẹlu lẹta ASCII kekere kan ki o si lo awọn lẹta ASCII kekere, awọn nọmba, ati dashes nikan, titi di 50 àmì",
+      "slugConflict": "Slug yẹn ti wa ni lilo pẹlu aṣojú ti a fi sori ẹrọ tabi aṣojú miiran ninu profaili yii",
       "edit": "Aṣoju Ṣatunkọ"
     },
     "slashCommands": {
@@ -3675,10 +3876,12 @@
       "description": "Apejuwe aṣẹ",
       "template": "Àdàkọ",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Ṣe alaye $ARGUMENTS",
       "subtask": "Ṣiṣe bi iṣẹ-ṣiṣe",
       "edit": "Ṣatunkọ pipaṣẹ idinku",
       "saveFailed": "Ko le fi aṣẹ pamọ",
+      "deleteFailed": "Ko le paarẹ aṣẹ",
       "nameRequired": "Tẹ orukọ aṣẹ sii",
       "nameInvalid": "Orukọ gbọdọ bẹrẹ pẹlu lẹta kekere ati lo awọn lẹta kekere nikan, awọn nọmba, ati dashes",
       "templateRequired": "Tẹ awoṣe aṣẹ sii",
@@ -3706,7 +3909,9 @@
       "pinFailed": "Ko le pin repo",
       "unboundToast": "A ti tú repo sílẹ̀",
       "unbindFailed": "Ko le yọkuro repo"
-    }
+    },
+    "variablesDeleteFailed": "Ko le paarẹ oniyipada",
+    "deleteCommand": "Pa òfin {{position}} rẹ́"
   },
   "credits": {
     "title": "Ra kírẹ́dítì",
@@ -3717,6 +3922,8 @@
     "empty": "Àwọn àpò kírẹ́dítì kò sí ní báyìí.",
     "noMatchingProducts": "App Store kò dá àwọn àpò kírẹ́dítì tó báramu padà.",
     "noMatchingProductsPlay": "Google Play kò dá àwọn àpò kírẹ́dítì tó báramu padà.",
+    "storeTimedOut": "App Store kò dáhùn ní àkókò tó yẹ. Tún gbìyànjú.",
+    "storeTimedOutPlay": "Google Play kò dáhùn ní àkókò tó yẹ. Tún gbìyànjú.",
     "purchaseOwnedByAnotherAccount": "Kírẹ́dítì lórí Apple Account yìí jẹ́ ti àkọọ́lẹ̀ Kilo mìíràn. Wọlé sí àkọọ́lẹ̀ Kilo yẹn láti lò ó.",
     "purchaseOwnedByAnotherAccountPlay": "Kírẹ́dítì lori Google Play àkọọ́lẹ̀ yii jẹ ti Kilo àkọọ́lẹ̀ miiran. Wọle si Kilo àkọọ́lẹ̀ yẹn lati lo o."
   },
@@ -3740,7 +3947,8 @@
       "archive": "Fi pamọ́",
       "unarchive": "Yọ kúrò nínú ìpamọ́",
       "deleteTitle": "Parẹ́ {{name}}?",
-      "deleteMessage": "A ó parẹ́ àwọn iṣẹ́ rẹ̀ pẹ̀lú. Àwọn ìgbà iṣẹ́ wọn yóò wà."
+      "deleteMessage": "A ó parẹ́ àwọn iṣẹ́ rẹ̀ pẹ̀lú. Àwọn ìgbà iṣẹ́ wọn yóò wà.",
+      "createFailed": "A kò lè ṣẹ̀dá àkójọ náà"
     },
     "listSettings": {
       "title": "Àwọn ètò àkójọ",
@@ -3808,24 +4016,24 @@
     }
   },
   "agentBriefing": {
-    "title": "Àkópọ̀ òwúrọ̀",
+    "title": "Àkópọ̀ aṣojú",
     "atLeast": "≥{{value}}",
     "coverageHint": "Àwọn ìṣe àtẹ̀yìnwá kan lè sọnù. ≥ túmọ̀ sí ó kéré tán iye yìí; àìmọ̀ kì í ṣe òdo.",
     "available": "Àwọn àkópọ̀ tó wà",
     "history": "Ìtàn àkópọ̀",
-    "historyHint": "A máa ń tọ́jú àwọn ìròyìn fún ọjọ́ 30, títí kan àwọn tí a ti yọ kúrò.",
+    "historyHint": "A máa ń tọ́jú àwọn àkópọ̀ fún ọjọ́ 30, títí kan àwọn tí a ti yọ kúrò.",
     "settings": "Ètò àkópọ̀",
-    "empty": "Kò sí ìṣe ní òru",
-    "emptyHint": "Àwọn ìgbà kóòdù cloud àti CLI rẹ yóò hàn níbí lẹ́yìn òru tí iṣẹ́ wà.",
+    "empty": "Kò sí ìṣe nínú àkókò àkópọ̀ yìí",
+    "emptyHint": "Àwọn ìgbà kóòdù cloud àti CLI rẹ yóò hàn níbí nígbà tí àkópọ̀ tí a ṣètò bá ní ìṣe.",
     "loadError": "Kò ṣeé ṣe láti gbé àwọn àkópọ̀ wọlé",
-    "sessions": "Tó ṣiṣẹ́ ní òru",
+    "sessions": "Tó ṣiṣẹ́ nínú àkókò",
     "pullRequests": "Àwọn PRs tí a ṣí",
     "blockers": "Àwọn ìdènà tuntun",
-    "spend": "Ìnáwó òru",
+    "spend": "Ìnáwó nínú àkókò",
     "view": "Ka àkópọ̀",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Fi ipò lọ́wọ́lọ́wọ́ hàn",
+    "dismiss": "Kọ àkópọ̀ sílẹ̀",
     "offline": "Kò sí lórí ayélujára · àkópọ̀ tí a fipamọ́",
     "cached": "Ìròyìn tí a fipamọ́ · kò ṣeé sọ di tuntun",
     "revised": "A ti ṣàtúnṣe · {{revision}}",
@@ -3843,13 +4051,13 @@
     "sources": "Ẹ̀rí àti àwọn ohun èlò",
     "timezone": "Àgbègbè àkókò àkópọ̀",
     "deviceTimezone": "Lo àgbègbè àkókò ẹ̀rọ",
-    "timezoneHint": "Àgbègbè àkókò IANA, fún àpẹẹrẹ Europe/Berlin. Àyípadà ìṣètò yóò kan àwọn òru iwájú.",
-    "nightStart": "Òru bẹ̀rẹ̀",
-    "morningStart": "Òru parí / òwúrọ̀ bẹ̀rẹ̀",
-    "morningEnd": "Òwúrọ̀ parí",
-    "timeHint": "Káàdì Ilé yóò dá ipò lọ́wọ́lọ́wọ́ padà nígbà tí òwúrọ̀ bá parí, kódà láìsí ayélujára.",
-    "invalidSchedule": "Yan àgbègbè àkókò tó tọ́ àti àwọn àkókò òru àti òwúrọ̀ tí kò ṣófo, tí kò sì kọlu ara wọn.",
-    "notificationsHint": "Ìfitónilétí kan ṣoṣo lójoojúmọ́ òwúrọ̀ nígbà tí ìròyìn àkọ́kọ́ rẹ bá ṣetán. Kò sinmi lórí àkópọ̀ AI olówó.",
+    "timezoneHint": "Àgbègbè àkókò IANA, fún àpẹẹrẹ Europe/Berlin. Àyípadà ìṣètò yóò kan àwọn àkópọ̀ iwájú.",
+    "nightStart": "Àkókò àkópọ̀ bẹ̀rẹ̀",
+    "morningStart": "Àkópọ̀ ti ṣetán ní",
+    "morningEnd": "Àkópọ̀ wà títí dé",
+    "timeHint": "Káàdì Ilé yóò dá ipò lọ́wọ́lọ́wọ́ padà nígbà tí àkókò àkópọ̀ bá parí, kódà láìsí ayélujára.",
+    "invalidSchedule": "Yan àgbègbè àkókò tó tọ́ àti àkókò àkópọ̀ tí kò ṣófo.",
+    "notificationsHint": "Ìfitónilétí kan ṣoṣo fún àkópọ̀ tí a ṣètò. Kò sinmi lórí àkópọ̀ AI olówó.",
     "notificationPermission": "Mú ìfitónilétí ẹ̀rọ ṣiṣẹ́ nínú $t(common.notifications) láti gba àkópọ̀ rẹ.",
     "aiOptIn": "Àkópọ̀ AI olówó",
     "aiHint": "Àṣàyàn fún àyíká yìí nìkan. A ń fi àwọn àyọkà tí a yàn, tí a ti bò, àti òtítọ́ onílànà ránṣẹ́ sí àwòṣe rẹ ní èdè app rẹ. Owó ń wá láti inú ìyókù àyíká yìí.",
@@ -3866,9 +4074,39 @@
     "enable": "Mú àkópọ̀ olówó ṣiṣẹ́",
     "contextSettings": "Ètò AI · {{context}}",
     "allContexts": "Àwọn àkópọ̀ ti ara ẹni àti ti àjọ wà lọ́tọ̀ọ̀tọ̀.",
+    "create": "Ṣẹ̀dá àkópọ̀",
+    "oneOff": "Lórí ìbéèrè",
+    "createdAt": "A ṣẹ̀dá rẹ̀ {{time}}",
+    "chooseContext": "Yan àyíká kan",
+    "period": "Àkókò àkópọ̀",
+    "last24Hours": "Wákàtí 24 tó kọjá",
+    "last7Days": "Ọjọ́ 7 tó kọjá",
+    "customPeriod": "Àkókò àṣàyàn",
+    "periodStart": "Ìbẹ̀rẹ̀ àkókò",
+    "periodEnd": "Ìparí àkókò",
+    "periodHint": "Yan ọjọ́ tí kò ju 31 lọ. Àwọn àkọsílẹ̀ ìgbà tí ó kọjá lè má pé.",
+    "periodSessions": "Ó ṣiṣẹ́ láàárín àkókò náà",
+    "periodSpend": "Ìnáwó àkókò náà",
+    "invalidPeriod": "Yan ìbẹ̀rẹ̀ tí ó ṣáájú ìparí.",
+    "futurePeriod": "Àkókò náà kò lè parí ní ọjọ́ iwájú.",
+    "periodTooLong": "Yan àkókò ọjọ́ 31 tàbí díẹ̀ sí i.",
+    "invalidLocalTime": "Àkókò agbègbè yìí kò sí ní àgbègbè àkókò àkópọ̀. Yan àkókò mìíràn.",
+    "reviewBriefing": "Ṣàtúnyẹ̀wò àkópọ̀",
+    "reviewAgain": "Múra àtúnyẹ̀wò tuntun sílẹ̀",
+    "payer": "A ó gba owó láti {{context}}",
+    "emptyPeriod": "A kò rí ìgbòkègbodò kankan láàárín àkókò yìí. Kò ní sí àkópọ̀ AI tàbí ìsanwó.",
+    "emptyHistory": "Kò sí àkópọ̀ tí a fi pamọ́",
+    "historicalStateHint": "Ipò ìgbà iṣẹ́ fi ipò ní ìparí àkókò tí a yàn hàn, kì í ṣe ipò lọ́wọ́lọ́wọ́.",
+    "oneOffHint": "AI gba ẹ̀rí tí a yàn, tí a sì ti yọ ìsọfúnni àṣírí kúrò nínú rẹ̀, ní èdè ìṣàfilọ́lẹ̀ rẹ. Àkópọ̀ lórí ìbéèrè yìí kò yí àkópọ̀ tí a ṣètò rẹ tàbí àwọn àṣàyàn AI rẹ padà.",
+    "createOffline": "Sopọ̀ mọ́ ayélujára láti ṣàtúnyẹ̀wò tàbí ṣẹ̀dá àkópọ̀. A kì í fi àwọn ìbéèrè tí ó ní ìsanwó sí ìlà ìdádúró nígbà tí kò sí ìsopọ̀ ayélujára.",
+    "estimateInputTooLarge": "Ẹ̀rí láàárín àkókò yìí pọ̀ ju ohun tí àwòṣe tí a yàn lè lò lọ.",
+    "estimatePermissionUnavailable": "O kò ní àṣẹ láti lo owó tó ṣẹ́ kù nínú àyíká yìí.",
+    "createFailed": "Kò ṣeé ṣe láti ṣẹ̀dá àkópọ̀ yìí.",
+    "reviewFailed": "Kò ṣeé ṣe láti ṣàtúnyẹ̀wò àkópọ̀ yìí.",
     "estimatePricingUnavailable": "Owó tí a ń gbà fún àwòkọ̀ yìí kò hàn.",
     "estimateBalanceUnavailable": "Owó inú àkántì kò tó fún àkọọ́lẹ̀ tí ó ní owó.",
     "estimateModelNotAllowed": "A kò jẹ́ kí a lo àwòkọ̀ yìí níbí.",
-    "estimateSpendLimitTooLow": "Gbé ìdààbòbò inúl owó sókè kí a lè fi sí àkọọ́lẹ̀ yìí."
+    "estimateSpendLimitTooLow": "Gbé ìdààbòbò inúl owó sókè kí a lè fi sí àkọọ́lẹ̀ yìí.",
+    "saved": "A ti fi Ètò àkópọ̀ pamọ́."
   }
 }

@@ -42,8 +42,8 @@ describe('estimateSessionListHeaderActionsWidth', () => {
   it('counts the filter button and its gap only when the list can be filtered', () => {
     const withoutFilter = estimateSessionListHeaderActionsWidth({ ...english, showFilter: false });
     const withFilter = estimateSessionListHeaderActionsWidth(english);
-    // The 36dp button plus one 14dp `gap-4`.
-    expect(withFilter - withoutFilter).toBe(50);
+    // The 48dp button plus one 14dp `gap-4`.
+    expect(withFilter - withoutFilter).toBe(62);
   });
 
   it('drops the letterspacing the RTL display treatment drops, per label script', () => {

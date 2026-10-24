@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { useCloudAgentSettings } from '@/hooks/useCloudAgentSettings';
 import {
   useProfiles,
   useCombinedProfiles,
@@ -31,6 +32,19 @@ export function ProfilesManager({
   openToNewProfile,
   initialSelectedProfileId,
 }: ProfilesManagerProps) {
+  const permissionsQuery = useCloudAgentSettings({
+    organizationId,
+    enabled: !!organizationId,
+  });
+  const canCreateOrganizationProfile =
+    !!organizationId && permissionsQuery.data?.canManage === true && !permissionsQuery.error;
+  const organizationPermissionMessage = permissionsQuery.error
+    ? 'Could not check organization permissions.'
+    : permissionsQuery.data?.canManage === false
+      ? 'Only organization owners and admins can create organization profiles.'
+      : !canCreateOrganizationProfile
+        ? 'Checking organization permissions...'
+        : undefined;
   const combinedQuery = useCombinedProfiles({
     organizationId: organizationId ?? '',
     enabled: !!organizationId,
@@ -98,6 +112,10 @@ export function ProfilesManager({
   };
 
   const handleCreateProfile = async () => {
+    if (newProfileOwnerType === 'organization' && !canCreateOrganizationProfile) {
+      toast.error(organizationPermissionMessage);
+      return;
+    }
     if (!newProfileName.trim()) {
       toast.error('Profile name is required');
       return;
@@ -217,6 +235,8 @@ export function ProfilesManager({
         {isCreating ? (
           <NewProfilePane
             organizationId={organizationId}
+            canCreateOrganizationProfile={canCreateOrganizationProfile}
+            organizationPermissionMessage={organizationPermissionMessage}
             name={newProfileName}
             description={newProfileDescription}
             ownerType={newProfileOwnerType}
@@ -331,6 +351,8 @@ function ProfileListItem({
 
 type NewProfilePaneProps = {
   organizationId?: string;
+  canCreateOrganizationProfile: boolean;
+  organizationPermissionMessage?: string;
   name: string;
   description: string;
   ownerType: 'personal' | 'organization';
@@ -344,6 +366,8 @@ type NewProfilePaneProps = {
 
 function NewProfilePane({
   organizationId,
+  canCreateOrganizationProfile,
+  organizationPermissionMessage,
   name,
   description,
   ownerType,
@@ -354,6 +378,7 @@ function NewProfilePane({
   onCancel,
   isSaving,
 }: NewProfilePaneProps) {
+  const isCreationBlocked = ownerType === 'organization' && !canCreateOrganizationProfile;
   return (
     <div className="space-y-4 p-4">
       <h3 className="text-sm font-semibold">New Profile</h3>
@@ -372,19 +397,30 @@ function NewProfilePane({
                 key={value}
                 type="button"
                 className={cn(
-                  'flex flex-1 items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-xs transition-colors',
+                  'flex flex-1 items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50',
                   ownerType === value
                     ? 'border-primary bg-accent text-foreground font-medium'
                     : 'text-muted-foreground hover:bg-accent/50'
                 )}
                 onClick={() => onOwnerTypeChange(value)}
-                disabled={isSaving}
+                disabled={isSaving || (value === 'organization' && !canCreateOrganizationProfile)}
+                aria-pressed={ownerType === value}
+                aria-describedby={
+                  value === 'organization' && !canCreateOrganizationProfile
+                    ? 'organization-profile-permission'
+                    : undefined
+                }
               >
                 <Icon className="h-3.5 w-3.5" />
                 {label}
               </button>
             ))}
           </div>
+          {organizationPermissionMessage && (
+            <p id="organization-profile-permission" className="text-muted-foreground text-xs">
+              {organizationPermissionMessage}
+            </p>
+          )}
         </div>
       )}
 
@@ -413,7 +449,7 @@ function NewProfilePane({
         <Button variant="ghost" size="sm" onClick={onCancel} disabled={isSaving}>
           Cancel
         </Button>
-        <Button size="sm" onClick={onSave} disabled={isSaving || !name.trim()}>
+        <Button size="sm" onClick={onSave} disabled={isSaving || isCreationBlocked || !name.trim()}>
           {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create'}
         </Button>
       </div>

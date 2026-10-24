@@ -97,12 +97,10 @@ function fixture(
   } = {}
 ) {
   const { storage, values } = fakeStorage();
-  const request = vi.fn(
-    async (): Promise<ControlPlaneControlResult> => ({
-      ok: true,
-      result: { pty: pty('pty_new') },
-    })
-  );
+  const request = vi.fn(async (): Promise<ControlPlaneControlResult> => ({
+    ok: true,
+    result: { pty: pty('pty_new') },
+  }));
   const terminals = createControlPlaneTerminals({
     state: { storage } as unknown as DurableObjectState,
     sessionId: SESSION_ID,

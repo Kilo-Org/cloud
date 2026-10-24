@@ -82,6 +82,7 @@ const ownerId = 'oauth/installation-handler-db-owner';
 const otherOwnerId = 'oauth/installation-handler-db-other-owner';
 const ACCOUNT_ID = 98765;
 const ACCOUNT_LOGIN = 'handler-db-acme';
+const REQUESTER_ID = 4242;
 
 function createdPayload(installationId: string): InstallationCreatedPayload {
   return {
@@ -94,8 +95,8 @@ function createdPayload(installationId: string): InstallationCreatedPayload {
       events: [],
       created_at: '2026-09-15T00:00:00.000Z',
     },
-    requester: { id: 4242, login: 'requester' },
-    sender: { login: 'requester' },
+    requester: { id: REQUESTER_ID, login: 'requester' },
+    sender: { id: REQUESTER_ID, login: 'requester' },
   } as InstallationCreatedPayload;
 }
 
@@ -116,7 +117,10 @@ function verifiedConnectionData(installationId: string, kiloUserId: string) {
   };
 }
 
-async function insertPendingRequest(organizationId: string) {
+async function insertPendingRequest(
+  organizationId: string,
+  requesterAccountId: string | null = String(REQUESTER_ID)
+) {
   const inserted = await db
     .insert(platform_integrations)
     .values({
@@ -126,6 +130,7 @@ async function insertPendingRequest(organizationId: string) {
       github_app_type: 'standard',
       platform_account_id: String(ACCOUNT_ID),
       platform_account_login: ACCOUNT_LOGIN,
+      platform_requester_account_id: requesterAccountId,
       platform_installation_id: null,
       integration_status: 'pending',
       repository_access: 'all',
@@ -220,6 +225,40 @@ describe('handleInstallationCreated sharing-admission serialization', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]?.owned_by_organization_id).toBe(organizationB.id);
     await expect(canonicalSharingMode(installationId)).resolves.toBe('exclusive');
+  });
+
+  test('leaves pending requests pending when the delivery is not attributed to their recorded requester', async () => {
+    const otherRequester = await createTestOrganization('Handler DB Other Requester', ownerId, 0);
+    const noRequester = await createTestOrganization('Handler DB No Requester', otherOwnerId, 0);
+    const installationId = '474747';
+
+    // One request records a different GitHub identity than this delivery's
+    // requester; the other never captured an identity at all.
+    const recordedOther = await insertPendingRequest(otherRequester.id, '9999');
+    const unrecorded = await insertPendingRequest(noRequester.id, null);
+
+    const response = await handleInstallationCreated(createdPayload(installationId), 'standard');
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ message: 'Installation recorded' });
+
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.platform, 'github'),
+          eq(platform_integrations.platform_account_id, String(ACCOUNT_ID)),
+          eq(platform_integrations.integration_status, 'pending')
+        )
+      );
+    expect(rows.map(row => row.id).sort()).toEqual([recordedOther.id, unrecorded.id].sort());
+    for (const row of rows) {
+      expect(row).toMatchObject({
+        platform_installation_id: null,
+        github_installation_id: null,
+      });
+    }
+    await expect(boundAssociations(installationId)).resolves.toHaveLength(0);
   });
 
   test('a pending completion that wins the installation lock still forces the verified path through sharing admission', async () => {

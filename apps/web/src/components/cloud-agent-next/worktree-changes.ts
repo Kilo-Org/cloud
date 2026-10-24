@@ -10,6 +10,32 @@ export type WorktreeChangesViewMode = 'flat' | 'tree';
 
 export type WorktreeChangesFile = WorktreeChangesSnapshot['files'][number];
 
+type WorktreeChangesScope = {
+  cloudAgentSessionId: string;
+  organizationId?: string;
+  worktreeId?: string;
+};
+
+export function getWorktreeChangesQueryKey({
+  cloudAgentSessionId,
+  organizationId,
+  worktreeId,
+}: WorktreeChangesScope) {
+  return [
+    'worktree-changes',
+    organizationId ?? null,
+    worktreeId === undefined ? ['session', cloudAgentSessionId] : ['worktree', worktreeId],
+  ] as const;
+}
+
+export function getWorktreeFileQueryKey({
+  path,
+  expectedRevision,
+  ...scope
+}: WorktreeChangesScope & { path: string; expectedRevision: number }) {
+  return [...getWorktreeChangesQueryKey(scope), 'file', path, expectedRevision] as const;
+}
+
 export type WorktreeChangesTreeNode =
   | {
       kind: 'directory';

@@ -11,7 +11,7 @@ import {
   verifyAndConsumeMagicLinkToken,
 } from './magic-link-tokens';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { sql, eq, and } from 'drizzle-orm';
+import { sql, eq, and, isNull } from 'drizzle-orm';
 import { magic_link_tokens } from '@kilocode/db/schema';
 import { createHash } from 'crypto';
 
@@ -525,6 +525,34 @@ describe('Magic Link Tokens', () => {
     });
 
     describe('challenge-keyed budget isolation', () => {
+      it('reserves and counts attempts in one locked transaction', async () => {
+        const { code, challengeId } = await createSignInCode(testEmail);
+        const wrongCode = code === '000000' ? '111111' : '000000';
+
+        const results = await Promise.all(
+          Array.from({ length: 20 }, () => reserveSignInCode(testEmail, wrongCode, challengeId))
+        );
+
+        const maxAttempts = 5;
+        const invalid = results.filter(r => r === 'invalid').length;
+        const tooMany = results.filter(r => r === 'too_many_attempts').length;
+        expect(invalid).toBe(maxAttempts);
+        expect(tooMany).toBe(20 - maxAttempts);
+        expect(results.every(r => r === 'invalid' || r === 'too_many_attempts')).toBe(true);
+
+        const [row] = await db
+          .select({ attempts: magic_link_tokens.attempts })
+          .from(magic_link_tokens)
+          .where(
+            and(
+              eq(magic_link_tokens.email, testEmail),
+              eq(magic_link_tokens.purpose, 'sign_in_code'),
+              isNull(magic_link_tokens.consumed_at)
+            )
+          );
+        expect(row?.attempts).toBe(maxAttempts);
+      });
+
       it('five wrong guesses against challenge A do not spend challenge B budget', async () => {
         const { code: codeA, challengeId: challengeA } = await createSignInCode(testEmail);
         const { code: codeB, challengeId: challengeB } =

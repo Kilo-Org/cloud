@@ -947,7 +947,12 @@ describe('listInbox', () => {
     destination: { branch: { name: 'main' }, repository: { full_name: fullName } },
   });
 
-  type InboxRow = { updated_on: string };
+  type InboxRow = {
+    id: number;
+    updated_on: string;
+    source: { repository: { full_name: string } };
+    destination: { repository: { full_name: string } };
+  };
   type InboxRequest = { slug: string; query: string | null; page: string | null };
 
   /** A provider timestamp in milliseconds, including sub-millisecond digits. */
@@ -962,24 +967,30 @@ describe('listInbox', () => {
    * with its rows at or below the requested boundary, newest first, one page.
    */
   const serveInbox = (rowsBySlug: Record<string, InboxRow[]>, requests: InboxRequest[]) => {
+    mockReadCachedRepositories.mockResolvedValue({
+      status: 'available',
+      repositories: Object.keys(rowsBySlug).map((slug, index) => ({
+        id: `87654321-4321-4321-4321-${String(index).padStart(12, '0')}`,
+        workspaceUuid: WORKSPACE.uuid,
+        name: slug,
+        fullName: `acme/${slug}`,
+        private: true,
+        defaultBranch: 'main',
+      })),
+      syncedAt: '2026-09-06T00:00:00.000Z',
+    });
     fetchMock.mockImplementation(async (url: string | URL) => {
       const full = url.toString();
       if (full.includes('token-service.example.com')) {
         return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
       }
       const parsed = new URL(full);
-      if (parsed.pathname === '/2.0/repositories/acme') {
-        return jsonResponse({
-          pagelen: 100,
-          values: Object.keys(rowsBySlug).map(slug => ({ slug })),
-          next: null,
-        });
-      }
       const match = parsed.pathname.match(/^\/2\.0\/repositories\/acme\/([^/]+)\/pullrequests$/);
       const rows = match ? rowsBySlug[match[1]] : undefined;
       if (!match || !rows) return jsonResponse({ pagelen: 50, values: [], next: null });
       const query = parsed.searchParams.get('q');
-      requests.push({ slug: match[1], query, page: parsed.searchParams.get('page') });
+      const page = Number(parsed.searchParams.get('page') ?? '1');
+      requests.push({ slug: match[1], query, page: String(page) });
       const boundary = query?.match(/^state="OPEN" AND updated_on <= (.+)$/);
       const boundaryMs = boundary ? inboxTime(boundary[1]) : null;
       const eligible = rows
@@ -987,12 +998,15 @@ describe('listInbox', () => {
         .sort((left, right) => inboxTime(right.updated_on) - inboxTime(left.updated_on));
       return jsonResponse({
         pagelen: 50,
-        values: eligible.slice(0, 50),
-        next: eligible.length > 50 ? 'https://api.bitbucket.org/2.0/next?page=2' : null,
+        values: eligible.slice((page - 1) * 50, page * 50).map(row => ({
+          ...row,
+          source: { repository: { full_name: `acme/${match[1]}` } },
+          destination: { repository: { full_name: `acme/${match[1]}` } },
+        })),
+        next: eligible.length > page * 50 ? 'https://api.bitbucket.org/2.0/next?page=2' : null,
       });
     });
   };
-
   const minutesFixture = (firstId: number, count: number) =>
     Array.from({ length: count }, (_, index) =>
       inboxPr(firstId + index, `2026-09-02T00:${String(index).padStart(2, '0')}:00+00:00`)
@@ -1005,13 +1019,6 @@ describe('listInbox', () => {
         return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
       }
       const parsed = new URL(full);
-      if (parsed.pathname === '/2.0/repositories/acme') {
-        return jsonResponse({
-          pagelen: 100,
-          values: [{ slug: 'repo' }, { slug: 'empty-repo' }],
-          next: null,
-        });
-      }
       if (parsed.pathname === '/2.0/repositories/acme/repo/pullrequests') {
         expect(parsed.searchParams.get('q')).toBe('state="OPEN"');
         // The provider listing is pinned to the inbox's own sort key, so the
@@ -1021,14 +1028,7 @@ describe('listInbox', () => {
           pagelen: 50,
           values: [
             inboxPr(12, '2026-09-02T00:00:00.000000+00:00'),
-            {
-              id: 13,
-              title: 'Foreign workspace PR',
-              state: 'OPEN',
-              draft: false,
-              updated_on: '2026-09-03T00:00:00.000000+00:00',
-              destination: { repository: { full_name: 'other-ws/other-repo' } },
-            },
+            inboxPr(15, '2026-09-04T00:00:00.000000+00:00', 'acme/decoy'),
             {
               id: 14,
               title: 'No repository identity',
@@ -1124,6 +1124,31 @@ describe('listInbox', () => {
       second.items.map(item => (item.ref && 'prId' in item.ref ? item.ref.prId : null))
     ).toEqual([301]);
     expect(second.nextCursor).toBeNull();
+  });
+
+  it('advances past a provider page of equal-timestamp rows', async () => {
+    const requests: InboxRequest[] = [];
+    const tiedAt = '2026-09-02T00:00:00.000000+00:00';
+    serveInbox(
+      { repo: Array.from({ length: 51 }, (_, index) => inboxPr(500 + index, tiedAt)) },
+      requests
+    );
+
+    const first = await listInbox(ORG_OWNER);
+    expect(first.items).toHaveLength(50);
+    expect(first.nextCursor).toBeTruthy();
+    expect(first.nextCursor!.length).toBeLessThanOrEqual(2048);
+
+    const second = await listInbox(ORG_OWNER, first.nextCursor!);
+    expect(second.items).toHaveLength(0);
+    expect(second.nextCursor).toBeTruthy();
+
+    const third = await listInbox(ORG_OWNER, second.nextCursor!);
+    expect(
+      third.items.map(item => (item.ref && 'prId' in item.ref ? item.ref.prId : null))
+    ).toEqual([550]);
+    expect(third.nextCursor).toBeNull();
+    expect(requests.map(request => request.page)).toEqual(['1', '1', '2']);
   });
 
   it('continues several repositories across pages', async () => {
@@ -1270,6 +1295,24 @@ describe('listInbox', () => {
     expect(requests).toHaveLength(1);
     expect(requests[0]).toMatchObject({ query: 'state="OPEN"' });
     expect(page.items).toHaveLength(50);
+  });
+
+  it('reports a provider permission refusal as a reconnect, never as the caller permission', async () => {
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      // The workspace repository listing is refused for the released token.
+      return jsonResponse({ error: { message: 'Forbidden' } }, 403);
+    });
+
+    const error = await captureRejection(listInbox(ORG_OWNER));
+
+    expect(error).toBeInstanceOf(BitbucketReviewError);
+    expect(error.kind).toBe('reconnect');
+    expect(error.retryable).toBe(false);
+    expect(error.message).toMatch(/reconnect/i);
   });
 });
 

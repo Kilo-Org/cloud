@@ -67,6 +67,17 @@ describe('internalDispatchSpendAlertRequestSchema', () => {
     ).toBe(false);
   });
 
+  it('rejects a scope and an organizationId that disagree', () => {
+    expect(
+      internalDispatchSpendAlertRequestSchema.safeParse({ ...personal, scope: 'organization' })
+        .success
+    ).toBe(false);
+    expect(
+      internalDispatchSpendAlertRequestSchema.safeParse({ ...personal, organizationId: 'org-1' })
+        .success
+    ).toBe(false);
+  });
+
   it('is accepted by the internal dispatch union', () => {
     expect(internalDispatchRequestSchema.safeParse(personal).success).toBe(true);
   });
@@ -120,6 +131,15 @@ describe('sendCloudAgentSessionNotificationInputSchema', () => {
       sendCloudAgentSessionNotificationInputSchema.safeParse({
         ...cloudAgentSessionBase,
         prUrl: 42,
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects an empty prUrl the notification could not open', () => {
+    expect(
+      sendCloudAgentSessionNotificationInputSchema.safeParse({
+        ...cloudAgentSessionBase,
+        prUrl: '',
       }).success
     ).toBe(false);
   });

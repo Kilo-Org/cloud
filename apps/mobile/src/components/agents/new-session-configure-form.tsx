@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- THE new-session body: one screen for every entry point, with a mutually-exclusive branch per target/state. */
 import { useState } from 'react';
-import { type LayoutChangeEvent, Pressable, ScrollView, View } from 'react-native';
+import { type LayoutChangeEvent, ScrollView, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -9,18 +9,16 @@ import { LaunchFolderField } from '@/components/agents/folder-selector';
 import { AdvancedConfigPanel } from '@/components/agents/advanced-config-panel';
 import { NewSessionCloudCreateError } from '@/components/agents/new-session-cloud-create-error';
 import { type NewSessionConfigureFormProps } from '@/components/agents/new-session-configure-form-props';
-import { renderProfileRowBody } from '@/components/agents/new-session-profile-row';
-import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
+import { NewSessionProfileRow } from '@/components/agents/new-session-environment-row';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
 import { NewSessionRunTarget } from '@/components/agents/new-session-run-target';
 import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
+import { NewSessionRemoteSpawnFailure } from '@/components/agents/new-session-remote-spawn-failure';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
-import { ChevronDown } from '@/components/ui/icons';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 import { keyboardInsetOffset } from '@/lib/keyboard-inset-offset';
 import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-insets';
@@ -53,6 +51,12 @@ type NewSessionProfileOverrideProps = {
   onManualCommandsChange: (next: string[]) => void;
   /** Opens the repo default-profile bindings screen from the advanced config. */
   onOpenRepoDefaults?: () => void;
+  /**
+   * The Organization section above Run on: the active account the create is
+   * attributed to. The body renders it for every entry point — switchable on
+   * the ordinary entry, a read-only scope row on the clone entry.
+   */
+  organizationSection?: React.ReactNode;
 };
 
 /**
@@ -94,6 +98,7 @@ export function NewSessionConfigureForm({
   isFetchingInstances,
   onRefreshInstances,
   onChangeRunOnInstance,
+  pendingComputer,
   showInstanceDisconnectedNote,
   folderPath,
   onChangeFolderPath,
@@ -121,14 +126,18 @@ export function NewSessionConfigureForm({
   onManualVarsChange,
   onManualCommandsChange,
   onOpenRepoDefaults,
+  organizationSection,
   autoCommit,
   onAutoCommitChange,
   isSpawningRemote,
   isStartDisabled,
   startBlockedReason = null,
+  startBlockedAction = null,
   onStartSession,
   cloudCreateError = null,
   onRetryCloudCreate,
+  remoteSpawnFailure = null,
+  onRetryRemoteSpawn,
 }: Readonly<NewSessionConfigureFormProps & NewSessionProfileOverrideProps>) {
   const { t } = useTranslation();
   const sideInsetStyle = useSideInsetStyle();
@@ -154,8 +163,20 @@ export function NewSessionConfigureForm({
   // `0` against that padding-free wrapper, dropping the content container's
   // `pt-4` gap and overstating the room the frame leaves for the input.
   const [composerTop, setComposerTop] = useState(0);
-  const isRemote = runOnInstance !== null;
-  const isStarting = isRemote ? isSpawningRemote : isCreating;
+  // The Run on block's height, reported by the wrapper below and threaded to
+  // the prompt as `belowCardHeight`, which reserves the row inside the frame
+  // while the composer can still keep its floor. The block starts at the
+  // Organization section (when the entry point renders one) and sits directly
+  // under the card, and its height does not depend on the card, so the frame
+  // fit converges without a second layout pass. Zero until it lays out, which
+  // owes nothing below the card; the corrected pass lands in the same commit
+  // chain.
+  const [runTargetHeight, setRunTargetHeight] = useState(0);
+  // The remote surface (launch folder, remote hint, no repository section)
+  // covers both a bound computer and the tour's computer target with none
+  // connected yet — the target is the computer either way.
+  const isRemote = runOnInstance !== null || pendingComputer === true;
+  const isStarting = runOnInstance !== null ? isSpawningRemote : isCreating;
   const runOnNote =
     runOnInlineNote ??
     (showInstanceDisconnectedNote ? remoteSpawnInstanceDisconnectedNote() : null);
@@ -208,21 +229,35 @@ export function NewSessionConfigureForm({
           initialPrompt={initialPrompt}
           frameHeight={frameHeight}
           cardTop={composerTop}
+          belowCardHeight={runTargetHeight}
           onStartSession={isStartDisabled ? undefined : onStartSession}
           isCloneEntry={isCloneEntry}
         />
       </View>
 
-      <NewSessionRunTarget
-        showRunOnSelector={showRunOnSelector}
-        runOnInstance={runOnInstance}
-        instanceList={instanceList}
-        isLoadingInstances={isLoadingInstances}
-        isFetchingInstances={isFetchingInstances}
-        onChangeRunOnInstance={onChangeRunOnInstance}
-        onRefreshInstances={onRefreshInstances}
-        disabled={isStarting}
-      />
+      {/* The block under the card the frame must still show: the Organization
+          section when the entry point renders one, then the Run on row and its
+          refresh control. Each child's own `mt-*` lives inside this wrapper, so
+          the prompt's frame fit reserves the block's whole footprint. */}
+      <View
+        onLayout={event => {
+          const next = Math.max(Math.round(event.nativeEvent.layout.height), 0);
+          setRunTargetHeight(current => (current === next ? current : next));
+        }}
+      >
+        {organizationSection}
+        <NewSessionRunTarget
+          showRunOnSelector={showRunOnSelector}
+          runOnInstance={runOnInstance}
+          instanceList={instanceList}
+          isLoadingInstances={isLoadingInstances}
+          isFetchingInstances={isFetchingInstances}
+          onChangeRunOnInstance={onChangeRunOnInstance}
+          onRefreshInstances={onRefreshInstances}
+          pendingComputer={pendingComputer}
+          disabled={isStarting}
+        />
+      </View>
 
       {isRemote ? (
         <LaunchFolderField
@@ -233,9 +268,11 @@ export function NewSessionConfigureForm({
         />
       ) : null}
 
-      <Text className="mt-2 text-xs text-muted-foreground">
-        {stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))}
-      </Text>
+      {isRemote ? (
+        <Text className="mt-2 text-xs text-muted-foreground">
+          {stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))}
+        </Text>
+      ) : null}
 
       {runOnNote ? <Text className="mt-2 text-sm text-muted-foreground">{runOnNote}</Text> : null}
 
@@ -325,12 +362,21 @@ export function NewSessionConfigureForm({
         />
       ) : null}
 
+      {isRemote && remoteSpawnFailure !== null ? (
+        <NewSessionRemoteSpawnFailure
+          failure={remoteSpawnFailure}
+          onRetry={onRetryRemoteSpawn}
+          isRetryDisabled={isStartDisabled}
+        />
+      ) : null}
+
       <NewSessionStartButton
         isCloneEntry={isCloneEntry}
         isRemote={isRemote}
         isStartDisabled={isStartDisabled}
         isStarting={isStarting}
         startBlockedReason={startBlockedReason}
+        startBlockedAction={startBlockedAction}
         onStartSession={onStartSession}
       />
     </View>
@@ -348,78 +394,5 @@ export function NewSessionConfigureForm({
       {body}
       {footer}
     </KeyboardAvoidingView>
-  );
-}
-
-type NewSessionProfileRowProps = {
-  profile: EffectiveAgentProfile | null;
-  isProfileLoading: boolean;
-  isProfileError: boolean;
-  /** The picked override no longer resolves to a profile. */
-  overrideNeedsAttention: boolean;
-  onRetryProfile: () => void;
-  /** Opens the profile picker sheet. */
-  onOpenProfilePicker: () => void;
-};
-
-/**
- * The new-session Environment row: a tappable summary of the effective profile.
- * Loading and failure keep the shared body's reserved lines, so the rows below
- * never move when the query settles and no default flashes before it does.
- * The settled row is the entry point that opens the profile picker.
- *
- * It lives with this screen rather than in `new-session-profile-row` because
- * the chevron reaches the app's icon barrel, which the mounted
- * suite that renders the read-only row cannot load.
- */
-export function NewSessionProfileRow({
-  profile,
-  isProfileLoading,
-  isProfileError,
-  overrideNeedsAttention,
-  onRetryProfile,
-  onOpenProfilePicker,
-}: Readonly<NewSessionProfileRowProps>) {
-  const { t } = useTranslation();
-  const colors = useThemeColors();
-
-  return (
-    <View className="mt-5">
-      <Text className="mb-2 text-sm font-medium text-muted-foreground">
-        {t('agentChat.newSession.environment')}
-      </Text>
-      {isProfileLoading || isProfileError ? (
-        renderProfileRowBody({ t, profile, isProfileLoading, isProfileError, onRetryProfile })
-      ) : (
-        <Pressable
-          className="min-h-11 flex-row items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2.5 active:opacity-70"
-          onPress={onOpenProfilePicker}
-          accessibilityRole="button"
-          accessibilityLabel={t('agentChat.newSession.pickProfile')}
-        >
-          <View className="min-w-0 flex-1 gap-1">
-            {overrideNeedsAttention ? (
-              <Text className="text-sm text-warn">
-                {t('agentChat.newSession.configNeedsAttention')}
-              </Text>
-            ) : null}
-            <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
-              {profile?.name ?? t('agentChat.newSession.defaultEnvironment')}
-            </Text>
-            {profile ? (
-              <Text className="text-sm text-muted-foreground" numberOfLines={1}>
-                {t('agentChat.newSession.environmentSummary', {
-                  commands: profile.commandCount,
-                  mcp: profile.mcpServerCount,
-                  skills: profile.skillCount,
-                  agents: profile.agentCount,
-                })}
-              </Text>
-            ) : null}
-          </View>
-          <ChevronDown size={18} color={colors.mutedForeground} />
-        </Pressable>
-      )}
-    </View>
   );
 }

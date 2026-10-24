@@ -437,13 +437,14 @@ describe('NotificationChannelDO.dispatchPush', () => {
     expect(dbState.deleteCalls).toBe(1);
   });
 
-  it('terminalizes mixed accepted and retryable ticket errors to avoid resending accepted tokens', async () => {
-    installDbMock({
+  it('records accepted ticket history despite mixed errors and replay', async () => {
+    const state: DbState = {
       tokens: [
         { user_id: 'user-partial-ticket-error', token: 'tok-accepted' },
         { user_id: 'user-partial-ticket-error', token: 'tok-rate-limited' },
       ],
-    });
+    };
+    installDbMock(state);
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
     vi.mocked(sendPushNotifications).mockResolvedValueOnce({
       ticketTokenPairs: [{ ticketId: 'ticket-accepted', token: 'tok-accepted' }],
@@ -465,6 +466,12 @@ describe('NotificationChannelDO.dispatchPush', () => {
 
     const first = await stub.dispatchPush(input);
     const second = await stub.dispatchPush(input);
+    expect(state.historyInserts).toHaveLength(1);
+    expect(state.historyInserts?.[0]).toMatchObject({
+      user_id: 'user-partial-ticket-error',
+      push_type: 'chat.message',
+      idempotency_key: 'k-partial-ticket-error',
+    });
 
     expect(first).toEqual({
       kind: 'failed',

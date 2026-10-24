@@ -406,9 +406,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
       // answers `duplicate` and would never write the row again, so a crash
       // between the two would lose that push from history for good. The insert
       // is idempotent on the dispatch key, so writing it first cannot double it.
-      if (result.ticketErrors.length === 0) {
-        await recordNotificationHistory(db, input);
-      }
+      await recordNotificationHistory(db, input);
 
       // Persist acceptance before side effects that can fail independently. A
       // replay then repairs bookkeeping rather than sending another OS push.

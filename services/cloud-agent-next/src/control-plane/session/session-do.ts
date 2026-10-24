@@ -2102,9 +2102,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   /**
-   * C1c security: closes this session's stream sockets when its owner leaves an
-   * organization (legacy `closeOrgStreams`). Reads the org from the same
-   * persisted session metadata and only closes on a match.
+   * C1c: closes the browser sockets of this session — the event stream and the
+   * browser side of each bridged terminal — and returns how many it closed.
+   * Reads the organization from the same persisted session metadata and only
+   * closes on a match.
    */
   async closeOrgStreams(organizationId: string): Promise<number> {
     await this.initialized;
@@ -2115,6 +2116,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       socket.close(1000, 'session access revoked');
       closed++;
     }
+    closed += this.terminals.closeBrowserSockets(1000, 'session access revoked');
     return closed;
   }
 

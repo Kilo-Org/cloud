@@ -1,5 +1,5 @@
 {
-  "id": "cd112d30-f76c-494c-b69f-4eda1fe382fe",
+  "id": "ff5b8190-a865-47ea-9c73-8120c8d9963a",
   "prevId": "c4c9111e-08c7-4dc3-9b6c-d9859f50241b",
   "version": "7",
   "dialect": "postgresql",
@@ -5518,22 +5518,6 @@
           "method": "btree",
           "with": {}
         },
-        "idx_cloud_agent_code_reviews_started_at_effective": {
-          "name": "idx_cloud_agent_code_reviews_started_at_effective",
-          "columns": [
-            {
-              "expression": "COALESCE(\"started_at\", \"updated_at\", \"created_at\")",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"cloud_agent_code_reviews\".\"status\" NOT IN ('pending', 'queued') AND COALESCE(\"cloud_agent_code_reviews\".\"terminal_reason\", '') <> 'abandoned'",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
         "idx_cloud_agent_code_reviews_terminal_missing_completed_at": {
           "name": "idx_cloud_agent_code_reviews_terminal_missing_completed_at",
           "columns": [
@@ -10662,6 +10646,13 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "credits_window_granted_microdollars": {
+          "name": "credits_window_granted_microdollars",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         },
         "linked_kilo_user_id": {
           "name": "linked_kilo_user_id",

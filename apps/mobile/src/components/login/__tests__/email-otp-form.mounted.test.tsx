@@ -264,6 +264,26 @@ describe('EmailOtpForm controls', () => {
     expect(props.onVerify).toHaveBeenCalledWith('123456');
     expect(destination(mounted.root).props.children).toBe(initialDescription);
   });
+
+  it.each([
+    ['Arabic-Indic', '٢٤٦٨١٠'],
+    ['Thai', '๒๔๖๘๑๐'],
+    ['full-width', '２４６８１０'],
+  ])('verifies a code typed in %s digits', (_script, typed) => {
+    const { mounted, props } = mount();
+    const input = mounted.root.findByType('TextInput');
+    act(() => {
+      (input.props.onChangeText as (value: string) => void)(typed);
+    });
+
+    const verify = mounted.root.findByProps({ accessibilityLabel: 'Verify code' });
+    expect(verify.props.disabled).toBe(false);
+    act(() => {
+      (verify.props.onPress as () => void)();
+    });
+
+    expect(props.onVerify).toHaveBeenCalledWith('246810');
+  });
 });
 
 describe('EmailOtpForm action labels', () => {

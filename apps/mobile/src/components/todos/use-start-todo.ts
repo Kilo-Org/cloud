@@ -1,11 +1,12 @@
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner-native';
 
 import { appendNewSessionPrefill } from '@/components/agents/new-session-prefill';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
+import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { startAgent } from '@/lib/app-actions/start-agent';
 import { linkStartedTodoSession } from '@/lib/hooks/todo-session-link';
@@ -39,17 +40,17 @@ function todoNewSessionHref(todo: StartableTodo, list: StartDefaults): Href {
  * list's repository, so without one `startNow` falls back to the review.
  */
 export function useStartTodo() {
-  const router = useRouter();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const navigateToSession = useAgentSessionNavigator();
+  const { openNewSessionHref } = useNewSessionNavigator();
   const [startingTodoId, setStartingTodoId] = useState<string | null>(null);
 
   const review = useCallback(
     (todo: StartableTodo, list: StartDefaults) => {
-      router.push(todoNewSessionHref(todo, list));
+      openNewSessionHref(todoNewSessionHref(todo, list));
     },
-    [router]
+    [openNewSessionHref]
   );
 
   const startNow = useCallback(

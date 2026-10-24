@@ -3,7 +3,7 @@ import type * as ModelsModule from '@kilocode/web-shared/lib/ai-gateway/models';
 import type * as AutoModelModule from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import type * as AnthropicModule from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
 import type * as GoogleModule from '@kilocode/web-shared/lib/ai-gateway/providers/google';
-import type * as InceptionModule from '@kilocode/web-shared/lib/ai-gateway/providers/inception';
+import type * as DeepseekModule from '@kilocode/web-shared/lib/ai-gateway/providers/deepseek';
 import type * as QwenModule from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
 import type * as StepFunModule from '@kilocode/web-shared/lib/ai-gateway/providers/stepfun';
 import type * as CustomPricingModule from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
@@ -32,8 +32,8 @@ describe('client-safe model imports', () => {
       const google = jest.requireActual<typeof GoogleModule>(
         '@kilocode/web-shared/lib/ai-gateway/providers/google'
       );
-      const inception = jest.requireActual<typeof InceptionModule>(
-        '@kilocode/web-shared/lib/ai-gateway/providers/inception'
+      const deepseek = jest.requireActual<typeof DeepseekModule>(
+        '@kilocode/web-shared/lib/ai-gateway/providers/deepseek'
       );
       const qwen = jest.requireActual<typeof QwenModule>(
         '@kilocode/web-shared/lib/ai-gateway/providers/qwen'
@@ -44,8 +44,8 @@ describe('client-safe model imports', () => {
 
       expect(models.isPdfSupportingModel(anthropic.CLAUDE_OPUS_CURRENT_MODEL_ID)).toBe(true);
       expect(autoModel.AUTO_SMALL_TARGET_MODELS).toEqual({
-        paid: inception.MERCURY_3_ID,
-        free: inception.MERCURY_3_FREE_ID,
+        paid: deepseek.DEEPSEEK_V4_1_FLASH_ID,
+        free: deepseek.DEEPSEEK_V4_1_FLASH_FREE_ID,
       });
       expect(anthropic.isClaudeModel(anthropic.CLAUDE_OPUS_CURRENT_MODEL_ID)).toBe(true);
       expect(google.isGeminiModel(google.GEMINI_FLASH_CURRENT_MODEL_ID)).toBe(true);
@@ -59,7 +59,9 @@ describe('client-safe model imports', () => {
         '@kilocode/web-shared/lib/ai-gateway/model-utils'
       );
       expect(customPricing.getCustomPricing(google.GEMINI_FLASH_CURRENT_MODEL_ID)).toBeDefined();
-      expect(modelUtils.normalizeModelId(inception.MERCURY_3_FREE_ID)).toBe(inception.MERCURY_3_ID);
+      expect(modelUtils.normalizeModelId(deepseek.DEEPSEEK_V4_1_FLASH_FREE_ID)).toBe(
+        deepseek.DEEPSEEK_V4_1_FLASH_ID
+      );
     });
   });
 });

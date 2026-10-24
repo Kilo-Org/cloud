@@ -1716,10 +1716,10 @@ describe('rewriteModelResponse', () => {
   test('continues stripping cost for free models outside the Kilo organization', async () => {
     const result = await rewriteModelResponse({
       response: jsonResponse({
-        model: 'inception/mercury-3:free',
+        model: 'deepseek/deepseek-v4.1-flash:free',
         usage: { cost: 0, is_byok: false },
       }),
-      model: 'inception/mercury-3:free',
+      model: 'deepseek/deepseek-v4.1-flash:free',
       providerId: 'openrouter',
       kind: 'chat_completions',
       logging: makeLogging(),
@@ -1728,7 +1728,7 @@ describe('rewriteModelResponse', () => {
 
     expect(result).not.toBeNull();
     expect(await result?.json()).toEqual({
-      model: 'inception/mercury-3:free',
+      model: 'deepseek/deepseek-v4.1-flash:free',
       usage: {},
     });
   });

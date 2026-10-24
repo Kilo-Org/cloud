@@ -18,7 +18,7 @@ import {
   claude_opus_4_6_stealth_model,
 } from './kilo-exclusive-models';
 import {
-  mercury_3_free_model,
+  deepseek_v4_1_flash_free_model,
   glyph_cluster_stealth_free_model,
   reflection_beam_free_model,
 } from './kilo-exclusive-models';
@@ -307,7 +307,9 @@ describe('getKiloExclusiveInferenceProviders', () => {
     expect(getKiloExclusiveInferenceProviders('stepfun/step-5-preview-free')).toBeUndefined();
     expect(getKiloExclusiveInferenceProviders('openai/gpt-5.6-sol-discounted')).toBeUndefined();
     expect(getKiloExclusiveInferenceProviders('tencent/hy3:free')).toBeUndefined();
-    expect(getKiloExclusiveInferenceProviders(mercury_3_free_model.public_id)).toBeUndefined();
+    expect(
+      getKiloExclusiveInferenceProviders(deepseek_v4_1_flash_free_model.public_id)
+    ).toBeUndefined();
     expect(getKiloExclusiveInferenceProviders('deepseek/deepseek-v4-pro')).toBeUndefined();
     expect(getKiloExclusiveInferenceProviders('unknown/model')).toBeUndefined();
   });

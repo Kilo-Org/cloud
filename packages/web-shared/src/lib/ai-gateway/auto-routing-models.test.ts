@@ -110,8 +110,8 @@ describe('addAutoRoutingModels', () => {
 
   test('annotates the small auto model with its visible targets', async () => {
     const smallModel = makeModel('kilo-auto/small');
-    const paidModel = makeModel('inception/mercury-3');
-    const freeModel = makeModel('inception/mercury-3:free');
+    const paidModel = makeModel('deepseek/deepseek-v4.1-flash');
+    const freeModel = makeModel('deepseek/deepseek-v4.1-flash:free');
 
     const result = await addAutoRoutingModels([smallModel, paidModel, freeModel]);
 
@@ -119,7 +119,7 @@ describe('addAutoRoutingModels', () => {
       {
         ...smallModel,
         autoRouting: {
-          models: ['inception/mercury-3', 'inception/mercury-3:free'],
+          models: ['deepseek/deepseek-v4.1-flash', 'deepseek/deepseek-v4.1-flash:free'],
         },
       },
       paidModel,

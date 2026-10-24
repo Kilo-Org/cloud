@@ -60,7 +60,7 @@ import { rewriteModelResponse } from '@kilocode/web-shared/lib/ai-gateway/rewrit
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
-import { mercury_3_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { deepseek_v4_1_flash_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { getEffectiveModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
@@ -109,7 +109,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => ({
   >),
   isUnavailableModel: jest.fn(async (modelId: string) =>
     [
-      'google/gemma-4-26b-a4b-it:free',
+      'deepseek/deepseek-v4.1-flash:free',
       'google/gemma-4-31b-it:free',
       'thinkingmachines/inkling:free',
     ].includes(modelId)
@@ -1318,7 +1318,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
   });
 
   it.each([
-    'google/gemma-4-26b-a4b-it:free',
+    'deepseek/deepseek-v4.1-flash:free',
     'google/gemma-4-31b-it:free',
     'thinkingmachines/inkling:free',
   ])('rejects the unavailable model %s before upstream', async modelId => {
@@ -1334,7 +1334,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it.each([mercury_3_free_model.public_id, 'test/free-model:free', 'openrouter/free'])(
+  it.each([deepseek_v4_1_flash_free_model.public_id, 'test/free-model:free', 'openrouter/free'])(
     'applies free-model rate limiting per IP to anonymous callers of the free model %s',
     async modelId => {
       setAnonymousAuth();
@@ -1369,7 +1369,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(mercury_3_free_model.public_id), {
+      makeRequest(makeBody(deepseek_v4_1_flash_free_model.public_id), {
         authorization: `Bearer ${signedToken(KILO_GATEWAY_AUDIENCE)}`,
         ...headers,
       }) as never
@@ -1396,7 +1396,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(mercury_3_free_model.public_id)) as never
+      makeRequest(makeBody(deepseek_v4_1_flash_free_model.public_id)) as never
     );
 
     expect(response.status).toBe(429);
@@ -1422,7 +1422,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(mercury_3_free_model.public_id), {
+      makeRequest(makeBody(deepseek_v4_1_flash_free_model.public_id), {
         authorization: `Bearer ${token()}`,
       }) as never
     );
@@ -1439,7 +1439,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(mercury_3_free_model.public_id), {
+      makeRequest(makeBody(deepseek_v4_1_flash_free_model.public_id), {
         'x-forwarded-for': '104.16.0.1',
         'x-kilocode-feature': 'cloud-agent',
       }) as never

@@ -7,9 +7,9 @@ import {
   CLAUDE_OPUS_4_6_STEALTH_MODEL_ID,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
 import {
-  MERCURY_3_FREE_ID,
-  MERCURY_3_ID,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/inception';
+  DEEPSEEK_V4_1_FLASH_FREE_ID,
+  DEEPSEEK_V4_1_FLASH_ID,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/deepseek';
 import {
   isStealthModel,
   type KiloExclusiveModel,
@@ -101,16 +101,16 @@ export const claude_opus_4_6_stealth_model: KiloExclusiveModel = {
   inference_providers: ['stealth'],
 };
 
-export const mercury_3_free_model: KiloExclusiveModel = {
-  public_id: MERCURY_3_FREE_ID,
-  display_name: 'Inception: Mercury 3 (free)',
+export const deepseek_v4_1_flash_free_model: KiloExclusiveModel = {
+  public_id: DEEPSEEK_V4_1_FLASH_FREE_ID,
+  display_name: 'DeepSeek: DeepSeek V4.1 Flash (free)',
   description:
-    "Mercury 3 is Inception's most capable model for agentic workflows and real-time applications. It is one of the world's fastest models, powered by diffusion.",
+    'DeepSeek V4.1 Flash is a fast, low-cost Mixture-of-Experts model from DeepSeek with text and image input.',
   context_length: 262144,
   max_completion_tokens: 32768,
-  flags: ['vercel-routing'],
+  flags: ['vision', 'vercel-routing'],
   provider: OPENROUTER,
-  internal_id: MERCURY_3_ID,
+  internal_id: DEEPSEEK_V4_1_FLASH_ID,
   pricing: null,
   inference_providers: [],
 };
@@ -231,7 +231,7 @@ export function isKiloExclusiveModel(model: string): boolean {
 }
 
 export const kiloExclusiveModels = [
-  mercury_3_free_model,
+  deepseek_v4_1_flash_free_model,
   qwen36_plus_stealth_model,
   claude_opus_4_8_stealth_model,
   claude_opus_4_7_stealth_model,

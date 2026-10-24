@@ -648,7 +648,7 @@ describe('resolveAutoModel — kilo-auto/free branch', () => {
 });
 
 describe('resolveAutoModel — kilo-auto/small branch', () => {
-  it('routes users with balance to Mercury 3 with reasoning disabled', async () => {
+  it('routes users with balance to DeepSeek V4.1 Flash with reasoning disabled', async () => {
     const result = await resolveAutoModel(
       { ...baseParams, model: KILO_AUTO_SMALL_MODEL.id, apiKind: 'chat_completions' },
       nullUserPromise,
@@ -657,11 +657,11 @@ describe('resolveAutoModel — kilo-auto/small branch', () => {
 
     expect(result).toEqual({
       kind: 'ok',
-      resolved: { model: 'inception/mercury-3', reasoning: { enabled: false } },
+      resolved: { model: 'deepseek/deepseek-v4.1-flash', reasoning: { enabled: false } },
     });
   });
 
-  it('routes users without balance to free Mercury 3 with reasoning disabled', async () => {
+  it('routes users without balance to free DeepSeek V4.1 Flash with reasoning disabled', async () => {
     const result = await resolveAutoModel(
       { ...baseParams, model: KILO_AUTO_SMALL_MODEL.id, apiKind: 'chat_completions' },
       nullUserPromise,
@@ -670,7 +670,7 @@ describe('resolveAutoModel — kilo-auto/small branch', () => {
 
     expect(result).toEqual({
       kind: 'ok',
-      resolved: { model: 'inception/mercury-3:free', reasoning: { enabled: false } },
+      resolved: { model: 'deepseek/deepseek-v4.1-flash:free', reasoning: { enabled: false } },
     });
   });
 });

@@ -13,7 +13,7 @@ import {
 } from '@kilocode/web-shared/tests/helpers/openrouter-models.helper';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { qwen36_plus_stealth_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { mercury_3_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { deepseek_v4_1_flash_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   findKiloExclusiveModel,
   kiloExclusiveModels,
@@ -371,14 +371,16 @@ describe('auto models', () => {
     global.fetch = jest.fn(() =>
       Promise.resolve(
         createMockResponse({
-          jsonData: { data: [buildModel({ id: mercury_3_free_model.public_id })] },
+          jsonData: { data: [buildModel({ id: deepseek_v4_1_flash_free_model.public_id })] },
         })
       )
     ) as unknown as typeof fetch;
 
     const models = await getEnhancedOpenRouterModels();
 
-    expect(models.data.some(model => model.id === mercury_3_free_model.public_id)).toBe(false);
+    expect(models.data.some(model => model.id === deepseek_v4_1_flash_free_model.public_id)).toBe(
+      false
+    );
   });
 
   it('replaces an OpenRouter model that shares an exclusive public id', async () => {

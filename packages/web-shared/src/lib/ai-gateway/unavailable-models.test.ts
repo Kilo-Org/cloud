@@ -23,10 +23,9 @@ beforeAll(async () => {
 });
 
 describe('unavailable models', () => {
-  test('combines the stored list with the hardcoded free models', async () => {
+  test('combines the stored list with the hardcoded DeepSeek free model', async () => {
     expect([...(await getUnavailableModelIds())]).toEqual([
-      'inception/mercury-3:free',
-      'google/gemma-4-26b-a4b-it:free',
+      'deepseek/deepseek-v4.1-flash:free',
       'apodex/apodex-1.1-mini:free',
       'google/gemma-4-31b-it:free',
       'qwen/qwen3.8-27b:free',
@@ -37,10 +36,8 @@ describe('unavailable models', () => {
   test('keeps exact matching for request rejection', async () => {
     expect(await isUnavailableModel('apodex/apodex-1.1-mini:free')).toBe(true);
     expect(await isUnavailableModel('apodex/apodex-1.1-mini')).toBe(false);
-    expect(await isUnavailableModel('inception/mercury-3:free')).toBe(true);
-    expect(await isUnavailableModel('inception/mercury-3')).toBe(false);
-    expect(await isUnavailableModel('google/gemma-4-26b-a4b-it:free')).toBe(true);
-    expect(await isUnavailableModel('google/gemma-4-26b-a4b-it')).toBe(false);
+    expect(await isUnavailableModel('deepseek/deepseek-v4.1-flash:free')).toBe(true);
+    expect(await isUnavailableModel('deepseek/deepseek-v4.1-flash')).toBe(false);
     expect(await isUnavailableModel('google/gemma-4-31b-it:free')).toBe(true);
     expect(await isUnavailableModel('google/gemma-4-31b-it')).toBe(false);
     expect(await isUnavailableModel('qwen/qwen3.8-27b:free')).toBe(true);

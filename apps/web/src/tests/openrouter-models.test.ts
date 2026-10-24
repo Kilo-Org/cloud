@@ -87,7 +87,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => ({
   getUnavailableModelIds: jest.fn(
     async () =>
       new Set([
-        'google/gemma-4-26b-a4b-it:free',
+        'deepseek/deepseek-v4.1-flash:free',
         'google/gemma-4-31b-it:free',
         'thinkingmachines/inkling:free',
       ])
@@ -363,7 +363,7 @@ describe('GET /api/v1/models', () => {
         ...mockOpenRouterModels.data,
         { ...original, id: 'google/gemma-4-31b-it', name: 'Google: Gemma 4 31B IT' },
         ...[
-          'google/gemma-4-26b-a4b-it:free',
+          'deepseek/deepseek-v4.1-flash:free',
           'google/gemma-4-31b-it:free',
           'thinkingmachines/inkling:free',
         ].map(id => ({
@@ -384,7 +384,7 @@ describe('GET /api/v1/models', () => {
 
     expect(captureException).not.toHaveBeenCalled();
     expect(response.status).toBe(200);
-    expect(modelIds).not.toContain('google/gemma-4-26b-a4b-it:free');
+    expect(modelIds).not.toContain('deepseek/deepseek-v4.1-flash:free');
     expect(modelIds).not.toContain('google/gemma-4-31b-it:free');
     expect(modelIds).not.toContain('thinkingmachines/inkling:free');
     expect(modelIds).toContain('google/gemma-4-31b-it');

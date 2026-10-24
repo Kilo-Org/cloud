@@ -3,7 +3,7 @@ import { getAutoFreeCandidates } from './resolution';
 import { getOpenRouterModelsFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   findKiloExclusiveModel,
-  mercury_3_free_model,
+  deepseek_v4_1_flash_free_model,
   glyph_cluster_stealth_free_model,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
@@ -48,9 +48,9 @@ function configure(models: string[]) {
 
 function restrictGemmaToChatCompletions() {
   jest.mocked(findKiloExclusiveModel).mockImplementation(model =>
-    model === mercury_3_free_model.public_id
+    model === deepseek_v4_1_flash_free_model.public_id
       ? {
-          ...mercury_3_free_model,
+          ...deepseek_v4_1_flash_free_model,
           provider: { ...OPENROUTER, supportedChatApis: ['chat_completions'] },
         }
       : actualFindKiloExclusiveModel(model)
@@ -62,7 +62,7 @@ describe('getAutoFreeCandidates', () => {
     jest.mocked(findKiloExclusiveModel).mockImplementation(actualFindKiloExclusiveModel);
     jest.mocked(getOpenRouterModelsFromDatabase).mockResolvedValue(new Set(['test/present:free']));
     configure([
-      mercury_3_free_model.public_id,
+      deepseek_v4_1_flash_free_model.public_id,
       glyph_cluster_stealth_free_model.public_id,
       'test/present:free',
       'test/absent:free',
@@ -74,7 +74,7 @@ describe('getAutoFreeCandidates', () => {
     async apiKind => {
       expect(await getAutoFreeCandidates(apiKind)).toEqual(
         [
-          mercury_3_free_model.public_id,
+          deepseek_v4_1_flash_free_model.public_id,
           glyph_cluster_stealth_free_model.public_id,
           'test/present:free',
         ].toSorted()
@@ -93,7 +93,7 @@ describe('getAutoFreeCandidates', () => {
   it('does not filter provider capabilities when the API kind is null', async () => {
     restrictGemmaToChatCompletions();
 
-    expect(await getAutoFreeCandidates(null)).toContain(mercury_3_free_model.public_id);
+    expect(await getAutoFreeCandidates(null)).toContain(deepseek_v4_1_flash_free_model.public_id);
   });
 
   it('skips configured models that are not free or need a non-default AI SDK provider', async () => {

@@ -113,10 +113,10 @@ describe('mapModelIdToVercel', () => {
 
   describe('kilo-exclusive models', () => {
     it('maps an exclusive flagged with vercel-routing to its internal id', async () => {
-      // inception/mercury-3:free is registered in kiloExclusiveModels
-      // with the 'vercel-routing' flag and internal_id 'inception/mercury-3'.
-      await expect(mapModelIdToVercel('inception/mercury-3:free')).resolves.toBe(
-        'inception/mercury-3'
+      // deepseek/deepseek-v4.1-flash:free is registered in kiloExclusiveModels
+      // with the 'vercel-routing' flag and internal_id 'deepseek/deepseek-v4.1-flash'.
+      await expect(mapModelIdToVercel('deepseek/deepseek-v4.1-flash:free')).resolves.toBe(
+        'deepseek/deepseek-v4.1-flash'
       );
     });
 

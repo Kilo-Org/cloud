@@ -41,9 +41,18 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
-  FadeIn: { duration: vi.fn() },
+  FadeIn: { duration: (ms: number) => ({ fadeIn: ms }) },
   FadeOut: { duration: vi.fn() },
   LinearTransition: {},
+}));
+const motion = vi.hoisted(() => ({ reducedMotion: false }));
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({
+    reducedMotion: motion.reducedMotion,
+    scrollAnimated: !motion.reducedMotion,
+  }),
+  selectReducedMotionEntrance: <T,>(reducedMotion: boolean, entrance: T) =>
+    reducedMotion ? undefined : entrance,
 }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
@@ -155,6 +164,7 @@ beforeEach(() => {
   queryError.variants = [];
   queryError.retries = [];
   skeletonRenders.count = 0;
+  motion.reducedMotion = false;
 });
 
 afterEach(() => {
@@ -199,5 +209,35 @@ describe('BitbucketOverview config body', () => {
     await renderScreen();
 
     expect(queryError.variants).toEqual(['offline']);
+  });
+});
+
+describe('BitbucketOverview rows entrance', () => {
+  /** The animated container that holds every configuration row. */
+  function rowsContainer(renderer: TestRenderer.ReactTestRenderer) {
+    return renderer.root
+      .findAllByType('Animated.View')
+      .find(node => node.props.className === 'gap-6');
+  }
+
+  it('paints the rows without an entrance animation under reduced motion', async () => {
+    // An entrance that never runs leaves the container at its initial opacity,
+    // so the rows exist but paint nothing and the body stays empty until the
+    // screen remounts.
+    motion.reducedMotion = true;
+    config.data = makeConfig();
+
+    const renderer = await renderScreen();
+
+    expect(rowsContainer(renderer)?.props.entering).toBeUndefined();
+  });
+
+  it('keeps the crossfade entrance while motion is allowed', async () => {
+    motion.reducedMotion = false;
+    config.data = makeConfig();
+
+    const renderer = await renderScreen();
+
+    expect(rowsContainer(renderer)?.props.entering).toBeDefined();
   });
 });

@@ -20,6 +20,7 @@ import { Text } from '@/components/ui/text';
 import { PlatformOverviewSkeleton } from '@/components/code-reviewer/platform-overview-skeleton';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
+import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 import { useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
@@ -53,6 +54,7 @@ export function BitbucketOverview({
   const readiness = useBitbucketReadiness(scope);
   const save = useSaveReviewConfig(scope, 'bitbucket');
   const { models, isLoading: modelsLoading } = useReviewerModels(scope);
+  const { reducedMotion } = useMotionPolicy();
   // The body of the config read has exactly one surface: rows from cache, an
   // error with retry, or a loading state -- never the header over an empty
   // scroll area.
@@ -165,7 +167,10 @@ export function BitbucketOverview({
           {(isLoading || configBody.body.status === 'loading') && <PlatformOverviewSkeleton />}
 
           {!isLoading && data != null && rows != null && (
-            <Animated.View entering={FadeIn.duration(200)} className="gap-6">
+            <Animated.View
+              entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(200))}
+              className="gap-6"
+            >
               {readiness.data?.ready === false && (
                 <View className="items-center gap-2 rounded-lg bg-secondary p-4">
                   <Text className="text-center text-xs text-muted-foreground">

@@ -25,6 +25,7 @@ import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
+import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 import { useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import {
   classifyProviderState,
@@ -56,6 +57,7 @@ export function PlatformOverviewScreen({
   const canEdit = permission.status === 'ready' && permission.canEdit;
   const { hasWebhookSyncWarning } = useGitLabWebhookWarning(scope, platform);
   const { models, isLoading: modelsLoading } = useReviewerModels(scope);
+  const { reducedMotion } = useMotionPolicy();
   // The body of the config read has exactly one surface: rows from cache, an
   // error with retry, or a loading state. Bitbucket renders its own overview,
   // which owns its restart, so this screen must not run a second one.
@@ -209,7 +211,10 @@ export function PlatformOverviewScreen({
           {(isLoading || configBody.body.status === 'loading') && <PlatformOverviewSkeleton />}
 
           {!isLoading && data != null && rows != null && (
-            <Animated.View entering={FadeIn.duration(200)} className="gap-6">
+            <Animated.View
+              entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(200))}
+              className="gap-6"
+            >
               {platform === 'gitlab' && hasWebhookSyncWarning && (
                 <View className="flex-row items-center justify-between rounded-lg bg-warn-tile-bg p-4">
                   <View className="flex-1 pr-3">

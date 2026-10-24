@@ -14,6 +14,10 @@ import '@/i18n';
 import { ReviewMemoryScreen } from './review-memory-screen';
 import { collectAccessibilityLabels, collectText } from './review-memory-screen.test-helpers';
 
+vi.mock('@/components/code-reviewer/review-memory-proposal-sheet', () => ({
+  ReviewMemoryProposalSheet: 'ReviewMemoryProposalSheet',
+}));
+
 const summary = vi.hoisted(() => ({
   isPending: false,
   isError: false,

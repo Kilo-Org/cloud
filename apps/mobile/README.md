@@ -57,6 +57,22 @@ with checked state on Android. `ChoiceRow` and `radioItemA11y` use this mapping.
 Verify both the native role and state transitions in device accessibility trees;
 a rendered checkmark alone does not verify accessibility.
 
+## Review memory proposals
+
+Code Reviewer review-memory rows show the proposal status and open full proposal
+details. Personal owners and organization owners, admins, and billing managers can
+edit or dismiss open, edited, and failed proposals, or open a REVIEW.md pull request.
+Save edits before opening the pull request. Other members can inspect the same
+details without mutation controls.
+Dismissal asks for confirmation before removing a proposal from the active list.
+
+For local device verification, run
+`pnpm dev:seed app:mobile-review-memory kilo-<name>-<timestamp>@example.com`.
+The fixture requires a localhost database and `SKIP_STRIPE_API=true`, returns mobile
+deep links, and creates no provider integration. It covers editable, opened, failed,
+and member-only proposals; successful provider pull-request creation requires a
+separate integration fixture.
+
 ## PR merge sheet
 
 The merge sheet composes the form and provider-specific bodies. `usePrMergeDraft`

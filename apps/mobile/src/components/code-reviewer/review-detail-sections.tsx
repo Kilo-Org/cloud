@@ -5,6 +5,7 @@ import {
   councilDecisionLabel,
   councilVoteLabel,
   gateThresholdLabel,
+  severityLabelKey,
 } from '@/components/code-reviewer/review-detail-helpers';
 import { Text } from '@/components/ui/text';
 import { type useReviewDetail } from '@/lib/hooks/use-code-reviews';
@@ -40,6 +41,7 @@ export function MetaRow({
 }
 
 export function FindingCard({ finding }: Readonly<{ finding: CouncilFinding }>) {
+  const { t } = useTranslation();
   return (
     <View className="gap-1 rounded-lg bg-secondary p-3">
       <View className="flex-row items-center justify-between">
@@ -51,7 +53,7 @@ export function FindingCard({ finding }: Readonly<{ finding: CouncilFinding }>) 
               : 'text-muted-foreground'
           )}
         >
-          {finding.severity}
+          {t(severityLabelKey(finding.severity))}
         </Text>
         <Text variant="muted" className="text-xs">
           {finding.path}

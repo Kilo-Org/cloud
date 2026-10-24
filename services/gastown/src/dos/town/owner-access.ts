@@ -11,10 +11,12 @@ import type { GastownAccessVerdict } from '../../util/gastown-access-flag.util';
 
 export const OWNER_ACCESS_STORAGE_KEY = 'access:owner';
 export const OWNER_ACCESS_CHECK_INTERVAL_MS = 10 * 60_000;
+export const OWNER_ACCESS_FLAG_CACHE_TTL_MS = 7 * 24 * 60 * 60_000;
 
 export type OwnerAccessState = {
   revoked: boolean;
   checkedAt: number;
+  evaluatedAt?: number;
 };
 
 export type OwnerAccessDeps = {
@@ -34,13 +36,23 @@ export async function refreshOwnerAccess(deps: OwnerAccessDeps): Promise<boolean
   const previous = state?.revoked ?? false;
   if (state && now - state.checkedAt < OWNER_ACCESS_CHECK_INTERVAL_MS) return previous;
 
-  const ownerUserId = await deps.getOwnerUserId();
-  if (!ownerUserId) {
-    logger.warn('owner access: town has no owner user, leaving container starts unchanged');
+  const cached =
+    state?.evaluatedAt !== undefined && now - state.evaluatedAt < OWNER_ACCESS_FLAG_CACHE_TTL_MS;
+  let ownerUserId: string | undefined;
+  let verdict: GastownAccessVerdict = previous ? 'denied' : 'allowed';
+  if (!cached) {
+    ownerUserId = await deps.getOwnerUserId();
+    if (!ownerUserId) {
+      logger.warn('owner access: town has no owner user, leaving container starts unchanged');
+    }
+    verdict = ownerUserId ? await deps.evaluateAccess(ownerUserId) : 'unknown';
   }
-  const verdict = ownerUserId ? await deps.evaluateAccess(ownerUserId) : 'unknown';
   const revoked = verdict === 'unknown' ? previous : verdict === 'denied';
-  await deps.setState({ revoked, checkedAt: now });
+  await deps.setState({
+    revoked,
+    checkedAt: now,
+    evaluatedAt: cached || verdict === 'unknown' ? state?.evaluatedAt : now,
+  });
   if (verdict === 'unknown') return revoked;
 
   if (revoked !== previous) {

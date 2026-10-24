@@ -222,7 +222,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `POSTGRES_REPLICA_EU_URL`, `POSTGRES_REPLICA_EU_URL_2` - EU read replicas; `readDb` picks one at random in EU regions and falls back to the primary when neither is set. `[SECRET]`
 - `POSTGRES_SCRIPT_URL` - Alternate Postgres URL used by one-off scripts/backfills in `src/scripts/` and tests. `[SECRET]`
 - `POSTGRES_URL_PRODUCTION` - Production Postgres connection string override; used by `packages/db/src/database-url.ts`. `[SECRET]`
-- `POSTGRES_CONNECT_TIMEOUT` - Postgres connect timeout in ms (default/typical: 10000). [SERVER]
+- `POSTGRES_CONNECT_TIMEOUT` - Postgres connect timeout in ms (required; typical: 10000). [SERVER]
 - `POSTGRES_MAX_QUERY_TIME` - Max allowed query time in ms. [SERVER]
 - `USE_PRODUCTION_DB` - Forces use of the production DB URL in non-production contexts; used by `packages/db/src/database-url.ts`. [SERVER]
 - `DATABASE_CA` - CA certificate content (PEM) for TLS connections to Postgres; used by `packages/db/src/database-url.ts` in tests and scripts. [SERVER]
@@ -233,6 +233,18 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 ### Redis & Queue
 
 - `REDIS_URL` - Redis connection URL; used by `packages/web-shared/src/lib/redis.ts` and bot state. `[SECRET]`
+- `UPSTASH_REDIS_REST_URL` - Shared Redis REST endpoint, including Discord message admission. Locally provided by `redis-http`. [SERVER]
+- `UPSTASH_REDIS_REST_TOKEN` - Redis REST credential used by the shared client. `[SECRET]`
+
+Discord message admission requires the shared Redis REST service. Accepted message
+claims are scoped to the bot and message, expire after 15 minutes, and remain
+accepted through background processing completion or failure. The gateway uses
+eight forwarding slots, a 10-second request deadline, and primary-database
+ownership checks with bounded retries. Listener availability is retained while
+ownership reads recover. Capacity drops are counted in listener logs.
+Forwarding slots cover the HTTP request lifecycle; background bot execution has a
+separate lifecycle. HTTP recovery uses at most three attempts for temporary
+admission responses within the same slot and deadline.
 
 ### Encryption & Secrets
 
@@ -309,6 +321,10 @@ The connection-role migration preserves a sole eligible connection, prefers an u
   - Financial events enter the durable `bouncer_credit_event_outbox` before acknowledgment. The dispatcher sends `/api/v2/credit-event` with a 5-second transport budget.
   - Delivery retries use the same event ID and type. Eight failed attempts produce a visible terminal failure; terminal rows remain for 30 days.
   - Apple `originalTransactionId` identifies a subscription chain, not an Apple ID. Refund requests and declined requests use distinct event types.
+  - Checkout calls `/api/v1/charge-decide` with `stage: "checkout"` before Stripe creates or reuses a Checkout session or updates a subscription: personal Kilo Pass and the KiloClaw upsell, KiloClaw subscription checkout, top-up, organization Kilo Pass, seat checkout, a seat-count increase, and personal or organization auto-top-up setup and payment-method change. Off-session background auto top-up is not gated. The call has a 1,500 ms budget.
+  - Only an enforced charge verdict refuses the checkout: tRPC procedures return `FORBIDDEN` with "We could not start this payment. Contact support.", and the top-up route returns HTTP 403 with the same copy in `{ error }`. Flags are logged server-side and never returned to a client. A timeout, error, non-2xx (including an older Bouncer's 404), or unknown shape fails open and the checkout proceeds.
+  - After a declined charge commits to `bouncer_credit_event_outbox`, the webhook delivers that row immediately, then calls `charge-decide` with `stage: "failure"` and the charge id as `requestId`. An enforced verdict expires every open Checkout session of the declined charge's Stripe customer, in payment or subscription mode; a charge without a customer falls back to the open session behind its payment intent. A failed immediate delivery leaves the sessions alone and the cron drainer retries it. These steps are bounded and never fail the webhook; a redelivered second Stripe event for the same charge finds the row already delivered and changes nothing.
+  - Bouncer enforces no charge block until `enforcement.enabled` is on and a reason is listed in `enforcement.chargeBlockReasons`, which ships empty; user and IP exemptions still apply.
   - Deploy Bouncer v2 before this cloud change. Bouncer retains v1 for the current cloud deployment; the new outbox sends only v2.
 - `CRON_SECRET` - Shared secret for authenticated cron endpoints; used in `dev/discord-gateway-cron.ts` and `.env.test`. `[SECRET]`
 - `dispatch-invite-email-outbox` - Vercel cron path (`/api/cron/dispatch-invite-email-outbox`) that drains the organization invite-email outbox; reuses `CRON_SECRET` for auth. [SERVER]

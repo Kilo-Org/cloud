@@ -319,6 +319,7 @@ export function EditWebhookTriggerContent({
   }
 
   if (triggerData?.canEdit === false) {
+    const creatorRunLock = triggerData.canEditReason === 'creator_run';
     return (
       <>
         <div className="mb-6">
@@ -335,8 +336,9 @@ export function EditWebhookTriggerContent({
             <h1 className="text-3xl font-bold">{triggerId}</h1>
           </div>
           <p className="text-muted-foreground mt-2">
-            This trigger runs as its creator. Only the creator, an organization owner, or an admin
-            can edit it.
+            {creatorRunLock
+              ? 'This trigger runs as its creator. Only the creator, an organization owner, or an admin can edit it.'
+              : 'Your organization role does not allow editing webhook triggers.'}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Button variant="outline" size="sm" asChild>
@@ -352,7 +354,9 @@ export function EditWebhookTriggerContent({
           <CardHeader>
             <CardTitle className="text-lg">Trigger Details</CardTitle>
             <CardDescription>
-              Editing is restricted to the trigger creator, organization owners, and admins.
+              {creatorRunLock
+                ? 'Editing is restricted to the trigger creator, organization owners, and admins.'
+                : 'Ask an organization owner or admin if this trigger needs a change.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -514,7 +518,9 @@ export function EditWebhookTriggerContent({
           hasCapabilitiesError={hasCapabilitiesError}
           onRetryCapabilities={() => void refetchCapabilities()}
           onSubmit={handleSubmit}
-          onSaveAndInvoke={!isKiloclawChat && isScheduled ? handleSaveAndInvoke : undefined}
+          onSaveAndInvoke={
+            !isKiloclawChat && isScheduled && triggerData?.canRun ? handleSaveAndInvoke : undefined
+          }
           onCancel={handleCancel}
           onDelete={handleDelete}
           isLoading={isActionPending}

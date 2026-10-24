@@ -3,6 +3,7 @@ import { createTRPCRouter, baseProcedure } from '@kilocode/web-shared/lib/trpc/i
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { generateCloudAgentToken } from '@kilocode/web-shared/lib/tokens';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
@@ -32,6 +33,7 @@ import {
   triggerIdCreateSchema,
   MIN_CREATOR_WEBHOOK_SECRET_LENGTH,
   CREATOR_WEBHOOK_SECRET_LENGTH_MESSAGE,
+  type WebhookTriggerEditRestriction,
 } from '@/lib/webhook-trigger-validation';
 import {
   validateCronExpression,
@@ -594,11 +596,23 @@ export const webhookTriggersRouter = createTRPCRouter({
         (actorRole !== undefined &&
           TRIGGER_WRITE_ROLES.includes(actorRole) &&
           (!executionUserId || executionUserId === userId || canManageOrganization(actorRole)));
+      const canRun = !input.organizationId
+        ? !executionUserId || executionUserId === userId
+        : actorRole !== undefined &&
+          TRIGGER_WRITE_ROLES.includes(actorRole) &&
+          (!executionUserId || executionUserId === userId);
+      const canEditReason: WebhookTriggerEditRestriction = canEdit
+        ? null
+        : executionUserId && executionUserId !== userId
+          ? 'creator_run'
+          : 'role';
 
       return {
         ...workerResult.config,
         inboundUrl,
         canEdit,
+        canEditReason,
+        canRun,
       };
     }),
 
@@ -942,6 +956,17 @@ export const webhookTriggersRouter = createTRPCRouter({
         updated_at: new Date().toISOString(),
       })
       .where(eq(cloud_agent_webhook_triggers.id, dbTrigger.id));
+
+    if (input.organizationId && executionUserId && executionUserId !== userId) {
+      await createAuditLog({
+        action: 'organization.webhook_trigger.update',
+        actor_email: ctx.user.google_user_email,
+        actor_id: ctx.user.id,
+        actor_name: ctx.user.google_user_name,
+        message: `Updated organization webhook trigger "${input.triggerId}", which runs as another member`,
+        organization_id: input.organizationId,
+      });
+    }
 
     // Build inbound URL
     const inboundUrl = buildInboundUrl(

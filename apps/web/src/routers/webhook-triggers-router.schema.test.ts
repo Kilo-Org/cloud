@@ -497,43 +497,31 @@ describe('webhook trigger variant inputs', () => {
         'trigger-id',
         expect.objectContaining({ promptTemplate: 'Changed prompt' })
       );
+      expect(mockDbInsert).toHaveBeenCalledTimes(1);
     }
   );
 
-  it('rejects editing another members creator-run trigger for a billing manager', async () => {
-    mockEnsureOrganizationAccess.mockResolvedValue('billing_manager');
-    mockGetWorkerTrigger.mockResolvedValue({
-      found: true,
-      config: { ...triggerConfig, executionUserId: 'another-user' },
-    });
-    await expect(
-      createCaller({ user }).update({
-        triggerId: 'trigger-id',
-        organizationId: '00000000-0000-4000-8000-000000000001',
-        promptTemplate: 'Changed prompt',
-      })
-    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
-  });
-
   it.each([
-    ['member', false],
-    ['billing_manager', false],
-    ['admin', true],
-    ['owner', true],
+    ['member', 'another-user', false, 'creator_run', false],
+    ['billing_manager', 'another-user', false, 'creator_run', false],
+    ['admin', 'another-user', true, null, false],
+    ['owner', 'another-user', true, null, false],
+    ['member', user.id, true, null, true],
+    ['billing_manager', null, false, 'role', false],
   ] as const)(
-    'reports editability for a %s viewing another members creator-run trigger',
-    async (role, canEdit) => {
+    'reports edit and run permissions for a %s viewing a trigger that runs as %s',
+    async (role, executionUserId, canEdit, canEditReason, canRun) => {
       mockEnsureOrganizationAccess.mockResolvedValue(role);
       mockGetWorkerTrigger.mockResolvedValue({
         found: true,
-        config: { ...triggerConfig, executionUserId: 'another-user' },
+        config: { ...triggerConfig, executionUserId },
       });
       await expect(
         createCaller({ user }).get({
           triggerId: 'trigger-id',
           organizationId: '00000000-0000-4000-8000-000000000001',
         })
-      ).resolves.toMatchObject({ canEdit });
+      ).resolves.toMatchObject({ canEdit, canEditReason, canRun });
     }
   );
 
@@ -555,6 +543,7 @@ describe('webhook trigger variant inputs', () => {
       expect.objectContaining({ promptTemplate: 'Changed prompt' })
     );
     expect(mockUpdateWorkerTrigger.mock.calls[0][3]).not.toHaveProperty('executionUserId');
+    expect(mockDbInsert).not.toHaveBeenCalled();
   });
 
   it('fails closed when the worker execution identity cannot be read', async () => {

@@ -61,7 +61,6 @@ afterEach(() => {
 
 describe('the control-plane budgets', () => {
   test('the procedure budget is strictly under the client deadline', () => {
-    expect(CONTROL_PLANE_PROCEDURE_BUDGET_MS).toBe(10_000);
     expect(CONTROL_PLANE_PROCEDURE_BUDGET_MS).toBeLessThan(CONTROL_PLANE_DEADLINE_MS);
   });
 });

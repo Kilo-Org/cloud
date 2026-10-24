@@ -5,8 +5,12 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { createRuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization';
 import { prepareCloudAgentWorkflowUser } from '@/lib/auth/cloud-agent-workflow-user';
-import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
+import {
+  createCloudAgentNextClient,
+  createCloudAgentNextClientForModel,
+} from '@/lib/cloud-agent-next/cloud-agent-client';
 import type { PrepareSessionInput } from '@/lib/cloud-agent-next/cloud-agent-client';
+import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
 import type SpawnCloudAgentSession from './tools/spawn-cloud-agent-session';
 import { runBotAgent } from './agent-runner';
 
@@ -84,6 +88,11 @@ jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({}));
 jest.mock('@/lib/bot-users/bot-user-service', () => ({}));
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: jest.fn(),
+  createCloudAgentNextClientForModel: jest.fn(),
+  InsufficientCreditsError: class InsufficientCreditsError extends Error {},
+}));
+jest.mock('@/lib/cloud-agent-next/balance-check-eligibility', () => ({
+  computeCloudAgentNextBalanceCheckEligibility: jest.fn(),
 }));
 jest.mock('@/lib/web-config.server', () => ({ CALLBACK_TOKEN_SECRET: 'test-callback-secret' }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
@@ -129,7 +138,14 @@ beforeEach(() => {
   jest.clearAllMocks();
   membershipAvailable = true;
   jest.mocked(prepareCloudAgentWorkflowUser).mockResolvedValue(user);
+  jest.mocked(computeCloudAgentNextBalanceCheckEligibility).mockResolvedValue({
+    isFree: false,
+    hasUserByokAvailable: false,
+  });
   jest.mocked(createOpenAICompatible).mockReturnValue({ chatModel: jest.fn() } as never);
+  jest
+    .mocked(createCloudAgentNextClientForModel)
+    .mockImplementation(token => jest.mocked(createCloudAgentNextClient)(token) as never);
   jest.mocked(createCloudAgentNextClient).mockImplementation(token => {
     mockPrepare.mockImplementation(async (input: PrepareSessionInput) => {
       const runtime = await createRuntimeAuthorization({

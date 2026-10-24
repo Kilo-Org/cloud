@@ -10,7 +10,9 @@ export type GitHubThreadCoordinates = {
  * before one exists. An absent id is not a GitHub thread and parses to null,
  * which callers already treat as "no repository".
  */
-export function parseGitHubThreadId(threadId: string | null | undefined): GitHubThreadCoordinates | null {
+export function parseGitHubThreadId(
+  threadId: string | null | undefined
+): GitHubThreadCoordinates | null {
   if (!threadId?.startsWith('github:')) return null;
 
   const withoutPrefix = threadId.slice('github:'.length);

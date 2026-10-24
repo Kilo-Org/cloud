@@ -149,7 +149,6 @@ export function buildSessionLiveActivityContentState(
  */
 export function sessionCardStaleAtSeconds(
   content: Pick<SessionLiveActivityContentState, 'statusKind' | 'lastActivityAt'>,
-  nowSeconds: number,
   defaultStaleAtSeconds: number
 ): number {
   if (content.statusKind !== 'running') return defaultStaleAtSeconds;

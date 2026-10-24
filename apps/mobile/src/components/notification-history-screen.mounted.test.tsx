@@ -213,10 +213,7 @@ describe('NotificationHistoryScreen', () => {
   });
 
   it('filters the list by the tapped chip', async () => {
-    state.rows = [
-      row(),
-      row({ id: 'row-2', category: 'chatMessages', pushType: 'chat.message' }),
-    ];
+    state.rows = [row(), row({ id: 'row-2', category: 'chatMessages', pushType: 'chat.message' })];
     await mount();
     expect(byType('Cell')).toHaveLength(2);
 
@@ -260,8 +257,7 @@ describe('NotificationHistoryScreen', () => {
     const empty = byType('EmptyState')[0];
     expect(empty?.props).toMatchObject({
       title: 'No notifications yet',
-      description:
-        'Notifications this account receives appear here. They are kept for 90 days.',
+      description: 'Notifications this account receives appear here. They are kept for 90 days.',
     });
   });
 

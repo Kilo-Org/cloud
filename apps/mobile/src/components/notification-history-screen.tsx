@@ -297,11 +297,7 @@ export function NotificationHistoryScreen() {
               onEndReached={() => {
                 // Once the next page has failed, auto-loading re-fires on every
                 // content-size change, so recovery waits for the footer's tap.
-                if (
-                  query.hasNextPage &&
-                  !query.isFetchingNextPage &&
-                  !query.isFetchNextPageError
-                ) {
+                if (query.hasNextPage && !query.isFetchingNextPage && !query.isFetchNextPageError) {
                   void query.fetchNextPage();
                 }
               }}

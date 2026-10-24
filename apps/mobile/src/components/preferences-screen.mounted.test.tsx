@@ -110,10 +110,7 @@ describe('PreferencesScreen hub', () => {
     ['Translate tool summaries', '/(app)/(tabs)/(3_profile)/tool-summary-translation'],
     ['Account', '/(app)/(tabs)/(3_profile)/account'],
     ['Notifications', '/(app)/notifications'],
-    [
-      i18n.t('notifications.history.title'),
-      '/(app)/(tabs)/(3_profile)/notification-history',
-    ],
+    [i18n.t('notifications.history.title'), '/(app)/(tabs)/(3_profile)/notification-history'],
     [i18n.t('notifications.channel.spend'), '/(app)/(tabs)/(3_profile)/spend-alerts'],
   ])('pushes the %s subpage from its row', async (title, route) => {
     const renderer = await mountPreferences();

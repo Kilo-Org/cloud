@@ -67,10 +67,7 @@ describe('notificationHistoryTarget', () => {
       { type: 'cloud_agent_session', cliSessionId: 'ses_1', organizationId: 'org-2' },
       '/(app)/agent-chat/ses_1',
     ],
-    [
-      { type: 'agent_briefing', url: '/agent-briefing' },
-      '/(app)/agent-briefing',
-    ],
+    [{ type: 'agent_briefing', url: '/agent-briefing' }, '/(app)/agent-briefing'],
   ])('opens the push destination of a %o row without the push marker', (payload, href) => {
     expect(notificationHistoryTarget(payload)).toMatchObject({ href });
   });

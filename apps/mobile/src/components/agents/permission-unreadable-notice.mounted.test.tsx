@@ -51,8 +51,8 @@ describe('PermissionUnreadableNotice mounted', () => {
 
     const alerts = renderer.root.findAll(node => node.props.accessibilityRole === 'alert');
     expect(alerts).toHaveLength(1);
-    expect(
-      renderer.root.findAll(node => node.props.accessibilityRole === 'button')
-    ).toHaveLength(0);
+    expect(renderer.root.findAll(node => node.props.accessibilityRole === 'button')).toHaveLength(
+      0
+    );
   });
 });

@@ -240,6 +240,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               onSelect={option => {
                 urlRef.current = '';
                 setUrlError(null);
+                start.reset();
                 setPlatformChoice(option);
               }}
             />
@@ -269,6 +270,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
                 if (urlError) {
                   setUrlError(null);
                 }
+                start.reset();
               }}
             />
             {urlError ? <Text className="text-xs text-destructive">{urlError}</Text> : null}
@@ -286,6 +288,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               placeholderTextColor={colors.mutedForeground}
               onChangeText={value => {
                 instructionsRef.current = value;
+                start.reset();
               }}
             />
           </View>
@@ -302,6 +305,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
                 variant={effectiveModel.thinkingEffort ?? ''}
                 onSelect={(modelId, variant) => {
                   setModelChoice({ modelSlug: modelId, thinkingEffort: variant || null });
+                  start.reset();
                 }}
               />
             </View>

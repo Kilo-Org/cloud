@@ -3826,6 +3826,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Gatiwwan akka •••• agarsiifaman icciita isaanii kuufame qabu; isa jijjiiruuf gatii tokko bakka buusi. Yeroo sarara ajaja jijjiiramu, gatiin hundi barbaachisaadha",
+      "headersHint": "Gatiwwan akka •••• agarsiifaman icciita isaanii kuufame qabu; isa jijjiiruuf gatii tokko bakka buusi. Yeroo URL jijjiiramu, gatiin hundi barbaachisaadha",
       "nameRequired": "Maqaa sarvarii galchi",
       "nameInvalid": "Maqaan qubee ASCII, lakkoofsota, sarara jalaa fi daash qofa fayyadamuu danda'a, arfiilee 100 ykn isaa gadi",
       "commandRequired": "Ajaja galchi",

@@ -3826,6 +3826,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "•••• olarak gösterilen değerler kayıtlı gizliliklerini korur; döndürmek için bir değeri değiştirin. Komut satırını değiştirmek tüm değerlerin yeniden girilmesini gerektirir",
+      "headersHint": "•••• olarak gösterilen değerler kayıtlı gizliliklerini korur; döndürmek için bir değeri değiştirin. URL'yi değiştirmek tüm değerlerin yeniden girilmesini gerektirir",
       "nameRequired": "Bir sunucu adı girin",
       "nameInvalid": "Adda yalnızca ASCII harfleri, rakamlar, alt çizgi ve kısa çizgi kullanılabilir, en fazla 100 karakter",
       "commandRequired": "Bir komut girin",

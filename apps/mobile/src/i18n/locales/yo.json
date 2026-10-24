@@ -3826,6 +3826,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Awọn iye ti o han bi •••• tọju aṣiri ti a fi pamọ wọn; rọpo iye kan lati yi i pada. Yiyipada laini aṣẹ nilo gbogbo iye lẹẹkansi",
+      "headersHint": "Awọn iye ti o han bi •••• tọju aṣiri ti a fi pamọ wọn; rọpo iye kan lati yi i pada. Yiyipada URL nilo gbogbo iye lẹẹkansi",
       "nameRequired": "Tẹ orukọ olupin sii",
       "nameInvalid": "Orukọ le lo awọn lẹta ASCII, awọn nọmba, awọn abẹlẹ, ati dashes nikan, titi di 100 àmì",
       "commandRequired": "Tẹ aṣẹ sii",

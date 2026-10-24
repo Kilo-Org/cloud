@@ -3920,6 +3920,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Values shown as •••• keep their stored secret; replace a value to rotate it. Changing the command line requires every value again",
+      "headersHint": "Values shown as •••• keep their stored secret; replace a value to rotate it. Changing the URL requires every value again",
       "nameRequired": "Enter a server name",
       "nameInvalid": "Name can use only ASCII letters, numbers, underscores, and dashes, up to 100 characters",
       "commandRequired": "Enter a command",

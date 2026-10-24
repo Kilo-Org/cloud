@@ -3877,6 +3877,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Vrijednosti prikazane kao •••• zadržavaju svoju pohranjenu tajnu; zamijenite vrijednost da biste je rotirali. Promjena naredbenog retka ponovno zahtijeva svaku vrijednost",
+      "headersHint": "Vrijednosti prikazane kao •••• zadržavaju svoju pohranjenu tajnu; zamijenite vrijednost da biste je rotirali. Promjena URL-a ponovno zahtijeva svaku vrijednost",
       "nameRequired": "Unesite naziv poslužitelja",
       "nameInvalid": "Ime može sadržavati samo ASCII slova, brojeve, podvlake i crtice, najviše 100 znakova",
       "commandRequired": "Unesite naredbu",

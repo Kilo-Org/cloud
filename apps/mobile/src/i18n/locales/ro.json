@@ -3877,6 +3877,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Valorile afișate ca •••• își păstrează secretul stocat; înlocuiți o valoare pentru a o rota. Modificarea liniei de comandă necesită din nou toate valorile",
+      "headersHint": "Valorile afișate ca •••• își păstrează secretul stocat; înlocuiți o valoare pentru a o rota. Modificarea URL-ului necesită din nou toate valorile",
       "nameRequired": "Introduceți un nume de server",
       "nameInvalid": "Numele poate folosi numai litere ASCII, cifre, litere de subliniere și liniuțe, până la 100 de caractere",
       "commandRequired": "Introduceți o comandă",

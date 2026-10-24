@@ -3826,6 +3826,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Qiimayaasha lagu muujiyay •••• waxay sii hayaan sirta kaydsan; beddel qiime si aad u rogto. Beddelidda khadka taliska waxay u baahan tahay qiimayaasha oo dhan mar kale",
+      "headersHint": "Qiimayaasha lagu muujiyay •••• waxay sii hayaan sirta kaydsan; beddel qiime si aad u rogto. Beddelidda URL-ka waxay u baahan tahay qiimayaasha oo dhan mar kale",
       "nameRequired": "Geli magaca adeegaha",
       "nameInvalid": "Magaca wuxuu isticmaali karaa kaliya xarfo ASCII, lambaro, hoosta, iyo xariijimaha, ugu badnaan 100 xaraf",
       "commandRequired": "Gali amar",

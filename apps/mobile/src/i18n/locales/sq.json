@@ -3826,6 +3826,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Vlerat e shfaqura si •••• mbajnë sekretin e tyre të ruajtur; zëvendëso një vlerë për ta rrotulluar. Ndryshimi i linjës së komandës kërkon përsëri të gjitha vlerat",
+      "headersHint": "Vlerat e shfaqura si •••• mbajnë sekretin e tyre të ruajtur; zëvendëso një vlerë për ta rrotulluar. Ndryshimi i URL-së kërkon përsëri të gjitha vlerat",
       "nameRequired": "Futni një emër serveri",
       "nameInvalid": "Emri mund të përdorë vetëm shkronja ASCII, numra, nënvizime dhe viza, deri në 100 karaktere",
       "commandRequired": "Futni një komandë",

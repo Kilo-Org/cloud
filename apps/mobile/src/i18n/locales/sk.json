@@ -3928,6 +3928,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Hodnoty zobrazené ako •••• si zachovávajú uloženú tajnú hodnotu; nahradením hodnoty ju obnovíte. Pri zmene príkazového riadka je potrebné znova zadať všetky hodnoty",
+      "headersHint": "Hodnoty zobrazené ako •••• si zachovávajú uloženú tajnú hodnotu; nahradením hodnoty ju obnovíte. Pri zmene URL je potrebné znova zadať všetky hodnoty",
       "nameRequired": "Zadajte názov servera",
       "nameInvalid": "Názov môže používať iba písmená ASCII, čísla, podčiarkovníky a pomlčky, maximálne 100 znakov",
       "commandRequired": "Zadajte príkaz",

@@ -3979,6 +3979,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Coinníonn luachanna a thaispeántar mar •••• a rún stóráilte; athchuir luach chun é a rothlú. Teastaíonn gach luach arís nuair a athraítear an líne ordaithe",
+      "headersHint": "Coinníonn luachanna a thaispeántar mar •••• a rún stóráilte; athchuir luach chun é a rothlú. Teastaíonn gach luach arís nuair a athraítear an URL",
       "nameRequired": "Cuir isteach ainm freastalaí",
       "nameInvalid": "Ní féidir le hainm ach litreacha ASCII, uimhreacha, béimeanna agus daiseanna a úsáid, suas le 100 carachtar",
       "commandRequired": "Cuir isteach ordú",

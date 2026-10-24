@@ -3826,6 +3826,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Valè ki parèt kòm •••• kenbe sekrè ki sere yo; ranplase yon valè pou w renouvle l. Chanje liy kòmand la mande tout valè yo ankò",
+      "headersHint": "Valè ki parèt kòm •••• kenbe sekrè ki sere yo; ranplase yon valè pou w renouvle l. Chanje URL la mande tout valè yo ankò",
       "nameRequired": "Antre yon non sèvè",
       "nameInvalid": "Non ka itilize sèlman lèt ASCII, nimewo, tirè ba ak tire, jiska 100 karaktè",
       "commandRequired": "Antre yon lòd",

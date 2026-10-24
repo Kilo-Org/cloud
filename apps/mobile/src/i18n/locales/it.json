@@ -3877,6 +3877,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "I valori mostrati come •••• conservano il segreto archiviato; sostituisci un valore per ruotarlo. Modificare la riga di comando richiede nuovamente tutti i valori",
+      "headersHint": "I valori mostrati come •••• conservano il segreto archiviato; sostituisci un valore per ruotarlo. Modificare l'URL richiede nuovamente tutti i valori",
       "nameRequired": "Immettere un nome server",
       "nameInvalid": "Il nome può contenere solo lettere ASCII, numeri, trattini bassi e trattini, fino a 100 caratteri",
       "commandRequired": "Inserisci un comando",

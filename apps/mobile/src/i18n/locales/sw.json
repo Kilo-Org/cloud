@@ -3826,6 +3826,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Thamani zinazoonyeshwa kama •••• huhifadhi siri zake zilizohifadhiwa; badilisha thamani ili kuizungusha. Kubadilisha mstari wa amri kunahitaji kila thamani tena",
+      "headersHint": "Thamani zinazoonyeshwa kama •••• huhifadhi siri zake zilizohifadhiwa; badilisha thamani ili kuizungusha. Kubadilisha URL kunahitaji kila thamani tena",
       "nameRequired": "Ingiza jina la seva",
       "nameInvalid": "Jina linaweza kutumia herufi za ASCII, nambari, mistari chini na deshi pekee, hadi vibambo 100",
       "commandRequired": "Ingiza amri",

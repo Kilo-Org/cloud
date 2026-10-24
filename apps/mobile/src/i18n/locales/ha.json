@@ -3826,6 +3826,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Ƙimomin da aka nuna a matsayin •••• suna riƙe sirrin da aka adana; maye gurbin ƙima don canza sirrin. Canza layin umarni yana buƙatar sake shigar da kowane ƙima",
+      "headersHint": "Ƙimomin da aka nuna a matsayin •••• suna riƙe sirrin da aka adana; maye gurbin ƙima don canza sirrin. Canza URL yana buƙatar sake shigar da kowane ƙima",
       "nameRequired": "Shigar da sunan uwar garke",
       "nameInvalid": "Sunan zai iya amfani da haruffan ASCII kawai, lambobi, ƙararraki, da dashes, har zuwa haruffa 100",
       "commandRequired": "Shigar da umarni",

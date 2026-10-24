@@ -3826,6 +3826,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Arvot, jotka näkyvät muodossa ••••, säilyttävät tallennetun salaisuutensa; korvaa arvo vaihtaaksesi sen. Komentorivin muuttaminen edellyttää kaikkien arvojen antamista uudelleen",
+      "headersHint": "Arvot, jotka näkyvät muodossa ••••, säilyttävät tallennetun salaisuutensa; korvaa arvo vaihtaaksesi sen. URL-osoitteen muuttaminen edellyttää kaikkien arvojen antamista uudelleen",
       "nameRequired": "Anna palvelimen nimi",
       "nameInvalid": "Nimessä voi käyttää vain ASCII-kirjaimia, numeroita, alaviivoja ja väliviivoja, enintään 100 merkkiä",
       "commandRequired": "Anna komento",

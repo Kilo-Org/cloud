@@ -3826,6 +3826,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "•••• ko'rinishida ko'rsatilgan qiymatlar saqlangan yashirin qiymatni o'zgartirmaydi; uni almashtirish uchun qiymatni yangilang. Buyruq qatorini o'zgartirish barcha qiymatlarni qaytadan talab qiladi",
+      "headersHint": "•••• ko'rinishida ko'rsatilgan qiymatlar saqlangan yashirin qiymatni o'zgartirmaydi; uni almashtirish uchun qiymatni yangilang. URL manzilini o'zgartirish barcha qiymatlarni qaytadan talab qiladi",
       "nameRequired": "Server nomini kiriting",
       "nameInvalid": "Ism faqat ASCII harflar, raqamlar, pastki chiziq va chiziqlardan foydalanishi mumkin, jami 100 ta belgidan oshmasligi kerak",
       "commandRequired": "Buyruqni kiriting",

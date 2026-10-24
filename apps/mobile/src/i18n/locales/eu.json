@@ -3826,6 +3826,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "•••• gisa erakutsitako balioek gordetako sekretua mantentzen dute; ordeztu balio bat biratzeko. Komando-lerroa aldatzeak balio guztiak berriro eskatzen ditu",
+      "headersHint": "•••• gisa erakutsitako balioek gordetako sekretua mantentzen dute; ordeztu balio bat biratzeko. URLa aldatzeak balio guztiak berriro eskatzen ditu",
       "nameRequired": "Sartu zerbitzariaren izena",
       "nameInvalid": "Izenak ASCII hizkiak, zenbakiak, azpimarra eta marra soilik erabil ditzake, gehienez 100 karaktere",
       "commandRequired": "Sartu komando bat",

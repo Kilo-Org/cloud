@@ -3826,6 +3826,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Ka pupuri tonu ngā uara e whakaaturia ana hei •••• i tō rātou muna kua tiakina; whakakapihia tētahi uara kia hurihia ai. E hiahiatia ana ngā uara katoa ina hurihia te raina whakahau",
+      "headersHint": "Ka pupuri tonu ngā uara e whakaaturia ana hei •••• i tō rātou muna kua tiakina; whakakapihia tētahi uara kia hurihia ai. E hiahiatia ana ngā uara katoa ina hurihia te URL",
       "nameRequired": "Whakauruhia he ingoa tūmau",
       "nameInvalid": "Ka taea e te ingoa te whakamahi i nga reta ASCII, nga nama, nga tohu raro (_), me nga tohu (-) anake, ki te 100 pūāhua iti iho rānei",
       "commandRequired": "Whakauruhia he whakahau",

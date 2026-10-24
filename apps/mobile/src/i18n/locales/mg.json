@@ -3826,6 +3826,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Ny sanda aseho ho •••• dia mitazona ny tsiambaratelo voatahiry; soloy ny sanda iray raha tianao havaozina. Ilaina ny sanda rehetra rehefa miova ny andalana baiko",
+      "headersHint": "Ny sanda aseho ho •••• dia mitazona ny tsiambaratelo voatahiry; soloy ny sanda iray raha tianao havaozina. Ilaina ny sanda rehetra rehefa miova ny URL",
       "nameRequired": "Ampidiro anarana mpizara",
       "nameInvalid": "Ny anarana dia tsy afaka mampiasa afa-tsy litera ASCII, isa, tsipiho ambany ary tsipiho, hatramin'ny 100 tarehintsoratra",
       "commandRequired": "Ampidiro baiko",

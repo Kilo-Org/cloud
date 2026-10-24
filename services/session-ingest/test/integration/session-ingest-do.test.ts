@@ -887,6 +887,50 @@ describe('SessionIngestDO integration', () => {
       });
     });
 
+    it('deletes the previous-layout body when the stored row is replaced', async () => {
+      const sessionId = 'ses_part_layout_body_00000001';
+      const stub = getStub(kiloUserId, sessionId);
+      const previousKey = `items/${kiloUserId}/${sessionId}/msg_a/prt_1/earlier`;
+      await stub.ingest([{ type: 'message', data: message(sessionId) }], kiloUserId, sessionId, 1);
+      try {
+        await env.SESSION_INGEST_R2.put(previousKey, '{}');
+        await runInDurableObject(stub, async (_instance, state) => {
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data, item_data_r2_key, ingested_at) ' +
+              'VALUES (?, ?, ?, ?, ?)',
+            'msg_a/prt_1',
+            'part',
+            '{}',
+            previousKey,
+            1000
+          );
+        });
+
+        await stub.ingest(
+          [{ type: 'part', data: part(sessionId, 'fresh') }],
+          kiloUserId,
+          sessionId,
+          1,
+          2000
+        );
+
+        const rows = await runInDurableObject(stub, async (_instance, state) =>
+          state.storage.sql
+            .exec<{ item_id: string; item_data_r2_key: string | null }>(
+              'SELECT item_id, item_data_r2_key FROM ingest_items WHERE item_type = ?',
+              'part'
+            )
+            .toArray()
+        );
+        expect(rows).toEqual([{ item_id: 'part/msg_a/prt_1', item_data_r2_key: null }]);
+        await vi.waitFor(async () => {
+          await expect(env.SESSION_INGEST_R2.head(previousKey)).resolves.toBeNull();
+        });
+      } finally {
+        await env.SESSION_INGEST_R2.delete(previousKey);
+      }
+    });
+
     it('preserves the most recent part value across persisted layouts', async () => {
       const sessionId = 'ses_part_layout_delayed_0000001';
       const stub = getStub(kiloUserId, sessionId);

@@ -1125,6 +1125,32 @@ it('ends queued reconciliation after the queue delivery window', async () => {
   expect(persisted.summary).toMatchObject({ chargeStatus: 'settled', costMicrodollars: 1300 });
 });
 
+it('clears a leftover charge schedule on an already settled report', async () => {
+  const { caller, report } = await prepareFailedSummary('committed');
+  await reconcileBriefingCharge(report);
+  expect((await caller.get({ reportId: report.id })).summary.chargeStatus).toBe('settled');
+  await db
+    .update(agent_briefing_reports)
+    .set({ next_charge_check_at: new Date(Date.now() - 60_000).toISOString() })
+    .where(eq(agent_briefing_reports.id, report.id));
+  const [stale] = await db
+    .select()
+    .from(agent_briefing_reports)
+    .where(eq(agent_briefing_reports.id, report.id));
+  await reconcileBriefingCharge(stale);
+  const [persisted] = await db
+    .select()
+    .from(agent_briefing_reports)
+    .where(eq(agent_briefing_reports.id, report.id));
+  expect(persisted.next_charge_check_at).toBeNull();
+  expect(persisted.summary).toMatchObject({
+    chargeStatus: 'settled',
+    costMicrodollars: 1300,
+    canRetry: true,
+  });
+  expect((await caller.get({ reportId: report.id })).summary.costMicrodollars).toBe(1300);
+});
+
 it('keeps generations without receipt accounting pending', async () => {
   const { caller, report, generationId } = await prepareFailedSummary('committed');
   await db

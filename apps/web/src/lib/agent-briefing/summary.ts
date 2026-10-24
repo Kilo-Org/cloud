@@ -573,7 +573,8 @@ async function reconcileLockedBriefingCharge(
     settled &&
     row.summary.chargeStatus === 'settled' &&
     row.summary.canRetry === canRetry &&
-    z.number().nonnegative().catch(-1).parse(row.summary.costMicrodollars) === total
+    z.number().nonnegative().catch(-1).parse(row.summary.costMicrodollars) === total &&
+    row.next_charge_check_at === null
   )
     return row;
   const [updated] = await tx

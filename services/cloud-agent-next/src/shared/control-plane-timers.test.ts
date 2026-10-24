@@ -51,8 +51,11 @@ describe('control-plane preparation attempt budget', () => {
       sandbox.wrapperHelloMs +
       wrapper.restoreMs +
       wrapper.cloneMs +
-      wrapper.kiloRuntimeStartMs +
-      wrapper.kiloSessionMs;
+      wrapper.captureMs +
+      // Kilo runtime start and the Kilo session each retry once inside the
+      // attempt, so each can consume two of its own bounds.
+      2 * wrapper.kiloRuntimeStartMs +
+      2 * wrapper.kiloSessionMs;
 
     // A shorter attempt deadline would fail a slow but valid preparation as
     // `preparation_timeout` while each step stayed inside its own bound.

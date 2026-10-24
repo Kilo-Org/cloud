@@ -76,8 +76,8 @@ catalogs:
       specifier: 7.3.0
       version: 7.3.0
     stripe:
-      specifier: 19.3.1
-      version: 19.3.1
+      specifier: 23.0.0
+      version: 23.0.0
     tsx:
       specifier: 4.23.15
       version: 4.23.15
@@ -210,6 +210,7 @@ patchedDependencies:
   react-native-appsflyer@7.0.2-v2: 7affcf3da23038fe6874ab68124824cb9e56d5ea8336611869b97d30fb1716b7
   react-native-screens@4.30.0: f5d2511c5911722d47aff1e7056ad8e7685699307c385d590a8268e256e6eea5
   react-native@0.88.0: 669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c
+  stripe@23.0.0: 24ec61befefef8ca01f7210393a805eeb572ef1b3dd66b4e2188e3aa4c8a9cae
 
 importers:
 
@@ -1383,7 +1384,7 @@ importers:
         version: 2.0.7(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       stripe:
         specifier: 'catalog:'
-        version: 19.3.1(@types/node@24.12.4)
+        version: 23.0.0(patch_hash=24ec61befefef8ca01f7210393a805eeb572ef1b3dd66b4e2188e3aa4c8a9cae)(@types/node@24.12.4)
       stytch:
         specifier: 12.43.1
         version: 12.43.1
@@ -1924,7 +1925,7 @@ importers:
         version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       stripe:
         specifier: 'catalog:'
-        version: 19.3.1(@types/node@25.5.2)
+        version: 23.0.0(patch_hash=24ec61befefef8ca01f7210393a805eeb572ef1b3dd66b4e2188e3aa4c8a9cae)(@types/node@24.12.4)
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -1940,7 +1941,10 @@ importers:
         version: link:../encryption
       '@sentry/nextjs':
         specifier: 11.7.0
-        version: 11.7.0(@babel/core@7.29.7)(@cloudflare/workers-types@4.20260605.1)(next@16.4.2(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@25.5.2)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(webpack@5.105.4)(wrangler@4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@25.5.2)(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+        version: 11.7.0(@babel/core@7.29.7)(@cloudflare/workers-types@4.20260605.1)(next@16.4.2(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@24.12.4)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(webpack@5.105.4)(wrangler@4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.12.4
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260707.2
@@ -2109,7 +2113,7 @@ importers:
         version: 0.0.1
       stripe:
         specifier: 'catalog:'
-        version: 19.3.1(@types/node@24.12.4)
+        version: 23.0.0(patch_hash=24ec61befefef8ca01f7210393a805eeb572ef1b3dd66b4e2188e3aa4c8a9cae)(@types/node@24.12.4)
       uuid:
         specifier: 11.1.1
         version: 11.1.1
@@ -20258,12 +20262,11 @@ packages:
   strip-literal@3.1.0:
     resolution: {integrity: sha512-8r3mkIM/2+PpjHoOtiAW8Rg3jJLHaV7xPwG+YRGrv6FP0wwk/toTpATxWYOW0BKdWwl82VT2tFYi5DlROa0Mxg==}
 
-  stripe@19.3.1:
-    resolution: {integrity: sha512-5NXhLxTZ+4uO1wnsmNysILVuyeZ1Xia7niz/8ykBkGJkCcrY2WyQZwcfYuWZmZEJtWr2+0j49JXwNC6y9CHL7Q==}
-    engines: {node: '>=16'}
-    deprecated: This version has a major bug where the Files API times out. See issue 2538
+  stripe@23.0.0:
+    resolution: {integrity: sha512-MDE2A5ZVVluYURORaZEVghSmnLJc3w6aHAlZSxDQMsOjOb3V0O6ro/CiaeFlJS4N7uIVmsg98ocRsPmUK6YfyA==}
+    engines: {node: '>=20'}
     peerDependencies:
-      '@types/node': '>=16'
+      '@types/node': '>=20'
     peerDependenciesMeta:
       '@types/node':
         optional: true
@@ -29820,18 +29823,6 @@ snapshots:
       '@cloudflare/workers-types': 4.20260605.1
       wrangler: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
-  '@sentry/cloudflare@11.7.0(@cloudflare/workers-types@4.20260605.1)(wrangler@4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@25.5.2)(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
-    dependencies:
-      '@opentelemetry/api': 1.9.1
-      '@sentry/conventions': 0.27.0
-      '@sentry/core': 11.7.0
-      '@sentry/opentelemetry': 11.7.0(@opentelemetry/api@1.9.1)
-      '@sentry/server-utils': 11.7.0
-      magic-string: 0.30.21
-    optionalDependencies:
-      '@cloudflare/workers-types': 4.20260605.1
-      wrangler: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@25.5.2)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
-
   '@sentry/cloudflare@9.47.1(@cloudflare/workers-types@4.20260605.1)':
     dependencies:
       '@opentelemetry/api': 1.9.1
@@ -29899,13 +29890,13 @@ snapshots:
       - webpack
       - wrangler
 
-  '@sentry/nextjs@11.7.0(@babel/core@7.29.7)(@cloudflare/workers-types@4.20260605.1)(next@16.4.2(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@25.5.2)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(webpack@5.105.4)(wrangler@4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@25.5.2)(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
+  '@sentry/nextjs@11.7.0(@babel/core@7.29.7)(@cloudflare/workers-types@4.20260605.1)(next@16.4.2(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@24.12.4)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(webpack@5.105.4)(wrangler@4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@rollup/plugin-commonjs': 28.0.1(rollup@4.64.7)
       '@sentry/browser-utils': 11.7.0
       '@sentry/bundler-plugins': 11.7.0(@babel/core@7.29.7)(rollup@4.64.7)(webpack@5.105.4)
-      '@sentry/cloudflare': 11.7.0(@cloudflare/workers-types@4.20260605.1)(wrangler@4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@25.5.2)(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@sentry/cloudflare': 11.7.0(@cloudflare/workers-types@4.20260605.1)(wrangler@4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@sentry/conventions': 0.27.0
       '@sentry/core': 11.7.0
       '@sentry/node': 11.7.0(@babel/core@7.29.7)(rollup@4.64.7)(webpack@5.105.4)
@@ -29914,7 +29905,7 @@ snapshots:
       '@sentry/server-runtime-injection': 11.7.0
       '@sentry/server-utils': 11.7.0
       '@sentry/vercel-edge': 11.7.0
-      next: 16.4.2(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@25.5.2)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      next: 16.4.2(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@24.12.4)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       rollup: 4.64.7
       stacktrace-parser: 0.1.11
     transitivePeerDependencies:
@@ -40074,34 +40065,6 @@ snapshots:
       - '@types/node'
       - babel-plugin-macros
 
-  next@16.4.2(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@25.5.2)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
-    dependencies:
-      '@next/env': 16.4.2
-      '@swc/helpers': 0.5.23
-      baseline-browser-mapping: 2.11.20
-      caniuse-lite: 1.0.30001810
-      postcss: 8.5.30
-      react: 19.2.6
-      react-dom: 19.2.6(react@19.2.6)
-      styled-jsx: 5.1.6(@babel/core@7.29.7)(react@19.2.6)
-    optionalDependencies:
-      '@next/swc-darwin-arm64': 16.4.2
-      '@next/swc-darwin-x64': 16.4.2
-      '@next/swc-linux-arm64-gnu': 16.4.2
-      '@next/swc-linux-arm64-musl': 16.4.2
-      '@next/swc-linux-x64-gnu': 16.4.2
-      '@next/swc-linux-x64-musl': 16.4.2
-      '@next/swc-win32-arm64-msvc': 16.4.2
-      '@next/swc-win32-x64-msvc': 16.4.2
-      '@opentelemetry/api': 1.9.1
-      '@playwright/test': 1.58.2
-      babel-plugin-react-compiler: 1.0.0
-      sharp: 0.35.5(@types/node@25.5.2)
-    transitivePeerDependencies:
-      - '@babel/core'
-      - '@types/node'
-      - babel-plugin-macros
-
   no-case@3.0.4:
     dependencies:
       lower-case: 2.0.2
@@ -43307,17 +43270,9 @@ snapshots:
     dependencies:
       js-tokens: 9.0.1
 
-  stripe@19.3.1(@types/node@24.12.4):
-    dependencies:
-      qs: 6.16.0
+  stripe@23.0.0(patch_hash=24ec61befefef8ca01f7210393a805eeb572ef1b3dd66b4e2188e3aa4c8a9cae)(@types/node@24.12.4):
     optionalDependencies:
       '@types/node': 24.12.4
-
-  stripe@19.3.1(@types/node@25.5.2):
-    dependencies:
-      qs: 6.16.0
-    optionalDependencies:
-      '@types/node': 25.5.2
 
   strnum@2.2.3: {}
 

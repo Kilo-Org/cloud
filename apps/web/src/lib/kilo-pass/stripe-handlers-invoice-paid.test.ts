@@ -41,7 +41,7 @@ import {
 } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { and, eq, inArray } from 'drizzle-orm';
-import type Stripe from 'stripe';
+import Stripe from 'stripe';
 import type * as affiliateEventsModule from '@/lib/impact/affiliate-events';
 import { randomUUID } from 'node:crypto';
 import { digestCardFingerprint } from '@/lib/kilo-pass/card-fingerprint-gate';
@@ -486,10 +486,12 @@ function attachSettledKiloPassLines(
               ],
         pricing: {
           type: 'price_details',
-          unit_amount_decimal: String(listProductMinor),
+          unit_amount_decimal: Stripe.Decimal.from(listProductMinor),
           price_details: { price: params.priceId, product: 'prod_kilo_pass' },
         },
         quantity: 1,
+        quantity_decimal: Stripe.Decimal.from(1),
+        subtotal: listProductMinor,
         subscription: null,
         taxes: null,
       } as Stripe.InvoiceLineItem,
@@ -519,6 +521,8 @@ function attachSettledKiloPassLines(
               ],
         pricing: null,
         quantity: 1,
+        quantity_decimal: Stripe.Decimal.from(1),
+        subtotal: listFeeMinor,
         subscription: null,
         taxes: null,
       } as Stripe.InvoiceLineItem,

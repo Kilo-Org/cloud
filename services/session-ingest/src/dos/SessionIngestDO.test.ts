@@ -1772,7 +1772,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
     expect(harness.pgCallCount).toBe(0);
   });
 
-  it('swallows persist failure and leaves meta un-advanced for retry', async () => {
+  it('handles a persist failure', async () => {
     const harness = makeLiveHarness({
       persistError: new Error('postgres down'),
     });
@@ -1857,7 +1857,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
     expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('100000');
   });
 
-  it('idle transition still scans and persists cost inside closed 30s window (D17)', async () => {
+  it('persists cost during an idle transition', async () => {
     const priorCost = JSON.stringify({
       role: 'assistant',
       time: { created: 1000 },

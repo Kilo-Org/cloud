@@ -609,8 +609,6 @@ export class SessionIngestDO extends DurableObject<Env> {
       const { item_id, item_type } = getItemIdentity(item);
       stageBriefingEvidence(this.db, statusEvidence([item]));
 
-      // Check timestamp guard: skip if existing row has a newer ingested_at.
-      // Also read the existing R2 key so we can clean up orphaned blobs.
       if (ingestedAt !== undefined) {
         const existing = this.db
           .select({
@@ -625,13 +623,11 @@ export class SessionIngestDO extends DurableObject<Env> {
           existing?.ingested_at !== undefined &&
           existing.ingested_at > ingestedAt
         ) {
-          // Item is stale — if the caller wrote an R2 blob for it, that blob is orphaned
           const newR2Key = r2References?.[item_id];
           if (newR2Key) orphanedR2Keys.push(newR2Key);
           continue;
         }
 
-        // If the existing row pointed to a different R2 blob, it will be orphaned after upsert
         const newR2Key = r2References?.[item_id] ?? null;
         if (existing?.item_data_r2_key && existing.item_data_r2_key !== newR2Key) {
           orphanedR2Keys.push(existing.item_data_r2_key);
@@ -689,8 +685,6 @@ export class SessionIngestDO extends DurableObject<Env> {
       if (item.type === 'message' || item.type === 'part') {
         wroteActivityItem = true;
       }
-      // Cost gate is assistant-only (computeRunningAssistantCostUsd sums role:assistant).
-      // data is looseObject — role is optional at the type level; cheap property check, no parse.
       if (item.type === 'message' && (item.data as { role?: unknown }).role === 'assistant') {
         wroteAssistantMessageItem = true;
       }
@@ -919,8 +913,6 @@ export class SessionIngestDO extends DurableObject<Env> {
       lastPersistedAtMs: readIngestMetaNumber(this.db, 'lastLiveSummaryPersistedAtMs'),
     });
 
-    // Only scan all inline messages when the cost-persist window is open (KB-3).
-    // Window needs no cost value: idle forces (D17), else assistant upsert + 30s throttle.
     const nowMs = Date.now();
     const lastCostPersistedAtMs = readIngestMetaNumber(this.db, 'lastCostPersistedAtMs');
     const costWindowOpen =
@@ -1531,7 +1523,6 @@ export class SessionIngestDO extends DurableObject<Env> {
     // Best-effort persist the per-session total cost to Postgres so the session
     // list can surface it. Runs before the O11Y RPC so an analytics failure cannot
     // skip it. Failures are logged and swallowed — must never break metrics emission.
-    // Same helper + CASE guard as live cost persist (D20).
     try {
       if (Number.isFinite(metrics.totalCost)) {
         const totalCostMicrodollars = Math.max(0, Math.round(metrics.totalCost * 1_000_000));

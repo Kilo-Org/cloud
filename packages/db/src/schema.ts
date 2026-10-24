@@ -5706,6 +5706,12 @@ export const cloud_agent_code_reviews = pgTable(
       .on(table.started_at)
       .concurrently()
       .where(isNotNull(table.started_at)),
+    index('idx_cloud_agent_code_reviews_started_at_effective')
+      .on(sql`COALESCE(${table.started_at}, ${table.updated_at}, ${table.created_at})`)
+      .concurrently()
+      .where(
+        sql`${table.status} NOT IN ('pending', 'queued') AND COALESCE(${table.terminal_reason}, '') <> 'abandoned'`
+      ),
     index('idx_cloud_agent_code_reviews_terminal_missing_completed_at')
       .on(table.status)
       .concurrently()

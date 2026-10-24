@@ -207,11 +207,13 @@ export function briefingPrompt(row: BriefingReportRow, language: string): string
  * The rates a briefing summary is bounded by: the price the model picker shows
  * for the model, and for a latest alias also the price of the target it
  * resolves to, so the quoted ceiling never undercuts the route the gateway
- * picks. A model the picker hides - one the gateway marks unavailable, a batch
- * variant, or one missing from a populated model snapshot - is refused as not
- * allowed, so a quote is never issued for a model the picker never offers. The
- * entries the picker builds from code win over a catalog row with the same id
- * and keep their own price, as the picker does.
+ * picks. An alias target with no picker price is refused, exactly as gateway
+ * admission refuses it, so a quote is never issued for a generation that will
+ * be declined. A model the picker hides - one the gateway marks unavailable, a
+ * batch variant, or one missing from a populated model snapshot - is refused as
+ * not allowed, so a quote is never issued for a model the picker never offers.
+ * The entries the picker builds from code win over a catalog row with the same
+ * id and keep their own price, as the picker does.
  */
 async function briefingPriceRates(model: string): Promise<TextPricingRates> {
   const extra = pickerExtraModel(model);

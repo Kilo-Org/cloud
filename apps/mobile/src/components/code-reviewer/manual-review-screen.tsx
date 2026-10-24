@@ -194,7 +194,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
         />
         <EmptyState
           icon={GitPullRequest}
-          title={t('codeReviewer.manualReview.connectProvider')}
+          title={t('common.connectProvider')}
           description={t('codeReviewer.manualReview.connectProviderDescription')}
           action={
             // `mt-3 w-full` matches the near-identical PR-review connect gate
@@ -240,6 +240,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               onSelect={option => {
                 urlRef.current = '';
                 setUrlError(null);
+                start.reset();
                 setPlatformChoice(option);
               }}
             />
@@ -269,6 +270,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
                 if (urlError) {
                   setUrlError(null);
                 }
+                start.reset();
               }}
             />
             {urlError ? <Text className="text-xs text-destructive">{urlError}</Text> : null}
@@ -279,13 +281,14 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               {t('codeReviewer.manualReview.instructions')}
             </Text>
             <TextInput
-              className="h-24 rounded-lg bg-secondary p-3 text-sm leading-5 text-foreground"
+              className="h-24 rounded-lg bg-secondary p-3 text-sm leading-[1.25rem] text-foreground"
               multiline
               textAlignVertical="top"
               placeholder={t('codeReviewer.manualReview.instructionsPlaceholder')}
               placeholderTextColor={colors.mutedForeground}
               onChangeText={value => {
                 instructionsRef.current = value;
+                start.reset();
               }}
             />
           </View>
@@ -302,6 +305,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
                 variant={effectiveModel.thinkingEffort ?? ''}
                 onSelect={(modelId, variant) => {
                   setModelChoice({ modelSlug: modelId, thinkingEffort: variant || null });
+                  start.reset();
                 }}
               />
             </View>

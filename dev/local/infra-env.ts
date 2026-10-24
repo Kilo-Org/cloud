@@ -19,6 +19,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getInfraBasePort, localPostgresUrl, portOffset } from './services';
+import { writeSecretsFile } from './secrets-file';
 
 /** Compose variable substituted into `dev/docker-compose.yml`, per service. */
 const COMPOSE_PORT_VARS: Record<string, string> = {
@@ -139,12 +140,6 @@ export function applyAppEnv(
   return { content: result, changed, kept };
 }
 
-function writeAtomic(filePath: string, content: string): void {
-  const temp = `${filePath}.${process.pid}.tmp`;
-  fs.writeFileSync(temp, content);
-  fs.renameSync(temp, filePath);
-}
-
 function infraPorts(offset: number): Record<string, number> {
   const ports: Record<string, number> = {};
   for (const service of Object.keys(COMPOSE_PORT_VARS)) {
@@ -164,7 +159,7 @@ function syncAppEnv(repoRoot: string, ports: Record<string, number>): string[] {
   );
   const report: string[] = [];
   if (changed.length > 0) {
-    writeAtomic(envLocalPath, content);
+    writeSecretsFile(envLocalPath, content);
     report.push(`.env.local: updated ${changed.join(', ')}`);
   }
   if (kept.length > 0) {
@@ -198,7 +193,7 @@ function syncWebTestEnv(
   });
   const report: string[] = [];
   if (changed.length > 0) {
-    writeAtomic(testEnvPath, content);
+    writeSecretsFile(testEnvPath, content);
     report.push(`${WEB_TEST_ENV_FILE}: updated POSTGRES_URL`);
   }
   if (kept.length > 0) {
@@ -227,7 +222,7 @@ export function syncInfraEnv(repoRoot: string): string[] {
   const project = composeProjectName(repoRoot, portOffset);
   const composeEnv = buildComposeEnv(project, ports);
   const lines = Object.entries(composeEnv).map(([key, value]) => `${key}=${value}`);
-  writeAtomic(composeEnvPath, `${GENERATED_HEADER}\n${lines.join('\n')}\n`);
+  writeSecretsFile(composeEnvPath, `${GENERATED_HEADER}\n${lines.join('\n')}\n`);
 
   return [
     `${COMPOSE_ENV_FILE}: project ${project}, postgres port ${ports.postgres}`,

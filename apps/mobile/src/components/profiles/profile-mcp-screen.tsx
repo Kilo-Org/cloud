@@ -24,6 +24,7 @@ import {
   useAgentProfile,
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
+import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
@@ -40,9 +41,9 @@ type McpServerRowProps = Readonly<{
   server: McpServerSource;
   summary: string;
   secretCount: number;
-  onToggle: (enabled: boolean) => void;
-  onEdit: () => void;
-  onDelete: () => void;
+  onToggle?: (enabled: boolean) => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }>;
 
 /**
@@ -95,23 +96,32 @@ function McpServerRowView({
           </Text>
         ) : null}
       </View>
-      <Switch value={server.enabled} accessibilityLabel={server.name} onValueChange={onToggle} />
-      <Pressable
-        className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-        accessibilityRole="button"
-        accessibilityLabel={t('profiles.mcp.edit')}
-        onPress={onEdit}
-      >
-        <Pencil size={18} color={colors.mutedForeground} />
-      </Pressable>
-      <Pressable
-        className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-        accessibilityRole="button"
-        accessibilityLabel={t('common.delete')}
-        onPress={onDelete}
-      >
-        <Trash2 size={18} color={colors.destructive} />
-      </Pressable>
+      <Switch
+        value={server.enabled}
+        accessibilityLabel={server.name}
+        disabled={onToggle === undefined}
+        onValueChange={onToggle}
+      />
+      {onEdit !== undefined ? (
+        <Pressable
+          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+          accessibilityRole="button"
+          accessibilityLabel={t('profiles.mcp.edit')}
+          onPress={onEdit}
+        >
+          <Pencil size={18} color={colors.mutedForeground} />
+        </Pressable>
+      ) : null}
+      {onDelete !== undefined ? (
+        <Pressable
+          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.delete')}
+          onPress={onDelete}
+        >
+          <Trash2 size={18} color={colors.destructive} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -136,6 +146,7 @@ export function ProfileMcpScreen({
   const profileQuery = useAgentProfile(profileId, organizationId);
   const { createMcp, updateMcp, deleteMcp, setMcpEnabled } =
     useAgentProfileSectionMutations(organizationId);
+  const canManage = useCanManageOrganizationProfiles(organizationId);
 
   const servers = profileQuery.data?.mcpServers ?? NO_MCP_SERVERS;
   const rows = mcpServerRows(servers);
@@ -206,9 +217,11 @@ export function ProfileMcpScreen({
         description={null}
         placement="top"
         action={
-          <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
-            <Text>{t('profiles.mcp.add')}</Text>
-          </Button>
+          canManage ? (
+            <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
+              <Text>{t('profiles.mcp.add')}</Text>
+            </Button>
+          ) : null
         }
       />
     );
@@ -226,30 +239,44 @@ export function ProfileMcpScreen({
               server={server}
               summary={row.summary}
               secretCount={row.secretCount}
-              onToggle={enabled => {
-                setMcpEnabled.mutate(
-                  { profileId, mcpServerId: server.id, enabled },
-                  {
-                    onError: error => {
-                      if (!hasUsableMessage(error)) {
-                        toast.error(t('profiles.mcp.updateFailed'));
-                      }
-                    },
-                  }
-                );
-              }}
-              onEdit={() => {
-                setForm({ server });
-              }}
-              onDelete={() => {
-                confirmDelete(server);
-              }}
+              onToggle={
+                canManage
+                  ? enabled => {
+                      setMcpEnabled.mutate(
+                        { profileId, mcpServerId: server.id, enabled },
+                        {
+                          onError: error => {
+                            if (!hasUsableMessage(error)) {
+                              toast.error(t('profiles.mcp.updateFailed'));
+                            }
+                          },
+                        }
+                      );
+                    }
+                  : undefined
+              }
+              onEdit={
+                canManage
+                  ? () => {
+                      setForm({ server });
+                    }
+                  : undefined
+              }
+              onDelete={
+                canManage
+                  ? () => {
+                      confirmDelete(server);
+                    }
+                  : undefined
+              }
             />
           );
         })}
-        <Button onPress={startAdd}>
-          <Text>{t('profiles.mcp.add')}</Text>
-        </Button>
+        {canManage ? (
+          <Button onPress={startAdd}>
+            <Text>{t('profiles.mcp.add')}</Text>
+          </Button>
+        ) : null}
       </>
     );
   }

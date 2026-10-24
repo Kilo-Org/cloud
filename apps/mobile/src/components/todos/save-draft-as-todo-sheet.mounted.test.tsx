@@ -11,7 +11,7 @@ import {
   type RenderWithProvidersResult,
   waitFor,
 } from '@/test/render-with-providers';
-import '@/i18n';
+import { i18n } from '@/i18n';
 
 const push = vi.hoisted(() => vi.fn());
 // The router's `lists.list` returns a bare `TodoList[]`, so the fake query
@@ -48,7 +48,7 @@ vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'Activ
 // polyfill the node-mounted harness cannot import (extension-less ESM import).
 // The error branch is not under test here; the component stub cuts the chain.
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/ui/icons', () => ({ ListTodo: 'ListTodo' }));
+vi.mock('@/components/ui/icons', () => ({ ListTodo: 'ListTodo', X: 'X' }));
 vi.mock('@/components/ui/sheet', () => ({
   Sheet: (props: { visible: boolean; children: ReactNode }) =>
     createElement('Sheet', { visible: props.visible }, props.children),
@@ -153,9 +153,18 @@ beforeEach(() => {
 describe('SaveDraftAsTodoSheet', () => {
   it('renders the account lists as tappable rows', async () => {
     const mounted = await mountSheet();
-    await waitFor(() => controls(mounted).length === 1);
+    await waitFor(() =>
+      controls(mounted).some(control => control.accessibilityLabel === 'Errands')
+    );
     expect(text(mounted)).toContain('Errands');
-    expect(controls(mounted)[0]?.accessibilityLabel).toBe('Errands');
+    expect(
+      controls(mounted).find(control => control.accessibilityLabel === 'Errands')
+    ).toBeDefined();
+    // The sheet's body scrolls, so the title row's close control is the exit
+    // the native drag no longer provides.
+    expect(
+      controls(mounted).find(control => control.accessibilityLabel === i18n.t('common.close'))
+    ).toBeDefined();
   });
 
   // The requested behaviour: the no-lists state keeps the empty message and

@@ -90,20 +90,30 @@ describe('Stripe webhook responses', () => {
     expect(await response.text()).toBe('Webhook Error');
     expect(processStripePaymentEventHook).not.toHaveBeenCalled();
     expect(captureException).toHaveBeenCalledTimes(1);
-    expect(captureException).toHaveBeenCalledWith(
-      expect.any(Stripe.errors.StripeSignatureVerificationError),
-      { tags: { source: 'stripe_webhook_signature' } }
-    );
+
+    const [reported, options] = jest.mocked(captureException).mock.calls[0];
+    expect(reported).toBeInstanceOf(Stripe.errors.StripeSignatureVerificationError);
+    expect(options).toEqual({ tags: { source: 'stripe_webhook_signature' } });
   });
 
-  test('limits repeated signature verification reports', async () => {
+  test('limits verification reports across failure causes', async () => {
     await deliver(body, 'fixture');
-    await deliver(body, 'another fixture');
+    await deliver(
+      body,
+      client.webhooks.generateTestHeaderString({ payload: body, secret: 'whsec_other_fixture' })
+    );
 
     expect(captureException).toHaveBeenCalledTimes(1);
 
     now += 60_000;
-    await deliver(body, 'a third fixture');
+    await deliver(
+      body,
+      client.webhooks.generateTestHeaderString({
+        payload: body,
+        secret,
+        timestamp: Math.floor(Date.now() / 1000) - 3600,
+      })
+    );
 
     expect(captureException).toHaveBeenCalledTimes(2);
   });

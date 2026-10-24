@@ -537,6 +537,24 @@ describe('upsertSlackInstallation organization workspace binding', () => {
     );
   });
 
+  it('stores no model when the supplied model is null', async () => {
+    mockLimit.mockResolvedValueOnce([organizationIntegration('T123')]).mockResolvedValueOnce([]);
+
+    await upsertSlackInstallation({
+      owner: organizationOwner,
+      teamId: 'T123',
+      installation,
+      defaultModel: null,
+    });
+
+    expect(mockGetDefaultAllowedModel).not.toHaveBeenCalled();
+    expect(mockUpdateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.not.objectContaining({ model_slug: expect.anything() }),
+      })
+    );
+  });
+
   it('refuses to move an organization connection without caller authorization', async () => {
     mockLimit.mockResolvedValueOnce([organizationIntegration('T_OLD')]).mockResolvedValueOnce([]);
 

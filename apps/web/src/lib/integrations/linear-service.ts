@@ -324,7 +324,11 @@ export function getOwnerFromInstallation(integration: PlatformIntegration): Owne
 }
 
 type LinearUpsertOptions = {
-  defaultModel?: string;
+  /**
+   * Model resolved by the caller before the install transaction. `null` means the
+   * owner's policy allows no candidate model; `undefined` resolves it here.
+   */
+  defaultModel?: string | null;
   getChatSdkAccessToken?: (organizationId: string) => Promise<string | null>;
   deleteChatSdkInstallation?: (organizationId: string) => Promise<void>;
   deleteChatSdkIdentityCache?: (organizationId: string) => Promise<void>;
@@ -386,10 +390,11 @@ export async function upsertLinearInstallation(
   // stores no model and the settings UI keeps its model placeholder.
   // For user integrations, use the shared bot default model.
   const defaultModel =
-    options.defaultModel ??
-    (owner.type === 'org'
-      ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
-      : DEFAULT_BOT_MODEL);
+    options.defaultModel !== undefined
+      ? options.defaultModel
+      : owner.type === 'org'
+        ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
+        : DEFAULT_BOT_MODEL;
 
   const existingMetadata =
     existing?.metadata && typeof existing.metadata === 'object' ? existing.metadata : {};

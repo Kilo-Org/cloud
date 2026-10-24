@@ -86,6 +86,20 @@ describe('upsertLinearInstallation', () => {
     );
   });
 
+  test('stores no model when the caller supplies null for the model', async () => {
+    const result = await upsertLinearInstallation(
+      {
+        owner: { type: 'user', id: user.id },
+        organizationId: 'workspace-unsupplied-model',
+        organizationName: 'Unsupplied Model Workspace',
+        botUserId: 'bot-1',
+      },
+      { defaultModel: null }
+    );
+
+    expect(result.metadata).not.toHaveProperty('model_slug');
+  });
+
   test('uses the supplied transaction for installation ownership and updates', async () => {
     const rollback = new Error('Rollback test transaction');
     await expect(

@@ -325,7 +325,11 @@ export async function upsertSlackInstallation(
     teamId: string;
     installation: SlackInstallation;
     allowWorkspaceRebind?: boolean;
-    defaultModel?: string;
+    /**
+     * Model resolved by the caller before the install transaction. `null` means
+     * the owner's policy allows no candidate model; `undefined` resolves it here.
+     */
+    defaultModel?: string | null;
   },
   database: typeof db | DrizzleTransaction = db
 ): Promise<PlatformIntegration> {
@@ -354,10 +358,11 @@ export async function upsertSlackInstallation(
   // stores no `model_slug` and the UI keeps its "Select a model" state.
   // For user integrations, use the shared bot default model.
   const defaultModel =
-    suppliedDefaultModel ??
-    (owner.type === 'org'
-      ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
-      : DEFAULT_BOT_MODEL);
+    suppliedDefaultModel !== undefined
+      ? suppliedDefaultModel
+      : owner.type === 'org'
+        ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
+        : DEFAULT_BOT_MODEL;
 
   const existingModelSlug =
     existing?.metadata &&

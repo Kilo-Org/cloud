@@ -36,6 +36,8 @@ import {
 } from '@/lib/integrations/oauth/common';
 import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
 import { withWorkspaceInstallationLock } from '@/lib/integrations/oauth/workspace-installation-lock';
+import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
+import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 
 async function getChatSdkLinearAccessToken(organizationId: string): Promise<string | null> {
   const installation = await bot.getAdapter('linear').getInstallation(organizationId);
@@ -313,6 +315,12 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
     const { accessToken, refreshToken, expiresIn } = await exchangeLinearOAuthCode(code);
     const identity = await fetchLinearOAuthIdentity(accessToken);
     const organizationId = identity.organizationId;
+    // Resolve the owner's model policy before taking the workspace locks, so the
+    // transaction only performs the ownership check and the integration write.
+    const defaultModel =
+      owner.type === 'org'
+        ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
+        : DEFAULT_BOT_MODEL;
 
     const conflictRedirect = NextResponse.redirect(
       new URL(
@@ -356,6 +364,7 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
             getChatSdkAccessToken: getChatSdkLinearAccessToken,
             deleteChatSdkInstallation: deleteChatSdkLinearInstallation,
             deleteChatSdkIdentityCache: deleteChatSdkLinearIdentityCache,
+            defaultModel,
           },
           tx
         );

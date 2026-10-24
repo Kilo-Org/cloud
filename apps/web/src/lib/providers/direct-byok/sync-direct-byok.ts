@@ -10,6 +10,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { direct_byok_model_lists } from '@kilocode/db/schema';
 import { ReasoningOptionSchema, type ReasoningOption } from '@kilocode/db/schema-types';
 import { toLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
+import type { AwsBedrockEndpoint } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/aws-bedrock';
 import { recordSyncCompleted } from '@/lib/providers/openrouter/sync-providers-stale-alert';
 
 const DEFAULT_CONTENT_LENGTH = 200_000;
@@ -52,9 +53,14 @@ const ModelsDevModelSchema = z.object({
     })
     .optional(),
   tool_call: z.boolean().optional(),
-  provider: z.object({ npm: z.string().optional() }).optional().catch(undefined),
+  provider: z
+    .object({ npm: z.string().optional(), api: z.string().optional() })
+    .optional()
+    .catch(undefined),
   canonical_model_id: z.string().optional().catch(undefined),
 });
+
+type ModelsDevModel = z.infer<typeof ModelsDevModelSchema>;
 
 // A models.dev per-model `provider.npm` names the SDK for the model's own endpoint. Several SDK
 // names, such as `@ai-sdk/mistral`, still speak Chat Completions, so only SDKs for the native
@@ -82,6 +88,7 @@ type RawModel = {
   input_modalities?: ReadonlyArray<z.infer<typeof ModalitySchema>>;
   flags?: ReadonlyArray<DirectByokModelFlag>;
   reasoning_options?: ReasoningOption[];
+  endpoint?: string;
 };
 
 type SyncContext = {
@@ -143,6 +150,28 @@ function supportedReasoningOptions(
   return options?.length && toLegacyVariants(options, undefined) ? options : undefined;
 }
 
+function isUsableModelsDevModel(model: ModelsDevModel) {
+  return (
+    model.status !== 'deprecated' &&
+    (!model.modalities?.output || model.modalities.output.includes('text')) &&
+    model.tool_call !== false &&
+    (!model.modalities?.input || model.modalities.input.includes('text'))
+  );
+}
+
+function toRawModel(model: ModelsDevModel, endpoint?: string): RawModel {
+  return {
+    id: model.id,
+    name: shortenDisplayName(model.name),
+    context_length: model.limit?.context,
+    max_completion_tokens: model.limit?.output,
+    input_modalities: model.modalities?.input,
+    flags: model.reasoning ? ['reasoning'] : undefined,
+    reasoning_options: supportedReasoningOptions(model.reasoning_options),
+    endpoint,
+  };
+}
+
 export function parseModelsDevProviderModels(
   entry: unknown,
   providerId: DirectUserByokInferenceProviderId,
@@ -152,23 +181,73 @@ export function parseModelsDevProviderModels(
   return Object.values(provider.models)
     .filter(
       model =>
-        model.status !== 'deprecated' &&
-        (!model.modalities?.output || model.modalities.output.includes('text')) &&
+        isUsableModelsDevModel(model) &&
         (!availableModelIds || availableModelIds.has(model.id)) &&
-        model.tool_call !== false &&
-        (!model.modalities?.input || model.modalities.input.includes('text')) &&
         (!model.provider?.npm || !GEMINI_API_MODELS_DEV_SDKS.has(model.provider.npm))
     )
-    .map(model => {
-      return {
-        id: model.id,
-        name: shortenDisplayName(model.name),
-        context_length: model.limit?.context,
-        max_completion_tokens: model.limit?.output,
-        input_modalities: model.modalities?.input,
-        flags: model.reasoning ? ['reasoning'] : undefined,
-        reasoning_options: supportedReasoningOptions(model.reasoning_options),
-      };
+    .map(model => toRawModel(model));
+}
+
+const BEDROCK_INFERENCE_PROFILE_PREFIX = /^(global|us|us-gov|eu|apac|au|jp|in|ca)\./;
+const BEDROCK_MANTLE_SDK = '@ai-sdk/amazon-bedrock/mantle';
+// Verified on 2026-10-21: these families have no OpenAI-compatible or Anthropic
+// endpoint on bedrock-runtime or bedrock-mantle; Bedrock serves them only
+// through its native Converse API, which the gateway cannot proxy.
+const BEDROCK_CONVERSE_ONLY_MODEL_PREFIXES = ['amazon.', 'mistral.pixtral-', 'qwen.qwen3-235b-'];
+
+function getBedrockMantleEndpoint(model: ModelsDevModel): AwsBedrockEndpoint | null {
+  if (model.provider?.npm !== BEDROCK_MANTLE_SDK) return null;
+  return model.provider.api?.endsWith('/openai/v1') ? 'mantle-openai' : 'mantle-v1';
+}
+
+/**
+ * One entry per Bedrock model. Claude and the open-weight models are called on
+ * bedrock-runtime through their `global.` cross-region inference profile when
+ * one exists, because on-demand calls to the base id fail. Models models.dev
+ * routes to bedrock-mantle are called there, except where only a `global.`
+ * profile on bedrock-runtime serves them; OpenAI's GPT models are the reverse.
+ */
+export function parseAwsBedrockModelsDevModels(entry: unknown): RawModel[] {
+  const { models } = ModelsDevProviderSchema.parse(entry);
+  const usable = Object.values(models).filter(isUsableModelsDevModel);
+  const globalIds = new Set(usable.map(model => model.id).filter(id => id.startsWith('global.')));
+
+  return usable.flatMap(model => {
+    if (BEDROCK_INFERENCE_PROFILE_PREFIX.test(model.id)) return [];
+    if (BEDROCK_CONVERSE_ONLY_MODEL_PREFIXES.some(prefix => model.id.startsWith(prefix))) {
+      return [];
+    }
+    const globalModel = globalIds.has(`global.${model.id}`) ? models[`global.${model.id}`] : null;
+    const mantleEndpoint = getBedrockMantleEndpoint(model);
+    if (mantleEndpoint && (!globalModel || model.id.startsWith('openai.'))) {
+      return [toRawModel(model, mantleEndpoint)];
+    }
+    const selected = globalModel ?? model;
+    const endpoint: AwsBedrockEndpoint = selected.id.includes('anthropic.claude')
+      ? 'runtime-anthropic'
+      : 'runtime-openai';
+    return [toRawModel(selected, endpoint)];
+  });
+}
+
+const VERTEX_ANTHROPIC_SDK = '@ai-sdk/google-vertex/anthropic';
+const VERTEX_OPENAI_COMPATIBLE_SDK = '@ai-sdk/openai-compatible';
+
+/**
+ * Gemini (no per-model SDK) and the managed open and partner models (the
+ * OpenAI-compatible SDK) use Vertex AI's Chat Completions endpoint; Claude uses
+ * Anthropic's format. Other publishers, such as Mistral, need their own
+ * request formats and are skipped.
+ */
+export function parseGcpVertexModelsDevModels(entry: unknown): RawModel[] {
+  const { models } = ModelsDevProviderSchema.parse(entry);
+  return Object.values(models)
+    .filter(isUsableModelsDevModel)
+    .flatMap(model => {
+      const npm = model.provider?.npm;
+      if (npm === VERTEX_ANTHROPIC_SDK) return [toRawModel(model, 'anthropic')];
+      if (!npm || npm === VERTEX_OPENAI_COMPATIBLE_SDK) return [toRawModel(model, 'openapi')];
+      return [];
     });
 }
 
@@ -222,6 +301,34 @@ async function getCatalogModelIds(
   return catalogModelIds;
 }
 
+function getModelsDevEntry(
+  providerId: DirectUserByokInferenceProviderId,
+  catalog: ModelsDevCatalog
+) {
+  const catalogKey = getModelsDevId(providerId);
+  if (!catalogKey) {
+    throw new Error(`${providerId} has no models.dev ID`);
+  }
+  const entry = catalog[catalogKey];
+  if (!entry) {
+    throw new Error(`models.dev catalog missing ${catalogKey} entry`);
+  }
+  return entry;
+}
+
+/** Parses a provider's models.dev entry with a provider-specific selection. */
+function customModelsDevFetcher(
+  providerId: DirectUserByokInferenceProviderId,
+  parse: (entry: unknown) => RawModel[]
+): ProviderFetcher {
+  return {
+    providerId,
+    async fetch(ctx) {
+      return parse(getModelsDevEntry(providerId, await ctx.getModelsDevCatalog()));
+    },
+  };
+}
+
 function modelsDevFetcher(
   providerId: DirectUserByokInferenceProviderId,
   availableModelsUrl?: string
@@ -229,15 +336,7 @@ function modelsDevFetcher(
   return {
     providerId,
     async fetch(ctx) {
-      const catalogKey = getModelsDevId(providerId);
-      if (!catalogKey) {
-        throw new Error(`${providerId} has no models.dev ID`);
-      }
-      const catalog = await ctx.getModelsDevCatalog();
-      const entry = catalog[catalogKey];
-      if (!entry) {
-        throw new Error(`models.dev catalog missing ${catalogKey} entry`);
-      }
+      const entry = getModelsDevEntry(providerId, await ctx.getModelsDevCatalog());
       if (!availableModelsUrl) {
         return parseModelsDevProviderModels(entry, providerId);
       }
@@ -311,6 +410,8 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
   modelsDevFetcher('opencode-go', 'https://opencode.ai/zen/go/v1/models'),
   modelsDevFetcher('xiaomi-token-plan-ams'),
   modelsDevFetcher('xiaomi-token-plan-sgp'),
+  customModelsDevFetcher('aws-bedrock', parseAwsBedrockModelsDevModels),
+  customModelsDevFetcher('gcp-vertex', parseGcpVertexModelsDevModels),
 ];
 
 async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise<number> {
@@ -337,6 +438,7 @@ async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise
       max_completion_tokens,
       reasoning_options: raw.reasoning_options,
       catalog_model_id: catalogModelIds.get(raw.id),
+      ...(raw.endpoint && { endpoint: raw.endpoint }),
     });
   }
 

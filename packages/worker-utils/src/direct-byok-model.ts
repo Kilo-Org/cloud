@@ -11,9 +11,11 @@
  */
 export const DIRECT_BYOK_PROVIDER_IDS = [
   'alibaba-token-plan',
+  'aws-bedrock',
   'byteplus-coding',
   'chutes-byok',
   'edenai',
+  'gcp-vertex',
   'kimi-coding',
   'inceptron-byok',
   'martian',

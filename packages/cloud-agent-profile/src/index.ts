@@ -148,6 +148,7 @@ export {
   MAX_KILO_COMMAND_DESCRIPTION_LENGTH,
   BUILTIN_COMMAND_NAMES,
   kiloCommandNameSchema,
+  kiloCommandReorderIdsSchema,
   kiloCommandCreateInputSchema,
   kiloCommandUpdateInputSchema,
   listKiloCommandsForProfile,

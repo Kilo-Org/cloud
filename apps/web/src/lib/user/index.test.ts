@@ -66,6 +66,7 @@ import {
   user_push_tokens,
   user_activity_tokens,
   user_notification_preferences,
+  user_notification_history,
   agent_briefing_reports,
   agent_briefing_events,
   agent_briefing_context_preferences,
@@ -5668,6 +5669,30 @@ describe('User', () => {
         .from(user_push_tokens)
         .where(eq(user_push_tokens.user_id, user.id));
       expect(tokens).toHaveLength(0);
+    });
+
+    it('should delete user_notification_history rows', async () => {
+      const user = await insertTestUser();
+      const other = await insertTestUser();
+      const historyRow = {
+        category: 'chatMessages',
+        push_type: 'chat.message',
+        payload: { type: 'chat.message' },
+        i18n_key: 'chat.message',
+        i18n_params: { conversationTitle: 'Hello' },
+        fallback_title: 'Kilo',
+        fallback_body: 'New message',
+        dedupe_bucket: Math.floor(Date.now() / 3_600_000),
+      };
+      await db.insert(user_notification_history).values([
+        { ...historyRow, user_id: user.id, idempotency_key: 'history-user' },
+        { ...historyRow, user_id: other.id, idempotency_key: 'history-other' },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      const remaining = await db.select().from(user_notification_history);
+      expect(remaining.map(row => row.idempotency_key)).toEqual(['history-other']);
     });
 
     it('should delete user_notification_preferences', async () => {

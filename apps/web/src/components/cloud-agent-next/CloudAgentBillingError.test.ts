@@ -39,15 +39,17 @@ describe('CloudAgentBillingError', () => {
       presentation: personal,
     });
     expect(html).toContain('role="alert"');
-    expect(html).toContain('Your account needs more credits to start Cloud Agent compute.');
-    expect(html).toContain('Available: $1.25 · Need more than $2.00');
-    expect(html).toContain('Your prompt did not start.');
+    expect(html).toContain(
+      'Your account needs more credits for Cloud Agent compute. Add credits, then send a new message.'
+    );
+    expect(html).toContain('Available: $1.25 · Need at least $2.00');
+    expect(html).not.toContain('Your prompt did not start.');
     expect(html).toContain('Add credits');
   });
 
   it.each([
     ['remainingMicrodollars', 'Available: $1.00'],
-    ['minimumRequiredMicrodollars', 'Need more than $2.00'],
+    ['minimumRequiredMicrodollars', 'Need at least $2.00'],
   ] as const)('renders %s independently', (key, text) => {
     const html = renderBillingError({
       failure: {
@@ -71,7 +73,7 @@ describe('CloudAgentBillingError', () => {
     ],
     [
       'BILLING_UNAVAILABLE',
-      'Cloud Agent cannot verify compute billing right now. Your prompt has not started and you have not been charged.',
+      'Cloud Agent cannot verify compute billing right now. Try again shortly.',
     ],
   ] as const)('renders exact %s core copy without an action', (code, copy) => {
     const html = renderBillingError({
@@ -100,6 +102,6 @@ describe('CloudAgentBillingError', () => {
         remainingMicrodollars: 5_000_000,
         minimumRequiredMicrodollars: 5_000_000,
       })
-    ).toBe('Available: $5.00 · Need more than $5.00');
+    ).toBe('Available: $5.00 · Need at least $5.00');
   });
 });

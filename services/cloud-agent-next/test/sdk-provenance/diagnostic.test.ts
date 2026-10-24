@@ -165,7 +165,7 @@ it.each(cases)('bounds the existing stop snapshot: $name', async scenario => {
     });
     const lifecycle = new MeteredBillingLifecycle({
       storage: ctx.storage,
-      usageClient: {} as ContainerUsageClient,
+      usageClient: { recordStart: vi.fn(async () => undefined) } as unknown as ContainerUsageClient,
       schedule: async () => {
         throw new Error('Unexpected scheduling');
       },
@@ -186,10 +186,18 @@ it.each(cases)('bounds the existing stop snapshot: $name', async scenario => {
         pending.push(promise);
       },
     });
-    const persistStop = vi.fn(async (_received: unknown, _stoppedAtMs?: number) => {
-      order.push('persist_stop');
-      return undefined;
-    });
+    const persistStop = vi.fn(
+      async (
+        received: { reason: 'exit' | 'runtime_signal' | 'activity_expired'; exitCode?: number },
+        stoppedAtMs = 1000
+      ) => {
+        order.push('persist_stop');
+        return {
+          ...billingContext,
+          pendingStop: { ...received, seq: 1, usageSinceLast: 0, measuredAtMs: stoppedAtMs },
+        };
+      }
+    );
     lifecycle.attachHeartbeat({
       persistStop,
       scheduleHeartbeat: async () => {
@@ -198,14 +206,16 @@ it.each(cases)('bounds the existing stop snapshot: $name', async scenario => {
       billingHeartbeatTick: async () => {
         throw new Error('Unexpected heartbeat');
       },
-      recordStop: async () => {
-        throw new Error('Unexpected settlement RPC');
-      },
+      recordStop: vi.fn(async () => undefined),
       cancelHeartbeat: () => {
         throw new Error('Unexpected heartbeat');
       },
     });
-    const billingContext = await setBillingContext(ctx.storage, attribution);
+    const billingContext = {
+      ...(await setBillingContext(ctx.storage, attribution)),
+      usageMeasuredAtMs: 0,
+    };
+    await updateBillingContext(ctx.storage, billingContext);
     const before = await ctx.storage.list();
     clock.mockClear();
     timers.mockClear();
@@ -215,7 +225,7 @@ it.each(cases)('bounds the existing stop snapshot: $name', async scenario => {
       });
       await Promise.all(pending);
       expect(getState).toHaveBeenCalledOnce();
-      expect(clockCallsAtScheduling).toBe(scenario.clockCalls ?? 1);
+      expect(clockCallsAtScheduling).toBe((scenario.clockCalls ?? 1) + 1);
       expect(timers).not.toHaveBeenCalled();
       expect(order).toEqual(['cleanup', 'existing_state_read', 'persist_stop']);
       expect(persistStop).toHaveBeenCalledOnce();
@@ -367,7 +377,7 @@ it('preserves real heartbeat settlement and one stop record per settled generati
       expect(logs).toHaveLength(1);
       expect(logs[0]).toMatchObject({
         generation: context.generation,
-        lifetimeMs: 3900,
+        lifetimeMs: 3000,
         reason: 'exit',
         exitCode: 0,
         sdkCallbackState: 'stopped_with_code',

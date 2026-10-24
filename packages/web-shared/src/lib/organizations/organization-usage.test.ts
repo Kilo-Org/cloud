@@ -687,7 +687,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 30000, // $0.03 usage
       });
@@ -716,7 +716,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 50000, // $0.05 usage (equal to limit)
       });
@@ -745,7 +745,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 75000, // $0.075 usage (exceeds limit)
       });
@@ -776,7 +776,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 60000, // $0.06 usage (exceeds limit)
       });
@@ -809,7 +809,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 10000, // $0.01 usage (allowance remains)
       });
@@ -840,7 +840,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE - INTERVAL '1 day'`, // Yesterday
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date - INTERVAL '1 day'`, // Yesterday
         limit_type: 'daily',
         microdollar_usage: 100000, // $0.10 usage (exceeds limit, but from yesterday)
       });
@@ -848,7 +848,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 10000, // $0.01 usage (below limit)
       });
@@ -881,7 +881,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user1.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 60000, // $0.06 usage (exceeds user1's limit)
       });
@@ -889,7 +889,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user2.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 20000, // $0.02 usage (below user2's limit)
       });
@@ -917,7 +917,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: org1.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 60000, // $0.06 usage (exceeds org1's limit)
       });
@@ -925,7 +925,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: org2.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 20000, // $0.02 usage (below org2's limit)
       });
@@ -947,7 +947,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 0, // Zero usage
       });
@@ -974,7 +974,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 1, // 1 microdollar usage
       });
@@ -995,7 +995,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 50000, // $0.05 usage
       });
@@ -1106,7 +1106,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 10000, // $0.01 usage
       });
@@ -1142,7 +1142,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 5000, // $0.005 usage
       });

@@ -2,6 +2,7 @@ import 'server-only';
 
 import { and, eq, gt, sql } from 'drizzle-orm';
 import {
+  compute_usage_charge,
   microdollar_usage,
   spend_alert_deliveries,
   spend_alert_hourly,
@@ -40,7 +41,7 @@ import type { db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
  * each stretch by the slots that stretch was actually granted, so nothing in it
  * waits longer than the rollup window. See {@link MAX_SCOPE_DECISIONS_PER_RUN}.
  *
- * The rolled-up bucket is re-derived from `microdollar_usage`, never
+ * The rolled-up bucket is re-derived from model and compute usage, never
  * incremented, so a replayed or overlapping window cannot double count. The
  * per-run cost is proportional to the usage rows written in the window: an idle
  * fleet costs one empty range scan. Nothing is added to the usage write path.
@@ -519,18 +520,33 @@ export type SpendAlertRollup = {
  */
 export async function sweepHourlyBuckets(
   database: Db,
-  options: { lookbackHours?: number; now?: Date } = {}
+  options: { lookbackHours?: number; now?: Date; scopeKey?: string } = {}
 ): Promise<SpendAlertRollup> {
   const lookbackHours = options.lookbackHours ?? LOOKBACK_HOURS;
   const now = options.now ?? new Date();
   const from = rollupWindowStart(now, lookbackHours);
+  const scope =
+    options.scopeKey === undefined ? undefined : parseSpendAlertScopeKey(options.scopeKey);
+  if (scope === null) throw new Error('Invalid spend alert scope');
+  const modelScope =
+    scope === undefined
+      ? sql`true`
+      : scope.type === 'personal'
+        ? sql`${microdollar_usage.organization_id} IS NULL AND ${microdollar_usage.kilo_user_id} = ${scope.userId}`
+        : sql`${microdollar_usage.organization_id} = ${scope.organizationId}`;
+  const computeScope =
+    scope === undefined
+      ? sql`true`
+      : scope.type === 'personal'
+        ? sql`${compute_usage_charge.organization_id} IS NULL AND ${compute_usage_charge.user_id} = ${scope.userId}`
+        : sql`${compute_usage_charge.organization_id} = ${scope.organizationId}`;
 
   // One scan feeds both answers: `rederived` is the aggregate over the window,
   // `rewritten` the guarded upsert over it, and the outer select joins the
   // guarded write back onto the aggregate so the re-derived set survives the
-  // guard. Two separate statements would scan `microdollar_usage` twice.
+  // guard. Two separate statements would scan the usage ledgers twice.
   const rows = await database.execute<{ scope_key: string; changed: boolean }>(sql`
-    WITH rederived AS (
+    WITH usage AS (
       SELECT
         CASE
           WHEN ${microdollar_usage.organization_id} IS NULL
@@ -538,11 +554,29 @@ export async function sweepHourlyBuckets(
           ELSE 'org:' || ${microdollar_usage.organization_id}
         END AS scope_key,
         date_trunc('hour', ${microdollar_usage.created_at}) AS hour_start,
-        SUM(${microdollar_usage.cost}) AS cost_microdollars
+        ${microdollar_usage.cost} AS cost_microdollars
       FROM ${microdollar_usage}
       WHERE ${microdollar_usage.created_at} >= ${from}
         AND ${microdollar_usage.created_at} <= ${now}
-      GROUP BY 1, 2
+        AND ${modelScope}
+      UNION ALL
+      SELECT
+        CASE
+          WHEN ${compute_usage_charge.organization_id} IS NULL
+            THEN 'user:' || ${compute_usage_charge.user_id}
+          ELSE 'org:' || ${compute_usage_charge.organization_id}
+        END AS scope_key,
+        date_trunc('hour', ${compute_usage_charge.created_at}) AS hour_start,
+        ${compute_usage_charge.amount_microdollars} AS cost_microdollars
+      FROM ${compute_usage_charge}
+      WHERE ${compute_usage_charge.created_at} >= ${from}
+        AND ${compute_usage_charge.created_at} <= ${now}
+        AND ${computeScope}
+    ),
+    rederived AS (
+      SELECT scope_key, hour_start, SUM(cost_microdollars) AS cost_microdollars
+      FROM usage
+      GROUP BY scope_key, hour_start
     ),
     rewritten AS (
       INSERT INTO ${spend_alert_hourly} (scope_key, hour_start, cost_microdollars, updated_at)

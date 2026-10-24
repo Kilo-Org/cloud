@@ -7,7 +7,6 @@ import type {
 import type { OrganizationPlan } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   organization_user_limits,
-  organization_user_usage,
   organizations,
   organization_memberships,
   microdollar_usage,
@@ -197,108 +196,15 @@ export async function getBalanceForOrganizationUser(
   };
 }
 
-export type OrganizationUsageMutationResult = {
-  crossedMinimumBalance: boolean;
-  recipients: string[];
-  minimumBalanceMicrodollars: number | null;
-};
-
-const NO_ORGANIZATION_BALANCE_ALERT: OrganizationUsageMutationResult = {
-  crossedMinimumBalance: false,
-  recipients: [],
-  minimumBalanceMicrodollars: null,
-};
-
-export type OrganizationUsageMutationInput = Pick<
-  MicrodollarUsage,
-  'kilo_user_id' | 'organization_id' | 'cost' | 'created_at'
->;
-
-export async function mutateOrganizationUsage(
-  tx: DrizzleTransaction,
-  usage: OrganizationUsageMutationInput
-): Promise<OrganizationUsageMutationResult> {
-  const { cost, kilo_user_id, organization_id, created_at } = usage;
-  if (!organization_id) return NO_ORGANIZATION_BALANCE_ALERT;
-
-  const limitType: OrganizationUserLimitType = 'daily';
-  await tx.execute(sql`
-    INSERT INTO ${organization_user_usage} (
-      organization_id,
-      kilo_user_id,
-      usage_date,
-      limit_type,
-      microdollar_usage,
-      created_at,
-      updated_at
-    )
-    SELECT
-      ${organization_id},
-      ${kilo_user_id},
-      (${created_at}::timestamptz AT TIME ZONE 'UTC')::date,
-      ${limitType},
-      ${cost},
-      NOW(),
-      NOW()
-    WHERE EXISTS (
-      SELECT 1
-      FROM ${organization_memberships}
-      WHERE ${organization_memberships.organization_id} = ${organization_id}
-        AND ${organization_memberships.kilo_user_id} = ${kilo_user_id}
-    )
-      AND EXISTS (
-        SELECT 1
-        FROM ${organizations}
-        WHERE ${organizations.id} = ${organization_id}
-      )
-    ON CONFLICT (organization_id, kilo_user_id, limit_type, usage_date)
-    DO UPDATE SET
-      microdollar_usage = ${organization_user_usage.microdollar_usage} + ${cost},
-      updated_at = NOW()
-  `);
-
-  type OrganizationBalanceRow = {
-    total_microdollars_acquired: number;
-    previous_microdollars_used: number;
-    new_microdollars_used: number;
-    settings: OrganizationSettings | null;
-  };
-  const balanceRows: OrganizationBalanceRow[] = await tx
-    .update(organizations)
-    .set({
-      microdollars_used: sql`${organizations.microdollars_used} + ${cost}`,
-      microdollars_balance: sql`${organizations.microdollars_balance} - ${cost}`,
-    })
-    .where(eq(organizations.id, organization_id))
-    .returning({
-      total_microdollars_acquired: organizations.total_microdollars_acquired,
-      previous_microdollars_used: sql<number>`${organizations.microdollars_used} - ${cost}`.mapWith(
-        Number
-      ),
-      new_microdollars_used: organizations.microdollars_used,
-      settings: organizations.settings,
-    });
-
-  const [orgData] = balanceRows;
-  if (!orgData) return NO_ORGANIZATION_BALANCE_ALERT;
-
-  const currentBalance = orgData.total_microdollars_acquired - orgData.previous_microdollars_used;
-  const newBalance = orgData.total_microdollars_acquired - orgData.new_microdollars_used;
-  const minimumBalance = orgData.settings?.minimum_balance
-    ? toMicrodollars(orgData.settings.minimum_balance)
-    : null;
-  const crossedMinimumBalance =
-    minimumBalance != null && currentBalance >= minimumBalance && newBalance < minimumBalance;
-  const recipients = crossedMinimumBalance
-    ? (orgData.settings?.minimum_balance_alert_email ?? [])
-    : [];
-
-  return {
-    crossedMinimumBalance,
-    recipients,
-    minimumBalanceMicrodollars: minimumBalance,
-  };
-}
+export { mutateOrganizationUsage } from '@kilocode/worker-utils/organization-usage';
+import {
+  mutateOrganizationUsage,
+  type OrganizationUsageMutationResult,
+} from '@kilocode/worker-utils/organization-usage';
+export type {
+  OrganizationUsageMutationResult,
+  OrganizationUsageMutationInput,
+} from '@kilocode/worker-utils/organization-usage';
 
 export function scheduleOrganizationLowBalanceAlert(
   organizationId: Organization['id'],
@@ -306,64 +212,70 @@ export function scheduleOrganizationLowBalanceAlert(
 ): void {
   const { crossedMinimumBalance, minimumBalanceMicrodollars, recipients } = result;
   if (!crossedMinimumBalance || minimumBalanceMicrodollars == null) return;
+  after(() =>
+    sendOrganizationLowBalanceAlert(organizationId, minimumBalanceMicrodollars, recipients)
+  );
+}
 
+export async function sendOrganizationLowBalanceAlert(
+  organizationId: Organization['id'],
+  minimumBalanceMicrodollars: number,
+  recipients: string[]
+): Promise<void> {
   logExceptInTest(
     `[ingestOrganizationTokenUsage] Balance alert triggered for org ${organizationId}: threshold=${fromMicrodollars(minimumBalanceMicrodollars)} recipients=${recipients.length}`
   );
-  after(async () => {
-    await sendBalanceAlertEmail({
-      organizationId,
-      minimum_balance: fromMicrodollars(minimumBalanceMicrodollars),
-      to: recipients,
-    }).catch(err => {
-      console.error('[ingestOrganizationTokenUsage] Failed to send balance alert email:', err);
-    });
-
-    // Best-effort mobile push: never block or fail the email path.
-    try {
-      const [org] = await db
-        .select({ name: organizations.name })
-        .from(organizations)
-        .where(eq(organizations.id, organizationId))
-        .limit(1);
-      if (!org) {
-        console.error(
-          `[ingestOrganizationTokenUsage] Skipping low-balance push: org ${organizationId} not found`
-        );
-        return;
-      }
-
-      if (recipients.length === 0) return;
-
-      const memberUsers = await db
-        .select({ id: kilocode_users.id })
-        .from(kilocode_users)
-        .innerJoin(
-          organization_memberships,
-          and(
-            eq(organization_memberships.kilo_user_id, kilocode_users.id),
-            eq(organization_memberships.organization_id, organizationId)
-          )
-        )
-        .where(inArray(kilocode_users.google_user_email, recipients));
-
-      const recipientUserIds = [...new Set(memberUsers.map(u => u.id))];
-      if (recipientUserIds.length === 0) return;
-
-      await dispatchLowBalancePush({
-        recipientUserIds,
-        organizationId,
-        organizationName: org.name,
-        minimumBalanceUsd: fromMicrodollars(minimumBalanceMicrodollars),
-      }).catch(err => {
-        console.error('[ingestOrganizationTokenUsage] Failed to dispatch low-balance push:', err);
-      });
-    } catch (err) {
-      console.error('[ingestOrganizationTokenUsage] Failed to dispatch low-balance push:', err);
-    }
+  await sendBalanceAlertEmail({
+    organizationId,
+    minimum_balance: fromMicrodollars(minimumBalanceMicrodollars),
+    to: recipients,
+  }).catch(err => {
+    console.error('[ingestOrganizationTokenUsage] Failed to send balance alert email:', err);
   });
-}
 
+  // Best-effort mobile push: never block or fail the email path.
+  try {
+    const [org] = await db
+      .select({ name: organizations.name })
+      .from(organizations)
+      .where(eq(organizations.id, organizationId))
+      .limit(1);
+    if (!org) {
+      console.error(
+        `[ingestOrganizationTokenUsage] Skipping low-balance push: org ${organizationId} not found`
+      );
+      return;
+    }
+
+    if (recipients.length === 0) return;
+
+    const memberUsers = await db
+      .select({ id: kilocode_users.id })
+      .from(kilocode_users)
+      .innerJoin(
+        organization_memberships,
+        and(
+          eq(organization_memberships.kilo_user_id, kilocode_users.id),
+          eq(organization_memberships.organization_id, organizationId)
+        )
+      )
+      .where(inArray(kilocode_users.google_user_email, recipients));
+
+    const recipientUserIds = [...new Set(memberUsers.map(u => u.id))];
+    if (recipientUserIds.length === 0) return;
+
+    await dispatchLowBalancePush({
+      recipientUserIds,
+      organizationId,
+      organizationName: org.name,
+      minimumBalanceUsd: fromMicrodollars(minimumBalanceMicrodollars),
+    }).catch(err => {
+      console.error('[ingestOrganizationTokenUsage] Failed to dispatch low-balance push:', err);
+    });
+  } catch (err) {
+    console.error('[ingestOrganizationTokenUsage] Failed to dispatch low-balance push:', err);
+  }
+}
 export async function ingestOrganizationTokenUsage(usage: MicrodollarUsage): Promise<void> {
   if (!usage.organization_id) return;
   const result = await db.transaction(tx => mutateOrganizationUsage(tx, usage));

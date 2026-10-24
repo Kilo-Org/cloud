@@ -78,6 +78,26 @@ function cloudflareProvider(
 afterEach(() => vi.unstubAllGlobals());
 
 describe('native egress policy forwarding', () => {
+  it('preserves the payer and exact balance details from a native admission denial', async () => {
+    const provider = cloudflareProvider('cloudflare-containers', async () => ({
+      success: false,
+      code: 'insufficient_credits',
+      message: 'raw-private-detail',
+      remainingMicrodollars: 4_000_000,
+      minimumRequiredMicrodollars: 5_000_000,
+    }));
+    await expect(provider.create(intent)).rejects.toMatchObject({
+      permanentReason: 'billing_blocked',
+      billingFailure: {
+        code: 'INSUFFICIENT_CREDITS',
+        payer: billing.subject,
+        retryable: true,
+        remainingMicrodollars: 4_000_000,
+        minimumRequiredMicrodollars: 5_000_000,
+      },
+    });
+  });
+
   it.each([
     { egressAllowlist: undefined },
     { egressAllowlist: [] },
@@ -191,23 +211,30 @@ describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation cau
       await expect(provider.create(intent)).rejects.toBe(denial);
     }
   );
-  it.each(['insufficient_credits', 'stopping', 'meter_unavailable'] as const)(
-    'preserves %s independently of unsafe provider text',
-    async code => {
-      const provider = cloudflareProvider(kind, async () => ({
-        success: false,
-        code,
-        message: 'raw-sensitive-provider-detail',
-      }));
-      const error = await provider.create(intent).catch((error: unknown) => error);
-      expect(error).toBeInstanceOf(ProviderCreationError);
-      expect(error).toMatchObject({
-        code,
-        permanentReason: code === 'insufficient_credits' ? 'billing_blocked' : null,
-      });
-      expect(error).not.toMatchObject({ message: 'raw-sensitive-provider-detail' });
-    }
-  );
+  it.each([
+    'insufficient_credits',
+    'stopping',
+    'meter_unavailable',
+    'invalid_configuration',
+  ] as const)('preserves %s independently of unsafe provider text', async code => {
+    const provider = cloudflareProvider(kind, async () => ({
+      success: false,
+      code,
+      message: 'raw-sensitive-provider-detail',
+    }));
+    const error = await provider.create(intent).catch((error: unknown) => error);
+    expect(error).toBeInstanceOf(ProviderCreationError);
+    expect(error).toMatchObject({
+      code,
+      permanentReason:
+        code === 'insufficient_credits'
+          ? 'billing_blocked'
+          : code === 'invalid_configuration'
+            ? 'invalid_configuration'
+            : null,
+    });
+    expect(error).not.toMatchObject({ message: 'raw-sensitive-provider-detail' });
+  });
 
   it('does not promote a transport exception containing billing text to insufficient credits', async () => {
     const provider = cloudflareProvider(kind, async () => {

@@ -30,7 +30,7 @@ export function billingBalanceCopy(failure: CustomerBillingFailure): string | nu
   const required =
     failure.minimumRequiredMicrodollars === undefined
       ? undefined
-      : `Need more than ${formatBillingMoney(failure.minimumRequiredMicrodollars)}`;
+      : `Need at least ${formatBillingMoney(failure.minimumRequiredMicrodollars)}`;
   return [available, required].filter(Boolean).join(' · ') || null;
 }
 
@@ -41,10 +41,12 @@ export function CloudAgentBillingError({ failure, presentation }: Props) {
   const balanceCopy = billingBalanceCopy(failure);
   const content =
     failure.code === 'INSUFFICIENT_CREDITS'
-      ? `${payerName} needs more credits to start Cloud Agent compute.`
+      ? failure.payer.type === 'org'
+        ? `${payerName} cannot cover Cloud Agent compute. Add credits or ask an owner or admin to check your daily spending limit, then send a new message.`
+        : `${payerName} needs more credits for Cloud Agent compute. Add credits, then send a new message.`
       : failure.code === 'COMPUTE_STOPPING'
         ? 'Cloud Agent is saving and stopping compute. Your prompt has not started. Try again after shutdown completes.'
-        : 'Cloud Agent cannot verify compute billing right now. Your prompt has not started and you have not been charged.';
+        : 'Cloud Agent cannot verify compute billing right now. Try again shortly.';
   return (
     <Alert variant="destructive" className="min-w-0">
       <AlertCircle className="size-4" aria-hidden="true" />
@@ -52,10 +54,7 @@ export function CloudAgentBillingError({ failure, presentation }: Props) {
       <AlertDescription className="space-y-2">
         <p>{content}</p>
         {failure.code === 'INSUFFICIENT_CREDITS' && (
-          <>
-            {balanceCopy && <p className="font-mono text-xs tabular-nums">{balanceCopy}</p>}
-            <p>Your prompt did not start.</p>
-          </>
+          <>{balanceCopy && <p className="font-mono text-xs tabular-nums">{balanceCopy}</p>}</>
         )}
         {action && (
           <div className="flex flex-wrap items-center gap-2">

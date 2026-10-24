@@ -67,6 +67,7 @@ exist as an org-scoped mirror under `organizations`, for example
 - `codeIndexing`
 - `codeReviews`
 - `codingPlans`
+- `computeBilling`
 - `credits`
 - `debug`
 - `discord`

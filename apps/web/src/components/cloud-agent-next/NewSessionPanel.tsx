@@ -23,6 +23,7 @@ import { startOfDay, subDays } from 'date-fns';
 import { useTRPC } from '@/lib/trpc/utils';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { Badge } from '@/components/ui/badge';
+import { ComputePrice } from './ComputePrice';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { MobileToolbarPopover } from './MobileToolbarPopover';
@@ -1012,6 +1013,20 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     repository: environmentRepository,
   });
 
+  const sandboxSelectionInput = {
+    repositoryType: hasPublicRepo ? ('git' as const) : selectedPlatform,
+    repositoryFullName: selectedRepo || undefined,
+  };
+  const sandboxOptions = useQuery({
+    ...(organizationId
+      ? trpc.organizations.cloudAgentNext.getSandboxSelectionOptions.queryOptions({
+          organizationId,
+          ...sandboxSelectionInput,
+        })
+      : trpc.cloudAgentNext.getSandboxSelectionOptions.queryOptions(sandboxSelectionInput)),
+    retry: false,
+  });
+
   const creationInput = useMemo(() => {
     const trimmed = prompt.trim();
     const slashMatch = /^\s*\/([\w.-]+)(?:\s+([\s\S]*))?\s*$/.exec(trimmed);
@@ -1765,6 +1780,17 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                 organizationId={organizationId}
                 repository={environmentRepository}
                 selectedProfileId={selectedProfileId}
+              />
+            )}
+            {sandboxOptions.isError ? (
+              <span className="text-muted-foreground text-xs">Compute price unavailable</span>
+            ) : (
+              <ComputePrice
+                destination={
+                  sandboxOptions.data?.effectiveDestination ??
+                  sandboxOptions.data?.defaultDestination
+                }
+                label="Compute"
               />
             )}
             <ProfilePickerPopover

@@ -49,6 +49,7 @@ import { moderationRouter } from '@/routers/moderation-router';
 import { userExportsRouter } from '@/routers/user-exports-router';
 import { spendAlertRouter } from '@/routers/spend-alert-router';
 import { agentBriefingRouter } from '@/routers/agent-briefing-router';
+import { computeBillingRouter } from '@/routers/compute-billing-router';
 export const rootRouter = createTRPCRouter({
   test: testRouter,
   organizations: organizationsRouter,
@@ -99,6 +100,7 @@ export const rootRouter = createTRPCRouter({
   userExports: userExportsRouter,
   spendAlerts: spendAlertRouter,
   agentBriefing: agentBriefingRouter,
+  computeBilling: computeBillingRouter,
 });
 // export type definition of API
 export type RootRouter = typeof rootRouter;

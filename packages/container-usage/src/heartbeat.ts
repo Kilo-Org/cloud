@@ -52,7 +52,8 @@ export type BillingHeartbeatDependencies = {
   ) => void | Promise<void>;
   enforceBudgetStop: (
     budget: BudgetVerdict,
-    expected: { generation: string; startEpochMs: number }
+    expected: { generation: string; startEpochMs: number },
+    failureCode?: 'BILLING_UNAVAILABLE'
   ) => Promise<void>;
   onBudgetWarning?: (budget: BudgetVerdict) => Promise<void> | void;
 };
@@ -444,7 +445,8 @@ export function installBillingHeartbeat(
           {
             generation: context.generation,
             startEpochMs: context.startEpochMs,
-          }
+          },
+          'BILLING_UNAVAILABLE'
         );
         if (!dependencies.deferBudgetStopFinalSettlement) {
           await recordStopForGeneration({ reason: 'runtime_signal' }, context.generation);

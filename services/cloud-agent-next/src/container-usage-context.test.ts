@@ -1,3 +1,4 @@
+import { ContainerUsageAdmissionError } from '@kilocode/container-usage';
 import { describe, expect, it, vi } from 'vitest';
 import type { VercelSandboxResources } from '@kilocode/worker-utils/sandbox-allocation';
 import type { SandboxId, SandboxInstance } from './types.js';
@@ -5,6 +6,7 @@ import type { SessionMetadata } from './persistence/session-metadata.js';
 import { containerLimitError } from './container-limit-test-helpers.js';
 import {
   assertSandboxBillingAllocation,
+  billingAdmissionFailureFromError,
   billingCapacityForSandboxClass,
   buildSandboxBillingInput,
   ensureSandboxBillingAdmissionInput,
@@ -32,6 +34,26 @@ function metadata(identity: SessionMetadata['identity']): SessionMetadata {
 }
 
 describe('container usage context', () => {
+  it('retains the trusted acting user for native organization bot compute only', () => {
+    const session = metadata({
+      sessionId: 'workspace_test',
+      userId: 'org-bot-user',
+      orgId: 'org_1',
+      botId: 'webhook',
+    });
+    session.workspace = { sandboxProvider: 'cloudflare-containers' };
+    const native = buildSandboxBillingInput(session, 'ses-abcdef');
+    expect(native.metadata?.billingUserId).toBe('org-bot-user');
+    expect(native.onBehalfOf).toEqual({ type: 'org', id: 'org_1' });
+    expect(() =>
+      assertSandboxBillingAllocation('SandboxContainersStandard3', native)
+    ).not.toThrow();
+    session.workspace.sandboxProvider = 'cloudflare';
+    expect(buildSandboxBillingInput(session, 'ses-abcdef').metadata).toEqual({ origin: 'other' });
+    session.workspace.sandboxProvider = 'vercel';
+    expect(buildSandboxBillingInput(session, 'ses-abcdef').metadata).toEqual({ origin: 'other' });
+  });
+
   it('invokes billing status as a binding method for RPC proxies', async () => {
     const status = {
       sandboxClassName: 'SandboxSmall' as const,
@@ -610,3 +632,12 @@ describe('container usage context', () => {
     ).rejects.toBe(failure);
   });
 });
+
+it.each(['sku_not_found', 'sku_unit_mismatch', 'sku_not_accepting_new_usage'] as const)(
+  'classifies permanent SKU rejection %s without retrying',
+  code => {
+    expect(
+      billingAdmissionFailureFromError(new ContainerUsageAdmissionError(code, 'Rejected'))
+    ).toMatchObject({ success: false, code: 'invalid_configuration' });
+  }
+);

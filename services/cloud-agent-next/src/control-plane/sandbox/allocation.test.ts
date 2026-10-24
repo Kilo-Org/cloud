@@ -310,6 +310,23 @@ describe('allocation create retry', () => {
     expect(due.state.createDeadlineAt).toBe(retryAt + TIMERS.providerCreateMs);
   });
 
+  it('does not wait beyond an admission deadline during the create retry pause', () => {
+    const retryDeadlineAt = CREATE_FAILED_AT + 5_000;
+    const { state } = reduceAllocation(
+      creatingState(),
+      {
+        type: 'create-failed',
+        at: CREATE_FAILED_AT,
+        allocationId: 'alloc-1',
+        nextAllocationId: 'alloc-2',
+        retryAllowed: true,
+        retryDeadlineAt,
+      },
+      TIMERS
+    );
+    expect(nextAllocationAlarmAt(state, TIMERS)).toBe(retryDeadlineAt);
+  });
+
   it('stops instead of retrying when no route attempt time remains', () => {
     const { state, effects } = failCreate(false);
     expect(state).toEqual(initialAllocationState());

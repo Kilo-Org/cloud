@@ -28,5 +28,6 @@ export const controlPlaneMessages = sqliteTable('control_plane_messages', {
   accepted_at: integer('accepted_at'),
   settled_at: integer('settled_at'),
   reason: text('reason'),
+  billing_failure: text('billing_failure'),
   container: text('container'),
 });

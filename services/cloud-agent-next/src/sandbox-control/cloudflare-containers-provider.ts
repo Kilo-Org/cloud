@@ -1,3 +1,4 @@
+import { billingFailureFromAdmission } from '../billing-failure.js';
 import { CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE } from '@kilocode/worker-utils/sandbox-allocation';
 import { getContainerCapacityFailureReason } from '../container-concurrency.js';
 import {
@@ -101,7 +102,12 @@ export function createCloudflareContainersProviderAdapter(deps: {
       };
     }
     if (!admission.success) {
-      throw new ProviderCreationError(admission.code);
+      throw new ProviderCreationError(
+        admission.code,
+        admission.code === 'invalid_configuration'
+          ? undefined
+          : billingFailureFromAdmission(input.subject, { ...admission, code: admission.code })
+      );
     }
   };
 

@@ -53,6 +53,7 @@ import {
   cloudMessageFailedDataSchema,
   type CloudAgentEvent,
   type SessionStatus,
+  type CustomerBillingFailure,
 } from './schemas';
 
 /** Chat events — data mutations for messages and parts. */
@@ -217,6 +218,7 @@ export type ServiceEvent =
       executionId?: string | undefined;
       delivery?: 'queued' | 'sent' | undefined;
       accepted?: boolean | undefined;
+      billingFailure?: CustomerBillingFailure;
       error: string;
       reason: 'interrupted' | 'exhausted' | 'execution';
       attempts?: number | undefined;
@@ -695,6 +697,10 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
         error,
         reason,
         attempts,
+        ...((rawReason === 'billing_blocked' || rawReason === 'billing_unavailable') &&
+        r.data.billingFailure !== undefined
+          ? { billingFailure: r.data.billingFailure }
+          : {}),
       };
     }
 

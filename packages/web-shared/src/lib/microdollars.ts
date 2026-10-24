@@ -1,3 +1,1 @@
-export function toMicrodollars(amount: number): number {
-  return Math.round(amount * 1000000);
-}
+export { toMicrodollars } from '@kilocode/worker-utils/microdollars';

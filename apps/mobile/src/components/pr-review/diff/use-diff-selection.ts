@@ -13,12 +13,15 @@ import {
   setDiffSelection,
 } from '@/lib/pr-review/diff-selection-bridge';
 import { type SelectionState, selectLine } from '@/lib/pr-review/diff-selection';
+import { type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 import { type DiffViewMode } from '@/lib/pr-review/diff/pr-diff-list-items';
 
 type UseDiffSelectionArgs = {
   owner: string;
   repo: string;
   number: number;
+  /** The provider ref (identity rule 17) the selection bridge keys under. */
+  ref?: ProviderPrRef;
   viewMode: DiffViewMode;
   isTablet: boolean;
 };
@@ -41,6 +44,7 @@ export function useDiffSelection({
   owner,
   repo,
   number,
+  ref,
   viewMode,
   isTablet,
 }: UseDiffSelectionArgs): UseDiffSelectionResult {
@@ -53,12 +57,12 @@ export function useDiffSelection({
     if (isTablet && viewMode === 'side-by-side') {
       setSelectionState(prev => {
         if (prev) {
-          clearDiffSelection({ owner, repo, number });
+          clearDiffSelection({ owner, repo, number, ref });
         }
         return null;
       });
     }
-  }, [isTablet, viewMode, owner, repo, number]);
+  }, [isTablet, viewMode, owner, repo, number, ref]);
 
   // Diff-line tap producer: build the per-side line-number → text map
   // for this hunk, run the reducer, mirror to the bridge, and store
@@ -88,6 +92,7 @@ export function useDiffSelection({
           owner,
           repo,
           number,
+          ref,
           path: next.path,
           side: next.side,
           line: next.line,
@@ -98,7 +103,7 @@ export function useDiffSelection({
         return next;
       });
     },
-    [owner, repo, number]
+    [owner, repo, number, ref]
   );
 
   const selectionView: SelectionView = useMemo(() => {

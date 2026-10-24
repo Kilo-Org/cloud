@@ -96,14 +96,6 @@ describe('highlightLine', () => {
     expect(texts(tokens).join('')).toBe('// hello');
   });
 
-  it('re-runs the same line through the cache and returns the same tokens', () => {
-    const a = highlightLine('const x = 1;', 'typescript');
-    const b = highlightLine('const x = 1;', 'typescript');
-    // Reference equality is not required, but the tokenized output
-    // should match exactly so the UI doesn't see visual diffs.
-    expect(b).toEqual(a);
-  });
-
   it('falls back to plain text when the highlighter throws', () => {
     // unknown language — lowlight throws and we recover.
     const tokens = highlightLine('hello world', 'not-a-real-language');

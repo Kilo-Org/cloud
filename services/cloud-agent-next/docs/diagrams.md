@@ -1,235 +1,158 @@
-# Cloud-Agent WebSockets: Core Diagrams
+# Cloud Agent control-plane diagrams
 
-These diagrams capture the core loops/patterns for queue-first V2 acceptance,
-DO ingestion + replay, and client reconnect.
+These diagrams cover the current `workspace_*` control plane: queue-first message
+acceptance, the Session and Sandbox DOs, wrapper delivery, streaming and
+reconnect.
+
+Implementation: `src/control-plane/session/`, `src/control-plane/sandbox/`, and
+`wrapper/src/control-plane/`. The Worker exports `SandboxSessionV2` as
+`SandboxSession` and `SandboxControlV2` as `SandboxControl`.
 
 ---
 
-## 1) System overview (data flow)
+## 1) System overview
 
 ```mermaid
 flowchart LR
-  clientA[Client A] -->|HTTP tRPC V2| worker[Worker]
-  clientB[Client B] -->|HTTP tRPC V2| worker
-  clientA -->|WS stream upgrade| worker
-  clientB -->|WS stream upgrade| worker
-  worker -->|RPC createSessionWithInitialAdmission / admitPreparedInitialMessage / admitSubmittedMessage| do[CloudAgentSession DO]
-  worker -->|proxy stream WS| do
-  do -->|metadata + SQLite| storage[(DO storage)]
-  do -->|ExecutionOrchestrator| sandbox[Sandbox]
-  sandbox -->|wrapper connects /ingest WS| do
-  do -->|broadcast stream| clientA
-  do -->|broadcast stream| clientB
+  client[Client] -->|tRPC start / send| worker[Worker]
+  client -->|/stream WebSocket| worker
+  worker -->|RPC createSessionWithInitialAdmission / send| session[Session DO<br/>SandboxSession]
+  worker -->|proxy /stream| session
+  session -->|prepare / deliver / release| sandbox[Sandbox DO<br/>SandboxControl]
+  sandbox -->|create / stop| provider[Provider allocation]
+  provider --> container[Sandbox container]
+  container --> wrapper[Control wrapper]
+  wrapper <-->|WebSocket control + events| sandbox
+  wrapper <-->|native API + SSE| kilo[Kilo]
+  sandbox -->|route view, events, outcome| session
+  session -->|event log + live broadcast| client
 ```
 
 ---
 
-## 2) Queue-first handoff
+## 2) Message admission and delivery
 
 ```mermaid
 sequenceDiagram
   participant C as Client
   participant W as Worker (tRPC)
-  participant SI as Session Ingest
-  participant DO as CloudAgentSession DO
-  participant SB as Sandbox
+  participant S as Session DO
+  participant B as Sandbox DO
+  participant R as Control wrapper
 
-  alt grouped start
+  alt unified start
     C->>W: start(initial turn)
-    W->>SI: create ownership row (external prerequisite)
-    W->>DO: createSessionWithInitialAdmission(accepted initial turn)
-    DO->>DO: register metadata, persist V2 intent + lifecycle state, ensure one queued event, schedule drain
-    Note over DO: One DO-owned command; staged writes, retries repair missing event/drain effects
-    DO-->>W: outcome=queued (durable admission)
-    W-->>C: compatibility ack {cloudAgentSessionId, kiloSessionId, messageId, delivery=queued}
-    Note over W,SI: Explicit DO rejection attempts best-effort onlyIfEmpty deletion; unknown RPC outcome retains possibly orphaned state for cleanup
-  else legacy prepared initiation
+    W->>W: authorize, preflight profile and model
+    W->>S: createSessionWithInitialAdmission(canonical turn)
+    S->>S: register metadata, append queued message, schedule drain
+    S-->>W: queued acknowledgement
+  else split adapter
+    C->>W: prepareSession
+    W->>S: register metadata only
     C->>W: initiateFromKilocodeSessionV2
-    W->>DO: admitPreparedInitialMessage() adapter reconstructs stored turn
-    DO->>DO: persist V2 intent + lifecycle state and schedule drain
-    DO-->>W: outcome=queued (durable admission)
-    W-->>C: compatibility ack {cloudAgentSessionId, executionId=messageId, status=started, streamUrl, messageId, delivery=queued}
-  else follow-up submission
+    W->>S: admit stored initial turn
+    S-->>W: queued acknowledgement
+  else follow-up
     C->>W: send / sendMessageV2
-    W->>DO: admitSubmittedMessage(submitted turn + overrides)
-    DO->>DO: persist V2 intent + lifecycle state and schedule drain
-    DO-->>W: outcome=queued (durable admission)
-    W-->>C: compatibility ack {cloudAgentSessionId, executionId=messageId, status=started, messageId, delivery=queued}
+    W->>S: append queued message
   end
 
-  Note over C,DO: queued acknowledgement is durable admission; wrapper delivery may fail asynchronously
-  DO->>DO: alarm takes next eligible pending message
-  DO->>DO: AgentRuntime reuses/allocates complete WrapperRunFence
-  DO->>SB: dispatch FencedWrapperDispatchRequest to wrapper
-  SB->>SB: submit prompt or command to Kilo
-  Note over SB: Ambiguous handoff may resubmit the same messageId; wrapper delivery is at-least-once until Kilo exposes atomic idempotent submit
-  SB->>DO: acknowledge acceptance / fenced wrapperRunId ingest events
-  DO->>DO: persist accepted state, ensure one sent-message event, remove pending residue
-  alt terminal ingest arrives over current fence
-    SB->>DO: forward terminal message.updated
-    DO->>DO: settle once through terminal effect/callback seams
-  else accepted wrapper is gone before terminal ingest
-    DO->>DO: disconnect/liveness expiry fails accepted work without redispatch
-    Note over DO,SB: No authoritative post-loss Kilo recovery contract exists today
-  end
+  W-->>C: compatibility ack {cloudAgentSessionId, messageId, delivery}
+  S->>B: prepare(route)
+  B->>B: ensure connected allocation and wrapper
+  B->>R: session.prepare
+  R->>R: clone, checkout, setup, start Kilo
+  R-->>B: session.ready
+  B-->>S: route ready
+  S->>B: deliver(queued messages)
+  B->>R: session.prompt
+  R-->>B: accepted
+  B-->>S: sent
+  S->>S: messages become accepted
 ```
 
 ---
 
-## 3) Fenced wrapper delivery lifecycle
+## 3) Event and outcome flow
 
 ```mermaid
 sequenceDiagram
-  participant DO as CloudAgentSession DO
-  participant Runtime as AgentRuntime
-  participant Orch as ExecutionOrchestrator
-  participant SB as Sandbox
-  participant Wrap as Wrapper
+  participant R as Control wrapper
+  participant B as Sandbox DO
+  participant S as Session DO
+  participant C as Client
 
-  DO->>Runtime: send(MessageDeliveryRequest)
-  Runtime->>Runtime: allocate/reuse WrapperRunFence
-  Runtime->>Orch: execute(FencedWrapperDispatchRequest)
-  Orch->>SB: ensure bootstrap wrapper
-  Orch->>Wrap: POST /session/ready
-  Orch->>Wrap: POST /job/prompt or /job/command
-  Wrap-->>Runtime: accepted messageId
-  Runtime->>DO: persist accepted state and sent effect
-
-  Wrap->>DO: /ingest WS connect with wrapperRunId + connection fence
-  loop stream events
-    Wrap->>DO: kilocode/output/error events
-  end
-  Wrap->>DO: message.updated (terminal assistant reply)
-  DO->>DO: terminalize accepted message state once
+  R->>B: Kilo events over the control socket
+  B->>S: route events
+  S->>S: persist to DO SQLite, assign event id
+  S-->>C: /stream live event
+  Note over C,S: reconnect replays from fromId
+  R->>B: session.outcome(status, reason, lastMessageId)
+  B->>S: route outcome
+  S->>S: settle accepted messages once
+  S-->>C: terminal events and callbacks
 ```
 
 ---
 
-## 4) DO ingest + stream handling
-
-```mermaid
-flowchart LR
-  subgraph DO["CloudAgentSession DO"]
-    ingest["/ingest WS"] --> normalize["normalize event"]
-    normalize --> insert["insert into SQLite (RETURNING id)"]
-    insert --> broadcast["broadcast to /stream clients"]
-
-    stream["/stream WS"] --> replay["query SQLite with filters"]
-    replay --> live["live broadcast"]
-  end
-```
-
----
-
-## 5) Wrapper lifecycle
+## 4) Sandbox and wrapper lifecycle
 
 ```mermaid
 sequenceDiagram
-  participant DO as DO (WrapperClient)
-  participant Wrap as Wrapper HTTP Server
-  participant Kilo as Kilo Server (SSE)
+  participant S as Session DO
+  participant B as Sandbox DO
+  participant P as Provider
+  participant R as Control wrapper
+  participant K as Kilo
 
-  DO->>Wrap: POST /session/ready
-  Wrap->>Kilo: create/resume session
-  Wrap-->>DO: {status, kiloSessionId}
-
-  DO->>Wrap: POST /job/prompt {message, agent, finalization, session}
-  Wrap->>Wrap: open connections (ingest WS + SSE)
-  Wrap->>Kilo: POST /session/:id/prompt_async
-  Wrap-->>DO: {messageId}
-
-  loop SSE events
-    Kilo->>Wrap: event stream
-    Wrap->>DO: forward via ingest WS
+  S->>B: prepare
+  B->>P: create or reuse allocation
+  P->>R: start supervisor and wrapper
+  R->>B: hello
+  B-->>R: welcome
+  B->>R: session.prepare
+  R->>K: start or restore Kilo
+  R-->>B: session.progress / session.ready
+  B-->>S: route view update
+  loop heartbeat
+    R->>B: heartbeat
+    B-->>R: heartbeat_ack
   end
-
-  Note over Wrap: on message.updated (completed)
-  Wrap->>Wrap: run post-completion tasks
-  Wrap->>Wrap: drain period (250ms)
-  Wrap->>Wrap: close connections
+  Note over B,R: close or 45 s without heartbeat -> disconnected
+  B->>P: stop at reconnect window or idle deadline
 ```
 
 ---
 
-## 6) Client reconnect + replay
+## 5) Client reconnect and replay
 
 ```mermaid
 sequenceDiagram
   participant C as Client
   participant W as Worker
-  participant DO as CloudAgentSession DO
+  participant S as Session DO
 
-  C->>W: GET /stream?sessionId=...&fromId=lastSeen
-  W->>DO: stub.fetch upgrade
-  DO->>DO: SELECT events WHERE id > fromId
-  DO-->>C: replay events
-  DO-->>C: live events
+  C->>W: GET /stream?...&ticket=...&fromId=lastSeen
+  W->>S: stub.fetch upgrade
+  S->>S: SELECT events WHERE id > fromId
+  S-->>C: replay events
+  S-->>C: live events
 ```
 
 ---
 
-## 7) Execution state machine (high-level)
+## 6) Message state machine
 
 ```mermaid
 stateDiagram-v2
-  [*] --> pending
-  pending --> running
-  pending --> failed
-  running --> completed
-  running --> failed
-  running --> interrupted
+  [*] --> queued
+  queued --> accepted: deliver sent
+  queued --> failed: preparation or route failure
+  queued --> cancelled: stop or cancel
+  accepted --> completed: outcome
+  accepted --> failed: outcome or route lost
+  accepted --> cancelled: stop
   completed --> [*]
   failed --> [*]
-  interrupted --> [*]
-```
-
----
-
-## 8) Prepared session lifecycle (split legacy and auto-initiate)
-
-```mermaid
-sequenceDiagram
-  participant B as Backend
-  participant W as Worker (tRPC)
-  participant DO as CloudAgentSession DO
-  participant SB as Sandbox
-
-  alt retained split legacy flow
-    B->>W: prepareSession(autoInitiate=false)
-    W->>DO: registerSession(metadata)
-    DO-->>W: success + registered metadata only
-    B->>W: initiateFromKilocodeSessionV2
-    W->>DO: admitPreparedInitialMessage()
-  else first-party creation flow
-    B->>W: prepareSession(autoInitiate=true)
-    W->>DO: createSessionWithInitialAdmission(canonical initial turn)
-  end
-  DO->>DO: persist V2 intent + lifecycle state and schedule drain
-  DO-->>W: outcome=queued
-  W-->>B: compatibility output (prepare shape unchanged; V2 alias remains status=started)
-  DO->>SB: dispatch during drain
-
-  B->>W: sendMessageV2 (follow-up)
-  W->>DO: admitSubmittedMessage(submitted turn)
-  DO-->>W: outcome=queued
-  W-->>B: compatibility ack status=started, delivery=queued
-```
-
----
-
-## 9) Error handling and retries
-
-```mermaid
-flowchart TD
-  A[Client Request] --> B{DO admission method}
-  B -->|Pending message stored; outcome=queued| Q[Public compatibility status=started delivery=queued]
-  B -->|Idempotent replay after wrapper already accepted| I[Public compatibility status=started delivery=sent]
-  B -->|Terminal messageId reused| C[400 BAD_REQUEST: submit new messageId]
-  B -->|Sandbox connect fail| E[503 SANDBOX_CONNECT_FAILED]
-  B -->|Workspace setup fail| F[503 WORKSPACE_SETUP_FAILED]
-  B -->|Kilo server fail| G[503 KILO_SERVER_FAILED]
-  B -->|Wrapper start fail| H[503 WRAPPER_START_FAILED]
-
-  E & F & G & H -->|Client retries| A
-  C -->|Legacy clients wait/poll| A
+  cancelled --> [*]
 ```

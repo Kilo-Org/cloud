@@ -19,6 +19,7 @@ import {
   saveOpenAiChatGptConnection,
 } from './store';
 import type { OpenAiChatGptConnection } from './types';
+import { CHATGPT_BUSINESS_USAGE_LIMIT_CODE } from './usage-limit';
 
 const originalPartnerKey = process.env.OPENAI_CHATGPT_API_KEY;
 
@@ -144,20 +145,52 @@ describe('openai-chatgpt shared-services connection (real database)', () => {
     const shared = openAiChatGptSharedServicesOwner(organization.id);
     const memberOwner = { kiloUserId: owner.id, organizationId: organization.id };
 
-    await recordOpenAiChatGptUsageLimit(shared, { resetsAt: Date.now() + 60 * 60 * 1000 });
+    await recordOpenAiChatGptUsageLimit(shared, {
+      code: null,
+      resetsAt: Date.now() + 60 * 60 * 1000,
+    });
 
     await expect(readOpenAiChatGptUsageLimit(shared)).resolves.toMatchObject({
       resetsAt: expect.any(String),
+      code: null,
     });
     await expect(readOpenAiChatGptUsageLimit(memberOwner)).resolves.toBeNull();
+  });
+
+  it('replaces workspace guidance when a consumer limit follows', async () => {
+    const shared = openAiChatGptSharedServicesOwner(organization.id);
+    await recordOpenAiChatGptUsageLimit(shared, {
+      code: CHATGPT_BUSINESS_USAGE_LIMIT_CODE,
+      resetsAt: null,
+    });
+    await expect(readOpenAiChatGptUsageLimit(shared)).resolves.toMatchObject({
+      code: CHATGPT_BUSINESS_USAGE_LIMIT_CODE,
+      resetsAt: null,
+    });
+
+    await recordOpenAiChatGptUsageLimit(shared, { code: null, resetsAt: null });
+    await expect(readOpenAiChatGptUsageLimit(shared)).resolves.toMatchObject({ code: null });
   });
 
   it('clears a recorded limit once a request through that row succeeded', async () => {
     const shared = openAiChatGptSharedServicesOwner(organization.id);
 
-    await recordOpenAiChatGptUsageLimit(shared, { resetsAt: Date.now() + 60 * 60 * 1000 });
+    await recordOpenAiChatGptUsageLimit(shared, {
+      code: CHATGPT_BUSINESS_USAGE_LIMIT_CODE,
+      resetsAt: Date.now() + 60 * 60 * 1000,
+    });
     await clearOpenAiChatGptUsageLimit(shared);
     await expect(readOpenAiChatGptUsageLimit(shared)).resolves.toBeNull();
+    const [row] = await db
+      .select({ code: openai_chatgpt_connections.usage_limit_error_code })
+      .from(openai_chatgpt_connections)
+      .where(
+        and(
+          eq(openai_chatgpt_connections.organization_id, organization.id),
+          eq(openai_chatgpt_connections.is_shared_services, true)
+        )
+      );
+    expect(row.code).toBeNull();
 
     // A success on a row that never hit a limit writes nothing and must not throw.
     await expect(clearOpenAiChatGptUsageLimit(shared)).resolves.toBeUndefined();

@@ -94,10 +94,7 @@ export function mapPrOperationError<T>(error: T, surface: PrMutationSurface): T 
     return new PrOperationMarkerError('ambiguous', i18n.t('prReview.operation.ambiguous'));
   }
   if (isPrOperationPersistenceFailed(error)) {
-    return new PrOperationMarkerError(
-      'persistence-failed',
-      i18n.t('prReview.operation.persistenceFailed')
-    );
+    return new PrOperationMarkerError('persistence-failed', i18n.t('common.actionNotRecorded'));
   }
   return error;
 }

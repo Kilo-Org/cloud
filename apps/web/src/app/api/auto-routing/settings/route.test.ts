@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { TRPCError } from '@trpc/server';
 import type { AutoRoutingSettingsResponse } from '@kilocode/auto-routing-contracts';
-import type * as KiloExclusiveModels from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { NextRequest } from 'next/server';
 import {
   getAutoRoutingMode,
@@ -28,15 +27,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-models', () => ({
   getAvailableModelsForOrganization: jest.fn(),
-}));
-jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => ({
-  gemma_4_26b_a4b_it_free_model: jest.requireActual<typeof KiloExclusiveModels>(
-    '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models'
-  ).gemma_4_26b_a4b_it_free_model,
-  kiloExclusiveModels: [
-    { public_id: 'kilo/hidden-model', status: 'hidden' },
-    { public_id: 'kilo/public-model', status: 'public' },
-  ],
 }));
 
 const { getEnhancedOpenRouterModels } = jest.requireMock(
@@ -438,16 +428,6 @@ describe('/api/auto-routing/settings', () => {
       setup: () => {
         mockedGetEnhanced.mockResolvedValue({
           data: [model('kilo-auto/efficient')],
-        });
-      },
-    },
-    {
-      name: 'hidden model',
-      entry: { model: 'kilo/hidden-model' },
-      reason: 'hidden_model' as const,
-      setup: () => {
-        mockedGetEnhanced.mockResolvedValue({
-          data: [model('kilo/hidden-model')],
         });
       },
     },

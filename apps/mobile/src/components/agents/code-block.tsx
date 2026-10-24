@@ -55,7 +55,7 @@ type CodeBlockProps = {
 /**
  * Mono sizing on every rendered code text: one per chunk of a fence.
  */
-const CODE_LINE_CLASSNAME = 'font-mono text-xs leading-4';
+const CODE_LINE_CLASSNAME = 'font-mono text-xs leading-[1rem]';
 
 /** `UITextView` with `className` mapped to `style`, like the built-in `Text`. */
 const SelectableCodeText = styled(UITextView, { className: 'style' });
@@ -227,7 +227,7 @@ function CodeBlockImpl({
   // nothing else, so its empty `displayText` skips the placeholder and the
   // fence renders the zero-height empty code `Text` it did before this block
   // chunked it, instead of gaining a blank code line (see `BLANK_CODE_LINE`
-  // in `code-block-chunk-content.ts`).
+  // in `code-block-chunk-content.tsx`).
   const keepBlankLineBox = displayText.length > 0;
   const codeContent = useMemo(
     () => (

@@ -78,6 +78,28 @@ export async function updateCheckRun(
   return;
 }
 
+export async function createPRComment(
+  _installationId: string,
+  _owner: string,
+  _repo: string,
+  _prNumber: number,
+  _body: string,
+  _appType: GitHubAppType = 'standard'
+): Promise<void> {
+  return;
+}
+
+export async function hasPRCommentWithMarker(
+  _installationId: string,
+  _owner: string,
+  _repo: string,
+  _prNumber: number,
+  _marker: string,
+  _appType: GitHubAppType = 'standard'
+): Promise<boolean> {
+  return false;
+}
+
 export type AssociatedPullRequest = {
   number: number;
   htmlUrl: string;

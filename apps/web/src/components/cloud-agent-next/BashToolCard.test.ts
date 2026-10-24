@@ -186,4 +186,51 @@ describe('BashToolCard streaming output', () => {
     expect(error?.textContent).toBe('EXPECTED_B_FAILURE');
     expect(container.textContent).toContain('Failed');
   });
+
+  it('labels a workspace-root cwd as the repo root', () => {
+    render(
+      bashPart({
+        status: 'completed',
+        input: {
+          command: 'ls',
+          workdir: '/workspace/a7e4d40b-c28c-4df1-9a1e-f88e7eb467f1/sessions/ses_abc',
+        },
+        output: '',
+        title: 'shell',
+        metadata: {},
+        time: { start: 1, end: 2 },
+      })
+    );
+
+    expect(container.textContent).toContain('cwd: .');
+    expect(container.textContent).not.toContain('ses_abc');
+  });
+
+  it('shortens a workspace root in the command preview', () => {
+    render(
+      bashPart({
+        status: 'completed',
+        input: { command: 'ls /workspace/user-1/sessions/ses_abc' },
+        output: '',
+        title: 'shell',
+        metadata: {},
+        time: { start: 1, end: 2 },
+      })
+    );
+    expect(container.textContent).toContain('ls .');
+  });
+
+  it('leaves names that only start with app untouched in the command preview', () => {
+    render(
+      bashPart({
+        status: 'completed',
+        input: { command: 'ls /workspace/application/a.ts' },
+        output: '',
+        title: 'shell',
+        metadata: {},
+        time: { start: 1, end: 2 },
+      })
+    );
+    expect(container.textContent).toContain('/workspace/application/a.ts');
+  });
 });

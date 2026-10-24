@@ -1,0 +1,2 @@
+ALTER TABLE "ai_gateway_sync_providers_state" ADD COLUMN "direct_byok_last_completed_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "ai_gateway_sync_providers_state" ADD COLUMN "direct_byok_stale_alert_last_posted_at" timestamp with time zone;

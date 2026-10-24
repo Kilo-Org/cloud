@@ -1,3 +1,4 @@
+import { preinstalledStartup } from '../../src/sandbox-control/preinstalled-startup.js';
 import {
   env,
   evictAllDurableObjects,
@@ -44,7 +45,10 @@ import type {
   StopResult,
 } from '../../src/sandbox-control/provider.js';
 import { ProviderCreationError } from '../../src/sandbox-control/provider.js';
-import { ContainerConcurrencyLimitError } from '../../src/container-concurrency.js';
+import {
+  ContainerCapacityUnavailableError,
+  ContainerConcurrencyLimitError,
+} from '../../src/container-concurrency.js';
 import { VERCEL_BILLING_SETTLEMENT_CALLBACK } from '../../src/sandbox-control/vercel-billing.js';
 import { encodeVercelProviderRef } from '../../src/sandbox-control/vercel-provider.js';
 import { encodeCloudflareProviderRef } from '../../src/sandbox-control/cloudflare-provider.js';
@@ -61,7 +65,7 @@ import {
   createFakeCredentialBroker,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
-import { FakeSessionPeer } from './helpers/fake-session-peer.js';
+import { FakeSessionPeer, createRuntimeProxyMintingPeer } from './helpers/fake-session-peer.js';
 import { waitFor } from './wait-for.js';
 import { SandboxStatusSnapshotSchema } from '../../src/shared/sandbox-status.js';
 
@@ -169,7 +173,7 @@ function createFakeProvider(options: FakeProviderOptions = {}): FakeProvider {
       }
       return { providerRef: ref };
     },
-    async launch(_ref, env) {
+    async launch(_ref, { env }) {
       provider.launchEnvs.push({ ...env });
       if (options.gateLaunch) {
         await new Promise<void>((resolve, reject) => {
@@ -641,24 +645,68 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     );
   });
 
-  it('fails a container limit denial from the sandbox start without retrying the create', async () => {
-    const provider = createFakeProvider({ gateLaunch: true });
-    const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
-    await waitFor(() => expect(provider.launchGates).toHaveLength(1));
-    await releaseGate(stub, () =>
-      provider.launchGates[0](
-        new Error(`remote: ${new ContainerConcurrencyLimitError('personal', 20).message}`)
-      )
-    );
-    await waitFor(async () =>
-      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
-        state: 'failed',
-        reason: 'container_limit_reached',
-      })
-    );
-    await waitFor(async () => expect((await readState(stub)).kind).not.toBe('creating'));
-    expect(provider.createCalls).toBe(1);
-  });
+  it.each(['cloudflare', 'cloudflare-containers', 'vercel'] as const)(
+    'does not call the %s provider when database admission is unavailable',
+    async providerKind => {
+      const sandboxId = `ses-${'b'.repeat(48)}`;
+      const sessionId = 'workspace_11111111-1111-4111-8111-111111111111';
+      const stub = sandboxNamespace.getByName(sandboxId);
+      await runInDurableObject(stub, instance => {
+        Object.assign(instance, {
+          env: {
+            ...instance.env,
+            CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: 'false',
+            HYPERDRIVE: undefined,
+          },
+        });
+      });
+      const provider = createFakeProvider();
+      await startAllocation(provider, {
+        sandboxId,
+        provider: providerKind,
+        preparingRoute: sessionId,
+        billing: {
+          sandboxId,
+          subject: { type: 'user', id: 'owner-1' },
+          actor: { type: 'user', id: 'owner-1' },
+          sessionId,
+          metadata: { origin: 'cloud-agent' },
+        },
+      });
+      await waitFor(async () =>
+        expect((await stub.status({ sessionId })).view).toMatchObject({
+          state: 'failed',
+          reason: 'billing_unavailable',
+        })
+      );
+      expect((await readState(stub)).kind).not.toBe('creating');
+      expect(provider.createCalls).toBe(0);
+      expect(provider.launchEnvs).toHaveLength(0);
+    }
+  );
+
+  it.each([
+    [new ContainerConcurrencyLimitError('personal', 20), 'container_limit_reached'],
+    [new ContainerCapacityUnavailableError(), 'billing_unavailable'],
+  ] as const)(
+    'fails capacity denial from the sandbox start without retrying creation: %s',
+    async (failure, reason) => {
+      const provider = createFakeProvider({ gateLaunch: true });
+      const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
+      await waitFor(() => expect(provider.launchGates).toHaveLength(1));
+      await releaseGate(stub, () =>
+        provider.launchGates[0](new Error(`remote: ${failure.message}`))
+      );
+      await waitFor(async () =>
+        expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+          state: 'failed',
+          reason,
+        })
+      );
+      await waitFor(async () => expect((await readState(stub)).kind).not.toBe('creating'));
+      expect(provider.createCalls).toBe(1);
+    }
+  );
 
   it('ignores a permanent late launch rejection after hello has acquired the allocation', async () => {
     const provider = createFakeProvider({ gateLaunch: true });
@@ -2936,9 +2984,20 @@ describe('SandboxControlV2 allocation egress policy', () => {
     'worker.example.com',
   ];
 
-  async function configureEgressSandbox(provider: FakeProvider, id = sandboxId) {
+  async function configureEgressSandbox(
+    provider: FakeProvider,
+    id = sandboxId,
+    extraEnv: Record<string, unknown> = {}
+  ) {
     const stub = sandboxNamespace.getByName(id);
     const peer = new FakeSessionPeer();
+    const mintsRuntimeProxy = createRuntimeProxyMintingPeer(env, sessionId => ({
+      userId: 'owner-1',
+      kiloSessionId:
+        sessionId === firstSessionId
+          ? 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa'
+          : 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb',
+    }));
     await runInDurableObject(stub, async instance => {
       await instance.getAllocationState();
       installFakeCredentialEnv(instance.env, createFakeCredentialBroker(), {
@@ -2947,11 +3006,21 @@ describe('SandboxControlV2 allocation egress policy', () => {
         KILO_OPENROUTER_BASE: 'https://gateway.example.com/api',
         KILO_SESSION_INGEST_URL: 'https://ingest.example.com',
         CREDENTIAL_CONTAINMENT_ENABLED: 'false',
+        ...extraEnv,
       });
       Object.assign(instance, {
         createProviderAdapter: () => provider.adapter,
         provider: provider.adapter,
-        sessionPeerFor: (_ownerId: string, sessionId: string) => peer.forSession(sessionId),
+        sessionPeerFor: (_ownerId: string, sessionId: string) => {
+          const recording = peer.forSession(sessionId);
+          const minting = mintsRuntimeProxy(sessionId);
+          return {
+            ...recording,
+            getRuntimeProxyDelegationExpiresAt: () => minting.getRuntimeProxyDelegationExpiresAt(),
+            issueRuntimeCredentialProxyGrant: fence =>
+              minting.issueRuntimeCredentialProxyGrant(fence),
+          };
+        },
       });
     });
     return { stub, peer };
@@ -2976,7 +3045,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
       credentials: {
         userId: 'owner-1',
         kiloSessionId,
-        kiloToken: 'native-kilo-token',
+        kiloToken: RUNTIME_AUTHORIZED_KILO_TOKEN,
         scopeId: sessionId,
         repository: { type: 'git', url: repositoryUrl },
       },
@@ -3016,11 +3085,12 @@ describe('SandboxControlV2 allocation egress policy', () => {
     }
   );
 
-  it('pins the provider origin from the session token during prepare', async () => {
+  it('pins the configured provider origin during prepare', async () => {
     const provider = createFakeProvider();
-    const { stub } = await configureEgressSandbox(provider);
+    const { stub } = await configureEgressSandbox(provider, sandboxId, {
+      KILO_OPENROUTER_BASE: 'https://token-provider.example.com/api',
+    });
     const input = prepareInput(firstSessionId, { egressMode: 'allowlist' });
-    input.credentials.kiloToken = 'https://token-provider.example.com/api:session-token';
     expect(await stub.prepare(input)).toMatchObject({ state: 'preparing' });
     await awaitStarting(provider, stub);
     expect(JSON.parse((await readProviderPin(stub)) ?? '{}').egressAllowlist).toEqual(
@@ -3111,7 +3181,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
         containment: false,
         instanceId: 'reconstructed-allocation',
       });
-      await reconstructed.provider.launch(ref, {});
+      await reconstructed.provider.launch(ref, { command: preinstalledStartup(), env: {} });
     });
     expect(launches).toHaveLength(1);
     expect(launches[0]?.egressAllowlist).toEqual(expected);
@@ -3356,7 +3426,7 @@ describe('SandboxControlV2 prepare frame secrets', () => {
       credentials: {
         userId: 'owner-1',
         kiloSessionId,
-        kiloToken: 'native-kilo-token',
+        kiloToken: RUNTIME_AUTHORIZED_KILO_TOKEN,
         orgId: 'org-1',
         repository: { type: 'github', repo: 'acme/widgets' },
         scopeId: sessionId,
@@ -3371,6 +3441,10 @@ describe('SandboxControlV2 prepare frame secrets', () => {
     peer: FakeSessionPeer
   ): Promise<DurableObjectStub<SandboxControlV2>> {
     const stub = sandboxNamespace.getByName(SANDBOX_ID);
+    const mint = createRuntimeProxyMintingPeer(env, () => ({
+      userId: 'owner-1',
+      kiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+    }));
     await runInDurableObject(stub, async instance => {
       await instance.getAllocationState();
       installFakeCredentialEnv(instance.env, createFakeCredentialBroker(), {
@@ -3379,7 +3453,11 @@ describe('SandboxControlV2 prepare frame secrets', () => {
       Object.assign(instance, {
         createProviderAdapter: () => provider.adapter,
         provider: provider.adapter,
-        sessionPeerFor: (_ownerId: string, sessionId: string) => peer.forSession(sessionId),
+        sessionPeerFor: (_ownerId: string, sessionId: string) => ({
+          ...peer.forSession(sessionId),
+          issueRuntimeCredentialProxyGrant: fence =>
+            mint(sessionId).issueRuntimeCredentialProxyGrant(fence),
+        }),
       });
     });
     return stub;

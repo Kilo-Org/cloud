@@ -12,7 +12,7 @@ import { z } from 'zod';
 import { handleTrpcQueryError } from '@/lib/auth/trpc-unauthorized';
 import { reportTrpcError } from '@/lib/force-update-signal';
 import { reportAppError } from '@/lib/telemetry/app-error-reporting';
-import { isTerminalTrpcCode, readTrpcErrorField } from '@/lib/trpc-error';
+import { isPermissionDeniedError, isTerminalTrpcCode, readTrpcErrorField } from '@/lib/trpc-error';
 
 export type ActiveSessionsQueryMetadata = Readonly<{
   acceptedRevision: number;
@@ -140,48 +140,6 @@ const PERMANENT_CODES = new Set([
   'UNPROCESSABLE_CONTENT',
 ]);
 
-type TrpcErrorData = {
-  code?: string;
-  authRequired?: boolean;
-};
-
-const trpcErrorDataSchema = z.object({
-  code: z.string().optional(),
-  authRequired: z.boolean().optional(),
-});
-const trpcErrorShapeSchema = z.object({
-  data: z.unknown().optional(),
-  shape: z.object({ data: z.unknown().optional() }).optional(),
-});
-
-/** The serialized tRPC error data, from either the direct or shaped variant. */
-function trpcErrorData(error: unknown): TrpcErrorData | undefined {
-  const parsedError = trpcErrorShapeSchema.safeParse(error);
-  if (!parsedError.success) {
-    return undefined;
-  }
-  const direct = trpcErrorDataSchema.safeParse(parsedError.data.data);
-  if (direct.success) {
-    return direct.data;
-  }
-  const shaped = trpcErrorDataSchema.safeParse(parsedError.data.shape?.data);
-  return shaped.success ? shaped.data : undefined;
-}
-
-/**
- * True when the error is a permission loss: a `FORBIDDEN`, or a procedure-level
- * `UNAUTHORIZED` without the context-level `authRequired` flag (which the
- * unauthorized handler signs the user out on). Permission loss must drop the
- * affected cache, not the session.
- */
-function isPermissionDeniedError(error: unknown): boolean {
-  const data = trpcErrorData(error);
-  if (data?.code === 'FORBIDDEN') {
-    return true;
-  }
-  return data?.code === 'UNAUTHORIZED' && data.authRequired !== true;
-}
-
 type QueryKeyInput = { organizationId?: unknown };
 
 const queryKeyMetaSchema = z.object({ input: z.unknown().optional() });
@@ -218,6 +176,36 @@ function removePermissionDeniedQueries(
     return;
   }
   queryClient.removeQueries({ queryKey: query.queryKey });
+}
+
+/**
+ * A permission denial on an org-scoped query can mean the membership itself is
+ * gone (the host removed the member) while the cached `organizations.list`
+ * still names the org — the provider's reconciliation then has nothing to act
+ * on. Invalidate the shared list so it refetches despite its freshness window;
+ * when the fresh list drops the org, `OrganizationProvider` switches to the
+ * remaining context. A list still holding the org (role-scoped denial, org
+ * intact) changes nothing: the fresh snapshot matches the selection's own.
+ */
+function refreshOrganizationsListOnPermissionLoss(
+  queryClient: QueryClient,
+  error: unknown,
+  query: Query<unknown, unknown, unknown>
+): void {
+  if (!isPermissionDeniedError(error)) {
+    return;
+  }
+  const organizationId = queryKeyInput(query.queryKey)?.organizationId;
+  if (organizationId === undefined || organizationId === null) {
+    return;
+  }
+  // `cancelRefetch: false` keeps one in-flight list fetch alive when several
+  // org-scoped queries fail around the same time, instead of cancelling and
+  // restarting the shared fetch once per denial.
+  void queryClient.invalidateQueries(
+    { queryKey: [['organizations', 'list']] },
+    { cancelRefetch: false }
+  );
 }
 
 /**
@@ -260,6 +248,7 @@ export function createKiloAppQueryClient(): QueryClient {
         if (!query.isActive()) {
           removePermissionDeniedQueries(queryClient, error, query);
         }
+        refreshOrganizationsListOnPermissionLoss(queryClient, error, query);
       },
     }),
     mutationCache: new MutationCache({

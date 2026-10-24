@@ -53,6 +53,7 @@
     "connected": "연결됨",
     "couldNotLoadModels": "모델을 불러오지 못했습니다.",
     "couldNotLoadRepositories": "저장소를 불러오지 못했습니다.",
+    "noRepositoriesFound": "저장소를 찾을 수 없습니다",
     "critical": "치명적",
     "delete": "삭제",
     "deleted": "삭제됨",
@@ -87,6 +88,7 @@
     "connect": "연결",
     "connectBitbucket": "Bitbucket 연결",
     "connectGitlab": "GitLab 연결",
+    "connectProvider": "서비스 연결",
     "contentTruncated": "내용 일부 생략됨",
     "copyLink": "링크 복사",
     "couldNotLoadOrganizations": "조직을 불러오지 못했습니다.",
@@ -145,7 +147,8 @@
     "agent": "대리인",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "변경 사항"
+    "changes": "변경 사항",
+    "organizationTrialEnded": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. 조직 소유자는 kilo.ai에서 결제 정보를 업데이트한 후 다시 시도하세요."
   },
   "language": {
     "restarting": "언어 적용을 위해 다시 시작 중",
@@ -883,7 +886,6 @@
       "gitlabNoRepositoriesDescription": "GitLab에서 더 많은 그룹이나 프로젝트에 대한 접근 권한을 부여해야 할 수 있습니다.",
       "installGithubApp": "저장소에 GitHub 앱 설치",
       "installGithubAppDescription": "Kilo GitHub 앱에 리뷰할 저장소의 접근 권한을 부여하세요.",
-      "noRepositoriesFound": "저장소를 찾을 수 없습니다",
       "repositoryAccess": "저장소 접근 권한"
     },
     "style": {
@@ -907,7 +909,6 @@
     "followReviewMd": "REVIEW.md 따르기",
     "followReviewMdSubtitle": "저장소별 REVIEW.md 파일의 지침을 따릅니다.",
     "manualReview": {
-      "connectProvider": "서비스 연결",
       "connectProviderDescription": "풀 리퀘스트 수동 리뷰를 시작하려면 GitHub를 연결하세요.",
       "couldNotCheckProviderStatus": "연결 서비스 상태를 확인할 수 없습니다.",
       "couldNotLoadProviders": "연결된 서비스를 불러올 수 없습니다. 다시 시도하세요.",
@@ -2432,7 +2433,6 @@
     "allow": "허용",
     "onlineMessage": "이 기기는 오프라인에서 음성을 텍스트로 변환할 수 없습니다. 녹음한 음성은 {{provider}}에 전송되어 텍스트로 변환됩니다. Kilo는 음성을 저장하지 않습니다.",
     "onlineTitle": "온라인 음성 처리 안내",
-    "staysOff": "온라인 음성 변환을 허용하기 전에는 음성 입력을 사용할 수 없습니다.",
     "start": "음성 입력 시작",
     "stop": "음성 입력 중지",
     "restricted": "이 기기에서 음성 입력이 제한되어 있습니다.",
@@ -3167,7 +3167,9 @@
       "sendInvite": "초대 보내기",
       "title": "멤버 초대",
       "alreadyInvited": "이미 초대되었거나 이미 멤버입니다.",
-      "sendError": "초대를 보내지 못했습니다."
+      "sendError": "초대를 보내지 못했습니다.",
+      "pendingInvitation": "이 이메일에는 이미 보류 중인 초대가 있습니다.",
+      "alreadyMember": "이 사용자는 이미 이 조직의 멤버입니다."
     },
     "invoices": {
       "downloadA11y": "청구서 {{number}} 다운로드",
@@ -3237,7 +3239,12 @@
       "pendingInvitations": "수락 대기 중인 초대",
       "resendInvite": "초대 다시 보내기",
       "shareInviteLink": "초대 링크 공유",
-      "resendInviteError": "초대를 다시 보내지 못했습니다."
+      "resendInviteError": "초대를 다시 보내지 못했습니다.",
+      "inviteNotResendable": "이 초대는 더 이상 다시 보낼 수 없습니다.",
+      "ownerAuthority": "조직 소유자만 소유자를 관리할 수 있습니다.",
+      "ownRoleChange": "자신의 역할은 변경할 수 없습니다.",
+      "inviteExpired": "이 초대는 만료되었습니다.",
+      "inviteAccepted": "이 초대는 이미 수락되었습니다."
     },
     "usageStats": {
       "inputTokens": "입력 토큰",

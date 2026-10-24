@@ -53,6 +53,7 @@
     "connected": "Nakakonekta",
     "couldNotLoadModels": "Hindi ma-load ang mga modelo.",
     "couldNotLoadRepositories": "Hindi ma-load ang mga repositoryo.",
+    "noRepositoriesFound": "Walang nahanap na repository",
     "critical": "Kritikal",
     "delete": "Burahin",
     "deleted": "Nabura",
@@ -87,6 +88,7 @@
     "connect": "Kumonekta",
     "connectBitbucket": "Ikonekta ang Bitbucket",
     "connectGitlab": "Ikonekta ang GitLab",
+    "connectProvider": "Ikonekta ang isang provider",
     "contentTruncated": "Pinaikli ang nilalaman",
     "copyLink": "Kopyahin ang link",
     "couldNotLoadOrganizations": "Hindi ma-load ang mga organisasyon.",
@@ -145,7 +147,8 @@
     "agent": "Ahente",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Mga pagbabago"
+    "changes": "Mga pagbabago",
+    "organizationTrialEnded": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update ng may-ari ng organisasyon ang billing sa kilo.ai, pagkatapos ay subukan muli."
   },
   "language": {
     "restarting": "Ini-restart para ilapat ang wika",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Maaaring kailangan mong magbigay ng access sa mas maraming grupo o proyekto sa GitLab.",
       "installGithubApp": "I-install ang GitHub app sa mga repository",
       "installGithubAppDescription": "Bigyan ang Kilo GitHub App ng access sa mga repository na gusto mong suriin.",
-      "noRepositoriesFound": "Walang nahanap na repository",
       "repositoryAccess": "access sa repository"
     },
     "style": {
@@ -1489,7 +1491,6 @@
       "invalidUrl": "Maglagay ng wastong URL ng pull request.",
       "couldNotCheckProviderStatus": "Hindi masuri ang katayuan ng provider.",
       "couldNotLoadProviders": "Hindi namin ma-load ang mga nakakonektang provider mo. Pakisubukang muli.",
-      "connectProvider": "Ikonekta ang isang provider",
       "connectProviderDescription": "Ikonekta ang GitHub para magsimula ng manu-manong pagsusuri ng isang pull request.",
       "pullRequestUrl": "URL ng pull request",
       "instructions": "Mga tagubilin (opsyonal)",
@@ -2953,7 +2954,6 @@
   },
   "voiceInput": {
     "listening": "Nakikinig...",
-    "staysOff": "Hindi magagamit ang pagdikta hangga't hindi mo pinapayagan ang online na pagsasalin ng boses sa teksto.",
     "onlineTitle": "Pinoproseso online ang boses",
     "onlineMessage": "Hindi kayang isalin ng device na ito ang boses sa teksto nang walang internet. Ipinapadala ang iyong rekording sa {{provider}} para gawing teksto. Hindi iniimbak ng Kilo ang audio.",
     "allow": "Payagan",
@@ -3168,7 +3168,9 @@
       "sendInvite": "Ipadala ang imbitasyon",
       "title": "Mag-imbita ng miyembro",
       "alreadyInvited": "Imbitado na sila o miyembro na.",
-      "sendError": "Hindi naipadala ang imbitasyon."
+      "sendError": "Hindi naipadala ang imbitasyon.",
+      "pendingInvitation": "May nakabinbing imbitasyon na ang email na ito.",
+      "alreadyMember": "Miembro na ng organisasyong ito ang taong ito."
     },
     "invoices": {
       "downloadA11y": "I-download ang talaan ng singil {{number}}",
@@ -3238,7 +3240,12 @@
       "pendingInvitations": "Mga nakabinbing imbitasyon",
       "resendInvite": "Ipadala muli ang imbitasyon",
       "shareInviteLink": "Ibahagi ang link ng imbitasyon",
-      "resendInviteError": "Hindi naipadala muli ang imbitasyon."
+      "resendInviteError": "Hindi naipadala muli ang imbitasyon.",
+      "inviteNotResendable": "Hindi na maaaring ipadala muli ang imbitasyong ito.",
+      "ownerAuthority": "Ang may-ari lamang ng organisasyon ang maaaring mamahala ng mga may-ari.",
+      "ownRoleChange": "Hindi mo maaaring baguhin ang iyong sariling tungkulin.",
+      "inviteExpired": "Nag-expire na ang imbitasyong ito.",
+      "inviteAccepted": "Tinanggap na ang imbitasyong ito."
     },
     "usageStats": {
       "inputTokens": "Mga papasok na token",

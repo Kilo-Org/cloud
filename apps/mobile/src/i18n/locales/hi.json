@@ -53,6 +53,7 @@
     "connected": "जुड़ा हुआ",
     "couldNotLoadModels": "मॉडल लोड नहीं हो सके।",
     "couldNotLoadRepositories": "रिपॉज़िटरी लोड नहीं हो सकीं।",
+    "noRepositoriesFound": "कोई रिपॉज़िटरी नहीं मिली",
     "critical": "अति गंभीर",
     "delete": "हटाएँ",
     "deleted": "हटाई गई",
@@ -87,6 +88,7 @@
     "connect": "जोड़ें",
     "connectBitbucket": "Bitbucket जोड़ें",
     "connectGitlab": "GitLab जोड़ें",
+    "connectProvider": "एक प्रदाता कनेक्ट करें",
     "contentTruncated": "सामग्री का कुछ हिस्सा नहीं दिखाया गया",
     "copyLink": "लिंक कॉपी करें",
     "couldNotLoadOrganizations": "संगठन लोड नहीं हो सके।",
@@ -145,7 +147,8 @@
     "agent": "प्रतिनिधि",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "बदलाव"
+    "changes": "बदलाव",
+    "organizationTrialEnded": "संगठन का परीक्षण समाप्त हो गया है और इसकी कोई सक्रिय योजना नहीं है। एक संगठन मालिक kilo.ai पर बिलिंग अपडेट कर सकता है, फिर दोबारा प्रयास करें।"
   },
   "language": {
     "restarting": "भाषा बदलने के लिए ऐप फिर से शुरू हो रहा है",
@@ -883,7 +886,6 @@
       "gitlabNoRepositoriesDescription": "आपको GitLab पर और समूहों या प्रोजेक्ट तक पहुँच देने की ज़रूरत हो सकती है।",
       "installGithubApp": "रिपॉज़िटरी पर GitHub ऐप इंस्टॉल करें",
       "installGithubAppDescription": "जिन रिपॉज़िटरी की समीक्षा करानी है, उन तक Kilo GitHub ऐप को पहुँच दें।",
-      "noRepositoriesFound": "कोई रिपॉज़िटरी नहीं मिली",
       "repositoryAccess": "रिपॉज़िटरी तक पहुँच"
     },
     "style": {
@@ -907,7 +909,6 @@
     "followReviewMd": "REVIEW.md का पालन करें",
     "followReviewMdSubtitle": "हर रिपॉज़िटरी की REVIEW.md फ़ाइल के निर्देशों का पालन करें",
     "manualReview": {
-      "connectProvider": "एक प्रदाता कनेक्ट करें",
       "connectProviderDescription": "पुल रिक्वेस्ट की मैन्युअल समीक्षा शुरू करने के लिए GitHub कनेक्ट करें।",
       "couldNotCheckProviderStatus": "प्रदाता की स्थिति की जाँच नहीं हो सकी।",
       "couldNotLoadProviders": "आपके कनेक्ट किए गए प्रदाताओं की जानकारी लोड नहीं हो सकी। कृपया फिर से कोशिश करें।",
@@ -2432,7 +2433,6 @@
     "allow": "अनुमति दें",
     "onlineMessage": "यह डिवाइस आवाज़ को ऑफ़लाइन टेक्स्ट में नहीं बदल सकता। आपकी रिकॉर्डिंग टेक्स्ट में बदलने के लिए {{provider}} को भेजी जाती है। Kilo ऑडियो सहेजकर नहीं रखता।",
     "onlineTitle": "आवाज़ ऑनलाइन प्रोसेस होती है",
-    "staysOff": "जब तक आप आवाज़ को ऑनलाइन टेक्स्ट में बदलने की अनुमति नहीं देते, वॉइस इनपुट बंद रहेगा।",
     "start": "वॉइस इनपुट शुरू करें",
     "stop": "वॉइस इनपुट रोकें",
     "restricted": "इस डिवाइस पर वॉइस इनपुट प्रतिबंधित है।",
@@ -3167,7 +3167,9 @@
       "sendInvite": "आमंत्रण भेजें",
       "title": "सदस्य को आमंत्रित करें",
       "alreadyInvited": "वे पहले से आमंत्रित हैं या पहले से ही सदस्य हैं।",
-      "sendError": "आमंत्रण नहीं भेजा जा सका।"
+      "sendError": "आमंत्रण नहीं भेजा जा सका।",
+      "pendingInvitation": "इस ईमेल के लिए पहले से ही एक आमंत्रण लंबित है।",
+      "alreadyMember": "यह व्यक्ति पहले से ही इस संगठन का सदस्य है।"
     },
     "invoices": {
       "downloadA11y": "इनवॉइस {{number}} डाउनलोड करें",
@@ -3237,7 +3239,12 @@
       "pendingInvitations": "लंबित आमंत्रण",
       "resendInvite": "आमंत्रण फिर से भेजें",
       "shareInviteLink": "आमंत्रण का लिंक साझा करें",
-      "resendInviteError": "आमंत्रण फिर से नहीं भेजा जा सका।"
+      "resendInviteError": "आमंत्रण फिर से नहीं भेजा जा सका।",
+      "inviteNotResendable": "यह आमंत्रण अब फिर से नहीं भेजा जा सकता।",
+      "ownerAuthority": "केवल संगठन का मालिक ही मालिकों को प्रबंधित कर सकता है।",
+      "ownRoleChange": "आप अपनी स्वयं की भूमिका नहीं बदल सकते।",
+      "inviteExpired": "यह आमंत्रण समाप्त हो चुका है।",
+      "inviteAccepted": "यह आमंत्रण पहले ही स्वीकार किया जा चुका है।"
     },
     "usageStats": {
       "inputTokens": "इनपुट टोकन",

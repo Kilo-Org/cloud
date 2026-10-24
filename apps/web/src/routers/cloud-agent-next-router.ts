@@ -14,6 +14,7 @@ import { assertSessionWorktree } from '@/lib/cloud-agent-next/worktree-review-ac
 import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
 import type { User } from '@kilocode/db/schema';
 import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
+import { resolveGitHubIntegrationIdForRepository } from '@/lib/cloud-agent/github-integration-resolution';
 import {
   getGitLabInstanceUrlForUser,
   buildGitLabCloneUrl,
@@ -63,7 +64,6 @@ import {
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentGetImageUploadUrlSchema,
   cloudAgentGetAttachmentDownloadUrlSchema,
-  cloudAgentLinkPendingUploadsSchema,
   cloudAgentReleasePendingUploadsSchema,
 } from './cloud-agent-next-schemas';
 import {
@@ -212,7 +212,15 @@ export const cloudAgentNextRouter = createTRPCRouter({
       });
       const client = createCloudAgentNextClientForModel(authToken, eligibility);
 
-      const { gitlabProject, githubRepo, publicRepoUrl, attachments, images, ...restInput } = input;
+      const {
+        gitlabProject,
+        githubRepo,
+        githubIntegrationId,
+        publicRepoUrl,
+        attachments,
+        images,
+        ...restInput
+      } = input;
 
       // Tokens are resolved inside cloud-agent-next via GIT_TOKEN_SERVICE.
       // Profile resolution (repo binding + default + explicit override) also
@@ -220,6 +228,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
       // envVars/setupCommands/mcpServers overrides.
       let gitParams: {
         githubRepo?: string;
+        githubIntegrationId?: string;
         gitUrl?: string;
         platform?: 'github' | 'gitlab';
       };
@@ -237,7 +246,24 @@ export const cloudAgentNextRouter = createTRPCRouter({
         }
         gitParams = { gitUrl: publicRepoUrl };
       } else {
-        gitParams = { githubRepo, platform: PLATFORM.GITHUB };
+        // The runtime's repository preflight runs only when the request names
+        // the integration that owns the repository, so resolve it for the
+        // caller here. An explicitly supplied id wins, and an unresolvable
+        // repository stays unqualified (the previous behaviour) rather than
+        // refusing a request the runtime can still serve.
+        const resolvedIntegrationId =
+          githubIntegrationId ??
+          (githubRepo === undefined
+            ? null
+            : await resolveGitHubIntegrationIdForRepository(
+                { type: 'user', id: ctx.user.id },
+                githubRepo
+              ));
+        gitParams = {
+          githubRepo,
+          githubIntegrationId: resolvedIntegrationId ?? undefined,
+          platform: PLATFORM.GITHUB,
+        };
       }
 
       try {
@@ -562,19 +588,6 @@ export const cloudAgentNextRouter = createTRPCRouter({
         messageUuid: input.messageUuid,
         filename: input.filename,
       });
-    }),
-
-  /**
-   * Finalize send-time attachment ledger rows: flip the caller's pending
-   * uploads for a message to 'linked'. Personal scope; the R2 key prefix is
-   * the caller's own user id.
-   */
-  linkPendingUploads: baseProcedure
-    .input(cloudAgentLinkPendingUploadsSchema)
-    .output(z.object({ success: z.boolean() }))
-    .mutation(async ({ ctx, input }) => {
-      await linkPendingUploads(ctx.user.id, input.messageUuid, input.objectKeys);
-      return { success: true };
     }),
 
   /**

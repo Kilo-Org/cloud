@@ -53,6 +53,7 @@
     "connected": "Поврзано",
     "couldNotLoadModels": "Моделите не се вчитаа.",
     "couldNotLoadRepositories": "Репозиториумите не се вчитаа.",
+    "noRepositoriesFound": "Не се пронајдени складишта",
     "critical": "Критично",
     "delete": "Избриши",
     "deleted": "Избришано",
@@ -87,6 +88,7 @@
     "connect": "Поврзи",
     "connectBitbucket": "Поврзи Bitbucket",
     "connectGitlab": "Поврзи GitLab",
+    "connectProvider": "Поврзи платформа",
     "contentTruncated": "Содржината е скратена",
     "copyLink": "Копирај врска",
     "couldNotLoadOrganizations": "Организациите не се вчитаа.",
@@ -145,7 +147,8 @@
     "agent": "Агент",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Промени"
+    "changes": "Промени",
+    "organizationTrialEnded": "Пробниот период на организацијата заврши и таа нема активен план. Сопственик на организација може да го ажурира наплатувањето на kilo.ai, а потоа да се обиде повторно."
   },
   "language": {
     "restarting": "Се рестартира за да се примени јазикот",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Можеби треба да дадеш пристап до повеќе групи или проекти на GitLab.",
       "installGithubApp": "Инсталирај ја апликацијата на GitHub за складиштата",
       "installGithubAppDescription": "Дозволи ѝ на апликацијата Kilo за GitHub да пристапи до складиштата што сакаш да се прегледуваат.",
-      "noRepositoriesFound": "Не се пронајдени складишта",
       "repositoryAccess": "пристап до складиштето"
     },
     "style": {
@@ -1489,7 +1491,6 @@
       "invalidUrl": "Внеси валидна URL-адреса на барање за спојување.",
       "couldNotCheckProviderStatus": "Не успеа проверката на статусот на платформата.",
       "couldNotLoadProviders": "Не успеа вчитувањето на твоите поврзани платформи. Обиди се повторно.",
-      "connectProvider": "Поврзи платформа",
       "connectProviderDescription": "Поврзи го GitHub за да започнеш рачен преглед на барање за спојување.",
       "pullRequestUrl": "URL-адреса на барањето за спојување",
       "instructions": "Упатства (незадолжително)",
@@ -2953,7 +2954,6 @@
   },
   "voiceInput": {
     "listening": "Се слуша...",
-    "staysOff": "Гласовниот внес останува исклучен додека не дозволиш онлајн транскрипција.",
     "onlineTitle": "Говорот се обработува онлајн",
     "onlineMessage": "Овој уред не може да го претвори говорот во текст без интернет. Твојата снимка се испраќа до {{provider}} за да се претвори во текст. Kilo не ја чува аудиоснимката.",
     "allow": "Дозволи",
@@ -3168,7 +3168,9 @@
       "sendInvite": "Испрати покана",
       "title": "Покани член",
       "alreadyInvited": "Оваа адреса веќе е поканета или веќе припаѓа на член.",
-      "sendError": "Не успеа испраќањето на поканата."
+      "sendError": "Не успеа испраќањето на поканата.",
+      "pendingInvitation": "Оваа е-пошта веќе има покана на чекање.",
+      "alreadyMember": "Ова лице веќе е член на оваа организација."
     },
     "invoices": {
       "downloadA11y": "Преземи фактура {{number}}",
@@ -3238,7 +3240,12 @@
       "pendingInvitations": "Покани на чекање",
       "resendInvite": "Испрати ја повторно поканата",
       "shareInviteLink": "Сподели линк за покана",
-      "resendInviteError": "Не успеа повторното испраќање на поканата."
+      "resendInviteError": "Не успеа повторното испраќање на поканата.",
+      "inviteNotResendable": "Оваа покана веќе не може да се испрати повторно.",
+      "ownerAuthority": "Само сопственик на организација може да управува со сопственици.",
+      "ownRoleChange": "Не можеш да ја промениш сопствената улога.",
+      "inviteExpired": "Оваа покана истече.",
+      "inviteAccepted": "Оваа покана е веќе прифатена."
     },
     "usageStats": {
       "inputTokens": "Влезни токени",

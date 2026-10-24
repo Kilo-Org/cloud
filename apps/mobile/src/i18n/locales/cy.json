@@ -53,6 +53,7 @@
     "connected": "Wedi cysylltu",
     "couldNotLoadModels": "Doedd dim modd llwytho'r modelau.",
     "couldNotLoadRepositories": "Doedd dim modd llwytho'r ystorfeydd.",
+    "noRepositoriesFound": "Heb ddod o hyd i unrhyw ystorfeydd",
     "critical": "Critigol",
     "delete": "Dileu",
     "deleted": "Dilëwyd",
@@ -87,6 +88,7 @@
     "connect": "Cysylltu",
     "connectBitbucket": "Cysylltu â Bitbucket",
     "connectGitlab": "Cysylltu â GitLab",
+    "connectProvider": "Cysylltu darparwr",
     "contentTruncated": "Cynnwys wedi'i gwtogi",
     "copyLink": "Copïo dolen",
     "couldNotLoadOrganizations": "Doedd dim modd llwytho'r sefydliadau.",
@@ -145,7 +147,8 @@
     "agent": "Asiant",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Newidiadau"
+    "changes": "Newidiadau",
+    "organizationTrialEnded": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gall perchennog sefydliad ddiweddaru bilio ar kilo.ai, ac yna rhoi cynnig arall arni."
   },
   "language": {
     "restarting": "Yn ailgychwyn i newid yr iaith",
@@ -1495,7 +1498,6 @@
       "gitlabNoRepositoriesDescription": "Efallai y bydd angen i chi ganiatáu mynediad i fwy o grwpiau neu brosiectau ar GitLab.",
       "installGithubApp": "Gosod yr ap GitHub ar ystorfeydd",
       "installGithubAppDescription": "Rhowch fynediad i ap GitHub Kilo at yr ystorfeydd rydych am eu hadolygu.",
-      "noRepositoriesFound": "Heb ddod o hyd i unrhyw ystorfeydd",
       "repositoryAccess": "mynediad i ystorfa"
     },
     "style": {
@@ -1577,7 +1579,6 @@
       "invalidUrl": "Rhowch URL dilys ar gyfer cais tynnu.",
       "couldNotCheckProviderStatus": "Ni ellid gwirio statws y darparwr.",
       "couldNotLoadProviders": "Ni allem lwytho'r darparwyr rydych wedi'u cysylltu. Ceisiwch eto.",
-      "connectProvider": "Cysylltu darparwr",
       "connectProviderDescription": "Cysylltwch GitHub i ddechrau adolygiad â llaw o gais tynnu.",
       "pullRequestUrl": "URL cais tynnu",
       "instructions": "Cyfarwyddiadau (dewisol)",
@@ -3125,7 +3126,6 @@
   },
   "voiceInput": {
     "listening": "Yn gwrando...",
-    "staysOff": "Bydd mewnbwn llais yn aros wedi'i ddiffodd nes i chi ganiatáu trawsgrifio ar-lein.",
     "onlineTitle": "Prosesir lleferydd ar-lein",
     "onlineMessage": "Ni all y ddyfais hon drawsgrifio all-lein. Anfonir eich recordiad at {{provider}} i'w droi'n destun. Nid yw Kilo yn storio'r sain.",
     "allow": "Caniatáu",
@@ -3344,7 +3344,9 @@
       "sendInvite": "Anfon gwahoddiad",
       "title": "Gwahodd aelod",
       "alreadyInvited": "Mae'r cyfeiriad e-bost hwn eisoes wedi cael gwahoddiad neu'n eisoes yn perthyn i aelod.",
-      "sendError": "Ni lwyddwyd i anfon y gwahoddiad."
+      "sendError": "Ni lwyddwyd i anfon y gwahoddiad.",
+      "pendingInvitation": "Mae gwahoddiad ar y gweill eisoes ar gyfer yr e-bost hwn.",
+      "alreadyMember": "Mae'r person hwn eisoes yn aelod o'r sefydliad hwn."
     },
     "invoices": {
       "downloadA11y": "Lawrlwytho anfoneb {{number}}",
@@ -3414,7 +3416,12 @@
       "pendingInvitations": "Gwahoddiadau sy'n aros",
       "resendInvite": "Ailanfon y gwahoddiad",
       "shareInviteLink": "Rhannu dolen gwahoddiad",
-      "resendInviteError": "Ni lwyddwyd i ailanfon y gwahoddiad."
+      "resendInviteError": "Ni lwyddwyd i ailanfon y gwahoddiad.",
+      "inviteNotResendable": "Ni ellir ailanfon y gwahoddiad hwn mwyach.",
+      "ownerAuthority": "Dim ond perchennog sefydliad sy'n gallu rheoli perchnogion.",
+      "ownRoleChange": "Ni allwch newid eich rôl eich hun.",
+      "inviteExpired": "Mae'r gwahoddiad hwn wedi dod i ben.",
+      "inviteAccepted": "Mae'r gwahoddiad hwn eisoes wedi'i dderbyn."
     },
     "usageStats": {
       "inputTokens": "Tocynnau mewnbwn",

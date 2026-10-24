@@ -53,6 +53,7 @@
     "connected": "Povezano",
     "couldNotLoadModels": "Nije moguće učitati modele.",
     "couldNotLoadRepositories": "Nije moguće učitati repozitorije.",
+    "noRepositoriesFound": "Nisu pronađeni repozitoriji",
     "critical": "Kritično",
     "delete": "Obriši",
     "deleted": "Obrisano",
@@ -87,6 +88,7 @@
     "connect": "Poveži",
     "connectBitbucket": "Poveži Bitbucket",
     "connectGitlab": "Poveži GitLab",
+    "connectProvider": "Poveži platformu",
     "contentTruncated": "Sadržaj skraćen",
     "copyLink": "Kopiraj vezu",
     "couldNotLoadOrganizations": "Nije moguće učitati organizacije.",
@@ -145,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Izmjene"
+    "changes": "Izmjene",
+    "organizationTrialEnded": "Probni period organizacije je završen i ona nema aktivan plan. Vlasnik organizacije može ažurirati naplatu na kilo.ai, a zatim pokušati ponovo."
   },
   "language": {
     "restarting": "Ponovno pokretanje radi primjene jezika",
@@ -1429,7 +1432,6 @@
       "gitlabNoRepositoriesDescription": "Možda trebaš odobriti pristup dodatnim grupama ili projektima na GitLabu.",
       "installGithubApp": "Instaliraj GitHub aplikaciju na repozitorije",
       "installGithubAppDescription": "Dodijeli Kilo GitHub aplikaciji pristup repozitorijima koje želiš pregledati.",
-      "noRepositoriesFound": "Nisu pronađeni repozitoriji",
       "repositoryAccess": "pristup repozitoriju"
     },
     "style": {
@@ -1511,7 +1513,6 @@
       "invalidUrl": "Unesi važeći URL zahtjeva za spajanje.",
       "couldNotCheckProviderStatus": "Nije moguće provjeriti status platforme.",
       "couldNotLoadProviders": "Nije moguće učitati povezane platforme. Pokušaj ponovo.",
-      "connectProvider": "Poveži platformu",
       "connectProviderDescription": "Poveži GitHub da započneš ručni pregled zahtjeva za spajanje.",
       "pullRequestUrl": "URL zahtjeva za spajanje",
       "instructions": "Upute (nisu obavezne)",
@@ -2996,7 +2997,6 @@
   },
   "voiceInput": {
     "listening": "Slušam...",
-    "staysOff": "Glasovni unos ostaje isključen dok ne dozvoliš pretvaranje govora u tekst putem interneta.",
     "onlineTitle": "Govor se obrađuje putem interneta",
     "onlineMessage": "Ovaj uređaj ne može pretvarati govor u tekst bez interneta. Tvoj snimak se šalje servisu {{provider}} radi pretvaranja u tekst. Kilo ne čuva zvučni snimak.",
     "allow": "Dozvoli",
@@ -3212,7 +3212,9 @@
       "sendInvite": "Pošalji pozivnicu",
       "title": "Pozovi člana",
       "alreadyInvited": "Osoba je već pozvana ili je već član.",
-      "sendError": "Slanje pozivnice nije uspjelo."
+      "sendError": "Slanje pozivnice nije uspjelo.",
+      "pendingInvitation": "Ova e-pošta već ima pozivnicu na čekanju.",
+      "alreadyMember": "Ova osoba je već član ove organizacije."
     },
     "invoices": {
       "downloadA11y": "Preuzmi fakturu {{number}}",
@@ -3282,7 +3284,12 @@
       "pendingInvitations": "Pozivnice na čekanju",
       "resendInvite": "Ponovo pošalji pozivnicu",
       "shareInviteLink": "Podijeli link pozivnice",
-      "resendInviteError": "Ponovno slanje pozivnice nije uspjelo."
+      "resendInviteError": "Ponovno slanje pozivnice nije uspjelo.",
+      "inviteNotResendable": "Ova pozivnica se više ne može ponovo poslati.",
+      "ownerAuthority": "Samo vlasnik organizacije može upravljati vlasnicima.",
+      "ownRoleChange": "Ne možeš promijeniti svoju ulogu.",
+      "inviteExpired": "Ova pozivnica je istekla.",
+      "inviteAccepted": "Ova pozivnica je već prihvaćena."
     },
     "usageStats": {
       "inputTokens": "Ulazni tokeni",

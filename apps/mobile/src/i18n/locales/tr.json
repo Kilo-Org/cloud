@@ -53,6 +53,7 @@
     "connected": "Bağlı",
     "couldNotLoadModels": "Modeller yüklenemedi.",
     "couldNotLoadRepositories": "Depolar yüklenemedi.",
+    "noRepositoriesFound": "Depo bulunamadı",
     "critical": "Kritik",
     "delete": "Sil",
     "deleted": "Silindi",
@@ -87,6 +88,7 @@
     "connect": "Bağla",
     "connectBitbucket": "Bitbucket hesabını bağla",
     "connectGitlab": "GitLab hesabını bağla",
+    "connectProvider": "Bir sağlayıcı bağla",
     "contentTruncated": "İçerik kısaltıldı",
     "copyLink": "Bağlantıyı kopyala",
     "couldNotLoadOrganizations": "Kuruluşlar yüklenemedi.",
@@ -145,7 +147,8 @@
     "agent": "Ajan",
     "durationMinuteShort": "dk",
     "durationHourShort": "sa",
-    "changes": "Değişiklikler"
+    "changes": "Değişiklikler",
+    "organizationTrialEnded": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. Kuruluş sahibi kilo.ai adresinden faturalandırmayı güncelleyip ardından tekrar deneyebilir."
   },
   "language": {
     "restarting": "Dil değişikliğini uygulamak için yeniden başlatılıyor",
@@ -883,7 +886,6 @@
       "gitlabNoRepositoriesDescription": "GitLab'da daha fazla gruba veya projeye erişim izni vermen gerekebilir.",
       "installGithubApp": "GitHub uygulamasını depolara yükle",
       "installGithubAppDescription": "Kilo GitHub uygulamasına, incelenmesini istediğin depolara erişim izni ver.",
-      "noRepositoriesFound": "Depo bulunamadı",
       "repositoryAccess": "depo erişimi"
     },
     "style": {
@@ -907,7 +909,6 @@
     "followReviewMd": "REVIEW.md yönergelerine uy",
     "followReviewMdSubtitle": "Her deponun REVIEW.md dosyasındaki talimatlara uy",
     "manualReview": {
-      "connectProvider": "Bir sağlayıcı bağla",
       "connectProviderDescription": "Bir çekme isteğinin incelemesini manuel olarak başlatmak için GitHub'ı bağla.",
       "couldNotCheckProviderStatus": "Sağlayıcı durumu kontrol edilemedi.",
       "couldNotLoadProviders": "Bağladığın sağlayıcılar yüklenemedi. Lütfen tekrar dene.",
@@ -2432,7 +2433,6 @@
     "allow": "İzin ver",
     "onlineMessage": "Bu cihaz, sesi çevrimdışı olarak metne dönüştüremiyor. Kaydın, metne dönüştürülmesi için {{provider}} hizmetine gönderilir. Kilo ses kaydını saklamaz.",
     "onlineTitle": "Konuşma çevrimiçi işleniyor",
-    "staysOff": "Sesin çevrimiçi olarak metne dönüştürülmesine izin verene kadar sesli giriş kapalı kalır.",
     "start": "Sesli girişi başlat",
     "stop": "Sesli girişi durdur",
     "restricted": "Bu cihazda sesli giriş kısıtlıdır.",
@@ -3167,7 +3167,9 @@
       "sendInvite": "Davet gönder",
       "title": "Üye davet et",
       "alreadyInvited": "Bu kişi zaten davet edilmiş veya zaten üye.",
-      "sendError": "Davet gönderilemedi."
+      "sendError": "Davet gönderilemedi.",
+      "pendingInvitation": "Bu e-posta adresinin zaten bekleyen bir daveti var.",
+      "alreadyMember": "Bu kişi zaten bu kuruluşun bir üyesi."
     },
     "invoices": {
       "downloadA11y": "{{number}} numaralı faturayı indir",
@@ -3237,7 +3239,12 @@
       "pendingInvitations": "Bekleyen davetler",
       "resendInvite": "Daveti yeniden gönder",
       "shareInviteLink": "Davet bağlantısını paylaş",
-      "resendInviteError": "Davet yeniden gönderilemedi."
+      "resendInviteError": "Davet yeniden gönderilemedi.",
+      "inviteNotResendable": "Bu davet artık yeniden gönderilemez.",
+      "ownerAuthority": "Yalnızca bir organizasyon sahibi sahipleri yönetebilir.",
+      "ownRoleChange": "Kendi rolünüzü değiştiremezsiniz.",
+      "inviteExpired": "Bu davetin süresi dolmuş.",
+      "inviteAccepted": "Bu davet zaten kabul edilmiş."
     },
     "usageStats": {
       "inputTokens": "Girdi tokenları",

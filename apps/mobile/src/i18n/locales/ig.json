@@ -53,6 +53,7 @@
     "connected": "Ejikọrọ",
     "couldNotLoadModels": "Enweghị ike ibudata ihe nlereanya.",
     "couldNotLoadRepositories": "Enweghị ike ibudata ebe nchekwa koodu.",
+    "noRepositoriesFound": "A hụghị ebe nchekwa",
     "critical": "Dị oké njọ",
     "delete": "Hichapụ",
     "deleted": "Ehichapụrụ",
@@ -87,6 +88,7 @@
     "connect": "Jikọọ",
     "connectBitbucket": "Jikọọ Bitbucket",
     "connectGitlab": "Jikọọ GitLab",
+    "connectProvider": "Jikọọ onye na-enye ọrụ",
     "contentTruncated": "Ebipụrụ akụkụ ọdịnaya",
     "copyLink": "Detuo njikọ",
     "couldNotLoadOrganizations": "Enweghị ike ibudata òtù.",
@@ -145,7 +147,8 @@
     "agent": "Onye nnọchi anya",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Mgbanwe"
+    "changes": "Mgbanwe",
+    "organizationTrialEnded": "Oge nnwale nke òtù ahụ agwụla na o nweghị atụmatụ na-arụ ọrụ. Onye nwe òtù nwere ike imelite nhazi ụgwọ na kilo.ai, wee nwaa ọzọ."
   },
   "language": {
     "restarting": "Na-amalitegharị iji asụsụ ahọpụtara",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "O nwere ike ịdị mkpa inye ikike ịnweta otu ma ọ bụ ọrụ ndị ọzọ na GitLab.",
       "installGithubApp": "Wụnye ngwa GitHub na ebe nchekwa",
       "installGithubAppDescription": "Nye ngwa Kilo maka GitHub ikike ịnweta ebe nchekwa ịchọrọ ka a nyochaa.",
-      "noRepositoriesFound": "A hụghị ebe nchekwa",
       "repositoryAccess": "ikike ịnweta ebe nchekwa"
     },
     "style": {
@@ -1489,7 +1491,6 @@
       "invalidUrl": "Tinye URL arịrịọ njikọ dị irè.",
       "couldNotCheckProviderStatus": "Enweghị ike ịlele ọnọdụ onye na-enye ọrụ.",
       "couldNotLoadProviders": "Anyị enweghị ike ibudata ndị na-enye ọrụ ị jikọrọ. Biko nwaa ọzọ.",
-      "connectProvider": "Jikọọ onye na-enye ọrụ",
       "connectProviderDescription": "Jikọọ GitHub iji jiri aka malite nyocha arịrịọ njikọ.",
       "pullRequestUrl": "URL arịrịọ njikọ",
       "instructions": "Ntụziaka (ọ bụghị iwu)",
@@ -2953,7 +2954,6 @@
   },
   "voiceInput": {
     "listening": "Na-ege ntị...",
-    "staysOff": "Ntinye olu agaghị arụ ọrụ ruo mgbe ị nyere ikike ịtụgharị okwu ka ọ bụrụ ederede n'ịntanetị.",
     "onlineTitle": "A na-ahazi okwu n'ịntanetị",
     "onlineMessage": "Ngwaọrụ a enweghị ike ịtụgharị okwu ka ọ bụrụ ederede na-enweghị ịntanetị. A na-ezigara {{provider}} ndekọ olu gị ka ọ tụgharịa ya ka ọ bụrụ ederede. Kilo anaghị echekwa ndekọ olu ahụ.",
     "allow": "Nye ikike",
@@ -3168,7 +3168,9 @@
       "sendInvite": "Ziga òkù",
       "title": "Kpọ onye otu",
       "alreadyInvited": "Ha etinyela òkụ ma ọ bụ ha abụrụla onye otu.",
-      "sendError": "Enweghị ike iziga òkụ."
+      "sendError": "Enweghị ike iziga òkụ.",
+      "pendingInvitation": "Adreesị ozi ịntanetị a enwetala òkù na-echere.",
+      "alreadyMember": "Onye a abụrụla onye otu nke òtù a."
     },
     "invoices": {
       "downloadA11y": "Budata akwụkwọ ịgba ụgwọ {{number}}",
@@ -3238,7 +3240,12 @@
       "pendingInvitations": "Òkù ndị na-echere",
       "resendInvite": "Ziga òkù ọzọ",
       "shareInviteLink": "Kekọrịta njikọ òkù",
-      "resendInviteError": "Enweghị ike iziga òkụ ọzọ."
+      "resendInviteError": "Enweghị ike iziga òkụ ọzọ.",
+      "inviteNotResendable": "A pụghịzi iziga òkù a ọzọ.",
+      "ownerAuthority": "Naanị onye nwe òtù nwere ike ijikwa ndị nwe.",
+      "ownRoleChange": "Ị nweghị ike ịgbanwe ọrụ gị.",
+      "inviteExpired": "Òkù a agwụla.",
+      "inviteAccepted": "A nakweelarị òkù a."
     },
     "usageStats": {
       "inputTokens": "Tokin ntinye",

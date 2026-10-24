@@ -89,8 +89,9 @@ export async function signKiloToken(params: {
   audience?: string;
   env?: string;
   extra?: SignKiloTokenExtra;
+  now?: Date;
 }): Promise<{ token: string; expiresAt: string }> {
-  const now = Math.floor(Date.now() / 1000);
+  const now = Math.floor((params.now ?? new Date()).getTime() / 1000);
   const exp = now + params.expiresInSeconds;
 
   const payload: Record<string, unknown> = {

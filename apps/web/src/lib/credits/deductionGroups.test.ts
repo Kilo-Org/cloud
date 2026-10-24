@@ -13,6 +13,7 @@ function makeDeduction(overrides: Partial<CreditDeductionRow> = {}): CreditDeduc
       description: 'Promotional credits',
       amount_mUsd: 50_000_000,
       is_free: false,
+      credit_source: 'stripe',
     },
     ...overrides,
   };
@@ -48,6 +49,7 @@ describe('buildDeductionGroups', () => {
           description: 'Referral bonus',
           amount_mUsd: 5_000_000,
           is_free: true,
+          credit_source: null,
         },
         amount_mUsd: -5_000_000,
       }),
@@ -55,6 +57,34 @@ describe('buildDeductionGroups', () => {
 
     expect(groups[0].main.type).toBe('Credit grant');
     expect(groups[0].child?.type).toBe('Adjustment');
+  });
+
+  it.each([
+    { source: 'stripe', isFree: false, label: 'Purchase' },
+    { source: 'google_play', isFree: false, label: 'Purchase' },
+    { source: 'apple', isFree: false, label: 'Purchase' },
+    { source: 'pass', isFree: false, label: 'Kilo Pass' },
+    { source: 'admin', isFree: false, label: 'Credit grant' },
+    { source: 'admin', isFree: true, label: 'Credit grant' },
+    // A legacy paid grant carries no source; its free flag still decides.
+    { source: null, isFree: false, label: 'Purchase' },
+    { source: null, isFree: true, label: 'Credit grant' },
+  ])('labels a $source grant as $label', ({ source, isFree, label }) => {
+    const groups = buildDeductionGroups([
+      makeDeduction({
+        purchase: {
+          id: 'grant-source',
+          date: '2025-10-01T00:00:00.000Z',
+          description: 'Expiring credits',
+          amount_mUsd: 5_000_000,
+          is_free: isFree,
+          credit_source: source,
+        },
+        amount_mUsd: -5_000_000,
+      }),
+    ]);
+
+    expect(groups[0].main.type).toBe(label);
   });
 
   it('leaves an unlinked deduction as a single row in its own date order', () => {
@@ -92,6 +122,7 @@ describe('buildDeductionGroups', () => {
           description: 'Older credits',
           amount_mUsd: 10_000_000,
           is_free: false,
+          credit_source: 'stripe',
         },
       }),
       makeDeduction({

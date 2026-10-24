@@ -19,6 +19,7 @@ import { formatMicrodollars } from '@/lib/admin-utils';
 import { buildDeductionGroups } from '@/lib/credits/deductionGroups';
 import { purchasedCreditTermsText } from '@/lib/credits/purchasedCreditTerms';
 import { CreditsDeductionRows } from '@/components/credits/CreditsDeductionRows';
+import { TableCell, TableHeaderCell } from '@/components/credits/table-cells';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -53,36 +54,6 @@ const HEADER_ACTIONS = (
     Manage subscriptions <ChevronRight className="size-4" />
   </Link>
 );
-
-function Th({ children, align = 'left' }: { children: React.ReactNode; align?: 'left' | 'right' }) {
-  return (
-    <th
-      className={`type-eyebrow text-muted-foreground px-4 py-3 sm:px-6 ${align === 'right' ? 'text-right' : 'text-left'}`}
-    >
-      {children}
-    </th>
-  );
-}
-
-function Td({
-  children,
-  align = 'left',
-  numeric = false,
-  className = '',
-}: {
-  children: React.ReactNode;
-  align?: 'left' | 'right';
-  numeric?: boolean;
-  className?: string;
-}) {
-  return (
-    <td
-      className={`type-body px-4 py-3 whitespace-nowrap sm:px-6 ${align === 'right' ? 'text-right' : ''} ${numeric ? 'tabular-nums' : ''} ${className}`}
-    >
-      {children}
-    </td>
-  );
-}
 
 function formatExpiryTimestamp(value: string): string {
   const date = new Date(value);
@@ -220,27 +191,27 @@ function CreditsPageContent() {
                 <table className="w-full">
                   <thead>
                     <tr className="bg-muted border-b">
-                      <Th>Purchase Date</Th>
-                      <Th>Type</Th>
-                      <Th>Credits Added</Th>
-                      <Th>Invoice</Th>
+                      <TableHeaderCell>Purchase Date</TableHeaderCell>
+                      <TableHeaderCell>Type</TableHeaderCell>
+                      <TableHeaderCell>Credits Added</TableHeaderCell>
+                      <TableHeaderCell>Invoice</TableHeaderCell>
                     </tr>
                   </thead>
                   <tbody className="divide-border divide-y">
                     {['first', 'second', 'third'].map(row => (
                       <tr key={row} className="even:bg-muted group">
-                        <Td>
+                        <TableCell>
                           <Skeleton className="group-even:bg-background h-4 w-20" />
-                        </Td>
-                        <Td>
+                        </TableCell>
+                        <TableCell>
                           <Skeleton className="group-even:bg-background h-4 w-24" />
-                        </Td>
-                        <Td>
+                        </TableCell>
+                        <TableCell>
                           <Skeleton className="group-even:bg-background h-4 w-16" />
-                        </Td>
-                        <Td>
+                        </TableCell>
+                        <TableCell>
                           <Skeleton className="group-even:bg-background h-4 w-16" />
-                        </Td>
+                        </TableCell>
                       </tr>
                     ))}
                   </tbody>
@@ -484,31 +455,31 @@ function CreditsPageContent() {
               <table className="w-full min-w-[36rem]">
                 <thead>
                   <tr className="bg-muted border-b">
-                    <Th>Purchase Date</Th>
-                    <Th>Type</Th>
-                    <Th>Credits Added</Th>
-                    <Th>Expires</Th>
-                    <Th>Invoice</Th>
+                    <TableHeaderCell>Purchase Date</TableHeaderCell>
+                    <TableHeaderCell>Type</TableHeaderCell>
+                    <TableHeaderCell>Credits Added</TableHeaderCell>
+                    <TableHeaderCell>Expires</TableHeaderCell>
+                    <TableHeaderCell>Invoice</TableHeaderCell>
                   </tr>
                 </thead>
                 <tbody className="divide-border divide-y">
                   {isPurchaseHistoryLoading && (
                     <tr>
-                      <Td>
+                      <TableCell>
                         <Skeleton className="h-4 w-20" />
-                      </Td>
-                      <Td>
+                      </TableCell>
+                      <TableCell>
                         <Skeleton className="h-4 w-24" />
-                      </Td>
-                      <Td>
+                      </TableCell>
+                      <TableCell>
                         <Skeleton className="h-4 w-16" />
-                      </Td>
-                      <Td>
+                      </TableCell>
+                      <TableCell>
                         <Skeleton className="h-4 w-20" />
-                      </Td>
-                      <Td>
+                      </TableCell>
+                      <TableCell>
                         <Skeleton className="h-4 w-20" />
-                      </Td>
+                      </TableCell>
                     </tr>
                   )}
                   {purchaseHistoryData?.entries.map(entry => {
@@ -517,15 +488,15 @@ function CreditsPageContent() {
                       receiptMutation.variables?.transactionId === entry.id;
                     return (
                       <tr key={entry.id} className="even:bg-muted">
-                        <Td>{formatIsoDateString_UsaDateOnlyFormat(entry.date)}</Td>
-                        <Td>{entry.description}</Td>
-                        <Td numeric>{formatMicrodollars(entry.amount_mUsd)}</Td>
-                        <Td>
+                        <TableCell>{formatIsoDateString_UsaDateOnlyFormat(entry.date)}</TableCell>
+                        <TableCell>{entry.description}</TableCell>
+                        <TableCell numeric>{formatMicrodollars(entry.amount_mUsd)}</TableCell>
+                        <TableCell>
                           {entry.expiryDate
                             ? formatExpiryTimestamp(entry.expiryDate)
                             : 'Does not expire'}
-                        </Td>
-                        <Td>
+                        </TableCell>
+                        <TableCell>
                           <Button
                             variant="link"
                             className="h-auto p-0"
@@ -543,7 +514,7 @@ function CreditsPageContent() {
                               </>
                             )}
                           </Button>
-                        </Td>
+                        </TableCell>
                       </tr>
                     );
                   })}
@@ -604,10 +575,10 @@ function CreditsPageContent() {
               <table className="w-full min-w-[36rem]">
                 <thead>
                   <tr className="bg-muted border-b">
-                    <Th>Date</Th>
-                    <Th>Description</Th>
-                    <Th>Type</Th>
-                    <Th align="right">Amount</Th>
+                    <TableHeaderCell>Date</TableHeaderCell>
+                    <TableHeaderCell>Description</TableHeaderCell>
+                    <TableHeaderCell>Type</TableHeaderCell>
+                    <TableHeaderCell align="right">Amount</TableHeaderCell>
                   </tr>
                 </thead>
                 <CreditsDeductionRows groups={deductionGroups} />

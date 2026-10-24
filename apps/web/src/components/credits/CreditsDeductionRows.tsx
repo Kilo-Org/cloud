@@ -1,5 +1,6 @@
 import * as React from 'react';
 
+import { TableCell } from '@/components/credits/table-cells';
 import { formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
 import { formatMicrodollars } from '@/lib/admin-utils';
 import type { DeductionGroup } from '@/lib/credits/deductionGroups';
@@ -22,30 +23,26 @@ export function CreditsDeductionRows({ groups }: Readonly<{ groups: DeductionGro
       {groups.map((group, index) => (
         <tbody key={group.key} className={index % 2 === 1 ? 'bg-muted' : undefined}>
           <tr className="border-border border-t">
-            <td className="type-body px-4 py-3 whitespace-nowrap tabular-nums sm:px-6">
-              {formatIsoDateString_UsaDateOnlyFormat(group.main.date)}
-            </td>
-            <td className="type-body px-4 py-3 whitespace-normal sm:px-6">
-              {group.main.description}
-            </td>
-            <td className="type-body px-4 py-3 whitespace-nowrap sm:px-6">{group.main.type}</td>
-            <td className="type-body px-4 py-3 text-right whitespace-nowrap tabular-nums sm:px-6">
+            <TableCell>{formatIsoDateString_UsaDateOnlyFormat(group.main.date)}</TableCell>
+            <TableCell className="whitespace-normal">{group.main.description}</TableCell>
+            <TableCell>{group.main.type}</TableCell>
+            <TableCell numeric align="right">
               {formatSignedAmount(group.main.amount_mUsd)}
-            </td>
+            </TableCell>
           </tr>
           {group.child && (
             <tr>
-              <td className="type-body px-4 py-3 whitespace-nowrap tabular-nums sm:px-6" />
-              <td className="type-body px-4 py-3 whitespace-normal sm:px-6">
+              <TableCell>{''}</TableCell>
+              <TableCell className="whitespace-normal">
                 <span aria-hidden="true" className="text-muted-foreground mr-1.5">
                   └
                 </span>
                 {group.child.description}
-              </td>
-              <td className="type-body px-4 py-3 whitespace-nowrap sm:px-6">{group.child.type}</td>
-              <td className="type-body px-4 py-3 text-right whitespace-nowrap tabular-nums sm:px-6">
+              </TableCell>
+              <TableCell>{group.child.type}</TableCell>
+              <TableCell numeric align="right">
                 {formatSignedAmount(group.child.amount_mUsd)}
-              </td>
+              </TableCell>
             </tr>
           )}
         </tbody>

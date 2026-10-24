@@ -246,6 +246,7 @@ describe('getCreditBlocks', () => {
         description: 'Promotional credits',
         amount_mUsd: 1_000_000,
         is_free: true,
+        credit_source: null,
       },
     });
   });

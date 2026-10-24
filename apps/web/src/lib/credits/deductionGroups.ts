@@ -13,6 +13,7 @@ export type CreditDeductionRow = {
     description: string;
     amount_mUsd: number;
     is_free: boolean;
+    credit_source: string | null;
   } | null;
 };
 
@@ -30,6 +31,29 @@ export function deductionKindLabel(kind: CreditDeductionKind): string {
       return 'Adjustment';
     case 'deduction':
       return 'Deduction';
+  }
+}
+
+/**
+ * The type shown on the grant line. `is_free` alone is not enough: admin and
+ * Pass grants carry `is_free: false`, so the recorded source decides first, and
+ * only a legacy paid grant with no source falls back to its free flag.
+ */
+export function grantTypeLabel(purchase: {
+  is_free: boolean;
+  credit_source: string | null;
+}): string {
+  switch (purchase.credit_source) {
+    case 'stripe':
+    case 'google_play':
+    case 'apple':
+      return 'Purchase';
+    case 'pass':
+      return 'Kilo Pass';
+    case 'admin':
+      return 'Credit grant';
+    default:
+      return purchase.is_free ? 'Credit grant' : 'Purchase';
   }
 }
 
@@ -57,9 +81,7 @@ export function buildDeductionGroups(deductions: CreditDeductionRow[]): Deductio
         main: {
           date: deduction.purchase.date,
           description: deduction.purchase.description,
-          // A promotional, referral, or Pass grant is not something the user
-          // bought, so it must not be typed `Purchase`.
-          type: deduction.purchase.is_free ? 'Credit grant' : 'Purchase',
+          type: grantTypeLabel(deduction.purchase),
           amount_mUsd: deduction.purchase.amount_mUsd,
         },
         child: {

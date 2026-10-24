@@ -258,7 +258,7 @@ async function resolveUserFromAuth(
   // This path is executed for non-next-auth requests
   // all calls from the extension including the openrouter proxy call use this auth method
   // also val.town and other blessed API users who are given their own custom JWTs use this path
-  if (headersList.get('Authorization')) {
+  if (authViaTokenFromHeaders(headersList)) {
     const rawAuthorization = headersList.get('Authorization');
     const bearer = rawAuthorization?.match(/^Bearer (.+)$/i)?.[1];
     let decoded: ReturnType<typeof jwt.decode>;

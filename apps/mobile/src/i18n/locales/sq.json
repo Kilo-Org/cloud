@@ -53,6 +53,7 @@
     "connected": "Lidhur",
     "couldNotLoadModels": "Modelet nuk u ngarkuan.",
     "couldNotLoadRepositories": "Depot nuk u ngarkuan.",
+    "noRepositoriesFound": "Nuk u gjet asnjë depo",
     "critical": "Kritike",
     "delete": "Fshi",
     "deleted": "Fshirë",
@@ -87,6 +88,7 @@
     "connect": "Lidhu",
     "connectBitbucket": "Lidhu me Bitbucket",
     "connectGitlab": "Lidhu me GitLab",
+    "connectProvider": "Lidh një ofrues",
     "contentTruncated": "Përmbajtja u shkurtua",
     "copyLink": "Kopjo lidhjen",
     "couldNotLoadOrganizations": "Organizatat nuk u ngarkuan.",
@@ -182,7 +184,7 @@
     "codeArrivalHint": "Nëse kjo adresë plotëson kushtet, kodi mbërrin brenda një minute.",
     "verifyCode": "Verifiko kodin",
     "resendCode": "Ridërgo kodin",
-    "termsPrefix": "Duke vazhduar, pajtohesh me",
+    "termsPrefix": "Duke vazhduar, pajtohesh me ",
     "terms": "Kushtet",
     "termsConnector": " dhe ",
     "termsSuffix": ".",
@@ -224,7 +226,7 @@
     "hideBalance": "Fshih gjendjen",
     "showBalance": "Shfaq gjendjen",
     "balanceHidden": "Gjendja është e fshehur",
-    "bonusCreditsExpiring": "Kredite bonus në vlerën {{amount}} skadojnë më {{date}}.",
+    "bonusCreditsExpiring": "Kredite në vlerën {{amount}} skadojnë më {{date}}.",
     "signOutTitle": "Do të dalësh nga llogaria?",
     "signOutMessage": "Do të duhet të hysh përsëri për të pasur qasje në hapësirën tënde të punës.",
     "deleteAccountTitle": "Të fshihet llogaria?",
@@ -293,7 +295,8 @@
     "condenseToolCallsSubtitle": "Grupo thirrjet e njëpasnjëshme të mjeteve në një rresht që mund ta hapësh.",
     "toolSummaryTranslation": "Përkthe përmbledhjet e mjeteve",
     "toolSummaryTranslationSubtitle": "Dërgo çdo përmbledhje mjeti te një model për ta përkthyer në gjuhën e aplikacionit tënd. Origjinali shfaqet nëse përkthimi dështon.",
-    "toolSummaryTranslationModelUnavailableNotice": "Ky model nuk ofrohet më. Trokit $t(common.model) për të zgjedhur një tjetër."
+    "toolSummaryTranslationModelUnavailableNotice": "Ky model nuk ofrohet më. Trokit $t(common.model) për të zgjedhur një tjetër.",
+    "autoExpandThinkingInactiveSubtitle": "Nuk ka asnjë efekt kur detajet e arsyetimit janë të fshehura."
   },
   "prReview": {
     "pullRequestUnavailable": "Kërkesa për bashkim nuk është e disponueshme",
@@ -622,9 +625,15 @@
       "viewOnGitHub": "Shiko PR-në në GitHub",
       "noChecksReported": "Asnjë kontroll i raportuar",
       "passed": "të kaluara: {{displayCount}}",
+      "passed_one": "të kaluara: {{displayCount}}",
+      "passed_other": "të kaluara: {{displayCount}}",
       "failed": "të dështuara: {{displayCount}}",
+      "failed_one": "të dështuara: {{displayCount}}",
+      "failed_other": "të dështuara: {{displayCount}}",
       "pending": "{{displayCount}} në pritje",
       "skipped": "të anashkaluara: {{displayCount}}",
+      "skipped_one": "të anashkaluara: {{displayCount}}",
+      "skipped_other": "të anashkaluara: {{displayCount}}",
       "checksCount": "{{displayCount}} kontrolle",
       "checksCount_one": "{{displayCount}} kontroll",
       "checksCount_other": "{{displayCount}} kontrolle",
@@ -669,7 +678,8 @@
       "gitlabDescription": "Lidho llogarinë tënde GitLab për të rishikuar kërkesat e integrimit në celular.",
       "bitbucketDescription": "Lidho Bitbucket me këtë organizatë për të rishikuar kërkesat për bashkim në celular.",
       "bitbucketOrgOnlyDescription": "Ndrysho llogarinë e mësipërme në një organizatë për të rishikuar kërkesat për bashkim në Bitbucket.",
-      "contextLine": "Për {{organization}}"
+      "contextLine": "Për {{organization}}",
+      "contextLinePersonal": "Për llogarinë personale"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1399,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "Mund të të duhet të japësh qasje në më shumë grupe ose projekte në GitLab.",
       "installGithubApp": "Instalo aplikacionin GitHub në depot",
       "installGithubAppDescription": "Jepi aplikacionit Kilo për GitHub qasje në depot që dëshiron të shqyrtohen.",
-      "noRepositoriesFound": "Nuk u gjet asnjë depo",
       "repositoryAccess": "qasja në depot"
     },
     "style": {
@@ -1429,6 +1438,8 @@
       "showMore": "Shfaq më shumë",
       "created": "Krijuar",
       "started": "Filluar",
+      "reviewEnded": "Mbaruar",
+      "severityNitpick": "Vërejtje",
       "tokens": "Tokenë",
       "tokensInOut": "{{input}} hyrës / {{output}} dalës",
       "council": "Këshilli",
@@ -1452,7 +1463,13 @@
       "sessionError": "Gabim në sesion: {{error}}.",
       "statusWithValue": "Statusi: {{status}}",
       "toolName": "Mjeti: {{name}}",
-      "toolNameError": "Mjeti {{name}} hasi një gabim."
+      "toolNameError": "Mjeti {{name}} hasi një gabim.",
+      "cancelReasonSuperseded": "U shtua një commit i re, kështu që ky shqyrtim u zëvendësua.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} është shkëputur, kështu që ky shqyrtim u anulua. Rilidhe atë, pastaj ekzekuto përsëri shqyrtimin.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer u fik për Bitbucket, kështu që ky shqyrtim u anulua. Aktivizoje përsëri, pastaj ekzekuto përsëri shqyrtimin.",
+      "cancelReasonBitbucketPullRequestChanged": "Pull request-i i Bitbucket-it ndryshoi, kështu që ky shqyrtim u zëvendësua.",
+      "cancelReasonCancelled": "Ky shqyrtim u anulua.",
+      "cancelReasonInterrupted": "Ky shqyrtim u ndërpre."
     },
     "reviewMemory": {
       "title": "Kujtesa e shqyrtimit",
@@ -1473,13 +1490,20 @@
       "invalidUrl": "Shkruaj një URL të vlefshme për PR.",
       "couldNotCheckProviderStatus": "Nuk u kontrollua statusi i ofruesit.",
       "couldNotLoadProviders": "Nuk u ngarkuan ofruesit që ke lidhur. Provo përsëri.",
-      "connectProvider": "Lidh një ofrues",
       "connectProviderDescription": "Lidh GitHub për të filluar shqyrtimin manual të një PR.",
       "pullRequestUrl": "URL-ja e PR",
       "instructions": "Udhëzimet (opsionale)",
       "instructionsPlaceholder": "Çështje të veçanta ku duhet të përqendrohet shqyrtuesi…",
       "starting": "Po nis shqyrtimi…",
-      "start": "Fillo shqyrtimin"
+      "start": "Fillo shqyrtimin",
+      "startNotFound": "Nuk u lexua dot ajo {{requestNoun}} nga {{provider}}. Kontrollo URL-në dhe sigurohu që depozitorja është e aksesueshme.",
+      "startRateLimited": "{{provider}} po kufizon kërkesat në këtë moment. Provo përsëri pas disa minutash.",
+      "startNotAllowed": "Nuk ke qasje për të nisur një shqyrtim për atë {{requestNoun}}. Kontrollo lejet e tua dhe planin e organizatës tënde.",
+      "startProviderNeedsAttention": "Shqyrtimet manuale kërkojnë lidhjen standarde të {{provider}}. Lidhe atë dhe provo përsëri.",
+      "startAlreadyRunning": "Një shqyrtim për atë {{requestNoun}} tashmë po ekzekutohet.",
+      "startRejected": "Kjo {{requestNoun}} nuk mund të shqyrtohet. Sigurohu që është e hapur, jo draft, dhe që URL-ja është e saktë.",
+      "startProviderUnavailable": "Nuk u arrit të kontaktohej {{provider}} për të lexuar atë {{requestNoun}}. Provo përsëri.",
+      "startFailed": "Shqyrtimi nuk u nis. Kontrollo lidhjen dhe provo përsëri."
     },
     "notConnectedReadOnly": "{{platform}} nuk është i lidhur. Vetëm pronarët e organizatës dhe administratorët mund ta lidhin.",
     "gitlab": {
@@ -1731,7 +1755,7 @@
       "deadlinePassed": "Afati kaloi",
       "deadlinePassedDetail": "{{critical}} kritike, {{high}} me rrezik të lartë",
       "dueThisWeek": "Afati këtë javë",
-      "dueThisWeekDetail": "{{exploitable}} të konfirmuara si të shfrytëzueshme",
+      "dueThisWeekDetail": "{{exploitable}} prej tyre të konfirmuara si të shfrytëzueshme",
       "noDeadline": "Pa afat",
       "reviewSlaAssignment": "Shqyrto caktimin e SLA-së",
       "allOpenFindingsTracked": "Të gjitha gjetjet e hapura gjurmohen"
@@ -1891,11 +1915,17 @@
       "actorSystem": "Sistemi Kilo",
       "couldNotLoad": "Nuk u ngarkua raporti i auditimit.",
       "events": "Ngjarjet",
+      "eventConfidence": "Besueshmëria: {{confidence}}",
+      "eventReason": "Arsyeja: {{reason}}",
+      "eventsCount_one": "{{displayCount}} ngjarje",
+      "eventsCount_other": "{{displayCount}} ngjarje",
       "generated": "Raporti u gjenerua më {{generatedAt}}.",
       "noActivity": "Asnjë aktivitet i regjistruar",
       "noActivityDescription": "Kilo nuk ka aktivitet për të raportuar për gjetjet e sigurisë nga {{start}} deri më {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Depoja nuk është regjistruar",
+      "reasonUnknown": "Arsye e panjohur",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Përmbledhja e raportit",
       "title": "Raporti i auditimit",
       "unavailable": "Raporti i auditimit nuk është i disponueshëm",
@@ -1948,8 +1978,9 @@
       "couldNotLoad": "Nuk u ngarkua agjenti i sigurisë.",
       "installApp": "Instalo aplikacionin GitHub",
       "reauthorizeButton": "Riautorizo aplikacionin GitHub",
-      "reauthorizeDescription": "Agjenti i sigurisë kërkon lejen vulnerability_alerts për të pasur qasje në njoftimet e Dependabot. Riautorizo aplikacionin GitHub për t'ia dhënë këtë leje.",
+      "reauthorizeDescription": "Agjenti i sigurisë ka nevojë për leje për të lexuar njoftimet e Dependabot. Riautorizo aplikacionin GitHub për t'ia dhënë këtë leje.",
       "reauthorizeTitle": "Kërkohen leje shtesë",
+      "retryFailed": "Nuk u ngarkua akoma agjenti i sigurisë. Kontrollo lidhjen dhe provo përsëri.",
       "setupFailed": "Nuk u nis konfigurimi i GitHub. Provo përsëri."
     },
     "queuedActionUntracked": "Nuk mund të ndiqej më gjendja e një veprimi në radhë. Rifresko për të parë gjendjen më të fundit.",
@@ -2112,7 +2143,8 @@
       "dollar_other": "dollarë",
       "costSpoken": "kostoja {{cost}}",
       "costSpokenWithTime": "kostoja {{cost}}, {{time}}",
-      "pullRequest": "kërkesa për bashkim {{number}}"
+      "pullRequest": "kërkesa për bashkim {{number}}",
+      "spokenJoiner": "dhe"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nuk u hap GitHub",
@@ -2241,13 +2273,13 @@
       "branchLoadError": "Degët nuk u ngarkuan dot",
       "branchUnavailable": "Nuk ka degë të disponueshme për këtë depo. Kontrollo aksesin tënd te ofruesi, pastaj përzgjidh një depo tjetër.",
       "branchEmpty": "Nuk ka degë të disponueshme",
+      "branchListIncomplete": "Shfaqen vetëm disa degë. Depoja ka më shumë degë sesa mund të përfshijë kjo listë.",
       "branchPlaceholder": "Përzgjidh një degë",
       "runOnWithTarget": "Ekzekuto në: {{target}}",
       "environment": "Mjedisi",
       "couldNotLoadEnvironment": "Nuk u ngarkua mjedisi yt.",
       "retryLoadingEnvironment": "Provo ta ngarkosh përsëri mjedisin",
       "defaultEnvironment": "Mjedisi i parazgjedhur",
-      "environmentSummary": "{{commands}} komanda · {{mcp}} MCP · {{skills}} aftësi · {{agents}} agjentë",
       "leaveChanges": "Lër ndryshimet",
       "commitAndPush": "Regjistro dhe dërgo",
       "startSession": "Nis seancën",
@@ -2466,7 +2498,71 @@
       "preparationComplete": "Përgatitja përfundoi",
       "preparationFailed": "Përgatitja dështoi",
       "setupCommand": "Komanda e konfigurimit {{index}}",
-      "setupCommandOf": "Komanda e konfigurimit {{index}} nga {{displayCount}}"
+      "setupCommandOf": "Komanda e konfigurimit {{index}} nga {{displayCount}}",
+      "stepWorkspaceSetup": "Konfigurimi i hapësirës së punës",
+      "stepDiskCheck": "Kontrolli i diskut",
+      "stepCloning": "Duke klonuar depon",
+      "stepBranch": "Duke konfiguruar degëzën",
+      "stepDevcontainerSetup": "Konfigurimi i dev container-it",
+      "stepWorkspaceRestore": "Duke rikthyer hapësirën e punës",
+      "stepWorkspaceBackup": "Duke ruajtur hapësirën e punës",
+      "stepSandboxProvision": "Duke furnizuar sandbox-un",
+      "stepSandboxBoot": "Duke nisur sandbox-un",
+      "stepSnapshotFallback": "Po provohet përsëri pa snapshot",
+      "stepKiloServer": "Duke nisur Kilo",
+      "stepKiloSession": "Duke përgatitur sesionin",
+      "stepRestoreIncomplete": "Rikthimi i sesionit nuk u plotësua",
+      "stepReady": "Mjedisi është gati",
+      "stepFailed": "Konfigurimi i mjedisit dështoi",
+      "stepUnknown": "Konfigurimi i mjedisit",
+      "detailCreatingSandbox": "Duke krijuar sandbox-un",
+      "detailUpdatingRepository": "Duke përditësuar depon",
+      "detailCheckingOutBranch": "Duke kaluar në degëz",
+      "detailRunningSetupCommands": "Duke ekzekutuar komandat e konfigurimit",
+      "detailSavingRepository": "Duke ruajtur depon për nisje më të shpejta",
+      "detailStartingKiloRuntime": "Duke nisur runtime-in Kilo",
+      "detailPreparingKiloSession": "Duke përgatitur sesionin Kilo",
+      "detailWaitingForPreviousSandbox": "Duke pritur që sandbox-u i mëparshëm të ndalet",
+      "detailRetryingSandboxCreation": "Po provohet përsëri krijimi i sandbox-ut",
+      "detailPreviousSnapshotFailed": "Nisja nga snapshot-i i mëparshëm dështoi. Po provohet pa snapshot.",
+      "detailSnapshotStartupFailed": "Nisja nga snapshot-i dështoi. Po provohet pa snapshot.",
+      "detailStartingSandboxWithoutSnapshot": "Duke nisur sandbox-un pa snapshot",
+      "detailSettingUpWorkspace": "Duke konfiguruar hapësirën e punës",
+      "detailRestoringSession": "Duke rikthyer sesionin",
+      "detailWarmWorkspaceReused": "U ripërdor hapësira e punës e ngrohtë",
+      "detailRetryingClone": "Po provohet përsëri klonimi (përpjekja {{attempt}} nga {{total}})",
+      "detailSetupCommandFailed": "Komanda e konfigurimit {{index}} dështoi",
+      "detailSetupCommandTimedOut": "Komandës së konfigurimit {{index}} i mbaroi koha",
+      "detailColdRestore": "Rikthim i ftohtë, snapshot-i u aplikua, {{applied}} nga {{total}} skedarë u rikthyera",
+      "detailProgressPercent": "{{percent}}% e përfunduar",
+      "detailRestoreIncompleteReport": "Rikthimi i sesionit nuk u plotësua: {{skipped}} nga {{total}} skedarë nuk u rikthyera ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Mungojnë: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} dhe {{omitted}} të tjera",
+      "detailReasonPatchFailed": "patch-i nuk u aplikua",
+      "detailReasonOutsideWorkspace": "rruga është jashtë hapësirës së punës",
+      "detailReasonMissingContent": "snapshot-i nuk përmbante përmbajtje për skedarin",
+      "detailReasonIndexResetFailed": "indeksi nuk mundi të rikthehej pas një aplikimi të dështuar",
+      "detailReasonUnlinkFailed": "skedari nuk mundi të hiqej",
+      "detailReasonWriteFailed": "skedari nuk mundi të shkruhej",
+      "detailReasonUnknown": "një arsye e panjohur",
+      "detailUnknown": "Po përgatitet akoma",
+      "errorPreparationTimeout": "Përgatitjes së mjedisit i mbaroi koha",
+      "errorWorkspaceSetupFailed": "Konfigurimi i hapësirës së punës dështoi",
+      "errorCredentialUpgradeRequired": "Këtij sesioni i mungon një përmirësim i kërkuar i kredencialeve. Nis një sesion të ri për të vazhduar.",
+      "errorAgentUnavailable": "Agjenti nuk është më i disponueshëm",
+      "errorBillingBlocked": "Faturimi i sandbox-ut kërkon kredi shtesë",
+      "errorBillingUnavailable": "Verifikimi i faturimit ose i kapacitetit të sandbox-ut nuk është i disponueshëm. Provo së shpejti.",
+      "errorContainerLimitReached": "U arrit kufiri i kontejnerëve. Ndal një kontejner ekzistues përpara se të nisësh një tjetër.",
+      "errorInvalidConfiguration": "Konfigurimi i sandbox-ut është i pavlefshëm ose i pambështetur",
+      "errorRuntimeArtifactUnauthorized": "Shkarkimi i runtime-it nuk u autorizua",
+      "errorRuntimeArtifactInvalid": "Verifikimi i artefaktit të runtime-it dështoi",
+      "errorRuntimeCliProbeFailed": "Validimi i CLI-së së runtime-it dështoi",
+      "errorRuntimeSupervisorMissing": "Mbikëqyrësi i runtime-it mungon",
+      "errorConnectionLost": "Lidhja me sandbox-un u humb",
+      "errorSandboxLost": "Sandbox-u u humb",
+      "errorAgentRestarted": "Agjenti u rindez",
+      "errorSandboxOutOfMemory": "Sandbox-u mbeti pa memorie",
+      "errorPreparationDidNotComplete": "Përgatitja nuk u krye plotësisht"
     },
     "permissionCard": {
       "title": "Kërkohet leje",
@@ -2478,7 +2574,10 @@
       "allowOnceAccessibility": "Lejo një herë",
       "alwaysAllow": "Lejo gjithmonë",
       "alwaysAllowAccessibility": "Lejo gjithmonë",
-      "retrying": "Duke u provuar përsëri…"
+      "retrying": "Duke u provuar përsëri…",
+      "retryDeny": "Provo ta refuzosh përsëri",
+      "retryAllowOnce": "Provo ta lejosh një herë përsëri",
+      "retryAlwaysAllow": "Provo ta lejosh gjithmonë përsëri"
     },
     "questionCard": {
       "title": "Agjenti kërkon përgjigjen tënde",
@@ -3030,22 +3129,16 @@
     "boundary": {
       "backToProfile": "Kthehu te profili",
       "loadErrorMessage": "Kontrollo lidhjen dhe provo përsëri.",
-
       "chooseAccount": "Zgjidh një llogari",
       "loadErrorTitle": "Nuk u ngarkuan organizatat e tua.",
       "membershipLostNotice": "Nuk ke më qasje në këtë organizatë. U kalua te {{target}}.",
       "noOrganization": "Asnjë organizatë",
-
       "noOrganizationDescription": "Kjo llogari nuk është pjesë e një organizate. Krijo ose bashkohu me një organizatë në ueb për të përdorur veçoritë e organizatës si ftesat për anëtarët dhe alarmet për balancë të ulët.",
-
       "openWebOrganizations": "Hap organizatat në ueb",
-
       "organizationUnavailable": "Organizata nuk është e disponueshme.",
       "selectDescriptionWithOrganizations": "Ti i përket një ose më shumë organizatave. Zgjidh llogarinë që duhet të përdorë ky ekran.",
-
       "selectOrganization": "Zgjidh një organizatë",
       "unavailableDescription": "Kjo organizatë nuk është më e disponueshme. Zgjidh një tjetër nga profili yt për të vazhduar.",
-
       "unavailableSessionsDescription": "Kjo organizatë nuk është më e disponueshme. Sesionet e saj nuk mund të ngarkohen.",
       "accessDeniedDescription": "Nuk ke qasje në këtë organizatë."
     },
@@ -3073,7 +3166,9 @@
       "permissionDenied": "Nuk ke leje për të ftuar anëtarë.",
       "roleMember": "Roli është anëtar.",
       "sendInvite": "Dërgo ftesën",
-      "title": "Fto anëtar"
+      "title": "Fto anëtar",
+      "alreadyInvited": "Ky person është ftuar tashmë ose është tashmë anëtar.",
+      "sendError": "Ftesa nuk u dërgua."
     },
     "invoices": {
       "downloadA11y": "Shkarko faturën {{number}}",
@@ -3142,7 +3237,8 @@
       "inviteCreated": "Ftesa u krijua",
       "pendingInvitations": "Ftesat në pritje",
       "resendInvite": "Ridërgo ftesën",
-      "shareInviteLink": "Ndaj lidhjen e ftesës"
+      "shareInviteLink": "Ndaj lidhjen e ftesës",
+      "resendInviteError": "Ftesa nuk u ridërgua."
     },
     "usageStats": {
       "inputTokens": "Tokenët hyrës",
@@ -3290,7 +3386,8 @@
     "noneChosen": "Asgjë nuk u zgjodh",
     "emptyTitle": "Nuk ka modele transkriptimi",
     "emptyDescription": "Kilo Gateway nuk ofron tani asnjë model transkriptimi.",
-    "loadFailed": "Modelet e transkriptimit nuk u ngarkuan."
+    "loadFailed": "Modelet e transkriptimit nuk u ngarkuan.",
+    "choose": "Zgjidh një model"
   },
   "voiceLanguage": {
     "title": "Gjuha e diktimit",
@@ -3386,7 +3483,12 @@
       "serverToolCount_one": "{{count}} mjet",
       "serverToolCount_other": "{{count}} mjete",
       "serverUnreachable": "Nuk u arrit ky server",
-      "serverOff": "Ky server është i fikur"
+      "serverOff": "Ky server është i fikur",
+      "app": {
+        "label": "Ndërfaqja e mjetit",
+        "failed": "Ndërfaqja e këtij mjeti nuk mund të ngarkohej.",
+        "empty": "Ndërfaqja e këtij mjeti nuk ka gjë për të shfaqur."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Vërtetimi",
@@ -3500,6 +3602,7 @@
       "fromHuggingFace": "Nga Hugging Face",
       "loading": "Po ngarkohen modelet",
       "noResults": "Nuk u gjet asnjë model",
+      "noResultsForQuery": "Nuk u gjet asnjë model për \"{{query}}\"",
       "noFits": "Asnjë model nuk përshtatet me këtë pajisje",
       "noFitsDescription": "Modelet më të mëdha janë te skeda $t(common.all).",
       "fit": {
@@ -3530,8 +3633,6 @@
       "quantizations": "Kuantizimet",
       "quantizationsHelp": "Skedarët më të vegjël përdorin më pak memorie dhe hapësirë. Skedarët më të mëdhenj zakonisht japin përgjigje më të mira.",
       "quantDetail": "Shkarkim {{size}} · rreth {{memory}} memorie",
-      "downloadQuant": "Shkarko {{quant}}",
-      "downloadModelA11y": "Shkarko {{name}}",
       "detailsA11y": "Detajet: {{name}}",
       "loadingModel": "Po ngarkohen detajet e modelit",
       "couldNotLoadModel": "Ky model nuk u ngarkua",
@@ -3576,13 +3677,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "Ky model mbështet nivelin e arsyetimit"
-    }
+    },
+    "creditsRequired": "Nuk ka kredi të mjaftueshme për të dërguar këtë mesazh. Shto kredite dhe provo sërish."
   },
   "settingsTools": {
     "confirmTitle": "Të konfirmohet ky ndryshim?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "depoja jote më e fundit",
+      "confirmMessage": "Depo: {{repository}}. Kërkesë: {{prompt}}",
+      "confirmTitle": "Të fillojmë këtë agjent?",
       "promptRequired": "Fillo agjentin kërkon një kërkesë. Shto një kërkesë dhe ekzekutoje përsëri.",
       "repositoryRequired": "Fillo agjentin kërkon një depo. Hap Kilo dhe zgjidh një depo, pastaj ekzekutoje përsëri.",
       "repositoryUnknown": "Kilo nuk e njeh {{repository}} si depo GitHub ose GitLab. Zgjidh një depo tjetër në Kilo.",
@@ -3612,7 +3717,9 @@
     "spend24h": "Shpenzimet në 24 orët e fundit",
     "multiplierError": "Vendos një shumëzues 1 ose më shumë",
     "permissionDenied": "Nuk ke leje për të menaxhuar njoftimet për shpenzimet.",
-    "pushOffByCategory": "Fikur në Njoftimet"
+    "pushOffByCategory": "Fikur në Njoftimet",
+    "multiplierMaxError": "Vendos një shumëzues {{max}} ose më të vogël",
+    "thresholdMaxError": "Shkruaj një shumë prej {{max}} ose më pak."
   },
   "profiles": {
     "title": "Profilet",
@@ -3629,9 +3736,10 @@
       "skills_other": "{{count}} aftësi",
       "commands_one": "{{count}} komandë",
       "commands_other": "{{count}} komanda",
-      "varsShort": "{{count}}v",
-      "skillsShort": "{{count}}a",
-      "commandsShort": "{{count}}k"
+      "setupCommands_one": "{{count}} komandë konfigurimi",
+      "setupCommands_other": "{{count}} komanda konfigurimi",
+      "agents_one": "{{count}} agjent",
+      "agents_other": "{{count}} agjentë"
     },
     "nameLabel": "Emri i profilit",
     "namePlaceholder": "p.sh. Korrigjimi i backend-it",
@@ -3659,6 +3767,8 @@
     "keyTooLong": "Çelësi duhet të ketë 256 karaktere ose më pak",
     "keyDuplicate": "Ky çelës ekziston tashmë në profil",
     "valueLabel": "Vlera",
+    "valueRequired": "Futni një vlerë",
+    "tooLong": "Përdorni më së shumti {{max}} karaktere",
     "secrets": {
       "markSecret": "Shënoni si sekret",
       "masked": "Vlera e fshehur",
@@ -3709,7 +3819,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Futni një emër serveri",
-      "nameInvalid": "Emri mund të përdorë vetëm shkronja, numra, nënvizime dhe viza",
+      "nameInvalid": "Emri mund të përdorë vetëm shkronja ASCII, numra, nënvizime dhe viza, deri në 100 karaktere",
       "commandRequired": "Futni një komandë",
       "commandTooLong": "Përdor maksimumi 50 argumente nga 500 karaktere secili",
       "urlRequired": "Fut një URL",
@@ -3737,16 +3847,16 @@
       "stepsPlaceholder": "p.sh. 50",
       "temperature": "Temperatura",
       "temperaturePlaceholder": "p.sh. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "p.sh. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Agjenti im",
       "promptPlaceholder": "Ju jeni një...",
       "tools": "Mjetet",
       "visibility": "Dukshmëria",
-      "visibilityPrimary": "Primar - tregohet në zgjedhës",
-      "visibilitySubagent": "Subagent - i thirrur vetëm nga të tjerët",
-      "visibilityAll": "Të gjitha - të dyja",
+      "visibilityPrimary": "Primar — tregohet në zgjedhës",
+      "visibilitySubagent": "Subagent — i thirrur vetëm nga të tjerët",
+      "visibilityAll": "Të gjitha — të dyja",
       "modePrimary": "Vetëm primar",
       "modeSubagent": "Vetëm subagent",
       "modeAll": "Të gjitha mënyrat",
@@ -3754,7 +3864,7 @@
       "deleteFailed": "Agjenti nuk mund të fshihej",
       "nameRequired": "Futni një emër agjenti",
       "slugRequired": "Fut një slug agjenti",
-      "slugInvalid": "Slug duhet të fillojë me një shkronjë dhe të përdorë vetëm shkronja të vogla, shifra dhe viza",
+      "slugInvalid": "Slug duhet të fillojë me një shkronjë të vogël ASCII dhe të përdorë vetëm shkronja të vogla ASCII, shifra dhe viza, deri në 50 karaktere",
       "slugConflict": "Ai slug është tashmë në përdorim nga një agjent i integruar ose një agjent tjetër në këtë profil",
       "edit": "Përpunoni agjent"
     },
@@ -3799,7 +3909,9 @@
       "pinFailed": "Depo nuk mund të gozhdohej",
       "unboundToast": "Repo e palidhur",
       "unbindFailed": "Repo nuk mund të shkëputej"
-    }
+    },
+    "variablesDeleteFailed": "Variabla nuk mund të fshihej",
+    "deleteCommand": "Fshi komandën {{position}}"
   },
   "credits": {
     "title": "Bli kredite",
@@ -3835,7 +3947,8 @@
       "archive": "Arkivo",
       "unarchive": "Çarkivo",
       "deleteTitle": "Të fshihet {{name}}?",
-      "deleteMessage": "Edhe detyrat e tij fshihen. Seancat e tyre mbeten."
+      "deleteMessage": "Edhe detyrat e tij fshihen. Seancat e tyre mbeten.",
+      "createFailed": "Lista nuk u krijua"
     },
     "listSettings": {
       "title": "Cilësimet e listës",
@@ -3903,20 +4016,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Përmbledhja e mëngjesit",
+    "title": "Përmbledhja e agjentit",
     "atLeast": "≥{{value}}",
     "coverageHint": "Mund të mungojë një pjesë e aktivitetit të mëparshëm. ≥ do të thotë të paktën kaq; e panjohura nuk është zero.",
     "available": "Përmbledhjet e disponueshme",
     "history": "Historiku i përmbledhjeve",
-    "historyHint": "Raportet ruhen për 30 ditë, përfshirë raportet e mbyllura.",
+    "historyHint": "Përmbledhjet ruhen për 30 ditë, përfshirë ato të mbyllura.",
     "settings": "Cilësimet e përmbledhjes",
-    "empty": "Asnjë aktivitet gjatë natës",
-    "emptyHint": "Seancat e kodimit në cloud dhe CLI do të shfaqen këtu pas një nate aktive.",
+    "empty": "Asnjë aktivitet në këtë dritare kohore të përmbledhjes",
+    "emptyHint": "Seancat e kodimit në cloud dhe CLI shfaqen këtu kur një përmbledhje e planifikuar ka aktivitet.",
     "loadError": "Përmbledhjet nuk u ngarkuan",
-    "sessions": "Aktive gjatë natës",
+    "sessions": "Aktive në dritaren kohore",
     "pullRequests": "PRs të hapura",
     "blockers": "Pengesa të reja",
-    "spend": "Shpenzimi i natës",
+    "spend": "Shpenzimi në dritaren kohore",
     "view": "Lexo përmbledhjen",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -3938,13 +4051,13 @@
     "sources": "Prova dhe artefakte",
     "timezone": "Zona kohore e përmbledhjes",
     "deviceTimezone": "Përdor zonën kohore të pajisjes",
-    "timezoneHint": "Zonë kohore IANA, p.sh. Europe/Berlin. Ndryshimet e orarit zbatohen për netët e ardhshme.",
-    "nightStart": "Nata fillon",
-    "morningStart": "Nata mbaron / mëngjesi fillon",
-    "morningEnd": "Mëngjesi mbaron",
-    "timeHint": "Karta Kreu rikthen statusin live kur mbaron mëngjesi, edhe jashtë linje.",
-    "invalidSchedule": "Zgjidh një zonë kohore të vlefshme dhe periudha nate e mëngjesi jo bosh që nuk mbivendosen.",
-    "notificationsHint": "Një njoftim i përgjithshëm çdo mëngjes kur raporti i parë është gati. I pavarur nga përmbledhjet AI me pagesë.",
+    "timezoneHint": "Zonë kohore IANA, p.sh. Europe/Berlin. Ndryshimet e orarit zbatohen për përmbledhjet e ardhshme.",
+    "nightStart": "Dritarja kohore e përmbledhjes fillon",
+    "morningStart": "Përmbledhja gati në",
+    "morningEnd": "Përmbledhja e disponueshme deri në",
+    "timeHint": "Karta Kreu rikthen statusin live kur mbaron dritarja kohore e përmbledhjes, edhe jashtë linje.",
+    "invalidSchedule": "Zgjidh një zonë kohore të vlefshme dhe një dritare kohore jo boshe për përmbledhjen.",
+    "notificationsHint": "Një njoftim i përgjithshëm për çdo përmbledhje të planifikuar. I pavarur nga përmbledhjet AI me pagesë.",
     "notificationPermission": "Aktivizo njoftimet e pajisjes te $t(common.notifications) për të marrë përmbledhjen.",
     "aiOptIn": "Përmbledhje AI me pagesë",
     "aiHint": "Opsionale vetëm për këtë kontekst. Fragmente të zgjedhura e të redaktuara dhe fakte të strukturuara dërgohen te modeli yt në gjuhën e aplikacionit. Tarifat përdorin balancën e këtij konteksti.",
@@ -3962,7 +4075,7 @@
     "contextSettings": "Cilësimet AI · {{context}}",
     "allContexts": "Përmbledhjet personale dhe të organizatës mbahen të ndara.",
     "create": "Krijo përmbledhje",
-    "oneOff": "Vetëm një herë",
+    "oneOff": "Sipas kërkesës",
     "createdAt": "Krijuar {{time}}",
     "chooseContext": "Zgjidh një kontekst",
     "period": "Periudha e përmbledhjes",
@@ -3984,13 +4097,16 @@
     "emptyPeriod": "Nuk u gjet aktivitet gjatë kësaj periudhe. Nuk krijohet përmbledhje AI dhe nuk ka tarifë.",
     "emptyHistory": "Nuk ka përmbledhje të ruajtura",
     "historicalStateHint": "Gjendja e seancës pasqyron fundin e periudhës së zgjedhur, jo gjendjen aktuale në kohë reale.",
-    "oneOffHint": "AI merr prova të përzgjedhura me të dhënat e ndjeshme të fshehura, në gjuhën e aplikacionit tënd. Ky raport i vetëm njëhershëm nuk ndryshon orarin tënd të mëngjesit ose preferencat e tua për AI.",
+    "oneOffHint": "AI merr prova të përzgjedhura me të dhënat e ndjeshme të fshehura, në gjuhën e aplikacionit tënd. Kjo përmbledhje sipas kërkesës nuk ndryshon përmbledhjen tënde të planifikuar ose preferencat e tua për AI.",
     "createOffline": "Lidhu me internetin për të shqyrtuar ose krijuar një përmbledhje. Kërkesat me pagesë nuk vendosen kurrë në radhë pa lidhje interneti.",
     "estimateInputTooLarge": "Kjo periudhë përmban tepër prova për modelin e zgjedhur.",
     "estimatePermissionUnavailable": "Nuk ke leje të përdorësh gjendjen e llogarisë së këtij konteksti.",
+    "createFailed": "Kjo përmbledhje nuk mund të krijohet.",
+    "reviewFailed": "Kjo përmbledhje nuk mund të shqyrtohet.",
     "estimatePricingUnavailable": "Çmimi për këtë model nuk është i disponueshëm.",
     "estimateBalanceUnavailable": "Balanca nuk mjafton për një përmbledhje me pagesë.",
     "estimateModelNotAllowed": "Ky model nuk lejohet këtu.",
-    "estimateSpendLimitTooLow": "Rrite kufirin e shpenzimit për ta lejuar këtë përmbledhje."
+    "estimateSpendLimitTooLow": "Rrite kufirin e shpenzimit për ta lejuar këtë përmbledhje.",
+    "saved": "Cilësimet e përmbledhjes u ruajtën"
   }
 }

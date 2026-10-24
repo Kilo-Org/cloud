@@ -3,14 +3,11 @@
 // But note tricky corner cases using vercel otel with sentry:
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/opentelemetry/custom-setup/
 
-import type { Event } from '@sentry/nextjs';
 import { consoleLoggingIntegration, httpIntegration, init } from '@sentry/nextjs';
 import { RESTRICTED_DATA_COLLECTION } from '@kilocode/web-shared/lib/observability/sentry-data-collection';
-import {
-  SENSITIVE_PATHS,
-  SENSITIVE_QUERY_PARAMS,
-  sanitizeAnalyticsPathname,
-} from '@kilocode/web-shared/lib/sanitize-analytics-url';
+import { sanitizeSentryRequestData } from '@kilocode/web-shared/lib/observability/sentry-request-data';
+
+export { sanitizeSentryRequestData };
 
 type DrizzleQueryError = Error & {
   query: string;
@@ -82,126 +79,6 @@ function isTRPC4xxError(error: unknown): boolean {
     typeof error.code === 'string' &&
     TRPC_4XX_CODES.has(error.code)
   );
-}
-
-const EXTRA_REDACTED_QUERY_KEYS = new Set(['installstate']);
-
-// Decode a raw query key the way URLSearchParams would, so percent-encoded
-// forms of the key are compared against their decoded value. Malformed
-// percent-encoding is not the redacted key and is left in its raw form.
-function decodeQueryKey(rawKey: string): string {
-  try {
-    return decodeURIComponent(rawKey.replace(/\+/g, ' '));
-  } catch {
-    return rawKey;
-  }
-}
-
-// One decoded-key predicate for every query form: URL, string, array, and
-// object. Keys are matched after URL-decoding and case-folding so percent-
-// encoded (`%73tate`) and mixed-case (`State`) forms cannot survive.
-function isRedactedQueryKey(rawKey: string): boolean {
-  const key = decodeQueryKey(rawKey).toLowerCase();
-  return SENSITIVE_QUERY_PARAMS.has(key) || EXTRA_REDACTED_QUERY_KEYS.has(key);
-}
-
-type SentryRequest = NonNullable<Event['request']>;
-type SentryQueryString = NonNullable<SentryRequest['query_string']>;
-
-function sanitizeStringQuery(queryString: string): string {
-  return queryString
-    .split('&')
-    .filter(part => !isRedactedQueryKey(part.split('=', 1)[0]))
-    .join('&');
-}
-
-function sanitizeRelativeRequestUrl(url: string): string {
-  const hashIndex = url.indexOf('#');
-  const fragment = hashIndex === -1 ? '' : url.slice(hashIndex);
-  const pathAndQuery = hashIndex === -1 ? url : url.slice(0, hashIndex);
-  const queryIndex = pathAndQuery.indexOf('?');
-  const path = sanitizeAnalyticsPathname(
-    queryIndex === -1 ? pathAndQuery : pathAndQuery.slice(0, queryIndex)
-  );
-  if (queryIndex === -1 || SENSITIVE_PATHS.has(path)) {
-    return `${path}${fragment}`;
-  }
-  const sanitizedQuery = sanitizeStringQuery(pathAndQuery.slice(queryIndex + 1));
-  return sanitizedQuery.length > 0 ? `${path}?${sanitizedQuery}${fragment}` : `${path}${fragment}`;
-}
-
-function sanitizeRequestUrl(url: string): string {
-  try {
-    const parsed = new URL(url);
-    parsed.pathname = sanitizeAnalyticsPathname(parsed.pathname);
-    if (SENSITIVE_PATHS.has(parsed.pathname)) {
-      parsed.search = '';
-      return parsed.toString();
-    }
-    for (const [key] of Array.from(parsed.searchParams)) {
-      if (isRedactedQueryKey(key)) {
-        parsed.searchParams.delete(key);
-      }
-    }
-    return parsed.toString();
-  } catch {
-    return sanitizeRelativeRequestUrl(url);
-  }
-}
-
-function requestPathname(url: string): string {
-  try {
-    return new URL(url).pathname;
-  } catch {
-    const hashIndex = url.indexOf('#');
-    const withoutFragment = hashIndex === -1 ? url : url.slice(0, hashIndex);
-    const queryIndex = withoutFragment.indexOf('?');
-    return queryIndex === -1 ? withoutFragment : withoutFragment.slice(0, queryIndex);
-  }
-}
-
-function emptyQueryString(queryString: SentryQueryString): SentryQueryString {
-  if (typeof queryString === 'string') {
-    return '';
-  }
-  if (Array.isArray(queryString)) {
-    return [];
-  }
-  return {};
-}
-
-function sanitizeQueryString(queryString: SentryQueryString): SentryQueryString {
-  if (typeof queryString === 'string') {
-    return sanitizeStringQuery(queryString);
-  }
-  if (Array.isArray(queryString)) {
-    return queryString.filter(([key]) => !isRedactedQueryKey(key));
-  }
-  const kept: Record<string, string> = {};
-  for (const [key, value] of Object.entries(queryString)) {
-    if (!isRedactedQueryKey(key)) {
-      kept[key] = value;
-    }
-  }
-  return kept;
-}
-
-export function sanitizeSentryRequestData(event: Event): Event {
-  const request = event.request;
-  if (!request) {
-    return event;
-  }
-  if (typeof request.url === 'string') {
-    request.url = sanitizeRequestUrl(request.url);
-  }
-  if (request.query_string !== undefined) {
-    const sensitivePath =
-      typeof request.url === 'string' && SENSITIVE_PATHS.has(requestPathname(request.url));
-    request.query_string = sensitivePath
-      ? emptyQueryString(request.query_string)
-      : sanitizeQueryString(request.query_string);
-  }
-  return event;
 }
 
 export function initServerSentry(): void {
@@ -283,6 +160,9 @@ export function initServerSentry(): void {
         }
       }
 
+      // Automatic request data can retain the GitHub OAuth `state` token, the
+      // app-flow `installState` bearer, or a `/s/{jwt}` share token; strip them
+      // while keeping the rest.
       sanitizeSentryRequestData(event);
 
       return event;

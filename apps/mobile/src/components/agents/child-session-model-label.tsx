@@ -7,7 +7,7 @@ export function ChildSessionModelLabel({ modelLabel }: Readonly<{ modelLabel: st
 
   return (
     <Text
-      className="text-xs leading-4 text-muted-foreground"
+      className="text-xs leading-[1rem] text-muted-foreground"
       numberOfLines={1}
       accessibilityLabel={t('agentChat.childSession.modelAccessibility', { modelLabel })}
     >

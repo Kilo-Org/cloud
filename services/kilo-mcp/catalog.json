@@ -6236,7 +6236,8 @@
                     },
                     "prompt": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "maxLength": 100000
                     },
                     "mode": {
                       "type": "string",
@@ -6274,7 +6275,8 @@
                     },
                     "arguments": {
                       "default": "",
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 100000
                     }
                   },
                   "required": [
@@ -7669,7 +7671,8 @@
                 },
                 "arguments": {
                   "default": "",
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 100000
                 }
               },
               "required": [
@@ -7774,8 +7777,7 @@
           "pattern": "^(agent|workspace)_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
         },
         "kilo_session_id": {
-          "type": "string",
-          "pattern": "^ses_[A-Za-z0-9]{26}$"
+          "type": "string"
         },
         "session_type": {
           "type": "string",
@@ -8272,31 +8274,6 @@
       "overrideuser"
     ],
     "searchBlob": "codeIndexing.getProjectFiles List indexed files within a project with pagination, search, and branch filtering, showing per-file chunk count, size, branches, line counts, and percentage of AI-generated lines. codeindexing getprojectfiles organizationid projectid gitbranch filesearch page pagesize overrideuser organizationId projectId gitBranch fileSearch page pageSize overrideUser"
-  },
-  "codeIndexing.getRecentSearches": {
-    "path": "codeIndexing.getRecentSearches",
-    "kind": "query",
-    "summary": "List the most recent code-indexing search queries made by members of an organization, with timestamps, project, and result counts.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId"
-      ]
-    },
-    "tags": [
-      "codeindexing",
-      "getrecentsearches",
-      "organizationid"
-    ],
-    "searchBlob": "codeIndexing.getRecentSearches List the most recent code-indexing search queries made by members of an organization, with timestamps, project, and result counts. codeindexing getrecentsearches organizationid organizationId"
   },
   "codeIndexing.search": {
     "path": "codeIndexing.search",
@@ -9392,7 +9369,10 @@
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
-      }
+      },
+      "required": [
+        "integrationId"
+      ]
     },
     "tags": [
       "githubapps",
@@ -16788,7 +16768,8 @@
                         },
                         "prompt": {
                           "type": "string",
-                          "minLength": 1
+                          "minLength": 1,
+                          "maxLength": 100000
                         },
                         "mode": {
                           "type": "string",
@@ -16826,7 +16807,8 @@
                         },
                         "arguments": {
                           "default": "",
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 100000
                         }
                       },
                       "required": [
@@ -18294,7 +18276,8 @@
                 },
                 "arguments": {
                   "default": "",
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 100000
                 }
               },
               "required": [

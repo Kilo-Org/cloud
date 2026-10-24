@@ -240,10 +240,12 @@ export {
   buildSecurityFindingAuditSnapshot,
   deriveSecurityFindingAuditEventKey,
   insertSecurityFindingAuditEvent,
+  insertSecurityFindingAuditEvents,
 } from './security-finding-audit.js';
 export type {
   NewSecurityFindingAuditLogValues,
   SecurityFindingAuditActor,
+  SecurityFindingAuditBatchWriterDb,
   SecurityFindingAuditEventFinding,
   SecurityFindingAuditEventInput,
   SecurityFindingAuditHumanActor,

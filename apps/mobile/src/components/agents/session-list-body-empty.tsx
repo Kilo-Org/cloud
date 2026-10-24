@@ -12,6 +12,10 @@ type BodyEmptyProps = {
   isSearching: boolean;
   secondaryAction?: 'clear-search' | 'clear-filters' | 'none';
   clearQueryAction: ReactNode;
+  /** In-flight state of the retry the query-error body offers. */
+  isRetrying?: boolean;
+  /** The no-history body's next step (start a session). */
+  createSessionAction?: ReactNode;
   onRetry: () => void;
   refreshControl?: ScrollViewProps['refreshControl'];
 };
@@ -21,6 +25,8 @@ export function BodyEmpty({
   isSearching,
   secondaryAction,
   clearQueryAction,
+  isRetrying,
+  createSessionAction,
   onRetry,
   refreshControl,
 }: Readonly<BodyEmptyProps>) {
@@ -53,6 +59,7 @@ export function BodyEmpty({
                 : t('common.couldNotLoadSessions')
             }
             onRetry={onRetry}
+            isRetrying={isRetrying}
           />
           {secondaryAction === 'clear-search' || secondaryAction === 'clear-filters'
             ? clearQueryAction
@@ -66,6 +73,7 @@ export function BodyEmpty({
       icon={History}
       title={t('agents.sessionList.noPastSessions')}
       description={t('agents.sessionList.completedWillAppear')}
+      action={createSessionAction}
       refreshControl={refreshControl}
     />
   );

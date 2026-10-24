@@ -5155,6 +5155,21 @@
         "session_id": {
           "type": "string",
           "minLength": 1
+        },
+        "duration": {
+          "default": "7d",
+          "type": "string",
+          "enum": [
+            "1h",
+            "1d",
+            "7d",
+            "30d",
+            "forever"
+          ]
+        },
+        "include_new_messages": {
+          "default": false,
+          "type": "boolean"
         }
       },
       "required": [
@@ -5164,9 +5179,11 @@
     "tags": [
       "clisessionsv2",
       "share",
-      "session_id"
+      "session_id",
+      "duration",
+      "include_new_messages"
     ],
-    "searchBlob": "cliSessionsV2.share Share a CLI session by generating a public share link. Return the share token. clisessionsv2 share session_id session_id"
+    "searchBlob": "cliSessionsV2.share Share a CLI session by generating a public share link. Return the share token. clisessionsv2 share session_id duration include_new_messages session_id duration include_new_messages"
   },
   "cliSessionsV2.unshare": {
     "path": "cliSessionsV2.unshare",
@@ -6219,7 +6236,8 @@
                     },
                     "prompt": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "maxLength": 100000
                     },
                     "mode": {
                       "type": "string",
@@ -6257,7 +6275,8 @@
                     },
                     "arguments": {
                       "default": "",
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 100000
                     }
                   },
                   "required": [
@@ -7652,7 +7671,8 @@
                 },
                 "arguments": {
                   "default": "",
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 100000
                 }
               },
               "required": [
@@ -7757,8 +7777,7 @@
           "pattern": "^(agent|workspace)_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
         },
         "kilo_session_id": {
-          "type": "string",
-          "pattern": "^ses_[A-Za-z0-9]{26}$"
+          "type": "string"
         },
         "session_type": {
           "type": "string",
@@ -9375,7 +9394,10 @@
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
-      }
+      },
+      "required": [
+        "integrationId"
+      ]
     },
     "tags": [
       "githubapps",
@@ -16771,7 +16793,8 @@
                         },
                         "prompt": {
                           "type": "string",
-                          "minLength": 1
+                          "minLength": 1,
+                          "maxLength": 100000
                         },
                         "mode": {
                           "type": "string",
@@ -16809,7 +16832,8 @@
                         },
                         "arguments": {
                           "default": "",
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 100000
                         }
                       },
                       "required": [
@@ -18277,7 +18301,8 @@
                 },
                 "arguments": {
                   "default": "",
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 100000
                 }
               },
               "required": [

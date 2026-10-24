@@ -2,7 +2,7 @@
 
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -15,6 +15,7 @@ import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { statusMeta } from '@/components/code-reviewer/review-list-screen';
 import {
   flattenCouncilFindings,
+  reviewCancellationLabel,
   reviewFailureLabel,
   selectRetryAction,
 } from '@/components/code-reviewer/review-detail-helpers';
@@ -50,7 +51,9 @@ function confirmRetry(onConfirm: () => void) {
     [
       { text: i18n.t('common.cancel'), style: 'cancel' },
       { text: i18n.t('common.retry'), onPress: onConfirm },
-    ]
+    ],
+    // Android back dismisses, which equals Cancel: no retrigger starts.
+    { cancelable: true }
   );
 }
 
@@ -64,6 +67,12 @@ export function ReviewDetailScreen({
   const { data, isLoading, isError, isFetching, error, refetch } = useReviewDetail(reviewId);
   const cancelReview = useCancelReview(scope);
   const retriggerReview = useRetriggerReview(scope);
+  // Set before `mutate` and released when the request settles. The mutation's own
+  // `isPending` only flips after `mutate` returns, so a confirmation that arrives
+  // twice — a double-tapped alert button, or the screen button pressed again
+  // before the pending render lands — would otherwise send a second retrigger
+  // that the server rejects with BAD_REQUEST.
+  const retryInFlight = useRef(false);
   const [visibleCount, setVisibleCount] = useState(FINDINGS_PAGE_SIZE);
   const loadedReview = data?.success ? data.review : undefined;
   // Only a retriggerable automatic review needs the reviewer config. Bitbucket
@@ -84,6 +93,24 @@ export function ReviewDetailScreen({
       cancelLabel: i18n.t('common.keepRunning'),
       onConfirm,
     });
+  }
+
+  function requestRetry() {
+    if (retryInFlight.current) {
+      return;
+    }
+    retryInFlight.current = true;
+    retriggerReview.mutate(
+      { reviewId },
+      {
+        onSuccess: () => {
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        },
+        onSettled: () => {
+          retryInFlight.current = false;
+        },
+      }
+    );
   }
 
   if (isLoading) {
@@ -151,6 +178,21 @@ export function ReviewDetailScreen({
   const gateThreshold = (
     review.manual_config as { agentConfig?: { gate_threshold?: string } } | null
   )?.agentConfig?.gate_threshold;
+  // A cancelled or interrupted row explains its outcome in the reader's own
+  // words; only a failure or an unmapped diagnostic keeps the raw message.
+  const cancellationLabel = reviewCancellationLabel(t, {
+    status: review.status,
+    errorMessage: review.error_message,
+    terminalReason: review.terminal_reason,
+    platformLabel: reviewerPlatformLabel(review.platform),
+  });
+  // The single message the conclusion block renders: the cancellation sentence,
+  // the failure copy, or a diagnostic we have no copy for.
+  const reviewMessage =
+    cancellationLabel ??
+    (review.status === 'failed'
+      ? reviewFailureLabel(t, review.error_message, review.terminal_reason)
+      : review.error_message);
 
   return (
     <View className="flex-1 bg-background">
@@ -181,15 +223,22 @@ export function ReviewDetailScreen({
           </Text>
         </Animated.View>
 
-        {/* Conclusion: the outcome leads — status first, then the failure reason. */}
+        {/* Conclusion: the outcome leads — status first, then the reason. */}
         <View className="gap-2">
           <Text className={cn('text-sm font-semibold', meta.className)}>{meta.label}</Text>
-          {review.status === 'failed' || review.error_message ? (
-            <View className="rounded-lg bg-danger-tile-bg p-3">
-              <Text className="text-xs text-destructive" numberOfLines={4}>
-                {review.status === 'failed'
-                  ? reviewFailureLabel(t, review.error_message, review.terminal_reason)
-                  : review.error_message}
+          {reviewMessage ? (
+            <View
+              className={cn(
+                'rounded-lg p-3',
+                cancellationLabel ? 'bg-secondary' : 'bg-danger-tile-bg'
+              )}
+            >
+              <Text
+                variant={cancellationLabel ? 'muted' : undefined}
+                className={cn('text-xs', !cancellationLabel && 'text-destructive')}
+                numberOfLines={4}
+              >
+                {reviewMessage}
               </Text>
             </View>
           ) : null}
@@ -255,7 +304,11 @@ export function ReviewDetailScreen({
             ) : null}
             {review.completed_at ? (
               <MetaRow
-                label={t('common.completed')}
+                label={t(
+                  review.status === 'completed'
+                    ? 'common.completed'
+                    : 'codeReviewer.reviewDetail.reviewEnded'
+                )}
                 value={timeAgo(parseTimestamp(review.completed_at))}
               />
             ) : null}
@@ -323,18 +376,13 @@ export function ReviewDetailScreen({
           {retryAction === 'retry' ? (
             <Button
               variant="secondary"
+              loading={retriggerReview.isPending}
               disabled={retriggerReview.isPending}
               onPress={() => {
-                confirmRetry(() => {
-                  retriggerReview.mutate(
-                    { reviewId },
-                    {
-                      onSuccess: () => {
-                        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                      },
-                    }
-                  );
-                });
+                if (retriggerReview.isPending) {
+                  return;
+                }
+                confirmRetry(requestRetry);
               }}
             >
               <Text>{t('codeReviewer.reviewDetail.retryReview')}</Text>
@@ -349,9 +397,7 @@ export function ReviewDetailScreen({
               <Button
                 variant="secondary"
                 onPress={() => {
-                  router.push(
-                    `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/${review.platform}` as Href
-                  );
+                  router.push(`/(app)/code-reviewer/${scope}/${review.platform}` as Href);
                 }}
               >
                 <Text>{t('codeReviewer.reviewDetail.fixSettings')}</Text>

@@ -11,6 +11,7 @@ import {
   getLastRouteSnapshot,
   isLastRouteHydrated,
   type LastRouteRecord,
+  prepareLastRouteRepair,
   recordLastRoute,
   subscribeLastRoute,
 } from './last-route';
@@ -136,6 +137,20 @@ describe('hydration state', () => {
 });
 
 describe('consumeLastRouteForRepair', () => {
+  it('keeps the focused profile route while root Retry remounts at Home', () => {
+    const profileRoute = '/(app)/(tabs)/(3_profile)/profiles/new';
+    consumeLastRouteForRepair('u1');
+    recordLastRoute(profileRoute, 'u1');
+
+    prepareLastRouteRepair();
+    expect(recordLastRoute('/(app)/(tabs)/(0_home)', 'u1')).toBe(false);
+    expect(consumeLastRouteForRepair('other-account')).toBeNull();
+    expect(consumeLastRouteForRepair('u1')).toBe(profileRoute);
+
+    expect(recordLastRoute('/(app)/(tabs)/(0_home)', 'u1')).toBe(true);
+    expect(getLastRoute('u1')).toBe('/(app)/(tabs)/(0_home)');
+  });
+
   it('returns the record once, then null', async () => {
     store.set(KEY, recordFor('/(app)/variables', 'u1'));
     await _hydrateLastRouteForTests();
@@ -215,6 +230,26 @@ describe('subscribeLastRoute (the restart read)', () => {
     expect(getLastRouteSnapshot()).toBeNull();
     expect(getLastRoute('u1')).toBeNull();
     expect(consumeLastRouteForRepair('u1')).toBeNull();
+  });
+
+  it.each([
+    [
+      '/(app)/(tabs)/(3_profile)/code-reviewer/personal/reviews',
+      '/(app)/code-reviewer/personal/reviews',
+    ],
+    [
+      '/(app)/(tabs)/(3_profile)/security-agent/org-1/findings/f_1',
+      '/(app)/security-agent/org-1/findings/f_1',
+    ],
+    ['/(app)/(tabs)/(3_profile)/notifications', '/(app)/notifications'],
+  ])('rehydrates a %s record at the path the screen has now', async (stored, current) => {
+    // Mirrored before these surfaces moved out of the Profile tab: replaying the
+    // old href after the update opens an unmatched route, so the record is read
+    // at the screen's current path.
+    store.set(KEY, recordFor(stored, 'u1'));
+    await _hydrateLastRouteForTests();
+
+    expect(getLastRoute('u1')).toBe(current);
   });
 
   it('a record written during the restart read owns the state', async () => {

@@ -449,6 +449,27 @@ describe('countAndStoreEmbeddingUsage', () => {
     }
   );
 
+  it.each([
+    ['an empty body', ''],
+    ['an HTML error page', '<html><body>502 Bad Gateway</body></html>'],
+  ])('records an upstream error with %s as errored usage without reporting it', async (_, body) => {
+    const usageContext: MicrodollarUsageContext = {
+      ...createMockUsageContext('user-id', 'embedding@example.com', 0),
+      api_kind: 'embeddings',
+      requested_model: 'test/embedding',
+      status_code: 502,
+    };
+
+    countAndStoreEmbeddingUsage(new Response(body, { status: 502 }), usageContext, undefined);
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ hasError: true, inputTokens: 0, cost_mUsd: 0, status_code: 502 }),
+      usageContext
+    );
+    expect(captureMessage).not.toHaveBeenCalled();
+  });
+
   it('reports a successful response without usage', async () => {
     const usageContext: MicrodollarUsageContext = {
       ...createMockUsageContext('user-id', 'embedding@example.com', 0),

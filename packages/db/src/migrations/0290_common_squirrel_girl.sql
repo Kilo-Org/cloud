@@ -1,0 +1,1 @@
+DROP TABLE "auto_triage_tickets" CASCADE;

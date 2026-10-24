@@ -8,6 +8,7 @@ import { after, NextRequest, NextResponse } from 'next/server';
 import type * as NextServer from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import {
   gatewayRateLimitKey,
@@ -142,6 +143,7 @@ const memberDecision = {
     organizationModelDenyList: [],
     memberGrant: { mode: 'unrestricted' as const },
     policyRevision: 1,
+    customLlmGrantee: { organizationId: 'org-1', groupIds: [] },
   },
   decision: { allowed: true },
 };
@@ -359,6 +361,7 @@ describe('handleSystemOneRequest', () => {
         kiloUserId: user.id,
         provider: 'openrouter',
         requested_model: TYPESAFE_MODEL,
+        is_free: false,
         organizationId: 'org-123',
         prior_microdollar_usage: 123,
         posthog_distinct_id: user.google_user_email,
@@ -525,24 +528,27 @@ describe('handleSystemOneRequest', () => {
   });
 
   it.each([
-    { model: OTHER_SYSTEM_ONE_MODEL, policyModel: OTHER_SYSTEM_ONE_MODEL },
-    { model: SYSTEM_ONE_ALIAS, policyModel: TYPESAFE_MODEL },
-  ])('forwards OpenRouter System One model $model unchanged', async ({ model, policyModel }) => {
-    setAuth('org-123');
+    { model: OTHER_SYSTEM_ONE_MODEL, policyModel: OTHER_SYSTEM_ONE_MODEL, isFree: true },
+    { model: SYSTEM_ONE_ALIAS, policyModel: TYPESAFE_MODEL, isFree: false },
+  ])(
+    'forwards OpenRouter System One model $model unchanged',
+    async ({ model, policyModel, isFree }) => {
+      setAuth('org-123');
 
-    const response = await handleSystemOneRequest(makeRequest({ ...requestBody, model }));
+      const response = await handleSystemOneRequest(makeRequest({ ...requestBody, model }));
 
-    expect(response.status).toBe(200);
-    expect(upstreamRequest().body.model).toBe(model);
-    expect(resolveOrganizationMemberModelDecision).toHaveBeenCalledWith(
-      expect.objectContaining({ modelId: policyModel })
-    );
-    await runAfter();
-    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ requested_model: model })
-    );
-  });
+      expect(response.status).toBe(200);
+      expect(upstreamRequest().body.model).toBe(model);
+      expect(resolveOrganizationMemberModelDecision).toHaveBeenCalledWith(
+        expect.objectContaining({ modelId: policyModel })
+      );
+      await runAfter();
+      expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+        expect.objectContaining({ cost_mUsd: isFree ? 0 : 124, market_cost: 124 }),
+        expect.objectContaining({ requested_model: model, is_free: isFree })
+      );
+    }
+  );
 
   it.each(['openai/gpt-4o', 'jev-latest', 'respan/span-01-lite', 'jev-2.0'])(
     'rejects %s when it is not an OpenRouter System One model',
@@ -630,7 +636,11 @@ describe('handleSystemOneRequest', () => {
     jest.mocked(creditsBlockedResponse).mockResolvedValue(blockedResponse);
 
     expect(await handleSystemOneRequest(makeRequest())).toBe(blockedResponse);
-    expect(getBalanceAndOrgSettings).toHaveBeenCalledWith('org-123', user);
+    const [organizationId, balanceUser, fromDb] =
+      jest.mocked(getBalanceAndOrgSettings).mock.lastCall ?? [];
+    expect(organizationId).toBe('org-123');
+    expect(balanceUser).toEqual(user);
+    expect(fromDb).toBe(readDb);
     expect(creditsBlockedResponse).toHaveBeenCalledWith({
       user,
       balance,
@@ -650,12 +660,15 @@ describe('handleSystemOneRequest', () => {
     });
 
     expect((await handleSystemOneRequest(makeRequest())).status).toBe(404);
-    expect(resolveOrganizationMemberModelDecision).toHaveBeenCalledWith({
+    const { fromDb, ...decisionParams } =
+      jest.mocked(resolveOrganizationMemberModelDecision).mock.lastCall?.[0] ?? {};
+    expect(decisionParams).toEqual({
       organizationId: 'org-123',
       kiloUserId: user.id,
       modelId: TYPESAFE_MODEL,
       providerLookup: getProviderSlugsForModel,
     });
+    expect(fromDb).toBe(readDb);
     expect(modelNotAllowedResponse).toHaveBeenCalledTimes(1);
     expect(mockedFetch).not.toHaveBeenCalled();
     expect(deferredUsageCallbacks()).toHaveLength(0);

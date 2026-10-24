@@ -60,6 +60,28 @@ const runBody = {
   variant: 'high',
 };
 
+const resultCallback = {
+  url: 'https://bench.test/container/case-result',
+  execution: {
+    runId: 'test-run',
+    model: runBody.model,
+    variant: runBody.variant,
+    rep: 0,
+    caseId: 'test-case',
+    token: 'test-claim-token',
+  },
+};
+
+const caseContext = {
+  runId: resultCallback.execution.runId,
+  model: resultCallback.execution.model,
+  variant: resultCallback.execution.variant,
+  rep: resultCallback.execution.rep,
+  caseId: resultCallback.execution.caseId,
+  attemptStartedAt: null,
+  retried: false,
+};
+
 type ContainerResponse = {
   status: number;
   body: {
@@ -89,6 +111,9 @@ function request(
     end: vi.fn((payload: string) => {
       res.emit('result', { status, body: JSON.parse(payload) });
       if (autoFinish) res.emit('finish');
+    }),
+    destroy: vi.fn((): void => {
+      res.emit('close');
     }),
   });
   const done = new Promise<ContainerResponse>(resolve => res.once('result', resolve));
@@ -123,6 +148,7 @@ beforeEach(() => {
   mocks.rm.mockReset().mockResolvedValue(undefined);
   mocks.close.mockReset();
   mocks.exit.mockReset();
+  vi.spyOn(console, 'log').mockImplementation(() => {});
   vi.spyOn(process, 'exit').mockImplementation(mocks.exit);
   mocks.kill.mockReset().mockReturnValue(true);
   vi.spyOn(process, 'kill').mockImplementation(mocks.kill);
@@ -144,6 +170,7 @@ afterEach(async () => {
   await flushServer();
   vi.useRealTimers();
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -399,9 +426,9 @@ it('delivers rollout-orphaned outcomes to the worker before exiting', async () =
     Buffer.from('{"type":"text","part":{"text":"42","time":{"end":1}}}\n')
   );
   mocks.children[0].emit('close', 0);
-  await running.done;
-  await queued.done;
   await flushServer();
+  expect(running.res.end).not.toHaveBeenCalled();
+  expect(queued.res.end).not.toHaveBeenCalled();
   expect(mocks.spawn).toHaveBeenCalledOnce();
   expect(delivered).toEqual([
     {
@@ -421,10 +448,372 @@ it('delivers rollout-orphaned outcomes to the worker before exiting', async () =
   ]);
   expect(mocks.exit).not.toHaveBeenCalled();
   releaseDelivery();
+  await Promise.all([running.done, queued.done]);
   await flushServer();
   await flushServer();
   expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
 });
+
+it('persists completed output before answering a connected caller', async () => {
+  let acknowledge = () => {};
+  const acknowledgement = new Promise<void>(resolve => {
+    acknowledge = resolve;
+  });
+  const fetch = vi.fn(async (_url: string, _init: RequestInit) => {
+    await acknowledgement;
+    return new Response(null, { status: 204 });
+  });
+  vi.stubGlobal('fetch', fetch);
+  await loadServer();
+  const pending = request('/run', { ...runBody, resultCallback });
+  await flushServer();
+  mocks.children[0].emit('close', 0);
+  await flushServer();
+  expect(fetch).toHaveBeenCalledOnce();
+  expect(pending.res.end).not.toHaveBeenCalled();
+  expect(JSON.parse(fetch.mock.calls[0][1].body as string)).toMatchObject({
+    execution: resultCallback.execution,
+    outcome: { kind: 'completed', response: { exitCode: 0 } },
+  });
+  acknowledge();
+  expect((await pending.done).status).toBe(200);
+  pending.res.emit('close');
+  await flushServer();
+  expect(fetch).toHaveBeenCalledOnce();
+  expect(console.log).toHaveBeenCalledWith(
+    JSON.stringify({
+      event: 'benchmark_container_case_accepted',
+      ...caseContext,
+      outcome: 'pending',
+      category: 'queued',
+    })
+  );
+  expect(console.log).toHaveBeenCalledWith(
+    JSON.stringify({
+      event: 'benchmark_container_case_started',
+      ...caseContext,
+      outcome: 'running',
+      category: 'spawned',
+    })
+  );
+  expect(console.log).toHaveBeenCalledWith(
+    JSON.stringify({
+      event: 'benchmark_container_case_settled',
+      ...caseContext,
+      outcome: 'completed',
+      category: 'success',
+    })
+  );
+  expect(console.log).toHaveBeenCalledWith(
+    JSON.stringify({
+      event: 'benchmark_container_result_delivered',
+      ...caseContext,
+      attempt: 1,
+      outcome: 'completed',
+      category: 'accepted',
+    })
+  );
+  expect(mocks.spawn).toHaveBeenCalledOnce();
+  stopServer();
+  expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
+});
+
+it.each(['close', 'error', 'throw'] as const)(
+  'delivers completed output despite response %s without another inference',
+  async failure => {
+    let acknowledge = () => {};
+    const acknowledgement = new Promise<void>(resolve => {
+      acknowledge = resolve;
+    });
+    const fetch = vi.fn(async (_url: string, _init: RequestInit) => {
+      await acknowledgement;
+      return new Response(null, { status: 204 });
+    });
+    vi.stubGlobal('fetch', fetch);
+    await loadServer();
+    const pending = request('/run', { ...runBody, resultCallback }, undefined, {
+      autoFinish: false,
+    });
+    const end = pending.res.end.getMockImplementation();
+    if (!end) throw new Error('Response writer was not installed');
+    if (failure === 'throw') {
+      pending.res.end.mockImplementationOnce(payload => {
+        end(payload);
+        throw new Error('response write failed');
+      });
+    } else {
+      pending.res.emit(failure, new Error('response disconnected'));
+    }
+    await flushServer();
+    mocks.children[0].emit('close', 0);
+    await flushServer();
+    expect(pending.res.end).not.toHaveBeenCalled();
+    await flushServer();
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(JSON.parse(fetch.mock.calls[0][1].body as string)).toMatchObject({
+      execution: resultCallback.execution,
+      outcome: { kind: 'completed', response: { exitCode: 0 } },
+    });
+    expect(mocks.spawn).toHaveBeenCalledOnce();
+    stopServer();
+    expect(mocks.exit).not.toHaveBeenCalled();
+    acknowledge();
+    expect((await pending.done).status).toBe(200);
+    await flushServer();
+    expect(pending.res.end).toHaveBeenCalledOnce();
+    expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
+  }
+);
+
+it('drains an in-flight callback before answering and exiting on shutdown', async () => {
+  let acknowledge = () => {};
+  const acknowledgement = new Promise<void>(resolve => {
+    acknowledge = resolve;
+  });
+  const fetch = vi.fn(async () => {
+    await acknowledgement;
+    return new Response(null, { status: 204 });
+  });
+  vi.stubGlobal('fetch', fetch);
+  await loadServer();
+  const pending = request('/run', { ...runBody, resultCallback }, undefined, {
+    autoFinish: false,
+  });
+  await flushServer();
+  mocks.children[0].emit('close', 0);
+  await flushServer();
+  expect(pending.res.end).not.toHaveBeenCalled();
+  stopServer();
+  expect(fetch).toHaveBeenCalledOnce();
+  expect(mocks.exit).not.toHaveBeenCalled();
+  expect(mocks.spawn).toHaveBeenCalledOnce();
+  acknowledge();
+  await pending.done;
+  expect(mocks.exit).not.toHaveBeenCalled();
+  pending.res.emit('finish');
+  await flushServer();
+  expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
+  expect(mocks.spawn).toHaveBeenCalledOnce();
+});
+
+it('bounds response completion after persisting output without blocking shutdown', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  const fetch = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+  vi.stubGlobal('fetch', fetch);
+  await loadServer();
+  const pending = request('/run', { ...runBody, resultCallback }, undefined, { autoFinish: false });
+  await flushServer();
+  mocks.children[0].emit('close', 0);
+  await pending.done;
+  await flushServer();
+  stopServer();
+  expect(mocks.exit).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(10_000);
+  expect(pending.res.destroy).toHaveBeenCalledOnce();
+  expect(fetch).toHaveBeenCalledOnce();
+  expect(mocks.spawn).toHaveBeenCalledOnce();
+  expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
+});
+
+it.each(['http_error', 'network_error', 'timeout'] as const)(
+  'retries a transient callback %s before answering without rerunning the CLI',
+  async category => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const fetch = vi
+      .fn()
+      .mockImplementationOnce(async () => {
+        if (category === 'http_error') return new Response(null, { status: 503 });
+        throw Object.assign(new Error('callback unavailable'), {
+          name: category === 'timeout' ? 'TimeoutError' : 'TypeError',
+        });
+      })
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetch);
+    await loadServer();
+    const pending = request('/run', { ...runBody, resultCallback });
+    await flushServer();
+    mocks.children[0].emit('close', 0);
+    await flushServer();
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(pending.res.end).not.toHaveBeenCalled();
+    expect(console.log).toHaveBeenCalledWith(
+      JSON.stringify({
+        event: 'benchmark_container_result_delivery_failed',
+        ...caseContext,
+        attempt: 1,
+        outcome: 'completed',
+        category,
+      })
+    );
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect((await pending.done).status).toBe(200);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch.mock.calls[1][1].body).toBe(fetch.mock.calls[0][1].body);
+    expect(console.log).toHaveBeenCalledWith(
+      JSON.stringify({
+        event: 'benchmark_container_result_delivery_attempt',
+        ...caseContext,
+        attempt: 2,
+        outcome: 'completed',
+        category: 'pending',
+      })
+    );
+    expect(console.log).toHaveBeenCalledWith(
+      JSON.stringify({
+        event: 'benchmark_container_result_delivered',
+        ...caseContext,
+        attempt: 2,
+        outcome: 'completed',
+        category: 'accepted',
+      })
+    );
+    expect(mocks.spawn).toHaveBeenCalledOnce();
+    stopServer();
+    expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
+  }
+);
+
+it.each(['http_error', 'network_error', 'timeout'] as const)(
+  'bounds callback %s retries and logs safe execution correlation before shutdown',
+  async category => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    const privateValues = [
+      runBody.kiloToken,
+      runBody.prompt,
+      resultCallback.url,
+      resultCallback.execution.token,
+      'private model output',
+      'private raw stderr',
+    ];
+    const privateDetail = privateValues.join(' ');
+    const fetch = vi.fn(async () => {
+      if (category === 'http_error') return new Response(privateDetail, { status: 503 });
+      throw Object.assign(new Error(privateDetail), {
+        name: category === 'timeout' ? 'TimeoutError' : 'TypeError',
+      });
+    });
+    vi.stubGlobal('fetch', fetch);
+    await loadServer();
+    const pending = request('/run', { ...runBody, resultCallback });
+    await flushServer();
+    mocks.children[0].stdout.emit('data', Buffer.from(`${privateDetail}\n`));
+    mocks.children[0].stderr.emit('data', Buffer.from(privateDetail));
+    mocks.children[0].emit('close', 0);
+    await flushServer();
+    stopServer();
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(mocks.exit).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(999);
+    expect(fetch).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(mocks.exit).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1_999);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect((await pending.done).status).toBe(200);
+    expect(timeout).toHaveBeenCalledTimes(3);
+    expect(timeout).toHaveBeenCalledWith(10_000);
+    expect(error).toHaveBeenCalledExactlyOnceWith(
+      JSON.stringify({
+        event: 'benchmark_container_result_delivery_exhausted',
+        ...caseContext,
+        category,
+        outcome: 'completed',
+        attempt: 3,
+        attempts: 3,
+      })
+    );
+    const logged = [...vi.mocked(console.log).mock.calls, ...error.mock.calls].flat().join('\n');
+    for (const value of privateValues) expect(logged).not.toContain(value);
+    expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(mocks.spawn).toHaveBeenCalledOnce();
+  }
+);
+
+it('stops callback retries on a stale execution without reporting exhaustion', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const fetch = vi.fn().mockResolvedValue(new Response(null, { status: 404 }));
+  vi.stubGlobal('fetch', fetch);
+  await loadServer();
+  const pending = request('/run', { ...runBody, resultCallback });
+  await flushServer();
+  pending.res.emit('close');
+  mocks.children[0].emit('close', 0);
+  await pending.done;
+  await flushServer();
+  expect(fetch).toHaveBeenCalledOnce();
+  expect(warning).toHaveBeenCalledExactlyOnceWith(
+    JSON.stringify({
+      event: 'benchmark_container_result_rejected',
+      ...caseContext,
+      attempt: 1,
+      outcome: 'completed',
+      category: 'not_found',
+    })
+  );
+  expect(error).not.toHaveBeenCalled();
+  stopServer();
+  expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
+  await vi.advanceTimersByTimeAsync(6_000);
+  expect(fetch).toHaveBeenCalledOnce();
+  expect(mocks.spawn).toHaveBeenCalledOnce();
+});
+
+it.each(['mkdtemp', 'spawn'] as const)(
+  'persists not_started proof for a %s failure before returning its error',
+  async failure => {
+    let acknowledge = () => {};
+    const acknowledgement = new Promise<void>(resolve => {
+      acknowledge = resolve;
+    });
+    const fetch = vi.fn(async (_url: string, _init: RequestInit) => {
+      await acknowledgement;
+      return new Response(null, { status: 204 });
+    });
+    vi.stubGlobal('fetch', fetch);
+    if (failure === 'mkdtemp') {
+      mocks.mkdtemp.mockRejectedValueOnce(new Error('case startup failed'));
+    } else {
+      mocks.spawn.mockImplementationOnce(() => {
+        throw new Error('case startup failed');
+      });
+    }
+    await loadServer();
+    const pending = request('/run', { ...runBody, resultCallback });
+    await flushServer();
+    expect(pending.res.end).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(JSON.parse(fetch.mock.calls[0][1].body as string)).toEqual({
+      execution: resultCallback.execution,
+      outcome: { kind: 'not_started' },
+    });
+    expect(console.log).toHaveBeenCalledWith(
+      JSON.stringify({
+        event: 'benchmark_container_case_settled',
+        ...caseContext,
+        outcome: 'not_started',
+        category: failure === 'mkdtemp' ? 'workspace_error' : 'spawn_error',
+      })
+    );
+    expect(mocks.children).toHaveLength(0);
+    acknowledge();
+    expect(await pending.done).toEqual({
+      status: 500,
+      body: { error: 'case startup failed' },
+    });
+    await flushServer();
+    stopServer();
+    expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
+  }
+);
 
 it('never reports a failure after the case started as not_started', async () => {
   const delivered: unknown[] = [];
@@ -510,6 +899,41 @@ it('releases a disconnected HTTP request without waiting for its pending body', 
   stream.push(null);
   await pending.done;
   expect(mocks.spawn).not.toHaveBeenCalled();
+  expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
+});
+
+it('persists not_started proof when an accepted request body arrives during shutdown', async () => {
+  let acknowledge = () => {};
+  const acknowledgement = new Promise<void>(resolve => {
+    acknowledge = resolve;
+  });
+  const fetch = vi.fn(async (_url: string, _init: RequestInit) => {
+    await acknowledgement;
+    return new Response(null, { status: 204 });
+  });
+  vi.stubGlobal('fetch', fetch);
+  await loadServer();
+  const stream = new Readable({ read() {} });
+  const pending = request('/run', undefined, stream);
+  stopServer();
+  expect(mocks.exit).not.toHaveBeenCalled();
+  stream.push(Buffer.from(JSON.stringify({ ...runBody, resultCallback })));
+  stream.push(null);
+  await flushServer();
+  expect(fetch).toHaveBeenCalledOnce();
+  expect(JSON.parse(fetch.mock.calls[0][1].body as string)).toEqual({
+    execution: resultCallback.execution,
+    outcome: { kind: 'not_started' },
+  });
+  expect(pending.res.end).not.toHaveBeenCalled();
+  expect(mocks.spawn).not.toHaveBeenCalled();
+  expect(mocks.exit).not.toHaveBeenCalled();
+  acknowledge();
+  expect(await pending.done).toEqual({
+    status: 503,
+    body: { error: 'container is stopping' },
+  });
+  await flushServer();
   expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
 });
 

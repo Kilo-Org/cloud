@@ -1,9 +1,5 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
-import {
-  CLAUDE_OPUS_CURRENT_MODEL_ID,
-  CLAUDE_SONNET_CURRENT_MODEL_ID,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
 import { addAutoRoutingModels, addCustomRouterModels } from './auto-routing-models';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache', () => ({
@@ -75,18 +71,40 @@ describe('addAutoRoutingModels', () => {
 
   test('annotates the frontier auto model with its visible targets', async () => {
     const frontierModel = makeModel('kilo-auto/frontier');
-    const opusModel = makeModel(CLAUDE_OPUS_CURRENT_MODEL_ID);
-    const sonnetModel = makeModel(CLAUDE_SONNET_CURRENT_MODEL_ID);
+    const opusModel = makeModel('openai/gpt-frontier');
+    const sonnetModel = makeModel('google/gemini-frontier');
+    const efficientOnlyModel = makeModel('google/gemini-efficient');
+    mockedGetCachedRoutingTable.mockImplementation(async (router?: string) =>
+      router === 'frontier'
+        ? routingTable([opusModel.id, sonnetModel.id, 'hidden/model', 'kilo-auto/frontier'])
+        : routingTable([efficientOnlyModel.id])
+    );
 
-    const result = await addAutoRoutingModels([frontierModel, sonnetModel, opusModel]);
+    const result = await addAutoRoutingModels([
+      frontierModel,
+      sonnetModel,
+      opusModel,
+      efficientOnlyModel,
+    ]);
 
     expect(result).toEqual([
       {
         ...frontierModel,
-        autoRouting: { models: [CLAUDE_OPUS_CURRENT_MODEL_ID, CLAUDE_SONNET_CURRENT_MODEL_ID] },
+        autoRouting: { models: [sonnetModel.id, opusModel.id] },
       },
       sonnetModel,
       opusModel,
+      efficientOnlyModel,
+    ]);
+  });
+
+  test('does not advertise static frontier candidates when its table is unavailable', async () => {
+    const frontierModel = makeModel('kilo-auto/frontier');
+    const visibleModel = makeModel('anthropic/claude-sonnet-5');
+
+    expect(await addAutoRoutingModels([frontierModel, visibleModel])).toEqual([
+      frontierModel,
+      visibleModel,
     ]);
   });
 

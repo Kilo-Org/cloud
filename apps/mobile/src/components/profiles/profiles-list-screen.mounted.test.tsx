@@ -1,4 +1,4 @@
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -14,6 +14,7 @@ type ListResult = {
   effectiveDefaultId: string | null;
   isLoading: boolean;
   isError: boolean;
+  error?: unknown;
   isRefetching: boolean;
   refetch: () => void;
 };
@@ -26,11 +27,14 @@ type ProfileSummary = {
   commandCount: number;
   mcpServerCount: number;
   skillCount: number;
+  kiloCommandCount: number;
+  agentCount: number;
   ownerType?: 'organization' | 'user';
 };
 
 const refetchFn = vi.hoisted(() => vi.fn());
 const routerPush = vi.hoisted(() => vi.fn());
+const connectivityState = vi.hoisted(() => ({ value: 'online' as string }));
 const organizationState = vi.hoisted(() => ({ organizationId: 'org-1' as string | null }));
 const listState = vi.hoisted<ListResult>(() => ({
   orgProfiles: [],
@@ -48,6 +52,11 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileList: () => listState,
 }));
 
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  getCommittedConnectivityStatus: () => connectivityState.value,
+  useCommittedConnectivityStatus: () => connectivityState.value,
+}));
+
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({
     organizationId: organizationState.organizationId,
@@ -60,8 +69,12 @@ vi.mock('expo-router', () => ({
 }));
 
 vi.mock('@/lib/profile-agent-navigation', () => ({
-  getProfileOverviewPath: (profileId: string, organizationId?: string) =>
-    organizationId ? `/profiles/${profileId}?org=${organizationId}` : `/profiles/${profileId}`,
+  getNewProfilePath: (stack: 'app' | 'profileTab') =>
+    stack === 'app' ? '/app-stack/profiles/new' : '/(app)/(tabs)/(3_profile)/profiles/new',
+  getProfileOverviewPath: (profileId: string, organizationId?: string, stack?: string) =>
+    `${stack === 'app' ? '/app-stack' : ''}/profiles/${profileId}${
+      organizationId ? `?org=${organizationId}` : ''
+    }`,
 }));
 
 vi.mock('react-native', () => ({
@@ -76,11 +89,14 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
+vi.mock('@/components/screen-header', () => ({
+  ScreenHeader: ({ headerRight }: { headerRight?: ReactNode }) => headerRight ?? null,
+}));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/icon-button', () => ({ IconButton: 'IconButton' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -103,6 +119,8 @@ function profile(overrides: Partial<ProfileSummary> & { id: string }): ProfileSu
     commandCount: 0,
     mcpServerCount: 0,
     skillCount: 0,
+    kiloCommandCount: 0,
+    agentCount: 0,
     ...overrides,
   };
 }
@@ -127,8 +145,8 @@ function textChildren(root: ReactTestInstance): string[] {
   return findAll(root, 'Text').map(node => String(node.props.children));
 }
 
-async function mount() {
-  const result = await renderWithProviders(createElement(ProfilesListScreen));
+async function mount(stack: 'app' | 'profileTab' = 'profileTab') {
+  const result = await renderWithProviders(createElement(ProfilesListScreen, { stack }));
   return result;
 }
 
@@ -139,12 +157,14 @@ describe('ProfilesListScreen', () => {
     refetchFn.mockReset();
     routerPush.mockReset();
     organizationState.organizationId = 'org-1';
+    connectivityState.value = 'online';
     Object.assign(listState, {
       orgProfiles: [],
       personalProfiles: [],
       effectiveDefaultId: null,
       isLoading: false,
       isError: false,
+      error: undefined,
       isRefetching: false,
     });
   });
@@ -168,10 +188,39 @@ describe('ProfilesListScreen', () => {
 
     const queryError = findOne(renderer.root, 'QueryError');
     expect(queryError.props.title).toBe("Couldn't load profiles");
+    expect(queryError.props.variant).toBe('server');
     act(() => {
       (queryError.props as { onRetry: () => void }).onRetry();
     });
     expect(refetchFn).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('a lost organization access renders the permission state without a retry', async () => {
+    listState.isError = true;
+    listState.error = { data: { code: 'UNAUTHORIZED' } };
+
+    const { renderer, unmount } = await mount();
+
+    const queryError = findOne(renderer.root, 'QueryError');
+    expect(queryError.props.variant).toBe('permission');
+    // The variant's own copy names the cause; the load-failure title would not.
+    expect(queryError.props.title).toBeUndefined();
+    expect(queryError.props.onRetry).toBeUndefined();
+
+    unmount();
+  });
+
+  it('a deleted organization renders the not-found state without a retry', async () => {
+    listState.isError = true;
+    listState.error = { data: { code: 'NOT_FOUND' } };
+
+    const { renderer, unmount } = await mount();
+
+    const queryError = findOne(renderer.root, 'QueryError');
+    expect(queryError.props.variant).toBe('not-found');
+    expect(queryError.props.onRetry).toBeUndefined();
 
     unmount();
   });
@@ -220,13 +269,13 @@ describe('ProfilesListScreen', () => {
     if (!personalRow) {
       throw new Error('personal row missing');
     }
-    expect(personalRow.props.subtitle).toBe('2 MCP');
+    expect(personalRow.props.subtitle).toBe('2 MCP · 9 setup cmds');
     const star = personalRow.props.trailing as {
       type: string;
       props: { accessibilityLabel: string };
     };
     expect(star.type).toBe('Star');
-    expect(star.props.accessibilityLabel).toBe('Personal profile, Default profile');
+    expect(star.props.accessibilityLabel).toBe('Default profile');
 
     const orgRow = findAll(renderer.root, 'ConfigureRow').find(
       row => row.props.title === 'Org profile'
@@ -234,7 +283,7 @@ describe('ProfilesListScreen', () => {
     if (!orgRow) {
       throw new Error('org row missing');
     }
-    expect(orgRow.props.subtitle).toBe('1v');
+    expect(orgRow.props.subtitle).toBe('1 var');
     // The row's leading icon names its owner.
     expect(orgRow.props.icon).toBe('Building2');
     expect(personalRow.props.icon).toBe('User');
@@ -252,11 +301,11 @@ describe('ProfilesListScreen', () => {
     // A personal profile keeps no owner context, even from an org list.
     expect(routerPush).toHaveBeenCalledWith('/profiles/personal-1');
 
-    // The persistent create CTA is present once profiles exist.
-    const buttons = findAll(renderer.root, 'Button');
-    const createButton = buttons.at(-1);
+    const createButton = findAll(renderer.root, 'IconButton').find(
+      button => button.props.accessibilityLabel === 'New profile'
+    );
     if (!createButton) {
-      throw new Error('create button was not rendered');
+      throw new Error('header create action was not rendered');
     }
     act(() => {
       (createButton.props as { onPress: () => void }).onPress();
@@ -276,6 +325,46 @@ describe('ProfilesListScreen', () => {
     expect(textChildren(renderer.root)).not.toContain('Organization');
     // `agentProfiles.list` does not tag owner, so every row is personal.
     expect(findOne(renderer.root, 'ConfigureRow').props.icon).toBe('User');
+
+    unmount();
+  });
+
+  it('offline refetch failure keeps the cached rows and names connectivity', async () => {
+    listState.personalProfiles = [profile({ id: 'personal-1', name: 'Personal profile' })];
+    listState.isError = true;
+    connectivityState.value = 'offline';
+
+    const { renderer, unmount } = await mount();
+
+    expect(findOne(renderer.root, 'QueryError').props.variant).toBe('offline');
+    // The cached rows stay usable under the banner.
+    expect(rowTitles(renderer.root)).toEqual(['Personal profile']);
+
+    unmount();
+  });
+
+  it('error without cached rows renders no rows, and connectivity unknown keeps server variant', async () => {
+    listState.isError = true;
+    connectivityState.value = 'unknown';
+
+    const { renderer, unmount } = await mount();
+
+    expect(findOne(renderer.root, 'QueryError').props.variant).toBe('server');
+    expect(findAll(renderer.root, 'ConfigureRow')).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('opens the profile it is mounted in the root stack for, not the Profile tab one', async () => {
+    listState.personalProfiles = [profile({ id: 'personal-1', name: 'Personal profile' })];
+
+    const { renderer, unmount } = await mount('app');
+
+    const row = findOne(renderer.root, 'ConfigureRow');
+    act(() => {
+      (row.props as { onPress: () => void }).onPress();
+    });
+    expect(routerPush).toHaveBeenCalledWith('/app-stack/profiles/personal-1');
 
     unmount();
   });

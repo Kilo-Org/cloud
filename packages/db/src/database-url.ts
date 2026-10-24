@@ -1,7 +1,6 @@
 import type { ClientConfig } from 'pg';
 
 export function computeDatabaseUrl(): string {
-  // Check if we should use production database
   const useProductionDb = process.env.USE_PRODUCTION_DB === 'true';
 
   const postgresUrl = useProductionDb

@@ -64,6 +64,9 @@ jobs:
       - name: Install root dependencies
         run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
 
+      - name: Check runtime publication workflow admission
+        run: pnpm --filter cloud-agent-next test:runtime-ci
+
       # dorny/paths-filter has no built-in retry: one dropped connection to
       # api.github.com ("other side closed" while listing the PR's changed
       # files) fails the step and, with it, every check that needs this job.
@@ -95,7 +98,6 @@ jobs:
               - 'packages/trpc/**'
               - 'packages/web-shared/**'
               - 'packages/worker-utils/**'
-              - 'services/deploy-infra/builder/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
             cloud_agent_next:
@@ -139,7 +141,6 @@ jobs:
               - 'packages/trpc/**'
               - 'packages/web-shared/**'
               - 'packages/worker-utils/**'
-              - 'services/deploy-infra/builder/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
             cloud_agent_next:
@@ -291,6 +292,10 @@ jobs:
 
       - name: Test typecheck CI wiring
         run: node --test scripts/typecheck-ci.test.mjs
+
+      # The relay regression executes Wrangler's real config parser.
+      - name: Install usage-ingest deployment test dependencies
+        run: pnpm --filter cloudflare-usage-ingest install --frozen-lockfile --ignore-scripts
 
       - name: Test scheduled deployment wiring
         run: node --test scripts/deployment-workflows.test.mjs
@@ -644,9 +649,6 @@ jobs:
       - name: Run script tests
         run: pnpm run test:scripts
 
-      - name: Run builder Postgres repository tests
-        run: pnpm --filter kilo-deploy-builder test:postgres
-
       - name: Run container usage Postgres tests
         # The meter suite connects to POSTGRES_URL directly. Avoid the Jest worker
         # suffix that computeDatabaseUrl adds whenever NODE_ENV=test.
@@ -895,7 +897,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.3.14
+          bun-version: 1.4.4
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

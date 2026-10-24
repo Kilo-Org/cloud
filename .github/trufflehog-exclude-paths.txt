@@ -14,3 +14,9 @@ apps/web/src/lib/cloud-agent/preview-link\.test\.ts
 # derived. Exclude the fixture path so the synthetic credential URI does not
 # fail the scan.
 packages/db/src/database-url\.test\.ts
+# URL-shape fixtures. sentry-scrub-message-redaction.test.ts asserts that a
+# captured URL keeps its origin and path. The first commit on the branch used a
+# literal fixture that a later commit builds from parts, and that commit stays
+# in branch history. Exclude the fixture path so the historical commit does not
+# fail the scan.
+apps/mobile/src/lib/telemetry/sentry-scrub-message-redaction\.test\.ts

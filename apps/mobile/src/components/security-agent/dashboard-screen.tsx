@@ -5,6 +5,7 @@ import {
   type DashboardStats,
   getAnalysisIncompleteCount,
   getSecurityRepositoriesInScope,
+  isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -20,6 +21,7 @@ import { AuditReportButton } from '@/components/security-agent/audit-report-butt
 import { ScreenHeader } from '@/components/screen-header';
 import { DashboardSections } from '@/components/security-agent/dashboard-sections';
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
+import { IconButton } from '@/components/ui/icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
@@ -34,18 +36,17 @@ import {
   useSecurityAgentRepositories,
   useTriggerSecuritySync,
 } from '@/lib/hooks/use-security-agent';
+import { isSecuritySyncRetryable, securitySyncReconcileCopy } from '@/lib/security-agent-ledger';
 import {
-  isSecurityConfigurationError,
-  isSecuritySyncRetryable,
-  securityConfigurationCopy,
-  securitySyncReconcileCopy,
-} from '@/lib/hooks/use-security-agent-mutations';
-import { useSecurityDismissFailures } from '@/lib/hooks/use-security-dismiss-draft';
+  securityDismissFailureCopy,
+  useSecurityDismissFailures,
+} from '@/lib/hooks/use-security-dismiss-draft';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
+import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 
 const METRIC_TONE_CLASS = {
   danger: 'text-destructive',
@@ -180,6 +181,13 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
     }, [refreshDismissFailures, refreshOutbox])
   );
 
+  // A failed repositories fetch disables the filter controls until a refetch
+  // succeeds; the same focus/foreground invalidation the findings list mounts
+  // also retries it here, matching the org/personal key split below.
+  useRouteForegroundRefresh(
+    isPersonalSecurityScope(scope) ? [[['securityAgent']]] : [[['organizations', 'securityAgent']]]
+  );
+
   const slaEnabled = config.data?.slaEnabled ?? true;
   const data = dashboardStats.data;
   const metrics = data ? buildLocalizedMetrics(data, slaEnabled) : [];
@@ -204,6 +212,9 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         const [statsResult, syncResult] = await Promise.all([
           dashboardStats.refetch(),
           lastSync.refetch(),
+          // The repositories fetch failure disables the filter controls until
+          // a refetch succeeds, so every dashboard refresh also retries it.
+          repositories.refetch(),
         ]);
         setRefreshFailed(statsResult.isError || syncResult.isError);
       } finally {
@@ -214,7 +225,8 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
 
   // Repos aren't known yet (still loading or the fetch failed) — the filter
   // stays disabled instead of silently offering a shrunken "All repositories
-  // only" option list.
+  // only" option list. A failed fetch is recoverable: the retry card below and
+  // pull-to-refresh both refetch the repositories query.
   const repoFilterUnavailable = repositories.isLoading || repositories.isError;
 
   // A non-retryable sync outcome ended the intent, so both sync controls
@@ -244,29 +256,31 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        className="px-6"
         title={t('common.securityAgent')}
+        // Size-11 (44dp) icon buttons: findings and settings, plus the audit
+        // overflow when the viewer can manage the agent. Declaring exactly the
+        // buttons this viewer renders drops the actions onto their own row
+        // before the one-line CJK title loses its readable minimum.
+        headerRightWidth={canManage ? 3 * 44 : 2 * 44}
         headerRight={
-          <View className="flex-row items-center">
-            <Pressable
+          <View className="flex-row items-center gap-2">
+            <IconButton
               onPress={() => {
                 router.push(getSecurityAgentPath(scope, 'findings'));
               }}
-              accessibilityRole="button"
               accessibilityLabel={t('common.findings')}
-              className="size-11 items-center justify-center active:opacity-70"
             >
               <ShieldAlert size={20} color={colors.foreground} />
-            </Pressable>
-            <Pressable
+            </IconButton>
+            <IconButton
               onPress={() => {
                 router.push(getSecurityAgentPath(scope, 'settings'));
               }}
-              accessibilityRole="button"
               accessibilityLabel={t('securityAgent.dashboard.settings')}
-              className="size-11 items-center justify-center active:opacity-70"
             >
               <Settings size={20} color={colors.foreground} />
-            </Pressable>
+            </IconButton>
             {canManage ? <AuditReportButton scope={scope} /> : null}
           </View>
         }
@@ -293,7 +307,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
               {lastSyncLabel}
             </Text>
           </Pressable>
-          <Pressable
+          <IconButton
             onPress={() => {
               triggerSync.mutate(
                 { repoFullName },
@@ -308,13 +322,9 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
               );
             }}
             disabled={syncDisabled}
-            accessibilityRole="button"
             accessibilityLabel={t('securityAgent.dashboard.syncNow')}
             accessibilityState={{ disabled: syncDisabled, busy: triggerSync.isPending }}
-            className={cn(
-              'size-11 items-center justify-center active:opacity-70',
-              syncBlocked && 'opacity-50'
-            )}
+            className={cn(syncBlocked && 'opacity-50')}
           >
             <SpinningIcon
               icon={RefreshCw}
@@ -322,25 +332,31 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
               color={colors.mutedForeground}
               spinning={triggerSync.isPending}
             />
-          </Pressable>
+          </IconButton>
         </View>
+
+        {repositories.isError ? (
+          <SecurityCommandRetryCard
+            lastError={t('common.couldNotLoadRepositories')}
+            retryable
+            onRetry={() => {
+              void repositories.refetch();
+            }}
+          />
+        ) : null}
 
         {refreshFailed ? (
           <Text className="text-xs text-warn">{t('securityAgent.dashboard.refreshFailed')}</Text>
         ) : null}
 
         {triggerSync.isError ? (
-          <Text className="text-xs text-destructive">
-            {isSecurityConfigurationError(triggerSync.error)
-              ? securityConfigurationCopy()
-              : triggerSync.error.message}
-          </Text>
+          <Text className="text-xs text-destructive">{triggerSync.error.message}</Text>
         ) : null}
 
         {dismissFailures.failures.map(failure => (
           <SecurityCommandRetryCard
             key={failure.findingId}
-            lastError={failure.lastError}
+            lastError={securityDismissFailureCopy(failure)}
             retryable={failure.retryable === true}
             onRetry={() => {
               router.push(getSecurityAgentPath(scope, `dismiss/${failure.findingId}`));
@@ -376,7 +392,10 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           />
         ))}
 
-        {dashboardStats.isLoading ? (
+        {/* `isPending` rather than `isLoading`: a NetInfo-paused read is pending
+            without fetching, and it must show this skeleton instead of an empty
+            metrics row. */}
+        {dashboardStats.isPending ? (
           <View className="flex-row flex-wrap gap-3">
             <Skeleton className="h-24 w-[47%] rounded-lg" />
             <Skeleton className="h-24 w-[47%] rounded-lg" />

@@ -23,6 +23,7 @@ import {
   sql,
 } from 'drizzle-orm';
 import { SecurityAuditLogAction } from '@/lib/security-agent/core/enums';
+import { csvLiteral } from '@/lib/admin-csv';
 import {
   logSecurityAudit,
   maskKiloAdminActors,
@@ -235,7 +236,7 @@ export const organizationSecurityAuditLogRouter = createTRPCRouter({
           log.after_state ? JSON.stringify(log.after_state) : '',
           log.metadata ? JSON.stringify(log.metadata) : '',
         ]
-          .map(field => `"${String(field).replace(/"/g, '""')}"`)
+          .map(field => `"${csvLiteral(String(field)).replace(/"/g, '""')}"`)
           .join(',')
       );
       return {

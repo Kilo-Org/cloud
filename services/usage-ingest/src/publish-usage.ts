@@ -2,7 +2,10 @@ import { timingSafeEqual } from '@kilocode/encryption';
 import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
 import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
 
-export type Env = Omit<CloudflareEnv, 'USAGE_INGEST_QUEUE' | 'USAGE_INGEST_MODE'> & {
+export type Env = Omit<
+  CloudflareEnv,
+  'USAGE_INGEST_QUEUE' | 'USAGE_INGEST_MODE' | 'USAGE_WRITER_URL'
+> & {
   USAGE_INGEST_QUEUE: Queue<UsageRecordRequest>;
   USAGE_INGEST_PUBLISH_SECRET?: string;
   USAGE_INGEST_MODE?: string;

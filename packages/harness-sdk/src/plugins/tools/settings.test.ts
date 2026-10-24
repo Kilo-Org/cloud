@@ -54,19 +54,19 @@ const call = (name: string, args: unknown): ToolCall => ({
   arguments: JSON.stringify(args),
 });
 
-const run = (tool: Tool, one: ToolCall) => Effect.runPromise(Effect.either(tool.run(one)));
+const run = (tool: Tool, one: ToolCall) => Effect.runPromise(Effect.result(tool.run(one)));
 
 /** What the model read back, or the refusal it got in its place. */
 const said = async (tool: Tool, one: ToolCall): Promise<string> => {
   const got = await run(tool, one);
-  expect(got._tag).toBe('Right');
-  return got._tag === 'Right' ? got.right : `REFUSED: ${String(got.left.cause)}`;
+  expect(got._tag).toBe('Success');
+  return got._tag === 'Success' ? got.success : `REFUSED: ${String(got.failure.cause)}`;
 };
 
 const refused = async (tool: Tool, one: ToolCall): Promise<string> => {
   const got = await run(tool, one);
-  expect(got._tag).toBe('Left');
-  return got._tag === 'Left' ? String(got.left.cause) : 'not refused';
+  expect(got._tag).toBe('Failure');
+  return got._tag === 'Failure' ? String(got.failure.cause) : 'not refused';
 };
 
 it('refuses an unknown setting and names the ones it knows', async () => {

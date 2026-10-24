@@ -37,7 +37,10 @@ function selectWaitingSessions(sessions: readonly ActiveSession[]) {
       shouldShowNeedsInput({
         status: session.status,
         raiseId: session.status,
-        isAcked: isAttentionAcked(session.id, session.status),
+        isAcked: isAttentionAcked(session.id, {
+          raiseId: session.statusUpdatedAt ?? session.status,
+          status: session.status,
+        }),
       })
     )
     .map(session => ({

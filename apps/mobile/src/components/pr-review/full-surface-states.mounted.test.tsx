@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one suite mounts every PR-review body (overview, composer, submit, merge, navigator) with the same query mock, so their shared loading/error states are asserted against one harness. */
 import type * as ReactQuery from '@tanstack/react-query';
 import { createElement } from 'react';
 import { RefreshControl } from '@/components/ui/refresh-control';
@@ -6,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { type ProviderPrScope, ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
 import { PrReviewOverview } from './pr-review-overview';
+import { PrReviewUnavailableActions } from './pr-review-unavailable-actions';
 import { PrReviewCommentComposerScreen } from './pr-review-comment-composer-screen';
 import { PrReviewReviewSubmitScreen } from './pr-review-review-submit-screen';
 import { PrReviewMergeScreen } from './pr-review-merge-screen';
@@ -89,6 +91,7 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/activity-indicator', () => ({
   ActivityIndicator: 'ActivityIndicator',
 }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
@@ -172,6 +175,28 @@ describe('PR Overview full-body states', () => {
     }
   );
 
+  it('paints an announced progress body while the read is in flight', async () => {
+    // A first load is the only thing on screen until it settles, and the app
+    // retries twice before the error copy appears. The pending body must be a
+    // visible, announced loading state: an unlabelled, background-coloured
+    // block reads as an empty screen to both users and assistive technology.
+    query.isError = false;
+    query.isLoading = true;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PrReviewOverview, overviewProps)
+    );
+    const body = renderer.root.find(
+      node => String(node.type) === 'View' && node.props.accessibilityRole === 'progressbar'
+    );
+    expect(body.props.accessibilityLabel).toBe('Loading…');
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton').length).toBeGreaterThan(
+      0
+    );
+    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
+    unmount();
+  });
+
   it('gives a provider reconnect its own notice and recovery CTA instead of the GitHub empty state', async () => {
     query.error.data.code = 'PRECONDITION_FAILED';
     const scope: ProviderPrScope = {
@@ -198,6 +223,43 @@ describe('PR Overview full-body states', () => {
           String(node.type) === 'Button' && node.props.accessibilityLabel === 'Check connection'
       )
     ).toHaveLength(1);
+    unmount();
+  });
+
+  it('gives a provider not-found its retry and connection-check actions while GitHub keeps the install CTA', async () => {
+    query.error.data.code = 'NOT_FOUND';
+    const scope: ProviderPrScope = {
+      ref: { platform: 'gitlab', projectPath: 'group/repo', mrIid: 1 },
+      organizationId: null,
+    };
+    const { renderer, unmount } = await renderWithProviders(
+      <ProviderPrScopeProvider value={scope}>
+        {createElement(PrReviewOverview, overviewProps)}
+      </ProviderPrScopeProvider>
+    );
+    const body = renderer.root.find(node => String(node.type) === 'EmptyState');
+    const actions = body.props.action as { type: unknown; props: { onRetry: () => void } };
+    // The provider actions row replaces GitHub's install CTA. The mocked
+    // EmptyState never renders its action slot, so the row is asserted
+    // structurally; its buttons are covered by the component's own suite.
+    expect(actions.type).toBe(PrReviewUnavailableActions);
+    actions.props.onRetry();
+    expect(query.refetch).toHaveBeenCalledOnce();
+    unmount();
+  });
+
+  it('keeps the GitHub not-found arm on the install CTA only', async () => {
+    query.error.data.code = 'NOT_FOUND';
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PrReviewOverview, overviewProps)
+    );
+    const body = renderer.root.find(node => String(node.type) === 'EmptyState');
+    const install = body.props.action as {
+      type: unknown;
+      props: { children: { props: { children: string } } };
+    };
+    expect(String(install.type)).toBe('Button');
+    expect(install.props.children.props.children).toBe('Install the Kilo GitHub App');
     unmount();
   });
 

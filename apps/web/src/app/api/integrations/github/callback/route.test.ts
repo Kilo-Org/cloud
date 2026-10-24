@@ -93,7 +93,6 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   findGitHubBotLinkIntegrations: jest.fn(),
   findIntegrationByInstallationId: jest.fn(),
   findIntegrationByInstallationIdForOwner: jest.fn(),
-  findPendingInstallationByRequesterId: jest.fn(),
   upsertPlatformIntegrationForOwner: jest.fn(async () => ({ ok: true })),
 }));
 jest.mock('@/lib/integrations/db/github-installations', () => ({
@@ -102,6 +101,8 @@ jest.mock('@/lib/integrations/db/github-installations', () => ({
   bindGitHubIntegrationToCanonicalInstallation: jest.fn(),
   updateGitHubInstallationRepositories: jest.fn(),
   lockGitHubInstallationIdentity: jest.fn(async () => undefined),
+}));
+jest.mock('@/lib/integrations/db/predicates', () => ({
   effectiveAppTypeCondition: jest.fn(() => undefined),
 }));
 jest.mock('@kilocode/worker-utils/account-access', () => ({

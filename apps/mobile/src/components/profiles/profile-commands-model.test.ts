@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import {
   addCommand,
+  commandPosition,
   commandRowA11yLabel,
   MAX_SETUP_COMMANDS,
   moveCommand,
+  nonBlankCommands,
   removeCommand,
   replaceCommand,
+  sameCommands,
 } from '@/components/profiles/profile-commands-model';
 
 describe('setup command list operations', () => {
@@ -55,9 +58,31 @@ describe('setup command list operations', () => {
   });
 });
 
+describe('command list payloads', () => {
+  it('drops the blank draft rows from what the server stores', () => {
+    expect(nonBlankCommands(['a', '  ', '', 'b '])).toEqual(['a', 'b ']);
+  });
+
+  it('compares lists by length and order', () => {
+    expect(sameCommands(['a', 'b'], ['a', 'b'])).toBe(true);
+    expect(sameCommands(['a', 'b'], ['b', 'a'])).toBe(false);
+    expect(sameCommands(['a'], ['a', 'b'])).toBe(false);
+  });
+});
+
 describe('commandRowA11yLabel', () => {
   it('labels a row with its 1-based position and the list length', () => {
     expect(commandRowA11yLabel(0, 1)).toBe('1 / 1');
     expect(commandRowA11yLabel(2, 3)).toBe('3 / 3');
+  });
+});
+
+describe('commandPosition', () => {
+  it('counts only commands, so a blank draft has no position', () => {
+    expect(commandPosition(['a', '', 'b'], 0)).toBe(1);
+    expect(commandPosition(['a', '', 'b'], 1)).toBeNull();
+    expect(commandPosition(['a', '', 'b'], 2)).toBe(2);
+    expect(commandPosition(['  '], 0)).toBeNull();
+    expect(commandPosition([], 0)).toBeNull();
   });
 });

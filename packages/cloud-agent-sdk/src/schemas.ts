@@ -715,12 +715,6 @@ const wireMessageTimeSchema = z
  * generated `Message` union declares all three, but only this schema makes them
  * true for a payload that arrives from the wire or a replay.
  *
- * The role is a non-empty string rather than the two literals of the union: a
- * newer CLI may send a role this SDK does not know, and such a message must
- * still parse (no reader branches on it). Everything else passes through — the
- * union is wider than what the SDK itself reads, and the transcript renders
- * whatever the CLI sent.
- *
  * Mirrored for the history/replay shape in `sessionSnapshotSchema`.
  */
 const wireMessageInfoSchema = z

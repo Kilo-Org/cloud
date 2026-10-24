@@ -103,12 +103,16 @@ describe('normalize', () => {
 
     it('returns null when info carries no role', () => {
       expect(
-        normalize(createRaw('message.updated', { info: { id: 'msg-1', sessionID: 'ses-1' } }))
+        normalize(
+          createRaw('message.updated', {
+            info: { id: 'msg-1', sessionID: 'ses-1', time: { created: 1 } },
+          })
+        )
       ).toBeNull();
     });
 
     it.each(['', 42, null])('returns null when info.role is %p', role => {
-      const info = { id: 'msg-1', sessionID: 'ses-1', role };
+      const info = { id: 'msg-1', sessionID: 'ses-1', role, time: { created: 1 } };
       expect(normalize(createRaw('message.updated', { info }))).toBeNull();
     });
 
@@ -138,8 +142,7 @@ describe('normalize', () => {
       });
     });
 
-    it('keeps a role this SDK does not know yet when the time is readable', () => {
-      // The role set can grow on the wire; only the assistant branch is read.
+    it('keeps a message whose role is not user or assistant', () => {
       const info = { id: 'msg-1', sessionID: 'ses-1', role: 'system', time: { created: 3 } };
       expect(normalize(createRaw('message.updated', { info }))).toEqual({
         type: 'message.updated',

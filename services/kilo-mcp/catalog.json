@@ -33524,6 +33524,40 @@
     ],
     "searchBlob": "user.getMyPushTokens List all push notification tokens registered for the current user across platforms, with their locale. user getmypushtokens"
   },
+  "user.getNotificationHistory": {
+    "path": "user.getNotificationHistory",
+    "kind": "query",
+    "summary": "List the signed-in user's past notifications, optionally filtered by category, with pagination for older entries.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "category": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "cursor": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
+    },
+    "tags": [
+      "user",
+      "getnotificationhistory",
+      "category",
+      "cursor",
+      "limit"
+    ],
+    "searchBlob": "user.getNotificationHistory List the signed-in user's past notifications, optionally filtered by category, with pagination for older entries. user getnotificationhistory category cursor limit category cursor limit"
+  },
   "user.getNotificationPreferences": {
     "path": "user.getNotificationPreferences",
     "kind": "query",

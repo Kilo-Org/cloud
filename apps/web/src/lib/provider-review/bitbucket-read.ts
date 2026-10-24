@@ -977,10 +977,11 @@ function classifyInboxError(error: unknown): BitbucketReviewError {
  *
  * The fan-out sorts across repositories, so one inbox page cannot map onto a
  * single provider page. A signed continuation carries the full-precision
- * timestamp boundary, the already-served rows at that boundary, and compact
- * per-repository page positions. If a provider page contains only rows already
- * served at the boundary, its position advances so later equal-time rows
- * remain reachable. Repository reads are capped at one page each per load.
+ * timestamp boundary and, per repository, the provider page it is on and how
+ * many of that page's rows are served. A page whose rows are all served moves
+ * to the next page within the same load, and a repository with nothing left at
+ * the boundary is not read again until the boundary changes. Repository reads
+ * are therefore capped at one page each per load.
  */
 export async function listInbox(
   owner: BitbucketReviewOwner,
@@ -1012,14 +1013,18 @@ export async function listInbox(
       ? `state="OPEN" AND updated_on <= ${position.boundary}`
       : 'state="OPEN"';
     let repositoryPageFull = false;
-    let window: ProviderPrInboxItem[] = [];
+    let window: InboxCandidate[] = [];
     let beyondWindow = false;
+    const pageReads: InboxPageRead[] = [];
     for (let offset = 0; offset < repositories.length; offset += INBOX_REPOSITORY_CONCURRENCY) {
-      const batch = repositories.slice(offset, offset + INBOX_REPOSITORY_CONCURRENCY);
+      const batch = repositories
+        .slice(offset, offset + INBOX_REPOSITORY_CONCURRENCY)
+        .filter(repository => position?.pages.get(repository.fullName.toLowerCase())?.page !== 0);
       const pages = await Promise.all(
-        batch.map(repository => {
-          const page = position?.providerPages.get(repository.fullName.toLowerCase()) ?? 1;
-          return requestBitbucketJson<unknown>(
+        batch.map(async repository => {
+          const key = repository.fullName.toLowerCase();
+          const page = position?.pages.get(key)?.page ?? 1;
+          const payload = await requestBitbucketJson<unknown>(
             access,
             `/2.0/repositories/${encodeURIComponent(access.workspace.slug)}/${encodeURIComponent(repository.slug)}/pullrequests`,
             {
@@ -1030,60 +1035,57 @@ export async function listInbox(
                 sort: '-updated_on',
               },
             }
-          ).then(payload => ({ payload, repository, page }));
+          );
+          return { key, page, payload };
         })
       );
-      for (const { payload, repository, page } of pages) {
+      for (const { key, page, payload } of pages) {
         const parsedPage = BitbucketPageSchema.safeParse(payload);
         if (!parsedPage.success) {
           throw new BitbucketReviewError('retryable', 'Bitbucket returned an unexpected page.');
         }
         if (parsedPage.data.next) repositoryPageFull = true;
-        const pageItems = inboxItemsFrom(parsedPage.data.values, position, repositoryNames);
-        const merged = [...window, ...pageItems].sort(compareInboxItems);
+        const rows = inboxItemsFrom(parsedPage.data.values, repositoryNames).map(
+          (item, rowIndex) => ({ item, repoKey: key, rowIndex })
+        );
+        const served = position?.pages.get(key)?.served ?? 0;
+        pageReads.push({ key, page, rows, hadNext: parsedPage.data.next !== null });
+        const merged = [...window, ...rows.slice(served)].sort(compareInboxCandidates);
         if (merged.length > BITBUCKET_PAGE_SIZE) beyondWindow = true;
         window = merged.slice(0, BITBUCKET_PAGE_SIZE);
-        if (
-          position &&
-          parsedPage.data.next &&
-          pageItems.length === 0 &&
-          parsedPage.data.values.length > 0
-        ) {
-          position.providerPages.set(repository.fullName.toLowerCase(), page + 1);
-        }
       }
+    }
+    const boundary = oldestInboxTimestamp(window) ?? position?.boundary ?? null;
+    const sameBoundary = boundary !== null && position?.boundary === boundary;
+    const pages = new Map<string, InboxPageState>();
+    for (const repository of repositories) {
+      const key = repository.fullName.toLowerCase();
+      const carried = sameBoundary ? position?.pages.get(key) : undefined;
+      pages.set(key, carried ? { ...carried } : { page: 1, served: 0 });
+    }
+    // Every row of the window is at the boundary, so the rows served from one
+    // repository are its next rows in the page order: a count, not a set.
+    for (const candidate of window) {
+      if (candidate.item.updatedAt !== boundary) continue;
+      const state = pages.get(candidate.repoKey);
+      if (state) state.served += 1;
+    }
+    for (const read of pageReads) {
+      const state = pages.get(read.key);
+      if (!state || state.served < read.rows.length) continue;
+      pages.set(
+        read.key,
+        read.hadNext && state.page < INBOX_PAGE_MAX
+          ? { page: state.page + 1, served: 0 }
+          : { page: 0, served: 0 }
+      );
     }
     const hasMore = repositoryPageFull || beyondWindow;
-    let boundary: string | null = position?.boundary ?? null;
-    for (let index = window.length - 1; index >= 0; index -= 1) {
-      const itemBoundary = inboxBoundaryValue(window[index]);
-      if (itemBoundary !== null) {
-        boundary = itemBoundary;
-        break;
-      }
-    }
-    const providerPages =
-      boundary !== null && position?.boundary === boundary
-        ? position.providerPages
-        : new Map<string, number>();
-    let lastBoundaryItem: ProviderPrInboxItem | undefined;
-    for (let index = window.length - 1; index >= 0; index -= 1) {
-      if (inboxBoundaryValue(window[index]) === boundary) {
-        lastBoundaryItem = window[index];
-        break;
-      }
-    }
-    const lastRef =
-      lastBoundaryItem?.ref.platform === 'bitbucket'
-        ? ([lastBoundaryItem.ref.repoSlug, lastBoundaryItem.ref.prId] as const)
-        : boundary === position?.boundary
-          ? position.lastRef
-          : null;
     return {
-      items: window,
+      items: window.map(candidate => candidate.item),
       nextCursor:
         hasMore && boundary !== null
-          ? encodeInboxCursor(identity, boundary, lastRef, providerPages, repositories)
+          ? encodeInboxCursor(identity, boundary, pages, repositories)
           : null,
     };
   } catch (error) {
@@ -1099,19 +1101,18 @@ function inboxUpdatedMs(item: ProviderPrInboxItem): number {
   return fraction.length > 3 ? ms + Number(fraction.slice(3)) / 10 ** (fraction.length - 3) : ms;
 }
 
-/**
- * The provider filter value of a row's `updated_on`: the provider's own
- * timestamp string, so its full precision carries into the continuation. A
- * row without a parseable timestamp has no boundary.
- */
-function inboxBoundaryValue(item: ProviderPrInboxItem): string | null {
-  if (Number.isNaN(Date.parse(item.updatedAt))) return null;
-  return item.updatedAt;
+/** The oldest parseable timestamp in the window: the next load's provider filter. */
+function oldestInboxTimestamp(window: InboxCandidate[]): string | null {
+  for (let index = window.length - 1; index >= 0; index -= 1) {
+    const item = window[index].item;
+    if (!Number.isNaN(Date.parse(item.updatedAt))) return item.updatedAt;
+  }
+  return null;
 }
-/** Rows in one provider page after applying the stable inbox continuation. */
+
+/** The inbox rows of one provider page, in provider order. */
 function inboxItemsFrom(
   values: unknown[],
-  position: InboxCursorPosition | null,
   allowedFullNames: ReadonlySet<string>
 ): ProviderPrInboxItem[] {
   const items: ProviderPrInboxItem[] = [];
@@ -1120,13 +1121,6 @@ function inboxItemsFrom(
     if (!parsed.success) continue;
     const ref = inboxRefFrom(parsed.data, allowedFullNames);
     if (ref?.platform !== 'bitbucket') continue;
-    if (
-      position?.lastRef &&
-      parsed.data.updated_on === position.boundary &&
-      compareInboxTie(ref.repoSlug, ref.prId, position.lastRef[0], position.lastRef[1]) <= 0
-    ) {
-      continue;
-    }
     items.push({
       ref,
       title: parsed.data.title,
@@ -1139,61 +1133,81 @@ function inboxItemsFrom(
   return items;
 }
 
-function compareInboxTie(
-  leftRepo: string,
-  leftId: number,
-  rightRepo: string,
-  rightId: number
-): number {
-  const leftKey = leftRepo.toLowerCase();
-  const rightKey = rightRepo.toLowerCase();
-  if (leftKey !== rightKey) return leftKey < rightKey ? -1 : 1;
-  return leftId - rightId;
-}
-
-function compareInboxItems(left: ProviderPrInboxItem, right: ProviderPrInboxItem): number {
-  const timestampOrder = inboxUpdatedMs(right) - inboxUpdatedMs(left);
+/**
+ * The merged inbox order: newest first, ties broken by repository and then by
+ * the row's position in that repository's provider page. Page order is kept,
+ * so the rows a continuation served from a page are always its leading rows.
+ */
+function compareInboxCandidates(left: InboxCandidate, right: InboxCandidate): number {
+  const timestampOrder = inboxUpdatedMs(right.item) - inboxUpdatedMs(left.item);
   if (timestampOrder !== 0) return timestampOrder;
-  if (left.ref.platform !== 'bitbucket' || right.ref.platform !== 'bitbucket') return 0;
-  return compareInboxTie(left.ref.repoSlug, left.ref.prId, right.ref.repoSlug, right.ref.prId);
+  if (left.repoKey !== right.repoKey) return left.repoKey < right.repoKey ? -1 : 1;
+  return left.rowIndex - right.rowIndex;
 }
 
 const INBOX_CURSOR_KIND = 'bitbucket-inbox-cursor';
+/** Bits of the packed word that hold the page number; the rest hold the count. */
+const INBOX_PAGE_BITS = 10;
+const INBOX_PAGE_MAX = (1 << INBOX_PAGE_BITS) - 1;
 const inboxCursorPayloadSchema = z.object({
   kind: z.literal(INBOX_CURSOR_KIND),
   identity: z.string().min(1),
   boundary: z.string().min(1),
-  lastRef: z.tuple([z.string().min(1).max(512), z.number().int().positive()]).nullable(),
   pages: z.string().max(800),
 });
 
-type InboxCursorPosition = {
-  boundary: string;
-  lastRef: readonly [string, number] | null;
-  providerPages: Map<string, number>;
+/** One provider row with the repository and page position it was read at. */
+type InboxCandidate = {
+  item: ProviderPrInboxItem;
+  repoKey: string;
+  rowIndex: number;
 };
 
+type InboxPageRead = {
+  key: string;
+  page: number;
+  rows: InboxCandidate[];
+  hadNext: boolean;
+};
+
+/**
+ * One repository's position in the continuation: the provider page it is on
+ * and how many of that page's rows are served. Page 0 means the repository has
+ * nothing left at this boundary and is not read again until the boundary
+ * changes.
+ */
+type InboxPageState = { page: number; served: number };
+
+type InboxCursorPosition = {
+  boundary: string;
+  pages: ReadonlyMap<string, InboxPageState>;
+};
+
+/**
+ * The inbox cursor is a signed continuation token carrying the caller and
+ * repository-set identity, the provider timestamp boundary, and two packed
+ * bytes per repository: its page number and how many rows of that page are
+ * served. The page position is meaningful only while the boundary is
+ * unchanged, because a different boundary selects a different provider
+ * collection.
+ */
 function encodeInboxCursor(
   identity: string,
   boundary: string,
-  lastRef: readonly [string, number] | null,
-  providerPages: ReadonlyMap<string, number>,
+  pages: ReadonlyMap<string, InboxPageState>,
   repositories: BitbucketWorkspaceRepositoryAccess['repositories']
 ): string {
-  const repositoryIndexes = new Map(
-    repositories.map((repository, index) => [repository.fullName.toLowerCase(), index])
-  );
-  const pages = Buffer.alloc(repositories.length * 2);
-  for (const [fullName, page] of providerPages) {
-    const index = repositoryIndexes.get(fullName);
-    if (index !== undefined && page <= 0xffff) pages.writeUInt16BE(page, index * 2);
+  const pageState = Buffer.alloc(repositories.length * 2);
+  for (const [index, repository] of repositories.entries()) {
+    const state = pages.get(repository.fullName.toLowerCase());
+    const page = Math.min(state?.page ?? 1, INBOX_PAGE_MAX);
+    pageState.writeUInt16BE(((state?.served ?? 0) << INBOX_PAGE_BITS) | page, index * 2);
   }
   return createSignedToken({
     kind: INBOX_CURSOR_KIND,
     identity,
     boundary,
-    lastRef,
-    pages: pages.toString('base64url'),
+    pages: pageState.toString('base64url'),
   });
 }
 
@@ -1208,22 +1222,22 @@ function decodeInboxCursor(
     parse: value => {
       const parsed = inboxCursorPayloadSchema.safeParse(value);
       if (!parsed.success || parsed.data.identity !== identity) return null;
-      const pageBytes = Buffer.from(parsed.data.pages, 'base64url');
-      if (pageBytes.length !== repositories.length * 2) return null;
-      const providerPages = new Map<string, number>();
+      const pageState = Buffer.from(parsed.data.pages, 'base64url');
+      if (pageState.length !== repositories.length * 2) return null;
+      const pages = new Map<string, InboxPageState>();
       for (let index = 0; index < repositories.length; index += 1) {
-        const page = pageBytes.readUInt16BE(index * 2);
-        if (page > 1) providerPages.set(repositories[index].fullName.toLowerCase(), page);
+        const packed = pageState.readUInt16BE(index * 2);
+        const served = packed >> INBOX_PAGE_BITS;
+        if (served > BITBUCKET_PAGE_SIZE) return null;
+        pages.set(repositories[index].fullName.toLowerCase(), {
+          page: packed & INBOX_PAGE_MAX,
+          served,
+        });
       }
-      return { boundary: parsed.data.boundary, lastRef: parsed.data.lastRef, providerPages };
+      return { boundary: parsed.data.boundary, pages };
     },
   });
-  if (payload === null) return null;
-  return {
-    boundary: payload.boundary,
-    lastRef: payload.lastRef,
-    providerPages: payload.providerPages,
-  };
+  return payload;
 }
 /**
  * The ref of an inbox row: `workspace/repo-slug` from the destination

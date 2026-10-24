@@ -1013,6 +1013,27 @@ describe('listInbox', () => {
       inboxPr(firstId + index, `2026-09-02T00:${String(index).padStart(2, '0')}:00+00:00`)
     );
 
+  /** The identity a continuation is bound to: the caller plus the repository set. */
+  const inboxIdentity = (slugs: string[]) =>
+    `bitbucket-inbox:acme:${ORG_OWNER.organizationId}:${ORG_OWNER.userId}:${crypto
+      .createHash('sha256')
+      .update(
+        [...slugs]
+          .sort()
+          .map(slug => `acme/${slug}`.toLowerCase())
+          .join('\0')
+      )
+      .digest('base64url')}`;
+
+  /** A continuation token in the shape the read layer issues. */
+  const inboxCursor = (identity: string, boundary: string, pages = Buffer.alloc(2)) =>
+    createSignedToken({
+      kind: 'bitbucket-inbox-cursor',
+      identity,
+      boundary,
+      pages: pages.toString('base64url'),
+    });
+
   it('fans out over the workspace repositories and carries full identity', async () => {
     fetchMock.mockImplementation(async (url: string | URL) => {
       const full = url.toString();
@@ -1127,7 +1148,7 @@ describe('listInbox', () => {
     expect(second.nextCursor).toBeNull();
   });
 
-  it('advances past a provider page of equal-timestamp rows', async () => {
+  it('advances past a provider page whose rows are all served', async () => {
     const requests: InboxRequest[] = [];
     const tiedAt = '2026-09-02T00:00:00.000000+00:00';
     serveInbox(
@@ -1141,15 +1162,11 @@ describe('listInbox', () => {
     expect(first.nextCursor!.length).toBeLessThanOrEqual(2048);
 
     const second = await listInbox(ORG_OWNER, first.nextCursor!);
-    expect(second.items).toHaveLength(0);
-    expect(second.nextCursor).toBeTruthy();
-
-    const third = await listInbox(ORG_OWNER, second.nextCursor!);
     expect(
-      third.items.map(item => (item.ref && 'prId' in item.ref ? item.ref.prId : null))
+      second.items.map(item => (item.ref && 'prId' in item.ref ? item.ref.prId : null))
     ).toEqual([550]);
-    expect(third.nextCursor).toBeNull();
-    expect(requests.map(request => request.page)).toEqual(['1', '1', '2']);
+    expect(second.nextCursor).toBeNull();
+    expect(requests.map(request => request.page)).toEqual(['1', '2']);
   });
   it('keeps equal-time rows in a stable order across inbox pages', async () => {
     const requests: InboxRequest[] = [];
@@ -1218,6 +1235,39 @@ describe('listInbox', () => {
     expect(new Set(served).size).toBe(100);
   });
 
+  it('serves every tied row when another repository also sits at the boundary', async () => {
+    // 60 tied rows in one repository and one tied row in a repository that
+    // sorts after it: the later repository's row must not hide the rows that
+    // continue onto the first repository's second provider page.
+    const requests: InboxRequest[] = [];
+    const tiedAt = '2026-09-02T00:00:00.000000+00:00';
+    serveInbox(
+      {
+        'repo-a': Array.from({ length: 60 }, (_, index) =>
+          inboxPr(100 + index, tiedAt, 'acme/repo-a')
+        ),
+        'repo-b': [inboxPr(900, tiedAt, 'acme/repo-b')],
+      },
+      requests
+    );
+
+    const served: number[] = [];
+    let cursor: string | undefined;
+    for (let load = 0; load < 4; load += 1) {
+      const page = await listInbox(ORG_OWNER, cursor);
+      served.push(
+        ...page.items.flatMap(item => (item.ref && 'prId' in item.ref ? [item.ref.prId] : []))
+      );
+      cursor = page.nextCursor ?? undefined;
+      if (cursor === undefined) break;
+    }
+
+    expect(served).toHaveLength(61);
+    expect(new Set(served).size).toBe(61);
+    expect(served).toEqual([...Array.from({ length: 60 }, (_, index) => 100 + index), 900]);
+    expect(requests).toHaveLength(4);
+  });
+
   it('reads one provider page per repository on every inbox page', async () => {
     // 12 repositories × 5 open PRs: every load reads one page per repository.
     const rowsBySlug: Record<string, InboxRow[]> = {};
@@ -1276,24 +1326,9 @@ describe('listInbox', () => {
     const requests: InboxRequest[] = [];
     serveInbox(rowsBySlug, requests);
 
-    const fingerprint = crypto
-      .createHash('sha256')
-      .update(
-        [...slugs]
-          .sort()
-          .map(slug => `acme/${slug}`)
-          .join('\0')
-      )
-      .digest('base64url');
     const pages = Buffer.alloc(slugs.length * 2);
     for (let index = 0; index < slugs.length; index += 1) pages.writeUInt16BE(2, index * 2);
-    const cursor = createSignedToken({
-      kind: 'bitbucket-inbox-cursor',
-      identity: `bitbucket-inbox:acme:${ORG_OWNER.organizationId}:${ORG_OWNER.userId}:${fingerprint}`,
-      boundary: tiedAt,
-      lastRef: null,
-      pages: pages.toString('base64url'),
-    });
+    const cursor = inboxCursor(inboxIdentity(slugs), tiedAt, pages);
     expect(cursor.length).toBeLessThanOrEqual(INBOX_CURSOR_MAX_CHARS);
 
     const page = await listInbox(ORG_OWNER, cursor);
@@ -1325,7 +1360,7 @@ describe('listInbox', () => {
       kind: 'bitbucket-inbox-cursor',
       identity: 'bitbucket-inbox:evil',
       boundary: '2026-09-02T00:10:00.000+00:00',
-      servedRefs: [],
+      pages: Buffer.alloc(2).toString('base64url'),
     });
     const page = await listInbox(ORG_OWNER, foreign);
 
@@ -1355,9 +1390,9 @@ describe('listInbox', () => {
     const encoded = Buffer.from(
       JSON.stringify({
         kind: 'bitbucket-inbox-cursor',
-        identity: 'bitbucket-inbox:acme',
+        identity: inboxIdentity(['repo']),
         boundary: '2026-09-02T00:10:00.000+00:00',
-        servedRefs: [],
+        pages: Buffer.alloc(2).toString('base64url'),
         iat: Math.floor(Date.now() / 1000) - 2 * 60 * 60,
         nonce: 'expired-nonce',
       })

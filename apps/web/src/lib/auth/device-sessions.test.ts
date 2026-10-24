@@ -17,6 +17,7 @@ import {
   issueSessionCredentials,
   rotateRefreshToken,
   revokeDeviceSession,
+  MAX_LIVE_APP_SESSIONS,
 } from './device-sessions';
 import { KeyCollisionError } from './native-admission';
 import type { User } from '@kilocode/db/schema';
@@ -91,6 +92,57 @@ describe('device-sessions', () => {
       expect(row!.kilo_user_id).toBe(testUserId);
       expect(row!.user_agent).toBe('test-agent');
       expect(row!.revoked_at).toBeNull();
+    });
+
+    test('signs out the least recently active app session beyond the cap', async () => {
+      const sessionIds: string[] = [];
+      for (let index = 0; index <= MAX_LIVE_APP_SESSIONS; index += 1) {
+        sessionIds.push(await createDeviceSession({ userId: testUserId }));
+      }
+
+      const rows = await db
+        .select({
+          id: device_sessions.id,
+          revoked_at: device_sessions.revoked_at,
+          revoked_reason: device_sessions.revoked_reason,
+        })
+        .from(device_sessions)
+        .where(eq(device_sessions.kilo_user_id, testUserId));
+
+      const live = rows.filter(row => row.revoked_at === null);
+      expect(live).toHaveLength(MAX_LIVE_APP_SESSIONS);
+
+      // The oldest insert is the one the cap retired.
+      const oldest = rows.find(row => row.id === sessionIds[0]);
+      expect(oldest?.revoked_reason).toBe('session_limit');
+      expect(oldest?.revoked_at).not.toBeNull();
+      expect(live.map(row => row.id)).toContain(sessionIds[sessionIds.length - 1]);
+    });
+
+    test('does not count or retire device-auth sessions', async () => {
+      for (let index = 0; index < MAX_LIVE_APP_SESSIONS; index += 1) {
+        await createDeviceSession({ userId: testUserId });
+      }
+      const deviceAuthSessionId = await createDeviceSession({
+        userId: testUserId,
+        deviceAuthRequestId: '11111111-1111-4111-8111-111111111111',
+      });
+
+      const [row] = await db
+        .select({ revoked_at: device_sessions.revoked_at })
+        .from(device_sessions)
+        .where(eq(device_sessions.id, deviceAuthSessionId));
+
+      expect(row!.revoked_at).toBeNull();
+
+      // A device-auth session also never evicts an app session.
+      const live = await db
+        .select({ id: device_sessions.id })
+        .from(device_sessions)
+        .where(
+          and(eq(device_sessions.kilo_user_id, testUserId), isNull(device_sessions.revoked_at))
+        );
+      expect(live).toHaveLength(MAX_LIVE_APP_SESSIONS + 1);
     });
   });
 

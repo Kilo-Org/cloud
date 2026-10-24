@@ -34,6 +34,20 @@ export function isPlatformIntegrationSuspended(
   );
 }
 
+/**
+ * Whether an integration may act for its owner. The active status is required,
+ * and the integration must carry no suspension, whether it is recorded as a
+ * status or as a timestamp.
+ */
+export function isPlatformIntegrationActive(
+  integration: PlatformIntegrationSuspensionState | null | undefined
+): boolean {
+  return (
+    integration?.integration_status === INTEGRATION_STATUS.ACTIVE &&
+    !isPlatformIntegrationSuspended(integration)
+  );
+}
+
 export function platformIntegrationHealthSql(): SQL {
   return sql`
     ${platform_integrations.integration_status} = ${INTEGRATION_STATUS.ACTIVE}

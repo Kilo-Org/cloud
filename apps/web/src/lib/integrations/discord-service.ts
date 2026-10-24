@@ -162,7 +162,7 @@ export function getOwnerFromInstallation(integration: PlatformIntegration): Owne
 }
 
 /**
- * Create or update Discord installation from OAuth response
+ * Persist the selected Discord installation while preserving owner configuration.
  */
 export async function upsertDiscordInstallation(
   owner: Owner,
@@ -195,6 +195,7 @@ export async function upsertDiscordInstallation(
     const [updated] = await db
       .update(platform_integrations)
       .set({
+        platform_installation_id: guildId,
         platform_account_id: guildId,
         platform_account_login: guildName,
         scopes,
@@ -208,7 +209,9 @@ export async function upsertDiscordInstallation(
     return updated;
   }
 
-  // For org integrations, get a model that respects org access policy.
+  // For org integrations, get a model that respects org access policy. A null
+  // result means the policy allows none of the candidates, so the installation
+  // stores no model and the bot reports that no model is configured.
   // For user integrations, use the shared bot default model.
   const defaultModel =
     owner.type === 'org'
@@ -217,7 +220,7 @@ export async function upsertDiscordInstallation(
 
   const metadata = {
     guild_icon: oauthResponse.guild.icon,
-    model_slug: defaultModel,
+    ...(defaultModel ? { model_slug: defaultModel } : {}),
   };
 
   const [created] = await db

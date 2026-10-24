@@ -27,6 +27,7 @@ import {
   ipCountryFromHeaders,
   ja4FromHeaders,
 } from '@kilocode/web-shared/lib/bouncer/credit-events';
+import { assertChargeAllowed } from '@kilocode/web-shared/lib/bouncer/charge-gate';
 
 /**
  * Durably enqueues the bouncer `charge.attempted` for an org auto-top-up setup checkout. Callers
@@ -136,6 +137,14 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
           // No payment method - redirect to Stripe checkout
           const stripeCustomerId = await getOrCreateStripeCustomerIdForOrganization(organizationId);
 
+          await assertChargeAllowed({
+            userId: ctx.user.id,
+            organizationId,
+            flow: 'auto_topup',
+            ip: ctx.ip,
+            ja4: ja4FromHeaders(ctx.headersList),
+          });
+
           await reportOrgAutoTopUpAttempt({
             organizationId,
             userId: ctx.user.id,
@@ -183,6 +192,14 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
       assertValidSettings(selectedAmount, selectedThreshold);
 
       const stripeCustomerId = await getOrCreateStripeCustomerIdForOrganization(organizationId);
+
+      await assertChargeAllowed({
+        userId: ctx.user.id,
+        organizationId,
+        flow: 'auto_topup',
+        ip: ctx.ip,
+        ja4: ja4FromHeaders(ctx.headersList),
+      });
 
       await reportOrgAutoTopUpAttempt({
         organizationId,

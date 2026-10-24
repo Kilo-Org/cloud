@@ -1,6 +1,7 @@
 import type { WorkerDb } from '@kilocode/db';
 import {
   agent_environment_profile_mcp_servers,
+  agent_environment_profiles,
   type AgentEnvironmentProfileMcpServer,
 } from '@kilocode/db/schema';
 import { and, eq, count } from 'drizzle-orm';
@@ -145,6 +146,12 @@ function encryptRecord(
  * Convert user input → config shape with encrypted env/header values.
  * On update, `existing` carries the previously stored encrypted envelopes
  * so keys left as the masked placeholder round-trip unchanged.
+ *
+ * The round-trip is bound to an unchanged destination: when a masked value is
+ * submitted for a different remote URL, a different local command, or a
+ * different transport type, the stored envelope no longer corresponds to
+ * where the caller is sending it, so the update is rejected and the caller
+ * must submit the plaintext values again.
  */
 function buildStoredConfig(
   publicKeyBase64: string,
@@ -152,17 +159,49 @@ function buildStoredConfig(
   existing?: StoredMcpConfig
 ): StoredMcpConfig {
   if (input.type === 'local') {
-    const existingEnv = existing && 'command' in existing ? existing.environment : undefined;
+    const existingLocal = existing && 'command' in existing ? existing : undefined;
+    if (
+      existing &&
+      (existingLocal === undefined ||
+        JSON.stringify(existingLocal.command) !== JSON.stringify(input.config.command)) &&
+      hasMaskedValue(input.config.environment)
+    ) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message:
+          'The command changed, so stored environment values cannot be kept: re-enter them as plain values',
+      });
+    }
     return {
       command: input.config.command,
-      environment: encryptRecord(publicKeyBase64, input.config.environment, existingEnv),
+      environment: encryptRecord(
+        publicKeyBase64,
+        input.config.environment,
+        existingLocal?.environment
+      ),
     };
   }
-  const existingHeaders = existing && 'url' in existing ? existing.headers : undefined;
+  const existingRemote = existing && 'url' in existing ? existing : undefined;
+  if (
+    existing &&
+    (existingRemote === undefined || existingRemote.url !== input.config.url) &&
+    hasMaskedValue(input.config.headers)
+  ) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message:
+        'The URL changed, so stored header values cannot be kept: re-enter them as plain values',
+    });
+  }
   return {
     url: input.config.url,
-    headers: encryptRecord(publicKeyBase64, input.config.headers, existingHeaders),
+    headers: encryptRecord(publicKeyBase64, input.config.headers, existingRemote?.headers),
   };
+}
+
+function hasMaskedValue(values: Record<string, string> | undefined): boolean {
+  if (!values) return false;
+  return Object.values(values).some(value => value === MASKED_SECRET_VALUE);
 }
 
 /**
@@ -204,8 +243,13 @@ function toMaskedConfig(
   };
 }
 
-async function assertMcpServerLimit(db: WorkerDb, profileId: string): Promise<void> {
-  const [row] = await db
+type McpServerWriteTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
+
+async function assertMcpServerLimit(
+  tx: McpServerWriteTransaction,
+  profileId: string
+): Promise<void> {
+  const [row] = await tx
     .select({ n: count() })
     .from(agent_environment_profile_mcp_servers)
     .where(eq(agent_environment_profile_mcp_servers.profile_id, profileId));
@@ -277,23 +321,34 @@ export async function createMcpServer(
   owner: ProfileOwner
 ): Promise<{ id: string }> {
   await verifyProfileOwnership(db, profileId, owner);
-  await assertMcpServerLimit(db, profileId);
 
   const config = buildStoredConfig(publicKeyBase64, input);
 
-  const [server] = await db
-    .insert(agent_environment_profile_mcp_servers)
-    .values({
-      profile_id: profileId,
-      name: input.name,
-      type: input.type,
-      enabled: input.enabled ?? true,
-      timeout: input.timeout ?? null,
-      config,
-    })
-    .returning({ id: agent_environment_profile_mcp_servers.id });
+  return await db.transaction(async tx => {
+    // Lock the owning profile row so the cap count and the insert are one
+    // serialized unit, keeping concurrent creates within the per-profile cap.
+    await tx
+      .select({ id: agent_environment_profiles.id })
+      .from(agent_environment_profiles)
+      .where(eq(agent_environment_profiles.id, profileId))
+      .for('update');
 
-  return { id: server.id };
+    await assertMcpServerLimit(tx, profileId);
+
+    const [server] = await tx
+      .insert(agent_environment_profile_mcp_servers)
+      .values({
+        profile_id: profileId,
+        name: input.name,
+        type: input.type,
+        enabled: input.enabled ?? true,
+        timeout: input.timeout ?? null,
+        config,
+      })
+      .returning({ id: agent_environment_profile_mcp_servers.id });
+
+    return { id: server.id };
+  });
 }
 
 export async function updateMcpServer(

@@ -70,12 +70,16 @@ const EMPTY_STATE_DESCRIPTION_GAP = 3.5;
 const EMPTY_STATE_DESCRIPTION_LINE_HEIGHT = 17.5;
 const EMPTY_STATE_ACTION_MIN_HEIGHT = 48;
 const EMPTY_STATE_ACTION_PADDING = 14;
-// The live empty state stacks a second action (its See-all history link) under
-// the primary button: a `gap-3` block gap (0.75rem, 10.5dp, fixed) plus one
-// eyebrow line. The eyebrow renders at `text-[11px]`; a `text-sm` line (17.5dp)
-// is a safe upper bound, so the estimate stays above the rendered height and
-// errs toward the compact form.
+// The live empty state stacks a second action (its history link) under the
+// primary button: a `gap-3` block gap (0.75rem, 10.5dp, fixed) plus the link's
+// own box. That box carries the platform touch target (44pt on iOS, 48dp on
+// Android) as a px literal, so it does not scale with rem, while a label
+// scaled by Dynamic Type still grows past it, exactly as the primary action's
+// does. The estimate takes the larger of the two floors, the Android one, so it
+// stays above the rendered height on either platform and errs toward the
+// compact form.
 const EMPTY_STATE_SECONDARY_ACTION_GAP = 10.5;
+const EMPTY_STATE_SECONDARY_ACTION_TARGET = 48;
 const EMPTY_STATE_SECONDARY_ACTION_LINE_HEIGHT = 17.5;
 
 /**
@@ -131,10 +135,15 @@ export function getEmptyStateFullHeight({
     EMPTY_STATE_ACTION_MIN_HEIGHT,
     EMPTY_STATE_DESCRIPTION_LINE_HEIGHT * fontScale + EMPTY_STATE_ACTION_PADDING
   );
-  // The stacked secondary action's gap is a fixed rem value; its label scales
-  // with Dynamic Type like the rest of the copy.
+  // The stacked secondary action's gap is a fixed rem value; its own box does
+  // not scale, so it stays at the platform target until a scaled label grows
+  // past it.
   const secondary = secondaryAction
-    ? EMPTY_STATE_SECONDARY_ACTION_GAP + EMPTY_STATE_SECONDARY_ACTION_LINE_HEIGHT * fontScale
+    ? EMPTY_STATE_SECONDARY_ACTION_GAP +
+      Math.max(
+        EMPTY_STATE_SECONDARY_ACTION_TARGET,
+        EMPTY_STATE_SECONDARY_ACTION_LINE_HEIGHT * fontScale
+      )
     : 0;
   return Math.round(
     EMPTY_STATE_BUBBLE_HEIGHT +

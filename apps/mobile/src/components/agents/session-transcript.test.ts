@@ -746,6 +746,28 @@ describe('session transcript', () => {
     ).toEqual(['msg_real']);
   });
 
+  it('keeps a contentless assistant failure in a read-only stored session', () => {
+    // Read-only drops the user rows that render nothing, but a response that
+    // failed before producing parts still owns its failure footer and Retry.
+    const base = 1_000_000_000;
+    const options = { dropUnrenderableUserRows: true };
+    const phantomUser = message('msg_phantom_user');
+    const failedResponse = {
+      ...assistantMessageWithStepStartOnly('msg_failed_response', base),
+      // A response that failed before producing any part: the stored record
+      // carries the error and nothing else.
+      parts: [],
+      info: {
+        ...assistantMessageWithStepStartOnly('msg_failed_response', base).info,
+        error: { name: 'APIError' as const, data: { message: 'boom', isRetryable: false } },
+      },
+    };
+
+    expect(keysOf(mergeSessionTranscript([phantomUser, failedResponse], [], options))).toEqual([
+      'msg_failed_response',
+    ]);
+  });
+
   it('keeps every unchanged item identity when only the last message changes', () => {
     const base = 1_000_000_000;
     const first = userMessageAt('msg_first', base);

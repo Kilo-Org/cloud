@@ -2,6 +2,7 @@ import { type ReactNode } from 'react';
 import { I18nManager, Pressable, View } from 'react-native';
 
 import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
+import { textActionTargetClass } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 type SectionHeaderProps = {
@@ -54,7 +55,6 @@ export function SectionHeader({
         <Pressable
           onPress={onActionPress}
           disabled={actionHidden}
-          hitSlop={8}
           accessibilityRole={actionHidden ? undefined : 'button'}
           accessibilityLabel={actionHidden ? undefined : actionLabel}
           accessibilityElementsHidden={actionHidden}
@@ -72,8 +72,15 @@ export function SectionHeader({
           // `text-left`/`text-right`: React Native swaps those two under RTL
           // (Android maps `textAlign: 'left'` to `Gravity.RIGHT` when the layout
           // is RTL).
+          // The frame is the box, not the 11px label line: a control-size audit
+          // reads the node's own rect and `hitSlop` never widens it. The row
+          // grows to hold the frame — RN stops delivering touches outside the
+          // parent, so a shrunk layout box would leave part of the target dead
+          // (`textActionTargetClass`, `comment-row.tsx`). The hidden action keeps
+          // the same box, so hiding it still cannot resize the header.
           className={cn(
-            'max-w-full shrink-0 flex-row active:opacity-70',
+            textActionTargetClass(),
+            'max-w-full shrink-0 flex-row items-center justify-center active:opacity-70',
             actionHidden && 'opacity-0'
           )}
         >

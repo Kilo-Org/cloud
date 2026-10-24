@@ -25,6 +25,7 @@ import { ChevronDown, ChevronUp, Terminal, Trash2 } from '@/components/ui/icons'
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAgentProfile } from '@/lib/hooks/use-agent-profiles';
+import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useProfileCommandsSave } from '@/lib/hooks/use-profile-commands-save';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -60,6 +61,7 @@ export function ProfileCommandsScreen({
   const router = useRouter();
   const colors = useThemeColors();
   const profileQuery = useAgentProfile(profileId, organizationId);
+  const canManage = useCanManageOrganizationProfiles(organizationId);
 
   const profile = profileQuery.data;
   const serverRows = profile?.commands ?? NO_COMMAND_ROWS;
@@ -198,6 +200,7 @@ export function ProfileCommandsScreen({
           autoCorrect={false}
           returnKeyType="done"
           accessibilityHint={rowHint}
+          disabled={!canManage}
           onChangeText={value => {
             setCommands(current => replaceCommand(current, index, value));
           }}
@@ -208,43 +211,45 @@ export function ProfileCommandsScreen({
             commit(index);
           }}
         />
-        <View className="flex-row items-center justify-end gap-1">
-          <Pressable
-            className={controlClass(isFirst)}
-            disabled={isFirst}
-            accessibilityRole="button"
-            accessibilityLabel={upLabel}
-            accessibilityHint={rowHint}
-            onPress={() => {
-              move(index, -1);
-            }}
-          >
-            <ChevronUp size={20} color={colors.mutedForeground} />
-          </Pressable>
-          <Pressable
-            className={controlClass(isLast)}
-            disabled={isLast}
-            accessibilityRole="button"
-            accessibilityLabel={downLabel}
-            accessibilityHint={rowHint}
-            onPress={() => {
-              move(index, 1);
-            }}
-          >
-            <ChevronDown size={20} color={colors.mutedForeground} />
-          </Pressable>
-          <Pressable
-            className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-            accessibilityRole="button"
-            accessibilityLabel={deleteLabel}
-            accessibilityHint={rowHint}
-            onPress={() => {
-              remove(index);
-            }}
-          >
-            <Trash2 size={20} color={colors.destructive} />
-          </Pressable>
-        </View>
+        {canManage ? (
+          <View className="flex-row items-center justify-end gap-1">
+            <Pressable
+              className={controlClass(isFirst)}
+              disabled={isFirst}
+              accessibilityRole="button"
+              accessibilityLabel={upLabel}
+              accessibilityHint={rowHint}
+              onPress={() => {
+                move(index, -1);
+              }}
+            >
+              <ChevronUp size={20} color={colors.mutedForeground} />
+            </Pressable>
+            <Pressable
+              className={controlClass(isLast)}
+              disabled={isLast}
+              accessibilityRole="button"
+              accessibilityLabel={downLabel}
+              accessibilityHint={rowHint}
+              onPress={() => {
+                move(index, 1);
+              }}
+            >
+              <ChevronDown size={20} color={colors.mutedForeground} />
+            </Pressable>
+            <Pressable
+              className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+              accessibilityRole="button"
+              accessibilityLabel={deleteLabel}
+              accessibilityHint={rowHint}
+              onPress={() => {
+                remove(index);
+              }}
+            >
+              <Trash2 size={20} color={colors.destructive} />
+            </Pressable>
+          </View>
+        ) : null}
       </View>
     );
   };
@@ -270,9 +275,11 @@ export function ProfileCommandsScreen({
         description={null}
         placement="top"
         action={
-          <Button className={STATE_ACTION_CLASS} onPress={add}>
-            <Text>{t('profiles.addCommand')}</Text>
-          </Button>
+          canManage ? (
+            <Button className={STATE_ACTION_CLASS} onPress={add}>
+              <Text>{t('profiles.addCommand')}</Text>
+            </Button>
+          ) : null
         }
       />
     );
@@ -280,9 +287,11 @@ export function ProfileCommandsScreen({
     content = (
       <>
         {commands.map((command, index) => renderCommandRow(command, index))}
-        <Button onPress={add} disabled={commands.length >= MAX_SETUP_COMMANDS}>
-          <Text>{t('profiles.addCommand')}</Text>
-        </Button>
+        {canManage ? (
+          <Button onPress={add} disabled={commands.length >= MAX_SETUP_COMMANDS}>
+            <Text>{t('profiles.addCommand')}</Text>
+          </Button>
+        ) : null}
       </>
     );
   }

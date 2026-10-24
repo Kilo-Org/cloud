@@ -17,6 +17,7 @@ import { Circle, CircleCheck } from '@/components/ui/icons';
 import { IconButton } from '@/components/ui/icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { selectableRowA11y } from '@/lib/a11y/selectable-row';
 import { useNowTicker } from '@/lib/hooks/use-now-ticker';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTodoItem, useTodoItemMutations } from '@/lib/hooks/use-todos';
@@ -40,8 +41,7 @@ function TodoCompletionCircle({ todo }: Readonly<{ todo: TodoItemDetail }>) {
         }
         update.mutate({ id: todo.id, done: !done });
       }}
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: done }}
+      {...selectableRowA11y({ multi: true, selected: done })}
       accessibilityLabel={done ? t('todos.item.markOpen') : t('todos.item.markDone')}
     >
       {done ? (

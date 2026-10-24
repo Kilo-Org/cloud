@@ -398,7 +398,7 @@ async function readBoundedInternalJsonRequest(request: Request): Promise<unknown
   }
 }
 
-type GitHubCapabilityCredential = 'pinned' | 'installation' | 'none';
+type GitHubCapabilityCredential = 'pinned' | 'none';
 
 type GitHubCapabilityUpstream =
   | { failure: RedeemGitHubSessionCapabilityFailureReason; credential?: never }
@@ -549,11 +549,12 @@ function validateGitHubCapabilityUpstream(
         : { failure: 'invalid_upstream_request' };
     }
     if (path === '/graphql') {
-      // gh resolves pull-request views and checks through GraphQL, which is not
-      // addressed by repository path. Answer it with the repository-scoped
-      // installation credential.
+      // gh resolves pull-request views and mutations through GraphQL, which is not
+      // addressed by repository path, so the capability's own credential answers it:
+      // the recorded user's token for a user source, the repository-scoped
+      // installation token for an installation source.
       return method === 'POST'
-        ? { failure: null, credential: 'installation' }
+        ? { failure: null, credential: 'pinned' }
         : { failure: 'invalid_upstream_request' };
     }
     if (!isRepositoryApiPath(path, repository)) return { failure: 'repository_mismatch' };
@@ -1188,58 +1189,6 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
         source: claims.source,
         appType: claims.identity.appType,
       };
-    }
-    const installationAuth = async (): Promise<RedeemGitHubSessionCapabilityResult> => {
-      let auth: GetCloudAgentAuthForRepoResult;
-      try {
-        auth = await this.getCloudAgentAuthForRepo(authParams);
-      } catch {
-        return { success: false, reason: 'source_unavailable' };
-      }
-      if (!auth.success) {
-        return {
-          success: false,
-          reason:
-            auth.reason === 'integration_mismatch' ? 'integration_mismatch' : 'source_unavailable',
-        };
-      }
-      const identityMatches =
-        claims.source === 'installation'
-          ? this.matchesSessionIdentity(claims.identity, auth)
-          : auth.installationId === claims.identity.installationId &&
-            auth.appType === claims.identity.appType;
-      if (!identityMatches) return { success: false, reason: 'identity_mismatch' };
-      return {
-        success: true,
-        authorization: this.formatUpstreamAuthorization(params.requestUrl, auth.githubToken),
-        installationId: auth.installationId,
-        source: auth.source,
-        appType: auth.appType,
-      };
-    };
-    if (upstream.credential === 'installation') {
-      // GraphQL is not addressed by repository path, so it is answered with the
-      // repository-scoped installation credential. A capability pinned to a user
-      // still requires that pin to resolve, so the session cannot outlive it.
-      if (claims.source === 'user') {
-        const pinned = await this.redeemPinnedUserAuthorization(authParams);
-        if (pinned && !pinned.success) {
-          return {
-            success: false,
-            reason:
-              pinned.reason === 'integration_mismatch'
-                ? 'integration_mismatch'
-                : 'source_unavailable',
-          };
-        }
-        if (!pinned || pinned.source !== claims.source) {
-          return { success: false, reason: 'source_unavailable' };
-        }
-        if (!this.matchesSessionIdentity(claims.identity, pinned)) {
-          return { success: false, reason: 'identity_mismatch' };
-        }
-      }
-      return installationAuth();
     }
 
     let auth: GetCloudAgentAuthForRepoResult | null;

@@ -1972,6 +1972,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     ['DELETE', 'https://api.github.com/repos/acme/repo/issues/42/labels/bug'],
     ['GET', 'https://api.github.com/repos/acme/repo/contents/src%2Findex.ts'],
     ['GET', 'https://api.github.com/user'],
+    ['POST', 'https://api.github.com/graphql'],
     ['POST', 'https://uploads.github.com/repos/acme/repo/releases/1/assets?name=asset.zip'],
     ['GET', 'https://npm.pkg.github.com/@acme%2fdesign'],
     ['GET', 'https://npm.pkg.github.com/download/@acme/design/1.0.0/package.tgz'],
@@ -2013,7 +2014,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     }
   );
 
-  it('redeems GraphQL for a selected-user capability with the repository installation token', async () => {
+  it('redeems GraphQL for a selected-user capability with the user token', async () => {
     const service = createService();
     const issued = await service.issueGitHubSessionCapability({
       githubRepo: 'acme/repo',
@@ -2034,13 +2035,43 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
       })
     ).resolves.toEqual({
       success: true,
+      authorization: 'Bearer user-token',
+      installationId: '123',
+      source: 'user',
+      appType: 'standard',
+    });
+    expect(serviceMocks.selectUserAuthorization).toHaveBeenCalledOnce();
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+  });
+
+  it('redeems GraphQL for an installation-source capability with the installation token', async () => {
+    const service = createService();
+    const issued = await service.issueGitHubSessionCapability({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId,
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+    expect(issued.source).toBe('installation');
+    serviceMocks.selectUserAuthorization.mockClear();
+    serviceMocks.getTokenForRepo.mockClear();
+
+    await expect(
+      service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestMethod: 'POST',
+        requestUrl: 'https://api.github.com/graphql',
+      })
+    ).resolves.toEqual({
+      success: true,
       authorization: 'Bearer installation-token',
       installationId: '123',
       source: 'installation',
       appType: 'standard',
     });
-    expect(serviceMocks.selectUserAuthorization).toHaveBeenCalledOnce();
     expect(serviceMocks.getTokenForRepo).toHaveBeenCalledOnce();
+    expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
   });
 
   it('refuses GraphQL for a selected-user capability whose pin no longer resolves', async () => {

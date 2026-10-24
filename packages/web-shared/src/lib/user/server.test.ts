@@ -22,8 +22,8 @@ jest.mock('next/navigation', () => ({
 }));
 
 import { afterEach, beforeEach, describe, test, expect } from '@jest/globals';
+import { isEmailBlacklistedByDomain } from '@kilocode/worker-utils/account-access';
 import {
-  isEmailBlacklistedByDomain,
   isBlockedTLD,
   getUserUUID,
   uuidSchema,
@@ -41,6 +41,7 @@ import {
 import { kilocode_users, organizations } from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { markOrganizationAsDeleted } from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { generateApiToken, JWT_TOKEN_VERSION } from '@kilocode/web-shared/lib/tokens';
 import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
@@ -622,6 +623,28 @@ describe('getUserFromAuth', () => {
     expect(result.organizationId).toBe(organization.id);
   });
 
+  test('rejects a token whose organization context was soft-deleted', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'deleted-organization-pepper' });
+    const organization = await createTestOrganization(
+      `Deleted Organization ${crypto.randomUUID()}`,
+      user.id,
+      0
+    );
+    await markOrganizationAsDeleted(organization.id);
+    const token = generateApiToken(user);
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        Authorization: `Bearer ${token}`,
+        [ORGANIZATION_ID_HEADER]: organization.id,
+      })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user).toBeNull();
+    expect(result.authFailedResponse?.status).toBe(403);
+  });
+
   test('allows API-token authentication for users from SSO-protected domains', async () => {
     const ssoDomain = `${crypto.randomUUID()}.example.com`;
     const user = await insertTestUser({
@@ -948,7 +971,7 @@ describe('credential exchange bearer authentication guard', () => {
 
   test('rejects absent and mismatched pepper claims, including a null database pepper', async () => {
     const user = await insertTestUser({ api_token_pepper: null });
-    const noPepper = await signPolicyClaims({
+    const noPepper = signPolicyClaims({
       version: 3,
       kiloUserId: user.id,
       env: process.env.NODE_ENV,
@@ -1054,7 +1077,7 @@ describe('credential exchange bearer authentication guard', () => {
     ],
   ])('rejects an eligible-looking token with %s', async (_name, claimsFor) => {
     const user = await insertTestUser({ api_token_pepper: 'ineligible-claim-pepper' });
-    const token = await signPolicyClaims(claimsFor(user, Math.floor(Date.now() / 1000)));
+    const token = signPolicyClaims(claimsFor(user, Math.floor(Date.now() / 1000)));
 
     const result = await getUserFromBearerForCredentialExchange(
       new Headers({ authorization: `Bearer ${token}` }),
@@ -1138,7 +1161,7 @@ describe('credential exchange bearer authentication guard', () => {
 
   test('rejects a valid token for a missing user', async () => {
     const now = Math.floor(Date.now() / 1000);
-    const token = await signPolicyClaims({
+    const token = signPolicyClaims({
       version: 3,
       kiloUserId: 'missing-credential-exchange-user',
       apiTokenPepper: 'pepper',
@@ -1197,7 +1220,7 @@ describe('credential exchange bearer authentication guard', () => {
 
     for (const claims of invalidClaims) {
       const result = await getUserFromBearerForCredentialExchange(
-        new Headers({ authorization: `Bearer ${await signPolicyClaims(claims)}` }),
+        new Headers({ authorization: `Bearer ${signPolicyClaims(claims)}` }),
         { legacy: 'deny' }
       );
       expect(result.authFailedResponse?.status).toBe(401);

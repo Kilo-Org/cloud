@@ -4,6 +4,7 @@ import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detec
 import type { OpenAiChatGptOwner } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import {
   ReasoningDetailsTransform,
+  type CustomLlmAwsBedrockCredentials,
   type ReasoningDetailsTransform as ReasoningDetailsTransformType,
 } from '@kilocode/db/schema-types';
 
@@ -70,6 +71,8 @@ export type Provider = {
    * `apiKey` is the proxy's shared secret.
    */
   secureProxy?: SecureProxyRoute;
+  /** Signs each request with AWS SigV4 for Amazon Bedrock; `apiKey` is then unused. */
+  awsBedrock?: CustomLlmAwsBedrockCredentials;
   supportedChatApis: ReadonlyArray<GatewayChatApiKind>;
   responseTransforms: ProviderResponseTransforms | null;
   transformRequest(context: TransformRequestContext): Promise<void>;

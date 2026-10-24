@@ -68,7 +68,7 @@ interface Watching {
 const watch = (
   session: SessionHandle,
   count: number,
-  within: Duration.DurationInput = '180 seconds'
+  within: Duration.Input = '180 seconds'
 ): Effect.Effect<Watching, never, Scope.Scope> => {
   const rounds: Round[] = [];
   let ended = 0;
@@ -93,16 +93,13 @@ const watch = (
         }
       })
   );
-  return Effect.map(
-    Effect.forkScoped(reading),
-    (fiber): Watching => ({
-      rounds,
-      done: Effect.raceFirst(Fiber.await(fiber), Effect.sleep(within)).pipe(
-        Effect.zipRight(Fiber.interrupt(fiber)),
-        Effect.as(rounds as readonly Round[])
-      ),
-    })
-  );
+  return Effect.map(Effect.forkScoped(reading), (fiber): Watching => ({
+    rounds,
+    done: Effect.raceFirst(Fiber.await(fiber), Effect.sleep(within)).pipe(
+      Effect.andThen(Fiber.interrupt(fiber)),
+      Effect.as(rounds as readonly Round[])
+    ),
+  }));
 };
 
 export type { Round, Watching };

@@ -6,6 +6,29 @@ import {
   sendCloudAgentSessionNotificationInputSchema,
 } from './rpc-schemas';
 
+describe('agent briefing dispatch', () => {
+  const request = {
+    kind: 'agent_briefing',
+    userId: 'oauth/github/123',
+    localDate: '2026-10-15',
+    expiresAt: '2026-10-15T12:00:00.000Z',
+  };
+
+  it('accepts a user-scoped dispatch with a local calendar date and UTC expiry', () => {
+    expect(internalDispatchRequestSchema.parse(request)).toEqual(request);
+  });
+
+  it.each([
+    { userId: '' },
+    { localDate: '2026-02-30' },
+    { localDate: '2026-10-15T00:00:00.000Z' },
+    { expiresAt: 'not-a-date' },
+    { expiresAt: undefined },
+  ])('rejects invalid briefing dispatch identity or expiry: %j', invalid => {
+    expect(internalDispatchRequestSchema.safeParse({ ...request, ...invalid }).success).toBe(false);
+  });
+});
+
 describe('internalDispatchSpendAlertRequestSchema', () => {
   const personal = {
     kind: 'spend_alert',
@@ -40,6 +63,17 @@ describe('internalDispatchSpendAlertRequestSchema', () => {
     ).toBe(false);
     expect(
       internalDispatchSpendAlertRequestSchema.safeParse({ ...personal, alertKind: 'budget' })
+        .success
+    ).toBe(false);
+  });
+
+  it('rejects a scope and an organizationId that disagree', () => {
+    expect(
+      internalDispatchSpendAlertRequestSchema.safeParse({ ...personal, scope: 'organization' })
+        .success
+    ).toBe(false);
+    expect(
+      internalDispatchSpendAlertRequestSchema.safeParse({ ...personal, organizationId: 'org-1' })
         .success
     ).toBe(false);
   });
@@ -97,6 +131,15 @@ describe('sendCloudAgentSessionNotificationInputSchema', () => {
       sendCloudAgentSessionNotificationInputSchema.safeParse({
         ...cloudAgentSessionBase,
         prUrl: 42,
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects an empty prUrl the notification could not open', () => {
+    expect(
+      sendCloudAgentSessionNotificationInputSchema.safeParse({
+        ...cloudAgentSessionBase,
+        prUrl: '',
       }).success
     ).toBe(false);
   });

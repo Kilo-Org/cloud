@@ -1,3 +1,4 @@
+import { parseCustomRouterModelId } from '@kilocode/auto-routing-contracts';
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { ORGANIZATION_AUTO_TARGET_MODELS } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 export { MAX_ORGANIZATION_AUTO_ROUTES } from '@kilocode/db/schema-types';
@@ -24,6 +25,12 @@ export function getOrganizationAutoRoute(
 
 export function isOrganizationAutoTargetModel(modelId: string): boolean {
   return (ORGANIZATION_AUTO_TARGET_MODELS as readonly string[]).includes(modelId);
+}
+
+// Organization Auto may route to the organization's own custom routers, never to a member's
+// personal router (ADR 0005).
+export function isOrganizationCustomRouterTarget(modelId: string): boolean {
+  return parseCustomRouterModelId(modelId)?.scope === 'org';
 }
 
 export function hasActiveOrganizationModelPolicy(

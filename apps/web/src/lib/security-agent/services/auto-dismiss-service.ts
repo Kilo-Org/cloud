@@ -16,7 +16,6 @@ import { security_findings, type SecurityFinding } from '@kilocode/db/schema';
 import { and, count, eq, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { trackSecurityAgentAutoDismiss } from '../posthog-tracking';
-import { updateSecurityFindingStatus } from '../db/security-findings';
 import { getSecurityAgentConfig } from '../db/security-config';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
 import { dismissDependabotAlert } from '../github/dependabot-api';
@@ -41,7 +40,6 @@ const log = sentryLogger('security-agent:auto-dismiss', 'info');
 const logError = sentryLogger('security-agent:auto-dismiss', 'error');
 const TRIAGE_CONFIDENCES = ['high', 'medium', 'low'] as const;
 
-// Each bulk item holds a dismissal transaction and one GitHub request.
 const AUTO_DISMISS_CONCURRENCY = 5;
 
 type TriageConfidence = (typeof TRIAGE_CONFIDENCES)[number];
@@ -91,10 +89,6 @@ function ownerFindingCondition(owner: SecurityReviewOwner) {
   throw new Error('Invalid owner: must have either organizationId or userId');
 }
 
-/**
- * Rows a bulk auto-dismiss run or an eligibility count may consider.
- * The per-row triage policy runs in the application tier so both paths stay in step.
- */
 function autoDismissCandidateCondition(owner: Owner) {
   return and(
     owner.type === 'org'
@@ -104,23 +98,6 @@ function autoDismissCandidateCondition(owner: Owner) {
     eq(security_findings.analysis_status, 'completed'),
     sql`(${security_findings.analysis}->'triage'->>'suggestedAction') = 'dismiss'`
   );
-}
-
-/**
- * Dismiss a security finding with the given reason
- */
-export async function dismissFinding(
-  findingId: string,
-  params: {
-    reason: string;
-    comment: string;
-    dismissedBy?: string;
-  }
-): Promise<void> {
-  await updateSecurityFindingStatus(findingId, 'ignored', {
-    ignoredReason: params.reason,
-    ignoredBy: params.dismissedBy || `auto-dismiss: ${params.comment}`,
-  });
 }
 
 async function dismissFindingWithAuditEvent(
@@ -203,19 +180,13 @@ async function dismissFindingWithAuditEvent(
   });
 }
 
-/**
- * The finding fields a Dependabot dismissal writeback needs.
- */
 type DependabotWritebackFinding = Pick<
   SecurityFinding,
   'id' | 'source' | 'source_id' | 'repo_full_name'
 >;
 
 /**
- * Write back a dismissal to Dependabot on GitHub for an already-loaded finding.
- * The caller resolves the owner's GitHub installation id once and passes it in, so a bulk run
- * performs one integration lookup instead of one per finding.
- * May throw on API errors — use safeWritebackDependabotDismissal when failures should be non-fatal.
+ * Write a finding's dismissal to Dependabot using the supplied installation.
  */
 export async function writebackDependabotDismissal(
   finding: DependabotWritebackFinding,
@@ -255,7 +226,7 @@ export async function writebackDependabotDismissal(
 }
 
 /**
- * Safely attempt Dependabot writeback, reporting failures with the external API status and message.
+ * Report provider status and message while preserving local dismissal results.
  */
 async function safeWritebackDependabotDismissal(
   finding: DependabotWritebackFinding,
@@ -265,7 +236,6 @@ async function safeWritebackDependabotDismissal(
   try {
     await writebackDependabotDismissal(finding, installationId, dismissedComment);
   } catch (error) {
-    // Octokit request errors expose status and message on the rejection value.
     const apiError = error as { status?: number; message?: string };
     logError('Dependabot writeback failed', {
       findingId: finding.id,
@@ -279,18 +249,11 @@ async function safeWritebackDependabotDismissal(
   }
 }
 
-/**
- * The owner's GitHub installation id, or null when the owner has no GitHub integration.
- */
 async function resolveGitHubInstallationId(owner: Owner): Promise<string | null> {
   const integration = await getIntegrationForOwner(owner, 'github');
   return integration?.platform_installation_id ?? null;
 }
 
-/**
- * Write back a dismissed finding to Dependabot, resolving the owner's GitHub installation id first.
- * Non-Dependabot findings need no lookup.
- */
 async function writebackDependabotForFinding(
   finding: SecurityFinding,
   owner: Owner,
@@ -575,9 +538,6 @@ export async function countEligibleForAutoDismiss(
 }> {
   const ownerConverted = toOwner(owner, userId);
 
-  // Mirrors the triage policy autoDismissEligibleFindings applies per finding, so the count
-  // and the bulk run agree: triage present, no sandbox result, sandbox analysis not needed,
-  // and a known confidence.
   const confidence = sql<string>`${security_findings.analysis}->'triage'->>'confidence'`;
 
   const rows = await db

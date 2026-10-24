@@ -1,5 +1,4 @@
 import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals';
-import type * as securityFindingsModule from '@/lib/security-agent/db/security-findings';
 import type * as securityConfigModule from '@/lib/security-agent/db/security-config';
 import type * as platformIntegrationsModule from '@/lib/integrations/db/platform-integrations';
 import type * as dependabotApiModule from '@/lib/security-agent/github/dependabot-api';
@@ -15,9 +14,6 @@ import type { SecurityFindingAnalysis } from '../core/types';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
-const mockUpdateSecurityFindingStatus = jest.fn() as jest.MockedFunction<
-  typeof securityFindingsModule.updateSecurityFindingStatus
->;
 const mockGetSecurityAgentConfig = jest.fn() as jest.MockedFunction<
   typeof securityConfigModule.getSecurityAgentConfig
 >;
@@ -43,9 +39,6 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: mockCaptureException,
 }));
 
-jest.mock('@/lib/security-agent/db/security-findings', () => ({
-  updateSecurityFindingStatus: mockUpdateSecurityFindingStatus,
-}));
 
 jest.mock('@/lib/security-agent/db/security-config', () => ({
   getSecurityAgentConfig: mockGetSecurityAgentConfig,
@@ -285,8 +278,6 @@ describe('maybeAutoDismissAnalysis', () => {
     } as Awaited<ReturnType<typeof securityConfigModule.getSecurityAgentConfig>>);
     mockGetIntegrationForOwner.mockResolvedValue(makeIntegration('inst-123'));
     mockDismissDependabotAlert.mockResolvedValue(undefined);
-    mockUpdateSecurityFindingStatus.mockResolvedValue(undefined);
-
     const result = await maybeAutoDismissAnalysis({
       findingId: 'finding-1',
       analysis: sandboxAnalysis,
@@ -312,8 +303,6 @@ describe('maybeAutoDismissAnalysis', () => {
     } as Awaited<ReturnType<typeof securityConfigModule.getSecurityAgentConfig>>);
     mockGetIntegrationForOwner.mockResolvedValue(makeIntegration('inst-123'));
     mockDismissDependabotAlert.mockResolvedValue(undefined);
-    mockUpdateSecurityFindingStatus.mockResolvedValue(undefined);
-
     const result = await maybeAutoDismissAnalysis({
       findingId: 'finding-1',
       analysis: triageAnalysis,
@@ -407,7 +396,7 @@ describe('maybeAutoDismissAnalysis', () => {
     expect(mockDismissDependabotAlert).not.toHaveBeenCalled();
   });
 
-  it('still dismisses locally and reports only the API status and message when writeback fails', async () => {
+  it('preserves dismissal results and exception visibility', async () => {
     mockGetSecurityAgentConfig.mockResolvedValue({
       auto_dismiss_enabled: true,
       auto_dismiss_confidence_threshold: 'high',
@@ -418,8 +407,6 @@ describe('maybeAutoDismissAnalysis', () => {
       request: { headers: { authorization: 'token installation-secret' } },
     });
     mockDismissDependabotAlert.mockRejectedValue(rejection);
-    mockUpdateSecurityFindingStatus.mockResolvedValue(undefined);
-
     const result = await maybeAutoDismissAnalysis({
       findingId: 'finding-1',
       analysis: sandboxAnalysis,
@@ -427,7 +414,6 @@ describe('maybeAutoDismissAnalysis', () => {
       userId: 'user-1',
     });
 
-    // Should still succeed — writeback failure is non-fatal
     expect(result).toEqual({ dismissed: true, source: 'sandbox' });
     expect(mockUpdatedRows).toHaveLength(1);
     expect(mockUpdatedRows[0]).toMatchObject({ status: 'ignored', ignored_reason: 'not_used' });
@@ -556,7 +542,7 @@ describe('maybeAutoDismissAnalysis', () => {
       expect(mockDismissDependabotAlert).not.toHaveBeenCalled();
     });
 
-    it('skips bulk candidates below the configured confidence threshold', async () => {
+    it('applies the configured confidence threshold', async () => {
       const triageCandidate = (
         confidence: NonNullable<SecurityFindingAnalysis['triage']>['confidence']
       ): SecurityFindingAnalysis => ({
@@ -594,7 +580,7 @@ describe('maybeAutoDismissAnalysis', () => {
       expect(mockAuditRows).toHaveLength(1);
     });
 
-    it('looks up the owner GitHub integration once and writes back every dismissal', async () => {
+    it('completes provider updates for the owner selection', async () => {
       const eligibleAnalysis: SecurityFindingAnalysis = {
         triage: {
           suggestedAction: 'dismiss',

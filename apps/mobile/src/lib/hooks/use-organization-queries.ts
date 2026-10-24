@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useOrganization } from '@/lib/organization-context';
-import { INFINITE_QUERY_MAX_PAGES, withInfiniteRetention } from '@/lib/query/infinite-retention';
+import { hasRetentionBudget, withInfiniteRetention } from '@/lib/query/infinite-retention';
 import { useTRPC } from '@/lib/trpc';
 
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
@@ -136,27 +136,15 @@ export type CreditTransaction =
   RouterOutputs['organizations']['creditTransactionsPage']['entries'][number];
 
 /**
- * Whether the newest-first org lists have reached their retention bound.
- *
- * Both lists order `created_at desc`, so page one holds the newest entries and
- * each screen renders every retained page as one flattened list. The shared
- * `INFINITE_QUERY_MAX_PAGES` retention bound therefore has to be reached by
- * refusing the next page rather than by React Query's `maxPages` trim: a
- * forward fetch runs `addToEnd(pages, page, maxPages)`, which drops index 0
- * once the bound is exceeded, and index 0 is page one — the newest page. Left
- * to `maxPages` alone that silently removes the newest rows from the top of
- * the screen once a sixth page loads. Refusing the next page keeps every
- * loaded page retained; the hooks read `hasNextPage`, so "Load more"
- * disappears at the bound instead of paging into a silent no-op.
- */
-function hasReachedRetentionBound(pageCount: number): boolean {
-  return pageCount >= INFINITE_QUERY_MAX_PAGES;
-}
-
-/**
  * Build the credit-transactions infinite-query options. Kept as a pure builder
  * so the retention bound and the cursor passthrough are testable without
  * mounting the hook.
+ *
+ * Both org lists order `created_at desc`, so page one holds the newest entries
+ * and each screen renders every retained page as one flattened list. Reaching
+ * the shared retention bound by refusing the next page (rather than letting
+ * React Query's `maxPages` trim drop index 0) keeps the newest rows on screen;
+ * see `hasRetentionBudget`.
  */
 export function buildOrgCreditTransactionsPageQueryOptions(
   trpc: ReturnType<typeof useTRPC>,
@@ -168,7 +156,7 @@ export function buildOrgCreditTransactionsPageQueryOptions(
       {
         enabled: organizationId != null,
         getNextPageParam: (lastPage, pages) =>
-          lastPage.hasMore && !hasReachedRetentionBound(pages.length)
+          lastPage.hasMore && hasRetentionBudget(pages.length)
             ? (lastPage.nextCursor ?? undefined)
             : undefined,
       }
@@ -201,6 +189,12 @@ export type OrgInvoice = RouterOutputs['organizations']['invoicesPage']['entries
  * Build the invoices infinite-query options. Kept as a pure builder so the
  * retention bound, the fixed `period: 'year'` input, and the cursor
  * passthrough are testable without mounting the hook.
+ *
+ * The first page must settle while the online manager reports offline: a
+ * paused read leaves the screen's `isLoading` branch (its skeleton rows) with
+ * no exit, because a paused query is pending but never fetching, so it neither
+ * errors nor loads. This read either answers or fails once the control-plane
+ * deadline lands, and the screen's error state then offers Retry.
  */
 export function buildOrgInvoicesPageQueryOptions(
   trpc: ReturnType<typeof useTRPC>,
@@ -212,9 +206,14 @@ export function buildOrgInvoicesPageQueryOptions(
       {
         enabled: organizationId != null,
         getNextPageParam: (lastPage, pages) =>
-          lastPage.hasMore && !hasReachedRetentionBound(pages.length)
+          lastPage.hasMore && hasRetentionBudget(pages.length)
             ? (lastPage.nextCursor ?? undefined)
             : undefined,
+        networkMode: 'always',
+        // `networkMode: 'always'` also disables the derived reconnect refetch
+        // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
+        // 'always'` when it is undefined), so ask for it explicitly.
+        refetchOnReconnect: true,
       }
     )
   );

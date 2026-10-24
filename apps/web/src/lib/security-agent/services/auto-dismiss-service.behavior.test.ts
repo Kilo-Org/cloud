@@ -84,7 +84,7 @@ async function statusesBySourceId(userId: string): Promise<Record<string, string
 }
 
 describe('auto-dismiss eligibility', () => {
-  it('counts exactly the findings a bulk run dismisses for the same owner', async () => {
+  it('returns owner-scoped eligibility totals and dismissal results', async () => {
     const user = await insertTestUser();
     const otherUser = await insertTestUser();
     await enableAutoDismissFor(user.id);
@@ -162,7 +162,7 @@ describe('auto-dismiss eligibility', () => {
     expect(mockDismissDependabotAlert).not.toHaveBeenCalled();
   });
 
-  it('excludes triage rows whose confidence is not a known level', async () => {
+  it('counts the supported confidence levels', async () => {
     const user = await insertTestUser();
 
     await db.insert(security_findings).values([

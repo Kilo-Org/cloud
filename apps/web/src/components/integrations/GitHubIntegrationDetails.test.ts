@@ -2,6 +2,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
   buildAppReturnOutcomeView,
+  buildGitHubManagementInput,
   getGitHubUserConnectionErrorMessage,
   GitHubIntegrationDetails,
 } from './GitHubIntegrationDetails';
@@ -54,6 +55,25 @@ describe('GitHub user-connect recovery copy', () => {
     'not_installation_admin',
   ])('leaves unrelated error presentation unchanged: %s', error => {
     expect(getGitHubUserConnectionErrorMessage(error, 'user-connect')).toBeNull();
+  });
+});
+
+describe('GitHub installation management input', () => {
+  test('targets the displayed personal installation', () => {
+    expect(buildGitHubManagementInput(undefined, 'displayed-integration')).toEqual({
+      integrationId: 'displayed-integration',
+    });
+  });
+
+  test('keeps the personal fallback when no installation is displayed', () => {
+    expect(buildGitHubManagementInput(undefined, undefined)).toBeUndefined();
+  });
+
+  test('keeps organization targeting unchanged', () => {
+    expect(buildGitHubManagementInput('organization-id', 'displayed-integration')).toEqual({
+      organizationId: 'organization-id',
+      integrationId: 'displayed-integration',
+    });
   });
 });
 

@@ -2,6 +2,7 @@ import { Eye } from 'lucide-react';
 import { ToolCardShell } from './ToolCardShell';
 import { ToolCodeBlock } from './ToolOutput';
 import { getFilename } from './toolCardUtils';
+import { cloudAgentFileLabel } from '@kilocode/app-shared/cloud-agent';
 import type { ToolPart } from './types';
 
 type ReadToolCardProps = {
@@ -11,7 +12,7 @@ type ReadToolCardProps = {
 export function ReadToolCard({ toolPart }: ReadToolCardProps) {
   const state = toolPart.state;
   const input = state.input;
-  const filePath = typeof input.filePath === 'string' ? input.filePath : '';
+  const filePath = typeof input.filePath === 'string' ? cloudAgentFileLabel(input.filePath) : '';
   const filename = getFilename(filePath);
   const args: string[] = [];
   if (typeof input.offset === 'number') args.push(`offset=${input.offset}`);

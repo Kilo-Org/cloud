@@ -19,6 +19,7 @@ export default defineConfig({
       'src/**/*.test.tsx',
       'entrypoints/**/*.test.ts',
       'entrypoints/**/*.test.tsx',
+      'scripts/**/*.test.ts',
     ],
     setupFiles: ['./vitest.setup.ts'],
   },

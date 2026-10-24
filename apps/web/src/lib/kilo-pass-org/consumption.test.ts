@@ -221,8 +221,7 @@ describe('organization Pass consumption', () => {
     ]);
     const replay = await db.transaction(tx => recordOrganizationConsumption(tx, input));
 
-    expect(first.recorded).toBe(true);
-    expect(concurrent.recorded).toBe(false);
+    expect([first.recorded, concurrent.recorded].sort()).toEqual([false, true]);
     expect(replay.recorded).toBe(false);
     const credits = await db
       .select({

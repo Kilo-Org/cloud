@@ -101,6 +101,7 @@ vi.mock('@/lib/trpc', () => ({
 }));
 
 vi.mock('@/lib/utils', () => ({
+  cn: (...parts: unknown[]) => parts.filter(Boolean).join(' '),
   parseTimestamp: () => new Date('2024-01-01T00:00:00Z'),
   timeAgo: () => '2d ago',
 }));

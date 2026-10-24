@@ -33,7 +33,7 @@ import {
   findIntegrationByInstallationIdForOwner,
   upsertPlatformIntegrationForOwner,
 } from '@/lib/integrations/db/platform-integrations';
-import { isOrganizationMember } from '@kilocode/web-shared/lib/organizations/organizations';
+import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
 import { verifyGitHubInstallationAuthorization } from '@/lib/integrations/github/installation-authorization';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import type { StateAdapter } from 'chat';
@@ -93,7 +93,6 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   findGitHubBotLinkIntegrations: jest.fn(),
   findIntegrationByInstallationId: jest.fn(),
   findIntegrationByInstallationIdForOwner: jest.fn(),
-  findPendingInstallationByRequesterId: jest.fn(),
   upsertPlatformIntegrationForOwner: jest.fn(async () => ({ ok: true })),
 }));
 jest.mock('@/lib/integrations/db/github-installations', () => ({
@@ -102,9 +101,12 @@ jest.mock('@/lib/integrations/db/github-installations', () => ({
   bindGitHubIntegrationToCanonicalInstallation: jest.fn(),
   updateGitHubInstallationRepositories: jest.fn(),
   lockGitHubInstallationIdentity: jest.fn(async () => undefined),
+}));
+jest.mock('@/lib/integrations/db/predicates', () => ({
   effectiveAppTypeCondition: jest.fn(() => undefined),
 }));
-jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
+jest.mock('@kilocode/worker-utils/account-access', () => ({
+  ...jest.requireActual('@kilocode/worker-utils/account-access'),
   isOrganizationMember: jest.fn(),
 }));
 jest.mock('@sentry/nextjs', () => ({
@@ -338,7 +340,7 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
       appType: 'standard',
       platformIntegrationId: '00000000-0000-4000-8000-000000000099',
     });
-    expect(mockedIsOrganizationMember).toHaveBeenCalledWith('org_1', USER_ID);
+    expect(mockedIsOrganizationMember).toHaveBeenCalledWith(expect.anything(), 'org_1', USER_ID);
     expect(mockedBot.initialize).toHaveBeenCalled();
     expect(mockedLinkKiloUser).toHaveBeenCalledWith(
       mockState,

@@ -334,7 +334,6 @@ describe('debounce', () => {
     vi.useFakeTimers();
     saveDraft('u1', 'A', 'va');
     saveDraft('u1', 'B', 'vb');
-    // Flushing only A writes A's value under A's key; B stays pending.
     await flushDraft('u1', 'A');
     expect(kvMock.setItem).toHaveBeenCalledWith('draft:u1', 'A', '"va"');
     expect(kvMock.setItem).not.toHaveBeenCalledWith('draft:u1', 'B', expect.anything());
@@ -602,7 +601,6 @@ describe('eviction at the entry cap', () => {
 
     const entries = await kvMock.listEntries('draft:u1');
     expect(entries).toHaveLength(DRAFT_MAX_ENTRIES);
-    // The two oldest seeds were evicted; the newest key survived.
     expect(entries.some(entry => entry.k === 'old-0')).toBe(false);
     expect(entries.some(entry => entry.k === 'old-1')).toBe(false);
     expect(entries.some(entry => entry.k === 'newest')).toBe(true);

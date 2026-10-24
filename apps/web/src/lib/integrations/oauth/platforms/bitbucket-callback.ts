@@ -7,9 +7,9 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
   appendIntegrationOAuthRedirectQuery,
   parseOAuthStateOwner,
-  safeCallbackContext,
 } from '@/lib/integrations/oauth/common';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
+import { safeCallbackContext, validOAuthCode } from '@/lib/integrations/oauth/callback-safety';
 import {
   exchangeBitbucketOAuthCode,
   fetchBitbucketUser,
@@ -48,11 +48,6 @@ function redirectWithStatus(
     ? appendIntegrationOAuthRedirectQuery(state.returnTo, `${key}=${encodeURIComponent(value)}`)
     : `${defaultPath}?${key}=${encodeURIComponent(value)}`;
   return NextResponse.redirect(new URL(path, APP_URL));
-}
-
-function validOAuthCode(code: string | null): string | null {
-  if (!code || code.length > 2048 || !/^[A-Za-z0-9._~+/-]+$/.test(code)) return null;
-  return code;
 }
 
 async function authorizeOwner(owner: Owner, user: AuthenticatedOAuthUser): Promise<void> {

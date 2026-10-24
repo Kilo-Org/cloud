@@ -41,6 +41,9 @@ vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'Activ
 vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
   PrReviewReconnectNotice: 'PrReviewReconnectNotice',
 }));
+vi.mock('@/components/pr-review/pr-review-unavailable-actions', () => ({
+  PrReviewUnavailableActions: 'PrReviewUnavailableActions',
+}));
 vi.mock('@/components/pr-review/diff/pr-diff-file-navigator', () => ({
   PrDiffFileNavigator: 'PrDiffFileNavigator',
 }));

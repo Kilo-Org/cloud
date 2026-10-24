@@ -4,7 +4,7 @@ const mockGetUserByokProviderIds = jest.fn();
 const mockGetOrganizationByokProviderIds = jest.fn();
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
-  isFreeModel: (...args: unknown[]) => mockIsFreeModel(...args),
+  isFreeModel: async (...args: unknown[]) => mockIsFreeModel(...args),
 }));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { captureException, captureMessage } from '@sentry/nextjs';
+import { getCallbackReportParams } from '@/lib/integrations/oauth/callback-params';
 import { LinearClient } from '@linear/sdk';
 import {
   exchangeLinearOAuthCode,
@@ -267,7 +268,7 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
       captureMessage('Linear callback missing code', {
         level: 'warning',
         tags: { endpoint: 'linear/callback', source: 'linear_oauth' },
-        extra: { state, allParams: Object.fromEntries(searchParams.entries()) },
+        extra: { state, allParams: getCallbackReportParams(searchParams) },
       });
       return NextResponse.redirect(
         new URL(
@@ -286,7 +287,7 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
       captureMessage('Linear callback invalid or tampered state signature', {
         level: 'warning',
         tags: { endpoint: 'linear/callback', source: 'linear_oauth' },
-        extra: { code: '***', state, allParams: Object.fromEntries(searchParams.entries()) },
+        extra: { code: '***', state, allParams: getCallbackReportParams(searchParams) },
       });
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }

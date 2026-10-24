@@ -216,7 +216,6 @@ export async function verifyAppleAttestation(
   // The challenge is base64url ASCII, so the string is the wire form.
   const clientDataHash = appAttestClientDataHash(challenge);
 
-  // Apple nonce = SHA256(authData || clientDataHash)
   const expectedNonce = createHash('sha256')
     .update(Buffer.concat([authData, clientDataHash]))
     .digest('hex');

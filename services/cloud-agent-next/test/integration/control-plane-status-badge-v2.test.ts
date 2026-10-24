@@ -1,3 +1,4 @@
+import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { env, reset, runInDurableObject } from 'cloudflare:test';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
@@ -6,7 +7,7 @@ import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-d
 import { allocation as allocationTable } from '../../src/control-plane/sandbox/sqlite-schema.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
-import { sessionDoName } from '../../src/session-plane.js';
+import { sessionDoName } from '../../src/session-identity.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import { SandboxStatusSnapshotSchema } from '../../src/shared/sandbox-status.js';
@@ -20,6 +21,7 @@ import {
   type ControlPlanePromptPayload,
 } from '../../src/shared/control-plane-protocol.js';
 import {
+  FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   createFakeCredentialBroker,
   FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
   installFakeCredentialEnv,
@@ -60,7 +62,7 @@ function metadata(input: { sessionId: string; kiloSessionId: string; sandboxId: 
       orgId: ORG_ID,
       createdOnPlatform: 'cloud-agent-web',
     },
-    auth: { kiloSessionId: input.kiloSessionId, kilocodeToken: 'native-token' },
+    auth: { kiloSessionId: input.kiloSessionId, kilocodeToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN },
     agent: { mode: 'code', model: 'test/model' },
     repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
     workspace: {
@@ -87,7 +89,7 @@ function createFakeProvider(): { adapter: ProviderAdapter; launchEnvs: Record<st
     async create(intent: ProviderCreateIntent) {
       return { providerRef: `mem_${intent.intentId}` };
     },
-    async launch(_ref, launchEnv) {
+    async launch(_ref, { env: launchEnv }) {
       provider.launchEnvs.push({ ...launchEnv });
       return { startSource: 'image' as const };
     },
@@ -120,6 +122,7 @@ async function injectProvider(
       KILO_OPENROUTER_BASE: 'https://control.test',
       KILO_SESSION_INGEST_URL: 'https://control.test',
     });
+    installFakeRuntimeProxyPeer(instance);
     Object.assign(instance, {
       createProviderAdapter: () => provider.adapter,
       provider: provider.adapter,
@@ -290,7 +293,7 @@ describe('sandbox status badge projection (B10)', () => {
       credentials: {
         userId: USER_ID,
         kiloSessionId: kiloSessionId(),
-        kiloToken: 'native-token',
+        kiloToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
         orgId: ORG_ID,
         repository: { type: 'github', repo: 'acme/widgets' },
         scopeId: sessionId,

@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { openai_chatgpt_connections } from '@kilocode/db/schema';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import {
   OPENAI_CLIENT_ID,
@@ -368,7 +368,9 @@ async function resolveOpenAiChatGptAccessTokenUncached(
 
     // Fast path: no lock, no network call while the stored token can still
     // serve a request. A disabled row is skipped so it can never serve one.
-    const row = await readOpenAiChatGptConnectionRow(db, owner);
+    // The replica is enough here: a lagging row still holds an unexpired token,
+    // and the refresh below re-reads the row on the primary under the lock.
+    const row = await readOpenAiChatGptConnectionRow(readDb, owner);
     const current =
       row?.is_enabled === true ? decryptOpenAiChatGptConnection(row.encrypted_connection) : null;
     if (current && isUsableWithoutRefresh(current, nowSeconds())) {

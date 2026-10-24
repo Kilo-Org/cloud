@@ -24,8 +24,10 @@ import { Clock, GitPullRequest, Inbox } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { useOrganization } from '@/lib/organization-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
+  type ProviderPrPlatform,
   providerPrRefLabel,
   providerPrRoutePath,
   providerPrTermKey,
@@ -46,6 +48,7 @@ type PrReviewInboxListProps = {
 
 export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxListProps>) {
   const inbox = useProviderInbox(true);
+  const { organizationId } = useOrganization();
   // Two different retries, because they recover two different failures: the
   // empty-state CTA re-runs the inbox from scratch, while the footer CTA must
   // load only the page (or the provider) that failed — re-fetching pages the
@@ -92,7 +95,13 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
         </View>
       }
       ListEmptyComponent={
-        <InboxEmpty view={view} onRetry={handleRetry} isRetrying={inbox.isFetching} />
+        <InboxEmpty
+          view={view}
+          onRetry={handleRetry}
+          isRetrying={inbox.isFetching}
+          reconnectPlatform={inbox.firstPageErrorPlatform}
+          organizationId={organizationId}
+        />
       }
       ListFooterComponent={
         <View className="gap-6 px-6 pb-12 pt-4">
@@ -202,7 +211,17 @@ function InboxEmpty({
   view,
   onRetry,
   isRetrying,
-}: Readonly<{ view: PrInboxView; onRetry: () => void; isRetrying: boolean }>) {
+  reconnectPlatform,
+  organizationId,
+}: Readonly<{
+  view: PrInboxView;
+  onRetry: () => void;
+  isRetrying: boolean;
+  /** The provider whose failure produced the reconnect view, when known. */
+  reconnectPlatform: ProviderPrPlatform | null;
+  /** The organization scope the inbox read failed in; null for personal. */
+  organizationId: string | null;
+}>) {
   const { t } = useTranslation();
   if (view.kind === 'loading') {
     return (
@@ -240,16 +259,27 @@ function InboxEmpty({
   if (view.kind === 'reconnect') {
     return (
       <View className="px-6 py-6">
-        <PrReviewReconnectNotice />
+        <PrReviewReconnectNotice
+          platform={reconnectPlatform ?? undefined}
+          organizationId={organizationId}
+        />
       </View>
     );
   }
 
-  // retryable
+  // retryable / service-unavailable: a BAD_GATEWAY names its own cause (the
+  // review service is temporarily unavailable); every other failure keeps the
+  // generic could-not-load copy. Both offer Retry.
+  const isServiceUnavailable = view.kind === 'service-unavailable';
   return (
     <QueryError
       variant="server"
-      title={t('prReview.inbox.couldNotLoad')}
+      title={
+        isServiceUnavailable
+          ? t('prReview.reviewServiceUnavailable')
+          : t('prReview.inbox.couldNotLoad')
+      }
+      message={isServiceUnavailable ? t('prReview.reviewServiceUnavailableDescription') : undefined}
       placement="top"
       onRetry={onRetry}
       isRetrying={isRetrying}

@@ -54,6 +54,8 @@ export type SessionRuntimeIntent = {
 };
 
 export type SessionCreateRequest = {
+  allowSubagentSessions?: boolean;
+  parentCloudAgentSessionId?: string;
   /** Omitted for a clone-only create: the copied transcript is the session state. */
   initialTurn?: ExecutionTurnSubmission;
   agent: AgentSelection;
@@ -91,5 +93,7 @@ export type SessionCreateRequest = {
     shallow?: boolean;
     /** Stable per-user-intent UUID; the handler admits it only with `autoInitiate` true. */
     operationKey?: string;
+    /** Client-proposed Kilo session ID; the Worker generates one when absent. */
+    kiloSessionId?: string;
   };
 };

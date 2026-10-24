@@ -12,13 +12,22 @@ export async function getBalanceForUser(
   options: {
     forceRefresh?: boolean;
     quiet?: boolean;
+    /** Instant the expiry cut-off is measured from. Defaults to the current time. */
+    now?: Date;
+    /** How many hours the cut-off trails `now` by. Defaults to a random 0-1 draw. */
+    expiryJitterHours?: number;
   } = {}
 ) {
-  const { forceRefresh = false, quiet = false } = options;
+  const {
+    forceRefresh = false,
+    quiet = false,
+    now = new Date(),
+    expiryJitterHours = Math.random(),
+  } = options;
   // If we DO unfortunately coincidentally check a user in multiple threads,
   // reduce chance of optimistic concurrency issues by giving users a random
   // extra 0 - 1 extra  hours before expiration:
-  const expireBefore = subHours(new Date(), Math.random());
+  const expireBefore = subHours(now, expiryJitterHours);
 
   const needsExpirationComputation =
     forceRefresh ||

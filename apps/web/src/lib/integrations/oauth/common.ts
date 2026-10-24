@@ -1,5 +1,4 @@
 import 'server-only';
-import { createHash } from 'node:crypto';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
@@ -55,21 +54,6 @@ export function appendIntegrationOAuthRedirectQuery(path: string, queryParam: st
   const hash = hashIndex === -1 ? '' : path.slice(hashIndex);
 
   return `${pathWithoutHash}${pathWithoutHash.includes('?') ? '&' : '?'}${queryParam}${hash}`;
-}
-
-/**
- * Context for an OAuth callback diagnostic: presence flags for the query's
- * entries and a truncated digest of the state, so events stay correlatable
- * without carrying the query itself.
- */
-export function safeCallbackContext(searchParams: URLSearchParams) {
-  const state = searchParams.get('state');
-  return {
-    hasCode: Boolean(searchParams.get('code')),
-    hasState: Boolean(state),
-    stateHash: state ? createHash('sha256').update(state).digest('hex').slice(0, 8) : null,
-    hasProviderError: Boolean(searchParams.get('error')),
-  };
 }
 
 export function parseOAuthStateOwner(owner: string): Owner | null {
@@ -246,19 +230,26 @@ export async function handleStatefulPlatformOAuthConnect(
 
     return NextResponse.redirect(buildOAuthUrl(state));
   } catch (error) {
-    captureException(error, {
-      tags: {
-        endpoint: `${platform}/connect`,
-        source,
-      },
-      extra: {
-        organizationId,
-      },
-    });
+    const denialCode = organizationAccessDenialErrorCode(error);
+    if (!denialCode) {
+      captureException(error, {
+        tags: {
+          endpoint: `${platform}/connect`,
+          source,
+        },
+        extra: {
+          organizationId,
+        },
+      });
+    }
 
     return NextResponse.redirect(
       new URL(
-        buildIntegrationOAuthConnectErrorPath(platform, organizationId, 'oauth_init_failed'),
+        buildIntegrationOAuthConnectErrorPath(
+          platform,
+          organizationId,
+          denialCode ?? 'oauth_init_failed'
+        ),
         APP_URL
       )
     );

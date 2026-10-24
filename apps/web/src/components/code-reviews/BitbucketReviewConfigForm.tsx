@@ -75,7 +75,10 @@ export function BitbucketReviewConfigForm({ organizationId }: BitbucketReviewCon
   const readinessQuery = useQuery(
     trpc.organizations.reviewAgent.getBitbucketReadiness.queryOptions({ organizationId })
   );
-  const { modelOptions, isLoadingModels } = useOrganizationModels(organizationId);
+  const { modelOptions, isLoadingModels } = useOrganizationModels(
+    organizationId,
+    'shared_services'
+  );
   const [draft, setDraft] = useState<BitbucketReviewConfig>(DEFAULT_CONFIG);
   const [baseline, setBaseline] = useState<BitbucketReviewConfig>(DEFAULT_CONFIG);
   const [validationError, setValidationError] = useState<string | null>(null);

@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/icons';
 
 import { i18n } from '@/i18n';
+import { modelLabelFromCatalogue } from '@/lib/auto-model-name';
 import { formatList, formatNumber } from '@/lib/format';
 import { type PLATFORM_CAPABILITIES, type ReviewConfigData } from '@/lib/code-reviewer-config';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
@@ -81,11 +82,12 @@ export function buildOverviewRows({
       subtitle:
         data.focusAreas.length > 0
           ? formatList(
-              // An area the app does not know yet reads as its raw code.
+              // A stored area the app does not know still names itself, wrapped
+              // in localized copy so no bare English code leaks into the list.
               data.focusAreas.map(area =>
-                area in focusAreaLabels
+                Object.hasOwn(focusAreaLabels, area)
                   ? i18n.t(focusAreaLabels[area as keyof typeof focusAreaLabels])
-                  : area
+                  : i18n.t('codeReviewer.focusArea.unknown', { area })
               ),
               i18n.language
             )
@@ -107,7 +109,7 @@ export function buildOverviewRows({
       field: 'model',
       icon: FileSliders,
       title: i18n.t('common.model'),
-      subtitle: models.find(model => model.id === data.modelSlug)?.name ?? data.modelSlug,
+      subtitle: modelLabelFromCatalogue(models, data.modelSlug),
       onPress: modelsLoading || models.length === 0 ? undefined : onOpenModelPicker,
     },
     ...(capabilities.gateRow

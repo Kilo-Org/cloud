@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterAll } from '@jest/globals';
 import type { User } from '@kilocode/db/schema';
+import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
@@ -86,7 +87,13 @@ function makeRequest(model = 'inception/mercury-edit-2') {
   });
 }
 
-function setOrganizationAuth(balance: number) {
+function setOrganizationAuth({
+  balance = 1000,
+  settings,
+}: {
+  balance?: number;
+  settings?: OrganizationSettings;
+} = {}) {
   mockedGetUserFromAuth.mockResolvedValue({
     user: {
       id: 'user-123',
@@ -98,7 +105,7 @@ function setOrganizationAuth(balance: number) {
   });
   mockedGetBalanceAndOrgSettings.mockResolvedValue({
     balance,
-    settings: undefined,
+    settings,
     plan: 'teams',
   });
   mockedGetBYOKforOrganization.mockResolvedValue(null);
@@ -141,7 +148,7 @@ describe('POST /api/fim/completions', () => {
   });
 
   it('bills the Inception model when using the system key', async () => {
-    setOrganizationAuth(1000);
+    setOrganizationAuth();
     mockedFetch.mockResolvedValue(makeUpstreamResponse());
 
     const { handleFimCompletionsRequest } = await import('./fim-completions');
@@ -182,7 +189,7 @@ describe('POST /api/fim/completions', () => {
   });
 
   it('rejects an exhausted balance for the Inception model', async () => {
-    setOrganizationAuth(0);
+    setOrganizationAuth({ balance: 0 });
 
     const { handleFimCompletionsRequest } = await import('./fim-completions');
     const response = await handleFimCompletionsRequest(makeRequest() as never);
@@ -195,7 +202,7 @@ describe('POST /api/fim/completions', () => {
   });
 
   it('rejects an exhausted balance for other FIM models', async () => {
-    setOrganizationAuth(0);
+    setOrganizationAuth({ balance: 0 });
 
     const { handleFimCompletionsRequest } = await import('./fim-completions');
     const response = await handleFimCompletionsRequest(
@@ -212,7 +219,7 @@ describe('POST /api/fim/completions', () => {
     'mistralai/codestral-latest',
     'inception/mercury-edit-latest',
   ])('rejects unknown FIM model or alias %s', async model => {
-    setOrganizationAuth(1000);
+    setOrganizationAuth();
 
     const { handleFimCompletionsRequest } = await import('./fim-completions');
     const response = await handleFimCompletionsRequest(makeRequest(model) as never);
@@ -225,7 +232,7 @@ describe('POST /api/fim/completions', () => {
   });
 
   it('allows Inception BYOK with an exhausted balance', async () => {
-    setOrganizationAuth(0);
+    setOrganizationAuth({ balance: 0 });
     mockedGetBYOKforOrganization.mockResolvedValue([
       { providerId: 'inception', decryptedAPIKey: 'user-inception-key' },
     ] as never);
@@ -243,5 +250,58 @@ describe('POST /api/fim/completions', () => {
     const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
     expect(stats.cost_mUsd).toBe(0);
     expect(stats.market_cost).toBe(325);
+  });
+
+  it.each(['inception/mercury-edit-2', 'mistralai/codestral-2508'])(
+    'forwards %s to its provider',
+    async model => {
+      setOrganizationAuth({ settings: { data_collection: 'deny' } satisfies OrganizationSettings });
+      mockedFetch.mockResolvedValue(makeUpstreamResponse());
+
+      const { handleFimCompletionsRequest } = await import('./fim-completions');
+      const response = await handleFimCompletionsRequest(makeRequest(model) as never);
+
+      expect(response.status).toBe(200);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+      const [url, init] = mockedFetch.mock.calls[0];
+      expect(url).toContain('/v1/fim/completions');
+      const upstreamBody = JSON.parse(init?.body as string);
+      expect(upstreamBody.prompt).toBe('const value =');
+      expect(upstreamBody.suffix).toBe(';');
+    }
+  );
+
+  it('forwards a BYOK request to its provider', async () => {
+    setOrganizationAuth({
+      balance: 0,
+      settings: { data_collection: 'deny' } satisfies OrganizationSettings,
+    });
+    mockedGetBYOKforOrganization.mockResolvedValue([
+      { providerId: 'inception', decryptedAPIKey: 'org-inception-key' },
+    ] as never);
+    mockedFetch.mockResolvedValue(makeUpstreamResponse());
+
+    const { handleFimCompletionsRequest } = await import('./fim-completions');
+    const response = await handleFimCompletionsRequest(makeRequest() as never);
+
+    expect(response.status).toBe(200);
+    const [, init] = mockedFetch.mock.calls[0];
+    const headers = init?.headers as Record<string, string>;
+    expect(headers.Authorization).toBe('Bearer org-inception-key');
+  });
+
+  it.each<OrganizationSettings | undefined>([
+    { data_collection: 'allow' },
+    { data_collection: null },
+    undefined,
+  ])('forwards a request for organization settings %j', async settings => {
+    setOrganizationAuth({ settings });
+    mockedFetch.mockResolvedValue(makeUpstreamResponse());
+
+    const { handleFimCompletionsRequest } = await import('./fim-completions');
+    const response = await handleFimCompletionsRequest(makeRequest() as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
   });
 });

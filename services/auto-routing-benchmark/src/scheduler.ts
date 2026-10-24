@@ -16,6 +16,7 @@ export type PaidExecutionKey = {
   rep: number;
   caseId: string;
   token: string;
+  attemptStartedAt?: number;
 };
 
 const positiveLimit = BenchmarkSchedulerLimitSchema;
@@ -651,6 +652,40 @@ export async function failChunk(db: D1Database, id: string, token: string): Prom
     .run();
 }
 
+export async function failScheduledEntry(
+  db: D1Database,
+  claim: SchedulerClaim,
+  nowIso: string = new Date().toISOString()
+): Promise<void> {
+  await db.batch([
+    db
+      .prepare(`
+        INSERT INTO run_lane_failures (run_id, model, variant, rep, chunk, shard, failed_at)
+        SELECT run_id, model, variant, rep, MIN(chunk), 0, ?
+        FROM scheduler_chunks
+        WHERE run_id = ? AND model = ? AND variant = ?
+          AND EXISTS (
+            SELECT 1 FROM scheduler_chunks AS owner
+            WHERE owner.id = ? AND owner.token = ? AND owner.status = 'active'
+          )
+        GROUP BY run_id, model, variant, rep
+        ON CONFLICT DO NOTHING
+      `)
+      .bind(nowIso, claim.run_id, claim.model, claim.variant, claim.id, claim.token),
+    db
+      .prepare(`
+        WITH owned AS MATERIALIZED (
+          SELECT id FROM scheduler_chunks WHERE id = ? AND token = ? AND status = 'active'
+        )
+        UPDATE scheduler_chunks SET status = 'failed', slot = NULL, lease_until = 0
+        WHERE run_id = ? AND model = ? AND variant = ?
+          AND (status IN ('pending', 'queued') OR (id = ? AND token = ? AND status = 'active'))
+          AND EXISTS (SELECT 1 FROM owned)
+      `)
+      .bind(claim.id, claim.token, claim.run_id, claim.model, claim.variant, claim.id, claim.token),
+  ]);
+}
+
 export async function recoverChunks(db: D1Database, now: number): Promise<SchedulerClaim[]> {
   const results = await db.batch<SchedulerClaim>([
     db.prepare(`WITH RECURSIVE busy_run(run_id) AS (
@@ -736,26 +771,49 @@ export async function recoverChunks(db: D1Database, now: number): Promise<Schedu
   return results[2]?.results ?? [];
 }
 
+const UNSETTLED_CHUNK_PREDICATE = `
+  chunk.status IN ('pending', 'queued', 'active')
+    AND (chunk.status = 'active' OR NOT EXISTS (
+      SELECT 1 FROM run_lane_failures AS failure
+      WHERE failure.run_id = chunk.run_id AND failure.model = chunk.model
+        AND failure.variant = chunk.variant AND failure.rep = chunk.rep))
+`;
+
 /** SQL for {@link hasUnsettledChunks}; exported for the query-plan regression test. */
 export const SCHEDULER_UNSETTLED_SQL = `
   SELECT 1 FROM scheduler_chunks AS chunk
-  WHERE chunk.run_id = ? AND chunk.status IN ('pending', 'queued', 'active')
-    AND NOT EXISTS (
-      SELECT 1 FROM run_lane_failures AS failure
-      WHERE failure.run_id = chunk.run_id AND failure.model = chunk.model
-        AND failure.variant = chunk.variant AND failure.rep = chunk.rep)
+  WHERE chunk.run_id = ? AND ${UNSETTLED_CHUNK_PREDICATE}
   LIMIT 1
 `;
 
+/** SQL for {@link listSettledSchedulerRuns}; exported for the query-plan regression test. */
+export const SCHEDULER_SETTLED_RUNS_SQL = `
+  SELECT id FROM benchmark_runs WHERE kind = 'decider' AND status = 'running'
+    AND EXISTS (SELECT 1 FROM scheduler_runs WHERE run_id = benchmark_runs.id)
+    AND NOT EXISTS (SELECT 1 FROM scheduler_chunks AS chunk
+      WHERE chunk.run_id = benchmark_runs.id AND ${UNSETTLED_CHUNK_PREDICATE})
+  LIMIT ?
+`;
+
 /**
- * Whether a run still has scheduled work that could settle it: a chunk that is
- * pending, queued or active in a lane that has not dead-lettered. Runs without
- * scheduler chunks (legacy whole-run work) are always settled. Callers use this
- * to keep run accounting off the per-completion path.
+ * Whether a run still has scheduled work that could settle it: an active chunk,
+ * or a pending or queued chunk in a lane that has not dead-lettered. Active calls
+ * retain their slots and keep runs unsettled even after their entry fails. Runs
+ * without scheduler chunks (legacy whole-run work) are always settled.
  */
 export async function hasUnsettledChunks(db: D1Database, runId: string): Promise<boolean> {
   const row = await db.prepare(SCHEDULER_UNSETTLED_SQL).bind(runId).first();
   return row !== null;
+}
+
+/**
+ * Running scheduler-initialized decider runs with no unsettled chunk left, by the
+ * same rule as {@link hasUnsettledChunks}. Dispatch finalizes these, since no chunk
+ * completion remains to do it.
+ */
+export async function listSettledSchedulerRuns(db: D1Database, limit: number): Promise<string[]> {
+  const rows = await db.prepare(SCHEDULER_SETTLED_RUNS_SQL).bind(limit).all<{ id: string }>();
+  return rows.results.map(row => row.id);
 }
 
 export async function beginPaidCase(
@@ -772,6 +830,11 @@ export async function beginPaidCase(
         AND token = ? AND status = 'active' AND lease_until > ?
         AND EXISTS (SELECT 1 FROM json_each(case_ids) WHERE value = ?)
         AND EXISTS (SELECT 1 FROM benchmark_runs WHERE id = scheduler_chunks.run_id AND status = 'running')
+        AND NOT EXISTS (
+          SELECT 1 FROM run_lane_failures AS failure
+          WHERE failure.run_id = scheduler_chunks.run_id AND failure.model = scheduler_chunks.model
+            AND failure.variant = scheduler_chunks.variant AND failure.rep = scheduler_chunks.rep
+        )
     ) ON CONFLICT DO NOTHING
   `)
     .bind(
@@ -805,8 +868,18 @@ export async function getPaidCasePromptRevision(
 ): Promise<number | null> {
   const row = await db
     .prepare(`SELECT prompt_revision FROM scheduler_executions
-    WHERE run_id = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ? AND token = ?`)
-    .bind(key.runId, key.model, key.variant, key.rep, key.caseId, key.token)
+    WHERE run_id = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ? AND token = ?
+      AND (? IS NULL OR started_at = ?)`)
+    .bind(
+      key.runId,
+      key.model,
+      key.variant,
+      key.rep,
+      key.caseId,
+      key.token,
+      key.attemptStartedAt ?? null,
+      key.attemptStartedAt ?? null
+    )
     .first<{ prompt_revision: number }>();
   return row?.prompt_revision ?? null;
 }
@@ -829,24 +902,82 @@ export async function restartPaidCase(
   db: D1Database,
   key: PaidExecutionKey,
   now: number
-): Promise<void> {
-  await db
+): Promise<boolean> {
+  const result = await db
     .prepare(`UPDATE scheduler_executions SET started_at = ?
-    WHERE run_id = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ? AND token = ?`)
-    .bind(now, key.runId, key.model, key.variant, key.rep, key.caseId, key.token)
+    WHERE run_id = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ? AND token = ?
+      AND (? IS NULL OR started_at = ?)
+      AND EXISTS (
+        SELECT 1 FROM scheduler_chunks AS chunk
+        WHERE chunk.run_id = scheduler_executions.run_id AND chunk.model = scheduler_executions.model
+          AND chunk.variant = scheduler_executions.variant AND chunk.rep = scheduler_executions.rep
+          AND chunk.token = scheduler_executions.token AND chunk.status = 'active' AND chunk.lease_until > ?
+      )
+      AND EXISTS (
+        SELECT 1 FROM benchmark_runs
+        WHERE id = scheduler_executions.run_id AND status = 'running'
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM run_lane_failures AS failure
+        WHERE failure.run_id = scheduler_executions.run_id AND failure.model = scheduler_executions.model
+          AND failure.variant = scheduler_executions.variant AND failure.rep = scheduler_executions.rep
+      )`)
+    .bind(
+      now,
+      key.runId,
+      key.model,
+      key.variant,
+      key.rep,
+      key.caseId,
+      key.token,
+      key.attemptStartedAt ?? null,
+      key.attemptStartedAt ?? null,
+      now
+    )
     .run();
+  return result.meta.changes > 0;
 }
 
 export function schedulerBackoffSeconds(attempts: number): number {
   return Math.min(300, 15 * 2 ** Math.min(attempts - 1, 5));
 }
 
-export async function clearUnbilledCase(db: D1Database, key: PaidExecutionKey): Promise<void> {
-  await db
-    .prepare(`DELETE FROM scheduler_executions
-    WHERE run_id = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ? AND token = ?`)
-    .bind(key.runId, key.model, key.variant, key.rep, key.caseId, key.token)
-    .run();
+export async function clearUnbilledCase(
+  db: D1Database,
+  key: Omit<PaidExecutionKey, 'token'> & { token?: string }
+): Promise<void> {
+  if (key.token === undefined && key.attemptStartedAt === undefined) {
+    throw new Error('Unbilled cleanup requires a claim token or attempt generation.');
+  }
+  const bindings = [
+    key.runId,
+    key.model,
+    key.variant,
+    key.rep,
+    key.caseId,
+    key.token ?? null,
+    key.attemptStartedAt ?? null,
+  ];
+  await db.batch([
+    db
+      .prepare(`
+        DELETE FROM pending_decider_outputs
+        WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND rep = ?4 AND case_id = ?5
+          AND EXISTS (
+            SELECT 1 FROM scheduler_executions
+            WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND rep = ?4 AND case_id = ?5
+              AND (?6 IS NULL OR token = ?6) AND (?7 IS NULL OR started_at = ?7)
+          )
+      `)
+      .bind(...bindings),
+    db
+      .prepare(`
+        DELETE FROM scheduler_executions
+        WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND rep = ?4 AND case_id = ?5
+          AND (?6 IS NULL OR token = ?6) AND (?7 IS NULL OR started_at = ?7)
+      `)
+      .bind(...bindings),
+  ]);
 }
 
 /**

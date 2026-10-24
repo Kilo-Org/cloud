@@ -10,12 +10,12 @@ import {
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { safeCallbackContext } from '@/lib/integrations/oauth/callback-safety';
 import {
   appendIntegrationOAuthRedirectQuery,
   buildIntegrationOAuthRedirectPath,
   buildIntegrationOAuthRedirectPathFromState,
   parseOAuthStateOwner,
-  safeCallbackContext,
 } from '@/lib/integrations/oauth/common';
 
 /**

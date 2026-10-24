@@ -1,4 +1,4 @@
-import { Effect, Either } from 'effect';
+import { Effect, Result } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -62,7 +62,7 @@ vi.mock('@/lib/trpc', () => ({
 
 const queryClientMock = vi.hoisted(() => ({
   getQueryData: vi.fn(),
-  ensureQueryData: vi.fn(async ({ queryFn }: { queryFn: () => Promise<unknown> }) => {
+  query: vi.fn(async ({ queryFn }: { queryFn: () => Promise<unknown> }) => {
     const result = await queryFn();
     return result;
   }),
@@ -139,8 +139,8 @@ describe('settingsService one source of truth', () => {
   });
 
   it('refuses a non-boolean value for the live activity toggle', () => {
-    const refused = Effect.runSync(Effect.either(settingsService().write('liveActivity', 'yes')));
-    expect(Either.isLeft(refused)).toBe(true);
+    const refused = Effect.runSync(Effect.result(settingsService().write('liveActivity', 'yes')));
+    expect(Result.isFailure(refused)).toBe(true);
   });
 
   it('reads the language a manual setter wrote', async () => {
@@ -191,31 +191,31 @@ describe('settingsService one source of truth', () => {
   });
 
   it('rejects an unknown setting name on read and on write', () => {
-    const read = Effect.runSync(Effect.either(settingsService().read('nope')));
-    expect(Either.isLeft(read)).toBe(true);
-    if (Either.isLeft(read)) {
-      expect(String(read.left.cause)).toContain('Unknown setting');
+    const read = Effect.runSync(Effect.result(settingsService().read('nope')));
+    expect(Result.isFailure(read)).toBe(true);
+    if (Result.isFailure(read)) {
+      expect(String(read.failure.cause)).toContain('Unknown setting');
     }
 
-    const write = Effect.runSync(Effect.either(settingsService().write('nope', 'true')));
-    expect(Either.isLeft(write)).toBe(true);
+    const write = Effect.runSync(Effect.result(settingsService().write('nope', 'true')));
+    expect(Result.isFailure(write)).toBe(true);
   });
 
   it('rejects a value outside an enum and a boolean that is not true or false', () => {
-    const badEnum = Effect.runSync(Effect.either(settingsService().write('theme', 'purple')));
-    expect(Either.isLeft(badEnum)).toBe(true);
+    const badEnum = Effect.runSync(Effect.result(settingsService().write('theme', 'purple')));
+    expect(Result.isFailure(badEnum)).toBe(true);
 
     const badBoolean = Effect.runSync(
-      Effect.either(settingsService().write('condenseToolCalls', 'yes'))
+      Effect.result(settingsService().write('condenseToolCalls', 'yes'))
     );
-    expect(Either.isLeft(badBoolean)).toBe(true);
+    expect(Result.isFailure(badBoolean)).toBe(true);
   });
 
   it('reads and rejects a non-list write for the trusted hosts', () => {
     const bad = Effect.runSync(
-      Effect.either(settingsService().write('trustedHosts', 'github.com'))
+      Effect.result(settingsService().write('trustedHosts', 'github.com'))
     );
-    expect(Either.isLeft(bad)).toBe(true);
+    expect(Result.isFailure(bad)).toBe(true);
   });
 
   it('reports what changed on every boolean write', () => {
@@ -268,12 +268,12 @@ describe('the language write applies the change', () => {
     applyLanguagePreference.mockResolvedValue({ kind });
 
     const refused = await Effect.runPromise(
-      Effect.either(settingsService().write('language', 'es'))
+      Effect.result(settingsService().write('language', 'es'))
     );
 
-    expect(Either.isLeft(refused)).toBe(true);
-    if (Either.isLeft(refused)) {
-      expect(String(refused.left.cause)).toContain(fragment);
+    expect(Result.isFailure(refused)).toBe(true);
+    if (Result.isFailure(refused)) {
+      expect(String(refused.failure.cause)).toContain(fragment);
     }
   });
 });

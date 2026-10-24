@@ -12,6 +12,7 @@ import { MonoScrollBlock } from '../mono-scroll-block';
 import { useOpenPartDetail } from '../open-part-detail-context';
 import { getToolFileAttachments, getToolImageAttachments } from '../tool-card-attachments';
 import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
+import { toolStatusLabel } from '../tool-status-label';
 
 /**
  * Sheet body for a generic tool part (including unknown tools): one labelled
@@ -95,7 +96,7 @@ export function GenericToolCard({ part }: Readonly<{ part: ToolPart }>) {
       status={part.state.status}
       accessibilityLabel={t('agentChat.toolCard.accessibilityLabel', {
         name: display.subtitle ?? display.title,
-        status: part.state.status,
+        status: toolStatusLabel(t, part.state.status),
       })}
       onPress={
         hasDetails && openPartDetail

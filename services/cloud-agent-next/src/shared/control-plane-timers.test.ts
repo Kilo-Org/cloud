@@ -47,6 +47,11 @@ describe('sandbox idle policy for route origins', () => {
     );
   });
 
+  it('keeps the interactive window for desktop routes', () => {
+    expect(sandboxIdlePolicyForOrigins(['desktop'])).toBe('interactive');
+    expect(sandboxIdlePolicyForOrigins(['scheduled', 'desktop'])).toBe('interactive');
+  });
+
   it.each([
     [['code-review']],
     [['slack', 'github']],

@@ -1,6 +1,6 @@
 import 'server-only';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import type { PlatformIntegration } from '@kilocode/db/schema';
+import type { PlatformIntegration, SlackOAuthCredential } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
@@ -13,7 +13,12 @@ import type { SlackInstallation } from '@chat-adapter/slack';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
-import { writeSlackCredential } from '@/lib/integrations/platforms/slack/credential-store';
+import {
+  decryptSlackBotToken,
+  getSlackCredentialByIntegrationId,
+  writeSlackCredential,
+} from '@/lib/integrations/platforms/slack/credential-store';
+import { SlackCredentialDecryptionError } from '@/lib/integrations/platforms/slack/credential-encryption';
 import { captureException } from '@sentry/nextjs';
 
 export class SlackWorkspaceAlreadyConnectedError extends Error {
@@ -203,38 +208,49 @@ export function getOwnerFromInstallation(integration: PlatformIntegration): Owne
 }
 
 /**
- * Dual-write the bot token into the encrypted `slack_oauth_credentials` store.
+ * Load the bot token for an integration from the encrypted credential store.
  *
- * Deliberately best-effort for now: nothing reads that store yet, so an unconfigured
- * or failing encryption keyset must not break Slack installs. Step 3 moves the read
- * paths onto the store, at which point this write becomes required and must move
- * inside the same transaction as the `platform_integrations` write.
+ * Returns null when no credential row exists, the row is revoked, or the row cannot
+ * be read (decryption failure or an owner that does not match the encryption AAD).
+ * Failures are reported to Sentry without token material; callers treat null as "no
+ * access token" and surface their own user-facing error.
  */
-async function mirrorSlackCredential({
-  integration,
-  owner,
-  teamId,
-  installation,
-}: {
-  integration: PlatformIntegration;
-  owner: Owner;
-  teamId: string;
-  installation: SlackInstallation;
-}): Promise<void> {
-  try {
-    await writeSlackCredential({
-      integrationId: integration.id,
-      slackTeamId: teamId,
-      owner,
-      botToken: installation.botToken,
-      botUserId: installation.botUserId ?? null,
+export async function getSlackBotToken(integration: PlatformIntegration): Promise<string | null> {
+  const owner = getOwnerFromInstallation(integration);
+  if (!owner) {
+    captureException(new Error('Slack integration has no exclusive owner'), {
+      level: 'error',
+      tags: { component: 'slack-service', op: 'read-slack-credential' },
+      extra: { integrationId: integration.id },
     });
+    return null;
+  }
+
+  let credential: SlackOAuthCredential | null;
+  try {
+    credential = await getSlackCredentialByIntegrationId(integration.id);
   } catch (error) {
     captureException(error, {
       level: 'error',
-      tags: { component: 'slack-service', op: 'mirror-slack-credential' },
-      extra: { integrationId: integration.id, teamId },
+      tags: { component: 'slack-service', op: 'read-slack-credential' },
+      extra: { integrationId: integration.id },
     });
+    return null;
+  }
+  if (!credential) return null;
+
+  try {
+    return decryptSlackBotToken(credential, owner);
+  } catch (error) {
+    captureException(error, {
+      level: 'error',
+      tags: { component: 'slack-service', op: 'read-slack-credential' },
+      extra: {
+        integrationId: integration.id,
+        kind: error instanceof SlackCredentialDecryptionError ? error.kind : 'unknown',
+      },
+    });
+    return null;
   }
 }
 
@@ -285,6 +301,9 @@ export async function upsertSlackInstallation({
       ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
       : DEFAULT_BOT_MODEL;
 
+  // Workspace identifiers and model policy only: credential material lives in the
+  // encrypted `slack_oauth_credentials` row that is written alongside this one, and
+  // metadata stays free of it.
   const existingModelSlug =
     existing?.metadata &&
     typeof existing.metadata === 'object' &&
@@ -296,7 +315,6 @@ export async function upsertSlackInstallation({
 
   const metadata: Record<string, unknown> = {
     ...(existing?.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}),
-    access_token: installation.botToken,
     bot_user_id: installation.botUserId,
   };
   if (modelSlug) {
@@ -304,26 +322,38 @@ export async function upsertSlackInstallation({
   } else {
     delete metadata.model_slug;
   }
+  delete metadata.access_token;
 
   if (existing) {
     try {
-      const [updated] = await db
-        .update(platform_integrations)
-        .set({
-          platform_installation_id: teamId,
-          platform_account_id: teamId,
-          platform_account_login: teamName,
-          scopes: SLACK_SCOPES,
-          integration_status: INTEGRATION_STATUS.ACTIVE,
-          metadata,
-          updated_at: new Date().toISOString(),
-        })
-        .where(eq(platform_integrations.id, existing.id))
-        .returning();
+      return await db.transaction(async tx => {
+        const [updated] = await tx
+          .update(platform_integrations)
+          .set({
+            platform_installation_id: teamId,
+            platform_account_id: teamId,
+            platform_account_login: teamName,
+            scopes: SLACK_SCOPES,
+            integration_status: INTEGRATION_STATUS.ACTIVE,
+            metadata,
+            updated_at: new Date().toISOString(),
+          })
+          .where(eq(platform_integrations.id, existing.id))
+          .returning();
 
-      await mirrorSlackCredential({ integration: updated, owner, teamId, installation });
+        // Both writes commit together: the integration row and its credential row
+        // form one unit, and each is incomplete without the other.
+        await writeSlackCredential({
+          integrationId: updated.id,
+          slackTeamId: teamId,
+          owner,
+          botToken: installation.botToken,
+          botUserId: installation.botUserId ?? null,
+          tx,
+        });
 
-      return updated;
+        return updated;
+      });
     } catch (error) {
       if (isSlackWorkspaceUniqueViolation(error)) {
         throw new SlackWorkspaceAlreadyConnectedError(teamName);
@@ -333,26 +363,35 @@ export async function upsertSlackInstallation({
   }
 
   try {
-    const [created] = await db
-      .insert(platform_integrations)
-      .values({
-        owned_by_user_id: owner.type === 'user' ? owner.id : null,
-        owned_by_organization_id: owner.type === 'org' ? owner.id : null,
-        platform: PLATFORM.SLACK,
-        integration_type: 'oauth',
-        platform_installation_id: teamId,
-        platform_account_id: teamId,
-        platform_account_login: teamName,
-        scopes: SLACK_SCOPES,
-        integration_status: INTEGRATION_STATUS.ACTIVE,
-        metadata,
-        installed_at: new Date().toISOString(),
-      })
-      .returning();
+    return await db.transaction(async tx => {
+      const [created] = await tx
+        .insert(platform_integrations)
+        .values({
+          owned_by_user_id: owner.type === 'user' ? owner.id : null,
+          owned_by_organization_id: owner.type === 'org' ? owner.id : null,
+          platform: PLATFORM.SLACK,
+          integration_type: 'oauth',
+          platform_installation_id: teamId,
+          platform_account_id: teamId,
+          platform_account_login: teamName,
+          scopes: SLACK_SCOPES,
+          integration_status: INTEGRATION_STATUS.ACTIVE,
+          metadata,
+          installed_at: new Date().toISOString(),
+        })
+        .returning();
 
-    await mirrorSlackCredential({ integration: created, owner, teamId, installation });
+      await writeSlackCredential({
+        integrationId: created.id,
+        slackTeamId: teamId,
+        owner,
+        botToken: installation.botToken,
+        botUserId: installation.botUserId ?? null,
+        tx,
+      });
 
-    return created;
+      return created;
+    });
   } catch (error) {
     if (isSlackWorkspaceUniqueViolation(error)) {
       throw new SlackWorkspaceAlreadyConnectedError(teamName);
@@ -377,11 +416,11 @@ export async function uninstallApp(owner: Owner, options: SlackUninstallOptions 
   const shouldDeleteSlackInstallation =
     integration.integration_status === INTEGRATION_STATUS.ACTIVE;
 
-  // Revoke the token if we have one
-  const metadata = integration.metadata as { access_token?: string } | null;
-  if (shouldDeleteSlackInstallation && metadata?.access_token) {
+  // Revoke the stored credential if we have one
+  const botToken = await getSlackBotToken(integration);
+  if (shouldDeleteSlackInstallation && botToken) {
     try {
-      await revokeSlackToken(metadata.access_token);
+      await revokeSlackToken(botToken);
     } catch (error) {
       console.error('Failed to revoke Slack token:', error);
     }
@@ -450,14 +489,14 @@ export async function testConnection(owner: Owner): Promise<{ success: boolean; 
     return { success: false, error: 'No Slack installation found' };
   }
 
-  const metadata = integration.metadata as { access_token?: string } | null;
+  const botToken = await getSlackBotToken(integration);
 
-  if (!metadata?.access_token) {
+  if (!botToken) {
     return { success: false, error: 'No access token found' };
   }
 
   try {
-    const client = new WebClient(metadata.access_token);
+    const client = new WebClient(botToken);
     const result = await client.auth.test();
 
     if (!result.ok) {
@@ -465,44 +504,6 @@ export async function testConnection(owner: Owner): Promise<{ success: boolean; 
     }
 
     return { success: true };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return { success: false, error: errorMessage };
-  }
-}
-
-/**
- * Send a message to a Slack channel using the stored integration
- */
-export async function sendMessage(
-  owner: Owner,
-  channel: string,
-  text: string
-): Promise<{ success: boolean; error?: string; ts?: string }> {
-  const integration = await getInstallation(owner);
-
-  if (!integration) {
-    return { success: false, error: 'No Slack installation found' };
-  }
-
-  const metadata = integration.metadata as { access_token?: string } | null;
-
-  if (!metadata?.access_token) {
-    return { success: false, error: 'No access token found' };
-  }
-
-  try {
-    const client = new WebClient(metadata.access_token);
-    const result = await client.chat.postMessage({
-      channel,
-      text,
-    });
-
-    if (!result.ok) {
-      return { success: false, error: result.error || 'Unknown error' };
-    }
-
-    return { success: true, ts: result.ts };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return { success: false, error: errorMessage };
@@ -578,16 +579,6 @@ export type SlackPostMessageResponse = {
   ts?: string;
   error?: string;
 };
-
-/**
- * Extract access token from installation metadata
- */
-export function getAccessTokenFromInstallation(
-  integration: PlatformIntegration
-): string | undefined {
-  const metadata = integration.metadata as { access_token?: string } | null;
-  return metadata?.access_token;
-}
 
 /**
  * Post a message to Slack using an access token directly

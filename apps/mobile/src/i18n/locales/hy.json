@@ -53,6 +53,7 @@
     "connected": "Միացված է",
     "couldNotLoadModels": "Չհաջողվեց բեռնել մոդելները։",
     "couldNotLoadRepositories": "Չհաջողվեց բեռնել պահոցները։",
+    "noRepositoriesFound": "Պահոցներ չեն գտնվել",
     "critical": "Կրիտիկական",
     "delete": "Ջնջել",
     "deleted": "Ջնջված",
@@ -87,6 +88,7 @@
     "connect": "Միացնել",
     "connectBitbucket": "Միացնել Bitbucket-ը",
     "connectGitlab": "Միացնել GitLab-ը",
+    "connectProvider": "Մատակարարի միացում",
     "contentTruncated": "Բովանդակությունը կրճատված է",
     "copyLink": "Պատճենել հղումը",
     "couldNotLoadOrganizations": "Չհաջողվեց բեռնել կազմակերպությունները։",
@@ -145,7 +147,8 @@
     "agent": "Գործակալ",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Փոփոխություններ"
+    "changes": "Փոփոխություններ",
+    "organizationTrialEnded": "Կազմակերպության փորձաշրջանն ավարտվել է, և այն չունի ակտիվ պլան։ Կազմակերպության սեփականատերը կարող է թարմացնել վճարումները kilo.ai-ում, ապա կրկին փորձել։"
   },
   "language": {
     "restarting": "Վերագործարկվում է՝ լեզվի փոփոխությունը կիրառելու համար",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Հնարավոր է՝ պետք է GitLab-ում ավելի շատ խմբերի կամ նախագծերի հասանելիություն տրամադրես։",
       "installGithubApp": "GitHub հավելվածի տեղադրում պահոցներում",
       "installGithubAppDescription": "Kilo-ի GitHub հավելվածին տրամադրիր այն պահոցների հասանելիությունը, որոնք ուզում ես ստուգել։",
-      "noRepositoriesFound": "Պահոցներ չեն գտնվել",
       "repositoryAccess": "պահոցի հասանելիություն"
     },
     "style": {
@@ -1489,7 +1491,6 @@
       "invalidUrl": "Մուտքագրիր միավորման հարցման վավեր URL։",
       "couldNotCheckProviderStatus": "Չհաջողվեց ստուգել մատակարարի կարգավիճակը։",
       "couldNotLoadProviders": "Չհաջողվեց բեռնել քո միացրած մատակարարները։ Կրկին փորձիր։",
-      "connectProvider": "Մատակարարի միացում",
       "connectProviderDescription": "Միացրու GitHub-ը՝ միավորման հարցման ձեռքով ստուգում սկսելու համար։",
       "pullRequestUrl": "Միավորման հարցման URL",
       "instructions": "Հրահանգներ (ըստ ցանկության)",
@@ -3168,7 +3169,9 @@
       "sendInvite": "Ուղարկել հրավեր",
       "title": "Հրավիրել անդամ",
       "alreadyInvited": "Նրանք արդեն հրավիրված են կամ արդեն անդամ են։",
-      "sendError": "Չհաջողվեց ուղարկել հրավերը։"
+      "sendError": "Չհաջողվեց ուղարկել հրավերը։",
+      "pendingInvitation": "Այս էլփոստն արդեն ունի սպասող հրավեր։",
+      "alreadyMember": "Այս անձն արդեն այս կազմակերպության անդամ է։"
     },
     "invoices": {
       "downloadA11y": "Ներբեռնել {{number}} հաշիվ-ապրանքագիրը",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "Սպասող հրավերներ",
       "resendInvite": "Կրկին ուղարկել հրավերը",
       "shareInviteLink": "Տարածել հրավերի հղումը",
-      "resendInviteError": "Չհաջողվեց կրկին ուղարկել հրավերը։"
+      "resendInviteError": "Չհաջողվեց կրկին ուղարկել հրավերը։",
+      "inviteNotResendable": "Այս հրավերն այլևս հնարավոր չէ կրկին ուղարկել։",
+      "ownerAuthority": "Միայն կազմակերպության սեփականատերը կարող է կառավարել սեփականատերերին։",
+      "ownRoleChange": "Դուք չեք կարող փոխել ձեր սեփական դերը։",
+      "inviteExpired": "Այս հրավերի ժամկետը լրացել է։",
+      "inviteAccepted": "Այս հրավերն արդեն ընդունվել է։"
     },
     "usageStats": {
       "inputTokens": "Մուտքային տոկեններ",

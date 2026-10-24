@@ -1,3 +1,4 @@
+import { webhookBodySchema } from '@kilocode/worker-utils/webhook-body-validation';
 import { createTRPCRouter, baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { generateCloudAgentToken } from '@kilocode/web-shared/lib/tokens';
@@ -66,7 +67,8 @@ export const WebhookTriggerCreateInput = z
     model: z.string().min(1, 'Model is required').optional(),
     variant: variantSchema.optional(),
     sandboxAllocation: sandboxAllocationSchema.optional(),
-    profileId: z.string().uuid().optional(),
+    profileId: z.string().uuid().nullable().optional(),
+    bodySchema: webhookBodySchema.nullable().optional(),
     // Shared fields
     promptTemplate: z
       .string()
@@ -86,6 +88,16 @@ export const WebhookTriggerCreateInput = z
     cronTimezone: z.string().max(50).optional().default('UTC'),
   })
   .superRefine((data, ctx) => {
+    if (
+      data.bodySchema != null &&
+      (data.targetType !== 'cloud_agent' || data.activationMode !== 'webhook')
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Body validation is only available for Cloud Agent webhooks',
+        path: ['bodySchema'],
+      });
+    }
     if (data.runAsCreator) {
       if (!data.organizationId || data.targetType !== 'cloud_agent') {
         ctx.addIssue({
@@ -153,8 +165,6 @@ export const WebhookTriggerCreateInput = z
       if (!data.mode) ctx.addIssue({ code: 'custom', message: 'Mode is required', path: ['mode'] });
       if (!data.model)
         ctx.addIssue({ code: 'custom', message: 'Model is required', path: ['model'] });
-      if (!data.profileId)
-        ctx.addIssue({ code: 'custom', message: 'Profile is required', path: ['profileId'] });
     }
     if (data.targetType === 'kiloclaw_chat') {
       if (!data.kiloclawInstanceId)
@@ -184,7 +194,8 @@ export const WebhookTriggerUpdateInput = z
     variant: variantSchema.nullable().optional(),
     sandboxAllocation: sandboxAllocationSchema.nullable().optional(),
     promptTemplate: z.string().min(1).max(10000).optional(),
-    profileId: z.string().uuid().optional(),
+    profileId: z.string().uuid().nullable().optional(),
+    bodySchema: webhookBodySchema.nullable().optional(),
     autoCommit: z.boolean().nullable().optional(),
     condenseOnComplete: z.boolean().nullable().optional(),
     isActive: z.boolean().optional(),
@@ -611,14 +622,12 @@ export const webhookTriggersRouter = createTRPCRouter({
     }
 
     // Target-specific validation (superRefine guarantees required fields per target type)
-    if (input.targetType === 'cloud_agent') {
-      if (!input.profileId) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Profile is required for Cloud Agent triggers',
-        });
-      }
-      await assertProfileOwnership(userId, input.organizationId, input.profileId);
+    if (input.targetType === 'cloud_agent' && input.profileId) {
+      await assertProfileOwnership(
+        userId,
+        input.runAsCreator ? undefined : input.organizationId,
+        input.profileId
+      );
     }
     if (input.targetType === 'kiloclaw_chat') {
       if (!input.kiloclawInstanceId) {
@@ -694,6 +703,7 @@ export const webhookTriggersRouter = createTRPCRouter({
           sandboxAllocation: input.sandboxAllocation,
           promptTemplate: input.promptTemplate,
           profileId: input.profileId,
+          bodySchema: input.bodySchema,
           autoCommit: input.autoCommit,
           condenseOnComplete: input.condenseOnComplete,
           webhookAuth: input.webhookAuth,
@@ -774,8 +784,9 @@ export const webhookTriggersRouter = createTRPCRouter({
     // Verify ownership via PostgreSQL
     const dbTrigger = await assertTriggerOwnership(userId, input.triggerId, input.organizationId);
 
+    let executionUserId: string | null = null;
     if (input.organizationId) {
-      const executionUserId = await getOrganizationTriggerExecutionUserId(
+      executionUserId = await getOrganizationTriggerExecutionUserId(
         input.organizationId,
         input.triggerId,
         dbTrigger.id
@@ -802,9 +813,23 @@ export const webhookTriggersRouter = createTRPCRouter({
       );
     }
 
+    if (
+      input.bodySchema != null &&
+      (dbTrigger.target_type !== 'cloud_agent' || dbTrigger.activation_mode !== 'webhook')
+    ) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Body validation is only available for Cloud Agent webhooks',
+      });
+    }
+
     // Validate profile ownership if profileId provided
     if (input.profileId) {
-      await assertProfileOwnership(userId, input.organizationId, input.profileId);
+      await assertProfileOwnership(
+        executionUserId ?? userId,
+        executionUserId ? undefined : input.organizationId,
+        input.profileId
+      );
     }
 
     const hasUpdates = [
@@ -814,6 +839,7 @@ export const webhookTriggersRouter = createTRPCRouter({
       input.sandboxAllocation,
       input.promptTemplate,
       input.profileId,
+      input.bodySchema,
       input.autoCommit,
       input.condenseOnComplete,
       input.isActive,
@@ -841,6 +867,7 @@ export const webhookTriggersRouter = createTRPCRouter({
       promptTemplate: input.promptTemplate,
       isActive: input.isActive,
       profileId: input.profileId,
+      bodySchema: input.bodySchema,
       autoCommit: input.autoCommit,
       condenseOnComplete: input.condenseOnComplete,
       webhookAuth: input.webhookAuth,

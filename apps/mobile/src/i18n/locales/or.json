@@ -53,6 +53,7 @@
     "connected": "ସଂଯୁକ୍ତ",
     "couldNotLoadModels": "ମଡେଲ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "couldNotLoadRepositories": "ରିପୋଜିଟୋରୀ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+    "noRepositoriesFound": "କୌଣସି ରିପୋଜିଟୋରୀ ମିଳିଲା ନାହିଁ",
     "critical": "ଗୁରୁତର",
     "delete": "ବିଲୋପ କରନ୍ତୁ",
     "deleted": "ବିଲୋପ ହେଲା",
@@ -87,6 +88,7 @@
     "connect": "ସଂଯୋଗ କରନ୍ତୁ",
     "connectBitbucket": "Bitbucket ସହ ସଂଯୋଗ କରନ୍ତୁ",
     "connectGitlab": "GitLab ସହ ସଂଯୋଗ କରନ୍ତୁ",
+    "connectProvider": "ଏକ ସେବା ପ୍ରଦାତାଙ୍କୁ ସଂଯୋଗ କରନ୍ତୁ",
     "contentTruncated": "ବିଷୟବସ୍ତୁର କିଛି ଅଂଶ ଦେଖାଯାଉଛି",
     "copyLink": "ଲିଙ୍କ୍ କପି କରନ୍ତୁ",
     "couldNotLoadOrganizations": "ସଂଗଠନର ତାଲିକା ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
@@ -145,7 +147,8 @@
     "agent": "ଏଜେଣ୍ଟ।",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "ପରିବର୍ତ୍ତନ"
+    "changes": "ପରିବର୍ତ୍ତନ",
+    "organizationTrialEnded": "ସଂଗଠନର ଟ୍ରାଏଲ୍ ଅବଧି ଶେଷ ହୋଇଛି ଏବଂ ଏହାର କୌଣସି ସକ୍ରିୟ ପ୍ଲାନ୍ ନାହିଁ। ଜଣେ ସଂଗଠନ ମାଲିକ kilo.ai ରେ ବିଲିଂ ଅପଡେଟ୍ କରିପାରିବେ, ତାପରେ ପୁନର୍ବାର ଚେଷ୍ଟା କରନ୍ତୁ।"
   },
   "language": {
     "restarting": "ଭାଷା ବଦଳାଇବାକୁ ଆପ୍ ପୁଣି ଆରମ୍ଭ ହେଉଛି",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "ଆପଣଙ୍କୁ GitLab ରେ ଅଧିକ ଗୋଷ୍ଠୀ କିମ୍ବା ପ୍ରୋଜେକ୍ଟ ବ୍ୟବହାର କରିବାର ଅନୁମତି ଦେବାକୁ ପଡ଼ିପାରେ।",
       "installGithubApp": "ରିପୋଜିଟୋରୀଗୁଡ଼ିକରେ GitHub ଆପ୍ ସଂସ୍ଥାପନ କରନ୍ତୁ",
       "installGithubAppDescription": "ଆପଣ ସମୀକ୍ଷା କରାଇବାକୁ ଚାହୁଁଥିବା ରିପୋଜିଟୋରୀଗୁଡ଼ିକୁ ବ୍ୟବହାର କରିବା ପାଇଁ Kilo GitHub ଆପ୍‌କୁ ଅନୁମତି ଦିଅନ୍ତୁ।",
-      "noRepositoriesFound": "କୌଣସି ରିପୋଜିଟୋରୀ ମିଳିଲା ନାହିଁ",
       "repositoryAccess": "ରିପୋଜିଟୋରୀ ବ୍ୟବହାରର ଅନୁମତି"
     },
     "style": {
@@ -1489,7 +1491,6 @@
       "invalidUrl": "ଏକ ବୈଧ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ URL ଲେଖନ୍ତୁ।",
       "couldNotCheckProviderStatus": "ସେବା ପ୍ରଦାତାଙ୍କ ସ୍ଥିତି ଯାଞ୍ଚ ହୋଇପାରିଲା ନାହିଁ।",
       "couldNotLoadProviders": "ଆପଣ ସଂଯୋଗ କରିଥିବା ସେବା ପ୍ରଦାତାଙ୍କ ତଥ୍ୟ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
-      "connectProvider": "ଏକ ସେବା ପ୍ରଦାତାଙ୍କୁ ସଂଯୋଗ କରନ୍ତୁ",
       "connectProviderDescription": "ନିଜେ ଏକ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟର ସମୀକ୍ଷା ଆରମ୍ଭ କରିବାକୁ GitHub ସଂଯୋଗ କରନ୍ତୁ।",
       "pullRequestUrl": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ URL",
       "instructions": "ନିର୍ଦ୍ଦେଶ (ଐଚ୍ଛିକ)",
@@ -3168,7 +3169,9 @@
       "sendInvite": "ନିମନ୍ତ୍ରଣ ପଠାନ୍ତୁ",
       "title": "ସଦସ୍ୟଙ୍କୁ ନିମନ୍ତ୍ରଣ କରନ୍ତୁ",
       "alreadyInvited": "ସେମାନେ ପୂର୍ବରୁ ନିମନ୍ତ୍ରିତ କିମ୍ବା ପୂର୍ବରୁ ସଦସ୍ୟ ଅଟନ୍ତି।",
-      "sendError": "ନିମନ୍ତ୍ରଣ ପଠାଇହେଲା ନାହିଁ।"
+      "sendError": "ନିମନ୍ତ୍ରଣ ପଠାଇହେଲା ନାହିଁ।",
+      "pendingInvitation": "ଏହି ଇମେଲରେ ପୂର୍ବରୁ ଏକ ବିଚାରାଧୀନ ନିମନ୍ତ୍ରଣ ଅଛି।",
+      "alreadyMember": "ଏହି ବ୍ୟକ୍ତି ପୂର୍ବରୁ ଏହି ସଂଗଠନର ସଦସ୍ୟ ଅଟନ୍ତି।"
     },
     "invoices": {
       "downloadA11y": "ଇନଭଏସ୍ {{number}} ଡାଉନଲୋଡ୍ କରନ୍ତୁ",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "ଅପେକ୍ଷାରେ ଥିବା ନିମନ୍ତ୍ରଣ",
       "resendInvite": "ନିମନ୍ତ୍ରଣ ପୁନଃପଠାନ୍ତୁ",
       "shareInviteLink": "ନିମନ୍ତ୍ରଣ ଲିଙ୍କ ସେୟାର କରନ୍ତୁ",
-      "resendInviteError": "ନିମନ୍ତ୍ରଣ ପୁନଃପଠାଇହେଲା ନାହିଁ।"
+      "resendInviteError": "ନିମନ୍ତ୍ରଣ ପୁନଃପଠାଇହେଲା ନାହିଁ।",
+      "inviteNotResendable": "ଏହି ନିମନ୍ତ୍ରଣ ଆଉ ପୁନଃପଠାଯାଇପାରିବ ନାହିଁ।",
+      "ownerAuthority": "କେବଳ ସଂଗଠନର ଜଣେ ମାଲିକ ହିଁ ମାଲିକମାନଙ୍କୁ ପରିଚାଳନା କରିପାରିବେ।",
+      "ownRoleChange": "ଆପଣ ନିଜର ଭୂମିକା ପରିବର୍ତ୍ତନ କରିପାରିବେ ନାହିଁ।",
+      "inviteExpired": "ଏହି ନିମନ୍ତ୍ରଣର ଅବଧି ସମାପ୍ତ ହୋଇଛି।",
+      "inviteAccepted": "ଏହି ନିମନ୍ତ୍ରଣ ପୂର୍ବରୁ ଗ୍ରହଣ କରାଯାଇଛି।"
     },
     "usageStats": {
       "inputTokens": "ଇନପୁଟ୍ ଟୋକନ୍",

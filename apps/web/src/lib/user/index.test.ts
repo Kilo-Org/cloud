@@ -29,6 +29,7 @@ import {
   organizations,
   user_feedback,
   cloud_agent_feedback,
+  cloud_agent_webhook_triggers,
   user_admin_notes,
   magic_link_tokens,
   device_sessions,
@@ -65,6 +66,7 @@ import {
   user_push_tokens,
   user_activity_tokens,
   user_notification_preferences,
+  user_notification_history,
   agent_briefing_reports,
   agent_briefing_events,
   agent_briefing_context_preferences,
@@ -82,6 +84,7 @@ import {
   agent_environment_profile_mcp_servers,
   agent_environment_profile_skills,
   cloud_agent_sandbox_allocation_settings,
+  cloud_agent_environments,
   deleted_user_email_tombstones,
   impact_attribution_touches,
   impact_advocate_participants,
@@ -323,6 +326,8 @@ describe('User', () => {
     await db.delete(kiloclaw_instances);
     await db.delete(agent_environment_profile_skills);
     await db.delete(agent_environment_profile_mcp_servers);
+    await db.delete(cloud_agent_webhook_triggers);
+    await db.delete(cloud_agent_environments);
     await db.delete(agent_environment_profiles);
     await db.delete(github_branch_pull_requests);
     await db.delete(code_review_memory_proposals);
@@ -2193,6 +2198,96 @@ describe('User', () => {
       expect(rows).toHaveLength(1);
       expect(rows[0].kilo_user_id).toBeNull();
       expect(rows[0].created_by).toBe(connector.id);
+    });
+
+    it('detaches deleted personal profiles while retaining organization webhooks and unrelated profile references', async () => {
+      const user = await insertTestUser({
+        google_user_email: `webhook-profile-delete-${randomUUID()}@example.com`,
+      });
+      const owner = await insertTestUser({
+        google_user_email: `webhook-profile-owner-${randomUUID()}@example.com`,
+      });
+      const organization = await createTestOrganization(
+        `Webhook profile cleanup ${randomUUID()}`,
+        owner.id,
+        0
+      );
+      await db
+        .insert(organization_memberships)
+        .values({ organization_id: organization.id, kilo_user_id: user.id, role: 'member' });
+      const [deletedProfile, otherProfile, organizationProfile] = await db
+        .insert(agent_environment_profiles)
+        .values([
+          { owned_by_user_id: user.id, name: 'Deleted personal profile' },
+          { owned_by_user_id: owner.id, name: 'Other personal profile' },
+          { owned_by_organization_id: organization.id, name: 'Organization profile' },
+        ])
+        .returning();
+      const [creatorTrigger, otherCreatorTrigger, botTrigger, personalTrigger] = await db
+        .insert(cloud_agent_webhook_triggers)
+        .values([
+          {
+            trigger_id: 'deleted-creator-profile',
+            organization_id: organization.id,
+            github_repo: 'owner/repo',
+            profile_id: deletedProfile.id,
+          },
+          {
+            trigger_id: 'other-creator-profile',
+            organization_id: organization.id,
+            github_repo: 'owner/repo',
+            profile_id: otherProfile.id,
+          },
+          {
+            trigger_id: 'organization-profile',
+            organization_id: organization.id,
+            github_repo: 'owner/repo',
+            profile_id: organizationProfile.id,
+          },
+          {
+            trigger_id: 'deleted-personal-trigger',
+            user_id: user.id,
+            github_repo: 'owner/repo',
+            profile_id: deletedProfile.id,
+          },
+        ])
+        .returning();
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+
+      expect(
+        await db
+          .select({
+            id: cloud_agent_webhook_triggers.id,
+            profileId: cloud_agent_webhook_triggers.profile_id,
+          })
+          .from(cloud_agent_webhook_triggers)
+          .where(eq(cloud_agent_webhook_triggers.organization_id, organization.id))
+      ).toEqual(
+        expect.arrayContaining([
+          { id: creatorTrigger.id, profileId: null },
+          { id: otherCreatorTrigger.id, profileId: otherProfile.id },
+          { id: botTrigger.id, profileId: organizationProfile.id },
+        ])
+      );
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_webhook_triggers)
+          .where(eq(cloud_agent_webhook_triggers.id, personalTrigger.id))
+      ).toEqual([]);
+      expect(
+        await db
+          .select()
+          .from(agent_environment_profiles)
+          .where(eq(agent_environment_profiles.id, deletedProfile.id))
+      ).toEqual([]);
+      expect(
+        await db
+          .select({ id: agent_environment_profiles.id })
+          .from(agent_environment_profiles)
+          .where(inArray(agent_environment_profiles.id, [otherProfile.id, organizationProfile.id]))
+      ).toEqual(expect.arrayContaining([{ id: otherProfile.id }, { id: organizationProfile.id }]));
     });
 
     it('removes personal sandbox allocation settings while keeping the organization rows', async () => {
@@ -5368,6 +5463,40 @@ describe('User', () => {
       expect(skills).toHaveLength(0);
     });
 
+    it('deletes user-owned repository environments without touching another owner', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+
+      await db.insert(cloud_agent_environments).values([
+        {
+          owned_by_user_id: user.id,
+          name: 'mine',
+          platform: 'github',
+          repo_full_name: 'acme/widgets',
+        },
+        {
+          owned_by_user_id: otherUser.id,
+          name: 'theirs',
+          platform: 'github',
+          repo_full_name: 'acme/widgets',
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      const environments = await db
+        .select()
+        .from(cloud_agent_environments)
+        .where(eq(cloud_agent_environments.owned_by_user_id, otherUser.id));
+      expect(environments.map(environment => environment.name)).toEqual(['theirs']);
+
+      const deletedUserEnvironments = await db
+        .select()
+        .from(cloud_agent_environments)
+        .where(eq(cloud_agent_environments.owned_by_user_id, user.id));
+      expect(deletedUserEnvironments).toHaveLength(0);
+    });
+
     it('should nullify user_feedback FK', async () => {
       const user = await insertTestUser();
       await db.insert(user_feedback).values({
@@ -5576,6 +5705,30 @@ describe('User', () => {
         .from(user_push_tokens)
         .where(eq(user_push_tokens.user_id, user.id));
       expect(tokens).toHaveLength(0);
+    });
+
+    it('should delete user_notification_history rows', async () => {
+      const user = await insertTestUser();
+      const other = await insertTestUser();
+      const historyRow = {
+        category: 'chatMessages',
+        push_type: 'chat.message',
+        payload: { type: 'chat.message' },
+        i18n_key: 'chat.message',
+        i18n_params: { conversationTitle: 'Hello' },
+        fallback_title: 'Kilo',
+        fallback_body: 'New message',
+        dedupe_bucket: Math.floor(Date.now() / 3_600_000),
+      };
+      await db.insert(user_notification_history).values([
+        { ...historyRow, user_id: user.id, idempotency_key: 'history-user' },
+        { ...historyRow, user_id: other.id, idempotency_key: 'history-other' },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      const remaining = await db.select().from(user_notification_history);
+      expect(remaining.map(row => row.idempotency_key)).toEqual(['history-other']);
     });
 
     it('should delete user_notification_preferences', async () => {

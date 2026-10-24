@@ -53,6 +53,7 @@
     "connected": "連携済み",
     "couldNotLoadModels": "モデルを読み込めませんでした。",
     "couldNotLoadRepositories": "リポジトリを読み込めませんでした。",
+    "noRepositoriesFound": "リポジトリが見つかりません",
     "critical": "重大",
     "delete": "削除",
     "deleted": "削除済み",
@@ -87,6 +88,7 @@
     "connect": "連携",
     "connectBitbucket": "Bitbucketと連携",
     "connectGitlab": "GitLabと連携",
+    "connectProvider": "プロバイダーを接続",
     "contentTruncated": "内容の一部を省略しています",
     "copyLink": "リンクをコピー",
     "couldNotLoadOrganizations": "組織を読み込めませんでした。",
@@ -145,7 +147,8 @@
     "agent": "エージェント",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "変更内容"
+    "changes": "変更内容",
+    "organizationTrialEnded": "組織のトライアルは終了し、有効なプランがありません。組織のオーナーは kilo.ai で請求情報を更新してから、もう一度お試しください。"
   },
   "language": {
     "restarting": "言語設定を適用するために再起動中",
@@ -883,7 +886,6 @@
       "gitlabNoRepositoriesDescription": "GitLabで、追加のグループやプロジェクトへのアクセスを許可する必要がある場合があります。",
       "installGithubApp": "リポジトリにGitHub Appをインストール",
       "installGithubAppDescription": "レビュー対象のリポジトリへのアクセスをKilo GitHub Appに許可してください。",
-      "noRepositoriesFound": "リポジトリが見つかりません",
       "repositoryAccess": "リポジトリへのアクセス権"
     },
     "style": {
@@ -907,7 +909,6 @@
     "followReviewMd": "REVIEW.mdに従う",
     "followReviewMdSubtitle": "各リポジトリのREVIEW.mdに記載された指示に従う",
     "manualReview": {
-      "connectProvider": "プロバイダーを接続",
       "connectProviderDescription": "プルリクエストの手動レビューを開始するにはGitHubを接続してください。",
       "couldNotCheckProviderStatus": "プロバイダーの状態を確認できませんでした。",
       "couldNotLoadProviders": "接続済みプロバイダーを読み込めませんでした。もう一度お試しください。",
@@ -3167,7 +3168,9 @@
       "sendInvite": "招待を送信",
       "title": "メンバーを招待",
       "alreadyInvited": "このメールアドレスは、すでに招待済みか、すでにメンバーに追加されています。",
-      "sendError": "招待を送信できませんでした。"
+      "sendError": "招待を送信できませんでした。",
+      "pendingInvitation": "このメールアドレスには、すでに保留中の招待があります。",
+      "alreadyMember": "このユーザーはすでにこの組織のメンバーです。"
     },
     "invoices": {
       "downloadA11y": "請求書{{number}}をダウンロード",
@@ -3237,7 +3240,12 @@
       "pendingInvitations": "承諾待ちの招待",
       "resendInvite": "招待を再送信",
       "shareInviteLink": "招待リンクを共有",
-      "resendInviteError": "招待を再送信できませんでした。"
+      "resendInviteError": "招待を再送信できませんでした。",
+      "inviteNotResendable": "この招待は再送信できなくなりました。",
+      "ownerAuthority": "組織のオーナーのみがオーナーを管理できます。",
+      "ownRoleChange": "自分の役割は変更できません。",
+      "inviteExpired": "この招待は有効期限が切れています。",
+      "inviteAccepted": "この招待はすでに承諾されています。"
     },
     "usageStats": {
       "inputTokens": "入力トークン",

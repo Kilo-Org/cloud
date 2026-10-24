@@ -53,6 +53,7 @@
     "connected": "Pievienots",
     "couldNotLoadModels": "Neizdevās ielādēt modeļus.",
     "couldNotLoadRepositories": "Neizdevās ielādēt repozitorijus.",
+    "noRepositoriesFound": "Nav atrasts neviens repozitorijs",
     "critical": "Kritisks",
     "delete": "Dzēst",
     "deleted": "Dzēsts",
@@ -87,6 +88,7 @@
     "connect": "Pievienot",
     "connectBitbucket": "Pievienot Bitbucket",
     "connectGitlab": "Pievienot GitLab",
+    "connectProvider": "Pievieno pakalpojuma sniedzēju",
     "contentTruncated": "Saturs saīsināts",
     "copyLink": "Kopēt saiti",
     "couldNotLoadOrganizations": "Neizdevās ielādēt organizācijas.",
@@ -145,7 +147,8 @@
     "agent": "Aģents",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Izmaiņas"
+    "changes": "Izmaiņas",
+    "organizationTrialEnded": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Organizācijas īpašnieks var atjaunināt norēķinu informāciju vietnē kilo.ai un pēc tam mēģināt vēlreiz."
   },
   "language": {
     "restarting": "Notiek restartēšana, lai lietotu izvēlēto valodu",
@@ -1429,7 +1432,6 @@
       "gitlabNoRepositoriesDescription": "Iespējams, tev jāpiešķir piekļuve papildu grupām vai projektiem pakalpojumā GitLab.",
       "installGithubApp": "Instalē GitHub lietotni repozitorijos",
       "installGithubAppDescription": "Piešķir Kilo GitHub lietotnei piekļuvi repozitorijiem, kuru kodu vēlies pārskatīt.",
-      "noRepositoriesFound": "Nav atrasts neviens repozitorijs",
       "repositoryAccess": "piekļuve repozitorijiem"
     },
     "style": {
@@ -1511,7 +1513,6 @@
       "invalidUrl": "Ievadi derīgu izmaiņu pieprasījuma URL.",
       "couldNotCheckProviderStatus": "Neizdevās pārbaudīt pakalpojuma sniedzēja statusu.",
       "couldNotLoadProviders": "Neizdevās ielādēt tavus pievienotos pakalpojumu sniedzējus. Lūdzu, mēģini vēlreiz.",
-      "connectProvider": "Pievieno pakalpojuma sniedzēju",
       "connectProviderDescription": "Pievieno GitHub, lai manuāli sāktu izmaiņu pieprasījuma koda pārskatīšanu.",
       "pullRequestUrl": "Izmaiņu pieprasījuma URL",
       "instructions": "Norādījumi (neobligāti)",
@@ -3212,7 +3213,9 @@
       "sendInvite": "Nosūtīt uzaicinājumu",
       "title": "Uzaicināt dalībnieku",
       "alreadyInvited": "Šī e-pasta adrese jau ir uzaicināta vai jau pieder dalībniekam.",
-      "sendError": "Neizdevās nosūtīt uzaicinājumu."
+      "sendError": "Neizdevās nosūtīt uzaicinājumu.",
+      "pendingInvitation": "Šai e-pasta adresei jau ir gaidošs uzaicinājums.",
+      "alreadyMember": "Šis cilvēks jau ir šīs organizācijas dalībnieks."
     },
     "invoices": {
       "downloadA11y": "Lejupielādēt rēķinu {{number}}",
@@ -3282,7 +3285,12 @@
       "pendingInvitations": "Neapstiprinātie uzaicinājumi",
       "resendInvite": "Nosūtīt uzaicinājumu vēlreiz",
       "shareInviteLink": "Kopīgot uzaicinājuma saiti",
-      "resendInviteError": "Neizdevās nosūtīt uzaicinājumu vēlreiz."
+      "resendInviteError": "Neizdevās nosūtīt uzaicinājumu vēlreiz.",
+      "inviteNotResendable": "Šo uzaicinājumu vairs nevar nosūtīt vēlreiz.",
+      "ownerAuthority": "Tikai organizācijas īpašnieks var pārvaldīt īpašniekus.",
+      "ownRoleChange": "Jūs nevarat mainīt savu lomu.",
+      "inviteExpired": "Šis uzaicinājums ir zaudējis derīgumu.",
+      "inviteAccepted": "Šis uzaicinājums jau ir apstiprināts."
     },
     "usageStats": {
       "inputTokens": "Ievades tokeni",

@@ -321,6 +321,7 @@ describe('sign-in touch targets', () => {
       'SIGNUP-RATE-LIMITED',
       'SIGNUP-STEP-UP',
       'EMAIL-ALREADY-USED',
+      'EMAIL-INVALID-FORMAT',
       'EMAIL-MUST-BE-LOWERCASE',
       'EMAIL-CANNOT-CONTAIN-PLUS',
       'untrusted-query-error',

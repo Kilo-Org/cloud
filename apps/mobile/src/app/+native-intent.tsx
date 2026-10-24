@@ -37,11 +37,33 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     return null;
   }
   if (__DEV__) {
+    const reviewCopyFixture =
+      /(?:^|\/)dev\/pr-review-copy-fixture\/(checks|navigator|files|merge|overview|merge-request-missing|merge-request-error|submit)\/?(?:\?([^#]*))?(?:#.*)?$/.exec(
+        path
+      );
+    if (reviewCopyFixture) {
+      // Carry the link's own query (the submit surface reads the PR triple from
+      // it) alongside the surface the fixture mounts.
+      const extras = reviewCopyFixture[2] ? `&${reviewCopyFixture[2]}` : '';
+      return `/(auth)/pr-review-copy-fixture?surface=${reviewCopyFixture[1]}${extras}`;
+    }
+    if (/(?:^|\/)dev\/button-label-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/button-label-fixture';
+    }
+    if (/(?:^|\/)dev\/session-row-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(auth)/session-row-fixture';
+    }
     if (/(?:^|\/)dev\/transcript-style-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(auth)/transcript-style-fixture';
     }
     if (/(?:^|\/)dev\/question-card-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(auth)/question-card-fixture';
+    }
+    const reauthorizeFixtureMatch =
+      /(?:^|\/)dev\/security-agent-reauthorize-fixture\/?(\?.*)?$/.exec(path);
+    if (reauthorizeFixtureMatch) {
+      // Keep the optional `?lang=` that the fixture reads to choose its capture language.
+      return `/(auth)/security-agent-reauthorize-fixture${reauthorizeFixtureMatch[1] ?? ''}`;
     }
     const fixtureRoute = modelPickerFixtureRoute(path);
     if (fixtureRoute) {

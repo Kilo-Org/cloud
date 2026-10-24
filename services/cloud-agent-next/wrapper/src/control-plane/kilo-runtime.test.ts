@@ -322,6 +322,107 @@ describe('prepareKiloFilesystem', () => {
 });
 
 describe('Kilo startup lifecycle', () => {
+  it.each([0, 3600, -3600])('refreshes MCP with a proxy handle expiry delta of %s', async delta => {
+    const exp = 1_800_000_000;
+    const { runtime } = createRuntime({
+      spawner: createSpawner(),
+      feed: createFeedFactory(),
+      probe: createProbe(true),
+      scheduler: createScheduler(),
+      isIdle: () => false,
+      env: { KILOCODE_TOKEN: proxyHandle(exp) },
+    });
+    const client = await runtime.ensure();
+    const refreshed: unknown[] = [];
+    client.updateCloudAgentMcp = async grant => {
+      refreshed.push(grant);
+    };
+    const grant = {
+      url: 'https://mcp.kiloapps.io/mcp' as const,
+      token: 'renewed-mcp-grant',
+      expiresAt: exp + 86_400,
+    };
+    await runtime.installCredentials({ KILOCODE_TOKEN: proxyHandle(exp + delta) }, grant);
+    expect(refreshed).toEqual(delta < 0 ? [] : [grant]);
+    expect(runtime.env.KILOCODE_TOKEN).toBe(proxyHandle(exp + Math.max(delta, 0)));
+    expect(await runtime.applyPendingCredentials(() => false)).toBe(false);
+    await runtime.shutdown();
+  });
+  it('refreshes scoped MCP in the running CLI even while a turn prevents credential restart', async () => {
+    const spawner = createSpawner();
+    const { runtime } = createRuntime({
+      spawner,
+      feed: createFeedFactory(),
+      probe: createProbe(true),
+      scheduler: createScheduler(),
+      isIdle: () => false,
+    });
+    const client = await runtime.ensure();
+    const refreshed: unknown[] = [];
+    client.updateCloudAgentMcp = async grant => {
+      refreshed.push(grant);
+    };
+    const grant = {
+      url: 'https://mcp.kiloapps.io/mcp' as const,
+      token: 'new-authorization-mcp',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+    };
+    await runtime.installCredentials(
+      {
+        HOME: '/new',
+        KILO_CONFIG_CONTENT: JSON.stringify({
+          mcp: {
+            'kilo-cloud-agent': {
+              type: 'remote',
+              url: grant.url,
+              headers: { Authorization: `Bearer ${grant.token}` },
+            },
+          },
+        }),
+      },
+      grant
+    );
+    expect(refreshed).toEqual([grant]);
+    expect(await runtime.applyPendingCredentials(() => false)).toBe(false);
+    expect(spawner.spawnCount()).toBe(1);
+    expect(runtime.env.KILO_CONFIG_CONTENT).toContain(grant.token);
+    await runtime.shutdown();
+  });
+  it.each(['rejection', 'timeout'])(
+    'does not reject general credential installation when MCP refresh fails by %s',
+    async failure => {
+      const spawner = createSpawner();
+      const { runtime, logs, restarts } = createRuntime({
+        spawner,
+        feed: createFeedFactory(),
+        probe: createProbe(true),
+        scheduler: createScheduler(),
+        isIdle: () => true,
+      });
+      const client = await runtime.ensure();
+      const grant = {
+        url: 'https://mcp.kiloapps.io/mcp' as const,
+        token: 'private-refreshed-mcp-token',
+        expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+      };
+      client.updateCloudAgentMcp = async (_grant, signal) => {
+        if (failure === 'rejection') throw new Error(grant.token);
+        await new Promise<void>((_resolve, reject) => {
+          signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
+        });
+      };
+      await runtime.installCredentials({ HOME: '/new' }, grant);
+      expect(runtime.env.HOME).toBe('/new');
+      expect(logs).toContain(
+        'control-plane MCP credential refresh failed; retaining pending credential restart'
+      );
+      expect(logs.join('\n')).not.toContain(grant.token);
+      expect(await runtime.applyPendingCredentials(() => true)).toBe(true);
+      expect(restarts).toEqual([{ reason: 'credentials' }]);
+      await runtime.shutdown();
+    },
+    15_000
+  );
   it('keeps credentials installed while the first feed is opening pending behind the idle gate', async () => {
     const spawner = createSpawner();
     const feed = createFeedFactory();

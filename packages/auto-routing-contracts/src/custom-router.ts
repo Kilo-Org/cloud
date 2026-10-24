@@ -1,5 +1,6 @@
 import * as z from 'zod';
 import { AutoRouterSchema, AutoRoutingModeSchema } from './router';
+import { OwnerTypeSchema, type OwnerType } from './owner';
 import { ClassifierSubtaskTypeSchema, ClassifierTaskTypeSchema } from './taxonomy';
 
 // ADR 0005: docs/adr/0005-custom-auto-routers.md
@@ -12,14 +13,11 @@ export const MAX_CUSTOM_ROUTER_ENTRIES = 20;
 export const MAX_CUSTOM_ROUTER_NAME_LENGTH = 100;
 export const CUSTOM_ROUTER_SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
 
-export const CustomRouterScopeSchema = z.enum(['user', 'org']);
-export type CustomRouterScope = z.infer<typeof CustomRouterScopeSchema>;
-
 export const CustomRouterSlugSchema = z.string().regex(CUSTOM_ROUTER_SLUG_PATTERN);
 
 export const CustomRouterReferenceSchema = z
   .object({
-    scope: CustomRouterScopeSchema,
+    scope: OwnerTypeSchema,
     slug: CustomRouterSlugSchema,
   })
   .superRefine((reference, ctx) => {
@@ -39,11 +37,11 @@ export function parseCustomRouterModelId(model: string): CustomRouterReference |
   return CustomRouterReferenceSchema.safeParse(reference).success ? reference : null;
 }
 
-export function customRouterModelId(scope: CustomRouterScope, slug: string): string {
+export function customRouterModelId(scope: OwnerType, slug: string): string {
   return `${scope === 'org' ? ORG_CUSTOM_ROUTER_MODEL_PREFIX : CUSTOM_ROUTER_MODEL_PREFIX}${slug}`;
 }
 
-function addReservedSlugIssue(scope: CustomRouterScope, slug: string, ctx: z.RefinementCtx): void {
+function addReservedSlugIssue(scope: OwnerType, slug: string, ctx: z.RefinementCtx): void {
   if (scope === 'user' && slug === RESERVED_USER_CUSTOM_ROUTER_SLUG) {
     ctx.addIssue({
       code: 'custom',
@@ -188,7 +186,7 @@ const EntryKeySchema = z.string().min(1);
 export const CustomRouterDefinitionSchema = z
   .object({
     id: z.uuid(),
-    ownerType: CustomRouterScopeSchema,
+    ownerType: OwnerTypeSchema,
     ownerId: z.string().trim().min(1),
     slug: CustomRouterSlugSchema,
     name: CustomRouterNameSchema,
@@ -196,6 +194,8 @@ export const CustomRouterDefinitionSchema = z
     mode: AutoRoutingModeSchema,
     entries: CustomRouterEntriesSchema,
     defaultEntryKey: EntryKeySchema,
+    legacyPool: z.boolean().optional(),
+    legacyModeInherited: z.boolean().optional(),
   })
   .superRefine((definition, ctx) => {
     addReservedSlugIssue(definition.ownerType, definition.slug, ctx);
@@ -269,7 +269,8 @@ export const CustomRouterDecisionSchema = z
     model: z.string().min(1),
     variant: z.string().trim().min(1).nullable(),
     stale: z.boolean(),
-    // True when the classifier produced no decision and the default or first servable entry was used.
+    // True when no routing decision named a servable entry, so the default or first servable
+    // entry was used. taskType and subtaskType still report the classification, if any.
     fallback: z.boolean(),
     sticky: z.boolean(),
     taskType: ClassifierTaskTypeSchema.nullable(),
@@ -294,6 +295,7 @@ export type CustomRouterDecideResponse = z.infer<typeof CustomRouterDecideRespon
 
 export const AUTO_DECISION_HEADER = 'x-kilo-auto-decision';
 export const AUTO_DECISION_TTL_MS = 5 * 60 * 1000;
+const AUTO_DECISION_CLOCK_SKEW_MS = 30 * 1000;
 const AUTO_DECISION_TOKEN_VERSION = 'v1';
 
 export const AutoDecisionPayloadSchema = z.object({
@@ -387,6 +389,11 @@ export async function verifyAutoDecision(
   const payload = AutoDecisionPayloadSchema.safeParse(json);
   if (!payload.success) return { ok: false, reason: 'malformed' };
   if (payload.data.expiresAt <= nowMs) return { ok: false, reason: 'expired' };
+  // The signer never issues a longer lifetime; the margin covers clock skew between the
+  // signing worker and the verifying gateway.
+  if (payload.data.expiresAt > nowMs + AUTO_DECISION_TTL_MS + AUTO_DECISION_CLOCK_SKEW_MS) {
+    return { ok: false, reason: 'malformed' };
+  }
   return { ok: true, payload: payload.data };
 }
 
@@ -471,11 +478,11 @@ export type ClientEvalResultResponse = z.infer<typeof ClientEvalResultResponseSc
 
 export const AUTO_ROUTING_CUSTOM_ROUTERS_PATH = '/api/auto-routing/custom-routers';
 
-export function customRouterPath(scope: CustomRouterScope, slug: string): string {
+export function customRouterPath(scope: OwnerType, slug: string): string {
   return `${AUTO_ROUTING_CUSTOM_ROUTERS_PATH}/${scope}/${slug}`;
 }
 
-export function customRouterClientEntriesPath(scope: CustomRouterScope, slug: string): string {
+export function customRouterClientEntriesPath(scope: OwnerType, slug: string): string {
   return `${customRouterPath(scope, slug)}/client-entries`;
 }
 
@@ -507,7 +514,7 @@ export type CustomRouterListEntry = z.infer<typeof CustomRouterListEntrySchema>;
 
 export const CustomRouterSummarySchema = z.object({
   id: RouterIdSchema,
-  scope: CustomRouterScopeSchema,
+  scope: OwnerTypeSchema,
   slug: CustomRouterSlugSchema,
   name: z.string(),
   modelId: z.string().min(1),
@@ -516,11 +523,14 @@ export const CustomRouterSummarySchema = z.object({
   defaultEntryKey: EntryKeySchema,
   canEdit: z.boolean(),
   entries: z.array(CustomRouterListEntrySchema),
+  legacyPool: z.boolean().optional(),
+  legacyModeInherited: z.boolean().optional(),
 });
 export type CustomRouterSummary = z.infer<typeof CustomRouterSummarySchema>;
 
 export const CustomRouterListResponseSchema = z.object({
   routers: z.array(CustomRouterSummarySchema),
+  canCreate: z.boolean().optional(),
 });
 export type CustomRouterListResponse = z.infer<typeof CustomRouterListResponseSchema>;
 
@@ -532,7 +542,7 @@ export type CustomRouterResponse = z.infer<typeof CustomRouterResponseSchema>;
 
 export const CreateCustomRouterRequestSchema = z
   .object({
-    scope: CustomRouterScopeSchema,
+    scope: OwnerTypeSchema,
     slug: CustomRouterSlugSchema,
     name: CustomRouterNameSchema,
     baseRouter: AutoRouterSchema,
@@ -587,7 +597,7 @@ export const CUSTOM_ROUTER_TABLE_PATH = '/admin/custom-router-table';
 export const CUSTOM_ROUTER_STATUS_PATH = '/admin/custom-router-status';
 
 const customRouterBenchmarkContextShape = {
-  ownerType: CustomRouterScopeSchema,
+  ownerType: OwnerTypeSchema,
   ownerId: z.string().trim().min(1),
   baseRouter: AutoRouterSchema,
   entries: CustomRouterEntriesSchema,

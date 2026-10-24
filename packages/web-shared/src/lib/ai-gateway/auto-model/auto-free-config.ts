@@ -1,7 +1,7 @@
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isKiloAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import type { AutoFreeModel } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import { ai_gateway_config } from '@kilocode/db/schema';
@@ -19,11 +19,14 @@ export const AUTO_FREE_FALLBACK_CONFIG: AutoFreeConfig = { models: [AUTO_FREE_FA
 /**
  * `kilo-auto/free` has no OpenCode settings, so clients talk to it with the
  * default AI SDK provider. Candidates must be free, concrete models that use
- * that same provider.
+ * that same provider. It serves anonymous callers, so custom LLMs, which only
+ * granted organizations may call, are never candidates.
  */
 export function isAutoFreeEligibleModelId(model: string): boolean {
   return (
-    isFreeModel(model) && !isKiloAutoModel(model) && getAiSdkProvider(model, null) === undefined
+    isFreeModelExcludingCustomLlms(model) &&
+    !isKiloAutoModel(model) &&
+    getAiSdkProvider(model, null) === undefined
   );
 }
 
@@ -33,7 +36,7 @@ export function getIneligibleAutoFreeModelIds(config: AutoFreeConfig): string[] 
 
 /** Returns the configured auto-free models, or null when none are stored or the stored value is invalid. */
 export async function readConfiguredAutoFreeModels(): Promise<ReadonlyArray<AutoFreeModel> | null> {
-  const [row] = await db
+  const [row] = await readDb
     .select({ auto_free: ai_gateway_config.auto_free })
     .from(ai_gateway_config)
     .where(eq(ai_gateway_config.id, 1))

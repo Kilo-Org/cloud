@@ -1,5 +1,4 @@
 import { ENKRYPT_PUBLICATION_ENABLED } from '@kilocode/web-shared/lib/config.server';
-import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import type { ModelStats } from '@kilocode/db/schema';
 import {
   ENKRYPT_STALE_AFTER_MS,
@@ -43,11 +42,14 @@ export function publishEnkryptBenchmark(
 
 type PublicModel = Pick<ModelStats, 'openrouterId' | 'isActive' | 'isStealth'>;
 
-export function isEnkryptPublicModel(model: PublicModel): boolean {
+export function isEnkryptPublicModel(
+  model: PublicModel,
+  customLlmIds: ReadonlySet<string>
+): boolean {
   return (
     model.isActive === true &&
     model.isStealth === false &&
-    !model.openrouterId.startsWith(CUSTOM_LLM_PREFIX)
+    !customLlmIds.has(model.openrouterId.toLowerCase())
   );
 }
 
@@ -61,7 +63,7 @@ export function publishEnkryptModelStats<
   const benchmarks = { ...stat.benchmarks };
   delete benchmarks.enkrypt;
   const enkrypt =
-    isModelStatsSnapshotFresh(snapshot) && isEnkryptPublicModel(stat)
+    isModelStatsSnapshotFresh(snapshot) && isEnkryptPublicModel(stat, snapshot.customLlmIds)
       ? publishEnkryptBenchmark(stat.benchmarks.enkrypt, Date.now(), verification)
       : undefined;
   return { ...publishedStat, benchmarks: { ...benchmarks, ...(enkrypt && { enkrypt }) } };

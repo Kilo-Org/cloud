@@ -54,3 +54,64 @@ const TERMINAL_TRPC_CODES = [
 export function isTerminalTrpcCode(code: string | undefined): boolean {
   return TERMINAL_TRPC_CODES.includes(code as (typeof TERMINAL_TRPC_CODES)[number]);
 }
+
+/** The user-facing state a tRPC code maps to, shared by the list screens. */
+export type TrpcErrorVariant = 'permission' | 'not-found' | 'server';
+
+/**
+ * Maps a tRPC code to the state the screen must show. A terminal code that is
+ * not an access outcome (a bad request, an unprocessable payload) stays a
+ * server state: it is a contract failure, not a permission one, and no retry
+ * is offered for it either (`isTerminalTrpcCode`).
+ */
+export function trpcErrorVariant(code: string | undefined): TrpcErrorVariant {
+  if (code === 'FORBIDDEN' || code === 'UNAUTHORIZED') {
+    return 'permission';
+  }
+  if (code === 'NOT_FOUND') {
+    return 'not-found';
+  }
+  return 'server';
+}
+
+type TrpcErrorData = {
+  code?: string;
+  authRequired?: boolean;
+};
+
+const TrpcErrorDataSchema = z.looseObject({
+  code: z.string().optional(),
+  authRequired: z.boolean().optional(),
+});
+const TrpcErrorEnvelopeSchema = z.looseObject({
+  data: z.unknown().optional(),
+  shape: z.looseObject({ data: z.unknown().optional() }).optional(),
+});
+
+/** The serialized tRPC error data, from either the direct or shaped variant. */
+function readTrpcErrorData(error: unknown): TrpcErrorData | undefined {
+  const parsedError = TrpcErrorEnvelopeSchema.safeParse(error);
+  if (!parsedError.success) {
+    return undefined;
+  }
+  const direct = TrpcErrorDataSchema.safeParse(parsedError.data.data);
+  if (direct.success) {
+    return direct.data;
+  }
+  const shaped = TrpcErrorDataSchema.safeParse(parsedError.data.shape?.data);
+  return shaped.success ? shaped.data : undefined;
+}
+
+/**
+ * True when the error is a permission loss: a `FORBIDDEN`, or a procedure-level
+ * `UNAUTHORIZED` without the context-level `authRequired` flag (which the
+ * unauthorized handler signs the user out on). Permission loss must drop the
+ * affected cache, not the session.
+ */
+export function isPermissionDeniedError(error: unknown): boolean {
+  const data = readTrpcErrorData(error);
+  if (data?.code === 'FORBIDDEN') {
+    return true;
+  }
+  return data?.code === 'UNAUTHORIZED' && data.authRequired !== true;
+}

@@ -1,11 +1,12 @@
 import { env, runInDurableObject } from 'cloudflare:test';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { getTableName } from 'drizzle-orm';
-import type { DispatchPushInput } from '@kilocode/notifications';
+import type { DispatchPushInput, PushData } from '@kilocode/notifications';
 
 import { sendPushNotifications } from '../lib/expo-push';
 import { setPushSinkModeForTesting } from '../lib/push-sink';
 import * as dbClient from '@kilocode/db/client';
+import type { NotificationChannelDO } from '../dos/NotificationChannelDO';
 
 vi.mock('../lib/expo-push', () => ({
   sendPushNotifications: vi.fn(async () => ({
@@ -24,13 +25,21 @@ type DbState = {
   previews?: 'generic' | 'full';
   // When true, the `user_notification_preferences` read throws.
   previewsThrows?: boolean;
+  briefingEnabled?: boolean;
+  briefingReadThrows?: boolean;
+  briefingReports?: { facts: unknown; morningEndAt: string }[];
+  onBriefingReportRead?: () => void;
+  /** Rows the DO wrote to `user_notification_history`, in insert order. */
+  historyInserts?: Record<string, unknown>[];
+  /** When set, a history insert throws this error instead of recording. */
+  historyInsertError?: Error;
 };
 
 function installDbMock(state: DbState) {
   const fakeDb = {
     select: () => ({
-      from: (table: Parameters<typeof getTableName>[0]) => ({
-        where: async () => {
+      from: (table: Parameters<typeof getTableName>[0]) => {
+        const readRows = async () => {
           const tableName = getTableName(table);
           if (tableName === 'user_push_tokens') {
             return state.tokens.map(t => ({
@@ -40,17 +49,35 @@ function installDbMock(state: DbState) {
             }));
           }
           if (tableName === 'user_notification_preferences') {
-            if (state.previewsThrows) {
-              throw new Error('previews read failed');
-            }
+            if (state.previewsThrows) throw new Error('previews read failed');
             return state.previews ? [{ notification_previews: state.previews }] : [];
           }
+          if (tableName === 'agent_briefing_preferences') {
+            if (state.briefingReadThrows) throw new Error('briefing read failed');
+            return state.briefingEnabled === undefined ? [] : [{ enabled: state.briefingEnabled }];
+          }
+          if (tableName === 'agent_briefing_reports') {
+            state.onBriefingReportRead?.();
+            return state.briefingReports ?? [];
+          }
           return [];
+        };
+        const where = () => {
+          const result = readRows();
+          return Object.assign(result, { limit: () => result });
+        };
+        return { where, leftJoin: () => ({ where }) };
+      },
+    }),
+    insert: (table: Parameters<typeof getTableName>[0]) => ({
+      values: (row: Record<string, unknown>) => ({
+        onConflictDoUpdate: async () => undefined,
+        onConflictDoNothing: async () => {
+          if (getTableName(table) !== 'user_notification_history') return;
+          if (state.historyInsertError) throw state.historyInsertError;
+          (state.historyInserts ??= []).push(row);
         },
       }),
-    }),
-    insert: () => ({
-      values: () => ({ onConflictDoUpdate: async () => undefined }),
     }),
     delete: () => ({
       where: async () => {
@@ -410,13 +437,14 @@ describe('NotificationChannelDO.dispatchPush', () => {
     expect(dbState.deleteCalls).toBe(1);
   });
 
-  it('terminalizes mixed accepted and retryable ticket errors to avoid resending accepted tokens', async () => {
-    installDbMock({
+  it('records accepted ticket history despite mixed errors and replay', async () => {
+    const state: DbState = {
       tokens: [
         { user_id: 'user-partial-ticket-error', token: 'tok-accepted' },
         { user_id: 'user-partial-ticket-error', token: 'tok-rate-limited' },
       ],
-    });
+    };
+    installDbMock(state);
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
     vi.mocked(sendPushNotifications).mockResolvedValueOnce({
       ticketTokenPairs: [{ ticketId: 'ticket-accepted', token: 'tok-accepted' }],
@@ -438,6 +466,12 @@ describe('NotificationChannelDO.dispatchPush', () => {
 
     const first = await stub.dispatchPush(input);
     const second = await stub.dispatchPush(input);
+    expect(state.historyInserts).toHaveLength(1);
+    expect(state.historyInserts?.[0]).toMatchObject({
+      user_id: 'user-partial-ticket-error',
+      push_type: 'chat.message',
+      idempotency_key: 'k-partial-ticket-error',
+    });
 
     expect(first).toEqual({
       kind: 'failed',
@@ -1610,5 +1644,377 @@ describe('NotificationChannelDO per-token locale translation', () => {
     const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
     expect(messages[0].title).toBe('My raw title');
     expect(messages[0].body).toBe('My raw body');
+  });
+});
+
+describe('NotificationChannelDO morning briefing', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(env.EXPO_ACCESS_TOKEN, 'get').mockResolvedValue('test-token');
+    setPushSinkModeForTesting('off');
+  });
+
+  afterEach(() => {
+    setPushSinkModeForTesting(undefined);
+  });
+
+  function briefingInput(userId: string): DispatchPushInput {
+    return baseInput({
+      userId,
+      presenceContext: null,
+      badge: null,
+      idempotencyKey: 'agent-briefing:2026-10-15',
+      agentBriefing: {
+        localDate: '2026-10-15',
+        expiresAt: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
+      },
+      push: {
+        title: 'Private report title must never appear',
+        body: 'Private report body must never appear',
+        data: { type: 'agent_briefing', url: '/agent-briefing' },
+      },
+    });
+  }
+
+  function eligibleState(): DbState {
+    return {
+      tokens: [{ user_id: 'user', token: 'tok1', locale: 'es', app_version: '1.0.12' }],
+      previews: 'full',
+      briefingEnabled: true,
+      briefingReports: [
+        {
+          facts: { scorecard: { sessions: 1 } },
+          morningEndAt: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
+        },
+      ],
+    };
+  }
+
+  it.each([undefined, false])(
+    'requires explicit briefing opt-in, not default-on preferences: %s',
+    async enabled => {
+      installDbMock({ ...eligibleState(), briefingEnabled: enabled });
+      const result = await getDO(`briefing-opt-in-${enabled}`).dispatchPush(
+        briefingInput(`briefing-opt-in-${enabled}`)
+      );
+      expect(result.kind).toBe('suppressed_preference');
+      expect(sendPushNotifications).not.toHaveBeenCalled();
+    }
+  );
+
+  it('fails closed on a live preference read failure', async () => {
+    installDbMock({ ...eligibleState(), briefingReadThrows: true });
+    const result = await getDO('briefing-read-failure').dispatchPush(
+      briefingInput('briefing-read-failure')
+    );
+    expect(result.kind).toBe('failed');
+    expect(sendPushNotifications).not.toHaveBeenCalled();
+  });
+
+  it('requires a currently accessible published nonempty report', async () => {
+    installDbMock({ ...eligibleState(), briefingReports: [] });
+    const result = await getDO('briefing-no-access').dispatchPush(
+      briefingInput('briefing-no-access')
+    );
+    expect(result.kind).toBe('suppressed_access');
+    expect(sendPushNotifications).not.toHaveBeenCalled();
+  });
+
+  it.each([{}, { scorecard: { sessions: 0 } }, { scorecard: { sessions: '1' } }])(
+    'does not notify for empty or malformed persisted facts: %j',
+    async facts => {
+      const state = eligibleState();
+      state.briefingReports = [
+        {
+          facts,
+          morningEndAt: new Date(Date.now() + 60_000).toISOString(),
+        },
+      ];
+      installDbMock(state);
+      expect(
+        (
+          await getDO(`briefing-empty-${JSON.stringify(facts)}`).dispatchPush(
+            briefingInput(`briefing-empty-${JSON.stringify(facts)}`)
+          )
+        ).kind
+      ).toBe('suppressed_access');
+      expect(sendPushNotifications).not.toHaveBeenCalled();
+    }
+  );
+
+  it('suppresses when expiry has passed, including a later retry', async () => {
+    installDbMock(eligibleState());
+    const input = briefingInput('briefing-expired');
+    input.agentBriefing = {
+      localDate: '2026-10-15',
+      expiresAt: new Date(Date.now() - 1).toISOString(),
+    };
+    expect((await getDO('briefing-expired').dispatchPush(input)).kind).toBe('suppressed_expired');
+    expect(sendPushNotifications).not.toHaveBeenCalled();
+  });
+
+  it('suppresses if the morning ends during the live report read', async () => {
+    let now = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
+    try {
+      const state = eligibleState();
+      const input = briefingInput('briefing-expires-during-read');
+      state.onBriefingReportRead = () => {
+        now += 5 * 60 * 60 * 1000;
+      };
+      installDbMock(state);
+      const result = await getDO('briefing-expires-during-read').dispatchPush(input);
+      expect(result.kind).toBe('suppressed_expired');
+      expect(sendPushNotifications).not.toHaveBeenCalled();
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('rechecks opt-in after token and credential lookups, immediately before sending', async () => {
+    const state = eligibleState();
+    installDbMock(state);
+    vi.spyOn(env.EXPO_ACCESS_TOKEN, 'get').mockImplementation(async () => {
+      state.briefingEnabled = false;
+      return 'test-token';
+    });
+    const result = await getDO('briefing-opted-out-during-send').dispatchPush(
+      briefingInput('briefing-opted-out-during-send')
+    );
+    expect(result.kind).toBe('suppressed_preference');
+    expect(sendPushNotifications).not.toHaveBeenCalled();
+  });
+
+  it('rechecks live eligibility for Expo chunks and retry attempts', async () => {
+    const state = eligibleState();
+    installDbMock(state);
+    vi.mocked(sendPushNotifications).mockImplementationOnce(
+      async (_messages, _accessToken, isCurrent) => {
+        state.briefingEnabled = false;
+        expect(isCurrent).toBeTypeOf('function');
+        expect(await isCurrent?.()).toBe(false);
+        return { ticketTokenPairs: [], staleTokens: [], ticketErrors: [] };
+      }
+    );
+    const result = await getDO('briefing-stopped-at-expo').dispatchPush(
+      briefingInput('briefing-stopped-at-expo')
+    );
+    expect(result.kind).toBe('suppressed_preference');
+  });
+
+  it('uses localized generic copy even with full previews and only routes to the report list', async () => {
+    installDbMock(eligibleState());
+    const result = await getDO('briefing-localized').dispatchPush(
+      briefingInput('briefing-localized')
+    );
+    expect(result.kind).toBe('delivered');
+    expect(sendPushNotifications).toHaveBeenCalledOnce();
+    const [messages] = vi.mocked(sendPushNotifications).mock.calls[0] ?? [];
+    expect(messages?.[0]).toMatchObject({
+      title: 'Kilo',
+      data: { type: 'agent_briefing', url: '/agent-briefing' },
+      channelId: 'agent-progress',
+      interruptionLevel: 'active',
+    });
+    expect(messages?.[0]?.expiration).toBeGreaterThan(Math.floor(Date.now() / 1000));
+    expect(messages?.[0]?.body).not.toContain('Private report');
+    expect(messages?.[0]?.body).not.toBe('Active agents have an update');
+    expect(messages?.[0]?.body?.length).toBeGreaterThan(0);
+  });
+
+  it('keeps user/date dedup across later context publications, summary attachments, and cleanup', async () => {
+    installDbMock(eligibleState());
+    const stub = getDO('briefing-one-per-morning');
+    const input = briefingInput('briefing-one-per-morning');
+    expect((await stub.dispatchPush(input)).kind).toBe('delivered');
+    await runInDurableObject(stub, async (instance, state) => {
+      await state.storage.put(`idem:${input.idempotencyKey}`, {
+        stage: 'delivered',
+        ts: Date.now() - 2 * 60 * 60 * 1000,
+      });
+      const channel = instance as NotificationChannelDO;
+      await channel.alarm();
+    });
+    expect((await stub.dispatchPush(input)).kind).toBe('duplicate');
+    expect(sendPushNotifications).toHaveBeenCalledOnce();
+  });
+
+  it('reclaims briefing dedup records after their extended retention', async () => {
+    installDbMock(eligibleState());
+    const stub = getDO('briefing-dedup-cleanup');
+    const key = 'idem:agent-briefing:2026-10-12';
+    await runInDurableObject(stub, async (instance, state) => {
+      await state.storage.put(key, { stage: 'delivered', ts: Date.now() - 49 * 60 * 60 * 1000 });
+      const channel = instance as NotificationChannelDO;
+      await channel.alarm();
+    });
+    expect(
+      await runInDurableObject(stub, (_instance, state) => state.storage.get(key))
+    ).toBeUndefined();
+  });
+});
+
+describe('NotificationChannelDO.dispatchPush — notification history', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setPushSinkModeForTesting(undefined);
+    vi.spyOn(env.EXPO_ACCESS_TOKEN, 'get').mockResolvedValue('test-token');
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+  });
+
+  afterEach(() => {
+    setPushSinkModeForTesting(undefined);
+  });
+
+  const chatPush = (idempotencyKey: string): DispatchPushInput =>
+    baseInput({
+      presenceContext: null,
+      badge: null,
+      idempotencyKey,
+      push: {
+        title: 'Fallback title',
+        body: 'Fallback body',
+        data: { type: 'chat.message', sandboxId: 'sb1', conversationId: 'conv1', messageId: 'm1' },
+        i18nKey: 'chat.message',
+        i18nParams: { conversationTitle: 'Private conversation' },
+      },
+    });
+
+  it('writes one row carrying the row content for an accepted dispatch', async () => {
+    const state: DbState = { tokens: [{ user_id: 'user-1', token: 'tok1' }] };
+    installDbMock(state);
+
+    const input = chatPush('history-accepted');
+    const result = await getDO('history-accepted').dispatchPush(input);
+
+    expect(result.kind).toBe('delivered');
+    expect(state.historyInserts).toEqual([
+      {
+        user_id: 'user-1',
+        category: 'chatMessages',
+        push_type: 'chat.message',
+        payload: input.push.data,
+        i18n_key: 'chat.message',
+        i18n_params: { conversationTitle: 'Private conversation' },
+        fallback_title: 'Fallback title',
+        fallback_body: 'Fallback body',
+        idempotency_key: 'history-accepted',
+        dedupe_bucket: expect.any(Number),
+      },
+    ]);
+  });
+
+  it('writes no second row for a replay with the same idempotency key', async () => {
+    const state: DbState = { tokens: [{ user_id: 'user-1', token: 'tok1' }] };
+    installDbMock(state);
+    const stub = getDO('history-replay');
+    const input = chatPush('history-replay-key');
+
+    expect((await stub.dispatchPush(input)).kind).toBe('delivered');
+    expect((await stub.dispatchPush(input)).kind).toBe('duplicate');
+
+    expect(state.historyInserts).toHaveLength(1);
+  });
+
+  it('writes no row when a presence context suppresses the push', async () => {
+    const state: DbState = { tokens: [{ user_id: 'user-1', token: 'tok1' }] };
+    installDbMock(state);
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValueOnce(true);
+
+    const result = await getDO('history-presence').dispatchPush({
+      ...chatPush('history-presence-key'),
+      presenceContext: '/presence/sb1/conv1',
+    });
+
+    expect(result.kind).toBe('suppressed_presence');
+    expect(state.historyInserts ?? []).toHaveLength(0);
+  });
+
+  it('writes no row when the account has no device token', async () => {
+    const state: DbState = { tokens: [] };
+    installDbMock(state);
+
+    const result = await getDO('history-no-tokens').dispatchPush(chatPush('history-no-tokens-key'));
+
+    expect(result.kind).toBe('no_tokens');
+    expect(state.historyInserts ?? []).toHaveLength(0);
+  });
+
+  it('writes no row for a push the rate limit suppresses', async () => {
+    const state: DbState = { tokens: [{ user_id: 'user-1', token: 'tok1' }] };
+    installDbMock(state);
+    const stub = getDO('history-rate-limit');
+    const rateLimit = { key: 'history-rate-limit', limit: 1, windowSeconds: 60 };
+
+    expect((await stub.dispatchPush({ ...chatPush('history-rl-1'), rateLimit })).kind).toBe(
+      'delivered'
+    );
+    expect((await stub.dispatchPush({ ...chatPush('history-rl-2'), rateLimit })).kind).toBe(
+      'suppressed_rate_limit'
+    );
+
+    expect(state.historyInserts).toHaveLength(1);
+  });
+
+  it('writes no row for a kind that has no message list', async () => {
+    const state: DbState = { tokens: [{ user_id: 'user-1', token: 'tok1' }] };
+    installDbMock(state);
+
+    const result = await getDO('history-os-only').dispatchPush(
+      baseInput({
+        presenceContext: null,
+        badge: null,
+        idempotencyKey: 'history-os-only-key',
+        push: {
+          title: 'T',
+          body: 'B',
+          data: {
+            type: 'session_live_update',
+            schemaVersion: 1,
+            event: 'end',
+            content: {},
+          } as unknown as PushData,
+        },
+      })
+    );
+
+    expect(result.kind).toBe('delivered');
+    expect(state.historyInserts ?? []).toHaveLength(0);
+  });
+
+  it('keeps the delivery outcome and writes no row when the history write fails', async () => {
+    const state: DbState = {
+      tokens: [{ user_id: 'user-1', token: 'tok1' }],
+      historyInsertError: new Error('insert failed for user-1 secret body'),
+    };
+    installDbMock(state);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const result = await getDO('history-write-fails').dispatchPush(
+      chatPush('history-write-fails-key')
+    );
+
+    expect(result.kind).toBe('delivered');
+    expect(state.historyInserts ?? []).toHaveLength(0);
+    // The failure is logged content-free: never the row, the user, or the
+    // provider error text.
+    expect(warn).toHaveBeenCalledWith('notification_history_write_failed', {
+      pushType: 'chat.message',
+      errorName: 'Error',
+    });
+    warn.mockRestore();
+  });
+
+  it('records the row through the local push sink as well', async () => {
+    setPushSinkModeForTesting('log');
+    const state: DbState = { tokens: [{ user_id: 'user-1', token: 'tok1' }] };
+    installDbMock(state);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    const result = await getDO('history-sink').dispatchPush(chatPush('history-sink-key'));
+
+    expect(result.kind).toBe('delivered');
+    expect(state.historyInserts).toHaveLength(1);
+    log.mockRestore();
   });
 });

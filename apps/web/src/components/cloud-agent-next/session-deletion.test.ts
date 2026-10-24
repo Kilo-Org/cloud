@@ -227,7 +227,7 @@ describe('session deletion', () => {
     const requests = keys.map(queryKey => {
       const staleData = context.queryClient.getQueryData(queryKey);
       return context.queryClient
-        .fetchQuery({
+        .query({
           queryKey,
           queryFn: async () => {
             await response.promise;

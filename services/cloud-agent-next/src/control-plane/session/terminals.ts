@@ -2,6 +2,10 @@ import { z } from 'zod';
 import type { SessionMetadata } from '../../persistence/session-metadata.js';
 import type { OperationResult } from '../../persistence/types.js';
 import {
+  SANDBOX_STATUS_DETAIL_MESSAGES,
+  type SandboxStatusSnapshot,
+} from '../../shared/sandbox-status.js';
+import {
   createSandboxTerminalBridge,
   terminalWrapperIdSchema,
   type SandboxTerminalRecord,
@@ -28,6 +32,7 @@ import { isTerminalSessionPlatform } from '../../terminal/access.js';
 const TERMINAL_PREFIX = 'control_terminal:';
 const TERMINAL_OPERATION_PREFIX = 'control_terminal_operation:';
 const TERMINAL_UNAVAILABLE = 'Terminal unavailable until the workspace is prepared';
+const TERMINAL_SLEEPING = SANDBOX_STATUS_DETAIL_MESSAGES.sandbox_stopped;
 
 const terminalRecordSchema = z
   .object({
@@ -75,6 +80,8 @@ export type ControlPlaneTerminalsDeps = {
   getWrapperId: () => Promise<string | undefined>;
   /** True when the route is ready to accept terminals (spec §5). */
   isRouteReady: () => boolean;
+  /** Passive sandbox snapshot used to distinguish an asleep sandbox from a starting one. */
+  getSandboxStatus: () => Promise<SandboxStatusSnapshot>;
   /** Forwards one terminal request to the Sandbox DO (spec §10). */
   request: (
     sandboxId: string,
@@ -88,6 +95,17 @@ function denied<T>(reason: string): OperationResult<T> {
 
 function unavailable<T>(): OperationResult<T> {
   return { success: false, error: TERMINAL_UNAVAILABLE };
+}
+
+function sleeping<T>(): OperationResult<T> {
+  return { success: false, error: TERMINAL_SLEEPING };
+}
+
+function thrownFailure<T>(error: unknown): OperationResult<T> {
+  return {
+    success: false,
+    error: error instanceof Error && error.message ? error.message : 'Terminal request failed',
+  };
 }
 
 function sameTerminalIdentity(left: SandboxTerminalRecord, right: SandboxTerminalRecord): boolean {
@@ -158,6 +176,15 @@ export function createControlPlaneTerminals(deps: ControlPlaneTerminalsDeps) {
     return record;
   }
 
+  async function isSandboxSleeping(): Promise<boolean> {
+    try {
+      const status = await deps.getSandboxStatus();
+      return status.status === 'sleeping' && status.detailCode === 'sandbox_stopped';
+    } catch {
+      return false;
+    }
+  }
+
   async function readyContext(): Promise<OperationResult<ReadyTerminalContext>> {
     const metadata = deps.getMetadata();
     if (metadata === null) return { success: false, error: 'Session not found' };
@@ -168,9 +195,14 @@ export function createControlPlaneTerminals(deps: ControlPlaneTerminalsDeps) {
     const sandboxId = metadata.workspace?.sandboxId;
     const kiloSessionId = metadata.auth.kiloSessionId;
     if (!directory || !sandboxId || !kiloSessionId) return unavailable();
-    if (!deps.isRouteReady()) return unavailable();
+    if (!deps.isRouteReady()) {
+      return (await isSandboxSleeping()) ? sleeping() : unavailable();
+    }
     const wrapperId = await deps.getWrapperId();
-    if (wrapperId === undefined || !terminalWrapperIdSchema.safeParse(wrapperId).success) {
+    if (wrapperId === undefined) {
+      return (await isSandboxSleeping()) ? sleeping() : unavailable();
+    }
+    if (!terminalWrapperIdSchema.safeParse(wrapperId).success) {
       return denied('the running wrapper does not support terminals');
     }
     // A replaced wrapper's running records are unreachable; settle them now so
@@ -331,8 +363,8 @@ export function createControlPlaneTerminals(deps: ControlPlaneTerminalsDeps) {
         session: context.session,
         payload,
       });
-    } catch {
-      return unavailable();
+    } catch (error) {
+      return thrownFailure(error);
     }
     if (!response.ok) return requestFailure(response);
     const result = sessionTerminalCreateResultSchema.safeParse(response.result);
@@ -391,8 +423,8 @@ export function createControlPlaneTerminals(deps: ControlPlaneTerminalsDeps) {
         session: context.session,
         payload: parsed.data,
       });
-    } catch {
-      return unavailable();
+    } catch (error) {
+      return thrownFailure(error);
     }
     if (!response.ok) return requestFailure(response);
     const latest = await readRecord(record.ptyId);
@@ -425,8 +457,8 @@ export function createControlPlaneTerminals(deps: ControlPlaneTerminalsDeps) {
         session: context.session,
         payload: parsed.data,
       });
-    } catch {
-      return unavailable();
+    } catch (error) {
+      return thrownFailure(error);
     }
     if (!response.ok) return requestFailure(response);
     const result = sessionTerminalCloseResultSchema.safeParse(response.result);
@@ -482,10 +514,14 @@ export function createControlPlaneTerminals(deps: ControlPlaneTerminalsDeps) {
         session: context.session,
         payload,
       });
-    } catch {
+    } catch (error) {
       return {
         ok: false,
-        error: { code: 'not_ready', message: TERMINAL_UNAVAILABLE, retryable: true },
+        error: {
+          code: 'not_ready',
+          message: error instanceof Error && error.message ? error.message : TERMINAL_UNAVAILABLE,
+          retryable: true,
+        },
       };
     }
     if (response.ok && !sessionTerminalConnectResultSchema.safeParse(response.result).success) {
@@ -502,9 +538,7 @@ export function createControlPlaneTerminals(deps: ControlPlaneTerminalsDeps) {
     getMetadata: async () => deps.getMetadata(),
     getTerminal,
     requestConnect,
-    // V2 has no activity RPC: terminal input is a wrapper-side signal, reported
-    // as heartbeat `active` only while input is recent (spec §6). The Session DO
-    // therefore has nothing to forward from a socket message.
+    // Terminal input must not renew sandbox activity (spec §6).
     reportActivity: async () => undefined,
     markEnded,
     resolveDirectory: () => deps.getDirectory(),

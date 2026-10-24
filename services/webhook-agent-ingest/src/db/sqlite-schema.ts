@@ -1,3 +1,4 @@
+import type { WebhookBodySchema } from '@kilocode/worker-utils/webhook-body-validation';
 import { sqliteTable, text, integer, index, check } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
@@ -43,6 +44,7 @@ export const triggerConfig = sqliteTable('trigger_config', {
   namespace: text('namespace').notNull(),
   user_id: text('user_id'),
   org_id: text('org_id'),
+  execution_user_id: text('execution_user_id'),
   created_at: text('created_at').notNull(),
   is_active: integer('is_active').notNull().default(1),
   target_type: text('target_type').notNull().default('cloud_agent'),
@@ -54,6 +56,7 @@ export const triggerConfig = sqliteTable('trigger_config', {
   sandbox_allocation: text('sandbox_allocation'),
   prompt_template: text('prompt_template').notNull(),
   profile_id: text('profile_id'),
+  body_schema: text('body_schema', { mode: 'json' }).$type<WebhookBodySchema>(),
   auto_commit: integer('auto_commit'),
   condense_on_complete: integer('condense_on_complete'),
   webhook_auth_header: text('webhook_auth_header'),

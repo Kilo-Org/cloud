@@ -207,7 +207,10 @@ export function ContextPreview({
         {path} {side} {lineLabel}
       </Text>
       {previewText.length > 0 ? (
-        <Text className="font-mono-medium text-[12px] leading-4 text-foreground" numberOfLines={1}>
+        <Text
+          className="font-mono-medium text-[12px] leading-[1rem] text-foreground"
+          numberOfLines={1}
+        >
           {previewText}
         </Text>
       ) : null}

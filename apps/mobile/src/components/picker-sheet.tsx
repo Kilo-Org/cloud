@@ -5,7 +5,8 @@ import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
-import { SheetHeader } from '@/components/sheet-header';
+import { SheetHeader, type SheetHeaderTopInset } from '@/components/sheet-header';
+import { useRouteFocused } from '@/lib/navigation/route-focus';
 
 export function PickerSheet({
   title,
@@ -18,6 +19,13 @@ export function PickerSheet({
   expired = false,
   scrollable = true,
   disabled = false,
+  doneDisabled = false,
+  /**
+   * Half-detent-only shells (mode-picker pins `sheetAllowedDetents: [0.5]`)
+   * can never reach the window top, so their header must not reserve the
+   * status-bar inset — it would only be a dead band above the title.
+   */
+  topInset = 'bottom-form-sheet',
 }: {
   title: string;
   onDone: () => void;
@@ -37,9 +45,19 @@ export function PickerSheet({
   scrollable?: boolean;
   /** Disables the header Done/Cancel controls while the caller applies a choice. */
   disabled?: boolean;
+  /** Disables Done alone, so Cancel stays usable while the choice is invalid. */
+  doneDisabled?: boolean;
+  topInset?: SheetHeaderTopInset;
 }) {
   const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
+  const routeFocused = useRouteFocused();
+  // A picker whose caller bridge is gone is a dead shell. It must only say so
+  // while its own route is the one on screen: painted over another screen it
+  // is a modal the user cannot leave through the screen they think they are on.
+  if (expired && !routeFocused) {
+    return null;
+  }
   const body = expired ? (
     <EmptyState
       icon={Info}
@@ -64,7 +82,8 @@ export function PickerSheet({
           doneLabel={doneLabel}
           cancelLabel={cancelLabel}
           disabled={disabled}
-          topInset="bottom-form-sheet"
+          doneDisabled={doneDisabled}
+          topInset={topInset}
         />
         {headerContent}
       </View>
@@ -72,6 +91,7 @@ export function PickerSheet({
         // keyboardShouldPersistTaps keeps a first tap on a row working while
         // a picker's search field holds the keyboard open.
         <ScrollView
+          nestedScrollEnabled
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingBottom: bottom + 16 }}
         >

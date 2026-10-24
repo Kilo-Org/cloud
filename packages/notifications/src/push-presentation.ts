@@ -278,6 +278,8 @@ export function androidChannelIdForPushData(data: PushData): AndroidNotification
     case 'security_finding':
     case 'security_lifecycle':
       return 'security';
+    case 'agent_briefing':
+      return 'agent-progress';
     case 'session_live_update':
       return 'followed-sessions-lock-screen';
     default: {
@@ -370,6 +372,7 @@ export function genericPushContentForPushData(
           'A security finding needs attention'
         ),
       };
+    case 'agent_briefing':
     case 'active_agents_glanceable':
       // Generic, count-free lock-screen banner copy: the ongoing notification
       // never leaks how many agents are running or which sessions they are.

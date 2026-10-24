@@ -6,16 +6,8 @@ import { computePlanAsync, findDevVarsExamples } from './plan';
 import { planHasChanges, displayPlan, applyEnvLocalAutoCreates, applyPlan } from './output';
 import type { SyncResult, CheckResult } from './types';
 
-// ---------------------------------------------------------------------------
-// ANSI color constants (used in CLI output below)
-// ---------------------------------------------------------------------------
-
 const GREEN = '\x1b[32m';
 const RESET = '\x1b[0m';
-
-// ---------------------------------------------------------------------------
-// Confirmation prompt
-// ---------------------------------------------------------------------------
 
 function confirm(question: string): Promise<boolean> {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -26,10 +18,6 @@ function confirm(question: string): Promise<boolean> {
     });
   });
 }
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 function resolveServiceFilter(targets?: string[]): Set<string> | undefined {
   if (!targets || targets.length === 0) return undefined;
@@ -122,10 +110,6 @@ async function checkEnvVars(repoRoot: string, targets?: string[]): Promise<Check
   };
 }
 
-// ---------------------------------------------------------------------------
-// CLI entry point
-// ---------------------------------------------------------------------------
-
 function findRepoRoot(): string {
   let dir = import.meta.dirname;
   for (let i = 0; i < 20; i++) {
@@ -188,10 +172,6 @@ if (isMain) {
     process.exit(1);
   });
 }
-
-// ---------------------------------------------------------------------------
-// Exports
-// ---------------------------------------------------------------------------
 
 export { syncEnvVars, checkEnvVars };
 export type { EnvSyncPlan, SyncResult, CheckResult } from './types';

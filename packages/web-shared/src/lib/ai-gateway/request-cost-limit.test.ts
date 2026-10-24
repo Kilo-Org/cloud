@@ -591,6 +591,23 @@ describe('System One request cost bound', () => {
     );
   });
 
+  it('bounds a discounted route at its undiscounted price', () => {
+    const discounted: StoredModel = {
+      id: 'typesafe/discounted',
+      name: 'Discounted',
+      endpoints: [{ pricing: { prompt: '0.0000005', completion: '0', discount: 0.5 } }],
+    };
+    const full: StoredModel = {
+      id: 'typesafe/full',
+      name: 'Full',
+      endpoints: [{ pricing: { prompt: '0.000001', completion: '0' } }],
+    };
+
+    expect(boundOf(discounted, { text: 'x'.repeat(1000) })).toBe(
+      boundOf(full, { text: 'x'.repeat(1000) })
+    );
+  });
+
   it('returns null for a model without usable pricing', () => {
     expect(
       systemOneRequestCostBound({ ...model, endpoints: [] }, { state: null, questions })

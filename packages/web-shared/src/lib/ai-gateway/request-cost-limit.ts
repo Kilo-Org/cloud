@@ -14,7 +14,10 @@ import {
   getCustomPricing,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
-import type { EndpointPricing } from './providers/openrouter/display-pricing';
+import {
+  getModelDisplayPricing,
+  type EndpointPricing,
+} from './providers/openrouter/display-pricing';
 import type { OpenRouterProviderConfig } from './providers/openrouter/types';
 import {
   getVercelModelIdOverrides,
@@ -410,12 +413,18 @@ function worstRates(rates: readonly (TextPricingRates | null)[]): TextPricingRat
 }
 
 /**
- * The rates a stored model may be billed at: its worst route and its most expensive billed tier, so
- * a bound built from them covers whichever route serves the request. `null` when the catalog cannot
- * price every one of them.
+ * The rates a stored model may be billed at: every route at both its stored price and its
+ * undiscounted list price, plus its most expensive billed tier, so a bound built from them covers
+ * whichever route serves the request at whichever price it is quoted. `null` when the catalog
+ * cannot price every one of them.
  */
 function storedModelWorstRates(metadata: StoredModel): TextPricingRates | null {
-  const routes = worstRates(metadata.endpoints.map(endpoint => pricedRates(endpoint.pricing)));
+  const routes = worstRates(
+    metadata.endpoints.flatMap(endpoint => [
+      pricedRates(endpoint.pricing),
+      pricedRates(getModelDisplayPricing(endpoint.pricing)),
+    ])
+  );
   const tiers = worstRates(
     [
       ...(getCustomPricing(metadata.id)?.pricing ?? []),

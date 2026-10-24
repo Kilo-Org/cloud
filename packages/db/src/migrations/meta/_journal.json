@@ -2108,6 +2108,13 @@
       "when": 1792869596255,
       "tag": "0300_device_auth_client_details",
       "breakpoints": true
+    },
+    {
+      "idx": 301,
+      "version": "7",
+      "when": 1792876471766,
+      "tag": "0301_contributor_credit_window",
+      "breakpoints": true
     }
   ]
 }

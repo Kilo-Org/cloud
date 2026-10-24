@@ -524,7 +524,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     emitProgress(spec.sessionId, 'checkout');
     const gitRoute: GitRouteClass = spec.git?.token ? 'managed' : 'direct';
     const runBranchGit = (args: string[], options?: ProcessOptions): Promise<ExecResult> =>
-      runGit([...managedGitHubPreparationGitArgs(spec.git, args[0]), ...args], {
+      runGit([...managedGitHubPreparationGitArgs(spec, args[0]), ...args], {
         ...options,
         cwd: directory,
         env,
@@ -538,8 +538,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     if (isSyntheticReviewRef(branch) && spec.branchMode !== 'working') {
       await checkoutSyntheticReviewRef({
         runGit: (args, options) => {
-          const gitConfigArgs =
-            args[0] === 'fetch' ? managedGitHubPreparationGitArgs(spec.git, 'fetch') : [];
+          const gitConfigArgs = managedGitHubPreparationGitArgs(spec, args[0]);
           return runGit([...gitConfigArgs, ...args], {
             ...options,
             cwd: directory,

@@ -34,7 +34,7 @@ export const SETUP_OUTPUT_EVENT_LIMIT = 8_192;
 export type RepositoryGit = NonNullable<ControlPlaneRouteSpec['git']>;
 
 /**
- * Spec §7: eligible managed GitHub HTTPS preparation clone/fetch opts into the
+ * Spec §7: eligible managed GitHub HTTPS preparation opts into the
  * two invocation-scoped native Git options together. `proactiveAuth=basic`
  * makes the first request carry the existing URL-bound control alias so
  * contained resolution, repository-authorized redemption and the bounded
@@ -52,17 +52,24 @@ const MANAGED_GITHUB_PREPARATION_GIT_CONFIG = [
 
 /**
  * The single eligibility decision for the two invocation-scoped options. Both
- * options or neither: the command must be preparation clone/fetch, the platform
+ * options or neither: the command must clone, fetch, or check out a code review
+ * that can lazily fetch blobs. The platform
  * must be managed GitHub, the token must parse as a `github` control alias, and
  * the URL must be the direct HTTPS default-port github.com URL. Callers judge
  * the route's git source, never the password parsed back out of the
  * authenticated URL.
  */
 export function managedGitHubPreparationGitArgs(
-  git: RepositoryGit | undefined,
+  spec: Pick<ControlPlaneRouteSpec, 'git' | 'createdOnPlatform'>,
   command: string
 ): string[] {
-  if (command !== 'clone' && command !== 'fetch') return [];
+  if (
+    command !== 'clone' &&
+    command !== 'fetch' &&
+    !(command === 'checkout' && spec.createdOnPlatform === 'code-review')
+  )
+    return [];
+  const git = spec.git;
   if (!git || git.platform !== 'github') return [];
   if (!git.token || parseControlPlaneCredential(git.token)?.purpose !== 'github') return [];
   let url: URL;
@@ -171,7 +178,7 @@ export function createRepositoryPreparation(
     const gitRoute: GitRouteClass = spec.git.token ? 'managed' : 'direct';
     if (!(await hasGit(directory))) {
       const cloneUrl = authenticatedGitUrl(spec.git.url, spec.git.token, spec.git.platform);
-      const gitConfigArgs = managedGitHubPreparationGitArgs(spec.git, 'clone');
+      const gitConfigArgs = managedGitHubPreparationGitArgs(spec, 'clone');
       const useBlobless = isBloblessReviewCloneEligible(
         spec.createdOnPlatform,
         spec.git.platform,

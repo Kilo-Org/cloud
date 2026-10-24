@@ -4253,7 +4253,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         // Persist a placeholder before the launch so a `hello` accepted while it
         // runs confirms this allocation, and that confirmation outlives the
         // allocation stopping before the launch resolves.
-        await beginRepositoryLaunch(this.ctx.storage, allocationId, launch.skipped);
+        await beginRepositoryLaunch(this.ctx.storage, allocationId, launch.skipped, selection.mode);
         if (Date.now() >= launchDeadline) throw new Error('Sandbox launch timed out');
         const launchOptions: ProviderLaunchOptions = {
           ...launch.options,

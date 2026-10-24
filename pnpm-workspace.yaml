@@ -259,6 +259,11 @@ patchedDependencies:
   # veto a requested dismissal, so a scrolling form can keep its values.
   '@expo/ui@58.0.17': patches/@expo+ui@58.0.17.patch
   expo-dev-launcher@58.0.14: patches/expo-dev-launcher@58.0.14.patch
+  # The app owns the layout direction: the picker forces RTL for an RTL language
+  # and relaunches, and the unset build-time template value must not reset that
+  # choice before React renders, or the relaunched app comes back in the other
+  # direction on every launch.
+  expo-localization@58.0.4: patches/expo-localization@58.0.4.patch
   # A zero badge count must not cancel every app notification: upstream called
   # cancelAll(), which removed the ongoing Active Agents card on Android.
   expo-notifications@58.1.4: patches/expo-notifications@58.1.4.patch

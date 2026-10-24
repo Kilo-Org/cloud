@@ -151,12 +151,21 @@ test('the gate job exposes the promote outputs the workflow reads', () => {
   }
 });
 
-// Each platform job checks its matching artifact before running build steps.
-test('platform jobs run independently and re-check their artifacts', () => {
+// One native build takes longer than the gap between two pushes of the same
+// native inputs, so the gate's artifact lookup cannot see the build in
+// flight. The job-level slot plus the re-check is what stops the duplicate.
+// The slot is keyed on the event as well: a push build must not be the pending
+// job that a later pull_request job cancels, or main keeps no durable artifact.
+test('each heavy job is serialized on its nativeHash and re-checks its artifact', () => {
   const workflow = readWorkflow();
   for (const platform of ['ios', 'android'] as const) {
     const job = workflow.jobs[platform];
-    assert.equal(job.concurrency, undefined);
+    assert.deepEqual(job.concurrency, {
+      group:
+        `\${{ github.workflow }}-\${{ github.event_name }}-${platform}` +
+        `-\${{ needs.gate.outputs.${platform}_hash }}`,
+      'cancel-in-progress': false,
+    });
     const published = step(job, 'published');
     assert.match(
       published.run ?? '',
@@ -168,7 +177,7 @@ test('platform jobs run independently and re-check their artifacts', () => {
       assert.equal(
         later.if,
         "steps.published.outputs.published != 'true'",
-        `${platform}: build steps must skip when an artifact is available`
+        `${platform}: every step after the re-check must skip when another run published`
       );
     }
   }
@@ -625,10 +634,10 @@ test('the gate CLI keeps an edited workflow out of the installed namespace', () 
   assert.doesNotMatch(ghLog, /artifacts\?name=mobile-native-ios-ioshash/);
 });
 
-// The heavy jobs re-check their own artifact before building. The check must
-// agree with the gate: a pull_request job may take the one-day artifact it
-// would publish itself, a push job must not.
-test('the published check reports the durable artifact to a job that is about to build', () => {
+// The heavy jobs re-check their own artifact once the hash's concurrency slot
+// frees. The check must agree with the gate: a pull_request job may take the
+// one-day artifact it would publish itself, a push job must not.
+test('the published check reports the durable artifact to a waiting job', () => {
   const { outputs } = runGateCli({
     eventName: 'push',
     published: 'mobile-native-ios-ioshash',

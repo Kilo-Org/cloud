@@ -147,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Ændringer"
+    "changes": "Ændringer",
+    "organizationTrialEnded": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. En ejer af organisationen kan opdatere betalingen på kilo.ai og derefter prøve igen."
   },
   "language": {
     "restarting": "Genstarter for at skifte sprog",
@@ -2953,7 +2954,6 @@
   },
   "voiceInput": {
     "listening": "Lytter...",
-    "staysOff": "Diktering er slået fra, indtil du tillader transskription på nettet.",
     "onlineTitle": "Tale behandles på nettet",
     "onlineMessage": "Denne enhed kan ikke omdanne tale til tekst uden internetforbindelse. Din optagelse sendes til {{provider}} for at blive omdannet til tekst. Kilo gemmer ikke lyden.",
     "allow": "Tillad",
@@ -3168,7 +3168,9 @@
       "sendInvite": "Send invitation",
       "title": "Invitér medlem",
       "alreadyInvited": "Personen er allerede inviteret eller allerede medlem.",
-      "sendError": "Invitationen kunne ikke sendes."
+      "sendError": "Invitationen kunne ikke sendes.",
+      "pendingInvitation": "Denne e-mailadresse har allerede en afventende invitation.",
+      "alreadyMember": "Denne person er allerede medlem af denne organisation."
     },
     "invoices": {
       "downloadA11y": "Download faktura {{number}}",
@@ -3238,7 +3240,12 @@
       "pendingInvitations": "Ubesvarede invitationer",
       "resendInvite": "Send invitation igen",
       "shareInviteLink": "Del invitationslink",
-      "resendInviteError": "Invitationen kunne ikke sendes igen."
+      "resendInviteError": "Invitationen kunne ikke sendes igen.",
+      "inviteNotResendable": "Denne invitation kan ikke længere sendes igen.",
+      "ownerAuthority": "Kun en organisationsejer kan administrere ejere.",
+      "ownRoleChange": "Du kan ikke ændre din egen rolle.",
+      "inviteExpired": "Denne invitation er udløbet.",
+      "inviteAccepted": "Denne invitation er allerede blevet accepteret."
     },
     "usageStats": {
       "inputTokens": "Tokens i inddata",

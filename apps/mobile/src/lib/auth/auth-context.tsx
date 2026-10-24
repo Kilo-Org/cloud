@@ -371,7 +371,9 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   );
 
   useEffect(() => {
-    // A root-boundary Retry remounts this provider after credentials may have changed.
+    // Android can recreate the activity without restarting JavaScript. Later provider mounts
+    // and root-boundary Retry remounts must read current credentials rather than the snapshot
+    // from before sign-in or a credential change.
     const preload = authPreloadAvailable
       ? { token: preloadedAuthToken, refresh: preloadedRefreshToken }
       : undefined;

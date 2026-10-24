@@ -147,7 +147,8 @@
     "agent": "Umboðsmaður",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Breytingar"
+    "changes": "Breytingar",
+    "organizationTrialEnded": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Eigandi fyrirtækis getur uppfært greiðsluupplýsingar á kilo.ai og reynir síðan aftur."
   },
   "language": {
     "restarting": "Endurræsi til að virkja valið tungumál",
@@ -2953,7 +2954,6 @@
   },
   "voiceInput": {
     "listening": "Hlusta…",
-    "staysOff": "Raddinnsláttur er óvirkur þar til þú leyfir umritun á netinu.",
     "onlineTitle": "Tal er unnið á netinu",
     "onlineMessage": "Þetta tæki getur ekki umritað án nettengingar. Upptakan þín er send til {{provider}} til að breyta henni í texta. Kilo geymir ekki hljóðið.",
     "allow": "Leyfa",
@@ -3168,7 +3168,9 @@
       "sendInvite": "Senda boð",
       "title": "Bjóða meðlim að taka þátt",
       "alreadyInvited": "Tölvupóstfangið er þegar boðið eða meðlimurinn er þegar í félaginu.",
-      "sendError": "Ekki tókst að senda boðið."
+      "sendError": "Ekki tókst að senda boðið.",
+      "pendingInvitation": "Þetta tölvupóstfang er þegar með boð í bið.",
+      "alreadyMember": "Þessi einstaklingur er þegar meðlimur í þessu fyrirtæki."
     },
     "invoices": {
       "downloadA11y": "Sækja reikning {{number}}",
@@ -3238,7 +3240,12 @@
       "pendingInvitations": "Boð í bið",
       "resendInvite": "Senda boð aftur",
       "shareInviteLink": "Deila boðstengli",
-      "resendInviteError": "Ekki tókst að senda boðið aftur."
+      "resendInviteError": "Ekki tókst að senda boðið aftur.",
+      "inviteNotResendable": "Ekki er lengur hægt að senda þetta boð aftur.",
+      "ownerAuthority": "Aðeins eigandi stofnunar getur stýrt eigendum.",
+      "ownRoleChange": "Þú getur ekki breytt þínu eigin hlutverki.",
+      "inviteExpired": "Þetta boð er útrunnið.",
+      "inviteAccepted": "Þetta boð hefur þegar verið samþykkt."
     },
     "usageStats": {
       "inputTokens": "Inntakstókar",

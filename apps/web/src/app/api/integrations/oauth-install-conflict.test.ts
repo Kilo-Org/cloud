@@ -103,8 +103,11 @@ jest.mock('@/lib/integrations/provider-oauth-attempts', () => ({
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 
-const createProviderState = (userId: string) =>
-  createOAuthState(`user_${userId}`, userId, undefined, 'provider_install');
+const createProviderState = (userId: string, platform: 'linear' | 'slack') =>
+  createOAuthState(`user_${userId}`, userId, undefined, {
+    provider: platform,
+    purpose: 'provider_install',
+  });
 
 async function callCallback(platform: 'linear' | 'slack', query: string) {
   const { GET } = await import('./[platform]/callback/route');
@@ -229,7 +232,7 @@ describe('Linear install callback against the real integration row', () => {
 
     const response = await callCallback(
       'linear',
-      `?code=abc&state=${createProviderState(otherOwner.id)}`
+      `?code=abc&state=${createProviderState(otherOwner.id, 'linear')}`
     );
 
     expect(redirectPath(response)).toBe('/integrations/linear?error=workspace_already_connected');
@@ -256,7 +259,7 @@ describe('Linear install callback against the real integration row', () => {
 
     const response = await callCallback(
       'linear',
-      `?code=abc&state=${createProviderState(otherOwner.id)}`
+      `?code=abc&state=${createProviderState(otherOwner.id, 'linear')}`
     );
 
     expect(redirectPath(response)).toBe('/integrations/linear?success=installed');
@@ -284,7 +287,7 @@ describe('Slack install callback against the real integration row', () => {
 
     const response = await callCallback(
       'slack',
-      `?code=abc&state=${createProviderState(otherOwner.id)}`
+      `?code=abc&state=${createProviderState(otherOwner.id, 'slack')}`
     );
 
     expect(redirectPath(response)).toBe('/integrations/slack?error=workspace_already_connected');
@@ -314,7 +317,7 @@ describe('Slack install callback against the real integration row', () => {
 
     const response = await callCallback(
       'slack',
-      `?code=abc&state=${createProviderState(otherOwner.id)}`
+      `?code=abc&state=${createProviderState(otherOwner.id, 'slack')}`
     );
 
     expect(redirectPath(response)).toBe('/integrations/slack?success=installed');
@@ -349,12 +352,10 @@ describe('Slack install callback against the real integration row', () => {
           metadata: { model_slug: 'test/selected-model' },
         })
         .returning();
-      const state = createOAuthState(
-        `org_${organization.id}`,
-        otherOwner.id,
-        undefined,
-        'provider_install'
-      );
+      const state = createOAuthState(`org_${organization.id}`, otherOwner.id, undefined, {
+        provider: 'slack',
+        purpose: 'provider_install',
+      });
       const response = await callCallback('slack', `?code=abc&state=${state}`);
 
       expect(redirectPath(response)).toBe(
@@ -392,12 +393,15 @@ test.each(['slack', 'linear'] as const)(
       .mockResolvedValueOnce({ user: { id: owner.id }, authFailedResponse: null } as never)
       .mockResolvedValueOnce({ user: { id: otherOwner.id }, authFailedResponse: null } as never);
 
-    const winner = callCallback(platform, `?code=first&state=${createProviderState(owner.id)}`);
+    const winner = callCallback(
+      platform,
+      `?code=first&state=${createProviderState(owner.id, platform)}`
+    );
     await firstWrite.promise;
     const storedInstallation = mockInstallations.get(installationId);
     const contender = callCallback(
       platform,
-      `?code=second&state=${createProviderState(otherOwner.id)}`
+      `?code=second&state=${createProviderState(otherOwner.id, platform)}`
     );
 
     const abort = new AbortController();

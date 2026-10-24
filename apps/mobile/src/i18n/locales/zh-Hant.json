@@ -147,7 +147,8 @@
     "agent": "代理人",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "變更"
+    "changes": "變更",
+    "organizationTrialEnded": "組織的試用期已結束，且沒有使用中的方案。組織擁有者可以在 kilo.ai 更新帳單資訊，然後再試一次。"
   },
   "language": {
     "restarting": "正在重新啟動以套用語言",
@@ -2432,7 +2433,6 @@
     "allow": "允許",
     "onlineMessage": "此裝置無法離線將語音轉成文字。你的錄音會傳送至 {{provider}} 以轉換為文字。Kilo 不會儲存音訊。",
     "onlineTitle": "語音會在線上處理",
-    "staysOff": "允許線上語音轉文字後，才能啟用語音輸入。",
     "start": "開始語音輸入",
     "stop": "停止語音輸入",
     "restricted": "此裝置上的語音輸入受到限制。",
@@ -3167,7 +3167,9 @@
       "sendInvite": "傳送邀請",
       "title": "邀請成員",
       "alreadyInvited": "該電子郵件地址已有待處理的邀請，或已是成員。",
-      "sendError": "無法傳送邀請。"
+      "sendError": "無法傳送邀請。",
+      "pendingInvitation": "這個電子郵件地址已有待處理的邀請。",
+      "alreadyMember": "這個人已經是此組織的成員。"
     },
     "invoices": {
       "downloadA11y": "下載發票 {{number}}",
@@ -3237,7 +3239,12 @@
       "pendingInvitations": "待處理的邀請",
       "resendInvite": "重新傳送邀請",
       "shareInviteLink": "分享邀請連結",
-      "resendInviteError": "無法重新傳送邀請。"
+      "resendInviteError": "無法重新傳送邀請。",
+      "inviteNotResendable": "此邀請已無法重新傳送。",
+      "ownerAuthority": "只有組織擁有者可以管理擁有者。",
+      "ownRoleChange": "您無法變更自己的角色。",
+      "inviteExpired": "此邀請已過期。",
+      "inviteAccepted": "此邀請已被接受。"
     },
     "usageStats": {
       "inputTokens": "輸入詞元",

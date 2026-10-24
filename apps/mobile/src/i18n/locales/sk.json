@@ -147,7 +147,8 @@
     "agent": "agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Zmeny"
+    "changes": "Zmeny",
+    "organizationTrialEnded": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Vlastník organizácie môže aktualizovať fakturáciu na kilo.ai a potom to skúsiť znova."
   },
   "language": {
     "restarting": "Aplikácia sa reštartuje na zmenu jazyka",
@@ -3039,7 +3040,6 @@
   },
   "voiceInput": {
     "listening": "Počúva sa…",
-    "staysOff": "Hlasový vstup zostane vypnutý, kým nepovolíte online prepis.",
     "onlineTitle": "Reč sa spracúva online",
     "onlineMessage": "Toto zariadenie nedokáže prepísať reč bez pripojenia na internet. Nahrávku odošleme poskytovateľovi {{provider}} na prepis do textu. Kilo zvukový záznam neukladá.",
     "allow": "Povoliť",
@@ -3256,7 +3256,9 @@
       "sendInvite": "Odoslať pozvánku",
       "title": "Pozvať člena",
       "alreadyInvited": "Táto osoba už bola pozvaná alebo už je členom.",
-      "sendError": "Pozvánku sa nepodarilo odoslať."
+      "sendError": "Pozvánku sa nepodarilo odoslať.",
+      "pendingInvitation": "Táto e-mailová adresa už má čakajúcu pozvánku.",
+      "alreadyMember": "Táto osoba je už členom tejto organizácie."
     },
     "invoices": {
       "downloadA11y": "Stiahnuť faktúru {{number}}",
@@ -3326,7 +3328,12 @@
       "pendingInvitations": "Čakajúce pozvánky",
       "resendInvite": "Znova odoslať pozvánku",
       "shareInviteLink": "Zdieľať odkaz na pozvánku",
-      "resendInviteError": "Pozvánku sa nepodarilo odoslať znova."
+      "resendInviteError": "Pozvánku sa nepodarilo odoslať znova.",
+      "inviteNotResendable": "Túto pozvánku už nemožno znova odoslať.",
+      "ownerAuthority": "Iba vlastník organizácie môže spravovať vlastníkov.",
+      "ownRoleChange": "Nemôžete si zmeniť vlastnú rolu.",
+      "inviteExpired": "Tejto pozvánke vypršila platnosť.",
+      "inviteAccepted": "Táto pozvánka už bola prijatá."
     },
     "usageStats": {
       "inputTokens": "Vstupné tokeny",

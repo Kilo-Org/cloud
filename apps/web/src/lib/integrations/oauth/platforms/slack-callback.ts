@@ -11,7 +11,7 @@ import {
   SlackWorkspaceAlreadyConnectedError,
   upsertSlackInstallation,
 } from '@/lib/integrations/slack-service';
-import { isLegacyProviderOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
+import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { bot } from '@/lib/bot';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -25,8 +25,6 @@ import {
 } from '@/lib/integrations/oauth/common';
 import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
 import { withWorkspaceInstallationLock } from '@/lib/integrations/oauth/workspace-installation-lock';
-import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
-import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 
 /**
  * Slack OAuth Callback
@@ -130,7 +128,7 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
       }
     }
 
-    if (verified.purpose !== 'provider_install' && !isLegacyProviderOAuthState(verified)) {
+    if (verified.provider !== PLATFORM.SLACK || verified.purpose !== 'provider_install') {
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
 
@@ -151,10 +149,6 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
     const slackAdapter = bot.getAdapter('slack');
 
     const { installationId, installation } = await exchangeSlackOAuthCode(code);
-    const defaultModel =
-      owner.type === 'org'
-        ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
-        : DEFAULT_BOT_MODEL;
 
     const conflictRedirect = NextResponse.redirect(
       new URL(
@@ -183,7 +177,6 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
             teamId: installationId,
             installation,
             allowWorkspaceRebind: owner.type === 'org',
-            defaultModel,
           },
           tx
         );

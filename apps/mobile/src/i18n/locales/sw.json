@@ -147,7 +147,8 @@
     "agent": "Wakala",
     "durationMinuteShort": "dk",
     "durationHourShort": "saa",
-    "changes": "Mabadiliko"
+    "changes": "Mabadiliko",
+    "organizationTrialEnded": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Mmiliki wa shirika anaweza kusasisha malipo kwenye kilo.ai, kisha ajaribu tena."
   },
   "language": {
     "restarting": "Programu inaanza upya ili kutumia lugha",
@@ -2953,7 +2954,6 @@
   },
   "voiceInput": {
     "listening": "Inasikiliza...",
-    "staysOff": "Uingizaji kwa sauti utaendelea kuzimwa hadi uruhusu ubadilishaji wa sauti kuwa maandishi mtandaoni.",
     "onlineTitle": "Sauti huchakatwa mtandaoni",
     "onlineMessage": "Kifaa hiki hakiwezi kubadilisha sauti kuwa maandishi bila mtandao. Rekodi yako inatumwa kwa {{provider}} ili ibadilishwe kuwa maandishi. Kilo haihifadhi sauti.",
     "allow": "Ruhusu",
@@ -3168,7 +3168,9 @@
       "sendInvite": "Tuma mwaliko",
       "title": "Alika mwanachama",
       "alreadyInvited": "Wamekwishaalikwa au ni wanachama tayari.",
-      "sendError": "Imeshindikana kutuma mwaliko."
+      "sendError": "Imeshindikana kutuma mwaliko.",
+      "pendingInvitation": "Barua pepe hii tayari ina mwaliko unaosubiri.",
+      "alreadyMember": "Mtu huyu tayari ni mwanachama wa shirika hili."
     },
     "invoices": {
       "downloadA11y": "Pakua ankara {{number}}",
@@ -3238,7 +3240,12 @@
       "pendingInvitations": "Mialiko inayosubiri",
       "resendInvite": "Tuma mwaliko tena",
       "shareInviteLink": "Shiriki kiungo cha mwaliko",
-      "resendInviteError": "Imeshindikana kutuma mwaliko tena."
+      "resendInviteError": "Imeshindikana kutuma mwaliko tena.",
+      "inviteNotResendable": "Mwaliko huu hauwezi kutumwa tena.",
+      "ownerAuthority": "Ni mmiliki wa shirika pekee anayeweza kusimamia wamiliki.",
+      "ownRoleChange": "Huwezi kubadilisha jukumu lako mwenyewe.",
+      "inviteExpired": "Mwaliko huu umeisha muda wake.",
+      "inviteAccepted": "Mwaliko huu tayari umekubaliwa."
     },
     "usageStats": {
       "inputTokens": "Tokeni za ingizo",

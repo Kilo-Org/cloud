@@ -147,7 +147,8 @@
     "agent": "Agjenti",
     "durationMinuteShort": "min",
     "durationHourShort": "orë",
-    "changes": "Ndryshimet"
+    "changes": "Ndryshimet",
+    "organizationTrialEnded": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv. Një pronar i organizatës mund të përditësojë faturimin në kilo.ai dhe më pas të provojë përsëri."
   },
   "language": {
     "restarting": "Po riniset për të zbatuar ndryshimin e gjuhës",
@@ -2953,7 +2954,6 @@
   },
   "voiceInput": {
     "listening": "Po dëgjon...",
-    "staysOff": "Diktimi mbetet i çaktivizuar derisa të lejosh transkriptimin në internet.",
     "onlineTitle": "Të folurit përpunohet në internet",
     "onlineMessage": "Kjo pajisje nuk mund të transkriptojë pa internet. Regjistrimi yt dërgohet te {{provider}} për t'u kthyer në tekst. Kilo nuk e ruan audion.",
     "allow": "Lejo",
@@ -3168,7 +3168,9 @@
       "sendInvite": "Dërgo ftesën",
       "title": "Fto anëtar",
       "alreadyInvited": "Ky person është ftuar tashmë ose është tashmë anëtar.",
-      "sendError": "Ftesa nuk u dërgua."
+      "sendError": "Ftesa nuk u dërgua.",
+      "pendingInvitation": "Ky email ka tashmë një ftesë në pritje.",
+      "alreadyMember": "Ky person është tashmë anëtar i kësaj organizate."
     },
     "invoices": {
       "downloadA11y": "Shkarko faturën {{number}}",
@@ -3238,7 +3240,12 @@
       "pendingInvitations": "Ftesat në pritje",
       "resendInvite": "Ridërgo ftesën",
       "shareInviteLink": "Ndaj lidhjen e ftesës",
-      "resendInviteError": "Ftesa nuk u ridërgua."
+      "resendInviteError": "Ftesa nuk u ridërgua.",
+      "inviteNotResendable": "Kjo ftesë nuk mund të ridërgohet më.",
+      "ownerAuthority": "Vetëm pronari i organizatës mund të menaxhojë pronarët.",
+      "ownRoleChange": "Nuk mund të ndryshosh rolin tënd.",
+      "inviteExpired": "Kjo ftesë ka skaduar.",
+      "inviteAccepted": "Kjo ftesë është pranuar tashmë."
     },
     "usageStats": {
       "inputTokens": "Tokenët hyrës",

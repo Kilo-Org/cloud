@@ -1,18 +1,22 @@
 import type { StoredModel } from '@kilocode/db';
-import { enforceRequestCostLimit, textRequestPriceCeiling } from './request-cost-limit';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { getOpenRouterModelsMetadataFromDatabase } from './providers/gateway-models-cache';
+import { getRawOpenRouterModels, pickerModelPricing } from './providers/openrouter';
+import { getPreferredProviderOrderConfig } from './providers/preferred-provider-order-config';
+import { enforceRequestCostLimit as enforceRequestCostLimitDecision } from './request-cost-limit';
 import { addCacheBreakpoints } from './providers/openrouter/request-helpers';
 import type { GatewayRequest } from './providers/openrouter/types';
 import { getVercelModelIdOverrides } from './providers/vercel/mapModelIdToVercel';
 
-const mockCatalogLimit = jest.fn();
-jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
-  db: {
-    select: () => ({
-      from: () => ({
-        orderBy: () => ({ limit: (...args: unknown[]) => mockCatalogLimit(...args) }),
-      }),
-    }),
-  },
+jest.mock('./providers/gateway-models-cache', () => ({
+  getOpenRouterModelsMetadataFromDatabase: jest.fn(),
+}));
+jest.mock('./providers/openrouter', () => ({
+  ...jest.requireActual('./providers/openrouter'),
+  getRawOpenRouterModels: jest.fn(),
+}));
+jest.mock('./providers/preferred-provider-order-config', () => ({
+  getPreferredProviderOrderConfig: jest.fn(),
 }));
 jest.mock('./providers/vercel/mapModelIdToVercel', () => ({
   ...jest.requireActual('./providers/vercel/mapModelIdToVercel'),
@@ -23,6 +27,7 @@ const model: StoredModel = {
   name: 'Bounded model',
   endpoints: [
     {
+      tag: 'first-route',
       pricing: {
         prompt: '0.000001',
         completion: '0.000002',
@@ -31,26 +36,213 @@ const model: StoredModel = {
         internal_reasoning: '0.000004',
       },
     },
-    { pricing: { prompt: '0.000002', completion: '0.000003', request: '0.02' } },
+    {
+      tag: 'second-route',
+      pricing: { prompt: '0.000002', completion: '0.000003', request: '0.02' },
+    },
   ],
 };
 const body = { messages: [{ role: 'user', content: 'Evidence' }], max_tokens: 64, stream: false };
+async function enforceRequestCostLimit(
+  header: string | null,
+  modelId: string,
+  requestBody: unknown,
+  availableBalanceMicrodollars: number
+) {
+  return (
+    await enforceRequestCostLimitDecision(
+      header,
+      modelId,
+      requestBody,
+      availableBalanceMicrodollars,
+      { id: 'openrouter', userFunded: false }
+    )
+  ).refusal;
+}
+const catalogModel = (id: string, pricing: OpenRouterModel['pricing']): OpenRouterModel =>
+  ({
+    id,
+    name: id,
+    created: 0,
+    description: '',
+    architecture: { input_modalities: ['text'], output_modalities: ['text'], tokenizer: 'Other' },
+    top_provider: { is_moderated: false },
+    pricing,
+    context_length: 128_000,
+  }) satisfies OpenRouterModel;
 beforeEach(() => {
-  mockCatalogLimit.mockResolvedValue([{ models: { [model.id]: model } }]);
+  jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
+    [model.id]: model,
+  });
+  jest.mocked(getRawOpenRouterModels).mockResolvedValue({
+    data: [catalogModel(model.id, { prompt: '0.0000001', completion: '0.0000002' })],
+  });
+  jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue({ rules: [] });
   jest.mocked(getVercelModelIdOverrides).mockResolvedValue(new Map());
 });
-describe('request cost admission', () => {
-  it('bounds every route including cache, reasoning and per-request fees', () => {
-    const price = textRequestPriceCeiling(model);
-    expect(price.inputRate).toBeCloseTo(0.000004, 12);
-    expect(price.outputRate).toBeCloseTo(0.000006, 12);
-    expect(price.requestCost).toBe(0.02);
+function mockModels(models: StoredModel[]) {
+  const modelMap = Object.fromEntries(models.map(entry => [entry.id, entry]));
+  jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue(modelMap);
+  jest.mocked(getRawOpenRouterModels).mockResolvedValue({
+    data: models
+      .filter(entry => entry.endpoints.length > 0 || entry.alias_target)
+      .map(entry => {
+        const target = entry.alias_target
+          ? models.find(candidate => candidate.id === entry.alias_target?.slug)
+          : undefined;
+        const pricing = entry.endpoints[0]?.pricing ??
+          target?.endpoints[0]?.pricing ?? { prompt: '', completion: '' };
+        return catalogModel(entry.id, pricing);
+      }),
   });
+}
+describe('request cost admission', () => {
   it('fails closed for unknown or incompletely priced routes', async () => {
     await expect(
       enforceRequestCostLimit('2000000', 'missing/model', body, 2_000_000)
     ).resolves.toMatch(/pricing/);
-    expect(() => textRequestPriceCeiling({ ...model, endpoints: [{}] })).toThrow();
+  });
+  it('returns a pricing refusal when the raw catalog cannot be fetched', async () => {
+    jest.mocked(getRawOpenRouterModels).mockRejectedValue(new Error('catalog unavailable'));
+
+    await expect(enforceRequestCostLimit('2000000', model.id, body, 2_000_000)).resolves.toBe(
+      'catalog unavailable'
+    );
+  });
+  it('admits a catalog-only model at the same price shown by the picker', async () => {
+    const catalogOnly = catalogModel('catalog/only', {
+      prompt: '0.0000001',
+      completion: '0.0000002',
+    });
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
+    jest.mocked(getRawOpenRouterModels).mockResolvedValue({ data: [catalogOnly] });
+    const pickerPrice = pickerModelPricing(catalogOnly, {}, { rules: [] });
+
+    await expect(
+      enforceRequestCostLimit('500', catalogOnly.id, body, 2_000_000)
+    ).resolves.toBeNull();
+    expect(pickerPrice).toEqual(catalogOnly.pricing);
+  });
+  it('admits against the preferred route price rather than a more expensive route', async () => {
+    const id = 'test/preferred';
+    const routeModel: StoredModel = {
+      id,
+      name: 'Preferred model',
+      endpoints: [
+        { tag: 'preferred-route', pricing: { prompt: '0.0000001', completion: '0.0000002' } },
+        { tag: 'other-route', pricing: { prompt: '0.000002', completion: '0.000004' } },
+      ],
+    };
+    const catalogEntry = catalogModel(id, { prompt: '0.0000003', completion: '0.0000005' });
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({ [id]: routeModel });
+    jest.mocked(getRawOpenRouterModels).mockResolvedValue({ data: [catalogEntry] });
+    const preferredOrder = {
+      rules: [{ includes: ['test/'], providers: ['preferred-route'] }],
+    };
+    jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue(preferredOrder);
+    const pickerPrice = pickerModelPricing(catalogEntry, { [id]: routeModel }, preferredOrder);
+    expect(pickerPrice).toEqual(routeModel.endpoints[0]?.pricing);
+
+    await expect(enforceRequestCostLimit('500', id, body, 2_000_000)).resolves.toBeNull();
+  });
+  it('refuses a managed provider that cannot enforce the quoted route price', async () => {
+    const decision = await enforceRequestCostLimitDecision(
+      '2000000',
+      model.id,
+      { ...body, provider: { only: ['second-route'] } },
+      2_000_000,
+      { id: 'vercel', userFunded: false }
+    );
+
+    expect(decision).toEqual({
+      refusal: 'Bounded spending requires a provider that can enforce it',
+      providerConfig: null,
+    });
+  });
+  it('admits a managed provider whose route ceiling the caller funds itself', async () => {
+    const decision = await enforceRequestCostLimitDecision(
+      '2000000',
+      model.id,
+      { ...body, provider: { only: ['second-route'] } },
+      2_000_000,
+      { id: 'vercel', userFunded: true }
+    );
+
+    expect(decision).toEqual({ refusal: null, providerConfig: null });
+  });
+  it('admits a free model on a managed provider without a route price cap', async () => {
+    const decision = await enforceRequestCostLimitDecision(
+      '2000000',
+      'stealth/glyph-cluster',
+      body,
+      2_000_000,
+      { id: 'vercel', userFunded: false }
+    );
+
+    expect(decision).toEqual({ refusal: null, providerConfig: null });
+  });
+  it('caps provider prices while preserving provider exclusions and organization allow-lists', async () => {
+    const provider = {
+      order: ['first-route', 'second-route'],
+      only: ['first-route', 'second-route'],
+      ignore: ['first-route'],
+      data_collection: 'deny',
+    };
+    const decision = await enforceRequestCostLimitDecision(
+      '2000000',
+      model.id,
+      { ...body, provider },
+      2_000_000,
+      { id: 'openrouter', userFunded: false }
+    );
+    expect(decision).toEqual({
+      refusal: null,
+      providerConfig: {
+        ...provider,
+        max_price: { prompt: 4, completion: 6, request: 0.01 },
+      },
+    });
+  });
+
+  it('caps catalog-only routing at the catalog price even without known endpoints', async () => {
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
+    const decision = await enforceRequestCostLimitDecision('1000', model.id, body, 2_000_000, {
+      id: 'openrouter',
+      userFunded: false,
+    });
+    expect(decision).toEqual({
+      refusal: null,
+      providerConfig: { max_price: { prompt: 0.1, completion: 0.2, request: 0 } },
+    });
+  });
+
+  it('keeps caller price constraints when they are stricter than admission rates', async () => {
+    const decision = await enforceRequestCostLimitDecision(
+      '2000000',
+      model.id,
+      { ...body, provider: { max_price: { prompt: 0.05, completion: 0.1, request: 0 } } },
+      2_000_000,
+      { id: 'openrouter', userFunded: false }
+    );
+    expect(decision.providerConfig?.max_price).toEqual({
+      prompt: 0.05,
+      completion: 0.1,
+      request: 0,
+    });
+  });
+  it('uses the tier reachable by the bounded input length for exclusive models', async () => {
+    const longRequest = {
+      ...body,
+      messages: [{ role: 'user' as const, content: 'x'.repeat(265_000) }],
+    };
+    const decision = await enforceRequestCostLimitDecision(
+      '500000',
+      'stealth/qwen3.6-plus',
+      longRequest,
+      2_000_000,
+      { id: 'openrouter', userFunded: false }
+    );
+    expect(decision.refusal).toBe('Request exceeds its spend safeguard before generation');
   });
   it('rejects before upstream spend for an insufficient ceiling or balance', async () => {
     await expect(enforceRequestCostLimit('1', model.id, body, 2_000_000)).resolves.toMatch(
@@ -66,7 +258,7 @@ describe('request cost admission', () => {
       endpoints: [],
       alias_target: { slug: model.id },
     };
-    mockCatalogLimit.mockResolvedValue([{ models: { [alias.id]: alias, [model.id]: model } }]);
+    mockModels([alias, model]);
     await expect(
       enforceRequestCostLimit('2000000', alias.id, { ...body, model: alias.id }, 2_000_000)
     ).resolves.toBeNull();
@@ -89,9 +281,7 @@ describe('request cost admission', () => {
       endpoints: [],
       alias_target: { slug: cheaper.id },
     };
-    mockCatalogLimit.mockResolvedValue([
-      { models: { [alias.id]: alias, [model.id]: model, [cheaper.id]: cheaper } },
-    ]);
+    mockModels([alias, model, cheaper]);
     await expect(
       enforceRequestCostLimit('1000', alias.id, { ...body, model: model.id }, 2_000_000)
     ).resolves.toMatch(/alias target changed/);
@@ -116,7 +306,7 @@ describe('request cost admission', () => {
         alias_target: { slug: target.id },
       };
       jest.mocked(getVercelModelIdOverrides).mockResolvedValue(overrides);
-      mockCatalogLimit.mockResolvedValue([{ models: { [alias.id]: alias, [target.id]: target } }]);
+      mockModels([alias, target]);
       await expect(
         enforceRequestCostLimit('2000000', alias.id, { ...body, model: transformed }, 2_000_000)
       ).resolves.toBeNull();
@@ -129,33 +319,23 @@ describe('request cost admission', () => {
       endpoints: [],
       alias_target: { slug: model.id },
     };
-    mockCatalogLimit.mockResolvedValue([{ models: { [alias.id]: alias, [model.id]: model } }]);
+    mockModels([alias, model]);
     await expect(enforceRequestCostLimit('2000000', alias.id, body, 2_000_000)).resolves.toMatch(
       /alias target changed/
     );
   });
-  it.each([undefined, { ...model, endpoints: [] }, { ...model, endpoints: [{}] }])(
-    'rejects an alias whose target has no usable pricing',
-    async unavailableTarget => {
-      const alias: StoredModel = {
-        id: '~test/bounded-latest',
-        name: 'Bounded latest',
-        endpoints: [],
-        alias_target: { slug: model.id },
-      };
-      mockCatalogLimit.mockResolvedValue([
-        {
-          models: {
-            [alias.id]: alias,
-            ...(unavailableTarget ? { [model.id]: unavailableTarget } : {}),
-          },
-        },
-      ]);
-      await expect(
-        enforceRequestCostLimit('2000000', alias.id, { ...body, model: alias.id }, 2_000_000)
-      ).resolves.toMatch(/pric/);
-    }
-  );
+  it('rejects an alias whose target has no picker price', async () => {
+    const alias: StoredModel = {
+      id: '~test/bounded-latest',
+      name: 'Bounded latest',
+      endpoints: [],
+      alias_target: { slug: model.id },
+    };
+    mockModels([alias]);
+    await expect(
+      enforceRequestCostLimit('2000000', alias.id, { ...body, model: alias.id }, 2_000_000)
+    ).resolves.toMatch(/pric/);
+  });
   it('accepts and counts the actual Claude cache-breakpoint text transform', async () => {
     const request: GatewayRequest = {
       kind: 'chat_completions',
@@ -189,20 +369,102 @@ describe('request cost admission', () => {
     ).resolves.toMatch(/spend safeguard/);
   });
   it('counts prompt text carried outside messages so it cannot bypass the ceiling', async () => {
-    for (const extra of [
-      { system: 'x'.repeat(600_000) },
-      { instructions: 'x'.repeat(600_000) },
-      { metadata: { note: 'x'.repeat(600_000) } },
-    ]) {
-      await expect(
-        enforceRequestCostLimit('2000000', model.id, { ...body, ...extra }, 2_000_000)
-      ).resolves.toMatch(/spend safeguard/);
-    }
     await expect(
       enforceRequestCostLimit(
         '2000000',
         model.id,
-        { ...body, system: 'Short system prompt.' },
+        { ...body, metadata: { note: 'x'.repeat(600_000) } },
+        2_000_000
+      )
+    ).resolves.toMatch(/spend safeguard/);
+  });
+  it('refuses top-level properties the admission bound does not price', async () => {
+    for (const extra of [
+      { system: 'Short system prompt.' },
+      { instructions: 'Short instructions.' },
+      { modalities: ['text', 'audio'] },
+      { web_search_options: {} },
+      { models: ['test/cheaper'] },
+    ]) {
+      await expect(
+        enforceRequestCostLimit('2000000', model.id, { ...body, ...extra }, 2_000_000)
+      ).resolves.toMatch(/does not price the \w+ request property/);
+    }
+  });
+  it('prices every choice and the full output ceiling the request can use', async () => {
+    await expect(
+      enforceRequestCostLimit('19000', model.id, { ...body, model: model.id }, 2_000_000)
+    ).resolves.toBeNull();
+    await expect(
+      enforceRequestCostLimit('19000', model.id, { ...body, model: model.id, n: 3 }, 2_000_000)
+    ).resolves.toMatch(/spend safeguard/);
+    await expect(
+      enforceRequestCostLimit(
+        '19000',
+        model.id,
+        { ...body, model: model.id, max_completion_tokens: 1000 },
+        2_000_000
+      )
+    ).resolves.toMatch(/spend safeguard/);
+    await expect(
+      enforceRequestCostLimit(
+        '25000',
+        model.id,
+        { ...body, model: model.id, max_completion_tokens: 1000 },
+        2_000_000
+      )
+    ).resolves.toBeNull();
+    await expect(
+      enforceRequestCostLimit(
+        '19000',
+        model.id,
+        { messages: body.messages, max_completion_tokens: 64, stream: false },
+        2_000_000
+      )
+    ).resolves.toBeNull();
+  });
+  it('refuses a service tier the catalog price does not cover', async () => {
+    for (const service_tier of ['priority', 'scale', 'unpriced']) {
+      await expect(
+        enforceRequestCostLimit('2000000', model.id, { ...body, service_tier }, 2_000_000)
+      ).resolves.toMatch(/auto, default and flex/);
+    }
+  });
+  it('refuses a choice count outside the priced range', async () => {
+    for (const n of [0, -2, 1.5, 129]) {
+      await expect(
+        enforceRequestCostLimit('2000000', model.id, { ...body, n }, 2_000_000)
+      ).resolves.toMatch(/between 1 and 128 choices/);
+    }
+  });
+  it('admits the cost-neutral properties the gateway adds before admission', async () => {
+    await expect(
+      enforceRequestCostLimit(
+        '40000',
+        model.id,
+        {
+          ...body,
+          model: model.id,
+          provider: {
+            order: ['anthropic'],
+            sort: 'price',
+            max_price: { prompt: 4, completion: 6 },
+            allow_fallbacks: false,
+          },
+          providerOptions: { gateway: { only: ['anthropic'] } },
+          prompt_cache_key: 'session-hash',
+          safety_identifier: 'user-hash',
+          user: 'user-hash',
+          service_tier: 'flex',
+          temperature: 0.2,
+          top_p: 0.9,
+          stop: ['\n\n'],
+          reasoning: { effort: 'high' },
+          reasoning_effort: 'high',
+          transforms: ['middle-out'],
+          stream_options: { include_usage: true },
+          metadata: { session: 'hash' },
+        },
         2_000_000
       )
     ).resolves.toBeNull();
@@ -225,12 +487,16 @@ describe('request cost admission', () => {
   it('requires finite positive integer safeguards, bounded text and explicit output tokens', async () => {
     for (const value of ['NaN', 'Infinity', '0', '-1', '1.5'])
       expect(await enforceRequestCostLimit(value, model.id, body, 2_000_000)).not.toBeNull();
+    await expect(
+      enforceRequestCostLimit('2000000', model.id, { ...body, max_tokens: undefined }, 2_000_000)
+    ).resolves.toMatch(/explicit output token limit/);
     for (const invalid of [
-      { ...body, max_tokens: undefined },
       { ...body, tools: [{}] },
       { ...body, stream: true },
     ])
-      expect(await enforceRequestCostLimit('2000000', model.id, invalid, 2_000_000)).not.toBeNull();
+      await expect(
+        enforceRequestCostLimit('2000000', model.id, invalid, 2_000_000)
+      ).resolves.toMatch(/text-only/);
   });
   it('does not alter ordinary gateway requests without a spending safeguard', async () => {
     await expect(enforceRequestCostLimit(null, model.id, {}, 0)).resolves.toBeNull();

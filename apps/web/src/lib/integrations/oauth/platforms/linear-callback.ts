@@ -13,7 +13,7 @@ import {
   revokeLinearToken,
   upsertLinearInstallation,
 } from '@/lib/integrations/linear-service';
-import { isLegacyProviderOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
+import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { bot } from '@/lib/bot';
 import { linkKiloUser, unlinkTeamKiloUsers } from '@/lib/bot-identity';
@@ -36,8 +36,6 @@ import {
 } from '@/lib/integrations/oauth/common';
 import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
 import { withWorkspaceInstallationLock } from '@/lib/integrations/oauth/workspace-installation-lock';
-import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
-import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 
 async function getChatSdkLinearAccessToken(organizationId: string): Promise<string | null> {
   const installation = await bot.getAdapter('linear').getInstallation(organizationId);
@@ -292,7 +290,7 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
       return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
     }
 
-    if (verified.purpose !== 'provider_install' && !isLegacyProviderOAuthState(verified)) {
+    if (verified.provider !== PLATFORM.LINEAR || verified.purpose !== 'provider_install') {
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
 
@@ -315,10 +313,6 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
     const { accessToken, refreshToken, expiresIn } = await exchangeLinearOAuthCode(code);
     const identity = await fetchLinearOAuthIdentity(accessToken);
     const organizationId = identity.organizationId;
-    const defaultModel =
-      owner.type === 'org'
-        ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
-        : DEFAULT_BOT_MODEL;
 
     const conflictRedirect = NextResponse.redirect(
       new URL(
@@ -362,7 +356,6 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
             getChatSdkAccessToken: getChatSdkLinearAccessToken,
             deleteChatSdkInstallation: deleteChatSdkLinearInstallation,
             deleteChatSdkIdentityCache: deleteChatSdkLinearIdentityCache,
-            defaultModel,
           },
           tx
         );

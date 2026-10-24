@@ -147,7 +147,8 @@
     "agent": "智能体",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "更改"
+    "changes": "更改",
+    "organizationTrialEnded": "组织的试用期已结束，且没有生效的套餐。组织所有者可以在 kilo.ai 更新账单信息，然后重试。"
   },
   "language": {
     "restarting": "正在重启以应用语言设置",
@@ -2432,7 +2433,6 @@
     "allow": "允许",
     "onlineMessage": "此设备不支持离线语音转写。录音将发送至 {{provider}} 转换为文字。Kilo 不会存储音频。",
     "onlineTitle": "语音将在线处理",
-    "staysOff": "允许在线语音转写后，才能使用语音输入。",
     "start": "开始语音输入",
     "stop": "停止语音输入",
     "restricted": "此设备上的语音输入受到限制。",
@@ -3167,7 +3167,9 @@
       "sendInvite": "发送邀请",
       "title": "邀请成员",
       "alreadyInvited": "该邮箱已被邀请或已是成员。",
-      "sendError": "无法发送邀请。"
+      "sendError": "无法发送邀请。",
+      "pendingInvitation": "该邮箱已有待处理的邀请。",
+      "alreadyMember": "此人已是该组织的成员。"
     },
     "invoices": {
       "downloadA11y": "下载发票 {{number}}",
@@ -3237,7 +3239,12 @@
       "pendingInvitations": "待接受的邀请",
       "resendInvite": "重新发送邀请",
       "shareInviteLink": "分享邀请链接",
-      "resendInviteError": "无法重新发送邀请。"
+      "resendInviteError": "无法重新发送邀请。",
+      "inviteNotResendable": "该邀请无法重新发送。",
+      "ownerAuthority": "只有组织所有者才能管理所有者。",
+      "ownRoleChange": "您无法更改自己的角色。",
+      "inviteExpired": "该邀请已过期。",
+      "inviteAccepted": "该邀请已被接受。"
     },
     "usageStats": {
       "inputTokens": "输入词元",

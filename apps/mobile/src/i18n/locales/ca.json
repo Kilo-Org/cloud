@@ -147,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Canvis"
+    "changes": "Canvis",
+    "organizationTrialEnded": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. El propietari de l'organització pot actualitzar la facturació a kilo.ai i tornar-ho a provar."
   },
   "language": {
     "restarting": "S'està reiniciant per aplicar l'idioma",
@@ -2996,7 +2997,6 @@
   },
   "voiceInput": {
     "listening": "S'està escoltant…",
-    "staysOff": "El dictat continuarà desactivat fins que permetis la transcripció en línia.",
     "onlineTitle": "La veu es processa en línia",
     "onlineMessage": "Aquest dispositiu no pot transcriure sense connexió. El teu enregistrament s'envia a {{provider}} per convertir-lo en text. Kilo no emmagatzema l'àudio.",
     "allow": "Permet",
@@ -3212,7 +3212,9 @@
       "sendInvite": "Envia la invitació",
       "title": "Convida un membre",
       "alreadyInvited": "Ja té una invitació pendent o ja és membre.",
-      "sendError": "No s'ha pogut enviar la invitació."
+      "sendError": "No s'ha pogut enviar la invitació.",
+      "pendingInvitation": "Aquest correu electrònic ja té una invitació pendent.",
+      "alreadyMember": "Aquesta persona ja és membre d'aquesta organització."
     },
     "invoices": {
       "downloadA11y": "Baixa la factura {{number}}",
@@ -3282,7 +3284,12 @@
       "pendingInvitations": "Invitacions pendents",
       "resendInvite": "Torna a enviar la invitació",
       "shareInviteLink": "Comparteix l'enllaç d'invitació",
-      "resendInviteError": "No s'ha pogut tornar a enviar la invitació."
+      "resendInviteError": "No s'ha pogut tornar a enviar la invitació.",
+      "inviteNotResendable": "Aquesta invitació ja no es pot tornar a enviar.",
+      "ownerAuthority": "Només un propietari de l'organització pot gestionar propietaris.",
+      "ownRoleChange": "No pots canviar el teu propi rol.",
+      "inviteExpired": "Aquesta invitació ha caducat.",
+      "inviteAccepted": "Aquesta invitació ja s'ha acceptat."
     },
     "usageStats": {
       "inputTokens": "Tòkens d'entrada",

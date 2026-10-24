@@ -147,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "daq",
     "durationHourShort": "soat",
-    "changes": "O'zgarishlar"
+    "changes": "O'zgarishlar",
+    "organizationTrialEnded": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Tashkilot egasi kilo.ai saytida hisob-kitobni yangilab, so'ng qayta urinib ko'rishi mumkin."
   },
   "language": {
     "restarting": "Tilni qo'llash uchun qayta ishga tushirilmoqda",
@@ -2953,7 +2954,6 @@
   },
   "voiceInput": {
     "listening": "Tinglanmoqda...",
-    "staysOff": "Nutqni onlayn matnga aylantirishga ruxsat bermaguningizcha ovozli kiritish o'chiq qoladi.",
     "onlineTitle": "Nutq onlayn qayta ishlanadi",
     "onlineMessage": "Bu qurilma nutqni oflayn matnga aylantira olmaydi. Ovoz yozuvingiz matnga aylantirish uchun {{provider}} xizmatiga yuboriladi. Kilo ovoz yozuvini saqlamaydi.",
     "allow": "Ruxsat berish",
@@ -3168,7 +3168,9 @@
       "sendInvite": "Taklifnomani yuborish",
       "title": "A’zo taklif qilish",
       "alreadyInvited": "Bu elektron pochta manzili allaqachon taklif qilingan yoki allaqachon a'zo.",
-      "sendError": "Taklifnomani yuborib bo'lmadi."
+      "sendError": "Taklifnomani yuborib bo'lmadi.",
+      "pendingInvitation": "Bu elektron pochta uchun allaqachon kutilayotgan taklifnoma mavjud.",
+      "alreadyMember": "Bu shaxs allaqachon ushbu tashkilotning a'zosi."
     },
     "invoices": {
       "downloadA11y": "{{number}} raqamli hisob-fakturani yuklab olish",
@@ -3238,7 +3240,12 @@
       "pendingInvitations": "Qabul qilinmagan taklifnomalar",
       "resendInvite": "Taklifnomani qayta yuborish",
       "shareInviteLink": "Taklifnoma havolasini ulashish",
-      "resendInviteError": "Taklifnomani qayta yuborib bo'lmadi."
+      "resendInviteError": "Taklifnomani qayta yuborib bo'lmadi.",
+      "inviteNotResendable": "Ushbu taklifnomani endi qayta yuborib bo'lmaydi.",
+      "ownerAuthority": "Faqat tashkilot egasi egalarni boshqarishi mumkin.",
+      "ownRoleChange": "Siz o'z rolingizni o'zgartira olmaysiz.",
+      "inviteExpired": "Ushbu taklifnomaning muddati tugagan.",
+      "inviteAccepted": "Ushbu taklifnoma allaqachon qabul qilingan."
     },
     "usageStats": {
       "inputTokens": "Kirish tokenlari",

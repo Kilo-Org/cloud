@@ -147,7 +147,8 @@
     "agent": "Tussenpersoon",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Wijzigingen"
+    "changes": "Wijzigingen",
+    "organizationTrialEnded": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Een eigenaar van de organisatie kan de facturering bijwerken op kilo.ai en het daarna opnieuw proberen."
   },
   "language": {
     "restarting": "Opnieuw starten om de taal in te stellen",
@@ -2432,7 +2433,6 @@
     "allow": "Toestaan",
     "onlineMessage": "Dit apparaat kan spraak niet offline omzetten naar tekst. Je opname wordt naar {{provider}} gestuurd om er tekst van te maken. Kilo slaat de audio niet op.",
     "onlineTitle": "Spraak wordt online verwerkt",
-    "staysOff": "Spraakinvoer blijft uitgeschakeld totdat je online omzetting naar tekst toestaat.",
     "start": "Spraakinvoer starten",
     "stop": "Spraakinvoer stoppen",
     "restricted": "Spraakinvoer is beperkt op dit apparaat.",
@@ -3167,7 +3167,9 @@
       "sendInvite": "Uitnodiging verzenden",
       "title": "Lid uitnodigen",
       "alreadyInvited": "Dit e-mailadres is al uitgenodigd of is al lid.",
-      "sendError": "De uitnodiging kon niet worden verzonden."
+      "sendError": "De uitnodiging kon niet worden verzonden.",
+      "pendingInvitation": "Dit e-mailadres heeft al een openstaande uitnodiging.",
+      "alreadyMember": "Deze persoon is al lid van deze organisatie."
     },
     "invoices": {
       "downloadA11y": "Factuur {{number}} downloaden",
@@ -3237,7 +3239,12 @@
       "pendingInvitations": "Openstaande uitnodigingen",
       "resendInvite": "Uitnodiging opnieuw verzenden",
       "shareInviteLink": "Uitnodigingslink delen",
-      "resendInviteError": "De uitnodiging kon niet opnieuw worden verzonden."
+      "resendInviteError": "De uitnodiging kon niet opnieuw worden verzonden.",
+      "inviteNotResendable": "Deze uitnodiging kan niet meer opnieuw worden verzonden.",
+      "ownerAuthority": "Alleen een organisatie-eigenaar kan eigenaren beheren.",
+      "ownRoleChange": "Je kunt je eigen rol niet wijzigen.",
+      "inviteExpired": "Deze uitnodiging is verlopen.",
+      "inviteAccepted": "Deze uitnodiging is al geaccepteerd."
     },
     "usageStats": {
       "inputTokens": "Invoertokens",

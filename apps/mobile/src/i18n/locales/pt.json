@@ -147,7 +147,8 @@
     "agent": "Agente",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Alterações"
+    "changes": "Alterações",
+    "organizationTrialEnded": "O período de teste da organização terminou e esta não tem um plano ativo. O proprietário da organização pode atualizar a faturação em kilo.ai e, em seguida, tentar novamente."
   },
   "language": {
     "restarting": "A reiniciar para aplicar o idioma",
@@ -2996,7 +2997,6 @@
   },
   "voiceInput": {
     "listening": "A ouvir...",
-    "staysOff": "O ditado fica desativado até permitires a transcrição pela Internet.",
     "onlineTitle": "O ditado é processado pela Internet",
     "onlineMessage": "Este dispositivo não consegue transcrever sem ligação à Internet. A tua gravação é enviada para {{provider}} para ser convertida em texto. O Kilo não guarda o áudio.",
     "allow": "Permitir",
@@ -3212,7 +3212,9 @@
       "sendInvite": "Enviar convite",
       "title": "Convidar membro",
       "alreadyInvited": "O utilizador já foi convidado ou já é membro.",
-      "sendError": "Não foi possível enviar o convite."
+      "sendError": "Não foi possível enviar o convite.",
+      "pendingInvitation": "Este email já tem um convite pendente.",
+      "alreadyMember": "Esta pessoa já é membro desta organização."
     },
     "invoices": {
       "downloadA11y": "Transferir fatura {{number}}",
@@ -3282,7 +3284,12 @@
       "pendingInvitations": "Convites pendentes",
       "resendInvite": "Reenviar convite",
       "shareInviteLink": "Partilhar ligação de convite",
-      "resendInviteError": "Não foi possível reenviar o convite."
+      "resendInviteError": "Não foi possível reenviar o convite.",
+      "inviteNotResendable": "Este convite não pode mais ser reenviado.",
+      "ownerAuthority": "Apenas um proprietário da organização pode gerenciar proprietários.",
+      "ownRoleChange": "Você não pode alterar sua própria função.",
+      "inviteExpired": "Este convite expirou.",
+      "inviteAccepted": "Este convite já foi aceito."
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",

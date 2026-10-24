@@ -55,7 +55,10 @@ const mockedUpsertSlackInstallation = jest.mocked(upsertSlackInstallation);
 const USER_ID = '034489e8-19e0-4479-9d69-2edad719e847';
 const TEAM_ID = 'T024BE7LD';
 const createProviderState = (returnTo?: string) =>
-  createOAuthState(`user_${USER_ID}`, USER_ID, returnTo, 'provider_install');
+  createOAuthState(`user_${USER_ID}`, USER_ID, returnTo, {
+    provider: 'slack',
+    purpose: 'provider_install',
+  });
 
 const INSTALLATION = {
   botToken: 'xoxb-new-token',

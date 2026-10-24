@@ -147,7 +147,8 @@
     "agent": "Činidlo",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Změny"
+    "changes": "Změny",
+    "organizationTrialEnded": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Vlastník organizace může aktualizovat fakturaci na kilo.ai a poté to zkuste znovu."
   },
   "language": {
     "restarting": "Aplikace se restartuje kvůli změně jazyka",
@@ -3039,7 +3040,6 @@
   },
   "voiceInput": {
     "listening": "Poslouchám…",
-    "staysOff": "Diktování zůstane vypnuté, dokud nepovolíte online přepis.",
     "onlineTitle": "Řeč se zpracovává online",
     "onlineMessage": "Toto zařízení neumí přepisovat řeč bez připojení k internetu. Nahrávka se odešle poskytovateli {{provider}}, který ji převede na text. Kilo zvuk neukládá.",
     "allow": "Povolit",
@@ -3256,7 +3256,9 @@
       "sendInvite": "Odeslat pozvánku",
       "title": "Pozvat člena",
       "alreadyInvited": "Tento uživatel už byl pozván nebo už je členem.",
-      "sendError": "Pozvánku se nepodařilo odeslat."
+      "sendError": "Pozvánku se nepodařilo odeslat.",
+      "pendingInvitation": "Pro tento e-mail již existuje čekající pozvánka.",
+      "alreadyMember": "Tato osoba je již členem této organizace."
     },
     "invoices": {
       "downloadA11y": "Stáhnout fakturu {{number}}",
@@ -3326,7 +3328,12 @@
       "pendingInvitations": "Čekající pozvánky",
       "resendInvite": "Poslat pozvánku znovu",
       "shareInviteLink": "Sdílet odkaz na pozvánku",
-      "resendInviteError": "Pozvánku se nepodařilo odeslat znovu."
+      "resendInviteError": "Pozvánku se nepodařilo odeslat znovu.",
+      "inviteNotResendable": "Tuto pozvánku již nelze znovu poslat.",
+      "ownerAuthority": "Pouze vlastník organizace může spravovat vlastníky.",
+      "ownRoleChange": "Nemůžete změnit svou vlastní roli.",
+      "inviteExpired": "Tato pozvánka vypršela.",
+      "inviteAccepted": "Tato pozvánka již byla přijata."
     },
     "usageStats": {
       "inputTokens": "Vstupní tokeny",

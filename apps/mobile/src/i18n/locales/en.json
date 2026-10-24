@@ -241,7 +241,8 @@
     "dismissed": "Dismissed",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Changes"
+    "changes": "Changes",
+    "organizationTrialEnded": "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again."
   },
   "language": {
     "restarting": "Restarting to apply language",
@@ -3061,7 +3062,6 @@
   "voiceInput": {
     "listening": "Listening...",
     "listeningStopped": "Listening stopped.",
-    "staysOff": "Speech stays off until you allow online transcription.",
     "onlineTitle": "Speech is processed online",
     "onlineMessage": "This device cannot transcribe offline. Your recording is sent to {{provider}} to turn it into text. Kilo does not store the audio.",
     "allow": "Allow",
@@ -3275,7 +3275,9 @@
       "sendInvite": "Send invite",
       "title": "Invite member",
       "alreadyInvited": "They're already invited or already a member.",
-      "sendError": "Couldn't send the invite."
+      "sendError": "Couldn't send the invite.",
+      "pendingInvitation": "This email already has a pending invitation.",
+      "alreadyMember": "This person is already a member of this organization."
     },
     "invoices": {
       "downloadA11y": "Download invoice {{number}}",
@@ -3345,7 +3347,12 @@
       "pendingInvitations": "Pending invitations",
       "resendInvite": "Resend invite",
       "shareInviteLink": "Share invite link",
-      "resendInviteError": "Couldn't resend the invite."
+      "resendInviteError": "Couldn't resend the invite.",
+      "inviteNotResendable": "This invitation can no longer be resent.",
+      "ownerAuthority": "Only an organization owner can manage owners.",
+      "ownRoleChange": "You cannot change your own role.",
+      "inviteExpired": "This invitation has expired.",
+      "inviteAccepted": "This invitation has already been accepted."
     },
     "usageStats": {
       "inputTokens": "Input Tokens",

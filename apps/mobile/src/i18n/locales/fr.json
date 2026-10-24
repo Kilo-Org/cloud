@@ -147,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Modifications"
+    "changes": "Modifications",
+    "organizationTrialEnded": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Le propriétaire de l'organisation peut mettre à jour la facturation sur kilo.ai, puis réessayer."
   },
   "language": {
     "restarting": "Redémarrage pour changer de langue",
@@ -2383,7 +2384,6 @@
     "allow": "Autoriser",
     "onlineMessage": "Cet appareil ne peut pas transcrire hors ligne. Votre enregistrement est envoyé à {{provider}} pour le convertir en texte. Kilo ne conserve pas l'audio.",
     "onlineTitle": "Transcription vocale en ligne",
-    "staysOff": "La saisie vocale reste désactivée tant que vous n'autorisez pas la transcription en ligne.",
     "start": "Démarrer la saisie vocale",
     "stop": "Arrêter la saisie vocale",
     "restricted": "La saisie vocale est restreinte sur cet appareil.",
@@ -3211,7 +3211,9 @@
       "sendInvite": "Envoyer l'invitation",
       "title": "Inviter un membre",
       "alreadyInvited": "Cette adresse a déjà reçu une invitation ou appartient déjà à un membre.",
-      "sendError": "Impossible d'envoyer l'invitation."
+      "sendError": "Impossible d'envoyer l'invitation.",
+      "pendingInvitation": "Cette adresse e-mail a déjà une invitation en attente.",
+      "alreadyMember": "Cette personne est déjà membre de cette organisation."
     },
     "invoices": {
       "downloadA11y": "Télécharger la facture {{number}}",
@@ -3281,7 +3283,12 @@
       "pendingInvitations": "Invitations en attente",
       "resendInvite": "Renvoyer l'invitation",
       "shareInviteLink": "Partager le lien d'invitation",
-      "resendInviteError": "Impossible de renvoyer l'invitation."
+      "resendInviteError": "Impossible de renvoyer l'invitation.",
+      "inviteNotResendable": "Cette invitation ne peut plus être renvoyée.",
+      "ownerAuthority": "Seul un propriétaire de l'organisation peut gérer les propriétaires.",
+      "ownRoleChange": "Vous ne pouvez pas changer votre propre rôle.",
+      "inviteExpired": "Cette invitation a expiré.",
+      "inviteAccepted": "Cette invitation a déjà été acceptée."
     },
     "usageStats": {
       "inputTokens": "Jetons d'entrée",

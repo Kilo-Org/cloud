@@ -147,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Endringer"
+    "changes": "Endringer",
+    "organizationTrialEnded": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. En organisasjonseier kan oppdatere faktureringen på kilo.ai og deretter prøve igjen."
   },
   "language": {
     "restarting": "Starter på nytt for å bruke språket",
@@ -2953,7 +2954,6 @@
   },
   "voiceInput": {
     "listening": "Lytter...",
-    "staysOff": "Diktering er deaktivert til du tillater at tale gjøres om til tekst på nettet.",
     "onlineTitle": "Tale behandles på nettet",
     "onlineMessage": "Denne enheten kan ikke gjøre tale om til tekst uten nettilkobling. Opptaket ditt sendes til {{provider}} for å gjøres om til tekst. Kilo lagrer ikke lyden.",
     "allow": "Tillat",
@@ -3168,7 +3168,9 @@
       "sendInvite": "Send invitasjon",
       "title": "Inviter medlem",
       "alreadyInvited": "Personen er allerede invitert eller allerede medlem.",
-      "sendError": "Kunne ikke sende invitasjonen."
+      "sendError": "Kunne ikke sende invitasjonen.",
+      "pendingInvitation": "Denne e-postadressen har allerede en ventende invitasjon.",
+      "alreadyMember": "Denne personen er allerede medlem av denne organisasjonen."
     },
     "invoices": {
       "downloadA11y": "Last ned faktura {{number}}",
@@ -3238,7 +3240,12 @@
       "pendingInvitations": "Ventende invitasjoner",
       "resendInvite": "Send invitasjon på nytt",
       "shareInviteLink": "Del invitasjonslenke",
-      "resendInviteError": "Kunne ikke sende invitasjonen på nytt."
+      "resendInviteError": "Kunne ikke sende invitasjonen på nytt.",
+      "inviteNotResendable": "Denne invitasjonen kan ikke lenger sendes på nytt.",
+      "ownerAuthority": "Bare en organisasjonseier kan administrere eiere.",
+      "ownRoleChange": "Du kan ikke endre din egen rolle.",
+      "inviteExpired": "Denne invitasjonen er utløpt.",
+      "inviteAccepted": "Denne invitasjonen er allerede akseptert."
     },
     "usageStats": {
       "inputTokens": "Inndatatokener",

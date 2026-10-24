@@ -14,6 +14,7 @@ import { UITextView } from '@bsky.app/react-native-uitextview';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type TokenScheme } from '@/lib/pr-review/diff/syntax-colors';
+import { LTR_TEXT_DIRECTION } from '@/lib/rtl-text';
 
 import { useTranscriptTextSelectable } from './bubble-text-selection-context';
 import { renderChunkChildren, renderSelectableChunkChildren } from './code-block-chunk-content';
@@ -245,8 +246,11 @@ function CodeBlockImpl({
               selectable
               uiTextView
               className={CODE_LINE_CLASSNAME}
+              // Direction and ink for the native text view's own paragraph
+              // style: the selectable chunk wraps like the plain one and its
+              // continuations start under the first line in an RTL interface.
               // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- base ink for untagged runs
-              style={{ color: textBase }}
+              style={{ color: textBase, ...LTR_TEXT_DIRECTION }}
             >
               {renderSelectableChunkChildren(chunk, effectiveTokenScheme, keepBlankLineBox)}
             </SelectableCodeText>
@@ -261,7 +265,7 @@ function CodeBlockImpl({
               selectable={effectiveSelectable}
               className={CODE_LINE_CLASSNAME}
               // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- base ink for untagged runs
-              style={{ color: textBase }}
+              style={{ color: textBase, ...LTR_TEXT_DIRECTION }}
             >
               {renderChunkChildren(chunk, effectiveTokenScheme, keepBlankLineBox)}
             </RNText>

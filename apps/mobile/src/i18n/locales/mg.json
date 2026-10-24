@@ -147,7 +147,8 @@
     "agent": "mpandraharaha",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Fiovana"
+    "changes": "Fiovana",
+    "organizationTrialEnded": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Ny tompon'ny fikambanana dia afaka manavao ny faktiora ao amin'ny kilo.ai, ary hanandrana indray."
   },
   "language": {
     "restarting": "Manomboka indray mba hampiharana ny fiteny",
@@ -2953,7 +2954,6 @@
   },
   "voiceInput": {
     "listening": "Mihaino...",
-    "staysOff": "Tsy handeha ny fampidirana amin'ny feo raha tsy avelanao hovadika ho soratra an-tserasera ny feo.",
     "onlineTitle": "Karakaraina an-tserasera ny feo",
     "onlineMessage": "Tsy afaka mamadika feo ho soratra ity fitaovana ity raha tsy mifandray amin'ny aterineto. Alefa any amin'ny {{provider}} ny feo noraketinao mba havadika ho soratra. Tsy mitahiry ny feo i Kilo.",
     "allow": "Avelao",
@@ -3168,7 +3168,9 @@
       "sendInvite": "Alefaso ny fanasana",
       "title": "Manasà mpikambana",
       "alreadyInvited": "Efa voasa na efa mpikambana izy.",
-      "sendError": "Tsy azo nalefa ny fanasana."
+      "sendError": "Tsy azo nalefa ny fanasana.",
+      "pendingInvitation": "Efa manana fanasana miandry ity mailaka ity.",
+      "alreadyMember": "Efa mpikambana ao amin'ity fikambanana ity ity olona ity."
     },
     "invoices": {
       "downloadA11y": "Alao ny faktiora {{number}}",
@@ -3238,7 +3240,12 @@
       "pendingInvitations": "Fanasana miandry",
       "resendInvite": "Alefaso indray ny fanasana",
       "shareInviteLink": "Zarao ny rohy fanasana",
-      "resendInviteError": "Tsy azo nalefa indray ny fanasana."
+      "resendInviteError": "Tsy azo nalefa indray ny fanasana.",
+      "inviteNotResendable": "Tsy afaka alefa indray intsony io fanasana io.",
+      "ownerAuthority": "Ny tompon'ny fikambanana ihany no afaka mitantana ny tompony.",
+      "ownRoleChange": "Tsy afaka manova ny andraikitrao ianao.",
+      "inviteExpired": "Efa lany andro io fanasana io.",
+      "inviteAccepted": "Efa nekena io fanasana io."
     },
     "usageStats": {
       "inputTokens": "Sombin-tsoratra miditra",

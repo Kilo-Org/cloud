@@ -21,6 +21,7 @@ import {
   toolsOfSession,
   wipeChats,
 } from './store';
+import { DERIVED_CHAT_TEXT_MAX_LENGTH } from './title';
 
 /**
  * The list and the delete run against the real schema of both owners: the SDK's
@@ -129,6 +130,38 @@ describe('listChats', () => {
     rememberChat(db, { sessionId: 'fresh', scope: 'me:personal', at: 1 });
 
     expect(listChats(db, 'me:personal')[0]?.title).toBe('');
+  });
+
+  it('reduces a long first message to one short line for the title and the preview', async () => {
+    const long = `${'tell me about the composer '.repeat(200)}\nand then some`;
+    await write(
+      Effect.gen(function* conversing() {
+        const store = yield* SessionStore;
+        yield* store.create({ id: 'long', system: 'be brief', model: 'kilo/one' });
+        yield* store.append({
+          sessionId: 'long',
+          turns: [said('long', 'user', long)],
+          prompted: 10,
+        });
+        yield* store.flush();
+      })
+    );
+    rememberChat(db, { sessionId: 'long', scope: 'me:personal', at: 1 });
+
+    const [row] = listChats(db, 'me:personal');
+    expect(row?.title).toHaveLength(DERIVED_CHAT_TEXT_MAX_LENGTH);
+    expect(row?.title.endsWith('…')).toBe(true);
+    expect(row?.title.startsWith('tell me about the composer')).toBe(true);
+    expect(row?.preview).toBe(row?.title);
+  });
+
+  it('shows a name the person gave a long chat exactly as it was typed', async () => {
+    const long = 'tell me about the composer '.repeat(200);
+    await write(conversation('named', 'kilo/one', long));
+    rememberChat(db, { sessionId: 'named', scope: 'me:personal', at: 1 });
+    renameChat(db, 'named', '  Composer notes  ');
+
+    expect(listChats(db, 'me:personal')[0]?.title).toBe('  Composer notes  ');
   });
 });
 

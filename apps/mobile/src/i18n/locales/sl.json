@@ -147,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Spremembe"
+    "changes": "Spremembe",
+    "organizationTrialEnded": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Lastnik organizacije lahko posodobi obračun na kilo.ai, nato poskusi znova."
   },
   "language": {
     "restarting": "Ponovni zagon za spremembo jezika",
@@ -3039,7 +3040,6 @@
   },
   "voiceInput": {
     "listening": "Poslušanje...",
-    "staysOff": "Glasovni vnos ostane izklopljen, dokler ne dovoliš spletnega prepisovanja.",
     "onlineTitle": "Govor se obdela na spletu",
     "onlineMessage": "Ta naprava ne more prepisovati govora brez povezave. Tvoj posnetek se pošlje ponudniku {{provider}}, da ga pretvori v besedilo. Kilo ne shranjuje zvoka.",
     "allow": "Dovoli",
@@ -3256,7 +3256,9 @@
       "sendInvite": "Pošlji povabilo",
       "title": "Povabi člana",
       "alreadyInvited": "Ta oseba je že povabljena ali že član organizacije.",
-      "sendError": "Povabila ni bilo mogoče poslati."
+      "sendError": "Povabila ni bilo mogoče poslati.",
+      "pendingInvitation": "Ta e-poštni naslov že ima čakajoče povabilo.",
+      "alreadyMember": "Ta oseba je že član te organizacije."
     },
     "invoices": {
       "downloadA11y": "Prenesi račun {{number}}",
@@ -3326,7 +3328,12 @@
       "pendingInvitations": "Čakajoča povabila",
       "resendInvite": "Ponovno pošlji povabilo",
       "shareInviteLink": "Deli povezavo do povabila",
-      "resendInviteError": "Povabila ni bilo mogoče ponovno poslati."
+      "resendInviteError": "Povabila ni bilo mogoče ponovno poslati.",
+      "inviteNotResendable": "Tega povabila ni več mogoče ponovno poslati.",
+      "ownerAuthority": "Samo lastnik organizacije lahko upravlja z lastniki.",
+      "ownRoleChange": "Svoje vloge ne morete spremeniti.",
+      "inviteExpired": "To povabilo je poteklo.",
+      "inviteAccepted": "To povabilo je bilo že sprejeto."
     },
     "usageStats": {
       "inputTokens": "Vhodni žetoni",

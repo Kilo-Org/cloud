@@ -147,7 +147,8 @@
     "agent": "Axente",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Cambios"
+    "changes": "Cambios",
+    "organizationTrialEnded": "O período de proba da organización rematou e non ten ningún plan activo. Un propietario da organización pode actualizar a facturación en kilo.ai e despois tentalo de novo."
   },
   "language": {
     "restarting": "Reiniciando para aplicar o idioma",
@@ -2953,7 +2954,6 @@
   },
   "voiceInput": {
     "listening": "Escoitando...",
-    "staysOff": "O ditado seguirá desactivado ata que permitas a transcrición en liña.",
     "onlineTitle": "O audio procésase en liña",
     "onlineMessage": "Este dispositivo non pode transcribir sen conexión. A túa gravación envíase a {{provider}} para convertela en texto. Kilo non almacena o audio.",
     "allow": "Permitir",
@@ -3168,7 +3168,9 @@
       "sendInvite": "Enviar invitación",
       "title": "Convidar un membro",
       "alreadyInvited": "Xa está convidado ou xa é membro.",
-      "sendError": "Non se puido enviar a invitación."
+      "sendError": "Non se puido enviar a invitación.",
+      "pendingInvitation": "Este correo xa ten unha invitación pendente.",
+      "alreadyMember": "Esta persoa xa é membro desta organización."
     },
     "invoices": {
       "downloadA11y": "Descargar factura {{number}}",
@@ -3238,7 +3240,12 @@
       "pendingInvitations": "Invitacións pendentes",
       "resendInvite": "Reenviar invitación",
       "shareInviteLink": "Compartir ligazón de invitación",
-      "resendInviteError": "Non se puido reenviar a invitación."
+      "resendInviteError": "Non se puido reenviar a invitación.",
+      "inviteNotResendable": "Xa non se pode reenviar esta invitación.",
+      "ownerAuthority": "Só un propietario da organización pode xestionar os propietarios.",
+      "ownRoleChange": "Non podes cambiar o teu propio rol.",
+      "inviteExpired": "Esta invitación caducou.",
+      "inviteAccepted": "Esta invitación xa foi aceptada."
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",

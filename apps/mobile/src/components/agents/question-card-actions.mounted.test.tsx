@@ -28,7 +28,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('@/lib/a11y/announce', () => ({
   announceForA11y: vi.fn(),
-  moveA11yFocus: vi.fn(() => true),
+  requestA11yFocus: vi.fn(() => true),
 }));
 
 type Props = ComponentProps<typeof QuestionCard>;
@@ -180,7 +180,12 @@ describe('QuestionCard actions', () => {
       renderer.update(
         createElement(QuestionCard, {
           ...props,
-          submissionError: { kind: 'retryable', action: failedAction, message: 'Try again.' },
+          submissionError: {
+            kind: 'retryable',
+            action: failedAction,
+            message: 'Try again.',
+            permissionResponse: null,
+          },
         })
       );
     });

@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Writable } from 'node:stream';
 import type { WorkspaceFailureSubtype } from '../../src/shared/wrapper-bootstrap.js';
+import { selectedRuntimeCli } from '../../src/shared/runtime-distribution.js';
 import {
   createSafeProcessDiagnostic,
   isTimeoutTermination,
@@ -1198,14 +1199,35 @@ export async function restoreSession(
     log(
       `running kilo import kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${env.HOME ?? '(unset)'} tmpPath=${tmpPath}`
     );
-    const importResult = await runProcess('kilo', ['import', tmpPath], {
+    const completedImport = new AbortController();
+    let completionTimer: ReturnType<typeof setTimeout> | undefined;
+    let pendingOutput = '';
+    const importResult = await runProcess(selectedRuntimeCli(process.env), ['import', tmpPath], {
       cwd: workspacePath,
       env,
       inheritEnv: false,
       timeoutMs: importTimeoutMs,
-      signal: options.signal,
+      signal: options.signal
+        ? AbortSignal.any([options.signal, completedImport.signal])
+        : completedImport.signal,
       terminationGraceMs: options.importTerminationGraceMs,
+      onOutput: (stream, output) => {
+        if (stream !== 'stdout' || completionTimer !== undefined) return;
+        pendingOutput += output;
+        const lines = pendingOutput.split('\n');
+        pendingOutput = (lines.pop() ?? '').slice(-512);
+        if (!lines.some(line => line.replace(/\r$/, '') === `Imported session: ${kiloSessionId}`))
+          return;
+        // Kilo prints this after committing import; its instance disposal can leave the CLI alive.
+        completionTimer = setTimeout(() => completedImport.abort(), 1_000);
+      },
+    }).finally(() => {
+      if (completionTimer !== undefined) clearTimeout(completionTimer);
     });
+    const importedBeforeCleanup =
+      completedImport.signal.aborted &&
+      !options.signal?.aborted &&
+      importResult.terminationReason === 'abort';
     const importElapsedMs = Date.now() - importStartedAt;
 
     if (isTimeoutTermination(importResult)) {
@@ -1221,7 +1243,7 @@ export async function restoreSession(
       );
     }
 
-    if (importResult.exitCode !== 0) {
+    if (importResult.exitCode !== 0 && !importedBeforeCleanup) {
       log(
         `kilo import finished outcome=error exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
       );
@@ -1234,7 +1256,7 @@ export async function restoreSession(
       );
     }
     log(
-      `kilo import finished outcome=ok exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
+      `kilo import finished outcome=${importedBeforeCleanup ? 'imported_cleanup' : 'ok'} exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
     );
 
     if (options.restoreFiles === false) {

@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 
 /**
  * Look up a user by their Kilo user ID. Returns the minimal fields
- * needed for ownership checks, account age and token generation.
+ * needed for ownership checks and token generation.
  */
 export async function findUserById(
   connectionString: string,
@@ -13,7 +13,6 @@ export async function findUserById(
   id: string;
   api_token_pepper: string | null;
   is_admin: boolean;
-  created_at: string;
 } | null> {
   const db = getWorkerDb(connectionString, {
     statement_timeout: 5_000,
@@ -24,7 +23,6 @@ export async function findUserById(
       id: kilocode_users.id,
       api_token_pepper: kilocode_users.api_token_pepper,
       is_admin: kilocode_users.is_admin,
-      created_at: kilocode_users.created_at,
     })
     .from(kilocode_users)
     .where(eq(kilocode_users.id, userId))

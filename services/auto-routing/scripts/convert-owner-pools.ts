@@ -23,15 +23,15 @@ async function cloudflareGet<T extends z.ZodType>(token: string, path: string, r
   const body = z
     .object({
       success: z.boolean(),
-      errors: z.array(z.object({ message: z.string() })).optional(),
-      result: z.array(resultSchema).default([]),
+      errors: z.array(z.object({ message: z.string() })).nullish(),
+      result: z.array(resultSchema).nullish(),
       result_info: z
         .object({
-          cursor: z.string().optional(),
-          page: z.number().int().optional(),
-          total_pages: z.number().int().optional(),
+          cursor: z.string().nullish(),
+          page: z.number().int().nullish(),
+          total_pages: z.number().int().nullish(),
         })
-        .optional(),
+        .nullish(),
     })
     .parse(await response.json());
   if (!response.ok || !body.success) {
@@ -39,7 +39,7 @@ async function cloudflareGet<T extends z.ZodType>(token: string, path: string, r
       `Cloudflare ${path.split('?')[0]} responded ${response.status}: ${body.errors?.map(e => e.message).join('; ') ?? ''}`
     );
   }
-  return body;
+  return { ...body, result: body.result ?? [] };
 }
 
 async function findNamespaceId(token: string, accountId: string): Promise<string> {

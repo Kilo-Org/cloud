@@ -417,28 +417,6 @@ export async function hasPRCommentWithMarker(
 }
 
 /**
- * Used to acknowledge @kilo fix mentions on inline review comments.
- */
-export async function addReactionToPRReviewComment(
-  installationId: string,
-  owner: string,
-  repo: string,
-  commentId: number,
-  reaction: 'eyes' | '+1' | '-1' | 'laugh' | 'confused' | 'heart' | 'hooray' | 'rocket',
-  appType: GitHubAppType = 'standard'
-): Promise<void> {
-  const tokenData = await generateGitHubInstallationToken(installationId, appType);
-  const octokit = new Octokit({ auth: tokenData.token });
-
-  await octokit.reactions.createForPullRequestReviewComment({
-    owner,
-    repo,
-    comment_id: commentId,
-    content: reaction,
-  });
-}
-
-/**
  * Returns the permission string ('admin' | 'write' | 'read' | 'none') or null
  * if the lookup fails (e.g. the App lacks permission to query collaborators).
  */
@@ -590,7 +568,6 @@ const MAX_KILO_REVIEW_COMMENT_PAGES = 5;
 
 /**
  * Looks for the <!-- kilo-review --> marker in issue comments.
- * Falls back to detecting older Kilo comments by patterns if no marker found.
  */
 export async function findKiloReviewComment(
   installationId: string,
@@ -693,7 +670,19 @@ export async function updateKiloReviewComment(
 }
 
 /**
+ * Fields the REST comment type omits but the API returns on every review comment.
+ * `position` is absent, not null, for comments on lines that no longer exist.
+ */
+type ReviewCommentExtras = {
+  position?: number | null;
+  performed_via_github_app?: { id?: number | string | null } | null;
+};
+
+/**
  * Used to detect duplicates and track outdated inline comments.
+ *
+ * `authoredByKilo` reports whether this app identity created the comment, following the same
+ * `performed_via_github_app.id` ownership test `findKiloReviewComment` applies to summaries.
  */
 export async function fetchPRInlineComments(
   installationId: string,
@@ -708,11 +697,13 @@ export async function fetchPRInlineComments(
     line: number | null;
     body: string;
     isOutdated: boolean;
+    authoredByKilo: boolean;
     user: { login: string };
   }>
 > {
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
   const octokit = new Octokit({ auth: tokenData.token });
+  const kiloAppId = String(getGitHubAppCredentials(appType).appId);
 
   const comments: Array<{
     id: number;
@@ -720,6 +711,7 @@ export async function fetchPRInlineComments(
     line: number | null;
     body: string;
     isOutdated: boolean;
+    authoredByKilo: boolean;
     user: { login: string };
   }> = [];
 
@@ -734,14 +726,16 @@ export async function fetchPRInlineComments(
       per_page: perPage,
       page,
     });
+    const rows = data as Array<(typeof data)[number] & ReviewCommentExtras>;
 
     comments.push(
-      ...data.map(c => ({
+      ...rows.map(c => ({
         id: c.id,
         path: c.path,
         line: c.line ?? null,
         body: c.body,
-        isOutdated: c.position === null, // null position = outdated
+        isOutdated: c.position == null, // absent or null position = outdated
+        authoredByKilo: String(c.performed_via_github_app?.id ?? '') === kiloAppId,
         user: { login: c.user?.login ?? 'unknown' },
       }))
     );

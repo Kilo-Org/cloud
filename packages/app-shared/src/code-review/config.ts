@@ -23,9 +23,9 @@ export type ManuallyAddedRepositoryInput = {
   private: boolean;
 };
 
-// Wire shape of the Code Reviewer council config (camelCase keys mirror the
-// tRPC patch input; the persisted snake_case shape is
-// CodeReviewCouncilConfigSchema in @kilocode/db/schema-types). Kept loose on
+// Wire shape of the Code Reviewer council config. Its keys are snake_case,
+// matching the route input and the persisted shape
+// (CodeReviewCouncilConfigSchema in @kilocode/db/schema-types). Kept loose on
 // purpose — callers zod-validate against the canonical schema at the route
 // boundary, and this helper only needs to know it's an opaque object that
 // should be preserved verbatim when the patch doesn't carry it.

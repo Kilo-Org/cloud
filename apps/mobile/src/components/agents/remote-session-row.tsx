@@ -138,12 +138,14 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
   // bumps the shared revision, so the flag re-derives when it ticks. A parent
   // re-render with an unchanged payload and no ack reuses this result.
   const needsInput = useMemo(
-    () =>
-      shouldShowNeedsInput({
+    () => {
+      const raiseId = session.statusUpdatedAt ?? session.status;
+      return shouldShowNeedsInput({
         status: session.status,
-        raiseId: session.status,
-        isAcked: isAttentionAcked(session.id, session.status),
-      }),
+        raiseId,
+        isAcked: isAttentionAcked(session.id, { raiseId, status: session.status }),
+      });
+    },
     // eslint-disable-next-line react/exhaustive-deps -- the revision is a real input: `isAttentionAcked` reads the ack store, so the flag must re-derive when that store ticks.
     [session, revision]
   );

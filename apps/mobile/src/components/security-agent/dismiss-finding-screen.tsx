@@ -14,11 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useSecurityAgentCapability } from '@/lib/hooks/use-security-agent';
-import {
-  isSecurityConfigurationError,
-  isSecuritySyncRetryable,
-  securityConfigurationCopy,
-} from '@/lib/hooks/use-security-agent-mutations';
+import { isSecuritySyncRetryable, securityMutationCopyKey } from '@/lib/security-agent-ledger';
 import { useSecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
 import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -49,7 +45,7 @@ function DismissFindingSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
+      <ScreenHeader className="px-6" title={t('securityAgent.dismiss.title')} modal />
       <View className="gap-6 px-6 pt-4">
         <Skeleton className="h-[224px] w-full rounded-lg" />
         <Skeleton className="h-24 w-full rounded-lg" />
@@ -95,7 +91,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
     const comment = commentRef.current.trim();
     // Record the intent before the request so a pre-accept failure (no
     // command id) leaves a durable draft the retry card can restore.
-    dismissDraft.persist({ reason, comment, lastError: null, retryable: null });
+    dismissDraft.persist({ reason, comment, lastError: null, retryable: null, lastErrorKey: null });
     dismissFinding.mutate(
       { findingId, reason, comment: comment || undefined },
       {
@@ -111,9 +107,8 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           dismissDraft.persist({
             reason,
             comment,
-            lastError: isSecurityConfigurationError(error)
-              ? securityConfigurationCopy()
-              : error.message,
+            lastError: error.message,
+            lastErrorKey: securityMutationCopyKey(error),
             retryable: isSecuritySyncRetryable(error),
           });
         },
@@ -123,14 +118,15 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
 
   // Persist the reason and comment as the user types (debounced by the drafts
   // module), so a typed draft survives leave and reopen without a submit. The
-  // existing `lastError`/`retryable` are preserved: editing an unresolved
-  // failure must not clear the retry card until the user re-submits.
+  // existing `lastError`/`lastErrorKey`/`retryable` are preserved: editing an
+  // unresolved failure must not clear the retry card until the user re-submits.
   const persistOnType = (nextReason: DismissReason | null, nextComment: string) => {
     const existing = dismissDraft.draft;
     dismissDraft.persist({
       reason: nextReason ?? '',
       comment: nextComment,
       lastError: existing?.lastError ?? null,
+      lastErrorKey: existing?.lastErrorKey ?? null,
       retryable: existing?.retryable ?? null,
     });
   };
@@ -145,7 +141,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (notFound) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
+        <ScreenHeader className="px-6" title={t('securityAgent.dismiss.title')} modal />
         <EmptyState
           icon={ShieldOff}
           title={t('securityAgent.dismiss.notFoundTitle')}
@@ -158,7 +154,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (findingQuery.isError && !findingQuery.data) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
+        <ScreenHeader className="px-6" title={t('securityAgent.dismiss.title')} modal />
         <QueryError
           message={t('securityAgent.dismiss.couldNotLoad')}
           onRetry={() => void findingQuery.refetch()}
@@ -170,7 +166,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (capability.status === 'error') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
+        <ScreenHeader className="px-6" title={t('securityAgent.dismiss.title')} modal />
         <QueryError
           message={t('securityAgent.dismiss.couldNotCheckPermissions')}
           onRetry={() => void capability.refetch()}
@@ -193,7 +189,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (!capability.canManage) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
+        <ScreenHeader className="px-6" title={t('securityAgent.dismiss.title')} modal />
         <EmptyState
           icon={ShieldOff}
           title={t('securityAgent.dismiss.cannotDismissTitle')}
@@ -206,7 +202,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (finding.status !== 'open') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
+        <ScreenHeader className="px-6" title={t('securityAgent.dismiss.title')} modal />
         <EmptyState
           icon={ShieldOff}
           title={t('securityAgent.dismiss.cannotDismissTitle')}
@@ -222,7 +218,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
+      <ScreenHeader className="px-6" title={t('securityAgent.dismiss.title')} modal />
       <ScrollView
         className="flex-1"
         contentContainerClassName="px-6 gap-6 pb-8 pt-4"
@@ -263,7 +259,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           </Text>
           <TextInput
             accessibilityLabel={t('securityAgent.dismiss.commentAccessibility')}
-            className="h-24 rounded-lg bg-secondary p-3 text-sm leading-5 text-foreground"
+            className="h-24 rounded-lg bg-secondary p-3 text-sm leading-[1.25rem] text-foreground"
             multiline
             textAlignVertical="top"
             placeholder={t('securityAgent.dismiss.commentPlaceholder')}
@@ -277,11 +273,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
         </View>
 
         {dismissFinding.isError && (
-          <Text className="text-sm text-destructive">
-            {isSecurityConfigurationError(dismissFinding.error)
-              ? securityConfigurationCopy()
-              : dismissFinding.error.message}
-          </Text>
+          <Text className="text-sm text-destructive">{dismissFinding.error.message}</Text>
         )}
 
         <Button disabled={!reason || dismissFinding.isPending || dismissBlocked} onPress={onSubmit}>

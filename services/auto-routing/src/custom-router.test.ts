@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AUTO_ROUTING_DENIED_MODELS_PATH,
   CUSTOM_ROUTER_DECIDE_PATH,
+  CUSTOM_ROUTER_EVAL_CASE_PATH,
   CUSTOM_ROUTER_EVAL_PLAN_PATH,
   CUSTOM_ROUTER_EVAL_RESULT_PATH,
   CUSTOM_ROUTER_TABLE_PATH,
@@ -258,6 +259,38 @@ async function post(path: string, body: unknown, headers: Record<string, string>
   );
 }
 
+// A request body that reports whether the handler consumed it. A ReadableStream fills its
+// queue on construction, so a pull counter cannot distinguish consumption; `bodyUsed` can.
+function streamingBody() {
+  const text = JSON.stringify({ routerId: '11111111-1111-4111-8111-111111111111' });
+  return new Response(text).body as ReadableStream<Uint8Array>;
+}
+
+async function postStream(
+  path: string,
+  body: ReadableStream<Uint8Array>,
+  headers: Record<string, string> = {}
+) {
+  const request = new Request(`https://auto-routing.example.com${path}`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${await userToken()}`,
+      'content-type': 'application/json',
+      ...headers,
+    },
+    body,
+    duplex: 'half',
+  } as RequestInit);
+  const res = await app.request(request, undefined, env, executionCtx);
+  return { res, bodyUsed: request.bodyUsed };
+}
+
+// Pads a request object with an unknown field, which the contracts strip, to an exact body size.
+function paddedBody(value: Record<string, unknown>, bytes: number) {
+  const base = JSON.stringify({ ...value, padding: '' }).length;
+  return { ...value, padding: 'x'.repeat(bytes - base) };
+}
+
 function decideBody(overrides: Record<string, unknown> = {}) {
   return {
     model: 'kilo-auto/custom/mine',
@@ -287,6 +320,17 @@ function memberBalanceRow(overrides: Partial<OrganizationMemberBalanceRow> = {})
 async function decisionOf(res: Response) {
   expect(res.status).toBe(200);
   return CustomRouterDecideResponseSchema.parse(await res.json());
+}
+
+// A user whose credited balance is fully spent.
+function spentBalanceUser() {
+  return {
+    api_token_pepper: 'pepper-1',
+    blocked_reason: null,
+    google_user_email: 'dev@example.com',
+    total_microdollars_acquired: 1_000_000,
+    microdollars_used: 1_000_000,
+  };
 }
 
 async function errorCode(res: Response) {
@@ -522,6 +566,60 @@ describe('public custom router decide', () => {
     });
   });
 
+  const imageMessages = [
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: 'Fix the layout in this screenshot.' },
+        { type: 'image_url', image_url: { url: 'data:image/png;base64,AAAA' } },
+      ],
+    },
+  ];
+
+  it('falls back past a default entry that lacks a required modality', async () => {
+    findCustomRouter.mockResolvedValue(
+      customRouter({ entries: [ollama, sonnet], defaultEntryKey: 'client:ollama/qwen3:32b' })
+    );
+    classifyNormalizedInput.mockRejectedValue(new Error('classifier down'));
+    const { decision } = await decisionOf(
+      await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody({ messages: imageMessages }))
+    );
+    expect(decision).toMatchObject({ model: SONNET, fallback: true });
+  });
+
+  it('fails with custom_router_unavailable when the classifier fails and no entry fits', async () => {
+    findCustomRouter.mockResolvedValue(
+      customRouter({ entries: [ollama, lmstudio], defaultEntryKey: 'client:ollama/qwen3:32b' })
+    );
+    classifyNormalizedInput.mockRejectedValue(new Error('classifier down'));
+    const res = await post(
+      CUSTOM_ROUTER_DECIDE_PATH,
+      decideBody({
+        messages: imageMessages,
+        clientEntries: [
+          { provider: 'ollama', model: 'qwen3:32b' },
+          { provider: 'lmstudio', model: 'gemma' },
+        ],
+      })
+    );
+    expect(res.status).toBe(422);
+    expect(await errorCode(res)).toBe('custom_router_unavailable');
+  });
+
+  it('accepts a body at the size limit and rejects one byte more', async () => {
+    const limit = 32_000_000;
+    const padded = (bytes: number) => {
+      const unpadded = JSON.stringify({ ...decideBody(), padding: '' }).length;
+      return { ...decideBody(), padding: 'x'.repeat(bytes - unpadded) };
+    };
+    await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, padded(limit)));
+    const tooLarge = await post(CUSTOM_ROUTER_DECIDE_PATH, padded(limit + 1));
+    expect(tooLarge.status).toBe(400);
+    expect(await tooLarge.json()).toEqual({
+      error: { code: 'invalid_request', message: 'Request body is too large' },
+    });
+  });
+
   it('drops gateway entries the organization policy denies the member', async () => {
     gatewayDeniedModelIds = [SONNET];
     const { decision } = await decisionOf(
@@ -719,6 +817,24 @@ describe('public custom router decide', () => {
     const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
     expect(res.status).toBe(402);
     expect(await errorCode(res)).toBe('insufficient_balance');
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+  });
+
+  it('requires a paid-usage balance from a personal caller', async () => {
+    dbRows.user = [
+      {
+        api_token_pepper: 'pepper-1',
+        blocked_reason: null,
+        google_user_email: 'dev@example.com',
+        total_microdollars_acquired: 1_000_000,
+        microdollars_used: 1_000_000,
+      },
+    ];
+    const { res, bodyUsed } = await postStream(CUSTOM_ROUTER_DECIDE_PATH, streamingBody());
+    expect(res.status).toBe(402);
+    expect(await errorCode(res)).toBe('insufficient_balance');
+    expect(bodyUsed).toBe(false);
+    expect(findCustomRouter).not.toHaveBeenCalled();
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 
@@ -951,6 +1067,23 @@ describe('client eval proxy', () => {
     return call ? (JSON.parse(call[1]?.body as string) as Record<string, unknown>) : null;
   }
 
+  function resultUpload(overrides: Record<string, unknown> = {}) {
+    return {
+      routerId: ROUTER_ID,
+      engineIdentity: 'router:v3:abc',
+      entry: { kind: 'client', provider: 'ollama', model: 'qwen3:32b' },
+      variant: null,
+      caseId: 'case-1',
+      rep: 0,
+      output: 'done',
+      costUsd: 0,
+      durationMs: 1200,
+      exitCode: 0,
+      timedOut: false,
+      ...overrides,
+    };
+  }
+
   it('forwards a plan with the router context and passes the benchmark answer through', async () => {
     benchmarkFetch.mockResolvedValueOnce(
       Response.json({ error: { code: 'internal_error', message: 'boom' } }, { status: 500 })
@@ -976,6 +1109,7 @@ describe('client eval proxy', () => {
       customRouter({ ownerType: 'org', ownerId: ORG_ID, slug: 'team' })
     );
     findOrganizationMemberRole.mockResolvedValue('billing_manager');
+    findOrganizationMemberBalanceRow.mockResolvedValue(null);
     benchmarkFetch.mockResolvedValueOnce(Response.json({ score: 1 }));
     const upload = {
       routerId: ROUTER_ID,
@@ -1032,5 +1166,96 @@ describe('client eval proxy', () => {
     );
     expect(res.status).toBe(402);
     expect(benchmarkFetch).not.toHaveBeenCalled();
+  });
+
+  it('requires a funded payer for an eval plan', async () => {
+    dbRows.user = [spentBalanceUser()];
+    dbRows.organization = [{ total_microdollars_acquired: 1_000, microdollars_used: 1_000 }];
+    const { res, bodyUsed } = await postStream(CUSTOM_ROUTER_EVAL_PLAN_PATH, streamingBody(), {
+      'X-KiloCode-OrganizationId': ORG_ID,
+    });
+    expect(res.status).toBe(402);
+    expect(await errorCode(res)).toBe('insufficient_balance');
+    expect(bodyUsed).toBe(false);
+    expect(findCustomRouterById).not.toHaveBeenCalled();
+    expect(benchmarkFetch).not.toHaveBeenCalled();
+  });
+
+  it('runs an eval plan for an organization billing manager funded by the organization', async () => {
+    findCustomRouterById.mockResolvedValue(
+      customRouter({ ownerType: 'org', ownerId: ORG_ID, slug: 'team' })
+    );
+    findOrganizationMemberRole.mockResolvedValue('billing_manager');
+    findOrganizationMemberBalanceRow.mockResolvedValue(null);
+    dbRows.user = [spentBalanceUser()];
+    benchmarkFetch.mockResolvedValueOnce(Response.json({}));
+    const res = await post(
+      CUSTOM_ROUTER_EVAL_PLAN_PATH,
+      { routerId: ROUTER_ID },
+      { 'X-KiloCode-OrganizationId': ORG_ID }
+    );
+    expect(res.status).toBe(200);
+    expect(forwarded(CUSTOM_ROUTER_EVAL_PLAN_PATH)).toMatchObject({
+      routerId: ROUTER_ID,
+      ownerType: 'org',
+      ownerId: ORG_ID,
+    });
+  });
+
+  it('accepts an eval plan at the body cap and refuses a larger one', async () => {
+    const limit = 16_000;
+    benchmarkFetch.mockResolvedValueOnce(Response.json({}));
+    const atLimit = await postStream(
+      CUSTOM_ROUTER_EVAL_PLAN_PATH,
+      new Response(JSON.stringify(paddedBody({ routerId: ROUTER_ID }, limit)))
+        .body as ReadableStream<Uint8Array>
+    );
+    expect(atLimit.res.status).toBe(200);
+    expect(atLimit.bodyUsed).toBe(true);
+    const tooLarge = await post(
+      CUSTOM_ROUTER_EVAL_PLAN_PATH,
+      paddedBody({ routerId: ROUTER_ID }, limit + 1)
+    );
+    expect(tooLarge.status).toBe(400);
+    expect(await tooLarge.json()).toEqual({
+      error: { code: 'invalid_request', message: 'Request body is too large' },
+    });
+    expect(benchmarkFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts an eval case at the body cap and refuses a larger one', async () => {
+    const limit = 16_000;
+    const body = { routerId: ROUTER_ID, caseId: 'case-1' };
+    benchmarkFetch.mockResolvedValueOnce(Response.json({}));
+    const atLimit = await post(CUSTOM_ROUTER_EVAL_CASE_PATH, paddedBody(body, limit));
+    expect(atLimit.status).toBe(200);
+    expect(forwarded(CUSTOM_ROUTER_EVAL_CASE_PATH)).toMatchObject({
+      routerId: ROUTER_ID,
+      caseId: 'case-1',
+    });
+    const tooLarge = await post(CUSTOM_ROUTER_EVAL_CASE_PATH, paddedBody(body, limit + 1));
+    expect(tooLarge.status).toBe(400);
+    expect(await tooLarge.json()).toEqual({
+      error: { code: 'invalid_request', message: 'Request body is too large' },
+    });
+    expect(benchmarkFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts a maximal client output and refuses a body above the result cap', async () => {
+    benchmarkFetch.mockResolvedValueOnce(Response.json({ score: 1 }));
+    const res = await post(
+      CUSTOM_ROUTER_EVAL_RESULT_PATH,
+      resultUpload({ output: 'x'.repeat(1_000_000) })
+    );
+    expect(res.status).toBe(200);
+    const tooLarge = await post(
+      CUSTOM_ROUTER_EVAL_RESULT_PATH,
+      paddedBody(resultUpload(), 8_000_000 + 1)
+    );
+    expect(tooLarge.status).toBe(400);
+    expect(await tooLarge.json()).toEqual({
+      error: { code: 'invalid_request', message: 'Request body is too large' },
+    });
+    expect(benchmarkFetch).toHaveBeenCalledTimes(1);
   });
 });

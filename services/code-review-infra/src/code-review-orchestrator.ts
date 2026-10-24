@@ -1288,6 +1288,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       };
       if (this.state.skipBalanceCheck) {
         userHeaders['x-skip-balance-check'] = 'true';
+        userHeaders['x-internal-api-key'] = this.env.INTERNAL_API_SECRET;
       }
 
       console.log('[CodeReviewOrchestrator] Calling initiateFromKilocodeSessionV2', {
@@ -1408,6 +1409,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       };
       if (this.state.skipBalanceCheck) {
         userHeaders['x-skip-balance-check'] = 'true';
+        userHeaders['x-internal-api-key'] = this.env.INTERNAL_API_SECRET;
       }
 
       let health: CloudAgentSessionHealthOutput;

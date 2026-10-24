@@ -41,7 +41,6 @@ import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client'
 import { client } from '@kilocode/web-shared/lib/stripe-client';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
-import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';
 import { blockUser } from '@/lib/user/block';
 
 type StripeReference = string | { id: string } | null | undefined;
@@ -533,7 +532,6 @@ async function blockUserForAcceptedDispute(params: {
   });
 
   await revokeWebSessions(userId);
-  await revokeGatewayGrantsForBlockedUser(userId);
 
   return {
     status: StripeDisputeActionStatus.Completed,

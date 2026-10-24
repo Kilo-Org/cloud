@@ -9,7 +9,8 @@ import {
   organization_memberships,
   organizations,
 } from '@kilocode/db/schema';
-import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { goneOrDeletingBlockedReasonSql } from '@kilocode/db/user-soft-delete';
+import { and, eq, inArray, isNull, not, or, sql } from 'drizzle-orm';
 import type { db } from '@kilocode/web-shared/lib/drizzle';
 import type { PoolNotificationOwner } from './auto-routing-pool-notifications';
 
@@ -17,6 +18,11 @@ import type { PoolNotificationOwner } from './auto-routing-pool-notifications';
 // into the child and carries billing authority there.
 const INHERITED_BILLING_ROLES = ORGANIZATION_BILLING_ROLES.filter(role =>
   ORGANIZATION_PARENT_ACCESS_ROLES.includes(role)
+);
+
+const liveUser = or(
+  isNull(kilocode_users.blocked_reason),
+  not(goneOrDeletingBlockedReasonSql(kilocode_users.blocked_reason))
 );
 
 export async function discoverPoolNotificationOwners(
@@ -35,7 +41,7 @@ export async function discoverPoolNotificationOwners(
         kilocode_users,
         eq(kilocode_users.id, auto_routing_custom_routers.owned_by_user_id)
       )
-      .where(eq(auto_routing_custom_routers.legacy_pool, true));
+      .where(and(eq(auto_routing_custom_routers.legacy_pool, true), liveUser));
     const organizationPools = await tx
       .select({
         id: auto_routing_custom_routers.id,
@@ -66,7 +72,8 @@ export async function discoverPoolNotificationOwners(
               and(
                 inArray(organization_memberships.organization_id, organizationIds),
                 inArray(organization_memberships.role, ORGANIZATION_BILLING_ROLES),
-                eq(kilocode_users.is_bot, false)
+                eq(kilocode_users.is_bot, false),
+                liveUser
               )
             );
     const inheritedBillingContacts =
@@ -87,7 +94,8 @@ export async function discoverPoolNotificationOwners(
               and(
                 inArray(organizations.id, organizationIds),
                 inArray(organization_memberships.role, INHERITED_BILLING_ROLES),
-                eq(kilocode_users.is_bot, false)
+                eq(kilocode_users.is_bot, false),
+                liveUser
               )
             );
     const allBillingContacts = [...billingContacts, ...inheritedBillingContacts];

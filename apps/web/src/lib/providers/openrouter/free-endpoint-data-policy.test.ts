@@ -29,7 +29,7 @@ function offering(slug: string, isFree = false): OpenRouterModel {
 
 function freeExclusiveModel(
   public_id: string,
-  inference_provider_restriction: KiloExclusiveModel['inference_provider_restriction']
+  inference_providers: KiloExclusiveModel['inference_providers']
 ): KiloExclusiveModel {
   return {
     public_id,
@@ -41,15 +41,15 @@ function freeExclusiveModel(
     flags: [],
     provider: OPENROUTER,
     pricing: null,
-    inference_provider_restriction,
+    inference_providers,
   };
 }
 
 function dataCollectionExclusiveModel(
   public_id: string,
-  inference_provider_restriction: KiloExclusiveModel['inference_provider_restriction']
+  inference_providers: KiloExclusiveModel['inference_providers']
 ): KiloExclusiveModel {
-  const model = freeExclusiveModel(public_id, inference_provider_restriction);
+  const model = freeExclusiveModel(public_id, inference_providers);
   model.pricing = {
     tiers: [
       {

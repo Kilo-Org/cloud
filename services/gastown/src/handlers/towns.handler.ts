@@ -4,7 +4,6 @@ import { getGastownUserStub } from '../dos/GastownUser.do';
 import { getTownDOStub } from '../dos/Town.do';
 import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
-import { checkTownCreationEligibility } from '../util/town-creation.util';
 import type { GastownEnv } from '../gastown.worker';
 
 const TOWNS_LOG = '[towns.handler]';
@@ -34,11 +33,6 @@ export async function handleCreateTown(c: Context<GastownEnv>, params: { userId:
       { success: false, error: 'Invalid request body', issues: parsed.error.issues },
       400
     );
-  }
-
-  const eligibility = await checkTownCreationEligibility(c.env, c.get('kiloUserId'));
-  if (!eligibility.allowed) {
-    return c.json(resError(eligibility.message), eligibility.code === 'FORBIDDEN' ? 403 : 503);
   }
 
   const townDO = getGastownUserStub(c.env, params.userId);

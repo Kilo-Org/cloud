@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import {
   AutoRoutingModeConfigDO,
   clearAutoRoutingSettingsCache,
@@ -9,7 +9,11 @@ import {
   setAutoRoutingMode,
   setAutoRoutingSettings,
 } from './routing-mode';
-import type { AutoRoutingMode, EfficientModelPool } from '@kilocode/auto-routing-contracts';
+import type {
+  AutoRoutingMode,
+  CustomRoutingTable,
+  EfficientModelPool,
+} from '@kilocode/auto-routing-contracts';
 import type { AutoRoutingOwnerSettings } from './routing-mode';
 
 type ModeStub = {
@@ -19,6 +23,12 @@ type ModeStub = {
   setPool: ReturnType<typeof vi.fn<(pool: EfficientModelPool | null) => Promise<void>>>;
   getSettings: ReturnType<typeof vi.fn<() => Promise<AutoRoutingOwnerSettings>>>;
   setSettings: ReturnType<typeof vi.fn<(settings: AutoRoutingOwnerSettings) => Promise<void>>>;
+  saveSettings: Mock<
+    (request: {
+      mode: AutoRoutingMode | null;
+      pool: EfficientModelPool | null;
+    }) => Promise<{ statuses: [] }>
+  >;
 };
 
 const SAMPLE_POOL: EfficientModelPool = [{ model: 'a/chat' }, { model: 'b/chat' }];
@@ -53,6 +63,11 @@ function makeEnv(
       setSettings: vi.fn(async (settings: AutoRoutingOwnerSettings) => {
         modes.set(id, settings.mode);
         pools.set(id, settings.pool);
+      }),
+      saveSettings: vi.fn(async request => {
+        modes.set(id, request.mode);
+        pools.set(id, request.pool);
+        return { statuses: [] };
       }),
     };
     stubs.set(id, stub);
@@ -139,14 +154,312 @@ function createFakeStorage() {
   return storage;
 }
 
-function createModeDO() {
+function createModeDO(env: Partial<Env> = {}) {
   const storage = createFakeStorage();
   const modeDO = new AutoRoutingModeConfigDO(
     { storage } as unknown as DurableObjectState,
-    {} as Env
+    env as Env
   );
   return { modeDO, storage };
 }
+
+type SubscriptionRequest = {
+  ownerType: 'user' | 'org';
+  ownerId: string;
+  entries: EfficientModelPool | null;
+  restorePrevious?: boolean;
+};
+
+function createSubscriptionDO() {
+  const state: {
+    subscriptions: EfficientModelPool | null;
+    table: CustomRoutingTable | null;
+  } = { subscriptions: null, table: null };
+  const requests: { path: string; body: SubscriptionRequest }[] = [];
+  const respond = async (path: string, body: SubscriptionRequest) => {
+    if (path === '/admin/profiles/subscriptions' || path === '/admin/profiles/register') {
+      state.subscriptions = body.entries;
+    }
+    if (path === '/admin/custom-routing-table') {
+      return Response.json({ table: state.table });
+    }
+    return Response.json({
+      statuses: (body.entries ?? []).map(entry => ({
+        entry: { ...entry, variant: null },
+        status: 'ready',
+      })),
+    });
+  };
+  const handle = vi.fn(respond);
+  const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+    if (typeof init?.body !== 'string') throw new Error('Expected serialized benchmark request');
+    const body = JSON.parse(init.body) as SubscriptionRequest;
+    const path = new URL(url).pathname;
+    requests.push({ path, body });
+    return handle(path, body);
+  });
+  const { modeDO, storage } = createModeDO({
+    INTERNAL_API_SECRET_PROD: { get: async () => 'test-secret' } as Env['INTERNAL_API_SECRET_PROD'],
+    BENCHMARK_SERVICE: { fetch } as unknown as Env['BENCHMARK_SERVICE'],
+  });
+  return { modeDO, storage, state, requests, handle, respond };
+}
+
+describe('owner benchmark subscriptions', () => {
+  const owner = { ownerType: 'user' as const, ownerId: 'user-1' };
+  const aliases: EfficientModelPool = [{ model: '~vendor/model-latest' }];
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('reads no-pool settings and saves only the mode without a benchmark dependency', async () => {
+    const { modeDO, handle, requests } = createSubscriptionDO();
+    handle.mockRejectedValue(new Error('benchmark unavailable'));
+    await expect(modeDO.getSubscribedSettings(owner)).resolves.toEqual({
+      settings: { mode: null, pool: null },
+      statuses: [],
+    });
+    await expect(
+      modeDO.saveSettings({ ...owner, mode: 'best_accuracy', pool: null })
+    ).resolves.toEqual({ statuses: [] });
+    expect(await modeDO.getCustomRoutingTable(owner)).toBeNull();
+    expect(await modeDO.getSettings()).toEqual({ mode: 'best_accuracy', pool: null });
+    expect(requests).toEqual([]);
+  });
+
+  it('preserves ready statuses without changing subscriptions on a mode-only save', async () => {
+    const { modeDO, state, requests } = createSubscriptionDO();
+    await modeDO.saveSettings({ ...owner, mode: null, pool: aliases });
+    requests.length = 0;
+
+    await expect(
+      modeDO.saveSettings({ ...owner, mode: 'best_accuracy', pool: aliases })
+    ).resolves.toEqual({
+      statuses: [{ entry: { model: '~vendor/model-latest', variant: null }, status: 'ready' }],
+    });
+    expect(await modeDO.getSettings()).toEqual({ mode: 'best_accuracy', pool: aliases });
+    expect(state.subscriptions).toEqual(aliases);
+    expect(requests).toEqual([
+      {
+        path: '/admin/profiles/status',
+        body: { router: 'efficient', ...owner, entries: aliases },
+      },
+    ]);
+  });
+
+  it('preserves settings and subscriptions when a mode-only status read fails', async () => {
+    const { modeDO, state, handle, requests } = createSubscriptionDO();
+    await modeDO.saveSettings({ ...owner, mode: 'cost_per_accuracy', pool: aliases });
+    requests.length = 0;
+    handle.mockRejectedValue(new Error('benchmark unavailable'));
+
+    await expect(
+      modeDO.saveSettings({ ...owner, mode: 'best_accuracy', pool: aliases })
+    ).rejects.toThrow('benchmark unavailable');
+
+    expect(await modeDO.getSettings()).toEqual({ mode: 'cost_per_accuracy', pool: aliases });
+    expect(state.subscriptions).toEqual(aliases);
+    expect(requests.map(request => request.path)).toEqual(['/admin/profiles/status']);
+  });
+
+  it('bootstraps historical aliases on every settings read without rewriting the saved pool', async () => {
+    const { modeDO, storage, requests } = createSubscriptionDO();
+    await modeDO.setSettings({ mode: 'best_accuracy', pool: aliases });
+
+    const first = await modeDO.getSubscribedSettings(owner);
+    const second = await modeDO.getSubscribedSettings(owner);
+
+    expect(first.settings).toEqual({ mode: 'best_accuracy', pool: aliases });
+    expect(second).toEqual(first);
+    expect(storage.entries.get('pool')).toEqual(aliases);
+    expect(requests).toEqual([
+      { path: '/admin/profiles/subscriptions', body: { ...owner, entries: aliases } },
+      {
+        path: '/admin/profiles/status',
+        body: { router: 'efficient', ...owner, entries: aliases },
+      },
+      { path: '/admin/profiles/subscriptions', body: { ...owner, entries: aliases } },
+      {
+        path: '/admin/profiles/status',
+        body: { router: 'efficient', ...owner, entries: aliases },
+      },
+    ]);
+  });
+
+  it('bootstraps the previous pool before replacement and clears subscriptions on removal', async () => {
+    const { modeDO, state, requests } = createSubscriptionDO();
+    await modeDO.setSettings({ mode: null, pool: aliases });
+    const replacement: EfficientModelPool = [{ model: '~vendor/other-latest' }];
+
+    await modeDO.saveSettings({ ...owner, mode: 'best_accuracy', pool: replacement });
+    expect(state.subscriptions).toEqual(replacement);
+    expect(requests.slice(0, 2)).toEqual([
+      { path: '/admin/profiles/subscriptions', body: { ...owner, entries: aliases } },
+      {
+        path: '/admin/profiles/register',
+        body: { router: 'efficient', ...owner, entries: replacement },
+      },
+    ]);
+
+    requests.length = 0;
+    await modeDO.saveSettings({ ...owner, mode: null, pool: null });
+    expect(state.subscriptions).toBeNull();
+    expect(await modeDO.getCustomRoutingTable(owner)).toBeNull();
+    expect(requests.every(request => request.path === '/admin/profiles/subscriptions')).toBe(true);
+    expect(await modeDO.getSettings()).toEqual({ mode: null, pool: null });
+  });
+
+  it('reads an existing owner serving table without synchronizing subscriptions', async () => {
+    const { modeDO, state, storage, requests } = createSubscriptionDO();
+    await modeDO.setSettings({ mode: null, pool: aliases });
+    const table: CustomRoutingTable = {
+      version: 'old-active',
+      generatedAt: '2026-10-01T00:00:00.000Z',
+      minAccuracy: 0.7,
+      switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
+      source: 'benchmark',
+      routes: {
+        'implementation/feature_development': [
+          {
+            model: 'vendor/old',
+            variant: null,
+            accuracy: 0.9,
+            avgCostUsd: 0.001,
+            meetsThreshold: true,
+          },
+        ],
+      },
+    };
+    state.table = table;
+
+    expect(await modeDO.getCustomRoutingTable(owner)).toEqual(table);
+    expect(requests).toEqual([
+      {
+        path: '/admin/custom-routing-table',
+        body: { router: 'efficient', ...owner, entries: aliases },
+      },
+    ]);
+    expect(storage.entries.get('pool')).toEqual(aliases);
+  });
+
+  it('bootstraps a missing subscription from the saved pool and retries table assembly', async () => {
+    const { modeDO, state, requests, handle, respond } = createSubscriptionDO();
+    await modeDO.setSettings({ mode: null, pool: aliases });
+    handle.mockImplementation(async (path, body) => {
+      if (path === '/admin/custom-routing-table' && state.subscriptions === null) {
+        return Response.json({ table: null });
+      }
+      return respond(path, body);
+    });
+
+    expect(await modeDO.getCustomRoutingTable(owner)).toBeNull();
+    expect(state.subscriptions).toEqual(aliases);
+    expect(requests.map(request => request.path)).toEqual([
+      '/admin/custom-routing-table',
+      '/admin/profiles/subscriptions',
+      '/admin/custom-routing-table',
+    ]);
+  });
+
+  it('leaves saved settings unchanged when historical bootstrap fails', async () => {
+    const { modeDO, handle, requests } = createSubscriptionDO();
+    await modeDO.setSettings({ mode: 'best_accuracy', pool: aliases });
+    handle.mockRejectedValueOnce(new Error('bootstrap unavailable'));
+
+    await expect(modeDO.saveSettings({ ...owner, mode: null, pool: SAMPLE_POOL })).rejects.toThrow(
+      'bootstrap unavailable'
+    );
+
+    expect(await modeDO.getSettings()).toEqual({ mode: 'best_accuracy', pool: aliases });
+    expect(requests.map(request => request.path)).toEqual(['/admin/profiles/subscriptions']);
+  });
+
+  it('restores the saved subscriptions after an ambiguous register failure', async () => {
+    const { modeDO, handle, respond, state, requests } = createSubscriptionDO();
+    await modeDO.setSettings({ mode: 'best_accuracy', pool: aliases });
+    handle.mockImplementation(async (path, body) => {
+      const response = await respond(path, body);
+      if (path === '/admin/profiles/register') throw new Error('register response lost');
+      return response;
+    });
+
+    await expect(modeDO.saveSettings({ ...owner, mode: null, pool: SAMPLE_POOL })).rejects.toThrow(
+      'register response lost'
+    );
+
+    expect(state.subscriptions).toEqual(aliases);
+    expect(await modeDO.getSettings()).toEqual({ mode: 'best_accuracy', pool: aliases });
+    expect(requests.at(-1)).toEqual({
+      path: '/admin/profiles/subscriptions',
+      body: { ...owner, entries: aliases, restorePrevious: true },
+    });
+  });
+
+  it('restores subscriptions when the local settings commit fails', async () => {
+    const { modeDO, state } = createSubscriptionDO();
+    await modeDO.setSettings({ mode: 'best_accuracy', pool: aliases });
+    vi.spyOn(modeDO, 'setSettings').mockRejectedValueOnce(new Error('storage unavailable'));
+
+    await expect(modeDO.saveSettings({ ...owner, mode: null, pool: null })).rejects.toThrow(
+      'storage unavailable'
+    );
+
+    expect(state.subscriptions).toEqual(aliases);
+    expect(await modeDO.getSettings()).toEqual({ mode: 'best_accuracy', pool: aliases });
+  });
+
+  it('does not clear the saved pool when removal fails and allows a later retry', async () => {
+    const { modeDO, handle, respond, state } = createSubscriptionDO();
+    await modeDO.setSettings({ mode: 'best_accuracy', pool: aliases });
+    handle.mockImplementationOnce(respond).mockRejectedValueOnce(new Error('removal unavailable'));
+
+    await expect(modeDO.saveSettings({ ...owner, mode: null, pool: null })).rejects.toThrow(
+      'removal unavailable'
+    );
+    expect(state.subscriptions).toEqual(aliases);
+    expect(await modeDO.getSettings()).toEqual({ mode: 'best_accuracy', pool: aliases });
+
+    await modeDO.saveSettings({ ...owner, mode: null, pool: null });
+    expect(state.subscriptions).toBeNull();
+    expect(await modeDO.getSettings()).toEqual({ mode: null, pool: null });
+  });
+
+  it('serializes concurrent saves and reads so an old bootstrap cannot restore a removed pool', async () => {
+    const { modeDO, handle, respond, state, requests } = createSubscriptionDO();
+    await modeDO.setSettings({ mode: null, pool: aliases });
+    let releaseBootstrap: (() => void) | undefined;
+    let notifyStarted: (() => void) | undefined;
+    const started = new Promise<void>(resolve => {
+      notifyStarted = resolve;
+    });
+    const blocked = new Promise<void>(resolve => {
+      releaseBootstrap = resolve;
+    });
+    handle.mockImplementationOnce(async (path, body) => {
+      notifyStarted?.();
+      await blocked;
+      return respond(path, body);
+    });
+
+    const oldRead = modeDO.getSubscribedSettings(owner);
+    await started;
+    const replacement = modeDO.saveSettings({ ...owner, mode: 'best_accuracy', pool: SAMPLE_POOL });
+    const removal = modeDO.saveSettings({ ...owner, mode: null, pool: null });
+    const finalRead = modeDO.getSubscribedSettings(owner);
+    expect(requests).toHaveLength(1);
+    releaseBootstrap?.();
+    await Promise.all([oldRead, replacement, removal, finalRead]);
+
+    expect(state.subscriptions).toBeNull();
+    expect(await modeDO.getSettings()).toEqual({ mode: null, pool: null });
+    expect(requests.at(-1)).toEqual({
+      path: '/admin/profiles/subscriptions',
+      body: { ...owner, entries: null },
+    });
+  });
+});
 
 describe('AutoRoutingModeConfigDO', () => {
   it('persists, clears, and validates the stored mode', async () => {
@@ -429,6 +742,7 @@ describe('auto routing mode config', () => {
     await expect(getEffectiveAutoRoutingSettings(env, owner)).resolves.toEqual({
       mode: 'best_accuracy',
       pool: SAMPLE_POOL,
+      poolOwner: { ownerType: 'user', ownerId: 'user-1' },
     });
 
     modes.set('user:user-1', 'cost_per_accuracy');
@@ -438,6 +752,7 @@ describe('auto routing mode config', () => {
     await expect(getEffectiveAutoRoutingSettings(env, owner)).resolves.toEqual({
       mode: 'best_accuracy',
       pool: SAMPLE_POOL,
+      poolOwner: { ownerType: 'user', ownerId: 'user-1' },
     });
     expect(stubs.get('user:user-1')?.getSettings).toHaveBeenCalledTimes(1);
 
@@ -445,6 +760,7 @@ describe('auto routing mode config', () => {
     await expect(getEffectiveAutoRoutingSettings(env, owner)).resolves.toEqual({
       mode: 'cost_per_accuracy',
       pool: null,
+      poolOwner: null,
     });
     expect(stubs.get('user:user-1')?.getSettings).toHaveBeenCalledTimes(2);
 
@@ -453,6 +769,7 @@ describe('auto routing mode config', () => {
     await expect(getEffectiveAutoRoutingSettings(env, owner)).resolves.toEqual({
       mode: 'best_accuracy',
       pool: null,
+      poolOwner: null,
     });
     expect(stubs.get('user:user-1')?.getSettings).toHaveBeenCalledTimes(3);
   });
@@ -466,10 +783,18 @@ describe('auto routing mode config', () => {
 
     await expect(
       getEffectiveAutoRoutingSettings(env, { userId: 'user-1', organizationId: 'org-1' })
-    ).resolves.toEqual({ mode: 'best_accuracy', pool: SAMPLE_POOL });
+    ).resolves.toEqual({
+      mode: 'best_accuracy',
+      pool: SAMPLE_POOL,
+      poolOwner: { ownerType: 'org', ownerId: 'org-1' },
+    });
     await expect(
       getEffectiveAutoRoutingSettings(env, { userId: 'user-2', organizationId: 'org-1' })
-    ).resolves.toEqual({ mode: 'cost_per_accuracy', pool: SAMPLE_POOL });
+    ).resolves.toEqual({
+      mode: 'cost_per_accuracy',
+      pool: SAMPLE_POOL,
+      poolOwner: { ownerType: 'org', ownerId: 'org-1' },
+    });
     expect(stubs.get('org:org-1')?.getSettings).toHaveBeenCalledTimes(1);
   });
 
@@ -486,10 +811,12 @@ describe('auto routing mode config', () => {
     await expect(getEffectiveAutoRoutingSettings(env, owner)).resolves.toEqual({
       mode: 'cost_per_accuracy',
       pool: null,
+      poolOwner: null,
     });
     await expect(getEffectiveAutoRoutingSettings(env, owner)).resolves.toEqual({
       mode: 'best_accuracy',
       pool: SAMPLE_POOL,
+      poolOwner: { ownerType: 'user', ownerId: 'user-1' },
     });
     expect(stubs.get('user:user-1')?.getSettings).toHaveBeenCalledTimes(2);
   });
@@ -534,6 +861,7 @@ describe('auto routing mode config', () => {
     ).resolves.toEqual({
       mode: 'best_accuracy',
       pool: SAMPLE_POOL,
+      poolOwner: { ownerType: 'org', ownerId: 'org-1' },
     });
   });
 
@@ -549,6 +877,7 @@ describe('auto routing mode config', () => {
     ).resolves.toEqual({
       mode: 'best_accuracy',
       pool: personalPool,
+      poolOwner: { ownerType: 'user', ownerId: 'user-1' },
     });
   });
 
@@ -562,7 +891,11 @@ describe('auto routing mode config', () => {
 
     await expect(
       getEffectiveAutoRoutingSettings(env, { userId: 'user-1', organizationId: 'org-1' })
-    ).resolves.toEqual({ mode: 'cost_per_accuracy', pool: orgPool });
+    ).resolves.toEqual({
+      mode: 'cost_per_accuracy',
+      pool: orgPool,
+      poolOwner: { ownerType: 'org', ownerId: 'org-1' },
+    });
 
     pools.set('org:org-1', null);
     modes.set('org:org-1', null);
@@ -570,20 +903,27 @@ describe('auto routing mode config', () => {
 
     await expect(
       getEffectiveAutoRoutingSettings(env, { userId: 'user-1', organizationId: 'org-1' })
-    ).resolves.toEqual({ mode: 'cost_per_accuracy', pool: personalPool });
+    ).resolves.toEqual({
+      mode: 'cost_per_accuracy',
+      pool: personalPool,
+      poolOwner: { ownerType: 'user', ownerId: 'user-1' },
+    });
   });
 
   it('writes combined settings through the owner stub', async () => {
     const { env, modes, pools, stubs } = makeEnv();
 
-    await setAutoRoutingSettings(
-      env,
-      { ownerType: 'user', ownerId: 'user-1' },
-      { mode: 'best_accuracy', pool: SAMPLE_POOL }
-    );
+    await setAutoRoutingSettings(env, {
+      ownerType: 'user',
+      ownerId: 'user-1',
+      mode: 'best_accuracy',
+      pool: SAMPLE_POOL,
+    });
     expect(modes.get('user:user-1')).toBe('best_accuracy');
     expect(pools.get('user:user-1')).toEqual(SAMPLE_POOL);
-    expect(stubs.get('user:user-1')?.setSettings).toHaveBeenCalledWith({
+    expect(stubs.get('user:user-1')?.saveSettings).toHaveBeenCalledWith({
+      ownerType: 'user',
+      ownerId: 'user-1',
       mode: 'best_accuracy',
       pool: SAMPLE_POOL,
     });

@@ -2,7 +2,7 @@ import {
   DEFAULT_AUTO_ROUTING_MODE,
   EfficientModelPoolSchema,
   type AutoRoutingMode,
-  type AutoRoutingModeOwnerType,
+  type OwnerType,
   type CustomRouterDefinition,
 } from '@kilocode/auto-routing-contracts';
 import { findLegacyPoolRouter } from './custom-router-store';
@@ -13,11 +13,12 @@ import {
   type AutoRoutingOwnerSettings,
 } from './routing-mode';
 
-type Owner = { ownerType: AutoRoutingModeOwnerType; ownerId: string };
+type Owner = { ownerType: OwnerType; ownerId: string };
 type OverlapEnv = Pick<Env, 'AUTO_ROUTING_MODE_CONFIG' | 'HYPERDRIVE'>;
 
 export type LegacyPoolRouting = AutoRoutingOwnerSettings & {
   mode: AutoRoutingMode;
+  poolOwner: Owner | null;
   router: CustomRouterDefinition | null;
 };
 
@@ -70,10 +71,17 @@ export async function resolveLegacyPoolRouting(
       : null,
   ]);
   const mode = org?.mode ?? user.mode ?? DEFAULT_AUTO_ROUTING_MODE;
-  const poolOwner = org?.router || org?.pool ? org : user;
+  const orgSettings = org?.router || org?.pool ? org : null;
+  const poolSettings = orgSettings ?? user;
   return {
     mode,
-    pool: poolOwner.pool,
-    router: poolOwner.router ? { ...poolOwner.router, mode } : null,
+    pool: poolSettings.pool,
+    poolOwner:
+      poolSettings.pool === null
+        ? null
+        : orgSettings && owner.organizationId
+          ? { ownerType: 'org', ownerId: owner.organizationId }
+          : { ownerType: 'user', ownerId: owner.userId },
+    router: poolSettings.router ? { ...poolSettings.router, mode } : null,
   };
 }

@@ -37,6 +37,7 @@ import {
 } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
+import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { cn } from '@/lib/utils';
 
 type OrganizationHubScreenProps = Readonly<{
@@ -90,10 +91,8 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
     : null;
   const kiloPassManagementUrl = `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions/kilo-pass`;
   const kiloPassSetupUrl = `${kiloPassManagementUrl}/setup`;
-  // A missing `withMembers` payload is not "off": the query can be paused
-  // offline or have errored with no persisted copy, so an org with the alert
-  // enabled must never read as disabled. Only a loaded payload with no stored
-  // threshold is genuinely off.
+  const lowBalanceUnavailable =
+    orgWithMembers.data == null && (orgWithMembers.isError || orgWithMembers.isPaused);
   const minimumBalance = orgWithMembers.data?.settings.minimum_balance;
   let lowBalanceSubtitle = t('common.loading');
   if (minimumBalance != null) {
@@ -102,13 +101,17 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
     });
   } else if (orgWithMembers.data != null) {
     lowBalanceSubtitle = t('common.off');
-  } else if (orgWithMembers.isError) {
-    lowBalanceSubtitle = t('common.unknown');
+  } else if (lowBalanceUnavailable) {
+    lowBalanceSubtitle = t(
+      orgWithMembers.isPaused ? 'queryError.offlineTitle' : 'common.somethingWentWrong'
+    );
   }
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={org.organizationName} />
+      {/* The organization name is user prose, not a UI label, so it keeps a
+          second line for a natural break. */}
+      <ScreenHeader title={org.organizationName} titleNumberOfLines={2} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-6 gap-6 pt-4"
@@ -207,7 +210,16 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                 icon={Bell}
                 title={t('organization.lowBalanceAlert.title')}
                 subtitle={lowBalanceSubtitle}
+                trailing={
+                  lowBalanceUnavailable ? (
+                    <Text className="text-xs font-medium text-primary">{t('common.retry')}</Text>
+                  ) : undefined
+                }
                 onPress={() => {
+                  if (lowBalanceUnavailable) {
+                    void orgWithMembers.refetch();
+                    return;
+                  }
                   router.push('/(app)/(tabs)/(3_profile)/organization/low-balance-alert' as Href);
                 }}
               />
@@ -238,6 +250,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           onClose={() => {
             setRenameVisible(false);
           }}
+          errorCopy={organizationErrorMessage}
         />
       )}
     </View>

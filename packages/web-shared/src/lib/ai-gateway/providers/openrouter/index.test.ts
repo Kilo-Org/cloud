@@ -18,7 +18,6 @@ import {
   findKiloExclusiveModel,
   kiloExclusiveModels,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { getInferenceProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import {
   AUTO_MODELS,
   KILO_AUTO_EFFICIENT_MODEL,
@@ -347,11 +346,10 @@ describe('auto models', () => {
     const models = kiloExclusiveModels.filter(model => !unavailableModelIds.has(model.public_id));
     expect(models.length).toBeGreaterThan(0);
     for (const model of models) {
-      const provider = getInferenceProvider(model);
-      if (!provider) continue;
+      if (model.inference_providers.length === 0) continue;
       expect(
         response.data.find(entry => entry.id === model.public_id)?.inference_provider_ids
-      ).toEqual([provider.slug]);
+      ).toEqual(model.inference_providers);
     }
   });
 

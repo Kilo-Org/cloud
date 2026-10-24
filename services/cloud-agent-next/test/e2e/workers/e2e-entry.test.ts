@@ -8,7 +8,7 @@ import production from '../../../src/index.js';
 import { e2eSurfaceApp } from '../../../src/e2e-surface/app.js';
 
 const ALLOWED_USER = 'usr_e2e_surface_allowed';
-const SESSION_ID = `agent_${crypto.randomUUID()}`;
+const SESSION_ID = `workspace_${crypto.randomUUID()}`;
 const KILO_SESSION_ID = 'ses_e2e_surface_0000000000000001';
 
 function pepperFor(userId: string): string {
@@ -188,10 +188,60 @@ describe('e2e surface auth chain', () => {
       expect(response.status, `presented=${String(presented)}`).toBe(401);
     }
   });
+
+  it('applies callback route admission', async () => {
+    const valid = tokenFor(ALLOWED_USER);
+    const mintedResponse = await SELF.fetch(
+      surfaceRequest('POST', '/__e2e/callbacks', { token: valid, secret: internalApiSecret })
+    );
+    expect(mintedResponse.status).toBe(200);
+    const minted = (await mintedResponse.json()) as { token: string; callbackUrl: string };
+    expect(minted.token).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
+    const payload = { messageId: 'entry_callback' };
+    expect(
+      (
+        await SELF.fetch(
+          surfaceRequest('POST', `/__e2e/callbacks/${minted.token}`, {
+            body: JSON.stringify(payload),
+          })
+        )
+      ).status
+    ).toBe(200);
+    const recorded = await SELF.fetch(
+      surfaceRequest('GET', `/__e2e/callbacks/${minted.token}`, {
+        token: valid,
+        secret: internalApiSecret,
+      })
+    );
+    expect(await recorded.json()).toEqual({ records: [payload] });
+
+    expect(
+      (
+        await SELF.fetch(
+          surfaceRequest('POST', `/__e2e/callbacks/${crypto.randomUUID()}`, {
+            body: '{}',
+          })
+        )
+      ).status
+    ).toBe(404);
+    for (const token of [
+      'invalid',
+      minted.token.toUpperCase(),
+      `${minted.token}0`,
+      `%61${minted.token.slice(1)}`,
+    ]) {
+      const response = await SELF.fetch(
+        surfaceRequest('POST', `/__e2e/callbacks/${token}`, { body: 'not json' })
+      );
+      expect(response.status, token).toBe(404);
+    }
+  });
 });
 
 describe('internal tRPC reachability (deliberately widened by the single secret)', () => {
-  const ABSENT_SESSION_ID = `agent_${crypto.randomUUID()}`;
+  const ABSENT_SESSION_ID = `workspace_${crypto.randomUUID()}`;
 
   it('reaches updateSession with the secret and a valid JWT and reports the handler error', async () => {
     // Intentional: with the e2e secret plus any valid JWT, `updateSession` is

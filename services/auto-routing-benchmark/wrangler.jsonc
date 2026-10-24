@@ -94,6 +94,12 @@
       "secret_name": "INTERNAL_API_SECRET_PROD",
     },
     {
+      // Authenticates only apps/web's POST /api/internal/bot-token mint.
+      "binding": "BOT_TOKEN_MINT_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "BOT_TOKEN_MINT_SECRET",
+    },
+    {
       "binding": "OPENROUTER_API_KEY",
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
       "secret_name": "OPENROUTER_API_KEY",

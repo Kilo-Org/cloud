@@ -1,11 +1,14 @@
 import 'server-only';
 
-import type { OrganizationGroupModelAccessPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
+import {
+  ORGANIZATION_GROUPS_ENTERPRISE_ONLY_MESSAGE,
+  type OrganizationGroupModelAccessPolicy,
+} from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import { modelsByProvider, organizations } from '@kilocode/db/schema';
 import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import { TRPCError } from '@trpc/server';
-import { desc, eq } from 'drizzle-orm';
-import { getKiloExclusiveInferenceProviderRestriction } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { and, desc, eq, isNull } from 'drizzle-orm';
+import { getKiloExclusiveInferenceProviders } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
@@ -13,7 +16,10 @@ import {
   VIRTUAL_PROVIDER,
   withoutVirtualProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
-import { isModelRestrictionExempt } from '@kilocode/web-shared/lib/model-allow.server';
+import {
+  isModelRestrictionExempt,
+  type CustomLlmGrantee,
+} from '@kilocode/web-shared/lib/model-allow.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   getOrganizationGroupPolicyContext,
@@ -35,6 +41,7 @@ export type EffectiveOrganizationModelPolicy = {
       };
   dataCollection?: OrganizationSettings['data_collection'];
   policyRevision: number;
+  customLlmGrantee: CustomLlmGrantee;
 };
 
 export type EffectiveModelDecision = {
@@ -58,6 +65,10 @@ export type ProviderLookup = (modelId: string) => Promise<ReadonlySet<string>>;
 export function evaluateEffectiveModelAccessPolicy(
   context: OrganizationGroupPolicyContext
 ): EffectiveOrganizationModelPolicy {
+  const customLlmGrantee = {
+    organizationId: context.organization.id,
+    groupIds: context.groupIds,
+  };
   const organizationRestrictionsEnabled = context.organization.plan === 'enterprise';
   const organizationModelDenyList = organizationRestrictionsEnabled
     ? (context.organization.settings.model_deny_list ?? []).map(normalizeModelId)
@@ -73,6 +84,7 @@ export function evaluateEffectiveModelAccessPolicy(
       memberGrant: { mode: 'unrestricted' },
       dataCollection: context.organization.settings.data_collection,
       policyRevision: context.policyRevision,
+      customLlmGrantee,
     };
   }
 
@@ -95,6 +107,7 @@ export function evaluateEffectiveModelAccessPolicy(
       memberGrant: { mode: 'organization_baseline' },
       dataCollection: context.organization.settings.data_collection,
       policyRevision: context.policyRevision,
+      customLlmGrantee,
     };
   }
 
@@ -124,6 +137,7 @@ export function evaluateEffectiveModelAccessPolicy(
     },
     dataCollection: context.organization.settings.data_collection,
     policyRevision: context.policyRevision,
+    customLlmGrantee,
   };
 }
 
@@ -149,7 +163,7 @@ export async function getEffectiveModelDecision(
   providerLookup: ProviderLookup = getProviderSlugsForModel
 ): Promise<EffectiveModelDecision> {
   const normalizedModelId = normalizeModelId(modelId);
-  if (await isModelRestrictionExempt(modelId)) {
+  if (await isModelRestrictionExempt(modelId, policy.customLlmGrantee)) {
     return { allowed: true };
   }
   if (
@@ -158,7 +172,7 @@ export async function getEffectiveModelDecision(
   ) {
     return { allowed: false, denialSource: 'organization_model' };
   }
-  const exclusiveProviders = getKiloExclusiveInferenceProviderRestriction(modelId);
+  const exclusiveProviders = getKiloExclusiveInferenceProviders(modelId);
   const currentModelProviders =
     exclusiveProviders ??
     (policy.requireModelInCurrentSnapshot ? await providerLookup(modelId) : undefined);
@@ -336,7 +350,7 @@ export async function getModelAccessPolicyEditorData(organizationId: string) {
     db
       .select({ plan: organizations.plan })
       .from(organizations)
-      .where(eq(organizations.id, organizationId))
+      .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
       .limit(1),
     db
       .select({ data: modelsByProvider.data })
@@ -344,8 +358,14 @@ export async function getModelAccessPolicyEditorData(organizationId: string) {
       .orderBy(desc(modelsByProvider.id))
       .limit(1),
   ]);
-  if (!organization || organization.plan !== 'enterprise') {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Enterprise organization not found' });
+  if (!organization) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+  }
+  if (organization.plan !== 'enterprise') {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: ORGANIZATION_GROUPS_ENTERPRISE_ONLY_MESSAGE,
+    });
   }
   if (!catalog) {
     throw new TRPCError({

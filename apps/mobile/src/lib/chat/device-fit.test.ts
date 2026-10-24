@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { deviceFit, maxParametersFor } from './device-fit';
+import { deviceFit, fitsDevice, maxParametersFor } from './device-fit';
 
 const GIB = 1024 ** 3;
 const roomy = { memoryBytes: 8 * GIB, freeBytes: 64 * GIB };
@@ -18,6 +18,14 @@ describe('device fit', () => {
 
   it('judges nothing on memory the platform does not report', () => {
     expect(deviceFit(0.5 * GIB, { memoryBytes: null, freeBytes: 64 * GIB })).toBeUndefined();
+  });
+
+  it('counts only a judged fit as fitting this device', () => {
+    expect(fitsDevice('fits')).toBe(true);
+    expect(fitsDevice('tight')).toBe(true);
+    expect(fitsDevice('tooLarge')).toBe(false);
+    expect(fitsDevice('noStorage')).toBe(false);
+    expect(fitsDevice(undefined)).toBe(false);
   });
 
   it('limits the fitting list to models whose Q4_K_M file fits at least tightly', () => {

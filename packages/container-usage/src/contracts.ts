@@ -136,8 +136,13 @@ export const nonRetryableSkuAdmissionCodes = [
   'sku_not_accepting_new_usage',
 ] as const;
 
-export const recordStartFailureCodeSchema = z.enum([
+export const nonRetryableAdmissionCodes = [
   ...nonRetryableSkuAdmissionCodes,
+  'invalid_billing_attribution',
+] as const;
+
+export const recordStartFailureCodeSchema = z.enum([
+  ...nonRetryableAdmissionCodes,
   'insufficient_credits',
   'container_limit_reached',
 ]);
@@ -162,7 +167,7 @@ const recordStartFailureSchema = z.discriminatedUnion('code', [
     .strict(),
   z
     .object({
-      code: z.enum(nonRetryableSkuAdmissionCodes),
+      code: z.enum(nonRetryableAdmissionCodes),
       message: z.string().min(1),
     })
     .strict(),

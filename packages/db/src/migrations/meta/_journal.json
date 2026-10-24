@@ -2423,6 +2423,13 @@
       "when": 1794239031730,
       "tag": "0345_cloud_agent_stacked_workspaces",
       "breakpoints": true
+    },
+    {
+      "idx": 346,
+      "version": "7",
+      "when": 1794304398824,
+      "tag": "0346_sour_the_fury",
+      "breakpoints": true
     }
   ]
 }

@@ -27,6 +27,7 @@ import { containerLimitError } from '../container-limit-test-helpers.js';
 import { ContainersBillingScheduler } from './containers-billing.js';
 import { CONTROL_SUPERVISOR_PATH } from '../sandbox-control/container-paths.js';
 import { SandboxContainers, type ContainerInstanceSize } from './SandboxContainers.js';
+import type { NativeBillingStopRequest } from '../shared/control-plane-protocol.js';
 
 const RECORD_KEY = 'containers:record:v1';
 const BILLING_CONTEXT_KEY = 'container-usage:billing-context:v1';
@@ -266,6 +267,8 @@ function setup(
     storage?: FakeStorage;
     container?: FakeContainer;
     meter?: FakeMeter;
+    billingStopError?: Error;
+    billingStopUnowned?: boolean;
   } = {}
 ) {
   const container = options.container ?? new FakeContainer();
@@ -289,8 +292,22 @@ function setup(
     },
   } as unknown as DurableObjectState;
   const meter = options.meter ?? new FakeMeter();
-  const instance = new SandboxContainers(ctx, { CONTAINER_USAGE_METER: meter } as unknown as Env);
-  return { storage, container, meter, instance, pendingTasks };
+  const billingStopRequests: NativeBillingStopRequest[] = [];
+  const instance = new SandboxContainers(ctx, {
+    CONTAINER_USAGE_METER: meter,
+    SANDBOX_CONTROL: {
+      getByName: () => ({
+        async requestBillingStop(request: NativeBillingStopRequest) {
+          billingStopRequests.push(request);
+          if (options.billingStopError) throw options.billingStopError;
+          if (options.billingStopUnowned) return false;
+          await instance.stop(request.allocationRef);
+          return true;
+        },
+      }),
+    },
+  } as unknown as Env);
+  return { storage, container, meter, instance, pendingTasks, billingStopRequests };
 }
 
 async function flushPending(pendingTasks: Promise<unknown>[]): Promise<void> {
@@ -346,6 +363,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.useRealTimers();
 });
 
@@ -362,6 +380,26 @@ describe('ContainersBilling identity and admission', () => {
     expect(container.running).toBe(false);
     recordStart.mockImplementation(original);
     await expect(admit(instance, 'standard-4')).resolves.toEqual({ success: true });
+  });
+
+  it('persists and sends the acting member for organization bot admission', async () => {
+    const { instance, storage, meter } = setup();
+    await instance.ensureBillingAdmission(
+      {
+        ...BILLING_INPUT,
+        subject: { type: 'org', id: 'org-1' },
+        actor: { type: 'bot', id: 'reviewer' },
+        onBehalfOf: { type: 'org', id: 'org-1' },
+        metadata: { origin: 'cloud-agent', billingUserId: 'oauth/member' },
+      },
+      'standard-4'
+    );
+    expect(storage.map.get(BILLING_CONTEXT_KEY)).toMatchObject({
+      metadata: { billingUserId: 'oauth/member' },
+    });
+    expect(meter.recordStartInputs[0]).toMatchObject({
+      metadata: { billingUserId: 'oauth/member' },
+    });
   });
 
   it('admits on a real continue meter and rejects on a real insufficient_credits admission', async () => {
@@ -483,6 +521,25 @@ describe('ContainersBilling identity and admission', () => {
 });
 
 describe('ContainersBilling physical lifecycle', () => {
+  it.each([
+    { budget: { verdict: 'stop' as const }, code: 'INSUFFICIENT_CREDITS' },
+    {
+      budget: { verdict: 'stop' as const, remainingMicrodollars: -1 },
+      code: 'BILLING_UNAVAILABLE',
+    },
+  ])('preserves the confirmed stop cause as $code', async ({ budget, code }) => {
+    const { instance, meter, storage, pendingTasks, billingStopRequests } = setup();
+    await admit(instance, 'standard-4');
+    await launch(instance, REF_A, 'standard-4');
+    await flushPending(pendingTasks);
+    meter.heartbeatBudget = budget;
+    vi.setSystemTime(readSchedules(storage)?.billingHeartbeatTick?.dueAtMs as number);
+    await instance.alarm();
+    await flushPending(pendingTasks);
+    expect(billingStopRequests).toHaveLength(1);
+    expect(billingStopRequests[0].billingFailure.code).toBe(code);
+  });
+
   it('activates metering when an issued start becomes running during PID 1 confirmation', async () => {
     const { instance, container, storage, meter, pendingTasks } = setup();
     await admit(instance, 'standard-3');
@@ -564,49 +621,116 @@ describe('ContainersBilling physical lifecycle', () => {
     expect(context.usageMeasuredAtMs).not.toBe(admittedAt);
   });
 
-  it('budget stop blocks, schedules force-stop, destroys, settles, and a fresh admission succeeds', async () => {
-    const { instance, container, storage, meter, pendingTasks } = setup();
+  it.each([false, true])(
+    'budget stop settles owned or unowned allocation (unowned=%s)',
+    async billingStopUnowned => {
+      const { instance, container, storage, meter, pendingTasks, billingStopRequests } = setup({
+        billingStopUnowned,
+      });
+      await admit(instance, 'standard-4');
+      await instance.launchWrapper({
+        command: preinstalledStartup(),
+        allocationRef: REF_A,
+        env: {},
+        instance: 'standard-4',
+      });
+      await flushPending(pendingTasks);
+
+      const heartbeatDue = readSchedules(storage)?.billingHeartbeatTick?.dueAtMs;
+      expect(heartbeatDue).toEqual(expect.any(Number));
+
+      meter.heartbeatBudget = {
+        verdict: 'stop',
+        remainingMicrodollars: 0,
+        minimumRequiredMicrodollars: 5_000_000,
+      };
+      vi.setSystemTime(heartbeatDue as number);
+      await instance.alarm();
+
+      const block = readBlock(storage);
+      expect(block).toMatchObject({ remainingMicrodollars: 0 });
+      expect(block?.forceStopAt).toBe((block?.blockedAt as number) + 120_000);
+      expect(readSchedules(storage)?.billingForceStop).toMatchObject({
+        payload: block?.generation,
+        dueAtMs: block?.forceStopAt,
+      });
+      await flushPending(pendingTasks);
+      expect(billingStopRequests).toEqual([
+        {
+          allocationRef: REF_A,
+          billingFailure: {
+            code: 'INSUFFICIENT_CREDITS',
+            payer: BILLING_INPUT.subject,
+            retryable: true,
+            remainingMicrodollars: 0,
+            minimumRequiredMicrodollars: 5_000_000,
+          },
+        },
+      ]);
+      expect(container.destroyCalls).toBe(1);
+      expect(container.running).toBe(false);
+      expect(readRecord(storage)).toMatchObject({
+        state: 'idle',
+        allocationRef: null,
+        instance: 'standard-4',
+        billingConfigured: true,
+      });
+      expect((await instance.getState()).status).toBe('stopped');
+
+      await flushPending(pendingTasks);
+      expect(meter.recordStopInputs).toHaveLength(1);
+      expect(meter.recordStopInputs[0].reason).toBe('runtime_signal');
+
+      meter.heartbeatBudget = { verdict: 'continue' };
+      await expect(admit(instance, 'standard-4')).resolves.toEqual({ success: true });
+      expect(storage.map.get(BLOCK_KEY)).toBeUndefined();
+      expect(meter.recordStartInputs).toHaveLength(2);
+    }
+  );
+
+  it('reports unavailable billing when a persisted legacy stop has no confirmed cause', async () => {
+    const { instance, meter, storage, pendingTasks, billingStopRequests } = setup();
     await admit(instance, 'standard-4');
-    await instance.launchWrapper({
-      command: preinstalledStartup(),
-      allocationRef: REF_A,
-      env: {},
-      instance: 'standard-4',
-    });
+    await launch(instance, REF_A, 'standard-4');
     await flushPending(pendingTasks);
-
-    const heartbeatDue = readSchedules(storage)?.billingHeartbeatTick?.dueAtMs;
-    expect(heartbeatDue).toEqual(expect.any(Number));
-
-    meter.heartbeatBudget = { verdict: 'stop', remainingMicrodollars: 0 };
-    vi.setSystemTime(heartbeatDue as number);
-    await instance.alarm();
-
-    const block = readBlock(storage);
-    expect(block).toMatchObject({ remainingMicrodollars: 0 });
-    expect(block?.forceStopAt).toBe((block?.blockedAt as number) + 120_000);
-    expect(readSchedules(storage)?.billingForceStop).toMatchObject({
-      payload: block?.generation,
-      dueAtMs: block?.forceStopAt,
+    const context = storage.map.get(BILLING_CONTEXT_KEY) as {
+      generation: string;
+      startEpochMs: number;
+    };
+    storage.map.set(BLOCK_KEY, {
+      generation: context.generation,
+      startEpochMs: context.startEpochMs,
+      blockedAt: Date.now(),
+      forceStopAt: Date.now() + 120_000,
     });
+    meter.heartbeatBudget = { verdict: 'stop' };
+    vi.setSystemTime(readSchedules(storage)?.billingHeartbeatTick?.dueAtMs as number);
+    await instance.alarm();
+    await flushPending(pendingTasks);
+    expect(billingStopRequests[0].billingFailure.code).toBe('BILLING_UNAVAILABLE');
+  });
+
+  it('force destroys at the stored deadline when the control stop request fails', async () => {
+    const { instance, container, storage, meter, pendingTasks, billingStopRequests } = setup({
+      billingStopError: new Error('Control unavailable'),
+    });
+    await admit(instance, 'standard-4');
+    await launch(instance, REF_A, 'standard-4');
+    await flushPending(pendingTasks);
+    meter.heartbeatBudget = { verdict: 'stop', remainingMicrodollars: 0 };
+    vi.setSystemTime(readSchedules(storage)?.billingHeartbeatTick?.dueAtMs as number);
+    await instance.alarm();
+    await flushPending(pendingTasks);
+    expect(billingStopRequests).toHaveLength(1);
+    expect(container.running).toBe(true);
+    const block = readBlock(storage);
+    expect(block?.forceStopAt).toBe((block?.blockedAt as number) + 120_000);
+    vi.setSystemTime(block?.forceStopAt as number);
+    await instance.alarm();
+    await flushPending(pendingTasks);
     expect(container.destroyCalls).toBe(1);
     expect(container.running).toBe(false);
-    expect(readRecord(storage)).toMatchObject({
-      state: 'idle',
-      allocationRef: null,
-      instance: 'standard-4',
-      billingConfigured: true,
-    });
-    expect((await instance.getState()).status).toBe('stopped');
-
-    await flushPending(pendingTasks);
     expect(meter.recordStopInputs).toHaveLength(1);
-    expect(meter.recordStopInputs[0].reason).toBe('runtime_signal');
-
-    meter.heartbeatBudget = { verdict: 'continue' };
-    await expect(admit(instance, 'standard-4')).resolves.toEqual({ success: true });
-    expect(storage.map.get(BLOCK_KEY)).toBeUndefined();
-    expect(meter.recordStartInputs).toHaveLength(2);
   });
 
   it('keeps the block and re-arms billingForceStop when destroy stays retryable', async () => {
@@ -652,6 +776,115 @@ describe('ContainersBilling physical lifecycle', () => {
 });
 
 describe('ContainersBilling stop boundary', () => {
+  it.each(['stop', 'forceDestroyForControlPlane'] as const)(
+    'settles a two-minute running container through %s and does not settle twice',
+    async method => {
+      const { instance, meter, pendingTasks } = setup();
+      await admit(instance, 'standard-4');
+      await launch(instance, REF_A, 'standard-4');
+      await flushPending(pendingTasks);
+
+      vi.setSystemTime(T0 + 120_000);
+      if (method === 'stop') await instance.stop(REF_A);
+      else await instance.forceDestroyForControlPlane();
+      await flushPending(pendingTasks);
+
+      expect(meter.recordStopInputs).toHaveLength(1);
+      expect(meter.recordStopInputs[0].usageSinceLast).toBe(120);
+      await instance.stop(REF_A);
+      await flushPending(pendingTasks);
+      expect(meter.recordStopInputs).toHaveLength(1);
+    }
+  );
+
+  it('settles the final interval after an acknowledged heartbeat', async () => {
+    const { instance, meter, storage, pendingTasks } = setup();
+    await admit(instance, 'standard-4');
+    await launch(instance, REF_A, 'standard-4');
+    await flushPending(pendingTasks);
+
+    vi.setSystemTime(readSchedules(storage)?.billingHeartbeatTick?.dueAtMs as number);
+    await instance.alarm();
+    await flushPending(pendingTasks);
+    expect(meter.recordHeartbeatInputs[0].usageSinceLast).toBe(300);
+
+    vi.setSystemTime(T0 + 450_000);
+    await instance.stop(REF_A);
+    await flushPending(pendingTasks);
+
+    expect(meter.recordStopInputs[0].usageSinceLast).toBe(150);
+  });
+
+  it('uses a confirmed running boundary instead of an inferred stopped boundary', async () => {
+    const { instance, storage, meter, pendingTasks } = setup();
+    await admit(instance, 'standard-4');
+    await launch(instance, REF_A, 'standard-4');
+    await flushPending(pendingTasks);
+    const context = storage.map.get(BILLING_CONTEXT_KEY) as Record<string, unknown>;
+    storage.map.set(BILLING_CONTEXT_KEY, { ...context, stoppedObservedAtMs: T0 });
+
+    vi.setSystemTime(T0 + 120_000);
+    await instance.stop(REF_A);
+    await flushPending(pendingTasks);
+
+    expect(meter.recordStopInputs[0].usageSinceLast).toBe(120);
+  });
+
+  it('continues measurement after a failed destroy', async () => {
+    const { instance, container, meter, storage, pendingTasks } = setup();
+    await admit(instance, 'standard-4');
+    await launch(instance, REF_A, 'standard-4');
+    await flushPending(pendingTasks);
+    container.destroyBehavior = 'reject';
+
+    vi.setSystemTime(T0 + 120_000);
+    await expect(instance.stop(REF_A)).resolves.toBe('retryable');
+    await flushPending(pendingTasks);
+    expect(meter.recordStopInputs).toHaveLength(0);
+    expect(storage.map.get(BILLING_CONTEXT_KEY)).toHaveProperty('pendingStop', undefined);
+
+    vi.setSystemTime(readSchedules(storage)?.billingHeartbeatTick?.dueAtMs as number);
+    await instance.alarm();
+    await flushPending(pendingTasks);
+    expect(meter.recordHeartbeatInputs[0].usageSinceLast).toBe(300);
+  });
+
+  it('retains a controlled-stop segment during failed delivery and replay', async () => {
+    const logs = vi.spyOn(console, 'log');
+    const { instance, meter, pendingTasks } = setup();
+    await admit(instance, 'standard-4');
+    await launch(instance, REF_A, 'standard-4');
+    await flushPending(pendingTasks);
+    meter.recordStopBehavior = 'reject';
+
+    vi.setSystemTime(T0 + 120_000);
+    await instance.stop(REF_A);
+    await vi.runAllTimersAsync();
+    await flushPending(pendingTasks);
+    const pendingStop = meter.recordStopInputs[0];
+    expect(pendingStop.usageSinceLast).toBe(120);
+
+    meter.recordStopBehavior = 'ok';
+    vi.setSystemTime(T0 + 600_000);
+    await instance.forceDestroyForControlPlane();
+    await flushPending(pendingTasks);
+    expect(meter.recordStopInputs.at(-1)).toEqual(pendingStop);
+    const stopLogs = logs.mock.calls
+      .flat()
+      .filter(
+        value =>
+          typeof value === 'object' &&
+          value !== null &&
+          'message' in value &&
+          value.message === 'Container stopped'
+      );
+    expect(stopLogs).toHaveLength(2);
+    expect(stopLogs).toEqual([
+      expect.objectContaining({ lifetimeMs: 120_000 }),
+      expect.objectContaining({ lifetimeMs: 120_000 }),
+    ]);
+  });
+
   it('reports the last-known-running measurement, not the observation time, for a self-stop', async () => {
     const { instance, container, storage } = setup();
     await admit(instance, 'standard-4');
@@ -813,7 +1046,7 @@ describe('ContainersBilling inert without persisted attribution', () => {
 
       await expect(instance.ensureBillingAdmission(BILLING_INPUT, instanceSize)).resolves.toEqual({
         success: false,
-        code: 'meter_unavailable',
+        code: 'invalid_configuration',
         message: 'Container billing is not configured for this instance size',
       });
       expect(storage.map.get(BILLING_CONTEXT_KEY)).toBeUndefined();

@@ -79,6 +79,8 @@ jobs:
         run: NODE_ENV=production pnpm exec tsx scripts/check-production-db-startup.ts
 
       - name: Run Drizzle migrations
+        env:
+          PGOPTIONS: -c lock_timeout=5s -c statement_timeout=60s
         run: NODE_ENV=production pnpm run drizzle migrate
 
   deploy-app:

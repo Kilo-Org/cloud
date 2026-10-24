@@ -1125,23 +1125,28 @@ export async function listInbox(
     const carriesNextWindow =
       !hasMore && inboxRepositoryWindow(cachedRepositories, nextWindow).length > 0;
     let nextCursor: string | null = null;
-    if (ceiling !== null) {
-      if (hasMore) {
-        nextCursor = encodeInboxCursor(identity, windowIndex, ceiling, pages, repositories);
-      } else if (carriesNextWindow) {
-        // This window is served in full: the walk moves to the next slice of the
-        // cached repositories, so a workspace larger than one window is still
-        // covered. The next window sets its own ceiling from its first load:
-        // its rows were never read under this window's ceiling, and one newer
-        // than it would otherwise stay outside the collection for the whole walk.
-        nextCursor = encodeInboxCursor(
-          identity,
-          nextWindow,
-          null,
-          new Map<string, InboxPageState>(),
-          inboxRepositoryWindow(cachedRepositories, nextWindow)
-        );
-      }
+    if (hasMore) {
+      // Every row of this window that can be ordered carries a timestamp, so a
+      // ceiling exists whenever the window still has rows to serve.
+      nextCursor =
+        ceiling === null
+          ? null
+          : encodeInboxCursor(identity, windowIndex, ceiling, pages, repositories);
+    } else if (carriesNextWindow) {
+      // This window is served in full: the walk moves to the next slice of the
+      // cached repositories, so a workspace larger than one window is still
+      // covered. The next window sets its own ceiling from its first load:
+      // its rows were never read under this window's ceiling, and one newer
+      // than it would otherwise stay outside the collection for the whole walk.
+      // A window that served nothing (every repository gone or empty) still
+      // hands the walk on, so the windows behind it are read.
+      nextCursor = encodeInboxCursor(
+        identity,
+        nextWindow,
+        null,
+        new Map<string, InboxPageState>(),
+        inboxRepositoryWindow(cachedRepositories, nextWindow)
+      );
     }
     return {
       items: window.map(candidate => candidate.item),

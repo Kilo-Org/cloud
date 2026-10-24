@@ -1612,6 +1612,60 @@ describe('listInbox', () => {
     });
   });
 
+  it('hands the walk to the next window when a window serves nothing', async () => {
+    // The first window holds repositories the provider no longer serves, so it
+    // produces no rows and no ceiling; the repository behind it still has to be
+    // read.
+    const slugs = Array.from(
+      { length: 301 },
+      (_, index) => `repo-${String(index).padStart(3, '0')}`
+    );
+    mockReadCachedRepositories.mockResolvedValue({
+      status: 'available',
+      repositories: slugs.map((slug, index) => ({
+        id: `87654321-4321-4321-4321-${String(index).padStart(12, '0')}`,
+        workspaceUuid: WORKSPACE.uuid,
+        name: slug,
+        fullName: `acme/${slug}`,
+        private: true,
+        defaultBranch: 'main',
+      })),
+      syncedAt: '2026-09-06T00:00:00.000Z',
+    });
+    const requests: InboxRequest[] = [];
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      const parsed = new URL(full);
+      const match = parsed.pathname.match(/^\/2\.0\/repositories\/acme\/([^/]+)\/pullrequests$/);
+      requests.push({
+        slug: match?.[1] ?? '',
+        query: parsed.searchParams.get('q'),
+        page: parsed.searchParams.get('page'),
+      });
+      if (match?.[1] !== 'repo-300') {
+        return jsonResponse({ type: 'error', error: { message: 'Repository not found' } }, 404);
+      }
+      return jsonResponse({
+        pagelen: 1,
+        values: [inboxPr(999, '2026-09-02T00:00:00+00:00', 'acme/repo-300')],
+        next: null,
+      });
+    });
+
+    const first = await listInbox(ORG_OWNER);
+    expect(first.items).toEqual([]);
+    expect(first.nextCursor).toBeTruthy();
+
+    const second = await listInbox(ORG_OWNER, first.nextCursor!);
+    expect(second.items).toHaveLength(1);
+    expect(second.items[0].ref).toMatchObject({ repoSlug: 'repo-300', prId: 999 });
+    expect(second.nextCursor).toBeNull();
+    expect(requests.at(-1)).toMatchObject({ slug: 'repo-300', query: 'state="OPEN"' });
+  });
+
   it('reads one provider page per repository that still has rows', async () => {
     // 12 repositories × 5 open PRs: the first load reads one page per
     // repository, and the continuation reads only the two with rows left.

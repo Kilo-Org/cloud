@@ -9,8 +9,16 @@ import { containedKiloSessionIdSchema } from '@kilocode/session-ingest-contracts
 import { SLACK_USER_FEEDBACK_WEBHOOK_URL } from '@kilocode/web-shared/lib/config.server';
 import { desc, eq } from 'drizzle-orm';
 import * as z from 'zod';
+import { toIsoTimestamp } from '@/lib/feedback/feedback-history';
 import { enforceFeedbackRateLimit, isFeedbackRateLimitError } from '@/lib/feedback/rate-limit';
 import { feedbackPlainTextBlocks } from '@/lib/feedback/slack';
+
+const DEFAULT_FEEDBACK_HISTORY_LIMIT = 5;
+const MAX_FEEDBACK_HISTORY_LIMIT = 20;
+
+const ListCloudAgentFeedbackInputSchema = z.object({
+  limit: z.number().int().min(1).max(MAX_FEEDBACK_HISTORY_LIMIT).optional(),
+});
 
 const recentMessageSchema = z.object({
   role: z.string().max(50),
@@ -145,6 +153,33 @@ function notifySlack(input: CloudAgentFeedbackInput): void {
 }
 
 export const cloudAgentNextFeedbackRouter = createTRPCRouter({
+  /**
+   * The caller's own recent Cloud Agent feedback, newest first.
+   *
+   * Scoped to `kilo_user_id`, so a user can only read back what they submitted.
+   * Used by the feedback dialog to show prior submissions and answer "did I
+   * already report this?".
+   */
+  list: baseProcedure
+    .input(ListCloudAgentFeedbackInputSchema.optional())
+    .query(async ({ ctx, input }) => {
+      const rows = await db
+        .select({
+          id: cloud_agent_feedback.id,
+          feedback_text: cloud_agent_feedback.feedback_text,
+          created_at: cloud_agent_feedback.created_at,
+        })
+        .from(cloud_agent_feedback)
+        .where(eq(cloud_agent_feedback.kilo_user_id, ctx.user.id))
+        .orderBy(desc(cloud_agent_feedback.created_at), desc(cloud_agent_feedback.id))
+        .limit(input?.limit ?? DEFAULT_FEEDBACK_HISTORY_LIMIT);
+
+      return rows.map(row => ({
+        ...row,
+        created_at: toIsoTimestamp(row.created_at),
+      }));
+    }),
+
   create: baseProcedure
     .input(CreateCloudAgentFeedbackInputSchema)
     .mutation(async ({ ctx, input }) => {

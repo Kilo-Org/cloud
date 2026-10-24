@@ -458,6 +458,34 @@ describe('login-screen language globe', () => {
     }
   });
 
+  it('drops the welcome block only in a window that is too short for the full stack', async () => {
+    const welcomeBlockCount = async (width: number, height: number) => {
+      windowSize.width = width;
+      windowSize.height = height;
+      const renderer = await mountLoginScreen();
+      try {
+        // The greeting and the logo are one block: the logo's presence is the
+        // block's presence.
+        return findByType(renderer.root, 'Image').length;
+      } finally {
+        renderer.unmount();
+      }
+    };
+
+    try {
+      // A phone held sideways at a large text size cannot fit the welcome block
+      // above the form: the form alone keeps the primary action on screen.
+      expect(await welcomeBlockCount(844, 390)).toBe(0);
+      // The same window with a tall short edge is a tablet, which has room.
+      expect(await welcomeBlockCount(1024, 600)).toBe(1);
+      // Portrait keeps the full stack at every text size.
+      expect(await welcomeBlockCount(390, 844)).toBe(1);
+    } finally {
+      windowSize.width = 390;
+      windowSize.height = 844;
+    }
+  });
+
   it('renders the globe and names it Language', async () => {
     const renderer = await mountLoginScreen();
     const globe = findGlobe(renderer.root);

@@ -48,6 +48,7 @@ export function LanguagePickerRow({
     return (
       <Text
         variant="small"
+        accessibilityRole="header"
         className={`uppercase tracking-wide text-muted-foreground ${first ? 'pb-2 pt-1' : 'pb-2 pt-6'}`}
       >
         {t(item.section === 'current' ? 'language.current' : 'language.allLanguages')}

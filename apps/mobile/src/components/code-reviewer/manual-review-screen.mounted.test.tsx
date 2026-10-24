@@ -1,18 +1,20 @@
+/* eslint-disable max-lines -- one mounted suite covers the screen's footer geometry, its recovery cases and the start-failure lifecycle on both platforms */
 import { createElement, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
-import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
+import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
 
+import { MANUAL_REVIEW_START_DEADLINE_MS } from './deadline-watched-start';
 import { ManualReviewScreen } from './manual-review-screen';
 
 // The explorer finding (manual-review, 2026-09-19) was the primary action
 // clipped mid-label at the scroll fold, under the tab bar, at 560 density. The
 // fix pins the action in a footer below the scroll view, so these tests assert
 // the structural guarantee (the action is not inside the scroll viewport) and
-// the footer clearance (it sits a tab bar's height above the overlay).
+// the footer clearance (it sits the screen's bottom clearance above the edge).
 const BOTTOM_INSET = 24;
 const TAB_SCREEN_BOTTOM_GAP = 16;
 
@@ -22,6 +24,7 @@ const status = vi.hoisted(() => ({
   loading: false,
   errorCode: null as string | null,
   pending: false,
+  mutate: vi.fn(),
   refetch: vi.fn(),
   push: vi.fn(),
 }));
@@ -134,7 +137,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     primaryForeground: '#111111',
   }),
 }));
-vi.mock('@/lib/hooks/use-available-models', () => ({ useAvailableModels: () => ({ models: [] }) }));
+vi.mock('@/lib/hooks/use-reviewer-models', () => ({ useReviewerModels: () => ({ models: [] }) }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   PERSONAL_SCOPE: 'personal',
   useGitHubStatus: () => ({
@@ -156,7 +159,7 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   useReviewConfig: () => ({ data: { modelSlug: 'model-x', thinkingEffort: null } }),
 }));
 vi.mock('@/lib/hooks/use-code-reviews', () => ({
-  useCreateManualReview: () => ({ mutate: vi.fn(), isPending: status.pending }),
+  useCreateManualReview: () => ({ mutate: status.mutate, isPending: status.pending }),
 }));
 
 function findAllOfType(root: TestRenderer.ReactTestInstance, type: string) {
@@ -172,10 +175,61 @@ function only<T>(items: T[], what: string): T {
 }
 
 async function renderScreen() {
+  // The root stack publishes `null`: no tab bar under this screen.
   const { renderer, unmount } = await renderWithProviders(
-    createElement(ManualReviewScreen, { scope: 'personal' })
+    createElement(
+      TabBarLabelContext,
+      { value: null },
+      createElement(ManualReviewScreen, { scope: 'personal' })
+    )
   );
   return { renderer, unmount };
+}
+
+const PR_URL_PLACEHOLDER = 'https://github.com/owner/repo/pull/123';
+const GITHUB_PR_URL = 'https://github.com/drain-e2e-labs/notes/pull/42';
+const SERVER_NOT_FOUND = 'GitHub could not find that pull request.';
+
+/**
+ * The sentence the screen renders for a NOT_FOUND start failure. Read from the
+ * catalog at call time, because this suite asserts where and for how long the
+ * failure stays on screen; the code-to-copy mapping has its own suite
+ * (`manual-review-start-failure.mounted.test.tsx`).
+ */
+function startFailureText(): string {
+  return i18n.t('codeReviewer.manualReview.startNotFound', {
+    provider: 'GitHub',
+    requestNoun: i18n.t('common.pullRequest'),
+  });
+}
+
+/** A failed call as the tRPC client reports it: a code plus the server's message. */
+function startFailure() {
+  return Object.assign(new Error(SERVER_NOT_FOUND), {
+    data: { code: 'NOT_FOUND', message: SERVER_NOT_FOUND },
+  });
+}
+
+function propOf(node: TestRenderer.ReactTestInstance, key: string): unknown {
+  /* eslint-disable-next-line typescript-eslint/no-unsafe-member-access -- renderer props are an index signature */
+  return node.props[key];
+}
+
+/** Every string rendered through the shared `Text` mock. */
+function renderedTexts(root: TestRenderer.ReactTestInstance): string[] {
+  return findAllOfType(root, 'Text')
+    .map(node => propOf(node, 'children'))
+    .filter(child => typeof child === 'string');
+}
+
+/** The pull request URL box, told apart from the instructions box by its placeholder. */
+function urlField(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+  return only(
+    findAllOfType(root, 'TextInput').filter(
+      node => propOf(node, 'placeholder') === PR_URL_PLACEHOLDER
+    ),
+    'pull request URL field'
+  );
 }
 
 /** Every inline `paddingBottom` on the way up from a node, nearest first. */
@@ -206,6 +260,7 @@ beforeEach(() => {
   status.loading = false;
   status.errorCode = null;
   status.pending = false;
+  status.mutate.mockClear();
   status.refetch.mockClear();
   status.push.mockClear();
 });
@@ -215,7 +270,7 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
     platformState.OS = platform;
   });
 
-  it('pins the start action outside the scroll viewport, clear of the tab bar', async () => {
+  it('pins the start action outside the scroll viewport, clear of the bottom inset', async () => {
     const { renderer, unmount } = await renderScreen();
 
     const scrollViews = findAllOfType(renderer.root, 'ScrollView');
@@ -227,21 +282,15 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
 
     const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
     const [footerClearance] = paddingBottomsAbove(action);
-    expect(footerClearance).toBe(
-      getEffectiveTabBarHeight({
-        bottomInset: BOTTOM_INSET,
-        platform,
-        fontScale: 1,
-      }) + TAB_SCREEN_BOTTOM_GAP
-    );
+    expect(footerClearance).toBe(BOTTOM_INSET + TAB_SCREEN_BOTTOM_GAP);
 
     unmount();
   });
 
-  it('drops the tab bar clearance while the keyboard lifts the footer', async () => {
+  it('drops the bottom clearance while the keyboard lifts the footer', async () => {
     const { renderer, unmount } = await renderScreen();
 
-    // A keyboard at least as tall as the tab bar. The footer hands the whole
+    // A keyboard at least as tall as the clearance. The footer hands the whole
     // bottom space to the lift view (`KeyboardAvoidingView`), which owns it
     // while the keyboard is open, so its own clearance collapses to 0.
     const keyboardLift = platform === 'android' ? 300 : 324;
@@ -255,36 +304,29 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
     expect(findAllOfType(renderer.root, 'KeyboardAvoidingView')).toHaveLength(1);
 
     // The provider clears the height when the keyboard hides; the footer
-    // restores its tab-bar clearance.
+    // restores its bottom clearance.
     act(() => {
       keyboardStore.setHeight(0);
     });
-    expect(paddingBottomsAbove(action)).toEqual([
-      getEffectiveTabBarHeight({ bottomInset: BOTTOM_INSET, platform, fontScale: 1 }) +
-        TAB_SCREEN_BOTTOM_GAP,
-    ]);
+    expect(paddingBottomsAbove(action)).toEqual([BOTTOM_INSET + TAB_SCREEN_BOTTOM_GAP]);
 
     unmount();
   });
 
-  it('keeps the tab bar clearance a short keyboard does not cover', async () => {
+  it('keeps the footer clearance a short keyboard does not cover', async () => {
     const { renderer, unmount } = await renderScreen();
 
-    // The hardware-keyboard IME bar is one navigation bar tall; the footer keeps
-    // the difference so the action never lands behind the tab bar (e1-fill).
-    const keyboardLift = BOTTOM_INSET + BOTTOM_INSET;
+    // A keyboard shorter than the clearance leaves part of it uncovered; the
+    // footer keeps the difference so the action never lands behind the bottom
+    // edge (e1-fill).
+    const keyboardLift = BOTTOM_INSET;
     act(() => {
       keyboardStore.setHeight(keyboardLift);
     });
 
     const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
-    const footerClearance = getEffectiveTabBarHeight({
-      bottomInset: BOTTOM_INSET,
-      platform,
-      fontScale: 1,
-    });
     expect(paddingBottomsAbove(action)).toEqual([
-      footerClearance + TAB_SCREEN_BOTTOM_GAP - keyboardLift,
+      BOTTOM_INSET + TAB_SCREEN_BOTTOM_GAP - keyboardLift,
     ]);
 
     unmount();
@@ -298,11 +340,8 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
     const button = only(findAllOfType(renderer.root, 'Button'), 'primary action');
     expect((button.props as { disabled: boolean }).disabled).toBe(true);
     // The footer is the sole clearance source now (the deleted lift layer is
-    // gone); at rest it reserves the tab bar height plus its final gap.
-    expect(paddingBottomsAbove(button)).toEqual([
-      getEffectiveTabBarHeight({ bottomInset: BOTTOM_INSET, platform, fontScale: 1 }) +
-        TAB_SCREEN_BOTTOM_GAP,
-    ]);
+    // gone); at rest it reserves the screen's bottom clearance plus its final gap.
+    expect(paddingBottomsAbove(button)).toEqual([BOTTOM_INSET + TAB_SCREEN_BOTTOM_GAP]);
     unmount();
   });
 
@@ -312,11 +351,8 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
     const button = only(findAllOfType(renderer.root, 'Button'), 'primary action');
     expect((button.props as { loading: boolean }).loading).toBe(true);
     // The footer is the sole clearance source now (the deleted lift layer is
-    // gone); at rest it reserves the tab bar height plus its final gap.
-    expect(paddingBottomsAbove(button)).toEqual([
-      getEffectiveTabBarHeight({ bottomInset: BOTTOM_INSET, platform, fontScale: 1 }) +
-        TAB_SCREEN_BOTTOM_GAP,
-    ]);
+    // gone); at rest it reserves the screen's bottom clearance plus its final gap.
+    expect(paddingBottomsAbove(button)).toEqual([BOTTOM_INSET + TAB_SCREEN_BOTTOM_GAP]);
     unmount();
   });
 
@@ -348,9 +384,7 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
     act(() => {
       action.props.onPress();
     });
-    expect(status.push).toHaveBeenCalledWith(
-      '/(app)/(tabs)/(3_profile)/code-reviewer/personal/github'
-    );
+    expect(status.push).toHaveBeenCalledWith('/(app)/code-reviewer/personal/github');
     expect(findAllOfType(renderer.root, 'ScrollView')).toHaveLength(0);
     unmount();
   });
@@ -368,5 +402,129 @@ describe('ManualReviewScreen connect provider CTA', () => {
     expect(className).toContain('mt-3');
 
     unmount();
+  });
+});
+
+describe('ManualReviewScreen failed start', () => {
+  it('keeps the form and withdraws the failure when the URL is cleared', async () => {
+    status.mutate.mockImplementationOnce(
+      (_vars: unknown, callbacks: { onError: (error: Error) => void }) => {
+        callbacks.onError(startFailure());
+      }
+    );
+    const { renderer, unmount } = await renderScreen();
+
+    act(() => {
+      (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(GITHUB_PR_URL);
+    });
+    const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
+    act(() => {
+      (propOf(action, 'onPress') as () => void)();
+    });
+
+    // The failure is reported inside the form: platform, both boxes and the
+    // model stay on screen with the draft the user entered.
+    expect(findAllOfType(renderer.root, 'ScrollView')).toHaveLength(1);
+    expect(findAllOfType(renderer.root, 'TextInput')).toHaveLength(2);
+    expect(findAllOfType(renderer.root, 'ModelSelector')).toHaveLength(1);
+    expect(renderedTexts(renderer.root)).toContain(startFailureText());
+    expect(renderedTexts(renderer.root)).not.toContain(SERVER_NOT_FOUND);
+    expect(findAllOfType(renderer.root, 'Button').map(node => propOf(node, 'variant'))).toContain(
+      'outline'
+    );
+
+    act(() => {
+      (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)('');
+    });
+
+    // Clearing the box withdraws the failure it produced and its retry, and
+    // leaves the form in place.
+    expect(renderedTexts(renderer.root)).not.toContain(startFailureText());
+    expect(
+      findAllOfType(renderer.root, 'Button').map(node => propOf(node, 'variant'))
+    ).not.toContain('outline');
+    expect(findAllOfType(renderer.root, 'ScrollView')).toHaveLength(1);
+    expect(findAllOfType(renderer.root, 'TextInput')).toHaveLength(2);
+
+    unmount();
+  });
+
+  it('ignores a late failure for a draft the user has already changed', async () => {
+    let finish: ((error: Error) => void) | undefined = undefined;
+    status.mutate.mockImplementationOnce(
+      (_vars: unknown, callbacks: { onError: (error: Error) => void }) => {
+        finish = callbacks.onError;
+      }
+    );
+    const { renderer, unmount } = await renderScreen();
+
+    act(() => {
+      (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(GITHUB_PR_URL);
+    });
+    const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
+    act(() => {
+      (propOf(action, 'onPress') as () => void)();
+    });
+
+    // The request is still out when the user edits the address it was made for.
+    act(() => {
+      (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(
+        `${GITHUB_PR_URL}/files`
+      );
+    });
+    act(() => finish?.(startFailure()));
+
+    expect(renderedTexts(renderer.root)).not.toContain(startFailureText());
+    expect(
+      findAllOfType(renderer.root, 'Button').map(node => propOf(node, 'variant'))
+    ).not.toContain('outline');
+
+    unmount();
+  });
+
+  it('still releases the action at the deadline after the draft changes', async () => {
+    vi.useFakeTimers();
+    try {
+      // The request never settles and the button reports it, so only the
+      // deadline can release the action.
+      status.pending = true;
+      status.mutate.mockImplementationOnce(() => undefined);
+      const { renderer, unmount } = await renderScreen();
+
+      const primaryAction = () =>
+        only(
+          findAllOfType(renderer.root, 'Button').filter(
+            node => propOf(node, 'variant') !== 'outline'
+          ),
+          'primary action'
+        );
+
+      act(() => {
+        (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(GITHUB_PR_URL);
+      });
+      act(() => {
+        (propOf(primaryAction(), 'onPress') as () => void)();
+      });
+      expect(propOf(primaryAction(), 'loading')).toBe(true);
+
+      // The user edits the draft while that request is still running.
+      act(() => {
+        (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(
+          `${GITHUB_PR_URL}/files`
+        );
+      });
+      act(() => {
+        vi.advanceTimersByTime(MANUAL_REVIEW_START_DEADLINE_MS);
+      });
+
+      // The wait is still real, so the action comes back and the stall copy
+      // explains it, even though the request was raised for older input.
+      expect(propOf(primaryAction(), 'loading')).toBe(false);
+      expect(renderedTexts(renderer.root)).toContain(i18n.t('common.takingLonger'));
+
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

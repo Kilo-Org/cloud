@@ -16,8 +16,6 @@ import type { ActiveEnvelopePublicKey, EnvelopePrivateKeySlots } from '@kilocode
  * threat this defends is a stolen database dump, not a compromise of web's
  * environment — an attacker holding web's env already holds `SLACK_CLIENT_SECRET`.
  *
- * `mcp-gateway` (`@/lib/mcp-gateway/config.ts`) is the existing precedent for a
- * keyed-envelope keyset with the private half in web, and this mirrors its env shape.
  * The keyset form (rather than three flat env vars) is what makes key rotation
  * possible: `decrypt` slots keep old ciphertext readable after `active` moves on.
  */

@@ -49,6 +49,7 @@ function labelKeyFor(kind: GlanceableStatusKind): string {
 type GlanceableActiveCardProps = {
   sessions: readonly ActiveSession[];
   onPressSession: (session: ActiveSession) => void;
+  embedded?: boolean;
 };
 
 /**
@@ -62,6 +63,7 @@ type GlanceableActiveCardProps = {
 export function GlanceableActiveCard({
   sessions,
   onPressSession,
+  embedded = false,
 }: Readonly<GlanceableActiveCardProps>) {
   const { t } = useTranslation();
   // A minute-bucketed clock keeps the relative age fresh without reading
@@ -91,7 +93,7 @@ export function GlanceableActiveCard({
   const newestLabel = [newestTitle, stateLabel, newestAge].filter(Boolean).join(', ');
 
   return (
-    <View className={CARD_CLASS}>
+    <View className={cn(CARD_CLASS, embedded && 'rounded-none border-0 bg-transparent')}>
       <View className={COUNTS_CLASS}>
         {COUNT_LINES.map(line => {
           const isPrimary = line.kind === primaryKind;
@@ -152,10 +154,12 @@ export function GlanceableActiveCard({
 }
 
 /** The pending placeholder repeats the card's minimum frame and count rows. */
-export function GlanceableActiveCardSkeleton() {
+export function GlanceableActiveCardSkeleton({
+  embedded = false,
+}: { readonly embedded?: boolean } = {}) {
   return (
     <View
-      className={CARD_CLASS}
+      className={cn(CARD_CLASS, embedded && 'rounded-none border-0 bg-transparent')}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >

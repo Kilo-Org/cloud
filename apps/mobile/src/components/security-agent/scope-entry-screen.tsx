@@ -1,13 +1,12 @@
 import { isPersonalSecurityScope } from '@kilocode/app-shared/security-agent';
-import Animated, { FadeIn } from 'react-native-reanimated';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { selectScopeEntryView } from '@/components/security-agent/scope-entry-render';
+import { ScopeAccessDeniedScreen } from '@/components/organization/scope-access-denied-screen';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
-import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { DashboardScreen } from '@/components/security-agent/dashboard-screen';
 import { SecurityAgentSetup } from '@/components/security-agent/security-agent-setup';
@@ -24,12 +23,13 @@ import {
   useSecurityAgentRepositories,
 } from '@/lib/hooks/use-security-agent';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access';
 
 function ScopeEntrySkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('common.securityAgent')} />
+      <ScreenHeader className="px-6" title={t('common.securityAgent')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-10 w-full rounded-lg" />
         <View className="flex-row flex-wrap gap-3">
@@ -49,18 +49,27 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   const { t } = useTranslation();
   const permission = useSecurityAgentPermissionStatus(scope);
   const config = useSecurityAgentConfig(scope);
-  useSecurityAgentRepositories(scope);
+  const repositories = useSecurityAgentRepositories(scope);
   const capability = useSecurityAgentCapability(scope);
   const recovery = useRetrySecurityAgentSettings(scope);
   const isConnectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
+  const access = classifyOrganizationScopeAccess({
+    isOrganizationScope: !isPersonalSecurityScope(scope),
+    errors: [permission.error, config.error, repositories.error],
+  });
 
   // Pending includes uncached queries paused by NetInfo. Cached query errors
   // must not replace usable settings or a resolved capability with an error screen.
   const isLoading = permission.isPending || config.isPending || capability.status === 'loading';
+  // The GitHub status read is the only input that decides between the connect
+  // and re-authorize setup screens, so its failure is fatal unless the enabled
+  // destination is already known from the config read.
+  const isGithubStatusUnknown = !permission.data && permission.isError;
+  const isEnabledResolved = config.data?.isEnabled ?? false;
   const isError =
-    (!permission.data && permission.isError) ||
     (!config.data && config.isError) ||
-    capability.status === 'error';
+    capability.status === 'error' ||
+    (isGithubStatusUnknown && !isEnabledResolved);
   const isPaused =
     permission.fetchStatus === 'paused' ||
     config.fetchStatus === 'paused' ||
@@ -68,11 +77,13 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
 
   const hasIntegration = permission.data?.hasIntegration ?? false;
   const hasPermissions = permission.data?.hasPermissions ?? false;
-  const isEnabled = config.data?.isEnabled ?? false;
+  const isEnabled = isEnabledResolved;
 
   const view = selectScopeEntryView({
     isLoading,
     isError,
+    isDenied: access !== 'granted',
+    isGithubStatusUnknown,
     hasIntegration,
     hasPermissions,
     isEnabled,
@@ -84,26 +95,45 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   // agents tab.
   const orgId = isPersonalSecurityScope(scope) ? undefined : scope;
   const [mintUrl, setMintUrl] = useState<string | null>(null);
-  const [mintFailed, setMintFailed] = useState(false);
+  const [isMinting, setIsMinting] = useState(false);
   const cancelledRef = useRef(false);
+  const mintUrlRef = useRef<string | null>(null);
 
-  const performMint = useCallback(async () => {
-    setMintFailed(false);
-    setMintUrl(null);
-    try {
-      const { token } = await trpcClient.githubApps.mintInstallState.mutate({
-        organizationId: orgId ?? undefined,
-        returnTo: '/cloud/sessions',
-      });
-      if (!cancelledRef.current) {
-        setMintUrl(getGitHubIntegrationUrl(WEB_BASE_URL, orgId, token));
+  // A failed mint must not replace the setup screen with an error-only page:
+  // the setup state (with the audit-report action) stays usable and the press
+  // retries the mint before opening. The mount-time mint (`isInitial`) clears
+  // any previous URL and drives the skeleton; a press-time re-mint leaves the
+  // setup mounted — its own connecting spinner covers the wait, and unmounting
+  // it would drop that state mid-press. Resolves to whether a URL is
+  // available afterwards so the button handler can open immediately.
+  const performMint = useCallback(
+    async (isInitial = false): Promise<boolean> => {
+      if (isInitial) {
+        setMintUrl(null);
+        mintUrlRef.current = null;
+        setIsMinting(true);
       }
-    } catch {
-      if (!cancelledRef.current) {
-        setMintFailed(true);
+      try {
+        const { token } = await trpcClient.githubApps.mintInstallState.mutate({
+          organizationId: orgId ?? undefined,
+          returnTo: '/cloud/sessions',
+        });
+        const url = getGitHubIntegrationUrl(WEB_BASE_URL, orgId, token);
+        mintUrlRef.current = url;
+        if (!cancelledRef.current) {
+          setMintUrl(url);
+        }
+        return true;
+      } catch {
+        return false;
+      } finally {
+        if (isInitial && !cancelledRef.current) {
+          setIsMinting(false);
+        }
       }
-    }
-  }, [orgId]);
+    },
+    [orgId]
+  );
 
   const reauthUrl = permission.data?.reauthorizeUrl;
 
@@ -117,7 +147,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   useEffect(() => {
     cancelledRef.current = false;
     if (shouldMint) {
-      void performMint();
+      void performMint(true);
     }
     return () => {
       cancelledRef.current = true;
@@ -129,17 +159,46 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   const connectUrl = mintUrl;
 
   const refetchAll = recovery.retry;
+  const { clearLastAttemptFailed } = recovery;
 
-  if (
-    view === 'error' ||
-    (isLoading && (isError || recovery.isRetrying || (isPaused && isConnectivityKnown)))
-  ) {
+  // A recorded failure describes the error episode that produced it. Clearing
+  // it on any other view keeps a later, unrelated failure from claiming that
+  // the reader's last retry is what failed.
+  useEffect(() => {
+    if (view !== 'error') {
+      clearLastAttemptFailed();
+    }
+  }, [view, clearLastAttemptFailed]);
+
+  if (view === 'denied') {
+    return (
+      <ScopeAccessDeniedScreen
+        title={t('common.securityAgent')}
+        kind={access === 'not-found' ? 'not-found' : 'denied'}
+        onRetry={() => void recovery.retry()}
+        isRetrying={recovery.isRetrying}
+      />
+    );
+  }
+
+  const isLoadFailureView =
+    view === 'error' || (isLoading && (isError || (isPaused && isConnectivityKnown)));
+
+  if (isLoadFailureView) {
+    // A retry in flight must be visible: the failure screen is swapped for the
+    // loading skeleton, so progress does not depend on a text-less button
+    // spinner, and a failure returns to the error screen with fresh feedback
+    // instead of the identical frame the tap started from. A retry that
+    // resolves the other reads still lands on their own view, as before.
+    if (recovery.isRetrying) {
+      return <ScopeEntrySkeleton />;
+    }
     return (
       <PlatformErrorScreen
         title={t('common.securityAgent')}
         errorTitle={t('securityAgent.scopeEntry.couldNotLoad')}
+        message={recovery.lastAttemptFailed ? t('securityAgent.scopeEntry.retryFailed') : undefined}
         onRetry={() => void recovery.retry()}
-        isRetrying={recovery.isRetrying}
       />
     );
   }
@@ -156,80 +215,69 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
 
   switch (view) {
     case 'connect-github': {
-      if (mintFailed) {
-        return (
-          <View className="flex-1 bg-background">
-            <ScreenHeader title={t('common.securityAgent')} headerRight={auditAction} />
-            <QueryError
-              variant="offline"
-              message={t('securityAgent.scopeEntry.setupFailed')}
-              onRetry={() => void performMint()}
-            />
-          </View>
-        );
-      }
-      if (!connectUrl) {
-        return (
-          <View className="flex-1 bg-background">
-            <ScreenHeader title={t('common.securityAgent')} headerRight={auditAction} />
+      // A failed or pending mount-time mint keeps this setup screen up; the
+      // button resolves (re-mints) the URL on press. An error-only page here
+      // made the landing permanently unusable on a transient backend failure.
+      return (
+        <View className="flex-1 bg-background">
+          <ScreenHeader
+            className="px-6"
+            title={t('common.securityAgent')}
+            headerRight={auditAction}
+          />
+          {!connectUrl && isMinting ? (
             <View className="gap-3 px-6 pt-4">
               <Skeleton className="h-10 w-full rounded-lg" />
               <Skeleton className="h-32 w-full rounded-lg" />
             </View>
-          </View>
-        );
-      }
-      return (
-        <View className="flex-1 bg-background">
-          <ScreenHeader title={t('common.securityAgent')} headerRight={auditAction} />
-          <SecurityAgentSetup
-            title={t('securityAgent.scopeEntry.connectTitle')}
-            description={t('securityAgent.scopeEntry.connectDescription')}
-            buttonLabel={t('securityAgent.scopeEntry.installApp')}
-            url={connectUrl}
-            onConnected={refetchAll}
-          />
+          ) : (
+            <SecurityAgentSetup
+              title={t('securityAgent.scopeEntry.connectTitle')}
+              description={t('securityAgent.scopeEntry.connectDescription')}
+              buttonLabel={t('securityAgent.scopeEntry.installApp')}
+              url={connectUrl ?? undefined}
+              resolveUrl={async () => {
+                const minted = await performMint();
+                return minted ? (mintUrlRef.current ?? undefined) : undefined;
+              }}
+              onConnected={refetchAll}
+            />
+          )}
         </View>
       );
     }
     case 'reauthorize': {
-      if (!reauthUrl && mintFailed) {
-        return (
-          <View className="flex-1 bg-background">
-            <ScreenHeader title={t('common.securityAgent')} headerRight={auditAction} />
-            <QueryError
-              variant="offline"
-              message={t('securityAgent.scopeEntry.reauthorizeFailed')}
-              onRetry={() => void performMint()}
-            />
-          </View>
-        );
-      }
-      if (!reauthUrl && !connectUrl) {
-        return (
-          <View className="flex-1 bg-background">
-            <ScreenHeader title={t('common.securityAgent')} headerRight={auditAction} />
+      // Same contract as connect-github: the reauthorize setup stays up when
+      // the server offered no URL and the mount-time mint failed; the button
+      // re-mints on press.
+      return (
+        <View className="flex-1 bg-background">
+          <ScreenHeader
+            className="px-6"
+            title={t('common.securityAgent')}
+            headerRight={auditAction}
+          />
+          {!reauthUrl && !connectUrl && isMinting ? (
             <View className="gap-3 px-6 pt-4">
               <Skeleton className="h-10 w-full rounded-lg" />
               <Skeleton className="h-32 w-full rounded-lg" />
             </View>
-          </View>
-        );
-      }
-      const url = reauthUrl ?? connectUrl;
-      if (!url) {
-        return null;
-      }
-      return (
-        <View className="flex-1 bg-background">
-          <ScreenHeader title={t('common.securityAgent')} headerRight={auditAction} />
-          <SecurityAgentSetup
-            title={t('securityAgent.scopeEntry.reauthorizeTitle')}
-            description={t('securityAgent.scopeEntry.reauthorizeDescription')}
-            buttonLabel={t('securityAgent.scopeEntry.reauthorizeButton')}
-            url={url}
-            onConnected={refetchAll}
-          />
+          ) : (
+            <SecurityAgentSetup
+              title={t('securityAgent.scopeEntry.reauthorizeTitle')}
+              description={t('securityAgent.scopeEntry.reauthorizeDescription')}
+              buttonLabel={t('securityAgent.scopeEntry.reauthorizeButton')}
+              url={reauthUrl ?? connectUrl ?? undefined}
+              resolveUrl={async () => {
+                if (reauthUrl) {
+                  return reauthUrl;
+                }
+                const minted = await performMint();
+                return minted ? (mintUrlRef.current ?? undefined) : undefined;
+              }}
+              onConnected={refetchAll}
+            />
+          )}
         </View>
       );
     }
@@ -243,16 +291,16 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       );
     }
     case 'dashboard': {
-      // Fade the Dashboard in when the agent is enabled: the
-      // `disabled-settings` branch's <SettingsOverviewScreen> unmounts in
-      // place once `config.isEnabled` flips true, which is otherwise an
-      // abrupt snap. Only the incoming subtree is wrapped — the loading,
-      // error, and setup branches above must stay snap-instant so they
-      // feel like real state changes, not animations.
+      // No entrance animation: a Reanimated `FadeIn` carries
+      // `initialValues: { opacity: 0 }`, so a first mount whose entrance is
+      // dropped or never started leaves this whole subtree — the header
+      // included — invisible at opacity 0, and only the tab bar outside the
+      // screen paints. The dashboard (and its header) must paint in the frame
+      // the enabled view resolves.
       return (
-        <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+        <View className="flex-1">
           <DashboardScreen scope={scope} />
-        </Animated.View>
+        </View>
       );
     }
     default: {

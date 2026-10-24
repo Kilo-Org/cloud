@@ -1,7 +1,8 @@
+/* eslint-disable promise/prefer-await-to-callbacks -- exercises work scheduled through the native idle callback */
 /* eslint-disable max-lines -- the submit suite covers queue retention, the footer preference, and the refused-submit wording wiring in one cohesive file */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake mutation and drafts factories settle without await because they resolve immediately */
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PrReviewSubmit } from './pr-review-submit';
 import { FeedbackPromptProvider } from '@/components/use-feedback-prompt';
@@ -108,10 +109,6 @@ vi.mock('expo-router', () => ({
 
 vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
-  InteractionManager: {
-    // eslint-disable-next-line promise/prefer-await-to-callbacks, typescript-eslint/no-confusing-void-expression -- passthrough so the deferred feedback ask runs synchronously and stays observable
-    runAfterInteractions: (callback: () => void) => callback(),
-  },
   Keyboard: { addListener: () => ({ remove: vi.fn() }) },
   Platform: { OS: 'ios' },
   ScrollView: 'ScrollView',
@@ -258,6 +255,10 @@ function findSummaryField(renderer: TestRenderer.ReactTestRenderer): Record<stri
 }
 
 beforeEach(() => {
+  vi.stubGlobal('requestIdleCallback', (callback: () => void) => {
+    callback();
+    return 1;
+  });
   latestItems = [];
   addCommentFn = null;
   submitMutationMock.mutateAsync.mockReset();
@@ -268,6 +269,7 @@ beforeEach(() => {
   footerPreferenceMock.hasLoaded = true;
   footerPreferenceMock.prReviewFooter = false;
 });
+afterEach(() => vi.unstubAllGlobals());
 
 describe('PrReviewSubmit queue retention', () => {
   it('keeps every queued item when a submit fails', async () => {

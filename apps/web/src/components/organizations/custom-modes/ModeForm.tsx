@@ -24,7 +24,6 @@ import {
   isOrganizationAutoTargetModel,
   isOrganizationCustomRouterTarget,
 } from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
-import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 
 const availableGroups = [
   { value: 'read', label: 'Read Files' },
@@ -171,7 +170,7 @@ export function ModeForm({
   const modelOptions = useMemo(
     () =>
       (modelsData?.data || []).filter(model => {
-        if (model.id.startsWith(CUSTOM_LLM_PREFIX)) {
+        if (model.isCustomLlm) {
           return false;
         }
         if (isOrganizationCustomRouterTarget(model.id)) {

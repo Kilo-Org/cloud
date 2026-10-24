@@ -2,7 +2,7 @@ import 'server-only';
 
 import { and, eq, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 import { openai_chatgpt_connections } from '@kilocode/db/schema';
-import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   decryptApiKey,
   encryptApiKey,
@@ -37,7 +37,7 @@ export type OpenAiChatGptOwner =
 
 /**
  * The organization's shared-services connection. It is the connection the
- * platform's own callers (code reviewer, Slack bot, auto-triage) use instead of
+ * platform's own callers (code reviewer, Slack bot) use instead of
  * a member's personal connection.
  */
 export function openAiChatGptSharedServicesOwner(organizationId: string): OpenAiChatGptOwner {
@@ -125,11 +125,14 @@ export async function getOpenAiChatGptConnection(
  * payload keeps saying `connected` because the toggle does not rewrite it. The
  * status router deliberately keeps using `getOpenAiChatGptConnection`, so a
  * terminal refresh failure still surfaces its reconnect message.
+ *
+ * Reads the replica: it runs before inference on gateway requests, which also
+ * execute in sfo1. Token refresh re-reads the row on the primary under a lock.
  */
 export async function getOpenAiChatGptStoredConnection(
   owner: OpenAiChatGptOwner
 ): Promise<{ connection: OpenAiChatGptConnection; isEnabled: boolean } | null> {
-  const row = await readOpenAiChatGptConnectionRow(db, owner);
+  const row = await readOpenAiChatGptConnectionRow(readDb, owner);
   if (!row) return null;
   const connection = decryptOpenAiChatGptConnection(row.encrypted_connection);
   return connection ? { connection, isEnabled: row.is_enabled } : null;
@@ -329,21 +332,6 @@ export async function markOpenAiChatGptConnectionErrored(
       is_enabled: false,
     })
     .where(openAiChatGptOwnerWhere(owner));
-}
-
-/**
- * Terminal-failure write for callers outside a transaction. A missing row is a
- * no-op. The refresh path uses `markOpenAiChatGptConnectionErrored` directly so
- * the write stays inside the row lock.
- */
-export async function markOpenAiChatGptError(
-  owner: OpenAiChatGptOwner,
-  message: string
-): Promise<void> {
-  const connection = await getOpenAiChatGptConnection(owner);
-  if (!connection) return;
-
-  await markOpenAiChatGptConnectionErrored(db, owner, connection, message);
 }
 
 /**

@@ -253,8 +253,16 @@ type SecurityFindingAuditInsertValues = {
   values(values: NewSecurityFindingAuditLogValues): SecurityFindingAuditInsertConflict;
 };
 
+type SecurityFindingAuditBatchInsertValues = {
+  values(values: NewSecurityFindingAuditLogValues[]): SecurityFindingAuditInsertConflict;
+};
+
 export type SecurityFindingAuditWriterDb = {
   insert(table: typeof security_audit_log): SecurityFindingAuditInsertValues;
+};
+
+export type SecurityFindingAuditBatchWriterDb = {
+  insert(table: typeof security_audit_log): SecurityFindingAuditBatchInsertValues;
 };
 
 export function buildSecurityFindingAuditSnapshot(
@@ -364,6 +372,28 @@ export async function insertSecurityFindingAuditEvent(
   return { inserted: inserted.length > 0, id: inserted[0]?.id ?? null };
 }
 
+/**
+ * Write several audit events in one statement. Callers batch a bounded slice of
+ * findings so a bulk operation does not pay one round trip per row; every row is
+ * still built by buildSecurityFindingAuditLogValues, so payloads are identical to
+ * the single-event path. Duplicate event keys are skipped.
+ */
+export async function insertSecurityFindingAuditEvents(
+  db: SecurityFindingAuditBatchWriterDb,
+  inputs: readonly SecurityFindingAuditEventInput[]
+): Promise<{ insertedCount: number }> {
+  if (inputs.length === 0) return { insertedCount: 0 };
+
+  const values = inputs.map(input => buildSecurityFindingAuditLogValues(input));
+  const inserted = await db
+    .insert(security_audit_log)
+    .values(values)
+    .onConflictDoNothing()
+    .returning({ id: security_audit_log.id });
+
+  return { insertedCount: inserted.length };
+}
+
 export function deriveSecurityFindingAuditEventKey(parts: readonly string[]): string {
   if (parts.length === 0) throw new Error('Security Finding audit event key requires parts');
   return [
@@ -420,8 +450,62 @@ function pickPresent<T extends Record<string, unknown>>(values: T): Partial<T> {
   return Object.fromEntries(entries) as Partial<T>;
 }
 
-const DISALLOWED_AUDIT_JSON_KEY_PATTERN =
-  /(^|_)(actor|recipient|email|prompt|rawmarkdown|raw_markdown|transcript|assistant|provider_response|authorization|auth_header|cookie|token|secret|password|credential|headers|raw_error)(_|$)/i;
+const DISALLOWED_AUDIT_JSON_KEY_PHRASES = [
+  'actor',
+  'recipient',
+  'email',
+  'prompt',
+  'rawmarkdown',
+  'raw_markdown',
+  'transcript',
+  'assistant',
+  'provider_response',
+  'authorization',
+  'auth_header',
+  'cookie',
+  'token',
+  'secret',
+  'password',
+  'credential',
+  'headers',
+  'raw_error',
+] as const;
+
+const DISALLOWED_AUDIT_JSON_KEY_PATTERN = new RegExp(
+  `(^|_)(${DISALLOWED_AUDIT_JSON_KEY_PHRASES.join('|')})(_|$)`,
+  'i'
+);
+
+const DISALLOWED_AUDIT_JSON_KEY_TOKEN_PAIRS: Record<string, true> = {};
+for (const phrase of DISALLOWED_AUDIT_JSON_KEY_PHRASES) {
+  DISALLOWED_AUDIT_JSON_KEY_TOKEN_PAIRS[phrase.replace(/_/g, '')] = true;
+}
+
+function auditJsonKeyTokens(key: string): string[] {
+  return key
+    .replace(
+      /([A-Z]+)(?=[A-Z][a-z])|([a-z0-9])(?=[A-Z])|([A-Za-z])(?=[0-9])|([0-9])(?=[A-Za-z])/g,
+      '$1$2$3$4 '
+    )
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean)
+    .map(token => token.toLowerCase());
+}
+
+function isDisallowedAuditJsonKey(key: string): boolean {
+  if (DISALLOWED_AUDIT_JSON_KEY_PATTERN.test(key)) return true;
+
+  const tokens = auditJsonKeyTokens(key);
+  for (let index = 0; index < tokens.length; index += 1) {
+    const single = DISALLOWED_AUDIT_JSON_KEY_TOKEN_PAIRS[tokens[index]] === true;
+    const pair =
+      index + 1 < tokens.length &&
+      DISALLOWED_AUDIT_JSON_KEY_TOKEN_PAIRS[tokens[index] + tokens[index + 1]] === true;
+    if (single || pair) return true;
+  }
+  return false;
+}
+
 const EMAIL_VALUE_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
 const EMAIL_VALUE_REPLACEMENT_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 
@@ -466,7 +550,7 @@ function validateSafeAuditJson(
   if (value && typeof value === 'object') {
     for (const [key, child] of Object.entries(value)) {
       const childPath = [...path, key];
-      if (DISALLOWED_AUDIT_JSON_KEY_PATTERN.test(key)) {
+      if (isDisallowedAuditJsonKey(key)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: `Audit JSON field is not allowed: ${childPath.join('.')}`,

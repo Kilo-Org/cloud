@@ -1,6 +1,8 @@
+import type { WebhookBodySchema } from '@kilocode/worker-utils/webhook-body-validation';
 import 'server-only';
 import { INTERNAL_API_SECRET, WEBHOOK_AGENT_URL } from '@kilocode/web-shared/lib/config.server';
 import { encodeUserIdForPath } from '@kilocode/worker-utils/user-id-encoding';
+import type { SandboxAllocation } from '@kilocode/worker-utils/sandbox-allocation';
 import * as z from 'zod';
 
 /**
@@ -11,6 +13,7 @@ export type TriggerConfigResponse = {
   namespace: string;
   userId: string | null;
   orgId: string | null;
+  executionUserId?: string | null;
   createdAt: string;
   isActive: boolean;
   targetType: 'cloud_agent' | 'kiloclaw_chat';
@@ -19,9 +22,10 @@ export type TriggerConfigResponse = {
   mode: string | null;
   model: string | null;
   variant?: string | null;
-  sandboxAllocation?: 'isolated-standard';
+  sandboxAllocation?: SandboxAllocation;
   promptTemplate: string;
   profileId?: string | null;
+  bodySchema?: WebhookBodySchema | null;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
   webhookAuthHeader?: string;
@@ -38,15 +42,17 @@ export type TriggerConfigResponse = {
  * Profile is referenced by ID - resolved at runtime in the worker.
  */
 export type CreateTriggerInput = {
+  executionUserId?: string;
   targetType?: 'cloud_agent' | 'kiloclaw_chat';
   kiloclawInstanceId?: string;
   githubRepo?: string;
   mode?: string;
   model?: string;
   variant?: string;
-  sandboxAllocation?: 'isolated-standard';
+  sandboxAllocation?: SandboxAllocation;
   promptTemplate: string;
-  profileId?: string;
+  profileId?: string | null;
+  bodySchema?: WebhookBodySchema | null;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
   webhookAuth?: {
@@ -67,10 +73,11 @@ export type UpdateTriggerInput = {
   mode?: string;
   model?: string;
   variant?: string | null;
-  sandboxAllocation?: 'isolated-standard' | null;
+  sandboxAllocation?: SandboxAllocation | null;
   promptTemplate?: string;
   isActive?: boolean;
-  profileId?: string;
+  profileId?: string | null;
+  bodySchema?: WebhookBodySchema | null;
   autoCommit?: boolean | null;
   condenseOnComplete?: boolean | null;
   webhookAuth?: {

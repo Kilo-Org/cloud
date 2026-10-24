@@ -1,6 +1,6 @@
 ---
 name: kilo-mcp
-description: Use when working with the Kilo MCP server, the kilo_search and kilo_call tools, or when deciding which Kilo API area covers a task. Covers the search-then-call sequence, the query/mutation kind split and the mutation safety rule, the retry rule after an ambiguous transport error, and every area of services/kilo-mcp/catalog.json with its query and mutation counts. Generated from that catalog — read the catalog for current detail.
+description: Use when working with the Kilo MCP server, the kilo_search and kilo_call tools, or when deciding which Kilo API area covers a task. Covers the search-then-call sequence, the query/mutation kind split and the mutation safety rule, the retry rule after an ambiguous transport error, and the top-level areas of services/kilo-mcp/catalog.json. Generated from that catalog — read the catalog for current detail.
 ---
 
 <!--
@@ -49,73 +49,53 @@ to send platform feedback and bug reports rather than a support channel.
 ## Areas
 
 The first path segment names an area. Search to learn an area's vocabulary:
-each row's `summary` and `tags` are what the search matches.
+each row's `summary` and `tags` are what the search matches. Some areas also
+exist as an org-scoped mirror under `organizations`, for example
+`organizations.kiloclaw`.
 
-**893 procedures** — **380 queries**, **513 mutations** — under **54 prefixes**.
-
-| Prefix | Procedures | Queries | Mutations |
-|---|---:|---:|---:|
-| `organizations` | 303 | 131 | 172 |
-| `kiloclaw` | 96 | 35 | 61 |
-| `user` | 40 | 15 | 25 |
-| `agentProfiles` | 36 | 4 | 32 |
-| `cloudAgentNext` | 33 | 13 | 20 |
-| `securityAgent` | 26 | 15 | 11 |
-| `kiloPass` | 21 | 11 | 10 |
-| `githubPrReview` | 20 | 6 | 14 |
-| `githubApps` | 19 | 9 | 10 |
-| `cliSessionsV2` | 18 | 10 | 8 |
-| `appBuilder` | 16 | 6 | 10 |
-| `cliSessions` | 16 | 7 | 9 |
-| `mcpGateway` | 16 | 4 | 12 |
-| `providerReview` | 16 | 8 | 8 |
-| `todos` | 16 | 6 | 10 |
-| `deployments` | 14 | 6 | 8 |
-| `moderation` | 11 | 3 | 8 |
-| `codeReviews` | 9 | 6 | 3 |
-| `gitlab` | 9 | 3 | 6 |
-| `personalReviewAgent` | 9 | 5 | 4 |
-| `webhookTriggers` | 9 | 5 | 4 |
-| `autoFix` | 8 | 4 | 4 |
-| `codingPlans` | 8 | 5 | 3 |
-| `personalAutoTriage` | 8 | 4 | 4 |
-| `reviewMemory` | 8 | 3 | 5 |
-| `byok` | 7 | 2 | 5 |
-| `codeIndexing` | 7 | 5 | 2 |
-| `personalAutoFix` | 7 | 3 | 4 |
-| `userExports` | 7 | 3 | 4 |
-| `autoTriage` | 6 | 4 | 2 |
-| `dolthub` | 6 | 4 | 2 |
-| `modelPreferences` | 6 | 1 | 5 |
-| `usageAnalytics` | 6 | 6 | 0 |
-| `workspaceFolders` | 6 | 1 | 5 |
-| `activeSessions` | 5 | 4 | 1 |
-| `cloudAgentSettings` | 5 | 2 | 3 |
-| `debug` | 4 | 4 | 0 |
-| `discord` | 4 | 1 | 3 |
-| `securityAuditLog` | 4 | 3 | 1 |
-| `slack` | 4 | 1 | 3 |
-| `credits` | 3 | 1 | 2 |
-| `linear` | 3 | 1 | 2 |
-| `unifiedSessions` | 3 | 3 | 0 |
-| `mcpGatewayAuthorizations` | 2 | 1 | 1 |
-| `models` | 2 | 2 | 0 |
-| `openAiChatGpt` | 2 | 1 | 1 |
-| `spendAlerts` | 2 | 1 | 1 |
-| `appBuilderFeedback` | 1 | 0 | 1 |
-| `appReportedMessages` | 1 | 0 | 1 |
-| `cloudAgentNextFeedback` | 1 | 0 | 1 |
-| `feedback` | 1 | 0 | 1 |
-| `kiloChat` | 1 | 1 | 0 |
-| `platformIntegrations` | 1 | 1 | 0 |
-| `userFeedback` | 1 | 0 | 1 |
-
-### Sub-areas
-
-The second path segment of each area that splits, with procedure counts:
-
-- `organizations.*` — 303: `kiloclaw` 66, `cloudAgentNext` 32, `securityAgent` 26, `(direct)` 19, `appBuilder` 17, `deployments` 17, `groups` 14, `reviewAgent` 13, `subscription` 12, `kiloPass` 11, `settings` 11, `autoTriage` 8, `autoFix` 7, `members` 7, `autoTopUp` 6, `bitbucket` 6, `sso` 6, `modes` 5, `subOrganizations` 5, `usageDetails` 5, `securityAuditLog` 4, `auditLogs` 3, `funds` 2, `salesDemo` 1
-
-- `todos.*` — 16: `items` 11, `lists` 5
-
-- `codeReviews.*` — 9: `(direct)` 7, `analytics` 2
+- `activeSessions`
+- `agentBriefing`
+- `agentProfiles`
+- `appReportedMessages`
+- `byok`
+- `cliSessions`
+- `cliSessionsV2`
+- `cloudAgentNext`
+- `cloudAgentNextFeedback`
+- `cloudAgentSettings`
+- `codeIndexing`
+- `codeReviews`
+- `codingPlans`
+- `credits`
+- `debug`
+- `discord`
+- `dolthub`
+- `feedback`
+- `githubApps`
+- `githubPrReview`
+- `gitlab`
+- `kiloChat`
+- `kiloPass`
+- `kiloclaw`
+- `linear`
+- `modelPreferences`
+- `models`
+- `moderation`
+- `openAiChatGpt`
+- `organizations`
+- `personalReviewAgent`
+- `platformIntegrations`
+- `providerReview`
+- `reviewMemory`
+- `securityAgent`
+- `securityAuditLog`
+- `slack`
+- `spendAlerts`
+- `todos`
+- `unifiedSessions`
+- `usageAnalytics`
+- `user`
+- `userExports`
+- `userFeedback`
+- `webhookTriggers`
+- `workspaceFolders`

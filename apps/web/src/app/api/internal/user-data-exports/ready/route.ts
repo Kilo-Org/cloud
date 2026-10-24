@@ -1,8 +1,7 @@
-import { timingSafeEqual } from '@kilocode/encryption';
+import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
 import { sql } from 'drizzle-orm';
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { sendUserDataExportReadyEmail } from '@kilocode/web-shared/lib/email';
 import { markDelivery, markRetryableDelivery } from './delivery-state';
@@ -20,10 +19,8 @@ type ClaimedExport = {
 };
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const secret = request.headers.get('x-internal-api-key');
-  if (!INTERNAL_API_SECRET || !secret || !timingSafeEqual(secret, INTERNAL_API_SECRET)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const unauthorized = authorizeInternalApiRequest(request);
+  if (unauthorized) return unauthorized;
 
   const body: unknown = await request.json().catch(() => null);
   const parsed = BodySchema.safeParse(body);

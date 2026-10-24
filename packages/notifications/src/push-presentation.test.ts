@@ -42,6 +42,7 @@ const channelCases = [
   ],
   [{ type: 'cloud_agent_session', cliSessionId: 'cli1', category: 'status' }, 'agent-progress'],
   [{ type: 'cloud_agent_session', cliSessionId: 'cli1' }, 'agent-progress'],
+  [{ type: 'agent_briefing', url: '/agent-briefing' }, 'agent-progress'],
   [{ type: 'low_balance', organizationId: 'org1' }, 'balance'],
   [{ type: 'spend_alert', scope: 'organization', organizationId: 'org1' }, 'balance'],
   [{ type: 'security_finding', findingId: 'f1', scope: 'org' }, 'security'],

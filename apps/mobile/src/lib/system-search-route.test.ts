@@ -68,7 +68,7 @@ import {
 
 const SESSION_ID = '/(app)/agent-chat/session-1';
 const PR_ID = '/(app)/pr-review/owner/repo/42';
-const FINDING_ID = '/(app)/(tabs)/(3_profile)/security-agent/personal/findings/finding-1';
+const FINDING_ID = '/(app)/security-agent/personal/findings/finding-1';
 
 /** The source of the durable record, the only place the source is observable. */
 function persistedSource(): string | null {
@@ -304,6 +304,12 @@ describe('system-search-route', () => {
       for (const id of ids) {
         expect(systemSearchHrefFromRoute(id)).toBe(id);
       }
+    });
+
+    it('resolves an id indexed before the finding route moved', () => {
+      expect(
+        systemSearchHrefFromRoute('/(app)/(tabs)/(3_profile)/security-agent/org-1/findings/f-1')
+      ).toBe('/(app)/security-agent/org-1/findings/f-1');
     });
 
     it('resolves the link Android stores to the exact screen', () => {

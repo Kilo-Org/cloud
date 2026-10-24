@@ -1,3 +1,4 @@
+import { FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN } from './helpers/fake-credentials.js';
 import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -46,7 +47,7 @@ async function setup() {
     metadata: parseSessionMetadata({
       metadataSchemaVersion: 2,
       identity: { sessionId, userId: 'user_transport', createdOnPlatform: 'cloud-agent-web' },
-      auth: { kiloSessionId, kilocodeToken: 'test-token' },
+      auth: { kiloSessionId, kilocodeToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN },
       agent: { mode: 'code', model: 'test/model' },
       repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
       callback: { target: { url: 'https://callback.test/hook' } },

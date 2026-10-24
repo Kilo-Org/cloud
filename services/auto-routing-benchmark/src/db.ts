@@ -56,6 +56,7 @@ import {
   variantToStorage,
 } from './reasoning-effort';
 import type { OfflineSweep } from './scoreboard/schema';
+import { noLiveBenchmarkChunks } from './profile-entry-claims';
 import { PROMPT_TRANSPORT_REVISION } from './prompt-transport';
 
 export type CaseResultRow = typeof caseResults.$inferSelect;
@@ -432,6 +433,13 @@ export async function reuseDeciderCaseResults(
               AND run.router = ? AND run.engine_identity = ? AND run.repetitions = ?
               AND source.model = ? AND source.variant = ?
               AND source.error IS NULL AND source.timed_out = 0 AND source.exit_code = 0
+              AND NOT EXISTS (
+                SELECT 1 FROM benchmark_profiles AS profile
+                WHERE profile.router = run.router AND profile.engine_identity = run.engine_identity
+                  AND profile.repetitions = run.repetitions AND profile.model = source.model
+                  AND profile.variant = source.variant AND profile.invalidated_at IS NOT NULL
+                  AND run.started_at < profile.invalidated_at
+              )
               AND NOT (source.prompt_revision < ?
                 AND source.case_id IN (SELECT value FROM json_each(?)))
           )
@@ -460,10 +468,18 @@ export async function reuseDeciderCaseResults(
             WHERE run.kind = 'decider' AND run.status IN ('completed', 'failed')
               AND run.router = ? AND run.engine_identity = ? AND run.repetitions = ?
               AND source.model = ? AND source.variant = ?
+              AND NOT EXISTS (
+                SELECT 1 FROM benchmark_profiles AS profile
+                WHERE profile.router = run.router AND profile.engine_identity = run.engine_identity
+                  AND profile.repetitions = run.repetitions AND profile.model = source.model
+                  AND profile.variant = source.variant AND profile.invalidated_at IS NOT NULL
+                  AND run.started_at < profile.invalidated_at
+              )
               AND CASE WHEN json_valid(source.payload) THEN
                 json_type(source.payload, '$.result.exitCode') = 'integer'
                 AND json_extract(source.payload, '$.result.exitCode') = 0
                 AND json_type(source.payload, '$.result.timedOut') = 'false'
+                AND json_extract(source.payload, '$.result.unavailableModelId') IS NULL
               ELSE 0 END
               AND NOT (source.prompt_revision < ?
                 AND source.case_id IN (SELECT value FROM json_each(?)))
@@ -636,11 +652,13 @@ const PendingDeciderOutputSchema = z.object({
     eventCount: z.number(),
     lastEventTypes: z.array(z.string()),
     timedOut: z.boolean(),
+    unavailableModelId: z.string().min(1).optional(),
   }),
   retried: z.boolean(),
   // From the row's prompt_revision column; absent when the output is about to be saved by
   // this worker, which uses PROMPT_TRANSPORT_REVISION.
   promptRevision: z.number().int().optional(),
+  attemptStartedAt: z.number().int().nonnegative().optional(),
 });
 
 export type PendingDeciderOutput = z.infer<typeof PendingDeciderOutputSchema>;
@@ -675,17 +693,139 @@ export async function getPendingDeciderOutput(
 export async function savePendingDeciderOutput(
   db: D1Database,
   key: PendingDeciderOutputKey,
-  output: PendingDeciderOutput
-): Promise<void> {
+  output: PendingDeciderOutput,
+  execution?: { token: string; attemptStartedAt?: number }
+): Promise<boolean> {
   const { promptRevision, ...payload } = output;
-  await drizzle(db)
-    .insert(pendingDeciderOutputs)
-    .values({
-      ...key,
-      payload: JSON.stringify(payload),
-      prompt_revision: promptRevision ?? PROMPT_TRANSPORT_REVISION,
-    })
-    .onConflictDoNothing();
+  const inserted = await db
+    .prepare(`
+      INSERT INTO pending_decider_outputs
+        (run_id, model, variant, case_id, rep, payload, prompt_revision)
+      SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7
+      WHERE NOT EXISTS (
+        SELECT 1 FROM case_results
+        WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND case_id = ?4 AND rep = ?5
+      ) AND (?8 IS NULL OR EXISTS (
+        SELECT 1 FROM scheduler_executions
+        WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND case_id = ?4 AND rep = ?5
+          AND token = ?8 AND (?9 IS NULL OR started_at = ?9)
+      ))
+      ON CONFLICT DO NOTHING
+    `)
+    .bind(
+      key.run_id,
+      key.model,
+      key.variant,
+      key.case_id,
+      key.rep,
+      JSON.stringify(payload),
+      promptRevision ?? PROMPT_TRANSPORT_REVISION,
+      execution?.token ?? null,
+      execution?.attemptStartedAt ?? null
+    )
+    .run();
+  return inserted.meta.changes > 0;
+}
+
+export async function claimDeciderGrading(
+  db: D1Database,
+  key: PendingDeciderOutputKey,
+  token: string,
+  now: number
+): Promise<boolean> {
+  const result = await db
+    .prepare(`
+      UPDATE pending_decider_outputs SET grading_token = ?6, grading_lease_until = ?7
+      WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND case_id = ?4 AND rep = ?5
+        AND grading_lease_until <= ?8
+        AND NOT EXISTS (
+          SELECT 1 FROM case_results
+          WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND case_id = ?4 AND rep = ?5
+        )
+    `)
+    .bind(key.run_id, key.model, key.variant, key.case_id, key.rep, token, now + 5 * 60_000, now)
+    .run();
+  return result.meta.changes > 0;
+}
+
+export async function releaseDeciderGrading(
+  db: D1Database,
+  key: PendingDeciderOutputKey,
+  token: string
+): Promise<void> {
+  await db
+    .prepare(`
+      UPDATE pending_decider_outputs SET grading_token = NULL, grading_lease_until = 0
+      WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND case_id = ?4 AND rep = ?5
+        AND grading_token = ?6
+    `)
+    .bind(key.run_id, key.model, key.variant, key.case_id, key.rep, token)
+    .run();
+}
+
+export async function deletePendingDeciderOutput(
+  db: D1Database,
+  key: PendingDeciderOutputKey
+): Promise<void> {
+  await drizzle(db).delete(pendingDeciderOutputs).where(pendingDeciderOutputPredicate(key));
+}
+
+export async function needsPendingOutputRecovery(
+  db: D1Database,
+  key: PendingDeciderOutputKey
+): Promise<boolean> {
+  const row = await db
+    .prepare(`
+      SELECT 1 AS needed FROM benchmark_runs AS run
+      WHERE run.id = ?1 AND (
+        run.status != 'running' OR EXISTS (
+          SELECT 1 FROM run_lane_failures
+          WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND rep = ?5
+        )
+      ) AND EXISTS (
+        SELECT 1 FROM pending_decider_outputs
+        WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND case_id = ?4 AND rep = ?5
+      ) AND NOT EXISTS (
+        SELECT 1 FROM case_results
+        WHERE run_id = ?1 AND model = ?2 AND variant = ?3 AND case_id = ?4 AND rep = ?5
+      )
+    `)
+    .bind(key.run_id, key.model, key.variant, key.case_id, key.rep)
+    .first<{ needed: number }>();
+  return row !== null;
+}
+
+export async function listPendingOutputRecoveries(
+  db: D1Database,
+  router: AutoRouter,
+  engineIdentity: string,
+  limit: number
+): Promise<PendingDeciderOutputKey[]> {
+  const rows = await db
+    .prepare(`
+    SELECT p.run_id, p.model, p.variant, p.rep, p.case_id
+    FROM pending_decider_outputs AS p
+    JOIN benchmark_runs AS run ON run.id = p.run_id
+    WHERE run.router = ?1 AND run.engine_identity = ?2
+      AND p.grading_lease_until <= ?3
+      AND (run.status != 'running' OR EXISTS (
+        SELECT 1 FROM run_lane_failures f WHERE f.run_id = p.run_id
+          AND f.model = p.model AND f.variant = p.variant AND f.rep = p.rep
+      ))
+      AND NOT EXISTS (
+        SELECT 1 FROM case_results r WHERE r.run_id = p.run_id AND r.model = p.model
+          AND r.variant = p.variant AND r.case_id = p.case_id AND r.rep = p.rep
+      )
+      AND (
+        json_extract(p.payload, '$.result.unavailableModelId') IS NULL
+        OR lower(json_extract(p.payload, '$.result.stderrTail')) LIKE '%failed to load%model catalog%'
+      )
+    ORDER BY p.run_id, p.model, p.variant, p.case_id, p.rep
+    LIMIT ?4
+  `)
+    .bind(router, engineIdentity, Date.now(), limit)
+    .all<PendingDeciderOutputKey>();
+  return rows.results;
 }
 
 export async function replaceModelSummaries(
@@ -1369,60 +1509,6 @@ export async function listQueuedRemeasures(
     );
 }
 
-/**
- * Move owner requests off pending alias rows whose concrete catalog target is
- * resolvable, so the owner queue never measures an alias beside its target.
- * Each alias still pending and owner-requested hands its flag to its concrete
- * pair (created pending when absent); a null target only drops the flag
- * because that variant no longer exists on the target. Running, failed and
- * ready alias rows are left untouched.
- */
-export async function collapsePendingOwnerAliasRows(
-  db: D1Database,
-  current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
-  aliases: readonly {
-    alias: { model: string; variant: string };
-    target: { model: string; variant: string | null } | null;
-  }[],
-  nowIso: string = new Date().toISOString()
-): Promise<void> {
-  const router = current.router ?? 'efficient';
-  const aliasKey = [router, current.engineIdentity, current.repetitions] as const;
-  const stmts = aliases.flatMap(({ alias, target }) => {
-    const unflag = db
-      .prepare(
-        `UPDATE benchmark_profiles SET user_requested = 0, updated_at = ?
-         WHERE router = ? AND engine_identity = ? AND repetitions = ? AND model = ? AND variant = ?
-           AND status = 'pending' AND user_requested = 1`
-      )
-      .bind(nowIso, ...aliasKey, alias.model, alias.variant);
-    if (!target) return [unflag];
-    const claimTarget = db
-      .prepare(
-        `INSERT INTO benchmark_profiles
-           (router, model, variant, engine_identity, repetitions, status, run_id, failure_reason,
-            requested_at, updated_at, completed_at, platform_requested, user_requested)
-         SELECT router, ?, ?, engine_identity, repetitions, 'pending', NULL, NULL,
-                requested_at, ?, NULL, 0, 1
-         FROM benchmark_profiles
-         WHERE router = ? AND engine_identity = ? AND repetitions = ? AND model = ? AND variant = ?
-           AND status = 'pending' AND user_requested = 1
-         ON CONFLICT (router, model, variant, engine_identity, repetitions)
-         DO UPDATE SET user_requested = 1`
-      )
-      .bind(
-        target.model,
-        variantToStorage(target.variant),
-        nowIso,
-        ...aliasKey,
-        alias.model,
-        alias.variant
-      );
-    return [claimTarget, unflag];
-  });
-  if (stmts.length > 0) await db.batch(stmts);
-}
-
 /** Registry row counts per status for one queue's current-engine rows. */
 export async function countCurrentProfilesByStatus(
   db: D1Database,
@@ -1506,6 +1592,13 @@ export async function requeueFailedCurrentProfiles(
         eq(benchmarkProfiles.router, current.router ?? 'efficient'),
         eq(benchmarkProfiles.engine_identity, current.engineIdentity),
         eq(benchmarkProfiles.repetitions, current.repetitions),
+        noLiveBenchmarkChunks({
+          router: benchmarkProfiles.router,
+          model: benchmarkProfiles.model,
+          variant: benchmarkProfiles.variant,
+          engineIdentity: benchmarkProfiles.engine_identity,
+          repetitions: benchmarkProfiles.repetitions,
+        }),
         queueFilter
       )
     );
@@ -1586,7 +1679,7 @@ export function claimPlatformRequestedStatement(
         // reaper only touches rows untouched for hours. This reconcile runs
         // every 15 minutes, so bumping it would hold every platform row
         // permanently below the reaper's age guard and an orphaned claim
-        // would keep the queue unsettled forever.
+        // would leave that pair unmeasured, never reaching the routing table.
         set: { platform_requested: true },
       })
   );
@@ -1696,8 +1789,8 @@ export async function getSummariesForRuns(
  * threw), or the claim landed and the run row was never written at all. Neither
  * is reachable otherwise — the drain wants `pending`, requeue wants `failed`,
  * and the stale sweep only looks at runs that are still `running`. Left alone
- * they stay claimed forever, and because a claimed platform row keeps the queue
- * unsettled, the platform routing table would never publish again.
+ * they stay claimed forever, so the pair is neither served nor re-measured and
+ * the routing table would never gain it.
  *
  * The age guard is what makes this safe to run from every sweep: a run marks
  * itself completed just before settling its rows, so without it this would fail

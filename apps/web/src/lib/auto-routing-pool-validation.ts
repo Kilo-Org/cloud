@@ -7,8 +7,6 @@ import {
   type AutoRoutingSettingsResponse,
   type PoolEntry,
 } from '@kilocode/auto-routing-contracts';
-import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
-import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   getDirectByokModelsForOrganization,
   getDirectByokModelsForUser,
@@ -20,7 +18,6 @@ import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/org
 export type PoolValidationReason =
   | 'unknown_model'
   | 'virtual_model'
-  | 'hidden_model'
   | 'byok_only_model'
   | 'organization_denied_model'
   | 'duplicate_model'
@@ -65,7 +62,6 @@ export type EligibleCatalog = {
 const REJECTION_MESSAGES: Record<PoolValidationReason, string> = {
   unknown_model: 'Unknown model. Choose a managed model from your catalog.',
   virtual_model: 'Virtual auto-routing models cannot be added to an Efficient pool.',
-  hidden_model: 'This model is not visible in your model picker.',
   byok_only_model: 'Direct BYOK-only models cannot be added to an Efficient pool.',
   organization_denied_model: 'This model is not allowed for the organization.',
   duplicate_model: 'Duplicate model in the pool.',
@@ -75,15 +71,6 @@ const REJECTION_MESSAGES: Record<PoolValidationReason, string> = {
 
 export function poolValidationMessage(reason: PoolValidationReason): string {
   return REJECTION_MESSAGES[reason];
-}
-
-function isHiddenExclusiveModel(modelId: string): boolean {
-  const exclusive = kiloExclusiveModels.find(model => model.public_id === modelId);
-  return exclusive !== undefined && exclusive.status !== 'public';
-}
-
-function isCustomLlmId(modelId: string): boolean {
-  return modelId.startsWith(CUSTOM_LLM_PREFIX);
 }
 
 /**
@@ -128,8 +115,7 @@ export async function buildEligibleCatalog(params: {
     const id = model.id;
     if (isVirtualAutoModelId(id)) continue;
     if (byokOnlyIds.has(id)) continue;
-    if (isCustomLlmId(id)) continue;
-    if (isHiddenExclusiveModel(id)) continue;
+    if (model.isCustomLlm) continue;
 
     byId.set(id, {
       id,
@@ -151,7 +137,6 @@ function classifyIneligibleModel(
 ): Exclude<PoolValidationReason, 'duplicate_model' | 'too_many_entries' | 'empty_pool'> {
   if (isVirtualAutoModelId(modelId)) return 'virtual_model';
   if (catalog.byokOnlyIds.has(modelId)) return 'byok_only_model';
-  if (isHiddenExclusiveModel(modelId)) return 'hidden_model';
   if (
     catalog.organizationId &&
     catalog.managedIds.has(modelId) &&

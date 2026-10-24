@@ -55,6 +55,11 @@ jest.mock('@/lib/integrations/platforms/slack/credential-store', () => ({
   decryptSlackBotToken: (...args: unknown[]) => mockDecryptSlackBotToken(...args),
 }));
 
+const mockGetDefaultAllowedModel = jest.fn();
+jest.mock('@/lib/slack-bot/model-allow-list', () => ({
+  getDefaultAllowedModel: (...args: unknown[]) => mockGetDefaultAllowedModel(...args),
+}));
+
 const mockCaptureException = jest.fn();
 jest.mock('@sentry/nextjs', () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
@@ -68,6 +73,7 @@ import {
   deleteInstallationByTeamId,
   getMissingSlackScopes,
   SlackWorkspaceAlreadyConnectedError,
+  SlackWorkspaceRebindNotAllowedError,
   SLACK_SCOPES,
   testConnection,
   uninstallApp,
@@ -75,6 +81,7 @@ import {
 } from './slack-service';
 
 const owner = { type: 'user', id: 'user-1' } satisfies Owner;
+const orgOwner = { type: 'org', id: 'org-1' } satisfies Owner;
 
 function buildSlackIntegration(overrides: Record<string, unknown> = {}) {
   return {
@@ -345,6 +352,7 @@ describe('upsertSlackInstallation', () => {
           insert: () => ({ values: mockInsertValues }),
         })
     );
+    mockGetDefaultAllowedModel.mockReset();
   });
 
   it('preserves the selected model when refreshing an existing installation', async () => {
@@ -400,6 +408,85 @@ describe('upsertSlackInstallation', () => {
     );
     const insertedMetadata = mockInsertValues.mock.calls[0][0].metadata as Record<string, unknown>;
     expect(insertedMetadata).not.toHaveProperty('access_token');
+  });
+
+  it('stores no model for a new organization installation when the policy allows none', async () => {
+    mockLimit.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    mockGetDefaultAllowedModel.mockResolvedValue(null);
+
+    const installation = {
+      botToken: 'xoxb-new-token',
+      botUserId: 'U_NEW_BOT',
+      teamName: 'Kilo Team',
+    } satisfies SlackInstallation;
+
+    await upsertSlackInstallation({ owner: orgOwner, teamId: 'T123', installation });
+
+    expect(mockGetDefaultAllowedModel).toHaveBeenCalledWith(orgOwner.id, DEFAULT_BOT_MODEL);
+    const inserted = mockInsertValues.mock.calls[0][0] as { metadata: Record<string, unknown> };
+    expect('model_slug' in inserted.metadata).toBe(false);
+    expect(inserted.metadata).toEqual({ bot_user_id: 'U_NEW_BOT' });
+  });
+
+  it('stores the allowed model for a new organization installation', async () => {
+    mockLimit.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    mockGetDefaultAllowedModel.mockResolvedValue('test/allowed-model');
+
+    const installation = {
+      botToken: 'xoxb-new-token',
+      botUserId: 'U_NEW_BOT',
+      teamName: 'Kilo Team',
+    } satisfies SlackInstallation;
+
+    await upsertSlackInstallation({ owner: orgOwner, teamId: 'T123', installation });
+
+    const inserted = mockInsertValues.mock.calls[0][0] as { metadata: Record<string, unknown> };
+    expect(inserted.metadata.model_slug).toBe('test/allowed-model');
+  });
+
+  it('drops a non-string stored model value on reinstall', async () => {
+    mockLimit.mockResolvedValue([
+      buildSlackIntegration({
+        owned_by_user_id: null,
+        owned_by_organization_id: orgOwner.id,
+        metadata: { access_token: 'xoxb-old-token', model_slug: 42 },
+      }),
+    ]);
+    mockGetDefaultAllowedModel.mockResolvedValue(null);
+
+    const installation = {
+      botToken: 'xoxb-new-token',
+      botUserId: 'U_NEW_BOT',
+      teamName: 'Kilo Team',
+    } satisfies SlackInstallation;
+
+    await upsertSlackInstallation({ owner: orgOwner, teamId: 'T123', installation });
+
+    const updated = mockUpdateSet.mock.calls[0][0] as { metadata: Record<string, unknown> };
+    expect('model_slug' in updated.metadata).toBe(false);
+    expect('access_token' in updated.metadata).toBe(false);
+  });
+
+  it('preserves the selected model on reinstall', async () => {
+    mockLimit.mockResolvedValue([
+      buildSlackIntegration({
+        owned_by_user_id: null,
+        owned_by_organization_id: orgOwner.id,
+        metadata: { access_token: 'xoxb-old-token', model_slug: 'anthropic/claude-sonnet-4.5' },
+      }),
+    ]);
+    mockGetDefaultAllowedModel.mockResolvedValue(null);
+
+    const installation = {
+      botToken: 'xoxb-new-token',
+      botUserId: 'U_NEW_BOT',
+      teamName: 'Kilo Team',
+    } satisfies SlackInstallation;
+
+    await upsertSlackInstallation({ owner: orgOwner, teamId: 'T123', installation });
+
+    const updated = mockUpdateSet.mock.calls[0][0] as { metadata: Record<string, unknown> };
+    expect(updated.metadata.model_slug).toBe('anthropic/claude-sonnet-4.5');
   });
 
   it('rejects installing a Slack workspace connected to another owner', async () => {
@@ -475,8 +562,8 @@ describe('upsertSlackInstallation', () => {
     );
   });
 
-  // The store is the system of record: if its write fails, the installation would
-  // have no readable credential anywhere, so the install fails and the user retries.
+  // The store is the system of record: a failed write fails the install so the
+  // caller can retry.
   it('fails the install when the credential store write fails', async () => {
     mockLimit.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     mockWriteSlackCredential.mockRejectedValue(new Error('encryption not configured'));
@@ -489,6 +576,112 @@ describe('upsertSlackInstallation', () => {
 
     await expect(upsertSlackInstallation({ owner, teamId: 'T123', installation })).rejects.toThrow(
       'encryption not configured'
+    );
+  });
+});
+
+describe('upsertSlackInstallation organization workspace binding', () => {
+  const organizationOwner = { type: 'org', id: 'org-1' } satisfies Owner;
+  const installation = {
+    botToken: 'xoxb-new-token',
+    botUserId: 'U_NEW_BOT',
+    teamName: 'Kilo Team',
+  } satisfies SlackInstallation;
+
+  function organizationIntegration(
+    platformInstallationId: string | null,
+    platformAccountId: string | null = platformInstallationId
+  ) {
+    return buildSlackIntegration({
+      owned_by_user_id: null,
+      owned_by_organization_id: organizationOwner.id,
+      platform_installation_id: platformInstallationId,
+      platform_account_id: platformAccountId,
+    });
+  }
+
+  beforeEach(() => {
+    mockLimit.mockReset();
+    mockUpdateSet.mockReset();
+    mockUpdateWhere.mockReset();
+    mockUpdateReturning.mockReset();
+    mockUpdateSet.mockReturnValue({ where: mockUpdateWhere });
+    mockUpdateWhere.mockReturnValue({ returning: mockUpdateReturning });
+    mockUpdateReturning.mockResolvedValue([buildSlackIntegration()]);
+    mockWriteSlackCredential.mockReset();
+    mockWriteSlackCredential.mockResolvedValue({ id: 'credential-1' });
+    mockGetDefaultAllowedModel.mockReset();
+    mockGetDefaultAllowedModel.mockResolvedValue(DEFAULT_BOT_MODEL);
+  });
+
+  it('refuses to move an organization connection without caller authorization', async () => {
+    mockLimit.mockResolvedValueOnce([organizationIntegration('T_OLD')]).mockResolvedValueOnce([]);
+
+    await expect(
+      upsertSlackInstallation({ owner: organizationOwner, teamId: 'T_NEW', installation })
+    ).rejects.toThrow(SlackWorkspaceRebindNotAllowedError);
+
+    expect(mockUpdateSet).not.toHaveBeenCalled();
+  });
+
+  it('moves an organization connection when the caller authorized the change', async () => {
+    mockLimit.mockResolvedValueOnce([organizationIntegration('T_OLD')]).mockResolvedValueOnce([]);
+
+    await upsertSlackInstallation({
+      owner: organizationOwner,
+      teamId: 'T_NEW',
+      installation,
+      allowWorkspaceRebind: true,
+    });
+
+    expect(mockUpdateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ platform_installation_id: 'T_NEW' })
+    );
+  });
+
+  it('refreshes an organization connection bound to the same workspace', async () => {
+    mockLimit.mockResolvedValueOnce([organizationIntegration('T123')]).mockResolvedValueOnce([]);
+
+    await upsertSlackInstallation({ owner: organizationOwner, teamId: 'T123', installation });
+
+    expect(mockUpdateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ platform_installation_id: 'T123' })
+    );
+  });
+
+  it('binds an organization row that has no workspace yet', async () => {
+    mockLimit
+      .mockResolvedValueOnce([organizationIntegration(null, null)])
+      .mockResolvedValueOnce([]);
+
+    await upsertSlackInstallation({ owner: organizationOwner, teamId: 'T123', installation });
+
+    expect(mockUpdateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ platform_installation_id: 'T123' })
+    );
+  });
+
+  it('refuses a legacy organization row bound only by its account id', async () => {
+    mockLimit
+      .mockResolvedValueOnce([organizationIntegration(null, 'T_OLD')])
+      .mockResolvedValueOnce([]);
+
+    await expect(
+      upsertSlackInstallation({ owner: organizationOwner, teamId: 'T_NEW', installation })
+    ).rejects.toThrow(SlackWorkspaceRebindNotAllowedError);
+
+    expect(mockUpdateSet).not.toHaveBeenCalled();
+  });
+
+  it('keeps personal workspace changes allowed', async () => {
+    mockLimit
+      .mockResolvedValueOnce([buildSlackIntegration({ platform_installation_id: 'T_OLD' })])
+      .mockResolvedValueOnce([]);
+
+    await upsertSlackInstallation({ owner, teamId: 'T_NEW', installation });
+
+    expect(mockUpdateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ platform_installation_id: 'T_NEW' })
     );
   });
 });

@@ -30,6 +30,15 @@ export class SlackWorkspaceAlreadyConnectedError extends Error {
   }
 }
 
+export class SlackWorkspaceRebindNotAllowedError extends Error {
+  constructor() {
+    super(
+      'This organization is already connected to a different Slack workspace. Disconnect it before connecting another workspace.'
+    );
+    this.name = 'SlackWorkspaceRebindNotAllowedError';
+  }
+}
+
 // Slack OAuth scopes for the integration
 // These should be kept in sync with the scopes requested in the Slack app configuration
 export const SLACK_SCOPES = [
@@ -247,46 +256,73 @@ export async function getSlackBotToken(integration: PlatformIntegration): Promis
 
 /**
  * Create or update Slack installation from the Chat SDK OAuth callback result.
+ *
+ * An organization connection holds a shared bot token and model policy, so moving
+ * it to another Slack workspace is refused unless the caller passes
+ * `allowWorkspaceRebind` after verifying organization-management authority.
  */
 export async function upsertSlackInstallation({
   owner,
   teamId,
   installation,
+  allowWorkspaceRebind = false,
 }: {
   owner: Owner;
   teamId: string;
   installation: SlackInstallation;
+  allowWorkspaceRebind?: boolean;
 }): Promise<PlatformIntegration> {
   const existing = await getInstallation(owner);
   const teamName = installation.teamName || 'Unknown Team';
+  // Legacy rows can carry the workspace id only in `platform_account_id`.
+  const boundTeamId = existing?.platform_installation_id ?? existing?.platform_account_id ?? null;
 
   const conflicting = await getConflictingSlackInstallation(owner, teamId);
   if (conflicting) {
     throw new SlackWorkspaceAlreadyConnectedError(teamName);
   }
 
-  // For org integrations, get a model that respects org access policy.
+  if (
+    existing &&
+    !allowWorkspaceRebind &&
+    owner.type === 'org' &&
+    boundTeamId &&
+    boundTeamId !== teamId
+  ) {
+    throw new SlackWorkspaceRebindNotAllowedError();
+  }
+
+  // For org integrations, get a model that respects org access policy. A null
+  // result means the policy allows none of the candidates; the installation then
+  // stores no `model_slug` and the UI keeps its "Select a model" state.
   // For user integrations, use the shared bot default model.
   const defaultModel =
     owner.type === 'org'
       ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
       : DEFAULT_BOT_MODEL;
 
-  // Non-secret workspace identifiers only. The bot token lives solely in the
-  // encrypted `slack_oauth_credentials` store; dropping `access_token` here also
-  // removes any leftover copy from rows written before the credential store
-  // existed (a reinstall refreshes the whole metadata object).
-  const existingMetadata =
-    existing?.metadata && typeof existing.metadata === 'object' ? existing.metadata : {};
-  const metadata = {
-    ...existingMetadata,
+  // Workspace identifiers and model policy only: credential material lives in the
+  // encrypted `slack_oauth_credentials` row that is written alongside this one, and
+  // metadata stays free of it.
+  const existingModelSlug =
+    existing?.metadata &&
+    typeof existing.metadata === 'object' &&
+    'model_slug' in existing.metadata &&
+    typeof existing.metadata.model_slug === 'string'
+      ? existing.metadata.model_slug
+      : null;
+  const modelSlug = existingModelSlug ?? defaultModel;
+
+  const metadata: Record<string, unknown> = {
+    ...(existing?.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}),
     bot_user_id: installation.botUserId,
-    model_slug:
-      'model_slug' in existingMetadata && typeof existingMetadata.model_slug === 'string'
-        ? existingMetadata.model_slug
-        : defaultModel,
   };
-  delete (metadata as Record<string, unknown>).access_token;
+  if (modelSlug) {
+    metadata.model_slug = modelSlug;
+  } else {
+    delete metadata.model_slug;
+  }
+  delete metadata.access_token;
 
   if (existing) {
     try {

@@ -1,26 +1,24 @@
 /**
- * Backfills existing Slack bot tokens from
- * `platform_integrations.metadata` into the encrypted
- * `slack_oauth_credentials` store, then removes the plaintext token from
- * metadata.
+ * Moves Slack bot credentials for existing integrations into the encrypted
+ * `slack_oauth_credentials` store and normalizes `platform_integrations.metadata`
+ * to non-secret workspace fields.
  *
  * The copy pass is idempotent: integrations that already have a credential row are
  * skipped rather than re-encrypted, so re-running does not churn `credential_version`
  * (each bump invalidates the previous ciphertext, since the version is inside the
  * AAD). The skip is enforced by the write itself, so a reinstall that lands mid-run
- * keeps its fresh token instead of being overwritten by this run's older metadata
+ * keeps its fresh credential instead of being overwritten by this run's earlier
  * snapshot.
  *
- * The scrub pass (on by default with --execute; opt out with --no-scrub) removes
- * the token key from metadata for every eligible Slack integration, preserving all
- * other metadata keys. A row is eligible only when its stored credential is
- * current: the credential was written by this run's copy pass, or an existing
- * credential decrypts to exactly the metadata token. Every other row keeps its
- * metadata unchanged and is reported, so the operation is safe to re-run after
- * the reported rows are resolved. Run this only after the cutover that reads
- * tokens from the credential store is deployed.
+ * The normalization pass (on by default with --execute; opt out with --no-scrub)
+ * removes the credential field from metadata for every Slack integration whose
+ * stored credential is current: either this run wrote it, or the stored credential
+ * decrypts to the same value. Every other integration keeps its metadata unchanged
+ * and is reported, so the operation is safe to re-run after the reported rows are
+ * resolved. Run this only after the release whose read paths use the credential
+ * store.
  *
- * Requires SLACK_CREDENTIAL_KEYSET_JSON. Never prints token material.
+ * Requires SLACK_CREDENTIAL_KEYSET_JSON. Never prints credential material.
  *
  * Usage:
  *   pnpm --filter web script src/scripts/d2026-08-07_backfill-slack-oauth-credentials.ts
@@ -45,7 +43,7 @@ import { requireSlackCredentialKeyset } from '@/lib/integrations/platforms/slack
 
 type SkipReason =
   | 'already_migrated'
-  | 'no_plaintext_token'
+  | 'no_metadata_credential'
   | 'no_owner'
   | 'no_team_id'
   | 'write_failed'
@@ -76,7 +74,7 @@ function parseArgs(): { execute: boolean; scrub: boolean; batchSize: number } {
   return { execute, scrub, batchSize };
 }
 
-function readPlaintextToken(metadata: unknown): string | null {
+function readMetadataCredential(metadata: unknown): string | null {
   if (metadata === null || typeof metadata !== 'object') return null;
   if (!('access_token' in metadata)) return null;
   const value = metadata.access_token;
@@ -113,7 +111,7 @@ async function main(): Promise<void> {
 
   const skipped: Record<SkipReason, number> = {
     already_migrated: 0,
-    no_plaintext_token: 0,
+    no_metadata_credential: 0,
     no_owner: 0,
     no_team_id: 0,
     write_failed: 0,
@@ -124,8 +122,8 @@ async function main(): Promise<void> {
   let eligible = 0;
   let scrubbed = 0;
   // Integrations whose credential row this run can vouch for: either the row was
-  // written by this run, or it decrypts to the metadata token (checked below).
-  // Only these are eligible for the scrub pass.
+  // written by this run, or it decrypts to the metadata value (checked below).
+  // Only these are eligible for the normalization pass.
   const scrubCandidateIds = new Set<string>();
 
   for (let offset = 0; offset < integrations.length; offset += batchSize) {
@@ -148,31 +146,31 @@ async function main(): Promise<void> {
     for (const integration of batch) {
       if (alreadyMigrated.has(integration.id)) {
         skipped.already_migrated += 1;
-        // The metadata token and the stored credential must agree before the
-        // metadata copy is removed. The comparison below admits the row for
-        // scrubbing only on an exact match; any other result keeps it unchanged.
-        if (execute && scrub && readPlaintextToken(integration.metadata)) {
+        // The stored credential must be current before the metadata field is
+        // removed. The comparison below admits the row for normalization only on an
+        // exact match; any other result keeps it unchanged.
+        if (execute && scrub && readMetadataCredential(integration.metadata)) {
           const fresh = await storedCredentialMatches(integration.id, integration);
           if (fresh === true) {
             scrubCandidateIds.add(integration.id);
           } else if (fresh === false) {
             skipped.scrub_no_credential += 1;
             console.warn(
-              `Kept metadata token for integration ${integration.id}: stored credential does not match it`
+              `Left metadata unchanged for integration ${integration.id}: stored credential does not match it`
             );
           } else {
             skipped.scrub_failed += 1;
             console.warn(
-              `Kept metadata token for integration ${integration.id}: stored credential could not be read`
+              `Left metadata unchanged for integration ${integration.id}: stored credential could not be read`
             );
           }
         }
         continue;
       }
 
-      const botToken = readPlaintextToken(integration.metadata);
+      const botToken = readMetadataCredential(integration.metadata);
       if (!botToken) {
-        skipped.no_plaintext_token += 1;
+        skipped.no_metadata_credential += 1;
         continue;
       }
 
@@ -218,12 +216,12 @@ async function main(): Promise<void> {
     }
   }
 
-  // Scrub pass: remove the metadata token for every eligible integration.
-  // - A row is eligible only when its stored credential is current: the credential
-  //   was written by this run's copy pass, or an existing credential decrypts to
-  //   exactly the metadata token. Every other row is reported and left unchanged so
-  //   the script can be repeated after it is resolved.
-  // The metadata update removes only the token key (`jsonb -`), so concurrent writes
+  // Normalization pass: remove the credential field from metadata for every eligible
+  // integration.
+  // - A row is eligible only when its stored credential is current: this run wrote it,
+  //   or the stored credential decrypts to the same value. Every other row is reported
+  //   and left unchanged so the script can be repeated after it is resolved.
+  // The metadata update removes only that key (`jsonb -`), so concurrent writes
   // to other metadata fields between the snapshot above and this update survive.
   if (execute && scrub) {
     for (const integration of integrations) {
@@ -244,7 +242,7 @@ async function main(): Promise<void> {
       } catch (error) {
         skipped.scrub_failed += 1;
         console.error(
-          `Failed to scrub integration ${integration.id}: ${error instanceof Error ? error.message : 'unknown error'}`
+          `Failed to normalize integration ${integration.id}: ${error instanceof Error ? error.message : 'unknown error'}`
         );
       }
     }
@@ -257,11 +255,11 @@ async function main(): Promise<void> {
   console.log('\n--- Summary ---');
   console.log(`Eligible for backfill:       ${eligible}`);
   console.log(`Migrated:                    ${migrated}`);
-  console.log(`Token fields removed:        ${scrubbed}`);
+  console.log(`Metadata fields normalized:  ${scrubbed}`);
   console.log(`Kept (credential not current): ${skipped.scrub_no_credential}`);
-  console.log(`Failed scrubs:               ${skipped.scrub_failed}`);
+  console.log(`Failed normalizations:       ${skipped.scrub_failed}`);
   console.log(`Skipped (already migrated):  ${skipped.already_migrated}`);
-  console.log(`Skipped (no plaintext):      ${skipped.no_plaintext_token}`);
+  console.log(`Skipped (no metadata value): ${skipped.no_metadata_credential}`);
   console.log(`Skipped (no owner):          ${skipped.no_owner}`);
   console.log(`Skipped (no team ID):        ${skipped.no_team_id}`);
   console.log(`Failed writes:               ${skipped.write_failed}`);
@@ -295,12 +293,12 @@ function readBotUserId(metadata: unknown): string | null {
 }
 
 /**
- * Whether the integration's stored credential is exactly its current metadata token.
+ * Whether the integration's stored credential is exactly its current metadata value.
  *
  * Returns true on an exact match, false when the credential row is absent, revoked,
  * or the integration has no exclusive owner, and null when the row could not be
  * read. The caller reports the distinction so each outcome gets the right follow-up.
- * Never logs or prints token material.
+ * Never logs or prints credential material.
  */
 async function storedCredentialMatches(
   integrationId: string,
@@ -310,7 +308,7 @@ async function storedCredentialMatches(
     metadata: unknown;
   }
 ): Promise<boolean | null> {
-  const botToken = readPlaintextToken(integration.metadata);
+  const botToken = readMetadataCredential(integration.metadata);
   if (!botToken) return false;
   const owner = readOwner(integration);
   if (!owner) return false;

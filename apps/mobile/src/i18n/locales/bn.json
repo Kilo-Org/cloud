@@ -53,6 +53,7 @@
     "connected": "সংযুক্ত",
     "couldNotLoadModels": "মডেল লোড করা যায়নি।",
     "couldNotLoadRepositories": "রিপোজিটরি লোড করা যায়নি।",
+    "noRepositoriesFound": "কোনো রিপোজিটরি পাওয়া যায়নি",
     "critical": "অতি গুরুতর",
     "delete": "মুছুন",
     "deleted": "মোছা হয়েছে",
@@ -87,6 +88,7 @@
     "connect": "সংযুক্ত করুন",
     "connectBitbucket": "Bitbucket সংযুক্ত করুন",
     "connectGitlab": "GitLab সংযুক্ত করুন",
+    "connectProvider": "একটি প্রোভাইডার সংযুক্ত করুন",
     "contentTruncated": "বিষয়বস্তু আংশিক দেখানো হয়েছে",
     "copyLink": "লিঙ্ক কপি করুন",
     "couldNotLoadOrganizations": "সংস্থাগুলো লোড করা যায়নি।",
@@ -145,7 +147,8 @@
     "agent": "এজেন্ট",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "পরিবর্তন"
+    "changes": "পরিবর্তন",
+    "organizationTrialEnded": "সংস্থার ট্রায়াল শেষ হয়েছে এবং এর কোনো সক্রিয় প্ল্যান নেই। একজন সংস্থা মালিক kilo.ai-এ বিলিং আপডেট করতে পারেন, তারপর আবার চেষ্টা করুন।"
   },
   "language": {
     "restarting": "নির্বাচিত ভাষা চালু করতে অ্যাপ আবার চালু হচ্ছে",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "GitLab-এ আরও গ্রুপ বা প্রকল্পে অ্যাক্সেস দিতে হতে পারে।",
       "installGithubApp": "রিপোজিটরিতে GitHub অ্যাপ ইনস্টল করুন",
       "installGithubAppDescription": "যেসব রিপোজিটরি পর্যালোচনা করাতে চান, সেগুলোতে Kilo GitHub অ্যাপকে অ্যাক্সেস দিন।",
-      "noRepositoriesFound": "কোনো রিপোজিটরি পাওয়া যায়নি",
       "repositoryAccess": "রিপোজিটরির অ্যাক্সেস"
     },
     "style": {
@@ -1489,7 +1491,6 @@
       "invalidUrl": "পুল রিকোয়েস্টের একটি সঠিক URL লিখুন।",
       "couldNotCheckProviderStatus": "প্রোভাইডারের অবস্থা পরীক্ষা করা যায়নি।",
       "couldNotLoadProviders": "আপনার সংযুক্ত প্রোভাইডার লোড করা যায়নি। আবার চেষ্টা করুন।",
-      "connectProvider": "একটি প্রোভাইডার সংযুক্ত করুন",
       "connectProviderDescription": "একটি পুল রিকোয়েস্টের ম্যানুয়াল পর্যালোচনা শুরু করতে GitHub সংযুক্ত করুন।",
       "pullRequestUrl": "পুল রিকোয়েস্টের URL",
       "instructions": "নির্দেশনা (ঐচ্ছিক)",
@@ -3168,7 +3169,9 @@
       "sendInvite": "আমন্ত্রণ পাঠান",
       "title": "সদস্যকে আমন্ত্রণ জানান",
       "alreadyInvited": "এই ব্যক্তি ইতোমধ্যে আমন্ত্রিত অথবা সদস্য।",
-      "sendError": "আমন্ত্রণ পাঠানো যায়নি।"
+      "sendError": "আমন্ত্রণ পাঠানো যায়নি।",
+      "pendingInvitation": "এই ইমেইলে ইতিমধ্যে একটি অপেক্ষমাণ আমন্ত্রণ রয়েছে।",
+      "alreadyMember": "এই ব্যক্তি ইতিমধ্যে এই সংস্থার একজন সদস্য।"
     },
     "invoices": {
       "downloadA11y": "ইনভয়েস {{number}} ডাউনলোড করুন",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "অপেক্ষমাণ আমন্ত্রণ",
       "resendInvite": "আমন্ত্রণ পুনরায় পাঠান",
       "shareInviteLink": "আমন্ত্রণের লিঙ্ক শেয়ার করুন",
-      "resendInviteError": "আমন্ত্রণ পুনরায় পাঠানো যায়নি।"
+      "resendInviteError": "আমন্ত্রণ পুনরায় পাঠানো যায়নি।",
+      "inviteNotResendable": "এই আমন্ত্রণটি আর পুনরায় পাঠানো যাবে না।",
+      "ownerAuthority": "কেবল একজন সংগঠনের মালিকই মালিকদের পরিচালনা করতে পারবেন।",
+      "ownRoleChange": "আপনি নিজের ভূমিকা পরিবর্তন করতে পারবেন না।",
+      "inviteExpired": "এই আমন্ত্রণটির মেয়াদ শেষ হয়ে গেছে।",
+      "inviteAccepted": "এই আমন্ত্রণটি ইতিমধ্যেই গ্রহণ করা হয়েছে।"
     },
     "usageStats": {
       "inputTokens": "ইনপুট টোকেন",

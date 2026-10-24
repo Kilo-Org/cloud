@@ -53,6 +53,7 @@
     "connected": "Terhubung",
     "couldNotLoadModels": "Tidak dapat memuat model.",
     "couldNotLoadRepositories": "Tidak dapat memuat repositori.",
+    "noRepositoriesFound": "Tidak ada repositori yang ditemukan",
     "critical": "Kritis",
     "delete": "Hapus",
     "deleted": "Dihapus",
@@ -87,6 +88,7 @@
     "connect": "Hubungkan",
     "connectBitbucket": "Hubungkan Bitbucket",
     "connectGitlab": "Hubungkan GitLab",
+    "connectProvider": "Hubungkan penyedia",
     "contentTruncated": "Konten dipotong",
     "copyLink": "Salin tautan",
     "couldNotLoadOrganizations": "Tidak dapat memuat organisasi.",
@@ -145,7 +147,8 @@
     "agent": "Agen",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Perubahan"
+    "changes": "Perubahan",
+    "organizationTrialEnded": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Pemilik organisasi dapat memperbarui penagihan di kilo.ai, lalu coba lagi."
   },
   "language": {
     "restarting": "Memulai ulang untuk menerapkan bahasa",
@@ -883,7 +886,6 @@
       "gitlabNoRepositoriesDescription": "Kamu mungkin perlu memberikan akses ke lebih banyak grup atau proyek di GitLab.",
       "installGithubApp": "Pasang aplikasi GitHub di repositori",
       "installGithubAppDescription": "Izinkan aplikasi GitHub Kilo mengakses repositori yang ingin kamu tinjau.",
-      "noRepositoriesFound": "Tidak ada repositori yang ditemukan",
       "repositoryAccess": "akses repositori"
     },
     "style": {
@@ -907,7 +909,6 @@
     "followReviewMd": "Ikuti REVIEW.md",
     "followReviewMdSubtitle": "Ikuti instruksi dalam berkas REVIEW.md di setiap repositori",
     "manualReview": {
-      "connectProvider": "Hubungkan penyedia",
       "connectProviderDescription": "Hubungkan GitHub untuk memulai tinjauan manual terhadap PR.",
       "couldNotCheckProviderStatus": "Tidak dapat memeriksa status penyedia.",
       "couldNotLoadProviders": "Kami tidak dapat memuat penyedia yang terhubung. Coba lagi.",
@@ -3167,7 +3168,9 @@
       "sendInvite": "Kirim undangan",
       "title": "Undang anggota",
       "alreadyInvited": "Alamat email tersebut sudah diundang atau sudah menjadi anggota.",
-      "sendError": "Tidak dapat mengirim undangan."
+      "sendError": "Tidak dapat mengirim undangan.",
+      "pendingInvitation": "Email ini sudah memiliki undangan yang tertunda.",
+      "alreadyMember": "Orang ini sudah menjadi anggota organisasi ini."
     },
     "invoices": {
       "downloadA11y": "Unduh faktur {{number}}",
@@ -3237,7 +3240,12 @@
       "pendingInvitations": "Undangan yang belum diterima",
       "resendInvite": "Kirim ulang undangan",
       "shareInviteLink": "Bagikan tautan undangan",
-      "resendInviteError": "Tidak dapat mengirim ulang undangan."
+      "resendInviteError": "Tidak dapat mengirim ulang undangan.",
+      "inviteNotResendable": "Undangan ini tidak dapat dikirim ulang lagi.",
+      "ownerAuthority": "Hanya pemilik organisasi yang dapat mengelola pemilik.",
+      "ownRoleChange": "Anda tidak dapat mengubah peran Anda sendiri.",
+      "inviteExpired": "Undangan ini telah kedaluwarsa.",
+      "inviteAccepted": "Undangan ini sudah diterima."
     },
     "usageStats": {
       "inputTokens": "Token masukan",

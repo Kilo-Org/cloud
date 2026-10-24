@@ -53,6 +53,7 @@
     "connected": "जोडलेले",
     "couldNotLoadModels": "मॉडेल लोड करता आले नाहीत.",
     "couldNotLoadRepositories": "रिपॉझिटरी लोड करता आल्या नाहीत.",
+    "noRepositoriesFound": "कोणतीही रिपॉझिटरी सापडली नाही",
     "critical": "गंभीर",
     "delete": "हटवा",
     "deleted": "हटवले",
@@ -87,6 +88,7 @@
     "connect": "जोडा",
     "connectBitbucket": "Bitbucket जोडा",
     "connectGitlab": "GitLab जोडा",
+    "connectProvider": "सेवा पुरवठादार जोडा",
     "contentTruncated": "काही मजकूर वगळला आहे",
     "copyLink": "लिंक कॉपी करा",
     "couldNotLoadOrganizations": "संस्थांची यादी लोड करता आली नाही.",
@@ -145,7 +147,8 @@
     "agent": "एजंट",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "बदल"
+    "changes": "बदल",
+    "organizationTrialEnded": "संस्थेची चाचणी संपली आहे आणि तिच्याकडे कोणतीही सक्रिय योजना नाही. संस्थेचा मालक kilo.ai वर बिलिंग अपडेट करू शकतो, त्यानंतर पुन्हा प्रयत्न करा."
   },
   "language": {
     "restarting": "निवडलेली भाषा लागू करण्यासाठी पुन्हा सुरू होत आहे",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "GitLab वरील आणखी गट किंवा प्रकल्पांसाठी प्रवेशाची परवानगी द्यावी लागू शकते.",
       "installGithubApp": "रिपॉझिटरींसाठी GitHub ॲप इन्स्टॉल करा",
       "installGithubAppDescription": "ज्या रिपॉझिटरींचे पुनरावलोकन हवे आहे, त्यांमध्ये Kilo GitHub ॲपला प्रवेश द्या.",
-      "noRepositoriesFound": "कोणतीही रिपॉझिटरी सापडली नाही",
       "repositoryAccess": "रिपॉझिटरीमधील प्रवेश"
     },
     "style": {
@@ -1489,7 +1491,6 @@
       "invalidUrl": "पुल रिक्वेस्टचा वैध URL टाका.",
       "couldNotCheckProviderStatus": "सेवा पुरवठादाराची स्थिती तपासता आली नाही.",
       "couldNotLoadProviders": "तुम्ही जोडलेल्या सेवा पुरवठादारांची माहिती लोड करता आली नाही. कृपया पुन्हा प्रयत्न करा.",
-      "connectProvider": "सेवा पुरवठादार जोडा",
       "connectProviderDescription": "पुल रिक्वेस्टचे पुनरावलोकन स्वतः सुरू करण्यासाठी GitHub जोडा.",
       "pullRequestUrl": "पुल रिक्वेस्टचा URL",
       "instructions": "सूचना (ऐच्छिक)",
@@ -3168,7 +3169,9 @@
       "sendInvite": "आमंत्रण पाठवा",
       "title": "सदस्याला आमंत्रित करा",
       "alreadyInvited": "त्यांना आधीच आमंत्रित केले आहे किंवा ते आधीपासूनच सदस्य आहेत.",
-      "sendError": "आमंत्रण पाठवता आले नाही."
+      "sendError": "आमंत्रण पाठवता आले नाही.",
+      "pendingInvitation": "या ईमेलकडे आधीच एक प्रलंबित आमंत्रण आहे.",
+      "alreadyMember": "ही व्यक्ती या संस्थेचा आधीच सदस्य आहे."
     },
     "invoices": {
       "downloadA11y": "{{number}} क्रमांकाचे बिल डाउनलोड करा",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "प्रलंबित आमंत्रणे",
       "resendInvite": "आमंत्रण पुन्हा पाठवा",
       "shareInviteLink": "आमंत्रणाची लिंक शेअर करा",
-      "resendInviteError": "आमंत्रण पुन्हा पाठवता आले नाही."
+      "resendInviteError": "आमंत्रण पुन्हा पाठवता आले नाही.",
+      "inviteNotResendable": "हे आमंत्रण यापुढे पुन्हा पाठवता येत नाही.",
+      "ownerAuthority": "फक्त संस्थेचा मालकच मालकांचे व्यवस्थापन करू शकतो.",
+      "ownRoleChange": "तुम्ही तुमची स्वतःची भूमिका बदलू शकत नाही.",
+      "inviteExpired": "हे आमंत्रण कालबाह्य झाले आहे.",
+      "inviteAccepted": "हे आमंत्रण आधीच स्वीकारले गेले आहे."
     },
     "usageStats": {
       "inputTokens": "इनपुट टोकन",

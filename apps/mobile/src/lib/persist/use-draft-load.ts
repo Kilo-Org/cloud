@@ -9,13 +9,21 @@ import {
   NEW_SESSION_DRAFT_KEY,
 } from '@/lib/persist/drafts';
 
-type UseFencedDraftLoadInput<T> = {
+type UseFencedDraftLoadBaseInput = {
   userId: string | undefined;
   isIdentityLoading: boolean;
   /** Full draft entity key under `draft:<userId>` (e.g. `agent-composer:new`). */
   entityKey: string;
-  /** Shape validator for the loaded value; defaults to a string draft. */
-  validate?: DraftShapeValidator<T>;
+};
+
+/** A string draft: the default shape, with no guard of its own. */
+type UseFencedDraftLoadStringInput = UseFencedDraftLoadBaseInput & {
+  validate?: undefined;
+};
+
+/** A non-string draft: the caller's guard is what types the loaded value. */
+type UseFencedDraftLoadGuardInput<T> = UseFencedDraftLoadBaseInput & {
+  validate: DraftShapeValidator<T>;
 };
 
 /**
@@ -26,24 +34,38 @@ type UseFencedDraftLoadInput<T> = {
  * run) bumps it, so a load started for an older account or session can never
  * publish into the newest screen. `value` stays null until a stored draft (or
  * the absence of one) has loaded. The draft shape is the caller's contract:
- * pass a `validate` guard for a non-string draft, or omit it for a string.
+ * omitting `validate` loads a string, and a non-string `T` requires the guard
+ * that validates it.
  */
+export function useFencedDraftLoad(input: UseFencedDraftLoadStringInput): {
+  settled: boolean;
+  value: string | null;
+};
+export function useFencedDraftLoad<T>(input: UseFencedDraftLoadGuardInput<T>): {
+  settled: boolean;
+  value: T | null;
+};
 export function useFencedDraftLoad<T = string>({
   userId,
   isIdentityLoading,
   entityKey,
   validate,
-}: UseFencedDraftLoadInput<T>): {
+}: UseFencedDraftLoadBaseInput & { validate?: DraftShapeValidator<T> }): {
   settled: boolean;
-  value: T | null;
+  value: T | string | null;
 } {
-  const resolvedValidate = (validate ?? isStringDraft) as DraftShapeValidator<T>;
+  // The fallback is only reachable from the string overload, so the loaded
+  // value is either the caller's guarded `T` or a plain string.
+  const resolvedValidate: DraftShapeValidator<T | string> = validate ?? isStringDraft;
   // Hold the resolved validator in a ref so the effect's dependency array stays
   // limited to the identity/entity generation (the validator is a stable
   // module-level guard for every caller).
   const resolvedValidateRef = useRef(resolvedValidate);
   resolvedValidateRef.current = resolvedValidate;
-  const [draftState, setDraftState] = useState<{ settled: boolean; value: T | null }>({
+  const [draftState, setDraftState] = useState<{
+    settled: boolean;
+    value: T | string | null;
+  }>({
     settled: false,
     value: null,
   });

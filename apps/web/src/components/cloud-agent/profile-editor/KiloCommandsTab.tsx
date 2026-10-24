@@ -26,9 +26,15 @@ type Props = {
   profileId: string;
   organizationId: string | undefined;
   kiloCommands: ProfileKiloCommand[];
+  readOnly?: boolean;
 };
 
-export function KiloCommandsTab({ profileId, organizationId, kiloCommands }: Props) {
+export function KiloCommandsTab({
+  profileId,
+  organizationId,
+  kiloCommands,
+  readOnly = false,
+}: Props) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -50,6 +56,7 @@ export function KiloCommandsTab({ profileId, organizationId, kiloCommands }: Pro
             command={cmd}
             profileId={profileId}
             organizationId={organizationId}
+            readOnly={readOnly}
             onEdit={() => {
               setEditingId(cmd.id);
               setIsAdding(false);
@@ -66,17 +73,19 @@ export function KiloCommandsTab({ profileId, organizationId, kiloCommands }: Pro
           onDone={() => setIsAdding(false)}
         />
       ) : (
-        <Button
-          variant="outline"
-          className="h-11 w-full border-dashed"
-          onClick={() => {
-            setIsAdding(true);
-            setEditingId(null);
-          }}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add command
-        </Button>
+        !readOnly && (
+          <Button
+            variant="outline"
+            className="h-11 w-full border-dashed"
+            onClick={() => {
+              setIsAdding(true);
+              setEditingId(null);
+            }}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add command
+          </Button>
+        )
       )}
 
       {kiloCommands.length === 0 && !isAdding && (
@@ -90,11 +99,13 @@ function KiloCommandRow({
   command,
   profileId,
   organizationId,
+  readOnly = false,
   onEdit,
 }: {
   command: ProfileKiloCommand;
   profileId: string;
   organizationId: string | undefined;
+  readOnly?: boolean;
   onEdit: () => void;
 }) {
   const { deleteKiloCommand } = useProfileMutations({ organizationId });
@@ -129,35 +140,39 @@ function KiloCommandRow({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7"
-            onClick={onEdit}
-            disabled={deleting}
-            aria-label="Edit command"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
-          <InlineDeleteConfirmation
-            onDelete={async () => {
-              setDeleting(true);
-              try {
-                await deleteKiloCommand.mutateAsync({
-                  profileId,
-                  organizationId,
-                  commandId: command.id,
-                });
-                toast.success(`Command "/${command.name}" deleted`);
-              } catch (error) {
-                console.error('Failed to delete command:', error);
-                toast.error('Failed to delete command');
-              } finally {
-                setDeleting(false);
-              }
-            }}
-            isLoading={deleting}
-          />
+          {!readOnly && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7"
+                onClick={onEdit}
+                disabled={deleting}
+                aria-label="Edit command"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+              <InlineDeleteConfirmation
+                onDelete={async () => {
+                  setDeleting(true);
+                  try {
+                    await deleteKiloCommand.mutateAsync({
+                      profileId,
+                      organizationId,
+                      commandId: command.id,
+                    });
+                    toast.success(`Command "/${command.name}" deleted`);
+                  } catch (error) {
+                    console.error('Failed to delete command:', error);
+                    toast.error('Failed to delete command');
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+                isLoading={deleting}
+              />
+            </>
+          )}
         </div>
       </div>
     </div>

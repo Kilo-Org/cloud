@@ -53,6 +53,7 @@
     "connected": "已连接",
     "couldNotLoadModels": "无法加载模型",
     "couldNotLoadRepositories": "无法加载仓库",
+    "noRepositoriesFound": "未找到仓库",
     "critical": "严重",
     "delete": "删除",
     "deleted": "已删除",
@@ -87,6 +88,7 @@
     "connect": "连接",
     "connectBitbucket": "连接 Bitbucket",
     "connectGitlab": "连接 GitLab",
+    "connectProvider": "连接代码托管平台",
     "contentTruncated": "内容已截断",
     "copyLink": "复制链接",
     "couldNotLoadOrganizations": "无法加载组织",
@@ -145,7 +147,8 @@
     "agent": "智能体",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "更改"
+    "changes": "更改",
+    "organizationTrialEnded": "组织的试用期已结束，且没有生效的套餐。组织所有者可以在 kilo.ai 更新账单信息，然后重试。"
   },
   "language": {
     "restarting": "正在重启以应用语言设置",
@@ -883,7 +886,6 @@
       "gitlabNoRepositoriesDescription": "你可能需要授予对 GitLab 上更多群组或项目的访问权限。",
       "installGithubApp": "为仓库安装 GitHub 应用",
       "installGithubAppDescription": "请授予 Kilo GitHub 应用访问待审查仓库的权限。",
-      "noRepositoriesFound": "未找到仓库",
       "repositoryAccess": "仓库访问权限"
     },
     "style": {
@@ -907,7 +909,6 @@
     "followReviewMd": "遵循 REVIEW.md",
     "followReviewMdSubtitle": "遵循各仓库 REVIEW.md 文件中的说明",
     "manualReview": {
-      "connectProvider": "连接代码托管平台",
       "connectProviderDescription": "连接 GitHub，即可手动发起拉取请求审查。",
       "couldNotCheckProviderStatus": "无法检查代码托管平台的状态",
       "couldNotLoadProviders": "无法加载已连接的代码托管平台。请重试。",
@@ -3167,7 +3168,9 @@
       "sendInvite": "发送邀请",
       "title": "邀请成员",
       "alreadyInvited": "该邮箱已被邀请或已是成员。",
-      "sendError": "无法发送邀请。"
+      "sendError": "无法发送邀请。",
+      "pendingInvitation": "该邮箱已有待处理的邀请。",
+      "alreadyMember": "此人已是该组织的成员。"
     },
     "invoices": {
       "downloadA11y": "下载发票 {{number}}",
@@ -3237,7 +3240,12 @@
       "pendingInvitations": "待接受的邀请",
       "resendInvite": "重新发送邀请",
       "shareInviteLink": "分享邀请链接",
-      "resendInviteError": "无法重新发送邀请。"
+      "resendInviteError": "无法重新发送邀请。",
+      "inviteNotResendable": "该邀请无法重新发送。",
+      "ownerAuthority": "只有组织所有者才能管理所有者。",
+      "ownRoleChange": "您无法更改自己的角色。",
+      "inviteExpired": "该邀请已过期。",
+      "inviteAccepted": "该邀请已被接受。"
     },
     "usageStats": {
       "inputTokens": "输入词元",

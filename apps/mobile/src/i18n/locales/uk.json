@@ -53,6 +53,7 @@
     "connected": "Підключено",
     "couldNotLoadModels": "Не вдалося завантажити моделі.",
     "couldNotLoadRepositories": "Не вдалося завантажити репозиторії.",
+    "noRepositoriesFound": "Репозиторіїв не знайдено",
     "critical": "Критичний",
     "delete": "Видалити",
     "deleted": "Видалено",
@@ -87,6 +88,7 @@
     "connect": "Підключити",
     "connectBitbucket": "Підключити Bitbucket",
     "connectGitlab": "Підключити GitLab",
+    "connectProvider": "Підключіть сервіс",
     "contentTruncated": "Вміст обрізано",
     "copyLink": "Скопіювати посилання",
     "couldNotLoadOrganizations": "Не вдалося завантажити організації.",
@@ -145,7 +147,8 @@
     "agent": "Агент",
     "durationMinuteShort": "хв",
     "durationHourShort": "год",
-    "changes": "Зміни"
+    "changes": "Зміни",
+    "organizationTrialEnded": "Пробний період організації завершився, і вона не має активного плану. Власник організації може оновити платіжні дані на kilo.ai, а потім спробувати ще раз."
   },
   "language": {
     "restarting": "Перезапуск для зміни мови",
@@ -889,7 +892,6 @@
       "gitlabNoRepositoriesDescription": "Можливо, потрібно надати доступ до більшої кількості груп або проєктів у GitLab.",
       "installGithubApp": "Установіть застосунок GitHub для репозиторіїв",
       "installGithubAppDescription": "Надайте застосунку Kilo для GitHub доступ до репозиторіїв, які потрібно перевіряти.",
-      "noRepositoriesFound": "Репозиторіїв не знайдено",
       "repositoryAccess": "доступ до репозиторію"
     },
     "style": {
@@ -913,7 +915,6 @@
     "followReviewMd": "Дотримуватися інструкцій REVIEW.md",
     "followReviewMdSubtitle": "Враховувати файли інструкцій REVIEW.md для кожного репозиторію",
     "manualReview": {
-      "connectProvider": "Підключіть сервіс",
       "connectProviderDescription": "Підключіть GitHub, щоб запустити перевірку запиту на злиття вручну.",
       "couldNotCheckProviderStatus": "Не вдалося перевірити стан сервісу.",
       "couldNotLoadProviders": "Не вдалося завантажити список підключених сервісів. Спробуйте ще раз.",
@@ -3255,7 +3256,9 @@
       "sendInvite": "Надіслати запрошення",
       "title": "Запросити учасника",
       "alreadyInvited": "Ця адреса вже запрошена або вже належить учаснику організації.",
-      "sendError": "Не вдалося надіслати запрошення."
+      "sendError": "Не вдалося надіслати запрошення.",
+      "pendingInvitation": "Для цієї адреси електронної пошти вже є очікуване запрошення.",
+      "alreadyMember": "Ця особа вже є учасником цієї організації."
     },
     "invoices": {
       "downloadA11y": "Завантажити рахунок {{number}}",
@@ -3325,7 +3328,12 @@
       "pendingInvitations": "Неприйняті запрошення",
       "resendInvite": "Надіслати запрошення повторно",
       "shareInviteLink": "Поділитися посиланням на запрошення",
-      "resendInviteError": "Не вдалося надіслати запрошення повторно."
+      "resendInviteError": "Не вдалося надіслати запрошення повторно.",
+      "inviteNotResendable": "Це запрошення більше не можна надіслати повторно.",
+      "ownerAuthority": "Лише власник організації може керувати власниками.",
+      "ownRoleChange": "Ви не можете змінити власну роль.",
+      "inviteExpired": "Термін дії цього запрошення минув.",
+      "inviteAccepted": "Це запрошення вже прийнято."
     },
     "usageStats": {
       "inputTokens": "Вхідні токени",

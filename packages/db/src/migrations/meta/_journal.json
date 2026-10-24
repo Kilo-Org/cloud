@@ -2080,6 +2080,20 @@
       "when": 1792693880283,
       "tag": "0296_orange_jack_power",
       "breakpoints": true
+    },
+    {
+      "idx": 297,
+      "version": "7",
+      "when": 1792780343168,
+      "tag": "0297_white_lenny_balinger",
+      "breakpoints": true
+    },
+    {
+      "idx": 298,
+      "version": "7",
+      "when": 1792829491526,
+      "tag": "0298_youthful_vin_gonzales",
+      "breakpoints": true
     }
   ]
 }

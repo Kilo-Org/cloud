@@ -234,6 +234,8 @@ Kilo Cloud distinguishes among several authorization contexts:
 
 Repository code includes token-version checks in shared JWT validation paths and revocation-pepper checks in selected web and Worker authorization paths. The exact lifetime, rotation cadence, and emergency-revocation process for production credentials are operational controls managed outside this overview.
 
+Slack and Linear installation callbacks serialize persistence by provider, owner, and workspace using primary-PostgreSQL transaction advisory locks, acquired in owner-then-workspace order. Ownership reads and integration-row writes share that transaction; installation-state updates and restoration complete while the locks are held. Organization model defaults are resolved before entering the transaction. Slack credential mirroring uses a transaction savepoint and retains its best-effort behavior.
+
 ### 5.3 Tenant and execution scoping
 
 Application data is commonly scoped to either a user or an organization. Cloud Agent durable state is session-scoped. KiloClaw runtimes are owner-scoped rather than shared global assistant processes. Some product areas are actively evolving from user-specific instances toward broader owner-scoped multi-instance support; this document describes the stable security boundary rather than transitional routing details.

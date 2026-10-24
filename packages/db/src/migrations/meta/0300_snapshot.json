@@ -1,5 +1,5 @@
 {
-  "id": "bed9c0b8-5810-4298-a9bb-da3f180ab76f",
+  "id": "c4c9111e-08c7-4dc3-9b6c-d9859f50241b",
   "prevId": "fd56687a-56e0-4224-9142-329998ec4347",
   "version": "7",
   "dialect": "postgresql",
@@ -4107,13 +4107,6 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
-        },
-        "is_fork": {
-          "name": "is_fork",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         },
         "parent_session_id": {
           "name": "parent_session_id",
@@ -11329,6 +11322,30 @@
         "ip_address": {
           "name": "ip_address",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "requesting_client_id": {
+          "name": "requesting_client_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "requesting_client_name": {
+          "name": "requesting_client_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "requesting_redirect_origin": {
+          "name": "requesting_redirect_origin",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "client_confirmed_at": {
+          "name": "client_confirmed_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
@@ -31707,13 +31724,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "pending_copy_ids": {
-          "name": "pending_copy_ids",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -31742,21 +31752,6 @@
           ],
           "isUnique": false,
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_shared_cli_sessions_kilo_user_id": {
-          "name": "IDX_shared_cli_sessions_kilo_user_id",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },

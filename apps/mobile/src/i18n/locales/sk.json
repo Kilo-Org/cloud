@@ -1662,8 +1662,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Nie sú dostupné žiadne filtre",
-      "noFiltersDescription": "Vráťte sa a znova otvorte filtre zo zoznamu nálezov.",
       "title": "Filtre nálezov",
       "reset": "Obnoviť pôvodné",
       "severity": "Závažnosť",
@@ -3040,7 +3038,6 @@
   },
   "voiceInput": {
     "listening": "Počúva sa…",
-    "staysOff": "Hlasový vstup zostane vypnutý, kým nepovolíte online prepis.",
     "onlineTitle": "Reč sa spracúva online",
     "onlineMessage": "Toto zariadenie nedokáže prepísať reč bez pripojenia na internet. Nahrávku odošleme poskytovateľovi {{provider}} na prepis do textu. Kilo zvukový záznam neukladá.",
     "allow": "Povoliť",

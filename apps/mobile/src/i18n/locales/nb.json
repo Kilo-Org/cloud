@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Ingen tilgjengelige filtre",
-      "noFiltersDescription": "Gå tilbake og åpne filtrene på nytt fra funnlisten.",
       "title": "Filtrer funn",
       "reset": "Tilbakestill",
       "severity": "Alvorlighetsgrad",
@@ -2954,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "Lytter...",
-    "staysOff": "Diktering er deaktivert til du tillater at tale gjøres om til tekst på nettet.",
     "onlineTitle": "Tale behandles på nettet",
     "onlineMessage": "Denne enheten kan ikke gjøre tale om til tekst uten nettilkobling. Opptaket ditt sendes til {{provider}} for å gjøres om til tekst. Kilo lagrer ikke lyden.",
     "allow": "Tillat",

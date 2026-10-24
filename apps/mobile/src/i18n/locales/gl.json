@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Non hai filtros dispoñibles",
-      "noFiltersDescription": "Volve atrás e abre de novo os filtros desde a lista de achados.",
       "title": "Filtros de achados",
       "reset": "Restablecer",
       "severity": "Gravidade",
@@ -2954,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "Escoitando...",
-    "staysOff": "O ditado seguirá desactivado ata que permitas a transcrición en liña.",
     "onlineTitle": "O audio procésase en liña",
     "onlineMessage": "Este dispositivo non pode transcribir sen conexión. A túa gravación envíase a {{provider}} para convertela en texto. Kilo non almacena o audio.",
     "allow": "Permitir",

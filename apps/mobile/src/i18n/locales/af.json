@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Geen filters beskikbaar",
-      "noFiltersDescription": "Gaan terug en maak die filters weer vanuit die bevindingslys oop.",
       "title": "Filtreer bevindings",
       "reset": "Stel terug",
       "severity": "Ernsgraad",
@@ -2954,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "Luister...",
-    "staysOff": "Steminvoer bly af totdat jy aanlyn transkripsie toelaat.",
     "onlineTitle": "Spraak word aanlyn verwerk",
     "onlineMessage": "Hierdie toestel kan nie vanlyn transkribeer nie. Jou opname word na {{provider}} gestuur om dit in teks te verander. Kilo stoor nie die klank nie.",
     "allow": "Laat toe",

@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Suodattimia ei ole saatavilla",
-      "noFiltersDescription": "Palaa takaisin ja avaa suodattimet uudelleen havaintolistasta.",
       "title": "Havaintojen suodatus",
       "reset": "Nollaa",
       "severity": "Vakavuus",
@@ -2954,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "Kuunnellaan…",
-    "staysOff": "Puheentunnistus pysyy pois käytöstä, kunnes sallit puheen muuttamisen tekstiksi verkossa.",
     "onlineTitle": "Puhe käsitellään verkossa",
     "onlineMessage": "Tämä laite ei voi muuttaa puhetta tekstiksi ilman verkkoyhteyttä. Äänitteesi lähetetään palveluun {{provider}}, joka muuttaa sen tekstiksi. Kilo ei tallenna ääntä.",
     "allow": "Salli",

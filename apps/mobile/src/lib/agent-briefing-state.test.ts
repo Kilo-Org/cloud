@@ -7,6 +7,7 @@ import {
   briefingReportMissing,
   briefingSyncDelayMs,
   canReadBriefingContext,
+  parseBriefingSafeguardInput,
   parseBriefingSafeguards,
   readableBriefingOrganizationIds,
   visibleHomeBriefing,
@@ -201,6 +202,41 @@ describe('parseBriefingSafeguards', () => {
     expect(parseBriefingSafeguards(5, Number.NaN)).toBeNull();
     expect(parseBriefingSafeguards(Number.POSITIVE_INFINITY, 2)).toBeNull();
     expect(parseBriefingSafeguards(5, Number.MAX_SAFE_INTEGER)).toBeNull();
+  });
+});
+
+describe('parseBriefingSafeguardInput', () => {
+  it('reads the decimal separator of the active language', () => {
+    expect(parseBriefingSafeguardInput('2,5', '2,5', 'de')).toEqual({
+      maxDurationSeconds: 150,
+      maxSpendMicrodollars: 2_500_000,
+    });
+    expect(parseBriefingSafeguardInput('10', '2.5', 'en')).toEqual({
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 2_500_000,
+    });
+  });
+
+  it('rejects text the fields cannot turn into a server-valid limit', () => {
+    expect(parseBriefingSafeguardInput('', '2,5', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('2,5', '', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('zwei', '2,5', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('2,5', '-1', 'de')).toBeNull();
+  });
+
+  it('refuses a separator the active language does not read as a decimal point', () => {
+    // A German "2.5" is not a group separator position, and reading it as one
+    // would save 25 instead of 2.5.
+    expect(parseBriefingSafeguardInput('2.5', '2.5', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('0.5', '1', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('2,5', '2,5', 'en')).toBeNull();
+  });
+
+  it('accepts the language its own display writes', () => {
+    expect(parseBriefingSafeguardInput('10', '1234,5', 'de')).toEqual({
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 1_234_500_000,
+    });
   });
 });
 

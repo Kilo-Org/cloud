@@ -325,6 +325,21 @@ Credit packs retain their native App Store and Google Play purchase flow.
 They require a development or production build with in-app purchases enabled;
 Expo Go is not supported.
 
+The app uses `expo-iap` v6 through a single `CreditNativeIapOwner`. Purchase
+completion comes from its `onPurchaseSuccess` callback, not the resolved value of
+`requestPurchase`. The backend verifies and grants the credits before the app calls
+`finishTransaction` with `isConsumable: true`. A failed store finish leaves the
+transaction available for a later recovery pass.
+
+Recovery reads unfinished StoreKit transactions with `getPendingTransactionsIOS`
+and Play purchases with `getAvailablePurchases`; these are not interchangeable
+for consumable credit packs.
+
+The Expo plugin disables Horizon and Fire OS through `modules.horizon` and
+`modules.amazon.fireOS`. The Amazon peer packages are optional for Apple/Play
+builds. Rebuild the native development client after changing `expo-iap`; a Metro
+reload alone does not update its native billing implementation.
+
 Kilo Pass has no native purchase, restore, or store-management flow in the app.
 The Profile card and `/kilo-pass` route render the backend
 `kiloPass.getPurchasePresentation` result:

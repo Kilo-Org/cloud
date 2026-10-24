@@ -1,15 +1,44 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
-import { device_sessions, device_refresh_tokens, kilocode_users } from '@kilocode/db/schema';
+import {
+  device_sessions,
+  device_refresh_tokens,
+  kilocode_users,
+  organizations,
+  user_auth_provider,
+  native_attested_keys,
+} from '@kilocode/db/schema';
+import type { Organization } from '@workos-inc/node';
 import { and, eq, getTableName, isNotNull, isNull, sql } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
 import {
   createDeviceSession,
+  createDeviceSessionWithAttestedKey,
   issueSessionCredentials,
   rotateRefreshToken,
   revokeDeviceSession,
 } from './device-sessions';
+import { KeyCollisionError } from './native-admission';
 import type { User } from '@kilocode/db/schema';
+import {
+  isEmailBlacklistedByDomainAsync,
+  isBlockedTLD,
+} from '@kilocode/web-shared/lib/user/server';
+import { getWorkOSOrganization } from '@/lib/user';
+
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
+  isEmailBlacklistedByDomainAsync: jest.fn(),
+  isBlockedTLD: jest.fn(),
+}));
+
+jest.mock('@/lib/user', () => ({
+  ...(jest.requireActual('@/lib/user') as object),
+  getWorkOSOrganization: jest.fn(),
+}));
+
+const mockIsEmailBlacklistedByDomainAsync = jest.mocked(isEmailBlacklistedByDomainAsync);
+const mockIsBlockedTLD = jest.mocked(isBlockedTLD);
+const mockGetWorkOSOrganization = jest.mocked(getWorkOSOrganization);
 
 describe('device-sessions', () => {
   const testUserId = 'test-user-ds-' + Date.now();
@@ -18,6 +47,10 @@ describe('device-sessions', () => {
   let fakeUser: User;
 
   beforeEach(async () => {
+    mockIsEmailBlacklistedByDomainAsync.mockResolvedValue(false);
+    mockIsBlockedTLD.mockReturnValue(false);
+    mockGetWorkOSOrganization.mockResolvedValue(null);
+
     await db.insert(kilocode_users).values({
       id: testUserId,
       google_user_email: testUserEmail,
@@ -501,6 +534,234 @@ describe('device-sessions', () => {
       expect(session!.revoked_at).toBeNull();
     });
 
+    test('refresh for a domain that is not allowed to sign in is refused and revokes the session', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      mockIsEmailBlacklistedByDomainAsync.mockResolvedValueOnce(true);
+
+      const result = await rotateRefreshToken(refreshToken);
+      expect(result).toEqual({ ok: false, error: 'USER_BLOCKED' });
+
+      const [session] = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, sessionId));
+      expect(session!.revoked_at).not.toBeNull();
+      expect(session!.revoked_reason).toBe('domain_ineligible');
+
+      const tokens = await db
+        .select()
+        .from(device_refresh_tokens)
+        .where(eq(device_refresh_tokens.device_session_id, sessionId));
+      expect(tokens).toHaveLength(1);
+      expect(tokens[0]!.consumed_at).toBeNull();
+    });
+    test('domain refusal revokes only the presented device session', async () => {
+      const presentedSessionId = await createDeviceSession({ userId: testUserId });
+      const siblingSessionId = await createDeviceSession({ userId: testUserId });
+      const presentedCredentials = await issueSessionCredentials(fakeUser, presentedSessionId);
+      const siblingCredentials = await issueSessionCredentials(fakeUser, siblingSessionId);
+
+      mockIsEmailBlacklistedByDomainAsync.mockResolvedValueOnce(true);
+
+      const result = await rotateRefreshToken(presentedCredentials.refreshToken);
+
+      expect(result).toEqual({ ok: false, error: 'USER_BLOCKED' });
+      const [presentedSession] = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, presentedSessionId));
+      const [siblingSession] = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, siblingSessionId));
+      expect(presentedSession!.revoked_reason).toBe('domain_ineligible');
+      expect(siblingSession!.revoked_at).toBeNull();
+
+      const siblingRetry = await rotateRefreshToken(siblingCredentials.refreshToken);
+      expect(siblingRetry.ok).toBe(true);
+    });
+
+    test('refresh for a domain that requires SSO without an SSO link is refused and revokes the session', async () => {
+      const ssoDomain = `sso-${Date.now()}.example`;
+      const ssoEmail = `member@${ssoDomain}`;
+      await db
+        .update(kilocode_users)
+        .set({ google_user_email: ssoEmail })
+        .where(eq(kilocode_users.id, testUserId));
+
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(
+        { ...fakeUser, google_user_email: ssoEmail },
+        sessionId
+      );
+
+      const [organization] = await db
+        .insert(organizations)
+        .values({ name: 'Rotation SSO Organization', sso_domain: ssoDomain })
+        .returning({ id: organizations.id });
+
+      try {
+        mockGetWorkOSOrganization.mockResolvedValueOnce({
+          id: 'org_rotation_sso_test',
+        } as unknown as Organization);
+
+        const result = await rotateRefreshToken(refreshToken);
+        expect(result).toEqual({ ok: false, error: 'USER_BLOCKED' });
+        expect(mockGetWorkOSOrganization).toHaveBeenCalledWith(ssoDomain);
+
+        const [session] = await db
+          .select()
+          .from(device_sessions)
+          .where(eq(device_sessions.id, sessionId));
+        expect(session!.revoked_at).not.toBeNull();
+        expect(session!.revoked_reason).toBe('domain_ineligible');
+
+        const tokens = await db
+          .select()
+          .from(device_refresh_tokens)
+          .where(eq(device_refresh_tokens.device_session_id, sessionId));
+        expect(tokens).toHaveLength(1);
+        expect(tokens[0]!.consumed_at).toBeNull();
+      } finally {
+        await db.delete(organizations).where(eq(organizations.id, organization!.id));
+      }
+    });
+
+    test('refresh for a domain that requires SSO keeps rotating when the account is linked to that SSO authority', async () => {
+      const ssoDomain = `sso-${Date.now()}.example`;
+      const ssoEmail = `member@${ssoDomain}`;
+      await db
+        .update(kilocode_users)
+        .set({ google_user_email: ssoEmail })
+        .where(eq(kilocode_users.id, testUserId));
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: testUserId,
+        provider: 'workos',
+        provider_account_id: `workos-${testUserId}`,
+        email: ssoEmail,
+        avatar_url: 'https://example.com/avatar.jpg',
+        hosted_domain: ssoDomain,
+      });
+
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(
+        { ...fakeUser, google_user_email: ssoEmail },
+        sessionId
+      );
+
+      const [organization] = await db
+        .insert(organizations)
+        .values({ name: 'Rotation Linked SSO Organization', sso_domain: ssoDomain })
+        .returning({ id: organizations.id });
+
+      try {
+        mockGetWorkOSOrganization.mockResolvedValueOnce({
+          id: 'org_rotation_sso_linked',
+        } as unknown as Organization);
+
+        const result = await rotateRefreshToken(refreshToken);
+        expect(result.ok).toBe(true);
+
+        const [session] = await db
+          .select()
+          .from(device_sessions)
+          .where(eq(device_sessions.id, sessionId));
+        expect(session!.revoked_at).toBeNull();
+      } finally {
+        await db.delete(organizations).where(eq(organizations.id, organization!.id));
+        await db.delete(user_auth_provider).where(eq(user_auth_provider.kilo_user_id, testUserId));
+      }
+    });
+
+    test('refresh fails without revoking when the SSO authority is misconfigured', async () => {
+      const ssoDomain = `sso-${Date.now()}.example`;
+      const ssoEmail = `member@${ssoDomain}`;
+      await db
+        .update(kilocode_users)
+        .set({ google_user_email: ssoEmail })
+        .where(eq(kilocode_users.id, testUserId));
+
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(
+        { ...fakeUser, google_user_email: ssoEmail },
+        sessionId
+      );
+
+      const organizationIds = await db
+        .insert(organizations)
+        .values([
+          { name: 'Rotation Ambiguous One', sso_domain: ssoDomain },
+          { name: 'Rotation Ambiguous Two', sso_domain: ssoDomain },
+        ])
+        .returning({ id: organizations.id });
+
+      try {
+        await expect(rotateRefreshToken(refreshToken)).rejects.toThrow();
+
+        const [session] = await db
+          .select()
+          .from(device_sessions)
+          .where(eq(device_sessions.id, sessionId));
+        expect(session!.revoked_at).toBeNull();
+
+        const tokens = await db
+          .select()
+          .from(device_refresh_tokens)
+          .where(eq(device_refresh_tokens.device_session_id, sessionId));
+        expect(tokens).toHaveLength(1);
+        expect(tokens[0]!.consumed_at).toBeNull();
+      } finally {
+        for (const organizationId of organizationIds) {
+          await db.delete(organizations).where(eq(organizations.id, organizationId.id));
+        }
+      }
+    });
+
+    test('preserves session credentials for a retryable policy lookup error', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+      const lookupError = new Error('Policy lookup unavailable');
+      mockIsEmailBlacklistedByDomainAsync.mockRejectedValueOnce(lookupError);
+
+      await expect(rotateRefreshToken(refreshToken)).rejects.toBe(lookupError);
+
+      const [session] = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, sessionId));
+      expect(session!.revoked_at).toBeNull();
+      expect(session!.revoked_reason).toBeNull();
+
+      const tokens = await db
+        .select()
+        .from(device_refresh_tokens)
+        .where(eq(device_refresh_tokens.device_session_id, sessionId));
+      expect(tokens).toHaveLength(1);
+      expect(tokens[0]!.consumed_at).toBeNull();
+
+      const retry = await rotateRefreshToken(refreshToken);
+      expect(retry.ok).toBe(true);
+      if (retry.ok) {
+        expect(retry.refreshToken).not.toBe(refreshToken);
+      }
+    });
+
+    test('refresh with an eligible domain rotates and keeps the session', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      const result = await rotateRefreshToken(refreshToken);
+
+      expect(result.ok).toBe(true);
+      const [session] = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, sessionId));
+      expect(session!.revoked_at).toBeNull();
+    });
+
     test('each rotation issues a fresh 30-day refresh token', async () => {
       const sessionId = await createDeviceSession({ userId: testUserId });
       const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
@@ -575,6 +836,94 @@ describe('device-sessions', () => {
       expect(retry.ok).toBe(true);
       if (retry.ok) {
         expect(retry.refreshToken).not.toBe(refreshToken);
+      }
+    });
+  });
+
+  describe('createDeviceSessionWithAttestedKey', () => {
+    const keyId = `ios-key-${Date.now()}`;
+
+    test('persists the key, the session, and the refresh token together', async () => {
+      const result = await createDeviceSessionWithAttestedKey({
+        userId: testUserId,
+        userAgent: 'attested-agent',
+        user: fakeUser,
+        verification: {
+          ok: true,
+          platform: 'ios',
+          keyId,
+          publicKey: 'c3BraS1wdWJsaWMta2V5',
+        },
+      });
+
+      const [key] = await db
+        .select()
+        .from(native_attested_keys)
+        .where(
+          and(eq(native_attested_keys.key_id, keyId), eq(native_attested_keys.platform, 'ios'))
+        );
+      expect(key?.kilo_user_id).toBe(testUserId);
+      expect(key?.public_key).toBe('c3BraS1wdWJsaWMta2V5');
+
+      const [session] = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, result.sessionId));
+      expect(session?.kilo_user_id).toBe(testUserId);
+      expect(session?.user_agent).toBe('attested-agent');
+
+      const refreshRows = await db
+        .select()
+        .from(device_refresh_tokens)
+        .where(eq(device_refresh_tokens.device_session_id, result.sessionId));
+      expect(refreshRows).toHaveLength(1);
+      expect(refreshRows[0]!.token_hash).toBe(
+        createHash('sha256').update(result.refreshToken).digest('hex')
+      );
+      expect(result.expiresIn).toBe(3600);
+      expect(result.token.length).toBeGreaterThan(0);
+    });
+
+    test('refuses a key already bound to another account and leaves no session', async () => {
+      const otherUserId = `test-user-ds-other-${Date.now()}`;
+      await db.insert(kilocode_users).values({
+        id: otherUserId,
+        google_user_email: `test-ds-other-${Date.now()}@example.com`,
+        google_user_name: 'Other User',
+        google_user_image_url: 'https://example.com/avatar.jpg',
+        stripe_customer_id: 'cus_test_other',
+      });
+
+      try {
+        await createDeviceSessionWithAttestedKey({
+          userId: otherUserId,
+          user: fakeUser,
+          verification: { ok: true, platform: 'ios', keyId, publicKey: 'Zmlyc3Q=' },
+        });
+
+        await expect(
+          createDeviceSessionWithAttestedKey({
+            userId: testUserId,
+            user: fakeUser,
+            verification: { ok: true, platform: 'ios', keyId, publicKey: 'c2Vjb25k' },
+          })
+        ).rejects.toThrow(KeyCollisionError);
+
+        const [key] = await db
+          .select()
+          .from(native_attested_keys)
+          .where(
+            and(eq(native_attested_keys.key_id, keyId), eq(native_attested_keys.platform, 'ios'))
+          );
+        expect(key?.kilo_user_id).toBe(otherUserId);
+
+        const sessions = await db
+          .select()
+          .from(device_sessions)
+          .where(eq(device_sessions.kilo_user_id, testUserId));
+        expect(sessions).toHaveLength(0);
+      } finally {
+        await db.delete(kilocode_users).where(eq(kilocode_users.id, otherUserId));
       }
     });
   });

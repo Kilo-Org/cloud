@@ -60,7 +60,7 @@ it('moves the model on when the caller sends a running call away', async () => {
   const answer = Effect.runSync(Deferred.make<string>());
   const { value } = await runWith({
     options,
-    tools: tool(() => Effect.zipRight(Deferred.succeed(started, true), Deferred.await(answer))),
+    tools: tool(() => Effect.andThen(Deferred.succeed(started, true), Deferred.await(answer))),
     replies: [
       { deltas: [], calls: [call], stop: 'tools' },
       { deltas: ['I will carry on'] },
@@ -68,8 +68,10 @@ it('moves the model on when the caller sends a running call away', async () => {
     ],
     use: session =>
       Effect.gen(function* () {
-        const watching = yield* Effect.fork(Stream.runCollect(Stream.take(session.continued, 2)));
-        const asking = yield* Effect.fork(Stream.runCollect(session.ask('start the build')));
+        const watching = yield* Effect.forkChild(
+          Stream.runCollect(Stream.take(session.continued, 2))
+        );
+        const asking = yield* Effect.forkChild(Stream.runCollect(session.ask('start the build')));
         /* Wait for the call to actually start, then send it away. Nothing about
            this is the clock: the deadline here is five minutes. */
         yield* Deferred.await(started);
@@ -112,11 +114,11 @@ it('sends a call away once, however many times it is asked to', async () => {
   const started = Effect.runSync(Deferred.make<boolean>());
   const { value, calls } = await runWith({
     options,
-    tools: tool(() => Effect.zipRight(Deferred.succeed(started, true), Effect.never)),
+    tools: tool(() => Effect.andThen(Deferred.succeed(started, true), Effect.never)),
     replies: [{ deltas: [], calls: [call], stop: 'tools' }, { deltas: ['I will carry on'] }],
     use: session =>
       Effect.gen(function* () {
-        const asking = yield* Effect.fork(Stream.runDrain(session.ask('start the build')));
+        const asking = yield* Effect.forkChild(Stream.runDrain(session.ask('start the build')));
         yield* Deferred.await(started);
         const first = yield* session.background(call.id);
         const again = yield* session.background(call.id);

@@ -12,6 +12,7 @@ import spawnCloudAgentSession, {
   spawnCloudAgentInputSchema,
 } from '@/lib/bot/tools/spawn-cloud-agent-session';
 import { buildSessionUrl } from '@/lib/cloud-agent-next/session-url';
+import { prepareCloudAgentWorkflowUser } from '@/lib/auth/cloud-agent-workflow-user';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import { ownerFromIntegration } from '@/lib/integrations/core/owner';
@@ -25,7 +26,11 @@ import {
   getGitLabRepositoryContext,
 } from '@/lib/slack-bot/gitlab-repository-context';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import {
+  generateApiToken,
+  generateCloudAgentWorkflowToken,
+  TOKEN_EXPIRY,
+} from '@kilocode/web-shared/lib/tokens';
 import { captureException } from '@sentry/nextjs';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { PlatformIntegration, User } from '@kilocode/db';
@@ -141,7 +146,7 @@ ${conversationContext}`;
 }
 
 async function pickSummaryModel(modelSlug: string): Promise<string> {
-  return isFreeModel(modelSlug) ? modelSlug : SUMMARY_MODEL;
+  return (await isFreeModel(modelSlug)) ? modelSlug : SUMMARY_MODEL;
 }
 
 async function summarizePrompt(
@@ -283,11 +288,21 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
             completedStepsInCurrentRun: collectedSteps.length,
           });
 
+          const cloudAgentToken = generateCloudAgentWorkflowToken(
+            await prepareCloudAgentWorkflowUser(params.user),
+            {
+              organizationId: owner.type === 'org' ? owner.id : undefined,
+              tokenSource: 'kilo-bot',
+              createdOnPlatform: chatPlatform,
+              expiresIn: TOKEN_EXPIRY.oneHour,
+            }
+          );
+
           const result = await spawnCloudAgentSession(
             args,
             modelSlug,
             params.platformIntegration,
-            authToken,
+            cloudAgentToken,
             params.botRequestId,
             ({ kiloSessionId, cloudAgentSessionId }) => {
               startedCloudAgentSession = true;

@@ -348,6 +348,19 @@ export function getCloudSessionCreationOperation(
   return { intent, operationKey: createOperationKey() };
 }
 
+/** Another attempt with the same operation key is still running on the server. */
+export function isCloudSessionCreationInProgressError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null || !('data' in error)) return false;
+  if (typeof error.data !== 'object' || error.data === null || !('code' in error.data)) {
+    return false;
+  }
+  return (
+    error.data.code === 'CONFLICT' &&
+    'message' in error &&
+    (error.message === 'creation_in_progress' || error.message === 'operation_in_progress')
+  );
+}
+
 export function isAmbiguousCloudSessionCreationError(error: unknown): boolean {
   if (typeof error !== 'object' || error === null || !('data' in error)) return true;
   if (typeof error.data !== 'object' || error.data === null || !('code' in error.data)) return true;
@@ -403,6 +416,8 @@ export type StoredSession = {
    * - `undefined`: PR data was not requested or not yet loaded for this row.
    */
   associatedPr?: AssociatedPr | null;
+  /** Set only for a session this client created and the server does not list yet. */
+  localSync?: 'syncing' | 'synced' | 'failed';
 };
 
 /**

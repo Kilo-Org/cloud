@@ -18,12 +18,9 @@ function fixture() {
     cancelQueuedMessage: vi.fn().mockResolvedValue({ dropped: true }),
     admitSubmittedMessage: vi.fn(),
   };
-  const legacy = { cancelQueuedMessage: vi.fn().mockResolvedValue({ dropped: false }) };
   const controlNamespace = { idFromName: vi.fn(name => name), get: vi.fn(() => control) };
-  const legacyNamespace = { idFromName: vi.fn(name => name), get: vi.fn(() => legacy) };
   const env = {
     SANDBOX_SESSION: controlNamespace,
-    CLOUD_AGENT_SESSION: legacyNamespace,
   } as unknown as Env;
   const call = (path: string, input: unknown, authenticated = true) => {
     const request = new Request(`https://queue.test/trpc/${path}`, {
@@ -43,7 +40,7 @@ function fixture() {
       }),
     });
   };
-  return { control, legacy, controlNamespace, legacyNamespace, call };
+  return { control, controlNamespace, call };
 }
 
 beforeEach(() => {
@@ -52,32 +49,32 @@ beforeEach(() => {
 
 describe('public queue RPC routing', () => {
   it.each(['workspace', 'agent'])(
-    'routes %s cancellation through its own plane without changing the result',
+    'accepts workspace cancellation and rejects retired agent IDs: %s',
     async plane => {
-      const { call, control, legacy, controlNamespace, legacyNamespace } = fixture();
+      const { call, control, controlNamespace } = fixture();
       const sessionId = `${plane}_11111111-1111-4111-8111-111111111111`;
       const response = await call('cancelQueuedMessage', { sessionId, messageId });
+      if (plane === 'agent') {
+        expect(response.status).toBe(400);
+        expect(controlNamespace.get).not.toHaveBeenCalled();
+        expect(requireCurrentSessionAccess).not.toHaveBeenCalled();
+        return;
+      }
       expect(response.status).toBe(200);
       expect(await response.json()).toMatchObject({
-        result: { data: { dropped: plane === 'workspace' } },
+        result: { data: { dropped: true } },
       });
-      const selected = plane === 'workspace' ? control : legacy;
-      const unused = plane === 'workspace' ? legacy : control;
-      expect(selected.cancelQueuedMessage).toHaveBeenCalledExactlyOnceWith(messageId);
-      expect(unused.cancelQueuedMessage).not.toHaveBeenCalled();
-      expect(
-        (plane === 'workspace' ? controlNamespace : legacyNamespace).idFromName
-      ).toHaveBeenCalledWith(`owner:${sessionId}`);
+      expect(control.cancelQueuedMessage).toHaveBeenCalledExactlyOnceWith(messageId);
+      expect(controlNamespace.idFromName).toHaveBeenCalledWith(`owner:${sessionId}`);
     }
   );
 
   it('never resolves a mutation receiver for unauthenticated or forbidden access', async () => {
-    const { call, controlNamespace, legacyNamespace } = fixture();
+    const { call, controlNamespace } = fixture();
     const input = { sessionId: 'workspace_11111111-1111-4111-8111-111111111111', messageId };
     expect((await call('cancelQueuedMessage', input, false)).status).toBe(401);
     vi.mocked(requireCurrentSessionAccess).mockRejectedValue(new TRPCError({ code: 'FORBIDDEN' }));
     expect((await call('cancelQueuedMessage', input)).status).toBe(403);
     expect(controlNamespace.get).not.toHaveBeenCalled();
-    expect(legacyNamespace.get).not.toHaveBeenCalled();
   });
 });

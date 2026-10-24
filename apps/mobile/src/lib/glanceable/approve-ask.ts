@@ -211,10 +211,11 @@ export async function runGlanceableApprove(
 ): Promise<GlanceableApproveResult> {
   if (options.target !== undefined) {
     // A session card names its own session and request; the recorded ask is
-    // the aggregate card's and stays as it is.
+    // the aggregate card's and stays as it is. A card's Approve answers a
+    // permission, and the card carries no status time.
     const result = await answerPendingPermission(options.target, options);
     if (result.kind === 'approved' || result.kind === 'gone') {
-      ackSessionAttention(options.target.kiloSessionId);
+      ackSessionAttention(options.target.kiloSessionId, 'permission');
     }
     return result;
   }
@@ -227,7 +228,7 @@ export async function runGlanceableApprove(
     recordWaitingAsk(null);
   }
   if (result.kind === 'approved' || result.kind === 'gone') {
-    ackSessionAttention(ask.kiloSessionId);
+    ackSessionAttention(ask.kiloSessionId, ask.status, ask.statusUpdatedAt);
   }
   return result;
 }

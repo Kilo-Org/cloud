@@ -4,7 +4,10 @@ import {
   getKiloSandboxAllocation,
   sandboxAllocationInputSchema,
 } from '@kilocode/worker-utils/sandbox-allocation';
-import { sessionIdSchema as kiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
+import {
+  clientKiloSessionIdSchema,
+  sessionIdSchema as kiloSessionIdSchema,
+} from '@kilocode/session-ingest-contracts';
 import { worktreeFileQuerySchema } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import {
   sessionIdSchema,
@@ -447,6 +450,7 @@ export const CloseTerminalOutput = z.object({
  * stable `operationKey`, and forbids any synthetic initial turn fields.
  */
 const PrepareSessionSharedFields = {
+  allowSubagentSessions: z.boolean().optional(),
   githubAccessPurpose: z.enum(['workflow', 'agent']).optional(),
   mode: ModeSlugSchema.describe(
     'Kilo Code execution mode (built-in or custom slug from runtimeAgents)'
@@ -569,13 +573,12 @@ const PrepareSessionSharedFields = {
     .uuid()
     .optional()
     .describe('Profile ID to resolve (repo binding + default still apply on top)'),
-
   ...AttachmentFieldsSchema,
   createdOnPlatform: z
     .string()
     .max(100)
     .optional()
-    .describe('Platform that created this session (e.g. slack, app-builder)'),
+    .describe('Platform that created this session (e.g. slack, code-review)'),
   clientProvenance: z.enum(['browser', 'mobile']).optional(),
   shallow: z
     .boolean()
@@ -603,6 +606,11 @@ const PrepareSessionSharedFields = {
 
 const PrepareSessionNonCloneVariant = z.object({
   prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH).describe('The task prompt for Kilo Code'),
+  kiloSessionId: clientKiloSessionIdSchema
+    .optional()
+    .describe(
+      'Client-proposed Kilo session ID, so the client can show the session before prepare returns'
+    ),
   initialMessageId: MessageIdSchema.optional().describe(
     'Initial message ID for correlation with external systems'
   ),
@@ -902,6 +910,8 @@ export type ProfileInput = z.infer<typeof ProfileInputSchema>;
  */
 export const StartSessionInput = z
   .object({
+    operationKey: z.string().uuid().optional(),
+    allowSubagentSessions: z.boolean().optional(),
     message: z
       .object({
         prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH),
@@ -953,6 +963,7 @@ export const StartSessionOutput = z.object({
   kiloSessionId: z.string(),
   messageId: MessageIdSchema,
   delivery: z.enum(['sent', 'queued']),
+  replayed: z.boolean().optional(),
   wrapperRunId: z.string().optional(),
 });
 

@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import {
   customRouterEntryKey,
+  MAX_CLIENT_CONTEXT_LENGTH,
+  MAX_CLIENT_VARIANTS,
+  MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH,
   type ClientCustomRouterEntry,
   type CustomRouterEntry,
   type CustomRouterListResponse,
@@ -25,13 +28,13 @@ import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
-import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { TRPCError } from '@trpc/server';
 import { eq, inArray, sql } from 'drizzle-orm';
 import { NextRequest, type NextResponse } from 'next/server';
+import { MAX_CUSTOM_ROUTER_BODY_BYTES, lockOwner } from '@/lib/auto-routing-custom-routers';
 import { GET as listRouters, POST as createRouter } from './route';
 import {
   DELETE as deleteRouter,
@@ -62,7 +65,6 @@ jest.mock('@kilocode/web-shared/lib/organizations/organization-models', () => ({
 }));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
-const mockedIsReleaseToggleEnabled = jest.mocked(isReleaseToggleEnabled);
 const mockedRequireActiveSubscription = jest.mocked(requireActiveSubscriptionOrTrial);
 const mockedGetStatus = jest.mocked(getCustomRouterStatus);
 const mockedRegister = jest.mocked(registerOwnerBenchmarkProfiles);
@@ -162,19 +164,22 @@ function variants(statuses: CustomRouterVariantStatus['status'][]): CustomRouter
   }));
 }
 
-async function waitForOwnerLockWaiter() {
-  for (let attempt = 0; attempt < 200; attempt++) {
-    const result = await db.execute<{ blocked: boolean }>(sql`
-      SELECT EXISTS (
-        SELECT 1 FROM pg_stat_activity
-        WHERE datname = current_database()
-          AND wait_event_type = 'Lock'
-          AND wait_event = 'advisory'
-      ) AS blocked
-    `);
-    if (result.rows[0]?.blocked) return;
-  }
-  throw new Error('Expected a concurrent update to wait on the owner lock');
+function holdSecondCatalogRequest() {
+  let calls = 0;
+  const arrived = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  mockedGetEnhanced.mockImplementation(async () => {
+    if (++calls === 2) {
+      arrived.resolve();
+      await release.promise;
+    }
+    return { data: [model(SONNET), model(FLASH), model(DENIED)] };
+  });
+  return { arrived: arrived.promise, release: release.resolve };
+}
+
+async function flushMicrotasks(turns = 10) {
+  for (let turn = 0; turn < turns; turn++) await Promise.resolve();
 }
 
 describe('/api/auto-routing/custom-routers', () => {
@@ -184,7 +189,6 @@ describe('/api/auto-routing/custom-routers', () => {
     jest.resetAllMocks();
     user = await insertTestUser();
     signIn(user);
-    mockedIsReleaseToggleEnabled.mockResolvedValue(true);
     mockedRequireActiveSubscription.mockResolvedValue({ isReadOnly: false, daysRemaining: 30 });
     mockedRegister.mockResolvedValue({ ok: true });
     mockedGetEnhanced.mockResolvedValue({ data: [model(SONNET), model(FLASH), model(DENIED)] });
@@ -206,43 +210,23 @@ describe('/api/auto-routing/custom-routers', () => {
     await cleanupDbForTest();
   });
 
-  describe('feature flag', () => {
-    test('a user without the flag gets router_not_found and cannot create routers', async () => {
-      mockedIsReleaseToggleEnabled.mockResolvedValue(false);
-
-      const listed = await errorOf(await listRouters(request('')));
-      const created = await create(routerBody());
-
-      expect(listed).toEqual({
-        status: 404,
-        body: { error: { code: 'router_not_found', message: expect.any(String) } },
-      });
-      expect(created.status).toBe(404);
-      expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
-      expect(mockedIsReleaseToggleEnabled).toHaveBeenCalledWith(
-        'kilo-auto-custom-routers',
-        user.id
-      );
-    });
-  });
-
   describe('migrated owner pools', () => {
-    test('an unflagged migrated owner can edit only the canonical router without creation access', async () => {
+    test('a migrated owner edits the canonical router and keeps full router access', async () => {
       await create(routerBody());
       await create(routerBody({ slug: 'efficient' }));
       await db
         .update(auto_routing_custom_routers)
         .set({ legacy_pool: true, legacy_mode_inherited: true })
         .where(eq(auto_routing_custom_routers.slug, 'efficient'));
-      mockedIsReleaseToggleEnabled.mockResolvedValue(false);
 
       const listed = await list();
-      expect(listed.body.canCreate).toBe(false);
+      expect(listed.body.canCreate).toBe(true);
       expect(listed.body.routers).toEqual([
+        expect.objectContaining({ slug: 'coding', legacyPool: false, canEdit: true }),
         expect.objectContaining({ slug: 'efficient', legacyPool: true, canEdit: true }),
       ]);
-      expect((await create(routerBody({ slug: 'another' }))).status).toBe(404);
-      expect((await getRouter(request('/user/coding'), params('user', 'coding'))).status).toBe(404);
+      expect((await create(routerBody({ slug: 'another' }))).status).toBe(201);
+      expect((await getRouter(request('/user/coding'), params('user', 'coding'))).status).toBe(200);
       const response = await updateRouter(
         request('/user/efficient', {
           method: 'PATCH',
@@ -333,7 +317,7 @@ describe('/api/auto-routing/custom-routers', () => {
     });
 
     test.each(['member', 'billing_manager'] as const)(
-      'an unflagged organization %s retains existing role permissions',
+      'an organization %s retains existing role permissions on a migrated router',
       async role => {
         const organization = await createTestOrganization('Migrated', user.id, 0);
         await create(
@@ -350,7 +334,6 @@ describe('/api/auto-routing/custom-routers', () => {
           kilo_user_id: member.id,
           role,
         });
-        mockedIsReleaseToggleEnabled.mockResolvedValue(false);
         signIn(member, organization.id);
 
         const listed = await list();
@@ -370,7 +353,7 @@ describe('/api/auto-routing/custom-routers', () => {
     );
 
     test.each(['owner', 'admin', 'billing_manager'] as const)(
-      'an unflagged parent %s can discover and edit its child migrated router only',
+      'a parent %s can discover and edit every router of its child organization',
       async role => {
         const parent = await createTestOrganization('Parent', user.id, 0);
         const childOwner = await insertTestUser();
@@ -390,49 +373,35 @@ describe('/api/auto-routing/custom-routers', () => {
           .update(auto_routing_custom_routers)
           .set({ legacy_pool: true })
           .where(eq(auto_routing_custom_routers.slug, 'efficient'));
-        mockedIsReleaseToggleEnabled.mockResolvedValue(false);
         signIn(user, child.id);
 
         const listed = await list();
         expect(listed.status).toBe(200);
-        expect(listed.body.canCreate).toBe(false);
+        expect(listed.body.canCreate).toBe(true);
         expect(listed.body.routers).toEqual([
           expect.objectContaining({
             modelId: 'kilo-auto/custom/org/efficient',
             legacyPool: true,
             canEdit: true,
           }),
+          expect.objectContaining({
+            modelId: 'kilo-auto/custom/org/unrelated-router',
+            legacyPool: false,
+            canEdit: true,
+          }),
         ]);
-        expect(
-          (await getRouter(request('/org/efficient'), params('org', 'efficient'))).status
-        ).toBe(200);
-        expect(
-          (
-            await updateRouter(
-              request('/org/efficient', {
-                method: 'PATCH',
-                body: { name: 'Inherited editor change' },
-              }),
-              params('org', 'efficient')
-            )
-          ).status
-        ).toBe(200);
-        expect((await create(routerBody({ scope: 'org', slug: 'new-router' }))).status).toBe(404);
-        expect(
-          (await getRouter(request('/org/unrelated-router'), params('org', 'unrelated-router')))
-            .status
-        ).toBe(404);
+        mockedRequireActiveSubscription.mockClear();
         expect(
           (
             await updateRouter(
               request('/org/unrelated-router', {
                 method: 'PATCH',
-                body: { name: 'Denied change' },
+                body: { name: 'Inherited editor change' },
               }),
               params('org', 'unrelated-router')
             )
           ).status
-        ).toBe(404);
+        ).toBe(200);
         expect(mockedRequireActiveSubscription).toHaveBeenCalledWith(child.id);
       }
     );
@@ -456,7 +425,6 @@ describe('/api/auto-routing/custom-routers', () => {
         .update(auto_routing_custom_routers)
         .set({ legacy_pool: true })
         .where(eq(auto_routing_custom_routers.owned_by_organization_id, child.id));
-      mockedIsReleaseToggleEnabled.mockResolvedValue(false);
       signIn(user, child.id);
 
       expect((await list()).body.routers).toEqual([expect.objectContaining({ canEdit: true })]);
@@ -505,7 +473,6 @@ describe('/api/auto-routing/custom-routers', () => {
             grandchild.id,
           ])
         );
-      mockedIsReleaseToggleEnabled.mockResolvedValue(false);
       signIn(user);
       expect((await list(`?organizationId=${child.id}`)).status).toBe(200);
       for (const organization of [sibling, grandchild]) {
@@ -635,7 +602,7 @@ describe('/api/auto-routing/custom-routers', () => {
       expect(mockedRegister.mock.calls[1]?.[1]).toBe(firstSignal);
     });
 
-    test('rolls back timed-out admission and releases the owner lock', async () => {
+    test('fails the save when admission times out and releases the owner admission slot', async () => {
       const controller = new AbortController();
       const timeout = jest.spyOn(AbortSignal, 'timeout').mockReturnValue(controller.signal);
       const admissionStarted = Promise.withResolvers<void>();
@@ -814,6 +781,118 @@ describe('/api/auto-routing/custom-routers', () => {
       expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
     });
 
+    test('rejects an oversized client entry before admission and storage', async () => {
+      const base = clientEntry('qwen3:32b');
+      const oversized = [
+        clientEntry('m'.repeat(MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH + 1)),
+        {
+          ...base,
+          variants: Array.from({ length: MAX_CLIENT_VARIANTS + 1 }, (_, index) => `v${index}`),
+        },
+        {
+          ...base,
+          capabilities: { ...base.capabilities, contextLength: MAX_CLIENT_CONTEXT_LENGTH + 1 },
+        },
+        {
+          ...base,
+          pricing: { inputPerMTokUsd: Number.POSITIVE_INFINITY, outputPerMTokUsd: 0 },
+        },
+      ];
+
+      for (const entry of oversized) {
+        const created = await create(
+          routerBody({ entries: [entry], defaultEntryKey: customRouterEntryKey(entry) })
+        );
+
+        expect(created.status).toBe(400);
+        expect(created.body).toMatchObject({ error: { code: 'invalid_request' } });
+      }
+      expect(mockedRegister).not.toHaveBeenCalled();
+      expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
+    });
+
+    test.each(['create', 'update'] as const)(
+      'rejects a %s body over the byte limit',
+      async route => {
+        if (route === 'update') await create(routerBody());
+        mockedRegister.mockClear();
+        const padding = 'x'.repeat(MAX_CUSTOM_ROUTER_BODY_BYTES + 1);
+
+        const result =
+          route === 'create'
+            ? await create(routerBody({ padding }))
+            : await errorOf(
+                await updateRouter(
+                  request('/user/coding', { method: 'PATCH', body: { padding } }),
+                  params('user', 'coding')
+                )
+              );
+
+        expect(result.status).toBe(400);
+        expect(result.body).toMatchObject({
+          error: {
+            code: 'invalid_request',
+            message: `Request body must be at most ${MAX_CUSTOM_ROUTER_BODY_BYTES} bytes`,
+          },
+        });
+        expect(mockedRegister).not.toHaveBeenCalled();
+        const rows = await db.select().from(auto_routing_custom_routers);
+        expect(rows.map(row => row.name)).toEqual(route === 'update' ? ['Coding'] : []);
+      }
+    );
+
+    test('accepts a body whose entries sit at every bound', async () => {
+      const fill = (units: number, index: number) =>
+        `${'a'.repeat(units - 2)}${index.toString().padStart(2, '0')}`;
+      const entries = Array.from({ length: 20 }, (_, index) => ({
+        kind: 'client' as const,
+        provider: fill(100, index),
+        model: fill(200, index),
+        variants: Array.from({ length: 20 }, (_, variant) => fill(100, variant)),
+        capabilities: {
+          contextLength: 10_000_000,
+          inputModalities: Array.from({ length: 10 }, (_, modality) => fill(50, modality)),
+          toolCall: true,
+          reasoning: true,
+        },
+        pricing: {
+          inputPerMTokUsd: 1_000_000,
+          outputPerMTokUsd: 1_000_000,
+          cacheReadPerMTokUsd: 1_000_000,
+        },
+      }));
+      const body = routerBody({
+        slug: 'wide-chars',
+        entries,
+        defaultEntryKey: customRouterEntryKey(entries[0]),
+      });
+
+      expect(Buffer.byteLength(JSON.stringify(body))).toBeGreaterThan(60 * 1024);
+
+      const created = await create(body);
+
+      expect(created.status).toBe(201);
+      expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(1);
+    });
+
+    test('maps an unreadable request body to invalid_request', async () => {
+      const broken = request('', { method: 'POST', body: {} });
+      Object.defineProperty(broken, 'body', {
+        value: new ReadableStream({
+          pull(controller) {
+            controller.error(new Error('socket hang up'));
+          },
+        }),
+      });
+
+      const result = await errorOf(await createRouter(broken));
+
+      expect(result).toEqual({
+        status: 400,
+        body: { error: expect.objectContaining({ code: 'invalid_request' }) },
+      });
+    });
+
     test('rejects a duplicate slug and an eleventh router for one owner', async () => {
       for (let index = 0; index < 10; index++) {
         expect((await create(routerBody({ slug: `router-${index}` }))).status).toBe(201);
@@ -889,7 +968,7 @@ describe('/api/auto-routing/custom-routers', () => {
 
   describe('concurrent admission', () => {
     test.each(['duplicate slug', 'last owner slot'])(
-      'rejects a concurrent create for the %s before spending benchmark quota',
+      'persists one router when concurrent creates collide on the %s',
       async race => {
         if (race === 'last owner slot') {
           for (let index = 0; index < 9; index++) {
@@ -921,7 +1000,6 @@ describe('/api/auto-routing/custom-routers', () => {
         const results = await pending;
 
         expect(results.map(result => result.status).sort()).toEqual([201, 400]);
-        expect(mockedRegister).toHaveBeenCalledTimes(1);
         const winner = results.find(result => result.status === 201);
         if (!winner) throw new Error('expected one create to win');
         const { router } = winner.body as CustomRouterResponse;
@@ -939,6 +1017,93 @@ describe('/api/auto-routing/custom-routers', () => {
         );
       }
     );
+
+    test('registers benchmarks before the owner lock, so no connection waits on it', async () => {
+      const admissionStarted = Promise.withResolvers<void>();
+      const releaseAdmission = Promise.withResolvers<void>();
+      mockedRegister.mockImplementationOnce(async () => {
+        admissionStarted.resolve();
+        await releaseAdmission.promise;
+        return { ok: true };
+      });
+
+      const pending = create(routerBody());
+      await admissionStarted.promise;
+
+      expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
+      await db.transaction(async tx => {
+        await tx.execute(sql`SET LOCAL statement_timeout = '500ms'`);
+        await lockOwner(tx, { type: 'user', id: user.id });
+      });
+
+      releaseAdmission.resolve();
+      expect((await pending).status).toBe(201);
+    });
+
+    test('admits one benchmark request at a time per owner', async () => {
+      let active = 0;
+      let maxActive = 0;
+      const order: string[] = [];
+      const admissionStarted = Promise.withResolvers<void>();
+      const releaseAdmission = Promise.withResolvers<void>();
+      mockedRegister.mockImplementation(async () => {
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        order.push('start');
+        admissionStarted.resolve();
+        if (order.length === 1) await releaseAdmission.promise;
+        order.push('end');
+        active -= 1;
+        return { ok: true };
+      });
+      const secondCatalog = holdSecondCatalogRequest();
+
+      const first = create(routerBody({ slug: 'one' }));
+      await admissionStarted.promise;
+      const second = create(routerBody({ slug: 'two' }));
+      await secondCatalog.arrived;
+      secondCatalog.release();
+      await flushMicrotasks();
+
+      expect(order).toEqual(['start']);
+
+      releaseAdmission.resolve();
+      const results = await Promise.all([first, second]);
+
+      expect(results.map(result => result.status)).toEqual([201, 201]);
+      expect(order).toEqual(['start', 'end', 'start', 'end']);
+      expect(maxActive).toBe(1);
+    });
+
+    test('admits different owners independently', async () => {
+      const organization = await createTestOrganization('Acme', user.id, 0);
+      signIn(user, organization.id);
+      const order: string[] = [];
+      const admissionStarted = Promise.withResolvers<void>();
+      const releaseAdmission = Promise.withResolvers<void>();
+      mockedRegister.mockImplementation(async () => {
+        order.push('start');
+        admissionStarted.resolve();
+        if (order.length === 1) await releaseAdmission.promise;
+        order.push('end');
+        return { ok: true };
+      });
+      const secondCatalog = holdSecondCatalogRequest();
+
+      const personal = create(routerBody({ slug: 'personal' }));
+      await admissionStarted.promise;
+      const orgRouter = create(routerBody({ scope: 'org', slug: 'team' }));
+      await secondCatalog.arrived;
+      secondCatalog.release();
+      await flushMicrotasks();
+
+      expect(order.slice(0, 2)).toEqual(['start', 'start']);
+
+      releaseAdmission.resolve();
+      const results = await Promise.all([personal, orgRouter]);
+
+      expect(results.map(result => result.status)).toEqual([201, 201]);
+    });
 
     test('admits the latest locked base router when a concurrent update changes the pool', async () => {
       await create(routerBody());
@@ -976,9 +1141,7 @@ describe('/api/auto-routing/custom-routers', () => {
       const [baseResponse, poolResponse] = await Promise.all([baseChange, poolChange]);
 
       expect([baseResponse.status, poolResponse.status]).toEqual([200, 200]);
-      expect(mockedRegister).toHaveBeenCalledTimes(2);
-      expect(mockedRegister).toHaveBeenNthCalledWith(
-        2,
+      expect(mockedRegister).toHaveBeenLastCalledWith(
         {
           router: 'frontier',
           ownerType: 'user',
@@ -994,7 +1157,7 @@ describe('/api/auto-routing/custom-routers', () => {
       });
     });
 
-    test('rejects a stale default-entry plan before admitting its benchmarks', async () => {
+    test('rejects a save whose router was deleted after admission', async () => {
       await create(routerBody({ entries: [gateway(SONNET), gateway(FLASH)] }));
       mockedRegister.mockClear();
       const admissionStarted = Promise.withResolvers<void>();
@@ -1004,44 +1167,25 @@ describe('/api/auto-routing/custom-routers', () => {
         await releaseAdmission.promise;
         return { ok: true };
       });
-      const poolChange = updateRouter(
-        request('/user/coding', {
-          method: 'PATCH',
-          body: {
-            entries: [gateway(SONNET)],
-            defaultEntryKey: customRouterEntryKey(gateway(SONNET)),
-          },
-        }),
+      const pendingUpdate = updateRouter(
+        request('/user/coding', { method: 'PATCH', body: { baseRouter: 'frontier' } }),
         params('user', 'coding')
       );
       await admissionStarted.promise;
 
-      const defaultChange = updateRouter(
-        request('/user/coding', {
-          method: 'PATCH',
-          body: {
-            baseRouter: 'frontier',
-            defaultEntryKey: customRouterEntryKey(gateway(FLASH)),
-          },
-        }),
+      const removed = await deleteRouter(
+        request('/user/coding', { method: 'DELETE' }),
         params('user', 'coding')
       );
-      await waitForOwnerLockWaiter();
+      expect(removed.status).toBe(204);
       releaseAdmission.resolve();
-      const [poolResponse, defaultResponse] = await Promise.all([poolChange, defaultChange]);
 
-      expect(poolResponse.status).toBe(200);
-      expect(await errorOf(defaultResponse)).toMatchObject({
-        status: 400,
-        body: { error: { code: 'invalid_request' } },
+      const updated = await pendingUpdate;
+      expect(await errorOf(updated)).toMatchObject({
+        status: 404,
+        body: { error: { code: 'router_not_found' } },
       });
-      expect(mockedRegister).toHaveBeenCalledTimes(1);
-      const [row] = await db.select().from(auto_routing_custom_routers);
-      expect(row).toMatchObject({
-        base_router: 'efficient',
-        entries: [gateway(SONNET)],
-        default_entry_key: customRouterEntryKey(gateway(SONNET)),
-      });
+      expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(0);
     });
   });
 

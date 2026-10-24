@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./setup-script": "./src/setup-script.ts",
     "./import": "./src/import/index.ts",
     "./import/testing": "./src/import/test-fixtures.ts"
   },
@@ -27,6 +28,6 @@
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:vitest5"
   }
 }

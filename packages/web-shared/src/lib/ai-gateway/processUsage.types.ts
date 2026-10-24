@@ -131,6 +131,7 @@ export type MicrodollarUsageContext = {
   organizationId?: Organization['id'];
   provider: ProviderId;
   requested_model: string;
+  readonly is_free: boolean;
   promptInfo: PromptInfo;
   max_tokens: number | null;
   has_middle_out_transform: boolean | null;

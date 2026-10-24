@@ -1,8 +1,8 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Switch, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import { View } from 'react-native';
+import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
 import { CenteredState } from '@/components/centered-state';
 import { openModelPicker } from '@/components/agents/model-selector';
@@ -15,10 +15,13 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { PlatformOverviewSkeleton } from '@/components/code-reviewer/platform-overview-skeleton';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
+import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
+import { useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import {
@@ -51,6 +54,11 @@ export function BitbucketOverview({
   const readiness = useBitbucketReadiness(scope);
   const save = useSaveReviewConfig(scope, 'bitbucket');
   const { models, isLoading: modelsLoading } = useReviewerModels(scope);
+  const { reducedMotion } = useMotionPolicy();
+  // The body of the config read has exactly one surface: rows from cache, an
+  // error with retry, or a loading state -- never the header over an empty
+  // scroll area.
+  const configBody = useReviewConfigBody(config);
   const providerState = classifyProviderState({
     isLoading: readiness.isLoading,
     isError: readiness.isError,
@@ -74,21 +82,20 @@ export function BitbucketOverview({
     );
   }
 
-  const isLoading = providerState.status === 'loading' || config.isLoading || permissionLoading;
+  const isLoading = providerState.status === 'loading' || permissionLoading;
   const connected = providerState.status === 'connected';
 
-  // A connected workspace whose config fails to load (and has no stale
-  // cache to fall back on) has nothing to show — surface a retry instead of
-  // a header over blank space. A background refetch failure with data
-  // already cached falls through to the normal content below, unaffected.
-  if (!isLoading && connected && config.isError && config.data == null) {
+  // A connected workspace whose config read failed (no cache to fall back on),
+  // or whose idle read could not be restarted, has nothing to show: surface a
+  // retry instead. Cached config keeps the rows through a background refetch
+  // failure, and an unsettled connectivity still waits on the skeleton.
+  if (!isLoading && connected && (configBody.body.status === 'error' || configBody.exhausted)) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
         <QueryError
-          onRetry={() => {
-            void config.refetch();
-          }}
+          variant={configBody.body.status === 'error' ? configBody.body.variant : 'server'}
+          onRetry={configBody.body.status === 'error' ? configBody.body.refetch : configBody.retry}
           isRetrying={config.isFetching}
         />
       </View>
@@ -99,7 +106,7 @@ export function BitbucketOverview({
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
-        <CenteredState className="px-6">
+        <CenteredState contentContainerClassName="px-6">
           {canEdit ? (
             <BitbucketConnectForm scope={scope} />
           ) : (
@@ -113,7 +120,7 @@ export function BitbucketOverview({
   }
 
   const pushField = (field: string) => {
-    router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/bitbucket/${field}` as Href);
+    router.push(`/(app)/code-reviewer/${scope}/bitbucket/${field}` as Href);
   };
 
   const data = config.data;
@@ -154,19 +161,16 @@ export function BitbucketOverview({
         keyboardShouldPersistTaps="handled"
       >
         <Animated.View layout={LinearTransition}>
-          {isLoading && (
-            <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
-              <Skeleton className="h-16 w-full rounded-lg" />
-              <View className="gap-2">
-                {Array.from({ length: 6 }, (_, index) => (
-                  <Skeleton key={index} className="h-12 w-full rounded-lg" />
-                ))}
-              </View>
-            </Animated.View>
-          )}
+          {/* Every read state paints something: while connectivity is unsettled a
+             paused read keeps the skeleton, and a pending read that nothing is
+             fetching also keeps it until its restart runs. */}
+          {(isLoading || configBody.body.status === 'loading') && <PlatformOverviewSkeleton />}
 
-          {!isLoading && connected && config.data != null && rows != null && (
-            <Animated.View entering={FadeIn.duration(200)} className="gap-6">
+          {!isLoading && data != null && rows != null && (
+            <Animated.View
+              entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(200))}
+              className="gap-6"
+            >
               {readiness.data?.ready === false && (
                 <View className="items-center gap-2 rounded-lg bg-secondary p-4">
                   <Text className="text-center text-xs text-muted-foreground">

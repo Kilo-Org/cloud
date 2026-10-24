@@ -50,17 +50,20 @@ describe('summarizeTerminalBench', () => {
       ...benchmarks(),
       artificialAnalysis: { liveCodeBench: null },
     };
-    const summaries = summarizeTerminalBench([
-      row(),
-      stealth,
-      row({ openrouterId: 'nullable/model', benchmarks: nullable }),
-      row({ openrouterId: 'kilo-internal/custom', benchmarks: benchmarks() }),
-      row({ isActive: false }),
-      row({ benchmarks: benchmarks({ nAttempts: 4 }) }),
-      row({ benchmarks: benchmarks({ avgAttemptCostUsd: null }) }),
-      row({ benchmarks: { kiloBench: { overallScore: 0.4, evals: {} } } }),
-      row({ benchmarks: { kiloBench: { overallScore: 'invalid' } } }),
-    ]);
+    const summaries = summarizeTerminalBench(
+      [
+        row(),
+        stealth,
+        row({ openrouterId: 'nullable/model', benchmarks: nullable }),
+        row({ openrouterId: 'Acme/Custom', benchmarks: benchmarks() }),
+        row({ isActive: false }),
+        row({ benchmarks: benchmarks({ nAttempts: 4 }) }),
+        row({ benchmarks: benchmarks({ avgAttemptCostUsd: null }) }),
+        row({ benchmarks: { kiloBench: { overallScore: 0.4, evals: {} } } }),
+        row({ benchmarks: { kiloBench: { overallScore: 'invalid' } } }),
+      ],
+      new Set(['acme/custom'])
+    );
 
     expect(summaries).toEqual(
       new Map([

@@ -116,6 +116,13 @@ describe('postLatencyBatch', () => {
 
     await expect(postLatencyBatch(batch())).resolves.toBeUndefined();
   });
+
+  it('resolves without throwing on a 5xx response', async () => {
+    fetchMock.mockResolvedValue(new Response('nope', { status: 503 }));
+
+    await expect(postLatencyBatch(batch())).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('resolveLatencyIngestUrl', () => {

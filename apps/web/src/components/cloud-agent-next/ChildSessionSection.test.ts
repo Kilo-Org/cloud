@@ -302,17 +302,14 @@ describe('ChildSessionDrawer header', () => {
   const manager = {
     atoms: {
       childMessages: atom(() => (_sessionId: string): StoredMessage[] => []),
-      childSessionHydrationState: atom(
-        () =>
-          (_sessionId: string): ChildSessionHydrationState => ({
-            status: 'ready',
-            cursor: null,
-            hasOlder: false,
-            isLoadingOlder: false,
-            olderError: null,
-            omittedItemCount: 0,
-          })
-      ),
+      childSessionHydrationState: atom(() => (_sessionId: string): ChildSessionHydrationState => ({
+        status: 'ready',
+        cursor: null,
+        hasOlder: false,
+        isLoadingOlder: false,
+        olderError: null,
+        omittedItemCount: 0,
+      })),
     },
     hydrateChildSession: jest.fn(),
     loadOlderChildMessages: jest.fn(),

@@ -111,7 +111,6 @@ async function insertBotUser({ id, email, displayName }: BotUserIdentity): Promi
  * Adds membership if it doesn't exist
  */
 async function ensureBotIsOrgMember(botUserId: string, organizationId: string): Promise<void> {
-  // Check if membership already exists
   const [existing] = await db
     .select()
     .from(organization_memberships)
@@ -157,7 +156,6 @@ export async function ensureBotUserForOrg(organizationId: string, botType: BotTy
   try {
     const botId = generateBotUserId(organizationId, botType);
 
-    // Try to get existing bot user
     const [existingBot] = await db
       .select()
       .from(kilocode_users)
@@ -183,7 +181,6 @@ export async function ensureBotUserForOrg(organizationId: string, botType: BotTy
       });
     }
 
-    // Ensure bot is org member
     await ensureBotIsOrgMember(botUser.id, organizationId);
 
     return botUser;

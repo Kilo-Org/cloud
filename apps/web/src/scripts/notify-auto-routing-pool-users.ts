@@ -5,6 +5,10 @@ import {
   runPoolNotifications,
 } from './lib/auto-routing-pool-notifications';
 import type { PoolNotificationResult } from './lib/auto-routing-pool-notifications';
+import { createRequire } from 'node:module';
+import type { sendAutoRoutingPoolNoticeEmail as sendAutoRoutingPoolNoticeEmailType } from '@kilocode/web-shared/lib/auto-routing-pool-notice-email';
+
+const requireFromScript = createRequire(__filename);
 
 function report(result: PoolNotificationResult, cutoverAt: string) {
   console.log(JSON.stringify({ ...result, cutoverAt }));
@@ -88,9 +92,13 @@ No raw recipient lists are printed or exported. --send requires configured produ
       ...options,
       owners,
       sendEmail: async (target, cutoverAt) => {
-        // Keep the credential-dependent mail module outside the dry-run path.
-        const { sendAutoRoutingPoolNoticeEmail } =
-          await import('@kilocode/web-shared/lib/auto-routing-pool-notice-email');
+        // Deferred so dry runs need no mail configuration. It must be a CommonJS require: a
+        // dynamic import() uses the ESM loader, which rejects Sentry's CommonJS namespace.
+        const {
+          sendAutoRoutingPoolNoticeEmail,
+        }: {
+          sendAutoRoutingPoolNoticeEmail: typeof sendAutoRoutingPoolNoticeEmailType;
+        } = requireFromScript('@kilocode/web-shared/lib/auto-routing-pool-notice-email');
         return sendAutoRoutingPoolNoticeEmail({ ...target, cutoverAt });
       },
     });

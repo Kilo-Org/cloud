@@ -184,6 +184,14 @@ function buildActions(
   return { actions, disabled, draft, onDraftChange, owner };
 }
 
+async function flushPendingTasks(): Promise<void> {
+  const { promise, resolve } = Promise.withResolvers<undefined>();
+  setImmediate(() => {
+    resolve(undefined);
+  });
+  await promise;
+}
+
 function idleSnapshot(): VoiceInputControllerSnapshot {
   return { availability: 'available', owner: null, status: 'idle' };
 }
@@ -449,7 +457,7 @@ describe('useVoiceInput integration', () => {
         expect(mockController.start.mock.calls[0]?.[0]?.requiresOnDeviceRecognition).toBe(false);
       });
 
-      it('shows a toast and does not start when consent is declined', async () => {
+      it('raises the disclosure again and does not start when consent is declined on a device without on-device recognition', async () => {
         const { actions } = buildActions({ userId: 'user-1' });
         mockController.setSnapshot(idleSnapshot());
         mockController.supportsOnDevice.mockReturnValue(false);
@@ -458,10 +466,59 @@ describe('useVoiceInput integration', () => {
         await actions.toggle();
 
         expect(mockController.start).not.toHaveBeenCalled();
-        expect(toastMock.error).toHaveBeenCalledWith(
-          'Speech stays off until you allow online transcription.'
+        expect(alertMock.alert).toHaveBeenCalledTimes(1);
+        expect(alertMock.alert).toHaveBeenCalledWith(
+          'Speech is processed online',
+          expect.stringContaining('This device cannot transcribe offline'),
+          expect.any(Array),
+          { cancelable: true }
         );
-        expect(alertMock.alert).not.toHaveBeenCalled();
+        expect(toastMock.error).not.toHaveBeenCalled();
+      });
+
+      it('persists granted and starts network recognition when the declined disclosure Allow action is pressed', async () => {
+        const { actions } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(false);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('declined');
+        voiceNetworkConsentMock.writeVoiceNetworkConsent.mockResolvedValue(true);
+
+        await actions.toggle();
+
+        const buttons = alertMock.alert.mock.calls[0]?.[2] as
+          | { text: string; onPress?: () => void }[]
+          | undefined;
+        const allow = buttons?.find(button => button.text === 'Allow');
+        allow?.onPress?.();
+        await flushPendingTasks();
+
+        expect(voiceNetworkConsentMock.writeVoiceNetworkConsent).toHaveBeenCalledWith(
+          'user-1',
+          'granted'
+        );
+        expect(mockController.start).toHaveBeenCalledTimes(1);
+        expect(mockController.start.mock.calls[0]?.[0]?.requiresOnDeviceRecognition).toBe(false);
+      });
+
+      it('keeps the refusal without starting when the declined disclosure Not now action is pressed', async () => {
+        const { actions } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(false);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('declined');
+
+        await actions.toggle();
+
+        const buttons = alertMock.alert.mock.calls[0]?.[2] as
+          | { text: string; onPress?: () => void }[]
+          | undefined;
+        const notNow = buttons?.find(button => button.text === 'Not now');
+        notNow?.onPress?.();
+
+        expect(voiceNetworkConsentMock.writeVoiceNetworkConsent).toHaveBeenCalledWith(
+          'user-1',
+          'declined'
+        );
+        expect(mockController.start).not.toHaveBeenCalled();
       });
 
       it('raises the disclosure and does not start when consent is unset', async () => {
@@ -477,7 +534,8 @@ describe('useVoiceInput integration', () => {
         expect(alertMock.alert).toHaveBeenCalledWith(
           'Speech is processed online',
           expect.stringContaining('This device cannot transcribe offline'),
-          expect.any(Array)
+          expect.any(Array),
+          { cancelable: true }
         );
         expect(toastMock.error).not.toHaveBeenCalled();
       });
@@ -496,9 +554,7 @@ describe('useVoiceInput integration', () => {
           | undefined;
         const allow = buttons?.find(button => button.text === 'Allow');
         allow?.onPress?.();
-        await new Promise<void>(resolve => {
-          setImmediate(resolve);
-        });
+        await flushPendingTasks();
 
         expect(voiceNetworkConsentMock.writeVoiceNetworkConsent).toHaveBeenCalledWith(
           'user-1',
@@ -569,7 +625,8 @@ describe('useVoiceInput integration', () => {
         expect(alertMock.alert).toHaveBeenCalledWith(
           i18n.t('voiceInput.onlineTitle'),
           i18n.t('voiceInput.onlineMessage', { provider: 'Apple' }),
-          expect.any(Array)
+          expect.any(Array),
+          { cancelable: true }
         );
 
         const buttons = alertMock.alert.mock.calls[0]?.[2] as
@@ -577,9 +634,7 @@ describe('useVoiceInput integration', () => {
           | undefined;
         const allow = buttons?.find(button => button.text === i18n.t('voiceInput.allow'));
         allow?.onPress?.();
-        await new Promise<void>(resolve => {
-          setImmediate(resolve);
-        });
+        await flushPendingTasks();
 
         expect(mockController.start).toHaveBeenCalledTimes(1);
         const startOptions = mockController.start.mock.calls[0]?.[0];
@@ -607,7 +662,8 @@ describe('useVoiceInput integration', () => {
         expect(alertMock.alert).toHaveBeenCalledWith(
           i18n.t('voiceInput.languageNotInstalledTitle', { language: 'Deutsch' }),
           i18n.t('voiceInput.languageNotInstalledMessage', { language: 'Deutsch' }),
-          expect.any(Array)
+          expect.any(Array),
+          { cancelable: true }
         );
 
         const buttons = alertMock.alert.mock.calls[0]?.[2] as
@@ -617,9 +673,7 @@ describe('useVoiceInput integration', () => {
           button => button.text === i18n.t('voiceInput.downloadOfflineModel')
         );
         download?.onPress?.();
-        await new Promise<void>(resolve => {
-          setImmediate(resolve);
-        });
+        await flushPendingTasks();
 
         expect(triggerOfflineModelDownloadMock).toHaveBeenCalledWith({ locale: 'de-DE' });
         expect(mockController.start).not.toHaveBeenCalled();
@@ -645,7 +699,8 @@ describe('useVoiceInput integration', () => {
         expect(alertMock.alert).toHaveBeenCalledWith(
           i18n.t('voiceInput.languageNotInstalledTitle', { language: 'Deutsch' }),
           i18n.t('voiceInput.languageNotInstalledMessage', { language: 'Deutsch' }),
-          expect.any(Array)
+          expect.any(Array),
+          { cancelable: true }
         );
 
         const buttons = alertMock.alert.mock.calls[0]?.[2] as
@@ -655,9 +710,7 @@ describe('useVoiceInput integration', () => {
           button => button.text === i18n.t('voiceInput.downloadOfflineModel')
         );
         download?.onPress?.();
-        await new Promise<void>(resolve => {
-          setImmediate(resolve);
-        });
+        await flushPendingTasks();
 
         expect(triggerOfflineModelDownloadMock).toHaveBeenCalledWith({ locale: 'de-DE' });
         expect(mockController.start).not.toHaveBeenCalled();
@@ -689,9 +742,7 @@ describe('useVoiceInput integration', () => {
           button => button.text === i18n.t('voiceInput.downloadOfflineModel')
         );
         download?.onPress?.();
-        await new Promise<void>(resolve => {
-          setImmediate(resolve);
-        });
+        await flushPendingTasks();
 
         expect(toastMock.success).toHaveBeenCalledWith(
           i18n.t('voiceInput.offlineModelDownloadScheduled')
@@ -725,9 +776,7 @@ describe('useVoiceInput integration', () => {
           button => button.text === i18n.t('voiceInput.downloadOfflineModel')
         );
         download?.onPress?.();
-        await new Promise<void>(resolve => {
-          setImmediate(resolve);
-        });
+        await flushPendingTasks();
 
         // The model is installed now; the gate must re-query the service
         // instead of trusting the memoized pre-download list.
@@ -768,9 +817,7 @@ describe('useVoiceInput integration', () => {
           button => button.text === i18n.t('voiceInput.downloadOfflineModel')
         );
         download?.onPress?.();
-        await new Promise<void>(resolve => {
-          setImmediate(resolve);
-        });
+        await flushPendingTasks();
 
         expect(toastMock.error).toHaveBeenCalledWith(i18n.t('voiceInput.unavailableLanguage'));
       });

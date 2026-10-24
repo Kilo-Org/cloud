@@ -10,7 +10,7 @@
  * keeps its fresh credential instead of being overwritten by this run's earlier
  * snapshot.
  *
- * The normalization pass (on by default with --execute; opt out with --no-scrub)
+ * The normalization pass (on by default with --execute; opt out with --no-normalize)
  * removes the credential field from metadata for every Slack integration whose
  * stored credential is current: either this run wrote it, or the stored credential
  * decrypts to the same value. Every other integration keeps its metadata unchanged
@@ -23,7 +23,7 @@
  * Usage:
  *   pnpm --filter web script src/scripts/d2026-08-07_backfill-slack-oauth-credentials.ts
  *   pnpm --filter web script src/scripts/d2026-08-07_backfill-slack-oauth-credentials.ts --execute
- *   pnpm --filter web script src/scripts/d2026-08-07_backfill-slack-oauth-credentials.ts --execute --no-scrub
+ *   pnpm --filter web script src/scripts/d2026-08-07_backfill-slack-oauth-credentials.ts --execute --no-normalize
  */
 
 import '../lib/load-env';
@@ -47,19 +47,19 @@ type SkipReason =
   | 'no_owner'
   | 'no_team_id'
   | 'write_failed'
-  | 'scrub_no_credential'
-  | 'scrub_failed';
+  | 'normalize_not_current'
+  | 'normalize_failed';
 
-function parseArgs(): { execute: boolean; scrub: boolean; batchSize: number } {
+function parseArgs(): { execute: boolean; normalize: boolean; batchSize: number } {
   let execute = false;
-  let scrub = true;
+  let normalize = true;
   let batchSize = 200;
 
   for (const arg of process.argv.slice(2)) {
     if (arg === '--execute') {
       execute = true;
-    } else if (arg === '--no-scrub') {
-      scrub = false;
+    } else if (arg === '--no-normalize') {
+      normalize = false;
     } else if (arg.startsWith('--batch-size=')) {
       const parsed = Number(arg.slice('--batch-size='.length));
       if (!Number.isInteger(parsed) || parsed <= 0) {
@@ -71,7 +71,7 @@ function parseArgs(): { execute: boolean; scrub: boolean; batchSize: number } {
     }
   }
 
-  return { execute, scrub, batchSize };
+  return { execute, normalize, batchSize };
 }
 
 function readMetadataCredential(metadata: unknown): string | null {
@@ -82,7 +82,7 @@ function readMetadataCredential(metadata: unknown): string | null {
 }
 
 async function main(): Promise<void> {
-  const { execute, scrub, batchSize } = parseArgs();
+  const { execute, normalize, batchSize } = parseArgs();
 
   // Fail fast rather than discovering a bad keyset partway through a run.
   const { active } = requireSlackCredentialKeyset();
@@ -115,16 +115,16 @@ async function main(): Promise<void> {
     no_owner: 0,
     no_team_id: 0,
     write_failed: 0,
-    scrub_no_credential: 0,
-    scrub_failed: 0,
+    normalize_not_current: 0,
+    normalize_failed: 0,
   };
   let migrated = 0;
   let eligible = 0;
-  let scrubbed = 0;
+  let normalized = 0;
   // Integrations whose credential row this run can vouch for: either the row was
   // written by this run, or it decrypts to the metadata value (checked below).
   // Only these are eligible for the normalization pass.
-  const scrubCandidateIds = new Set<string>();
+  const normalizationCandidateIds = new Set<string>();
 
   for (let offset = 0; offset < integrations.length; offset += batchSize) {
     const batch = integrations.slice(offset, offset + batchSize);
@@ -149,17 +149,17 @@ async function main(): Promise<void> {
         // The stored credential must be current before the metadata field is
         // removed. The comparison below admits the row for normalization only on an
         // exact match; any other result keeps it unchanged.
-        if (execute && scrub && readMetadataCredential(integration.metadata)) {
+        if (execute && normalize && readMetadataCredential(integration.metadata)) {
           const fresh = await storedCredentialMatches(integration.id, integration);
           if (fresh === true) {
-            scrubCandidateIds.add(integration.id);
+            normalizationCandidateIds.add(integration.id);
           } else if (fresh === false) {
-            skipped.scrub_no_credential += 1;
+            skipped.normalize_not_current += 1;
             console.warn(
               `Left metadata unchanged for integration ${integration.id}: stored credential does not match it`
             );
           } else {
-            skipped.scrub_failed += 1;
+            skipped.normalize_failed += 1;
             console.warn(
               `Left metadata unchanged for integration ${integration.id}: stored credential could not be read`
             );
@@ -204,7 +204,7 @@ async function main(): Promise<void> {
           skipped.already_migrated += 1;
         } else {
           migrated += 1;
-          scrubCandidateIds.add(integration.id);
+          normalizationCandidateIds.add(integration.id);
         }
       } catch (error) {
         skipped.write_failed += 1;
@@ -223,9 +223,9 @@ async function main(): Promise<void> {
   //   and left unchanged so the script can be repeated after it is resolved.
   // The metadata update removes only that key (`jsonb -`), so concurrent writes
   // to other metadata fields between the snapshot above and this update survive.
-  if (execute && scrub) {
+  if (execute && normalize) {
     for (const integration of integrations) {
-      if (!scrubCandidateIds.has(integration.id)) continue;
+      if (!normalizationCandidateIds.has(integration.id)) continue;
       const metadata = integration.metadata;
       if (metadata === null || typeof metadata !== 'object') continue;
       if (!('access_token' in metadata)) continue;
@@ -238,9 +238,9 @@ async function main(): Promise<void> {
             updated_at: new Date().toISOString(),
           })
           .where(eq(platform_integrations.id, integration.id));
-        scrubbed += 1;
+        normalized += 1;
       } catch (error) {
-        skipped.scrub_failed += 1;
+        skipped.normalize_failed += 1;
         console.error(
           `Failed to normalize integration ${integration.id}: ${error instanceof Error ? error.message : 'unknown error'}`
         );
@@ -255,9 +255,9 @@ async function main(): Promise<void> {
   console.log('\n--- Summary ---');
   console.log(`Eligible for backfill:       ${eligible}`);
   console.log(`Migrated:                    ${migrated}`);
-  console.log(`Metadata fields normalized:  ${scrubbed}`);
-  console.log(`Kept (credential not current): ${skipped.scrub_no_credential}`);
-  console.log(`Failed normalizations:       ${skipped.scrub_failed}`);
+  console.log(`Metadata fields normalized:  ${normalized}`);
+  console.log(`Kept (credential not current): ${skipped.normalize_not_current}`);
+  console.log(`Failed normalizations:       ${skipped.normalize_failed}`);
   console.log(`Skipped (already migrated):  ${skipped.already_migrated}`);
   console.log(`Skipped (no metadata value): ${skipped.no_metadata_credential}`);
   console.log(`Skipped (no owner):          ${skipped.no_owner}`);

@@ -311,7 +311,9 @@ so a later report changes nothing.
 
 ### Route state (per session)
 
-`preparing` → `ready` → `failed`. Each preparation attempt has a 12-minute deadline. An attempt
+`preparing` → `ready` → `failed`. Each preparation attempt has a deadline that outlasts its
+own steps in sequence (sandbox create, wrapper first connect and hello, snapshot restore with
+the clone fallback, Kilo runtime start, session import). An attempt
 starts when a route enters `preparing`: the first `prepare`, a `prepare` after `failed`, or a
 re-prepare after a wrapper restart. A repeated `prepare`, a reconnect or a new allocation inside the
 attempt keeps its deadline.

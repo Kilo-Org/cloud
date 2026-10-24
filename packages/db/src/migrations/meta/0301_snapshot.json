@@ -1,5 +1,5 @@
 {
-  "id": "be63e8a7-1fc0-4d4b-80a2-18a9480a28d9",
+  "id": "ff5b8190-a865-47ea-9c73-8120c8d9963a",
   "prevId": "c4c9111e-08c7-4dc3-9b6c-d9859f50241b",
   "version": "7",
   "dialect": "postgresql",
@@ -10646,6 +10646,13 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "credits_window_granted_microdollars": {
+          "name": "credits_window_granted_microdollars",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         },
         "linked_kilo_user_id": {
           "name": "linked_kilo_user_id",
@@ -22089,13 +22096,6 @@
         },
         "attempts": {
           "name": "attempts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "legacy_attempts": {
-          "name": "legacy_attempts",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,

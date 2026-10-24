@@ -112,11 +112,12 @@ jobs:
           }
           const queuesRequired = config.queues.producers.some(p => p.queue?.endsWith('-eu'));
           appendFileSync(process.env.GITHUB_OUTPUT, `queues_required=${queuesRequired}\n`);
+          appendFileSync(process.env.GITHUB_OUTPUT, `prepare_required=${queuesRequired || existsSync('scripts/provision-queues.mjs')}\n`);
           appendFileSync(process.env.GITHUB_OUTPUT, `required=${required}\n`);
           NODE
 
-      - name: Prepare staging EU queues
-        if: steps.usage_relay.outputs.queues_required == 'true'
+      - name: Prepare staging usage queues
+        if: steps.usage_relay.outputs.prepare_required == 'true'
         working-directory: services/usage-ingest
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -392,11 +393,12 @@ jobs:
           }
           const queuesRequired = config.queues.producers.some(p => p.queue?.endsWith('-eu'));
           appendFileSync(process.env.GITHUB_OUTPUT, `queues_required=${queuesRequired}\n`);
+          appendFileSync(process.env.GITHUB_OUTPUT, `prepare_required=${queuesRequired || existsSync('scripts/provision-queues.mjs')}\n`);
           appendFileSync(process.env.GITHUB_OUTPUT, `required=${required}\n`);
           NODE
 
-      - name: Prepare staging EU queues
-        if: steps.usage_relay.outputs.queues_required == 'true'
+      - name: Prepare staging usage queues
+        if: steps.usage_relay.outputs.prepare_required == 'true'
         working-directory: services/usage-ingest
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

@@ -193,12 +193,14 @@ production and staging deployments. To deploy it individually, dispatch that
 workflow with `worker: services/usage-ingest` and `target_environment: production`
 or `staging`.
 
-Normal staging CI has one EU queue preparation step before any Worker upload.
+Normal staging CI has one queue preparation step before any Worker upload.
 It reads queue names from `wrangler.jsonc`, creates missing resources with
 explicit `jurisdiction: "eu"`, and verifies/reuses existing EU resources.
 Unknown jurisdiction or lookup/API errors stop deployment. Then the existing
 Frankfurt relay and consumer deploy in order; both consumer upload attempts disable Wrangler's
-global auto-provisioning. See [setup and operational detachment](eu-queues.md).
+global auto-provisioning for EU selections. The preparation step also detaches the obsolete
+staging consumer before Wrangler attaches the selected source; it preserves both queue pairs.
+See [deployment-driven cutover and routing rollback](eu-queues.md).
 Production keeps automatic provisioning and its original names/policy.
 `USAGE_INGEST_QUEUE` binds the source and `USAGE_INGEST_DLQ` binds its matching DLQ;
 only the source has a consumer. Exhausted failures route to that DLQ.
@@ -305,5 +307,5 @@ Local runtime tests prove the service-binding path and ACK/retry behavior, not
 geographical placement or speedup.
 
 For relay-only rollback, deploy a reviewed direct-path change preserving the EU
-queue pair and single consumer. Queue routing rollback is a manual binding/config
-redeploy described in the [EU setup](eu-queues.md). The unused relay can remain private.
+queue pair and single consumer. Queue routing rollback retains the deployment helper and changes only staging queue
+selection as described in the [EU setup](eu-queues.md); a full PR revert cannot detach EU automatically. The unused relay can remain private.

@@ -31,9 +31,9 @@ test('both Worker deployment paths deploy the private relay before the staging u
     const checkIndex = steps.findIndex(step => step.id === 'usage_relay');
     const consumerIndex = steps.findIndex(step => step.name === 'Deploy to Cloudflare Workers');
     assert.ok(checkIndex > steps.findIndex(step => step.name === 'Install dependencies'));
-    const prepareIndex = steps.findIndex(step => step.name === 'Prepare staging EU queues');
+    const prepareIndex = steps.findIndex(step => step.name === 'Prepare staging usage queues');
     assert.ok(checkIndex < prepareIndex && prepareIndex < relayIndex);
-    assert.equal(steps[prepareIndex].if, "steps.usage_relay.outputs.queues_required == 'true'");
+    assert.equal(steps[prepareIndex].if, "steps.usage_relay.outputs.prepare_required == 'true'");
     assert.equal(
       steps[prepareIndex].env.CLOUDFLARE_API_TOKEN,
       '${{ secrets.CLOUDFLARE_API_TOKEN }}'
@@ -114,7 +114,7 @@ test('selected source controls the relay requirement and failures stop consumer 
     for (const job of ['deploy-manual', 'deploy-changed']) {
       const check = workers.jobs[job].steps.find(step => step.id === 'usage_relay');
       const prepare = workers.jobs[job].steps.find(
-        step => step.name === 'Prepare staging EU queues'
+        step => step.name === 'Prepare staging usage queues'
       );
       const relay = workers.jobs[job].steps.find(
         step => step.name === 'Deploy private staging usage writer relay'
@@ -128,8 +128,12 @@ test('selected source controls the relay requirement and failures stop consumer 
         'eu',
         'eu-failure',
         'eu-missing-helper',
+        'global',
+        'global-failure',
+        'renamed-failure',
       ]) {
         const eu = scenario.startsWith('eu');
+        const prepared = eu || scenario.startsWith('global') || scenario === 'renamed-failure';
         const required = !['historical-direct', 'direct-unused-file'].includes(scenario);
         writeFileSync(
           join(directory, 'wrangler.jsonc'),
@@ -139,7 +143,22 @@ test('selected source controls the relay requirement and failures stop consumer 
             env: {
               staging: {
                 name: 'usage-ingest-staging',
-                ...(eu ? { queues: { producers: [{ binding: 'QUEUE', queue: 'test-eu' }] } } : {}),
+                ...(prepared
+                  ? {
+                      queues: {
+                        producers: [
+                          {
+                            binding: 'QUEUE',
+                            queue: eu
+                              ? 'test-eu'
+                              : scenario === 'renamed-failure'
+                                ? 'usage-ingest-renamed'
+                                : 'usage-ingest-processing-staging',
+                          },
+                        ],
+                      },
+                    }
+                  : {}),
                 ...(required
                   ? {
                       services: [
@@ -157,7 +176,7 @@ test('selected source controls the relay requirement and failures stop consumer 
         }
         for (const path of ['scripts/provision-queues.mjs'])
           rmSync(join(directory, path), { force: true });
-        if (eu && scenario !== 'eu-missing-helper')
+        if (prepared && scenario !== 'eu-missing-helper')
           writeFileSync(
             join(directory, 'scripts/provision-queues.mjs'),
             `
@@ -165,7 +184,7 @@ test('selected source controls the relay requirement and failures stop consumer 
           appendFileSync(process.env.DEPLOY_CALLS, 'prepare\\n');
         `
           );
-        if (scenario === 'eu-failure')
+        if (['eu-failure', 'global-failure', 'renamed-failure'].includes(scenario))
           writeFileSync(
             join(directory, 'scripts/provision-queues.mjs'),
             readFileSync(
@@ -187,7 +206,7 @@ test('selected source controls the relay requirement and failures stop consumer 
             if [ "$1 $2" = 'deploy --config' ] && [ "$FAIL_RELAY" = true ]; then return 17; fi
           }
           ${check.run}
-          if grep -q '^queues_required=true$' "$GITHUB_OUTPUT"; then ${prepare.run}; fi
+          if grep -q '^prepare_required=true$' "$GITHUB_OUTPUT"; then ${prepare.run}; fi
           if grep -q '^required=true$' "$GITHUB_OUTPUT"; then
             wrangler ${relay.with.command}
           fi
@@ -208,7 +227,11 @@ test('selected source controls the relay requirement and failures stop consumer 
           }
         );
         const deployed = readFileSync(calls, 'utf8').trim().split('\n').filter(Boolean);
-        if (['eu-failure', 'eu-missing-helper'].includes(scenario)) {
+        if (
+          ['eu-failure', 'eu-missing-helper', 'global-failure', 'renamed-failure'].includes(
+            scenario
+          )
+        ) {
           assert.notEqual(result.status, 0, `${job} ${scenario}: preparation must stop upload`);
           assert.deepEqual(deployed, []);
         } else if (scenario === 'required-missing') {
@@ -221,7 +244,7 @@ test('selected source controls the relay requirement and failures stop consumer 
         } else {
           assert.equal(result.status, 0, `${job} ${scenario}: ${result.stderr}`);
           assert.deepEqual(deployed, [
-            ...(eu ? ['prepare'] : []),
+            ...(prepared ? ['prepare'] : []),
             ...(required ? ['deploy --config wrangler.writer-relay.jsonc'] : []),
             'deploy --env staging',
           ]);

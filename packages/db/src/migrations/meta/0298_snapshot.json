@@ -1,5 +1,5 @@
 {
-  "id": "3adc56f8-4509-4ce0-a1e1-c518d6baefd8",
+  "id": "c610aea6-1362-401e-9837-38e9b39c5ea4",
   "prevId": "f3abc364-273c-444a-824b-7db65a082252",
   "version": "7",
   "dialect": "postgresql",
@@ -5514,22 +5514,6 @@
           ],
           "isUnique": false,
           "where": "\"cloud_agent_code_reviews\".\"started_at\" is not null",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_cloud_agent_code_reviews_started_at_effective": {
-          "name": "idx_cloud_agent_code_reviews_started_at_effective",
-          "columns": [
-            {
-              "expression": "COALESCE(\"started_at\", \"updated_at\", \"created_at\")",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"cloud_agent_code_reviews\".\"status\" NOT IN ('pending', 'queued') AND COALESCE(\"cloud_agent_code_reviews\".\"terminal_reason\", '') <> 'abandoned'",
           "concurrently": true,
           "method": "btree",
           "with": {}
@@ -37807,6 +37791,198 @@
         }
       },
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.user_notification_history": {
+      "name": "user_notification_history",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "push_type": {
+          "name": "push_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "i18n_key": {
+          "name": "i18n_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "i18n_params": {
+          "name": "i18n_params",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fallback_title": {
+          "name": "fallback_title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fallback_body": {
+          "name": "fallback_body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "idempotency_key": {
+          "name": "idempotency_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dedupe_bucket": {
+          "name": "dedupe_bucket",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_user_notification_history_user_idempotency": {
+          "name": "UQ_user_notification_history_user_idempotency",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "idempotency_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "dedupe_bucket",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_user_notification_history_user_created": {
+          "name": "IDX_user_notification_history_user_created",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_user_notification_history_user_category_created": {
+          "name": "IDX_user_notification_history_user_category_created",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "category",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_user_notification_history_created_at": {
+          "name": "IDX_user_notification_history_created_at",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "user_notification_history_user_id_kilocode_users_id_fk": {
+          "name": "user_notification_history_user_id_kilocode_users_id_fk",
+          "tableFrom": "user_notification_history",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},

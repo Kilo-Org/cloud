@@ -353,6 +353,9 @@ patchedDependencies:
   # React Native installs on-device JSI bindings through its TurboModule runtime hook.
   llama.rn@0.12.9: patches/llama.rn@0.12.9.patch
   '@expo/react-native-action-sheet@4.1.1': patches/@expo+react-native-action-sheet@4.1.1.patch
+  # Android: a hugged markdown node re-measures its height at the width its view
+  # actually receives, so a line that the display view wraps is inside the box.
+  react-native-enriched-markdown@1.1.1: patches/react-native-enriched-markdown@1.1.1.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

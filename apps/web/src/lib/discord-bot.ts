@@ -23,7 +23,13 @@ import { runBot } from '@/lib/bots/core/run-bot';
 import {
   formatGitHubRepositoriesForPrompt,
   getGitHubRepositoryContext,
+  resolveGitHubRepositoryForOwner,
 } from '@/lib/slack-bot/github-repository-context';
+import {
+  authorizeDiscordSessionRequester,
+  DISCORD_SESSION_DENIAL_MESSAGES,
+  DISCORD_SESSION_DENIAL_PROMPT_NOTICES,
+} from '@/lib/discord-bot/discord-session-authorization';
 import {
   formatDiscordConversationContextForPrompt,
   getDiscordConversationContext,
@@ -164,6 +170,7 @@ async function spawnCloudAgentSession(
   model: string,
   authToken: string,
   ticketUserId: string,
+  sessionRequester: { discordUserId: string; kiloUserId: string },
   requesterInfo?: DiscordRequesterInfo
 ): Promise<{ response: string; sessionId?: string }> {
   console.log(
@@ -171,6 +178,26 @@ async function spawnCloudAgentSession(
     JSON.stringify(args, null, 2)
   );
   console.log('[DiscordBot] Owner:', JSON.stringify(owner, null, 2));
+
+  const repository = await resolveGitHubRepositoryForOwner(owner, args.githubRepo);
+  if (!repository) {
+    console.log('[DiscordBot] Rejected session for a repository outside the installation', {
+      discordUserId: sessionRequester.discordUserId,
+      kiloUserId: sessionRequester.kiloUserId,
+      githubRepo: args.githubRepo,
+    });
+    return {
+      response:
+        'Error: That GitHub repository is not available through this Discord installation. Ask an integration admin to connect it in Kilo, then try again.',
+    };
+  }
+
+  console.log('[DiscordBot] Starting Cloud Agent session', {
+    discordUserId: sessionRequester.discordUserId,
+    kiloUserId: sessionRequester.kiloUserId,
+    githubRepo: repository.full_name,
+    model,
+  });
 
   let githubToken: string | undefined;
   let kilocodeOrganizationId: string | undefined;
@@ -207,7 +234,7 @@ async function spawnCloudAgentSession(
   const result = await runSessionToCompletion({
     client,
     prepareInput: {
-      githubRepo: args.githubRepo,
+      githubRepo: repository.full_name,
       prompt: promptWithSignature,
       mode: (args.mode as PrepareSessionInput['mode']) || 'code',
       model,
@@ -289,6 +316,13 @@ export async function processDiscordBotMessage(
   const authToken = authResult.authToken;
   const authUserId = authResult.userId;
 
+  const authorization = await authorizeDiscordSessionRequester(owner, discordEventContext?.userId);
+  console.log('[DiscordBot] Session authorization', {
+    discordUserId: authorization.discordUserId ?? null,
+    authorized: authorization.authorized,
+    reason: authorization.authorized ? undefined : authorization.reason,
+  });
+
   // Gather context in parallel
   let discordContextForPrompt = '';
   let requesterInfo: DiscordRequesterInfo | undefined;
@@ -311,19 +345,20 @@ export async function processDiscordBotMessage(
     };
   }
 
-  const repoContext = await getGitHubRepositoryContext(owner);
+  const repoContext = authorization.authorized ? await getGitHubRepositoryContext(owner) : null;
 
   const systemPrompt =
     KILO_BOT_SYSTEM_PROMPT +
+    (authorization.authorized ? '' : DISCORD_SESSION_DENIAL_PROMPT_NOTICES[authorization.reason]) +
     discordContextForPrompt +
-    formatGitHubRepositoriesForPrompt(repoContext);
+    (repoContext ? formatGitHubRepositoriesForPrompt(repoContext) : '');
 
   const runResult = await runBot({
     authToken,
     model: selectedModel,
     systemPrompt,
     userMessage,
-    tools: [SPAWN_CLOUD_AGENT_TOOL],
+    tools: authorization.authorized ? [SPAWN_CLOUD_AGENT_TOOL] : [],
     logPrefix: '[DiscordBot]',
     requestOptions: {
       version: DISCORD_BOT_VERSION,
@@ -340,6 +375,14 @@ export async function processDiscordBotMessage(
         return { content: `Error executing tool: Unknown tool ${toolCall.function.name}` };
       }
 
+      if (!authorization.authorized) {
+        console.log('[DiscordBot] Denied session start', {
+          discordUserId: authorization.discordUserId ?? null,
+          reason: authorization.reason,
+        });
+        return { content: DISCORD_SESSION_DENIAL_MESSAGES[authorization.reason] };
+      }
+
       const args = JSON.parse(toolCall.function.arguments);
       const toolResult = await spawnCloudAgentSession(
         args,
@@ -347,6 +390,7 @@ export async function processDiscordBotMessage(
         selectedModel,
         authToken,
         authUserId,
+        { discordUserId: authorization.discordUserId, kiloUserId: authorization.kiloUserId },
         requesterInfo
       );
 

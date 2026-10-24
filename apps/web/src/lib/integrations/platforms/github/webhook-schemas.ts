@@ -32,11 +32,18 @@ export const GitHubAppAuthorizationRevokedPayloadSchema = z.object({
   }),
 });
 
+// installation.created always carries `sender.id`; the handler compares the
+// delivery's GitHub identities with the pending request's recorded requester,
+// so the id must survive validation instead of being stripped.
+const InstallationCreatedSenderSchema = GitHubSenderSchema.extend({
+  id: z.number(),
+});
+
 export const InstallationCreatedPayloadSchema = z.object({
   action: z.literal('created'),
   installation: GitHubInstallationSchema,
   requester: GitHubRequesterSchema.nullable().optional(),
-  sender: GitHubSenderSchema.optional(),
+  sender: InstallationCreatedSenderSchema.optional(),
 });
 
 export const InstallationDeletedPayloadSchema = z.object({
@@ -172,45 +179,6 @@ export const PullRequestPayloadSchema = z.object({
   sender: GitHubSenderSchema.optional(),
 });
 
-export const IssuePayloadSchema = z.object({
-  action: z.string(),
-  issue: z.object({
-    number: z.number(),
-    html_url: z.string(),
-    title: z.string(),
-    body: z.string().nullable().optional(),
-    user: z.object({
-      login: z.string(),
-      type: z.string().optional(),
-    }),
-    labels: z
-      .array(
-        z.union([
-          z.string(),
-          z.object({
-            name: z.string(),
-          }),
-        ])
-      )
-      .optional(),
-  }),
-  // Label field is present for "labeled" and "unlabeled" actions
-  label: z
-    .object({
-      name: z.string(),
-      color: z.string().optional(),
-    })
-    .optional(),
-  repository: GitHubRepositorySchema,
-  installation: z.object({
-    id: z.number(),
-  }),
-  sender: z.object({
-    login: z.string(),
-    type: z.string().optional(),
-  }),
-});
-
 // GitHub author_association values from webhook payloads
 export const GitHubAuthorAssociationSchema = z.enum([
   'COLLABORATOR',
@@ -309,7 +277,6 @@ export type InstallationTargetRenamedPayload = z.infer<
 export type InstallationRepositoriesPayload = z.infer<typeof InstallationRepositoriesPayloadSchema>;
 export type PushEventPayload = z.infer<typeof PushEventPayloadSchema>;
 export type PullRequestPayload = z.infer<typeof PullRequestPayloadSchema>;
-export type IssuePayload = z.infer<typeof IssuePayloadSchema>;
 export type PullRequestReviewCommentPayload = z.infer<typeof PullRequestReviewCommentPayloadSchema>;
 export type PullRequestReviewPayload = z.infer<typeof PullRequestReviewPayloadSchema>;
 export type GitHubAuthorAssociation = z.infer<typeof GitHubAuthorAssociationSchema>;

@@ -186,8 +186,8 @@ describe('recordElevatedOrganizationAdminAction', () => {
         organizationId,
         requiredRoles: ['owner'],
         membershipScope: scope,
-        action: 'organization.mcp_gateway.update',
-        message: 'MCP gateway: delete',
+        action: 'organization.gitlab_webhook_secret.rotate',
+        message: 'GitLab webhook secret: rotate',
       }
     );
   }

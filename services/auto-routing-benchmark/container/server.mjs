@@ -53,12 +53,17 @@ function serializeCli(run) {
   return next;
 }
 
-class NotStartedError extends Error {}
+class NotStartedError extends Error {
+  constructor(message, category) {
+    super(message);
+    this.category = category;
+  }
+}
 
 // A case accepted before SIGTERM but not yet spawned never reaches a provider.
 function runCaseSerialized(params) {
   return serializeCli(() => {
-    if (stopRequested) throw new NotStartedError('container is stopping');
+    if (stopRequested) throw new NotStartedError('container is stopping', 'shutdown');
     return runCase(params);
   });
 }
@@ -66,12 +71,20 @@ function runCaseSerialized(params) {
 const RESULT_DELIVERY_ATTEMPTS = 3;
 const RESPONSE_COMPLETION_TIMEOUT_MS = 10_000;
 
-// A rollout tears down the caller's connection while this process drains, so the
-// outcome is also posted to the worker, which persists it as recoverable output.
-async function deliverResult(callback, outcome) {
+function logCaseEvent(event, context, details, level = 'log') {
+  console[level](JSON.stringify({ event, ...context, ...details }));
+}
+
+// A successful HTTP write does not prove the worker persisted the result.
+async function deliverResult(callback, outcome, context) {
   const body = JSON.stringify({ execution: callback.execution, outcome });
   let category = 'http_error';
   for (let attempt = 1; attempt <= RESULT_DELIVERY_ATTEMPTS; attempt++) {
+    const details = { attempt, outcome: outcome.kind };
+    logCaseEvent('benchmark_container_result_delivery_attempt', context, {
+      ...details,
+      category: 'pending',
+    });
     try {
       const response = await fetch(callback.url, {
         method: 'POST',
@@ -79,10 +92,19 @@ async function deliverResult(callback, outcome) {
         body,
         signal: AbortSignal.timeout(10_000),
       });
-      if (response.ok) return;
+      if (response.ok) {
+        logCaseEvent('benchmark_container_result_delivered', context, {
+          ...details,
+          category: 'accepted',
+        });
+        return;
+      }
       if (response.status === 404) {
-        console.warn(
-          JSON.stringify({ event: 'benchmark_container_result_rejected', category: 'not_found' })
+        logCaseEvent(
+          'benchmark_container_result_rejected',
+          context,
+          { ...details, category: 'not_found' },
+          'warn'
         );
         return;
       }
@@ -93,16 +115,24 @@ async function deliverResult(callback, outcome) {
           ? 'timeout'
           : 'network_error';
     }
+    logCaseEvent('benchmark_container_result_delivery_failed', context, {
+      ...details,
+      category,
+    });
     if (attempt < RESULT_DELIVERY_ATTEMPTS) {
       await new Promise(resolve => setTimeout(resolve, attempt * 1_000));
     }
   }
-  console.error(
-    JSON.stringify({
-      event: 'benchmark_container_result_delivery_exhausted',
+  logCaseEvent(
+    'benchmark_container_result_delivery_exhausted',
+    context,
+    {
       category,
+      outcome: outcome.kind,
+      attempt: RESULT_DELIVERY_ATTEMPTS,
       attempts: RESULT_DELIVERY_ATTEMPTS,
-    })
+    },
+    'error'
   );
 }
 
@@ -114,6 +144,21 @@ function isResultCallback(value) {
     typeof value.execution === 'object' &&
     value.execution !== null
   );
+}
+
+function executionContext(callback, model, variant) {
+  const execution = callback?.execution;
+  return {
+    runId: typeof execution?.runId === 'string' ? execution.runId : null,
+    model: typeof execution?.model === 'string' ? execution.model : model,
+    variant: typeof execution?.variant === 'string' ? execution.variant : (variant ?? ''),
+    rep: Number.isInteger(execution?.rep) ? execution.rep : null,
+    caseId: typeof execution?.caseId === 'string' ? execution.caseId : null,
+    attemptStartedAt: Number.isInteger(execution?.attemptStartedAt)
+      ? execution.attemptStartedAt
+      : null,
+    retried: execution?.retried === true,
+  };
 }
 
 let warmup = null;
@@ -143,7 +188,7 @@ function warmUpOnce() {
 // 128 KiB (MAX_ARG_STRLEN), which a long-context case exceeds, and `kilo run` re-quotes
 // argv messages that contain spaces. With no positional message it reads stdin to EOF
 // and sends that text verbatim as the user message.
-function runCase({ model, prompt, kiloToken, kiloApiUrl, orgId, timeoutMs, variant }) {
+function runCase({ model, prompt, kiloToken, kiloApiUrl, orgId, timeoutMs, variant, context }) {
   const resolvedOrgId = typeof orgId === 'string' && orgId.length > 0 ? orgId : null;
   const args = ['run', '--format', 'json', '--auto', '-m', `kilo/${model}`];
   if (typeof variant === 'string' && variant.length > 0) args.push('--variant', variant);
@@ -166,16 +211,19 @@ function runCase({ model, prompt, kiloToken, kiloApiUrl, orgId, timeoutMs, varia
     },
     timeoutMs,
     kiloToken,
+    context,
   });
 }
 
-async function runCli({ args, stdin, env, timeoutMs, kiloToken }) {
+async function runCli({ args, stdin, env, timeoutMs, kiloToken, context }) {
   let dir;
   try {
     dir = await mkdtemp(join(tmpdir(), 'kilo-bench-'));
   } catch (error) {
-    // No child exists yet, so this case never reached a provider.
-    throw new NotStartedError(error instanceof Error ? error.message : 'case workspace failed');
+    throw new NotStartedError(
+      error instanceof Error ? error.message : 'case workspace failed',
+      'workspace_error'
+    );
   }
   const startedAt = Date.now();
   let result;
@@ -195,8 +243,16 @@ async function runCli({ args, stdin, env, timeoutMs, kiloToken }) {
           detached: true,
         });
       } catch (error) {
-        // A synchronous spawn failure creates no process, so no provider call happened.
-        throw new NotStartedError(error instanceof Error ? error.message : 'case process failed');
+        throw new NotStartedError(
+          error instanceof Error ? error.message : 'case process failed',
+          'spawn_error'
+        );
+      }
+      if (context && typeof child.pid === 'number') {
+        logCaseEvent('benchmark_container_case_started', context, {
+          outcome: 'running',
+          category: 'spawned',
+        });
       }
       if (stdin !== undefined) {
         // A CLI that exits before reading everything closes the pipe; its exit code reports it.
@@ -273,26 +329,21 @@ const server = createServer(
     activeHttpRequests += 1;
     let responseSettled = false;
     let responseDeadline;
-    let completeResponse;
-    const responseCompletion = new Promise(resolve => {
-      completeResponse = resolve;
-    });
-    const finishRequest = delivered => {
+    const finishRequest = () => {
       if (responseSettled) return;
       responseSettled = true;
       clearTimeout(responseDeadline);
       activeHttpRequests -= 1;
-      completeResponse(delivered);
       exitWhenIdle();
     };
-    res.once('finish', () => finishRequest(true));
-    res.once('close', () => finishRequest(false));
-    res.once('error', () => finishRequest(false));
+    res.once('finish', finishRequest);
+    res.once('close', finishRequest);
+    res.once('error', finishRequest);
     const sendResponse = (status, body) => {
       try {
         sendJson(res, status, body);
       } catch {
-        finishRequest(false);
+        finishRequest();
       }
     };
     void (async () => {
@@ -321,10 +372,6 @@ const server = createServer(
           return;
         }
 
-        if (stopRequested) {
-          sendResponse(503, { error: 'container is stopping' });
-          return;
-        }
         const { model, prompt, kiloToken, kiloApiUrl, orgId, variant, resultCallback } =
           parsed ?? {};
         const timeoutMs =
@@ -353,11 +400,18 @@ const server = createServer(
           return;
         }
         const callback = isResultCallback(resultCallback) ? resultCallback : null;
+        const context = executionContext(callback, model, variant);
+        logCaseEvent('benchmark_container_case_accepted', context, {
+          outcome: 'pending',
+          category: 'queued',
+        });
         if (callback) pendingDeliveries += 1;
         try {
           let outcome;
           let failure = null;
+          let category;
           try {
+            if (stopRequested) throw new NotStartedError('container is stopping', 'shutdown');
             outcome = {
               kind: 'completed',
               response: await runCaseSerialized({
@@ -368,36 +422,42 @@ const server = createServer(
                 orgId,
                 timeoutMs,
                 variant,
+                context,
               }),
             };
+            category = outcome.response.timedOut
+              ? 'timeout'
+              : outcome.response.exitCode === 0
+                ? 'success'
+                : 'cli_error';
           } catch (err) {
             // A case may only be reported as never started when no child was spawned.
             if (err instanceof NotStartedError) {
               outcome = { kind: 'not_started' };
+              category = err.category;
               if (!stopRequested) failure = err.message;
             } else {
               outcome = { kind: 'failed' };
+              category = 'execution_error';
               failure = err instanceof Error ? err.message : 'run failed';
             }
+          }
+          logCaseEvent('benchmark_container_case_settled', context, {
+            outcome: outcome.kind,
+            category,
+          });
+          if (callback && (outcome.kind === 'completed' || outcome.kind === 'not_started')) {
+            await deliverResult(callback, outcome, context);
           }
           if (outcome.kind === 'completed') sendResponse(200, outcome.response);
           else if (failure) sendResponse(500, { error: failure });
           else sendResponse(503, { error: 'container is stopping' });
-          if (!callback) return;
-          const recoverable = outcome.kind === 'completed' || outcome.kind === 'not_started';
-          if (!responseSettled) {
+          if (callback && !responseSettled) {
             responseDeadline = setTimeout(() => {
-              finishRequest(false);
+              finishRequest();
               res.destroy();
             }, RESPONSE_COMPLETION_TIMEOUT_MS);
             responseDeadline.unref();
-          }
-          const responseDelivered = await responseCompletion;
-          if (
-            recoverable &&
-            (outcome.kind === 'not_started' || stopRequested || !responseDelivered)
-          ) {
-            await deliverResult(callback, outcome);
           }
         } finally {
           if (callback) {

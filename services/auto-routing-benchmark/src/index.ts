@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { AUTO_ROUTERS, POLICY_SETTING_KEYS } from '@kilocode/auto-routing-contracts';
+import { AUTO_ROUTERS } from '@kilocode/auto-routing-contracts';
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { registerAdminRoutes } from './admin';
 import { authMiddleware } from './auth';
@@ -89,9 +89,8 @@ export default {
           );
           if (computed) {
             const computedValues: Record<string, unknown> = {};
-            for (const key of POLICY_SETTING_KEYS) {
-              const record = computed[key];
-              if (record) computedValues[key] = { value: record.value, source: record.source };
+            for (const [key, record] of Object.entries(computed)) {
+              computedValues[key] = { value: record.value, source: record.source };
             }
             console.log(
               JSON.stringify({
@@ -158,12 +157,30 @@ export default {
             console.error(
               JSON.stringify({
                 event: 'benchmark_capacity_requeue_failed',
-                error: String(dispatchError),
+                runId: message.body.runId,
+                kind: message.body.kind,
+                model: message.body.model,
+                variant: message.body.variant ?? null,
+                rep: message.body.rep ?? null,
+                caseIds: message.body.caseIds ?? null,
+                errorType: dispatchError instanceof Error ? dispatchError.name : 'unknown',
               })
             );
           }
         }
-        console.error(JSON.stringify({ event: 'benchmark_job_retry', error: String(error) }));
+        console.error(
+          JSON.stringify({
+            event: 'benchmark_job_retry',
+            runId: message.body.runId,
+            kind: message.body.kind,
+            model: message.body.model,
+            variant: message.body.variant ?? null,
+            rep: message.body.rep ?? null,
+            caseIds: message.body.caseIds ?? null,
+            recoverOutput: message.body.recoverOutput ?? false,
+            errorType: error instanceof Error ? error.name : 'unknown',
+          })
+        );
         // Explicit retry preserves redelivery without reducing Queue consumer concurrency.
         message.retry();
       }

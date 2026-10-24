@@ -80,6 +80,13 @@ The entry key is `gateway:<model>` or `client:<provider>/<model>`. The CLI regis
 entries from its own configuration (`kilo auto router add`). The web editor manages gateway
 entries and can remove client entries.
 
+Write requests carry an explicit entry budget: model IDs up to 200 characters, provider IDs up to
+100, at most 20 variants of up to 100 characters, at most 10 input modalities of up to 50
+characters, context lengths up to 10,000,000, per-million-token prices that are finite and at most
+1,000,000, and default entry keys up to 320 characters. The budget applies to create, update, and
+client-entry registration; stored definitions and responses still parse rows written before it, so
+the worker keeps serving them.
+
 The serving worker reads definitions through its existing Hyperdrive binding with an isolate
 cache. The web app owns create, update, and delete.
 
@@ -95,15 +102,18 @@ The benchmark worker stays the only writer of measurements and routing tables.
 - Platform-paid admission is limited to 20 new models per base router per owner per rolling 24
   hours. Ready and pending models do not count. A save over the limit gets `quota_exceeded`
   (HTTP 429) with `retryAt`, and every other validation runs before admission.
-  Web saves fetch the catalog before locking, then serialize final validation, admission, and
-  the write with the owner's PostgreSQL advisory lock. Updates validate and admit the merged,
-  locked definition; deletes and client-entry edits use the same lock. All registration batches
-  share a ten-second HTTP deadline, including response-body reads. A batch that fails in transit
-  or gets a worker 5xx before the deadline is retried once.
+  Web saves fetch the catalog and admit benchmarks before locking, and the owner's PostgreSQL
+  advisory lock covers the final validation and the write, so queued saves do not hold a pooled
+  connection across an outbound benchmark request. Admission runs at most one in-flight request per
+  owner. Updates admit the merged definition computed from a pre-lock read; if a concurrent save
+  changes the base router or pool before the lock is taken, the locked definition is admitted again
+  while that lock is held, before the write. Deletes and client-entry edits use the same lock without
+  admission. All registration batches share a ten-second HTTP deadline, including response-body
+  reads. A batch that fails in transit or gets a worker 5xx before the deadline is retried once.
   PostgreSQL and worker D1 do not share a transaction: an ambiguous HTTP failure, a later batch
-  rejection, or a database commit failure can leave already-admitted profiles and quota charges.
-  There is no refund API. Re-registering current pending, running, or ready profiles is
-  idempotent, but cannot undo those charges.
+  rejection, a database commit failure, or a save that loses a concurrent race can leave
+  already-admitted profiles and quota charges. There is no refund API. Re-registering current
+  pending, running, or ready profiles is idempotent, but cannot undo those charges.
 - The frontier base gets an owner queue, as the efficient base has today.
 - Client profiles are keyed by (owner, base router, entry key, variant, engine identity,
   repetitions). They are never shared with another owner or promoted to the platform.
@@ -202,7 +212,8 @@ with `custom_router_unavailable`. A custom router never routes outside its pool.
 ## Rollout and cutover
 
 1. Deploy contracts, benchmark support, web, serving, and gateway integration behind the
-   `kilo-auto-custom-routers` flag. Publish the CLI after cloud verification.
+   `kilo-auto-custom-routers` flag. Publish the CLI after cloud verification. The flag was
+   rolled out to everyone and removed before the cutover; custom routers no longer have a gate.
 2. Deploy the overlap migration separately from graduation. Keep legacy serving, settings,
    and storage. Run the silent conversion before sending the advance notice.
    - Each saved pool becomes an owner-scoped `efficient` custom router.
@@ -211,8 +222,7 @@ with `custom_router_unavailable`. A custom router never routes outside its pool.
      Custom modes are independent of platform mode settings and organization mode inheritance.
      Platform mode settings remain stored and editable throughout the transition.
    - Keep the migrated slug stable and reject deletion until graduation; benchmark difficulty remains editable.
-   - Migrated owners and authorized organization editors can use their router without the flag.
-     This does not enable unrelated router creation.
+   - Migrated owners and authorized organization editors keep using their router.
    - New legacy pool saves also convert before acknowledging success, including owners missed
      by an earlier scan.
 3. Resolve every conversion exception and verify both model IDs before the blast.
@@ -232,7 +242,7 @@ with `custom_router_unavailable`. A custom router never routes outside its pool.
    - The custom model ID retains its own pool and independently selected mode and benchmark difficulty.
    - Remove legacy pool settings/UI, custom-mode inheritance compatibility, and temporary pool edit guards.
      Keep the platform mode endpoint, mode-only UI, and persisted mode storage.
-   - Remove the rollout flag. Do not reconvert pools or resend the advance notice.
+   - Do not reconvert pools or resend the advance notice.
 7. Retire one-time pool conversion tooling after verification. Preserve the existing mode Durable
    Object, its binding, namespace, and saved modes. Do not apply a `deleted_classes` migration.
 

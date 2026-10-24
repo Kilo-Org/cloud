@@ -115,6 +115,7 @@ describe('getProvider local fake deterministic routing', () => {
       kind: 'provider',
       bypassAccessCheck: true,
       userByok: null,
+      isFree: true,
       provider: {
         id: 'custom',
         apiUrl: 'http://localhost:8811/api/openrouter',
@@ -134,6 +135,7 @@ describe('getProvider local fake deterministic routing', () => {
       kind: 'provider',
       provider: OPENROUTER,
       userByok: null,
+      isFree: false,
       bypassAccessCheck: false,
     });
 
@@ -146,6 +148,7 @@ describe('getProvider local fake deterministic routing', () => {
       kind: 'provider',
       provider: OPENROUTER,
       userByok: null,
+      isFree: false,
       bypassAccessCheck: false,
     });
     vercel.restore();
@@ -155,6 +158,7 @@ describe('getProvider local fake deterministic routing', () => {
       kind: 'provider',
       provider: OPENROUTER,
       userByok: null,
+      isFree: false,
       bypassAccessCheck: false,
     });
     missingUrl.restore();
@@ -188,6 +192,7 @@ describe('getProvider local fake deterministic routing', () => {
           kind: 'provider',
           provider,
           userByok: null,
+          isFree: true,
           bypassAccessCheck: false,
         });
         expect(shouldRouteToVercel).toHaveBeenCalledWith(
@@ -237,6 +242,18 @@ describe('getProvider exclusive model routing', () => {
       expect(result.kind === 'provider' && result.provider).toBe(VERCEL_AI_GATEWAY);
     }
   );
+
+  test('keeps a spend-bounded request on the provider that can enforce its ceiling', async () => {
+    jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
+
+    const result = await getProvider({
+      ...providerInput('openai/gpt-5-nano'),
+      boundedSpending: true,
+    });
+
+    expect(result.kind === 'provider' && result.provider).toBe(OPENROUTER);
+    expect(shouldRouteToVercel).not.toHaveBeenCalled();
+  });
 });
 
 describe('getProvider ChatGPT connection routing order', () => {
@@ -343,6 +360,7 @@ describe('getProvider ChatGPT connection routing order', () => {
       kind: 'provider',
       provider: VERCEL_AI_GATEWAY,
       userByok: [{ decryptedAPIKey: 'user-vercel-key', providerId: 'openai' }],
+      isFree: false,
       bypassAccessCheck: false,
     });
     env.restore();
@@ -361,6 +379,7 @@ describe('getProvider ChatGPT connection routing order', () => {
       kind: 'provider',
       provider: VERCEL_AI_GATEWAY,
       userByok: credentials,
+      isFree: false,
       bypassAccessCheck: false,
     });
     expect(jest.mocked(getBYOKforUser).mock.calls[0]?.slice(1)).toEqual([user.id, ['anthropic']]);
@@ -378,6 +397,7 @@ describe('getProvider ChatGPT connection routing order', () => {
       kind: 'provider',
       provider: OPENROUTER,
       userByok: null,
+      isFree: false,
       bypassAccessCheck: false,
     });
     expect(getOpenAiChatGptStoredConnection).not.toHaveBeenCalled();
@@ -399,6 +419,7 @@ describe('getProvider ChatGPT connection routing order', () => {
       kind: 'provider',
       provider: VERCEL_AI_GATEWAY,
       userByok: [{ decryptedAPIKey: 'user-vercel-key', providerId: 'openai' }],
+      isFree: false,
       bypassAccessCheck: false,
     });
     env.restore();

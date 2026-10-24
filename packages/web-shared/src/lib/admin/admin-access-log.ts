@@ -18,6 +18,8 @@ import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
  * `surface` — how the request arrived:
  *   - `"rest"` — a Next.js route handler (`/admin/api/*`, `/api/*`).
  *   - `"trpc"` — a tRPC procedure.
+ *   - `"server-component"` — a React server component render (a page, a layout,
+ *     or a server action), which has request headers but no tRPC context.
  *
  * `kind` — what produced the event (two values):
  *   - `"admin_guard"` — an explicit admin gate was satisfied. Emitted at the two
@@ -40,16 +42,19 @@ import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
  * or any secret in this event.
  */
 
-export type AdminAccessSurface = 'rest' | 'trpc';
-
-export type AdminAccessKind = 'admin_guard' | 'kilo_admin_elevation';
+export type AdminAccessSurface = 'rest' | 'trpc' | 'server-component';
 
 /**
  * Why an `is_admin` elevation fired. A closed union so the values stay stable
  * and queryable in Axiom, and so a typo cannot silently create a new bucket.
  */
 export type KiloAdminElevationReason =
-  /** REST `getAuthorizedOrgContext` granted `owner` on an arbitrary org. */
+  /**
+   * `getAuthorizedOrgContext` granted `owner` on an arbitrary org. The `_rest`
+   * suffix is historical: the helper is called from route handlers (default
+   * surface `"rest"`) and from server components (`"server-component"`), and the
+   * event's `surface` is what distinguishes them.
+   */
   | 'organization_access_rest'
   /** tRPC `ensureOrganizationAccess` granted `owner` on an arbitrary org. */
   | 'organization_access'
@@ -61,17 +66,15 @@ export type KiloAdminElevationReason =
   | 'cli_session_cross_org_query'
   /** Code-index read/write redirected to another org or user via `overrideUser`. */
   | 'code_index_user_override'
-  /** MCP gateway org-manager check bypassed for a global admin. */
-  | 'mcp_gateway_organization_manage'
   /** Security Agent audit report assembled with Kilo-admin visibility. */
   | 'security_agent_audit_report'
   /** A token carrying `isAdmin` was minted for a downstream service. */
   | 'service_token_mint';
 
-export type AdminAccessEvent = {
+/** Fields every `admin_access` event carries, whatever produced it. */
+type AdminAccessAttribution = {
   event: 'admin_access';
   surface: AdminAccessSurface;
-  kind: AdminAccessKind;
   kiloUserId: string;
   email: string;
   adminTier: 'super_admin' | 'platform_admin';
@@ -85,22 +88,46 @@ export type AdminAccessEvent = {
   tokenSource: string | null;
   /**
    * Best-effort route identifier. For tRPC this is the exact procedure path;
-   * for REST it is the concrete pathname (`x-pathname`) when available, falling
-   * back to Vercel's matched route pattern (`x-matched-path`), which may be
-   * templated (e.g. `/admin/api/users/[id]/...`).
+   * for REST and server components it is the concrete pathname (`x-pathname`)
+   * when available, falling back to Vercel's matched route pattern
+   * (`x-matched-path`), which may be templated (e.g. `/admin/api/users/[id]/...`).
    */
   route: string | null;
+  /**
+   * The tRPC operation type (`query`, `mutation`) on `surface:"trpc"`; the HTTP
+   * method on `surface:"rest"`. Null when no reliable value exists, which is
+   * today every REST and server-component path: neither carries a trustworthy
+   * method, so nothing is fabricated.
+   */
   method: string | null;
   ip: string | null;
-  /** Set for `kind:"kilo_admin_elevation"`; null for `kind:"admin_guard"`. */
-  reason: KiloAdminElevationReason | null;
-  /**
-   * What the elevation reached, as a `<type>:<id>` reference (see
-   * {@link organizationTarget} and friends). Null for `kind:"admin_guard"`,
-   * where `route` already identifies the resource.
-   */
-  target: string | null;
 };
+
+/**
+ * Discriminated on `kind`, so the documented correlation is enforced by the
+ * compiler: a guard event cannot carry elevation attribution, and an elevation
+ * always names its reason and target.
+ */
+export type AdminAccessEvent =
+  | (AdminAccessAttribution & {
+      kind: 'admin_guard';
+      reason: null;
+      target: null;
+    })
+  | (AdminAccessAttribution & {
+      kind: 'kilo_admin_elevation';
+      /** Why the `is_admin` escape hatch fired. */
+      reason: KiloAdminElevationReason;
+      /**
+       * What the elevation reached, as a `<type>:<id>` reference (see
+       * {@link organizationTarget} and friends), or {@link UNSCOPED_TARGET}
+       * when the elevation is not scoped to any single resource.
+       */
+      target: string;
+    });
+
+/** The `kind` discriminant of {@link AdminAccessEvent}. */
+export type AdminAccessKind = AdminAccessEvent['kind'];
 
 export type AdminAccessSink = (event: AdminAccessEvent) => void;
 
@@ -120,40 +147,62 @@ export function setAdminAccessSinkForTest(sink: AdminAccessSink | null): void {
 type AdminAccessUser = Pick<User, 'id' | 'google_user_email' | 'is_super_admin'>;
 
 /**
- * Build and emit an `admin_access` event. Called from both admin guard choke
- * points; elevation sites should use {@link elevateViaKiloAdmin} or
- * {@link recordKiloAdminElevation} instead of calling this directly.
+ * Input of {@link emitAdminAccessEvent}: the transport and identity fields plus
+ * the same `kind`-discriminated attribution as {@link AdminAccessEvent}. A guard
+ * caller cannot pass a `reason` or `target`, and an elevation caller cannot omit
+ * them.
  */
-export function emitAdminAccessEvent(params: {
+export type AdminAccessEventInput = {
   surface: AdminAccessSurface;
-  kind: AdminAccessKind;
   user: AdminAccessUser;
   authViaToken: boolean;
   tokenSource: string | null;
   route: string | null;
   method: string | null;
   ip: string | null;
-  reason?: KiloAdminElevationReason | null;
-  target?: string | null;
-}): void {
+} & (
+  | { kind: 'admin_guard' }
+  | { kind: 'kilo_admin_elevation'; reason: KiloAdminElevationReason; target: string }
+);
+
+/**
+ * Build and emit an `admin_access` event. Called from both admin guard choke
+ * points; elevation sites should use {@link elevateViaKiloAdmin} or
+ * {@link recordKiloAdminElevation} instead of calling this directly.
+ */
+export function emitAdminAccessEvent(params: AdminAccessEventInput): void {
+  const attribution = {
+    kiloUserId: params.user.id,
+    email: params.user.google_user_email,
+    adminTier: params.user.is_super_admin ? ('super_admin' as const) : ('platform_admin' as const),
+    authVia: params.authViaToken ? ('token' as const) : ('session' as const),
+    tokenSource: params.tokenSource,
+    route: params.route,
+    method: params.method,
+    ip: params.ip,
+  };
   // Audit logging is a side effect that must never deny a legitimate admin
   // action: swallow (and report) any sink failure rather than propagate it.
   try {
-    currentSink({
-      event: 'admin_access',
-      surface: params.surface,
-      kind: params.kind,
-      kiloUserId: params.user.id,
-      email: params.user.google_user_email,
-      adminTier: params.user.is_super_admin ? 'super_admin' : 'platform_admin',
-      authVia: params.authViaToken ? 'token' : 'session',
-      tokenSource: params.tokenSource,
-      route: params.route,
-      method: params.method,
-      ip: params.ip,
-      reason: params.reason ?? null,
-      target: params.target ?? null,
-    });
+    currentSink(
+      params.kind === 'kilo_admin_elevation'
+        ? {
+            event: 'admin_access',
+            surface: params.surface,
+            kind: 'kilo_admin_elevation',
+            ...attribution,
+            reason: params.reason,
+            target: params.target,
+          }
+        : {
+            event: 'admin_access',
+            surface: params.surface,
+            kind: 'admin_guard',
+            ...attribution,
+            reason: null,
+            target: null,
+          }
+    );
   } catch (error) {
     captureException(error, { tags: { operation: 'admin_access_log' } });
   }
@@ -200,7 +249,7 @@ export type AdminAuditContext = {
  */
 export async function recordKiloAdminElevation(
   ctx: AdminAuditContext,
-  params: { reason: KiloAdminElevationReason; target: string | null }
+  params: { reason: KiloAdminElevationReason; target: string }
 ): Promise<void> {
   if (ctx.trpcPath === undefined) {
     // `tokenSource` can only be preserved when the caller put it on the context,
@@ -248,7 +297,8 @@ export async function elevateViaKiloAdmin<const TGrant>(
   ctx: AdminAuditContext,
   params: {
     reason: KiloAdminElevationReason;
-    target: string | null;
+    /** See {@link organizationTarget} and {@link UNSCOPED_TARGET}. */
+    target: string;
     grant: TGrant;
   }
 ): Promise<TGrant> {
@@ -262,6 +312,10 @@ export async function elevateViaKiloAdmin<const TGrant>(
  * REST-only sites; `recordKiloAdminElevation` also delegates here for the
  * transport-agnostic helpers that REST handlers share with tRPC procedures.
  *
+ * `surface` says how the request arrived, and defaults to `'rest'` because route
+ * handlers are the common caller. Server components pass `'server-component'`,
+ * so their events are not labelled as route handlers.
+ *
  * Resolves the header store itself so callers cannot forget to. If the store is
  * unavailable — a unit test invoking the surrounding function directly, or a
  * script outside any request — the event is still emitted with null request
@@ -272,7 +326,8 @@ export async function recordKiloAdminElevationForRequest(params: {
   user: AdminAccessUser;
   tokenSource?: string | null;
   reason: KiloAdminElevationReason;
-  target: string | null;
+  target: string;
+  surface?: AdminAccessSurface;
 }): Promise<void> {
   let headersList: Headers;
   try {
@@ -288,10 +343,11 @@ function recordKiloAdminElevationFromHeaders(params: {
   headersList: Headers;
   tokenSource?: string | null;
   reason: KiloAdminElevationReason;
-  target: string | null;
+  target: string;
+  surface?: AdminAccessSurface;
 }): void {
   emitAdminAccessEvent({
-    surface: 'rest',
+    surface: params.surface ?? 'rest',
     kind: 'kilo_admin_elevation',
     user: params.user,
     authViaToken: authViaTokenFromHeaders(params.headersList),
@@ -338,10 +394,10 @@ export function serviceTarget(service: string): string {
 export const UNSCOPED_TARGET = '*';
 
 /**
- * Whether a request authenticated via an API bearer token. Mirrors the exact
- * branch condition in `getUserFromAuth` (truthiness of the `Authorization`
- * header), so the emitted `authVia` label can never diverge from the auth path
- * that was actually taken. This is the compromise discriminator.
+ * Whether a request authenticated via an API bearer token. This is the branch
+ * condition `getUserFromAuth`'s resolver takes — both call this predicate — so
+ * the emitted `authVia` label cannot diverge from the auth path that was
+ * actually taken. This is the compromise discriminator.
  */
 export function authViaTokenFromHeaders(headersList: Headers): boolean {
   return Boolean(headersList.get('Authorization'));

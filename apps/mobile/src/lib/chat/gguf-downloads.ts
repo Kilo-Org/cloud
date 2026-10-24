@@ -208,11 +208,15 @@ export function ggufDownloads({
       return;
     }
     if (outcome.value === null) {
-      // A cancel that raced the pause wins: the task reports itself paused, but
-      // the person asked for the download to stop, so it does.
+      // A cancel or a low-space stop that raced the pause wins: the task reports
+      // itself paused, but the download was already meant to end, so it does.
       if (download.stop === 'cancel') {
         discard(download);
         publish();
+        return;
+      }
+      if (download.stop === 'space') {
+        fail(download, 'space');
         return;
       }
       download.phase = 'paused';

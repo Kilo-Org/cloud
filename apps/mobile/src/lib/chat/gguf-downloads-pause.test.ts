@@ -50,4 +50,23 @@ describe('pausing one download', () => {
     expect(h.store.snapshot()).toMatchObject({ download: null, failure: null });
     expect(h.files.size).toBe(0);
   });
+
+  it('reports the space failure when a stated length arrives while the pause is landing', async () => {
+    const h = harness({ freeBytes: 2_000_000_000, cancelRacesPause: true });
+    h.store.start({
+      kind: 'url',
+      fileId: 'linked',
+      name: 'Linked',
+      url: 'https://example.com/big.gguf',
+    });
+    h.store.pause('linked');
+    // The server states a length that does not fit before the task reports the pause.
+    taskAt(h.tasks, 0).progress({ bytesWritten: 0, totalBytes: 3_000_000_000 });
+    await flush();
+    expect(h.store.snapshot()).toMatchObject({
+      download: null,
+      failure: { fileId: 'linked', problem: 'space' },
+    });
+    expect(h.files.size).toBe(0);
+  });
 });

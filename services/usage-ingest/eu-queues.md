@@ -8,7 +8,7 @@ consumer uploads. The [helper](scripts/provision-queues.mjs) looks up both exact
 names, verifies existing EU jurisdiction, creates only missing queues with explicit
 EU jurisdiction (DLQ first), and reads each creation back. Reruns reuse the pair;
 wrong/unknown jurisdiction, ambiguous/incomplete lookup or API/network errors stop
-upload. Nothing is deleted or modified. Native global auto-provisioning is disabled
+upload. No queue is deleted or modified. Native global auto-provisioning is disabled
 for EU deployments. Historical revisions without EU config keep their existing path.
 
 Local deployment uses `pnpm --filter cloudflare-usage-ingest queues:prepare` before

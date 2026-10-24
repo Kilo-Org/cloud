@@ -108,9 +108,13 @@ const KILO_SESSION_MS = 2 * MINUTE_MS;
  * too. Further retries stay bounded by this deadline, which is what stops a
  * create that keeps failing.
  *
- * Setup commands have no term here: each command carries its own inactivity and
- * hard timeout (`wrapper/src/control-plane/prepare.ts`), while their number is
- * the route's configuration, so this deadline is their aggregate bound.
+ * Setup commands have no term here. Each command carries its own inactivity and
+ * hard timeout (`wrapper/src/control-plane/prepare.ts`), while how many run and
+ * how long each takes are the route's configuration (bounded per command, not in
+ * total). This deadline is therefore their aggregate stop by design: a route
+ * whose setup work together outlasts the attempt fails as
+ * `preparation_timeout`, because a bound that grew with the configured command
+ * count would also stretch how long a stuck preparation can hold a session.
  */
 const ROUTE_PREPARATION_MS =
   PREPARATION_CREATE_MS +

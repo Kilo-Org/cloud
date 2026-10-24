@@ -147,12 +147,18 @@ overrides:
   adm-zip: 0.6.1
   baseline-browser-mapping: 2.11.20
   browserslist: 4.28.7
-  glob: '>=13.0.1'
+  # An entry added or changed here names a reviewed version: an exact pin for the
+  # version the lockfile carries, or a range that also states its upper bound, so
+  # the entry moves only through a reviewed change to this file and the lockfile.
+  # esbuild below keeps a floor without an upper bound; see its own note.
+  glob: 13.0.6
   google-auth-library: 10.6.2
+  # Two 0.28.x copies are in the tree as peer variants of the vite/vitest/storybook
+  # graph, so a bound here re-points those dependents. Not narrowed in this change.
   esbuild: '>=0.28.1'
-  lodash: '>=4.18.1'
-  diff: '>=8.0.3'
-  fast-xml-parser: '>=5.7.3'
+  lodash: 4.18.1
+  diff: 8.0.3
+  fast-xml-parser: 5.7.3
   fflate@^0.4.8: 0.4.9
   fflate@^0.8.2: 0.8.3
   vite: '>=8.1.6 <8.2.0'
@@ -169,7 +175,7 @@ overrides:
   compression: 1.8.2
   source-map-js: 1.2.2
   tinypool: 2.1.2
-  postcss: '>=8.5.23'
+  postcss: 8.5.30
   # @modelcontextprotocol/sdk declares zod as a peer and packages/harness-sdk
   # relies on the auto-installed peer. Without this line, a dependency that
   # brings a newer zod into the dev graph (knip) would silently change the zod
@@ -185,12 +191,14 @@ overrides:
   image-size@^1: npm:image-size-next@1.2.2
   image-size@^2: npm:image-size-next@2.1.1
   drizzle-orm: 0.45.2
-  lodash-es: '>=4.18.1'
+  lodash-es: 4.18.1
   '@xmldom/xmldom': 0.8.15
   qs: 6.16.0
   smol-toml: 1.9.0
   uuid@<11.1.1: 11.1.1
-  serialize-javascript: '>=7.0.3'
+  # Nothing in the tree depends on serialize-javascript today; the spec stays for a
+  # future dependent, bounded to the reviewed major.
+  serialize-javascript: '>=7.0.3 <8'
   hono: 4.13.13
   '@modelcontextprotocol/sdk@1.29.0': 1.32.1
   '@modelcontextprotocol/sdk@1.32.1>@hono/node-server': 2.0.10
@@ -235,19 +243,23 @@ overrides:
   '@expo/ui': 58.0.17
 packageExtensions:
   # Undeclared upstream deps that break config evaluation outside the Expo CLI
-  # under pnpm's isolated linker (autoInstallPeers is false).
+  # under pnpm's isolated linker (autoInstallPeers is false). An injected
+  # dependency selects a version at install, so each one is pinned to the copy its
+  # package already resolves.
   '@sentry/react-native':
     dependencies:
-      '@expo/config-plugins': '*'
+      '@expo/config-plugins': 58.0.9
       # React Native does not expose Metro to Sentry's vendored require calls.
       # Pin the exact Metro used by the SDK 58 @expo/metro graph.
       metro: 0.87.1
   expo-share-intent:
     dependencies:
-      '@expo/plist': '*'
+      '@expo/plist': 0.10.1
   react-native-appsflyer:
     dependencies:
-      '@expo/config-plugins': '*'
+      # This package's own Expo SDK line resolves 57.x; pin that copy, not the
+      # 58.x one the other injection uses.
+      '@expo/config-plugins': 57.0.9
   # Native ref declarations must use the app's React type identity.
   react-native-screens:
     peerDependencies:
@@ -331,14 +343,26 @@ publicHoistPattern:
   - metro
 autoInstallPeers: false
 allowBuilds:
+  # Verifies the resolved native binding, and only when it is absent installs the
+  # matching @swc/wasm through npm. Never fetches a bare binary.
   '@swc/core': true
+  # No install hook in the versions the lockfile resolves; the native binary is an
+  # optional platform package. Kept so a future release that adds a build step stays
+  # gated behind this list.
   '@tailwindcss/oxide': true
+  # Uses the @esbuild/<platform> optional dependency, and otherwise downloads the
+  # binary from the registry and checks it against `esbuild.binaryHashes`.
   esbuild: true
+  # Compiles the PostgreSQL client binding with node-gyp against the system libpq.
   libpq: true
+  # Uses the @cloudflare/workerd-<platform> optional dependency; when it is missing,
+  # downloads that platform package from the registry.
   workerd: true
   # Downloads its prebuilt iOS xcframework and Android JNI libraries from the
   # matching GitHub release and verifies each archive's SHA-256 (Quick Chat GGUF).
   llama.rn: true
+  # Downloads the vendored tree-sitter grammar sources and the iOS math xcframework
+  # from their upstream releases; a missing manifest is a no-op.
   react-native-enriched-markdown: true
   '@sentry/cli': false
   bufferutil: false
@@ -357,6 +381,9 @@ allowBuilds:
   '@openrouter/sdk': false
   spawn-sync: false
   tree-sitter-bash: false
+  # WebDriver binary for the extension's Firefox e2e suite; the postinstall
+  # downloads the driver for the current platform from its GitHub release.
   geckodriver: true
+  dtrace-provider: false
   '@scarf/scarf': false
   '@parcel/watcher': false

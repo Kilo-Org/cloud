@@ -2,7 +2,7 @@
 
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -67,6 +67,12 @@ export function ReviewDetailScreen({
   const { data, isLoading, isError, isFetching, error, refetch } = useReviewDetail(reviewId);
   const cancelReview = useCancelReview(scope);
   const retriggerReview = useRetriggerReview(scope);
+  // Set before `mutate` and released when the request settles. The mutation's own
+  // `isPending` only flips after `mutate` returns, so a confirmation that arrives
+  // twice — a double-tapped alert button, or the screen button pressed again
+  // before the pending render lands — would otherwise send a second retrigger
+  // that the server rejects with BAD_REQUEST.
+  const retryInFlight = useRef(false);
   const [visibleCount, setVisibleCount] = useState(FINDINGS_PAGE_SIZE);
   const loadedReview = data?.success ? data.review : undefined;
   // Only a retriggerable automatic review needs the reviewer config. Bitbucket
@@ -87,6 +93,24 @@ export function ReviewDetailScreen({
       cancelLabel: i18n.t('common.keepRunning'),
       onConfirm,
     });
+  }
+
+  function requestRetry() {
+    if (retryInFlight.current) {
+      return;
+    }
+    retryInFlight.current = true;
+    retriggerReview.mutate(
+      { reviewId },
+      {
+        onSuccess: () => {
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        },
+        onSettled: () => {
+          retryInFlight.current = false;
+        },
+      }
+    );
   }
 
   if (isLoading) {
@@ -280,7 +304,11 @@ export function ReviewDetailScreen({
             ) : null}
             {review.completed_at ? (
               <MetaRow
-                label={t('common.completed')}
+                label={t(
+                  review.status === 'completed'
+                    ? 'common.completed'
+                    : 'codeReviewer.reviewDetail.reviewEnded'
+                )}
                 value={timeAgo(parseTimestamp(review.completed_at))}
               />
             ) : null}
@@ -348,18 +376,13 @@ export function ReviewDetailScreen({
           {retryAction === 'retry' ? (
             <Button
               variant="secondary"
+              loading={retriggerReview.isPending}
               disabled={retriggerReview.isPending}
               onPress={() => {
-                confirmRetry(() => {
-                  retriggerReview.mutate(
-                    { reviewId },
-                    {
-                      onSuccess: () => {
-                        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                      },
-                    }
-                  );
-                });
+                if (retriggerReview.isPending) {
+                  return;
+                }
+                confirmRetry(requestRetry);
               }}
             >
               <Text>{t('codeReviewer.reviewDetail.retryReview')}</Text>

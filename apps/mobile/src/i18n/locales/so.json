@@ -53,6 +53,7 @@
     "connected": "Ku xiran",
     "couldNotLoadModels": "Moodeellada lama soo rari karin.",
     "couldNotLoadRepositories": "Kaydadka lama soo rari karin.",
+    "noRepositoriesFound": "Ma jiraan kaydad la helay",
     "critical": "Halis daran",
     "delete": "Tirtir",
     "deleted": "La tirtiray",
@@ -87,6 +88,7 @@
     "connect": "Ku xir",
     "connectBitbucket": "Ku xir Bitbucket",
     "connectGitlab": "Ku xir GitLab",
+    "connectProvider": "Ku xidh bixiye",
     "contentTruncated": "Nuxurka waa la gaabiyay",
     "copyLink": "Nuqul ka samee xiriiriyaha",
     "couldNotLoadOrganizations": "Ururrada lama soo rari karin.",
@@ -145,7 +147,8 @@
     "agent": "Wakiil",
     "durationMinuteShort": "daq",
     "durationHourShort": "saac",
-    "changes": "Isbeddellada"
+    "changes": "Isbeddellada",
+    "organizationTrialEnded": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Milkiilaha ururku wuxuu cusboonaysiin karaa biilasha kilo.ai, ka dibna isku day mar kale."
   },
   "language": {
     "restarting": "Dib ayaa loo bilaabayaa si luqadda loo adeegsado",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Waxaa laga yaabaa inaad u baahato inaad oggolaato gelitaanka kooxo ama mashaariic dheeraad ah oo ku jira GitLab.",
       "installGithubApp": "Abka GitHub ku rakib kaydadka",
       "installGithubAppDescription": "U oggolow abka Kilo ee GitHub inuu galo kaydadka aad rabto in dib loo eego.",
-      "noRepositoriesFound": "Ma jiraan kaydad la helay",
       "repositoryAccess": "oggolaanshaha gelitaanka kaydka"
     },
     "style": {
@@ -1437,6 +1439,8 @@
       "showMore": "Muuji wax badan",
       "created": "Waa la abuuray",
       "started": "Waa la bilaabay",
+      "reviewEnded": "La soo afjaray",
+      "severityNitpick": "Arrin yar",
       "tokens": "Tokenno",
       "tokensInOut": "{{input}} soo galay / {{output}} baxay",
       "council": "Golaha",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "Geli URL ansax ah oo codsi isku dar ah.",
       "couldNotCheckProviderStatus": "Xaaladda bixiyaha lama hubin karin.",
       "couldNotLoadProviders": "Bixiyeyaashaaga ku xiran lama soo dejin karin. Fadlan mar kale isku day.",
-      "connectProvider": "Ku xidh bixiye",
       "connectProviderDescription": "Ku xidh GitHub si aad adigu u bilowdo dib-u-eegista codsi isku dar ah.",
       "pullRequestUrl": "URL-ka codsiga isku darka",
       "instructions": "Tilmaamo (ikhtiyaari)",
@@ -1913,11 +1916,17 @@
       "actorSystem": "Nidaamka Kilo",
       "couldNotLoad": "Warbixinta hanti-dhawrka lama soo dejin karin.",
       "events": "Dhacdooyin",
+      "eventConfidence": "Kalsooni: {{confidence}}",
+      "eventReason": "Sabab: {{reason}}",
+      "eventsCount_one": "{{displayCount}} dhacdooyin",
+      "eventsCount_other": "{{displayCount}} dhacdooyin",
       "generated": "Waxaa la soo saaray {{generatedAt}}.",
       "noActivity": "Ma jiro dhaqdhaqaaq la diiwaangeliyay",
       "noActivityDescription": "Kilo ma hayo wax hawlo ah oo la xiriira natiijooyinka amniga oo laga warbixin karo laga bilaabo {{start}} ilaa {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Kaydka lama diiwaangelin",
+      "reasonUnknown": "Sabab aan la aqoonsan",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Soo koobidda warbixinta",
       "title": "Warbixinta hanti-dhawrka",
       "unavailable": "Warbixinta hanti-dhawrka lama heli karo",
@@ -1972,6 +1981,7 @@
       "reauthorizeButton": "Mar kale oggolaansho sii abka GitHub",
       "reauthorizeDescription": "Wakiilka amnigu wuxuu u baahan yahay oggolaansho si uu u akhriyo digniinaha Dependabot. Mar kale oggolaansho sii abka GitHub si aad u siiso oggolaanshahan.",
       "reauthorizeTitle": "Oggolaansho dheeraad ah ayaa loo baahan yahay",
+      "retryFailed": "Wakiilka amniga wali lama soo dejin karin. Isku xidhkaaga hubi oo mar kale isku day.",
       "setupFailed": "Lama bilaabi karin dejinta GitHub. Fadlan mar kale isku day."
     },
     "queuedActionUntracked": "Tallaabo safka ku jirta mar dambe lama raaci karin. Cusboonaysii si aad u aragto xaaladda ugu dambaysa.",
@@ -2565,7 +2575,10 @@
       "allowOnceAccessibility": "Oggolow hal mar",
       "alwaysAllow": "Had iyo jeer oggolow",
       "alwaysAllowAccessibility": "Had iyo jeer oggolow",
-      "retrying": "Mar kale ayaa la isku dayayaa…"
+      "retrying": "Mar kale ayaa la isku dayayaa…",
+      "retryDeny": "Mar kale isku day inaad diiddo",
+      "retryAllowOnce": "Mar kale isku day inaad oggolaato hal mar",
+      "retryAlwaysAllow": "Mar kale isku day inaad had iyo jeer oggolaato"
     },
     "questionCard": {
       "title": "Wakiilku wuxuu u baahan yahay jawaab",
@@ -3156,7 +3169,9 @@
       "sendInvite": "Dir casuumaad",
       "title": "Casuum xubin",
       "alreadyInvited": "Isaga ama iyadu horeba waa la casuumay ama horeba waa xubin.",
-      "sendError": "Casuumaadda lama diri karin."
+      "sendError": "Casuumaadda lama diri karin.",
+      "pendingInvitation": "Iimaylkani horeyba wuxuu leeyahay casuumaad sugaysa.",
+      "alreadyMember": "Qofkani horeyba waa xubin ka mid ah ururkan."
     },
     "invoices": {
       "downloadA11y": "Soo deji qaansheegta {{number}}",
@@ -3226,7 +3241,12 @@
       "pendingInvitations": "Casuumaadaha sugaya",
       "resendInvite": "Dib u dir casuumaadda",
       "shareInviteLink": "Wadaag xiriiriyaha casuumaadda",
-      "resendInviteError": "Casuumaadda dib lama diri karin."
+      "resendInviteError": "Casuumaadda dib lama diri karin.",
+      "inviteNotResendable": "Casuumaaddan mar dambe dib looma diri karo.",
+      "ownerAuthority": "Kaliya milkiilaha ururka ayaa maamuli kara milkiilayaasha.",
+      "ownRoleChange": "Ma beddeli kartid doorkaaga.",
+      "inviteExpired": "Casuumaaddan waqtigeedii wuu dhammaaday.",
+      "inviteAccepted": "Casuumaaddan mar hore ayaa la aqbalay."
     },
     "usageStats": {
       "inputTokens": "Halbeegyada qoraalka la geliyay",

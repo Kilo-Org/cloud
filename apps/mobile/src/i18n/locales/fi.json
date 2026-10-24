@@ -53,6 +53,7 @@
     "connected": "Yhdistetty",
     "couldNotLoadModels": "Mallien lataaminen epäonnistui.",
     "couldNotLoadRepositories": "Koodivarastojen lataaminen epäonnistui.",
+    "noRepositoriesFound": "Koodivarastoja ei löytynyt",
     "critical": "Kriittinen",
     "delete": "Poista",
     "deleted": "Poistettu",
@@ -87,6 +88,7 @@
     "connect": "Yhdistä",
     "connectBitbucket": "Yhdistä Bitbucket-tili",
     "connectGitlab": "Yhdistä GitLab-tili",
+    "connectProvider": "Yhdistä palveluntarjoaja",
     "contentTruncated": "Sisältö katkaistu",
     "copyLink": "Kopioi linkki",
     "couldNotLoadOrganizations": "Organisaatioiden lataaminen epäonnistui.",
@@ -145,7 +147,8 @@
     "agent": "Agentti",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Muutokset"
+    "changes": "Muutokset",
+    "organizationTrialEnded": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Organisaation omistaja voi päivittää laskutuksen osoitteessa kilo.ai ja yrittää sitten uudelleen."
   },
   "language": {
     "restarting": "Käynnistetään uudelleen kielen vaihtamiseksi",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Sinun on ehkä myönnettävä käyttöoikeus useampiin ryhmiin tai projekteihin GitLabissa.",
       "installGithubApp": "Asenna GitHub-sovellus koodivarastoihin",
       "installGithubAppDescription": "Anna Kilon GitHub-sovellukselle käyttöoikeus koodivarastoihin, jotka haluat katselmoida.",
-      "noRepositoriesFound": "Koodivarastoja ei löytynyt",
       "repositoryAccess": "koodivaraston käyttöoikeus"
     },
     "style": {
@@ -1437,6 +1439,8 @@
       "showMore": "Näytä lisää",
       "created": "Luotu",
       "started": "Aloitettu",
+      "reviewEnded": "Päättynyt",
+      "severityNitpick": "Pikkuvika",
       "tokens": "Tokenit",
       "tokensInOut": "{{input}} syötteenä / {{output}} tulosteena",
       "council": "Arviointiryhmä",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "Anna kelvollinen muutospyynnön URL-osoite.",
       "couldNotCheckProviderStatus": "Palveluntarjoajan tilaa ei voitu tarkistaa.",
       "couldNotLoadProviders": "Yhdistettyjä palveluntarjoajia ei voitu ladata. Yritä uudelleen.",
-      "connectProvider": "Yhdistä palveluntarjoaja",
       "connectProviderDescription": "Yhdistä GitHub, niin voit käynnistää muutospyynnön katselmoinnin manuaalisesti.",
       "pullRequestUrl": "Muutospyynnön URL-osoite",
       "instructions": "Ohjeet (valinnaiset)",
@@ -1913,11 +1916,17 @@
       "actorSystem": "Kilo-järjestelmä",
       "couldNotLoad": "Tarkastusraporttia ei voitu ladata",
       "events": "Tapahtumat",
+      "eventConfidence": "Varmuus: {{confidence}}",
+      "eventReason": "Syy: {{reason}}",
+      "eventsCount_one": "{{displayCount}} tapahtuma",
+      "eventsCount_other": "{{displayCount}} tapahtumaa",
       "generated": "Raportti luotiin {{generatedAt}}",
       "noActivity": "Ei kirjattuja tapahtumia",
       "noActivityDescription": "Kilossa ei ole raportoitavia tietoturvahavaintojen tapahtumia ajalta {{start}}–{{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Koodivarastoa ei ole kirjattu",
+      "reasonUnknown": "Tunnistamaton syy",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Raportin yhteenveto",
       "title": "Tarkastusraportti",
       "unavailable": "Tarkastusraporttia ei ole saatavilla",
@@ -1972,6 +1981,7 @@
       "reauthorizeButton": "Valtuuta GitHub-sovellus uudelleen",
       "reauthorizeDescription": "Tietoturva-agentti tarvitsee käyttöoikeuden Dependabot-hälytysten lukemiseen. Myönnä käyttöoikeus valtuuttamalla GitHub-sovellus uudelleen.",
       "reauthorizeTitle": "Lisäkäyttöoikeuksia tarvitaan",
+      "retryFailed": "Tietoturva-agenttia ei yhä voitu ladata. Tarkista internetyhteytesi ja yritä uudelleen.",
       "setupFailed": "GitHubin käyttöönottoa ei voitu aloittaa. Yritä uudelleen."
     },
     "queuedActionUntracked": "Jonoon lisätyn toiminnon seuranta katkesi. Näet ajantasaisen tilan päivittämällä näkymän.",
@@ -2565,7 +2575,10 @@
       "allowOnceAccessibility": "Salli kerran",
       "alwaysAllow": "Salli aina",
       "alwaysAllowAccessibility": "Salli aina",
-      "retrying": "Yritetään uudelleen…"
+      "retrying": "Yritetään uudelleen…",
+      "retryDeny": "Yritä kieltää uudelleen",
+      "retryAllowOnce": "Yritä salli kerran uudelleen",
+      "retryAlwaysAllow": "Yritä salli aina uudelleen"
     },
     "questionCard": {
       "title": "Agentti tarvitsee vastauksesi",
@@ -3156,7 +3169,9 @@
       "sendInvite": "Lähetä kutsu",
       "title": "Kutsu jäsen",
       "alreadyInvited": "Tämä sähköpostiosoite on jo kutsuttu tai kuuluu jo jäsenelle.",
-      "sendError": "Kutsun lähettäminen epäonnistui."
+      "sendError": "Kutsun lähettäminen epäonnistui.",
+      "pendingInvitation": "Tällä sähköpostiosoitteella on jo odottava kutsu.",
+      "alreadyMember": "Tämä henkilö on jo tämän organisaation jäsen."
     },
     "invoices": {
       "downloadA11y": "Lataa lasku {{number}}",
@@ -3226,7 +3241,12 @@
       "pendingInvitations": "Odottavat kutsut",
       "resendInvite": "Lähetä kutsu uudelleen",
       "shareInviteLink": "Jaa kutsulinkki",
-      "resendInviteError": "Kutsun lähettäminen uudelleen epäonnistui."
+      "resendInviteError": "Kutsun lähettäminen uudelleen epäonnistui.",
+      "inviteNotResendable": "Tätä kutsua ei voi enää lähettää uudelleen.",
+      "ownerAuthority": "Vain organisaation omistaja voi hallita omistajia.",
+      "ownRoleChange": "Et voi vaihtaa omaa rooliasi.",
+      "inviteExpired": "Tämä kutsu on vanhentunut.",
+      "inviteAccepted": "Tämä kutsu on jo hyväksytty."
     },
     "usageStats": {
       "inputTokens": "Syötetokenit",

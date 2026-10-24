@@ -11,6 +11,7 @@ const mutation = vi.hoisted(() => ({ mutate: vi.fn(), mutateAsync: vi.fn() }));
 
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',

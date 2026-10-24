@@ -53,6 +53,7 @@
     "connected": "కనెక్ట్ అయింది",
     "couldNotLoadModels": "మోడళ్లను లోడ్ చేయలేకపోయాం.",
     "couldNotLoadRepositories": "రిపోజిటరీలను లోడ్ చేయలేకపోయాం.",
+    "noRepositoriesFound": "రిపోజిటరీలు కనుగొనబడలేదు",
     "critical": "అత్యంత తీవ్రమైనది",
     "delete": "తొలగించండి",
     "deleted": "తొలగించారు",
@@ -87,6 +88,7 @@
     "connect": "కనెక్ట్ చేయండి",
     "connectBitbucket": "Bitbucketను కనెక్ట్ చేయండి",
     "connectGitlab": "GitLabను కనెక్ట్ చేయండి",
+    "connectProvider": "ప్రొవైడర్‌ను కనెక్ట్ చేయండి",
     "contentTruncated": "విషయాన్ని కుదించారు",
     "copyLink": "లింక్ కాపీ చేయండి",
     "couldNotLoadOrganizations": "సంస్థలను లోడ్ చేయలేకపోయాం.",
@@ -145,7 +147,8 @@
     "agent": "ఏజెంట్",
     "durationMinuteShort": "నిమి",
     "durationHourShort": "గం",
-    "changes": "మార్పులు"
+    "changes": "మార్పులు",
+    "organizationTrialEnded": "సంస్థ యొక్క ట్రయల్ ముగిసింది మరియు దానికి సక్రియ ప్లాన్ లేదు. సంస్థ యజమాని kilo.ai లో బిల్లింగ్‌ను అప్‌డేట్ చేసి, ఆపై మళ్లీ ప్రయత్నించవచ్చు."
   },
   "language": {
     "restarting": "ఎంచుకున్న భాషను వర్తింపజేయడానికి పునఃప్రారంభిస్తోంది",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "GitLabలో మరిన్ని గ్రూప్‌లు లేదా ప్రాజెక్ట్‌లకు యాక్సెస్ ఇవ్వాల్సి రావచ్చు.",
       "installGithubApp": "రిపోజిటరీల్లో GitHub యాప్‌ను ఇన్‌స్టాల్ చేయండి",
       "installGithubAppDescription": "మీరు సమీక్ష చేయించాలనుకునే రిపోజిటరీలను యాక్సెస్ చేయడానికి Kilo GitHub యాప్‌కు అనుమతి ఇవ్వండి.",
-      "noRepositoriesFound": "రిపోజిటరీలు కనుగొనబడలేదు",
       "repositoryAccess": "రిపోజిటరీ యాక్సెస్"
     },
     "style": {
@@ -1437,6 +1439,8 @@
       "showMore": "మరిన్ని చూపండి",
       "created": "సృష్టించబడింది",
       "started": "ప్రారంభించబడింది",
+      "reviewEnded": "ముగిసింది",
+      "severityNitpick": "చిన్న సూచన",
       "tokens": "టోకెన్లు",
       "tokensInOut": "{{input}} ఇన్‌పుట్ / {{output}} అవుట్‌పుట్",
       "council": "సమీక్ష మండలి",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "చెల్లుబాటు అయ్యే పుల్ రిక్వెస్ట్ URLను నమోదు చేయండి.",
       "couldNotCheckProviderStatus": "ప్రొవైడర్ స్థితిని తనిఖీ చేయలేకపోయాము.",
       "couldNotLoadProviders": "మీరు కనెక్ట్ చేసిన ప్రొవైడర్‌లను లోడ్ చేయలేకపోయాము. దయచేసి మళ్లీ ప్రయత్నించండి.",
-      "connectProvider": "ప్రొవైడర్‌ను కనెక్ట్ చేయండి",
       "connectProviderDescription": "పుల్ రిక్వెస్ట్ సమీక్షను మీరే ప్రారంభించడానికి GitHubను కనెక్ట్ చేయండి.",
       "pullRequestUrl": "పుల్ రిక్వెస్ట్ URL",
       "instructions": "సూచనలు (ఐచ్ఛికం)",
@@ -1913,11 +1916,17 @@
       "actorSystem": "Kilo సిస్టమ్",
       "couldNotLoad": "ఆడిట్ నివేదికను లోడ్ చేయలేకపోయాము.",
       "events": "సంఘటనలు",
+      "eventConfidence": "విశ్వాసం: {{confidence}}",
+      "eventReason": "కారణం: {{reason}}",
+      "eventsCount_one": "{{displayCount}} సంఘటన",
+      "eventsCount_other": "{{displayCount}} సంఘటనలు",
       "generated": "రూపొందించిన సమయం: {{generatedAt}}.",
       "noActivity": "కార్యాచరణ ఏదీ నమోదు కాలేదు",
       "noActivityDescription": "{{start}} నుంచి {{end}} వరకు భద్రతా సమస్యలకు సంబంధించి నివేదించదగిన కార్యాచరణ Kiloలో లేదు.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "రిపోజిటరీ నమోదు కాలేదు",
+      "reasonUnknown": "గుర్తించబడని కారణం",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "నివేదిక సారాంశం",
       "title": "ఆడిట్ నివేదిక",
       "unavailable": "ఆడిట్ నివేదిక అందుబాటులో లేదు",
@@ -1972,6 +1981,7 @@
       "reauthorizeButton": "GitHub యాప్‌కు మళ్లీ అనుమతి ఇవ్వండి",
       "reauthorizeDescription": "Dependabot హెచ్చరికలను చదవడానికి భద్రతా ఏజెంట్‌కు అనుమతి అవసరం. ఈ అనుమతి ఇవ్వడానికి GitHub యాప్‌కు మళ్లీ అనుమతి ఇవ్వండి.",
       "reauthorizeTitle": "అదనపు అనుమతులు అవసరం",
+      "retryFailed": "ఇంకా భద్రతా ఏజెంట్‌ను లోడ్ చేయలేకపోయాము. దయచేసి మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
       "setupFailed": "GitHub సెటప్‌ను ప్రారంభించలేకపోయాము. దయచేసి మళ్లీ ప్రయత్నించండి."
     },
     "queuedActionUntracked": "క్యూలో ఉన్న ఒక చర్య స్థితిని ఇక తెలుసుకోలేకపోయాము. తాజా స్థితిని చూడటానికి రిఫ్రెష్ చేయండి.",
@@ -2565,7 +2575,10 @@
       "allowOnceAccessibility": "ఒకసారి అనుమతించండి",
       "alwaysAllow": "ఎల్లప్పుడూ అనుమతించండి",
       "alwaysAllowAccessibility": "ఎల్లప్పుడూ అనుమతించండి",
-      "retrying": "మళ్లీ ప్రయత్నిస్తోంది…"
+      "retrying": "మళ్లీ ప్రయత్నిస్తోంది…",
+      "retryDeny": "నిరాకరించడానికి మళ్లీ ప్రయత్నించండి",
+      "retryAllowOnce": "ఒకసారి అనుమతించడానికి మళ్లీ ప్రయత్నించండి",
+      "retryAlwaysAllow": "ఎల్లప్పుడూ అనుమతించడానికి మళ్లీ ప్రయత్నించండి"
     },
     "questionCard": {
       "title": "ఏజెంట్‌కు మీ సమాధానం అవసరం",
@@ -3156,7 +3169,9 @@
       "sendInvite": "ఆహ్వానం పంపండి",
       "title": "సభ్యుడిని ఆహ్వానించండి",
       "alreadyInvited": "వారికి ఇప్పటికే ఆహ్వానం వెళ్లింది లేదా వారు ఇప్పటికే సభ్యులే.",
-      "sendError": "ఆహ్వానాన్ని పంపలేకపోయాము."
+      "sendError": "ఆహ్వానాన్ని పంపలేకపోయాము.",
+      "pendingInvitation": "ఈ ఇమెయిల్‌కు ఇప్పటికే పెండింగ్‌లో ఉన్న ఆహ్వానం ఉంది.",
+      "alreadyMember": "ఈ వ్యక్తి ఇప్పటికే ఈ సంస్థలో సభ్యుడు."
     },
     "invoices": {
       "downloadA11y": "{{number}} ఇన్వాయిస్‌ను డౌన్‌లోడ్ చేయండి",
@@ -3226,7 +3241,12 @@
       "pendingInvitations": "ఆమోదం కోసం వేచి ఉన్న ఆహ్వానాలు",
       "resendInvite": "ఆహ్వానాన్ని మళ్లీ పంపండి",
       "shareInviteLink": "ఆహ్వాన లింక్‌ను పంచుకోండి",
-      "resendInviteError": "ఆహ్వానాన్ని మళ్లీ పంపలేకపోయాము."
+      "resendInviteError": "ఆహ్వానాన్ని మళ్లీ పంపలేకపోయాము.",
+      "inviteNotResendable": "ఈ ఆహ్వానాన్ని ఇకపై మళ్లీ పంపడం సాధ్యం కాదు.",
+      "ownerAuthority": "సంస్థ యజమాని మాత్రమే యజమానులను నిర్వహించగలరు.",
+      "ownRoleChange": "మీరు మీ స్వంత పాత్రను మార్చలేరు.",
+      "inviteExpired": "ఈ ఆహ్వానం గడువు ముగిసింది.",
+      "inviteAccepted": "ఈ ఆహ్వానం ఇప్పటికే అంగీకరించబడింది."
     },
     "usageStats": {
       "inputTokens": "ఇన్‌పుట్ టోకెన్లు",

@@ -53,6 +53,7 @@
     "connected": "Ulangan",
     "couldNotLoadModels": "Modellarni yuklab bo‘lmadi.",
     "couldNotLoadRepositories": "Repozitoriylarni yuklab bo‘lmadi.",
+    "noRepositoriesFound": "Repozitoriyalar topilmadi",
     "critical": "O‘ta yuqori",
     "delete": "O‘chirish",
     "deleted": "O‘chirilgan",
@@ -87,6 +88,7 @@
     "connect": "Ulash",
     "connectBitbucket": "Bitbucketni ulash",
     "connectGitlab": "GitLabni ulash",
+    "connectProvider": "Provayderni ulash",
     "contentTruncated": "Matnning bir qismi ko‘rsatilmagan",
     "copyLink": "Havolani nusxalash",
     "couldNotLoadOrganizations": "Tashkilotlarni yuklab bo‘lmadi.",
@@ -145,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "daq",
     "durationHourShort": "soat",
-    "changes": "O'zgarishlar"
+    "changes": "O'zgarishlar",
+    "organizationTrialEnded": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Tashkilot egasi kilo.ai saytida hisob-kitobni yangilab, so'ng qayta urinib ko'rishi mumkin."
   },
   "language": {
     "restarting": "Tilni qo'llash uchun qayta ishga tushirilmoqda",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "GitLabda qo'shimcha guruh yoki loyihalarga kirish huquqini berishingiz kerak bo'lishi mumkin.",
       "installGithubApp": "GitHub ilovasini repozitoriyalarga o'rnating",
       "installGithubAppDescription": "Kilo GitHub ilovasiga ko'rib chiqilishini xohlagan repozitoriyalaringizga kirish huquqini bering.",
-      "noRepositoriesFound": "Repozitoriyalar topilmadi",
       "repositoryAccess": "repozitoriyaga kirish huquqi"
     },
     "style": {
@@ -1437,6 +1439,8 @@
       "showMore": "Ko'proq ko'rsatish",
       "created": "Yaratilgan",
       "started": "Boshlangan",
+      "reviewEnded": "Tugagan",
+      "severityNitpick": "Arzimagan",
       "tokens": "Token",
       "tokensInOut": "{{input}} kirish / {{output}} chiqish",
       "council": "Kengash",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "PR uchun to'g'ri URL manzilini kiriting.",
       "couldNotCheckProviderStatus": "Provayder holatini tekshirib bo'lmadi.",
       "couldNotLoadProviders": "Ulangan provayderlaringizni yuklay olmadik. Iltimos, qayta urinib ko'ring.",
-      "connectProvider": "Provayderni ulash",
       "connectProviderDescription": "PRni qo'lda ko'rib chiqishni boshlash uchun GitHubni ulang.",
       "pullRequestUrl": "PR manzili (URL)",
       "instructions": "Ko'rsatmalar (ixtiyoriy)",
@@ -1913,11 +1916,17 @@
       "actorSystem": "Kilo tizimi",
       "couldNotLoad": "Audit hisobotini yuklab bo'lmadi.",
       "events": "Hodisalar",
+      "eventConfidence": "Ishonch: {{confidence}}",
+      "eventReason": "Sabab: {{reason}}",
+      "eventsCount_one": "{{displayCount}} ta hodisa",
+      "eventsCount_other": "{{displayCount}} ta hodisa",
       "generated": "Yaratilgan vaqt: {{generatedAt}}.",
       "noActivity": "Qayd etilgan faoliyat yo'q",
       "noActivityDescription": "{{start}} dan {{end}} gacha Kilo tizimida xavfsizlik muammolari bo'yicha hisobotga kiritiladigan amallar qayd etilmagan.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repozitoriya qayd etilmagan",
+      "reasonUnknown": "Tanilmagan sabab",
+      "severityCount": "{{displayCount}} ta {{label}}",
       "summary": "Hisobot xulosasi",
       "title": "Audit hisoboti",
       "unavailable": "Audit hisoboti mavjud emas",
@@ -1972,6 +1981,7 @@
       "reauthorizeButton": "GitHub ilovasiga qayta ruxsat berish",
       "reauthorizeDescription": "Xavfsizlik agentiga Dependabot ogohlantirishlarini o'qish uchun ruxsat kerak. Bu ruxsatni berish uchun GitHub ilovasiga qayta ruxsat bering.",
       "reauthorizeTitle": "Qo'shimcha ruxsatlar talab qilinadi",
+      "retryFailed": "Xavfsizlik agentini hali ham yuklab bo'lmadi. Iltimos, aloqani tekshirib, qayta urinib ko'ring.",
       "setupFailed": "GitHubni sozlashni boshlab bo'lmadi. Iltimos, qayta urinib ko'ring."
     },
     "queuedActionUntracked": "Navbatga qo'yilgan amalni kuzatish imkoni yo'qoldi. Eng so'nggi holatni ko'rish uchun yangilang.",
@@ -2565,7 +2575,10 @@
       "allowOnceAccessibility": "Bir marta ruxsat berish",
       "alwaysAllow": "Doim ruxsat berish",
       "alwaysAllowAccessibility": "Doim ruxsat berish",
-      "retrying": "Qayta urinilmoqda…"
+      "retrying": "Qayta urinilmoqda…",
+      "retryDeny": "Qayta rad etish",
+      "retryAllowOnce": "Qayta bir marta ruxsat berish",
+      "retryAlwaysAllow": "Qayta doim ruxsat berish"
     },
     "questionCard": {
       "title": "Agentga javob kerak",
@@ -3156,7 +3169,9 @@
       "sendInvite": "Taklifnomani yuborish",
       "title": "A’zo taklif qilish",
       "alreadyInvited": "Bu elektron pochta manzili allaqachon taklif qilingan yoki allaqachon a'zo.",
-      "sendError": "Taklifnomani yuborib bo'lmadi."
+      "sendError": "Taklifnomani yuborib bo'lmadi.",
+      "pendingInvitation": "Bu elektron pochta uchun allaqachon kutilayotgan taklifnoma mavjud.",
+      "alreadyMember": "Bu shaxs allaqachon ushbu tashkilotning a'zosi."
     },
     "invoices": {
       "downloadA11y": "{{number}} raqamli hisob-fakturani yuklab olish",
@@ -3226,7 +3241,12 @@
       "pendingInvitations": "Qabul qilinmagan taklifnomalar",
       "resendInvite": "Taklifnomani qayta yuborish",
       "shareInviteLink": "Taklifnoma havolasini ulashish",
-      "resendInviteError": "Taklifnomani qayta yuborib bo'lmadi."
+      "resendInviteError": "Taklifnomani qayta yuborib bo'lmadi.",
+      "inviteNotResendable": "Ushbu taklifnomani endi qayta yuborib bo'lmaydi.",
+      "ownerAuthority": "Faqat tashkilot egasi egalarni boshqarishi mumkin.",
+      "ownRoleChange": "Siz o'z rolingizni o'zgartira olmaysiz.",
+      "inviteExpired": "Ushbu taklifnomaning muddati tugagan.",
+      "inviteAccepted": "Ushbu taklifnoma allaqachon qabul qilingan."
     },
     "usageStats": {
       "inputTokens": "Kirish tokenlari",

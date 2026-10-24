@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
+import { PREPARATION_OUTPUT_MAX_LENGTH, PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
 import { sortRemoteModelCatalogProviders } from './remote-model-order';
 import type { KiloSessionId, SlashCommandCatalogStatus } from './types';
 
@@ -374,6 +375,25 @@ export const REMOTE_COMMAND_MAX_COMMANDS = 256;
 export const REMOTE_COMMAND_MAX_STRING_LENGTH = 2_000;
 export const REMOTE_COMMAND_MAX_HINTS = 32;
 export const REMOTE_COMMAND_CATALOG_MAX_SERIALIZED_BYTES = 512 * 1024;
+
+/** Most message IDs a `session.queue.changed` snapshot may carry. */
+export const SESSION_QUEUE_MAX_IDS = 1_000;
+/** Most questions a `question.asked` event may carry. */
+export const SESSION_QUESTION_MAX_QUESTIONS = 32;
+
+/**
+ * A snapshot's retained tail carries the same byte budget the client applies
+ * when it trims step output. The character maximum is a cheap first pass: a
+ * string can never encode to fewer bytes than it has characters, so anything
+ * rejected there would fail the byte check too.
+ */
+const preparationOutputTailSchema = z
+  .string()
+  .max(PREPARATION_OUTPUT_TAIL_MAX_BYTES)
+  .refine(
+    value => new TextEncoder().encode(value).byteLength <= PREPARATION_OUTPUT_TAIL_MAX_BYTES,
+    { message: `Output tail cannot exceed ${PREPARATION_OUTPUT_TAIL_MAX_BYTES} UTF-8 bytes` }
+  );
 
 const remoteCommandStringSchema = z.string().max(REMOTE_COMMAND_MAX_STRING_LENGTH);
 const remoteSlashCommandInfoSchema = z
@@ -759,7 +779,7 @@ export type SessionTurnCloseData = z.infer<typeof sessionTurnCloseDataSchema>;
 export const sessionQueueChangedDataSchema = z
   .object({
     sessionID: z.string(),
-    queued: z.array(z.string()),
+    queued: z.array(z.string()).max(SESSION_QUEUE_MAX_IDS),
   })
   .passthrough();
 export type SessionQueueChangedData = z.infer<typeof sessionQueueChangedDataSchema>;
@@ -804,17 +824,22 @@ function toQuestionInfo(parsed: z.infer<typeof questionInfoSchema>): QuestionInf
  * run of entries that match `QuestionInfo` and stop at the first entry that
  * does not, so a rendered question keeps its CLI index instead of every later
  * answer sliding onto the wrong question. No usable entry means the payload
- * carries no questions the client can render.
+ * carries no questions the client can render. A list longer than
+ * `SESSION_QUESTION_MAX_QUESTIONS` fails the field, which the caller catches to
+ * `undefined`.
  */
-const questionListSchema = z.array(z.unknown()).transform((entries): QuestionInfo[] | undefined => {
-  const questions: QuestionInfo[] = [];
-  for (const entry of entries) {
-    const parsed = questionInfoSchema.safeParse(entry);
-    if (!parsed.success) break;
-    questions.push(toQuestionInfo(parsed.data));
-  }
-  return questions.length > 0 ? questions : entries.length > 0 ? undefined : [];
-});
+const questionListSchema = z
+  .array(z.unknown())
+  .max(SESSION_QUESTION_MAX_QUESTIONS)
+  .transform((entries): QuestionInfo[] | undefined => {
+    const questions: QuestionInfo[] = [];
+    for (const entry of entries) {
+      const parsed = questionInfoSchema.safeParse(entry);
+      if (!parsed.success) break;
+      questions.push(toQuestionInfo(parsed.data));
+    }
+    return questions.length > 0 ? questions : entries.length > 0 ? undefined : [];
+  });
 
 export const questionAskedDataSchema = z.object({
   id: z.string(),
@@ -915,7 +940,7 @@ const preparationStepSchema = z.object({
   command: z.string().optional(),
   commandIndex: z.number().optional(),
   commandCount: z.number().optional(),
-  outputTail: z.string().optional(),
+  outputTail: preparationOutputTailSchema.optional(),
   outputTruncated: z.boolean().optional(),
   exitCode: z.number().optional(),
 });
@@ -962,7 +987,7 @@ export const preparingDataSchema = z
     commandIndex: z.number().optional(),
     commandCount: z.number().optional(),
     detail: z.string().optional(),
-    output: z.string().optional(),
+    output: z.string().max(PREPARATION_OUTPUT_MAX_LENGTH).optional(),
     safeError: z.string().optional(),
     exitCode: z.number().optional(),
     attempt: preparationAttemptSchema.optional(),
@@ -1043,7 +1068,7 @@ export const slashCommandInfoSchema = z.object({
   agent: z.string().optional(),
   model: z.string().optional(),
   source: z.enum(['command', 'mcp', 'skill']).optional(),
-  hints: z.array(z.string()).default([]),
+  hints: z.array(z.string()).max(REMOTE_COMMAND_MAX_HINTS).default([]),
   subtask: z.boolean().optional(),
 });
 export type SlashCommandInfo = z.infer<typeof slashCommandInfoSchema>;
@@ -1054,7 +1079,7 @@ export const slashCommandCatalogStatusSchema: z.ZodType<SlashCommandCatalogStatu
 });
 
 export const commandsAvailableDataSchema = z.object({
-  commands: z.array(slashCommandInfoSchema),
+  commands: z.array(slashCommandInfoSchema).max(REMOTE_COMMAND_MAX_COMMANDS),
   // The notice is a nicety and the catalog is essential, so a malformed status
   // is dropped instead of failing the whole event and losing the catalog.
   catalogStatus: slashCommandCatalogStatusSchema.optional().catch(undefined),

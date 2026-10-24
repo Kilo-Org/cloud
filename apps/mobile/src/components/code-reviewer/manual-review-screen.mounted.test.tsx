@@ -1,11 +1,13 @@
+/* eslint-disable max-lines -- one mounted suite covers the screen's footer geometry, its recovery cases and the start-failure lifecycle on both platforms */
 import { createElement, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
 
+import { MANUAL_REVIEW_START_DEADLINE_MS } from './deadline-watched-start';
 import { ManualReviewScreen } from './manual-review-screen';
 
 // The explorer finding (manual-review, 2026-09-19) was the primary action
@@ -22,6 +24,7 @@ const status = vi.hoisted(() => ({
   loading: false,
   errorCode: null as string | null,
   pending: false,
+  mutate: vi.fn(),
   refetch: vi.fn(),
   push: vi.fn(),
 }));
@@ -156,7 +159,7 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   useReviewConfig: () => ({ data: { modelSlug: 'model-x', thinkingEffort: null } }),
 }));
 vi.mock('@/lib/hooks/use-code-reviews', () => ({
-  useCreateManualReview: () => ({ mutate: vi.fn(), isPending: status.pending }),
+  useCreateManualReview: () => ({ mutate: status.mutate, isPending: status.pending }),
 }));
 
 function findAllOfType(root: TestRenderer.ReactTestInstance, type: string) {
@@ -181,6 +184,52 @@ async function renderScreen() {
     )
   );
   return { renderer, unmount };
+}
+
+const PR_URL_PLACEHOLDER = 'https://github.com/owner/repo/pull/123';
+const GITHUB_PR_URL = 'https://github.com/drain-e2e-labs/notes/pull/42';
+const SERVER_NOT_FOUND = 'GitHub could not find that pull request.';
+
+/**
+ * The sentence the screen renders for a NOT_FOUND start failure. Read from the
+ * catalog at call time, because this suite asserts where and for how long the
+ * failure stays on screen; the code-to-copy mapping has its own suite
+ * (`manual-review-start-failure.mounted.test.tsx`).
+ */
+function startFailureText(): string {
+  return i18n.t('codeReviewer.manualReview.startNotFound', {
+    provider: 'GitHub',
+    requestNoun: i18n.t('common.pullRequest'),
+  });
+}
+
+/** A failed call as the tRPC client reports it: a code plus the server's message. */
+function startFailure() {
+  return Object.assign(new Error(SERVER_NOT_FOUND), {
+    data: { code: 'NOT_FOUND', message: SERVER_NOT_FOUND },
+  });
+}
+
+function propOf(node: TestRenderer.ReactTestInstance, key: string): unknown {
+  /* eslint-disable-next-line typescript-eslint/no-unsafe-member-access -- renderer props are an index signature */
+  return node.props[key];
+}
+
+/** Every string rendered through the shared `Text` mock. */
+function renderedTexts(root: TestRenderer.ReactTestInstance): string[] {
+  return findAllOfType(root, 'Text')
+    .map(node => propOf(node, 'children'))
+    .filter(child => typeof child === 'string');
+}
+
+/** The pull request URL box, told apart from the instructions box by its placeholder. */
+function urlField(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+  return only(
+    findAllOfType(root, 'TextInput').filter(
+      node => propOf(node, 'placeholder') === PR_URL_PLACEHOLDER
+    ),
+    'pull request URL field'
+  );
 }
 
 /** Every inline `paddingBottom` on the way up from a node, nearest first. */
@@ -211,6 +260,7 @@ beforeEach(() => {
   status.loading = false;
   status.errorCode = null;
   status.pending = false;
+  status.mutate.mockClear();
   status.refetch.mockClear();
   status.push.mockClear();
 });
@@ -352,5 +402,129 @@ describe('ManualReviewScreen connect provider CTA', () => {
     expect(className).toContain('mt-3');
 
     unmount();
+  });
+});
+
+describe('ManualReviewScreen failed start', () => {
+  it('keeps the form and withdraws the failure when the URL is cleared', async () => {
+    status.mutate.mockImplementationOnce(
+      (_vars: unknown, callbacks: { onError: (error: Error) => void }) => {
+        callbacks.onError(startFailure());
+      }
+    );
+    const { renderer, unmount } = await renderScreen();
+
+    act(() => {
+      (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(GITHUB_PR_URL);
+    });
+    const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
+    act(() => {
+      (propOf(action, 'onPress') as () => void)();
+    });
+
+    // The failure is reported inside the form: platform, both boxes and the
+    // model stay on screen with the draft the user entered.
+    expect(findAllOfType(renderer.root, 'ScrollView')).toHaveLength(1);
+    expect(findAllOfType(renderer.root, 'TextInput')).toHaveLength(2);
+    expect(findAllOfType(renderer.root, 'ModelSelector')).toHaveLength(1);
+    expect(renderedTexts(renderer.root)).toContain(startFailureText());
+    expect(renderedTexts(renderer.root)).not.toContain(SERVER_NOT_FOUND);
+    expect(findAllOfType(renderer.root, 'Button').map(node => propOf(node, 'variant'))).toContain(
+      'outline'
+    );
+
+    act(() => {
+      (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)('');
+    });
+
+    // Clearing the box withdraws the failure it produced and its retry, and
+    // leaves the form in place.
+    expect(renderedTexts(renderer.root)).not.toContain(startFailureText());
+    expect(
+      findAllOfType(renderer.root, 'Button').map(node => propOf(node, 'variant'))
+    ).not.toContain('outline');
+    expect(findAllOfType(renderer.root, 'ScrollView')).toHaveLength(1);
+    expect(findAllOfType(renderer.root, 'TextInput')).toHaveLength(2);
+
+    unmount();
+  });
+
+  it('ignores a late failure for a draft the user has already changed', async () => {
+    let finish: ((error: Error) => void) | undefined = undefined;
+    status.mutate.mockImplementationOnce(
+      (_vars: unknown, callbacks: { onError: (error: Error) => void }) => {
+        finish = callbacks.onError;
+      }
+    );
+    const { renderer, unmount } = await renderScreen();
+
+    act(() => {
+      (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(GITHUB_PR_URL);
+    });
+    const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
+    act(() => {
+      (propOf(action, 'onPress') as () => void)();
+    });
+
+    // The request is still out when the user edits the address it was made for.
+    act(() => {
+      (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(
+        `${GITHUB_PR_URL}/files`
+      );
+    });
+    act(() => finish?.(startFailure()));
+
+    expect(renderedTexts(renderer.root)).not.toContain(startFailureText());
+    expect(
+      findAllOfType(renderer.root, 'Button').map(node => propOf(node, 'variant'))
+    ).not.toContain('outline');
+
+    unmount();
+  });
+
+  it('still releases the action at the deadline after the draft changes', async () => {
+    vi.useFakeTimers();
+    try {
+      // The request never settles and the button reports it, so only the
+      // deadline can release the action.
+      status.pending = true;
+      status.mutate.mockImplementationOnce(() => undefined);
+      const { renderer, unmount } = await renderScreen();
+
+      const primaryAction = () =>
+        only(
+          findAllOfType(renderer.root, 'Button').filter(
+            node => propOf(node, 'variant') !== 'outline'
+          ),
+          'primary action'
+        );
+
+      act(() => {
+        (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(GITHUB_PR_URL);
+      });
+      act(() => {
+        (propOf(primaryAction(), 'onPress') as () => void)();
+      });
+      expect(propOf(primaryAction(), 'loading')).toBe(true);
+
+      // The user edits the draft while that request is still running.
+      act(() => {
+        (propOf(urlField(renderer.root), 'onChangeText') as (value: string) => void)(
+          `${GITHUB_PR_URL}/files`
+        );
+      });
+      act(() => {
+        vi.advanceTimersByTime(MANUAL_REVIEW_START_DEADLINE_MS);
+      });
+
+      // The wait is still real, so the action comes back and the stall copy
+      // explains it, even though the request was raised for older input.
+      expect(propOf(primaryAction(), 'loading')).toBe(false);
+      expect(renderedTexts(renderer.root)).toContain(i18n.t('common.takingLonger'));
+
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

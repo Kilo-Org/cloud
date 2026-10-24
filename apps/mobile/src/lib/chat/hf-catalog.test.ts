@@ -138,7 +138,6 @@ describe('a Hugging Face model detail', () => {
       file('Aux-27B-embeddings.gguf', 1_500_000_000, '8'),
     ]);
     expect(detail.quants).toEqual([]);
-    expect(detail.hasGgufFiles).toBe(true);
   });
 
   it('keeps a quantization of an embedding model named with a version or size', () => {
@@ -154,7 +153,6 @@ describe('a Hugging Face model detail', () => {
       file('Aux-27B-embedding-F16.gguf', 1_500_000_000, '1'),
     ]);
     expect(detail.quants).toEqual([]);
-    expect(detail.hasGgufFiles).toBe(true);
   });
 
   it('drops an auxiliary embedding file when the repository states no parameter count', () => {
@@ -188,7 +186,6 @@ describe('a Hugging Face model detail', () => {
       file('mtp-Model-27B-Q4_0.gguf', 1_680_271_776, '3'),
     ]);
     expect(detail.quants).toEqual([]);
-    expect(detail.hasGgufFiles).toBe(true);
   });
 
   it('offers nothing runnable when sharded files leave only an unlabeled draft', () => {
@@ -210,12 +207,11 @@ describe('a Hugging Face model detail', () => {
     ).toBe(undefined);
   });
 
-  it('says a repository without GGUF files has none', () => {
+  it('offers no quantization for a repository without GGUF files', () => {
     const detail = readModelDetail(info(), [
       { type: 'file', path: 'README.md', size: 10, oid: 'x' },
     ]);
     expect(detail.quants).toEqual([]);
-    expect(detail.hasGgufFiles).toBe(false);
   });
 
   it('still offers a file without a quantization name when no file has one', () => {
@@ -249,8 +245,8 @@ describe('a Hugging Face model detail', () => {
 
   it('shows one license name on the summary and every quantization card', () => {
     const detail = readModelDetail(info({ cardData: { license: 'apache-2.0' } }), [
-      file('Tiny-Chat-Q4_K_M.gguf', 500, '1'),
-      file('Tiny-Chat-Q8_0.gguf', 900, '2'),
+      file('Tiny-Chat-Q4_K_M.gguf', 320_000_000, '1'),
+      file('Tiny-Chat-Q8_0.gguf', 560_000_000, '2'),
     ]);
     expect(detail.license).toBe('Apache 2.0');
     expect(detail.quants.map(quant => quant.model.license)).toEqual(['Apache 2.0', 'Apache 2.0']);

@@ -179,6 +179,7 @@ export default function FolderPickerScreen() {
         empty
       ) : (
         <FlashList
+          nestedScrollEnabled
           style={[listStyle, { backgroundColor: colors.background }]}
           data={data}
           keyExtractor={entry => entry.path}

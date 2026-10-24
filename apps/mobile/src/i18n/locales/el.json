@@ -147,7 +147,8 @@
     "agent": "Μέσο",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Αλλαγές"
+    "changes": "Αλλαγές",
+    "organizationTrialEnded": "Η δοκιμαστική περίοδος του οργανισμού έχει λήξει και δεν υπάρχει ενεργό πρόγραμμα. Ένας ιδιοκτήτης οργανισμού μπορεί να ενημερώσει τη χρέωση στο kilo.ai και μετά να δοκιμάσει ξανά."
   },
   "language": {
     "restarting": "Επανεκκίνηση για εφαρμογή της νέας γλώσσας",
@@ -598,7 +599,7 @@
     "reviewServiceUnavailableDescription": "Η υπηρεσία είναι προσωρινά μη διαθέσιμη. Δοκιμάστε ξανά σε λίγο.",
     "description": "Περιγραφή",
     "noDescriptionProvided": "Δεν έχει προστεθεί περιγραφή.",
-    "review": "Έλεγχος",
+    "review": "Αξιολόγηση",
     "reviewPullRequest": "Αξιολόγηση αιτήματος ενσωμάτωσης",
     "headLine": "{{counts}} · τελευταία καταχώριση: {{sha}}",
     "entry": {
@@ -694,7 +695,7 @@
       "pendingComment": "εκκρεμή σχόλια",
       "pendingComment_other": "εκκρεμή σχόλια",
       "submitCountOfTotal": "Υποβολή {{displayFreshCount}} από {{displayTotalCount}} σχόλια",
-      "submitReview": "Υποβολή ελέγχου",
+      "submitReview": "Υποβολή αξιολόγησης",
       "partialPostedMessage": "Σχόλια που δημοσιεύτηκαν: {{displayFreshCount}}. Σχόλια που παρέμειναν στην ουρά σου επειδή αναφέρονται σε παλαιότερη καταχώριση: {{displayStaleCount}}.",
       "blockedRequestChanges": "Πρόσθεσε μια σύνοψη ή τουλάχιστον ένα σχόλιο για να ζητήσεις αλλαγές.",
       "blockedComment": "Πρόσθεσε μια σύνοψη ή τουλάχιστον ένα σχόλιο για να υποβάλεις αξιολόγηση με σχόλια."
@@ -730,13 +731,13 @@
       "mergedByAgo": "Συγχωνεύτηκε από {{login}} {{time}}",
       "closedAgo": "Έκλεισε {{time}}",
       "labels": "Ετικέτες",
-      "reviewers": "Ελεγκτές",
+      "reviewers": "Αξιολογητές",
       "assignees": "Υπεύθυνοι",
       "linkedIssues": "Συνδεδεμένα ζητήματα",
       "reviewApproved": "Εγκρίθηκε",
       "reviewChangesRequested": "Ζητήθηκαν αλλαγές",
       "reviewCommented": "Προστέθηκε σχόλιο",
-      "reviewPending": "Σε αναμονή ελέγχου",
+      "reviewPending": "Σε αναμονή αξιολόγησης",
       "openIssueA11y": "Άνοιγμα ζητήματος #{{number}} στο GitHub"
     },
     "pendingComment": {
@@ -813,9 +814,9 @@
       "shareMergeRequest": "Κοινοποίηση αιτήματος συγχώνευσης",
       "viewOnProvider": "Προβολή σε {{provider}}",
       "mergeRequestUnavailable": "Μη διαθέσιμο αίτημα συγχώνευσης",
-      "unavailableDescription": "Μπορεί να έχει διαγραφεί, ή μπορεί να μην έχετε πρόσβαση σε αυτό.",
+      "unavailableDescription": "Μπορεί να έχει διαγραφεί, ή μπορεί να μην έχεις πρόσβαση σε αυτό.",
       "accessDeniedMergeRequest": "Δεν έχεις δικαίωμα προβολής αυτού του αιτήματος συγχώνευσης.",
-      "couldNotLoadMergeRequest": "Δεν ήταν δυνατή η φόρτωση του αιτήματος συγχώνευσης.",
+      "couldNotLoadMergeRequest": "Δεν ήταν δυνατή η φόρτωση του αιτήματος συγχώνευσης",
       "discussionAccessDenied": "Δεν έχεις δικαίωμα προβολής της συζήτησης αυτού του αιτήματος συγχώνευσης.",
       "discussionUnavailableMessage": "Αυτό το αίτημα συγχώνευσης μπορεί να έχει αφαιρεθεί.",
       "noDiscussionDescription": "Δεν υπάρχουν νήματα αξιολόγησης ή σχόλια συζήτησης σε αυτό το αίτημα συγχώνευσης.",
@@ -3168,7 +3169,9 @@
       "sendInvite": "Αποστολή πρόσκλησης",
       "title": "Πρόσκληση μέλους",
       "alreadyInvited": "Ο χρήστης έχει ήδη προσκληθεί ή είναι ήδη μέλος.",
-      "sendError": "Δεν ήταν δυνατή η αποστολή της πρόσκλησης."
+      "sendError": "Δεν ήταν δυνατή η αποστολή της πρόσκλησης.",
+      "pendingInvitation": "Αυτό το email έχει ήδη μια εκκρεμή πρόσκληση.",
+      "alreadyMember": "Αυτό το άτομο είναι ήδη μέλος αυτού του οργανισμού."
     },
     "invoices": {
       "downloadA11y": "Λήψη τιμολογίου {{number}}",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "Εκκρεμείς προσκλήσεις",
       "resendInvite": "Επαναποστολή πρόσκλησης",
       "shareInviteLink": "Κοινή χρήση συνδέσμου πρόσκλησης",
-      "resendInviteError": "Δεν ήταν δυνατή η επαναποστολή της πρόσκλησης."
+      "resendInviteError": "Δεν ήταν δυνατή η επαναποστολή της πρόσκλησης.",
+      "inviteNotResendable": "Αυτή η πρόσκληση δεν μπορεί πλέον να επανασταλεί.",
+      "ownerAuthority": "Μόνο ο κάτοχος του οργανισμού μπορεί να διαχειρίζεται κατόχους.",
+      "ownRoleChange": "Δεν μπορείτε να αλλάξετε τον δικό σας ρόλο.",
+      "inviteExpired": "Αυτή η πρόσκληση έχει λήξει.",
+      "inviteAccepted": "Αυτή η πρόσκληση έχει ήδη γίνει αποδεκτή."
     },
     "usageStats": {
       "inputTokens": "Διακριτικά εισόδου",

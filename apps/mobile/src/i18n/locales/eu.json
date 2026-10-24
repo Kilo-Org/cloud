@@ -147,7 +147,8 @@
     "agent": "Agentea",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Aldaketak"
+    "changes": "Aldaketak",
+    "organizationTrialEnded": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Erakundearen jabe batek fakturazioa egunera dezake kilo.ai-n, eta gero berriro saiatu."
   },
   "language": {
     "restarting": "Hizkuntza aplikatzeko berrabiarazten",
@@ -3168,7 +3169,9 @@
       "sendInvite": "Bidali gonbidapena",
       "title": "Gonbidatu kidea",
       "alreadyInvited": "Dagoeneko gonbidatuta dago edo dagoeneko kidea da.",
-      "sendError": "Ezin izan da gonbidapena bidali."
+      "sendError": "Ezin izan da gonbidapena bidali.",
+      "pendingInvitation": "Helbide elektroniko honek dagoeneko gonbidapen bat du zain.",
+      "alreadyMember": "Pertsona hau dagoeneko erakunde honetako kidea da."
     },
     "invoices": {
       "downloadA11y": "Deskargatu {{number}} faktura",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "Onartzeko zain dauden gonbidapenak",
       "resendInvite": "Bidali gonbidapena berriro",
       "shareInviteLink": "Partekatu gonbidapen-esteka",
-      "resendInviteError": "Ezin izan da gonbidapena berriro bidali."
+      "resendInviteError": "Ezin izan da gonbidapena berriro bidali.",
+      "inviteNotResendable": "Gonbidapen hau ezin da berriro bidali.",
+      "ownerAuthority": "Erakunde baten jabeak soilik kudea ditzake beste jabeak.",
+      "ownRoleChange": "Ezin duzu zure rola aldatu.",
+      "inviteExpired": "Gonbidapen hau iraungi da.",
+      "inviteAccepted": "Gonbidapen hau dagoeneko onartu da."
     },
     "usageStats": {
       "inputTokens": "Sarrerako tokenak",

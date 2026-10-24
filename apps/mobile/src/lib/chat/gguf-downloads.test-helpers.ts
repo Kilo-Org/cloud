@@ -41,6 +41,10 @@ export function harness(
     readonly checksums?: Readonly<Record<string, string>>;
     /** A file the native hash cannot read. */
     readonly unreadable?: string;
+    /** A task that refuses pause the way expo-file-system does once it is cancelled. */
+    readonly refusePause?: boolean;
+    /** A task whose cancel loses to a pause already under way: it reports itself paused. */
+    readonly cancelRacesPause?: boolean;
   } = {}
 ) {
   const freeBytes = options.freeBytes ?? 8_000_000_000;
@@ -111,9 +115,17 @@ export function harness(
           return current.promise;
         },
         pause: () => {
+          if (options.refusePause === true) {
+            throw new Error('Cannot call pause() in state "cancelled"');
+          }
           paused();
         },
         cancel: () => {
+          // A pause already under way answers the cancel: the task reports itself paused.
+          if (options.cancelRacesPause === true) {
+            current.resolve(null);
+            return;
+          }
           current.reject(new Error('download cancelled'));
         },
       } satisfies GgufDownloadTask;

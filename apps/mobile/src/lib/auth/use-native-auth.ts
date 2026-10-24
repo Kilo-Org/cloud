@@ -33,10 +33,9 @@ import {
 import { resolveAdmission } from '@/lib/auth/resolve-admission';
 import { type SsoRecovery, useSsoRecovery } from '@/lib/auth/use-sso-recovery';
 
-// `/api/auth/native/otp` validates the address with zod's email check and
-// answers 400 INVALID_REQUEST. The hook runs the same check first, so a
-// mistyped address shows the same inline error without a failed request.
-const emailAddressSchema = z.email();
+// Match the OTP route's syntax check and bound the mobile address length
+// before delivery, keeping validation beside the email field.
+const emailAddressSchema = z.email().max(254);
 
 // Module-level guard — GoogleSignin.configure() is cheap but re-calling it
 // on every button press is pointless; upgrade to a re-configure path if client IDs

@@ -147,7 +147,8 @@
     "agent": "Ajan",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Chanjman"
+    "changes": "Chanjman",
+    "organizationTrialEnded": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Yon pwopriyetè òganizasyon ka mete ajou faktirasyon sou kilo.ai, epi eseye ankò."
   },
   "language": {
     "restarting": "Ap rekòmanse pou itilize lang ou chwazi a",
@@ -3168,7 +3169,9 @@
       "sendInvite": "Voye envitasyon an",
       "title": "Envite yon manm",
       "alreadyInvited": "Yo deja gen yon envitasyon oswa yo deja se yon manm.",
-      "sendError": "Pa t ka voye envitasyon an."
+      "sendError": "Pa t ka voye envitasyon an.",
+      "pendingInvitation": "Imel sa a deja gen yon envitasyon ki an atant.",
+      "alreadyMember": "Moun sa a deja yon manm nan òganizasyon sa a."
     },
     "invoices": {
       "downloadA11y": "Telechaje fakti {{number}}",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "Envitasyon annatant",
       "resendInvite": "Revoye envitasyon an",
       "shareInviteLink": "Pataje lyen envitasyon an",
-      "resendInviteError": "Pa t ka revoye envitasyon an."
+      "resendInviteError": "Pa t ka revoye envitasyon an.",
+      "inviteNotResendable": "Yo pa ka revoye envitasyon sa a ankò.",
+      "ownerAuthority": "Se yon pwopriyetè òganizasyon sèlman ki ka jere pwopriyetè yo.",
+      "ownRoleChange": "Ou pa ka chanje pwòp wòl ou.",
+      "inviteExpired": "Envitasyon sa a ekspire.",
+      "inviteAccepted": "Yo deja aksepte envitasyon sa a."
     },
     "usageStats": {
       "inputTokens": "Jeton antre",

@@ -147,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Ändringar"
+    "changes": "Ändringar",
+    "organizationTrialEnded": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. En organisationsägare kan uppdatera faktureringen på kilo.ai och sedan försöka igen."
   },
   "language": {
     "restarting": "Startar om för att byta språk",
@@ -3168,7 +3169,9 @@
       "sendInvite": "Skicka inbjudan",
       "title": "Bjud in medlem",
       "alreadyInvited": "Personen är redan inbjuden eller redan medlem.",
-      "sendError": "Inbjudan kunde inte skickas."
+      "sendError": "Inbjudan kunde inte skickas.",
+      "pendingInvitation": "Den här e-postadressen har redan en väntande inbjudan.",
+      "alreadyMember": "Den här personen är redan medlem i den här organisationen."
     },
     "invoices": {
       "downloadA11y": "Ladda ner faktura {{number}}",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "Väntande inbjudningar",
       "resendInvite": "Skicka inbjudan igen",
       "shareInviteLink": "Dela inbjudningslänk",
-      "resendInviteError": "Inbjudan kunde inte skickas igen."
+      "resendInviteError": "Inbjudan kunde inte skickas igen.",
+      "inviteNotResendable": "Den här inbjudan kan inte längre skickas igen.",
+      "ownerAuthority": "Endast en organisationsägare kan hantera ägare.",
+      "ownRoleChange": "Du kan inte ändra din egen roll.",
+      "inviteExpired": "Den här inbjudan har gått ut.",
+      "inviteAccepted": "Den här inbjudan har redan accepterats."
     },
     "usageStats": {
       "inputTokens": "Inmatade token",

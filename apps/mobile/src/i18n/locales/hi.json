@@ -147,7 +147,8 @@
     "agent": "प्रतिनिधि",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "बदलाव"
+    "changes": "बदलाव",
+    "organizationTrialEnded": "संगठन का परीक्षण समाप्त हो गया है और इसकी कोई सक्रिय योजना नहीं है। एक संगठन मालिक kilo.ai पर बिलिंग अपडेट कर सकता है, फिर दोबारा प्रयास करें।"
   },
   "language": {
     "restarting": "भाषा बदलने के लिए ऐप फिर से शुरू हो रहा है",
@@ -3167,7 +3168,9 @@
       "sendInvite": "आमंत्रण भेजें",
       "title": "सदस्य को आमंत्रित करें",
       "alreadyInvited": "वे पहले से आमंत्रित हैं या पहले से ही सदस्य हैं।",
-      "sendError": "आमंत्रण नहीं भेजा जा सका।"
+      "sendError": "आमंत्रण नहीं भेजा जा सका।",
+      "pendingInvitation": "इस ईमेल के लिए पहले से ही एक आमंत्रण लंबित है।",
+      "alreadyMember": "यह व्यक्ति पहले से ही इस संगठन का सदस्य है।"
     },
     "invoices": {
       "downloadA11y": "इनवॉइस {{number}} डाउनलोड करें",
@@ -3237,7 +3240,12 @@
       "pendingInvitations": "लंबित आमंत्रण",
       "resendInvite": "आमंत्रण फिर से भेजें",
       "shareInviteLink": "आमंत्रण का लिंक साझा करें",
-      "resendInviteError": "आमंत्रण फिर से नहीं भेजा जा सका।"
+      "resendInviteError": "आमंत्रण फिर से नहीं भेजा जा सका।",
+      "inviteNotResendable": "यह आमंत्रण अब फिर से नहीं भेजा जा सकता।",
+      "ownerAuthority": "केवल संगठन का मालिक ही मालिकों को प्रबंधित कर सकता है।",
+      "ownRoleChange": "आप अपनी स्वयं की भूमिका नहीं बदल सकते।",
+      "inviteExpired": "यह आमंत्रण समाप्त हो चुका है।",
+      "inviteAccepted": "यह आमंत्रण पहले ही स्वीकार किया जा चुका है।"
     },
     "usageStats": {
       "inputTokens": "इनपुट टोकन",

@@ -18,6 +18,14 @@ current render time. Elapsed grants and non-expiring credits do not contribute t
 its amount or earliest expiry, for both personal and organization accounts.
 The balance continues to come from the balance query.
 
+## Session restoration
+
+The first auth-provider mount uses the credentials preloaded when JavaScript
+starts. Later mounts read secure storage again: Android can recreate the activity
+without restarting JavaScript, so the initial snapshot may predate sign-in.
+Back-exit and force-stop preserve the stored session; explicit sign-out clears it.
+The existing bootstrap loading and retryable-error surfaces cover restoration.
+
 ## Runtime recovery
 
 Retry on the runtime-error screen restores the last focused route for the
@@ -40,6 +48,17 @@ Usage tiles retain labels and show cached totals or em dash placeholders.
 Unavailable usage and low-balance settings expose Retry. The low-balance row
 retries its settings read until data is available, then opens configuration.
 Cached settings remain visible during offline pauses and refresh failures.
+
+## Sheet list gestures and actions
+
+Vertical scroll containers inside native route sheets and `Sheet` surfaces enable
+`nestedScrollEnabled` so Android scrolls the list before handing a downward drag
+to the sheet at the top. Keep self-scrolling picker lists outside the shell's
+`ScrollView`.
+
+Shared `SheetHeader` actions use explicit 48px minimum width and height, not
+rem-based sizes: native rem is 14dp. Labels retain their intrinsic size as text
+scales; the title takes the remaining space.
 
 ## Selectable row accessibility
 
@@ -69,6 +88,14 @@ A response that fails before producing any content still shows its failure and
 Retry action, including after reopening the session. Retry resends the original
 user prompt as a new turn in the same session; the original prompt remains in
 the transcript.
+
+## Email sign-in
+
+The email form validates syntax and a 254-character maximum after trimming and
+lowercasing. Invalid addresses stay on the email step with localized inline
+feedback. The code-step destination abbreviates addresses longer than 48
+characters with a middle ellipsis; delivery and verification use the full address.
+The code input and Verify action remain available below the destination prompt.
 
 ## Transcript action targets
 

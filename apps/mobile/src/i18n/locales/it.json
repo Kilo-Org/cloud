@@ -147,7 +147,8 @@
     "agent": "Agente",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Modifiche"
+    "changes": "Modifiche",
+    "organizationTrialEnded": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Il proprietario dell'organizzazione può aggiornare la fatturazione su kilo.ai, poi riprova."
   },
   "language": {
     "restarting": "Riavvio per applicare la lingua selezionata",
@@ -3211,7 +3212,9 @@
       "sendInvite": "Invia l'invito",
       "title": "Invita un membro",
       "alreadyInvited": "Questo indirizzo ha già un invito in sospeso o appartiene già a un membro.",
-      "sendError": "Impossibile inviare l'invito."
+      "sendError": "Impossibile inviare l'invito.",
+      "pendingInvitation": "Questo indirizzo email ha già un invito in sospeso.",
+      "alreadyMember": "Questa persona è già un membro di questa organizzazione."
     },
     "invoices": {
       "downloadA11y": "Scarica la fattura {{number}}",
@@ -3281,7 +3284,12 @@
       "pendingInvitations": "Inviti in sospeso",
       "resendInvite": "Invia di nuovo l'invito",
       "shareInviteLink": "Condividi il link di invito",
-      "resendInviteError": "Impossibile inviare di nuovo l'invito."
+      "resendInviteError": "Impossibile inviare di nuovo l'invito.",
+      "inviteNotResendable": "Questo invito non può più essere inviato di nuovo.",
+      "ownerAuthority": "Solo un proprietario dell'organizzazione può gestire i proprietari.",
+      "ownRoleChange": "Non puoi modificare il tuo ruolo.",
+      "inviteExpired": "Questo invito è scaduto.",
+      "inviteAccepted": "Questo invito è già stato accettato."
     },
     "usageStats": {
       "inputTokens": "Token in ingresso",

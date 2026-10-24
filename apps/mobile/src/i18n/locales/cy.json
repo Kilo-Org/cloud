@@ -147,7 +147,8 @@
     "agent": "Asiant",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Newidiadau"
+    "changes": "Newidiadau",
+    "organizationTrialEnded": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gall perchennog sefydliad ddiweddaru bilio ar kilo.ai, ac yna rhoi cynnig arall arni."
   },
   "language": {
     "restarting": "Yn ailgychwyn i newid yr iaith",
@@ -3344,7 +3345,9 @@
       "sendInvite": "Anfon gwahoddiad",
       "title": "Gwahodd aelod",
       "alreadyInvited": "Mae'r cyfeiriad e-bost hwn eisoes wedi cael gwahoddiad neu'n eisoes yn perthyn i aelod.",
-      "sendError": "Ni lwyddwyd i anfon y gwahoddiad."
+      "sendError": "Ni lwyddwyd i anfon y gwahoddiad.",
+      "pendingInvitation": "Mae gwahoddiad ar y gweill eisoes ar gyfer yr e-bost hwn.",
+      "alreadyMember": "Mae'r person hwn eisoes yn aelod o'r sefydliad hwn."
     },
     "invoices": {
       "downloadA11y": "Lawrlwytho anfoneb {{number}}",
@@ -3414,7 +3417,12 @@
       "pendingInvitations": "Gwahoddiadau sy'n aros",
       "resendInvite": "Ailanfon y gwahoddiad",
       "shareInviteLink": "Rhannu dolen gwahoddiad",
-      "resendInviteError": "Ni lwyddwyd i ailanfon y gwahoddiad."
+      "resendInviteError": "Ni lwyddwyd i ailanfon y gwahoddiad.",
+      "inviteNotResendable": "Ni ellir ailanfon y gwahoddiad hwn mwyach.",
+      "ownerAuthority": "Dim ond perchennog sefydliad sy'n gallu rheoli perchnogion.",
+      "ownRoleChange": "Ni allwch newid eich rôl eich hun.",
+      "inviteExpired": "Mae'r gwahoddiad hwn wedi dod i ben.",
+      "inviteAccepted": "Mae'r gwahoddiad hwn eisoes wedi'i dderbyn."
     },
     "usageStats": {
       "inputTokens": "Tocynnau mewnbwn",

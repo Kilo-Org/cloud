@@ -147,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Muudatused"
+    "changes": "Muudatused",
+    "organizationTrialEnded": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Organisatsiooni omanik saab arveldust kilo.ai keskkonnas uuendada ja seejärel uuesti proovida."
   },
   "language": {
     "restarting": "Keele vahetamiseks taaskäivitatakse rakendus",
@@ -3168,7 +3169,9 @@
       "sendInvite": "Saada kutse",
       "title": "Kutsu liige",
       "alreadyInvited": "Ta on juba kutsutud või juba liige.",
-      "sendError": "Kutset ei õnnestunud saata."
+      "sendError": "Kutset ei õnnestunud saata.",
+      "pendingInvitation": "Sellele e-posti aadressile on juba saadetud kutse, mis on ootel.",
+      "alreadyMember": "See isik on juba selle organisatsiooni liige."
     },
     "invoices": {
       "downloadA11y": "Laadi alla arve {{number}}",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "Ootel kutsed",
       "resendInvite": "Saada kutse uuesti",
       "shareInviteLink": "Jaga kutselinki",
-      "resendInviteError": "Kutset ei õnnestunud uuesti saata."
+      "resendInviteError": "Kutset ei õnnestunud uuesti saata.",
+      "inviteNotResendable": "Seda kutset ei saa enam uuesti saata.",
+      "ownerAuthority": "Ainult organisatsiooni omanik saab omanikke hallata.",
+      "ownRoleChange": "Sa ei saa oma rolli muuta.",
+      "inviteExpired": "See kutse on aegunud.",
+      "inviteAccepted": "See kutse on juba vastu võetud."
     },
     "usageStats": {
       "inputTokens": "Sisendtokenid",

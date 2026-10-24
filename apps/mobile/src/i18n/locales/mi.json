@@ -147,7 +147,8 @@
     "agent": "Kaihoko",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Ngā huringa"
+    "changes": "Ngā huringa",
+    "organizationTrialEnded": "Kua mutu te whakamātautau o te whakahaerenga, ā, kāore ōna mahere kaha. Ka taea e te rangatira o te whakahaerenga te whakahou i te nama i kilo.ai, kātahi ka whakamātau anō."
   },
   "language": {
     "restarting": "Kei te tīmata anō hei whakamahi i te reo",
@@ -3168,7 +3169,9 @@
       "sendInvite": "Tukuna te pōwhiri",
       "title": "Pōwhiritia he mema",
       "alreadyInvited": "Kua pōwhiritia kē, kua mema kē rānei.",
-      "sendError": "Kāore i taea te tuku i te pōwhiri."
+      "sendError": "Kāore i taea te tuku i te pōwhiri.",
+      "pendingInvitation": "Kua whai kē tēnei īmēra i tētahi pōwhiri e tatari ana.",
+      "alreadyMember": "He mema kē tēnei tangata o tēnei whakahaerenga."
     },
     "invoices": {
       "downloadA11y": "Tīkina ake te nama {{number}}",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "Ngā pōwhiri e tatari ana",
       "resendInvite": "Tukuna anō te pōwhiri",
       "shareInviteLink": "Tuaritia te hononga pōwhiri",
-      "resendInviteError": "Kāore i taea te tuku anō i te pōwhiri."
+      "resendInviteError": "Kāore i taea te tuku anō i te pōwhiri.",
+      "inviteNotResendable": "Kua kore e taea tēnei pōwhiri te tuku anō.",
+      "ownerAuthority": "Mā te rangatira anake o te whakahaere e taea te whakahaere i ngā rangatira.",
+      "ownRoleChange": "Kāore e taea e koe te huri i tō ake tūranga.",
+      "inviteExpired": "Kua pau te wā o tēnei pōwhiri.",
+      "inviteAccepted": "Kua whakaaetia kētia tēnei pōwhiri."
     },
     "usageStats": {
       "inputTokens": "Ngā tōkena tāuru",

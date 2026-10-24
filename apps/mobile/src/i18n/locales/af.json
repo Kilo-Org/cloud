@@ -147,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Wysigings"
+    "changes": "Wysigings",
+    "organizationTrialEnded": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. 'n Organisasie-eienaar kan die fakturering by kilo.ai opdateer en dan weer probeer."
   },
   "language": {
     "restarting": "Herbegin om die taal toe te pas",
@@ -3168,7 +3169,9 @@
       "sendInvite": "Stuur uitnodiging",
       "title": "Nooi lid uit",
       "alreadyInvited": "Hulle is reeds genooi of is reeds 'n lid.",
-      "sendError": "Kon nie die uitnodiging stuur nie."
+      "sendError": "Kon nie die uitnodiging stuur nie.",
+      "pendingInvitation": "Hierdie e-posadres het reeds 'n hangende uitnodiging.",
+      "alreadyMember": "Hierdie persoon is reeds 'n lid van hierdie organisasie."
     },
     "invoices": {
       "downloadA11y": "Laai faktuur {{number}} af",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "Hangende uitnodigings",
       "resendInvite": "Stuur uitnodiging weer",
       "shareInviteLink": "Deel uitnodigingskakel",
-      "resendInviteError": "Kon nie die uitnodiging weer stuur nie."
+      "resendInviteError": "Kon nie die uitnodiging weer stuur nie.",
+      "inviteNotResendable": "Hierdie uitnodiging kan nie meer weer gestuur word nie.",
+      "ownerAuthority": "Slegs 'n organisasie-eienaar kan eienaars bestuur.",
+      "ownRoleChange": "Jy kan nie jou eie rol verander nie.",
+      "inviteExpired": "Hierdie uitnodiging het verval.",
+      "inviteAccepted": "Hierdie uitnodiging is reeds aanvaar."
     },
     "usageStats": {
       "inputTokens": "Invoertekens",

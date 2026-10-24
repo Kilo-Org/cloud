@@ -444,6 +444,28 @@ describe('useNativeAuth email validation feedback', () => {
     }
   );
 
+  it.each([255, 3508])('rejects an address of %i characters before delivery', async length => {
+    const address = `${'a'.repeat(length - 12)}@example.com`;
+    mockPostAuth.mockResolvedValue({ ok: true, data: { success: true } });
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      expect(await resultRef.current?.requestEmailCode(address)).toBe(false);
+    });
+    expect(resultRef.current?.emailErrorKey).toBe(mapErrorKey('INVALID_REQUEST'));
+    expect(mockPostAuth).not.toHaveBeenCalled();
+  });
+
+  it('allows the 254-character boundary after normalization', async () => {
+    const address = `${'a'.repeat(64)}@${'b'.repeat(63)}.${'c'.repeat(63)}.${'d'.repeat(61)}`;
+    mockPostAuth.mockResolvedValue({ ok: true, data: { success: true } });
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      expect(await resultRef.current?.requestEmailCode(` ${address.toUpperCase()} `)).toBe(true);
+    });
+    expect(mockPostAuth).toHaveBeenCalledWith('/api/auth/native/otp', { email: address });
+    expect(resultRef.current?.emailErrorKey).toBeUndefined();
+  });
+
   it('keeps an empty-email error inline without sending a request', async () => {
     const resultRef = await mountNativeAuth();
     await act(async () => {

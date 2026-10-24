@@ -147,7 +147,8 @@
     "agent": "Onye nnọchi anya",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Mgbanwe"
+    "changes": "Mgbanwe",
+    "organizationTrialEnded": "Oge nnwale nke òtù ahụ agwụla na o nweghị atụmatụ na-arụ ọrụ. Onye nwe òtù nwere ike imelite nhazi ụgwọ na kilo.ai, wee nwaa ọzọ."
   },
   "language": {
     "restarting": "Na-amalitegharị iji asụsụ ahọpụtara",
@@ -3168,7 +3169,9 @@
       "sendInvite": "Ziga òkù",
       "title": "Kpọ onye otu",
       "alreadyInvited": "Ha etinyela òkụ ma ọ bụ ha abụrụla onye otu.",
-      "sendError": "Enweghị ike iziga òkụ."
+      "sendError": "Enweghị ike iziga òkụ.",
+      "pendingInvitation": "Adreesị ozi ịntanetị a enwetala òkù na-echere.",
+      "alreadyMember": "Onye a abụrụla onye otu nke òtù a."
     },
     "invoices": {
       "downloadA11y": "Budata akwụkwọ ịgba ụgwọ {{number}}",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "Òkù ndị na-echere",
       "resendInvite": "Ziga òkù ọzọ",
       "shareInviteLink": "Kekọrịta njikọ òkù",
-      "resendInviteError": "Enweghị ike iziga òkụ ọzọ."
+      "resendInviteError": "Enweghị ike iziga òkụ ọzọ.",
+      "inviteNotResendable": "A pụghịzi iziga òkù a ọzọ.",
+      "ownerAuthority": "Naanị onye nwe òtù nwere ike ijikwa ndị nwe.",
+      "ownRoleChange": "Ị nweghị ike ịgbanwe ọrụ gị.",
+      "inviteExpired": "Òkù a agwụla.",
+      "inviteAccepted": "A nakweelarị òkù a."
     },
     "usageStats": {
       "inputTokens": "Tokin ntinye",

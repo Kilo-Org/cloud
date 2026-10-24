@@ -147,7 +147,8 @@
     "agent": "ejen",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Perubahan"
+    "changes": "Perubahan",
+    "organizationTrialEnded": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Pemilik organisasi boleh mengemas kini bil di kilo.ai, kemudian cuba lagi."
   },
   "language": {
     "restarting": "Memulakan semula apl untuk menukar bahasa",
@@ -3168,7 +3169,9 @@
       "sendInvite": "Hantar jemputan",
       "title": "Jemput ahli",
       "alreadyInvited": "E-mel itu sudah dijemput atau sudah menjadi ahli.",
-      "sendError": "Tidak dapat menghantar jemputan."
+      "sendError": "Tidak dapat menghantar jemputan.",
+      "pendingInvitation": "E-mel ini sudah mempunyai jemputan yang belum selesai.",
+      "alreadyMember": "Orang ini sudah menjadi ahli organisasi ini."
     },
     "invoices": {
       "downloadA11y": "Muat turun invois {{number}}",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "Jemputan menunggu jawapan",
       "resendInvite": "Hantar semula jemputan",
       "shareInviteLink": "Kongsi pautan jemputan",
-      "resendInviteError": "Tidak dapat menghantar semula jemputan."
+      "resendInviteError": "Tidak dapat menghantar semula jemputan.",
+      "inviteNotResendable": "Jemputan ini tidak boleh dihantar semula lagi.",
+      "ownerAuthority": "Hanya pemilik organisasi boleh mengurus pemilik.",
+      "ownRoleChange": "Anda tidak boleh menukar peranan anda sendiri.",
+      "inviteExpired": "Jemputan ini telah tamat tempoh.",
+      "inviteAccepted": "Jemputan ini telah pun diterima."
     },
     "usageStats": {
       "inputTokens": "Token masukan",

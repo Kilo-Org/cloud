@@ -147,7 +147,8 @@
     "agent": "Ügynök",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Változtatások"
+    "changes": "Változtatások",
+    "organizationTrialEnded": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. A szervezet tulajdonosa frissítheti a számlázást a kilo.ai oldalon, majd próbálja újra."
   },
   "language": {
     "restarting": "Újraindítás a nyelv beállításához",
@@ -3168,7 +3169,9 @@
       "sendInvite": "Meghívó küldése",
       "title": "Tag meghívása",
       "alreadyInvited": "Már meg van hívva, vagy már tag.",
-      "sendError": "Nem sikerült elküldeni a meghívót."
+      "sendError": "Nem sikerült elküldeni a meghívót.",
+      "pendingInvitation": "Erre az e-mail-címre már van egy függőben lévő meghívó.",
+      "alreadyMember": "Ez a személy már tagja ennek a szervezetnek."
     },
     "invoices": {
       "downloadA11y": "A(z) {{number}} számú számla letöltése",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "Függőben lévő meghívók",
       "resendInvite": "Meghívó újraküldése",
       "shareInviteLink": "Meghívóhivatkozás megosztása",
-      "resendInviteError": "Nem sikerült újraküldeni a meghívót."
+      "resendInviteError": "Nem sikerült újraküldeni a meghívót.",
+      "inviteNotResendable": "Ez a meghívó már nem küldhető újra.",
+      "ownerAuthority": "Csak a szervezet tulajdonosa kezelheti a tulajdonosokat.",
+      "ownRoleChange": "Nem módosíthatja a saját szerepkörét.",
+      "inviteExpired": "Ez a meghívó lejárt.",
+      "inviteAccepted": "Ezt a meghívót már elfogadták."
     },
     "usageStats": {
       "inputTokens": "Bemeneti tokenek",

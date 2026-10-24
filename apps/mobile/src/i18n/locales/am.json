@@ -147,7 +147,8 @@
     "agent": "ወኪል",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "ለውጦች"
+    "changes": "ለውጦች",
+    "organizationTrialEnded": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም። የድርጅት ባለቤት በkilo.ai ላይ የክፍያ መረጃን ማዘመን ይችላል፣ ከዚያ እንደገና ይሞክሩ።"
   },
   "language": {
     "restarting": "ቋንቋውን ለመቀየር እንደገና በመጀመር ላይ",
@@ -3168,7 +3169,9 @@
       "sendInvite": "ግብዣ ይላኩ",
       "title": "አባል ጋብዝ",
       "alreadyInvited": "አስቀድሞ ግብዣ ተልኳል ወይም አስቀድሞ አባል ነው።",
-      "sendError": "ግብዣውን መላክ አልተቻለም።"
+      "sendError": "ግብዣውን መላክ አልተቻለም።",
+      "pendingInvitation": "ይህ ኢሜይል አስቀድሞ በመጠባበቅ ላይ ያለ ግብዣ አለው።",
+      "alreadyMember": "ይህ ሰው አስቀድሞ የዚህ ድርጅት አባል ነው።"
     },
     "invoices": {
       "downloadA11y": "ደረሰኝ {{number}}ን ያውርዱ",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "ምላሽ የሚጠብቁ ግብዣዎች",
       "resendInvite": "ግብዣውን እንደገና ይላኩ",
       "shareInviteLink": "የግብዣውን አገናኝ ያጋሩ",
-      "resendInviteError": "ግብዣውን እንደገና መላክ አልተቻለም።"
+      "resendInviteError": "ግብዣውን እንደገና መላክ አልተቻለም።",
+      "inviteNotResendable": "ይህ ግብዣ ከአሁን በኋላ እንደገና መላክ አይቻልም።",
+      "ownerAuthority": "የድርጅት ባለቤት ብቻ ባለቤቶችን ማስተዳደር ይችላል።",
+      "ownRoleChange": "የራስዎን ሚና መቀየር አይችሉም።",
+      "inviteExpired": "ይህ ግብዣ ጊዜው አልፎበታል።",
+      "inviteAccepted": "ይህ ግብዣ አስቀድሞ ተቀብሏል።"
     },
     "usageStats": {
       "inputTokens": "የግብዓት ቶከኖች",

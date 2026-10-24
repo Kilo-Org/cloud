@@ -2,6 +2,7 @@ import {
   heartbeatIdempotencyKey,
   heartbeatAckSchema,
   nonRetryableSkuAdmissionCodes,
+  nonRetryableAdmissionCodes,
   recordAckSchema,
   recordStartResultSchema,
   startIdempotencyKey,
@@ -97,6 +98,16 @@ export function isNonRetryableSkuAdmissionError(
   return (
     error instanceof ContainerUsageAdmissionError &&
     (nonRetryableSkuAdmissionCodes as readonly string[]).includes(error.code)
+  );
+}
+
+/** Admission rejections that need configuration repair rather than transport retries. */
+export function isNonRetryableAdmissionError(
+  error: unknown
+): error is ContainerUsageAdmissionError & { code: (typeof nonRetryableAdmissionCodes)[number] } {
+  return (
+    error instanceof ContainerUsageAdmissionError &&
+    (nonRetryableAdmissionCodes as readonly string[]).includes(error.code)
   );
 }
 

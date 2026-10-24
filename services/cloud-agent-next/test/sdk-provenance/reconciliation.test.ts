@@ -72,7 +72,9 @@ it('reconciled stopped container does not establish an observed clean exit', asy
           const lifecycle = new MeteredBillingLifecycle({
             enforceContainerCapacity: true,
             storage: ctx.storage,
-            usageClient: {} as ContainerUsageClient,
+            usageClient: {
+              recordStart: vi.fn(async () => undefined),
+            } as unknown as ContainerUsageClient,
             schedule: async () => {
               throw new Error('Unexpected billing schedule');
             },
@@ -101,7 +103,15 @@ it('reconciled stopped container does not establish an observed clean exit', asy
           lifecycle.attachHeartbeat({
             persistStop: async (params, stoppedAtMs) => {
               persistedStops.push({ params, stoppedAtMs });
-              return undefined;
+              return {
+                ...billingContext,
+                pendingStop: {
+                  ...params,
+                  seq: 1,
+                  usageSinceLast: 0,
+                  measuredAtMs: stoppedAtMs ?? 1000,
+                },
+              };
             },
             scheduleHeartbeat: async () => {
               throw new Error('Unexpected heartbeat schedule');
@@ -109,9 +119,7 @@ it('reconciled stopped container does not establish an observed clean exit', asy
             billingHeartbeatTick: async () => {
               throw new Error('Unexpected heartbeat tick');
             },
-            recordStop: async () => {
-              throw new Error('Unexpected billing RPC');
-            },
+            recordStop: vi.fn(async () => undefined),
             cancelHeartbeat: () => {
               throw new Error('Unexpected heartbeat cancellation');
             },

@@ -1,3 +1,4 @@
+import { billingFailureFromAdmission } from '../../billing-failure.js';
 import {
   WORKSPACE_CONFIGURATION_HEADER,
   WORKSPACE_CONFIGURATION_VERSION,
@@ -27,7 +28,17 @@ import {
   SESSION_SNAPSHOT_ALLOCATION_KEY,
   SESSION_SNAPSHOT_KEY,
 } from './session-snapshot.js';
+import type { CustomerBillingFailure } from '@kilocode/session-ingest-contracts';
+import {
+  nativeBillingStopRequestSchema,
+  type NativeBillingStopRequest,
+} from '../../shared/control-plane-protocol.js';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
+import {
+  clearNativeBillingAdmissionDeadline,
+  storedNativeBillingAdmissionDeadlineAt,
+  nativeBillingAdmissionDeadlineAt,
+} from './native-billing-admission.js';
 import { egressPolicySchema, type EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import { CloudAgentRunContainerSchema } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { eq, sql } from 'drizzle-orm';
@@ -737,6 +748,39 @@ export class SandboxControlV2 extends DurableObject<Env> {
     this.db = drizzle(ctx.storage, { logger: false });
     this.provider = this.createProviderAdapter(this.defaultPin('cloudflare'));
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
+  }
+
+  async requestBillingStop(input: NativeBillingStopRequest): Promise<void> {
+    await this.initialized;
+    const request = nativeBillingStopRequestSchema.parse(input);
+    await this.enqueue(async () => {
+      const state = await this.readAllocation();
+      if (
+        this.currentProvider() !== 'cloudflare-containers' ||
+        state.providerRef !== request.allocationRef ||
+        state.kind === 'stopping' ||
+        state.kind === 'stopped'
+      ) {
+        logger
+          .withFields({
+            provider: this.currentProvider(),
+            allocationRef: request.allocationRef,
+            expectedAllocationRef: state.providerRef,
+            state: state.kind,
+          })
+          .debug('Native billing stop request does not match an active allocation');
+        return;
+      }
+      await this.applyEvent({
+        type: 'stop-requested',
+        at: Date.now(),
+        reason:
+          request.billingFailure.code === 'BILLING_UNAVAILABLE'
+            ? 'billing_unavailable'
+            : 'billing_blocked',
+        billingFailure: request.billingFailure,
+      });
+    });
   }
 
   /**
@@ -2053,6 +2097,22 @@ export class SandboxControlV2 extends DurableObject<Env> {
       this.expireUnboundSockets(Date.now());
       await this.recoverRepositoryPreparationFailures();
       let state = await this.readAllocation();
+      const admissionDeadline =
+        state.kind === 'creating' && this.currentProvider() === 'cloudflare-containers'
+          ? await storedNativeBillingAdmissionDeadlineAt(
+              this.ctx.storage,
+              await listRoutes(this.db),
+              state.allocationId
+            )
+          : undefined;
+      if (
+        admissionDeadline !== undefined &&
+        Date.now() >= admissionDeadline &&
+        state.allocationId !== null
+      ) {
+        await this.failCreationRoutesNow(state.allocationId, false, 'billing_unavailable');
+        state = await this.readAllocation();
+      }
       await failExpiredRoutes(this.routeContext(state));
       if (
         state.kind === 'stopped' &&
@@ -2073,7 +2133,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
           Math.min(
             Date.now() + this.sandboxTimers().providerCreateMs,
             (await earliestRouteDeadlineAt(this.db)) ?? Infinity,
-            this.earliestHelloDeadlineAt() ?? Infinity
+            this.earliestHelloDeadlineAt() ?? Infinity,
+            admissionDeadline ?? Infinity
           )
         );
         return;
@@ -3457,7 +3518,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (previous.kind !== 'stopping' && next.kind === 'stopping') {
       // The reducer owns the cause; ready routes must not re-derive it.
       if (stopReason !== undefined) {
-        await dropReadyRoutes(this.routeContext(next), stopReason);
+        await dropReadyRoutes(
+          this.routeContext(next),
+          stopReason,
+          event.type === 'stop-requested' ? event.billingFailure : undefined
+        );
         // The sandbox is already stopping; refresh best-effort.
         await this.refreshVercelNetworkPolicy();
       }
@@ -4370,6 +4435,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
       const state = await this.readAllocation();
       if (state.kind !== 'creating' || state.allocationId !== allocationId) return;
       let createdRef: string | null = null;
+      let billingAdmissionDeadlineAt: number | undefined;
+      let billingAdmissionTimedOut = false;
       try {
         const credential = generateSandboxCredential();
         await this.ctx.storage.put(CREDENTIAL_HASH_KEY, await hashSandboxCredential(credential));
@@ -4398,6 +4465,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
                 'Runtime preflight timed out'
               );
         const launchEnv = await this.wrapperLaunchEnv(credential, allocationId, pin.provider);
+        const afterPreflight = await this.readAllocation();
+        if (afterPreflight.kind !== 'creating' || afterPreflight.allocationId !== allocationId)
+          return;
         const intent: ProviderCreateIntent = {
           intentId: allocationId,
           createdAt: Date.now(),
@@ -4405,12 +4475,40 @@ export class SandboxControlV2 extends DurableObject<Env> {
           containment: this.resolvedContainment(),
           ...(pin.billing === null ? {} : { billing: pin.billing }),
         };
+        if (pin.provider === 'cloudflare-containers') {
+          billingAdmissionDeadlineAt = await nativeBillingAdmissionDeadlineAt(
+            this.ctx.storage,
+            await listRoutes(this.db),
+            allocationId,
+            this.sandboxTimers(),
+            Date.now()
+          );
+        }
+        if (billingAdmissionDeadlineAt !== undefined) {
+          await this.armAlarm(state);
+          if (
+            billingAdmissionDeadlineAt - Date.now() <
+            this.sandboxTimers().billingAdmissionMinimumMs
+          ) {
+            billingAdmissionTimedOut = true;
+            throw new Error('Native billing admission deadline reached');
+          }
+        }
         // N2: create and launch share one bound (the create deadline).
         const created = await withTimeout(
           this.provider.create(intent),
-          remainingMs(createDeadline),
-          'Sandbox create timed out'
+          remainingMs(Math.min(createDeadline, billingAdmissionDeadlineAt ?? createDeadline)),
+          'Sandbox create timed out',
+          () => {
+            billingAdmissionTimedOut =
+              billingAdmissionDeadlineAt !== undefined &&
+              billingAdmissionDeadlineAt <= createDeadline;
+          }
         );
+        if (billingAdmissionDeadlineAt !== undefined) {
+          await clearNativeBillingAdmissionDeadline(this.ctx.storage);
+          billingAdmissionDeadlineAt = undefined;
+        }
         if ('unresolved' in created) {
           await this.dispatchCreateFailed(allocationId);
           return;
@@ -4574,6 +4672,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
           providerRef: createdRef,
         });
       } catch (error) {
+        if (
+          billingAdmissionDeadlineAt !== undefined &&
+          !billingAdmissionTimedOut &&
+          !(error instanceof ProviderCreationError && error.code === 'meter_unavailable')
+        ) {
+          await clearNativeBillingAdmissionDeadline(this.ctx.storage);
+        }
         if (await this.enqueue(() => this.retrySessionSnapshotRestore(allocationId))) return;
         if (error instanceof ByocVercelProviderError) {
           await this.failCreationRoutes(allocationId, false, error.reason);
@@ -4596,8 +4701,23 @@ export class SandboxControlV2 extends DurableObject<Env> {
           await this.failCreationRoutes(allocationId, false, capacityFailure);
           return;
         }
+        if (
+          billingAdmissionTimedOut ||
+          (error instanceof ProviderCreationError &&
+            error.code === 'meter_unavailable' &&
+            billingAdmissionDeadlineAt !== undefined &&
+            Date.now() >= billingAdmissionDeadlineAt)
+        ) {
+          await this.failCreationRoutes(allocationId, false, 'billing_unavailable');
+          return;
+        }
         if (error instanceof ProviderCreationError && error.permanentReason !== null) {
-          await this.failCreationRoutes(allocationId, false, error.permanentReason);
+          await this.failCreationRoutes(
+            allocationId,
+            false,
+            error.permanentReason,
+            error.billingFailure
+          );
           return;
         }
         // N5: only clean up a container the reducer still owns. If a `hello`
@@ -4609,7 +4729,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
             await this.stopRef(createdRef, allocationId);
           }
         }
-        await this.dispatchCreateFailed(allocationId);
+        await this.dispatchCreateFailed(
+          allocationId,
+          error instanceof ProviderCreationError && error.code === 'meter_unavailable'
+            ? billingAdmissionDeadlineAt
+            : undefined
+        );
       }
     } finally {
       this.createInFlight = false;
@@ -4900,13 +5025,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
     );
   }
 
-  private async dispatchCreateFailed(allocationId: string): Promise<void> {
+  private async dispatchCreateFailed(
+    allocationId: string,
+    retryDeadlineAt?: number
+  ): Promise<void> {
     await this.dispatchResult({
       type: 'create-failed',
       at: Date.now(),
       allocationId,
       nextAllocationId: crypto.randomUUID(),
       retryAllowed: await this.retryAllowed(),
+      retryDeadlineAt,
     });
   }
 
@@ -5469,35 +5598,55 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private async failCreationRoutes(
     allocationId: string,
     retryable: boolean,
-    reason: ControlPlaneFailureReason
+    reason: ControlPlaneFailureReason,
+    billingFailure?: CustomerBillingFailure
   ): Promise<void> {
-    await this.enqueue(async () => {
-      const state = await this.readAllocation();
-      if (state.kind !== 'creating' || state.allocationId !== allocationId) return;
-      if (!retryable) {
-        for (const route of await listRoutes(this.db)) {
-          if (route.state === 'preparing') {
-            await failCurrentAttempt(
-              this.routeContext(state),
-              route.sessionId,
-              route.attemptId,
-              reason,
-              'create_failed'
-            );
-          }
-        }
-        if (state.providerRef !== null) {
-          await this.applyEvent({ type: 'stop-requested', at: Date.now(), reason });
-          return;
+    await this.enqueue(() =>
+      this.failCreationRoutesNow(allocationId, retryable, reason, billingFailure)
+    );
+  }
+
+  private async failCreationRoutesNow(
+    allocationId: string,
+    retryable: boolean,
+    reason: ControlPlaneFailureReason,
+    billingFailure?: CustomerBillingFailure
+  ): Promise<void> {
+    const state = await this.readAllocation();
+    if (state.kind !== 'creating' || state.allocationId !== allocationId) return;
+    if (!retryable) {
+      await clearNativeBillingAdmissionDeadline(this.ctx.storage);
+      const pin = this.providerPin;
+      const customerFailure: CustomerBillingFailure | undefined =
+        billingFailure ??
+        (reason === 'billing_unavailable' &&
+        pin?.provider === 'cloudflare-containers' &&
+        pin.billing
+          ? billingFailureFromAdmission(pin.billing.subject, { code: 'meter_unavailable' })
+          : undefined);
+      for (const route of await listRoutes(this.db)) {
+        if (route.state === 'preparing') {
+          await failCurrentAttempt(
+            this.routeContext(state),
+            route.sessionId,
+            route.attemptId,
+            reason,
+            'create_failed',
+            customerFailure
+          );
         }
       }
-      await this.applyEvent({
-        type: 'create-failed',
-        at: Date.now(),
-        allocationId,
-        nextAllocationId: crypto.randomUUID(),
-        retryAllowed: retryable && (await this.retryAllowed()),
-      });
+      if (state.providerRef !== null) {
+        await this.applyEvent({ type: 'stop-requested', at: Date.now(), reason });
+        return;
+      }
+    }
+    await this.applyEvent({
+      type: 'create-failed',
+      at: Date.now(),
+      allocationId,
+      nextAllocationId: crypto.randomUUID(),
+      retryAllowed: retryable && (await this.retryAllowed()),
     });
   }
 
@@ -5727,7 +5876,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
       'info',
       { coalesceIdentity: `session_snapshot_schedule:${this.sandboxId}` }
     );
+    const admissionAt =
+      state.kind === 'creating' && this.currentProvider() === 'cloudflare-containers'
+        ? await storedNativeBillingAdmissionDeadlineAt(
+            this.ctx.storage,
+            await listRoutes(this.db),
+            state.allocationId
+          )
+        : undefined;
     const candidates = [
+      admissionAt ?? null,
       allocationAt,
       routeAt,
       retryAt,

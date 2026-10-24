@@ -6,6 +6,7 @@ export * from './public-worktree-projection';
 export * from './session-share';
 export * from './message-id';
 export * from './kilo-session-id';
+export * from './cloud-agent-billing';
 
 export const DEFAULT_SESSION_TITLE_PATTERN =
   /^(New session - |Child session - )\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;

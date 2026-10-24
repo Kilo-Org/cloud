@@ -1,20 +1,3 @@
-/**
- * Event Processor
- *
- * Pure TypeScript class that processes events from WebSocket streams.
- * Buffers messages while streaming and after completion so late metadata/part
- * updates can still merge into the final message before the consumer renders it.
- *
- * Key behavior:
- * - Messages are stored internally for pending parts and late updates
- * - When a message completes, onMessageCompleted is called and the buffered message is retained
- *
- * Storage uses composite keys (sessionId:messageId) for unified handling of
- * both root session and child session messages.
- *
- * This module is framework-agnostic and contains no React/Jotai dependencies.
- */
-
 import type { CloudAgentEvent } from '../event-types';
 import { isValidCloudAgentEvent } from '../event-types';
 import type { Part, QuestionInfo } from '@/types/opencode.gen';
@@ -33,10 +16,6 @@ import {
   type EventSessionUpdated,
 } from '@/components/cloud-agent-next/types';
 
-/**
- * Event types we handle directly.
- * These are the payload.type values inside kilocode events.
- */
 const HANDLED_EVENT_TYPES = new Set([
   'message.updated',
   'message.part.updated',
@@ -75,37 +54,24 @@ function isKilocodePayload(data: unknown): data is KilocodePayload {
   return typeof data === 'object' && data !== null && 'type' in data && 'properties' in data;
 }
 
-/**
- * Pending part entry - used when parts arrive before their message.
- */
 type PendingPartEntry = {
   part: Part;
 };
 
-/**
- * Check if an assistant message is complete.
- * Complete when time.completed is set (message stopped streaming).
- */
 function isAssistantMessageComplete(message: ProcessedMessage): boolean {
   if (!isAssistantMessage(message.info)) return false;
   return message.info.time.completed !== undefined;
 }
 
-/**
- * Create composite key for message storage.
- */
 function messageKey(sessionId: string, messageId: string): string {
   return `${sessionId}:${messageId}`;
 }
 
 export type EventProcessor = {
-  /** Process a cloud agent event from WebSocket */
   processEvent: (event: CloudAgentEvent) => void;
 
-  /** Force-complete all in-flight messages. Called on session interrupt. */
   forceCompleteAll: () => void;
 
-  /** Clear all state */
   clear: () => void;
 };
 
@@ -138,29 +104,15 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
   // Suppresses subsequent session.error events (aftershocks from the CLI dying).
   let terminated = false;
 
-  /**
-   * Get parent session ID for a session.
-   * Returns null if:
-   * - Session was registered as root (parentID: null)
-   * - Session was never registered (treat as root)
-   */
   function getParentSessionId(sessionId: string): string | null {
     return sessionParents.get(sessionId) ?? null;
   }
 
-  /**
-   * Check if a session is a child/sub-agent session.
-   * A session is a child if it has a non-null parent in sessionParents.
-   * Unknown/unregistered sessions are treated as root (safe default).
-   */
   function isChildSession(sessionId: string | undefined): boolean {
     if (!sessionId) return false;
     return getParentSessionId(sessionId) !== null;
   }
 
-  /**
-   * Apply pending parts to a message if any exist.
-   */
   function applyPendingParts(
     sessionId: string,
     messageId: string,
@@ -179,10 +131,6 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
     pendingParts.delete(key);
   }
 
-  /**
-   * Apply a part update to a message — upsert by part id.
-   * Returns false if the update was rejected (no mutation occurred), true otherwise.
-   */
   function applyPartToMessage(message: ProcessedMessage, part: Part): boolean {
     const existingIndex = message.parts.findIndex(p => p.id === part.id);
 
@@ -202,11 +150,6 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
     return true;
   }
 
-  /**
-   * Check if an assistant message is complete and handle completion.
-   * User messages are completed separately when session goes idle.
-   * If complete, fires onMessageCompleted once and keeps the buffered message.
-   */
   function checkAndHandleCompletion(
     sessionId: string,
     messageId: string,
@@ -242,10 +185,6 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
     }
   }
 
-  /**
-   * Handle message.updated events - create or update message info.
-   * Completed messages stay buffered so late metadata-only updates do not drop parts.
-   */
   function handleMessageUpdated(data: EventMessageUpdated['properties']): void {
     const { info } = data;
     const sessionId = info.sessionID;
@@ -266,10 +205,6 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
     checkAndHandleCompletion(sessionId, messageId, message);
   }
 
-  /**
-   * Handle message.part.updated events - update or queue parts.
-   * Completed messages stay buffered so late part updates can still merge.
-   */
   function handleMessagePartUpdated(data: EventMessagePartUpdated['properties']): void {
     // Strip large content from file parts immediately to reduce memory
     const part = stripPartContentIfFile(data.part);
@@ -295,9 +230,6 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
     }
   }
 
-  /**
-   * Handle message.part.removed events.
-   */
   function handleMessagePartRemoved(data: EventMessagePartRemoved['properties']): void {
     const { sessionID, messageID, partID } = data;
     const key = messageKey(sessionID, messageID);
@@ -339,9 +271,6 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
     // 'retry' status keeps streaming active
   }
 
-  /**
-   * Handle session.created events - track session parent relationships.
-   */
   function handleSessionCreated(data: EventSessionCreated['properties']): void {
     const { info } = data;
 
@@ -350,9 +279,6 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
     callbacks.onSessionCreated?.(info);
   }
 
-  /**
-   * Handle session.updated events.
-   */
   function handleSessionUpdated(data: EventSessionUpdated['properties']): void {
     const { info } = data;
     callbacks.onSessionUpdated?.(info);
@@ -380,11 +306,6 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
     callbacks.onError?.(errorMessage, data.sessionID);
   }
 
-  /**
-   * Handle question.asked events.
-   * Tool-associated questions map callID→requestId for QuestionToolCard.
-   * Standalone questions (no tool) are forwarded separately.
-   */
   function handleQuestionAsked(data: {
     id: string;
     questions?: Array<QuestionInfo>;
@@ -399,12 +320,6 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
     }
   }
 
-  /**
-   * Handle session.idle events.
-   * Completes all pending user messages since they don't have their own completion signals.
-   * Child session idle events still trigger user message completion
-   * but do NOT toggle the streaming flag or fire onStreamingChanged.
-   */
   function handleSessionIdle(_data: { sessionID: string }): void {
     completeUserMessages();
   }
@@ -540,10 +455,6 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
     }
   }
 
-  /**
-   * Handle autocommit_started events.
-   * Only fires callback if the event includes a messageId.
-   */
   function handleAutocommitStarted(data: { message?: string; messageId?: string }): void {
     if (!data.messageId) return;
     const status: AutocommitStatus = {
@@ -554,11 +465,6 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
     callbacks.onAutocommitUpdated?.(data.messageId, status);
   }
 
-  /**
-   * Handle autocommit_completed events.
-   * Only fires callback if the event includes a messageId.
-   * Skipped autocommits are silently dropped (no map entry).
-   */
   function handleAutocommitCompleted(data: {
     success?: boolean;
     message?: string;
@@ -579,9 +485,6 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
     callbacks.onAutocommitUpdated?.(data.messageId, status);
   }
 
-  /**
-   * Process a cloud agent event, dispatching to the appropriate handler.
-   */
   function processEvent(event: CloudAgentEvent): void {
     if (!isValidCloudAgentEvent(event)) {
       return;
@@ -589,7 +492,6 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
 
     let { streamEventType, data } = event;
 
-    // Handle kilocode wrapper: streamEventType="kilocode" with type/properties in data
     if (streamEventType === 'kilocode' && isKilocodePayload(data)) {
       streamEventType = data.type;
       data = data.properties;
@@ -690,9 +592,6 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
     }
   }
 
-  /**
-   * Clear all state.
-   */
   function clear(): void {
     messagesMap.clear();
     pendingParts.clear();

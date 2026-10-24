@@ -1662,8 +1662,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Filtrų nėra",
-      "noFiltersDescription": "Grįžk į radinių sąrašą ir vėl atidaryk filtrus.",
       "title": "Radinių filtravimas",
       "reset": "Atkurti",
       "severity": "Pavojingumas",
@@ -3040,7 +3038,6 @@
   },
   "voiceInput": {
     "listening": "Klausomasi...",
-    "staysOff": "Balso įvestis liks išjungta, kol leisi paversti kalbą tekstu internetu.",
     "onlineTitle": "Kalba apdorojama internetu",
     "onlineMessage": "Šis įrenginys negali paversti kalbos tekstu be interneto ryšio. Tavo įrašas perduodamas paslaugų teikėjui {{provider}}, kad būtų paverstas tekstu. Kilo garso įrašo nesaugo.",
     "allow": "Leisti",

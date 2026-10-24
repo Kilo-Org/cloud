@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Ez dago iragazki erabilgarririk",
-      "noFiltersDescription": "Itzuli eta ireki berriro iragazkiak aurkikuntzen zerrendatik.",
       "title": "Aurkikuntzen iragazkia",
       "reset": "Berrezarri",
       "severity": "Larritasuna",
@@ -2954,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "Entzuten...",
-    "staysOff": "Ahots-sarrerak desgaituta jarraituko du lineako transkripzioa baimendu arte.",
     "onlineTitle": "Hizketa linean prozesatzen da",
     "onlineMessage": "Gailu honek ezin du lineaz kanpo transkribatu. Zure grabazioa {{provider}} hornitzaileari bidaltzen zaio testu bihurtzeko. Kilok ez du audioa gordetzen.",
     "allow": "Baimendu",

@@ -1,5 +1,5 @@
 {
-  "id": "2c5c44ac-5a07-45b2-9603-3d148f88753c",
+  "id": "c4c9111e-08c7-4dc3-9b6c-d9859f50241b",
   "prevId": "fd56687a-56e0-4224-9142-329998ec4347",
   "version": "7",
   "dialect": "postgresql",
@@ -10647,13 +10647,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "credits_window_granted_microdollars": {
-          "name": "credits_window_granted_microdollars",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
         "linked_kilo_user_id": {
           "name": "linked_kilo_user_id",
           "type": "text",
@@ -11329,6 +11322,30 @@
         "ip_address": {
           "name": "ip_address",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "requesting_client_id": {
+          "name": "requesting_client_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "requesting_client_name": {
+          "name": "requesting_client_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "requesting_redirect_origin": {
+          "name": "requesting_redirect_origin",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "client_confirmed_at": {
+          "name": "client_confirmed_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },

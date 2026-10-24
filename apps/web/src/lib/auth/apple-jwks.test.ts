@@ -124,6 +124,35 @@ describe('verifyAppleJwtWithJwks', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('refreshes the key set at cache expiry', async () => {
+    const { verifyAppleJwtWithJwks } = await loadFreshModule();
+    let now = Date.now();
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(jwksResponse([jwkForKey('current-key')]))
+      .mockResolvedValueOnce(jwksResponse([jwkForKey('renewed-key')]));
+
+    await expect(
+      verifyAppleJwtWithJwks(signToken('current-key', { sub: 'fixture' }), 'com.kilocode.kiloapp')
+    ).resolves.toMatchObject({ sub: 'fixture' });
+
+    now += 60 * 60 * 1000 - 1;
+    await expect(
+      verifyAppleJwtWithJwks(signToken('current-key', { sub: 'fixture' }), 'com.kilocode.kiloapp')
+    ).resolves.toMatchObject({ sub: 'fixture' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    now += 1;
+    await expect(
+      verifyAppleJwtWithJwks(signToken('renewed-key', { sub: 'fixture' }), 'com.kilocode.kiloapp')
+    ).resolves.toMatchObject({ sub: 'fixture' });
+    await expect(
+      verifyAppleJwtWithJwks(signToken('current-key'), 'com.kilocode.kiloapp')
+    ).rejects.toThrow('No matching Apple public key');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps the cached key set usable when a refresh fails', async () => {
     const { verifyAppleJwtWithJwks, AppleJwtClientError } = await loadFreshModule();
     let now = 1_700_000_000_000;

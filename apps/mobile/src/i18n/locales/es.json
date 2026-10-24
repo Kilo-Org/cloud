@@ -1097,8 +1097,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "No hay filtros disponibles",
-      "noFiltersDescription": "Vuelve atrás y abre de nuevo los filtros desde la lista de hallazgos.",
       "title": "Filtrar hallazgos",
       "fixed": "Corregido",
       "outcome": "Resultado",
@@ -2457,7 +2455,6 @@
     "allow": "Permitir",
     "onlineMessage": "Este dispositivo no puede transcribir sin conexión. Tu grabación se envía a {{provider}} para convertirla en texto. Kilo no almacena el audio.",
     "onlineTitle": "La voz se procesa en línea",
-    "staysOff": "El dictado seguirá desactivado hasta que permitas la transcripción en línea.",
     "start": "Iniciar dictado",
     "stop": "Detener dictado",
     "restricted": "El dictado está restringido en este dispositivo.",

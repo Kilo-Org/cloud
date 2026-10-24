@@ -1094,8 +1094,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Keine Filter verfügbar",
-      "noFiltersDescription": "Geh zurück und öffne die Filter erneut über die Befundliste.",
       "title": "Befunde filtern",
       "fixed": "Behoben",
       "outcome": "Ergebnis",
@@ -2433,7 +2431,6 @@
     "allow": "Erlauben",
     "onlineMessage": "Dieses Gerät kann Sprache nicht offline in Text umwandeln. Deine Aufnahme wird zur Umwandlung in Text an {{provider}} gesendet. Kilo speichert die Audiodaten nicht.",
     "onlineTitle": "Sprachaufnahmen werden online verarbeitet",
-    "staysOff": "Die Spracheingabe bleibt deaktiviert, bis du die Online-Transkription erlaubst.",
     "start": "Spracheingabe starten",
     "stop": "Spracheingabe beenden",
     "restricted": "Die Spracheingabe ist auf diesem Gerät eingeschränkt.",

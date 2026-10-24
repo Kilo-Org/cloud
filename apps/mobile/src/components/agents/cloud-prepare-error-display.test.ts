@@ -73,6 +73,20 @@ describe('cloudPrepareFailureMessage', () => {
     }
   );
 
+  it('explains a repository refusal carried by a server-shaped error', () => {
+    const refusal = {
+      shape: {
+        data: {
+          code: 'BAD_REQUEST',
+          message: 'GitHub repository authorization failed (repository_not_installed)',
+        },
+      },
+    };
+    expect(cloudPrepareFailureMessage(refusal)).toBe(
+      "Branches aren't available for this repository. Check your access with the provider, then pick another repository."
+    );
+  });
+
   it('keeps the generic copy for a credential-service failure worded the same way', () => {
     // The same message prefix also covers a temporarily unavailable credential
     // service, which retrying does fix.

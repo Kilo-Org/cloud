@@ -276,6 +276,42 @@ describe('LanguagePickerSheet apply', () => {
     renderer.unmount();
   });
 
+  it('marks the tapped row selected and applies that language on Done', async () => {
+    const onClose = vi.fn<() => void>();
+    const renderer = await mountSheet(onClose);
+    expect(findChoiceRow(renderer.root, 'Español').props.selected).toBe(false);
+
+    act(() => {
+      (findChoiceRow(renderer.root, 'Español').props.onPress as () => void)();
+    });
+
+    // FlashList's memoized cells only repaint when `data` or `extraData`
+    // changes identity, so the selection has to travel through `extraData`.
+    // Without it the tap leaves `selected` unreadable and the picker inert.
+    expect(renderer.root.findByType(flashListMock).props.extraData).toEqual({
+      selected: 'es',
+      disabled: false,
+    });
+    expect(findChoiceRow(renderer.root, 'Español').props.selected).toBe(true);
+    expect(findChoiceRow(renderer.root, 'Français').props.selected).toBe(false);
+
+    const sheet = findByType(renderer.root, 'PickerSheet')[0];
+    if (!sheet) {
+      throw new Error('PickerSheet not found');
+    }
+    await act(async () => {
+      (sheet.props.onDone as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('es', 'en');
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
   it('clears the live search field on focus instead of remounting the input', async () => {
     const renderer = await mountSheet(vi.fn<() => void>());
     const input = findByType(renderer.root, 'TextInput')[0];

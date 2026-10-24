@@ -180,7 +180,12 @@ describe('QuestionCard actions', () => {
       renderer.update(
         createElement(QuestionCard, {
           ...props,
-          submissionError: { kind: 'retryable', action: failedAction, message: 'Try again.' },
+          submissionError: {
+            kind: 'retryable',
+            action: failedAction,
+            message: 'Try again.',
+            permissionResponse: null,
+          },
         })
       );
     });

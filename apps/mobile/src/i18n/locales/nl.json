@@ -53,6 +53,7 @@
     "connected": "Gekoppeld",
     "couldNotLoadModels": "De modellen konden niet worden geladen.",
     "couldNotLoadRepositories": "De coderepository's konden niet worden geladen.",
+    "noRepositoriesFound": "Geen repositories gevonden",
     "critical": "Kritiek",
     "delete": "Verwijderen",
     "deleted": "Verwijderd",
@@ -87,6 +88,7 @@
     "connect": "Koppelen",
     "connectBitbucket": "Bitbucket koppelen",
     "connectGitlab": "GitLab koppelen",
+    "connectProvider": "Platform koppelen",
     "contentTruncated": "Inhoud ingekort",
     "copyLink": "Link kopiëren",
     "couldNotLoadOrganizations": "De organisaties konden niet worden geladen.",
@@ -883,7 +885,6 @@
       "gitlabNoRepositoriesDescription": "Je moet mogelijk toegang verlenen tot meer groepen of projecten op GitLab.",
       "installGithubApp": "Installeer de GitHub-app op repositories",
       "installGithubAppDescription": "Geef de Kilo GitHub-app toegang tot de repositories die je wilt laten beoordelen.",
-      "noRepositoriesFound": "Geen repositories gevonden",
       "repositoryAccess": "toegang tot repositories"
     },
     "style": {
@@ -907,7 +908,6 @@
     "followReviewMd": "REVIEW.md volgen",
     "followReviewMdSubtitle": "Volg de REVIEW.md-instructiebestanden per repository",
     "manualReview": {
-      "connectProvider": "Platform koppelen",
       "connectProviderDescription": "Koppel GitHub om een handmatige review van een PR te starten.",
       "couldNotCheckProviderStatus": "De platformstatus kon niet worden gecontroleerd.",
       "couldNotLoadProviders": "Je gekoppelde platformen konden niet worden geladen. Probeer het opnieuw.",
@@ -970,6 +970,8 @@
       "retryTitle": "Review opnieuw proberen?",
       "showMore": "Meer tonen",
       "started": "Gestart",
+      "reviewEnded": "Beëindigd",
+      "severityNitpick": "Futiliteit",
       "threshold": "Drempelwaarde",
       "title": "Beoordeling",
       "tokens": "Teksttokens",
@@ -1158,12 +1160,18 @@
       "actorSystem": "Kilo-systeem",
       "couldNotLoad": "Het auditrapport kon niet worden geladen.",
       "events": "Gebeurtenissen",
+      "eventConfidence": "Vertrouwen: {{confidence}}",
+      "eventReason": "Reden: {{reason}}",
+      "eventsCount_one": "{{displayCount}} gebeurtenis",
+      "eventsCount_other": "{{displayCount}} gebeurtenissen",
       "generated": "Dit rapport is gegenereerd op {{generatedAt}}.",
       "noActivity": "Geen vastgelegde activiteit",
       "noActivityDescription": "Kilo heeft van {{start}} tot {{end}} geen activiteit rond beveiligingsbevindingen om te rapporteren.",
       "periodUtc": "{{start}} TOT {{end}} · UTC",
       "queryFailed": "Het opvragen van het rapport is niet voltooid. Probeer het opnieuw.",
       "repositoryNotRecorded": "Repository niet vastgelegd",
+      "reasonUnknown": "Onbekende reden",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Rapportsamenvatting",
       "title": "Auditrapport",
       "unavailable": "Auditrapport niet beschikbaar",
@@ -1405,6 +1413,7 @@
       "reauthorizeButton": "GitHub-app opnieuw toegang geven",
       "reauthorizeDescription": "Security Agent heeft toestemming nodig om Dependabot-waarschuwingen te lezen. Geef de GitHub-app opnieuw toegang om deze toestemming te verlenen.",
       "reauthorizeTitle": "Extra rechten vereist",
+      "retryFailed": "Security Agent kon nog steeds niet worden geladen. Controleer je verbinding en probeer het opnieuw.",
       "setupFailed": "Het instellen van GitHub kon niet worden gestart. Probeer het opnieuw."
     },
     "settingsOverview": {
@@ -2041,7 +2050,10 @@
       "allowOnceAccessibility": "Eenmalig toestaan",
       "alwaysAllow": "Altijd toestaan",
       "alwaysAllowAccessibility": "Altijd toestaan",
-      "retrying": "Opnieuw proberen…"
+      "retrying": "Opnieuw proberen…",
+      "retryDeny": "Opnieuw weigeren",
+      "retryAllowOnce": "Opnieuw eenmalig toestaan",
+      "retryAlwaysAllow": "Opnieuw altijd toestaan"
     },
     "questionCard": {
       "title": "Invoer voor de agent nodig",

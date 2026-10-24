@@ -53,6 +53,7 @@
     "connected": "Terhubung",
     "couldNotLoadModels": "Tidak dapat memuat model.",
     "couldNotLoadRepositories": "Tidak dapat memuat repositori.",
+    "noRepositoriesFound": "Tidak ada repositori yang ditemukan",
     "critical": "Kritis",
     "delete": "Hapus",
     "deleted": "Dihapus",
@@ -87,6 +88,7 @@
     "connect": "Hubungkan",
     "connectBitbucket": "Hubungkan Bitbucket",
     "connectGitlab": "Hubungkan GitLab",
+    "connectProvider": "Hubungkan penyedia",
     "contentTruncated": "Konten dipotong",
     "copyLink": "Salin tautan",
     "couldNotLoadOrganizations": "Tidak dapat memuat organisasi.",
@@ -883,7 +885,6 @@
       "gitlabNoRepositoriesDescription": "Kamu mungkin perlu memberikan akses ke lebih banyak grup atau proyek di GitLab.",
       "installGithubApp": "Pasang aplikasi GitHub di repositori",
       "installGithubAppDescription": "Izinkan aplikasi GitHub Kilo mengakses repositori yang ingin kamu tinjau.",
-      "noRepositoriesFound": "Tidak ada repositori yang ditemukan",
       "repositoryAccess": "akses repositori"
     },
     "style": {
@@ -907,7 +908,6 @@
     "followReviewMd": "Ikuti REVIEW.md",
     "followReviewMdSubtitle": "Ikuti instruksi dalam berkas REVIEW.md di setiap repositori",
     "manualReview": {
-      "connectProvider": "Hubungkan penyedia",
       "connectProviderDescription": "Hubungkan GitHub untuk memulai tinjauan manual terhadap PR.",
       "couldNotCheckProviderStatus": "Tidak dapat memeriksa status penyedia.",
       "couldNotLoadProviders": "Kami tidak dapat memuat penyedia yang terhubung. Coba lagi.",
@@ -970,6 +970,8 @@
       "retryTitle": "Coba tinjauan lagi?",
       "showMore": "Tampilkan lebih banyak",
       "started": "Dimulai",
+      "reviewEnded": "Berakhir",
+      "severityNitpick": "Catatan kecil",
       "threshold": "Ambang batas",
       "title": "Tinjauan",
       "tokens": "Token",
@@ -1158,12 +1160,18 @@
       "actorSystem": "Sistem Kilo",
       "couldNotLoad": "Tidak dapat memuat laporan audit.",
       "events": "Peristiwa",
+      "eventConfidence": "Keyakinan: {{confidence}}",
+      "eventReason": "Alasan: {{reason}}",
+      "eventsCount_one": "{{displayCount}} peristiwa",
+      "eventsCount_other": "{{displayCount}} peristiwa",
       "generated": "Laporan dibuat pada {{generatedAt}}.",
       "noActivity": "Tidak ada aktivitas yang tercatat",
       "noActivityDescription": "Tidak ada aktivitas temuan keamanan di Kilo yang dapat dilaporkan dari {{start}} hingga {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "Kueri laporan tidak selesai. Coba lagi.",
       "repositoryNotRecorded": "Repositori tidak tercatat",
+      "reasonUnknown": "Alasan tidak dikenali",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Ringkasan laporan",
       "title": "Laporan audit",
       "unavailable": "Laporan audit tidak tersedia",
@@ -1405,6 +1413,7 @@
       "reauthorizeButton": "Otorisasi ulang aplikasi GitHub",
       "reauthorizeDescription": "Agen keamanan memerlukan izin untuk membaca peringatan Dependabot. Otorisasi ulang aplikasi GitHub untuk memberikan izin ini.",
       "reauthorizeTitle": "Perlu izin tambahan",
+      "retryFailed": "Masih tidak dapat memuat Agen keamanan. Periksa koneksi Anda dan coba lagi.",
       "setupFailed": "Tidak dapat memulai penyiapan GitHub. Coba lagi."
     },
     "settingsOverview": {
@@ -2041,7 +2050,10 @@
       "allowOnceAccessibility": "Izinkan sekali",
       "alwaysAllow": "Selalu izinkan",
       "alwaysAllowAccessibility": "Selalu izinkan",
-      "retrying": "Mencoba lagi…"
+      "retrying": "Mencoba lagi…",
+      "retryDeny": "Coba tolak lagi",
+      "retryAllowOnce": "Coba izinkan sekali lagi",
+      "retryAlwaysAllow": "Coba selalu izinkan lagi"
     },
     "questionCard": {
       "title": "Agen membutuhkan masukan",

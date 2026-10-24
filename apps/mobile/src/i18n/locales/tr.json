@@ -53,6 +53,7 @@
     "connected": "Bağlı",
     "couldNotLoadModels": "Modeller yüklenemedi.",
     "couldNotLoadRepositories": "Depolar yüklenemedi.",
+    "noRepositoriesFound": "Depo bulunamadı",
     "critical": "Kritik",
     "delete": "Sil",
     "deleted": "Silindi",
@@ -87,6 +88,7 @@
     "connect": "Bağla",
     "connectBitbucket": "Bitbucket hesabını bağla",
     "connectGitlab": "GitLab hesabını bağla",
+    "connectProvider": "Bir sağlayıcı bağla",
     "contentTruncated": "İçerik kısaltıldı",
     "copyLink": "Bağlantıyı kopyala",
     "couldNotLoadOrganizations": "Kuruluşlar yüklenemedi.",
@@ -883,7 +885,6 @@
       "gitlabNoRepositoriesDescription": "GitLab'da daha fazla gruba veya projeye erişim izni vermen gerekebilir.",
       "installGithubApp": "GitHub uygulamasını depolara yükle",
       "installGithubAppDescription": "Kilo GitHub uygulamasına, incelenmesini istediğin depolara erişim izni ver.",
-      "noRepositoriesFound": "Depo bulunamadı",
       "repositoryAccess": "depo erişimi"
     },
     "style": {
@@ -907,7 +908,6 @@
     "followReviewMd": "REVIEW.md yönergelerine uy",
     "followReviewMdSubtitle": "Her deponun REVIEW.md dosyasındaki talimatlara uy",
     "manualReview": {
-      "connectProvider": "Bir sağlayıcı bağla",
       "connectProviderDescription": "Bir çekme isteğinin incelemesini manuel olarak başlatmak için GitHub'ı bağla.",
       "couldNotCheckProviderStatus": "Sağlayıcı durumu kontrol edilemedi.",
       "couldNotLoadProviders": "Bağladığın sağlayıcılar yüklenemedi. Lütfen tekrar dene.",
@@ -970,6 +970,8 @@
       "retryTitle": "İnceleme tekrar denensin mi?",
       "showMore": "Daha fazla göster",
       "started": "Başlangıç zamanı",
+      "reviewEnded": "İnceleme bitiş zamanı",
+      "severityNitpick": "Küçük detay",
       "threshold": "Eşik",
       "title": "İnceleme",
       "tokens": "Belirteç",
@@ -1158,12 +1160,18 @@
       "actorSystem": "Kilo sistemi",
       "couldNotLoad": "Denetim raporu yüklenemedi.",
       "events": "Olaylar",
+      "eventConfidence": "Güven: {{confidence}}",
+      "eventReason": "Neden: {{reason}}",
+      "eventsCount_one": "{{displayCount}} olay",
+      "eventsCount_other": "{{displayCount}} olay",
       "generated": "Raporun oluşturulma zamanı: {{generatedAt}}.",
       "noActivity": "Kayıtlı etkinlik yok",
       "noActivityDescription": "Kilo'da {{start}} ile {{end}} arasında güvenlik bulgularıyla ilgili raporlanabilecek bir etkinlik yok.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "Rapor sorgusu tamamlanmadı. Tekrar dene.",
       "repositoryNotRecorded": "Depo kaydedilmedi",
+      "reasonUnknown": "Tanınmayan neden",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Rapor özeti",
       "title": "Denetim raporu",
       "unavailable": "Denetim raporu kullanılamıyor",
@@ -1405,6 +1413,7 @@
       "reauthorizeButton": "GitHub uygulamasını yeniden yetkilendir",
       "reauthorizeDescription": "Güvenlik ajanının Dependabot uyarılarını okuyabilmesi için izin gerekir. Bu izni vermek için GitHub uygulamasını yeniden yetkilendir.",
       "reauthorizeTitle": "Ek izinler gerekiyor",
+      "retryFailed": "Güvenlik ajanı hâlâ yüklenemedi. Bağlantını kontrol et ve tekrar dene.",
       "setupFailed": "GitHub kurulumu başlatılamadı. Lütfen tekrar dene."
     },
     "settingsOverview": {
@@ -2041,7 +2050,10 @@
       "allowOnceAccessibility": "Bir kez izin ver",
       "alwaysAllow": "Her zaman izin ver",
       "alwaysAllowAccessibility": "Her zaman izin ver",
-      "retrying": "Tekrar deneniyor…"
+      "retrying": "Tekrar deneniyor…",
+      "retryDeny": "Reddetmeyi tekrar dene",
+      "retryAllowOnce": "Bir kez izin vermeyi tekrar dene",
+      "retryAlwaysAllow": "Her zaman izin vermeyi tekrar dene"
     },
     "questionCard": {
       "title": "Ajan yanıt bekliyor",

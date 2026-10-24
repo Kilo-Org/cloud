@@ -53,6 +53,7 @@
     "connected": "Conectado",
     "couldNotLoadModels": "Não foi possível carregar os modelos.",
     "couldNotLoadRepositories": "Não foi possível carregar os repositórios.",
+    "noRepositoriesFound": "Nenhum repositório encontrado",
     "critical": "Nível crítico",
     "delete": "Excluir",
     "deleted": "Excluído",
@@ -87,6 +88,7 @@
     "connect": "Conectar",
     "connectBitbucket": "Conectar Bitbucket",
     "connectGitlab": "Conectar GitLab",
+    "connectProvider": "Conectar um provedor",
     "contentTruncated": "Conteúdo exibido parcialmente",
     "copyLink": "Copiar link",
     "couldNotLoadOrganizations": "Não foi possível carregar as organizações.",
@@ -854,7 +856,6 @@
       "gitlabNoRepositoriesDescription": "Talvez você precise conceder acesso a mais grupos ou projetos no GitLab.",
       "installGithubApp": "Instalar o app do GitHub nos repositórios",
       "installGithubAppDescription": "Conceda ao app do Kilo no GitHub acesso aos repositórios que você quer revisar.",
-      "noRepositoriesFound": "Nenhum repositório encontrado",
       "repositoryAccess": "acesso ao repositório"
     },
     "style": {
@@ -878,7 +879,6 @@
     "followReviewMd": "Seguir REVIEW.md",
     "followReviewMdSubtitle": "Seguir as instruções do arquivo REVIEW.md de cada repositório",
     "manualReview": {
-      "connectProvider": "Conectar um provedor",
       "connectProviderDescription": "Conecte o GitHub para iniciar a revisão manual de um PR.",
       "couldNotCheckProviderStatus": "Não foi possível verificar o status do provedor.",
       "couldNotLoadProviders": "Não foi possível carregar seus provedores conectados. Tente novamente.",
@@ -941,6 +941,8 @@
       "retryTitle": "Tentar revisar novamente?",
       "showMore": "Mostrar mais",
       "started": "Iniciada",
+      "reviewEnded": "Encerrada",
+      "severityNitpick": "Observação",
       "threshold": "Limite",
       "title": "Revisão",
       "tokens": "Unidades de texto",
@@ -1129,12 +1131,19 @@
       "actorSystem": "Sistema Kilo",
       "couldNotLoad": "Não foi possível carregar o relatório de auditoria.",
       "events": "Eventos",
+      "eventConfidence": "Confiança: {{confidence}}",
+      "eventReason": "Motivo: {{reason}}",
+      "eventsCount_one": "{{displayCount}} evento",
+      "eventsCount_many": "{{displayCount}} eventos",
+      "eventsCount_other": "{{displayCount}} eventos",
       "generated": "O relatório foi gerado em {{generatedAt}}.",
       "noActivity": "Nenhuma atividade registrada",
       "noActivityDescription": "O Kilo não tem atividades relacionadas a ocorrências de segurança para incluir no relatório de {{start}} a {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "A consulta do relatório não foi concluída. Tente novamente.",
       "repositoryNotRecorded": "Repositório não registrado",
+      "reasonUnknown": "Motivo não reconhecido",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Resumo do relatório",
       "title": "Relatório de auditoria",
       "unavailable": "Relatório de auditoria indisponível",
@@ -1379,6 +1388,7 @@
       "reauthorizeButton": "Reautorizar app do GitHub",
       "reauthorizeDescription": "O agente de segurança precisa de permissão para ler os alertas do Dependabot. Reautorize o app do GitHub para conceder essa permissão.",
       "reauthorizeTitle": "Permissões adicionais necessárias",
+      "retryFailed": "Não foi possível carregar o agente de segurança. Verifique sua conexão e tente novamente.",
       "setupFailed": "Não foi possível iniciar a configuração do GitHub. Tente novamente."
     },
     "settingsOverview": {
@@ -2025,7 +2035,10 @@
       "allowOnceAccessibility": "Permitir uma vez",
       "alwaysAllow": "Permitir sempre",
       "alwaysAllowAccessibility": "Permitir sempre",
-      "retrying": "Tentando novamente…"
+      "retrying": "Tentando novamente…",
+      "retryDeny": "Tentar negar novamente",
+      "retryAllowOnce": "Tentar permitir uma vez novamente",
+      "retryAlwaysAllow": "Tentar permitir sempre novamente"
     },
     "questionCard": {
       "title": "O agente precisa de uma resposta",

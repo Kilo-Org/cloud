@@ -53,6 +53,7 @@
     "connected": "Połączono",
     "couldNotLoadModels": "Nie udało się wczytać modeli.",
     "couldNotLoadRepositories": "Nie udało się wczytać repozytoriów.",
+    "noRepositoriesFound": "Nie znaleziono repozytoriów",
     "critical": "Poziom krytyczny",
     "delete": "Usuń",
     "deleted": "Usunięto",
@@ -87,6 +88,7 @@
     "connect": "Połącz",
     "connectBitbucket": "Połącz konto Bitbucket",
     "connectGitlab": "Połącz konto GitLab",
+    "connectProvider": "Połącz konto dostawcy",
     "contentTruncated": "Skrócono treść",
     "copyLink": "Kopiuj link",
     "couldNotLoadOrganizations": "Nie udało się wczytać organizacji.",
@@ -889,7 +891,6 @@
       "gitlabNoRepositoriesDescription": "Może być konieczne przyznanie dostępu do większej liczby grup lub projektów w serwisie GitLab.",
       "installGithubApp": "Zainstaluj aplikację GitHub dla repozytoriów",
       "installGithubAppDescription": "Przyznaj aplikacji Kilo w serwisie GitHub dostęp do repozytoriów, które chcesz poddać przeglądowi.",
-      "noRepositoriesFound": "Nie znaleziono repozytoriów",
       "repositoryAccess": "dostęp do repozytorium"
     },
     "style": {
@@ -913,7 +914,6 @@
     "followReviewMd": "Postępuj zgodnie z REVIEW.md",
     "followReviewMdSubtitle": "Przestrzegaj instrukcji z pliku REVIEW.md w każdym repozytorium",
     "manualReview": {
-      "connectProvider": "Połącz konto dostawcy",
       "connectProviderDescription": "Połącz konto GitHub, aby rozpocząć ręczny przegląd PR.",
       "couldNotCheckProviderStatus": "Nie udało się sprawdzić statusu dostawcy.",
       "couldNotLoadProviders": "Nie udało się wczytać połączonych dostawców. Spróbuj ponownie.",
@@ -976,6 +976,8 @@
       "retryTitle": "Ponowić przegląd?",
       "showMore": "Pokaż więcej",
       "started": "Rozpoczęto",
+      "reviewEnded": "Zakończono",
+      "severityNitpick": "Drobiazg",
       "threshold": "Próg",
       "title": "Przegląd",
       "tokens": "Liczba tokenów",
@@ -1164,12 +1166,20 @@
       "actorSystem": "System Kilo",
       "couldNotLoad": "Nie udało się wczytać raportu audytu.",
       "events": "Zdarzenia",
+      "eventConfidence": "Pewność: {{confidence}}",
+      "eventReason": "Powód: {{reason}}",
+      "eventsCount_one": "{{displayCount}} zdarzenie",
+      "eventsCount_few": "{{displayCount}} zdarzenia",
+      "eventsCount_many": "{{displayCount}} zdarzeń",
+      "eventsCount_other": "{{displayCount}} zdarzenia",
       "generated": "Wygenerowano {{generatedAt}}.",
       "noActivity": "Brak zarejestrowanej aktywności",
       "noActivityDescription": "W okresie od {{start}} do {{end}} Kilo nie zarejestrowało zdarzeń dotyczących problemów z bezpieczeństwem, które można uwzględnić w raporcie.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "Nie udało się pobrać danych do raportu. Spróbuj ponownie.",
       "repositoryNotRecorded": "Nie zapisano repozytorium",
+      "reasonUnknown": "Nierozpoznany powód",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Podsumowanie raportu",
       "title": "Raport audytu",
       "unavailable": "Raport audytu niedostępny",
@@ -1417,6 +1427,7 @@
       "reauthorizeButton": "Autoryzuj ponownie aplikację GitHub",
       "reauthorizeDescription": "Agent bezpieczeństwa wymaga uprawnienia do odczytu alertów Dependabot. Autoryzuj ponownie aplikację GitHub, aby przyznać to uprawnienie.",
       "reauthorizeTitle": "Wymagane dodatkowe uprawnienia",
+      "retryFailed": "Nadal nie udało się wczytać agenta bezpieczeństwa. Sprawdź połączenie i spróbuj ponownie.",
       "setupFailed": "Nie udało się rozpocząć konfiguracji GitHub. Spróbuj ponownie."
     },
     "settingsOverview": {
@@ -2073,7 +2084,10 @@
       "allowOnceAccessibility": "Zezwól tylko tym razem",
       "alwaysAllow": "Zawsze zezwalaj",
       "alwaysAllowAccessibility": "Zawsze zezwalaj",
-      "retrying": "Ponawianie…"
+      "retrying": "Ponawianie…",
+      "retryDeny": "Ponów odmowę",
+      "retryAllowOnce": "Ponów zezwolenie tylko tym razem",
+      "retryAlwaysAllow": "Ponów zezwalanie zawsze"
     },
     "questionCard": {
       "title": "Agent czeka na odpowiedź",

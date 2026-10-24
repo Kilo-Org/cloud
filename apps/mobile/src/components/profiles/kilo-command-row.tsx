@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next';
-import { Pressable, Switch, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { ChevronDown, ChevronUp, Pencil, Terminal, Trash2 } from '@/components/ui/icons';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -17,11 +18,11 @@ type KiloCommandRowProps = Readonly<{
   enabled: boolean;
   isFirst: boolean;
   isLast: boolean;
-  onToggle: (enabled: boolean) => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
+  onToggle?: (enabled: boolean) => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }>;
 
 /**
@@ -81,44 +82,62 @@ export function KiloCommandRowView({
             </Text>
           ) : null}
         </View>
-        <Switch value={enabled} accessibilityLabel={name} onValueChange={onToggle} />
+        <Switch
+          value={enabled}
+          accessibilityLabel={name}
+          disabled={onToggle === undefined}
+          onValueChange={onToggle}
+        />
       </View>
-      <View className="flex-row items-center justify-end gap-1">
-        <Pressable
-          className={controlClass(isFirst)}
-          disabled={isFirst}
-          accessibilityRole="button"
-          accessibilityLabel={t('profiles.moveUp')}
-          onPress={onMoveUp}
-        >
-          <ChevronUp size={20} color={colors.mutedForeground} />
-        </Pressable>
-        <Pressable
-          className={controlClass(isLast)}
-          disabled={isLast}
-          accessibilityRole="button"
-          accessibilityLabel={t('profiles.moveDown')}
-          onPress={onMoveDown}
-        >
-          <ChevronDown size={20} color={colors.mutedForeground} />
-        </Pressable>
-        <Pressable
-          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-          accessibilityRole="button"
-          accessibilityLabel={t('profiles.slashCommands.edit')}
-          onPress={onEdit}
-        >
-          <Pencil size={18} color={colors.mutedForeground} />
-        </Pressable>
-        <Pressable
-          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-          accessibilityRole="button"
-          accessibilityLabel={t('common.delete')}
-          onPress={onDelete}
-        >
-          <Trash2 size={18} color={colors.destructive} />
-        </Pressable>
-      </View>
+      {onMoveUp !== undefined ||
+      onMoveDown !== undefined ||
+      onEdit !== undefined ||
+      onDelete !== undefined ? (
+        <View className="flex-row items-center justify-end gap-1">
+          {onMoveUp !== undefined ? (
+            <Pressable
+              className={controlClass(isFirst)}
+              disabled={isFirst}
+              accessibilityRole="button"
+              accessibilityLabel={t('profiles.moveUp')}
+              onPress={onMoveUp}
+            >
+              <ChevronUp size={20} color={colors.mutedForeground} />
+            </Pressable>
+          ) : null}
+          {onMoveDown !== undefined ? (
+            <Pressable
+              className={controlClass(isLast)}
+              disabled={isLast}
+              accessibilityRole="button"
+              accessibilityLabel={t('profiles.moveDown')}
+              onPress={onMoveDown}
+            >
+              <ChevronDown size={20} color={colors.mutedForeground} />
+            </Pressable>
+          ) : null}
+          {onEdit !== undefined ? (
+            <Pressable
+              className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+              accessibilityRole="button"
+              accessibilityLabel={t('profiles.slashCommands.edit')}
+              onPress={onEdit}
+            >
+              <Pencil size={18} color={colors.mutedForeground} />
+            </Pressable>
+          ) : null}
+          {onDelete !== undefined ? (
+            <Pressable
+              className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.delete')}
+              onPress={onDelete}
+            >
+              <Trash2 size={18} color={colors.destructive} />
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }

@@ -15,7 +15,7 @@
     "@typescript/native-preview": "catalog:",
     "wrangler": "catalog:",
     "@types/node": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:vitest5"
   },
   "dependencies": {
     "@kilocode/encryption": "workspace:*",

@@ -2,6 +2,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { withProcessLockAsync } from '../process-lock';
+import { writeSecretsFile } from '../secrets-file';
 import { mapWithConcurrency, resolveEnvSyncConcurrency } from './concurrency';
 import type {
   DevVarsFileChange,
@@ -12,20 +13,12 @@ import type {
 } from './types';
 import { formatValue, readEnvFile } from './parse';
 
-// ---------------------------------------------------------------------------
-// ANSI color constants
-// ---------------------------------------------------------------------------
-
 const RESET = '\x1b[0m';
 const DIM = '\x1b[2m';
 const GREEN = '\x1b[32m';
 const YELLOW = '\x1b[33m';
 const RED = '\x1b[31m';
 const CYAN = '\x1b[36m';
-
-// ---------------------------------------------------------------------------
-// Plan display
-// ---------------------------------------------------------------------------
 
 function planHasChanges(plan: EnvSyncPlan): boolean {
   const hasDevVarsDrift = plan.devVarsChanges.some(c => c.isNew || c.keyChanges.length > 0);
@@ -44,8 +37,6 @@ function displayPlan(plan: EnvSyncPlan): void {
   }
 
   let hasOutput = false;
-
-  // ── Group per-service items by workerDir ──────────────────────────────
 
   type ServiceGroup = {
     devVars: DevVarsFileChange | undefined;
@@ -67,8 +58,6 @@ function displayPlan(plan: EnvSyncPlan): void {
   for (const c of plan.devVarsChanges) getGroup(c.workerDir).devVars = c;
   for (const c of plan.secretStoreAutoCreates) getGroup(c.workerDir).autoCreates.push(c);
   for (const w of plan.secretStoreWarnings) getGroup(w.workerDir).warning = w;
-
-  // ── Render each service ───────────────────────────────────────────────
 
   for (const [workerDir, group] of serviceMap) {
     const dv = group.devVars;
@@ -117,8 +106,6 @@ function displayPlan(plan: EnvSyncPlan): void {
     hasOutput = true;
   }
 
-  // ── .env.local auto-created values ───────────────────────────────────
-
   if (plan.envLocalAutoCreates.length > 0) {
     if (hasOutput) console.log();
     console.log(`${CYAN}✎ .env.local${RESET}`);
@@ -128,8 +115,6 @@ function displayPlan(plan: EnvSyncPlan): void {
     }
     hasOutput = true;
   }
-
-  // ── .env.development.local (not per-service) ─────────────────────────
 
   if (plan.envDevLocalChanges.length > 0) {
     if (hasOutput) console.log();
@@ -143,8 +128,6 @@ function displayPlan(plan: EnvSyncPlan): void {
     }
     hasOutput = true;
   }
-
-  // ── Consistency warnings (cross-service) ──────────────────────────────
 
   if (plan.consistencyWarnings.length > 0) {
     if (hasOutput) console.log();
@@ -179,17 +162,11 @@ function displayPlan(plan: EnvSyncPlan): void {
     return;
   }
 
-  // ── Legend ─────────────────────────────────────────────────────────────
-
   console.log();
   console.log(
     `${DIM}${GREEN}+${RESET}${DIM} new  ${YELLOW}~${RESET}${DIM} changed  ${GREEN}⊕${RESET}${DIM} create secret  ${RED}⚠${RESET}${DIM} missing  ${RED}✗${RESET}${DIM} mismatch${RESET}`
   );
 }
-
-// ---------------------------------------------------------------------------
-// Plan application
-// ---------------------------------------------------------------------------
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -205,26 +182,21 @@ function upsertEnvValue(filePath: string, key: string, value: string): void {
 
   const line = `${key}=${formatValue(value)}`;
   if (!content) {
-    fs.writeFileSync(filePath, `${line}\n`, 'utf-8');
+    writeSecretsFile(filePath, `${line}\n`);
     return;
   }
 
   const regex = new RegExp(`^${escapeRegex(key)}=.*$`, 'm');
   if (regex.test(content)) {
-    fs.writeFileSync(
+    writeSecretsFile(
       filePath,
-      content.replace(regex, () => line),
-      'utf-8'
+      content.replace(regex, () => line)
     );
     return;
   }
 
-  fs.writeFileSync(filePath, `${content.trimEnd()}\n${line}\n`, 'utf-8');
+  writeSecretsFile(filePath, `${content.trimEnd()}\n${line}\n`);
 }
-
-// ---------------------------------------------------------------------------
-// .env.local auto-created values
-// ---------------------------------------------------------------------------
 
 function applyEnvLocalAutoCreates(creates: EnvLocalAutoCreate[], repoRoot: string): void {
   if (creates.length === 0) return;
@@ -258,10 +230,6 @@ function applyEnvLocalAutoCreates(creates: EnvLocalAutoCreate[], repoRoot: strin
     console.log(`  ✓ ${create.key}`);
   }
 }
-
-// ---------------------------------------------------------------------------
-// Secrets store creation
-// ---------------------------------------------------------------------------
 
 type WranglerResult = {
   status: number;
@@ -386,7 +354,7 @@ async function applyPlan(
     const devVarsPath = path.join(repoRoot, change.workerDir, '.dev.vars');
 
     if (change.newFileContent !== undefined) {
-      fs.writeFileSync(devVarsPath, change.newFileContent, 'utf-8');
+      writeSecretsFile(devVarsPath, change.newFileContent);
     } else {
       let content = fs.readFileSync(devVarsPath, 'utf-8');
       const appendLines: string[] = [];
@@ -405,7 +373,7 @@ async function applyPlan(
         content = content.trimEnd() + '\n' + appendLines.join('\n') + '\n';
       }
 
-      fs.writeFileSync(devVarsPath, content, 'utf-8');
+      writeSecretsFile(devVarsPath, content);
     }
   }
 
@@ -430,10 +398,10 @@ async function applyPlan(
           content = content.trimEnd() + `\n${line}\n`;
         }
       }
-      fs.writeFileSync(envDevLocalPath, content, 'utf-8');
+      writeSecretsFile(envDevLocalPath, content);
     } else {
       const lines = plan.envDevLocalChanges.map(c => `${c.key}=${formatValue(c.newValue)}`);
-      fs.writeFileSync(envDevLocalPath, lines.join('\n') + '\n', 'utf-8');
+      writeSecretsFile(envDevLocalPath, lines.join('\n') + '\n');
     }
   }
 }

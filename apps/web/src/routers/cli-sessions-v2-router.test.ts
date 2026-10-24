@@ -1559,6 +1559,25 @@ describe('cli-sessions-v2-router', () => {
         expect.objectContaining({ method: 'DELETE' })
       );
     });
+
+    it('deletes a legacy agent session through ingest without a runtime call', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ cloud_agent_session_id: 'agent_12345678-1234-4234-9234-123456789abc' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).resolves.toEqual({
+        success: true,
+        session_id: sessionId,
+      });
+
+      expect(mockDeleteCloudAgentSession).not.toHaveBeenCalled();
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `https://test-ingest.example.com/api/session/${encodeURIComponent(sessionId)}`,
+        expect.objectContaining({ method: 'DELETE' })
+      );
+    });
   });
 
   describe('session authorization', () => {
@@ -2007,7 +2026,11 @@ describe('cli-sessions-v2-router', () => {
       mockGetSession.mockRejectedValue(new Error('not mocked'));
     });
 
-    it.each(['11111111-1111-4111-8111-111111111111', 'agent_legacy'])(
+    it.each([
+      '11111111-1111-4111-8111-111111111111',
+      'agent_legacy',
+      'agent_11111111-1111-4111-8111-111111111111',
+    ])(
       'returns historical metadata for unsupported runtime identifier %s',
       async cloudAgentSessionId => {
         await db.insert(cli_sessions_v2).values({
@@ -2028,7 +2051,7 @@ describe('cli-sessions-v2-router', () => {
       }
     );
 
-    it.each(['agent', 'workspace'])(
+    it.each(['workspace'])(
       'preserves runtime failures for current %s identifiers',
       async prefix => {
         await db.insert(cli_sessions_v2).values({
@@ -3834,6 +3857,39 @@ describe('cli-sessions-v2-router', () => {
       expect(result.results.find(session => session.session_id === sharedId)).not.toHaveProperty(
         'public_id'
       );
+    });
+  });
+
+  describe('share size result', () => {
+    const sessionId = 'ses_share_oversized_info_0001';
+
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values({
+        session_id: sessionId,
+        kilo_user_id: regularUser.id,
+        title: 'Large session',
+      });
+    });
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    });
+
+    it('returns PAYLOAD_TOO_LARGE with the size message from an HTTP 413', async () => {
+      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ success: false, error: 'share_snapshot_too_large' }), {
+          status: 413,
+        })
+      );
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        await expect(caller.cliSessionsV2.share({ session_id: sessionId })).rejects.toMatchObject({
+          code: 'PAYLOAD_TOO_LARGE',
+          message: 'Session details are too large to share. Existing links are unchanged.',
+        });
+      } finally {
+        fetchSpy.mockRestore();
+      }
     });
   });
 

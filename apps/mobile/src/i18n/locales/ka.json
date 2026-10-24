@@ -53,6 +53,7 @@
     "connected": "დაკავშირებულია",
     "couldNotLoadModels": "მოდელების ჩატვირთვა ვერ მოხერხდა.",
     "couldNotLoadRepositories": "რეპოზიტორიების ჩატვირთვა ვერ მოხერხდა.",
+    "noRepositoriesFound": "რეპოზიტორები ვერ მოიძებნა",
     "critical": "კრიტიკული",
     "delete": "წაშლა",
     "deleted": "წაშლილია",
@@ -87,6 +88,7 @@
     "connect": "დაკავშირება",
     "connectBitbucket": "Bitbucket-თან დაკავშირება",
     "connectGitlab": "GitLab-თან დაკავშირება",
+    "connectProvider": "პროვაიდერის დაკავშირება",
     "contentTruncated": "შიგთავსი შეკვეცილია",
     "copyLink": "ბმულის კოპირება",
     "couldNotLoadOrganizations": "ორგანიზაციების ჩატვირთვა ვერ მოხერხდა.",
@@ -182,7 +184,7 @@
     "codeArrivalHint": "თუ ეს მისამართი პირობებს აკმაყოფილებს, კოდს ერთი წუთის განმავლობაში მიიღებ.",
     "verifyCode": "კოდის დადასტურება",
     "resendCode": "კოდის ხელახლა გაგზავნა",
-    "termsPrefix": "გაგრძელებით ეთანხმები ჩვენს",
+    "termsPrefix": "გაგრძელებით ეთანხმები ჩვენს ",
     "terms": "პირობებს",
     "termsConnector": " და ",
     "termsSuffix": ".",
@@ -224,7 +226,7 @@
     "hideBalance": "ბალანსის დამალვა",
     "showBalance": "ბალანსის ჩვენება",
     "balanceHidden": "ბალანსი დამალულია",
-    "bonusCreditsExpiring": "ბონუსური კრედიტების ({{amount}}) ვადა იწურება: {{date}}.",
+    "bonusCreditsExpiring": "კრედიტების ({{amount}}) ვადა იწურება: {{date}}.",
     "signOutTitle": "ანგარიშიდან გასვლა?",
     "signOutMessage": "სამუშაო სივრცის გამოსაყენებლად ანგარიშში ხელახლა შესვლა დაგჭირდება.",
     "deleteAccountTitle": "ანგარიშის წაშლა?",
@@ -293,7 +295,8 @@
     "condenseToolCallsSubtitle": "დააჯგუფეთ ზედიზედ ინსტრუმენტის გამოძახებები ერთ რიგში, რომლის გახსნაც შეგიძლიათ.",
     "toolSummaryTranslation": "ინსტრუმენტების შეჯამებების თარგმნა",
     "toolSummaryTranslationSubtitle": "გაგზავნე ყოველი ინსტრუმენტის შეჯამება მოდელთან, რომ ის შენი აპის ენაზე ითარგმნოს. თარგმნის ვერ მოხერხდებისას ორიგინალი ჩანს.",
-    "toolSummaryTranslationModelUnavailableNotice": "ეს მოდელი აღარ არის ხელმისაწვდომი. სხვის ასარჩევად შეეხეთ $t(common.model)-ს."
+    "toolSummaryTranslationModelUnavailableNotice": "ეს მოდელი აღარ არის ხელმისაწვდომი. სხვის ასარჩევად შეეხეთ $t(common.model)-ს.",
+    "autoExpandThinkingInactiveSubtitle": "მსჯელობის დეტალების დამალვისას ეფექტს არ მოახდენს."
   },
   "prReview": {
     "pullRequestUnavailable": "შერწყმის მოთხოვნა მიუწვდომელია",
@@ -622,9 +625,15 @@
       "viewOnGitHub": "PR-ის ნახვა GitHub-ზე",
       "noChecksReported": "შემოწმებების მონაცემები არ არის",
       "passed": "{{displayCount}} წარმატებულია",
+      "passed_one": "{{displayCount}} წარმატებულია",
+      "passed_other": "{{displayCount}} წარმატებულია",
       "failed": "{{displayCount}} წარუმატებელია",
+      "failed_one": "{{displayCount}} წარუმატებელია",
+      "failed_other": "{{displayCount}} წარუმატებელია",
       "pending": "{{displayCount}} მოლოდინშია",
       "skipped": "{{displayCount}} გამოტოვებულია",
+      "skipped_one": "{{displayCount}} გამოტოვებულია",
+      "skipped_other": "{{displayCount}} გამოტოვებულია",
       "checksCount": "{{displayCount}} შემოწმება",
       "checksCount_one": "{{displayCount}} შემოწმება",
       "checksCount_other": "{{displayCount}} შემოწმება",
@@ -669,7 +678,8 @@
       "gitlabDescription": "დააკავშირეთ თქვენი GitLab ანგარიში, შერწყმის მოთხოვნების მობილურში განსახილველად.",
       "bitbucketDescription": "დააკავშირეთ Bitbucket ამ ორგანიზაციას, PR-ების მობილურში განსახილველად.",
       "bitbucketOrgOnlyDescription": "ზემოთ მყოფი ანგარიში გადართეთ ორგანიზაციაზე, მისი Bitbucket-ის PR-ების განსახილველად.",
-      "contextLine": "{{organization}}-სთვის"
+      "contextLine": "{{organization}}-სთვის",
+      "contextLinePersonal": "პირადი ანგარიშისთვის"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1399,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "შესაძლოა საჭირო იყოს GitLab-ზე დამატებით ჯგუფებსა და პროექტებზე წვდომის მინიჭება.",
       "installGithubApp": "GitHub აპის დაყენება რეპოზიტორებზე",
       "installGithubAppDescription": "მიანიჭე Kilo-ს GitHub აპს წვდომა იმ რეპოზიტორებზე, რომელთა შემოწმებაც გსურს.",
-      "noRepositoriesFound": "რეპოზიტორები ვერ მოიძებნა",
       "repositoryAccess": "რეპოზიტორზე წვდომა"
     },
     "style": {
@@ -1429,6 +1438,8 @@
       "showMore": "მეტის ჩვენება",
       "created": "შექმნის თარიღი",
       "started": "დაწყების თარიღი",
+      "reviewEnded": "დასრულების თარიღი",
+      "severityNitpick": "წვრილმანი",
       "tokens": "ტოკენი",
       "tokensInOut": "{{input}} შემავალი / {{output}} გამომავალი",
       "council": "საბჭო",
@@ -1452,7 +1463,13 @@
       "sessionError": "სესიის შეცდომა: {{error}}.",
       "statusWithValue": "სტატუსი: {{status}}",
       "toolName": "ინსტრუმენტი: {{name}}",
-      "toolNameError": "ინსტრუმენტის შეცდომა: {{name}}."
+      "toolNameError": "ინსტრუმენტის შეცდომა: {{name}}.",
+      "cancelReasonSuperseded": "დაემატა უფრო ახალი კომიტი, ამიტომ ეს შემოწმება ჩაანაცვლდა.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} გათიშულია, ამიტომ ეს შემოწმება გაუქმდა. ხელახლა დააკავშირეთ იგი, შემდეგ კი ხელახლა გაუშვით შემოწმება.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer გამორთულია Bitbucket-ისთვის, ამიტომ ეს შემოწმება გაუქმდა. ხელახლა ჩართეთ იგი, შემდეგ კი ხელახლა გაუშვით შემოწმება.",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket-ის pull request შეიცვალა, ამიტომ ეს შემოწმება ჩაანაცვლდა.",
+      "cancelReasonCancelled": "ეს შემოწმება გაუქმდა.",
+      "cancelReasonInterrupted": "ეს შემოწმება შეწყდა."
     },
     "reviewMemory": {
       "title": "შემოწმების მეხსიერება",
@@ -1473,13 +1490,20 @@
       "invalidUrl": "შეიყვანე PR-ის სწორი URL.",
       "couldNotCheckProviderStatus": "პროვაიდერის სტატუსის შემოწმება ვერ მოხერხდა.",
       "couldNotLoadProviders": "დაკავშირებული პროვაიდერების ჩატვირთვა ვერ მოხერხდა. სცადე ხელახლა.",
-      "connectProvider": "პროვაიდერის დაკავშირება",
       "connectProviderDescription": "PR-ის ხელით შემოწმების დასაწყებად დააკავშირე GitHub.",
       "pullRequestUrl": "PR-ის URL",
       "instructions": "ინსტრუქციები (არასავალდებულო)",
       "instructionsPlaceholder": "რას უნდა მიაქციოს შემმოწმებელმა განსაკუთრებული ყურადღება…",
       "starting": "შემოწმება იწყება…",
-      "start": "შემოწმების დაწყება"
+      "start": "შემოწმების დაწყება",
+      "startNotFound": "მოცემული {{requestNoun}} {{provider}}-ზე ვერ მოიძებნა. გადაამოწმე URL და რეპოზიტორიის ხელმისაწვდომობა.",
+      "startRateLimited": "{{provider}} ამ დროს მოთხოვნებს ზღუდავს. სცადე ხელახლა რამდენიმე წუთში.",
+      "startNotAllowed": "მოცემული {{requestNoun}} — შემოწმების დასაწყებად არ გაქვს საჭირო წვდომა. გადაამოწმე შენი უფლებები და ორგანიზაციის გეგმა.",
+      "startProviderNeedsAttention": "ხელით შემოწმებას სჭირდება სტანდარტული {{provider}}-ის დაკავშირება. დააკავშირე ის და სცადე ხელახლა.",
+      "startAlreadyRunning": "ეს {{requestNoun}} უკვე შემოწმების პროცესშია.",
+      "startRejected": "ეს {{requestNoun}} შემოწმებას არ ექვემდებარება. დარწმუნდი, რომ ის ღიაა, დრაფტი არ არის და URL სწორია.",
+      "startProviderUnavailable": "{{provider}}-თან დაკავშირება ვერ მოხერხდა და ეს {{requestNoun}} ვერ იკითხება. სცადე ხელახლა.",
+      "startFailed": "შემოწმების დაწყება ვერ მოხერხდა. შეამოწმე კავშირი და სცადე ხელახლა."
     },
     "notConnectedReadOnly": "{{platform}} არ არის დაკავშირებული. მისი დაკავშირება მხოლოდ ორგანიზაციის მფლობელებსა და ადმინისტრატორებს შეუძლიათ.",
     "gitlab": {
@@ -1731,7 +1755,7 @@
       "deadlinePassed": "ვადა ამოიწურა",
       "deadlinePassedDetail": "{{critical}} კრიტიკული, {{high}} მაღალი",
       "dueThisWeek": "ვადა ამ კვირაშია",
-      "dueThisWeekDetail": "{{exploitable}} მიგნების ბოროტად გამოყენების შესაძლებლობა დადასტურებულია",
+      "dueThisWeekDetail": "{{exploitable}} ამათგან ბოროტად გამოყენების შესაძლებლობა დადასტურებულია",
       "noDeadline": "ვადის გარეშე",
       "reviewSlaAssignment": "SLA-ის ვადების მინიჭების შემოწმება",
       "allOpenFindingsTracked": "ყველა ღია მიგნება კონტროლდება"
@@ -1891,11 +1915,17 @@
       "actorSystem": "Kilo სისტემა",
       "couldNotLoad": "აუდიტის ანგარიშის ჩატვირთვა ვერ მოხერხდა.",
       "events": "მოვლენები",
+      "eventConfidence": "სანდოობა: {{confidence}}",
+      "eventReason": "მიზეზი: {{reason}}",
+      "eventsCount_one": "{{displayCount}} მოვლენა",
+      "eventsCount_other": "{{displayCount}} მოვლენა",
       "generated": "შექმნის დრო: {{generatedAt}}.",
       "noActivity": "აქტივობა არ დაფიქსირებულა",
       "noActivityDescription": "{{start}}-დან {{end}}-მდე Kilo-ში უსაფრთხოების მიგნებებთან დაკავშირებული აქტივობა არ დაფიქსირებულა, რომელიც ანგარიშში აისახებოდა.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "რეპოზიტორი არ არის ჩაწერილი",
+      "reasonUnknown": "ამოუცნობი მიზეზი",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "ანგარიშის შეჯამება",
       "title": "აუდიტის ანგარიში",
       "unavailable": "აუდიტის ანგარიში მიუწვდომელია",
@@ -1948,8 +1978,9 @@
       "couldNotLoad": "უსაფრთხოების აგენტის ჩატვირთვა ვერ მოხერხდა.",
       "installApp": "GitHub აპის დაყენება",
       "reauthorizeButton": "GitHub აპის ხელახალი ავტორიზაცია",
-      "reauthorizeDescription": "უსაფრთხოების აგენტს Dependabot-ის გაფრთხილებებზე წვდომისთვის vulnerability_alerts ნებართვა სჭირდება. ამ ნებართვის მისანიჭებლად ხელახლა გაიარე GitHub აპის ავტორიზაცია.",
+      "reauthorizeDescription": "უსაფრთხოების აგენტს Dependabot-ის გაფრთხილებების წაკითხვის ნებართვა სჭირდება. ამ ნებართვის მისანიჭებლად ხელახლა გაიარე GitHub აპის ავტორიზაცია.",
       "reauthorizeTitle": "საჭიროა დამატებითი ნებართვები",
+      "retryFailed": "უსაფრთხოების აგენტის ჩატვირთვა კვლავ ვერ მოხერხდა. შეამოწმე კავშირი და სცადე ხელახლა.",
       "setupFailed": "GitHub-ის გამართვის დაწყება ვერ მოხერხდა. სცადე ხელახლა."
     },
     "queuedActionUntracked": "რიგში დამატებული მოქმედების სტატუსის კონტროლი ვეღარ ხერხდება. მიმდინარე მდგომარეობის სანახავად განაახლე მონაცემები.",
@@ -2112,7 +2143,8 @@
       "dollar_other": "დოლარი",
       "costSpoken": "ღირებულება {{cost}}",
       "costSpokenWithTime": "ღირებულება {{cost}}, {{time}}",
-      "pullRequest": "შერწყმის მოთხოვნა {{number}}"
+      "pullRequest": "შერწყმის მოთხოვნა {{number}}",
+      "spokenJoiner": "და"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub-ის გახსნა ვერ მოხერხდა",
@@ -2231,6 +2263,9 @@
       "noRepositoriesVisibleGitlab": "რეპოზიტორიები არ ჩანს. შეამოწმეთ GitLab-ის რეპოზიტორიებზე წვდომა, შემდეგ განაახლეთ სია.",
       "noRepositoriesVisibleBitbucket": "რეპოზიტორიები არ ჩანს. შეამოწმეთ Bitbucket-ის რეპოზიტორიებზე წვდომა, შემდეგ განაახლეთ სია.",
       "bitbucketOrganizationsOnly": "Bitbucket მხოლოდ ორგანიზაციებისთვისაა ხელმისაწვდომი.",
+      "githubNeedsAttention": "GitHub-ის ხელახლა დაკავშირებაა საჭირო",
+      "githubNeedsAttentionDescription": "ხელახლა დააკავშირეთ Kilo GitHub App, შემდეგ განაახლეთ სია მისი რეპოზიტორიების ჩასატვირთად.",
+      "partialRepositories": "ზოგიერთი GitHub-ის რეპოზიტორიის ჩატვირთვა ვერ მოხერხდა.",
       "branchPickerTitle": "განშტოების არჩევა",
       "branchDefault": "ნაგულისხმები",
       "branchAccessibility": "განშტოება: {{label}}",
@@ -2238,13 +2273,13 @@
       "branchLoadError": "განშტოებების ჩატვირთვა ვერ მოხერხდა",
       "branchUnavailable": "ამ რეპოზიტორიისთვის განშტოებები მიუწვდომელია. შეამოწმეთ წვდომა პროვაიდერთან, შემდეგ აირჩიეთ სხვა რეპოზიტორია.",
       "branchEmpty": "განშტოებები მიუწვდომელია",
+      "branchListIncomplete": "მხოლოდ ზოგიერთი განშტოებაა ნაჩვენები. რეპოზიტორიაში იმაზე მეტი განშტოებაა, ვიდრე ამ სიაში ეტევა.",
       "branchPlaceholder": "აირჩიეთ განშტოება",
       "runOnWithTarget": "გაშვების გარემო: {{target}}",
       "environment": "გარემო",
       "couldNotLoadEnvironment": "თქვენი გარემოს ჩატვირთვა ვერ მოხერხდა.",
       "retryLoadingEnvironment": "გარემოს ხელახლა ჩატვირთვა",
       "defaultEnvironment": "ნაგულისხმევი გარემო",
-      "environmentSummary": "{{commands}} ბრძანება · {{mcp}} MCP · {{skills}} უნარი · {{agents}} აგენტი",
       "leaveChanges": "ცვლილებების დატოვება",
       "commitAndPush": "კომიტი და ატვირთვა",
       "startSession": "სესიის დაწყება",
@@ -2463,7 +2498,71 @@
       "preparationComplete": "მომზადება დასრულდა",
       "preparationFailed": "მომზადება ვერ მოხერხდა",
       "setupCommand": "გამართვის ბრძანება {{index}}",
-      "setupCommandOf": "გამართვის ბრძანება {{index}}, სულ {{displayCount}}"
+      "setupCommandOf": "გამართვის ბრძანება {{index}}, სულ {{displayCount}}",
+      "stepWorkspaceSetup": "სამუშაო სივრცის მომზადება",
+      "stepDiskCheck": "დისკის შემოწმება",
+      "stepCloning": "რეპოზიტორიის კლონირება",
+      "stepBranch": "ბრენჩის მომზადება",
+      "stepDevcontainerSetup": "Dev-კონტეინერის მომზადება",
+      "stepWorkspaceRestore": "სამუშაო სივრცის აღდგენა",
+      "stepWorkspaceBackup": "სამუშაო სივრცის შენახვა",
+      "stepSandboxProvision": "სენდბოქსის გამოყოფა",
+      "stepSandboxBoot": "სენდბოქსის გაშვება",
+      "stepSnapshotFallback": "სნეპშოტის გარეშე თავიდან ცდა",
+      "stepKiloServer": "Kilo-ს გაშვება",
+      "stepKiloSession": "სესიის მომზადება",
+      "stepRestoreIncomplete": "სესიის აღდგენა არასრულია",
+      "stepReady": "გარემო მზადაა",
+      "stepFailed": "გარემოს მომზადება ვერ მოხერხდა",
+      "stepUnknown": "გარემოს მომზადება",
+      "detailCreatingSandbox": "სენდბოქსის შექმნა",
+      "detailUpdatingRepository": "რეპოზიტორიის განახლება",
+      "detailCheckingOutBranch": "ბრენჩზე გადასვლა",
+      "detailRunningSetupCommands": "გამართვის ბრძანებების გაშვება",
+      "detailSavingRepository": "რეპოზიტორიის შენახვა სწრაფი გაშვებისთვის",
+      "detailStartingKiloRuntime": "Kilo runtime-ის გაშვება",
+      "detailPreparingKiloSession": "Kilo-ს სესიის მომზადება",
+      "detailWaitingForPreviousSandbox": "წინა სენდბოქსის გაჩერების მოლოდინი",
+      "detailRetryingSandboxCreation": "სენდბოქსის შექმნის ხელახლა ცდა",
+      "detailPreviousSnapshotFailed": "წინა სნეპშოტით გაშვება ჩაიშალა. თავიდან ვცდილობთ სნეპშოტის გარეშე.",
+      "detailSnapshotStartupFailed": "სნეპშოტით გაშვება ჩაიშალა. თავიდან ვცდილობთ სნეპშოტის გარეშე.",
+      "detailStartingSandboxWithoutSnapshot": "სენდბოქსის გაშვება სნეპშოტის გარეშე",
+      "detailSettingUpWorkspace": "სამუშაო სივრცის მომზადება",
+      "detailRestoringSession": "სესიის აღდგენა",
+      "detailWarmWorkspaceReused": "თბილი სამუშაო სივრცე ხელახლა გამოიყენება",
+      "detailRetryingClone": "კლონირების ხელახლა ცდა (მცდელობა {{attempt}} {{total}}-დან)",
+      "detailSetupCommandFailed": "გამართვის ბრძანება {{index}} ჩაიშალა",
+      "detailSetupCommandTimedOut": "გამართვის ბრძანება {{index}}-ის ვადა ამოიწურა",
+      "detailColdRestore": "ცივი აღდგენა, სნეპშოტი გამოყენებულია, აღდგენილია {{total}} ფაილიდან {{applied}}",
+      "detailProgressPercent": "დასრულებულია {{percent}}%",
+      "detailRestoreIncompleteReport": "სესიის აღდგენა არასრულია: {{total}} ფაილიდან {{skipped}} არ აღდგენილა ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "აკლია: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} და კიდევ {{omitted}}",
+      "detailReasonPatchFailed": "პაჩი არ გამოიყენებოდა",
+      "detailReasonOutsideWorkspace": "გზა სამუშაო სივრცის ფარგლებს გარეთაა",
+      "detailReasonMissingContent": "სნეპშოტს ფაილისთვის შინაარსი არ შეეცავდა",
+      "detailReasonIndexResetFailed": "ჩავარდნის შემდეგ ინდექსის ხელახლა დაყენება ვერ მოხერხდა",
+      "detailReasonUnlinkFailed": "ფაილის წაშლა ვერ მოხერხდა",
+      "detailReasonWriteFailed": "ფაილის ჩაწერა ვერ მოხერხდა",
+      "detailReasonUnknown": "უცნობი მიზეზი",
+      "detailUnknown": "ჯერ კიდევ ემზადება",
+      "errorPreparationTimeout": "გარემოს მომზადების ვადა ამოიწურა",
+      "errorWorkspaceSetupFailed": "სამუშაო სივრცის მომზადება ჩაიშალა",
+      "errorCredentialUpgradeRequired": "ამ სესიას აკლია საჭირო ავტორიზაციის განახლება. გასაგრძელებლად დაიწყეთ ახალი სესია.",
+      "errorAgentUnavailable": "აგენტი ხელმისაწვდომი აღარ არის",
+      "errorBillingBlocked": "სენდბოქსის ბილინგი დამატებით კრედიტს მოითხოვს",
+      "errorBillingUnavailable": "სენდბოქსის ბილინგის ან ტევადობის შემოწმება ხელმისაწვდომი არ არის. მოგვიანებით სცადეთ.",
+      "errorContainerLimitReached": "მიღწეულია კონტეინერების ლიმიტი. ახლის გაშვებამდე გააჩერეთ არსებული კონტეინერი.",
+      "errorInvalidConfiguration": "სენდბოქსის კონფიგურაცია არასწორი ან მხარდაუჭერელია",
+      "errorRuntimeArtifactUnauthorized": "runtime-ის ჩამოტვირთვა არ იყო ავტორიზებული",
+      "errorRuntimeArtifactInvalid": "runtime-ის არტეფაქტის გადამოწმება ჩაიშალა",
+      "errorRuntimeCliProbeFailed": "runtime CLI-ს შემოწმება ჩაიშალა",
+      "errorRuntimeSupervisorMissing": "runtime supervisor აკლია",
+      "errorConnectionLost": "სენდბოქსთან კავშირი დაიკარგა",
+      "errorSandboxLost": "სენდბოქსი დაიკარგა",
+      "errorAgentRestarted": "აგენტი ხელახლა გაეშვა",
+      "errorSandboxOutOfMemory": "სენდბოქსს მეხსიერება ამოეწურა",
+      "errorPreparationDidNotComplete": "მომზადება არ დასრულდა"
     },
     "permissionCard": {
       "title": "საჭიროა ნებართვა",
@@ -2475,7 +2574,10 @@
       "allowOnceAccessibility": "ერთჯერადი დაშვება",
       "alwaysAllow": "ყოველთვის დაშვება",
       "alwaysAllowAccessibility": "ყოველთვის დაშვება",
-      "retrying": "ხელახლა ცდა…"
+      "retrying": "ხელახლა ცდა…",
+      "retryDeny": "უარყოფის ხელახლა ცდა",
+      "retryAllowOnce": "ერთჯერადი დაშვების ხელახლა ცდა",
+      "retryAlwaysAllow": "ყოველთვის დაშვების ხელახლა ცდა"
     },
     "questionCard": {
       "title": "აგენტი პასუხს ელოდება",
@@ -3027,22 +3129,16 @@
     "boundary": {
       "backToProfile": "პროფილზე დაბრუნება",
       "loadErrorMessage": "შეამოწმე კავშირი და ხელახლა სცადე.",
-
       "chooseAccount": "ანგარიშის არჩევა",
       "loadErrorTitle": "თქვენი ორგანიზაციების ჩატვირთვა ვერ მოხერხდა.",
       "membershipLostNotice": "თქვენ აღარ გაქვთ წვდომა ამ ორგანიზაციაზე. გადავერთეთ {{target}}-ზე.",
       "noOrganization": "ორგანიზაცია არ არის",
-
       "noOrganizationDescription": "ეს ანგარიში არ არის ორგანიზაციის ნაწილი. ორგანიზაციის ფუნქციების, როგორიცაა წევრების მოწვევა და დაბალი ბალანსის შეტყობინებები, გამოსაყენებლად შექმენით ორგანიზაცია ან შეუერთდით მას ვებსაიტზე.",
-
       "openWebOrganizations": "ორგანიზაციების გახსნა ვებსაიტზე",
-
       "organizationUnavailable": "ორგანიზაცია მიუწვდომელია.",
       "selectDescriptionWithOrganizations": "თქვენ ეკუთვნით ერთ ან რამდენიმე ორგანიზაციას. აირჩიეთ ანგარიში, რომელიც ამ ეკრანმა უნდა გამოიყენოს.",
-
       "selectOrganization": "აირჩიეთ ორგანიზაცია",
       "unavailableDescription": "ეს ორგანიზაცია აღარ არის ხელმისაწვდომი. გასაგრძელებლად თქვენს პროფილში აირჩიეთ სხვა ორგანიზაცია.",
-
       "unavailableSessionsDescription": "ეს ორგანიზაცია აღარ არის ხელმისაწვდომი. მისი სესიების ჩატვირთვა შეუძლებელია.",
       "accessDeniedDescription": "თქვენ არ გაქვთ წვდომა ამ ორგანიზაციაზე."
     },
@@ -3070,7 +3166,9 @@
       "permissionDenied": "წევრების მოწვევის უფლება არ გაქვთ.",
       "roleMember": "როლი: წევრი",
       "sendInvite": "მოწვევის გაგზავნა",
-      "title": "წევრის მოწვევა"
+      "title": "წევრის მოწვევა",
+      "alreadyInvited": "ის უკვე მოწვეულია ან უკვე არის წევრი.",
+      "sendError": "მოწვევის გაგზავნა ვერ მოხერხდა."
     },
     "invoices": {
       "downloadA11y": "ინვოისის ჩამოტვირთვა: {{number}}",
@@ -3139,7 +3237,8 @@
       "inviteCreated": "მოწვევა შეიქმნა",
       "pendingInvitations": "დაუდასტურებელი მოწვევები",
       "resendInvite": "მოწვევის ხელახლა გაგზავნა",
-      "shareInviteLink": "მოწვევის ბმულის გაზიარება"
+      "shareInviteLink": "მოწვევის ბმულის გაზიარება",
+      "resendInviteError": "მოწვევის ხელახლა გაგზავნა ვერ მოხერხდა."
     },
     "usageStats": {
       "inputTokens": "შემავალი ტოკენები",
@@ -3287,7 +3386,8 @@
     "noneChosen": "არჩეული არ არის",
     "emptyTitle": "ტრანსკრიფციის მოდელები არ არის",
     "emptyDescription": "Kilo Gateway ამჟამად არ სთავაზობს ტრანსკრიფციის მოდელებს.",
-    "loadFailed": "ტრანსკრიფციის მოდელების ჩატვირთვა ვერ მოხერხდა."
+    "loadFailed": "ტრანსკრიფციის მოდელების ჩატვირთვა ვერ მოხერხდა.",
+    "choose": "აირჩიეთ მოდელი"
   },
   "voiceLanguage": {
     "title": "ხმოვანი შეყვანის ენა",
@@ -3383,7 +3483,12 @@
       "serverToolCount_one": "{{count}} ხელსაწყო",
       "serverToolCount_other": "{{count}} ხელსაწყო",
       "serverUnreachable": "ამ სერვერთან დაკავშირება ვერ მოხერხდა",
-      "serverOff": "ეს სერვერი გამორთულია"
+      "serverOff": "ეს სერვერი გამორთულია",
+      "app": {
+        "label": "ხელსაწყოს ინტერფეისი",
+        "failed": "ამ ხელსაწყოს ინტერფეისის ჩატვირთვა ვერ მოხერხდა.",
+        "empty": "ამ ხელსაწყოს ინტერფეისს საჩვენებელი არაფერი აქვს."
+      }
     },
     "mcpOAuth": {
       "authMethod": "ავთენტიფიკაცია",
@@ -3497,6 +3602,7 @@
       "fromHuggingFace": "Hugging Face-იდან",
       "loading": "მოდელები იტვირთება",
       "noResults": "მოდელები ვერ მოიძებნა",
+      "noResultsForQuery": "\"{{query}}\" არანაირი მოდელი ვერ მოიძებნა",
       "noFits": "ამ მოწყობილობას არცერთი მოდელი არ ერგება",
       "noFitsDescription": "უფრო დიდი მოდელები ჩანართშია „$t(common.all)“.",
       "fit": {
@@ -3527,8 +3633,6 @@
       "quantizations": "კვანტიზაციები",
       "quantizationsHelp": "პატარა ფაილები ნაკლებ ოპერატიულ მეხსიერებასა და საცავს იყენებს. დიდი ფაილები, როგორც წესი, უკეთეს პასუხებს იძლევა.",
       "quantDetail": "ჩამოტვირთვა: {{size}} · დაახლოებით {{memory}} მეხსიერება",
-      "downloadQuant": "{{quant}} ჩამოტვირთვა",
-      "downloadModelA11y": "{{name}} ჩამოტვირთვა",
       "detailsA11y": "დეტალები: {{name}}",
       "loadingModel": "მოდელის დეტალები იტვირთება",
       "couldNotLoadModel": "ამ მოდელის ჩატვირთვა ვერ მოხერხდა",
@@ -3573,13 +3677,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "ეს მოდელი მხარს უჭერს მსჯელობის ინტენსივობას"
-    }
+    },
+    "creditsRequired": "ამ მესიჯის გასაგზავნად საკმარისი კრედიტები არ გაქვთ. დაამატეთ კრედიტები და სცადეთ ხელახლა."
   },
   "settingsTools": {
     "confirmTitle": "დავადასტუროთ ეს ცვლილება?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "თქვენი უახლესი რეპოზიტორია",
+      "confirmMessage": "რეპოზიტორია: {{repository}}. მოთხოვნა: {{prompt}}",
+      "confirmTitle": "გსურთ ამ აგენტის გაშვება?",
       "promptRequired": "აგენტის გაშვებას მოთხოვნა სჭირდება. დაამატე მოთხოვნა და კვლავ გაუშვი.",
       "repositoryRequired": "აგენტის გაშვებას რეპოზიტორია სჭირდება. გახსენი Kilo, აირჩიე რეპოზიტორია და კვლავ გაუშვი.",
       "repositoryUnknown": "Kilo {{repository}}-ს GitHub-ის ან GitLab-ის რეპოზიტორიად არ ცნობს. აირჩიე სხვა რეპოზიტორია Kilo-ში.",
@@ -3609,7 +3717,9 @@
     "spend24h": "ხარჯვა ბოლო 24 საათში",
     "multiplierError": "შეიყვანე 1 ან მეტი მამრავლი",
     "permissionDenied": "ხარჯვის შეტყობინებების მართვის უფლება არ გაქვთ.",
-    "pushOffByCategory": "გამორთულია შეტყობინებებში"
+    "pushOffByCategory": "გამორთულია შეტყობინებებში",
+    "multiplierMaxError": "შეიყვანე {{max}}-მდე მამრავლი",
+    "thresholdMaxError": "შეიყვანეთ {{max}}-მდე თანხა."
   },
   "profiles": {
     "title": "პროფილები",
@@ -3626,9 +3736,10 @@
       "skills_other": "{{count}} უნარი",
       "commands_one": "{{count}} ბრძანება",
       "commands_other": "{{count}} ბრძანება",
-      "varsShort": "{{count}}ც",
-      "skillsShort": "{{count}}უ",
-      "commandsShort": "{{count}}ბ"
+      "setupCommands_one": "{{count}} დაყენების ბრძანება",
+      "setupCommands_other": "{{count}} დაყენების ბრძანება",
+      "agents_one": "{{count}} აგენტი",
+      "agents_other": "{{count}} აგენტი"
     },
     "nameLabel": "პროფილის სახელი",
     "namePlaceholder": "მაგ. Backend-ის გამართვა",
@@ -3656,6 +3767,8 @@
     "keyTooLong": "გასაღები უნდა იყოს 256 სიმბოლო ან ნაკლები",
     "keyDuplicate": "ეს გასაღები უკვე არსებობს პროფილში",
     "valueLabel": "ღირებულება",
+    "valueRequired": "შეიყვანეთ მნიშვნელობა",
+    "tooLong": "გამოიყენეთ არაუმეტეს {{max}} სიმბოლო",
     "secrets": {
       "markSecret": "საიდუმლოდ მონიშვნა",
       "masked": "ფარული ღირებულება",
@@ -3684,6 +3797,8 @@
     "skillNameInvalid": "უნარის სახელი უნდა დაიწყოს ასოთი ან ციფრით და გამოიყენოს მხოლოდ მცირე ასოები, ციფრები და ტირეები",
     "skillContentRequired": "საჭიროა უნარების შინაარსი",
     "skillSaveFailed": "უნარების შენახვა ვერ მოხერხდა",
+    "skillSourceCustom": "საკუთარი",
+    "skillSourceMarketplace": "ბაზარი",
     "skillsHint": "ჩასვით SKILL.md და ივსება მისი სახელი; დაამატეთ უნარი თქვენი ტელეფონიდან გადათრევის გარეშე.",
     "skillEditTitle": "რედაქტირების უნარი",
     "mcp": {
@@ -3704,7 +3819,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "შეიყვანეთ სერვერის სახელი",
-      "nameInvalid": "სახელს შეუძლია გამოიყენოს მხოლოდ ასოები, რიცხვები, ხაზები და ტირეები",
+      "nameInvalid": "სახელს შეუძლია გამოიყენოს მხოლოდ ASCII ასოები, რიცხვები, ხაზები და ტირეები, არაუმეტეს 100 სიმბოლო",
       "commandRequired": "შეიყვანეთ ბრძანება",
       "commandTooLong": "გამოიყენეთ მაქსიმუმ 50 არგუმენტი, თითოეული 500 სიმბოლო",
       "urlRequired": "შეიყვანეთ URL",
@@ -3732,16 +3847,16 @@
       "stepsPlaceholder": "მაგ. 50",
       "temperature": "ტემპერატურა",
       "temperaturePlaceholder": "მაგ. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "მაგ. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "ჩემი აგენტი",
       "promptPlaceholder": "შენ ხარ...",
       "tools": "ხელსაწყოები",
       "visibility": "ხილვადობა",
-      "visibilityPrimary": "პირველადი - ნაჩვენებია ამომრჩეველში",
-      "visibilitySubagent": "სუბაგენტი - გამოძახება შესაძლებელია მხოლოდ სხვებისგან",
-      "visibilityAll": "ყველა - ორივე",
+      "visibilityPrimary": "პირველადი — ნაჩვენებია ამომრჩეველში",
+      "visibilitySubagent": "სუბაგენტი — გამოძახება შესაძლებელია მხოლოდ სხვებისგან",
+      "visibilityAll": "ყველა — ორივე",
       "modePrimary": "მხოლოდ პირველადი",
       "modeSubagent": "მხოლოდ სუბაგენტი",
       "modeAll": "ყველა რეჟიმი",
@@ -3749,7 +3864,7 @@
       "deleteFailed": "აგენტის წაშლა ვერ მოხერხდა",
       "nameRequired": "შეიყვანეთ აგენტის სახელი",
       "slugRequired": "შეიყვანეთ აგენტი შლაგი",
-      "slugInvalid": "Slug უნდა დაიწყოს ასოთი და გამოიყენოს მხოლოდ მცირე ასოები, ციფრები და ტირეები",
+      "slugInvalid": "Slug უნდა დაიწყოს ASCII მცირე ასოთი და გამოიყენოს მხოლოდ ASCII მცირე ასოები, ციფრები და ტირეები, არაუმეტეს 50 სიმბოლო",
       "slugConflict": "ეს slug უკვე გამოიყენება ჩაშენებული აგენტის ან ამ პროფილის სხვა აგენტის მიერ",
       "edit": "რედაქტირების აგენტი"
     },
@@ -3794,7 +3909,9 @@
       "pinFailed": "რეპოს ჩამაგრება ვერ მოხერხდა",
       "unboundToast": "რეპო შეუზღუდავია",
       "unbindFailed": "რეპოს გაუქმება ვერ მოხერხდა"
-    }
+    },
+    "variablesDeleteFailed": "ცვლადის წაშლა ვერ მოხერხდა",
+    "deleteCommand": "წაშალე ბრძანება {{position}}"
   },
   "credits": {
     "title": "კრედიტების ყიდვა",
@@ -3830,7 +3947,8 @@
       "archive": "არქივში გადატანა",
       "unarchive": "არქივიდან ამოღება",
       "deleteTitle": "წავშალოთ {{name}}?",
-      "deleteMessage": "მისი დავალებებიც წაიშლება. სესიები დარჩება."
+      "deleteMessage": "მისი დავალებებიც წაიშლება. სესიები დარჩება.",
+      "createFailed": "სიის შექმნა ვერ მოხერხდა."
     },
     "listSettings": {
       "title": "სიის პარამეტრები",
@@ -3898,20 +4016,20 @@
     }
   },
   "agentBriefing": {
-    "title": "დილის მიმოხილვა",
+    "title": "აგენტის მიმოხილვა",
     "atLeast": "≥{{value}}",
     "coverageHint": "ზოგიერთი ისტორიული აქტივობა შეიძლება აკლდეს. ≥ ნიშნავს სულ მცირე ამდენს; უცნობი არ ნიშნავს ნულს.",
     "available": "ხელმისაწვდომი მიმოხილვები",
     "history": "მიმოხილვების ისტორია",
-    "historyHint": "ანგარიშები ინახება 30 დღის განმავლობაში, დახურული ანგარიშების ჩათვლით.",
+    "historyHint": "მიმოხილვები ინახება 30 დღის განმავლობაში, მათ შორის უგულებელყოფილიც.",
     "settings": "მიმოხილვის პარამეტრები",
-    "empty": "ღამის აქტივობა არ ყოფილა",
-    "emptyHint": "თქვენი ღრუბლოვანი და CLI კოდირების სესიები აქ გამოჩნდება აქტიური ღამის შემდეგ.",
+    "empty": "ამ მიმოხილვის ინტერვალში აქტივობა არ არის",
+    "emptyHint": "თქვენი ღრუბლოვანი და CLI კოდირების სესიები აქ გამოჩნდება, როცა დაგეგმილ მიმოხილვას აქტივობა ექნება.",
     "loadError": "მიმოხილვების ჩატვირთვა ვერ მოხერხდა",
-    "sessions": "აქტიური ღამით",
+    "sessions": "აქტიური ინტერვალში",
     "pullRequests": "გახსნილი PRs",
     "blockers": "ახალი ბლოკერები",
-    "spend": "ღამის ხარჯი",
+    "spend": "ხარჯი ინტერვალში",
     "view": "მიმოხილვის წაკითხვა",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -3933,13 +4051,13 @@
     "sources": "მტკიცებულებები და არტეფაქტები",
     "timezone": "მიმოხილვის სასაათო სარტყელი",
     "deviceTimezone": "მოწყობილობის სასაათო სარტყლის გამოყენება",
-    "timezoneHint": "IANA სასაათო სარტყელი, მაგალითად Europe/Berlin. განრიგის ცვლილებები მომავალ ღამეებზე გავრცელდება.",
-    "nightStart": "ღამის დასაწყისი",
-    "morningStart": "ღამის დასასრული / დილის დასაწყისი",
-    "morningEnd": "დილის დასასრული",
-    "timeHint": "მთავარი ბარათი დილის დასრულებისას მიმდინარე სტატუსს აღადგენს, ოფლაინშიც კი.",
-    "invalidSchedule": "აირჩიეთ სწორი სასაათო სარტყელი და ღამისა და დილის არაგადამფარავი, არაცარიელი პერიოდები.",
-    "notificationsHint": "ერთი ზოგადი შეტყობინება ყოველ დილით, როცა პირველი ანგარიში მზად იქნება. ფასიანი AI შეჯამებებისგან დამოუკიდებელია.",
+    "timezoneHint": "IANA სასაათო სარტყელი, მაგალითად Europe/Berlin. განრიგის ცვლილებები მომავალ მიმოხილვებზე გავრცელდება.",
+    "nightStart": "მიმოხილვის ინტერვალის დასაწყისი",
+    "morningStart": "მიმოხილვის მზადყოფნის დრო",
+    "morningEnd": "მიმოხილვის ხელმისაწვდომობის დასრულება",
+    "timeHint": "მთავარი ბარათი მიმდინარე სტატუსს აღადგენს მიმოხილვის ინტერვალის დასრულებისას, ოფლაინშიც კი.",
+    "invalidSchedule": "აირჩიეთ სწორი სასაათო სარტყელი და არაცარიელი მიმოხილვის ინტერვალი.",
+    "notificationsHint": "ერთი ზოგადი შეტყობინება ყოველ დაგეგმილ მიმოხილვაზე. ფასიანი AI შეჯამებებისგან დამოუკიდებელია.",
     "notificationPermission": "მიმოხილვის მისაღებად ჩართეთ მოწყობილობის შეტყობინებები აქ: $t(common.notifications).",
     "aiOptIn": "ფასიანი AI შეჯამებები",
     "aiHint": "არჩევითია მხოლოდ ამ კონტექსტისთვის. შერჩეული, რედაქტირებული ფრაგმენტები და სტრუქტურირებული ფაქტები იგზავნება თქვენს მოდელთან აპის ენაზე. გადასახადი ამ კონტექსტის ბალანსიდან ჩამოიჭრება.",
@@ -3956,9 +4074,39 @@
     "enable": "ფასიანი შეჯამებების ჩართვა",
     "contextSettings": "AI პარამეტრები · {{context}}",
     "allContexts": "პირადი და ორგანიზაციის მიმოხილვები ცალ-ცალკე ინახება.",
+    "create": "მიმოხილვის შექმნა",
+    "oneOff": "მოთხოვნისამებრ",
+    "createdAt": "შექმნილია {{time}}",
+    "chooseContext": "აირჩიეთ ერთი კონტექსტი",
+    "period": "მიმოხილვის პერიოდი",
+    "last24Hours": "ბოლო 24 საათი",
+    "last7Days": "ბოლო 7 დღე",
+    "customPeriod": "მორგებული პერიოდი",
+    "periodStart": "პერიოდის დასაწყისი",
+    "periodEnd": "პერიოდის დასასრული",
+    "periodHint": "აირჩიეთ არაუმეტეს 31 დღისა. ისტორიული მონაცემები შესაძლოა არასრული იყოს.",
+    "periodSessions": "პერიოდში აქტიური",
+    "periodSpend": "პერიოდის ხარჯი",
+    "invalidPeriod": "აირჩიეთ დასაწყისი, რომელიც დასასრულზე ადრეა.",
+    "futurePeriod": "პერიოდი მომავალში ვერ დასრულდება.",
+    "periodTooLong": "აირჩიეთ 31-დღიანი ან უფრო მოკლე პერიოდი.",
+    "invalidLocalTime": "ეს ადგილობრივი დრო მიმოხილვის სასაათო სარტყელში არ არსებობს. აირჩიეთ სხვა დრო.",
+    "reviewBriefing": "მიმოხილვის გადახედვა",
+    "reviewAgain": "ახალი გადახედვის მომზადება",
+    "payer": "თანხა ჩამოიჭრება კონტექსტიდან: {{context}}",
+    "emptyPeriod": "ამ პერიოდში აქტივობა ვერ მოიძებნა. AI შეჯამება არ შეიქმნება და თანხა არ ჩამოიჭრება.",
+    "emptyHistory": "შენახული მიმოხილვები არ არის",
+    "historicalStateHint": "სესიის მდგომარეობა ასახავს არჩეული პერიოდის დასასრულს არსებულ მდგომარეობას და არა მიმდინარე სტატუსს.",
+    "oneOffHint": "AI იღებს შერჩეულ, გასუფთავებულ მასალებს თქვენი აპის ენაზე. ეს მოთხოვნით შექმნილი მიმოხილვა არ ცვლის თქვენს დაგეგმილ მიმოხილვას ან AI პარამეტრებს.",
+    "createOffline": "მიმოხილვის გადასახედად ან შესაქმნელად დაუკავშირდით ინტერნეტს. ინტერნეტთან კავშირის გარეშე ფასიანი მოთხოვნები რიგში არასდროს ინახება.",
+    "estimateInputTooLarge": "ამ პერიოდში არჩეული მოდელისთვის მეტისმეტად ბევრი მასალაა.",
+    "estimatePermissionUnavailable": "ამ კონტექსტის ბალანსის გამოყენების უფლება არ გაქვთ.",
+    "createFailed": "ამ მიმოხილვის შექმნა ვერ მოხერხდა.",
+    "reviewFailed": "ამ მიმოხილვის გადახედვა ვერ მოხერხდა.",
     "estimatePricingUnavailable": "ამ მოდელის ფასები ხელმისაწვდომი არ არის.",
     "estimateBalanceUnavailable": "ბალანსი არ არის საკმარისი ფასიანი შეჯამებისთვის.",
     "estimateModelNotAllowed": "ეს მოდელი აქ ნებადართული არ არის.",
-    "estimateSpendLimitTooLow": "გაზარდეთ ხარჯვის ლიმიტი ამ შეჯამების დასაშვებად."
+    "estimateSpendLimitTooLow": "გაზარდეთ ხარჯვის ლიმიტი ამ შეჯამების დასაშვებად.",
+    "saved": "მიმოხილვის პარამეტრები შენახულია"
   }
 }

@@ -53,6 +53,7 @@
     "connected": "Tilknyttet",
     "couldNotLoadModels": "Modellerne kunne ikke indlæses.",
     "couldNotLoadRepositories": "Kodelagrene kunne ikke indlæses.",
+    "noRepositoriesFound": "Ingen kodelagre fundet",
     "critical": "Kritisk",
     "delete": "Slet",
     "deleted": "Slettet",
@@ -87,6 +88,7 @@
     "connect": "Tilknyt",
     "connectBitbucket": "Tilknyt Bitbucket",
     "connectGitlab": "Tilknyt GitLab",
+    "connectProvider": "Tilslut en udbyder",
     "contentTruncated": "Indhold afkortet",
     "copyLink": "Kopiér link",
     "couldNotLoadOrganizations": "Organisationerne kunne ikke indlæses.",
@@ -182,7 +184,7 @@
     "codeArrivalHint": "Hvis adressen opfylder betingelserne, modtager du koden inden for et minut.",
     "verifyCode": "Bekræft kode",
     "resendCode": "Send kode igen",
-    "termsPrefix": "Ved at fortsætte accepterer du vores",
+    "termsPrefix": "Ved at fortsætte accepterer du vores ",
     "terms": "Vilkår",
     "termsConnector": " og ",
     "termsSuffix": ".",
@@ -224,7 +226,7 @@
     "hideBalance": "Skjul saldo",
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
-    "bonusCreditsExpiring": "{{amount}} i bonuskreditter udløber {{date}}.",
+    "bonusCreditsExpiring": "{{amount}} i kreditter udløber {{date}}.",
     "signOutTitle": "Log ud?",
     "signOutMessage": "Du skal logge ind igen for at få adgang til dit arbejdsområde.",
     "deleteAccountTitle": "Slet konto?",
@@ -293,7 +295,8 @@
     "condenseToolCallsSubtitle": "Gruppér fortløbende værktøjskald i én række, du kan åbne.",
     "toolSummaryTranslation": "Oversæt værktøjssammendrag",
     "toolSummaryTranslationSubtitle": "Send hvert værktøjssammendrag til en model for at oversætte det til dit appsprog. Originalen vises, hvis oversættelsen mislykkes.",
-    "toolSummaryTranslationModelUnavailableNotice": "Denne model tilbydes ikke længere. Tryk på $t(common.model) for at vælge en anden."
+    "toolSummaryTranslationModelUnavailableNotice": "Denne model tilbydes ikke længere. Tryk på $t(common.model) for at vælge en anden.",
+    "autoExpandThinkingInactiveSubtitle": "Ingen effekt, mens detaljer om ræsonnement er skjult."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ikke tilgængelig",
@@ -622,9 +625,15 @@
       "viewOnGitHub": "Vis PR på GitHub",
       "noChecksReported": "Ingen kontroller rapporteret",
       "passed": "{{displayCount}} bestået",
+      "passed_one": "{{displayCount}} bestået",
+      "passed_other": "{{displayCount}} bestået",
       "failed": "{{displayCount}} fejlet",
+      "failed_one": "{{displayCount}} fejlet",
+      "failed_other": "{{displayCount}} fejlet",
       "pending": "{{displayCount}} afventer",
       "skipped": "{{displayCount}} sprunget over",
+      "skipped_one": "{{displayCount}} sprunget over",
+      "skipped_other": "{{displayCount}} sprunget over",
       "checksCount": "{{displayCount}} kontroller",
       "checksCount_one": "{{displayCount}} kontrol",
       "checksCount_other": "{{displayCount}} kontroller",
@@ -669,7 +678,8 @@
       "gitlabDescription": "Tilslut din GitLab-konto for at gennemgå merge requests på mobilen.",
       "bitbucketDescription": "Tilslut Bitbucket til denne organisation for at gennemgå pull requests på mobilen.",
       "bitbucketOrgOnlyDescription": "Skift kontoen ovenfor til en organisation for at gennemgå dens pull requests i Bitbucket.",
-      "contextLine": "Til {{organization}}"
+      "contextLine": "Til {{organization}}",
+      "contextLinePersonal": "Til din personlige konto"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1399,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "Du skal muligvis give adgang til flere grupper eller projekter på GitLab.",
       "installGithubApp": "Installér GitHub-appen på kodelagre",
       "installGithubAppDescription": "Giv Kilos GitHub-app adgang til de kodelagre, du vil have gennemgået.",
-      "noRepositoriesFound": "Ingen kodelagre fundet",
       "repositoryAccess": "adgang til kodelagre"
     },
     "style": {
@@ -1429,6 +1438,8 @@
       "showMore": "Vis mere",
       "created": "Oprettet",
       "started": "Startet",
+      "reviewEnded": "Ophørt",
+      "severityNitpick": "Detalje",
       "tokens": "Teksttokens",
       "tokensInOut": "{{input}} ind / {{output}} ud",
       "council": "Bedømmelsespanel",
@@ -1452,7 +1463,13 @@
       "sessionError": "Sessionsfejl: {{error}}",
       "statusWithValue": "Aktuel status: {{status}}",
       "toolName": "Værktøj: {{name}}",
-      "toolNameError": "Der opstod en fejl i værktøjet {{name}}."
+      "toolNameError": "Der opstod en fejl i værktøjet {{name}}.",
+      "cancelReasonSuperseded": "Der blev pushed et nyere commit, så denne gennemgang blev erstattet.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} er afbrudt, så denne gennemgang blev annulleret. Opret forbindelsen igen, og kør gennemgangen igen.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer blev slået fra for Bitbucket, så denne gennemgang blev annulleret. Slå den til igen, og kør gennemgangen igen.",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket-pull requesten blev ændret, så denne gennemgang blev erstattet.",
+      "cancelReasonCancelled": "Denne gennemgang blev annulleret.",
+      "cancelReasonInterrupted": "Denne gennemgang blev afbrudt."
     },
     "reviewMemory": {
       "title": "Hukommelse for gennemgange",
@@ -1473,13 +1490,20 @@
       "invalidUrl": "Indtast en gyldig URL til en pull request.",
       "couldNotCheckProviderStatus": "Udbyderens status kunne ikke kontrolleres.",
       "couldNotLoadProviders": "Dine tilsluttede udbydere kunne ikke indlæses. Prøv igen.",
-      "connectProvider": "Tilslut en udbyder",
       "connectProviderDescription": "Tilslut GitHub for at starte en manuel gennemgang af en pull request.",
       "pullRequestUrl": "URL til pull request",
       "instructions": "Instruktioner (valgfrie)",
       "instructionsPlaceholder": "Særlige fokuspunkter for gennemgangen…",
       "starting": "Starter gennemgang…",
-      "start": "Start gennemgang"
+      "start": "Start gennemgang",
+      "startNotFound": "Kunne ikke læse denne {{requestNoun}} fra {{provider}}. Tjek URL'en, og at repository'et er tilgængeligt.",
+      "startRateLimited": "{{provider}} begrænser anmodninger lige nu. Prøv igen om et par minutter.",
+      "startNotAllowed": "Du har ikke adgang til at starte en gennemgang af denne {{requestNoun}}. Tjek dine tilladelser og din organisations plan.",
+      "startProviderNeedsAttention": "Manuel gennemgang kræver den almindelige {{provider}}-forbindelse. Tilslut den, og prøv igen.",
+      "startAlreadyRunning": "En gennemgang af den pågældende {{requestNoun}} er allerede i gang.",
+      "startRejected": "Den pågældende {{requestNoun}} kan ikke gennemgås. Sørg for, at den er åben, ikke en kladde, og at URL'en er korrekt.",
+      "startProviderUnavailable": "{{provider}} kunne ikke nås for at læse den pågældende {{requestNoun}}. Prøv igen.",
+      "startFailed": "Gennemgangen kunne ikke startes. Tjek din forbindelse, og prøv igen."
     },
     "notConnectedReadOnly": "{{platform}} er ikke tilsluttet. Kun organisationsejere og administratorer kan oprette forbindelsen.",
     "gitlab": {
@@ -1731,7 +1755,7 @@
       "deadlinePassed": "Frist overskredet",
       "deadlinePassedDetail": "{{critical}} med kritisk risiko, {{high}} med høj risiko",
       "dueThisWeek": "Frist i denne uge",
-      "dueThisWeekDetail": "{{exploitable}} fund kan bekræftet udnyttes",
+      "dueThisWeekDetail": "{{exploitable}} af disse fund er bekræftet udnyttelige",
       "noDeadline": "Ingen frist",
       "reviewSlaAssignment": "Gennemgå tildelingen af SLA-frister",
       "allOpenFindingsTracked": "Alle åbne fund har en frist"
@@ -1891,11 +1915,17 @@
       "actorSystem": "Kilo-system",
       "couldNotLoad": "Revisionsrapporten kunne ikke indlæses.",
       "events": "Hændelser",
+      "eventConfidence": "Konfidens: {{confidence}}",
+      "eventReason": "Begrundelse: {{reason}}",
+      "eventsCount_one": "{{displayCount}} hændelse",
+      "eventsCount_other": "{{displayCount}} hændelser",
       "generated": "Rapporten blev genereret {{generatedAt}}.",
       "noActivity": "Ingen registreret aktivitet",
       "noActivityDescription": "Kilo har ingen aktivitet om sikkerhedsfund at rapportere fra {{start}} til {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Kodelager ikke registreret",
+      "reasonUnknown": "Ukendt begrundelse",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Resumé af rapporten",
       "title": "Revisionsrapport",
       "unavailable": "Revisionsrapport utilgængelig",
@@ -1948,8 +1978,9 @@
       "couldNotLoad": "Security Agent kunne ikke indlæses.",
       "installApp": "Installér GitHub-appen",
       "reauthorizeButton": "Godkend GitHub-appen igen",
-      "reauthorizeDescription": "Security Agent kræver tilladelsen vulnerability_alerts for at få adgang til Dependabot-advarsler. Godkend GitHub-appen igen for at give denne tilladelse.",
+      "reauthorizeDescription": "Security Agent har brug for tilladelse til at læse Dependabot-advarsler. Godkend GitHub-appen igen for at give denne tilladelse.",
       "reauthorizeTitle": "Yderligere tilladelser påkrævet",
+      "retryFailed": "Security Agent kunne stadig ikke indlæses. Kontroller din forbindelse, og prøv igen.",
       "setupFailed": "Opsætningen af GitHub kunne ikke startes. Prøv igen."
     },
     "queuedActionUntracked": "Status for en handling i kø kunne ikke længere følges. Opdatér for at se den seneste status.",
@@ -2112,7 +2143,8 @@
       "dollar_other": "dollar",
       "costSpoken": "pris {{cost}}",
       "costSpokenWithTime": "pris {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}"
+      "pullRequest": "pR {{number}}",
+      "spokenJoiner": "og"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kunne ikke åbne GitHub",
@@ -2231,6 +2263,9 @@
       "noRepositoriesVisibleGitlab": "Der er ingen synlige kodelagre. Kontrollér adgangen til dine kodelagre på GitLab og opdatér derefter listen.",
       "noRepositoriesVisibleBitbucket": "Der er ingen synlige kodelagre. Kontrollér adgangen til dine kodelagre på Bitbucket og opdatér derefter listen.",
       "bitbucketOrganizationsOnly": "Bitbucket er kun tilgængeligt for organisationer.",
+      "githubNeedsAttention": "GitHub skal tilsluttes igen",
+      "githubNeedsAttentionDescription": "Tilslut Kilo GitHub-appen igen, og opdatér derefter for at indlæse dens kodelagre.",
+      "partialRepositories": "Nogle GitHub-kodelagre blev ikke indlæst.",
       "branchPickerTitle": "Vælg gren",
       "branchDefault": "Standard",
       "branchAccessibility": "Gren: {{label}}",
@@ -2238,13 +2273,13 @@
       "branchLoadError": "Grene kunne ikke indlæses",
       "branchUnavailable": "For dette kodelager er der ingen tilgængelige grene. Tjek din adgang hos udbyderen, og vælg et andet kodelager.",
       "branchEmpty": "Ingen tilgængelige grene",
+      "branchListIncomplete": "Der vises kun nogle grene. Kodelageret har flere grene, end denne liste kan indeholde.",
       "branchPlaceholder": "Vælg en gren",
       "runOnWithTarget": "Kør på: {{target}}",
       "environment": "Miljø",
       "couldNotLoadEnvironment": "Kunne ikke indlæse dit miljø.",
       "retryLoadingEnvironment": "Prøv at indlæse miljøet igen",
       "defaultEnvironment": "Standardmiljø",
-      "environmentSummary": "{{commands}} kommandoer · {{mcp}} MCP · {{skills}} færdigheder · {{agents}} agenter",
       "leaveChanges": "Behold ændringer",
       "commitAndPush": "Commit og push",
       "startSession": "Start en session",
@@ -2463,7 +2498,71 @@
       "preparationComplete": "Forberedelsen er færdig",
       "preparationFailed": "Forberedelsen mislykkedes",
       "setupCommand": "Opsætningskommando {{index}}",
-      "setupCommandOf": "Opsætningskommando {{index}} af {{displayCount}}"
+      "setupCommandOf": "Opsætningskommando {{index}} af {{displayCount}}",
+      "stepWorkspaceSetup": "Opsætning af arbejdsområde",
+      "stepDiskCheck": "Diskkontrol",
+      "stepCloning": "Kloner repository",
+      "stepBranch": "Opsætter branch",
+      "stepDevcontainerSetup": "Opsætning af dev container",
+      "stepWorkspaceRestore": "Gendanner arbejdsområde",
+      "stepWorkspaceBackup": "Gemmer arbejdsområde",
+      "stepSandboxProvision": "Klargør sandbox",
+      "stepSandboxBoot": "Starter sandbox",
+      "stepSnapshotFallback": "Prøver igen uden snapshot",
+      "stepKiloServer": "Starter Kilo",
+      "stepKiloSession": "Forbereder session",
+      "stepRestoreIncomplete": "Gendannelse af session ufuldstændig",
+      "stepReady": "Miljøet er klar",
+      "stepFailed": "Opsætning af miljøet mislykkedes",
+      "stepUnknown": "Opsætning af miljø",
+      "detailCreatingSandbox": "Opretter sandbox",
+      "detailUpdatingRepository": "Opdaterer repository",
+      "detailCheckingOutBranch": "Tjekker branch ud",
+      "detailRunningSetupCommands": "Kører opsætningskommandoer",
+      "detailSavingRepository": "Gemmer repository til hurtigere opstart",
+      "detailStartingKiloRuntime": "Starter Kilo-runtime",
+      "detailPreparingKiloSession": "Forbereder Kilo-session",
+      "detailWaitingForPreviousSandbox": "Venter på, at den tidligere sandbox stopper",
+      "detailRetryingSandboxCreation": "Opretter sandbox igen",
+      "detailPreviousSnapshotFailed": "Opstart fra tidligere snapshot mislykkedes. Prøver igen uden snapshot.",
+      "detailSnapshotStartupFailed": "Snapshot-opstart mislykkedes. Prøver igen uden snapshot.",
+      "detailStartingSandboxWithoutSnapshot": "Starter sandbox uden snapshot",
+      "detailSettingUpWorkspace": "Opsætter arbejdsområde",
+      "detailRestoringSession": "Gendanner session",
+      "detailWarmWorkspaceReused": "Varmt arbejdsområde genbrugt",
+      "detailRetryingClone": "Prøver klon igen (forsøg {{attempt}} af {{total}})",
+      "detailSetupCommandFailed": "Opsætningskommando {{index}} mislykkedes",
+      "detailSetupCommandTimedOut": "Opsætningskommando {{index}} fik timeout",
+      "detailColdRestore": "Kold gendannelse, snapshot anvendt, {{applied}} af {{total}} filer gendannet",
+      "detailProgressPercent": "{{percent}}% fuldført",
+      "detailRestoreIncompleteReport": "Gendannelse af session ufuldstændig: {{skipped}} af {{total}} filer blev ikke gendannet ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Mangler: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} og {{omitted}} mere",
+      "detailReasonPatchFailed": "patchen blev ikke anvendt",
+      "detailReasonOutsideWorkspace": "stien ligger uden for arbejdsområdet",
+      "detailReasonMissingContent": "snapshotet havde intet indhold til filen",
+      "detailReasonIndexResetFailed": "indekset kunne ikke nulstilles efter en mislykket anvendelse",
+      "detailReasonUnlinkFailed": "filen kunne ikke fjernes",
+      "detailReasonWriteFailed": "filen kunne ikke skrives",
+      "detailReasonUnknown": "en ukendt årsag",
+      "detailUnknown": "Forbereder stadig",
+      "errorPreparationTimeout": "Forberedelse af miljøet fik timeout",
+      "errorWorkspaceSetupFailed": "Opsætning af arbejdsområdet mislykkedes",
+      "errorCredentialUpgradeRequired": "Denne session mangler en nødvendig opgradering af legitimationsoplysninger. Start en ny session for at fortsætte.",
+      "errorAgentUnavailable": "Agenten blev utilgængelig",
+      "errorBillingBlocked": "Sandbox-fakturering kræver yderligere credits",
+      "errorBillingUnavailable": "Sandbox-fakturering eller kapacitetsverifikation er utilgængelig. Prøv igen om lidt.",
+      "errorContainerLimitReached": "Containergrænsen er nået. Stop en eksisterende container, før du starter en anden.",
+      "errorInvalidConfiguration": "Sandbox-konfigurationen er ugyldig eller understøttes ikke",
+      "errorRuntimeArtifactUnauthorized": "Download af runtime blev ikke godkendt",
+      "errorRuntimeArtifactInvalid": "Verificering af runtime-artefakt mislykkedes",
+      "errorRuntimeCliProbeFailed": "Validering af runtime-CLI mislykkedes",
+      "errorRuntimeSupervisorMissing": "Runtime-supervisor mangler",
+      "errorConnectionLost": "Forbindelsen til sandboxen blev mistet",
+      "errorSandboxLost": "Sandboxen gik tabt",
+      "errorAgentRestarted": "Agenten genstartede",
+      "errorSandboxOutOfMemory": "Sandboxen løb tør for hukommelse",
+      "errorPreparationDidNotComplete": "Forberedelsen blev ikke fuldført"
     },
     "permissionCard": {
       "title": "Tilladelse påkrævet",
@@ -2475,7 +2574,10 @@
       "allowOnceAccessibility": "Tillad én gang",
       "alwaysAllow": "Tillad altid",
       "alwaysAllowAccessibility": "Tillad altid",
-      "retrying": "Prøver igen…"
+      "retrying": "Prøver igen…",
+      "retryDeny": "Prøv at afvise igen",
+      "retryAllowOnce": "Prøv at tillade én gang igen",
+      "retryAlwaysAllow": "Prøv at tillade altid igen"
     },
     "questionCard": {
       "title": "Agenten har brug for svar",
@@ -3027,22 +3129,16 @@
     "boundary": {
       "backToProfile": "Tilbage til profil",
       "loadErrorMessage": "Tjek din forbindelse og prøv igen.",
-
       "chooseAccount": "Vælg en konto",
       "loadErrorTitle": "Kunne ikke indlæse dine organisationer.",
       "membershipLostNotice": "Du har ikke længere adgang til denne organisation. Skiftet til {{target}}.",
       "noOrganization": "Ingen organisation",
-
       "noOrganizationDescription": "Denne konto er ikke en del af en organisation. Opret eller tilslut dig en organisation på hjemmesiden for at bruge organisationsfunktioner som medlemsinvitationer og advarsler om lav saldo.",
-
       "openWebOrganizations": "Åbn organisationer på hjemmesiden",
-
       "organizationUnavailable": "Organisationen er ikke tilgængelig.",
       "selectDescriptionWithOrganizations": "Du tilhører en eller flere organisationer. Vælg den konto, som denne skærm skal bruge.",
-
       "selectOrganization": "Vælg en organisation",
       "unavailableDescription": "Denne organisation er ikke længere tilgængelig. Vælg en organisation på din profil for at fortsætte.",
-
       "unavailableSessionsDescription": "Denne organisation er ikke længere tilgængelig. Dens sessioner kan ikke indlæses.",
       "accessDeniedDescription": "Du har ikke adgang til denne organisation."
     },
@@ -3070,7 +3166,9 @@
       "permissionDenied": "Du har ikke tilladelse til at invitere medlemmer.",
       "roleMember": "Rolle: medlem",
       "sendInvite": "Send invitation",
-      "title": "Invitér medlem"
+      "title": "Invitér medlem",
+      "alreadyInvited": "Personen er allerede inviteret eller allerede medlem.",
+      "sendError": "Invitationen kunne ikke sendes."
     },
     "invoices": {
       "downloadA11y": "Download faktura {{number}}",
@@ -3139,7 +3237,8 @@
       "inviteCreated": "Invitation oprettet",
       "pendingInvitations": "Ubesvarede invitationer",
       "resendInvite": "Send invitation igen",
-      "shareInviteLink": "Del invitationslink"
+      "shareInviteLink": "Del invitationslink",
+      "resendInviteError": "Invitationen kunne ikke sendes igen."
     },
     "usageStats": {
       "inputTokens": "Tokens i inddata",
@@ -3287,7 +3386,8 @@
     "noneChosen": "Ingen valgt",
     "emptyTitle": "Ingen transskriptionsmodeller",
     "emptyDescription": "Kilo Gateway tilbyder ikke nogen transskriptionsmodeller lige nu.",
-    "loadFailed": "Transskriptionsmodellerne kunne ikke indlæses."
+    "loadFailed": "Transskriptionsmodellerne kunne ikke indlæses.",
+    "choose": "Vælg en model"
   },
   "voiceLanguage": {
     "title": "Dikteringssprog",
@@ -3383,7 +3483,12 @@
       "serverToolCount_one": "{{count}} værktøj",
       "serverToolCount_other": "{{count}} værktøjer",
       "serverUnreachable": "Kunne ikke nå denne server",
-      "serverOff": "Denne server er slået fra"
+      "serverOff": "Denne server er slået fra",
+      "app": {
+        "label": "Værktøjsgrænseflade",
+        "failed": "Grænsefladen til dette værktøj kunne ikke indlæses.",
+        "empty": "Grænsefladen til dette værktøj har intet at vise."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Godkendelse",
@@ -3497,6 +3602,7 @@
       "fromHuggingFace": "Fra Hugging Face",
       "loading": "Indlæser modeller",
       "noResults": "Ingen modeller fundet",
+      "noResultsForQuery": "Ingen modeller fundet for \"{{query}}\"",
       "noFits": "Ingen modeller passer til denne enhed",
       "noFitsDescription": "Større modeller findes under fanen $t(common.all).",
       "fit": {
@@ -3527,8 +3633,6 @@
       "quantizations": "Kvantiseringer",
       "quantizationsHelp": "Mindre filer bruger mindre hukommelse og lagerplads. Større filer giver som regel bedre svar.",
       "quantDetail": "{{size}} download · cirka {{memory}} hukommelse",
-      "downloadQuant": "Download {{quant}}",
-      "downloadModelA11y": "Download {{name}}",
       "detailsA11y": "Detaljer: {{name}}",
       "loadingModel": "Indlæser modeldetaljer",
       "couldNotLoadModel": "Kunne ikke indlæse denne model",
@@ -3573,13 +3677,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "Denne model understøtter ræsonnementsniveau"
-    }
+    },
+    "creditsRequired": "Ikke nok kreditter til at sende denne besked. Tilføj kreditter, og prøv igen."
   },
   "settingsTools": {
     "confirmTitle": "Bekræft denne ændring?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "dit seneste kodelager",
+      "confirmMessage": "Kodelager: {{repository}}. Forespørgsel: {{prompt}}",
+      "confirmTitle": "Start denne agent?",
       "promptRequired": "Start agenten kræver en forespørgsel. Tilføj en forespørgsel, og kør den igen.",
       "repositoryRequired": "Start agenten kræver et kodelager. Åbn Kilo, vælg et, og kør den igen.",
       "repositoryUnknown": "Kilo genkender ikke {{repository}} som et GitHub- eller GitLab-kodelager. Vælg et andet kodelager i Kilo.",
@@ -3609,7 +3717,9 @@
     "spend24h": "Forbrug de seneste 24 timer",
     "multiplierError": "Angiv en multiplikator på 1 eller mere",
     "permissionDenied": "Du har ikke tilladelse til at administrere forbrugsadvarsler.",
-    "pushOffByCategory": "Fra i Notifikationer"
+    "pushOffByCategory": "Fra i Notifikationer",
+    "multiplierMaxError": "Angiv en multiplikator på {{max}} eller mindre",
+    "thresholdMaxError": "Angiv et beløb på {{max}} eller mindre."
   },
   "profiles": {
     "title": "Profiler",
@@ -3626,9 +3736,10 @@
       "skills_other": "{{count}} færdigheder",
       "commands_one": "{{count}} kommando",
       "commands_other": "{{count}} kommandoer",
-      "varsShort": "{{count}}var",
-      "skillsShort": "{{count}}fæ",
-      "commandsShort": "{{count}}kom"
+      "setupCommands_one": "{{count}} opsætningskommando",
+      "setupCommands_other": "{{count}} opsætningskommandoer",
+      "agents_one": "{{count}} agent",
+      "agents_other": "{{count}} agenter"
     },
     "nameLabel": "Profilnavn",
     "namePlaceholder": "f.eks. Backend debugging",
@@ -3656,6 +3767,8 @@
     "keyTooLong": "Nøglen må højst være 256 tegn",
     "keyDuplicate": "Denne nøgle findes allerede i profilen",
     "valueLabel": "Værdi",
+    "valueRequired": "Indtast en værdi",
+    "tooLong": "Brug højst {{max}} tegn",
     "secrets": {
       "markSecret": "Markér som hemmelig",
       "masked": "Skjult værdi",
@@ -3684,6 +3797,8 @@
     "skillNameInvalid": "Færdighedsnavn skal starte med et bogstav eller ciffer og kun bruge små bogstaver, cifre og bindestreger",
     "skillContentRequired": "Færdighedsindhold er påkrævet",
     "skillSaveFailed": "Kunne ikke gemme færdighed",
+    "skillSourceCustom": "Brugerdefineret",
+    "skillSourceMarketplace": "Markedsplads",
     "skillsHint": "Indsæt en SKILL.md og dens navn udfyldes; tilføje en færdighed fra din telefon uden træk og slip.",
     "skillEditTitle": "Rediger færdighed",
     "mcp": {
@@ -3704,7 +3819,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Indtast et servernavn",
-      "nameInvalid": "Navn kan kun bruge bogstaver, tal, understregninger og bindestreger",
+      "nameInvalid": "Navn kan kun bruge ASCII-bogstaver, tal, understregninger og bindestreger, højst 100 tegn",
       "commandRequired": "Indtast en kommando",
       "commandTooLong": "Brug højst 50 argumenter på 500 tegn hver",
       "urlRequired": "Indtast en URL",
@@ -3732,7 +3847,7 @@
       "stepsPlaceholder": "f.eks. 50",
       "temperature": "Temperatur",
       "temperaturePlaceholder": "f.eks. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "f.eks. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Min agent",
@@ -3741,7 +3856,7 @@
       "visibility": "Sigtbarhed",
       "visibilityPrimary": "Primær — vist i vælgeren",
       "visibilitySubagent": "Subagent — kan kun kaldes fra andre",
-      "visibilityAll": "Alle - begge",
+      "visibilityAll": "Alle — begge",
       "modePrimary": "Kun primær",
       "modeSubagent": "Kun subagent",
       "modeAll": "Alle",
@@ -3749,7 +3864,7 @@
       "deleteFailed": "Agenten kunne ikke slettes",
       "nameRequired": "Indtast et agentnavn",
       "slugRequired": "Indtast en agentsnegl",
-      "slugInvalid": "Slug skal starte med et bogstav og kun bruge små bogstaver, cifre og bindestreger",
+      "slugInvalid": "Slug skal starte med et lille ASCII-bogstav og kun bruge små ASCII-bogstaver, cifre og bindestreger, højst 50 tegn",
       "slugConflict": "Det slug bruges allerede af en indbygget agent eller en anden agent i denne profil",
       "edit": "Rediger agent"
     },
@@ -3794,7 +3909,9 @@
       "pinFailed": "Repo kunne ikke fastgøres",
       "unboundToast": "Repo ubundet",
       "unbindFailed": "Repo kunne ikke ophæves"
-    }
+    },
+    "variablesDeleteFailed": "Variablen kunne ikke slettes",
+    "deleteCommand": "Slet kommando {{position}}"
   },
   "credits": {
     "title": "Køb kreditter",
@@ -3830,7 +3947,8 @@
       "archive": "Arkivér",
       "unarchive": "Fjern fra arkiv",
       "deleteTitle": "Slet {{name}}?",
-      "deleteMessage": "Dens opgaver slettes også. Sessionerne bevares."
+      "deleteMessage": "Dens opgaver slettes også. Sessionerne bevares.",
+      "createFailed": "Kunne ikke oprette listen"
     },
     "listSettings": {
       "title": "Listeindstillinger",
@@ -3898,20 +4016,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Morgenbriefing",
+    "title": "Agentbriefing",
     "atLeast": "≥{{value}}",
     "coverageHint": "Noget historisk aktivitet kan mangle. ≥ betyder mindst så meget; ukendt er ikke nul.",
     "available": "Tilgængelige briefinger",
     "history": "Briefinghistorik",
-    "historyHint": "Rapporter gemmes i 30 dage, også afviste rapporter.",
+    "historyHint": "Briefinger gemmes i 30 dage, også afviste.",
     "settings": "Briefingindstillinger",
-    "empty": "Ingen aktivitet i nat",
-    "emptyHint": "Dine cloud- og CLI-kodesessioner vises her efter en aktiv nat.",
+    "empty": "Ingen aktivitet i dette briefingvindue",
+    "emptyHint": "Dine cloud- og CLI-kodesessioner vises her, når en planlagt briefing har aktivitet.",
     "loadError": "Kunne ikke indlæse briefinger",
-    "sessions": "Aktive i nat",
+    "sessions": "Aktive i briefingvinduet",
     "pullRequests": "PRs åbnet",
     "blockers": "Nye blokeringer",
-    "spend": "Forbrug i nat",
+    "spend": "Forbrug i briefingvinduet",
     "view": "Læs briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -3933,13 +4051,13 @@
     "sources": "Dokumentation og artefakter",
     "timezone": "Tidszone for briefing",
     "deviceTimezone": "Brug enhedens tidszone",
-    "timezoneHint": "IANA-tidszone, for eksempel Europe/Berlin. Ændringer i tidsplanen gælder fremtidige nætter.",
-    "nightStart": "Natten starter",
-    "morningStart": "Natten slutter / morgenen starter",
-    "morningEnd": "Morgenen slutter",
-    "timeHint": "Hjem-kortet viser live-status igen, når morgenen slutter, også offline.",
-    "invalidSchedule": "Vælg en gyldig tidszone og nat- og morgenperioder, der ikke er tomme eller overlapper.",
-    "notificationsHint": "Én generisk notifikation hver morgen, når din første rapport er klar. Uafhængigt af betalte AI-resuméer.",
+    "timezoneHint": "IANA-tidszone, for eksempel Europe/Berlin. Ændringer i tidsplanen gælder fremtidige briefinger.",
+    "nightStart": "Briefingvinduet starter",
+    "morningStart": "Briefing klar klokken",
+    "morningEnd": "Briefing tilgængelig indtil",
+    "timeHint": "Hjem-kortet viser live-status igen, når briefingvinduet slutter, også offline.",
+    "invalidSchedule": "Vælg en gyldig tidszone og et ikke-tomt briefingvindue.",
+    "notificationsHint": "Én generisk notifikation pr. planlagt briefing. Uafhængigt af betalte AI-resuméer.",
     "notificationPermission": "Slå enhedsnotifikationer til under $t(common.notifications) for at modtage din briefing.",
     "aiOptIn": "Betalte AI-resuméer",
     "aiHint": "Valgfrit og kun for denne kontekst. Udvalgte, redigerede uddrag og strukturerede fakta sendes til din model på appens sprog. Betalinger trækkes fra denne konteksts saldo.",
@@ -3959,6 +4077,36 @@
     "paidDisclosure": "{{estimate}} anslået, op til {{maximum}}, med en grænse på {{minutes}} minutter. Der opkræves betaling, selv hvis genereringen mislykkes.",
     "enable": "Slå betalte resuméer til",
     "contextSettings": "AI-indstillinger · {{context}}",
-    "allContexts": "Personlige briefinger og organisationsbriefinger holdes adskilt."
+    "allContexts": "Personlige briefinger og organisationsbriefinger holdes adskilt.",
+    "create": "Opret briefing",
+    "oneOff": "Efter behov",
+    "createdAt": "Oprettet {{time}}",
+    "chooseContext": "Vælg én kontekst",
+    "period": "Briefingperiode",
+    "last24Hours": "Seneste 24 timer",
+    "last7Days": "Seneste 7 dage",
+    "customPeriod": "Brugerdefineret periode",
+    "periodStart": "Periodens start",
+    "periodEnd": "Periodens slutning",
+    "periodHint": "Vælg op til 31 dage. Historiske data kan være ufuldstændige.",
+    "periodSessions": "Aktive i perioden",
+    "periodSpend": "Forbrug i perioden",
+    "invalidPeriod": "Vælg et starttidspunkt før sluttidspunktet.",
+    "futurePeriod": "Perioden må ikke slutte i fremtiden.",
+    "periodTooLong": "Vælg en periode på højst 31 dage.",
+    "invalidLocalTime": "Dette lokale tidspunkt findes ikke i briefingens tidszone. Vælg et andet tidspunkt.",
+    "reviewBriefing": "Gennemgå briefing",
+    "reviewAgain": "Forbered en ny gennemgang",
+    "payer": "Opkræves hos {{context}}",
+    "emptyPeriod": "Ingen aktivitet fundet i denne periode. Intet AI-resumé og ingen opkrævning.",
+    "emptyHistory": "Ingen gemte briefinger",
+    "historicalStateHint": "Sessionens tilstand afspejler slutningen af den valgte periode, ikke den aktuelle status.",
+    "oneOffHint": "AI modtager udvalgt dokumentation med følsomme oplysninger fjernet på dit appsprog. Denne briefing efter behov ændrer ikke din planlagte briefing eller dine AI-præferencer.",
+    "createOffline": "Opret forbindelse til internettet for at gennemgå eller oprette en briefing. Betalte anmodninger sættes aldrig i kø, når du er offline.",
+    "estimateInputTooLarge": "Denne periode indeholder for meget dokumentation til den valgte model.",
+    "estimatePermissionUnavailable": "Du har ikke tilladelse til at bruge denne konteksts saldo.",
+    "createFailed": "Kunne ikke oprette denne briefing.",
+    "reviewFailed": "Kunne ikke gennemgå denne briefing.",
+    "saved": "Briefingindstillinger gemt"
   }
 }

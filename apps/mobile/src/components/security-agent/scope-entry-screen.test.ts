@@ -13,7 +13,9 @@ import { renderWithProviders } from '@/test/render-with-providers';
 import { ScopeEntryScreen } from './scope-entry-screen';
 import { SettingsOverviewScreen } from './settings-overview-screen';
 
-const transport = vi.hoisted(() => vi.fn<typeof fetch>());
+const transport = vi.hoisted(() =>
+  vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+);
 let permissionData = {
   hasIntegration: true,
   hasPermissions: true,
@@ -26,6 +28,16 @@ let queryClient = new QueryClient();
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 let previousOnline = true;
 let mintFailed = false;
+let configHold: Promise<boolean> | undefined = undefined;
+let deniedProcedures = new Set<string>();
+let sessionAuthRequired = false;
+let failingProcedures = new Set<string>();
+let heldProcedures = new Set<string>();
+let releaseHeld: (() => void) | undefined = undefined;
+const DENIAL_MESSAGE = 'You do not have access to this organization';
+const SERVER_ERROR_MESSAGE = 'Internal server error';
+const RETRY_FAILED_COPY =
+  'Still could not load Security Agent. Check your connection and try again.';
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
@@ -40,7 +52,7 @@ vi.mock('@/lib/trpc', async () => {
   };
 });
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://settings.test' }));
-vi.mock('react-native', () => ({ View: 'View', Switch: 'Switch' }));
+vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, View: 'View', Switch: 'Switch' }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: () => ({}) },
@@ -73,6 +85,9 @@ vi.mock('@/components/security-agent/security-agent-setup', () => ({
 vi.mock('@/components/platform-error-screen', () => ({
   PlatformErrorScreen: 'PlatformErrorScreen',
 }));
+vi.mock('@/components/organization/scope-access-denied-screen', () => ({
+  ScopeAccessDeniedScreen: 'ScopeAccessDeniedScreen',
+}));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -84,7 +99,7 @@ vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 function host(root: TestRenderer.ReactTestInstance, type: string) {
   return root.findAll(node => node.type === type);
 }
-function procedureFor(input: Parameters<typeof fetch>[0]) {
+function procedureFor(input: RequestInfo | URL) {
   return new URL(input instanceof Request ? input.url : input).pathname.split('.').at(-1) ?? '';
 }
 async function advanceBy() {
@@ -123,12 +138,55 @@ beforeEach(() => {
   permissionData = { hasIntegration: true, hasPermissions: true, reauthorizeUrl: null };
   configData = structuredClone(securityConfigFixture);
   mintFailed = false;
+  configHold = undefined;
+  deniedProcedures = new Set();
+  sessionAuthRequired = false;
+  failingProcedures = new Set();
+  heldProcedures = new Set();
+  releaseHeld = undefined;
   repositoriesData = [{ id: 1 }];
   roles = [{ organizationId: 'org_123', role: 'owner' }];
   transport.mockReset().mockImplementation(async input => {
     await Promise.resolve();
+    if (configHold && procedureFor(input) === 'getConfig') {
+      await configHold;
+    }
     if (mintFailed && procedureFor(input) === 'mintInstallState') {
       throw new Error('Setup failed');
+    }
+    if (heldProcedures.has(procedureFor(input))) {
+      await new Promise<void>(resolve => {
+        releaseHeld = resolve;
+      });
+    }
+    if (failingProcedures.has(procedureFor(input))) {
+      return Response.json(
+        {
+          error: {
+            message: SERVER_ERROR_MESSAGE,
+            code: -32_603,
+            data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500, path: procedureFor(input) },
+          },
+        },
+        { status: 500 }
+      );
+    }
+    if (deniedProcedures.has(procedureFor(input))) {
+      return Response.json(
+        {
+          error: {
+            message: DENIAL_MESSAGE,
+            code: -32_003,
+            data: {
+              code: 'UNAUTHORIZED',
+              httpStatus: 401,
+              authRequired: sessionAuthRequired,
+              path: procedureFor(input),
+            },
+          },
+        },
+        { status: 401 }
+      );
     }
     const data: Record<string, unknown> = {
       getPermissionStatus: permissionData,
@@ -254,6 +312,141 @@ describe.each(['personal', 'org_123'])('ScopeEntryScreen %s routing', scope => {
   );
 });
 
+describe('ScopeEntryScreen dashboard first mount', () => {
+  it('paints the enabled dashboard on the first mount with no entering animation above it', async () => {
+    configData.isEnabled = true;
+    const root = await mount('personal');
+    const dashboard = host(root, 'DashboardScreen')[0];
+    expect(dashboard).toBeDefined();
+
+    // A Reanimated entering animation carries `initialValues: { opacity: 0 }`.
+    // On an ancestor of the dashboard it starts the header and the whole body
+    // at opacity 0, so a first mount whose entrance is dropped leaves the
+    // screen blank while only the tab bar outside the screen paints.
+    const ancestorsWithEntering: string[] = [];
+    for (let node = dashboard?.parent ?? null; node; node = node.parent) {
+      if ('entering' in node.props) {
+        ancestorsWithEntering.push(String(node.type));
+      }
+    }
+    expect(ancestorsWithEntering).toEqual([]);
+    expect(host(root, 'Animated.View')).toHaveLength(0);
+  });
+
+  it('renders the loading skeleton, then the dashboard, on the first mount', async () => {
+    configData.isEnabled = true;
+    const held = Promise.withResolvers<boolean>();
+    configHold = held.promise;
+
+    const root = await mount('personal');
+    // Pending settings keep the screen on the header + skeleton, never on an
+    // empty body.
+    expect(host(root, 'ScreenHeader')).toHaveLength(1);
+    expect(host(root, 'Skeleton').length).toBeGreaterThan(0);
+    expect(host(root, 'DashboardScreen')).toHaveLength(0);
+
+    act(() => {
+      held.resolve(true);
+    });
+    await advanceBy();
+    await advanceBy();
+    await advanceBy();
+
+    expect(host(root, 'DashboardScreen')).toHaveLength(1);
+    expect(host(root, 'Skeleton')).toHaveLength(0);
+  });
+});
+
+describe('ScopeEntryScreen organization access', () => {
+  it('shows the no-access state instead of the setup when the organization denies access', async () => {
+    // The organization still appears in the cached membership list — the state
+    // the old build rendered as the personal first-run setup.
+    permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+    deniedProcedures = new Set(['getPermissionStatus', 'getConfig', 'getRepositories']);
+    const root = await mount('org_123');
+    expect(host(root, 'ScopeAccessDeniedScreen')).toHaveLength(1);
+    expect(host(root, 'ScopeAccessDeniedScreen')[0]?.props.kind).toBe('denied');
+    expect(host(root, 'SecurityAgentSetup')).toHaveLength(0);
+    expect(host(root, 'DashboardScreen')).toHaveLength(0);
+    // No install-state token is minted for a scope the reader cannot use.
+    expect(transport.mock.calls.some(([input]) => procedureFor(input) === 'mintInstallState')).toBe(
+      false
+    );
+  });
+
+  it('keeps cached organization data out of view when one of its queries is denied', async () => {
+    const trpc = createTRPCOptionsProxy<MobileRouter>({ client: trpcClient, queryClient });
+    queryClient.setQueryData(
+      trpc.organizations.securityAgent.getConfig.queryKey({ organizationId: 'org_123' }),
+      configData
+    );
+    queryClient.setQueryData(
+      trpc.organizations.securityAgent.getPermissionStatus.queryKey({ organizationId: 'org_123' }),
+      {
+        hasIntegration: true,
+        hasPermissions: true,
+        integrationId: 'int_1',
+        reauthorizeUrl: null,
+        authInvalidAt: null,
+        authInvalidReason: null,
+      }
+    );
+    // Only the config read is denied; its cached value alone would render the
+    // dashboard, so the denial has to outrank cached data.
+    deniedProcedures = new Set(['getConfig']);
+    const root = await mount('org_123');
+    expect(host(root, 'ScopeAccessDeniedScreen')).toHaveLength(1);
+    expect(host(root, 'DashboardScreen')).toHaveLength(0);
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
+  });
+
+  it('shows the organization landing again when Retry finds access restored', async () => {
+    permissionData = { hasIntegration: true, hasPermissions: true, reauthorizeUrl: null };
+    configData.isEnabled = true;
+    deniedProcedures = new Set(['getPermissionStatus', 'getConfig', 'getRepositories']);
+    const root = await mount('org_123');
+    expect(host(root, 'ScopeAccessDeniedScreen')).toHaveLength(1);
+
+    deniedProcedures = new Set();
+    sessionAuthRequired = false;
+    const onRetry = host(root, 'ScopeAccessDeniedScreen')[0]?.props.onRetry as () => void;
+    act(onRetry);
+    await advanceBy();
+    await advanceBy();
+    await advanceBy();
+
+    expect(host(root, 'ScopeAccessDeniedScreen')).toHaveLength(0);
+    expect(host(root, 'DashboardScreen')).toHaveLength(1);
+  });
+
+  it('keeps the organization landing when the membership list does not contain it', async () => {
+    // Access is decided by the organization's own queries. A list without the
+    // organization is not a denial: a Kilo admin, or a parent owner opening a
+    // child organization, is absent from it and still reaches the landing.
+    roles = [];
+    configData.isEnabled = true;
+    const root = await mount('org_123');
+    await advanceBy();
+    expect(host(root, 'ScopeAccessDeniedScreen')).toHaveLength(0);
+    expect(host(root, 'DashboardScreen')).toHaveLength(1);
+  });
+
+  it('keeps the load-error screen for the personal scope when its procedures fail', async () => {
+    deniedProcedures = new Set(['getPermissionStatus', 'getConfig', 'getRepositories']);
+    const root = await mount('personal');
+    expect(host(root, 'ScopeAccessDeniedScreen')).toHaveLength(0);
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(1);
+  });
+
+  it('treats a session-level unauthorized response as a load failure, not as lost access', async () => {
+    sessionAuthRequired = true;
+    deniedProcedures = new Set(['getPermissionStatus', 'getConfig', 'getRepositories']);
+    const root = await mount('org_123');
+    expect(host(root, 'ScopeAccessDeniedScreen')).toHaveLength(0);
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(1);
+  });
+});
+
 describe.each([
   ['standalone', SettingsOverviewScreen],
   ['inline', ScopeEntryScreen],
@@ -313,7 +506,13 @@ describe.each([
       organizationId: 'org_123',
     });
     const other = trpc.securityAgent.getConfig.queryOptions();
-    void queryClient.prefetchQuery(other);
+    void (async () => {
+      try {
+        await queryClient.query(other);
+      } catch {
+        // Offline: the fetch stays paused for the retry path.
+      }
+    })();
     queryClient.setQueryData(configKey, configData);
     const root = await mount('org_123', Screen);
     const error = host(root, 'PlatformErrorScreen')[0];
@@ -329,5 +528,89 @@ describe.each([
     });
     await advanceBy();
     expect(queryClient.getQueryState(configKey)?.fetchStatus).toBe('paused');
+  });
+});
+
+describe('ScopeEntryScreen retry recovery', () => {
+  it('shows progress while a retry runs and a fresh message when it fails again', async () => {
+    failingProcedures = new Set(['getConfig']);
+    const root = await mount('personal');
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(1);
+    expect(host(root, 'PlatformErrorScreen')[0]?.props.message).toBeUndefined();
+
+    // Hold one refetch open so the in-flight attempt is observable.
+    heldProcedures = new Set(['getConfig']);
+    await retry(root);
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
+    expect(host(root, 'Skeleton').length).toBeGreaterThan(0);
+
+    releaseHeld?.();
+    await advanceBy();
+    await advanceBy();
+    await advanceBy();
+
+    expect(host(root, 'Skeleton')).toHaveLength(0);
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(1);
+    expect(host(root, 'PlatformErrorScreen')[0]?.props.message).toBe(RETRY_FAILED_COPY);
+  });
+
+  it('leaves the error screen for the resolved destination when the retry succeeds', async () => {
+    configData.isEnabled = true;
+    failingProcedures = new Set(['getConfig']);
+    const root = await mount('personal');
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(1);
+
+    failingProcedures = new Set();
+    await retry(root);
+    await advanceBy();
+    await advanceBy();
+
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
+    expect(host(root, 'DashboardScreen')).toHaveLength(1);
+  });
+
+  it('refetches the GitHub status read that the entry error came from', async () => {
+    configData.isEnabled = false;
+    failingProcedures = new Set(['getPermissionStatus']);
+    const root = await mount('personal');
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(1);
+
+    failingProcedures = new Set();
+    await retry(root);
+    await advanceBy();
+    await advanceBy();
+
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
+    expect(
+      transport.mock.calls.filter(([input]) => procedureFor(input) === 'getPermissionStatus')
+    ).toHaveLength(2);
+  });
+
+  it.each(['personal', 'org_123'])(
+    'opens the enabled destination while the GitHub status read fails for %s',
+    async scope => {
+      configData.isEnabled = true;
+      failingProcedures = new Set(['getPermissionStatus']);
+      const root = await mount(scope);
+      expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
+      expect(host(root, 'ScopeAccessDeniedScreen')).toHaveLength(0);
+      expect(host(root, 'DashboardScreen')).toHaveLength(1);
+    }
+  );
+
+  it('keeps the load-error screen when the GitHub status read fails and the scope is disabled', async () => {
+    configData.isEnabled = false;
+    failingProcedures = new Set(['getPermissionStatus']);
+    const root = await mount('personal');
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(1);
+    expect(host(root, 'DashboardScreen')).toHaveLength(0);
+  });
+
+  it('keeps a denied scope denied while the GitHub status read fails', async () => {
+    deniedProcedures = new Set(['getPermissionStatus']);
+    const root = await mount('org_123');
+    expect(host(root, 'ScopeAccessDeniedScreen')).toHaveLength(1);
+    expect(host(root, 'DashboardScreen')).toHaveLength(0);
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
   });
 });

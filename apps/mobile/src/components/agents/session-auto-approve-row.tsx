@@ -1,6 +1,7 @@
-import { Switch, View } from 'react-native';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 
 import { type SessionAutoApproveState } from './session-auto-approve';

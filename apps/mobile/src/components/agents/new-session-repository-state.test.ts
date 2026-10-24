@@ -79,6 +79,18 @@ describe('resolveProviderStatus', () => {
     ).toBe('connect');
   });
 
+  it('returns unavailable when an installation exists but cannot list repositories', () => {
+    expect(
+      resolveProviderStatus({
+        isLoading: false,
+        isError: false,
+        integrationInstalled: false,
+        repositoryCount: 0,
+        unavailableReason: 'suspended',
+      })
+    ).toBe('unavailable');
+  });
+
   it('returns connected-empty when installed but no repos are visible', () => {
     expect(
       resolveProviderStatus({
@@ -230,6 +242,18 @@ describe('resolveRepositoryGroups', () => {
     expect(githubGroup?.status).toBe('repos');
     expect(githubGroup?.repositories).toEqual([githubRow]);
     expect(gitlabGroup?.status).toBe('error');
+  });
+
+  it('carries a partial-list notice into the provider group', () => {
+    const { groups } = resolveRepositoryGroups({
+      organizationId: 'org-1',
+      github: group('github', { repositories: [githubRow], notice: 'partial' }),
+      gitlab: group('gitlab', { status: 'connect' }),
+      bitbucket: group('bitbucket', { status: 'connect' }),
+      recents: [],
+    });
+    expect(groups.find(g => g.key === 'github')?.notice).toBe('partial');
+    expect(groups.find(g => g.key === 'gitlab')?.notice).toBeUndefined();
   });
 });
 

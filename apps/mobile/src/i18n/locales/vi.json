@@ -53,6 +53,7 @@
     "connected": "Đã kết nối",
     "couldNotLoadModels": "Không thể tải danh sách mô hình.",
     "couldNotLoadRepositories": "Không thể tải danh sách kho mã nguồn.",
+    "noRepositoriesFound": "Không tìm thấy kho lưu trữ",
     "critical": "Nghiêm trọng",
     "delete": "Xóa",
     "deleted": "Đã xóa",
@@ -87,6 +88,7 @@
     "connect": "Kết nối",
     "connectBitbucket": "Kết nối Bitbucket",
     "connectGitlab": "Kết nối GitLab",
+    "connectProvider": "Kết nối nhà cung cấp",
     "contentTruncated": "Nội dung bị cắt bớt",
     "copyLink": "Sao chép liên kết",
     "couldNotLoadOrganizations": "Không thể tải danh sách tổ chức.",
@@ -182,7 +184,7 @@
     "codeArrivalHint": "Nếu địa chỉ này đủ điều kiện, bạn sẽ nhận được mã trong vòng một phút.",
     "verifyCode": "Xác minh mã",
     "resendCode": "Gửi lại mã",
-    "termsPrefix": "Khi tiếp tục, bạn đồng ý với",
+    "termsPrefix": "Khi tiếp tục, bạn đồng ý với ",
     "terms": "Điều khoản",
     "termsConnector": " và ",
     "termsSuffix": ".",
@@ -224,7 +226,7 @@
     "hideBalance": "Ẩn số dư",
     "showBalance": "Hiện số dư",
     "balanceHidden": "Số dư đã ẩn",
-    "bonusCreditsExpiring": "Khoản tiền thưởng {{amount}} sẽ hết hạn vào {{date}}.",
+    "bonusCreditsExpiring": "Khoản tiền {{amount}} sẽ hết hạn vào {{date}}.",
     "signOutTitle": "Đăng xuất?",
     "signOutMessage": "Bạn cần đăng nhập lại để truy cập không gian làm việc của mình.",
     "deleteAccountTitle": "Xóa tài khoản?",
@@ -293,7 +295,8 @@
     "condenseToolCallsSubtitle": "Nhóm các lệnh gọi công cụ liên tiếp vào một hàng mà bạn có thể mở.",
     "toolSummaryTranslation": "Dịch tóm tắt công cụ",
     "toolSummaryTranslationSubtitle": "Gửi từng tóm tắt công cụ đến một mô hình để dịch sang ngôn ngữ ứng dụng của bạn. Bản gốc sẽ hiển thị nếu dịch thất bại.",
-    "toolSummaryTranslationModelUnavailableNotice": "Mô hình này không còn được cung cấp nữa. Nhấn $t(common.model) để chọn mô hình khác."
+    "toolSummaryTranslationModelUnavailableNotice": "Mô hình này không còn được cung cấp nữa. Nhấn $t(common.model) để chọn mô hình khác.",
+    "autoExpandThinkingInactiveSubtitle": "Không có tác dụng khi chi tiết suy luận đang bị ẩn."
   },
   "notifications": {
     "liveActivities": "Hoạt động trực tiếp",
@@ -882,7 +885,6 @@
       "gitlabNoRepositoriesDescription": "Bạn có thể cần cấp quyền truy cập thêm nhóm hoặc dự án trên GitLab.",
       "installGithubApp": "Cài đặt ứng dụng GitHub cho các kho lưu trữ",
       "installGithubAppDescription": "Cấp quyền truy cập cho ứng dụng Kilo trên GitHub vào các kho lưu trữ bạn muốn rà soát.",
-      "noRepositoriesFound": "Không tìm thấy kho lưu trữ",
       "repositoryAccess": "quyền truy cập kho lưu trữ"
     },
     "style": {
@@ -906,7 +908,6 @@
     "followReviewMd": "Tuân theo REVIEW.md",
     "followReviewMdSubtitle": "Tuân theo tệp hướng dẫn REVIEW.md của từng kho lưu trữ",
     "manualReview": {
-      "connectProvider": "Kết nối nhà cung cấp",
       "connectProviderDescription": "Kết nối GitHub để bắt đầu rà soát thủ công một yêu cầu hợp nhất.",
       "couldNotCheckProviderStatus": "Không thể kiểm tra trạng thái nhà cung cấp.",
       "couldNotLoadProviders": "Không thể tải danh sách nhà cung cấp bạn đã kết nối. Vui lòng thử lại.",
@@ -916,7 +917,15 @@
       "pullRequestUrl": "URL yêu cầu hợp nhất",
       "start": "Bắt đầu rà soát",
       "starting": "Đang bắt đầu rà soát…",
-      "title": "Rà soát thủ công"
+      "title": "Rà soát thủ công",
+      "startNotFound": "Không thể đọc {{requestNoun}} đó từ {{provider}}. Vui lòng kiểm tra URL và khả năng truy cập kho lưu trữ.",
+      "startRateLimited": "{{provider}} đang giới hạn số lượng yêu cầu. Vui lòng thử lại sau vài phút.",
+      "startNotAllowed": "Bạn không có quyền truy cập để bắt đầu rà soát {{requestNoun}} đó. Vui lòng kiểm tra quyền của bạn và gói của tổ chức.",
+      "startProviderNeedsAttention": "Rà soát thủ công cần kết nối {{provider}} tiêu chuẩn. Hãy kết nối rồi thử lại.",
+      "startAlreadyRunning": "Đã có một lượt rà soát {{requestNoun}} đó đang chạy.",
+      "startRejected": "{{requestNoun}} đó không thể được rà soát. Hãy đảm bảo nó đang mở, không phải bản nháp và URL chính xác.",
+      "startProviderUnavailable": "Không thể kết nối tới {{provider}} để đọc {{requestNoun}} đó. Vui lòng thử lại.",
+      "startFailed": "Không thể bắt đầu rà soát. Hãy kiểm tra kết nối của bạn và thử lại."
     },
     "notConnectedReadOnly": "{{platform}} chưa được kết nối. Chỉ chủ sở hữu tổ chức và quản trị viên mới có thể kết nối.",
     "gitlab": {
@@ -961,6 +970,8 @@
       "retryTitle": "Rà soát lại?",
       "showMore": "Xem thêm",
       "started": "Đã bắt đầu",
+      "reviewEnded": "Đã kết thúc",
+      "severityNitpick": "Nhỏ nhặt",
       "threshold": "Ngưỡng",
       "title": "Rà soát",
       "tokens": "Token",
@@ -979,7 +990,13 @@
       "sessionError": "Phiên gặp lỗi: {{error}}.",
       "statusWithValue": "Trạng thái: {{status}}",
       "toolName": "Công cụ: {{name}}",
-      "toolNameError": "Công cụ {{name}} gặp lỗi."
+      "toolNameError": "Công cụ {{name}} gặp lỗi.",
+      "cancelReasonSuperseded": "Một commit mới hơn đã được đẩy lên nên phiên rà soát này đã được thay thế.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} đã bị ngắt kết nối nên phiên rà soát này đã bị hủy. Hãy kết nối lại, sau đó chạy lại phiên rà soát.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer đã bị tắt cho Bitbucket nên phiên rà soát này đã bị hủy. Hãy bật lại, sau đó chạy lại phiên rà soát.",
+      "cancelReasonBitbucketPullRequestChanged": "Pull request trên Bitbucket đã thay đổi nên phiên rà soát này đã được thay thế.",
+      "cancelReasonCancelled": "Phiên rà soát này đã bị hủy.",
+      "cancelReasonInterrupted": "Phiên rà soát này đã bị gián đoạn."
     },
     "reviewList": {
       "configureProvider": "Cấu hình nhà cung cấp",
@@ -1143,12 +1160,18 @@
       "actorSystem": "Hệ thống Kilo",
       "couldNotLoad": "Không thể tải báo cáo kiểm toán.",
       "events": "Sự kiện",
+      "eventConfidence": "Độ tin cậy: {{confidence}}",
+      "eventReason": "Lý do: {{reason}}",
+      "eventsCount_one": "{{displayCount}} sự kiện",
+      "eventsCount_other": "{{displayCount}} sự kiện",
       "generated": "Báo cáo được tạo vào {{generatedAt}}.",
       "noActivity": "Chưa ghi nhận hoạt động nào",
       "noActivityDescription": "Kilo không ghi nhận hoạt động nào về vấn đề bảo mật để đưa vào báo cáo từ {{start}} đến {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "Truy vấn báo cáo chưa hoàn tất. Hãy thử lại.",
       "repositoryNotRecorded": "Chưa ghi nhận kho lưu trữ",
+      "reasonUnknown": "Lý do không được nhận diện",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Tóm tắt báo cáo",
       "title": "Báo cáo kiểm toán",
       "unavailable": "Không có báo cáo kiểm toán",
@@ -1259,7 +1282,7 @@
       "deadlinePassed": "Đã quá hạn",
       "deadlinePassedDetail": "{{critical}} nghiêm trọng, {{high}} cao",
       "dueThisWeek": "Đến hạn trong tuần này",
-      "dueThisWeekDetail": "{{exploitable}} vấn đề đã được xác nhận là có thể bị khai thác",
+      "dueThisWeekDetail": "{{exploitable}} trong số này đã được xác nhận là có thể bị khai thác",
       "noDeadline": "Không có hạn chót",
       "reviewSlaAssignment": "Rà soát việc đặt hạn chót SLA",
       "allOpenFindingsTracked": "Đang theo dõi tất cả vấn đề chưa xử lý"
@@ -1388,8 +1411,9 @@
       "couldNotLoad": "Không thể tải Trợ lý bảo mật.",
       "installApp": "Cài đặt ứng dụng GitHub",
       "reauthorizeButton": "Cấp quyền lại cho ứng dụng GitHub",
-      "reauthorizeDescription": "Trợ lý bảo mật cần quyền vulnerability_alerts để truy cập cảnh báo Dependabot. Hãy cấp quyền lại cho ứng dụng GitHub để bổ sung quyền này.",
+      "reauthorizeDescription": "Trợ lý bảo mật cần quyền đọc cảnh báo Dependabot. Hãy cấp quyền lại cho ứng dụng GitHub để trao quyền này.",
       "reauthorizeTitle": "Cần thêm quyền",
+      "retryFailed": "Vẫn không thể tải Trợ lý bảo mật. Kiểm tra kết nối rồi thử lại.",
       "setupFailed": "Không thể bắt đầu thiết lập GitHub. Vui lòng thử lại."
     },
     "settingsOverview": {
@@ -1595,7 +1619,8 @@
       "dollar_other": "đô la",
       "costSpoken": "chi phí {{cost}}",
       "costSpokenWithTime": "chi phí {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}"
+      "pullRequest": "pR {{number}}",
+      "spokenJoiner": "và"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Chúng tôi không thể bắt đầu thiết lập ứng dụng GitHub. Vui lòng thử lại.",
@@ -1714,6 +1739,9 @@
       "noRepositoriesVisibleGitlab": "Không thấy kho mã nào. Hãy kiểm tra quyền truy cập kho mã trên GitLab, rồi làm mới danh sách.",
       "noRepositoriesVisibleBitbucket": "Không thấy kho mã nào. Hãy kiểm tra quyền truy cập kho mã trên Bitbucket, rồi làm mới danh sách.",
       "bitbucketOrganizationsOnly": "Bitbucket chỉ khả dụng cho các tổ chức.",
+      "githubNeedsAttention": "Cần kết nối lại GitHub",
+      "githubNeedsAttentionDescription": "Hãy kết nối lại ứng dụng Kilo trên GitHub, rồi làm mới để tải danh sách kho mã của ứng dụng.",
+      "partialRepositories": "Một số kho mã GitHub không tải được.",
       "branchPickerTitle": "Chọn nhánh",
       "branchDefault": "Mặc định",
       "branchAccessibility": "Nhánh: {{label}}",
@@ -1721,13 +1749,13 @@
       "branchLoadError": "Không tải được các nhánh",
       "branchUnavailable": "Không có nhánh khả dụng cho kho mã nguồn này. Kiểm tra quyền truy cập của bạn với nhà cung cấp, rồi chọn kho mã nguồn khác.",
       "branchEmpty": "Không có nhánh khả dụng",
+      "branchListIncomplete": "Chỉ một số nhánh được hiển thị. Kho mã nguồn có nhiều nhánh hơn mức danh sách này có thể chứa.",
       "branchPlaceholder": "Chọn một nhánh",
       "runOnWithTarget": "Chạy trên: {{target}}",
       "environment": "Môi trường",
       "couldNotLoadEnvironment": "Không thể tải môi trường của bạn.",
       "retryLoadingEnvironment": "Thử tải lại môi trường",
       "defaultEnvironment": "Môi trường mặc định",
-      "environmentSummary": "{{commands}} lệnh · {{mcp}} MCP · {{skills}} kỹ năng · {{agents}} tác nhân",
       "leaveChanges": "Giữ thay đổi",
       "commitAndPush": "Ghi nhận và đẩy",
       "startSession": "Bắt đầu phiên",
@@ -1946,7 +1974,71 @@
       "preparationComplete": "Đã chuẩn bị xong",
       "preparationFailed": "Chuẩn bị thất bại",
       "setupCommand": "Lệnh thiết lập {{index}}",
-      "setupCommandOf": "Lệnh thiết lập {{index}} trong tổng số {{displayCount}}"
+      "setupCommandOf": "Lệnh thiết lập {{index}} trong tổng số {{displayCount}}",
+      "stepWorkspaceSetup": "Thiết lập vùng làm việc",
+      "stepDiskCheck": "Kiểm tra ổ đĩa",
+      "stepCloning": "Đang sao chép kho mã",
+      "stepBranch": "Đang thiết lập nhánh",
+      "stepDevcontainerSetup": "Thiết lập dev container",
+      "stepWorkspaceRestore": "Đang khôi phục vùng làm việc",
+      "stepWorkspaceBackup": "Đang lưu vùng làm việc",
+      "stepSandboxProvision": "Đang cấp phát sandbox",
+      "stepSandboxBoot": "Đang khởi động sandbox",
+      "stepSnapshotFallback": "Đang thử lại không dùng bản chụp nhanh",
+      "stepKiloServer": "Đang khởi động Kilo",
+      "stepKiloSession": "Đang chuẩn bị phiên làm việc",
+      "stepRestoreIncomplete": "Khôi phục phiên chưa hoàn tất",
+      "stepReady": "Môi trường đã sẵn sàng",
+      "stepFailed": "Thiết lập môi trường thất bại",
+      "stepUnknown": "Thiết lập môi trường",
+      "detailCreatingSandbox": "Đang tạo sandbox",
+      "detailUpdatingRepository": "Đang cập nhật kho mã",
+      "detailCheckingOutBranch": "Đang chuyển sang nhánh",
+      "detailRunningSetupCommands": "Đang chạy lệnh thiết lập",
+      "detailSavingRepository": "Đang lưu kho mã để khởi động nhanh hơn",
+      "detailStartingKiloRuntime": "Đang khởi động runtime Kilo",
+      "detailPreparingKiloSession": "Đang chuẩn bị phiên Kilo",
+      "detailWaitingForPreviousSandbox": "Đang chờ sandbox trước đó dừng lại",
+      "detailRetryingSandboxCreation": "Đang thử lại việc tạo sandbox",
+      "detailPreviousSnapshotFailed": "Khởi động từ bản chụp nhanh trước đó thất bại. Đang thử lại không dùng bản chụp nhanh.",
+      "detailSnapshotStartupFailed": "Khởi động từ bản chụp nhanh thất bại. Đang thử lại không dùng bản chụp nhanh.",
+      "detailStartingSandboxWithoutSnapshot": "Đang khởi động sandbox không dùng bản chụp nhanh",
+      "detailSettingUpWorkspace": "Đang thiết lập vùng làm việc",
+      "detailRestoringSession": "Đang khôi phục phiên",
+      "detailWarmWorkspaceReused": "Vùng làm việc đã được tái sử dụng",
+      "detailRetryingClone": "Đang thử lại sao chép (lần thứ {{attempt}} trong tổng số {{total}})",
+      "detailSetupCommandFailed": "Lệnh thiết lập {{index}} thất bại",
+      "detailSetupCommandTimedOut": "Lệnh thiết lập {{index}} đã quá thời gian chờ",
+      "detailColdRestore": "Khôi phục lạnh, đã áp dụng bản chụp nhanh, {{applied}} trong tổng số {{total}} tệp đã được khôi phục",
+      "detailProgressPercent": "Hoàn thành {{percent}}%",
+      "detailRestoreIncompleteReport": "Khôi phục phiên chưa hoàn tất: {{skipped}} trong tổng số {{total}} tệp chưa được khôi phục ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Thiếu: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} và {{omitted}} mục khác",
+      "detailReasonPatchFailed": "bản vá không áp dụng được",
+      "detailReasonOutsideWorkspace": "đường dẫn nằm ngoài vùng làm việc",
+      "detailReasonMissingContent": "bản chụp nhanh không có nội dung cho tệp",
+      "detailReasonIndexResetFailed": "không thể đặt lại chỉ mục sau khi áp dụng thất bại",
+      "detailReasonUnlinkFailed": "không thể xóa tệp",
+      "detailReasonWriteFailed": "không thể ghi tệp",
+      "detailReasonUnknown": "lý do không xác định",
+      "detailUnknown": "Vẫn đang chuẩn bị",
+      "errorPreparationTimeout": "Đã quá thời gian chuẩn bị môi trường",
+      "errorWorkspaceSetupFailed": "Thiết lập vùng làm việc thất bại",
+      "errorCredentialUpgradeRequired": "Phiên này thiếu bản nâng cấp thông tin đăng nhập bắt buộc. Hãy bắt đầu phiên mới để tiếp tục.",
+      "errorAgentUnavailable": "Agent đã không còn khả dụng",
+      "errorBillingBlocked": "Việc thanh toán sandbox cần thêm tín dụng",
+      "errorBillingUnavailable": "Không thể xác minh thanh toán hoặc dung lượng sandbox. Vui lòng thử lại sau ít phút.",
+      "errorContainerLimitReached": "Đã đạt giới hạn container. Hãy dừng một container hiện có trước khi khởi động container khác.",
+      "errorInvalidConfiguration": "Cấu hình sandbox không hợp lệ hoặc không được hỗ trợ",
+      "errorRuntimeArtifactUnauthorized": "Tải xuống runtime không được cấp phép",
+      "errorRuntimeArtifactInvalid": "Xác minh tệp runtime thất bại",
+      "errorRuntimeCliProbeFailed": "Xác thực CLI runtime thất bại",
+      "errorRuntimeSupervisorMissing": "Thiếu runtime supervisor",
+      "errorConnectionLost": "Đã mất kết nối với sandbox",
+      "errorSandboxLost": "Đã mất sandbox",
+      "errorAgentRestarted": "Agent đã khởi động lại",
+      "errorSandboxOutOfMemory": "Sandbox đã hết bộ nhớ",
+      "errorPreparationDidNotComplete": "Quá trình chuẩn bị chưa hoàn tất"
     },
     "permissionCard": {
       "title": "Cần cấp quyền",
@@ -1958,7 +2050,10 @@
       "allowOnceAccessibility": "Cho phép một lần",
       "alwaysAllow": "Luôn cho phép",
       "alwaysAllowAccessibility": "Luôn cho phép",
-      "retrying": "Đang thử lại…"
+      "retrying": "Đang thử lại…",
+      "retryDeny": "Thử lại thao tác từ chối",
+      "retryAllowOnce": "Thử lại thao tác cho phép một lần",
+      "retryAlwaysAllow": "Thử lại thao tác luôn cho phép"
     },
     "questionCard": {
       "title": "Tác nhân cần bạn trả lời",
@@ -2507,14 +2602,20 @@
       "checksCount_other": "{{displayCount}} bước kiểm tra",
       "couldNotLoad": "Không thể tải các bước kiểm tra.",
       "failed": "{{displayCount}} không đạt",
+      "failed_one": "{{displayCount}} không đạt",
+      "failed_other": "{{displayCount}} không đạt",
       "noAccess": "Bạn không có quyền xem các bước kiểm tra của kho lưu trữ này.",
       "noChecksReported": "Chưa có thông tin kiểm tra",
       "notAvailable": "Chưa có thông tin kiểm tra. Có thể bản ghi mới nhất chưa được xử lý hoặc ứng dụng Kilo trên GitHub chưa được cài đặt cho kho lưu trữ nguồn.",
       "openDetails": "Mở chi tiết {{name}}",
       "passed": "{{displayCount}} đạt",
+      "passed_one": "{{displayCount}} đạt",
+      "passed_other": "{{displayCount}} đạt",
       "pending": "{{displayCount}} đang chờ",
       "retryChecks": "Thử lại các bước kiểm tra",
       "skipped": "{{displayCount}} đã bỏ qua",
+      "skipped_one": "{{displayCount}} đã bỏ qua",
+      "skipped_other": "{{displayCount}} đã bỏ qua",
       "title": "Các bước kiểm tra",
       "viewOnGitHub": "Xem PR trên GitHub",
       "checkDetails": "chi tiết bước kiểm tra"
@@ -2551,7 +2652,8 @@
       "gitlabDescription": "Kết nối tài khoản GitLab để xem merge request trên thiết bị di động.",
       "bitbucketDescription": "Kết nối Bitbucket với tổ chức này để xem PR trên thiết bị di động.",
       "bitbucketOrgOnlyDescription": "Chuyển tài khoản ở trên sang một tổ chức để xem các PR Bitbucket của tổ chức đó.",
-      "contextLine": "Cho {{organization}}"
+      "contextLine": "Cho {{organization}}",
+      "contextLinePersonal": "Cho tài khoản cá nhân"
     },
     "connectionExpired": "Kết nối GitHub đã hết hạn.",
     "couldNotLoadPullRequest": "Không thể tải PR.",
@@ -3019,22 +3121,16 @@
     "boundary": {
       "backToProfile": "Quay lại hồ sơ",
       "loadErrorMessage": "Kiểm tra kết nối và thử lại.",
-
       "chooseAccount": "Chọn tài khoản",
       "loadErrorTitle": "Không thể tải danh sách tổ chức của bạn.",
       "membershipLostNotice": "Bạn không còn quyền truy cập vào tổ chức này. Đã chuyển sang {{target}}.",
       "noOrganization": "Không có tổ chức",
-
       "noOrganizationDescription": "Tài khoản này không thuộc tổ chức nào. Hãy tạo hoặc tham gia một tổ chức trên web để sử dụng các tính năng của tổ chức như lời mời thành viên và cảnh báo số dư thấp.",
-
       "openWebOrganizations": "Mở tổ chức trên web",
-
       "organizationUnavailable": "Không thể truy cập tổ chức.",
       "selectDescriptionWithOrganizations": "Bạn thuộc một hoặc nhiều tổ chức. Chọn tài khoản mà màn hình này nên sử dụng.",
-
       "selectOrganization": "Chọn một tổ chức",
       "unavailableDescription": "Bạn không còn truy cập được tổ chức này. Hãy chọn tổ chức khác trong hồ sơ để tiếp tục.",
-
       "unavailableSessionsDescription": "Bạn không còn truy cập được tổ chức này. Không thể tải phiên của tổ chức này.",
       "accessDeniedDescription": "Bạn không có quyền truy cập vào tổ chức này."
     },
@@ -3069,7 +3165,9 @@
       "permissionDenied": "Bạn không có quyền mời thành viên.",
       "roleMember": "Vai trò của người được mời là thành viên.",
       "sendInvite": "Gửi lời mời",
-      "title": "Mời thành viên"
+      "title": "Mời thành viên",
+      "alreadyInvited": "Địa chỉ email này đã được mời hoặc đã là thành viên.",
+      "sendError": "Không gửi được lời mời."
     },
     "invoices": {
       "downloadA11y": "Tải xuống hóa đơn {{number}}",
@@ -3138,7 +3236,8 @@
       "inviteCreated": "Đã tạo lời mời",
       "pendingInvitations": "Lời mời chờ phản hồi",
       "resendInvite": "Gửi lại lời mời",
-      "shareInviteLink": "Chia sẻ liên kết lời mời"
+      "shareInviteLink": "Chia sẻ liên kết lời mời",
+      "resendInviteError": "Không gửi lại được lời mời."
     },
     "usageStats": {
       "inputTokens": "Token đầu vào",
@@ -3287,7 +3386,8 @@
     "noneChosen": "Chưa chọn",
     "emptyTitle": "Không có mô hình chuyển giọng nói thành văn bản",
     "emptyDescription": "Hiện Kilo Gateway không cung cấp mô hình chuyển giọng nói thành văn bản.",
-    "loadFailed": "Không thể tải các mô hình chuyển giọng nói thành văn bản."
+    "loadFailed": "Không thể tải các mô hình chuyển giọng nói thành văn bản.",
+    "choose": "Chọn một mô hình"
   },
   "voiceLanguage": {
     "title": "Ngôn ngữ nhập bằng giọng nói",
@@ -3383,7 +3483,12 @@
       "serverToolCount_one": "{{count}} công cụ",
       "serverToolCount_other": "{{count}} công cụ",
       "serverUnreachable": "Không thể kết nối với máy chủ này",
-      "serverOff": "Máy chủ này đang tắt"
+      "serverOff": "Máy chủ này đang tắt",
+      "app": {
+        "label": "Giao diện công cụ",
+        "failed": "Không thể tải giao diện của công cụ này.",
+        "empty": "Giao diện của công cụ này không có gì để hiển thị."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Xác thực",
@@ -3497,6 +3602,7 @@
       "fromHuggingFace": "Từ Hugging Face",
       "loading": "Đang tải danh sách mô hình",
       "noResults": "Không tìm thấy mô hình nào",
+      "noResultsForQuery": "Không tìm thấy mô hình nào cho \"{{query}}\"",
       "noFits": "Không có mô hình nào phù hợp với thiết bị này",
       "noFitsDescription": "Các mô hình lớn hơn nằm ở thẻ $t(common.all).",
       "fit": {
@@ -3527,8 +3633,6 @@
       "quantizations": "Lượng tử hóa",
       "quantizationsHelp": "Tệp nhỏ hơn dùng ít bộ nhớ và dung lượng hơn. Tệp lớn hơn thường cho câu trả lời tốt hơn.",
       "quantDetail": "Tải xuống {{size}} · khoảng {{memory}} bộ nhớ",
-      "downloadQuant": "Tải {{quant}} xuống",
-      "downloadModelA11y": "Tải {{name}} xuống",
       "detailsA11y": "Chi tiết: {{name}}",
       "loadingModel": "Đang tải chi tiết mô hình",
       "couldNotLoadModel": "Không thể tải mô hình này",
@@ -3573,13 +3677,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "Mô hình này hỗ trợ mức độ suy luận"
-    }
+    },
+    "creditsRequired": "Không đủ tín dụng để gửi tin nhắn này, hãy nạp tiền và thử lại."
   },
   "settingsTools": {
     "confirmTitle": "Xác nhận thay đổi này?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "kho mã nguồn gần đây nhất của bạn",
+      "confirmMessage": "Kho mã nguồn: {{repository}}. Yêu cầu: {{prompt}}",
+      "confirmTitle": "Bắt đầu trợ lý này?",
       "promptRequired": "Bắt đầu trợ lý cần một lời nhắc. Thêm lời nhắc và chạy lại.",
       "repositoryRequired": "Bắt đầu trợ lý cần một kho mã nguồn. Mở Kilo, chọn một kho mã nguồn, rồi chạy lại.",
       "repositoryUnknown": "Kilo không nhận diện {{repository}} là kho mã nguồn GitHub hoặc GitLab. Chọn kho mã nguồn khác trong Kilo.",
@@ -3609,7 +3717,9 @@
     "spend24h": "Chi tiêu trong 24 giờ qua",
     "multiplierError": "Nhập hệ số từ 1 trở lên",
     "permissionDenied": "Bạn không có quyền quản lý cảnh báo chi tiêu.",
-    "pushOffByCategory": "Đã tắt trong Thông báo"
+    "pushOffByCategory": "Đã tắt trong Thông báo",
+    "multiplierMaxError": "Nhập hệ số từ {{max}} trở xuống",
+    "thresholdMaxError": "Hãy nhập số tiền từ {{max}} trở xuống."
   },
   "profiles": {
     "title": "Hồ sơ",
@@ -3626,9 +3736,10 @@
       "skills_other": "{{count}} kỹ năng",
       "commands_one": "{{count}} lệnh",
       "commands_other": "{{count}} lệnh",
-      "varsShort": "{{count}}b",
-      "skillsShort": "{{count}}k",
-      "commandsShort": "{{count}}l"
+      "setupCommands_one": "{{count}} lệnh thiết lập",
+      "setupCommands_other": "{{count}} lệnh thiết lập",
+      "agents_one": "{{count}} đại lý",
+      "agents_other": "{{count}} đại lý"
     },
     "nameLabel": "Tên hồ sơ",
     "namePlaceholder": "ví dụ. Gỡ lỗi phụ trợ",
@@ -3656,6 +3767,8 @@
     "keyTooLong": "Khóa phải có 256 ký tự hoặc ít hơn",
     "keyDuplicate": "Khóa này đã tồn tại trong hồ sơ",
     "valueLabel": "Giá trị",
+    "valueRequired": "Nhập giá trị",
+    "tooLong": "Sử dụng tối đa {{max}} ký tự",
     "secrets": {
       "markSecret": "Đánh dấu là bí mật",
       "masked": "Giá trị ẩn",
@@ -3684,6 +3797,8 @@
     "skillNameInvalid": "Tên kỹ năng phải bắt đầu bằng một chữ cái hoặc chữ số và chỉ sử dụng chữ cái viết thường, chữ số và dấu gạch ngang",
     "skillContentRequired": "Nội dung kỹ năng là bắt buộc",
     "skillSaveFailed": "Không thể lưu kỹ năng",
+    "skillSourceCustom": "Tùy chỉnh",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Dán SKILL.md và điền tên của nó vào; thêm kỹ năng từ điện thoại của bạn mà không cần kéo và thả.",
     "skillEditTitle": "Chỉnh sửa kỹ năng",
     "mcp": {
@@ -3704,7 +3819,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Nhập tên máy chủ",
-      "nameInvalid": "Tên chỉ có thể sử dụng chữ cái, số, dấu gạch dưới và dấu gạch ngang",
+      "nameInvalid": "Tên chỉ có thể sử dụng chữ cái ASCII, số, dấu gạch dưới và dấu gạch ngang, tối đa 100 ký tự",
       "commandRequired": "Nhập lệnh",
       "commandTooLong": "Dùng tối đa 50 đối số, mỗi đối số 500 ký tự",
       "urlRequired": "Nhập một URL",
@@ -3732,7 +3847,7 @@
       "stepsPlaceholder": "ví dụ: 50",
       "temperature": "Nhiệt độ",
       "temperaturePlaceholder": "ví dụ: 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "ví dụ: 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Đại lý của tôi",
@@ -3740,8 +3855,8 @@
       "tools": "Công cụ",
       "visibility": "Khả năng hiển thị",
       "visibilityPrimary": "Chính — hiển thị trong bộ chọn",
-      "visibilitySubagent": "Subagent - chỉ có thể gọi được từ người khác",
-      "visibilityAll": "Tất cả - cả hai",
+      "visibilitySubagent": "Subagent — chỉ có thể gọi được từ người khác",
+      "visibilityAll": "Tất cả — cả hai",
       "modePrimary": "Chỉ chính",
       "modeSubagent": "Chỉ subagent",
       "modeAll": "Tất cả chế độ",
@@ -3749,7 +3864,7 @@
       "deleteFailed": "Không thể xóa đại lý",
       "nameRequired": "Nhập tên đại lý",
       "slugRequired": "Nhập sên đại lý",
-      "slugInvalid": "Slug phải bắt đầu bằng một chữ cái và chỉ sử dụng chữ cái viết thường, chữ số và dấu gạch ngang",
+      "slugInvalid": "Slug phải bắt đầu bằng một chữ cái ASCII viết thường và chỉ sử dụng chữ cái ASCII viết thường, chữ số và dấu gạch ngang, tối đa 50 ký tự",
       "slugConflict": "Slug đó đã được một tác nhân tích hợp sẵn hoặc tác nhân khác trong hồ sơ này sử dụng",
       "edit": "Chỉnh sửa đại lý"
     },
@@ -3794,7 +3909,9 @@
       "pinFailed": "Không thể ghim kho lưu trữ",
       "unboundToast": "Repo không bị ràng buộc",
       "unbindFailed": "Không thể hủy liên kết repo"
-    }
+    },
+    "variablesDeleteFailed": "Không thể xóa biến",
+    "deleteCommand": "Xóa lệnh {{position}}"
   },
   "credits": {
     "title": "Mua tín dụng",
@@ -3830,7 +3947,8 @@
       "archive": "Lưu trữ",
       "unarchive": "Bỏ lưu trữ",
       "deleteTitle": "Xóa {{name}}?",
-      "deleteMessage": "Việc cần làm của nó cũng bị xóa. Các phiên vẫn được giữ lại."
+      "deleteMessage": "Việc cần làm của nó cũng bị xóa. Các phiên vẫn được giữ lại.",
+      "createFailed": "Không thể tạo danh sách"
     },
     "listSettings": {
       "title": "Cài đặt danh sách",
@@ -3898,20 +4016,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Bản tin buổi sáng",
+    "title": "Bản tin tác nhân",
     "atLeast": "≥{{value}}",
     "coverageHint": "Có thể thiếu một số hoạt động trước đây. ≥ nghĩa là ít nhất bằng mức này; không xác định không có nghĩa là bằng 0.",
     "available": "Bản tin hiện có",
     "history": "Lịch sử bản tin",
-    "historyHint": "Báo cáo được lưu trong 30 ngày, kể cả báo cáo đã bỏ qua.",
+    "historyHint": "Bản tin được lưu trong 30 ngày, kể cả bản tin đã bỏ qua.",
     "settings": "Cài đặt bản tin",
-    "empty": "Không có hoạt động qua đêm",
-    "emptyHint": "Các phiên lập trình trên đám mây và CLI của bạn sẽ hiển thị tại đây sau một đêm có hoạt động.",
+    "empty": "Không có hoạt động trong khung thời gian bản tin này.",
+    "emptyHint": "Các phiên lập trình trên đám mây và CLI của bạn sẽ hiển thị tại đây khi một bản tin theo lịch có hoạt động.",
     "loadError": "Không thể tải bản tin",
-    "sessions": "Hoạt động qua đêm",
+    "sessions": "Đang hoạt động trong khung thời gian",
     "pullRequests": "PRs đã mở",
     "blockers": "Vướng mắc mới",
-    "spend": "Chi phí qua đêm",
+    "spend": "Chi phí trong khung thời gian",
     "view": "Đọc bản tin",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -3933,13 +4051,13 @@
     "sources": "Bằng chứng và tạo phẩm",
     "timezone": "Múi giờ bản tin",
     "deviceTimezone": "Dùng múi giờ của thiết bị",
-    "timezoneHint": "Múi giờ IANA, ví dụ Europe/Berlin. Thay đổi lịch sẽ áp dụng cho các đêm sau.",
-    "nightStart": "Bắt đầu ban đêm",
-    "morningStart": "Kết thúc ban đêm / bắt đầu buổi sáng",
-    "morningEnd": "Kết thúc buổi sáng",
-    "timeHint": "Thẻ Trang chủ sẽ trở lại trạng thái trực tiếp khi buổi sáng kết thúc, kể cả khi ngoại tuyến.",
-    "invalidSchedule": "Hãy chọn múi giờ hợp lệ và các khoảng ban đêm, buổi sáng không trống, không chồng lấn.",
-    "notificationsHint": "Mỗi sáng một thông báo chung khi báo cáo đầu tiên sẵn sàng. Không phụ thuộc vào tóm tắt AI trả phí.",
+    "timezoneHint": "Múi giờ IANA, ví dụ Europe/Berlin. Thay đổi lịch sẽ áp dụng cho các bản tin sau.",
+    "nightStart": "Khung thời gian bản tin bắt đầu",
+    "morningStart": "Bản tin sẵn sàng lúc",
+    "morningEnd": "Bản tin có sẵn đến",
+    "timeHint": "Thẻ Trang chủ sẽ trở lại trạng thái trực tiếp khi khung thời gian bản tin kết thúc, kể cả khi ngoại tuyến.",
+    "invalidSchedule": "Hãy chọn múi giờ hợp lệ và khung thời gian bản tin không trống.",
+    "notificationsHint": "Một thông báo chung cho mỗi bản tin theo lịch. Không phụ thuộc vào tóm tắt AI trả phí.",
     "notificationPermission": "Bật thông báo thiết bị trong $t(common.notifications) để nhận bản tin.",
     "aiOptIn": "Tóm tắt AI trả phí",
     "aiHint": "Tùy chọn, chỉ cho ngữ cảnh này. Các đoạn trích đã chọn và ẩn thông tin nhạy cảm cùng dữ kiện có cấu trúc sẽ được gửi đến mô hình của bạn bằng ngôn ngữ ứng dụng. Phí được trừ vào số dư của ngữ cảnh này.",
@@ -3956,9 +4074,39 @@
     "enable": "Bật tóm tắt trả phí",
     "contextSettings": "Cài đặt AI · {{context}}",
     "allContexts": "Bản tin cá nhân và tổ chức được tách riêng.",
+    "create": "Tạo bản tin",
+    "oneOff": "Theo yêu cầu",
+    "createdAt": "Đã tạo {{time}}",
+    "chooseContext": "Chọn một ngữ cảnh",
+    "period": "Khoảng thời gian của bản tin",
+    "last24Hours": "24 giờ qua",
+    "last7Days": "7 ngày qua",
+    "customPeriod": "Khoảng thời gian tùy chỉnh",
+    "periodStart": "Thời điểm bắt đầu",
+    "periodEnd": "Thời điểm kết thúc",
+    "periodHint": "Chọn tối đa 31 ngày. Dữ liệu lịch sử có thể không đầy đủ.",
+    "periodSessions": "Có hoạt động trong khoảng thời gian",
+    "periodSpend": "Chi phí trong khoảng thời gian",
+    "invalidPeriod": "Chọn thời điểm bắt đầu trước thời điểm kết thúc.",
+    "futurePeriod": "Khoảng thời gian không được kết thúc trong tương lai.",
+    "periodTooLong": "Chọn khoảng thời gian không quá 31 ngày.",
+    "invalidLocalTime": "Giờ địa phương này không tồn tại trong múi giờ của bản tin. Hãy chọn giờ khác.",
+    "reviewBriefing": "Xem lại bản tin",
+    "reviewAgain": "Chuẩn bị lượt xem xét mới",
+    "payer": "Tính phí cho {{context}}",
+    "emptyPeriod": "Không tìm thấy hoạt động trong khoảng thời gian này. Không tạo tóm tắt AI và không tính phí.",
+    "emptyHistory": "Chưa có bản tin đã lưu",
+    "historicalStateHint": "Trạng thái phiên phản ánh thời điểm kết thúc khoảng thời gian đã chọn, không phải trạng thái trực tiếp hiện tại.",
+    "oneOffHint": "AI nhận dữ liệu minh chứng đã chọn và đã ẩn thông tin nhạy cảm bằng ngôn ngữ ứng dụng của bạn. Bản tin theo yêu cầu này không thay đổi bản tin theo lịch hay tùy chọn AI của bạn.",
+    "createOffline": "Kết nối mạng để xem lại hoặc tạo bản tin. Yêu cầu trả phí không bao giờ được đưa vào hàng đợi khi ngoại tuyến.",
+    "estimateInputTooLarge": "Khoảng thời gian này có quá nhiều dữ liệu minh chứng cho mô hình đã chọn.",
+    "estimatePermissionUnavailable": "Bạn không có quyền sử dụng số dư của ngữ cảnh này.",
+    "createFailed": "Không thể tạo bản tin này.",
+    "reviewFailed": "Không thể xem lại bản tin này.",
     "estimatePricingUnavailable": "Không có thông tin giá cho mô hình này.",
     "estimateBalanceUnavailable": "Số dư không đủ để tóm tắt trả phí.",
     "estimateModelNotAllowed": "Mô hình này không được phép ở đây.",
-    "estimateSpendLimitTooLow": "Nâng giới hạn chi tiêu để cho phép tóm tắt này."
+    "estimateSpendLimitTooLow": "Nâng giới hạn chi tiêu để cho phép tóm tắt này.",
+    "saved": "Đã lưu cài đặt bản tin"
   }
 }

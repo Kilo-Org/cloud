@@ -4,7 +4,8 @@ import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { FeedbackFor, FeedbackSource } from '@/lib/feedback/enums';
-import { isFeedbackRateLimitError, submitUserFeedback } from '@/lib/feedback/submit';
+import { isFeedbackRateLimitError } from '@/lib/feedback/rate-limit';
+import { submitUserFeedback } from '@/lib/feedback/submit';
 
 /**
  * MCP-facing feedback entry point. `feedback.submit` is the tRPC twin of the

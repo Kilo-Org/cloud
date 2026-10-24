@@ -46,6 +46,7 @@ type StartAgentFailureCode =
   | 'unknown-repository'
   | 'unsupported-repository'
   | 'no-repository'
+  | 'start-cancelled'
   | 'start-failed';
 
 /**

@@ -5,7 +5,6 @@ import android.app.KeyguardManager
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
-import android.view.WindowManager
 
 /**
  * The Approve action's target, and the gate between the tap and the headless
@@ -36,15 +35,10 @@ class ActiveAgentsApprovalActivity : Activity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
-    // The activity is translucent and draws nothing, so showing it over the
-    // keyguard reveals no content; it only lets the dismissal request come from
-    // a visible activity.
-    if (Build.VERSION.SDK_INT >= 27) {
-      setShowWhenLocked(true)
-    } else {
-      @Suppress("DEPRECATION")
-      window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED)
-    }
+    // It draws nothing and stays behind the keyguard, which is what lets the
+    // dismissal request below present the device credential: an activity that
+    // shows itself over the keyguard has already occluded it, and a dismissal
+    // requested then has no keyguard left to ask about.
     if (!ApprovalGate.isDeviceLocked(this)) {
       approveAndFinish()
       return

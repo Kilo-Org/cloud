@@ -5,8 +5,13 @@ export type GitHubThreadCoordinates = {
   reviewCommentId: number | null;
 };
 
-export function parseGitHubThreadId(threadId: string): GitHubThreadCoordinates | null {
-  if (!threadId.startsWith('github:')) return null;
+/**
+ * Thread ids are assigned by the chat adapter, so a thread can reach bot code
+ * before one exists. An absent id is not a GitHub thread and parses to null,
+ * which callers already treat as "no repository".
+ */
+export function parseGitHubThreadId(threadId: string | null | undefined): GitHubThreadCoordinates | null {
+  if (!threadId?.startsWith('github:')) return null;
 
   const withoutPrefix = threadId.slice('github:'.length);
   const reviewCommentMatch = withoutPrefix.match(/^([^/]+)\/([^:]+):(\d+):rc:(\d+)$/);
@@ -42,7 +47,9 @@ export function parseGitHubThreadId(threadId: string): GitHubThreadCoordinates |
   return null;
 }
 
-export function getGitHubRepositoryFullNameFromThread(threadId: string): string | null {
+export function getGitHubRepositoryFullNameFromThread(
+  threadId: string | null | undefined
+): string | null {
   const coordinates = parseGitHubThreadId(threadId);
   return coordinates ? `${coordinates.owner}/${coordinates.repo}` : null;
 }

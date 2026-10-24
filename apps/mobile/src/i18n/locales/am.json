@@ -53,6 +53,7 @@
     "connected": "ተገናኝቷል",
     "couldNotLoadModels": "ሞዴሎችን መጫን አልተቻለም።",
     "couldNotLoadRepositories": "ማከማቻዎችን መጫን አልተቻለም።",
+    "noRepositoriesFound": "ምንም ማከማቻዎች አልተገኙም",
     "critical": "እጅግ ከፍተኛ",
     "delete": "ሰርዝ",
     "deleted": "ተሰርዟል",
@@ -87,6 +88,7 @@
     "connect": "አገናኝ",
     "connectBitbucket": "Bitbucketን አገናኝ",
     "connectGitlab": "GitLabን አገናኝ",
+    "connectProvider": "አቅራቢን ያገናኙ",
     "contentTruncated": "ይዘቱ ተቆርጧል",
     "copyLink": "አገናኙን ቅዳ",
     "couldNotLoadOrganizations": "ድርጅቶችን መጫን አልተቻለም።",
@@ -145,7 +147,8 @@
     "agent": "ወኪል",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "ለውጦች"
+    "changes": "ለውጦች",
+    "organizationTrialEnded": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም። የድርጅት ባለቤት በkilo.ai ላይ የክፍያ መረጃን ማዘመን ይችላል፣ ከዚያ እንደገና ይሞክሩ።"
   },
   "language": {
     "restarting": "ቋንቋውን ለመቀየር እንደገና በመጀመር ላይ",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "በGitLab ላይ ወደ ተጨማሪ ቡድኖች ወይም ፕሮጀክቶች የመድረስ ፈቃድ መስጠት ሊያስፈልግዎ ይችላል።",
       "installGithubApp": "የGitHub መተግበሪያን በማከማቻዎች ላይ ይጫኑ",
       "installGithubAppDescription": "ለKilo የGitHub መተግበሪያ እንዲገመገሙ ወደሚፈልጓቸው ማከማቻዎች የመድረስ ፈቃድ ይስጡ።",
-      "noRepositoriesFound": "ምንም ማከማቻዎች አልተገኙም",
       "repositoryAccess": "የማከማቻ መዳረሻ"
     },
     "style": {
@@ -1489,7 +1491,6 @@
       "invalidUrl": "ትክክለኛ የኮድ ውህደት ጥያቄ URL ያስገቡ።",
       "couldNotCheckProviderStatus": "የአቅራቢውን ሁኔታ መፈተሽ አልተቻለም።",
       "couldNotLoadProviders": "የተገናኙትን አቅራቢዎች መጫን አልቻልንም። እባክዎ እንደገና ይሞክሩ።",
-      "connectProvider": "አቅራቢን ያገናኙ",
       "connectProviderDescription": "የኮድ ውህደት ጥያቄ ግምገማን ራስዎ ለማስጀመር GitHubን ያገናኙ።",
       "pullRequestUrl": "የኮድ ውህደት ጥያቄ URL",
       "instructions": "መመሪያዎች (አማራጭ)",
@@ -2953,7 +2954,6 @@
   },
   "voiceInput": {
     "listening": "በማዳመጥ ላይ...",
-    "staysOff": "በመስመር ላይ ንግግርን ወደ ጽሑፍ መቀየር እስኪፈቅዱ ድረስ የድምፅ ግብዓት ተሰናክሎ ይቆያል።",
     "onlineTitle": "ንግግር በመስመር ላይ ወደ ጽሑፍ ይቀየራል",
     "onlineMessage": "ይህ መሣሪያ ያለ በይነመረብ ግንኙነት ንግግርን ወደ ጽሑፍ መቀየር አይችልም። የተቀዳው ድምፅዎ ወደ ጽሑፍ እንዲቀየር ወደ {{provider}} ይላካል። Kilo ድምፁን አያከማችም።",
     "allow": "ይፍቀዱ",
@@ -3168,7 +3168,9 @@
       "sendInvite": "ግብዣ ይላኩ",
       "title": "አባል ጋብዝ",
       "alreadyInvited": "አስቀድሞ ግብዣ ተልኳል ወይም አስቀድሞ አባል ነው።",
-      "sendError": "ግብዣውን መላክ አልተቻለም።"
+      "sendError": "ግብዣውን መላክ አልተቻለም።",
+      "pendingInvitation": "ይህ ኢሜይል አስቀድሞ በመጠባበቅ ላይ ያለ ግብዣ አለው።",
+      "alreadyMember": "ይህ ሰው አስቀድሞ የዚህ ድርጅት አባል ነው።"
     },
     "invoices": {
       "downloadA11y": "ደረሰኝ {{number}}ን ያውርዱ",
@@ -3238,7 +3240,12 @@
       "pendingInvitations": "ምላሽ የሚጠብቁ ግብዣዎች",
       "resendInvite": "ግብዣውን እንደገና ይላኩ",
       "shareInviteLink": "የግብዣውን አገናኝ ያጋሩ",
-      "resendInviteError": "ግብዣውን እንደገና መላክ አልተቻለም።"
+      "resendInviteError": "ግብዣውን እንደገና መላክ አልተቻለም።",
+      "inviteNotResendable": "ይህ ግብዣ ከአሁን በኋላ እንደገና መላክ አይቻልም።",
+      "ownerAuthority": "የድርጅት ባለቤት ብቻ ባለቤቶችን ማስተዳደር ይችላል።",
+      "ownRoleChange": "የራስዎን ሚና መቀየር አይችሉም።",
+      "inviteExpired": "ይህ ግብዣ ጊዜው አልፎበታል።",
+      "inviteAccepted": "ይህ ግብዣ አስቀድሞ ተቀብሏል።"
     },
     "usageStats": {
       "inputTokens": "የግብዓት ቶከኖች",

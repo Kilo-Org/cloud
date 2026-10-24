@@ -53,6 +53,7 @@
     "connected": "Prijungta",
     "couldNotLoadModels": "Nepavyko įkelti modelių.",
     "couldNotLoadRepositories": "Nepavyko įkelti saugyklų.",
+    "noRepositoriesFound": "Saugyklų nerasta",
     "critical": "Kritinis",
     "delete": "Ištrinti",
     "deleted": "Ištrinta",
@@ -87,6 +88,7 @@
     "connect": "Prijungti",
     "connectBitbucket": "Prijungti Bitbucket",
     "connectGitlab": "Prijungti GitLab",
+    "connectProvider": "Prijunk paslaugų teikėją",
     "contentTruncated": "Turinys sutrumpintas",
     "copyLink": "Kopijuoti nuorodą",
     "couldNotLoadOrganizations": "Nepavyko įkelti organizacijų.",
@@ -145,7 +147,8 @@
     "agent": "Agentas",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Pakeitimai"
+    "changes": "Pakeitimai",
+    "organizationTrialEnded": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Organizacijos savininkas gali atnaujinti atsiskaitymo duomenis adresu kilo.ai, tada bandykite dar kartą."
   },
   "language": {
     "restarting": "Paleidžiama iš naujo, kad būtų pakeista kalba",
@@ -1451,7 +1454,6 @@
       "gitlabNoRepositoriesDescription": "Gali reikėti suteikti prieigą prie daugiau GitLab grupių ar projektų.",
       "installGithubApp": "Įdiek GitHub programėlę saugyklose",
       "installGithubAppDescription": "Suteik Kilo GitHub programėlei prieigą prie saugyklų, kurių kodą nori peržiūrėti.",
-      "noRepositoriesFound": "Saugyklų nerasta",
       "repositoryAccess": "prieiga prie saugyklų"
     },
     "style": {
@@ -1533,7 +1535,6 @@
       "invalidUrl": "Įvesk tinkamą PR URL.",
       "couldNotCheckProviderStatus": "Nepavyko patikrinti paslaugų teikėjo būsenos.",
       "couldNotLoadProviders": "Nepavyko įkelti tavo prijungtų paslaugų teikėjų. Bandyk dar kartą.",
-      "connectProvider": "Prijunk paslaugų teikėją",
       "connectProviderDescription": "Prijunk GitHub, kad galėtum rankiniu būdu pradėti PR peržiūrą.",
       "pullRequestUrl": "PR adresas (URL)",
       "instructions": "Instrukcijos (neprivaloma)",
@@ -3039,7 +3040,6 @@
   },
   "voiceInput": {
     "listening": "Klausomasi...",
-    "staysOff": "Balso įvestis liks išjungta, kol leisi paversti kalbą tekstu internetu.",
     "onlineTitle": "Kalba apdorojama internetu",
     "onlineMessage": "Šis įrenginys negali paversti kalbos tekstu be interneto ryšio. Tavo įrašas perduodamas paslaugų teikėjui {{provider}}, kad būtų paverstas tekstu. Kilo garso įrašo nesaugo.",
     "allow": "Leisti",
@@ -3256,7 +3256,9 @@
       "sendInvite": "Siųsti kvietimą",
       "title": "Pakviesti narį",
       "alreadyInvited": "Vartotojas jau pakviestas arba jau yra narys.",
-      "sendError": "Nepavyko išsiųsti kvietimo."
+      "sendError": "Nepavyko išsiųsti kvietimo.",
+      "pendingInvitation": "Šiam el. pašto adresui jau išsiųstas laukiantis kvietimas.",
+      "alreadyMember": "Šis asmuo jau yra šios organizacijos narys."
     },
     "invoices": {
       "downloadA11y": "Atsisiųsti sąskaitą {{number}}",
@@ -3326,7 +3328,12 @@
       "pendingInvitations": "Nepriimti kvietimai",
       "resendInvite": "Išsiųsti kvietimą dar kartą",
       "shareInviteLink": "Bendrinti kvietimo nuorodą",
-      "resendInviteError": "Nepavyko išsiųsti kvietimo dar kartą."
+      "resendInviteError": "Nepavyko išsiųsti kvietimo dar kartą.",
+      "inviteNotResendable": "Šio kvietimo nebegalima išsiųsti dar kartą.",
+      "ownerAuthority": "Tik organizacijos savininkas gali valdyti savininkus.",
+      "ownRoleChange": "Negalite pakeisti savo paties vaidmens.",
+      "inviteExpired": "Šio kvietimo galiojimas baigėsi.",
+      "inviteAccepted": "Šis kvietimas jau buvo priimtas."
     },
     "usageStats": {
       "inputTokens": "Įvesties žetonai",

@@ -366,6 +366,10 @@ export async function upsertLinearInstallation(
     await options.deleteChatSdkIdentityCache?.(previousOrganizationId);
   }
 
+  // For org integrations, get a model that respects org access policy. A null
+  // result means the policy allows none of the candidates, so the installation
+  // stores no model and the settings UI keeps its model placeholder.
+  // For user integrations, use the shared bot default model.
   const defaultModel =
     owner.type === 'org'
       ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
@@ -379,12 +383,17 @@ export async function upsertLinearInstallation(
       ? existingMetadata.model_slug
       : null;
 
-  const metadata = {
+  const modelSlug = existingModelSlug ?? defaultModel;
+  const metadata: Record<string, unknown> = {
     ...existingMetadata,
     bot_enabled: true,
     bot_user_id: botUserId,
-    model_slug: existingModelSlug ?? defaultModel,
   };
+  if (modelSlug) {
+    metadata.model_slug = modelSlug;
+  } else {
+    delete metadata.model_slug;
+  }
 
   if (existing) {
     try {
@@ -396,6 +405,8 @@ export async function upsertLinearInstallation(
           platform_account_login: organizationName,
           scopes: LINEAR_SCOPES,
           integration_status: INTEGRATION_STATUS.ACTIVE,
+          suspended_at: null,
+          suspended_by: null,
           metadata,
           updated_at: new Date().toISOString(),
         })

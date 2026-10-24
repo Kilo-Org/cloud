@@ -53,6 +53,7 @@
     "connected": "已連結",
     "couldNotLoadModels": "無法載入模型。",
     "couldNotLoadRepositories": "無法載入存放庫。",
+    "noRepositoriesFound": "找不到存放庫",
     "critical": "嚴重",
     "delete": "刪除",
     "deleted": "已刪除",
@@ -87,6 +88,7 @@
     "connect": "連結",
     "connectBitbucket": "連結 Bitbucket",
     "connectGitlab": "連結 GitLab",
+    "connectProvider": "連結平台",
     "contentTruncated": "內容已截斷",
     "copyLink": "複製連結",
     "couldNotLoadOrganizations": "無法載入組織。",
@@ -145,7 +147,8 @@
     "agent": "代理人",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "變更"
+    "changes": "變更",
+    "organizationTrialEnded": "組織的試用期已結束，且沒有使用中的方案。組織擁有者可以在 kilo.ai 更新帳單資訊，然後再試一次。"
   },
   "language": {
     "restarting": "正在重新啟動以套用語言",
@@ -883,7 +886,6 @@
       "gitlabNoRepositoriesDescription": "你可能需要授權存取 GitLab 上的更多群組或專案。",
       "installGithubApp": "為存放庫安裝 GitHub App",
       "installGithubAppDescription": "請授權 Kilo GitHub App 存取要審查的存放庫。",
-      "noRepositoriesFound": "找不到存放庫",
       "repositoryAccess": "存放庫存取權限"
     },
     "style": {
@@ -907,7 +909,6 @@
     "followReviewMd": "遵循 REVIEW.md",
     "followReviewMdSubtitle": "遵循每個存放庫的 REVIEW.md 指示檔案",
     "manualReview": {
-      "connectProvider": "連結平台",
       "connectProviderDescription": "連結 GitHub，即可手動開始審查 PR。",
       "couldNotCheckProviderStatus": "無法檢查平台狀態。",
       "couldNotLoadProviders": "無法載入已連結的平台。請再試一次。",
@@ -2432,7 +2433,6 @@
     "allow": "允許",
     "onlineMessage": "此裝置無法離線將語音轉成文字。你的錄音會傳送至 {{provider}} 以轉換為文字。Kilo 不會儲存音訊。",
     "onlineTitle": "語音會在線上處理",
-    "staysOff": "允許線上語音轉文字後，才能啟用語音輸入。",
     "start": "開始語音輸入",
     "stop": "停止語音輸入",
     "restricted": "此裝置上的語音輸入受到限制。",
@@ -3167,7 +3167,9 @@
       "sendInvite": "傳送邀請",
       "title": "邀請成員",
       "alreadyInvited": "該電子郵件地址已有待處理的邀請，或已是成員。",
-      "sendError": "無法傳送邀請。"
+      "sendError": "無法傳送邀請。",
+      "pendingInvitation": "這個電子郵件地址已有待處理的邀請。",
+      "alreadyMember": "這個人已經是此組織的成員。"
     },
     "invoices": {
       "downloadA11y": "下載發票 {{number}}",
@@ -3237,7 +3239,12 @@
       "pendingInvitations": "待處理的邀請",
       "resendInvite": "重新傳送邀請",
       "shareInviteLink": "分享邀請連結",
-      "resendInviteError": "無法重新傳送邀請。"
+      "resendInviteError": "無法重新傳送邀請。",
+      "inviteNotResendable": "此邀請已無法重新傳送。",
+      "ownerAuthority": "只有組織擁有者可以管理擁有者。",
+      "ownRoleChange": "您無法變更自己的角色。",
+      "inviteExpired": "此邀請已過期。",
+      "inviteAccepted": "此邀請已被接受。"
     },
     "usageStats": {
       "inputTokens": "輸入詞元",

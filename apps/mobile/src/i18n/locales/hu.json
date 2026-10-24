@@ -53,6 +53,7 @@
     "connected": "Csatlakoztatva",
     "couldNotLoadModels": "Nem sikerült betölteni a modelleket.",
     "couldNotLoadRepositories": "Nem sikerült betölteni az adattárakat.",
+    "noRepositoriesFound": "Nem találhatók kódtárak",
     "critical": "Kritikus",
     "delete": "Törlés",
     "deleted": "Törölve",
@@ -87,6 +88,7 @@
     "connect": "Csatlakoztatás",
     "connectBitbucket": "Bitbucket csatlakoztatása",
     "connectGitlab": "GitLab csatlakoztatása",
+    "connectProvider": "Szolgáltató csatlakoztatása",
     "contentTruncated": "Tartalom csonkolva",
     "copyLink": "Hivatkozás másolása",
     "couldNotLoadOrganizations": "Nem sikerült betölteni a szervezeteket.",
@@ -145,7 +147,8 @@
     "agent": "Ügynök",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Változtatások"
+    "changes": "Változtatások",
+    "organizationTrialEnded": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. A szervezet tulajdonosa frissítheti a számlázást a kilo.ai oldalon, majd próbálja újra."
   },
   "language": {
     "restarting": "Újraindítás a nyelv beállításához",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Lehet, hogy több csoporthoz vagy projekthez kell hozzáférést adnod a GitLabon.",
       "installGithubApp": "GitHub-alkalmazás telepítése a kódtárakhoz",
       "installGithubAppDescription": "Adj hozzáférést a Kilo GitHub-alkalmazásnak az ellenőrizni kívánt kódtárakhoz.",
-      "noRepositoriesFound": "Nem találhatók kódtárak",
       "repositoryAccess": "hozzáférés a kódtárakhoz"
     },
     "style": {
@@ -1489,7 +1491,6 @@
       "invalidUrl": "Adj meg egy érvényes URL-t a PR-hez.",
       "couldNotCheckProviderStatus": "Nem sikerült ellenőrizni a szolgáltató állapotát.",
       "couldNotLoadProviders": "Nem sikerült betölteni a csatlakoztatott szolgáltatóidat. Próbáld újra.",
-      "connectProvider": "Szolgáltató csatlakoztatása",
       "connectProviderDescription": "Csatlakoztasd a GitHubot egy PR kézi kódellenőrzésének indításához.",
       "pullRequestUrl": "PR URL-címe",
       "instructions": "Utasítások (nem kötelező)",
@@ -2953,7 +2954,6 @@
   },
   "voiceInput": {
     "listening": "Beszéd figyelése…",
-    "staysOff": "A hangbevitel kikapcsolva marad, amíg nem engedélyezed az online átírást.",
     "onlineTitle": "Online beszédfeldolgozás",
     "onlineMessage": "Ez az eszköz nem tud internetkapcsolat nélkül beszédet átírni. A felvételedet ennek a szolgáltatónak küldjük el, hogy szöveggé alakítsa: {{provider}}. A Kilo nem tárolja a hangfelvételt.",
     "allow": "Engedélyezés",
@@ -3168,7 +3168,9 @@
       "sendInvite": "Meghívó küldése",
       "title": "Tag meghívása",
       "alreadyInvited": "Már meg van hívva, vagy már tag.",
-      "sendError": "Nem sikerült elküldeni a meghívót."
+      "sendError": "Nem sikerült elküldeni a meghívót.",
+      "pendingInvitation": "Erre az e-mail-címre már van egy függőben lévő meghívó.",
+      "alreadyMember": "Ez a személy már tagja ennek a szervezetnek."
     },
     "invoices": {
       "downloadA11y": "A(z) {{number}} számú számla letöltése",
@@ -3238,7 +3240,12 @@
       "pendingInvitations": "Függőben lévő meghívók",
       "resendInvite": "Meghívó újraküldése",
       "shareInviteLink": "Meghívóhivatkozás megosztása",
-      "resendInviteError": "Nem sikerült újraküldeni a meghívót."
+      "resendInviteError": "Nem sikerült újraküldeni a meghívót.",
+      "inviteNotResendable": "Ez a meghívó már nem küldhető újra.",
+      "ownerAuthority": "Csak a szervezet tulajdonosa kezelheti a tulajdonosokat.",
+      "ownRoleChange": "Nem módosíthatja a saját szerepkörét.",
+      "inviteExpired": "Ez a meghívó lejárt.",
+      "inviteAccepted": "Ezt a meghívót már elfogadták."
     },
     "usageStats": {
       "inputTokens": "Bemeneti tokenek",

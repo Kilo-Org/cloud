@@ -53,6 +53,7 @@
     "connected": "Yhdistetty",
     "couldNotLoadModels": "Mallien lataaminen epäonnistui.",
     "couldNotLoadRepositories": "Koodivarastojen lataaminen epäonnistui.",
+    "noRepositoriesFound": "Koodivarastoja ei löytynyt",
     "critical": "Kriittinen",
     "delete": "Poista",
     "deleted": "Poistettu",
@@ -87,6 +88,7 @@
     "connect": "Yhdistä",
     "connectBitbucket": "Yhdistä Bitbucket-tili",
     "connectGitlab": "Yhdistä GitLab-tili",
+    "connectProvider": "Yhdistä palveluntarjoaja",
     "contentTruncated": "Sisältö katkaistu",
     "copyLink": "Kopioi linkki",
     "couldNotLoadOrganizations": "Organisaatioiden lataaminen epäonnistui.",
@@ -145,7 +147,8 @@
     "agent": "Agentti",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Muutokset"
+    "changes": "Muutokset",
+    "organizationTrialEnded": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Organisaation omistaja voi päivittää laskutuksen osoitteessa kilo.ai ja yrittää sitten uudelleen."
   },
   "language": {
     "restarting": "Käynnistetään uudelleen kielen vaihtamiseksi",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Sinun on ehkä myönnettävä käyttöoikeus useampiin ryhmiin tai projekteihin GitLabissa.",
       "installGithubApp": "Asenna GitHub-sovellus koodivarastoihin",
       "installGithubAppDescription": "Anna Kilon GitHub-sovellukselle käyttöoikeus koodivarastoihin, jotka haluat katselmoida.",
-      "noRepositoriesFound": "Koodivarastoja ei löytynyt",
       "repositoryAccess": "koodivaraston käyttöoikeus"
     },
     "style": {
@@ -1489,7 +1491,6 @@
       "invalidUrl": "Anna kelvollinen muutospyynnön URL-osoite.",
       "couldNotCheckProviderStatus": "Palveluntarjoajan tilaa ei voitu tarkistaa.",
       "couldNotLoadProviders": "Yhdistettyjä palveluntarjoajia ei voitu ladata. Yritä uudelleen.",
-      "connectProvider": "Yhdistä palveluntarjoaja",
       "connectProviderDescription": "Yhdistä GitHub, niin voit käynnistää muutospyynnön katselmoinnin manuaalisesti.",
       "pullRequestUrl": "Muutospyynnön URL-osoite",
       "instructions": "Ohjeet (valinnaiset)",
@@ -2953,7 +2954,6 @@
   },
   "voiceInput": {
     "listening": "Kuunnellaan…",
-    "staysOff": "Puheentunnistus pysyy pois käytöstä, kunnes sallit puheen muuttamisen tekstiksi verkossa.",
     "onlineTitle": "Puhe käsitellään verkossa",
     "onlineMessage": "Tämä laite ei voi muuttaa puhetta tekstiksi ilman verkkoyhteyttä. Äänitteesi lähetetään palveluun {{provider}}, joka muuttaa sen tekstiksi. Kilo ei tallenna ääntä.",
     "allow": "Salli",
@@ -3168,7 +3168,9 @@
       "sendInvite": "Lähetä kutsu",
       "title": "Kutsu jäsen",
       "alreadyInvited": "Tämä sähköpostiosoite on jo kutsuttu tai kuuluu jo jäsenelle.",
-      "sendError": "Kutsun lähettäminen epäonnistui."
+      "sendError": "Kutsun lähettäminen epäonnistui.",
+      "pendingInvitation": "Tällä sähköpostiosoitteella on jo odottava kutsu.",
+      "alreadyMember": "Tämä henkilö on jo tämän organisaation jäsen."
     },
     "invoices": {
       "downloadA11y": "Lataa lasku {{number}}",
@@ -3238,7 +3240,12 @@
       "pendingInvitations": "Odottavat kutsut",
       "resendInvite": "Lähetä kutsu uudelleen",
       "shareInviteLink": "Jaa kutsulinkki",
-      "resendInviteError": "Kutsun lähettäminen uudelleen epäonnistui."
+      "resendInviteError": "Kutsun lähettäminen uudelleen epäonnistui.",
+      "inviteNotResendable": "Tätä kutsua ei voi enää lähettää uudelleen.",
+      "ownerAuthority": "Vain organisaation omistaja voi hallita omistajia.",
+      "ownRoleChange": "Et voi vaihtaa omaa rooliasi.",
+      "inviteExpired": "Tämä kutsu on vanhentunut.",
+      "inviteAccepted": "Tämä kutsu on jo hyväksytty."
     },
     "usageStats": {
       "inputTokens": "Syötetokenit",

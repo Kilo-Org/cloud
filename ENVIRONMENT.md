@@ -202,6 +202,9 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `GOOGLE_PLAY_RTDN_PUSH_AUDIENCE` - Expected OIDC audience for Play Real-time Developer Notification Pub/Sub push (the HTTPS URL of POST /api/kilo-pass/play/notifications). `[SERVER]`
 - `GOOGLE_PLAY_RTDN_PUSH_SERVICE_ACCOUNT_EMAIL` - Expected service-account email for the Play RTDN Pub/Sub push OIDC token; the token `email` claim must match it. [SERVER]
 - `APPLE_APP_BUNDLE_ID` - iOS app bundle ID for Apple App Attest and Sign In verification. [SERVER]
+- `APPLE_JWKS_URL_OVERRIDE` - Apple JWKS endpoint override for local verification runs; applies only outside production deployments. [SERVER]
+- `NATIVE_APPLE_NONCE_REQUIRED_SINCE` - ISO 8601 instant; the native Apple sign-in nonce requirement applies from this instant onward. Before it, requests are accepted without the field while the `native-apple-signin-nonce-relaxed-path` release toggle is enabled. Unset, invalid, or past ⇒ the requirement applies unconditionally. [SERVER]
+- `NATIVE_APPLE_NONCE_TRANSITION_LOCAL` - When `true` in a development environment outside Vercel, the transition window opens without the release toggle, for local verification runs without PostHog credentials. [SERVER]
 - `NATIVE_ADMISSION_DEV_SENTINEL` - When `true`, non-production accepts the fixed device-attestation sentinel from devices that cannot attest (simulator, emulator without Play Services). Ignored when `NODE_ENV=production`. The mobile build reads the same name. [SERVER]
 - `GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER` - Google Cloud project number for Play Integrity API. Also read by the mobile build, where it ships in the bundle; it is an identifier, not a secret. [SERVER]
 - `GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY` - Service account JSON key for Play Integrity API. `[SECRET]`
@@ -219,7 +222,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `POSTGRES_REPLICA_EU_URL`, `POSTGRES_REPLICA_EU_URL_2` - EU read replicas; `readDb` picks one at random in EU regions and falls back to the primary when neither is set. `[SECRET]`
 - `POSTGRES_SCRIPT_URL` - Alternate Postgres URL used by one-off scripts/backfills in `src/scripts/` and tests. `[SECRET]`
 - `POSTGRES_URL_PRODUCTION` - Production Postgres connection string override; used by `packages/db/src/database-url.ts`. `[SECRET]`
-- `POSTGRES_CONNECT_TIMEOUT` - Postgres connect timeout in ms (default/typical: 10000). [SERVER]
+- `POSTGRES_CONNECT_TIMEOUT` - Postgres connect timeout in ms (required; typical: 10000). [SERVER]
 - `POSTGRES_MAX_QUERY_TIME` - Max allowed query time in ms. [SERVER]
 - `USE_PRODUCTION_DB` - Forces use of the production DB URL in non-production contexts; used by `packages/db/src/database-url.ts`. [SERVER]
 - `DATABASE_CA` - CA certificate content (PEM) for TLS connections to Postgres; used by `packages/db/src/database-url.ts` in tests and scripts. [SERVER]

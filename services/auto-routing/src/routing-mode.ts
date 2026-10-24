@@ -4,7 +4,7 @@ import {
   CustomRouterEntriesSchema,
   PersistedEfficientModelPoolSchema,
   type AutoRoutingMode,
-  type AutoRoutingModeOwnerType,
+  type OwnerType,
   type BenchmarkProfileEntryStatus,
   type CustomRoutingTable,
   type EfficientModelPool,
@@ -46,7 +46,7 @@ export type StoredOwnerSettings = AutoRoutingOwnerSettings & {
 };
 
 export type AutoRoutingSettingsOwner = {
-  ownerType: AutoRoutingModeOwnerType;
+  ownerType: OwnerType;
   ownerId: string;
 };
 
@@ -75,7 +75,7 @@ export function clearAutoRoutingSettingsCache(): void {
   autoRoutingSettingsCache.clear();
 }
 
-function modeKey(ownerType: AutoRoutingModeOwnerType, ownerId: string): string {
+function modeKey(ownerType: OwnerType, ownerId: string): string {
   return `${ownerType}:${ownerId}`;
 }
 
@@ -339,21 +339,21 @@ export class AutoRoutingModeConfigDO extends DurableObject<Env> {
   }
 }
 
-function modeStub(env: AutoRoutingModeEnv, ownerType: AutoRoutingModeOwnerType, ownerId: string) {
+function modeStub(env: AutoRoutingModeEnv, ownerType: OwnerType, ownerId: string) {
   const namespace = env.AUTO_ROUTING_MODE_CONFIG;
   return namespace.get(namespace.idFromName(modeKey(ownerType, ownerId)));
 }
 
 export function readConfiguredAutoRoutingMode(
   env: AutoRoutingModeEnv,
-  owner: { ownerType: AutoRoutingModeOwnerType; ownerId: string }
+  owner: { ownerType: OwnerType; ownerId: string }
 ): Promise<AutoRoutingMode | null> {
   return modeStub(env, owner.ownerType, owner.ownerId).getMode();
 }
 
 export async function getConfiguredAutoRoutingMode(
   env: AutoRoutingModeEnv,
-  owner: { ownerType: AutoRoutingModeOwnerType; ownerId: string }
+  owner: { ownerType: OwnerType; ownerId: string }
 ): Promise<AutoRoutingMode | null> {
   return readConfiguredAutoRoutingMode(env, owner).catch((error: unknown) => {
     console.warn(
@@ -369,7 +369,7 @@ export async function getConfiguredAutoRoutingMode(
 
 async function readAutoRoutingSettings(
   env: AutoRoutingModeEnv,
-  owner: { ownerType: AutoRoutingModeOwnerType; ownerId: string }
+  owner: { ownerType: OwnerType; ownerId: string }
 ): Promise<AutoRoutingOwnerSettings> {
   return modeStub(env, owner.ownerType, owner.ownerId)
     .getSettings()
@@ -387,7 +387,7 @@ async function readAutoRoutingSettings(
 
 export async function getConfiguredAutoRoutingSettings(
   env: AutoRoutingModeEnv,
-  owner: { ownerType: AutoRoutingModeOwnerType; ownerId: string }
+  owner: { ownerType: OwnerType; ownerId: string }
 ): Promise<AutoRoutingOwnerSettings> {
   return readAutoRoutingSettings(env, owner).catch(() => ({ mode: null, pool: null }));
 }
@@ -408,7 +408,7 @@ export async function getOwnerCustomRoutingTable(
 
 export function getCachedAutoRoutingSettings(
   env: AutoRoutingModeEnv,
-  owner: { ownerType: AutoRoutingModeOwnerType; ownerId: string }
+  owner: { ownerType: OwnerType; ownerId: string }
 ): Promise<AutoRoutingOwnerSettings> {
   const key = modeKey(owner.ownerType, owner.ownerId);
   const now = Date.now();
@@ -486,7 +486,7 @@ export async function getEffectiveAutoRoutingSettings(
 
 export async function setAutoRoutingMode(
   env: AutoRoutingModeEnv,
-  owner: { ownerType: AutoRoutingModeOwnerType; ownerId: string },
+  owner: { ownerType: OwnerType; ownerId: string },
   mode: AutoRoutingMode | null
 ): Promise<void> {
   await modeStub(env, owner.ownerType, owner.ownerId).setMode(mode);

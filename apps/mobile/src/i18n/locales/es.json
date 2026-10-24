@@ -53,6 +53,7 @@
     "connected": "Conectado",
     "couldNotLoadModels": "No se pudieron cargar los modelos.",
     "couldNotLoadRepositories": "No se pudieron cargar los repositorios.",
+    "noRepositoriesFound": "No se encontraron repositorios",
     "critical": "Nivel crítico",
     "delete": "Eliminar",
     "deleted": "Eliminado",
@@ -87,6 +88,7 @@
     "connect": "Conectar",
     "connectBitbucket": "Conectar Bitbucket",
     "connectGitlab": "Conectar GitLab",
+    "connectProvider": "Conecta un proveedor",
     "contentTruncated": "Contenido truncado",
     "copyLink": "Copiar enlace",
     "couldNotLoadOrganizations": "No se pudieron cargar las organizaciones.",
@@ -145,7 +147,8 @@
     "agent": "Agente",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Cambios"
+    "changes": "Cambios",
+    "organizationTrialEnded": "La prueba de la organización ha finalizado y no tiene ningún plan activo. El propietario de la organización puede actualizar la facturación en kilo.ai y, después, volver a intentarlo."
   },
   "language": {
     "restarting": "Reiniciando para aplicar el idioma",
@@ -886,7 +889,6 @@
       "gitlabNoRepositoriesDescription": "Es posible que debas conceder acceso a más grupos o proyectos en GitLab.",
       "installGithubApp": "Instala la aplicación de GitHub en los repositorios",
       "installGithubAppDescription": "Concede a la aplicación de Kilo en GitHub acceso a los repositorios que quieres revisar.",
-      "noRepositoriesFound": "No se encontraron repositorios",
       "repositoryAccess": "acceso al repositorio"
     },
     "style": {
@@ -910,7 +912,6 @@
     "followReviewMd": "Seguir las instrucciones de REVIEW.md",
     "followReviewMdSubtitle": "Respeta las instrucciones del archivo REVIEW.md de cada repositorio",
     "manualReview": {
-      "connectProvider": "Conecta un proveedor",
       "connectProviderDescription": "Conecta GitHub para iniciar una revisión manual de un PR.",
       "couldNotCheckProviderStatus": "No se pudo comprobar el estado del proveedor.",
       "couldNotLoadProviders": "No se pudieron cargar los proveedores que has conectado. Inténtalo de nuevo.",
@@ -2456,7 +2457,6 @@
     "allow": "Permitir",
     "onlineMessage": "Este dispositivo no puede transcribir sin conexión. Tu grabación se envía a {{provider}} para convertirla en texto. Kilo no almacena el audio.",
     "onlineTitle": "La voz se procesa en línea",
-    "staysOff": "El dictado seguirá desactivado hasta que permitas la transcripción en línea.",
     "start": "Iniciar dictado",
     "stop": "Detener dictado",
     "restricted": "El dictado está restringido en este dispositivo.",
@@ -3211,7 +3211,9 @@
       "sendInvite": "Enviar invitación",
       "title": "Invitar a un miembro",
       "alreadyInvited": "Ya está invitado o ya es miembro.",
-      "sendError": "No se pudo enviar la invitación."
+      "sendError": "No se pudo enviar la invitación.",
+      "pendingInvitation": "Este correo electrónico ya tiene una invitación pendiente.",
+      "alreadyMember": "Esta persona ya es miembro de esta organización."
     },
     "invoices": {
       "downloadA11y": "Descargar factura {{number}}",
@@ -3281,7 +3283,12 @@
       "pendingInvitations": "Invitaciones pendientes",
       "resendInvite": "Reenviar invitación",
       "shareInviteLink": "Compartir enlace de invitación",
-      "resendInviteError": "No se pudo reenviar la invitación."
+      "resendInviteError": "No se pudo reenviar la invitación.",
+      "inviteNotResendable": "Esta invitación ya no se puede reenviar.",
+      "ownerAuthority": "Solo el propietario de una organización puede gestionar a los propietarios.",
+      "ownRoleChange": "No puedes cambiar tu propio rol.",
+      "inviteExpired": "Esta invitación ha caducado.",
+      "inviteAccepted": "Esta invitación ya ha sido aceptada."
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",

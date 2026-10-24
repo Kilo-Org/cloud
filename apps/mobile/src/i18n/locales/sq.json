@@ -53,6 +53,7 @@
     "connected": "Lidhur",
     "couldNotLoadModels": "Modelet nuk u ngarkuan.",
     "couldNotLoadRepositories": "Depot nuk u ngarkuan.",
+    "noRepositoriesFound": "Nuk u gjet asnjë depo",
     "critical": "Kritike",
     "delete": "Fshi",
     "deleted": "Fshirë",
@@ -87,6 +88,7 @@
     "connect": "Lidhu",
     "connectBitbucket": "Lidhu me Bitbucket",
     "connectGitlab": "Lidhu me GitLab",
+    "connectProvider": "Lidh një ofrues",
     "contentTruncated": "Përmbajtja u shkurtua",
     "copyLink": "Kopjo lidhjen",
     "couldNotLoadOrganizations": "Organizatat nuk u ngarkuan.",
@@ -145,7 +147,8 @@
     "agent": "Agjenti",
     "durationMinuteShort": "min",
     "durationHourShort": "orë",
-    "changes": "Ndryshimet"
+    "changes": "Ndryshimet",
+    "organizationTrialEnded": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv. Një pronar i organizatës mund të përditësojë faturimin në kilo.ai dhe më pas të provojë përsëri."
   },
   "language": {
     "restarting": "Po riniset për të zbatuar ndryshimin e gjuhës",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Mund të të duhet të japësh qasje në më shumë grupe ose projekte në GitLab.",
       "installGithubApp": "Instalo aplikacionin GitHub në depot",
       "installGithubAppDescription": "Jepi aplikacionit Kilo për GitHub qasje në depot që dëshiron të shqyrtohen.",
-      "noRepositoriesFound": "Nuk u gjet asnjë depo",
       "repositoryAccess": "qasja në depot"
     },
     "style": {
@@ -1489,7 +1491,6 @@
       "invalidUrl": "Shkruaj një URL të vlefshme për PR.",
       "couldNotCheckProviderStatus": "Nuk u kontrollua statusi i ofruesit.",
       "couldNotLoadProviders": "Nuk u ngarkuan ofruesit që ke lidhur. Provo përsëri.",
-      "connectProvider": "Lidh një ofrues",
       "connectProviderDescription": "Lidh GitHub për të filluar shqyrtimin manual të një PR.",
       "pullRequestUrl": "URL-ja e PR",
       "instructions": "Udhëzimet (opsionale)",
@@ -2953,7 +2954,6 @@
   },
   "voiceInput": {
     "listening": "Po dëgjon...",
-    "staysOff": "Diktimi mbetet i çaktivizuar derisa të lejosh transkriptimin në internet.",
     "onlineTitle": "Të folurit përpunohet në internet",
     "onlineMessage": "Kjo pajisje nuk mund të transkriptojë pa internet. Regjistrimi yt dërgohet te {{provider}} për t'u kthyer në tekst. Kilo nuk e ruan audion.",
     "allow": "Lejo",
@@ -3168,7 +3168,9 @@
       "sendInvite": "Dërgo ftesën",
       "title": "Fto anëtar",
       "alreadyInvited": "Ky person është ftuar tashmë ose është tashmë anëtar.",
-      "sendError": "Ftesa nuk u dërgua."
+      "sendError": "Ftesa nuk u dërgua.",
+      "pendingInvitation": "Ky email ka tashmë një ftesë në pritje.",
+      "alreadyMember": "Ky person është tashmë anëtar i kësaj organizate."
     },
     "invoices": {
       "downloadA11y": "Shkarko faturën {{number}}",
@@ -3238,7 +3240,12 @@
       "pendingInvitations": "Ftesat në pritje",
       "resendInvite": "Ridërgo ftesën",
       "shareInviteLink": "Ndaj lidhjen e ftesës",
-      "resendInviteError": "Ftesa nuk u ridërgua."
+      "resendInviteError": "Ftesa nuk u ridërgua.",
+      "inviteNotResendable": "Kjo ftesë nuk mund të ridërgohet më.",
+      "ownerAuthority": "Vetëm pronari i organizatës mund të menaxhojë pronarët.",
+      "ownRoleChange": "Nuk mund të ndryshosh rolin tënd.",
+      "inviteExpired": "Kjo ftesë ka skaduar.",
+      "inviteAccepted": "Kjo ftesë është pranuar tashmë."
     },
     "usageStats": {
       "inputTokens": "Tokenët hyrës",

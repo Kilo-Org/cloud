@@ -12,16 +12,11 @@ export async function getBalanceForUser(
     quiet?: boolean;
     /** Instant the expiry cut-off is measured from. Defaults to the current time. */
     now?: Date;
-    /** How many hours the cut-off trails `now` by. Defaults to a random 0-1 draw. */
+    /** How many hours the cut-off trails `now` by. Defaults to no jitter. */
     expiryJitterHours?: number;
   } = {}
 ) {
-  const {
-    forceRefresh = false,
-    quiet = false,
-    now = new Date(),
-    expiryJitterHours = 0,
-  } = options;
+  const { forceRefresh = false, quiet = false, now = new Date(), expiryJitterHours = 0 } = options;
   const expireBefore = subHours(now, expiryJitterHours);
 
   const needsExpirationComputation =

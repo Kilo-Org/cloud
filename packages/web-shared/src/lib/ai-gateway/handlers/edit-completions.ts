@@ -220,7 +220,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
   // Use read replica for balance check - this is a read-only operation that can tolerate
   // slight replication lag, and provides lower latency for US users.
   const freeRequest = await isFreeModel(requestBody.model);
-  const { balance, settings, plan, payer } = await getBalanceAndOrgSettings(
+  const { balance, plan, payer } = await getBalanceAndOrgSettings(
     organizationId,
     user,
     readDb,

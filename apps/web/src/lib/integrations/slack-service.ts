@@ -279,6 +279,8 @@ export async function upsertSlackInstallation({
           platform_account_login: teamName,
           scopes: SLACK_SCOPES,
           integration_status: INTEGRATION_STATUS.ACTIVE,
+          suspended_at: null,
+          suspended_by: null,
           metadata,
           updated_at: new Date().toISOString(),
         })

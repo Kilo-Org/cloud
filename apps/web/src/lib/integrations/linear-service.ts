@@ -396,6 +396,8 @@ export async function upsertLinearInstallation(
           platform_account_login: organizationName,
           scopes: LINEAR_SCOPES,
           integration_status: INTEGRATION_STATUS.ACTIVE,
+          suspended_at: null,
+          suspended_by: null,
           metadata,
           updated_at: new Date().toISOString(),
         })

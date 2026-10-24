@@ -164,4 +164,36 @@ describe('upsertLinearInstallation', () => {
 
     expect(calls).toEqual([]);
   });
+  test('clears the lifecycle marker when the owner re-authorizes a workspace', async () => {
+    const [suspended] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: user.id,
+        platform: PLATFORM.LINEAR,
+        integration_type: 'oauth',
+        platform_installation_id: null,
+        platform_account_id: 'workspace-recover',
+        platform_account_login: 'Recovery Workspace',
+        scopes: [],
+        integration_status: INTEGRATION_STATUS.SUSPENDED,
+        suspended_at: new Date().toISOString(),
+        suspended_by: 'workspace_detach',
+      })
+      .returning();
+
+    const result = await upsertLinearInstallation({
+      owner: { type: 'user', id: user.id },
+      organizationId: 'workspace-recover',
+      organizationName: 'Recovery Workspace',
+      botUserId: 'bot-recovered',
+    });
+
+    expect(result.id).toBe(suspended.id);
+    expect(result).toMatchObject({
+      integration_status: INTEGRATION_STATUS.ACTIVE,
+      suspended_at: null,
+      suspended_by: null,
+      platform_installation_id: 'workspace-recover',
+    });
+  });
 });

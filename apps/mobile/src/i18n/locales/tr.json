@@ -2433,7 +2433,6 @@
     "allow": "İzin ver",
     "onlineMessage": "Bu cihaz, sesi çevrimdışı olarak metne dönüştüremiyor. Kaydın, metne dönüştürülmesi için {{provider}} hizmetine gönderilir. Kilo ses kaydını saklamaz.",
     "onlineTitle": "Konuşma çevrimiçi işleniyor",
-    "staysOff": "Sesin çevrimiçi olarak metne dönüştürülmesine izin verene kadar sesli giriş kapalı kalır.",
     "start": "Sesli girişi başlat",
     "stop": "Sesli girişi durdur",
     "restricted": "Bu cihazda sesli giriş kısıtlıdır.",

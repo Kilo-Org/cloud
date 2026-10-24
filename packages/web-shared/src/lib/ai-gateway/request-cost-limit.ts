@@ -1,63 +1,156 @@
-import { desc } from 'drizzle-orm';
 import { z } from 'zod';
-import { modelsByProvider, StoredModelSchema, type StoredModel } from '@kilocode/db';
-import { db } from '@kilocode/web-shared/lib/drizzle';
-import { getModelDisplayPricing } from './providers/openrouter/display-pricing';
+import { StoredModelSchema, type StoredModel } from '@kilocode/db';
+import type { PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
+import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  getRawOpenRouterModels,
+  pickerExtraModel,
+  pickerModelPricing,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
+import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import {
+  formatPricePerToken,
+  getCustomPricing,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { EndpointPricing } from './providers/openrouter/display-pricing';
+import type { OpenRouterProviderConfig } from './providers/openrouter/types';
 import {
   getVercelModelIdOverrides,
   mapResolvedModelIdToVercel,
 } from './providers/vercel/mapModelIdToVercel';
-import { getCustomPricing } from './custom-pricing.constants';
-import { findKiloExclusiveModel } from './kilo-exclusive-models';
+import { applyCustomPricingToPricing } from './custom-pricing';
 
-export type TextRequestPriceCeiling = {
+type RateTier = {
+  start_context_length: number;
+  pricing: {
+    prompt_per_million: number;
+    completion_per_million: number;
+    input_cache_read_per_million: number | null;
+    input_cache_write_per_million: number | null;
+  };
+};
+
+function tierPricing(tier: RateTier): EndpointPricing {
+  const { pricing } = tier;
+  return {
+    prompt: formatPricePerToken(pricing.prompt_per_million),
+    completion: formatPricePerToken(pricing.completion_per_million),
+    input_cache_read: formatPricePerToken(
+      pricing.input_cache_read_per_million ?? pricing.prompt_per_million
+    ),
+    input_cache_write: formatPricePerToken(
+      pricing.input_cache_write_per_million ?? pricing.prompt_per_million
+    ),
+    request: '0',
+  };
+}
+
+function ratesForTier(tier: RateTier, requestCost: number): TextPricingRates {
+  const rates = pricedRates(tierPricing(tier));
+  if (!rates) throw new Error('Model has invalid billed pricing');
+  return { ...rates, requestCost };
+}
+function tierAtInputLength(
+  tiers: readonly RateTier[],
+  inputTokenCeiling: number
+): RateTier | undefined {
+  let selected: RateTier | undefined;
+  for (const tier of tiers) {
+    if (tier.start_context_length <= inputTokenCeiling) selected = tier;
+  }
+  return selected;
+}
+
+function combineRates(a: TextPricingRates, b: TextPricingRates): TextPricingRates {
+  return {
+    inputRate: Math.max(a.inputRate, b.inputRate),
+    outputRate: Math.max(a.outputRate, b.outputRate),
+    requestCost: Math.max(a.requestCost, b.requestCost),
+  };
+}
+
+function pickerRequestPrice(
+  modelId: string,
+  models: Record<string, StoredModel>,
+  catalog: OpenRouterModel[],
+  preferredProviderOrderConfig: PreferredProviderOrderConfig,
+  inputTokenCeiling: number
+): TextPricingRates {
+  const extra = pickerExtraModel(modelId);
+  const model = extra ?? catalog.find(entry => entry.id === modelId);
+  if (!model) throw new Error('Model pricing is unavailable');
+  const pickerPricing = applyCustomPricingToPricing(
+    model.id,
+    extra ? model.pricing : pickerModelPricing(model, models, preferredProviderOrderConfig)
+  );
+  let rates = textPricingRates(pickerPricing);
+  const exclusivePricing = findKiloExclusiveModel(modelId)?.pricing;
+  const customPricing = getCustomPricing(modelId);
+  const exclusiveTier = exclusivePricing
+    ? tierAtInputLength(exclusivePricing.tiers, inputTokenCeiling)
+    : undefined;
+  const customTier = customPricing
+    ? tierAtInputLength(customPricing.pricing, inputTokenCeiling)
+    : undefined;
+  if (exclusiveTier) {
+    const tierRates = ratesForTier(exclusiveTier, rates.requestCost);
+    rates = exclusivePricing?.fallbackOnly ? combineRates(rates, tierRates) : tierRates;
+  }
+  if (customTier) {
+    const tierRates = ratesForTier(customTier, rates.requestCost);
+    rates = customPricing?.fallbackOnly ? combineRates(rates, tierRates) : tierRates;
+  }
+  return rates;
+}
+
+export type RequestCostLimitResult = {
+  refusal: string | null;
+  providerConfig: OpenRouterProviderConfig | null;
+};
+
+function refused(message: string): RequestCostLimitResult {
+  return { refusal: message, providerConfig: null };
+}
+export type TextPricingRates = {
   inputRate: number;
   outputRate: number;
   requestCost: number;
 };
 
-/** Catalog-pricing failures are returned as messages; unexpected failures propagate. */
-export function textRequestPriceCeiling(metadata: StoredModel): TextRequestPriceCeiling | string {
-  if (metadata.endpoints.length === 0) return 'Model pricing is unavailable';
-  let inputRate = 0;
-  let outputRate = 0;
-  let requestCost = 0;
-  for (const endpoint of metadata.endpoints) {
-    const price = getModelDisplayPricing(endpoint.pricing);
-    if (!price) return 'Model has an unpriced route';
-    const values = [
-      price.prompt,
-      price.completion,
-      price.request ?? '0',
-      price.input_cache_write ?? '0',
-      price.input_cache_read ?? '0',
-      price.internal_reasoning ?? '0',
-    ].map(Number);
-    if (values.some(value => !Number.isFinite(value) || value < 0))
-      return 'Model has invalid pricing';
-    inputRate = Math.max(inputRate, values[0] + Math.max(values[3], values[4]));
-    outputRate = Math.max(outputRate, values[1] + values[5]);
-    requestCost = Math.max(requestCost, values[2]);
-  }
-  const billedTiers = [
-    ...(getCustomPricing(metadata.id)?.pricing ?? []),
-    ...(findKiloExclusiveModel(metadata.id)?.pricing?.tiers ?? []),
-  ];
-  for (const { pricing } of billedTiers) {
-    const input =
-      Math.max(
-        pricing.prompt_per_million,
-        pricing.input_cache_write_per_million ?? 0,
-        pricing.input_cache_read_per_million ?? 0
-      ) / 1_000_000;
-    const output = pricing.completion_per_million / 1_000_000;
-    if (![input, output].every(value => Number.isFinite(value) && value >= 0))
-      return 'Model has invalid billed pricing';
-    inputRate = Math.max(inputRate, input);
-    outputRate = Math.max(outputRate, output);
-  }
-  return { inputRate, outputRate, requestCost };
+/**
+ * Per-token rates for a text request under one price: the prompt rate plus the
+ * worse of the cache read/write rates for input, the completion rate plus the
+ * reasoning rate for output, and the per-request fee. `null` when the price is
+ * missing or unusable.
+ */
+function pricedRates(pricing: EndpointPricing | undefined): TextPricingRates | null {
+  if (!pricing) return null;
+  const values = [
+    pricing.prompt,
+    pricing.completion,
+    pricing.request ?? '0',
+    pricing.input_cache_write ?? '0',
+    pricing.input_cache_read ?? '0',
+    pricing.internal_reasoning ?? '0',
+  ].map(Number);
+  if (values.some(value => !Number.isFinite(value) || value < 0)) return null;
+  return {
+    inputRate: values[0] + Math.max(values[3], values[4]),
+    outputRate: values[1] + values[5],
+    requestCost: values[2],
+  };
 }
+
+/** {@link pricedRates} for a caller that cannot proceed without a price. */
+export function textPricingRates(pricing: EndpointPricing | undefined): TextPricingRates {
+  if (!pricing) throw new Error('Model has an unpriced route');
+  const rates = pricedRates(pricing);
+  if (!rates) throw new Error('Model has invalid pricing');
+  return rates;
+}
+
 function requestTextBytes(value: unknown): number {
   if (typeof value === 'string') return Buffer.byteLength(value, 'utf8');
   if (Array.isArray(value)) {
@@ -71,35 +164,6 @@ function requestTextBytes(value: unknown): number {
   }
   return 0;
 }
-/** Output-token allowance for one System One answer, covering its generation and envelope. */
-export const SYSTEM_ONE_MAX_OUTPUT_TOKENS = 16_384;
-
-/**
- * Cost bound, in microdollars, of one System One request against a model's current prices, or
- * `null` when the stored catalog cannot price the model.
- *
- * The questions bound the answer envelope: answers repeat the question criteria keys, and score
- * questions their legend. `state` is read once and never echoed. The output allowance adds room
- * for the answer generation each model also prices.
- */
-export function systemOneRequestCostBound(
-  metadata: StoredModel,
-  request: { state: unknown; questions: Record<string, unknown> }
-): number | null {
-  const price = textRequestPriceCeiling(metadata);
-  if (typeof price === 'string') return null;
-  const questionBytes = Buffer.byteLength(JSON.stringify(request.questions) ?? '', 'utf8');
-  const inputTokenCeiling =
-    Buffer.byteLength(JSON.stringify(request.state) ?? '', 'utf8') + questionBytes + 1024;
-  const outputTokenCeiling = questionBytes + SYSTEM_ONE_MAX_OUTPUT_TOKENS;
-  return Math.ceil(
-    (inputTokenCeiling * price.inputRate +
-      outputTokenCeiling * price.outputRate +
-      price.requestCost) *
-      1_000_000
-  );
-}
-
 /** OpenAI serves at most this many choices per request; a larger count is refused as unpricable. */
 const MAX_BOUNDED_CHOICES = 128;
 
@@ -161,7 +225,23 @@ const boundedRequestProperties = z
     prompt_cache_key: inertProperty,
     safety_identifier: inertProperty,
     session_id: inertProperty,
-    provider: inertProperty,
+    provider: z
+      .object({
+        order: z.array(z.string()).optional(),
+        only: z.array(z.string()).optional(),
+        ignore: z.array(z.string()).optional(),
+        allow_fallbacks: z.boolean().optional(),
+        max_price: z
+          .object({
+            prompt: z.number().finite().nonnegative().optional(),
+            completion: z.number().finite().nonnegative().optional(),
+            request: z.number().finite().nonnegative().optional(),
+          })
+          .passthrough()
+          .optional(),
+      })
+      .passthrough()
+      .optional(),
     providerOptions: inertProperty,
     transforms: inertProperty,
     reasoning: inertProperty,
@@ -200,42 +280,81 @@ function boundedRefusal(error: z.ZodError): string {
   return BOUNDED_SHAPE_REFUSAL;
 }
 
+export type RequestCostLimitProvider = {
+  /** The upstream provider that serves the attempt. */
+  id: string;
+  /** The caller's own credential pays, so Kilo carries no route price. */
+  userFunded: boolean;
+};
+
 export async function enforceRequestCostLimit(
   header: string | null,
   model: string,
   body: unknown,
-  availableBalanceMicrodollars: number
-): Promise<string | null> {
-  if (header === null) return null;
+  availableBalanceMicrodollars: number,
+  provider: RequestCostLimitProvider
+): Promise<RequestCostLimitResult> {
+  if (header === null) return { refusal: null, providerConfig: null };
   const maximum = Number(header);
-  if (!Number.isSafeInteger(maximum) || maximum <= 0) return 'Invalid request spend safeguard';
+  if (!Number.isSafeInteger(maximum) || maximum <= 0)
+    return refused('Invalid request spend safeguard');
   const parsed = boundedRequestSchema.safeParse(body);
-  if (!parsed.success) return boundedRefusal(parsed.error);
-  const [catalog] = await db
-    .select({ models: modelsByProvider.openrouter })
-    .from(modelsByProvider)
-    .orderBy(desc(modelsByProvider.id))
-    .limit(1);
-  const requestedMetadata = StoredModelSchema.safeParse(catalog?.models?.[model]);
-  const aliasTarget =
-    model.startsWith('~') && requestedMetadata.success
-      ? requestedMetadata.data.alias_target?.slug
-      : undefined;
-  const metadata = aliasTarget
-    ? StoredModelSchema.safeParse(catalog?.models?.[aliasTarget])
-    : requestedMetadata;
-  if (!metadata.success) return 'Current model pricing is unavailable for bounded spending';
+  if (!parsed.success) return refused(boundedRefusal(parsed.error));
   try {
+    const [models, rawCatalog, preferredProviderOrderConfig] = await Promise.all([
+      getOpenRouterModelsMetadataFromDatabase(),
+      getRawOpenRouterModels(),
+      getPreferredProviderOrderConfig(),
+    ]);
+    const requestedMetadata = StoredModelSchema.safeParse(models[model]);
+    const aliasTarget =
+      model.startsWith('~') && requestedMetadata.success
+        ? requestedMetadata.data.alias_target?.slug
+        : undefined;
+    const targetCatalogEntry = aliasTarget
+      ? rawCatalog.data.find(entry => entry.id === aliasTarget)
+      : undefined;
+    const targetPickerExtra = aliasTarget ? pickerExtraModel(aliasTarget) : undefined;
+    if (
+      !pickerExtraModel(model) &&
+      !rawCatalog.data.some(entry => entry.id === model) &&
+      !requestedMetadata.success
+    )
+      return refused('Current model pricing is unavailable for bounded spending');
+    if (aliasTarget && !targetPickerExtra && !targetCatalogEntry)
+      return refused('Current model pricing is unavailable for bounded spending');
     if (
       aliasTarget &&
       parsed.data.model !== model &&
       parsed.data.model !==
         mapResolvedModelIdToVercel(aliasTarget, await getVercelModelIdOverrides())
     )
-      return 'Model alias target changed before bounded spending admission';
-    const price = textRequestPriceCeiling(metadata.data);
-    if (typeof price === 'string') return price;
+      return refused('Model alias target changed before bounded spending admission');
+
     const inputTokenCeiling = requestTextBytes(body) + 2048;
+    const requestedPrice = pickerRequestPrice(
+      model,
+      models,
+      rawCatalog.data,
+      preferredProviderOrderConfig,
+      inputTokenCeiling
+    );
+    const targetPrice = aliasTarget
+      ? pickerRequestPrice(
+          aliasTarget,
+          models,
+          rawCatalog.data,
+          preferredProviderOrderConfig,
+          inputTokenCeiling
+        )
+      : undefined;
+    const price = targetPrice
+      ? {
+          inputRate: Math.max(requestedPrice.inputRate, targetPrice.inputRate),
+          outputRate: Math.max(requestedPrice.outputRate, targetPrice.outputRate),
+          requestCost: Math.max(requestedPrice.requestCost, targetPrice.requestCost),
+        }
+      : requestedPrice;
     // max_completion_tokens supersedes max_tokens where both are accepted, so the larger of the
     // two bounds either resolution; every requested choice carries its own output ceiling.
     const outputTokenCeiling =
@@ -247,11 +366,91 @@ export async function enforceRequestCostLimit(
         price.requestCost) *
         1_000_000
     );
-    if (bound > maximum) return 'Request exceeds its spend safeguard before generation';
+    if (bound > maximum) return refused('Request exceeds its spend safeguard before generation');
     if (bound > availableBalanceMicrodollars)
-      return 'Request exceeds the available context balance or allowance';
-    return null;
+      return refused('Request exceeds the available context balance or allowance');
+    // A provider that cannot cap a per-route price may serve this request only when
+    // there is nothing to cap: a model quoted at zero costs the caller nothing.
+    if (provider.id === 'vercel' && !provider.userFunded && bound > 0)
+      return refused('Bounded spending requires a provider that can enforce it');
+
+    const requestedMaxPrice = parsed.data.provider?.max_price;
+    const providerConfig: OpenRouterProviderConfig | null =
+      provider.id === 'openrouter'
+        ? {
+            ...parsed.data.provider,
+            max_price: {
+              ...requestedMaxPrice,
+              prompt: Math.min(
+                requestedMaxPrice?.prompt ?? Infinity,
+                Number((price.inputRate * 1_000_000).toFixed(12))
+              ),
+              completion: Math.min(
+                requestedMaxPrice?.completion ?? Infinity,
+                Number((price.outputRate * 1_000_000).toFixed(12))
+              ),
+              request: Math.min(requestedMaxPrice?.request ?? Infinity, price.requestCost),
+            },
+          }
+        : null;
+    return { refusal: null, providerConfig };
   } catch (error) {
-    return error instanceof Error ? error.message : 'Request pricing unavailable';
+    return refused(error instanceof Error ? error.message : 'Request pricing unavailable');
   }
+}
+
+/** The worst rates across the given prices, or `null` when one of them cannot be read. */
+function worstRates(rates: readonly (TextPricingRates | null)[]): TextPricingRates | null {
+  let worst: TextPricingRates | null = null;
+  for (const rate of rates) {
+    if (!rate) return null;
+    worst = worst ? combineRates(worst, rate) : rate;
+  }
+  return worst;
+}
+
+/**
+ * The rates a stored model may be billed at: its worst route and its most expensive billed tier, so
+ * a bound built from them covers whichever route serves the request. `null` when the catalog cannot
+ * price every one of them.
+ */
+function storedModelWorstRates(metadata: StoredModel): TextPricingRates | null {
+  const routes = worstRates(metadata.endpoints.map(endpoint => pricedRates(endpoint.pricing)));
+  const tiers = worstRates(
+    [
+      ...(getCustomPricing(metadata.id)?.pricing ?? []),
+      ...(findKiloExclusiveModel(metadata.id)?.pricing?.tiers ?? []),
+    ].map(tier => pricedRates(tierPricing(tier)))
+  );
+  if (!routes) return null;
+  return tiers ? combineRates(routes, tiers) : routes;
+}
+
+/** Output-token allowance for one System One answer, covering its generation and envelope. */
+export const SYSTEM_ONE_MAX_OUTPUT_TOKENS = 16_384;
+
+/**
+ * Cost bound, in microdollars, of one System One request at the model's current prices, or `null`
+ * when the stored catalog cannot price every route the request may be served on.
+ *
+ * The request's own serialized bytes bound the input tokens, and answers repeat the question
+ * criteria keys, so the questions bound the output tokens as well. The output allowance adds room
+ * for the answer generation each model also prices.
+ */
+export function systemOneRequestCostBound(
+  metadata: StoredModel,
+  request: { state: unknown; questions: Record<string, unknown> }
+): number | null {
+  const price = storedModelWorstRates(metadata);
+  if (!price) return null;
+  const questionBytes = Buffer.byteLength(JSON.stringify(request.questions) ?? '', 'utf8');
+  const inputTokenCeiling =
+    Buffer.byteLength(JSON.stringify(request.state) ?? '', 'utf8') + questionBytes + 1024;
+  const outputTokenCeiling = questionBytes + SYSTEM_ONE_MAX_OUTPUT_TOKENS;
+  return Math.ceil(
+    (inputTokenCeiling * price.inputRate +
+      outputTokenCeiling * price.outputRate +
+      price.requestCost) *
+      1_000_000
+  );
 }

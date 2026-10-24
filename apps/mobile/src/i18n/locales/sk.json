@@ -3040,7 +3040,6 @@
   },
   "voiceInput": {
     "listening": "Počúva sa…",
-    "staysOff": "Hlasový vstup zostane vypnutý, kým nepovolíte online prepis.",
     "onlineTitle": "Reč sa spracúva online",
     "onlineMessage": "Toto zariadenie nedokáže prepísať reč bez pripojenia na internet. Nahrávku odošleme poskytovateľovi {{provider}} na prepis do textu. Kilo zvukový záznam neukladá.",
     "allow": "Povoliť",

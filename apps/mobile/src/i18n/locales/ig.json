@@ -2954,7 +2954,6 @@
   },
   "voiceInput": {
     "listening": "Na-ege ntị...",
-    "staysOff": "Ntinye olu agaghị arụ ọrụ ruo mgbe ị nyere ikike ịtụgharị okwu ka ọ bụrụ ederede n'ịntanetị.",
     "onlineTitle": "A na-ahazi okwu n'ịntanetị",
     "onlineMessage": "Ngwaọrụ a enweghị ike ịtụgharị okwu ka ọ bụrụ ederede na-enweghị ịntanetị. A na-ezigara {{provider}} ndekọ olu gị ka ọ tụgharịa ya ka ọ bụrụ ederede. Kilo anaghị echekwa ndekọ olu ahụ.",
     "allow": "Nye ikike",

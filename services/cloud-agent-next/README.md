@@ -66,6 +66,14 @@ Both sandbox Dockerfiles configure the [Git stable PPA](https://launchpad.net/~g
 APT verifies the repository with its signing key in a dedicated `signed-by` keyring.
 This retains current Git packages without calling the Launchpad API through `add-apt-repository`.
 
+### Managed GitLab requests
+
+Managed GitLab sessions support project REST operations and Git smart-HTTP/LFS
+endpoints for their configured repository. REST project selectors use the full
+project path; project credentials also support their recorded numeric project ID.
+The configured instance base path and outbound container binding remain part of
+request authorization.
+
 ## API Documentation
 
 ### Overview

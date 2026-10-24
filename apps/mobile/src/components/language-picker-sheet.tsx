@@ -274,6 +274,7 @@ export function LanguagePickerSheet({
         />
       ) : (
         <FlashList
+          nestedScrollEnabled
           style={listStyle}
           contentContainerStyle={listContentContainerStyle}
           data={items}
